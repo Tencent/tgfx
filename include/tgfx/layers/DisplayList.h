@@ -225,14 +225,17 @@ class DisplayList {
   }
 
   /**
-   * Returns the background color of the root layer. The background is an infinite rectangle that
-   * covers the entire display area and is drawn using the SrcOver blend mode.
+   * Returns the background color of the display list. The background is an infinite rectangle that
+   * covers the entire display area and is drawn using the SrcOver blend mode during rendering.
+   * It is only drawn in the DisplayList::render() path, not when calling Layer::draw() directly.
    * The default value is transparent.
    */
-  Color backgroundColor() const;
+  Color backgroundColor() const {
+    return _backgroundColor;
+  }
 
   /**
-   * Sets the background color of the root layer.
+   * Sets the background color of the display list.
    */
   void setBackgroundColor(const Color& color);
 
@@ -280,6 +283,7 @@ class DisplayList {
 
  private:
   std::shared_ptr<RootLayer> _root = nullptr;
+  Color _backgroundColor = Color::Transparent();
   int64_t _zoomScaleInt = 1000;
   int _zoomScalePrecision = 1000;
   Point _contentOffset = {};

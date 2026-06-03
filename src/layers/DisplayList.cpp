@@ -276,14 +276,13 @@ void DisplayList::setMaxTileCount(int count) {
   resetCaches();
 }
 
-Color DisplayList::backgroundColor() const {
-  return _root->backgroundColor();
-}
-
 void DisplayList::setBackgroundColor(const Color& color) {
-  if (_root->setBackgroundColor(color)) {
-    resetCaches();
+  if (_backgroundColor == color) {
+    return;
   }
+  _backgroundColor = color;
+  _root->invalidateContent();
+  resetCaches();
 }
 
 void DisplayList::setSubtreeCacheMaxSize(int maxSize) {
@@ -1071,6 +1070,7 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, std::vector
   // Clip to render bounds because fallback tiles may extend beyond content due to roundOut.
   tileRect.intersect(renderBounds);
 
+  paint.setColor(_backgroundColor);
   auto backgroundRect = GetNonIntersectingRects(screenRect, tileRect);
   for (auto& rect : backgroundRect) {
     canvas->drawRect(rect, paint);
@@ -1160,6 +1160,9 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   args.renderRects = &renderRectsVec;
   args.dstColorSpace = surface->colorSpace();
   args.subtreeCacheMaxSize = _subtreeCacheMaxSize;
+  // Draw background color before the layer tree. This ensures backgroundColor is only rendered
+  // through the DisplayList::render() path, not when calling Layer::draw() directly.
+  canvas->drawColor(_backgroundColor, BlendMode::SrcOver);
   // Consume pass: replay snapshots produced by the capture pass. When the tree has no
   // background-sourced styles, snapshots is null and we fall back to NoOp, which makes
   // background-sourced styles (if any show up unexpectedly) silently no-op — matching the
