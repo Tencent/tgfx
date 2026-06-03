@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <array>
+#include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/TileMode.h"
 #include "tgfx/svg/xml/XMLDOM.h"
@@ -54,6 +56,38 @@ class SVGCustomWriter {
   virtual DOMAttribute writeInnerShadowImageFilter(float dx, float dy, float blurrinessX,
                                                    float blurrinessY, Color color,
                                                    bool innerShadowOnly) = 0;
+
+  /**
+   * Called when exporting a BlendColorImageFilter (color blend applied to the layer) to SVG.
+   * @param color The constant color used in the blend.
+   * @param mode The blend mode.
+   * return A DOMAttribute to be added to the <filter> element as a custom attribute.
+   */
+  virtual DOMAttribute writeBlendColorImageFilter(Color color, BlendMode mode) {
+    (void)color;
+    (void)mode;
+    return {};
+  }
+
+  /**
+   * Called when exporting a ColorMatrixImageFilter (4x5 color matrix) to SVG.
+   * @param matrix The 4x5 color transformation matrix.
+   * return A DOMAttribute to be added to the <filter> element as a custom attribute.
+   */
+  virtual DOMAttribute writeColorMatrixImageFilter(const std::array<float, 20>& matrix) {
+    (void)matrix;
+    return {};
+  }
+
+  /**
+   * Called when exporting a NoiseImageFilter (BlendImageFilter with noise shader) to SVG.
+   * @param blendMode The blend mode used to composite noise with the content.
+   * return A DOMAttribute to be added to the <filter> element as a custom attribute.
+   */
+  virtual DOMAttribute writeNoiseImageFilter(BlendMode blendMode) {
+    (void)blendMode;
+    return {};
+  }
 };
 
 }  // namespace tgfx

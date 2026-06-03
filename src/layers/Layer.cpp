@@ -1498,10 +1498,25 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   auto clipBounds = GetClipBounds(canvas);
   auto result = OffscreenResult{};
 
+  // When there is no Surface (e.g. SVG export canvas), tell filters to skip rasterization so
+  // the FilterImage chain remains available for vector serialization.
+  bool svgExportMode = canvas->getSurface() == nullptr;
+  if (svgExportMode) {
+    for (const auto& filter : _filters) {
+      filter->skipRasterize_ = true;
+    }
+  }
+
   if (shouldPassThroughBackground(blendMode) && canvas->getSurface()) {
     result = OffscreenRenderer::RenderPassThrough(this, args, canvas, clipBounds);
   } else {
     result = OffscreenRenderer::RenderContent(this, args, canvas->getMatrix(), clipBounds);
+  }
+
+  if (svgExportMode) {
+    for (const auto& filter : _filters) {
+      filter->skipRasterize_ = false;
+    }
   }
 
   auto invertImageMatrix = Matrix::I();

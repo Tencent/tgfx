@@ -175,8 +175,9 @@ std::shared_ptr<Image> NoiseFilter::onFilterImage(std::shared_ptr<Image> input, 
   auto result =
       FilterImage::MakeFrom(std::move(input), std::move(compositeFilter), offset, nullptr);
   // Rasterize the filter result so that chained noise filters do not accumulate deeply nested
-  // fragment processor trees that exceed GPU sampler limits.
-  if (result != nullptr) {
+  // fragment processor trees that exceed GPU sampler limits. Skip rasterization when the layer
+  // pipeline requests it (e.g. during SVG export) so the FilterImage chain remains inspectable.
+  if (result != nullptr && !skipRasterize_) {
     auto rasterized = result->makeRasterized();
     if (rasterized != nullptr) {
       return rasterized;

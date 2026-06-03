@@ -96,6 +96,12 @@ class LayerFilter : public LayerProperty {
    */
   virtual void onInvalidateFilter();
 
+  // When true, onFilterImage implementations should skip makeRasterized() to preserve the
+  // FilterImage chain for vector export (e.g. SVG). Set temporarily by Layer::drawOffscreen
+  // when a non-GPU canvas is detected.
+  bool skipRasterize_ = false;
+
+  friend class Layer;
   friend class Types;
 };
 }  // namespace tgfx

@@ -35,7 +35,10 @@
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/ShapeStyle.h"
+#include "tgfx/layers/filters/BlendFilter.h"
 #include "tgfx/layers/filters/BlurFilter.h"
+#include "tgfx/layers/filters/ColorMatrixFilter.h"
+#include "tgfx/layers/filters/NoiseFilter.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
 #include "tgfx/svg/SVGExporter.h"
@@ -1230,4 +1233,88 @@ TGFX_TEST(SVGExportTest, ClipShortCircuitWithStaleGroup) {
   exporter->close();
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/ClipShortCircuitWithStaleGroup"));
 }
+
+TGFX_TEST(SVGExportTest, BlendFilterExport) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200));
+  auto canvas = exporter->getCanvas();
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto layer = ShapeLayer::Make();
+  Path rect;
+  rect.addRect(Rect::MakeXYWH(50, 50, 100, 100));
+  layer->setPath(rect);
+  layer->setFillStyle(ShapeStyle::Make(Color::Red()));
+  layer->setFilters({BlendFilter::Make(Color{0.f, 0.f, 1.f, 0.5f}, BlendMode::Multiply)});
+  displayList->root()->addChild(layer);
+  displayList->root()->draw(canvas);
+
+  exporter->close();
+  auto data = SVGStream->readData();
+  std::string svgContent(static_cast<const char*>(data->data()), data->size());
+  EXPECT_TRUE(svgContent.find("feFlood") != std::string::npos);
+  EXPECT_TRUE(svgContent.find("feBlend") != std::string::npos);
+  EXPECT_TRUE(svgContent.find("feComposite") != std::string::npos);
+}
+
+TGFX_TEST(SVGExportTest, ColorMatrixFilterExport) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200));
+  auto canvas = exporter->getCanvas();
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto layer = ShapeLayer::Make();
+  Path rect;
+  rect.addRect(Rect::MakeXYWH(50, 50, 100, 100));
+  layer->setPath(rect);
+  layer->setFillStyle(ShapeStyle::Make(Color::Green()));
+  std::array<float, 20> matrix = {0.33f, 0.33f, 0.33f, 0, 0, 0.33f, 0.33f, 0.33f, 0, 0,
+                                  0.33f, 0.33f, 0.33f, 0, 0, 0,     0,     0,     1, 0};
+  layer->setFilters({ColorMatrixFilter::Make(matrix)});
+  displayList->root()->addChild(layer);
+  displayList->root()->draw(canvas);
+
+  exporter->close();
+  auto data = SVGStream->readData();
+  std::string svgContent(static_cast<const char*>(data->data()), data->size());
+  EXPECT_TRUE(svgContent.find("feColorMatrix") != std::string::npos);
+  EXPECT_TRUE(svgContent.find("type=\"matrix\"") != std::string::npos);
+}
+
+TGFX_TEST(SVGExportTest, MonoNoiseFilterExport) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200));
+  auto canvas = exporter->getCanvas();
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto layer = ShapeLayer::Make();
+  Path rect;
+  rect.addRect(Rect::MakeXYWH(50, 50, 100, 100));
+  layer->setPath(rect);
+  layer->setFillStyle(ShapeStyle::Make(Color::Red()));
+  auto noiseFilter = NoiseFilter::MakeMono(50.f, 0.5f, Color::Black(), 42.f, BlendMode::SrcOver);
+  layer->setFilters({noiseFilter});
+  displayList->root()->addChild(layer);
+  displayList->root()->draw(canvas);
+
+  exporter->close();
+  auto data = SVGStream->readData();
+  std::string svgContent(static_cast<const char*>(data->data()), data->size());
+  EXPECT_TRUE(svgContent.find("feTurbulence") != std::string::npos);
+  EXPECT_TRUE(svgContent.find("feComponentTransfer") != std::string::npos);
+  EXPECT_TRUE(svgContent.find("feComposite") != std::string::npos);
+}
+
 }  // namespace tgfx

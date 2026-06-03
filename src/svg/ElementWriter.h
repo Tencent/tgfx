@@ -19,6 +19,7 @@
 #pragma once
 
 #include "ResourceStore.h"
+#include "core/filters/BlendImageFilter.h"
 #include "core/filters/DropShadowImageFilter.h"
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/filters/InnerShadowImageFilter.h"
@@ -97,6 +98,10 @@ class ElementWriter {
   void addImageShaderResources(const ImageShader* shader, const Matrix& matrix, Context* context,
                                Resources* resources);
 
+  void addBlendColorFilterPrimitives(const ModeColorFilter* modeColorFilter);
+  void addMatrixColorFilterPrimitives(const MatrixColorFilter* matrixColorFilter);
+  void addColorImageFilter(const ColorFilter* colorFilter);
+
   void addBlendColorFilterResources(const ModeColorFilter* modeColorFilter, Resources* resources);
 
   void addMatrixColorFilterResources(const MatrixColorFilter* matrixColorFilter,
@@ -138,6 +143,11 @@ class ElementWriter {
   void addBlurImageFilter(const GaussianBlurImageFilter* filter);
   void addDropShadowImageFilter(const DropShadowImageFilter* filter);
   void addInnerShadowImageFilter(const InnerShadowImageFilter* filter);
+  void addBlendImageFilter(const BlendImageFilter* filter);
+  std::string addShaderAsFilterPrimitives(const Shader* shader);
+  std::string addColorFilterAsPrimitive(const ColorFilter* colorFilter,
+                                        const std::string& inputRef);
+  std::string nextResultName();
 
   void reportUnsupportedElement(const char* message) const;
 
@@ -149,6 +159,7 @@ class ElementWriter {
   XMLWriter* writer = nullptr;
   ResourceStore* resourceStore = nullptr;
   bool disableWarning = false;
+  int resultCounter = 0;
   std::shared_ptr<ColorSpace> _targetColorSpace = nullptr;
   std::shared_ptr<ColorSpace> _assignColorSpace = nullptr;
   std::string _writeColorSpaceString;
