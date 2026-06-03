@@ -1053,7 +1053,7 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, std::vector
   auto screenRect = Rect::MakeWH(surface->width(), surface->height());
   screenRect.offset(-_contentOffset.x, -_contentOffset.y);
 
-  paint.setColor(_root->backgroundColor());
+  paint.setColor(_backgroundColor);
   for (auto& rect : skippedRects) {
     canvas->drawRect(rect, paint);
     tileRect.join(rect);
