@@ -3383,6 +3383,7 @@ TGFX_TEST(LayerTest, BackgroundColor) {
     displayList->setBackgroundColor(bgColor);
     displayList->render(surface.get());
     context->flushAndSubmit();
+    EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundColor_Render"));
 
     Bitmap bitmap(surfaceWidth, surfaceHeight);
     Pixmap pixmap(bitmap);
@@ -3407,6 +3408,7 @@ TGFX_TEST(LayerTest, BackgroundColor) {
     // Draw via Layer::draw() directly on root layer — backgroundColor must not appear
     displayList->root()->draw(surface->getCanvas());
     context->flushAndSubmit();
+    EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundColor_Draw"));
 
     Bitmap bitmap(surfaceWidth, surfaceHeight);
     Pixmap pixmap(bitmap);
