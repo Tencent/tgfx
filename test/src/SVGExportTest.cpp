@@ -1325,8 +1325,7 @@ TGFX_TEST(SVGExportTest, MonoNoiseFilterExport) {
     layer->setMatrix(
         Matrix::MakeTrans(static_cast<float>(margin + rectSize + gap), static_cast<float>(margin)));
     layer->setFillStyle(ShapeStyle::Make(Color::Red()));
-    auto noiseFilter =
-        NoiseFilter::MakeMono(10.f, 0.5f, Color::Black(), 42.f, BlendMode::SrcOver);
+    auto noiseFilter = NoiseFilter::MakeMono(10.f, 0.5f, Color::Black(), 42.f, BlendMode::SrcOver);
     auto dropShadowStyle = DropShadowStyle::Make(5.f, 5.f, 4.f, 4.f, Color::Black());
     layer->setFilters({noiseFilter});
     layer->setLayerStyles({dropShadowStyle});
@@ -1339,15 +1338,12 @@ TGFX_TEST(SVGExportTest, MonoNoiseFilterExport) {
     Path rect;
     rect.addRect(Rect::MakeWH(rectSize, rectSize));
     layer->setPath(rect);
-    layer->setMatrix(Matrix::MakeTrans(static_cast<float>(margin),
-                                       static_cast<float>(margin + rectSize + gap)));
+    layer->setMatrix(
+        Matrix::MakeTrans(static_cast<float>(margin), static_cast<float>(margin + rectSize + gap)));
     layer->setFillStyle(ShapeStyle::Make(Color::Red()));
-    auto noiseFilter1 =
-        NoiseFilter::MakeMono(10.f, 0.3f, Color::Black(), 1.f, BlendMode::SrcOver);
-    auto noiseFilter2 =
-        NoiseFilter::MakeMono(10.f, 0.6f, Color::Black(), 2.f, BlendMode::SrcOver);
-    auto noiseFilter3 =
-        NoiseFilter::MakeMono(10.f, 0.9f, Color::Black(), 3.f, BlendMode::SrcOver);
+    auto noiseFilter1 = NoiseFilter::MakeMono(10.f, 0.3f, Color::Black(), 1.f, BlendMode::SrcOver);
+    auto noiseFilter2 = NoiseFilter::MakeMono(10.f, 0.6f, Color::Black(), 2.f, BlendMode::SrcOver);
+    auto noiseFilter3 = NoiseFilter::MakeMono(10.f, 0.9f, Color::Black(), 3.f, BlendMode::SrcOver);
     layer->setFilters({noiseFilter1, noiseFilter2, noiseFilter3});
     displayList->root()->addChild(layer);
   }

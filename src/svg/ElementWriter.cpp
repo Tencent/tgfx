@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ElementWriter.h"
+#include <functional>
 #include "SVGExportContext.h"
 #include "SVGUtils.h"
 #include "core/codecs/jpeg/JpegCodec.h"
@@ -317,97 +318,89 @@ Resources ElementWriter::addColorFilterResource(const std::shared_ptr<ColorFilte
   return resources;
 }
 
-// Recursively checks whether a shader tree contains a PerlinNoiseShader.
-bool ElementWriter::HasNoiseShader(const Shader* shader) {
+// Common shader-tree traversal used by HasNoiseShader and FindNoiseShift. Calls `visitor` for each
+// leaf-like shader type (PerlinNoise, Color, or unsupported). For branch types (Matrix, ColorFilter,
+// Blend, Image/FilterImage) it recurses and passes through the visitor results.
+static void TraverseShaderTree(const Shader* shader,
+                               const std::function<void(const Shader*)>& visitor) {
   if (shader == nullptr) {
-    return false;
+    return;
   }
   auto shaderType = Types::Get(shader);
-  if (shaderType == Types::ShaderType::PerlinNoise) {
-    return true;
-  }
-  if (shaderType == Types::ShaderType::Matrix) {
-    auto matrixShader = static_cast<const MatrixShader*>(shader);
-    return HasNoiseShader(matrixShader->source.get());
-  }
-  if (shaderType == Types::ShaderType::ColorFilter) {
-    auto cfShader = static_cast<const ColorFilterShader*>(shader);
-    return HasNoiseShader(cfShader->shader.get());
-  }
-  if (shaderType == Types::ShaderType::Blend) {
-    auto blendShader = static_cast<const BlendShader*>(shader);
-    return HasNoiseShader(blendShader->dst.get()) || HasNoiseShader(blendShader->src.get());
-  }
-  if (shaderType == Types::ShaderType::Image) {
-    auto imageShader = static_cast<const ImageShader*>(shader);
-    if (imageShader->image) {
-      auto imageType = Types::Get(imageShader->image.get());
-      if (imageType == Types::ImageType::Filter) {
-        auto filterImage = static_cast<const FilterImage*>(imageShader->image.get());
-        if (filterImage->filter) {
-          auto filterType = Types::Get(filterImage->filter.get());
-          if (filterType == Types::ImageFilterType::Blend) {
-            auto innerBlend = static_cast<const BlendImageFilter*>(filterImage->filter.get());
-            return HasNoiseShader(innerBlend->shader.get());
+  switch (shaderType) {
+    case Types::ShaderType::PerlinNoise:
+    case Types::ShaderType::Color:
+      visitor(shader);
+      break;
+    case Types::ShaderType::Matrix: {
+      auto matrixShader = static_cast<const MatrixShader*>(shader);
+      visitor(shader);
+      TraverseShaderTree(matrixShader->source.get(), visitor);
+      break;
+    }
+    case Types::ShaderType::ColorFilter: {
+      auto cfShader = static_cast<const ColorFilterShader*>(shader);
+      TraverseShaderTree(cfShader->shader.get(), visitor);
+      break;
+    }
+    case Types::ShaderType::Blend: {
+      auto blendShader = static_cast<const BlendShader*>(shader);
+      TraverseShaderTree(blendShader->dst.get(), visitor);
+      TraverseShaderTree(blendShader->src.get(), visitor);
+      break;
+    }
+    case Types::ShaderType::Image: {
+      auto imageShader = static_cast<const ImageShader*>(shader);
+      if (imageShader->image) {
+        auto imageType = Types::Get(imageShader->image.get());
+        if (imageType == Types::ImageType::Filter) {
+          auto filterImage = static_cast<const FilterImage*>(imageShader->image.get());
+          if (filterImage->filter) {
+            auto filterType = Types::Get(filterImage->filter.get());
+            if (filterType == Types::ImageFilterType::Blend) {
+              auto innerBlend = static_cast<const BlendImageFilter*>(filterImage->filter.get());
+              TraverseShaderTree(innerBlend->shader.get(), visitor);
+            }
           }
         }
       }
+      break;
     }
+    default:
+      break;
   }
-  return false;
 }
 
-// Recursively searches the shader tree for a MatrixShader with a translation, returning the first
-// shift found. The noise pipeline wraps the base shader with ShiftShader (MatrixShader with a
-// translation), so this locates the phase shift regardless of nesting depth.
+bool ElementWriter::HasNoiseShader(const Shader* shader) {
+  bool found = false;
+  TraverseShaderTree(shader, [&](const Shader* s) {
+    if (Types::Get(s) == Types::ShaderType::PerlinNoise) {
+      found = true;
+    }
+  });
+  return found;
+}
+
 static Point FindNoiseShift(const Shader* shader) {
-  if (shader == nullptr) {
-    return {0.f, 0.f};
-  }
-  auto shaderType = Types::Get(shader);
-  if (shaderType == Types::ShaderType::Matrix) {
-    auto matrixShader = static_cast<const MatrixShader*>(shader);
-    auto tx = matrixShader->matrix.getTranslateX();
-    auto ty = matrixShader->matrix.getTranslateY();
-    if (!FloatNearlyZero(tx) || !FloatNearlyZero(ty)) {
-      return {tx, ty};
-    }
-    return FindNoiseShift(matrixShader->source.get());
-  }
-  if (shaderType == Types::ShaderType::ColorFilter) {
-    auto cfShader = static_cast<const ColorFilterShader*>(shader);
-    return FindNoiseShift(cfShader->shader.get());
-  }
-  if (shaderType == Types::ShaderType::Blend) {
-    auto blendShader = static_cast<const BlendShader*>(shader);
-    auto shift = FindNoiseShift(blendShader->dst.get());
-    if (!FloatNearlyZero(shift.x) || !FloatNearlyZero(shift.y)) {
-      return shift;
-    }
-    return FindNoiseShift(blendShader->src.get());
-  }
-  if (shaderType == Types::ShaderType::Image) {
-    auto imageShader = static_cast<const ImageShader*>(shader);
-    if (imageShader->image) {
-      auto imageType = Types::Get(imageShader->image.get());
-      if (imageType == Types::ImageType::Filter) {
-        auto filterImage = static_cast<const FilterImage*>(imageShader->image.get());
-        if (filterImage->filter) {
-          auto filterType = Types::Get(filterImage->filter.get());
-          if (filterType == Types::ImageFilterType::Blend) {
-            auto innerBlend = static_cast<const BlendImageFilter*>(filterImage->filter.get());
-            return FindNoiseShift(innerBlend->shader.get());
-          }
-        }
+  Point shift = {0.f, 0.f};
+  TraverseShaderTree(shader, [&](const Shader* s) {
+    if (Types::Get(s) == Types::ShaderType::Matrix && FloatNearlyZero(shift.x) &&
+        FloatNearlyZero(shift.y)) {
+      auto matrixShader = static_cast<const MatrixShader*>(s);
+      auto tx = matrixShader->matrix.getTranslateX();
+      auto ty = matrixShader->matrix.getTranslateY();
+      if (!FloatNearlyZero(tx) || !FloatNearlyZero(ty)) {
+        shift = {tx, ty};
       }
     }
-  }
-  return {0.f, 0.f};
+  });
+  return shift;
 }
 
 std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& imageFilter,
                                           Rect bound,
                                           const std::shared_ptr<SVGCustomWriter>& exportWriter) {
+  resultCounter = 0;
   auto type = Types::Get(imageFilter.get());
   switch (type) {
     case Types::ImageFilterType::Blur: {
@@ -527,7 +520,6 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
             filterElement.addAttribute(attr.name, attr.value);
           }
         }
-        resultCounter = 0;
         addBlendImageFilter(blendFilter);
       }
       return filterID;
@@ -1004,7 +996,7 @@ std::string ElementWriter::addColorFilterAsPrimitive(const ColorFilter* colorFil
         ElementWriter funcA("feFuncA", writer);
         funcA.addAttribute("type", "discrete");
         std::string tableValues;
-        int segments = 256;
+        int segments = 100;
         for (int i = 0; i < segments; i++) {
           float center = (static_cast<float>(i) + 0.5f) / static_cast<float>(segments);
           tableValues += (center >= thresholdFilter->threshold) ? "1" : "0";
