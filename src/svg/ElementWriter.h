@@ -88,6 +88,11 @@ class ElementWriter {
    */
   Resources addColorFilterResource(const std::shared_ptr<ColorFilter>& colorFilter);
 
+  /**
+   * Returns true if the shader tree rooted at `shader` contains a PerlinNoiseShader.
+   */
+  static bool HasNoiseShader(const Shader* shader);
+
  private:
   Resources addResources(const Brush& brush, Context* context, SVGExportContext* svgContext);
 

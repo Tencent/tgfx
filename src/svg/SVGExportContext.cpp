@@ -22,6 +22,7 @@
 #include "SVGUtils.h"
 #include "core/GlyphTransform.h"
 #include "core/RunRecord.h"
+#include "core/filters/BlendImageFilter.h"
 #include "core/images/CodecImage.h"
 #include "core/images/FilterImage.h"
 #include "core/images/PictureImage.h"
@@ -221,22 +222,33 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
   } else if (type == Types::ImageType::Filter) {
     const auto filterImage = static_cast<const FilterImage*>(image.get());
     auto filter = filterImage->filter;
-    auto bound = Rect::MakeWH(filterImage->source->width(), filterImage->source->height());
+    auto sourceBound = Rect::MakeWH(filterImage->source->width(), filterImage->source->height());
     auto filtBound = filterImage->bounds;
-    auto outer = Point::Make((filtBound.width() - bound.width()) / 2,
-                             (filtBound.height() - bound.height()) / 2);
-    auto offset =
-        Point::Make((filtBound.centerX() - bound.centerX()), filtBound.centerY() - bound.centerY());
-    bound = matrix.mapRect(bound);
+    auto outer = Point::Make((filtBound.width() - sourceBound.width()) / 2,
+                             (filtBound.height() - sourceBound.height()) / 2);
+    auto offset = Point::Make((filtBound.centerX() - sourceBound.centerX()),
+                              filtBound.centerY() - sourceBound.centerY());
+    auto deviceBound = matrix.mapRect(sourceBound);
+    // SVG <feTurbulence> samples the noise function at the current user coordinate, with no
+    // primitive parameter that can shift the phase origin. To make the noise pattern stay screen-
+    // stable as the layer translates (matching the GPU MatrixShader-based path that anchors phase
+    // in layer-local space), the noise filter must run in layer-local coordinates and the outer
+    // <g> must carry the layer's device transform.
+    bool transformFilteredImage = false;
+    if (filter && Types::Get(filter.get()) == Types::ImageFilterType::Blend) {
+      auto blendFilter = static_cast<const BlendImageFilter*>(filter.get());
+      transformFilteredImage = ElementWriter::HasNoiseShader(blendFilter->shader.get());
+    }
+    auto filterBound = transformFilteredImage ? sourceBound : deviceBound;
 
     Resources resources;
     if (filter) {
       ElementWriter defs("defs", xmlWriter, resourceBucket.get(), _targetColorSpace,
                          _assignColorSpace);
-      resources = defs.addImageFilterResource(filter, bound, customWriter);
+      resources = defs.addImageFilterResource(filter, filterBound, customWriter);
     }
     auto clipPath = clip.getClipPath();
-    bool needsClip = !clipPath.isEmpty() && !clipPath.contains(bound);
+    bool needsClip = !clipPath.isEmpty() && !clipPath.contains(deviceBound);
     std::string clipID;
     if (needsClip) {
       clipID = defineClipPath(clipPath);
@@ -254,14 +266,25 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
         clipElement->addAttribute("clip-path", "url(#" + clipID + ")");
       }
       auto groupElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
-      if (!outer.isZero()) {
-        groupElement->addAttribute(
-            "transform", ToSVGTransform(Matrix::MakeTrans(outer.x - offset.x, outer.y - offset.y)));
+      auto groupMatrix = Matrix::MakeTrans(outer.x - offset.x, outer.y - offset.y);
+      if (transformFilteredImage) {
+        // Fold the layer's device transform into the outer <g> so that filter primitives evaluate
+        // in layer-local coordinates. This makes feTurbulence's phase origin track the layer
+        // translation, which is the only way SVG can replicate the GPU's screen-stable noise.
+        groupMatrix.postConcat(matrix);
+      }
+      if (!groupMatrix.isIdentity()) {
+        groupElement->addAttribute("transform", ToSVGTransform(groupMatrix));
       }
       if (filter) {
         groupElement->addAttribute("filter", resources.filter);
       }
-      drawImage(filterImage->source, sampling, matrix, needsClip ? ClipStack{} : clip, brush);
+      // For the layer-local replay, draw the source with identity (the outer transform already
+      // places it in device space) and leave the device-space clip outside the transformed group;
+      // re-emitting that clip inside would interpret its coordinates as layer-local and crop the
+      // noise overlay incorrectly.
+      drawImage(filterImage->source, sampling, transformFilteredImage ? Matrix::I() : matrix,
+                (needsClip || transformFilteredImage) ? ClipStack{} : clip, brush);
       clipGroupElement = nullptr;
       currentClipPath = {};
     }

@@ -317,6 +317,94 @@ Resources ElementWriter::addColorFilterResource(const std::shared_ptr<ColorFilte
   return resources;
 }
 
+// Recursively checks whether a shader tree contains a PerlinNoiseShader.
+bool ElementWriter::HasNoiseShader(const Shader* shader) {
+  if (shader == nullptr) {
+    return false;
+  }
+  auto shaderType = Types::Get(shader);
+  if (shaderType == Types::ShaderType::PerlinNoise) {
+    return true;
+  }
+  if (shaderType == Types::ShaderType::Matrix) {
+    auto matrixShader = static_cast<const MatrixShader*>(shader);
+    return HasNoiseShader(matrixShader->source.get());
+  }
+  if (shaderType == Types::ShaderType::ColorFilter) {
+    auto cfShader = static_cast<const ColorFilterShader*>(shader);
+    return HasNoiseShader(cfShader->shader.get());
+  }
+  if (shaderType == Types::ShaderType::Blend) {
+    auto blendShader = static_cast<const BlendShader*>(shader);
+    return HasNoiseShader(blendShader->dst.get()) || HasNoiseShader(blendShader->src.get());
+  }
+  if (shaderType == Types::ShaderType::Image) {
+    auto imageShader = static_cast<const ImageShader*>(shader);
+    if (imageShader->image) {
+      auto imageType = Types::Get(imageShader->image.get());
+      if (imageType == Types::ImageType::Filter) {
+        auto filterImage = static_cast<const FilterImage*>(imageShader->image.get());
+        if (filterImage->filter) {
+          auto filterType = Types::Get(filterImage->filter.get());
+          if (filterType == Types::ImageFilterType::Blend) {
+            auto innerBlend = static_cast<const BlendImageFilter*>(filterImage->filter.get());
+            return HasNoiseShader(innerBlend->shader.get());
+          }
+        }
+      }
+    }
+  }
+  return false;
+}
+
+// Recursively searches the shader tree for a MatrixShader with a translation, returning the first
+// shift found. The noise pipeline wraps the base shader with ShiftShader (MatrixShader with a
+// translation), so this locates the phase shift regardless of nesting depth.
+static Point FindNoiseShift(const Shader* shader) {
+  if (shader == nullptr) {
+    return {0.f, 0.f};
+  }
+  auto shaderType = Types::Get(shader);
+  if (shaderType == Types::ShaderType::Matrix) {
+    auto matrixShader = static_cast<const MatrixShader*>(shader);
+    auto tx = matrixShader->matrix.getTranslateX();
+    auto ty = matrixShader->matrix.getTranslateY();
+    if (!FloatNearlyZero(tx) || !FloatNearlyZero(ty)) {
+      return {tx, ty};
+    }
+    return FindNoiseShift(matrixShader->source.get());
+  }
+  if (shaderType == Types::ShaderType::ColorFilter) {
+    auto cfShader = static_cast<const ColorFilterShader*>(shader);
+    return FindNoiseShift(cfShader->shader.get());
+  }
+  if (shaderType == Types::ShaderType::Blend) {
+    auto blendShader = static_cast<const BlendShader*>(shader);
+    auto shift = FindNoiseShift(blendShader->dst.get());
+    if (!FloatNearlyZero(shift.x) || !FloatNearlyZero(shift.y)) {
+      return shift;
+    }
+    return FindNoiseShift(blendShader->src.get());
+  }
+  if (shaderType == Types::ShaderType::Image) {
+    auto imageShader = static_cast<const ImageShader*>(shader);
+    if (imageShader->image) {
+      auto imageType = Types::Get(imageShader->image.get());
+      if (imageType == Types::ImageType::Filter) {
+        auto filterImage = static_cast<const FilterImage*>(imageShader->image.get());
+        if (filterImage->filter) {
+          auto filterType = Types::Get(filterImage->filter.get());
+          if (filterType == Types::ImageFilterType::Blend) {
+            auto innerBlend = static_cast<const BlendImageFilter*>(filterImage->filter.get());
+            return FindNoiseShift(innerBlend->shader.get());
+          }
+        }
+      }
+    }
+  }
+  return {0.f, 0.f};
+}
+
 std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& imageFilter,
                                           Rect bound,
                                           const std::shared_ptr<SVGCustomWriter>& exportWriter) {
@@ -413,14 +501,26 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
     }
     case Types::ImageFilterType::Blend: {
       const auto blendFilter = static_cast<const BlendImageFilter*>(imageFilter.get());
+      // The noise shader chain contains a MatrixShader with the phase shift that anchors the
+      // noise pattern to the content center. The filter region must expand along the
+      // reverse-shift direction so that feTurbulence has room to generate noise that, once
+      // translated by feOffset(shiftX, shiftY), still fully covers the visible bound.
+      auto shift = FindNoiseShift(blendFilter->shader.get());
+      auto filterRegion = bound;
+      if (!FloatNearlyZero(shift.x) || !FloatNearlyZero(shift.y)) {
+        filterRegion.join(bound.makeOffset(-shift.x, -shift.y));
+      }
       std::string filterID = resourceStore->addFilter();
       {
         ElementWriter filterElement("filter", writer);
         filterElement.addAttribute("id", filterID);
-        filterElement.addAttribute("x", "0%");
-        filterElement.addAttribute("y", "0%");
-        filterElement.addAttribute("width", "100%");
-        filterElement.addAttribute("height", "100%");
+        filterElement.addAttribute("x", filterRegion.x());
+        filterElement.addAttribute("y", filterRegion.y());
+        filterElement.addAttribute("width", filterRegion.width());
+        filterElement.addAttribute("height", filterRegion.height());
+        filterElement.addAttribute("filterUnits", "userSpaceOnUse");
+        filterElement.addAttribute("primitiveUnits", "userSpaceOnUse");
+        filterElement.addAttribute("color-interpolation-filters", "sRGB");
         if (exportWriter) {
           auto attr = exportWriter->writeNoiseImageFilter(blendFilter->blendMode);
           if (!attr.name.empty() && !attr.value.empty()) {
@@ -959,6 +1059,12 @@ std::string ElementWriter::addShaderAsFilterPrimitives(const Shader* shader) {
                                          : "turbulence");
       feElement.addAttribute("baseFrequency", FloatToString(noiseShader->baseFrequencyX) + " " +
                                                   FloatToString(noiseShader->baseFrequencyY));
+      // Use "noStitch" so each octave keeps the exact requested baseFrequency, matching the GPU
+      // Shader::MakeFractalNoise path (which never adjusts frequency to fit a region). With
+      // "stitch" browsers slightly change the per-octave frequency to align noise periods to the
+      // filter region size, which makes the noise frequency drift from frame to frame whenever the
+      // filter region grows or shrinks.
+      feElement.addAttribute("stitchTiles", "noStitch");
       feElement.addAttribute("numOctaves", noiseShader->numOctaves);
       feElement.addAttribute("seed", static_cast<int32_t>(noiseShader->seed));
       feElement.addAttribute("result", resultName);
@@ -974,7 +1080,7 @@ std::string ElementWriter::addShaderAsFilterPrimitives(const Shader* shader) {
       auto innerResult = addShaderAsFilterPrimitives(matrixShader->source.get());
       float tx = matrixShader->matrix.getTranslateX();
       float ty = matrixShader->matrix.getTranslateY();
-      if (tx == 0.f && ty == 0.f) {
+      if (FloatNearlyZero(tx) && FloatNearlyZero(ty)) {
         return innerResult;
       }
       auto resultName = nextResultName();

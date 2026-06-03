@@ -38,9 +38,11 @@
 #include "tgfx/layers/filters/BlendFilter.h"
 #include "tgfx/layers/filters/BlurFilter.h"
 #include "tgfx/layers/filters/ColorMatrixFilter.h"
+#include "tgfx/layers/filters/DropShadowFilter.h"
 #include "tgfx/layers/filters/NoiseFilter.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
+#include "tgfx/layers/layerstyles/NoiseStyle.h"
 #include "tgfx/svg/SVGExporter.h"
 #include "tgfx/svg/SVGPathParser.h"
 #include "utils/TestUtils.h"
@@ -1287,21 +1289,80 @@ TGFX_TEST(SVGExportTest, MonoNoiseFilterExport) {
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
 
-  auto SVGStream = MemoryWriteStream::Make();
-  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200));
-  auto canvas = exporter->getCanvas();
+  // Three rectangles:
+  // Top-left: MonoNoiseStyle + DropShadowFilter
+  // Top-right: MonoNoiseFilter + DropShadowStyle
+  // Bottom: three NoiseFilters with different seeds and increasing density
+  constexpr int rectSize = 100;
+  constexpr int margin = 50;
+  constexpr int gap = 50;
+  constexpr int canvasWidth = margin * 2 + rectSize * 2 + gap;
+  constexpr int canvasHeight = margin * 2 + rectSize * 2 + gap;
 
   auto displayList = std::make_unique<DisplayList>();
-  auto layer = ShapeLayer::Make();
-  Path rect;
-  rect.addRect(Rect::MakeXYWH(50, 50, 100, 100));
-  layer->setPath(rect);
-  layer->setFillStyle(ShapeStyle::Make(Color::Red()));
-  auto noiseFilter = NoiseFilter::MakeMono(10.f, 0.5f, Color::Black(), 42.f, BlendMode::SrcOver);
-  layer->setFilters({noiseFilter});
-  displayList->root()->addChild(layer);
-  displayList->root()->draw(canvas);
 
+  // Left: MonoNoiseStyle + DropShadowFilter
+  {
+    auto layer = ShapeLayer::Make();
+    Path rect;
+    rect.addRect(Rect::MakeWH(rectSize, rectSize));
+    layer->setPath(rect);
+    layer->setMatrix(Matrix::MakeTrans(static_cast<float>(margin), static_cast<float>(margin)));
+    layer->setFillStyle(ShapeStyle::Make(Color::Red()));
+    auto noiseStyle = NoiseStyle::MakeMono(10.f, 0.5f, Color::Black(), 42.f);
+    auto dropShadowFilter = DropShadowFilter::Make(5.f, 5.f, 4.f, 4.f, Color::Black());
+    layer->setLayerStyles({noiseStyle});
+    layer->setFilters({dropShadowFilter});
+    displayList->root()->addChild(layer);
+  }
+
+  // Right: MonoNoiseFilter + DropShadowStyle
+  {
+    auto layer = ShapeLayer::Make();
+    Path rect;
+    rect.addRect(Rect::MakeWH(rectSize, rectSize));
+    layer->setPath(rect);
+    layer->setMatrix(
+        Matrix::MakeTrans(static_cast<float>(margin + rectSize + gap), static_cast<float>(margin)));
+    layer->setFillStyle(ShapeStyle::Make(Color::Red()));
+    auto noiseFilter =
+        NoiseFilter::MakeMono(10.f, 0.5f, Color::Black(), 42.f, BlendMode::SrcOver);
+    auto dropShadowStyle = DropShadowStyle::Make(5.f, 5.f, 4.f, 4.f, Color::Black());
+    layer->setFilters({noiseFilter});
+    layer->setLayerStyles({dropShadowStyle});
+    displayList->root()->addChild(layer);
+  }
+
+  // Bottom: three NoiseFilters with different seeds and increasing density
+  {
+    auto layer = ShapeLayer::Make();
+    Path rect;
+    rect.addRect(Rect::MakeWH(rectSize, rectSize));
+    layer->setPath(rect);
+    layer->setMatrix(Matrix::MakeTrans(static_cast<float>(margin),
+                                       static_cast<float>(margin + rectSize + gap)));
+    layer->setFillStyle(ShapeStyle::Make(Color::Red()));
+    auto noiseFilter1 =
+        NoiseFilter::MakeMono(10.f, 0.3f, Color::Black(), 1.f, BlendMode::SrcOver);
+    auto noiseFilter2 =
+        NoiseFilter::MakeMono(10.f, 0.6f, Color::Black(), 2.f, BlendMode::SrcOver);
+    auto noiseFilter3 =
+        NoiseFilter::MakeMono(10.f, 0.9f, Color::Black(), 3.f, BlendMode::SrcOver);
+    layer->setFilters({noiseFilter1, noiseFilter2, noiseFilter3});
+    displayList->root()->addChild(layer);
+  }
+
+  // Render with TGFX for webp comparison
+  auto surface = Surface::Make(context, canvasWidth, canvasHeight);
+  EXPECT_TRUE(surface != nullptr);
+  displayList->root()->draw(surface->getCanvas());
+  context->flushAndSubmit();
+  EXPECT_TRUE(Baseline::Compare(surface, "SVGExportTest/MonoNoiseFilterExport"));
+
+  // Export SVG
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(canvasWidth, canvasHeight));
+  displayList->root()->draw(exporter->getCanvas());
   exporter->close();
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/MonoNoiseFilterExport"));
 }
