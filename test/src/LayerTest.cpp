@@ -3393,10 +3393,10 @@ TGFX_TEST(LayerTest, BackgroundColor) {
     // Center pixel should have the background color (R=200, G=50, B=50)
     // Note: macOS uses BGRA byte order in pixel buffers
     auto centerPixel = (surfaceHeight / 2) * surfaceWidth + (surfaceWidth / 2);
-    EXPECT_NEAR(pixels[centerPixel * 4 + 2], 200, 2);   // R (BGRA layout)
-    EXPECT_NEAR(pixels[centerPixel * 4 + 1], 50, 2);     // G
-    EXPECT_NEAR(pixels[centerPixel * 4], 50, 2);         // B
-    EXPECT_GT(pixels[centerPixel * 4 + 3], 0);           // A > 0
+    EXPECT_NEAR(pixels[centerPixel * 4 + 2], 200, 2);  // R (BGRA layout)
+    EXPECT_NEAR(pixels[centerPixel * 4 + 1], 50, 2);   // G
+    EXPECT_NEAR(pixels[centerPixel * 4], 50, 2);       // B
+    EXPECT_GT(pixels[centerPixel * 4 + 3], 0);         // A > 0
   }
 
   // Test 2: Layer::draw() on root layer should NOT paint backgroundColor
