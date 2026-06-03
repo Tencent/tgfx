@@ -268,6 +268,7 @@
         "textMask": "bf48e614"
     },
     "LayerTest": {
+<<<<<<< HEAD
         "AdaptiveDashEffect": "eefb7a46",
         "BackgroundBlurWithFilter_Partial": "ad116c00",
         "BackgroundBlurWithFilter_Tiled": "3d686214e",
@@ -645,5 +646,9 @@
         "TrimPathReversedWrapAround": "4a74f6aa",
         "TrimPathWithScale": "4a74f6aa",
         "VectorGroupTransform": "4a74f6aa"
+=======
+        "BackgroundColor_Draw": "7a4bd9a7",
+        "BackgroundColor_Render": "7a4bd9a7"
+>>>>>>> ee0c478f (Update baseline for BackgroundColor test.)
     }
 }
