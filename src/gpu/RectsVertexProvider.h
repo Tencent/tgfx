@@ -54,12 +54,16 @@ class RectsVertexProvider : public VertexProvider {
                                                     AAType aaType);
 
   /**
-   * Creates a new RectsVertexProvider from a list of rect records.
+   * Creates a new RectsVertexProvider from a list of rect records. If subsetRects is non-empty
+   * and subsetMode != None, each entry replaces the per-rect subset (clamp range) used by the
+   * shader. When subsetRects is empty, the legacy behavior applies: the per-rect subset is
+   * derived from the corresponding uvRect (or the rect itself when uvRects is empty).
    */
   static PlacementPtr<RectsVertexProvider> MakeFrom(
       BlockAllocator* allocator, std::vector<PlacementPtr<RectRecord>>&& rects,
-      std::vector<PlacementPtr<Rect>>&& uvRects, AAType aaType, bool needUVCoord,
-      UVSubsetMode subsetMode, std::vector<PlacementPtr<Stroke>>&& strokes,
+      std::vector<PlacementPtr<Rect>>&& uvRects, std::vector<PlacementPtr<Rect>>&& subsetRects,
+      AAType aaType, bool needUVCoord, UVSubsetMode subsetMode,
+      std::vector<PlacementPtr<Stroke>>&& strokes,
       std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
@@ -133,6 +137,7 @@ class RectsVertexProvider : public VertexProvider {
  protected:
   PlacementArray<RectRecord> rects = {};
   PlacementArray<Rect> uvRects = {};
+  PlacementArray<Rect> subsetRects = {};
   std::shared_ptr<ColorSpace> _dstColorSpace = nullptr;
   std::optional<LineJoin> _lineJoin = std::nullopt;
   struct {
@@ -143,7 +148,8 @@ class RectsVertexProvider : public VertexProvider {
   } bitFields = {};
 
   RectsVertexProvider(PlacementArray<RectRecord>&& rects, PlacementArray<Rect>&& uvRects,
-                      AAType aaType, bool hasUVCoord, bool hasColor, UVSubsetMode subsetMode,
+                      PlacementArray<Rect>&& subsetRects, AAType aaType, bool hasUVCoord,
+                      bool hasColor, UVSubsetMode subsetMode,
                       std::shared_ptr<BlockAllocator> reference,
                       std::shared_ptr<ColorSpace> colorSpace);
 };

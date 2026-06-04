@@ -216,7 +216,8 @@ void PDFExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
 void PDFExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
                                      const Rect& dstRect, const SamplingOptions& sampling,
                                      const Matrix& matrix, const ClipStack& clip,
-                                     const Brush& brush, SrcRectConstraint) {
+                                     const Brush& brush, SrcRectConstraint,
+                                     const Rect* /*strictRect*/) {
   auto subsetImage = image->makeSubset(srcRect);
   if (subsetImage == nullptr) {
     return;

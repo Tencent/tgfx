@@ -75,7 +75,8 @@ void MeasureContext::drawImage(std::shared_ptr<Image> image, const SamplingOptio
 
 void MeasureContext::drawImageRect(std::shared_ptr<Image>, const Rect&, const Rect& dstRect,
                                    const SamplingOptions&, const Matrix& matrix,
-                                   const ClipStack& clip, const Brush&, SrcRectConstraint) {
+                                   const ClipStack& clip, const Brush&, SrcRectConstraint,
+                                   const Rect*) {
   addLocalBounds(matrix, clip, dstRect);
 }
 

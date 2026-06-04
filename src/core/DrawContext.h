@@ -82,11 +82,14 @@ class DrawContext {
 
   /**
    * Draws a rectangle filled with the specified image, sampling options, matrix, clip, and brush.
+   * @param strictRect  Optional. Only effective when constraint == SrcRectConstraint::Strict.
+   * If non-null, the shader clamps UV samples within strictRect (in image space). If null,
+   * defaults to using srcRect as the clamp range.
    */
   virtual void drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
                              const SamplingOptions& sampling, const Matrix& matrix,
                              const ClipStack& clip, const Brush& brush,
-                             SrcRectConstraint constraint) = 0;
+                             SrcRectConstraint constraint, const Rect* strictRect = nullptr) = 0;
 
   /**
    * Draws a TextBlob with the specified matrix, clip, brush, and optional stroke.
