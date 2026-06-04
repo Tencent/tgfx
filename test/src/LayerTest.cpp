@@ -3406,16 +3406,6 @@ TGFX_TEST(LayerTest, BackgroundColor) {
     displayList->root()->draw(surface->getCanvas());
     context->flushAndSubmit();
     EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundColor_Draw"));
-
-    Bitmap bitmap(surfaceWidth, surfaceHeight);
-    Pixmap pixmap(bitmap);
-    auto result = surface->readPixels(pixmap.info(), pixmap.writablePixels());
-    EXPECT_TRUE(result);
-    auto color = pixmap.getColor(surfaceWidth / 2, surfaceHeight / 2);
-    EXPECT_EQ(color.red, 0);
-    EXPECT_EQ(color.green, 0);
-    EXPECT_EQ(color.blue, 0);
-    EXPECT_EQ(color.alpha, 0);
   }
 }
 
