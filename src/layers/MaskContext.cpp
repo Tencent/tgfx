@@ -186,7 +186,7 @@ void MaskContext::drawImage(std::shared_ptr<Image>, const SamplingOptions&, cons
 
 void MaskContext::drawImageRect(std::shared_ptr<Image>, const Rect&, const Rect&,
                                 const SamplingOptions&, const Matrix&, const ClipStack&,
-                                const Brush&, SrcRectConstraint) {
+                                const Brush&, SrcRectConstraint, const Rect*) {
   _aborted = true;
 }
 

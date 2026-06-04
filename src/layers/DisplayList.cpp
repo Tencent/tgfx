@@ -72,6 +72,10 @@ class DrawTask {
     return _tileRect;
   }
 
+  const Rect& strictRect() const {
+    return _strictRect;
+  }
+
   const std::vector<std::shared_ptr<Tile>>& getTiles() const {
     return tiles;
   }
@@ -85,6 +89,7 @@ class DrawTask {
   std::vector<std::shared_ptr<Tile>> tiles = {};
   Rect _sourceRect = {};
   Rect _tileRect = {};
+  Rect _strictRect = {};
   bool _identityScale = true;
 
   void calculateRects(int tileSize, const Rect& drawRect, float scale) {
@@ -99,6 +104,8 @@ class DrawTask {
     auto offsetY = (tile->sourceY - tile->tileY) * tileSize;
     _sourceRect.offset(static_cast<float>(offsetX), static_cast<float>(offsetY));
     _tileRect.scale(scale, scale);
+    _strictRect =
+        Rect::MakeXYWH(tile->sourceX * tileSize, tile->sourceY * tileSize, tileSize, tileSize);
   }
 };
 
@@ -1038,7 +1045,7 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, std::vector
     auto image = surfaceCache->makeImageSnapshot();
     auto& sampling = task.identityScale() ? nearestSampling : linearSampling;
     canvas->drawImageRect(image, task.sourceRect(), task.tileRect(), sampling, &paint,
-                          SrcRectConstraint::Strict);
+                          SrcRectConstraint::Strict, &task.strictRect());
     tileRect.join(task.tileRect());
   }
 
