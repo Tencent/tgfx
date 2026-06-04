@@ -196,7 +196,7 @@ export const uploadVideoToWebGPUTexture = (source: HTMLVideoElement, texturePtr:
     if (!gpuTexture) {
         return;
     }
-    const device = (Module as any).preinitializedWebGPUDevice as GPUDevice;
+    const device: any = (Module as any).preinitializedWebGPUDevice;
     if (!device || !device.queue) {
         return;
     }
