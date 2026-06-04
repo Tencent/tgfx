@@ -42,9 +42,14 @@ class EGLHardwareTexture : public GLTexture {
  private:
   HardwareBufferRef hardwareBuffer = nullptr;
   EGLImageKHR eglImage = EGL_NO_IMAGE_KHR;
+  // Owned EGLClientBuffer that may need to be released alongside the EGLImage. On platforms whose
+  // acquire returns a non-owning view (e.g. Android) this field is unused at release time because
+  // the matching release function pointer stays nullptr.
+  EGLClientBuffer clientBuffer = nullptr;
 
   EGLHardwareTexture(const GPUTextureDescriptor& descriptor, HardwareBufferRef hardwareBuffer,
-                     EGLImageKHR eglImage, unsigned target, unsigned textureID);
+                     EGLImageKHR eglImage, EGLClientBuffer clientBuffer, unsigned target,
+                     unsigned textureID);
 };
 }  // namespace tgfx
 
