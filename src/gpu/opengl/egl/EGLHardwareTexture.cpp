@@ -34,10 +34,16 @@
 
 namespace tgfx {
 
-typedef EGLClientBuffer(EGLAPIENTRYP PFNEGLGETNATIVECLIENTBUFFERPROC)(HardwareBufferRef buffer);
+typedef EGLClientBuffer(EGLAPIENTRYP PFNEGLACQUIRENATIVECLIENTBUFFERPROC)(HardwareBufferRef buffer);
+typedef void(EGLAPIENTRYP PFNEGLRELEASENATIVECLIENTBUFFERPROC)(EGLClientBuffer buffer);
 
 namespace eglext {
-static PFNEGLGETNATIVECLIENTBUFFERPROC eglGetNativeClientBuffer = nullptr;
+// Acquires an EGLClientBuffer view of a HardwareBufferRef. On OHOS this allocates a wrapper that
+// must be paired with eglReleaseNativeClientBuffer; on Android it just returns a non-owning view.
+static PFNEGLACQUIRENATIVECLIENTBUFFERPROC eglAcquireNativeClientBuffer = nullptr;
+// Releases the EGLClientBuffer returned by eglAcquireNativeClientBuffer. Stays nullptr on Android
+// because the Android variant returns a non-owning view that needs no release.
+static PFNEGLRELEASENATIVECLIENTBUFFERPROC eglReleaseNativeClientBuffer = nullptr;
 static PFNGLEGLIMAGETARGETTEXTURE2DOESPROC glEGLImageTargetTexture2DOES = nullptr;
 static PFNEGLCREATEIMAGEKHRPROC eglCreateImageKHR = nullptr;
 static PFNEGLDESTROYIMAGEKHRPROC eglDestroyImageKHR = nullptr;
@@ -46,19 +52,27 @@ static PFNEGLDESTROYIMAGEKHRPROC eglDestroyImageKHR = nullptr;
 static bool InitEGLEXTProc() {
 #if defined(__OHOS__)
 #define EGL_NATIVE_BUFFER_TARGET EGL_NATIVE_BUFFER_OHOS
-  eglext::eglGetNativeClientBuffer =
-      (PFNEGLGETNATIVECLIENTBUFFERPROC)OH_NativeWindow_CreateNativeWindowBufferFromNativeBuffer;
+  eglext::eglAcquireNativeClientBuffer =
+      (PFNEGLACQUIRENATIVECLIENTBUFFERPROC)OH_NativeWindow_CreateNativeWindowBufferFromNativeBuffer;
+  eglext::eglReleaseNativeClientBuffer =
+      (PFNEGLRELEASENATIVECLIENTBUFFERPROC)OH_NativeWindow_DestroyNativeWindowBuffer;
 #else
 #define EGL_NATIVE_BUFFER_TARGET EGL_NATIVE_BUFFER_ANDROID
-  eglext::eglGetNativeClientBuffer =
-      (PFNEGLGETNATIVECLIENTBUFFERPROC)eglGetProcAddress("eglGetNativeClientBufferANDROID");
+  eglext::eglAcquireNativeClientBuffer =
+      (PFNEGLACQUIRENATIVECLIENTBUFFERPROC)eglGetProcAddress("eglGetNativeClientBufferANDROID");
 #endif
   eglext::glEGLImageTargetTexture2DOES =
       (PFNGLEGLIMAGETARGETTEXTURE2DOESPROC)eglGetProcAddress("glEGLImageTargetTexture2DOES");
   eglext::eglCreateImageKHR = (PFNEGLCREATEIMAGEKHRPROC)eglGetProcAddress("eglCreateImageKHR");
   eglext::eglDestroyImageKHR = (PFNEGLDESTROYIMAGEKHRPROC)eglGetProcAddress("eglDestroyImageKHR");
-  return eglext::eglGetNativeClientBuffer && eglext::glEGLImageTargetTexture2DOES &&
+  return eglext::eglAcquireNativeClientBuffer && eglext::glEGLImageTargetTexture2DOES &&
          eglext::eglCreateImageKHR && eglext::eglDestroyImageKHR;
+}
+
+static void ReleaseClientBuffer(EGLClientBuffer clientBuffer) {
+  if (clientBuffer != nullptr && eglext::eglReleaseNativeClientBuffer != nullptr) {
+    eglext::eglReleaseNativeClientBuffer(clientBuffer);
+  }
 }
 
 std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(EGLGPU* gpu,
@@ -92,7 +106,7 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(EGLGPU* gpu,
     return nullptr;
   }
   unsigned target = isYUV ? GL_TEXTURE_EXTERNAL_OES : GL_TEXTURE_2D;
-  auto clientBuffer = eglext::eglGetNativeClientBuffer(hardwareBuffer);
+  auto clientBuffer = eglext::eglAcquireNativeClientBuffer(hardwareBuffer);
   if (!clientBuffer) {
     return nullptr;
   }
@@ -101,9 +115,7 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(EGLGPU* gpu,
   EGLImageKHR eglImage = eglext::eglCreateImageKHR(
       display, EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_TARGET, clientBuffer, attributes);
   if (eglImage == EGL_NO_IMAGE_KHR) {
-#if defined(__OHOS__)
-    OH_NativeWindow_DestroyNativeWindowBuffer(static_cast<OHNativeWindowBuffer*>(clientBuffer));
-#endif
+    ReleaseClientBuffer(clientBuffer);
     return nullptr;
   }
 
@@ -111,19 +123,12 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(EGLGPU* gpu,
   glGenTextures(1, &textureID);
   if (textureID == 0) {
     eglext::eglDestroyImageKHR(display, eglImage);
-#if defined(__OHOS__)
-    OH_NativeWindow_DestroyNativeWindowBuffer(static_cast<OHNativeWindowBuffer*>(clientBuffer));
-#endif
+    ReleaseClientBuffer(clientBuffer);
     return nullptr;
   }
   TextureDescriptor descriptor = {info.width, info.height, format, false, 1, usage};
-  auto texture = gpu->makeResource<EGLHardwareTexture>(descriptor, hardwareBuffer, eglImage, target,
-                                                       textureID);
-#if defined(__OHOS__)
-  // Hand wrapper ownership to the texture; it will be destroyed in onReleaseTexture together with
-  // the EGLImage, ensuring the underlying OH_NativeBuffer reference is released.
-  texture->nativeWindowBuffer = clientBuffer;
-#endif
+  auto texture = gpu->makeResource<EGLHardwareTexture>(descriptor, hardwareBuffer, eglImage,
+                                                       clientBuffer, target, textureID);
   auto state = gpu->state();
   state->bindTexture(texture.get());
   eglext::glEGLImageTargetTexture2DOES(target, (GLeglImageOES)eglImage);
@@ -135,8 +140,10 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(EGLGPU* gpu,
 
 EGLHardwareTexture::EGLHardwareTexture(const TextureDescriptor& descriptor,
                                        HardwareBufferRef hardwareBuffer, EGLImageKHR eglImage,
-                                       unsigned target, unsigned textureID)
-    : GLTexture(descriptor, target, textureID), hardwareBuffer(hardwareBuffer), eglImage(eglImage) {
+                                       EGLClientBuffer clientBuffer, unsigned target,
+                                       unsigned textureID)
+    : GLTexture(descriptor, target, textureID), hardwareBuffer(hardwareBuffer), eglImage(eglImage),
+      clientBuffer(clientBuffer) {
   HardwareBufferRetain(hardwareBuffer);
 }
 
@@ -148,13 +155,8 @@ void EGLHardwareTexture::onReleaseTexture(GLGPU* gpu) {
   GLTexture::onReleaseTexture(gpu);
   auto display = static_cast<EGLGPU*>(gpu)->getDisplay();
   eglext::eglDestroyImageKHR(display, eglImage);
-#if defined(__OHOS__)
-  if (nativeWindowBuffer != nullptr) {
-    OH_NativeWindow_DestroyNativeWindowBuffer(
-        static_cast<OHNativeWindowBuffer*>(nativeWindowBuffer));
-    nativeWindowBuffer = nullptr;
-  }
-#endif
+  ReleaseClientBuffer(clientBuffer);
+  clientBuffer = nullptr;
 }
 }  // namespace tgfx
 

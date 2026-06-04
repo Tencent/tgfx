@@ -42,15 +42,14 @@ class EGLHardwareTexture : public GLTexture {
  private:
   HardwareBufferRef hardwareBuffer = nullptr;
   EGLImageKHR eglImage = EGL_NO_IMAGE_KHR;
-#if defined(__OHOS__)
-  // OH_NativeWindow_CreateNativeWindowBufferFromNativeBuffer allocates a wrapper that must be
-  // paired with OH_NativeWindow_DestroyNativeWindowBuffer; otherwise the underlying
-  // OH_NativeBuffer reference is leaked. Stored as void* to avoid pulling OHOS headers here.
-  void* nativeWindowBuffer = nullptr;
-#endif
+  // Owned EGLClientBuffer that may need to be released alongside the EGLImage. On platforms whose
+  // acquire returns a non-owning view (e.g. Android) this field is unused at release time because
+  // the matching release function pointer stays nullptr.
+  EGLClientBuffer clientBuffer = nullptr;
 
   EGLHardwareTexture(const TextureDescriptor& descriptor, HardwareBufferRef hardwareBuffer,
-                     EGLImageKHR eglImage, unsigned target, unsigned textureID);
+                     EGLImageKHR eglImage, EGLClientBuffer clientBuffer, unsigned target,
+                     unsigned textureID);
   friend class GLGPU;
 };
 }  // namespace tgfx
