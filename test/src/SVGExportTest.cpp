@@ -1395,4 +1395,46 @@ TGFX_TEST(SVGExportTest, FilterImageWithBlendMode) {
   exporter->close();
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/FilterImageWithBlendMode"));
 }
+
+TGFX_TEST(SVGExportTest, FilterImageWithBlendModeAndClip) {
+  // Same as FilterImageWithBlendMode but with an active clip on the canvas. Verifies that
+  // clip-path, filter and mix-blend-mode all collapse onto a single <g>: an extra <g clip-path>
+  // wrapper around the blend element would isolate it from its real previous siblings and
+  // silently drop the blend.
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto image = MakeImage("resources/assets/bridge.jpg");
+  ASSERT_TRUE(image != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200));
+  auto canvas = exporter->getCanvas();
+  // Tight clip that actually crops the overlay (which spans 30..170) so needsClip is true on
+  // the FilterImage export path.
+  canvas->clipRect(Rect::MakeXYWH(60, 60, 80, 80));
+
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto background = ShapeLayer::Make();
+  Path bgPath;
+  bgPath.addRect(Rect::MakeWH(200, 200));
+  background->setPath(bgPath);
+  background->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 200, 0)));
+  displayList->root()->addChild(background);
+
+  auto overlay = ImageLayer::Make();
+  overlay->setMatrix(Matrix::MakeTrans(30, 30) *
+                     Matrix::MakeScale(140.f / static_cast<float>(image->width()),
+                                       140.f / static_cast<float>(image->height())));
+  overlay->setImage(image);
+  overlay->setFilters({BlurFilter::Make(4, 4)});
+  overlay->setBlendMode(BlendMode::Color);
+  displayList->root()->addChild(overlay);
+
+  displayList->root()->draw(canvas);
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/FilterImageWithBlendModeAndClip"));
+}
 }  // namespace tgfx

@@ -384,13 +384,22 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
     }
     auto clipPath = clip.getClipPath();
     bool needsClip = !clipPath.isEmpty() && !clipPath.contains(bound);
+    // Close any active clip group from prior draws BEFORE emitting our own <clipPath> resource
+    // and brush <g>. Otherwise the <clipPath> definition would be nested inside the stale wrapper
+    // and the new <g> would sit at the wrong XML depth. On exit, leave both members cleared so
+    // the next applyClipPath rebuilds the clip group instead of short-circuiting on a matching
+    // currentClipPath.
+    clipGroupElement = nullptr;
+    currentClipPath = {};
     std::string clipID;
     if (needsClip) {
       clipID = defineClipPath(clipPath);
     }
-    // A <g filter> creates an isolation group, so a child-level mix-blend-mode would composite
-    // against an empty backdrop and visually disappear. Lift mix-blend-mode/opacity onto the
-    // same <g> as the filter to make blending happen against the real parent backdrop.
+    // Collapse clip-path, filter, mix-blend-mode and opacity onto a single <g>. Wrapping the
+    // mix-blend-mode element in any extra parent <g> (e.g. one that only carries clip-path)
+    // would make its backdrop the empty content of that wrapper instead of the real previous
+    // siblings, causing the blend to silently fail. SVG/CSS painting model applies clip before
+    // filter on the same element, so co-locating them is semantically equivalent to nesting.
     std::string outerBlendStyle;
     if (brush.blendMode != BlendMode::SrcOver) {
       auto svgBlendMode = ToSVGBlendMode(brush.blendMode);
@@ -400,18 +409,10 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
     }
     float outerAlpha = brush.color.alpha;
     {
-      // Close any active clip group from prior draws so the local clip/transform/filter
-      // groups below sit at the correct parent level. On exit, leave both members cleared
-      // so the next applyClipPath rebuilds the clip group instead of short-circuiting on
-      // a matching currentClipPath.
-      clipGroupElement = nullptr;
-      currentClipPath = {};
-      std::unique_ptr<ElementWriter> clipElement;
-      if (needsClip) {
-        clipElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
-        clipElement->addAttribute("clip-path", "url(#" + clipID + ")");
-      }
       auto groupElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
+      if (needsClip) {
+        groupElement->addAttribute("clip-path", "url(#" + clipID + ")");
+      }
       if (filter) {
         groupElement->addAttribute("filter", resources.filter);
       }
