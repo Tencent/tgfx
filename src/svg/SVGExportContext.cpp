@@ -388,6 +388,17 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
     if (needsClip) {
       clipID = defineClipPath(clipPath);
     }
+    // A <g filter> creates an isolation group, so a child-level mix-blend-mode would composite
+    // against an empty backdrop and visually disappear. Lift mix-blend-mode/opacity onto the
+    // same <g> as the filter to make blending happen against the real parent backdrop.
+    std::string outerBlendStyle;
+    if (brush.blendMode != BlendMode::SrcOver) {
+      auto svgBlendMode = ToSVGBlendMode(brush.blendMode);
+      if (!svgBlendMode.empty() && svgBlendMode != "normal") {
+        outerBlendStyle = "mix-blend-mode: " + svgBlendMode;
+      }
+    }
+    float outerAlpha = brush.color.alpha;
     {
       // Close any active clip group from prior draws so the local clip/transform/filter
       // groups below sit at the correct parent level. On exit, leave both members cleared
@@ -404,13 +415,28 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
       if (filter) {
         groupElement->addAttribute("filter", resources.filter);
       }
+      if (!outerBlendStyle.empty()) {
+        groupElement->addAttribute("style", outerBlendStyle);
+      }
+      if (outerAlpha != 1.0f) {
+        groupElement->addAttribute("opacity", outerAlpha);
+      }
+      // Strip lifted effects from the inner brush so the recursive draw does not re-emit them
+      // on a nested <g>, which would both double the effect and reintroduce the isolation issue.
+      Brush innerBrush = brush;
+      if (!outerBlendStyle.empty()) {
+        innerBrush.blendMode = BlendMode::SrcOver;
+      }
+      if (outerAlpha != 1.0f) {
+        innerBrush.color.alpha = 1.0f;
+      }
       // contentMatrix already pre-translates by (outer - offset) so the source is drawn at its
       // intended user-space position. Pre-concatenating this offset into the matrix (instead of
       // writing it as the group's transform) keeps the source-local offset correctly oriented
       // under any rotation/scale in the layer matrix, matching the raster pipeline in
       // Canvas::drawLayer (which uses drawMatrix.preTranslate(filterOffset)).
       drawImage(filterImage->source, sampling, contentMatrix, needsClip ? ClipStack{} : clip,
-                brush);
+                innerBrush);
       clipGroupElement = nullptr;
       currentClipPath = {};
     }

@@ -33,6 +33,7 @@
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/WriteStream.h"
 #include "tgfx/layers/DisplayList.h"
+#include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/ShapeStyle.h"
 #include "tgfx/layers/filters/BlurFilter.h"
@@ -1355,5 +1356,43 @@ TGFX_TEST(SVGExportTest, BlurFilterWithRotation) {
   displayList->root()->draw(exporter->getCanvas());
   exporter->close();
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/BlurFilterWithRotation"));
+}
+
+TGFX_TEST(SVGExportTest, FilterImageWithBlendMode) {
+  // When a raster ImageLayer carries both a BlurFilter and a non-SrcOver BlendMode, filter and
+  // mix-blend-mode must share the same <g>; otherwise the filter's isolation group would erase
+  // the blend. Uses a real image asset so the inner content stays raster (rendered as
+  // <rect fill="url(#pattern)">), matching the failing scenario from real exports.
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto image = MakeImage("resources/assets/bridge.jpg");
+  ASSERT_TRUE(image != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200));
+
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto background = ShapeLayer::Make();
+  Path bgPath;
+  bgPath.addRect(Rect::MakeWH(200, 200));
+  background->setPath(bgPath);
+  background->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 200, 0)));
+  displayList->root()->addChild(background);
+
+  auto overlay = ImageLayer::Make();
+  overlay->setMatrix(Matrix::MakeTrans(50, 50) *
+                     Matrix::MakeScale(100.f / static_cast<float>(image->width()),
+                                       100.f / static_cast<float>(image->height())));
+  overlay->setImage(image);
+  overlay->setFilters({BlurFilter::Make(4, 4)});
+  overlay->setBlendMode(BlendMode::Color);
+  displayList->root()->addChild(overlay);
+
+  displayList->root()->draw(exporter->getCanvas());
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/FilterImageWithBlendMode"));
 }
 }  // namespace tgfx
