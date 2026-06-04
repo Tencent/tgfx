@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "lib": ["ES5", "ES6", "DOM", "DOM.Iterable", "WebWorker"],
+    "types": ["@webgpu/types", "@types/emscripten"],
     "target": "ES2020",
     "declaration": true,
     "declarationDir": "./types",
