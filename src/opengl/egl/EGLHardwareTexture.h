@@ -48,10 +48,15 @@ class EGLHardwareTexture : public Texture {
   std::unique_ptr<TextureSampler> sampler = {};
   HardwareBufferRef hardwareBuffer = nullptr;
   EGLImageKHR eglImage = EGL_NO_IMAGE_KHR;
+  // Owned EGLClientBuffer that may need to be released alongside the EGLImage. On platforms whose
+  // acquire returns a non-owning view (e.g. Android) this field is unused at release time because
+  // the matching release function pointer stays nullptr.
+  EGLClientBuffer clientBuffer = nullptr;
 
   static ScratchKey ComputeScratchKey(void* hardwareBuffer);
 
-  EGLHardwareTexture(HardwareBufferRef hardwareBuffer, EGLImageKHR eglImage, int width, int height);
+  EGLHardwareTexture(HardwareBufferRef hardwareBuffer, EGLImageKHR eglImage,
+                     EGLClientBuffer clientBuffer, int width, int height);
 
   ~EGLHardwareTexture() override;
 };
