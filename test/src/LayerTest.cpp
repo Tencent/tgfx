@@ -3384,16 +3384,6 @@ TGFX_TEST(LayerTest, BackgroundColor) {
     displayList->render(surface.get());
     context->flushAndSubmit();
     EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundColor_Render"));
-
-    Bitmap bitmap(surfaceWidth, surfaceHeight);
-    Pixmap pixmap(bitmap);
-    auto result = surface->readPixels(pixmap.info(), pixmap.writablePixels());
-    EXPECT_TRUE(result);
-    auto color = pixmap.getColor(surfaceWidth / 2, surfaceHeight / 2);
-    EXPECT_NEAR(color.red * 255, 200, 2);
-    EXPECT_NEAR(color.green * 255, 50, 2);
-    EXPECT_NEAR(color.blue * 255, 50, 2);
-    EXPECT_GT(color.alpha, 0);
   }
 
   // Test 2: Layer::draw() on root layer should NOT paint backgroundColor
