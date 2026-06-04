@@ -1302,4 +1302,58 @@ TGFX_TEST(SVGExportTest, BackgroundBlurWithDropShadow) {
   exporter->close();
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/BackgroundBlurWithDropShadow"));
 }
+TGFX_TEST(SVGExportTest, BlurFilterWithRotation) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  int width = 530;
+  int height = 300;
+
+  auto displayList = std::make_unique<DisplayList>();
+
+  Path rect200;
+  rect200.addRect(Rect::MakeWH(200, 200));
+  Path rect100;
+  rect100.addRect(Rect::MakeWH(100, 100));
+
+  // Left group: overlay without rotation.
+  auto leftBg = ShapeLayer::Make();
+  leftBg->setMatrix(Matrix::MakeTrans(50, 50));
+  leftBg->setPath(rect200);
+  leftBg->setFillStyle(ShapeStyle::Make(Color::Red()));
+  displayList->root()->addChild(leftBg);
+
+  auto leftOverlay = ShapeLayer::Make();
+  leftOverlay->setMatrix(Matrix::MakeTrans(50, 50));
+  leftOverlay->setPath(rect100);
+  leftOverlay->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 240)));
+  leftOverlay->setFilters({BlurFilter::Make(15, 15)});
+  displayList->root()->addChild(leftOverlay);
+
+  // Right group: overlay with 180-degree rotation. The overlay is translated by its own
+  // size (100,100) then rotated 180°, which maps the local (0,0)-(100,100) rect back to
+  // the same canvas position as the non-rotated case.
+  auto rightBg = ShapeLayer::Make();
+  rightBg->setMatrix(Matrix::MakeTrans(280, 50));
+  rightBg->setPath(rect200);
+  rightBg->setFillStyle(ShapeStyle::Make(Color::Red()));
+  displayList->root()->addChild(rightBg);
+
+  auto rightOverlay = ShapeLayer::Make();
+  auto rightMatrix = Matrix::MakeTrans(380, 150);
+  rightMatrix.preRotate(180);
+  rightOverlay->setMatrix(rightMatrix);
+  rightOverlay->setPath(rect100);
+  rightOverlay->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 240)));
+  rightOverlay->setFilters({BlurFilter::Make(15, 15)});
+  displayList->root()->addChild(rightOverlay);
+
+  // Export as SVG.
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(width, height));
+  displayList->root()->draw(exporter->getCanvas());
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/BlurFilterWithRotation"));
+}
 }  // namespace tgfx

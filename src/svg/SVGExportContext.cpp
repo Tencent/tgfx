@@ -366,7 +366,15 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
                              (filtBound.height() - bound.height()) / 2);
     auto offset =
         Point::Make((filtBound.centerX() - bound.centerX()), filtBound.centerY() - bound.centerY());
-    bound = matrix.mapRect(bound);
+    // Source is drawn with the matrix preTranslated by (outer - offset) below (see innerMatrix).
+    // The filter region must follow the same matrix to stay aligned in user space; using the raw
+    // `matrix` here would place the <filter> region at the pre-compensation location while the
+    // content renders at the compensated location, leaving the filter region clipped on one side
+    // (cutting off the blur halo) and extending into empty sandbox space on the other (creating
+    // hard-edged banding from the implicit source edge at the sandbox boundary).
+    auto contentMatrix = matrix;
+    contentMatrix.preTranslate(outer.x - offset.x, outer.y - offset.y);
+    bound = contentMatrix.mapRect(bound);
 
     Resources resources;
     if (filter) {
@@ -393,14 +401,16 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
         clipElement->addAttribute("clip-path", "url(#" + clipID + ")");
       }
       auto groupElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
-      if (!outer.isZero()) {
-        groupElement->addAttribute(
-            "transform", ToSVGTransform(Matrix::MakeTrans(outer.x - offset.x, outer.y - offset.y)));
-      }
       if (filter) {
         groupElement->addAttribute("filter", resources.filter);
       }
-      drawImage(filterImage->source, sampling, matrix, needsClip ? ClipStack{} : clip, brush);
+      // contentMatrix already pre-translates by (outer - offset) so the source is drawn at its
+      // intended user-space position. Pre-concatenating this offset into the matrix (instead of
+      // writing it as the group's transform) keeps the source-local offset correctly oriented
+      // under any rotation/scale in the layer matrix, matching the raster pipeline in
+      // Canvas::drawLayer (which uses drawMatrix.preTranslate(filterOffset)).
+      drawImage(filterImage->source, sampling, contentMatrix, needsClip ? ClipStack{} : clip,
+                brush);
       clipGroupElement = nullptr;
       currentClipPath = {};
     }
@@ -646,7 +656,12 @@ void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
   if (imageFilter) {
     ElementWriter defs("defs", xmlWriter, resourceBucket.get(), _targetColorSpace,
                        _assignColorSpace);
-    resources = defs.addImageFilterResource(imageFilter, picture->getBounds(), customWriter);
+    // The <filter> element uses filterUnits="userSpaceOnUse", so its x/y/width/height must be
+    // in user space. Passing the picture-local bounds here mis-locates the filter region
+    // whenever the matrix is non-identity, which both cuts off the blur halo on one side and
+    // exposes the filter sandbox edges (the empty area inside the filter region but outside
+    // the source) as hard banding artifacts.
+    resources = defs.addImageFilterResource(imageFilter, bound, customWriter);
   }
   auto clipPath = clip.getClipPath();
   bool needsClip = !clipPath.isEmpty() && !clipPath.contains(bound);
