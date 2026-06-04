@@ -440,7 +440,16 @@ void ElementWriter::addBlurImageFilter(const GaussianBlurImageFilter* filter) {
   blurElement.addAttribute("result", "blur");
 }
 
+void ElementWriter::addHardAlphaElement() {
+  ElementWriter colorMatrixElement("feColorMatrix", writer);
+  colorMatrixElement.addAttribute("in", "SourceAlpha");
+  colorMatrixElement.addAttribute("type", "matrix");
+  colorMatrixElement.addAttribute("values", "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0");
+  colorMatrixElement.addAttribute("result", "hardAlpha");
+}
+
 void ElementWriter::addDropShadowImageFilter(const DropShadowImageFilter* filter) {
+  addHardAlphaElement();
   {
     ElementWriter offsetElement("feOffset", writer);
     offsetElement.addAttribute("dx", filter->dx);
@@ -457,7 +466,11 @@ void ElementWriter::addDropShadowImageFilter(const DropShadowImageFilter* filter
       }
     }
     blurElement.addAttribute("stdDeviation", blurriness);
-    blurElement.addAttribute("result", "blur");
+  }
+  {
+    ElementWriter compositeElement("feComposite", writer);
+    compositeElement.addAttribute("in2", "hardAlpha");
+    compositeElement.addAttribute("operator", "out");
   }
   {
     ElementWriter colorMatrixElement("feColorMatrix", writer);
@@ -468,24 +481,20 @@ void ElementWriter::addDropShadowImageFilter(const DropShadowImageFilter* filter
                                                   FloatToString(color.green) + " 0 0 0 0 " +
                                                   FloatToString(color.blue) + " 0 0 0 " +
                                                   FloatToString(color.alpha) + " 0");
+    colorMatrixElement.addAttribute("result", "shadow");
   }
   if (!filter->shadowOnly) {
     ElementWriter blendElement("feBlend", writer);
     blendElement.addAttribute("mode", "normal");
     blendElement.addAttribute("in", "SourceGraphic");
+    blendElement.addAttribute("in2", "shadow");
   }
 }
 void ElementWriter::addInnerShadowImageFilter(const InnerShadowImageFilter* filter) {
   if (!filter->blurFilter) {
     return;
   }
-  {
-    ElementWriter colorMatrixElement("feColorMatrix", writer);
-    colorMatrixElement.addAttribute("in", "SourceAlpha");
-    colorMatrixElement.addAttribute("type", "matrix");
-    colorMatrixElement.addAttribute("values", "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0");
-    colorMatrixElement.addAttribute("result", "hardAlpha");
-  }
+  addHardAlphaElement();
   if (!filter->shadowOnly) {
     {
       ElementWriter floodElement("feFlood", writer);

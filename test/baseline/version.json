@@ -491,6 +491,8 @@
     },
     "SVGExportTest": {
         "AssignColorSpace": "0d4409dd",
+        "BackgroundBlur": "3e8f5ddc6",
+        "BackgroundBlurWithDropShadow": "3e8f5ddc6",
         "ClipShortCircuitWithStaleGroup": "28f84e48",
         "ClipWithMatrixTransform": "082ec7b6b",
         "DrawImageRect": "f8344be7",

@@ -36,6 +36,7 @@
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/ShapeStyle.h"
 #include "tgfx/layers/filters/BlurFilter.h"
+#include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
 #include "tgfx/svg/SVGExporter.h"
@@ -1229,5 +1230,76 @@ TGFX_TEST(SVGExportTest, ClipShortCircuitWithStaleGroup) {
 
   exporter->close();
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/ClipShortCircuitWithStaleGroup"));
+}
+
+TGFX_TEST(SVGExportTest, BackgroundBlur) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(300, 300));
+  auto canvas = exporter->getCanvas();
+
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Red background rect.
+  auto backgroundLayer = ShapeLayer::Make();
+  backgroundLayer->setMatrix(Matrix::MakeTrans(50, 50));
+  Path rectPath;
+  rectPath.addRect(Rect::MakeWH(150, 150));
+  backgroundLayer->setPath(rectPath);
+  backgroundLayer->setFillStyle(ShapeStyle::Make(Color::Red()));
+  displayList->root()->addChild(backgroundLayer);
+
+  // Same-sized rect offset to overlap, with background blur.
+  auto overlayLayer = ShapeLayer::Make();
+  overlayLayer->setMatrix(Matrix::MakeTrans(100, 100));
+  overlayLayer->setPath(rectPath);
+  overlayLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 100)));
+  auto backgroundBlur = BackgroundBlurStyle::Make(15, 15);
+  overlayLayer->setLayerStyles({backgroundBlur});
+  displayList->root()->addChild(overlayLayer);
+
+  displayList->root()->draw(canvas);
+
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/BackgroundBlur"));
+}
+
+TGFX_TEST(SVGExportTest, BackgroundBlurWithDropShadow) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(300, 300));
+  auto canvas = exporter->getCanvas();
+
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Red background rect.
+  auto backgroundLayer = ShapeLayer::Make();
+  backgroundLayer->setMatrix(Matrix::MakeTrans(50, 50));
+  Path rectPath;
+  rectPath.addRect(Rect::MakeWH(150, 150));
+  backgroundLayer->setPath(rectPath);
+  backgroundLayer->setFillStyle(ShapeStyle::Make(Color::Red()));
+  displayList->root()->addChild(backgroundLayer);
+
+  // Same-sized rect offset to overlap, with background blur and drop shadow.
+  auto overlayLayer = ShapeLayer::Make();
+  overlayLayer->setMatrix(Matrix::MakeTrans(100, 100));
+  overlayLayer->setPath(rectPath);
+  overlayLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 100)));
+  auto backgroundBlur = BackgroundBlurStyle::Make(15, 15);
+  auto dropShadow = DropShadowStyle::Make(5, 5, 8, 8, Color::Black(), true);
+  overlayLayer->setLayerStyles({backgroundBlur, dropShadow});
+  displayList->root()->addChild(overlayLayer);
+
+  displayList->root()->draw(canvas);
+
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/BackgroundBlurWithDropShadow"));
 }
 }  // namespace tgfx
