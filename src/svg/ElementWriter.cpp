@@ -435,8 +435,12 @@ void ElementWriter::callbackInnerShadowImageFilter(
 
 void ElementWriter::addBlurImageFilter(const GaussianBlurImageFilter* filter) {
   ElementWriter blurElement("feGaussianBlur", writer);
-  blurElement.addAttribute("stdDeviation",
-                           std::max(filter->blurrinessX, filter->blurrinessY) / 2.f);
+  if (FloatNearlyEqual(filter->blurrinessX, filter->blurrinessY)) {
+    blurElement.addAttribute("stdDeviation", filter->blurrinessX);
+  } else {
+    blurElement.addAttribute("stdDeviation", FloatToString(filter->blurrinessX) + " " +
+                                                 FloatToString(filter->blurrinessY));
+  }
   blurElement.addAttribute("result", "blur");
 }
 

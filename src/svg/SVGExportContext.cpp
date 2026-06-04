@@ -649,7 +649,7 @@ void SVGExportContext::exportPictureImageAsVector(const PictureImage* pictureIma
 
 void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
                                  std::shared_ptr<ImageFilter> imageFilter, const Matrix& matrix,
-                                 const ClipStack& clip, const Brush&) {
+                                 const ClipStack& clip, const Brush& brush) {
   DEBUG_ASSERT(picture != nullptr);
   Resources resources;
   auto bound = matrix.mapRect(picture->getBounds());
@@ -680,6 +680,15 @@ void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
     }
     if (imageFilter) {
       groupElement->addAttribute("filter", resources.filter);
+    }
+    if (brush.blendMode != BlendMode::SrcOver) {
+      auto svgBlendMode = ToSVGBlendMode(brush.blendMode);
+      if (!svgBlendMode.empty() && svgBlendMode != "normal") {
+        groupElement->addAttribute("style", "mix-blend-mode: " + svgBlendMode);
+      }
+    }
+    if (brush.color.alpha != 1.0f) {
+      groupElement->addAttribute("opacity", brush.color.alpha);
     }
     picture->playback(this, matrix, needsClip ? ClipStack{} : clip);
     clipGroupElement = nullptr;
