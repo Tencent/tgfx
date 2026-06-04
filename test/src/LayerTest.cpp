@@ -32,7 +32,6 @@
 #include "layers/contents/RectsContent.h"
 #include "layers/contents/TextContent.h"
 #include "tgfx/core/Mesh.h"
-#include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/core/TextBlob.h"
 #include "tgfx/layers/DisplayList.h"
