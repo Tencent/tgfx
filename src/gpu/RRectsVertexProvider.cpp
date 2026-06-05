@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RRectsVertexProvider.h"
+#include <cstring>
 #include "core/utils/ColorHelper.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/Log.h"
@@ -230,10 +231,9 @@ class AARRectsVertexProvider final : public RRectsVertexProvider {
       auto viewMatrix = record->viewMatrix;
       auto rRect = record->rRect;
       auto scales = viewMatrix.getAxisScales();
-      float compressedColor = 0.f;
+      uint32_t uintColor = 0;
       if (bitFields.hasColor) {
-        uint32_t uintColor = ToUintPMColor(record->color, steps.get());
-        compressedColor = *reinterpret_cast<float*>(&uintColor);
+        uintColor = ToUintPMColor(record->color, steps.get());
       }
 
       auto stroke = strokes.size() > currentIndex ? strokes[currentIndex].get() : nullptr;
@@ -288,7 +288,7 @@ class AARRectsVertexProvider final : public RRectsVertexProvider {
         vertices[index++] = point.x;
         vertices[index++] = point.y;
         if (bitFields.hasColor) {
-          vertices[index++] = compressedColor;
+          std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
         }
         vertices[index++] = xMaxOffset;
         vertices[index++] = yOuterOffsets[i];
@@ -302,7 +302,7 @@ class AARRectsVertexProvider final : public RRectsVertexProvider {
         vertices[index++] = point.x;
         vertices[index++] = point.y;
         if (bitFields.hasColor) {
-          vertices[index++] = compressedColor;
+          std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
         }
         vertices[index++] = FLOAT_NEARLY_ZERO;
         vertices[index++] = yOuterOffsets[i];
@@ -316,7 +316,7 @@ class AARRectsVertexProvider final : public RRectsVertexProvider {
         vertices[index++] = point.x;
         vertices[index++] = point.y;
         if (bitFields.hasColor) {
-          vertices[index++] = compressedColor;
+          std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
         }
         vertices[index++] = FLOAT_NEARLY_ZERO;
         vertices[index++] = yOuterOffsets[i];
@@ -330,7 +330,7 @@ class AARRectsVertexProvider final : public RRectsVertexProvider {
         vertices[index++] = point.x;
         vertices[index++] = point.y;
         if (bitFields.hasColor) {
-          vertices[index++] = compressedColor;
+          std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
         }
         vertices[index++] = xMaxOffset;
         vertices[index++] = yOuterOffsets[i];
@@ -381,10 +381,9 @@ class NonAARRectsVertexProvider final : public RRectsVertexProvider {
       DEBUG_ASSERT(!record->rRect.isComplex());
       auto viewMatrix = record->viewMatrix;
       auto rRect = record->rRect;
-      float compressedColor = 0.f;
+      uint32_t uintColor = 0;
       if (bitFields.hasColor) {
-        uint32_t uintColor = ToUintPMColor(record->color, steps.get());
-        compressedColor = *reinterpret_cast<float*>(&uintColor);
+        uintColor = ToUintPMColor(record->color, steps.get());
       }
 
       auto scales = viewMatrix.getAxisScales();
@@ -431,7 +430,7 @@ class NonAARRectsVertexProvider final : public RRectsVertexProvider {
         vertices[index++] = rect.bottom;
         // Optional color
         if (bitFields.hasColor) {
-          vertices[index++] = compressedColor;
+          std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
         }
         // strokeWidth (2 floats) - only for stroke mode
         if (bitFields.hasStroke) {
@@ -483,10 +482,9 @@ class AAComplexRRectsVertexProvider final : public RRectsVertexProvider {
       auto viewMatrix = record->viewMatrix;
       auto rRect = record->rRect;
       auto scales = viewMatrix.getAxisScales();
-      float compressedColor = 0.f;
+      uint32_t uintColor = 0;
       if (bitFields.hasColor) {
-        uint32_t uintColor = ToUintPMColor(record->color, steps.get());
-        compressedColor = *reinterpret_cast<float*>(&uintColor);
+        uintColor = ToUintPMColor(record->color, steps.get());
       }
 
       auto stroke = strokes.size() > currentIndex ? strokes[currentIndex].get() : nullptr;
@@ -543,7 +541,7 @@ class AAComplexRRectsVertexProvider final : public RRectsVertexProvider {
           vertices[index++] = point.x;
           vertices[index++] = point.y;
           if (bitFields.hasColor) {
-            vertices[index++] = compressedColor;
+            std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
           }
           vertices[index++] = xOffset;
           vertices[index++] = yOffset;
@@ -600,10 +598,9 @@ class NonAAComplexRRectsVertexProvider final : public RRectsVertexProvider {
     for (auto& record : rects) {
       auto viewMatrix = record->viewMatrix;
       auto rRect = record->rRect;
-      float compressedColor = 0.f;
+      uint32_t uintColor = 0;
       if (bitFields.hasColor) {
-        uint32_t uintColor = ToUintPMColor(record->color, steps.get());
-        compressedColor = *reinterpret_cast<float*>(&uintColor);
+        uintColor = ToUintPMColor(record->color, steps.get());
       }
 
       auto scales = viewMatrix.getAxisScales();
@@ -657,7 +654,7 @@ class NonAAComplexRRectsVertexProvider final : public RRectsVertexProvider {
         vertices[index++] = rect.bottom;
         // Optional color
         if (bitFields.hasColor) {
-          vertices[index++] = compressedColor;
+          std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
         }
         // strokeWidth (2 floats) - only for stroke mode
         if (bitFields.hasStroke) {
