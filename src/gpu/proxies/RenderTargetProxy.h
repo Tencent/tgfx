@@ -22,6 +22,7 @@
 #include "gpu/BackingFit.h"
 #include "gpu/resources/RenderTarget.h"
 #include "tgfx/core/Matrix.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
 /**
@@ -114,6 +115,17 @@ class RenderTargetProxy {
   virtual std::shared_ptr<RenderTarget> getRenderTarget() const = 0;
 
   /**
+   * Returns the depth/stencil texture associated with this render target, lazily allocating it
+   * on the first call. The proxy keeps a strong reference, so all OpsRenderTasks targeting this
+   * proxy share the same stencil texture across the proxy's lifetime. Returns nullptr if the
+   * underlying texture allocation fails. Subclasses that need to route the request elsewhere
+   * (e.g. a drawable proxy that delegates to its backing texture proxy) override this; the
+   * default implementation creates a DEPTH24_STENCIL8 texture sized to the proxy's current
+   * width/height.
+   */
+  virtual std::shared_ptr<Texture> getStencil();
+
+  /**
    * Creates a compatible TextureProxy instance matches the properties of the RenderTargetProxy.
    */
   std::shared_ptr<TextureProxy> makeTextureProxy() const {
@@ -145,5 +157,29 @@ class RenderTargetProxy {
    * Y-axis for ImageOrigin::BottomLeft.
    */
   Matrix getOriginTransform() const;
+
+ protected:
+  // Cached stencil texture, lazily created by getStencil(). Held as a strong reference so all
+  // OpsRenderTasks targeting this proxy share one stencil texture across the proxy's lifetime.
+  std::shared_ptr<Texture> stencilTexture = nullptr;
+
+  /**
+   * Returns the width to use when allocating the stencil texture in getStencil(). Defaults to
+   * width(), which matches the proxy's logical width. Subclasses whose backing store size differs
+   * from the logical size (e.g. approximate-fit texture proxies whose actual storage is rounded up)
+   * must override this so the stencil attachment matches the colour render texture's true storage
+   * dimensions.
+   */
+  virtual int stencilWidth() const {
+    return width();
+  }
+
+  /**
+   * Returns the height to use when allocating the stencil texture in getStencil(). See
+   * stencilWidth() for the rationale; the same backing-store-vs-logical contract applies here.
+   */
+  virtual int stencilHeight() const {
+    return height();
+  }
 };
 }  // namespace tgfx

@@ -76,6 +76,14 @@ class TextureRenderTargetProxy : public DefaultTextureProxy,
                            bool mipmapped = false, ImageOrigin origin = ImageOrigin::TopLeft,
                            bool externallyOwned = false);
 
+  int stencilWidth() const override {
+    return _backingStoreWidth;
+  }
+
+  int stencilHeight() const override {
+    return _backingStoreHeight;
+  }
+
   std::shared_ptr<TextureView> onMakeTexture(Context* context) const override;
 
   friend class ProxyProvider;

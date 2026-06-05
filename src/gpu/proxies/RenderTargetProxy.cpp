@@ -57,6 +57,16 @@ std::shared_ptr<RenderTargetProxy> RenderTargetProxy::makeRenderTargetProxy(int 
                                                                 sampleCount());
 }
 
+std::shared_ptr<Texture> RenderTargetProxy::getStencil() {
+  if (stencilTexture != nullptr) {
+    return stencilTexture;
+  }
+  TextureDescriptor descriptor(stencilWidth(), stencilHeight(), PixelFormat::DEPTH24_STENCIL8,
+                               false, 1, TextureUsage::RENDER_ATTACHMENT);
+  stencilTexture = getContext()->gpu()->createTexture(descriptor);
+  return stencilTexture;
+}
+
 Matrix RenderTargetProxy::getOriginTransform() const {
   if (origin() == ImageOrigin::TopLeft) {
     return Matrix::I();
