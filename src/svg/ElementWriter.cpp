@@ -461,15 +461,21 @@ void ElementWriter::addDropShadowImageFilter(const DropShadowImageFilter* filter
   }
   {
     ElementWriter blurElement("feGaussianBlur", writer);
-    float blurriness = 0.f;
-    if (filter->blurFilter) {
-      if (Types::Get(filter->blurFilter.get()) == Types::ImageFilterType::Blur) {
-        const auto blurFilter =
-            static_cast<const GaussianBlurImageFilter*>(filter->blurFilter.get());
-        blurriness = std::max(blurFilter->blurrinessX, blurFilter->blurrinessY) / 2.f;
-      }
+    float blurX = 0.f;
+    float blurY = 0.f;
+    if (filter->blurFilter &&
+        Types::Get(filter->blurFilter.get()) == Types::ImageFilterType::Blur) {
+      const auto blurFilter =
+          static_cast<const GaussianBlurImageFilter*>(filter->blurFilter.get());
+      blurX = blurFilter->blurrinessX;
+      blurY = blurFilter->blurrinessY;
     }
-    blurElement.addAttribute("stdDeviation", blurriness);
+    if (FloatNearlyEqual(blurX, blurY)) {
+      blurElement.addAttribute("stdDeviation", blurX);
+    } else {
+      blurElement.addAttribute("stdDeviation",
+                               FloatToString(blurX) + " " + FloatToString(blurY));
+    }
   }
   {
     ElementWriter compositeElement("feComposite", writer);
@@ -522,8 +528,12 @@ void ElementWriter::addInnerShadowImageFilter(const InnerShadowImageFilter* filt
     ElementWriter blurElement("feGaussianBlur", writer);
     if (Types::Get(filter->blurFilter.get()) == Types::ImageFilterType::Blur) {
       auto blurFilter = static_cast<const GaussianBlurImageFilter*>(filter->blurFilter.get());
-      blurElement.addAttribute("stdDeviation",
-                               std::max(blurFilter->blurrinessX, blurFilter->blurrinessY) / 2.f);
+      if (FloatNearlyEqual(blurFilter->blurrinessX, blurFilter->blurrinessY)) {
+        blurElement.addAttribute("stdDeviation", blurFilter->blurrinessX);
+      } else {
+        blurElement.addAttribute("stdDeviation", FloatToString(blurFilter->blurrinessX) + " " +
+                                                     FloatToString(blurFilter->blurrinessY));
+      }
     }
   }
   {
