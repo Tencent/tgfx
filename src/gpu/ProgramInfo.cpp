@@ -151,7 +151,7 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
   programKey.write(depthStencil.stencilWriteMask);
   EncodeStencilFace(programKey, depthStencil.stencilFront);
   EncodeStencilFace(programKey, depthStencil.stencilBack);
-  CAPUTRE_PROGRAM_INFO(programKey, context, this);
+
   auto program = context->globalCache()->findProgram(programKey);
   if (program == nullptr) {
     program = ProgramBuilder::CreateProgram(context, this);
