@@ -117,11 +117,11 @@ class RenderTargetProxy {
   /**
    * Returns the depth/stencil texture associated with this render target, lazily allocating it
    * on the first call. The proxy keeps a strong reference, so all OpsRenderTasks targeting this
-   * proxy share the same stencil texture across the proxy's lifetime. Returns nullptr if the
-   * underlying texture allocation fails. Subclasses that need to route the request elsewhere
-   * (e.g. a drawable proxy that delegates to its backing texture proxy) override this; the
-   * default implementation creates a DEPTH24_STENCIL8 texture sized to the proxy's current
-   * width/height.
+   * proxy reuse one stencil allocation across the proxy's lifetime; the buffer contents are
+   * cleared at the start of each pass that opts in. Returns nullptr if the underlying texture
+   * allocation fails. Subclasses that need to route the request elsewhere (e.g. a drawable proxy
+   * that delegates to its backing texture proxy) override this; the default implementation
+   * creates a DEPTH24_STENCIL8 texture sized to the proxy's current width/height.
    */
   virtual std::shared_ptr<Texture> getStencil();
 
@@ -160,7 +160,8 @@ class RenderTargetProxy {
 
  protected:
   // Cached stencil texture, lazily created by getStencil(). Held as a strong reference so all
-  // OpsRenderTasks targeting this proxy share one stencil texture across the proxy's lifetime.
+  // OpsRenderTasks targeting this proxy reuse one stencil allocation across the proxy's
+  // lifetime; the buffer contents are cleared at the start of each pass that opts in.
   std::shared_ptr<Texture> stencilTexture = nullptr;
 
   /**
