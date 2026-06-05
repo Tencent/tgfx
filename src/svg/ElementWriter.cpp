@@ -465,16 +465,14 @@ void ElementWriter::addDropShadowImageFilter(const DropShadowImageFilter* filter
     float blurY = 0.f;
     if (filter->blurFilter &&
         Types::Get(filter->blurFilter.get()) == Types::ImageFilterType::Blur) {
-      const auto blurFilter =
-          static_cast<const GaussianBlurImageFilter*>(filter->blurFilter.get());
+      const auto blurFilter = static_cast<const GaussianBlurImageFilter*>(filter->blurFilter.get());
       blurX = blurFilter->blurrinessX;
       blurY = blurFilter->blurrinessY;
     }
     if (FloatNearlyEqual(blurX, blurY)) {
       blurElement.addAttribute("stdDeviation", blurX);
     } else {
-      blurElement.addAttribute("stdDeviation",
-                               FloatToString(blurX) + " " + FloatToString(blurY));
+      blurElement.addAttribute("stdDeviation", FloatToString(blurX) + " " + FloatToString(blurY));
     }
   }
   {
