@@ -33,9 +33,11 @@
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/WriteStream.h"
 #include "tgfx/layers/DisplayList.h"
+#include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/ShapeStyle.h"
 #include "tgfx/layers/filters/BlurFilter.h"
+#include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
 #include "tgfx/svg/SVGExporter.h"
@@ -1164,5 +1166,275 @@ TGFX_TEST(SVGExportTest, ComplexRRect) {
   // Complex RRect must be exported as <path>, not <rect>.
   ASSERT_NE(SVGString.find("<path"), std::string::npos);
   ASSERT_EQ(SVGString.find("<rect"), std::string::npos);
+}
+
+/**
+ * Reproduces a bug where a draw whose bounds lie fully inside an outer clip
+ * gets short-circuited (no clip emitted), but is then incorrectly written into
+ * a stale <g clip-path> wrapper opened by a previous draw with a different,
+ * smaller clip. Sequence:
+ *   1. Outer clipRect(0,0,300,300)  - must stay a convex rect so that
+ *                                     conservativelyContainsRect returns true
+ *                                     for steps 3/4 and triggers the
+ *                                     short-circuit.
+ *   2. Inner clipRect(0,0,100,100)  - small clip
+ *      drawRect(0,0,200,200)         -> escapes the small clip, opens
+ *                                       <g clip-path="url(#clip_0)">
+ *      restore()                      -> pops the inner clip
+ *   3. drawRect(150,150,100,100)     -> bounds fully inside the outer clip,
+ *                                       so applyClip short-circuits and the
+ *                                       rect must not stay inside the still-
+ *                                       open <g clip-path="url(#clip_0)">.
+ *   4. drawPath bounds (180,180,100,100) covers the real-world failure shape:
+ *      a <path> draw must escape the stale group on the same code path.
+ */
+TGFX_TEST(SVGExportTest, ClipShortCircuitWithStaleGroup) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(300, 300));
+  auto canvas = exporter->getCanvas();
+
+  canvas->save();
+  canvas->clipRect(Rect::MakeXYWH(0, 0, 300, 300));
+
+  // First draw escapes the small clip and opens a <g clip-path> wrapper.
+  Paint redPaint;
+  redPaint.setColor(Color::Red());
+  canvas->save();
+  canvas->clipRect(Rect::MakeXYWH(0, 0, 100, 100));
+  canvas->drawRect(Rect::MakeXYWH(0, 0, 200, 200), redPaint);
+  canvas->restore();
+
+  // Second draw (rect) is fully inside the outer clip - short-circuits and must
+  // NOT inherit the small clip group.
+  Paint bluePaint;
+  bluePaint.setColor(Color::Blue());
+  canvas->drawRect(Rect::MakeXYWH(150, 150, 100, 100), bluePaint);
+
+  // Third draw (path) reproduces the real-world failure shape: a path whose
+  // bounds lie fully inside the outer clip must also escape the stale group.
+  // Use a triangle so Canvas cannot forward to drawRect/drawRRect; this
+  // exercises SVGExportContext::drawPath directly and emits a <path>.
+  Paint greenPaint;
+  greenPaint.setColor(Color::Green());
+  Path path;
+  path.moveTo(180, 280);
+  path.lineTo(230, 180);
+  path.lineTo(280, 280);
+  path.close();
+  canvas->drawPath(path, greenPaint);
+
+  canvas->restore();
+
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/ClipShortCircuitWithStaleGroup"));
+}
+
+TGFX_TEST(SVGExportTest, BackgroundBlur) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(300, 300));
+  auto canvas = exporter->getCanvas();
+
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Red background rect.
+  auto backgroundLayer = ShapeLayer::Make();
+  backgroundLayer->setMatrix(Matrix::MakeTrans(50, 50));
+  Path rectPath;
+  rectPath.addRect(Rect::MakeWH(150, 150));
+  backgroundLayer->setPath(rectPath);
+  backgroundLayer->setFillStyle(ShapeStyle::Make(Color::Red()));
+  displayList->root()->addChild(backgroundLayer);
+
+  // Same-sized rect offset to overlap, with background blur.
+  auto overlayLayer = ShapeLayer::Make();
+  overlayLayer->setMatrix(Matrix::MakeTrans(100, 100));
+  overlayLayer->setPath(rectPath);
+  overlayLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 100)));
+  auto backgroundBlur = BackgroundBlurStyle::Make(15, 15);
+  overlayLayer->setLayerStyles({backgroundBlur});
+  displayList->root()->addChild(overlayLayer);
+
+  displayList->root()->draw(canvas);
+
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/BackgroundBlur"));
+}
+
+TGFX_TEST(SVGExportTest, BackgroundBlurWithDropShadow) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(300, 300));
+  auto canvas = exporter->getCanvas();
+
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Red background rect.
+  auto backgroundLayer = ShapeLayer::Make();
+  backgroundLayer->setMatrix(Matrix::MakeTrans(50, 50));
+  Path rectPath;
+  rectPath.addRect(Rect::MakeWH(150, 150));
+  backgroundLayer->setPath(rectPath);
+  backgroundLayer->setFillStyle(ShapeStyle::Make(Color::Red()));
+  displayList->root()->addChild(backgroundLayer);
+
+  // Same-sized rect offset to overlap, with background blur and drop shadow.
+  auto overlayLayer = ShapeLayer::Make();
+  overlayLayer->setMatrix(Matrix::MakeTrans(100, 100));
+  overlayLayer->setPath(rectPath);
+  overlayLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 100)));
+  auto backgroundBlur = BackgroundBlurStyle::Make(15, 15);
+  auto dropShadow = DropShadowStyle::Make(5, 5, 8, 8, Color::Black(), true);
+  overlayLayer->setLayerStyles({backgroundBlur, dropShadow});
+  displayList->root()->addChild(overlayLayer);
+
+  displayList->root()->draw(canvas);
+
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/BackgroundBlurWithDropShadow"));
+}
+TGFX_TEST(SVGExportTest, BlurFilterWithRotation) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  int width = 530;
+  int height = 300;
+
+  auto displayList = std::make_unique<DisplayList>();
+
+  Path rect200;
+  rect200.addRect(Rect::MakeWH(200, 200));
+  Path rect100;
+  rect100.addRect(Rect::MakeWH(100, 100));
+
+  // Left group: overlay without rotation.
+  auto leftBg = ShapeLayer::Make();
+  leftBg->setMatrix(Matrix::MakeTrans(50, 50));
+  leftBg->setPath(rect200);
+  leftBg->setFillStyle(ShapeStyle::Make(Color::Red()));
+  displayList->root()->addChild(leftBg);
+
+  auto leftOverlay = ShapeLayer::Make();
+  leftOverlay->setMatrix(Matrix::MakeTrans(50, 50));
+  leftOverlay->setPath(rect100);
+  leftOverlay->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 240)));
+  leftOverlay->setFilters({BlurFilter::Make(15, 15)});
+  displayList->root()->addChild(leftOverlay);
+
+  // Right group: overlay with 180-degree rotation. The overlay is translated by its own
+  // size (100,100) then rotated 180°, which maps the local (0,0)-(100,100) rect back to
+  // the same canvas position as the non-rotated case.
+  auto rightBg = ShapeLayer::Make();
+  rightBg->setMatrix(Matrix::MakeTrans(280, 50));
+  rightBg->setPath(rect200);
+  rightBg->setFillStyle(ShapeStyle::Make(Color::Red()));
+  displayList->root()->addChild(rightBg);
+
+  auto rightOverlay = ShapeLayer::Make();
+  auto rightMatrix = Matrix::MakeTrans(380, 150);
+  rightMatrix.preRotate(180);
+  rightOverlay->setMatrix(rightMatrix);
+  rightOverlay->setPath(rect100);
+  rightOverlay->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 240)));
+  rightOverlay->setFilters({BlurFilter::Make(15, 15)});
+  displayList->root()->addChild(rightOverlay);
+
+  // Export as SVG.
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(width, height));
+  displayList->root()->draw(exporter->getCanvas());
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/BlurFilterWithRotation"));
+}
+
+TGFX_TEST(SVGExportTest, FilterImageWithBlendMode) {
+  // When a raster ImageLayer carries both a BlurFilter and a non-SrcOver BlendMode, filter and
+  // mix-blend-mode must share the same <g>; otherwise the filter's isolation group would erase
+  // the blend. Uses a real image asset so the inner content stays raster (rendered as
+  // <rect fill="url(#pattern)">), matching the failing scenario from real exports.
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto image = MakeImage("resources/assets/bridge.jpg");
+  ASSERT_TRUE(image != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200));
+
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto background = ShapeLayer::Make();
+  Path bgPath;
+  bgPath.addRect(Rect::MakeWH(200, 200));
+  background->setPath(bgPath);
+  background->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 200, 0)));
+  displayList->root()->addChild(background);
+
+  auto overlay = ImageLayer::Make();
+  overlay->setMatrix(Matrix::MakeTrans(50, 50) *
+                     Matrix::MakeScale(100.f / static_cast<float>(image->width()),
+                                       100.f / static_cast<float>(image->height())));
+  overlay->setImage(image);
+  overlay->setFilters({BlurFilter::Make(4, 4)});
+  overlay->setBlendMode(BlendMode::Color);
+  displayList->root()->addChild(overlay);
+
+  displayList->root()->draw(exporter->getCanvas());
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/FilterImageWithBlendMode"));
+}
+
+TGFX_TEST(SVGExportTest, FilterImageWithBlendModeAndClip) {
+  // Same as FilterImageWithBlendMode but with an active clip on the canvas. Verifies that
+  // clip-path, filter and mix-blend-mode all collapse onto a single <g>: an extra <g clip-path>
+  // wrapper around the blend element would isolate it from its real previous siblings and
+  // silently drop the blend.
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto image = MakeImage("resources/assets/bridge.jpg");
+  ASSERT_TRUE(image != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200));
+  auto canvas = exporter->getCanvas();
+  // Tight clip that actually crops the overlay (which spans 30..170) so needsClip is true on
+  // the FilterImage export path.
+  canvas->clipRect(Rect::MakeXYWH(60, 60, 80, 80));
+
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto background = ShapeLayer::Make();
+  Path bgPath;
+  bgPath.addRect(Rect::MakeWH(200, 200));
+  background->setPath(bgPath);
+  background->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 200, 0)));
+  displayList->root()->addChild(background);
+
+  auto overlay = ImageLayer::Make();
+  overlay->setMatrix(Matrix::MakeTrans(30, 30) *
+                     Matrix::MakeScale(140.f / static_cast<float>(image->width()),
+                                       140.f / static_cast<float>(image->height())));
+  overlay->setImage(image);
+  overlay->setFilters({BlurFilter::Make(4, 4)});
+  overlay->setBlendMode(BlendMode::Color);
+  displayList->root()->addChild(overlay);
+
+  displayList->root()->draw(canvas);
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/FilterImageWithBlendModeAndClip"));
 }
 }  // namespace tgfx

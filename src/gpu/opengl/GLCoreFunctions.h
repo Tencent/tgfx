@@ -105,6 +105,7 @@
   M(glTexSubImage2D)                  \
   M(glUniform1i)                      \
   M(glUseProgram)                     \
+  M(glVertexAttribIPointer)           \
   M(glVertexAttribPointer)            \
   M(glVertexAttribDivisor)            \
   M(glViewport)                       \

@@ -30,6 +30,7 @@
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/filters/InnerShadowImageFilter.h"
 #include "core/filters/ShaderMaskFilter.h"
+#include "core/images/FilterImage.h"
 #include "core/images/PictureImage.h"
 #include "core/shaders/ColorShader.h"
 #include "core/shaders/ImageShader.h"
@@ -294,6 +295,24 @@ Brush clean_paint(const Brush& srcBrush) {
 int add_resource(std::unordered_set<PDFIndirectReference>& resources, PDFIndirectReference ref) {
   resources.insert(ref);
   return ref.value;
+}
+
+// Detects the (BlendMode::Src + FilterImage<Blur> + maskFilter) draw pattern. Today this shape is
+// only produced by BackgroundBlurStyle's lower path, but the check intentionally matches on the
+// pattern itself rather than the originating layer style: any caller that ends up in this exact
+// combination is known to render incorrectly through the current PDF maskFilter path, so the
+// caller treats a positive result as a "PDF cannot express this" guard and skips the draw (see
+// TODO at the call site).
+bool IsBackgroundBlurStylePattern(const Brush& brush, const Image* image) {
+  if (brush.blendMode != BlendMode::Src) {
+    return false;
+  }
+  if (Types::Get(image) != Types::ImageType::Filter) {
+    return false;
+  }
+  const auto* filterImage = static_cast<const FilterImage*>(image);
+  return filterImage->filter &&
+         Types::Get(filterImage->filter.get()) == Types::ImageFilterType::Blur;
 }
 }  // namespace
 
@@ -776,6 +795,12 @@ void PDFExportContext::drawLayer(std::shared_ptr<Picture> picture,
 }
 
 std::shared_ptr<Data> PDFExportContext::getContent() {
+  // Close any graphic-state stack frames that ScopedContentEntry left open. finishContentEntry()
+  // intentionally skips drainStack() for regular blend modes so that consecutive draws can reuse
+  // the same activeStackState (and avoid re-emitting clip / cm sequences). The residual q's must
+  // still be balanced before the stream is sealed into a Form XObject or page content stream.
+  activeStackState.drainStack();
+  activeStackState = PDFGraphicStackState();
   if (content->bytesWritten() == 0) {
     return Data::MakeEmpty();
   }
@@ -930,6 +955,16 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
     return;
   }
   if (modifiedBrush.maskFilter) {
+    // TODO(pdf): BackgroundBlurStyle currently lowers to (BlendMode::Src + FilterImage<Blur> +
+    // maskFilter). The PDF maskFilter path cannot express this combination correctly — running
+    // it produces visibly wrong output. Skip the draw as a temporary workaround until the PDF
+    // backend gains a proper backdrop-blur path. Add a regression test once the real path lands.
+    if (IsBackgroundBlurStylePattern(modifiedBrush, image.get())) {
+      return;
+    }
+    // Convert the image into an image shader and route through onDrawPath, which emits the
+    // bitmap as a tiling pattern combined with the existing maskFilter machinery. This is the
+    // historical PDF path that supports DropShadowStyle's mask-filter case.
     auto imageShader =
         Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp, SamplingOptions());
     imageShader = imageShader->makeWithMatrix(transform);
@@ -990,14 +1025,20 @@ std::vector<PDFIndirectReference> Sort(const std::unordered_set<PDFIndirectRefer
 }
 }  // namespace
 
-std::unique_ptr<PDFDictionary> PDFExportContext::makeResourceDict() {
-  return MakePDFResourceDictionary(Sort(graphicStateResources), Sort(shaderResources),
-                                   Sort(xObjectResources), Sort(fontResources));
-}
-
 std::unique_ptr<PDFDictionary> PDFExportContext::makeResourceDictionary() {
-  return MakePDFResourceDictionary(Sort(graphicStateResources), Sort(shaderResources),
-                                   Sort(xObjectResources), Sort(fontResources));
+  auto resourceDict = MakePDFResourceDictionary(Sort(graphicStateResources), Sort(shaderResources),
+                                                Sort(xObjectResources), Sort(fontResources));
+  // Inject the document-wide /CS color space into the Resources/ColorSpace dictionary whenever a
+  // target color space has been set. Form XObjects and Tiling Patterns own independent Resources
+  // dictionaries (ISO 32000-1 §8.10.1, §8.7.3.3) and cannot inherit ColorSpace from the page, so
+  // their content streams that emit "/CS CS" or "/CS cs" would fail in strict PDF readers (Adobe
+  // Acrobat, qpdf) when /CS is not declared locally.
+  if (auto ref = document->colorSpaceRef()) {
+    auto colorSpaceDic = PDFDictionary::Make();
+    colorSpaceDic->insertRef("CS", ref);
+    resourceDict->insertObject("ColorSpace", std::move(colorSpaceDic));
+  }
+  return resourceDict;
 }
 
 bool PDFExportContext::isContentEmpty() {

@@ -49,7 +49,7 @@ class QGLDrawableProxy : public RenderTargetProxy {
   int _height = 0;
   PixelFormat _format = PixelFormat::RGBA_8888;
   int _sampleCount = 1;
-  ImageOrigin _origin = ImageOrigin::BottomLeft;
+  ImageOrigin _origin = ImageOrigin::TopLeft;
   QGLWindow* _window = nullptr;
   mutable std::shared_ptr<RenderTargetProxy> textureRTProxy = nullptr;
   std::weak_ptr<RenderTargetProxy> weakThis;

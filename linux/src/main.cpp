@@ -33,7 +33,9 @@ static std::string GetRootPath() {
 static void SaveFile(std::shared_ptr<tgfx::Data> data, const std::string& output) {
   std::filesystem::path path = output;
   std::filesystem::create_directories(path.parent_path());
-  std::ofstream out(path);
+  // Open in binary mode; otherwise on Windows '\n' (0x0A) bytes inside the binary payload would
+  // be expanded to "\r\n" (0x0D 0x0A), corrupting encoded image data such as WebP.
+  std::ofstream out(path, std::ios::binary | std::ios::trunc);
   out.write(reinterpret_cast<const char*>(data->data()),
             static_cast<std::streamsize>(data->size()));
   out.close();

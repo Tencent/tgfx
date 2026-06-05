@@ -206,33 +206,36 @@ class DisplayList {
   }
 
   /**
-   * Returns the maximum number of tiles that can be refined (updated to the current zoom scale) per
-   * frame in tiled rendering mode. This setting is ignored in other render modes or if
-   * allowZoomBlur is false. When zooming, cached images from other zoom levels may be used
-   * temporarily, resulting in brief blur artifacts. Increasing this value refines more tiles per
-   * frame, reducing blur more quickly but potentially impacting performance. The default is 5.
+   * Returns the maximum number of tiles rasterized per frame in tiled rendering mode. This
+   * setting is ignored in other render modes or if allowZoomBlur is false. Once the limit is
+   * reached, remaining tiles fall back to cached content from other zoom scales, or are filled
+   * with the background color when no fallback is available. Higher values fill the screen
+   * faster during zoom and pan at the cost of per-frame GPU load; lower values prioritize
+   * stable frame rate.
    */
   int maxTilesRefinedPerFrame() const {
     return _maxTilesRefinedPerFrame;
   }
 
   /**
-   * Sets the maximum number of tiles that can be refined (updated to the current zoom scale) per
-   * frame in tiled rendering mode.
+   * Sets the maximum number of tiles processed per frame in tiled rendering mode.
    */
   void setMaxTilesRefinedPerFrame(int count) {
     _maxTilesRefinedPerFrame = count;
   }
 
   /**
-   * Returns the background color of the root layer. The background is an infinite rectangle that
-   * covers the entire display area and is drawn using the SrcOver blend mode.
+   * Returns the background color of the display list. The background is an infinite rectangle that
+   * covers the entire display area and is drawn using the SrcOver blend mode during rendering.
+   * It is only drawn in the DisplayList::render() path, not when calling Layer::draw() directly.
    * The default value is transparent.
    */
-  Color backgroundColor() const;
+  Color backgroundColor() const {
+    return _backgroundColor;
+  }
 
   /**
-   * Sets the background color of the root layer.
+   * Sets the background color of the display list.
    */
   void setBackgroundColor(const Color& color);
 
@@ -280,6 +283,7 @@ class DisplayList {
 
  private:
   std::shared_ptr<RootLayer> _root = nullptr;
+  Color _backgroundColor = Color::Transparent();
   int64_t _zoomScaleInt = 1000;
   int _zoomScalePrecision = 1000;
   Point _contentOffset = {};
@@ -318,8 +322,10 @@ class DisplayList {
 
   void recycleCurrentTileTasks(const std::vector<DrawTask>& tileTasks);
 
-  std::vector<DrawTask> collectScreenTasks(const Surface* surface,
-                                           std::vector<DrawTask>* tileTasks);
+  std::vector<DrawTask> collectScreenTasks(const Surface* surface, std::vector<DrawTask>* tileTasks,
+                                           std::vector<Rect>* skippedRects,
+                                           std::vector<DrawTask>* throttleScreenTasks,
+                                           bool autoClear);
 
   std::vector<std::pair<float, TileCache*>> getSortedTileCaches() const;
 
@@ -327,6 +333,9 @@ class DisplayList {
       const std::vector<std::pair<float, TileCache*>>& sortedCaches) const;
 
   std::vector<DrawTask> getFallbackDrawTasks(
+      int tileX, int tileY, const std::vector<std::pair<float, TileCache*>>& fallbackCaches) const;
+
+  std::vector<DrawTask> getThrottleFallbackTasks(
       int tileX, int tileY, const std::vector<std::pair<float, TileCache*>>& fallbackCaches) const;
 
   std::vector<std::shared_ptr<Tile>> getFreeTiles(
@@ -342,9 +351,13 @@ class DisplayList {
 
   int getMaxTileCountPerAtlas(Context* context) const;
 
-  void drawTileTask(const DrawTask& task, const BackgroundSnapshotMap* snapshots) const;
+  void drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snapshots) const;
 
-  void drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* surface, bool autoClear) const;
+  void drawScreenTasks(std::vector<DrawTask> screenTasks, std::vector<Rect> skippedRects,
+                       Surface* surface, bool autoClear) const;
+
+  void drawThrottleScreenTasks(std::vector<DrawTask> throttleScreenTasks, Surface* surface,
+                               bool autoClear) const;
 
   void renderDirtyRegions(Canvas* canvas, std::vector<Rect> dirtyRegions);
 
@@ -353,7 +366,7 @@ class DisplayList {
   void resetCaches();
 
   void drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
-                     bool autoClear, const BackgroundSnapshotMap* snapshots) const;
+                     bool autoClear, BackgroundSnapshotMap* snapshots) const;
 
   std::unique_ptr<BackgroundSnapshotMap> captureBackgrounds(
       Surface* surface, const std::vector<Rect>& renderRects) const;

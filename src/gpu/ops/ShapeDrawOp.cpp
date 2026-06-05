@@ -24,7 +24,6 @@
 #include "gpu/RectsVertexProvider.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
-#include "inspect/InspectorMark.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
@@ -50,8 +49,6 @@ ShapeDrawOp::ShapeDrawOp(BlockAllocator* allocator, std::shared_ptr<GPUShapeProx
 }
 
 PlacementPtr<GeometryProcessor> ShapeDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
-  ATTRIBUTE_NAME("color", color);
-  ATTRIBUTE_NAME("uvMatrix", uvMatrix);
   if (shapeProxy == nullptr) {
     return nullptr;
   }

@@ -68,18 +68,34 @@ struct BackgroundSnapshotKeyHash {
 };
 
 /**
- * Concrete map type used to carry background snapshots from the capture pass to the consume
- * pass. Declared as a named struct (instead of a using-alias over std::unordered_map) so that
- * callers which only need a pointer or reference can forward-declare the type in public headers
- * without pulling in this internal header.
+ * Carries background snapshots from the capture pass to the consume pass. Each (Layer, LayerStyle)
+ * key maps to a vector (not a single entry), since the same pair can be dispatched more than once
+ * within one render — e.g. a BackgroundBlur layer that gets split into multiple fragments by a
+ * 3D subtree's BSP. Capture pushes entries in dispatch order; consume reads them in the same
+ * order through a cursor that lives on BackgroundConsumer (per-consumer state), so that the same
+ * shared snapshot map can be consumed multiple times — once per tile in tiled rendering, or twice
+ * when partial-cache and on-screen passes share a cache. Normal 2D paths only ever push and read a
+ * single entry, which is equivalent to the previous single-value behaviour.
  *
  * Also caches LayerStyleSource per layer: capture and consume passes walk the same tree, so
  * each layer's content/contour images are identical between passes. Building the source once in
- * capture and reusing it in consume avoids redundant intermediate renders.
+ * capture and reusing it in consume avoids redundant intermediate renders. LayerStyleSource is
+ * not list-ised because, even when a layer is split into multiple fragments, the source is
+ * built at most once and read N times — list semantics would offer no value here.
+ *
+ * Consumers (BackgroundConsumer) read the snapshots vector through their own readCursors state
+ * (per-consumer, stored on the consumer itself), not through the map. This is why callers that
+ * only need to hand a snapshot map to a consumer can pass a const pointer to the map while the
+ * consumer still advances its non-const cursor — the cursor is not on the map. It also explains
+ * why some call sites (e.g. DisplayList::drawTileTask) pass BackgroundSnapshotMap* as non-const
+ * despite not writing snapshots: the consumer's cursor state is co-located with the consumer,
+ * not the map, but the consumer is constructed with a mutable pointer so it can read the vector
+ * contents through a non-const path.
  */
-struct BackgroundSnapshotMap
-    : public std::unordered_map<BackgroundSnapshotKey, BackgroundSnapshotEntry,
-                                BackgroundSnapshotKeyHash> {
+struct BackgroundSnapshotMap {
+  std::unordered_map<BackgroundSnapshotKey, std::vector<BackgroundSnapshotEntry>,
+                     BackgroundSnapshotKeyHash>
+      snapshots = {};
   std::unordered_map<Layer*, std::unique_ptr<LayerStyleSource>> layerStyleSources = {};
 };
 

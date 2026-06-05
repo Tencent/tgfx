@@ -435,12 +435,25 @@ void ElementWriter::callbackInnerShadowImageFilter(
 
 void ElementWriter::addBlurImageFilter(const GaussianBlurImageFilter* filter) {
   ElementWriter blurElement("feGaussianBlur", writer);
-  blurElement.addAttribute("stdDeviation",
-                           std::max(filter->blurrinessX, filter->blurrinessY) / 2.f);
+  if (FloatNearlyEqual(filter->blurrinessX, filter->blurrinessY)) {
+    blurElement.addAttribute("stdDeviation", filter->blurrinessX);
+  } else {
+    blurElement.addAttribute("stdDeviation", FloatToString(filter->blurrinessX) + " " +
+                                                 FloatToString(filter->blurrinessY));
+  }
   blurElement.addAttribute("result", "blur");
 }
 
+void ElementWriter::addHardAlphaElement() {
+  ElementWriter colorMatrixElement("feColorMatrix", writer);
+  colorMatrixElement.addAttribute("in", "SourceAlpha");
+  colorMatrixElement.addAttribute("type", "matrix");
+  colorMatrixElement.addAttribute("values", "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0");
+  colorMatrixElement.addAttribute("result", "hardAlpha");
+}
+
 void ElementWriter::addDropShadowImageFilter(const DropShadowImageFilter* filter) {
+  addHardAlphaElement();
   {
     ElementWriter offsetElement("feOffset", writer);
     offsetElement.addAttribute("dx", filter->dx);
@@ -448,16 +461,24 @@ void ElementWriter::addDropShadowImageFilter(const DropShadowImageFilter* filter
   }
   {
     ElementWriter blurElement("feGaussianBlur", writer);
-    float blurriness = 0.f;
-    if (filter->blurFilter) {
-      if (Types::Get(filter->blurFilter.get()) == Types::ImageFilterType::Blur) {
-        const auto blurFilter =
-            static_cast<const GaussianBlurImageFilter*>(filter->blurFilter.get());
-        blurriness = std::max(blurFilter->blurrinessX, blurFilter->blurrinessY) / 2.f;
-      }
+    float blurX = 0.f;
+    float blurY = 0.f;
+    if (filter->blurFilter &&
+        Types::Get(filter->blurFilter.get()) == Types::ImageFilterType::Blur) {
+      const auto blurFilter = static_cast<const GaussianBlurImageFilter*>(filter->blurFilter.get());
+      blurX = blurFilter->blurrinessX;
+      blurY = blurFilter->blurrinessY;
     }
-    blurElement.addAttribute("stdDeviation", blurriness);
-    blurElement.addAttribute("result", "blur");
+    if (FloatNearlyEqual(blurX, blurY)) {
+      blurElement.addAttribute("stdDeviation", blurX);
+    } else {
+      blurElement.addAttribute("stdDeviation", FloatToString(blurX) + " " + FloatToString(blurY));
+    }
+  }
+  {
+    ElementWriter compositeElement("feComposite", writer);
+    compositeElement.addAttribute("in2", "hardAlpha");
+    compositeElement.addAttribute("operator", "out");
   }
   {
     ElementWriter colorMatrixElement("feColorMatrix", writer);
@@ -468,24 +489,20 @@ void ElementWriter::addDropShadowImageFilter(const DropShadowImageFilter* filter
                                                   FloatToString(color.green) + " 0 0 0 0 " +
                                                   FloatToString(color.blue) + " 0 0 0 " +
                                                   FloatToString(color.alpha) + " 0");
+    colorMatrixElement.addAttribute("result", "shadow");
   }
   if (!filter->shadowOnly) {
     ElementWriter blendElement("feBlend", writer);
     blendElement.addAttribute("mode", "normal");
     blendElement.addAttribute("in", "SourceGraphic");
+    blendElement.addAttribute("in2", "shadow");
   }
 }
 void ElementWriter::addInnerShadowImageFilter(const InnerShadowImageFilter* filter) {
   if (!filter->blurFilter) {
     return;
   }
-  {
-    ElementWriter colorMatrixElement("feColorMatrix", writer);
-    colorMatrixElement.addAttribute("in", "SourceAlpha");
-    colorMatrixElement.addAttribute("type", "matrix");
-    colorMatrixElement.addAttribute("values", "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0");
-    colorMatrixElement.addAttribute("result", "hardAlpha");
-  }
+  addHardAlphaElement();
   if (!filter->shadowOnly) {
     {
       ElementWriter floodElement("feFlood", writer);
@@ -509,8 +526,12 @@ void ElementWriter::addInnerShadowImageFilter(const InnerShadowImageFilter* filt
     ElementWriter blurElement("feGaussianBlur", writer);
     if (Types::Get(filter->blurFilter.get()) == Types::ImageFilterType::Blur) {
       auto blurFilter = static_cast<const GaussianBlurImageFilter*>(filter->blurFilter.get());
-      blurElement.addAttribute("stdDeviation",
-                               std::max(blurFilter->blurrinessX, blurFilter->blurrinessY) / 2.f);
+      if (FloatNearlyEqual(blurFilter->blurrinessX, blurFilter->blurrinessY)) {
+        blurElement.addAttribute("stdDeviation", blurFilter->blurrinessX);
+      } else {
+        blurElement.addAttribute("stdDeviation", FloatToString(blurFilter->blurrinessX) + " " +
+                                                     FloatToString(blurFilter->blurrinessY));
+      }
     }
   }
   {

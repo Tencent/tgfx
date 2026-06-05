@@ -22,7 +22,6 @@
 #include "gpu/GlobalCache.h"
 #include "gpu/ProgramBuilder.h"
 #include "gpu/resources/RenderTarget.h"
-#include "inspect/InspectorMark.h"
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
@@ -285,7 +284,7 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
                                   fragmentOffset);
 
   auto samplers = getSamplers();
-  unsigned textureBinding = TEXTURE_BINDING_POINT_START;
+  unsigned textureBinding = 0;
   auto gpu = renderTarget->getContext()->gpu();
   for (auto& [texture, state] : samplers) {
     SamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),

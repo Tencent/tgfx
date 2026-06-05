@@ -205,7 +205,7 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
                                     ShaderVisibility::Fragment};
     descriptor.layout.uniformBlocks.push_back(fragmentBinding);
   }
-  int textureBinding = TEXTURE_BINDING_POINT_START;
+  int textureBinding = 0;
   for (const auto& sampler : _uniformHandler.getSamplers()) {
     descriptor.layout.textureSamplers.emplace_back(sampler.name(), textureBinding++);
   }

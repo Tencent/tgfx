@@ -231,7 +231,11 @@ void SerializeStream(PDFDictionary* origDict, Stream* stream, PDFSteamCompressio
     }
   }
 
-  dict.insertInt("Length", stream->size());
+  // /Length must equal the number of bytes actually written between the "stream" and "endstream"
+  // keywords (see ISO 32000-1 §7.3.8.2). When compression succeeds inputPointer is switched to the
+  // compressed stream, so its size matches the bytes that will be emitted. Using stream->size()
+  // here would emit the uncompressed length and produce a malformed PDF.
+  dict.insertInt("Length", inputPointer->size());
 
   auto writeStream = [inputPointer](const std::shared_ptr<WriteStream>& destination) {
     StreamCopy(destination.get(), inputPointer);
