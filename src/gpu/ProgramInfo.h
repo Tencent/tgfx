@@ -123,29 +123,11 @@ class ProgramInfo {
   }
 
   /**
-   * Sets the depth/stencil descriptor for the render pipeline. Callers typically use this to
-   * enable stencil-based rendering (e.g. the bezier rasterization path); the descriptor is mixed
-   * into the program cache key so two pipelines with identical shaders but different stencil
-   * state are not collapsed by the cache.
-   */
-  void setDepthStencil(const DepthStencilDescriptor& descriptor) {
-    depthStencil = descriptor;
-  }
-
-  /**
    * Returns the colour write mask applied to the colour attachment when constructing the render
    * pipeline. Defaults to ColorWriteMask::All, meaning every channel is written.
    */
   uint32_t getColorWriteMask() const {
     return colorWriteMask;
-  }
-
-  /**
-   * Overrides the colour write mask. Callers typically set this to 0 for stencil-only passes
-   * which intentionally drop the colour output. The mask is mixed into the program cache key.
-   */
-  void setColorWriteMask(uint32_t mask) {
-    colorWriteMask = mask;
   }
 
  private:
