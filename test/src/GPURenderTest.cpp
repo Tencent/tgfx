@@ -20,9 +20,12 @@
 #include <vector>
 #include "InstancedGridRenderPass.h"
 #include "MultisampleTestEffect.h"
+#include "StencilMaskRenderPass.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/RenderPass.h"
+#include "tgfx/gpu/Texture.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
@@ -92,6 +95,92 @@ TGFX_TEST(GPURenderTest, InstancedGridRender) {
 
   // Also compare with baseline
   EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/InstancedGridRender"));
+}
+
+// ==================== Stencil Pipeline Tests ====================
+
+// End-to-end exercise of the stencil-aware pipeline plumbing introduced for the bezier
+// rasterization render path: ProgramInfo's stencil/colourWriteMask cache key contributions,
+// GLSLProgramBuilder forwarding `depthStencil` to the pipeline descriptor, and the GL
+// stencil-state factory's no-op detection (which previously dropped any pipeline whose
+// compare function was Always — exactly the configuration the mask pass uses).
+//
+// Pass 1 stamps a centred disc into the stencil buffer with compare=Always +
+// passOp=Replace; pass 2 fills the entire viewport with red but is gated on stencil==1.
+// Reading back the rendered pixels lets us verify both that the mask was written (centre
+// pixel is red) and that the stencil test is precise (corner pixel is the clear colour).
+TGFX_TEST(GPURenderTest, StencilMaskRenderPass) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto gpu = context->gpu();
+  ASSERT_TRUE(gpu != nullptr);
+
+  constexpr int SIZE = 200;
+  TextureDescriptor renderTextureDesc(
+      SIZE, SIZE, PixelFormat::RGBA_8888, false, 1,
+      TextureUsage::RENDER_ATTACHMENT | TextureUsage::TEXTURE_BINDING);
+  auto renderTexture = gpu->createTexture(renderTextureDesc);
+  ASSERT_TRUE(renderTexture != nullptr);
+
+  TextureDescriptor stencilTextureDesc(SIZE, SIZE, PixelFormat::DEPTH24_STENCIL8, false, 1,
+                                       TextureUsage::RENDER_ATTACHMENT);
+  auto stencilTexture = gpu->createTexture(stencilTextureDesc);
+  ASSERT_TRUE(stencilTexture != nullptr);
+
+  auto encoder = gpu->createCommandEncoder();
+  ASSERT_TRUE(encoder != nullptr);
+  // Cover colour: opaque red, in premultiplied space.
+  auto coverColor = Color{1.0f, 0.0f, 0.0f, 1.0f}.premultiply();
+  auto pass = StencilMaskRenderPass::Make(coverColor);
+  ASSERT_TRUE(pass != nullptr);
+  ASSERT_TRUE(pass->draw(encoder.get(), renderTexture, stencilTexture));
+
+  auto commandBuffer = encoder->finish();
+  ASSERT_TRUE(commandBuffer != nullptr);
+  gpu->queue()->submit(commandBuffer);
+  gpu->queue()->waitUntilCompleted();
+
+  // Sample two pixels: the surface centre (well inside the disc, must be red) and a corner
+  // (well outside the disc, must be the clear colour transparent black). The disc has
+  // radius 0.6 in NDC, so a pixel 4 pixels in from the corner sits at NDC ~(-0.96, -0.96)
+  // — comfortably outside.
+  auto surface =
+      Surface::MakeFrom(context, renderTexture->getBackendTexture(), ImageOrigin::TopLeft);
+  ASSERT_TRUE(surface != nullptr);
+  auto info = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  uint32_t centrePixel = 0;
+  ASSERT_TRUE(surface->readPixels(info, &centrePixel, SIZE / 2, SIZE / 2));
+  uint32_t cornerPixel = 0xDEADBEEF;
+  ASSERT_TRUE(surface->readPixels(info, &cornerPixel, 4, 4));
+
+  // RGBA_8888 byte order is R, G, B, A. The centre must read as opaque red; the corner must
+  // read as the transparent-black clear colour.
+  EXPECT_EQ(centrePixel, 0xFF0000FFu) << "centre pixel was not the opaque red cover colour";
+  EXPECT_EQ(cornerPixel, 0u) << "corner pixel was not the clear colour";
+}
+
+// Verifies RenderTargetProxy::getStencil() lazily allocates a stencil texture the first
+// time it is called and then returns the same instance on subsequent calls. This is the
+// behaviour OpsRenderTask relies on: every render task targeting the same proxy shares one
+// stencil texture for the proxy's lifetime.
+TGFX_TEST(GPURenderTest, RenderTargetProxyGetStencil) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto proxy = RenderTargetProxy::Make(context, 96, 64, /*alphaOnly=*/false);
+  ASSERT_TRUE(proxy != nullptr);
+
+  auto first = proxy->getStencil();
+  ASSERT_TRUE(first != nullptr);
+  EXPECT_EQ(first->width(), 96);
+  EXPECT_EQ(first->height(), 64);
+
+  auto second = proxy->getStencil();
+  ASSERT_TRUE(second != nullptr);
+  // Lazy-init contract: subsequent calls return the cached instance, not a fresh texture.
+  EXPECT_EQ(first.get(), second.get());
 }
 
 // ==================== Multisample Tests ====================
