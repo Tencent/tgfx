@@ -24,7 +24,9 @@
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/GeometryProcessor.h"
 #include "gpu/resources/RenderTarget.h"
+#include "tgfx/gpu/ColorWriteMask.h"
 #include "tgfx/gpu/RenderPass.h"
+#include "tgfx/gpu/RenderPipeline.h"
 
 namespace tgfx {
 struct SamplerInfo {
@@ -111,6 +113,41 @@ class ProgramInfo {
     cullMode = mode;
   }
 
+  /**
+   * Returns the depth/stencil descriptor that will be applied to the render pipeline. The default
+   * value is a no-op (no depth test, no stencil test) so existing draw ops which never touch the
+   * stencil buffer keep their previous behaviour.
+   */
+  const DepthStencilDescriptor& getDepthStencil() const {
+    return depthStencil;
+  }
+
+  /**
+   * Sets the depth/stencil descriptor for the render pipeline. Callers typically use this to
+   * enable stencil-based rendering (e.g. the bezier rasterization path); the descriptor is mixed
+   * into the program cache key so two pipelines with identical shaders but different stencil
+   * state are not collapsed by the cache.
+   */
+  void setDepthStencil(const DepthStencilDescriptor& descriptor) {
+    depthStencil = descriptor;
+  }
+
+  /**
+   * Returns the colour write mask applied to the colour attachment when constructing the render
+   * pipeline. Defaults to ColorWriteMask::All, meaning every channel is written.
+   */
+  uint32_t getColorWriteMask() const {
+    return colorWriteMask;
+  }
+
+  /**
+   * Overrides the colour write mask. Callers typically set this to 0 for stencil-only passes
+   * which intentionally drop the colour output. The mask is mixed into the program cache key.
+   */
+  void setColorWriteMask(uint32_t mask) {
+    colorWriteMask = mask;
+  }
+
  private:
   RenderTarget* renderTarget = nullptr;
   GeometryProcessor* geometryProcessor = nullptr;
@@ -121,6 +158,8 @@ class ProgramInfo {
   XferProcessor* xferProcessor = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
   CullMode cullMode = CullMode::None;
+  DepthStencilDescriptor depthStencil = {};
+  uint32_t colorWriteMask = ColorWriteMask::All;
 
   void updateProcessorIndices();
 

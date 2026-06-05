@@ -217,6 +217,10 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
   // Only sampleCount is needed here. The mask and alphaToCoverage are only used in RuntimeEffect.
   // If they are added here later, remember to encode them into ProgramInfo::getProgram()'s key.
   descriptor.multisample.count = programInfo->getSampleCount();
+  // Forward the depth/stencil descriptor configured by the draw op (if any). Default
+  // construction leaves all stencil ops at Keep so existing draw ops which never opt into
+  // stencil writes keep their previous behaviour.
+  descriptor.depthStencil = programInfo->getDepthStencil();
   auto pipeline = gpu->createRenderPipeline(descriptor);
   if (pipeline == nullptr) {
     return nullptr;
