@@ -26,6 +26,14 @@
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
+
+static void EncodeStencilFace(BytesKey& key, const StencilDescriptor& face) {
+  key.write(static_cast<uint32_t>(face.compare));
+  key.write(static_cast<uint32_t>(face.failOp));
+  key.write(static_cast<uint32_t>(face.depthFailOp));
+  key.write(static_cast<uint32_t>(face.passOp));
+}
+
 ProgramInfo::ProgramInfo(RenderTarget* renderTarget, GeometryProcessor* geometryProcessor,
                          std::vector<FragmentProcessor*> fragmentProcessors,
                          size_t numColorProcessors, XferProcessor* xferProcessor,
@@ -68,6 +76,7 @@ int ProgramInfo::getSampleCount() const {
 PipelineColorAttachment ProgramInfo::getPipelineColorAttachment() const {
   PipelineColorAttachment colorAttachment = {};
   colorAttachment.format = renderTarget->format();
+  colorAttachment.colorWriteMask = colorWriteMask;
   if (xferProcessor != nullptr || blendMode == BlendMode::Src) {
     return colorAttachment;
   }
@@ -82,7 +91,6 @@ PipelineColorAttachment ProgramInfo::getPipelineColorAttachment() const {
   colorAttachment.srcAlphaBlendFactor = blendFormula.srcFactor();
   colorAttachment.dstAlphaBlendFactor = blendFormula.dstFactor();
   colorAttachment.alphaBlendOp = blendFormula.operation();
-  colorAttachment.colorWriteMask = ColorWriteMask::All;
   return colorAttachment;
 }
 
@@ -132,6 +140,18 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
   // Note: if mask or alphaToCoverage from MultisampleDescriptor are used in the pipeline
   // creation, they must also be encoded here.
   programKey.write(static_cast<uint32_t>(renderTarget->sampleCount()));
+  // Pipelines that share shaders but differ in colour write mask or stencil configuration must
+  // resolve to distinct cache entries — otherwise the bezier rasterization stencil/cover passes
+  // would silently collapse onto a single program. Keep this section in sync with the fields that
+  // are actually written into RenderPipelineDescriptor.
+  programKey.write(colorWriteMask);
+  programKey.write(static_cast<uint32_t>(depthStencil.format));
+  programKey.write(static_cast<uint32_t>(depthStencil.depthCompare));
+  programKey.write(static_cast<uint32_t>(depthStencil.depthWriteEnabled ? 1 : 0));
+  programKey.write(depthStencil.stencilReadMask);
+  programKey.write(depthStencil.stencilWriteMask);
+  EncodeStencilFace(programKey, depthStencil.stencilFront);
+  EncodeStencilFace(programKey, depthStencil.stencilBack);
   CAPUTRE_PROGRAM_INFO(programKey, context, this);
   auto program = context->globalCache()->findProgram(programKey);
   if (program == nullptr) {
