@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/filters/GaussianBlurImageFilter.h"
-#include "core/utils/Log.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/PictureRecorder.h"
@@ -800,130 +799,6 @@ TGFX_TEST(LayerFilterTest, ChainedMonoNoise) {
   displayList->root()->addChild(layer);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/ChainedMonoNoise"));
-}
-
-TGFX_TEST(LayerFilterTest, DropShadowBlurDuoNoise) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-
-  constexpr int rectSize = 120;
-  constexpr int margin = 50;
-  constexpr int canvasWidth = margin * 2 + rectSize;
-  constexpr int canvasHeight = margin * 2 + rectSize;
-
-  auto displayList = std::make_unique<DisplayList>();
-
-  auto layer = ShapeLayer::Make();
-  Path rect;
-  rect.addRect(Rect::MakeWH(static_cast<float>(rectSize), static_cast<float>(rectSize)));
-  layer->setPath(rect);
-  layer->setMatrix(Matrix::MakeTrans(static_cast<float>(margin), static_cast<float>(margin)));
-  layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(60, 120, 200)));
-
-  auto dropShadow = DropShadowFilter::Make(6.0f, 6.0f, 4.0f, 4.0f, Color::Black());
-  auto blur = BlurFilter::Make(3.0f, 3.0f);
-  auto duoNoise = NoiseFilter::MakeDuo(8.0f, 1.0f, Color::FromRGBA(255, 0, 0, 128),
-                                       Color::FromRGBA(0, 0, 255, 128), 42.0f, BlendMode::SrcOver);
-  layer->setFilters({dropShadow, blur, duoNoise});
-
-  displayList->root()->addChild(layer);
-
-  auto surface = Surface::Make(context, canvasWidth, canvasHeight);
-  ASSERT_TRUE(surface != nullptr);
-  displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/DropShadowBlurDuoNoise"));
-}
-
-TGFX_TEST(LayerFilterTest, TextLayerNoiseBoundsDiagnosis) {
-  auto typeface =
-      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
-  ASSERT_TRUE(typeface != nullptr);
-
-  float fontSize = 40.0f;
-  Font font(typeface, fontSize);
-
-  // Build a TextBlob for "Ag" to test bounds
-  const char* text = "Ag";
-  auto blob = TextBlob::MakeFrom(text, font);
-  ASSERT_TRUE(blob != nullptr);
-
-  auto bounds = blob->getBounds();
-  auto tightBounds = blob->getTightBounds();
-
-  LOGI("=== TextBlob 'Ag' (fontSize=%.1f) ===", fontSize);
-  LOGI("  getBounds():      left=%.2f top=%.2f right=%.2f bottom=%.2f  [w=%.2f h=%.2f]",
-       bounds.left, bounds.top, bounds.right, bounds.bottom, bounds.width(), bounds.height());
-  LOGI("  getTightBounds(): left=%.2f top=%.2f right=%.2f bottom=%.2f  [w=%.2f h=%.2f]",
-       tightBounds.left, tightBounds.top, tightBounds.right, tightBounds.bottom,
-       tightBounds.width(), tightBounds.height());
-  LOGI("  getBounds center:      (%.2f, %.2f)", bounds.centerX(), bounds.centerY());
-  LOGI("  getTightBounds center: (%.2f, %.2f)", tightBounds.centerX(), tightBounds.centerY());
-
-  // Simulate what Layer::computeBounds() does for TextContent
-  // TextContent::onGetBounds() returns textBlob->getBounds().makeOffset(offset)
-  // For a TextLayer with no offset, this is just textBlob->getBounds()
-  auto contentBounds = bounds;  // This is what Layer passes to NoiseFilter
-  LOGI("  contentBounds (passed to NoiseFilter): left=%.2f top=%.2f right=%.2f bottom=%.2f",
-       contentBounds.left, contentBounds.top, contentBounds.right, contentBounds.bottom);
-  LOGI("  NoiseFilter shift (contentBounds.center): (%.2f, %.2f)", contentBounds.centerX(),
-       contentBounds.centerY());
-  LOGI("  Ideal shift (tightBounds.center):         (%.2f, %.2f)", tightBounds.centerX(),
-       tightBounds.centerY());
-  LOGI("  Shift error: dx=%.2f dy=%.2f", contentBounds.centerX() - tightBounds.centerX(),
-       contentBounds.centerY() - tightBounds.centerY());
-
-  // Also test with a Chinese character
-  blob = TextBlob::MakeFrom("你", font);
-  ASSERT_TRUE(blob != nullptr);
-  bounds = blob->getBounds();
-  tightBounds = blob->getTightBounds();
-
-  LOGI("=== TextBlob '你' (fontSize=%.1f) ===", fontSize);
-  LOGI("  getBounds():      left=%.2f top=%.2f right=%.2f bottom=%.2f  [w=%.2f h=%.2f]",
-       bounds.left, bounds.top, bounds.right, bounds.bottom, bounds.width(), bounds.height());
-  LOGI("  getTightBounds(): left=%.2f top=%.2f right=%.2f bottom=%.2f  [w=%.2f h=%.2f]",
-       tightBounds.left, tightBounds.top, tightBounds.right, tightBounds.bottom,
-       tightBounds.width(), tightBounds.height());
-  LOGI("  getBounds center:      (%.2f, %.2f)", bounds.centerX(), bounds.centerY());
-  LOGI("  getTightBounds center: (%.2f, %.2f)", tightBounds.centerX(), tightBounds.centerY());
-  LOGI("  Shift error: dx=%.2f dy=%.2f", bounds.centerX() - tightBounds.centerX(),
-       bounds.centerY() - tightBounds.centerY());
-
-  // Now render a TextLayer with NoiseFilter for visual comparison
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-
-  auto textLayer = TextLayer::Make();
-  textLayer->setText("Ag");
-  textLayer->setFont(font);
-  textLayer->setTextColor(Color::FromRGBA(60, 120, 200));
-
-  auto noise =
-      NoiseFilter::MakeMono(8.0f, 1.0f, Color::FromRGBA(0, 0, 0, 128), 42.0f, BlendMode::SrcOver);
-  textLayer->setFilters({noise});
-
-  // Compute actual layer bounds for surface sizing
-  auto displayList = std::make_unique<DisplayList>();
-  displayList->root()->addChild(textLayer);
-
-  constexpr int margin = 50;
-  auto layerBounds = textLayer->getBounds();
-  int canvasWidth = static_cast<int>(ceilf(layerBounds.width())) + margin * 2;
-  int canvasHeight = static_cast<int>(ceilf(layerBounds.height())) + margin * 2;
-  textLayer->setMatrix(Matrix::MakeTrans(static_cast<float>(margin) - layerBounds.left,
-                                         static_cast<float>(margin) - layerBounds.top));
-
-  LOGI("=== TextLayer with NoiseFilter ===");
-  LOGI("  layerBounds: left=%.2f top=%.2f right=%.2f bottom=%.2f  [w=%.2f h=%.2f]",
-       layerBounds.left, layerBounds.top, layerBounds.right, layerBounds.bottom,
-       layerBounds.width(), layerBounds.height());
-
-  auto surface = Surface::Make(context, canvasWidth, canvasHeight);
-  ASSERT_TRUE(surface != nullptr);
-  displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/TextLayerNoiseBoundsDiagnosis"));
 }
 
 }  // namespace tgfx

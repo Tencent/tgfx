@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <cmath>
-#include "core/utils/Log.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Color.h"
@@ -1957,100 +1956,6 @@ TGFX_TEST(TextRenderTest, VerticalTextWithEmoji) {
 
   context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "TextRenderTest/VerticalTextWithEmoji"));
-}
-
-TGFX_TEST(TextRenderTest, TextBlobBoundsDiagnosis) {
-  auto typeface =
-      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
-  ASSERT_TRUE(typeface != nullptr);
-
-  float fontSize = 40.0f;
-  Font font(typeface, fontSize);
-
-  // Test with a single character "g" (has descender, should be smaller than full font bounds)
-  const char* text = "g";
-  auto blob = TextBlob::MakeFrom(text, font);
-  ASSERT_TRUE(blob != nullptr);
-
-  auto bounds = blob->getBounds();
-  auto tightBounds = blob->getTightBounds();
-
-  LOGI("=== Single char 'g' (fontSize=%.1f) ===", fontSize);
-  LOGI("  getBounds():     left=%.2f top=%.2f right=%.2f bottom=%.2f  [w=%.2f h=%.2f]", bounds.left,
-       bounds.top, bounds.right, bounds.bottom, bounds.width(), bounds.height());
-  LOGI("  getTightBounds(): left=%.2f top=%.2f right=%.2f bottom=%.2f  [w=%.2f h=%.2f]",
-       tightBounds.left, tightBounds.top, tightBounds.right, tightBounds.bottom,
-       tightBounds.width(), tightBounds.height());
-
-  // Per-glyph bounds from Font::getBounds()
-  auto glyphID = font.getGlyphID('g');
-  auto glyphBounds = font.getBounds(glyphID);
-  LOGI("  font.getBounds('g'): left=%.2f top=%.2f right=%.2f bottom=%.2f  [w=%.2f h=%.2f]",
-       glyphBounds.left, glyphBounds.top, glyphBounds.right, glyphBounds.bottom,
-       glyphBounds.width(), glyphBounds.height());
-
-  // Typeface-level bounds
-  auto typefaceBounds = typeface->getBounds();
-  LOGI("  typeface->getBounds(): left=%.4f top=%.4f right=%.4f bottom=%.4f  [w=%.4f h=%.4f]",
-       typefaceBounds.left, typefaceBounds.top, typefaceBounds.right, typefaceBounds.bottom,
-       typefaceBounds.width(), typefaceBounds.height());
-
-  // Font metrics
-  auto metrics = font.getMetrics();
-  LOGI(
-      "  FontMetrics: top=%.2f ascent=%.2f descent=%.2f bottom=%.2f leading=%.2f "
-      "xMin=%.2f xMax=%.2f",
-      metrics.top, metrics.ascent, metrics.descent, metrics.bottom, metrics.leading, metrics.xMin,
-      metrics.xMax);
-
-  // Scaled typeface bounds for comparison
-  auto scaledTypefaceBounds = typefaceBounds;
-  scaledTypefaceBounds.scale(fontSize, fontSize);
-  LOGI("  scaledTypefaceBounds: left=%.2f top=%.2f right=%.2f bottom=%.2f  [w=%.2f h=%.2f]",
-       scaledTypefaceBounds.left, scaledTypefaceBounds.top, scaledTypefaceBounds.right,
-       scaledTypefaceBounds.bottom, scaledTypefaceBounds.width(), scaledTypefaceBounds.height());
-
-  // Test with "Ag" to see multi-char
-  blob = TextBlob::MakeFrom("Ag", font);
-  ASSERT_TRUE(blob != nullptr);
-  bounds = blob->getBounds();
-  tightBounds = blob->getTightBounds();
-
-  LOGI("=== Text 'Ag' (fontSize=%.1f) ===", fontSize);
-  LOGI("  getBounds():     left=%.2f top=%.2f right=%.2f bottom=%.2f  [w=%.2f h=%.2f]", bounds.left,
-       bounds.top, bounds.right, bounds.bottom, bounds.width(), bounds.height());
-  LOGI("  getTightBounds(): left=%.2f top=%.2f right=%.2f bottom=%.2f  [w=%.2f h=%.2f]",
-       tightBounds.left, tightBounds.top, tightBounds.right, tightBounds.bottom,
-       tightBounds.width(), tightBounds.height());
-
-  // Per-glyph bounds for 'A' and 'g'
-  auto glyphA = font.getGlyphID('A');
-  auto glyphG = font.getGlyphID('g');
-  auto boundsA = font.getBounds(glyphA);
-  auto boundsG = font.getBounds(glyphG);
-  LOGI("  font.getBounds('A'): left=%.2f top=%.2f right=%.2f bottom=%.2f  [w=%.2f h=%.2f]",
-       boundsA.left, boundsA.top, boundsA.right, boundsA.bottom, boundsA.width(), boundsA.height());
-  LOGI("  font.getBounds('g'): left=%.2f top=%.2f right=%.2f bottom=%.2f  [w=%.2f h=%.2f]",
-       boundsG.left, boundsG.top, boundsG.right, boundsG.bottom, boundsG.width(), boundsG.height());
-
-  // Test Chinese character
-  blob = TextBlob::MakeFrom("你", font);
-  ASSERT_TRUE(blob != nullptr);
-  bounds = blob->getBounds();
-  tightBounds = blob->getTightBounds();
-
-  LOGI("=== Chinese char '你' (fontSize=%.1f) ===", fontSize);
-  LOGI("  getBounds():     left=%.2f top=%.2f right=%.2f bottom=%.2f  [w=%.2f h=%.2f]", bounds.left,
-       bounds.top, bounds.right, bounds.bottom, bounds.width(), bounds.height());
-  LOGI("  getTightBounds(): left=%.2f top=%.2f right=%.2f bottom=%.2f  [w=%.2f h=%.2f]",
-       tightBounds.left, tightBounds.top, tightBounds.right, tightBounds.bottom,
-       tightBounds.width(), tightBounds.height());
-
-  auto glyphCN = font.getGlyphID(0x4F60);  // 你
-  auto boundsCN = font.getBounds(glyphCN);
-  LOGI("  font.getBounds('你'): left=%.2f top=%.2f right=%.2f bottom=%.2f  [w=%.2f h=%.2f]",
-       boundsCN.left, boundsCN.top, boundsCN.right, boundsCN.bottom, boundsCN.width(),
-       boundsCN.height());
 }
 
 }  // namespace tgfx
