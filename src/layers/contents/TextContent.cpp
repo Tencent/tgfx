@@ -27,7 +27,7 @@ TextContent::TextContent(std::shared_ptr<TextBlob> textBlob, const Point& offset
 }
 
 Rect TextContent::onGetBounds() const {
-  return textBlob->getBounds().makeOffset(offset.x, offset.y);
+  return textBlob->getTightBounds().makeOffset(offset.x, offset.y);
 }
 
 Rect TextContent::getTightBounds(const Matrix& matrix) const {

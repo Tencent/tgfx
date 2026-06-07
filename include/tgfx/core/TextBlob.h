@@ -147,6 +147,7 @@ class TextBlob {
  private:
   size_t runCount = 0;
   mutable std::atomic<Rect*> bounds = {nullptr};
+  mutable std::atomic<Rect*> tightBounds = {nullptr};
 
   explicit TextBlob(size_t runCount);
   TextBlob(size_t runCount, const Rect& bounds);
@@ -156,6 +157,7 @@ class TextBlob {
 
   const RunRecord* firstRun() const;
   Rect computeBounds() const;
+  Rect computeTightBounds() const;
 
   friend class TextBlobBuilder;
 };

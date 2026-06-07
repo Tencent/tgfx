@@ -129,6 +129,7 @@ TextBlob::TextBlob(size_t runCount, const Rect& bounds)
 
 TextBlob::~TextBlob() {
   AtomicCacheReset(bounds);
+  AtomicCacheReset(tightBounds);
   // Explicitly destruct RunRecords since they contain Font objects
   const RunRecord* run = firstRun();
   for (size_t i = 0; i < runCount; i++) {
@@ -258,11 +259,19 @@ Rect TextBlob::computeBounds() const {
   if (!finalBounds.isEmpty()) {
     return finalBounds;
   }
-  return getTightBounds();
+  return computeTightBounds();
 }
 
 Rect TextBlob::getTightBounds(const Matrix* matrix) const {
-  auto resolutionScale = matrix ? matrix->getMaxScale() : 1.0f;
+  if (matrix == nullptr) {
+    if (auto cached = AtomicCacheGet(tightBounds)) {
+      return *cached;
+    }
+    auto result = computeTightBounds();
+    AtomicCacheSet(tightBounds, &result);
+    return result;
+  }
+  auto resolutionScale = matrix->getMaxScale();
   if (FloatNearlyZero(resolutionScale)) {
     return {};
   }
@@ -285,8 +294,19 @@ Rect TextBlob::getTightBounds(const Matrix* matrix) const {
       totalBounds.join(glyphBounds);
     }
   }
-  if (matrix) {
-    totalBounds = matrix->mapRect(totalBounds);
+  return matrix->mapRect(totalBounds);
+}
+
+Rect TextBlob::computeTightBounds() const {
+  Rect totalBounds = {};
+  for (auto run : *this) {
+    auto& font = run.font;
+    for (size_t i = 0; i < run.glyphCount; i++) {
+      auto glyphBounds = font.getBounds(run.glyphs[i]);
+      auto glyphMatrix = GetGlyphMatrix(run, i);
+      glyphBounds = glyphMatrix.mapRect(glyphBounds);
+      totalBounds.join(glyphBounds);
+    }
   }
   return totalBounds;
 }
