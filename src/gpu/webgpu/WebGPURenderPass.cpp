@@ -236,8 +236,6 @@ void WebGPURenderPass::updateBindGroup() {
   bindGroupDesc.layout = currentPipeline->bindGroupLayout();
   bindGroupDesc.entryCount = entries.size();
   bindGroupDesc.entries = entries.data();
-  for (size_t i = 0; i < entries.size(); i++) {
-  }
   auto bindGroup = wgpuDeviceCreateBindGroup(_gpu->device(), &bindGroupDesc);
   if (bindGroup != nullptr) {
     wgpuRenderPassEncoderSetBindGroup(passEncoder, 0, bindGroup, 0, nullptr);
