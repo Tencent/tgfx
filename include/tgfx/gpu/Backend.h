@@ -65,7 +65,7 @@ class BackendTexture {
   /**
    * Creates a WebGPU backend texture.
    */
-  BackendTexture(const WebGPUTextureInfo& webgpuInfo, int width, int height)
+  explicit BackendTexture(const WebGPUTextureInfo& webgpuInfo, int width, int height)
       : _backend(Backend::WebGPU), _width(width), _height(height), webgpuInfo(webgpuInfo) {
   }
 
@@ -180,7 +180,7 @@ class BackendRenderTarget {
   /**
    * Creates a WebGPU backend render target.
    */
-  BackendRenderTarget(const WebGPUTextureInfo& webgpuInfo, int width, int height)
+  explicit BackendRenderTarget(const WebGPUTextureInfo& webgpuInfo, int width, int height)
       : _backend(Backend::WebGPU), _width(width), _height(height), webgpuInfo(webgpuInfo) {
   }
 
@@ -294,7 +294,7 @@ class BackendSemaphore {
   /**
    * Creates a WebGPU backend semaphore.
    */
-  BackendSemaphore(const WebGPUSyncInfo& webgpuInfo)
+  explicit BackendSemaphore(const WebGPUSyncInfo& webgpuInfo)
       : _backend(Backend::WebGPU), webgpuSyncInfo(webgpuInfo) {
   }
 
