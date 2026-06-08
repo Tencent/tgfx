@@ -97,11 +97,10 @@ void OpsCompositor::fillImageRect(std::shared_ptr<Image> image, const Rect& srcR
   auto record = drawingAllocator()->make<RectRecord>(dstRect, matrix, brushInLocal.color);
   pendingRects.emplace_back(std::move(record));
   pendingUVRects.emplace_back(drawingAllocator()->make<Rect>(srcRect));
-  // For Strict mode, track a per-rect subset rectangle. When strictRect is null, fall back to
-  // srcRect (the legacy behavior of using the uv rect as the clamp range). Maintaining a
-  // parallel array (instead of only when explicitly provided) keeps indices aligned with
-  // pendingRects, simplifying flush-time access. Non-Strict ops never reach the subset path
-  // (see flushPendingDraws), so the extra memory is harmless.
+  // For Strict mode, track a per-rect subset rectangle, falling back to srcRect when strictRect is
+  // null. The parallel array keeps indices aligned with pendingRects, simplifying flush-time
+  // access. Non-Strict ops never reach the subset path (see flushPendingDraws), so the extra
+  // memory is harmless.
   if (constraint == SrcRectConstraint::Strict) {
     pendingSubsetRects.emplace_back(
         drawingAllocator()->make<Rect>(strictRect != nullptr ? *strictRect : srcRect));

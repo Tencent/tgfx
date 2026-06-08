@@ -54,10 +54,7 @@ class RectsVertexProvider : public VertexProvider {
                                                     AAType aaType);
 
   /**
-   * Creates a new RectsVertexProvider from a list of rect records. If subsetRects is non-empty
-   * and subsetMode != None, each entry replaces the per-rect subset (clamp range) used by the
-   * shader. When subsetRects is empty, the legacy behavior applies: the per-rect subset is
-   * derived from the corresponding uvRect (or the rect itself when uvRects is empty).
+   * Creates a new RectsVertexProvider from a list of rect records.
    */
   static PlacementPtr<RectsVertexProvider> MakeFrom(
       BlockAllocator* allocator, std::vector<PlacementPtr<RectRecord>>&& rects,

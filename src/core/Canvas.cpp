@@ -580,10 +580,6 @@ void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, co
     return;
   }
   auto imageRect = srcRect;
-  // strictRect (if any) is in SubsetImage coordinate space. When we unwrap the SubsetImage and
-  // pass the underlying source image to drawContext, strictRect must be translated alongside
-  // imageRect so that the shader's clamp range stays consistent with the source coordinate
-  // space the UV map is now expressed in.
   std::optional<Rect> adjustedStrictRect =
       strictRect ? std::optional<Rect>(*strictRect) : std::nullopt;
   auto safeBounds = Rect::MakeWH(image->width(), image->height());
@@ -593,6 +589,8 @@ void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, co
     auto subsetImage = static_cast<const SubsetImage*>(image.get());
     auto& subset = subsetImage->bounds;
     imageRect.offset(subset.left, subset.top);
+    // strictRect lives in the SubsetImage coordinate space; translate it together with imageRect
+    // so the shader's clamp range stays in the unwrapped source coordinate space.
     if (adjustedStrictRect) {
       adjustedStrictRect->offset(subset.left, subset.top);
     }
