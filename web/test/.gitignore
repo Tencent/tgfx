@@ -7,6 +7,7 @@ node_modules/
 # Compiled WASM output
 tgfx-test.js
 tgfx-test.wasm
+tgfx-test.wasm.map
 tgfx-test.data
 
 # Copied from web/lib/ at runtime
