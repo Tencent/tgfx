@@ -401,7 +401,9 @@ class Canvas {
    * @param constraint  the constraint for the source rectangle sampling. Defaults to
    * SrcRectConstraint::Fast.
    * @param strictRect  Rectangle in image space that constrains where samples may be taken.
-   * Only effective when constraint == SrcRectConstraint::Strict.
+   * Only effective when constraint == SrcRectConstraint::Strict. Must contain srcRect; passing
+   * a strictRect that does not fully contain srcRect will clamp srcRect-edge samples to the
+   * strictRect boundary and produce incorrect output.
    * If nullptr, Strict uses srcRect as the constraint. Use case: when srcRect is a sub-region
    * of a larger logical unit (e.g. a sub-window within an atlas tile), pass the full unit as
    * strictRect to prevent samples from leaking outside the unit while still allowing srcRect

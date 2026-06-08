@@ -1093,7 +1093,7 @@ void DisplayList::drawThrottleScreenTasks(std::vector<DrawTask> throttleScreenTa
     DEBUG_ASSERT(surfaceCache != nullptr);
     auto image = surfaceCache->makeImageSnapshot();
     canvas->drawImageRect(std::move(image), task.sourceRect(), task.tileRect(), linearSampling,
-                          &paint, SrcRectConstraint::Strict);
+                          &paint, SrcRectConstraint::Strict, &task.strictRect());
   }
 }
 
