@@ -102,6 +102,10 @@ void* WebGPUBuffer::map(size_t offset, size_t mapSize) {
   }
   // WebGPU does not support synchronous buffer mapping. Allocate a CPU-side staging buffer
   // and flush data to the GPU buffer on unmap() via wgpuQueueWriteBuffer.
+  if (stagingData != nullptr) {
+    free(stagingData);
+    stagingData = nullptr;
+  }
   stagingData = malloc(mapSize);
   if (stagingData == nullptr) {
     return nullptr;
