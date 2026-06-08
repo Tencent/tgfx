@@ -94,6 +94,12 @@ WebGPUWindow::WebGPUWindow(std::shared_ptr<Device> device, void* surface, int wi
       _height(height) {
 }
 
+WebGPUWindow::~WebGPUWindow() {
+  if (_surface) {
+    wgpuSurfaceRelease(static_cast<WGPUSurface>(_surface));
+  }
+}
+
 std::shared_ptr<RenderTargetProxy> WebGPUWindow::onCreateRenderTarget(Context* context) {
   if (_surface == nullptr) {
     return nullptr;

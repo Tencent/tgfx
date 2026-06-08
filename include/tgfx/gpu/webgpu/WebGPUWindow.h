@@ -33,6 +33,8 @@ class WebGPUWindow : public Window {
   static std::shared_ptr<WebGPUWindow> MakeFrom(const std::string& canvasSelector,
                                                 std::shared_ptr<WebGPUDevice> device = nullptr);
 
+  ~WebGPUWindow() override;
+
  protected:
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
   void onPresent(Context* context) override;
