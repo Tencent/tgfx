@@ -54,6 +54,7 @@ std::shared_ptr<WebGPUDevice> WebGPUDevice::Make() {
   wgpuDeviceSetUncapturedErrorCallback(wgpuDevice, OnUncapturedError, nullptr);
   auto gpu = WebGPUGPU::Make(wgpuDevice);
   if (gpu == nullptr) {
+    wgpuDeviceRelease(wgpuDevice);
     return nullptr;
   }
   auto device = std::shared_ptr<WebGPUDevice>(new WebGPUDevice(std::move(gpu)));
