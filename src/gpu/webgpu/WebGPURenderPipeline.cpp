@@ -243,14 +243,15 @@ bool WebGPURenderPipeline::createPipelineState(WebGPUGPU* gpu,
       },
       nullptr);
 
+  if (pipeline == nullptr) {
+    return false;
+  }
+
   // Also create a TriangleStrip variant since WebGPU requires topology at pipeline creation time,
   // but TGFX specifies it at draw time. Many draw calls use TriangleStrip(4 vertices) for quads.
   pipelineDesc.primitive.topology = WGPUPrimitiveTopology_TriangleStrip;
   pipelineDesc.primitive.stripIndexFormat = WGPUIndexFormat_Uint16;
   pipelineStrip = wgpuDeviceCreateRenderPipeline(gpu->device(), &pipelineDesc);
-  if (pipeline == nullptr) {
-    return false;
-  }
   return true;
 }
 
