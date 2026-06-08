@@ -48,6 +48,10 @@ class VulkanTexture : public Texture, public VulkanResource {
     return imageView;
   }
 
+  VkImageView vulkanRenderImageView() const {
+    return renderImageView != VK_NULL_HANDLE ? renderImageView : imageView;
+  }
+
   VkFormat vulkanFormat() const {
     return format;
   }
@@ -68,12 +72,13 @@ class VulkanTexture : public Texture, public VulkanResource {
 
  private:
   VulkanTexture(const TextureDescriptor& descriptor, VkImage image, VkImageView imageView,
-                VmaAllocation allocation, VkFormat format, bool adopted,
-                VkImageLayout initialLayout);
+                VkImageView renderImageView, VmaAllocation allocation, VkFormat format,
+                bool adopted, VkImageLayout initialLayout);
   ~VulkanTexture() override = default;
 
   VkImage image = VK_NULL_HANDLE;
   VkImageView imageView = VK_NULL_HANDLE;
+  VkImageView renderImageView = VK_NULL_HANDLE;
   VmaAllocation allocation = VK_NULL_HANDLE;
   VkFormat format = VK_FORMAT_UNDEFINED;
   VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;

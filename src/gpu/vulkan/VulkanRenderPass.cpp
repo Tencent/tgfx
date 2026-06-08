@@ -119,7 +119,7 @@ VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder, VulkanGPU* gpu
     colorRefs.push_back(
         {static_cast<uint32_t>(attachments.size()), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
     attachments.push_back(attachment);
-    fbAttachments.push_back(vulkanTexture->vulkanImageView());
+    fbAttachments.push_back(vulkanTexture->vulkanRenderImageView());
 
     VkClearValue clearValue = {};
     clearValue.color = {
@@ -154,7 +154,7 @@ VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder, VulkanGPU* gpu
       resolveRefs.push_back(
           {static_cast<uint32_t>(attachments.size()), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
       attachments.push_back(resolveAttachment);
-      fbAttachments.push_back(resolveVulkanTexture->vulkanImageView());
+      fbAttachments.push_back(resolveVulkanTexture->vulkanRenderImageView());
       clearValues.push_back({});
     } else {
       resolveRefs.push_back({VK_ATTACHMENT_UNUSED, VK_IMAGE_LAYOUT_UNDEFINED});
