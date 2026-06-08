@@ -31,7 +31,11 @@ class WebGPUGPU;
 class WebGPUCommandQueue : public CommandQueue {
  public:
   explicit WebGPUCommandQueue(WebGPUGPU* gpu);
-  ~WebGPUCommandQueue() override = default;
+  ~WebGPUCommandQueue() override {
+    if (queue) {
+      wgpuQueueRelease(queue);
+    }
+  }
 
   WGPUQueue webgpuQueue() const {
     return queue;
