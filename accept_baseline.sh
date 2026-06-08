@@ -19,8 +19,42 @@ if [ ! -f "test/out/version.json" ]; then
   exit 1
 fi
 
-echo "Step 1: Accepting version.json..."
-cp test/out/version.json test/baseline/version.json
+echo "Step 1: Merging version.json (update existing keys, add new keys, preserve others)..."
+
+# Merge test/out/version.json INTO test/baseline/version.json:
+#   - Keys present in out: update with new value
+#   - Keys only in baseline: preserve as-is
+#   - Keys only in out: add to baseline
+python3 -c "
+import json
+
+baseline_path = 'test/baseline/version.json'
+out_path = 'test/out/version.json'
+
+with open(baseline_path, 'r') as f:
+    baseline = json.load(f)
+with open(out_path, 'r') as f:
+    out = json.load(f)
+
+# Deep merge: out overwrites baseline at the key level
+for category, keys in out.items():
+    if category not in baseline:
+        baseline[category] = {}
+    for key, value in keys.items():
+        baseline[category][key] = value
+
+# Sort for deterministic output
+sorted_baseline = {}
+for category in sorted(baseline.keys()):
+    sorted_baseline[category] = dict(sorted(baseline[category].items()))
+
+with open(baseline_path, 'w') as f:
+    json.dump(sorted_baseline, f, indent=4)
+    f.write('\n')
+
+print(f'  Merged {sum(len(v) for v in out.values())} keys from out into baseline.')
+print(f'  Baseline now has {sum(len(v) for v in sorted_baseline.values())} total keys.')
+"
 
 # Determine which backends to refresh based on current platform.
 OS=$(uname -s)

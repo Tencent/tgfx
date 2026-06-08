@@ -200,6 +200,8 @@
         "scaled_mipmap": "1b8d95f2",
         "scaled_scale_up": "1b8d95f2",
         "tile_mode_normal": "c5cfce4d",
+        "TileModeFallback": "bf48e614",
+        "hardware_render_target_blend": "bf48e614",
         "tile_mode_rgbaaa": "bf48e614",
         "tile_mode_subset": "c5cfce4d"
     },
