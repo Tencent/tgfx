@@ -755,8 +755,9 @@ AppliedClip OpsCompositor::applyClip(const ClipStack& clipStack) {
     return out;
   }
   clipBounds.roundOut();
-  FlipYIfNeeded(&clipBounds, renderTarget.get());
-  out.scissor = clipBounds;
+  auto scissorBounds = clipBounds;
+  FlipYIfNeeded(&scissorBounds, renderTarget.get());
+  out.scissor = scissorBounds;
 
   // Stage 3: Iterate through valid elements.
   auto& elements = clipStack.elements();
