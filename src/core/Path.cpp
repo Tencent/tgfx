@@ -194,6 +194,11 @@ Rect Path::getBounds() const {
   return pathRef->getBounds();
 }
 
+Rect Path::computeTightBounds() const {
+  auto skRect = pathRef->path.computeTightBounds();
+  return {skRect.fLeft, skRect.fTop, skRect.fRight, skRect.fBottom};
+}
+
 bool Path::isEmpty() const {
   return pathRef->path.isEmpty();
 }

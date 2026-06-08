@@ -115,6 +115,16 @@ class Path {
   Rect getBounds() const;
 
   /**
+   * Returns the axis-aligned extrema (minimum and maximum values) of lines and curves in the Path.
+   * Returns (0, 0, 0, 0) if the Path contains no points. The bounds width and height may be larger
+   * or smaller than the area affected when drawing. Includes Point associated with kMove that
+   * define empty contours. Behaves identically to getBounds() when the Path contains only lines. If
+   * the Path contains curves, the computed bounds includes the maximum extent of the quad, conic, or
+   * cubic; is slower than getBounds(); and unlike getBounds(), does not cache the result.
+   */
+  Rect computeTightBounds() const;
+
+  /**
    * Returns true if Path is empty.
    */
   bool isEmpty() const;
