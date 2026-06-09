@@ -31,6 +31,10 @@ WebGPUDrawableProxy::WebGPUDrawableProxy(Context* context, int width, int height
       _pixelFormat(pixelFormat) {
 }
 
+WebGPUDrawableProxy::~WebGPUDrawableProxy() {
+  releaseDrawable();
+}
+
 Context* WebGPUDrawableProxy::getContext() const {
   return _context;
 }

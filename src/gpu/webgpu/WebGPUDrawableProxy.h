@@ -28,6 +28,8 @@ class WebGPUDrawableProxy : public RenderTargetProxy {
   WebGPUDrawableProxy(Context* context, int width, int height, WGPUSurface surface,
                       WGPUTextureFormat format, PixelFormat pixelFormat);
 
+  ~WebGPUDrawableProxy() override;
+
   Context* getContext() const override;
   int width() const override;
   int height() const override;
