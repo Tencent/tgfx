@@ -36,7 +36,12 @@
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/ShapeStyle.h"
+#include "tgfx/layers/filters/BlurFilter.h"
+#include "tgfx/layers/filters/DropShadowFilter.h"
+#include "tgfx/layers/filters/InnerShadowFilter.h"
+#include "tgfx/layers/filters/NoiseFilter.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
+#include "tgfx/layers/layerstyles/NoiseStyle.h"
 #include "tgfx/pdf/PDFDocument.h"
 #include "tgfx/pdf/PDFMetadata.h"
 #include "tgfx/svg/SVGPathParser.h"
@@ -1269,6 +1274,100 @@ TGFX_TEST(PDFExportTest, PDFStreamOutFallsBackWhenCompressionDoesNotSave) {
                                  "compression path is skipped. declared="
                               << declared << " actual=" << actual;
   EXPECT_EQ(declared, input.size());
+}
+
+TGFX_TEST(PDFExportTest, NoiseFilter) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto fill = Color::FromRGBA(60, 120, 200);
+  constexpr float RectW = 80.f;
+  constexpr float RectH = 80.f;
+  constexpr float GapX = 20.f;
+  constexpr float GapY = 20.f;
+  constexpr float Margin = 40.f;
+  constexpr int Cols = 3;
+  constexpr int Rows = 4;
+
+  auto root = Layer::Make();
+
+  // Helper to create a rect ShapeLayer at (col, row) grid position.
+  auto addRect = [&](int col, int row) {
+    auto shape = ShapeLayer::Make();
+    Path path;
+    path.addRect(Rect::MakeWH(RectW, RectH));
+    shape->setPath(path);
+    shape->setFillStyle(ShapeStyle::Make(fill));
+    float x = Margin + static_cast<float>(col) * (RectW + GapX);
+    float y = Margin + static_cast<float>(row) * (RectH + GapY);
+    shape->setMatrix(Matrix::MakeTrans(x, y));
+    root->addChild(shape);
+    return shape;
+  };
+
+  // Row 1: NoiseFilter only.
+  addRect(0, 0)->setFilters(
+      {NoiseFilter::MakeMono(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128), 42.0f, BlendMode::SrcOver)});
+  addRect(1, 0)->setFilters({NoiseFilter::MakeDuo(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128),
+                                                   Color::FromRGBA(0, 0, 255, 128), 43.0f,
+                                                   BlendMode::SrcOver)});
+  addRect(2, 0)->setFilters({NoiseFilter::MakeMulti(8.0f, 0.5f, 0.5f, 44.0f, BlendMode::SrcOver)});
+
+  // Row 2: NoiseStyle only.
+  addRect(0, 1)->setLayerStyles({NoiseStyle::MakeMono(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128), 42.0f)});
+  addRect(1, 1)->setLayerStyles({NoiseStyle::MakeDuo(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128),
+                                                      Color::FromRGBA(0, 0, 255, 128), 43.0f)});
+  addRect(2, 1)->setLayerStyles({NoiseStyle::MakeMulti(8.0f, 0.5f, 0.5f, 44.0f)});
+
+  // Row 3: Row 1 filters + BlurFilter / InnerShadowFilter / DropShadowFilter.
+  addRect(0, 2)->setFilters(
+      {NoiseFilter::MakeMono(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128), 42.0f, BlendMode::SrcOver),
+       BlurFilter::Make(5.0f, 5.0f)});
+  addRect(1, 2)->setFilters(
+      {NoiseFilter::MakeDuo(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128), Color::FromRGBA(0, 0, 255, 128),
+                            43.0f, BlendMode::SrcOver),
+       InnerShadowFilter::Make(5.0f, 5.0f, 5.0f, 5.0f, Color::Black())});
+  addRect(2, 2)->setFilters(
+      {NoiseFilter::MakeMulti(8.0f, 0.5f, 0.5f, 44.0f, BlendMode::SrcOver),
+       DropShadowFilter::Make(5.0f, 5.0f, 5.0f, 5.0f, Color::Black())});
+
+  // Row 4: Row 2 styles + BlurFilter / InnerShadowFilter / DropShadowFilter.
+  auto r4c0 = addRect(0, 3);
+  r4c0->setLayerStyles({NoiseStyle::MakeMono(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128), 42.0f)});
+  r4c0->setFilters({BlurFilter::Make(5.0f, 5.0f)});
+
+  auto r4c1 = addRect(1, 3);
+  r4c1->setLayerStyles({NoiseStyle::MakeDuo(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128),
+                                             Color::FromRGBA(0, 0, 255, 128), 43.0f)});
+  r4c1->setFilters({InnerShadowFilter::Make(5.0f, 5.0f, 5.0f, 5.0f, Color::Black())});
+
+  auto r4c2 = addRect(2, 3);
+  r4c2->setLayerStyles({NoiseStyle::MakeMulti(8.0f, 0.5f, 0.5f, 44.0f)});
+  r4c2->setFilters({DropShadowFilter::Make(5.0f, 5.0f, 5.0f, 5.0f, Color::Black())});
+
+  // Export PDF.
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  float pageW = Margin * 2 + Cols * RectW + (Cols - 1) * GapX;
+  float pageH = Margin * 2 + Rows * RectH + (Rows - 1) * GapY;
+  auto canvas = document->beginPage(pageW, pageH);
+  root->draw(canvas);
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/NoiseFilter"));
+
+  // Render to surface for webp screenshot.
+  auto bounds = root->getBounds(nullptr, true);
+  auto surface = Surface::Make(context, static_cast<int>(bounds.width() + 100.f),
+                               static_cast<int>(bounds.height() + 100.f));
+  ASSERT_TRUE(surface != nullptr);
+  surface->getCanvas()->clear();
+  surface->getCanvas()->translate(-bounds.left + 50.f, -bounds.top + 50.f);
+  root->draw(surface->getCanvas());
+  EXPECT_TRUE(Baseline::Compare(surface, "PDFExportTest/NoiseFilter"));
 }
 
 }  // namespace tgfx
