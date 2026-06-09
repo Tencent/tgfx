@@ -19,6 +19,7 @@
 #include "WebGPUBuffer.h"
 #include <cstdlib>
 #include <cstring>
+#include "WebGPUCommandQueue.h"
 #include "WebGPUGPU.h"
 #include "WebGPUUtil.h"
 #include "core/utils/Log.h"
@@ -141,9 +142,9 @@ void WebGPUBuffer::unmap() {
     return;
   }
   if (stagingData != nullptr) {
-    auto queue = wgpuDeviceGetQueue(_gpu->device());
-    wgpuQueueWriteBuffer(queue, buffer, stagingOffset, stagingData, stagingSize);
-    wgpuQueueRelease(queue);
+    auto commandQueue = static_cast<WebGPUCommandQueue*>(_gpu->queue());
+    wgpuQueueWriteBuffer(commandQueue->webgpuQueue(), buffer, stagingOffset, stagingData,
+                         stagingSize);
     free(stagingData);
     stagingData = nullptr;
     stagingOffset = 0;
