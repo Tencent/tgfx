@@ -162,6 +162,10 @@ void WebGPUGPU::releaseAll(bool releaseGPU) {
   }
   resources.clear();
   samplerCache.clear();
+  if (releaseGPU && webgpuDevice != nullptr) {
+    wgpuDeviceRelease(webgpuDevice);
+    webgpuDevice = nullptr;
+  }
 }
 
 }  // namespace tgfx
