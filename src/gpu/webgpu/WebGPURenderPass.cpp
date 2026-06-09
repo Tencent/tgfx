@@ -59,15 +59,24 @@ std::shared_ptr<WebGPURenderPass> WebGPURenderPass::Make(WebGPUGPU* gpu, WGPUCom
     auto depthTexture =
         std::static_pointer_cast<WebGPUTexture>(descriptor.depthStencilAttachment.texture);
     depthStencilAttach.view = depthTexture->webgpuTextureView();
-    depthStencilAttach.depthLoadOp = ToWGPULoadOp(descriptor.depthStencilAttachment.loadAction);
-    depthStencilAttach.depthStoreOp = ToWGPUStoreOp(descriptor.depthStencilAttachment.storeAction);
-    depthStencilAttach.depthClearValue = descriptor.depthStencilAttachment.depthClearValue;
-    depthStencilAttach.depthReadOnly = descriptor.depthStencilAttachment.depthReadOnly;
-    depthStencilAttach.stencilLoadOp = ToWGPULoadOp(descriptor.depthStencilAttachment.loadAction);
-    depthStencilAttach.stencilStoreOp =
-        ToWGPUStoreOp(descriptor.depthStencilAttachment.storeAction);
-    depthStencilAttach.stencilClearValue = descriptor.depthStencilAttachment.stencilClearValue;
-    depthStencilAttach.stencilReadOnly = descriptor.depthStencilAttachment.stencilReadOnly;
+    if (descriptor.depthStencilAttachment.depthReadOnly) {
+      depthStencilAttach.depthReadOnly = true;
+      // WebGPU requires loadOp/storeOp to be undefined when read-only.
+    } else {
+      depthStencilAttach.depthLoadOp = ToWGPULoadOp(descriptor.depthStencilAttachment.loadAction);
+      depthStencilAttach.depthStoreOp =
+          ToWGPUStoreOp(descriptor.depthStencilAttachment.storeAction);
+      depthStencilAttach.depthClearValue = descriptor.depthStencilAttachment.depthClearValue;
+    }
+    if (descriptor.depthStencilAttachment.stencilReadOnly) {
+      depthStencilAttach.stencilReadOnly = true;
+      // WebGPU requires loadOp/storeOp to be undefined when read-only.
+    } else {
+      depthStencilAttach.stencilLoadOp = ToWGPULoadOp(descriptor.depthStencilAttachment.loadAction);
+      depthStencilAttach.stencilStoreOp =
+          ToWGPUStoreOp(descriptor.depthStencilAttachment.storeAction);
+      depthStencilAttach.stencilClearValue = descriptor.depthStencilAttachment.stencilClearValue;
+    }
   }
 
   WGPURenderPassDescriptor passDesc = {};

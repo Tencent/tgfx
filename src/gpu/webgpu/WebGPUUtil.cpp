@@ -91,12 +91,16 @@ WGPUVertexFormat ToWGPUVertexFormat(VertexFormat format) {
     case VertexFormat::Int4:
       return WGPUVertexFormat_Sint32x4;
     case VertexFormat::UByteNormalized:
-      LOGE("WebGPU has no Unorm8x1 format; UByteNormalized is not correctly supported, using Unorm8x2");
+      LOGE(
+          "WebGPU has no Unorm8x1 format; UByteNormalized is not correctly supported, using "
+          "Unorm8x2");
       return WGPUVertexFormat_Unorm8x2;
     case VertexFormat::UByte2Normalized:
       return WGPUVertexFormat_Unorm8x2;
     case VertexFormat::UByte3Normalized:
-      LOGE("WebGPU has no Unorm8x3 format; UByte3Normalized is not correctly supported, using Unorm8x4");
+      LOGE(
+          "WebGPU has no Unorm8x3 format; UByte3Normalized is not correctly supported, using "
+          "Unorm8x4");
       return WGPUVertexFormat_Unorm8x4;
     case VertexFormat::UByte4Normalized:
       return WGPUVertexFormat_Unorm8x4;

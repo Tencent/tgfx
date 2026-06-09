@@ -147,8 +147,8 @@ std::shared_ptr<TextureView> WebImageBuffer::onMakeTexture(Context* context, boo
     return nullptr;
   }
   auto glTexture = std::static_pointer_cast<GLTexture>(textureView->getTexture());
-  val::module_property("tgfx").call<void>("uploadToTexture", val::module_property("GL"),
-                                          getImage(), glTexture->textureID(), 0, 0, _alphaOnly);
+  val::module_property("tgfx").call<void>("uploadToTexture", val::module_property("GL"), getImage(),
+                                          glTexture->textureID(), 0, 0, _alphaOnly);
   return textureView;
 #else
   // WebGPU path: read pixels to CPU, premultiply, then create texture from pixel data.
