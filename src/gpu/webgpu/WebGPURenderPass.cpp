@@ -249,7 +249,10 @@ void WebGPURenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount,
   // WebGPU requires topology at pipeline creation time. Select the correct pipeline variant.
   auto topology = ToWGPUPrimitiveTopology(primitiveType);
   auto wgpuPipeline = currentPipeline->webgpuRenderPipeline(topology);
-  wgpuRenderPassEncoderSetPipeline(passEncoder, wgpuPipeline);
+  if (wgpuPipeline != lastBoundPipeline) {
+    wgpuRenderPassEncoderSetPipeline(passEncoder, wgpuPipeline);
+    lastBoundPipeline = wgpuPipeline;
+  }
   updateBindGroup();
   wgpuRenderPassEncoderDraw(passEncoder, vertexCount, instanceCount, firstVertex, firstInstance);
 }
@@ -262,7 +265,10 @@ void WebGPURenderPass::drawIndexed(PrimitiveType primitiveType, uint32_t indexCo
   }
   auto topology = ToWGPUPrimitiveTopology(primitiveType);
   auto wgpuPipeline = currentPipeline->webgpuRenderPipeline(topology);
-  wgpuRenderPassEncoderSetPipeline(passEncoder, wgpuPipeline);
+  if (wgpuPipeline != lastBoundPipeline) {
+    wgpuRenderPassEncoderSetPipeline(passEncoder, wgpuPipeline);
+    lastBoundPipeline = wgpuPipeline;
+  }
   updateBindGroup();
   wgpuRenderPassEncoderDrawIndexed(passEncoder, indexCount, instanceCount, firstIndex, baseVertex,
                                    firstInstance);

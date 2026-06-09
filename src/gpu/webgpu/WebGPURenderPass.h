@@ -89,6 +89,7 @@ class WebGPURenderPass : public RenderPass {
   std::unordered_map<unsigned, TextureBinding> pendingTextures = {};
 
   bool bindGroupDirty = false;
+  WGPURenderPipeline lastBoundPipeline = nullptr;
 };
 
 }  // namespace tgfx
