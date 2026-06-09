@@ -23,6 +23,9 @@
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/gpu/CommandQueue.h"
 #include "tgfx/gpu/GPU.h"
+#ifndef TGFX_USE_WEBGPU
+#include "gpu/opengl/GLTexture.h"
+#endif
 
 using namespace emscripten;
 
@@ -95,16 +98,22 @@ bool WebImageBuffer::uploadToTexture(std::shared_ptr<Texture> texture, CommandQu
   if (texture == nullptr || queue == nullptr || !nativeImage.as<bool>()) {
     return false;
   }
+#ifndef TGFX_USE_WEBGPU
+  // WebGL fast path: upload directly from JS image via texSubImage2D (zero CPU copy).
+  auto glTexture = std::static_pointer_cast<GLTexture>(texture);
+  val::module_property("tgfx").call<void>("uploadToTexture", val::module_property("GL"),
+                                          nativeImage, glTexture->textureID(), offsetX, offsetY,
+                                          _alphaOnly);
+  return true;
+#else
+  // WebGPU path: read pixels to CPU, premultiply, then upload via writeTexture.
   auto pixelData = CopyPixelsFromNativeImage(getImage(), _width, _height);
   if (pixelData == nullptr) {
     return false;
   }
-  // Canvas 2D getImageData returns unpremultiplied RGBA. Convert to the format expected by the
-  // texture (premultiplied, matching the native AtlasUploadTask behavior).
   auto srcInfo = ImageInfo::Make(_width, _height, ColorType::RGBA_8888, AlphaType::Unpremultiplied,
                                  static_cast<size_t>(_width) * 4);
   if (_alphaOnly) {
-    // Target is R8 (alpha-only): convert RGBA unpremul to ALPHA_8.
     auto dstInfo = ImageInfo::Make(_width, _height, ColorType::ALPHA_8, AlphaType::Premultiplied,
                                    static_cast<size_t>(_width));
     Buffer dstBuffer(dstInfo.byteSize());
@@ -113,7 +122,6 @@ bool WebImageBuffer::uploadToTexture(std::shared_ptr<Texture> texture, CommandQu
     auto rect = Rect::MakeXYWH(offsetX, offsetY, _width, _height);
     queue->writeTexture(texture, rect, dstBuffer.data(), static_cast<size_t>(_width));
   } else {
-    // Target is RGBA8: convert unpremultiplied to premultiplied.
     auto dstInfo = ImageInfo::Make(_width, _height, ColorType::RGBA_8888, AlphaType::Premultiplied,
                                    static_cast<size_t>(_width) * 4);
     Buffer dstBuffer(dstInfo.byteSize());
@@ -123,15 +131,31 @@ bool WebImageBuffer::uploadToTexture(std::shared_ptr<Texture> texture, CommandQu
     queue->writeTexture(texture, rect, dstBuffer.data(), static_cast<size_t>(_width) * 4);
   }
   return true;
+#endif
 }
 
 std::shared_ptr<TextureView> WebImageBuffer::onMakeTexture(Context* context, bool mipmapped) const {
+#ifndef TGFX_USE_WEBGPU
+  // WebGL fast path: create texture then upload directly from JS image via texSubImage2D.
+  std::shared_ptr<TextureView> textureView = nullptr;
+  if (_alphaOnly) {
+    textureView = TextureView::MakeAlpha(context, width(), height(), nullptr, 0, mipmapped);
+  } else {
+    textureView = TextureView::MakeRGBA(context, width(), height(), nullptr, 0, mipmapped);
+  }
+  if (textureView == nullptr) {
+    return nullptr;
+  }
+  auto glTexture = std::static_pointer_cast<GLTexture>(textureView->getTexture());
+  val::module_property("tgfx").call<void>("uploadToTexture", val::module_property("GL"),
+                                          getImage(), glTexture->textureID(), 0, 0, _alphaOnly);
+  return textureView;
+#else
+  // WebGPU path: read pixels to CPU, premultiply, then create texture from pixel data.
   auto pixelData = CopyPixelsFromNativeImage(getImage(), _width, _height);
   if (pixelData == nullptr) {
     return nullptr;
   }
-  // Canvas 2D getImageData returns unpremultiplied RGBA. Convert to premultiplied before uploading
-  // to match the native ImageCodec behavior (all GPU texture data must be premultiplied).
   auto srcInfo = ImageInfo::Make(_width, _height, ColorType::RGBA_8888, AlphaType::Unpremultiplied,
                                  static_cast<size_t>(_width) * 4);
   if (_alphaOnly) {
@@ -150,6 +174,7 @@ std::shared_ptr<TextureView> WebImageBuffer::onMakeTexture(Context* context, boo
   srcPixmap.readPixels(dstInfo, dstBuffer.data());
   return TextureView::MakeRGBA(context, _width, _height, dstBuffer.data(),
                                static_cast<size_t>(_width) * 4, mipmapped);
+#endif
 }
 
 emscripten::val WebImageBuffer::getImage() const {
