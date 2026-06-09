@@ -18,6 +18,7 @@
 
 #include "GLSLTiledTextureEffect.h"
 #include "gpu/SamplerState.h"
+#include "gpu/ShaderCaps.h"
 #include "gpu/processors/TextureEffect.h"
 
 namespace tgfx {
@@ -373,22 +374,32 @@ void GLSLTiledTextureEffect::emitCode(EmitArgs& args) const {
       ifStr = "else if";
     }
     if (repeatX) {
+      auto shaderCaps = fragBuilder->shaderCaps();
       if (!(repeatX && repeatY)) {
-        // Read texture outside the conditional to satisfy WGSL uniformity requirements.
-        // When both repeatX and repeatY are true, these reads were already done above.
-        readColor(args, names.dimensionsName, "vec2(repeatCoordX, clampedCoord.y)", repeatReadX);
+        if (shaderCaps->requiresUniformControlFlow) {
+          // Read texture outside the conditional to satisfy WGSL uniformity requirements.
+          readColor(args, names.dimensionsName, "vec2(repeatCoordX, clampedCoord.y)", repeatReadX);
+        }
       }
       fragBuilder->codeAppendf("%s (errX != 0.0) {", ifStr);
+      if (!shaderCaps->requiresUniformControlFlow && !(repeatX && repeatY)) {
+        readColor(args, names.dimensionsName, "vec2(repeatCoordX, clampedCoord.y)", repeatReadX);
+      }
       fragBuilder->codeAppendf("textureColor = mix(textureColor, %s, errX);", repeatReadX);
       fragBuilder->codeAppend("}");
     }
     if (repeatY) {
+      auto shaderCaps = fragBuilder->shaderCaps();
       if (!(repeatX && repeatY)) {
-        // Read texture outside the conditional to satisfy WGSL uniformity requirements.
-        // When both repeatX and repeatY are true, these reads were already done above.
-        readColor(args, names.dimensionsName, "vec2(clampedCoord.x, repeatCoordY)", repeatReadY);
+        if (shaderCaps->requiresUniformControlFlow) {
+          // Read texture outside the conditional to satisfy WGSL uniformity requirements.
+          readColor(args, names.dimensionsName, "vec2(clampedCoord.x, repeatCoordY)", repeatReadY);
+        }
       }
       fragBuilder->codeAppendf("%s (errY != 0.0) {", ifStr);
+      if (!shaderCaps->requiresUniformControlFlow && !(repeatX && repeatY)) {
+        readColor(args, names.dimensionsName, "vec2(clampedCoord.x, repeatCoordY)", repeatReadY);
+      }
       fragBuilder->codeAppendf("textureColor = mix(textureColor, %s, errY);", repeatReadY);
       fragBuilder->codeAppend("}");
     }
