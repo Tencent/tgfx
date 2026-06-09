@@ -99,7 +99,7 @@ void OpsCompositor::fillImageRect(std::shared_ptr<Image> image, const Rect& srcR
   pendingUVRects.emplace_back(drawingAllocator()->make<Rect>(srcRect));
   // For Strict mode, track a per-rect subset rectangle, falling back to srcRect when strictRect is
   // null. The parallel array keeps indices aligned with pendingRects, simplifying flush-time
-  // access. Non-Strict ops never reach the subset path (see flushPendingDraws), so the extra
+  // access. Non-Strict ops never reach the subset path (see flushPendingOps), so the extra
   // memory is harmless.
   if (constraint == SrcRectConstraint::Strict) {
     pendingSubsetRects.emplace_back(

@@ -104,8 +104,7 @@ class DrawTask {
     auto offsetY = (tile->sourceY - tile->tileY) * tileSize;
     _sourceRect.offset(static_cast<float>(offsetX), static_cast<float>(offsetY));
     _tileRect.scale(scale, scale);
-    _strictRect =
-        Rect::MakeXYWH(tile->sourceX * tileSize, tile->sourceY * tileSize, tileSize, tileSize);
+    _strictRect = tile->getSourceRect(tileSize);
   }
 };
 
