@@ -58,6 +58,20 @@ rm -rf "$BUILD_DIR"
 STASH_LIST_BEFORE=$(git stash list)
 git stash push --include-untracked --quiet
 STASH_LIST_AFTER=$(git stash list)
+
+restore_branch() {
+    cd "$PROJECT_ROOT"
+    if [[ $CURRENT_BRANCH == "HEAD" ]]; then
+        git checkout "$CURRENT_COMMIT" --quiet 2>/dev/null || true
+    else
+        git switch "$CURRENT_BRANCH" --quiet 2>/dev/null || true
+    fi
+    if [[ $STASH_LIST_BEFORE != "$STASH_LIST_AFTER" ]]; then
+        git stash pop --index --quiet 2>/dev/null || true
+    fi
+}
+trap restore_branch EXIT
+
 git switch main --quiet
 
 cd "$WEB_TEST_DIR"
@@ -80,15 +94,6 @@ echo "Running web tests on main..."
 node run_test.js --backend="$BACKEND" || true
 
 cd "$PROJECT_ROOT"
-
-if [[ $CURRENT_BRANCH == "HEAD" ]]; then
-    git checkout "$CURRENT_COMMIT" --quiet
-else
-    git switch "$CURRENT_BRANCH" --quiet
-fi
-if [[ $STASH_LIST_BEFORE != "$STASH_LIST_AFTER" ]]; then
-    git stash pop --index --quiet
-fi
 
 echo "~~~~~~~~~~~~~~~~~~~Update Baseline ($BACKEND) Success~~~~~~~~~~~~~~~~~~~~~"
 echo "Baseline cache updated at: test/baseline/.cache/${BACKEND}/"
