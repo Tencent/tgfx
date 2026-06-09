@@ -106,6 +106,16 @@ class WebGPUGPU : public GPU {
 
   void releaseAll(bool releaseGPU);
 
+  struct MipmapPipeline {
+    WGPUShaderModule shaderModule = nullptr;
+    WGPUBindGroupLayout bindGroupLayout = nullptr;
+    WGPUPipelineLayout pipelineLayout = nullptr;
+    WGPURenderPipeline pipeline = nullptr;
+    WGPUSampler sampler = nullptr;
+  };
+
+  const MipmapPipeline* getMipmapPipeline(WGPUTextureFormat format);
+
  private:
   explicit WebGPUGPU(WGPUDevice device);
 
@@ -119,6 +129,7 @@ class WebGPUGPU : public GPU {
   std::list<WebGPUResource*> resources = {};
   std::shared_ptr<ReturnQueue> returnQueue = ReturnQueue::Make();
   std::unordered_map<uint32_t, std::shared_ptr<Sampler>> samplerCache = {};
+  std::unordered_map<uint32_t, MipmapPipeline> mipmapPipelineCache = {};
 };
 
 }  // namespace tgfx

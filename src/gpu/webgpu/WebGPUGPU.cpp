@@ -162,10 +162,108 @@ void WebGPUGPU::releaseAll(bool releaseGPU) {
   }
   resources.clear();
   samplerCache.clear();
+  if (releaseGPU) {
+    for (auto& [_, mp] : mipmapPipelineCache) {
+      if (mp.sampler) wgpuSamplerRelease(mp.sampler);
+      if (mp.pipeline) wgpuRenderPipelineRelease(mp.pipeline);
+      if (mp.pipelineLayout) wgpuPipelineLayoutRelease(mp.pipelineLayout);
+      if (mp.bindGroupLayout) wgpuBindGroupLayoutRelease(mp.bindGroupLayout);
+      if (mp.shaderModule) wgpuShaderModuleRelease(mp.shaderModule);
+    }
+    mipmapPipelineCache.clear();
+  }
   if (releaseGPU && webgpuDevice != nullptr) {
     wgpuDeviceRelease(webgpuDevice);
     webgpuDevice = nullptr;
   }
+}
+
+static const char* MipmapWGSL = R"(
+struct VertexOutput {
+  @builtin(position) position : vec4f,
+  @location(0) texCoord : vec2f,
+};
+@vertex
+fn vs_main(@builtin(vertex_index) vertexIndex : u32) -> VertexOutput {
+  var pos = array<vec2f, 3>(vec2f(-1.0, -3.0), vec2f(-1.0, 1.0), vec2f(3.0, 1.0));
+  var uv = array<vec2f, 3>(vec2f(0.0, 2.0), vec2f(0.0, 0.0), vec2f(2.0, 0.0));
+  var output : VertexOutput;
+  output.position = vec4f(pos[vertexIndex], 0.0, 1.0);
+  output.texCoord = uv[vertexIndex];
+  return output;
+}
+@group(0) @binding(0) var inputTexture : texture_2d<f32>;
+@group(0) @binding(1) var inputSampler : sampler;
+@fragment
+fn fs_main(@location(0) texCoord : vec2f) -> @location(0) vec4f {
+  return textureSample(inputTexture, inputSampler, texCoord);
+}
+)";
+
+const WebGPUGPU::MipmapPipeline* WebGPUGPU::getMipmapPipeline(WGPUTextureFormat format) {
+  auto key = static_cast<uint32_t>(format);
+  auto it = mipmapPipelineCache.find(key);
+  if (it != mipmapPipelineCache.end()) {
+    return &it->second;
+  }
+  MipmapPipeline mp = {};
+  WGPUShaderModuleWGSLDescriptor wgslDesc = {};
+  wgslDesc.chain.sType = WGPUSType_ShaderModuleWGSLDescriptor;
+  wgslDesc.code = MipmapWGSL;
+  WGPUShaderModuleDescriptor shaderDesc = {};
+  shaderDesc.nextInChain = &wgslDesc.chain;
+  mp.shaderModule = wgpuDeviceCreateShaderModule(webgpuDevice, &shaderDesc);
+  if (mp.shaderModule == nullptr) {
+    return nullptr;
+  }
+  WGPUBindGroupLayoutEntry bglEntries[2] = {};
+  bglEntries[0].binding = 0;
+  bglEntries[0].visibility = WGPUShaderStage_Fragment;
+  bglEntries[0].texture.sampleType = WGPUTextureSampleType_Float;
+  bglEntries[0].texture.viewDimension = WGPUTextureViewDimension_2D;
+  bglEntries[1].binding = 1;
+  bglEntries[1].visibility = WGPUShaderStage_Fragment;
+  bglEntries[1].sampler.type = WGPUSamplerBindingType_Filtering;
+  WGPUBindGroupLayoutDescriptor bglDesc = {};
+  bglDesc.entryCount = 2;
+  bglDesc.entries = bglEntries;
+  mp.bindGroupLayout = wgpuDeviceCreateBindGroupLayout(webgpuDevice, &bglDesc);
+  WGPUPipelineLayoutDescriptor plDesc = {};
+  plDesc.bindGroupLayoutCount = 1;
+  plDesc.bindGroupLayouts = &mp.bindGroupLayout;
+  mp.pipelineLayout = wgpuDeviceCreatePipelineLayout(webgpuDevice, &plDesc);
+  WGPUColorTargetState colorTarget = {};
+  colorTarget.format = format;
+  colorTarget.writeMask = WGPUColorWriteMask_All;
+  WGPUFragmentState fragmentState = {};
+  fragmentState.module = mp.shaderModule;
+  fragmentState.entryPoint = "fs_main";
+  fragmentState.targetCount = 1;
+  fragmentState.targets = &colorTarget;
+  WGPURenderPipelineDescriptor rpDesc = {};
+  rpDesc.layout = mp.pipelineLayout;
+  rpDesc.vertex.module = mp.shaderModule;
+  rpDesc.vertex.entryPoint = "vs_main";
+  rpDesc.primitive.topology = WGPUPrimitiveTopology_TriangleList;
+  rpDesc.fragment = &fragmentState;
+  rpDesc.multisample.count = 1;
+  rpDesc.multisample.mask = 0xFFFFFFFF;
+  mp.pipeline = wgpuDeviceCreateRenderPipeline(webgpuDevice, &rpDesc);
+  if (mp.pipeline == nullptr) {
+    wgpuPipelineLayoutRelease(mp.pipelineLayout);
+    wgpuBindGroupLayoutRelease(mp.bindGroupLayout);
+    wgpuShaderModuleRelease(mp.shaderModule);
+    return nullptr;
+  }
+  WGPUSamplerDescriptor samplerDesc = {};
+  samplerDesc.minFilter = WGPUFilterMode_Linear;
+  samplerDesc.magFilter = WGPUFilterMode_Linear;
+  samplerDesc.mipmapFilter = WGPUMipmapFilterMode_Nearest;
+  samplerDesc.addressModeU = WGPUAddressMode_ClampToEdge;
+  samplerDesc.addressModeV = WGPUAddressMode_ClampToEdge;
+  mp.sampler = wgpuDeviceCreateSampler(webgpuDevice, &samplerDesc);
+  mipmapPipelineCache[key] = mp;
+  return &mipmapPipelineCache[key];
 }
 
 }  // namespace tgfx

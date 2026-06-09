@@ -26,41 +26,6 @@
 #include "WebGPUUtil.h"
 #include "core/utils/Log.h"
 
-// WGSL shader for mipmap generation via fullscreen triangle + bilinear sampling.
-static const char* MipmapWGSL = R"(
-struct VertexOutput {
-  @builtin(position) position : vec4f,
-  @location(0) texCoord : vec2f,
-};
-
-@vertex
-fn vs_main(@builtin(vertex_index) vertexIndex : u32) -> VertexOutput {
-  // Fullscreen triangle: 3 vertices cover the entire screen.
-  var pos = array<vec2f, 3>(
-    vec2f(-1.0, -3.0),
-    vec2f(-1.0,  1.0),
-    vec2f( 3.0,  1.0)
-  );
-  var uv = array<vec2f, 3>(
-    vec2f(0.0, 2.0),
-    vec2f(0.0, 0.0),
-    vec2f(2.0, 0.0)
-  );
-  var output : VertexOutput;
-  output.position = vec4f(pos[vertexIndex], 0.0, 1.0);
-  output.texCoord = uv[vertexIndex];
-  return output;
-}
-
-@group(0) @binding(0) var inputTexture : texture_2d<f32>;
-@group(0) @binding(1) var inputSampler : sampler;
-
-@fragment
-fn fs_main(@location(0) texCoord : vec2f) -> @location(0) vec4f {
-  return textureSample(inputTexture, inputSampler, texCoord);
-}
-)";
-
 namespace tgfx {
 
 std::shared_ptr<WebGPUCommandEncoder> WebGPUCommandEncoder::Make(WebGPUGPU* gpu) {
@@ -150,75 +115,16 @@ void WebGPUCommandEncoder::generateMipmapsForTexture(std::shared_ptr<Texture> te
   if (mipLevelCount <= 1) {
     return;
   }
-  auto device = _gpu->device();
   auto format = webgpuTexture->webgpuFormat();
-
-  // Create WGSL shader module.
-  WGPUShaderModuleWGSLDescriptor wgslDesc = {};
-  wgslDesc.chain.sType = WGPUSType_ShaderModuleWGSLDescriptor;
-  wgslDesc.code = MipmapWGSL;
-  WGPUShaderModuleDescriptor shaderDesc = {};
-  shaderDesc.nextInChain = &wgslDesc.chain;
-  auto shaderModule = wgpuDeviceCreateShaderModule(device, &shaderDesc);
-  if (shaderModule == nullptr) {
-    LOGE("generateMipmapsForTexture: failed to create mipmap shader module.");
+  auto mipmapPipeline = _gpu->getMipmapPipeline(format);
+  if (mipmapPipeline == nullptr) {
+    LOGE("generateMipmapsForTexture: failed to get mipmap pipeline.");
     return;
   }
-
-  // Create bind group layout: texture + sampler.
-  WGPUBindGroupLayoutEntry bglEntries[2] = {};
-  bglEntries[0].binding = 0;
-  bglEntries[0].visibility = WGPUShaderStage_Fragment;
-  bglEntries[0].texture.sampleType = WGPUTextureSampleType_Float;
-  bglEntries[0].texture.viewDimension = WGPUTextureViewDimension_2D;
-  bglEntries[1].binding = 1;
-  bglEntries[1].visibility = WGPUShaderStage_Fragment;
-  bglEntries[1].sampler.type = WGPUSamplerBindingType_Filtering;
-  WGPUBindGroupLayoutDescriptor bglDesc = {};
-  bglDesc.entryCount = 2;
-  bglDesc.entries = bglEntries;
-  auto bindGroupLayout = wgpuDeviceCreateBindGroupLayout(device, &bglDesc);
-
-  // Create pipeline layout.
-  WGPUPipelineLayoutDescriptor plDesc = {};
-  plDesc.bindGroupLayoutCount = 1;
-  plDesc.bindGroupLayouts = &bindGroupLayout;
-  auto pipelineLayout = wgpuDeviceCreatePipelineLayout(device, &plDesc);
-
-  // Create render pipeline.
-  WGPUColorTargetState colorTarget = {};
-  colorTarget.format = format;
-  colorTarget.writeMask = WGPUColorWriteMask_All;
-  WGPUFragmentState fragmentState = {};
-  fragmentState.module = shaderModule;
-  fragmentState.entryPoint = "fs_main";
-  fragmentState.targetCount = 1;
-  fragmentState.targets = &colorTarget;
-  WGPURenderPipelineDescriptor rpDesc = {};
-  rpDesc.layout = pipelineLayout;
-  rpDesc.vertex.module = shaderModule;
-  rpDesc.vertex.entryPoint = "vs_main";
-  rpDesc.primitive.topology = WGPUPrimitiveTopology_TriangleList;
-  rpDesc.fragment = &fragmentState;
-  rpDesc.multisample.count = 1;
-  rpDesc.multisample.mask = 0xFFFFFFFF;
-  auto pipeline = wgpuDeviceCreateRenderPipeline(device, &rpDesc);
-  if (pipeline == nullptr) {
-    LOGE("generateMipmapsForTexture: failed to create mipmap render pipeline.");
-    wgpuPipelineLayoutRelease(pipelineLayout);
-    wgpuBindGroupLayoutRelease(bindGroupLayout);
-    wgpuShaderModuleRelease(shaderModule);
-    return;
-  }
-
-  // Create a linear sampler for downsampling.
-  WGPUSamplerDescriptor samplerDesc = {};
-  samplerDesc.minFilter = WGPUFilterMode_Linear;
-  samplerDesc.magFilter = WGPUFilterMode_Linear;
-  samplerDesc.mipmapFilter = WGPUMipmapFilterMode_Nearest;
-  samplerDesc.addressModeU = WGPUAddressMode_ClampToEdge;
-  samplerDesc.addressModeV = WGPUAddressMode_ClampToEdge;
-  auto sampler = wgpuDeviceCreateSampler(device, &samplerDesc);
+  auto device = _gpu->device();
+  auto pipeline = mipmapPipeline->pipeline;
+  auto bindGroupLayout = mipmapPipeline->bindGroupLayout;
+  auto sampler = mipmapPipeline->sampler;
 
   // Generate each mip level by rendering from the previous level.
   for (int level = 1; level < mipLevelCount; level++) {
@@ -276,13 +182,6 @@ void WebGPUCommandEncoder::generateMipmapsForTexture(std::shared_ptr<Texture> te
     wgpuTextureViewRelease(srcView);
     wgpuTextureViewRelease(dstView);
   }
-
-  // Cleanup.
-  wgpuSamplerRelease(sampler);
-  wgpuRenderPipelineRelease(pipeline);
-  wgpuPipelineLayoutRelease(pipelineLayout);
-  wgpuBindGroupLayoutRelease(bindGroupLayout);
-  wgpuShaderModuleRelease(shaderModule);
 }
 
 std::shared_ptr<CommandBuffer> WebGPUCommandEncoder::onFinish() {
