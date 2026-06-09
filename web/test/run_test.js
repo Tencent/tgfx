@@ -84,18 +84,22 @@ async function run() {
   let testExitCode = 1;
 
   try {
+    const launchArgs = [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--enable-unsafe-webgpu',
+      '--enable-features=Vulkan,UseSkiaRenderer,WebGPU',
+      '--experimental-wasm-stack-switching',
+    ];
+    if (process.platform === 'darwin') {
+      launchArgs.push('--use-gl=angle', '--use-angle=metal');
+    }
+    if (process.platform === 'linux') {
+      launchArgs.push('--disable-dev-shm-usage');
+    }
     browser = await puppeteer.launch({
-      headless: 'new',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--use-gl=angle',
-        '--use-angle=metal',
-        '--enable-webgl2-compute-context',
-        '--enable-unsafe-webgpu',
-        '--enable-features=Vulkan,UseSkiaRenderer,WebGPU',
-        '--experimental-wasm-stack-switching',
-      ],
+      headless: true,
+      args: launchArgs,
     });
 
     const page = await browser.newPage();
