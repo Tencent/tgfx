@@ -39,7 +39,7 @@ class TextureGradientColorizer : public FragmentProcessor {
   }
 
   size_t onCountTextureSamplers() const override {
-    return 1;
+    return gradient->getTextureView() ? 1 : 0;
   }
 
   std::shared_ptr<Texture> onTextureAt(size_t) const override {
