@@ -101,7 +101,10 @@ void WebGPUDrawableProxy::releaseDrawable() {
     wgpuTextureViewRelease(_surfaceTextureView);
     _surfaceTextureView = nullptr;
   }
-  _surfaceTexture = nullptr;
+  if (_surfaceTexture != nullptr) {
+    wgpuTextureRelease(_surfaceTexture);
+    _surfaceTexture = nullptr;
+  }
   _renderTarget = nullptr;
 }
 
