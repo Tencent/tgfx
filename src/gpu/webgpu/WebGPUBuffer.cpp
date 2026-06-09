@@ -79,8 +79,10 @@ EM_ASYNC_JS(int, webgpu_buffer_map_sync, (WGPUBuffer bufHandle, size_t size), {
 });
 #else
 static void OnBufferMapped(WGPUBufferMapAsyncStatus status, void* userdata) {
-  auto ready = static_cast<bool*>(userdata);
-  *ready = (status == WGPUBufferMapAsyncStatus_Success);
+  if (status != WGPUBufferMapAsyncStatus_Success || userdata == nullptr) {
+    return;
+  }
+  *static_cast<bool*>(userdata) = true;
 }
 #endif
 
@@ -155,6 +157,7 @@ void WebGPUBuffer::onRelease(WebGPUGPU*) {
     stagingData = nullptr;
   }
   if (buffer != nullptr) {
+    wgpuBufferDestroy(buffer);
     wgpuBufferRelease(buffer);
     buffer = nullptr;
   }
