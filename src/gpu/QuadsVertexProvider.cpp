@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "QuadsVertexProvider.h"
+#include <cstring>
 #include <optional>
 #include "core/ColorSpaceXformSteps.h"
 #include "core/utils/ColorHelper.h"
@@ -391,11 +392,11 @@ static inline void ComputeAAVerticesDegenerate(const Vertices4& vertices, const 
  * @param coord The 4 vertices of the quad in Z-order.
  * @param coverage Coverage value for AA (1.0 for inner, 0.0 for outer).
  * @param uvCoord Optional UV coordinates for texture mapping.
- * @param color Optional compressed color value to write.
+ * @param color Optional packed uint32 color value to write.
  */
 static inline void WriteQuadVertices(float* vertices, size_t& index, const Vertices4& coord,
                                      float coverage, const std::optional<Vertices4>& uvCoord,
-                                     const std::optional<float>& color) {
+                                     const std::optional<uint32_t>& color) {
   for (int i = 0; i < 4; ++i) {
     vertices[index++] = coord.xs[i];
     vertices[index++] = coord.ys[i];
@@ -405,7 +406,7 @@ static inline void WriteQuadVertices(float* vertices, size_t& index, const Verti
       vertices[index++] = uvCoord->ys[i];
     }
     if (color) {
-      vertices[index++] = *color;
+      std::memcpy(&vertices[index++], &*color, sizeof(*color));
     }
   }
 }
@@ -444,10 +445,9 @@ class NonAAQuadsVertexProvider : public QuadsVertexProvider {
     }
     for (size_t i = 0; i < quads.size(); ++i) {
       auto& record = quads[i];
-      float compressedColor = 0.f;
+      uint32_t uintColor = 0;
       if (_hasColor) {
-        const auto uintColor = ToUintPMColor(record->color, steps.get());
-        compressedColor = *reinterpret_cast<const float*>(&uintColor);
+        uintColor = ToUintPMColor(record->color, steps.get());
       }
       auto transformedQuad = record->quad;
       transformedQuad.transform(record->matrix);
@@ -461,7 +461,7 @@ class NonAAQuadsVertexProvider : public QuadsVertexProvider {
           vertices[index++] = uv.y;
         }
         if (_hasColor) {
-          vertices[index++] = compressedColor;
+          std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
         }
       }
     }
@@ -546,10 +546,9 @@ class AAQuadsVertexProvider : public QuadsVertexProvider {
       }
     }
 
-    std::optional<float> color = std::nullopt;
+    std::optional<uint32_t> color = std::nullopt;
     if (_hasColor) {
-      const auto uintColor = ToUintPMColor(record.color, steps);
-      color = *reinterpret_cast<const float*>(&uintColor);
+      color = ToUintPMColor(record.color, steps);
     }
 
     WriteQuadVertices(vertices, index, insetCoord, 1.0f, insetUV, color);
