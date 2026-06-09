@@ -74,6 +74,8 @@ std::shared_ptr<RenderTarget> WebGPUDrawableProxy::getRenderTarget() const {
     _surfaceTexture = surfaceTexture.texture;
     _surfaceTextureView = wgpuTextureCreateView(_surfaceTexture, nullptr);
     if (_surfaceTextureView == nullptr) {
+      wgpuTextureRelease(_surfaceTexture);
+      _surfaceTexture = nullptr;
       return nullptr;
     }
     WebGPUTextureInfo textureInfo = {};
