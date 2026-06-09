@@ -214,17 +214,20 @@ export class ScalerContext {
             provider.releaseCanvas2D(canvas);
             return null;
         }
+        context.setTransform(1, 0, 0, 1, 0, 0);
         context.clearRect(0, 0, width, height);
         context.font = this.fontString(fauxBold, false);
+        context.setTransform(this.textScale, 0, 0, this.textScale, -bounds.left, -bounds.top);
         if (stroke){
             context.lineJoin = ScalerContext.getLineJoin(stroke.join);
             context.miterLimit = stroke.miterLimit;
             context.lineCap = ScalerContext.getLineCap(stroke.cap);
-            context.lineWidth = stroke.width;
-            context.strokeText(text, -bounds.left, -bounds.top);
+            context.lineWidth = stroke.width / this.textScale;
+            context.strokeText(text, 0, 0);
         } else {
-            context.fillText(text, -bounds.left, -bounds.top);
+            context.fillText(text, 0, 0);
         }
+        context.setTransform(1, 0, 0, 1, 0, 0);
         const {data} = context.getImageData(0, 0, width, height);
         provider.releaseCanvas2D(canvas);
         return new Uint8Array(data);
@@ -257,19 +260,23 @@ export class ScalerContext {
             provider.releaseCanvas2D(canvas);
             return null;
         }
+        context.setTransform(1, 0, 0, 1, 0, 0);
         context.clearRect(0, 0, width, height);
         context.font = this.fontString(fauxBold, false);
+        context.setTransform(
+            this.textScale, 0, 0, this.textScale, padding - bounds.left, padding - bounds.top);
         if (stroke) {
             context.strokeStyle = "#FFFFFF";
             context.lineJoin = ScalerContext.getLineJoin(stroke.join);
             context.miterLimit = stroke.miterLimit;
             context.lineCap = ScalerContext.getLineCap(stroke.cap);
-            context.lineWidth = stroke.width;
-            context.strokeText(text, -bounds.left + padding, -bounds.top + padding);
+            context.lineWidth = stroke.width / this.textScale;
+            context.strokeText(text, 0, 0);
         } else {
             context.fillStyle = "#FFFFFF";
-            context.fillText(text, -bounds.left + padding, -bounds.top + padding);
+            context.fillText(text, 0, 0);
         }
+        context.setTransform(1, 0, 0, 1, 0, 0);
         return canvas;
     }
 
