@@ -106,7 +106,7 @@ BackendTexture WebGPUTexture::getBackendTexture() const {
   WebGPUTextureInfo info = {};
   info.texture = texture;
   info.textureView = textureView;
-  info.format = static_cast<unsigned>(wgpuFormat);
+  info.format = static_cast<uint32_t>(wgpuFormat);
   return {info, descriptor.width, descriptor.height};
 }
 
@@ -117,7 +117,7 @@ BackendRenderTarget WebGPUTexture::getBackendRenderTarget() const {
   WebGPUTextureInfo info = {};
   info.texture = texture;
   info.textureView = textureView;
-  info.format = static_cast<unsigned>(wgpuFormat);
+  info.format = static_cast<uint32_t>(wgpuFormat);
   return {info, descriptor.width, descriptor.height};
 }
 

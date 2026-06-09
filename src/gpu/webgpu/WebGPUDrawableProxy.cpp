@@ -79,7 +79,7 @@ std::shared_ptr<RenderTarget> WebGPUDrawableProxy::getRenderTarget() const {
     WebGPUTextureInfo textureInfo = {};
     textureInfo.texture = _surfaceTexture;
     textureInfo.textureView = _surfaceTextureView;
-    textureInfo.format = static_cast<unsigned>(_wgpuFormat);
+    textureInfo.format = static_cast<uint32_t>(_wgpuFormat);
     auto textureWidth = static_cast<int>(wgpuTextureGetWidth(_surfaceTexture));
     auto textureHeight = static_cast<int>(wgpuTextureGetHeight(_surfaceTexture));
     BackendRenderTarget backendRT(textureInfo, textureWidth, textureHeight);

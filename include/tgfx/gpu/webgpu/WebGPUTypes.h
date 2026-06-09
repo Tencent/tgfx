@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cstdint>
+#include <type_traits>
 
 namespace tgfx {
 /**
@@ -36,10 +37,15 @@ struct WebGPUTextureInfo {
   const void* textureView = nullptr;
 
   /**
-   * The pixel format of this texture (WGPUTextureFormat value).
+   * The pixel format of this texture (WGPUTextureFormat value). Must be explicitly set by the
+   * caller. Default 0 means unspecified.
    */
-  unsigned format = 0x12;  // WGPUTextureFormat_RGBA8Unorm
+  uint32_t format = 0;
 };
+
+static_assert(std::is_trivially_copyable_v<WebGPUTextureInfo> &&
+                  std::is_standard_layout_v<WebGPUTextureInfo>,
+              "WebGPUTextureInfo must be trivially copyable and standard layout for union usage.");
 
 /**
  * Types for interacting with WebGPU sync objects. WebGPU has no cross-queue synchronization, so
