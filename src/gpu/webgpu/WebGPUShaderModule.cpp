@@ -210,8 +210,7 @@ std::shared_ptr<WebGPUShaderModule> WebGPUShaderModule::Make(
 }
 
 WebGPUShaderModule::WebGPUShaderModule(WebGPUGPU* gpu, const ShaderModuleDescriptor& descriptor)
-    : _stage(descriptor.stage),
-      _glslCode(descriptor.stage == ShaderStage::Fragment ? descriptor.code : std::string{}) {
+    : _stage(descriptor.stage) {
   compileShader(gpu->device(), descriptor.code, descriptor.stage);
 }
 

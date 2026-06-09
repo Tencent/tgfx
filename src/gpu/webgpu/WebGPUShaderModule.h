@@ -42,10 +42,6 @@ class WebGPUShaderModule : public ShaderModule, public WebGPUResource {
     return _stage;
   }
 
-  const std::string& glslCode() const {
-    return _glslCode;
-  }
-
   void onRelease(WebGPUGPU* gpu) override;
 
  private:
@@ -55,7 +51,6 @@ class WebGPUShaderModule : public ShaderModule, public WebGPUResource {
 
   WGPUShaderModule shaderModule = nullptr;
   ShaderStage _stage = ShaderStage::Vertex;
-  std::string _glslCode;
 
   friend class WebGPUGPU;
 };
