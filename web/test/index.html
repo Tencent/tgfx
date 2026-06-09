@@ -76,6 +76,7 @@
             }
         }
 
+        try {
         const module = await TGFXTest(moduleOptions);
         TGFXBind(module);
         // Patch missing setColorSpace (tgfx.esm.js is out of date with tgfx.ts source).
@@ -120,6 +121,10 @@
             }
         } catch (e) {
             console.warn('Failed to create cache-web.zip:', e);
+        }
+        } catch (e) {
+            console.error('Test execution failed:', e);
+            console.log('All tests finished with exit code: 1');
         }
     </script>
 </body>
