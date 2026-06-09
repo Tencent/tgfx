@@ -96,8 +96,9 @@ void WebGPUCommandQueue::waitSemaphore(std::shared_ptr<Semaphore>) {
 }
 
 void WebGPUCommandQueue::waitUntilCompleted() {
-  // WebGPU is asynchronous by design. In Emscripten single-threaded mode,
-  // all submitted work completes before the next event loop iteration.
+  // No-op: WebGPU has no synchronous GPU fence API. Callers that need to wait for GPU completion
+  // (e.g., readback) must use requestMapAsync() + Asyncify which implicitly waits for submitted
+  // work to finish before the buffer becomes mappable.
 }
 
 }  // namespace tgfx
