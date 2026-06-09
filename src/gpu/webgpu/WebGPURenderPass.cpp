@@ -154,6 +154,7 @@ void WebGPURenderPass::setPipeline(std::shared_ptr<RenderPipeline> pipeline) {
     return;
   }
   wgpuRenderPassEncoderSetPipeline(passEncoder, currentPipeline->webgpuRenderPipeline());
+  lastBoundPipeline = currentPipeline->webgpuRenderPipeline();
   pendingUniforms.clear();
   pendingTextures.clear();
   bindGroupDirty = true;
