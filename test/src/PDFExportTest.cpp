@@ -1276,7 +1276,7 @@ TGFX_TEST(PDFExportTest, PDFStreamOutFallsBackWhenCompressionDoesNotSave) {
   EXPECT_EQ(declared, input.size());
 }
 
-TGFX_TEST(PDFExportTest, NoiseFilter) {
+TGFX_TEST(PDFExportTest, NoiseEffects) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -1357,7 +1357,7 @@ TGFX_TEST(PDFExportTest, NoiseFilter) {
   document->close();
   PDFStream->flush();
 
-  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/NoiseFilter"));
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/NoiseEffects"));
 
   // Render to surface for webp screenshot.
   auto bounds = root->getBounds(nullptr, true);
@@ -1367,7 +1367,7 @@ TGFX_TEST(PDFExportTest, NoiseFilter) {
   surface->getCanvas()->clear();
   surface->getCanvas()->translate(-bounds.left + 50.f, -bounds.top + 50.f);
   root->draw(surface->getCanvas());
-  EXPECT_TRUE(Baseline::Compare(surface, "PDFExportTest/NoiseFilter"));
+  EXPECT_TRUE(Baseline::Compare(surface, "PDFExportTest/NoiseEffects"));
 }
 
 }  // namespace tgfx

@@ -340,10 +340,9 @@
         "rasterize_path_texture": "c475bfb"
     },
     "PDFExportTest": {
-        "NoiseFilter": "856112db"
+        "NoiseEffects": "856112db"
     },
     "PDFTest": {
-        "AssignColorSpace": "bf721f63",
         "BitmapMask": "bf721f63",
         "Complex": "bf721f63",
         "DrawColor": "bf721f63",
@@ -372,7 +371,7 @@
         "LayerLinearGradient": "bf721f63",
         "LayerRadialGradient": "bf721f63",
         "LinearGradientWhiteAlpha": "bf721f63",
-        "NoiseFilter": "856112db",
+        "NoiseEffects": "856112db",
         "NonRegularBlendMode": "bf721f63",
         "SimpleText": "bf721f63",
         "SrcBlendOverlap": "bf721f63"
