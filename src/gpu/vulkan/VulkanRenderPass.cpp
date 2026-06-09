@@ -189,7 +189,7 @@ VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder, VulkanGPU* gpu
     depthRef = {static_cast<uint32_t>(attachments.size()),
                 VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
     attachments.push_back(depthAttachment);
-    fbAttachments.push_back(dsTexture->vulkanImageView());
+    fbAttachments.push_back(dsTexture->vulkanRenderImageView());
 
     VkClearValue dsClear = {};
     dsClear.depthStencil = {passDescriptor.depthStencilAttachment.depthClearValue,
