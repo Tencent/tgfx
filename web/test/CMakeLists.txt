@@ -29,12 +29,12 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/vendor_tools/vendor.cmake)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../.. ./tgfx)
 
 # Collect test sources (reuse existing tests)
-file(GLOB_RECURSE TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/*.*)
+file(GLOB_RECURSE TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/*.*)
 
 # Exclude platform-specific directories
-file(GLOB_RECURSE TEST_METAL_FILES ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/metal/*.*)
-file(GLOB_RECURSE TEST_OPENGL_FILES ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/opengl/*.*)
-file(GLOB_RECURSE TEST_VULKAN_FILES ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/vulkan/*.*)
+file(GLOB_RECURSE TEST_METAL_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/metal/*.*)
+file(GLOB_RECURSE TEST_OPENGL_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/opengl/*.*)
+file(GLOB_RECURSE TEST_VULKAN_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/vulkan/*.*)
 if (TEST_METAL_FILES)
     list(REMOVE_ITEM TEST_SOURCES ${TEST_METAL_FILES})
 endif ()
@@ -47,18 +47,18 @@ endif ()
 
 # Include backend-specific test sources
 if (TGFX_USE_WEBGPU)
-    file(GLOB_RECURSE TEST_WEBGL_FILES ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/webgl/*.*)
+    file(GLOB_RECURSE TEST_WEBGL_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/webgl/*.*)
     if (TEST_WEBGL_FILES)
         list(REMOVE_ITEM TEST_SOURCES ${TEST_WEBGL_FILES})
     endif ()
-    file(GLOB_RECURSE TEST_WEBGPU_FILES ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/webgpu/*.*)
+    file(GLOB_RECURSE TEST_WEBGPU_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/webgpu/*.*)
     list(APPEND TEST_SOURCES ${TEST_WEBGPU_FILES})
 else ()
-    file(GLOB_RECURSE TEST_WEBGPU_FILES ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/webgpu/*.*)
+    file(GLOB_RECURSE TEST_WEBGPU_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/webgpu/*.*)
     if (TEST_WEBGPU_FILES)
         list(REMOVE_ITEM TEST_SOURCES ${TEST_WEBGPU_FILES})
     endif ()
-    file(GLOB_RECURSE TEST_WEBGL_FILES ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/webgl/*.*)
+    file(GLOB_RECURSE TEST_WEBGL_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/webgl/*.*)
     list(APPEND TEST_SOURCES ${TEST_WEBGL_FILES})
 endif ()
 
@@ -80,7 +80,7 @@ if (TEST_EXCLUDE_FILES)
 endif ()
 
 # Web test adapter sources
-file(GLOB WEB_TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
+file(GLOB WEB_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 
 # Build Google Test and harfbuzz
 add_vendor_target(test-vendor STATIC_VENDORS harfbuzz googletest CONFIG_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../..)
