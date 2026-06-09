@@ -31,6 +31,7 @@ using namespace emscripten;
 
 namespace tgfx {
 
+#ifdef TGFX_USE_WEBGPU
 static std::shared_ptr<Data> CopyPixelsFromNativeImage(const val& nativeImage, int width,
                                                        int height) {
   auto data = val::module_property("tgfx").call<val>(
@@ -52,6 +53,7 @@ static std::shared_ptr<Data> CopyPixelsFromNativeImage(const val& nativeImage, i
   memoryView.call<void>("set", data);
   return buffer.release();
 }
+#endif
 
 std::shared_ptr<WebImageBuffer> WebImageBuffer::MakeFrom(emscripten::val nativeImage) {
   if (!nativeImage.as<bool>()) {
