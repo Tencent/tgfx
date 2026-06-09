@@ -138,8 +138,9 @@ void WebGPURenderPass::setPipeline(std::shared_ptr<RenderPipeline> pipeline) {
   }
   currentPipeline = std::static_pointer_cast<WebGPURenderPipeline>(pipeline);
   if (currentPipeline->webgpuRenderPipeline() == nullptr) {
-    LOGE("[WebGPU RenderPass] setPipeline FAILED: webgpuRenderPipeline is null (shader compile "
-         "failed)");
+    LOGE(
+        "[WebGPU RenderPass] setPipeline FAILED: webgpuRenderPipeline is null (shader compile "
+        "failed)");
     currentPipeline = nullptr;
     return;
   }
@@ -242,8 +243,8 @@ void WebGPURenderPass::updateBindGroup() {
 void WebGPURenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount,
                             uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) {
   if (passEncoder == nullptr || currentPipeline == nullptr) {
-    LOGE("[WebGPU Draw] SKIPPED: encoder=%p pipeline=%p",
-         static_cast<void*>(passEncoder), static_cast<void*>(currentPipeline.get()));
+    LOGE("[WebGPU Draw] SKIPPED: encoder=%p pipeline=%p", static_cast<void*>(passEncoder),
+         static_cast<void*>(currentPipeline.get()));
     return;
   }
   // WebGPU requires topology at pipeline creation time. Select the correct pipeline variant.
