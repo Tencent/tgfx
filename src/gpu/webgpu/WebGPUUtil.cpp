@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "WebGPUUtil.h"
+#include "core/utils/Log.h"
 #include "tgfx/gpu/ColorWriteMask.h"
 #include "tgfx/gpu/GPUBuffer.h"
 #include "tgfx/gpu/Texture.h"
@@ -72,10 +73,12 @@ WGPUVertexFormat ToWGPUVertexFormat(VertexFormat format) {
     case VertexFormat::Float4:
       return WGPUVertexFormat_Float32x4;
     case VertexFormat::Half:
+      LOGE("WebGPU has no Float16x1 format; Half is not correctly supported, using Float16x2");
       return WGPUVertexFormat_Float16x2;
     case VertexFormat::Half2:
       return WGPUVertexFormat_Float16x2;
     case VertexFormat::Half3:
+      LOGE("WebGPU has no Float16x3 format; Half3 is not correctly supported, using Float16x4");
       return WGPUVertexFormat_Float16x4;
     case VertexFormat::Half4:
       return WGPUVertexFormat_Float16x4;
@@ -88,10 +91,12 @@ WGPUVertexFormat ToWGPUVertexFormat(VertexFormat format) {
     case VertexFormat::Int4:
       return WGPUVertexFormat_Sint32x4;
     case VertexFormat::UByteNormalized:
+      LOGE("WebGPU has no Unorm8x1 format; UByteNormalized is not correctly supported, using Unorm8x2");
       return WGPUVertexFormat_Unorm8x2;
     case VertexFormat::UByte2Normalized:
       return WGPUVertexFormat_Unorm8x2;
     case VertexFormat::UByte3Normalized:
+      LOGE("WebGPU has no Unorm8x3 format; UByte3Normalized is not correctly supported, using Unorm8x4");
       return WGPUVertexFormat_Unorm8x4;
     case VertexFormat::UByte4Normalized:
       return WGPUVertexFormat_Unorm8x4;
