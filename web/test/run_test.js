@@ -14,6 +14,11 @@ const TIMEOUT_MS = 10 * 60 * 1000;
 // Determine backend from --backend argument (default: webgl).
 const backendArg = process.argv.find(a => a.startsWith('--backend'));
 const BACKEND = backendArg ? (backendArg.includes('=') ? backendArg.split('=')[1] : process.argv[process.argv.indexOf(backendArg) + 1]) : 'webgl';
+const ALLOWED_BACKENDS = new Set(['webgl', 'webgpu']);
+if (!ALLOWED_BACKENDS.has(BACKEND)) {
+  console.error(`Invalid backend: "${BACKEND}". Must be one of: ${[...ALLOWED_BACKENDS].join(', ')}`);
+  process.exit(1);
+}
 
 // Map downloaded zip files to their extraction destinations.
 const ZIP_DESTINATIONS = {
@@ -53,6 +58,13 @@ function extractZip(zipPath, destDir) {
   }
   fs.mkdirSync(destDir, { recursive: true });
   const zip = new AdmZip(zipPath);
+  const resolved = path.resolve(destDir);
+  for (const entry of zip.getEntries()) {
+    const target = path.resolve(destDir, entry.entryName);
+    if (!target.startsWith(resolved + path.sep) && target !== resolved) {
+      throw new Error(`Zip-Slip path traversal detected: ${entry.entryName}`);
+    }
+  }
   zip.extractAllTo(destDir, true);
 }
 
