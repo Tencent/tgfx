@@ -27,6 +27,12 @@
 
 namespace tgfx {
 
+static void OnPipelineErrorScope(WGPUErrorType type, const char* message, void*) {
+  if (type != WGPUErrorType_NoError) {
+    LOGE("[WebGPU Pipeline] Validation error: %s", message);
+  }
+}
+
 std::shared_ptr<WebGPURenderPipeline> WebGPURenderPipeline::Make(
     WebGPUGPU* gpu, const RenderPipelineDescriptor& descriptor) {
   if (gpu == nullptr) {
@@ -238,15 +244,7 @@ bool WebGPURenderPipeline::createPipelineState(WebGPUGPU* gpu,
   // Push error scope to capture validation errors from pipeline creation.
   wgpuDevicePushErrorScope(gpu->device(), WGPUErrorFilter_Validation);
   pipeline = wgpuDeviceCreateRenderPipeline(gpu->device(), &pipelineDesc);
-  // Pop error scope and log any validation errors synchronously.
-  wgpuDevicePopErrorScope(
-      gpu->device(),
-      [](WGPUErrorType type, const char* message, void* /*userdata*/) {
-        if (type != WGPUErrorType_NoError) {
-          LOGE("[WebGPU Pipeline] Validation error: %s", message);
-        }
-      },
-      nullptr);
+  wgpuDevicePopErrorScope(gpu->device(), OnPipelineErrorScope, nullptr);
 
   if (pipeline == nullptr) {
     return false;
@@ -258,14 +256,7 @@ bool WebGPURenderPipeline::createPipelineState(WebGPUGPU* gpu,
   pipelineDesc.primitive.stripIndexFormat = WGPUIndexFormat_Uint16;
   wgpuDevicePushErrorScope(gpu->device(), WGPUErrorFilter_Validation);
   pipelineStrip = wgpuDeviceCreateRenderPipeline(gpu->device(), &pipelineDesc);
-  wgpuDevicePopErrorScope(
-      gpu->device(),
-      [](WGPUErrorType type, const char* message, void* /*userdata*/) {
-        if (type != WGPUErrorType_NoError) {
-          LOGE("[WebGPU Pipeline] Strip variant validation error: %s", message);
-        }
-      },
-      nullptr);
+  wgpuDevicePopErrorScope(gpu->device(), OnPipelineErrorScope, nullptr);
   return true;
 }
 
