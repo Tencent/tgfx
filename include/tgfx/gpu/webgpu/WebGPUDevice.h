@@ -34,7 +34,8 @@ class WebGPUDevice : public Device {
 
   /**
    * Creates a new WebGPUDevice from an existing WGPUDevice. The device parameter is a pointer to a
-   * WGPUDevice object.
+   * WGPUDevice object. The WebGPUDevice takes ownership of the device and will release it when
+   * destroyed. The caller must not release the device after this call.
    */
   static std::shared_ptr<WebGPUDevice> MakeFrom(void* device);
 
