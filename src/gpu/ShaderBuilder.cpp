@@ -46,6 +46,10 @@ const ProgramInfo* ShaderBuilder::getProgramInfo() const {
   return programBuilder->getProgramInfo();
 }
 
+const ShaderCaps* ShaderBuilder::shaderCaps() const {
+  return programBuilder->getContext()->shaderCaps();
+}
+
 void ShaderBuilder::setPrecisionQualifier(const std::string& precision) {
   shaderStrings[Type::PrecisionQualifier] = precision;
 }

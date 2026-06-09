@@ -45,7 +45,7 @@ void GLSLClampedGradientEffect::emitCode(EmitArgs& args) const {
   emitChild(gradLayoutIndex, &_child1, args);
   fragBuilder->codeAppendf("vec4 t = %s;", _child1.c_str());
 
-  auto shaderCaps = fragBuilder->programBuilder->getContext()->shaderCaps();
+  auto shaderCaps = fragBuilder->shaderCaps();
   if (shaderCaps->requiresUniformControlFlow) {
     // WebGPU/WGSL requires texture sampling in uniform control flow. Emit colorizer before the
     // conditional so textureSample is not inside a divergent branch.
