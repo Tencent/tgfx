@@ -115,11 +115,19 @@ bool WebGPURenderPipeline::createPipelineState(WebGPUGPU* gpu,
   bindGroupLayoutDesc.entryCount = layoutEntries.size();
   bindGroupLayoutDesc.entries = layoutEntries.data();
   _bindGroupLayout = wgpuDeviceCreateBindGroupLayout(gpu->device(), &bindGroupLayoutDesc);
+  if (_bindGroupLayout == nullptr) {
+    LOGE("[WebGPU Pipeline] Failed to create bind group layout");
+    return false;
+  }
 
   WGPUPipelineLayoutDescriptor pipelineLayoutDesc = {};
   pipelineLayoutDesc.bindGroupLayoutCount = 1;
   pipelineLayoutDesc.bindGroupLayouts = &_bindGroupLayout;
   pipelineLayout = wgpuDeviceCreatePipelineLayout(gpu->device(), &pipelineLayoutDesc);
+  if (pipelineLayout == nullptr) {
+    LOGE("[WebGPU Pipeline] Failed to create pipeline layout");
+    return false;
+  }
 
   // Configure vertex state.
   std::vector<WGPUVertexBufferLayout> vertexBuffers = {};
@@ -248,7 +256,16 @@ bool WebGPURenderPipeline::createPipelineState(WebGPUGPU* gpu,
   // but TGFX specifies it at draw time. Many draw calls use TriangleStrip(4 vertices) for quads.
   pipelineDesc.primitive.topology = WGPUPrimitiveTopology_TriangleStrip;
   pipelineDesc.primitive.stripIndexFormat = WGPUIndexFormat_Uint16;
+  wgpuDevicePushErrorScope(gpu->device(), WGPUErrorFilter_Validation);
   pipelineStrip = wgpuDeviceCreateRenderPipeline(gpu->device(), &pipelineDesc);
+  wgpuDevicePopErrorScope(
+      gpu->device(),
+      [](WGPUErrorType type, const char* message, void* /*userdata*/) {
+        if (type != WGPUErrorType_NoError) {
+          LOGE("[WebGPU Pipeline] Strip variant validation error: %s", message);
+        }
+      },
+      nullptr);
   return true;
 }
 
