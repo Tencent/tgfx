@@ -29,14 +29,15 @@
 
 namespace tgfx {
 
-std::unique_ptr<WebGPUGPU> WebGPUGPU::Make(WGPUDevice device) {
+std::unique_ptr<WebGPUGPU> WebGPUGPU::Make(WGPUDevice device, bool externallyOwned) {
   if (device == nullptr) {
     return nullptr;
   }
-  return std::unique_ptr<WebGPUGPU>(new WebGPUGPU(device));
+  return std::unique_ptr<WebGPUGPU>(new WebGPUGPU(device, externallyOwned));
 }
 
-WebGPUGPU::WebGPUGPU(WGPUDevice device) : webgpuDevice(device) {
+WebGPUGPU::WebGPUGPU(WGPUDevice device, bool externallyOwned)
+    : webgpuDevice(device), _externallyOwned(externallyOwned) {
   caps = std::make_unique<WebGPUCaps>(device);
   commandQueue = std::make_unique<WebGPUCommandQueue>(this);
 }
@@ -172,7 +173,7 @@ void WebGPUGPU::releaseAll(bool releaseGPU) {
     }
     mipmapPipelineCache.clear();
   }
-  if (releaseGPU && webgpuDevice != nullptr) {
+  if (releaseGPU && !_externallyOwned && webgpuDevice != nullptr) {
     wgpuDeviceRelease(webgpuDevice);
     webgpuDevice = nullptr;
   }

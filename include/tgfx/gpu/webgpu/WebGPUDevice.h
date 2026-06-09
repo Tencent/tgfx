@@ -34,8 +34,8 @@ class WebGPUDevice : public Device {
 
   /**
    * Creates a new WebGPUDevice from an existing WGPUDevice. The device parameter is a pointer to a
-   * WGPUDevice object. The WebGPUDevice takes ownership of the device and will release it when
-   * destroyed. The caller must not release the device after this call.
+   * WGPUDevice object. The caller retains ownership of the device and must keep it alive for the
+   * lifetime of the returned WebGPUDevice. tgfx will NOT release the device on shutdown.
    */
   static std::shared_ptr<WebGPUDevice> MakeFrom(void* device);
 

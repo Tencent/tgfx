@@ -36,7 +36,7 @@ class WebGPUResource;
  */
 class WebGPUGPU : public GPU {
  public:
-  static std::unique_ptr<WebGPUGPU> Make(WGPUDevice device);
+  static std::unique_ptr<WebGPUGPU> Make(WGPUDevice device, bool externallyOwned = false);
 
   ~WebGPUGPU();
 
@@ -117,13 +117,14 @@ class WebGPUGPU : public GPU {
   const MipmapPipeline* getMipmapPipeline(WGPUTextureFormat format);
 
  private:
-  explicit WebGPUGPU(WGPUDevice device);
+  explicit WebGPUGPU(WGPUDevice device, bool externallyOwned);
 
   std::shared_ptr<WebGPUResource> addResource(WebGPUResource* resource);
 
   static uint32_t MakeSamplerKey(const SamplerDescriptor& descriptor);
 
   WGPUDevice webgpuDevice = nullptr;
+  bool _externallyOwned = false;
   std::unique_ptr<WebGPUCaps> caps = nullptr;
   std::unique_ptr<WebGPUCommandQueue> commandQueue = nullptr;
   std::list<WebGPUResource*> resources = {};
