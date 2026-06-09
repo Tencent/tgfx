@@ -84,6 +84,9 @@ std::shared_ptr<WebGPUTexture> WebGPUTexture::MakeFrom(WebGPUGPU* gpu, WGPUTextu
   descriptor.usage = usage;
   auto textureView = wgpuTextureCreateView(texture, nullptr);
   if (textureView == nullptr) {
+    if (adopted) {
+      wgpuTextureRelease(texture);
+    }
     return nullptr;
   }
   return gpu->makeResource<WebGPUTexture>(texture, textureView, format, descriptor, adopted);
