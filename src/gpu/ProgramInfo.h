@@ -123,11 +123,31 @@ class ProgramInfo {
   }
 
   /**
+   * Sets the depth/stencil descriptor that will be applied to the render pipeline. Draw ops that
+   * need stencil testing or writing call this before getProgram() so the pipeline descriptor
+   * forwarded by GLSLProgramBuilder picks up the configuration and the program-cache key reflects
+   * the requested stencil state.
+   */
+  void setDepthStencil(const DepthStencilDescriptor& descriptor) {
+    depthStencil = descriptor;
+  }
+
+  /**
    * Returns the colour write mask applied to the colour attachment when constructing the render
    * pipeline. Defaults to ColorWriteMask::All, meaning every channel is written.
    */
   uint32_t getColorWriteMask() const {
     return colorWriteMask;
+  }
+
+  /**
+   * Sets the colour write mask applied to the colour attachment. Pass 0 to disable colour writes
+   * entirely (typical for a stencil-only mask pass); pass any combination of ColorWriteMask flags
+   * to restrict writes to selected channels. Must be called before getProgram() so the program
+   * cache distinguishes pipelines that share shaders but differ only in colour write mask.
+   */
+  void setColorWriteMask(uint32_t mask) {
+    colorWriteMask = mask;
   }
 
  private:

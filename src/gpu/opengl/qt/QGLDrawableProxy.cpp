@@ -76,9 +76,9 @@ std::shared_ptr<RenderTarget> QGLDrawableProxy::getRenderTarget() const {
   return textureRTProxy ? textureRTProxy->getRenderTarget() : nullptr;
 }
 
-std::shared_ptr<Texture> QGLDrawableProxy::getStencil() {
+std::shared_ptr<Texture> QGLDrawableProxy::getStencil(int sampleCount) {
   ensureTextureRTProxy();
-  return textureRTProxy ? textureRTProxy->getStencil() : nullptr;
+  return textureRTProxy ? textureRTProxy->getStencil(sampleCount) : nullptr;
 }
 
 std::shared_ptr<RenderTargetProxy> QGLDrawableProxy::getTextureTargetProxy() const {
