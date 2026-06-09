@@ -229,10 +229,19 @@ const WebGPUGPU::MipmapPipeline* WebGPUGPU::getMipmapPipeline(WGPUTextureFormat 
   bglDesc.entryCount = 2;
   bglDesc.entries = bglEntries;
   mp.bindGroupLayout = wgpuDeviceCreateBindGroupLayout(webgpuDevice, &bglDesc);
+  if (mp.bindGroupLayout == nullptr) {
+    wgpuShaderModuleRelease(mp.shaderModule);
+    return nullptr;
+  }
   WGPUPipelineLayoutDescriptor plDesc = {};
   plDesc.bindGroupLayoutCount = 1;
   plDesc.bindGroupLayouts = &mp.bindGroupLayout;
   mp.pipelineLayout = wgpuDeviceCreatePipelineLayout(webgpuDevice, &plDesc);
+  if (mp.pipelineLayout == nullptr) {
+    wgpuBindGroupLayoutRelease(mp.bindGroupLayout);
+    wgpuShaderModuleRelease(mp.shaderModule);
+    return nullptr;
+  }
   WGPUColorTargetState colorTarget = {};
   colorTarget.format = format;
   colorTarget.writeMask = WGPUColorWriteMask_All;
@@ -263,6 +272,13 @@ const WebGPUGPU::MipmapPipeline* WebGPUGPU::getMipmapPipeline(WGPUTextureFormat 
   samplerDesc.addressModeU = WGPUAddressMode_ClampToEdge;
   samplerDesc.addressModeV = WGPUAddressMode_ClampToEdge;
   mp.sampler = wgpuDeviceCreateSampler(webgpuDevice, &samplerDesc);
+  if (mp.sampler == nullptr) {
+    wgpuRenderPipelineRelease(mp.pipeline);
+    wgpuPipelineLayoutRelease(mp.pipelineLayout);
+    wgpuBindGroupLayoutRelease(mp.bindGroupLayout);
+    wgpuShaderModuleRelease(mp.shaderModule);
+    return nullptr;
+  }
   mipmapPipelineCache[key] = mp;
   return &mipmapPipelineCache[key];
 }

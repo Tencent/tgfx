@@ -20,7 +20,6 @@
 
 #include <webgpu/webgpu.h>
 #include <string>
-#include <vector>
 #include "WebGPUResource.h"
 #include "tgfx/gpu/ShaderModule.h"
 #include "tgfx/gpu/ShaderStage.h"

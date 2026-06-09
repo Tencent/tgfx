@@ -140,9 +140,11 @@ void WebGPURenderPass::setScissorRect(int x, int y, int width, int height) {
 }
 
 void WebGPURenderPass::setPipeline(std::shared_ptr<RenderPipeline> pipeline) {
-  if (passEncoder == nullptr || pipeline == nullptr) {
-    LOGE("[WebGPU RenderPass] setPipeline FAILED: encoder=%p pipeline=%p",
-         static_cast<void*>(passEncoder), static_cast<void*>(pipeline.get()));
+  if (passEncoder == nullptr) {
+    LOGE("[WebGPU RenderPass] setPipeline FAILED: passEncoder is null");
+    return;
+  }
+  if (pipeline == nullptr) {
     return;
   }
   currentPipeline = std::static_pointer_cast<WebGPURenderPipeline>(pipeline);

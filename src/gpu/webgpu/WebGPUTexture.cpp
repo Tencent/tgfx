@@ -59,6 +59,11 @@ std::shared_ptr<WebGPUTexture> WebGPUTexture::Make(WebGPUGPU* gpu,
     viewDesc.baseArrayLayer = 0;
     viewDesc.arrayLayerCount = 1;
     renderView = wgpuTextureCreateView(texture, &viewDesc);
+    if (renderView == nullptr) {
+      wgpuTextureViewRelease(textureView);
+      wgpuTextureRelease(texture);
+      return nullptr;
+    }
   }
   auto result = gpu->makeResource<WebGPUTexture>(texture, textureView, format, descriptor, true);
   result->renderView = renderView;
