@@ -169,6 +169,9 @@ void WebGPURenderPass::setVertexBuffer(unsigned slot, std::shared_ptr<GPUBuffer>
   }
   auto webgpuBuffer = std::static_pointer_cast<WebGPUBuffer>(buffer);
   auto bufferSize = webgpuBuffer->size();
+  if (offset >= bufferSize) {
+    return;
+  }
   wgpuRenderPassEncoderSetVertexBuffer(passEncoder, slot, webgpuBuffer->webgpuBuffer(), offset,
                                        bufferSize - offset);
 }
