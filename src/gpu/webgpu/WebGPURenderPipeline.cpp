@@ -24,9 +24,6 @@
 #include "core/utils/Log.h"
 #include "gpu/UniformData.h"
 #include "tgfx/gpu/ShaderVisibility.h"
-#ifdef __EMSCRIPTEN__
-#include <emscripten/console.h>
-#endif
 
 namespace tgfx {
 
@@ -238,7 +235,7 @@ bool WebGPURenderPipeline::createPipelineState(WebGPUGPU* gpu,
       gpu->device(),
       [](WGPUErrorType type, const char* message, void* /*userdata*/) {
         if (type != WGPUErrorType_NoError) {
-          emscripten_console_errorf("[WebGPU Pipeline] Validation error: %s", message);
+          LOGE("[WebGPU Pipeline] Validation error: %s", message);
         }
       },
       nullptr);

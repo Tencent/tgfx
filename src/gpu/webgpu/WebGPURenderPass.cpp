@@ -24,9 +24,6 @@
 #include "WebGPUTexture.h"
 #include "WebGPUUtil.h"
 #include "core/utils/Log.h"
-#ifdef __EMSCRIPTEN__
-#include <emscripten/console.h>
-#endif
 
 namespace tgfx {
 
@@ -135,15 +132,14 @@ void WebGPURenderPass::setScissorRect(int x, int y, int width, int height) {
 
 void WebGPURenderPass::setPipeline(std::shared_ptr<RenderPipeline> pipeline) {
   if (passEncoder == nullptr || pipeline == nullptr) {
-    emscripten_console_errorf("[WebGPU RenderPass] setPipeline FAILED: encoder=%p pipeline=%p",
-                              static_cast<void*>(passEncoder), static_cast<void*>(pipeline.get()));
+    LOGE("[WebGPU RenderPass] setPipeline FAILED: encoder=%p pipeline=%p",
+         static_cast<void*>(passEncoder), static_cast<void*>(pipeline.get()));
     return;
   }
   currentPipeline = std::static_pointer_cast<WebGPURenderPipeline>(pipeline);
   if (currentPipeline->webgpuRenderPipeline() == nullptr) {
-    emscripten_console_errorf(
-        "[WebGPU RenderPass] setPipeline FAILED: webgpuRenderPipeline is null (shader compile "
-        "failed)");
+    LOGE("[WebGPU RenderPass] setPipeline FAILED: webgpuRenderPipeline is null (shader compile "
+         "failed)");
     currentPipeline = nullptr;
     return;
   }
@@ -246,9 +242,8 @@ void WebGPURenderPass::updateBindGroup() {
 void WebGPURenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount,
                             uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) {
   if (passEncoder == nullptr || currentPipeline == nullptr) {
-    emscripten_console_errorf("[WebGPU Draw] SKIPPED: encoder=%p pipeline=%p",
-                              static_cast<void*>(passEncoder),
-                              static_cast<void*>(currentPipeline.get()));
+    LOGE("[WebGPU Draw] SKIPPED: encoder=%p pipeline=%p",
+         static_cast<void*>(passEncoder), static_cast<void*>(currentPipeline.get()));
     return;
   }
   // WebGPU requires topology at pipeline creation time. Select the correct pipeline variant.
