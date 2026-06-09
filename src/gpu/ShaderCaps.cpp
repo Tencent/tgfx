@@ -81,6 +81,7 @@ ShaderCaps::ShaderCaps(GPU* gpu) {
     // style for consistency with Metal, but the feature is disabled.
     frameBufferFetchSupport = false;
     frameBufferFetchUsesSubpassInput = true;
+    requiresUniformControlFlow = true;
   } else if (HasExtension(info, "GL_EXT_shader_framebuffer_fetch")) {
     frameBufferFetchNeedsCustomOutput = true;
     frameBufferFetchSupport = true;
