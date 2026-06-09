@@ -25,7 +25,7 @@ if [ -z "$EMSDK" ]; then
     echo "  git clone https://github.com/emscripten-core/emsdk.git" >&2
     echo "  cd emsdk && ./emsdk install ${EMSDK_REQUIRED_VERSION} && ./emsdk activate ${EMSDK_REQUIRED_VERSION}" >&2
     echo "Or set EMSDK environment variable to your emsdk directory." >&2
-    exit 1
+    return 1 2>/dev/null || exit 1
 fi
 
 # Check active Emscripten version and auto-switch if incompatible
