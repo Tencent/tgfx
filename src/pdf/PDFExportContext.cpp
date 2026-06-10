@@ -664,9 +664,9 @@ void PDFExportContext::emitPendingTextClip() {
     for (size_t index = 0; index < glyphRun.glyphCount; ++index) {
       auto glyphID = glyphRun.glyphs[index];
       if (NeedsNewFont(font, glyphID,
-                       PDFFont::FontType(*pdfStrike, *PDFFont::GetAdvancedInfo(
-                                                         pdfStrike->strikeSpec.typeface, textSize,
-                                                         document)))) {
+                       PDFFont::FontType(*pdfStrike,
+                                         *PDFFont::GetAdvancedInfo(pdfStrike->strikeSpec.typeface,
+                                                                   textSize, document)))) {
         font = pdfStrike->getFontResource(glyphID);
         if (!font) {
           continue;

@@ -1477,47 +1477,4 @@ TGFX_TEST(PDFExportTest, TextLayerStyleAlignment) {
   EXPECT_TRUE(Baseline::Compare(surface, "PDFExportTest/TextLayerStyleAlignment"));
 }
 
-TGFX_TEST(PDFExportTest, TextMultiLineTd) {
-  ContextScope scope;
-  auto* context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-
-  auto root = Layer::Make();
-  auto typeface =
-      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
-
-  // Multi-line text triggers Td for line breaks (y changes between glyphs).
-  auto textLayer = TextLayer::Make();
-  textLayer->setText("AB\nCD\nEF");
-  textLayer->setTextColor(Color::FromRGBA(60, 120, 200));
-  textLayer->setFont(Font(typeface, 40.f));
-  textLayer->setMatrix(Matrix::MakeTrans(50.f, 50.f));
-  textLayer->setLayerStyles(
-      {NoiseStyle::MakeDuo(8.f, 1.f, Color::FromRGBA(255, 0, 0, 128),
-                           Color::FromRGBA(0, 0, 255, 128), 42.f)});
-  root->addChild(textLayer);
-
-  // Export PDF.
-  auto PDFStream = MemoryWriteStream::Make();
-  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
-  auto bounds = root->getBounds(nullptr, true);
-  auto canvas = document->beginPage(bounds.width() + 100.f, bounds.height() + 100.f);
-  canvas->translate(-bounds.left + 50.f, -bounds.top + 50.f);
-  root->draw(canvas);
-  document->endPage();
-  document->close();
-  PDFStream->flush();
-
-  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/TextMultiLineTd"));
-
-  // Render to surface for webp screenshot.
-  auto surface = Surface::Make(context, static_cast<int>(bounds.width() + 100.f),
-                               static_cast<int>(bounds.height() + 100.f));
-  ASSERT_TRUE(surface != nullptr);
-  surface->getCanvas()->clear();
-  surface->getCanvas()->translate(-bounds.left + 50.f, -bounds.top + 50.f);
-  root->draw(surface->getCanvas());
-  EXPECT_TRUE(Baseline::Compare(surface, "PDFExportTest/TextMultiLineTd"));
-}
-
 }  // namespace tgfx

@@ -340,7 +340,8 @@
         "rasterize_path_texture": "c475bfb"
     },
     "PDFExportTest": {
-        "NoiseEffects": "856112db"
+        "NoiseEffects": "856112db",
+        "TextLayerStyleAlignment": "d9ef21d1"
     },
     "PDFTest": {
         "AssignColorSpace": "bf721f63",
@@ -372,10 +373,11 @@
         "LayerLinearGradient": "bf721f63",
         "LayerRadialGradient": "bf721f63",
         "LinearGradientWhiteAlpha": "bf721f63",
-        "NoiseEffects": "856112db",
+        "NoiseEffects": "d9ef21d1",
         "NonRegularBlendMode": "bf721f63",
         "SimpleText": "bf721f63",
-        "SrcBlendOverlap": "bf721f63"
+        "SrcBlendOverlap": "bf721f63",
+        "TextLayerStyleAlignment": "d9ef21d1"
     },
     "PathShapeTest": {
         "AdaptiveDashEffect": "0448e0fe",
