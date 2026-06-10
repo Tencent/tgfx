@@ -168,6 +168,8 @@ PDFExportContext::~PDFExportContext() = default;
 
 void PDFExportContext::reset() {
   content->reset();
+  lastTextBlob = nullptr;
+  lastTextMatrix = Matrix::I();
 }
 
 void PDFExportContext::drawFill(const Brush& brush) {
@@ -425,10 +427,8 @@ bool NeedsNewFont(PDFFont* font, GlyphID glyphID, AdvancedTypefaceInfo::FontType
 void PDFExportContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const Matrix& matrix,
                                     const ClipStack& clip, const Brush& brush,
                                     const Stroke* stroke) {
-  if (!textClipMode) {
-    lastTextBlob = textBlob;
-    lastTextMatrix = matrix;
-  }
+  lastTextBlob = textBlob;
+  lastTextMatrix = matrix;
   for (auto glyphRun : *textBlob) {
     onDrawGlyphRun(glyphRun, matrix, clip, brush, stroke);
   }
@@ -508,9 +508,6 @@ void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const Matr
   auto out = content.stream();
 
   out->writeText("BT\n");
-  if (textClipMode) {
-    out->writeText("7 Tr\n");
-  }
   {
     // Destinations are in absolute coordinates.
     // The glyphs bounds go through the localToDevice separately for clipping.
@@ -644,10 +641,18 @@ void PDFExportContext::emitPendingTextClip() {
   activeStackState = PDFGraphicStackState(content);
   content->writeText("q\n");
   content->writeText("BT\n7 Tr\n");
+  // Note: Only the translation component of lastTextMatrix is used here. Scale, rotation, and
+  // skew are not applied to the text clip. This is acceptable because TextLayer with Above
+  // LayerStyles is typically drawn with identity scale/rotation at the canvas level.
   float textTx = lastTextMatrix.getTranslateX();
   float textTy = lastTextMatrix.getTranslateY();
   for (auto glyphRun : *lastTextBlob) {
     if (glyphRun.glyphCount == 0) {
+      continue;
+    }
+    // Text clip via Tr 7 relies on glyph-level positioning (Td). Complex transforms such as
+    // RSXform and Matrix cannot be represented by PDF text operators; skip these runs.
+    if (HasComplexTransform(glyphRun)) {
       continue;
     }
     auto pdfStrike = PDFStrike::Make(document, glyphRun.font);
