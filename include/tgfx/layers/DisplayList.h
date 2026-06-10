@@ -190,8 +190,9 @@ class DisplayList {
    * Returns true if zoom blur is allowed in tiled rendering mode. This setting is ignored in other
    * render modes. When enabled, if the zoomScale changes and cached images at other zoom levels are
    * available, the display list will use those caches to render first, then gradually update to the
-   * current zoomScale in later frames. Use setMaxTilesRefinedPerFrame() to control how many tiles
-   * are updated per frame. This can improve zooming performance, but may cause temporary zoom blur
+   * current zoomScale in later frames. Use setTileThrottleEnabled() and
+   * setMaxTilesRefinedPerFrame() to control how many tiles are updated per frame. This can improve
+   * zooming performance, but may cause temporary zoom blur
    * artifacts. The default is false.
    */
   bool allowZoomBlur() const {
