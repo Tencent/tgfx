@@ -35,7 +35,16 @@ inline void ApplySubsetMode(UVSubsetMode mode, Rect* rect) {
   if (mode == UVSubsetMode::RoundOutAndSubset) {
     rect->roundOut();
   }
-  rect->inset(0.5f, 0.5f);
+  // Inset by half a texel and pin the result to the rect center. When the rect is narrower
+  // than 1 texel, plain inset would invert it; pinning to center keeps the resulting span
+  // non-inverted (collapsed to a point in the worst case) so the shader receives a
+  // geometrically valid subset.
+  const auto cx = rect->centerX();
+  const auto cy = rect->centerY();
+  rect->left = std::min(rect->left + 0.5f, cx);
+  rect->top = std::min(rect->top + 0.5f, cy);
+  rect->right = std::max(rect->right - 0.5f, cx);
+  rect->bottom = std::max(rect->bottom - 0.5f, cy);
 }
 
 inline void WriteSubset(float* vertices, size_t& index, const Rect& subset) {
