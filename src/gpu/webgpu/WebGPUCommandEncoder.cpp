@@ -137,6 +137,9 @@ void WebGPUCommandEncoder::generateMipmapsForTexture(std::shared_ptr<Texture> te
     srcViewDesc.baseArrayLayer = 0;
     srcViewDesc.arrayLayerCount = 1;
     auto srcView = wgpuTextureCreateView(webgpuTexture->webgpuTexture(), &srcViewDesc);
+    if (srcView == nullptr) {
+      break;
+    }
 
     // Create destination view (current level, single mip).
     WGPUTextureViewDescriptor dstViewDesc = {};
@@ -147,6 +150,10 @@ void WebGPUCommandEncoder::generateMipmapsForTexture(std::shared_ptr<Texture> te
     dstViewDesc.baseArrayLayer = 0;
     dstViewDesc.arrayLayerCount = 1;
     auto dstView = wgpuTextureCreateView(webgpuTexture->webgpuTexture(), &dstViewDesc);
+    if (dstView == nullptr) {
+      wgpuTextureViewRelease(srcView);
+      break;
+    }
 
     // Create bind group with source texture view + sampler.
     WGPUBindGroupEntry bgEntries[2] = {};
@@ -159,6 +166,11 @@ void WebGPUCommandEncoder::generateMipmapsForTexture(std::shared_ptr<Texture> te
     bgDesc.entryCount = 2;
     bgDesc.entries = bgEntries;
     auto bindGroup = wgpuDeviceCreateBindGroup(device, &bgDesc);
+    if (bindGroup == nullptr) {
+      wgpuTextureViewRelease(srcView);
+      wgpuTextureViewRelease(dstView);
+      break;
+    }
 
     // Begin render pass targeting this mip level.
     WGPURenderPassColorAttachment colorAttachment = {};
@@ -171,6 +183,12 @@ void WebGPUCommandEncoder::generateMipmapsForTexture(std::shared_ptr<Texture> te
     passDesc.colorAttachmentCount = 1;
     passDesc.colorAttachments = &colorAttachment;
     auto passEncoder = wgpuCommandEncoderBeginRenderPass(commandEncoder, &passDesc);
+    if (passEncoder == nullptr) {
+      wgpuBindGroupRelease(bindGroup);
+      wgpuTextureViewRelease(srcView);
+      wgpuTextureViewRelease(dstView);
+      break;
+    }
 
     wgpuRenderPassEncoderSetPipeline(passEncoder, pipeline);
     wgpuRenderPassEncoderSetBindGroup(passEncoder, 0, bindGroup, 0, nullptr);
