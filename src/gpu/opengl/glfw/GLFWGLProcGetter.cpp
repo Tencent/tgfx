@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <GLFW/glfw3.h>
 #include "GLFWGLProcGetter.h"
+#include <GLFW/glfw3.h>
 #include "core/utils/Log.h"
 
 namespace tgfx {

@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/opengl/glfw/GLFWGLWindow.h"
-#include "gpu/proxies/RenderTargetProxy.h"
 #include "core/utils/Log.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
 
