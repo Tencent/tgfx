@@ -47,6 +47,9 @@ WGPUBufferUsageFlags ToWGPUBufferUsage(uint32_t usage) {
     flags |= WGPUBufferUsage_Uniform;
   }
   if (usage & GPUBufferUsage::READBACK) {
+    if (usage & (GPUBufferUsage::INDEX | GPUBufferUsage::VERTEX | GPUBufferUsage::UNIFORM)) {
+      LOGE("[WebGPU] READBACK buffer cannot combine with INDEX/VERTEX/UNIFORM, ignoring them");
+    }
     flags = WGPUBufferUsage_CopyDst | WGPUBufferUsage_MapRead;
   }
   return flags;
