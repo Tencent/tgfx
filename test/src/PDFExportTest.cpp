@@ -42,6 +42,7 @@
 #include "tgfx/layers/filters/InnerShadowFilter.h"
 #include "tgfx/layers/filters/NoiseFilter.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
+#include "tgfx/layers/layerstyles/InnerShadowStyle.h"
 #include "tgfx/layers/layerstyles/NoiseStyle.h"
 #include "tgfx/pdf/PDFDocument.h"
 #include "tgfx/pdf/PDFMetadata.h"
@@ -1416,6 +1417,106 @@ TGFX_TEST(PDFExportTest, NoiseEffects) {
   surface->getCanvas()->translate(-bounds.left + 50.f, -bounds.top + 50.f);
   root->draw(surface->getCanvas());
   EXPECT_TRUE(Baseline::Compare(surface, "PDFExportTest/NoiseEffects"));
+}
+
+TGFX_TEST(PDFExportTest, TextLayerStyleAlignment) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto root = Layer::Make();
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+
+  auto addText = [&](float x, float y) {
+    auto textLayer = TextLayer::Make();
+    textLayer->setText("Hello");
+    textLayer->setTextColor(Color::FromRGBA(60, 120, 200));
+    textLayer->setFont(Font(typeface, 40.f));
+    textLayer->setMatrix(Matrix::MakeTrans(x, y));
+    root->addChild(textLayer);
+    return textLayer;
+  };
+
+  // Col 0: TextLayer + DropShadowStyle (Below position)
+  addText(50.f, 50.f)->setLayerStyles({DropShadowStyle::Make(5.f, 5.f, 3.f, 3.f, Color::Black())});
+
+  // Col 1: TextLayer + InnerShadowStyle (Above position)
+  addText(250.f, 50.f)
+      ->setLayerStyles({InnerShadowStyle::Make(3.f, 3.f, 3.f, 3.f, Color::Black())});
+
+  // Col 2: TextLayer + NoiseStyle (Above position)
+  addText(50.f, 150.f)
+      ->setLayerStyles({NoiseStyle::MakeMono(8.f, 0.5f, Color::FromRGBA(255, 0, 0, 128), 42.f)});
+
+  // Col 3: TextLayer + DropShadowStyle + NoiseStyle (Below + Above)
+  addText(250.f, 150.f)
+      ->setLayerStyles({DropShadowStyle::Make(5.f, 5.f, 3.f, 3.f, Color::Black()),
+                        NoiseStyle::MakeMono(8.f, 0.5f, Color::FromRGBA(255, 0, 0, 128), 42.f)});
+
+  // Export PDF.
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  auto bounds = root->getBounds(nullptr, true);
+  auto canvas = document->beginPage(bounds.width() + 100.f, bounds.height() + 100.f);
+  canvas->translate(-bounds.left + 50.f, -bounds.top + 50.f);
+  root->draw(canvas);
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/TextLayerStyleAlignment"));
+
+  // Render to surface for webp screenshot.
+  auto surface = Surface::Make(context, static_cast<int>(bounds.width() + 100.f),
+                               static_cast<int>(bounds.height() + 100.f));
+  ASSERT_TRUE(surface != nullptr);
+  surface->getCanvas()->clear();
+  surface->getCanvas()->translate(-bounds.left + 50.f, -bounds.top + 50.f);
+  root->draw(surface->getCanvas());
+  EXPECT_TRUE(Baseline::Compare(surface, "PDFExportTest/TextLayerStyleAlignment"));
+}
+
+TGFX_TEST(PDFExportTest, TextMultiLineTd) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto root = Layer::Make();
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+
+  // Multi-line text triggers Td for line breaks (y changes between glyphs).
+  auto textLayer = TextLayer::Make();
+  textLayer->setText("AB\nCD\nEF");
+  textLayer->setTextColor(Color::FromRGBA(60, 120, 200));
+  textLayer->setFont(Font(typeface, 40.f));
+  textLayer->setMatrix(Matrix::MakeTrans(50.f, 50.f));
+  textLayer->setLayerStyles(
+      {NoiseStyle::MakeMono(8.f, 0.5f, Color::FromRGBA(255, 0, 0, 128), 42.f)});
+  root->addChild(textLayer);
+
+  // Export PDF.
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  auto bounds = root->getBounds(nullptr, true);
+  auto canvas = document->beginPage(bounds.width() + 100.f, bounds.height() + 100.f);
+  canvas->translate(-bounds.left + 50.f, -bounds.top + 50.f);
+  root->draw(canvas);
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/TextMultiLineTd"));
+
+  // Render to surface for webp screenshot.
+  auto surface = Surface::Make(context, static_cast<int>(bounds.width() + 100.f),
+                               static_cast<int>(bounds.height() + 100.f));
+  ASSERT_TRUE(surface != nullptr);
+  surface->getCanvas()->clear();
+  surface->getCanvas()->translate(-bounds.left + 50.f, -bounds.top + 50.f);
+  root->draw(surface->getCanvas());
+  EXPECT_TRUE(Baseline::Compare(surface, "PDFExportTest/TextMultiLineTd"));
 }
 
 }  // namespace tgfx

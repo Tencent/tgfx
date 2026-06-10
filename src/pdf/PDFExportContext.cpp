@@ -210,6 +210,15 @@ void PDFExportContext::drawShape(std::shared_ptr<Shape> shape, const Matrix& mat
 
 void PDFExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                                  const Matrix& matrix, const ClipStack& clip, const Brush& brush) {
+  auto clipPath = clip.getClipPath();
+  if (!clipPath.isEmpty()) {
+    auto cb = clipPath.getBounds();
+    LOGI("PDFExportContext::drawImage size=(%d,%d) matrix=[%.2f %.2f %.2f %.2f %.2f %.2f] "
+         "clipBounds=(%.2f, %.2f, %.2f, %.2f)",
+         image->width(), image->height(), matrix.getScaleX(), matrix.getSkewX(),
+         matrix.getTranslateX(), matrix.getSkewY(), matrix.getScaleY(), matrix.getTranslateY(),
+         cb.left, cb.top, cb.right, cb.bottom);
+  }
   auto rect = Rect::MakeWH(image->width(), image->height());
   onDrawImageRect(image, rect, sampling, matrix, clip, brush);
 }
@@ -352,7 +361,6 @@ class GlyphPositioner {
       content->writeText(" ");
       PDFUtils::AppendFloat(currentMatrixOrigin.y, content);
       content->writeText(" Tm\n");
-      currentMatrixOrigin.set(0.0f, 0.0f);
       initialized = true;
     }
     Point position = xy - currentMatrixOrigin;
@@ -417,6 +425,9 @@ bool NeedsNewFont(PDFFont* font, GlyphID glyphID, AdvancedTypefaceInfo::FontType
 void PDFExportContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const Matrix& matrix,
                                     const ClipStack& clip, const Brush& brush,
                                     const Stroke* stroke) {
+  LOGI("PDFExportContext::drawTextBlob matrix=[%.2f %.2f %.2f %.2f %.2f %.2f]", matrix.getScaleX(),
+       matrix.getSkewX(), matrix.getTranslateX(), matrix.getSkewY(), matrix.getScaleY(),
+       matrix.getTranslateY());
   for (auto glyphRun : *textBlob) {
     onDrawGlyphRun(glyphRun, matrix, clip, brush, stroke);
   }
@@ -489,6 +500,12 @@ void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const Matr
   Brush brushPaint(brush);
   brushPaint.maskFilter = nullptr;
   auto paint = clean_paint(brushPaint);
+  auto clipPath = clip.getClipPath();
+  if (!clipPath.isEmpty()) {
+    auto cb = clipPath.getBounds();
+    LOGI("exportGlyphRunAsText clipPath bounds=(%.2f, %.2f, %.2f, %.2f)",
+         cb.left, cb.top, cb.right, cb.bottom);
+  }
   ScopedContentEntry content(this, matrix, clip, Matrix::I(), paint);
   if (!content) {
     return;
@@ -504,6 +521,9 @@ void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const Matr
 
     const auto numGlyphs = typeface->glyphsCount();
     auto offset = GetGlyphPosition(glyphRun, 0);
+    LOGI("exportGlyphRunAsText: glyphPosition[0]=(%.2f, %.2f) leading=%.2f positioning=%d",
+         offset.x, offset.y, glyphRunFont.getMetrics().leading,
+         static_cast<int>(glyphRun.positioning));
     GlyphPositioner glyphPositioner(out, glyphRunFont.getMetrics().leading, offset);
     PDFFont* font = nullptr;
 

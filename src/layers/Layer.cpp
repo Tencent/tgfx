@@ -42,6 +42,8 @@
 #include "layers/RootLayer.h"
 #include "layers/SubtreeCache.h"
 #include "layers/contents/LayerContent.h"
+#include "layers/contents/TextContent.h"
+#include "core/GlyphTransform.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Surface.h"
@@ -1570,6 +1572,12 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
   auto content = getContent();
   bool hasForeground = false;
   if (content) {
+    auto m = canvas->getMatrix();
+    LOGI(
+        "drawContents before drawDefault canvasMatrix=[%.2f %.2f %.2f %.2f %.2f %.2f] "
+        "hasLayerStyle=%d",
+        m.getScaleX(), m.getSkewX(), m.getTranslateX(), m.getSkewY(), m.getScaleY(),
+        m.getTranslateY(), layerStyleSource != nullptr);
     hasForeground = content->drawDefault(canvas, alpha, bitFields.allowsEdgeAntialiasing);
   }
   if (!drawChildren(args, canvas, alpha, stopChild)) {
@@ -1581,6 +1589,32 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
     return;
   }
   if (layerStyleSource) {
+    // When content is text, clip Above styles to the precise text outline to prevent rasterized
+    // style images (e.g., noise) from bleeding beyond the vector text boundary in PDF export.
+    AutoCanvasRestore clipRestore(canvas);
+    if (content && Types::Get(content) == Types::LayerContentType::Text) {
+      auto* textContent = static_cast<const TextContent*>(content);
+      Path textPath;
+      for (auto glyphRun : *textContent->textBlob) {
+        for (size_t i = 0; i < glyphRun.glyphCount; ++i) {
+          Path glyphPath;
+          if (glyphRun.font.getPath(glyphRun.glyphs[i], &glyphPath)) {
+            glyphPath.transform(GetGlyphMatrix(glyphRun, i));
+            textPath.addPath(glyphPath);
+          }
+        }
+      }
+      if (!textPath.isEmpty()) {
+        textPath.transform(Matrix::MakeTrans(textContent->offset.x, textContent->offset.y));
+        auto clipBounds = textPath.getBounds();
+        auto m = canvas->getMatrix();
+        LOGI("clipPath textPath bounds=(%.2f, %.2f, %.2f, %.2f) canvasMatrix=[%.2f %.2f %.2f %.2f %.2f %.2f]",
+             clipBounds.left, clipBounds.top, clipBounds.right, clipBounds.bottom,
+             m.getScaleX(), m.getSkewX(), m.getTranslateX(), m.getSkewY(), m.getScaleY(),
+             m.getTranslateY());
+        canvas->clipPath(textPath);
+      }
+    }
     drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Above);
   }
   if (hasForeground) {
@@ -1903,6 +1937,15 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
   auto* group = source->groups[groupIndex].get();
   if (group == nullptr) {
     return;
+  }
+  {
+    auto m = canvas->getMatrix();
+    auto& contentEntry = group->content;
+    LOGI(
+        "drawLayerStyleDefault canvasMatrix=[%.2f %.2f %.2f %.2f %.2f %.2f] "
+        "contentScale=%.2f contentOffset=(%.2f, %.2f)",
+        m.getScaleX(), m.getSkewX(), m.getTranslateX(), m.getSkewY(), m.getScaleY(),
+        m.getTranslateY(), source->contentScale, contentEntry.offset.x, contentEntry.offset.y);
   }
   auto& contentEntry = group->content;
   // Apply the content transform matrix to canvas so that rendering happens at the final scale,
