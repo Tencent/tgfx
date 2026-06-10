@@ -66,6 +66,8 @@ class WebGPUCaps {
   void initFeatureSet(WGPUDevice device);
   void initLimits(WGPUDevice device);
   void initFormatTable(WGPUDevice device);
+  void addFormat(PixelFormat format, bool renderable, bool colorAttachment,
+                 std::vector<int> sampleCounts);
 
   GPUInfo gpuInfo = {};
   GPUFeatures gpuFeatures = {};

@@ -53,15 +53,16 @@ void WebGPUCaps::initLimits(WGPUDevice) {
   gpuLimits.minBufferCopyRowAlignment = 256;
 }
 
+void WebGPUCaps::addFormat(PixelFormat format, bool renderable, bool colorAttachment,
+                           std::vector<int> sampleCounts) {
+  WebGPUFormatInfo info = {};
+  info.renderable = renderable;
+  info.colorAttachment = colorAttachment;
+  info.sampleCounts = std::move(sampleCounts);
+  formatTable[format] = info;
+}
+
 void WebGPUCaps::initFormatTable(WGPUDevice) {
-  auto addFormat = [this](PixelFormat format, bool renderable, bool colorAttachment,
-                          std::vector<int> sampleCounts) {
-    WebGPUFormatInfo info = {};
-    info.renderable = renderable;
-    info.colorAttachment = colorAttachment;
-    info.sampleCounts = std::move(sampleCounts);
-    formatTable[format] = info;
-  };
   addFormat(PixelFormat::ALPHA_8, true, true, {1, 4});
   addFormat(PixelFormat::GRAY_8, true, true, {1, 4});
   addFormat(PixelFormat::RG_88, true, true, {1, 4});
