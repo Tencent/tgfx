@@ -1308,30 +1308,30 @@ TGFX_TEST(PDFExportTest, NoiseEffects) {
   };
 
   // Row 1: NoiseFilter only.
-  addRect(0, 0)->setFilters(
-      {NoiseFilter::MakeMono(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128), 42.0f, BlendMode::SrcOver)});
-  addRect(1, 0)->setFilters({NoiseFilter::MakeDuo(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128),
-                                                   Color::FromRGBA(0, 0, 255, 128), 43.0f,
-                                                   BlendMode::SrcOver)});
+  addRect(0, 0)->setFilters({NoiseFilter::MakeMono(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128),
+                                                   42.0f, BlendMode::SrcOver)});
+  addRect(1, 0)->setFilters(
+      {NoiseFilter::MakeDuo(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128),
+                            Color::FromRGBA(0, 0, 255, 128), 43.0f, BlendMode::SrcOver)});
   addRect(2, 0)->setFilters({NoiseFilter::MakeMulti(8.0f, 0.5f, 0.5f, 44.0f, BlendMode::SrcOver)});
 
   // Row 2: NoiseStyle only.
-  addRect(0, 1)->setLayerStyles({NoiseStyle::MakeMono(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128), 42.0f)});
+  addRect(0, 1)->setLayerStyles(
+      {NoiseStyle::MakeMono(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128), 42.0f)});
   addRect(1, 1)->setLayerStyles({NoiseStyle::MakeDuo(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128),
-                                                      Color::FromRGBA(0, 0, 255, 128), 43.0f)});
+                                                     Color::FromRGBA(0, 0, 255, 128), 43.0f)});
   addRect(2, 1)->setLayerStyles({NoiseStyle::MakeMulti(8.0f, 0.5f, 0.5f, 44.0f)});
 
   // Row 3: Row 1 filters + BlurFilter / InnerShadowFilter / DropShadowFilter.
-  addRect(0, 2)->setFilters(
-      {NoiseFilter::MakeMono(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128), 42.0f, BlendMode::SrcOver),
-       BlurFilter::Make(5.0f, 5.0f)});
+  addRect(0, 2)->setFilters({NoiseFilter::MakeMono(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128),
+                                                   42.0f, BlendMode::SrcOver),
+                             BlurFilter::Make(5.0f, 5.0f)});
   addRect(1, 2)->setFilters(
-      {NoiseFilter::MakeDuo(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128), Color::FromRGBA(0, 0, 255, 128),
-                            43.0f, BlendMode::SrcOver),
+      {NoiseFilter::MakeDuo(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128),
+                            Color::FromRGBA(0, 0, 255, 128), 43.0f, BlendMode::SrcOver),
        InnerShadowFilter::Make(5.0f, 5.0f, 5.0f, 5.0f, Color::Black())});
-  addRect(2, 2)->setFilters(
-      {NoiseFilter::MakeMulti(8.0f, 0.5f, 0.5f, 44.0f, BlendMode::SrcOver),
-       DropShadowFilter::Make(5.0f, 5.0f, 5.0f, 5.0f, Color::Black())});
+  addRect(2, 2)->setFilters({NoiseFilter::MakeMulti(8.0f, 0.5f, 0.5f, 44.0f, BlendMode::SrcOver),
+                             DropShadowFilter::Make(5.0f, 5.0f, 5.0f, 5.0f, Color::Black())});
 
   // Row 4: Row 2 styles + BlurFilter / InnerShadowFilter / DropShadowFilter.
   auto r4c0 = addRect(0, 3);
@@ -1340,7 +1340,7 @@ TGFX_TEST(PDFExportTest, NoiseEffects) {
 
   auto r4c1 = addRect(1, 3);
   r4c1->setLayerStyles({NoiseStyle::MakeDuo(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128),
-                                             Color::FromRGBA(0, 0, 255, 128), 43.0f)});
+                                            Color::FromRGBA(0, 0, 255, 128), 43.0f)});
   r4c1->setFilters({InnerShadowFilter::Make(5.0f, 5.0f, 5.0f, 5.0f, Color::Black())});
 
   auto r4c2 = addRect(2, 3);
@@ -1348,27 +1348,26 @@ TGFX_TEST(PDFExportTest, NoiseEffects) {
   r4c2->setFilters({DropShadowFilter::Make(5.0f, 5.0f, 5.0f, 5.0f, Color::Black())});
 
   // Row 5: NoiseFilter with different BlendMode.
-  addRect(0, 4)->setFilters(
-      {NoiseFilter::MakeMono(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128), 42.0f, BlendMode::Multiply)});
-  addRect(1, 4)->setFilters({NoiseFilter::MakeDuo(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128),
-                                                   Color::FromRGBA(0, 0, 255, 128), 43.0f,
-                                                   BlendMode::Overlay)});
-  addRect(2, 4)->setFilters(
-      {NoiseFilter::MakeMulti(8.0f, 0.5f, 0.5f, 44.0f, BlendMode::Screen)});
+  addRect(0, 4)->setFilters({NoiseFilter::MakeMono(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128),
+                                                   42.0f, BlendMode::Multiply)});
+  addRect(1, 4)->setFilters(
+      {NoiseFilter::MakeDuo(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128),
+                            Color::FromRGBA(0, 0, 255, 128), 43.0f, BlendMode::Overlay)});
+  addRect(2, 4)->setFilters({NoiseFilter::MakeMulti(8.0f, 0.5f, 0.5f, 44.0f, BlendMode::Screen)});
 
   // Row 6: NoiseStyle + DropShadowStyle combination.
   auto r6c0 = addRect(0, 5);
   r6c0->setLayerStyles({NoiseStyle::MakeMono(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128), 42.0f),
-                         DropShadowStyle::Make(5.0f, 5.0f, 5.0f, 5.0f, Color::Black())});
+                        DropShadowStyle::Make(5.0f, 5.0f, 5.0f, 5.0f, Color::Black())});
 
   auto r6c1 = addRect(1, 5);
   r6c1->setLayerStyles({NoiseStyle::MakeDuo(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128),
-                                             Color::FromRGBA(0, 0, 255, 128), 43.0f),
-                         DropShadowStyle::Make(5.0f, 5.0f, 5.0f, 5.0f, Color::Black())});
+                                            Color::FromRGBA(0, 0, 255, 128), 43.0f),
+                        DropShadowStyle::Make(5.0f, 5.0f, 5.0f, 5.0f, Color::Black())});
 
   auto r6c2 = addRect(2, 5);
   r6c2->setLayerStyles({NoiseStyle::MakeMulti(8.0f, 0.5f, 0.5f, 44.0f),
-                         DropShadowStyle::Make(5.0f, 5.0f, 5.0f, 5.0f, Color::Black())});
+                        DropShadowStyle::Make(5.0f, 5.0f, 5.0f, 5.0f, Color::Black())});
 
   // Row 7: TextLayer with NoiseFilter / NoiseStyle / both.
   auto typeface =
@@ -1386,10 +1385,10 @@ TGFX_TEST(PDFExportTest, NoiseEffects) {
     return textLayer;
   };
 
-  addText(0, 6)->setFilters(
-      {NoiseFilter::MakeMono(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128), 42.0f, BlendMode::SrcOver)});
+  addText(0, 6)->setFilters({NoiseFilter::MakeMono(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128),
+                                                   42.0f, BlendMode::SrcOver)});
   addText(1, 6)->setLayerStyles({NoiseStyle::MakeDuo(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128),
-                                                      Color::FromRGBA(0, 0, 255, 128), 43.0f)});
+                                                     Color::FromRGBA(0, 0, 255, 128), 43.0f)});
 
   auto textBoth = addText(2, 6);
   textBoth->setLayerStyles({NoiseStyle::MakeMulti(8.0f, 0.5f, 0.5f, 44.0f)});
