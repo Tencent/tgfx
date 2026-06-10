@@ -17,12 +17,25 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "WebGPUUtil.h"
+#include "WebGPUDefines.h"
 #include "core/utils/Log.h"
 #include "tgfx/gpu/ColorWriteMask.h"
 #include "tgfx/gpu/GPUBuffer.h"
 #include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
+
+// Verify that hardcoded format values in WebGPUDefines.h match the webgpu.h enum.
+static_assert(WGPU_TEXTURE_FORMAT_R8Unorm == WGPUTextureFormat_R8Unorm,
+              "WGPU_TEXTURE_FORMAT_R8Unorm mismatch");
+static_assert(WGPU_TEXTURE_FORMAT_RG8Unorm == WGPUTextureFormat_RG8Unorm,
+              "WGPU_TEXTURE_FORMAT_RG8Unorm mismatch");
+static_assert(WGPU_TEXTURE_FORMAT_RGBA8Unorm == WGPUTextureFormat_RGBA8Unorm,
+              "WGPU_TEXTURE_FORMAT_RGBA8Unorm mismatch");
+static_assert(WGPU_TEXTURE_FORMAT_BGRA8Unorm == WGPUTextureFormat_BGRA8Unorm,
+              "WGPU_TEXTURE_FORMAT_BGRA8Unorm mismatch");
+static_assert(WGPU_TEXTURE_FORMAT_Depth24PlusStencil8 == WGPUTextureFormat_Depth24PlusStencil8,
+              "WGPU_TEXTURE_FORMAT_Depth24PlusStencil8 mismatch");
 
 WGPUTextureUsageFlags ToWGPUTextureUsage(uint32_t usage) {
   WGPUTextureUsageFlags flags = WGPUTextureUsage_CopyDst | WGPUTextureUsage_CopySrc;

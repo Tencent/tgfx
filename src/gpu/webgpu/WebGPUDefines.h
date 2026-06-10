@@ -26,7 +26,7 @@ static constexpr int TEXTURE_BINDING_POINT_START = 2;
 
 // WGPUTextureFormat values copied from webgpu.h (Emscripten SDK).
 // These must match the WGPUTextureFormat enum in <webgpu/webgpu.h>.
-// If Emscripten updates enum values, compile will fail at static_assert in WebGPUTypes.h.
+// If Emscripten updates enum values, compile will fail at static_assert in WebGPUUtil.cpp.
 #define WGPU_TEXTURE_FORMAT_R8Unorm 0x01
 #define WGPU_TEXTURE_FORMAT_RG8Unorm 0x04
 #define WGPU_TEXTURE_FORMAT_RGBA8Unorm 0x12
