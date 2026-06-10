@@ -257,6 +257,10 @@ bool WebGPURenderPipeline::createPipelineState(WebGPUGPU* gpu,
   wgpuDevicePushErrorScope(gpu->device(), WGPUErrorFilter_Validation);
   pipelineStrip = wgpuDeviceCreateRenderPipeline(gpu->device(), &pipelineDesc);
   wgpuDevicePopErrorScope(gpu->device(), OnPipelineErrorScope, nullptr);
+  if (pipelineStrip == nullptr) {
+    LOGE(
+        "[WebGPU] Failed to create TriangleStrip pipeline variant, will fall back to TriangleList");
+  }
   return true;
 }
 
