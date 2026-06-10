@@ -183,8 +183,11 @@ class PDFExportContext : public DrawContext {
 
   std::shared_ptr<TextBlob> lastTextBlob = nullptr;
   Matrix lastTextMatrix = Matrix::I();
+  bool textClipActive = false;
+  Matrix textClipImageMatrix = Matrix::I();
 
   void emitPendingTextClip();
+  void closeTextClipIfActive();
 
   friend class ScopedContentEntry;
   friend class PDFFont;

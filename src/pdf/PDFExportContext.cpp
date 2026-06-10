@@ -167,12 +167,14 @@ PDFExportContext::PDFExportContext(ISize pageSize, PDFDocumentImpl* document,
 PDFExportContext::~PDFExportContext() = default;
 
 void PDFExportContext::reset() {
+  closeTextClipIfActive();
   content->reset();
   lastTextBlob = nullptr;
   lastTextMatrix = Matrix::I();
 }
 
 void PDFExportContext::drawFill(const Brush& brush) {
+  closeTextClipIfActive();
   Path path;
   path.addRect(Rect::MakeSize(_pageSize));
   onDrawPath(Matrix::I(), ClipStack(), path, brush);
@@ -180,6 +182,7 @@ void PDFExportContext::drawFill(const Brush& brush) {
 
 void PDFExportContext::drawRect(const Rect& rect, const Matrix& matrix, const ClipStack& clip,
                                 const Brush& brush, const Stroke* stroke) {
+  closeTextClipIfActive();
   Path path;
   path.addRect(rect);
   if (stroke) {
@@ -190,6 +193,7 @@ void PDFExportContext::drawRect(const Rect& rect, const Matrix& matrix, const Cl
 
 void PDFExportContext::drawRRect(const RRect& rRect, const Matrix& matrix, const ClipStack& clip,
                                  const Brush& brush, const Stroke* stroke) {
+  closeTextClipIfActive();
   Path path;
   path.addRRect(rRect);
   if (stroke) {
@@ -200,11 +204,13 @@ void PDFExportContext::drawRRect(const RRect& rRect, const Matrix& matrix, const
 
 void PDFExportContext::drawPath(const Path& path, const Matrix& matrix, const ClipStack& clip,
                                 const Brush& brush) {
+  closeTextClipIfActive();
   this->onDrawPath(matrix, clip, path, brush);
 };
 
 void PDFExportContext::drawShape(std::shared_ptr<Shape> shape, const Matrix& matrix,
                                  const ClipStack& clip, const Brush& brush, const Stroke* stroke) {
+  closeTextClipIfActive();
   shape = Shape::ApplyStroke(std::move(shape), stroke);
   auto path = ShapeUtils::GetShapeRenderingPath(shape, matrix.getMaxScale());
   this->onDrawPath(matrix, clip, path, brush);
@@ -212,18 +218,17 @@ void PDFExportContext::drawShape(std::shared_ptr<Shape> shape, const Matrix& mat
 
 void PDFExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                                  const Matrix& matrix, const ClipStack& clip, const Brush& brush) {
-  bool hasTextClip = lastTextBlob != nullptr;
-  if (hasTextClip) {
+  if (textClipActive && matrix != textClipImageMatrix) {
+    closeTextClipIfActive();
+  }
+  if (lastTextBlob != nullptr && !textClipActive) {
     emitPendingTextClip();
     lastTextBlob = nullptr;
+    textClipActive = true;
+    textClipImageMatrix = matrix;
   }
   auto rect = Rect::MakeWH(image->width(), image->height());
   onDrawImageRect(image, rect, sampling, matrix, clip, brush);
-  if (hasTextClip) {
-    activeStackState.drainStack();
-    activeStackState = PDFGraphicStackState();
-    content->writeText("Q\n");
-  }
 }
 
 void PDFExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
@@ -428,6 +433,7 @@ bool NeedsNewFont(PDFFont* font, GlyphID glyphID, AdvancedTypefaceInfo::FontType
 void PDFExportContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const Matrix& matrix,
                                     const ClipStack& clip, const Brush& brush,
                                     const Stroke* stroke) {
+  closeTextClipIfActive();
   lastTextBlob = textBlob;
   lastTextMatrix = matrix;
   for (auto glyphRun : *textBlob) {
@@ -710,7 +716,17 @@ void PDFExportContext::emitPendingTextClip() {
     }
   }
   content->writeText("ET\n");
-  // The q opened here will be closed by drawImage after the image is drawn.
+  // The q opened here will be closed by closeTextClipIfActive after all images are drawn.
+}
+
+void PDFExportContext::closeTextClipIfActive() {
+  if (!textClipActive) {
+    return;
+  }
+  activeStackState.drainStack();
+  activeStackState = PDFGraphicStackState();
+  content->writeText("Q\n");
+  textClipActive = false;
 }
 
 void PDFExportContext::drawPicture(std::shared_ptr<Picture> picture, const Matrix& matrix,
@@ -892,6 +908,7 @@ void PDFExportContext::drawLayer(std::shared_ptr<Picture> picture,
 }
 
 std::shared_ptr<Data> PDFExportContext::getContent() {
+  closeTextClipIfActive();
   // Close any graphic-state stack frames that ScopedContentEntry left open. finishContentEntry()
   // intentionally skips drainStack() for regular blend modes so that consecutive draws can reuse
   // the same activeStackState (and avoid re-emitting clip / cm sequences). The residual q's must
