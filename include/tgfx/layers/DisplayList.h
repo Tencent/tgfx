@@ -207,11 +207,11 @@ class DisplayList {
 
   /**
    * Returns the maximum number of tiles rasterized per frame in tiled rendering mode. This
-   * setting is ignored in other render modes or if allowZoomBlur is false. Once the limit is
-   * reached, remaining tiles fall back to cached content from other zoom scales, or are filled
-   * with the background color when no fallback is available. Higher values fill the screen
-   * faster during zoom and pan at the cost of per-frame GPU load; lower values prioritize
-   * stable frame rate.
+   * setting only takes effect when both tileThrottleEnabled() and allowZoomBlur() are true, and
+   * is ignored in other render modes. Once the limit is reached, remaining tiles fall back to
+   * cached content from other zoom scales, or are filled with the background color when no
+   * fallback is available. Higher values fill the screen faster during zoom and pan at the cost
+   * of per-frame GPU load; lower values prioritize stable frame rate.
    */
   int maxTilesRefinedPerFrame() const {
     return _maxTilesRefinedPerFrame;
@@ -222,6 +222,28 @@ class DisplayList {
    */
   void setMaxTilesRefinedPerFrame(int count) {
     _maxTilesRefinedPerFrame = count;
+  }
+
+  /**
+   * Returns true if tile throttling is enabled in tiled rendering mode. This setting is ignored
+   * in other render modes or if allowZoomBlur is false. When enabled, the number of tiles
+   * rasterized per frame is capped by maxTilesRefinedPerFrame(); remaining tiles fall back to
+   * cached content from other zoom scales, or are filled with the background color when no
+   * fallback is available. This keeps the frame rate stable during zoom and pan but may briefly
+   * show lower-resolution or background-colored regions. When disabled, all required tiles are
+   * rasterized in the current frame regardless of maxTilesRefinedPerFrame(), which may cause
+   * frame drops during heavy zoom or pan but avoids any transient blur or background fill. The
+   * default is false.
+   */
+  bool tileThrottleEnabled() const {
+    return _tileThrottleEnabled;
+  }
+
+  /**
+   * Sets whether tile throttling is enabled in tiled rendering mode.
+   */
+  void setTileThrottleEnabled(bool enabled) {
+    _tileThrottleEnabled = enabled;
   }
 
   /**
@@ -291,6 +313,7 @@ class DisplayList {
   int _tileSize = 256;
   int _maxTileCount = 0;
   bool _allowZoomBlur = false;
+  bool _tileThrottleEnabled = false;
   int _maxTilesRefinedPerFrame = 5;
   int _subtreeCacheMaxSize = 0;
   bool _showDirtyRegions = false;

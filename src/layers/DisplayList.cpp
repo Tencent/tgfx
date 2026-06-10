@@ -635,10 +635,9 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
       screenTasks.emplace_back(tile, _tileSize, tileRect);
       continue;
     }
-    if (!_allowZoomBlur || maxBudget > 0) {
-      // Either zoom-blur is disabled (no throttling) or the budget still allows rasterizing
-      // this tile. Either way, schedule it for refinement.
-      if (_allowZoomBlur) {
+    if (!_allowZoomBlur || !_tileThrottleEnabled || maxBudget > 0) {
+      // Refine this tile when throttling is disabled, or when the budget still allows it.
+      if (_allowZoomBlur && _tileThrottleEnabled) {
         maxBudget--;
       }
       dirtyGrids.emplace_back(tileX, tileY);
