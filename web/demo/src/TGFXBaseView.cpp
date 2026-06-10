@@ -28,7 +28,7 @@ namespace hello2d {
 TGFXBaseView::TGFXBaseView(const std::string& canvasID) : canvasID(canvasID) {
   appHost = std::make_shared<hello2d::AppHost>();
   displayList.setRenderMode(tgfx::RenderMode::Tiled);
-  displayList.setAllowZoomBlur(true);
+  displayList.setTileUpdateMode(tgfx::TileUpdateMode::Smooth);
   displayList.setMaxTileCount(512);
 }
 

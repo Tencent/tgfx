@@ -34,7 +34,7 @@ TGFXView::TGFXView(QQuickItem* parent) : QQuickItem(parent) {
   setFocus(true);
   createAppHost();
   displayList.setRenderMode(tgfx::RenderMode::Tiled);
-  displayList.setAllowZoomBlur(true);
+  displayList.setTileUpdateMode(tgfx::TileUpdateMode::Smooth);
   displayList.setMaxTileCount(512);
   updateLayerTree();
 }
