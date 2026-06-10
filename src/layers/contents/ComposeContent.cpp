@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ComposeContent.h"
+#include "tgfx/core/Path.h"
 
 namespace tgfx {
 
@@ -91,6 +92,21 @@ bool ComposeContent::hasBlendMode() const {
     }
   }
   return false;
+}
+
+bool ComposeContent::getClipPath(Path* path) const {
+  Path combined = {};
+  for (const auto& content : contents) {
+    Path subPath = {};
+    if (!content->getClipPath(&subPath)) {
+      return false;
+    }
+    combined.addPath(subPath);
+  }
+  if (path) {
+    *path = std::move(combined);
+  }
+  return true;
 }
 
 bool ComposeContent::drawDefault(Canvas* canvas, float alpha, bool antiAlias) const {

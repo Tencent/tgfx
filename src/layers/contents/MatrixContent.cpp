@@ -45,6 +45,18 @@ bool MatrixContent::hitTestPoint(float localX, float localY) const {
   return content->hitTestPoint(localPoint.x, localPoint.y);
 }
 
+bool MatrixContent::getClipPath(Path* path) const {
+  Path subPath = {};
+  if (!content->getClipPath(&subPath)) {
+    return false;
+  }
+  subPath.transform(matrix);
+  if (path) {
+    *path = std::move(subPath);
+  }
+  return true;
+}
+
 bool MatrixContent::drawDefault(Canvas* canvas, float alpha, bool antiAlias) const {
   AutoCanvasRestore autoRestore(canvas);
   canvas->concat(matrix);

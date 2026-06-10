@@ -215,6 +215,7 @@ void PDFExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
   bool hasTextClip = lastTextBlob != nullptr;
   if (hasTextClip) {
     emitPendingTextClip();
+    lastTextBlob = nullptr;
   }
   auto rect = Rect::MakeWH(image->width(), image->height());
   onDrawImageRect(image, rect, sampling, matrix, clip, brush);

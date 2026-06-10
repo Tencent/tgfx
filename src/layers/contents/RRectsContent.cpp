@@ -83,6 +83,13 @@ bool RRectsContent::onHasSameGeometry(const GeometryContent* other) const {
   return true;
 }
 
+bool RRectsContent::getClipPath(Path* path) const {
+  if (path) {
+    *path = getFilledPath();
+  }
+  return true;
+}
+
 Path RRectsContent::getFilledPath() const {
   Path path = {};
   for (const auto& rRect : rRects) {

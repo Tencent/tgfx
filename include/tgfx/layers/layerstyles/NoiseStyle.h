@@ -109,6 +109,10 @@ class NoiseStyle : public LayerStyle {
     return LayerStylePosition::Above;
   }
 
+  bool needsContentClip() const override {
+    return true;
+  }
+
   Rect filterBounds(const Rect& srcRect, float contentScale) override;
 
  protected:

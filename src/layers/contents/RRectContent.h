@@ -29,6 +29,7 @@ class RRectContent : public DrawContent {
 
   Rect getTightBounds(const Matrix& matrix) const override;
   bool hitTestPoint(float localX, float localY) const override;
+  bool getClipPath(Path* path) const override;
 
   RRect rRect = {};
 

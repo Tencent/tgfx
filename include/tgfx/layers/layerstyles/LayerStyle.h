@@ -154,6 +154,15 @@ class LayerStyle : public LayerProperty {
   void setExcludeChildEffects(bool value);
 
   /**
+   * Returns true if this layer style requires the canvas to be clipped to the content path before
+   * drawing. This is used for styles like NoiseStyle whose effect can bleed beyond the content
+   * boundary. Default is false.
+   */
+  virtual bool needsContentClip() const {
+    return false;
+  }
+
+  /**
    * Returns the type of the extra source required by the layer style.
    * Default is LayerStyleExtraSourceType::None.
    */

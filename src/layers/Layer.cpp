@@ -1580,8 +1580,29 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
     // interested in the portion that contributes to the synthesized backdrop.
     return;
   }
+  bool clippedForAbove = false;
+  if (layerStyleSource && content) {
+    bool needsClip = false;
+    for (const auto& layerStyle : _layerStyles) {
+      if (layerStyle->position() == LayerStylePosition::Above && layerStyle->needsContentClip()) {
+        needsClip = true;
+        break;
+      }
+    }
+    if (needsClip) {
+      Path clipPath = {};
+      if (content->getClipPath(&clipPath)) {
+        canvas->save();
+        canvas->clipPath(clipPath);
+        clippedForAbove = true;
+      }
+    }
+  }
   if (layerStyleSource) {
     drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Above);
+  }
+  if (clippedForAbove) {
+    canvas->restore();
   }
   if (hasForeground) {
     content->drawForeground(canvas, alpha, bitFields.allowsEdgeAntialiasing);

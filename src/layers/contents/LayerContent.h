@@ -20,6 +20,7 @@
 
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Matrix.h"
+#include "tgfx/core/Path.h"
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
@@ -66,6 +67,16 @@ class LayerContent {
    * Returns true if any part of the content uses a blend mode other than SrcOver.
    */
   virtual bool hasBlendMode() const {
+    return false;
+  }
+
+  /**
+   * Returns the clip path of the content for constraining layer style effects. If the content
+   * supports path-based clipping, fills the output path and returns true. Text content returns
+   * false because it uses PDF Tr 7 for clipping.
+   */
+  virtual bool getClipPath(Path* path) const {
+    (void)path;
     return false;
   }
 
