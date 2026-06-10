@@ -627,7 +627,11 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   screenTasks.reserve(tileCount);
   dirtyGrids.reserve(tileCount);
   auto sortedCaches = getSortedTileCaches();
-  auto fallbackTileCaches = getFallbackTileCaches(sortedCaches);
+  // fallbackTileCaches is only consumed inside the throttling branch below; skip building it
+  // when throttling is inactive to avoid unnecessary work.
+  auto fallbackTileCaches = throttleActive
+                                ? getFallbackTileCaches(sortedCaches)
+                                : std::vector<std::pair<float, TileCache*>>{};
   auto sortedTiles = GetSortedTiles(startX, endX, startY, endY, _tileSize, mousePosition);
   for (const auto& [tileX, tileY] : sortedTiles) {
     auto tile = currentTileCache->getTile(tileX, tileY);
