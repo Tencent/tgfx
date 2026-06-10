@@ -34,10 +34,11 @@ if command -v emcc >/dev/null 2>&1; then
     if [ "$EMCC_VERSION" != "$EMSDK_REQUIRED_VERSION" ]; then
         echo "Active Emscripten is ${EMCC_VERSION}, switching to ${EMSDK_REQUIRED_VERSION}..."
         (
+            set -e
             cd "$EMSDK"
             ./emsdk install "$EMSDK_REQUIRED_VERSION"
             ./emsdk activate "$EMSDK_REQUIRED_VERSION"
-        )
+        ) || { echo "ERROR: Failed to install/activate emsdk ${EMSDK_REQUIRED_VERSION}"; return 1 2>/dev/null || exit 1; }
         source "$EMSDK/emsdk_env.sh" >/dev/null 2>&1
         echo "Switched to Emscripten $(emcc --version | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
     fi
