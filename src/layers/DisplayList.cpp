@@ -585,7 +585,7 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
                                                       std::vector<DrawTask>* throttleScreenTasks,
                                                       bool autoClear) {
   auto maxBudget = _maxTilesRefinedPerFrame;
-  const bool throttleActive = _allowZoomBlur && _tileThrottleEnabled;
+  const auto throttleActive = _allowZoomBlur && _tileThrottleEnabled;
   if (lastContentOffset != _contentOffset || lastZoomScaleInt != _zoomScaleInt) {
     updateMousePosition();
     lastContentOffset = _contentOffset;
