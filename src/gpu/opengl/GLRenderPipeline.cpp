@@ -228,11 +228,24 @@ static GLStencil MakeGLStencil(const StencilDescriptor& descriptor) {
   return stencil;
 }
 
+// A stencil face is a true no-op (the pipeline can run without enabling GL_STENCIL_TEST at
+// all) only when both:
+//   - the comparison is Always, so every fragment passes the stencil test regardless of the
+//     buffer's current value, and
+//   - every op is Keep, so the buffer is never modified.
+// Either condition alone is meaningful on its own:
+//   - Always + Replace stamps the reference value into the buffer (mask-write pipelines).
+//   - Equal + Keep gates fragments on a previously written mask (cover pipelines).
+// Both must continue to enable the stencil test.
+static bool IsStencilFaceNoOp(const StencilDescriptor& face) {
+  return face.compare == CompareFunction::Always && face.failOp == StencilOperation::Keep &&
+         face.passOp == StencilOperation::Keep && face.depthFailOp == StencilOperation::Keep;
+}
+
 static std::unique_ptr<GLStencilState> MakeStencilState(const DepthStencilDescriptor& descriptor) {
   auto& stencilFront = descriptor.stencilFront;
   auto& stencilBack = descriptor.stencilBack;
-  if (stencilFront.compare == CompareFunction::Always &&
-      stencilBack.compare == CompareFunction::Always) {
+  if (IsStencilFaceNoOp(stencilFront) && IsStencilFaceNoOp(stencilBack)) {
     return nullptr;
   }
   auto stencilState = std::make_unique<GLStencilState>();

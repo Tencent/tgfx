@@ -38,6 +38,7 @@ class QGLDrawableProxy : public RenderTargetProxy {
   std::shared_ptr<TextureView> getTextureView() const override;
   std::shared_ptr<TextureProxy> asTextureProxy() const override;
   std::shared_ptr<RenderTarget> getRenderTarget() const override;
+  std::shared_ptr<Texture> getStencil(int sampleCount) override;
 
   std::shared_ptr<RenderTargetProxy> getTextureTargetProxy() const;
   void releaseTexture();
