@@ -72,7 +72,9 @@ class SurfaceReadback {
   /**
    * Returns the underlying GPU buffer used for readback. This is useful for platforms that need
    * to perform async buffer mapping externally (e.g., WebGPU's mapAsync via JavaScript Promise).
-   * May trigger a flush if the buffer has not been created yet. Returns nullptr on failure.
+   * May trigger a flush if the buffer has not been created yet, but does NOT wait for GPU
+   * completion. The caller must use requestMapAsync() + isReady() or equivalent async mechanism
+   * before reading buffer contents. Returns nullptr on failure.
    */
   std::shared_ptr<GPUBuffer> getGPUBuffer(Context* context) const;
 
