@@ -1570,12 +1570,6 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
   auto content = getContent();
   bool hasForeground = false;
   if (content) {
-    auto m = canvas->getMatrix();
-    LOGI(
-        "drawContents before drawDefault canvasMatrix=[%.2f %.2f %.2f %.2f %.2f %.2f] "
-        "hasLayerStyle=%d",
-        m.getScaleX(), m.getSkewX(), m.getTranslateX(), m.getSkewY(), m.getScaleY(),
-        m.getTranslateY(), layerStyleSource != nullptr);
     hasForeground = content->drawDefault(canvas, alpha, bitFields.allowsEdgeAntialiasing);
   }
   if (!drawChildren(args, canvas, alpha, stopChild)) {
@@ -1909,15 +1903,6 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
   auto* group = source->groups[groupIndex].get();
   if (group == nullptr) {
     return;
-  }
-  {
-    auto m = canvas->getMatrix();
-    auto& contentEntry = group->content;
-    LOGI(
-        "drawLayerStyleDefault canvasMatrix=[%.2f %.2f %.2f %.2f %.2f %.2f] "
-        "contentScale=%.2f contentOffset=(%.2f, %.2f)",
-        m.getScaleX(), m.getSkewX(), m.getTranslateX(), m.getSkewY(), m.getScaleY(),
-        m.getTranslateY(), source->contentScale, contentEntry.offset.x, contentEntry.offset.y);
   }
   auto& contentEntry = group->content;
   // Apply the content transform matrix to canvas so that rendering happens at the final scale,

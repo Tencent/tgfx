@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextContent.h"
-#include "core/utils/Log.h"
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
@@ -46,10 +45,6 @@ bool TextContent::hitTestPoint(float localX, float localY) const {
 }
 
 void TextContent::onDraw(Canvas* canvas, const Paint& paint) const {
-  auto m = canvas->getMatrix();
-  LOGI("TextContent::onDraw offset=(%.2f, %.2f) canvasMatrix=[%.2f %.2f %.2f %.2f %.2f %.2f]",
-       offset.x, offset.y, m.getScaleX(), m.getSkewX(), m.getTranslateX(), m.getSkewY(),
-       m.getScaleY(), m.getTranslateY());
   canvas->drawTextBlob(textBlob, offset.x, offset.y, paint);
 }
 
