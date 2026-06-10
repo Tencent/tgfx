@@ -122,10 +122,10 @@ class RenderTargetProxy {
    * proxy keeps a strong reference so subsequent callers reuse the same allocation for the
    * proxy's lifetime; repeated calls must therefore pass the same `sampleCount` (debug-asserted),
    * because in practice the colour attachment's sample count is fixed for a given proxy.
-   * Returns nullptr if the underlying texture allocation fails. Subclasses that need to route
-   * the request elsewhere (e.g. a drawable proxy that delegates to its backing texture proxy)
-   * override this; the default implementation creates a DEPTH24_STENCIL8 texture sized to the
-   * proxy's current width/height.
+   * Returns nullptr if the underlying texture allocation fails. The default implementation
+   * sizes the stencil texture to width()/height(); subclasses whose colour attachment uses a
+   * different storage size (e.g. approximate-fit texture proxies), or that route the request
+   * elsewhere (e.g. a drawable proxy delegating to its backing texture proxy), override this.
    */
   virtual std::shared_ptr<Texture> getStencil(int sampleCount);
 
@@ -168,22 +168,12 @@ class RenderTargetProxy {
   std::shared_ptr<Texture> stencilTexture = nullptr;
 
   /**
-   * Returns the width to use when allocating the stencil texture in getStencil(). Defaults to
-   * width(), which matches the proxy's logical width. Subclasses whose backing store size differs
-   * from the logical size (e.g. approximate-fit texture proxies whose actual storage is rounded up)
-   * must override this so the stencil attachment matches the colour render texture's true storage
-   * dimensions.
+   * Cache-or-allocate helper used by getStencil() implementations. Returns the cached stencil
+   * texture if present (asserting in debug that its sampleCount matches), otherwise creates a
+   * DEPTH24_STENCIL8 texture of the requested size and caches it. Subclasses override
+   * getStencil() and forward to this helper with the size that matches their colour
+   * attachment's true storage dimensions.
    */
-  virtual int stencilWidth() const {
-    return width();
-  }
-
-  /**
-   * Returns the height to use when allocating the stencil texture in getStencil(). See
-   * stencilWidth() for the rationale; the same backing-store-vs-logical contract applies here.
-   */
-  virtual int stencilHeight() const {
-    return height();
-  }
+  std::shared_ptr<Texture> getOrAllocateStencil(int width, int height, int sampleCount);
 };
 }  // namespace tgfx

@@ -59,6 +59,11 @@ std::shared_ptr<RenderTargetProxy> RenderTargetProxy::makeRenderTargetProxy(int 
 }
 
 std::shared_ptr<Texture> RenderTargetProxy::getStencil(int sampleCount) {
+  return getOrAllocateStencil(width(), height(), sampleCount);
+}
+
+std::shared_ptr<Texture> RenderTargetProxy::getOrAllocateStencil(int width, int height,
+                                                                 int sampleCount) {
   if (stencilTexture != nullptr) {
     // The cached entry must match the requested sample count; otherwise the caller is mixing
     // MSAA configurations on the same proxy, which would silently violate the "all attachments
@@ -66,8 +71,8 @@ std::shared_ptr<Texture> RenderTargetProxy::getStencil(int sampleCount) {
     DEBUG_ASSERT(stencilTexture->sampleCount() == sampleCount);
     return stencilTexture;
   }
-  TextureDescriptor descriptor(stencilWidth(), stencilHeight(), PixelFormat::DEPTH24_STENCIL8,
-                               false, sampleCount, TextureUsage::RENDER_ATTACHMENT);
+  TextureDescriptor descriptor(width, height, PixelFormat::DEPTH24_STENCIL8, false, sampleCount,
+                               TextureUsage::RENDER_ATTACHMENT);
   stencilTexture = getContext()->gpu()->createTexture(descriptor);
   return stencilTexture;
 }

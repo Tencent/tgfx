@@ -68,6 +68,10 @@ class TextureRenderTargetProxy : public DefaultTextureProxy,
 
   std::shared_ptr<RenderTarget> getRenderTarget() const override;
 
+  std::shared_ptr<Texture> getStencil(int sampleCount) override {
+    return getOrAllocateStencil(_backingStoreWidth, _backingStoreHeight, sampleCount);
+  }
+
  protected:
   int _sampleCount = 1;
   bool _externallyOwned = false;
@@ -75,14 +79,6 @@ class TextureRenderTargetProxy : public DefaultTextureProxy,
   TextureRenderTargetProxy(int width, int height, PixelFormat format, int sampleCount,
                            bool mipmapped = false, ImageOrigin origin = ImageOrigin::TopLeft,
                            bool externallyOwned = false);
-
-  int stencilWidth() const override {
-    return _backingStoreWidth;
-  }
-
-  int stencilHeight() const override {
-    return _backingStoreHeight;
-  }
 
   std::shared_ptr<TextureView> onMakeTexture(Context* context) const override;
 
