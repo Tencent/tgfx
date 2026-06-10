@@ -158,6 +158,10 @@ void WebGPUBuffer::onRelease(WebGPUGPU*) {
     stagingData = nullptr;
   }
   if (buffer != nullptr) {
+    if (mapReady) {
+      wgpuBufferUnmap(buffer);
+      mapReady = false;
+    }
     wgpuBufferDestroy(buffer);
     wgpuBufferRelease(buffer);
     buffer = nullptr;
