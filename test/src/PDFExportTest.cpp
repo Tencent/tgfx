@@ -36,6 +36,7 @@
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/ShapeStyle.h"
+#include "tgfx/layers/TextLayer.h"
 #include "tgfx/layers/filters/BlurFilter.h"
 #include "tgfx/layers/filters/DropShadowFilter.h"
 #include "tgfx/layers/filters/InnerShadowFilter.h"
@@ -1288,7 +1289,7 @@ TGFX_TEST(PDFExportTest, NoiseEffects) {
   constexpr float GapY = 20.f;
   constexpr float Margin = 40.f;
   constexpr int Cols = 3;
-  constexpr int Rows = 4;
+  constexpr int Rows = 7;
 
   auto root = Layer::Make();
 
@@ -1345,6 +1346,54 @@ TGFX_TEST(PDFExportTest, NoiseEffects) {
   auto r4c2 = addRect(2, 3);
   r4c2->setLayerStyles({NoiseStyle::MakeMulti(8.0f, 0.5f, 0.5f, 44.0f)});
   r4c2->setFilters({DropShadowFilter::Make(5.0f, 5.0f, 5.0f, 5.0f, Color::Black())});
+
+  // Row 5: NoiseFilter with different BlendMode.
+  addRect(0, 4)->setFilters(
+      {NoiseFilter::MakeMono(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128), 42.0f, BlendMode::Multiply)});
+  addRect(1, 4)->setFilters({NoiseFilter::MakeDuo(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128),
+                                                   Color::FromRGBA(0, 0, 255, 128), 43.0f,
+                                                   BlendMode::Overlay)});
+  addRect(2, 4)->setFilters(
+      {NoiseFilter::MakeMulti(8.0f, 0.5f, 0.5f, 44.0f, BlendMode::Screen)});
+
+  // Row 6: NoiseStyle + DropShadowStyle combination.
+  auto r6c0 = addRect(0, 5);
+  r6c0->setLayerStyles({NoiseStyle::MakeMono(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128), 42.0f),
+                         DropShadowStyle::Make(5.0f, 5.0f, 5.0f, 5.0f, Color::Black())});
+
+  auto r6c1 = addRect(1, 5);
+  r6c1->setLayerStyles({NoiseStyle::MakeDuo(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128),
+                                             Color::FromRGBA(0, 0, 255, 128), 43.0f),
+                         DropShadowStyle::Make(5.0f, 5.0f, 5.0f, 5.0f, Color::Black())});
+
+  auto r6c2 = addRect(2, 5);
+  r6c2->setLayerStyles({NoiseStyle::MakeMulti(8.0f, 0.5f, 0.5f, 44.0f),
+                         DropShadowStyle::Make(5.0f, 5.0f, 5.0f, 5.0f, Color::Black())});
+
+  // Row 7: TextLayer with NoiseFilter / NoiseStyle / both.
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+
+  auto addText = [&](int col, int row) {
+    auto textLayer = TextLayer::Make();
+    textLayer->setText("Noise");
+    textLayer->setTextColor(Color::FromRGBA(60, 120, 200));
+    textLayer->setFont(Font(typeface, 32.f));
+    float x = Margin + static_cast<float>(col) * (RectW + GapX);
+    float y = Margin + static_cast<float>(row) * (RectH + GapY) + 20.f;
+    textLayer->setMatrix(Matrix::MakeTrans(x, y));
+    root->addChild(textLayer);
+    return textLayer;
+  };
+
+  addText(0, 6)->setFilters(
+      {NoiseFilter::MakeMono(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128), 42.0f, BlendMode::SrcOver)});
+  addText(1, 6)->setLayerStyles({NoiseStyle::MakeDuo(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128),
+                                                      Color::FromRGBA(0, 0, 255, 128), 43.0f)});
+
+  auto textBoth = addText(2, 6);
+  textBoth->setLayerStyles({NoiseStyle::MakeMulti(8.0f, 0.5f, 0.5f, 44.0f)});
+  textBoth->setFilters({BlurFilter::Make(3.0f, 3.0f)});
 
   // Export PDF.
   auto PDFStream = MemoryWriteStream::Make();
