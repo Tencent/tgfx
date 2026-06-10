@@ -709,6 +709,7 @@ TGFX_TEST_PRIVATE(LayerCacheTest, DirtyRegionTest) {
 
   displayList->setRenderMode(RenderMode::Tiled);
   displayList->setAllowZoomBlur(true);
+  displayList->setTileThrottleEnabled(true);
   displayList->setMaxTileCount(512);
   displayList->render(surface.get());
   // Clear the previous dirty regions.
