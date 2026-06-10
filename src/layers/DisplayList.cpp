@@ -585,7 +585,7 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
                                                       std::vector<DrawTask>* throttleScreenTasks,
                                                       bool autoClear) {
   auto maxBudget = _maxTilesRefinedPerFrame;
-  const auto throttleActive = _allowZoomBlur && _tileThrottleEnabled;
+  const auto useFallback = _tileUpdateMode != TileUpdateMode::Immediate;
   if (lastContentOffset != _contentOffset || lastZoomScaleInt != _zoomScaleInt) {
     updateMousePosition();
     lastContentOffset = _contentOffset;
@@ -636,19 +636,25 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
       screenTasks.emplace_back(tile, _tileSize, tileRect);
       continue;
     }
-    if (!throttleActive || maxBudget > 0) {
-      // Refine this tile when throttling is disabled, or when the budget still allows it.
-      if (throttleActive) {
+    if (!useFallback || maxBudget > 0) {
+      if (useFallback) {
         maxBudget--;
       }
       dirtyGrids.emplace_back(tileX, tileY);
     } else {
-      hasZoomBlurTiles = true;
       auto fallbackTasks = getFallbackDrawTasks(tileX, tileY, fallbackTileCaches);
       if (!fallbackTasks.empty()) {
+        hasZoomBlurTiles = true;
         screenTasks.insert(screenTasks.end(), fallbackTasks.begin(), fallbackTasks.end());
         continue;
       }
+      if (_tileUpdateMode == TileUpdateMode::Smooth) {
+        // No cached fallback in Smooth mode: rasterize the tile in this frame to keep the result
+        // correct.
+        dirtyGrids.emplace_back(tileX, tileY);
+        continue;
+      }
+      hasZoomBlurTiles = true;
       skippedRects->emplace_back(
           Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize));
       if (!autoClear) {
@@ -729,7 +735,7 @@ std::vector<std::pair<float, TileCache*>> DisplayList::getSortedTileCaches() con
 
 std::vector<std::pair<float, TileCache*>> DisplayList::getFallbackTileCaches(
     const std::vector<std::pair<float, TileCache*>>& sortedCaches) const {
-  if (!_allowZoomBlur || !_tileThrottleEnabled) {
+  if (_tileUpdateMode == TileUpdateMode::Immediate) {
     return {};
   }
   auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);

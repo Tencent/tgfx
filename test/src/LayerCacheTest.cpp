@@ -708,8 +708,7 @@ TGFX_TEST_PRIVATE(LayerCacheTest, DirtyRegionTest) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerCacheTest/DirtyRegionTest5"));
 
   displayList->setRenderMode(RenderMode::Tiled);
-  displayList->setAllowZoomBlur(true);
-  displayList->setTileThrottleEnabled(true);
+  displayList->setTileUpdateMode(TileUpdateMode::Fast);
   displayList->setMaxTileCount(512);
   displayList->render(surface.get());
   // Clear the previous dirty regions.

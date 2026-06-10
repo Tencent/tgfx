@@ -64,6 +64,36 @@ enum class RenderMode {
 };
 
 /**
+ * TileUpdateMode defines how missing tiles are produced in tiled rendering mode when the
+ * zoomScale changes or when the viewport scrolls into uncached regions.
+ */
+enum class TileUpdateMode {
+  /**
+   * Missing tiles are rasterized at the current zoomScale within the same frame. Cached tiles
+   * from other zoom scales are never reused. This produces the highest visual fidelity but may
+   * cause frame drops during heavy zoom or pan. This is the default mode.
+   */
+  Immediate,
+
+  /**
+   * For each missing tile, the display list first tries to reuse a cached tile from another
+   * zoom scale as a temporary fallback (producing brief zoom blur). When no such cache is
+   * available, the tile is rasterized at the current zoomScale within the same frame to keep
+   * the result correct. Use this mode when you want a smoother visual transition during zoom
+   * while still guaranteeing visible content on every frame.
+   */
+  Smooth,
+
+  /**
+   * The number of tiles rasterized per frame is capped by setMaxTilesRefinedPerFrame(). Tiles
+   * beyond the cap are filled with cached content from other zoom scales, or with the background
+   * color when no fallback is available. This keeps the frame rate stable during heavy zoom or
+   * pan at the cost of longer-lasting blur or background-colored regions.
+   */
+  Fast
+};
+
+/**
  * DisplayList represents a collection of layers can be drawn to a Surface. Note: All layers in the
  * display list are not thread-safe and should only be accessed from a single thread.
  */
@@ -187,32 +217,32 @@ class DisplayList {
   void setMaxTileCount(int count);
 
   /**
-   * Returns true if zoom blur is allowed in tiled rendering mode. This setting is ignored in other
-   * render modes. When enabled, if the zoomScale changes and cached images at other zoom levels are
-   * available, the display list will use those caches to render first, then gradually update to the
-   * current zoomScale in later frames. Use setTileThrottleEnabled() and
-   * setMaxTilesRefinedPerFrame() to control how many tiles are updated per frame. This can improve
-   * zooming performance, but may cause temporary zoom blur
-   * artifacts. The default is false.
+   * Returns the current tile update mode. This setting only applies in tiled rendering mode and
+   * controls how missing tiles are produced when the zoomScale changes. The default is
+   * TileUpdateMode::Immediate.
    */
-  bool allowZoomBlur() const {
-    return _allowZoomBlur;
+  TileUpdateMode tileUpdateMode() const {
+    return _tileUpdateMode;
   }
 
   /**
-   * Sets whether to allow zoom blur in tiled rendering mode.
+   * Sets the tile update mode used in tiled rendering mode.
    */
-  void setAllowZoomBlur(bool allow) {
-    _allowZoomBlur = allow;
+  void setTileUpdateMode(TileUpdateMode mode) {
+    _tileUpdateMode = mode;
   }
 
   /**
-   * Returns the maximum number of tiles rasterized per frame. This setting only applies in tiled
-   * rendering mode and only takes effect when both tileThrottleEnabled() and allowZoomBlur() are
-   * true. Once the limit is reached, remaining tiles fall back to cached content from other zoom
-   * scales, or are filled with the background color when no fallback is available. Higher values
-   * fill the screen faster during zoom and pan at the cost of per-frame GPU load; lower values
-   * prioritize stable frame rate.
+   * Returns the per-frame budget for rasterizing missing tiles. This setting only applies in
+   * tiled rendering mode and is ignored when tileUpdateMode() is TileUpdateMode::Immediate. In
+   * TileUpdateMode::Smooth, once the budget is exhausted, tiles that have a cached fallback at
+   * another zoom scale will display the fallback instead of being rasterized; tiles without any
+   * fallback are still rasterized in the same frame to keep the result correct, so the actual
+   * tiles drawn per frame may exceed this limit. In TileUpdateMode::Fast, the budget is a hard
+   * cap: tiles beyond it fall back to cached content from other zoom scales, or are filled with
+   * the background color when no fallback is available. Higher values fill the screen faster
+   * during zoom and pan at the cost of per-frame GPU load; lower values prioritize stable frame
+   * rate.
    */
   int maxTilesRefinedPerFrame() const {
     return _maxTilesRefinedPerFrame;
@@ -223,28 +253,6 @@ class DisplayList {
    */
   void setMaxTilesRefinedPerFrame(int count) {
     _maxTilesRefinedPerFrame = count;
-  }
-
-  /**
-   * Returns true if tile throttling is enabled in tiled rendering mode. This setting is ignored
-   * in other render modes or if allowZoomBlur is false. When enabled, the number of tiles
-   * rasterized per frame is capped by maxTilesRefinedPerFrame(); remaining tiles fall back to
-   * cached content from other zoom scales, or are filled with the background color when no
-   * fallback is available. This keeps the frame rate stable during zoom and pan but may briefly
-   * show lower-resolution or background-colored regions. When disabled, all required tiles are
-   * rasterized in the current frame regardless of maxTilesRefinedPerFrame(), which may cause
-   * frame drops during heavy zoom or pan but avoids any transient blur or background fill. The
-   * default is false.
-   */
-  bool tileThrottleEnabled() const {
-    return _tileThrottleEnabled;
-  }
-
-  /**
-   * Sets whether tile throttling is enabled in tiled rendering mode.
-   */
-  void setTileThrottleEnabled(bool enabled) {
-    _tileThrottleEnabled = enabled;
   }
 
   /**
@@ -313,8 +321,7 @@ class DisplayList {
   RenderMode _renderMode = RenderMode::Partial;
   int _tileSize = 256;
   int _maxTileCount = 0;
-  bool _allowZoomBlur = false;
-  bool _tileThrottleEnabled = false;
+  TileUpdateMode _tileUpdateMode = TileUpdateMode::Immediate;
   int _maxTilesRefinedPerFrame = 5;
   int _subtreeCacheMaxSize = 0;
   bool _showDirtyRegions = false;
