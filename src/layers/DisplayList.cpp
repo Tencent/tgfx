@@ -627,11 +627,7 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   screenTasks.reserve(tileCount);
   dirtyGrids.reserve(tileCount);
   auto sortedCaches = getSortedTileCaches();
-  // fallbackTileCaches is only consumed inside the throttling branch below; skip building it
-  // when throttling is inactive to avoid unnecessary work.
-  auto fallbackTileCaches = throttleActive
-                                ? getFallbackTileCaches(sortedCaches)
-                                : std::vector<std::pair<float, TileCache*>>{};
+  auto fallbackTileCaches = getFallbackTileCaches(sortedCaches);
   auto sortedTiles = GetSortedTiles(startX, endX, startY, endY, _tileSize, mousePosition);
   for (const auto& [tileX, tileY] : sortedTiles) {
     auto tile = currentTileCache->getTile(tileX, tileY);
@@ -733,7 +729,7 @@ std::vector<std::pair<float, TileCache*>> DisplayList::getSortedTileCaches() con
 
 std::vector<std::pair<float, TileCache*>> DisplayList::getFallbackTileCaches(
     const std::vector<std::pair<float, TileCache*>>& sortedCaches) const {
-  if (!_allowZoomBlur) {
+  if (!_allowZoomBlur || !_tileThrottleEnabled) {
     return {};
   }
   auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
