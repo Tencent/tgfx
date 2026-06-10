@@ -585,6 +585,7 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
                                                       std::vector<DrawTask>* throttleScreenTasks,
                                                       bool autoClear) {
   auto maxBudget = _maxTilesRefinedPerFrame;
+  const bool throttleActive = _allowZoomBlur && _tileThrottleEnabled;
   if (lastContentOffset != _contentOffset || lastZoomScaleInt != _zoomScaleInt) {
     updateMousePosition();
     lastContentOffset = _contentOffset;
@@ -635,9 +636,9 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
       screenTasks.emplace_back(tile, _tileSize, tileRect);
       continue;
     }
-    if (!_allowZoomBlur || !_tileThrottleEnabled || maxBudget > 0) {
+    if (!throttleActive || maxBudget > 0) {
       // Refine this tile when throttling is disabled, or when the budget still allows it.
-      if (_allowZoomBlur && _tileThrottleEnabled) {
+      if (throttleActive) {
         maxBudget--;
       }
       dirtyGrids.emplace_back(tileX, tileY);
