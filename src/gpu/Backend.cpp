@@ -232,6 +232,7 @@ bool BackendSemaphore::isInitialized() const {
     case Backend::Vulkan:
       return vulkanSyncInfo.semaphore != 0;
     case Backend::WebGPU:
+      // WebGPU has no explicit semaphore handle; synchronization is managed by the browser.
       return true;
     default:
       break;

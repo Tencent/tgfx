@@ -23,8 +23,8 @@
 
 static bool initialized = false;
 
-// Asyncify (WebGPU only) causes function signature mismatch in BackgroundBlurTest due to
-// instrumentation of deep virtual call chains. Exclude the entire suite for WebGPU builds.
+// Asyncify (WebGPU only) causes function signature mismatch in FlushSemaphore due to
+// instrumentation of async wait chains. Exclude it for WebGPU builds.
 #ifdef TGFX_USE_ASYNCIFY
 static const char* excludeFilter = "-CanvasTest.FlushSemaphore";
 #else

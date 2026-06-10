@@ -194,11 +194,6 @@ emscripten::val TGFXBaseView::startReadback(int srcX, int srcY, int width, int h
 
   // Get the underlying WebGPU buffer handle for JS-side mapAsync.
   auto info = pendingReadback->info();
-  // We need to access the internal buffer proxy. Since SurfaceReadback doesn't expose it directly,
-  // we call lockPixels which will flush if needed, but we already flushed above.
-  // Instead, use isReady to check — if not ready, the buffer handle should be obtainable after
-  // flush. For WebGPU, we need to expose buffer info through a different path.
-  // For now, use a simpler approach: call readPixels synchronously on WebGL, async on WebGPU.
 #ifdef TGFX_USE_WEBGPU
   auto gpuBuffer = pendingReadback->getGPUBuffer(context);
   if (gpuBuffer == nullptr) {
