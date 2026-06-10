@@ -15,6 +15,12 @@ if (EMSCRIPTEN)
             "  cd emsdk && ./emsdk install 4.0.15 && ./emsdk activate 4.0.15\n"
             "  source ./emsdk_env.sh\n"
             "See README.md for details.")
+    elseif (EMSCRIPTEN_VERSION VERSION_LESS "4.0.15")
+        message(FATAL_ERROR
+            "Emscripten ${EMSCRIPTEN_VERSION} is too old. "
+            "This project requires emsdk >= 4.0.15 for WebGPU support.\n"
+            "  cd <path-to-emsdk> && ./emsdk install 4.0.15 && ./emsdk activate 4.0.15\n"
+            "  source ./emsdk_env.sh")
     elseif (EMSCRIPTEN_VERSION VERSION_GREATER_EQUAL "4.0.18")
         message(FATAL_ERROR
             "Emscripten ${EMSCRIPTEN_VERSION} is not supported. "
