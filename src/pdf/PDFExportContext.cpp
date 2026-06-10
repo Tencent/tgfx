@@ -210,17 +210,17 @@ void PDFExportContext::drawShape(std::shared_ptr<Shape> shape, const Matrix& mat
 
 void PDFExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                                  const Matrix& matrix, const ClipStack& clip, const Brush& brush) {
-  auto clipPath = clip.getClipPath();
-  if (!clipPath.isEmpty()) {
-    auto cb = clipPath.getBounds();
-    LOGI("PDFExportContext::drawImage size=(%d,%d) matrix=[%.2f %.2f %.2f %.2f %.2f %.2f] "
-         "clipBounds=(%.2f, %.2f, %.2f, %.2f)",
-         image->width(), image->height(), matrix.getScaleX(), matrix.getSkewX(),
-         matrix.getTranslateX(), matrix.getSkewY(), matrix.getScaleY(), matrix.getTranslateY(),
-         cb.left, cb.top, cb.right, cb.bottom);
+  bool hasTextClip = lastTextBlob != nullptr;
+  if (hasTextClip) {
+    emitPendingTextClip();
   }
   auto rect = Rect::MakeWH(image->width(), image->height());
   onDrawImageRect(image, rect, sampling, matrix, clip, brush);
+  if (hasTextClip) {
+    activeStackState.drainStack();
+    activeStackState = PDFGraphicStackState();
+    content->writeText("Q\n");
+  }
 }
 
 void PDFExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
@@ -425,9 +425,10 @@ bool NeedsNewFont(PDFFont* font, GlyphID glyphID, AdvancedTypefaceInfo::FontType
 void PDFExportContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const Matrix& matrix,
                                     const ClipStack& clip, const Brush& brush,
                                     const Stroke* stroke) {
-  LOGI("PDFExportContext::drawTextBlob matrix=[%.2f %.2f %.2f %.2f %.2f %.2f]", matrix.getScaleX(),
-       matrix.getSkewX(), matrix.getTranslateX(), matrix.getSkewY(), matrix.getScaleY(),
-       matrix.getTranslateY());
+  if (!textClipMode) {
+    lastTextBlob = textBlob;
+    lastTextMatrix = matrix;
+  }
   for (auto glyphRun : *textBlob) {
     onDrawGlyphRun(glyphRun, matrix, clip, brush, stroke);
   }
@@ -513,6 +514,9 @@ void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const Matr
   auto out = content.stream();
 
   out->writeText("BT\n");
+  if (textClipMode) {
+    out->writeText("7 Tr\n");
+  }
   {
     // Destinations are in absolute coordinates.
     // The glyphs bounds go through the localToDevice separately for clipping.
@@ -635,6 +639,68 @@ void PDFExportContext::exportGlyphRunAsImage(const GlyphRun& glyphRun, const Mat
   Brush transparentBrush = brush;
   transparentBrush.color = Color::Transparent();
   exportGlyphRunAsText(glyphRun, matrix, clip, transparentBrush);
+}
+
+void PDFExportContext::emitPendingTextClip() {
+  if (!lastTextBlob) {
+    return;
+  }
+  // Drain any existing graphics state and start a fresh q for the text clip scope.
+  // No cm is applied here — the text CTM translate is baked into Tm so that the text clip is
+  // defined in the initial page coordinate system (after y-flip). This way subsequent image draws
+  // with their own cm transforms are not affected by a leftover translate.
+  activeStackState.drainStack();
+  activeStackState = PDFGraphicStackState(content);
+  content->writeText("q\n");
+  content->writeText("BT\n7 Tr\n");
+  float textTx = lastTextMatrix.getTranslateX();
+  float textTy = lastTextMatrix.getTranslateY();
+  for (auto glyphRun : *lastTextBlob) {
+    if (glyphRun.glyphCount == 0) {
+      continue;
+    }
+    auto pdfStrike = PDFStrike::Make(document, glyphRun.font);
+    if (!pdfStrike) {
+      continue;
+    }
+    auto textSize = pdfStrike->strikeSpec.textSize;
+    float advanceScale = textSize / pdfStrike->strikeSpec.unitsPerEM;
+    auto offset = GetGlyphPosition(glyphRun, 0);
+    // Bake the text CTM translate into the GlyphPositioner origin so we don't need a cm.
+    Point adjustedOrigin = {offset.x + textTx, offset.y + textTy};
+    GlyphPositioner glyphPositioner(content, glyphRun.font.getMetrics().leading, adjustedOrigin);
+    PDFFont* font = nullptr;
+    for (size_t index = 0; index < glyphRun.glyphCount; ++index) {
+      auto glyphID = glyphRun.glyphs[index];
+      if (NeedsNewFont(font, glyphID,
+                       PDFFont::FontType(*pdfStrike, *PDFFont::GetAdvancedInfo(
+                                                         pdfStrike->strikeSpec.typeface, textSize,
+                                                         document)))) {
+        font = pdfStrike->getFontResource(glyphID);
+        if (!font) {
+          continue;
+        }
+        glyphPositioner.setFont(font);
+        PDFWriteResourceName(content, PDFResourceType::Font,
+                             add_resource(fontResources, font->indirectReference()));
+        content->writeText(" ");
+        PDFUtils::AppendFloat(textSize, content);
+        content->writeText(" Tf\n");
+      }
+      if (!font) {
+        continue;
+      }
+      font->noteGlyphUsage(glyphID);
+      GlyphID encodedGlyph = font->glyphToPDFFontEncoding(glyphID);
+      float advance = advanceScale * glyphRun.font.getAdvance(glyphID);
+      auto pos = GetGlyphPosition(glyphRun, index);
+      pos.x += textTx;
+      pos.y += textTy;
+      glyphPositioner.writeGlyph(encodedGlyph, advance, pos);
+    }
+  }
+  content->writeText("ET\n");
+  // The q opened here will be closed by drawImage after the image is drawn.
 }
 
 void PDFExportContext::drawPicture(std::shared_ptr<Picture> picture, const Matrix& matrix,

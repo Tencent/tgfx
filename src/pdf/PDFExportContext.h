@@ -181,6 +181,12 @@ class PDFExportContext : public DrawContext {
   std::unordered_set<PDFIndirectReference> shaderResources;
   std::unordered_set<PDFIndirectReference> fontResources;
 
+  std::shared_ptr<TextBlob> lastTextBlob = nullptr;
+  Matrix lastTextMatrix = Matrix::I();
+  bool textClipMode = false;
+
+  void emitPendingTextClip();
+
   friend class ScopedContentEntry;
   friend class PDFFont;
 };

@@ -1493,7 +1493,8 @@ TGFX_TEST(PDFExportTest, TextMultiLineTd) {
   textLayer->setFont(Font(typeface, 40.f));
   textLayer->setMatrix(Matrix::MakeTrans(50.f, 50.f));
   textLayer->setLayerStyles(
-      {NoiseStyle::MakeMono(8.f, 0.5f, Color::FromRGBA(255, 0, 0, 128), 42.f)});
+      {NoiseStyle::MakeDuo(8.f, 1.f, Color::FromRGBA(255, 0, 0, 128),
+                           Color::FromRGBA(0, 0, 255, 128), 42.f)});
   root->addChild(textLayer);
 
   // Export PDF.
