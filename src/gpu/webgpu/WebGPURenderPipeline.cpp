@@ -252,6 +252,9 @@ bool WebGPURenderPipeline::createPipelineState(WebGPUGPU* gpu,
 
   // Also create a TriangleStrip variant since WebGPU requires topology at pipeline creation time,
   // but TGFX specifies it at draw time. Many draw calls use TriangleStrip(4 vertices) for quads.
+  // NOTE: stripIndexFormat is hardcoded to UInt16. All current TriangleStrip usage in tgfx is
+  // non-indexed draw(). If indexed TriangleStrip + UInt32 is needed in the future, a separate
+  // UInt32 strip variant must be created.
   pipelineDesc.primitive.topology = WGPUPrimitiveTopology_TriangleStrip;
   pipelineDesc.primitive.stripIndexFormat = WGPUIndexFormat_Uint16;
   wgpuDevicePushErrorScope(gpu->device(), WGPUErrorFilter_Validation);

@@ -46,6 +46,7 @@ void WebGPUCaps::initLimits(WGPUDevice) {
   // GPUSupportedLimits may not include all property names that the Emscripten WebGPU
   // binding expects (e.g. maxBindGroupsPlusVertexBuffers), causing 'undefined' to be
   // written into the integer heap. Use conservative defaults instead.
+  // TODO: Switch to wgpuDeviceGetLimits when Emscripten WebGPU bindings stabilize.
   gpuLimits.maxTextureDimension2D = 8192;
   gpuLimits.maxSamplersPerShaderStage = 16;
   gpuLimits.maxUniformBufferBindingSize = 65536;
