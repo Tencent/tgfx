@@ -634,24 +634,17 @@ void PDFExportContext::emitPendingTextClip() {
     return;
   }
   // Drain any existing graphics state and start a fresh q for the text clip scope.
-  // No cm is applied here — the text CTM translate is baked into Tm so that the text clip is
-  // defined in the initial page coordinate system (after y-flip). This way subsequent image draws
-  // with their own cm transforms are not affected by a leftover translate.
+  // The full lastTextMatrix (including scale/rotation) is baked into each glyph's Tm so that the
+  // text clip is defined in the initial page coordinate system (after y-flip). This way subsequent
+  // image draws with their own cm transforms are not affected by a leftover CTM transform.
   activeStackState.drainStack();
   activeStackState = PDFGraphicStackState(content);
   content->writeText("q\n");
   content->writeText("BT\n7 Tr\n");
-  // Note: Only the translation component of lastTextMatrix is used here. Scale, rotation, and
-  // skew are not applied to the text clip. This is acceptable because TextLayer with Above
-  // LayerStyles is typically drawn with identity scale/rotation at the canvas level.
-  float textTx = lastTextMatrix.getTranslateX();
-  float textTy = lastTextMatrix.getTranslateY();
   for (auto glyphRun : *lastTextBlob) {
     if (glyphRun.glyphCount == 0) {
       continue;
     }
-    // Text clip via Tr 7 relies on glyph-level positioning (Td). Complex transforms such as
-    // RSXform and Matrix cannot be represented by PDF text operators; skip these runs.
     if (HasComplexTransform(glyphRun)) {
       continue;
     }
@@ -660,11 +653,6 @@ void PDFExportContext::emitPendingTextClip() {
       continue;
     }
     auto textSize = pdfStrike->strikeSpec.textSize;
-    float advanceScale = textSize / pdfStrike->strikeSpec.unitsPerEM;
-    auto offset = GetGlyphPosition(glyphRun, 0);
-    // Bake the text CTM translate into the GlyphPositioner origin so we don't need a cm.
-    Point adjustedOrigin = {offset.x + textTx, offset.y + textTy};
-    GlyphPositioner glyphPositioner(content, glyphRun.font.getMetrics().leading, adjustedOrigin);
     PDFFont* font = nullptr;
     for (size_t index = 0; index < glyphRun.glyphCount; ++index) {
       auto glyphID = glyphRun.glyphs[index];
@@ -676,7 +664,6 @@ void PDFExportContext::emitPendingTextClip() {
         if (!font) {
           continue;
         }
-        glyphPositioner.setFont(font);
         PDFWriteResourceName(content, PDFResourceType::Font,
                              add_resource(fontResources, font->indirectReference()));
         content->writeText(" ");
@@ -688,11 +675,37 @@ void PDFExportContext::emitPendingTextClip() {
       }
       font->noteGlyphUsage(glyphID);
       GlyphID encodedGlyph = font->glyphToPDFFontEncoding(glyphID);
-      float advance = advanceScale * glyphRun.font.getAdvance(glyphID);
+      // Compute per-glyph Tm that includes the full text matrix (translate + rotate + scale)
+      // and the glyph's local position with y-flip.
       auto pos = GetGlyphPosition(glyphRun, index);
-      pos.x += textTx;
-      pos.y += textTy;
-      glyphPositioner.writeGlyph(encodedGlyph, advance, pos);
+      // Glyph local matrix: translate to glyph position, then y-flip for PDF text rendering.
+      // localTm = [1, 0, 0, -1, pos.x, pos.y]
+      // Combined Tm = lastTextMatrix * localTm
+      Matrix glyphTm = Matrix::MakeTrans(pos.x, pos.y);
+      glyphTm.preScale(1.f, -1.f);
+      Matrix combinedTm = lastTextMatrix;
+      combinedTm.preConcat(glyphTm);
+      // Write Tm: a b c d e f
+      PDFUtils::AppendFloat(combinedTm.getScaleX(), content);
+      content->writeText(" ");
+      PDFUtils::AppendFloat(combinedTm.getSkewY(), content);
+      content->writeText(" ");
+      PDFUtils::AppendFloat(combinedTm.getSkewX(), content);
+      content->writeText(" ");
+      PDFUtils::AppendFloat(combinedTm.getScaleY(), content);
+      content->writeText(" ");
+      PDFUtils::AppendFloat(combinedTm.getTranslateX(), content);
+      content->writeText(" ");
+      PDFUtils::AppendFloat(combinedTm.getTranslateY(), content);
+      content->writeText(" Tm\n");
+      // Write glyph
+      content->writeText("<");
+      if (font->multiByteGlyphs()) {
+        PDFUtils::WriteUInt16BE(content, encodedGlyph);
+      } else {
+        PDFUtils::WriteUInt8(content, static_cast<uint8_t>(encodedGlyph));
+      }
+      content->writeText("> Tj\n");
     }
   }
   content->writeText("ET\n");
