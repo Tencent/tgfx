@@ -130,6 +130,10 @@ BackendSemaphore WebGPUGPU::stealBackendSemaphore(std::shared_ptr<Semaphore>) {
 }
 
 uint32_t WebGPUGPU::MakeSamplerKey(const SamplerDescriptor& descriptor) {
+  // Each field occupies 4 bits (max 16 enum values). Static asserts guard against overflow.
+  static_assert(static_cast<int>(AddressMode::ClampToBorder) < 16, "AddressMode exceeds 4 bits");
+  static_assert(static_cast<int>(FilterMode::Linear) < 16, "FilterMode exceeds 4 bits");
+  static_assert(static_cast<int>(MipmapMode::Linear) < 16, "MipmapMode exceeds 4 bits");
   uint32_t key = 0;
   key |= static_cast<uint32_t>(descriptor.addressModeX);
   key |= static_cast<uint32_t>(descriptor.addressModeY) << 4;
