@@ -150,8 +150,7 @@ class MonoNoiseStyle : public NoiseStyle {
   }
 
   void onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-              const Point& contentOffset, float alpha, BlendMode blendMode,
-              const Path* contentClipPath = nullptr) override;
+              const Point& contentOffset, float alpha, BlendMode blendMode) override;
 
  private:
   MonoNoiseStyle(float size, float density, const Color& color, float seed);
@@ -197,8 +196,7 @@ class DuoNoiseStyle : public NoiseStyle {
   }
 
   void onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-              const Point& contentOffset, float alpha, BlendMode blendMode,
-              const Path* contentClipPath = nullptr) override;
+              const Point& contentOffset, float alpha, BlendMode blendMode) override;
 
  private:
   DuoNoiseStyle(float size, float density, const Color& firstColor, const Color& secondColor,
@@ -234,8 +232,7 @@ class MultiNoiseStyle : public NoiseStyle {
   }
 
   void onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-              const Point& contentOffset, float alpha, BlendMode blendMode,
-              const Path* contentClipPath = nullptr) override;
+              const Point& contentOffset, float alpha, BlendMode blendMode) override;
 
  private:
   MultiNoiseStyle(float size, float density, float opacity, float seed);
