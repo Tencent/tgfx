@@ -1,0 +1,8 @@
+../include/
+../src/
+../CMakeLists.txt
+../vendor.json
+../DEPS
+../hello2d
+./demo/src
+./demo/CMakeLists.txt

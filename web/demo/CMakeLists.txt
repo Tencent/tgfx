@@ -52,5 +52,11 @@ target_compile_options(hello2d PUBLIC ${H2D_COMPILE_OPTIONS})
 target_link_options(hello2d PUBLIC ${H2D_LINK_OPTIONS})
 if (TGFX_USE_WEBGPU)
     target_compile_definitions(hello2d PRIVATE TGFX_USE_WEBGPU ${TGFX_DEFINES})
+    # The WebGPU JS binding glue in this demo currently reaches into tgfx's internal WebGPU
+    # types (e.g., WebGPUBuffer) to expose the native WGPUBuffer handle to JS-side mapAsync.
+    # Grant access to tgfx/src and the headers transitively required by that include chain.
+    target_include_directories(hello2d PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../src
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/concurrentqueue)
 endif ()
 target_link_libraries(hello2d tgfx-hello2d tgfx ${HELLO_2D_SHARED_LIBS})

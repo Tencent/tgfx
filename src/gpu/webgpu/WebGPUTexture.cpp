@@ -112,7 +112,7 @@ BackendTexture WebGPUTexture::getBackendTexture() const {
   info.texture = texture;
   info.textureView = textureView;
   info.format = static_cast<uint32_t>(wgpuFormat);
-  return {info, descriptor.width, descriptor.height};
+  return BackendTexture(info, descriptor.width, descriptor.height);
 }
 
 BackendRenderTarget WebGPUTexture::getBackendRenderTarget() const {
@@ -123,7 +123,7 @@ BackendRenderTarget WebGPUTexture::getBackendRenderTarget() const {
   info.texture = texture;
   info.textureView = textureView;
   info.format = static_cast<uint32_t>(wgpuFormat);
-  return {info, descriptor.width, descriptor.height};
+  return BackendRenderTarget(info, descriptor.width, descriptor.height);
 }
 
 void WebGPUTexture::onRelease(WebGPUGPU*) {
