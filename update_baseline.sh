@@ -10,8 +10,20 @@
 #   ./update_baseline.sh USE_VULKAN                 # Vulkan (真机 GPU)
 #   ./update_baseline.sh USE_VULKAN_SWIFTSHADER     # Vulkan (SwiftShader)
 #   ./update_baseline.sh USE_METAL                  # Metal (Apple GPU)
+#   ./update_baseline.sh USE_WEBGL                  # Web (WebGL)
+#   ./update_baseline.sh USE_WEBGPU                 # Web (WebGPU)
 
 {
+  # Web backends are handled by a separate script with Emscripten toolchain.
+  case "$1" in
+    USE_WEBGL)
+      TGFX_WEB_BASELINE_INVOKED=1 exec bash web/test/update_web_baseline.sh webgl
+      ;;
+    USE_WEBGPU)
+      TGFX_WEB_BASELINE_INVOKED=1 exec bash web/test/update_web_baseline.sh webgpu
+      ;;
+  esac
+
   # Determine cmake args and backend name
   case "$1" in
     USE_OPENGL_SWIFTSHADER)

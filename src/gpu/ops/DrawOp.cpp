@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawOp.h"
+#include <algorithm>
 #include "gpu/AlignTo.h"
 #include "gpu/Program.h"
 
@@ -49,9 +50,16 @@ void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   if (scissorRect.isEmpty()) {
     renderPass->setScissorRect(0, 0, renderTarget->width(), renderTarget->height());
   } else {
-    renderPass->setScissorRect(static_cast<int>(scissorRect.x()), static_cast<int>(scissorRect.y()),
-                               static_cast<int>(scissorRect.width()),
-                               static_cast<int>(scissorRect.height()));
+    // Clamp scissor rect to render target bounds
+    int scissorX = std::max(0, static_cast<int>(scissorRect.x()));
+    int scissorY = std::max(0, static_cast<int>(scissorRect.y()));
+    int scissorRight =
+        std::min(renderTarget->width(), static_cast<int>(scissorRect.x() + scissorRect.width()));
+    int scissorBottom =
+        std::min(renderTarget->height(), static_cast<int>(scissorRect.y() + scissorRect.height()));
+    int scissorWidth = std::max(0, scissorRight - scissorX);
+    int scissorHeight = std::max(0, scissorBottom - scissorY);
+    renderPass->setScissorRect(scissorX, scissorY, scissorWidth, scissorHeight);
   }
   onDraw(renderPass);
 }

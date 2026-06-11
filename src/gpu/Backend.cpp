@@ -20,6 +20,7 @@
 #include "metal/MetalDefines.h"
 #include "opengl/GLDefines.h"
 #include "vulkan/VulkanDefines.h"
+#include "webgpu/WebGPUDefines.h"
 
 namespace tgfx {
 
@@ -63,6 +64,9 @@ BackendTexture& BackendTexture::operator=(const BackendTexture& that) {
     case Backend::Vulkan:
       vulkanInfo = that.vulkanInfo;
       break;
+    case Backend::WebGPU:
+      webgpuInfo = that.webgpuInfo;
+      break;
     default:
       break;
   }
@@ -80,6 +84,8 @@ PixelFormat BackendTexture::format() const {
       return MetalPixelFormatToPixelFormat(metalInfo.format);
     case Backend::Vulkan:
       return VulkanFormatToPixelFormat(vulkanInfo.format);
+    case Backend::WebGPU:
+      return WebGPUTextureFormatToPixelFormat(webgpuInfo.format);
     default:
       break;
   }
@@ -110,6 +116,14 @@ bool BackendTexture::getVulkanImageInfo(VulkanImageInfo* vulkanImageInfo) const 
   return true;
 }
 
+bool BackendTexture::getWebGPUTextureInfo(WebGPUTextureInfo* webgpuTextureInfo) const {
+  if (!isValid() || _backend != Backend::WebGPU) {
+    return false;
+  }
+  *webgpuTextureInfo = webgpuInfo;
+  return true;
+}
+
 BackendRenderTarget& BackendRenderTarget::operator=(const BackendRenderTarget& that) {
   if (!that.isValid()) {
     _width = _height = 0;
@@ -128,6 +142,9 @@ BackendRenderTarget& BackendRenderTarget::operator=(const BackendRenderTarget& t
     case Backend::Vulkan:
       vulkanInfo = that.vulkanInfo;
       break;
+    case Backend::WebGPU:
+      webgpuInfo = that.webgpuInfo;
+      break;
     default:
       break;
   }
@@ -145,6 +162,8 @@ PixelFormat BackendRenderTarget::format() const {
       return MetalPixelFormatToPixelFormat(metalInfo.format);
     case Backend::Vulkan:
       return VulkanFormatToPixelFormat(vulkanInfo.format);
+    case Backend::WebGPU:
+      return WebGPUTextureFormatToPixelFormat(webgpuInfo.format);
     default:
       break;
   }
@@ -175,6 +194,14 @@ bool BackendRenderTarget::getVulkanImageInfo(VulkanImageInfo* vulkanImageInfo) c
   return true;
 }
 
+bool BackendRenderTarget::getWebGPUTextureInfo(WebGPUTextureInfo* webgpuTextureInfo) const {
+  if (!isValid() || _backend != Backend::WebGPU) {
+    return false;
+  }
+  *webgpuTextureInfo = webgpuInfo;
+  return true;
+}
+
 BackendSemaphore& BackendSemaphore::operator=(const BackendSemaphore& that) {
   _backend = that._backend;
   switch (that._backend) {
@@ -186,6 +213,9 @@ BackendSemaphore& BackendSemaphore::operator=(const BackendSemaphore& that) {
       break;
     case Backend::Vulkan:
       vulkanSyncInfo = that.vulkanSyncInfo;
+      break;
+    case Backend::WebGPU:
+      webgpuSyncInfo = that.webgpuSyncInfo;
       break;
     default:
       break;
@@ -201,6 +231,9 @@ bool BackendSemaphore::isInitialized() const {
       return metalSyncInfo.event != nullptr;
     case Backend::Vulkan:
       return vulkanSyncInfo.semaphore != 0;
+    case Backend::WebGPU:
+      // WebGPU has no explicit semaphore handle; synchronization is managed by the browser.
+      return true;
     default:
       break;
   }
@@ -228,6 +261,14 @@ bool BackendSemaphore::getVulkanSync(VulkanSyncInfo* vulkanSyncInfo) const {
     return false;
   }
   *vulkanSyncInfo = this->vulkanSyncInfo;
+  return true;
+}
+
+bool BackendSemaphore::getWebGPUSync(WebGPUSyncInfo* webgpuInfo) const {
+  if (_backend != Backend::WebGPU) {
+    return false;
+  }
+  *webgpuInfo = webgpuSyncInfo;
   return true;
 }
 

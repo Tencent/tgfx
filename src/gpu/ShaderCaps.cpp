@@ -76,6 +76,12 @@ ShaderCaps::ShaderCaps(GPU* gpu) {
     // the [[color(0)]] attribute when use_framebuffer_fetch_subpasses is enabled.
     frameBufferFetchSupport = true;
     frameBufferFetchUsesSubpassInput = true;
+  } else if (info->backend == Backend::WebGPU) {
+    // WebGPU does not support framebuffer fetch. The shader generation path uses subpassInput
+    // style for consistency with Metal, but the feature is disabled.
+    frameBufferFetchSupport = false;
+    frameBufferFetchUsesSubpassInput = true;
+    requiresUniformControlFlow = true;
   } else if (HasExtension(info, "GL_EXT_shader_framebuffer_fetch")) {
     frameBufferFetchNeedsCustomOutput = true;
     frameBufferFetchSupport = true;
