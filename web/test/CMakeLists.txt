@@ -123,13 +123,6 @@ target_compile_options(tgfx-test PRIVATE
     -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0
 )
 
-target_compile_definitions(tgfx-test PRIVATE
-    GENERATE_BASELINE_IMAGES
-    TGFX_BACKEND_NAME="${TGFX_BACKEND_NAME}"
-    $<$<BOOL:${TGFX_UPDATE_BASELINE}>:UPDATE_BASELINE>
-    ${ASYNCIFY_COMPILE_DEFS}
-)
-
 if (TGFX_USE_WEBGPU)
     set(WEB_GRAPHICS_LINK_OPTIONS -sUSE_WEBGPU=1)
 else ()
@@ -157,6 +150,13 @@ else ()
     set(ASYNCIFY_LINK_OPTIONS "")
     set(ASYNCIFY_COMPILE_DEFS "")
 endif ()
+
+target_compile_definitions(tgfx-test PRIVATE
+    GENERATE_BASELINE_IMAGES
+    TGFX_BACKEND_NAME="${TGFX_BACKEND_NAME}"
+    $<$<BOOL:${TGFX_UPDATE_BASELINE}>:UPDATE_BASELINE>
+    ${ASYNCIFY_COMPILE_DEFS}
+)
 
 target_link_options(tgfx-test PRIVATE
     -lembind
