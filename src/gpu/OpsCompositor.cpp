@@ -82,7 +82,7 @@ void OpsCompositor::fillImage(std::shared_ptr<Image> image, const SamplingOption
 void OpsCompositor::fillImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
                                   const Rect& dstRect, const SamplingOptions& sampling,
                                   const Matrix& matrix, const ClipStack& clip, const Brush& brush,
-                                  SrcRectConstraint constraint) {
+                                  SrcRectConstraint constraint, const Rect* strictRect) {
   DEBUG_ASSERT(image != nullptr);
   DEBUG_ASSERT(!srcRect.isEmpty());
   DEBUG_ASSERT(!dstRect.isEmpty());
@@ -97,6 +97,14 @@ void OpsCompositor::fillImageRect(std::shared_ptr<Image> image, const Rect& srcR
   auto record = drawingAllocator()->make<RectRecord>(dstRect, matrix, brushInLocal.color);
   pendingRects.emplace_back(std::move(record));
   pendingUVRects.emplace_back(drawingAllocator()->make<Rect>(srcRect));
+  // For Strict mode, track a per-rect subset rectangle, falling back to srcRect when strictRect is
+  // null. The parallel array keeps indices aligned with pendingRects, simplifying flush-time
+  // access. Non-Strict ops never reach the subset path (see flushPendingOps), so the extra
+  // memory is harmless.
+  if (constraint == SrcRectConstraint::Strict) {
+    pendingSubsetRects.emplace_back(
+        drawingAllocator()->make<Rect>(strictRect != nullptr ? *strictRect : srcRect));
+  }
   if (!hasRectToRectDraw && srcRect != dstRect) {
     hasRectToRectDraw = true;
   }
@@ -338,6 +346,7 @@ void OpsCompositor::resetPendingOps(PendingOpType type, ClipStack clip, Brush br
   pendingConstraint = SrcRectConstraint::Fast;
   pendingRects.clear();
   pendingUVRects.clear();
+  pendingSubsetRects.clear();
   pendingRRects.clear();
   pendingStrokes.clear();
   pendingAtlasTexture = nullptr;
@@ -519,9 +528,12 @@ void OpsCompositor::flushPendingOps(PendingOpType type, ClipStack clip, Brush br
           needLocalBounds && (hasRectToRectDraw || HasDifferentViewMatrix(pendingRects));
       auto uvRects =
           hasRectToRectDraw ? std::move(pendingUVRects) : std::vector<PlacementPtr<Rect>>();
+      // pendingSubsetRects is populated only when constraint == Strict (per fillImageRect).
+      // When subsetMode != None we must provide subset rects of the same size as pendingRects.
+      auto subsetRects = std::move(pendingSubsetRects);
       auto provider = RectsVertexProvider::MakeFrom(
-          drawingAllocator(), std::move(pendingRects), std::move(uvRects), aaType, needUVCoord,
-          subsetMode, std::move(pendingStrokes), dstColorSpace);
+          drawingAllocator(), std::move(pendingRects), std::move(uvRects), std::move(subsetRects),
+          aaType, needUVCoord, subsetMode, std::move(pendingStrokes), dstColorSpace);
       drawOp = RectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     case PendingOpType::RRect: {
@@ -532,7 +544,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, ClipStack clip, Brush br
     } break;
     case PendingOpType::Atlas: {
       auto provider =
-          RectsVertexProvider::MakeFrom(drawingAllocator(), std::move(pendingRects), {},
+          RectsVertexProvider::MakeFrom(drawingAllocator(), std::move(pendingRects), {}, {},
                                         AAType::None, true, UVSubsetMode::None, {}, dstColorSpace);
       drawOp = AtlasTextOp::Make(context, std::move(provider), renderFlags,
                                  std::move(pendingAtlasTexture), pendingSampling);
@@ -755,8 +767,9 @@ AppliedClip OpsCompositor::applyClip(const ClipStack& clipStack) {
     return out;
   }
   clipBounds.roundOut();
-  FlipYIfNeeded(&clipBounds, renderTarget.get());
-  out.scissor = clipBounds;
+  auto scissorBounds = clipBounds;
+  FlipYIfNeeded(&scissorBounds, renderTarget.get());
+  out.scissor = scissorBounds;
 
   // Stage 3: Iterate through valid elements.
   auto& elements = clipStack.elements();

@@ -110,7 +110,7 @@ void OpaqueContext::drawImage(std::shared_ptr<Image> image, const SamplingOption
 void OpaqueContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
                                   const Rect& dstRect, const SamplingOptions& sampling,
                                   const Matrix& matrix, const ClipStack& clip, const Brush& brush,
-                                  SrcRectConstraint constraint) {
+                                  SrcRectConstraint constraint, const Rect* strictRect) {
   if (constraint != SrcRectConstraint::Strict) {
     auto newMatrix = matrix;
     newMatrix.preConcat(MakeRectToRectMatrix(srcRect, dstRect));
@@ -129,7 +129,8 @@ void OpaqueContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcR
     return;
   }
   flushPendingContour();
-  pictureContext.drawImageRect(image, srcRect, dstRect, sampling, matrix, clip, brush, constraint);
+  pictureContext.drawImageRect(image, srcRect, dstRect, sampling, matrix, clip, brush, constraint,
+                               strictRect);
 }
 
 void OpaqueContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const Matrix& matrix,

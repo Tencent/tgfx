@@ -3374,6 +3374,39 @@ TGFX_TEST(LayerTest, BackgroundBlurWithFilter) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundBlurWithFilter_Partial"));
 }
 
+TGFX_TEST(LayerTest, BackgroundColor) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto bgColor = Color::FromRGBA(200, 50, 50);
+  const int surfaceWidth = 100;
+  const int surfaceHeight = 80;
+
+  // Test 1: DisplayList::render() should paint backgroundColor
+  {
+    auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+    ASSERT_TRUE(surface != nullptr);
+    auto displayList = std::make_unique<DisplayList>();
+    displayList->setBackgroundColor(bgColor);
+    displayList->render(surface.get());
+    context->flushAndSubmit();
+    EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundColor_Render"));
+  }
+
+  // Test 2: Layer::draw() on root layer should NOT paint backgroundColor
+  {
+    auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+    ASSERT_TRUE(surface != nullptr);
+    auto displayList = std::make_unique<DisplayList>();
+    displayList->setBackgroundColor(bgColor);
+    // Draw via Layer::draw() directly on root layer — backgroundColor must not appear
+    displayList->root()->draw(surface->getCanvas());
+    context->flushAndSubmit();
+    EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundColor_Draw"));
+  }
+}
+
 static const Color YELLOW_COLOR = {1.0f, 1.0f, 0.0f, 1.0f};
 
 enum class ShadowType { Drop, Inner };

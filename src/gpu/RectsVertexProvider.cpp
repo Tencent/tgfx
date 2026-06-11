@@ -18,6 +18,7 @@
 
 #include "RectsVertexProvider.h"
 #include <array>
+#include <cstring>
 #include "core/ColorSpaceXformSteps.h"
 #include "core/utils/ColorHelper.h"
 #include "core/utils/ColorSpaceHelper.h"
@@ -34,7 +35,16 @@ inline void ApplySubsetMode(UVSubsetMode mode, Rect* rect) {
   if (mode == UVSubsetMode::RoundOutAndSubset) {
     rect->roundOut();
   }
-  rect->inset(0.5f, 0.5f);
+  // Inset by half a texel and pin the result to the rect center. When the rect is narrower
+  // than 1 texel, plain inset would invert it; pinning to center keeps the resulting span
+  // non-inverted (collapsed to a point in the worst case) so the shader receives a
+  // geometrically valid subset.
+  const auto cx = rect->centerX();
+  const auto cy = rect->centerY();
+  rect->left = std::min(rect->left + 0.5f, cx);
+  rect->top = std::min(rect->top + 0.5f, cy);
+  rect->right = std::max(rect->right - 0.5f, cx);
+  rect->bottom = std::max(rect->bottom - 0.5f, cy);
 }
 
 inline void WriteSubset(float* vertices, size_t& index, const Rect& subset) {
@@ -47,11 +57,13 @@ inline void WriteSubset(float* vertices, size_t& index, const Rect& subset) {
 class AARectsVertexProvider : public RectsVertexProvider {
  public:
   AARectsVertexProvider(PlacementArray<RectRecord>&& rects, PlacementArray<Rect>&& uvRects,
-                        AAType aaType, bool hasUVCoord, bool hasColor, UVSubsetMode subsetMode,
+                        PlacementArray<Rect>&& subsetRects, AAType aaType, bool hasUVCoord,
+                        bool hasColor, UVSubsetMode subsetMode,
                         std::shared_ptr<BlockAllocator> reference,
                         std::shared_ptr<ColorSpace> colorSpace = nullptr)
-      : RectsVertexProvider(std::move(rects), std::move(uvRects), aaType, hasUVCoord, hasColor,
-                            subsetMode, std::move(reference), std::move(colorSpace)) {
+      : RectsVertexProvider(std::move(rects), std::move(uvRects), std::move(subsetRects), aaType,
+                            hasUVCoord, hasColor, subsetMode, std::move(reference),
+                            std::move(colorSpace)) {
   }
 
   size_t vertexCount() const override {
@@ -69,6 +81,7 @@ class AARectsVertexProvider : public RectsVertexProvider {
     size_t index = 0;
     bool needSubset = static_cast<UVSubsetMode>(bitFields.subsetMode) != UVSubsetMode::None;
     auto hasUVRect = !uvRects.empty();
+    auto hasSubsetRect = !subsetRects.empty();
     auto rectCount = rects.size();
     std::unique_ptr<ColorSpaceXformSteps> steps = nullptr;
     if (bitFields.hasColor && NeedConvertColorSpace(ColorSpace::SRGB(), _dstColorSpace)) {
@@ -80,10 +93,9 @@ class AARectsVertexProvider : public RectsVertexProvider {
       auto& record = rects[i];
       auto& viewMatrix = record->viewMatrix;
       auto& rect = record->rect;
-      float compressedColor = 0.f;
+      uint32_t uintColor = 0;
       if (bitFields.hasColor) {
-        uint32_t uintColor = ToUintPMColor(record->color, steps.get());
-        compressedColor = *reinterpret_cast<float*>(&uintColor);
+        uintColor = ToUintPMColor(record->color, steps.get());
       }
 
       auto scale = sqrtf(viewMatrix.getScaleX() * viewMatrix.getScaleX() +
@@ -103,6 +115,9 @@ class AARectsVertexProvider : public RectsVertexProvider {
         outsetUV = uvRect.makeOutset(padding, padding);
         subset = uvRect;
       }
+      if (hasSubsetRect) {
+        subset = *subsetRects[i];
+      }
       if (needSubset) {
         ApplySubsetMode(static_cast<UVSubsetMode>(bitFields.subsetMode), &subset);
       }
@@ -121,7 +136,7 @@ class AARectsVertexProvider : public RectsVertexProvider {
             vertices[index++] = uvQuad.point(k).y;
           }
           if (bitFields.hasColor) {
-            vertices[index++] = compressedColor;
+            std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
           }
           if (needSubset) {
             WriteSubset(vertices, index, subset);
@@ -135,11 +150,13 @@ class AARectsVertexProvider : public RectsVertexProvider {
 class NonAARectsVertexProvider : public RectsVertexProvider {
  public:
   NonAARectsVertexProvider(PlacementArray<RectRecord>&& rects, PlacementArray<Rect>&& uvRects,
-                           AAType aaType, bool hasUVCoord, bool hasColor, UVSubsetMode subsetMode,
+                           PlacementArray<Rect>&& subsetRects, AAType aaType, bool hasUVCoord,
+                           bool hasColor, UVSubsetMode subsetMode,
                            std::shared_ptr<BlockAllocator> reference,
                            std::shared_ptr<ColorSpace> colorSpace = nullptr)
-      : RectsVertexProvider(std::move(rects), std::move(uvRects), aaType, hasUVCoord, hasColor,
-                            subsetMode, std::move(reference), std::move(colorSpace)) {
+      : RectsVertexProvider(std::move(rects), std::move(uvRects), std::move(subsetRects), aaType,
+                            hasUVCoord, hasColor, subsetMode, std::move(reference),
+                            std::move(colorSpace)) {
   }
 
   size_t vertexCount() const override {
@@ -157,6 +174,7 @@ class NonAARectsVertexProvider : public RectsVertexProvider {
     size_t index = 0;
     bool needSubset = static_cast<UVSubsetMode>(bitFields.subsetMode) != UVSubsetMode::None;
     auto hasUVRect = !uvRects.empty();
+    auto hasSubsetRect = !subsetRects.empty();
     auto rectCount = rects.size();
     std::unique_ptr<ColorSpaceXformSteps> steps = nullptr;
     if (bitFields.hasColor && NeedConvertColorSpace(ColorSpace::SRGB(), _dstColorSpace)) {
@@ -168,15 +186,15 @@ class NonAARectsVertexProvider : public RectsVertexProvider {
       auto& record = rects[i];
       auto& viewMatrix = record->viewMatrix;
       auto& rect = record->rect;
-      float compressedColor = 0.f;
+      uint32_t uintColor = 0;
       if (bitFields.hasColor) {
-        uint32_t uintColor = ToUintPMColor(record->color, steps.get());
-        compressedColor = *reinterpret_cast<float*>(&uintColor);
+        uintColor = ToUintPMColor(record->color, steps.get());
       }
       auto quad = Quad::MakeFrom(rect, &viewMatrix);
       auto& uvRect = hasUVRect ? *uvRects[i] : rect;
       auto uvQuad = Quad::MakeFrom(uvRect);
-      auto subset = uvRect;
+      // Per-rect subset overrides uvRect-derived subset when provided.
+      auto subset = hasSubsetRect ? *subsetRects[i] : uvRect;
       if (needSubset) {
         ApplySubsetMode(static_cast<UVSubsetMode>(bitFields.subsetMode), &subset);
       }
@@ -188,7 +206,7 @@ class NonAARectsVertexProvider : public RectsVertexProvider {
           vertices[index++] = uvQuad.point(j - 1).y;
         }
         if (bitFields.hasColor) {
-          vertices[index++] = compressedColor;
+          std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
         }
         if (needSubset) {
           WriteSubset(vertices, index, subset);
@@ -209,7 +227,7 @@ class AAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
                                      bool hasUVCoord, bool hasColor,
                                      std::shared_ptr<BlockAllocator> reference,
                                      std::shared_ptr<ColorSpace> colorSpace = nullptr)
-      : RectsVertexProvider(std::move(rects), std::move(uvRects), aaType, hasUVCoord, hasColor,
+      : RectsVertexProvider(std::move(rects), std::move(uvRects), {}, aaType, hasUVCoord, hasColor,
                             UVSubsetMode::None, std::move(reference), std::move(colorSpace)),
         strokes(std::move(strokes)) {
     DEBUG_ASSERT(!this->strokes.empty() && this->strokes.size() == this->rects.size());
@@ -217,7 +235,7 @@ class AAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
   }
 
   void writeQuad(float* vertices, size_t& index, const Quad& quad, const Quad& uvQuad,
-                 float compressedColor, float coverage) const {
+                 uint32_t uintColor, float coverage) const {
     for (size_t i = 0; i < 4; ++i) {
       vertices[index++] = quad.point(i).x;
       vertices[index++] = quad.point(i).y;
@@ -227,7 +245,7 @@ class AAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
         vertices[index++] = uvQuad.point(i).y;
       }
       if (bitFields.hasColor) {
-        vertices[index++] = compressedColor;
+        std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
       }
     }
   }
@@ -273,10 +291,9 @@ class AAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
       auto inUV = inSide;
       auto assistUV = outSideAssist;
       float vOffset = 0.0f;
-      float compressedColor = 0.f;
+      uint32_t uintColor = 0;
       if (bitFields.hasColor) {
-        uint32_t uintColor = ToUintPMColor(record->color, steps.get());
-        compressedColor = *reinterpret_cast<float*>(&uintColor);
+        uintColor = ToUintPMColor(record->color, steps.get());
       }
       if (hasUVCoord) {
         auto& uvRect = *uvRects[i];
@@ -332,27 +349,27 @@ class AAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
       if (hasUVCoord) {
         uvQuad = Quad::MakeFrom(outUV.makeOutset(outset, outset));
       }
-      writeQuad(vertices, index, outOutsetQuad, uvQuad, compressedColor, outerCoverage);
+      writeQuad(vertices, index, outOutsetQuad, uvQuad, uintColor, outerCoverage);
       if (isBevelJoin) {
         const auto assistOutsetQuad =
             Quad::MakeFrom(outSideAssist.makeOutset(outset, outset), &viewMatrix);
         if (hasUVCoord) {
           uvQuad = Quad::MakeFrom(assistUV.makeOutset(outset, outset));
         }
-        writeQuad(vertices, index, assistOutsetQuad, uvQuad, compressedColor, outerCoverage);
+        writeQuad(vertices, index, assistOutsetQuad, uvQuad, uintColor, outerCoverage);
       }
       const auto outInsetQuad = Quad::MakeFrom(outSide.makeInset(inset, inset), &viewMatrix);
       if (hasUVCoord) {
         uvQuad = Quad::MakeFrom(outUV.makeInset(inset, inset));
       }
-      writeQuad(vertices, index, outInsetQuad, uvQuad, compressedColor, innerCoverage);
+      writeQuad(vertices, index, outInsetQuad, uvQuad, uintColor, innerCoverage);
       if (isBevelJoin) {
         const auto assistInsetQuad =
             Quad::MakeFrom(outSideAssist.makeInset(inset, inset), &viewMatrix);
         if (hasUVCoord) {
           uvQuad = Quad::MakeFrom(assistUV.makeInset(inset, inset));
         }
-        writeQuad(vertices, index, assistInsetQuad, uvQuad, compressedColor, innerCoverage);
+        writeQuad(vertices, index, assistInsetQuad, uvQuad, uintColor, innerCoverage);
       }
       if (!isDegenerate) {
         // Interior inset rect (toward stroke).
@@ -360,7 +377,7 @@ class AAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
         if (hasUVCoord) {
           uvQuad = Quad::MakeFrom(inUV.makeOutset(inset, inset));
         }
-        writeQuad(vertices, index, innerInsetQuad, uvQuad, compressedColor, innerCoverage);
+        writeQuad(vertices, index, innerInsetQuad, uvQuad, uintColor, innerCoverage);
         // Interior outset rect (away from stroke, toward center of rect).
         Rect interiorAABoundary = inSide.makeInset(interiorOutset, interiorOutset);
         float coverageBackset = 0.0f;  // Adds back coverage when the interior AA edges cross.
@@ -391,15 +408,15 @@ class AAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
           }
           uvQuad = Quad::MakeFrom(uvBoundary);
         }
-        writeQuad(vertices, index, innerAAQuad, uvQuad, compressedColor, interiorCoverage);
+        writeQuad(vertices, index, innerAAQuad, uvQuad, uintColor, interiorCoverage);
       } else {
         // When the interior rect has become degenerate we smoosh to a single point
         const auto innerQuad = Quad::MakeFrom(inSide, &viewMatrix);
         if (hasUVCoord) {
           uvQuad = Quad::MakeFrom(inUV);
         }
-        writeQuad(vertices, index, innerQuad, uvQuad, compressedColor, innerCoverage);
-        writeQuad(vertices, index, innerQuad, uvQuad, compressedColor, innerCoverage);
+        writeQuad(vertices, index, innerQuad, uvQuad, uintColor, innerCoverage);
+        writeQuad(vertices, index, innerQuad, uvQuad, uintColor, innerCoverage);
       }
     }
   }
@@ -416,7 +433,7 @@ class NonAAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
                                         bool hasUVCoord, bool hasColor,
                                         std::shared_ptr<BlockAllocator> reference,
                                         std::shared_ptr<ColorSpace> colorSpace = nullptr)
-      : RectsVertexProvider(std::move(rects), std::move(uvRects), aaType, hasUVCoord, hasColor,
+      : RectsVertexProvider(std::move(rects), std::move(uvRects), {}, aaType, hasUVCoord, hasColor,
                             UVSubsetMode::None, std::move(reference), std::move(colorSpace)),
         strokes(std::move(strokes)) {
     DEBUG_ASSERT(!this->strokes.empty() && this->strokes.size() == this->rects.size());
@@ -424,7 +441,7 @@ class NonAAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
   }
 
   void writeQuad(float* vertices, size_t& index, const Quad& quad, const Quad& uvQuad,
-                 float compressedColor) const {
+                 uint32_t uintColor) const {
     for (size_t i = 0; i < 4; ++i) {
       vertices[index++] = quad.point(i).x;
       vertices[index++] = quad.point(i).y;
@@ -433,7 +450,7 @@ class NonAAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
         vertices[index++] = uvQuad.point(i).y;
       }
       if (bitFields.hasColor) {
-        vertices[index++] = compressedColor;
+        std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
       }
     }
   }
@@ -481,10 +498,9 @@ class NonAAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
       auto inUV = inSide;
       auto assistUV = outSideAssist;
       auto vOffset = 0.0f;
-      float compressedColor = 0.f;
+      uint32_t uintColor = 0;
       if (bitFields.hasColor) {
-        uint32_t uintColor = ToUintPMColor(record->color, steps.get());
-        compressedColor = *reinterpret_cast<float*>(&uintColor);
+        uintColor = ToUintPMColor(record->color, steps.get());
       }
       if (hasUVCoord) {
         auto& uvRect = *uvRects[i];
@@ -521,19 +537,19 @@ class NonAAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
       if (hasUVCoord) {
         uvQuad = Quad::MakeFrom(outUV);
       }
-      writeQuad(vertices, index, outQuad, uvQuad, compressedColor);
+      writeQuad(vertices, index, outQuad, uvQuad, uintColor);
       if (lineJoin() == LineJoin::Bevel) {
         const auto assistQuad = Quad::MakeFrom(outSideAssist, &viewMatrix);
         if (hasUVCoord) {
           uvQuad = Quad::MakeFrom(assistUV);
         }
-        writeQuad(vertices, index, assistQuad, uvQuad, compressedColor);
+        writeQuad(vertices, index, assistQuad, uvQuad, uintColor);
       }
       const auto inQuad = Quad::MakeFrom(inSide, &viewMatrix);
       if (hasUVCoord) {
         uvQuad = Quad::MakeFrom(inUV);
       }
-      writeQuad(vertices, index, inQuad, uvQuad, compressedColor);
+      writeQuad(vertices, index, inQuad, uvQuad, uintColor);
     }
   }
 };
@@ -547,7 +563,7 @@ class AARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
                                    AAType aaType, bool hasUVCoord, bool hasColor,
                                    std::shared_ptr<BlockAllocator> reference,
                                    std::shared_ptr<ColorSpace> colorSpace = nullptr)
-      : RectsVertexProvider(std::move(rects), std::move(uvRects), aaType, hasUVCoord, hasColor,
+      : RectsVertexProvider(std::move(rects), std::move(uvRects), {}, aaType, hasUVCoord, hasColor,
                             UVSubsetMode::None, std::move(reference), std::move(colorSpace)),
         strokes(std::move(strokes)) {
     _lineJoin = LineJoin::Round;
@@ -582,10 +598,9 @@ class AARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
       auto viewMatrix = record->viewMatrix;
       auto scales = viewMatrix.getAxisScales();
       auto rect = record->rect;
-      float compressedColor = 0.f;
+      uint32_t uintColor = 0;
       if (bitFields.hasColor) {
-        uint32_t uintColor = ToUintPMColor(record->color, steps.get());
-        compressedColor = *reinterpret_cast<float*>(&uintColor);
+        uintColor = ToUintPMColor(record->color, steps.get());
       }
       rect.scale(scales.x, scales.y);
       viewMatrix.preScale(1.0f / scales.x, 1.0f / scales.y);
@@ -639,7 +654,7 @@ class AARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
             vertices[index++] = vCoords[k];
           }
           if (hasColor) {
-            vertices[index++] = compressedColor;
+            std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
           }
         }
       }
@@ -686,7 +701,7 @@ class AARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
             vertices[index++] = uvQuad.point(k).y;
           }
           if (hasColor) {
-            vertices[index++] = compressedColor;
+            std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
           }
         }
       }
@@ -704,7 +719,7 @@ class NonAARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
                                       bool hasUVCoord, bool hasColor,
                                       std::shared_ptr<BlockAllocator> reference,
                                       std::shared_ptr<ColorSpace> colorSpace = nullptr)
-      : RectsVertexProvider(std::move(rects), std::move(uvRects), aaType, hasUVCoord, hasColor,
+      : RectsVertexProvider(std::move(rects), std::move(uvRects), {}, aaType, hasUVCoord, hasColor,
                             UVSubsetMode::None, std::move(reference), std::move(colorSpace)),
         strokes(std::move(strokes)) {
     _lineJoin = LineJoin::Round;
@@ -738,10 +753,9 @@ class NonAARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
       auto viewMatrix = record->viewMatrix;
       auto scales = viewMatrix.getAxisScales();
       auto rect = record->rect;
-      float compressedColor = 0.f;
+      uint32_t uintColor = 0;
       if (bitFields.hasColor) {
-        uint32_t uintColor = ToUintPMColor(record->color, steps.get());
-        compressedColor = *reinterpret_cast<float*>(&uintColor);
+        uintColor = ToUintPMColor(record->color, steps.get());
       }
       rect.scale(scales.x, scales.y);
       viewMatrix.preScale(1.0f / scales.x, 1.0f / scales.y);
@@ -784,7 +798,7 @@ class NonAARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
             vertices[index++] = vCoords[k];
           }
           if (hasColor) {
-            vertices[index++] = compressedColor;
+            std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
           }
         }
       }
@@ -814,7 +828,7 @@ class NonAARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
           vertices[index++] = inUVQuad.point(k).y;
         }
         if (hasColor) {
-          vertices[index++] = compressedColor;
+          std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
         }
       }
     }
@@ -829,21 +843,22 @@ PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(BlockAllocator* 
   auto record = allocator->make<RectRecord>(rect, Matrix::I());
   auto rects = allocator->makeArray<RectRecord>(&record, 1);
   auto uvRects = allocator->makeArray<Rect>(0);
+  auto subsetRects = allocator->makeArray<Rect>(0);
   if (aaType == AAType::Coverage) {
-    return allocator->make<AARectsVertexProvider>(std::move(rects), std::move(uvRects), aaType,
-                                                  false, false, UVSubsetMode::None,
-                                                  allocator->addReference());
+    return allocator->make<AARectsVertexProvider>(std::move(rects), std::move(uvRects),
+                                                  std::move(subsetRects), aaType, false, false,
+                                                  UVSubsetMode::None, allocator->addReference());
   }
-  return allocator->make<NonAARectsVertexProvider>(std::move(rects), std::move(uvRects), aaType,
-                                                   false, false, UVSubsetMode::None,
-                                                   allocator->addReference());
+  return allocator->make<NonAARectsVertexProvider>(std::move(rects), std::move(uvRects),
+                                                   std::move(subsetRects), aaType, false, false,
+                                                   UVSubsetMode::None, allocator->addReference());
 }
 
 PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(
     BlockAllocator* allocator, std::vector<PlacementPtr<RectRecord>>&& rects,
-    std::vector<PlacementPtr<Rect>>&& uvRects, AAType aaType, bool needUVCoord,
-    UVSubsetMode subsetMode, std::vector<PlacementPtr<Stroke>>&& strokes,
-    std::shared_ptr<ColorSpace> colorSpace) {
+    std::vector<PlacementPtr<Rect>>&& uvRects, std::vector<PlacementPtr<Rect>>&& subsetRects,
+    AAType aaType, bool needUVCoord, UVSubsetMode subsetMode,
+    std::vector<PlacementPtr<Stroke>>&& strokes, std::shared_ptr<ColorSpace> colorSpace) {
   if (rects.empty()) {
     return nullptr;
   }
@@ -859,19 +874,21 @@ PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(
   }
   auto rectArray = allocator->makeArray(std::move(rects));
   auto uvRectArray = allocator->makeArray(std::move(uvRects));
+  auto subsetRectArray = allocator->makeArray(std::move(subsetRects));
   if (strokes.empty()) {
     if (aaType == AAType::Coverage) {
       return allocator->make<AARectsVertexProvider>(
-          std::move(rectArray), std::move(uvRectArray), aaType, needUVCoord, hasColor, subsetMode,
-          allocator->addReference(), std::move(colorSpace));
+          std::move(rectArray), std::move(uvRectArray), std::move(subsetRectArray), aaType,
+          needUVCoord, hasColor, subsetMode, allocator->addReference(), std::move(colorSpace));
     }
     return allocator->make<NonAARectsVertexProvider>(
-        std::move(rectArray), std::move(uvRectArray), aaType, needUVCoord, hasColor, subsetMode,
-        allocator->addReference(), std::move(colorSpace));
+        std::move(rectArray), std::move(uvRectArray), std::move(subsetRectArray), aaType,
+        needUVCoord, hasColor, subsetMode, allocator->addReference(), std::move(colorSpace));
   }
 
   const auto isRound = strokes.front()->join == LineJoin::Round;
   auto strokeArray = allocator->makeArray(std::move(strokes));
+  // Stroke variants do not use Strict subsetting, so subsetRectArray is dropped here.
   if (aaType == AAType::Coverage) {
     if (isRound) {
       return allocator->make<AARoundStrokeRectsVertexProvider>(
@@ -894,12 +911,13 @@ PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(
 }
 
 RectsVertexProvider::RectsVertexProvider(PlacementArray<RectRecord>&& rects,
-                                         PlacementArray<Rect>&& uvRects, AAType aaType,
+                                         PlacementArray<Rect>&& uvRects,
+                                         PlacementArray<Rect>&& subsetRects, AAType aaType,
                                          bool hasUVCoord, bool hasColor, UVSubsetMode subsetMode,
                                          std::shared_ptr<BlockAllocator> reference,
                                          std::shared_ptr<ColorSpace> colorSpace)
     : VertexProvider(std::move(reference)), rects(std::move(rects)), uvRects(std::move(uvRects)),
-      _dstColorSpace(std::move(colorSpace)) {
+      subsetRects(std::move(subsetRects)), _dstColorSpace(std::move(colorSpace)) {
   bitFields.aaType = static_cast<uint8_t>(aaType);
   bitFields.hasUVCoord = hasUVCoord;
   bitFields.hasColor = hasColor;
