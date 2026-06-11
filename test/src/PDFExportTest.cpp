@@ -1493,8 +1493,8 @@ TGFX_TEST(PDFExportTest, TextMultiNoiseTransforms) {
     textLayer->setFont(Font(typeface, 40.f));
     textLayer->setMatrix(matrix);
     textLayer->setAllowsEdgeAntialiasing(false);
-    textLayer->setLayerStyles(
-        {NoiseStyle::MakeDuo(8.f, 1.f, Color::FromRGBA(200, 50, 50), Color::FromRGBA(50, 200, 50), 42.f)});
+    textLayer->setLayerStyles({NoiseStyle::MakeDuo(8.f, 1.f, Color::FromRGBA(200, 50, 50),
+                                                   Color::FromRGBA(50, 200, 50), 42.f)});
     root->addChild(textLayer);
     return textLayer;
   };
@@ -1541,8 +1541,8 @@ TGFX_TEST(PDFExportTest, TextMultiNoiseTransforms) {
   noiseTextLayer->setTextColor(Color::White());
   noiseTextLayer->setFont(Font(typeface, 40.f));
   noiseTextLayer->setAllowsEdgeAntialiasing(false);
-  noiseTextLayer->setLayerStyles(
-      {NoiseStyle::MakeDuo(8.f, 1.f, Color::FromRGBA(200, 50, 50), Color::FromRGBA(50, 200, 50), 42.f)});
+  noiseTextLayer->setLayerStyles({NoiseStyle::MakeDuo(8.f, 1.f, Color::FromRGBA(200, 50, 50),
+                                                      Color::FromRGBA(50, 200, 50), 42.f)});
   noiseRoot->addChild(noiseTextLayer);
   auto noiseBounds = noiseRoot->getBounds(nullptr, true);
   auto noiseSurface = Surface::Make(context, static_cast<int>(noiseBounds.width() + 20.f),

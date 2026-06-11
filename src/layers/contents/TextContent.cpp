@@ -44,6 +44,10 @@ bool TextContent::hitTestPoint(float localX, float localY) const {
   return textBlob->hitTestPoint(localPoint.x, localPoint.y, stroke.get());
 }
 
+bool TextContent::supportsPDFLayerStyleClip() const {
+  return true;
+}
+
 void TextContent::onDraw(Canvas* canvas, const Paint& paint) const {
   canvas->drawTextBlob(textBlob, offset.x, offset.y, paint);
 }

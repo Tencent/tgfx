@@ -81,6 +81,14 @@ class LayerContent {
   }
 
   /**
+   * Returns true if PDF export can constrain layer style output to this content without first
+   * baking that output into the content image.
+   */
+  virtual bool supportsPDFLayerStyleClip() const {
+    return false;
+  }
+
+  /**
    * Draws the default content of the layer (content below children) to the specified canvas.
    * Returns true if the content has foreground graphics that should be drawn above children
    * by calling drawForeground().

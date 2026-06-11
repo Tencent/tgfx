@@ -3415,8 +3415,8 @@ TGFX_TEST(LayerTest, TextDuoNoiseTransforms) {
     textLayer->setFont(Font(typeface, 40.f));
     textLayer->setMatrix(matrix);
     textLayer->setAllowsEdgeAntialiasing(false);
-    textLayer->setLayerStyles(
-        {NoiseStyle::MakeDuo(8.f, 1.f, Color::FromRGBA(200, 50, 50), Color::FromRGBA(50, 200, 50), 42.f)});
+    textLayer->setLayerStyles({NoiseStyle::MakeDuo(8.f, 1.f, Color::FromRGBA(200, 50, 50),
+                                                   Color::FromRGBA(50, 200, 50), 42.f)});
     root->addChild(textLayer);
   };
 

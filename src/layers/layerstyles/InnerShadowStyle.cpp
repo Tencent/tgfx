@@ -83,7 +83,8 @@ Rect InnerShadowStyle::filterBounds(const Rect& srcRect, float contentScale) {
 }
 
 void InnerShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                              const Point& /*contentOffset*/, float alpha, BlendMode blendMode) {
+                              const Point& /*contentOffset*/, float alpha, BlendMode blendMode,
+                              bool /*shouldExportFullNoiseImage*/) {
   auto filter = getShadowFilter(contentScale);
   if (!filter) {
     return;

@@ -1207,6 +1207,7 @@ std::shared_ptr<Picture> Layer::getMaskPicture(const DrawArgs& args, bool isCont
   // extracting maskPath from the picture, resulting in incorrect clip regions.
   DrawArgs maskArgs = args;
   maskArgs.excludeEffects |= isContourMode;
+  maskArgs.recordingIntermediateImage = true;
   maskArgs.backgroundHandler = BackgroundHandler::NoOp();
   auto maskCanPreserve3D = _mask->canPreserve3D();
   // When mask enables 3D context, the full 3D relative matrix is handled by the 3D context.
@@ -1300,6 +1301,7 @@ std::shared_ptr<Image> Layer::getContentContourImage(const DrawArgs& args, float
   contourCanvas->scale(contentScale, contentScale);
   auto contourArgs = args;
   contourArgs.opaqueContext = &opaqueContext;
+  contourArgs.recordingIntermediateImage = true;
   // Contour recording is an intermediate artifact — skip background capture / consume.
   contourArgs.backgroundHandler = BackgroundHandler::NoOp();
   // Detach from any active 3D rendering context: the contour image we are about to record is the
@@ -1400,6 +1402,7 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
   auto drawArgs = args;
   drawArgs.renderFlags |= RenderFlags::DisableCache;
   drawArgs.renderRects = nullptr;
+  drawArgs.recordingIntermediateImage = true;
   // Cache content should be rendered to a regular texture, not to 3D compositor.
   drawArgs.render3DContext = nullptr;
   drawArgs.backgroundHandler = BackgroundHandler::NoOp();
@@ -1582,7 +1585,8 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
   }
   if (layerStyleSource) {
     bool clippedForAbove = false;
-    if (content && canvas->getSurface() == nullptr) {
+    bool shouldExportFullNoiseImage = false;
+    if (content) {
       bool needsClip = false;
       for (const auto& layerStyle : _layerStyles) {
         if (layerStyle->position() == LayerStylePosition::Above && layerStyle->needsContentClip()) {
@@ -1592,14 +1596,19 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
       }
       if (needsClip) {
         Path clipPath = {};
-        if (content->getClipPath(&clipPath)) {
+        auto hasVectorClipPath = content->getClipPath(&clipPath);
+        shouldExportFullNoiseImage = args.context == nullptr && !args.recordingIntermediateImage &&
+                                     _filters.empty() &&
+                                     (hasVectorClipPath || content->supportsPDFLayerStyleClip());
+        if (shouldExportFullNoiseImage && hasVectorClipPath) {
           canvas->save();
           canvas->clipPath(clipPath);
           clippedForAbove = true;
         }
       }
     }
-    drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Above);
+    drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Above,
+                    shouldExportFullNoiseImage);
     if (clippedForAbove) {
       canvas->restore();
     }
@@ -1794,6 +1803,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
 
   DrawArgs drawArgs = args;
   drawArgs.render3DContext = nullptr;
+  drawArgs.recordingIntermediateImage = true;
   // Layer style source content is an intermediate artifact — skip background capture / consume.
   drawArgs.backgroundHandler = BackgroundHandler::NoOp();
 
@@ -1839,7 +1849,8 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
 }
 
 void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
-                            const LayerStyleSource* source, LayerStylePosition position) {
+                            const LayerStyleSource* source, LayerStylePosition position,
+                            bool shouldExportFullNoiseImage) {
   DEBUG_ASSERT(source != nullptr && !FloatNearlyZero(source->contentScale));
   for (const auto& layerStyle : _layerStyles) {
     DEBUG_ASSERT(layerStyle != nullptr);
@@ -1850,7 +1861,8 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
       BackgroundHandler::DispatchOrSkip(args, canvas, this, alpha, layerStyle.get(), source);
       continue;
     }
-    drawLayerStyleDefault(args, canvas, alpha, layerStyle.get(), source);
+    drawLayerStyleDefault(args, canvas, alpha, layerStyle.get(), source,
+                          shouldExportFullNoiseImage);
   }
 }
 
@@ -1917,7 +1929,8 @@ std::shared_ptr<Image> Layer::synthesizeBackgroundImage(const DrawArgs& args, fl
 }
 
 void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, float alpha,
-                                  LayerStyle* layerStyle, const LayerStyleSource* source) {
+                                  LayerStyle* layerStyle, const LayerStyleSource* source,
+                                  bool shouldExportFullNoiseImage) {
   DEBUG_ASSERT(source != nullptr && !FloatNearlyZero(source->contentScale));
   DEBUG_ASSERT(layerStyle->extraSourceType() != LayerStyleExtraSourceType::Background);
   auto groupIndex = static_cast<int>(layerStyle->excludeChildEffects());
@@ -1934,8 +1947,8 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
   canvas->concat(matrix);
   switch (layerStyle->extraSourceType()) {
     case LayerStyleExtraSourceType::None:
-      layerStyle->draw(canvas, contentEntry.image, source->contentScale, contentEntry.offset,
-                       alpha);
+      layerStyle->draw(canvas, contentEntry.image, source->contentScale, contentEntry.offset, alpha,
+                       shouldExportFullNoiseImage);
       break;
     case LayerStyleExtraSourceType::Background:
       // Unreachable: Background-sourced styles are routed through BackgroundHandler.

@@ -179,7 +179,9 @@ OffscreenResult OffscreenRenderer::RenderContentOnPicture(Layer* layer, const Dr
   }
   canvas->setMatrix(density);
 
-  layer->drawDirectly(args, canvas, 1.0f);
+  auto drawArgs = args;
+  drawArgs.recordingIntermediateImage = true;
+  layer->drawDirectly(drawArgs, canvas, 1.0f);
 
   OffscreenResult result;
   Point offset = {};
@@ -245,7 +247,9 @@ OffscreenResult OffscreenRenderer::RenderPassThroughOnPicture(
   SeedBackdrop(canvas, backdrop, surfaceRect);
   canvas->setMatrix(localToSurface);
 
-  layer->drawDirectly(args, canvas, 1.0f);
+  auto drawArgs = args;
+  drawArgs.recordingIntermediateImage = true;
+  layer->drawDirectly(drawArgs, canvas, 1.0f);
 
   OffscreenResult result;
   Point offset = {};
