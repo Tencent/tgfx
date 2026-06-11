@@ -132,10 +132,13 @@ class LayerStyle : public LayerProperty {
    * to anchor their pattern so it does not shift when the layer is repainted with different dirty
    * regions. Styles that do not need this information can safely ignore it.
    * @param alpha The alpha transparency value used for drawing the layer style.
+   * @param contentClipPath Optional clip path from vector content. When non-null, styles that need
+   * content clipping (e.g., NoiseStyle on PDF export) can use it to constrain their output.
    */
   void draw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-            const Point& contentOffset, float alpha) {
-    onDraw(canvas, std::move(content), contentScale, contentOffset, alpha, _blendMode);
+            const Point& contentOffset, float alpha, const Path* contentClipPath = nullptr) {
+    onDraw(canvas, std::move(content), contentScale, contentOffset, alpha, _blendMode,
+           contentClipPath);
   }
 
   /**
@@ -154,9 +157,9 @@ class LayerStyle : public LayerProperty {
   void setExcludeChildEffects(bool value);
 
   /**
-   * Returns true if this layer style requires the canvas to be clipped to the content path before
-   * drawing. This is used for styles like NoiseStyle whose effect can bleed beyond the content
-   * boundary. Default is false.
+   * Returns true if this layer style needs the content clip path passed to its draw method. Styles
+   * that return true will receive the clip path and can apply it selectively (e.g., only during PDF
+   * export). Default is false.
    */
   virtual bool needsContentClip() const {
     return false;
@@ -206,9 +209,11 @@ class LayerStyle : public LayerProperty {
    * @param alpha The alpha transparency value used for drawing the layer style.
    * @param blendMode The blend mode used to composite the layer style with the existing content on
    * the canvas.
+   * @param contentClipPath Optional clip path from vector content for PDF export clipping.
    */
   virtual void onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                      const Point& contentOffset, float alpha, BlendMode blendMode) = 0;
+                      const Point& contentOffset, float alpha, BlendMode blendMode,
+                      const Path* contentClipPath = nullptr) = 0;
 
   /**
    * Applies the layer style with extra source to the opaque layer content image and draws

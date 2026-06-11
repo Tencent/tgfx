@@ -1492,7 +1492,8 @@ TGFX_TEST(PDFExportTest, TextMultiNoiseTransforms) {
     textLayer->setTextColor(Color::FromRGBA(60, 120, 200));
     textLayer->setFont(Font(typeface, 40.f));
     textLayer->setMatrix(matrix);
-    textLayer->setLayerStyles({NoiseStyle::MakeMulti(8.f, 1.f, 0.8f, 42.f)});
+    textLayer->setLayerStyles(
+        {NoiseStyle::MakeDuo(8.f, 1.f, Color::FromRGBA(200, 50, 50), Color::FromRGBA(50, 200, 50), 42.f)});
     root->addChild(textLayer);
     return textLayer;
   };

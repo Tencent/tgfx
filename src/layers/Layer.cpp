@@ -1580,29 +1580,22 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
     // interested in the portion that contributes to the synthesized backdrop.
     return;
   }
-  bool clippedForAbove = false;
-  if (layerStyleSource && content) {
-    bool needsClip = false;
-    for (const auto& layerStyle : _layerStyles) {
-      if (layerStyle->position() == LayerStylePosition::Above && layerStyle->needsContentClip()) {
-        needsClip = true;
-        break;
-      }
-    }
-    if (needsClip) {
-      Path clipPath = {};
-      if (content->getClipPath(&clipPath)) {
-        canvas->save();
-        canvas->clipPath(clipPath);
-        clippedForAbove = true;
-      }
-    }
-  }
   if (layerStyleSource) {
-    drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Above);
-  }
-  if (clippedForAbove) {
-    canvas->restore();
+    Path contentClipPath = {};
+    Path* clipPathPtr = nullptr;
+    if (content) {
+      bool needsClip = false;
+      for (const auto& layerStyle : _layerStyles) {
+        if (layerStyle->position() == LayerStylePosition::Above && layerStyle->needsContentClip()) {
+          needsClip = true;
+          break;
+        }
+      }
+      if (needsClip && content->getClipPath(&contentClipPath)) {
+        clipPathPtr = &contentClipPath;
+      }
+    }
+    drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Above, clipPathPtr);
   }
   if (hasForeground) {
     content->drawForeground(canvas, alpha, bitFields.allowsEdgeAntialiasing);
@@ -1839,7 +1832,8 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
 }
 
 void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
-                            const LayerStyleSource* source, LayerStylePosition position) {
+                            const LayerStyleSource* source, LayerStylePosition position,
+                            const Path* contentClipPath) {
   DEBUG_ASSERT(source != nullptr && !FloatNearlyZero(source->contentScale));
   for (const auto& layerStyle : _layerStyles) {
     DEBUG_ASSERT(layerStyle != nullptr);
@@ -1850,7 +1844,7 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
       BackgroundHandler::DispatchOrSkip(args, canvas, this, alpha, layerStyle.get(), source);
       continue;
     }
-    drawLayerStyleDefault(args, canvas, alpha, layerStyle.get(), source);
+    drawLayerStyleDefault(args, canvas, alpha, layerStyle.get(), source, contentClipPath);
   }
 }
 
@@ -1917,7 +1911,8 @@ std::shared_ptr<Image> Layer::synthesizeBackgroundImage(const DrawArgs& args, fl
 }
 
 void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, float alpha,
-                                  LayerStyle* layerStyle, const LayerStyleSource* source) {
+                                  LayerStyle* layerStyle, const LayerStyleSource* source,
+                                  const Path* contentClipPath) {
   DEBUG_ASSERT(source != nullptr && !FloatNearlyZero(source->contentScale));
   DEBUG_ASSERT(layerStyle->extraSourceType() != LayerStyleExtraSourceType::Background);
   auto groupIndex = static_cast<int>(layerStyle->excludeChildEffects());
@@ -1932,10 +1927,11 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
   auto matrix = Matrix::MakeScale(1.f / source->contentScale, 1.f / source->contentScale);
   matrix.preTranslate(contentEntry.offset.x, contentEntry.offset.y);
   canvas->concat(matrix);
+  auto* clipPath = layerStyle->needsContentClip() ? contentClipPath : nullptr;
   switch (layerStyle->extraSourceType()) {
     case LayerStyleExtraSourceType::None:
-      layerStyle->draw(canvas, contentEntry.image, source->contentScale, contentEntry.offset,
-                       alpha);
+      layerStyle->draw(canvas, contentEntry.image, source->contentScale, contentEntry.offset, alpha,
+                       clipPath);
       break;
     case LayerStyleExtraSourceType::Background:
       // Unreachable: Background-sourced styles are routed through BackgroundHandler.
