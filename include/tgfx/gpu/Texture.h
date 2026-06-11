@@ -94,7 +94,7 @@ class TextureDescriptor {
    * The bitwise flags that indicate the usage options for the texture. The value is the sum of the
    * decimal values for each flag. See TextureUsage for more details.
    */
-  uint32_t usage = TextureUsage::TEXTURE_BINDING | TextureUsage::RENDER_ATTACHMENT;
+  uint32_t usage = TextureUsage::TEXTURE_BINDING;
 };
 
 /**
