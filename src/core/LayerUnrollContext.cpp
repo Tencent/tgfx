@@ -69,9 +69,10 @@ void LayerUnrollContext::drawImage(std::shared_ptr<Image> image, const SamplingO
 void LayerUnrollContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
                                        const Rect& dstRect, const SamplingOptions& sampling,
                                        const Matrix& matrix, const ClipStack& clip,
-                                       const Brush& brush, SrcRectConstraint constraint) {
+                                       const Brush& brush, SrcRectConstraint constraint,
+                                       const Rect* strictRect) {
   drawContext->drawImageRect(std::move(image), srcRect, dstRect, sampling, matrix, clip,
-                             mergeBrush(brush), constraint);
+                             mergeBrush(brush), constraint, strictRect);
   unrolled = true;
 }
 

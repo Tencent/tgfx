@@ -531,13 +531,13 @@ void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& dstRect,
 
 void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
                            const SamplingOptions& sampling, const Paint* paint,
-                           SrcRectConstraint constraint) {
+                           SrcRectConstraint constraint, const Rect* strictRect) {
   if (image == nullptr || srcRect.isEmpty() || dstRect.isEmpty()) {
     return;
   }
   SaveLayerForImageFilter(paint ? paint->getImageFilter() : nullptr);
   auto brush = GetBrushForImage(paint, image.get());
-  drawImageRect(std::move(image), srcRect, dstRect, sampling, brush, constraint);
+  drawImageRect(std::move(image), srcRect, dstRect, sampling, brush, constraint, strictRect);
 }
 
 void Canvas::drawImage(std::shared_ptr<Image> image, const Brush& brush,
@@ -569,17 +569,19 @@ void Canvas::drawImage(std::shared_ptr<Image> image, const Brush& brush,
 // and rendered into the same area, transformed by extraMatrix and the current matrix.
 void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
                            const SamplingOptions& sampling, const Brush& brush,
-                           SrcRectConstraint constraint) {
+                           SrcRectConstraint constraint, const Rect* strictRect) {
   DEBUG_ASSERT(image != nullptr);
   DEBUG_ASSERT(!srcRect.isEmpty());
   DEBUG_ASSERT(!dstRect.isEmpty());
   auto type = Types::Get(image.get());
   if (type != Types::ImageType::Subset || image->hasMipmaps()) {
     drawContext->drawImageRect(std::move(image), srcRect, dstRect, sampling, _matrix, *clipStack,
-                               brush, constraint);
+                               brush, constraint, strictRect);
     return;
   }
   auto imageRect = srcRect;
+  std::optional<Rect> adjustedStrictRect =
+      strictRect ? std::optional<Rect>(*strictRect) : std::nullopt;
   auto safeBounds = Rect::MakeWH(image->width(), image->height());
   safeBounds.inset(0.5f, 0.5f);
   if (constraint == SrcRectConstraint::Strict || safeBounds.contains(srcRect)) {
@@ -587,10 +589,16 @@ void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, co
     auto subsetImage = static_cast<const SubsetImage*>(image.get());
     auto& subset = subsetImage->bounds;
     imageRect.offset(subset.left, subset.top);
+    // strictRect lives in the SubsetImage coordinate space; translate it together with imageRect
+    // so the shader's clamp range stays in the unwrapped source coordinate space.
+    if (adjustedStrictRect) {
+      adjustedStrictRect->offset(subset.left, subset.top);
+    }
     image = subsetImage->source;
   }
   drawContext->drawImageRect(std::move(image), imageRect, dstRect, sampling, _matrix, *clipStack,
-                             brush, constraint);
+                             brush, constraint,
+                             adjustedStrictRect ? &*adjustedStrictRect : nullptr);
 }
 
 void Canvas::drawSimpleText(const std::string& text, float x, float y, const Font& font,

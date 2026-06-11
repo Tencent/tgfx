@@ -467,7 +467,8 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
 void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
                                      const Rect& dstRect, const SamplingOptions&,
                                      const Matrix& matrix, const ClipStack& clip,
-                                     const Brush& brush, SrcRectConstraint) {
+                                     const Brush& brush, SrcRectConstraint,
+                                     const Rect* /*strictRect*/) {
   DEBUG_ASSERT(image != nullptr);
   auto modifyImage = ConvertImageColorSpace(image, context, _targetColorSpace, _assignColorSpace);
   auto subsetImage = modifyImage->makeSubset(srcRect);

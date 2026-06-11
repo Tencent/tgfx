@@ -400,10 +400,19 @@ class Canvas {
    * @param paint  the paint to apply blending, filtering, etc.; can be nullptr.
    * @param constraint  the constraint for the source rectangle sampling. Defaults to
    * SrcRectConstraint::Fast.
+   * @param strictRect  Rectangle in image space that constrains where samples may be taken.
+   * Only effective when constraint == SrcRectConstraint::Strict. Must contain srcRect; passing
+   * a strictRect that does not fully contain srcRect will clamp srcRect-edge samples to the
+   * strictRect boundary and produce incorrect output.
+   * If nullptr, Strict uses srcRect as the constraint. Use case: when srcRect is a sub-region
+   * of a larger logical unit (e.g. a sub-window within an atlas tile), pass the full unit as
+   * strictRect to prevent samples from leaking outside the unit while still allowing srcRect
+   * to address an arbitrary portion of it.
    */
   void drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
                      const SamplingOptions& sampling = {}, const Paint* paint = nullptr,
-                     SrcRectConstraint constraint = SrcRectConstraint::Fast);
+                     SrcRectConstraint constraint = SrcRectConstraint::Fast,
+                     const Rect* strictRect = nullptr);
 
   /**
    * Draws text at the specified (x, y) coordinates using the current clip, matrix, font, and paint.
@@ -488,7 +497,8 @@ class Canvas {
                  const Matrix* dstMatrix);
   void drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
                      const SamplingOptions& sampling, const Brush& brush,
-                     SrcRectConstraint constraint = SrcRectConstraint::Fast);
+                     SrcRectConstraint constraint = SrcRectConstraint::Fast,
+                     const Rect* strictRect = nullptr);
   void drawLayer(std::shared_ptr<Picture> picture, const Matrix& matrix, const ClipStack& clip,
                  const Brush& brush, std::shared_ptr<ImageFilter> imageFilter = nullptr);
   void drawFill(const Matrix& matrix, const ClipStack& clip, const Brush& brush) const;
