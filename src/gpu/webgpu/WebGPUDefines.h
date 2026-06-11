@@ -28,13 +28,13 @@ static constexpr int TEXTURE_BINDING_POINT_START = 2;
 // These must match the WGPUTextureFormat enum in <webgpu/webgpu.h>.
 // If Emscripten updates enum values, compile will fail at static_assert in WebGPUUtil.cpp.
 #define WGPU_TEXTURE_FORMAT_R8Unorm 0x01
-#define WGPU_TEXTURE_FORMAT_RG8Unorm 0x04
+#define WGPU_TEXTURE_FORMAT_RG8Unorm 0x08
 #define WGPU_TEXTURE_FORMAT_RGBA8Unorm 0x12
 #define WGPU_TEXTURE_FORMAT_RGBA8UnormSrgb 0x13
 #define WGPU_TEXTURE_FORMAT_BGRA8Unorm 0x17
 #define WGPU_TEXTURE_FORMAT_BGRA8UnormSrgb 0x18
-#define WGPU_TEXTURE_FORMAT_Depth24PlusStencil8 0x28
-#define WGPU_TEXTURE_FORMAT_Depth32FloatStencil8 0x2A
+#define WGPU_TEXTURE_FORMAT_Depth24PlusStencil8 0x29
+#define WGPU_TEXTURE_FORMAT_Depth32FloatStencil8 0x2B
 
 inline PixelFormat WebGPUTextureFormatToPixelFormat(unsigned webgpuFormat) {
   switch (webgpuFormat) {

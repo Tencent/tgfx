@@ -52,5 +52,8 @@ target_compile_options(hello2d PUBLIC ${H2D_COMPILE_OPTIONS})
 target_link_options(hello2d PUBLIC ${H2D_LINK_OPTIONS})
 if (TGFX_USE_WEBGPU)
     target_compile_definitions(hello2d PRIVATE TGFX_USE_WEBGPU ${TGFX_DEFINES})
+    target_include_directories(hello2d PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../src
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/concurrentqueue)
 endif ()
 target_link_libraries(hello2d tgfx-hello2d tgfx ${HELLO_2D_SHARED_LIBS})
