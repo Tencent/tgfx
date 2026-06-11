@@ -441,8 +441,8 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   auto tileTasks = invalidateTileCaches(dirtyRegions);
   std::vector<Rect> skippedRects = {};
   std::vector<DrawTask> throttleScreenTasks = {};
-  auto screenTasks =
-      collectScreenTasks(surface, &tileTasks, &skippedRects, &throttleScreenTasks, autoClear);
+  auto screenTasks = collectScreenTasks(surface, !dirtyRegions.empty(), autoClear, &tileTasks,
+                                        &skippedRects, &throttleScreenTasks);
   // Throttle tasks and skipped rects must keep the tiled path; only fall back when all are empty.
   if (screenTasks.empty() && throttleScreenTasks.empty() && skippedRects.empty()) {
     recycleCurrentTileTasks(tileTasks);
@@ -579,11 +579,11 @@ void DisplayList::invalidateCurrentTileCache(const TileCache* tileCache,
   }
 }
 
-std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
+std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface, bool hasDirtyRegions,
+                                                      bool autoClear,
                                                       std::vector<DrawTask>* tileTasks,
                                                       std::vector<Rect>* skippedRects,
-                                                      std::vector<DrawTask>* throttleScreenTasks,
-                                                      bool autoClear) {
+                                                      std::vector<DrawTask>* throttleScreenTasks) {
   auto maxBudget = _maxTilesRefinedPerFrame;
   const auto useFallback = _tileUpdateMode != TileUpdateMode::Immediate;
   if (lastContentOffset != _contentOffset || lastZoomScaleInt != _zoomScaleInt) {
@@ -648,9 +648,9 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
         screenTasks.insert(screenTasks.end(), fallbackTasks.begin(), fallbackTasks.end());
         continue;
       }
-      if (_tileUpdateMode == TileUpdateMode::Smooth) {
-        // No cached fallback in Smooth mode: rasterize the tile in this frame to keep the result
-        // correct.
+      // Rasterize in Smooth mode, or when this frame has dirty regions: dirty regions also
+      // clear fallback tiles at other scales, so a skipRect would render as background color.
+      if (_tileUpdateMode == TileUpdateMode::Smooth || hasDirtyRegions) {
         dirtyGrids.emplace_back(tileX, tileY);
         continue;
       }
