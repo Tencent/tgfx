@@ -1951,9 +1951,9 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
     drawSource.extraSourceOffset = group->contour->offset - contentEntry.offset;
   }
   if (layerStyle->needContentShape()) {
-    if (!source->contentShape.has_value()) {
-      return;
-    }
+    // contentShape may be nullopt when the layer has no simple vector content (e.g. a group layer
+    // with only children). The style still draws using the rasterized content image; spread
+    // features that depend on the shape will gracefully degrade.
     drawSource.contentShape = source->contentShape;
   }
   layerStyle->draw(canvas, drawSource, alpha);
