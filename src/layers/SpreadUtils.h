@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,27 +16,31 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/layerstyles/LayerStyle.h"
+#pragma once
+
+#include <memory>
+#include "tgfx/core/Image.h"
+#include "tgfx/core/Point.h"
+#include "tgfx/layers/layerstyles/LayerStyleInput.h"
 
 namespace tgfx {
-void LayerStyle::setBlendMode(BlendMode blendMode) {
-  if (_blendMode == blendMode) {
-    return;
-  }
-  _blendMode = blendMode;
-  invalidateTransform();
-}
 
-Rect LayerStyle::filterBackground(const Rect& srcRect, float) {
-  return srcRect;
-}
+class SpreadUtils {
+ public:
+  struct OffsetImage {
+    std::shared_ptr<Image> image = nullptr;
+    /**
+     * The offset of the image relative to the content image, scaled by contentScale.
+     */
+    Point offset = {};
+  };
 
-void LayerStyle::setExcludeChildEffects(bool value) {
-  if (_excludeChildEffects == value) {
-    return;
-  }
-  _excludeChildEffects = value;
-  invalidateTransform();
-}
+  /**
+   * Rasterizes the contentShape with spread applied into a tightly-sized alpha image. Positive
+   * spread outsets the shape, negative spread insets it. Returns {nullptr, {}} when contentShape is
+   * unavailable or the path is empty.
+   */
+  static OffsetImage MakeSpreadShapeImage(const LayerStyleInput& input, float spread);
+};
 
 }  // namespace tgfx
