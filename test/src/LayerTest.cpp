@@ -47,6 +47,7 @@
 #include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
+#include "tgfx/layers/layerstyles/NoiseStyle.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
@@ -3396,6 +3397,50 @@ TGFX_TEST(LayerTest, BackgroundColor) {
     context->flushAndSubmit();
     EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundColor_Draw"));
   }
+}
+
+TGFX_TEST(LayerTest, TextDuoNoiseTransforms) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto root = Layer::Make();
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+
+  auto addText = [&](const std::string& text, const Matrix& matrix) {
+    auto textLayer = TextLayer::Make();
+    textLayer->setText(text);
+    textLayer->setTextColor(Color::FromRGBA(60, 120, 200));
+    textLayer->setFont(Font(typeface, 40.f));
+    textLayer->setMatrix(matrix);
+    textLayer->setAllowsEdgeAntialiasing(false);
+    textLayer->setLayerStyles(
+        {NoiseStyle::MakeDuo(8.f, 1.f, Color::FromRGBA(200, 50, 50), Color::FromRGBA(50, 200, 50), 42.f)});
+    root->addChild(textLayer);
+  };
+
+  // Text 1: normal (translation only).
+  addText("Hello", Matrix::MakeTrans(50.f, 50.f));
+
+  // Text 2: rotated 30 degrees.
+  auto rotMatrix = Matrix::MakeTrans(50.f, 150.f);
+  rotMatrix.preRotate(30.f, 50.f, 150.f);
+  addText("Hello", rotMatrix);
+
+  // Text 3: scaled 1.5x.
+  auto scaleMatrix = Matrix::MakeTrans(50.f, 250.f);
+  scaleMatrix.preScale(1.5f, 1.5f, 50.f, 250.f);
+  addText("Hello", scaleMatrix);
+
+  auto bounds = root->getBounds(nullptr, true);
+  auto surface = Surface::Make(context, static_cast<int>(bounds.width() + 100.f),
+                               static_cast<int>(bounds.height() + 100.f));
+  ASSERT_TRUE(surface != nullptr);
+  surface->getCanvas()->clear();
+  surface->getCanvas()->translate(-bounds.left + 50.f, -bounds.top + 50.f);
+  root->draw(surface->getCanvas());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/TextDuoNoiseTransforms"));
 }
 
 }  // namespace tgfx

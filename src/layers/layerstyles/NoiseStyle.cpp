@@ -22,6 +22,7 @@
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageFilter.h"
+#include "tgfx/core/PictureRecorder.h"
 
 namespace tgfx {
 
@@ -112,25 +113,45 @@ static void DrawNoiseLayer(Canvas* canvas, std::shared_ptr<Image> content,
   auto samplingMatrix = Matrix::MakeTrans(-1.f * contentOffset.x + width * 0.5f,
                                           -1.f * contentOffset.y + height * 0.5f);
   auto centeredShader = coloredShader->makeWithMatrix(samplingMatrix);
-  auto blendFilter = ImageFilter::Blend(BlendMode::SrcIn, std::move(centeredShader));
-  if (blendFilter == nullptr) {
-    return;
-  }
-  auto noiseImage = content->makeWithFilter(std::move(blendFilter));
-  if (noiseImage == nullptr) {
-    return;
-  }
-  bool clipped = false;
-  if (contentClipPath != nullptr && canvas->getSurface() == nullptr) {
-    canvas->save();
-    canvas->clipPath(*contentClipPath);
-    clipped = true;
-  }
-  Paint paint = {};
-  paint.setBlendMode(blendMode);
-  canvas->drawImage(std::move(noiseImage), &paint);
-  if (clipped) {
-    canvas->restore();
+  bool isPDF = canvas->getSurface() == nullptr;
+  if (isPDF) {
+    PictureRecorder recorder;
+    auto* recCanvas = recorder.beginRecording();
+    Paint shaderPaint = {};
+    shaderPaint.setShader(std::move(centeredShader));
+    recCanvas->drawRect(Rect::MakeWH(width, height), shaderPaint);
+    auto picture = recorder.finishRecordingAsPicture();
+    auto noiseImage = Image::MakeFrom(std::move(picture), static_cast<int>(width),
+                                      static_cast<int>(height));
+    if (noiseImage == nullptr) {
+      return;
+    }
+    bool clipped = false;
+    if (contentClipPath != nullptr) {
+      canvas->save();
+      canvas->clipPath(*contentClipPath);
+      clipped = true;
+    }
+    Paint paint = {};
+    paint.setAntiAlias(false);
+    paint.setBlendMode(blendMode);
+    canvas->drawImage(std::move(noiseImage), &paint);
+    if (clipped) {
+      canvas->restore();
+    }
+  } else {
+    auto blendFilter = ImageFilter::Blend(BlendMode::SrcIn, std::move(centeredShader));
+    if (blendFilter == nullptr) {
+      return;
+    }
+    auto noiseImage = content->makeWithFilter(std::move(blendFilter));
+    if (noiseImage == nullptr) {
+      return;
+    }
+    Paint paint = {};
+    paint.setAntiAlias(false);
+    paint.setBlendMode(blendMode);
+    canvas->drawImage(std::move(noiseImage), &paint);
   }
 }
 

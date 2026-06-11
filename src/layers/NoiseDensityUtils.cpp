@@ -64,6 +64,12 @@ std::shared_ptr<Shader> MakeDensityBandShader(std::shared_ptr<Shader> noiseShade
   auto lowerThreshold = static_cast<float>(std::max(0, std::min(99, lowerBucket))) / 100.0f;
   auto upperThreshold = static_cast<float>(std::max(0, std::min(100, upperBucket + 1))) / 100.0f;
   auto lowerMaskFilter = MakeLumaAlphaThresholdFilter(lowerThreshold);
+  if (upperThreshold >= 1.0f) {
+    if (lowerMaskFilter == nullptr) {
+      return Shader::MakeColorShader(Color::White());
+    }
+    return noiseShader->makeWithColorFilter(std::move(lowerMaskFilter));
+  }
   auto upperMaskFilter = MakeLumaAlphaThresholdFilter(upperThreshold);
   auto upperMask = noiseShader->makeWithColorFilter(std::move(upperMaskFilter));
   if (lowerMaskFilter == nullptr) {

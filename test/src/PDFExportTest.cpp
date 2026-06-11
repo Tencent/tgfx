@@ -1492,6 +1492,7 @@ TGFX_TEST(PDFExportTest, TextMultiNoiseTransforms) {
     textLayer->setTextColor(Color::FromRGBA(60, 120, 200));
     textLayer->setFont(Font(typeface, 40.f));
     textLayer->setMatrix(matrix);
+    textLayer->setAllowsEdgeAntialiasing(false);
     textLayer->setLayerStyles(
         {NoiseStyle::MakeDuo(8.f, 1.f, Color::FromRGBA(200, 50, 50), Color::FromRGBA(50, 200, 50), 42.f)});
     root->addChild(textLayer);
@@ -1532,6 +1533,25 @@ TGFX_TEST(PDFExportTest, TextMultiNoiseTransforms) {
   surface->getCanvas()->translate(-bounds.left + 50.f, -bounds.top + 50.f);
   root->draw(surface->getCanvas());
   EXPECT_TRUE(Baseline::Compare(surface, "PDFExportTest/TextMultiNoiseTransforms"));
+
+  // Save the DuoNoise content image for a single text layer.
+  auto noiseRoot = Layer::Make();
+  auto noiseTextLayer = TextLayer::Make();
+  noiseTextLayer->setText("Hello");
+  noiseTextLayer->setTextColor(Color::White());
+  noiseTextLayer->setFont(Font(typeface, 40.f));
+  noiseTextLayer->setAllowsEdgeAntialiasing(false);
+  noiseTextLayer->setLayerStyles(
+      {NoiseStyle::MakeDuo(8.f, 1.f, Color::FromRGBA(200, 50, 50), Color::FromRGBA(50, 200, 50), 42.f)});
+  noiseRoot->addChild(noiseTextLayer);
+  auto noiseBounds = noiseRoot->getBounds(nullptr, true);
+  auto noiseSurface = Surface::Make(context, static_cast<int>(noiseBounds.width() + 20.f),
+                                    static_cast<int>(noiseBounds.height() + 20.f));
+  ASSERT_TRUE(noiseSurface != nullptr);
+  noiseSurface->getCanvas()->clear(Color::Black());
+  noiseSurface->getCanvas()->translate(-noiseBounds.left + 10.f, -noiseBounds.top + 10.f);
+  noiseRoot->draw(noiseSurface->getCanvas());
+  EXPECT_TRUE(Baseline::Compare(noiseSurface, "PDFExportTest/DuoNoiseImage"));
 }
 
 TGFX_TEST(PDFExportTest, EllipseNoiseStyle) {

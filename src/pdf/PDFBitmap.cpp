@@ -50,6 +50,7 @@ void EmitImageStream(PDFDocumentImpl* doc, PDFIndirectReference ref, T writeStre
     pdfDict->insertRef("SMask", sMask);
   }
   pdfDict->insertInt("BitsPerComponent", 8);
+  pdfDict->insertBool("Interpolate", false);
 
   switch (format) {
     case PDFStreamFormat::DCT:
