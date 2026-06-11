@@ -103,6 +103,7 @@ void WebGPUDrawableProxy::present() {
 }
 
 void WebGPUDrawableProxy::releaseDrawable() {
+  _renderTarget = nullptr;
   if (_surfaceTextureView != nullptr) {
     wgpuTextureViewRelease(_surfaceTextureView);
     _surfaceTextureView = nullptr;
@@ -111,7 +112,6 @@ void WebGPUDrawableProxy::releaseDrawable() {
     wgpuTextureRelease(_surfaceTexture);
     _surfaceTexture = nullptr;
   }
-  _renderTarget = nullptr;
 }
 
 }  // namespace tgfx
