@@ -120,8 +120,7 @@ void DropShadowStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Imag
 }
 
 void DropShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                             const Point& contentOffset, float alpha, BlendMode blendMode,
-                             bool /*shouldExportFullNoiseImage*/) {
+                             const Point& contentOffset, float alpha, BlendMode blendMode) {
   onDrawWithExtraSource(canvas, content, contentScale, contentOffset, nullptr, {}, alpha,
                         blendMode);
 }

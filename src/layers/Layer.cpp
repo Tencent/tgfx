@@ -1572,7 +1572,7 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
   }
   auto content = getContent();
   bool hasForeground = false;
-  bool shouldExportFullNoiseImage = false;
+  bool useVectorClip = false;
   Path contentClipPath = {};
   if (content && layerStyleSource) {
     bool needsClip = false;
@@ -1584,12 +1584,12 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
     }
     if (needsClip) {
       auto hasVectorClipPath = content->getClipPath(&contentClipPath);
-      shouldExportFullNoiseImage = args.context == nullptr && !args.recordingIntermediateImage &&
-                                   _filters.empty() && hasVectorClipPath;
+      useVectorClip = args.context == nullptr && !args.recordingIntermediateImage &&
+                      _filters.empty() && hasVectorClipPath;
     }
   }
   if (content) {
-    if (shouldExportFullNoiseImage) {
+    if (useVectorClip) {
       content->drawAsPath(canvas, contentClipPath, alpha, bitFields.allowsEdgeAntialiasing);
     } else {
       hasForeground = content->drawDefault(canvas, alpha, bitFields.allowsEdgeAntialiasing);
@@ -1603,13 +1603,12 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
   }
   if (layerStyleSource) {
     bool clippedForAbove = false;
-    if (shouldExportFullNoiseImage) {
+    if (useVectorClip) {
       canvas->save();
       canvas->clipPath(contentClipPath);
       clippedForAbove = true;
     }
-    drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Above,
-                    shouldExportFullNoiseImage);
+    drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Above);
     if (clippedForAbove) {
       canvas->restore();
     }
@@ -1850,8 +1849,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
 }
 
 void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
-                            const LayerStyleSource* source, LayerStylePosition position,
-                            bool shouldExportFullNoiseImage) {
+                            const LayerStyleSource* source, LayerStylePosition position) {
   DEBUG_ASSERT(source != nullptr && !FloatNearlyZero(source->contentScale));
   for (const auto& layerStyle : _layerStyles) {
     DEBUG_ASSERT(layerStyle != nullptr);
@@ -1862,8 +1860,7 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
       BackgroundHandler::DispatchOrSkip(args, canvas, this, alpha, layerStyle.get(), source);
       continue;
     }
-    drawLayerStyleDefault(args, canvas, alpha, layerStyle.get(), source,
-                          shouldExportFullNoiseImage);
+    drawLayerStyleDefault(args, canvas, alpha, layerStyle.get(), source);
   }
 }
 
@@ -1930,8 +1927,7 @@ std::shared_ptr<Image> Layer::synthesizeBackgroundImage(const DrawArgs& args, fl
 }
 
 void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, float alpha,
-                                  LayerStyle* layerStyle, const LayerStyleSource* source,
-                                  bool shouldExportFullNoiseImage) {
+                                  LayerStyle* layerStyle, const LayerStyleSource* source) {
   DEBUG_ASSERT(source != nullptr && !FloatNearlyZero(source->contentScale));
   DEBUG_ASSERT(layerStyle->extraSourceType() != LayerStyleExtraSourceType::Background);
   auto groupIndex = static_cast<int>(layerStyle->excludeChildEffects());
@@ -1948,8 +1944,8 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
   canvas->concat(matrix);
   switch (layerStyle->extraSourceType()) {
     case LayerStyleExtraSourceType::None:
-      layerStyle->draw(canvas, contentEntry.image, source->contentScale, contentEntry.offset, alpha,
-                       shouldExportFullNoiseImage);
+      layerStyle->draw(canvas, contentEntry.image, source->contentScale, contentEntry.offset,
+                       alpha);
       break;
     case LayerStyleExtraSourceType::Background:
       // Unreachable: Background-sourced styles are routed through BackgroundHandler.

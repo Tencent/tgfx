@@ -134,9 +134,8 @@ class LayerStyle : public LayerProperty {
    * @param alpha The alpha transparency value used for drawing the layer style.
    */
   void draw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-            const Point& contentOffset, float alpha, bool shouldExportFullNoiseImage = false) {
-    onDraw(canvas, std::move(content), contentScale, contentOffset, alpha, _blendMode,
-           shouldExportFullNoiseImage);
+            const Point& contentOffset, float alpha) {
+    onDraw(canvas, std::move(content), contentScale, contentOffset, alpha, _blendMode);
   }
 
   /**
@@ -209,8 +208,7 @@ class LayerStyle : public LayerProperty {
    * the canvas.
    */
   virtual void onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                      const Point& contentOffset, float alpha, BlendMode blendMode,
-                      bool shouldExportFullNoiseImage = false) = 0;
+                      const Point& contentOffset, float alpha, BlendMode blendMode) = 0;
 
   /**
    * Applies the layer style with extra source to the opaque layer content image and draws

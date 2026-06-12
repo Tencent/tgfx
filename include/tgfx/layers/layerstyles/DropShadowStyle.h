@@ -122,8 +122,7 @@ class DropShadowStyle : public LayerStyle {
 
  protected:
   void onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-              const Point& contentOffset, float alpha, BlendMode blendMode,
-              bool shouldExportFullNoiseImage = false) override;
+              const Point& contentOffset, float alpha, BlendMode blendMode) override;
 
   void onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
                              const Point& contentOffset, std::shared_ptr<Image> extraSource,
