@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>CSS Shadow Spread - Replicate Figma test3</title>
+<style>
+body {
+  background: #1e1e1e;
+  color: white;
+  font-family: sans-serif;
+  padding: 30px;
+}
+h2 { margin-top: 30px; font-size: 16px; }
+.row {
+  display: flex;
+  gap: 80px;
+  margin: 20px 0 50px;
+  align-items: flex-start;
+}
+.item { text-align: center; }
+.label {
+  margin-top: 10px;
+  font-size: 11px;
+  color: #aaa;
+  white-space: pre-line;
+}
+
+/* Row 1: 100x100 ellipse (fill) */
+.ellipse {
+  width: 100px;
+  height: 100px;
+  background: #3c78dc;
+  border-radius: 50%;
+  margin: 60px;
+}
+
+/* Row 2: 100x100 ring (center stroke 20)
+   Center stroke on a 100x100 ellipse: stroke extends 10px outward and 10px inward.
+   Outer radius = 50+10 = 60, inner radius = 50-10 = 40.
+   So: element = 120x120 (outer diameter), border = 20px, content = 80x80 (inner diameter).
+*/
+.ring {
+  width: 80px;
+  height: 80px;
+  background: transparent;
+  border: 20px solid #0064ff;
+  border-radius: 50%;
+  margin: 50px;
+  box-sizing: content-box;
+}
+
+/* Row 3: 100x100 image fill */
+.img-box {
+  width: 100px;
+  height: 100px;
+  margin: 60px;
+  display: inline-block;
+}
+.img-box img {
+  width: 100px;
+  height: 100px;
+  display: block;
+}
+
+/* Column 1: shadow offset=100, blur=0, spread=0 */
+.shadow-ref { box-shadow: 100px 100px 0px 0px #00c800; }
+
+/* Column 2: shadow offset=100, blur=0, spread=10 */
+.shadow-spread10 { box-shadow: 100px 100px 0px 10px #00c800; }
+
+/* Ring shadow uses filter: drop-shadow to follow the ring's alpha shape
+   (preserving the central hole). drop-shadow has no spread parameter. */
+.ring-drop-shadow-ref      { filter: drop-shadow(100px 100px 0 #00c800); }
+.ring-drop-shadow-blur5    { filter: drop-shadow(100px 100px 5px #00c800); }
+
+/* Row 2 blur variants */
+.shadow-blur5-ref { box-shadow: 100px 100px 5px 0px #00c800; }
+.shadow-blur5-spread10 { box-shadow: 100px 100px 5px 10px #00c800; }
+
+/* For image: box-shadow works on box, drop-shadow works on alpha */
+.img-box-shadow-ref { box-shadow: 100px 100px 0px 0px #00c800; }
+.img-box-shadow-spread10 { box-shadow: 100px 100px 0px 10px #00c800; }
+.img-drop-shadow-ref { filter: drop-shadow(100px 100px 0px #00c800); }
+</style>
+</head>
+<body>
+
+<h1>CSS Shadow Spread - Replicate Figma test3.png</h1>
+
+<h2>Row 1: 100x100 Ellipse (fill) - blur=0</h2>
+<div class="row">
+  <div class="item">
+    <div class="ellipse shadow-ref"></div>
+    <div class="label">Col 1: Fill + Shadow
+offset=100, blur=0, spread=0</div>
+  </div>
+  <div class="item">
+    <div class="ellipse shadow-spread10"></div>
+    <div class="label">Col 2: Fill + Shadow
+offset=100, blur=0, spread=10</div>
+  </div>
+</div>
+
+<h2>Row 2: 100x100 Ring (center stroke 20) - blur=0</h2>
+<p style="font-size:12px; color:#888;">Ring 用 border + 透明背景实现。要保留中空效果，必须用 filter: drop-shadow（跟随 alpha 通道），但它没有 spread 参数。box-shadow 会忽略 border 的环形拓扑。</p>
+<div class="row">
+  <div class="item">
+    <div class="ring ring-drop-shadow-ref"></div>
+    <div class="label">Col 3: Ring + drop-shadow
+spread N/A (CSS 不支持)</div>
+  </div>
+  <div class="item">
+    <div class="ring shadow-spread10"></div>
+    <div class="label">Col 4: Ring + box-shadow spread=10
+(box-shadow 忽略环形, 阴影是实心椭圆)</div>
+  </div>
+</div>
+
+<h2>Row 3: 100x100 Image fill (image_as_mask.png)</h2>
+<p style="font-size:12px; color:#888;">box-shadow 作用于 box 形状，drop-shadow 作用于 alpha 轮廓</p>
+<div class="row">
+  <div class="item">
+    <div class="img-box img-drop-shadow-ref">
+      <img src="file:///Users/chenjie/Desktop/Work/Resources/Image/image_as_mask.png">
+    </div>
+    <div class="label">drop-shadow (alpha)
+blur=0, no spread
+(CSS drop-shadow has no spread)</div>
+  </div>
+  <div class="item">
+    <div class="img-box img-box-shadow-ref">
+      <img src="file:///Users/chenjie/Desktop/Work/Resources/Image/image_as_mask.png">
+    </div>
+    <div class="label">box-shadow
+blur=0, spread=0
+(shadow = box rect)</div>
+  </div>
+  <div class="item">
+    <div class="img-box img-box-shadow-spread10">
+      <img src="file:///Users/chenjie/Desktop/Work/Resources/Image/image_as_mask.png">
+    </div>
+    <div class="label">box-shadow
+blur=0, spread=10
+(shadow = box rect outset 10px)</div>
+  </div>
+</div>
+
+<h2>Row 4: Ellipse + Ring with blur=5</h2>
+<div class="row">
+  <div class="item">
+    <div class="ellipse shadow-blur5-ref"></div>
+    <div class="label">Ellipse box-shadow
+blur=5, spread=0</div>
+  </div>
+  <div class="item">
+    <div class="ellipse shadow-blur5-spread10"></div>
+    <div class="label">Ellipse box-shadow
+blur=5, spread=10</div>
+  </div>
+  <div class="item">
+    <div class="ring ring-drop-shadow-blur5"></div>
+    <div class="label">Ring drop-shadow
+blur=5, no spread</div>
+  </div>
+  <div class="item">
+    <div class="ring shadow-blur5-spread10"></div>
+    <div class="label">Ring box-shadow
+blur=5, spread=10
+(忽略环形)</div>
+  </div>
+</div>
+
+<hr style="margin-top:40px; border-color:#444;">
+<h2>Key Observations</h2>
+<ul style="font-size:13px; line-height:1.8;">
+  <li><strong>CSS box-shadow spread on ring (border)</strong>: spread outsets the BOX shape, not the ring shape. The shadow is a solid ellipse outset by spread, not a ring with adjusted radii.</li>
+  <li><strong>Figma spread on ring</strong>: outer circle expands AND inner hole shrinks — this is dilate behavior on the alpha channel.</li>
+  <li><strong>Figma spread on image fill</strong>: shadow becomes a solid rectangle — uses frame bounds, not content alpha.</li>
+  <li><strong>CSS has no equivalent</strong> to Figma's ring spread behavior. box-shadow ignores border shape, drop-shadow has no spread.</li>
+</ul>
+
+</body>
+</html>

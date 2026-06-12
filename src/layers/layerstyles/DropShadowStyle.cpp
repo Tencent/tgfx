@@ -17,13 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
+#include "core/utils/Log.h"
+#include "core/utils/MathExtra.h"
+#include "layers/SpreadUtils.h"
+#include "tgfx/core/ImageFilter.h"
 
 namespace tgfx {
 
-std::shared_ptr<class DropShadowStyle> DropShadowStyle::Make(float offsetX, float offsetY,
-                                                             float blurrinessX, float blurrinessY,
-                                                             const Color& color,
-                                                             bool showBehindLayer) {
+std::shared_ptr<DropShadowStyle> DropShadowStyle::Make(float offsetX, float offsetY,
+                                                       float blurrinessX, float blurrinessY,
+                                                       const Color& color, bool showBehindLayer) {
   return std::shared_ptr<DropShadowStyle>(
       new DropShadowStyle(offsetX, offsetY, blurrinessX, blurrinessY, color, showBehindLayer));
 }
@@ -76,6 +79,16 @@ void DropShadowStyle::setShowBehindLayer(bool showBehindLayer) {
   invalidateTransform();
 }
 
+void DropShadowStyle::setSpread(float spread) {
+  if (_spread == spread) {
+    return;
+  }
+  _spread = spread;
+  // Spread does not affect the cached ImageFilter. Only trigger a redraw to regenerate the
+  // spread shape image.
+  invalidateTransform();
+}
+
 DropShadowStyle::DropShadowStyle(float offsetX, float offsetY, float blurrinessX, float blurrinessY,
                                  const Color& color, bool showBehindLayer)
     : _offsetX(offsetX), _offsetY(offsetY), _blurrinessX(blurrinessX), _blurrinessY(blurrinessY),
@@ -87,20 +100,42 @@ Rect DropShadowStyle::filterBounds(const Rect& srcRect, float contentScale) {
   if (!filter) {
     return srcRect;
   }
-  return filter->filterBounds(srcRect);
+  auto bounds = srcRect;
+  if (!FloatNearlyZero(_spread)) {
+    bounds.outset(_spread * contentScale, _spread * contentScale);
+  }
+  return filter->filterBounds(bounds);
 }
 
-void DropShadowStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> content,
-                                            float contentScale, const Point& /*contentOffset*/,
-                                            std::shared_ptr<Image> extraSource,
-                                            const Point& extraSourceOffset, float alpha,
-                                            BlendMode blendMode) {
+void DropShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alpha,
+                             BlendMode blendMode) {
   Point offset = {};
-  auto filter = getShadowFilter(contentScale);
+  auto filter = getShadowFilter(input.contentScale);
   if (!filter) {
     return;
   }
-  auto shadowImage = content->makeWithFilter(filter, &offset);
+  std::shared_ptr<Image> filterSource = input.content;
+  Point filterSourceOffset = {};
+  if (!FloatNearlyZero(_spread)) {
+    auto spreadImage = SpreadUtils::MakeSpreadShapeImage(input, _spread);
+    if (spreadImage.collapsed) {
+      return;
+    }
+    if (spreadImage.image != nullptr) {
+      filterSource = std::move(spreadImage.image);
+      filterSourceOffset = spreadImage.offset;
+    }
+  }
+  DEBUG_ASSERT(filterSource != nullptr);
+  if (filterSource == nullptr) {
+    return;
+  }
+  auto shadowImage = filterSource->makeWithFilter(filter, &offset);
+  DEBUG_ASSERT(shadowImage != nullptr);
+  if (shadowImage == nullptr) {
+    return;
+  }
+
   // Use nearest filtering when there's no blur to avoid edge artifacts caused by linear
   // interpolation. When the texture is scaled up, linear filtering produces intermediate alpha
   // values at edges, which causes visible borders in the shadow.
@@ -108,21 +143,17 @@ void DropShadowStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Imag
                       ? SamplingOptions(FilterMode::Nearest, MipmapMode::None)
                       : SamplingOptions();
   Paint paint = {};
-  if (!_showBehindLayer) {
-    auto shader = Shader::MakeImageShader(extraSource, TileMode::Decal, TileMode::Decal, sampling);
-    auto matrixShader =
-        shader->makeWithMatrix(Matrix::MakeTrans(extraSourceOffset.x, extraSourceOffset.y));
+  if (!_showBehindLayer && input.extraSource != nullptr) {
+    auto shader =
+        Shader::MakeImageShader(input.extraSource, TileMode::Decal, TileMode::Decal, sampling);
+    auto matrixShader = shader->makeWithMatrix(
+        Matrix::MakeTrans(input.extraSourceOffset.x, input.extraSourceOffset.y));
     paint.setMaskFilter(MaskFilter::MakeShader(matrixShader, true));
   }
   paint.setBlendMode(blendMode);
   paint.setAlpha(alpha);
-  canvas->drawImage(shadowImage, offset.x, offset.y, sampling, &paint);
-}
-
-void DropShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                             const Point& contentOffset, float alpha, BlendMode blendMode) {
-  onDrawWithExtraSource(canvas, content, contentScale, contentOffset, nullptr, {}, alpha,
-                        blendMode);
+  canvas->drawImage(shadowImage, filterSourceOffset.x + offset.x, filterSourceOffset.y + offset.y,
+                    sampling, &paint);
 }
 
 std::shared_ptr<ImageFilter> DropShadowStyle::getShadowFilter(float scale) {

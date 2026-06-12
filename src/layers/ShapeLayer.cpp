@@ -21,6 +21,7 @@
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/layers/LayerPaint.h"
+#include "tgfx/layers/layerstyles/StyledShape.h"
 
 namespace tgfx {
 std::shared_ptr<ShapeLayer> ShapeLayer::Make() {
@@ -261,5 +262,19 @@ std::shared_ptr<Shape> ShapeLayer::createStrokeShape() const {
     strokeShape = Shape::Merge(std::move(strokeShape), _shape, PathOp::Difference);
   }
   return strokeShape;
+}
+
+std::optional<StyledShape> ShapeLayer::onGetContentShape() {
+  if (_shape == nullptr) {
+    return std::nullopt;
+  }
+  auto fillCount = _fillStyles.size();
+  auto strokeCount = _strokeStyles.size();
+  if (strokeCount == 0 && fillCount == 0) {
+    return std::nullopt;
+  }
+
+  return StyledShape::Make(Shape::MakeFrom(_shape->getPath()), fillCount > 0, strokeCount > 0,
+                           stroke.width, static_cast<StrokeAlign>(shapeBitFields.strokeAlign));
 }
 }  // namespace tgfx

@@ -20,6 +20,7 @@
 
 #include "tgfx/core/Canvas.h"
 #include "tgfx/layers/LayerProperty.h"
+#include "tgfx/layers/layerstyles/LayerStyleInput.h"
 
 namespace tgfx {
 
@@ -121,24 +122,6 @@ class LayerStyle : public LayerProperty {
   virtual Rect filterBackground(const Rect& srcRect, float contentScale);
 
   /**
-   * Applies the layer style to the scaled image of the layer content and draws it on the canvas.
-   * @param canvas The canvas to draw the layer style on.
-   * @param content The opaque layer content image. Rendered with normal fills, then all
-   * semi-transparent pixels converted to fully opaque (fully transparent pixels preserved).
-   * @param contentScale The scale factor of the layer content relative to its original size.
-   * Some layer styles have size-related parameters that must be adjusted with this scale factor.
-   * @param contentOffset The offset of the content image's top-left corner in the layer's local
-   * coordinate space. Styles that need a stable sampling origin (e.g., procedural noise) use this
-   * to anchor their pattern so it does not shift when the layer is repainted with different dirty
-   * regions. Styles that do not need this information can safely ignore it.
-   * @param alpha The alpha transparency value used for drawing the layer style.
-   */
-  void draw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-            const Point& contentOffset, float alpha) {
-    onDraw(canvas, std::move(content), contentScale, contentOffset, alpha, _blendMode);
-  }
-
-  /**
    * Whether to exclude child effects when generating the source images for this layer style.
    * If true, child layer styles and filters are not included in the content, contour, or
    * background images used by this layer style. This option only affects the source images of
@@ -162,69 +145,27 @@ class LayerStyle : public LayerProperty {
   }
 
   /**
-   * Applies the layer style with the layer contour to the scaled image of the layer content and
-   * draws it on the canvas.
+   * Returns whether this layer style needs the content shape of the layer for drawing. When true,
+   * the layer attempts to extract its vector shape (e.g. Rect, Oval, or RRect) from the content;
+   * if the shape cannot be extracted, the layer's bounding rect is used as a fallback.
+   */
+  virtual bool needContentShape() const {
+    return false;
+  }
+
+  /**
+   * Draws this layer style onto the canvas using the provided input data.
    * @param canvas The canvas to draw the layer style on.
-   * @param content The opaque layer content image. Rendered with normal fills, then all
-   * semi-transparent pixels converted to fully opaque (fully transparent pixels preserved).
-   * @param contentScale The scale factor of the layer content relative to its original size.
-   * Some layer styles have size-related parameters that must be adjusted with this scale factor.
-   * @param contentOffset The offset of the content image's top-left corner in the layer's local
-   * coordinate space. See draw() for details.
-   * @param extraSource The extra source image. For Contour type: similar to content, but includes
-   * geometries from alpha=0 painters and replaces gradient fills with solid colors. For Background
-   * type: the normally rendered content below the current layer.
-   * @param extraSourceOffset The offset of the extra image relative to the layer content.
+   * @param input The input data for this layer style.
    * @param alpha The alpha transparency value used for drawing the layer style.
    */
-  void drawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                           const Point& contentOffset, std::shared_ptr<Image> extraSource,
-                           const Point& extraSourceOffset, float alpha) {
-    onDrawWithExtraSource(canvas, std::move(content), contentScale, contentOffset,
-                          std::move(extraSource), extraSourceOffset, alpha, _blendMode);
+  void draw(Canvas* canvas, const LayerStyleInput& input, float alpha) {
+    onDraw(canvas, input, alpha, _blendMode);
   }
 
  protected:
-  /**
-   * Applies the layer style to the opaque layer content image and draws it on the canvas.
-   * @param canvas The canvas to draw the layer style on.
-   * @param content The opaque layer content image. Rendered with normal fills, then all
-   * semi-transparent pixels converted to fully opaque (fully transparent pixels preserved).
-   * @param contentScale The scale factor of the layer content relative to its original size.
-   * Some layer styles have size-related parameters that must be adjusted with this scale factor.
-   * @param contentOffset The offset of the content image's top-left corner in the layer's local
-   * coordinate space. Styles that need a stable sampling origin use this to anchor their pattern.
-   * @param alpha The alpha transparency value used for drawing the layer style.
-   * @param blendMode The blend mode used to composite the layer style with the existing content on
-   * the canvas.
-   */
-  virtual void onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                      const Point& contentOffset, float alpha, BlendMode blendMode) = 0;
-
-  /**
-   * Applies the layer style with extra source to the opaque layer content image and draws
-   * it on the canvas.
-   * The default implementation calls onDraw with the layer content only.
-   * @param canvas The canvas to draw the layer style on.
-   * @param content The opaque layer content image. Rendered with normal fills, then all
-   * semi-transparent pixels converted to fully opaque (fully transparent pixels preserved).
-   * @param contentScale The scale factor of the layer content relative to its original size.
-   * Some layer styles have size-related parameters that must be adjusted with this scale factor.
-   * @param contentOffset The offset of the content image's top-left corner in the layer's local
-   * coordinate space. See onDraw for details.
-   * @param extraSource The extra source image. For Contour type: similar to content, but includes
-   * geometries from alpha=0 painters and replaces gradient fills with solid colors. For Background
-   * type: the normally rendered content below the current layer.
-   * @param extraSourceOffset The offset of the extra source relative to the layer content.
-   * @param alpha The alpha transparency value used for drawing the layer style.
-   * @param blendMode The blend mode used to composite the layer style with the existing content on
-   * the canvas.
-   */
-  virtual void onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> content,
-                                     float contentScale, const Point& contentOffset,
-                                     std::shared_ptr<Image> extraSource,
-                                     const Point& extraSourceOffset, float alpha,
-                                     BlendMode blendMode);
+  virtual void onDraw(Canvas* canvas, const LayerStyleInput& input, float alpha,
+                      BlendMode blendMode) = 0;
 
  private:
   BlendMode _blendMode = BlendMode::SrcOver;

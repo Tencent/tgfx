@@ -17,8 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/VectorLayer.h"
+#include <algorithm>
 #include "core/utils/Log.h"
 #include "tgfx/layers/LayerRecorder.h"
+#include "tgfx/layers/layerstyles/StyledShape.h"
+#include "vectors/Painter.h"
 #include "vectors/VectorContext.h"
 
 namespace tgfx {
@@ -65,6 +68,67 @@ void VectorLayer::onUpdateContent(LayerRecorder* recorder) {
   for (const auto& painter : context.painters) {
     painter->draw(recorder);
   }
+}
+
+std::optional<StyledShape> VectorLayer::onGetContentShape() {
+  if (_contents.empty()) {
+    return std::nullopt;
+  }
+  VectorContext context = {};
+  for (const auto& element : _contents) {
+    DEBUG_ASSERT(element != nullptr);
+    if (element->enabled()) {
+      element->apply(&context);
+    }
+  }
+  if (context.painters.empty()) {
+    return std::nullopt;
+  }
+
+  // Only a single shared geometry across all painters with a uniform stroke style can be
+  // simplified to a StyledShape.
+  Geometry* sharedGeometry = nullptr;
+  auto hasFill = false;
+  std::optional<PainterStyle> strokeStyle = std::nullopt;
+  for (const auto& painter : context.painters) {
+    DEBUG_ASSERT(painter != nullptr);
+    if (painter->geometries.size() != 1) {
+      return Layer::onGetContentShape();
+    }
+    if (sharedGeometry == nullptr) {
+      sharedGeometry = painter->geometries[0];
+    } else if (painter->geometries[0] != sharedGeometry) {
+      return Layer::onGetContentShape();
+    }
+
+    auto style = painter->getStyle();
+    if (style.style == PaintStyle::Fill) {
+      hasFill = true;
+    } else {
+      // Multiple strokes cannot be simplified to a single StyledShape.
+      if (strokeStyle.has_value()) {
+        return Layer::onGetContentShape();
+      }
+      strokeStyle = style;
+    }
+  }
+
+  if (sharedGeometry == nullptr) {
+    return std::nullopt;
+  }
+  auto shape = sharedGeometry->getShape();
+  if (shape == nullptr) {
+    return std::nullopt;
+  }
+  shape = Shape::ApplyMatrix(shape, sharedGeometry->matrix);
+  if (shape == nullptr) {
+    return std::nullopt;
+  }
+
+  auto hasStroke = strokeStyle.has_value();
+  auto strokeWidth = hasStroke ? strokeStyle->strokeWidth : 0.0f;
+  auto strokeAlign = hasStroke ? strokeStyle->strokeAlign : StrokeAlign::Center;
+  return StyledShape::Make(shape, hasFill, hasStroke, strokeWidth, strokeAlign);
 }
 
 }  // namespace tgfx
