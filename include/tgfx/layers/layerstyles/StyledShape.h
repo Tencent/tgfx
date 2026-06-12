@@ -19,11 +19,28 @@
 #pragma once
 
 #include <memory>
-#include "tgfx/core/Paint.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/layers/StrokeAlign.h"
 
 namespace tgfx {
+
+/**
+ * The drawing type of a StyledShape.
+ */
+enum class StyledShapeType {
+  /**
+   * Fill only.
+   */
+  Fill,
+  /**
+   * Stroke only.
+   */
+  Stroke,
+  /**
+   * Both fill and stroke.
+   */
+  FillStroke
+};
 
 /**
  * StyledShape describes a vector shape along with its style attributes (e.g. fill or stroke, stroke
@@ -42,25 +59,19 @@ struct StyledShape {
   std::shared_ptr<Shape> shape = nullptr;
 
   /**
-   * Whether the shape represents a fill or a stroke.
+   * The drawing type of this shape.
    */
-  PaintStyle style = PaintStyle::Fill;
+  StyledShapeType type = StyledShapeType::Fill;
 
   /**
-   * The stroke width. Ignored when style is Fill.
+   * The stroke width. Valid when type is Stroke or FillStroke.
    */
   float strokeWidth = 0.0f;
 
   /**
-   * The stroke alignment. Ignored when style is Fill.
+   * The stroke alignment. Valid when type is Stroke or FillStroke.
    */
   StrokeAlign strokeAlign = StrokeAlign::Center;
-
-  /**
-   * The outset distance from the shape path when style is Fill. The actual visible boundary is the
-   * shape path expanded outward by this amount. Ignored when style is Stroke.
-   */
-  float fillOutset = 0.0f;
 };
 
 }  // namespace tgfx

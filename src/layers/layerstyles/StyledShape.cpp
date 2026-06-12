@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/layerstyles/StyledShape.h"
-#include "layers/SpreadUtils.h"
 
 namespace tgfx {
 
@@ -25,13 +24,14 @@ StyledShape StyledShape::Make(std::shared_ptr<Shape> shape, bool hasFill, bool h
                               float strokeWidth, StrokeAlign strokeAlign) {
   StyledShape result = {};
   result.shape = std::move(shape);
-  if (hasFill) {
-    result.style = PaintStyle::Fill;
-    if (hasStroke) {
-      result.fillOutset = SpreadUtils::StrokeOutset(strokeWidth, strokeAlign);
-    }
+  if (hasFill && hasStroke) {
+    result.type = StyledShapeType::FillStroke;
+    result.strokeWidth = strokeWidth;
+    result.strokeAlign = strokeAlign;
+  } else if (hasFill) {
+    result.type = StyledShapeType::Fill;
   } else {
-    result.style = PaintStyle::Stroke;
+    result.type = StyledShapeType::Stroke;
     result.strokeWidth = strokeWidth;
     result.strokeAlign = strokeAlign;
   }

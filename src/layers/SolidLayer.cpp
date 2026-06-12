@@ -91,7 +91,7 @@ std::optional<StyledShape> SolidLayer::onGetContentShape() {
   }
   StyledShape result = {};
   result.shape = Shape::MakeFrom(path);
-  result.style = PaintStyle::Fill;
+  result.type = StyledShapeType::Fill;
   return result;
 }
 

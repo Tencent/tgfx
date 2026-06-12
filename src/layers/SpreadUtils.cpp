@@ -69,35 +69,61 @@ float SpreadUtils::StrokeOutset(float width, StrokeAlign align) {
   return 0.0f;
 }
 
-static inline void DrawSpreadRRect(Canvas* canvas, const RRect& rRect, PaintStyle style,
-                                   StrokeAlign strokeAlign, float strokeWidth, float fillOutset,
-                                   float spread) {
+static inline void DrawSpreadRRect(Canvas* canvas, const RRect& rRect, StyledShapeType type,
+                                   StrokeAlign strokeAlign, float strokeWidth, float spread) {
   Paint paint = {};
   paint.setColor(Color::White());
   paint.setAntiAlias(true);
-  if (style == PaintStyle::Fill) {
-    auto outset = fillOutset + spread;
-    if (outset != 0) {
-      auto spreadRRect = MakeSpreadRRect(rRect, outset);
-      DEBUG_ASSERT(!spreadRRect.rect().isEmpty());
-      canvas->drawRRect(spreadRRect, paint);
-    } else {
-      DEBUG_ASSERT(!rRect.rect().isEmpty());
-      canvas->drawRRect(rRect, paint);
+  switch (type) {
+    case StyledShapeType::Fill:
+    case StyledShapeType::FillStroke: {
+      auto outset = spread;
+      if (type == StyledShapeType::FillStroke) {
+        outset += SpreadUtils::StrokeOutset(strokeWidth, strokeAlign);
+      }
+      if (outset != 0) {
+        auto spreadRRect = MakeSpreadRRect(rRect, outset);
+        DEBUG_ASSERT(!spreadRRect.rect().isEmpty());
+        canvas->drawRRect(spreadRRect, paint);
+      } else {
+        DEBUG_ASSERT(!rRect.rect().isEmpty());
+        canvas->drawRRect(rRect, paint);
+      }
+      break;
     }
-  } else {
-    auto effectiveWidth = strokeWidth + 2.0f * spread;
-    DEBUG_ASSERT(effectiveWidth > 0.0f);
-    paint.setStyle(PaintStyle::Stroke);
-    paint.setStroke(Stroke(effectiveWidth));
-    auto drawRRect = rRect;
-    if (strokeAlign == StrokeAlign::Outside) {
-      drawRRect = MakeSpreadRRect(rRect, effectiveWidth * 0.5f);
-    } else if (strokeAlign == StrokeAlign::Inside) {
-      drawRRect = MakeSpreadRRect(rRect, -effectiveWidth * 0.5f);
+    case StyledShapeType::Stroke: {
+      auto effectiveWidth = strokeWidth + 2.0f * spread;
+      paint.setStyle(PaintStyle::Stroke);
+      paint.setStroke(Stroke(effectiveWidth));
+      auto drawRRect = rRect;
+      if (strokeAlign == StrokeAlign::Outside) {
+        drawRRect = MakeSpreadRRect(rRect, effectiveWidth * 0.5f);
+      } else if (strokeAlign == StrokeAlign::Inside) {
+        drawRRect = MakeSpreadRRect(rRect, -effectiveWidth * 0.5f);
+      }
+      DEBUG_ASSERT(!drawRRect.rect().isEmpty());
+      canvas->drawRRect(drawRRect, paint);
+      break;
     }
-    canvas->drawRRect(drawRRect, paint);
   }
+}
+
+bool SpreadUtils::IsSpreadCollapsed(const Shape& shape, StyledShapeType type, float strokeWidth,
+                                    StrokeAlign strokeAlign, float spread) {
+  switch (type) {
+    case StyledShapeType::Fill: {
+      auto bounds = shape.getPath().getBounds();
+      return bounds.width() + 2.0f * spread <= 0.0f || bounds.height() + 2.0f * spread <= 0.0f;
+    }
+    case StyledShapeType::Stroke:
+      return strokeWidth * 0.5f + spread <= 0.0f;
+    case StyledShapeType::FillStroke: {
+      auto bounds = shape.getPath().getBounds();
+      auto outset = spread + StrokeOutset(strokeWidth, strokeAlign);
+      return bounds.width() + 2.0f * outset <= 0.0f || bounds.height() + 2.0f * outset <= 0.0f;
+    }
+  }
+  return false;
 }
 
 SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInput& input,
@@ -110,18 +136,14 @@ SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInpu
   if (styledShape.shape == nullptr || styledShape.shape->getPath().isEmpty()) {
     return {nullptr, {}, false};
   }
-  // Stroke fully collapsed by negative spread.
-  if (styledShape.style == PaintStyle::Stroke && styledShape.strokeWidth * 0.5f + spread <= 0.0f) {
-    return {nullptr, {}, true};
-  }
   auto [shape, shapeMatrix] = UnwrapMatrixShape(styledShape.shape);
-  // Fill fully collapsed by negative spread.
-  if (styledShape.style == PaintStyle::Fill) {
-    auto bounds = shape->getPath().getBounds();
-    auto outset = styledShape.fillOutset + spread;
-    if (bounds.width() + 2.0f * outset <= 0.0f || bounds.height() + 2.0f * outset <= 0.0f) {
-      return {nullptr, {}, true};
-    }
+  DEBUG_ASSERT(shape != nullptr);
+  if (shape == nullptr) {
+    return {nullptr, {}, false};
+  }
+  if (IsSpreadCollapsed(*shape, styledShape.type, styledShape.strokeWidth, styledShape.strokeAlign,
+                        spread)) {
+    return {nullptr, {}, true};
   }
 
   auto path = shape->getPath();
@@ -132,27 +154,25 @@ SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInpu
 
   Rect rect = {};
   RRect rRect = {};
-  auto style = styledShape.style;
+  auto type = styledShape.type;
   auto strokeWidth = styledShape.strokeWidth;
-  auto fillOutset = styledShape.fillOutset;
   auto strokeAlign = styledShape.strokeAlign;
   if (path.isOval(&rect)) {
-    DrawSpreadRRect(recordCanvas, RRect::MakeOval(rect), style, strokeAlign, strokeWidth,
-                    fillOutset, spread);
+    DrawSpreadRRect(recordCanvas, RRect::MakeOval(rect), type, strokeAlign, strokeWidth, spread);
   } else if (path.isRRect(&rRect)) {
-    DrawSpreadRRect(recordCanvas, rRect, style, strokeAlign, strokeWidth, fillOutset, spread);
+    DrawSpreadRRect(recordCanvas, rRect, type, strokeAlign, strokeWidth, spread);
   } else {
     if (!path.isRect(&rect)) {
       // Complex paths use their bounding rect as a fill approximation for the shadow source.
       rect = path.getBounds();
-      if (style == PaintStyle::Stroke) {
-        auto outset = StrokeOutset(strokeWidth, styledShape.strokeAlign);
+      if (type == StyledShapeType::Stroke || type == StyledShapeType::FillStroke) {
+        auto outset = SpreadUtils::StrokeOutset(strokeWidth, styledShape.strokeAlign);
         rect.outset(outset, outset);
       }
-      style = PaintStyle::Fill;
+      type = StyledShapeType::Fill;
     }
-    DrawSpreadRRect(recordCanvas, RRect::MakeRectXY(rect, 0, 0), style, strokeAlign, strokeWidth,
-                    fillOutset, spread);
+    DrawSpreadRRect(recordCanvas, RRect::MakeRectXY(rect, 0, 0), type, strokeAlign, strokeWidth,
+                    spread);
   }
 
   auto picture = recorder.finishRecordingAsPicture();

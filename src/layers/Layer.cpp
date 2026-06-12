@@ -229,7 +229,7 @@ static inline std::optional<StyledShape> MakeContentShape(LayerContent* content)
   Path path = {};
   path.addRect(bounds);
   styledShape.shape = Shape::MakeFrom(path);
-  styledShape.style = PaintStyle::Fill;
+  styledShape.type = StyledShapeType::Fill;
   return styledShape;
 }
 

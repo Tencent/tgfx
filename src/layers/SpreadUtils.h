@@ -51,6 +51,10 @@ class SpreadUtils {
    * unavailable or the path is empty.
    */
   static SpreadResult MakeSpreadShapeImage(const LayerStyleInput& input, float spread);
+
+ private:
+  static bool IsSpreadCollapsed(const Shape& shape, StyledShapeType type, float strokeWidth,
+                                StrokeAlign strokeAlign, float spread);
 };
 
 }  // namespace tgfx
