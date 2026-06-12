@@ -163,6 +163,15 @@ class LayerStyle : public LayerProperty {
   }
 
   /**
+   * Returns true if this layer style uses the content image's alpha channel to compute its effect.
+   * When true, the content image cannot be replaced with an opaque placeholder during vector clip
+   * export. Default is true.
+   */
+  virtual bool needsContentAlpha() const {
+    return true;
+  }
+
+  /**
    * Returns the type of the extra source required by the layer style.
    * Default is LayerStyleExtraSourceType::None.
    */

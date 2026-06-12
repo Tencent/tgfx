@@ -1608,7 +1608,8 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
       canvas->clipPath(contentClipPath);
       clippedForAbove = true;
     }
-    drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Above);
+    drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Above,
+                    useVectorClip);
     if (clippedForAbove) {
       canvas->restore();
     }
@@ -1849,7 +1850,8 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
 }
 
 void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
-                            const LayerStyleSource* source, LayerStylePosition position) {
+                            const LayerStyleSource* source, LayerStylePosition position,
+                            bool useVectorClip) {
   DEBUG_ASSERT(source != nullptr && !FloatNearlyZero(source->contentScale));
   for (const auto& layerStyle : _layerStyles) {
     DEBUG_ASSERT(layerStyle != nullptr);
@@ -1860,7 +1862,7 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
       BackgroundHandler::DispatchOrSkip(args, canvas, this, alpha, layerStyle.get(), source);
       continue;
     }
-    drawLayerStyleDefault(args, canvas, alpha, layerStyle.get(), source);
+    drawLayerStyleDefault(args, canvas, alpha, layerStyle.get(), source, useVectorClip);
   }
 }
 
@@ -1927,7 +1929,8 @@ std::shared_ptr<Image> Layer::synthesizeBackgroundImage(const DrawArgs& args, fl
 }
 
 void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, float alpha,
-                                  LayerStyle* layerStyle, const LayerStyleSource* source) {
+                                  LayerStyle* layerStyle, const LayerStyleSource* source,
+                                  bool useVectorClip) {
   DEBUG_ASSERT(source != nullptr && !FloatNearlyZero(source->contentScale));
   DEBUG_ASSERT(layerStyle->extraSourceType() != LayerStyleExtraSourceType::Background);
   auto groupIndex = static_cast<int>(layerStyle->excludeChildEffects());
@@ -1942,10 +1945,22 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
   auto matrix = Matrix::MakeScale(1.f / source->contentScale, 1.f / source->contentScale);
   matrix.preTranslate(contentEntry.offset.x, contentEntry.offset.y);
   canvas->concat(matrix);
+  auto contentImage = contentEntry.image;
+  if (useVectorClip && contentImage != nullptr && !layerStyle->needsContentAlpha()) {
+    PictureRecorder recorder;
+    auto* recCanvas = recorder.beginRecording();
+    Paint opaquePaint = {};
+    opaquePaint.setColor(Color::White());
+    recCanvas->drawRect(Rect::MakeWH(contentImage->width(), contentImage->height()), opaquePaint);
+    auto picture = recorder.finishRecordingAsPicture();
+    if (picture != nullptr) {
+      contentImage = Image::MakeFrom(std::move(picture), contentImage->width(),
+                                     contentImage->height());
+    }
+  }
   switch (layerStyle->extraSourceType()) {
     case LayerStyleExtraSourceType::None:
-      layerStyle->draw(canvas, contentEntry.image, source->contentScale, contentEntry.offset,
-                       alpha);
+      layerStyle->draw(canvas, contentImage, source->contentScale, contentEntry.offset, alpha);
       break;
     case LayerStyleExtraSourceType::Background:
       // Unreachable: Background-sourced styles are routed through BackgroundHandler.
