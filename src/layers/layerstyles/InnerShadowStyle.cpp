@@ -22,6 +22,7 @@
 #include "core/utils/MathExtra.h"
 #include "layers/SpreadUtils.h"
 #include "tgfx/core/Canvas.h"
+#include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/ImageFilter.h"
 
 namespace tgfx {
@@ -109,10 +110,20 @@ void InnerShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, floa
   std::shared_ptr<Image> filterSource = input.content;
   Point filterSourceOffset = {};
   if (!FloatNearlyZero(_spread)) {
-    // TODO: when the mask collapses to empty due to spread, the entire content should be covered
-    // by shadow.
     auto shapeSource = SpreadUtils::MakeSpreadShapeImage(input, 0);
     auto maskSource = SpreadUtils::MakeSpreadShapeImage(input, -_spread);
+    if (maskSource.collapsed) {
+      // The mask fully collapsed — shadow fills the entire content area.
+      if (shapeSource.image == nullptr) {
+        return;
+      }
+      Paint paint = {};
+      paint.setBlendMode(blendMode);
+      paint.setAlpha(alpha);
+      paint.setColorFilter(ColorFilter::Blend(_color, BlendMode::SrcIn));
+      canvas->drawImage(shapeSource.image, shapeSource.offset.x, shapeSource.offset.y, {}, &paint);
+      return;
+    }
     if (shapeSource.image != nullptr && maskSource.image != nullptr) {
       filterSource = shapeSource.image;
       filterSourceOffset = shapeSource.offset;

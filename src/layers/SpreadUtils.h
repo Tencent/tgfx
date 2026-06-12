@@ -27,20 +27,30 @@ namespace tgfx {
 
 class SpreadUtils {
  public:
-  struct OffsetImage {
+  struct SpreadResult {
     std::shared_ptr<Image> image = nullptr;
     /**
      * The offset of the image relative to the content image, scaled by contentScale.
      */
     Point offset = {};
+    /**
+     * Whether the shape collapsed to empty due to spread (e.g. negative spread fully consumed the
+     * geometry).
+     */
+    bool collapsed = false;
   };
+
+  /**
+   * Returns the outward expansion distance from the path boundary caused by the stroke.
+   */
+  static float StrokeOutset(float width, StrokeAlign align);
 
   /**
    * Rasterizes the contentShape with spread applied into a tightly-sized alpha image. Positive
    * spread outsets the shape, negative spread insets it. Returns {nullptr, {}} when contentShape is
    * unavailable or the path is empty.
    */
-  static OffsetImage MakeSpreadShapeImage(const LayerStyleInput& input, float spread);
+  static SpreadResult MakeSpreadShapeImage(const LayerStyleInput& input, float spread);
 };
 
 }  // namespace tgfx

@@ -46,6 +46,18 @@ static inline RRect MakeSpreadRRect(const RRect& rRect, float distance) {
   return result;
 }
 
+float SpreadUtils::StrokeOutset(float width, StrokeAlign align) {
+  switch (align) {
+    case StrokeAlign::Center:
+      return width * 0.5f;
+    case StrokeAlign::Outside:
+      return width;
+    case StrokeAlign::Inside:
+      return 0.0f;
+  }
+  return 0.0f;
+}
+
 static inline void DrawSpreadRRect(Canvas* canvas, const RRect& rRect, PaintStyle style,
                                    float strokeWidth, float fillOutset, float spread) {
   Paint paint = {};
@@ -55,11 +67,10 @@ static inline void DrawSpreadRRect(Canvas* canvas, const RRect& rRect, PaintStyl
     auto outset = fillOutset + spread;
     if (outset != 0) {
       auto spreadRRect = MakeSpreadRRect(rRect, outset);
-      if (spreadRRect.rect().isEmpty()) {
-        return;
-      }
+      DEBUG_ASSERT(!spreadRRect.rect().isEmpty());
       canvas->drawRRect(spreadRRect, paint);
     } else {
+      DEBUG_ASSERT(!rRect.rect().isEmpty());
       canvas->drawRRect(rRect, paint);
     }
   } else {
@@ -70,19 +81,27 @@ static inline void DrawSpreadRRect(Canvas* canvas, const RRect& rRect, PaintStyl
   }
 }
 
-SpreadUtils::OffsetImage SpreadUtils::MakeSpreadShapeImage(const LayerStyleInput& input,
-                                                           float spread) {
+SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInput& input,
+                                                            float spread) {
   if (!input.contentShape.has_value()) {
-    return {nullptr, {}};
+    return {nullptr, {}, false};
   }
   auto& styledShape = *input.contentShape;
   DEBUG_ASSERT(styledShape.shape != nullptr);
   if (styledShape.shape == nullptr || styledShape.shape->getPath().isEmpty()) {
-    return {nullptr, {}};
+    return {nullptr, {}, false};
   }
   // Stroke fully collapsed by negative spread.
   if (styledShape.style == PaintStyle::Stroke && styledShape.strokeWidth * 0.5f + spread <= 0.0f) {
-    return {nullptr, {}};
+    return {nullptr, {}, true};
+  }
+  // Fill fully collapsed by negative spread.
+  if (styledShape.style == PaintStyle::Fill) {
+    auto bounds = styledShape.shape->getPath().getBounds();
+    auto outset = styledShape.fillOutset + spread;
+    if (bounds.width() + 2.0f * outset <= 0.0f || bounds.height() + 2.0f * outset <= 0.0f) {
+      return {nullptr, {}, true};
+    }
   }
 
   auto path = styledShape.shape->getPath();
@@ -103,6 +122,10 @@ SpreadUtils::OffsetImage SpreadUtils::MakeSpreadShapeImage(const LayerStyleInput
     if (!path.isRect(&rect)) {
       // Complex paths use their bounding rect as a fill approximation for the shadow source.
       rect = path.getBounds();
+      if (style == PaintStyle::Stroke) {
+        auto outset = StrokeOutset(strokeWidth, styledShape.strokeAlign);
+        rect.outset(outset, outset);
+      }
       style = PaintStyle::Fill;
     }
     DrawSpreadRRect(recordCanvas, RRect::MakeRectXY(rect, 0, 0), style, strokeWidth, fillOutset,
@@ -112,13 +135,14 @@ SpreadUtils::OffsetImage SpreadUtils::MakeSpreadShapeImage(const LayerStyleInput
   auto picture = recorder.finishRecordingAsPicture();
   Point offset = {};
   auto image = ToImageWithOffset(std::move(picture), &offset);
+  DEBUG_ASSERT(image != nullptr);
   if (image == nullptr) {
-    DEBUG_ASSERT(false);
-    return {nullptr, {}};
+    return {nullptr, {}, false};
   }
   return {std::move(image),
           {offset.x - input.contentOffset.x * input.contentScale,
-           offset.y - input.contentOffset.y * input.contentScale}};
+           offset.y - input.contentOffset.y * input.contentScale},
+          false};
 }
 
 }  // namespace tgfx

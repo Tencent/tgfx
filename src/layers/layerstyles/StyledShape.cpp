@@ -17,20 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/layerstyles/StyledShape.h"
+#include "layers/SpreadUtils.h"
 
 namespace tgfx {
-
-static inline float StrokeOutset(float strokeWidth, StrokeAlign align) {
-  switch (align) {
-    case StrokeAlign::Center:
-      return strokeWidth * 0.5f;
-    case StrokeAlign::Outside:
-      return strokeWidth;
-    case StrokeAlign::Inside:
-      return 0.0f;
-  }
-  return 0.0f;
-}
 
 StyledShape StyledShape::Make(std::shared_ptr<Shape> shape, bool hasFill, bool hasStroke,
                               float strokeWidth, StrokeAlign strokeAlign) {
@@ -39,7 +28,7 @@ StyledShape StyledShape::Make(std::shared_ptr<Shape> shape, bool hasFill, bool h
   if (hasFill) {
     result.style = PaintStyle::Fill;
     if (hasStroke) {
-      result.fillOutset = StrokeOutset(strokeWidth, strokeAlign);
+      result.fillOutset = SpreadUtils::StrokeOutset(strokeWidth, strokeAlign);
     }
   } else {
     result.style = PaintStyle::Stroke;
