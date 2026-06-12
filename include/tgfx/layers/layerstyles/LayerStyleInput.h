@@ -37,8 +37,8 @@ struct LayerStyleInput {
   std::shared_ptr<Image> content = nullptr;
 
   /**
-   * The offset of the content image's top-left corner in the layer's local coordinate space.
-   * Styles that need a stable sampling origin use this to anchor their pattern.
+   * The offset of the content image's top-left corner in pixel coordinates (already scaled by
+   * contentScale). Styles that need a stable sampling origin use this to anchor their pattern.
    */
   Point contentOffset = {};
 

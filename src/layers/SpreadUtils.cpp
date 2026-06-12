@@ -18,8 +18,9 @@
 
 #include "layers/SpreadUtils.h"
 #include <algorithm>
+#include "core/shapes/MatrixShape.h"
 #include "core/utils/Log.h"
-#include "core/utils/MathExtra.h"
+#include "core/utils/ShapeUtils.h"
 #include "layers/LayerStyleSource.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/PictureRecorder.h"
@@ -28,6 +29,16 @@
 #include "tgfx/core/Stroke.h"
 
 namespace tgfx {
+
+static inline std::pair<std::shared_ptr<Shape>, Matrix> UnwrapMatrixShape(
+    std::shared_ptr<Shape> shape) {
+  auto matrix = Matrix::I();
+  while (auto* ms = ShapeUtils::AsMatrixShape(shape.get())) {
+    matrix.preConcat(ms->matrix);
+    shape = ms->shape;
+  }
+  return {std::move(shape), matrix};
+}
 
 static inline RRect MakeSpreadRRect(const RRect& rRect, float distance) {
   auto bounds = rRect.rect();
@@ -59,7 +70,8 @@ float SpreadUtils::StrokeOutset(float width, StrokeAlign align) {
 }
 
 static inline void DrawSpreadRRect(Canvas* canvas, const RRect& rRect, PaintStyle style,
-                                   float strokeWidth, float fillOutset, float spread) {
+                                   StrokeAlign strokeAlign, float strokeWidth, float fillOutset,
+                                   float spread) {
   Paint paint = {};
   paint.setColor(Color::White());
   paint.setAntiAlias(true);
@@ -74,10 +86,17 @@ static inline void DrawSpreadRRect(Canvas* canvas, const RRect& rRect, PaintStyl
       canvas->drawRRect(rRect, paint);
     }
   } else {
-    DEBUG_ASSERT(strokeWidth * 0.5f + spread > 0.0f);
+    auto effectiveWidth = strokeWidth + 2.0f * spread;
+    DEBUG_ASSERT(effectiveWidth > 0.0f);
     paint.setStyle(PaintStyle::Stroke);
-    paint.setStroke(Stroke(strokeWidth + 2.0f * spread));
-    canvas->drawRRect(rRect, paint);
+    paint.setStroke(Stroke(effectiveWidth));
+    auto drawRRect = rRect;
+    if (strokeAlign == StrokeAlign::Outside) {
+      drawRRect = MakeSpreadRRect(rRect, effectiveWidth * 0.5f);
+    } else if (strokeAlign == StrokeAlign::Inside) {
+      drawRRect = MakeSpreadRRect(rRect, -effectiveWidth * 0.5f);
+    }
+    canvas->drawRRect(drawRRect, paint);
   }
 }
 
@@ -95,29 +114,33 @@ SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInpu
   if (styledShape.style == PaintStyle::Stroke && styledShape.strokeWidth * 0.5f + spread <= 0.0f) {
     return {nullptr, {}, true};
   }
+  auto [shape, shapeMatrix] = UnwrapMatrixShape(styledShape.shape);
   // Fill fully collapsed by negative spread.
   if (styledShape.style == PaintStyle::Fill) {
-    auto bounds = styledShape.shape->getPath().getBounds();
+    auto bounds = shape->getPath().getBounds();
     auto outset = styledShape.fillOutset + spread;
     if (bounds.width() + 2.0f * outset <= 0.0f || bounds.height() + 2.0f * outset <= 0.0f) {
       return {nullptr, {}, true};
     }
   }
 
-  auto path = styledShape.shape->getPath();
+  auto path = shape->getPath();
   PictureRecorder recorder;
   auto* recordCanvas = recorder.beginRecording();
   recordCanvas->scale(input.contentScale, input.contentScale);
+  recordCanvas->concat(shapeMatrix);
 
   Rect rect = {};
   RRect rRect = {};
   auto style = styledShape.style;
   auto strokeWidth = styledShape.strokeWidth;
   auto fillOutset = styledShape.fillOutset;
+  auto strokeAlign = styledShape.strokeAlign;
   if (path.isOval(&rect)) {
-    DrawSpreadRRect(recordCanvas, RRect::MakeOval(rect), style, strokeWidth, fillOutset, spread);
+    DrawSpreadRRect(recordCanvas, RRect::MakeOval(rect), style, strokeAlign, strokeWidth,
+                    fillOutset, spread);
   } else if (path.isRRect(&rRect)) {
-    DrawSpreadRRect(recordCanvas, rRect, style, strokeWidth, fillOutset, spread);
+    DrawSpreadRRect(recordCanvas, rRect, style, strokeAlign, strokeWidth, fillOutset, spread);
   } else {
     if (!path.isRect(&rect)) {
       // Complex paths use their bounding rect as a fill approximation for the shadow source.
@@ -128,8 +151,8 @@ SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInpu
       }
       style = PaintStyle::Fill;
     }
-    DrawSpreadRRect(recordCanvas, RRect::MakeRectXY(rect, 0, 0), style, strokeWidth, fillOutset,
-                    spread);
+    DrawSpreadRRect(recordCanvas, RRect::MakeRectXY(rect, 0, 0), style, strokeAlign, strokeWidth,
+                    fillOutset, spread);
   }
 
   auto picture = recorder.finishRecordingAsPicture();
@@ -140,8 +163,7 @@ SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInpu
     return {nullptr, {}, false};
   }
   return {std::move(image),
-          {offset.x - input.contentOffset.x * input.contentScale,
-           offset.y - input.contentOffset.y * input.contentScale},
+          {offset.x - input.contentOffset.x, offset.y - input.contentOffset.y},
           false};
 }
 

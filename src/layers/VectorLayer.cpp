@@ -120,6 +120,10 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
   if (shape == nullptr) {
     return std::nullopt;
   }
+  shape = Shape::ApplyMatrix(shape, sharedGeometry->matrix);
+  if (shape == nullptr) {
+    return std::nullopt;
+  }
 
   auto hasStroke = strokeStyle.has_value();
   auto strokeWidth = hasStroke ? strokeStyle->strokeWidth : 0.0f;

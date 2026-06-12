@@ -3537,7 +3537,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(layer);
   }
 
-  // Case 8: TextLayer, spread=8
+  // Case 8: TextLayer with perspective, spread=8
   {
     auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
     for (int i = 0; i < 2; ++i) {
@@ -3547,8 +3547,10 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
       layer->setText("TGFX");
       layer->setFont(font);
       layer->setTextColor(Color::Red());
-      layer->setMatrix(
-          Matrix::MakeTrans(cellW + (i == 0 ? lItemXOffset : rItemXOffset), cellH * 2 + gap));
+      auto matrix =
+          Matrix::MakeTrans(cellW + (i == 0 ? lItemXOffset : rItemXOffset), cellH * 2 + gap);
+      matrix.preConcat(Matrix::MakeAll(1, 0, 0, 0, 1, 0, 0.002f, 0.001f, 1));
+      layer->setMatrix(matrix);
       layer->setLayerStyles({MakeShadow(type, 25, 25, 3, 3, YELLOW_COLOR, i == 0 ? 0.0f : 8.0f)});
       displayList.root()->addChild(layer);
     }
@@ -3574,7 +3576,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(vectorLayer);
   }
 
-  // Case 10: VectorLayer Ellipse + Center stroke 15px, spread=-5
+  // Case 10: VectorLayer Ellipse + Center stroke 15px, spread=-10 (stroke collapse)
   for (int i = 0; i < 2; ++i) {
     auto vectorLayer = VectorLayer::Make();
     auto group = VectorGroup::Make();
@@ -3588,7 +3590,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     vectorLayer->setMatrix(
         Matrix::MakeTrans(i == 0 ? lItemXOffset : rItemXOffset, cellH * 3 + gap));
     vectorLayer->setLayerStyles(
-        {MakeShadow(type, 25, 25, 3, 3, Color::Green(), i == 0 ? 0.0f : -5.0f)});
+        {MakeShadow(type, 25, 25, 3, 3, Color::Green(), i == 0 ? 0.0f : -10.0f)});
     displayList.root()->addChild(vectorLayer);
   }
 
@@ -3677,6 +3679,34 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
         Matrix::MakeTrans(cellW + (i == 0 ? lItemXOffset : rItemXOffset), cellH * 4 + gap));
     vectorLayer->setLayerStyles(
         {MakeShadow(type, 25, 25, 3, 3, Color::Green(), i == 0 ? 0.0f : 8.0f)});
+    displayList.root()->addChild(vectorLayer);
+  }
+
+  // Case 15: VectorLayer Ellipse + Center stroke 15px with compound transform, spread=-5
+  for (int i = 0; i < 2; ++i) {
+    auto vectorLayer = VectorLayer::Make();
+    auto innerGroup = VectorGroup::Make();
+    // auto ellipse = Ellipse::Make();
+    auto ellipse = Rectangle::Make();
+    ellipse->setPosition({50, 30});
+    ellipse->setSize({100, 60});
+    auto stroke = StrokeStyle::Make(SolidColor::Make(Color::Blue()));
+    stroke->setStrokeWidth(15);
+    stroke->setStrokeAlign(StrokeAlign::Inside);
+    innerGroup->setElements({ellipse, stroke});
+    innerGroup->setScale({1.5f, 1.5f});
+    innerGroup->setRotation(-30);
+    auto group = VectorGroup::Make();
+    group->setElements({innerGroup});
+    vectorLayer->setContents({group});
+    auto matrix =
+        Matrix::MakeTrans(cellW * 2 + (i == 0 ? lItemXOffset : rItemXOffset), cellH * 4 + gap);
+    matrix.preConcat(Matrix::MakeScale(0.8f));
+    matrix.preConcat(Matrix::MakeRotate(15));
+    matrix.preConcat(Matrix::MakeTrans(-10, 15));
+    vectorLayer->setMatrix(matrix);
+    vectorLayer->setLayerStyles(
+        {MakeShadow(type, 25, 25, 3, 3, Color::Green(), i == 0 ? 0.0f : -5.0f)});
     displayList.root()->addChild(vectorLayer);
   }
 }
