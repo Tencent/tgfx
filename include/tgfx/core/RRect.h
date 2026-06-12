@@ -19,7 +19,6 @@
 #pragma once
 
 #include <array>
-#include "tgfx/core/Matrix.h"
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
@@ -28,6 +27,15 @@ namespace tgfx {
  */
 class RRect {
  public:
+  /**
+   * Returns an RRect representing a plain rectangle with zero corner radii.
+   */
+  static RRect MakeRect(const Rect& rect) {
+    RRect rr = {};
+    rr.setRect(rect);
+    return rr;
+  }
+
   /**
    * Returns an RRect with the same radii for all four corners. See setRectXY() for details.
    */
@@ -93,6 +101,12 @@ class RRect {
   bool isComplex() const {
     return _type == Type::Complex;
   }
+
+  /**
+   * Sets to a plain rectangle with zero corner radii.
+   * @param rect  bounds of the rectangle
+   */
+  void setRect(const Rect& rect);
 
   /**
    * Sets to rounded rectangle with the same radii for all four corners.

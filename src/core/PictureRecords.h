@@ -92,7 +92,7 @@ class SetClip : public PictureRecord {
     auto& elements = clip.elements();
     for (size_t i = clip.oldestValidIndex(); i < elements.size(); ++i) {
       const auto& element = elements[i];
-      if (element.isValid() && element.path().isInverseFillType()) {
+      if (element.isValid() && element.asPath().isInverseFillType()) {
         hasInverseClip = true;
         return false;
       }

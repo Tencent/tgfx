@@ -22,11 +22,13 @@
 #include <cmath>
 #include <memory>
 #include <stack>
+#include <type_traits>
 #include <vector>
 #include "core/utils/GeometryExtra.h"
 #include "core/utils/Log.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
+#include "tgfx/core/RRect.h"
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
@@ -47,55 +49,68 @@ enum class ClipState {
 
 class ClipElement {
  public:
-  ClipElement() = default;
+  enum class Type { Empty, Rect, RRect, Path };
+
+  ClipElement();
+  ClipElement(const Rect& rect, const Matrix& matrix, bool antiAlias);
+  ClipElement(const RRect& rRect, const Matrix& matrix, bool antiAlias);
   ClipElement(const Path& path, bool antiAlias);
 
-  const Path& path() const {
-    return _path;
+  ClipElement(const ClipElement& other);
+  ClipElement& operator=(const ClipElement& other);
+  // No move constructor/assignment — clip operations are not on a hot path.
+  ~ClipElement();
+
+  Type type() const {
+    return _type;
+  }
+
+  const Rect& rect() const {
+    DEBUG_ASSERT(_type == Type::Rect);
+    return _rect;
+  }
+
+  const RRect& rRect() const {
+    DEBUG_ASSERT(_type == Type::RRect);
+    return _rRect;
+  }
+
+  const Matrix& matrix() const {
+    return _matrix;
   }
 
   bool isAntiAlias() const {
     return _antiAlias;
   }
 
-  const Rect& bounds() const {
-    return _bounds;
+  const Rect& outerBounds() const {
+    return _outerBounds;
+  }
+
+  const Rect& innerBounds() const {
+    return _innerBounds;
   }
 
   bool isRect() const {
-    return _isRect;
+    return _type == Type::Rect && _matrix.isIdentity();
   }
 
   bool isValid() const {
     return _invalidatedByIndex < 0;
   }
 
-  bool isPixelAligned() const {
-    return IsPixelAligned(_bounds.left) && IsPixelAligned(_bounds.top) &&
-           IsPixelAligned(_bounds.right) && IsPixelAligned(_bounds.bottom);
-  }
+  bool isPixelAligned() const;
+
+  /**
+   * Returns a device-space Path representing this element's shape. For Rect and RRect types
+   * the path is constructed on demand and transformed by the element's matrix. For Path type
+   * the stored path is returned directly.
+   */
+  Path asPath() const;
 
   bool tryCombine(const ClipElement& other);
 
-  /**
-   * Returns whether this element's keep-region fully contains the keep-region of other.
-   *
-   * A true result guarantees containment; a false result means containment could not be
-   * cheaply proven, so it may or may not actually hold. For example, when this is a concave
-   * path such as an L shape and other's bounds fit entirely inside the L, the geometric
-   * check cannot prove containment and returns false even though it does hold.
-   */
-  bool tightContains(const ClipElement& other) const;
-
-  /**
-   * Returns whether this element's keep-region intersects the keep-region of other.
-   *
-   * A false result guarantees disjointness; a true result means disjointness could not be
-   * cheaply proven, so the two regions may or may not actually overlap. For example, when
-   * this is a concave path and other fits entirely inside a concave gap of this, the AABB
-   * check still reports them as overlapping and returns true even though they are disjoint.
-   */
-  bool looseIntersects(const ClipElement& other) const;
+  bool contains(const ClipElement& other) const;
 
   void transform(const Matrix& matrix);
 
@@ -108,11 +123,28 @@ class ClipElement {
   }
 
  private:
-  Path _path = {};
+  Rect getBounds() const;
+  void simplify();
+  void updateOuterInnerBounds();
+  void setType(Type type);
+  void setRect(const Rect& rect);
+  void setRRect(const RRect& rRect);
+  void setPath(const Path& path);
+
+  union {
+    Rect _rect;
+    RRect _rRect;
+    Path _path;
+  };
+  static_assert(std::is_trivially_destructible_v<Rect>, "Rect must remain trivially destructible");
+  static_assert(std::is_trivially_destructible_v<RRect>,
+                "RRect must remain trivially destructible");
+
+  Type _type = Type::Rect;
+  Matrix _matrix = Matrix::I();
+  Rect _outerBounds = {};
+  Rect _innerBounds = {};
   bool _antiAlias = false;
-  Rect _bounds = {};
-  bool _isRect = false;
-  // The startIndex of the ClipRecord that invalidated this element. -1 means valid.
   int _invalidatedByIndex = -1;
 };
 
@@ -170,6 +202,14 @@ class ClipStack {
  public:
   ClipStack();
 
+  // Adds a rectangle clip with the given matrix mapping it from local space to device space.
+  void clipRect(const Rect& rect, const Matrix& matrix, bool antiAlias);
+
+  // Adds a rounded rectangle clip with the given matrix mapping it from local space to
+  // device space.
+  void clipRRect(const RRect& rRect, const Matrix& matrix, bool antiAlias);
+
+  // Adds a generic path clip. The path is expected to already be in device space.
   void clip(const Path& path, bool antiAlias);
 
   void save();

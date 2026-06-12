@@ -54,7 +54,7 @@ void PlaybackContext::setClip(const ClipStack& clip) {
     if (!element.isValid()) {
       continue;
     }
-    auto path = element.path();
+    auto path = element.asPath();
     if (hasInitMatrix) {
       path.transform(initMatrix);
     }
