@@ -167,14 +167,10 @@ PDFExportContext::PDFExportContext(ISize pageSize, PDFDocumentImpl* document,
 PDFExportContext::~PDFExportContext() = default;
 
 void PDFExportContext::reset() {
-  closeTextClipIfActive();
   content->reset();
-  lastTextBlob = nullptr;
-  lastTextMatrix = Matrix::I();
 }
 
 void PDFExportContext::drawFill(const Brush& brush) {
-  closeTextClipIfActive();
   Path path;
   path.addRect(Rect::MakeSize(_pageSize));
   onDrawPath(Matrix::I(), ClipStack(), path, brush);
@@ -182,7 +178,6 @@ void PDFExportContext::drawFill(const Brush& brush) {
 
 void PDFExportContext::drawRect(const Rect& rect, const Matrix& matrix, const ClipStack& clip,
                                 const Brush& brush, const Stroke* stroke) {
-  closeTextClipIfActive();
   Path path;
   path.addRect(rect);
   if (stroke) {
@@ -193,7 +188,6 @@ void PDFExportContext::drawRect(const Rect& rect, const Matrix& matrix, const Cl
 
 void PDFExportContext::drawRRect(const RRect& rRect, const Matrix& matrix, const ClipStack& clip,
                                  const Brush& brush, const Stroke* stroke) {
-  closeTextClipIfActive();
   Path path;
   path.addRRect(rRect);
   if (stroke) {
@@ -204,13 +198,11 @@ void PDFExportContext::drawRRect(const RRect& rRect, const Matrix& matrix, const
 
 void PDFExportContext::drawPath(const Path& path, const Matrix& matrix, const ClipStack& clip,
                                 const Brush& brush) {
-  closeTextClipIfActive();
   this->onDrawPath(matrix, clip, path, brush);
 };
 
 void PDFExportContext::drawShape(std::shared_ptr<Shape> shape, const Matrix& matrix,
                                  const ClipStack& clip, const Brush& brush, const Stroke* stroke) {
-  closeTextClipIfActive();
   shape = Shape::ApplyStroke(std::move(shape), stroke);
   auto path = ShapeUtils::GetShapeRenderingPath(shape, matrix.getMaxScale());
   this->onDrawPath(matrix, clip, path, brush);
@@ -218,15 +210,6 @@ void PDFExportContext::drawShape(std::shared_ptr<Shape> shape, const Matrix& mat
 
 void PDFExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                                  const Matrix& matrix, const ClipStack& clip, const Brush& brush) {
-  if (textClipActive && matrix != textClipImageMatrix) {
-    closeTextClipIfActive();
-  }
-  if (lastTextBlob != nullptr && !textClipActive) {
-    emitPendingTextClip();
-    lastTextBlob = nullptr;
-    textClipActive = true;
-    textClipImageMatrix = matrix;
-  }
   auto rect = Rect::MakeWH(image->width(), image->height());
   onDrawImageRect(image, rect, sampling, matrix, clip, brush);
 }
@@ -433,9 +416,6 @@ bool NeedsNewFont(PDFFont* font, GlyphID glyphID, AdvancedTypefaceInfo::FontType
 void PDFExportContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const Matrix& matrix,
                                     const ClipStack& clip, const Brush& brush,
                                     const Stroke* stroke) {
-  closeTextClipIfActive();
-  lastTextBlob = textBlob;
-  lastTextMatrix = matrix;
   for (auto glyphRun : *textBlob) {
     onDrawGlyphRun(glyphRun, matrix, clip, brush, stroke);
   }
@@ -636,99 +616,6 @@ void PDFExportContext::exportGlyphRunAsImage(const GlyphRun& glyphRun, const Mat
   exportGlyphRunAsText(glyphRun, matrix, clip, transparentBrush);
 }
 
-void PDFExportContext::emitPendingTextClip() {
-  if (!lastTextBlob) {
-    return;
-  }
-  // Drain any existing graphics state and start a fresh q for the text clip scope.
-  // The full lastTextMatrix (including scale/rotation) is baked into each glyph's Tm so that the
-  // text clip is defined in the initial page coordinate system (after y-flip). This way subsequent
-  // image draws with their own cm transforms are not affected by a leftover CTM transform.
-  activeStackState.drainStack();
-  activeStackState = PDFGraphicStackState(content);
-  content->writeText("q\n");
-  content->writeText("BT\n7 Tr\n");
-  for (auto glyphRun : *lastTextBlob) {
-    if (glyphRun.glyphCount == 0) {
-      continue;
-    }
-    if (HasComplexTransform(glyphRun)) {
-      continue;
-    }
-    auto pdfStrike = PDFStrike::Make(document, glyphRun.font);
-    if (!pdfStrike) {
-      continue;
-    }
-    auto textSize = pdfStrike->strikeSpec.textSize;
-    PDFFont* font = nullptr;
-    for (size_t index = 0; index < glyphRun.glyphCount; ++index) {
-      auto glyphID = glyphRun.glyphs[index];
-      if (NeedsNewFont(font, glyphID,
-                       PDFFont::FontType(*pdfStrike,
-                                         *PDFFont::GetAdvancedInfo(pdfStrike->strikeSpec.typeface,
-                                                                   textSize, document)))) {
-        font = pdfStrike->getFontResource(glyphID);
-        if (!font) {
-          continue;
-        }
-        PDFWriteResourceName(content, PDFResourceType::Font,
-                             add_resource(fontResources, font->indirectReference()));
-        content->writeText(" ");
-        PDFUtils::AppendFloat(textSize, content);
-        content->writeText(" Tf\n");
-      }
-      if (!font) {
-        continue;
-      }
-      font->noteGlyphUsage(glyphID);
-      GlyphID encodedGlyph = font->glyphToPDFFontEncoding(glyphID);
-      // Compute per-glyph Tm that includes the full text matrix (translate + rotate + scale)
-      // and the glyph's local position with y-flip.
-      auto pos = GetGlyphPosition(glyphRun, index);
-      // Glyph local matrix: translate to glyph position, then y-flip for PDF text rendering.
-      // localTm = [1, 0, 0, -1, pos.x, pos.y]
-      // Combined Tm = lastTextMatrix * localTm
-      Matrix glyphTm = Matrix::MakeTrans(pos.x, pos.y);
-      glyphTm.preScale(1.f, -1.f);
-      Matrix combinedTm = lastTextMatrix;
-      combinedTm.preConcat(glyphTm);
-      // Write Tm: a b c d e f
-      PDFUtils::AppendFloat(combinedTm.getScaleX(), content);
-      content->writeText(" ");
-      PDFUtils::AppendFloat(combinedTm.getSkewY(), content);
-      content->writeText(" ");
-      PDFUtils::AppendFloat(combinedTm.getSkewX(), content);
-      content->writeText(" ");
-      PDFUtils::AppendFloat(combinedTm.getScaleY(), content);
-      content->writeText(" ");
-      PDFUtils::AppendFloat(combinedTm.getTranslateX(), content);
-      content->writeText(" ");
-      PDFUtils::AppendFloat(combinedTm.getTranslateY(), content);
-      content->writeText(" Tm\n");
-      // Write glyph
-      content->writeText("<");
-      if (font->multiByteGlyphs()) {
-        PDFUtils::WriteUInt16BE(content, encodedGlyph);
-      } else {
-        PDFUtils::WriteUInt8(content, static_cast<uint8_t>(encodedGlyph));
-      }
-      content->writeText("> Tj\n");
-    }
-  }
-  content->writeText("ET\n");
-  // The q opened here will be closed by closeTextClipIfActive after all images are drawn.
-}
-
-void PDFExportContext::closeTextClipIfActive() {
-  if (!textClipActive) {
-    return;
-  }
-  activeStackState.drainStack();
-  activeStackState = PDFGraphicStackState();
-  content->writeText("Q\n");
-  textClipActive = false;
-}
-
 void PDFExportContext::drawPicture(std::shared_ptr<Picture> picture, const Matrix& matrix,
                                    const ClipStack& clip) {
   picture->playback(this, matrix, clip);
@@ -908,7 +795,6 @@ void PDFExportContext::drawLayer(std::shared_ptr<Picture> picture,
 }
 
 std::shared_ptr<Data> PDFExportContext::getContent() {
-  closeTextClipIfActive();
   // Close any graphic-state stack frames that ScopedContentEntry left open. finishContentEntry()
   // intentionally skips drainStack() for regular blend modes so that consecutive draws can reuse
   // the same activeStackState (and avoid re-emitting clip / cm sequences). The residual q's must

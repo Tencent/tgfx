@@ -29,7 +29,7 @@ class TextContent : public DrawContent {
 
   Rect getTightBounds(const Matrix& matrix) const override;
   bool hitTestPoint(float localX, float localY) const override;
-  bool supportsPDFLayerStyleClip() const override;
+  bool getClipPath(Path* path) const override;
 
   std::shared_ptr<TextBlob> textBlob = nullptr;
   Point offset = Point::Zero();

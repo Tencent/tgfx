@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextContent.h"
+#include "tgfx/core/Font.h"
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
@@ -44,7 +45,22 @@ bool TextContent::hitTestPoint(float localX, float localY) const {
   return textBlob->hitTestPoint(localPoint.x, localPoint.y, stroke.get());
 }
 
-bool TextContent::supportsPDFLayerStyleClip() const {
+bool TextContent::getClipPath(Path* path) const {
+  auto shape = Shape::MakeFrom(textBlob);
+  if (shape == nullptr) {
+    return false;
+  }
+  auto shapePath = shape->getPath();
+  if (shapePath.isEmpty()) {
+    return false;
+  }
+  shapePath.transform(Matrix::MakeTrans(offset.x, offset.y));
+  if (stroke) {
+    stroke->applyToPath(&shapePath);
+  }
+  if (path) {
+    *path = std::move(shapePath);
+  }
   return true;
 }
 

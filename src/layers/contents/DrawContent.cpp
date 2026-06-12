@@ -82,6 +82,21 @@ bool DrawContent::contourEqualsOpaqueContent() const {
   return true;
 }
 
+void DrawContent::drawAsPath(Canvas* canvas, const Path& path, float alpha, bool antiAlias) const {
+  if (color.alpha <= 0) {
+    return;
+  }
+  Paint paint = {};
+  paint.setAntiAlias(antiAlias);
+  paint.setColor(color);
+  paint.setAlpha(color.alpha * alpha);
+  if (shader) {
+    paint.setShader(shader);
+  }
+  paint.setBlendMode(blendMode);
+  canvas->drawPath(path, paint);
+}
+
 bool DrawContent::drawDefault(Canvas* canvas, float alpha, bool antiAlias) const {
   if (color.alpha <= 0) {
     return false;

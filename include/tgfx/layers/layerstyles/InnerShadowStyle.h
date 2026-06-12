@@ -37,6 +37,10 @@ class InnerShadowStyle : public LayerStyle {
     return LayerStyleType::InnerShadow;
   }
 
+  bool needsContentClip() const override {
+    return true;
+  }
+
   /**
    * The x offset of the shadow.
    */

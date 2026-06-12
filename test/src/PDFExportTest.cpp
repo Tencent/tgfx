@@ -24,6 +24,7 @@
 #include "pdf/PDFDocumentImpl.h"
 #include "pdf/PDFTypes.h"
 #include "tgfx/core/Color.h"
+#include "tgfx/core/Font.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Paint.h"
@@ -32,6 +33,7 @@
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/core/TileMode.h"
+#include "tgfx/core/Typeface.h"
 #include "tgfx/core/WriteStream.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ShapeLayer.h"
@@ -1591,6 +1593,47 @@ TGFX_TEST(PDFExportTest, EllipseNoiseStyle) {
   surface->getCanvas()->translate(-bounds.left + 50.f, -bounds.top + 50.f);
   root->draw(surface->getCanvas());
   EXPECT_TRUE(Baseline::Compare(surface, "PDFExportTest/EllipseNoiseStyle"));
+}
+
+TGFX_TEST(PDFExportTest, TextInnerShadow) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto root = Layer::Make();
+  auto textLayer = TextLayer::Make();
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_TRUE(typeface != nullptr);
+  Font font(typeface, 60.0f);
+  textLayer->setText("text");
+  textLayer->setTextColor(Color::FromRGBA(80, 160, 240));
+  textLayer->setFont(font);
+  textLayer->setLayerStyles({InnerShadowStyle::Make(3.f, 3.f, 3.f, 3.f, Color::Black())});
+  root->addChild(textLayer);
+
+  auto bounds = root->getBounds(nullptr, true);
+
+  // Export PDF.
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  auto canvas = document->beginPage(bounds.width() + 100.f, bounds.height() + 100.f);
+  canvas->translate(-bounds.left + 50.f, -bounds.top + 50.f);
+  root->draw(canvas);
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/TextInnerShadow"));
+
+  // Render to surface for webp screenshot.
+  auto surface = Surface::Make(context, static_cast<int>(bounds.width() + 100.f),
+                               static_cast<int>(bounds.height() + 100.f));
+  ASSERT_TRUE(surface != nullptr);
+  surface->getCanvas()->clear();
+  surface->getCanvas()->translate(-bounds.left + 50.f, -bounds.top + 50.f);
+  root->draw(surface->getCanvas());
+  EXPECT_TRUE(Baseline::Compare(surface, "PDFExportTest/TextInnerShadow"));
 }
 
 }  // namespace tgfx

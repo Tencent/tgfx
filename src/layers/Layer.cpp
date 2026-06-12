@@ -1572,40 +1572,41 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
   }
   auto content = getContent();
   bool hasForeground = false;
+  bool shouldExportFullNoiseImage = false;
+  Path contentClipPath = {};
+  if (content && layerStyleSource) {
+    bool needsClip = false;
+    for (const auto& layerStyle : _layerStyles) {
+      if (layerStyle->position() == LayerStylePosition::Above && layerStyle->needsContentClip()) {
+        needsClip = true;
+        break;
+      }
+    }
+    if (needsClip) {
+      auto hasVectorClipPath = content->getClipPath(&contentClipPath);
+      shouldExportFullNoiseImage = args.context == nullptr && !args.recordingIntermediateImage &&
+                                   _filters.empty() && hasVectorClipPath;
+    }
+  }
   if (content) {
-    hasForeground = content->drawDefault(canvas, alpha, bitFields.allowsEdgeAntialiasing);
+    if (shouldExportFullNoiseImage) {
+      content->drawAsPath(canvas, contentClipPath, alpha, bitFields.allowsEdgeAntialiasing);
+    } else {
+      hasForeground = content->drawDefault(canvas, alpha, bitFields.allowsEdgeAntialiasing);
+    }
   }
   if (!drawChildren(args, canvas, alpha, stopChild)) {
     return;
   }
   if (stopChild != nullptr) {
-    // Background-walk path: skip Above styles and foreground for this layer; the caller is only
-    // interested in the portion that contributes to the synthesized backdrop.
     return;
   }
   if (layerStyleSource) {
     bool clippedForAbove = false;
-    bool shouldExportFullNoiseImage = false;
-    if (content) {
-      bool needsClip = false;
-      for (const auto& layerStyle : _layerStyles) {
-        if (layerStyle->position() == LayerStylePosition::Above && layerStyle->needsContentClip()) {
-          needsClip = true;
-          break;
-        }
-      }
-      if (needsClip) {
-        Path clipPath = {};
-        auto hasVectorClipPath = content->getClipPath(&clipPath);
-        shouldExportFullNoiseImage = args.context == nullptr && !args.recordingIntermediateImage &&
-                                     _filters.empty() &&
-                                     (hasVectorClipPath || content->supportsPDFLayerStyleClip());
-        if (shouldExportFullNoiseImage && hasVectorClipPath) {
-          canvas->save();
-          canvas->clipPath(clipPath);
-          clippedForAbove = true;
-        }
-      }
+    if (shouldExportFullNoiseImage) {
+      canvas->save();
+      canvas->clipPath(contentClipPath);
+      clippedForAbove = true;
     }
     drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Above,
                     shouldExportFullNoiseImage);

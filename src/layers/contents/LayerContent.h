@@ -89,6 +89,17 @@ class LayerContent {
   }
 
   /**
+   * Draws the content as an explicit path instead of native geometry. Used during PDF export to
+   * write vector text outlines directly into the content stream.
+   */
+  virtual void drawAsPath(Canvas* canvas, const Path& path, float alpha, bool antiAlias) const {
+    (void)canvas;
+    (void)path;
+    (void)alpha;
+    (void)antiAlias;
+  }
+
+  /**
    * Draws the default content of the layer (content below children) to the specified canvas.
    * Returns true if the content has foreground graphics that should be drawn above children
    * by calling drawForeground().

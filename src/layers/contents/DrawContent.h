@@ -38,6 +38,7 @@ class DrawContent : public GeometryContent {
   bool hitTestPoint(float localX, float localY) const override = 0;
   void drawContour(Canvas* canvas, bool antiAlias) const override;
   bool contourEqualsOpaqueContent() const override;
+  void drawAsPath(Canvas* canvas, const Path& path, float alpha, bool antiAlias) const override;
   bool drawDefault(Canvas* canvas, float alpha, bool antiAlias) const override;
   void drawForeground(Canvas* canvas, float alpha, bool antiAlias) const override;
   const std::shared_ptr<Shader>& getShader() const override;
