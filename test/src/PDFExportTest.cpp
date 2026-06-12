@@ -29,8 +29,10 @@
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Point.h"
+#include "tgfx/core/RRect.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Shader.h"
+#include "tgfx/core/Shape.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/core/TileMode.h"
 #include "tgfx/core/Typeface.h"
@@ -1634,6 +1636,138 @@ TGFX_TEST(PDFExportTest, TextInnerShadow) {
   surface->getCanvas()->translate(-bounds.left + 50.f, -bounds.top + 50.f);
   root->draw(surface->getCanvas());
   EXPECT_TRUE(Baseline::Compare(surface, "PDFExportTest/TextInnerShadow"));
+}
+
+TGFX_TEST(PDFExportTest, ShapeNoiseStyle) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto root = Layer::Make();
+  auto noiseStyle = NoiseStyle::MakeMono(8.f, 0.5f, Color::FromRGBA(200, 50, 50, 128), 42.f);
+  constexpr float ShapeW = 100.f;
+  constexpr float ShapeH = 80.f;
+  constexpr float GapX = 30.f;
+  constexpr float GapY = 30.f;
+  constexpr float Margin = 50.f;
+
+  // Row 0: PathContent (custom bezier path)
+  {
+    Path path;
+    path.moveTo(0, ShapeH * 0.5f);
+    path.cubicTo(ShapeW * 0.25f, 0, ShapeW * 0.75f, ShapeH, ShapeW, ShapeH * 0.5f);
+    path.close();
+    auto layer = ShapeLayer::Make();
+    layer->setPath(path);
+    layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(80, 160, 240)));
+    layer->setMatrix(Matrix::MakeTrans(Margin, Margin));
+    layer->setLayerStyles({noiseStyle});
+    root->addChild(layer);
+  }
+
+  // Row 0 col 1: RectContent (addRect)
+  {
+    Path path;
+    path.addRect(Rect::MakeWH(ShapeW, ShapeH));
+    auto layer = ShapeLayer::Make();
+    layer->setPath(path);
+    layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(80, 160, 240)));
+    layer->setMatrix(
+        Matrix::MakeTrans(Margin + static_cast<float>(1) * (ShapeW + GapX), Margin));
+    layer->setLayerStyles({noiseStyle});
+    root->addChild(layer);
+  }
+
+  // Row 0 col 2: RRectContent (addOval)
+  {
+    Path path;
+    path.addOval(Rect::MakeWH(ShapeW, ShapeH));
+    auto layer = ShapeLayer::Make();
+    layer->setPath(path);
+    layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(80, 160, 240)));
+    layer->setMatrix(
+        Matrix::MakeTrans(Margin + static_cast<float>(2) * (ShapeW + GapX), Margin));
+    layer->setLayerStyles({noiseStyle});
+    root->addChild(layer);
+  }
+
+  // Row 1 col 0: ShapeContent (Shape::MakeFrom rect)
+  {
+    Path shapePath;
+    shapePath.addRect(Rect::MakeWH(ShapeW, ShapeH));
+    auto shape = Shape::MakeFrom(shapePath);
+    auto layer = ShapeLayer::Make();
+    layer->setShape(shape);
+    layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(240, 160, 80)));
+    layer->setMatrix(
+        Matrix::MakeTrans(Margin, Margin + static_cast<float>(1) * (ShapeH + GapY)));
+    layer->setLayerStyles({noiseStyle});
+    root->addChild(layer);
+  }
+
+  // Row 1 col 1: ComposeContent (multiple sublayers in a container layer)
+  {
+    auto container = Layer::Make();
+    Path rectPath;
+    rectPath.addRect(Rect::MakeWH(ShapeW * 0.4f, ShapeH));
+    auto sub1 = ShapeLayer::Make();
+    sub1->setPath(rectPath);
+    sub1->setFillStyle(ShapeStyle::Make(Color::FromRGBA(80, 200, 120)));
+    container->addChild(sub1);
+
+    Path rectPath2;
+    rectPath2.addRect(Rect::MakeXYWH(static_cast<float>(ShapeW * 0.6), 0.f,
+                                      static_cast<float>(ShapeW * 0.4), ShapeH));
+    auto sub2 = ShapeLayer::Make();
+    sub2->setPath(rectPath2);
+    sub2->setFillStyle(ShapeStyle::Make(Color::FromRGBA(80, 200, 120)));
+    container->addChild(sub2);
+
+    container->setMatrix(
+        Matrix::MakeTrans(Margin + static_cast<float>(1) * (ShapeW + GapX),
+                          Margin + static_cast<float>(1) * (ShapeH + GapY)));
+    container->setLayerStyles({noiseStyle});
+    root->addChild(container);
+  }
+
+  // Row 1 col 2: MatrixContent (rotated layer)
+  {
+    Path path;
+    path.addRRect(RRect::MakeRectXY(Rect::MakeWH(ShapeW, ShapeH), 10.f, 10.f));
+    auto layer = ShapeLayer::Make();
+    layer->setPath(path);
+    layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(180, 80, 200)));
+    auto matrix = Matrix::MakeTrans(Margin + static_cast<float>(2) * (ShapeW + GapX) + ShapeW * 0.5f,
+                                    Margin + static_cast<float>(1) * (ShapeH + GapY) + ShapeH * 0.5f);
+    matrix.preRotate(15.f);
+    matrix.preTranslate(-ShapeW * 0.5f, -ShapeH * 0.5f);
+    layer->setMatrix(matrix);
+    layer->setLayerStyles({noiseStyle});
+    root->addChild(layer);
+  }
+
+  auto bounds = root->getBounds(nullptr, true);
+
+  // Export PDF.
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  auto canvas = document->beginPage(bounds.width() + 100.f, bounds.height() + 100.f);
+  canvas->translate(-bounds.left + 50.f, -bounds.top + 50.f);
+  root->draw(canvas);
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/ShapeNoiseStyle"));
+
+  // Render to surface for webp screenshot.
+  auto surface = Surface::Make(context, static_cast<int>(bounds.width() + 100.f),
+                               static_cast<int>(bounds.height() + 100.f));
+  ASSERT_TRUE(surface != nullptr);
+  surface->getCanvas()->clear();
+  surface->getCanvas()->translate(-bounds.left + 50.f, -bounds.top + 50.f);
+  root->draw(surface->getCanvas());
+  EXPECT_TRUE(Baseline::Compare(surface, "PDFExportTest/ShapeNoiseStyle"));
 }
 
 }  // namespace tgfx

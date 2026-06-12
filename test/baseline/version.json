@@ -344,6 +344,7 @@
         "DuoNoiseImage": "d0b91dc5",
         "EllipseNoiseStyle": "d0b91dc5",
         "NoiseEffects": "856112db",
+        "ShapeNoiseStyle": "b01dd852",
         "TextInnerShadow": "d0b91dc5",
         "TextLayerStyleAlignment": "d9ef21d1",
         "TextMultiNoiseTransforms": "d0b91dc5"
@@ -381,6 +382,7 @@
         "LinearGradientWhiteAlpha": "bf721f63",
         "NoiseEffects": "d0b91dc5",
         "NonRegularBlendMode": "bf721f63",
+        "ShapeNoiseStyle": "b01dd852",
         "SimpleText": "bf721f63",
         "SrcBlendOverlap": "bf721f63",
         "TextInnerShadow": "d0b91dc5",
