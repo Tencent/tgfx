@@ -325,6 +325,7 @@
         "TemporaryOffscreenImage_image1": "76a54f43",
         "TemporaryOffscreenImage_image2": "1642114b",
         "TemporaryOffscreenImage_pic": "76a54f43",
+        "TextDuoNoiseTransforms": "d0b91dc5",
         "ZoomAndOffset": "6b4e5ce0",
         "draw_shape": "eefb7a46",
         "draw_solid": "b4a1231",
@@ -340,8 +341,12 @@
         "rasterize_path_texture": "c475bfb"
     },
     "PDFExportTest": {
+        "DuoNoiseImage": "d0b91dc5",
+        "EllipseNoiseStyle": "d0b91dc5",
         "NoiseEffects": "856112db",
-        "TextLayerStyleAlignment": "d9ef21d1"
+        "TextInnerShadow": "d0b91dc5",
+        "TextLayerStyleAlignment": "d9ef21d1",
+        "TextMultiNoiseTransforms": "d0b91dc5"
     },
     "PDFTest": {
         "AssignColorSpace": "bf721f63",
@@ -353,6 +358,7 @@
         "DropShadowLayer": "bf721f63",
         "DstAssignColorSpace": "bf721f63",
         "DstColorSpace": "bf721f63",
+        "EllipseNoiseStyle": "d0b91dc5",
         "EmojiText": "bf721f63",
         "Empty": "79ce3a28",
         "EmptyMultiPage": "79ce3a28",
@@ -373,11 +379,13 @@
         "LayerLinearGradient": "bf721f63",
         "LayerRadialGradient": "bf721f63",
         "LinearGradientWhiteAlpha": "bf721f63",
-        "NoiseEffects": "d9ef21d1",
+        "NoiseEffects": "d0b91dc5",
         "NonRegularBlendMode": "bf721f63",
         "SimpleText": "bf721f63",
         "SrcBlendOverlap": "bf721f63",
-        "TextLayerStyleAlignment": "d9ef21d1"
+        "TextInnerShadow": "d0b91dc5",
+        "TextLayerStyleAlignment": "d0b91dc5",
+        "TextMultiNoiseTransforms": "d0b91dc5"
     },
     "PathShapeTest": {
         "AdaptiveDashEffect": "0448e0fe",
