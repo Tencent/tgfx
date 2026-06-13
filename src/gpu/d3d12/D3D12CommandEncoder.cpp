@@ -1,0 +1,456 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making tgfx available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+//  in compliance with the License. You may obtain a copy of the License at
+//
+//      https://opensource.org/licenses/BSD-3-Clause
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#include "D3D12CommandEncoder.h"
+#include "D3D12BarrierBatch.h"
+#include "D3D12Buffer.h"
+#include "D3D12CommandBuffer.h"
+#include "D3D12Defines.h"
+#include "D3D12GPU.h"
+#include "D3D12MipmapGenerator.h"
+#include "D3D12RenderPass.h"
+#include "D3D12Texture.h"
+#include "core/utils/Log.h"
+
+namespace tgfx {
+
+std::shared_ptr<D3D12CommandEncoder> D3D12CommandEncoder::Make(D3D12GPU* gpu) {
+  if (gpu == nullptr) {
+    return nullptr;
+  }
+  // Pull a recording-state allocator/list pair from the pool. On a hit, it has just been Reset();
+  // on a miss, the pool creates a fresh pair internally. Either way, the list arrives in the
+  // same recording state CreateCommandList would have produced.
+  auto entry = gpu->commandListPool().acquire(gpu->device());
+  if (!entry.valid()) {
+    LOGE("D3D12CommandEncoder: command-list pool acquire failed.");
+    return nullptr;
+  }
+
+  // Bind the process-wide shader-visible CBV/SRV/UAV ring and Sampler heap once for the entire
+  // life of this command list. Reset() clears any previous SetDescriptorHeaps state, so the
+  // bind has to happen on every reuse, not just on first creation. D3D12 documents repeated
+  // SetDescriptorHeaps as a potential stall on some drivers, and our render passes always
+  // sub-allocate descriptors into these two heaps, so a single bind is both correct and optimal.
+  ID3D12DescriptorHeap* heaps[] = {gpu->srvRing().heap(), gpu->samplerHeap()};
+  entry.commandList->SetDescriptorHeaps(2, heaps);
+
+  return gpu->makeResource<D3D12CommandEncoder>(gpu, std::move(entry.allocator),
+                                                std::move(entry.commandList));
+}
+
+D3D12CommandEncoder::D3D12CommandEncoder(D3D12GPU* gpu, ComPtr<ID3D12CommandAllocator> allocator,
+                                         ComPtr<ID3D12GraphicsCommandList> commandList)
+    : _gpu(gpu) {
+  session.commandAllocator = std::move(allocator);
+  session.commandList = std::move(commandList);
+}
+
+GPU* D3D12CommandEncoder::gpu() const {
+  return _gpu;
+}
+
+std::shared_ptr<RenderPass> D3D12CommandEncoder::onBeginRenderPass(
+    const RenderPassDescriptor& descriptor) {
+  return D3D12RenderPass::Make(this, descriptor);
+}
+
+void D3D12CommandEncoder::copyTextureToTexture(std::shared_ptr<Texture> srcTexture,
+                                               const Rect& srcRect,
+                                               std::shared_ptr<Texture> dstTexture,
+                                               const Point& dstOffset) {
+  if (!srcTexture || !dstTexture) {
+    return;
+  }
+  // Clamp copy region to source bounds.
+  auto srcX = static_cast<int32_t>(srcRect.x());
+  auto srcY = static_cast<int32_t>(srcRect.y());
+  auto copyWidth = static_cast<uint32_t>(srcRect.width());
+  auto copyHeight = static_cast<uint32_t>(srcRect.height());
+  auto srcW = static_cast<uint32_t>(srcTexture->width());
+  auto srcH = static_cast<uint32_t>(srcTexture->height());
+  if (srcX + copyWidth > srcW) {
+    copyWidth = srcW > static_cast<uint32_t>(srcX) ? srcW - static_cast<uint32_t>(srcX) : 0;
+  }
+  if (srcY + copyHeight > srcH) {
+    copyHeight = srcH > static_cast<uint32_t>(srcY) ? srcH - static_cast<uint32_t>(srcY) : 0;
+  }
+
+  auto d3d12Src = std::static_pointer_cast<D3D12Texture>(srcTexture);
+  auto d3d12Dst = std::static_pointer_cast<D3D12Texture>(dstTexture);
+  retainResource(d3d12Src);
+  retainResource(d3d12Dst);
+
+  auto cmd = session.commandList.Get();
+  if (copyWidth == 0 || copyHeight == 0) {
+    return;
+  }
+
+  // Combine the two pre-copy transitions (src -> COPY_SOURCE, dst -> COPY_DEST) into a single
+  // ResourceBarrier(2, ...) call. addTransition() collapses no-op transitions, so callers that
+  // are already in the requested state simply skip ahead. recordTextureStateChange snapshots
+  // the original state into session.initialTextureStates on first touch so the abandoned-
+  // session path can roll _currentState back if this copy never reaches the GPU.
+  D3D12BarrierBatch enterBatch;
+  enterBatch.addTransition(d3d12Src->d3d12Resource(), d3d12Src->currentState(),
+                           D3D12_RESOURCE_STATE_COPY_SOURCE);
+  recordTextureStateChange(d3d12Src.get(), D3D12_RESOURCE_STATE_COPY_SOURCE);
+  enterBatch.addTransition(d3d12Dst->d3d12Resource(), d3d12Dst->currentState(),
+                           D3D12_RESOURCE_STATE_COPY_DEST);
+  recordTextureStateChange(d3d12Dst.get(), D3D12_RESOURCE_STATE_COPY_DEST);
+  enterBatch.flush(cmd);
+
+  D3D12_TEXTURE_COPY_LOCATION dst = {};
+  dst.pResource = d3d12Dst->d3d12Resource();
+  dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+  dst.SubresourceIndex = 0;
+
+  D3D12_TEXTURE_COPY_LOCATION src = {};
+  src.pResource = d3d12Src->d3d12Resource();
+  src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+  // Both SubresourceIndex 0 values intentionally target (mip 0, array slice 0, plane 0). The
+  // CommandEncoder::copyTextureToTexture contract does not expose mip / slice arguments and the
+  // Vulkan/Metal backends do exactly the same thing. A per-mip copy would require an API
+  // extension across every backend, not just D3D12.
+  src.SubresourceIndex = 0;
+
+  D3D12_BOX srcBox = {};
+  srcBox.left = static_cast<UINT>(srcX);
+  srcBox.top = static_cast<UINT>(srcY);
+  srcBox.front = 0;
+  srcBox.right = static_cast<UINT>(srcX) + copyWidth;
+  srcBox.bottom = static_cast<UINT>(srcY) + copyHeight;
+  srcBox.back = 1;
+
+  cmd->CopyTextureRegion(&dst, static_cast<UINT>(dstOffset.x), static_cast<UINT>(dstOffset.y), 0,
+                         &src, &srcBox);
+
+  // Transition both resources back to COMMON in a single barrier call. D3D12 will then promote
+  // them implicitly to PIXEL_SHADER_RESOURCE on the next sample — matching the "promote on
+  // demand" behaviour the rest of the backend assumes.
+  D3D12BarrierBatch exitBatch;
+  exitBatch.addTransition(d3d12Src->d3d12Resource(), D3D12_RESOURCE_STATE_COPY_SOURCE,
+                          D3D12_RESOURCE_STATE_COMMON);
+  exitBatch.addTransition(d3d12Dst->d3d12Resource(), D3D12_RESOURCE_STATE_COPY_DEST,
+                          D3D12_RESOURCE_STATE_COMMON);
+  exitBatch.flush(cmd);
+  recordTextureStateChange(d3d12Src.get(), D3D12_RESOURCE_STATE_COMMON);
+  recordTextureStateChange(d3d12Dst.get(), D3D12_RESOURCE_STATE_COMMON);
+}
+
+void D3D12CommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTexture,
+                                              const Rect& srcRect,
+                                              std::shared_ptr<GPUBuffer> dstBuffer,
+                                              size_t dstOffset, size_t dstRowBytes) {
+  if (!srcTexture || !dstBuffer) {
+    return;
+  }
+  auto srcX = static_cast<int32_t>(srcRect.x());
+  auto srcY = static_cast<int32_t>(srcRect.y());
+  auto copyWidth = static_cast<uint32_t>(srcRect.width());
+  auto copyHeight = static_cast<uint32_t>(srcRect.height());
+  auto srcW = static_cast<uint32_t>(srcTexture->width());
+  auto srcH = static_cast<uint32_t>(srcTexture->height());
+  if (srcX + copyWidth > srcW) {
+    copyWidth = srcW > static_cast<uint32_t>(srcX) ? srcW - static_cast<uint32_t>(srcX) : 0;
+  }
+  if (srcY + copyHeight > srcH) {
+    copyHeight = srcH > static_cast<uint32_t>(srcY) ? srcH - static_cast<uint32_t>(srcY) : 0;
+  }
+  if (copyWidth == 0 || copyHeight == 0) {
+    return;
+  }
+
+  auto d3d12Src = std::static_pointer_cast<D3D12Texture>(srcTexture);
+  auto d3d12Dst = std::static_pointer_cast<D3D12Buffer>(dstBuffer);
+  retainResource(d3d12Src);
+  retainResource(d3d12Dst);
+
+  auto cmd = session.commandList.Get();
+  auto bytesPerPixel = static_cast<uint32_t>(DXGIFormatBytesPerPixel(d3d12Src->dxgiFormat()));
+  uint32_t tightRowBytes =
+      dstRowBytes > 0 ? static_cast<uint32_t>(dstRowBytes) : copyWidth * bytesPerPixel;
+
+  // D3D12 requires CopyTextureRegion's destination buffer footprint to use a row pitch that is a
+  // multiple of D3D12_TEXTURE_DATA_PITCH_ALIGNMENT (256). The caller's buffer is laid out tightly
+  // (one row immediately follows the previous), so when tightRowBytes happens to be unaligned we
+  // route the copy through a transient default-heap staging buffer with an aligned row pitch and
+  // then issue per-row CopyBufferRegion calls to repack the rows into the caller's buffer.
+  uint32_t alignedRowPitch = (tightRowBytes + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1) &
+                             ~(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1);
+  bool needsRepack = (alignedRowPitch != tightRowBytes);
+
+  TransitionResourceState(cmd, d3d12Src->d3d12Resource(), d3d12Src->currentState(),
+                          D3D12_RESOURCE_STATE_COPY_SOURCE);
+  recordTextureStateChange(d3d12Src.get(), D3D12_RESOURCE_STATE_COPY_SOURCE);
+
+  ComPtr<ID3D12Resource> stagingBuffer = nullptr;
+  ID3D12Resource* footprintTarget = d3d12Dst->d3d12Resource();
+  UINT64 footprintOffset = static_cast<UINT64>(dstOffset);
+
+  if (needsRepack) {
+    // Allocate a transient default-heap buffer big enough to hold the aligned-row-pitch image.
+    // The buffer is created in COPY_DEST state so CopyTextureRegion can write to it directly,
+    // then transitioned to COPY_SOURCE so we can read it back row-by-row into the caller's
+    // buffer. The session retains the staging buffer until the fence signals.
+    auto device = _gpu->device();
+    D3D12_HEAP_PROPERTIES heapProps = {};
+    heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
+    D3D12_RESOURCE_DESC bufferDesc = {};
+    bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    bufferDesc.Width = static_cast<UINT64>(alignedRowPitch) * copyHeight;
+    bufferDesc.Height = 1;
+    bufferDesc.DepthOrArraySize = 1;
+    bufferDesc.MipLevels = 1;
+    bufferDesc.Format = static_cast<DXGI_FORMAT>(0);  // DXGI_FORMAT_UNKNOWN
+    bufferDesc.SampleDesc.Count = 1;
+    bufferDesc.SampleDesc.Quality = 0;
+    bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    bufferDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+    auto hr = device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &bufferDesc,
+                                              D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
+                                              IID_PPV_ARGS(&stagingBuffer));
+    if (FAILED(hr)) {
+      LOGE(
+          "D3D12CommandEncoder::copyTextureToBuffer: staging buffer creation failed, "
+          "HRESULT=0x%08X",
+          static_cast<unsigned>(hr));
+      // Fall back to direct copy with potentially wrong stride; better than dropping silently.
+      stagingBuffer = nullptr;
+      needsRepack = false;
+    } else {
+      footprintTarget = stagingBuffer.Get();
+      footprintOffset = 0;
+    }
+  }
+
+  D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint = {};
+  footprint.Offset = footprintOffset;
+  footprint.Footprint.Format = static_cast<DXGI_FORMAT>(d3d12Src->dxgiFormat());
+  footprint.Footprint.Width = copyWidth;
+  footprint.Footprint.Height = copyHeight;
+  footprint.Footprint.Depth = 1;
+  footprint.Footprint.RowPitch = needsRepack ? alignedRowPitch : tightRowBytes;
+
+  D3D12_TEXTURE_COPY_LOCATION dstLoc = {};
+  dstLoc.pResource = footprintTarget;
+  dstLoc.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+  dstLoc.PlacedFootprint = footprint;
+
+  D3D12_TEXTURE_COPY_LOCATION srcLoc = {};
+  srcLoc.pResource = d3d12Src->d3d12Resource();
+  srcLoc.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+  srcLoc.SubresourceIndex = 0;
+
+  D3D12_BOX srcBox = {};
+  srcBox.left = static_cast<UINT>(srcX);
+  srcBox.top = static_cast<UINT>(srcY);
+  srcBox.front = 0;
+  srcBox.right = static_cast<UINT>(srcX) + copyWidth;
+  srcBox.bottom = static_cast<UINT>(srcY) + copyHeight;
+  srcBox.back = 1;
+
+  cmd->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, &srcBox);
+
+  if (needsRepack) {
+    // Transition the staging buffer to COPY_SOURCE and repack each row into the caller's buffer.
+    TransitionResourceState(cmd, stagingBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST,
+                            D3D12_RESOURCE_STATE_COPY_SOURCE);
+    for (uint32_t row = 0; row < copyHeight; row++) {
+      cmd->CopyBufferRegion(d3d12Dst->d3d12Resource(),
+                            static_cast<UINT64>(dstOffset) + row * tightRowBytes,
+                            stagingBuffer.Get(), row * alignedRowPitch, tightRowBytes);
+    }
+    session.auxBuffers.push_back(std::move(stagingBuffer));
+  }
+
+  TransitionResourceState(cmd, d3d12Src->d3d12Resource(), D3D12_RESOURCE_STATE_COPY_SOURCE,
+                          D3D12_RESOURCE_STATE_COMMON);
+  recordTextureStateChange(d3d12Src.get(), D3D12_RESOURCE_STATE_COMMON);
+}
+
+void D3D12CommandEncoder::generateMipmapsForTexture(std::shared_ptr<Texture> texture) {
+  if (!texture) {
+    return;
+  }
+  auto d3d12Tex = std::static_pointer_cast<D3D12Texture>(texture);
+  auto mipCount = static_cast<uint32_t>(d3d12Tex->mipLevelCount());
+  if (mipCount <= 1) {
+    return;
+  }
+
+  auto* generator = _gpu->mipmapGenerator();
+  if (generator == nullptr || !generator->isReady()) {
+    static bool warned = false;
+    if (!warned) {
+      LOGE(
+          "D3D12CommandEncoder::generateMipmapsForTexture: mipmap generator unavailable, "
+          "skipping (subsequent calls silently no-op).");
+      warned = true;
+    }
+    return;
+  }
+
+  auto device = _gpu->device();
+  auto cmd = session.commandList.Get();
+  auto resource = d3d12Tex->d3d12Resource();
+  auto dxgiFormat = static_cast<DXGI_FORMAT>(d3d12Tex->dxgiFormat());
+
+  retainResource(d3d12Tex);
+
+  // Sub-allocate a contiguous (mipCount-1)*2-slot range out of the GPU's process-wide
+  // CBV/SRV/UAV ring. Each mip level pair occupies two consecutive slots (SRV at 2i, UAV at
+  // 2i+1) so the compute shader's two single-descriptor tables can be bound by GPU handle. The
+  // ring is already bound to this command list; no SetDescriptorHeaps needed.
+  uint32_t descriptorsPerLevel = 2;
+  uint32_t totalDescriptors = (mipCount - 1) * descriptorsPerLevel;
+  auto range = _gpu->srvRing().allocate(totalDescriptors);
+  if (!range.valid()) {
+    LOGE("D3D12CommandEncoder::generateMipmapsForTexture: SRV ring allocation failed (count=%u).",
+         totalDescriptors);
+    return;
+  }
+  auto descSize = _gpu->srvRing().descriptorSize();
+
+  cmd->SetComputeRootSignature(generator->rootSignature());
+  cmd->SetPipelineState(generator->pipelineState());
+
+  // Move every subresource into NON_PIXEL_SHADER_RESOURCE so the SRV reads in the first iteration
+  // are valid. The current() state is the per-resource state set by previous code (typically
+  // COMMON after a writeTexture / RenderPass end).
+  auto previousState = d3d12Tex->currentState();
+  if (previousState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
+    TransitionResourceState(cmd, resource, previousState,
+                            D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    recordTextureStateChange(d3d12Tex.get(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+  }
+
+  uint32_t mipWidth = static_cast<uint32_t>(d3d12Tex->width());
+  uint32_t mipHeight = static_cast<uint32_t>(d3d12Tex->height());
+  for (uint32_t i = 0; i < mipCount - 1; i++) {
+    uint32_t outWidth = (mipWidth > 1) ? mipWidth / 2 : 1;
+    uint32_t outHeight = (mipHeight > 1) ? mipHeight / 2 : 1;
+
+    // Transition the destination subresource (mip[i+1]) from NON_PIXEL_SHADER_RESOURCE to
+    // UNORDERED_ACCESS so the compute shader can write to it. Source mip[i] stays in
+    // NON_PIXEL_SHADER_RESOURCE.
+    D3D12_RESOURCE_BARRIER barrier = {};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+    barrier.Transition.pResource = resource;
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    barrier.Transition.Subresource = i + 1;
+    cmd->ResourceBarrier(1, &barrier);
+
+    // Compute the descriptor handles for this iteration's SRV (slot 2i within range) and UAV
+    // (slot 2i+1).
+    D3D12_CPU_DESCRIPTOR_HANDLE srvCpu = range.cpuStart;
+    srvCpu.ptr += static_cast<SIZE_T>(2 * i) * descSize;
+    D3D12_CPU_DESCRIPTOR_HANDLE uavCpu = range.cpuStart;
+    uavCpu.ptr += static_cast<SIZE_T>(2 * i + 1) * descSize;
+    D3D12_GPU_DESCRIPTOR_HANDLE srvGpu = range.gpuStart;
+    srvGpu.ptr += static_cast<UINT64>(2 * i) * descSize;
+    D3D12_GPU_DESCRIPTOR_HANDLE uavGpu = range.gpuStart;
+    uavGpu.ptr += static_cast<UINT64>(2 * i + 1) * descSize;
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Format = dxgiFormat;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.Texture2D.MostDetailedMip = i;
+    srvDesc.Texture2D.MipLevels = 1;
+    srvDesc.Texture2D.PlaneSlice = 0;
+    srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
+    device->CreateShaderResourceView(resource, &srvDesc, srvCpu);
+
+    D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+    uavDesc.Format = dxgiFormat;
+    uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+    uavDesc.Texture2D.MipSlice = i + 1;
+    uavDesc.Texture2D.PlaneSlice = 0;
+    device->CreateUnorderedAccessView(resource, nullptr, &uavDesc, uavCpu);
+
+    // Bind 4 root constants (output mip width, height, 1/width, 1/height) plus the SRV and UAV
+    // tables, then dispatch enough thread groups to cover the destination mip.
+    UINT mipConstants[4];
+    mipConstants[0] = outWidth;
+    mipConstants[1] = outHeight;
+    *reinterpret_cast<float*>(&mipConstants[2]) = 1.0f / static_cast<float>(outWidth);
+    *reinterpret_cast<float*>(&mipConstants[3]) = 1.0f / static_cast<float>(outHeight);
+    cmd->SetComputeRoot32BitConstants(0, 4, mipConstants, 0);
+    cmd->SetComputeRootDescriptorTable(1, srvGpu);
+    cmd->SetComputeRootDescriptorTable(2, uavGpu);
+
+    UINT groupsX = (outWidth + D3D12_MIPMAP_THREAD_GROUP_SIZE - 1) / D3D12_MIPMAP_THREAD_GROUP_SIZE;
+    UINT groupsY =
+        (outHeight + D3D12_MIPMAP_THREAD_GROUP_SIZE - 1) / D3D12_MIPMAP_THREAD_GROUP_SIZE;
+    cmd->Dispatch(groupsX, groupsY, 1);
+
+    // Transition mip[i+1] from UNORDERED_ACCESS back to NON_PIXEL_SHADER_RESOURCE so the next
+    // iteration can use it as the SRV source.
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+    barrier.Transition.Subresource = i + 1;
+    cmd->ResourceBarrier(1, &barrier);
+
+    mipWidth = outWidth;
+    mipHeight = outHeight;
+  }
+
+  // Final transition: every subresource is currently NON_PIXEL_SHADER_RESOURCE. Move the whole
+  // resource back to COMMON so subsequent samplers / RTVs can pick a fresh state on demand,
+  // matching the convention every other code path uses.
+  TransitionResourceState(cmd, resource, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
+                          D3D12_RESOURCE_STATE_COMMON);
+  recordTextureStateChange(d3d12Tex.get(), D3D12_RESOURCE_STATE_COMMON);
+}
+
+std::shared_ptr<CommandBuffer> D3D12CommandEncoder::onFinish() {
+  auto hr = session.commandList->Close();
+  if (FAILED(hr)) {
+    LOGE("D3D12CommandEncoder: ID3D12GraphicsCommandList::Close failed, HRESULT=0x%08X",
+         static_cast<unsigned>(hr));
+    _gpu->reclaimAbandonedSession(std::move(session));
+    return nullptr;
+  }
+  return std::make_shared<D3D12CommandBuffer>(_gpu, std::move(session));
+}
+
+void D3D12CommandEncoder::recordTextureStateChange(D3D12Texture* texture,
+                                                   D3D12_RESOURCE_STATES newState) {
+  if (texture == nullptr) {
+    return;
+  }
+  // Snapshot the original state on the first call for this texture inside the current session.
+  // unordered_map::emplace inserts only when the key is not present, leaving subsequent calls
+  // for the same texture as cheap O(1) lookups that do not overwrite the saved value.
+  session.initialTextureStates.emplace(texture, texture->currentState());
+  texture->setCurrentState(newState);
+}
+
+void D3D12CommandEncoder::onRelease(D3D12GPU* gpu) {
+  // If onFinish() was called, the session has already been moved to D3D12CommandBuffer.
+  // This path only handles abandoned encoders (encoding was started but never finished).
+  if (session.commandList == nullptr) {
+    return;
+  }
+  gpu->reclaimAbandonedSession(std::move(session));
+}
+
+}  // namespace tgfx

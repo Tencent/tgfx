@@ -89,6 +89,10 @@
     "opengl": {
       "description": "Enable OpenGL as the GPU backend"
     },
+    "d3d12": {
+      "description": "Enable D3D12 as the GPU backend",
+      "supports": "windows"
+    },
     "threads": {
       "description": "Enable support for multithreaded rendering"
     },

@@ -380,10 +380,12 @@
       "cmake": {
         "targets": [
           "spirv-cross-core",
-          "spirv-cross-glsl"
+          "spirv-cross-glsl",
+          "spirv-cross-hlsl"
         ],
         "arguments": [
-          "-DSPIRV_CROSS_ENABLE_TESTS=OFF"
+          "-DSPIRV_CROSS_ENABLE_TESTS=OFF",
+          "-DCMAKE_CXX_FLAGS=\"-w\""
         ],
         "platforms": [
           "win"

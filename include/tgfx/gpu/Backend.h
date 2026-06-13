@@ -19,6 +19,7 @@
 #pragma once
 
 #include "tgfx/gpu/PixelFormat.h"
+#include "tgfx/gpu/d3d12/D3D12Types.h"
 #include "tgfx/gpu/metal/MetalTypes.h"
 #include "tgfx/gpu/opengl/GLTypes.h"
 #include "tgfx/gpu/vulkan/VulkanTypes.h"
@@ -27,7 +28,7 @@ namespace tgfx {
 /**
  * Possible GPU backend APIs that may be used by TGFX.
  */
-enum class Backend { Unknown, OpenGL, Metal, Vulkan, WebGPU };
+enum class Backend { Unknown, OpenGL, Metal, Vulkan, WebGPU, D3D12 };
 
 /**
  * Wrapper class for passing into and receiving data from TGFX about a backend texture object.
@@ -59,6 +60,13 @@ class BackendTexture {
    */
   explicit BackendTexture(const VulkanImageInfo& vulkanInfo, int width, int height)
       : _backend(Backend::Vulkan), _width(width), _height(height), vulkanInfo(vulkanInfo) {
+  }
+
+  /**
+   * Creates a D3D12 backend texture.
+   */
+  explicit BackendTexture(const D3D12TextureInfo& d3d12Info, int width, int height)
+      : _backend(Backend::D3D12), _width(width), _height(height), d3d12Info(d3d12Info) {
   }
 
   BackendTexture(const BackendTexture& that) {
@@ -118,6 +126,12 @@ class BackendTexture {
    */
   bool getVulkanImageInfo(VulkanImageInfo* vulkanImageInfo) const;
 
+  /**
+   * If the backend API is D3D12, copies a snapshot of the D3D12TextureInfo struct into the passed
+   * in pointer and returns true. Otherwise, returns false if the backend API is not D3D12.
+   */
+  bool getD3D12TextureInfo(D3D12TextureInfo* d3d12TextureInfo) const;
+
  private:
   Backend _backend = Backend::Unknown;
   int _width = 0;
@@ -127,6 +141,7 @@ class BackendTexture {
     GLTextureInfo glInfo;
     MetalTextureInfo metalInfo;
     VulkanImageInfo vulkanInfo;
+    D3D12TextureInfo d3d12Info;
   };
 };
 
@@ -160,6 +175,13 @@ class BackendRenderTarget {
    */
   explicit BackendRenderTarget(const VulkanImageInfo& vulkanInfo, int width, int height)
       : _backend(Backend::Vulkan), _width(width), _height(height), vulkanInfo(vulkanInfo) {
+  }
+
+  /**
+   * Creates a D3D12 backend render target.
+   */
+  explicit BackendRenderTarget(const D3D12TextureInfo& d3d12Info, int width, int height)
+      : _backend(Backend::D3D12), _width(width), _height(height), d3d12Info(d3d12Info) {
   }
 
   BackendRenderTarget(const BackendRenderTarget& that) {
@@ -219,6 +241,12 @@ class BackendRenderTarget {
    */
   bool getVulkanImageInfo(VulkanImageInfo* vulkanImageInfo) const;
 
+  /**
+   * If the backend API is D3D12, copies a snapshot of the D3D12TextureInfo struct into the passed
+   * in pointer and returns true. Otherwise, returns false if the backend API is not D3D12.
+   */
+  bool getD3D12TextureInfo(D3D12TextureInfo* d3d12TextureInfo) const;
+
  private:
   Backend _backend = Backend::Unknown;
   int _width = 0;
@@ -227,6 +255,7 @@ class BackendRenderTarget {
     GLFrameBufferInfo glInfo;
     MetalTextureInfo metalInfo;
     VulkanImageInfo vulkanInfo;
+    D3D12TextureInfo d3d12Info;
   };
 };
 
@@ -260,6 +289,13 @@ class BackendSemaphore {
    */
   explicit BackendSemaphore(const VulkanSyncInfo& vulkanInfo)
       : _backend(Backend::Vulkan), vulkanSyncInfo(vulkanInfo) {
+  }
+
+  /**
+   * Creates a D3D12 backend semaphore.
+   */
+  explicit BackendSemaphore(const D3D12SyncInfo& d3d12Info)
+      : _backend(Backend::D3D12), d3d12SyncInfo(d3d12Info) {
   }
 
   BackendSemaphore(const BackendSemaphore& that) {
@@ -298,12 +334,19 @@ class BackendSemaphore {
    */
   bool getVulkanSync(VulkanSyncInfo* vulkanSyncInfo) const;
 
+  /**
+   * If the backend API is D3D12, copies a snapshot of the D3D12SyncInfo struct into the passed in
+   * pointer and returns true. Otherwise, returns false if the backend API is not D3D12.
+   */
+  bool getD3D12Sync(D3D12SyncInfo* d3d12Info) const;
+
  private:
   Backend _backend = Backend::Unknown;
   union {
     GLSyncInfo glSyncInfo;
     MetalSyncInfo metalSyncInfo;
     VulkanSyncInfo vulkanSyncInfo;
+    D3D12SyncInfo d3d12SyncInfo;
   };
 };
 }  // namespace tgfx
