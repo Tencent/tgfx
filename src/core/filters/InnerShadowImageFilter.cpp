@@ -19,7 +19,6 @@
 #include "InnerShadowImageFilter.h"
 #include "core/images/TextureImage.h"
 #include "core/utils/ColorHelper.h"
-#include "core/utils/Log.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
@@ -49,22 +48,17 @@ InnerShadowImageFilter::InnerShadowImageFilter(float dx, float dy, float blurrin
 PlacementPtr<FragmentProcessor> InnerShadowImageFilter::getShadowFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     SrcRectConstraint constraint, const Matrix* uvMatrix) const {
-  DEBUG_ASSERT((maskImage == nullptr) == (!maskOffset.has_value()));
   auto shadowMatrix = Matrix::MakeTrans(-dx, -dy);
-  if (maskOffset.has_value()) {
-    shadowMatrix.preTranslate(-maskOffset->x, -maskOffset->y);
-  }
   if (uvMatrix) {
     shadowMatrix.preConcat(*uvMatrix);
   }
 
-  auto maskSource = maskImage ? maskImage : source;
   PlacementPtr<FragmentProcessor> invertShadowMask;
   if (blurFilter != nullptr) {
     invertShadowMask =
-        blurFilter->asFragmentProcessor(maskSource, args, sampling, constraint, &shadowMatrix);
+        blurFilter->asFragmentProcessor(source, args, sampling, constraint, &shadowMatrix);
   } else {
-    invertShadowMask = FragmentProcessor::Make(maskSource, args, TileMode::Decal, TileMode::Decal,
+    invertShadowMask = FragmentProcessor::Make(source, args, TileMode::Decal, TileMode::Decal,
                                                sampling, constraint, &shadowMatrix);
   }
 

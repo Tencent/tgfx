@@ -17,13 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
-#include "core/filters/InnerShadowImageFilter.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "layers/SpreadUtils.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/ImageFilter.h"
+#include "tgfx/core/MaskFilter.h"
+#include "tgfx/core/Shader.h"
 
 namespace tgfx {
 
@@ -91,7 +92,12 @@ InnerShadowStyle::InnerShadowStyle(float offsetX, float offsetY, float blurrines
 }
 
 Rect InnerShadowStyle::filterBounds(const Rect& srcRect, float contentScale) {
-  // Spread does not change the output bounds because inner shadow remains within the content area.
+  // When spread is non-zero, the shadow is drawn via a custom path without using the cached
+  // filter. Inner shadow never expands the content bounds regardless of spread.
+  if (!FloatNearlyZero(_spread)) {
+    return srcRect;
+  }
+
   auto filter = getShadowFilter(contentScale);
   if (!filter) {
     return srcRect;
@@ -101,41 +107,16 @@ Rect InnerShadowStyle::filterBounds(const Rect& srcRect, float contentScale) {
 
 void InnerShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alpha,
                               BlendMode blendMode) {
-  auto scale = input.contentScale;
-  auto filter = getShadowFilter(scale);
-  if (!filter) {
+  if (!FloatNearlyZero(_spread)) {
+    drawWithSpread(canvas, input, alpha, blendMode);
     return;
   }
 
-  std::shared_ptr<Image> filterSource = input.content;
-  Point filterSourceOffset = {};
-  if (!FloatNearlyZero(_spread)) {
-    auto shapeSource = SpreadUtils::MakeSpreadShapeImage(input, 0);
-    auto maskSource = SpreadUtils::MakeSpreadShapeImage(input, -_spread);
-    if (maskSource.collapsed) {
-      // The mask fully collapsed — shadow fills the entire content area.
-      if (shapeSource.image == nullptr) {
-        return;
-      }
-      Paint paint = {};
-      paint.setBlendMode(blendMode);
-      paint.setAlpha(alpha);
-      paint.setColorFilter(ColorFilter::Blend(_color, BlendMode::SrcIn));
-      canvas->drawImage(shapeSource.image, shapeSource.offset.x, shapeSource.offset.y, {}, &paint);
-      return;
-    }
-    if (shapeSource.image != nullptr && maskSource.image != nullptr) {
-      filterSource = shapeSource.image;
-      filterSourceOffset = shapeSource.offset;
-      filter->maskImage = maskSource.image;
-      filter->maskOffset = Point::Make(_spread * scale, _spread * scale);
-    }
-  }
-  DEBUG_ASSERT(filterSource != nullptr);
-  if (filterSource == nullptr) {
+  auto filter = getShadowFilter(input.contentScale);
+  if (!filter) {
     return;
   }
-  auto content = filterSource->makeWithFilter(filter);
+  auto content = input.content->makeWithFilter(filter);
   DEBUG_ASSERT(content != nullptr);
   if (content == nullptr) {
     return;
@@ -151,18 +132,71 @@ void InnerShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, floa
   if (_blurrinessX == 0 && _blurrinessY == 0) {
     sampling = SamplingOptions(FilterMode::Nearest, MipmapMode::None);
   }
-  canvas->drawImage(content, filterSourceOffset.x, filterSourceOffset.y, sampling, &paint);
+  canvas->drawImage(content, sampling, &paint);
 }
 
-std::shared_ptr<InnerShadowImageFilter> InnerShadowStyle::getShadowFilter(float scale) {
+void InnerShadowStyle::drawWithSpread(Canvas* canvas, const LayerStyleInput& input, float alpha,
+                                      BlendMode blendMode) {
+  auto shapeResult = SpreadUtils::MakeSpreadShapeImage(input, 0);
+  auto spreadShapeResult = SpreadUtils::MakeSpreadShapeImage(input, -_spread);
+
+  if (spreadShapeResult.collapsed) {
+    // The mask fully collapsed — shadow fills the entire content area.
+    if (!shapeResult.image) {
+      return;
+    }
+    Paint paint = {};
+    paint.setBlendMode(blendMode);
+    paint.setAlpha(alpha);
+    paint.setColorFilter(ColorFilter::Blend(_color, BlendMode::SrcIn));
+    canvas->drawImage(shapeResult.image, shapeResult.offset.x, shapeResult.offset.y, {}, &paint);
+    return;
+  }
+  if (!shapeResult.image || !spreadShapeResult.image) {
+    return;
+  }
+
+  auto scale = input.contentScale;
+  auto blurFilter = ImageFilter::Blur(_blurrinessX * scale, _blurrinessY * scale);
+  auto maskImage = spreadShapeResult.image;
+  auto maskOffset = spreadShapeResult.offset;
+  if (blurFilter) {
+    Point blurOffset = {};
+    auto filtered = spreadShapeResult.image->makeWithFilter(blurFilter, &blurOffset);
+    if (filtered) {
+      maskImage = filtered;
+      maskOffset.offset(blurOffset.x, blurOffset.y);
+    }
+  }
+
+  // The mask shader samples in content-local coordinates. maskOffset positions the mask image
+  // relative to the content origin, and the shadow offset shifts it further.
+  auto maskShader = Shader::MakeImageShader(maskImage, TileMode::Decal, TileMode::Decal);
+  auto offsetX = maskOffset.x + _offsetX * scale;
+  auto offsetY = maskOffset.y + _offsetY * scale;
+  auto offsetMaskShader = maskShader->makeWithMatrix(Matrix::MakeTrans(offsetX, offsetY));
+
+  // Draw shape with shadow color, masked by the inverted blurred spread shape.
+  Paint paint = {};
+  paint.setBlendMode(blendMode);
+  paint.setAlpha(alpha);
+  paint.setColorFilter(ColorFilter::Blend(_color, BlendMode::SrcIn));
+  paint.setMaskFilter(MaskFilter::MakeShader(offsetMaskShader, true));
+  auto sampling = SamplingOptions();
+  if (_blurrinessX == 0 && _blurrinessY == 0) {
+    sampling = SamplingOptions(FilterMode::Nearest, MipmapMode::None);
+  }
+  canvas->drawImage(shapeResult.image, shapeResult.offset.x, shapeResult.offset.y, sampling,
+                    &paint);
+}
+
+std::shared_ptr<ImageFilter> InnerShadowStyle::getShadowFilter(float scale) {
   if (shadowFilter && scale == currentScale) {
     return shadowFilter;
   }
-
-  shadowFilter = std::make_shared<InnerShadowImageFilter>(
-      _offsetX * scale, _offsetY * scale, _blurrinessX * scale, _blurrinessY * scale, _color, true);
+  shadowFilter = ImageFilter::InnerShadowOnly(_offsetX * scale, _offsetY * scale,
+                                              _blurrinessX * scale, _blurrinessY * scale, _color);
   currentScale = scale;
-
   return shadowFilter;
 }
 

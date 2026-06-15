@@ -22,8 +22,6 @@
 
 namespace tgfx {
 
-class InnerShadowImageFilter;
-
 /**
  * InnerShadowStyle adds an inner shadow above the layer.
  */
@@ -134,7 +132,10 @@ class InnerShadowStyle : public LayerStyle {
   void onDraw(Canvas* canvas, const LayerStyleInput& input, float alpha,
               BlendMode blendMode) override;
 
-  std::shared_ptr<InnerShadowImageFilter> getShadowFilter(float scale);
+  void drawWithSpread(Canvas* canvas, const LayerStyleInput& input, float alpha,
+                      BlendMode blendMode);
+
+  std::shared_ptr<ImageFilter> getShadowFilter(float scale);
 
   void invalidateFilter();
 
@@ -143,7 +144,7 @@ class InnerShadowStyle : public LayerStyle {
   float _blurrinessX = 0.0f;
   float _blurrinessY = 0.0f;
   Color _color = Color::Black();
-  std::shared_ptr<InnerShadowImageFilter> shadowFilter = nullptr;
+  std::shared_ptr<ImageFilter> shadowFilter = nullptr;
   float currentScale = 0.0f;
   float _spread = 0.0f;
 };

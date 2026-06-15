@@ -18,9 +18,7 @@
 
 #pragma once
 
-#include <optional>
 #include "tgfx/core/ImageFilter.h"
-#include "tgfx/core/Point.h"
 
 namespace tgfx {
 class InnerShadowImageFilter : public ImageFilter {
@@ -33,15 +31,6 @@ class InnerShadowImageFilter : public ImageFilter {
   std::shared_ptr<ImageFilter> blurFilter = nullptr;
   Color color = Color::Black();
   bool shadowOnly = false;
-
-  /**
-   * Optional mask image used to define the shadow boundary instead of the source image.
-   */
-  std::shared_ptr<Image> maskImage = nullptr;
-  /**
-   * The offset of the mask image relative to the source image.
-   */
-  std::optional<Point> maskOffset = std::nullopt;
 
  protected:
   Type type() const override {
