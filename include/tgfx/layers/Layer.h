@@ -656,6 +656,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   std::unique_ptr<LayerStyleSource> getLayerStyleSource(const DrawArgs& args, const Matrix& matrix);
 
+  bool shouldUseVectorClip(const DrawArgs& args, const LayerContent* content,
+                           const LayerStyleSource* layerStyleSource, Path* clipPath) const;
+
   void drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
                        const LayerStyleSource* source, LayerStylePosition position,
                        bool useVectorClip = false);

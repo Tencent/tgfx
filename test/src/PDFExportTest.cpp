@@ -1672,8 +1672,7 @@ TGFX_TEST(PDFExportTest, ShapeNoiseStyle) {
     auto layer = ShapeLayer::Make();
     layer->setPath(path);
     layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(80, 160, 240)));
-    layer->setMatrix(
-        Matrix::MakeTrans(Margin + static_cast<float>(1) * (ShapeW + GapX), Margin));
+    layer->setMatrix(Matrix::MakeTrans(Margin + static_cast<float>(1) * (ShapeW + GapX), Margin));
     layer->setLayerStyles({noiseStyle});
     root->addChild(layer);
   }
@@ -1685,8 +1684,7 @@ TGFX_TEST(PDFExportTest, ShapeNoiseStyle) {
     auto layer = ShapeLayer::Make();
     layer->setPath(path);
     layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(80, 160, 240)));
-    layer->setMatrix(
-        Matrix::MakeTrans(Margin + static_cast<float>(2) * (ShapeW + GapX), Margin));
+    layer->setMatrix(Matrix::MakeTrans(Margin + static_cast<float>(2) * (ShapeW + GapX), Margin));
     layer->setLayerStyles({noiseStyle});
     root->addChild(layer);
   }
@@ -1699,8 +1697,7 @@ TGFX_TEST(PDFExportTest, ShapeNoiseStyle) {
     auto layer = ShapeLayer::Make();
     layer->setShape(shape);
     layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(240, 160, 80)));
-    layer->setMatrix(
-        Matrix::MakeTrans(Margin, Margin + static_cast<float>(1) * (ShapeH + GapY)));
+    layer->setMatrix(Matrix::MakeTrans(Margin, Margin + static_cast<float>(1) * (ShapeH + GapY)));
     layer->setLayerStyles({noiseStyle});
     root->addChild(layer);
   }
@@ -1717,15 +1714,14 @@ TGFX_TEST(PDFExportTest, ShapeNoiseStyle) {
 
     Path rectPath2;
     rectPath2.addRect(Rect::MakeXYWH(static_cast<float>(ShapeW * 0.6), 0.f,
-                                      static_cast<float>(ShapeW * 0.4), ShapeH));
+                                     static_cast<float>(ShapeW * 0.4), ShapeH));
     auto sub2 = ShapeLayer::Make();
     sub2->setPath(rectPath2);
     sub2->setFillStyle(ShapeStyle::Make(Color::FromRGBA(80, 200, 120)));
     container->addChild(sub2);
 
-    container->setMatrix(
-        Matrix::MakeTrans(Margin + static_cast<float>(1) * (ShapeW + GapX),
-                          Margin + static_cast<float>(1) * (ShapeH + GapY)));
+    container->setMatrix(Matrix::MakeTrans(Margin + static_cast<float>(1) * (ShapeW + GapX),
+                                           Margin + static_cast<float>(1) * (ShapeH + GapY)));
     container->setLayerStyles({noiseStyle});
     root->addChild(container);
   }
@@ -1737,8 +1733,9 @@ TGFX_TEST(PDFExportTest, ShapeNoiseStyle) {
     auto layer = ShapeLayer::Make();
     layer->setPath(path);
     layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(180, 80, 200)));
-    auto matrix = Matrix::MakeTrans(Margin + static_cast<float>(2) * (ShapeW + GapX) + ShapeW * 0.5f,
-                                    Margin + static_cast<float>(1) * (ShapeH + GapY) + ShapeH * 0.5f);
+    auto matrix =
+        Matrix::MakeTrans(Margin + static_cast<float>(2) * (ShapeW + GapX) + ShapeW * 0.5f,
+                          Margin + static_cast<float>(1) * (ShapeH + GapY) + ShapeH * 0.5f);
     matrix.preRotate(15.f);
     matrix.preTranslate(-ShapeW * 0.5f, -ShapeH * 0.5f);
     layer->setMatrix(matrix);

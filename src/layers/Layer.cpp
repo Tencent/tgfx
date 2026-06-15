@@ -1565,6 +1565,33 @@ void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {
   drawContents(args, canvas, alpha, sourcePtr);
 }
 
+// Determines whether Above-position layer styles can be clipped using a vector path instead of
+// raster masks. This is used during PDF export to produce sharp, resolution-independent clip
+// boundaries for effects like InnerShadow and Noise that render within the content shape.
+bool Layer::shouldUseVectorClip(const DrawArgs& args, const LayerContent* content,
+                                const LayerStyleSource* layerStyleSource, Path* clipPath) const {
+  if (content == nullptr || layerStyleSource == nullptr) {
+    return false;
+  }
+  bool needsClip = false;
+  for (const auto& layerStyle : _layerStyles) {
+    if (layerStyle->position() == LayerStylePosition::Above && layerStyle->needsContentClip()) {
+      needsClip = true;
+      break;
+    }
+  }
+  if (!needsClip) {
+    return false;
+  }
+  // Layer filters render via offscreen rasterization, which converts content to a bitmap and
+  // discards vector path information. Vector clipping is therefore only valid when no filters
+  // are present.
+  if (args.context != nullptr || args.recordingIntermediateImage || !_filters.empty()) {
+    return false;
+  }
+  return content->getClipPath(clipPath) && !clipPath->isEmpty();
+}
+
 void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
                          const LayerStyleSource* layerStyleSource, const Layer* stopChild) {
   if (layerStyleSource) {
@@ -1574,21 +1601,8 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
   bool hasForeground = false;
   bool useVectorClip = false;
   Path contentClipPath = {};
-  if (content && layerStyleSource) {
-    bool needsClip = false;
-    for (const auto& layerStyle : _layerStyles) {
-      if (layerStyle->position() == LayerStylePosition::Above && layerStyle->needsContentClip()) {
-        needsClip = true;
-        break;
-      }
-    }
-    if (needsClip) {
-      auto hasVectorClipPath = content->getClipPath(&contentClipPath);
-      useVectorClip = args.context == nullptr && !args.recordingIntermediateImage &&
-                      _filters.empty() && hasVectorClipPath && !contentClipPath.isEmpty();
-    }
-  }
   if (content) {
+    useVectorClip = shouldUseVectorClip(args, content, layerStyleSource, &contentClipPath);
     if (useVectorClip) {
       hasForeground =
           content->drawAsPath(canvas, contentClipPath, alpha, bitFields.allowsEdgeAntialiasing);
@@ -1603,15 +1617,13 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
     return;
   }
   if (layerStyleSource) {
-    bool clippedForAbove = false;
     if (useVectorClip) {
       canvas->save();
       canvas->clipPath(contentClipPath);
-      clippedForAbove = true;
     }
     drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Above,
                     useVectorClip);
-    if (clippedForAbove) {
+    if (useVectorClip) {
       canvas->restore();
     }
   }
@@ -1956,8 +1968,8 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
     recCanvas->drawRect(Rect::MakeWH(contentImage->width(), contentImage->height()), opaquePaint);
     auto picture = recorder.finishRecordingAsPicture();
     if (picture != nullptr) {
-      contentImage = Image::MakeFrom(std::move(picture), contentImage->width(),
-                                     contentImage->height());
+      contentImage =
+          Image::MakeFrom(std::move(picture), contentImage->width(), contentImage->height());
     }
   }
   switch (layerStyle->extraSourceType()) {
