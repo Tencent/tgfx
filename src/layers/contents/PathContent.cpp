@@ -59,13 +59,6 @@ bool PathContent::onHasSameGeometry(const GeometryContent* other) const {
   return path == static_cast<const PathContent*>(other)->path;
 }
 
-bool PathContent::getClipPath(Path* outPath) const {
-  if (outPath) {
-    *outPath = getFilledPath();
-  }
-  return true;
-}
-
 Path PathContent::getFilledPath() const {
   Path result = path;
   if (stroke) {

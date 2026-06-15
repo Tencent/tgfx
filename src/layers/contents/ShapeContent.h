@@ -30,7 +30,6 @@ class ShapeContent : public DrawContent {
   Rect getBounds() const override;
   Rect getTightBounds(const Matrix& matrix) const override;
   bool hitTestPoint(float localX, float localY) const override;
-  bool getClipPath(Path* path) const override;
 
   std::shared_ptr<Shape> shape = nullptr;
 
@@ -39,12 +38,10 @@ class ShapeContent : public DrawContent {
     return Type::Shape;
   }
 
+  Path getFilledPath() const override;
   Rect onGetBounds() const override;
   void onDraw(Canvas* canvas, const Paint& paint) const override;
   bool onHasSameGeometry(const GeometryContent* other) const override;
-
- private:
-  Path getFilledPath() const;
 };
 
 }  // namespace tgfx

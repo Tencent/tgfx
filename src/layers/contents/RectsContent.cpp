@@ -80,13 +80,6 @@ bool RectsContent::onHasSameGeometry(const GeometryContent* other) const {
   return rects == static_cast<const RectsContent*>(other)->rects;
 }
 
-bool RectsContent::getClipPath(Path* path) const {
-  if (path) {
-    *path = getFilledPath();
-  }
-  return true;
-}
-
 Path RectsContent::getFilledPath() const {
   Path path = {};
   for (const auto& rect : rects) {

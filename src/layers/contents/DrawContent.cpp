@@ -82,6 +82,17 @@ bool DrawContent::contourEqualsOpaqueContent() const {
   return true;
 }
 
+bool DrawContent::getClipPath(Path* path) const {
+  auto filledPath = getFilledPath();
+  if (filledPath.isEmpty()) {
+    return false;
+  }
+  if (path) {
+    *path = std::move(filledPath);
+  }
+  return true;
+}
+
 bool DrawContent::drawAsPath(Canvas* canvas, const Path& path, float alpha, bool antiAlias) const {
   if (color.alpha <= 0) {
     return false;

@@ -54,13 +54,6 @@ bool RRectContent::onHasSameGeometry(const GeometryContent* other) const {
   return rRect.rect() == otherRRect.rect() && rRect.radii() == otherRRect.radii();
 }
 
-bool RRectContent::getClipPath(Path* path) const {
-  if (path) {
-    *path = getFilledPath();
-  }
-  return true;
-}
-
 Path RRectContent::getFilledPath() const {
   Path path = {};
   path.addRRect(rRect);

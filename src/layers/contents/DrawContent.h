@@ -38,6 +38,7 @@ class DrawContent : public GeometryContent {
   bool hitTestPoint(float localX, float localY) const override = 0;
   void drawContour(Canvas* canvas, bool antiAlias) const override;
   bool contourEqualsOpaqueContent() const override;
+  bool getClipPath(Path* path) const override;
   bool drawAsPath(Canvas* canvas, const Path& path, float alpha, bool antiAlias) const override;
   bool drawDefault(Canvas* canvas, float alpha, bool antiAlias) const override;
   void drawForeground(Canvas* canvas, float alpha, bool antiAlias) const override;
@@ -58,6 +59,8 @@ class DrawContent : public GeometryContent {
   }
 
  protected:
+  // Returns the stroked or filled path of this content's geometry for vector clip computation.
+  virtual Path getFilledPath() const = 0;
   virtual Rect onGetBounds() const = 0;
   virtual void onDraw(Canvas* canvas, const Paint& paint) const = 0;
   virtual bool onHasSameGeometry(const GeometryContent* other) const = 0;
