@@ -33,6 +33,8 @@ class WebGPURenderPass : public RenderPass {
   static std::shared_ptr<WebGPURenderPass> Make(WebGPUGPU* gpu, WGPUCommandEncoder encoder,
                                                 const RenderPassDescriptor& descriptor);
 
+  ~WebGPURenderPass() override;
+
   GPU* gpu() const override;
 
   void setViewport(int x, int y, int width, int height) override;

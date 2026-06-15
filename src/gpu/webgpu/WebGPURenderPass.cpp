@@ -106,6 +106,10 @@ WebGPURenderPass::WebGPURenderPass(WebGPUGPU* gpu, WGPURenderPassEncoder encoder
     : RenderPass(descriptor), _gpu(gpu), passEncoder(encoder) {
 }
 
+WebGPURenderPass::~WebGPURenderPass() {
+  onEnd();
+}
+
 GPU* WebGPURenderPass::gpu() const {
   return _gpu;
 }

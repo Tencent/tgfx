@@ -190,6 +190,8 @@ jobs:
             !web/node_modules
 
   web-webgpu:
+    # NOTE: This job only verifies compilation. WebGPU runtime tests are not run because GitHub
+    # Actions Linux runners lack GPU hardware and headless Chrome WebGPU support is unreliable in CI.
     name: web (webgpu)
     runs-on: ubuntu-latest
     steps:

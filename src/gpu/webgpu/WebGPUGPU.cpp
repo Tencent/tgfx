@@ -160,13 +160,15 @@ void WebGPUGPU::processUnreferencedResources() {
 
 void WebGPUGPU::releaseAll(bool releaseGPU) {
   processUnreferencedResources();
+  // Clear caches first. Sampler cache holds shared_ptrs that may trigger ReturnQueue on release,
+  // so it must be cleared before resources.clear() invalidates the resource list iterators.
+  samplerCache.clear();
   for (auto* resource : resources) {
     if (releaseGPU) {
       resource->onRelease(this);
     }
   }
   resources.clear();
-  samplerCache.clear();
   if (releaseGPU) {
     for (auto& [_, mp] : mipmapPipelineCache) {
       if (mp.sampler) wgpuSamplerRelease(mp.sampler);
