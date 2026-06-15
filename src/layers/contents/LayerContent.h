@@ -72,8 +72,7 @@ class LayerContent {
 
   /**
    * Returns the clip path of the content for constraining layer style effects. If the content
-   * supports path-based clipping, fills the output path and returns true. Text content returns
-   * false because it uses PDF Tr 7 for clipping.
+   * supports path-based clipping, fills the output path and returns true.
    */
   virtual bool getClipPath(Path* path) const {
     (void)path;
@@ -81,22 +80,16 @@ class LayerContent {
   }
 
   /**
-   * Returns true if PDF export can constrain layer style output to this content without first
-   * baking that output into the content image.
-   */
-  virtual bool supportsPDFLayerStyleClip() const {
-    return false;
-  }
-
-  /**
    * Draws the content as an explicit path instead of native geometry. Used during PDF export to
-   * write vector text outlines directly into the content stream.
+   * write vector text outlines directly into the content stream. Returns true if the content has
+   * foreground graphics that should be drawn above children by calling drawForeground().
    */
-  virtual void drawAsPath(Canvas* canvas, const Path& path, float alpha, bool antiAlias) const {
+  virtual bool drawAsPath(Canvas* canvas, const Path& path, float alpha, bool antiAlias) const {
     (void)canvas;
     (void)path;
     (void)alpha;
     (void)antiAlias;
+    return false;
   }
 
   /**

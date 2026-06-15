@@ -155,8 +155,8 @@ class LayerStyle : public LayerProperty {
 
   /**
    * Returns true if this layer style requires the canvas to be clipped to the content path before
-   * drawing during PDF export. This is used for styles like NoiseStyle that output a full rectangle
-   * noise bitmap and rely on vector clip for precise boundaries. Default is false.
+   * drawing during software-based rendering (e.g., PDF export). This is used for styles that need
+   * vector clip boundaries for precise rendering. Default is false.
    */
   virtual bool needsContentClip() const {
     return false;
@@ -164,8 +164,8 @@ class LayerStyle : public LayerProperty {
 
   /**
    * Returns true if this layer style uses the content image's alpha channel to compute its effect.
-   * When true, the content image cannot be replaced with an opaque placeholder during vector clip
-   * export. Default is true.
+   * When true, the content image cannot be replaced with an opaque placeholder during software-based
+   * rendering. Default is true.
    */
   virtual bool needsContentAlpha() const {
     return true;

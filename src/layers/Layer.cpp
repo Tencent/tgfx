@@ -1585,12 +1585,13 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
     if (needsClip) {
       auto hasVectorClipPath = content->getClipPath(&contentClipPath);
       useVectorClip = args.context == nullptr && !args.recordingIntermediateImage &&
-                      _filters.empty() && hasVectorClipPath;
+                      _filters.empty() && hasVectorClipPath && !contentClipPath.isEmpty();
     }
   }
   if (content) {
     if (useVectorClip) {
-      content->drawAsPath(canvas, contentClipPath, alpha, bitFields.allowsEdgeAntialiasing);
+      hasForeground =
+          content->drawAsPath(canvas, contentClipPath, alpha, bitFields.allowsEdgeAntialiasing);
     } else {
       hasForeground = content->drawDefault(canvas, alpha, bitFields.allowsEdgeAntialiasing);
     }
@@ -1913,6 +1914,7 @@ std::shared_ptr<Image> Layer::synthesizeBackgroundImage(const DrawArgs& args, fl
   DrawArgs subArgs = args;
   subArgs.backgroundHandler = BackgroundHandler::NoOp();
   subArgs.excludeEffects = false;
+  subArgs.recordingIntermediateImage = true;
 
   auto currentAlpha = drawBackgroundLayers(subArgs, recordingCanvas);
   auto belowSource = getLayerStyleSource(subArgs, recordingCanvas->getMatrix());

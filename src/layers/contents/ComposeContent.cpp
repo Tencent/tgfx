@@ -109,6 +109,10 @@ bool ComposeContent::getClipPath(Path* path) const {
   return true;
 }
 
+bool ComposeContent::drawAsPath(Canvas* canvas, const Path&, float alpha, bool antiAlias) const {
+  return drawDefault(canvas, alpha, antiAlias);
+}
+
 bool ComposeContent::drawDefault(Canvas* canvas, float alpha, bool antiAlias) const {
   for (size_t i = 0; i < foregroundStartIndex; ++i) {
     contents[i]->drawDefault(canvas, alpha, antiAlias);
