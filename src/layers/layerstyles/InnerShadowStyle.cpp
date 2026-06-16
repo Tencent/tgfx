@@ -129,7 +129,7 @@ void InnerShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, floa
   // interpolation. When the texture is scaled up, linear filtering produces intermediate alpha
   // values at edges, which causes visible gray borders in the inner shadow.
   auto sampling = SamplingOptions();
-  if (_blurrinessX == 0 && _blurrinessY == 0) {
+  if (FloatNearlyZero(_blurrinessX) && FloatNearlyZero(_blurrinessY)) {
     sampling = SamplingOptions(FilterMode::Nearest, MipmapMode::None);
   }
   canvas->drawImage(content, sampling, &paint);
@@ -140,6 +140,14 @@ void InnerShadowStyle::drawWithSpread(Canvas* canvas, const LayerStyleInput& inp
   auto shapeResult = SpreadUtils::MakeSpreadShapeImage(input, 0);
   auto spreadShapeResult = SpreadUtils::MakeSpreadShapeImage(input, -_spread);
 
+  // Use nearest filtering when there's no blur to avoid edge artifacts caused by linear
+  // interpolation. When the texture is scaled up, linear filtering produces intermediate alpha
+  // values at edges, which causes visible gray borders in the inner shadow.
+  auto sampling = SamplingOptions();
+  if (FloatNearlyZero(_blurrinessX) && FloatNearlyZero(_blurrinessY)) {
+    sampling = SamplingOptions(FilterMode::Nearest, MipmapMode::None);
+  }
+
   if (spreadShapeResult.collapsed) {
     // The mask fully collapsed — shadow fills the entire content area.
     if (!shapeResult.image) {
@@ -149,7 +157,8 @@ void InnerShadowStyle::drawWithSpread(Canvas* canvas, const LayerStyleInput& inp
     paint.setBlendMode(blendMode);
     paint.setAlpha(alpha);
     paint.setColorFilter(ColorFilter::Blend(_color, BlendMode::SrcIn));
-    canvas->drawImage(shapeResult.image, shapeResult.offset.x, shapeResult.offset.y, {}, &paint);
+    canvas->drawImage(shapeResult.image, shapeResult.offset.x, shapeResult.offset.y, sampling,
+                      &paint);
     return;
   }
   if (!shapeResult.image || !spreadShapeResult.image) {
@@ -171,7 +180,7 @@ void InnerShadowStyle::drawWithSpread(Canvas* canvas, const LayerStyleInput& inp
 
   // The mask shader samples in content-local coordinates. maskOffset positions the mask image
   // relative to the content origin, and the shadow offset shifts it further.
-  auto maskShader = Shader::MakeImageShader(maskImage, TileMode::Decal, TileMode::Decal);
+  auto maskShader = Shader::MakeImageShader(maskImage, TileMode::Decal, TileMode::Decal, sampling);
   auto offsetX = maskOffset.x + _offsetX * scale;
   auto offsetY = maskOffset.y + _offsetY * scale;
   auto offsetMaskShader = maskShader->makeWithMatrix(Matrix::MakeTrans(offsetX, offsetY));
@@ -182,10 +191,6 @@ void InnerShadowStyle::drawWithSpread(Canvas* canvas, const LayerStyleInput& inp
   paint.setAlpha(alpha);
   paint.setColorFilter(ColorFilter::Blend(_color, BlendMode::SrcIn));
   paint.setMaskFilter(MaskFilter::MakeShader(offsetMaskShader, true));
-  auto sampling = SamplingOptions();
-  if (_blurrinessX == 0 && _blurrinessY == 0) {
-    sampling = SamplingOptions(FilterMode::Nearest, MipmapMode::None);
-  }
   canvas->drawImage(shapeResult.image, shapeResult.offset.x, shapeResult.offset.y, sampling,
                     &paint);
 }

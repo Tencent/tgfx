@@ -3682,12 +3682,11 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(vectorLayer);
   }
 
-  // Case 15: VectorLayer Ellipse + Center stroke 15px with compound transform, spread=-5
+  // Case 15: VectorLayer Ellipse + Inside stroke 15px with compound transform, spread=-5
   for (int i = 0; i < 2; ++i) {
     auto vectorLayer = VectorLayer::Make();
     auto innerGroup = VectorGroup::Make();
-    // auto ellipse = Ellipse::Make();
-    auto ellipse = Rectangle::Make();
+    auto ellipse = Ellipse::Make();
     ellipse->setPosition({50, 30});
     ellipse->setSize({100, 60});
     auto stroke = StrokeStyle::Make(SolidColor::Make(Color::Blue()));
@@ -3723,7 +3722,7 @@ TGFX_TEST(LayerTest, DropShadow) {
   auto displayList = std::make_unique<DisplayList>();
   BuildShadowTestLayers(*displayList, ShadowType::Drop, cellW, cellH, gap);
   displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/1DropShadow"));
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DropShadow"));
 }
 
 TGFX_TEST(LayerTest, InnerShadow) {
@@ -3738,7 +3737,7 @@ TGFX_TEST(LayerTest, InnerShadow) {
   auto displayList = std::make_unique<DisplayList>();
   BuildShadowTestLayers(*displayList, ShadowType::Inner, cellW, cellH, gap);
   displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/1InnerShadow"));
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/InnerShadow"));
 }
 
 }  // namespace tgfx

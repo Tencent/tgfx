@@ -139,7 +139,7 @@ void DropShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float
   // Use nearest filtering when there's no blur to avoid edge artifacts caused by linear
   // interpolation. When the texture is scaled up, linear filtering produces intermediate alpha
   // values at edges, which causes visible borders in the shadow.
-  auto sampling = (_blurrinessX == 0 && _blurrinessY == 0)
+  auto sampling = (FloatNearlyZero(_blurrinessX) && FloatNearlyZero(_blurrinessY))
                       ? SamplingOptions(FilterMode::Nearest, MipmapMode::None)
                       : SamplingOptions();
   Paint paint = {};

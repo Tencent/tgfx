@@ -32,7 +32,7 @@ class LayerStyle;
 /**
  * A snapshot of the background image and its offset captured during the capture pass for a
  * specific (Layer, LayerStyle) pair. Consumed during the consume pass by LayerStyle::draw via
- * LayerStyleInput::extra.
+ * LayerStyleInput::extraSource.
  */
 struct BackgroundSnapshotEntry {
   std::shared_ptr<Image> image = nullptr;

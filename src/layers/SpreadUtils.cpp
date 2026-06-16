@@ -46,7 +46,8 @@ static inline RRect MakeSpreadRRect(const RRect& rRect, float distance) {
   if (bounds.width() <= 0.0f || bounds.height() <= 0.0f) {
     return {};
   }
-  // Adjust radii by the same amount so the expanded/contracted corners stay concentric with the original.
+  // Adjust radii by the same amount so the expanded/contracted corners stay concentric with the
+  // original.
   auto radii = rRect.radii();
   for (auto& corner : radii) {
     corner.x = std::max(0.0f, corner.x + distance);
@@ -100,6 +101,11 @@ static inline void DrawSpreadRRect(Canvas* canvas, const RRect& rRect, StyledSha
         drawRRect = MakeSpreadRRect(rRect, effectiveWidth * 0.5f);
       } else if (strokeAlign == StrokeAlign::Inside) {
         drawRRect = MakeSpreadRRect(rRect, -effectiveWidth * 0.5f);
+        if (drawRRect.rect().isEmpty()) {
+          // Inside stroke wider than the shape fills it solid; draw the original rect as fill.
+          paint.setStyle(PaintStyle::Fill);
+          drawRRect = rRect;
+        }
       }
       DEBUG_ASSERT(!drawRRect.rect().isEmpty());
       canvas->drawRRect(drawRRect, paint);
@@ -115,8 +121,9 @@ bool SpreadUtils::IsSpreadCollapsed(const Shape& shape, StyledShapeType type, fl
       auto bounds = shape.getPath().getBounds();
       return bounds.width() + 2.0f * spread <= 0.0f || bounds.height() + 2.0f * spread <= 0.0f;
     }
-    case StyledShapeType::Stroke:
-      return strokeWidth * 0.5f + spread <= 0.0f;
+    case StyledShapeType::Stroke: {
+      return strokeWidth + 2.0f * spread <= 0.0f;
+    }
     case StyledShapeType::FillStroke: {
       auto bounds = shape.getPath().getBounds();
       auto outset = spread + StrokeOutset(strokeWidth, strokeAlign);
@@ -151,7 +158,7 @@ SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInpu
     return {nullptr, {}, true};
   }
 
-  auto path = shape->getPath();
+  const auto path = shape->getPath();
   PictureRecorder recorder;
   auto* recordCanvas = recorder.beginRecording();
   recordCanvas->scale(input.contentScale, input.contentScale);
@@ -160,8 +167,8 @@ SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInpu
   Rect rect = {};
   RRect rRect = {};
   auto type = styledShape.type;
-  auto strokeWidth = styledShape.strokeWidth;
-  auto strokeAlign = styledShape.strokeAlign;
+  const auto strokeWidth = styledShape.strokeWidth;
+  const auto strokeAlign = styledShape.strokeAlign;
   if (path.isOval(&rect)) {
     DrawSpreadRRect(recordCanvas, RRect::MakeOval(rect), type, strokeAlign, strokeWidth, spread);
   } else if (path.isRRect(&rRect)) {

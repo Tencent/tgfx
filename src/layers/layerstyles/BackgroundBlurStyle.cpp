@@ -71,10 +71,10 @@ void BackgroundBlurStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, f
   // create blurred background
   auto blurFilter = getBackgroundFilter(input.contentScale);
   Point backgroundOffset = {};
-  auto clipRect = Rect::MakeWH(input.extraSource->image()->width(),
-                               input.extraSource->image()->height());
-  auto blurBackground = input.extraSource->image()->makeWithFilter(
-      blurFilter, &backgroundOffset, &clipRect);
+  auto clipRect =
+      Rect::MakeWH(input.extraSource->image()->width(), input.extraSource->image()->height());
+  auto blurBackground =
+      input.extraSource->image()->makeWithFilter(blurFilter, &backgroundOffset, &clipRect);
   backgroundOffset += input.extraSource->imageOffset();
 
   auto maskShader = Shader::MakeImageShader(input.content, TileMode::Decal, TileMode::Decal);

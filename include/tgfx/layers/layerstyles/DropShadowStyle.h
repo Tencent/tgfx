@@ -143,7 +143,7 @@ class DropShadowStyle : public LayerStyle {
   }
 
   bool needContourShape() const override {
-    return true;
+    return _spread != 0.0f;
   }
 
  protected:
