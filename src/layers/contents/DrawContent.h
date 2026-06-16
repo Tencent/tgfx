@@ -19,7 +19,6 @@
 #pragma once
 
 #include "layers/contents/GeometryContent.h"
-#include "tgfx/core/Path.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/layers/LayerPaint.h"
 
@@ -58,8 +57,6 @@ class DrawContent : public GeometryContent {
   }
 
  protected:
-  // Returns the stroked or filled path of this content's geometry for vector clip computation.
-  virtual Path getFilledPath() const = 0;
   virtual Rect onGetBounds() const = 0;
   virtual void onDraw(Canvas* canvas, const Paint& paint) const = 0;
   virtual bool onHasSameGeometry(const GeometryContent* other) const = 0;

@@ -44,22 +44,6 @@ bool TextContent::hitTestPoint(float localX, float localY) const {
   return textBlob->hitTestPoint(localPoint.x, localPoint.y, stroke.get());
 }
 
-Path TextContent::getFilledPath() const {
-  auto shape = Shape::MakeFrom(textBlob);
-  if (shape == nullptr) {
-    return {};
-  }
-  auto shapePath = shape->getPath();
-  if (shapePath.isEmpty()) {
-    return {};
-  }
-  shapePath.transform(Matrix::MakeTrans(offset.x, offset.y));
-  if (stroke) {
-    stroke->applyToPath(&shapePath);
-  }
-  return shapePath;
-}
-
 void TextContent::onDraw(Canvas* canvas, const Paint& paint) const {
   canvas->drawTextBlob(textBlob, offset.x, offset.y, paint);
 }

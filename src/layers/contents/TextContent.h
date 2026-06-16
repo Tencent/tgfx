@@ -38,7 +38,6 @@ class TextContent : public DrawContent {
     return Type::Text;
   }
 
-  Path getFilledPath() const override;
   Rect onGetBounds() const override;
   void onDraw(Canvas* canvas, const Paint& paint) const override;
   bool onHasSameGeometry(const GeometryContent* other) const override;

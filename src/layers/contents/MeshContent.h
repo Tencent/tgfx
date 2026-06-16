@@ -37,9 +37,6 @@ class MeshContent : public DrawContent {
     return Type::Mesh;
   }
 
-  Path getFilledPath() const override {
-    return {};
-  }
   Rect onGetBounds() const override;
   void onDraw(Canvas* canvas, const Paint& paint) const override;
   bool onHasSameGeometry(const GeometryContent* other) const override;
