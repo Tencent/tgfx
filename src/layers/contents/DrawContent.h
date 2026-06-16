@@ -19,6 +19,7 @@
 #pragma once
 
 #include "layers/contents/GeometryContent.h"
+#include "tgfx/core/Path.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/layers/LayerPaint.h"
 
@@ -38,8 +39,6 @@ class DrawContent : public GeometryContent {
   bool hitTestPoint(float localX, float localY) const override = 0;
   void drawContour(Canvas* canvas, bool antiAlias) const override;
   bool contourEqualsOpaqueContent() const override;
-  bool getClipPath(Path* path) const override;
-  bool drawAsPath(Canvas* canvas, const Path& path, float alpha, bool antiAlias) const override;
   bool drawDefault(Canvas* canvas, float alpha, bool antiAlias) const override;
   void drawForeground(Canvas* canvas, float alpha, bool antiAlias) const override;
   const std::shared_ptr<Shader>& getShader() const override;

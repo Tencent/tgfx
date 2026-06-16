@@ -82,33 +82,6 @@ bool DrawContent::contourEqualsOpaqueContent() const {
   return true;
 }
 
-bool DrawContent::getClipPath(Path* path) const {
-  auto filledPath = getFilledPath();
-  if (filledPath.isEmpty()) {
-    return false;
-  }
-  if (path) {
-    *path = std::move(filledPath);
-  }
-  return true;
-}
-
-bool DrawContent::drawAsPath(Canvas* canvas, const Path& path, float alpha, bool antiAlias) const {
-  if (color.alpha <= 0) {
-    return false;
-  }
-  Paint paint = {};
-  paint.setAntiAlias(antiAlias);
-  paint.setColor(color);
-  paint.setAlpha(color.alpha * alpha);
-  if (shader) {
-    paint.setShader(shader);
-  }
-  paint.setBlendMode(blendMode);
-  canvas->drawPath(path, paint);
-  return false;
-}
-
 bool DrawContent::drawDefault(Canvas* canvas, float alpha, bool antiAlias) const {
   if (color.alpha <= 0) {
     return false;

@@ -426,29 +426,15 @@ void PDFExportContext::onDrawGlyphRun(const GlyphRun& glyphRun, const Matrix& ma
                                       const Stroke* stroke) {
 
   auto& font = glyphRun.font;
-  auto typeface = font.getTypeface();
-  // RSXform/Matrix positioning requires path export since PDF text operators cannot represent
-  // per-glyph rotation/scale.
-  if (!typeface->isCustom()) {
-    if (font.hasColor()) {
-      exportGlyphRunAsImage(glyphRun, matrix, clip, brush);
-    } else if (HasComplexTransform(glyphRun) || brush.maskFilter || stroke) {
-      exportGlyphRunAsPath(glyphRun, matrix, clip, brush, stroke);
-    } else {
-      exportGlyphRunAsText(glyphRun, matrix, clip, brush);
-    }
+  if (font.hasColor()) {
+    exportGlyphRunAsImage(glyphRun, matrix, clip, brush);
   } else {
-    if (font.hasColor()) {
-      exportGlyphRunAsImage(glyphRun, matrix, clip, brush);
-    } else {
-      exportGlyphRunAsPath(glyphRun, matrix, clip, brush, stroke);
-    }
+    exportGlyphRunAsPath(glyphRun, matrix, clip, brush, stroke);
   }
 }
 
 void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const Matrix& matrix,
                                             const ClipStack& clip, const Brush& brush) {
-  DEBUG_ASSERT(!HasComplexTransform(glyphRun));
   if (glyphRun.glyphCount == 0) {
     return;
   }
@@ -477,13 +463,6 @@ void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const Matr
   // The size, skewX, and scaleX are applied here.
   float advanceScale = textSize * 1.f / pdfStrike->strikeSpec.unitsPerEM;
 
-  // textScaleX and textScaleY are used to get a conservative bounding box for glyphs.
-  float textScaleY = textSize / pdfStrike->strikeSpec.unitsPerEM;
-  float textScaleX = advanceScale;
-
-  const auto clipStackBounds =
-      clip.state() == ClipState::WideOpen ? Rect::MakeSize(_pageSize) : clip.bounds();
-
   // Clear everything from the runPaint that will be applied by the strike.
   Brush brushPaint(brush);
   brushPaint.maskFilter = nullptr;
@@ -508,6 +487,10 @@ void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const Matr
 
     for (size_t index = 0; index < glyphRun.glyphCount; ++index) {
       auto glyphID = glyphRun.glyphs[index];
+      if (numGlyphs <= glyphID) {
+        continue;
+      }
+      auto xy = GetGlyphPosition(glyphRun, index);
 
       glyphPositioner.flush();
       out->writeText("/Span<</ActualText ");
@@ -516,25 +499,6 @@ void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const Matr
       PDFWriteTextString(out, utf8Text);
       // begin marked-content sequence with an associated property list.
       out->writeText(" >> BDC\n");
-      if (numGlyphs <= glyphID) {
-        continue;
-      }
-      auto xy = GetGlyphPosition(glyphRun, index);
-      // Do a glyph-by-glyph bounds-reject if positions are absolute.
-      auto glyphBounds = glyphRunFont.getBounds(glyphID);
-      glyphBounds = Matrix::MakeScale(textScaleX, textScaleY).mapRect(glyphBounds);
-      glyphBounds.offset(xy + offset);
-      matrix.mapRect(&glyphBounds);
-
-      if (glyphBounds.isEmpty()) {
-        if (!clipStackBounds.contains(glyphBounds.x(), glyphBounds.y())) {
-          continue;
-        }
-      } else {
-        if (!Rect::Intersects(clipStackBounds, glyphBounds)) {
-          continue;
-        }
-      }
       if (NeedsNewFont(font, glyphID, initialFontType)) {
         // Not yet specified font or need to switch font.
         font = pdfStrike->getFontResource(glyphID);
