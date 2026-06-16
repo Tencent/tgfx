@@ -43,7 +43,8 @@ WebGPUGPU::WebGPUGPU(WGPUDevice device, bool externallyOwned)
 }
 
 WebGPUGPU::~WebGPUGPU() {
-  releaseAll(false);
+  DEBUG_ASSERT(returnQueue == nullptr);
+  DEBUG_ASSERT(resources.empty());
 }
 
 CommandQueue* WebGPUGPU::queue() const {
@@ -169,6 +170,7 @@ void WebGPUGPU::releaseAll(bool releaseGPU) {
     }
   }
   resources.clear();
+  returnQueue = nullptr;
   if (releaseGPU) {
     for (auto& [_, mp] : mipmapPipelineCache) {
       if (mp.sampler) wgpuSamplerRelease(mp.sampler);
