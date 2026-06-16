@@ -145,11 +145,21 @@ class LayerStyle : public LayerProperty {
   }
 
   /**
-   * Returns whether this layer style needs the content shape of the layer for drawing. When true,
-   * the layer attempts to extract its vector shape (e.g. Rect, Oval, or RRect) from the content;
-   * if the shape cannot be extracted, the layer's bounding rect is used as a fallback.
+   * Returns whether this layer style needs the contour image of the layer for drawing. Only
+   * meaningful when extraSourceType() returns Contour. When true, the layer rasterizes the contour
+   * image and provides it through the contour input source. The default value is false.
    */
-  virtual bool needContentShape() const {
+  virtual bool needContourImage() const {
+    return false;
+  }
+
+  /**
+   * Returns whether this layer style needs the contour shape of the layer for drawing. Only
+   * meaningful when extraSourceType() returns Contour. When true, the layer attempts to extract its
+   * vector shape (e.g. Rect, Oval, or RRect) from the content; if the shape cannot be extracted,
+   * the layer's bounding rect is used as a fallback. The default value is false.
+   */
+  virtual bool needContourShape() const {
     return false;
   }
 

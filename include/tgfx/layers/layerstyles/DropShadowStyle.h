@@ -135,10 +135,14 @@ class DropShadowStyle : public LayerStyle {
   Rect filterBounds(const Rect& srcRect, float contentScale) override;
 
   LayerStyleExtraSourceType extraSourceType() const override {
-    return !_showBehindLayer ? LayerStyleExtraSourceType::Contour : LayerStyleExtraSourceType::None;
+    return LayerStyleExtraSourceType::Contour;
   }
 
-  bool needContentShape() const override {
+  bool needContourImage() const override {
+    return !_showBehindLayer;
+  }
+
+  bool needContourShape() const override {
     return true;
   }
 

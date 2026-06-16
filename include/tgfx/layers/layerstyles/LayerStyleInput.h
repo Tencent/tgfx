@@ -27,6 +27,71 @@
 namespace tgfx {
 
 /**
+ * Extra input source that a LayerStyle may need beyond the primary content image.
+ */
+class LayerStyleInputSource {
+ public:
+  enum class Type { Base, Contour };
+
+  LayerStyleInputSource(std::shared_ptr<Image> image, Point imageOffset)
+      : _type(Type::Base), _image(std::move(image)), _imageOffset(imageOffset) {
+  }
+
+  Type type() const {
+    return _type;
+  }
+
+  /**
+   * The source image.
+   */
+  const std::shared_ptr<Image>& image() const {
+    return _image;
+  }
+
+  /**
+   * The offset of the source image relative to the content image.
+   */
+  Point imageOffset() const {
+    return _imageOffset;
+  }
+
+ protected:
+  LayerStyleInputSource(Type type, std::shared_ptr<Image> image, Point imageOffset)
+      : _type(type), _image(std::move(image)), _imageOffset(imageOffset) {
+  }
+
+ private:
+  Type _type = Type::Base;
+  std::shared_ptr<Image> _image = nullptr;
+  Point _imageOffset = {};
+};
+
+/**
+ * Contour input source with additional vector shape information.
+ */
+class LayerStyleInputSourceContour : public LayerStyleInputSource {
+ public:
+  LayerStyleInputSourceContour(std::shared_ptr<Image> image, Point imageOffset,
+                               std::optional<StyledShape> shape = std::nullopt)
+      : LayerStyleInputSource(Type::Contour, std::move(image), imageOffset),
+        _shape(std::move(shape)) {
+  }
+
+  /**
+   * Returns the optional content shape of the layer. For styles whose needContourShape() returns
+   * true, it is the layer's vector shape (e.g. Rect, Oval, or RRect with fill/stroke info) when
+   * extractable; otherwise the layer's bounding rect is used as a fallback. For styles that do not
+   * need it, this is std::nullopt.
+   */
+  const std::optional<StyledShape>& shape() const {
+    return _shape;
+  }
+
+ private:
+  std::optional<StyledShape> _shape = std::nullopt;
+};
+
+/**
  * Contains the source data that a LayerStyle needs to perform its drawing.
  */
 struct LayerStyleInput {
@@ -49,26 +114,13 @@ struct LayerStyleInput {
   float contentScale = 1.0f;
 
   /**
-   * Optional extra source image. The semantics depend on the LayerStyle's extraSourceType: for
-   * Contour styles it is similar to content, but includes geometries from alpha=0 painters and
-   * replaces gradient fills with solid colors; for Background styles it is the normally rendered
-   * content below the current layer; for None styles it is nullptr.
+   * Optional extra source. The actual type depends on the LayerStyle's extraSourceType:
+   * LayerStyleInputSourceContour for Contour, LayerStyleInputSource for Background, nullptr
+   * for None. For Contour the image is similar to content, but includes geometries from alpha=0
+   * painters and replaces gradient fills with solid colors. For Background the image is the
+   * normally rendered content below the current layer.
    */
-  std::shared_ptr<Image> extraSource = nullptr;
-
-  /**
-   * The offset of the extra source image relative to the content image. Only meaningful when
-   * extraSource is non-null.
-   */
-  Point extraSourceOffset = {};
-
-  /**
-   * Optional content shape of the layer. For styles whose needContentShape() returns true, it is
-   * the layer's vector shape (e.g. Rect, Oval, or RRect with fill/stroke info) when extractable;
-   * otherwise the layer's bounding rect is used as a fallback. For styles that do not need it,
-   * this is std::nullopt.
-   */
-  std::optional<StyledShape> contentShape = std::nullopt;
+  std::shared_ptr<LayerStyleInputSource> extraSource = nullptr;
 };
 
 }  // namespace tgfx

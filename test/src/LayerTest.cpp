@@ -3723,7 +3723,7 @@ TGFX_TEST(LayerTest, DropShadow) {
   auto displayList = std::make_unique<DisplayList>();
   BuildShadowTestLayers(*displayList, ShadowType::Drop, cellW, cellH, gap);
   displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DropShadow"));
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/1DropShadow"));
 }
 
 TGFX_TEST(LayerTest, InnerShadow) {
@@ -3738,7 +3738,7 @@ TGFX_TEST(LayerTest, InnerShadow) {
   auto displayList = std::make_unique<DisplayList>();
   BuildShadowTestLayers(*displayList, ShadowType::Inner, cellW, cellH, gap);
   displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/InnerShadow"));
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/1InnerShadow"));
 }
 
 }  // namespace tgfx

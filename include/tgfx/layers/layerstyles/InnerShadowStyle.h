@@ -121,7 +121,11 @@ class InnerShadowStyle : public LayerStyle {
 
   Rect filterBounds(const Rect& srcRect, float contentScale) override;
 
-  bool needContentShape() const override {
+  LayerStyleExtraSourceType extraSourceType() const override {
+    return LayerStyleExtraSourceType::Contour;
+  }
+
+  bool needContourShape() const override {
     return true;
   }
 

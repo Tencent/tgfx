@@ -144,10 +144,10 @@ void DropShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float
                       : SamplingOptions();
   Paint paint = {};
   if (!_showBehindLayer && input.extraSource != nullptr) {
-    auto shader =
-        Shader::MakeImageShader(input.extraSource, TileMode::Decal, TileMode::Decal, sampling);
-    auto matrixShader = shader->makeWithMatrix(
-        Matrix::MakeTrans(input.extraSourceOffset.x, input.extraSourceOffset.y));
+    auto shader = Shader::MakeImageShader(input.extraSource->image(), TileMode::Decal,
+                                          TileMode::Decal, sampling);
+    auto contourOffset = input.extraSource->imageOffset();
+    auto matrixShader = shader->makeWithMatrix(Matrix::MakeTrans(contourOffset.x, contourOffset.y));
     paint.setMaskFilter(MaskFilter::MakeShader(matrixShader, true));
   }
   paint.setBlendMode(blendMode);
