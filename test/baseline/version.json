@@ -383,7 +383,7 @@
         "NoiseEffects": "2c4681a2",
         "NonRegularBlendMode": "bf721f63",
         "ShapeNoiseStyle": "2c4681a2",
-        "SimpleText": "bf721f63",
+        "SimpleText": "984e8f18",
         "SrcBlendOverlap": "bf721f63",
         "TextInnerShadow": "c746d1ea",
         "TextLayerStyleAlignment": "2c4681a2",
@@ -489,7 +489,11 @@
         "WebpCodec_Encode_RGBA": "0cfb8996",
         "read_RGBA_1010102_scaled_codec": "eefb7a46",
         "read_RGBA_F16_scaled_codec": "eefb7a46",
-        "read_RGB_565_scaled_codec": "29745c73"
+        "read_RGB_565_scaled_codec": "29745c73",
+        "NativeCodec_Decode_Alpha8": "afd80b4",
+        "NativeCodec_Decode_RGBA": "afd80b4",
+        "NativeCodec_Encode_Alpha8": "afd80b4",
+        "NativeCodec_Encode_RGBA": "afd80b4"
     },
     "RecordingTest": {
         "BasicFlushAndSubmit": "3c65b221",
