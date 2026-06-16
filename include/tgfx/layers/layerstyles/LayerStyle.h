@@ -154,24 +154,6 @@ class LayerStyle : public LayerProperty {
   void setExcludeChildEffects(bool value);
 
   /**
-   * Returns true if this layer style requires the canvas to be clipped to the content path before
-   * drawing during software-based rendering (e.g., PDF export). This is used for styles that need
-   * vector clip boundaries for precise rendering. Default is false.
-   */
-  virtual bool needsContentClip() const {
-    return false;
-  }
-
-  /**
-   * Returns true if this layer style uses the content image's alpha channel to compute its effect.
-   * When true, the content image cannot be replaced with an opaque placeholder during software-based
-   * rendering. Default is true.
-   */
-  virtual bool needsContentAlpha() const {
-    return true;
-  }
-
-  /**
    * Returns the type of the extra source required by the layer style.
    * Default is LayerStyleExtraSourceType::None.
    */

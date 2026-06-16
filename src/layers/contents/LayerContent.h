@@ -20,7 +20,6 @@
 
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Matrix.h"
-#include "tgfx/core/Path.h"
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
@@ -67,28 +66,6 @@ class LayerContent {
    * Returns true if any part of the content uses a blend mode other than SrcOver.
    */
   virtual bool hasBlendMode() const {
-    return false;
-  }
-
-  /**
-   * Returns the clip path of the content for constraining layer style effects. If the content
-   * supports path-based clipping, fills the output path and returns true.
-   */
-  virtual bool getClipPath(Path* path) const {
-    (void)path;
-    return false;
-  }
-
-  /**
-   * Draws the content as an explicit path instead of native geometry. Used during PDF export to
-   * write vector text outlines directly into the content stream. Returns true if the content has
-   * foreground graphics that should be drawn above children by calling drawForeground().
-   */
-  virtual bool drawAsPath(Canvas* canvas, const Path& path, float alpha, bool antiAlias) const {
-    (void)canvas;
-    (void)path;
-    (void)alpha;
-    (void)antiAlias;
     return false;
   }
 

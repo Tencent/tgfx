@@ -1207,7 +1207,6 @@ std::shared_ptr<Picture> Layer::getMaskPicture(const DrawArgs& args, bool isCont
   // extracting maskPath from the picture, resulting in incorrect clip regions.
   DrawArgs maskArgs = args;
   maskArgs.excludeEffects |= isContourMode;
-  maskArgs.recordingIntermediateImage = true;
   maskArgs.backgroundHandler = BackgroundHandler::NoOp();
   auto maskCanPreserve3D = _mask->canPreserve3D();
   // When mask enables 3D context, the full 3D relative matrix is handled by the 3D context.
@@ -1301,7 +1300,6 @@ std::shared_ptr<Image> Layer::getContentContourImage(const DrawArgs& args, float
   contourCanvas->scale(contentScale, contentScale);
   auto contourArgs = args;
   contourArgs.opaqueContext = &opaqueContext;
-  contourArgs.recordingIntermediateImage = true;
   // Contour recording is an intermediate artifact — skip background capture / consume.
   contourArgs.backgroundHandler = BackgroundHandler::NoOp();
   // Detach from any active 3D rendering context: the contour image we are about to record is the
@@ -1402,7 +1400,6 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
   auto drawArgs = args;
   drawArgs.renderFlags |= RenderFlags::DisableCache;
   drawArgs.renderRects = nullptr;
-  drawArgs.recordingIntermediateImage = true;
   // Cache content should be rendered to a regular texture, not to 3D compositor.
   drawArgs.render3DContext = nullptr;
   drawArgs.backgroundHandler = BackgroundHandler::NoOp();
@@ -1565,33 +1562,6 @@ void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {
   drawContents(args, canvas, alpha, sourcePtr);
 }
 
-// Determines whether Above-position layer styles can be clipped using a vector path instead of
-// raster masks. This is used during PDF export to produce sharp, resolution-independent clip
-// boundaries for effects like InnerShadow and Noise that render within the content shape.
-bool Layer::shouldUseVectorClip(const DrawArgs& args, const LayerContent* content,
-                                const LayerStyleSource* layerStyleSource, Path* clipPath) const {
-  if (content == nullptr || layerStyleSource == nullptr) {
-    return false;
-  }
-  bool needsClip = false;
-  for (const auto& layerStyle : _layerStyles) {
-    if (layerStyle->position() == LayerStylePosition::Above && layerStyle->needsContentClip()) {
-      needsClip = true;
-      break;
-    }
-  }
-  if (!needsClip) {
-    return false;
-  }
-  // Layer filters render via offscreen rasterization, which converts content to a bitmap and
-  // discards vector path information. Vector clipping is therefore only valid when no filters
-  // are present.
-  if (args.context != nullptr || args.recordingIntermediateImage || !_filters.empty()) {
-    return false;
-  }
-  return content->getClipPath(clipPath) && !clipPath->isEmpty();
-}
-
 void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
                          const LayerStyleSource* layerStyleSource, const Layer* stopChild) {
   if (layerStyleSource) {
@@ -1599,33 +1569,19 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
   }
   auto content = getContent();
   bool hasForeground = false;
-  bool useVectorClip = false;
-  Path contentClipPath = {};
   if (content) {
-    useVectorClip = shouldUseVectorClip(args, content, layerStyleSource, &contentClipPath);
-    if (useVectorClip) {
-      hasForeground =
-          content->drawAsPath(canvas, contentClipPath, alpha, bitFields.allowsEdgeAntialiasing);
-    } else {
-      hasForeground = content->drawDefault(canvas, alpha, bitFields.allowsEdgeAntialiasing);
-    }
+    hasForeground = content->drawDefault(canvas, alpha, bitFields.allowsEdgeAntialiasing);
   }
   if (!drawChildren(args, canvas, alpha, stopChild)) {
     return;
   }
   if (stopChild != nullptr) {
+    // Background-walk path: skip Above styles and foreground for this layer; the caller is only
+    // interested in the portion that contributes to the synthesized backdrop.
     return;
   }
   if (layerStyleSource) {
-    if (useVectorClip) {
-      canvas->save();
-      canvas->clipPath(contentClipPath);
-    }
-    drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Above,
-                    useVectorClip);
-    if (useVectorClip) {
-      canvas->restore();
-    }
+    drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Above);
   }
   if (hasForeground) {
     content->drawForeground(canvas, alpha, bitFields.allowsEdgeAntialiasing);
@@ -1817,7 +1773,6 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
 
   DrawArgs drawArgs = args;
   drawArgs.render3DContext = nullptr;
-  drawArgs.recordingIntermediateImage = true;
   // Layer style source content is an intermediate artifact — skip background capture / consume.
   drawArgs.backgroundHandler = BackgroundHandler::NoOp();
 
@@ -1863,8 +1818,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
 }
 
 void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
-                            const LayerStyleSource* source, LayerStylePosition position,
-                            bool useVectorClip) {
+                            const LayerStyleSource* source, LayerStylePosition position) {
   DEBUG_ASSERT(source != nullptr && !FloatNearlyZero(source->contentScale));
   for (const auto& layerStyle : _layerStyles) {
     DEBUG_ASSERT(layerStyle != nullptr);
@@ -1875,7 +1829,7 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
       BackgroundHandler::DispatchOrSkip(args, canvas, this, alpha, layerStyle.get(), source);
       continue;
     }
-    drawLayerStyleDefault(args, canvas, alpha, layerStyle.get(), source, useVectorClip);
+    drawLayerStyleDefault(args, canvas, alpha, layerStyle.get(), source);
   }
 }
 
@@ -1926,7 +1880,6 @@ std::shared_ptr<Image> Layer::synthesizeBackgroundImage(const DrawArgs& args, fl
   DrawArgs subArgs = args;
   subArgs.backgroundHandler = BackgroundHandler::NoOp();
   subArgs.excludeEffects = false;
-  subArgs.recordingIntermediateImage = true;
 
   auto currentAlpha = drawBackgroundLayers(subArgs, recordingCanvas);
   auto belowSource = getLayerStyleSource(subArgs, recordingCanvas->getMatrix());
@@ -1943,8 +1896,7 @@ std::shared_ptr<Image> Layer::synthesizeBackgroundImage(const DrawArgs& args, fl
 }
 
 void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, float alpha,
-                                  LayerStyle* layerStyle, const LayerStyleSource* source,
-                                  bool useVectorClip) {
+                                  LayerStyle* layerStyle, const LayerStyleSource* source) {
   DEBUG_ASSERT(source != nullptr && !FloatNearlyZero(source->contentScale));
   DEBUG_ASSERT(layerStyle->extraSourceType() != LayerStyleExtraSourceType::Background);
   auto groupIndex = static_cast<int>(layerStyle->excludeChildEffects());
@@ -1959,22 +1911,10 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
   auto matrix = Matrix::MakeScale(1.f / source->contentScale, 1.f / source->contentScale);
   matrix.preTranslate(contentEntry.offset.x, contentEntry.offset.y);
   canvas->concat(matrix);
-  auto contentImage = contentEntry.image;
-  if (useVectorClip && contentImage != nullptr && !layerStyle->needsContentAlpha()) {
-    PictureRecorder recorder;
-    auto* recCanvas = recorder.beginRecording();
-    Paint opaquePaint = {};
-    opaquePaint.setColor(Color::White());
-    recCanvas->drawRect(Rect::MakeWH(contentImage->width(), contentImage->height()), opaquePaint);
-    auto picture = recorder.finishRecordingAsPicture();
-    if (picture != nullptr) {
-      contentImage =
-          Image::MakeFrom(std::move(picture), contentImage->width(), contentImage->height());
-    }
-  }
   switch (layerStyle->extraSourceType()) {
     case LayerStyleExtraSourceType::None:
-      layerStyle->draw(canvas, contentImage, source->contentScale, contentEntry.offset, alpha);
+      layerStyle->draw(canvas, contentEntry.image, source->contentScale, contentEntry.offset,
+                       alpha);
       break;
     case LayerStyleExtraSourceType::Background:
       // Unreachable: Background-sourced styles are routed through BackgroundHandler.

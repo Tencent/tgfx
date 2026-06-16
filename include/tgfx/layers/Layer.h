@@ -656,15 +656,11 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   std::unique_ptr<LayerStyleSource> getLayerStyleSource(const DrawArgs& args, const Matrix& matrix);
 
-  bool shouldUseVectorClip(const DrawArgs& args, const LayerContent* content,
-                           const LayerStyleSource* layerStyleSource, Path* clipPath) const;
-
   void drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
-                       const LayerStyleSource* source, LayerStylePosition position,
-                       bool useVectorClip = false);
+                       const LayerStyleSource* source, LayerStylePosition position);
 
   void drawLayerStyleDefault(const DrawArgs& args, Canvas* canvas, float alpha, LayerStyle* style,
-                             const LayerStyleSource* source, bool useVectorClip = false);
+                             const LayerStyleSource* source);
 
   // Walks ancestors and prior siblings, painting their content + Below styles into canvas. Used
   // by synthesizeBackgroundImage for the picture-canvas fallback. Returns the cumulative alpha

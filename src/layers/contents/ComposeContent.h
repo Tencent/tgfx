@@ -40,8 +40,6 @@ class ComposeContent : public LayerContent {
   void drawContour(Canvas* canvas, bool antiAlias) const override;
   bool contourEqualsOpaqueContent() const override;
   bool hasBlendMode() const override;
-  bool getClipPath(Path* path) const override;
-  bool drawAsPath(Canvas* canvas, const Path& path, float alpha, bool antiAlias) const override;
   bool drawDefault(Canvas* canvas, float alpha, bool antiAlias) const override;
   void drawForeground(Canvas* canvas, float alpha, bool antiAlias) const override;
 
