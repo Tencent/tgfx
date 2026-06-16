@@ -43,11 +43,7 @@ namespace tgfx {
 
 static const std::string BASELINE_ROOT = ProjectPath::Absolute("test/baseline/");
 static const std::string BASELINE_VERSION_PATH = BASELINE_ROOT + "/version.json";
-#ifdef __EMSCRIPTEN__
-static const std::string CACHE_DIR = BASELINE_ROOT + "/.cache-web/";
-#else
 static const std::string CACHE_DIR = BASELINE_ROOT + "/.cache/" + TGFX_BACKEND_NAME + "/";
-#endif
 static const std::string CACHE_MD5_PATH = CACHE_DIR + "md5.json";
 static const std::string CACHE_VERSION_PATH = CACHE_DIR + "version.json";
 static const std::string GIT_HEAD_PATH = CACHE_DIR + "HEAD";

@@ -103,6 +103,13 @@ static std::array<float, 4> GetRTAdjustArray(const RenderTarget* renderTarget) {
     result[2] = -result[2];
     result[3] = -result[3];
   }
+  // WebGPU viewport Y transform is (1 - y_ndc)/2, meaning NDC y=+1 maps to framebuffer top.
+  // For TopLeft origin (pixel y=0 at top), we need pixel y=0 -> NDC y=+1, requiring Y negate.
+  if (renderTarget->getContext()->backend() == Backend::WebGPU &&
+      renderTarget->origin() == ImageOrigin::TopLeft) {
+    result[2] = -result[2];
+    result[3] = -result[3];
+  }
   return result;
 }
 

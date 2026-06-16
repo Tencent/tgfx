@@ -269,7 +269,8 @@
           "-DCMAKE_CXX_FLAGS=\"-w\""
         ],
         "platforms": [
-          "mac"
+          "mac",
+          "web"
         ]
       }
     },
@@ -304,7 +305,8 @@
           "-DCMAKE_CXX_FLAGS=\"-w\""
         ],
         "platforms": [
-          "mac"
+          "mac",
+          "web"
         ]
       }
     },

@@ -31,7 +31,7 @@ static std::vector<std::shared_ptr<Texture>> MakeTexturePlanes(GPU* gpu, const Y
   for (int index = 0; index < count; index++) {
     auto w = yuvData->width() >> YUV_SIZE_FACTORS[index];
     auto h = yuvData->height() >> YUV_SIZE_FACTORS[index];
-    TextureDescriptor descriptor = {w, h, formats[index]};
+    TextureDescriptor descriptor = {w, h, formats[index], false, 1, TextureUsage::TEXTURE_BINDING};
     auto texture = gpu->createTexture(descriptor);
     if (texture == nullptr) {
       return {};

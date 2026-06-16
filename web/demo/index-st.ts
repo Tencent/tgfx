@@ -46,13 +46,11 @@ if (typeof window !== 'undefined') {
             tgfxView.setImagePath("TGFX",image);
 
             var font = new FontFace('default', "url(resources/font/NotoSansSC-Regular.otf)");
-            font.load().then((loadedFont) => {
-                document.fonts.add(loadedFont);
-            })
             var emojiFont = new FontFace('emoji', "url(resources/font/NotoColorEmoji.ttf)");
-            emojiFont.load().then((loadedFont) => {
+            await Promise.all([font.load(), emojiFont.load()]).then(([loadedFont, loadedEmoji]) => {
                 document.fonts.add(loadedFont);
-            })
+                document.fonts.add(loadedEmoji);
+            });
             tgfxView.registerFonts();
 
             updateSize(shareData);
