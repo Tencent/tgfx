@@ -34,7 +34,7 @@ and various video-editing apps.
 - WebGL 2.0+
 - Metal 1.1+ (in progress)
 - Vulkan 1.1+ (in progress)
-- WebGPU (in progress)
+- WebGPU 1.0
 
 ## Build Prerequisites
 
