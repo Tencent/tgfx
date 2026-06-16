@@ -62,8 +62,7 @@ class TextureDescriptor {
    */
   TextureDescriptor(int width, int height, PixelFormat format, bool mipmapped = false,
                     int sampleCount = 1,
-                    uint32_t usage = TextureUsage::TEXTURE_BINDING |
-                                     TextureUsage::RENDER_ATTACHMENT);
+                    uint32_t usage = TextureUsage::TEXTURE_BINDING);
 
   /**
    * The width of the texture in pixels.
