@@ -167,6 +167,9 @@ class PDFExportContext : public DrawContext {
   void drawPathWithFilter(const Matrix& matrix, const ClipStack& clip, const Path& originPath,
                           const Matrix& pathExtraMatrix, const Brush& originPaint);
 
+  static Path ExtractClipPathFromPicture(const std::shared_ptr<Picture>& picture,
+                                         const Matrix& imageMatrix);
+
   ISize _pageSize = {};
   PDFDocumentImpl* document = nullptr;
   Matrix _initialTransform = {};

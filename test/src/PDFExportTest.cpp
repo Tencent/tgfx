@@ -1399,12 +1399,14 @@ TGFX_TEST(PDFExportTest, NoiseEffects) {
   textBoth->setLayerStyles({NoiseStyle::MakeMulti(8.0f, 0.5f, 0.5f, 44.0f)});
   textBoth->setFilters({BlurFilter::Make(3.0f, 3.0f)});
 
-  // Export PDF.
+  // Export PDF with 2x pixel density for noise patterns.
   auto PDFStream = MemoryWriteStream::Make();
   auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
   float pageW = Margin * 2 + Cols * RectW + (Cols - 1) * GapX;
   float pageH = Margin * 2 + Rows * RectH + (Rows - 1) * GapY;
-  auto canvas = document->beginPage(pageW, pageH);
+  constexpr float pdfDensity = 2.f;
+  auto canvas = document->beginPage(pageW * pdfDensity, pageH * pdfDensity);
+  canvas->scale(pdfDensity, pdfDensity);
   root->draw(canvas);
   document->endPage();
   document->close();
@@ -1516,11 +1518,15 @@ TGFX_TEST(PDFExportTest, TextMultiNoiseTransforms) {
   scaleMatrix.preScale(1.5f, 1.5f, 50.f, 250.f);
   addText("Hello", scaleMatrix);
 
-  // Export PDF.
+  // Export PDF with 4x pixel density for noise patterns.
   auto PDFStream = MemoryWriteStream::Make();
   auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
   auto bounds = root->getBounds(nullptr, true);
-  auto canvas = document->beginPage(bounds.width() + 100.f, bounds.height() + 100.f);
+  constexpr float pdfDensity = 4.f;
+  float pageW = bounds.width() + 100.f;
+  float pageH = bounds.height() + 100.f;
+  auto canvas = document->beginPage(pageW * pdfDensity, pageH * pdfDensity);
+  canvas->scale(pdfDensity, pdfDensity);
   canvas->translate(-bounds.left + 50.f, -bounds.top + 50.f);
   root->draw(canvas);
   document->endPage();
@@ -1603,23 +1609,39 @@ TGFX_TEST(PDFExportTest, TextInnerShadow) {
   ASSERT_TRUE(context != nullptr);
 
   auto root = Layer::Make();
-  auto textLayer = TextLayer::Make();
   auto typeface =
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
   ASSERT_TRUE(typeface != nullptr);
   Font font(typeface, 60.0f);
+
+  // Text with InnerShadowStyle.
+  auto textLayer = TextLayer::Make();
   textLayer->setText("text");
   textLayer->setTextColor(Color::FromRGBA(80, 160, 240));
   textLayer->setFont(font);
   textLayer->setLayerStyles({InnerShadowStyle::Make(3.f, 3.f, 3.f, 3.f, Color::Black())});
   root->addChild(textLayer);
 
+  // Text with DuoNoiseStyle below.
+  auto noiseTextLayer = TextLayer::Make();
+  noiseTextLayer->setText("text");
+  noiseTextLayer->setTextColor(Color::FromRGBA(80, 160, 240));
+  noiseTextLayer->setFont(font);
+  noiseTextLayer->setMatrix(Matrix::MakeTrans(0.f, 80.f));
+  noiseTextLayer->setLayerStyles({NoiseStyle::MakeDuo(8.f, 1.f, Color::FromRGBA(200, 50, 50),
+                                                      Color::FromRGBA(50, 200, 50), 42.f)});
+  root->addChild(noiseTextLayer);
+
   auto bounds = root->getBounds(nullptr, true);
 
-  // Export PDF.
+  // Export PDF with 4x pixel density.
   auto PDFStream = MemoryWriteStream::Make();
   auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
-  auto canvas = document->beginPage(bounds.width() + 100.f, bounds.height() + 100.f);
+  constexpr float pdfDensity = 4.f;
+  float pageW = bounds.width() + 100.f;
+  float pageH = bounds.height() + 100.f;
+  auto canvas = document->beginPage(pageW * pdfDensity, pageH * pdfDensity);
+  canvas->scale(pdfDensity, pdfDensity);
   canvas->translate(-bounds.left + 50.f, -bounds.top + 50.f);
   root->draw(canvas);
   document->endPage();

@@ -26,6 +26,7 @@
 #include "core/PictureRecords.h"
 #include "core/RunRecord.h"
 #include "core/ScalerContext.h"
+#include "core/filters/BlendImageFilter.h"
 #include "core/filters/DropShadowImageFilter.h"
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/filters/InnerShadowImageFilter.h"
@@ -64,6 +65,7 @@
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathTypes.h"
 #include "tgfx/core/Picture.h"
+#include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/SamplingOptions.h"
@@ -315,6 +317,61 @@ bool IsBackgroundBlurStylePattern(const Brush& brush, const Image* image) {
   return filterImage->filter &&
          Types::Get(filterImage->filter.get()) == Types::ImageFilterType::Blur;
 }
+
+// Detects the FilterImage<Blend(SrcIn, Shader)> pattern produced by NoiseStyle. The source must be
+// a PictureImage so that vector clip paths can be extracted from its recorded drawing commands.
+const FilterImage* AsNoiseStylePattern(const Image* image) {
+  if (Types::Get(image) != Types::ImageType::Filter) {
+    return nullptr;
+  }
+  const auto* filterImage = static_cast<const FilterImage*>(image);
+  if (!filterImage->filter ||
+      Types::Get(filterImage->filter.get()) != Types::ImageFilterType::Blend) {
+    return nullptr;
+  }
+  const auto* blendFilter = static_cast<const BlendImageFilter*>(filterImage->filter.get());
+  if (blendFilter->blendMode != BlendMode::SrcIn) {
+    return nullptr;
+  }
+  if (Types::Get(filterImage->source.get()) != Types::ImageType::Picture) {
+    return nullptr;
+  }
+  return filterImage;
+}
+
+Path GetGlyphRunPath(const GlyphRun& glyphRun, float resolutionScale) {
+  if (resolutionScale <= 0.0f) {
+    return {};
+  }
+  const bool hasScale = resolutionScale != 1.0f;
+  const auto scaleMatrix = Matrix::MakeScale(resolutionScale, resolutionScale);
+  auto font = glyphRun.font;
+  if (hasScale) {
+    font = font.makeWithSize(resolutionScale * font.getSize());
+  }
+
+  Path path = {};
+  for (size_t index = 0; index < glyphRun.glyphCount; index++) {
+    auto glyphID = glyphRun.glyphs[index];
+    Path glyphPath = {};
+    if (!font.getPath(glyphID, &glyphPath)) {
+      continue;
+    }
+    auto glyphMatrix = GetGlyphMatrix(glyphRun, index);
+    if (hasScale) {
+      glyphMatrix.preScale(1.0f / resolutionScale, 1.0f / resolutionScale);
+      glyphMatrix.postConcat(scaleMatrix);
+    }
+    glyphPath.transform(glyphMatrix);
+    path.addPath(glyphPath);
+  }
+  if (hasScale) {
+    auto inverseMatrix = Matrix::MakeScale(1.0f / resolutionScale, 1.0f / resolutionScale);
+    path.transform(inverseMatrix);
+  }
+  return path;
+}
+
 }  // namespace
 
 namespace {
@@ -527,20 +584,7 @@ void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const Matr
 void PDFExportContext::exportGlyphRunAsPath(const GlyphRun& glyphRun, const Matrix& matrix,
                                             const ClipStack& clip, const Brush& brush,
                                             const Stroke* stroke) {
-  const auto& glyphFont = glyphRun.font;
-  Path path;
-
-  for (size_t i = 0; i < glyphRun.glyphCount; ++i) {
-    auto glyphID = glyphRun.glyphs[i];
-    auto glyphMatrix = GetGlyphMatrix(glyphRun, i);
-    Path glyphPath;
-    if (!glyphFont.getPath(glyphID, &glyphPath)) {
-      continue;
-    }
-    glyphPath.transform(glyphMatrix);
-    path.addPath(glyphPath);
-  }
-
+  auto path = GetGlyphRunPath(glyphRun, matrix.getMaxScale());
   if (path.isEmpty()) {
     return;
   }
@@ -846,6 +890,41 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
                                        const ClipStack& clip, const Brush& brush) {
   if (!image) {
     return;
+  }
+
+  // NoiseStyle pattern: FilterImage<Blend(SrcIn, Shader)> over PictureImage. Instead of
+  // rasterizing the alpha-masked noise, extract vector paths from the PictureImage and emit them
+  // as a PDF clip, then render the full noise bitmap inside that clip.
+  if (auto* noiseFilter = AsNoiseStylePattern(image.get())) {
+    auto* pictureImage = static_cast<const PictureImage*>(noiseFilter->source.get());
+    Matrix imageMatrix = pictureImage->matrix ? *pictureImage->matrix : Matrix::I();
+    auto clipPath = ExtractClipPathFromPicture(pictureImage->picture, imageMatrix);
+    if (!clipPath.isEmpty()) {
+      // Transform clip path from image-local space to device space using the draw matrix.
+      clipPath.transform(matrix);
+      // Render full noise (replace source with opaque white so SrcIn yields unclipped noise).
+      PictureRecorder recorder;
+      auto* recCanvas = recorder.beginRecording();
+      Paint opaquePaint = {};
+      opaquePaint.setColor(Color::White());
+      recCanvas->drawRect(Rect::MakeWH(noiseFilter->source->width(), noiseFilter->source->height()),
+                          opaquePaint);
+      auto whitePicture = recorder.finishRecordingAsPicture();
+      auto whiteImage = Image::MakeFrom(std::move(whitePicture), noiseFilter->source->width(),
+                                        noiseFilter->source->height());
+      if (whiteImage != nullptr) {
+        auto fullNoiseImage = whiteImage->makeWithFilter(noiseFilter->filter);
+        if (fullNoiseImage != nullptr) {
+          fullNoiseImage = fullNoiseImage->makeTextureImage(document->context());
+          if (fullNoiseImage != nullptr) {
+            auto newClip = clip;
+            newClip.clip(clipPath, false);
+            onDrawImageRect(fullNoiseImage, rect, sampling, matrix, newClip, brush);
+            return;
+          }
+        }
+      }
+    }
   }
 
   // First, figure out the src->dst transform and subset the image if needed.
@@ -1442,6 +1521,51 @@ void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack&
 
   PDFUtils::PaintPath(path.getFillType(), contentEntry.stream());
   clearMaskOnGraphicState(contentEntry.stream());
+}
+
+Path PDFExportContext::ExtractClipPathFromPicture(const std::shared_ptr<Picture>& picture,
+                                                  const Matrix& imageMatrix) {
+  Path combined = {};
+  Matrix currentMatrix = Matrix::I();
+  for (const auto& record : picture->records) {
+    if (record->type() == PictureRecordType::SetMatrix) {
+      const auto* setMatrix = static_cast<const SetMatrix*>(record.get());
+      currentMatrix = setMatrix->matrix;
+    } else if (record->type() == PictureRecordType::DrawTextBlob) {
+      const auto* drawText = static_cast<const DrawTextBlob*>(record.get());
+      for (auto glyphRun : *drawText->textBlob) {
+        auto shapePath = GetGlyphRunPath(glyphRun, currentMatrix.getMaxScale());
+        if (!shapePath.isEmpty()) {
+          shapePath.transform(currentMatrix);
+          combined.addPath(shapePath);
+        }
+      }
+    } else if (record->type() == PictureRecordType::DrawRect) {
+      const auto* drawRect = static_cast<const DrawRect*>(record.get());
+      Path rectPath;
+      rectPath.addRect(drawRect->rect);
+      rectPath.transform(currentMatrix);
+      combined.addPath(rectPath);
+    } else if (record->type() == PictureRecordType::DrawRRect) {
+      const auto* drawRRect = static_cast<const DrawRRect*>(record.get());
+      Path rrectPath;
+      rrectPath.addRRect(drawRRect->rRect);
+      rrectPath.transform(currentMatrix);
+      combined.addPath(rrectPath);
+    } else if (record->type() == PictureRecordType::DrawPath) {
+      const auto* drawPath = static_cast<const DrawPath*>(record.get());
+      Path pathCopy = drawPath->path;
+      pathCopy.transform(currentMatrix);
+      combined.addPath(pathCopy);
+    } else if (record->type() == PictureRecordType::DrawShape) {
+      const auto* drawShape = static_cast<const DrawShape*>(record.get());
+      auto shapePath = drawShape->shape->getPath();
+      shapePath.transform(currentMatrix);
+      combined.addPath(shapePath);
+    }
+  }
+  combined.transform(imageMatrix);
+  return combined;
 }
 
 }  // namespace tgfx
