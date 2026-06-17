@@ -458,7 +458,7 @@ struct StyledShape {
 
 识别分两层：
 
-1. **Layer 基类默认实现**：`Layer::onGetContentShape()` 调用静态 `MakeContentShape(getContent())`——取 content 的 tight-bounds，构造一个 fill 类型、shape 为该 bounds Rect 的 StyledShape；content 为空或 bounds 为空时返回 `std::nullopt`。同时基类提供私有的 `getContentShape()`：当图层带子节点（容器）时直接走 bounds 兜底（`MakeContentShape`），否则调用虚方法 `onGetContentShape()`。SolidLayer / ImageLayer / MeshLayer / Layer 容器均走默认实现，不需要 override。
+1. **Layer 基类默认实现**：`Layer::onGetContentShape()` 调用静态 `MakeContentShape(getContent())`——取 content 的 tight-bounds，构造一个 fill 类型、shape 为该 bounds Rect 的 StyledShape；content 为空或 bounds 为空时返回 `std::nullopt`。同时基类提供私有的 `getContentShape()`：当图层带子节点（容器）时直接走 bounds 兜底（`MakeContentShape`），否则调用虚方法 `onGetContentShape()`。ImageLayer / MeshLayer / Layer 容器均走默认实现，不需要 override。
 2. **ShapeLayer / VectorLayer override `onGetContentShape()`**：从各自的内容里提取单一形状及其 fill / stroke 信息，无法精确还原时调用 `Layer::onGetContentShape()` 走基类 bounds 兜底。
 3. **TextLayer**：没有 override，直接使用基类的 bounds-rect 兜底。spread 沿文字外接矩形扩，不沿字形轮廓扩。视觉退化是有意为之，与 Figma "文字不支持 spread"对齐（Figma 直接禁用 UI，TGFX 选择把视觉退化到矩形以保证规则统一）。
 
@@ -489,7 +489,7 @@ VectorLayer 直接遍历 `context.painters`，检查"单一共享 geometry + 统
 
 | Layer 类型 | 是否 override | 单一形状条件 | 复杂场景 |
 |-----------|------|---------|---------|
-| SolidLayer | 否 | 始终满足 | — |
+| SolidLayer | 是 | 始终满足（按宽高 / 圆角构造 Rect / RRect） | — |
 | ImageLayer | 否 | 始终满足（图像矩形） | — |
 | ShapeLayer | 是 | 有 fill / stroke 时取 `_shape` 的 path | 无 fill 且无 stroke 时 nullopt |
 | VectorLayer | 是 | 单一共享 geometry + 至多一个 stroke | bounds Rect + fill |
@@ -630,7 +630,7 @@ class DropShadowStyle : public LayerStyle {
 
 #### DropShadowFilter / InnerShadowFilter 变更
 
-Filter 层不经过 Layer 体系，走的是 ImageFilter 管线，没有几何信息。Filter 层的 spread 参数仅做存储，实际 spread 效果不生效，与 CSS `drop-shadow()` 行为一致。
+Filter 层不经过 Layer 体系，走的是 ImageFilter 管线，没有几何信息。DropShadowFilter / InnerShadowFilter 完全没有 spread 概念——spread 依赖图层的矢量几何，而在 Filter 层级拿不到几何，因此 Filter 层不提供也不支持 spread，与 CSS `drop-shadow()` 行为一致。
 
 #### filterBounds 变更
 

@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/VectorLayer.h"
-#include <algorithm>
 #include "core/utils/Log.h"
 #include "tgfx/layers/LayerRecorder.h"
 #include "tgfx/layers/layerstyles/StyledShape.h"

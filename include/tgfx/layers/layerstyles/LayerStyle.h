@@ -156,8 +156,9 @@ class LayerStyle : public LayerProperty {
   /**
    * Returns whether this layer style needs the contour shape of the layer for drawing. Only
    * meaningful when extraSourceType() returns Contour. When true, the layer attempts to extract its
-   * vector shape (e.g. Rect, Oval, or RRect) from the content; if the shape cannot be extracted,
-   * the layer's bounding rect is used as a fallback. The default value is false.
+   * vector shape (e.g. Rect, Oval, or RRect) from the content; if the shape cannot be extracted
+   * (e.g. a group layer with only children), it is unavailable (std::nullopt) and no fallback rect
+   * is substituted. The default value is false.
    */
   virtual bool needContourShape() const {
     return false;

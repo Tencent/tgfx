@@ -133,9 +133,6 @@ void DropShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float
     filterSourceOffset = spreadImage.offset;
   }
   DEBUG_ASSERT(filterSource != nullptr);
-  if (filterSource == nullptr) {
-    return;
-  }
   auto shadowImage = filterSource->makeWithFilter(filter, &offset);
   DEBUG_ASSERT(shadowImage != nullptr);
   if (shadowImage == nullptr) {

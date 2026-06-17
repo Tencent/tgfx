@@ -103,8 +103,8 @@ class InnerShadowStyle : public LayerStyle {
    * content image without any spread adjustment.
    * When positive, the shadow coverage grows inward, making the shadow thicker. When negative,
    * the shadow coverage shrinks, making the shadow thinner. The spread is derived from the layer's
-   * vector shape (e.g. Rect, Oval, or RRect); if the vector shape cannot be extracted, the layer's
-   * bounding rect is used as a fallback.
+   * vector shape (e.g. Rect, Oval, or RRect); when the vector shape cannot be extracted (e.g. a
+   * group layer with only children), the inner shadow spread is skipped rather than drawn.
    */
   float spread() const {
     return _spread;

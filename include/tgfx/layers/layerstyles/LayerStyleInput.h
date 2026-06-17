@@ -77,7 +77,7 @@ class LayerStyleInputSource {
 
  private:
   Type _type = Type::Base;
-  std::shared_ptr<Image> _image = nullptr;
+  std::shared_ptr<Image> _image;
   Point _imageOffset = {};
 };
 
@@ -95,8 +95,8 @@ class LayerStyleInputSourceContour : public LayerStyleInputSource {
   /**
    * Returns the optional content shape of the layer. For styles whose needContourShape() returns
    * true, it is the layer's vector shape (e.g. Rect, Oval, or RRect with fill/stroke info) when
-   * extractable; otherwise the layer's bounding rect is used as a fallback. For styles that do not
-   * need it, this is std::nullopt.
+   * extractable; otherwise it is std::nullopt and no fallback rect is substituted. For styles that
+   * do not need it, this is std::nullopt.
    */
   const std::optional<StyledShape>& shape() const {
     return _shape;
