@@ -727,9 +727,7 @@ void ElementWriter::addBlendColorFilterPrimitives(const ModeColorFilter* modeCol
     ElementWriter floodElement("feFlood", writer);
     auto color = ConvertColorSpace(modeColorFilter->color, _targetColorSpace);
     floodElement.addAttribute("flood-color", ToSVGColor(color));
-    if (!color.isOpaque()) {
-      floodElement.addAttribute("flood-opacity", color.alpha);
-    }
+    floodElement.addAttribute("flood-opacity", color.alpha);
     floodElement.addAttribute("result", "flood");
     std::string cssStyle;
     if (writeColorCSSStyleAttribute("flood-color", color, &cssStyle)) {
