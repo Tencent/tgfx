@@ -89,7 +89,7 @@ std::optional<StyledShape> SolidLayer::onGetContentShape() {
   } else {
     path.addRect(rect);
   }
-  return StyledShape::Make(Shape::MakeFrom(path), true, false, 0, StrokeAlign::Center);
+  return StyledShape::Make(Shape::MakeFrom(path), StyledShapeType::Fill, 0, StrokeAlign::Center);
 }
 
 }  // namespace tgfx

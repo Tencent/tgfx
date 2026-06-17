@@ -21,20 +21,19 @@
 
 namespace tgfx {
 
-StyledShape StyledShape::Make(std::shared_ptr<Shape> shape, bool hasFill, bool hasStroke,
-                              float strokeWidth, StrokeAlign strokeAlign) {
+StyledShape StyledShape::Make(std::shared_ptr<Shape> shape, StyledShapeType type, float strokeWidth,
+                              StrokeAlign strokeAlign) {
   StyledShape result = {};
   result.shape = std::move(shape);
-  if (hasFill && hasStroke) {
-    result.type = StyledShapeType::FillStroke;
-    result.strokeWidth = strokeWidth;
-    result.strokeAlign = strokeAlign;
-  } else if (hasFill) {
-    result.type = StyledShapeType::Fill;
-  } else {
-    result.type = StyledShapeType::Stroke;
-    result.strokeWidth = strokeWidth;
-    result.strokeAlign = strokeAlign;
+  result.type = type;
+  switch (type) {
+    case StyledShapeType::Fill:
+      break;
+    case StyledShapeType::Stroke:
+    case StyledShapeType::FillStroke:
+      result.strokeWidth = strokeWidth;
+      result.strokeAlign = strokeAlign;
+      break;
   }
   return result;
 }

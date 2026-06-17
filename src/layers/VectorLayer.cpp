@@ -129,7 +129,13 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
   auto hasStroke = strokeStyle.has_value();
   auto strokeWidth = hasStroke ? strokeStyle->strokeWidth : 0.0f;
   auto strokeAlign = hasStroke ? strokeStyle->strokeAlign : StrokeAlign::Center;
-  return StyledShape::Make(shape, hasFill, hasStroke, strokeWidth, strokeAlign);
+  auto type = StyledShapeType::FillStroke;
+  if (!hasStroke) {
+    type = StyledShapeType::Fill;
+  } else if (!hasFill) {
+    type = StyledShapeType::Stroke;
+  }
+  return StyledShape::Make(shape, type, strokeWidth, strokeAlign);
 }
 
 }  // namespace tgfx

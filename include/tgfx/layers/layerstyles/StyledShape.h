@@ -48,10 +48,11 @@ enum class StyledShapeType {
  */
 struct StyledShape {
   /**
-   * Builds a StyledShape from the given shape and fill/stroke information.
+   * Builds a StyledShape from the given shape and style type. The strokeWidth and strokeAlign are
+   * stored only when type is Stroke or FillStroke; otherwise they are ignored.
    */
-  static StyledShape Make(std::shared_ptr<Shape> shape, bool hasFill, bool hasStroke,
-                          float strokeWidth, StrokeAlign strokeAlign);
+  static StyledShape Make(std::shared_ptr<Shape> shape, StyledShapeType type, float strokeWidth,
+                          StrokeAlign strokeAlign);
 
   /**
    * Returns the bounding box of the shape in its local coordinate space. For Stroke and FillStroke
