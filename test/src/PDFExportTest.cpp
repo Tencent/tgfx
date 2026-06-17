@@ -24,19 +24,30 @@
 #include "pdf/PDFDocumentImpl.h"
 #include "pdf/PDFTypes.h"
 #include "tgfx/core/Color.h"
+#include "tgfx/core/Font.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Point.h"
+#include "tgfx/core/RRect.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Shader.h"
+#include "tgfx/core/Shape.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/core/TileMode.h"
+#include "tgfx/core/Typeface.h"
 #include "tgfx/core/WriteStream.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/ShapeStyle.h"
+#include "tgfx/layers/TextLayer.h"
+#include "tgfx/layers/filters/BlurFilter.h"
+#include "tgfx/layers/filters/DropShadowFilter.h"
+#include "tgfx/layers/filters/InnerShadowFilter.h"
+#include "tgfx/layers/filters/NoiseFilter.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
+#include "tgfx/layers/layerstyles/InnerShadowStyle.h"
+#include "tgfx/layers/layerstyles/NoiseStyle.h"
 #include "tgfx/pdf/PDFDocument.h"
 #include "tgfx/pdf/PDFMetadata.h"
 #include "tgfx/svg/SVGPathParser.h"
@@ -1269,6 +1280,475 @@ TGFX_TEST(PDFExportTest, PDFStreamOutFallsBackWhenCompressionDoesNotSave) {
                                  "compression path is skipped. declared="
                               << declared << " actual=" << actual;
   EXPECT_EQ(declared, input.size());
+}
+
+TGFX_TEST(PDFExportTest, NoiseEffects) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto fill = Color::FromRGBA(60, 120, 200);
+  constexpr float RectW = 80.f;
+  constexpr float RectH = 80.f;
+  constexpr float GapX = 20.f;
+  constexpr float GapY = 20.f;
+  constexpr float Margin = 40.f;
+  constexpr int Cols = 3;
+  constexpr int Rows = 7;
+
+  auto root = Layer::Make();
+
+  // Helper to create a rect ShapeLayer at (col, row) grid position.
+  auto addRect = [&](int col, int row) {
+    auto shape = ShapeLayer::Make();
+    Path path;
+    path.addRect(Rect::MakeWH(RectW, RectH));
+    shape->setPath(path);
+    shape->setFillStyle(ShapeStyle::Make(fill));
+    float x = Margin + static_cast<float>(col) * (RectW + GapX);
+    float y = Margin + static_cast<float>(row) * (RectH + GapY);
+    shape->setMatrix(Matrix::MakeTrans(x, y));
+    root->addChild(shape);
+    return shape;
+  };
+
+  // Row 1: NoiseFilter only.
+  addRect(0, 0)->setFilters({NoiseFilter::MakeMono(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128),
+                                                   42.0f, BlendMode::SrcOver)});
+  addRect(1, 0)->setFilters(
+      {NoiseFilter::MakeDuo(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128),
+                            Color::FromRGBA(0, 0, 255, 128), 43.0f, BlendMode::SrcOver)});
+  addRect(2, 0)->setFilters({NoiseFilter::MakeMulti(8.0f, 0.5f, 0.5f, 44.0f, BlendMode::SrcOver)});
+
+  // Row 2: NoiseStyle only.
+  addRect(0, 1)->setLayerStyles(
+      {NoiseStyle::MakeMono(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128), 42.0f)});
+  addRect(1, 1)->setLayerStyles({NoiseStyle::MakeDuo(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128),
+                                                     Color::FromRGBA(0, 0, 255, 128), 43.0f)});
+  addRect(2, 1)->setLayerStyles({NoiseStyle::MakeMulti(8.0f, 0.5f, 0.5f, 44.0f)});
+
+  // Row 3: Row 1 filters + BlurFilter / InnerShadowFilter / DropShadowFilter.
+  addRect(0, 2)->setFilters({NoiseFilter::MakeMono(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128),
+                                                   42.0f, BlendMode::SrcOver),
+                             BlurFilter::Make(5.0f, 5.0f)});
+  addRect(1, 2)->setFilters(
+      {NoiseFilter::MakeDuo(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128),
+                            Color::FromRGBA(0, 0, 255, 128), 43.0f, BlendMode::SrcOver),
+       InnerShadowFilter::Make(5.0f, 5.0f, 5.0f, 5.0f, Color::Black())});
+  addRect(2, 2)->setFilters({NoiseFilter::MakeMulti(8.0f, 0.5f, 0.5f, 44.0f, BlendMode::SrcOver),
+                             DropShadowFilter::Make(5.0f, 5.0f, 5.0f, 5.0f, Color::Black())});
+
+  // Row 4: Row 2 styles + BlurFilter / InnerShadowFilter / DropShadowFilter.
+  auto r4c0 = addRect(0, 3);
+  r4c0->setLayerStyles({NoiseStyle::MakeMono(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128), 42.0f)});
+  r4c0->setFilters({BlurFilter::Make(5.0f, 5.0f)});
+
+  auto r4c1 = addRect(1, 3);
+  r4c1->setLayerStyles({NoiseStyle::MakeDuo(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128),
+                                            Color::FromRGBA(0, 0, 255, 128), 43.0f)});
+  r4c1->setFilters({InnerShadowFilter::Make(5.0f, 5.0f, 5.0f, 5.0f, Color::Black())});
+
+  auto r4c2 = addRect(2, 3);
+  r4c2->setLayerStyles({NoiseStyle::MakeMulti(8.0f, 0.5f, 0.5f, 44.0f)});
+  r4c2->setFilters({DropShadowFilter::Make(5.0f, 5.0f, 5.0f, 5.0f, Color::Black())});
+
+  // Row 5: NoiseFilter with different BlendMode.
+  addRect(0, 4)->setFilters({NoiseFilter::MakeMono(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128),
+                                                   42.0f, BlendMode::Multiply)});
+  addRect(1, 4)->setFilters(
+      {NoiseFilter::MakeDuo(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128),
+                            Color::FromRGBA(0, 0, 255, 128), 43.0f, BlendMode::Overlay)});
+  addRect(2, 4)->setFilters({NoiseFilter::MakeMulti(8.0f, 0.5f, 0.5f, 44.0f, BlendMode::Screen)});
+
+  // Row 6: NoiseStyle + DropShadowStyle combination.
+  auto r6c0 = addRect(0, 5);
+  r6c0->setLayerStyles({NoiseStyle::MakeMono(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128), 42.0f),
+                        DropShadowStyle::Make(5.0f, 5.0f, 5.0f, 5.0f, Color::Black())});
+
+  auto r6c1 = addRect(1, 5);
+  r6c1->setLayerStyles({NoiseStyle::MakeDuo(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128),
+                                            Color::FromRGBA(0, 0, 255, 128), 43.0f),
+                        DropShadowStyle::Make(5.0f, 5.0f, 5.0f, 5.0f, Color::Black())});
+
+  auto r6c2 = addRect(2, 5);
+  r6c2->setLayerStyles({NoiseStyle::MakeMulti(8.0f, 0.5f, 0.5f, 44.0f),
+                        DropShadowStyle::Make(5.0f, 5.0f, 5.0f, 5.0f, Color::Black())});
+
+  // Row 7: TextLayer with NoiseFilter / NoiseStyle / both.
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+
+  auto addText = [&](int col, int row) {
+    auto textLayer = TextLayer::Make();
+    textLayer->setText("Noise");
+    textLayer->setTextColor(Color::FromRGBA(60, 120, 200));
+    textLayer->setFont(Font(typeface, 32.f));
+    float x = Margin + static_cast<float>(col) * (RectW + GapX);
+    float y = Margin + static_cast<float>(row) * (RectH + GapY) + 20.f;
+    textLayer->setMatrix(Matrix::MakeTrans(x, y));
+    root->addChild(textLayer);
+    return textLayer;
+  };
+
+  addText(0, 6)->setFilters({NoiseFilter::MakeMono(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128),
+                                                   42.0f, BlendMode::SrcOver)});
+  addText(1, 6)->setLayerStyles({NoiseStyle::MakeDuo(8.0f, 0.5f, Color::FromRGBA(255, 0, 0, 128),
+                                                     Color::FromRGBA(0, 0, 255, 128), 43.0f)});
+
+  auto textBoth = addText(2, 6);
+  textBoth->setLayerStyles({NoiseStyle::MakeMulti(8.0f, 0.5f, 0.5f, 44.0f)});
+  textBoth->setFilters({BlurFilter::Make(3.0f, 3.0f)});
+
+  // Export PDF with 2x pixel density for noise patterns.
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  float pageW = Margin * 2 + Cols * RectW + (Cols - 1) * GapX;
+  float pageH = Margin * 2 + Rows * RectH + (Rows - 1) * GapY;
+  constexpr float pdfDensity = 2.f;
+  auto canvas = document->beginPage(pageW * pdfDensity, pageH * pdfDensity);
+  canvas->scale(pdfDensity, pdfDensity);
+  root->draw(canvas);
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/NoiseEffects"));
+
+  // Render to surface for webp screenshot.
+  auto bounds = root->getBounds(nullptr, true);
+  auto surface = Surface::Make(context, static_cast<int>(bounds.width() + 100.f),
+                               static_cast<int>(bounds.height() + 100.f));
+  ASSERT_TRUE(surface != nullptr);
+  surface->getCanvas()->clear();
+  surface->getCanvas()->translate(-bounds.left + 50.f, -bounds.top + 50.f);
+  root->draw(surface->getCanvas());
+  EXPECT_TRUE(Baseline::Compare(surface, "PDFExportTest/NoiseEffects"));
+}
+
+TGFX_TEST(PDFExportTest, TextLayerStyleAlignment) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto root = Layer::Make();
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+
+  auto addText = [&](float x, float y) {
+    auto textLayer = TextLayer::Make();
+    textLayer->setText("Hello");
+    textLayer->setTextColor(Color::FromRGBA(60, 120, 200));
+    textLayer->setFont(Font(typeface, 40.f));
+    textLayer->setMatrix(Matrix::MakeTrans(x, y));
+    root->addChild(textLayer);
+    return textLayer;
+  };
+
+  // Col 0: TextLayer + DropShadowStyle (Below position)
+  addText(50.f, 50.f)->setLayerStyles({DropShadowStyle::Make(5.f, 5.f, 3.f, 3.f, Color::Black())});
+
+  // Col 1: TextLayer + InnerShadowStyle (Above position) — positioned so half is outside page.
+  addText(350.f, 50.f)
+      ->setLayerStyles({InnerShadowStyle::Make(3.f, 3.f, 3.f, 3.f, Color::Black())});
+
+  // Col 2: TextLayer + NoiseStyle (Above position)
+  addText(50.f, 150.f)
+      ->setLayerStyles({NoiseStyle::MakeMono(8.f, 0.5f, Color::FromRGBA(255, 0, 0, 128), 42.f)});
+
+  // Col 3: TextLayer + DropShadowStyle + NoiseStyle (Below + Above) — half outside page.
+  addText(350.f, 150.f)
+      ->setLayerStyles({DropShadowStyle::Make(5.f, 5.f, 3.f, 3.f, Color::Black()),
+                        NoiseStyle::MakeMono(8.f, 0.5f, Color::FromRGBA(255, 0, 0, 128), 42.f)});
+
+  // Export PDF with fixed page width so right-column text is half inside, half outside.
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  auto bounds = root->getBounds(nullptr, true);
+  float pageW = 400.f;
+  float pageH = bounds.height() + 100.f;
+  auto canvas = document->beginPage(pageW, pageH);
+  canvas->translate(-bounds.left + 50.f, -bounds.top + 50.f);
+  root->draw(canvas);
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/TextLayerStyleAlignment"));
+
+  // Render to surface for webp screenshot, matching page dimensions.
+  auto surface = Surface::Make(context, static_cast<int>(pageW), static_cast<int>(pageH));
+  ASSERT_TRUE(surface != nullptr);
+  surface->getCanvas()->clear();
+  surface->getCanvas()->translate(-bounds.left + 50.f, -bounds.top + 50.f);
+  root->draw(surface->getCanvas());
+  EXPECT_TRUE(Baseline::Compare(surface, "PDFExportTest/TextLayerStyleAlignment"));
+}
+
+TGFX_TEST(PDFExportTest, TextMultiNoiseTransforms) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto root = Layer::Make();
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+
+  auto addText = [&](const std::string& text, const Matrix& matrix) {
+    auto textLayer = TextLayer::Make();
+    textLayer->setText(text);
+    textLayer->setTextColor(Color::FromRGBA(60, 120, 200));
+    textLayer->setFont(Font(typeface, 40.f));
+    textLayer->setMatrix(matrix);
+    textLayer->setAllowsEdgeAntialiasing(false);
+    textLayer->setLayerStyles({NoiseStyle::MakeDuo(8.f, 1.f, Color::FromRGBA(200, 50, 50),
+                                                   Color::FromRGBA(50, 200, 50), 42.f)});
+    root->addChild(textLayer);
+    return textLayer;
+  };
+
+  // Text 1: normal (translation only).
+  addText("Hello", Matrix::MakeTrans(50.f, 50.f));
+
+  // Text 2: rotated 30 degrees around its baseline origin.
+  auto rotMatrix = Matrix::MakeTrans(50.f, 150.f);
+  rotMatrix.preRotate(30.f, 50.f, 150.f);
+  addText("Hello", rotMatrix);
+
+  // Text 3: scaled 1.5x.
+  auto scaleMatrix = Matrix::MakeTrans(50.f, 250.f);
+  scaleMatrix.preScale(1.5f, 1.5f, 50.f, 250.f);
+  addText("Hello", scaleMatrix);
+
+  // Export PDF with 4x pixel density for noise patterns.
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  auto bounds = root->getBounds(nullptr, true);
+  constexpr float pdfDensity = 4.f;
+  float pageW = bounds.width() + 100.f;
+  float pageH = bounds.height() + 100.f;
+  auto canvas = document->beginPage(pageW * pdfDensity, pageH * pdfDensity);
+  canvas->scale(pdfDensity, pdfDensity);
+  canvas->translate(-bounds.left + 50.f, -bounds.top + 50.f);
+  root->draw(canvas);
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/TextMultiNoiseTransforms"));
+
+  // Render to surface for webp screenshot.
+  auto surface = Surface::Make(context, static_cast<int>(bounds.width() + 100.f),
+                               static_cast<int>(bounds.height() + 100.f));
+  ASSERT_TRUE(surface != nullptr);
+  surface->getCanvas()->clear();
+  surface->getCanvas()->translate(-bounds.left + 50.f, -bounds.top + 50.f);
+  root->draw(surface->getCanvas());
+  EXPECT_TRUE(Baseline::Compare(surface, "PDFExportTest/TextMultiNoiseTransforms"));
+
+  // Save the DuoNoise content image for a single text layer.
+  auto noiseRoot = Layer::Make();
+  auto noiseTextLayer = TextLayer::Make();
+  noiseTextLayer->setText("Hello");
+  noiseTextLayer->setTextColor(Color::White());
+  noiseTextLayer->setFont(Font(typeface, 40.f));
+  noiseTextLayer->setAllowsEdgeAntialiasing(false);
+  noiseTextLayer->setLayerStyles({NoiseStyle::MakeDuo(8.f, 1.f, Color::FromRGBA(200, 50, 50),
+                                                      Color::FromRGBA(50, 200, 50), 42.f)});
+  noiseRoot->addChild(noiseTextLayer);
+  auto noiseBounds = noiseRoot->getBounds(nullptr, true);
+  auto noiseSurface = Surface::Make(context, static_cast<int>(noiseBounds.width() + 20.f),
+                                    static_cast<int>(noiseBounds.height() + 20.f));
+  ASSERT_TRUE(noiseSurface != nullptr);
+  noiseSurface->getCanvas()->clear(Color::Black());
+  noiseSurface->getCanvas()->translate(-noiseBounds.left + 10.f, -noiseBounds.top + 10.f);
+  noiseRoot->draw(noiseSurface->getCanvas());
+  EXPECT_TRUE(Baseline::Compare(noiseSurface, "PDFExportTest/DuoNoiseImage"));
+}
+
+TGFX_TEST(PDFExportTest, TextInnerShadow) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto root = Layer::Make();
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_TRUE(typeface != nullptr);
+  Font font(typeface, 60.0f);
+
+  // Text with InnerShadowStyle.
+  auto textLayer = TextLayer::Make();
+  textLayer->setText("text");
+  textLayer->setTextColor(Color::FromRGBA(80, 160, 240));
+  textLayer->setFont(font);
+  textLayer->setLayerStyles({InnerShadowStyle::Make(3.f, 3.f, 3.f, 3.f, Color::Black())});
+  root->addChild(textLayer);
+
+  // Text with DuoNoiseStyle below.
+  auto noiseTextLayer = TextLayer::Make();
+  noiseTextLayer->setText("text");
+  noiseTextLayer->setTextColor(Color::FromRGBA(80, 160, 240));
+  noiseTextLayer->setFont(font);
+  noiseTextLayer->setMatrix(Matrix::MakeTrans(0.f, 80.f));
+  noiseTextLayer->setLayerStyles({NoiseStyle::MakeDuo(8.f, 1.f, Color::FromRGBA(200, 50, 50),
+                                                      Color::FromRGBA(50, 200, 50), 42.f)});
+  root->addChild(noiseTextLayer);
+
+  auto bounds = root->getBounds(nullptr, true);
+
+  // Export PDF with 4x pixel density.
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  constexpr float pdfDensity = 4.f;
+  float pageW = bounds.width() + 100.f;
+  float pageH = bounds.height() + 100.f;
+  auto canvas = document->beginPage(pageW * pdfDensity, pageH * pdfDensity);
+  canvas->scale(pdfDensity, pdfDensity);
+  canvas->translate(-bounds.left + 50.f, -bounds.top + 50.f);
+  root->draw(canvas);
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/TextInnerShadow"));
+
+  // Render to surface for webp screenshot.
+  auto surface = Surface::Make(context, static_cast<int>(bounds.width() + 100.f),
+                               static_cast<int>(bounds.height() + 100.f));
+  ASSERT_TRUE(surface != nullptr);
+  surface->getCanvas()->clear();
+  surface->getCanvas()->translate(-bounds.left + 50.f, -bounds.top + 50.f);
+  root->draw(surface->getCanvas());
+  EXPECT_TRUE(Baseline::Compare(surface, "PDFExportTest/TextInnerShadow"));
+}
+
+TGFX_TEST(PDFExportTest, ShapeNoiseStyle) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto root = Layer::Make();
+  auto noiseStyle = NoiseStyle::MakeMono(8.f, 0.5f, Color::FromRGBA(200, 50, 50, 128), 42.f);
+  constexpr float ShapeW = 100.f;
+  constexpr float ShapeH = 80.f;
+  constexpr float GapX = 30.f;
+  constexpr float GapY = 30.f;
+  constexpr float Margin = 50.f;
+
+  // Row 0: PathContent (custom bezier path)
+  {
+    Path path;
+    path.moveTo(0, ShapeH * 0.5f);
+    path.cubicTo(ShapeW * 0.25f, 0, ShapeW * 0.75f, ShapeH, ShapeW, ShapeH * 0.5f);
+    path.close();
+    auto layer = ShapeLayer::Make();
+    layer->setPath(path);
+    layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(80, 160, 240)));
+    layer->setMatrix(Matrix::MakeTrans(Margin, Margin));
+    layer->setLayerStyles({noiseStyle});
+    root->addChild(layer);
+  }
+
+  // Row 0 col 1: RectContent (addRect)
+  {
+    Path path;
+    path.addRect(Rect::MakeWH(ShapeW, ShapeH));
+    auto layer = ShapeLayer::Make();
+    layer->setPath(path);
+    layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(80, 160, 240)));
+    layer->setMatrix(Matrix::MakeTrans(Margin + static_cast<float>(1) * (ShapeW + GapX), Margin));
+    layer->setLayerStyles({noiseStyle});
+    root->addChild(layer);
+  }
+
+  // Row 0 col 2: RRectContent (addOval)
+  {
+    Path path;
+    path.addOval(Rect::MakeWH(ShapeW, ShapeH));
+    auto layer = ShapeLayer::Make();
+    layer->setPath(path);
+    layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(80, 160, 240)));
+    layer->setMatrix(Matrix::MakeTrans(Margin + static_cast<float>(2) * (ShapeW + GapX), Margin));
+    layer->setLayerStyles({noiseStyle});
+    root->addChild(layer);
+  }
+
+  // Row 1 col 0: ShapeContent (Shape::MakeFrom rect)
+  {
+    Path shapePath;
+    shapePath.addRect(Rect::MakeWH(ShapeW, ShapeH));
+    auto shape = Shape::MakeFrom(shapePath);
+    auto layer = ShapeLayer::Make();
+    layer->setShape(shape);
+    layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(240, 160, 80)));
+    layer->setMatrix(Matrix::MakeTrans(Margin, Margin + static_cast<float>(1) * (ShapeH + GapY)));
+    layer->setLayerStyles({noiseStyle});
+    root->addChild(layer);
+  }
+
+  // Row 1 col 1: ComposeContent (multiple sublayers in a container layer)
+  {
+    auto container = Layer::Make();
+    Path rectPath;
+    rectPath.addRect(Rect::MakeWH(ShapeW * 0.4f, ShapeH));
+    auto sub1 = ShapeLayer::Make();
+    sub1->setPath(rectPath);
+    sub1->setFillStyle(ShapeStyle::Make(Color::FromRGBA(80, 200, 120)));
+    container->addChild(sub1);
+
+    Path rectPath2;
+    rectPath2.addRect(Rect::MakeXYWH(static_cast<float>(ShapeW * 0.6), 0.f,
+                                     static_cast<float>(ShapeW * 0.4), ShapeH));
+    auto sub2 = ShapeLayer::Make();
+    sub2->setPath(rectPath2);
+    sub2->setFillStyle(ShapeStyle::Make(Color::FromRGBA(80, 200, 120)));
+    container->addChild(sub2);
+
+    container->setMatrix(Matrix::MakeTrans(Margin + static_cast<float>(1) * (ShapeW + GapX),
+                                           Margin + static_cast<float>(1) * (ShapeH + GapY)));
+    container->setLayerStyles({noiseStyle});
+    root->addChild(container);
+  }
+
+  // Row 1 col 2: MatrixContent (rotated layer)
+  {
+    Path path;
+    path.addRRect(RRect::MakeRectXY(Rect::MakeWH(ShapeW, ShapeH), 10.f, 10.f));
+    auto layer = ShapeLayer::Make();
+    layer->setPath(path);
+    layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(180, 80, 200)));
+    auto matrix =
+        Matrix::MakeTrans(Margin + static_cast<float>(2) * (ShapeW + GapX) + ShapeW * 0.5f,
+                          Margin + static_cast<float>(1) * (ShapeH + GapY) + ShapeH * 0.5f);
+    matrix.preRotate(15.f);
+    matrix.preTranslate(-ShapeW * 0.5f, -ShapeH * 0.5f);
+    layer->setMatrix(matrix);
+    layer->setLayerStyles({noiseStyle});
+    root->addChild(layer);
+  }
+
+  auto bounds = root->getBounds(nullptr, true);
+
+  // Export PDF.
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  auto canvas = document->beginPage(bounds.width() + 100.f, bounds.height() + 100.f);
+  canvas->translate(-bounds.left + 50.f, -bounds.top + 50.f);
+  root->draw(canvas);
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/ShapeNoiseStyle"));
+
+  // Render to surface for webp screenshot.
+  auto surface = Surface::Make(context, static_cast<int>(bounds.width() + 100.f),
+                               static_cast<int>(bounds.height() + 100.f));
+  ASSERT_TRUE(surface != nullptr);
+  surface->getCanvas()->clear();
+  surface->getCanvas()->translate(-bounds.left + 50.f, -bounds.top + 50.f);
+  root->draw(surface->getCanvas());
+  EXPECT_TRUE(Baseline::Compare(surface, "PDFExportTest/ShapeNoiseStyle"));
 }
 
 }  // namespace tgfx
