@@ -113,9 +113,9 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
     }
   }
 
-  if (sharedGeometry == nullptr) {
-    return std::nullopt;
-  }
+  // sharedGeometry is non-null here: painters is non-empty and the loop above assigns it from
+  // geometries[0] on the first iteration, where every geometry is created via make_unique and is
+  // therefore never null.
   auto shape = sharedGeometry->getShape();
   if (shape == nullptr) {
     return std::nullopt;
