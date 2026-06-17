@@ -118,13 +118,15 @@ void DropShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float
   Point filterSourceOffset = {};
   if (!FloatNearlyZero(_spread)) {
     auto spreadImage = SpreadUtils::MakeSpreadShapeImage(input, _spread);
-    if (spreadImage.collapsed) {
+    // The spread shadow is drawn from the spread shape image. When the vector shape is unavailable
+    // (e.g. a group layer with only children) or exceeds the content image, the spread cannot be
+    // applied; skip drawing rather than falling back, since filterBounds cannot reflect the
+    // fallback geometry.
+    if (spreadImage.collapsed || spreadImage.image == nullptr) {
       return;
     }
-    if (spreadImage.image != nullptr) {
-      filterSource = std::move(spreadImage.image);
-      filterSourceOffset = spreadImage.offset;
-    }
+    filterSource = std::move(spreadImage.image);
+    filterSourceOffset = spreadImage.offset;
   }
   DEBUG_ASSERT(filterSource != nullptr);
   if (filterSource == nullptr) {

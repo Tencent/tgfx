@@ -54,6 +54,12 @@ struct StyledShape {
                           float strokeWidth, StrokeAlign strokeAlign);
 
   /**
+   * Returns the bounding box of the shape in its local coordinate space. For Stroke and FillStroke
+   * types, the bounds include the outward expansion caused by the stroke width and alignment.
+   */
+  Rect getBounds() const;
+
+  /**
    * The original vector shape.
    */
   std::shared_ptr<Shape> shape = nullptr;

@@ -148,6 +148,17 @@ SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInpu
   if (styledShape.shape == nullptr || styledShape.shape->getPath().isEmpty()) {
     return {nullptr, {}, false};
   }
+  // The contentShape footprint must stay within the content image; a shape exceeding it cannot be
+  // represented in the output and is treated as unavailable.
+  auto shapeBounds = styledShape.getBounds();
+  shapeBounds.scale(input.contentScale, input.contentScale);
+  auto contentBounds = Rect::MakeXYWH(input.contentOffset.x, input.contentOffset.y,
+                                      static_cast<float>(input.content->width()),
+                                      static_cast<float>(input.content->height()));
+  DEBUG_ASSERT(contentBounds.contains(shapeBounds));
+  if (!contentBounds.contains(shapeBounds)) {
+    return {nullptr, {}, false};
+  }
   auto [shape, shapeMatrix] = UnwrapMatrixShape(styledShape.shape);
   DEBUG_ASSERT(shape != nullptr);
   if (shape == nullptr) {
@@ -175,7 +186,9 @@ SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInpu
     DrawSpreadRRect(recordCanvas, rRect, type, strokeAlign, strokeWidth, spread);
   } else {
     if (!path.isRect(&rect)) {
-      // Complex paths use their bounding rect as a fill approximation for the shadow source.
+      // Complex paths use their bounding rect as a fill approximation for the shadow source. A
+      // collapsed stroke is already rejected by IsSpreadCollapsed above, so any stroke reaching
+      // here is non-collapsed and safe to approximate as a fill.
       rect = path.getBounds();
       if (type == StyledShapeType::Stroke || type == StyledShapeType::FillStroke) {
         auto outset = SpreadUtils::StrokeOutset(strokeWidth, styledShape.strokeAlign);

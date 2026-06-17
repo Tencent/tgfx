@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/layerstyles/StyledShape.h"
+#include "layers/SpreadUtils.h"
 
 namespace tgfx {
 
@@ -36,6 +37,15 @@ StyledShape StyledShape::Make(std::shared_ptr<Shape> shape, bool hasFill, bool h
     result.strokeAlign = strokeAlign;
   }
   return result;
+}
+
+Rect StyledShape::getBounds() const {
+  auto bounds = shape->getPath().getBounds();
+  if (type == StyledShapeType::Stroke || type == StyledShapeType::FillStroke) {
+    const auto outset = SpreadUtils::StrokeOutset(strokeWidth, strokeAlign);
+    bounds.outset(outset, outset);
+  }
+  return bounds;
 }
 
 }  // namespace tgfx
