@@ -174,7 +174,7 @@ blur=5, spread=10
 <h2>Key Observations</h2>
 <ul style="font-size:13px; line-height:1.8;">
   <li><strong>CSS box-shadow spread on ring (border)</strong>: spread outsets the BOX shape, not the ring shape. The shadow is a solid ellipse outset by spread, not a ring with adjusted radii.</li>
-  <li><strong>Figma spread on ring</strong>: outer circle expands AND inner hole shrinks — this is dilate behavior on the alpha channel.</li>
+  <li><strong>Figma spread on ring</strong>: outer circle expands AND inner hole shrinks — this is a geometric outset on the shape (outer radius +spread, inner radius -spread), NOT an alpha-channel dilate. A pixel dilate would turn the circle into a rounded rectangle.</li>
   <li><strong>Figma spread on image fill</strong>: shadow becomes a solid rectangle — uses frame bounds, not content alpha.</li>
   <li><strong>CSS has no equivalent</strong> to Figma's ring spread behavior. box-shadow ignores border shape, drop-shadow has no spread.</li>
 </ul>
