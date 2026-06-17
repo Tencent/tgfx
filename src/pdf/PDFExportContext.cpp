@@ -525,12 +525,28 @@ void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const Matr
     GlyphPositioner glyphPositioner(out, glyphRunFont.getMetrics().leading, offset);
     PDFFont* font = nullptr;
 
+    // Use clip bounds to cull glyphs outside the visible area, preventing ghost text in the PDF
+    // text layer that would otherwise be selectable but visually invisible.
+    const auto clipStackBounds =
+        clip.state() == ClipState::WideOpen ? Rect::MakeSize(_pageSize) : clip.bounds();
+
     for (size_t index = 0; index < glyphRun.glyphCount; ++index) {
       auto glyphID = glyphRun.glyphs[index];
       if (numGlyphs <= glyphID) {
         continue;
       }
       auto xy = GetGlyphPosition(glyphRun, index);
+      // Skip glyphs outside the clip region to keep visual and text layers consistent.
+      auto glyphBounds = glyphRunFont.getBounds(glyphID);
+      glyphBounds.scale(advanceScale, advanceScale);
+      glyphBounds.offset(xy + offset);
+      matrix.mapRect(&glyphBounds);
+      if (!glyphBounds.isEmpty() && !Rect::Intersects(clipStackBounds, glyphBounds)) {
+        continue;
+      }
+      if (glyphBounds.isEmpty() && !clipStackBounds.contains(glyphBounds.x(), glyphBounds.y())) {
+        continue;
+      }
 
       glyphPositioner.flush();
       out->writeText("/Span<</ActualText ");

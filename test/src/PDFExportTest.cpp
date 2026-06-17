@@ -1447,24 +1447,26 @@ TGFX_TEST(PDFExportTest, TextLayerStyleAlignment) {
   // Col 0: TextLayer + DropShadowStyle (Below position)
   addText(50.f, 50.f)->setLayerStyles({DropShadowStyle::Make(5.f, 5.f, 3.f, 3.f, Color::Black())});
 
-  // Col 1: TextLayer + InnerShadowStyle (Above position)
-  addText(250.f, 50.f)
+  // Col 1: TextLayer + InnerShadowStyle (Above position) — positioned so half is outside page.
+  addText(350.f, 50.f)
       ->setLayerStyles({InnerShadowStyle::Make(3.f, 3.f, 3.f, 3.f, Color::Black())});
 
   // Col 2: TextLayer + NoiseStyle (Above position)
   addText(50.f, 150.f)
       ->setLayerStyles({NoiseStyle::MakeMono(8.f, 0.5f, Color::FromRGBA(255, 0, 0, 128), 42.f)});
 
-  // Col 3: TextLayer + DropShadowStyle + NoiseStyle (Below + Above)
-  addText(250.f, 150.f)
+  // Col 3: TextLayer + DropShadowStyle + NoiseStyle (Below + Above) — half outside page.
+  addText(350.f, 150.f)
       ->setLayerStyles({DropShadowStyle::Make(5.f, 5.f, 3.f, 3.f, Color::Black()),
                         NoiseStyle::MakeMono(8.f, 0.5f, Color::FromRGBA(255, 0, 0, 128), 42.f)});
 
-  // Export PDF.
+  // Export PDF with fixed page width so right-column text is half inside, half outside.
   auto PDFStream = MemoryWriteStream::Make();
   auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
   auto bounds = root->getBounds(nullptr, true);
-  auto canvas = document->beginPage(bounds.width() + 100.f, bounds.height() + 100.f);
+  float pageW = 400.f;
+  float pageH = bounds.height() + 100.f;
+  auto canvas = document->beginPage(pageW, pageH);
   canvas->translate(-bounds.left + 50.f, -bounds.top + 50.f);
   root->draw(canvas);
   document->endPage();
@@ -1473,9 +1475,8 @@ TGFX_TEST(PDFExportTest, TextLayerStyleAlignment) {
 
   EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/TextLayerStyleAlignment"));
 
-  // Render to surface for webp screenshot.
-  auto surface = Surface::Make(context, static_cast<int>(bounds.width() + 100.f),
-                               static_cast<int>(bounds.height() + 100.f));
+  // Render to surface for webp screenshot, matching page dimensions.
+  auto surface = Surface::Make(context, static_cast<int>(pageW), static_cast<int>(pageH));
   ASSERT_TRUE(surface != nullptr);
   surface->getCanvas()->clear();
   surface->getCanvas()->translate(-bounds.left + 50.f, -bounds.top + 50.f);
