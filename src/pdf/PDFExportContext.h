@@ -167,7 +167,6 @@ class PDFExportContext : public DrawContext {
   void drawPathWithFilter(const Matrix& matrix, const ClipStack& clip, const Path& originPath,
                           const Matrix& pathExtraMatrix, const Brush& originPaint);
 
-
   ISize _pageSize = {};
   PDFDocumentImpl* document = nullptr;
   Matrix _initialTransform = {};

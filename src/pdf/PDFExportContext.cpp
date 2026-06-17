@@ -1471,6 +1471,4 @@ void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack&
   clearMaskOnGraphicState(contentEntry.stream());
 }
 
-
-
 }  // namespace tgfx
