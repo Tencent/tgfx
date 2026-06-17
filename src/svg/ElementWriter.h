@@ -18,7 +18,10 @@
 
 #pragma once
 
+#include <vector>
 #include "ResourceStore.h"
+#include "core/filters/BlendImageFilter.h"
+#include "core/filters/ColorImageFilter.h"
 #include "core/filters/DropShadowImageFilter.h"
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/filters/InnerShadowImageFilter.h"
@@ -79,6 +82,16 @@ class ElementWriter {
                                    const std::shared_ptr<SVGCustomWriter>& exportWriter);
 
   /**
+   * Emits SVG <filter> resources for the given image filter and returns all filter IDs. For a
+   * Compose filter, each sub-filter gets its own <filter> element, and all IDs are returned in
+   * application order (innermost first). The caller can use these IDs to create nested <g>
+   * elements. Must be called within a parent <defs> element.
+   */
+  std::vector<std::string> addImageFilterChain(
+      const std::shared_ptr<ImageFilter>& imageFilter, Rect bound,
+      const std::shared_ptr<SVGCustomWriter>& exportWriter);
+
+  /**
    * Emits an SVG <filter> resource that reproduces the given color filter and returns its
    * Resources::filter url. Returns empty Resources::filter when the color filter type cannot be
    * expressed as a vector SVG filter, in which case the caller must rasterize. Must be called
@@ -101,6 +114,12 @@ class ElementWriter {
 
   void addMatrixColorFilterResources(const MatrixColorFilter* matrixColorFilter,
                                      Resources* resources);
+
+  void addMatrixColorFilterPrimitives(const MatrixColorFilter* matrixColorFilter);
+
+  void addBlendColorFilterPrimitives(const ModeColorFilter* modeColorFilter);
+
+  bool addColorFilterPrimitives(const std::shared_ptr<ColorFilter>& colorFilter);
 
   void addMaskResources(const std::shared_ptr<MaskFilter>& maskFilter, Resources* resources,
                         Context* context, SVGExportContext* svgContext);
@@ -135,10 +154,18 @@ class ElementWriter {
   void callbackInnerShadowImageFilter(const InnerShadowImageFilter* filter,
                                       const std::shared_ptr<SVGCustomWriter>& exportWriter,
                                       ElementWriter& filterElement);
+  void callbackColorImageFilter(const ColorImageFilter* filter,
+                                const std::shared_ptr<SVGCustomWriter>& exportWriter,
+                                ElementWriter& filterElement);
+  void callbackBlendImageFilter(const BlendImageFilter* filter,
+                                const std::shared_ptr<SVGCustomWriter>& exportWriter,
+                                ElementWriter& filterElement);
   void addHardAlphaElement();
   void addBlurImageFilter(const GaussianBlurImageFilter* filter);
   void addDropShadowImageFilter(const DropShadowImageFilter* filter);
   void addInnerShadowImageFilter(const InnerShadowImageFilter* filter);
+  void addColorImageFilter(const ColorImageFilter* filter);
+  void addBlendImageFilter(const BlendImageFilter* filter);
 
   void reportUnsupportedElement(const char* message) const;
 
