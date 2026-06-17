@@ -107,6 +107,10 @@ Rect DropShadowStyle::filterBounds(const Rect& srcRect, float contentScale) {
   return filter->filterBounds(bounds);
 }
 
+bool DropShadowStyle::needContourShape() const {
+  return !FloatNearlyZero(_spread);
+}
+
 void DropShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alpha,
                              BlendMode blendMode) {
   Point offset = {};

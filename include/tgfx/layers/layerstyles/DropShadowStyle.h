@@ -142,9 +142,7 @@ class DropShadowStyle : public LayerStyle {
     return !_showBehindLayer;
   }
 
-  bool needContourShape() const override {
-    return _spread != 0.0f;
-  }
+  bool needContourShape() const override;
 
  protected:
   void onDraw(Canvas* canvas, const LayerStyleInput& input, float alpha,
