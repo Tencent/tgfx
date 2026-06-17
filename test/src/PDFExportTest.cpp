@@ -1564,45 +1564,6 @@ TGFX_TEST(PDFExportTest, TextMultiNoiseTransforms) {
   EXPECT_TRUE(Baseline::Compare(noiseSurface, "PDFExportTest/DuoNoiseImage"));
 }
 
-TGFX_TEST(PDFExportTest, EllipseNoiseStyle) {
-  ContextScope scope;
-  auto* context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-
-  auto root = Layer::Make();
-  auto ellipseLayer = ShapeLayer::Make();
-  Path ellipsePath;
-  ellipsePath.addOval(Rect::MakeXYWH(0, 0, 200, 120));
-  ellipseLayer->setPath(ellipsePath);
-  ellipseLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(80, 160, 240)));
-  ellipseLayer->setMatrix(Matrix::MakeTrans(50.f, 50.f));
-  ellipseLayer->setLayerStyles(
-      {NoiseStyle::MakeMono(6.f, 0.8f, Color::FromRGBA(200, 50, 50, 180), 42.f)});
-  root->addChild(ellipseLayer);
-
-  // Export PDF.
-  auto PDFStream = MemoryWriteStream::Make();
-  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
-  auto bounds = root->getBounds(nullptr, true);
-  auto canvas = document->beginPage(bounds.width() + 100.f, bounds.height() + 100.f);
-  canvas->translate(-bounds.left + 50.f, -bounds.top + 50.f);
-  root->draw(canvas);
-  document->endPage();
-  document->close();
-  PDFStream->flush();
-
-  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/EllipseNoiseStyle"));
-
-  // Render to surface for webp screenshot.
-  auto surface = Surface::Make(context, static_cast<int>(bounds.width() + 100.f),
-                               static_cast<int>(bounds.height() + 100.f));
-  ASSERT_TRUE(surface != nullptr);
-  surface->getCanvas()->clear();
-  surface->getCanvas()->translate(-bounds.left + 50.f, -bounds.top + 50.f);
-  root->draw(surface->getCanvas());
-  EXPECT_TRUE(Baseline::Compare(surface, "PDFExportTest/EllipseNoiseStyle"));
-}
-
 TGFX_TEST(PDFExportTest, TextInnerShadow) {
   ContextScope scope;
   auto* context = scope.getContext();

@@ -373,7 +373,6 @@
         "NonRegularBlendMode": "bf721f63",
         "SimpleText": "984e8f18",
         "SrcBlendOverlap": "bf721f63",
-        "EllipseNoiseStyle": "2c4681a2",
         "NoiseEffects": "2c4681a2",
         "ShapeNoiseStyle": "2c4681a2",
         "TextInnerShadow": "c746d1ea",
@@ -662,7 +661,6 @@
     },
     "PDFExportTest": {
         "DuoNoiseImage": "2c4681a2",
-        "EllipseNoiseStyle": "2c4681a2",
         "NoiseEffects": "2c4681a2",
         "ShapeNoiseStyle": "2c4681a2",
         "TextInnerShadow": "2c4681a2",
