@@ -501,7 +501,7 @@ void ElementWriter::callbackColorImageFilter(const ColorImageFilter* filter,
 void ElementWriter::callbackBlendImageFilter(const BlendImageFilter* filter,
                                              const std::shared_ptr<SVGCustomWriter>& exportWriter,
                                              ElementWriter& filterElement) {
-  if (!exportWriter) {
+  if (!exportWriter || !filter->shader) {
     return;
   }
   auto attribute = exportWriter->writeBlendImageFilter(filter->blendMode, filter->shader);
