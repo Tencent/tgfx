@@ -1471,49 +1471,6 @@ void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack&
   clearMaskOnGraphicState(contentEntry.stream());
 }
 
-Path PDFExportContext::ExtractClipPathFromPicture(const std::shared_ptr<Picture>& picture,
-                                                  const Matrix& imageMatrix) {
-  Path combined = {};
-  Matrix currentMatrix = Matrix::I();
-  for (const auto& record : picture->records) {
-    if (record->type() == PictureRecordType::SetMatrix) {
-      const auto* setMatrix = static_cast<const SetMatrix*>(record.get());
-      currentMatrix = setMatrix->matrix;
-    } else if (record->type() == PictureRecordType::DrawTextBlob) {
-      const auto* drawText = static_cast<const DrawTextBlob*>(record.get());
-      for (auto glyphRun : *drawText->textBlob) {
-        auto shapePath = GetGlyphRunPath(glyphRun, currentMatrix.getMaxScale());
-        if (!shapePath.isEmpty()) {
-          shapePath.transform(currentMatrix);
-          combined.addPath(shapePath);
-        }
-      }
-    } else if (record->type() == PictureRecordType::DrawRect) {
-      const auto* drawRect = static_cast<const DrawRect*>(record.get());
-      Path rectPath;
-      rectPath.addRect(drawRect->rect);
-      rectPath.transform(currentMatrix);
-      combined.addPath(rectPath);
-    } else if (record->type() == PictureRecordType::DrawRRect) {
-      const auto* drawRRect = static_cast<const DrawRRect*>(record.get());
-      Path rrectPath;
-      rrectPath.addRRect(drawRRect->rRect);
-      rrectPath.transform(currentMatrix);
-      combined.addPath(rrectPath);
-    } else if (record->type() == PictureRecordType::DrawPath) {
-      const auto* drawPath = static_cast<const DrawPath*>(record.get());
-      Path pathCopy = drawPath->path;
-      pathCopy.transform(currentMatrix);
-      combined.addPath(pathCopy);
-    } else if (record->type() == PictureRecordType::DrawShape) {
-      const auto* drawShape = static_cast<const DrawShape*>(record.get());
-      auto shapePath = drawShape->shape->getPath();
-      shapePath.transform(currentMatrix);
-      combined.addPath(shapePath);
-    }
-  }
-  combined.transform(imageMatrix);
-  return combined;
-}
+
 
 }  // namespace tgfx
