@@ -30,16 +30,6 @@
 
 namespace tgfx {
 
-static inline std::pair<std::shared_ptr<Shape>, Matrix> UnwrapMatrixShape(
-    std::shared_ptr<Shape> shape) {
-  auto matrix = Matrix::I();
-  while (auto* ms = ShapeUtils::AsMatrixShape(shape.get())) {
-    matrix.preConcat(ms->matrix);
-    shape = ms->shape;
-  }
-  return {std::move(shape), matrix};
-}
-
 static inline RRect MakeSpreadRRect(const RRect& rRect, float distance) {
   auto bounds = rRect.rect();
   bounds.outset(distance, distance);
@@ -68,6 +58,16 @@ float SpreadUtils::StrokeOutset(float width, StrokeAlign align) {
       return 0.0f;
   }
   return 0.0f;
+}
+
+std::pair<std::shared_ptr<Shape>, Matrix> SpreadUtils::UnwrapMatrixShape(
+    std::shared_ptr<Shape> shape) {
+  auto matrix = Matrix::I();
+  while (auto* ms = ShapeUtils::AsMatrixShape(shape.get())) {
+    matrix.preConcat(ms->matrix);
+    shape = ms->shape;
+  }
+  return {std::move(shape), matrix};
 }
 
 static inline void DrawSpreadRRect(Canvas* canvas, const RRect& rRect, StyledShapeType type,

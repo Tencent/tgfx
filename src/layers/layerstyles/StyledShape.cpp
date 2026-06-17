@@ -40,12 +40,13 @@ StyledShape StyledShape::Make(std::shared_ptr<Shape> shape, bool hasFill, bool h
 }
 
 Rect StyledShape::getBounds() const {
-  auto bounds = shape->getPath().getBounds();
+  auto [innerShape, matrix] = SpreadUtils::UnwrapMatrixShape(shape);
+  auto bounds = innerShape->getPath().getBounds();
   if (type == StyledShapeType::Stroke || type == StyledShapeType::FillStroke) {
     const auto outset = SpreadUtils::StrokeOutset(strokeWidth, strokeAlign);
     bounds.outset(outset, outset);
   }
-  return bounds;
+  return matrix.mapRect(bounds);
 }
 
 }  // namespace tgfx
