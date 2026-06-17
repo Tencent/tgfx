@@ -225,12 +225,9 @@ static inline std::optional<StyledShape> MakeContentShape(LayerContent* content)
     return std::nullopt;
   }
 
-  StyledShape styledShape = {};
   Path path = {};
   path.addRect(bounds);
-  styledShape.shape = Shape::MakeFrom(path);
-  styledShape.type = StyledShapeType::Fill;
-  return styledShape;
+  return StyledShape::Make(Shape::MakeFrom(path), true, false, 0, StrokeAlign::Center);
 }
 
 bool Layer::DefaultAllowsEdgeAntialiasing() {
