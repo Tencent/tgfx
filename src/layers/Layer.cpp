@@ -1777,14 +1777,12 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
 
   // Collect which excludeChildEffects values need content and/or contour.
   bool needContent[2] = {false, false};
-  bool needContourImage[2] = {false, false};
-  bool needContourShape = false;
+  bool needContour[2] = {false, false};
   for (const auto& layerStyle : _layerStyles) {
     auto index = static_cast<int>(layerStyle->excludeChildEffects());
     needContent[index] = true;
     if (layerStyle->extraSourceType() == LayerStyleExtraSourceType::Contour) {
-      needContourImage[index] |= layerStyle->needContourImage();
-      needContourShape |= layerStyle->needContourShape();
+      needContour[index] = true;
     }
   }
 
@@ -1797,14 +1795,14 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   drawArgs.backgroundHandler = BackgroundHandler::NoOp();
 
   for (int i = 0; i < 2; i++) {
-    if (!needContent[i] && !needContourImage[i]) {
+    if (!needContent[i] && !needContour[i]) {
       continue;
     }
     drawArgs.excludeEffects = static_cast<bool>(i);
     auto group = std::make_unique<LayerStyleSourceGroup>();
 
     bool allContourMatch = false;
-    if (needContourImage[i]) {
+    if (needContour[i]) {
       LayerStyleSourceEntry contourEntry = {};
       contourEntry.image =
           getContentContourImage(drawArgs, contentScale, &contourEntry.offset, &allContourMatch);
@@ -1834,7 +1832,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
     source->groups[i] = std::move(group);
   }
 
-  if (needContourShape) {
+  if (needContour[0] || needContour[1]) {
     source->contentShape = getContentShape();
   }
 
@@ -1936,22 +1934,20 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
   auto matrix = Matrix::MakeScale(1.f / source->contentScale, 1.f / source->contentScale);
   matrix.preTranslate(contentEntry.offset.x, contentEntry.offset.y);
   canvas->concat(matrix);
-  LayerStyleInput drawSource = {};
-  drawSource.content = contentEntry.image;
-  drawSource.contentOffset = contentEntry.offset;
-  drawSource.contentScale = source->contentScale;
+  LayerStyleInput styleInput = {};
+  styleInput.content = contentEntry.image;
+  styleInput.contentOffset = contentEntry.offset;
+  styleInput.contentScale = source->contentScale;
   if (layerStyle->extraSourceType() == LayerStyleExtraSourceType::Contour) {
-    DEBUG_ASSERT(!layerStyle->needContourImage() || group->contour.has_value());
-    auto contourImage = layerStyle->needContourImage() ? group->contour->image : nullptr;
+    auto contourImage = group->contour.has_value() ? group->contour->image : nullptr;
     auto contourOffset =
         contourImage ? group->contour->offset - contentEntry.offset : Point::Zero();
     // contour shape may be nullopt when the layer has no simple vector content (e.g. a group
     // layer with only children).
-    auto contourShape = layerStyle->needContourShape() ? source->contentShape : std::nullopt;
-    drawSource.extraSource = std::make_shared<LayerStyleInputSourceContour>(
-        std::move(contourImage), contourOffset, std::move(contourShape));
+    styleInput.extraSource = std::make_shared<LayerStyleInputSourceContour>(
+        std::move(contourImage), contourOffset, source->contentShape);
   }
-  layerStyle->draw(canvas, drawSource, alpha);
+  layerStyle->draw(canvas, styleInput, alpha);
 }
 
 bool Layer::getLayersUnderPointInternal(float x, float y,

@@ -145,26 +145,6 @@ class LayerStyle : public LayerProperty {
   }
 
   /**
-   * Returns whether this layer style needs the contour image of the layer for drawing. Only
-   * meaningful when extraSourceType() returns Contour. When true, the layer rasterizes the contour
-   * image and provides it through the contour input source. The default value is false.
-   */
-  virtual bool needContourImage() const {
-    return false;
-  }
-
-  /**
-   * Returns whether this layer style needs the contour shape of the layer for drawing. Only
-   * meaningful when extraSourceType() returns Contour. When true, the layer attempts to extract its
-   * vector shape (e.g. Rect, Oval, or RRect) from the content; if the shape cannot be extracted
-   * (e.g. a group layer with only children), it is unavailable (std::nullopt) and no fallback rect
-   * is substituted. The default value is false.
-   */
-  virtual bool needContourShape() const {
-    return false;
-  }
-
-  /**
    * Draws this layer style onto the canvas using the provided input data.
    * @param canvas The canvas to draw the layer style on.
    * @param input The input data for this layer style.

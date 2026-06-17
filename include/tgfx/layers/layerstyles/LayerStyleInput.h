@@ -93,10 +93,9 @@ class LayerStyleInputSourceContour : public LayerStyleInputSource {
   }
 
   /**
-   * Returns the optional content shape of the layer. For styles whose needContourShape() returns
-   * true, it is the layer's vector shape (e.g. Rect, Oval, or RRect with fill/stroke info) when
-   * extractable; otherwise it is std::nullopt and no fallback rect is substituted. For styles that
-   * do not need it, this is std::nullopt.
+   * Returns the optional content shape of the layer. It is the layer's vector shape (e.g. Rect,
+   * Oval, or RRect with fill/stroke info) when extractable; otherwise it is std::nullopt and no
+   * fallback rect is substituted.
    */
   const std::optional<StyledShape>& shape() const {
     return _shape;

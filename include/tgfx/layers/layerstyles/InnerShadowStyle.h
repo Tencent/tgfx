@@ -125,8 +125,6 @@ class InnerShadowStyle : public LayerStyle {
     return LayerStyleExtraSourceType::Contour;
   }
 
-  bool needContourShape() const override;
-
  private:
   InnerShadowStyle(float offsetX, float offsetY, float blurrinessX, float blurrinessY,
                    const Color& color);

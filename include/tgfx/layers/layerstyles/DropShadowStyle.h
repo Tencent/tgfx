@@ -139,12 +139,6 @@ class DropShadowStyle : public LayerStyle {
     return LayerStyleExtraSourceType::Contour;
   }
 
-  bool needContourImage() const override {
-    return !_showBehindLayer;
-  }
-
-  bool needContourShape() const override;
-
  protected:
   void onDraw(Canvas* canvas, const LayerStyleInput& input, float alpha,
               BlendMode blendMode) override;
