@@ -25,6 +25,7 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RenderContext.h"
+#include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/Window.h"
 
 namespace tgfx {
@@ -218,9 +219,14 @@ std::shared_ptr<SurfaceReadback> Surface::asyncReadPixels(const Rect& rect) {
   auto renderTarget = renderContext->renderTarget;
   auto srcRect = renderTarget->getOriginTransform().mapRect(rect);
   auto colorType = PixelFormatToColorType(renderTarget->format());
-  auto info = ImageInfo::Make(static_cast<int>(srcRect.width()), static_cast<int>(srcRect.height()),
-                              colorType, AlphaType::Premultiplied, 0, colorSpace());
   auto context = renderTarget->getContext();
+  auto rowBytes = static_cast<size_t>(srcRect.width()) * ImageInfo::GetBytesPerPixel(colorType);
+  auto alignment = static_cast<size_t>(context->gpu()->limits()->minBufferCopyRowAlignment);
+  if (alignment > 1) {
+    rowBytes = (rowBytes + alignment - 1) & ~(alignment - 1);
+  }
+  auto info = ImageInfo::Make(static_cast<int>(srcRect.width()), static_cast<int>(srcRect.height()),
+                              colorType, AlphaType::Premultiplied, rowBytes, colorSpace());
   auto readbackBuffer = context->proxyProvider()->createReadbackBufferProxy(info.byteSize());
   if (readbackBuffer == nullptr) {
     return nullptr;
@@ -237,9 +243,6 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
     return false;
   }
   dstPixels = dstInfo.computeOffset(dstPixels, -srcX, -srcY);
-  auto colorType = PixelFormatToColorType(renderTarget->format());
-  auto srcInfo = ImageInfo::Make(outInfo.width(), outInfo.height(), colorType,
-                                 AlphaType::Premultiplied, 0, colorSpace());
   auto readX = std::max(0, srcX);
   auto readY = std::max(0, srcY);
   auto rect = Rect::MakeXYWH(readX, readY, outInfo.width(), outInfo.height());
@@ -253,6 +256,8 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
     return false;
   }
   auto flipY = renderTarget->origin() == ImageOrigin::BottomLeft;
+  // Use the readback's ImageInfo which has the correct aligned rowBytes for GPU buffer layout.
+  auto srcInfo = readback->info();
   CopyPixels(srcInfo, srcPixels, outInfo, dstPixels, flipY);
   readback->unlockPixels(context);
   return true;

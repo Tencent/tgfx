@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.13)
 project(TGFXWebTest)
 
+include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/check_emscripten.cmake)
+
 set(CMAKE_CXX_STANDARD 17)
 
 if (NOT CMAKE_BUILD_TYPE)
@@ -18,6 +20,7 @@ set(TGFX_BUILD_HELLO2D ON)
 set(TGFX_USE_FREETYPE ON)
 # Web platform only enables WEBP decode by default. Enable encode for baseline image generation.
 set(TGFX_USE_WEBP_ENCODE ON)
+set(TGFX_USE_JPEG_ENCODE ON)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 # Include vendor.cmake before add_subdirectory so that vendor variables (VENDOR_TOOLS_DIR,
 # PLATFORM, ARCH, etc.) are set in this scope. The include_guard(GLOBAL) in vendor.cmake
@@ -26,21 +29,38 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/vendor_tools/vendor.cmake)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../.. ./tgfx)
 
 # Collect test sources (reuse existing tests)
-file(GLOB_RECURSE TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/*.*)
+file(GLOB_RECURSE TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/*.*)
 
 # Exclude platform-specific directories
-file(GLOB_RECURSE TEST_METAL_FILES ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/metal/*.*)
-file(GLOB_RECURSE TEST_OPENGL_FILES ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/opengl/*.*)
+file(GLOB_RECURSE TEST_METAL_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/metal/*.*)
+file(GLOB_RECURSE TEST_OPENGL_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/opengl/*.*)
+file(GLOB_RECURSE TEST_VULKAN_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/vulkan/*.*)
 if (TEST_METAL_FILES)
     list(REMOVE_ITEM TEST_SOURCES ${TEST_METAL_FILES})
 endif ()
 if (TEST_OPENGL_FILES)
     list(REMOVE_ITEM TEST_SOURCES ${TEST_OPENGL_FILES})
 endif ()
+if (TEST_VULKAN_FILES)
+    list(REMOVE_ITEM TEST_SOURCES ${TEST_VULKAN_FILES})
+endif ()
 
-# Include WebGL-specific test sources
-file(GLOB_RECURSE TEST_WEBGL_FILES ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/webgl/*.*)
-list(APPEND TEST_SOURCES ${TEST_WEBGL_FILES})
+# Include backend-specific test sources
+if (TGFX_USE_WEBGPU)
+    file(GLOB_RECURSE TEST_WEBGL_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/webgl/*.*)
+    if (TEST_WEBGL_FILES)
+        list(REMOVE_ITEM TEST_SOURCES ${TEST_WEBGL_FILES})
+    endif ()
+    file(GLOB_RECURSE TEST_WEBGPU_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/webgpu/*.*)
+    list(APPEND TEST_SOURCES ${TEST_WEBGPU_FILES})
+else ()
+    file(GLOB_RECURSE TEST_WEBGPU_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/webgpu/*.*)
+    if (TEST_WEBGPU_FILES)
+        list(REMOVE_ITEM TEST_SOURCES ${TEST_WEBGPU_FILES})
+    endif ()
+    file(GLOB_RECURSE TEST_WEBGL_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/webgl/*.*)
+    list(APPEND TEST_SOURCES ${TEST_WEBGL_FILES})
+endif ()
 
 # Exclude TestMain.cpp since web uses WebTestRunner.cpp as entry point
 list(FILTER TEST_SOURCES EXCLUDE REGEX ".*/TestMain\\.cpp$")
@@ -60,7 +80,7 @@ if (TEST_EXCLUDE_FILES)
 endif ()
 
 # Web test adapter sources
-file(GLOB WEB_TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
+file(GLOB WEB_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 
 # Build Google Test and harfbuzz
 add_vendor_target(test-vendor STATIC_VENDORS harfbuzz googletest CONFIG_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../..)
@@ -75,29 +95,67 @@ execute_process(COMMAND git rev-parse --short HEAD
     OUTPUT_VARIABLE HEAD_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE)
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/HEAD "${HEAD_COMMIT}")
 
-# Preload web-specific baseline cache if it exists locally (from a previous test run download).
-set(CACHE_WEB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../test/baseline/.cache-web)
-set(PRELOAD_CACHE_WEB "")
-if (EXISTS ${CACHE_WEB_DIR}/md5.json AND EXISTS ${CACHE_WEB_DIR}/version.json)
-    set(PRELOAD_CACHE_WEB
-        "SHELL:--preload-file ${CACHE_WEB_DIR}/md5.json@/test/baseline/.cache-web/md5.json"
-        "SHELL:--preload-file ${CACHE_WEB_DIR}/version.json@/test/baseline/.cache-web/version.json"
+# Determine backend name for baseline cache directory.
+if (TGFX_USE_WEBGPU)
+    set(TGFX_BACKEND_NAME "webgpu")
+else ()
+    set(TGFX_BACKEND_NAME "webgl")
+endif ()
+
+# Preload backend-specific baseline cache if it exists locally (from a previous test run download).
+set(CACHE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../test/baseline/.cache/${TGFX_BACKEND_NAME})
+set(PRELOAD_CACHE "")
+if (EXISTS ${CACHE_DIR}/md5.json AND EXISTS ${CACHE_DIR}/version.json)
+    set(PRELOAD_CACHE
+        "SHELL:--preload-file ${CACHE_DIR}/md5.json@/test/baseline/.cache/${TGFX_BACKEND_NAME}/md5.json"
+        "SHELL:--preload-file ${CACHE_DIR}/version.json@/test/baseline/.cache/${TGFX_BACKEND_NAME}/version.json"
     )
 else ()
-    message(WARNING "Baseline cache not found at ${CACHE_WEB_DIR}/. "
+    message(WARNING "Baseline cache not found at ${CACHE_DIR}/. "
         "Screenshot tests will pass without actual comparison. "
-        "Run 'bash update_baseline.sh' first to generate the baseline cache from main branch.")
+        "Run './update_baseline.sh USE_WEBGL' (or USE_WEBGPU) from project root first.")
 endif ()
 
 target_compile_options(tgfx-test PRIVATE
     -fno-rtti
+    -fno-exceptions
     -fno-access-control
     -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0
 )
 
+if (TGFX_USE_WEBGPU)
+    set(WEB_GRAPHICS_LINK_OPTIONS -sUSE_WEBGPU=1)
+else ()
+    set(WEB_GRAPHICS_LINK_OPTIONS -sMAX_WEBGL_VERSION=2)
+endif ()
+
+# Asyncify enables synchronous C++ code to await JS Promises.
+# Required for WebGPU buffer.mapAsync() which is fully async. Without Asyncify, readPixels() will
+# timeout because the WASM busy-wait blocks the JS event loop preventing callbacks from firing.
+# Only enabled for WebGPU builds. WebGL readPixels is synchronous and does not need Asyncify.
+# Enabling Asyncify on WebGL causes function signature mismatch crashes in indirect calls.
+if (TGFX_USE_WEBGPU)
+    # Asyncify is needed to synchronously wait for WebGPU async buffer mapping.
+    # ASYNCIFY_REMOVE excludes shader compilation libraries (shaderc, glslang, tint, spvtools)
+    # from instrumentation. These are pure CPU computation and never participate in async
+    # operations. Without this exclusion, Asyncify corrupts their execution state.
+    set(ASYNCIFY_LINK_OPTIONS
+        -sASYNCIFY=1
+        -sASYNCIFY_STACK_SIZE=262144
+        "-sASYNCIFY_REMOVE=['shaderc*','glslang*','spv::*','spvtools*','tint::*','Glslang*','TShader*','Compile*ToSpv*','SpvCompilat*']"
+    )
+    set(ASYNCIFY_COMPILE_DEFS TGFX_USE_ASYNCIFY)
+    target_compile_definitions(tgfx PUBLIC TGFX_USE_ASYNCIFY)
+else ()
+    set(ASYNCIFY_LINK_OPTIONS "")
+    set(ASYNCIFY_COMPILE_DEFS "")
+endif ()
+
 target_compile_definitions(tgfx-test PRIVATE
     GENERATE_BASELINE_IMAGES
+    TGFX_BACKEND_NAME="${TGFX_BACKEND_NAME}"
     $<$<BOOL:${TGFX_UPDATE_BASELINE}>:UPDATE_BASELINE>
+    ${ASYNCIFY_COMPILE_DEFS}
 )
 
 target_link_options(tgfx-test PRIVATE
@@ -105,10 +163,12 @@ target_link_options(tgfx-test PRIVATE
     -fno-rtti
     -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0
     -sWASM=1
-    -sMAX_WEBGL_VERSION=2
+    ${WEB_GRAPHICS_LINK_OPTIONS}
+    ${ASYNCIFY_LINK_OPTIONS}
     -sALLOW_MEMORY_GROWTH=1
     -sINITIAL_MEMORY=256MB
     -sMAXIMUM_MEMORY=2GB
+    -sSTACK_SIZE=1MB
     -sEXPORT_NAME='TGFXTest'
     -sEXPORTED_FUNCTIONS=['_RunAllTests','_RunTest']
     -sEXPORTED_RUNTIME_METHODS=['FS','ccall','cwrap','GL']
@@ -117,8 +177,8 @@ target_link_options(tgfx-test PRIVATE
     -sENVIRONMENT=web,worker
     "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/../../resources@/resources"
     "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/../../test/baseline/version.json@/test/baseline/version.json"
-    "SHELL:--preload-file ${CMAKE_CURRENT_BINARY_DIR}/HEAD@/test/baseline/.cache-web/HEAD"
-    ${PRELOAD_CACHE_WEB}
+    "SHELL:--preload-file ${CMAKE_CURRENT_BINARY_DIR}/HEAD@/test/baseline/.cache/${TGFX_BACKEND_NAME}/HEAD"
+    ${PRELOAD_CACHE}
 )
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -126,6 +186,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_link_options(tgfx-test PRIVATE
         -g3 -O0
         -gsource-map
+        -sASSERTIONS=2
         -Wno-limited-postlink-optimizations
     )
 else ()

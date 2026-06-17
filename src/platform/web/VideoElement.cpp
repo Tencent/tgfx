@@ -17,8 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "platform/web/VideoElement.h"
-#include "gpu/opengl/GLTexture.h"
 #include "gpu/resources/DefaultTextureView.h"
+#ifdef TGFX_USE_WEBGPU
+#include <emscripten.h>
+#include "gpu/webgpu/WebGPUTexture.h"
+#else
+#include "gpu/opengl/GLTexture.h"
+#endif
 
 namespace tgfx {
 using namespace emscripten;
@@ -62,9 +67,18 @@ std::shared_ptr<TextureView> VideoElement::onMakeTexture(Context* context, bool 
 }
 
 bool VideoElement::onUpdateTexture(std::shared_ptr<TextureView> textureView) {
+#ifdef TGFX_USE_WEBGPU
+  auto webgpuTexture = std::static_pointer_cast<WebGPUTexture>(textureView->getTexture());
+  auto wgpuTexture = webgpuTexture->webgpuTexture();
+  auto w = webgpuTexture->width();
+  auto h = webgpuTexture->height();
+  val::module_property("tgfx").call<void>("uploadVideoToWebGPUTexture", source,
+                                          reinterpret_cast<uintptr_t>(wgpuTexture), w, h);
+#else
   auto glTexture = std::static_pointer_cast<GLTexture>(textureView->getTexture());
   val::module_property("tgfx").call<void>("uploadToTexture", emscripten::val::module_property("GL"),
                                           source, glTexture->textureID(), 0, 0, false);
+#endif
   return true;
 }
 }  // namespace tgfx

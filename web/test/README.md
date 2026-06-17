@@ -4,9 +4,11 @@
 
 ## 前置要求
 
-- [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html)（确保 `emcmake` 可用）
+- [emsdk](https://github.com/emscripten-core/emsdk) 4.0.15（`-sUSE_WEBGPU` 在 4.0.18 中被移除，4.0.15 是最后一个兼容版本。安装后无需每次手动 source，构建脚本会自动检测 `~/emsdk`、`/opt/emsdk`、`~/.emsdk`）
 - Node.js >= 18
 - Chrome（autotest 模式需要，Puppeteer 会自动下载）
+
+> 如果 emsdk 不在上述默认路径，可设置环境变量 `EMSDK` 指向安装目录，或手动 `source <path>/emsdk_env.sh`。
 
 ## 快速开始
 
@@ -57,9 +59,9 @@ Web 端的 baseline 机制与原生主干一致，核心流程相同，但因 WA
 原生通过 `accept_baseline.sh` 脚本完成 baseline 更新，内部依赖两个 target：
 
 1. **`TGFXFullTest`**（无特殊宏）：运行所有测试，输出 `test/out/version.json` 记录当前各 key 的版本
-2. **`UpdateBaseline`**（带 `UPDATE_BASELINE` + `GENERATE_BASELINE_IMAGES` 宏）：运行所有测试，无条件记录每个 key 的 MD5 到 cache，生成 baseline 图片，TearDown 时写入 `test/baseline/.cache/md5.json`
+2. **`UpdateBaseline`**（带 `UPDATE_BASELINE` + `GENERATE_BASELINE_IMAGES` 宏）：运行所有测试，无条件记录每个 key 的 MD5 到 cache，生成 baseline 图片，TearDown 时写入 `test/baseline/.cache/{backend}/md5.json`
 
-Web 端不需要 `accept_baseline.sh`，用 `update_baseline.sh` 替代（见下文）。
+Web 端 accept baseline 后，`accept_baseline.sh` 会自动同步 `version.json` 到 `test/baseline/.cache/webgl/` 和 `.cache/webgpu/`（如目录存在）。
 
 ### Web 端流程
 
@@ -67,14 +69,14 @@ Web 端构建时始终开启 `GENERATE_BASELINE_IMAGES`，等效于原生的 `Up
 
 1. **构建时**：CMake 将以下文件 preload 进 WASM 虚拟 FS：
    - `test/baseline/version.json`（仓库基准版本）
-   - `test/baseline/.cache-web/md5.json` + `version.json`（本地 cache，如果存在）
+   - `test/baseline/.cache/{backend}/md5.json` + `version.json`（本地 cache，如果存在）
    - 当前 git commit hash 写入 `HEAD` 文件
 
 2. **运行时**：`Baseline::Compare` 对每个截图 key：
    - 计算当前截图的 MD5
    - 若 `test/out/` 中已有 `_base` 图且 cache 的 version、MD5 均匹配 → 直接复用，不重新生成
    - 否则生成新的 `_base` 图到 `test/baseline-out/`
-   - 比较 `version.json`（仓库）与 `.cache-web/version.json`（cache）的版本号：
+   - 比较 `version.json`（仓库）与 `.cache/{backend}/version.json`（cache）的版本号：
      - **两边都有且版本号不同** → 跳过比较，视为通过（已接受变更）
      - **版本号相同或 key 不存在** → 做实际 MD5 比较，不匹配则测试失败
 
@@ -84,23 +86,24 @@ Web 端构建时始终开启 `GENERATE_BASELINE_IMAGES`，等效于原生的 `Up
    |-----|------|---------|
    | `baseline-out.zip` | baseline 截图 (`_base.webp`) + `md5.json` + `version.json` | `test/baseline-out/` |
    | `test-out.zip` | 失败截图 + `version.json` | `test/out/` |
-   | `cache-web.zip` | `md5.json` + `version.json` | `test/baseline/.cache-web/` |
+   | `cache-web.zip` | `md5.json` + `version.json` | `test/baseline/.cache/{backend}/` |
 
-4. **下次构建**：`test/baseline/.cache-web/` 中的 cache 被 preload 回 WASM，实现跨次运行的 baseline 比对。
+4. **下次构建**：`test/baseline/.cache/{backend}/` 中的 cache 被 preload 回 WASM，实现跨次运行的 baseline 比对。
 
 ### 更新 Baseline Cache
 
-使用 `update_baseline.sh` 从 main 分支生成 baseline cache：
+使用顶层 `update_baseline.sh` 从 main 分支生成 baseline cache：
 
 ```bash
-cd web/test
-bash update_baseline.sh
+# 从项目根目录执行
+./update_baseline.sh USE_WEBGL
+./update_baseline.sh USE_WEBGPU
 ```
 
-该脚本会：
+该命令会：
 1. 暂存当前分支的未提交改动（如有）
 2. 切到 main 分支，以 `UPDATE_BASELINE` 模式构建并运行 web 测试
-3. 生成 baseline cache 到 `test/baseline/.cache-web/`
+3. 生成 baseline cache 到 `test/baseline/.cache/webgl/`（或 `webgpu/`）
 4. 切回当前分支，恢复暂存改动
 
 之后在当前分支运行 `npm run autotest` 即可对比 main baseline 验证。

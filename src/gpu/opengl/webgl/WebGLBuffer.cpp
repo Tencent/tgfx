@@ -31,6 +31,13 @@ WebGLBuffer::~WebGLBuffer() {
   }
 }
 
+bool WebGLBuffer::isReady() const {
+  // WebGL uses synchronous getBufferSubData() for readback, so the buffer is always ready
+  // immediately after the GPU commands complete. The fence-based check in GLBuffer::isReady() is
+  // unreliable in WebGL2 headless environments where clientWaitSync may not behave correctly.
+  return true;
+}
+
 void* WebGLBuffer::map(size_t offset, size_t size) {
   if (bufferData != nullptr) {
     LOGE("WebGLBuffer::map() you must call unmap() before mapping again.");

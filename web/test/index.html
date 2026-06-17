@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <title>TGFX Web Test</title>
-    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"
+            integrity="sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG"
+            crossorigin="anonymous"></script>
 </head>
 <body>
     <canvas id="tgfx-test-canvas" width="1024" height="1024" style="display: none;"></canvas>
@@ -58,7 +60,24 @@
             console.log(`Download started: ${zipName}`);
         }
 
-        const module = await TGFXTest();
+        // Initialize WebGPU device if available, needed for WebGPU backend builds.
+        const moduleOptions = {};
+        if (navigator.gpu) {
+            try {
+                const adapter = await navigator.gpu.requestAdapter();
+                if (adapter) {
+                    const device = await adapter.requestDevice();
+                    if (device) {
+                        moduleOptions.preinitializedWebGPUDevice = device;
+                    }
+                }
+            } catch (e) {
+                console.warn('WebGPU initialization failed:', e);
+            }
+        }
+
+        try {
+        const module = await TGFXTest(moduleOptions);
         TGFXBind(module);
         // Patch missing setColorSpace (tgfx.esm.js is out of date with tgfx.ts source).
         if (!module.tgfx.setColorSpace) {
@@ -72,12 +91,13 @@
                 return colorSpace <= 1;
             };
         }
-        const result = module.ccall('RunAllTests', 'number', [], []);
+        // When Asyncify is enabled, ccall returns a Promise; await handles both Asyncify and non-Asyncify cases.
+        const result = await module.ccall('RunAllTests', 'number', [], [], {async: true});
         console.log('All tests finished with exit code:', result);
         await downloadOutputDir(module.FS, '/test/baseline-out', 'baseline-out.zip');
         await downloadOutputDir(module.FS, '/test/out', 'test-out.zip');
         // Pack md5.json and version.json from baseline-out as cache-web.zip for reuse.
-        // Extract this zip into test/baseline/.cache-web/ to enable baseline comparison.
+        // Extract this zip into test/baseline/.cache/{backend}/ to enable baseline comparison.
         try {
             const cacheZip = new JSZip();
             const baselineOut = '/test/baseline-out';
@@ -101,6 +121,10 @@
             }
         } catch (e) {
             console.warn('Failed to create cache-web.zip:', e);
+        }
+        } catch (e) {
+            console.error('Test execution failed:', e);
+            console.log('All tests finished with exit code: 1');
         }
     </script>
 </body>
