@@ -107,7 +107,7 @@ CSS 定义了两种阴影机制，它们在输入、spread 支持和实现层级
 
 #### CSS 对环形场景的限制
 
-通过 HTML 实测（`designs/shadow_spread_test.html`）验证：
+通过 HTML 实测验证：
 
 - 用 `border: 20px solid` 模拟环形（背景透明，border 实心）
 - 给该元素加 `box-shadow` + spread：阴影是**实心椭圆**，完全忽略 border 中间的透明孔洞
@@ -471,7 +471,7 @@ struct StyledShape {
 | 无 fill 且无 stroke（或 `_shape` 为空） | `std::nullopt` |
 | 有 fill 或 stroke | `StyledShape::Make(Shape::MakeFrom(_shape->getPath()), hasFill, hasStroke, stroke.width, strokeAlign)` |
 
-由 `StyledShape::Make` 按 fill / stroke 的有无折算出 `StyledShapeType`，把当前 stroke 的宽度与对齐方式一并携带。Rect / RRect / Oval 等具体形状识别延后到光栅化阶段（见 `SpreadUtils`），ShapeLayer 这一层只负责交出 path + 样式语义。
+由 `StyledShape::Make` 按 fill / stroke 的有无折算出 `StyledShapeType`，把当前 stroke 的宽度与对齐方式一并携带。Rect / RRect / Oval 等具体形状识别延后到光栅化阶段（见 `SpreadUtils`），ShapeLayer 这一层只负责交出 path + 样式语义。虚线（`_lineDashPattern`）不参与 contentShape 构造：dash 只改变描边的显示样式、不改变轮廓几何，spread 按实线 stroke 处理。
 
 ##### VectorLayer override 规则
 
@@ -551,7 +551,7 @@ class LayerStyle {
 };
 ```
 
-DropShadowStyle 在 `needContourShape()` 返回 `_spread != 0.0f`，即只有 spread 非零时才需要 StyledShape。LayerStyle 在 `onDraw` 中通过 `input.extraSource` 取回形状：把 `extraSource` 转型为 `LayerStyleInputSourceContour`，再调用 `shape()`（返回 `const std::optional<StyledShape>&`）。
+DropShadowStyle 在 `needContourShape()` 返回 `!FloatNearlyZero(_spread)`，即只有 spread 非零时才需要 StyledShape。LayerStyle 在 `onDraw` 中通过 `input.extraSource` 取回形状：把 `extraSource` 转型为 `LayerStyleInputSourceContour`，再调用 `shape()`（返回 `const std::optional<StyledShape>&`）。
 
 #### DropShadowStyle 绘制逻辑变更
 
@@ -569,13 +569,13 @@ void DropShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float
   if (!FloatNearlyZero(_spread)) {
     // 几何路径：把 StyledShape 经 spread 形变后光栅化为 alpha image
     auto spreadImage = SpreadUtils::MakeSpreadShapeImage(input, _spread);
-    if (spreadImage.collapsed) {
-      return;  // 负 spread 把几何完全吞掉
+    // 几何不可用（collapsed 或无 StyledShape）时跳过绘制，不回退到 content image：
+    // filterBounds 按 spread 几何预留，回退绘制会超出而被裁
+    if (spreadImage.collapsed || spreadImage.image == nullptr) {
+      return;
     }
-    if (spreadImage.image != nullptr) {
-      filterSource = std::move(spreadImage.image);
-      filterSourceOffset = spreadImage.offset;
-    }
+    filterSource = std::move(spreadImage.image);
+    filterSourceOffset = spreadImage.offset;
   }
   // 喂给现有滤镜：offset + blur + colorize 全部由 ImageFilter::DropShadowOnly 完成
   auto shadowImage = filterSource->makeWithFilter(filter, &offset);
@@ -583,7 +583,7 @@ void DropShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float
 }
 ```
 
-`SpreadUtils::MakeSpreadShapeImage(input, spread)` 从 `input.extraSource` 取出 StyledShape，按 path 是 Oval / RRect / Rect 分派到 `DrawSpreadRRect`（其余复杂 path 退化为 bounding rect 的 fill）。形变规则：
+`SpreadUtils::MakeSpreadShapeImage(input, spread)` 从 `input.extraSource` 取出 StyledShape，按 path 是 Oval / RRect / Rect 分派到 `DrawSpreadRRect`（其余复杂 path 退化为 bounding rect 的 fill）。取出 StyledShape 后先校验其 footprint（经 contentScale 缩放后）落在 content image 范围内，越界则视为不可用返回空 image（spread 被跳过），避免绘制超出 filterBounds 被裁。形变规则：
 
 - Fill / FillStroke：把 RRect 外扩 `spread`（FillStroke 额外加 `StrokeOutset(width, align)`），角半径同步增减
 - Stroke：有效描边宽度 = `strokeWidth + 2·spread`，按 strokeAlign 决定绘制 RRect 的位置
@@ -615,7 +615,7 @@ class DropShadowStyle : public LayerStyle {
   float spread() const { return _spread; }
   void setSpread(float spread);
 
-  bool needContourShape() const override { return _spread != 0.0f; }
+  bool needContourShape() const override;  // 返回 !FloatNearlyZero(_spread)
 
  protected:
   void onDraw(Canvas* canvas, const LayerStyleInput& input, float alpha,
@@ -726,8 +726,8 @@ Rect DropShadowStyle::filterBounds(const Rect& srcRect, float contentScale) {
 | 2 | `include/tgfx/layers/ShapeLayer.h` + `src/layers/ShapeLayer.cpp` | override `onGetContentShape()`：有 fill / stroke 时用 `_shape` 的 path 构造 StyledShape，否则返回 `std::nullopt` |
 | 2 | `include/tgfx/layers/VectorLayer.h` + `src/layers/VectorLayer.cpp` | override `onGetContentShape()`：遍历 `VectorContext::painters`，单一共享 geometry + 至多一个 stroke 时构造 StyledShape，否则委托基类返回 bounds 兜底 |
 | 2 | TextLayer | 不新增 override，直接使用基类 bounds-rect 兜底 |
-| 2 | `src/layers/SpreadUtils.h` + `.cpp` | 新增 `MakeSpreadShapeImage(input, spread)`：从 contour shape 取 StyledShape，按 Oval / RRect / Rect 分派形变并光栅化为 alpha image；`StrokeOutset` / `IsSpreadCollapsed` 辅助 |
-| 3 | `include/tgfx/layers/layerstyles/DropShadowStyle.h` + `.cpp` | 新增 `_spread` 成员、getter/setter、`needContourShape()` 返回 `_spread != 0`；`onDraw` 在 spread 非零时用 `MakeSpreadShapeImage` 替换滤镜源，`filterBounds` 预先 outset srcRect |
+| 2 | `src/layers/SpreadUtils.h` + `.cpp` | 新增 `MakeSpreadShapeImage(input, spread)`：从 contour shape 取 StyledShape，先校验 footprint 落在 content image 内，再按 Oval / RRect / Rect 分派形变并光栅化为 alpha image；`StrokeOutset` / `IsSpreadCollapsed` 辅助 |
+| 3 | `include/tgfx/layers/layerstyles/DropShadowStyle.h` + `.cpp` | 新增 `_spread` 成员、getter/setter、`needContourShape()` 返回 `!FloatNearlyZero(_spread)`；`onDraw` 在 spread 非零时用 `MakeSpreadShapeImage` 替换滤镜源（几何不可用时跳过绘制），`filterBounds` 预先 outset srcRect |
 | 3 | `include/tgfx/layers/layerstyles/InnerShadowStyle.h` + `.cpp` | 同上；spread 非零时走 `drawWithSpread`（mask-shader 路径），`filterBounds` 返回 srcRect |
 | 4 | `test/src/` | 截图测试 |
 
@@ -774,7 +774,6 @@ Rect DropShadowStyle::filterBounds(const Rect& srcRect, float contentScale) {
 
 | 路径 | 说明 |
 |------|------|
-| `designs/shadow_spread_test.html` | CSS box-shadow / drop-shadow 行为对比，含矩形/椭圆/环形/图片填充场景 |
 | `~/Desktop/test2.png` | Figma 实测：图片填充 frame + spread |
 | `~/Desktop/test3.png` | Figma 实测：椭圆 fill / inner stroke + spread |
 | `~/Desktop/test4.png` | Figma 实测：Frame/Group 容器整体阴影（spread 灰色） |
