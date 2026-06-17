@@ -63,7 +63,7 @@ class SVGCustomWriter {
    * @param colorFilter The color filter being exported.
    * return A DOMAttribute to be added to the <filter> element as a custom attribute.
    */
-  virtual DOMAttribute writeColorImageFilter(const std::shared_ptr<ColorFilter>& colorFilter) {
+  virtual DOMAttribute writeColorImageFilter(const std::shared_ptr<ColorFilter>&) {
     return {};
   }
 
@@ -73,8 +73,7 @@ class SVGCustomWriter {
    * @param shader The shader whose output is blended with the source graphic.
    * return A DOMAttribute to be added to the <filter> element as a custom attribute.
    */
-  virtual DOMAttribute writeBlendImageFilter(BlendMode blendMode,
-                                            const std::shared_ptr<Shader>& shader) {
+  virtual DOMAttribute writeBlendImageFilter(BlendMode, const std::shared_ptr<Shader>&) {
     return {};
   }
 };
