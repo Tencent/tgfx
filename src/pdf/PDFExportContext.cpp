@@ -339,6 +339,12 @@ const FilterImage* AsNoiseStylePattern(const Image* image) {
   return filterImage;
 }
 
+// Generates a glyph path at the given resolutionScale to match the hinting result used by GPU
+// rasterization. FreeType hinting snaps glyph control points to the pixel grid at the rendered
+// font size, so a path obtained at 60px and scaled 4x differs from one obtained directly at 240px.
+// By generating the path at the final device font size (fontSize * resolutionScale) and then
+// scaling back to logical coordinates, the path shape matches the GPU-rasterized mask used by
+// InnerShadowStyle and NoiseStyle.
 Path GetGlyphRunPath(const GlyphRun& glyphRun, float resolutionScale) {
   if (resolutionScale <= 0.0f) {
     return {};
@@ -892,37 +898,20 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
     return;
   }
 
-  // NoiseStyle pattern: FilterImage<Blend(SrcIn, Shader)> over PictureImage. Instead of
-  // rasterizing the alpha-masked noise, extract vector paths from the PictureImage and emit them
-  // as a PDF clip, then render the full noise bitmap inside that clip.
+  // NoiseStyle pattern: FilterImage<Blend(SrcIn, Shader)> over PictureImage. Rasterize the
+  // noise image normally and clip it with the vector path extracted from the PictureImage.
   if (auto* noiseFilter = AsNoiseStylePattern(image.get())) {
     auto* pictureImage = static_cast<const PictureImage*>(noiseFilter->source.get());
     Matrix imageMatrix = pictureImage->matrix ? *pictureImage->matrix : Matrix::I();
     auto clipPath = ExtractClipPathFromPicture(pictureImage->picture, imageMatrix);
     if (!clipPath.isEmpty()) {
-      // Transform clip path from image-local space to device space using the draw matrix.
       clipPath.transform(matrix);
-      // Render full noise (replace source with opaque white so SrcIn yields unclipped noise).
-      PictureRecorder recorder;
-      auto* recCanvas = recorder.beginRecording();
-      Paint opaquePaint = {};
-      opaquePaint.setColor(Color::White());
-      recCanvas->drawRect(Rect::MakeWH(noiseFilter->source->width(), noiseFilter->source->height()),
-                          opaquePaint);
-      auto whitePicture = recorder.finishRecordingAsPicture();
-      auto whiteImage = Image::MakeFrom(std::move(whitePicture), noiseFilter->source->width(),
-                                        noiseFilter->source->height());
-      if (whiteImage != nullptr) {
-        auto fullNoiseImage = whiteImage->makeWithFilter(noiseFilter->filter);
-        if (fullNoiseImage != nullptr) {
-          fullNoiseImage = fullNoiseImage->makeTextureImage(document->context());
-          if (fullNoiseImage != nullptr) {
-            auto newClip = clip;
-            newClip.clip(clipPath, false);
-            onDrawImageRect(fullNoiseImage, rect, sampling, matrix, newClip, brush);
-            return;
-          }
-        }
+      auto rasterized = image->makeTextureImage(document->context());
+      if (rasterized != nullptr) {
+        auto newClip = clip;
+        newClip.clip(clipPath, false);
+        onDrawImageRect(rasterized, rect, sampling, matrix, newClip, brush);
+        return;
       }
     }
   }
