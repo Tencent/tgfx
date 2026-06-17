@@ -31,12 +31,27 @@ namespace tgfx {
  */
 class LayerStyleInputSource {
  public:
-  enum class Type { Base, Contour };
+  /**
+   * The kind of extra source carried by this object.
+   */
+  enum class Type {
+    /**
+     * A plain image source, such as the background content below the layer.
+     */
+    Base,
+    /**
+     * A contour source that additionally carries the layer's vector shape.
+     */
+    Contour
+  };
 
   LayerStyleInputSource(std::shared_ptr<Image> image, Point imageOffset)
       : _type(Type::Base), _image(std::move(image)), _imageOffset(imageOffset) {
   }
 
+  /**
+   * The kind of this source.
+   */
   Type type() const {
     return _type;
   }
