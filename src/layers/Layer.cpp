@@ -1944,7 +1944,7 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
         contourImage ? group->contour->offset - contentEntry.offset : Point::Zero();
     // contour shape may be nullopt when the layer has no simple vector content (e.g. a group
     // layer with only children).
-    styleInput.extraSource = std::make_shared<LayerStyleInputSourceContour>(
+    styleInput.extraSource = std::make_shared<ContourInputSource>(
         std::move(contourImage), contourOffset, source->contentShape);
   }
   layerStyle->draw(canvas, styleInput, alpha);

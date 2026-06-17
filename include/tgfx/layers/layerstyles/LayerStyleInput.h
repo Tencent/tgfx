@@ -29,7 +29,7 @@ namespace tgfx {
 /**
  * Extra input source that a LayerStyle may need beyond the primary content image.
  */
-class LayerStyleInputSource {
+class StyleInputSource {
  public:
   /**
    * The kind of extra source carried by this object.
@@ -45,7 +45,7 @@ class LayerStyleInputSource {
     Contour
   };
 
-  LayerStyleInputSource(std::shared_ptr<Image> image, Point imageOffset)
+  StyleInputSource(std::shared_ptr<Image> image, Point imageOffset)
       : _type(Type::Base), _image(std::move(image)), _imageOffset(imageOffset) {
   }
 
@@ -71,7 +71,7 @@ class LayerStyleInputSource {
   }
 
  protected:
-  LayerStyleInputSource(Type type, std::shared_ptr<Image> image, Point imageOffset)
+  StyleInputSource(Type type, std::shared_ptr<Image> image, Point imageOffset)
       : _type(type), _image(std::move(image)), _imageOffset(imageOffset) {
   }
 
@@ -84,12 +84,11 @@ class LayerStyleInputSource {
 /**
  * Contour input source with additional vector shape information.
  */
-class LayerStyleInputSourceContour : public LayerStyleInputSource {
+class ContourInputSource : public StyleInputSource {
  public:
-  LayerStyleInputSourceContour(std::shared_ptr<Image> image, Point imageOffset,
-                               std::optional<StyledShape> shape = std::nullopt)
-      : LayerStyleInputSource(Type::Contour, std::move(image), imageOffset),
-        _shape(std::move(shape)) {
+  ContourInputSource(std::shared_ptr<Image> image, Point imageOffset,
+                     std::optional<StyledShape> shape = std::nullopt)
+      : StyleInputSource(Type::Contour, std::move(image), imageOffset), _shape(std::move(shape)) {
   }
 
   /**
@@ -129,12 +128,12 @@ struct LayerStyleInput {
 
   /**
    * Optional extra source. The actual type depends on the LayerStyle's extraSourceType:
-   * LayerStyleInputSourceContour for Contour, LayerStyleInputSource for Background, nullptr
+   * ContourInputSource for Contour, StyleInputSource for Background, nullptr
    * for None. For Contour the image is similar to content, but includes geometries from alpha=0
    * painters and replaces gradient fills with solid colors. For Background the image is the
    * normally rendered content below the current layer.
    */
-  std::shared_ptr<LayerStyleInputSource> extraSource = nullptr;
+  std::shared_ptr<StyleInputSource> extraSource = nullptr;
 };
 
 }  // namespace tgfx
