@@ -60,6 +60,7 @@ class SVGCustomWriter {
 
   /**
    * Called when exporting a ColorImageFilter to SVG.
+   * @param colorFilter The color filter being exported.
    * return A DOMAttribute to be added to the <filter> element as a custom attribute.
    */
   virtual DOMAttribute writeColorImageFilter(const std::shared_ptr<ColorFilter>& colorFilter) {
@@ -68,6 +69,8 @@ class SVGCustomWriter {
 
   /**
    * Called when exporting a BlendImageFilter to SVG.
+   * @param blendMode The blend mode used to composite the shader output with the source.
+   * @param shader The shader whose output is blended with the source graphic.
    * return A DOMAttribute to be added to the <filter> element as a custom attribute.
    */
   virtual DOMAttribute writeBlendImageFilter(BlendMode blendMode,
