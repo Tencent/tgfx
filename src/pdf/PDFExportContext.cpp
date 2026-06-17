@@ -27,6 +27,9 @@
 #include "core/RunRecord.h"
 #include "core/ScalerContext.h"
 #include "core/filters/BlendImageFilter.h"
+#include "core/shaders/BlendShader.h"
+#include "core/shaders/ColorFilterShader.h"
+#include "core/shaders/MatrixShader.h"
 #include "core/filters/DropShadowImageFilter.h"
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/filters/InnerShadowImageFilter.h"
@@ -65,7 +68,7 @@
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathTypes.h"
 #include "tgfx/core/Picture.h"
-#include "tgfx/core/PictureRecorder.h"
+
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/SamplingOptions.h"
@@ -318,8 +321,30 @@ bool IsBackgroundBlurStylePattern(const Brush& brush, const Image* image) {
          Types::Get(filterImage->filter.get()) == Types::ImageFilterType::Blur;
 }
 
-// Detects the FilterImage<Blend(SrcIn, Shader)> pattern produced by NoiseStyle. The source must be
-// a PictureImage so that vector clip paths can be extracted from its recorded drawing commands.
+// Recursively checks whether a shader tree contains a PerlinNoiseShader at any depth.
+bool ContainsPerlinNoise(const Shader* shader) {
+  if (shader == nullptr) {
+    return false;
+  }
+  auto type = Types::Get(shader);
+  if (type == Types::ShaderType::PerlinNoise) {
+    return true;
+  }
+  if (type == Types::ShaderType::Matrix) {
+    return ContainsPerlinNoise(static_cast<const MatrixShader*>(shader)->source.get());
+  }
+  if (type == Types::ShaderType::ColorFilter) {
+    return ContainsPerlinNoise(static_cast<const ColorFilterShader*>(shader)->shader.get());
+  }
+  if (type == Types::ShaderType::Blend) {
+    auto blend = static_cast<const BlendShader*>(shader);
+    return ContainsPerlinNoise(blend->dst.get()) || ContainsPerlinNoise(blend->src.get());
+  }
+  return false;
+}
+
+// Detects the FilterImage<Blend(SrcIn, Shader)> pattern produced by NoiseStyle/NoiseFilter.
+// Requires: SrcIn blend mode, PictureImage source, and a shader containing PerlinNoise.
 const FilterImage* AsNoiseStylePattern(const Image* image) {
   if (Types::Get(image) != Types::ImageType::Filter) {
     return nullptr;
@@ -334,6 +359,9 @@ const FilterImage* AsNoiseStylePattern(const Image* image) {
     return nullptr;
   }
   if (Types::Get(filterImage->source.get()) != Types::ImageType::Picture) {
+    return nullptr;
+  }
+  if (!ContainsPerlinNoise(blendFilter->shader.get())) {
     return nullptr;
   }
   return filterImage;

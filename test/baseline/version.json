@@ -325,7 +325,6 @@
         "TemporaryOffscreenImage_image1": "76a54f43",
         "TemporaryOffscreenImage_image2": "1642114b",
         "TemporaryOffscreenImage_pic": "76a54f43",
-        "TextDuoNoiseTransforms": "2c4681a2",
         "ZoomAndOffset": "6b4e5ce0",
         "draw_shape": "eefb7a46",
         "draw_solid": "b4a1231",
@@ -333,21 +332,13 @@
         "getBounds": "3247ebaa",
         "getLayersUnderPoint": "4d602959",
         "getTightBounds": "880d5a6c",
-        "imageLayer": "e5103ae6"
+        "imageLayer": "e5103ae6",
+        "TextDuoNoiseTransforms": "2c4681a2"
     },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",
         "rasterize_path": "b062b9a",
         "rasterize_path_texture": "c475bfb"
-    },
-    "PDFExportTest": {
-        "DuoNoiseImage": "2c4681a2",
-        "EllipseNoiseStyle": "2c4681a2",
-        "NoiseEffects": "2c4681a2",
-        "ShapeNoiseStyle": "2c4681a2",
-        "TextInnerShadow": "2c4681a2",
-        "TextLayerStyleAlignment": "2c4681a2",
-        "TextMultiNoiseTransforms": "2c4681a2"
     },
     "PDFTest": {
         "AssignColorSpace": "bf721f63",
@@ -359,7 +350,6 @@
         "DropShadowLayer": "bf721f63",
         "DstAssignColorSpace": "bf721f63",
         "DstColorSpace": "bf721f63",
-        "EllipseNoiseStyle": "2c4681a2",
         "EmojiText": "bf721f63",
         "Empty": "79ce3a28",
         "EmptyMultiPage": "79ce3a28",
@@ -380,11 +370,12 @@
         "LayerLinearGradient": "bf721f63",
         "LayerRadialGradient": "bf721f63",
         "LinearGradientWhiteAlpha": "bf721f63",
-        "NoiseEffects": "2c4681a2",
         "NonRegularBlendMode": "bf721f63",
-        "ShapeNoiseStyle": "2c4681a2",
         "SimpleText": "984e8f18",
         "SrcBlendOverlap": "bf721f63",
+        "EllipseNoiseStyle": "2c4681a2",
+        "NoiseEffects": "2c4681a2",
+        "ShapeNoiseStyle": "2c4681a2",
         "TextInnerShadow": "c746d1ea",
         "TextLayerStyleAlignment": "2c4681a2",
         "TextMultiNoiseTransforms": "2c4681a2"
@@ -438,6 +429,10 @@
         "JpegCodec_Encode_Gray8": "afd80b4",
         "JpegCodec_Encode_RGB565": "afd80b4",
         "JpegCodec_Encode_RGBA": "afd80b4",
+        "NativeCodec_Decode_Alpha8": "afd80b4",
+        "NativeCodec_Decode_RGBA": "afd80b4",
+        "NativeCodec_Encode_Alpha8": "afd80b4",
+        "NativeCodec_Encode_RGBA": "afd80b4",
         "PixelMap_BGRA_to_BGRA": "d010fb8",
         "PixelMap_BGRA_to_RGBA": "d010fb8",
         "PixelMap_BGRA_to_rgb_A": "d010fb8",
@@ -489,11 +484,7 @@
         "WebpCodec_Encode_RGBA": "0cfb8996",
         "read_RGBA_1010102_scaled_codec": "eefb7a46",
         "read_RGBA_F16_scaled_codec": "eefb7a46",
-        "read_RGB_565_scaled_codec": "29745c73",
-        "NativeCodec_Decode_Alpha8": "afd80b4",
-        "NativeCodec_Decode_RGBA": "afd80b4",
-        "NativeCodec_Encode_Alpha8": "afd80b4",
-        "NativeCodec_Encode_RGBA": "afd80b4"
+        "read_RGB_565_scaled_codec": "29745c73"
     },
     "RecordingTest": {
         "BasicFlushAndSubmit": "3c65b221",
@@ -668,5 +659,14 @@
         "TrimPathReversedWrapAround": "4a74f6aa",
         "TrimPathWithScale": "4a74f6aa",
         "VectorGroupTransform": "4a74f6aa"
+    },
+    "PDFExportTest": {
+        "DuoNoiseImage": "2c4681a2",
+        "EllipseNoiseStyle": "2c4681a2",
+        "NoiseEffects": "2c4681a2",
+        "ShapeNoiseStyle": "2c4681a2",
+        "TextInnerShadow": "2c4681a2",
+        "TextLayerStyleAlignment": "2c4681a2",
+        "TextMultiNoiseTransforms": "2c4681a2"
     }
 }
