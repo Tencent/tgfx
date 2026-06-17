@@ -120,6 +120,8 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
   if (shape == nullptr) {
     return std::nullopt;
   }
+  // Baking the geometry matrix into the shape makes spread scale with the layer transform, like
+  // stroke width and other in-layer measurements. This is intentional.
   shape = Shape::ApplyMatrix(shape, sharedGeometry->matrix);
   if (shape == nullptr) {
     return std::nullopt;
