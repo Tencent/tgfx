@@ -3443,4 +3443,57 @@ TGFX_TEST(LayerTest, TextDuoNoiseTransforms) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/TextDuoNoiseTransforms"));
 }
 
+TGFX_TEST(LayerTest, ShapeLayerSmallOvalScaledUp) {
+  // Validates the HasSharpCorner device-space threshold via the ShapeLayer -> drawShape
+  // -> private drawPath path. A 0.9x0.9 oval under a 100x parent scale must stay round
+  // instead of being degenerated into a rectangle by the local-space half-pixel check.
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto container = Layer::Make();
+  auto containerMatrix = Matrix::MakeScale(100.f);
+  containerMatrix.postTranslate(50.f, 50.f);
+  container->setMatrix(containerMatrix);
+  displayList->root()->addChild(container);
+
+  auto shape = ShapeLayer::Make();
+  Path circle;
+  circle.addOval(Rect::MakeWH(0.9f, 0.9f));
+  shape->setPath(circle);
+  shape->setFillStyle(ShapeStyle::Make(Color::Red()));
+
+  container->addChild(shape);
+
+  auto surface = Surface::Make(context, 190, 190);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ShapeLayerSmallOvalScaledUp"));
+}
+
+TGFX_TEST(LayerTest, DrawRRectSmallOvalScaledUp) {
+  // Validates the Canvas::drawRRect device-space threshold directly, without going through
+  // ShapeLayer / drawShape. Guards regressions on the drawRRect entry point itself, which
+  // shares the same sub-half-pixel classification logic but is reached by a different path.
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 190, 190);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  canvas->translate(50.f, 50.f);
+  canvas->scale(100.f, 100.f);
+
+  Paint paint;
+  paint.setColor(Color::Red());
+  canvas->drawRRect(RRect::MakeOval(Rect::MakeWH(0.9f, 0.9f)), paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DrawRRectSmallOvalScaledUp"));
+}
+
 }  // namespace tgfx
