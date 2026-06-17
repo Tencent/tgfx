@@ -70,7 +70,8 @@ class SVGCustomWriter {
    * Called when exporting a BlendImageFilter to SVG.
    * return A DOMAttribute to be added to the <filter> element as a custom attribute.
    */
-  virtual DOMAttribute writeBlendImageFilter(BlendMode, const std::shared_ptr<Shader>&) {
+  virtual DOMAttribute writeBlendImageFilter(BlendMode blendMode,
+                                            const std::shared_ptr<Shader>& shader) {
     return {};
   }
 };
