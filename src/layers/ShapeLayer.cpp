@@ -274,6 +274,9 @@ std::optional<StyledShape> ShapeLayer::onGetContentShape() {
     return std::nullopt;
   }
 
+  // The dash pattern is intentionally ignored here: spread expands the stroke outline, and a dash
+  // only changes how that outline is displayed, not its geometry, so it is treated as a solid
+  // stroke.
   return StyledShape::Make(Shape::MakeFrom(_shape->getPath()), fillCount > 0, strokeCount > 0,
                            stroke.width, static_cast<StrokeAlign>(shapeBitFields.strokeAlign));
 }

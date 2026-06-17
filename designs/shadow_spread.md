@@ -707,7 +707,7 @@ Rect DropShadowStyle::filterBounds(const Rect& srcRect, float contentScale) {
 ### 6.2 边界情况
 
 - spread = 0：行为与修改前完全一致
-- spread > 0 在复杂图层（多 element / fill+stroke 混合且 path 非 Rect/RRect/Oval / dash / Inside/Outside align）：spread 沿图层 bounds Rect 作用，视觉等价于矩形外扩
+- spread > 0 在复杂图层（多 element / fill+stroke 混合且 path 非 Rect/RRect/Oval / Inside/Outside align）：spread 沿图层 bounds Rect 作用，视觉等价于矩形外扩
 - blur = 0 + spread > 0：阴影是硬边的扩展形状
 - 负 spread 导致形状完全收缩消失
 - spread 与 contentScale 的交互
