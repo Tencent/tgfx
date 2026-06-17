@@ -26,15 +26,12 @@
 #include "core/PictureRecords.h"
 #include "core/RunRecord.h"
 #include "core/ScalerContext.h"
-#include "core/filters/BlendImageFilter.h"
 #include "core/filters/DropShadowImageFilter.h"
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/filters/InnerShadowImageFilter.h"
 #include "core/filters/ShaderMaskFilter.h"
 #include "core/images/FilterImage.h"
 #include "core/images/PictureImage.h"
-#include "core/shaders/BlendShader.h"
-#include "core/shaders/ColorFilterShader.h"
 #include "core/shaders/ColorShader.h"
 #include "core/shaders/ImageShader.h"
 #include "core/shaders/MatrixShader.h"
@@ -317,52 +314,6 @@ bool IsBackgroundBlurStylePattern(const Brush& brush, const Image* image) {
   const auto* filterImage = static_cast<const FilterImage*>(image);
   return filterImage->filter &&
          Types::Get(filterImage->filter.get()) == Types::ImageFilterType::Blur;
-}
-
-// Recursively checks whether a shader tree contains a PerlinNoiseShader at any depth.
-bool ContainsPerlinNoise(const Shader* shader) {
-  if (shader == nullptr) {
-    return false;
-  }
-  auto type = Types::Get(shader);
-  if (type == Types::ShaderType::PerlinNoise) {
-    return true;
-  }
-  if (type == Types::ShaderType::Matrix) {
-    return ContainsPerlinNoise(static_cast<const MatrixShader*>(shader)->source.get());
-  }
-  if (type == Types::ShaderType::ColorFilter) {
-    return ContainsPerlinNoise(static_cast<const ColorFilterShader*>(shader)->shader.get());
-  }
-  if (type == Types::ShaderType::Blend) {
-    auto blend = static_cast<const BlendShader*>(shader);
-    return ContainsPerlinNoise(blend->dst.get()) || ContainsPerlinNoise(blend->src.get());
-  }
-  return false;
-}
-
-// Detects the FilterImage<Blend(SrcIn, Shader)> pattern produced by NoiseStyle/NoiseFilter.
-// Requires: SrcIn blend mode, PictureImage source, and a shader containing PerlinNoise.
-const FilterImage* AsNoiseStylePattern(const Image* image) {
-  if (Types::Get(image) != Types::ImageType::Filter) {
-    return nullptr;
-  }
-  const auto* filterImage = static_cast<const FilterImage*>(image);
-  if (!filterImage->filter ||
-      Types::Get(filterImage->filter.get()) != Types::ImageFilterType::Blend) {
-    return nullptr;
-  }
-  const auto* blendFilter = static_cast<const BlendImageFilter*>(filterImage->filter.get());
-  if (blendFilter->blendMode != BlendMode::SrcIn) {
-    return nullptr;
-  }
-  if (Types::Get(filterImage->source.get()) != Types::ImageType::Picture) {
-    return nullptr;
-  }
-  if (!ContainsPerlinNoise(blendFilter->shader.get())) {
-    return nullptr;
-  }
-  return filterImage;
 }
 
 // Generates a glyph path at the given resolutionScale to match the hinting result used by GPU
@@ -922,24 +873,6 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
                                        const ClipStack& clip, const Brush& brush) {
   if (!image) {
     return;
-  }
-
-  // NoiseStyle pattern: FilterImage<Blend(SrcIn, Shader)> over PictureImage. Rasterize the
-  // noise image normally and clip it with the vector path extracted from the PictureImage.
-  if (auto* noiseFilter = AsNoiseStylePattern(image.get())) {
-    auto* pictureImage = static_cast<const PictureImage*>(noiseFilter->source.get());
-    Matrix imageMatrix = pictureImage->matrix ? *pictureImage->matrix : Matrix::I();
-    auto clipPath = ExtractClipPathFromPicture(pictureImage->picture, imageMatrix);
-    if (!clipPath.isEmpty()) {
-      clipPath.transform(matrix);
-      auto rasterized = image->makeTextureImage(document->context());
-      if (rasterized != nullptr) {
-        auto newClip = clip;
-        newClip.clip(clipPath, false);
-        onDrawImageRect(rasterized, rect, sampling, matrix, newClip, brush);
-        return;
-      }
-    }
   }
 
   // First, figure out the src->dst transform and subset the image if needed.
