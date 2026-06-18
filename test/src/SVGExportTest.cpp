@@ -1727,4 +1727,38 @@ TGFX_TEST(SVGExportTest, BlendImageFilterClipToSource) {
   surfaceCanvas->restore();
   EXPECT_TRUE(Baseline::Compare(surface, "SVGExportTest/BlendImageFilterClipToSource"));
 }
+
+TGFX_TEST(SVGExportTest, DropShadowOnly) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200));
+  auto canvas = exporter->getCanvas();
+
+  Paint backgroundPaint;
+  backgroundPaint.setColor(Color::White());
+  canvas->drawRect(Rect::MakeWH(200, 200), backgroundPaint);
+
+  Paint paint;
+  paint.setColor(Color::Blue());
+  paint.setImageFilter(ImageFilter::DropShadowOnly(10, 10, 5, 5, Color::Black()));
+  canvas->drawRect(Rect::MakeXYWH(60, 60, 80, 80), paint);
+
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/DropShadowOnly"));
+
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  auto surfaceCanvas = surface->getCanvas();
+  Paint bg;
+  bg.setColor(Color::White());
+  surfaceCanvas->drawRect(Rect::MakeWH(200, 200), bg);
+  Paint sp;
+  sp.setColor(Color::Blue());
+  sp.setImageFilter(ImageFilter::DropShadowOnly(10, 10, 5, 5, Color::Black()));
+  surfaceCanvas->drawRect(Rect::MakeXYWH(60, 60, 80, 80), sp);
+  EXPECT_TRUE(Baseline::Compare(surface, "SVGExportTest/DropShadowOnly"));
+}
 }  // namespace tgfx
