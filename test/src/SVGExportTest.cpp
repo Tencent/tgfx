@@ -1550,7 +1550,8 @@ TGFX_TEST(SVGExportTest, BlendNoiseFilter) {
   auto blendFilter = ImageFilter::Blend(BlendMode::SrcOver, noiseShader);
   Paint paint;
   paint.setImageFilter(blendFilter);
-  canvas->drawRect(Rect::MakeXYWH(60, 60, 80, 80), paint);
+  canvas->drawRect(Rect::MakeXYWH(20, 60, 80, 80), paint);
+  canvas->drawRect(Rect::MakeXYWH(100, 60, 80, 80), paint);
 
   exporter->close();
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/BlendNoiseFilter"));
@@ -1565,7 +1566,8 @@ TGFX_TEST(SVGExportTest, BlendNoiseFilter) {
   auto blendFilter2 = ImageFilter::Blend(BlendMode::SrcOver, noiseShader2);
   Paint sp;
   sp.setImageFilter(blendFilter2);
-  surfaceCanvas->drawRect(Rect::MakeXYWH(60, 60, 80, 80), sp);
+  surfaceCanvas->drawRect(Rect::MakeXYWH(20, 60, 80, 80), sp);
+  surfaceCanvas->drawRect(Rect::MakeXYWH(100, 60, 80, 80), sp);
   EXPECT_TRUE(Baseline::Compare(surface, "SVGExportTest/BlendNoiseFilter"));
 }
 }  // namespace tgfx
