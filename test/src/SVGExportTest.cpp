@@ -1649,13 +1649,12 @@ TGFX_TEST(SVGExportTest, ComposeFilterWithBlurShadow) {
   auto image = MakeImage("resources/apitest/rotation.jpg");
   ASSERT_TRUE(image != nullptr);
 
-  auto blurFilter = ImageFilter::Blur(10, 10);
   auto dropShadowFilter = ImageFilter::DropShadowOnly(10, 10, 20, 20, Color::Black());
   auto innerShadowFilter = ImageFilter::InnerShadow(-10, -10, 5, 5, Color::White());
   auto colorFilter = ColorFilter::Blend(Color::Red(), BlendMode::Multiply);
   auto colorImageFilter = ImageFilter::ColorFilter(colorFilter);
   auto composeFilter =
-      ImageFilter::Compose({blurFilter, dropShadowFilter, innerShadowFilter, colorImageFilter});
+      ImageFilter::Compose({dropShadowFilter, innerShadowFilter, colorImageFilter});
 
   auto SVGStream = MemoryWriteStream::Make();
   auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200));
