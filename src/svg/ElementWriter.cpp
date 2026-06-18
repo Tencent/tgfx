@@ -310,6 +310,57 @@ Resources ElementWriter::addColorFilterResource(const std::shared_ptr<ColorFilte
   return resources;
 }
 
+std::string ElementWriter::emitFilterElement(const std::shared_ptr<ImageFilter>& imageFilter,
+                                             const Rect& bound,
+                                             const std::shared_ptr<SVGCustomWriter>& exportWriter) {
+  std::string filterID = resourceStore->addFilter();
+  ElementWriter filterElement("filter", writer);
+  filterElement.addAttribute("id", filterID);
+  filterElement.addAttribute("color-interpolation-filters", "sRGB");
+  filterElement.addAttribute("x", bound.x());
+  filterElement.addAttribute("y", bound.y());
+  filterElement.addAttribute("width", bound.width());
+  filterElement.addAttribute("height", bound.height());
+  filterElement.addAttribute("filterUnits", "userSpaceOnUse");
+  auto type = Types::Get(imageFilter.get());
+  switch (type) {
+    case Types::ImageFilterType::Blur: {
+      const auto blurFilter = static_cast<const GaussianBlurImageFilter*>(imageFilter.get());
+      callbackBlurImageFilter(blurFilter, exportWriter, filterElement);
+      addBlurImageFilter(blurFilter);
+      break;
+    }
+    case Types::ImageFilterType::DropShadow: {
+      const auto dropShadowFilter = static_cast<const DropShadowImageFilter*>(imageFilter.get());
+      callbackDropShadowImageFilter(dropShadowFilter, exportWriter, filterElement);
+      addDropShadowImageFilter(dropShadowFilter);
+      break;
+    }
+    case Types::ImageFilterType::InnerShadow: {
+      const auto innerShadowFilter = static_cast<const InnerShadowImageFilter*>(imageFilter.get());
+      callbackInnerShadowImageFilter(innerShadowFilter, exportWriter, filterElement);
+      addInnerShadowImageFilter(innerShadowFilter);
+      break;
+    }
+    case Types::ImageFilterType::Color: {
+      const auto colorFilter = static_cast<const ColorImageFilter*>(imageFilter.get());
+      callbackColorImageFilter(colorFilter, exportWriter, filterElement);
+      addColorImageFilter(colorFilter);
+      break;
+    }
+    case Types::ImageFilterType::Blend: {
+      const auto blendFilter = static_cast<const BlendImageFilter*>(imageFilter.get());
+      callbackBlendImageFilter(blendFilter, exportWriter, filterElement);
+      addBlendImageFilter(blendFilter);
+      break;
+    }
+    default:
+      reportUnsupportedElement("Unsupported image filter in Compose");
+      return "";
+  }
+  return filterID;
+}
+
 std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& imageFilter,
                                           Rect bound,
                                           const std::shared_ptr<SVGCustomWriter>& exportWriter) {
@@ -421,10 +472,12 @@ std::vector<std::string> ElementWriter::addImageFilterChain(
   auto type = Types::Get(imageFilter.get());
   if (type == Types::ImageFilterType::Compose) {
     const auto composeFilter = static_cast<const ComposeImageFilter*>(imageFilter.get());
+    // Use the Compose filter's overall filterBounds as a shared region for all sub-filters.
+    // This prevents outermost <g filter> from clipping inner sub-filter effects.
+    auto composeBound = imageFilter->filterBounds(bound);
     std::vector<std::string> filterIDs;
     for (const auto& filterItem : composeFilter->filters) {
-      auto subIDs = addImageFilterChain(filterItem, bound, exportWriter);
-      filterIDs.insert(filterIDs.end(), subIDs.begin(), subIDs.end());
+      filterIDs.push_back(emitFilterElement(filterItem, composeBound, exportWriter));
     }
     return filterIDs;
   }

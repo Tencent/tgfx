@@ -145,6 +145,8 @@ class ElementWriter {
 
   std::string addImageFilter(const std::shared_ptr<ImageFilter>& imageFilter, Rect bound,
                              const std::shared_ptr<SVGCustomWriter>& exportWriter);
+  std::string emitFilterElement(const std::shared_ptr<ImageFilter>& imageFilter, const Rect& bound,
+                                const std::shared_ptr<SVGCustomWriter>& exportWriter);
   void callbackBlurImageFilter(const GaussianBlurImageFilter* filter,
                                const std::shared_ptr<SVGCustomWriter>& exportWriter,
                                ElementWriter& filterElement);

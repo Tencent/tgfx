@@ -863,9 +863,8 @@ TGFX_TEST(SVGExportTest, DstAssignColorSpace) {
   exporter->close();
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/DstAssignColorSpace"));
 
-  auto surface =
-      Surface::Make(context, 2048, 2048, ColorType::RGBA_8888, 1, false, 0,
-                    ColorSpace::DisplayP3());
+  auto surface = Surface::Make(context, 2048, 2048, ColorType::RGBA_8888, 1, false, 0,
+                               ColorSpace::DisplayP3());
   ASSERT_TRUE(surface != nullptr);
   auto surfaceCanvas = surface->getCanvas();
   Paint sp;
