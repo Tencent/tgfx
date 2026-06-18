@@ -135,9 +135,7 @@ class DropShadowStyle : public LayerStyle {
 
   Rect filterBounds(const Rect& srcRect, float contentScale) override;
 
-  LayerStyleExtraSourceType extraSourceType() const override {
-    return LayerStyleExtraSourceType::Contour;
-  }
+  LayerStyleExtraSourceType extraSourceType() const override;
 
  protected:
   void onDraw(Canvas* canvas, const LayerStyleInput& input, float alpha,

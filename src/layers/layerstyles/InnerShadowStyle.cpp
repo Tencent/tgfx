@@ -105,6 +105,11 @@ Rect InnerShadowStyle::filterBounds(const Rect& srcRect, float contentScale) {
   return filter->filterBounds(srcRect);
 }
 
+LayerStyleExtraSourceType InnerShadowStyle::extraSourceType() const {
+  return !FloatNearlyZero(_spread) ? LayerStyleExtraSourceType::Contour
+                                   : LayerStyleExtraSourceType::None;
+}
+
 void InnerShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alpha,
                               BlendMode blendMode) {
   if (!FloatNearlyZero(_spread)) {
