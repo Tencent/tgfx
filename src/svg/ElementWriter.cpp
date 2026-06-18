@@ -321,6 +321,7 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
       std::string filterID = resourceStore->addFilter();
       ElementWriter filterElement("filter", writer);
       filterElement.addAttribute("id", filterID);
+      filterElement.addAttribute("color-interpolation-filters", "sRGB");
       filterElement.addAttribute("x", bound.x());
       filterElement.addAttribute("y", bound.y());
       filterElement.addAttribute("width", bound.width());
@@ -336,6 +337,7 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
       std::string filterID = resourceStore->addFilter();
       ElementWriter filterElement("filter", writer);
       filterElement.addAttribute("id", filterID);
+      filterElement.addAttribute("color-interpolation-filters", "sRGB");
       filterElement.addAttribute("x", bound.x());
       filterElement.addAttribute("y", bound.y());
       filterElement.addAttribute("width", bound.width());
@@ -351,6 +353,7 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
       std::string filterID = resourceStore->addFilter();
       ElementWriter filterElement("filter", writer);
       filterElement.addAttribute("id", filterID);
+      filterElement.addAttribute("color-interpolation-filters", "sRGB");
       filterElement.addAttribute("x", bound.x());
       filterElement.addAttribute("y", bound.y());
       filterElement.addAttribute("width", bound.width() + innerShadowFilter->dx);
@@ -377,6 +380,7 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
       std::string filterID = resourceStore->addFilter();
       ElementWriter filterElement("filter", writer);
       filterElement.addAttribute("id", filterID);
+      filterElement.addAttribute("color-interpolation-filters", "sRGB");
       filterElement.addAttribute("x", bound.x());
       filterElement.addAttribute("y", bound.y());
       filterElement.addAttribute("width", bound.width());
@@ -392,6 +396,7 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
       std::string filterID = resourceStore->addFilter();
       ElementWriter filterElement("filter", writer);
       filterElement.addAttribute("id", filterID);
+      filterElement.addAttribute("color-interpolation-filters", "sRGB");
       filterElement.addAttribute("x", bound.x());
       filterElement.addAttribute("y", bound.y());
       filterElement.addAttribute("width", bound.width());
@@ -1031,6 +1036,7 @@ void ElementWriter::addBlendColorFilterResources(const ModeColorFilter* modeColo
   {
     ElementWriter filterElement("filter", writer);
     filterElement.addAttribute("id", filterID);
+    filterElement.addAttribute("color-interpolation-filters", "sRGB");
     filterElement.addAttribute("x", "0%");
     filterElement.addAttribute("y", "0%");
     filterElement.addAttribute("width", "100%");
@@ -1046,6 +1052,7 @@ void ElementWriter::addMatrixColorFilterResources(const MatrixColorFilter* matri
   {
     ElementWriter filterElement("filter", writer);
     filterElement.addAttribute("id", filterID);
+    filterElement.addAttribute("color-interpolation-filters", "sRGB");
     filterElement.addAttribute("x", "0%");
     filterElement.addAttribute("y", "0%");
     filterElement.addAttribute("width", "100%");
