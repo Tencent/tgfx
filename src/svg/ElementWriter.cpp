@@ -627,7 +627,7 @@ void ElementWriter::addDropShadowImageFilter(const DropShadowImageFilter* filter
       blurElement.addAttribute("stdDeviation", FloatToString(blurX) + " " + FloatToString(blurY));
     }
   }
-  {
+  if (!filter->shadowOnly) {
     ElementWriter compositeElement("feComposite", writer);
     compositeElement.addAttribute("in2", "hardAlpha");
     compositeElement.addAttribute("operator", "out");
