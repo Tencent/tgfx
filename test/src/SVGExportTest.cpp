@@ -24,11 +24,13 @@
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/ColorFilter.h"
+#include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Rect.h"
+#include "tgfx/core/Shader.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/WriteStream.h"
@@ -1436,5 +1438,34 @@ TGFX_TEST(SVGExportTest, FilterImageWithBlendModeAndClip) {
   displayList->root()->draw(canvas);
   exporter->close();
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/FilterImageWithBlendModeAndClip"));
+}
+
+TGFX_TEST(SVGExportTest, PerlinNoiseShaderExport) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200));
+  auto canvas = exporter->getCanvas();
+
+  Paint backgroundPaint;
+  backgroundPaint.setColor(Color::White());
+  canvas->drawRect(Rect::MakeWH(200, 200), backgroundPaint);
+
+  auto leftNoise = Shader::MakeFractalNoise(0.05f, 0.05f, 3, 42);
+  auto leftFilter = ImageFilter::Blend(BlendMode::SrcOver, leftNoise);
+  Paint leftPaint;
+  leftPaint.setImageFilter(leftFilter);
+  canvas->drawRect(Rect::MakeXYWH(20, 60, 80, 80), leftPaint);
+
+  auto rightNoise = Shader::MakeTurbulence(0.05f, 0.05f, 3, 42);
+  auto rightFilter = ImageFilter::Blend(BlendMode::SrcOver, rightNoise);
+  Paint rightPaint;
+  rightPaint.setImageFilter(rightFilter);
+  canvas->drawRect(Rect::MakeXYWH(100, 60, 80, 80), rightPaint);
+
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/PerlinNoiseShaderExport"));
 }
 }  // namespace tgfx
