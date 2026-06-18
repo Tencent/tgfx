@@ -696,6 +696,9 @@ void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter) {
                                            FloatToString(noiseShader->baseFrequencyY));
         turbulenceElement.addAttribute("numOctaves", noiseShader->numOctaves);
         turbulenceElement.addAttribute("seed", noiseShader->seed);
+        if (noiseShader->stitchTiles) {
+          turbulenceElement.addAttribute("stitchTiles", "stitch");
+        }
         turbulenceElement.addAttribute("result", "noise");
       }
       {
