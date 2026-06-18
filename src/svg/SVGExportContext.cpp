@@ -415,12 +415,13 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
     {
       std::vector<std::unique_ptr<ElementWriter>> groupElements;
       if (filterIDs.size() > 1) {
-        // Compose: outermost <g> carries first filter + clip + blend + opacity.
+        // Compose: outermost <g> carries last filter + clip + blend + opacity.
+        // Innermost <g> carries first filter (applied first to the source).
         auto outermost = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
         if (needsClip) {
           outermost->addAttribute("clip-path", "url(#" + clipID + ")");
         }
-        outermost->addAttribute("filter", "url(#" + filterIDs[0] + ")");
+        outermost->addAttribute("filter", "url(#" + filterIDs.back() + ")");
         if (!outerBlendStyle.empty()) {
           outermost->addAttribute("style", outerBlendStyle);
         }
@@ -428,9 +429,9 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
           outermost->addAttribute("opacity", outerAlpha);
         }
         groupElements.push_back(std::move(outermost));
-        for (size_t i = 1; i < filterIDs.size(); ++i) {
+        for (size_t i = filterIDs.size() - 1; i > 0; --i) {
           auto inner = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
-          inner->addAttribute("filter", "url(#" + filterIDs[i] + ")");
+          inner->addAttribute("filter", "url(#" + filterIDs[i - 1] + ")");
           groupElements.push_back(std::move(inner));
         }
       } else {
@@ -734,7 +735,7 @@ void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
       if (needsClip) {
         outermost->addAttribute("clip-path", "url(#" + clipID + ")");
       }
-      outermost->addAttribute("filter", "url(#" + filterIDs[0] + ")");
+      outermost->addAttribute("filter", "url(#" + filterIDs.back() + ")");
       if (brush.blendMode != BlendMode::SrcOver) {
         auto svgBlendMode = ToSVGBlendMode(brush.blendMode);
         if (!svgBlendMode.empty() && svgBlendMode != "normal") {
@@ -745,9 +746,9 @@ void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
         outermost->addAttribute("opacity", brush.color.alpha);
       }
       groupElements.push_back(std::move(outermost));
-      for (size_t i = 1; i < filterIDs.size(); ++i) {
+      for (size_t i = filterIDs.size() - 1; i > 0; --i) {
         auto inner = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
-        inner->addAttribute("filter", "url(#" + filterIDs[i] + ")");
+        inner->addAttribute("filter", "url(#" + filterIDs[i - 1] + ")");
         groupElements.push_back(std::move(inner));
       }
     } else {

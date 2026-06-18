@@ -1569,4 +1569,40 @@ TGFX_TEST(SVGExportTest, BlendNoiseFilter) {
   surfaceCanvas->drawRect(Rect::MakeXYWH(100, 60, 80, 80), sp);
   EXPECT_TRUE(Baseline::Compare(surface, "SVGExportTest/BlendNoiseFilter"));
 }
+
+TGFX_TEST(SVGExportTest, ComposeImageFilter) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/assets/bridge.jpg");
+  ASSERT_TRUE(image != nullptr);
+  image = image->makeMipmapped(true);
+
+  auto blueFilter = ImageFilter::DropShadow(100, 100, 0, 0, Color::Blue());
+  auto greenFilter = ImageFilter::DropShadow(-100, -100, 0, 0, Color::Green());
+  auto blackFilter = ImageFilter::DropShadow(0, 0, 100, 100, Color::Black());
+  auto composeFilter = ImageFilter::Compose({blueFilter, greenFilter, blackFilter});
+  auto filterImage = image->makeWithFilter(composeFilter);
+  auto imageSize = 512.0f;
+  auto imageScale = imageSize / static_cast<float>(filterImage->width());
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(720, 720));
+  auto canvas = exporter->getCanvas();
+  canvas->translate(104, 104);
+  canvas->scale(imageScale, imageScale);
+  Paint paint;
+  paint.setImageFilter(composeFilter);
+  canvas->drawImage(image, &paint);
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/ComposeImageFilter"));
+
+  auto surface = Surface::Make(context, 720, 720);
+  ASSERT_TRUE(surface != nullptr);
+  auto surfaceCanvas = surface->getCanvas();
+  surfaceCanvas->translate(104, 104);
+  surfaceCanvas->scale(imageScale, imageScale);
+  surfaceCanvas->drawImage(image, &paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "SVGExportTest/ComposeImageFilter"));
+}
 }  // namespace tgfx
