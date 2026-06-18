@@ -862,6 +862,32 @@ TGFX_TEST(SVGExportTest, DstAssignColorSpace) {
   canvas->drawRect(Rect::MakeXYWH(400, 140, 100, 100), paint);
   exporter->close();
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/DstAssignColorSpace"));
+
+  auto surface =
+      Surface::Make(context, 2048, 2048, ColorType::RGBA_8888, 1, false, 0,
+                    ColorSpace::DisplayP3());
+  ASSERT_TRUE(surface != nullptr);
+  auto surfaceCanvas = surface->getCanvas();
+  Paint sp;
+  sp.setColor(Color::Green());
+  surfaceCanvas->drawRect(Rect::MakeXYWH(20, 20, 100, 100), sp);
+  surfaceCanvas->drawRRect(RRect::MakeOval(Rect::MakeXYWH(140, 20, 100, 100)), sp);
+  surfaceCanvas->drawImageRect(image, Rect::MakeXYWH(260, 20, 100, 100), {}, &sp);
+  surfaceCanvas->drawSimpleText("TGFX", 400, 80, font, sp);
+  sp.setShader(Shader::MakeColorShader(Color::Red()));
+  surfaceCanvas->drawRect(Rect::MakeXYWH(580, 20, 100, 100), sp);
+  sp.setShader(Shader::MakeLinearGradient({720, 20}, {820, 20}, {Color::Green(), Color::Red()}));
+  surfaceCanvas->drawRect(Rect::MakeXYWH(720, 20, 100, 100), sp);
+  sp.setShader(Shader::MakeRadialGradient({70, 190}, 50, {Color::Green(), Color::Red()}));
+  surfaceCanvas->drawRect(Rect::MakeXYWH(20, 140, 100, 100), sp);
+  sp.setShader(Shader::MakeRadialGradient({190, 190}, 50, {Color::Green(), Color::Red()}));
+  sp.setColorFilter(ColorFilter::Blend(Color::White(), BlendMode::Difference));
+  surfaceCanvas->drawRect(Rect::MakeXYWH(140, 140, 100, 100), sp);
+  sp.setImageFilter(ImageFilter::DropShadow(10, 10, 10, 10, Color::Green()));
+  surfaceCanvas->drawRect(Rect::MakeXYWH(260, 140, 100, 100), sp);
+  sp.setImageFilter(ImageFilter::InnerShadow(10, 10, 10, 10, Color::Green()));
+  surfaceCanvas->drawRect(Rect::MakeXYWH(400, 140, 100, 100), sp);
+  EXPECT_TRUE(Baseline::Compare(surface, "SVGExportTest/DstAssignColorSpace"));
 }
 
 TGFX_TEST(SVGExportTest, LayerMaskBlur) {
@@ -1505,5 +1531,41 @@ TGFX_TEST(SVGExportTest, ShapeLayerWithColorMatrixAndBlend) {
 
   exporter->close();
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/ShapeLayerWithColorMatrixAndBlend"));
+}
+
+TGFX_TEST(SVGExportTest, BlendNoiseFilter) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200));
+  auto canvas = exporter->getCanvas();
+
+  Paint backgroundPaint;
+  backgroundPaint.setColor(Color::White());
+  canvas->drawRect(Rect::MakeWH(200, 200), backgroundPaint);
+
+  auto noiseShader = Shader::MakeFractalNoise(0.05f, 0.05f, 3, 42);
+  auto blendFilter = ImageFilter::Blend(BlendMode::SrcOver, noiseShader);
+  Paint paint;
+  paint.setImageFilter(blendFilter);
+  canvas->drawRect(Rect::MakeXYWH(60, 60, 80, 80), paint);
+
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/BlendNoiseFilter"));
+
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  auto surfaceCanvas = surface->getCanvas();
+  Paint bg;
+  bg.setColor(Color::White());
+  surfaceCanvas->drawRect(Rect::MakeWH(200, 200), bg);
+  auto noiseShader2 = Shader::MakeFractalNoise(0.05f, 0.05f, 3, 42);
+  auto blendFilter2 = ImageFilter::Blend(BlendMode::SrcOver, noiseShader2);
+  Paint sp;
+  sp.setImageFilter(blendFilter2);
+  surfaceCanvas->drawRect(Rect::MakeXYWH(60, 60, 80, 80), sp);
+  EXPECT_TRUE(Baseline::Compare(surface, "SVGExportTest/BlendNoiseFilter"));
 }
 }  // namespace tgfx
