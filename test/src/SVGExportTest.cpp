@@ -1468,4 +1468,42 @@ TGFX_TEST(SVGExportTest, PerlinNoiseShaderExport) {
   exporter->close();
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/PerlinNoiseShaderExport"));
 }
+
+TGFX_TEST(SVGExportTest, ShapeLayerWithColorMatrixAndBlend) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(500, 200));
+  auto canvas = exporter->getCanvas();
+
+  // Left: plain red rectangle.
+  Paint leftPaint;
+  leftPaint.setColor(Color::Red());
+  canvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), leftPaint);
+
+  // Middle: red rectangle with Blend color filter (blue, exclusion mode).
+  Paint blendPaint;
+  blendPaint.setColor(Color::Red());
+  blendPaint.setColorFilter(ColorFilter::Blend(Color::Blue(), BlendMode::Exclusion));
+  canvas->drawRect(Rect::MakeXYWH(200, 50, 100, 100), blendPaint);
+
+  // Right: red rectangle with Matrix color filter (luminance).
+  // clang-format off
+  std::array<float, 20> luminanceMatrix = {
+    0.2126f, 0.7152f, 0.0722f, 0.0f, 0.0f,
+    0.2126f, 0.7152f, 0.0722f, 0.0f, 0.0f,
+    0.2126f, 0.7152f, 0.0722f, 0.0f, 0.0f,
+    0.0f,    0.0f,    0.0f,    1.0f, 0.0f,
+  };
+  // clang-format on
+  Paint matrixPaint;
+  matrixPaint.setColor(Color::Red());
+  matrixPaint.setColorFilter(ColorFilter::Matrix(luminanceMatrix));
+  canvas->drawRect(Rect::MakeXYWH(350, 50, 100, 100), matrixPaint);
+
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/ShapeLayerWithColorMatrixAndBlend"));
+}
 }  // namespace tgfx
