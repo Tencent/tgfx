@@ -25,6 +25,7 @@
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/filters/ShaderMaskFilter.h"
 #include "core/shaders/MatrixShader.h"
+#include "core/shaders/PerlinNoiseShader.h"
 #include "core/utils/ColorHelper.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/Log.h"
@@ -654,35 +655,60 @@ void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter) {
     reportUnsupportedElement("Missing shader in BlendImageFilter");
     return;
   }
-  auto shaderType = Types::Get(filter->shader.get());
-  if (shaderType != Types::ShaderType::Color) {
-    reportUnsupportedElement("Unsupported shader type in BlendImageFilter");
-    return;
-  }
-  const auto colorShader = static_cast<const ColorShader*>(filter->shader.get());
-  Color color;
-  if (!colorShader->asColor(&color)) {
-    reportUnsupportedElement("Failed to extract color from ColorShader in BlendImageFilter");
-    return;
-  }
-  color = ConvertColorSpace(color, _targetColorSpace);
-  {
-    ElementWriter floodElement("feFlood", writer);
-    floodElement.addAttribute("flood-color", ToSVGColor(color));
-    if (!color.isOpaque()) {
-      floodElement.addAttribute("flood-opacity", color.alpha);
+  switch (Types::Get(filter->shader.get())) {
+    case Types::ShaderType::Color: {
+      const auto colorShader = static_cast<const ColorShader*>(filter->shader.get());
+      Color color;
+      if (!colorShader->asColor(&color)) {
+        reportUnsupportedElement("Failed to extract color from ColorShader in BlendImageFilter");
+        return;
+      }
+      color = ConvertColorSpace(color, _targetColorSpace);
+      {
+        ElementWriter floodElement("feFlood", writer);
+        floodElement.addAttribute("flood-color", ToSVGColor(color));
+        if (!color.isOpaque()) {
+          floodElement.addAttribute("flood-opacity", color.alpha);
+        }
+        floodElement.addAttribute("result", "flood");
+        std::string cssStyle;
+        if (writeColorCSSStyleAttribute("flood-color", color, &cssStyle)) {
+          floodElement.addAttribute("style", cssStyle);
+        }
+      }
+      {
+        ElementWriter blendElement("feBlend", writer);
+        blendElement.addAttribute("in", "flood");
+        blendElement.addAttribute("in2", "SourceGraphic");
+        blendElement.addAttribute("mode", blendModeString);
+      }
+      break;
     }
-    floodElement.addAttribute("result", "flood");
-    std::string cssStyle;
-    if (writeColorCSSStyleAttribute("flood-color", color, &cssStyle)) {
-      floodElement.addAttribute("style", cssStyle);
+    case Types::ShaderType::PerlinNoise: {
+      const auto noiseShader = static_cast<const PerlinNoiseShader*>(filter->shader.get());
+      {
+        ElementWriter turbulenceElement("feTurbulence", writer);
+        turbulenceElement.addAttribute(
+            "type", noiseShader->noiseType == PerlinNoiseType::FractalNoise ? "fractalNoise"
+                                                                            : "turbulence");
+        turbulenceElement.addAttribute("baseFrequency",
+                                       FloatToString(noiseShader->baseFrequencyX) + " " +
+                                           FloatToString(noiseShader->baseFrequencyY));
+        turbulenceElement.addAttribute("numOctaves", noiseShader->numOctaves);
+        turbulenceElement.addAttribute("seed", noiseShader->seed);
+        turbulenceElement.addAttribute("result", "noise");
+      }
+      {
+        ElementWriter blendElement("feBlend", writer);
+        blendElement.addAttribute("in", "noise");
+        blendElement.addAttribute("in2", "SourceGraphic");
+        blendElement.addAttribute("mode", blendModeString);
+      }
+      break;
     }
-  }
-  {
-    ElementWriter blendElement("feBlend", writer);
-    blendElement.addAttribute("in", "flood");
-    blendElement.addAttribute("in2", "SourceGraphic");
-    blendElement.addAttribute("mode", blendModeString);
+    default:
+      reportUnsupportedElement("Unsupported shader type in BlendImageFilter");
+      break;
   }
 }
 
