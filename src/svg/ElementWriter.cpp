@@ -21,6 +21,7 @@
 #include "SVGUtils.h"
 #include "core/codecs/jpeg/JpegCodec.h"
 #include "core/codecs/png/PngCodec.h"
+#include "core/filters/ComposeColorFilter.h"
 #include "core/filters/ComposeImageFilter.h"
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/filters/ShaderMaskFilter.h"
@@ -304,6 +305,21 @@ Resources ElementWriter::addColorFilterResource(const std::shared_ptr<ColorFilte
       addMatrixColorFilterResources(static_cast<const MatrixColorFilter*>(colorFilter.get()),
                                     &resources);
       break;
+    case Types::ColorFilterType::Compose: {
+      std::string filterID = resourceStore->addFilter();
+      {
+        ElementWriter filterElement("filter", writer);
+        filterElement.addAttribute("id", filterID);
+        filterElement.addAttribute("color-interpolation-filters", "sRGB");
+        filterElement.addAttribute("x", "0%");
+        filterElement.addAttribute("y", "0%");
+        filterElement.addAttribute("width", "100%");
+        filterElement.addAttribute("height", "100%");
+        addColorFilterPrimitives(colorFilter);
+      }
+      resources.filter = "url(#" + filterID + ")";
+      break;
+    }
     default:
       break;
   }
@@ -784,6 +800,14 @@ bool ElementWriter::addColorFilterPrimitives(const std::shared_ptr<ColorFilter>&
     case Types::ColorFilterType::Blend:
       addBlendColorFilterPrimitives(static_cast<const ModeColorFilter*>(colorFilter.get()));
       return true;
+    case Types::ColorFilterType::Compose: {
+      const auto compose =
+          static_cast<const ComposeColorFilter*>(colorFilter.get());
+      if (!addColorFilterPrimitives(compose->inner)) {
+        return false;
+      }
+      return addColorFilterPrimitives(compose->outer);
+    }
     default:
       return false;
   }
@@ -791,7 +815,6 @@ bool ElementWriter::addColorFilterPrimitives(const std::shared_ptr<ColorFilter>&
 
 void ElementWriter::addMatrixColorFilterPrimitives(const MatrixColorFilter* matrixColorFilter) {
   ElementWriter colorMatrixElement("feColorMatrix", writer);
-  colorMatrixElement.addAttribute("in", "SourceGraphic");
   colorMatrixElement.addAttribute("type", "matrix");
   auto colorMatrix = matrixColorFilter->matrix;
   std::string matrixString;
