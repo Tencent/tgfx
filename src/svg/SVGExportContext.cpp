@@ -377,14 +377,10 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
     bound = contentMatrix.mapRect(bound);
 
     Resources resources;
-    std::vector<std::string> filterIDs;
     if (filter) {
       ElementWriter defs("defs", xmlWriter, resourceBucket.get(), _targetColorSpace,
                          _assignColorSpace);
-      filterIDs = defs.addImageFilterChain(filter, bound, customWriter);
-      if (filterIDs.size() == 1) {
-        resources.filter = "url(#" + filterIDs[0] + ")";
-      }
+      resources = defs.addImageFilterResource(filter, bound, customWriter);
     }
     auto clipPath = clip.getClipPath();
     bool needsClip = !clipPath.isEmpty() && !clipPath.contains(bound);
@@ -413,40 +409,18 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
     }
     float outerAlpha = brush.color.alpha;
     {
-      // For Compose filters, create nested <g> elements with each sub-filter applied.
-      // filterIDs are in application order (innermost first), so reverse to create
-      // the outermost wrapper first.
-      std::vector<std::unique_ptr<ElementWriter>> groupElements;
-      // Only create nested <g> for Compose filters (>1 sub-filter). Single-filter images
-      // use the resources.filter fallback below (see the else-if(filter) branch).
-      if (filterIDs.size() > 1) {
-        for (auto it = filterIDs.rbegin(); it != filterIDs.rend(); ++it) {
-          auto groupElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
-          groupElements.push_back(std::move(groupElement));
-        }
-      }
-      if (groupElements.empty()) {
-        auto groupElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
-        groupElements.push_back(std::move(groupElement));
-      }
+      auto groupElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
       if (needsClip) {
-        groupElements.front()->addAttribute("clip-path", "url(#" + clipID + ")");
+        groupElement->addAttribute("clip-path", "url(#" + clipID + ")");
       }
-      // Add filter attribute after clip-path to preserve the original attribute order.
-      if (filterIDs.size() > 1) {
-        auto it = filterIDs.rbegin();
-        for (auto& groupElement : groupElements) {
-          groupElement->addAttribute("filter", "url(#" + *it + ")");
-          ++it;
-        }
-      } else if (filter) {
-        groupElements.front()->addAttribute("filter", resources.filter);
+      if (filter) {
+        groupElement->addAttribute("filter", resources.filter);
       }
       if (!outerBlendStyle.empty()) {
-        groupElements.front()->addAttribute("style", outerBlendStyle);
+        groupElement->addAttribute("style", outerBlendStyle);
       }
       if (outerAlpha != 1.0f) {
-        groupElements.front()->addAttribute("opacity", outerAlpha);
+        groupElement->addAttribute("opacity", outerAlpha);
       }
       // Strip lifted effects from the inner brush so the recursive draw does not re-emit them
       // on a nested <g>, which would both double the effect and reintroduce the isolation issue.
@@ -464,10 +438,6 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
       // Canvas::drawLayer (which uses drawMatrix.preTranslate(filterOffset)).
       drawImage(filterImage->source, sampling, contentMatrix, needsClip ? ClipStack{} : clip,
                 innerBrush);
-      // Destroy group elements in reverse order (innermost first) to close XML tags correctly.
-      while (!groupElements.empty()) {
-        groupElements.pop_back();
-      }
       clipGroupElement = nullptr;
       currentClipPath = {};
     }
@@ -709,7 +679,7 @@ void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
                                  std::shared_ptr<ImageFilter> imageFilter, const Matrix& matrix,
                                  const ClipStack& clip, const Brush& brush) {
   DEBUG_ASSERT(picture != nullptr);
-  std::vector<std::string> filterIDs;
+  Resources resources;
   auto bound = matrix.mapRect(picture->getBounds());
   if (imageFilter) {
     ElementWriter defs("defs", xmlWriter, resourceBucket.get(), _targetColorSpace,
@@ -719,7 +689,7 @@ void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
     // whenever the matrix is non-identity, which both cuts off the blur halo on one side and
     // exposes the filter sandbox edges (the empty area inside the filter region but outside
     // the source) as hard banding artifacts.
-    filterIDs = defs.addImageFilterChain(imageFilter, bound, customWriter);
+    resources = defs.addImageFilterResource(imageFilter, bound, customWriter);
   }
   auto clipPath = clip.getClipPath();
   bool needsClip = !clipPath.isEmpty() && !clipPath.contains(bound);
@@ -732,49 +702,23 @@ void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
     // left cleared on exit instead of being saved and restored.
     clipGroupElement = nullptr;
     currentClipPath = {};
-    // For Compose filters, create nested <g> elements with each sub-filter applied.
-    std::vector<std::unique_ptr<ElementWriter>> groupElements;
-    // Unlike drawImage, drawLayer has no resources.filter fallback, so any filter
-    // (including single) must use the nested <g> structure.
-    if (!filterIDs.empty()) {
-      // filterIDs are in application order (innermost first), so reverse to create
-      // the outermost wrapper first.
-      for (auto it = filterIDs.rbegin(); it != filterIDs.rend(); ++it) {
-        auto groupElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
-        groupElements.push_back(std::move(groupElement));
-      }
-    }
-    // The outermost element carries clip, blend mode, and opacity.
-    // If no filter groups exist, create a single group for these attributes.
-    if (groupElements.empty()) {
-      auto groupElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
-      groupElements.push_back(std::move(groupElement));
-    }
+    auto groupElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
     if (needsClip) {
-      groupElements.front()->addAttribute("clip-path", "url(#" + clipID + ")");
+      groupElement->addAttribute("clip-path", "url(#" + clipID + ")");
     }
-    // Add filter attributes after clip-path to preserve the original attribute order.
-    if (!filterIDs.empty()) {
-      auto it = filterIDs.rbegin();
-      for (auto& groupElement : groupElements) {
-        groupElement->addAttribute("filter", "url(#" + *it + ")");
-        ++it;
-      }
+    if (imageFilter) {
+      groupElement->addAttribute("filter", resources.filter);
     }
     if (brush.blendMode != BlendMode::SrcOver) {
       auto svgBlendMode = ToSVGBlendMode(brush.blendMode);
       if (!svgBlendMode.empty() && svgBlendMode != "normal") {
-        groupElements.front()->addAttribute("style", "mix-blend-mode: " + svgBlendMode);
+        groupElement->addAttribute("style", "mix-blend-mode: " + svgBlendMode);
       }
     }
     if (brush.color.alpha != 1.0f) {
-      groupElements.front()->addAttribute("opacity", brush.color.alpha);
+      groupElement->addAttribute("opacity", brush.color.alpha);
     }
     picture->playback(this, matrix, needsClip ? ClipStack{} : clip);
-    // Destroy group elements in reverse order (innermost first) to close XML tags correctly.
-    while (!groupElements.empty()) {
-      groupElements.pop_back();
-    }
     clipGroupElement = nullptr;
     currentClipPath = {};
   }
