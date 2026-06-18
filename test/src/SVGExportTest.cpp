@@ -1605,4 +1605,126 @@ TGFX_TEST(SVGExportTest, ComposeImageFilter) {
   surfaceCanvas->drawImage(image, &paint);
   EXPECT_TRUE(Baseline::Compare(surface, "SVGExportTest/ComposeImageFilter"));
 }
+
+TGFX_TEST(SVGExportTest, ComposeColorFilter) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/rotation.jpg");
+  ASSERT_TRUE(image != nullptr);
+
+  auto matrixFilter = ColorFilter::Matrix({0.2f, 0,    0, 0, 0,
+                                           0,    0.2f, 0, 0, 0,
+                                           0,    0,    2, 0, 0,
+                                           0,    0,    0, 1, 0});
+  auto lumaFilter = ColorFilter::Matrix({0.2126f, 0.7152f, 0.0722f, 0, 0,
+                                         0.2126f, 0.7152f, 0.0722f, 0, 0,
+                                         0.2126f, 0.7152f, 0.0722f, 0, 0,
+                                         0,       0,       0,       1, 0});
+  auto composeFilter = ColorFilter::Compose(matrixFilter, lumaFilter);
+
+  int w = image->width() / 4;
+  int h = image->height() / 4;
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(w, h));
+  auto canvas = exporter->getCanvas();
+  canvas->scale(0.25f, 0.25f);
+  Paint paint;
+  paint.setColorFilter(composeFilter);
+  canvas->drawImage(image, &paint);
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/ComposeColorFilter"));
+
+  auto surface = Surface::Make(context, w, h);
+  auto surfaceCanvas = surface->getCanvas();
+  surfaceCanvas->scale(0.25f, 0.25f);
+  surfaceCanvas->drawImage(image, &paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "SVGExportTest/ComposeColorFilter"));
+}
+
+TGFX_TEST(SVGExportTest, ComposeFilterWithBlurShadow) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/rotation.jpg");
+  ASSERT_TRUE(image != nullptr);
+
+  auto blurFilter = ImageFilter::Blur(10, 10);
+  auto dropShadowFilter = ImageFilter::DropShadowOnly(10, 10, 20, 20, Color::Black());
+  auto innerShadowFilter = ImageFilter::InnerShadow(-10, -10, 5, 5, Color::White());
+  auto colorFilter = ColorFilter::Blend(Color::Red(), BlendMode::Multiply);
+  auto colorImageFilter = ImageFilter::ColorFilter(colorFilter);
+  auto composeFilter =
+      ImageFilter::Compose({blurFilter, dropShadowFilter, innerShadowFilter, colorImageFilter});
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200));
+  auto canvas = exporter->getCanvas();
+  canvas->translate(50, 50);
+  canvas->clipRect(Rect::MakeWH(100, 100));
+  Paint paint;
+  paint.setImageFilter(composeFilter);
+  canvas->drawImage(image, &paint);
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/ComposeFilterWithBlurShadow"));
+
+  auto surface = Surface::Make(context, 200, 200);
+  auto surfaceCanvas = surface->getCanvas();
+  surfaceCanvas->translate(50, 50);
+  surfaceCanvas->clipRect(Rect::MakeWH(100, 100));
+  surfaceCanvas->drawImage(image, &paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "SVGExportTest/ComposeFilterWithBlurShadow"));
+}
+
+TGFX_TEST(SVGExportTest, BlendImageFilterClipToSource) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/image_as_mask.png");
+  ASSERT_TRUE(image != nullptr);
+  auto imageWidth = static_cast<float>(image->width());
+  auto imageHeight = static_cast<float>(image->height());
+  auto padding = 30.f;
+  auto surfaceWidth = static_cast<int>(imageWidth * 2.f + padding * 3.f);
+  auto surfaceHeight = static_cast<int>(imageHeight + padding * 2.f);
+
+  auto noiseShader = Shader::MakeFractalNoise(0.25f, 0.25f, 3, 6903);
+  auto blendFilter = ImageFilter::Blend(BlendMode::SrcOver, noiseShader);
+  auto imageShader = Shader::MakeImageShader(image);
+  auto clipFilter = ImageFilter::Blend(BlendMode::DstIn, imageShader);
+  auto composeFilter = ImageFilter::Compose(blendFilter, clipFilter);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(surfaceWidth, surfaceHeight));
+  auto canvas = exporter->getCanvas();
+  canvas->clear(Color::FromRGBA(217, 217, 217));
+  canvas->save();
+  canvas->concat(Matrix::MakeTrans(padding, padding));
+  Paint paint;
+  paint.setImageFilter(blendFilter);
+  canvas->drawImage(image, &paint);
+  canvas->restore();
+  canvas->save();
+  canvas->concat(Matrix::MakeTrans(imageWidth + padding * 2.f, padding));
+  paint.setImageFilter(composeFilter);
+  canvas->drawImage(image, &paint);
+  canvas->restore();
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/BlendImageFilterClipToSource"));
+
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  auto surfaceCanvas = surface->getCanvas();
+  surfaceCanvas->clear(Color::FromRGBA(217, 217, 217));
+  surfaceCanvas->save();
+  surfaceCanvas->concat(Matrix::MakeTrans(padding, padding));
+  paint.setImageFilter(blendFilter);
+  surfaceCanvas->drawImage(image, &paint);
+  surfaceCanvas->restore();
+  surfaceCanvas->save();
+  surfaceCanvas->concat(Matrix::MakeTrans(imageWidth + padding * 2.f, padding));
+  paint.setImageFilter(composeFilter);
+  surfaceCanvas->drawImage(image, &paint);
+  surfaceCanvas->restore();
+  EXPECT_TRUE(Baseline::Compare(surface, "SVGExportTest/BlendImageFilterClipToSource"));
+}
 }  // namespace tgfx
