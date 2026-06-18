@@ -854,6 +854,7 @@ void ElementWriter::addBlendColorFilterPrimitives(const ModeColorFilter* modeCol
   {
     ElementWriter compositeElement("feComposite", writer);
     compositeElement.addAttribute("in", "blend");
+    compositeElement.addAttribute("in2", "SourceGraphic");
     compositeElement.addAttribute("operator", "in");
   }
 }
