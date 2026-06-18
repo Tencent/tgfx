@@ -97,18 +97,41 @@ class InnerShadowStyle : public LayerStyle {
    */
   void setColor(const Color& color);
 
+  /**
+   * Controls how much the inner shadow expands (positive) or shrinks (negative).
+   * When zero (the default), the inner shadow is rendered directly from the layer's rasterized
+   * content image without any spread adjustment.
+   * When positive, the shadow coverage grows inward, making the shadow thicker. When negative,
+   * the shadow coverage shrinks, making the shadow thinner. The spread is derived from the layer's
+   * vector shape (e.g. Rect, Oval, or RRect); when the vector shape cannot be extracted (e.g. a
+   * group layer with only children), the inner shadow spread is skipped rather than drawn.
+   */
+  float spread() const {
+    return _spread;
+  }
+
+  /**
+   * Sets the spread distance for the inner shadow.
+   */
+  void setSpread(float spread);
+
   LayerStylePosition position() const override {
     return LayerStylePosition::Above;
   }
 
   Rect filterBounds(const Rect& srcRect, float contentScale) override;
 
+  LayerStyleExtraSourceType extraSourceType() const override;
+
  private:
   InnerShadowStyle(float offsetX, float offsetY, float blurrinessX, float blurrinessY,
                    const Color& color);
 
-  void onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-              const Point& contentOffset, float alpha, BlendMode blendMode) override;
+  void onDraw(Canvas* canvas, const LayerStyleInput& input, float alpha,
+              BlendMode blendMode) override;
+
+  void drawWithSpread(Canvas* canvas, const LayerStyleInput& input, float alpha,
+                      BlendMode blendMode);
 
   std::shared_ptr<ImageFilter> getShadowFilter(float scale);
 
@@ -121,5 +144,6 @@ class InnerShadowStyle : public LayerStyle {
   Color _color = Color::Black();
   std::shared_ptr<ImageFilter> shadowFilter = nullptr;
   float currentScale = 0.0f;
+  float _spread = 0.0f;
 };
 }  // namespace tgfx

@@ -90,6 +90,10 @@ class FillPainter : public Painter {
     }
     return emit;
   }
+
+  PainterStyle onGetStyle() const override {
+    return {PaintStyle::Fill, 0.0f, StrokeAlign::Center};
+  }
 };
 
 std::shared_ptr<FillStyle> FillStyle::Make(std::shared_ptr<ColorSource> colorSource) {

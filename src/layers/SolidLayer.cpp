@@ -77,4 +77,19 @@ void SolidLayer::onUpdateContent(LayerRecorder* recorder) {
   recorder->addRRect(rRect, LayerPaint(_color));
 }
 
+std::optional<StyledShape> SolidLayer::onGetContentShape() {
+  if (_width == 0 || _height == 0) {
+    return std::nullopt;
+  }
+
+  auto rect = Rect::MakeLTRB(0, 0, _width, _height);
+  Path path = {};
+  if (_radiusX > 0 || _radiusY > 0) {
+    path.addRRect(RRect::MakeRectXY(rect, _radiusX, _radiusY));
+  } else {
+    path.addRect(rect);
+  }
+  return StyledShape::Make(Shape::MakeFrom(path), StyledShapeType::Fill, 0, StrokeAlign::Center);
+}
+
 }  // namespace tgfx

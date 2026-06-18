@@ -216,6 +216,20 @@ static std::shared_ptr<Layer3DContext> Create3DContext(const DrawArgs& args, Can
                               args.dstColorSpace);
 }
 
+static inline std::optional<StyledShape> MakeContentShape(LayerContent* content) {
+  if (content == nullptr) {
+    return std::nullopt;
+  }
+  auto bounds = content->getTightBounds(Matrix::I());
+  if (bounds.isEmpty()) {
+    return std::nullopt;
+  }
+
+  Path path = {};
+  path.addRect(bounds);
+  return StyledShape::Make(Shape::MakeFrom(path), StyledShapeType::Fill, 0, StrokeAlign::Center);
+}
+
 bool Layer::DefaultAllowsEdgeAntialiasing() {
   return AllowsEdgeAntialiasing;
 }
@@ -1016,6 +1030,10 @@ void Layer::detachProperty(LayerProperty* property) {
   }
 }
 
+std::optional<StyledShape> Layer::onGetContentShape() {
+  return MakeContentShape(getContent());
+}
+
 void Layer::onAttachToRoot(RootLayer* rootLayer) {
   _root = rootLayer;
   for (auto& child : _children) {
@@ -1814,6 +1832,10 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
     source->groups[i] = std::move(group);
   }
 
+  if (needContour[0] || needContour[1]) {
+    source->contentShape = getContentShape();
+  }
+
   return source;
 }
 
@@ -1904,6 +1926,7 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
   if (group == nullptr) {
     return;
   }
+
   auto& contentEntry = group->content;
   // Apply the content transform matrix to canvas so that rendering happens at the final scale,
   // avoiding blurry results that would come from baking contentScale into a picture recording.
@@ -1911,24 +1934,20 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
   auto matrix = Matrix::MakeScale(1.f / source->contentScale, 1.f / source->contentScale);
   matrix.preTranslate(contentEntry.offset.x, contentEntry.offset.y);
   canvas->concat(matrix);
-  switch (layerStyle->extraSourceType()) {
-    case LayerStyleExtraSourceType::None:
-      layerStyle->draw(canvas, contentEntry.image, source->contentScale, contentEntry.offset,
-                       alpha);
-      break;
-    case LayerStyleExtraSourceType::Background:
-      // Unreachable: Background-sourced styles are routed through BackgroundHandler.
-      DEBUG_ASSERT(false);
-      break;
-    case LayerStyleExtraSourceType::Contour:
-      if (group->contour.has_value()) {
-        auto contourOffset = group->contour->offset - contentEntry.offset;
-        layerStyle->drawWithExtraSource(canvas, contentEntry.image, source->contentScale,
-                                        contentEntry.offset, group->contour->image, contourOffset,
-                                        alpha);
-      }
-      break;
+  LayerStyleInput styleInput = {};
+  styleInput.content = contentEntry.image;
+  styleInput.contentOffset = contentEntry.offset;
+  styleInput.contentScale = source->contentScale;
+  if (layerStyle->extraSourceType() == LayerStyleExtraSourceType::Contour) {
+    auto contourImage = group->contour.has_value() ? group->contour->image : nullptr;
+    auto contourOffset =
+        contourImage ? group->contour->offset - contentEntry.offset : Point::Zero();
+    // contour shape may be nullopt when the layer has no simple vector content (e.g. a group
+    // layer with only children).
+    styleInput.extraSource = std::make_shared<ContourInputSource>(
+        std::move(contourImage), contourOffset, source->contentShape);
   }
+  layerStyle->draw(canvas, styleInput, alpha);
 }
 
 bool Layer::getLayersUnderPointInternal(float x, float y,
@@ -2227,6 +2246,13 @@ void Layer::updateStaticSubtreeFlags() {
   for (const auto& child : _children) {
     child->updateStaticSubtreeFlags();
   }
+}
+
+std::optional<StyledShape> Layer::getContentShape() {
+  if (!_children.empty()) {
+    return MakeContentShape(getContent());
+  }
+  return onGetContentShape();
 }
 
 }  // namespace tgfx
