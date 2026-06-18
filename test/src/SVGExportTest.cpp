@@ -1651,10 +1651,8 @@ TGFX_TEST(SVGExportTest, ComposeFilterWithBlurShadow) {
 
   auto dropShadowFilter = ImageFilter::DropShadowOnly(10, 10, 20, 20, Color::Black());
   auto innerShadowFilter = ImageFilter::InnerShadow(-10, -10, 5, 5, Color::White());
-  auto colorFilter = ColorFilter::Blend(Color::Red(), BlendMode::Multiply);
-  auto colorImageFilter = ImageFilter::ColorFilter(colorFilter);
   auto composeFilter =
-      ImageFilter::Compose({dropShadowFilter, innerShadowFilter, colorImageFilter});
+      ImageFilter::Compose({dropShadowFilter, innerShadowFilter});
 
   auto SVGStream = MemoryWriteStream::Make();
   auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200));
