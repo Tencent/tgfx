@@ -282,15 +282,6 @@ void ElementWriter::addPathAttributes(const Path& path, SVGPathParser::PathEncod
   addAttribute("d", SVGPathParser::ToSVGString(path, encoding));
 }
 
-Resources ElementWriter::addImageFilterResource(
-    const std::shared_ptr<ImageFilter>& imageFilter, Rect bound,
-    const std::shared_ptr<SVGCustomWriter>& exportWriter, Context* context) {
-  auto filterID = addImageFilter(imageFilter, bound, std::move(exportWriter), context);
-  Resources resources;
-  resources.filter = "url(#" + filterID + ")";
-  return resources;
-}
-
 Resources ElementWriter::addColorFilterResource(const std::shared_ptr<ColorFilter>& colorFilter) {
   Resources resources;
   if (!colorFilter) {
@@ -479,15 +470,6 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
       reportUnsupportedElement("Unsupported image filter");
       return "";
   }
-}
-
-std::string ElementWriter::emitComposeSubFilter(const std::shared_ptr<ImageFilter>& subFilter,
-                                                const std::string& inputResult, int stepIndex,
-                                                const std::shared_ptr<SVGCustomWriter>&) {
-  (void)subFilter;
-  (void)inputResult;
-  (void)stepIndex;
-  return "";
 }
 
 std::vector<std::string> ElementWriter::addImageFilterChain(

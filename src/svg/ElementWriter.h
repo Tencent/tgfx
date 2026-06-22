@@ -78,10 +78,6 @@ class ElementWriter {
   void addEllipseAttributes(const Rect& bound);
   void addPathAttributes(const Path& path, SVGPathParser::PathEncoding encoding);
 
-  Resources addImageFilterResource(const std::shared_ptr<ImageFilter>& imageFilter, Rect bound,
-                                   const std::shared_ptr<SVGCustomWriter>& exportWriter,
-                                   Context* context = nullptr);
-
   /**
    * Emits SVG <filter> resources for the given image filter and returns all filter IDs. For a
    * Compose filter, each sub-filter gets its own <filter> element, and all IDs are returned in
@@ -181,11 +177,6 @@ class ElementWriter {
   void addColorImageFilter(const ColorImageFilter* filter, const std::string& inputResult = "");
   void addBlendImageFilter(const BlendImageFilter* filter, const std::string& inputResult = "",
                            const Rect* filterBounds = nullptr, Context* context = nullptr);
-  // Emit all primitives for a sub-filter inside a Compose chain. Returns the result name of the
-  // last primitive written, which serves as the input for the next sub-filter.
-  std::string emitComposeSubFilter(const std::shared_ptr<ImageFilter>& subFilter,
-                                   const std::string& inputResult, int stepIndex,
-                                   const std::shared_ptr<SVGCustomWriter>& exportWriter);
 
   void reportUnsupportedElement(const char* message) const;
 
