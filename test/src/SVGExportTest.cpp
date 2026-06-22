@@ -1613,14 +1613,11 @@ TGFX_TEST(SVGExportTest, ComposeColorFilter) {
   auto image = MakeImage("resources/apitest/rotation.jpg");
   ASSERT_TRUE(image != nullptr);
 
-  auto matrixFilter = ColorFilter::Matrix({0.2f, 0,    0, 0, 0,
-                                           0,    0.2f, 0, 0, 0,
-                                           0,    0,    2, 0, 0,
-                                           0,    0,    0, 1, 0});
-  auto lumaFilter = ColorFilter::Matrix({0.2126f, 0.7152f, 0.0722f, 0, 0,
-                                         0.2126f, 0.7152f, 0.0722f, 0, 0,
-                                         0.2126f, 0.7152f, 0.0722f, 0, 0,
-                                         0,       0,       0,       1, 0});
+  auto matrixFilter =
+      ColorFilter::Matrix({0.2f, 0, 0, 0, 0, 0, 0.2f, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 1, 0});
+  auto lumaFilter =
+      ColorFilter::Matrix({0.2126f, 0.7152f, 0.0722f, 0, 0, 0.2126f, 0.7152f, 0.0722f, 0, 0,
+                           0.2126f, 0.7152f, 0.0722f, 0, 0, 0,       0,       0,       1, 0});
   auto composeFilter = ColorFilter::Compose(matrixFilter, lumaFilter);
 
   int w = image->width() / 4;
@@ -1654,25 +1651,44 @@ TGFX_TEST(SVGExportTest, ComposeFilterWithBlurShadow) {
   auto innerShadowFilter = ImageFilter::InnerShadow(-10, -10, 5, 5, Color::White());
   auto colorFilter = ColorFilter::Blend(Color::Red(), BlendMode::Multiply);
   auto colorImageFilter = ImageFilter::ColorFilter(colorFilter);
-  auto composeFilter =
+
+  auto compose1 = ImageFilter::Compose({blurFilter});
+  auto compose2 = ImageFilter::Compose({blurFilter, dropShadowFilter});
+  auto compose3 = ImageFilter::Compose({blurFilter, dropShadowFilter, innerShadowFilter});
+  auto compose4 =
       ImageFilter::Compose({blurFilter, dropShadowFilter, innerShadowFilter, colorImageFilter});
 
+  float cellSize = 200.f;
+  int cols = 4;
   auto SVGStream = MemoryWriteStream::Make();
-  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200));
+  auto exporter =
+      SVGExporter::Make(SVGStream, context, Rect::MakeWH(cellSize * static_cast<float>(cols), cellSize));
   auto canvas = exporter->getCanvas();
-  canvas->translate(50, 50);
-  canvas->clipRect(Rect::MakeWH(100, 100));
-  Paint paint;
-  paint.setImageFilter(composeFilter);
-  canvas->drawImage(image, &paint);
+
+  std::vector<std::shared_ptr<ImageFilter>> filters = {compose1, compose2, compose3, compose4};
+  for (size_t i = 0; i < filters.size(); ++i) {
+    canvas->save();
+    canvas->translate(static_cast<float>(i) * cellSize + 50.f, 50.f);
+    canvas->clipRect(Rect::MakeWH(100, 100));
+    Paint paint;
+    paint.setImageFilter(filters[i]);
+    canvas->drawImage(image, &paint);
+    canvas->restore();
+  }
   exporter->close();
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/ComposeFilterWithBlurShadow"));
 
-  auto surface = Surface::Make(context, 200, 200);
+  auto surface = Surface::Make(context, static_cast<int>(cellSize) * cols, static_cast<int>(cellSize));
   auto surfaceCanvas = surface->getCanvas();
-  surfaceCanvas->translate(50, 50);
-  surfaceCanvas->clipRect(Rect::MakeWH(100, 100));
-  surfaceCanvas->drawImage(image, &paint);
+  for (size_t i = 0; i < filters.size(); ++i) {
+    surfaceCanvas->save();
+    surfaceCanvas->translate(static_cast<float>(i) * cellSize + 50.f, 50.f);
+    surfaceCanvas->clipRect(Rect::MakeWH(100, 100));
+    Paint paint;
+    paint.setImageFilter(filters[i]);
+    surfaceCanvas->drawImage(image, &paint);
+    surfaceCanvas->restore();
+  }
   EXPECT_TRUE(Baseline::Compare(surface, "SVGExportTest/ComposeFilterWithBlurShadow"));
 }
 
