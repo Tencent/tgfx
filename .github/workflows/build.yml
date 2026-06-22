@@ -469,8 +469,8 @@ jobs:
           path: out
 
 
-  ohos-opengl:
-    name: ohos (opengl)
+  ohos-opengles:
+    name: ohos (opengles)
     runs-on: ubuntu-latest
     steps:
       - name: Check Out Repo
@@ -568,9 +568,9 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ~/.cache/ccache
-          key: ccache-ohos-opengl-${{ runner.os }}-main
+          key: ccache-ohos-opengles-${{ runner.os }}-main
           restore-keys: |
-            ccache-ohos-opengl-${{ runner.os }}-
+            ccache-ohos-opengles-${{ runner.os }}-
 
       - name: Build Harmony
         run: |
@@ -588,7 +588,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: ~/.cache/ccache
-          key: ccache-ohos-opengl-${{ runner.os }}-main
+          key: ccache-ohos-opengles-${{ runner.os }}-main
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -601,7 +601,7 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@v4
         with:
-          name: ohos_opengl_build
+          name: ohos_opengles_build
           path: ohos/out
 
   ohos-vulkan:
