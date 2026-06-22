@@ -33,6 +33,10 @@ struct NativeWindow;
 typedef struct NativeWindow OHNativeWindow;
 #endif
 
+#ifdef __ANDROID__
+struct ANativeWindow;
+#endif
+
 namespace tgfx {
 
 /**
@@ -58,6 +62,16 @@ class VulkanWindow : public Window {
    * swapchain cannot be created. Note: only sRGB output is currently supported.
    */
   static std::shared_ptr<VulkanWindow> MakeFrom(OHNativeWindow* nativeWindow,
+                                                std::shared_ptr<VulkanDevice> device,
+                                                std::shared_ptr<ColorSpace> colorSpace = nullptr);
+#endif
+
+#ifdef __ANDROID__
+  /**
+   * Creates a VulkanWindow from an Android ANativeWindow. Returns nullptr if the Vulkan surface or
+   * swapchain cannot be created. Note: only sRGB output is currently supported.
+   */
+  static std::shared_ptr<VulkanWindow> MakeFrom(ANativeWindow* nativeWindow,
                                                 std::shared_ptr<VulkanDevice> device,
                                                 std::shared_ptr<ColorSpace> colorSpace = nullptr);
 #endif

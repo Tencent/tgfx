@@ -26,7 +26,12 @@
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Recording.h"
 #include "tgfx/gpu/Window.h"
+#ifdef TGFX_USE_VULKAN
+#include "tgfx/gpu/vulkan/VulkanDevice.h"
+#include "tgfx/gpu/vulkan/VulkanWindow.h"
+#else
 #include "tgfx/gpu/opengl/egl/EGLWindow.h"
+#endif
 #include "tgfx/layers/DisplayList.h"
 
 namespace hello2d {

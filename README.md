@@ -33,7 +33,7 @@ and various video-editing apps.
 - OpenGL ES 3.0+
 - WebGL 2.0+
 - Metal 1.1+ (in progress)
-- Vulkan 1.1+ (in progress)
+- Vulkan 1.1+
 - WebGPU 1.0
 
 ## Build Prerequisites
@@ -47,7 +47,7 @@ TGFX uses **C++17** features. Here are the minimum tools needed to build TGFX on
 - Ninja 1.9.0+
 - CMake 3.13.0+
 - QT 6.2.0+
-- NDK 20+ (**20.1.5948944 recommended**)
+- NDK 25+ (**25.2.9519653 recommended**)
 - Emscripten 4.0.15 (via [emsdk](https://github.com/emscripten-core/emsdk))
 
 
@@ -111,7 +111,7 @@ These will guide you through the necessary steps to set up your development envi
 
 ### Android
 
-The Android demo project requires the **Android NDK**. We recommend using version **20.1.5948944**,
+The Android demo project requires the **Android NDK**. We recommend using version **25.2.9519653**,
 which has been fully tested with the TGFX library. If you open the project with Android Studio, it
 will automatically download the NDK during Gradle synchronization. Alternatively, you can download 
 it from the [NDK Downloads](https://developer.android.com/ndk/downloads) page.
@@ -120,13 +120,13 @@ If you choose to manually download the Android NDK, please extract it to the def
 On macOS, this would be:
 
 ```
-/Users/yourname/Library/Android/sdk/ndk/20.1.5948944
+/Users/yourname/Library/Android/sdk/ndk/25.2.9519653
 ```
 
 On Windows, it would be：
 
 ```
-C:\Users\yourname\AppData\Local\Android\Sdk\ndk\20.1.5948944
+C:\Users\yourname\AppData\Local\Android\Sdk\ndk\25.2.9519653
 ```
 
 Alternatively, you can set one of the following environment variables to help tgfx locate the NDK:
@@ -141,6 +141,15 @@ version upgrades. If you have, undo the changes and try synchronizing again. If 
 to your IDE configuration, search for a solution on Google. If you believe the problem is with the 
 project configuration, you can open an [Issue](https://github.com/Tencent/tgfx/issues/new/choose) to
 address it.
+
+By default, the demo uses OpenGL ES as the rendering backend. To build with the **Vulkan** backend
+instead, run the following command in the `android/` directory:
+
+```
+./gradlew assembleDebug -PcmakeArgs="-DTGFX_USE_VULKAN=ON"
+```
+
+Note: Vulkan requires Android 7.0 (API 24) or above.
 
 ### iOS
 
