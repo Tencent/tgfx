@@ -851,15 +851,32 @@ void ElementWriter::addMatrixColorFilterPrimitives(const MatrixColorFilter* matr
 
 void ElementWriter::addBlendColorFilterPrimitives(const ModeColorFilter* modeColorFilter,
                                                   const std::string& inputResult) {
+  auto color = ConvertColorSpace(modeColorFilter->color, _targetColorSpace);
+  auto sourceRef = inputResult.empty() ? std::string("SourceGraphic") : inputResult;
+
+  // SVG feBlend modes include Porter-Duff compositing terms (e.g. src*(1-dstA)), which causes
+  // color leakage into transparent regions. For Multiply mode, use feColorMatrix instead — it
+  // performs pure per-channel multiplication without compositing, matching the GPU pipeline.
+  if (modeColorFilter->mode == BlendMode::Multiply) {
+    ElementWriter colorMatrixElement("feColorMatrix", writer);
+    if (!inputResult.empty()) {
+      colorMatrixElement.addAttribute("in", inputResult);
+    }
+    colorMatrixElement.addAttribute("type", "matrix");
+    colorMatrixElement.addAttribute(
+        "values", FloatToString(color.red) + " 0 0 0 0 0 " + FloatToString(color.green) +
+                      " 0 0 0 0 0 " + FloatToString(color.blue) + " 0 0 0 0 0 " +
+                      FloatToString(color.alpha) + " 0");
+    return;
+  }
+
   auto blendModeString = ToSVGBlendMode(modeColorFilter->mode);
   if (blendModeString.empty()) {
     reportUnsupportedElement("Unsupported blend mode in color filter");
     return;
   }
-  auto sourceRef = inputResult.empty() ? std::string("SourceGraphic") : inputResult;
   {
     ElementWriter floodElement("feFlood", writer);
-    auto color = ConvertColorSpace(modeColorFilter->color, _targetColorSpace);
     floodElement.addAttribute("flood-color", ToSVGColor(color));
     floodElement.addAttribute("flood-opacity", color.alpha);
     floodElement.addAttribute("result", "flood");
