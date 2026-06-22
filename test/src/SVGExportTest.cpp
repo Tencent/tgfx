@@ -1664,8 +1664,8 @@ TGFX_TEST(SVGExportTest, ComposeFilterWithBlurShadow) {
   float cellSize = 200.f;
   int cols = 4;
   auto SVGStream = MemoryWriteStream::Make();
-  auto exporter =
-      SVGExporter::Make(SVGStream, context, Rect::MakeWH(cellSize * static_cast<float>(cols), cellSize));
+  auto exporter = SVGExporter::Make(SVGStream, context,
+                                    Rect::MakeWH(cellSize * static_cast<float>(cols), cellSize));
   auto canvas = exporter->getCanvas();
   Paint backgroundPaint;
   backgroundPaint.setColor(Color::White());
@@ -1684,7 +1684,8 @@ TGFX_TEST(SVGExportTest, ComposeFilterWithBlurShadow) {
   exporter->close();
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/ComposeFilterWithBlurShadow"));
 
-  auto surface = Surface::Make(context, static_cast<int>(cellSize) * cols, static_cast<int>(cellSize));
+  auto surface =
+      Surface::Make(context, static_cast<int>(cellSize) * cols, static_cast<int>(cellSize));
   auto surfaceCanvas = surface->getCanvas();
   surfaceCanvas->clear(Color::White());
   for (size_t i = 0; i < filters.size(); ++i) {

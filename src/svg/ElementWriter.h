@@ -88,9 +88,10 @@ class ElementWriter {
    * application order (innermost first). The caller can use these IDs to create nested <g>
    * elements. Must be called within a parent <defs> element.
    */
-  std::vector<std::string> addImageFilterChain(
-      const std::shared_ptr<ImageFilter>& imageFilter, Rect bound,
-      const std::shared_ptr<SVGCustomWriter>& exportWriter, Context* context);
+  std::vector<std::string> addImageFilterChain(const std::shared_ptr<ImageFilter>& imageFilter,
+                                               Rect bound,
+                                               const std::shared_ptr<SVGCustomWriter>& exportWriter,
+                                               Context* context);
 
   /**
    * Emits an SVG <filter> resource that reproduces the given color filter and returns its

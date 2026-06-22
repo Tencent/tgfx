@@ -630,8 +630,8 @@ void ElementWriter::addSoftAlphaElement(const std::string&) {
 }
 
 void ElementWriter::addDropShadowImageFilter(const DropShadowImageFilter* filter,
-                                              const std::string& inputResult,
-                                              bool preserveSoftAlpha) {
+                                             const std::string& inputResult,
+                                             bool preserveSoftAlpha) {
   const auto alphaResult = preserveSoftAlpha ? "softAlpha" : "hardAlpha";
   if (preserveSoftAlpha) {
     addSoftAlphaElement(inputResult);
@@ -684,8 +684,8 @@ void ElementWriter::addDropShadowImageFilter(const DropShadowImageFilter* filter
   }
 }
 void ElementWriter::addInnerShadowImageFilter(const InnerShadowImageFilter* filter,
-                                               const std::string& inputResult,
-                                               bool preserveSoftAlpha) {
+                                              const std::string& inputResult,
+                                              bool preserveSoftAlpha) {
   if (!filter->blurFilter) {
     return;
   }
@@ -743,10 +743,10 @@ void ElementWriter::addInnerShadowImageFilter(const InnerShadowImageFilter* filt
       ElementWriter colorMatrixElement("feColorMatrix", writer);
       colorMatrixElement.addAttribute("type", "matrix");
       auto color = ConvertColorSpace(filter->color, _targetColorSpace);
-      colorMatrixElement.addAttribute("values", "0 0 0 0 " + FloatToString(color.red) + " 0 0 0 0 " +
-                                                    FloatToString(color.green) + " 0 0 0 0 " +
-                                                    FloatToString(color.blue) + " 0 0 0 " +
-                                                    FloatToString(color.alpha) + " 0");
+      colorMatrixElement.addAttribute("values", "0 0 0 0 " + FloatToString(color.red) +
+                                                    " 0 0 0 0 " + FloatToString(color.green) +
+                                                    " 0 0 0 0 " + FloatToString(color.blue) +
+                                                    " 0 0 0 " + FloatToString(color.alpha) + " 0");
     }
     return;
   }
@@ -819,8 +819,8 @@ void ElementWriter::addColorImageFilter(const ColorImageFilter* filter,
 }
 
 void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter,
-                                        const std::string& inputResult,
-                                        const Rect* filterBounds, Context* context) {
+                                        const std::string& inputResult, const Rect* filterBounds,
+                                        Context* context) {
   if (!filter->shader) {
     reportUnsupportedElement("Missing shader in BlendImageFilter");
     return;
@@ -983,10 +983,10 @@ void ElementWriter::addBlendColorFilterPrimitives(const ModeColorFilter* modeCol
       colorMatrixElement.addAttribute("in", inputResult);
     }
     colorMatrixElement.addAttribute("type", "matrix");
-    colorMatrixElement.addAttribute(
-        "values", FloatToString(color.red) + " 0 0 0 0 0 " + FloatToString(color.green) +
-                      " 0 0 0 0 0 " + FloatToString(color.blue) + " 0 0 0 0 0 " +
-                      FloatToString(color.alpha) + " 0");
+    colorMatrixElement.addAttribute("values", FloatToString(color.red) + " 0 0 0 0 0 " +
+                                                  FloatToString(color.green) + " 0 0 0 0 0 " +
+                                                  FloatToString(color.blue) + " 0 0 0 0 0 " +
+                                                  FloatToString(color.alpha) + " 0");
     return;
   }
 
