@@ -20,9 +20,7 @@
 
 #pragma once
 
-#include "gpu/vulkan/VulkanAPI.h"
-#include "gpu/vulkan/VulkanResource.h"
-#include "tgfx/gpu/Texture.h"
+#include "gpu/vulkan/VulkanTexture.h"
 #include "tgfx/platform/HardwareBuffer.h"
 
 namespace tgfx {
@@ -33,42 +31,16 @@ class VulkanGPU;
  * Vulkan texture backed by an Android AHardwareBuffer. Imports the hardware buffer as external
  * memory and creates a VkImage bound to it for zero-copy texture sharing.
  */
-class VulkanHardwareTexture : public Texture, public VulkanResource {
+class VulkanHardwareTexture : public VulkanTexture {
  public:
   static std::shared_ptr<VulkanHardwareTexture> MakeFrom(VulkanGPU* gpu,
                                                          HardwareBufferRef hardwareBuffer,
                                                          uint32_t usage);
-
-  VkImage vulkanImage() const {
-    return image;
-  }
-
-  VkImageView vulkanImageView() const {
-    return imageView;
-  }
-
-  VkImageView vulkanRenderImageView() const {
-    return imageView;
-  }
-
-  VkFormat vulkanFormat() const {
-    return format;
-  }
-
-  VkImageLayout currentLayout() const {
-    return layout;
-  }
-
-  void setCurrentLayout(VkImageLayout newLayout) {
-    layout = newLayout;
-  }
+  ~VulkanHardwareTexture() override;
 
   HardwareBufferRef getHardwareBuffer() const override {
     return hardwareBuffer;
   }
-
-  BackendTexture getBackendTexture() const override;
-  BackendRenderTarget getBackendRenderTarget() const override;
 
  protected:
   void onRelease(VulkanGPU* gpu) override;
@@ -77,15 +49,10 @@ class VulkanHardwareTexture : public Texture, public VulkanResource {
   VulkanHardwareTexture(const TextureDescriptor& descriptor, HardwareBufferRef hardwareBuffer,
                         VkImage image, VkImageView imageView, VkDeviceMemory dedicatedMemory,
                         VkSamplerYcbcrConversion ycbcrConversion, VkFormat format);
-  ~VulkanHardwareTexture() override;
 
   HardwareBufferRef hardwareBuffer = nullptr;
-  VkImage image = VK_NULL_HANDLE;
-  VkImageView imageView = VK_NULL_HANDLE;
   VkDeviceMemory dedicatedMemory = VK_NULL_HANDLE;
   VkSamplerYcbcrConversion ycbcrConversion = VK_NULL_HANDLE;
-  VkFormat format = VK_FORMAT_UNDEFINED;
-  VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
 
   friend class VulkanGPU;
 };

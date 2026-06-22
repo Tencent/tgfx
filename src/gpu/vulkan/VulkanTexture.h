@@ -68,13 +68,12 @@ class VulkanTexture : public Texture, public VulkanResource {
   BackendRenderTarget getBackendRenderTarget() const override;
 
  protected:
-  void onRelease(VulkanGPU* gpu) override;
-
- private:
   VulkanTexture(const TextureDescriptor& descriptor, VkImage image, VkImageView imageView,
                 VkImageView renderImageView, VmaAllocation allocation, VkFormat format,
                 bool adopted, VkImageLayout initialLayout);
   ~VulkanTexture() override = default;
+
+  void onRelease(VulkanGPU* gpu) override;
 
   VkImage image = VK_NULL_HANDLE;
   VkImageView imageView = VK_NULL_HANDLE;
@@ -84,6 +83,7 @@ class VulkanTexture : public Texture, public VulkanResource {
   VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
   bool adopted = true;
 
+ private:
   friend class VulkanGPU;
 };
 

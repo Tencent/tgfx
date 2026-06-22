@@ -35,7 +35,6 @@ static VkFormat HardwareBufferFormatToVkFormat(HardwareBufferFormat format) {
     case HardwareBufferFormat::BGRA_8888:
       return VK_FORMAT_B8G8R8A8_UNORM;
     case HardwareBufferFormat::YCBCR_420_SP:
-      // YUV formats use VK_FORMAT_UNDEFINED and rely on VkExternalFormatANDROID.
       return VK_FORMAT_UNDEFINED;
     default:
       return VK_FORMAT_UNDEFINED;
@@ -52,7 +51,6 @@ static uint32_t FindMemoryType(VkPhysicalDevice physicalDevice, uint32_t memoryT
       return i;
     }
   }
-  // Fallback: pick any valid memory type from the bitmask.
   for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
     if (memoryTypeBits & (1u << i)) {
       return i;
@@ -84,7 +82,6 @@ std::shared_ptr<VulkanHardwareTexture> VulkanHardwareTexture::MakeFrom(
   VkDevice device = gpu->device();
   VkPhysicalDevice physDevice = gpu->physicalDevice();
 
-  // Query hardware buffer properties including format info.
   VkAndroidHardwareBufferFormatPropertiesANDROID formatProps = {};
   formatProps.sType = VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_FORMAT_PROPERTIES_ANDROID;
 
@@ -99,19 +96,15 @@ std::shared_ptr<VulkanHardwareTexture> VulkanHardwareTexture::MakeFrom(
     return nullptr;
   }
 
-  // Determine the VkFormat. For YUV buffers the format from the hardware buffer properties is
-  // VK_FORMAT_UNDEFINED and we use VkExternalFormatANDROID instead.
   VkFormat vkFormat = formatProps.format;
   bool useExternalFormat = (vkFormat == VK_FORMAT_UNDEFINED);
   if (!useExternalFormat && !isYUV) {
-    // Use the format from our mapping as a cross-check.
     VkFormat expectedFormat = HardwareBufferFormatToVkFormat(info.format);
     if (expectedFormat != VK_FORMAT_UNDEFINED) {
       vkFormat = expectedFormat;
     }
   }
 
-  // Build VkImage create info with external memory.
   VkExternalMemoryImageCreateInfo externalMemoryInfo = {};
   externalMemoryInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO;
   externalMemoryInfo.handleTypes =
@@ -154,7 +147,6 @@ std::shared_ptr<VulkanHardwareTexture> VulkanHardwareTexture::MakeFrom(
     return nullptr;
   }
 
-  // Allocate and bind dedicated memory imported from the AHardwareBuffer.
   VkImportAndroidHardwareBufferInfoANDROID importInfo = {};
   importInfo.sType = VK_STRUCTURE_TYPE_IMPORT_ANDROID_HARDWARE_BUFFER_INFO_ANDROID;
   importInfo.buffer = hardwareBuffer;
@@ -195,7 +187,6 @@ std::shared_ptr<VulkanHardwareTexture> VulkanHardwareTexture::MakeFrom(
     return nullptr;
   }
 
-  // Create YCbCr sampler conversion for YUV buffers.
   VkSamplerYcbcrConversion ycbcrConversion = VK_NULL_HANDLE;
   if (useExternalFormat) {
     VkSamplerYcbcrConversionCreateInfo ycbcrInfo = {};
@@ -224,7 +215,6 @@ std::shared_ptr<VulkanHardwareTexture> VulkanHardwareTexture::MakeFrom(
     }
   }
 
-  // Create image view.
   VkImageViewCreateInfo viewInfo = {};
   viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
   viewInfo.image = vkImage;
@@ -256,8 +246,6 @@ std::shared_ptr<VulkanHardwareTexture> VulkanHardwareTexture::MakeFrom(
     return nullptr;
   }
 
-  // For YUV external format textures, report as RGBA_8888 at the tgfx level since sampling
-  // through the YCbCr conversion produces RGBA output.
   PixelFormat pixelFormat =
       useExternalFormat ? PixelFormat::RGBA_8888 : VkFormatToPixelFormat(vkFormat);
   TextureDescriptor descriptor = {};
@@ -277,8 +265,10 @@ VulkanHardwareTexture::VulkanHardwareTexture(const TextureDescriptor& descriptor
                                              VkImageView imageView, VkDeviceMemory dedicatedMemory,
                                              VkSamplerYcbcrConversion ycbcrConversion,
                                              VkFormat format)
-    : Texture(descriptor), hardwareBuffer(hardwareBuffer), image(image), imageView(imageView),
-      dedicatedMemory(dedicatedMemory), ycbcrConversion(ycbcrConversion), format(format) {
+    : VulkanTexture(descriptor, image, imageView, VK_NULL_HANDLE, VK_NULL_HANDLE, format, true,
+                    VK_IMAGE_LAYOUT_UNDEFINED),
+      hardwareBuffer(hardwareBuffer), dedicatedMemory(dedicatedMemory),
+      ycbcrConversion(ycbcrConversion) {
   HardwareBufferRetain(hardwareBuffer);
 }
 
@@ -304,28 +294,6 @@ void VulkanHardwareTexture::onRelease(VulkanGPU* gpu) {
     vkFreeMemory(device, dedicatedMemory, nullptr);
     dedicatedMemory = VK_NULL_HANDLE;
   }
-}
-
-BackendTexture VulkanHardwareTexture::getBackendTexture() const {
-  if (image == VK_NULL_HANDLE || !(descriptor.usage & TextureUsage::TEXTURE_BINDING)) {
-    return {};
-  }
-  VulkanImageInfo vulkanInfo;
-  vulkanInfo.image = reinterpret_cast<uint64_t>(image);
-  vulkanInfo.format = static_cast<uint32_t>(format);
-  vulkanInfo.layout = static_cast<uint32_t>(layout);
-  return BackendTexture(vulkanInfo, descriptor.width, descriptor.height);
-}
-
-BackendRenderTarget VulkanHardwareTexture::getBackendRenderTarget() const {
-  if (image == VK_NULL_HANDLE || !(descriptor.usage & TextureUsage::RENDER_ATTACHMENT)) {
-    return {};
-  }
-  VulkanImageInfo vulkanInfo;
-  vulkanInfo.image = reinterpret_cast<uint64_t>(image);
-  vulkanInfo.format = static_cast<uint32_t>(format);
-  vulkanInfo.layout = static_cast<uint32_t>(layout);
-  return BackendRenderTarget(vulkanInfo, descriptor.width, descriptor.height);
 }
 
 }  // namespace tgfx
