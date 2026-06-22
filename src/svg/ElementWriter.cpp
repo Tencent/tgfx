@@ -725,6 +725,17 @@ void ElementWriter::addInnerShadowImageFilter(const InnerShadowImageFilter* filt
     ElementWriter blendElement("feBlend", writer);
     blendElement.addAttribute("mode", "normal");
     blendElement.addAttribute("in2", "shape");
+    blendElement.addAttribute("result", "innerBlend");
+  }
+  if (!filter->shadowOnly) {
+    // GPU uses SrcATop to merge the inner shadow with the source, which limits the output alpha
+    // to the source's alpha. SVG feBlend mode="normal" is SrcOver and can expand alpha beyond
+    // the source. Clip the result back to SourceGraphic's alpha to match GPU semantics.
+    auto sourceRef = inputResult.empty() ? std::string("SourceGraphic") : inputResult;
+    ElementWriter compositeElement("feComposite", writer);
+    compositeElement.addAttribute("in", "innerBlend");
+    compositeElement.addAttribute("in2", sourceRef);
+    compositeElement.addAttribute("operator", "in");
   }
 }
 
