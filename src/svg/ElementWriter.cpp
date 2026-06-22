@@ -423,17 +423,6 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
       addInnerShadowImageFilter(innerShadowFilter);
       return filterID;
     }
-    case Types::ImageFilterType::Compose: {
-      const auto composeFilter = static_cast<const ComposeImageFilter*>(imageFilter.get());
-      std::string filterID;
-      for (const auto& filterItem : composeFilter->filters) {
-        auto id = addImageFilter(filterItem, bound, exportWriter, context);
-        if (!id.empty()) {
-          filterID = id;
-        }
-      }
-      return filterID;
-    }
     case Types::ImageFilterType::Color: {
       const auto colorFilter = static_cast<const ColorImageFilter*>(imageFilter.get());
       bound = colorFilter->filterBounds(bound);
