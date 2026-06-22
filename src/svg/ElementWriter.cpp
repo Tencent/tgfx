@@ -328,7 +328,8 @@ Resources ElementWriter::addColorFilterResource(const std::shared_ptr<ColorFilte
 
 std::string ElementWriter::emitFilterElement(const std::shared_ptr<ImageFilter>& imageFilter,
                                              const Rect& bound,
-                                             const std::shared_ptr<SVGCustomWriter>& exportWriter) {
+                                             const std::shared_ptr<SVGCustomWriter>& exportWriter,
+                                             bool preserveSoftAlpha) {
   std::string filterID = resourceStore->addFilter();
   ElementWriter filterElement("filter", writer);
   filterElement.addAttribute("id", filterID);
@@ -349,13 +350,13 @@ std::string ElementWriter::emitFilterElement(const std::shared_ptr<ImageFilter>&
     case Types::ImageFilterType::DropShadow: {
       const auto dropShadowFilter = static_cast<const DropShadowImageFilter*>(imageFilter.get());
       callbackDropShadowImageFilter(dropShadowFilter, exportWriter, filterElement);
-      addDropShadowImageFilter(dropShadowFilter);
+      addDropShadowImageFilter(dropShadowFilter, "", preserveSoftAlpha);
       break;
     }
     case Types::ImageFilterType::InnerShadow: {
       const auto innerShadowFilter = static_cast<const InnerShadowImageFilter*>(imageFilter.get());
       callbackInnerShadowImageFilter(innerShadowFilter, exportWriter, filterElement);
-      addInnerShadowImageFilter(innerShadowFilter);
+      addInnerShadowImageFilter(innerShadowFilter, "", preserveSoftAlpha);
       break;
     }
     case Types::ImageFilterType::Color: {
@@ -503,7 +504,7 @@ std::vector<std::string> ElementWriter::addImageFilterChain(
     auto composeBound = imageFilter->filterBounds(bound);
     std::vector<std::string> filterIDs;
     for (const auto& filterItem : composeFilter->filters) {
-      filterIDs.push_back(emitFilterElement(filterItem, composeBound, exportWriter));
+      filterIDs.push_back(emitFilterElement(filterItem, composeBound, exportWriter, true));
     }
     return filterIDs;
   }
@@ -628,8 +629,14 @@ void ElementWriter::addSoftAlphaElement(const std::string&) {
 }
 
 void ElementWriter::addDropShadowImageFilter(const DropShadowImageFilter* filter,
-                                              const std::string& inputResult) {
-  addSoftAlphaElement(inputResult);
+                                              const std::string& inputResult,
+                                              bool preserveSoftAlpha) {
+  const auto alphaResult = preserveSoftAlpha ? "softAlpha" : "hardAlpha";
+  if (preserveSoftAlpha) {
+    addSoftAlphaElement(inputResult);
+  } else {
+    addHardAlphaElement(inputResult);
+  }
   {
     ElementWriter offsetElement("feOffset", writer);
     offsetElement.addAttribute("dx", filter->dx);
@@ -651,9 +658,9 @@ void ElementWriter::addDropShadowImageFilter(const DropShadowImageFilter* filter
       blurElement.addAttribute("stdDeviation", FloatToString(blurX) + " " + FloatToString(blurY));
     }
   }
-  if (!filter->shadowOnly) {
+  if (!preserveSoftAlpha || !filter->shadowOnly) {
     ElementWriter compositeElement("feComposite", writer);
-    compositeElement.addAttribute("in2", "softAlpha");
+    compositeElement.addAttribute("in2", alphaResult);
     compositeElement.addAttribute("operator", "out");
   }
   {
@@ -676,11 +683,17 @@ void ElementWriter::addDropShadowImageFilter(const DropShadowImageFilter* filter
   }
 }
 void ElementWriter::addInnerShadowImageFilter(const InnerShadowImageFilter* filter,
-                                               const std::string& inputResult) {
+                                               const std::string& inputResult,
+                                               bool preserveSoftAlpha) {
   if (!filter->blurFilter) {
     return;
   }
-  addSoftAlphaElement(inputResult);
+  const auto alphaResult = preserveSoftAlpha ? "softAlpha" : "hardAlpha";
+  if (preserveSoftAlpha) {
+    addSoftAlphaElement(inputResult);
+  } else {
+    addHardAlphaElement(inputResult);
+  }
   auto sourceRef = inputResult.empty() ? std::string("SourceGraphic") : inputResult;
   if (!filter->shadowOnly) {
     {
@@ -698,11 +711,14 @@ void ElementWriter::addInnerShadowImageFilter(const InnerShadowImageFilter* filt
   }
   {
     ElementWriter offsetElement("feOffset", writer);
+    offsetElement.addAttribute("in", alphaResult);
     offsetElement.addAttribute("dx", filter->dx);
     offsetElement.addAttribute("dy", filter->dy);
+    offsetElement.addAttribute("result", "offsetAlpha");
   }
   {
     ElementWriter blurElement("feGaussianBlur", writer);
+    blurElement.addAttribute("in", "offsetAlpha");
     if (Types::Get(filter->blurFilter.get()) == Types::ImageFilterType::Blur) {
       auto blurFilter = static_cast<const GaussianBlurImageFilter*>(filter->blurFilter.get());
       if (FloatNearlyEqual(blurFilter->blurrinessX, blurFilter->blurrinessY)) {
@@ -712,39 +728,82 @@ void ElementWriter::addInnerShadowImageFilter(const InnerShadowImageFilter* filt
                                                      FloatToString(blurFilter->blurrinessY));
       }
     }
+    blurElement.addAttribute("result", "blurredAlpha");
+  }
+  if (!preserveSoftAlpha) {
+    {
+      ElementWriter compositeElement("feComposite", writer);
+      compositeElement.addAttribute("in2", alphaResult);
+      compositeElement.addAttribute("operator", "arithmetic");
+      compositeElement.addAttribute("k2", "-1");
+      compositeElement.addAttribute("k3", "1");
+    }
+    {
+      ElementWriter colorMatrixElement("feColorMatrix", writer);
+      colorMatrixElement.addAttribute("type", "matrix");
+      auto color = ConvertColorSpace(filter->color, _targetColorSpace);
+      colorMatrixElement.addAttribute("values", "0 0 0 0 " + FloatToString(color.red) + " 0 0 0 0 " +
+                                                    FloatToString(color.green) + " 0 0 0 0 " +
+                                                    FloatToString(color.blue) + " 0 0 0 " +
+                                                    FloatToString(color.alpha) + " 0");
+    }
+    return;
+  }
+
+  auto color = ConvertColorSpace(filter->color, _targetColorSpace);
+  {
+    ElementWriter floodElement("feFlood", writer);
+    floodElement.addAttribute("flood-color", ToSVGColor(color));
+    floodElement.addAttribute("flood-opacity", color.alpha);
+    floodElement.addAttribute("result", "shadowColor");
+    std::string cssStyle;
+    if (writeColorCSSStyleAttribute("flood-color", color, &cssStyle)) {
+      floodElement.addAttribute("style", cssStyle);
+    }
   }
   {
+    // Match InnerShadowImageFilter::getShadowFragmentProcessor():
+    // colorShadow = SrcOut(shadowColor, blurredAlpha).
     ElementWriter compositeElement("feComposite", writer);
-    compositeElement.addAttribute("in2", "softAlpha");
-    compositeElement.addAttribute("operator", "arithmetic");
-    compositeElement.addAttribute("k2", "-1");
-    compositeElement.addAttribute("k3", "1");
+    compositeElement.addAttribute("in", "shadowColor");
+    compositeElement.addAttribute("in2", "blurredAlpha");
+    compositeElement.addAttribute("operator", "out");
+    compositeElement.addAttribute("result", "colorShadow");
   }
-  {
-    ElementWriter colorMatrixElement("feColorMatrix", writer);
-    colorMatrixElement.addAttribute("type", "matrix");
-    auto color = filter->color;
-    color = ConvertColorSpace(color, _targetColorSpace);
-    colorMatrixElement.addAttribute("values", "0 0 0 0 " + FloatToString(color.red) + " 0 0 0 0 " +
-                                                  FloatToString(color.green) + " 0 0 0 0 " +
-                                                  FloatToString(color.blue) + " 0 0 0 " +
-                                                  FloatToString(color.alpha) + " 0");
-  }
-  if (!filter->shadowOnly) {
-    ElementWriter blendElement("feBlend", writer);
-    blendElement.addAttribute("mode", "normal");
-    blendElement.addAttribute("in2", "shape");
-    blendElement.addAttribute("result", "innerBlend");
-  }
-  if (!filter->shadowOnly) {
-    // GPU uses SrcATop to merge the inner shadow with the source, which limits the output alpha
-    // to the source's alpha. SVG feBlend mode="normal" is SrcOver and can expand alpha beyond
-    // the source. Clip the result back to SourceGraphic's alpha to match GPU semantics.
-    auto sourceRef = inputResult.empty() ? std::string("SourceGraphic") : inputResult;
+  if (filter->shadowOnly) {
     ElementWriter compositeElement("feComposite", writer);
-    compositeElement.addAttribute("in", "innerBlend");
-    compositeElement.addAttribute("in2", sourceRef);
+    compositeElement.addAttribute("in", "colorShadow");
+    compositeElement.addAttribute("in2", "shape");
     compositeElement.addAttribute("operator", "in");
+    return;
+  }
+  {
+    // Match InnerShadowImageFilter::asFragmentProcessor():
+    // result = SrcATop(colorShadow, source).
+    ElementWriter shadowInsideElement("feComposite", writer);
+    shadowInsideElement.addAttribute("in", "colorShadow");
+    shadowInsideElement.addAttribute("in2", "shape");
+    shadowInsideElement.addAttribute("operator", "in");
+    shadowInsideElement.addAttribute("result", "shadowInside");
+  }
+  {
+    ElementWriter shapeOutsideElement("feComposite", writer);
+    shapeOutsideElement.addAttribute("in", "shape");
+    shapeOutsideElement.addAttribute("in2", "colorShadow");
+    shapeOutsideElement.addAttribute("operator", "out");
+    shapeOutsideElement.addAttribute("result", "shapeOutsideShadow");
+  }
+  {
+    ElementWriter mergeElement("feMerge", writer);
+    mergeElement.addAttribute("result", "innerShadowResult");
+    {
+      ElementWriter mergeNode("feMergeNode", writer);
+      mergeNode.addAttribute("in", "shapeOutsideShadow");
+    }
+    {
+      ElementWriter mergeNode("feMergeNode", writer);
+      mergeNode.addAttribute("in", "shadowInside");
+    }
   }
 }
 

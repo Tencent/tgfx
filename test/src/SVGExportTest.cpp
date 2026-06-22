@@ -754,6 +754,12 @@ TGFX_TEST(SVGExportTest, LayerShadow) {
 
   exporter->close();
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/LayerDropShadow"));
+
+  auto surface = Surface::Make(context, 400, 400);
+  ASSERT_TRUE(surface != nullptr);
+  surface->getCanvas()->clear();
+  displayList->root()->draw(surface->getCanvas());
+  EXPECT_TRUE(Baseline::Compare(surface, "SVGExportTest/LayerDropShadow"));
 }
 
 TGFX_TEST(SVGExportTest, DstColorSpace) {

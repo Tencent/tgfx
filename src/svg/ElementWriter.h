@@ -148,7 +148,8 @@ class ElementWriter {
   std::string addImageFilter(const std::shared_ptr<ImageFilter>& imageFilter, Rect bound,
                              const std::shared_ptr<SVGCustomWriter>& exportWriter);
   std::string emitFilterElement(const std::shared_ptr<ImageFilter>& imageFilter, const Rect& bound,
-                                const std::shared_ptr<SVGCustomWriter>& exportWriter);
+                                const std::shared_ptr<SVGCustomWriter>& exportWriter,
+                                bool preserveSoftAlpha = false);
   void callbackBlurImageFilter(const GaussianBlurImageFilter* filter,
                                const std::shared_ptr<SVGCustomWriter>& exportWriter,
                                ElementWriter& filterElement);
@@ -169,9 +170,11 @@ class ElementWriter {
   void addBlurImageFilter(const GaussianBlurImageFilter* filter,
                           const std::string& inputResult = "");
   void addDropShadowImageFilter(const DropShadowImageFilter* filter,
-                                const std::string& inputResult = "");
+                                const std::string& inputResult = "",
+                                bool preserveSoftAlpha = false);
   void addInnerShadowImageFilter(const InnerShadowImageFilter* filter,
-                                 const std::string& inputResult = "");
+                                 const std::string& inputResult = "",
+                                 bool preserveSoftAlpha = false);
   void addColorImageFilter(const ColorImageFilter* filter, const std::string& inputResult = "");
   void addBlendImageFilter(const BlendImageFilter* filter, const std::string& inputResult = "");
   // Emit all primitives for a sub-filter inside a Compose chain. Returns the result name of the
