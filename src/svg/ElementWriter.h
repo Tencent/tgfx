@@ -117,9 +117,11 @@ class ElementWriter {
 
   void addMatrixColorFilterPrimitives(const MatrixColorFilter* matrixColorFilter);
 
-  void addBlendColorFilterPrimitives(const ModeColorFilter* modeColorFilter);
+  void addBlendColorFilterPrimitives(const ModeColorFilter* modeColorFilter,
+                                     const std::string& inputResult = "");
 
-  bool addColorFilterPrimitives(const std::shared_ptr<ColorFilter>& colorFilter);
+  bool addColorFilterPrimitives(const std::shared_ptr<ColorFilter>& colorFilter,
+                                const std::string& inputResult = "");
 
   void addMaskResources(const std::shared_ptr<MaskFilter>& maskFilter, Resources* resources,
                         Context* context, SVGExportContext* svgContext);
@@ -162,12 +164,20 @@ class ElementWriter {
   void callbackBlendImageFilter(const BlendImageFilter* filter,
                                 const std::shared_ptr<SVGCustomWriter>& exportWriter,
                                 ElementWriter& filterElement);
-  void addHardAlphaElement();
-  void addBlurImageFilter(const GaussianBlurImageFilter* filter);
-  void addDropShadowImageFilter(const DropShadowImageFilter* filter);
-  void addInnerShadowImageFilter(const InnerShadowImageFilter* filter);
-  void addColorImageFilter(const ColorImageFilter* filter);
-  void addBlendImageFilter(const BlendImageFilter* filter);
+  void addHardAlphaElement(const std::string& inputResult = "");
+  void addBlurImageFilter(const GaussianBlurImageFilter* filter,
+                          const std::string& inputResult = "");
+  void addDropShadowImageFilter(const DropShadowImageFilter* filter,
+                                const std::string& inputResult = "");
+  void addInnerShadowImageFilter(const InnerShadowImageFilter* filter,
+                                 const std::string& inputResult = "");
+  void addColorImageFilter(const ColorImageFilter* filter, const std::string& inputResult = "");
+  void addBlendImageFilter(const BlendImageFilter* filter, const std::string& inputResult = "");
+  // Emit all primitives for a sub-filter inside a Compose chain. Returns the result name of the
+  // last primitive written, which serves as the input for the next sub-filter.
+  std::string emitComposeSubFilter(const std::shared_ptr<ImageFilter>& subFilter,
+                                   const std::string& inputResult, int stepIndex,
+                                   const std::shared_ptr<SVGCustomWriter>& exportWriter);
 
   void reportUnsupportedElement(const char* message) const;
 

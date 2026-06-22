@@ -479,6 +479,15 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
   }
 }
 
+std::string ElementWriter::emitComposeSubFilter(const std::shared_ptr<ImageFilter>& subFilter,
+                                                const std::string& inputResult, int stepIndex,
+                                                const std::shared_ptr<SVGCustomWriter>&) {
+  (void)subFilter;
+  (void)inputResult;
+  (void)stepIndex;
+  return "";
+}
+
 std::vector<std::string> ElementWriter::addImageFilterChain(
     const std::shared_ptr<ImageFilter>& imageFilter, Rect bound,
     const std::shared_ptr<SVGCustomWriter>& exportWriter) {
@@ -488,8 +497,9 @@ std::vector<std::string> ElementWriter::addImageFilterChain(
   auto type = Types::Get(imageFilter.get());
   if (type == Types::ImageFilterType::Compose) {
     const auto composeFilter = static_cast<const ComposeImageFilter*>(imageFilter.get());
-    // Use the Compose filter's overall filterBounds as a shared region for all sub-filters.
-    // This prevents outermost <g filter> from clipping inner sub-filter effects.
+    // GPU pipeline: each sub-filter receives the previous sub-filter's full output as its source.
+    // In SVG, nested <g filter="..."> achieves exactly this: each layer's SourceGraphic/SourceAlpha
+    // is the output of the inner layer's filter. This matches the GPU's serial FilterImage chain.
     auto composeBound = imageFilter->filterBounds(bound);
     std::vector<std::string> filterIDs;
     for (const auto& filterItem : composeFilter->filters) {
@@ -585,8 +595,12 @@ void ElementWriter::callbackBlendImageFilter(const BlendImageFilter* filter,
   }
 }
 
-void ElementWriter::addBlurImageFilter(const GaussianBlurImageFilter* filter) {
+void ElementWriter::addBlurImageFilter(const GaussianBlurImageFilter* filter,
+                                       const std::string& inputResult) {
   ElementWriter blurElement("feGaussianBlur", writer);
+  if (!inputResult.empty()) {
+    blurElement.addAttribute("in", inputResult);
+  }
   if (FloatNearlyEqual(filter->blurrinessX, filter->blurrinessY)) {
     blurElement.addAttribute("stdDeviation", filter->blurrinessX);
   } else {
@@ -596,7 +610,7 @@ void ElementWriter::addBlurImageFilter(const GaussianBlurImageFilter* filter) {
   blurElement.addAttribute("result", "blur");
 }
 
-void ElementWriter::addHardAlphaElement() {
+void ElementWriter::addHardAlphaElement(const std::string&) {
   ElementWriter colorMatrixElement("feColorMatrix", writer);
   colorMatrixElement.addAttribute("in", "SourceAlpha");
   colorMatrixElement.addAttribute("type", "matrix");
@@ -604,8 +618,9 @@ void ElementWriter::addHardAlphaElement() {
   colorMatrixElement.addAttribute("result", "hardAlpha");
 }
 
-void ElementWriter::addDropShadowImageFilter(const DropShadowImageFilter* filter) {
-  addHardAlphaElement();
+void ElementWriter::addDropShadowImageFilter(const DropShadowImageFilter* filter,
+                                              const std::string& inputResult) {
+  addHardAlphaElement(inputResult);
   {
     ElementWriter offsetElement("feOffset", writer);
     offsetElement.addAttribute("dx", filter->dx);
@@ -644,17 +659,20 @@ void ElementWriter::addDropShadowImageFilter(const DropShadowImageFilter* filter
     colorMatrixElement.addAttribute("result", "shadow");
   }
   if (!filter->shadowOnly) {
+    auto sourceRef = inputResult.empty() ? "SourceGraphic" : inputResult;
     ElementWriter blendElement("feBlend", writer);
     blendElement.addAttribute("mode", "normal");
-    blendElement.addAttribute("in", "SourceGraphic");
+    blendElement.addAttribute("in", sourceRef);
     blendElement.addAttribute("in2", "shadow");
   }
 }
-void ElementWriter::addInnerShadowImageFilter(const InnerShadowImageFilter* filter) {
+void ElementWriter::addInnerShadowImageFilter(const InnerShadowImageFilter* filter,
+                                               const std::string& inputResult) {
   if (!filter->blurFilter) {
     return;
   }
-  addHardAlphaElement();
+  addHardAlphaElement(inputResult);
+  auto sourceRef = inputResult.empty() ? std::string("SourceGraphic") : inputResult;
   if (!filter->shadowOnly) {
     {
       ElementWriter floodElement("feFlood", writer);
@@ -664,7 +682,7 @@ void ElementWriter::addInnerShadowImageFilter(const InnerShadowImageFilter* filt
     {
       ElementWriter blendElement("feBlend", writer);
       blendElement.addAttribute("mode", "normal");
-      blendElement.addAttribute("in", "SourceGraphic");
+      blendElement.addAttribute("in", sourceRef);
       blendElement.addAttribute("in2", "BackgroundImageFix");
       blendElement.addAttribute("result", "shape");
     }
@@ -710,16 +728,18 @@ void ElementWriter::addInnerShadowImageFilter(const InnerShadowImageFilter* filt
   }
 }
 
-void ElementWriter::addColorImageFilter(const ColorImageFilter* filter) {
+void ElementWriter::addColorImageFilter(const ColorImageFilter* filter,
+                                        const std::string& inputResult) {
   if (!filter->filter) {
     return;
   }
-  if (!addColorFilterPrimitives(filter->filter)) {
+  if (!addColorFilterPrimitives(filter->filter, inputResult)) {
     reportUnsupportedElement("Unsupported color filter in ColorImageFilter");
   }
 }
 
-void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter) {
+void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter,
+                                        const std::string& inputResult) {
   auto blendModeString = ToSVGBlendMode(filter->blendMode);
   if (blendModeString.empty()) {
     reportUnsupportedElement("Unsupported blend mode in BlendImageFilter");
@@ -729,6 +749,7 @@ void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter) {
     reportUnsupportedElement("Missing shader in BlendImageFilter");
     return;
   }
+  auto sourceRef = inputResult.empty() ? std::string("SourceGraphic") : inputResult;
   switch (Types::Get(filter->shader.get())) {
     case Types::ShaderType::Color: {
       const auto colorShader = static_cast<const ColorShader*>(filter->shader.get());
@@ -753,7 +774,7 @@ void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter) {
       {
         ElementWriter blendElement("feBlend", writer);
         blendElement.addAttribute("in", "flood");
-        blendElement.addAttribute("in2", "SourceGraphic");
+        blendElement.addAttribute("in2", sourceRef);
         blendElement.addAttribute("mode", blendModeString);
       }
       break;
@@ -778,7 +799,7 @@ void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter) {
       {
         ElementWriter blendElement("feBlend", writer);
         blendElement.addAttribute("in", "noise");
-        blendElement.addAttribute("in2", "SourceGraphic");
+        blendElement.addAttribute("in2", sourceRef);
         blendElement.addAttribute("mode", blendModeString);
       }
       break;
@@ -789,7 +810,8 @@ void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter) {
   }
 }
 
-bool ElementWriter::addColorFilterPrimitives(const std::shared_ptr<ColorFilter>& colorFilter) {
+bool ElementWriter::addColorFilterPrimitives(const std::shared_ptr<ColorFilter>& colorFilter,
+                                             const std::string& inputResult) {
   if (!colorFilter) {
     return false;
   }
@@ -798,12 +820,12 @@ bool ElementWriter::addColorFilterPrimitives(const std::shared_ptr<ColorFilter>&
       addMatrixColorFilterPrimitives(static_cast<const MatrixColorFilter*>(colorFilter.get()));
       return true;
     case Types::ColorFilterType::Blend:
-      addBlendColorFilterPrimitives(static_cast<const ModeColorFilter*>(colorFilter.get()));
+      addBlendColorFilterPrimitives(static_cast<const ModeColorFilter*>(colorFilter.get()),
+                                    inputResult);
       return true;
     case Types::ColorFilterType::Compose: {
-      const auto compose =
-          static_cast<const ComposeColorFilter*>(colorFilter.get());
-      if (!addColorFilterPrimitives(compose->inner)) {
+      const auto compose = static_cast<const ComposeColorFilter*>(colorFilter.get());
+      if (!addColorFilterPrimitives(compose->inner, inputResult)) {
         return false;
       }
       return addColorFilterPrimitives(compose->outer);
@@ -827,12 +849,14 @@ void ElementWriter::addMatrixColorFilterPrimitives(const MatrixColorFilter* matr
   colorMatrixElement.addAttribute("values", matrixString);
 }
 
-void ElementWriter::addBlendColorFilterPrimitives(const ModeColorFilter* modeColorFilter) {
+void ElementWriter::addBlendColorFilterPrimitives(const ModeColorFilter* modeColorFilter,
+                                                  const std::string& inputResult) {
   auto blendModeString = ToSVGBlendMode(modeColorFilter->mode);
   if (blendModeString.empty()) {
     reportUnsupportedElement("Unsupported blend mode in color filter");
     return;
   }
+  auto sourceRef = inputResult.empty() ? std::string("SourceGraphic") : inputResult;
   {
     ElementWriter floodElement("feFlood", writer);
     auto color = ConvertColorSpace(modeColorFilter->color, _targetColorSpace);
@@ -847,14 +871,14 @@ void ElementWriter::addBlendColorFilterPrimitives(const ModeColorFilter* modeCol
   {
     ElementWriter blendElement("feBlend", writer);
     blendElement.addAttribute("in", "flood");
-    blendElement.addAttribute("in2", "SourceGraphic");
+    blendElement.addAttribute("in2", sourceRef);
     blendElement.addAttribute("mode", blendModeString);
     blendElement.addAttribute("result", "blend");
   }
   {
     ElementWriter compositeElement("feComposite", writer);
     compositeElement.addAttribute("in", "blend");
-    compositeElement.addAttribute("in2", "SourceGraphic");
+    compositeElement.addAttribute("in2", sourceRef);
     compositeElement.addAttribute("operator", "in");
   }
 }
