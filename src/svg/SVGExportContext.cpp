@@ -684,7 +684,7 @@ void SVGExportContext::exportPictureImageAsVector(const PictureImage* pictureIma
     if (colorFilter) {
       ElementWriter defs("defs", xmlWriter, resourceBucket.get(), _targetColorSpace,
                          _assignColorSpace);
-      filterUrl = defs.addColorFilterResource(colorFilter, true).filter;
+      filterUrl = defs.addColorFilterResource(colorFilter).filter;
     }
     std::unique_ptr<ElementWriter> clipElement;
     if (needsClip) {

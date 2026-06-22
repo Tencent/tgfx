@@ -95,8 +95,7 @@ class ElementWriter {
    * expressed as a vector SVG filter, in which case the caller must rasterize. Must be called
    * within a parent <defs> element.
    */
-  Resources addColorFilterResource(const std::shared_ptr<ColorFilter>& colorFilter,
-                                   bool sourceIsVector = false);
+  Resources addColorFilterResource(const std::shared_ptr<ColorFilter>& colorFilter);
 
  private:
   Resources addResources(const Brush& brush, Context* context, SVGExportContext* svgContext);
@@ -109,11 +108,11 @@ class ElementWriter {
   void addImageShaderResources(const ImageShader* shader, const Matrix& matrix, Context* context,
                                Resources* resources);
 
-  void addBlendColorFilterResources(const ModeColorFilter* modeColorFilter, Resources* resources,
-                                    bool sourceIsVector = false);
+  void addBlendColorFilterResources(const ModeColorFilter* modeColorFilter,
+                                    Resources* resources);
 
   void addMatrixColorFilterResources(const MatrixColorFilter* matrixColorFilter,
-                                     Resources* resources, bool sourceIsVector = false);
+                                     Resources* resources);
 
   void addMatrixColorFilterPrimitives(const MatrixColorFilter* matrixColorFilter);
 

@@ -282,9 +282,8 @@ void ElementWriter::addPathAttributes(const Path& path, SVGPathParser::PathEncod
   addAttribute("d", SVGPathParser::ToSVGString(path, encoding));
 }
 
-Resources ElementWriter::addColorFilterResource(const std::shared_ptr<ColorFilter>& colorFilter,
-                                               bool sourceIsVector) {
-  (void)sourceIsVector;
+Resources ElementWriter::addColorFilterResource(
+    const std::shared_ptr<ColorFilter>& colorFilter) {
   Resources resources;
   if (!colorFilter) {
     return resources;
@@ -1251,8 +1250,7 @@ void ElementWriter::addImageShaderResources(const ImageShader* shader, const Mat
 }
 
 void ElementWriter::addBlendColorFilterResources(const ModeColorFilter* modeColorFilter,
-                                                 Resources* resources, bool sourceIsVector) {
-  (void)sourceIsVector;
+                                                 Resources* resources) {
   auto blendModeString = ToSVGBlendMode(modeColorFilter->mode);
   if (blendModeString.empty()) {
     reportUnsupportedElement("Unsupported blend mode in color filter");
@@ -1273,8 +1271,7 @@ void ElementWriter::addBlendColorFilterResources(const ModeColorFilter* modeColo
 }
 
 void ElementWriter::addMatrixColorFilterResources(const MatrixColorFilter* matrixColorFilter,
-                                                  Resources* resources, bool sourceIsVector) {
-  (void)sourceIsVector;
+                                                  Resources* resources) {
   std::string filterID = resourceStore->addFilter();
   {
     ElementWriter filterElement("filter", writer);
