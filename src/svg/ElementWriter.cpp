@@ -594,7 +594,7 @@ void ElementWriter::addBlurImageFilter(const GaussianBlurImageFilter* filter,
   blurElement.addAttribute("result", "blur");
 }
 
-void ElementWriter::addHardAlphaElement(const std::string&) {
+void ElementWriter::addHardAlphaElement() {
   ElementWriter colorMatrixElement("feColorMatrix", writer);
   colorMatrixElement.addAttribute("in", "SourceAlpha");
   colorMatrixElement.addAttribute("type", "matrix");
@@ -602,7 +602,7 @@ void ElementWriter::addHardAlphaElement(const std::string&) {
   colorMatrixElement.addAttribute("result", "hardAlpha");
 }
 
-void ElementWriter::addSoftAlphaElement(const std::string&) {
+void ElementWriter::addSoftAlphaElement() {
   ElementWriter colorMatrixElement("feColorMatrix", writer);
   colorMatrixElement.addAttribute("in", "SourceAlpha");
   colorMatrixElement.addAttribute("type", "matrix");
@@ -616,9 +616,9 @@ void ElementWriter::addDropShadowImageFilter(const DropShadowImageFilter* filter
                                              bool preserveSoftAlpha) {
   const auto alphaResult = preserveSoftAlpha ? "softAlpha" : "hardAlpha";
   if (preserveSoftAlpha) {
-    addSoftAlphaElement(inputResult);
+    addSoftAlphaElement();
   } else {
-    addHardAlphaElement(inputResult);
+    addHardAlphaElement();
   }
   {
     ElementWriter offsetElement("feOffset", writer);
@@ -673,9 +673,9 @@ void ElementWriter::addInnerShadowImageFilter(const InnerShadowImageFilter* filt
   }
   const auto alphaResult = preserveSoftAlpha ? "softAlpha" : "hardAlpha";
   if (preserveSoftAlpha) {
-    addSoftAlphaElement(inputResult);
+    addSoftAlphaElement();
   } else {
-    addHardAlphaElement(inputResult);
+    addHardAlphaElement();
   }
   auto sourceRef = inputResult.empty() ? std::string("SourceGraphic") : inputResult;
   if (!filter->shadowOnly) {
