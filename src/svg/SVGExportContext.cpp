@@ -381,7 +381,7 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
     if (filter) {
       ElementWriter defs("defs", xmlWriter, resourceBucket.get(), _targetColorSpace,
                          _assignColorSpace);
-      filterIDs = defs.addImageFilterChain(filter, bound, customWriter);
+      filterIDs = defs.addImageFilterChain(filter, bound, customWriter, context);
       if (filterIDs.size() == 1) {
         resources.filter = "url(#" + filterIDs[0] + ")";
       }
@@ -716,7 +716,7 @@ void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
   if (imageFilter) {
     ElementWriter defs("defs", xmlWriter, resourceBucket.get(), _targetColorSpace,
                        _assignColorSpace);
-    filterIDs = defs.addImageFilterChain(imageFilter, bound, customWriter);
+    filterIDs = defs.addImageFilterChain(imageFilter, bound, customWriter, context);
   }
   auto clipPath = clip.getClipPath();
   bool needsClip = !clipPath.isEmpty() && !clipPath.contains(bound);

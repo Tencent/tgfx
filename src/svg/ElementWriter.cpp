@@ -284,8 +284,8 @@ void ElementWriter::addPathAttributes(const Path& path, SVGPathParser::PathEncod
 
 Resources ElementWriter::addImageFilterResource(
     const std::shared_ptr<ImageFilter>& imageFilter, Rect bound,
-    const std::shared_ptr<SVGCustomWriter>& exportWriter) {
-  auto filterID = addImageFilter(imageFilter, bound, std::move(exportWriter));
+    const std::shared_ptr<SVGCustomWriter>& exportWriter, Context* context) {
+  auto filterID = addImageFilter(imageFilter, bound, std::move(exportWriter), context);
   Resources resources;
   resources.filter = "url(#" + filterID + ")";
   return resources;
@@ -329,7 +329,7 @@ Resources ElementWriter::addColorFilterResource(const std::shared_ptr<ColorFilte
 std::string ElementWriter::emitFilterElement(const std::shared_ptr<ImageFilter>& imageFilter,
                                              const Rect& bound,
                                              const std::shared_ptr<SVGCustomWriter>& exportWriter,
-                                             bool preserveSoftAlpha) {
+                                             Context* context, bool preserveSoftAlpha) {
   std::string filterID = resourceStore->addFilter();
   ElementWriter filterElement("filter", writer);
   filterElement.addAttribute("id", filterID);
@@ -368,7 +368,7 @@ std::string ElementWriter::emitFilterElement(const std::shared_ptr<ImageFilter>&
     case Types::ImageFilterType::Blend: {
       const auto blendFilter = static_cast<const BlendImageFilter*>(imageFilter.get());
       callbackBlendImageFilter(blendFilter, exportWriter, filterElement);
-      addBlendImageFilter(blendFilter);
+      addBlendImageFilter(blendFilter, "", &bound, context);
       break;
     }
     default:
@@ -380,7 +380,8 @@ std::string ElementWriter::emitFilterElement(const std::shared_ptr<ImageFilter>&
 
 std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& imageFilter,
                                           Rect bound,
-                                          const std::shared_ptr<SVGCustomWriter>& exportWriter) {
+                                          const std::shared_ptr<SVGCustomWriter>& exportWriter,
+                                          Context* context) {
   auto type = Types::Get(imageFilter.get());
   switch (type) {
     case Types::ImageFilterType::Blur: {
@@ -435,7 +436,7 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
       const auto composeFilter = static_cast<const ComposeImageFilter*>(imageFilter.get());
       std::string filterID;
       for (const auto& filterItem : composeFilter->filters) {
-        auto id = addImageFilter(filterItem, bound, exportWriter);
+        auto id = addImageFilter(filterItem, bound, exportWriter, context);
         if (!id.empty()) {
           filterID = id;
         }
@@ -471,7 +472,7 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
       filterElement.addAttribute("height", bound.height());
       filterElement.addAttribute("filterUnits", "userSpaceOnUse");
       callbackBlendImageFilter(blendFilter, exportWriter, filterElement);
-      addBlendImageFilter(blendFilter);
+      addBlendImageFilter(blendFilter, "", &bound, context);
       return filterID;
     }
     default:
@@ -491,7 +492,7 @@ std::string ElementWriter::emitComposeSubFilter(const std::shared_ptr<ImageFilte
 
 std::vector<std::string> ElementWriter::addImageFilterChain(
     const std::shared_ptr<ImageFilter>& imageFilter, Rect bound,
-    const std::shared_ptr<SVGCustomWriter>& exportWriter) {
+    const std::shared_ptr<SVGCustomWriter>& exportWriter, Context* context) {
   if (!imageFilter) {
     return {};
   }
@@ -504,11 +505,11 @@ std::vector<std::string> ElementWriter::addImageFilterChain(
     auto composeBound = imageFilter->filterBounds(bound);
     std::vector<std::string> filterIDs;
     for (const auto& filterItem : composeFilter->filters) {
-      filterIDs.push_back(emitFilterElement(filterItem, composeBound, exportWriter, true));
+      filterIDs.push_back(emitFilterElement(filterItem, composeBound, exportWriter, context, true));
     }
     return filterIDs;
   }
-  auto id = addImageFilter(imageFilter, bound, exportWriter);
+  auto id = addImageFilter(imageFilter, bound, exportWriter, context);
   if (!id.empty()) {
     return {id};
   }
@@ -818,17 +819,57 @@ void ElementWriter::addColorImageFilter(const ColorImageFilter* filter,
 }
 
 void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter,
-                                        const std::string& inputResult) {
-  auto blendModeString = ToSVGBlendMode(filter->blendMode);
-  if (blendModeString.empty()) {
-    reportUnsupportedElement("Unsupported blend mode in BlendImageFilter");
-    return;
-  }
+                                        const std::string& inputResult,
+                                        const Rect* filterBounds, Context* context) {
   if (!filter->shader) {
     reportUnsupportedElement("Missing shader in BlendImageFilter");
     return;
   }
   auto sourceRef = inputResult.empty() ? std::string("SourceGraphic") : inputResult;
+  if (filter->blendMode == BlendMode::DstIn) {
+    if (Types::Get(filter->shader.get()) != Types::ShaderType::Image) {
+      reportUnsupportedElement("Unsupported DstIn shader type in BlendImageFilter");
+      return;
+    }
+    const auto imageShader = static_cast<const ImageShader*>(filter->shader.get());
+    auto data = SVGExportContext::ImageToEncodedData(imageShader->image);
+    std::shared_ptr<Data> dataUri = nullptr;
+    if (data && (JpegCodec::IsJpeg(data) || PngCodec::IsPng(data))) {
+      dataUri = AsDataUri(data);
+    } else if (context) {
+      Bitmap bitmap = SVGExportContext::ImageExportToBitmap(context, imageShader->image);
+      if (!bitmap.isEmpty()) {
+        dataUri = AsDataUri(Pixmap(bitmap));
+      }
+    }
+    if (!dataUri) {
+      reportUnsupportedElement("Failed to encode DstIn image shader in BlendImageFilter");
+      return;
+    }
+    {
+      ElementWriter imageElement("feImage", writer);
+      if (filterBounds) {
+        imageElement.addAttribute("x", filterBounds->x());
+        imageElement.addAttribute("y", filterBounds->y());
+      }
+      imageElement.addAttribute("width", imageShader->image->width());
+      imageElement.addAttribute("height", imageShader->image->height());
+      imageElement.addAttribute("xlink:href", static_cast<const char*>(dataUri->data()));
+      imageElement.addAttribute("result", "blendMask");
+    }
+    {
+      ElementWriter compositeElement("feComposite", writer);
+      compositeElement.addAttribute("in", sourceRef);
+      compositeElement.addAttribute("in2", "blendMask");
+      compositeElement.addAttribute("operator", "in");
+    }
+    return;
+  }
+  auto blendModeString = ToSVGBlendMode(filter->blendMode);
+  if (blendModeString.empty()) {
+    reportUnsupportedElement("Unsupported blend mode in BlendImageFilter");
+    return;
+  }
   switch (Types::Get(filter->shader.get())) {
     case Types::ShaderType::Color: {
       const auto colorShader = static_cast<const ColorShader*>(filter->shader.get());

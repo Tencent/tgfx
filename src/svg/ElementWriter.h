@@ -79,7 +79,8 @@ class ElementWriter {
   void addPathAttributes(const Path& path, SVGPathParser::PathEncoding encoding);
 
   Resources addImageFilterResource(const std::shared_ptr<ImageFilter>& imageFilter, Rect bound,
-                                   const std::shared_ptr<SVGCustomWriter>& exportWriter);
+                                   const std::shared_ptr<SVGCustomWriter>& exportWriter,
+                                   Context* context = nullptr);
 
   /**
    * Emits SVG <filter> resources for the given image filter and returns all filter IDs. For a
@@ -89,7 +90,7 @@ class ElementWriter {
    */
   std::vector<std::string> addImageFilterChain(
       const std::shared_ptr<ImageFilter>& imageFilter, Rect bound,
-      const std::shared_ptr<SVGCustomWriter>& exportWriter);
+      const std::shared_ptr<SVGCustomWriter>& exportWriter, Context* context);
 
   /**
    * Emits an SVG <filter> resource that reproduces the given color filter and returns its
@@ -146,10 +147,11 @@ class ElementWriter {
   std::string addUnsupportedGradientDef(const GradientInfo& info, const Matrix& matrix);
 
   std::string addImageFilter(const std::shared_ptr<ImageFilter>& imageFilter, Rect bound,
-                             const std::shared_ptr<SVGCustomWriter>& exportWriter);
+                             const std::shared_ptr<SVGCustomWriter>& exportWriter,
+                             Context* context = nullptr);
   std::string emitFilterElement(const std::shared_ptr<ImageFilter>& imageFilter, const Rect& bound,
                                 const std::shared_ptr<SVGCustomWriter>& exportWriter,
-                                bool preserveSoftAlpha = false);
+                                Context* context, bool preserveSoftAlpha = false);
   void callbackBlurImageFilter(const GaussianBlurImageFilter* filter,
                                const std::shared_ptr<SVGCustomWriter>& exportWriter,
                                ElementWriter& filterElement);
@@ -176,7 +178,8 @@ class ElementWriter {
                                  const std::string& inputResult = "",
                                  bool preserveSoftAlpha = false);
   void addColorImageFilter(const ColorImageFilter* filter, const std::string& inputResult = "");
-  void addBlendImageFilter(const BlendImageFilter* filter, const std::string& inputResult = "");
+  void addBlendImageFilter(const BlendImageFilter* filter, const std::string& inputResult = "",
+                           const Rect* filterBounds = nullptr, Context* context = nullptr);
   // Emit all primitives for a sub-filter inside a Compose chain. Returns the result name of the
   // last primitive written, which serves as the input for the next sub-filter.
   std::string emitComposeSubFilter(const std::shared_ptr<ImageFilter>& subFilter,
