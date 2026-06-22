@@ -282,7 +282,9 @@ void ElementWriter::addPathAttributes(const Path& path, SVGPathParser::PathEncod
   addAttribute("d", SVGPathParser::ToSVGString(path, encoding));
 }
 
-Resources ElementWriter::addColorFilterResource(const std::shared_ptr<ColorFilter>& colorFilter) {
+Resources ElementWriter::addColorFilterResource(const std::shared_ptr<ColorFilter>& colorFilter,
+                                               bool sourceIsVector) {
+  (void)sourceIsVector;
   Resources resources;
   if (!colorFilter) {
     return resources;
@@ -301,7 +303,6 @@ Resources ElementWriter::addColorFilterResource(const std::shared_ptr<ColorFilte
       {
         ElementWriter filterElement("filter", writer);
         filterElement.addAttribute("id", filterID);
-        filterElement.addAttribute("color-interpolation-filters", "sRGB");
         filterElement.addAttribute("x", "0%");
         filterElement.addAttribute("y", "0%");
         filterElement.addAttribute("width", "100%");
@@ -1250,7 +1251,8 @@ void ElementWriter::addImageShaderResources(const ImageShader* shader, const Mat
 }
 
 void ElementWriter::addBlendColorFilterResources(const ModeColorFilter* modeColorFilter,
-                                                 Resources* resources) {
+                                                 Resources* resources, bool sourceIsVector) {
+  (void)sourceIsVector;
   auto blendModeString = ToSVGBlendMode(modeColorFilter->mode);
   if (blendModeString.empty()) {
     reportUnsupportedElement("Unsupported blend mode in color filter");
@@ -1261,7 +1263,6 @@ void ElementWriter::addBlendColorFilterResources(const ModeColorFilter* modeColo
   {
     ElementWriter filterElement("filter", writer);
     filterElement.addAttribute("id", filterID);
-    filterElement.addAttribute("color-interpolation-filters", "sRGB");
     filterElement.addAttribute("x", "0%");
     filterElement.addAttribute("y", "0%");
     filterElement.addAttribute("width", "100%");
@@ -1272,12 +1273,12 @@ void ElementWriter::addBlendColorFilterResources(const ModeColorFilter* modeColo
 }
 
 void ElementWriter::addMatrixColorFilterResources(const MatrixColorFilter* matrixColorFilter,
-                                                  Resources* resources) {
+                                                  Resources* resources, bool sourceIsVector) {
+  (void)sourceIsVector;
   std::string filterID = resourceStore->addFilter();
   {
     ElementWriter filterElement("filter", writer);
     filterElement.addAttribute("id", filterID);
-    filterElement.addAttribute("color-interpolation-filters", "sRGB");
     filterElement.addAttribute("x", "0%");
     filterElement.addAttribute("y", "0%");
     filterElement.addAttribute("width", "100%");
