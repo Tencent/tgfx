@@ -659,7 +659,7 @@ void ElementWriter::addDropShadowImageFilter(const DropShadowImageFilter* filter
       blurElement.addAttribute("stdDeviation", FloatToString(blurX) + " " + FloatToString(blurY));
     }
   }
-  if (!preserveSoftAlpha || !filter->shadowOnly) {
+  if (!filter->shadowOnly) {
     ElementWriter compositeElement("feComposite", writer);
     compositeElement.addAttribute("in2", alphaResult);
     compositeElement.addAttribute("operator", "out");
@@ -747,6 +747,11 @@ void ElementWriter::addInnerShadowImageFilter(const InnerShadowImageFilter* filt
                                                     " 0 0 0 0 " + FloatToString(color.green) +
                                                     " 0 0 0 0 " + FloatToString(color.blue) +
                                                     " 0 0 0 " + FloatToString(color.alpha) + " 0");
+    }
+    if (!filter->shadowOnly) {
+      ElementWriter blendElement("feBlend", writer);
+      blendElement.addAttribute("mode", "normal");
+      blendElement.addAttribute("in2", "shape");
     }
     return;
   }

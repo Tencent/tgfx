@@ -796,6 +796,31 @@ TGFX_TEST(SVGExportTest, DstColorSpace) {
   canvas->drawRect(Rect::MakeXYWH(400, 140, 100, 100), paint);
   exporter->close();
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/DstColorSpace"));
+
+  auto surface = Surface::Make(context, 2048, 2048, ColorType::RGBA_8888, 1, false, 0,
+                               ColorSpace::DisplayP3());
+  ASSERT_TRUE(surface != nullptr);
+  auto surfaceCanvas = surface->getCanvas();
+  Paint sp;
+  sp.setColor(Color::Green());
+  surfaceCanvas->drawRect(Rect::MakeXYWH(20, 20, 100, 100), sp);
+  surfaceCanvas->drawRRect(RRect::MakeOval(Rect::MakeXYWH(140, 20, 100, 100)), sp);
+  surfaceCanvas->drawImageRect(image, Rect::MakeXYWH(260, 20, 100, 100), {}, &sp);
+  surfaceCanvas->drawSimpleText("TGFX", 400, 80, font, sp);
+  sp.setShader(Shader::MakeColorShader(Color::Red()));
+  surfaceCanvas->drawRect(Rect::MakeXYWH(580, 20, 100, 100), sp);
+  sp.setShader(Shader::MakeLinearGradient({720, 20}, {820, 20}, {Color::Green(), Color::Red()}));
+  surfaceCanvas->drawRect(Rect::MakeXYWH(720, 20, 100, 100), sp);
+  sp.setShader(Shader::MakeRadialGradient({70, 190}, 50, {Color::Green(), Color::Red()}));
+  surfaceCanvas->drawRect(Rect::MakeXYWH(20, 140, 100, 100), sp);
+  sp.setShader(Shader::MakeRadialGradient({190, 190}, 50, {Color::Green(), Color::Red()}));
+  sp.setColorFilter(ColorFilter::Blend(Color::White(), BlendMode::Difference));
+  surfaceCanvas->drawRect(Rect::MakeXYWH(140, 140, 100, 100), sp);
+  sp.setImageFilter(ImageFilter::DropShadow(10, 10, 10, 10, Color::Green()));
+  surfaceCanvas->drawRect(Rect::MakeXYWH(260, 140, 100, 100), sp);
+  sp.setImageFilter(ImageFilter::InnerShadow(10, 10, 10, 10, Color::Green()));
+  surfaceCanvas->drawRect(Rect::MakeXYWH(400, 140, 100, 100), sp);
+  EXPECT_TRUE(Baseline::Compare(surface, "SVGExportTest/DstColorSpace"));
 }
 
 TGFX_TEST(SVGExportTest, AssignColorSpace) {
@@ -1335,7 +1360,14 @@ TGFX_TEST(SVGExportTest, BackgroundBlurWithDropShadow) {
 
   exporter->close();
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/BackgroundBlurWithDropShadow"));
+
+  auto surface = Surface::Make(context, 300, 300);
+  ASSERT_TRUE(surface != nullptr);
+  auto surfaceCanvas = surface->getCanvas();
+  displayList->root()->draw(surfaceCanvas);
+  EXPECT_TRUE(Baseline::Compare(surface, "SVGExportTest/BackgroundBlurWithDropShadow"));
 }
+
 TGFX_TEST(SVGExportTest, BlurFilterWithRotation) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -1784,5 +1816,32 @@ TGFX_TEST(SVGExportTest, DropShadowOnly) {
   sp.setImageFilter(ImageFilter::DropShadowOnly(10, 10, 5, 5, Color::Black()));
   surfaceCanvas->drawRect(Rect::MakeXYWH(60, 60, 80, 80), sp);
   EXPECT_TRUE(Baseline::Compare(surface, "SVGExportTest/DropShadowOnly"));
+}
+
+TGFX_TEST(SVGExportTest, DstColorSpaceDifferenceFilterRect) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(160, 160), 0, nullptr,
+                                    ColorSpace::DisplayP3());
+  auto canvas = exporter->getCanvas();
+  Paint paint;
+  paint.setShader(Shader::MakeRadialGradient({80, 80}, 50, {Color::Green(), Color::Red()}));
+  paint.setColorFilter(ColorFilter::Blend(Color::White(), BlendMode::Difference));
+  canvas->drawRect(Rect::MakeXYWH(30, 30, 100, 100), paint);
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/DstColorSpaceDifferenceFilterRect"));
+
+  auto surface =
+      Surface::Make(context, 160, 160, ColorType::RGBA_8888, 1, false, 0, ColorSpace::DisplayP3());
+  ASSERT_TRUE(surface != nullptr);
+  auto surfaceCanvas = surface->getCanvas();
+  Paint surfacePaint;
+  surfacePaint.setShader(Shader::MakeRadialGradient({80, 80}, 50, {Color::Green(), Color::Red()}));
+  surfacePaint.setColorFilter(ColorFilter::Blend(Color::White(), BlendMode::Difference));
+  surfaceCanvas->drawRect(Rect::MakeXYWH(30, 30, 100, 100), surfacePaint);
+  EXPECT_TRUE(Baseline::Compare(surface, "SVGExportTest/DstColorSpaceDifferenceFilterRect"));
 }
 }  // namespace tgfx
