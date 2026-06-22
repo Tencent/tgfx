@@ -45,6 +45,12 @@ struct VulkanExtensions {
   bool rasterizationOrderAttachmentAccess = false;
   /// Whether VK_KHR_swapchain is available. Headless drivers (e.g. SwiftShader) do not expose it.
   bool swapchain = false;
+#if defined(__ANDROID__)
+  /// Whether VK_ANDROID_external_memory_android_hardware_buffer is available.
+  bool androidHardwareBuffer = false;
+  /// Whether VK_KHR_sampler_ycbcr_conversion is available and the feature is supported.
+  bool samplerYcbcrConversion = false;
+#endif
 
  private:
   // Stores the actual ROAA extension name detected (EXT or ARM variant) for use in
@@ -64,6 +70,13 @@ struct VulkanExtensions {
     bool hasDynState = false;
     const char* roaaExtName = nullptr;
     bool hasSwapchain = false;
+#if defined(__ANDROID__)
+    bool hasExternalMemory = false;
+    bool hasDedicatedAllocation = false;
+    bool hasAndroidHwb = false;
+    bool hasYcbcr = false;
+    bool hasQueueFamilyForeign = false;
+#endif
     for (const auto& ext : available) {
       if (strcmp(ext.extensionName, VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME) == 0) {
         hasTimeline = true;
@@ -78,6 +91,20 @@ struct VulkanExtensions {
       } else if (strcmp(ext.extensionName, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0) {
         hasSwapchain = true;
       }
+#if defined(__ANDROID__)
+      else if (strcmp(ext.extensionName, VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME) == 0) {
+        hasExternalMemory = true;
+      } else if (strcmp(ext.extensionName, VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME) == 0) {
+        hasDedicatedAllocation = true;
+      } else if (strcmp(ext.extensionName,
+                        VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME) == 0) {
+        hasAndroidHwb = true;
+      } else if (strcmp(ext.extensionName, VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME) == 0) {
+        hasYcbcr = true;
+      } else if (strcmp(ext.extensionName, VK_EXT_QUEUE_FAMILY_FOREIGN_EXTENSION_NAME) == 0) {
+        hasQueueFamilyForeign = true;
+      }
+#endif
     }
 
     // Verify actual feature support. Spec allows extension present + feature FALSE.
@@ -91,8 +118,19 @@ struct VulkanExtensions {
     roaaFeature.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_FEATURES_EXT;
 
-    // Build pNext chain: timeline → dynState → roaa (only include structs for detected extensions)
+#if defined(__ANDROID__)
+    VkPhysicalDeviceSamplerYcbcrConversionFeatures ycbcrFeature = {};
+    ycbcrFeature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES;
+#endif
+
+    // Build pNext chain: timeline → dynState → roaa → ycbcr
     void* pNextChain = nullptr;
+#if defined(__ANDROID__)
+    if (hasYcbcr) {
+      ycbcrFeature.pNext = pNextChain;
+      pNextChain = &ycbcrFeature;
+    }
+#endif
     if (roaaExtName) {
       roaaFeature.pNext = pNextChain;
       pNextChain = &roaaFeature;
@@ -117,6 +155,12 @@ struct VulkanExtensions {
         (roaaExtName != nullptr) && roaaFeature.rasterizationOrderColorAttachmentAccess;
     _roaaExtensionName = roaaExtName;
     swapchain = hasSwapchain;
+#if defined(__ANDROID__)
+    // Android HardwareBuffer import requires the full extension chain.
+    androidHardwareBuffer =
+        hasAndroidHwb && hasExternalMemory && hasDedicatedAllocation && hasQueueFamilyForeign;
+    samplerYcbcrConversion = hasYcbcr && ycbcrFeature.samplerYcbcrConversion;
+#endif
   }
 
   /// Infers enabled extensions from volk function pointers. Used for externally created VkDevices
@@ -128,6 +172,12 @@ struct VulkanExtensions {
     rasterizationOrderAttachmentAccess = false;
     // Swapchain can be detected from its unique entry point.
     swapchain = (vkCreateSwapchainKHR != nullptr);
+#if defined(__ANDROID__)
+    androidHardwareBuffer = (vkGetAndroidHardwareBufferPropertiesANDROID != nullptr);
+    // YCbCr cannot be reliably inferred from function pointers alone; assume available if the
+    // hardware buffer extension is present (the host app is responsible for enabling it).
+    samplerYcbcrConversion = androidHardwareBuffer;
+#endif
   }
 
   /// Returns the list of extension names to pass to VkDeviceCreateInfo::ppEnabledExtensionNames.
@@ -145,30 +195,64 @@ struct VulkanExtensions {
     if (rasterizationOrderAttachmentAccess) {
       names.push_back(_roaaExtensionName);
     }
+#if defined(__ANDROID__)
+    if (androidHardwareBuffer) {
+      names.push_back(VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME);
+      names.push_back(VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME);
+      names.push_back(VK_EXT_QUEUE_FAMILY_FOREIGN_EXTENSION_NAME);
+      names.push_back(VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME);
+    }
+    if (samplerYcbcrConversion) {
+      names.push_back(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME);
+    }
+#endif
     return names;
   }
 
-  /// Builds the VkPhysicalDeviceFeatures2 pNext chain for vkCreateDevice. The caller must keep
-  /// the returned feature structs alive until vkCreateDevice returns. For simplicity, this method
-  /// populates the provided output structs and chains them into features2.
-  void buildFeatureChain(VkPhysicalDeviceFeatures2& features2,
-                         VkPhysicalDeviceTimelineSemaphoreFeatures& timelineFeature,
-                         VkPhysicalDeviceExtendedDynamicStateFeaturesEXT& dynStateFeature) const {
-    features2 = {};
-    features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-    timelineFeature = {};
-    timelineFeature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
-    timelineFeature.timelineSemaphore = timelineSemaphore ? VK_TRUE : VK_FALSE;
-    dynStateFeature = {};
-    dynStateFeature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
-    dynStateFeature.extendedDynamicState = extendedDynamicState ? VK_TRUE : VK_FALSE;
+  /// Holds all feature structs needed for vkCreateDevice. Declared by the caller on the stack and
+  /// populated by buildFeatureChain(). The pNext chain is wired after construction via
+  /// linkFeatureChain() to ensure pointers point into the final object.
+  struct FeatureChain {
+    VkPhysicalDeviceFeatures2 features2 = {};
+    VkPhysicalDeviceTimelineSemaphoreFeatures timelineFeature = {};
+    VkPhysicalDeviceExtendedDynamicStateFeaturesEXT dynStateFeature = {};
+#if defined(__ANDROID__)
+    VkPhysicalDeviceSamplerYcbcrConversionFeatures ycbcrFeature = {};
+#endif
+  };
 
-    if (timelineSemaphore) {
-      timelineFeature.pNext = extendedDynamicState ? &dynStateFeature : nullptr;
-      features2.pNext = &timelineFeature;
-    } else if (extendedDynamicState) {
-      features2.pNext = &dynStateFeature;
+  /// Populates feature structs and wires the pNext chain inside the caller-owned FeatureChain.
+  void buildFeatureChain(FeatureChain& chain) const {
+    chain.features2 = {};
+    chain.features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    chain.timelineFeature = {};
+    chain.timelineFeature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
+    chain.timelineFeature.timelineSemaphore = timelineSemaphore ? VK_TRUE : VK_FALSE;
+    chain.dynStateFeature = {};
+    chain.dynStateFeature.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
+    chain.dynStateFeature.extendedDynamicState = extendedDynamicState ? VK_TRUE : VK_FALSE;
+
+    void* pNextChain = nullptr;
+#if defined(__ANDROID__)
+    if (samplerYcbcrConversion) {
+      chain.ycbcrFeature = {};
+      chain.ycbcrFeature.sType =
+          VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES;
+      chain.ycbcrFeature.samplerYcbcrConversion = VK_TRUE;
+      chain.ycbcrFeature.pNext = pNextChain;
+      pNextChain = &chain.ycbcrFeature;
     }
+#endif
+    if (extendedDynamicState) {
+      chain.dynStateFeature.pNext = pNextChain;
+      pNextChain = &chain.dynStateFeature;
+    }
+    if (timelineSemaphore) {
+      chain.timelineFeature.pNext = pNextChain;
+      pNextChain = &chain.timelineFeature;
+    }
+    chain.features2.pNext = pNextChain;
   }
 };
 
