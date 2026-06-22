@@ -37,11 +37,15 @@ static inline RRect MakeSpreadRRect(const RRect& rRect, float distance) {
     return {};
   }
   // Adjust radii by the same amount so the expanded/contracted corners stay concentric with the
-  // original.
+  // original. Corners that are already sharp (zero radius) stay sharp.
   auto radii = rRect.radii();
   for (auto& corner : radii) {
-    corner.x = std::max(0.0f, corner.x + distance);
-    corner.y = std::max(0.0f, corner.y + distance);
+    if (corner.x > 0.0f) {
+      corner.x = std::max(0.0f, corner.x + distance);
+    }
+    if (corner.y > 0.0f) {
+      corner.y = std::max(0.0f, corner.y + distance);
+    }
   }
   RRect result = {};
   result.setRectRadii(bounds, radii);
