@@ -60,7 +60,8 @@ jobs:
           name: ios_build
           path: ios
 
-  android:
+  android-opengles:
+    name: android (opengles)
     runs-on: ubuntu-latest
     steps:
       - name: Check Out Repo
@@ -106,7 +107,57 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@v4
         with:
-          name: android_build
+          name: android_opengles_build
+          path: android
+
+  android-vulkan:
+    name: android (vulkan)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v4
+
+      - name: Get Third-Party Cache
+        id: third-party-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            third_party
+          key: third-party-android-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          restore-keys: third-party-android-
+
+      - name: Run depsync
+        run: |
+          npm install depsync -g
+          depsync
+
+      - name: Install Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Build Android
+        run: |
+          cd android
+          ./gradlew assembleRelease -Parm64-only --no-daemon -PcmakeArgs="-DTGFX_USE_VULKAN=ON -DTGFX_BUILD_LAYERS=ON -DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON"
+
+      - name: Save Third-Party Cache
+        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            third_party
+          key: third-party-android-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+
+      - name: Job Failed
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: android_vulkan_build
           path: android
 
   web-webgl:
