@@ -1643,9 +1643,6 @@ TGFX_TEST(SVGExportTest, ComposeFilterWithBlurShadow) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto image = MakeImage("resources/apitest/rotation.jpg");
-  ASSERT_TRUE(image != nullptr);
-
   auto blurFilter = ImageFilter::Blur(10, 10);
   auto dropShadowFilter = ImageFilter::DropShadowOnly(10, 10, 20, 20, Color::Black());
   auto innerShadowFilter = ImageFilter::InnerShadow(-10, -10, 5, 5, Color::White());
@@ -1664,15 +1661,18 @@ TGFX_TEST(SVGExportTest, ComposeFilterWithBlurShadow) {
   auto exporter =
       SVGExporter::Make(SVGStream, context, Rect::MakeWH(cellSize * static_cast<float>(cols), cellSize));
   auto canvas = exporter->getCanvas();
+  Paint backgroundPaint;
+  backgroundPaint.setColor(Color::White());
+  canvas->drawRect(Rect::MakeWH(cellSize * static_cast<float>(cols), cellSize), backgroundPaint);
 
   std::vector<std::shared_ptr<ImageFilter>> filters = {compose1, compose2, compose3, compose4};
   for (size_t i = 0; i < filters.size(); ++i) {
     canvas->save();
     canvas->translate(static_cast<float>(i) * cellSize + 50.f, 50.f);
-    canvas->clipRect(Rect::MakeWH(100, 100));
     Paint paint;
+    paint.setColor(Color::FromRGBA(80, 160, 240));
     paint.setImageFilter(filters[i]);
-    canvas->drawImage(image, &paint);
+    canvas->drawRect(Rect::MakeWH(100, 100), paint);
     canvas->restore();
   }
   exporter->close();
@@ -1680,13 +1680,14 @@ TGFX_TEST(SVGExportTest, ComposeFilterWithBlurShadow) {
 
   auto surface = Surface::Make(context, static_cast<int>(cellSize) * cols, static_cast<int>(cellSize));
   auto surfaceCanvas = surface->getCanvas();
+  surfaceCanvas->clear(Color::White());
   for (size_t i = 0; i < filters.size(); ++i) {
     surfaceCanvas->save();
     surfaceCanvas->translate(static_cast<float>(i) * cellSize + 50.f, 50.f);
-    surfaceCanvas->clipRect(Rect::MakeWH(100, 100));
     Paint paint;
+    paint.setColor(Color::FromRGBA(80, 160, 240));
     paint.setImageFilter(filters[i]);
-    surfaceCanvas->drawImage(image, &paint);
+    surfaceCanvas->drawRect(Rect::MakeWH(100, 100), paint);
     surfaceCanvas->restore();
   }
   EXPECT_TRUE(Baseline::Compare(surface, "SVGExportTest/ComposeFilterWithBlurShadow"));

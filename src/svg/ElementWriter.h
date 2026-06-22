@@ -165,6 +165,7 @@ class ElementWriter {
                                 const std::shared_ptr<SVGCustomWriter>& exportWriter,
                                 ElementWriter& filterElement);
   void addHardAlphaElement(const std::string& inputResult = "");
+  void addSoftAlphaElement(const std::string& inputResult = "");
   void addBlurImageFilter(const GaussianBlurImageFilter* filter,
                           const std::string& inputResult = "");
   void addDropShadowImageFilter(const DropShadowImageFilter* filter,

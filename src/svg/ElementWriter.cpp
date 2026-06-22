@@ -618,9 +618,18 @@ void ElementWriter::addHardAlphaElement(const std::string&) {
   colorMatrixElement.addAttribute("result", "hardAlpha");
 }
 
+void ElementWriter::addSoftAlphaElement(const std::string&) {
+  ElementWriter colorMatrixElement("feColorMatrix", writer);
+  colorMatrixElement.addAttribute("in", "SourceAlpha");
+  colorMatrixElement.addAttribute("type", "matrix");
+  // Match the GPU pipeline: preserve the source's soft alpha instead of hardening blurred edges.
+  colorMatrixElement.addAttribute("values", "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0");
+  colorMatrixElement.addAttribute("result", "softAlpha");
+}
+
 void ElementWriter::addDropShadowImageFilter(const DropShadowImageFilter* filter,
                                               const std::string& inputResult) {
-  addHardAlphaElement(inputResult);
+  addSoftAlphaElement(inputResult);
   {
     ElementWriter offsetElement("feOffset", writer);
     offsetElement.addAttribute("dx", filter->dx);
@@ -644,7 +653,7 @@ void ElementWriter::addDropShadowImageFilter(const DropShadowImageFilter* filter
   }
   if (!filter->shadowOnly) {
     ElementWriter compositeElement("feComposite", writer);
-    compositeElement.addAttribute("in2", "hardAlpha");
+    compositeElement.addAttribute("in2", "softAlpha");
     compositeElement.addAttribute("operator", "out");
   }
   {
@@ -671,7 +680,7 @@ void ElementWriter::addInnerShadowImageFilter(const InnerShadowImageFilter* filt
   if (!filter->blurFilter) {
     return;
   }
-  addHardAlphaElement(inputResult);
+  addSoftAlphaElement(inputResult);
   auto sourceRef = inputResult.empty() ? std::string("SourceGraphic") : inputResult;
   if (!filter->shadowOnly) {
     {
@@ -706,7 +715,7 @@ void ElementWriter::addInnerShadowImageFilter(const InnerShadowImageFilter* filt
   }
   {
     ElementWriter compositeElement("feComposite", writer);
-    compositeElement.addAttribute("in2", "hardAlpha");
+    compositeElement.addAttribute("in2", "softAlpha");
     compositeElement.addAttribute("operator", "arithmetic");
     compositeElement.addAttribute("k2", "-1");
     compositeElement.addAttribute("k3", "1");
