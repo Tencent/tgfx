@@ -27,9 +27,13 @@
 #endif
 
 #ifdef _WIN32
+#ifndef VK_USE_PLATFORM_WIN32_KHR
 #define VK_USE_PLATFORM_WIN32_KHR
+#endif
 #elif defined(__ANDROID__)
+#ifndef VK_USE_PLATFORM_ANDROID_KHR
 #define VK_USE_PLATFORM_ANDROID_KHR
+#endif
 #elif defined(__OHOS__)
 #ifndef VK_USE_PLATFORM_OHOS
 #define VK_USE_PLATFORM_OHOS
