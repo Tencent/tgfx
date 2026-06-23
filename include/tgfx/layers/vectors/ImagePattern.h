@@ -47,21 +47,61 @@ class ImagePattern : public ColorSource {
                                             TileMode tileModeY = TileMode::Decal,
                                             const SamplingOptions& sampling = {});
 
+  /**
+   * Returns the image currently used by this pattern. The returned image is the one set via
+   * Make() or setImage(), or nullptr if the image has been cleared. The image is sampled with
+   * the tile modes and sampling options returned by tileModeX(), tileModeY(), and
+   * samplingOptions(), and is transformed by the matrix returned by matrix() before being fitted
+   * into each geometry's bounding box according to scaleMode().
+   */
   std::shared_ptr<Image> image() const {
     return _image;
   }
 
+  /**
+   * Sets the image used by this pattern.
+   * @param image The new image. Pass nullptr to clear the current image.
+   */
+  void setImage(std::shared_ptr<Image> image);
+
+  /**
+   * Returns the tile mode used when the image is repeated in the x direction.
+   */
   TileMode tileModeX() const {
     return _tileModeX;
   }
 
+  /**
+   * Sets the tile mode used when the image is repeated in the x direction.
+   * @param tileModeX The tile mode for the x direction.
+   */
+  void setTileModeX(TileMode tileModeX);
+
+  /**
+   * Returns the tile mode used when the image is repeated in the y direction.
+   */
   TileMode tileModeY() const {
     return _tileModeY;
   }
 
+  /**
+   * Sets the tile mode used when the image is repeated in the y direction.
+   * @param tileModeY The tile mode for the y direction.
+   */
+  void setTileModeY(TileMode tileModeY);
+
+  /**
+   * Returns the sampling options used when sampling the image.
+   */
   SamplingOptions samplingOptions() const {
     return _sampling;
   }
+
+  /**
+   * Sets the sampling options used when sampling the image.
+   * @param sampling The sampling options.
+   */
+  void setSamplingOptions(const SamplingOptions& sampling);
 
   /**
    * Returns the transformation matrix applied to the image pattern. The matrix operates on the
