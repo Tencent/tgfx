@@ -630,7 +630,8 @@ elseif (ANDROID)
 
     if (TGFX_USE_VULKAN)
         # SurfaceTexture depends on GL and is not available in Vulkan mode.
-        list(FILTER TGFX_FILES EXCLUDE REGEX ".*SurfaceTexture.*\\.cpp$")
+        # Only exclude the internal implementation; SurfaceTextureReader.cpp is kept with a stub.
+        list(FILTER TGFX_FILES EXCLUDE REGEX ".*/SurfaceTexture\\.(cpp|h)$")
         find_library(VULKAN_LIB vulkan)
         list(APPEND TGFX_SHARED_LIBS ${VULKAN_LIB})
     elseif (TGFX_USE_NATIVE_GL)
