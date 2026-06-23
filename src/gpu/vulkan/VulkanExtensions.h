@@ -61,20 +61,28 @@ struct VulkanExtensions {
   /// Queries extension availability and feature support from a physical device. Used when tgfx
   /// creates its own VkDevice.
   void query(VkPhysicalDevice physicalDevice) {
+    VkPhysicalDeviceProperties deviceProps = {};
+    vkGetPhysicalDeviceProperties(physicalDevice, &deviceProps);
+    bool isVulkan11OrLater = (deviceProps.apiVersion >= VK_API_VERSION_1_1);
+
     uint32_t extCount = 0;
     vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extCount, nullptr);
     std::vector<VkExtensionProperties> available(extCount);
     vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extCount, available.data());
 
-    bool hasTimeline = false;
+    // VK_KHR_timeline_semaphore, VK_KHR_external_memory, VK_KHR_dedicated_allocation, and
+    // VK_KHR_sampler_ycbcr_conversion are promoted to Vulkan 1.1 core. Drivers may omit them
+    // from the enumeration list on 1.1+ devices, so treat them as available when the device
+    // reports apiVersion >= 1.1.
+    bool hasTimeline = isVulkan11OrLater;
     bool hasDynState = false;
     const char* roaaExtName = nullptr;
     bool hasSwapchain = false;
 #if defined(__ANDROID__)
-    bool hasExternalMemory = false;
-    bool hasDedicatedAllocation = false;
+    bool hasExternalMemory = isVulkan11OrLater;
+    bool hasDedicatedAllocation = isVulkan11OrLater;
     bool hasAndroidHwb = false;
-    bool hasYcbcr = false;
+    bool hasYcbcr = isVulkan11OrLater;
     bool hasQueueFamilyForeign = false;
 #endif
     for (const auto& ext : available) {
