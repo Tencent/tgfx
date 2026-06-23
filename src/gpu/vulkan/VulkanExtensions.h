@@ -218,8 +218,8 @@ struct VulkanExtensions {
   }
 
   /// Holds all feature structs needed for vkCreateDevice. Declared by the caller on the stack and
-  /// populated by buildFeatureChain(). The pNext chain is wired after construction via
-  /// linkFeatureChain() to ensure pointers point into the final object.
+  /// populated by buildFeatureChain(). The pNext chain is wired during buildFeatureChain() to
+  /// ensure pointers point into the final object.
   struct FeatureChain {
     VkPhysicalDeviceFeatures2 features2 = {};
     VkPhysicalDeviceTimelineSemaphoreFeatures timelineFeature = {};
