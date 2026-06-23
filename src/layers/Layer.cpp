@@ -216,20 +216,6 @@ static std::shared_ptr<Layer3DContext> Create3DContext(const DrawArgs& args, Can
                               args.dstColorSpace);
 }
 
-static inline std::optional<StyledShape> MakeContentShape(LayerContent* content) {
-  if (content == nullptr) {
-    return std::nullopt;
-  }
-  auto bounds = content->getTightBounds(Matrix::I());
-  if (bounds.isEmpty()) {
-    return std::nullopt;
-  }
-
-  Path path = {};
-  path.addRect(bounds);
-  return StyledShape::Make(Shape::MakeFrom(path), StyledShapeType::Fill, 0, StrokeAlign::Center);
-}
-
 bool Layer::DefaultAllowsEdgeAntialiasing() {
   return AllowsEdgeAntialiasing;
 }
@@ -1031,7 +1017,17 @@ void Layer::detachProperty(LayerProperty* property) {
 }
 
 std::optional<StyledShape> Layer::onGetContentShape() {
-  return MakeContentShape(getContent());
+  auto* content = getContent();
+  if (content == nullptr) {
+    return std::nullopt;
+  }
+  auto bounds = content->getTightBounds(Matrix::I());
+  if (bounds.isEmpty()) {
+    return std::nullopt;
+  }
+  Path path = {};
+  path.addRect(bounds);
+  return StyledShape::Make(Shape::MakeFrom(path), StyledShapeType::Fill, 0, StrokeAlign::Center);
 }
 
 void Layer::onAttachToRoot(RootLayer* rootLayer) {
@@ -2249,9 +2245,6 @@ void Layer::updateStaticSubtreeFlags() {
 }
 
 std::optional<StyledShape> Layer::getContentShape() {
-  if (!_children.empty()) {
-    return MakeContentShape(getContent());
-  }
   return onGetContentShape();
 }
 
