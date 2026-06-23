@@ -18,36 +18,17 @@
 
 #pragma once
 
-#include "DrawOp.h"
-#include "gpu/proxies/GPUMeshProxy.h"
+#include "gpu/processors/StencilCoverCoverPassGeometryProcessor.h"
 
 namespace tgfx {
-
-class MeshDrawOp : public DrawOp {
+class GLSLStencilCoverCoverPassGeometryProcessor : public StencilCoverCoverPassGeometryProcessor {
  public:
-  static PlacementPtr<MeshDrawOp> Make(std::shared_ptr<GPUMeshProxy> meshProxy, PMColor color,
-                                       const Matrix& viewMatrix);
+  GLSLStencilCoverCoverPassGeometryProcessor(PMColor color, const Matrix& viewMatrix,
+                                             const Matrix& uvMatrix);
 
-  bool hasCoverage() const override;
+  void emitCode(EmitArgs& args) const override;
 
- protected:
-  PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
-
-  void onDraw(RenderPass* renderPass, RenderTarget* renderTarget) override;
-
-  Type type() override {
-    return Type::MeshDrawOp;
-  }
-
- private:
-  MeshDrawOp(BlockAllocator* allocator, std::shared_ptr<GPUMeshProxy> meshProxy, PMColor color,
-             const Matrix& viewMatrix);
-
-  std::shared_ptr<GPUMeshProxy> meshProxy = nullptr;
-  PMColor color = PMColor::Transparent();
-  Matrix viewMatrix = {};
-
-  friend class BlockAllocator;
+  void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
+               FPCoordTransformIter* transformIter) const override;
 };
-
 }  // namespace tgfx

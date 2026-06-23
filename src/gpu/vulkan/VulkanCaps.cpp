@@ -80,6 +80,14 @@ void VulkanCaps::initFeatures(VkPhysicalDevice, const VulkanExtensions& extensio
   _features.clampToBorder = true;
   // Vulkan has no glTextureBarrier() equivalent. Disable to force the copy path for dst reads.
   _features.textureBarrier = false;
+  // Bezier rasterization is supported on Vulkan: the shader path reuses the same GLSL emitted
+  // by GLSLStencilCoverStencilPassGeometryProcessor / GLSLStencilCoverCoverPassGeometryProcessor (compiled to
+  // SPIR-V at runtime by VulkanShaderModule), the stencil ops it needs (Invert / IncrementWrap
+  // / DecrementWrap / Zero) are all mapped in VulkanRenderPipeline, and the D24S8 / D32S8
+  // fallback is wired up in initFormatTable. Mirroring the GL/Metal stance — feature is
+  // advertised by default and any device-specific quirks should be handled as opt-out
+  // overrides rather than an opt-in gate.
+  _features.stencilCoverPathSupported = true;
 
   frameBufferFetchSupported = extensions.rasterizationOrderAttachmentAccess;
 }

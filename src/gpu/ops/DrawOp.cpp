@@ -17,14 +17,28 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawOp.h"
-#include "gpu/AlignTo.h"
+#include "core/utils/Log.h"
 #include "gpu/Program.h"
 
 namespace tgfx {
 void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
+  onDraw(renderPass, renderTarget);
+}
+
+void DrawOp::applyScissor(RenderPass* renderPass, RenderTarget* renderTarget) const {
+  if (scissorRect.isEmpty()) {
+    renderPass->setScissorRect(0, 0, renderTarget->width(), renderTarget->height());
+  } else {
+    renderPass->setScissorRect(static_cast<int>(scissorRect.x()), static_cast<int>(scissorRect.y()),
+                               static_cast<int>(scissorRect.width()),
+                               static_cast<int>(scissorRect.height()));
+  }
+}
+
+bool DrawOp::bindStandardPipeline(RenderPass* renderPass, RenderTarget* renderTarget) {
   auto geometryProcessor = onMakeGeometryProcessor(renderTarget);
   if (geometryProcessor == nullptr) {
-    return;
+    return false;
   }
   std::vector<FragmentProcessor*> fragmentProcessors = {};
   fragmentProcessors.reserve(colors.size() + coverages.size());
@@ -37,22 +51,15 @@ void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   ProgramInfo programInfo(renderTarget, geometryProcessor.get(), std::move(fragmentProcessors),
                           colors.size(), xferProcessor.get(), blendMode);
   programInfo.setCullMode(cullMode);
+  onConfigureProgramInfo(programInfo);
   auto program = programInfo.getProgram();
   if (program == nullptr) {
-    LOGE("DrawOp::execute() Failed to get the program!");
-    return;
+    LOGE("DrawOp::bindStandardPipeline() Failed to get the program!");
+    return false;
   }
   renderPass->setPipeline(program->getPipeline());
-
   programInfo.setUniformsAndSamplers(renderPass, program.get());
-
-  if (scissorRect.isEmpty()) {
-    renderPass->setScissorRect(0, 0, renderTarget->width(), renderTarget->height());
-  } else {
-    renderPass->setScissorRect(static_cast<int>(scissorRect.x()), static_cast<int>(scissorRect.y()),
-                               static_cast<int>(scissorRect.width()),
-                               static_cast<int>(scissorRect.height()));
-  }
-  onDraw(renderPass);
+  applyScissor(renderPass, renderTarget);
+  return true;
 }
 }  // namespace tgfx

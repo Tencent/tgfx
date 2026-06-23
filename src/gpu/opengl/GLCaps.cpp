@@ -146,6 +146,13 @@ GLCaps::GLCaps(const GLInfo& info) {
       break;
   }
   _features.semaphore = true;
+  // Bezier rasterization needs stencil and DEPTH24_STENCIL8 support — both guaranteed by
+  // tgfx's minimum required GL versions (desktop GL >= 3.2, GLES >= 3.0, WebGL >= 2.0).
+  // The stencil-pass fragment shader uses only basic GLSL ES 3.0 features (no derivatives,
+  // no gl_FragCoord), so WebGL 2 is included. Enable it for every concrete GL standard;
+  // GLStandard::None means version-string parsing failed earlier in init() and should never
+  // reach this branch.
+  _features.stencilCoverPathSupported = standard != GLStandard::None;
   info.getIntegerv(GL_MAX_TEXTURE_SIZE, &_limits.maxTextureDimension2D);
   info.getIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &_limits.maxSamplersPerShaderStage);
   info.getIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &_limits.maxUniformBufferBindingSize);

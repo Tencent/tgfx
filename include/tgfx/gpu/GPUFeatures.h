@@ -39,5 +39,12 @@ class GPUFeatures {
    * immediately visible to subsequent texture reads without needing to flush the pipeline.
    */
   bool textureBarrier = false;
+
+  /**
+   * Indicates whether the GPU supports the stencil-and-cover render path used to draw
+   * non-antialiased paths through stencil-based bezier coverage instead of CPU triangulation.
+   * When false, the path renderer falls back to the default triangulation pipeline.
+   */
+  bool stencilCoverPathSupported = false;
 };
 }  // namespace tgfx

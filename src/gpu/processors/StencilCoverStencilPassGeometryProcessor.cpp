@@ -16,38 +16,20 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "DrawOp.h"
-#include "gpu/proxies/GPUMeshProxy.h"
+#include "StencilCoverStencilPassGeometryProcessor.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
-
-class MeshDrawOp : public DrawOp {
- public:
-  static PlacementPtr<MeshDrawOp> Make(std::shared_ptr<GPUMeshProxy> meshProxy, PMColor color,
-                                       const Matrix& viewMatrix);
-
-  bool hasCoverage() const override;
-
- protected:
-  PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
-
-  void onDraw(RenderPass* renderPass, RenderTarget* renderTarget) override;
-
-  Type type() override {
-    return Type::MeshDrawOp;
-  }
-
- private:
-  MeshDrawOp(BlockAllocator* allocator, std::shared_ptr<GPUMeshProxy> meshProxy, PMColor color,
-             const Matrix& viewMatrix);
-
-  std::shared_ptr<GPUMeshProxy> meshProxy = nullptr;
-  PMColor color = PMColor::Transparent();
-  Matrix viewMatrix = {};
-
-  friend class BlockAllocator;
-};
-
+StencilCoverStencilPassGeometryProcessor::StencilCoverStencilPassGeometryProcessor(
+    const Matrix& viewMatrix)
+    : GeometryProcessor(ClassID()), viewMatrix(viewMatrix) {
+  position = {"aPosition", VertexFormat::Float2};
+  klm = {"aKLM", VertexFormat::Float3};
+  // setVertexAttributes treats the pair as Attribute[2]; verify the members really are
+  // adjacent. Attribute is not standard-layout (it holds a std::string), so offsetof is not
+  // usable here and the check has to run on a constructed instance.
+  DEBUG_ASSERT(reinterpret_cast<const Attribute*>(&klm) ==
+               reinterpret_cast<const Attribute*>(&position) + 1);
+  setVertexAttributes(&position, 2);
+}
 }  // namespace tgfx

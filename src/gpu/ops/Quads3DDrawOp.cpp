@@ -72,7 +72,7 @@ PlacementPtr<GeometryProcessor> Quads3DDrawOp::onMakeGeometryProcessor(RenderTar
                                               false);
 }
 
-void Quads3DDrawOp::onDraw(RenderPass* renderPass) {
+void Quads3DDrawOp::onDraw(RenderPass* renderPass, RenderTarget* renderTarget) {
   std::shared_ptr<BufferResource> indexBuffer = nullptr;
   if (indexBufferProxy) {
     indexBuffer = indexBufferProxy->getBuffer();
@@ -82,6 +82,9 @@ void Quads3DDrawOp::onDraw(RenderPass* renderPass) {
   }
   auto vertexBuffer = vertexBufferProxyView ? vertexBufferProxyView->getBuffer() : nullptr;
   if (vertexBuffer == nullptr) {
+    return;
+  }
+  if (!bindStandardPipeline(renderPass, renderTarget)) {
     return;
   }
   renderPass->setVertexBuffer(0, vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
