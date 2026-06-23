@@ -129,14 +129,25 @@ void VulkanExtensions::query(VkPhysicalDevice physicalDevice) {
 #endif
 }
 
-void VulkanExtensions::detectFromDevice() {
+void VulkanExtensions::detectFromDevice(VkPhysicalDevice physicalDevice) {
+  (void)physicalDevice;
   timelineSemaphore = (vkGetSemaphoreCounterValueKHR != nullptr);
   extendedDynamicState = (vkCmdSetPrimitiveTopologyEXT != nullptr);
   rasterizationOrderAttachmentAccess = false;
   swapchain = (vkCreateSwapchainKHR != nullptr);
 #if defined(__ANDROID__)
   androidHardwareBuffer = (vkGetAndroidHardwareBufferPropertiesANDROID != nullptr);
-  samplerYcbcrConversion = androidHardwareBuffer;
+  if (androidHardwareBuffer && vkGetPhysicalDeviceFeatures2 != nullptr) {
+    VkPhysicalDeviceSamplerYcbcrConversionFeatures ycbcrFeature = {};
+    ycbcrFeature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES;
+    VkPhysicalDeviceFeatures2 features2 = {};
+    features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    features2.pNext = &ycbcrFeature;
+    vkGetPhysicalDeviceFeatures2(physicalDevice, &features2);
+    samplerYcbcrConversion = (ycbcrFeature.samplerYcbcrConversion == VK_TRUE);
+  } else {
+    samplerYcbcrConversion = false;
+  }
 #endif
 }
 

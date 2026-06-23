@@ -55,7 +55,8 @@ struct VulkanExtensions {
   void query(VkPhysicalDevice physicalDevice);
 
   /// Infers enabled extensions from volk function pointers. Used for externally created VkDevices.
-  void detectFromDevice();
+  /// The physicalDevice is used to verify feature support (e.g. YCbCr conversion).
+  void detectFromDevice(VkPhysicalDevice physicalDevice);
 
   /// Returns the list of extension names to pass to VkDeviceCreateInfo::ppEnabledExtensionNames.
   std::vector<const char*> getEnabledNames() const;

@@ -112,7 +112,7 @@ std::unique_ptr<VulkanGPU> VulkanGPU::MakeFrom(VkInstance instance, VkPhysicalDe
   volkLoadDevice(device);
   gpu->debugUtilsEnabled = (vkCreateDebugUtilsMessengerEXT != nullptr);
   gpu->installDebugMessenger();
-  gpu->_extensions.detectFromDevice();
+  gpu->_extensions.detectFromDevice(physicalDevice);
   // Query the actual Vulkan API version supported by the host instance. VMA requires this to match
   // the instance version — using a higher version causes NULL dereferences on 1.0 entry points.
   uint32_t instanceVersion = VK_API_VERSION_1_0;
