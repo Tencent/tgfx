@@ -51,6 +51,19 @@ struct VulkanExtensions {
   bool samplerYcbcrConversion = false;
 #endif
 
+ private:
+  const char* _roaaExtensionName = nullptr;
+#if defined(__ANDROID__)
+  // Track whether promoted-to-1.1 extensions were actually enumerated by the driver.
+  // On Vulkan 1.1+ devices, drivers may omit these from vkEnumerateDeviceExtensionProperties.
+  // We must only include them in ppEnabledExtensionNames when they were actually enumerated,
+  // otherwise vkCreateDevice fails with VK_ERROR_EXTENSION_NOT_PRESENT.
+  bool enumeratedExternalMemory = false;
+  bool enumeratedDedicatedAllocation = false;
+  bool enumeratedYcbcr = false;
+#endif
+
+ public:
   /// Queries extension availability and feature support from a physical device.
   void query(VkPhysicalDevice physicalDevice);
 
@@ -75,9 +88,6 @@ struct VulkanExtensions {
 
   /// Populates feature structs and wires the pNext chain inside the caller-owned FeatureChain.
   void buildFeatureChain(FeatureChain& chain) const;
-
- private:
-  const char* _roaaExtensionName = nullptr;
 };
 
 }  // namespace tgfx

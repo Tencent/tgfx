@@ -63,13 +63,16 @@ void VulkanExtensions::query(VkPhysicalDevice physicalDevice) {
 #if defined(__ANDROID__)
     else if (strcmp(ext.extensionName, VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME) == 0) {
       hasExternalMemory = true;
+      enumeratedExternalMemory = true;
     } else if (strcmp(ext.extensionName, VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME) == 0) {
       hasDedicatedAllocation = true;
+      enumeratedDedicatedAllocation = true;
     } else if (strcmp(ext.extensionName,
                       VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME) == 0) {
       hasAndroidHwb = true;
     } else if (strcmp(ext.extensionName, VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME) == 0) {
       hasYcbcr = true;
+      enumeratedYcbcr = true;
     } else if (strcmp(ext.extensionName, VK_EXT_QUEUE_FAMILY_FOREIGN_EXTENSION_NAME) == 0) {
       hasQueueFamilyForeign = true;
     }
@@ -167,12 +170,19 @@ std::vector<const char*> VulkanExtensions::getEnabledNames() const {
   }
 #if defined(__ANDROID__)
   if (androidHardwareBuffer) {
-    names.push_back(VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME);
-    names.push_back(VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME);
+    // Only request promoted-to-1.1 extensions when the driver actually enumerated them.
+    // On 1.1+ devices that omit these, the functionality is available via core and must not
+    // be listed in ppEnabledExtensionNames (VUID-VkDeviceCreateInfo-ppEnabledExtensionNames-01387).
+    if (enumeratedExternalMemory) {
+      names.push_back(VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME);
+    }
+    if (enumeratedDedicatedAllocation) {
+      names.push_back(VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME);
+    }
     names.push_back(VK_EXT_QUEUE_FAMILY_FOREIGN_EXTENSION_NAME);
     names.push_back(VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME);
   }
-  if (samplerYcbcrConversion) {
+  if (samplerYcbcrConversion && enumeratedYcbcr) {
     names.push_back(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME);
   }
 #endif

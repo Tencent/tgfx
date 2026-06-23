@@ -69,7 +69,13 @@ class VulkanWindow : public Window {
 #ifdef __ANDROID__
   /**
    * Creates a VulkanWindow from an Android ANativeWindow. Returns nullptr if the Vulkan surface or
-   * swapchain cannot be created. Note: only sRGB output is currently supported.
+   * swapchain cannot be created. Note: only sRGB output is currently supported; a non-sRGB
+   * colorSpace value is ignored with a warning. HDR / Display-P3 support will be added later.
+   * @param nativeWindow The Android ANativeWindow to render into. Returns nullptr if null.
+   * @param device The VulkanDevice used to create the surface and swapchain. Returns nullptr if
+   * null.
+   * @param colorSpace The desired color space for the swapchain images. Defaults to sRGB when
+   * nullptr is passed.
    */
   static std::shared_ptr<VulkanWindow> MakeFrom(ANativeWindow* nativeWindow,
                                                 std::shared_ptr<VulkanDevice> device,
