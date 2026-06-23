@@ -90,5 +90,11 @@ class ShaderCaps {
    * Returns the required alignment in bytes for offsets within a uniform buffer object (UBO).
    */
   int uboOffsetAlignment = 1;
+
+  /**
+   * Whether texture sampling must occur in uniform control flow (not inside divergent branches).
+   * Required by WebGPU/WGSL; not required by GLSL/Metal.
+   */
+  bool requiresUniformControlFlow = false;
 };
 }  // namespace tgfx

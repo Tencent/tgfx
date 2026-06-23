@@ -217,7 +217,8 @@ void PDFExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
 void PDFExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
                                      const Rect& dstRect, const SamplingOptions& sampling,
                                      const Matrix& matrix, const ClipStack& clip,
-                                     const Brush& brush, SrcRectConstraint) {
+                                     const Brush& brush, SrcRectConstraint,
+                                     const Rect* /*strictRect*/) {
   auto subsetImage = image->makeSubset(srcRect);
   if (subsetImage == nullptr) {
     return;
@@ -314,6 +315,46 @@ bool IsBackgroundBlurStylePattern(const Brush& brush, const Image* image) {
   return filterImage->filter &&
          Types::Get(filterImage->filter.get()) == Types::ImageFilterType::Blur;
 }
+
+// Generates a glyph path at the given resolutionScale to match the hinting result used by GPU
+// rasterization. FreeType hinting snaps glyph control points to the pixel grid at the rendered
+// font size, so a path obtained at 60px and scaled 4x differs from one obtained directly at 240px.
+// By generating the path at the final device font size (fontSize * resolutionScale) and then
+// scaling back to logical coordinates, the path shape matches the GPU-rasterized mask used by
+// InnerShadowStyle and NoiseStyle.
+Path GetGlyphRunPath(const GlyphRun& glyphRun, float resolutionScale) {
+  if (resolutionScale <= 0.0f) {
+    return {};
+  }
+  const bool hasScale = resolutionScale != 1.0f;
+  const auto scaleMatrix = Matrix::MakeScale(resolutionScale, resolutionScale);
+  auto font = glyphRun.font;
+  if (hasScale) {
+    font = font.makeWithSize(resolutionScale * font.getSize());
+  }
+
+  Path path = {};
+  for (size_t index = 0; index < glyphRun.glyphCount; index++) {
+    auto glyphID = glyphRun.glyphs[index];
+    Path glyphPath = {};
+    if (!font.getPath(glyphID, &glyphPath)) {
+      continue;
+    }
+    auto glyphMatrix = GetGlyphMatrix(glyphRun, index);
+    if (hasScale) {
+      glyphMatrix.preScale(1.0f / resolutionScale, 1.0f / resolutionScale);
+      glyphMatrix.postConcat(scaleMatrix);
+    }
+    glyphPath.transform(glyphMatrix);
+    path.addPath(glyphPath);
+  }
+  if (hasScale) {
+    auto inverseMatrix = Matrix::MakeScale(1.0f / resolutionScale, 1.0f / resolutionScale);
+    path.transform(inverseMatrix);
+  }
+  return path;
+}
+
 }  // namespace
 
 namespace {
@@ -351,7 +392,6 @@ class GlyphPositioner {
       content->writeText(" ");
       PDFUtils::AppendFloat(currentMatrixOrigin.y, content);
       content->writeText(" Tm\n");
-      currentMatrixOrigin.set(0.0f, 0.0f);
       initialized = true;
     }
     Point position = xy - currentMatrixOrigin;
@@ -426,29 +466,15 @@ void PDFExportContext::onDrawGlyphRun(const GlyphRun& glyphRun, const Matrix& ma
                                       const Stroke* stroke) {
 
   auto& font = glyphRun.font;
-  auto typeface = font.getTypeface();
-  // RSXform/Matrix positioning requires path export since PDF text operators cannot represent
-  // per-glyph rotation/scale.
-  if (!typeface->isCustom()) {
-    if (font.hasColor()) {
-      exportGlyphRunAsImage(glyphRun, matrix, clip, brush);
-    } else if (HasComplexTransform(glyphRun) || brush.maskFilter || stroke) {
-      exportGlyphRunAsPath(glyphRun, matrix, clip, brush, stroke);
-    } else {
-      exportGlyphRunAsText(glyphRun, matrix, clip, brush);
-    }
+  if (font.hasColor()) {
+    exportGlyphRunAsImage(glyphRun, matrix, clip, brush);
   } else {
-    if (font.hasColor()) {
-      exportGlyphRunAsImage(glyphRun, matrix, clip, brush);
-    } else {
-      exportGlyphRunAsPath(glyphRun, matrix, clip, brush, stroke);
-    }
+    exportGlyphRunAsPath(glyphRun, matrix, clip, brush, stroke);
   }
 }
 
 void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const Matrix& matrix,
                                             const ClipStack& clip, const Brush& brush) {
-  DEBUG_ASSERT(!HasComplexTransform(glyphRun));
   if (glyphRun.glyphCount == 0) {
     return;
   }
@@ -477,13 +503,6 @@ void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const Matr
   // The size, skewX, and scaleX are applied here.
   float advanceScale = textSize * 1.f / pdfStrike->strikeSpec.unitsPerEM;
 
-  // textScaleX and textScaleY are used to get a conservative bounding box for glyphs.
-  float textScaleY = textSize / pdfStrike->strikeSpec.unitsPerEM;
-  float textScaleX = advanceScale;
-
-  const auto clipStackBounds =
-      clip.state() == ClipState::WideOpen ? Rect::MakeSize(_pageSize) : clip.bounds();
-
   // Clear everything from the runPaint that will be applied by the strike.
   Brush brushPaint(brush);
   brushPaint.maskFilter = nullptr;
@@ -506,8 +525,28 @@ void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const Matr
     GlyphPositioner glyphPositioner(out, glyphRunFont.getMetrics().leading, offset);
     PDFFont* font = nullptr;
 
+    // Use clip bounds to cull glyphs outside the visible area, preventing ghost text in the PDF
+    // text layer that would otherwise be selectable but visually invisible.
+    const auto clipStackBounds =
+        clip.state() == ClipState::WideOpen ? Rect::MakeSize(_pageSize) : clip.bounds();
+
     for (size_t index = 0; index < glyphRun.glyphCount; ++index) {
       auto glyphID = glyphRun.glyphs[index];
+      if (numGlyphs <= glyphID) {
+        continue;
+      }
+      auto xy = GetGlyphPosition(glyphRun, index);
+      // Skip glyphs outside the clip region to keep visual and text layers consistent.
+      auto glyphBounds = glyphRunFont.getBounds(glyphID);
+      glyphBounds.scale(advanceScale, advanceScale);
+      glyphBounds.offset(xy + offset);
+      matrix.mapRect(&glyphBounds);
+      if (!glyphBounds.isEmpty() && !Rect::Intersects(clipStackBounds, glyphBounds)) {
+        continue;
+      }
+      if (glyphBounds.isEmpty() && !clipStackBounds.contains(glyphBounds.x(), glyphBounds.y())) {
+        continue;
+      }
 
       glyphPositioner.flush();
       out->writeText("/Span<</ActualText ");
@@ -516,25 +555,6 @@ void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const Matr
       PDFWriteTextString(out, utf8Text);
       // begin marked-content sequence with an associated property list.
       out->writeText(" >> BDC\n");
-      if (numGlyphs <= glyphID) {
-        continue;
-      }
-      auto xy = GetGlyphPosition(glyphRun, index);
-      // Do a glyph-by-glyph bounds-reject if positions are absolute.
-      auto glyphBounds = glyphRunFont.getBounds(glyphID);
-      glyphBounds = Matrix::MakeScale(textScaleX, textScaleY).mapRect(glyphBounds);
-      glyphBounds.offset(xy + offset);
-      matrix.mapRect(&glyphBounds);
-
-      if (glyphBounds.isEmpty()) {
-        if (!clipStackBounds.contains(glyphBounds.x(), glyphBounds.y())) {
-          continue;
-        }
-      } else {
-        if (!Rect::Intersects(clipStackBounds, glyphBounds)) {
-          continue;
-        }
-      }
       if (NeedsNewFont(font, glyphID, initialFontType)) {
         // Not yet specified font or need to switch font.
         font = pdfStrike->getFontResource(glyphID);
@@ -563,20 +583,7 @@ void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const Matr
 void PDFExportContext::exportGlyphRunAsPath(const GlyphRun& glyphRun, const Matrix& matrix,
                                             const ClipStack& clip, const Brush& brush,
                                             const Stroke* stroke) {
-  const auto& glyphFont = glyphRun.font;
-  Path path;
-
-  for (size_t i = 0; i < glyphRun.glyphCount; ++i) {
-    auto glyphID = glyphRun.glyphs[i];
-    auto glyphMatrix = GetGlyphMatrix(glyphRun, i);
-    Path glyphPath;
-    if (!glyphFont.getPath(glyphID, &glyphPath)) {
-      continue;
-    }
-    glyphPath.transform(glyphMatrix);
-    path.addPath(glyphPath);
-  }
-
+  auto path = GetGlyphRunPath(glyphRun, matrix.getMaxScale());
   if (path.isEmpty()) {
     return;
   }

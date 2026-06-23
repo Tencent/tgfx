@@ -170,6 +170,10 @@ class StrokePainter : public Painter {
     }
     return Shape::Merge(std::move(shape), std::move(originalShape), op);
   }
+
+  PainterStyle onGetStyle() const override {
+    return {PaintStyle::Stroke, stroke.width, strokeAlign};
+  }
 };
 
 std::shared_ptr<StrokeStyle> StrokeStyle::Make(std::shared_ptr<ColorSource> colorSource) {

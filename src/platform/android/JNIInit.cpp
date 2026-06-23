@@ -20,7 +20,9 @@
 #include "GlyphRenderer.h"
 #include "HandlerThread.h"
 #include "NativeCodec.h"
+#ifndef TGFX_USE_VULKAN
 #include "platform/android/SurfaceTexture.h"
+#endif
 #include "tgfx/platform/android/AndroidBitmap.h"
 
 namespace tgfx {
@@ -37,7 +39,9 @@ void JNIInit::Run() {
   initialized = true;
   NativeCodec::JNIInit(env);
   HandlerThread::JNIInit(env);
+#ifndef TGFX_USE_VULKAN
   SurfaceTexture::JNIInit(env);
+#endif
   AndroidBitmap::JNIInit(env);
   GlyphRenderer::JNIInit(env);
   env->ExceptionClear();

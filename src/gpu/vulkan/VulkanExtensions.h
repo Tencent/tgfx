@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <cstring>
 #include <vector>
 #include "gpu/vulkan/VulkanAPI.h"
 
@@ -45,131 +44,50 @@ struct VulkanExtensions {
   bool rasterizationOrderAttachmentAccess = false;
   /// Whether VK_KHR_swapchain is available. Headless drivers (e.g. SwiftShader) do not expose it.
   bool swapchain = false;
+#if defined(__ANDROID__)
+  /// Whether VK_ANDROID_external_memory_android_hardware_buffer is available.
+  bool androidHardwareBuffer = false;
+  /// Whether VK_KHR_sampler_ycbcr_conversion is available and the feature is supported.
+  bool samplerYcbcrConversion = false;
+#endif
 
  private:
-  // Stores the actual ROAA extension name detected (EXT or ARM variant) for use in
-  // getEnabledNames(). Null when ROAA is unavailable.
   const char* _roaaExtensionName = nullptr;
+#if defined(__ANDROID__)
+  // Track whether promoted-to-1.1 extensions were actually enumerated by the driver.
+  // On Vulkan 1.1+ devices, drivers may omit these from vkEnumerateDeviceExtensionProperties.
+  // We must only include them in ppEnabledExtensionNames when they were actually enumerated,
+  // otherwise vkCreateDevice fails with VK_ERROR_EXTENSION_NOT_PRESENT.
+  bool enumeratedExternalMemory = false;
+  bool enumeratedDedicatedAllocation = false;
+  bool enumeratedYcbcr = false;
+#endif
 
  public:
-  /// Queries extension availability and feature support from a physical device. Used when tgfx
-  /// creates its own VkDevice.
-  void query(VkPhysicalDevice physicalDevice) {
-    uint32_t extCount = 0;
-    vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extCount, nullptr);
-    std::vector<VkExtensionProperties> available(extCount);
-    vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extCount, available.data());
+  /// Queries extension availability and feature support from a physical device.
+  void query(VkPhysicalDevice physicalDevice);
 
-    bool hasTimeline = false;
-    bool hasDynState = false;
-    const char* roaaExtName = nullptr;
-    bool hasSwapchain = false;
-    for (const auto& ext : available) {
-      if (strcmp(ext.extensionName, VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME) == 0) {
-        hasTimeline = true;
-      } else if (strcmp(ext.extensionName, VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME) == 0) {
-        hasDynState = true;
-      } else if (strcmp(ext.extensionName, "VK_EXT_rasterization_order_attachment_access") == 0) {
-        roaaExtName = "VK_EXT_rasterization_order_attachment_access";
-      } else if (strcmp(ext.extensionName, "VK_ARM_rasterization_order_attachment_access") == 0) {
-        if (!roaaExtName) {
-          roaaExtName = "VK_ARM_rasterization_order_attachment_access";
-        }
-      } else if (strcmp(ext.extensionName, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0) {
-        hasSwapchain = true;
-      }
-    }
-
-    // Verify actual feature support. Spec allows extension present + feature FALSE.
-    VkPhysicalDeviceTimelineSemaphoreFeatures timelineFeature = {};
-    timelineFeature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
-
-    VkPhysicalDeviceExtendedDynamicStateFeaturesEXT dynStateFeature = {};
-    dynStateFeature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
-
-    VkPhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT roaaFeature = {};
-    roaaFeature.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_FEATURES_EXT;
-
-    // Build pNext chain: timeline → dynState → roaa (only include structs for detected extensions)
-    void* pNextChain = nullptr;
-    if (roaaExtName) {
-      roaaFeature.pNext = pNextChain;
-      pNextChain = &roaaFeature;
-    }
-    if (hasDynState) {
-      dynStateFeature.pNext = pNextChain;
-      pNextChain = &dynStateFeature;
-    }
-    if (hasTimeline) {
-      timelineFeature.pNext = pNextChain;
-      pNextChain = &timelineFeature;
-    }
-
-    VkPhysicalDeviceFeatures2 features2 = {};
-    features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-    features2.pNext = pNextChain;
-    vkGetPhysicalDeviceFeatures2(physicalDevice, &features2);
-
-    timelineSemaphore = hasTimeline && timelineFeature.timelineSemaphore;
-    extendedDynamicState = hasDynState && dynStateFeature.extendedDynamicState;
-    rasterizationOrderAttachmentAccess =
-        (roaaExtName != nullptr) && roaaFeature.rasterizationOrderColorAttachmentAccess;
-    _roaaExtensionName = roaaExtName;
-    swapchain = hasSwapchain;
-  }
-
-  /// Infers enabled extensions from volk function pointers. Used for externally created VkDevices
-  /// (MakeFrom path) where we cannot know which extensions the host app enabled at creation time.
-  void detectFromDevice() {
-    timelineSemaphore = (vkGetSemaphoreCounterValueKHR != nullptr);
-    extendedDynamicState = (vkCmdSetPrimitiveTopologyEXT != nullptr);
-    // ROAA has no unique entry points; cannot be inferred from function pointers.
-    rasterizationOrderAttachmentAccess = false;
-    // Swapchain can be detected from its unique entry point.
-    swapchain = (vkCreateSwapchainKHR != nullptr);
-  }
+  /// Infers enabled extensions from volk function pointers. Used for externally created VkDevices.
+  /// The physicalDevice is used to verify feature support (e.g. YCbCr conversion).
+  void detectFromDevice(VkPhysicalDevice physicalDevice);
 
   /// Returns the list of extension names to pass to VkDeviceCreateInfo::ppEnabledExtensionNames.
-  std::vector<const char*> getEnabledNames() const {
-    std::vector<const char*> names;
-    if (swapchain) {
-      names.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-    }
-    if (timelineSemaphore) {
-      names.push_back(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
-    }
-    if (extendedDynamicState) {
-      names.push_back(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
-    }
-    if (rasterizationOrderAttachmentAccess) {
-      names.push_back(_roaaExtensionName);
-    }
-    return names;
-  }
+  std::vector<const char*> getEnabledNames() const;
 
-  /// Builds the VkPhysicalDeviceFeatures2 pNext chain for vkCreateDevice. The caller must keep
-  /// the returned feature structs alive until vkCreateDevice returns. For simplicity, this method
-  /// populates the provided output structs and chains them into features2.
-  void buildFeatureChain(VkPhysicalDeviceFeatures2& features2,
-                         VkPhysicalDeviceTimelineSemaphoreFeatures& timelineFeature,
-                         VkPhysicalDeviceExtendedDynamicStateFeaturesEXT& dynStateFeature) const {
-    features2 = {};
-    features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-    timelineFeature = {};
-    timelineFeature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
-    timelineFeature.timelineSemaphore = timelineSemaphore ? VK_TRUE : VK_FALSE;
-    dynStateFeature = {};
-    dynStateFeature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
-    dynStateFeature.extendedDynamicState = extendedDynamicState ? VK_TRUE : VK_FALSE;
+  /// Holds all feature structs needed for vkCreateDevice. Declared by the caller on the stack and
+  /// populated by buildFeatureChain(). The pNext chain is wired during buildFeatureChain() to
+  /// ensure pointers point into the final object.
+  struct FeatureChain {
+    VkPhysicalDeviceFeatures2 features2 = {};
+    VkPhysicalDeviceTimelineSemaphoreFeatures timelineFeature = {};
+    VkPhysicalDeviceExtendedDynamicStateFeaturesEXT dynStateFeature = {};
+#if defined(__ANDROID__)
+    VkPhysicalDeviceSamplerYcbcrConversionFeatures ycbcrFeature = {};
+#endif
+  };
 
-    if (timelineSemaphore) {
-      timelineFeature.pNext = extendedDynamicState ? &dynStateFeature : nullptr;
-      features2.pNext = &timelineFeature;
-    } else if (extendedDynamicState) {
-      features2.pNext = &dynStateFeature;
-    }
-  }
+  /// Populates feature structs and wires the pNext chain inside the caller-owned FeatureChain.
+  void buildFeatureChain(FeatureChain& chain) const;
 };
 
 }  // namespace tgfx

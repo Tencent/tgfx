@@ -23,12 +23,31 @@
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/layers/LayerPaint.h"
+#include "tgfx/layers/StrokeAlign.h"
 #include "tgfx/layers/vectors/ColorSource.h"
 
 namespace tgfx {
 
 class LayerRecorder;
 class VectorContext;
+
+/**
+ * Describes the fill/stroke style of a drawing operation.
+ */
+struct PainterStyle {
+  /**
+   * Whether the geometry is filled or stroked.
+   */
+  PaintStyle style = PaintStyle::Fill;
+  /**
+   * The width of the stroke. Only meaningful when style is Stroke.
+   */
+  float strokeWidth = 0.0f;
+  /**
+   * The alignment of the stroke relative to the shape boundary.
+   */
+  StrokeAlign strokeAlign = StrokeAlign::Center;
+};
 
 /**
  * Painter is the base class for objects that perform draw operations on a list of Geometries.
@@ -65,6 +84,11 @@ class Painter {
    * Creates a copy of this painter.
    */
   virtual std::unique_ptr<Painter> clone() const = 0;
+
+  /**
+   * Returns the fill/stroke style of this painter.
+   */
+  PainterStyle getStyle() const;
 
   std::shared_ptr<Shader> shader = nullptr;
   std::shared_ptr<ColorSource> colorSource = nullptr;
@@ -116,6 +140,11 @@ class Painter {
    * Builds a base LayerPaint pre-populated with the painter's blendMode/alpha/placement.
    */
   LayerPaint makeBasePaint() const;
+
+  /**
+   * Returns the fill/stroke style of this painter.
+   */
+  virtual PainterStyle onGetStyle() const = 0;
 
  private:
   /**

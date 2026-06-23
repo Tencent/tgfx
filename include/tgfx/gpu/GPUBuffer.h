@@ -86,6 +86,15 @@ class GPUBuffer {
   virtual bool isReady() const = 0;
 
   /**
+   * Requests asynchronous mapping of the buffer for readback. This is used by WebGPU and other
+   * backends that require explicit async operations. For other backends, this is a no-op.
+   * After calling this, poll isReady() until it returns true, then call map() to get the data.
+   */
+  virtual void requestMapAsync() {
+    // Default implementation is a no-op for backends that don't require async mapping
+  }
+
+  /**
    * Maps a range of the GPUBuffer, allowing the CPU to directly access a specific portion of its
    * memory for reading or writing. For readback buffers, this method may block until the data
    * transfer from the GPU to the CPU is complete, if the backend supports blocking. After

@@ -99,6 +99,16 @@
         "url": "https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git",
         "commit": "1d8f600fd424278486eade7ed3e877c99f0846b1",
         "dir": "third_party/VulkanMemoryAllocator"
+      },
+      {
+        "url": "https://dawn.googlesource.com/tint",
+        "commit": "f744c741427a2ea8623c089e531fb73db9948f80",
+        "dir": "third_party/tint"
+      },
+      {
+        "url": "https://chromium.googlesource.com/chromium/src/third_party/abseil-cpp",
+        "commit": "4ef9b33175828ea46d091e7e5ec28259d39a8ba5",
+        "dir": "third_party/tint/third_party/abseil-cpp"
       }
     ]
   },

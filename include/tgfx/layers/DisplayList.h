@@ -353,10 +353,10 @@ class DisplayList {
 
   void recycleCurrentTileTasks(const std::vector<DrawTask>& tileTasks);
 
-  std::vector<DrawTask> collectScreenTasks(const Surface* surface, std::vector<DrawTask>* tileTasks,
+  std::vector<DrawTask> collectScreenTasks(const Surface* surface, bool hasDirtyRegions,
+                                           bool autoClear, std::vector<DrawTask>* tileTasks,
                                            std::vector<Rect>* skippedRects,
-                                           std::vector<DrawTask>* throttleScreenTasks,
-                                           bool autoClear);
+                                           std::vector<DrawTask>* throttleScreenTasks);
 
   std::vector<std::pair<float, TileCache*>> getSortedTileCaches() const;
 

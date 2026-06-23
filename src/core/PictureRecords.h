@@ -315,8 +315,9 @@ class DrawImage : public PictureRecord {
 class DrawImageRect : public DrawImage {
  public:
   DrawImageRect(std::shared_ptr<Image> image, const Rect& rect, const SamplingOptions& sampling,
-                SrcRectConstraint constraint)
-      : DrawImage(std::move(image), sampling), rect(rect), constraint(constraint) {
+                SrcRectConstraint constraint, const Rect& strictRect = Rect::MakeEmpty())
+      : DrawImage(std::move(image), sampling), rect(rect), constraint(constraint),
+        strictRect(strictRect) {
   }
 
   PictureRecordType type() const override {
@@ -324,19 +325,23 @@ class DrawImageRect : public DrawImage {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
+    const Rect* strictRectPtr = strictRect.isEmpty() ? nullptr : &strictRect;
     context->drawImageRect(image, rect, rect, sampling, playback->matrix(), playback->clip(),
-                           playback->brush(), constraint);
+                           playback->brush(), constraint, strictRectPtr);
   }
 
   Rect rect;
   SrcRectConstraint constraint = SrcRectConstraint::Fast;
+  Rect strictRect = Rect::MakeEmpty();
 };
 
 class DrawImageRectToRect : public DrawImageRect {
  public:
   DrawImageRectToRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
-                      const SamplingOptions& sampling, SrcRectConstraint constraint)
-      : DrawImageRect(std::move(image), srcRect, sampling, constraint), dstRect(dstRect) {
+                      const SamplingOptions& sampling, SrcRectConstraint constraint,
+                      const Rect& strictRect = Rect::MakeEmpty())
+      : DrawImageRect(std::move(image), srcRect, sampling, constraint, strictRect),
+        dstRect(dstRect) {
   }
 
   PictureRecordType type() const override {
@@ -344,8 +349,9 @@ class DrawImageRectToRect : public DrawImageRect {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
+    const Rect* strictRectPtr = strictRect.isEmpty() ? nullptr : &strictRect;
     context->drawImageRect(image, rect, dstRect, sampling, playback->matrix(), playback->clip(),
-                           playback->brush(), constraint);
+                           playback->brush(), constraint, strictRectPtr);
   }
 
   Rect dstRect = {};

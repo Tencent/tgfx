@@ -332,8 +332,12 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   matrix.preTranslate(contentEntry.offset.x, contentEntry.offset.y);
   canvas->concat(matrix);
   auto backgroundOffset = bgOffset - contentEntry.offset;
-  style->drawWithExtraSource(canvas, contentEntry.image, source->contentScale, contentEntry.offset,
-                             std::move(bgImage), backgroundOffset, alpha);
+  LayerStyleInput styleInput = {};
+  styleInput.content = contentEntry.image;
+  styleInput.contentOffset = contentEntry.offset;
+  styleInput.contentScale = source->contentScale;
+  styleInput.extraSource = std::make_shared<StyleInputSource>(std::move(bgImage), backgroundOffset);
+  style->draw(canvas, styleInput, alpha);
 }
 
 void BackgroundCapturer::Run(Layer* captureRoot, const DrawArgs& baseArgs,

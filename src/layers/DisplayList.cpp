@@ -72,6 +72,10 @@ class DrawTask {
     return _tileRect;
   }
 
+  const Rect& strictRect() const {
+    return _strictRect;
+  }
+
   const std::vector<std::shared_ptr<Tile>>& getTiles() const {
     return tiles;
   }
@@ -85,6 +89,7 @@ class DrawTask {
   std::vector<std::shared_ptr<Tile>> tiles = {};
   Rect _sourceRect = {};
   Rect _tileRect = {};
+  Rect _strictRect = {};
   bool _identityScale = true;
 
   void calculateRects(int tileSize, const Rect& drawRect, float scale) {
@@ -94,19 +99,12 @@ class DrawTask {
     }));
     auto& tile = tiles.front();
     _tileRect = drawRect.isEmpty() ? tile->getTileRect(tileSize) : drawRect;
-    // For fallback rendering, round to integers to ensure precise pixel mapping with sourceRect.
-    if (!_identityScale) {
-      _tileRect.roundOut();
-    }
     _sourceRect = _tileRect;
     auto offsetX = (tile->sourceX - tile->tileX) * tileSize;
     auto offsetY = (tile->sourceY - tile->tileY) * tileSize;
     _sourceRect.offset(static_cast<float>(offsetX), static_cast<float>(offsetY));
     _tileRect.scale(scale, scale);
-    // Round to pixel boundaries for 1:1 mapping; fallback uses linear sampling with float coords.
-    if (_identityScale) {
-      _tileRect.round();
-    }
+    _strictRect = tile->getSourceRect(tileSize);
   }
 };
 
@@ -441,8 +439,8 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   auto tileTasks = invalidateTileCaches(dirtyRegions);
   std::vector<Rect> skippedRects = {};
   std::vector<DrawTask> throttleScreenTasks = {};
-  auto screenTasks =
-      collectScreenTasks(surface, &tileTasks, &skippedRects, &throttleScreenTasks, autoClear);
+  auto screenTasks = collectScreenTasks(surface, !dirtyRegions.empty(), autoClear, &tileTasks,
+                                        &skippedRects, &throttleScreenTasks);
   // Throttle tasks and skipped rects must keep the tiled path; only fall back when all are empty.
   if (screenTasks.empty() && throttleScreenTasks.empty() && skippedRects.empty()) {
     recycleCurrentTileTasks(tileTasks);
@@ -579,11 +577,11 @@ void DisplayList::invalidateCurrentTileCache(const TileCache* tileCache,
   }
 }
 
-std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
+std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface, bool hasDirtyRegions,
+                                                      bool autoClear,
                                                       std::vector<DrawTask>* tileTasks,
                                                       std::vector<Rect>* skippedRects,
-                                                      std::vector<DrawTask>* throttleScreenTasks,
-                                                      bool autoClear) {
+                                                      std::vector<DrawTask>* throttleScreenTasks) {
   auto maxBudget = _maxTilesRefinedPerFrame;
   const auto useFallback = _tileUpdateMode != TileUpdateMode::Immediate;
   if (lastContentOffset != _contentOffset || lastZoomScaleInt != _zoomScaleInt) {
@@ -648,9 +646,9 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
         screenTasks.insert(screenTasks.end(), fallbackTasks.begin(), fallbackTasks.end());
         continue;
       }
-      if (_tileUpdateMode == TileUpdateMode::Smooth) {
-        // No cached fallback in Smooth mode: rasterize the tile in this frame to keep the result
-        // correct.
+      // Rasterize in Smooth mode, or when this frame has dirty regions: dirty regions also
+      // clear fallback tiles at other scales, so a skipRect would render as background color.
+      if (_tileUpdateMode == TileUpdateMode::Smooth || hasDirtyRegions) {
         dirtyGrids.emplace_back(tileX, tileY);
         continue;
       }
@@ -1052,7 +1050,7 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, std::vector
     auto image = surfaceCache->makeImageSnapshot();
     auto& sampling = task.identityScale() ? nearestSampling : linearSampling;
     canvas->drawImageRect(image, task.sourceRect(), task.tileRect(), sampling, &paint,
-                          SrcRectConstraint::Strict);
+                          SrcRectConstraint::Strict, &task.strictRect());
     tileRect.join(task.tileRect());
   }
 
@@ -1100,7 +1098,7 @@ void DisplayList::drawThrottleScreenTasks(std::vector<DrawTask> throttleScreenTa
     DEBUG_ASSERT(surfaceCache != nullptr);
     auto image = surfaceCache->makeImageSnapshot();
     canvas->drawImageRect(std::move(image), task.sourceRect(), task.tileRect(), linearSampling,
-                          &paint, SrcRectConstraint::Strict);
+                          &paint, SrcRectConstraint::Strict, &task.strictRect());
   }
 }
 

@@ -21,6 +21,7 @@
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/layers/LayerPaint.h"
+#include "tgfx/layers/layerstyles/StyledShape.h"
 
 namespace tgfx {
 std::shared_ptr<ShapeLayer> ShapeLayer::Make() {
@@ -261,5 +262,28 @@ std::shared_ptr<Shape> ShapeLayer::createStrokeShape() const {
     strokeShape = Shape::Merge(std::move(strokeShape), _shape, PathOp::Difference);
   }
   return strokeShape;
+}
+
+std::optional<StyledShape> ShapeLayer::onGetContentShape() {
+  if (_shape == nullptr) {
+    return std::nullopt;
+  }
+  auto fillCount = _fillStyles.size();
+  auto strokeCount = _strokeStyles.size();
+  if (strokeCount == 0 && fillCount == 0) {
+    return std::nullopt;
+  }
+
+  auto type = StyledShapeType::FillStroke;
+  if (strokeCount == 0) {
+    type = StyledShapeType::Fill;
+  } else if (fillCount == 0) {
+    type = StyledShapeType::Stroke;
+  }
+  // The dash pattern is intentionally ignored here: spread expands the stroke outline, and a dash
+  // only changes how that outline is displayed, not its geometry, so it is treated as a solid
+  // stroke.
+  return StyledShape::Make(Shape::MakeFrom(_shape->getPath()), type, stroke.width,
+                           static_cast<StrokeAlign>(shapeBitFields.strokeAlign));
 }
 }  // namespace tgfx

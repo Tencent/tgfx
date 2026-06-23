@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/layerstyles/LayerStyle.h"
-#include <utility>
 
 namespace tgfx {
 void LayerStyle::setBlendMode(BlendMode blendMode) {
@@ -38,13 +37,6 @@ void LayerStyle::setExcludeChildEffects(bool value) {
   }
   _excludeChildEffects = value;
   invalidateTransform();
-}
-
-void LayerStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> content,
-                                       float contentScale, const Point& contentOffset,
-                                       std::shared_ptr<Image>, const Point&, float alpha,
-                                       BlendMode blendMode) {
-  onDraw(canvas, std::move(content), contentScale, contentOffset, alpha, blendMode);
 }
 
 }  // namespace tgfx

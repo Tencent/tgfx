@@ -29,6 +29,7 @@
 #include "tgfx/layers/LayerType.h"
 #include "tgfx/layers/filters/LayerFilter.h"
 #include "tgfx/layers/layerstyles/LayerStyle.h"
+#include "tgfx/layers/layerstyles/StyledShape.h"
 
 namespace tgfx {
 class LayerContent;
@@ -589,6 +590,13 @@ class Layer : public std::enable_shared_from_this<Layer> {
    */
   void detachProperty(LayerProperty* property);
 
+  /**
+   * Returns the content shape of this layer.
+   * The base class generates a shape from the content's bounding rect. Subclasses can override
+   * this to provide a more precise shape.
+   */
+  virtual std::optional<StyledShape> onGetContentShape();
+
  private:
   /**
    * Marks the layer as needing to be redrawn. Unlike invalidateContent(), this method only marks
@@ -727,6 +735,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
   void invalidateSubtree();
 
   void updateStaticSubtreeFlags();
+
+  std::optional<StyledShape> getContentShape();
 
   struct {
     bool dirtyContent : 1;        // layer's content needs updating

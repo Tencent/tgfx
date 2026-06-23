@@ -22,6 +22,7 @@
 #include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
+class CommandQueue;
 class Texture;
 class WebImageBuffer : public ImageBuffer {
  public:
@@ -58,7 +59,8 @@ class WebImageBuffer : public ImageBuffer {
   /**
    * Uploads the image to a region of the target texture. Returns true if successful.
    */
-  bool uploadToTexture(std::shared_ptr<Texture> texture, int offsetX, int offsetY) const;
+  bool uploadToTexture(std::shared_ptr<Texture> texture, CommandQueue* queue, int offsetX,
+                       int offsetY) const;
 
   const std::shared_ptr<ColorSpace>& colorSpace() const override {
     return ColorSpace::SRGB();

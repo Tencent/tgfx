@@ -269,7 +269,8 @@
           "-DCMAKE_CXX_FLAGS=\"-w\""
         ],
         "platforms": [
-          "mac"
+          "mac",
+          "web"
         ]
       }
     },
@@ -304,7 +305,8 @@
           "-DCMAKE_CXX_FLAGS=\"-w\""
         ],
         "platforms": [
-          "mac"
+          "mac",
+          "web"
         ]
       }
     },
@@ -356,6 +358,39 @@
         ],
         "platforms": [
           "ohos"
+        ]
+      }
+    },
+    {
+      "name": "shaderc",
+      "cmake": {
+        "targets": [
+          "shaderc_combined"
+        ],
+        "arguments": [
+          "-DSHADERC_SKIP_TESTS=ON",
+          "-DSHADERC_SKIP_EXAMPLES=ON",
+          "-DSHADERC_SKIP_INSTALL=ON",
+          "-DCMAKE_CXX_FLAGS=\"-w\""
+        ],
+        "platforms": [
+          "android"
+        ]
+      }
+    },
+    {
+      "name": "SPIRV-Cross",
+      "cmake": {
+        "targets": [
+          "spirv-cross-core",
+          "spirv-cross-glsl"
+        ],
+        "arguments": [
+          "-DSPIRV_CROSS_ENABLE_TESTS=OFF",
+          "-DCMAKE_CXX_FLAGS=\"-w\""
+        ],
+        "platforms": [
+          "android"
         ]
       }
     },
