@@ -206,7 +206,10 @@ std::shared_ptr<VulkanHardwareTexture> VulkanHardwareTexture::MakeFrom(
     ycbcrInfo.components = formatProps.samplerYcbcrConversionComponents;
     ycbcrInfo.xChromaOffset = formatProps.suggestedXChromaOffset;
     ycbcrInfo.yChromaOffset = formatProps.suggestedYChromaOffset;
-    ycbcrInfo.chromaFilter = VK_FILTER_LINEAR;
+    ycbcrInfo.chromaFilter = (formatProps.formatFeatures &
+                              VK_FORMAT_FEATURE_SAMPLED_IMAGE_YCBCR_CONVERSION_LINEAR_FILTER_BIT)
+                                 ? VK_FILTER_LINEAR
+                                 : VK_FILTER_NEAREST;
     ycbcrInfo.forceExplicitReconstruction = VK_FALSE;
 
     VkExternalFormatANDROID ycbcrExternalFormat = {};
