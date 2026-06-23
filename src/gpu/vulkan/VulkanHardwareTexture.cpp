@@ -290,18 +290,11 @@ VulkanHardwareTexture::~VulkanHardwareTexture() {
 
 void VulkanHardwareTexture::onRelease(VulkanGPU* gpu) {
   VkDevice device = gpu->device();
-  if (imageView != VK_NULL_HANDLE) {
-    vkDestroyImageView(device, imageView, nullptr);
-    imageView = VK_NULL_HANDLE;
-  }
   if (ycbcrConversion != VK_NULL_HANDLE) {
     vkDestroySamplerYcbcrConversion(device, ycbcrConversion, nullptr);
     ycbcrConversion = VK_NULL_HANDLE;
   }
-  if (image != VK_NULL_HANDLE) {
-    vkDestroyImage(device, image, nullptr);
-    image = VK_NULL_HANDLE;
-  }
+  VulkanTexture::onRelease(gpu);
   if (dedicatedMemory != VK_NULL_HANDLE) {
     vkFreeMemory(device, dedicatedMemory, nullptr);
     dedicatedMemory = VK_NULL_HANDLE;
