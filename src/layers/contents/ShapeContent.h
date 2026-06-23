@@ -27,11 +27,18 @@ class ShapeContent : public DrawContent {
  public:
   ShapeContent(std::shared_ptr<Shape> shape, const LayerPaint& paint);
 
+  // Renders shape inside clipShape (toggle inverse fill on clipShape for Outside-stroke).
+  // Note: during contour recording for shadow spread, the clip-edge AA combined with
+  // OpaqueContext's alpha threshold can widen the contour by ~1 px versus a geometric merge.
+  ShapeContent(std::shared_ptr<Shape> shape, std::shared_ptr<Shape> clipShape,
+               const LayerPaint& paint);
+
   Rect getBounds() const override;
   Rect getTightBounds(const Matrix& matrix) const override;
   bool hitTestPoint(float localX, float localY) const override;
 
   std::shared_ptr<Shape> shape = nullptr;
+  std::shared_ptr<Shape> clipShape = nullptr;
 
  protected:
   Type type() const override {
