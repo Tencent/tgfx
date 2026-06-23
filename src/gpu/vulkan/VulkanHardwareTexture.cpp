@@ -76,6 +76,9 @@ std::shared_ptr<VulkanHardwareTexture> VulkanHardwareTexture::MakeFrom(
     return nullptr;
   }
   if (isYUV && (usage & TextureUsage::RENDER_ATTACHMENT)) {
+    LOGE(
+        "VulkanHardwareTexture::MakeFrom() YUV hardware buffer cannot be used as render "
+        "attachment.");
     return nullptr;
   }
 
@@ -188,6 +191,12 @@ std::shared_ptr<VulkanHardwareTexture> VulkanHardwareTexture::MakeFrom(
   }
 
   VkSamplerYcbcrConversion ycbcrConversion = VK_NULL_HANDLE;
+  if (useExternalFormat && !gpu->extensions().samplerYcbcrConversion) {
+    LOGE("VulkanHardwareTexture::MakeFrom() external format requires YCbCr conversion support.");
+    vkFreeMemory(device, memory, nullptr);
+    vkDestroyImage(device, vkImage, nullptr);
+    return nullptr;
+  }
   if (useExternalFormat) {
     VkSamplerYcbcrConversionCreateInfo ycbcrInfo = {};
     ycbcrInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_CREATE_INFO;
