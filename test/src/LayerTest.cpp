@@ -3511,9 +3511,9 @@ enum class ShadowType { Drop, Inner };
 
 static inline std::shared_ptr<LayerStyle> MakeShadow(ShadowType type, float offsetX, float offsetY,
                                                      float blurX, float blurY, const Color& color,
-                                                     float spread) {
+                                                     float spread, bool dropBehindLayer = true) {
   if (type == ShadowType::Drop) {
-    auto style = DropShadowStyle::Make(offsetX, offsetY, blurX, blurY, color);
+    auto style = DropShadowStyle::Make(offsetX, offsetY, blurX, blurY, color, dropBehindLayer);
     style->setSpread(spread);
     return style;
   }
@@ -3587,7 +3587,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     layer->setStrokeStyle(ShapeStyle::Make(Color::Blue()));
     layer->setLineWidth(15);
     layer->setMatrix(Matrix::MakeTrans(i == 0 ? lItemXOffset : rItemXOffset, cellH + gap));
-    layer->setLayerStyles({MakeShadow(type, 25, 25, 3, 3, Color::Green(), i == 0 ? 0.0f : 8.0f)});
+    layer->setLayerStyles({MakeShadow(type, 25, 25, 3, 3, Color::Green(), i == 0 ? 0.0f : 8.0f, false)});
     displayList.root()->addChild(layer);
   }
 
@@ -3790,7 +3790,8 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     auto stroke = StrokeStyle::Make(SolidColor::Make(Color::Blue()));
     stroke->setStrokeWidth(15);
     stroke->setStrokeAlign(StrokeAlign::Inside);
-    innerGroup->setElements({ellipse, stroke});
+    auto fill = FillStyle::Make(SolidColor::Make(Color::Transparent()));
+    innerGroup->setElements({ellipse, stroke, fill});
     innerGroup->setScale({1.5f, 1.5f});
     innerGroup->setRotation(-30);
     auto group = VectorGroup::Make();
@@ -3803,7 +3804,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     matrix.preConcat(Matrix::MakeTrans(-10, 15));
     vectorLayer->setMatrix(matrix);
     vectorLayer->setLayerStyles(
-        {MakeShadow(type, 25, 25, 3, 3, Color::Green(), i == 0 ? 0.0f : -5.0f)});
+        {MakeShadow(type, 25, 25, 3, 3, Color::Green(), i == 0 ? 0.0f : -5.0f, false)});
     displayList.root()->addChild(vectorLayer);
   }
 }
