@@ -56,7 +56,7 @@ PlacementPtr<GeometryProcessor> HairlineQuadOp::onMakeGeometryProcessor(
                                              aaType);
 }
 
-void HairlineQuadOp::onDraw(RenderPass* renderPass) {
+void HairlineQuadOp::onDraw(RenderPass* renderPass, RenderTarget* renderTarget) {
   auto quadVertexBufferProxy = hairlineProxy->getQuadVertexBufferProxy();
   if (quadVertexBufferProxy == nullptr || indexBufferProxy == nullptr) {
     return;
@@ -67,6 +67,9 @@ void HairlineQuadOp::onDraw(RenderPass* renderPass) {
   }
   auto indexBuffer = indexBufferProxy->getBuffer();
   if (indexBuffer == nullptr) {
+    return;
+  }
+  if (!bindStandardPipeline(renderPass, renderTarget)) {
     return;
   }
   auto totalQuadCount = vertexBuffer->size() / (VerticesPerQuad * BytesPerQuadVertex);

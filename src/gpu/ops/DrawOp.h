@@ -35,6 +35,7 @@ class DrawOp {
     HairlineLineOp,
     HairlineQuadOp,
     ShapeInstancedDrawOp,
+    StencilCoverPathDrawOp,
   };
 
   virtual ~DrawOp() = default;
@@ -69,6 +70,16 @@ class DrawOp {
 
   void execute(RenderPass* renderPass, RenderTarget* renderTarget);
 
+  /**
+   * Returns true when the op needs a depth/stencil attachment to be present on the render
+   * pass. OpsRenderTask scans the op list with this hook before beginning the pass and attaches
+   * a stencil texture when at least one op opts in. Default is false so existing draw ops keep
+   * running without a stencil buffer.
+   */
+  virtual bool needsStencil() const {
+    return false;
+  }
+
  protected:
   BlockAllocator* allocator = nullptr;
   AAType aaType = AAType::None;
@@ -84,7 +95,36 @@ class DrawOp {
 
   virtual PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) = 0;
 
-  virtual void onDraw(RenderPass* renderPass) = 0;
+  /**
+   * Hook invoked by bindStandardPipeline() right before the program is materialised, giving the
+   * op a chance to inject pipeline-level overrides such as the depth/stencil descriptor or the
+   * colour write mask into the ProgramInfo. The default does nothing; only ops that opt into
+   * stencil-based rendering need to override.
+   */
+  virtual void onConfigureProgramInfo(ProgramInfo& /*programInfo*/) {
+  }
+
+  /**
+   * Applies the op's scissor rectangle to the render pass. An empty scissor expands to the
+   * full render target. bindStandardPipeline() calls this internally, but multi-pass ops that
+   * bind their own pipelines must call it for every pass — otherwise that pass writes outside
+   * the op's clip and may pollute the render pass for subsequent ops (especially relevant for
+   * stencil writes, which are not undone by the cover pass outside the cover scissor).
+   */
+  void applyScissor(RenderPass* renderPass, RenderTarget* renderTarget) const;
+
+  /**
+   * Builds the op's standard render pipeline from its current geometry/fragment processor
+   * configuration and binds it to the render pass, together with uniforms, samplers and the
+   * scissor rectangle. Subclasses must call this from onDraw() before issuing any draw call
+   * that should run through the standard pipeline. Multi-pass ops can call it again after
+   * temporarily switching to a self-managed pipeline (e.g. a stencil pass) to re-attach the
+   * standard pipeline. Returns false if program creation fails, in which case the caller
+   * should abort the draw.
+   */
+  bool bindStandardPipeline(RenderPass* renderPass, RenderTarget* renderTarget);
+
+  virtual void onDraw(RenderPass* renderPass, RenderTarget* renderTarget) = 0;
 
   virtual Type type() = 0;
 };

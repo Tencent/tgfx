@@ -62,7 +62,7 @@ class RRectDrawOp : public DrawOp {
  protected:
   PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
 
-  void onDraw(RenderPass* renderPass) override;
+  void onDraw(RenderPass* renderPass, RenderTarget* renderTarget) override;
 
   Type type() override {
     return Type::RRectDrawOp;

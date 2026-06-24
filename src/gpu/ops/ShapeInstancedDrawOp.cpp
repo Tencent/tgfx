@@ -106,11 +106,14 @@ PlacementPtr<GeometryProcessor> ShapeInstancedDrawOp::onMakeGeometryProcessor(
                                                realUVMatrix, viewMatrix);
 }
 
-void ShapeInstancedDrawOp::onDraw(RenderPass* renderPass) {
+void ShapeInstancedDrawOp::onDraw(RenderPass* renderPass, RenderTarget* renderTarget) {
   auto vertexBuffer = shapeProxy->getTriangles();
   auto instanceBuffer = instanceBufferProxy->getBuffer();
   if (instanceBuffer == nullptr) {
     LOGE("ShapeInstancedDrawOp::onDraw() Failed to get instance buffer!");
+    return;
+  }
+  if (!bindStandardPipeline(renderPass, renderTarget)) {
     return;
   }
   if (vertexBuffer != nullptr) {
