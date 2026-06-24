@@ -139,6 +139,10 @@ class SVGExportContext : public DrawContext {
 
   std::string defineClipPath(const Path& clipPath);
 
+  std::vector<std::unique_ptr<ElementWriter>> buildFilterGroupElements(
+      const std::vector<std::string>& filterIDs, const std::string& singleFilterRef,
+      const std::string& clipID, const std::string& blendStyle, float alpha);
+
   static SVGPathParser::PathEncoding PathEncodingType();
 
   uint32_t exportFlags = {};

@@ -413,44 +413,8 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
     }
     float outerAlpha = brush.color.alpha;
     {
-      std::vector<std::unique_ptr<ElementWriter>> groupElements;
-      if (filterIDs.size() > 1) {
-        // Compose: outermost <g> carries last filter + clip + blend + opacity.
-        // Innermost <g> carries first filter (applied first to the source).
-        auto outermost = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
-        if (needsClip) {
-          outermost->addAttribute("clip-path", "url(#" + clipID + ")");
-        }
-        outermost->addAttribute("filter", "url(#" + filterIDs.back() + ")");
-        if (!outerBlendStyle.empty()) {
-          outermost->addAttribute("style", outerBlendStyle);
-        }
-        if (outerAlpha != 1.0f) {
-          outermost->addAttribute("opacity", outerAlpha);
-        }
-        groupElements.push_back(std::move(outermost));
-        for (size_t i = filterIDs.size() - 1; i > 0; --i) {
-          auto inner = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
-          inner->addAttribute("filter", "url(#" + filterIDs[i - 1] + ")");
-          groupElements.push_back(std::move(inner));
-        }
-      } else {
-        // Single filter or no filter: single <g> with all attributes.
-        auto groupElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
-        if (needsClip) {
-          groupElement->addAttribute("clip-path", "url(#" + clipID + ")");
-        }
-        if (!resources.filter.empty()) {
-          groupElement->addAttribute("filter", resources.filter);
-        }
-        if (!outerBlendStyle.empty()) {
-          groupElement->addAttribute("style", outerBlendStyle);
-        }
-        if (outerAlpha != 1.0f) {
-          groupElement->addAttribute("opacity", outerAlpha);
-        }
-        groupElements.push_back(std::move(groupElement));
-      }
+      auto groupElements = buildFilterGroupElements(
+          filterIDs, resources.filter, needsClip ? clipID : "", outerBlendStyle, outerAlpha);
       // Strip lifted effects from the inner brush so the recursive draw does not re-emit them
       // on a nested <g>, which would both double the effect and reintroduce the isolation issue.
       Brush innerBrush = brush;
@@ -707,6 +671,47 @@ void SVGExportContext::exportPictureImageAsVector(const PictureImage* pictureIma
   }
 }
 
+std::vector<std::unique_ptr<ElementWriter>> SVGExportContext::buildFilterGroupElements(
+    const std::vector<std::string>& filterIDs, const std::string& singleFilterRef,
+    const std::string& clipID, const std::string& blendStyle, float alpha) {
+  std::vector<std::unique_ptr<ElementWriter>> groupElements;
+  if (filterIDs.size() > 1) {
+    auto outermost = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
+    if (!clipID.empty()) {
+      outermost->addAttribute("clip-path", "url(#" + clipID + ")");
+    }
+    outermost->addAttribute("filter", "url(#" + filterIDs.back() + ")");
+    if (!blendStyle.empty()) {
+      outermost->addAttribute("style", blendStyle);
+    }
+    if (alpha != 1.0f) {
+      outermost->addAttribute("opacity", alpha);
+    }
+    groupElements.push_back(std::move(outermost));
+    for (size_t i = filterIDs.size() - 1; i > 0; --i) {
+      auto inner = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
+      inner->addAttribute("filter", "url(#" + filterIDs[i - 1] + ")");
+      groupElements.push_back(std::move(inner));
+    }
+  } else {
+    auto groupElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
+    if (!clipID.empty()) {
+      groupElement->addAttribute("clip-path", "url(#" + clipID + ")");
+    }
+    if (!singleFilterRef.empty()) {
+      groupElement->addAttribute("filter", singleFilterRef);
+    }
+    if (!blendStyle.empty()) {
+      groupElement->addAttribute("style", blendStyle);
+    }
+    if (alpha != 1.0f) {
+      groupElement->addAttribute("opacity", alpha);
+    }
+    groupElements.push_back(std::move(groupElement));
+  }
+  return groupElements;
+}
+
 void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
                                  std::shared_ptr<ImageFilter> imageFilter, const Matrix& matrix,
                                  const ClipStack& clip, const Brush& brush) {
@@ -729,47 +734,19 @@ void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
     // left cleared on exit instead of being saved and restored.
     clipGroupElement = nullptr;
     currentClipPath = {};
-    std::vector<std::unique_ptr<ElementWriter>> groupElements;
-    if (filterIDs.size() > 1) {
-      auto outermost = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
-      if (needsClip) {
-        outermost->addAttribute("clip-path", "url(#" + clipID + ")");
+    std::string blendStyle;
+    if (brush.blendMode != BlendMode::SrcOver) {
+      auto svgBlendMode = ToSVGBlendMode(brush.blendMode);
+      if (!svgBlendMode.empty() && svgBlendMode != "normal") {
+        blendStyle = "mix-blend-mode: " + svgBlendMode;
       }
-      outermost->addAttribute("filter", "url(#" + filterIDs.back() + ")");
-      if (brush.blendMode != BlendMode::SrcOver) {
-        auto svgBlendMode = ToSVGBlendMode(brush.blendMode);
-        if (!svgBlendMode.empty() && svgBlendMode != "normal") {
-          outermost->addAttribute("style", "mix-blend-mode: " + svgBlendMode);
-        }
-      }
-      if (brush.color.alpha != 1.0f) {
-        outermost->addAttribute("opacity", brush.color.alpha);
-      }
-      groupElements.push_back(std::move(outermost));
-      for (size_t i = filterIDs.size() - 1; i > 0; --i) {
-        auto inner = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
-        inner->addAttribute("filter", "url(#" + filterIDs[i - 1] + ")");
-        groupElements.push_back(std::move(inner));
-      }
-    } else {
-      auto groupElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
-      if (needsClip) {
-        groupElement->addAttribute("clip-path", "url(#" + clipID + ")");
-      }
-      if (!filterIDs.empty()) {
-        groupElement->addAttribute("filter", "url(#" + filterIDs[0] + ")");
-      }
-      if (brush.blendMode != BlendMode::SrcOver) {
-        auto svgBlendMode = ToSVGBlendMode(brush.blendMode);
-        if (!svgBlendMode.empty() && svgBlendMode != "normal") {
-          groupElement->addAttribute("style", "mix-blend-mode: " + svgBlendMode);
-        }
-      }
-      if (brush.color.alpha != 1.0f) {
-        groupElement->addAttribute("opacity", brush.color.alpha);
-      }
-      groupElements.push_back(std::move(groupElement));
     }
+    std::string singleFilterRef;
+    if (!filterIDs.empty()) {
+      singleFilterRef = "url(#" + filterIDs[0] + ")";
+    }
+    auto groupElements = buildFilterGroupElements(
+        filterIDs, singleFilterRef, needsClip ? clipID : "", blendStyle, brush.color.alpha);
     picture->playback(this, matrix, needsClip ? ClipStack{} : clip);
     while (!groupElements.empty()) {
       groupElements.pop_back();
