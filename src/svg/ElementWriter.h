@@ -102,6 +102,8 @@ class ElementWriter {
 
   void addShaderResources(const std::shared_ptr<Shader>& shader, Context* context,
                           Resources* resources);
+  void addShaderFilterPrimitives(const Shader* shader);
+  void addPerlinNoisePrimitives(const Shader* noiseShader);
   void addColorShaderResources(const ColorShader* shader, Resources* resources);
   void addGradientShaderResources(const GradientShader* shader, const Matrix& matrix,
                                   Resources* resources);

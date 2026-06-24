@@ -1439,127 +1439,66 @@ TGFX_TEST(SVGExportTest, FilterImageWithBlendModeAndClip) {
   exporter->close();
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/FilterImageWithBlendModeAndClip"));
 }
-TGFX_TEST(SVGExportTest, BlendImageFilterGradient) {
+TGFX_TEST(SVGExportTest, FilterAndShaderExport) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
   auto SVGStream = MemoryWriteStream::Make();
-  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(800, 500),
                                     SVGExportFlags::DisablePrettyXML);
   auto canvas = exporter->getCanvas();
 
-  Paint paint;
-  paint.setColor(Color::Blue());
-  auto gradientShader =
-      Shader::MakeLinearGradient({0, 0}, {200, 200}, {Color::Red(), Color::Green()});
-  paint.setImageFilter(ImageFilter::Blend(BlendMode::Multiply, gradientShader));
-  canvas->drawRect(Rect::MakeXYWH(25, 25, 150, 150), paint);
+  // 1. BlendImageFilter + Gradient: white rect with red-green gradient multiplied.
+  Paint blendGradPaint;
+  blendGradPaint.setColor(Color::White());
+  auto gradShader = Shader::MakeLinearGradient({0, 0}, {200, 200}, {Color::Red(), Color::Green()});
+  blendGradPaint.setImageFilter(ImageFilter::Blend(BlendMode::Multiply, gradShader));
+  canvas->drawRect(Rect::MakeXYWH(25, 25, 150, 150), blendGradPaint);
 
-  exporter->close();
-  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/BlendImageFilterGradient"));
-}
-
-TGFX_TEST(SVGExportTest, BlendImageFilterImageNonDstIn) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-
-  auto SVGStream = MemoryWriteStream::Make();
-  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
-                                    SVGExportFlags::DisablePrettyXML);
-  auto canvas = exporter->getCanvas();
-
-  auto image = MakeImage("resources/apitest/test_timestretch.png");
+  // 2. BlendImageFilter + Image (Screen): original image vs brown+Screen blend.
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
   ASSERT_TRUE(image != nullptr);
   auto imageShader = Shader::MakeImageShader(image);
-  Paint paint;
-  paint.setColor(Color::White());
-  paint.setImageFilter(ImageFilter::Blend(BlendMode::Screen, imageShader));
-  canvas->drawRect(Rect::MakeXYWH(25, 25, 150, 150), paint);
+  canvas->drawImageRect(image, Rect::MakeXYWH(200, 36, 128, 128));
+  Paint blendImgPaint;
+  blendImgPaint.setColor(Color::FromRGBA(101, 67, 33));
+  blendImgPaint.setImageFilter(ImageFilter::Blend(BlendMode::Screen, imageShader));
+  canvas->drawRect(Rect::MakeXYWH(350, 36, 128, 128), blendImgPaint);
+
+  // 3. ColorFilterShader: gradient with green overlay.
+  auto cfGradient = Shader::MakeLinearGradient({500, 0}, {700, 0}, {Color::Red(), Color::Blue()});
+  auto cfFilter = ColorFilter::Blend(Color::FromRGBA(0, 255, 0, 128), BlendMode::SrcOver);
+  Paint cfsPaint;
+  cfsPaint.setShader(cfGradient->makeWithColorFilter(cfFilter));
+  canvas->drawRect(Rect::MakeXYWH(500, 25, 150, 150), cfsPaint);
+
+  // 4. PerlinNoise shader.
+  Paint noisePaint;
+  noisePaint.setShader(Shader::MakeFractalNoise(0.05f, 0.05f, 3, 42));
+  canvas->drawRect(Rect::MakeXYWH(25, 225, 150, 150), noisePaint);
+
+  // 5. Luma ColorFilter: black-to-white gradient converted to grayscale.
+  Paint lumaPaint;
+  lumaPaint.setShader(
+      Shader::MakeLinearGradient({200, 0}, {400, 0}, {Color::Black(), Color::White()}));
+  lumaPaint.setColorFilter(ColorFilter::Luma());
+  canvas->drawRect(Rect::MakeXYWH(200, 225, 150, 150), lumaPaint);
+
+  // 6. AlphaThreshold: alpha gradient + noise with threshold cutoff.
+  auto alphaGrad = Shader::MakeLinearGradient(
+      {400, 0}, {475, 0}, {Color::FromRGBA(0, 0, 255, 0), Color::FromRGBA(0, 0, 255, 255)});
+  Paint atPaint;
+  atPaint.setShader(alphaGrad);
+  atPaint.setColorFilter(ColorFilter::AlphaThreshold(0.5f));
+  canvas->drawRect(Rect::MakeXYWH(400, 225, 75, 150), atPaint);
+  Paint atNoisePaint;
+  atNoisePaint.setShader(Shader::MakeFractalNoise(0.05f, 0.05f, 4, 0));
+  atNoisePaint.setColorFilter(ColorFilter::AlphaThreshold(0.5f));
+  canvas->drawRect(Rect::MakeXYWH(485, 225, 75, 150), atNoisePaint);
 
   exporter->close();
-  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/BlendImageFilterImageNonDstIn"));
-}
-
-TGFX_TEST(SVGExportTest, ColorFilterShaderExport) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-
-  auto SVGStream = MemoryWriteStream::Make();
-  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
-                                    SVGExportFlags::DisablePrettyXML);
-  auto canvas = exporter->getCanvas();
-
-  auto gradientShader = Shader::MakeLinearGradient({0, 0}, {200, 0}, {Color::Red(), Color::Blue()});
-  auto colorFilter = ColorFilter::Blend(Color::FromRGBA(0, 255, 0, 128), BlendMode::SrcOver);
-  auto colorFilterShader = gradientShader->makeWithColorFilter(colorFilter);
-
-  Paint paint;
-  paint.setShader(colorFilterShader);
-  canvas->drawRect(Rect::MakeXYWH(25, 25, 150, 150), paint);
-
-  exporter->close();
-  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/ColorFilterShaderExport"));
-}
-
-TGFX_TEST(SVGExportTest, PerlinNoiseShaderExport) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-
-  auto SVGStream = MemoryWriteStream::Make();
-  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
-                                    SVGExportFlags::DisablePrettyXML);
-  auto canvas = exporter->getCanvas();
-
-  auto noiseShader = Shader::MakeFractalNoise(0.05f, 0.05f, 3, 42);
-  Paint paint;
-  paint.setShader(noiseShader);
-  canvas->drawRect(Rect::MakeXYWH(25, 25, 150, 150), paint);
-
-  exporter->close();
-  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/PerlinNoiseShaderExport"));
-}
-
-TGFX_TEST(SVGExportTest, LumaColorFilter) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-
-  auto SVGStream = MemoryWriteStream::Make();
-  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
-                                    SVGExportFlags::DisablePrettyXML);
-  auto canvas = exporter->getCanvas();
-
-  Paint paint;
-  auto gradientShader = Shader::MakeLinearGradient({0, 0}, {200, 0}, {Color::Red(), Color::Blue()});
-  paint.setShader(gradientShader);
-  paint.setColorFilter(ColorFilter::Luma());
-  canvas->drawRect(Rect::MakeXYWH(25, 25, 150, 150), paint);
-
-  exporter->close();
-  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/LumaColorFilter"));
-}
-
-TGFX_TEST(SVGExportTest, AlphaThresholdColorFilter) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-
-  auto SVGStream = MemoryWriteStream::Make();
-  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
-                                    SVGExportFlags::DisablePrettyXML);
-  auto canvas = exporter->getCanvas();
-
-  Paint paint;
-  paint.setColor(Color::FromRGBA(0, 0, 255, 128));
-  paint.setColorFilter(ColorFilter::AlphaThreshold(0.3f));
-  canvas->drawRect(Rect::MakeXYWH(25, 25, 150, 150), paint);
-
-  exporter->close();
-  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/AlphaThresholdColorFilter"));
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/FilterAndShaderExport"));
 }
 
 }  // namespace tgfx

@@ -851,9 +851,17 @@ void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter,
     reportUnsupportedElement("Unsupported blend mode in BlendImageFilter");
     return;
   }
-  switch (Types::Get(filter->shader.get())) {
+  // Unwrap MatrixShader to get the actual shader type and accumulated matrix.
+  const Shader* blendShader = filter->shader.get();
+  Matrix shaderMatrix = Matrix::I();
+  while (blendShader && Types::Get(blendShader) == Types::ShaderType::Matrix) {
+    auto matrixShader = static_cast<const MatrixShader*>(blendShader);
+    shaderMatrix = shaderMatrix * matrixShader->matrix;
+    blendShader = matrixShader->source.get();
+  }
+  switch (Types::Get(blendShader)) {
     case Types::ShaderType::Color: {
-      const auto colorShader = static_cast<const ColorShader*>(filter->shader.get());
+      const auto colorShader = static_cast<const ColorShader*>(blendShader);
       Color color;
       if (!colorShader->asColor(&color)) {
         reportUnsupportedElement("Failed to extract color from ColorShader in BlendImageFilter");
@@ -881,7 +889,7 @@ void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter,
       break;
     }
     case Types::ShaderType::PerlinNoise: {
-      const auto noiseShader = static_cast<const PerlinNoiseShader*>(filter->shader.get());
+      const auto noiseShader = static_cast<const PerlinNoiseShader*>(blendShader);
       {
         ElementWriter turbulenceElement("feTurbulence", writer);
         turbulenceElement.addAttribute(
@@ -906,10 +914,19 @@ void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter,
       break;
     }
     case Types::ShaderType::Gradient: {
-      auto gradientShader = static_cast<const GradientShader*>(filter->shader.get());
+      auto gradientShader = static_cast<const GradientShader*>(blendShader);
       GradientInfo info;
       GradientType gradientType = gradientShader->asGradient(&info);
-      std::string svgFragment = "<svg xmlns='http://www.w3.org/2000/svg'>";
+      std::string svgFragment = "<svg xmlns='http://www.w3.org/2000/svg'";
+      if (filterBounds) {
+        svgFragment += " width='" + FloatToString(filterBounds->width()) + "'";
+        svgFragment += " height='" + FloatToString(filterBounds->height()) + "'";
+        svgFragment += " viewBox='" + FloatToString(filterBounds->x()) + " " +
+                       FloatToString(filterBounds->y()) + " " +
+                       FloatToString(filterBounds->width()) + " " +
+                       FloatToString(filterBounds->height()) + "'";
+      }
+      svgFragment += ">";
       if (gradientType == GradientType::Linear) {
         svgFragment += "<defs><linearGradient id='g' gradientUnits='userSpaceOnUse'";
         svgFragment += " x1='" + FloatToString(info.points[0].x) + "'";
@@ -969,7 +986,7 @@ void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter,
       break;
     }
     case Types::ShaderType::Image: {
-      const auto imageShader = static_cast<const ImageShader*>(filter->shader.get());
+      const auto imageShader = static_cast<const ImageShader*>(blendShader);
       auto data = SVGExportContext::ImageToEncodedData(imageShader->image);
       std::shared_ptr<Data> dataUri = nullptr;
       if (data && (JpegCodec::IsJpeg(data) || PngCodec::IsPng(data))) {
@@ -986,12 +1003,18 @@ void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter,
       }
       {
         ElementWriter imageElement("feImage", writer);
-        if (filterBounds) {
-          imageElement.addAttribute("x", filterBounds->x());
-          imageElement.addAttribute("y", filterBounds->y());
-        }
-        imageElement.addAttribute("width", imageShader->image->width());
-        imageElement.addAttribute("height", imageShader->image->height());
+        auto imgRect = Rect::MakeWH(static_cast<float>(imageShader->image->width()),
+                                    static_cast<float>(imageShader->image->height()));
+        auto mappedRect = shaderMatrix.mapRect(imgRect);
+        // The shader is sampled relative to the source graphic's local coordinates (0,0 is the
+        // top-left of the drawn shape). Offset by filterBounds origin to convert to user space.
+        float offsetX = filterBounds ? filterBounds->x() : 0;
+        float offsetY = filterBounds ? filterBounds->y() : 0;
+        imageElement.addAttribute("x", mappedRect.x() + offsetX);
+        imageElement.addAttribute("y", mappedRect.y() + offsetY);
+        imageElement.addAttribute("width", mappedRect.width());
+        imageElement.addAttribute("height", mappedRect.height());
+        imageElement.addAttribute("preserveAspectRatio", "none");
         imageElement.addAttribute("xlink:href", static_cast<const char*>(dataUri->data()));
         imageElement.addAttribute("result", "blendImage");
       }
@@ -1030,11 +1053,19 @@ bool ElementWriter::addColorFilterPrimitives(const std::shared_ptr<ColorFilter>&
       return addColorFilterPrimitives(compose->outer);
     }
     case Types::ColorFilterType::Luma: {
+      // tgfx Luma outputs vec4(luma) where luma = dot(rgb, vec3(Kr, Kg, Kb)).
+      // All four channels (R, G, B, A) are set to the luminance value.
+      // Use a custom feColorMatrix to replicate: R'=G'=B'=A' = Kr*R + Kg*G + Kb*B.
       ElementWriter colorMatrixElement("feColorMatrix", writer);
       if (!inputResult.empty()) {
         colorMatrixElement.addAttribute("in", inputResult);
       }
-      colorMatrixElement.addAttribute("type", "luminanceToAlpha");
+      colorMatrixElement.addAttribute("type", "matrix");
+      colorMatrixElement.addAttribute("values",
+                                      "0.2126 0.7152 0.0722 0 0 "
+                                      "0.2126 0.7152 0.0722 0 0 "
+                                      "0.2126 0.7152 0.0722 0 0 "
+                                      "0.2126 0.7152 0.0722 0 0");
       return true;
     }
     case Types::ColorFilterType::AlphaThreshold: {
@@ -1142,16 +1173,47 @@ Resources ElementWriter::addResources(const Brush& brush, Context* context,
   Resources resources(color);
 
   if (auto shader = brush.shader) {
-    ElementWriter defs("defs", writer);
-    addShaderResources(shader, context, &resources);
+    // Check if shader needs defs resources (gradient/pattern/image). PerlinNoise and standalone
+    // ColorFilterShader only need filter primitives (handled below), not defs.
+    const Shader* innerShader = shader.get();
+    while (innerShader && Types::Get(innerShader) == Types::ShaderType::Matrix) {
+      innerShader = static_cast<const MatrixShader*>(innerShader)->source.get();
+    }
+    auto shaderType = innerShader ? Types::Get(innerShader) : Types::ShaderType::Color;
+    if (shaderType != Types::ShaderType::PerlinNoise) {
+      ElementWriter defs("defs", writer);
+      addShaderResources(shader, context, &resources);
+    } else {
+      resources.filter = "pending";
+    }
   }
 
-  if (brush.colorFilter) {
-    auto filterResources = addColorFilterResource(brush.colorFilter);
-    if (filterResources.filter.empty()) {
-      reportUnsupportedElement("Unsupported color filter");
+  // Determine whether the shader produced filter primitives (PerlinNoise / ColorFilterShader)
+  // that need to be combined with brush.colorFilter into a single <filter> element.
+  // A "pending" value in resources.filter means the shader needs filter primitives but has not
+  // yet emitted the <filter> element.
+  bool shaderNeedsFilter = (resources.filter == "pending");
+  bool hasColorFilter = brush.colorFilter != nullptr;
+
+  if (shaderNeedsFilter || hasColorFilter) {
+    resources.filter = "";
+    std::string filterID = resourceStore->addFilter();
+    {
+      ElementWriter filterElement("filter", writer);
+      filterElement.addAttribute("id", filterID);
+      filterElement.addAttribute("color-interpolation-filters", "sRGB");
+      filterElement.addAttribute("x", "0%");
+      filterElement.addAttribute("y", "0%");
+      filterElement.addAttribute("width", "100%");
+      filterElement.addAttribute("height", "100%");
+      if (shaderNeedsFilter) {
+        addShaderFilterPrimitives(brush.shader.get());
+      }
+      if (hasColorFilter) {
+        addColorFilterPrimitives(brush.colorFilter);
+      }
     }
-    resources.filter = filterResources.filter;
+    resources.filter = "url(#" + filterID + ")";
   }
 
   if (auto maskFilter = brush.maskFilter) {
@@ -1192,48 +1254,66 @@ void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader, Co
       break;
     case Types::ShaderType::ColorFilter: {
       auto colorFilterShader = static_cast<const ColorFilterShader*>(decomposedShader);
+      // Process the inner shader (may set fill/gradient/pattern resources).
       addShaderResources(colorFilterShader->shader, context, resources);
+      // Mark that filter primitives are needed. The actual <filter> element will be emitted
+      // by addResources, which may combine it with a brush colorFilter.
       if (colorFilterShader->colorFilter) {
-        auto filterResources = addColorFilterResource(colorFilterShader->colorFilter);
-        if (!filterResources.filter.empty()) {
-          resources->filter = filterResources.filter;
-        } else {
-          reportUnsupportedElement("Unsupported color filter in ColorFilterShader");
-        }
+        resources->filter = "pending";
       }
       break;
     }
     case Types::ShaderType::PerlinNoise: {
-      auto noiseShader = static_cast<const PerlinNoiseShader*>(decomposedShader);
-      std::string filterID = resourceStore->addFilter();
-      {
-        ElementWriter filterElement("filter", writer);
-        filterElement.addAttribute("id", filterID);
-        filterElement.addAttribute("color-interpolation-filters", "sRGB");
-        filterElement.addAttribute("x", "0%");
-        filterElement.addAttribute("y", "0%");
-        filterElement.addAttribute("width", "100%");
-        filterElement.addAttribute("height", "100%");
-        {
-          ElementWriter turbulenceElement("feTurbulence", writer);
-          turbulenceElement.addAttribute(
-              "type", noiseShader->noiseType == PerlinNoiseType::FractalNoise ? "fractalNoise"
-                                                                              : "turbulence");
-          turbulenceElement.addAttribute("baseFrequency",
-                                         FloatToString(noiseShader->baseFrequencyX) + " " +
-                                             FloatToString(noiseShader->baseFrequencyY));
-          turbulenceElement.addAttribute("numOctaves", noiseShader->numOctaves);
-          turbulenceElement.addAttribute("seed", static_cast<int32_t>(noiseShader->seed));
-          if (noiseShader->stitchTiles) {
-            turbulenceElement.addAttribute("stitchTiles", "stitch");
-          }
-        }
-      }
-      resources->filter = "url(#" + filterID + ")";
+      // Mark that this shader needs a filter. The actual <filter> element will be emitted by
+      // addResources, which may combine it with a brush colorFilter.
+      resources->filter = "pending";
       break;
     }
     default:
       reportUnsupportedElement("Unsupported shader");
+  }
+}
+
+void ElementWriter::addShaderFilterPrimitives(const Shader* shader) {
+  const Shader* inner = shader;
+  while (inner && Types::Get(inner) == Types::ShaderType::Matrix) {
+    inner = static_cast<const MatrixShader*>(inner)->source.get();
+  }
+  if (!inner) {
+    return;
+  }
+  auto type = Types::Get(inner);
+  switch (type) {
+    case Types::ShaderType::PerlinNoise:
+      addPerlinNoisePrimitives(inner);
+      break;
+    case Types::ShaderType::ColorFilter: {
+      auto colorFilterShader = static_cast<const ColorFilterShader*>(inner);
+      // Recurse into the inner shader for its filter primitives.
+      addShaderFilterPrimitives(colorFilterShader->shader.get());
+      // Then append the ColorFilterShader's own color filter primitives.
+      if (colorFilterShader->colorFilter) {
+        addColorFilterPrimitives(colorFilterShader->colorFilter);
+      }
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+void ElementWriter::addPerlinNoisePrimitives(const Shader* shader) {
+  auto noiseShader = static_cast<const PerlinNoiseShader*>(shader);
+  ElementWriter turbulenceElement("feTurbulence", writer);
+  turbulenceElement.addAttribute("type", noiseShader->noiseType == PerlinNoiseType::FractalNoise
+                                             ? "fractalNoise"
+                                             : "turbulence");
+  turbulenceElement.addAttribute("baseFrequency", FloatToString(noiseShader->baseFrequencyX) + " " +
+                                                      FloatToString(noiseShader->baseFrequencyY));
+  turbulenceElement.addAttribute("numOctaves", noiseShader->numOctaves);
+  turbulenceElement.addAttribute("seed", static_cast<int32_t>(noiseShader->seed));
+  if (noiseShader->stitchTiles) {
+    turbulenceElement.addAttribute("stitchTiles", "stitch");
   }
 }
 
