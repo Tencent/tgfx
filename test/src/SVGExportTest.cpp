@@ -1497,6 +1497,19 @@ TGFX_TEST(SVGExportTest, FilterAndShaderExport) {
   atNoisePaint.setColorFilter(ColorFilter::AlphaThreshold(0.5f));
   canvas->drawRect(Rect::MakeXYWH(485, 225, 75, 150), atNoisePaint);
 
+  // 7. ComposeImageFilter: blur + dropShadowOnly + innerShadow + colorFilter composed together.
+  auto blurFilter = ImageFilter::Blur(5, 5);
+  auto dropShadowOnlyFilter = ImageFilter::DropShadowOnly(5, 5, 10, 10, Color::Black());
+  auto innerShadowFilter = ImageFilter::InnerShadow(-5, -5, 3, 3, Color::White());
+  auto colorImageFilter =
+      ImageFilter::ColorFilter(ColorFilter::Blend(Color::Red(), BlendMode::Multiply));
+  auto composeFilter =
+      ImageFilter::Compose({blurFilter, dropShadowOnlyFilter, innerShadowFilter, colorImageFilter});
+  Paint composePaint;
+  composePaint.setColor(Color::Blue());
+  composePaint.setImageFilter(composeFilter);
+  canvas->drawRect(Rect::MakeXYWH(600, 225, 150, 150), composePaint);
+
   exporter->close();
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/FilterAndShaderExport"));
 }

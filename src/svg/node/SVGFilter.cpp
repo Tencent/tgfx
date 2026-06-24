@@ -151,6 +151,9 @@ std::shared_ptr<ImageFilter> SVGFilter::buildDropShadowFilter(
   auto colorMatrix = colorMatrixFe->getValues();
   Color color{colorMatrix[4], colorMatrix[9], colorMatrix[14], colorMatrix[18]};
 
+  // When exporting, DropShadow (shadowOnly=false) appends a <feBlend> to composite the shadow
+  // with the original graphic, while DropShadowOnly omits it. Check for its presence to
+  // distinguish the two modes during import.
   if (colorMatrixIndex + 1 < children.size() &&
       children[colorMatrixIndex + 1]->tag() == SVGTag::FeBlend) {
     return ImageFilter::DropShadow(dx, dy, blurrinessX, blurrinessY, color);
