@@ -115,7 +115,8 @@ class ElementWriter {
   void addMatrixColorFilterResources(const MatrixColorFilter* matrixColorFilter,
                                      Resources* resources);
 
-  void addMatrixColorFilterPrimitives(const MatrixColorFilter* matrixColorFilter);
+  void addMatrixColorFilterPrimitives(const MatrixColorFilter* matrixColorFilter,
+                                      const std::string& inputResult = "");
 
   void addBlendColorFilterPrimitives(const ModeColorFilter* modeColorFilter,
                                      const std::string& inputResult = "");

@@ -1024,7 +1024,8 @@ bool ElementWriter::addColorFilterPrimitives(const std::shared_ptr<ColorFilter>&
   }
   switch (Types::Get(colorFilter.get())) {
     case Types::ColorFilterType::Matrix:
-      addMatrixColorFilterPrimitives(static_cast<const MatrixColorFilter*>(colorFilter.get()));
+      addMatrixColorFilterPrimitives(static_cast<const MatrixColorFilter*>(colorFilter.get()),
+                                     inputResult);
       return true;
     case Types::ColorFilterType::Blend:
       addBlendColorFilterPrimitives(static_cast<const ModeColorFilter*>(colorFilter.get()),
@@ -1087,8 +1088,12 @@ bool ElementWriter::addColorFilterPrimitives(const std::shared_ptr<ColorFilter>&
   }
 }
 
-void ElementWriter::addMatrixColorFilterPrimitives(const MatrixColorFilter* matrixColorFilter) {
+void ElementWriter::addMatrixColorFilterPrimitives(const MatrixColorFilter* matrixColorFilter,
+                                                   const std::string& inputResult) {
   ElementWriter colorMatrixElement("feColorMatrix", writer);
+  if (!inputResult.empty()) {
+    colorMatrixElement.addAttribute("in", inputResult);
+  }
   colorMatrixElement.addAttribute("type", "matrix");
   auto colorMatrix = matrixColorFilter->matrix;
   std::string matrixString;
