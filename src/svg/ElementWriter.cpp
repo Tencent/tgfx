@@ -21,10 +21,13 @@
 #include "SVGUtils.h"
 #include "core/codecs/jpeg/JpegCodec.h"
 #include "core/codecs/png/PngCodec.h"
+#include "core/filters/AlphaThresholdColorFilter.h"
 #include "core/filters/ComposeColorFilter.h"
 #include "core/filters/ComposeImageFilter.h"
 #include "core/filters/GaussianBlurImageFilter.h"
+#include "core/filters/LumaColorFilter.h"
 #include "core/filters/ShaderMaskFilter.h"
+#include "core/shaders/ColorFilterShader.h"
 #include "core/shaders/MatrixShader.h"
 #include "core/shaders/PerlinNoiseShader.h"
 #include "core/utils/ColorHelper.h"
@@ -282,8 +285,7 @@ void ElementWriter::addPathAttributes(const Path& path, SVGPathParser::PathEncod
   addAttribute("d", SVGPathParser::ToSVGString(path, encoding));
 }
 
-Resources ElementWriter::addColorFilterResource(
-    const std::shared_ptr<ColorFilter>& colorFilter) {
+Resources ElementWriter::addColorFilterResource(const std::shared_ptr<ColorFilter>& colorFilter) {
   Resources resources;
   if (!colorFilter) {
     return resources;
@@ -297,11 +299,14 @@ Resources ElementWriter::addColorFilterResource(
       addMatrixColorFilterResources(static_cast<const MatrixColorFilter*>(colorFilter.get()),
                                     &resources);
       break;
-    case Types::ColorFilterType::Compose: {
+    case Types::ColorFilterType::Compose:
+    case Types::ColorFilterType::Luma:
+    case Types::ColorFilterType::AlphaThreshold: {
       std::string filterID = resourceStore->addFilter();
       {
         ElementWriter filterElement("filter", writer);
         filterElement.addAttribute("id", filterID);
+        filterElement.addAttribute("color-interpolation-filters", "sRGB");
         filterElement.addAttribute("x", "0%");
         filterElement.addAttribute("y", "0%");
         filterElement.addAttribute("width", "100%");
@@ -900,6 +905,104 @@ void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter,
       }
       break;
     }
+    case Types::ShaderType::Gradient: {
+      auto gradientShader = static_cast<const GradientShader*>(filter->shader.get());
+      GradientInfo info;
+      GradientType gradientType = gradientShader->asGradient(&info);
+      std::string svgFragment = "<svg xmlns='http://www.w3.org/2000/svg'>";
+      if (gradientType == GradientType::Linear) {
+        svgFragment += "<defs><linearGradient id='g' gradientUnits='userSpaceOnUse'";
+        svgFragment += " x1='" + FloatToString(info.points[0].x) + "'";
+        svgFragment += " y1='" + FloatToString(info.points[0].y) + "'";
+        svgFragment += " x2='" + FloatToString(info.points[1].x) + "'";
+        svgFragment += " y2='" + FloatToString(info.points[1].y) + "'>";
+      } else {
+        svgFragment += "<defs><radialGradient id='g' gradientUnits='userSpaceOnUse'";
+        svgFragment += " cx='" + FloatToString(info.points[0].x) + "'";
+        svgFragment += " cy='" + FloatToString(info.points[0].y) + "'";
+        svgFragment += " r='" + FloatToString(info.radiuses[0]) + "'>";
+      }
+      for (size_t i = 0; i < info.colors.size(); ++i) {
+        auto color = ConvertColorSpace(info.colors[i], _targetColorSpace);
+        svgFragment += "<stop offset='" + FloatToString(info.positions[i]) + "'";
+        svgFragment += " stop-color='" + ToSVGColor(color) + "'";
+        if (!color.isOpaque()) {
+          svgFragment += " stop-opacity='" + FloatToString(color.alpha) + "'";
+        }
+        svgFragment += "/>";
+      }
+      if (gradientType == GradientType::Linear) {
+        svgFragment += "</linearGradient></defs>";
+      } else {
+        svgFragment += "</radialGradient></defs>";
+      }
+      svgFragment += "<rect fill='url(#g)'";
+      if (filterBounds) {
+        svgFragment += " x='" + FloatToString(filterBounds->x()) + "'";
+        svgFragment += " y='" + FloatToString(filterBounds->y()) + "'";
+        svgFragment += " width='" + FloatToString(filterBounds->width()) + "'";
+        svgFragment += " height='" + FloatToString(filterBounds->height()) + "'";
+      }
+      svgFragment += "/></svg>";
+      auto svgData = reinterpret_cast<const unsigned char*>(svgFragment.data());
+      auto svgLength = svgFragment.size();
+      auto base64Length = ((svgLength + 2) / 3) * 4;
+      std::string base64String(base64Length, '\0');
+      Base64Encode(svgData, svgLength, base64String.data());
+      {
+        ElementWriter feImageElement("feImage", writer);
+        feImageElement.addAttribute("href", "data:image/svg+xml;base64," + base64String);
+        if (filterBounds) {
+          feImageElement.addAttribute("x", filterBounds->x());
+          feImageElement.addAttribute("y", filterBounds->y());
+          feImageElement.addAttribute("width", filterBounds->width());
+          feImageElement.addAttribute("height", filterBounds->height());
+        }
+        feImageElement.addAttribute("result", "gradient");
+      }
+      {
+        ElementWriter blendElement("feBlend", writer);
+        blendElement.addAttribute("in", "gradient");
+        blendElement.addAttribute("in2", sourceRef);
+        blendElement.addAttribute("mode", blendModeString);
+      }
+      break;
+    }
+    case Types::ShaderType::Image: {
+      const auto imageShader = static_cast<const ImageShader*>(filter->shader.get());
+      auto data = SVGExportContext::ImageToEncodedData(imageShader->image);
+      std::shared_ptr<Data> dataUri = nullptr;
+      if (data && (JpegCodec::IsJpeg(data) || PngCodec::IsPng(data))) {
+        dataUri = AsDataUri(data);
+      } else if (context) {
+        Bitmap bitmap = SVGExportContext::ImageExportToBitmap(context, imageShader->image);
+        if (!bitmap.isEmpty()) {
+          dataUri = AsDataUri(Pixmap(bitmap));
+        }
+      }
+      if (!dataUri) {
+        reportUnsupportedElement("Failed to encode image shader in BlendImageFilter");
+        break;
+      }
+      {
+        ElementWriter imageElement("feImage", writer);
+        if (filterBounds) {
+          imageElement.addAttribute("x", filterBounds->x());
+          imageElement.addAttribute("y", filterBounds->y());
+        }
+        imageElement.addAttribute("width", imageShader->image->width());
+        imageElement.addAttribute("height", imageShader->image->height());
+        imageElement.addAttribute("xlink:href", static_cast<const char*>(dataUri->data()));
+        imageElement.addAttribute("result", "blendImage");
+      }
+      {
+        ElementWriter blendElement("feBlend", writer);
+        blendElement.addAttribute("in", "blendImage");
+        blendElement.addAttribute("in2", sourceRef);
+        blendElement.addAttribute("mode", blendModeString);
+      }
+      break;
+    }
     default:
       reportUnsupportedElement("Unsupported shader type in BlendImageFilter");
       break;
@@ -925,6 +1028,43 @@ bool ElementWriter::addColorFilterPrimitives(const std::shared_ptr<ColorFilter>&
         return false;
       }
       return addColorFilterPrimitives(compose->outer);
+    }
+    case Types::ColorFilterType::Luma: {
+      ElementWriter colorMatrixElement("feColorMatrix", writer);
+      if (!inputResult.empty()) {
+        colorMatrixElement.addAttribute("in", inputResult);
+      }
+      colorMatrixElement.addAttribute("type", "luminanceToAlpha");
+      return true;
+    }
+    case Types::ColorFilterType::AlphaThreshold: {
+      const auto thresholdFilter = static_cast<const AlphaThresholdColorFilter*>(colorFilter.get());
+      float threshold = thresholdFilter->threshold;
+      ElementWriter transferElement("feComponentTransfer", writer);
+      if (!inputResult.empty()) {
+        transferElement.addAttribute("in", inputResult);
+      }
+      {
+        ElementWriter funcA("feFuncA", writer);
+        funcA.addAttribute("type", "discrete");
+        // Generate a 256-entry discrete table: values below threshold map to 0, at or above to 1.
+        int cutoff = FloatCeilToInt(threshold * 256.0f);
+        if (cutoff < 0) {
+          cutoff = 0;
+        }
+        if (cutoff > 256) {
+          cutoff = 256;
+        }
+        std::string tableValues;
+        for (int i = 0; i < 256; ++i) {
+          if (i > 0) {
+            tableValues += " ";
+          }
+          tableValues += (i < cutoff) ? "0" : "1";
+        }
+        funcA.addAttribute("tableValues", tableValues);
+      }
+      return true;
     }
     default:
       return false;
@@ -1050,10 +1190,49 @@ void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader, Co
       addImageShaderResources(static_cast<const ImageShader*>(decomposedShader), matrix, context,
                               resources);
       break;
+    case Types::ShaderType::ColorFilter: {
+      auto colorFilterShader = static_cast<const ColorFilterShader*>(decomposedShader);
+      addShaderResources(colorFilterShader->shader, context, resources);
+      if (colorFilterShader->colorFilter) {
+        auto filterResources = addColorFilterResource(colorFilterShader->colorFilter);
+        if (!filterResources.filter.empty()) {
+          resources->filter = filterResources.filter;
+        } else {
+          reportUnsupportedElement("Unsupported color filter in ColorFilterShader");
+        }
+      }
+      break;
+    }
+    case Types::ShaderType::PerlinNoise: {
+      auto noiseShader = static_cast<const PerlinNoiseShader*>(decomposedShader);
+      std::string filterID = resourceStore->addFilter();
+      {
+        ElementWriter filterElement("filter", writer);
+        filterElement.addAttribute("id", filterID);
+        filterElement.addAttribute("color-interpolation-filters", "sRGB");
+        filterElement.addAttribute("x", "0%");
+        filterElement.addAttribute("y", "0%");
+        filterElement.addAttribute("width", "100%");
+        filterElement.addAttribute("height", "100%");
+        {
+          ElementWriter turbulenceElement("feTurbulence", writer);
+          turbulenceElement.addAttribute(
+              "type", noiseShader->noiseType == PerlinNoiseType::FractalNoise ? "fractalNoise"
+                                                                              : "turbulence");
+          turbulenceElement.addAttribute("baseFrequency",
+                                         FloatToString(noiseShader->baseFrequencyX) + " " +
+                                             FloatToString(noiseShader->baseFrequencyY));
+          turbulenceElement.addAttribute("numOctaves", noiseShader->numOctaves);
+          turbulenceElement.addAttribute("seed", static_cast<int32_t>(noiseShader->seed));
+          if (noiseShader->stitchTiles) {
+            turbulenceElement.addAttribute("stitchTiles", "stitch");
+          }
+        }
+      }
+      resources->filter = "url(#" + filterID + ")";
+      break;
+    }
     default:
-      // TODO(YGaurora):
-      // Export color filter shaders as color filters.
-      // Export blend shaders as a combination of a shader and blend mode.
       reportUnsupportedElement("Unsupported shader");
   }
 }

@@ -108,8 +108,7 @@ class ElementWriter {
   void addImageShaderResources(const ImageShader* shader, const Matrix& matrix, Context* context,
                                Resources* resources);
 
-  void addBlendColorFilterResources(const ModeColorFilter* modeColorFilter,
-                                    Resources* resources);
+  void addBlendColorFilterResources(const ModeColorFilter* modeColorFilter, Resources* resources);
 
   void addMatrixColorFilterResources(const MatrixColorFilter* matrixColorFilter,
                                      Resources* resources);
