@@ -1514,4 +1514,39 @@ TGFX_TEST(SVGExportTest, FilterAndShaderExport) {
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/FilterAndShaderExport"));
 }
 
+TGFX_TEST(SVGExportTest, DropShadowComparison) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(400, 200),
+                                    SVGExportFlags::DisablePrettyXML);
+  auto canvas = exporter->getCanvas();
+
+  auto displayList = std::make_unique<DisplayList>();
+  Path rect;
+  rect.addRect(Rect::MakeWH(80, 80));
+
+  // Left: DropShadowStyle with showBehindLayer=true (normal drop shadow, shape + shadow).
+  auto leftLayer = ShapeLayer::Make();
+  leftLayer->setMatrix(Matrix::MakeTrans(50, 50));
+  leftLayer->setPath(rect);
+  leftLayer->setFillStyle(ShapeStyle::Make(Color::Blue()));
+  leftLayer->setLayerStyles({DropShadowStyle::Make(10, 10, 5, 5, Color::Black(), true)});
+  displayList->root()->addChild(leftLayer);
+
+  // Right: DropShadowStyle with showBehindLayer=false (shadow only visible where not behind layer).
+  auto rightLayer = ShapeLayer::Make();
+  rightLayer->setMatrix(Matrix::MakeTrans(250, 50));
+  rightLayer->setPath(rect);
+  rightLayer->setFillStyle(ShapeStyle::Make(Color::Blue()));
+  rightLayer->setLayerStyles({DropShadowStyle::Make(10, 10, 5, 5, Color::Black(), false)});
+  displayList->root()->addChild(rightLayer);
+
+  displayList->root()->draw(canvas);
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/DropShadowComparison"));
+}
+
 }  // namespace tgfx
