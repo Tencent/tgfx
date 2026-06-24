@@ -174,7 +174,6 @@
     },
     "ImageRenderTest": {
         "RotateImageRect": "bf48e614",
-        "TileModeFallback": "bf48e614",
         "YUVImage": "bf48e614",
         "YUVImage_RGBAA": "bf48e614",
         "atlas": "bf48e614",
@@ -186,7 +185,6 @@
         "drawScaleSubImage": "bf48e614",
         "filter_mode_linear": "bf48e614",
         "filter_mode_nearest": "bf48e614",
-        "hardware_render_target_blend": "bf48e614",
         "mipmap_linear": "bf48e614",
         "mipmap_linear_hardware": "bf48e614",
         "mipmap_linear_texture_effect": "bf48e614",
@@ -202,6 +200,8 @@
         "scaled_mipmap": "1b8d95f2",
         "scaled_scale_up": "1b8d95f2",
         "tile_mode_normal": "c5cfce4d",
+        "TileModeFallback": "bf48e614",
+        "hardware_render_target_blend": "bf48e614",
         "tile_mode_rgbaaa": "bf48e614",
         "tile_mode_subset": "c5cfce4d"
     },
