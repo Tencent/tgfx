@@ -440,7 +440,7 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
         if (needsClip) {
           groupElement->addAttribute("clip-path", "url(#" + clipID + ")");
         }
-        if (filter) {
+        if (!resources.filter.empty()) {
           groupElement->addAttribute("filter", resources.filter);
         }
         if (!outerBlendStyle.empty()) {

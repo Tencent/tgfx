@@ -889,22 +889,7 @@ void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter,
       break;
     }
     case Types::ShaderType::PerlinNoise: {
-      const auto noiseShader = static_cast<const PerlinNoiseShader*>(blendShader);
-      {
-        ElementWriter turbulenceElement("feTurbulence", writer);
-        turbulenceElement.addAttribute(
-            "type", noiseShader->noiseType == PerlinNoiseType::FractalNoise ? "fractalNoise"
-                                                                            : "turbulence");
-        turbulenceElement.addAttribute("baseFrequency",
-                                       FloatToString(noiseShader->baseFrequencyX) + " " +
-                                           FloatToString(noiseShader->baseFrequencyY));
-        turbulenceElement.addAttribute("numOctaves", noiseShader->numOctaves);
-        turbulenceElement.addAttribute("seed", noiseShader->seed);
-        if (noiseShader->stitchTiles) {
-          turbulenceElement.addAttribute("stitchTiles", "stitch");
-        }
-        turbulenceElement.addAttribute("result", "noise");
-      }
+      addPerlinNoisePrimitives(blendShader, "noise");
       {
         ElementWriter blendElement("feBlend", writer);
         blendElement.addAttribute("in", "noise");
@@ -1302,7 +1287,7 @@ void ElementWriter::addShaderFilterPrimitives(const Shader* shader) {
   }
 }
 
-void ElementWriter::addPerlinNoisePrimitives(const Shader* shader) {
+void ElementWriter::addPerlinNoisePrimitives(const Shader* shader, const std::string& resultName) {
   auto noiseShader = static_cast<const PerlinNoiseShader*>(shader);
   ElementWriter turbulenceElement("feTurbulence", writer);
   turbulenceElement.addAttribute("type", noiseShader->noiseType == PerlinNoiseType::FractalNoise
@@ -1314,6 +1299,9 @@ void ElementWriter::addPerlinNoisePrimitives(const Shader* shader) {
   turbulenceElement.addAttribute("seed", static_cast<int32_t>(noiseShader->seed));
   if (noiseShader->stitchTiles) {
     turbulenceElement.addAttribute("stitchTiles", "stitch");
+  }
+  if (!resultName.empty()) {
+    turbulenceElement.addAttribute("result", resultName);
   }
 }
 
