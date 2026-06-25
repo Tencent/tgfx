@@ -3463,4 +3463,45 @@ TGFX_TEST(CanvasTest, EmptyRectStroke) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/EmptyRectStroke"));
 }
 
+// Repro for discussion #1482: rounded-rect filled with a conic gradient renders only the
+// outline (hollow center) on native desktop GL. Verifies the interior is actually filled.
+TGFX_TEST(CanvasTest, ConicGradientFillHollowRepro) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  int size = 200;
+  auto surface = Surface::Make(context, size, size);
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+
+  auto center = Point::Make(size / 2, size / 2);
+  auto conicShader = Shader::MakeConicGradient(
+      center, 0, 360, {Color::FromRGBA(0, 255, 255, 255), Color::FromRGBA(255, 0, 255, 255),
+                       Color::FromRGBA(255, 255, 0, 255), Color::FromRGBA(0, 255, 255, 255)},
+      {});
+  Path path = {};
+  path.addRoundRect(Rect::MakeXYWH(20, 20, size - 40, size - 40), 20, 20);
+  Paint paint = {};
+  paint.setShader(conicShader);
+  canvas->drawPath(path, paint);
+  context->flushAndSubmit();
+
+  Bitmap bitmap(size, size, false, false);
+  auto pixels = bitmap.lockPixels();
+  ASSERT_TRUE(surface->readPixels(bitmap.info(), pixels));
+  bitmap.unlockPixels();
+
+  auto addr = static_cast<const uint8_t*>(pixels);
+  // Sample interior points that must be opaque if the fill is solid.
+  int cx = size / 2;
+  int cy = size / 2;
+  int centerAlpha = addr[(static_cast<size_t>(cy) * size + cx) * 4 + 3];
+  int q1 = addr[(static_cast<size_t>(cy - 30) * size + (cx - 30)) * 4 + 3];
+  int q2 = addr[(static_cast<size_t>(cy + 30) * size + (cx + 30)) * 4 + 3];
+  printf("[ConicHollowRepro] centerAlpha=%d q1=%d q2=%d\n", centerAlpha, q1, q2);
+  EXPECT_GT(centerAlpha, 250);
+  EXPECT_GT(q1, 250);
+  EXPECT_GT(q2, 250);
+}
+
 }  // namespace tgfx
