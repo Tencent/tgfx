@@ -82,12 +82,6 @@ bool IsPureFilterGroup(const SVGNode* node) {
   return true;
 }
 
-bool IsShapeElement(const SVGNode* node) {
-  auto t = node->tag();
-  return t == SVGTag::Path || t == SVGTag::Rect || t == SVGTag::Circle || t == SVGTag::Ellipse ||
-         t == SVGTag::Line || t == SVGTag::Polygon || t == SVGTag::Polyline;
-}
-
 bool IsMatchingShape(const SVGNode* a, const SVGNode* b) {
   if (a->tag() != b->tag()) {
     return false;
@@ -216,7 +210,7 @@ std::vector<MergeCandidate> CollectMergeCandidates(SVGContainer* container,
   for (size_t i = 0; i + 1 < children.size(); ++i) {
     auto* contentNode = children[i].get();
 
-    if (!IsShapeElement(contentNode) || !GetFilterUrl(contentNode).empty()) {
+    if (!IsMatchingShape(contentNode, contentNode) || !GetFilterUrl(contentNode).empty()) {
       continue;
     }
 
@@ -242,7 +236,7 @@ std::vector<MergeCandidate> CollectMergeCandidates(SVGContainer* container,
       continue;
     }
 
-    if (!IsShapeElement(chain.leafNode) || !IsWhiteFill(chain.leafNode) ||
+    if (!IsMatchingShape(chain.leafNode, chain.leafNode) || !IsWhiteFill(chain.leafNode) ||
         !IsMatchingShape(contentNode, chain.leafNode)) {
       continue;
     }
@@ -320,7 +314,7 @@ void ExecuteMerge(SVGContainer* container, const std::vector<MergeCandidate>& ca
         auto& ch = cont->getChildren();
         if (ch.size() == 1 && IsPureFilterGroup(ch[0].get())) {
           current = ch[0].get();
-        } else if (ch.size() == 1 && IsShapeElement(ch[0].get())) {
+        } else if (ch.size() == 1 && IsMatchingShape(ch[0].get(), ch[0].get())) {
           innermostGroup = cont;
           break;
         } else {
