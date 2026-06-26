@@ -152,6 +152,10 @@ class ElementWriter {
   std::string emitFilterElement(const std::shared_ptr<ImageFilter>& imageFilter, const Rect& bound,
                                 const std::shared_ptr<SVGCustomWriter>& exportWriter,
                                 Context* context, bool preserveSoftAlpha = false);
+  bool writeFilterPrimitives(const std::shared_ptr<ImageFilter>& imageFilter,
+                            ElementWriter& filterElement,
+                            const std::shared_ptr<SVGCustomWriter>& exportWriter,
+                            const Rect& bound, Context* context, bool preserveSoftAlpha);
   void callbackBlurImageFilter(const GaussianBlurImageFilter* filter,
                                const std::shared_ptr<SVGCustomWriter>& exportWriter,
                                ElementWriter& filterElement);

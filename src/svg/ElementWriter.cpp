@@ -322,19 +322,11 @@ Resources ElementWriter::addColorFilterResource(const std::shared_ptr<ColorFilte
   return resources;
 }
 
-std::string ElementWriter::emitFilterElement(const std::shared_ptr<ImageFilter>& imageFilter,
-                                             const Rect& bound,
-                                             const std::shared_ptr<SVGCustomWriter>& exportWriter,
-                                             Context* context, bool preserveSoftAlpha) {
-  std::string filterID = resourceStore->addFilter();
-  ElementWriter filterElement("filter", writer);
-  filterElement.addAttribute("id", filterID);
-  filterElement.addAttribute("color-interpolation-filters", "sRGB");
-  filterElement.addAttribute("x", bound.x());
-  filterElement.addAttribute("y", bound.y());
-  filterElement.addAttribute("width", bound.width());
-  filterElement.addAttribute("height", bound.height());
-  filterElement.addAttribute("filterUnits", "userSpaceOnUse");
+bool ElementWriter::writeFilterPrimitives(const std::shared_ptr<ImageFilter>& imageFilter,
+                                          ElementWriter& filterElement,
+                                          const std::shared_ptr<SVGCustomWriter>& exportWriter,
+                                          const Rect& bound, Context* context,
+                                          bool preserveSoftAlpha) {
   auto type = Types::Get(imageFilter.get());
   switch (type) {
     case Types::ImageFilterType::Blur: {
@@ -366,8 +358,37 @@ std::string ElementWriter::emitFilterElement(const std::shared_ptr<ImageFilter>&
       break;
     }
     default:
-      reportUnsupportedElement("Unsupported image filter in Compose");
-      return "";
+      reportUnsupportedElement("Unsupported image filter");
+      return false;
+  }
+  return true;
+}
+
+std::string ElementWriter::emitFilterElement(const std::shared_ptr<ImageFilter>& imageFilter,
+                                             const Rect& bound,
+                                             const std::shared_ptr<SVGCustomWriter>& exportWriter,
+                                             Context* context, bool preserveSoftAlpha) {
+  std::string filterID = resourceStore->addFilter();
+  ElementWriter filterElement("filter", writer);
+  filterElement.addAttribute("id", filterID);
+  filterElement.addAttribute("color-interpolation-filters", "sRGB");
+  auto type = Types::Get(imageFilter.get());
+  // InnerShadow needs extra space for the shadow offset since filterBounds() does not expand.
+  float extraWidth = 0;
+  float extraHeight = 0;
+  if (type == Types::ImageFilterType::InnerShadow) {
+    const auto innerShadowFilter = static_cast<const InnerShadowImageFilter*>(imageFilter.get());
+    extraWidth = innerShadowFilter->dx;
+    extraHeight = innerShadowFilter->dy;
+  }
+  filterElement.addAttribute("x", bound.x());
+  filterElement.addAttribute("y", bound.y());
+  filterElement.addAttribute("width", bound.width() + extraWidth);
+  filterElement.addAttribute("height", bound.height() + extraHeight);
+  filterElement.addAttribute("filterUnits", "userSpaceOnUse");
+  if (!writeFilterPrimitives(imageFilter, filterElement, exportWriter, bound, context,
+                             preserveSoftAlpha)) {
+    return "";
   }
   return filterID;
 }
@@ -377,89 +398,28 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
                                           const std::shared_ptr<SVGCustomWriter>& exportWriter,
                                           Context* context) {
   auto type = Types::Get(imageFilter.get());
-  switch (type) {
-    case Types::ImageFilterType::Blur: {
-      const auto blurFilter = static_cast<const GaussianBlurImageFilter*>(imageFilter.get());
-      bound = blurFilter->filterBounds(bound);
-      std::string filterID = resourceStore->addFilter();
-      ElementWriter filterElement("filter", writer);
-      filterElement.addAttribute("id", filterID);
-      filterElement.addAttribute("color-interpolation-filters", "sRGB");
-      filterElement.addAttribute("x", bound.x());
-      filterElement.addAttribute("y", bound.y());
-      filterElement.addAttribute("width", bound.width());
-      filterElement.addAttribute("height", bound.height());
-      filterElement.addAttribute("filterUnits", "userSpaceOnUse");
-      callbackBlurImageFilter(blurFilter, exportWriter, filterElement);
-      addBlurImageFilter(blurFilter);
-      return filterID;
-    }
-    case Types::ImageFilterType::DropShadow: {
-      const auto dropShadowFilter = static_cast<const DropShadowImageFilter*>(imageFilter.get());
-      bound = dropShadowFilter->filterBounds(bound);
-      std::string filterID = resourceStore->addFilter();
-      ElementWriter filterElement("filter", writer);
-      filterElement.addAttribute("id", filterID);
-      filterElement.addAttribute("color-interpolation-filters", "sRGB");
-      filterElement.addAttribute("x", bound.x());
-      filterElement.addAttribute("y", bound.y());
-      filterElement.addAttribute("width", bound.width());
-      filterElement.addAttribute("height", bound.height());
-      filterElement.addAttribute("filterUnits", "userSpaceOnUse");
-      callbackDropShadowImageFilter(dropShadowFilter, exportWriter, filterElement);
-      addDropShadowImageFilter(dropShadowFilter);
-      return filterID;
-    }
-    case Types::ImageFilterType::InnerShadow: {
-      const auto innerShadowFilter = static_cast<const InnerShadowImageFilter*>(imageFilter.get());
-      bound = innerShadowFilter->filterBounds(bound);
-      std::string filterID = resourceStore->addFilter();
-      ElementWriter filterElement("filter", writer);
-      filterElement.addAttribute("id", filterID);
-      filterElement.addAttribute("color-interpolation-filters", "sRGB");
-      filterElement.addAttribute("x", bound.x());
-      filterElement.addAttribute("y", bound.y());
-      filterElement.addAttribute("width", bound.width() + innerShadowFilter->dx);
-      filterElement.addAttribute("height", bound.height() + innerShadowFilter->dy);
-      filterElement.addAttribute("filterUnits", "userSpaceOnUse");
-      callbackInnerShadowImageFilter(innerShadowFilter, exportWriter, filterElement);
-      addInnerShadowImageFilter(innerShadowFilter);
-      return filterID;
-    }
-    case Types::ImageFilterType::Color: {
-      const auto colorFilter = static_cast<const ColorImageFilter*>(imageFilter.get());
-      bound = colorFilter->filterBounds(bound);
-      std::string filterID = resourceStore->addFilter();
-      ElementWriter filterElement("filter", writer);
-      filterElement.addAttribute("id", filterID);
-      filterElement.addAttribute("color-interpolation-filters", "sRGB");
-      filterElement.addAttribute("x", bound.x());
-      filterElement.addAttribute("y", bound.y());
-      filterElement.addAttribute("width", bound.width());
-      filterElement.addAttribute("height", bound.height());
-      filterElement.addAttribute("filterUnits", "userSpaceOnUse");
-      addColorImageFilter(colorFilter);
-      return filterID;
-    }
-    case Types::ImageFilterType::Blend: {
-      const auto blendFilter = static_cast<const BlendImageFilter*>(imageFilter.get());
-      bound = blendFilter->filterBounds(bound);
-      std::string filterID = resourceStore->addFilter();
-      ElementWriter filterElement("filter", writer);
-      filterElement.addAttribute("id", filterID);
-      filterElement.addAttribute("color-interpolation-filters", "sRGB");
-      filterElement.addAttribute("x", bound.x());
-      filterElement.addAttribute("y", bound.y());
-      filterElement.addAttribute("width", bound.width());
-      filterElement.addAttribute("height", bound.height());
-      filterElement.addAttribute("filterUnits", "userSpaceOnUse");
-      addBlendImageFilter(blendFilter, "", &bound, context);
-      return filterID;
-    }
-    default:
-      reportUnsupportedElement("Unsupported image filter");
-      return "";
+  bound = imageFilter->filterBounds(bound);
+  std::string filterID = resourceStore->addFilter();
+  ElementWriter filterElement("filter", writer);
+  filterElement.addAttribute("id", filterID);
+  filterElement.addAttribute("color-interpolation-filters", "sRGB");
+  // InnerShadow needs extra space for the shadow offset since filterBounds() does not expand.
+  float extraWidth = 0;
+  float extraHeight = 0;
+  if (type == Types::ImageFilterType::InnerShadow) {
+    const auto innerShadowFilter = static_cast<const InnerShadowImageFilter*>(imageFilter.get());
+    extraWidth = innerShadowFilter->dx;
+    extraHeight = innerShadowFilter->dy;
   }
+  filterElement.addAttribute("x", bound.x());
+  filterElement.addAttribute("y", bound.y());
+  filterElement.addAttribute("width", bound.width() + extraWidth);
+  filterElement.addAttribute("height", bound.height() + extraHeight);
+  filterElement.addAttribute("filterUnits", "userSpaceOnUse");
+  if (!writeFilterPrimitives(imageFilter, filterElement, exportWriter, bound, context, false)) {
+    return "";
+  }
+  return filterID;
 }
 
 std::vector<std::string> ElementWriter::addImageFilterChain(
