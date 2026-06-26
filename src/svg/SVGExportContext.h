@@ -101,6 +101,13 @@ class SVGExportContext : public DrawContext {
    */
   static std::shared_ptr<Data> ImageToEncodedData(const std::shared_ptr<Image>& image);
 
+  /**
+   * Encodes an image to a data URI string. Tries to use the original encoded data if available
+   * (JPEG/PNG), otherwise rasterizes via the GPU context and encodes as PNG.
+   */
+  static std::shared_ptr<Data> EncodeImageToDataUri(const std::shared_ptr<Image>& image,
+                                                    Context* context);
+
  private:
   /**
    * Determine if the paint requires us to reset the viewport.Currently, we do this whenever the

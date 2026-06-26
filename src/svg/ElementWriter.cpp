@@ -357,13 +357,11 @@ std::string ElementWriter::emitFilterElement(const std::shared_ptr<ImageFilter>&
     }
     case Types::ImageFilterType::Color: {
       const auto colorFilter = static_cast<const ColorImageFilter*>(imageFilter.get());
-      callbackColorImageFilter(colorFilter, exportWriter, filterElement);
       addColorImageFilter(colorFilter);
       break;
     }
     case Types::ImageFilterType::Blend: {
       const auto blendFilter = static_cast<const BlendImageFilter*>(imageFilter.get());
-      callbackBlendImageFilter(blendFilter, exportWriter, filterElement);
       addBlendImageFilter(blendFilter, "", &bound, context);
       break;
     }
@@ -440,7 +438,6 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
       filterElement.addAttribute("width", bound.width());
       filterElement.addAttribute("height", bound.height());
       filterElement.addAttribute("filterUnits", "userSpaceOnUse");
-      callbackColorImageFilter(colorFilter, exportWriter, filterElement);
       addColorImageFilter(colorFilter);
       return filterID;
     }
@@ -456,7 +453,6 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
       filterElement.addAttribute("width", bound.width());
       filterElement.addAttribute("height", bound.height());
       filterElement.addAttribute("filterUnits", "userSpaceOnUse");
-      callbackBlendImageFilter(blendFilter, exportWriter, filterElement);
       addBlendImageFilter(blendFilter, "", &bound, context);
       return filterID;
     }
@@ -544,30 +540,6 @@ void ElementWriter::callbackInnerShadowImageFilter(
   }
   auto attribute = exportWriter->writeInnerShadowImageFilter(
       filter->dx, filter->dy, blurrinessX, blurrinessY, filter->color, filter->shadowOnly);
-  if (!attribute.name.empty() && !attribute.value.empty()) {
-    filterElement.addAttribute(attribute.name, attribute.value);
-  }
-}
-
-void ElementWriter::callbackColorImageFilter(const ColorImageFilter* filter,
-                                             const std::shared_ptr<SVGCustomWriter>& exportWriter,
-                                             ElementWriter& filterElement) {
-  if (!exportWriter || !filter->filter) {
-    return;
-  }
-  auto attribute = exportWriter->writeColorImageFilter(filter->filter);
-  if (!attribute.name.empty() && !attribute.value.empty()) {
-    filterElement.addAttribute(attribute.name, attribute.value);
-  }
-}
-
-void ElementWriter::callbackBlendImageFilter(const BlendImageFilter* filter,
-                                             const std::shared_ptr<SVGCustomWriter>& exportWriter,
-                                             ElementWriter& filterElement) {
-  if (!exportWriter || !filter->shader) {
-    return;
-  }
-  auto attribute = exportWriter->writeBlendImageFilter(filter->blendMode, filter->shader);
   if (!attribute.name.empty() && !attribute.value.empty()) {
     filterElement.addAttribute(attribute.name, attribute.value);
   }
@@ -813,16 +785,7 @@ void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter,
       return;
     }
     const auto imageShader = static_cast<const ImageShader*>(filter->shader.get());
-    auto data = SVGExportContext::ImageToEncodedData(imageShader->image);
-    std::shared_ptr<Data> dataUri = nullptr;
-    if (data && (JpegCodec::IsJpeg(data) || PngCodec::IsPng(data))) {
-      dataUri = AsDataUri(data);
-    } else if (context) {
-      Bitmap bitmap = SVGExportContext::ImageExportToBitmap(context, imageShader->image);
-      if (!bitmap.isEmpty()) {
-        dataUri = AsDataUri(Pixmap(bitmap));
-      }
-    }
+    auto dataUri = SVGExportContext::EncodeImageToDataUri(imageShader->image, context);
     if (!dataUri) {
       reportUnsupportedElement("Failed to encode DstIn image shader in BlendImageFilter");
       return;
@@ -918,11 +881,14 @@ void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter,
         svgFragment += " y1='" + FloatToString(info.points[0].y) + "'";
         svgFragment += " x2='" + FloatToString(info.points[1].x) + "'";
         svgFragment += " y2='" + FloatToString(info.points[1].y) + "'>";
-      } else {
+      } else if (gradientType == GradientType::Radial) {
         svgFragment += "<defs><radialGradient id='g' gradientUnits='userSpaceOnUse'";
         svgFragment += " cx='" + FloatToString(info.points[0].x) + "'";
         svgFragment += " cy='" + FloatToString(info.points[0].y) + "'";
         svgFragment += " r='" + FloatToString(info.radiuses[0]) + "'>";
+      } else {
+        reportUnsupportedElement("Unsupported gradient type in BlendImageFilter");
+        break;
       }
       for (size_t i = 0; i < info.colors.size(); ++i) {
         auto color = ConvertColorSpace(info.colors[i], _targetColorSpace);
@@ -953,7 +919,7 @@ void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter,
       Base64Encode(svgData, svgLength, base64String.data());
       {
         ElementWriter feImageElement("feImage", writer);
-        feImageElement.addAttribute("href", "data:image/svg+xml;base64," + base64String);
+        feImageElement.addAttribute("xlink:href", "data:image/svg+xml;base64," + base64String);
         if (filterBounds) {
           feImageElement.addAttribute("x", filterBounds->x());
           feImageElement.addAttribute("y", filterBounds->y());
@@ -972,16 +938,7 @@ void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter,
     }
     case Types::ShaderType::Image: {
       const auto imageShader = static_cast<const ImageShader*>(blendShader);
-      auto data = SVGExportContext::ImageToEncodedData(imageShader->image);
-      std::shared_ptr<Data> dataUri = nullptr;
-      if (data && (JpegCodec::IsJpeg(data) || PngCodec::IsPng(data))) {
-        dataUri = AsDataUri(data);
-      } else if (context) {
-        Bitmap bitmap = SVGExportContext::ImageExportToBitmap(context, imageShader->image);
-        if (!bitmap.isEmpty()) {
-          dataUri = AsDataUri(Pixmap(bitmap));
-        }
-      }
+      auto dataUri = SVGExportContext::EncodeImageToDataUri(imageShader->image, context);
       if (!dataUri) {
         reportUnsupportedElement("Failed to encode image shader in BlendImageFilter");
         break;
@@ -1429,19 +1386,7 @@ void ElementWriter::addImageShaderResources(const ImageShader* shader, const Mat
   auto image = shader->image;
   DEBUG_ASSERT(image);
   image = ConvertImageColorSpace(image, context, _targetColorSpace, _assignColorSpace);
-  std::shared_ptr<Data> dataUri = nullptr;
-
-  auto data = SVGExportContext::ImageToEncodedData(image);
-  if (data && (JpegCodec::IsJpeg(data) || PngCodec::IsPng(data))) {
-    dataUri = AsDataUri(data);
-  } else {
-    Bitmap bitmap = SVGExportContext::ImageExportToBitmap(context, image);
-    if (bitmap.isEmpty()) {
-      return;
-    }
-    dataUri = AsDataUri(Pixmap(bitmap));
-  }
-
+  auto dataUri = SVGExportContext::EncodeImageToDataUri(image, context);
   if (!dataUri) {
     return;
   }

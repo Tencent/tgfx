@@ -22,6 +22,8 @@
 #include "SVGUtils.h"
 #include "core/GlyphTransform.h"
 #include "core/RunRecord.h"
+#include "core/codecs/jpeg/JpegCodec.h"
+#include "core/codecs/png/PngCodec.h"
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/filters/ShaderMaskFilter.h"
 #include "core/images/CodecImage.h"
@@ -862,6 +864,21 @@ std::shared_ptr<Data> SVGExportContext::ImageToEncodedData(const std::shared_ptr
   const auto codecImage = static_cast<const CodecImage*>(image.get());
   auto imageCodec = codecImage->getCodec();
   return imageCodec->getEncodedData();
+}
+
+std::shared_ptr<Data> SVGExportContext::EncodeImageToDataUri(const std::shared_ptr<Image>& image,
+                                                             Context* context) {
+  auto data = ImageToEncodedData(image);
+  if (data && (JpegCodec::IsJpeg(data) || PngCodec::IsPng(data))) {
+    return AsDataUri(data);
+  }
+  if (context) {
+    Bitmap bitmap = ImageExportToBitmap(context, image);
+    if (!bitmap.isEmpty()) {
+      return AsDataUri(Pixmap(bitmap));
+    }
+  }
+  return nullptr;
 }
 
 }  // namespace tgfx

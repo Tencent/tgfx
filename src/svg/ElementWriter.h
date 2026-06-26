@@ -161,12 +161,7 @@ class ElementWriter {
   void callbackInnerShadowImageFilter(const InnerShadowImageFilter* filter,
                                       const std::shared_ptr<SVGCustomWriter>& exportWriter,
                                       ElementWriter& filterElement);
-  void callbackColorImageFilter(const ColorImageFilter* filter,
-                                const std::shared_ptr<SVGCustomWriter>& exportWriter,
-                                ElementWriter& filterElement);
-  void callbackBlendImageFilter(const BlendImageFilter* filter,
-                                const std::shared_ptr<SVGCustomWriter>& exportWriter,
-                                ElementWriter& filterElement);
+
   void addHardAlphaElement();
   void addSoftAlphaElement();
   void addBlurImageFilter(const GaussianBlurImageFilter* filter,
