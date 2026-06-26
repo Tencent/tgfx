@@ -189,7 +189,14 @@ void ProgramBuilder::nameExpression(std::string* output, const std::string& base
   } else {
     outName = nameVariable(baseName);
   }
-  fragmentShaderBuilder()->codeAppendf("vec4 %s;", outName.c_str());
+  // Coverage is a geometric quantity (AA edge / clip / mask) that is sensitive to precision; a
+  // mediump carrier can collapse interior coverage to zero on some ES GPUs. Declare the coverage
+  // stage result as highp while keeping color at the default precision.
+  if (getContext()->shaderCaps()->usesPrecisionModifiers && baseName == "outputCoverage") {
+    fragmentShaderBuilder()->codeAppendf("highp vec4 %s;", outName.c_str());
+  } else {
+    fragmentShaderBuilder()->codeAppendf("vec4 %s;", outName.c_str());
+  }
   *output = outName;
 }
 

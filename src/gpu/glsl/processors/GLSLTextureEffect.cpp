@@ -126,8 +126,8 @@ void GLSLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
     auto alphaStartName =
         uniformHandler->addUniform("AlphaStart", UniformFormat::Float2, ShaderStage::Fragment);
     std::string alphaVertexColor = "alphaVertexColor";
-    fragBuilder->codeAppendf("vec2 %s = %s + %s;", alphaVertexColor.c_str(), finalCoordName.c_str(),
-                             alphaStartName.c_str());
+    fragBuilder->codeAppendf("highp vec2 %s = %s + %s;", alphaVertexColor.c_str(),
+                             finalCoordName.c_str(), alphaStartName.c_str());
     fragBuilder->codeAppend("vec4 alpha = ");
     fragBuilder->appendTextureLookup(textureSampler, alphaVertexColor);
     fragBuilder->codeAppend(";");
@@ -186,8 +186,8 @@ void GLSLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
     auto alphaStartName =
         uniformHandler->addUniform("AlphaStart", UniformFormat::Float2, ShaderStage::Fragment);
     std::string alphaVertexColor = "alphaVertexColor";
-    fragBuilder->codeAppendf("vec2 %s = %s + %s;", alphaVertexColor.c_str(), finalCoordName.c_str(),
-                             alphaStartName.c_str());
+    fragBuilder->codeAppendf("highp vec2 %s = %s + %s;", alphaVertexColor.c_str(),
+                             finalCoordName.c_str(), alphaStartName.c_str());
     fragBuilder->codeAppend("float yuv_a = ");
     fragBuilder->appendTextureLookup(textureSamplers[0], alphaVertexColor);
     fragBuilder->codeAppend(".r;");
