@@ -3585,6 +3585,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     Path path = {};
     path.addOval(Rect::MakeXYWH(0.0f, 0.0f, 100.0f, 60.0f));
     layer->setPath(path);
+    layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 0)));
     layer->setStrokeStyle(ShapeStyle::Make(Color::Blue()));
     layer->setLineWidth(15);
     layer->setMatrix(Matrix::MakeTrans(i == 0 ? lItemXOffset : rItemXOffset, cellH + gap));
