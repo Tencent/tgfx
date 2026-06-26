@@ -112,16 +112,32 @@ void SVGDOMOptimizer::processContainer(SVGContainer* container, const SVGIDMappe
       continue;
     }
 
-    // Pattern matched! Upgrade InnerShadowOnly filters to InnerShadow so the filter
-    // preserves the original content when applied directly to the content element.
+    // Verify all filters in the chain are InnerShadowOnly. Skip if any filter is not
+    // a recognized InnerShadowOnly pattern to avoid mismerging unrelated SVG structures.
+    bool allInnerShadowOnly = true;
     for (const auto& filterUrl : chain.filterUrls) {
       auto it = idMapper.find(filterUrl);
-      if (it != idMapper.end() && it->second->tag() == SVGTag::Filter) {
-        auto* filterNode = static_cast<SVGContainer*>(it->second.get());
-        if (isInnerShadowOnlyFilter(filterNode)) {
-          upgradeToInnerShadow(filterNode);
-        }
+      if (it == idMapper.end() || it->second->tag() != SVGTag::Filter) {
+        allInnerShadowOnly = false;
+        break;
       }
+      auto* filterNode = static_cast<const SVGContainer*>(it->second.get());
+      if (!isInnerShadowOnlyFilter(filterNode)) {
+        allInnerShadowOnly = false;
+        break;
+      }
+    }
+    if (!allInnerShadowOnly) {
+      --idx;
+      continue;
+    }
+
+    // Upgrade InnerShadowOnly filters to InnerShadow so the filter preserves the original
+    // content when applied directly to the content element.
+    for (const auto& filterUrl : chain.filterUrls) {
+      auto it = idMapper.find(filterUrl);
+      auto* filterNode = static_cast<SVGContainer*>(it->second.get());
+      upgradeToInnerShadow(filterNode);
     }
 
     // Apply the innermost filter to the content node.
