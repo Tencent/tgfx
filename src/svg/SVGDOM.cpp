@@ -71,8 +71,8 @@ std::shared_ptr<SVGDOM> SVGDOM::Make(Stream& stream, std::shared_ptr<TextShaper>
   }
   SVGNodeConstructor::SetClassStyleAttributes(*root, cssMapper);
 
-  // Optimize filter pairs (merge content + filter carrier into single elements).
-  SVGDOMOptimizer::OptimizeFilterPairs(static_cast<SVGContainer*>(root.get()), mapper);
+  // Optimize the SVG DOM tree (merge content + filter carrier into single elements, etc.).
+  SVGDOMOptimizer::Optimize(static_cast<SVGContainer*>(root.get()), mapper);
 
   // Create SVGDOM with the root node and ID mapper
   return std::shared_ptr<SVGDOM>(new SVGDOM(std::static_pointer_cast<SVGRoot>(root),

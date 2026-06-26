@@ -31,6 +31,14 @@ class SVGRenderContext;
 class SVGContainer : public SVGTransformableNode {
  public:
   void appendChild(std::shared_ptr<SVGNode> node) override;
+
+  /// Removes the child at the specified index. The index must be less than the number of children.
+  void eraseChild(size_t index);
+
+  /// Replaces the child at the specified index with the given node. The index must be less than the
+  /// number of children.
+  void replaceChild(size_t index, std::shared_ptr<SVGNode> node);
+
   const std::vector<std::shared_ptr<SVGNode>>& getChildren() const;
   bool hasChildren() const final;
 
@@ -56,8 +64,6 @@ class SVGContainer : public SVGTransformableNode {
 
  private:
   using INHERITED = SVGTransformableNode;
-
-  friend class SVGDOMOptimizer;
 };
 
 }  // namespace tgfx

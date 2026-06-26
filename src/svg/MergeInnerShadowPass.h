@@ -28,15 +28,12 @@ class SVGContainer;
 class SVGNode;
 
 using SVGIDMapper = std::unordered_map<std::string, std::shared_ptr<SVGNode>>;
-using SVGOptimizeFunc = void (*)(SVGContainer*, const SVGIDMapper&);
 
 /**
- * Post-construction optimizer for the SVG DOM tree. Runs a pipeline of optimization passes
- * sequentially on the DOM tree.
+ * Detects patterns where tgfx exports a layer with filter styles as two separate elements
+ * (content + filter carrier with identical shape), and merges them into a single element with the
+ * filter applied directly.
  */
-class SVGDOMOptimizer {
- public:
-  static void Optimize(SVGContainer* root, const SVGIDMapper& idMapper);
-};
+void MergeInnerShadowFilters(SVGContainer* root, const SVGIDMapper& idMapper);
 
 }  // namespace tgfx
