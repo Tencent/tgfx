@@ -673,22 +673,31 @@ void SVGExportContext::exportPictureImageAsVector(const PictureImage* pictureIma
   }
 }
 
+static void ApplyGroupAttributes(ElementWriter* element, const std::string& clipID,
+                                 const std::string& filterRef, const std::string& blendStyle,
+                                 float alpha) {
+  if (!clipID.empty()) {
+    element->addAttribute("clip-path", "url(#" + clipID + ")");
+  }
+  if (!filterRef.empty()) {
+    element->addAttribute("filter", filterRef);
+  }
+  if (!blendStyle.empty()) {
+    element->addAttribute("style", blendStyle);
+  }
+  if (alpha != 1.0f) {
+    element->addAttribute("opacity", alpha);
+  }
+}
+
 std::vector<std::unique_ptr<ElementWriter>> SVGExportContext::buildFilterGroupElements(
     const std::vector<std::string>& filterIDs, const std::string& singleFilterRef,
     const std::string& clipID, const std::string& blendStyle, float alpha) {
   std::vector<std::unique_ptr<ElementWriter>> groupElements;
   if (filterIDs.size() > 1) {
     auto outermost = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
-    if (!clipID.empty()) {
-      outermost->addAttribute("clip-path", "url(#" + clipID + ")");
-    }
-    outermost->addAttribute("filter", "url(#" + filterIDs.back() + ")");
-    if (!blendStyle.empty()) {
-      outermost->addAttribute("style", blendStyle);
-    }
-    if (alpha != 1.0f) {
-      outermost->addAttribute("opacity", alpha);
-    }
+    ApplyGroupAttributes(outermost.get(), clipID, "url(#" + filterIDs.back() + ")", blendStyle,
+                         alpha);
     groupElements.push_back(std::move(outermost));
     for (size_t i = filterIDs.size() - 1; i > 0; --i) {
       auto inner = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
@@ -697,18 +706,7 @@ std::vector<std::unique_ptr<ElementWriter>> SVGExportContext::buildFilterGroupEl
     }
   } else {
     auto groupElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
-    if (!clipID.empty()) {
-      groupElement->addAttribute("clip-path", "url(#" + clipID + ")");
-    }
-    if (!singleFilterRef.empty()) {
-      groupElement->addAttribute("filter", singleFilterRef);
-    }
-    if (!blendStyle.empty()) {
-      groupElement->addAttribute("style", blendStyle);
-    }
-    if (alpha != 1.0f) {
-      groupElement->addAttribute("opacity", alpha);
-    }
+    ApplyGroupAttributes(groupElement.get(), clipID, singleFilterRef, blendStyle, alpha);
     groupElements.push_back(std::move(groupElement));
   }
   return groupElements;
