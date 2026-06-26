@@ -18,11 +18,16 @@
 
 #pragma once
 
-#include "tgfx/svg/SVGDOM.h"
+#include <memory>
+#include <string>
+#include <unordered_map>
+#include <vector>
 #include "tgfx/svg/node/SVGContainer.h"
 #include "tgfx/svg/node/SVGNode.h"
 
 namespace tgfx {
+
+using SVGIDMapper = std::unordered_map<std::string, std::shared_ptr<SVGNode>>;
 
 /**
  * Post-construction optimizer for the SVG DOM tree. Detects patterns where tgfx exports a layer

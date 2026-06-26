@@ -50,11 +50,16 @@ void SVGDOMOptimizer::OptimizeFilterPairs(SVGContainer* root, const SVGIDMapper&
 }
 
 void SVGDOMOptimizer::processContainer(SVGContainer* container, const SVGIDMapper& idMapper) {
-  // First, recursively process child containers (depth-first).
+  // Collect child containers first, then recurse. This avoids iterating
+  // container->getChildren() while a recursive call might modify a child's vector.
+  std::vector<SVGContainer*> childContainers;
   for (const auto& child : container->getChildren()) {
     if (child->hasChildren()) {
-      processContainer(static_cast<SVGContainer*>(child.get()), idMapper);
+      childContainers.push_back(static_cast<SVGContainer*>(child.get()));
     }
+  }
+  for (auto* childContainer : childContainers) {
+    processContainer(childContainer, idMapper);
   }
 
   // Now scan for filter-pair patterns in this container's children.
@@ -64,15 +69,14 @@ void SVGDOMOptimizer::processContainer(SVGContainer* container, const SVGIDMappe
   }
 
   // Scan from the end to avoid index invalidation during erasure.
-  for (size_t idx = children.size() - 1; idx > 0; --idx) {
+  size_t idx = children.size() - 1;
+  while (idx > 0) {
     size_t i = idx - 1;
     auto* contentNode = children[i].get();
 
     // Content node must be a shape element without a filter.
-    if (!isShapeElement(contentNode)) {
-      continue;
-    }
-    if (!GetFilterUrl(contentNode).empty()) {
+    if (!isShapeElement(contentNode) || !GetFilterUrl(contentNode).empty()) {
+      --idx;
       continue;
     }
 
@@ -86,28 +90,25 @@ void SVGDOMOptimizer::processContainer(SVGContainer* container, const SVGIDMappe
       if (isPureFilterGroup(children[j].get())) {
         filterGroupIdx = j;
         found = true;
-        break;
       }
       break;
     }
     if (!found) {
+      --idx;
       continue;
     }
 
     // Unwrap nested filter groups to find the leaf content node.
     auto chain = unwrapFilterGroups(children[filterGroupIdx].get());
     if (chain.filterUrls.empty() || !chain.leafNode) {
+      --idx;
       continue;
     }
 
     // Leaf must be a matching shape with white fill.
-    if (!isShapeElement(chain.leafNode)) {
-      continue;
-    }
-    if (!isWhiteFill(chain.leafNode)) {
-      continue;
-    }
-    if (!isMatchingShape(contentNode, chain.leafNode)) {
+    if (!isShapeElement(chain.leafNode) || !isWhiteFill(chain.leafNode) ||
+        !isMatchingShape(contentNode, chain.leafNode)) {
+      --idx;
       continue;
     }
 
@@ -162,6 +163,12 @@ void SVGDOMOptimizer::processContainer(SVGContainer* container, const SVGIDMappe
         // Fallback: just remove the filter group (shouldn't happen with well-formed tgfx output).
         children.erase(children.begin() + static_cast<ptrdiff_t>(filterGroupIdx));
       }
+    }
+    // After erase, idx now points beyond the new size or at a valid position.
+    // Reset to re-check from the current end.
+    idx = (i > 0) ? i : 0;
+    if (idx == 0) {
+      break;
     }
   }
 }
