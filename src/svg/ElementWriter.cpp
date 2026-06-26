@@ -1407,6 +1407,7 @@ void ElementWriter::addBlendColorFilterResources(const ModeColorFilter* modeColo
   {
     ElementWriter filterElement("filter", writer);
     filterElement.addAttribute("id", filterID);
+    filterElement.addAttribute("color-interpolation-filters", "sRGB");
     filterElement.addAttribute("x", "0%");
     filterElement.addAttribute("y", "0%");
     filterElement.addAttribute("width", "100%");
@@ -1422,6 +1423,7 @@ void ElementWriter::addMatrixColorFilterResources(const MatrixColorFilter* matri
   {
     ElementWriter filterElement("filter", writer);
     filterElement.addAttribute("id", filterID);
+    filterElement.addAttribute("color-interpolation-filters", "sRGB");
     filterElement.addAttribute("x", "0%");
     filterElement.addAttribute("y", "0%");
     filterElement.addAttribute("width", "100%");
