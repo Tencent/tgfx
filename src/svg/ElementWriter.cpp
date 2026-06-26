@@ -1130,21 +1130,21 @@ Resources ElementWriter::addResources(const Brush& brush, Context* context,
   return resources;
 }
 
+static std::pair<const Shader*, Matrix> DecomposeShader(
+    const std::shared_ptr<Shader>& shader) {
+  Matrix matrix = {};
+  const Shader* tempShader = shader.get();
+  while (Types::Get(tempShader) == Types::ShaderType::Matrix) {
+    auto matrixShader = static_cast<const MatrixShader*>(tempShader);
+    matrix = matrix * matrixShader->matrix;
+    tempShader = matrixShader->source.get();
+  }
+  return {tempShader, matrix};
+}
+
 void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader, Context* context,
                                        Resources* resources) {
-  auto shaderDecomposer =
-      [](const std::shared_ptr<Shader>& decomposedShader) -> std::pair<const Shader*, Matrix> {
-    Matrix matrix = {};
-    const Shader* tempShader = decomposedShader.get();
-
-    while (Types::Get(tempShader) == Types::ShaderType::Matrix) {
-      auto matrixShader = static_cast<const MatrixShader*>(tempShader);
-      matrix = matrix * matrixShader->matrix;
-      tempShader = matrixShader->source.get();
-    };
-    return {tempShader, matrix};
-  };
-  auto [decomposedShader, matrix] = shaderDecomposer(shader);
+  auto [decomposedShader, matrix] = DecomposeShader(shader);
 
   auto type = Types::Get(decomposedShader);
   switch (type) {
