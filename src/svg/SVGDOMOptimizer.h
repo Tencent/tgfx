@@ -28,7 +28,6 @@ class SVGContainer;
 class SVGNode;
 
 using SVGIDMapper = std::unordered_map<std::string, std::shared_ptr<SVGNode>>;
-using SVGOptimizeFunc = void (*)(SVGContainer*, const SVGIDMapper&);
 
 /**
  * Post-construction optimizer for the SVG DOM tree. Runs a pipeline of optimization passes

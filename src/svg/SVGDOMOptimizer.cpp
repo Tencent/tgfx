@@ -21,6 +21,8 @@
 
 namespace tgfx {
 
+using SVGOptimizeFunc = void (*)(SVGContainer*, const SVGIDMapper&);
+
 static const SVGOptimizeFunc Passes[] = {
     MergeInnerShadowFilters,
 };
