@@ -56,6 +56,8 @@ class SVGContainer : public SVGTransformableNode {
 
  private:
   using INHERITED = SVGTransformableNode;
+
+  friend class SVGDOMOptimizer;
 };
 
 }  // namespace tgfx
