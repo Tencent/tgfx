@@ -193,6 +193,11 @@ bool IsInnerShadowOnlyFilter(const SVGContainer* filterNode) {
   return false;
 }
 
+// Appends a bare FeBlend as a sentinel so that buildInnerShadowFilter (SVGFilter.cpp) detects
+// the filter as InnerShadow instead of InnerShadowOnly.  Only the in2 attribute is set because
+// buildInnerShadowFilter only checks for the presence of an FeBlend tag at compositeIndex+2;
+// the in and mode attributes are intentionally omitted since this node is never evaluated by
+// the generic filter DAG path.
 void UpgradeToInnerShadow(SVGContainer* filterNode) {
   auto feBlend = SVGFeBlend::Make();
   feBlend->setIn2(SVGFeInputType(SVGFeInputType::Type::SourceGraphic));
