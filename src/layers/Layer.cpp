@@ -1829,6 +1829,12 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   }
 
   if (needContour[0] || needContour[1]) {
+    // TODO: The contour shape should have the same semantics as the contour image,
+    // covering the entire subtree content. Contour should be encapsulated as a composite
+    // class that records Picture data containing draw instructions, with a new interface
+    // to parse Shape from the Picture data. This ensures the Image and Shape inside
+    // Contour have consistent semantics. The layer's clip region should also be stored
+    // within Contour.
     source->contentShape = getContentShape();
   }
 
