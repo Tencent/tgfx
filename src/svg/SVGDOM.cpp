@@ -22,7 +22,6 @@
 #include <ctime>
 #include <memory>
 #include <utility>
-#include "svg/SVGDOMOptimizer.h"
 #include "svg/SVGNodeConstructor.h"
 #include "svg/SVGRenderContext.h"
 #include "tgfx/core/Canvas.h"
@@ -30,7 +29,6 @@
 #include "tgfx/core/Surface.h"
 #include "tgfx/svg/SVGLengthContext.h"
 #include "tgfx/svg/SVGTypes.h"
-#include "tgfx/svg/node/SVGContainer.h"
 #include "tgfx/svg/node/SVGNode.h"
 #include "tgfx/svg/xml/XMLDOM.h"
 
@@ -70,9 +68,6 @@ std::shared_ptr<SVGDOM> SVGDOM::Make(Stream& stream, std::shared_ptr<TextShaper>
     return nullptr;
   }
   SVGNodeConstructor::SetClassStyleAttributes(*root, cssMapper);
-
-  // Optimize the SVG DOM tree (merge content + filter carrier into single elements, etc.).
-  SVGDOMOptimizer::Optimize(static_cast<SVGContainer*>(root.get()), mapper);
 
   // Create SVGDOM with the root node and ID mapper
   return std::shared_ptr<SVGDOM>(new SVGDOM(std::static_pointer_cast<SVGRoot>(root),
