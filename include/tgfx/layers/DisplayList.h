@@ -206,6 +206,26 @@ class DisplayList {
   }
 
   /**
+   * Returns whether super-sampling anti-aliasing (SSAA) is enabled. Only takes effect in
+   * RenderMode::Tiled; other render modes ignore this setting. The default is false.
+   */
+  bool useSSAA() const {
+    return _useSSAA;
+  }
+
+  /**
+   * Sets whether super-sampling anti-aliasing (SSAA) is enabled. When enabled and the render
+   * mode is RenderMode::Tiled, each tile is rendered at 2x resolution with edge anti-aliasing
+   * disabled, then downsampled to the atlas with linear sampling. This eliminates the
+   * edge-bleeding artifact that coverage-based AA causes when many semi-transparent layers
+   * stack on top of each other, at the cost of roughly 4x fragment work per tile. Render modes
+   * other than Tiled silently ignore this setting.
+   */
+  void setUseSSAA(bool use) {
+    _useSSAA = use;
+  }
+
+  /**
    * Returns the maximum number of tiles rasterized per frame in tiled rendering mode. This
    * setting is ignored in other render modes or if allowZoomBlur is false. Once the limit is
    * reached, remaining tiles fall back to cached content from other zoom scales, or are filled
@@ -287,6 +307,7 @@ class DisplayList {
   int _tileSize = 256;
   int _maxTileCount = 0;
   bool _allowZoomBlur = false;
+  bool _useSSAA = false;
   int _maxTilesRefinedPerFrame = 5;
   int _subtreeCacheMaxSize = 0;
   bool _showDirtyRegions = false;
@@ -367,7 +388,8 @@ class DisplayList {
   void resetCaches();
 
   void drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
-                     bool autoClear, BackgroundSnapshotMap* snapshots) const;
+                     bool autoClear, BackgroundSnapshotMap* snapshots,
+                     bool forceNoEdgeAA = false) const;
 
   std::unique_ptr<BackgroundSnapshotMap> captureBackgrounds(
       Surface* surface, const std::vector<Rect>& renderRects) const;
