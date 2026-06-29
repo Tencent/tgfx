@@ -51,10 +51,6 @@ class ShapeBezierRasterizeDrawOp : public DrawOp {
       const Matrix& viewMatrix, const Matrix& uvMatrix, const Rect& coverLocalBounds,
       PathFillType fillType);
 
-  bool hasCoverage() const override {
-    return true;
-  }
-
   bool needsStencil() const override {
     return true;
   }

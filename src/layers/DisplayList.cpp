@@ -22,7 +22,6 @@
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/TileSortCompareFunc.h"
-#include "gpu/OpsCompositor.h"
 #include "gpu/RenderContext.h"
 #include "layers/BackgroundHandler.h"
 #include "layers/BackgroundSnapshotMap.h"
@@ -39,6 +38,7 @@ static constexpr int MIN_TILE_SIZE = 16;
 static constexpr int MAX_TILE_SIZE = 2048;
 static constexpr int FALLBACK_GRID_SIZE = 64;
 static constexpr int MAX_ATLAS_SIZE = 8192;
+static constexpr int SSAA_SCALE = 2;
 
 class DrawTask {
  public:
@@ -1012,40 +1012,43 @@ void DisplayList::drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snap
   // SSAA path for Tiled mode: render each tile at 2x resolution with NoAA into a reusable SSAA
   // tile surface, then downsample to the atlas with linear sampling. This provides anti-aliasing
   // via supersampling and avoids edge bleeding caused by coverage-based AA when layers stack.
-  constexpr int SSAAScale = 2;
-  auto tileWidthInt = static_cast<int>(std::ceil(tileRect.width()));
-  auto tileHeightInt = static_cast<int>(std::ceil(tileRect.height()));
-  auto ssaaWidth = tileWidthInt * SSAAScale;
-  auto ssaaHeight = tileHeightInt * SSAAScale;
-  auto tileSurface = getOrCreateSSAATileSurface(renderSurface, ssaaWidth, ssaaHeight);
-  if (tileSurface != nullptr) {
-    // Render to the SSAA tile surface at 2x scale starting from (0, 0).
-    auto viewMatrix = Matrix::MakeScale(currentZoomScale * SSAAScale);
-    viewMatrix.postTranslate(-tileRect.left * SSAAScale, -tileRect.top * SSAAScale);
-    auto tileClipRect = Rect::MakeWH(tileRect.width() * SSAAScale, tileRect.height() * SSAAScale);
-    // Force all draws to use NoAA; the flag must remain true through makeImageSnapshot(), which
-    // internally triggers renderContext->flush() where getAAType() is evaluated.
-    OpsCompositorForceNoAA = true;
-    drawRootLayer(tileSurface, tileClipRect, viewMatrix, true, snapshots);
-    auto image = tileSurface->makeImageSnapshot();
-    OpsCompositorForceNoAA = false;
+  if (_useSSAA) {
+    auto tileWidthInt = static_cast<int>(std::ceil(tileRect.width()));
+    auto tileHeightInt = static_cast<int>(std::ceil(tileRect.height()));
+    auto ssaaWidth = tileWidthInt * SSAA_SCALE;
+    auto ssaaHeight = tileHeightInt * SSAA_SCALE;
+    auto tileSurface = getOrCreateSSAATileSurface(renderSurface, ssaaWidth, ssaaHeight);
+    if (tileSurface != nullptr) {
+      // Render to the SSAA tile surface at 2x scale starting from (0, 0).
+      auto viewMatrix = Matrix::MakeScale(currentZoomScale * SSAA_SCALE);
+      viewMatrix.postTranslate(-tileRect.left * SSAA_SCALE, -tileRect.top * SSAA_SCALE);
+      auto tileClipRect =
+          Rect::MakeWH(tileRect.width() * SSAA_SCALE, tileRect.height() * SSAA_SCALE);
+      // forceNoEdgeAA=true is written into the root DrawArgs by drawRootLayer and propagates
+      // along the DrawArgs copy chain into every Layer::allowsEdgeAntialiasing read site as
+      // well as every derived intermediate surface (layer style offscreen, background snapshot,
+      // 3D leaf surface). All draws on this SSAA tile surface therefore go through with
+      // AAType::None.
+      drawRootLayer(tileSurface, tileClipRect, viewMatrix, true, snapshots,
+                    /*forceNoEdgeAA=*/true);
+      auto image = tileSurface->makeImageSnapshot();
 
-    // Downsample to the atlas with linear sampling.
-    auto atlasCanvas = atlasSurface->getCanvas();
-    AutoCanvasRestore autoRestore(atlasCanvas);
-    atlasCanvas->resetMatrix();
-    Paint paint = {};
-    paint.setAntiAlias(false);
-    paint.setBlendMode(BlendMode::Src);
-    static SamplingOptions linearSampling(FilterMode::Linear, MipmapMode::None);
-    auto srcRect = Rect::MakeWH(tileRect.width() * SSAAScale, tileRect.height() * SSAAScale);
-    atlasCanvas->drawImageRect(std::move(image), srcRect, sourceRect, linearSampling, &paint,
-                               SrcRectConstraint::Strict);
-    atlasSurface->renderContext->flush();
-    return;
+      // Downsample to the atlas with linear sampling.
+      auto atlasCanvas = atlasSurface->getCanvas();
+      AutoCanvasRestore autoRestore(atlasCanvas);
+      atlasCanvas->resetMatrix();
+      Paint paint = {};
+      paint.setAntiAlias(false);
+      paint.setBlendMode(BlendMode::Src);
+      static SamplingOptions linearSampling(FilterMode::Linear, MipmapMode::None);
+      auto srcRect = Rect::MakeWH(tileRect.width() * SSAA_SCALE, tileRect.height() * SSAA_SCALE);
+      atlasCanvas->drawImageRect(std::move(image), srcRect, sourceRect, linearSampling, &paint,
+                                 SrcRectConstraint::Strict);
+      return;
+    }
   }
 
-  // Fallback: render directly to atlas (original path).
+  // Non-SSAA path: render directly to atlas (forceNoEdgeAA defaults to false).
   auto canvas = atlasSurface->getCanvas();
   AutoCanvasRestore autoRestore(canvas);
   auto viewMatrix = Matrix::MakeScale(currentZoomScale);
@@ -1192,7 +1195,8 @@ void DisplayList::resetCaches() {
 }
 
 void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
-                                bool autoClear, BackgroundSnapshotMap* snapshots) const {
+                                bool autoClear, BackgroundSnapshotMap* snapshots,
+                                bool forceNoEdgeAA) const {
   DEBUG_ASSERT(surface != nullptr);
   auto canvas = surface->getCanvas();
   auto context = surface->getContext();
@@ -1207,6 +1211,7 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   }
   canvas->setMatrix(viewMatrix);
   DrawArgs args(context);
+  args.forceNoEdgeAA = forceNoEdgeAA;
   DEBUG_ASSERT(viewMatrix.invertible());
   Matrix inverse = Matrix::I();
   viewMatrix.invert(&inverse);

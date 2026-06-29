@@ -97,7 +97,12 @@ void ShapeDrawOp::onDraw(RenderPass* renderPass) {
 }
 
 bool ShapeDrawOp::hasCoverage() const {
-  return true;
+  // Triangulated path: when aaType != None the GeometryProcessor writes an edge-coverage
+  // attribute; with aaType == None the GP emits vec4(1.0) and the op itself has no coverage.
+  // Mask-texture path: the rasterized mask FP is appended via addCoverageFP and therefore
+  // shows up in `coverages` — covered by the second clause. Plus the maskFilter and AA-clip
+  // coverage FPs (added by OpsCompositor::addDrawOp) also flow into `coverages`.
+  return aaType != AAType::None || !coverages.empty();
 }
 
 }  // namespace tgfx

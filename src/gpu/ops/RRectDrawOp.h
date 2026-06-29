@@ -69,7 +69,11 @@ class RRectDrawOp : public DrawOp {
   }
 
   bool hasCoverage() const override {
-    return aaType != AAType::None;
+    // Three independent sources: (a) when aaType != None the simple/complex GP writes edge AA
+    // coverage; (b) when isComplex the complex GP always writes a 0/1 shape mask through
+    // outputCoverage to clip away the corners — even at aaType == None; (c) maskFilter and
+    // AA-clip coverage FPs flow into `coverages` via OpsCompositor::addDrawOp.
+    return aaType != AAType::None || isComplex || !coverages.empty();
   }
 
  private:

@@ -130,7 +130,10 @@ void ShapeInstancedDrawOp::onDraw(RenderPass* renderPass) {
 }
 
 bool ShapeInstancedDrawOp::hasCoverage() const {
-  return true;
+  // Same rationale as ShapeDrawOp::hasCoverage — triangulated path with aaType == None has no
+  // GP-emitted coverage; mask-texture path / maskFilter / AA-clip contributions all land in
+  // `coverages` and are caught by the second clause.
+  return aaType != AAType::None || !coverages.empty();
 }
 
 }  // namespace tgfx
