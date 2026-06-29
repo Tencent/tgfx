@@ -34,6 +34,7 @@
 #include "core/utils/MathExtra.h"
 #include "core/utils/RectToRectMatrix.h"
 #include "core/utils/ShapeUtils.h"
+#include "core/utils/StrokeUtils.h"
 #include "core/utils/Types.h"
 #include "svg/SVGTextBuilder.h"
 #include "tgfx/core/Bitmap.h"
@@ -138,7 +139,7 @@ void SVGExportContext::drawFill(const Brush& brush) {
 }
 
 void SVGExportContext::drawRect(const Rect& rect, const Matrix& matrix, const ClipStack& clip,
-                                const Brush& brush, const Stroke*) {
+                                const Brush& brush, const Stroke* stroke) {
   std::unique_ptr<ElementWriter> svg;
   if (RequiresViewportReset(brush)) {
     svg =
@@ -148,10 +149,14 @@ void SVGExportContext::drawRect(const Rect& rect, const Matrix& matrix, const Cl
     svg->addRectAttributes(rect);
   }
 
-  applyClip(clip, matrix.mapRect(rect));
+  auto contentBounds = rect;
+  if (stroke) {
+    ApplyStrokeToBounds(*stroke, &contentBounds, matrix);
+  }
+  applyClip(clip, matrix.mapRect(contentBounds));
 
   ElementWriter rectElement("rect", context, this, xmlWriter.get(), resourceBucket.get(),
-                            exportFlags & SVGExportFlags::DisableWarnings, matrix, brush, nullptr,
+                            exportFlags & SVGExportFlags::DisableWarnings, matrix, brush, stroke,
                             _targetColorSpace, _assignColorSpace);
 
   if (svg) {
@@ -165,30 +170,41 @@ void SVGExportContext::drawRect(const Rect& rect, const Matrix& matrix, const Cl
 }
 
 void SVGExportContext::drawRRect(const RRect& roundRect, const Matrix& matrix,
-                                 const ClipStack& clip, const Brush& brush, const Stroke*) {
-  applyClip(clip, matrix.mapRect(roundRect.rect()));
+                                 const ClipStack& clip, const Brush& brush, const Stroke* stroke) {
+  if (roundRect.isComplex()) {
+    // SVG <rect> only supports uniform rx/ry; complex RRects must be exported as <path>.
+    // With stroke, route through drawShape so the generic stroker handles it.
+    Path path = {};
+    path.addRRect(roundRect);
+    if (stroke) {
+      drawShape(Shape::MakeFrom(std::move(path)), matrix, clip, brush, stroke);
+    } else {
+      drawPath(path, matrix, clip, brush);
+    }
+    return;
+  }
+
+  auto contentBounds = roundRect.rect();
+  if (stroke) {
+    ApplyStrokeToBounds(*stroke, &contentBounds, matrix);
+  }
+  applyClip(clip, matrix.mapRect(contentBounds));
   if (roundRect.isOval()) {
     if (roundRect.rect().width() == roundRect.rect().height()) {
       ElementWriter circleElement("circle", context, this, xmlWriter.get(), resourceBucket.get(),
                                   exportFlags & SVGExportFlags::DisableWarnings, matrix, brush,
-                                  nullptr, _targetColorSpace, _assignColorSpace);
+                                  stroke, _targetColorSpace, _assignColorSpace);
       circleElement.addCircleAttributes(roundRect.rect());
-      return;
     } else {
       ElementWriter ovalElement("ellipse", context, this, xmlWriter.get(), resourceBucket.get(),
                                 exportFlags & SVGExportFlags::DisableWarnings, matrix, brush,
-                                nullptr, _targetColorSpace, _assignColorSpace);
+                                stroke, _targetColorSpace, _assignColorSpace);
       ovalElement.addEllipseAttributes(roundRect.rect());
     }
-  } else if (roundRect.isComplex()) {
-    // SVG <rect> only supports uniform rx/ry. Complex RRects must be exported as <path>.
-    Path path = {};
-    path.addRRect(roundRect);
-    drawPath(path, matrix, clip, brush);
   } else {
     ElementWriter rrectElement("rect", context, this, xmlWriter.get(), resourceBucket.get(),
-                               exportFlags & SVGExportFlags::DisableWarnings, matrix, brush,
-                               nullptr, _targetColorSpace, _assignColorSpace);
+                               exportFlags & SVGExportFlags::DisableWarnings, matrix, brush, stroke,
+                               _targetColorSpace, _assignColorSpace);
     rrectElement.addRoundRectAttributes(roundRect);
   }
 }

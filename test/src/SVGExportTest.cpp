@@ -328,7 +328,8 @@ TGFX_TEST(SVGExportTest, StrokeWidth) {
   std::string compareString =
       "<?xml version=\"1.0\" encoding=\"utf-8\" ?><svg xmlns=\"http://www.w3.org/2000/svg\" "
       "xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"200\" height=\"200\"><rect "
-      "fill=\"#F00\" x=\"50\" y=\"50\" width=\"100\" height=\"100\"/></svg>";
+      "fill=\"none\" stroke=\"#F00\" stroke-width=\"5\" x=\"50\" y=\"50\" width=\"100\" "
+      "height=\"100\"/></svg>";
 
   ContextScope scope;
   auto context = scope.getContext();
