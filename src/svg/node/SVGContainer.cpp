@@ -35,17 +35,6 @@ void SVGContainer::appendChild(std::shared_ptr<SVGNode> node) {
   children.push_back(std::move(node));
 }
 
-void SVGContainer::eraseChild(size_t index) {
-  ASSERT(index < children.size());
-  children.erase(children.begin() + static_cast<ptrdiff_t>(index));
-}
-
-void SVGContainer::replaceChild(size_t index, std::shared_ptr<SVGNode> node) {
-  ASSERT(index < children.size());
-  ASSERT(node);
-  children[index] = std::move(node);
-}
-
 const std::vector<std::shared_ptr<SVGNode>>& SVGContainer::getChildren() const {
   return children;
 }
