@@ -31,7 +31,6 @@ class SVGRenderContext;
 class SVGContainer : public SVGTransformableNode {
  public:
   void appendChild(std::shared_ptr<SVGNode> node) override;
-
   const std::vector<std::shared_ptr<SVGNode>>& getChildren() const;
   bool hasChildren() const final;
 
