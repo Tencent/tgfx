@@ -20,13 +20,13 @@
 
 namespace tgfx {
 PlacementPtr<StencilCoverCoverPassGeometryProcessor> StencilCoverCoverPassGeometryProcessor::Make(
-    BlockAllocator* allocator, PMColor color, const Matrix& viewMatrix, const Matrix& uvMatrix) {
-  return allocator->make<GLSLStencilCoverCoverPassGeometryProcessor>(color, viewMatrix, uvMatrix);
+    BlockAllocator* allocator, PMColor color, const Matrix& viewMatrix) {
+  return allocator->make<GLSLStencilCoverCoverPassGeometryProcessor>(color, viewMatrix);
 }
 
 GLSLStencilCoverCoverPassGeometryProcessor::GLSLStencilCoverCoverPassGeometryProcessor(
-    PMColor color, const Matrix& viewMatrix, const Matrix& uvMatrix)
-    : StencilCoverCoverPassGeometryProcessor(color, viewMatrix, uvMatrix) {
+    PMColor color, const Matrix& viewMatrix)
+    : StencilCoverCoverPassGeometryProcessor(color, viewMatrix) {
 }
 
 void GLSLStencilCoverCoverPassGeometryProcessor::emitCode(EmitArgs& args) const {
@@ -64,7 +64,7 @@ void GLSLStencilCoverCoverPassGeometryProcessor::emitCode(EmitArgs& args) const 
 void GLSLStencilCoverCoverPassGeometryProcessor::setData(
     UniformData* vertexUniformData, UniformData* fragmentUniformData,
     FPCoordTransformIter* transformIter) const {
-  setTransformDataHelper(uvMatrix, vertexUniformData, transformIter);
+  setTransformDataHelper(Matrix::I(), vertexUniformData, transformIter);
   vertexUniformData->setData("Matrix", viewMatrix);
   fragmentUniformData->setData("Color", color);
 }

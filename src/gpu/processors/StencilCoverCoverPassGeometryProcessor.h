@@ -42,8 +42,7 @@ class StencilCoverCoverPassGeometryProcessor : public GeometryProcessor {
  public:
   static PlacementPtr<StencilCoverCoverPassGeometryProcessor> Make(BlockAllocator* allocator,
                                                                    PMColor color,
-                                                                   const Matrix& viewMatrix,
-                                                                   const Matrix& uvMatrix);
+                                                                   const Matrix& viewMatrix);
 
   std::string name() const override {
     return "StencilCoverCoverPassGeometryProcessor";
@@ -52,17 +51,11 @@ class StencilCoverCoverPassGeometryProcessor : public GeometryProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  StencilCoverCoverPassGeometryProcessor(PMColor color, const Matrix& viewMatrix,
-                                         const Matrix& uvMatrix);
-
-  bool hasUVPerspective() const override {
-    return uvMatrix.hasPerspective();
-  }
+  StencilCoverCoverPassGeometryProcessor(PMColor color, const Matrix& viewMatrix);
 
   Attribute position;
 
   PMColor color = PMColor::Transparent();
   Matrix viewMatrix = {};
-  Matrix uvMatrix = {};
 };
 }  // namespace tgfx

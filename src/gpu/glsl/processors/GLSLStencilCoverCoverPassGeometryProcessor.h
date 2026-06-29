@@ -23,8 +23,7 @@
 namespace tgfx {
 class GLSLStencilCoverCoverPassGeometryProcessor : public StencilCoverCoverPassGeometryProcessor {
  public:
-  GLSLStencilCoverCoverPassGeometryProcessor(PMColor color, const Matrix& viewMatrix,
-                                             const Matrix& uvMatrix);
+  GLSLStencilCoverCoverPassGeometryProcessor(PMColor color, const Matrix& viewMatrix);
 
   void emitCode(EmitArgs& args) const override;
 

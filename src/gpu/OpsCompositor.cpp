@@ -291,7 +291,7 @@ void OpsCompositor::drawStencilCoverPath(std::shared_ptr<Shape> shape, const Mat
 
   auto dstColor = ToPMColor(brush.color, dstColorSpace);
   auto fillType = shape->getPath().getFillType();
-  auto drawOp = StencilCoverPathDrawOp::Make(std::move(geometryProxy), dstColor, matrix, uvMatrix,
+  auto drawOp = StencilCoverPathDrawOp::Make(std::move(geometryProxy), dstColor, matrix,
                                              coverLocalBounds, fillType);
   if (drawOp == nullptr) {
     return;

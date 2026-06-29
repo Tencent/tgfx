@@ -115,7 +115,7 @@ uint32_t CoverPassStencilReference(PathFillType fillType) {
 
 PlacementPtr<StencilCoverPathDrawOp> StencilCoverPathDrawOp::Make(
     std::shared_ptr<StencilCoverPathProxy> geometryProxy, PMColor color, const Matrix& viewMatrix,
-    const Matrix& uvMatrix, const Rect& coverLocalBounds, PathFillType fillType) {
+    const Rect& coverLocalBounds, PathFillType fillType) {
   if (geometryProxy == nullptr) {
     return nullptr;
   }
@@ -125,17 +125,16 @@ PlacementPtr<StencilCoverPathDrawOp> StencilCoverPathDrawOp::Make(
   }
   auto allocator = context->drawingAllocator();
   return allocator->make<StencilCoverPathDrawOp>(allocator, std::move(geometryProxy), color,
-                                                 viewMatrix, uvMatrix, coverLocalBounds, fillType);
+                                                 viewMatrix, coverLocalBounds, fillType);
 }
 
 StencilCoverPathDrawOp::StencilCoverPathDrawOp(BlockAllocator* allocator,
                                                std::shared_ptr<StencilCoverPathProxy> geometryProxy,
                                                PMColor color, const Matrix& viewMatrix,
-                                               const Matrix& uvMatrix, const Rect& coverLocalBounds,
+                                               const Rect& coverLocalBounds,
                                                PathFillType fillType)
     : DrawOp(allocator, AAType::None), geometryProxy(std::move(geometryProxy)), color(color),
-      viewMatrix(viewMatrix), uvMatrix(uvMatrix), coverLocalBounds(coverLocalBounds),
-      fillType(fillType) {
+      viewMatrix(viewMatrix), coverLocalBounds(coverLocalBounds), fillType(fillType) {
   // The cover quad is built in local space — the cover GP applies the view matrix itself, so
   // pre-applying it here would double-transform. Inverse fill draws supply a clip-derived
   // local rect that already covers the inverse region.
@@ -159,7 +158,7 @@ PlacementPtr<GeometryProcessor> StencilCoverPathDrawOp::onMakeGeometryProcessor(
   // The cover pass owns the brush FP chain via DrawOp::execute(); it is therefore the GP that
   // we hand back to the standard pipeline. The stencil pass GP is built on demand inside
   // onDraw() so it can run with its own ProgramInfo and stencil configuration.
-  return StencilCoverCoverPassGeometryProcessor::Make(allocator, color, viewMatrix, uvMatrix);
+  return StencilCoverCoverPassGeometryProcessor::Make(allocator, color, viewMatrix);
 }
 
 void StencilCoverPathDrawOp::onConfigureProgramInfo(ProgramInfo& programInfo) {
