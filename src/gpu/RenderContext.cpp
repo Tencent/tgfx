@@ -224,7 +224,16 @@ static const Rect* GetGlyphBounds(const Font& font, GlyphID glyphID, float inver
 }
 
 static SamplingOptions GetSamplingOptions(float glyphRenderScale, bool fauxItalic,
-                                          const Matrix& stateMatrix) {
+                                          const Matrix& stateMatrix, bool brushAntiAlias) {
+  // When brush antialiasing is off, the caller either explicitly opted out of AA or the SSAA
+  // tile path forced it off (DrawArgs::forceNoEdgeAA flowing through ResolveAntiAlias). In both
+  // cases the outer pipeline replaces the role of per-glyph linear filtering: SSAA box-averages
+  // multiple supersamples, and explicit AA-off means the caller accepts crisp pixel-aligned
+  // output. Use Nearest to preserve the glyph atlas's original crispness instead of softening
+  // it via bilinear blending.
+  if (!brushAntiAlias) {
+    return SamplingOptions{FilterMode::Nearest, MipmapMode::None};
+  }
   if (fauxItalic || !FloatNearlyEqual(glyphRenderScale, 1.0f)) {
     return SamplingOptions{FilterMode::Linear, MipmapMode::None};
   }
@@ -517,7 +526,8 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
   const auto atlasBrush = brush.makeWithMatrix(matrix);
   const auto glyphRenderScale = font.scalerContext->getSize() / backingSize;
   const auto combinedScale = glyphRenderScale * inverseScale;
-  const auto sampling = GetSamplingOptions(glyphRenderScale, font.isFauxItalic(), matrix);
+  const auto sampling =
+      GetSamplingOptions(glyphRenderScale, font.isFauxItalic(), matrix, brush.antiAlias);
 
   auto typefaceBounds =
       GetTypefaceBounds(typeface, font.getSize(), inverseScale, scaledStroke.get());
