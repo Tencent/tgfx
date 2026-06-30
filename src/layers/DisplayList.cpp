@@ -22,6 +22,7 @@
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/TileSortCompareFunc.h"
+#include "gpu/RenderContext.h"
 #include "layers/BackgroundHandler.h"
 #include "layers/BackgroundSnapshotMap.h"
 #include "layers/BackgroundSource.h"
@@ -1052,6 +1053,7 @@ void DisplayList::drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snap
       static SamplingOptions linearSampling(FilterMode::Linear, MipmapMode::None);
       atlasCanvas->drawImageRect(std::move(image), tileClipRect, sourceRect, linearSampling, &paint,
                                  SrcRectConstraint::Strict);
+      atlasSurface->renderContext->flush();
       return;
     }
   }
