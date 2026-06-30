@@ -32,10 +32,11 @@ void GLSLAARectEffect::emitCode(EmitArgs& args) const {
 
   auto rectName = uniformHandler->addUniform("Rect", UniformFormat::Float4, ShaderStage::Fragment);
   fragBuilder->codeAppendf(
-      "vec4 dists4 = clamp(vec4(1.0, 1.0, -1.0, -1.0) * vec4(gl_FragCoord.xyxy - %s), 0.0, 1.0);",
+      "highp vec4 dists4 = clamp(vec4(1.0, 1.0, -1.0, -1.0) * vec4(gl_FragCoord.xyxy - %s), 0.0, "
+      "1.0);",
       rectName.c_str());
-  fragBuilder->codeAppend("vec2 dists2 = dists4.xy + dists4.zw - 1.0;");
-  fragBuilder->codeAppend("float coverage = dists2.x * dists2.y;");
+  fragBuilder->codeAppend("highp vec2 dists2 = dists4.xy + dists4.zw - 1.0;");
+  fragBuilder->codeAppend("highp float coverage = dists2.x * dists2.y;");
   fragBuilder->codeAppendf("%s = %s * coverage;", args.outputColor.c_str(),
                            args.inputColor.c_str());
 }
