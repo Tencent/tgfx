@@ -107,10 +107,11 @@ class Painter {
    * applied as CTM around the emit, and the shader wrapped via wrapShaderWithFit lives in the
    * same inner-group space as the bounds. Subclasses may further modify the shape and must
    * populate paint.shader; style and stroke may be set when applicable. Return nullptr to skip
-   * emission.
+   * emission. Setting *outClipShape attaches a clip mask in the same space as innerShape.
    */
   virtual std::shared_ptr<Shape> prepareShape(std::shared_ptr<Shape> innerShape, size_t index,
-                                              LayerPaint* paint) = 0;
+                                              LayerPaint* paint,
+                                              std::shared_ptr<Shape>* outClipShape) = 0;
 
   /**
    * Subclass hook for glyph runs. Unlike prepareShape, the TextBlob stays in run-local space:
@@ -124,6 +125,9 @@ class Painter {
   struct GlyphRunEmit {
     std::shared_ptr<TextBlob> textBlob = nullptr;
     std::shared_ptr<Shape> shape = nullptr;
+    // Optional clip mask paired with shape, in the same run-local space. Ignored when textBlob
+    // is used.
+    std::shared_ptr<Shape> clipShape = nullptr;
     std::vector<LayerPaint> paints = {};
   };
   virtual GlyphRunEmit prepareGlyphRun(const StyledGlyphRun& run, size_t index) = 0;

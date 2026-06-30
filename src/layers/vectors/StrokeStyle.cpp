@@ -25,8 +25,6 @@
 
 namespace tgfx {
 
-static constexpr float MIN_BOUND_EXTENT_FOR_BOOLEAN_OP = 0.5f;
-
 static float BlendStrokeWidth(float base, const GlyphStyle& style) {
   if (style.strokeWidthFactor <= 0.0f) {
     return base;
@@ -50,7 +48,8 @@ class StrokePainter : public Painter {
 
  protected:
   std::shared_ptr<Shape> prepareShape(std::shared_ptr<Shape> innerShape, size_t index,
-                                      LayerPaint* paint) override {
+                                      LayerPaint* paint,
+                                      std::shared_ptr<Shape>* outClipShape) override {
     // Derive the fit shader from the pre-stroke geometry bounds. SVG and Figma both compute
     // gradient fit boxes from the fill geometry only and ignore stroke width, so dash, stroke
     // alignment and stroke width never affect the fit region. Reading getPath() here also
@@ -69,9 +68,15 @@ class StrokePainter : public Painter {
       // Center (text geometries push a null placeholder, but prepareGlyphRun handles text).
       DEBUG_ASSERT(originalShapes[index] != nullptr);
       auto originalShape = Shape::ApplyMatrix(originalShapes[index], innerMatrices[index]);
-      innerShape = applyStrokeAndAlign(std::move(innerShape), std::move(originalShape), stroke);
+      innerShape = expandStrokeForAlignment(std::move(innerShape), stroke);
       if (innerShape == nullptr) {
         return nullptr;
+      }
+      // The clip mask shares the inner-group space with innerShape (originalShape has been
+      // mapped through innerMatrices[index] above). Toggle the inverse fill type for Outside
+      // alignment so the clip keeps the area outside the original path.
+      if (outClipShape != nullptr) {
+        *outClipShape = makeAlignmentClip(std::move(originalShape));
       }
     } else {
       paint->style = PaintStyle::Stroke;
@@ -92,22 +97,26 @@ class StrokePainter : public Painter {
     auto baseShader = wrapShaderWithFit(run.textBlob->getTightBounds());
 
     // Emit path: non-center alignment or an active path effect require expanding the text blob
-    // into a shape (alignment needs a boolean op against the original outline, path effects
+    // into a shape (alignment needs a clip mask against the original outline; path effects
     // operate on path geometry). When neither applies keep the blob intact to preserve color
     // glyphs (e.g. emoji) that cannot be reduced to a path.
     std::shared_ptr<Shape> runShape = nullptr;
-    bool needsBooleanOp = strokeAlign != StrokeAlign::Center;
-    if (pathEffect != nullptr || needsBooleanOp) {
+    std::shared_ptr<Shape> runClipShape = nullptr;
+    bool nonCenterAlign = strokeAlign != StrokeAlign::Center;
+    if (pathEffect != nullptr || nonCenterAlign) {
       runShape = Shape::MakeFrom(run.textBlob);
-      // Snapshot the un-effected outline for the boolean-op step. Shape is immutable, so the
-      // pre-effect shape remains a valid "original outline" and sharing it lets Shape::getPath()'s
-      // atomic cache serve both the boolean op and any subsequent path consumer.
+      // Snapshot the un-effected outline as the clip mask. Shape is immutable, so the pre-effect
+      // shape remains a valid "original outline" and sharing it lets Shape::getPath()'s atomic
+      // cache serve both the clip mask and any subsequent path consumer.
       auto originalShape = runShape;
       if (runShape != nullptr && pathEffect != nullptr) {
         runShape = Shape::ApplyEffect(runShape, pathEffect);
       }
-      if (runShape != nullptr && needsBooleanOp) {
-        runShape = applyStrokeAndAlign(std::move(runShape), std::move(originalShape), runStroke);
+      if (runShape != nullptr && nonCenterAlign) {
+        runShape = expandStrokeForAlignment(std::move(runShape), runStroke);
+        if (runShape != nullptr) {
+          runClipShape = makeAlignmentClip(std::move(originalShape));
+        }
       }
       if (runShape == nullptr) {
         return emit;
@@ -115,6 +124,7 @@ class StrokePainter : public Painter {
     }
     if (runShape != nullptr) {
       emit.shape = runShape;
+      emit.clipShape = runClipShape;
     } else {
       emit.textBlob = run.textBlob;
     }
@@ -125,7 +135,7 @@ class StrokePainter : public Painter {
       auto paint = makeBasePaint();
       paint.color.alpha = runAlpha;
       paint.shader = baseShader;
-      if (!needsBooleanOp) {
+      if (!nonCenterAlign) {
         paint.style = PaintStyle::Stroke;
         paint.stroke = runStroke;
       }
@@ -138,7 +148,7 @@ class StrokePainter : public Painter {
       paint.blendMode = BlendMode::SrcOver;
       paint.shader = Shader::MakeColorShader(overlayColor);
       paint.color.alpha = runAlpha;
-      if (!needsBooleanOp) {
+      if (!nonCenterAlign) {
         paint.style = PaintStyle::Stroke;
         paint.stroke = runStroke;
       }
@@ -148,27 +158,25 @@ class StrokePainter : public Painter {
   }
 
  private:
-  std::shared_ptr<Shape> applyStrokeAndAlign(std::shared_ptr<Shape> shape,
-                                             std::shared_ptr<Shape> originalShape,
-                                             const Stroke& strokeToApply) const {
+  std::shared_ptr<Shape> expandStrokeForAlignment(std::shared_ptr<Shape> shape,
+                                                  const Stroke& strokeToApply) const {
     Stroke doubled = strokeToApply;
+    // 2x width: the clip mask in makeAlignmentClip trims the expanded outline back to a band of
+    // the requested width on the kept side.
     doubled.width *= 2;
-    shape = Shape::ApplyStroke(shape, &doubled);
-    if (shape == nullptr) {
+    return Shape::ApplyStroke(std::move(shape), &doubled);
+  }
+
+  std::shared_ptr<Shape> makeAlignmentClip(std::shared_ptr<Shape> originalShape) const {
+    if (originalShape == nullptr) {
       return nullptr;
     }
-    auto op = strokeAlign == StrokeAlign::Inside ? PathOp::Intersect : PathOp::Difference;
-    if (op == PathOp::Difference && originalShape != nullptr) {
-      // Skip the boolean op when the original shape's bounds are sub-pixel thin: the path-op
-      // subtraction is numerically unstable on such input and can produce spurious geometry.
-      // At sub-pixel scale the original shape is invisible anyway, so omitting it is harmless.
-      const auto bounds = originalShape->getBounds();
-      if (bounds.width() < MIN_BOUND_EXTENT_FOR_BOOLEAN_OP ||
-          bounds.height() < MIN_BOUND_EXTENT_FOR_BOOLEAN_OP) {
-        return shape;
-      }
+    if (strokeAlign == StrokeAlign::Inside) {
+      return originalShape;
     }
-    return Shape::Merge(std::move(shape), std::move(originalShape), op);
+    auto inversePath = originalShape->getPath();
+    inversePath.toggleInverseFillType();
+    return Shape::MakeFrom(std::move(inversePath));
   }
 
   PainterStyle onGetStyle() const override {

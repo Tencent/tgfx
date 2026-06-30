@@ -30,6 +30,8 @@ namespace tgfx {
 class Mesh;
 class LayerContent;
 class GeometryContent;
+class Painter;
+class ShapeLayer;
 
 /**
  * LayerRecorder records geometries and their paints as layer content. Geometries with invisible
@@ -138,6 +140,10 @@ class LayerRecorder {
 
   std::unique_ptr<LayerContent> finishRecording();
 
+  void emitContent(std::unique_ptr<GeometryContent> content, LayerPlacement placement);
+
   friend class Layer;
+  friend class ShapeLayer;
+  friend class Painter;
 };
 }  // namespace tgfx
