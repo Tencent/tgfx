@@ -1024,17 +1024,16 @@ void DisplayList::drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snap
   // tile surface, then downsample to the atlas with linear sampling. This provides anti-aliasing
   // via supersampling and avoids edge bleeding caused by coverage-based AA when layers stack.
   if (_useSSAA) {
-    const auto tileWidthInt = FloatCeilToInt(tileRect.width());
-    const auto tileHeightInt = FloatCeilToInt(tileRect.height());
-    const auto ssaaWidth = tileWidthInt * SSAA_SCALE;
-    const auto ssaaHeight = tileHeightInt * SSAA_SCALE;
-    auto tileSurface = getOrCreateSSAATileSurface(renderSurface, ssaaWidth, ssaaHeight);
+    const auto ssaaTileWidth = tileRect.width() * SSAA_SCALE;
+    const auto ssaaTileHeight = tileRect.height() * SSAA_SCALE;
+    const auto surfaceWidth = FloatCeilToInt(ssaaTileWidth);
+    const auto surfaceHeight = FloatCeilToInt(ssaaTileHeight);
+    auto tileSurface = getOrCreateSSAATileSurface(renderSurface, surfaceWidth, surfaceHeight);
     if (tileSurface != nullptr) {
       // Render to the SSAA tile surface at 2x scale starting from (0, 0).
       auto viewMatrix = Matrix::MakeScale(currentZoomScale * SSAA_SCALE);
       viewMatrix.postTranslate(-tileRect.left * SSAA_SCALE, -tileRect.top * SSAA_SCALE);
-      auto tileClipRect =
-          Rect::MakeWH(tileRect.width() * SSAA_SCALE, tileRect.height() * SSAA_SCALE);
+      auto tileClipRect = Rect::MakeWH(ssaaTileWidth, ssaaTileHeight);
       // forceNoEdgeAA=true is written into the root DrawArgs by drawRootLayer and propagates
       // along the DrawArgs copy chain into every Layer::allowsEdgeAntialiasing read site as
       // well as every derived intermediate surface (layer style offscreen, background snapshot,
@@ -1051,8 +1050,7 @@ void DisplayList::drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snap
       paint.setAntiAlias(false);
       paint.setBlendMode(BlendMode::Src);
       static SamplingOptions linearSampling(FilterMode::Linear, MipmapMode::None);
-      auto srcRect = Rect::MakeWH(tileRect.width() * SSAA_SCALE, tileRect.height() * SSAA_SCALE);
-      atlasCanvas->drawImageRect(std::move(image), srcRect, sourceRect, linearSampling, &paint,
+      atlasCanvas->drawImageRect(std::move(image), tileClipRect, sourceRect, linearSampling, &paint,
                                  SrcRectConstraint::Strict);
       return;
     }
