@@ -70,7 +70,10 @@ bool ShapeContent::hitTestPoint(float localX, float localY) const {
     return false;
   }
   if (clipShape) {
-    return clipShape->getPath().contains(localX, localY);
+    auto inside = clipShape->getPath().contains(localX, localY);
+    // Inverse-fill clips (Outside-stroke) keep the area outside the path, so a point passes
+    // iff it is NOT inside the geometric path region.
+    return clipShape->isInverseFillType() ? !inside : inside;
   }
   return true;
 }
