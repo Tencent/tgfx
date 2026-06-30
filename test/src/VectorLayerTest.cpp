@@ -4915,8 +4915,8 @@ static std::vector<std::shared_ptr<VectorElement>> MakeAbsoluteCellContents(
   return elements;
 }
 
-// Non-center stroke alignment with fit color sources exercises the boolean-op branch of
-// StrokeStyle::prepareShape combined with an outer transform.
+// Non-center stroke alignment with fit color sources exercises the clip-mask alignment
+// path of StrokeStyle::prepareShape combined with an outer transform.
 static std::vector<std::shared_ptr<VectorElement>> MakeStrokeAlignCellContents(
     float cx, float cy, int column, float cellSize, const std::vector<Color>& gradientColors,
     const std::shared_ptr<Image>& image) {
