@@ -20,8 +20,8 @@
 
 namespace tgfx {
 StencilCoverCoverPassGeometryProcessor::StencilCoverCoverPassGeometryProcessor(
-    PMColor color, const Matrix& viewMatrix, const Matrix& uvMatrix)
-    : GeometryProcessor(ClassID()), color(color), viewMatrix(viewMatrix), uvMatrix(uvMatrix) {
+    PMColor color, const Matrix& viewMatrix)
+    : GeometryProcessor(ClassID()), color(color), viewMatrix(viewMatrix) {
   position = {"aPosition", VertexFormat::Float2};
   setVertexAttributes(&position, 1);
 }

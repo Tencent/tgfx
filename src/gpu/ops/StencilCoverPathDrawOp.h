@@ -56,7 +56,7 @@ class StencilCoverPathDrawOp : public DrawOp {
  public:
   static PlacementPtr<StencilCoverPathDrawOp> Make(
       std::shared_ptr<StencilCoverPathProxy> geometryProxy, PMColor color, const Matrix& viewMatrix,
-      const Matrix& uvMatrix, const Rect& coverLocalBounds, PathFillType fillType);
+      const Rect& coverLocalBounds, PathFillType fillType);
 
   bool needsStencil() const override {
     return true;
@@ -78,7 +78,6 @@ class StencilCoverPathDrawOp : public DrawOp {
   std::shared_ptr<VertexBufferView> coverQuadBuffer = nullptr;
   PMColor color = PMColor::Transparent();
   Matrix viewMatrix = {};
-  Matrix uvMatrix = {};
   // The local-space rect that bounds the cover-pass quad. The cover GP applies the view
   // matrix the same way the stencil pass does, so this rect must be in the path's local
   // coordinate system (not device space).
@@ -100,8 +99,8 @@ class StencilCoverPathDrawOp : public DrawOp {
 
   StencilCoverPathDrawOp(BlockAllocator* allocator,
                          std::shared_ptr<StencilCoverPathProxy> geometryProxy, PMColor color,
-                         const Matrix& viewMatrix, const Matrix& uvMatrix,
-                         const Rect& coverLocalBounds, PathFillType fillType);
+                         const Matrix& viewMatrix, const Rect& coverLocalBounds,
+                         PathFillType fillType);
 
   // Builds the stencil-pass ProgramInfo (stencil GP, no FP chain, no xfer processor, colour
   // writes disabled) and binds the resulting pipeline together with its uniforms and samplers
