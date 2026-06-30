@@ -2874,6 +2874,70 @@ TGFX_TEST(VectorLayerTest, ImagePattern) {
 }
 
 /**
+ * Test ImagePattern runtime mutation: setImage, setTileModeX, setTileModeY, setSamplingOptions.
+ * Renders the initial pattern, then mutates each property and re-renders to verify the changes
+ * take effect on the next draw.
+ */
+TGFX_TEST(VectorLayerTest, ImagePatternMutation) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 240, 120);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto image = MakeImage("resources/assets/bridge.jpg");
+  ASSERT_TRUE(image != nullptr);
+  auto image2 = MakeImage("resources/assets/tgfx.png");
+  ASSERT_TRUE(image2 != nullptr);
+
+  auto rect = Rectangle::Make();
+  rect->setPosition({60, 60});
+  rect->setSize({80, 80});
+  auto pattern = ImagePattern::Make(image, TileMode::Clamp, TileMode::Clamp);
+  ASSERT_TRUE(pattern != nullptr);
+  pattern->setScaleMode(ScaleMode::None);
+  auto scale = 80.0f / static_cast<float>(image->width());
+  Matrix matrix = Matrix::MakeScale(scale);
+  pattern->setMatrix(matrix);
+  auto fill = FillStyle::Make(pattern);
+  auto group = VectorGroup::Make();
+  group->setElements({rect, fill});
+  auto vectorLayer = VectorLayer::Make();
+  vectorLayer->setContents({group});
+
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->root()->addChild(vectorLayer);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/ImagePatternMutation_Initial"));
+
+  // setImage swaps the image; the rendered pattern changes.
+  pattern->setImage(image2);
+  scale = 80.0f / static_cast<float>(image2->width());
+  pattern->setMatrix(Matrix::MakeScale(scale));
+  canvas->clear(Color::White());
+  displayList->render(surface.get());
+  EXPECT_EQ(pattern->image(), image2);
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/ImagePatternMutation_SetImage"));
+
+  // setTileModeX / setTileModeY change tiling.
+  pattern->setTileModeX(TileMode::Repeat);
+  pattern->setTileModeY(TileMode::Mirror);
+  canvas->clear(Color::White());
+  displayList->render(surface.get());
+  EXPECT_EQ(pattern->tileModeX(), TileMode::Repeat);
+  EXPECT_EQ(pattern->tileModeY(), TileMode::Mirror);
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/ImagePatternMutation_SetTileMode"));
+
+  // setSamplingOptions changes filtering.
+  pattern->setSamplingOptions(SamplingOptions(FilterMode::Nearest));
+  canvas->clear(Color::White());
+  displayList->render(surface.get());
+  EXPECT_EQ(pattern->samplingOptions().minFilterMode, FilterMode::Nearest);
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/ImagePatternMutation_SetSampling"));
+}
+
+/**
  * Test ImagePattern ScaleMode values (Stretch, LetterBox, Zoom, None) with visible borders and
  * labels. Each ScaleMode is rendered in its own rectangle. The trailing None rectangle also
  * carries a user matrix (rotate 30 degrees and scale 0.5x) to demonstrate that the pattern's

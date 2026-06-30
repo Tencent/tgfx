@@ -47,7 +47,7 @@ void GLSLMeshGeometryProcessor::emitCode(EmitArgs& args) const {
 
   // Transform position by view matrix
   std::string positionName = "position";
-  vertBuilder->codeAppendf("vec2 %s = (%s * vec3(%s, 1.0)).xy;", positionName.c_str(),
+  vertBuilder->codeAppendf("highp vec2 %s = (%s * vec3(%s, 1.0)).xy;", positionName.c_str(),
                            matrixName.c_str(), position.name().c_str());
 
   // Handle texture coordinates for FragmentProcessor

@@ -32,6 +32,7 @@
 #include "layers/contents/RectsContent.h"
 #include "layers/contents/TextContent.h"
 #include "tgfx/core/Mesh.h"
+#include "tgfx/core/PathEffect.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/core/TextBlob.h"
 #include "tgfx/layers/DisplayList.h"
@@ -3511,9 +3512,9 @@ enum class ShadowType { Drop, Inner };
 
 static inline std::shared_ptr<LayerStyle> MakeShadow(ShadowType type, float offsetX, float offsetY,
                                                      float blurX, float blurY, const Color& color,
-                                                     float spread) {
+                                                     float spread, bool dropBehindLayer = true) {
   if (type == ShadowType::Drop) {
-    auto style = DropShadowStyle::Make(offsetX, offsetY, blurX, blurY, color);
+    auto style = DropShadowStyle::Make(offsetX, offsetY, blurX, blurY, color, dropBehindLayer);
     style->setSpread(spread);
     return style;
   }
@@ -3584,10 +3585,12 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     Path path = {};
     path.addOval(Rect::MakeXYWH(0.0f, 0.0f, 100.0f, 60.0f));
     layer->setPath(path);
+    layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 0)));
     layer->setStrokeStyle(ShapeStyle::Make(Color::Blue()));
     layer->setLineWidth(15);
     layer->setMatrix(Matrix::MakeTrans(i == 0 ? lItemXOffset : rItemXOffset, cellH + gap));
-    layer->setLayerStyles({MakeShadow(type, 25, 25, 3, 3, Color::Green(), i == 0 ? 0.0f : 8.0f)});
+    layer->setLayerStyles(
+        {MakeShadow(type, 25, 25, 3, 3, Color::Green(), i == 0 ? 0.0f : 8.0f, false)});
     displayList.root()->addChild(layer);
   }
 
@@ -3635,7 +3638,31 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(layer);
   }
 
-  // Case 8: TextLayer with perspective, spread=8
+  // Case 8: ShapeLayer with an Inside dashed stroke baked into a fill path, spread=8
+  for (int i = 0; i < 2; ++i) {
+    auto layer = ShapeLayer::Make();
+    Path rectPath = {};
+    rectPath.addRect(Rect::MakeXYWH(0.0f, 0.0f, 100.0f, 60.0f));
+    auto rectShape = Shape::MakeFrom(rectPath);
+    const float intervals[] = {10.0f, 20.0f};
+    auto dashedShape = Shape::ApplyEffect(rectShape, PathEffect::MakeDash(intervals, 2, 0.0f));
+    auto doubled = Stroke(10.0f * 2.0f, LineCap::Butt, LineJoin::Miter);
+    auto strokedShape = Shape::ApplyStroke(dashedShape, &doubled);
+    auto insideShape = Shape::Merge(strokedShape, rectShape, PathOp::Intersect);
+    layer->setPath(insideShape->getPath());
+    layer->setFillStyle(ShapeStyle::Make(Color::Blue()));
+    layer->setMatrix(
+        Matrix::MakeTrans(cellW + (i == 0 ? lItemXOffset : rItemXOffset), cellH * 2 + gap));
+    auto child = ShapeLayer::Make();
+    child->setPath(rectPath);
+    child->setFillStyle(ShapeStyle::Make(Color::Transparent()));
+    layer->addChild(child);
+    layer->setLayerStyles(
+        {MakeShadow(type, 25, 25, 3, 3, Color::Green(), i == 0 ? 0.0f : 8.0f, false)});
+    displayList.root()->addChild(layer);
+  }
+
+  // Case 9: TextLayer with perspective, spread=8
   {
     auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
     for (int i = 0; i < 2; ++i) {
@@ -3646,7 +3673,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
       layer->setFont(font);
       layer->setTextColor(Color::Red());
       auto matrix =
-          Matrix::MakeTrans(cellW + (i == 0 ? lItemXOffset : rItemXOffset), cellH * 2 + gap);
+          Matrix::MakeTrans(cellW * 2 + (i == 0 ? lItemXOffset : rItemXOffset), cellH * 2 + gap);
       matrix.preConcat(Matrix::MakeAll(1, 0, 0, 0, 1, 0, 0.002f, 0.001f, 1));
       layer->setMatrix(matrix);
       layer->setLayerStyles({MakeShadow(type, 25, 25, 3, 3, YELLOW_COLOR, i == 0 ? 0.0f : 8.0f)});
@@ -3654,7 +3681,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     }
   }
 
-  // Case 9: VectorLayer RoundRect + ImagePattern fill, spread=-8
+  // Case 10: VectorLayer RoundRect + ImagePattern fill, spread=-8
   for (int i = 0; i < 2; ++i) {
     auto vectorLayer = VectorLayer::Make();
     auto group = VectorGroup::Make();
@@ -3668,13 +3695,13 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     group->setElements({rect, fill});
     vectorLayer->setContents({group});
     vectorLayer->setMatrix(
-        Matrix::MakeTrans(cellW * 2 + (i == 0 ? lItemXOffset : rItemXOffset), cellH * 2 + gap));
+        Matrix::MakeTrans(i == 0 ? lItemXOffset : rItemXOffset, cellH * 3 + gap));
     vectorLayer->setLayerStyles(
         {MakeShadow(type, 25, 25, 3, 3, YELLOW_COLOR, i == 0 ? 0.0f : -8.0f)});
     displayList.root()->addChild(vectorLayer);
   }
 
-  // Case 10: VectorLayer Ellipse + Center stroke 15px, spread=-10 (stroke collapse)
+  // Case 11: VectorLayer Ellipse + Center stroke 15px, spread=-10 (stroke collapse)
   for (int i = 0; i < 2; ++i) {
     auto vectorLayer = VectorLayer::Make();
     auto group = VectorGroup::Make();
@@ -3686,13 +3713,13 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     group->setElements({ellipse, stroke});
     vectorLayer->setContents({group});
     vectorLayer->setMatrix(
-        Matrix::MakeTrans(i == 0 ? lItemXOffset : rItemXOffset, cellH * 3 + gap));
+        Matrix::MakeTrans(cellW + (i == 0 ? lItemXOffset : rItemXOffset), cellH * 3 + gap));
     vectorLayer->setLayerStyles(
         {MakeShadow(type, 25, 25, 3, 3, Color::Green(), i == 0 ? 0.0f : -10.0f)});
     displayList.root()->addChild(vectorLayer);
   }
 
-  // Case 11: VectorLayer star fill, spread=8
+  // Case 12: VectorLayer star fill, spread=8
   for (int i = 0; i < 2; ++i) {
     auto vectorLayer = VectorLayer::Make();
     auto group = VectorGroup::Make();
@@ -3702,13 +3729,13 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     group->setElements({star, fill});
     vectorLayer->setContents({group});
     vectorLayer->setMatrix(
-        Matrix::MakeTrans(cellW + (i == 0 ? lItemXOffset : rItemXOffset), cellH * 3 + gap));
+        Matrix::MakeTrans(cellW * 2 + (i == 0 ? lItemXOffset : rItemXOffset), cellH * 3 + gap));
     vectorLayer->setLayerStyles(
         {MakeShadow(type, 25, 25, 3, 3, Color::Green(), i == 0 ? 0.0f : 8.0f)});
     displayList.root()->addChild(vectorLayer);
   }
 
-  // Case 12: VectorLayer Rect+Ellipse + Inside stroke 8px, spread=5
+  // Case 13: VectorLayer Rect+Ellipse + Inside stroke 8px, spread=5
   for (int i = 0; i < 2; ++i) {
     auto vectorLayer = VectorLayer::Make();
     auto group = VectorGroup::Make();
@@ -3724,13 +3751,13 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     group->setElements({rect, ellipse, stroke});
     vectorLayer->setContents({group});
     vectorLayer->setMatrix(
-        Matrix::MakeTrans(cellW * 2 + (i == 0 ? lItemXOffset : rItemXOffset), cellH * 3 + gap));
+        Matrix::MakeTrans(i == 0 ? lItemXOffset : rItemXOffset, cellH * 4 + gap));
     vectorLayer->setLayerStyles(
         {MakeShadow(type, 25, 25, 3, 3, Color::Green(), i == 0 ? 0.0f : 5.0f)});
     displayList.root()->addChild(vectorLayer);
   }
 
-  // Case 13: VectorLayer Ellipse + Outside dashed stroke 8px + SolidLayer child, spread=8
+  // Case 14: VectorLayer Ellipse + Outside dashed stroke 8px + SolidLayer child, spread=8
   for (int i = 0; i < 2; ++i) {
     auto vectorLayer = VectorLayer::Make();
     auto group = VectorGroup::Make();
@@ -3745,7 +3772,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     group->setElements({ellipse, stroke});
     vectorLayer->setContents({group});
     vectorLayer->setMatrix(
-        Matrix::MakeTrans(i == 0 ? lItemXOffset : rItemXOffset, cellH * 4 + gap));
+        Matrix::MakeTrans(cellW + (i == 0 ? lItemXOffset : rItemXOffset), cellH * 4 + gap));
     auto child = SolidLayer::Make();
     child->setWidth(30);
     child->setHeight(20);
@@ -3757,7 +3784,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(vectorLayer);
   }
 
-  // Case 14: VectorLayer Rect fill + Outside dashed stroke, spread=8
+  // Case 15: VectorLayer Rect fill + Outside dashed stroke, spread=8
   for (int i = 0; i < 2; ++i) {
     auto vectorLayer = VectorLayer::Make();
     auto group = VectorGroup::Make();
@@ -3774,13 +3801,13 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     group->setElements({rect, fill, stroke});
     vectorLayer->setContents({group});
     vectorLayer->setMatrix(
-        Matrix::MakeTrans(cellW + (i == 0 ? lItemXOffset : rItemXOffset), cellH * 4 + gap));
+        Matrix::MakeTrans(cellW * 2 + (i == 0 ? lItemXOffset : rItemXOffset), cellH * 4 + gap));
     vectorLayer->setLayerStyles(
         {MakeShadow(type, 25, 25, 3, 3, Color::Green(), i == 0 ? 0.0f : 8.0f)});
     displayList.root()->addChild(vectorLayer);
   }
 
-  // Case 15: VectorLayer Ellipse + Inside stroke 15px with compound transform, spread=-5
+  // Case 16: VectorLayer Ellipse + Inside stroke 15px with compound transform, spread=-5
   for (int i = 0; i < 2; ++i) {
     auto vectorLayer = VectorLayer::Make();
     auto innerGroup = VectorGroup::Make();
@@ -3790,20 +3817,51 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     auto stroke = StrokeStyle::Make(SolidColor::Make(Color::Blue()));
     stroke->setStrokeWidth(15);
     stroke->setStrokeAlign(StrokeAlign::Inside);
-    innerGroup->setElements({ellipse, stroke});
+    auto fill = FillStyle::Make(SolidColor::Make(Color::Transparent()));
+    innerGroup->setElements({ellipse, stroke, fill});
     innerGroup->setScale({1.5f, 1.5f});
     innerGroup->setRotation(-30);
     auto group = VectorGroup::Make();
     group->setElements({innerGroup});
     vectorLayer->setContents({group});
-    auto matrix =
-        Matrix::MakeTrans(cellW * 2 + (i == 0 ? lItemXOffset : rItemXOffset), cellH * 4 + gap);
+    auto matrix = Matrix::MakeTrans(i == 0 ? lItemXOffset : rItemXOffset, cellH * 5 + gap);
     matrix.preConcat(Matrix::MakeScale(0.8f));
     matrix.preConcat(Matrix::MakeRotate(15));
     matrix.preConcat(Matrix::MakeTrans(-10, 15));
     vectorLayer->setMatrix(matrix);
     vectorLayer->setLayerStyles(
-        {MakeShadow(type, 25, 25, 3, 3, Color::Green(), i == 0 ? 0.0f : -5.0f)});
+        {MakeShadow(type, 25, 25, 3, 3, Color::Green(), i == 0 ? 0.0f : -5.0f, false)});
+    displayList.root()->addChild(vectorLayer);
+  }
+
+  // Case 17: VectorLayer Ellipse + Outside dashed stroke 15px with transparent-fill child, spread=6
+  for (int i = 0; i < 2; ++i) {
+    auto vectorLayer = VectorLayer::Make();
+    auto group = VectorGroup::Make();
+    auto ellipse = Ellipse::Make();
+    ellipse->setPosition({50, 30});
+    ellipse->setSize({100, 60});
+    auto stroke = StrokeStyle::Make(SolidColor::Make(Color::Blue()));
+    stroke->setStrokeWidth(15);
+    stroke->setStrokeAlign(StrokeAlign::Outside);
+    stroke->setLineCap(LineCap::Butt);
+    stroke->setLineJoin(LineJoin::Miter);
+    stroke->setDashes({10, 20});
+    group->setElements({ellipse, stroke});
+    vectorLayer->setContents({group});
+    vectorLayer->setMatrix(
+        Matrix::MakeTrans(cellW + (i == 0 ? lItemXOffset : rItemXOffset), cellH * 5 + gap));
+    auto child = VectorLayer::Make();
+    auto childGroup = VectorGroup::Make();
+    auto childEllipse = Ellipse::Make();
+    childEllipse->setPosition({50, 30});
+    childEllipse->setSize({100, 60});
+    auto childFill = FillStyle::Make(SolidColor::Make(Color::Transparent()));
+    childGroup->setElements({childEllipse, childFill});
+    child->setContents({childGroup});
+    vectorLayer->addChild(child);
+    vectorLayer->setLayerStyles(
+        {MakeShadow(type, 25, 25, 3, 3, Color::Green(), i == 0 ? 0.0f : 6.0f, false)});
     displayList.root()->addChild(vectorLayer);
   }
 }
@@ -3816,7 +3874,7 @@ TGFX_TEST(LayerTest, DropShadow) {
   constexpr float cellH = 120.0f;
   constexpr float gap = 30.0f;
   auto surface =
-      Surface::Make(context, static_cast<int>(cellW * 3 + gap), static_cast<int>(cellH * 5 + gap));
+      Surface::Make(context, static_cast<int>(cellW * 3 + gap), static_cast<int>(cellH * 6 + gap));
   auto displayList = std::make_unique<DisplayList>();
   BuildShadowTestLayers(*displayList, ShadowType::Drop, cellW, cellH, gap);
   displayList->render(surface.get());
@@ -3831,7 +3889,7 @@ TGFX_TEST(LayerTest, InnerShadow) {
   constexpr float cellH = 120.0f;
   constexpr float gap = 30.0f;
   auto surface =
-      Surface::Make(context, static_cast<int>(cellW * 3 + gap), static_cast<int>(cellH * 5 + gap));
+      Surface::Make(context, static_cast<int>(cellW * 3 + gap), static_cast<int>(cellH * 6 + gap));
   auto displayList = std::make_unique<DisplayList>();
   BuildShadowTestLayers(*displayList, ShadowType::Inner, cellW, cellH, gap);
   displayList->render(surface.get());

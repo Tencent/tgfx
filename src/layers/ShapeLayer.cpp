@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/ShapeLayer.h"
+#include "core/utils/MathExtra.h"
 #include "layers/DashEffect.h"
 #include "layers/contents/ShapeContent.h"
 #include "tgfx/core/Matrix.h"
@@ -26,6 +27,16 @@
 #include "tgfx/layers/layerstyles/StyledShape.h"
 
 namespace tgfx {
+static size_t CountVisibleShapeStyles(const std::vector<std::shared_ptr<ShapeStyle>>& styles) {
+  size_t count = 0;
+  for (const auto& style : styles) {
+    if (style && !FloatNearlyZero(style->color().alpha)) {
+      ++count;
+    }
+  }
+  return count;
+}
+
 std::shared_ptr<ShapeLayer> ShapeLayer::Make() {
   return std::shared_ptr<ShapeLayer>(new ShapeLayer());
 }
@@ -280,8 +291,8 @@ std::optional<StyledShape> ShapeLayer::onGetContentShape() {
   if (_shape == nullptr) {
     return std::nullopt;
   }
-  auto fillCount = _fillStyles.size();
-  auto strokeCount = _strokeStyles.size();
+  auto fillCount = CountVisibleShapeStyles(_fillStyles);
+  auto strokeCount = CountVisibleShapeStyles(_strokeStyles);
   if (strokeCount == 0 && fillCount == 0) {
     return std::nullopt;
   }

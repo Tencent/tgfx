@@ -37,11 +37,15 @@ static inline RRect MakeSpreadRRect(const RRect& rRect, float distance) {
     return {};
   }
   // Adjust radii by the same amount so the expanded/contracted corners stay concentric with the
-  // original.
+  // original. Corners that are already sharp (zero radius) stay sharp.
   auto radii = rRect.radii();
   for (auto& corner : radii) {
-    corner.x = std::max(0.0f, corner.x + distance);
-    corner.y = std::max(0.0f, corner.y + distance);
+    if (corner.x > 0.0f) {
+      corner.x = std::max(0.0f, corner.x + distance);
+    }
+    if (corner.y > 0.0f) {
+      corner.y = std::max(0.0f, corner.y + distance);
+    }
   }
   RRect result = {};
   result.setRectRadii(bounds, radii);
@@ -93,22 +97,36 @@ static inline void DrawSpreadRRect(Canvas* canvas, const RRect& rRect, StyledSha
       break;
     }
     case StyledShapeType::Stroke: {
-      auto effectiveWidth = strokeWidth + 2.0f * spread;
-      paint.setStyle(PaintStyle::Stroke);
-      paint.setStroke(Stroke(effectiveWidth));
-      auto drawRRect = rRect;
-      if (strokeAlign == StrokeAlign::Outside) {
-        drawRRect = MakeSpreadRRect(rRect, effectiveWidth * 0.5f);
-      } else if (strokeAlign == StrokeAlign::Inside) {
-        drawRRect = MakeSpreadRRect(rRect, -effectiveWidth * 0.5f);
-        if (drawRRect.rect().isEmpty()) {
-          // Inside stroke wider than the shape fills it solid; draw the original rect as fill.
-          paint.setStyle(PaintStyle::Fill);
-          drawRRect = rRect;
-        }
+      const auto effectiveWidth = strokeWidth + 2.0f * spread;
+      const auto halfWidth = effectiveWidth * 0.5f;
+      // Displacement of the original stroke centerline relative to the outline. The underlying
+      // stroker only draws a centered band, so non-center alignments are emulated by moving the
+      // stroked outline.
+      auto centerOffset = 0.0f;
+      switch (strokeAlign) {
+        case StrokeAlign::Outside:
+          centerOffset = strokeWidth * 0.5f;
+          break;
+        case StrokeAlign::Inside:
+          centerOffset = -strokeWidth * 0.5f;
+          break;
+        case StrokeAlign::Center:
+          centerOffset = 0.0f;
+          break;
       }
-      DEBUG_ASSERT(!drawRRect.rect().isEmpty());
-      canvas->drawRRect(drawRRect, paint);
+      const auto innerOffset = centerOffset - halfWidth;
+      const auto outerOffset = centerOffset + halfWidth;
+      if (MakeSpreadRRect(rRect, innerOffset).rect().isEmpty()) {
+        // The inner hole has vanished; the band fills the shape solid out to its outer edge.
+        paint.setStyle(PaintStyle::Fill);
+        canvas->drawRRect(MakeSpreadRRect(rRect, outerOffset), paint);
+      } else {
+        paint.setStyle(PaintStyle::Stroke);
+        paint.setStroke(Stroke(effectiveWidth));
+        const auto drawRRect = centerOffset == 0.0f ? rRect : MakeSpreadRRect(rRect, centerOffset);
+        DEBUG_ASSERT(!drawRRect.rect().isEmpty());
+        canvas->drawRRect(drawRRect, paint);
+      }
       break;
     }
   }

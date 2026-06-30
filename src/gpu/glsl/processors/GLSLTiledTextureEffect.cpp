@@ -138,31 +138,31 @@ void GLSLTiledTextureEffect::subsetCoord(EmitArgs& args, TiledTextureEffect::Sha
     case TiledTextureEffect::ShaderMode::RepeatNearestMipmap:
     case TiledTextureEffect::ShaderMode::RepeatLinearMipmap:
       fragBuilder->codeAppend("{");
-      fragBuilder->codeAppendf("float w = %s.%s - %s.%s;", subsetName.c_str(), subsetStopSwizzle,
+      fragBuilder->codeAppendf("highp float w = %s.%s - %s.%s;", subsetName.c_str(),
+                               subsetStopSwizzle, subsetName.c_str(), subsetStartSwizzle);
+      fragBuilder->codeAppendf("highp float w2 = 2.0 * w;");
+      fragBuilder->codeAppendf("highp float d = inCoord.%s - %s.%s;", coordSwizzle,
                                subsetName.c_str(), subsetStartSwizzle);
-      fragBuilder->codeAppendf("float w2 = 2.0 * w;");
-      fragBuilder->codeAppendf("float d = inCoord.%s - %s.%s;", coordSwizzle, subsetName.c_str(),
-                               subsetStartSwizzle);
-      fragBuilder->codeAppend("float m = mod(d, w2);");
-      fragBuilder->codeAppend("float o = mix(m, w2 - m, step(w, m));");
+      fragBuilder->codeAppend("highp float m = mod(d, w2);");
+      fragBuilder->codeAppend("highp float o = mix(m, w2 - m, step(w, m));");
       fragBuilder->codeAppendf("subsetCoord.%s = o + %s.%s;", coordSwizzle, subsetName.c_str(),
                                subsetStartSwizzle);
       fragBuilder->codeAppendf("%s = w - o + %s.%s;", extraCoord, subsetName.c_str(),
                                subsetStartSwizzle);
       // coordWeight is used as the third param of mix() to blend between a sample taken using
       // subsetCoord and a sample at extraCoord.
-      fragBuilder->codeAppend("float hw = w / 2.0;");
-      fragBuilder->codeAppend("float n = mod(d - hw, w2);");
+      fragBuilder->codeAppend("highp float hw = w / 2.0;");
+      fragBuilder->codeAppend("highp float n = mod(d - hw, w2);");
       fragBuilder->codeAppendf("%s = clamp(mix(n, w2 - n, step(w, n)) - hw + 0.5, 0.0, 1.0);",
                                coordWeight);
       fragBuilder->codeAppend("}");
       break;
     case TiledTextureEffect::ShaderMode::MirrorRepeat:
       fragBuilder->codeAppend("{");
-      fragBuilder->codeAppendf("float w = %s.%s - %s.%s;", subsetName.c_str(), subsetStopSwizzle,
-                               subsetName.c_str(), subsetStartSwizzle);
-      fragBuilder->codeAppendf("float w2 = 2.0 * w;");
-      fragBuilder->codeAppendf("float m = mod(inCoord.%s - %s.%s, w2);", coordSwizzle,
+      fragBuilder->codeAppendf("highp float w = %s.%s - %s.%s;", subsetName.c_str(),
+                               subsetStopSwizzle, subsetName.c_str(), subsetStartSwizzle);
+      fragBuilder->codeAppendf("highp float w2 = 2.0 * w;");
+      fragBuilder->codeAppendf("highp float m = mod(inCoord.%s - %s.%s, w2);", coordSwizzle,
                                subsetName.c_str(), subsetStartSwizzle);
       fragBuilder->codeAppendf("subsetCoord.%s = mix(m, w2 - m, step(w, m)) + %s.%s;", coordSwizzle,
                                subsetName.c_str(), subsetStartSwizzle);
@@ -236,7 +236,7 @@ void GLSLTiledTextureEffect::emitCode(EmitArgs& args) const {
     fragBuilder->appendTextureLookup((*args.textureSamplers)[0], texCoordName);
     fragBuilder->codeAppend(";");
   } else {
-    fragBuilder->codeAppendf("vec2 inCoord = %s;", texCoordName.c_str());
+    fragBuilder->codeAppendf("highp vec2 inCoord = %s;", texCoordName.c_str());
     bool useClamp[2] = {ShaderModeUsesClamp(sampling.shaderModeX),
                         ShaderModeUsesClamp(sampling.shaderModeY)};
     auto names = initUniform(args, textureView, sampling, useClamp);
@@ -257,7 +257,7 @@ void GLSLTiledTextureEffect::emitCode(EmitArgs& args) const {
         sampling.shaderModeY == TiledTextureEffect::ShaderMode::RepeatLinearMipmap;
 
     if (mipmapRepeatX || mipmapRepeatY) {
-      fragBuilder->codeAppend("vec2 extraRepeatCoord;");
+      fragBuilder->codeAppend("highp vec2 extraRepeatCoord;");
     }
     if (mipmapRepeatX) {
       fragBuilder->codeAppend("float repeatCoordWeightX;");
@@ -345,16 +345,16 @@ void GLSLTiledTextureEffect::emitCode(EmitArgs& args) const {
     bool repeatY = sampling.shaderModeY == TiledTextureEffect::ShaderMode::RepeatLinearNone ||
                    sampling.shaderModeY == TiledTextureEffect::ShaderMode::RepeatLinearMipmap;
     if (repeatX || sampling.shaderModeX == TiledTextureEffect::ShaderMode::ClampToBorderLinear) {
-      fragBuilder->codeAppend("float errX = subsetCoord.x - clampedCoord.x;");
+      fragBuilder->codeAppend("highp float errX = subsetCoord.x - clampedCoord.x;");
       if (repeatX) {
-        fragBuilder->codeAppendf("float repeatCoordX = errX > 0.0 ? %s.x : %s.z;",
+        fragBuilder->codeAppendf("highp float repeatCoordX = errX > 0.0 ? %s.x : %s.z;",
                                  names.clampName.c_str(), names.clampName.c_str());
       }
     }
     if (repeatY || sampling.shaderModeY == TiledTextureEffect::ShaderMode::ClampToBorderLinear) {
-      fragBuilder->codeAppend("float errY = subsetCoord.y - clampedCoord.y;");
+      fragBuilder->codeAppend("highp float errY = subsetCoord.y - clampedCoord.y;");
       if (repeatY) {
-        fragBuilder->codeAppendf("float repeatCoordY = errY > 0.0 ? %s.y : %s.w;",
+        fragBuilder->codeAppendf("highp float repeatCoordY = errY > 0.0 ? %s.y : %s.w;",
                                  names.clampName.c_str(), names.clampName.c_str());
       }
     }
@@ -411,14 +411,14 @@ void GLSLTiledTextureEffect::emitCode(EmitArgs& args) const {
       fragBuilder->codeAppendf("textureColor = mix(textureColor, vec4(0.0), min(abs(errY), 1.0));");
     }
     if (sampling.shaderModeX == TiledTextureEffect::ShaderMode::ClampToBorderNearest) {
-      fragBuilder->codeAppend("float snappedX = floor(inCoord.x + 0.001) + 0.5;");
+      fragBuilder->codeAppend("highp float snappedX = floor(inCoord.x + 0.001) + 0.5;");
       fragBuilder->codeAppendf("if (snappedX < %s.x || snappedX > %s.z) {",
                                names.subsetName.c_str(), names.subsetName.c_str());
       fragBuilder->codeAppend("textureColor = vec4(0.0);");  // border color
       fragBuilder->codeAppend("}");
     }
     if (sampling.shaderModeY == TiledTextureEffect::ShaderMode::ClampToBorderNearest) {
-      fragBuilder->codeAppend("float snappedY = floor(inCoord.y + 0.001) + 0.5;");
+      fragBuilder->codeAppend("highp float snappedY = floor(inCoord.y + 0.001) + 0.5;");
       fragBuilder->codeAppendf("if (snappedY < %s.y || snappedY > %s.w) {",
                                names.subsetName.c_str(), names.subsetName.c_str());
       fragBuilder->codeAppend("textureColor = vec4(0.0);");  // border color
