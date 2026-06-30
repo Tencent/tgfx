@@ -88,6 +88,17 @@ class Layer3DContext : public std::enable_shared_from_this<Layer3DContext> {
    */
   virtual void finishAndDrawTo(const DrawArgs& args, Canvas* canvas) = 0;
 
+  /**
+   * Mirrors DrawArgs::forceNoEdgeAA for nodes collected by this 3D context. Render3DContext
+   * consults this flag when filling each PendingNode::antialiasing (the polygon-level edge AA
+   * flag fed to Context3DCompositor) so the SSAA tile path forces NoAA on 3D polygons too. Set
+   * by the call site that constructs this context (Layer::drawByStarting3DContext), before
+   * addLayer().
+   */
+  void setForceNoEdgeAA(bool value) {
+    _forceNoEdgeAA = value;
+  }
+
  protected:
   // Emits one descriptor per layer that should participate in 3D compositing. Subclasses push
   // it onto their own _pendingNodes container.
@@ -102,6 +113,7 @@ class Layer3DContext : public std::enable_shared_from_this<Layer3DContext> {
   float _contentScale = 1.0f;
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;
   LayerDrawFunc _drawFunc = nullptr;
+  bool _forceNoEdgeAA = false;
 
  private:
   void collectNodes(Layer* layer, const Matrix3D& transform, float alpha, int depth);

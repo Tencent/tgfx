@@ -55,6 +55,10 @@ static constexpr int SUBTREE_CACHE_MIN_SIZE = 32;
 static std::atomic_bool AllowsEdgeAntialiasing = true;
 static std::atomic_bool AllowsGroupOpacity = false;
 
+static inline bool ResolveAntiAlias(const DrawArgs& args, bool layerFlag) {
+  return !args.forceNoEdgeAA && layerFlag;
+}
+
 /**
  * Clips the canvas using the scroll rect. If the sublayer's Matrix contains 3D transformations or
  * projection transformations, because this matrix has been merged into the Canvas, it can be
@@ -1210,7 +1214,8 @@ bool Layer::prepareMask(const DrawArgs& args, Canvas* canvas,
     if (maskData.clipPath.isEmpty() && !maskData.clipPath.isInverseFillType()) {
       return false;
     }
-    canvas->clipPath(maskData.clipPath, _mask->bitFields.allowsEdgeAntialiasing);
+    canvas->clipPath(maskData.clipPath,
+                     ResolveAntiAlias(args, _mask->bitFields.allowsEdgeAntialiasing));
     return true;
   }
   if (maskFilter) {
@@ -1498,7 +1503,7 @@ bool Layer::drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alp
   if (maskFilter) {
     paint.setMaskFilter(maskFilter);
   }
-  paint.setAntiAlias(bitFields.allowsEdgeAntialiasing);
+  paint.setAntiAlias(ResolveAntiAlias(args, bitFields.allowsEdgeAntialiasing));
   paint.setAlpha(alpha);
   paint.setBlendMode(blendMode);
   cache->draw(args.context, longEdge, canvas, paint);
@@ -1588,7 +1593,8 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
   auto content = getContent();
   bool hasForeground = false;
   if (content) {
-    hasForeground = content->drawDefault(canvas, alpha, bitFields.allowsEdgeAntialiasing);
+    hasForeground = content->drawDefault(canvas, alpha,
+                                         ResolveAntiAlias(args, bitFields.allowsEdgeAntialiasing));
   }
   if (!drawChildren(args, canvas, alpha, stopChild)) {
     return;
@@ -1602,7 +1608,8 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
     drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Above);
   }
   if (hasForeground) {
-    content->drawForeground(canvas, alpha, bitFields.allowsEdgeAntialiasing);
+    content->drawForeground(canvas, alpha,
+                            ResolveAntiAlias(args, bitFields.allowsEdgeAntialiasing));
   }
 }
 
@@ -1635,7 +1642,8 @@ bool Layer::drawContourInternal(const DrawArgs& args, Canvas* canvas, bool conte
       if (maskData.clipPath.isEmpty() && !maskData.clipPath.isInverseFillType()) {
         return allMatch;
       }
-      canvas->clipPath(maskData.clipPath, _mask->bitFields.allowsEdgeAntialiasing);
+      canvas->clipPath(maskData.clipPath,
+                       ResolveAntiAlias(args, _mask->bitFields.allowsEdgeAntialiasing));
     } else {
       maskFilter = maskData.maskFilter;
     }
@@ -1672,7 +1680,7 @@ bool Layer::drawContourInternal(const DrawArgs& args, Canvas* canvas, bool conte
     if (!content->contourEqualsOpaqueContent()) {
       allMatch = false;
     }
-    content->drawContour(canvas, bitFields.allowsEdgeAntialiasing);
+    content->drawContour(canvas, ResolveAntiAlias(args, bitFields.allowsEdgeAntialiasing));
   }
 
   // 3D middle node: descendants are independently registered with the active Layer3DContext, so
@@ -1744,6 +1752,7 @@ void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, const 
     return;
   }
 
+  newContext->setForceNoEdgeAA(args.forceNoEdgeAA);
   newContext->addLayer(this, matrix3D, alpha, drawFunc);
   newContext->finishAndDrawTo(args, canvas);
 }
@@ -1760,7 +1769,7 @@ bool Layer::drawChild(const DrawArgs& args, Canvas* canvas, Layer* child, float 
   AutoCanvasRestore autoRestore(canvas);
   canvas->concat(child->getMatrixWithScrollRect().asMatrix());
   ClipScrollRect(canvas, child->_scrollRect.get(), nullptr,
-                 child->bitFields.allowsEdgeAntialiasing);
+                 ResolveAntiAlias(args, child->bitFields.allowsEdgeAntialiasing));
   auto blendMode = static_cast<BlendMode>(child->bitFields.blendMode);
   return (child->*drawFunc)(args, canvas, child->_alpha * alpha, blendMode);
 }
@@ -1868,7 +1877,7 @@ float Layer::drawBackgroundLayers(const DrawArgs& args, Canvas* canvas) {
   _parent->drawContents(args, canvas, currentAlpha, parentSource.get(), this);
   canvas->concat(getMatrixWithScrollRect().asMatrix());
   if (_scrollRect) {
-    canvas->clipRect(*_scrollRect, bitFields.allowsEdgeAntialiasing);
+    canvas->clipRect(*_scrollRect, ResolveAntiAlias(args, bitFields.allowsEdgeAntialiasing));
   }
   return currentAlpha * _alpha;
 }

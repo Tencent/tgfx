@@ -292,6 +292,26 @@ class DisplayList {
   void setSubtreeCacheMaxSize(int maxSize);
 
   /**
+   * Returns whether super-sampling anti-aliasing (SSAA) is enabled. Only takes effect in
+   * RenderMode::Tiled; other render modes ignore this setting. The default is false.
+   */
+  bool useSSAA() const {
+    return _useSSAA;
+  }
+
+  /**
+   * Sets whether super-sampling anti-aliasing (SSAA) is enabled. When enabled and the render
+   * mode is RenderMode::Tiled, each tile is rendered at 2x resolution with edge anti-aliasing
+   * disabled, then downsampled to the atlas with linear sampling. This eliminates the
+   * edge-bleeding artifact that coverage-based AA causes when many semi-transparent layers
+   * stack on top of each other, at the cost of roughly 4x fragment work per tile. Render modes
+   * other than Tiled silently ignore this setting.
+   */
+  void setUseSSAA(bool use) {
+    _useSSAA = use;
+  }
+
+  /**
    * Sets whether to show dirty regions during rendering. When enabled, the dirty regions will be
    * highlighted in the rendered output. This is useful for debugging to visualize which parts of
    * the display list are being updated. The default value is false.
@@ -324,6 +344,7 @@ class DisplayList {
   TileUpdateMode _tileUpdateMode = TileUpdateMode::Immediate;
   int _maxTilesRefinedPerFrame = 5;
   int _subtreeCacheMaxSize = 0;
+  bool _useSSAA = false;
   bool _showDirtyRegions = false;
   bool _hasContentChanged = false;
   bool hasZoomBlurTiles = false;
@@ -332,6 +353,7 @@ class DisplayList {
   Point mousePosition = {};
   int totalTileCount = 0;
   std::vector<std::shared_ptr<Surface>> surfaceCaches = {};
+  std::shared_ptr<Surface> ssaaTileSurface = nullptr;
   std::unordered_map<int64_t, TileCache*> tileCaches = {};
   std::vector<std::shared_ptr<Tile>> emptyTiles = {};
   std::deque<std::vector<Rect>> lastDirtyRegions = {};
@@ -382,7 +404,11 @@ class DisplayList {
 
   int getMaxTileCountPerAtlas(Context* context) const;
 
-  void drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snapshots) const;
+  void drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snapshots,
+                    const Surface* renderSurface);
+
+  Surface* getOrCreateSSAATileSurface(const Surface* renderSurface, int requiredWidth,
+                                      int requiredHeight);
 
   void drawScreenTasks(std::vector<DrawTask> screenTasks, std::vector<Rect> skippedRects,
                        Surface* surface, bool autoClear) const;
@@ -397,7 +423,8 @@ class DisplayList {
   void resetCaches();
 
   void drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
-                     bool autoClear, BackgroundSnapshotMap* snapshots) const;
+                     bool autoClear, BackgroundSnapshotMap* snapshots,
+                     bool forceNoEdgeAA = false) const;
 
   std::unique_ptr<BackgroundSnapshotMap> captureBackgrounds(
       Surface* surface, const std::vector<Rect>& renderRects) const;

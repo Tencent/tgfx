@@ -72,5 +72,13 @@ class DrawArgs {
   // BackgroundHandler::NoOp() on intermediate-artifact paths (mask prep, contour, subtree cache,
   // layer style source, 3D entry). nullptr falls back to NoOp in DispatchOrSkip.
   BackgroundHandler* backgroundHandler = nullptr;
+
+  // When true, every Layer.allowsEdgeAntialiasing read site treats the layer as if edge AA is
+  // disabled, so paint.antiAlias / clip antiAlias end up false and OpsCompositor::getAAType
+  // returns AAType::None. Set to true by DisplayList::drawRootLayer when entering the SSAA tile
+  // path; propagates automatically along the DrawArgs copy chain (DrawArgs childArgs = parentArgs)
+  // into all derived intermediate surfaces — layer style offscreen (OffscreenRenderer),
+  // background snapshot (BackgroundCapturer), 3D leaf surfaces (Render3DContext), etc.
+  bool forceNoEdgeAA = false;
 };
 }  // namespace tgfx

@@ -58,10 +58,6 @@ class StencilCoverPathDrawOp : public DrawOp {
       std::shared_ptr<StencilCoverPathProxy> geometryProxy, PMColor color, const Matrix& viewMatrix,
       const Matrix& uvMatrix, const Rect& coverLocalBounds, PathFillType fillType);
 
-  bool hasCoverage() const override {
-    return true;
-  }
-
   bool needsStencil() const override {
     return true;
   }

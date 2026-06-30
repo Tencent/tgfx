@@ -133,7 +133,7 @@ void ShapeInstancedDrawOp::onDraw(RenderPass* renderPass, RenderTarget* renderTa
 }
 
 bool ShapeInstancedDrawOp::hasCoverage() const {
-  return true;
+  return aaType != AAType::None || !coverages.empty();
 }
 
 }  // namespace tgfx

@@ -76,7 +76,7 @@ void Render3DContext::emitNode(Layer* layer, const Rect& localBounds, const Matr
   node.localBounds = localBounds;
   node.depth = depth;
   node.alpha = alpha;
-  node.antialiasing = layer->allowsEdgeAntialiasing();
+  node.antialiasing = !_forceNoEdgeAA && layer->allowsEdgeAntialiasing();
   node.hasBackgroundStyle = hasBackgroundStyle;
   _pendingNodes.push_back(node);
   _subtreeNeedsBackdrop = _subtreeNeedsBackdrop || hasBackgroundStyle;
