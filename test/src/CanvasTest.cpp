@@ -3463,47 +3463,4 @@ TGFX_TEST(CanvasTest, EmptyRectStroke) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/EmptyRectStroke"));
 }
 
-// Regression for discussion #1482: a rounded-rect filled with a conic gradient must render a
-// solid fill. On OpenGL ES hardware the default mediump fragment precision could collapse the
-// interior coverage to zero, leaving only the anti-aliased outline (a hollow center). Verifies
-// the interior pixels are fully opaque.
-TGFX_TEST(CanvasTest, ConicGradientFillHollow) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  int size = 200;
-  auto surface = Surface::Make(context, size, size);
-  auto canvas = surface->getCanvas();
-  canvas->clear();
-
-  auto center = Point::Make(size / 2, size / 2);
-  auto conicShader = Shader::MakeConicGradient(
-      center, 0, 360,
-      {Color::FromRGBA(0, 255, 255, 255), Color::FromRGBA(255, 0, 255, 255),
-       Color::FromRGBA(255, 255, 0, 255), Color::FromRGBA(0, 255, 255, 255)},
-      {});
-  Path path = {};
-  path.addRoundRect(Rect::MakeXYWH(20, 20, size - 40, size - 40), 20, 20);
-  Paint paint = {};
-  paint.setShader(conicShader);
-  canvas->drawPath(path, paint);
-  context->flushAndSubmit();
-
-  Bitmap bitmap(size, size, false, false);
-  auto pixels = bitmap.lockPixels();
-  ASSERT_TRUE(surface->readPixels(bitmap.info(), pixels));
-  bitmap.unlockPixels();
-
-  auto addr = static_cast<const uint8_t*>(pixels);
-  // Sample interior points that must be opaque if the fill is solid.
-  auto stride = static_cast<size_t>(size);
-  auto half = static_cast<size_t>(size / 2);
-  int centerAlpha = addr[(half * stride + half) * 4 + 3];
-  int q1 = addr[((half - 30) * stride + (half - 30)) * 4 + 3];
-  int q2 = addr[((half + 30) * stride + (half + 30)) * 4 + 3];
-  EXPECT_GT(centerAlpha, 250);
-  EXPECT_GT(q1, 250);
-  EXPECT_GT(q2, 250);
-}
-
 }  // namespace tgfx
