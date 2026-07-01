@@ -731,6 +731,129 @@ void ElementWriter::addColorImageFilter(const ColorImageFilter* filter,
   }
 }
 
+std::string ElementWriter::emitShaderAsPrimitive(const Shader* shader, const Matrix& shaderMatrix,
+                                                 const Rect* filterBounds, Context* context) {
+  auto resultName = resourceStore->addFilterResult();
+  switch (Types::Get(shader)) {
+    case Types::ShaderType::Color: {
+      const auto colorShader = static_cast<const ColorShader*>(shader);
+      Color color;
+      if (!colorShader->asColor(&color)) {
+        return "";
+      }
+      color = ConvertColorSpace(color, _targetColorSpace);
+      ElementWriter floodElement("feFlood", writer);
+      floodElement.addAttribute("flood-color", ToSVGColor(color));
+      if (!color.isOpaque()) {
+        floodElement.addAttribute("flood-opacity", color.alpha);
+      }
+      floodElement.addAttribute("result", resultName);
+      std::string cssStyle;
+      if (writeColorCSSStyleAttribute("flood-color", color, &cssStyle)) {
+        floodElement.addAttribute("style", cssStyle);
+      }
+      return resultName;
+    }
+    case Types::ShaderType::PerlinNoise: {
+      addPerlinNoisePrimitives(shader, resultName);
+      return resultName;
+    }
+    case Types::ShaderType::Gradient: {
+      auto gradientShader = static_cast<const GradientShader*>(shader);
+      GradientInfo info;
+      GradientType gradientType = gradientShader->asGradient(&info);
+      std::string svgFragment = "<svg xmlns='http://www.w3.org/2000/svg'";
+      if (filterBounds) {
+        svgFragment += " width='" + FloatToString(filterBounds->width()) + "'";
+        svgFragment += " height='" + FloatToString(filterBounds->height()) + "'";
+        svgFragment += " viewBox='" + FloatToString(filterBounds->x()) + " " +
+                       FloatToString(filterBounds->y()) + " " +
+                       FloatToString(filterBounds->width()) + " " +
+                       FloatToString(filterBounds->height()) + "'";
+      }
+      svgFragment += ">";
+      // Shader gradient coordinates are in local space (relative to the shape's top-left).
+      // Offset them by filterBounds origin to convert to the viewBox coordinate system.
+      float offsetX = filterBounds ? filterBounds->x() : 0;
+      float offsetY = filterBounds ? filterBounds->y() : 0;
+      if (gradientType == GradientType::Linear) {
+        svgFragment += "<defs><linearGradient id='g' gradientUnits='userSpaceOnUse'";
+        svgFragment += " x1='" + FloatToString(info.points[0].x + offsetX) + "'";
+        svgFragment += " y1='" + FloatToString(info.points[0].y + offsetY) + "'";
+        svgFragment += " x2='" + FloatToString(info.points[1].x + offsetX) + "'";
+        svgFragment += " y2='" + FloatToString(info.points[1].y + offsetY) + "'>";
+      } else if (gradientType == GradientType::Radial) {
+        svgFragment += "<defs><radialGradient id='g' gradientUnits='userSpaceOnUse'";
+        svgFragment += " cx='" + FloatToString(info.points[0].x + offsetX) + "'";
+        svgFragment += " cy='" + FloatToString(info.points[0].y + offsetY) + "'";
+        svgFragment += " r='" + FloatToString(info.radiuses[0]) + "'>";
+      } else {
+        return "";
+      }
+      for (size_t i = 0; i < info.colors.size(); ++i) {
+        auto color = ConvertColorSpace(info.colors[i], _targetColorSpace);
+        svgFragment += "<stop offset='" + FloatToString(info.positions[i]) + "'";
+        svgFragment += " stop-color='" + ToSVGColor(color) + "'";
+        if (!color.isOpaque()) {
+          svgFragment += " stop-opacity='" + FloatToString(color.alpha) + "'";
+        }
+        svgFragment += "/>";
+      }
+      if (gradientType == GradientType::Linear) {
+        svgFragment += "</linearGradient></defs>";
+      } else {
+        svgFragment += "</radialGradient></defs>";
+      }
+      svgFragment += "<rect fill='url(#g)'";
+      if (filterBounds) {
+        svgFragment += " x='" + FloatToString(filterBounds->x()) + "'";
+        svgFragment += " y='" + FloatToString(filterBounds->y()) + "'";
+        svgFragment += " width='" + FloatToString(filterBounds->width()) + "'";
+        svgFragment += " height='" + FloatToString(filterBounds->height()) + "'";
+      }
+      svgFragment += "/></svg>";
+      auto svgData = reinterpret_cast<const unsigned char*>(svgFragment.data());
+      auto svgLength = svgFragment.size();
+      auto base64Length = ((svgLength + 2) / 3) * 4;
+      std::string base64String(base64Length, '\0');
+      Base64Encode(svgData, svgLength, base64String.data());
+      ElementWriter feImageElement("feImage", writer);
+      feImageElement.addAttribute("xlink:href", "data:image/svg+xml;base64," + base64String);
+      if (filterBounds) {
+        feImageElement.addAttribute("x", filterBounds->x());
+        feImageElement.addAttribute("y", filterBounds->y());
+        feImageElement.addAttribute("width", filterBounds->width());
+        feImageElement.addAttribute("height", filterBounds->height());
+      }
+      feImageElement.addAttribute("result", resultName);
+      return resultName;
+    }
+    case Types::ShaderType::Image: {
+      const auto imageShader = static_cast<const ImageShader*>(shader);
+      auto dataUri = SVGExportContext::EncodeImageToDataUri(imageShader->image, context);
+      if (!dataUri) {
+        return "";
+      }
+      ElementWriter imageElement("feImage", writer);
+      auto imgRect = Rect::MakeWH(static_cast<float>(imageShader->image->width()),
+                                  static_cast<float>(imageShader->image->height()));
+      auto mappedRect = shaderMatrix.mapRect(imgRect);
+      float offsetX = filterBounds ? filterBounds->x() : 0;
+      float offsetY = filterBounds ? filterBounds->y() : 0;
+      imageElement.addAttribute("x", mappedRect.x() + offsetX);
+      imageElement.addAttribute("y", mappedRect.y() + offsetY);
+      imageElement.addAttribute("width", mappedRect.width());
+      imageElement.addAttribute("height", mappedRect.height());
+      imageElement.addAttribute("preserveAspectRatio", "none");
+      imageElement.addAttribute("xlink:href", static_cast<const char*>(dataUri->data()));
+      imageElement.addAttribute("result", resultName);
+      return resultName;
+    }
+    default:
+      return "";
+  }
+}
+
 void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter,
                                         const std::string& inputResult, const Rect* filterBounds,
                                         Context* context) {
@@ -835,16 +958,20 @@ void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter,
                        FloatToString(filterBounds->height()) + "'";
       }
       svgFragment += ">";
+      // Shader gradient coordinates are in local space (relative to the shape's top-left).
+      // Offset them by filterBounds origin to convert to the viewBox coordinate system.
+      float gradOffsetX = filterBounds ? filterBounds->x() : 0;
+      float gradOffsetY = filterBounds ? filterBounds->y() : 0;
       if (gradientType == GradientType::Linear) {
         svgFragment += "<defs><linearGradient id='g' gradientUnits='userSpaceOnUse'";
-        svgFragment += " x1='" + FloatToString(info.points[0].x) + "'";
-        svgFragment += " y1='" + FloatToString(info.points[0].y) + "'";
-        svgFragment += " x2='" + FloatToString(info.points[1].x) + "'";
-        svgFragment += " y2='" + FloatToString(info.points[1].y) + "'>";
+        svgFragment += " x1='" + FloatToString(info.points[0].x + gradOffsetX) + "'";
+        svgFragment += " y1='" + FloatToString(info.points[0].y + gradOffsetY) + "'";
+        svgFragment += " x2='" + FloatToString(info.points[1].x + gradOffsetX) + "'";
+        svgFragment += " y2='" + FloatToString(info.points[1].y + gradOffsetY) + "'>";
       } else if (gradientType == GradientType::Radial) {
         svgFragment += "<defs><radialGradient id='g' gradientUnits='userSpaceOnUse'";
-        svgFragment += " cx='" + FloatToString(info.points[0].x) + "'";
-        svgFragment += " cy='" + FloatToString(info.points[0].y) + "'";
+        svgFragment += " cx='" + FloatToString(info.points[0].x + gradOffsetX) + "'";
+        svgFragment += " cy='" + FloatToString(info.points[0].y + gradOffsetY) + "'";
         svgFragment += " r='" + FloatToString(info.radiuses[0]) + "'>";
       } else {
         reportUnsupportedElement("Unsupported gradient type in BlendImageFilter");
@@ -928,6 +1055,42 @@ void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter,
       }
       break;
     }
+    case Types::ShaderType::ColorFilter: {
+      auto colorFilterShader = static_cast<const ColorFilterShader*>(blendShader);
+      // Unwrap the inner shader's MatrixShader layer.
+      const Shader* innerShader = colorFilterShader->shader.get();
+      Matrix innerMatrix = shaderMatrix;
+      while (innerShader && Types::Get(innerShader) == Types::ShaderType::Matrix) {
+        auto ms = static_cast<const MatrixShader*>(innerShader);
+        innerMatrix = innerMatrix * ms->matrix;
+        innerShader = ms->source.get();
+      }
+      // Step 1: Emit inner shader as a filter primitive.
+      auto shaderResult = emitShaderAsPrimitive(innerShader, innerMatrix, filterBounds, context);
+      if (shaderResult.empty()) {
+        reportUnsupportedElement("Unsupported inner shader in ColorFilterShader BlendImageFilter");
+        break;
+      }
+      // Step 2: Apply the color filter on top of the inner shader output.
+      std::string finalResult = shaderResult;
+      if (colorFilterShader->colorFilter) {
+        auto cfResult = resourceStore->addFilterResult();
+        if (!addColorFilterPrimitives(colorFilterShader->colorFilter, shaderResult, cfResult)) {
+          reportUnsupportedElement(
+              "Unsupported color filter in ColorFilterShader BlendImageFilter");
+          break;
+        }
+        finalResult = cfResult;
+      }
+      // Step 3: Blend the processed result with the source.
+      {
+        ElementWriter blendElement("feBlend", writer);
+        blendElement.addAttribute("in", finalResult);
+        blendElement.addAttribute("in2", sourceRef);
+        blendElement.addAttribute("mode", blendModeString);
+      }
+      break;
+    }
     default:
       reportUnsupportedElement("Unsupported shader type in BlendImageFilter");
       break;
@@ -935,25 +1098,29 @@ void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter,
 }
 
 bool ElementWriter::addColorFilterPrimitives(const std::shared_ptr<ColorFilter>& colorFilter,
-                                             const std::string& inputResult) {
+                                             const std::string& inputResult,
+                                             const std::string& outputResult) {
   if (!colorFilter) {
     return false;
   }
   switch (Types::Get(colorFilter.get())) {
     case Types::ColorFilterType::Matrix:
       addMatrixColorFilterPrimitives(static_cast<const MatrixColorFilter*>(colorFilter.get()),
-                                     inputResult);
+                                     inputResult, outputResult);
       return true;
     case Types::ColorFilterType::Blend:
       addBlendColorFilterPrimitives(static_cast<const ModeColorFilter*>(colorFilter.get()),
-                                    inputResult);
+                                    inputResult, outputResult);
       return true;
     case Types::ColorFilterType::Compose: {
       const auto compose = static_cast<const ComposeColorFilter*>(colorFilter.get());
-      if (!addColorFilterPrimitives(compose->inner, inputResult)) {
+      // Generate a unique result name to bridge inner's output to outer's input.
+      // Without this, outer's Blend path falls back to SourceGraphic instead of inner's output.
+      auto bridgeResult = resourceStore->addFilterResult();
+      if (!addColorFilterPrimitives(compose->inner, inputResult, bridgeResult)) {
         return false;
       }
-      return addColorFilterPrimitives(compose->outer);
+      return addColorFilterPrimitives(compose->outer, bridgeResult, outputResult);
     }
     case Types::ColorFilterType::Luma: {
       // tgfx Luma outputs vec4(luma) where luma = dot(rgb, vec3(Kr, Kg, Kb)).
@@ -969,6 +1136,9 @@ bool ElementWriter::addColorFilterPrimitives(const std::shared_ptr<ColorFilter>&
                                       "0.2126 0.7152 0.0722 0 0 "
                                       "0.2126 0.7152 0.0722 0 0 "
                                       "0.2126 0.7152 0.0722 0 0");
+      if (!outputResult.empty()) {
+        colorMatrixElement.addAttribute("result", outputResult);
+      }
       return true;
     }
     case Types::ColorFilterType::AlphaThreshold: {
@@ -998,6 +1168,9 @@ bool ElementWriter::addColorFilterPrimitives(const std::shared_ptr<ColorFilter>&
         }
         funcA.addAttribute("tableValues", tableValues);
       }
+      if (!outputResult.empty()) {
+        transferElement.addAttribute("result", outputResult);
+      }
       return true;
     }
     default:
@@ -1006,7 +1179,8 @@ bool ElementWriter::addColorFilterPrimitives(const std::shared_ptr<ColorFilter>&
 }
 
 void ElementWriter::addMatrixColorFilterPrimitives(const MatrixColorFilter* matrixColorFilter,
-                                                   const std::string& inputResult) {
+                                                   const std::string& inputResult,
+                                                   const std::string& outputResult) {
   ElementWriter colorMatrixElement("feColorMatrix", writer);
   if (!inputResult.empty()) {
     colorMatrixElement.addAttribute("in", inputResult);
@@ -1021,12 +1195,17 @@ void ElementWriter::addMatrixColorFilterPrimitives(const MatrixColorFilter* matr
     }
   }
   colorMatrixElement.addAttribute("values", matrixString);
+  if (!outputResult.empty()) {
+    colorMatrixElement.addAttribute("result", outputResult);
+  }
 }
 
 void ElementWriter::addBlendColorFilterPrimitives(const ModeColorFilter* modeColorFilter,
-                                                  const std::string& inputResult) {
+                                                  const std::string& inputResult,
+                                                  const std::string& outputResult) {
   auto color = ConvertColorSpace(modeColorFilter->color, _targetColorSpace);
-  auto sourceRef = inputResult.empty() ? std::string("SourceGraphic") : inputResult;
+  // blendSource: the color data to blend against. In a Compose chain, this is inner's output.
+  auto blendSource = inputResult.empty() ? std::string("SourceGraphic") : inputResult;
 
   // SVG feBlend modes include Porter-Duff compositing terms (e.g. src*(1-dstA)), which causes
   // color leakage into transparent regions. For Multiply mode, use feColorMatrix instead — it
@@ -1041,6 +1220,9 @@ void ElementWriter::addBlendColorFilterPrimitives(const ModeColorFilter* modeCol
                                                   FloatToString(color.green) + " 0 0 0 0 0 " +
                                                   FloatToString(color.blue) + " 0 0 0 0 0 " +
                                                   FloatToString(color.alpha) + " 0");
+    if (!outputResult.empty()) {
+      colorMatrixElement.addAttribute("result", outputResult);
+    }
     return;
   }
 
@@ -1062,15 +1244,21 @@ void ElementWriter::addBlendColorFilterPrimitives(const ModeColorFilter* modeCol
   {
     ElementWriter blendElement("feBlend", writer);
     blendElement.addAttribute("in", "flood");
-    blendElement.addAttribute("in2", sourceRef);
+    blendElement.addAttribute("in2", blendSource);
     blendElement.addAttribute("mode", blendModeString);
     blendElement.addAttribute("result", "blend");
   }
   {
+    // Always clip to SourceGraphic alpha (the original shape boundary), not inner's potentially
+    // alpha-modified output. GPU's ModeColorFilter operates per-pixel without an extra alpha clip
+    // from inner — the shape boundary itself provides the clip.
     ElementWriter compositeElement("feComposite", writer);
     compositeElement.addAttribute("in", "blend");
-    compositeElement.addAttribute("in2", sourceRef);
+    compositeElement.addAttribute("in2", "SourceGraphic");
     compositeElement.addAttribute("operator", "in");
+    if (!outputResult.empty()) {
+      compositeElement.addAttribute("result", outputResult);
+    }
   }
 }
 

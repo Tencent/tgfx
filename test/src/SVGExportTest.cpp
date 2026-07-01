@@ -1445,7 +1445,7 @@ TGFX_TEST(SVGExportTest, FilterAndShaderExport) {
   ASSERT_TRUE(context != nullptr);
 
   auto SVGStream = MemoryWriteStream::Make();
-  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(800, 500),
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(800, 600),
                                     SVGExportFlags::DisablePrettyXML);
   auto canvas = exporter->getCanvas();
 
@@ -1510,8 +1510,89 @@ TGFX_TEST(SVGExportTest, FilterAndShaderExport) {
   composePaint.setImageFilter(composeFilter);
   canvas->drawRect(Rect::MakeXYWH(600, 225, 150, 150), composePaint);
 
+  // 8. ComposeColorFilter with non-Multiply Blend outer: Compose(Luma, Screen(red)).
+  // Verifies the Compose chain correctly bridges inner's output to outer's feBlend input.
+  auto composeColorFilter = ColorFilter::Compose(
+      ColorFilter::Luma(), ColorFilter::Blend(Color::Red(), BlendMode::Screen));
+  Paint composeBlendPaint;
+  composeBlendPaint.setColor(Color::Blue());
+  composeBlendPaint.setColorFilter(composeColorFilter);
+  canvas->drawRect(Rect::MakeXYWH(25, 425, 150, 150), composeBlendPaint);
+
   exporter->close();
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/FilterAndShaderExport"));
+}
+
+TGFX_TEST(SVGExportTest, BlendImageFilterWithColorFilterShader) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(700, 200),
+                                    SVGExportFlags::DisablePrettyXML);
+  auto canvas = exporter->getCanvas();
+
+  // ColorFilterShader = inner shader + colorFilter applied on top.
+  // Test all four inner shader types with a Multiply colorFilter and Multiply blend mode.
+  // Use dark blue base color to make the overlay effects visible.
+  auto cf = ColorFilter::Blend(Color::FromRGBA(255, 128, 0), BlendMode::Multiply);
+
+  // 1. Inner = ColorShader (green) + Multiply(orange), Multiply blended onto blue.
+  auto colorShader = Shader::MakeColorShader(Color::Green())->makeWithColorFilter(cf);
+  Paint paint1;
+  paint1.setColor(Color::FromRGBA(50, 50, 200));
+  paint1.setImageFilter(ImageFilter::Blend(BlendMode::Multiply, colorShader));
+  canvas->drawRect(Rect::MakeXYWH(25, 25, 150, 150), paint1);
+
+  // 2. Inner = PerlinNoise + Multiply(orange), Multiply blended onto blue.
+  auto noiseShader = Shader::MakeFractalNoise(0.05f, 0.05f, 2, 7)->makeWithColorFilter(cf);
+  Paint paint2;
+  paint2.setColor(Color::FromRGBA(50, 50, 200));
+  paint2.setImageFilter(ImageFilter::Blend(BlendMode::Multiply, noiseShader));
+  canvas->drawRect(Rect::MakeXYWH(200, 25, 150, 150), paint2);
+
+  // 3. Inner = LinearGradient (red→blue) + Multiply(orange), Multiply blended onto blue.
+  auto gradShader = Shader::MakeLinearGradient({0, 0}, {150, 150}, {Color::Red(), Color::Blue()})
+                        ->makeWithColorFilter(cf);
+  Paint paint3;
+  paint3.setColor(Color::FromRGBA(50, 50, 200));
+  paint3.setImageFilter(ImageFilter::Blend(BlendMode::Multiply, gradShader));
+  canvas->drawRect(Rect::MakeXYWH(375, 25, 150, 150), paint3);
+
+  // 4. Inner = ImageShader + Multiply(orange), Multiply blended onto blue.
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_TRUE(image != nullptr);
+  image = image->makeScaled(150, 150);
+  auto imgShader = Shader::MakeImageShader(image)->makeWithColorFilter(cf);
+  Paint paint4;
+  paint4.setColor(Color::FromRGBA(50, 50, 200));
+  paint4.setImageFilter(ImageFilter::Blend(BlendMode::Multiply, imgShader));
+  canvas->drawRect(Rect::MakeXYWH(550, 25, 150, 150), paint4);
+
+  exporter->close();
+
+  auto data = SVGStream->readData();
+  SaveFile(data, "SVGExportTest/BlendImageFilterWithColorFilterShader.svg");
+  std::string svgText(static_cast<const char*>(data->data()), data->size());
+
+  // Verify ColorFilterShader is properly decomposed (not reported as unsupported).
+  EXPECT_TRUE(svgText.find("Unsupported") == std::string::npos);
+  // Verify all four blend filters are present.
+  EXPECT_TRUE(svgText.find("feFlood") != std::string::npos);
+  EXPECT_TRUE(svgText.find("feTurbulence") != std::string::npos);
+  EXPECT_TRUE(svgText.find("feImage") != std::string::npos);
+  EXPECT_TRUE(svgText.find("feBlend") != std::string::npos);
+
+  // Also render GPU result for visual comparison.
+  auto surface = Surface::Make(context, 700, 200);
+  auto gpuCanvas = surface->getCanvas();
+  gpuCanvas->drawRect(Rect::MakeXYWH(25, 25, 150, 150), paint1);
+  gpuCanvas->drawRect(Rect::MakeXYWH(200, 25, 150, 150), paint2);
+  gpuCanvas->drawRect(Rect::MakeXYWH(375, 25, 150, 150), paint3);
+  gpuCanvas->drawRect(Rect::MakeXYWH(550, 25, 150, 150), paint4);
+  context->flushAndSubmit();
+  Baseline::Compare(surface, "SVGExportTest/BlendImageFilterWithColorFilterShader");
 }
 
 }  // namespace tgfx

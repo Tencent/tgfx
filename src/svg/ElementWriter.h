@@ -116,13 +116,16 @@ class ElementWriter {
                                      Resources* resources);
 
   void addMatrixColorFilterPrimitives(const MatrixColorFilter* matrixColorFilter,
-                                      const std::string& inputResult = "");
+                                      const std::string& inputResult = "",
+                                      const std::string& outputResult = "");
 
   void addBlendColorFilterPrimitives(const ModeColorFilter* modeColorFilter,
-                                     const std::string& inputResult = "");
+                                     const std::string& inputResult = "",
+                                     const std::string& outputResult = "");
 
   bool addColorFilterPrimitives(const std::shared_ptr<ColorFilter>& colorFilter,
-                                const std::string& inputResult = "");
+                                const std::string& inputResult = "",
+                                const std::string& outputResult = "");
 
   void addMaskResources(const std::shared_ptr<MaskFilter>& maskFilter, Resources* resources,
                         Context* context, SVGExportContext* svgContext);
@@ -179,6 +182,9 @@ class ElementWriter {
   void addColorImageFilter(const ColorImageFilter* filter, const std::string& inputResult = "");
   void addBlendImageFilter(const BlendImageFilter* filter, const std::string& inputResult = "",
                            const Rect* filterBounds = nullptr, Context* context = nullptr);
+
+  std::string emitShaderAsPrimitive(const Shader* shader, const Matrix& shaderMatrix,
+                                    const Rect* filterBounds, Context* context);
 
   void reportUnsupportedElement(const char* message) const;
 
