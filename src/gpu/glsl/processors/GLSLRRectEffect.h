@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,23 +18,19 @@
 
 #pragma once
 
-#include "gpu/processors/FragmentProcessor.h"
+#include "gpu/processors/RRectEffect.h"
 
 namespace tgfx {
-class AARectEffect : public FragmentProcessor {
+
+class GLSLRRectEffect : public RRectEffect {
  public:
-  static PlacementPtr<AARectEffect> Make(BlockAllocator* allocator, const Rect& rect);
+  GLSLRRectEffect(const Rect& localRect, const std::array<Point, 4>& radii,
+                  const Matrix& deviceToLocal, bool needTransform, bool antiAlias);
 
-  std::string name() const override {
-    return "AARectEffect";
-  }
+  void emitCode(EmitArgs& args) const override;
 
- protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
-  explicit AARectEffect(const Rect& rect) : FragmentProcessor(ClassID()), rect(rect) {
-  }
-
-  Rect rect = {};
+ private:
+  void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 };
+
 }  // namespace tgfx

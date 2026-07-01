@@ -206,6 +206,14 @@ bool Path::contains(const Rect& rect) const {
   return pathRef->path.conservativelyContainsRect(ToSkRect(rect));
 }
 
+bool Path::isConvex() const {
+  return pathRef->path.isConvex();
+}
+
+bool Path::isLastContourClosed() const {
+  return pathRef->path.isLastContourClosed();
+}
+
 void Path::moveTo(float x, float y) {
   writableRef()->path.moveTo(x, y);
 }

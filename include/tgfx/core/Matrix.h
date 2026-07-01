@@ -827,6 +827,17 @@ class Matrix {
   }
 
   /**
+   * Maps a 2D homogeneous coordinate (x, y, w) using this matrix.
+   * The result is NOT perspective-divided; i.e., the w component may not be 1.
+   * To get the final 2D point, divide x' and y' by w'.
+   * @param x  x-coordinate of the input point
+   * @param y  y-coordinate of the input point
+   * @param w  w-coordinate of the input point (typically 1 for points, 0 for vectors)
+   * @return   the mapped homogeneous coordinate (x', y', w')
+   */
+  Vec3 mapHomogeneous(float x, float y, float w) const;
+
+  /**
    * Returns true if Matrix maps Rect to another Rect. If true, the Matrix is identity, or scales,
    * or rotates a multiple of 90 degrees, or mirrors on axes. In all cases, Matrix may also have
    * translation. Matrix form is either:
@@ -1007,17 +1018,6 @@ class Matrix {
   bool invertNonIdentity(Matrix* inverse) const;
 
   bool getMinMaxScaleFactors(float results[2]) const;
-
-  /**
-   * Maps a 2D homogeneous coordinate (x, y, w) using this matrix.
-   * The result is NOT perspective-divided; i.e., the w component may not be 1.
-   * To get the final 2D point, divide x' and y' by w'.
-   * @param x  x-coordinate of the input point
-   * @param y  y-coordinate of the input point
-   * @param w  w-coordinate of the input point (typically 1 for points, 0 for vectors)
-   * @return   the mapped homogeneous coordinate (x', y', w')
-   */
-  Vec3 mapHomogeneous(float x, float y, float w) const;
 
   friend class Matrix3D;
 };

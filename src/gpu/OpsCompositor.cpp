@@ -34,8 +34,9 @@
 #include "gpu/ops/MeshDrawOp.h"
 #include "gpu/ops/ShapeDrawOp.h"
 #include "gpu/ops/ShapeInstancedDrawOp.h"
-#include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
+#include "gpu/processors/RRectEffect.h"
+#include "gpu/processors/RectEffect.h"
 #include "inspect/InspectorMark.h"
 #include "processors/ColorSpaceXFormEffect.h"
 #include "processors/PorterDuffXferProcessor.h"
@@ -388,14 +389,6 @@ bool OpsCompositor::canAppend(PendingOpType type, const ClipStack& clip, const B
       break;
   }
   return true;
-}
-
-/**
- * Returns true if the given rect counts as aligned with pixel boundaries.
- */
-static bool IsPixelAligned(const Rect& rect) {
-  return IsPixelAligned(rect.left) && IsPixelAligned(rect.top) && IsPixelAligned(rect.right) &&
-         IsPixelAligned(rect.bottom);
 }
 
 class PendingOpsAutoReset {
@@ -766,24 +759,35 @@ AppliedClip OpsCompositor::applyClip(const ClipStack& clipStack) {
   std::vector<const ClipElement*> elementsForMask;
   elementsForMask.reserve(elements.size() - clipStack.oldestValidIndex());
   PlacementPtr<FragmentProcessor> clipFP = nullptr;
+  // Cap the analytic FP chain at the same limit Skia uses; longer chains bloat program keys
+  // and shader complexity. Excess elements fall through to the mask path.
+  constexpr size_t kMaxAnalyticFPs = 4;
+  size_t analyticFPCount = 0;
   for (size_t i = clipStack.oldestValidIndex(); i < elements.size(); ++i) {
     auto& element = elements[i];
     if (!element.isValid()) {
       continue;
     }
 
-    // Pixel-aligned rects or non-AA rects have hard edges, already covered by clipBounds scissor.
-    if (element.isRect() && (element.isPixelAligned() || !element.isAntiAlias())) {
+    // When the element's inner and outer bounds coincide it is exactly an integer scissor rect,
+    // already covered by the clipBounds scissor, so it needs no coverage FP or mask.
+    if (element.innerBounds() == element.outerBounds()) {
       continue;
     }
 
-    // AA rect uses AARectEffect for smooth edges.
-    if (element.isRect() && element.isAntiAlias()) {
-      clipFP = makeAnalyticFP(element, std::move(clipFP));
-      continue;
+    if (analyticFPCount < kMaxAnalyticFPs) {
+      auto elementFP = makeAnalyticFP(element);
+      if (elementFP) {
+        if (clipFP) {
+          clipFP = FragmentProcessor::Compose(drawingAllocator(), std::move(clipFP),
+                                              std::move(elementFP));
+        } else {
+          clipFP = std::move(elementFP);
+        }
+        ++analyticFPCount;
+        continue;
+      }
     }
-
-    // Collect elements that need mask processing.
     elementsForMask.push_back(&element);
   }
 
@@ -797,20 +801,33 @@ AppliedClip OpsCompositor::applyClip(const ClipStack& clipStack) {
   return out;
 }
 
-PlacementPtr<FragmentProcessor> OpsCompositor::makeAnalyticFP(
-    const ClipElement& element, PlacementPtr<FragmentProcessor> inputFP) {
-  if (!element.isRect()) {
-    // Future extension: RRectEffect, etc.
-    return inputFP;
+PlacementPtr<FragmentProcessor> OpsCompositor::makeAnalyticFP(const ClipElement& element) {
+  // The shader reads gl_FragCoord, which is the fragment's window-space coordinate. For
+  // BottomLeft origin render targets, we need to compose the render target's origin transform
+  // into the element's matrix so the FP's local-to-window mapping matches the actual rasterizer.
+  auto matrix = element.matrix();
+  matrix.postConcat(renderTarget->getOriginTransform());
+  if (matrix.hasPerspective()) {
+    return nullptr;
   }
-
-  auto rect = element.bounds();
-  FlipYIfNeeded(&rect, renderTarget.get());
-  auto clipFP = AARectEffect::Make(drawingAllocator(), rect);
-  if (!inputFP) {
-    return clipFP;
+  const bool aa = element.antiAlias();
+  const auto& shape = element.shape();
+  switch (shape.type()) {
+    case GeometryShape::Type::Empty:
+      return nullptr;
+    case GeometryShape::Type::Rect:
+      return RectEffect::Make(drawingAllocator(), shape.rect(), matrix, aa);
+    case GeometryShape::Type::RRect: {
+      const auto& rRect = shape.rRect();
+      if (rRect.type() == RRect::Type::Rect) {
+        return RectEffect::Make(drawingAllocator(), rRect.rect(), matrix, aa);
+      }
+      return RRectEffect::Make(drawingAllocator(), rRect, matrix, aa);
+    }
+    case GeometryShape::Type::Path:
+      return nullptr;
   }
-  return FragmentProcessor::Compose(drawingAllocator(), std::move(inputFP), std::move(clipFP));
+  return nullptr;
 }
 
 PlacementPtr<FragmentProcessor> OpsCompositor::getClipMaskFP(
@@ -847,9 +864,9 @@ std::shared_ptr<TextureProxy> OpsCompositor::makeClipTexture(
   for (size_t i = 0; i < elements.size(); ++i) {
     const auto element = elements[i];
     DEBUG_ASSERT(element->isValid());
-    const auto aaType = element->isAntiAlias() ? AAType::Coverage : AAType::None;
+    const auto aaType = element->antiAlias() ? AAType::Coverage : AAType::None;
     auto clipBounds = Rect::MakeWH(width, height);
-    auto path = element->path();
+    auto path = element->getDevicePath();
     if (i > 0) {
       // Modulate blend erases the mask when hasCoverage is true (source coefficient becomes zero).
       // Use inverse fill + DstOut to erase areas outside each clip shape instead.

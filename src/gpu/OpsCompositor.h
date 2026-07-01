@@ -191,8 +191,7 @@ class OpsCompositor {
                                           bool hasImageFill = false);
   Rect getClipBounds(const ClipStack& clip) const;
   AppliedClip applyClip(const ClipStack& clipStack);
-  PlacementPtr<FragmentProcessor> makeAnalyticFP(const ClipElement& element,
-                                                 PlacementPtr<FragmentProcessor> inputFP);
+  PlacementPtr<FragmentProcessor> makeAnalyticFP(const ClipElement& element);
   PlacementPtr<FragmentProcessor> getClipMaskFP(const std::vector<const ClipElement*>& elements,
                                                 uint32_t uniqueID, const Rect& clipBound,
                                                 PlacementPtr<FragmentProcessor> inputFP);

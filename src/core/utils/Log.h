@@ -48,10 +48,13 @@ namespace tgfx {
 #if DEBUG
 
 #define DEBUG_ASSERT(assertion) ASSERT(assertion)
+#define DEBUG_ASSERT_RESULT(expression) ASSERT(expression)
 
 #else
 
 #define DEBUG_ASSERT(assertion)
+// Unlike DEBUG_ASSERT, this macro executes the expression in non-debug builds as well.
+#define DEBUG_ASSERT_RESULT(expression) expression
 
 #endif
 }  // namespace tgfx

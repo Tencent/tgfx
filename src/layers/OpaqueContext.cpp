@@ -118,7 +118,7 @@ void OpaqueContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcR
     path.addRect(dstRect);
     path.transform(matrix);
     auto newClip = clip;
-    newClip.clip(path, false);
+    newClip.clipPath(path, Matrix::I(), false);
     auto newBrush = brush;
     newBrush.shader = Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp, sampling);
     drawRect(dstRect, newMatrix, newClip, newBrush, nullptr);
@@ -296,7 +296,7 @@ void OpaqueContext::flushPendingContour(const Contour& contour, const Matrix& ma
     // (fewer optimization opportunities).
     auto hasAAClip =
         std::any_of(pendingClip.elements().begin(), pendingClip.elements().end(),
-                    [](const ClipElement& e) { return e.isValid() && e.isAntiAlias(); });
+                    [](const ClipElement& e) { return e.isValid() && e.antiAlias(); });
     if (hasAAClip) {
       globalBounds.roundIn();
     }

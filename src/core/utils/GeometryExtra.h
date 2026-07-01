@@ -25,15 +25,29 @@
 namespace tgfx {
 
 /**
- * Defines the maximum distance a draw can extend beyond a clip's boundary and still be considered
- * 'on the other side'. This tolerance accounts for potential floating point rounding errors. The
- * value of 1e-3 is chosen because, in the coverage case, as long as coverage stays within
- * 0.5 * 1/256 of its intended value, it shouldn't affect the final pixel values.
+ * Defines the maximum distance, in device pixels, a draw can extend beyond a clip's boundary and
+ * still be considered 'on the other side'. This tolerance absorbs the floating-point rounding noise
+ * accumulated while computing analytic bounds, so a value like 100.0003 is not treated as crossing
+ * into the next pixel.
+ *
+ * The value 1e-3 is justified visually for the anti-aliased case. There coverage equals the
+ * fraction of a unit-sized pixel that lies inside the edge, so a positional shift of d pixels moves
+ * an axis-aligned edge by at most d in coverage as well; the sensitivity of coverage to position is
+ * bounded by 1 per pixel, which lets the pixel-space tolerance be compared directly against a
+ * coverage threshold. Keeping the shift under 0.5 * 1/256 (half a step of 8-bit quantization,
+ * ~1.95e-3) leaves the quantized pixel value unchanged, and 1e-3 sits safely below that bound. This
+ * is an order-of-magnitude safety argument, not an exact identity, and it only covers the AA edge;
+ * non-AA edges are hard and rely on a separate rounding tolerance instead.
  */
 static constexpr float BOUNDS_TOLERANCE = 1e-3f;
 
 inline bool IsPixelAligned(float value) {
   return fabsf(roundf(value) - value) <= BOUNDS_TOLERANCE;
+}
+
+inline bool IsPixelAligned(const Rect& rect) {
+  return IsPixelAligned(rect.left) && IsPixelAligned(rect.top) && IsPixelAligned(rect.right) &&
+         IsPixelAligned(rect.bottom);
 }
 
 inline Rect ToLocalBounds(const Rect& bounds, const Matrix& viewMatrix) {
