@@ -27,7 +27,7 @@
 
 namespace hello2d {
 static std::vector<LayerBuilder*> layerBuilders = {
-    new ConicGradient(), new GlassEffect(), new ImageWithMipmap(), new ImageWithShadow(),
+    new ConicGradient(), new ImageWithMipmap(), new ImageWithShadow(),
     new Layer3DTree(),   new RichText(),    new SimpleLayerTree(),
 };
 

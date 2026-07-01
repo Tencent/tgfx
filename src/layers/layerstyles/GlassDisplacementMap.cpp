@@ -25,8 +25,6 @@
 
 namespace tgfx {
 
-static constexpr float PI = 3.14159265358979323846f;
-
 static float RoundedRectSDF(float px, float py, float halfWidth, float halfHeight, float radius) {
   float qx = std::abs(px) - halfWidth + radius;
   float qy = std::abs(py) - halfHeight + radius;
@@ -36,19 +34,46 @@ static float RoundedRectSDF(float px, float py, float halfWidth, float halfHeigh
   return outsideDist + insideDist - radius;
 }
 
-// SDF-based smooth surface height: cosine profile from edge (h=0) to interior (h=sagitta).
+// Distance from center (0,0) to the rounded-rectangle boundary along the direction of (px, py).
+// Uses binary search on the ray from origin through (px, py) to find the zero-crossing of the SDF.
+static float DistToBoundary(float px, float py, float halfWidth, float halfHeight, float radius) {
+  float len = std::sqrt(px * px + py * py);
+  if (len < 0.001f) {
+    return std::min(halfWidth, halfHeight);
+  }
+  float dx = px / len;
+  float dy = py / len;
+  // Upper bound: the point is inside, so the boundary is at least at distance len.
+  // Maximum possible distance from center to boundary is sqrt(halfW^2 + halfH^2).
+  float lo = 0.0f;
+  float hi = std::sqrt(halfWidth * halfWidth + halfHeight * halfHeight);
+  for (int i = 0; i < 16; i++) {
+    float mid = (lo + hi) * 0.5f;
+    float sdf = RoundedRectSDF(dx * mid, dy * mid, halfWidth, halfHeight, radius);
+    if (sdf < 0.0f) {
+      lo = mid;
+    } else {
+      hi = mid;
+    }
+  }
+  return (lo + hi) * 0.5f;
+}
+
+// Elliptical arc height profile for a convex glass surface.
+// t = |OP| / |OB| where O is center, P is current pixel, B is the boundary along OP direction.
+// t=0 at center, t=1 at boundary.
+// h(t) = edgeThickness + (sagitta - edgeThickness) * sqrt(1 - t^2)
+// Center (t=0): h = sagitta. Edge (t=1): h = edgeThickness, slope -> infinity.
 static float SDFHeight(float px, float py, float halfWidth, float halfHeight, float radius,
-                       float depth, float sagitta) {
+                       float sagitta, float edgeThickness) {
   float dist = RoundedRectSDF(px, py, halfWidth, halfHeight, radius);
-  float edgeDist = -dist;
-  if (edgeDist <= 0.0f) {
+  if (dist >= 0.0f) {
     return 0.0f;
   }
-  if (edgeDist >= depth) {
-    return sagitta;
-  }
-  float t = edgeDist / depth;
-  return sagitta * std::sin(t * PI * 0.5f);
+  float distToCenter = std::sqrt(px * px + py * py);
+  float distToBnd = DistToBoundary(px, py, halfWidth, halfHeight, radius);
+  float t = (distToBnd > 0.001f) ? std::min(distToCenter / distToBnd, 1.0f) : 0.0f;
+  return edgeThickness + (sagitta - edgeThickness) * std::sqrt(1.0f - t * t);
 }
 
 std::shared_ptr<Image> GlassDisplacementMap::Generate(int width, int height, float cornerRadius,
@@ -60,17 +85,27 @@ std::shared_ptr<Image> GlassDisplacementMap::Generate(int width, int height, flo
   float halfWidth = static_cast<float>(width) * 0.5f;
   float halfHeight = static_cast<float>(height) * 0.5f;
   float crRadius = std::min(cornerRadius, std::min(halfWidth, halfHeight));
-  float maxDepth = std::min(halfWidth, halfHeight) - 1.0f;
-  depth = std::min(depth, maxDepth);
 
-  float sagitta = depth * 0.5f;
+  // depth controls overall glass thickness (sagitta).
+  float maxThickness = std::min(halfWidth, halfHeight);
+  float sagitta = std::min(depth, maxThickness);
 
-  // Sphere for global lens normal: radius = 2 * max(halfW, halfH),
-  // centered at (0, 0, -sphereR) so the glass surface is inscribed at z=0.
-  float sphereR = 2.0f * std::max(halfWidth, halfHeight);
+  // edgeThickness: minimum glass thickness at the edge.
+  float edgeThickness = std::max(sagitta * 0.3f, 10.0f);
+  edgeThickness = std::min(edgeThickness, sagitta);
+
+  // maxInterior: maximum SDF edgeDist at the center of the shape.
+  float maxInterior = std::min(halfWidth, halfHeight);
 
   // Precompute max displacement for encoding normalization.
-  float maxSlope = sagitta * PI * 0.5f / depth;
+  // Elliptical arc: dh/d(edgeDist) = heightRange/maxInterior * (1-t)/sqrt(1-(1-t)^2).
+  // At edgeDist=1, t_min=1/maxInterior, slope is large.
+  float heightRange = sagitta - edgeThickness;
+  float tMin = std::min(1.0f / maxInterior, 0.99f);
+  float oneMinusTMin = 1.0f - tMin;
+  float denom = std::sqrt(1.0f - oneMinusTMin * oneMinusTMin);
+  float maxSlope =
+      (denom > 0.001f) ? (heightRange / maxInterior) * oneMinusTMin / denom : 100.0f;
   float nLen = std::sqrt(maxSlope * maxSlope + 1.0f);
   float maxSinI = maxSlope / nLen;
   float maxSinR = std::min(maxSinI / ior, 0.99f);
@@ -82,6 +117,11 @@ std::shared_ptr<Image> GlassDisplacementMap::Generate(int width, int height, flo
   if (maxDisp < 1.0f) {
     maxDisp = 1.0f;
   }
+
+  fprintf(stderr,
+          "[DispMap] w=%d h=%d sagitta=%.1f edgeH=%.1f maxInt=%.1f maxSlope=%.3f "
+          "maxDisp=%.3f ior=%.2f crRadius=%.1f\n",
+          width, height, sagitta, edgeThickness, maxInterior, maxSlope, maxDisp, ior, crRadius);
 
   float eta = 1.0f / ior;
   constexpr float eps = 0.5f;
@@ -96,52 +136,27 @@ std::shared_ptr<Image> GlassDisplacementMap::Generate(int width, int height, flo
       float dispX = 0.0f;
       float dispY = 0.0f;
 
-      float h = SDFHeight(px, py, halfWidth, halfHeight, crRadius, depth, sagitta);
+      float h = SDFHeight(px, py, halfWidth, halfHeight, crRadius, sagitta, edgeThickness);
 
       if (h > 0.001f) {
-        // --- Normal 1: SDF-based surface normal (numerical derivatives) ---
-        float hxp = SDFHeight(px + eps, py, halfWidth, halfHeight, crRadius, depth, sagitta);
-        float hxm = SDFHeight(px - eps, py, halfWidth, halfHeight, crRadius, depth, sagitta);
-        float hyp = SDFHeight(px, py + eps, halfWidth, halfHeight, crRadius, depth, sagitta);
-        float hym = SDFHeight(px, py - eps, halfWidth, halfHeight, crRadius, depth, sagitta);
+        float hxp = SDFHeight(px + eps, py, halfWidth, halfHeight, crRadius, sagitta,
+                              edgeThickness);
+        float hxm = SDFHeight(px - eps, py, halfWidth, halfHeight, crRadius, sagitta,
+                              edgeThickness);
+        float hyp = SDFHeight(px, py + eps, halfWidth, halfHeight, crRadius, sagitta,
+                              edgeThickness);
+        float hym = SDFHeight(px, py - eps, halfWidth, halfHeight, crRadius, sagitta,
+                              edgeThickness);
         float dhdx = (hxp - hxm) / (2.0f * eps);
         float dhdy = (hyp - hym) / (2.0f * eps);
 
-        float sdfNx = -dhdx;
-        float sdfNy = -dhdy;
-        float sdfNz = 1.0f;
-        float sdfLen = std::sqrt(sdfNx * sdfNx + sdfNy * sdfNy + sdfNz * sdfNz);
-        sdfNx /= sdfLen;
-        sdfNy /= sdfLen;
-        sdfNz /= sdfLen;
-
-        // --- Normal 2: Global sphere normal ---
-        // Sphere center at (0, 0, -sphereR), pixel at (px, py, h).
-        // Vector from sphere center to pixel = (px, py, h + sphereR)
-        float gx = px;
-        float gy = py;
-        float gz = h + sphereR;
-        float gLen = std::sqrt(gx * gx + gy * gy + gz * gz);
-        float sphereNx = gx / gLen;
-        float sphereNy = gy / gLen;
-        float sphereNz = gz / gLen;
-
-        // --- Blend: SDF normal only within cornerRadius distance from edge ---
-        float dist = RoundedRectSDF(px, py, halfWidth, halfHeight, crRadius);
-        float edgeDist = -dist;
-        float sdfWeight = 0.0f;
-        if (edgeDist < crRadius && crRadius > 0.0f) {
-          float t = edgeDist / crRadius;
-          sdfWeight = (1.0f - t) * (1.0f - t);
-        }
-
-        float nx = sdfNx * sdfWeight + sphereNx * (1.0f - sdfWeight);
-        float ny = sdfNy * sdfWeight + sphereNy * (1.0f - sdfWeight);
-        float nz = sdfNz * sdfWeight + sphereNz * (1.0f - sdfWeight);
-        float finalLen = std::sqrt(nx * nx + ny * ny + nz * nz);
-        nx /= finalLen;
-        ny /= finalLen;
-        nz /= finalLen;
+        float nx = -dhdx;
+        float ny = -dhdy;
+        float nz = 1.0f;
+        float nLen = std::sqrt(nx * nx + ny * ny + nz * nz);
+        nx /= nLen;
+        ny /= nLen;
+        nz /= nLen;
 
         // --- 3D Snell's Law ---
         float cosI = nz;
@@ -153,10 +168,16 @@ std::shared_ptr<Image> GlassDisplacementMap::Generate(int width, int height, flo
           float ty = factor * ny;
           float tz = eta * (-1.0f) + factor * nz;
           if (std::abs(tz) > 0.001f) {
-            dispX = (tx / tz) * h;
-            dispY = (ty / tz) * h;
+            dispX = (tx / tz) * sagitta;
+            dispY = (ty / tz) * sagitta;
           }
         }
+      }
+
+      if ((x == width / 2 && y == height / 2) || (x == 1 && y == height / 2) ||
+          (x == width / 4 && y == height / 2)) {
+        fprintf(stderr, "[px(%d,%d)] h=%.4f dispX=%.4f dispY=%.4f dispX/maxDisp=%.6f\n", x, y, h,
+                dispX, dispY, dispX / maxDisp);
       }
 
       float encodedX = (dispX / maxDisp) * 0.5f + 0.5f;

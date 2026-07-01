@@ -4039,29 +4039,30 @@ TGFX_TEST(LayerTest, GlassStyle) {
 static void BuildRefractionScene(DisplayList& displayList, float refraction) {
   auto container = Layer::Make();
 
-  // Green rectangle 200x200, its top-right corner at the glass center (200, 100)
-  auto greenRect = ShapeLayer::Make();
-  Path greenPath = {};
-  greenPath.addRect(Rect::MakeXYWH(0.0f, 100.0f, 200.0f, 200.0f));
-  greenRect->setPath(greenPath);
-  greenRect->setFillStyle(ShapeStyle::Make(Color::FromRGBA(50, 200, 80, 255)));
-  container->addChild(greenRect);
+  // Mandrill image 200x200 at (0, 100), same position as the original green rect
+  auto bgImage = MakeImage("resources/apitest/mandrill_128.png");
+  auto bgLayer = ImageLayer::Make();
+  bgLayer->setImage(bgImage);
+  auto scale = 200.0f / static_cast<float>(std::max(bgImage->width(), bgImage->height()));
+  auto matrix = Matrix::MakeScale(scale, scale);
+  matrix.postTranslate(0, 100);
+  bgLayer->setMatrix(matrix);
+  container->addChild(bgLayer);
 
-  // Glass panel 200x200 at top-right, so green rect's top-right corner (200,100) = glass center
+  // Glass panel 200x200 at (100, 0), same position as before
   auto glassLayer = SolidLayer::Make();
   glassLayer->setColor(Color::FromRGBA(255, 255, 255, 10));
   glassLayer->setWidth(200);
   glassLayer->setHeight(200);
   glassLayer->setRadiusX(16);
   glassLayer->setRadiusY(16);
-  glassLayer->setMatrix(Matrix::MakeTrans(100, 0));
+  glassLayer->setMatrix(Matrix::MakeTrans(100, -50));
   auto style = GlassStyle::Make(refraction, 50, 0, 0, 0, 135, 0);
   style->setCornerRadius(16);
   glassLayer->setLayerStyles({style});
   container->addChild(glassLayer);
 
   displayList.root()->addChild(container);
-  // A second container is needed for the Layer system to trigger background capture
   displayList.root()->addChild(Layer::Make());
 }
 

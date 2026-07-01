@@ -63,7 +63,6 @@ static constexpr char GLASS_FRAGMENT_SHADER[] = R"(
             return;
         }
         vec2 disp = texture(uDisplacement, dispMapUV).rg;
-        // Debug: visualize normal direction. disp encodes (nx, ny) as 0.5 + val*0.5
         tgfx_FragColor = vec4(disp.r, disp.g, 0.5, 1.0);
     }
 )";
@@ -233,9 +232,14 @@ bool GlassRefractionEffect::onDraw(CommandEncoder* encoder,
   float dispMapScaleX = (_glassWidth > 0.0f) ? sourceWidth / _glassWidth : 1.0f;
   float dispMapScaleY = (_glassHeight > 0.0f) ? sourceHeight / _glassHeight : 1.0f;
 
-  // pixelToUV: converts pixel displacement to source texture UV offset
+  // pixelToUV: converts pixel displacement to source texture UV offset.
+  // Displacement is computed in glass-pixel units, so convert using glass dimensions.
   float pixelToUVx = 1.0f / sourceWidth;
   float pixelToUVy = 1.0f / sourceHeight;
+  fprintf(stderr,
+          "[GlassRefraction] source=%.0fx%.0f glass=%.0fx%.0f pxToUV=(%.6f,%.6f) maxDisp=%.1f\n",
+          sourceWidth, sourceHeight, _glassWidth, _glassHeight, pixelToUVx, pixelToUVy,
+          _displacementScale);
 
   // std140 layout: vec2 + vec2 + vec2 + float + float = 8 floats (32 bytes, naturally aligned)
   size_t uniformSize = 8 * sizeof(float);

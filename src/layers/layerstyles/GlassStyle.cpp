@@ -146,29 +146,42 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
     int layerHeight = input.content->height();
 
     float ior = 1.0f + (_refraction / 100.0f) * 4.0f;
-    float maxDepth =
-        std::min(static_cast<float>(layerWidth), static_cast<float>(layerHeight)) * 0.5f - 1.0f;
-    float depthPx = (_depth / 100.0f) * maxDepth;
+    float halfW = static_cast<float>(layerWidth) * 0.5f;
+    float halfH = static_cast<float>(layerHeight) * 0.5f;
+    float maxThickness = std::min(halfW, halfH);
+    float depthPx = (_depth / 100.0f) * maxThickness;
     float scaledRadius = _cornerRadius * input.contentScale;
 
     auto dispMap = getCachedDisplacementMap(layerWidth, layerHeight, scaledRadius, depthPx, ior);
     if (dispMap) {
       float channelOffset = (_dispersion / 100.0f) * 0.15f;
       // displacementScale must match the encoding normalization in GlassDisplacementMap.
-      // The spherical lens model computes maxDisp dynamically based on sagitta and ior.
-      // Replicate the same formula here to ensure correct decoding.
-      float sagitta = depthPx * 0.5f;
-      float sphereR = (depthPx * depthPx + sagitta * sagitta) / (2.0f * sagitta);
-      float maxSinI = std::min(depthPx / sphereR, 0.99f);
-      float maxSinR = maxSinI / ior;
-      float maxCosI = std::sqrt(1.0f - maxSinI * maxSinI);
+      // Replicate the same maxDisp formula: single elliptical arc over maxInterior.
+      float sagitta = std::min(depthPx, maxThickness);
+      float edgeThickness = std::max(sagitta * 0.3f, 10.0f);
+      edgeThickness = std::min(edgeThickness, sagitta);
+      float maxInterior = std::min(halfW, halfH);
+      float heightRange = sagitta - edgeThickness;
+      float tMin = std::min(1.0f / maxInterior, 0.99f);
+      float oneMinusTMin = 1.0f - tMin;
+      float denom = std::sqrt(1.0f - oneMinusTMin * oneMinusTMin);
+      float maxSlope =
+          (denom > 0.001f) ? (heightRange / maxInterior) * oneMinusTMin / denom : 100.0f;
+      float nLen = std::sqrt(maxSlope * maxSlope + 1.0f);
+      float maxSinI = maxSlope / nLen;
+      float maxSinR = std::min(maxSinI / ior, 0.99f);
+      float maxCosI = 1.0f / nLen;
       float maxCosR = std::sqrt(1.0f - maxSinR * maxSinR);
-      float maxTanDiff =
-          (maxCosI > 0.001f && maxCosR > 0.001f) ? (maxSinI / maxCosI - maxSinR / maxCosR) : 1.0f;
-      float displacementScale = sagitta * maxTanDiff * 1.2f * 10.0f;
+      float maxTanI = maxSinI / std::max(maxCosI, 0.001f);
+      float maxTanR = maxSinR / std::max(maxCosR, 0.001f);
+      float displacementScale = sagitta * std::abs(maxTanI - maxTanR) * 1.5f;
       if (displacementScale < 1.0f) {
         displacementScale = 1.0f;
       }
+      fprintf(stderr,
+              "[GlassStyle] ior=%.2f sagitta=%.1f edgeH=%.1f maxInt=%.1f "
+              "maxSlope=%.3f dispScale=%.3f\n",
+              ior, sagitta, edgeThickness, maxInterior, maxSlope, displacementScale);
       auto refractionEffect = std::make_shared<GlassRefractionEffect>(
           dispMap, displacementScale, channelOffset, static_cast<float>(layerWidth),
           static_cast<float>(layerHeight));
@@ -196,13 +209,12 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
   if (_lightIntensity > 0) {
     int layerWidth = input.content->width();
     int layerHeight = input.content->height();
-    float maxDepth =
-        std::min(static_cast<float>(layerWidth), static_cast<float>(layerHeight)) * 0.5f - 1.0f;
-    float depthPx = (_depth / 100.0f) * maxDepth;
+    float maxThicknessHL = std::min(static_cast<float>(layerWidth), static_cast<float>(layerHeight)) * 0.25f;
+    float depthPxHL = (_depth / 100.0f) * maxThicknessHL;
     float scaledRadius = _cornerRadius * input.contentScale;
     float highlightOpacity = _lightIntensity / 100.0f;
 
-    auto lightMaps = GlassHighlightMap::Generate(layerWidth, layerHeight, scaledRadius, depthPx,
+    auto lightMaps = GlassHighlightMap::Generate(layerWidth, layerHeight, scaledRadius, depthPxHL,
                                                  _splay, _lightAngle, highlightOpacity);
 
     // Draw specular highlight (white, alpha varies, SrcOver blend)
