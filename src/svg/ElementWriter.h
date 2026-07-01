@@ -110,11 +110,6 @@ class ElementWriter {
   void addImageShaderResources(const ImageShader* shader, const Matrix& matrix, Context* context,
                                Resources* resources);
 
-  void addBlendColorFilterResources(const ModeColorFilter* modeColorFilter, Resources* resources);
-
-  void addMatrixColorFilterResources(const MatrixColorFilter* matrixColorFilter,
-                                     Resources* resources);
-
   void addMatrixColorFilterPrimitives(const MatrixColorFilter* matrixColorFilter,
                                       const std::string& inputResult = "",
                                       const std::string& outputResult = "");
@@ -180,8 +175,8 @@ class ElementWriter {
                                  const std::string& inputResult = "",
                                  bool preserveSoftAlpha = false);
   void addColorImageFilter(const ColorImageFilter* filter, const std::string& inputResult = "");
-  void addBlendImageFilter(const BlendImageFilter* filter, const std::string& inputResult = "",
-                           const Rect* filterBounds = nullptr, Context* context = nullptr);
+  void addBlendImageFilter(const BlendImageFilter* filter, const std::string& inputResult,
+                           const Rect* filterBounds, Context* context);
 
   std::string emitShaderAsPrimitive(const Shader* shader, const Matrix& shaderMatrix,
                                     const Rect* filterBounds, Context* context);

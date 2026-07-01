@@ -290,34 +290,22 @@ Resources ElementWriter::addColorFilterResource(const std::shared_ptr<ColorFilte
   if (!colorFilter) {
     return resources;
   }
-  switch (Types::Get(colorFilter.get())) {
-    case Types::ColorFilterType::Blend:
-      addBlendColorFilterResources(static_cast<const ModeColorFilter*>(colorFilter.get()),
-                                   &resources);
-      break;
-    case Types::ColorFilterType::Matrix:
-      addMatrixColorFilterResources(static_cast<const MatrixColorFilter*>(colorFilter.get()),
-                                    &resources);
-      break;
-    case Types::ColorFilterType::Compose:
-    case Types::ColorFilterType::Luma:
-    case Types::ColorFilterType::AlphaThreshold: {
-      std::string filterID = resourceStore->addFilter();
-      {
-        ElementWriter filterElement("filter", writer);
-        filterElement.addAttribute("id", filterID);
-        filterElement.addAttribute("color-interpolation-filters", "sRGB");
-        filterElement.addAttribute("x", "0%");
-        filterElement.addAttribute("y", "0%");
-        filterElement.addAttribute("width", "100%");
-        filterElement.addAttribute("height", "100%");
-        addColorFilterPrimitives(colorFilter);
-      }
-      resources.filter = "url(#" + filterID + ")";
-      break;
+  auto type = Types::Get(colorFilter.get());
+  if (type == Types::ColorFilterType::Blend || type == Types::ColorFilterType::Matrix ||
+      type == Types::ColorFilterType::Compose || type == Types::ColorFilterType::Luma ||
+      type == Types::ColorFilterType::AlphaThreshold) {
+    std::string filterID = resourceStore->addFilter();
+    {
+      ElementWriter filterElement("filter", writer);
+      filterElement.addAttribute("id", filterID);
+      filterElement.addAttribute("color-interpolation-filters", "sRGB");
+      filterElement.addAttribute("x", "0%");
+      filterElement.addAttribute("y", "0%");
+      filterElement.addAttribute("width", "100%");
+      filterElement.addAttribute("height", "100%");
+      addColorFilterPrimitives(colorFilter);
     }
-    default:
-      break;
+    resources.filter = "url(#" + filterID + ")";
   }
   return resources;
 }
@@ -1421,44 +1409,6 @@ void ElementWriter::addImageShaderResources(const ImageShader* shader, const Mat
     imageTag.addAttribute("xlink:href", static_cast<const char*>(dataUri->data()));
   }
   resources->paintColor = "url(#" + patternID + ")";
-}
-
-void ElementWriter::addBlendColorFilterResources(const ModeColorFilter* modeColorFilter,
-                                                 Resources* resources) {
-  auto blendModeString = ToSVGBlendMode(modeColorFilter->mode);
-  if (blendModeString.empty()) {
-    reportUnsupportedElement("Unsupported blend mode in color filter");
-    return;
-  }
-
-  std::string filterID = resourceStore->addFilter();
-  {
-    ElementWriter filterElement("filter", writer);
-    filterElement.addAttribute("id", filterID);
-    filterElement.addAttribute("color-interpolation-filters", "sRGB");
-    filterElement.addAttribute("x", "0%");
-    filterElement.addAttribute("y", "0%");
-    filterElement.addAttribute("width", "100%");
-    filterElement.addAttribute("height", "100%");
-    addBlendColorFilterPrimitives(modeColorFilter);
-  }
-  resources->filter = "url(#" + filterID + ")";
-}
-
-void ElementWriter::addMatrixColorFilterResources(const MatrixColorFilter* matrixColorFilter,
-                                                  Resources* resources) {
-  std::string filterID = resourceStore->addFilter();
-  {
-    ElementWriter filterElement("filter", writer);
-    filterElement.addAttribute("id", filterID);
-    filterElement.addAttribute("color-interpolation-filters", "sRGB");
-    filterElement.addAttribute("x", "0%");
-    filterElement.addAttribute("y", "0%");
-    filterElement.addAttribute("width", "100%");
-    filterElement.addAttribute("height", "100%");
-    addMatrixColorFilterPrimitives(matrixColorFilter);
-  }
-  resources->filter = "url(#" + filterID + ")";
 }
 
 void ElementWriter::addMaskResources(const std::shared_ptr<MaskFilter>& maskFilter,
