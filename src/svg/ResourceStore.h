@@ -64,6 +64,10 @@ class ResourceStore {
     return "mask_" + std::to_string(maskCount++);
   }
 
+  std::string addFilterResult() {
+    return "fr" + std::to_string(filterResultCount++);
+  }
+
  private:
   uint32_t gradientCount = 0;
   uint32_t pathCount = 0;
@@ -72,6 +76,7 @@ class ResourceStore {
   uint32_t filterCount = 0;
   uint32_t clipCount = 0;
   uint32_t maskCount = 0;
+  uint32_t filterResultCount = 0;
 };
 
 }  // namespace tgfx
