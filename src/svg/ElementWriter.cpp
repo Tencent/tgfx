@@ -390,7 +390,7 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
 }
 
 std::vector<std::string> ElementWriter::addImageFilterChain(
-    const std::shared_ptr<ImageFilter>& imageFilter, Rect bound,
+    const std::shared_ptr<ImageFilter>& imageFilter, const Rect& bound,
     const std::shared_ptr<SVGCustomWriter>& exportWriter, Context* context) {
   if (!imageFilter) {
     return {};

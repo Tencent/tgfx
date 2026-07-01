@@ -85,7 +85,7 @@ class ElementWriter {
    * elements. Must be called within a parent <defs> element.
    */
   std::vector<std::string> addImageFilterChain(const std::shared_ptr<ImageFilter>& imageFilter,
-                                               Rect bound,
+                                               const Rect& bound,
                                                const std::shared_ptr<SVGCustomWriter>& exportWriter,
                                                Context* context);
 
