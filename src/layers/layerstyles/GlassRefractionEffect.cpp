@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GlassRefractionEffect.h"
+#include <cstdio>
 #include <string>
 #include "tgfx/gpu/GPU.h"
 
@@ -36,30 +37,34 @@ static constexpr char GLASS_VERTEX_SHADER[] = R"(
     }
 )";
 
+// The fragment shader uses two coordinate systems:
+// - vTexCoord: UV for sampling the source (background) texture, range [0,1] over the source image.
+// - dispMapUV: UV for sampling the displacement map, computed from vTexCoord using uDispMapOffset
+//   and uDispMapScale. The displacement map covers the glass layer region, which is a sub-region
+//   of the source texture.
+// The displacement offset is in pixels, converted to source texture UV space using uPixelToUV.
 static constexpr char GLASS_FRAGMENT_SHADER[] = R"(
     precision mediump float;
     in vec2 vTexCoord;
     uniform sampler2D uSource;
     uniform sampler2D uDisplacement;
     layout(std140) uniform GlassUniforms {
-        float uScale;
+        vec2 uDispMapOffset;
+        vec2 uDispMapScale;
+        vec2 uPixelToUV;
+        float uMaxDispPixels;
         float uDispersion;
     };
     out vec4 tgfx_FragColor;
     void main() {
-        vec2 disp = texture(uDisplacement, vTexCoord).rg;
-        vec2 offset = (disp - 0.5) * 2.0 * uScale;
-        if (uDispersion < 0.001) {
-            tgfx_FragColor = texture(uSource, vTexCoord + offset);
-        } else {
-            float scaleR = 1.0 + uDispersion;
-            float scaleB = 1.0 - uDispersion;
-            float r = texture(uSource, vTexCoord + offset * scaleR).r;
-            float g = texture(uSource, vTexCoord + offset).g;
-            float b = texture(uSource, vTexCoord + offset * scaleB).b;
-            float a = texture(uSource, vTexCoord + offset).a;
-            tgfx_FragColor = vec4(r, g, b, a);
+        vec2 dispMapUV = (vTexCoord - uDispMapOffset) * uDispMapScale;
+        if (dispMapUV.x < 0.0 || dispMapUV.x > 1.0 || dispMapUV.y < 0.0 || dispMapUV.y > 1.0) {
+            tgfx_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+            return;
         }
+        vec2 disp = texture(uDisplacement, dispMapUV).rg;
+        // Debug: visualize normal direction. disp encodes (nx, ny) as 0.5 + val*0.5
+        tgfx_FragColor = vec4(disp.r, disp.g, 0.5, 1.0);
     }
 )";
 
@@ -71,9 +76,10 @@ static std::string GetFinalShaderCode(const char* codeSnippet, bool isDesktop) {
 }
 
 GlassRefractionEffect::GlassRefractionEffect(std::shared_ptr<Image> displacementMap,
-                                             float displacementScale, float dispersion)
+                                             float displacementScale, float dispersion,
+                                             float glassWidth, float glassHeight)
     : RuntimeEffect({displacementMap}), _displacementScale(displacementScale),
-      _dispersion(dispersion) {
+      _dispersion(dispersion), _glassWidth(glassWidth), _glassHeight(glassHeight) {
 }
 
 std::shared_ptr<RenderPipeline> GlassRefractionEffect::createPipeline(GPU* gpu) const {
@@ -117,14 +123,11 @@ void GlassRefractionEffect::collectVertices(const Texture* source, const Texture
   auto targetWidth = static_cast<float>(target->width());
   auto targetHeight = static_cast<float>(target->height());
 
-  // Full-screen quad in NDC with texture coordinates covering the source region
-  // Vertex order: bottom-left, bottom-right, top-left, top-right (TriangleStrip)
   float left = offset.x;
   float top = offset.y;
   float right = offset.x + sourceWidth;
   float bottom = offset.y + sourceHeight;
 
-  // Convert pixel coordinates to NDC [-1, 1]
   float ndcLeft = 2.0f * left / targetWidth - 1.0f;
   float ndcRight = 2.0f * right / targetWidth - 1.0f;
   float ndcTop = 2.0f * top / targetHeight - 1.0f;
@@ -212,9 +215,30 @@ bool GlassRefractionEffect::onDraw(CommandEncoder* encoder,
   auto dispSampler = gpu->createSampler(dispSamplerDesc);
   renderPass->setTexture(1, inputTextures[1], dispSampler);
 
-  // Create and fill uniform buffer with scale and dispersion
-  // Pack both floats into one buffer: [scale, dispersion]
-  size_t uniformSize = 2 * sizeof(float);
+  // Compute UV mapping between source texture and displacement map.
+  // The displacement map covers the glass layer region, which may be a sub-region of the source.
+  // Source texture UV [0,1] maps to the full background image.
+  // Displacement map UV [0,1] maps to the glass layer bounds within that background.
+  // Since the source texture is the background cropped/filtered region and the glass layer
+  // content is centered within it, we assume the displacement map aligns with the source center.
+  auto sourceWidth = static_cast<float>(inputTextures[0]->width());
+  auto sourceHeight = static_cast<float>(inputTextures[0]->height());
+
+  // dispMapOffset: source UV where the displacement map's top-left corner starts
+  // dispMapScale: ratio to convert source UV range to displacement map UV [0,1]
+  float dispMapOffsetX =
+      (_glassWidth < sourceWidth) ? (1.0f - _glassWidth / sourceWidth) * 0.5f : 0.0f;
+  float dispMapOffsetY =
+      (_glassHeight < sourceHeight) ? (1.0f - _glassHeight / sourceHeight) * 0.5f : 0.0f;
+  float dispMapScaleX = (_glassWidth > 0.0f) ? sourceWidth / _glassWidth : 1.0f;
+  float dispMapScaleY = (_glassHeight > 0.0f) ? sourceHeight / _glassHeight : 1.0f;
+
+  // pixelToUV: converts pixel displacement to source texture UV offset
+  float pixelToUVx = 1.0f / sourceWidth;
+  float pixelToUVy = 1.0f / sourceHeight;
+
+  // std140 layout: vec2 + vec2 + vec2 + float + float = 8 floats (32 bytes, naturally aligned)
+  size_t uniformSize = 8 * sizeof(float);
   auto uniformBuffer = gpu->createBuffer(uniformSize, GPUBufferUsage::UNIFORM);
   if (uniformBuffer == nullptr) {
     return false;
@@ -223,10 +247,14 @@ bool GlassRefractionEffect::onDraw(CommandEncoder* encoder,
   if (uniformData == nullptr) {
     return false;
   }
-  // Normalize displacement scale relative to texture dimensions
-  auto sourceWidth = static_cast<float>(inputTextures[0]->width());
-  uniformData[0] = _displacementScale / sourceWidth;
-  uniformData[1] = _dispersion;
+  uniformData[0] = dispMapOffsetX;      // uDispMapOffset.x
+  uniformData[1] = dispMapOffsetY;      // uDispMapOffset.y
+  uniformData[2] = dispMapScaleX;       // uDispMapScale.x
+  uniformData[3] = dispMapScaleY;       // uDispMapScale.y
+  uniformData[4] = pixelToUVx;          // uPixelToUV.x
+  uniformData[5] = pixelToUVy;          // uPixelToUV.y
+  uniformData[6] = _displacementScale;  // uMaxDispPixels (in pixels, not normalized)
+  uniformData[7] = _dispersion;         // uDispersion
   uniformBuffer->unmap();
   renderPass->setUniformBuffer(0, uniformBuffer, 0, uniformSize);
 

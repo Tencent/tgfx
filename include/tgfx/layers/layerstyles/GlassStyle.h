@@ -140,6 +140,8 @@ class GlassStyle : public LayerStyle {
              float lightAngle, float lightIntensity);
 
   std::shared_ptr<ImageFilter> getFrostFilter(float contentScale);
+  std::shared_ptr<Image> getCachedDisplacementMap(int width, int height, float scaledRadius,
+                                                  float depthPx, float ior);
 
   float _refraction = 50.0f;
   float _depth = 15.0f;
@@ -152,6 +154,14 @@ class GlassStyle : public LayerStyle {
 
   std::shared_ptr<ImageFilter> frostFilter = nullptr;
   float currentFrostScale = 0.0f;
+
+  // Displacement map cache
+  std::shared_ptr<Image> cachedDispMap = nullptr;
+  int cachedDispWidth = 0;
+  int cachedDispHeight = 0;
+  float cachedDispRadius = 0.0f;
+  float cachedDispDepth = 0.0f;
+  float cachedDispIOR = 0.0f;
 };
 
 }  // namespace tgfx

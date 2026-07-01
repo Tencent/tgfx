@@ -25,108 +25,30 @@
 
 namespace tgfx {
 
-// Computes the signed distance from a point to a rounded rectangle centered at origin.
-// Negative values are inside, positive values are outside.
+static constexpr float PI = 3.14159265358979323846f;
+
 static float RoundedRectSDF(float px, float py, float halfWidth, float halfHeight, float radius) {
   float qx = std::abs(px) - halfWidth + radius;
   float qy = std::abs(py) - halfHeight + radius;
-  float outsideDist =
-      std::sqrt(std::max(qx, 0.0f) * std::max(qx, 0.0f) + std::max(qy, 0.0f) * std::max(qy, 0.0f));
+  float outsideDist = std::sqrt(std::max(qx, 0.0f) * std::max(qx, 0.0f) +
+                                std::max(qy, 0.0f) * std::max(qy, 0.0f));
   float insideDist = std::min(std::max(qx, qy), 0.0f);
   return outsideDist + insideDist - radius;
 }
 
-// Computes the gradient (normal direction) of the rounded rect SDF at a point.
-// Returns a normalized 2D vector pointing away from the nearest edge.
-static void RoundedRectNormal(float px, float py, float halfWidth, float halfHeight, float radius,
-                              float* nx, float* ny) {
-  float qx = std::abs(px) - halfWidth + radius;
-  float qy = std::abs(py) - halfHeight + radius;
-
-  float gradX = 0.0f;
-  float gradY = 0.0f;
-
-  if (qx > 0.0f && qy > 0.0f) {
-    // In the corner region: gradient points radially from corner center
-    gradX = qx;
-    gradY = qy;
-  } else if (qx > qy) {
-    // Closest to vertical edge
-    gradX = 1.0f;
-    gradY = 0.0f;
-  } else {
-    // Closest to horizontal edge
-    gradX = 0.0f;
-    gradY = 1.0f;
-  }
-
-  // Restore sign based on quadrant
-  if (px < 0.0f) {
-    gradX = -gradX;
-  }
-  if (py < 0.0f) {
-    gradY = -gradY;
-  }
-
-  float len = std::sqrt(gradX * gradX + gradY * gradY);
-  if (len > 0.0f) {
-    *nx = gradX / len;
-    *ny = gradY / len;
-  } else {
-    *nx = 0.0f;
-    *ny = 0.0f;
-  }
-}
-
-// Derivative of the squircle surface function for computing surface slope.
-// The surface function is f(t) = (1 - (1-t)^4)^0.25, mapping edge distance [0,1] to height.
-static float SquircleSurfaceDerivative(float t) {
-  if (t <= 0.0f || t >= 1.0f) {
+// SDF-based smooth surface height: cosine profile from edge (h=0) to interior (h=sagitta).
+static float SDFHeight(float px, float py, float halfWidth, float halfHeight, float radius,
+                       float depth, float sagitta) {
+  float dist = RoundedRectSDF(px, py, halfWidth, halfHeight, radius);
+  float edgeDist = -dist;
+  if (edgeDist <= 0.0f) {
     return 0.0f;
   }
-  float oneMinusT = 1.0f - t;
-  float p3 = oneMinusT * oneMinusT * oneMinusT;  // (1-t)^3
-  float p4 = p3 * oneMinusT;                     // (1-t)^4
-  float base = 1.0f - p4;
-  if (base <= 0.0f) {
-    return 0.0f;
+  if (edgeDist >= depth) {
+    return sagitta;
   }
-  // d/dt [ (1 - (1-t)^4)^0.25 ] = 0.25 * (1-(1-t)^4)^(-0.75) * 4*(1-t)^3
-  //                                = (1-t)^3 / (1-(1-t)^4)^0.75
-  return p3 / std::pow(base, 0.75f);
-}
-
-// Applies Snell's Law in 2D to compute the refraction displacement.
-// incident: the viewing direction (assumed to be straight down, i.e. (0,0,-1) in 3D)
-// surfaceNormal: 2D normal of the glass surface at this point
-// ior: index of refraction of the glass
-// Returns the 2D displacement (dx, dy) in pixels.
-static void ComputeRefractionOffset(float surfaceSlope, float normalX, float normalY, float ior,
-                                    float thickness, float* dx, float* dy) {
-  // The surface slope determines the angle of incidence
-  // For a ray going straight down hitting a tilted surface:
-  // sin(theta_i) = surfaceSlope / sqrt(1 + surfaceSlope^2)
-  float sinIncident = surfaceSlope / std::sqrt(1.0f + surfaceSlope * surfaceSlope);
-
-  // Snell's Law: n1 * sin(theta_i) = n2 * sin(theta_t)
-  // n1 = 1.0 (air), n2 = ior
-  float sinRefracted = sinIncident / ior;
-  sinRefracted = std::max(-1.0f, std::min(1.0f, sinRefracted));
-
-  // The lateral displacement through a glass slab of given thickness:
-  // displacement = thickness * tan(theta_t) - thickness * tan(theta_i)
-  // Simplified: displacement = thickness * (tan(theta_t) - tan(theta_i))
-  // But since we want the apparent shift of the background:
-  // displacement = thickness * (sin(theta_i) - sin(theta_t)) / cos(theta_t)
-  float cosRefracted = std::sqrt(1.0f - sinRefracted * sinRefracted);
-  float displacement = 0.0f;
-  if (cosRefracted > 0.001f) {
-    displacement = thickness * (sinIncident - sinRefracted) / cosRefracted;
-  }
-
-  // Project the displacement along the 2D normal direction
-  *dx = displacement * normalX;
-  *dy = displacement * normalY;
+  float t = edgeDist / depth;
+  return sagitta * std::sin(t * PI * 0.5f);
 }
 
 std::shared_ptr<Image> GlassDisplacementMap::Generate(int width, int height, float cornerRadius,
@@ -137,50 +59,106 @@ std::shared_ptr<Image> GlassDisplacementMap::Generate(int width, int height, flo
 
   float halfWidth = static_cast<float>(width) * 0.5f;
   float halfHeight = static_cast<float>(height) * 0.5f;
-  float radius = std::min(cornerRadius, std::min(halfWidth, halfHeight));
+  float crRadius = std::min(cornerRadius, std::min(halfWidth, halfHeight));
   float maxDepth = std::min(halfWidth, halfHeight) - 1.0f;
   depth = std::min(depth, maxDepth);
 
-  // The glass "thickness" for Snell's law displacement calculation scales with depth
-  float glassThickness = depth * 0.5f;
+  float sagitta = depth * 0.5f;
+
+  // Sphere for global lens normal: radius = 2 * max(halfW, halfH),
+  // centered at (0, 0, -sphereR) so the glass surface is inscribed at z=0.
+  float sphereR = 2.0f * std::max(halfWidth, halfHeight);
+
+  // Precompute max displacement for encoding normalization.
+  float maxSlope = sagitta * PI * 0.5f / depth;
+  float nLen = std::sqrt(maxSlope * maxSlope + 1.0f);
+  float maxSinI = maxSlope / nLen;
+  float maxSinR = std::min(maxSinI / ior, 0.99f);
+  float maxCosI = 1.0f / nLen;
+  float maxCosR = std::sqrt(1.0f - maxSinR * maxSinR);
+  float maxTanI = maxSinI / std::max(maxCosI, 0.001f);
+  float maxTanR = maxSinR / std::max(maxCosR, 0.001f);
+  float maxDisp = sagitta * std::abs(maxTanI - maxTanR) * 1.5f;
+  if (maxDisp < 1.0f) {
+    maxDisp = 1.0f;
+  }
+
+  float eta = 1.0f / ior;
+  constexpr float eps = 0.5f;
 
   std::vector<uint8_t> pixels(static_cast<size_t>(width) * static_cast<size_t>(height) * 4);
 
   for (int y = 0; y < height; y++) {
     for (int x = 0; x < width; x++) {
-      // Convert to centered coordinates
       float px = static_cast<float>(x) - halfWidth + 0.5f;
       float py = static_cast<float>(y) - halfHeight + 0.5f;
-
-      // Compute SDF distance (negative = inside)
-      float dist = RoundedRectSDF(px, py, halfWidth, halfHeight, radius);
-
-      // Only pixels within the depth region get displacement
-      // dist is negative inside, so edge distance from inside = -dist
-      float edgeDist = -dist;
 
       float dispX = 0.0f;
       float dispY = 0.0f;
 
-      if (edgeDist > 0.0f && edgeDist < depth) {
-        // Normalized position within the refraction band [0=edge, 1=deep inside]
-        float t = edgeDist / depth;
+      float h = SDFHeight(px, py, halfWidth, halfHeight, crRadius, depth, sagitta);
 
-        // Compute surface slope from the squircle function
-        float slope = SquircleSurfaceDerivative(t);
+      if (h > 0.001f) {
+        // --- Normal 1: SDF-based surface normal (numerical derivatives) ---
+        float hxp = SDFHeight(px + eps, py, halfWidth, halfHeight, crRadius, depth, sagitta);
+        float hxm = SDFHeight(px - eps, py, halfWidth, halfHeight, crRadius, depth, sagitta);
+        float hyp = SDFHeight(px, py + eps, halfWidth, halfHeight, crRadius, depth, sagitta);
+        float hym = SDFHeight(px, py - eps, halfWidth, halfHeight, crRadius, depth, sagitta);
+        float dhdx = (hxp - hxm) / (2.0f * eps);
+        float dhdy = (hyp - hym) / (2.0f * eps);
 
-        // Get the 2D edge normal direction
-        float nx = 0.0f;
-        float ny = 0.0f;
-        RoundedRectNormal(px, py, halfWidth, halfHeight, radius, &nx, &ny);
+        float sdfNx = -dhdx;
+        float sdfNy = -dhdy;
+        float sdfNz = 1.0f;
+        float sdfLen = std::sqrt(sdfNx * sdfNx + sdfNy * sdfNy + sdfNz * sdfNz);
+        sdfNx /= sdfLen;
+        sdfNy /= sdfLen;
+        sdfNz /= sdfLen;
 
-        // Compute refraction displacement
-        ComputeRefractionOffset(slope, nx, ny, ior, glassThickness, &dispX, &dispY);
+        // --- Normal 2: Global sphere normal ---
+        // Sphere center at (0, 0, -sphereR), pixel at (px, py, h).
+        // Vector from sphere center to pixel = (px, py, h + sphereR)
+        float gx = px;
+        float gy = py;
+        float gz = h + sphereR;
+        float gLen = std::sqrt(gx * gx + gy * gy + gz * gz);
+        float sphereNx = gx / gLen;
+        float sphereNy = gy / gLen;
+        float sphereNz = gz / gLen;
+
+        // --- Blend: SDF normal only within cornerRadius distance from edge ---
+        float dist = RoundedRectSDF(px, py, halfWidth, halfHeight, crRadius);
+        float edgeDist = -dist;
+        float sdfWeight = 0.0f;
+        if (edgeDist < crRadius && crRadius > 0.0f) {
+          float t = edgeDist / crRadius;
+          sdfWeight = (1.0f - t) * (1.0f - t);
+        }
+
+        float nx = sdfNx * sdfWeight + sphereNx * (1.0f - sdfWeight);
+        float ny = sdfNy * sdfWeight + sphereNy * (1.0f - sdfWeight);
+        float nz = sdfNz * sdfWeight + sphereNz * (1.0f - sdfWeight);
+        float finalLen = std::sqrt(nx * nx + ny * ny + nz * nz);
+        nx /= finalLen;
+        ny /= finalLen;
+        nz /= finalLen;
+
+        // --- 3D Snell's Law ---
+        float cosI = nz;
+        float sinR2 = eta * eta * (1.0f - cosI * cosI);
+        if (sinR2 < 1.0f) {
+          float cosR = std::sqrt(1.0f - sinR2);
+          float factor = eta * cosI - cosR;
+          float tx = factor * nx;
+          float ty = factor * ny;
+          float tz = eta * (-1.0f) + factor * nz;
+          if (std::abs(tz) > 0.001f) {
+            dispX = (tx / tz) * h;
+            dispY = (ty / tz) * h;
+          }
+        }
       }
 
-      // Encode displacement to [0, 255] range. 128 = no displacement.
-      // Normalize displacement relative to a maximum expected displacement
-      float maxDisp = glassThickness * 2.0f;
       float encodedX = (dispX / maxDisp) * 0.5f + 0.5f;
       float encodedY = (dispY / maxDisp) * 0.5f + 0.5f;
       encodedX = std::max(0.0f, std::min(1.0f, encodedX));
@@ -188,10 +166,10 @@ std::shared_ptr<Image> GlassDisplacementMap::Generate(int width, int height, flo
 
       size_t offset =
           (static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(x)) * 4;
-      pixels[offset + 0] = static_cast<uint8_t>(encodedX * 255.0f);  // R = horizontal offset
-      pixels[offset + 1] = static_cast<uint8_t>(encodedY * 255.0f);  // G = vertical offset
-      pixels[offset + 2] = 0;                                        // B unused
-      pixels[offset + 3] = 255;                                      // A opaque
+      pixels[offset + 0] = static_cast<uint8_t>(encodedX * 255.0f);
+      pixels[offset + 1] = static_cast<uint8_t>(encodedY * 255.0f);
+      pixels[offset + 2] = 0;
+      pixels[offset + 3] = 255;
     }
   }
 

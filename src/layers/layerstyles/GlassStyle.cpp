@@ -17,6 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/layerstyles/GlassStyle.h"
+#include <algorithm>
+#include <cmath>
+#include "GlassDisplacementMap.h"
+#include "GlassHighlightMap.h"
+#include "GlassRefractionEffect.h"
 #include "core/utils/Log.h"
 
 namespace tgfx {
@@ -102,10 +107,15 @@ void GlassStyle::setCornerRadius(float radius) {
 
 Rect GlassStyle::filterBackground(const Rect& srcRect, float contentScale) {
   auto filter = getFrostFilter(contentScale);
-  if (!filter) {
-    return srcRect;
+  if (filter) {
+    return filter->filterBounds(srcRect);
   }
-  return filter->filterBounds(srcRect);
+  // Even without frost, refraction still needs the background content. Return a slightly expanded
+  // rect so the Layer system triggers background capture.
+  if (_refraction > 0 || _lightIntensity > 0) {
+    return srcRect.makeOutset(1.0f, 1.0f);
+  }
+  return srcRect;
 }
 
 void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, BlendMode) {
@@ -130,9 +140,50 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
     }
   }
 
-  // TODO(Phase 2): Generate displacement map and apply refraction
-  // TODO(Phase 3): Apply dispersion (RGB channel splitting)
-  // TODO(Phase 4): Generate and composite highlight/shadow maps
+  // Step 2 & 3: Generate displacement map and apply refraction with dispersion
+  if (_refraction > 0) {
+    int layerWidth = input.content->width();
+    int layerHeight = input.content->height();
+
+    float ior = 1.0f + (_refraction / 100.0f) * 4.0f;
+    float maxDepth =
+        std::min(static_cast<float>(layerWidth), static_cast<float>(layerHeight)) * 0.5f - 1.0f;
+    float depthPx = (_depth / 100.0f) * maxDepth;
+    float scaledRadius = _cornerRadius * input.contentScale;
+
+    auto dispMap = getCachedDisplacementMap(layerWidth, layerHeight, scaledRadius, depthPx, ior);
+    if (dispMap) {
+      float channelOffset = (_dispersion / 100.0f) * 0.15f;
+      // displacementScale must match the encoding normalization in GlassDisplacementMap.
+      // The spherical lens model computes maxDisp dynamically based on sagitta and ior.
+      // Replicate the same formula here to ensure correct decoding.
+      float sagitta = depthPx * 0.5f;
+      float sphereR = (depthPx * depthPx + sagitta * sagitta) / (2.0f * sagitta);
+      float maxSinI = std::min(depthPx / sphereR, 0.99f);
+      float maxSinR = maxSinI / ior;
+      float maxCosI = std::sqrt(1.0f - maxSinI * maxSinI);
+      float maxCosR = std::sqrt(1.0f - maxSinR * maxSinR);
+      float maxTanDiff =
+          (maxCosI > 0.001f && maxCosR > 0.001f) ? (maxSinI / maxCosI - maxSinR / maxCosR) : 1.0f;
+      float displacementScale = sagitta * maxTanDiff * 1.2f * 10.0f;
+      if (displacementScale < 1.0f) {
+        displacementScale = 1.0f;
+      }
+      auto refractionEffect = std::make_shared<GlassRefractionEffect>(
+          dispMap, displacementScale, channelOffset, static_cast<float>(layerWidth),
+          static_cast<float>(layerHeight));
+      auto refractionFilter = ImageFilter::Runtime(refractionEffect);
+      Point refractOffset = {};
+      auto clipRect = Rect::MakeWH(static_cast<float>(processedBg->width()),
+                                   static_cast<float>(processedBg->height()));
+      auto refractedImage =
+          processedBg->makeWithFilter(std::move(refractionFilter), &refractOffset, &clipRect);
+      if (refractedImage) {
+        processedBg = refractedImage;
+        processedOffset += refractOffset;
+      }
+    }
+  }
 
   // Mask the processed background with the layer content shape
   auto maskShader = Shader::MakeImageShader(input.content, TileMode::Decal, TileMode::Decal);
@@ -140,6 +191,38 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
   paint.setMaskFilter(MaskFilter::MakeShader(maskShader, false));
   paint.setBlendMode(BlendMode::Src);
   canvas->drawImage(processedBg, processedOffset.x, processedOffset.y, &paint);
+
+  // Step 4: Generate and composite highlight/shadow maps
+  if (_lightIntensity > 0) {
+    int layerWidth = input.content->width();
+    int layerHeight = input.content->height();
+    float maxDepth =
+        std::min(static_cast<float>(layerWidth), static_cast<float>(layerHeight)) * 0.5f - 1.0f;
+    float depthPx = (_depth / 100.0f) * maxDepth;
+    float scaledRadius = _cornerRadius * input.contentScale;
+    float highlightOpacity = _lightIntensity / 100.0f;
+
+    auto lightMaps = GlassHighlightMap::Generate(layerWidth, layerHeight, scaledRadius, depthPx,
+                                                 _splay, _lightAngle, highlightOpacity);
+
+    // Draw specular highlight (white, alpha varies, SrcOver blend)
+    if (lightMaps.highlight) {
+      Paint highlightPaint = {};
+      highlightPaint.setMaskFilter(MaskFilter::MakeShader(maskShader, false));
+      highlightPaint.setBlendMode(BlendMode::SrcOver);
+      canvas->drawImage(lightMaps.highlight, input.contentOffset.x, input.contentOffset.y,
+                        &highlightPaint);
+    }
+
+    // Draw inner shadow (directional dark/light edges, SrcOver blend)
+    if (lightMaps.innerShadow) {
+      Paint shadowPaint = {};
+      shadowPaint.setMaskFilter(MaskFilter::MakeShader(maskShader, false));
+      shadowPaint.setBlendMode(BlendMode::SrcOver);
+      canvas->drawImage(lightMaps.innerShadow, input.contentOffset.x, input.contentOffset.y,
+                        &shadowPaint);
+    }
+  }
 }
 
 std::shared_ptr<ImageFilter> GlassStyle::getFrostFilter(float contentScale) {
@@ -153,6 +236,22 @@ std::shared_ptr<ImageFilter> GlassStyle::getFrostFilter(float contentScale) {
   float sigma = (_frost / 100.0f) * MaxFrostSigma * contentScale;
   frostFilter = ImageFilter::Blur(sigma, sigma, TileMode::Mirror);
   return frostFilter;
+}
+
+std::shared_ptr<Image> GlassStyle::getCachedDisplacementMap(int width, int height,
+                                                            float scaledRadius, float depthPx,
+                                                            float ior) {
+  if (cachedDispMap && cachedDispWidth == width && cachedDispHeight == height &&
+      cachedDispRadius == scaledRadius && cachedDispDepth == depthPx && cachedDispIOR == ior) {
+    return cachedDispMap;
+  }
+  cachedDispMap = GlassDisplacementMap::Generate(width, height, scaledRadius, depthPx, ior);
+  cachedDispWidth = width;
+  cachedDispHeight = height;
+  cachedDispRadius = scaledRadius;
+  cachedDispDepth = depthPx;
+  cachedDispIOR = ior;
+  return cachedDispMap;
 }
 
 }  // namespace tgfx

@@ -48,6 +48,7 @@
 #include "tgfx/layers/filters/DropShadowFilter.h"
 #include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
+#include "tgfx/layers/layerstyles/GlassStyle.h"
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
 #include "tgfx/layers/layerstyles/NoiseStyle.h"
 #include "tgfx/layers/vectors/Ellipse.h"
@@ -3894,6 +3895,198 @@ TGFX_TEST(LayerTest, InnerShadow) {
   BuildShadowTestLayers(*displayList, ShadowType::Inner, cellW, cellH, gap);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/InnerShadow"));
+}
+
+// Creates a single glass cell: background image + colored rect + glass panel at (x, y).
+static void AddGlassCell(Layer* root, std::shared_ptr<Image> bgImage, float x, float y,
+                         float cellSize, float refraction, float depth, float frost,
+                         float dispersion, float splay, float lightAngle, float lightIntensity,
+                         float cornerRadius) {
+  auto container = Layer::Make();
+  container->setMatrix(Matrix::MakeTrans(x, y));
+
+  // Background image scaled to fill the cell
+  if (bgImage) {
+    auto imgLayer = ImageLayer::Make();
+    imgLayer->setImage(bgImage);
+    auto scale = cellSize / static_cast<float>(std::max(bgImage->width(), bgImage->height()));
+    imgLayer->setMatrix(Matrix::MakeScale(scale, scale));
+    container->addChild(imgLayer);
+  }
+
+  // Colored rectangles for refraction contrast
+  auto blueRect = ShapeLayer::Make();
+  Path bluePath = {};
+  bluePath.addRect(
+      Rect::MakeXYWH(cellSize * 0.15f, cellSize * 0.15f, cellSize * 0.4f, cellSize * 0.4f));
+  blueRect->setPath(bluePath);
+  blueRect->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 100, 255, 255)));
+  container->addChild(blueRect);
+
+  auto greenCircle = ShapeLayer::Make();
+  Path greenPath = {};
+  greenPath.addOval(
+      Rect::MakeXYWH(cellSize * 0.45f, cellSize * 0.45f, cellSize * 0.4f, cellSize * 0.4f));
+  greenCircle->setPath(greenPath);
+  greenCircle->setFillStyle(ShapeStyle::Make(Color::FromRGBA(50, 200, 80, 200)));
+  container->addChild(greenCircle);
+
+  // Glass panel
+  float glassSize = cellSize - 20;
+  auto glassLayer = SolidLayer::Make();
+  glassLayer->setColor(Color::FromRGBA(255, 255, 255, 128));
+  glassLayer->setWidth(glassSize);
+  glassLayer->setHeight(glassSize);
+  glassLayer->setRadiusX(cornerRadius);
+  glassLayer->setRadiusY(cornerRadius);
+  glassLayer->setMatrix(Matrix::MakeTrans(10, 10));
+  auto style =
+      GlassStyle::Make(refraction, depth, frost, dispersion, splay, lightAngle, lightIntensity);
+  style->setCornerRadius(cornerRadius);
+  glassLayer->setLayerStyles({style});
+  container->addChild(glassLayer);
+
+  root->addChild(container);
+}
+
+TGFX_TEST(LayerTest, GlassStyle) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // 7 rows (one per parameter) x 3 columns (low / medium / high)
+  constexpr float cellSize = 200;
+  constexpr float gap = 10;
+  constexpr int cols = 3;
+  constexpr int rows = 7;
+  int surfaceW = static_cast<int>(cols * (cellSize + gap) + gap);
+  int surfaceH = static_cast<int>(rows * (cellSize + gap) + gap);
+  auto surface = Surface::Make(context, surfaceW, surfaceH);
+  auto displayList = std::make_unique<DisplayList>();
+  auto bgImage = MakeImage("resources/apitest/imageReplacement.png");
+
+  // Default values for unchanged parameters
+  float defRef = 50, defDepth = 20, defFrost = 10, defDisp = 0;
+  float defSplay = 50, defAngle = 135, defIntensity = 50, defRadius = 16;
+
+  // Row 0: Refraction sweep (10 / 50 / 90)
+  float refractionVals[] = {10, 50, 90};
+  for (int c = 0; c < cols; c++) {
+    float cx = gap + static_cast<float>(c) * (cellSize + gap);
+    float cy = gap;
+    AddGlassCell(displayList->root(), bgImage, cx, cy, cellSize, refractionVals[c], defDepth,
+                 defFrost, defDisp, defSplay, defAngle, defIntensity, defRadius);
+  }
+
+  // Row 1: Depth sweep (5 / 25 / 60)
+  float depthVals[] = {5, 25, 60};
+  for (int c = 0; c < cols; c++) {
+    float cx = gap + static_cast<float>(c) * (cellSize + gap);
+    float cy = gap + (cellSize + gap);
+    AddGlassCell(displayList->root(), bgImage, cx, cy, cellSize, defRef, depthVals[c], defFrost,
+                 defDisp, defSplay, defAngle, defIntensity, defRadius);
+  }
+
+  // Row 2: Frost sweep (0 / 30 / 80)
+  float frostVals[] = {0, 30, 80};
+  for (int c = 0; c < cols; c++) {
+    float cx = gap + static_cast<float>(c) * (cellSize + gap);
+    float cy = gap + 2 * (cellSize + gap);
+    AddGlassCell(displayList->root(), bgImage, cx, cy, cellSize, defRef, defDepth, frostVals[c],
+                 defDisp, defSplay, defAngle, defIntensity, defRadius);
+  }
+
+  // Row 3: Dispersion sweep (0 / 40 / 90)
+  float dispVals[] = {0, 40, 90};
+  for (int c = 0; c < cols; c++) {
+    float cx = gap + static_cast<float>(c) * (cellSize + gap);
+    float cy = gap + 3 * (cellSize + gap);
+    AddGlassCell(displayList->root(), bgImage, cx, cy, cellSize, defRef, defDepth, defFrost,
+                 dispVals[c], defSplay, defAngle, defIntensity, defRadius);
+  }
+
+  // Row 4: Splay sweep (0 / 50 / 100)
+  float splayVals[] = {0, 50, 100};
+  for (int c = 0; c < cols; c++) {
+    float cx = gap + static_cast<float>(c) * (cellSize + gap);
+    float cy = gap + 4 * (cellSize + gap);
+    AddGlassCell(displayList->root(), bgImage, cx, cy, cellSize, defRef, defDepth, defFrost,
+                 defDisp, splayVals[c], defAngle, defIntensity, defRadius);
+  }
+
+  // Row 5: LightAngle sweep (0 / 135 / 270)
+  float angleVals[] = {0, 135, 270};
+  for (int c = 0; c < cols; c++) {
+    float cx = gap + static_cast<float>(c) * (cellSize + gap);
+    float cy = gap + 5 * (cellSize + gap);
+    AddGlassCell(displayList->root(), bgImage, cx, cy, cellSize, defRef, defDepth, defFrost,
+                 defDisp, defSplay, angleVals[c], defIntensity, defRadius);
+  }
+
+  // Row 6: LightIntensity sweep (0 / 50 / 100)
+  float intensityVals[] = {0, 50, 100};
+  for (int c = 0; c < cols; c++) {
+    float cx = gap + static_cast<float>(c) * (cellSize + gap);
+    float cy = gap + 6 * (cellSize + gap);
+    AddGlassCell(displayList->root(), bgImage, cx, cy, cellSize, defRef, defDepth, defFrost,
+                 defDisp, defSplay, defAngle, intensityVals[c], defRadius);
+  }
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyle"));
+}
+
+static void BuildRefractionScene(DisplayList& displayList, float refraction) {
+  auto container = Layer::Make();
+
+  // Green rectangle 200x200, its top-right corner at the glass center (200, 100)
+  auto greenRect = ShapeLayer::Make();
+  Path greenPath = {};
+  greenPath.addRect(Rect::MakeXYWH(0.0f, 100.0f, 200.0f, 200.0f));
+  greenRect->setPath(greenPath);
+  greenRect->setFillStyle(ShapeStyle::Make(Color::FromRGBA(50, 200, 80, 255)));
+  container->addChild(greenRect);
+
+  // Glass panel 200x200 at top-right, so green rect's top-right corner (200,100) = glass center
+  auto glassLayer = SolidLayer::Make();
+  glassLayer->setColor(Color::FromRGBA(255, 255, 255, 10));
+  glassLayer->setWidth(200);
+  glassLayer->setHeight(200);
+  glassLayer->setRadiusX(16);
+  glassLayer->setRadiusY(16);
+  glassLayer->setMatrix(Matrix::MakeTrans(100, 0));
+  auto style = GlassStyle::Make(refraction, 50, 0, 0, 0, 135, 0);
+  style->setCornerRadius(16);
+  glassLayer->setLayerStyles({style});
+  container->addChild(glassLayer);
+
+  displayList.root()->addChild(container);
+  // A second container is needed for the Layer system to trigger background capture
+  displayList.root()->addChild(Layer::Make());
+}
+
+TGFX_TEST(LayerTest, GlassStyleRefraction) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // Refraction = 10
+  {
+    auto surface = Surface::Make(context, 350, 350);
+    auto displayList = std::make_unique<DisplayList>();
+    BuildRefractionScene(*displayList, 10);
+    displayList->render(surface.get());
+    EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleRefraction10"));
+  }
+
+  // Refraction = 50
+  {
+    auto surface = Surface::Make(context, 350, 350);
+    auto displayList = std::make_unique<DisplayList>();
+    BuildRefractionScene(*displayList, 80);
+    displayList->render(surface.get());
+    EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleRefraction80"));
+  }
 }
 
 }  // namespace tgfx

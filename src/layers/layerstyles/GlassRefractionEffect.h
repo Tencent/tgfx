@@ -33,9 +33,11 @@ class GlassRefractionEffect : public RuntimeEffect {
    * @param displacementMap The displacement map image (R=dx, G=dy, 128=zero offset).
    * @param displacementScale The maximum displacement in pixels.
    * @param dispersion The chromatic aberration coefficient [0, 0.15]. Zero means no dispersion.
+   * @param glassWidth The glass layer width in pixels (same as displacement map width).
+   * @param glassHeight The glass layer height in pixels (same as displacement map height).
    */
   GlassRefractionEffect(std::shared_ptr<Image> displacementMap, float displacementScale,
-                        float dispersion);
+                        float dispersion, float glassWidth, float glassHeight);
 
  protected:
   bool onDraw(CommandEncoder* encoder, const std::vector<std::shared_ptr<Texture>>& inputTextures,
@@ -48,6 +50,8 @@ class GlassRefractionEffect : public RuntimeEffect {
 
   float _displacementScale = 0.0f;
   float _dispersion = 0.0f;
+  float _glassWidth = 0.0f;
+  float _glassHeight = 0.0f;
   // Pipeline requires GPU pointer only available in onDraw (which is const). Caching here avoids
   // re-creating the pipeline on every frame.
   mutable std::shared_ptr<RenderPipeline> cachedPipeline = nullptr;
