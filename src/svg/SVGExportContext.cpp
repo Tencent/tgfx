@@ -433,9 +433,7 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
       // Canvas::drawLayer (which uses drawMatrix.preTranslate(filterOffset)).
       drawImage(filterImage->source, sampling, contentMatrix, needsClip ? ClipStack{} : clip,
                 innerBrush);
-      while (!groupElements.empty()) {
-        groupElements.pop_back();
-      }
+      groupElements.clear();
       clipGroupElement = nullptr;
       currentClipPath = {};
     }
@@ -748,9 +746,7 @@ void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
     auto groupElements = buildFilterGroupElements(
         filterIDs, singleFilterRef, needsClip ? clipID : "", blendStyle, brush.color.alpha);
     picture->playback(this, matrix, needsClip ? ClipStack{} : clip);
-    while (!groupElements.empty()) {
-      groupElements.pop_back();
-    }
+    groupElements.clear();
     clipGroupElement = nullptr;
     currentClipPath = {};
   }

@@ -755,6 +755,7 @@ std::string ElementWriter::emitShaderAsPrimitive(const Shader* shader, const Mat
         svgFragment += " cy='" + FloatToString(info.points[0].y + offsetY) + "'";
         svgFragment += " r='" + FloatToString(info.radiuses[0]) + "'>";
       } else {
+        reportUnsupportedElement("Unsupported gradient type in emitShaderAsPrimitive");
         return "";
       }
       for (size_t i = 0; i < info.colors.size(); ++i) {
