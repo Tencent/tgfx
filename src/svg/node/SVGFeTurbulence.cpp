@@ -15,15 +15,12 @@ namespace tgfx {
 
 bool SVGFeTurbulence::parseAndSetAttribute(const std::string& name, const std::string& value) {
   return INHERITED::parseAndSetAttribute(name, value) ||
-         this->setNumOctaves(
-             SVGAttributeParser::parse<SVGIntegerType>("numOctaves", name, value)) ||
-         this->setSeed(SVGAttributeParser::parse<SVGNumberType>("seed", name, value)) ||
-         this->setBaseFrequency(SVGAttributeParser::parse<SVGFeTurbulenceBaseFrequency>(
-             "baseFrequency", name, value)) ||
-         this->setTurbulenceType(
-             SVGAttributeParser::parse<SVGFeTurbulenceType>("type", name, value)) ||
-         this->setStitchTiles(
-             SVGAttributeParser::parse<SVGFeStitchTiles>("stitchTiles", name, value));
+         setNumOctaves(SVGAttributeParser::parse<SVGIntegerType>("numOctaves", name, value)) ||
+         setSeed(SVGAttributeParser::parse<SVGNumberType>("seed", name, value)) ||
+         setBaseFrequency(SVGAttributeParser::parse<SVGFeTurbulenceBaseFrequency>("baseFrequency",
+                                                                                  name, value)) ||
+         setTurbulenceType(SVGAttributeParser::parse<SVGFeTurbulenceType>("type", name, value)) ||
+         setStitchTiles(SVGAttributeParser::parse<SVGFeStitchTiles>("stitchTiles", name, value));
 }
 
 template <>
@@ -74,15 +71,15 @@ bool SVGAttributeParser::parse<SVGFeStitchTiles>(SVGFeStitchTiles* stitchTiles) 
 
 std::shared_ptr<ImageFilter> SVGFeTurbulence::onMakeImageFilter(
     const SVGRenderContext&, const SVGFilterContext& filterContext) const {
-  auto freq = this->getBaseFrequency();
+  auto freq = getBaseFrequency();
   float freqX = freq.freqX();
   float freqY = freq.freqY();
-  int octaves = this->getNumOctaves();
-  float seed = this->getSeed();
+  int octaves = getNumOctaves();
+  float seed = getSeed();
 
   const ISize* tileSizePtr = nullptr;
   ISize tileSizeValue = ISize::MakeEmpty();
-  if (this->getStitchTiles().type == SVGFeStitchTiles::Type::Stitch) {
+  if (getStitchTiles().type == SVGFeStitchTiles::Type::Stitch) {
     auto region = filterContext.filterEffectsRegion();
     tileSizeValue =
         ISize::Make(static_cast<int>(region.width()), static_cast<int>(region.height()));
@@ -90,7 +87,7 @@ std::shared_ptr<ImageFilter> SVGFeTurbulence::onMakeImageFilter(
   }
 
   std::shared_ptr<Shader> noiseShader;
-  if (this->getTurbulenceType().type == SVGFeTurbulenceType::Type::FractalNoise) {
+  if (getTurbulenceType().type == SVGFeTurbulenceType::Type::FractalNoise) {
     noiseShader = Shader::MakeFractalNoise(freqX, freqY, octaves, seed, tileSizePtr);
   } else {
     noiseShader = Shader::MakeTurbulence(freqX, freqY, octaves, seed, tileSizePtr);
