@@ -4036,58 +4036,58 @@ TGFX_TEST(LayerTest, GlassStyle) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyle"));
 }
 
-static void BuildRefractionScene(DisplayList& displayList, float refraction) {
-  auto container = Layer::Make();
-
-  // Mandrill image 200x200 at (0, 100), same position as the original green rect
-  auto bgImage = MakeImage("resources/apitest/mandrill_128.png");
-  auto bgLayer = ImageLayer::Make();
-  bgLayer->setImage(bgImage);
-  auto scale = 200.0f / static_cast<float>(std::max(bgImage->width(), bgImage->height()));
-  auto matrix = Matrix::MakeScale(scale, scale);
-  matrix.postTranslate(0, 100);
-  bgLayer->setMatrix(matrix);
-  container->addChild(bgLayer);
-
-  // Glass panel 200x200 at (100, 0), same position as before
-  auto glassLayer = SolidLayer::Make();
-  glassLayer->setColor(Color::FromRGBA(255, 255, 255, 10));
-  glassLayer->setWidth(200);
-  glassLayer->setHeight(200);
-  glassLayer->setRadiusX(16);
-  glassLayer->setRadiusY(16);
-  glassLayer->setMatrix(Matrix::MakeTrans(100, -50));
-  auto style = GlassStyle::Make(refraction, 50, 0, 0, 0, 135, 0);
-  style->setCornerRadius(16);
-  glassLayer->setLayerStyles({style});
-  container->addChild(glassLayer);
-
-  displayList.root()->addChild(container);
-  displayList.root()->addChild(Layer::Make());
-}
-
 TGFX_TEST(LayerTest, GlassStyleRefraction) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  // Refraction = 10
-  {
-    auto surface = Surface::Make(context, 350, 350);
-    auto displayList = std::make_unique<DisplayList>();
-    BuildRefractionScene(*displayList, 10);
-    displayList->render(surface.get());
-    EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleRefraction10"));
-  }
+  int cellSize = 200;
+  int cols = 3;
+  int rows = 3;
+  int gap = 10;
+  int totalW = cols * cellSize + (cols - 1) * gap;
+  int totalH = rows * cellSize + (rows - 1) * gap;
+  auto surface = Surface::Make(context, totalW, totalH);
+  auto displayList = std::make_unique<DisplayList>();
+  auto bgImage = MakeImage("resources/apitest/mandrill_128.png");
 
-  // Refraction = 50
-  {
-    auto surface = Surface::Make(context, 350, 350);
-    auto displayList = std::make_unique<DisplayList>();
-    BuildRefractionScene(*displayList, 80);
-    displayList->render(surface.get());
-    EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleRefraction80"));
+  for (int i = 0; i < 9; i++) {
+    int col = i % cols;
+    int row = i / cols;
+    float offsetX = static_cast<float>(col * (cellSize + gap));
+    float offsetY = static_cast<float>(row * (cellSize + gap));
+    float refraction = static_cast<float>((i + 1) * 10);
+
+    auto cell = Layer::Make();
+    cell->setMatrix(Matrix::MakeTrans(offsetX, offsetY));
+
+    auto imgLayer = ImageLayer::Make();
+    imgLayer->setImage(bgImage);
+    float scale = static_cast<float>(cellSize) /
+                  static_cast<float>(std::max(bgImage->width(), bgImage->height()));
+    imgLayer->setMatrix(Matrix::MakeScale(scale, scale));
+    cell->addChild(imgLayer);
+
+    float glassSize = 120.0f;
+    float glassOffset = (static_cast<float>(cellSize) - glassSize) * 0.5f;
+    auto glassLayer = SolidLayer::Make();
+    glassLayer->setColor(Color::FromRGBA(255, 255, 255, 10));
+    glassLayer->setWidth(glassSize);
+    glassLayer->setHeight(glassSize);
+    glassLayer->setRadiusX(16);
+    glassLayer->setRadiusY(16);
+    glassLayer->setMatrix(Matrix::MakeTrans(glassOffset, glassOffset));
+    auto style = GlassStyle::Make(refraction, 50, 0, 0, 0, 135, 0);
+    style->setCornerRadius(16);
+    glassLayer->setLayerStyles({style});
+    cell->addChild(glassLayer);
+
+    displayList->root()->addChild(cell);
   }
+  displayList->root()->addChild(Layer::Make());
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleRefraction"));
 }
 
 }  // namespace tgfx
