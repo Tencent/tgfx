@@ -149,7 +149,7 @@ class ElementWriter {
   std::string addRadialGradientDef(const GradientInfo& info, const Matrix& matrix);
   std::string addUnsupportedGradientDef(const GradientInfo& info, const Matrix& matrix);
 
-  std::string addImageFilter(const std::shared_ptr<ImageFilter>& imageFilter, Rect bound,
+  std::string addImageFilter(const std::shared_ptr<ImageFilter>& imageFilter, const Rect& bound,
                              const std::shared_ptr<SVGCustomWriter>& exportWriter,
                              Context* context);
   std::string emitFilterElement(const std::shared_ptr<ImageFilter>& imageFilter, const Rect& bound,

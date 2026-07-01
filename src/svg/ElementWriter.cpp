@@ -394,7 +394,7 @@ std::string ElementWriter::emitFilterElement(const std::shared_ptr<ImageFilter>&
 }
 
 std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& imageFilter,
-                                          Rect bound,
+                                          const Rect& bound,
                                           const std::shared_ptr<SVGCustomWriter>& exportWriter,
                                           Context* context) {
   auto filteredBound = imageFilter->filterBounds(bound);

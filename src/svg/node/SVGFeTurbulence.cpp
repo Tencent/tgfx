@@ -26,45 +26,45 @@ bool SVGFeTurbulence::parseAndSetAttribute(const std::string& name, const std::s
 template <>
 bool SVGAttributeParser::parse<SVGFeTurbulenceBaseFrequency>(SVGFeTurbulenceBaseFrequency* freq) {
   SVGNumberType freqX;
-  if (!this->parse(&freqX)) {
+  if (!parse(&freqX)) {
     return false;
   }
 
   SVGNumberType freqY;
-  this->parseCommaWspToken();
-  if (this->parse(&freqY)) {
+  parseCommaWspToken();
+  if (parse(&freqY)) {
     *freq = SVGFeTurbulenceBaseFrequency(freqX, freqY);
   } else {
     *freq = SVGFeTurbulenceBaseFrequency(freqX, freqX);
   }
 
-  return this->parseEOSToken();
+  return parseEOSToken();
 }
 
 template <>
 bool SVGAttributeParser::parse<SVGFeTurbulenceType>(SVGFeTurbulenceType* type) {
   bool parsedValue = false;
 
-  if (this->parseExpectedStringToken("fractalNoise")) {
+  if (parseExpectedStringToken("fractalNoise")) {
     *type = SVGFeTurbulenceType(SVGFeTurbulenceType::Type::FractalNoise);
     parsedValue = true;
-  } else if (this->parseExpectedStringToken("turbulence")) {
+  } else if (parseExpectedStringToken("turbulence")) {
     *type = SVGFeTurbulenceType(SVGFeTurbulenceType::Type::Turbulence);
     parsedValue = true;
   }
 
-  return parsedValue && this->parseEOSToken();
+  return parsedValue && parseEOSToken();
 }
 
 template <>
 bool SVGAttributeParser::parse<SVGFeStitchTiles>(SVGFeStitchTiles* stitchTiles) {
-  if (this->parseExpectedStringToken("stitch")) {
+  if (parseExpectedStringToken("stitch")) {
     *stitchTiles = SVGFeStitchTiles(SVGFeStitchTiles::Type::Stitch);
-    return this->parseEOSToken();
+    return parseEOSToken();
   }
-  if (this->parseExpectedStringToken("noStitch")) {
+  if (parseExpectedStringToken("noStitch")) {
     *stitchTiles = SVGFeStitchTiles(SVGFeStitchTiles::Type::NoStitch);
-    return this->parseEOSToken();
+    return parseEOSToken();
   }
   return false;
 }
@@ -81,8 +81,7 @@ std::shared_ptr<ImageFilter> SVGFeTurbulence::onMakeImageFilter(
   ISize tileSizeValue = ISize::MakeEmpty();
   if (getStitchTiles().type == SVGFeStitchTiles::Type::Stitch) {
     auto region = filterContext.filterEffectsRegion();
-    tileSizeValue =
-        ISize::Make(static_cast<int>(region.width()), static_cast<int>(region.height()));
+    tileSizeValue = ISize::Make(region.width(), region.height());
     tileSizePtr = &tileSizeValue;
   }
 
