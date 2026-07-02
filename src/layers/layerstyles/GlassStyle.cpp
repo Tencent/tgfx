@@ -145,7 +145,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
     int layerWidth = input.content->width();
     int layerHeight = input.content->height();
 
-    float ior = 1.0f + (_refraction / 100.0f) * 4.0f;
+    float ior = 1.0f + (_refraction / 100.0f) * 9.0f;
     float halfW = static_cast<float>(layerWidth) * 0.5f;
     float halfH = static_cast<float>(layerHeight) * 0.5f;
     float maxDepth = std::min(halfW, halfH) - 1.0f;
@@ -153,9 +153,8 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
     float scaledRadius = _cornerRadius * input.contentScale;
 
     float displacementScale = 0.0f;
-    auto dispMap =
-        getCachedDisplacementMap(layerWidth, layerHeight, scaledRadius, depthPx, ior,
-                                &displacementScale);
+    auto dispMap = getCachedDisplacementMap(layerWidth, layerHeight, scaledRadius, depthPx, ior,
+                                            &displacementScale);
     if (dispMap) {
       float channelOffset = (_dispersion / 100.0f) * 0.15f;
       auto refractionEffect = std::make_shared<GlassRefractionEffect>(
@@ -185,7 +184,8 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
   if (_lightIntensity > 0) {
     int layerWidth = input.content->width();
     int layerHeight = input.content->height();
-    float maxDepthHL = std::min(static_cast<float>(layerWidth), static_cast<float>(layerHeight)) * 0.5f - 1.0f;
+    float maxDepthHL =
+        std::min(static_cast<float>(layerWidth), static_cast<float>(layerHeight)) * 0.5f - 1.0f;
     float depthPxHL = (_depth / 100.0f) * maxDepthHL;
     float scaledRadius = _cornerRadius * input.contentScale;
     float highlightOpacity = _lightIntensity / 100.0f;

@@ -57,25 +57,18 @@ static constexpr char GLASS_FRAGMENT_SHADER[] = R"(
     };
     out vec4 tgfx_FragColor;
     void main() {
-        vec2 dispMapUV = (vTexCoord - uDispMapOffset) * uDispMapScale;
+        vec2 rawUV = (vTexCoord - uDispMapOffset) * uDispMapScale;
+        vec2 dispMapUV = vec2(rawUV.x, 1.0 - rawUV.y);
         if (dispMapUV.x < 0.0 || dispMapUV.x > 1.0 || dispMapUV.y < 0.0 || dispMapUV.y > 1.0) {
-            tgfx_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+            tgfx_FragColor = texture(uSource, vTexCoord);
             return;
         }
-        vec2 disp = texture(uDisplacement, dispMapUV).rg;
-        vec2 offsetPixels = (disp - 0.5) * 2.0 * uMaxDispPixels;
-        vec2 offset = offsetPixels * uPixelToUV;
-        if (uDispersion < 0.001) {
-            tgfx_FragColor = texture(uSource, vTexCoord + offset);
-        } else {
-            float scaleR = 1.0 + uDispersion;
-            float scaleB = 1.0 - uDispersion;
-            float r = texture(uSource, vTexCoord + offset * scaleR).r;
-            float g = texture(uSource, vTexCoord + offset).g;
-            float b = texture(uSource, vTexCoord + offset * scaleB).b;
-            float a = texture(uSource, vTexCoord + offset).a;
-            tgfx_FragColor = vec4(r, g, b, a);
-        }
+        vec2 encoded = texture(uDisplacement, dispMapUV).rg;
+        vec2 dispPixels = (encoded - 0.5) * 2.0 * uMaxDispPixels;
+        vec2 uvOffset = vec2(dispPixels.x * uPixelToUV.x, -dispPixels.y * uPixelToUV.y);
+        vec2 sampledUV = vTexCoord + uvOffset;
+        sampledUV = clamp(sampledUV, vec2(0.0), vec2(1.0));
+        tgfx_FragColor = texture(uSource, sampledUV);
     }
 )";
 

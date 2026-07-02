@@ -28,8 +28,8 @@ namespace tgfx {
 static float RoundedRectSDF(float px, float py, float halfWidth, float halfHeight, float radius) {
   float qx = std::abs(px) - halfWidth + radius;
   float qy = std::abs(py) - halfHeight + radius;
-  float outsideDist = std::sqrt(std::max(qx, 0.0f) * std::max(qx, 0.0f) +
-                                std::max(qy, 0.0f) * std::max(qy, 0.0f));
+  float outsideDist =
+      std::sqrt(std::max(qx, 0.0f) * std::max(qx, 0.0f) + std::max(qy, 0.0f) * std::max(qy, 0.0f));
   float insideDist = std::min(std::max(qx, qy), 0.0f);
   return outsideDist + insideDist - radius;
 }
@@ -50,13 +50,22 @@ std::shared_ptr<Image> GlassDisplacementMap::Generate(int width, int height, flo
 
   float halfWidth = static_cast<float>(width) * 0.5f;
   float halfHeight = static_cast<float>(height) * 0.5f;
-  float crRadius = std::min(cornerRadius, std::min(halfWidth, halfHeight));
+  float minHalf = std::min(halfWidth, halfHeight);
+  float crRadius = std::min(cornerRadius, minHalf);
 
-  float depthPx = std::min(depth, std::min(halfWidth, halfHeight) - 1.0f);
-  float glassThickness = 10.0f + (ior - 1.0f) / 4.0f * 190.0f;
+  float depthRatio = std::min(depth / (minHalf - 1.0f), 1.0f);
+  float glassThickness = 1.0f + depthRatio * (minHalf - 1.0f);
 
   float eta = 1.0f / ior;
   constexpr float eps = 0.5f;
+
+  // Inner rounded rect (proportionally scaled) defines the flat region boundary.
+  // depth 0~50 maps to flat region 100%~30%, depth 50~100 stays at 30%.
+  float flatRatio = (depthRatio <= 0.5f) ? (1.0f - depthRatio * 1.4f) : 0.3f;
+  float scale = flatRatio;
+  float innerHalfW = halfWidth * scale;
+  float innerHalfH = halfHeight * scale;
+  float innerRadius = crRadius * scale;
 
   // Pass 1: compute all displacements and find actual maxDisp.
   size_t totalPixels = static_cast<size_t>(width) * static_cast<size_t>(height);
@@ -69,60 +78,67 @@ std::shared_ptr<Image> GlassDisplacementMap::Generate(int width, int height, flo
       float px = static_cast<float>(x) - halfWidth + 0.5f;
       float py = static_cast<float>(y) - halfHeight + 0.5f;
 
-      float sdfDist = RoundedRectSDF(px, py, halfWidth, halfHeight, crRadius);
-      float edgeDist = -sdfDist;
+      // Outside the outer shape: no refraction.
+      float outerSDF = RoundedRectSDF(px, py, halfWidth, halfHeight, crRadius);
+      if (outerSDF >= 0.0f) {
+        continue;
+      }
+      // Inside the inner (scaled) shape: flat region, no refraction.
+      float innerSDF = RoundedRectSDF(px, py, innerHalfW, innerHalfH, innerRadius);
+      if (innerSDF < 0.0f) {
+        continue;
+      }
 
-      if (edgeDist > 0.0f && edgeDist < depthPx) {
-        float xNorm = edgeDist / depthPx;
-        float h = SquircleSurface(xNorm) * glassThickness;
+      // In the edge band between outer and inner shapes.
+      // xNorm: 0 at outer edge, 1 at inner edge.
+      float edgeDist = -outerSDF;
+      float totalDist = edgeDist + innerSDF;
+      float xNorm = (totalDist > 0.001f) ? edgeDist / totalDist : 0.0f;
+      xNorm = std::min(xNorm, 1.0f);
+      float h = glassThickness;
 
-        // SDF gradient for normal direction.
-        float sdfXp = RoundedRectSDF(px + eps, py, halfWidth, halfHeight, crRadius);
-        float sdfXm = RoundedRectSDF(px - eps, py, halfWidth, halfHeight, crRadius);
-        float sdfYp = RoundedRectSDF(px, py + eps, halfWidth, halfHeight, crRadius);
-        float sdfYm = RoundedRectSDF(px, py - eps, halfWidth, halfHeight, crRadius);
-        float gradX = (sdfXp - sdfXm) / (2.0f * eps);
-        float gradY = (sdfYp - sdfYm) / (2.0f * eps);
-        float gradLen = std::sqrt(gradX * gradX + gradY * gradY);
-        if (gradLen < 0.001f) {
-          continue;
-        }
-        gradX /= gradLen;
-        gradY /= gradLen;
+      // Normal direction: radial from pixel toward center (inward tilt).
+      float dirLen = std::sqrt(px * px + py * py);
+      float gradX, gradY;
+      if (dirLen > 0.001f) {
+        gradX = -px / dirLen;
+        gradY = -py / dirLen;
+      } else {
+        continue;
+      }
 
-        // Surface slope along edge-inward direction.
-        float xP = std::min((edgeDist + eps) / depthPx, 1.0f);
-        float xM = std::max((edgeDist - eps) / depthPx, 0.0f);
-        float hP = SquircleSurface(xP) * glassThickness;
-        float hM = SquircleSurface(xM) * glassThickness;
-        float dhdEdge = (hP - hM) / (2.0f * eps);
+      // Surface slope: use xNorm derivative w.r.t. edgeDist.
+      float xNormP = std::min((edgeDist + eps) / totalDist, 1.0f);
+      float xNormM = std::max((edgeDist - eps) / totalDist, 0.0f);
+      float hP = SquircleSurface(xNormP) * glassThickness;
+      float hM = SquircleSurface(xNormM) * glassThickness;
+      float dhdEdge = (hP - hM) / (2.0f * eps);
 
-        // Surface normal.
-        float nx = gradX * dhdEdge;
-        float ny = gradY * dhdEdge;
-        float nz = 1.0f;
-        float normalLen = std::sqrt(nx * nx + ny * ny + nz * nz);
-        nx /= normalLen;
-        ny /= normalLen;
-        nz /= normalLen;
+      // Surface normal.
+      float nx = gradX * dhdEdge;
+      float ny = gradY * dhdEdge;
+      float nz = 1.0f;
+      float normalLen = std::sqrt(nx * nx + ny * ny + nz * nz);
+      nx /= normalLen;
+      ny /= normalLen;
+      nz /= normalLen;
 
-        // Snell's Law.
-        float cosI = nz;
-        float sinR2 = eta * eta * (1.0f - cosI * cosI);
-        if (sinR2 < 1.0f) {
-          float cosR = std::sqrt(1.0f - sinR2);
-          float factor = eta * cosI - cosR;
-          float tx = factor * nx;
-          float ty = factor * ny;
-          float tz = eta * (-1.0f) + factor * nz;
-          if (std::abs(tz) > 0.001f) {
-            float dispX = (tx / tz) * h;
-            float dispY = (ty / tz) * h;
-            size_t idx = static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(x);
-            dispXArr[idx] = dispX;
-            dispYArr[idx] = dispY;
-            maxDisp = std::max(maxDisp, std::max(std::abs(dispX), std::abs(dispY)));
-          }
+      // Snell's Law.
+      float cosI = nz;
+      float sinR2 = eta * eta * (1.0f - cosI * cosI);
+      if (sinR2 < 1.0f) {
+        float cosR = std::sqrt(1.0f - sinR2);
+        float factor = eta * cosI - cosR;
+        float tx = factor * nx;
+        float ty = factor * ny;
+        float tz = eta * (-1.0f) + factor * nz;
+        if (std::abs(tz) > 0.001f) {
+          float dispX = (tx / tz) * h;
+          float dispY = (ty / tz) * h;
+          size_t idx = static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(x);
+          dispXArr[idx] = dispX;
+          dispYArr[idx] = dispY;
+          maxDisp = std::max(maxDisp, std::max(std::abs(dispX), std::abs(dispY)));
         }
       }
     }
@@ -131,6 +147,9 @@ std::shared_ptr<Image> GlassDisplacementMap::Generate(int width, int height, flo
   if (maxDisp < 1.0f) {
     maxDisp = 1.0f;
   }
+
+
+
   if (outMaxDisp) {
     *outMaxDisp = maxDisp;
   }
