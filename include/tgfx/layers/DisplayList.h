@@ -426,8 +426,9 @@ class DisplayList {
                      bool autoClear, BackgroundSnapshotMap* snapshots,
                      bool forceNoEdgeAA = false) const;
 
-  std::unique_ptr<BackgroundSnapshotMap> captureBackgrounds(
-      Surface* surface, const std::vector<Rect>& renderRects) const;
+  std::unique_ptr<BackgroundSnapshotMap> captureBackgrounds(Surface* surface,
+                                                            const std::vector<Rect>& renderRects,
+                                                            bool forceNoEdgeAA = false) const;
 
   void updateMousePosition();
 };

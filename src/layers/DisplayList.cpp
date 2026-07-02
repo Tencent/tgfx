@@ -458,7 +458,7 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
       captureRect.offset(_contentOffset.x, _contentOffset.y);
       captureRects.push_back(captureRect);
     }
-    snapshotMap = captureBackgrounds(surface, captureRects);
+    snapshotMap = captureBackgrounds(surface, captureRects, _useSSAA);
   }
   std::vector<Rect> dirtyRects = {};
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
@@ -1238,7 +1238,7 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
 }
 
 std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
-    Surface* surface, const std::vector<Rect>& renderRects) const {
+    Surface* surface, const std::vector<Rect>& renderRects, bool forceNoEdgeAA) const {
   DEBUG_ASSERT(surface != nullptr);
   if (!_root->hasBackgroundStyle()) {
     return nullptr;
@@ -1277,6 +1277,7 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
     rect.outset(_root->maxBackgroundOutset, _root->maxBackgroundOutset);
   }
   DrawArgs args(context);
+  args.forceNoEdgeAA = forceNoEdgeAA;
   args.dstColorSpace = surface->colorSpace();
   args.subtreeCacheMaxSize = _subtreeCacheMaxSize;
   auto bgSource =
