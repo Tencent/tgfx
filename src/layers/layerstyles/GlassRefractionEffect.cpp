@@ -65,9 +65,15 @@ static constexpr char GLASS_FRAGMENT_SHADER[] = R"(
         vec4 dispSample = texture(uDisplacement, dispMapUV);
         vec2 dispPixels = (dispSample.rg - 0.5) * 2.0 * uMaxDispPixels;
         vec2 uvOffset = vec2(dispPixels.x * uPixelToUV.x, -dispPixels.y * uPixelToUV.y);
-        vec2 sampledUV = vTexCoord + uvOffset;
-        sampledUV = clamp(sampledUV, vec2(0.0), vec2(1.0));
-        tgfx_FragColor = texture(uSource, sampledUV);
+        // Chromatic dispersion: R/G/B channels sample at slightly different offsets.
+        vec2 uvR = clamp(vTexCoord + uvOffset * (1.0 + uDispersion), vec2(0.0), vec2(1.0));
+        vec2 uvG = clamp(vTexCoord + uvOffset, vec2(0.0), vec2(1.0));
+        vec2 uvB = clamp(vTexCoord + uvOffset * (1.0 - uDispersion), vec2(0.0), vec2(1.0));
+        float r = texture(uSource, uvR).r;
+        float g = texture(uSource, uvG).g;
+        float b = texture(uSource, uvB).b;
+        float a = texture(uSource, uvG).a;
+        tgfx_FragColor = vec4(r, g, b, a);
     }
 )";
 

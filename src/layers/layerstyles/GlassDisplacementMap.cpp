@@ -54,10 +54,10 @@ std::shared_ptr<Image> GlassDisplacementMap::Generate(int width, int height, flo
   float crRadius = std::min(cornerRadius, minHalf);
 
   float depthRatio = std::min(depth / (minHalf - 1.0f), 1.0f);
-  // refraction 0~100 applies an additional thickness multiplier of 1.0~1.5.
+  // refraction 0~100 applies an additional thickness multiplier of 1.0~2.0.
   // ior = 1 + refraction/100 * 9, so refractionRatio = (ior - 1) / 9.
   float refractionRatio = (ior - 1.0f) / 9.0f;
-  float thicknessMultiplier = 1.0f + refractionRatio * 0.5f;
+  float thicknessMultiplier = 1.0f + refractionRatio * 1.0f;
   float glassThickness = (1.0f + depthRatio * (minHalf - 1.0f)) * thicknessMultiplier;
 
   float eta = 1.0f / ior;
@@ -143,6 +143,7 @@ std::shared_ptr<Image> GlassDisplacementMap::Generate(int width, int height, flo
           dispXArr[idx] = dispX;
           dispYArr[idx] = dispY;
           maxDisp = std::max(maxDisp, std::max(std::abs(dispX), std::abs(dispY)));
+        }
         }
       }
     }

@@ -3963,10 +3963,10 @@ TGFX_TEST(LayerTest, GlassStyle) {
   int surfaceH = static_cast<int>(rows * (cellSize + gap) + gap);
   auto surface = Surface::Make(context, surfaceW, surfaceH);
   auto displayList = std::make_unique<DisplayList>();
-  auto bgImage = MakeImage("resources/apitest/imageReplacement.png");
+  auto bgImage = MakeImage("resources/apitest/checker_128.png");
 
   // Default values for unchanged parameters
-  float defRef = 50, defDepth = 20, defFrost = 10, defDisp = 0;
+  float defRef = 50, defDepth = 20, defFrost = 0, defDisp = 0;
   float defSplay = 50, defAngle = 135, defIntensity = 50, defRadius = 16;
 
   // Row 0: Refraction sweep (10 / 50 / 90)
@@ -4140,6 +4140,40 @@ TGFX_TEST(LayerTest, GlassStyleDepth) {
 
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleDepth"));
+}
+
+TGFX_TEST(LayerTest, GlassStyleSingle) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  int bgSize = 128;
+  int scale = 5;
+  int surfaceSize = bgSize * scale;
+  auto surface = Surface::Make(context, surfaceSize, surfaceSize);
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto bgImage = MakeImage("resources/apitest/checker_128.png");
+  auto imgLayer = ImageLayer::Make();
+  imgLayer->setImage(bgImage);
+  imgLayer->setMatrix(Matrix::MakeScale(static_cast<float>(scale), static_cast<float>(scale)));
+  displayList->root()->addChild(imgLayer);
+
+  auto glassLayer = SolidLayer::Make();
+  glassLayer->setColor(Color::FromRGBA(255, 255, 255, 10));
+  glassLayer->setWidth(static_cast<float>(surfaceSize));
+  glassLayer->setHeight(static_cast<float>(surfaceSize));
+  glassLayer->setRadiusX(32);
+  glassLayer->setRadiusY(32);
+  auto style = GlassStyle::Make(50, 50, 0, 0, 0, 135, 0);
+  style->setCornerRadius(32);
+  glassLayer->setLayerStyles({style});
+  displayList->root()->addChild(glassLayer);
+
+  displayList->root()->addChild(Layer::Make());
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleSingle"));
 }
 
 }  // namespace tgfx

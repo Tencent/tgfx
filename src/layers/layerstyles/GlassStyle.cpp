@@ -156,7 +156,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
     auto dispMap = getCachedDisplacementMap(layerWidth, layerHeight, scaledRadius, depthPx, ior,
                                             &displacementScale);
     if (dispMap) {
-      float channelOffset = (_dispersion / 100.0f) * 0.15f;
+      float channelOffset = (_dispersion / 100.0f) * 0.5f;
       auto refractionEffect = std::make_shared<GlassRefractionEffect>(
           dispMap, displacementScale, channelOffset, static_cast<float>(layerWidth),
           static_cast<float>(layerHeight));
