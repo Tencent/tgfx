@@ -36,39 +36,120 @@ static constexpr char GLASS_VERTEX_SHADER[] = R"(
     }
 )";
 
-// The fragment shader uses two coordinate systems:
-// - vTexCoord: UV for sampling the source (background) texture, range [0,1] over the source image.
-// - dispMapUV: UV for sampling the displacement map, computed from vTexCoord using uDispMapOffset
-//   and uDispMapScale. The displacement map covers the glass layer region, which is a sub-region
-//   of the source texture.
-// The displacement offset is in pixels, converted to source texture UV space using uPixelToUV.
+// The fragment shader computes the glass refraction displacement entirely on the GPU, without
+// any intermediate displacement map texture. For each pixel it:
+//   1. Converts the source texture UV to glass pixel coordinates (centered at origin).
+//   2. Evaluates the rounded-rectangle SDF for the outer and inner shapes.
+//   3. If the pixel is in the edge band (between outer and inner shapes), computes the Squircle
+//      surface derivative, surface normal, and Snell's Law refraction to obtain the displacement.
+//   4. Converts the displacement (in glass pixels) to a source texture UV offset.
+//   5. Applies chromatic dispersion by sampling R/G/B channels at different UV offsets.
+//
+// Uniform layout (std140, 4 vec4s = 64 bytes):
+//   uParams0: glassOffsetX, glassOffsetY, glassScaleX, glassScaleY
+//   uParams1: halfW, halfH, cornerRadius, minHalf
+//   uParams2: innerHalfW, innerHalfH, innerRadius, glassThickness
+//   uParams3: eta, dispersion, 1/sourceWidth, 1/sourceHeight
 static constexpr char GLASS_FRAGMENT_SHADER[] = R"(
-    precision mediump float;
+    precision highp float;
     in vec2 vTexCoord;
     uniform sampler2D uSource;
-    uniform sampler2D uDisplacement;
     layout(std140) uniform GlassUniforms {
-        vec2 uDispMapOffset;
-        vec2 uDispMapScale;
-        vec2 uPixelToUV;
-        float uMaxDispPixels;
-        float uDispersion;
+        vec4 uParams0;  // glassOffsetX, glassOffsetY, glassScaleX, glassScaleY
+        vec4 uParams1;  // halfW, halfH, cornerRadius, minHalf
+        vec4 uParams2;  // innerHalfW, innerHalfH, innerRadius, glassThickness
+        vec4 uParams3;  // eta, dispersion, 1/sourceWidth, 1/sourceHeight
     };
     out vec4 tgfx_FragColor;
+
+    float roundedRectSDF(float px, float py, float hw, float hh, float r) {
+        float qx = abs(px) - hw + r;
+        float qy = abs(py) - hh + r;
+        float outsideDist = sqrt(max(qx, 0.0) * max(qx, 0.0) + max(qy, 0.0) * max(qy, 0.0));
+        float insideDist = min(max(qx, qy), 0.0);
+        return outsideDist + insideDist - r;
+    }
+
+    float squircleSurface(float x) {
+        x = clamp(x, 0.0, 1.0);
+        float oneMinusX = 1.0 - x;
+        float inner = oneMinusX * oneMinusX * oneMinusX * oneMinusX;
+        return pow(1.0 - inner, 0.25);
+    }
+
     void main() {
-        vec2 rawUV = (vTexCoord - uDispMapOffset) * uDispMapScale;
-        vec2 dispMapUV = vec2(rawUV.x, 1.0 - rawUV.y);
-        if (dispMapUV.x < 0.0 || dispMapUV.x > 1.0 || dispMapUV.y < 0.0 || dispMapUV.y > 1.0) {
-            tgfx_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
-            return;
+        float halfW = uParams1.x;
+        float halfH = uParams1.y;
+        float cornerRadius = uParams1.z;
+        float innerHalfW = uParams2.x;
+        float innerHalfH = uParams2.y;
+        float innerRadius = uParams2.z;
+        float glassThickness = uParams2.w;
+        float eta = uParams3.x;
+        float dispersion = uParams3.y;
+        float invSourceW = uParams3.z;
+        float invSourceH = uParams3.w;
+
+        // Convert source UV to glass pixel coordinates centered at origin.
+        vec2 glassUV = (vTexCoord - uParams0.xy) * uParams0.zw;
+        glassUV = vec2(glassUV.x, 1.0 - glassUV.y);
+        vec2 glassPixel = glassUV * vec2(halfW * 2.0, halfH * 2.0);
+        float px = glassPixel.x - halfW;
+        float py = glassPixel.y - halfH;
+
+        vec2 uvOffset = vec2(0.0);
+
+        float outerSDF = roundedRectSDF(px, py, halfW, halfH, cornerRadius);
+        float innerSDF = roundedRectSDF(px, py, innerHalfW, innerHalfH, innerRadius);
+
+        // Only apply refraction in the edge band between outer and inner shapes.
+        if (outerSDF < 0.0 && innerSDF >= 0.0) {
+            float edgeDist = -outerSDF;
+            float totalDist = edgeDist + innerSDF;
+            float xNorm = (totalDist > 0.001) ? edgeDist / totalDist : 0.0;
+            xNorm = min(xNorm, 1.0);
+            float h = glassThickness;
+
+            float dirLen = sqrt(px * px + py * py);
+            if (dirLen > 0.001) {
+                float gradX = -px / dirLen;
+                float gradY = -py / dirLen;
+
+                float eps = 0.5;
+                float xNormP = min((edgeDist + eps) / totalDist, 1.0);
+                float xNormM = max((edgeDist - eps) / totalDist, 0.0);
+                float hP = squircleSurface(xNormP) * glassThickness;
+                float hM = squircleSurface(xNormM) * glassThickness;
+                float dhdEdge = (hP - hM) / (2.0 * eps);
+
+                float nx = gradX * dhdEdge;
+                float ny = gradY * dhdEdge;
+                float nz = 1.0;
+                float normalLen = sqrt(nx * nx + ny * ny + nz * nz);
+                nx /= normalLen;
+                ny /= normalLen;
+                nz /= normalLen;
+
+                float cosI = nz;
+                float sinR2 = eta * eta * (1.0 - cosI * cosI);
+                if (sinR2 < 1.0) {
+                    float cosR = sqrt(1.0 - sinR2);
+                    float factor = eta * cosI - cosR;
+                    float tx = factor * nx;
+                    float ty = factor * ny;
+                    float tz = eta * (-1.0) + factor * nz;
+                    if (abs(tz) > 0.001) {
+                        float dispX = (tx / tz) * h;
+                        float dispY = (ty / tz) * h;
+                        uvOffset = vec2(dispX * invSourceW, -dispY * invSourceH);
+                    }
+                }
+            }
         }
-        vec4 dispSample = texture(uDisplacement, dispMapUV);
-        vec2 dispPixels = (dispSample.rg - 0.5) * 2.0 * uMaxDispPixels;
-        vec2 uvOffset = vec2(dispPixels.x * uPixelToUV.x, -dispPixels.y * uPixelToUV.y);
-        // Chromatic dispersion: R/G/B channels sample at slightly different offsets.
-        vec2 uvR = clamp(vTexCoord + uvOffset * (1.0 + uDispersion), vec2(0.0), vec2(1.0));
+
+        vec2 uvR = clamp(vTexCoord + uvOffset * (1.0 + dispersion), vec2(0.0), vec2(1.0));
         vec2 uvG = clamp(vTexCoord + uvOffset, vec2(0.0), vec2(1.0));
-        vec2 uvB = clamp(vTexCoord + uvOffset * (1.0 - uDispersion), vec2(0.0), vec2(1.0));
+        vec2 uvB = clamp(vTexCoord + uvOffset * (1.0 - dispersion), vec2(0.0), vec2(1.0));
         float r = texture(uSource, uvR).r;
         float g = texture(uSource, uvG).g;
         float b = texture(uSource, uvB).b;
@@ -84,11 +165,15 @@ static std::string GetFinalShaderCode(const char* codeSnippet, bool isDesktop) {
   return std::string("#version 300 es\n\n") + codeSnippet;
 }
 
-GlassRefractionEffect::GlassRefractionEffect(std::shared_ptr<Image> displacementMap,
-                                             float displacementScale, float dispersion,
-                                             float glassWidth, float glassHeight)
-    : RuntimeEffect({displacementMap}), _displacementScale(displacementScale),
-      _dispersion(dispersion), _glassWidth(glassWidth), _glassHeight(glassHeight) {
+GlassRefractionEffect::GlassRefractionEffect(float glassWidth, float glassHeight, float halfWidth,
+                                             float halfHeight, float cornerRadius, float minHalf,
+                                             float innerHalfWidth, float innerHalfHeight,
+                                             float innerRadius, float glassThickness, float eta,
+                                             float dispersion)
+    : RuntimeEffect({}), _glassWidth(glassWidth), _glassHeight(glassHeight), _halfWidth(halfWidth),
+      _halfHeight(halfHeight), _cornerRadius(cornerRadius), _minHalf(minHalf),
+      _innerHalfWidth(innerHalfWidth), _innerHalfHeight(innerHalfHeight), _innerRadius(innerRadius),
+      _glassThickness(glassThickness), _eta(eta), _dispersion(dispersion) {
 }
 
 std::shared_ptr<RenderPipeline> GlassRefractionEffect::createPipeline(GPU* gpu) const {
@@ -117,9 +202,7 @@ std::shared_ptr<RenderPipeline> GlassRefractionEffect::createPipeline(GPU* gpu) 
   descriptor.fragment.colorAttachments.push_back({});
   descriptor.multisample.count = MSAA_SAMPLE_COUNT;
   BindingEntry sourceBinding = {"uSource", 0};
-  BindingEntry dispBinding = {"uDisplacement", 1};
   descriptor.layout.textureSamplers.push_back(sourceBinding);
-  descriptor.layout.textureSamplers.push_back(dispBinding);
   BindingEntry uniformBlockBinding = {"GlassUniforms", 0};
   descriptor.layout.uniformBlocks.push_back(uniformBlockBinding);
   return gpu->createRenderPipeline(descriptor);
@@ -169,7 +252,7 @@ bool GlassRefractionEffect::onDraw(CommandEncoder* encoder,
                                    const std::vector<std::shared_ptr<Texture>>& inputTextures,
                                    std::shared_ptr<Texture> outputTexture,
                                    const Point& offset) const {
-  if (inputTextures.size() < 2) {
+  if (inputTextures.empty()) {
     return false;
   }
   auto gpu = encoder->gpu();
@@ -218,37 +301,22 @@ bool GlassRefractionEffect::onDraw(CommandEncoder* encoder,
   auto sampler = gpu->createSampler(samplerDesc);
   renderPass->setTexture(0, inputTextures[0], sampler);
 
-  // Bind displacement map texture (binding 1)
-  SamplerDescriptor dispSamplerDesc(AddressMode::ClampToEdge, AddressMode::ClampToEdge,
-                                    FilterMode::Linear, FilterMode::Linear, MipmapMode::None);
-  auto dispSampler = gpu->createSampler(dispSamplerDesc);
-  renderPass->setTexture(1, inputTextures[1], dispSampler);
-
-  // Compute UV mapping between source texture and displacement map.
-  // The displacement map covers the glass layer region, which may be a sub-region of the source.
-  // Source texture UV [0,1] maps to the full background image.
-  // Displacement map UV [0,1] maps to the glass layer bounds within that background.
-  // Since the source texture is the background cropped/filtered region and the glass layer
-  // content is centered within it, we assume the displacement map aligns with the source center.
+  // Compute UV mapping between source texture and glass region.
   auto sourceWidth = static_cast<float>(inputTextures[0]->width());
   auto sourceHeight = static_cast<float>(inputTextures[0]->height());
 
-  // dispMapOffset: source UV where the displacement map's top-left corner starts
-  // dispMapScale: ratio to convert source UV range to displacement map UV [0,1]
-  float dispMapOffsetX =
+  float glassOffsetX =
       (_glassWidth < sourceWidth) ? (1.0f - _glassWidth / sourceWidth) * 0.5f : 0.0f;
-  float dispMapOffsetY =
+  float glassOffsetY =
       (_glassHeight < sourceHeight) ? (1.0f - _glassHeight / sourceHeight) * 0.5f : 0.0f;
-  float dispMapScaleX = (_glassWidth > 0.0f) ? sourceWidth / _glassWidth : 1.0f;
-  float dispMapScaleY = (_glassHeight > 0.0f) ? sourceHeight / _glassHeight : 1.0f;
+  float glassScaleX = (_glassWidth > 0.0f) ? sourceWidth / _glassWidth : 1.0f;
+  float glassScaleY = (_glassHeight > 0.0f) ? sourceHeight / _glassHeight : 1.0f;
 
-  // pixelToUV: converts pixel displacement to source texture UV offset.
-  // Displacement is computed in glass-pixel units, so convert using glass dimensions.
-  float pixelToUVx = 1.0f / sourceWidth;
-  float pixelToUVy = 1.0f / sourceHeight;
+  float invSourceW = 1.0f / sourceWidth;
+  float invSourceH = 1.0f / sourceHeight;
 
-  // std140 layout: vec2 + vec2 + vec2 + float + float = 8 floats (32 bytes, naturally aligned)
-  size_t uniformSize = 8 * sizeof(float);
+  // std140 layout: 4 vec4s = 16 floats (64 bytes)
+  size_t uniformSize = 16 * sizeof(float);
   auto uniformBuffer = gpu->createBuffer(uniformSize, GPUBufferUsage::UNIFORM);
   if (uniformBuffer == nullptr) {
     return false;
@@ -257,14 +325,26 @@ bool GlassRefractionEffect::onDraw(CommandEncoder* encoder,
   if (uniformData == nullptr) {
     return false;
   }
-  uniformData[0] = dispMapOffsetX;      // uDispMapOffset.x
-  uniformData[1] = dispMapOffsetY;      // uDispMapOffset.y
-  uniformData[2] = dispMapScaleX;       // uDispMapScale.x
-  uniformData[3] = dispMapScaleY;       // uDispMapScale.y
-  uniformData[4] = pixelToUVx;          // uPixelToUV.x
-  uniformData[5] = pixelToUVy;          // uPixelToUV.y
-  uniformData[6] = _displacementScale;  // uMaxDispPixels (in pixels, not normalized)
-  uniformData[7] = _dispersion;         // uDispersion
+  // uParams0: glassOffsetX, glassOffsetY, glassScaleX, glassScaleY
+  uniformData[0] = glassOffsetX;
+  uniformData[1] = glassOffsetY;
+  uniformData[2] = glassScaleX;
+  uniformData[3] = glassScaleY;
+  // uParams1: halfW, halfH, cornerRadius, minHalf
+  uniformData[4] = _halfWidth;
+  uniformData[5] = _halfHeight;
+  uniformData[6] = _cornerRadius;
+  uniformData[7] = _minHalf;
+  // uParams2: innerHalfW, innerHalfH, innerRadius, glassThickness
+  uniformData[8] = _innerHalfWidth;
+  uniformData[9] = _innerHalfHeight;
+  uniformData[10] = _innerRadius;
+  uniformData[11] = _glassThickness;
+  // uParams3: eta, dispersion, 1/sourceWidth, 1/sourceHeight
+  uniformData[12] = _eta;
+  uniformData[13] = _dispersion;
+  uniformData[14] = invSourceW;
+  uniformData[15] = invSourceH;
   uniformBuffer->unmap();
   renderPass->setUniformBuffer(0, uniformBuffer, 0, uniformSize);
 
