@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GlassRefractionEffect.h"
-#include <cstdio>
 #include <string>
 #include "tgfx/gpu/GPU.h"
 
@@ -60,11 +59,11 @@ static constexpr char GLASS_FRAGMENT_SHADER[] = R"(
         vec2 rawUV = (vTexCoord - uDispMapOffset) * uDispMapScale;
         vec2 dispMapUV = vec2(rawUV.x, 1.0 - rawUV.y);
         if (dispMapUV.x < 0.0 || dispMapUV.x > 1.0 || dispMapUV.y < 0.0 || dispMapUV.y > 1.0) {
-            tgfx_FragColor = texture(uSource, vTexCoord);
+            tgfx_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
             return;
         }
-        vec2 encoded = texture(uDisplacement, dispMapUV).rg;
-        vec2 dispPixels = (encoded - 0.5) * 2.0 * uMaxDispPixels;
+        vec4 dispSample = texture(uDisplacement, dispMapUV);
+        vec2 dispPixels = (dispSample.rg - 0.5) * 2.0 * uMaxDispPixels;
         vec2 uvOffset = vec2(dispPixels.x * uPixelToUV.x, -dispPixels.y * uPixelToUV.y);
         vec2 sampledUV = vTexCoord + uvOffset;
         sampledUV = clamp(sampledUV, vec2(0.0), vec2(1.0));
@@ -241,10 +240,6 @@ bool GlassRefractionEffect::onDraw(CommandEncoder* encoder,
   // Displacement is computed in glass-pixel units, so convert using glass dimensions.
   float pixelToUVx = 1.0f / sourceWidth;
   float pixelToUVy = 1.0f / sourceHeight;
-  fprintf(stderr,
-          "[GlassRefraction] source=%.0fx%.0f glass=%.0fx%.0f pxToUV=(%.6f,%.6f) maxDisp=%.1f\n",
-          sourceWidth, sourceHeight, _glassWidth, _glassHeight, pixelToUVx, pixelToUVy,
-          _displacementScale);
 
   // std140 layout: vec2 + vec2 + vec2 + float + float = 8 floats (32 bytes, naturally aligned)
   size_t uniformSize = 8 * sizeof(float);

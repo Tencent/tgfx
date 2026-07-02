@@ -54,7 +54,11 @@ std::shared_ptr<Image> GlassDisplacementMap::Generate(int width, int height, flo
   float crRadius = std::min(cornerRadius, minHalf);
 
   float depthRatio = std::min(depth / (minHalf - 1.0f), 1.0f);
-  float glassThickness = 1.0f + depthRatio * (minHalf - 1.0f);
+  // refraction 0~100 applies an additional thickness multiplier of 1.0~1.5.
+  // ior = 1 + refraction/100 * 9, so refractionRatio = (ior - 1) / 9.
+  float refractionRatio = (ior - 1.0f) / 9.0f;
+  float thicknessMultiplier = 1.0f + refractionRatio * 0.5f;
+  float glassThickness = (1.0f + depthRatio * (minHalf - 1.0f)) * thicknessMultiplier;
 
   float eta = 1.0f / ior;
   constexpr float eps = 0.5f;
@@ -148,10 +152,12 @@ std::shared_ptr<Image> GlassDisplacementMap::Generate(int width, int height, flo
     maxDisp = 1.0f;
   }
 
-
+  // Use the actual max displacement as the encoding reference so the displacement map
+  // covers the full [0,1] range regardless of refraction value.
+  float fixedMax = maxDisp;
 
   if (outMaxDisp) {
-    *outMaxDisp = maxDisp;
+    *outMaxDisp = fixedMax;
   }
 
   // Pass 2: encode to pixels.
@@ -160,8 +166,8 @@ std::shared_ptr<Image> GlassDisplacementMap::Generate(int width, int height, flo
   for (int y = 0; y < height; y++) {
     for (int x = 0; x < width; x++) {
       size_t idx = static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(x);
-      float encodedX = (dispXArr[idx] / maxDisp) * 0.5f + 0.5f;
-      float encodedY = (dispYArr[idx] / maxDisp) * 0.5f + 0.5f;
+      float encodedX = (dispXArr[idx] / fixedMax) * 0.5f + 0.5f;
+      float encodedY = (dispYArr[idx] / fixedMax) * 0.5f + 0.5f;
       encodedX = std::max(0.0f, std::min(1.0f, encodedX));
       encodedY = std::max(0.0f, std::min(1.0f, encodedY));
 

@@ -141,8 +141,7 @@ class GlassStyle : public LayerStyle {
 
   std::shared_ptr<ImageFilter> getFrostFilter(float contentScale);
   std::shared_ptr<Image> getCachedDisplacementMap(int width, int height, float scaledRadius,
-                                                  float depthPx, float ior,
-                                                  float* outMaxDisp);
+                                                  float depthPx, float ior, float* outMaxDisp);
 
   float _refraction = 50.0f;
   float _depth = 15.0f;
