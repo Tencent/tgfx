@@ -44,7 +44,7 @@ class GlassDisplacementMap {
    * @return A displacement map image, or nullptr if generation fails.
    */
   static std::shared_ptr<Image> Generate(int width, int height, float cornerRadius, float depth,
-                                         float ior);
+                                         float ior, float* outMaxDisp = nullptr);
 };
 
 }  // namespace tgfx

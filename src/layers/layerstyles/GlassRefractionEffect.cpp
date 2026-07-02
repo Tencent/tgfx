@@ -63,7 +63,19 @@ static constexpr char GLASS_FRAGMENT_SHADER[] = R"(
             return;
         }
         vec2 disp = texture(uDisplacement, dispMapUV).rg;
-        tgfx_FragColor = vec4(disp.r, disp.g, 0.5, 1.0);
+        vec2 offsetPixels = (disp - 0.5) * 2.0 * uMaxDispPixels;
+        vec2 offset = offsetPixels * uPixelToUV;
+        if (uDispersion < 0.001) {
+            tgfx_FragColor = texture(uSource, vTexCoord + offset);
+        } else {
+            float scaleR = 1.0 + uDispersion;
+            float scaleB = 1.0 - uDispersion;
+            float r = texture(uSource, vTexCoord + offset * scaleR).r;
+            float g = texture(uSource, vTexCoord + offset).g;
+            float b = texture(uSource, vTexCoord + offset * scaleB).b;
+            float a = texture(uSource, vTexCoord + offset).a;
+            tgfx_FragColor = vec4(r, g, b, a);
+        }
     }
 )";
 
