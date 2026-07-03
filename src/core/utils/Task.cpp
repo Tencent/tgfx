@@ -90,6 +90,32 @@ void Task::wait() {
   }
 }
 
+bool Task::waitFor(std::chrono::milliseconds timeout) {
+  auto oldStatus = _status.load(std::memory_order_acquire);
+  if (oldStatus == TaskStatus::Canceled || oldStatus == TaskStatus::Finished) {
+    return true;
+  }
+  // If waitFor() is called from the thread pool, all threads might block, leaving no thread to
+  // execute this task. To avoid deadlock, execute the task directly on the current thread if it's
+  // queued.
+  if (oldStatus == TaskStatus::Queueing) {
+    if (_status.compare_exchange_strong(oldStatus, TaskStatus::Executing, std::memory_order_acq_rel,
+                                        std::memory_order_relaxed)) {
+      onExecute();
+      oldStatus = TaskStatus::Executing;
+      while (!_status.compare_exchange_weak(oldStatus, TaskStatus::Finished,
+                                            std::memory_order_acq_rel, std::memory_order_relaxed)) {
+      }
+      return true;
+    }
+  }
+  std::unique_lock<std::mutex> autoLock(locker);
+  if (_status.load(std::memory_order_acquire) == TaskStatus::Executing) {
+    return condition.wait_for(autoLock, timeout) == std::cv_status::no_timeout;
+  }
+  return true;
+}
+
 void Task::execute() {
   auto oldStatus = _status.load(std::memory_order_acquire);
   if (oldStatus == TaskStatus::Queueing &&

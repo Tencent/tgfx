@@ -19,6 +19,7 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <functional>
 #include <memory>
@@ -119,6 +120,16 @@ class Task {
    * canceled and still in the queue.
    */
   void wait();
+
+  /**
+   * Blocks the current thread until the Task finishes its execution or the specified timeout
+   * elapses. Returns true if the Task finished or was canceled before the timeout, false if it
+   * timed out. The task may be executed on the calling thread if it is not canceled and still in
+   * the queue, in which case the timeout is not applied.
+   * @param timeout The maximum duration to wait for the Task to finish.
+   * @return true if the Task finished or was canceled before the timeout, false if it timed out.
+   */
+  bool waitFor(std::chrono::milliseconds timeout);
 
  protected:
   /**
