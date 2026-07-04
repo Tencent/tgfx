@@ -40,14 +40,14 @@ class GlassRefractionEffect : public RuntimeEffect {
    * @param innerHalfWidth Half width of the inner (flat region) shape in pixels.
    * @param innerHalfHeight Half height of the inner (flat region) shape in pixels.
    * @param innerRadius The corner radius of the inner shape in pixels.
-   * @param glassThickness The glass thickness used in Snell's Law displacement.
-   * @param eta The ratio 1/ior used in Snell's Law.
+   * @param glassThickness The glass thickness used to scale the displacement magnitude.
+   * @param refractionFactor The refraction factor [0, 1] scaling the displacement.
    * @param dispersion The chromatic aberration coefficient. Zero means no dispersion.
    */
   GlassRefractionEffect(float glassWidth, float glassHeight, float halfWidth, float halfHeight,
                         float cornerRadius, float minHalf, float innerHalfWidth,
-                        float innerHalfHeight, float innerRadius, float glassThickness, float eta,
-                        float dispersion);
+                        float innerHalfHeight, float innerRadius, float glassThickness,
+                        float refractionFactor, float dispersion);
 
  protected:
   bool onDraw(CommandEncoder* encoder, const std::vector<std::shared_ptr<Texture>>& inputTextures,
@@ -68,7 +68,7 @@ class GlassRefractionEffect : public RuntimeEffect {
   float _innerHalfHeight = 0.0f;
   float _innerRadius = 0.0f;
   float _glassThickness = 0.0f;
-  float _eta = 0.0f;
+  float _refractionFactor = 0.0f;
   float _dispersion = 0.0f;
   // Pipeline requires GPU pointer only available in onDraw (which is const). Caching here avoids
   // re-creating the pipeline on every frame.

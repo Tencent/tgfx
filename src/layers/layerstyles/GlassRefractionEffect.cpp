@@ -40,8 +40,8 @@ static constexpr char GLASS_VERTEX_SHADER[] = R"(
 // any intermediate displacement map texture. For each pixel it:
 //   1. Converts the source texture UV to glass pixel coordinates (centered at origin).
 //   2. Evaluates the rounded-rectangle SDF for the outer and inner shapes.
-//   3. If the pixel is in the edge band (between outer and inner shapes), computes the Squircle
-//      surface derivative, surface normal, and Snell's Law refraction to obtain the displacement.
+//   3. If the pixel is in the edge band (between outer and inner shapes), computes the displacement:
+//      direction = radial toward center, distance = glassThickness * refractionFactor * edgeFactor².
 //   4. Converts the displacement (in glass pixels) to a source texture UV offset.
 //   5. Applies chromatic dispersion by sampling R/G/B channels at different UV offsets.
 //
@@ -49,7 +49,7 @@ static constexpr char GLASS_VERTEX_SHADER[] = R"(
 //   uParams0: glassOffsetX, glassOffsetY, glassScaleX, glassScaleY
 //   uParams1: halfW, halfH, cornerRadius, minHalf
 //   uParams2: innerHalfW, innerHalfH, innerRadius, glassThickness
-//   uParams3: eta, dispersion, 1/sourceWidth, 1/sourceHeight
+//   uParams3: refractionFactor, dispersion, 1/sourceWidth, 1/sourceHeight
 static constexpr char GLASS_FRAGMENT_SHADER[] = R"(
     precision highp float;
     in vec2 vTexCoord;
@@ -58,7 +58,7 @@ static constexpr char GLASS_FRAGMENT_SHADER[] = R"(
         vec4 uParams0;  // glassOffsetX, glassOffsetY, glassScaleX, glassScaleY
         vec4 uParams1;  // halfW, halfH, cornerRadius, minHalf
         vec4 uParams2;  // innerHalfW, innerHalfH, innerRadius, glassThickness
-        vec4 uParams3;  // eta, dispersion, 1/sourceWidth, 1/sourceHeight
+        vec4 uParams3;  // refractionFactor, dispersion, 1/sourceWidth, 1/sourceHeight
     };
     out vec4 tgfx_FragColor;
 
@@ -70,13 +70,6 @@ static constexpr char GLASS_FRAGMENT_SHADER[] = R"(
         return outsideDist + insideDist - r;
     }
 
-    float squircleSurface(float x) {
-        x = clamp(x, 0.0, 1.0);
-        float oneMinusX = 1.0 - x;
-        float inner = oneMinusX * oneMinusX * oneMinusX * oneMinusX;
-        return pow(1.0 - inner, 0.25);
-    }
-
     void main() {
         float halfW = uParams1.x;
         float halfH = uParams1.y;
@@ -85,7 +78,7 @@ static constexpr char GLASS_FRAGMENT_SHADER[] = R"(
         float innerHalfH = uParams2.y;
         float innerRadius = uParams2.z;
         float glassThickness = uParams2.w;
-        float eta = uParams3.x;
+        float refractionFactor = uParams3.x;
         float dispersion = uParams3.y;
         float invSourceW = uParams3.z;
         float invSourceH = uParams3.w;
@@ -108,48 +101,30 @@ static constexpr char GLASS_FRAGMENT_SHADER[] = R"(
             float totalDist = edgeDist + innerSDF;
             float xNorm = (totalDist > 0.001) ? edgeDist / totalDist : 0.0;
             xNorm = min(xNorm, 1.0);
-            float h = glassThickness;
 
+            // Edge factor: 1.0 at outer edge (xNorm=0), 0.0 at flat region (xNorm=1).
+            float edgeFactor = 1.0 - xNorm;
+            // Offset distance: glassThickness * refractionFactor * edgeFactor² * 2.
+            float offsetDist = glassThickness * refractionFactor * edgeFactor * edgeFactor * 2.0;
+
+            // Refraction direction: radial toward center.
             float dirLen = sqrt(px * px + py * py);
             if (dirLen > 0.001) {
-                float gradX = -px / dirLen;
-                float gradY = -py / dirLen;
-
-                float eps = 0.5;
-                float xNormP = min((edgeDist + eps) / totalDist, 1.0);
-                float xNormM = max((edgeDist - eps) / totalDist, 0.0);
-                float hP = squircleSurface(xNormP) * glassThickness;
-                float hM = squircleSurface(xNormM) * glassThickness;
-                float dhdEdge = (hP - hM) / (2.0 * eps);
-
-                float nx = gradX * dhdEdge;
-                float ny = gradY * dhdEdge;
-                float nz = 1.0;
-                float normalLen = sqrt(nx * nx + ny * ny + nz * nz);
-                nx /= normalLen;
-                ny /= normalLen;
-                nz /= normalLen;
-
-                float cosI = nz;
-                float sinR2 = eta * eta * (1.0 - cosI * cosI);
-                if (sinR2 < 1.0) {
-                    float cosR = sqrt(1.0 - sinR2);
-                    float factor = eta * cosI - cosR;
-                    float tx = factor * nx;
-                    float ty = factor * ny;
-                    float tz = eta * (-1.0) + factor * nz;
-                    if (abs(tz) > 0.001) {
-                        float dispX = (tx / tz) * h;
-                        float dispY = (ty / tz) * h;
-                        uvOffset = vec2(dispX * invSourceW, -dispY * invSourceH);
-                    }
-                }
+                vec2 refractDir = vec2(-px / dirLen, -py / dirLen);
+                float dispX = refractDir.x * offsetDist;
+                float dispY = refractDir.y * offsetDist;
+                uvOffset = vec2(dispX * invSourceW, -dispY * invSourceH);
             }
         }
 
-        vec2 uvR = clamp(vTexCoord + uvOffset * (1.0 + dispersion), vec2(0.0), vec2(1.0));
-        vec2 uvG = clamp(vTexCoord + uvOffset, vec2(0.0), vec2(1.0));
-        vec2 uvB = clamp(vTexCoord + uvOffset * (1.0 - dispersion), vec2(0.0), vec2(1.0));
+        vec2 uvR, uvG, uvB;
+        if (dispersion < 0.01) {
+            uvR = uvG = uvB = clamp(vTexCoord + uvOffset, vec2(0.0), vec2(1.0));
+        } else {
+            uvR = clamp(vTexCoord + uvOffset * (1.0 + dispersion), vec2(0.0), vec2(1.0));
+            uvG = clamp(vTexCoord + uvOffset, vec2(0.0), vec2(1.0));
+            uvB = clamp(vTexCoord + uvOffset * (1.0 - dispersion), vec2(0.0), vec2(1.0));
+        }
         float r = texture(uSource, uvR).r;
         float g = texture(uSource, uvG).g;
         float b = texture(uSource, uvB).b;
@@ -168,12 +143,13 @@ static std::string GetFinalShaderCode(const char* codeSnippet, bool isDesktop) {
 GlassRefractionEffect::GlassRefractionEffect(float glassWidth, float glassHeight, float halfWidth,
                                              float halfHeight, float cornerRadius, float minHalf,
                                              float innerHalfWidth, float innerHalfHeight,
-                                             float innerRadius, float glassThickness, float eta,
-                                             float dispersion)
+                                             float innerRadius, float glassThickness,
+                                             float refractionFactor, float dispersion)
     : RuntimeEffect({}), _glassWidth(glassWidth), _glassHeight(glassHeight), _halfWidth(halfWidth),
       _halfHeight(halfHeight), _cornerRadius(cornerRadius), _minHalf(minHalf),
       _innerHalfWidth(innerHalfWidth), _innerHalfHeight(innerHalfHeight), _innerRadius(innerRadius),
-      _glassThickness(glassThickness), _eta(eta), _dispersion(dispersion) {
+      _glassThickness(glassThickness), _refractionFactor(refractionFactor),
+      _dispersion(dispersion) {
 }
 
 std::shared_ptr<RenderPipeline> GlassRefractionEffect::createPipeline(GPU* gpu) const {
@@ -340,8 +316,8 @@ bool GlassRefractionEffect::onDraw(CommandEncoder* encoder,
   uniformData[9] = _innerHalfHeight;
   uniformData[10] = _innerRadius;
   uniformData[11] = _glassThickness;
-  // uParams3: eta, dispersion, 1/sourceWidth, 1/sourceHeight
-  uniformData[12] = _eta;
+  // uParams3: refractionFactor, dispersion, 1/sourceWidth, 1/sourceHeight
+  uniformData[12] = _refractionFactor;
   uniformData[13] = _dispersion;
   uniformData[14] = invSourceW;
   uniformData[15] = invSourceH;

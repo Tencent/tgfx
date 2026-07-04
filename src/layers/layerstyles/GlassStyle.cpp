@@ -157,17 +157,18 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
     float refractionRatio = (ior - 1.0f) / 9.0f;
     float thicknessMultiplier = 1.0f + refractionRatio;
     float glassThickness = (1.0f + depthRatio * (minHalf - 1.0f)) * thicknessMultiplier;
-    float eta = 1.0f / ior;
+    float refractionFactor = _refraction / 100.0f;
     // depth 0~50 maps to flat region 100%~30%, depth 50~100 stays at 30%.
     float flatRatio = (depthRatio <= 0.5f) ? (1.0f - depthRatio * 1.4f) : 0.3f;
     float innerHalfW = halfW * flatRatio;
     float innerHalfH = halfH * flatRatio;
     float innerRadius = crRadius * flatRatio;
 
-    float channelOffset = (_dispersion / 100.0f) * 0.5f;
+    float channelOffset = (_dispersion / 100.0f) * 0.2f;
     auto refractionEffect = std::make_shared<GlassRefractionEffect>(
         static_cast<float>(layerWidth), static_cast<float>(layerHeight), halfW, halfH, crRadius,
-        minHalf, innerHalfW, innerHalfH, innerRadius, glassThickness, eta, channelOffset);
+        minHalf, innerHalfW, innerHalfH, innerRadius, glassThickness, refractionFactor,
+        channelOffset);
     auto refractionFilter = ImageFilter::Runtime(refractionEffect);
     Point refractOffset = {};
     auto clipRect = Rect::MakeWH(static_cast<float>(processedBg->width()),
