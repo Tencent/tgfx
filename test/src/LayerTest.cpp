@@ -3918,7 +3918,7 @@ static void AddGlassCell(Layer* root, std::shared_ptr<Image> bgImage, float x, f
   auto blueRect = ShapeLayer::Make();
   Path bluePath = {};
   bluePath.addRect(
-      Rect::MakeXYWH(cellSize * 0.15f, cellSize * 0.15f, cellSize * 0.4f, cellSize * 0.4f));
+      Rect::MakeXYWH(cellSize * 0.15f, cellSize * 0.15f, cellSize * 0.35f, cellSize * 0.35f));
   blueRect->setPath(bluePath);
   blueRect->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 100, 255, 255)));
   container->addChild(blueRect);

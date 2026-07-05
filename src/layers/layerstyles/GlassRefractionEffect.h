@@ -43,11 +43,13 @@ class GlassRefractionEffect : public RuntimeEffect {
    * @param glassThickness The glass thickness used to scale the displacement magnitude.
    * @param refractionFactor The refraction factor [0, 1] scaling the displacement.
    * @param dispersion The chromatic aberration coefficient. Zero means no dispersion.
+   * @param splay The mix factor [0, 1] controlling SDF vs radial direction threshold.
+   * @param depthRatio The depth ratio [0, 1], also contributes to threshold control.
    */
   GlassRefractionEffect(float glassWidth, float glassHeight, float halfWidth, float halfHeight,
                         float cornerRadius, float minHalf, float innerHalfWidth,
                         float innerHalfHeight, float innerRadius, float glassThickness,
-                        float refractionFactor, float dispersion);
+                        float refractionFactor, float dispersion, float splay, float depthRatio);
 
  protected:
   bool onDraw(CommandEncoder* encoder, const std::vector<std::shared_ptr<Texture>>& inputTextures,
@@ -70,6 +72,8 @@ class GlassRefractionEffect : public RuntimeEffect {
   float _glassThickness = 0.0f;
   float _refractionFactor = 0.0f;
   float _dispersion = 0.0f;
+  float _splay = 0.0f;
+  float _depthRatio = 0.0f;
   // Pipeline requires GPU pointer only available in onDraw (which is const). Caching here avoids
   // re-creating the pipeline on every frame.
   mutable std::shared_ptr<RenderPipeline> cachedPipeline = nullptr;

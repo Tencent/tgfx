@@ -41,15 +41,17 @@ static constexpr char GLASS_VERTEX_SHADER[] = R"(
 //   1. Converts the source texture UV to glass pixel coordinates (centered at origin).
 //   2. Evaluates the rounded-rectangle SDF for the outer and inner shapes.
 //   3. If the pixel is in the edge band (between outer and inner shapes), computes the displacement:
-//      direction = radial toward center, distance = glassThickness * refractionFactor * edgeFactor².
+//      direction = mix(radial, SDF gradient) based on dot product and splay threshold.
+//      distance = glassThickness * refractionFactor * edgeFactor² * 2.
 //   4. Converts the displacement (in glass pixels) to a source texture UV offset.
 //   5. Applies chromatic dispersion by sampling R/G/B channels at different UV offsets.
 //
-// Uniform layout (std140, 4 vec4s = 64 bytes):
+// Uniform layout (std140, 5 vec4s = 80 bytes):
 //   uParams0: glassOffsetX, glassOffsetY, glassScaleX, glassScaleY
 //   uParams1: halfW, halfH, cornerRadius, minHalf
 //   uParams2: innerHalfW, innerHalfH, innerRadius, glassThickness
 //   uParams3: refractionFactor, dispersion, 1/sourceWidth, 1/sourceHeight
+//   uParams4: splay, depthRatio, 0, 0
 static constexpr char GLASS_FRAGMENT_SHADER[] = R"(
     precision highp float;
     in vec2 vTexCoord;
@@ -59,6 +61,7 @@ static constexpr char GLASS_FRAGMENT_SHADER[] = R"(
         vec4 uParams1;  // halfW, halfH, cornerRadius, minHalf
         vec4 uParams2;  // innerHalfW, innerHalfH, innerRadius, glassThickness
         vec4 uParams3;  // refractionFactor, dispersion, 1/sourceWidth, 1/sourceHeight
+        vec4 uParams4;  // splay, depthRatio, 0, 0
     };
     out vec4 tgfx_FragColor;
 
@@ -68,6 +71,21 @@ static constexpr char GLASS_FRAGMENT_SHADER[] = R"(
         float outsideDist = sqrt(max(qx, 0.0) * max(qx, 0.0) + max(qy, 0.0) * max(qy, 0.0));
         float insideDist = min(max(qx, qy), 0.0);
         return outsideDist + insideDist - r;
+    }
+
+    // Computes the SDF gradient direction via central differences (normalized, points outward).
+    vec2 sdfGradientDir(float px, float py, float hw, float hh, float r) {
+        float eps = 0.5;
+        float dx = roundedRectSDF(px + eps, py, hw, hh, r) -
+                   roundedRectSDF(px - eps, py, hw, hh, r);
+        float dy = roundedRectSDF(px, py + eps, hw, hh, r) -
+                   roundedRectSDF(px, py - eps, hw, hh, r);
+        vec2 g = vec2(dx, dy);
+        float len = length(g);
+        if (len > 0.0001) {
+            return g / len;
+        }
+        return vec2(0.0);
     }
 
     void main() {
@@ -82,6 +100,8 @@ static constexpr char GLASS_FRAGMENT_SHADER[] = R"(
         float dispersion = uParams3.y;
         float invSourceW = uParams3.z;
         float invSourceH = uParams3.w;
+        float splay = uParams4.x;
+        float depthRatio = uParams4.y;
 
         // Convert source UV to glass pixel coordinates centered at origin.
         vec2 glassUV = (vTexCoord - uParams0.xy) * uParams0.zw;
@@ -107,10 +127,29 @@ static constexpr char GLASS_FRAGMENT_SHADER[] = R"(
             // Offset distance: glassThickness * refractionFactor * edgeFactor² * 2.
             float offsetDist = glassThickness * refractionFactor * edgeFactor * edgeFactor * 2.0;
 
-            // Refraction direction: radial toward center.
+            // Refraction direction: mix radial and axis direction based on alignment.
             float dirLen = sqrt(px * px + py * py);
             if (dirLen > 0.001) {
-                vec2 refractDir = vec2(-px / dirLen, -py / dirLen);
+                vec2 radialDir = vec2(-px / dirLen, -py / dirLen);
+
+                // Nearest axis direction aligned with radial.
+                vec2 axisDir;
+                if (abs(radialDir.x) > abs(radialDir.y)) {
+                    axisDir = vec2(sign(radialDir.x), 0.0);
+                } else {
+                    axisDir = vec2(0.0, sign(radialDir.y));
+                }
+
+                // Dot of radial with nearest axis = max component absolute value.
+                float maxAxisDot = max(abs(radialDir.x), abs(radialDir.y));
+                // Threshold controlled by max(depthRatio, splay): 0 → 0.8, 1 → 1.0.
+                float controlValue = depthRatio * splay;
+                float axisThreshold = mix(0.9, 1.0, controlValue);
+                // axisWeight: 0 when maxAxisDot < threshold (corners, 100% radial),
+                //              1 when maxAxisDot reaches 1 (straight edges, 100% axis).
+                float axisWeight = smoothstep(axisThreshold, 1.0, maxAxisDot);
+
+                vec2 refractDir = mix(radialDir, axisDir, axisWeight);
                 float dispX = refractDir.x * offsetDist;
                 float dispY = refractDir.y * offsetDist;
                 uvOffset = vec2(dispX * invSourceW, -dispY * invSourceH);
@@ -144,12 +183,13 @@ GlassRefractionEffect::GlassRefractionEffect(float glassWidth, float glassHeight
                                              float halfHeight, float cornerRadius, float minHalf,
                                              float innerHalfWidth, float innerHalfHeight,
                                              float innerRadius, float glassThickness,
-                                             float refractionFactor, float dispersion)
+                                             float refractionFactor, float dispersion, float splay,
+                                             float depthRatio)
     : RuntimeEffect({}), _glassWidth(glassWidth), _glassHeight(glassHeight), _halfWidth(halfWidth),
       _halfHeight(halfHeight), _cornerRadius(cornerRadius), _minHalf(minHalf),
       _innerHalfWidth(innerHalfWidth), _innerHalfHeight(innerHalfHeight), _innerRadius(innerRadius),
-      _glassThickness(glassThickness), _refractionFactor(refractionFactor),
-      _dispersion(dispersion) {
+      _glassThickness(glassThickness), _refractionFactor(refractionFactor), _dispersion(dispersion),
+      _splay(splay), _depthRatio(depthRatio) {
 }
 
 std::shared_ptr<RenderPipeline> GlassRefractionEffect::createPipeline(GPU* gpu) const {
@@ -291,8 +331,8 @@ bool GlassRefractionEffect::onDraw(CommandEncoder* encoder,
   float invSourceW = 1.0f / sourceWidth;
   float invSourceH = 1.0f / sourceHeight;
 
-  // std140 layout: 4 vec4s = 16 floats (64 bytes)
-  size_t uniformSize = 16 * sizeof(float);
+  // std140 layout: 5 vec4s = 20 floats (80 bytes)
+  size_t uniformSize = 20 * sizeof(float);
   auto uniformBuffer = gpu->createBuffer(uniformSize, GPUBufferUsage::UNIFORM);
   if (uniformBuffer == nullptr) {
     return false;
@@ -321,6 +361,11 @@ bool GlassRefractionEffect::onDraw(CommandEncoder* encoder,
   uniformData[13] = _dispersion;
   uniformData[14] = invSourceW;
   uniformData[15] = invSourceH;
+  // uParams4: splay, depthRatio, 0, 0
+  uniformData[16] = _splay;
+  uniformData[17] = _depthRatio;
+  uniformData[18] = 0.0f;
+  uniformData[19] = 0.0f;
   uniformBuffer->unmap();
   renderPass->setUniformBuffer(0, uniformBuffer, 0, uniformSize);
 

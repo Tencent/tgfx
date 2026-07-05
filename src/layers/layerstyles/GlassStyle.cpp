@@ -165,10 +165,11 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
     float innerRadius = crRadius * flatRatio;
 
     float channelOffset = (_dispersion / 100.0f) * 0.2f;
+    float splay = _splay / 100.0f;
     auto refractionEffect = std::make_shared<GlassRefractionEffect>(
         static_cast<float>(layerWidth), static_cast<float>(layerHeight), halfW, halfH, crRadius,
         minHalf, innerHalfW, innerHalfH, innerRadius, glassThickness, refractionFactor,
-        channelOffset);
+        channelOffset, splay, depthRatio);
     auto refractionFilter = ImageFilter::Runtime(refractionEffect);
     Point refractOffset = {};
     auto clipRect = Rect::MakeWH(static_cast<float>(processedBg->width()),
