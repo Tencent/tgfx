@@ -18,12 +18,25 @@
 
 #include "tgfx/layers/VectorLayer.h"
 #include "core/utils/Log.h"
+#include "core/utils/MathExtra.h"
+#include "core/utils/Types.h"
 #include "tgfx/layers/LayerRecorder.h"
 #include "tgfx/layers/layerstyles/StyledShape.h"
+#include "tgfx/layers/vectors/SolidColor.h"
 #include "vectors/Painter.h"
 #include "vectors/VectorContext.h"
 
 namespace tgfx {
+
+// Returns true when the painter's color source is a fully transparent solid color, which
+// contributes no visible content.
+static inline bool HasTransparentSolidColor(const Painter* painter) {
+  const auto* colorSource = painter->colorSource.get();
+  if (colorSource == nullptr || Types::Get(colorSource) != Types::ColorSourceType::SolidColor) {
+    return false;
+  }
+  return FloatNearlyZero(static_cast<const SolidColor*>(colorSource)->color().alpha);
+}
 
 std::shared_ptr<VectorLayer> VectorLayer::Make() {
   return std::shared_ptr<VectorLayer>(new VectorLayer());
@@ -91,6 +104,9 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
   std::optional<PainterStyle> strokeStyle = std::nullopt;
   for (const auto& painter : context.painters) {
     DEBUG_ASSERT(painter != nullptr);
+    if (HasTransparentSolidColor(painter.get())) {
+      continue;
+    }
     if (painter->geometries.size() != 1) {
       return Layer::onGetContentShape();
     }
@@ -112,9 +128,11 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
     }
   }
 
-  // sharedGeometry is non-null here: painters is non-empty and the loop above assigns it from
-  // geometries[0] on the first iteration, where every geometry is created via make_unique and is
-  // therefore never null.
+  // sharedGeometry stays null when every painter was skipped as invisible, meaning the layer has
+  // no visible content.
+  if (sharedGeometry == nullptr) {
+    return std::nullopt;
+  }
   auto shape = sharedGeometry->getShape();
   if (shape == nullptr) {
     return std::nullopt;

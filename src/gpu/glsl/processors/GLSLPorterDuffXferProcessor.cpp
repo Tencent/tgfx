@@ -57,7 +57,7 @@ void GLSLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
 
     fragBuilder->codeAppend("// Read color from copy of the destination.\n");
     std::string dstTexCoord = "_dstTexCoord";
-    fragBuilder->codeAppendf("vec2 %s = (gl_FragCoord.xy - %s) * %s;", dstTexCoord.c_str(),
+    fragBuilder->codeAppendf("highp vec2 %s = (gl_FragCoord.xy - %s) * %s;", dstTexCoord.c_str(),
                              dstTopLeftName.c_str(), dstCoordScaleName.c_str());
 
     fragBuilder->codeAppendf("vec4 %s = ", dstColor.c_str());
