@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Task.h"
+#include <chrono>
 #include "core/utils/TaskGroup.h"
 
 namespace tgfx {
@@ -66,7 +67,7 @@ void Task::cancel() {
   }
 }
 
-bool Task::wait(std::chrono::milliseconds timeout) {
+bool Task::wait(uint64_t timeout) {
   auto oldStatus = _status.load(std::memory_order_acquire);
   if (oldStatus == TaskStatus::Canceled || oldStatus == TaskStatus::Finished) {
     return true;
@@ -86,11 +87,12 @@ bool Task::wait(std::chrono::milliseconds timeout) {
   }
   std::unique_lock<std::mutex> autoLock(locker);
   if (_status.load(std::memory_order_acquire) == TaskStatus::Executing) {
-    if (timeout == std::chrono::milliseconds(0)) {
+    if (timeout == 0) {
       condition.wait(autoLock);
       return true;
     }
-    return condition.wait_for(autoLock, timeout) == std::cv_status::no_timeout;
+    auto chronoTimeout = std::chrono::milliseconds(timeout);
+    return condition.wait_for(autoLock, chronoTimeout) == std::cv_status::no_timeout;
   }
   return true;
 }
