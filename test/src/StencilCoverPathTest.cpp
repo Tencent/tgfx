@@ -91,7 +91,12 @@ TGFX_TEST(StencilCoverPathTest, Caps_BackendReportsExpectedSupport) {
   // three" disjunction. New backends added in the future hit the default branch and fail
   // until they declare an expectation here, since GPUFeatures::stencilCoverPathSupported
   // defaults to false.
-  auto backend = context->gpu()->info()->backend;
+  auto gpuInfo = context->gpu()->info();
+  auto backend = gpuInfo->backend;
+  // SwiftShader (Vulkan software renderer, vendorID 0x1AE0) has stencil-operation bugs
+  // that cause segfaults, so VulkanCaps deliberately sets stencilCoverPathSupported = false
+  // for it. The test must accept that.
+  bool isSwiftShader = gpuInfo->vendor == "6880";  // 0x1AE0 = 6880 decimal
   switch (backend) {
     case Backend::Metal:
       EXPECT_TRUE(features->stencilCoverPathSupported);
@@ -100,7 +105,11 @@ TGFX_TEST(StencilCoverPathTest, Caps_BackendReportsExpectedSupport) {
       EXPECT_TRUE(features->stencilCoverPathSupported);
       break;
     case Backend::Vulkan:
-      EXPECT_TRUE(features->stencilCoverPathSupported);
+      if (isSwiftShader) {
+        EXPECT_FALSE(features->stencilCoverPathSupported);
+      } else {
+        EXPECT_TRUE(features->stencilCoverPathSupported);
+      }
       break;
     default:
       ADD_FAILURE() << "Unhandled backend in Caps_BackendReportsExpectedSupport; declare "
