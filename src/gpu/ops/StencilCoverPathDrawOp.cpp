@@ -131,8 +131,7 @@ PlacementPtr<StencilCoverPathDrawOp> StencilCoverPathDrawOp::Make(
 StencilCoverPathDrawOp::StencilCoverPathDrawOp(BlockAllocator* allocator,
                                                std::shared_ptr<StencilCoverPathProxy> geometryProxy,
                                                PMColor color, const Matrix& viewMatrix,
-                                               const Rect& coverLocalBounds,
-                                               PathFillType fillType)
+                                               const Rect& coverLocalBounds, PathFillType fillType)
     : DrawOp(allocator, AAType::None), geometryProxy(std::move(geometryProxy)), color(color),
       viewMatrix(viewMatrix), coverLocalBounds(coverLocalBounds), fillType(fillType) {
   // The cover quad is built in local space — the cover GP applies the view matrix itself, so
