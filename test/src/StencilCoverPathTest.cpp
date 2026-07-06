@@ -31,6 +31,7 @@
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/ColorFilter.h"
+#include "tgfx/core/Font.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
@@ -39,9 +40,15 @@
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/core/Surface.h"
+#include "tgfx/core/TextBlob.h"
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/GPUFeatures.h"
 #include "utils/TestUtils.h"
+
+// Set to 1 locally to render both legacy and bezier pipelines and dump each as a separate
+// webp under `test/out/StencilCoverPath/`. Must remain 0 in committed code so CI runs
+// the canonical single-pass baseline comparison.
+#define TGFX_BEZIER_VISUAL_DEBUG_EXPORT 0
 
 namespace tgfx {
 
@@ -313,7 +320,7 @@ TGFX_TEST(StencilCoverPathTest, DrawOp_NullProxyReturnsNull) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto op = StencilCoverPathDrawOp::Make(nullptr, PMColor::Transparent(), Matrix::I(), Matrix::I(),
+  auto op = StencilCoverPathDrawOp::Make(nullptr, PMColor::Transparent(), Matrix::I(),
                                          Rect::MakeWH(100, 100), PathFillType::Winding);
   EXPECT_TRUE(op == nullptr);
 }
@@ -329,9 +336,9 @@ TGFX_TEST(StencilCoverPathTest, DrawOp_MakeReturnsValidOp) {
   auto geometryProxy = context->proxyProvider()->createStencilCoverPathProxy(shape, 0);
   ASSERT_TRUE(geometryProxy != nullptr);
 
-  auto op = StencilCoverPathDrawOp::Make(geometryProxy, PMColor::Transparent(),
-                                         Matrix::MakeTrans(10, 20), Matrix::I(),
-                                         Rect::MakeXYWH(10, 20, 100, 80), PathFillType::EvenOdd);
+  auto op =
+      StencilCoverPathDrawOp::Make(geometryProxy, PMColor::Transparent(), Matrix::MakeTrans(10, 20),
+                                   Rect::MakeXYWH(10, 20, 100, 80), PathFillType::EvenOdd);
   ASSERT_TRUE(op != nullptr);
   EXPECT_TRUE(op->hasCoverage());
   EXPECT_TRUE(op->needsStencil());
@@ -369,7 +376,7 @@ TGFX_TEST(StencilCoverPathTest, DrawOp_AllFillTypesProduceValidOpWithExpectedSte
   };
   for (const auto& c : cases) {
     auto op = StencilCoverPathDrawOp::Make(geometryProxy, PMColor::Transparent(),
-                                           Matrix::MakeTrans(10, 20), Matrix::I(),
+                                           Matrix::MakeTrans(10, 20),
                                            Rect::MakeXYWH(10, 20, 100, 80), c.fillType);
     ASSERT_TRUE(op != nullptr) << c.name;
     EXPECT_TRUE(op->hasCoverage()) << c.name;
@@ -665,10 +672,11 @@ TGFX_TEST(StencilCoverPathTest, Dispatch_StencilWritesAreScissoredToOpClip) {
 // These cases render a single path through the stencil-and-cover pipeline and hand the
 // result off to Baseline::Compare for screenshot regression protection.
 //
-// Two operating modes, controlled by `TGFX_BEZIER_VISUAL_DEBUG_EXPORT` below:
+// Two operating modes, controlled by `TGFX_BEZIER_VISUAL_DEBUG_EXPORT` (defined at the top of
+// this file):
 //
 //   * Default (macro = 0): only the bezier pass is rendered, and the result is compared
-//     against the canonical baseline `StencilCoverPathDebug/<Name>` (no suffix). This is the
+//     against the canonical baseline `StencilCoverPath/<Name>` (no suffix). This is the
 //     CI-friendly mode — accept new baselines via `/accept-baseline` once outputs stabilise.
 //
 //   * Debug export (macro = 1): both pipelines are rendered into the same surface size and
@@ -684,18 +692,13 @@ TGFX_TEST(StencilCoverPathTest, Dispatch_StencilWritesAreScissoredToOpClip) {
 //     the backend's current default. The guard restores the previous value on scope exit so
 //     other tests stay deterministic even if a fatal ASSERT fires mid-test.
 
-// Set to 1 locally to render both legacy and bezier pipelines and dump each as a separate
-// webp under `test/out/StencilCoverPathDebug/`. Must remain 0 in committed code so CI runs
-// the canonical single-pass baseline comparison.
-#define TGFX_BEZIER_VISUAL_DEBUG_EXPORT 0
-
 // Shared palette for the visual debug renders. Warm off-white background plus a deep teal
 // foreground keeps the contrast readable while side-by-side comparing legacy vs bezier
 // outputs without the eye-strain of pure red on pure black. Cases that test brush
 // behaviour (gradient / colour filter / blend mode) override these locally because their
 // pixel outcome depends on a specific colour choice.
 static const Color kDebugBackground{0.961f, 0.941f, 0.910f, 1.f};  // #F5F0E8
-static const Color kDebugForeground{0.173f, 0.373f, 0.365f, 1.f};  // #2C5F5D
+static const Color kDebugForeground{0.2f, 0.5f, 0.8f, 1.f};        // #3380CC
 
 // Optional transform hook applied around `canvas->drawPath` via canvas->save/restore. Cases
 // that don't need a non-identity canvas matrix pass nullptr.
@@ -820,11 +823,20 @@ static Path BuildSemicircleQuadPath() {
   return path;
 }
 
-// Solid disc via Path::addOval, which internally emits four conic verbs. Exercises the
-// NoConicsPathIterator → quad expansion path. Bbox is [40, 260] x [40, 260].
+// Solid disc approximated with 4 quadratic Bezier segments instead of addOval, to avoid
+// Canvas::drawPath's isOval detection (which would redirect to drawRRect and bypass the
+// stencil-cover pipeline). The 0.5523 control-point factor gives a close circle
+// approximation. Bbox is [40, 260] x [40, 260], matching the original addOval version.
 static Path BuildCirclePath() {
+  auto cx = 150.f, cy = 150.f, r = 110.f;
+  auto k = r * 0.5523f;
   Path path;
-  path.addOval(Rect::MakeXYWH(40, 40, 220, 220));
+  path.moveTo(cx + r, cy);
+  path.quadTo(cx + r, cy + k, cx, cy + r);
+  path.quadTo(cx - k, cy + r, cx - r, cy);
+  path.quadTo(cx - r, cy - k, cx, cy - r);
+  path.quadTo(cx + k, cy - r, cx + r, cy);
+  path.close();
   return path;
 }
 
@@ -883,12 +895,22 @@ static Path BuildCShapePath() {
   return path;
 }
 
-// Plain centred square used by the brush-combination cases below. Path geometry isn't the
-// focus there; using a rectangle (line-only, no curves) keeps the comparison clean of the
-// 1-pixel curve-edge differences seen in SemicircleQuad / Donut.
+// Square-like path with 5px quad-curve corners, used by the brush-combination cases below.
+// Built with quadTo instead of addRect to avoid Canvas::drawPath's isRect detection, which
+// would redirect to drawRect → RectDrawOp and bypass the stencil-cover pipeline entirely.
+// Bbox is [50, 250] x [50, 250], matching the original addRect version.
 static Path BuildSquarePath() {
   Path path;
-  path.addRect(Rect::MakeXYWH(50, 50, 200, 200));
+  path.moveTo(55, 50);
+  path.lineTo(245, 50);
+  path.quadTo(250, 50, 250, 55);
+  path.lineTo(250, 245);
+  path.quadTo(250, 250, 245, 250);
+  path.lineTo(55, 250);
+  path.quadTo(50, 250, 50, 245);
+  path.lineTo(50, 55);
+  path.quadTo(50, 50, 55, 50);
+  path.close();
   return path;
 }
 
@@ -932,7 +954,7 @@ TGFX_TEST(StencilCoverPathTest, Visual_HeartCubic) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  RenderPathAndCompareBaselines(context, BuildHeartCubicPath(), "StencilCoverPathDebug/HeartCubic");
+  RenderPathAndCompareBaselines(context, BuildHeartCubicPath(), "StencilCoverPath/HeartCubic");
 }
 
 TGFX_TEST(StencilCoverPathTest, Visual_ConcavePolygon) {
@@ -940,7 +962,7 @@ TGFX_TEST(StencilCoverPathTest, Visual_ConcavePolygon) {
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   RenderPathAndCompareBaselines(context, BuildConcavePolygonPath(),
-                                "StencilCoverPathDebug/ConcavePolygon");
+                                "StencilCoverPath/ConcavePolygon");
 }
 
 TGFX_TEST(StencilCoverPathTest, Visual_SemicircleQuad) {
@@ -948,36 +970,35 @@ TGFX_TEST(StencilCoverPathTest, Visual_SemicircleQuad) {
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   RenderPathAndCompareBaselines(context, BuildSemicircleQuadPath(),
-                                "StencilCoverPathDebug/SemicircleQuad");
+                                "StencilCoverPath/SemicircleQuad");
 }
 
 TGFX_TEST(StencilCoverPathTest, Visual_Circle) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  RenderPathAndCompareBaselines(context, BuildCirclePath(), "StencilCoverPathDebug/Circle");
+  RenderPathAndCompareBaselines(context, BuildCirclePath(), "StencilCoverPath/Circle");
 }
 
 TGFX_TEST(StencilCoverPathTest, Visual_StarEvenOdd) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  RenderPathAndCompareBaselines(context, BuildStarEvenOddPath(),
-                                "StencilCoverPathDebug/StarEvenOdd");
+  RenderPathAndCompareBaselines(context, BuildStarEvenOddPath(), "StencilCoverPath/StarEvenOdd");
 }
 
 TGFX_TEST(StencilCoverPathTest, Visual_Donut) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  RenderPathAndCompareBaselines(context, BuildDonutPath(), "StencilCoverPathDebug/Donut");
+  RenderPathAndCompareBaselines(context, BuildDonutPath(), "StencilCoverPath/Donut");
 }
 
 TGFX_TEST(StencilCoverPathTest, Visual_CShape) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  RenderPathAndCompareBaselines(context, BuildCShapePath(), "StencilCoverPathDebug/CShape");
+  RenderPathAndCompareBaselines(context, BuildCShapePath(), "StencilCoverPath/CShape");
 }
 
 // Inverse-fill rendering: the rasterizer must paint the path's *outside*. With the
@@ -989,15 +1010,14 @@ TGFX_TEST(StencilCoverPathTest, Visual_InversePentagon) {
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   RenderPathAndCompareBaselines(context, BuildInverseSquarePath(),
-                                "StencilCoverPathDebug/InversePentagon");
+                                "StencilCoverPath/InversePentagon");
 }
 
 TGFX_TEST(StencilCoverPathTest, Visual_EmptyInverse) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  RenderPathAndCompareBaselines(context, BuildEmptyInversePath(),
-                                "StencilCoverPathDebug/EmptyInverse");
+  RenderPathAndCompareBaselines(context, BuildEmptyInversePath(), "StencilCoverPath/EmptyInverse");
 }
 
 // ----- Brush combination cases (square path keeps geometry differences out of the picture) -----
@@ -1005,7 +1025,7 @@ TGFX_TEST(StencilCoverPathTest, Visual_EmptyInverse) {
 // Linear gradient from red on the left to blue on the right. Validates that the cover GP's
 // emitTransforms hands the correct local coordinates to the shader FP — if uvMatrix were
 // wrong the gradient would be skewed or stretched.
-TGFX_TEST(StencilCoverPathTest, Visual_BrushLinearGradient) {
+TGFX_TEST(StencilCoverPathTest, Visual_GradientLinear) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -1016,7 +1036,107 @@ TGFX_TEST(StencilCoverPathTest, Visual_BrushLinearGradient) {
   paint.setShader(Shader::MakeLinearGradient(
       {50, 150}, {250, 150}, {Color{1.f, 0.f, 0.f, 1.f}, Color{0.f, 0.f, 1.f, 1.f}}, {0.f, 1.f}));
   RenderPathAndCompareBaselines(context, BuildSquarePath(), paint,
-                                "StencilCoverPathDebug/BrushLinearGradient");
+                                "StencilCoverPath/GradientLinear");
+}
+
+// Radial gradient centred in the square. Validates that the cover pass's uvMatrix hands the
+// correct local coordinates to the radial gradient FP — if the center were wrong the gradient
+// would be off-centre or clipped.
+TGFX_TEST(StencilCoverPathTest, Visual_GradientRadial) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  Paint paint;
+  paint.setAntiAlias(false);
+  paint.setShader(Shader::MakeRadialGradient(
+      {150, 150}, 100, {Color{1.f, 0.f, 0.f, 1.f}, Color{0.f, 0.f, 1.f, 1.f}}, {0.f, 1.f}));
+  RenderPathAndCompareBaselines(context, BuildSquarePath(), paint,
+                                "StencilCoverPath/GradientRadial");
+}
+
+// Conic (sweep) gradient centred in the square, sweeping a full 360° from red through green
+// to blue. Validates that the conic gradient FP receives the correct local coordinates from
+// the cover pass — a wrong uvMatrix would rotate or skew the sweep.
+TGFX_TEST(StencilCoverPathTest, Visual_GradientConic) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  Paint paint;
+  paint.setAntiAlias(false);
+  paint.setShader(Shader::MakeConicGradient(
+      {150, 150}, 0, 360,
+      {Color{1.f, 0.f, 0.f, 1.f}, Color{0.f, 1.f, 0.f, 1.f}, Color{0.f, 0.f, 1.f, 1.f}},
+      {0.f, 0.5f, 1.f}));
+  RenderPathAndCompareBaselines(context, BuildSquarePath(), paint,
+                                "StencilCoverPath/GradientConic");
+}
+
+// Diamond gradient centred in the square. The diamond shape produces a different pixel
+// distribution than the radial gradient, exercising a separate FP code path in the gradient
+// shader.
+TGFX_TEST(StencilCoverPathTest, Visual_GradientDiamond) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  Paint paint;
+  paint.setAntiAlias(false);
+  paint.setShader(Shader::MakeDiamondGradient(
+      {150, 150}, 100, {Color{1.f, 0.f, 0.f, 1.f}, Color{0.f, 0.f, 1.f, 1.f}}, {0.f, 1.f}));
+  RenderPathAndCompareBaselines(context, BuildSquarePath(), paint,
+                                "StencilCoverPath/GradientDiamond");
+}
+
+// Vertical linear gradient from top (red) to bottom (blue). The existing
+// Visual_GradientLinear tests the horizontal direction; this case verifies the gradient
+// direction is independent of the cover pass's vertex layout.
+TGFX_TEST(StencilCoverPathTest, Visual_GradientLinearVertical) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  Paint paint;
+  paint.setAntiAlias(false);
+  paint.setShader(Shader::MakeLinearGradient(
+      {150, 50}, {150, 250}, {Color{1.f, 0.f, 0.f, 1.f}, Color{0.f, 0.f, 1.f, 1.f}}, {0.f, 1.f}));
+  RenderPathAndCompareBaselines(context, BuildSquarePath(), paint,
+                                "StencilCoverPath/GradientLinearVertical");
+}
+
+// Linear gradient with four colour stops and non-uniform positions. The colours are
+// concentrated in the first half of the gradient (positions 0, 0.2, 0.4, 1.0), exercising the
+// position interpolation logic in the gradient FP.
+TGFX_TEST(StencilCoverPathTest, Visual_GradientLinearMultiStop) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  Paint paint;
+  paint.setAntiAlias(false);
+  paint.setShader(Shader::MakeLinearGradient({50, 150}, {250, 150},
+                                             {Color{1.f, 0.f, 0.f, 1.f}, Color{1.f, 1.f, 0.f, 1.f},
+                                              Color{0.f, 1.f, 0.f, 1.f}, Color{0.f, 0.f, 1.f, 1.f}},
+                                             {0.f, 0.2f, 0.4f, 1.f}));
+  RenderPathAndCompareBaselines(context, BuildSquarePath(), paint,
+                                "StencilCoverPath/GradientLinearMultiStop");
+}
+
+// Diagonal linear gradient from top-left (red) to bottom-right (blue). Exercises a gradient
+// direction that is neither purely horizontal nor purely vertical, verifying the uvMatrix
+// handles arbitrary start/end point pairs.
+TGFX_TEST(StencilCoverPathTest, Visual_GradientLinearDiagonal) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  Paint paint;
+  paint.setAntiAlias(false);
+  paint.setShader(Shader::MakeLinearGradient(
+      {50, 50}, {250, 250}, {Color{1.f, 0.f, 0.f, 1.f}, Color{0.f, 0.f, 1.f, 1.f}}, {0.f, 1.f}));
+  RenderPathAndCompareBaselines(context, BuildSquarePath(), paint,
+                                "StencilCoverPath/GradientLinearDiagonal");
 }
 
 // Colour matrix that inverts RGB (R' = 1 - R, etc.). Applied on top of a solid red brush
@@ -1038,7 +1158,7 @@ TGFX_TEST(StencilCoverPathTest, Visual_BrushColorFilterInvert) {
   paint.setColor(Color{1.f, 0.f, 0.f, 1.f});
   paint.setColorFilter(ColorFilter::Matrix(invertMatrix));
   RenderPathAndCompareBaselines(context, BuildSquarePath(), paint,
-                                "StencilCoverPathDebug/BrushColorFilterInvert");
+                                "StencilCoverPath/BrushColorFilterInvert");
 }
 
 // Plus / additive blend on top of a non-debug background. The square is drawn with green
@@ -1054,7 +1174,7 @@ TGFX_TEST(StencilCoverPathTest, Visual_BrushBlendModePlus) {
   paint.setColor(Color{0.f, 1.f, 0.f, 1.f});
   paint.setBlendMode(BlendMode::PlusLighter);
   RenderPathAndCompareBaselines(context, BuildSquarePath(), paint, Color{1.f, 0.f, 0.f, 1.f},
-                                nullptr, "StencilCoverPathDebug/BrushBlendModePlus");
+                                nullptr, "StencilCoverPath/BrushBlendModePlus");
 }
 
 // Rotate 30 degrees and scale 0.7x around the surface centre. Without the centre pivot the
@@ -1080,7 +1200,76 @@ TGFX_TEST(StencilCoverPathTest, Visual_BrushScaleRotate) {
   paint.setAntiAlias(false);
   paint.setColor(kDebugForeground);
   RenderPathAndCompareBaselines(context, BuildHeartCubicPath(), paint, kDebugBackground,
-                                ApplyBrushScaleRotate, "StencilCoverPathDebug/BrushScaleRotate");
+                                ApplyBrushScaleRotate, "StencilCoverPath/BrushScaleRotate");
+}
+
+// ====================================================================================
+// Shader + canvas transform regression tests
+//
+// These cases exercise the uvMatrix bug fix in OpsCompositor::drawStencilCoverPath: before the
+// fix, the cover pass passed matrix.invert() as the UV matrix to setTransformDataHelper, but the
+// cover quad vertices are already in local space — the extra matrix.invert() doubled the canvas
+// translation and shifted/scaled/stretched shader coordinates. Each case below combines a
+// non-identity canvas matrix (ApplyBrushScaleRotate: translate + rotate + scale) with a
+// different shader type (gradient, image, noise) to verify the UV transform is correct across
+// all FP coordTransform types.
+// ====================================================================================
+
+// Linear gradient under a non-identity canvas matrix. Before the fix the gradient was shifted
+// by double the canvas translation; now the cover pass's uvMatrix is identity and the FP's own
+// coordTransform (carrying the brush matrix) handles the local-to-shader mapping. Uses
+// BuildHeartCubicPath (not BuildSquarePath) because Canvas::drawPath redirects rect paths to
+// drawRect → RectDrawOp, bypassing the stencil-cover pipeline entirely.
+TGFX_TEST(StencilCoverPathTest, Visual_GradientLinearTransform) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  Paint paint;
+  paint.setAntiAlias(false);
+  // Heart bbox is [30, 270] x [60, 230]; span the full width at the vertical centre.
+  paint.setShader(Shader::MakeLinearGradient(
+      {30, 145}, {270, 145}, {Color{1.f, 0.f, 0.f, 1.f}, Color{0.f, 0.f, 1.f, 1.f}}, {0.f, 1.f}));
+  RenderPathAndCompareBaselines(context, BuildHeartCubicPath(), paint, kDebugBackground,
+                                ApplyBrushScaleRotate, "StencilCoverPath/GradientLinearTransform");
+}
+
+// Image shader under a non-identity canvas matrix. Same uvMatrix bug scenario, but exercising
+// the TextureEffect FP's coordTransform instead of a gradient layout FP. The 128px mandrill
+// image is scaled to 64px and tiled with Repeat mode so a wrong UV transform would visibly
+// shift or stretch the tile pattern. Uses BuildHeartCubicPath for the same rect-bypass reason
+// as Visual_GradientLinearTransform.
+TGFX_TEST(StencilCoverPathTest, Visual_ImageShaderTransform) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_TRUE(image != nullptr);
+  auto shader = Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Repeat);
+  shader = shader->makeWithMatrix(Matrix::MakeScale(0.5f));
+
+  Paint paint;
+  paint.setAntiAlias(false);
+  paint.setShader(shader);
+  RenderPathAndCompareBaselines(context, BuildHeartCubicPath(), paint, kDebugBackground,
+                                ApplyBrushScaleRotate, "StencilCoverPath/ImageShaderTransform");
+}
+
+// Perlin fractal noise shader under a non-identity canvas matrix. Same uvMatrix bug scenario,
+// exercising the PerlinNoiseFragmentProcessor's coordTransform. The noise pattern is defined in
+// shader-local coordinates; a wrong uvMatrix would shift or stretch the noise tiles. Uses
+// BuildHeartCubicPath for the same rect-bypass reason as Visual_GradientLinearTransform.
+TGFX_TEST(StencilCoverPathTest, Visual_NoiseShaderTransform) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  Paint paint;
+  paint.setAntiAlias(false);
+  paint.setShader(Shader::MakeFractalNoise(0.02f, 0.02f, 4, 0));
+  RenderPathAndCompareBaselines(context, BuildHeartCubicPath(), paint, kDebugBackground,
+                                ApplyBrushScaleRotate, "StencilCoverPath/NoiseShaderTransform");
 }
 
 // ----- Canvas transform correctness cases -----
@@ -1096,9 +1285,18 @@ TGFX_TEST(StencilCoverPathTest, Visual_BrushScaleRotate) {
 // below the 162-px MIN_TRIANGULATE_SIZE threshold but the canvas matrix scales it up so the
 // rendered geometry clears that threshold. Using a smaller source keeps it inside the
 // surface after a 2x or 4x scale.
+// Small disc approximated with 4 quadratic Bezier segments instead of addOval, to avoid
+// Canvas::drawPath's isOval detection. Bbox is [35, 115] x [35, 115].
 static Path BuildSmallCirclePath() {
+  auto cx = 75.f, cy = 75.f, r = 40.f;
+  auto k = r * 0.5523f;
   Path path;
-  path.addOval(Rect::MakeXYWH(35, 35, 80, 80));
+  path.moveTo(cx + r, cy);
+  path.quadTo(cx + r, cy + k, cx, cy + r);
+  path.quadTo(cx - k, cy + r, cx - r, cy);
+  path.quadTo(cx - r, cy - k, cx, cy - r);
+  path.quadTo(cx + k, cy - r, cx + r, cy);
+  path.close();
   return path;
 }
 
@@ -1126,7 +1324,7 @@ TGFX_TEST(StencilCoverPathTest, Visual_TransformPureScale2x) {
   ASSERT_TRUE(context != nullptr);
   RenderPathAndCompareBaselines(context, BuildSmallCirclePath(), MakeTransformDebugPaint(),
                                 kDebugBackground, ApplyPureScale2x,
-                                "StencilCoverPathDebug/TransformPureScale2x");
+                                "StencilCoverPath/TransformPureScale2x");
 }
 
 // Non-uniform scale: 2x horizontally, 1x vertically. The disc must turn into a horizontal
@@ -1145,7 +1343,7 @@ TGFX_TEST(StencilCoverPathTest, Visual_TransformNonUniformScale) {
   ASSERT_TRUE(context != nullptr);
   RenderPathAndCompareBaselines(context, BuildSmallCirclePath(), MakeTransformDebugPaint(),
                                 kDebugBackground, ApplyNonUniformScale,
-                                "StencilCoverPathDebug/TransformNonUniformScale");
+                                "StencilCoverPath/TransformNonUniformScale");
 }
 
 // Pure 45-degree rotation around the surface centre. The heart's bottom tip rotates to the
@@ -1164,7 +1362,7 @@ TGFX_TEST(StencilCoverPathTest, Visual_TransformPureRotate45) {
   ASSERT_TRUE(context != nullptr);
   RenderPathAndCompareBaselines(context, BuildHeartCubicPath(), MakeTransformDebugPaint(),
                                 kDebugBackground, ApplyPureRotate45,
-                                "StencilCoverPathDebug/TransformPureRotate45");
+                                "StencilCoverPath/TransformPureRotate45");
 }
 
 // Large 4x scale on a tiny disc. This is where bezier and legacy diverge most visibly:
@@ -1184,11 +1382,19 @@ TGFX_TEST(StencilCoverPathTest, Visual_TransformLargeScale4x) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  // Tiny source: 30x30 disc, scaled 4x ends up at 120x120 around the centre.
+  // Tiny source: 30x30 disc built with quad curves (not addOval) to avoid isOval detection,
+  // scaled 4x ends up at 120x120 around the centre.
+  auto cx = 37.5f, cy = 37.5f, r = 15.f;
+  auto k = r * 0.5523f;
   Path path;
-  path.addOval(Rect::MakeXYWH(22.5f, 22.5f, 30.f, 30.f));
+  path.moveTo(cx + r, cy);
+  path.quadTo(cx + r, cy + k, cx, cy + r);
+  path.quadTo(cx - k, cy + r, cx - r, cy);
+  path.quadTo(cx - r, cy - k, cx, cy - r);
+  path.quadTo(cx + k, cy - r, cx + r, cy);
+  path.close();
   RenderPathAndCompareBaselines(context, path, MakeTransformDebugPaint(), kDebugBackground,
-                                ApplyLargeScale4x, "StencilCoverPathDebug/TransformLargeScale4x");
+                                ApplyLargeScale4x, "StencilCoverPath/TransformLargeScale4x");
 }
 
 // ====================================================================================
@@ -1228,7 +1434,7 @@ TGFX_TEST(StencilCoverPathTest, Visual_WaveQuadStrip) {
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   RenderPathAndCompareBaselines(context, BuildWaveQuadStripPath(),
-                                "StencilCoverPathDebug/WaveQuadStrip");
+                                "StencilCoverPath/WaveQuadStrip");
 }
 
 // A spiral assembled from three cubic Bezier turns, each tightening towards the centre.
@@ -1260,8 +1466,7 @@ TGFX_TEST(StencilCoverPathTest, Visual_SpiralCubic) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  RenderPathAndCompareBaselines(context, BuildSpiralCubicPath(),
-                                "StencilCoverPathDebug/SpiralCubic");
+  RenderPathAndCompareBaselines(context, BuildSpiralCubicPath(), "StencilCoverPath/SpiralCubic");
 }
 
 // Five-petal flower: each petal is one cubic segment that loops out from and back to the
@@ -1293,17 +1498,25 @@ TGFX_TEST(StencilCoverPathTest, Visual_FlowerSelfIntersect) {
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   RenderPathAndCompareBaselines(context, BuildFlowerSelfIntersectPath(),
-                                "StencilCoverPathDebug/FlowerSelfIntersect");
+                                "StencilCoverPath/FlowerSelfIntersect");
 }
 
-// Rounded rectangle via Path::addRoundRect, which internally emits a sequence of conic
-// verbs (quarter-circle corners) joined by line segments along the edges. Conics are
-// expanded to quads by NoConicsPathIterator before they reach the rasterizer, so this is
-// the canonical "mixed line + curve" multi-contour path that real-world UI rendering
-// hits. Bbox is [40, 260] x [40, 260] with 40 px corner radius.
+// Rounded rectangle built with quadTo instead of addRoundRect, to avoid Canvas::drawPath's
+// isRRect detection (which would redirect to drawRRect and bypass the stencil-cover pipeline).
+// Bbox is [40, 260] x [40, 260] with 40 px corner radius, matching the original addRoundRect version.
 static Path BuildRoundedRectPath() {
+  auto x = 40.f, y = 40.f, w = 220.f, h = 220.f, r = 40.f;
   Path path;
-  path.addRoundRect(Rect::MakeXYWH(40, 40, 220, 220), 40, 40);
+  path.moveTo(x + r, y);
+  path.lineTo(x + w - r, y);
+  path.quadTo(x + w, y, x + w, y + r);
+  path.lineTo(x + w, y + h - r);
+  path.quadTo(x + w, y + h, x + w - r, y + h);
+  path.lineTo(x + r, y + h);
+  path.quadTo(x, y + h, x, y + h - r);
+  path.lineTo(x, y + r);
+  path.quadTo(x, y, x + r, y);
+  path.close();
   return path;
 }
 
@@ -1311,8 +1524,7 @@ TGFX_TEST(StencilCoverPathTest, Visual_RoundedRect) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  RenderPathAndCompareBaselines(context, BuildRoundedRectPath(),
-                                "StencilCoverPathDebug/RoundedRect");
+  RenderPathAndCompareBaselines(context, BuildRoundedRectPath(), "StencilCoverPath/RoundedRect");
 }
 
 // Lollipop: a circle (head) joined to a thin rectangle (stick) via Path::addPath. Two
@@ -1338,19 +1550,24 @@ TGFX_TEST(StencilCoverPathTest, Visual_Lollipop) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  RenderPathAndCompareBaselines(context, BuildLollipopPath(), "StencilCoverPathDebug/Lollipop");
+  RenderPathAndCompareBaselines(context, BuildLollipopPath(), "StencilCoverPath/Lollipop");
 }
 
-// Highly elongated ellipse (10:1 aspect ratio). The conic→quad expansion produces quads
-// with very high curvature at the two ends and very low curvature along the long sides —
-// the perfect input for ChopQuadAtMaxCurvature, which subdivides high-curvature quads
-// at their max-curvature parameter to keep `u² - v > 0` well-defined. If the chop
-// threshold is wrong, the ellipse caps would show kinks; if the chop is too aggressive,
-// the long flat sides accumulate more triangles than necessary but visually match.
-// Bbox is [30, 270] x [130, 170].
+// Highly elongated ellipse approximated with 4 quadratic Bezier segments instead of addOval,
+// to avoid Canvas::drawPath's isOval detection. Bbox is [30, 270] x [130, 170], matching the
+// original addOval version. The high-curvature quad ends exercise the same
+// ChopQuadAtMaxCurvature subdivision as the original conic→quad expansion.
 static Path BuildNarrowEllipsePath() {
+  auto cx = 150.f, cy = 150.f, rx = 120.f, ry = 20.f;
+  auto kx = rx * 0.5523f;
+  auto ky = ry * 0.5523f;
   Path path;
-  path.addOval(Rect::MakeXYWH(30, 130, 240, 40));
+  path.moveTo(cx + rx, cy);
+  path.quadTo(cx + rx, cy + ky, cx, cy + ry);
+  path.quadTo(cx - kx, cy + ry, cx - rx, cy);
+  path.quadTo(cx - rx, cy - ky, cx, cy - ry);
+  path.quadTo(cx + kx, cy - ry, cx + rx, cy);
+  path.close();
   return path;
 }
 
@@ -1359,7 +1576,126 @@ TGFX_TEST(StencilCoverPathTest, Visual_NarrowEllipse) {
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   RenderPathAndCompareBaselines(context, BuildNarrowEllipsePath(),
-                                "StencilCoverPathDebug/NarrowEllipse");
+                                "StencilCoverPath/NarrowEllipse");
+}
+
+// ====================================================================================
+// Gradient text cases
+//
+// Large text (font size 400) has glyph bounds exceeding Atlas::MaxCellSize (256px), so each
+// glyph is rejected from the atlas and rendered as a path via drawGlyphAsPath. With the
+// stencil-and-cover caps enabled, this exercises the full bezier pipeline for text:
+// each glyph shape goes through the stencil pass and the cover pass, with the gradient
+// shader applied in the cover pass. These tests verify that gradient shaders work
+// correctly when text is rendered as paths through the stencil-and-cover pipeline.
+// ====================================================================================
+
+// Renders text with the given paint into a surface sized to fit the text with ~50px margin.
+// The stencil-and-cover caps are forced on so glyphs rendered as paths go through the bezier
+// pipeline. Surface dimensions are computed from the text's tight bounds to ensure the content
+// is centred per the screenshot test rules.
+static void RenderTextAndCompareBaselines(Context* context,
+                                          const std::shared_ptr<TextBlob>& textBlob,
+                                          const Rect& textBounds, const Paint& paint,
+                                          const Color& clearColor, const std::string& keyPrefix) {
+  ScopedStencilCoverCaps capsGuard(context, false);
+
+  auto surfaceWidth = static_cast<int>(textBounds.width()) + 100;
+  auto surfaceHeight = static_cast<int>(textBounds.height()) + 100;
+  auto drawX = 50.f - textBounds.left;
+  auto drawY = 50.f - textBounds.top;
+
+#if TGFX_BEZIER_VISUAL_DEBUG_EXPORT
+  capsGuard.features->stencilCoverPathSupported = false;
+  {
+    auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+    ASSERT_TRUE(surface != nullptr);
+    auto canvas = surface->getCanvas();
+    canvas->clear(clearColor);
+    canvas->drawTextBlob(textBlob, drawX, drawY, paint);
+    context->flushAndSubmit();
+    (void)Baseline::Compare(surface, keyPrefix + "_Legacy");
+  }
+  capsGuard.features->stencilCoverPathSupported = true;
+  {
+    auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+    ASSERT_TRUE(surface != nullptr);
+    auto canvas = surface->getCanvas();
+    canvas->clear(clearColor);
+    canvas->drawTextBlob(textBlob, drawX, drawY, paint);
+    context->flushAndSubmit();
+    EXPECT_TRUE(Baseline::Compare(surface, keyPrefix + "_Bezier"));
+  }
+#else
+  capsGuard.features->stencilCoverPathSupported = true;
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(clearColor);
+  canvas->drawTextBlob(textBlob, drawX, drawY, paint);
+  context->flushAndSubmit();
+  EXPECT_TRUE(Baseline::Compare(surface, keyPrefix));
+#endif
+}
+
+// Linear gradient applied to large text rendered as paths. "TGFX" at font size 400 has glyph
+// bounds exceeding Atlas::MaxCellSize (256px), so each glyph is rejected from the atlas and
+// drawn through drawGlyphAsPath, which then enters the stencil-and-cover pipeline. The gradient
+// spans the text's tight bounds from left (red) to right (blue), verifying that the cover
+// pass's uvMatrix correctly maps the gradient coordinates across multiple glyph shapes drawn
+// as separate path ops.
+TGFX_TEST(StencilCoverPathTest, Visual_GradientTextLinear) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  ASSERT_TRUE(typeface != nullptr);
+  // Font size 400 ensures glyph bounds (cap height ≈ 0.72 × 400 = 288px) exceed
+  // Atlas::MaxCellSize (256px), forcing drawGlyphAsPath and thus the stencil-cover pipeline.
+  Font font(typeface, 400);
+  auto textBlob = TextBlob::MakeFrom("TGFX", font);
+  ASSERT_TRUE(textBlob != nullptr);
+  auto bounds = textBlob->getTightBounds();
+  ASSERT_FALSE(bounds.isEmpty());
+
+  Paint paint;
+  paint.setAntiAlias(false);
+  paint.setShader(Shader::MakeLinearGradient(
+      {bounds.left, bounds.centerY()}, {bounds.right, bounds.centerY()},
+      {Color{1.f, 0.f, 0.f, 1.f}, Color{0.f, 0.f, 1.f, 1.f}}, {0.f, 1.f}));
+
+  RenderTextAndCompareBaselines(context, textBlob, bounds, paint, kDebugBackground,
+                                "StencilCoverPath/GradientTextLinear");
+}
+
+// Radial gradient applied to large text rendered as paths. The gradient is centred on the
+// text's tight-bounds centre with a radius covering half the text width, producing a
+// circular colour falloff that must stay consistent across glyph boundaries — each glyph is
+// a separate stencil-and-cover op, but the gradient coordinates are in canvas space, so the
+// radial pattern must remain continuous across glyphs.
+TGFX_TEST(StencilCoverPathTest, Visual_GradientTextRadial) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  ASSERT_TRUE(typeface != nullptr);
+  Font font(typeface, 400);
+  auto textBlob = TextBlob::MakeFrom("TGFX", font);
+  ASSERT_TRUE(textBlob != nullptr);
+  auto bounds = textBlob->getTightBounds();
+  ASSERT_FALSE(bounds.isEmpty());
+
+  Paint paint;
+  paint.setAntiAlias(false);
+  auto radius = bounds.width() * 0.5f;
+  paint.setShader(Shader::MakeRadialGradient({bounds.centerX(), bounds.centerY()}, radius,
+                                             {Color{1.f, 0.f, 0.f, 1.f}, Color{0.f, 0.f, 1.f, 1.f}},
+                                             {0.f, 1.f}));
+
+  RenderTextAndCompareBaselines(context, textBlob, bounds, paint, kDebugBackground,
+                                "StencilCoverPath/GradientTextRadial");
 }
 
 }  // namespace tgfx
