@@ -20,6 +20,7 @@
 
 #include <atomic>
 #include <condition_variable>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -114,11 +115,15 @@ class Task {
   void cancel();
 
   /**
-   * Blocks the current thread until the Task finishes its execution. Returns immediately if the
-   * Task is finished or canceled. The task may be executed on the calling thread if it is not
-   * canceled and still in the queue.
+   * Blocks the current thread until the Task finishes its execution or the specified timeout
+   * elapses. Returns immediately if the Task is finished or canceled. The task may be executed on
+   * the calling thread if it is not canceled and still in the queue, in which case the timeout is
+   * not applied. If the timeout is zero, this method blocks indefinitely until the Task finishes.
+   * @param timeout The maximum duration in milliseconds to wait for the Task to finish. The default
+   * is 0ms, which means the method will block indefinitely.
+   * @return true if the Task finished or was canceled, false if it timed out.
    */
-  void wait();
+  bool wait(uint64_t timeout = 0);
 
  protected:
   /**
