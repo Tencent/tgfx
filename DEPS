@@ -22,7 +22,7 @@
       },
       {
         "url": "https://github.com/madler/zlib.git",
-        "commit": "51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf",
+        "commit": "da607da739fa6047df13e66a2af6b8bec7c2a498",
         "dir": "third_party/zlib"
       },
       {
