@@ -25,6 +25,10 @@
 #include <cstring>
 #include <shaderc/shaderc.hpp>
 #include <vector>
+#if defined(__ANDROID__)
+#include <dlfcn.h>
+#include "gpu/vulkan/VulkanHardwareTexture.h"
+#endif
 #include "core/utils/Log.h"
 #include "gpu/vulkan/VulkanBuffer.h"
 #include "gpu/vulkan/VulkanCommandEncoder.h"
@@ -65,9 +69,17 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugMessengerCallback(
 }
 #endif
 
+#if defined(__ANDROID__)
+bool HardwareBufferAvailable() {
+  // On Android, AHardwareBuffer is available on API 26+. Dynamically check by probing the symbol.
+  static const bool available = (dlsym(RTLD_DEFAULT, "AHardwareBuffer_allocate") != nullptr);
+  return available;
+}
+#else
 bool HardwareBufferAvailable() {
   return false;
 }
+#endif
 
 std::unique_ptr<VulkanGPU> VulkanGPU::Make() {
   auto gpu = std::unique_ptr<VulkanGPU>(new VulkanGPU());
@@ -100,7 +112,7 @@ std::unique_ptr<VulkanGPU> VulkanGPU::MakeFrom(VkInstance instance, VkPhysicalDe
   volkLoadDevice(device);
   gpu->debugUtilsEnabled = (vkCreateDebugUtilsMessengerEXT != nullptr);
   gpu->installDebugMessenger();
-  gpu->_extensions.detectFromDevice();
+  gpu->_extensions.detectFromDevice(physicalDevice);
   // Query the actual Vulkan API version supported by the host instance. VMA requires this to match
   // the instance version — using a higher version causes NULL dereferences on 1.0 entry points.
   uint32_t instanceVersion = VK_API_VERSION_1_0;
@@ -217,6 +229,11 @@ bool VulkanGPU::createInstance() {
   if (HasInstanceExtension(availableExts, VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME)) {
     instanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
   }
+#if defined(__ANDROID__)
+  if (HasInstanceExtension(availableExts, VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME)) {
+    instanceExtensions.push_back(VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME);
+  }
+#endif
 
   if (HasInstanceExtension(availableExts, VK_KHR_SURFACE_EXTENSION_NAME)) {
     instanceExtensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
@@ -340,14 +357,12 @@ bool VulkanGPU::createDevice() {
   _extensions.query(vulkanPhysicalDevice);
   auto deviceExtensions = _extensions.getEnabledNames();
 
-  VkPhysicalDeviceFeatures2 deviceFeatures2 = {};
-  VkPhysicalDeviceTimelineSemaphoreFeatures timelineFeatures = {};
-  VkPhysicalDeviceExtendedDynamicStateFeaturesEXT extDynStateFeatures = {};
-  _extensions.buildFeatureChain(deviceFeatures2, timelineFeatures, extDynStateFeatures);
+  VulkanExtensions::FeatureChain featureChain = {};
+  _extensions.buildFeatureChain(featureChain);
 
   VkDeviceCreateInfo deviceCreateInfo = {};
   deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-  deviceCreateInfo.pNext = &deviceFeatures2;
+  deviceCreateInfo.pNext = &featureChain.features2;
   deviceCreateInfo.queueCreateInfoCount = 1;
   deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
   deviceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
@@ -444,9 +459,27 @@ std::shared_ptr<CommandEncoder> VulkanGPU::createCommandEncoder() {
   return VulkanCommandEncoder::Make(this);
 }
 
-std::vector<std::shared_ptr<Texture>> VulkanGPU::importHardwareTextures(HardwareBufferRef,
-                                                                        uint32_t) {
+std::vector<std::shared_ptr<Texture>> VulkanGPU::importHardwareTextures(
+    HardwareBufferRef hardwareBuffer, uint32_t usage) {
+#if defined(__ANDROID__)
+  if (!HardwareBufferCheck(hardwareBuffer)) {
+    return {};
+  }
+  if (!_extensions.androidHardwareBuffer) {
+    return {};
+  }
+  auto texture = VulkanHardwareTexture::MakeFrom(this, hardwareBuffer, usage);
+  if (texture == nullptr) {
+    return {};
+  }
+  std::vector<std::shared_ptr<Texture>> textures;
+  textures.push_back(std::move(texture));
+  return textures;
+#else
+  (void)hardwareBuffer;
+  (void)usage;
   return {};
+#endif
 }
 
 std::shared_ptr<Texture> VulkanGPU::importBackendTexture(const BackendTexture& backendTexture,

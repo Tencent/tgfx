@@ -44,6 +44,38 @@ void ImagePattern::setMatrix(const Matrix& matrix) {
   invalidateContent();
 }
 
+void ImagePattern::setImage(std::shared_ptr<Image> image) {
+  if (_image == image) {
+    return;
+  }
+  _image = std::move(image);
+  invalidateContent();
+}
+
+void ImagePattern::setTileModeX(TileMode tileModeX) {
+  if (_tileModeX == tileModeX) {
+    return;
+  }
+  _tileModeX = tileModeX;
+  invalidateContent();
+}
+
+void ImagePattern::setTileModeY(TileMode tileModeY) {
+  if (_tileModeY == tileModeY) {
+    return;
+  }
+  _tileModeY = tileModeY;
+  invalidateContent();
+}
+
+void ImagePattern::setSamplingOptions(const SamplingOptions& sampling) {
+  if (_sampling == sampling) {
+    return;
+  }
+  _sampling = sampling;
+  invalidateContent();
+}
+
 void ImagePattern::setScaleMode(ScaleMode mode) {
   if (_scaleMode == mode) {
     return;

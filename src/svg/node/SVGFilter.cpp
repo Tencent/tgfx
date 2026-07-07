@@ -124,8 +124,10 @@ std::shared_ptr<ImageFilter> SVGFilter::buildDropShadowFilter(
       std::static_pointer_cast<SVGFeGaussianBlur>(children[blurIndex]);
   std::shared_ptr<SVGFeColorMatrix> colorMatrixFe = nullptr;
 
+  size_t colorMatrixIndex = 0;
   if (blurIndex + 1 < children.size() && children[blurIndex + 1]->tag() == SVGTag::FeColorMatrix) {
     colorMatrixFe = std::static_pointer_cast<SVGFeColorMatrix>(children[blurIndex + 1]);
+    colorMatrixIndex = blurIndex + 1;
   } else if (blurIndex + 2 < children.size() &&
              children[blurIndex + 1]->tag() == SVGTag::FeComposite &&
              children[blurIndex + 2]->tag() == SVGTag::FeColorMatrix) {
@@ -134,6 +136,7 @@ std::shared_ptr<ImageFilter> SVGFilter::buildDropShadowFilter(
       return nullptr;
     }
     colorMatrixFe = std::static_pointer_cast<SVGFeColorMatrix>(children[blurIndex + 2]);
+    colorMatrixIndex = blurIndex + 2;
   } else {
     return nullptr;
   }
@@ -148,7 +151,17 @@ std::shared_ptr<ImageFilter> SVGFilter::buildDropShadowFilter(
   auto colorMatrix = colorMatrixFe->getValues();
   Color color{colorMatrix[4], colorMatrix[9], colorMatrix[14], colorMatrix[18]};
 
-  return ImageFilter::DropShadow(dx, dy, blurrinessX, blurrinessY, color);
+  // When exporting, DropShadow (shadowOnly=false) appends a <feBlend mode="normal"> to composite
+  // the shadow with the original graphic, while DropShadowOnly omits it. Check for its presence
+  // and mode to distinguish the two modes during import.
+  if (colorMatrixIndex + 1 < children.size() &&
+      children[colorMatrixIndex + 1]->tag() == SVGTag::FeBlend) {
+    auto blendFe = std::static_pointer_cast<SVGFeBlend>(children[colorMatrixIndex + 1]);
+    if (blendFe->getBlendMode() == SVGFeBlend::Mode::Normal) {
+      return ImageFilter::DropShadow(dx, dy, blurrinessX, blurrinessY, color);
+    }
+  }
+  return ImageFilter::DropShadowOnly(dx, dy, blurrinessX, blurrinessY, color);
 }
 
 std::shared_ptr<ImageFilter> SVGFilter::buildInnerShadowFilter(
