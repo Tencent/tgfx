@@ -104,56 +104,6 @@ static constexpr char GLASS_SDF_ELLIPSE[] = R"(
     }
 )";
 
-// SDF module: Regular Pentagram (5-pointed star)
-// Based on Inigo Quilez's star SDF.
-// r = outer radius, the inner radius is computed from r.
-static constexpr char GLASS_SDF_STAR[] = R"(
-    const float STAR_PI = 3.141592653589793;
-
-    // IQ star SDF: r is the outer radius, ratio is inner/outer.
-    float sdStar5(float px, float py, float r, float ratio) {
-        // 5-pointed star
-        const float n = 5.0;
-        float an = STAR_PI / n;
-        float en = STAR_PI / n;  // pi/n
-        vec2 p = vec2(px, py);
-        vec2 ac = vec2(cos(an), sin(an));
-        vec2 es = vec2(r, 1.0);
-        vec2 en2 = vec2(cos(en), sin(en));
-        float bn = mod(atan(p.x, p.y), 2.0 * an) - an;
-        p = length(p) * vec2(cos(bn), abs(sin(bn)));
-        p -= r * es;
-        p += mix(vec2(0.0), -2.0 * es * clamp(dot(en2, p) / dot(es, es), 0.0, 1.0), ratio);
-        return length(p) * sign(p.y);
-    }
-
-    float outerShapeSDF(float px, float py) {
-        float hw = uParams1.x;
-        float R = hw * 0.9;
-        float ratio = 0.382;  // inner/outer ratio, matching ShapeLayer path
-        return sdStar5(px, py, R, ratio);
-    }
-
-    float innerShapeSDF(float px, float py) {
-        float hw = uParams2.x;
-        float R = hw * 0.9;
-        float ratio = 0.382;  // inner/outer ratio, matching ShapeLayer path
-        return sdStar5(px, py, R, ratio);
-    }
-
-    vec2 shapeNormal(float px, float py) {
-        float eps = 0.5;
-        float dx = outerShapeSDF(px + eps, py) - outerShapeSDF(px - eps, py);
-        float dy = outerShapeSDF(px, py + eps) - outerShapeSDF(px, py - eps);
-        vec2 g = vec2(dx, dy);
-        float len = length(g);
-        if (len > 0.0001) {
-            return -g / len;
-        }
-        return vec2(0.0);
-    }
-)";
-
 // SDF module: Alpha Mask (arbitrary shape via Gaussian-blurred UDF height map)
 // The mask texture stores the blurred alpha packed into RGBA8 for 32-bit precision.
 // Unpack with: dot(rgba, vec4(1.0, 1.0/255.0, 1.0/65025.0, 1.0/16581375.0))
@@ -277,13 +227,21 @@ static constexpr char GLASS_SHADER_MAIN[] = R"(
             // Use height to determine edge proximity: height≈0 at edge, height≈max at center.
             float height = sampleHeight(px, py);
 
-            // Step 2: gradient (direction only) from height map.
+            // Step 2: Sobel operator for smoother gradient direction.
             float step = minHalf / 20.0 + 1.0;
-            float left = sampleHeight(px - step, py);
-            float right = sampleHeight(px + step, py);
-            float bottom = sampleHeight(px, py - step);
-            float top = sampleHeight(px, py + step);
-            vec2 grad = vec2(right - left, top - bottom) / (2.0 * step);
+            float tl = sampleHeight(px - step, py + step);
+            float tc = sampleHeight(px, py + step);
+            float tr = sampleHeight(px + step, py + step);
+            float ml = sampleHeight(px - step, py);
+            float mr = sampleHeight(px + step, py);
+            float bl = sampleHeight(px - step, py - step);
+            float bc = sampleHeight(px, py - step);
+            float br = sampleHeight(px + step, py - step);
+            // Sobel X: [-1,0,1; -2,0,2; -1,0,1]
+            float gx = (tr + 2.0 * mr + br) - (tl + 2.0 * ml + bl);
+            // Sobel Y: [-1,-2,-1; 0,0,0; 1,2,1]
+            float gy = (bl + 2.0 * bc + br) - (tl + 2.0 * tc + tr);
+            vec2 grad = vec2(gx, gy) / (8.0 * step);
             float gradLen = length(grad);
 
             if (gradLen > 0.0001) {

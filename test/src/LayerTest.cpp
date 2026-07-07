@@ -3961,7 +3961,6 @@ static void AddGlassCell(Layer* root, std::shared_ptr<Image> bgImage, float x, f
     auto style =
         GlassStyle::Make(refraction, depth, frost, dispersion, splay, lightAngle, lightIntensity);
     style->setCornerRadius(cornerRadius);
-    style->setShapeType(shapeType);
     glassLayer->setLayerStyles({style});
     container->addChild(glassLayer);
   } else {
@@ -3980,7 +3979,6 @@ static void AddGlassCell(Layer* root, std::shared_ptr<Image> bgImage, float x, f
     auto style =
         GlassStyle::Make(refraction, depth, frost, dispersion, splay, lightAngle, lightIntensity);
     style->setCornerRadius(cornerRadius);
-    style->setShapeType(shapeType);
     glassLayer->setLayerStyles({style});
     container->addChild(glassLayer);
   }
@@ -4474,20 +4472,16 @@ TGFX_TEST(LayerTest, GlassStyleSingle) {
     float outerAngle = startAngle + static_cast<float>(i) * 3.1415926f * 0.8f;
     float innerAngle = outerAngle + 3.1415926f * 0.2f;
     if (i == 0) {
-      starPath.moveTo(halfSize + outerR * cosf(outerAngle),
-                      halfSize + outerR * sinf(outerAngle));
+      starPath.moveTo(halfSize + outerR * cosf(outerAngle), halfSize + outerR * sinf(outerAngle));
     } else {
-      starPath.lineTo(halfSize + outerR * cosf(outerAngle),
-                      halfSize + outerR * sinf(outerAngle));
+      starPath.lineTo(halfSize + outerR * cosf(outerAngle), halfSize + outerR * sinf(outerAngle));
     }
-    starPath.lineTo(halfSize + innerR * cosf(innerAngle),
-                    halfSize + innerR * sinf(innerAngle));
+    starPath.lineTo(halfSize + innerR * cosf(innerAngle), halfSize + innerR * sinf(innerAngle));
   }
   starPath.close();
   glassLayer->setPath(starPath);
   glassLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 128)));
-  auto style = GlassStyle::Make(50, 50, 0, 0, 0, 135, 0);
-  style->setShapeType(GlassShapeType::AlphaMask);
+  auto style = GlassStyle::Make(1, 10, 0, 0, 0, 135, 0);
   glassLayer->setLayerStyles({style});
   displayList->root()->addChild(glassLayer);
 
