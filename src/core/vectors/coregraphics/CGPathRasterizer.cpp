@@ -111,28 +111,8 @@ static bool DrawPathWithGammaCorrection(const Path& path, void* pixels, const Im
 }
 
 static void CompositeA8Mask(const uint8_t* src, uint8_t* dst, int width, int height,
-                            size_t srcRowBytes, size_t dstRowBytes, int dstX, int dstY,
-                            int dstWidth, int dstHeight) {
-  if (dstX < 0) {
-    width += dstX;
-    src -= dstX;
-    dstX = 0;
-  }
-  if (dstY < 0) {
-    height += dstY;
-    src -= dstY * static_cast<int>(srcRowBytes);
-    dstY = 0;
-  }
-  if (dstX + width > dstWidth) {
-    width = dstWidth - dstX;
-  }
-  if (dstY + height > dstHeight) {
-    height = dstHeight - dstY;
-  }
-  if (width <= 0 || height <= 0) {
-    return;
-  }
-  dst += dstY * dstRowBytes + dstX;
+                            size_t srcRowBytes, size_t dstRowBytes, int dstX, int dstY) {
+  dst += static_cast<size_t>(dstY) * dstRowBytes + static_cast<size_t>(dstX);
   for (int y = 0; y < height; ++y) {
     for (int x = 0; x < width; ++x) {
       auto srcAlpha = src[x];
@@ -212,7 +192,7 @@ bool CGPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
   }
   CompositeA8Mask(static_cast<const uint8_t*>(tempPixels), static_cast<uint8_t*>(dstPixels), width,
                   height, tempBuffer->info().rowBytes(), dstRowBytes, static_cast<int>(bounds.left),
-                  static_cast<int>(bounds.top), targetInfo.width(), targetInfo.height());
+                  static_cast<int>(bounds.top));
   tempBuffer->unlockPixels();
   CGContextRelease(cgContext);
   if (NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
