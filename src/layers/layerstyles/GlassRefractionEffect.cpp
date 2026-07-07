@@ -18,9 +18,41 @@
 
 #include "GlassRefractionEffect.h"
 #include <string>
+#include "GlassShaderFragments.h"
+#include "core/utils/Log.h"
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
+
+// --- GlassMaskEffect: Packs blurred alpha float into RGBA8 (32-bit precision) ---
+
+static constexpr char MASK_VERTEX_SHADER[] = R"(
+    in vec2 aPosition;
+    in vec2 aTextureCoord;
+    out vec2 vTexCoord;
+    void main() {
+        gl_Position = vec4(aPosition, 0.0, 1.0);
+        vTexCoord = aTextureCoord;
+    }
+)";
+
+static constexpr char MASK_FRAGMENT_SHADER[] = R"(
+    precision highp float;
+    in vec2 vTexCoord;
+    uniform sampler2D uSource;
+    out vec4 tgfx_FragColor;
+
+    void main() {
+        float value = texture(uSource, vTexCoord).a;
+        // Pack float [0,1] into RGBA8 channels for 32-bit precision.
+        vec4 enc = vec4(1.0, 255.0, 65025.0, 16581375.0) * value;
+        enc = fract(enc);
+        enc -= enc.yzww * vec4(1.0 / 255.0, 1.0 / 255.0, 1.0 / 255.0, 0.0);
+        tgfx_FragColor = enc;
+    }
+)";
+
+// --- Shared vertex helpers ---
 
 // 4 vertices * (2 position + 2 texcoord) = 16 floats
 static constexpr size_t GLASS_VERTEX_SIZE = 16 * sizeof(float);
@@ -36,174 +68,189 @@ static constexpr char GLASS_VERTEX_SHADER[] = R"(
     }
 )";
 
-// The fragment shader computes the glass refraction displacement entirely on the GPU, without
-// any intermediate displacement map texture. For each pixel it:
-//   1. Converts the source texture UV to glass pixel coordinates (centered at origin).
-//   2. Evaluates the rounded-rectangle SDF for the outer and inner shapes.
-//   3. If the pixel is in the edge band (between outer and inner shapes), computes the displacement:
-//      direction = mix(radial, SDF gradient) based on dot product and splay threshold.
-//      distance = glassThickness * refractionFactor * edgeFactor² * 2.
-//   4. Converts the displacement (in glass pixels) to a source texture UV offset.
-//   5. Applies chromatic dispersion by sampling R/G/B channels at different UV offsets.
-//
-// Uniform layout (std140, 5 vec4s = 80 bytes):
-//   uParams0: glassOffsetX, glassOffsetY, glassScaleX, glassScaleY
-//   uParams1: halfW, halfH, cornerRadius, minHalf
-//   uParams2: innerHalfW, innerHalfH, innerRadius, glassThickness
-//   uParams3: refractionFactor, dispersion, 1/sourceWidth, 1/sourceHeight
-//   uParams4: splay, depthRatio, 0, 0
-static constexpr char GLASS_FRAGMENT_SHADER[] = R"(
-    precision highp float;
-    in vec2 vTexCoord;
-    uniform sampler2D uSource;
-    layout(std140) uniform GlassUniforms {
-        vec4 uParams0;  // glassOffsetX, glassOffsetY, glassScaleX, glassScaleY
-        vec4 uParams1;  // halfW, halfH, cornerRadius, minHalf
-        vec4 uParams2;  // innerHalfW, innerHalfH, innerRadius, glassThickness
-        vec4 uParams3;  // refractionFactor, dispersion, 1/sourceWidth, 1/sourceHeight
-        vec4 uParams4;  // splay, depthRatio, 0, 0
-    };
-    out vec4 tgfx_FragColor;
+// --- GlassMaskEffect implementation ---
 
-    float roundedRectSDF(float px, float py, float hw, float hh, float r) {
-        float qx = abs(px) - hw + r;
-        float qy = abs(py) - hh + r;
-        float outsideDist = sqrt(max(qx, 0.0) * max(qx, 0.0) + max(qy, 0.0) * max(qy, 0.0));
-        float insideDist = min(max(qx, qy), 0.0);
-        return outsideDist + insideDist - r;
-    }
-
-    // Computes the SDF gradient direction via central differences (normalized, points outward).
-    vec2 sdfGradientDir(float px, float py, float hw, float hh, float r) {
-        float eps = 0.5;
-        float dx = roundedRectSDF(px + eps, py, hw, hh, r) -
-                   roundedRectSDF(px - eps, py, hw, hh, r);
-        float dy = roundedRectSDF(px, py + eps, hw, hh, r) -
-                   roundedRectSDF(px, py - eps, hw, hh, r);
-        vec2 g = vec2(dx, dy);
-        float len = length(g);
-        if (len > 0.0001) {
-            return g / len;
-        }
-        return vec2(0.0);
-    }
-
-    void main() {
-        float halfW = uParams1.x;
-        float halfH = uParams1.y;
-        float cornerRadius = uParams1.z;
-        float innerHalfW = uParams2.x;
-        float innerHalfH = uParams2.y;
-        float innerRadius = uParams2.z;
-        float glassThickness = uParams2.w;
-        float refractionFactor = uParams3.x;
-        float dispersion = uParams3.y;
-        float invSourceW = uParams3.z;
-        float invSourceH = uParams3.w;
-        float splay = uParams4.x;
-        float depthRatio = uParams4.y;
-
-        // Convert source UV to glass pixel coordinates centered at origin.
-        vec2 glassUV = (vTexCoord - uParams0.xy) * uParams0.zw;
-        glassUV = vec2(glassUV.x, 1.0 - glassUV.y);
-        vec2 glassPixel = glassUV * vec2(halfW * 2.0, halfH * 2.0);
-        float px = glassPixel.x - halfW;
-        float py = glassPixel.y - halfH;
-
-        vec2 uvOffset = vec2(0.0);
-
-        float outerSDF = roundedRectSDF(px, py, halfW, halfH, cornerRadius);
-        float innerSDF = roundedRectSDF(px, py, innerHalfW, innerHalfH, innerRadius);
-
-        // Only apply refraction in the edge band between outer and inner shapes.
-        if (outerSDF < 0.0 && innerSDF >= 0.0) {
-            float edgeDist = -outerSDF;
-            float totalDist = edgeDist + innerSDF;
-            float xNorm = (totalDist > 0.001) ? edgeDist / totalDist : 0.0;
-            xNorm = min(xNorm, 1.0);
-
-            // Edge factor: 1.0 at outer edge (xNorm=0), 0.0 at flat region (xNorm=1).
-            float edgeFactor = 1.0 - xNorm;
-            // Offset distance: glassThickness * refractionFactor * edgeFactor² * 2.
-            float offsetDist = glassThickness * refractionFactor * edgeFactor * edgeFactor * 2.0;
-
-            // Refraction direction: mix radial and axis direction based on alignment.
-            float dirLen = sqrt(px * px + py * py);
-            if (dirLen > 0.001) {
-                vec2 radialDir = vec2(-px / dirLen, -py / dirLen);
-
-                // Nearest axis direction aligned with radial.
-                vec2 axisDir;
-                if (abs(radialDir.x) > abs(radialDir.y)) {
-                    axisDir = vec2(sign(radialDir.x), 0.0);
-                } else {
-                    axisDir = vec2(0.0, sign(radialDir.y));
-                }
-
-                // Dot of radial with nearest axis = max component absolute value.
-                float maxAxisDot = max(abs(radialDir.x), abs(radialDir.y));
-                // Threshold controlled by max(depthRatio, splay): 0 → 0.8, 1 → 1.0.
-                float controlValue = depthRatio * splay;
-                float axisThreshold = mix(0.9, 1.0, controlValue);
-                // axisWeight: 0 when maxAxisDot < threshold (corners, 100% radial),
-                //              1 when maxAxisDot reaches 1 (straight edges, 100% axis).
-                float axisWeight = smoothstep(axisThreshold, 1.0, maxAxisDot);
-
-                vec2 refractDir = mix(radialDir, axisDir, axisWeight);
-                float dispX = refractDir.x * offsetDist;
-                float dispY = refractDir.y * offsetDist;
-                uvOffset = vec2(dispX * invSourceW, -dispY * invSourceH);
-            }
-        }
-
-        vec2 uvR, uvG, uvB;
-        if (dispersion < 0.01) {
-            uvR = uvG = uvB = clamp(vTexCoord + uvOffset, vec2(0.0), vec2(1.0));
-        } else {
-            uvR = clamp(vTexCoord + uvOffset * (1.0 + dispersion), vec2(0.0), vec2(1.0));
-            uvG = clamp(vTexCoord + uvOffset, vec2(0.0), vec2(1.0));
-            uvB = clamp(vTexCoord + uvOffset * (1.0 - dispersion), vec2(0.0), vec2(1.0));
-        }
-        float r = texture(uSource, uvR).r;
-        float g = texture(uSource, uvG).g;
-        float b = texture(uSource, uvB).b;
-        float a = texture(uSource, uvG).a;
-        tgfx_FragColor = vec4(r, g, b, a);
-    }
-)";
-
-static std::string GetFinalShaderCode(const char* codeSnippet, bool isDesktop) {
-  if (isDesktop) {
-    return std::string("#version 150\n\n") + codeSnippet;
-  }
-  return std::string("#version 300 es\n\n") + codeSnippet;
+static std::string GetShaderVersion(bool isDesktop) {
+  return isDesktop ? "#version 150\n\n" : "#version 300 es\n\n";
 }
 
-GlassRefractionEffect::GlassRefractionEffect(float glassWidth, float glassHeight, float halfWidth,
-                                             float halfHeight, float cornerRadius, float minHalf,
-                                             float innerHalfWidth, float innerHalfHeight,
-                                             float innerRadius, float glassThickness,
-                                             float refractionFactor, float dispersion, float splay,
-                                             float depthRatio)
-    : RuntimeEffect({}), _glassWidth(glassWidth), _glassHeight(glassHeight), _halfWidth(halfWidth),
-      _halfHeight(halfHeight), _cornerRadius(cornerRadius), _minHalf(minHalf),
-      _innerHalfWidth(innerHalfWidth), _innerHalfHeight(innerHalfHeight), _innerRadius(innerRadius),
-      _glassThickness(glassThickness), _refractionFactor(refractionFactor), _dispersion(dispersion),
-      _splay(splay), _depthRatio(depthRatio) {
-}
-
-std::shared_ptr<RenderPipeline> GlassRefractionEffect::createPipeline(GPU* gpu) const {
+std::shared_ptr<RenderPipeline> GlassMaskEffect::createPipeline(GPU* gpu) const {
   auto info = gpu->info();
   auto isDesktop = info->version.find("OpenGL ES") == std::string::npos;
   ShaderModuleDescriptor vertexModule = {};
-  vertexModule.code = GetFinalShaderCode(GLASS_VERTEX_SHADER, isDesktop);
+  vertexModule.code = GetShaderVersion(isDesktop) + MASK_VERTEX_SHADER;
   vertexModule.stage = ShaderStage::Vertex;
   auto vertexShader = gpu->createShaderModule(vertexModule);
   if (vertexShader == nullptr) {
     return nullptr;
   }
   ShaderModuleDescriptor fragmentModule = {};
-  fragmentModule.code = GetFinalShaderCode(GLASS_FRAGMENT_SHADER, isDesktop);
+  fragmentModule.code = GetShaderVersion(isDesktop) + MASK_FRAGMENT_SHADER;
+  fragmentModule.stage = ShaderStage::Fragment;
+  auto fragmentShader = gpu->createShaderModule(fragmentModule);
+  if (fragmentShader == nullptr) {
+    return nullptr;
+  }
+  RenderPipelineDescriptor descriptor = {};
+  VertexBufferLayout vertexLayout(
+      {{"aPosition", VertexFormat::Float2}, {"aTextureCoord", VertexFormat::Float2}});
+  descriptor.vertex.bufferLayouts = {vertexLayout};
+  descriptor.vertex.module = vertexShader;
+  descriptor.fragment.module = fragmentShader;
+  descriptor.fragment.colorAttachments.push_back({});
+  BindingEntry sourceBinding = {"uSource", 0};
+  descriptor.layout.textureSamplers.push_back(sourceBinding);
+  return gpu->createRenderPipeline(descriptor);
+}
+
+void GlassMaskEffect::collectVertices(const Texture* source, const Texture* target,
+                                      const Point& offset, float* vertices) const {
+  auto sourceWidth = static_cast<float>(source->width());
+  auto sourceHeight = static_cast<float>(source->height());
+  auto targetWidth = static_cast<float>(target->width());
+  auto targetHeight = static_cast<float>(target->height());
+
+  float left = offset.x;
+  float top = offset.y;
+  float right = offset.x + sourceWidth;
+  float bottom = offset.y + sourceHeight;
+
+  float ndcLeft = 2.0f * left / targetWidth - 1.0f;
+  float ndcRight = 2.0f * right / targetWidth - 1.0f;
+  float ndcTop = 2.0f * top / targetHeight - 1.0f;
+  float ndcBottom = 2.0f * bottom / targetHeight - 1.0f;
+
+  size_t i = 0;
+  vertices[i++] = ndcLeft;
+  vertices[i++] = ndcBottom;
+  vertices[i++] = 0.0f;
+  vertices[i++] = 1.0f;
+  vertices[i++] = ndcRight;
+  vertices[i++] = ndcBottom;
+  vertices[i++] = 1.0f;
+  vertices[i++] = 1.0f;
+  vertices[i++] = ndcLeft;
+  vertices[i++] = ndcTop;
+  vertices[i++] = 0.0f;
+  vertices[i++] = 0.0f;
+  vertices[i++] = ndcRight;
+  vertices[i++] = ndcTop;
+  vertices[i++] = 1.0f;
+  vertices[i++] = 0.0f;
+}
+
+bool GlassMaskEffect::onDraw(CommandEncoder* encoder,
+                             const std::vector<std::shared_ptr<Texture>>& inputTextures,
+                             std::shared_ptr<Texture> outputTexture, const Point& offset) const {
+  if (inputTextures.empty()) {
+    LOGE("GlassMaskEffect: no input textures!");
+    return false;
+  }
+  auto gpu = encoder->gpu();
+  if (cachedPipeline == nullptr) {
+    cachedPipeline = createPipeline(gpu);
+    if (cachedPipeline == nullptr) {
+      return false;
+    }
+  }
+
+  TextureDescriptor textureDesc(outputTexture->width(), outputTexture->height(),
+                                outputTexture->format(), false, 1,
+                                TextureUsage::RENDER_ATTACHMENT | TextureUsage::TEXTURE_BINDING);
+  auto renderTexture = gpu->createTexture(textureDesc);
+  if (renderTexture == nullptr) {
+    return false;
+  }
+
+  RenderPassDescriptor renderPassDesc(renderTexture, LoadAction::Clear, StoreAction::Store,
+                                      PMColor::Transparent(), outputTexture);
+  auto renderPass = encoder->beginRenderPass(renderPassDesc);
+  if (renderPass == nullptr) {
+    return false;
+  }
+  renderPass->setPipeline(cachedPipeline);
+
+  auto vertexBuffer = gpu->createBuffer(16 * sizeof(float), GPUBufferUsage::VERTEX);
+  if (vertexBuffer == nullptr) {
+    return false;
+  }
+  auto vertices = static_cast<float*>(vertexBuffer->map());
+  if (vertices == nullptr) {
+    return false;
+  }
+  collectVertices(inputTextures[0].get(), outputTexture.get(), offset, vertices);
+  vertexBuffer->unmap();
+  renderPass->setVertexBuffer(0, vertexBuffer);
+
+  SamplerDescriptor samplerDesc(AddressMode::ClampToEdge, AddressMode::ClampToEdge,
+                                FilterMode::Nearest, FilterMode::Nearest, MipmapMode::None);
+  auto sampler = gpu->createSampler(samplerDesc);
+  renderPass->setTexture(0, inputTextures[0], sampler);
+
+  renderPass->draw(PrimitiveType::TriangleStrip, 4);
+  renderPass->end();
+  return true;
+}
+
+// --- GlassRefractionEffect implementation ---
+
+GlassRefractionEffect::GlassRefractionEffect(float glassWidth, float glassHeight, float halfWidth,
+                                             float halfHeight, float cornerRadius, float minHalf,
+                                             float innerHalfWidth, float innerHalfHeight,
+                                             float innerRadius, float glassThickness,
+                                             float refractionFactor, float dispersion, float splay,
+                                             float depthRatio, float lightAngle,
+                                             float lightIntensity, GlassShapeType shapeType,
+                                             std::shared_ptr<Image> maskImage)
+    : RuntimeEffect(maskImage ? std::vector<std::shared_ptr<Image>>{maskImage}
+                              : std::vector<std::shared_ptr<Image>>{}),
+      _glassWidth(glassWidth), _glassHeight(glassHeight), _halfWidth(halfWidth),
+      _halfHeight(halfHeight), _cornerRadius(cornerRadius), _minHalf(minHalf),
+      _innerHalfWidth(innerHalfWidth), _innerHalfHeight(innerHalfHeight), _innerRadius(innerRadius),
+      _glassThickness(glassThickness), _refractionFactor(refractionFactor), _dispersion(dispersion),
+      _splay(splay), _depthRatio(depthRatio), _lightAngle(lightAngle),
+      _lightIntensity(lightIntensity), _shapeType(shapeType), _maskImage(maskImage) {
+}
+
+std::string GlassRefractionEffect::buildFragmentShader(bool isDesktop) const {
+  std::string code;
+  code += isDesktop ? "#version 150\n\n" : "#version 300 es\n\n";
+  code += GLASS_SHADER_HEADER;
+  switch (_shapeType) {
+    case GlassShapeType::RoundedRect:
+      code += "#define GLASS_USE_AXIS_MIX\n";
+      code += GLASS_SDF_ROUNDED_RECT;
+      break;
+    case GlassShapeType::Ellipse:
+      code += "#define GLASS_USE_AXIS_MIX\n";
+      code += GLASS_SDF_ELLIPSE;
+      break;
+    case GlassShapeType::Star:
+      code += "#define GLASS_USE_AXIS_MIX\n";
+      code += GLASS_SDF_STAR;
+      break;
+    case GlassShapeType::AlphaMask:
+      code += GLASS_SDF_ALPHA_MASK;
+      break;
+  }
+  code += GLASS_SHADER_MAIN;
+  return code;
+}
+
+std::shared_ptr<RenderPipeline> GlassRefractionEffect::createPipeline(GPU* gpu) const {
+  auto info = gpu->info();
+  auto isDesktop = info->version.find("OpenGL ES") == std::string::npos;
+  ShaderModuleDescriptor vertexModule = {};
+  std::string vertexCode = isDesktop ? "#version 150\n\n" : "#version 300 es\n\n";
+  vertexCode += GLASS_VERTEX_SHADER;
+  vertexModule.code = vertexCode;
+  vertexModule.stage = ShaderStage::Vertex;
+  auto vertexShader = gpu->createShaderModule(vertexModule);
+  if (vertexShader == nullptr) {
+    return nullptr;
+  }
+  ShaderModuleDescriptor fragmentModule = {};
+  fragmentModule.code = buildFragmentShader(isDesktop);
   fragmentModule.stage = ShaderStage::Fragment;
   auto fragmentShader = gpu->createShaderModule(fragmentModule);
   if (fragmentShader == nullptr) {
@@ -219,6 +266,10 @@ std::shared_ptr<RenderPipeline> GlassRefractionEffect::createPipeline(GPU* gpu) 
   descriptor.multisample.count = MSAA_SAMPLE_COUNT;
   BindingEntry sourceBinding = {"uSource", 0};
   descriptor.layout.textureSamplers.push_back(sourceBinding);
+  if (_shapeType == GlassShapeType::AlphaMask) {
+    BindingEntry maskBinding = {"uMask", 1};
+    descriptor.layout.textureSamplers.push_back(maskBinding);
+  }
   BindingEntry uniformBlockBinding = {"GlassUniforms", 0};
   descriptor.layout.uniformBlocks.push_back(uniformBlockBinding);
   return gpu->createRenderPipeline(descriptor);
@@ -269,6 +320,7 @@ bool GlassRefractionEffect::onDraw(CommandEncoder* encoder,
                                    std::shared_ptr<Texture> outputTexture,
                                    const Point& offset) const {
   if (inputTextures.empty()) {
+    LOGE("GlassRefractionEffect: no input textures!");
     return false;
   }
   auto gpu = encoder->gpu();
@@ -276,6 +328,7 @@ bool GlassRefractionEffect::onDraw(CommandEncoder* encoder,
   if (cachedPipeline == nullptr) {
     cachedPipeline = createPipeline(gpu);
     if (cachedPipeline == nullptr) {
+      LOGE("GlassRefractionEffect: failed to create pipeline!");
       return false;
     }
   }
@@ -286,6 +339,7 @@ bool GlassRefractionEffect::onDraw(CommandEncoder* encoder,
                                 TextureUsage::RENDER_ATTACHMENT);
   auto renderTexture = gpu->createTexture(textureDesc);
   if (renderTexture == nullptr) {
+    LOGE("GlassRefractionEffect: failed to create MSAA texture!");
     return false;
   }
 
@@ -317,6 +371,16 @@ bool GlassRefractionEffect::onDraw(CommandEncoder* encoder,
   auto sampler = gpu->createSampler(samplerDesc);
   renderPass->setTexture(0, inputTextures[0], sampler);
 
+  // Bind mask texture (binding 1) for AlphaMask shape type
+  if (_shapeType == GlassShapeType::AlphaMask) {
+    if (inputTextures.size() > 1) {
+      renderPass->setTexture(1, inputTextures[1], sampler);
+    } else {
+      LOGE("GlassRefractionEffect: AlphaMask but no mask texture in inputTextures! size=%zu",
+           inputTextures.size());
+    }
+  }
+
   // Compute UV mapping between source texture and glass region.
   auto sourceWidth = static_cast<float>(inputTextures[0]->width());
   auto sourceHeight = static_cast<float>(inputTextures[0]->height());
@@ -330,6 +394,9 @@ bool GlassRefractionEffect::onDraw(CommandEncoder* encoder,
 
   float invSourceW = 1.0f / sourceWidth;
   float invSourceH = 1.0f / sourceHeight;
+
+  // Convert light angle from degrees to radians.
+  float lightAngleRad = _lightAngle * 3.14159265358979323846f / 180.0f;
 
   // std140 layout: 5 vec4s = 20 floats (80 bytes)
   size_t uniformSize = 20 * sizeof(float);
@@ -361,11 +428,11 @@ bool GlassRefractionEffect::onDraw(CommandEncoder* encoder,
   uniformData[13] = _dispersion;
   uniformData[14] = invSourceW;
   uniformData[15] = invSourceH;
-  // uParams4: splay, depthRatio, 0, 0
+  // uParams4: splay, depthRatio, lightAngleRad, lightIntensity
   uniformData[16] = _splay;
   uniformData[17] = _depthRatio;
-  uniformData[18] = 0.0f;
-  uniformData[19] = 0.0f;
+  uniformData[18] = lightAngleRad;
+  uniformData[19] = _lightIntensity;
   uniformBuffer->unmap();
   renderPass->setUniformBuffer(0, uniformBuffer, 0, uniformSize);
 

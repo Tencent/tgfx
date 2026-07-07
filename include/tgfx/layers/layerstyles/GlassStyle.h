@@ -22,6 +22,13 @@
 
 namespace tgfx {
 
+enum class GlassShapeType {
+  RoundedRect,
+  Ellipse,
+  Star,
+  AlphaMask,
+};
+
 /**
  * GlassStyle simulates the physical behavior of light passing through a glass surface, producing
  * refraction, chromatic dispersion, frosted blur, and specular highlights. It captures the
@@ -117,6 +124,14 @@ class GlassStyle : public LayerStyle {
   /** Sets the corner radius for the glass surface shape. */
   void setCornerRadius(float radius);
 
+  /** The shape type of the glass surface. */
+  GlassShapeType shapeType() const {
+    return _shapeType;
+  }
+
+  /** Sets the shape type of the glass surface. */
+  void setShapeType(GlassShapeType type);
+
   LayerStylePosition position() const override {
     return LayerStylePosition::Below;
   }
@@ -149,6 +164,7 @@ class GlassStyle : public LayerStyle {
   float _lightAngle = 135.0f;
   float _lightIntensity = 50.0f;
   float _cornerRadius = 0.0f;
+  GlassShapeType _shapeType = GlassShapeType::RoundedRect;
 
   std::shared_ptr<ImageFilter> frostFilter = nullptr;
   float currentFrostScale = 0.0f;

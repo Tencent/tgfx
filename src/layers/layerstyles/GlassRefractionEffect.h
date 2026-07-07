@@ -19,43 +19,53 @@
 #pragma once
 
 #include "tgfx/gpu/RuntimeEffect.h"
+#include "tgfx/layers/layerstyles/GlassStyle.h"
 
 namespace tgfx {
 
 /**
- * A RuntimeEffect that performs glass refraction by computing the surface normal and UV offset
- * directly in the shader, without any intermediate displacement map texture. Supports optional
- * chromatic dispersion (RGB channel splitting).
+ * A RuntimeEffect that performs glass refraction and edge lighting by computing the displacement
+ * directly in the shader. Supports analytical SDF shapes (rounded rect, ellipse, star) and
+ * alpha-mask-based shapes (arbitrary paths). Supports optional chromatic dispersion.
  */
-class GlassRefractionEffect : public RuntimeEffect {
+/**
+ * Pass 1: Generates a packed gradient mask from an alpha mask image.
+ * Output: R=alpha, G=gradient.x (packed to [0,1]), B=gradient.y (packed to [0,1])
+ */
+class GlassMaskEffect : public RuntimeEffect {
  public:
-  /**
-   * Creates a GlassRefractionEffect.
-   * @param glassWidth The glass layer width in pixels.
-   * @param glassHeight The glass layer height in pixels.
-   * @param halfWidth Half of the glass width in pixels.
-   * @param halfHeight Half of the glass height in pixels.
-   * @param cornerRadius The corner radius of the rounded rectangle shape in pixels.
-   * @param minHalf The minimum of halfWidth and halfHeight.
-   * @param innerHalfWidth Half width of the inner (flat region) shape in pixels.
-   * @param innerHalfHeight Half height of the inner (flat region) shape in pixels.
-   * @param innerRadius The corner radius of the inner shape in pixels.
-   * @param glassThickness The glass thickness used to scale the displacement magnitude.
-   * @param refractionFactor The refraction factor [0, 1] scaling the displacement.
-   * @param dispersion The chromatic aberration coefficient. Zero means no dispersion.
-   * @param splay The mix factor [0, 1] controlling SDF vs radial direction threshold.
-   * @param depthRatio The depth ratio [0, 1], also contributes to threshold control.
-   */
-  GlassRefractionEffect(float glassWidth, float glassHeight, float halfWidth, float halfHeight,
-                        float cornerRadius, float minHalf, float innerHalfWidth,
-                        float innerHalfHeight, float innerRadius, float glassThickness,
-                        float refractionFactor, float dispersion, float splay, float depthRatio);
+  GlassMaskEffect() : RuntimeEffect({}) {
+  }
 
  protected:
   bool onDraw(CommandEncoder* encoder, const std::vector<std::shared_ptr<Texture>>& inputTextures,
               std::shared_ptr<Texture> outputTexture, const Point& offset) const override;
 
  private:
+  std::shared_ptr<RenderPipeline> createPipeline(GPU* gpu) const;
+  void collectVertices(const Texture* source, const Texture* target, const Point& offset,
+                       float* vertices) const;
+  mutable std::shared_ptr<RenderPipeline> cachedPipeline = nullptr;
+};
+
+/**
+ * Pass 2: Performs glass refraction and edge lighting using the packed gradient mask.
+ */
+class GlassRefractionEffect : public RuntimeEffect {
+ public:
+  GlassRefractionEffect(float glassWidth, float glassHeight, float halfWidth, float halfHeight,
+                        float cornerRadius, float minHalf, float innerHalfWidth,
+                        float innerHalfHeight, float innerRadius, float glassThickness,
+                        float refractionFactor, float dispersion, float splay, float depthRatio,
+                        float lightAngle, float lightIntensity, GlassShapeType shapeType,
+                        std::shared_ptr<Image> maskImage = nullptr);
+
+ protected:
+  bool onDraw(CommandEncoder* encoder, const std::vector<std::shared_ptr<Texture>>& inputTextures,
+              std::shared_ptr<Texture> outputTexture, const Point& offset) const override;
+
+ private:
+  std::string buildFragmentShader(bool isDesktop) const;
   std::shared_ptr<RenderPipeline> createPipeline(GPU* gpu) const;
   void collectVertices(const Texture* source, const Texture* target, const Point& offset,
                        float* vertices) const;
@@ -74,8 +84,10 @@ class GlassRefractionEffect : public RuntimeEffect {
   float _dispersion = 0.0f;
   float _splay = 0.0f;
   float _depthRatio = 0.0f;
-  // Pipeline requires GPU pointer only available in onDraw (which is const). Caching here avoids
-  // re-creating the pipeline on every frame.
+  float _lightAngle = 0.0f;
+  float _lightIntensity = 0.0f;
+  GlassShapeType _shapeType = GlassShapeType::RoundedRect;
+  std::shared_ptr<Image> _maskImage = nullptr;
   mutable std::shared_ptr<RenderPipeline> cachedPipeline = nullptr;
 };
 

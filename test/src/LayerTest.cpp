@@ -3901,7 +3901,8 @@ TGFX_TEST(LayerTest, InnerShadow) {
 static void AddGlassCell(Layer* root, std::shared_ptr<Image> bgImage, float x, float y,
                          float cellSize, float refraction, float depth, float frost,
                          float dispersion, float splay, float lightAngle, float lightIntensity,
-                         float cornerRadius) {
+                         float cornerRadius,
+                         GlassShapeType shapeType = GlassShapeType::RoundedRect) {
   auto container = Layer::Make();
   container->setMatrix(Matrix::MakeTrans(x, y));
 
@@ -3933,18 +3934,56 @@ static void AddGlassCell(Layer* root, std::shared_ptr<Image> bgImage, float x, f
 
   // Glass panel
   float glassSize = cellSize - 20;
-  auto glassLayer = SolidLayer::Make();
-  glassLayer->setColor(Color::FromRGBA(255, 255, 255, 128));
-  glassLayer->setWidth(glassSize);
-  glassLayer->setHeight(glassSize);
-  glassLayer->setRadiusX(cornerRadius);
-  glassLayer->setRadiusY(cornerRadius);
-  glassLayer->setMatrix(Matrix::MakeTrans(10, 10));
-  auto style =
-      GlassStyle::Make(refraction, depth, frost, dispersion, splay, lightAngle, lightIntensity);
-  style->setCornerRadius(cornerRadius);
-  glassLayer->setLayerStyles({style});
-  container->addChild(glassLayer);
+  if (shapeType == GlassShapeType::AlphaMask) {
+    // Use ShapeLayer with pentagram path for star-shaped mask.
+    // Match shader: R = halfW * 0.9 = glassSize * 0.45, inner = R * 0.382
+    auto glassLayer = ShapeLayer::Make();
+    Path starPath = {};
+    float halfSize = glassSize * 0.5f;
+    float outerR = halfSize * 0.9f;
+    float innerR = outerR * 0.382f;
+    // Star centered at (halfSize, halfSize) in local coordinates
+    float startAngle = -3.1415926f * 0.5f;  // point up
+    for (int i = 0; i < 5; i++) {
+      float outerAngle = startAngle + static_cast<float>(i) * 3.1415926f * 0.8f;
+      float innerAngle = outerAngle + 3.1415926f * 0.2f;
+      if (i == 0) {
+        starPath.moveTo(halfSize + outerR * cosf(outerAngle), halfSize + outerR * sinf(outerAngle));
+      } else {
+        starPath.lineTo(halfSize + outerR * cosf(outerAngle), halfSize + outerR * sinf(outerAngle));
+      }
+      starPath.lineTo(halfSize + innerR * cosf(innerAngle), halfSize + innerR * sinf(innerAngle));
+    }
+    starPath.close();
+    glassLayer->setPath(starPath);
+    glassLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 128)));
+    glassLayer->setMatrix(Matrix::MakeTrans(10, 10));
+    auto style =
+        GlassStyle::Make(refraction, depth, frost, dispersion, splay, lightAngle, lightIntensity);
+    style->setCornerRadius(cornerRadius);
+    style->setShapeType(shapeType);
+    glassLayer->setLayerStyles({style});
+    container->addChild(glassLayer);
+  } else {
+    auto glassLayer = SolidLayer::Make();
+    glassLayer->setColor(Color::FromRGBA(255, 255, 255, 128));
+    glassLayer->setWidth(glassSize);
+    glassLayer->setHeight(glassSize);
+    if (shapeType == GlassShapeType::Ellipse) {
+      glassLayer->setRadiusX(glassSize * 0.5f);
+      glassLayer->setRadiusY(glassSize * 0.5f);
+    } else {
+      glassLayer->setRadiusX(cornerRadius);
+      glassLayer->setRadiusY(cornerRadius);
+    }
+    glassLayer->setMatrix(Matrix::MakeTrans(10, 10));
+    auto style =
+        GlassStyle::Make(refraction, depth, frost, dispersion, splay, lightAngle, lightIntensity);
+    style->setCornerRadius(cornerRadius);
+    style->setShapeType(shapeType);
+    glassLayer->setLayerStyles({style});
+    container->addChild(glassLayer);
+  }
 
   root->addChild(container);
 }
@@ -4034,6 +4073,271 @@ TGFX_TEST(LayerTest, GlassStyle) {
 
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyle"));
+}
+
+TGFX_TEST(LayerTest, GlassStyleEllipse) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // 7 rows (one per parameter) x 3 columns (low / medium / high), same as GlassStyle but ellipse
+  constexpr float cellSize = 200;
+  constexpr float gap = 10;
+  constexpr int cols = 3;
+  constexpr int rows = 7;
+  int surfaceW = static_cast<int>(cols * (cellSize + gap) + gap);
+  int surfaceH = static_cast<int>(rows * (cellSize + gap) + gap);
+  auto surface = Surface::Make(context, surfaceW, surfaceH);
+  auto displayList = std::make_unique<DisplayList>();
+  auto bgImage = MakeImage("resources/apitest/checker_128.png");
+
+  float defRef = 50, defDepth = 20, defFrost = 0, defDisp = 0;
+  float defSplay = 50, defAngle = 135, defIntensity = 50, defRadius = 16;
+
+  // Row 0: Refraction sweep (10 / 50 / 90)
+  float refractionVals[] = {10, 50, 90};
+  for (int c = 0; c < cols; c++) {
+    float cx = gap + static_cast<float>(c) * (cellSize + gap);
+    float cy = gap;
+    AddGlassCell(displayList->root(), bgImage, cx, cy, cellSize, refractionVals[c], defDepth,
+                 defFrost, defDisp, defSplay, defAngle, defIntensity, defRadius,
+                 GlassShapeType::Ellipse);
+  }
+
+  // Row 1: Depth sweep (5 / 25 / 60)
+  float depthVals[] = {5, 25, 60};
+  for (int c = 0; c < cols; c++) {
+    float cx = gap + static_cast<float>(c) * (cellSize + gap);
+    float cy = gap + (cellSize + gap);
+    AddGlassCell(displayList->root(), bgImage, cx, cy, cellSize, defRef, depthVals[c], defFrost,
+                 defDisp, defSplay, defAngle, defIntensity, defRadius, GlassShapeType::Ellipse);
+  }
+
+  // Row 2: Frost sweep (0 / 30 / 80)
+  float frostVals[] = {0, 30, 80};
+  for (int c = 0; c < cols; c++) {
+    float cx = gap + static_cast<float>(c) * (cellSize + gap);
+    float cy = gap + 2 * (cellSize + gap);
+    AddGlassCell(displayList->root(), bgImage, cx, cy, cellSize, defRef, defDepth, frostVals[c],
+                 defDisp, defSplay, defAngle, defIntensity, defRadius, GlassShapeType::Ellipse);
+  }
+
+  // Row 3: Dispersion sweep (0 / 40 / 90)
+  float dispVals[] = {0, 40, 90};
+  for (int c = 0; c < cols; c++) {
+    float cx = gap + static_cast<float>(c) * (cellSize + gap);
+    float cy = gap + 3 * (cellSize + gap);
+    AddGlassCell(displayList->root(), bgImage, cx, cy, cellSize, defRef, defDepth, defFrost,
+                 dispVals[c], defSplay, defAngle, defIntensity, defRadius, GlassShapeType::Ellipse);
+  }
+
+  // Row 4: Splay sweep (0 / 50 / 100)
+  float splayVals[] = {0, 50, 100};
+  for (int c = 0; c < cols; c++) {
+    float cx = gap + static_cast<float>(c) * (cellSize + gap);
+    float cy = gap + 4 * (cellSize + gap);
+    AddGlassCell(displayList->root(), bgImage, cx, cy, cellSize, defRef, defDepth, defFrost,
+                 defDisp, splayVals[c], defAngle, defIntensity, defRadius, GlassShapeType::Ellipse);
+  }
+
+  // Row 5: LightAngle sweep (0 / 135 / 270)
+  float angleVals[] = {0, 135, 270};
+  for (int c = 0; c < cols; c++) {
+    float cx = gap + static_cast<float>(c) * (cellSize + gap);
+    float cy = gap + 5 * (cellSize + gap);
+    AddGlassCell(displayList->root(), bgImage, cx, cy, cellSize, defRef, defDepth, defFrost,
+                 defDisp, defSplay, angleVals[c], defIntensity, defRadius, GlassShapeType::Ellipse);
+  }
+
+  // Row 6: LightIntensity sweep (0 / 50 / 100)
+  float intensityVals[] = {0, 50, 100};
+  for (int c = 0; c < cols; c++) {
+    float cx = gap + static_cast<float>(c) * (cellSize + gap);
+    float cy = gap + 6 * (cellSize + gap);
+    AddGlassCell(displayList->root(), bgImage, cx, cy, cellSize, defRef, defDepth, defFrost,
+                 defDisp, defSplay, defAngle, intensityVals[c], defRadius, GlassShapeType::Ellipse);
+  }
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleEllipse"));
+}
+
+TGFX_TEST(LayerTest, GlassStyleStar) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // 7 rows x 3 columns, same as GlassStyle but with Star shape
+  constexpr float cellSize = 200;
+  constexpr float gap = 10;
+  constexpr int cols = 3;
+  constexpr int rows = 7;
+  int surfaceW = static_cast<int>(cols * (cellSize + gap) + gap);
+  int surfaceH = static_cast<int>(rows * (cellSize + gap) + gap);
+  auto surface = Surface::Make(context, surfaceW, surfaceH);
+  auto displayList = std::make_unique<DisplayList>();
+  auto bgImage = MakeImage("resources/apitest/checker_128.png");
+
+  float defRef = 50, defDepth = 20, defFrost = 0, defDisp = 0;
+  float defSplay = 50, defAngle = 135, defIntensity = 50, defRadius = 16;
+
+  // Row 0: Refraction sweep (10 / 50 / 90)
+  float refractionVals[] = {10, 50, 90};
+  for (int c = 0; c < cols; c++) {
+    float cx = gap + static_cast<float>(c) * (cellSize + gap);
+    float cy = gap;
+    AddGlassCell(displayList->root(), bgImage, cx, cy, cellSize, refractionVals[c], defDepth,
+                 defFrost, defDisp, defSplay, defAngle, defIntensity, defRadius,
+                 GlassShapeType::AlphaMask);
+  }
+
+  // Row 1: Depth sweep (5 / 25 / 60)
+  float depthVals[] = {5, 25, 60};
+  for (int c = 0; c < cols; c++) {
+    float cx = gap + static_cast<float>(c) * (cellSize + gap);
+    float cy = gap + (cellSize + gap);
+    AddGlassCell(displayList->root(), bgImage, cx, cy, cellSize, defRef, depthVals[c], defFrost,
+                 defDisp, defSplay, defAngle, defIntensity, defRadius, GlassShapeType::AlphaMask);
+  }
+
+  // Row 2: Frost sweep (0 / 30 / 80)
+  float frostVals[] = {0, 30, 80};
+  for (int c = 0; c < cols; c++) {
+    float cx = gap + static_cast<float>(c) * (cellSize + gap);
+    float cy = gap + 2 * (cellSize + gap);
+    AddGlassCell(displayList->root(), bgImage, cx, cy, cellSize, defRef, defDepth, frostVals[c],
+                 defDisp, defSplay, defAngle, defIntensity, defRadius, GlassShapeType::AlphaMask);
+  }
+
+  // Row 3: Dispersion sweep (0 / 40 / 90)
+  float dispVals[] = {0, 40, 90};
+  for (int c = 0; c < cols; c++) {
+    float cx = gap + static_cast<float>(c) * (cellSize + gap);
+    float cy = gap + 3 * (cellSize + gap);
+    AddGlassCell(displayList->root(), bgImage, cx, cy, cellSize, defRef, defDepth, defFrost,
+                 dispVals[c], defSplay, defAngle, defIntensity, defRadius,
+                 GlassShapeType::AlphaMask);
+  }
+
+  // Row 4: Splay sweep (0 / 50 / 100)
+  float splayVals[] = {0, 50, 100};
+  for (int c = 0; c < cols; c++) {
+    float cx = gap + static_cast<float>(c) * (cellSize + gap);
+    float cy = gap + 4 * (cellSize + gap);
+    AddGlassCell(displayList->root(), bgImage, cx, cy, cellSize, defRef, defDepth, defFrost,
+                 defDisp, splayVals[c], defAngle, defIntensity, defRadius,
+                 GlassShapeType::AlphaMask);
+  }
+
+  // Row 5: LightAngle sweep (0 / 135 / 270)
+  float angleVals[] = {0, 135, 270};
+  for (int c = 0; c < cols; c++) {
+    float cx = gap + static_cast<float>(c) * (cellSize + gap);
+    float cy = gap + 5 * (cellSize + gap);
+    AddGlassCell(displayList->root(), bgImage, cx, cy, cellSize, defRef, defDepth, defFrost,
+                 defDisp, defSplay, angleVals[c], defIntensity, defRadius,
+                 GlassShapeType::AlphaMask);
+  }
+
+  // Row 6: LightIntensity sweep (0 / 50 / 100)
+  float intensityVals[] = {0, 50, 100};
+  for (int c = 0; c < cols; c++) {
+    float cx = gap + static_cast<float>(c) * (cellSize + gap);
+    float cy = gap + 6 * (cellSize + gap);
+    AddGlassCell(displayList->root(), bgImage, cx, cy, cellSize, defRef, defDepth, defFrost,
+                 defDisp, defSplay, defAngle, intensityVals[c], defRadius,
+                 GlassShapeType::AlphaMask);
+  }
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleStar"));
+}
+
+TGFX_TEST(LayerTest, GlassStyleGrid) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // 3 rows x 7 columns: same as GlassStyle but transposed (each column is a parameter sweep)
+  constexpr float cellSize = 200;
+  constexpr float gap = 10;
+  constexpr int cols = 7;
+  constexpr int rows = 3;
+  int surfaceW = static_cast<int>(cols * (cellSize + gap) + gap);
+  int surfaceH = static_cast<int>(rows * (cellSize + gap) + gap);
+  auto surface = Surface::Make(context, surfaceW, surfaceH);
+  auto displayList = std::make_unique<DisplayList>();
+  auto bgImage = MakeImage("resources/apitest/checker_128.png");
+
+  // Default values for unchanged parameters
+  float defRef = 50, defDepth = 20, defFrost = 0, defDisp = 0;
+  float defSplay = 50, defAngle = 135, defIntensity = 50, defRadius = 16;
+
+  // Col 0: Refraction sweep (10 / 50 / 90) across 3 rows
+  float refractionVals[] = {10, 50, 90};
+  for (int r = 0; r < rows; r++) {
+    float cx = gap;
+    float cy = gap + static_cast<float>(r) * (cellSize + gap);
+    AddGlassCell(displayList->root(), bgImage, cx, cy, cellSize, refractionVals[r], defDepth,
+                 defFrost, defDisp, defSplay, defAngle, defIntensity, defRadius);
+  }
+
+  // Col 1: Depth sweep (5 / 25 / 60)
+  float depthVals[] = {5, 25, 60};
+  for (int r = 0; r < rows; r++) {
+    float cx = gap + (cellSize + gap);
+    float cy = gap + static_cast<float>(r) * (cellSize + gap);
+    AddGlassCell(displayList->root(), bgImage, cx, cy, cellSize, defRef, depthVals[r], defFrost,
+                 defDisp, defSplay, defAngle, defIntensity, defRadius);
+  }
+
+  // Col 2: Frost sweep (0 / 30 / 80)
+  float frostVals[] = {0, 30, 80};
+  for (int r = 0; r < rows; r++) {
+    float cx = gap + 2 * (cellSize + gap);
+    float cy = gap + static_cast<float>(r) * (cellSize + gap);
+    AddGlassCell(displayList->root(), bgImage, cx, cy, cellSize, defRef, defDepth, frostVals[r],
+                 defDisp, defSplay, defAngle, defIntensity, defRadius);
+  }
+
+  // Col 3: Dispersion sweep (0 / 40 / 90)
+  float dispVals[] = {0, 40, 90};
+  for (int r = 0; r < rows; r++) {
+    float cx = gap + 3 * (cellSize + gap);
+    float cy = gap + static_cast<float>(r) * (cellSize + gap);
+    AddGlassCell(displayList->root(), bgImage, cx, cy, cellSize, defRef, defDepth, defFrost,
+                 dispVals[r], defSplay, defAngle, defIntensity, defRadius);
+  }
+
+  // Col 4: Splay sweep (0 / 50 / 100)
+  float splayVals[] = {0, 50, 100};
+  for (int r = 0; r < rows; r++) {
+    float cx = gap + 4 * (cellSize + gap);
+    float cy = gap + static_cast<float>(r) * (cellSize + gap);
+    AddGlassCell(displayList->root(), bgImage, cx, cy, cellSize, defRef, defDepth, defFrost,
+                 defDisp, splayVals[r], defAngle, defIntensity, defRadius);
+  }
+
+  // Col 5: LightAngle sweep (0 / 135 / 270)
+  float angleVals[] = {0, 135, 270};
+  for (int r = 0; r < rows; r++) {
+    float cx = gap + 5 * (cellSize + gap);
+    float cy = gap + static_cast<float>(r) * (cellSize + gap);
+    AddGlassCell(displayList->root(), bgImage, cx, cy, cellSize, defRef, defDepth, defFrost,
+                 defDisp, defSplay, angleVals[r], defIntensity, defRadius);
+  }
+
+  // Col 6: LightIntensity sweep (0 / 50 / 100)
+  float intensityVals[] = {0, 50, 100};
+  for (int r = 0; r < rows; r++) {
+    float cx = gap + 6 * (cellSize + gap);
+    float cy = gap + static_cast<float>(r) * (cellSize + gap);
+    AddGlassCell(displayList->root(), bgImage, cx, cy, cellSize, defRef, defDepth, defFrost,
+                 defDisp, defSplay, defAngle, intensityVals[r], defRadius);
+  }
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleGrid"));
 }
 
 TGFX_TEST(LayerTest, GlassStyleRefraction) {
@@ -4159,14 +4463,31 @@ TGFX_TEST(LayerTest, GlassStyleSingle) {
   imgLayer->setMatrix(Matrix::MakeScale(static_cast<float>(scale), static_cast<float>(scale)));
   displayList->root()->addChild(imgLayer);
 
-  auto glassLayer = SolidLayer::Make();
-  glassLayer->setColor(Color::FromRGBA(255, 255, 255, 10));
-  glassLayer->setWidth(static_cast<float>(surfaceSize));
-  glassLayer->setHeight(static_cast<float>(surfaceSize));
-  glassLayer->setRadiusX(32);
-  glassLayer->setRadiusY(32);
+  float glassSize = static_cast<float>(surfaceSize);
+  auto glassLayer = ShapeLayer::Make();
+  Path starPath = {};
+  float halfSize = glassSize * 0.5f;
+  float outerR = halfSize * 0.9f;
+  float innerR = outerR * 0.382f;
+  float startAngle = -3.1415926f * 0.5f;
+  for (int i = 0; i < 5; i++) {
+    float outerAngle = startAngle + static_cast<float>(i) * 3.1415926f * 0.8f;
+    float innerAngle = outerAngle + 3.1415926f * 0.2f;
+    if (i == 0) {
+      starPath.moveTo(halfSize + outerR * cosf(outerAngle),
+                      halfSize + outerR * sinf(outerAngle));
+    } else {
+      starPath.lineTo(halfSize + outerR * cosf(outerAngle),
+                      halfSize + outerR * sinf(outerAngle));
+    }
+    starPath.lineTo(halfSize + innerR * cosf(innerAngle),
+                    halfSize + innerR * sinf(innerAngle));
+  }
+  starPath.close();
+  glassLayer->setPath(starPath);
+  glassLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 128)));
   auto style = GlassStyle::Make(50, 50, 0, 0, 0, 135, 0);
-  style->setCornerRadius(32);
+  style->setShapeType(GlassShapeType::AlphaMask);
   glassLayer->setLayerStyles({style});
   displayList->root()->addChild(glassLayer);
 

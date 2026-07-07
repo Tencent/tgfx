@@ -19,7 +19,6 @@
 #include "tgfx/layers/layerstyles/GlassStyle.h"
 #include <algorithm>
 #include <cmath>
-#include "GlassHighlightMap.h"
 #include "GlassRefractionEffect.h"
 #include "core/utils/Log.h"
 
@@ -104,6 +103,14 @@ void GlassStyle::setCornerRadius(float radius) {
   invalidateTransform();
 }
 
+void GlassStyle::setShapeType(GlassShapeType type) {
+  if (_shapeType == type) {
+    return;
+  }
+  _shapeType = type;
+  invalidateTransform();
+}
+
 Rect GlassStyle::filterBackground(const Rect& srcRect, float contentScale) {
   auto filter = getFrostFilter(contentScale);
   if (filter) {
@@ -139,8 +146,8 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
     }
   }
 
-  // Step 2 & 3: Apply refraction with dispersion (computed entirely in GPU shader)
-  if (_refraction > 0) {
+  // Step 2 & 3: Apply refraction with dispersion and lighting (computed entirely in GPU shader)
+  if (_refraction > 0 || _lightIntensity > 0) {
     int layerWidth = input.content->width();
     int layerHeight = input.content->height();
 
@@ -166,10 +173,42 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
 
     float channelOffset = (_dispersion / 100.0f) * 0.2f;
     float splay = _splay / 100.0f;
+    float lightAngle = _lightAngle;
+    float lightIntensity = (_lightIntensity > 0) ? _lightIntensity / 100.0f : 0.0f;
+    // For AlphaMask shape, generate a UDF height map:
+    // 1. Gaussian-blur the binary alpha to approximate UDF
+    // 2. Pack the float result into RGBA8 (32-bit precision) via GlassMaskEffect
+    std::shared_ptr<Image> maskImage = nullptr;
+    if (_shapeType == GlassShapeType::AlphaMask) {
+      // Use inner radius for sigma calculation to match actual shape size.
+      // For star/polygon shapes, inner radius is much smaller than minHalf.
+      float blurSigma = minHalf * (0.2f + (_depth / 100.0f) * 0.2f);
+      auto blurFilter = ImageFilter::Blur(blurSigma, blurSigma, TileMode::Decal);
+      Point blurMaskOffset = {};
+      auto maskClipRect =
+          Rect::MakeWH(static_cast<float>(layerWidth), static_cast<float>(layerHeight));
+      auto blurredMask =
+          input.content->makeWithFilter(blurFilter, &blurMaskOffset, &maskClipRect);
+      if (!blurredMask) {
+        LOGE("GlassStyle: Failed to blur alpha for UDF, falling back to content.");
+        blurredMask = input.content;
+      }
+      // Pack blurred alpha into RGBA8 32-bit encoding.
+      auto packEffect = std::make_shared<GlassMaskEffect>();
+      auto packFilter = ImageFilter::Runtime(packEffect);
+      Point packOffset = {};
+      auto packClipRect = Rect::MakeWH(static_cast<float>(blurredMask->width()),
+                                       static_cast<float>(blurredMask->height()));
+      maskImage = blurredMask->makeWithFilter(packFilter, &packOffset, &packClipRect);
+      if (!maskImage) {
+        LOGE("GlassStyle: Failed to pack UDF height map, falling back to blurred.");
+        maskImage = blurredMask;
+      }
+    }
     auto refractionEffect = std::make_shared<GlassRefractionEffect>(
         static_cast<float>(layerWidth), static_cast<float>(layerHeight), halfW, halfH, crRadius,
         minHalf, innerHalfW, innerHalfH, innerRadius, glassThickness, refractionFactor,
-        channelOffset, splay, depthRatio);
+        channelOffset, splay, depthRatio, lightAngle, lightIntensity, _shapeType, maskImage);
     auto refractionFilter = ImageFilter::Runtime(refractionEffect);
     Point refractOffset = {};
     auto clipRect = Rect::MakeWH(static_cast<float>(processedBg->width()),
@@ -188,38 +227,6 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
   paint.setMaskFilter(MaskFilter::MakeShader(maskShader, false));
   paint.setBlendMode(BlendMode::Src);
   canvas->drawImage(processedBg, processedOffset.x, processedOffset.y, &paint);
-
-  // Step 4: Generate and composite highlight/shadow maps
-  if (_lightIntensity > 0) {
-    int layerWidth = input.content->width();
-    int layerHeight = input.content->height();
-    float maxDepthHL =
-        std::min(static_cast<float>(layerWidth), static_cast<float>(layerHeight)) * 0.5f - 1.0f;
-    float depthPxHL = (_depth / 100.0f) * maxDepthHL;
-    float scaledRadius = _cornerRadius * input.contentScale;
-    float highlightOpacity = _lightIntensity / 100.0f;
-
-    auto lightMaps = GlassHighlightMap::Generate(layerWidth, layerHeight, scaledRadius, depthPxHL,
-                                                 _splay, _lightAngle, highlightOpacity);
-
-    // Draw specular highlight (white, alpha varies, SrcOver blend)
-    if (lightMaps.highlight) {
-      Paint highlightPaint = {};
-      highlightPaint.setMaskFilter(MaskFilter::MakeShader(maskShader, false));
-      highlightPaint.setBlendMode(BlendMode::SrcOver);
-      canvas->drawImage(lightMaps.highlight, input.contentOffset.x, input.contentOffset.y,
-                        &highlightPaint);
-    }
-
-    // Draw inner shadow (directional dark/light edges, SrcOver blend)
-    if (lightMaps.innerShadow) {
-      Paint shadowPaint = {};
-      shadowPaint.setMaskFilter(MaskFilter::MakeShader(maskShader, false));
-      shadowPaint.setBlendMode(BlendMode::SrcOver);
-      canvas->drawImage(lightMaps.innerShadow, input.contentOffset.x, input.contentOffset.y,
-                        &shadowPaint);
-    }
-  }
 }
 
 std::shared_ptr<ImageFilter> GlassStyle::getFrostFilter(float contentScale) {
