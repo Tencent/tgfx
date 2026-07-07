@@ -224,15 +224,15 @@ void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const Matrix& matrix
 bool OpsCompositor::shouldUseStencilCover(const Brush& brush) const {
   // Any brush requesting antialiasing keeps using the legacy triangulation path so the
   // existing coverage-AA / alpha-ramp visual contract is preserved without modification.
-  // This includes draws onto an MSAA render target — even though the MSAA pipeline would
-  // discard brush.antiAlias and rely on hardware multisample AA, routing such draws into
-  // the bezier path here would still change which renderer produces the pixels, so we
-  // keep the conservative behaviour and revisit MSAA-specific routing in a later stage.
+  // MSAA render targets are *not* excluded: the stencil pass evaluates the Loop-Blinn test
+  // per-sample when the depth/stencil attachment is multisampled (OpsRenderTask requests the
+  // stencil texture with the same sampleCount as the render target), so hardware MSAA and
+  // stencil-and-cover compose naturally — MSAA handles edge coverage while stencil-and-cover
+  // handles interior/exterior classification.
   if (brush.antiAlias) {
     return false;
   }
-  // The capability is the gating switch — false during stage 2 (skeleton not yet electrified)
-  // and flipped on per backend after stage 3 lands the algorithm and shaders.
+  // Feature gate — flipped on per backend by GPUFeatures::stencilCoverPathSupported.
   return context->gpu()->features()->stencilCoverPathSupported;
 }
 
@@ -256,13 +256,20 @@ void OpsCompositor::drawStencilCoverPath(std::shared_ptr<Shape> shape, const Mat
   auto [needLocalBounds, needDeviceBounds] = needComputeBounds(brush, /*hasCoverage=*/true);
   auto clipBounds = getClipBounds(clip);
   auto shapeBounds = shape->getBounds();
+  bool isInverseFill = shape->isInverseFillType();
+  // Inverse fills paint the region outside the path clipped to the visible clip rect. If the
+  // clip is empty there is nothing to draw, and forwarding an empty cover rect would still
+  // consume a stencil attachment allocation in OpsRenderTask for zero visual effect.
+  if (isInverseFill && clipBounds.isEmpty()) {
+    return;
+  }
   // Local-space clip rect is shared by the cover quad and the inverse-fill local bounds —
   // computing it once avoids re-inverting the view matrix.
   Rect localClipBounds = uvMatrix.mapRect(clipBounds);
 
   float drawScale = 1.0f;
   if (needLocalBounds) {
-    if (shape->isInverseFillType()) {
+    if (isInverseFill) {
       localBounds = localClipBounds;
     } else {
       localBounds = ClipLocalBounds(shapeBounds, matrix, clipBounds);
@@ -274,7 +281,7 @@ void OpsCompositor::drawStencilCoverPath(std::shared_ptr<Shape> shape, const Mat
   }
 
   if (needDeviceBounds) {
-    if (shape->isInverseFillType()) {
+    if (isInverseFill) {
       deviceBounds = clipBounds;
     } else {
       deviceBounds = matrix.mapRect(shapeBounds);
@@ -287,7 +294,10 @@ void OpsCompositor::drawStencilCoverPath(std::shared_ptr<Shape> shape, const Mat
   // The cover-pass quad is supplied in local space because the cover GP applies the view
   // matrix (same as the stencil pass). For inverse fills the visible region is the device-space
   // clip, so the cover quad uses the local-space clip rect computed above.
-  Rect coverLocalBounds = shape->isInverseFillType() ? localClipBounds : shapeBounds;
+  Rect coverLocalBounds = isInverseFill ? localClipBounds : shapeBounds;
+  if (coverLocalBounds.isEmpty()) {
+    return;
+  }
 
   auto dstColor = ToPMColor(brush.color, dstColorSpace);
   auto fillType = shape->getPath().getFillType();

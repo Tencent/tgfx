@@ -86,6 +86,13 @@ class StencilCoverPathDrawOp : public DrawOp {
   // matrix the same way the stencil pass does, so this rect must be in the path's local
   // coordinate system (not device space).
   Rect coverLocalBounds = {};
+  // The device-space bounds of the cover quad, cached at construction time to constrain the
+  // stencil pass scissor. The stencil pass must never write outside this region, otherwise
+  // the cover pass's zeroing sweep will not clear those writes and they leak into subsequent
+  // ops that share the same depth/stencil attachment. Note this bound is used *independently*
+  // of the op's scissorRect: even when scissorRect is empty (no user clip), the stencil pass
+  // is still confined to the cover area.
+  Rect coverDeviceBounds = {};
   PathFillType fillType = PathFillType::Winding;
 
   // Stencil-pass GP. Made once at construction time so onDraw() can reuse it instead of
@@ -112,6 +119,13 @@ class StencilCoverPathDrawOp : public DrawOp {
   // both helpers leave the render pass ready for vertex-buffer + draw calls. Returns false
   // if program creation fails, in which case the caller should abort the stencil pass.
   bool bindStencilPipeline(RenderPass* renderPass, RenderTarget* renderTarget);
+
+  // Sets the render pass scissor to the intersection of the cover-pass device bounds and the
+  // op's clip rect. This is stricter than DrawOp::applyScissor(): when the op has no user
+  // scissor set, applyScissor() would expand to the whole render target, which is unsafe for
+  // the stencil pass because any stencil write outside the cover quad is never cleared by
+  // the cover pass and pollutes the shared depth/stencil attachment.
+  void applyStencilScissor(RenderPass* renderPass, RenderTarget* renderTarget) const;
 
   friend class BlockAllocator;
 };

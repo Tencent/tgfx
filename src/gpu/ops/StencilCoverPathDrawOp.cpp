@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "StencilCoverPathDrawOp.h"
+#include <algorithm>
+#include <cmath>
 #include "core/utils/Log.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RectsVertexProvider.h"
@@ -27,7 +29,7 @@
 namespace tgfx {
 
 // Bytes per stencil-pass vertex: position (Float2) + klm (Float3) = 5 floats.
-static constexpr size_t kStencilVertexStride = 5 * sizeof(float);
+static constexpr size_t STENCIL_VERTEX_STRIDE = 5 * sizeof(float);
 
 namespace {
 
@@ -84,7 +86,7 @@ DepthStencilDescriptor MakeCoverPassDS(PathFillType fillType) {
   ds.stencilWriteMask = 0xFF;
   StencilDescriptor s = {};
   s.passOp = StencilOperation::Zero;
-  s.failOp = StencilOperation::Keep;
+  s.failOp = StencilOperation::Zero;
   s.depthFailOp = StencilOperation::Keep;
   // Inverse fill paints the "outside" of the path. Both inverse-evenodd and inverse-nonzero
   // boil down to "shade pixels whose stencil counter is zero", regardless of which counting
@@ -150,6 +152,11 @@ StencilCoverPathDrawOp::StencilCoverPathDrawOp(BlockAllocator* allocator,
   stencilPassDS = MakeStencilPassDS(fillType);
   coverPassDS = MakeCoverPassDS(fillType);
   coverStencilRef = CoverPassStencilReference(fillType);
+  // The cover quad's device-space footprint is the strict upper bound on where the cover
+  // pass's Zero op will run, so the stencil pass must be scissored to (at most) the same
+  // region — any stencil write outside would leak into subsequent ops sharing the render
+  // pass's depth/stencil attachment.
+  coverDeviceBounds = viewMatrix.mapRect(coverLocalBounds);
 }
 
 PlacementPtr<GeometryProcessor> StencilCoverPathDrawOp::onMakeGeometryProcessor(
@@ -193,12 +200,36 @@ bool StencilCoverPathDrawOp::bindStencilPipeline(RenderPass* renderPass,
   }
   renderPass->setPipeline(stencilProgram->getPipeline());
   stencilInfo.setUniformsAndSamplers(renderPass, stencilProgram.get());
-  // Constrain stencil writes to the op's clip region, matching the cover pass scissor.
-  // Without this the stencil pass writes outside the cover scissor and those writes are
-  // not cleared by the cover pass's Zero stencil op, polluting subsequent ops sharing the
-  // same depth/stencil attachment.
-  applyScissor(renderPass, renderTarget);
+  // Constrain stencil writes to the cover-quad device bounds intersected with the op's
+  // clip region. See applyStencilScissor() for why relying on DrawOp::applyScissor() alone
+  // is unsafe here.
+  applyStencilScissor(renderPass, renderTarget);
   return true;
+}
+
+void StencilCoverPathDrawOp::applyStencilScissor(RenderPass* renderPass,
+                                                 RenderTarget* renderTarget) const {
+  // Start from the cover-quad's device bounds — the cover pass's Zero stencil op only touches
+  // fragments inside this rect, so any stencil write outside it would never be cleared.
+  Rect stencilRect = coverDeviceBounds;
+  // Intersect with the op's user-supplied scissor (from clip) when present, matching the
+  // cover pass's effective visible area. When scissorRect is empty the cover pass falls back
+  // to "whole render target" — but we still keep the stencil writes clipped to coverDeviceBounds.
+  if (!scissorRect.isEmpty() && !stencilRect.intersect(scissorRect)) {
+    stencilRect.setEmpty();
+  }
+  // Clamp to the render target extent and convert to integer pixel coordinates. Left/top use
+  // floor via truncation of positive values (max(0, ...) rules out negatives), right/bottom
+  // use ceil so no partial-pixel stencil write escapes the scissor.
+  int scissorX = std::max(0, static_cast<int>(stencilRect.left));
+  int scissorY = std::max(0, static_cast<int>(stencilRect.top));
+  int scissorRight =
+      std::min(renderTarget->width(), static_cast<int>(std::ceil(stencilRect.right)));
+  int scissorBottom =
+      std::min(renderTarget->height(), static_cast<int>(std::ceil(stencilRect.bottom)));
+  int scissorWidth = std::max(0, scissorRight - scissorX);
+  int scissorHeight = std::max(0, scissorBottom - scissorY);
+  renderPass->setScissorRect(scissorX, scissorY, scissorWidth, scissorHeight);
 }
 
 void StencilCoverPathDrawOp::onDraw(RenderPass* renderPass, RenderTarget* renderTarget) {
@@ -220,7 +251,8 @@ void StencilCoverPathDrawOp::onDraw(RenderPass* renderPass, RenderTarget* render
   uint32_t stencilVertexCount = 0;
   if (vertexBufferResource != nullptr) {
     stencilGPUBuffer = vertexBufferResource->gpuBuffer();
-    stencilVertexCount = static_cast<uint32_t>(vertexBufferResource->size() / kStencilVertexStride);
+    stencilVertexCount =
+        static_cast<uint32_t>(vertexBufferResource->size() / STENCIL_VERTEX_STRIDE);
   }
   if (stencilGPUBuffer != nullptr && stencilVertexCount > 0) {
     if (!bindStencilPipeline(renderPass, renderTarget)) {

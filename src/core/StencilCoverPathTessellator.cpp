@@ -38,8 +38,8 @@ struct Vertex {
   float w;  // m — reserved for cubic Loop-Blinn extension; always 0 for the quadratic test
 };
 
-constexpr float kFillU = 1.0f;
-constexpr float kFillV = 1.0f;
+constexpr float FILL_U = 1.0f;
+constexpr float FILL_V = 1.0f;
 
 // Appends a fan-fill triangle from `a` to `b` back to the shared fan origin `o`. All three
 // vertices get the "neutral fill" KLM (1, 1, _), so the fragment test `k*k - l > 0` reduces
@@ -49,9 +49,9 @@ constexpr float kFillV = 1.0f;
 // fan), while the third vertex is always the fan origin. Mirrors the line triangle in
 // demo/vertexBuffer.js.
 void EmitFillTriangle(std::vector<Vertex>& out, const Point& a, const Point& b, const Point& o) {
-  out.push_back({a.x, a.y, kFillU, kFillV, 0.0f});
-  out.push_back({b.x, b.y, kFillU, kFillV, 0.0f});
-  out.push_back({o.x, o.y, kFillU, kFillV, 0.0f});
+  out.push_back({a.x, a.y, FILL_U, FILL_V, 0.0f});
+  out.push_back({b.x, b.y, FILL_U, FILL_V, 0.0f});
+  out.push_back({o.x, o.y, FILL_U, FILL_V, 0.0f});
 }
 
 // Appends the two triangles for a quadratic bezier segment.
@@ -118,12 +118,12 @@ class PathDecomposer {
   }
 
  private:
-  static constexpr float kPointEpsilonSquared = 1e-12f;
+  static constexpr float POINT_EPSILON_SQUARED = 1e-12f;
 
   static bool IsZeroLengthLine(const Point& a, const Point& b) {
     auto dx = a.x - b.x;
     auto dy = a.y - b.y;
-    return dx * dx + dy * dy < kPointEpsilonSquared;
+    return dx * dx + dy * dy < POINT_EPSILON_SQUARED;
   }
 
   // Returns true if the three control points of a quadratic bezier are (near) collinear, in
@@ -132,7 +132,7 @@ class PathDecomposer {
     auto ab = Point::Make(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
     auto ac = Point::Make(pts[2].x - pts[0].x, pts[2].y - pts[0].y);
     auto cross = ab.x * ac.y - ab.y * ac.x;
-    return cross * cross < kPointEpsilonSquared;
+    return cross * cross < POINT_EPSILON_SQUARED;
   }
 
   void addLine(const Point& a, const Point& b) {

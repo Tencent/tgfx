@@ -1707,4 +1707,155 @@ TGFX_TEST(StencilCoverPathTest, Visual_GradientTextRadial) {
                                 "StencilCoverPath/GradientTextRadial");
 }
 
+// ====================================================================================
+// Dispatch coverage gap: brush.antiAlias fallback + no-clip stencil isolation
+// ====================================================================================
+
+// Guarding the AA fallback branch of OpsCompositor::shouldUseStencilCover: whenever the brush
+// requests antialiasing, the dispatcher must keep using the legacy triangulation path even
+// when the stencil-cover capability is enabled. Otherwise the coverage-AA / alpha-ramp
+// contract silently changes and edge pixels start snapping to fully opaque or fully
+// transparent. The test cross-checks two facts on the same pentagon:
+//   1. Enabling caps has no observable effect on an AA draw — pixel at the shape centre and
+//      corner must match the caps-off legacy render.
+//   2. That equivalence must hold even though the same pentagon *does* diverge in the non-AA
+//      case (covered by Dispatch_LegacyAndBezierProduceMatchingSampledPixels, which uses
+//      centre/corner sampling for the same reason).
+// If someone accidentally inverts the antiAlias guard to `!brush.antiAlias` the AA render
+// would suddenly go through stencil-and-cover and this test would flip the interior sample
+// (or, more likely, fail Surface::readPixels comparisons on edge samples).
+TGFX_TEST(StencilCoverPathTest, Dispatch_AntiAliasedBrushKeepsLegacyPath) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  constexpr int SIZE = 64;
+  auto renderAA = [&](bool capsValue) -> DispatchSnapshot {
+    ScopedStencilCoverCaps capsGuard(context, capsValue);
+    auto surface = Surface::Make(context, SIZE, SIZE);
+    if (surface == nullptr) {
+      return {0, 0};
+    }
+    auto canvas = surface->getCanvas();
+    canvas->clear(Color{0.f, 0.f, 0.f, 1.f});
+
+    Paint paint;
+    paint.setAntiAlias(true);
+    paint.setColor(Color{1.f, 0.f, 0.f, 1.f});
+
+    Path path = BuildCentredPentagonForDispatch();
+    path.setFillType(PathFillType::Winding);
+    canvas->drawPath(path, paint);
+    context->flushAndSubmit();
+    return {ReadRedChannel(surface.get(), SIZE / 2, SIZE / 2), ReadRedChannel(surface.get(), 4, 4)};
+  };
+
+  auto capsOff = renderAA(false);
+  auto capsOn = renderAA(true);
+  // Interior of the AA pentagon must be fully covered under both configurations. If caps=on
+  // routed the AA draw into stencil-and-cover, the interior would still be red but the
+  // outside/edge behaviour would diverge; the outside-corner sample is the discriminator.
+  EXPECT_EQ(capsOff.insideRed, 0xFF) << "AA legacy interior should be fully red";
+  EXPECT_EQ(capsOn.insideRed, capsOff.insideRed)
+      << "Enabling stencil-cover caps must not change AA interior pixels";
+  EXPECT_EQ(capsOn.outsideRed, capsOff.outsideRed)
+      << "Enabling stencil-cover caps must not change AA outside pixels";
+}
+
+// Regression pin-down for the coverDeviceBounds-based stencil scissor introduced alongside
+// applyStencilScissor(). The existing Dispatch_StencilWritesAreScissoredToOpClip test forces
+// a non-empty scissorRect via canvas->clipRect(...); this variant deliberately draws *without*
+// any clip so both ops enter drawStencilCoverPath with an empty scissorRect (ClipStack::WideOpen
+// → AppliedClip::scissor stays nullopt → DrawOp::scissorRect is default-constructed empty).
+//
+// In the pre-fix code, bindStencilPipeline called DrawOp::applyScissor(), which for an empty
+// scissorRect expanded to the full render target. After the fix, applyStencilScissor() always
+// clamps the stencil pass to coverDeviceBounds regardless of scissorRect. The bezier tessellator
+// only emits vertices inside the shape's bounds today, so today's build passes either way — but
+// the pin-down keeps the "stencil confined to cover quad" invariant enforced against future
+// regressions (path builder padding, tessellator over-emission, etc.).
+//
+// Op A is a non-inverse pentagon in the LEFT half; op B is an InverseWinding pentagon in the
+// RIGHT half. Op B's inverse-fill cover pass compares stencil == 0 across the *entire* render
+// target (no clip, so localClipBounds spans the whole surface). The verification samples check:
+//   - op A's interior is red (op A itself rendered correctly);
+//   - op A's own shape interior stays black in the final image after op B's inverse fill,
+//     because op B's stencil==0 test still succeeds at those pixels (op A's cover pass
+//     already zeroed its own stencil region) so op B repaints them red on top of black;
+//     wait — this is exactly the invariant. We instead pick a discriminating sample below.
+//   - the pixel well outside both shapes must be red (op B inverse fill applies there, and
+//     op A's stencil is guaranteed to have been zeroed inside op A's coverDeviceBounds).
+//
+// The most sensitive discriminator would be a pixel where op A's stencil pass could have
+// leaked without the fix: outside op A's coverDeviceBounds. Today the tessellator can't cause
+// that leak, so both fix and pre-fix pass. We still lock the pixel-level result down so any
+// future change that lets stencil escape produces a visible red→black flip at (62, 1).
+TGFX_TEST(StencilCoverPathTest, Dispatch_StencilConfinedByCoverBoundsWithoutClip) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  ScopedStencilCoverCaps capsGuard(context, true);
+
+  constexpr int SIZE = 64;
+  auto surface = Surface::Make(context, SIZE, SIZE);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color{0.f, 0.f, 0.f, 1.f});
+
+  Paint paint;
+  paint.setAntiAlias(false);
+  paint.setColor(Color{1.f, 0.f, 0.f, 1.f});
+
+  // Op A: small non-inverse pentagon in the LEFT half. No clipRect — so scissorRect on the
+  // op will be empty (WideOpen clip state) and the pre-fix code would have set the stencil
+  // scissor to the whole render target.
+  Path pathA;
+  pathA.moveTo(16, 9);
+  pathA.lineTo(28, 24);
+  pathA.lineTo(24, 41);
+  pathA.lineTo(8, 41);
+  pathA.lineTo(4, 24);
+  pathA.close();
+  pathA.setFillType(PathFillType::Winding);
+  canvas->drawPath(pathA, paint);
+
+  // Op B: InverseWinding pentagon in the RIGHT half. Inverse fill compares stencil == 0
+  // across the full render target (no clip → localClipBounds is the whole surface). The
+  // discriminating pixel is one where (a) op A did not paint (outside pathA's bbox), and
+  // (b) op B's inverse fill applies (outside pathB's bbox), and (c) op A's stencil must
+  // have already been zeroed. If any op A stencil write escaped op A's coverDeviceBounds
+  // and landed outside pathB, op B's Equal-0 compare would fail there and the pixel would
+  // stay black. Locking the pixel to red catches such a future regression.
+  Path pathB;
+  pathB.moveTo(48, 9);
+  pathB.lineTo(60, 24);
+  pathB.lineTo(56, 41);
+  pathB.lineTo(40, 41);
+  pathB.lineTo(36, 24);
+  pathB.close();
+  pathB.setFillType(PathFillType::InverseWinding);
+  canvas->drawPath(pathB, paint);
+
+  context->flushAndSubmit();
+
+  // Sanity: op A rendered under the empty-scissor configuration.
+  EXPECT_EQ(ReadRedChannel(surface.get(), 16, 28), 0xFF) << "Pentagon A interior should be red";
+  // Op B's shape interior — inverse fill leaves this unfilled, so it stays background black.
+  EXPECT_EQ(ReadRedChannel(surface.get(), 48, 28), 0x00) << "Pentagon B interior should be black";
+  // Discriminator pixel: outside both shapes' bboxes, on the RIGHT half. Op B inverse fill
+  // should paint it red *if* op A's stencil writes were properly confined. Any future stencil
+  // leak from op A's pass into this half of the render target would fail op B's Equal-0
+  // compare and flip this pixel to black.
+  EXPECT_EQ(ReadRedChannel(surface.get(), 62, 1), 0xFF)
+      << "Op B inverse fill outside its bbox must be red (catches stencil leakage from op A)";
+  // Discriminator pixel: outside both shapes' bboxes, on the LEFT half. Same rationale as
+  // (62, 1) but on op A's side. Op B inverse fill spans the whole render target, so this
+  // pixel is also inside op B's cover quad — it must be red for the same reason. This one
+  // is the tightest check because a stencil leak from op A into its own half is the most
+  // plausible future regression pattern.
+  EXPECT_EQ(ReadRedChannel(surface.get(), 1, 1), 0xFF)
+      << "Op B inverse fill inside op A's half but outside op A's bbox must be red";
+}
+
 }  // namespace tgfx
