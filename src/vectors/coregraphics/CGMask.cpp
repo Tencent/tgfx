@@ -88,11 +88,12 @@ static void DrawPath(const Path& path, CGContextRef cgContext, const ImageInfo& 
   CGPathRelease(cgPath);
 }
 
-static CGImageRef CreateCGImage(const Path& path, void* pixels, const ImageInfo& info, float left,
-                                float top, const std::array<uint8_t, 256>& gammaTable) {
+static bool DrawPathWithGammaCorrection(const Path& path, void* pixels, const ImageInfo& info,
+                                        float left, float top,
+                                        const std::array<uint8_t, 256>& gammaTable) {
   auto cgContext = CreateBitmapContext(info, pixels);
   if (cgContext == nullptr) {
-    return nullptr;
+    return false;
   }
   CGContextTranslateCTM(cgContext, -left, -top);
   DrawPath(path, cgContext, info);
@@ -106,9 +107,42 @@ static CGImageRef CreateCGImage(const Path& path, void* pixels, const ImageInfo&
     p += stride;
   }
   CGContextSynchronize(cgContext);
-  auto image = CGBitmapContextCreateImage(cgContext);
   CGContextRelease(cgContext);
-  return image;
+  return true;
+}
+
+static void CompositeA8Mask(const uint8_t* src, uint8_t* dst, int width, int height,
+                            size_t srcRowBytes, size_t dstRowBytes, int dstX, int dstY,
+                            int dstWidth, int dstHeight) {
+  if (dstX < 0) {
+    width += dstX;
+    src += static_cast<size_t>(-dstX);
+    dstX = 0;
+  }
+  if (dstY < 0) {
+    height += dstY;
+    src += static_cast<size_t>(-dstY) * srcRowBytes;
+    dstY = 0;
+  }
+  if (dstX + width > dstWidth) {
+    width = dstWidth - dstX;
+  }
+  if (dstY + height > dstHeight) {
+    height = dstHeight - dstY;
+  }
+  if (width <= 0 || height <= 0) {
+    return;
+  }
+  dst += static_cast<size_t>(dstY) * dstRowBytes + static_cast<size_t>(dstX);
+  for (int y = 0; y < height; ++y) {
+    for (int x = 0; x < width; ++x) {
+      auto srcAlpha = src[x];
+      auto dstAlpha = dst[x];
+      dst[x] = static_cast<uint8_t>(srcAlpha + (dstAlpha * (255 - srcAlpha) + 127) / 255);
+    }
+    src += srcRowBytes;
+    dst += dstRowBytes;
+  }
 }
 
 void CGMask::onFillPath(const Path& path, const Matrix& matrix, bool needsGammaCorrection) {
@@ -156,19 +190,20 @@ void CGMask::onFillPath(const Path& path, const Matrix& matrix, bool needsGammaC
     return;
   }
   memset(tempPixels, 0, tempBuffer->info().byteSize());
-  auto image = CreateCGImage(finalPath, tempPixels, tempBuffer->info(), bounds.left, bounds.top,
-                             PixelRefMask::GammaTable());
-  tempBuffer->unlockPixels();
-  if (image == nullptr) {
+  if (!DrawPathWithGammaCorrection(finalPath, tempPixels, tempBuffer->info(), bounds.left,
+                                   bounds.top, PixelRefMask::GammaTable())) {
+    tempBuffer->unlockPixels();
     CGContextRelease(cgContext);
     pixelRef->unlockPixels();
     return;
   }
-  auto rect = CGRectMake(bounds.left, bounds.top, bounds.width(), bounds.height());
-  CGContextDrawImage(cgContext, rect, image);
+  CompositeA8Mask(static_cast<const uint8_t*>(tempPixels), static_cast<uint8_t*>(pixels), width,
+                  height, tempBuffer->info().rowBytes(), info.rowBytes(),
+                  static_cast<int>(bounds.left), static_cast<int>(bounds.top), info.width(),
+                  info.height());
+  tempBuffer->unlockPixels();
   CGContextRelease(cgContext);
   pixelRef->unlockPixels();
-  CGImageRelease(image);
 }
 
 static CGAffineTransform MatrixToCGAffineTransform(const Matrix& matrix) {
