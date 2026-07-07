@@ -37,4 +37,16 @@ DEFINE_LAYER_BUILDER(ImageWithShadow);
 DEFINE_LAYER_BUILDER(Layer3DTree);
 DEFINE_LAYER_BUILDER(RichText);
 DEFINE_LAYER_BUILDER(SimpleLayerTree);
+
+// LiquidGlass has extra methods for mouse interaction.
+class LiquidGlass : public hello2d::LayerBuilder {
+ public:
+  LiquidGlass() : hello2d::LayerBuilder("LiquidGlass") {
+  }
+
+  void setGlassPosition(float x, float y) override;
+
+ protected:
+  std::shared_ptr<tgfx::Layer> onBuildLayerTree(const hello2d::AppHost* host) override;
+};
 }  // namespace hello2d

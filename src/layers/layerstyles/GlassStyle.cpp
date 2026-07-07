@@ -151,7 +151,6 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
     int layerWidth = input.content->width();
     int layerHeight = input.content->height();
 
-    float ior = 1.0f + (_refraction / 100.0f) * 9.0f;
     float halfW = static_cast<float>(layerWidth) * 0.5f;
     float halfH = static_cast<float>(layerHeight) * 0.5f;
     float minHalf = std::min(halfW, halfH);
@@ -161,10 +160,9 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
     float depthPx = (_depth / 100.0f) * maxDepth;
     float depthRatio = std::min(depthPx / maxDepth, 1.0f);
     // refraction 0~100 applies an additional thickness multiplier of 1.0~2.0.
-    float refractionRatio = (ior - 1.0f) / 9.0f;
-    float thicknessMultiplier = 1.0f + refractionRatio;
-    float glassThickness = (1.0f + depthRatio * (minHalf - 1.0f)) * thicknessMultiplier;
     float refractionFactor = _refraction / 100.0f;
+    float thicknessMultiplier = 1.0f + refractionFactor;
+    float glassThickness = (1.0f + depthRatio * (minHalf - 1.0f)) * thicknessMultiplier;
     // depth 0~50 maps to flat region 100%~30%, depth 50~100 stays at 30%.
     float flatRatio = (depthRatio <= 0.5f) ? (1.0f - depthRatio * 1.4f) : 0.3f;
     float innerHalfW = halfW * flatRatio;
