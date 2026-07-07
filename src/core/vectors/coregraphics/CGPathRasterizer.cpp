@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "CGPathRasterizer.h"
-#include <CoreGraphics/CGBitmapContext.h>
 #include "core/NoConicsPathIterator.h"
 #include "core/PixelBuffer.h"
 #include "core/utils/ColorSpaceHelper.h"
@@ -88,12 +87,12 @@ static void DrawPath(const Path& path, CGContextRef cgContext, const ImageInfo& 
   CGPathRelease(cgPath);
 }
 
-static CGImageRef CreateCGImage(const Path& path, void* pixels, const ImageInfo& info,
-                                bool antiAlias, float left, float top,
-                                const std::array<uint8_t, 256>& gammaTable) {
+static bool DrawPathWithGammaCorrection(const Path& path, void* pixels, const ImageInfo& info,
+                                        bool antiAlias, float left, float top,
+                                        const std::array<uint8_t, 256>& gammaTable) {
   auto cgContext = CreateBitmapContext(info, pixels);
   if (cgContext == nullptr) {
-    return nullptr;
+    return false;
   }
   CGContextTranslateCTM(cgContext, -left, -top);
   DrawPath(path, cgContext, info, antiAlias);
@@ -107,9 +106,42 @@ static CGImageRef CreateCGImage(const Path& path, void* pixels, const ImageInfo&
     p += stride;
   }
   CGContextSynchronize(cgContext);
-  auto image = CGBitmapContextCreateImage(cgContext);
   CGContextRelease(cgContext);
-  return image;
+  return true;
+}
+
+static void CompositeA8Mask(const uint8_t* src, uint8_t* dst, int width, int height,
+                            size_t srcRowBytes, size_t dstRowBytes, int dstX, int dstY,
+                            int dstWidth, int dstHeight) {
+  if (dstX < 0) {
+    width += dstX;
+    src -= dstX;
+    dstX = 0;
+  }
+  if (dstY < 0) {
+    height += dstY;
+    src -= dstY * static_cast<int>(srcRowBytes);
+    dstY = 0;
+  }
+  if (dstX + width > dstWidth) {
+    width = dstWidth - dstX;
+  }
+  if (dstY + height > dstHeight) {
+    height = dstHeight - dstY;
+  }
+  if (width <= 0 || height <= 0) {
+    return;
+  }
+  dst += dstY * dstRowBytes + dstX;
+  for (int y = 0; y < height; ++y) {
+    for (int x = 0; x < width; ++x) {
+      auto srcAlpha = src[x];
+      auto dstAlpha = dst[x];
+      dst[x] = static_cast<uint8_t>(srcAlpha + (dstAlpha * (255 - srcAlpha) + 127) / 255);
+    }
+    src += srcRowBytes;
+    dst += dstRowBytes;
+  }
 }
 
 std::shared_ptr<PathRasterizer> PathRasterizer::MakeFrom(int width, int height,
@@ -146,10 +178,17 @@ bool CGPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
   path.transform(totalMatrix);
   if (!needsGammaCorrection) {
     DrawPath(path, cgContext, targetInfo, antiAlias);
+    CGContextRelease(cgContext);
+    if (NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
+      ConvertColorSpaceInPlace(ImageGenerator::width(), ImageGenerator::height(), colorType,
+                               alphaType, dstRowBytes, colorSpace(), dstColorSpace, dstPixels);
+    }
+    return true;
   }
   auto bounds = path.getBounds();
   auto clipBounds = Rect::MakeWH(targetInfo.width(), targetInfo.height());
   if (!bounds.intersect(clipBounds)) {
+    CGContextRelease(cgContext);
     return false;
   }
   auto width = FloatCeilToInt(bounds.width());
@@ -165,17 +204,17 @@ bool CGPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
     return false;
   }
   memset(tempPixels, 0, tempBuffer->info().byteSize());
-  auto image = CreateCGImage(path, tempPixels, tempBuffer->info(), antiAlias, bounds.left,
-                             bounds.top, GammaCorrection::GammaTable());
-  tempBuffer->unlockPixels();
-  if (image == nullptr) {
+  if (!DrawPathWithGammaCorrection(path, tempPixels, tempBuffer->info(), antiAlias, bounds.left,
+                                   bounds.top, GammaCorrection::GammaTable())) {
+    tempBuffer->unlockPixels();
     CGContextRelease(cgContext);
     return false;
   }
-  auto rect = CGRectMake(bounds.left, bounds.top, bounds.width(), bounds.height());
-  CGContextDrawImage(cgContext, rect, image);
+  CompositeA8Mask(static_cast<const uint8_t*>(tempPixels), static_cast<uint8_t*>(dstPixels), width,
+                  height, tempBuffer->info().rowBytes(), dstRowBytes, static_cast<int>(bounds.left),
+                  static_cast<int>(bounds.top), targetInfo.width(), targetInfo.height());
+  tempBuffer->unlockPixels();
   CGContextRelease(cgContext);
-  CGImageRelease(image);
   if (NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
     ConvertColorSpaceInPlace(ImageGenerator::width(), ImageGenerator::height(), colorType,
                              alphaType, dstRowBytes, colorSpace(), dstColorSpace, dstPixels);
