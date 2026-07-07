@@ -1940,6 +1940,7 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
   styleInput.content = contentEntry.image;
   styleInput.contentOffset = contentEntry.offset;
   styleInput.contentScale = source->contentScale;
+  styleInput.layerContent = getContent();
   if (layerStyle->extraSourceType() == LayerStyleExtraSourceType::Contour) {
     auto contourImage = group->contour.has_value() ? group->contour->image : nullptr;
     auto contourOffset =

@@ -21,6 +21,7 @@
 #include <cmath>
 #include "GlassRefractionEffect.h"
 #include "core/utils/Log.h"
+#include "layers/contents/LayerContent.h"
 
 namespace tgfx {
 
@@ -103,14 +104,6 @@ void GlassStyle::setCornerRadius(float radius) {
   invalidateTransform();
 }
 
-void GlassStyle::setShapeType(GlassShapeType type) {
-  if (_shapeType == type) {
-    return;
-  }
-  _shapeType = type;
-  invalidateTransform();
-}
-
 Rect GlassStyle::filterBackground(const Rect& srcRect, float contentScale) {
   auto filter = getFrostFilter(contentScale);
   if (filter) {
@@ -156,6 +149,34 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
     float minHalf = std::min(halfW, halfH);
     float scaledRadius = _cornerRadius * input.contentScale;
     float crRadius = std::min(scaledRadius, minHalf);
+
+    // Auto-detect shape type from layerContent.
+    GlassShapeType effectiveShapeType = GlassShapeType::AlphaMask;
+    if (input.layerContent != nullptr) {
+      auto contentType = input.layerContent->getType();
+      if (contentType == LayerContent::Type::RRect) {
+        effectiveShapeType = GlassShapeType::RoundedRect;
+        auto rrect = input.layerContent->getRRect();
+        if (rrect.has_value()) {
+          auto radii = rrect->radii();
+          // Use the top-left corner radius as representative.
+          float maxRadius = std::min(radii[0].x, radii[0].y);
+          crRadius = std::min(maxRadius * input.contentScale, minHalf);
+        }
+      } else if (contentType == LayerContent::Type::Rect) {
+        effectiveShapeType = GlassShapeType::RoundedRect;
+        crRadius = 0.0f;
+      } else if (contentType == LayerContent::Type::Path ||
+                 contentType == LayerContent::Type::Shape) {
+        // Check if the path is an oval (ellipse).
+        if (input.layerContent->getOval().has_value()) {
+          effectiveShapeType = GlassShapeType::Ellipse;
+        } else {
+          effectiveShapeType = GlassShapeType::AlphaMask;
+        }
+      }
+    }
+
     float maxDepth = minHalf - 1.0f;
     float depthPx = (_depth / 100.0f) * maxDepth;
     float depthRatio = std::min(depthPx / maxDepth, 1.0f);
@@ -177,21 +198,17 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
     // 1. Gaussian-blur the binary alpha to approximate UDF
     // 2. Pack the float result into RGBA8 (32-bit precision) via GlassMaskEffect
     std::shared_ptr<Image> maskImage = nullptr;
-    if (_shapeType == GlassShapeType::AlphaMask) {
-      // Use inner radius for sigma calculation to match actual shape size.
-      // For star/polygon shapes, inner radius is much smaller than minHalf.
+    if (effectiveShapeType == GlassShapeType::AlphaMask) {
       float blurSigma = minHalf * (0.2f + (_depth / 100.0f) * 0.2f);
       auto blurFilter = ImageFilter::Blur(blurSigma, blurSigma, TileMode::Decal);
       Point blurMaskOffset = {};
       auto maskClipRect =
           Rect::MakeWH(static_cast<float>(layerWidth), static_cast<float>(layerHeight));
-      auto blurredMask =
-          input.content->makeWithFilter(blurFilter, &blurMaskOffset, &maskClipRect);
+      auto blurredMask = input.content->makeWithFilter(blurFilter, &blurMaskOffset, &maskClipRect);
       if (!blurredMask) {
         LOGE("GlassStyle: Failed to blur alpha for UDF, falling back to content.");
         blurredMask = input.content;
       }
-      // Pack blurred alpha into RGBA8 32-bit encoding.
       auto packEffect = std::make_shared<GlassMaskEffect>();
       auto packFilter = ImageFilter::Runtime(packEffect);
       Point packOffset = {};
@@ -206,7 +223,8 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
     auto refractionEffect = std::make_shared<GlassRefractionEffect>(
         static_cast<float>(layerWidth), static_cast<float>(layerHeight), halfW, halfH, crRadius,
         minHalf, innerHalfW, innerHalfH, innerRadius, glassThickness, refractionFactor,
-        channelOffset, splay, depthRatio, lightAngle, lightIntensity, _shapeType, maskImage);
+        channelOffset, splay, depthRatio, lightAngle, lightIntensity, effectiveShapeType,
+        maskImage);
     auto refractionFilter = ImageFilter::Runtime(refractionEffect);
     Point refractOffset = {};
     auto clipRect = Rect::MakeWH(static_cast<float>(processedBg->width()),
