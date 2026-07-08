@@ -24,41 +24,13 @@
 
 namespace tgfx {
 
-#pragma pack(push, 1)
-
-struct BundleFileHeader {
-  uint32_t magic = 0x54475346;  // "TGSF"
-  uint16_t formatVersion = 1;
-  uint16_t compressionType = 0;  // 0=none
-  uint64_t sourceHash = 0;
-  uint32_t toolchainVersion = 0x00010000;  // 1.0.0
-  uint32_t entryCount = 0;
-  uint32_t reflectionOffset = 0;
-  uint32_t shaderDataOffset = 0;
-  uint32_t shaderDataSize = 0;
-  char profileTag[32] = {};
-};
-
-struct BundleIndexEntry {
-  uint64_t shaderKeyHashHi = 0;
-  uint64_t shaderKeyHashLo = 0;
-  uint32_t vertexBlobOffset = 0;
-  uint32_t vertexBlobSize = 0;
-  uint32_t fragmentBlobOffset = 0;
-  uint32_t fragmentBlobSize = 0;
-  uint32_t reflectionOffset = 0;
-};
-
-#pragma pack(pop)
-
 struct UniformEntry {
   std::string name;
   uint8_t format = 0;  // UniformFormat enum value
 };
 
-struct ReflectionData {
-  std::vector<UniformEntry> vertexUniforms;
-  std::vector<UniformEntry> fragmentUniforms;
+struct StageReflectionData {
+  std::vector<UniformEntry> uniforms;
   std::vector<UniformEntry> samplers;
 };
 
@@ -68,7 +40,8 @@ struct VariantData {
   std::string profileTag;
   std::vector<uint8_t> vertexBlob;
   std::vector<uint8_t> fragmentBlob;
-  ReflectionData reflection;
+  StageReflectionData vertexReflection;
+  StageReflectionData fragmentReflection;
 };
 
 struct ShaderKeyHash {
@@ -80,7 +53,7 @@ struct ShaderKeyHash {
 ShaderKeyHash ComputeShaderKeyHash(const std::string& shaderName, uint32_t permutationIndex,
                                    const std::string& profileTag);
 
-/// Writes a complete shader bundle file containing all variant entries for one backend/profile.
+/// Writes a v3 shader bundle file with separate vertex and fragment pools.
 bool WriteBundle(const std::string& outPath, const std::string& profileTag,
                  const std::vector<VariantData>& variants);
 

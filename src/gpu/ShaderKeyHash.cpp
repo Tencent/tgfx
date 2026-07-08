@@ -65,4 +65,14 @@ ShaderKeyHash ComputeShaderKeyHash(const std::string& shaderName, uint32_t permu
   return result;
 }
 
+ShaderKeyHash ComputeVertexKeyHash(const std::string& shaderName, uint32_t permutationIndex,
+                                   const std::string& profileTag) {
+  return ComputeShaderKeyHash(shaderName + "_Vert", permutationIndex, profileTag);
+}
+
+ShaderKeyHash ComputeFragmentKeyHash(const std::string& shaderName, uint32_t permutationIndex,
+                                     const std::string& profileTag) {
+  return ComputeShaderKeyHash(shaderName + "_Frag", permutationIndex, profileTag);
+}
+
 }  // namespace tgfx

@@ -51,10 +51,17 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
     return nullptr;
   }
 
-  auto hash = ComputeShaderKeyHash(matchResult->shaderName, matchResult->permutationIndex,
-                                   cache->profileTag());
-  auto blob = cache->find(hash.hi, hash.lo);
-  if (blob == nullptr) {
+  auto vertHash = ComputeVertexKeyHash(matchResult->shaderName, matchResult->vertPermutationIndex,
+                                       cache->profileTag());
+  auto fragHash = ComputeFragmentKeyHash(matchResult->shaderName, matchResult->fragPermutationIndex,
+                                         cache->profileTag());
+
+  auto vertBlob = cache->findVertex(vertHash.hi, vertHash.lo);
+  if (vertBlob == nullptr) {
+    return nullptr;
+  }
+  auto fragBlob = cache->findFragment(fragHash.hi, fragHash.lo);
+  if (fragBlob == nullptr) {
     return nullptr;
   }
 
@@ -65,30 +72,30 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
   vertexDesc.format = format;
   vertexDesc.stage = ShaderStage::Vertex;
   if (format == ShaderCodeFormat::SPIRV) {
-    vertexDesc.binaryData = blob->vertexData;
+    vertexDesc.binaryData = vertBlob->data;
   } else {
-    vertexDesc.code = std::string(blob->vertexData.begin(), blob->vertexData.end());
+    vertexDesc.code = std::string(vertBlob->data.begin(), vertBlob->data.end());
   }
 
   ShaderModuleDescriptor fragmentDesc = {};
   fragmentDesc.format = format;
   fragmentDesc.stage = ShaderStage::Fragment;
   if (format == ShaderCodeFormat::SPIRV) {
-    fragmentDesc.binaryData = blob->fragmentData;
+    fragmentDesc.binaryData = fragBlob->data;
   } else {
-    fragmentDesc.code = std::string(blob->fragmentData.begin(), blob->fragmentData.end());
+    fragmentDesc.code = std::string(fragBlob->data.begin(), fragBlob->data.end());
   }
 
   auto vertexShader = gpu->createShaderModule(vertexDesc);
   if (vertexShader == nullptr) {
-    LOGE("PrecompiledProgramCreator: Failed to create vertex shader module for %s[%u]",
-         matchResult->shaderName.c_str(), matchResult->permutationIndex);
+    LOGE("PrecompiledProgramCreator: Failed to create vertex shader module for %s[vert=%u]",
+         matchResult->shaderName.c_str(), matchResult->vertPermutationIndex);
     return nullptr;
   }
   auto fragmentShader = gpu->createShaderModule(fragmentDesc);
   if (fragmentShader == nullptr) {
-    LOGE("PrecompiledProgramCreator: Failed to create fragment shader module for %s[%u]",
-         matchResult->shaderName.c_str(), matchResult->permutationIndex);
+    LOGE("PrecompiledProgramCreator: Failed to create fragment shader module for %s[frag=%u]",
+         matchResult->shaderName.c_str(), matchResult->fragPermutationIndex);
     return nullptr;
   }
 
@@ -106,20 +113,20 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
 
   std::unique_ptr<UniformData> vertexUniformData = nullptr;
   std::unique_ptr<UniformData> fragmentUniformData = nullptr;
-  if (!blob->vertexUniforms.empty()) {
-    vertexUniformData = std::unique_ptr<UniformData>(new UniformData(blob->vertexUniforms));
+  if (!vertBlob->uniforms.empty()) {
+    vertexUniformData = std::unique_ptr<UniformData>(new UniformData(vertBlob->uniforms));
     BindingEntry vertexBinding = {VertexUniformBlockName, VERTEX_UBO_BINDING_POINT,
                                   ShaderVisibility::Vertex};
     descriptor.layout.uniformBlocks.push_back(vertexBinding);
   }
-  if (!blob->fragmentUniforms.empty()) {
-    fragmentUniformData = std::unique_ptr<UniformData>(new UniformData(blob->fragmentUniforms));
+  if (!fragBlob->uniforms.empty()) {
+    fragmentUniformData = std::unique_ptr<UniformData>(new UniformData(fragBlob->uniforms));
     BindingEntry fragmentBinding = {FragmentUniformBlockName, FRAGMENT_UBO_BINDING_POINT,
                                     ShaderVisibility::Fragment};
     descriptor.layout.uniformBlocks.push_back(fragmentBinding);
   }
   int textureBinding = 0;
-  for (const auto& sampler : blob->samplers) {
+  for (const auto& sampler : fragBlob->samplers) {
     descriptor.layout.textureSamplers.emplace_back(sampler.name(), textureBinding++);
   }
 
@@ -129,8 +136,9 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
 
   auto pipeline = gpu->createRenderPipeline(descriptor);
   if (pipeline == nullptr) {
-    LOGE("PrecompiledProgramCreator: Failed to create render pipeline for %s[%u]",
-         matchResult->shaderName.c_str(), matchResult->permutationIndex);
+    LOGE("PrecompiledProgramCreator: Failed to create render pipeline for %s[vert=%u,frag=%u]",
+         matchResult->shaderName.c_str(), matchResult->vertPermutationIndex,
+         matchResult->fragPermutationIndex);
     return nullptr;
   }
 

@@ -34,4 +34,12 @@ struct ShaderKeyHash {
 ShaderKeyHash ComputeShaderKeyHash(const std::string& shaderName, uint32_t permutationIndex,
                                    const std::string& profileTag);
 
+/// Computes the vertex shader key hash: hash(shaderName + "_Vert", permutationIndex, profileTag).
+ShaderKeyHash ComputeVertexKeyHash(const std::string& shaderName, uint32_t permutationIndex,
+                                   const std::string& profileTag);
+
+/// Computes the fragment shader key hash: hash(shaderName + "_Frag", permutationIndex, profileTag).
+ShaderKeyHash ComputeFragmentKeyHash(const std::string& shaderName, uint32_t permutationIndex,
+                                     const std::string& profileTag);
+
 }  // namespace tgfx

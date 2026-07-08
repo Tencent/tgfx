@@ -214,7 +214,8 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   auto bundlePath = ProjectPath::Absolute("resources/shaders/shader_bundle.vulkan.bin");
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
-  EXPECT_EQ(cache->entryCount(), 6u);
+  EXPECT_EQ(cache->vertexEntryCount(), 6u);
+  EXPECT_EQ(cache->fragmentEntryCount(), 6u);
   EXPECT_EQ(cache->profileTag(), "vulkan");
 }
 

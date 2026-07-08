@@ -21,6 +21,7 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <set>
 
 namespace tgfx {
 
@@ -41,19 +42,16 @@ static std::vector<uint8_t> SerializeFieldsLE(const std::string& shaderName,
                                               uint32_t permutationIndex,
                                               const std::string& profileTag) {
   std::vector<uint8_t> bytes;
-  // Write shaderName: length prefix (4 bytes LE) + content
   auto nameLen = static_cast<uint32_t>(shaderName.size());
   bytes.push_back(static_cast<uint8_t>(nameLen & 0xFF));
   bytes.push_back(static_cast<uint8_t>((nameLen >> 8) & 0xFF));
   bytes.push_back(static_cast<uint8_t>((nameLen >> 16) & 0xFF));
   bytes.push_back(static_cast<uint8_t>((nameLen >> 24) & 0xFF));
   bytes.insert(bytes.end(), shaderName.begin(), shaderName.end());
-  // Write permutationIndex (4 bytes LE)
   bytes.push_back(static_cast<uint8_t>(permutationIndex & 0xFF));
   bytes.push_back(static_cast<uint8_t>((permutationIndex >> 8) & 0xFF));
   bytes.push_back(static_cast<uint8_t>((permutationIndex >> 16) & 0xFF));
   bytes.push_back(static_cast<uint8_t>((permutationIndex >> 24) & 0xFF));
-  // Write profileTag: length prefix (4 bytes LE) + content
   auto tagLen = static_cast<uint32_t>(profileTag.size());
   bytes.push_back(static_cast<uint8_t>(tagLen & 0xFF));
   bytes.push_back(static_cast<uint8_t>((tagLen >> 8) & 0xFF));
@@ -104,22 +102,34 @@ static void WriteUniformEntries(std::vector<uint8_t>& blob,
   }
 }
 
-// Serializes a single ReflectionData into a byte blob.
-// Format: [vertexUniformCount:u8][fragmentUniformCount:u8][samplerCount:u8][reserved:u8]
-//         For each uniform: [nameLen:u8][name:bytes][format:u8]
-//         For each sampler: [nameLen:u8][name:bytes][format:u8]
-static std::vector<uint8_t> SerializeReflection(const ReflectionData& reflection) {
+// Serializes stage reflection: [uniformCount:u8][samplerCount:u8][reserved:u8][reserved:u8]
+//                              For each: [nameLen:u8][name:bytes][format:u8]
+static std::vector<uint8_t> SerializeStageReflection(const StageReflectionData& reflection) {
   std::vector<uint8_t> blob;
-  blob.push_back(static_cast<uint8_t>(reflection.vertexUniforms.size()));
-  blob.push_back(static_cast<uint8_t>(reflection.fragmentUniforms.size()));
+  blob.push_back(static_cast<uint8_t>(reflection.uniforms.size()));
   blob.push_back(static_cast<uint8_t>(reflection.samplers.size()));
-  blob.push_back(0);  // reserved padding
+  blob.push_back(0);  // reserved
+  blob.push_back(0);  // reserved
 
-  WriteUniformEntries(blob, reflection.vertexUniforms);
-  WriteUniformEntries(blob, reflection.fragmentUniforms);
+  WriteUniformEntries(blob, reflection.uniforms);
   WriteUniformEntries(blob, reflection.samplers);
   return blob;
 }
+
+struct PoolEntry {
+  ShaderKeyHash hash;
+  uint32_t dataOffset = 0;
+  uint32_t dataSize = 0;
+  uint32_t reflOffset = 0;
+};
+
+// v3 Header layout (80 bytes):
+//   magic(4) + formatVersion(2) + compressionType(2) + sourceHash(8) + toolchainVersion(4) +
+//   vertPoolCount(4) + fragPoolCount(4) + vertPoolOffset(4) + fragPoolOffset(4) +
+//   dataOffset(4) + dataSize(4) + reflectionOffset(4) + profileTag(32) = 80
+static constexpr uint32_t HEADER_SIZE_V3 = 80;
+// PoolEntry on disk: hashHi(8) + hashLo(8) + dataOff(4) + dataSize(4) + reflOff(4) = 28
+static constexpr uint32_t POOL_ENTRY_SIZE = 28;
 
 bool WriteBundle(const std::string& outPath, const std::string& profileTag,
                  const std::vector<VariantData>& variants) {
@@ -127,65 +137,73 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
     return true;
   }
 
-  // Compute hashes and build index entries
-  struct IndexedEntry {
-    ShaderKeyHash hash;
-    size_t variantIdx;
+  // Build separate vert and frag entries with deduplication by hash.
+  std::vector<uint8_t> dataPool;
+  std::vector<uint8_t> reflPool;
+  std::vector<PoolEntry> vertPool;
+  std::vector<PoolEntry> fragPool;
+
+  struct HashKeyLess {
+    bool operator()(const ShaderKeyHash& a, const ShaderKeyHash& b) const {
+      if (a.hi != b.hi) {
+        return a.hi < b.hi;
+      }
+      return a.lo < b.lo;
+    }
   };
-  std::vector<IndexedEntry> entries;
-  entries.reserve(variants.size());
-  for (size_t i = 0; i < variants.size(); i++) {
-    const auto& v = variants[i];
-    auto hash = ComputeShaderKeyHash(v.shaderName, v.permutationIndex, v.profileTag);
-    entries.push_back({hash, i});
+  std::set<ShaderKeyHash, HashKeyLess> vertSeen;
+  std::set<ShaderKeyHash, HashKeyLess> fragSeen;
+
+  for (const auto& v : variants) {
+    // Vertex entry: key = hash(shaderName + "_Vert", permutationIndex, profileTag)
+    auto vertHash = ComputeShaderKeyHash(v.shaderName + "_Vert", v.permutationIndex, v.profileTag);
+    if (vertSeen.find(vertHash) == vertSeen.end()) {
+      vertSeen.insert(vertHash);
+      PoolEntry entry;
+      entry.hash = vertHash;
+      entry.dataOffset = static_cast<uint32_t>(dataPool.size());
+      entry.dataSize = static_cast<uint32_t>(v.vertexBlob.size());
+      dataPool.insert(dataPool.end(), v.vertexBlob.begin(), v.vertexBlob.end());
+      auto reflBlob = SerializeStageReflection(v.vertexReflection);
+      entry.reflOffset = static_cast<uint32_t>(reflPool.size());
+      reflPool.insert(reflPool.end(), reflBlob.begin(), reflBlob.end());
+      vertPool.push_back(entry);
+    }
+
+    // Fragment entry: key = hash(shaderName + "_Frag", permutationIndex, profileTag)
+    auto fragHash = ComputeShaderKeyHash(v.shaderName + "_Frag", v.permutationIndex, v.profileTag);
+    if (fragSeen.find(fragHash) == fragSeen.end()) {
+      fragSeen.insert(fragHash);
+      PoolEntry entry;
+      entry.hash = fragHash;
+      entry.dataOffset = static_cast<uint32_t>(dataPool.size());
+      entry.dataSize = static_cast<uint32_t>(v.fragmentBlob.size());
+      dataPool.insert(dataPool.end(), v.fragmentBlob.begin(), v.fragmentBlob.end());
+      auto reflBlob = SerializeStageReflection(v.fragmentReflection);
+      entry.reflOffset = static_cast<uint32_t>(reflPool.size());
+      reflPool.insert(reflPool.end(), reflBlob.begin(), reflBlob.end());
+      fragPool.push_back(entry);
+    }
   }
 
-  // Sort by hash (hi, lo) for binary search at runtime
-  std::sort(entries.begin(), entries.end(), [](const IndexedEntry& a, const IndexedEntry& b) {
+  // Sort pools by hash for deterministic output
+  auto hashCompare = [](const PoolEntry& a, const PoolEntry& b) {
     if (a.hash.hi != b.hash.hi) {
       return a.hash.hi < b.hash.hi;
     }
     return a.hash.lo < b.hash.lo;
-  });
+  };
+  std::sort(vertPool.begin(), vertPool.end(), hashCompare);
+  std::sort(fragPool.begin(), fragPool.end(), hashCompare);
 
-  // Check for duplicates
-  for (size_t i = 1; i < entries.size(); i++) {
-    if (entries[i].hash.hi == entries[i - 1].hash.hi &&
-        entries[i].hash.lo == entries[i - 1].hash.lo) {
-      std::cerr << "ERROR: Duplicate hash in bundle for variant "
-                << variants[entries[i].variantIdx].shaderName << " index "
-                << variants[entries[i].variantIdx].permutationIndex << "\n";
-      return false;
-    }
-  }
-
-  // Layout: FileHeader | IndexEntries[] | ShaderDataPool | ReflectionPool
-  uint32_t headerSize = sizeof(BundleFileHeader);
-  uint32_t indexSize = static_cast<uint32_t>(entries.size()) * sizeof(BundleIndexEntry);
-  uint32_t shaderDataStart = headerSize + indexSize;
-
-  // Build shader data pool and reflection pool, record offsets
-  std::vector<uint8_t> shaderDataPool;
-  std::vector<uint8_t> reflectionPool;
-  std::vector<BundleIndexEntry> indexEntries(entries.size());
-
-  for (size_t i = 0; i < entries.size(); i++) {
-    const auto& v = variants[entries[i].variantIdx];
-    auto& idx = indexEntries[i];
-    idx.shaderKeyHashHi = entries[i].hash.hi;
-    idx.shaderKeyHashLo = entries[i].hash.lo;
-    idx.vertexBlobOffset = static_cast<uint32_t>(shaderDataPool.size());
-    idx.vertexBlobSize = static_cast<uint32_t>(v.vertexBlob.size());
-    shaderDataPool.insert(shaderDataPool.end(), v.vertexBlob.begin(), v.vertexBlob.end());
-    idx.fragmentBlobOffset = static_cast<uint32_t>(shaderDataPool.size());
-    idx.fragmentBlobSize = static_cast<uint32_t>(v.fragmentBlob.size());
-    shaderDataPool.insert(shaderDataPool.end(), v.fragmentBlob.begin(), v.fragmentBlob.end());
-
-    // Serialize reflection for this entry
-    auto reflBlob = SerializeReflection(v.reflection);
-    idx.reflectionOffset = static_cast<uint32_t>(reflectionPool.size());
-    reflectionPool.insert(reflectionPool.end(), reflBlob.begin(), reflBlob.end());
-  }
+  // Compute layout offsets
+  auto vertPoolCount = static_cast<uint32_t>(vertPool.size());
+  auto fragPoolCount = static_cast<uint32_t>(fragPool.size());
+  uint32_t vertPoolOffset = HEADER_SIZE_V3;
+  uint32_t fragPoolOffset = vertPoolOffset + vertPoolCount * POOL_ENTRY_SIZE;
+  uint32_t dataOffset = fragPoolOffset + fragPoolCount * POOL_ENTRY_SIZE;
+  uint32_t dataSize = static_cast<uint32_t>(dataPool.size());
+  uint32_t reflectionOffset = dataOffset + dataSize;
 
   // Write file
   std::ofstream file(outPath, std::ios::binary);
@@ -194,49 +212,49 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
     return false;
   }
 
-  // Compute reflection pool file offset
-  uint32_t reflectionPoolFileOffset =
-      shaderDataStart + static_cast<uint32_t>(shaderDataPool.size());
+  // Header
+  WriteU32LE(file, 0x54475346);       // magic "TGSF"
+  WriteU16LE(file, 3);                // formatVersion
+  WriteU16LE(file, 0);                // compressionType
+  WriteU64LE(file, 0);                // sourceHash (reserved)
+  WriteU32LE(file, 0x00010000);       // toolchainVersion 1.0.0
+  WriteU32LE(file, vertPoolCount);    // vertPoolCount
+  WriteU32LE(file, fragPoolCount);    // fragPoolCount
+  WriteU32LE(file, vertPoolOffset);   // vertPoolOffset
+  WriteU32LE(file, fragPoolOffset);   // fragPoolOffset
+  WriteU32LE(file, dataOffset);       // dataOffset
+  WriteU32LE(file, dataSize);         // dataSize
+  WriteU32LE(file, reflPool.empty() ? 0 : reflectionOffset);  // reflectionOffset
+  char tagBuf[32] = {};
+  std::strncpy(tagBuf, profileTag.c_str(), sizeof(tagBuf) - 1);
+  file.write(tagBuf, sizeof(tagBuf));
 
-  // Write header
-  BundleFileHeader header;
-  header.formatVersion = 2;
-  header.entryCount = static_cast<uint32_t>(entries.size());
-  header.shaderDataOffset = shaderDataStart;
-  header.shaderDataSize = static_cast<uint32_t>(shaderDataPool.size());
-  header.reflectionOffset = reflectionPool.empty() ? 0 : reflectionPoolFileOffset;
-  std::strncpy(header.profileTag, profileTag.c_str(), sizeof(header.profileTag) - 1);
-
-  WriteU32LE(file, header.magic);
-  WriteU16LE(file, header.formatVersion);
-  WriteU16LE(file, header.compressionType);
-  WriteU64LE(file, header.sourceHash);
-  WriteU32LE(file, header.toolchainVersion);
-  WriteU32LE(file, header.entryCount);
-  WriteU32LE(file, header.reflectionOffset);
-  WriteU32LE(file, header.shaderDataOffset);
-  WriteU32LE(file, header.shaderDataSize);
-  file.write(header.profileTag, sizeof(header.profileTag));
-
-  // Write index entries
-  for (const auto& idx : indexEntries) {
-    WriteU64LE(file, idx.shaderKeyHashHi);
-    WriteU64LE(file, idx.shaderKeyHashLo);
-    WriteU32LE(file, idx.vertexBlobOffset);
-    WriteU32LE(file, idx.vertexBlobSize);
-    WriteU32LE(file, idx.fragmentBlobOffset);
-    WriteU32LE(file, idx.fragmentBlobSize);
-    WriteU32LE(file, idx.reflectionOffset);
+  // Vert pool entries
+  for (const auto& entry : vertPool) {
+    WriteU64LE(file, entry.hash.hi);
+    WriteU64LE(file, entry.hash.lo);
+    WriteU32LE(file, entry.dataOffset);
+    WriteU32LE(file, entry.dataSize);
+    WriteU32LE(file, entry.reflOffset);
   }
 
-  // Write shader data pool
-  file.write(reinterpret_cast<const char*>(shaderDataPool.data()),
-             static_cast<std::streamsize>(shaderDataPool.size()));
+  // Frag pool entries
+  for (const auto& entry : fragPool) {
+    WriteU64LE(file, entry.hash.hi);
+    WriteU64LE(file, entry.hash.lo);
+    WriteU32LE(file, entry.dataOffset);
+    WriteU32LE(file, entry.dataSize);
+    WriteU32LE(file, entry.reflOffset);
+  }
 
-  // Write reflection pool
-  if (!reflectionPool.empty()) {
-    file.write(reinterpret_cast<const char*>(reflectionPool.data()),
-               static_cast<std::streamsize>(reflectionPool.size()));
+  // Data pool
+  file.write(reinterpret_cast<const char*>(dataPool.data()),
+             static_cast<std::streamsize>(dataPool.size()));
+
+  // Reflection pool
+  if (!reflPool.empty()) {
+    file.write(reinterpret_cast<const char*>(reflPool.data()),
+               static_cast<std::streamsize>(reflPool.size()));
   }
 
   file.close();

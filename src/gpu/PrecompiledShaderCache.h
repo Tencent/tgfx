@@ -26,33 +26,44 @@
 
 namespace tgfx {
 
-struct ShaderBlob {
-  std::vector<uint8_t> vertexData;
-  std::vector<uint8_t> fragmentData;
-  std::vector<Uniform> vertexUniforms;
-  std::vector<Uniform> fragmentUniforms;
+struct ShaderStageBlob {
+  std::vector<uint8_t> data;
+  std::vector<Uniform> uniforms;
   std::vector<Uniform> samplers;
 };
 
 /// Runtime cache that loads precompiled shader bundles and provides O(1) lookup by ShaderKey hash.
-/// Each Context holds one instance. If no bundle is available or lookup misses, the caller falls
-/// back to ProgramBuilder.
+/// Each Context holds one instance. Bundle v3 stores vertex and fragment shaders in separate pools,
+/// enabling M+N storage instead of M*N.
 class PrecompiledShaderCache {
  public:
   /// Loads a bundle file from the given path. Returns true if the bundle was loaded successfully.
   bool loadBundle(const std::string& path);
 
-  /// Looks up a shader variant by its 128-bit hash. Returns nullptr if not found.
-  const ShaderBlob* find(uint64_t hashHi, uint64_t hashLo) const;
+  /// Looks up a vertex shader by its 128-bit hash. Returns nullptr if not found.
+  const ShaderStageBlob* findVertex(uint64_t hashHi, uint64_t hashLo) const;
+
+  /// Looks up a fragment shader by its 128-bit hash. Returns nullptr if not found.
+  const ShaderStageBlob* findFragment(uint64_t hashHi, uint64_t hashLo) const;
 
   /// Returns true if at least one bundle has been loaded.
   bool isLoaded() const {
-    return !entries.empty();
+    return !vertEntries.empty() || !fragEntries.empty();
   }
 
-  /// Returns the number of loaded shader entries.
+  /// Returns the total number of loaded entries (vertex + fragment).
   size_t entryCount() const {
-    return entries.size();
+    return vertEntries.size() + fragEntries.size();
+  }
+
+  /// Returns the number of vertex shader entries.
+  size_t vertexEntryCount() const {
+    return vertEntries.size();
+  }
+
+  /// Returns the number of fragment shader entries.
+  size_t fragmentEntryCount() const {
+    return fragEntries.size();
   }
 
   /// Returns the profile tag from the loaded bundle header (e.g. "vulkan-android").
@@ -60,8 +71,6 @@ class PrecompiledShaderCache {
     return _profileTag;
   }
 
- private:
-  std::string _profileTag;
   struct HashKey {
     uint64_t hi;
     uint64_t lo;
@@ -76,7 +85,10 @@ class PrecompiledShaderCache {
     }
   };
 
-  std::unordered_map<HashKey, ShaderBlob, HashKeyHasher> entries;
+ private:
+  std::string _profileTag;
+  std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> vertEntries;
+  std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> fragEntries;
 };
 
 }  // namespace tgfx

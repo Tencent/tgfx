@@ -20,16 +20,14 @@
 
 #include <optional>
 #include <string>
-#include <vector>
 #include "gpu/ProgramInfo.h"
-#include "gpu/shaders/ShaderPermutation.h"
 
 namespace tgfx {
 
 struct PermutationMatchResult {
   std::string shaderName;
-  uint32_t permutationIndex;
-  PermutationDomain domain;
+  uint32_t vertPermutationIndex;
+  uint32_t fragPermutationIndex;
 };
 
 /**

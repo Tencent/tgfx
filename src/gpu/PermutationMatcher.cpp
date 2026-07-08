@@ -53,7 +53,8 @@ static std::optional<PermutationMatchResult> TryMatchTextureFill(const ProgramIn
   values[TextureFillShader::D::HAS_RGBAAA] = te->hasRGBAAA() ? 1 : 0;
   values[TextureFillShader::D::HAS_SUBSET] = te->hasSubset() ? 1 : 0;
   auto index = domain.encode(values);
-  return PermutationMatchResult{"TextureFillShader", index, domain};
+  // TextureFillShader uses the same domain for both vert and frag.
+  return PermutationMatchResult{"TextureFillShader", index, index};
 }
 
 std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* programInfo) {

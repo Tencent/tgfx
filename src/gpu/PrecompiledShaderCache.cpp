@@ -23,7 +23,6 @@
 
 namespace tgfx {
 
-// Must match BundleWriter's header layout (explicit LE serialization).
 static uint16_t ReadU16LE(const uint8_t* p) {
   return static_cast<uint16_t>(static_cast<uint16_t>(p[0]) | (static_cast<uint16_t>(p[1]) << 8));
 }
@@ -41,16 +40,13 @@ static uint64_t ReadU64LE(const uint8_t* p) {
   return val;
 }
 
-// FileHeader size: magic(4) + formatVersion(2) + compressionType(2) + sourceHash(8) +
-//                  toolchainVersion(4) + entryCount(4) + reflectionOffset(4) +
-//                  shaderDataOffset(4) + shaderDataSize(4) + profileTag(32) = 68 bytes
-static constexpr size_t HEADER_SIZE = 68;
-// IndexEntry size: hashHi(8) + hashLo(8) + vertOff(4) + vertSize(4) + fragOff(4) + fragSize(4) +
-//                  reflOff(4) = 36 bytes
-static constexpr size_t INDEX_ENTRY_SIZE = 36;
+// v3 FileHeader: magic(4) + formatVersion(2) + compressionType(2) + sourceHash(8) +
+//   toolchainVersion(4) + vertPoolCount(4) + fragPoolCount(4) + vertPoolOffset(4) +
+//   fragPoolOffset(4) + dataOffset(4) + dataSize(4) + reflectionOffset(4) + profileTag(32) = 80
+static constexpr size_t HEADER_SIZE_V3 = 80;
+// PoolEntry: hashHi(8) + hashLo(8) + dataOff(4) + dataSize(4) + reflOff(4) = 28
+static constexpr size_t POOL_ENTRY_SIZE = 28;
 
-// Reads a sequence of uniform entries from the reflection pool at the given offset.
-// Each entry: [nameLen:u8][name:bytes][format:u8]. Returns false on out-of-bounds.
 static bool ReadUniformEntries(const uint8_t* data, size_t maxLen, size_t* offset, uint8_t count,
                                std::vector<Uniform>& out) {
   for (uint8_t i = 0; i < count; i++) {
@@ -69,28 +65,66 @@ static bool ReadUniformEntries(const uint8_t* data, size_t maxLen, size_t* offse
   return true;
 }
 
-// Deserializes reflection data from the bundle's reflection pool into a ShaderBlob's
-// vertexUniforms, fragmentUniforms and samplers fields.
-// Format: [vertexUniformCount:u8][fragmentUniformCount:u8][samplerCount:u8][reserved:u8]
-//         For each entry: [nameLen:u8][name:bytes][format:u8]
-static bool ParseReflection(const uint8_t* data, size_t maxLen, ShaderBlob* blob) {
+// Reflection format: [uniformCount:u8][samplerCount:u8][reserved:u8][reserved:u8]
+//                    For each uniform: [nameLen:u8][name:bytes][format:u8]
+//                    For each sampler: [nameLen:u8][name:bytes][format:u8]
+static bool ParseStageReflection(const uint8_t* data, size_t maxLen, ShaderStageBlob* blob) {
   if (maxLen < 4) {
     return false;
   }
   size_t offset = 0;
-  uint8_t vertexCount = data[offset++];
-  uint8_t fragmentCount = data[offset++];
+  uint8_t uniformCount = data[offset++];
   uint8_t samplerCount = data[offset++];
-  offset++;  // reserved
+  offset += 2;  // reserved
 
-  if (!ReadUniformEntries(data, maxLen, &offset, vertexCount, blob->vertexUniforms)) {
-    return false;
-  }
-  if (!ReadUniformEntries(data, maxLen, &offset, fragmentCount, blob->fragmentUniforms)) {
+  if (!ReadUniformEntries(data, maxLen, &offset, uniformCount, blob->uniforms)) {
     return false;
   }
   if (!ReadUniformEntries(data, maxLen, &offset, samplerCount, blob->samplers)) {
     return false;
+  }
+  return true;
+}
+
+static bool LoadPool(const uint8_t* fileData, size_t fileSize, uint32_t poolOffset,
+                     uint32_t poolCount, uint32_t dataOffset, uint32_t reflectionOffset,
+                     std::unordered_map<PrecompiledShaderCache::HashKey, ShaderStageBlob,
+                                        PrecompiledShaderCache::HashKeyHasher>& entries) {
+  for (uint32_t i = 0; i < poolCount; i++) {
+    size_t entryOff = poolOffset + static_cast<size_t>(i) * POOL_ENTRY_SIZE;
+    if (entryOff + POOL_ENTRY_SIZE > fileSize) {
+      LOGE("PrecompiledShaderCache: Pool entry %u out of bounds", i);
+      return false;
+    }
+    const uint8_t* entry = fileData + entryOff;
+    uint64_t hashHi = ReadU64LE(entry);
+    uint64_t hashLo = ReadU64LE(entry + 8);
+    uint32_t blobOff = ReadU32LE(entry + 16);
+    uint32_t blobSize = ReadU32LE(entry + 20);
+    uint32_t reflOff = ReadU32LE(entry + 24);
+
+    size_t absDataOff = static_cast<size_t>(dataOffset) + blobOff;
+    if (absDataOff + blobSize > fileSize) {
+      LOGE("PrecompiledShaderCache: Data blob out of bounds for entry %u", i);
+      return false;
+    }
+
+    ShaderStageBlob blob;
+    blob.data.assign(fileData + absDataOff, fileData + absDataOff + blobSize);
+
+    if (reflectionOffset != 0) {
+      size_t absReflOff = static_cast<size_t>(reflectionOffset) + reflOff;
+      if (absReflOff < fileSize) {
+        size_t maxReflLen = fileSize - absReflOff;
+        if (!ParseStageReflection(fileData + absReflOff, maxReflLen, &blob)) {
+          LOGE("PrecompiledShaderCache: Failed to parse reflection for entry %u", i);
+          return false;
+        }
+      }
+    }
+
+    PrecompiledShaderCache::HashKey key{hashHi, hashLo};
+    entries[key] = std::move(blob);
   }
   return true;
 }
@@ -101,7 +135,7 @@ bool PrecompiledShaderCache::loadBundle(const std::string& path) {
     return false;
   }
   auto fileSize = static_cast<size_t>(file.tellg());
-  if (fileSize < HEADER_SIZE) {
+  if (fileSize < HEADER_SIZE_V3) {
     LOGE("PrecompiledShaderCache: Bundle too small: %s", path.c_str());
     return false;
   }
@@ -110,7 +144,6 @@ bool PrecompiledShaderCache::loadBundle(const std::string& path) {
   file.read(reinterpret_cast<char*>(data.data()), static_cast<std::streamsize>(fileSize));
   file.close();
 
-  // Parse header
   const uint8_t* ptr = data.data();
   uint32_t magic = ReadU32LE(ptr);
   if (magic != 0x54475346) {  // "TGSF"
@@ -118,77 +151,57 @@ bool PrecompiledShaderCache::loadBundle(const std::string& path) {
     return false;
   }
   uint16_t formatVersion = ReadU16LE(ptr + 4);
+  if (formatVersion != 3) {
+    LOGE("PrecompiledShaderCache: Unsupported format version %u (expected 3)", formatVersion);
+    return false;
+  }
   uint16_t compressionType = ReadU16LE(ptr + 6);
   if (compressionType != 0) {
     LOGE("PrecompiledShaderCache: Compressed bundles not yet supported");
     return false;
   }
-  uint32_t entryCount = ReadU32LE(ptr + 20);
-  uint32_t reflectionOffset = ReadU32LE(ptr + 24);
-  uint32_t shaderDataOffset = ReadU32LE(ptr + 28);
+  // offset 8: sourceHash(8), offset 16: toolchainVersion(4)
+  uint32_t vertPoolCount = ReadU32LE(ptr + 20);
+  uint32_t fragPoolCount = ReadU32LE(ptr + 24);
+  uint32_t vertPoolOffset = ReadU32LE(ptr + 28);
+  uint32_t fragPoolOffset = ReadU32LE(ptr + 32);
+  uint32_t dataOffset = ReadU32LE(ptr + 36);
+  uint32_t dataSize = ReadU32LE(ptr + 40);
+  uint32_t reflectionOffset = ReadU32LE(ptr + 44);
+  (void)dataSize;
 
-  // Parse profileTag (32 bytes at offset 36)
-  const char* tagPtr = reinterpret_cast<const char*>(ptr + 36);
+  // Parse profileTag (32 bytes at offset 48)
+  const char* tagPtr = reinterpret_cast<const char*>(ptr + 48);
   _profileTag = std::string(tagPtr, strnlen(tagPtr, 32));
 
-  // Validate sizes
-  size_t expectedMinSize = HEADER_SIZE + static_cast<size_t>(entryCount) * INDEX_ENTRY_SIZE;
-  if (fileSize < expectedMinSize) {
-    LOGE("PrecompiledShaderCache: File too small for %u entries", entryCount);
+  if (!LoadPool(ptr, fileSize, vertPoolOffset, vertPoolCount, dataOffset, reflectionOffset,
+                vertEntries)) {
+    return false;
+  }
+  if (!LoadPool(ptr, fileSize, fragPoolOffset, fragPoolCount, dataOffset, reflectionOffset,
+                fragEntries)) {
     return false;
   }
 
-  bool hasReflection = (formatVersion >= 2 && reflectionOffset != 0);
-
-  // Parse index entries
-  const uint8_t* indexStart = ptr + HEADER_SIZE;
-  for (uint32_t i = 0; i < entryCount; i++) {
-    const uint8_t* entry = indexStart + static_cast<size_t>(i) * INDEX_ENTRY_SIZE;
-    uint64_t hashHi = ReadU64LE(entry);
-    uint64_t hashLo = ReadU64LE(entry + 8);
-    uint32_t vertOff = ReadU32LE(entry + 16);
-    uint32_t vertSize = ReadU32LE(entry + 20);
-    uint32_t fragOff = ReadU32LE(entry + 24);
-    uint32_t fragSize = ReadU32LE(entry + 28);
-    uint32_t reflOff = ReadU32LE(entry + 32);
-
-    // Offsets are relative to shader data pool start
-    size_t vertAbsOff = shaderDataOffset + vertOff;
-    size_t fragAbsOff = shaderDataOffset + fragOff;
-    if (vertAbsOff + vertSize > fileSize || fragAbsOff + fragSize > fileSize) {
-      LOGE("PrecompiledShaderCache: Entry %u has out-of-bounds offsets", i);
-      return false;
-    }
-
-    ShaderBlob blob;
-    blob.vertexData.assign(ptr + vertAbsOff, ptr + vertAbsOff + vertSize);
-    blob.fragmentData.assign(ptr + fragAbsOff, ptr + fragAbsOff + fragSize);
-
-    // Parse reflection data if available
-    if (hasReflection) {
-      size_t reflAbsOff = static_cast<size_t>(reflectionOffset) + reflOff;
-      if (reflAbsOff < fileSize) {
-        size_t maxReflLen = fileSize - reflAbsOff;
-        if (!ParseReflection(ptr + reflAbsOff, maxReflLen, &blob)) {
-          LOGE("PrecompiledShaderCache: Failed to parse reflection for entry %u", i);
-          return false;
-        }
-      }
-    }
-
-    HashKey key{hashHi, hashLo};
-    entries[key] = std::move(blob);
-  }
-
-  LOGI("PrecompiledShaderCache: Loaded %u entries from %s (format v%u%s)", entryCount, path.c_str(),
-       formatVersion, hasReflection ? ", with reflection" : "");
+  LOGI("PrecompiledShaderCache: Loaded %u vert + %u frag entries from %s (format v%u)",
+       vertPoolCount, fragPoolCount, path.c_str(), formatVersion);
   return true;
 }
 
-const ShaderBlob* PrecompiledShaderCache::find(uint64_t hashHi, uint64_t hashLo) const {
+const ShaderStageBlob* PrecompiledShaderCache::findVertex(uint64_t hashHi, uint64_t hashLo) const {
   HashKey key{hashHi, hashLo};
-  auto it = entries.find(key);
-  if (it == entries.end()) {
+  auto it = vertEntries.find(key);
+  if (it == vertEntries.end()) {
+    return nullptr;
+  }
+  return &it->second;
+}
+
+const ShaderStageBlob* PrecompiledShaderCache::findFragment(uint64_t hashHi,
+                                                            uint64_t hashLo) const {
+  HashKey key{hashHi, hashLo};
+  auto it = fragEntries.find(key);
+  if (it == fragEntries.end()) {
     return nullptr;
   }
   return &it->second;

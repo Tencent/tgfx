@@ -19,16 +19,19 @@
 #pragma once
 
 #include <cstdint>
-#include <string>
 #include <vector>
 #include "BundleWriter.h"
 
 namespace tgfx {
 
+struct ReflectionResult {
+  StageReflectionData vertexReflection;
+  StageReflectionData fragmentReflection;
+};
+
 /// Extracts reflection data (uniform block members and samplers) from compiled SPIR-V binaries
-/// using spirv-cross. The extracted information is used to populate the ReflectionData in the
-/// shader bundle, enabling the runtime to reconstruct UniformData without recompilation.
-ReflectionData ExtractReflection(const std::vector<uint32_t>& vertexSPIRV,
-                                 const std::vector<uint32_t>& fragmentSPIRV);
+/// using spirv-cross. Returns per-stage reflection data for vertex and fragment shaders.
+ReflectionResult ExtractReflection(const std::vector<uint32_t>& vertexSPIRV,
+                                   const std::vector<uint32_t>& fragmentSPIRV);
 
 }  // namespace tgfx

@@ -105,22 +105,22 @@ static std::vector<UniformEntry> ExtractSamplers(spirv_cross::Compiler& compiler
   return result;
 }
 
-ReflectionData ExtractReflection(const std::vector<uint32_t>& vertexSPIRV,
-                                 const std::vector<uint32_t>& fragmentSPIRV) {
-  ReflectionData reflection;
+ReflectionResult ExtractReflection(const std::vector<uint32_t>& vertexSPIRV,
+                                   const std::vector<uint32_t>& fragmentSPIRV) {
+  ReflectionResult result;
 
   if (!vertexSPIRV.empty()) {
     spirv_cross::Compiler vertCompiler(vertexSPIRV);
-    reflection.vertexUniforms = ExtractUBOMembers(vertCompiler, "VertexUniformBlock");
+    result.vertexReflection.uniforms = ExtractUBOMembers(vertCompiler, "VertexUniformBlock");
   }
 
   if (!fragmentSPIRV.empty()) {
     spirv_cross::Compiler fragCompiler(fragmentSPIRV);
-    reflection.fragmentUniforms = ExtractUBOMembers(fragCompiler, "FragmentUniformBlock");
-    reflection.samplers = ExtractSamplers(fragCompiler);
+    result.fragmentReflection.uniforms = ExtractUBOMembers(fragCompiler, "FragmentUniformBlock");
+    result.fragmentReflection.samplers = ExtractSamplers(fragCompiler);
   }
 
-  return reflection;
+  return result;
 }
 
 }  // namespace tgfx

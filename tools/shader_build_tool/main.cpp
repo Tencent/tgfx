@@ -204,7 +204,8 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
         variant.profileTag = backend;
         variant.vertexBlob = std::move(vertBlob);
         variant.fragmentBlob = std::move(fragBlob);
-        variant.reflection = reflection;
+        variant.vertexReflection = reflection.vertexReflection;
+        variant.fragmentReflection = reflection.fragmentReflection;
         outVariants->push_back(std::move(variant));
       }
     }
