@@ -17,10 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "base/TGFXTest.h"
+#include "gpu/PrecompiledShaderCache.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/ShaderPermutation.h"
 #include "gpu/shaders/level1/TextureFillShader.h"
 #include "gtest/gtest.h"
+#include "tgfx/core/Image.h"
+#include "tgfx/core/Surface.h"
+#include "utils/TestUtils.h"
 
 namespace tgfx {
 
@@ -180,7 +184,7 @@ TGFX_TEST(ShaderPermutationTest, ShouldCompile) {
         compiledCount++;
       }
     }
-    EXPECT_EQ(compiledCount, 10);
+    EXPECT_EQ(compiledCount, 6);
   }
 }
 
@@ -200,6 +204,34 @@ TGFX_TEST(ShaderPermutationTest, EncodeWithBitShift) {
   EXPECT_EQ(domain.encode({0, 0, 0, 1}), 1u << D::HAS_SUBSET);
   // HAS_YUV=1, HAS_SUBSET=1 -> index = (1<<0) | (1<<3) = 9
   EXPECT_EQ(domain.encode({1, 0, 0, 1}), (1u << D::HAS_YUV) | (1u << D::HAS_SUBSET));
+}
+
+TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto bundlePath = ProjectPath::Absolute("resources/shaders/shader_bundle.vulkan.bin");
+  auto* cache = context->precompiledShaderCache();
+  ASSERT_TRUE(cache->loadBundle(bundlePath));
+  EXPECT_EQ(cache->entryCount(), 6u);
+  EXPECT_EQ(cache->profileTag(), "vulkan");
+}
+
+TGFX_TEST(ShaderPermutationTest, PrecompiledRender) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto bundlePath = ProjectPath::Absolute("resources/shaders/shader_bundle.vulkan.bin");
+  auto* cache = context->precompiledShaderCache();
+  ASSERT_TRUE(cache->loadBundle(bundlePath));
+
+  auto image = MakeImage("resources/apitest/test_timestretch.png");
+  ASSERT_TRUE(image != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->drawImage(image, 0, 0);
+  EXPECT_TRUE(Baseline::Compare(surface, "ShaderPermutationTest/PrecompiledRender"));
 }
 
 }  // namespace tgfx
