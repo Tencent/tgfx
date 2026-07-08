@@ -230,9 +230,11 @@ void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const Matrix& matrix
 
 bool OpsCompositor::shouldUseStencilCover(const Brush& brush) const {
 #ifndef TGFX_ENABLE_STENCIL_COVER_PATH
-  // Compile-time master switch: the stencil-and-cover renderer is fully disabled at build
-  // configuration time. Everything downstream (dispatch, tessellator, draw op) is compiled
-  // out of the hot path so there is zero runtime overhead when disabled.
+  // Compile-time master switch: shouldUseStencilCover returns false unconditionally when
+  // TGFX_ENABLE_STENCIL_COVER_PATH is off, which removes the only caller of the stencil-cover
+  // dispatch path (drawStencilCoverPath) and yields zero runtime overhead. The stencil-cover
+  // support files (tessellator, draw op, GPs, upload task) are still pulled in by the CMake
+  // GLOB and rely on the linker's dead-code stripping to drop them from the final binary.
   USE(brush);
   return false;
 #else
