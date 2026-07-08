@@ -184,15 +184,34 @@ std::optional<Rect> Canvas::getTotalClipBounds() const {
 }
 
 void Canvas::clipRect(const Rect& rect, bool antiAlias) {
-  Path path = {};
-  path.addRect(rect);
-  clipPath(path, antiAlias);
+  clipStack->clipRect(rect, _matrix, antiAlias);
+}
+
+void Canvas::clipRRect(const RRect& rRect, bool antiAlias) {
+  clipStack->clipRRect(rRect, _matrix, antiAlias);
 }
 
 void Canvas::clipPath(const Path& path, bool antiAlias) {
-  auto clipPath = path;
-  clipPath.transform(_matrix);
-  clipStack->clip(clipPath, antiAlias);
+  if (path.isInverseFillType()) {
+    // Inverse-fill paths cannot be expressed as a simple rect/rrect clip, so fall back to path.
+    clipStack->clipPath(path, _matrix, antiAlias);
+    return;
+  }
+
+  if (Rect rect = {}; path.isRect(&rect)) {
+    clipStack->clipRect(rect, _matrix, antiAlias);
+    return;
+  }
+  // Ovals and general RRects are treated as separate types, so handle ovals separately.
+  if (Rect ovalBounds = {}; path.isOval(&ovalBounds)) {
+    clipStack->clipRRect(RRect::MakeOval(ovalBounds), _matrix, antiAlias);
+    return;
+  }
+  if (RRect rRect = {}; path.isRRect(&rRect)) {
+    clipStack->clipRRect(rRect, _matrix, antiAlias);
+    return;
+  }
+  clipStack->clipPath(path, _matrix, antiAlias);
 }
 
 void Canvas::resetStateStack() {

@@ -17,10 +17,117 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ClipStack.h"
+#include <algorithm>
+#include "RRectUtils.h"
 #include "core/utils/Log.h"
 #include "core/utils/UniqueID.h"
 
 namespace tgfx {
+
+using ShapeType = GeometryShape::Type;
+
+// A non-AA coordinate whose fractional part is near 0.5 sits between two pixels, and rasterization
+// may count that pixel as covered or not. Offsetting the coordinate away from the halfway point
+// before rounding biases the resulting bound to the safe side, so the ambiguous pixel is
+// deliberately included or excluded, with actual coverage still decided by the GPU. AA uses
+// floor/ceil and needs no offset.
+static constexpr float HALF_PIXEL_ROUNDING_TOLERANCE = 5e-2f;
+
+// A mapped point's w' is 0 on the camera plane, negative behind it, and a tiny positive value just
+// in front of it makes the divided coordinates blow up. A w' below this small positive threshold
+// therefore covers all the cases where perspective division no longer yields a usable position.
+static constexpr float W0_PLANE_DISTANCE = 1.f / (1 << 14);
+
+// Rounds a coordinate down to the pixel grid (floor-like), moving it in the negative direction.
+static inline float RoundPixelLow(float v, bool antiAlias) {
+  v += CLIP_BOUNDS_TOLERANCE;
+  return antiAlias ? floorf(v) : roundf(v - HALF_PIXEL_ROUNDING_TOLERANCE);
+}
+
+// Rounds a coordinate up to the pixel grid (ceil-like), moving it in the positive direction.
+static inline float RoundPixelHigh(float v, bool antiAlias) {
+  v -= CLIP_BOUNDS_TOLERANCE;
+  return antiAlias ? ceilf(v) : roundf(v + HALF_PIXEL_ROUNDING_TOLERANCE);
+}
+
+// Converts analytic shape bounds to an integer pixel box for the given AA mode.
+// exterior: tight cover of pixels that may get non-zero coverage.
+// interior: largest set of pixels guaranteed fully covered.
+static Rect GetPixelBounds(const Rect& bounds, bool antiAlias, bool exterior) {
+  if (bounds.isEmpty()) {
+    return Rect::MakeEmpty();
+  }
+  if (exterior) {
+    return Rect::MakeLTRB(
+        RoundPixelLow(bounds.left, antiAlias), RoundPixelLow(bounds.top, antiAlias),
+        RoundPixelHigh(bounds.right, antiAlias), RoundPixelHigh(bounds.bottom, antiAlias));
+  }
+  return Rect::MakeLTRB(
+      RoundPixelHigh(bounds.left, antiAlias), RoundPixelHigh(bounds.top, antiAlias),
+      RoundPixelLow(bounds.right, antiAlias), RoundPixelLow(bounds.bottom, antiAlias));
+}
+
+// Conservative containment test: returns true only when the shape provably contains the rect.
+// A false result may just mean containment could not be decided cheaply, not that it fails.
+static bool ShapeContainsRect(const GeometryShape& shape, const Matrix& shapeToDevice,
+                              const Rect& rect, const Matrix& rectToDevice, bool mixedAA) {
+  if (!shape.convex()) {
+    // Containment against a concave shape has no cheap test.
+    return false;
+  }
+
+  Matrix deviceToShape = {};
+  if (!shapeToDevice.invert(&deviceToShape)) {
+    // Clip element matrices are always invertible, so this should never happen.
+    DEBUG_ASSERT(false);
+    return false;
+  }
+
+  if (!mixedAA && shapeToDevice == rectToDevice) {
+    // Both live in the same coordinate space, so compare their shapes directly without mapping.
+    return shape.conservativeContains(rect);
+  }
+  if (rectToDevice.isIdentity() && shapeToDevice.rectStaysRect()) {
+    // The rect is already in device space and shapeToDevice preserves the rect shape, so mapping
+    // the rect into the shape's space keeps it an axis-aligned rect and containment is a direct
+    // rect test.
+    auto rectInShape = rect;
+    if (mixedAA) {
+      rectInShape.outset(0.5f, 0.5f);
+    }
+    deviceToShape.mapRect(&rectInShape);
+    return shape.conservativeContains(rectInShape);
+  }
+
+  if (mixedAA) {
+    // Under mixedAA the rect needs a half-pixel expansion, which must offset each mapped quad edge
+    // along its normal and cannot be done by a simple outset here, so conservatively report
+    // "not contained".
+    // TODO: Reuse core-level per-edge quad outsetting (as in AAQuadsVertexProvider) for this test.
+    return false;
+  }
+
+  // The shape is convex here, so it contains the rect once it contains all four corners.
+  const Point localCorners[4] = {{rect.left, rect.top},
+                                 {rect.right, rect.top},
+                                 {rect.right, rect.bottom},
+                                 {rect.left, rect.bottom}};
+  for (const auto& localCorner : localCorners) {
+    const auto h = rectToDevice.mapHomogeneous(localCorner.x, localCorner.y, 1.0f);
+    if (h.z < W0_PLANE_DISTANCE) {
+      // h.z carries the mapped w; below the threshold perspective division no longer gives a
+      // dependable device position, so the shape cannot reliably contain the rect.
+      return false;
+    }
+    const auto invW = 1.0f / h.z;
+    // This is a conservative containment test, so the w of deviceToShape's mapping is not
+    // re-checked when mapping the corner back into the shape's space.
+    if (!shape.contains(deviceToShape.mapXY(h.x * invW, h.y * invW))) {
+      return false;
+    }
+  }
+  return true;
+}
 
 /**
  * Describes which clip elements to keep when combining two clip elements.
@@ -41,17 +148,30 @@ enum class ClipGeometry {
  * are equivalent.
  */
 static ClipGeometry ResolveClipGeometry(const ClipElement& a, const ClipElement& b) {
-  if (!a.looseIntersects(b)) {
+  // A mixed normal/inverse pair is disjoint only when the normal element lies entirely inside the
+  // inverse-fill path's removed region.
+  const bool aInverse = a.shape().isPath() && a.shape().path().isInverseFillType();
+  const bool bInverse = b.shape().isPath() && b.shape().path().isInverseFillType();
+  if (aInverse != bInverse) {
+    const auto& inv = aInverse ? a : b;
+    const auto& normal = aInverse ? b : a;
+    // normal.outerBounds() is in device space, so map the inverse path to device space too.
+    auto restoredInvPath = inv.getDevicePath();
+    restoredInvPath.toggleInverseFillType();
+    if (restoredInvPath.contains(normal.outerBounds())) {
+      return ClipGeometry::Empty;
+    }
+  }
+  // Two normal elements are disjoint when their bounds do not intersect. Two inverse-fill paths
+  // always keep overlapping regions, so their intersection is never empty.
+  if (!Rect::Intersects(a.outerBounds(), b.outerBounds())) {
     return ClipGeometry::Empty;
   }
-  if (b.tightContains(a)) {
+
+  if (b.contains(a)) {
     return ClipGeometry::AOnly;
   }
-  if (a.tightContains(b)) {
-    return ClipGeometry::BOnly;
-  }
-  // Fallback for equivalent paths whose containment cannot be proven by bounds checks.
-  if (a.path().isSame(b.path()) && a.isAntiAlias() == b.isAntiAlias()) {
+  if (a.contains(b)) {
     return ClipGeometry::BOnly;
   }
   return ClipGeometry::Both;
@@ -80,92 +200,261 @@ static void UpdateElements(ClipElement& existing, ClipElement& toAdd, const Clip
       // and potentially optimize with more elements in the stack.
       if (toAdd.tryCombine(existing)) {
         existing.markInvalid(static_cast<int>(record.startIndex));
+        if (toAdd.shape().isEmpty()) {
+          toAdd.markInvalid(static_cast<int>(record.startIndex));
+        }
       }
       break;
   }
 }
 
-ClipElement::ClipElement(const Path& path, bool antiAlias) : _path(path), _antiAlias(antiAlias) {
-  if (path.isInverseFillType()) {
-    _bounds = Rect::MakeLTRB(-FLT_MAX, -FLT_MAX, FLT_MAX, FLT_MAX);
-    return;
-  }
-
-  _bounds = path.getBounds();
-  _isRect = path.isRect(nullptr);
+ClipElement::ClipElement() : _shape(Rect::MakeEmpty()) {
 }
 
-bool ClipElement::tightContains(const ClipElement& other) const {
-  auto thisInverse = _path.isInverseFillType();
-  auto otherInverse = other._path.isInverseFillType();
-  if (thisInverse && otherInverse) {
-    // Containment of complements flips direction: this contains other when
-    // this's shape is inside other's shape.
-    return other._path.contains(_path.getBounds());
-  }
-  if (thisInverse) {
-    // This's complement contains other only when this's shape is disjoint from other's bounds.
-    return !Rect::Intersects(_path.getBounds(), other._bounds);
-  }
-  if (otherInverse) {
-    // A bounded region cannot contain a near-full-plane region.
-    return false;
-  }
-  if (_isRect) {
-    return _bounds.contains(other._bounds);
-  }
-  return _path.contains(other._bounds);
+ClipElement::ClipElement(const GeometryShape& shape, const Matrix& matrix, bool antiAlias)
+    : _shape(shape), _matrix(matrix), _antiAlias(antiAlias) {
+  simplify();
 }
 
-bool ClipElement::looseIntersects(const ClipElement& other) const {
-  auto thisInverse = _path.isInverseFillType();
-  auto otherInverse = other._path.isInverseFillType();
-  if (thisInverse && otherInverse) {
-    // Two near-full-plane regions always overlap.
-    return true;
+ClipState ClipElement::clipState() const {
+  switch (_shape.type()) {
+    case ShapeType::Empty:
+      return ClipState::Empty;
+    case ShapeType::Rect:
+      return _matrix.isIdentity() ? ClipState::Rect : ClipState::Complex;
+    case ShapeType::RRect:
+    case ShapeType::Path:
+      return ClipState::Complex;
   }
-  if (!thisInverse && !otherInverse) {
-    return Rect::Intersects(_bounds, other._bounds);
+}
+
+Path ClipElement::getDevicePath() const {
+  auto path = _shape.asPath();
+  if (!_matrix.isIdentity()) {
+    path.transform(_matrix);
   }
-  // Exactly one is inverse: the two regions are disjoint only when the non-inverse
-  // side lies entirely inside the inverse side's removed shape.
-  const auto& inversePath = thisInverse ? _path : other._path;
-  const auto& boundedRect = thisInverse ? other._bounds : _bounds;
-  return !inversePath.contains(boundedRect);
+  return path;
 }
 
 bool ClipElement::tryCombine(const ClipElement& other) {
-  if (!_isRect || !other._isRect) {
-    return false;
+  // Combining an empty element with any other always succeeds, yielding an empty element.
+  if (_shape.isEmpty()) {
+    return true;
   }
-  // Pixel-aligned rect has sharp edges regardless of AA setting, so we can ignore its AA type.
-  auto thisPixelAligned = isPixelAligned();
-  auto otherPixelAligned = other.isPixelAligned();
-  if (!thisPixelAligned && !otherPixelAligned && _antiAlias != other._antiAlias) {
-    return false;
+  if (other._shape.isEmpty()) {
+    _shape.setEmpty();
+    return true;
   }
-  auto combined = _bounds;
-  if (!combined.intersect(other._bounds)) {
+  // A Path element or a matrix mismatch prevents combining the two elements cheaply.
+  if (_shape.type() == ShapeType::Path || other._shape.type() == ShapeType::Path ||
+      _matrix != other._matrix) {
     return false;
   }
 
-  _bounds = combined;
-  _path = Path();
-  _path.addRect(combined);
-  // Use the non-pixel-aligned element's AA type.
-  if (thisPixelAligned) {
-    _antiAlias = other._antiAlias;
+  // Case 1: Rect + Rect.
+  if (_shape.type() == ShapeType::Rect && other._shape.type() == ShapeType::Rect) {
+    if (_antiAlias != other._antiAlias) {
+      if (!_matrix.isIdentity()) {
+        // Non-identity matrix means the rect may not be axis-aligned in device space, so the two
+        // cannot be merged.
+        return false;
+      }
+
+      if (IsClipPixelAligned(_shape.rect())) {
+        // Case 1a: this is pixel-aligned so AA has no visual effect, adopt other's AA flag.
+        _antiAlias = other._antiAlias;
+      } else if (!IsClipPixelAligned(other._shape.rect())) {
+        // Case 1b: neither side is pixel-aligned and AA flags differ, cannot merge.
+        return false;
+      }
+      // Case 1c: other is pixel-aligned, its AA flag is irrelevant, keep this->_antiAlias.
+    }
+
+    auto rect = _shape.rect();
+    if (!rect.intersect(other._shape.rect())) {
+      _shape.setEmpty();
+      return true;
+    }
+    _shape.setRect(rect);
+  } else {
+    // Case 2: Rect + RRect / RRect + RRect.
+    DEBUG_ASSERT(_shape.type() == ShapeType::Rect || _shape.type() == ShapeType::RRect);
+    DEBUG_ASSERT(other._shape.type() == ShapeType::Rect || other._shape.type() == ShapeType::RRect);
+    // RRect has curved arcs at corners where AA always affects visual output, so unlike Rect there
+    // is no pixel-aligned exemption. AA flags must match exactly.
+    if (_antiAlias != other._antiAlias) {
+      return false;
+    }
+
+    const auto thisRRect =
+        _shape.type() == ShapeType::Rect ? RRect::MakeRect(_shape.rect()) : _shape.rRect();
+    const auto otherRRect = other._shape.type() == ShapeType::Rect
+                                ? RRect::MakeRect(other._shape.rect())
+                                : other._shape.rRect();
+    const auto mergedRRect = RRectUtils::ConservativeIntersect(thisRRect, otherRRect);
+    if (!mergedRRect.has_value()) {
+      // The intersection cannot be represented as a single RRect (e.g., incompatible corner radii
+      // or radii overflow), so we cannot merge the two elements.
+      return false;
+    }
+
+    if (mergedRRect->rect().isEmpty()) {
+      _shape.setEmpty();
+      return true;
+    }
+
+    if (mergedRRect->type() == RRect::Type::Rect) {
+      _shape.setRect(mergedRRect->rect());
+    } else {
+      _shape.setRRect(*mergedRRect);
+    }
+  }
+
+  // The combined bounds can be computed by intersecting the existing bounds directly, avoiding
+  // the full recomputation in updateOuterInnerBounds(). The outerBounds intersection cannot fail
+  // because empty intersections are already handled above.
+  DEBUG_ASSERT_RESULT(_outerBounds.intersect(other._outerBounds));
+  if (!_innerBounds.intersect(other._innerBounds)) {
+    // This can happen when an RRect with asymmetric radii causes InnerBounds to pick a narrow
+    // strip strategy that does not cover the other element's inner region. E.g., RRect(LTRB)
+    // [0,0,300,200] with radii TL(10,90) TR(10,90) BR(20,90) BL(10,90) and Rect [280,0,300,100].
+    _innerBounds = Rect::MakeEmpty();
   }
   return true;
 }
 
+bool ClipElement::contains(const ClipElement& other) const {
+  // The empty region is contained by anything, but contains nothing except another empty region.
+  if (other._shape.type() == ShapeType::Empty) {
+    return true;
+  }
+  if (_shape.type() == ShapeType::Empty) {
+    return false;
+  }
+
+  // If this element's guaranteed-fill region already covers the other's largest possible fill
+  // region, this element contains the other.
+  if (_innerBounds.contains(other._outerBounds)) {
+    return true;
+  }
+
+  // Inverse-fill paths keep the region OUTSIDE their bounds, so the normal bounds-containment logic
+  // does not apply and they are handled separately.
+  if (_shape.type() == ShapeType::Path && _shape.path().isInverseFillType()) {
+    if (other._shape.type() == ShapeType::Path && other._shape.path().isInverseFillType()) {
+      // When this path's removed region lies inside the other's, this path's keep region contains
+      // the other's.
+      return other.getDevicePath().contains(getDevicePath().getBounds());
+    }
+    // This inverse-fill path contains a normal element only when its removed region does not
+    // intersect the normal element's keep region.
+    return !Rect::Intersects(getDevicePath().getBounds(), other._outerBounds);
+  }
+  if (other._shape.type() == ShapeType::Path && other._shape.path().isInverseFillType()) {
+    // A normal element cannot contain the near-full-plane keep-region of an inverse-fill path.
+    return false;
+  }
+
+  // When matrix and AA flag match, the two shapes live in the same space and round their edges the
+  // same way, so they can be compared directly. This is cheaper than the fallback below and, for
+  // rounded or non-rect shapes, more accurate, since the fallback compares against the other's
+  // bounding box.
+  if (_antiAlias == other._antiAlias && _matrix == other._matrix) {
+    if (_shape.type() == ShapeType::RRect && other._shape.type() == ShapeType::RRect) {
+      const auto intersected =
+          RRectUtils::ConservativeIntersect(_shape.rRect(), other._shape.rRect());
+      if (intersected.has_value()) {
+        // Strict equality, ignoring floating-point tolerance.
+        return *intersected == other._shape.rRect();
+      }
+    }
+    if (_shape.type() == ShapeType::Path && other._shape.type() == ShapeType::Path) {
+      return _shape.path().isSame(other._shape.path());
+    }
+  }
+
+  return ShapeContainsRect(_shape, _matrix, other._shape.bounds(), other._matrix,
+                           _antiAlias != other._antiAlias);
+}
+
 void ClipElement::transform(const Matrix& matrix) {
-  _path.transform(matrix);
-  if (_path.isInverseFillType()) {
+  _matrix.postConcat(matrix);
+  simplify();
+}
+
+void ClipElement::simplify() {
+  // First reduce the shape to its simplest type (e.g. a rect-shaped path becomes a Rect), so the
+  // matrix folding below can apply to the degenerated rect/rrect.
+  _shape.simplify();
+  if (_shape.isEmpty()) {
     return;
   }
-  _bounds = _path.getBounds();
-  _isRect = _path.isRect(nullptr);
+
+  // For a Rect or RRect under an axis-aligned matrix, fold the matrix into the geometry and reset
+  // it to identity, simplifying later computations. Other cases keep the matrix on the element.
+  if (_shape.type() == ShapeType::Rect && _matrix.rectStaysRect()) {
+    _shape.setRect(_matrix.mapRect(_shape.rect()));
+    _matrix.setIdentity();
+  } else if (_shape.type() == ShapeType::RRect && _matrix.rectStaysRect()) {
+    auto transformed = RRectUtils::TryAxisAlignedTransform(_shape.rRect(), _matrix);
+    DEBUG_ASSERT(transformed.has_value());
+    if (transformed.has_value()) {
+      _matrix.setIdentity();
+      if (transformed->type() == RRect::Type::Rect) {
+        _shape.setRect(transformed->rect());
+      } else {
+        _shape.setRRect(*transformed);
+      }
+    }
+  }
+
+  updateOuterInnerBounds();
+
+  // This can happen for a sub-pixel non-AA rect that covers no pixel center. Covering no pixel
+  // makes it equivalent to an empty clip, so mark it empty.
+  if (_outerBounds.isEmpty()) {
+    _shape.setEmpty();
+    _innerBounds = Rect::MakeEmpty();
+  }
+}
+
+void ClipElement::updateOuterInnerBounds() {
+  if (_shape.type() == ShapeType::Empty) {
+    _outerBounds = Rect::MakeEmpty();
+    _innerBounds = Rect::MakeEmpty();
+    return;
+  }
+  // An inverse-fill path keeps the region OUTSIDE its geometry, so its outer bound is the whole
+  // plane regardless of the matrix.
+  if (_shape.type() == ShapeType::Path && _shape.path().isInverseFillType()) {
+    _outerBounds = Rect::MakeLTRB(-FLT_MAX, -FLT_MAX, FLT_MAX, FLT_MAX);
+    _innerBounds = Rect::MakeEmpty();
+    return;
+  }
+
+  Rect outer = _matrix.mapRect(_shape.bounds());
+  if (_shape.type() == ShapeType::Rect && _matrix.isIdentity() && !_antiAlias) {
+    // A non-AA axis-aligned rect maps exactly onto the integer pixel grid, so rounding it gives a
+    // single rect that is both the outer and inner bound. Setting them equal lets the clip run as a
+    // pure hardware scissor, skipping the half-pixel expansion GetPixelBounds applies for
+    // conservative bounds (which would otherwise split inner and outer by up to a pixel).
+    _outerBounds = outer;
+    _outerBounds.round();
+    _innerBounds = _outerBounds;
+  } else {
+    _outerBounds = GetPixelBounds(outer, _antiAlias, true);
+    if (_shape.type() == ShapeType::Rect && _matrix.isIdentity()) {
+      _innerBounds = GetPixelBounds(outer, _antiAlias, false);
+    } else if (_shape.type() == ShapeType::RRect && _matrix.isIdentity()) {
+      // Identity-matrix RRect: compute the largest inscribed rectangle that avoids the corners.
+      _innerBounds = GetPixelBounds(RRectUtils::InnerBounds(_shape.rRect()), _antiAlias, false);
+    } else {
+      // For non-identity matrices the mapped bounding box is not a reliable inner bound (the actual
+      // shape may not fill the entire box), and for Path types the inner region cannot be computed
+      // cheaply. Fall back to empty.
+      _innerBounds = Rect::MakeEmpty();
+    }
+  }
 }
 
 ClipRecord::ClipRecord() : uniqueID(UniqueID::Next()) {
@@ -178,9 +467,9 @@ ClipData::ClipData() {
 ClipStack::ClipStack() : _data(std::make_shared<ClipData>()) {
 }
 
-void ClipStack::clip(const Path& path, bool antiAlias) {
+void ClipStack::clipShape(GeometryShape&& shape, const Matrix& matrix, bool antiAlias) {
   bool didSave = willModify();
-  ClipElement toAdd(path, antiAlias);
+  ClipElement toAdd(std::move(shape), matrix, antiAlias);
   if (addElement(std::move(toAdd)) || !didSave) {
     return;
   }
@@ -188,6 +477,18 @@ void ClipStack::clip(const Path& path, bool antiAlias) {
   // So instead of keeping an empty save record around, pop it off and restore the counter.
   _data->records.pop();
   current().pushSave();
+}
+
+void ClipStack::clipPath(const Path& path, const Matrix& matrix, bool antiAlias) {
+  clipShape(GeometryShape(path), matrix, antiAlias);
+}
+
+void ClipStack::clipRect(const Rect& rect, const Matrix& matrix, bool antiAlias) {
+  clipShape(GeometryShape(rect), matrix, antiAlias);
+}
+
+void ClipStack::clipRRect(const RRect& rRect, const Matrix& matrix, bool antiAlias) {
+  clipShape(GeometryShape(rRect), matrix, antiAlias);
 }
 
 void ClipStack::save() {
@@ -246,7 +547,7 @@ bool ClipStack::addElement(ClipElement&& toAdd) {
     // Already empty, adding more clips won't change anything.
     return false;
   }
-  if (toAdd.bounds().isEmpty()) {
+  if (toAdd.shape().isEmpty()) {
     cur.state = ClipState::Empty;
     cur.uniqueID = UniqueID::Next();
     return true;
@@ -259,7 +560,7 @@ bool ClipStack::addElement(ClipElement&& toAdd) {
   // can handle containment and intersection against toAdd uniformly.
   Path curBoundsPath = {};
   curBoundsPath.addRect(cur.bounds);
-  const ClipElement curElement(curBoundsPath, false);
+  const ClipElement curElement(GeometryShape(curBoundsPath), Matrix::I(), false);
   switch (ResolveClipGeometry(curElement, toAdd)) {
     case ClipGeometry::Empty:
       cur.state = ClipState::Empty;
@@ -281,8 +582,8 @@ bool ClipStack::addElement(ClipElement&& toAdd) {
 void ClipStack::replaceWithElement(ClipElement&& toAdd) {
   auto& cur = current();
   _data->elements.resize(cur.startIndex);
-  cur.bounds = toAdd.bounds();
-  cur.state = toAdd.isRect() ? ClipState::Rect : ClipState::Complex;
+  cur.bounds = toAdd.outerBounds();
+  cur.state = toAdd.clipState();
   _data->elements.push_back(std::move(toAdd));
   cur.oldestValidIndex = _data->elements.size() - 1;
   cur.uniqueID = UniqueID::Next();
@@ -328,10 +629,9 @@ bool ClipStack::appendElement(ClipElement&& toAdd) {
 
   // If oldestValidIdx remains unchanged, all existing elements are invalid, so the clip state
   // depends solely on the new element. Must be checked before modifying _data->elements.
-  cur.state = (oldestValidIdx == _data->elements.size() && toAdd.isRect()) ? ClipState::Rect
-                                                                           : ClipState::Complex;
+  cur.state = (oldestValidIdx == _data->elements.size()) ? toAdd.clipState() : ClipState::Complex;
   cur.oldestValidIndex = std::min(oldestValidIdx, oldestActiveInvalidIdx);
-  cur.bounds.intersect(toAdd.bounds());
+  cur.bounds.intersect(toAdd.outerBounds());
   cur.uniqueID = UniqueID::Next();
 
   _data->elements.resize(targetEndIdx);
@@ -362,7 +662,7 @@ Path ClipStack::getClipPath() const {
   for (size_t i = oldestValidIndex(); i < elems.size(); ++i) {
     const auto& element = elems[i];
     if (element.isValid()) {
-      result.addPath(element.path(), PathOp::Intersect);
+      result.addPath(element.getDevicePath(), PathOp::Intersect);
     }
   }
   return result;
