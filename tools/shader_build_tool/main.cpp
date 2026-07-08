@@ -20,9 +20,11 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <sstream>
 #include <string>
 #include <vector>
+#include "BundleWriter.h"
 #include "ShaderCompiler.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/level1/TextureFillShader.h"
@@ -45,6 +47,7 @@ struct ShaderReport {
 
 struct BuildReport {
   std::vector<ShaderReport> shaders;
+  std::vector<VariantData> variants;
   bool hasErrors = false;
   std::string errorMessage;
 };
@@ -107,7 +110,8 @@ static std::string ReadFileContents(const std::string& path) {
 }
 
 static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info,
-                                     const BuildOptions& options) {
+                                     const BuildOptions& options,
+                                     std::vector<VariantData>* outVariants) {
   ShaderReport report;
   report.name = info.name;
   auto domain = info.domain;
@@ -157,14 +161,26 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info,
           report.errorCount++;
           continue;
         }
-        if (backend == "metal") {
+
+        std::vector<uint8_t> vertBlob;
+        std::vector<uint8_t> fragBlob;
+
+        if (backend == "vulkan") {
+          auto* vp = reinterpret_cast<const uint8_t*>(vertResult.spirv.data());
+          vertBlob.assign(vp, vp + vertResult.spirv.size() * 4);
+          auto* fp = reinterpret_cast<const uint8_t*>(fragResult.spirv.data());
+          fragBlob.assign(fp, fp + fragResult.spirv.size() * 4);
+        } else if (backend == "metal") {
           auto mslVert = TranslateToMSL(vertResult.spirv);
           auto mslFrag = TranslateToMSL(fragResult.spirv);
           if (!mslVert.success || !mslFrag.success) {
             std::cerr << "  MSL translation error: "
                       << (mslVert.success ? mslFrag.error : mslVert.error) << "\n";
             report.errorCount++;
+            continue;
           }
+          vertBlob.assign(mslVert.msl.begin(), mslVert.msl.end());
+          fragBlob.assign(mslFrag.msl.begin(), mslFrag.msl.end());
         } else if (backend == "webgpu") {
           auto wgslVert = TranslateToWGSL(vertResult.spirv);
           auto wgslFrag = TranslateToWGSL(fragResult.spirv);
@@ -172,8 +188,19 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info,
             std::cerr << "  WGSL translation error: "
                       << (wgslVert.success ? wgslFrag.error : wgslVert.error) << "\n";
             report.errorCount++;
+            continue;
           }
+          vertBlob.assign(wgslVert.wgsl.begin(), wgslVert.wgsl.end());
+          fragBlob.assign(wgslFrag.wgsl.begin(), wgslFrag.wgsl.end());
         }
+
+        VariantData variant;
+        variant.shaderName = info.name;
+        variant.permutationIndex = i;
+        variant.profileTag = backend;
+        variant.vertexBlob = std::move(vertBlob);
+        variant.fragmentBlob = std::move(fragBlob);
+        outVariants->push_back(std::move(variant));
       }
     }
   }
@@ -224,14 +251,35 @@ int main(int argc, char** argv) {
   for (const auto& factory : factories) {
     auto shader = factory();
     auto info = shader->info();
-    auto shaderReport = tgfx::CompileOneShader(info, options);
+    auto shaderReport = tgfx::CompileOneShader(info, options, &report.variants);
     std::cout << "[" << shaderReport.name << "] raw=" << shaderReport.rawCount
-              << " compiled=" << shaderReport.compiledCount << "\n";
+              << " compiled=" << shaderReport.compiledCount;
+    if (shaderReport.errorCount > 0) {
+      std::cout << " errors=" << shaderReport.errorCount;
+    }
+    std::cout << "\n";
     report.shaders.push_back(std::move(shaderReport));
   }
 
   if (!tgfx::WriteReportJson(report, options.outDir)) {
     return 1;
+  }
+
+  // Write bundle files grouped by backend (profileTag)
+  if (!options.reportOnly && !report.variants.empty()) {
+    std::map<std::string, std::vector<tgfx::VariantData>> byBackend;
+    for (auto& v : report.variants) {
+      byBackend[v.profileTag].push_back(std::move(v));
+    }
+    for (const auto& pair : byBackend) {
+      std::string filename = "shader_bundle." + pair.first + ".bin";
+      std::string path = options.outDir + "/" + filename;
+      if (!tgfx::WriteBundle(path, pair.first, pair.second)) {
+        std::cerr << "Failed to write bundle: " << path << "\n";
+        return 1;
+      }
+      std::cout << "Bundle written: " << filename << " (" << pair.second.size() << " entries)\n";
+    }
   }
 
   return 0;
