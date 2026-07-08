@@ -39,6 +39,7 @@ class AtlasManager;
 class CommandBuffer;
 class ShaderCaps;
 class AtlasStrikeCache;
+class PrecompiledShaderCache;
 class SingleOwner;
 
 /**
@@ -199,6 +200,10 @@ class Context {
     return _atlasStrikeCache;
   }
 
+  PrecompiledShaderCache* precompiledShaderCache() const {
+    return _precompiledShaderCache;
+  }
+
  private:
   std::shared_ptr<DrawingBuffer> getDrawingBuffer(const Recording* recording) const;
 
@@ -211,6 +216,7 @@ class Context {
   ProxyProvider* _proxyProvider = nullptr;
   AtlasManager* _atlasManager = nullptr;
   AtlasStrikeCache* _atlasStrikeCache = nullptr;
+  PrecompiledShaderCache* _precompiledShaderCache = nullptr;
   std::deque<std::shared_ptr<DrawingBuffer>> pendingDrawingBuffers = {};
 
 #if DEBUG

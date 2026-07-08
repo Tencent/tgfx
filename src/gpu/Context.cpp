@@ -25,6 +25,7 @@
 #include "core/utils/SlidingWindowTracker.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/GlobalCache.h"
+#include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ResourceCache.h"
 #include "gpu/ShaderCaps.h"
@@ -46,6 +47,7 @@ Context::Context(Device* device, GPU* gpu) : _device(device), _gpu(gpu) {
   _proxyProvider = new ProxyProvider(this);
   _atlasManager = new AtlasManager(this);
   _atlasStrikeCache = new AtlasStrikeCache();
+  _precompiledShaderCache = new PrecompiledShaderCache();
 }
 
 Context::~Context() {
@@ -56,6 +58,7 @@ Context::~Context() {
   delete _resourceCache;
   delete _shaderCaps;
   delete _atlasStrikeCache;
+  delete _precompiledShaderCache;
 }
 
 Backend Context::backend() const {
