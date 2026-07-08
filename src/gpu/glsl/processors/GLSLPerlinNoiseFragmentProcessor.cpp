@@ -50,21 +50,18 @@ PlacementPtr<PerlinNoiseFragmentProcessor> PerlinNoiseFragmentProcessor::Make(
     return nullptr;
   }
 
-  auto permTex = permutationsView->getTexture();
-  auto noiseTex = noiseView->getTexture();
   return allocator->make<GLSLPerlinNoiseFragmentProcessor>(
-      noiseType, numOctaves, stitchTiles, std::move(paintingData), std::move(permTex),
-      std::move(noiseTex), uvMatrix);
+      noiseType, numOctaves, stitchTiles, std::move(paintingData), std::move(permutationsView),
+      std::move(noiseView), uvMatrix);
 }
 
 GLSLPerlinNoiseFragmentProcessor::GLSLPerlinNoiseFragmentProcessor(
     PerlinNoiseType noiseType, int numOctaves, bool stitchTiles,
     std::unique_ptr<PerlinNoiseShader::PaintingData> paintingData,
-    std::shared_ptr<Texture> permutationsTexture, std::shared_ptr<Texture> noiseTexture,
+    std::shared_ptr<TextureView> permutationsView, std::shared_ptr<TextureView> noiseView,
     const Matrix* uvMatrix)
     : PerlinNoiseFragmentProcessor(noiseType, numOctaves, stitchTiles, std::move(paintingData),
-                                   std::move(permutationsTexture), std::move(noiseTexture),
-                                   uvMatrix) {
+                                   std::move(permutationsView), std::move(noiseView), uvMatrix) {
 }
 
 void GLSLPerlinNoiseFragmentProcessor::emitCode(EmitArgs& args) const {
@@ -84,24 +81,38 @@ void GLSLPerlinNoiseFragmentProcessor::emitCode(EmitArgs& args) const {
 
   auto texCoordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[0]);
 
-  // Compute noise coordinates with 0.5 pixel offset for SVG spec consistency.
-  fragBuilder->codeAppendf("vec2 noiseVec = (%s + 0.5) * %s;", texCoordName.c_str(),
+  // tgfx feeds the fragment shader transformedCoords sitting on the pixel centre (X+0.5, Y+0.5).
+  // Multiplying by baseFrequency directly would shift every pixel onto a noise lattice point
+  // whenever baseFrequency is an integer: every fragment ends up with fract(noiseVec) = 0, all
+  // four corner gradient dot products vanish, and the output collapses to a flat 0.5 grey
+  // (visible bug at baseFrequency=1, which the SVG feTurbulence reference uses). To prevent
+  // this we add a tiny sub-lattice bias so fract(noiseVec) stays bounded away from 0. 1/128 is
+  // exactly representable in float and stays well below half a lattice cell at typical
+  // baseFrequencies, so it is invisible in output.
+  //
+  // Octave doubling: every iteration multiplies noiseVec by 2.0, so the bias becomes 2^k/128.
+  // For k <= 6 the bias contribution to fract is non-zero, keeping each octave non-degenerate;
+  // for k >= 7 the bias lands back on an integer and that octave can degenerate, but its
+  // weight in the final accumulation is ratio = 2^-k <= 1/128, contributing < 1% of the total
+  // amplitude. With the supported numOctaves <= 8 this is invisible. The exact bias value is
+  // not load-bearing — any small non-zero constant breaks the integer-baseFrequency case.
+  fragBuilder->codeAppendf("highp vec2 noiseVec = %s * %s + vec2(0.0078125);", texCoordName.c_str(),
                            baseFreqName.c_str());
 
   fragBuilder->codeAppend("vec4 color = vec4(0.0);");
 
   if (stitchTiles) {
-    fragBuilder->codeAppendf("vec2 stitchData = %s;", stitchDataName.c_str());
+    fragBuilder->codeAppendf("highp vec2 stitchData = %s;", stitchDataName.c_str());
   }
 
   fragBuilder->codeAppend("float ratio = 1.0;");
 
   fragBuilder->codeAppendf("for (int octave = 0; octave < %d; ++octave) {", numOctaves);
 
-  fragBuilder->codeAppend("vec4 floorVal;");
+  fragBuilder->codeAppend("highp vec4 floorVal;");
   fragBuilder->codeAppend("floorVal.xy = floor(noiseVec);");
   fragBuilder->codeAppend("floorVal.zw = floorVal.xy + vec2(1.0);");
-  fragBuilder->codeAppend("vec2 fractVal = fract(noiseVec);");
+  fragBuilder->codeAppend("highp vec2 fractVal = fract(noiseVec);");
 
   // Hermite interpolation
   fragBuilder->codeAppend("vec2 noiseSmooth = smoothstep(0.0, 1.0, fractVal);");
@@ -116,19 +127,19 @@ void GLSLPerlinNoiseFragmentProcessor::emitCode(EmitArgs& args) const {
 
   // Look up permutation values. Permutations texture is 256x1 A8 (swizzled to RRRR).
   // Texel center: (i + 0.5) / 256.0
-  fragBuilder->codeAppend("float permX = ");
+  fragBuilder->codeAppend("highp float permX = ");
   fragBuilder->appendTextureLookup(permSampler, "vec2((floorVal.x + 0.5) / 256.0, 0.5)");
   fragBuilder->codeAppend(".r;");
 
-  fragBuilder->codeAppend("float permZ = ");
+  fragBuilder->codeAppend("highp float permZ = ");
   fragBuilder->appendTextureLookup(permSampler, "vec2((floorVal.z + 0.5) / 256.0, 0.5)");
   fragBuilder->codeAppend(".r;");
 
   // Recover [0,255] index from [0,1] texture value.
-  fragBuilder->codeAppend("vec2 latticeIdx = floor(vec2(permX, permZ) * 255.0 + 0.5);");
+  fragBuilder->codeAppend("highp vec2 latticeIdx = floor(vec2(permX, permZ) * 255.0 + 0.5);");
 
   // bcoords: (latticeIdx + floorY) mod 256, used to index into noise texture.
-  fragBuilder->codeAppend("vec4 bcoords = mod(latticeIdx.xyxy + floorVal.yyww, 256.0);");
+  fragBuilder->codeAppend("highp vec4 bcoords = mod(latticeIdx.xyxy + floorVal.yyww, 256.0);");
 
   fragBuilder->codeAppend("vec4 noiseResult;");
 

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head><title>JSPI Test</title></head>
+<body>
+<canvas id="tgfx-test-canvas" width="1024" height="1024" style="display:none;"></canvas>
+<script type="module">
+    import TGFXTest from './tgfx-test.js';
+    
+    console.log('JSPI check - promising:', typeof WebAssembly.promising);
+    console.log('JSPI check - Suspending:', typeof WebAssembly.Suspending);
+    
+    const moduleOptions = {};
+    if (navigator.gpu) {
+        try {
+            const adapter = await navigator.gpu.requestAdapter();
+            if (adapter) {
+                const device = await adapter.requestDevice();
+                if (device) {
+                    moduleOptions.preinitializedWebGPUDevice = device;
+                    console.log('WebGPU device obtained');
+                }
+            }
+        } catch (e) {
+            console.warn('WebGPU init failed:', e);
+        }
+    }
+    
+    console.log('Loading WASM module...');
+    try {
+        const module = await TGFXTest(moduleOptions);
+        console.log('Module loaded successfully!');
+        console.log('Exports:', Object.keys(module).filter(k => k.startsWith('_R')));
+    } catch (e) {
+        console.error('Module load failed:', e.message);
+        console.error('Stack:', e.stack);
+    }
+</script>
+</body>
+</html>

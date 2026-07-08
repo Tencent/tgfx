@@ -232,8 +232,8 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   if (image == nullptr) {
     return;
   }
-  snapshots->emplace(BackgroundSnapshotKey{layer, style},
-                     BackgroundSnapshotEntry{std::move(image), offset});
+  snapshots->snapshots[BackgroundSnapshotKey{layer, style}].push_back(
+      BackgroundSnapshotEntry{std::move(image), offset});
 }
 
 const LayerStyleSource* BackgroundCapturer::getCachedLayerStyleSource(Layer* layer) const {
@@ -304,14 +304,21 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   std::shared_ptr<Image> bgImage = nullptr;
   Point bgOffset = {};
   if (snapshots != nullptr) {
-    auto it = snapshots->find(BackgroundSnapshotKey{layer, style});
-    if (it == snapshots->end()) {
+    BackgroundSnapshotKey key{layer, style};
+    auto it = snapshots->snapshots.find(key);
+    if (it == snapshots->snapshots.end()) {
       // Surface path: the map is authoritative, so a miss is a capture-side coverage bug.
       // Silently skip rather than masking the bug with on-the-fly synthesis.
       return;
     }
-    bgImage = it->second.image;
-    bgOffset = it->second.offset;
+    auto& cursor = readCursors[key];
+    DEBUG_ASSERT(cursor < it->second.size() && "capture/consume push-pop count mismatch");
+    if (cursor >= it->second.size()) {
+      return;
+    }
+    auto& entry = it->second[cursor++];
+    bgImage = entry.image;
+    bgOffset = entry.offset;
   } else {
     // Picture-canvas path: capture was skipped because there is no GPU context. Synthesize the
     // backdrop on the fly by walking ancestors and prior siblings via PictureRecorder.
@@ -325,8 +332,12 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   matrix.preTranslate(contentEntry.offset.x, contentEntry.offset.y);
   canvas->concat(matrix);
   auto backgroundOffset = bgOffset - contentEntry.offset;
-  style->drawWithExtraSource(canvas, contentEntry.image, source->contentScale, std::move(bgImage),
-                             backgroundOffset, alpha);
+  LayerStyleInput styleInput = {};
+  styleInput.content = contentEntry.image;
+  styleInput.contentOffset = contentEntry.offset;
+  styleInput.contentScale = source->contentScale;
+  styleInput.extraSource = std::make_shared<StyleInputSource>(std::move(bgImage), backgroundOffset);
+  style->draw(canvas, styleInput, alpha);
 }
 
 void BackgroundCapturer::Run(Layer* captureRoot, const DrawArgs& baseArgs,
@@ -341,8 +352,8 @@ void BackgroundCapturer::Run(Layer* captureRoot, const DrawArgs& baseArgs,
   }
 
   auto* bgCanvas = bgSource->getCanvas();
-  AutoCanvasRestore autoRestore(bgCanvas);
   BackgroundCapturer capturer(snapshots, std::move(bgSource));
+  AutoCanvasRestore autoRestore(bgCanvas);
   DrawArgs captureArgs = baseArgs;
   captureArgs.backgroundHandler = &capturer;
   captureArgs.renderRects = &renderRects;

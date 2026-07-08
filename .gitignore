@@ -57,6 +57,8 @@ local.properties
 /vendor_tools
 /out
 cmake-build-*
+/build-*
+/web/test/build-*
 node_modules
 Build/
 test/out/
@@ -83,7 +85,6 @@ win/Debug-x86/
 win/Release-x86/
 QTCMAKE.cfg
 test/baseline/.cache
-test/baseline/.cache-web
 /result
 .vscode
 ios/TGFX

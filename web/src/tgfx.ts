@@ -24,6 +24,7 @@ import {EmscriptenGL, TGFX, WindowColorSpace} from './types';
 import type {wx} from './wechat/interfaces';
 
 declare const wx: wx;
+declare const Module: any;
 
 export const createImage = (source: string) => {
     return new Promise<HTMLImageElement | null>((resolve) => {
@@ -54,7 +55,12 @@ export const readImagePixels = (module: TGFX, image: CanvasImageSource, width: n
     if (!ctx) {
         return null;
     }
+    // Use "copy" composite operation to avoid source-over blending artifacts from canvas reuse.
+    // This ensures the image pixels are written directly without compositing with any residual
+    // background, which can cause white fringe on semi-transparent edges.
+    ctx.globalCompositeOperation = 'copy';
     ctx.drawImage(image, 0, 0, width, height);
+    ctx.globalCompositeOperation = 'source-over';
     const {data} = ctx.getImageData(0, 0, width, height);
     releaseCanvas2D(canvas);
     if (data.length === 0) {
@@ -173,6 +179,32 @@ export const releaseNativeImage = (source: TexImageSource | OffscreenCanvas) => 
 export const getBytesFromPath = async (module: TGFX, path: string) => {
     const buffer = await fetch(path).then((res) => res.arrayBuffer());
     return new Uint8Array(buffer);
+};
+
+export const uploadVideoToWebGPUTexture = (source: HTMLVideoElement, texturePtr: number,
+                                           width: number, height: number) => {
+    if (!source || !texturePtr) {
+        return;
+    }
+    syncVideoFrame(source);
+    // Emscripten maps WGPUTexture C pointers to JS GPUTexture objects via WebGPU.mgrTexture.
+    const WebGPU = (Module as any).WebGPU;
+    if (!WebGPU) {
+        return;
+    }
+    const gpuTexture = WebGPU.mgrTexture.get(texturePtr);
+    if (!gpuTexture) {
+        return;
+    }
+    const device: any = (Module as any).preinitializedWebGPUDevice;
+    if (!device || !device.queue) {
+        return;
+    }
+    device.queue.copyExternalImageToTexture(
+        {source: source},
+        {texture: gpuTexture, premultipliedAlpha: true},
+        [width, height]
+    );
 };
 
 export {getCanvas2D as createCanvas2D};

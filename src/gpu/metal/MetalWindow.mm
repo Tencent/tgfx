@@ -17,7 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/metal/MetalWindow.h"
+#import <Foundation/Foundation.h>
 #import <MetalKit/MetalKit.h>
+#include "core/utils/Log.h"
 #include "gpu/metal/MetalDefines.h"
 #include "gpu/metal/MetalDrawableProxy.h"
 #include "platform/apple/CGColorSpaceUtil.h"
@@ -89,6 +91,12 @@ MetalWindow::MetalWindow(std::shared_ptr<Device> device, MTKView* view, CAMetalL
 
 std::shared_ptr<RenderTargetProxy> MetalWindow::onCreateRenderTarget(Context* context) {
   if (metalView != nil) {
+    if (![NSThread isMainThread]) {
+      LOGE("MetalWindow::onCreateRenderTarget() must be called on the main thread when the "
+           "window is created from an MTKView, because MTKView is a UIView/NSView subclass "
+           "annotated with @MainActor. Create the Surface on the main thread, then render on "
+           "any thread.");
+    }
     metalLayer.drawableSize = metalView.drawableSize;
   }
   auto drawableSize = metalLayer.drawableSize;

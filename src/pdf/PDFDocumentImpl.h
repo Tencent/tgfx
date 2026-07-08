@@ -167,6 +167,9 @@ class PDFDocumentImpl : public PDFDocument {
   std::unordered_map<PDFFillGraphicState, PDFIndirectReference> fillGSMap;
   PDFIndirectReference noSmaskGraphicState;
   std::vector<PDFNamedDestination> namedDestinations;
+  // Uses shared_ptr as key to hold a strong reference, preventing the Image from being released
+  // mid-document and its address reused by a different Image, which would cause false cache hits.
+  std::unordered_map<std::shared_ptr<Image>, PDFIndirectReference> imageRefCache;
 
  private:
   std::shared_ptr<WriteStream> beginObject(PDFIndirectReference ref);

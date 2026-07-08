@@ -290,9 +290,18 @@ void Canvas::drawRoundRect(const Rect& rect, float radiusX, float radiusY, const
   drawRRect(RRect::MakeRectXY(rect, radiusX, radiusY), paint);
 }
 
-static bool HasSharpCorner(const RRect& rRect) {
+// The sub-half-pixel threshold classifies a corner as "sharp" only when the arc would be
+// shorter than one device pixel; therefore the local radius must be projected to device space
+// via the current CTM's max scale before comparison. Without this, a tiny local-space radius
+// inside a large scale-up (e.g. a 0.9-unit oval under 100x) is wrongly treated as sharp and
+// the dedicated RRect op is bypassed.
+static bool HasSharpCorner(const RRect& rRect, const Matrix& viewMatrix) {
+  auto deviceScale = viewMatrix.getMaxScale();
+  if (FloatNearlyZero(deviceScale)) {
+    return true;
+  }
   for (const auto& r : rRect.radii()) {
-    if (r.x < 0.5f || r.y < 0.5f) {
+    if (r.x * deviceScale < 0.5f || r.y * deviceScale < 0.5f) {
       return true;
     }
   }
@@ -391,11 +400,20 @@ void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
     return;
   }
   // Classify corner radii in a single pass so both the allSmall degenerate check and the
-  // anySmall op-capability check share one traversal.
+  // anySmall op-capability check share one traversal. The sub-half-pixel threshold is evaluated
+  // in device space, so the local radii are scaled by the current CTM's max scale before
+  // comparing. Otherwise a layer-local small RRect inside a scaled-up parent (e.g. a 0.9x0.9
+  // oval inside a 100x scale) would be wrongly degenerated into a rect even though its arcs
+  // are clearly visible after the transform. A singular CTM (max scale == 0) projects all
+  // geometry to a zero-area region, so nothing visible would be drawn anyway.
+  auto deviceScale = _matrix.getMaxScale();
+  if (FloatNearlyZero(deviceScale)) {
+    return;
+  }
   auto allSmall = true;
   auto anySmall = false;
   for (const auto& r : rRect.radii()) {
-    if (r.x < 0.5f || r.y < 0.5f) {
+    if (r.x * deviceScale < 0.5f || r.y * deviceScale < 0.5f) {
       anySmall = true;
     } else {
       allSmall = false;
@@ -459,7 +477,7 @@ void Canvas::drawPath(const Path& path, const Matrix& matrix, const ClipStack& c
   }
   // UseDrawPath forces complex stroke/radius combinations through the generic stroker, matching
   // the drawRRect entry point.
-  if (hasRRect && !UseDrawPath(stroke, rRect, HasSharpCorner(rRect), matrix)) {
+  if (hasRRect && !UseDrawPath(stroke, rRect, HasSharpCorner(rRect, matrix), matrix)) {
     drawContext->drawRRect(rRect, matrix, clip, brush, stroke);
     return;
   }
@@ -550,13 +568,13 @@ void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& dstRect,
 
 void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
                            const SamplingOptions& sampling, const Paint* paint,
-                           SrcRectConstraint constraint) {
+                           SrcRectConstraint constraint, const Rect* strictRect) {
   if (image == nullptr || srcRect.isEmpty() || dstRect.isEmpty()) {
     return;
   }
   SaveLayerForImageFilter(paint ? paint->getImageFilter() : nullptr);
   auto brush = GetBrushForImage(paint, image.get());
-  drawImageRect(std::move(image), srcRect, dstRect, sampling, brush, constraint);
+  drawImageRect(std::move(image), srcRect, dstRect, sampling, brush, constraint, strictRect);
 }
 
 void Canvas::drawImage(std::shared_ptr<Image> image, const Brush& brush,
@@ -588,17 +606,19 @@ void Canvas::drawImage(std::shared_ptr<Image> image, const Brush& brush,
 // and rendered into the same area, transformed by extraMatrix and the current matrix.
 void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
                            const SamplingOptions& sampling, const Brush& brush,
-                           SrcRectConstraint constraint) {
+                           SrcRectConstraint constraint, const Rect* strictRect) {
   DEBUG_ASSERT(image != nullptr);
   DEBUG_ASSERT(!srcRect.isEmpty());
   DEBUG_ASSERT(!dstRect.isEmpty());
   auto type = Types::Get(image.get());
   if (type != Types::ImageType::Subset || image->hasMipmaps()) {
     drawContext->drawImageRect(std::move(image), srcRect, dstRect, sampling, _matrix, *clipStack,
-                               brush, constraint);
+                               brush, constraint, strictRect);
     return;
   }
   auto imageRect = srcRect;
+  std::optional<Rect> adjustedStrictRect =
+      strictRect ? std::optional<Rect>(*strictRect) : std::nullopt;
   auto safeBounds = Rect::MakeWH(image->width(), image->height());
   safeBounds.inset(0.5f, 0.5f);
   if (constraint == SrcRectConstraint::Strict || safeBounds.contains(srcRect)) {
@@ -606,10 +626,16 @@ void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, co
     auto subsetImage = static_cast<const SubsetImage*>(image.get());
     auto& subset = subsetImage->bounds;
     imageRect.offset(subset.left, subset.top);
+    // strictRect lives in the SubsetImage coordinate space; translate it together with imageRect
+    // so the shader's clamp range stays in the unwrapped source coordinate space.
+    if (adjustedStrictRect) {
+      adjustedStrictRect->offset(subset.left, subset.top);
+    }
     image = subsetImage->source;
   }
   drawContext->drawImageRect(std::move(image), imageRect, dstRect, sampling, _matrix, *clipStack,
-                             brush, constraint);
+                             brush, constraint,
+                             adjustedStrictRect ? &*adjustedStrictRect : nullptr);
 }
 
 void Canvas::drawSimpleText(const std::string& text, float x, float y, const Font& font,

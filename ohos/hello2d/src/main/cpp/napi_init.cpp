@@ -1,12 +1,17 @@
 #include "napi/native_api.h"
 #include <ace/xcomponent/native_interface_xcomponent.h>
 #include "tgfx/core/Surface.h"
-#include "tgfx/gpu/opengl/egl/EGLWindow.h"
 #include "tgfx/gpu/Recording.h"
 #include "hello2d/AppHost.h"
 #include "hello2d/LayerBuilder.h"
 #include "DisplayLink.h"
 #include "tgfx/layers/DisplayList.h"
+#ifdef TGFX_USE_VULKAN
+#include "tgfx/gpu/vulkan/VulkanWindow.h"
+#include "tgfx/gpu/vulkan/VulkanDevice.h"
+#else
+#include "tgfx/gpu/opengl/egl/EGLWindow.h"
+#endif
 
 static float screenDensity = 1.0f;
 static double drawIndex = 0;
@@ -180,7 +185,7 @@ static napi_value StopDrawLoop(napi_env, napi_callback_info) {
 static std::shared_ptr<hello2d::AppHost> CreateAppHost() {
   auto appHost = std::make_shared<hello2d::AppHost>();
   displayList.setRenderMode(tgfx::RenderMode::Tiled);
-  displayList.setAllowZoomBlur(true);
+  displayList.setTileUpdateMode(tgfx::TileUpdateMode::Smooth);
   displayList.setMaxTileCount(512);
   static const std::string FallbackFontFileNames[] = {"/system/fonts/HarmonyOS_Sans.ttf",
                                                       "/system/fonts/HarmonyOS_Sans_SC.ttf",
@@ -231,7 +236,13 @@ static void DispatchTouchEventCB(OH_NativeXComponent*, void*) {
 
 static void OnSurfaceCreatedCB(OH_NativeXComponent* component, void* nativeWindow) {
   UpdateSize(component, nativeWindow);
+#ifdef TGFX_USE_VULKAN
+  auto ohosWindow = static_cast<OHNativeWindow*>(nativeWindow);
+  auto vulkanDevice = tgfx::VulkanDevice::Make();
+  window = tgfx::VulkanWindow::MakeFrom(ohosWindow, vulkanDevice);
+#else
   window = tgfx::EGLWindow::MakeFrom(reinterpret_cast<EGLNativeWindowType>(nativeWindow));
+#endif
   if (window == nullptr) {
     return;
   }

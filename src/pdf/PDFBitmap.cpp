@@ -17,12 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFBitmap.h"
+#include <vector>
+#include "core/utils/USE.h"
 #include "pdf/DeflateStream.h"
 #include "pdf/PDFDocumentImpl.h"
 #include "pdf/PDFTypes.h"
 #include "tgfx/core/AlphaType.h"
 #include "tgfx/core/ColorType.h"
 #include "tgfx/core/Data.h"
+#include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Surface.h"
@@ -59,9 +62,6 @@ void EmitImageStream(PDFDocumentImpl* doc, PDFIndirectReference ref, T writeStre
       break;
   }
 
-  if (format == PDFStreamFormat::DCT) {
-    pdfDict->insertInt("ColorTransform", 0);
-  }
   pdfDict->insertInt("Length", length);
   doc->emitStream(*pdfDict, std::move(writeStream), ref);
 }
@@ -249,13 +249,15 @@ void DoDeflatedImage(const Pixmap& pixmap, PDFDocumentImpl* document, bool isOpa
         auto scanline =
             reinterpret_cast<const uint32_t*>(pixelPointer + (static_cast<size_t>(y) * rowBytes));
         for (int x = 0; x < pixmap.width(); ++x) {
-          uint32_t color = *scanline++;
-          if ((((color) >> 24) & 0xFF) == 0x00) {
+          uint32_t color = scanline[x];
+          // Replace RGB of fully-transparent pixels with the neighborhood average so undefined
+          // RGB does not leak through to color sampling at SMask edges.
+          if (!isOpaque && ((color >> 24) & 0xFF) == 0x00) {
             color = GetNeighborAvgColor(pixmap, x, y);
           }
-          *bufferPointer++ = (((color) >> 0) & 0xFF);
-          *bufferPointer++ = (((color) >> 8) & 0xFF);
-          *bufferPointer++ = (((color) >> 16) & 0xFF);
+          *bufferPointer++ = static_cast<uint8_t>((color >> 0) & 0xFF);
+          *bufferPointer++ = static_cast<uint8_t>((color >> 8) & 0xFF);
+          *bufferPointer++ = static_cast<uint8_t>((color >> 16) & 0xFF);
           if (bufferPointer == bufferStop) {
             stream->write(byteBuffer, sizeof(byteBuffer));
             bufferPointer = byteBuffer;
@@ -283,12 +285,81 @@ void DoDeflatedImage(const Pixmap& pixmap, PDFDocumentImpl* document, bool isOpa
   }
 }
 
+#ifdef TGFX_USE_JPEG_ENCODE
+// Build a tightly-packed RGBA copy of the source pixmap where any pixel with alpha==0 has its RGB
+// channels replaced by the average color of its non-transparent 3x3 neighborhood. The alpha byte
+// is preserved but unused — the JPEG encoder reads only RGB.
+//
+// Used by the DCT (JPEG) path because libjpeg consumes a Pixmap, not a stream, so the cleaned
+// pixels must be staged into a buffer first. The Flate path inlines the same cleanup directly in
+// its streaming write loop and does not need this helper.
+std::vector<uint8_t> BuildCleanRGBA(const Pixmap& pixmap) {
+  auto width = pixmap.width();
+  auto height = pixmap.height();
+  std::vector<uint8_t> dst(static_cast<size_t>(width) * static_cast<size_t>(height) * 4);
+  const auto srcBytes = reinterpret_cast<const uint8_t*>(pixmap.pixels());
+  auto srcRowBytes = pixmap.rowBytes();
+  uint8_t* dstPointer = dst.data();
+  for (int y = 0; y < height; ++y) {
+    auto scanline =
+        reinterpret_cast<const uint32_t*>(srcBytes + (static_cast<size_t>(y) * srcRowBytes));
+    for (int x = 0; x < width; ++x) {
+      uint32_t color = scanline[x];
+      uint8_t alpha = static_cast<uint8_t>((color >> 24) & 0xFF);
+      if (alpha == 0x00) {
+        color = GetNeighborAvgColor(pixmap, x, y);
+      }
+      *dstPointer++ = static_cast<uint8_t>((color >> 0) & 0xFF);
+      *dstPointer++ = static_cast<uint8_t>((color >> 8) & 0xFF);
+      *dstPointer++ = static_cast<uint8_t>((color >> 16) & 0xFF);
+      *dstPointer++ = alpha;
+    }
+  }
+  return dst;
+}
+
+void DoDCTImage(const Pixmap& pixmap, PDFDocumentImpl* document, bool isOpaque, int encodingQuality,
+                PDFIndirectReference ref) {
+  // For non-opaque images, replace the RGB of fully-transparent pixels with the neighborhood
+  // average so JPEG's 8x8 DCT blocks do not bleed undefined colors into nearby semi-transparent
+  // pixels at the SMask edge.
+  std::shared_ptr<Data> jpegData;
+  if (isOpaque) {
+    jpegData = ImageCodec::Encode(pixmap, EncodedFormat::JPEG, encodingQuality);
+  } else {
+    auto cleanRGBA = BuildCleanRGBA(pixmap);
+    auto cleanInfo = ImageInfo::Make(pixmap.width(), pixmap.height(), ColorType::RGBA_8888,
+                                     AlphaType::Unpremultiplied, 0, pixmap.colorSpace());
+    Pixmap cleanPixmap(cleanInfo, cleanRGBA.data());
+    jpegData = ImageCodec::Encode(cleanPixmap, EncodedFormat::JPEG, encodingQuality);
+  }
+  DEBUG_ASSERT(jpegData);
+
+  PDFIndirectReference sMask;
+  if (!isOpaque) {
+    sMask = document->reserveRef();
+  }
+
+  auto length = static_cast<int>(jpegData->size());
+  auto imageSize = ISize::Make(pixmap.width(), pixmap.height());
+  auto colorSpaceRef = document->colorSpaceRef();
+  auto colorSpace = colorSpaceRef ? PDFUnion::Ref(colorSpaceRef) : PDFUnion::Name("DeviceRGB");
+  auto streamWriter = [&jpegData](const std::shared_ptr<WriteStream>& stream) {
+    stream->write(jpegData->data(), jpegData->size());
+  };
+  EmitImageStream(document, ref, streamWriter, imageSize, std::move(colorSpace), sMask, length,
+                  PDFStreamFormat::DCT);
+
+  if (!isOpaque) {
+    DoDeflatedAlpha(pixmap, document, sMask);
+  }
+}
+#endif  // TGFX_USE_JPEG_ENCODE
+
 }  // namespace
 
-void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int /*encodingQuality*/,
+void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int encodingQuality,
                                PDFDocumentImpl* doc, PDFIndirectReference ref) {
-  // TODO (YGaurora): Re-enable JPEG direct embedding once Image provides a unified encoded data
-  // access interface, so we don't need to reach into internal Image subclass hierarchy.
   auto image2bitmap = [doc](Context* context, const std::shared_ptr<Image>& image) {
     auto surface = Surface::Make(context, image->width(), image->height(), false, 1, false, 0,
                                  doc->dstColorSpace());
@@ -302,7 +373,6 @@ void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int /*encodi
                                    AlphaType::Unpremultiplied, 0, surface->colorSpace());
     Bitmap bitmap(surface->width(), surface->height(), false, false, surface->colorSpace());
     auto pixels = bitmap.lockPixels();
-    //bitmap in pdf must be unpremultiplied
     if (surface->readPixels(dstInfo, pixels)) {
       bitmap.unlockPixels();
       return bitmap;
@@ -315,6 +385,16 @@ void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int /*encodi
     return;
   }
   auto pixmap = Pixmap(bitmap);
+
+#ifdef TGFX_USE_JPEG_ENCODE
+  if (encodingQuality <= 100) {
+    DoDCTImage(pixmap, doc, bitmap.isOpaque(), encodingQuality, ref);
+    return;
+  }
+#else
+  USE(encodingQuality);
+#endif
+
   DoDeflatedImage(pixmap, doc, bitmap.isOpaque(), ref);
 }
 
@@ -322,8 +402,13 @@ PDFIndirectReference PDFBitmap::Serialize(const std::shared_ptr<Image>& image,
                                           PDFDocumentImpl* document, int encodingQuality) {
   DEBUG_ASSERT(image);
   DEBUG_ASSERT(document);
+  auto it = document->imageRefCache.find(image);
+  if (it != document->imageRefCache.end()) {
+    return it->second;
+  }
   auto ref = document->reserveRef();
   SerializeImage(image, encodingQuality, document, ref);
+  document->imageRefCache[image] = ref;
   return ref;
 }
 }  // namespace tgfx

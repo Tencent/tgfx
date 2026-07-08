@@ -88,12 +88,8 @@ class BackgroundBlurStyle : public LayerStyle {
   }
 
  protected:
-  void onDraw(Canvas*, std::shared_ptr<Image>, float, float, BlendMode) override {
-  }
-
-  void onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                             std::shared_ptr<Image> extraSource, const Point& extraSourceOffset,
-                             float alpha, BlendMode blendMode) override;
+  void onDraw(Canvas* canvas, const LayerStyleInput& input, float alpha,
+              BlendMode blendMode) override;
 
  private:
   BackgroundBlurStyle(float blurrinessX, float blurrinessY, TileMode tileMode);

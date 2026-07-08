@@ -17,10 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TGFXBaseView.h"
+#include <emscripten/html5.h>
 #include <cmath>
 #include "hello2d/LayerBuilder.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Surface.h"
+#ifdef TGFX_USE_WEBGPU
+#include "gpu/webgpu/WebGPUBuffer.h"
+#endif
 
 using namespace emscripten;
 namespace hello2d {
@@ -28,13 +32,17 @@ namespace hello2d {
 TGFXBaseView::TGFXBaseView(const std::string& canvasID) : canvasID(canvasID) {
   appHost = std::make_shared<hello2d::AppHost>();
   displayList.setRenderMode(tgfx::RenderMode::Tiled);
-  displayList.setAllowZoomBlur(true);
+  displayList.setTileUpdateMode(tgfx::TileUpdateMode::Smooth);
   displayList.setMaxTileCount(512);
 }
 
 void TGFXBaseView::updateSize() {
   if (window == nullptr) {
+#ifdef TGFX_USE_WEBGPU
+    window = tgfx::WebGPUWindow::MakeFrom(canvasID);
+#else
     window = tgfx::WebGLWindow::MakeFrom(canvasID);
+#endif
   }
   if (window == nullptr) {
     return;
@@ -96,7 +104,11 @@ void TGFXBaseView::updateLayerTree(int drawIndex) {
 
 void TGFXBaseView::draw() {
   if (window == nullptr) {
+#ifdef TGFX_USE_WEBGPU
+    window = tgfx::WebGPUWindow::MakeFrom(canvasID);
+#else
     window = tgfx::WebGLWindow::MakeFrom(canvasID);
+#endif
   }
   if (window == nullptr) {
     return;
@@ -135,6 +147,11 @@ void TGFXBaseView::draw() {
 
   auto recording = context->flush();
 
+#ifdef TGFX_USE_WEBGPU
+  if (recording) {
+    context->submit(std::move(recording));
+  }
+#else
   if (presentImmediately) {
     presentImmediately = false;
     if (recording) {
@@ -147,8 +164,123 @@ void TGFXBaseView::draw() {
       context->submit(std::move(recording));
     }
   }
+#endif
 
   device->unlock();
+}
+
+emscripten::val TGFXBaseView::startReadback(int srcX, int srcY, int width, int height) {
+  if (window == nullptr || surface == nullptr) {
+    return emscripten::val::null();
+  }
+  auto device = window->getDevice();
+  auto context = device->lockContext();
+  if (context == nullptr) {
+    return emscripten::val::null();
+  }
+
+  auto rect = tgfx::Rect::MakeXYWH(srcX, srcY, width, height);
+  pendingReadback = surface->asyncReadPixels(rect);
+  if (pendingReadback == nullptr) {
+    device->unlock();
+    return emscripten::val::null();
+  }
+
+  // Flush and submit GPU commands (but don't wait for completion).
+  auto recording = context->flush();
+  if (recording) {
+    context->submit(std::move(recording), false);
+  }
+
+  // Get the underlying WebGPU buffer handle for JS-side mapAsync.
+  auto info = pendingReadback->info();
+#ifdef TGFX_USE_WEBGPU
+  auto gpuBuffer = pendingReadback->getGPUBuffer(context);
+  if (gpuBuffer == nullptr) {
+    pendingReadback = nullptr;
+    device->unlock();
+    return emscripten::val::null();
+  }
+  auto result = emscripten::val::object();
+  result.set("width", info.width());
+  result.set("height", info.height());
+  result.set("rowBytes", static_cast<int>(info.rowBytes()));
+  result.set(
+      "bufferHandle",
+      reinterpret_cast<int>(static_cast<tgfx::WebGPUBuffer*>(gpuBuffer.get())->webgpuBuffer()));
+  result.set("bufferSize", static_cast<int>(gpuBuffer->size()));
+  result.set("ready", false);
+  device->unlock();
+  return result;
+#else
+  // WebGL: readback is synchronous, just do it immediately.
+  auto pixels =
+      pendingReadback->lockPixels(context, surface->origin() == tgfx::ImageOrigin::BottomLeft);
+  if (pixels == nullptr) {
+    pendingReadback = nullptr;
+    device->unlock();
+    return emscripten::val::null();
+  }
+  auto byteSize = static_cast<size_t>(info.height()) * info.rowBytes();
+  auto uint8Array = emscripten::val::global("Uint8Array").new_(byteSize);
+  auto memory = emscripten::val::module_property("HEAPU8")["buffer"];
+  auto view = emscripten::val::global("Uint8Array")
+                  .new_(memory, reinterpret_cast<uintptr_t>(pixels), byteSize);
+  uint8Array.call<void>("set", view);
+  pendingReadback->unlockPixels(context);
+  pendingReadback = nullptr;
+  auto result = emscripten::val::object();
+  result.set("width", info.width());
+  result.set("height", info.height());
+  result.set("rowBytes", static_cast<int>(info.rowBytes()));
+  result.set("pixels", uint8Array);
+  result.set("ready", true);
+  device->unlock();
+  return result;
+#endif
+}
+
+emscripten::val TGFXBaseView::finishReadback() {
+  if (window == nullptr || pendingReadback == nullptr) {
+    return emscripten::val::null();
+  }
+  auto device = window->getDevice();
+  auto context = device->lockContext();
+  if (context == nullptr) {
+    return emscripten::val::null();
+  }
+
+#ifdef TGFX_USE_WEBGPU
+  // JS already called mapAsync and it resolved. Mark buffer as ready so lockPixels skips
+  // requestMapAsync (which would trigger Asyncify).
+  auto gpuBuffer = pendingReadback->getGPUBuffer(context);
+  if (gpuBuffer != nullptr) {
+    static_cast<tgfx::WebGPUBuffer*>(gpuBuffer.get())->setMapReady(true);
+  }
+  auto info = pendingReadback->info();
+  auto pixels =
+      pendingReadback->lockPixels(context, surface->origin() == tgfx::ImageOrigin::BottomLeft);
+  if (pixels == nullptr) {
+    pendingReadback = nullptr;
+    device->unlock();
+    return emscripten::val::null();
+  }
+  auto byteSize = static_cast<size_t>(info.height()) * info.rowBytes();
+  auto uint8Array = emscripten::val::global("Uint8Array").new_(byteSize);
+  auto memory = emscripten::val::module_property("HEAPU8")["buffer"];
+  auto view = emscripten::val::global("Uint8Array")
+                  .new_(memory, reinterpret_cast<uintptr_t>(pixels), byteSize);
+  uint8Array.call<void>("set", view);
+  pendingReadback->unlockPixels(context);
+  pendingReadback = nullptr;
+  device->unlock();
+  return uint8Array;
+#else
+  // WebGL path: should not reach here (startReadback returns ready=true with pixels).
+  pendingReadback = nullptr;
+  device->unlock();
+  return emscripten::val::null();
+#endif
 }
 
 }  // namespace hello2d

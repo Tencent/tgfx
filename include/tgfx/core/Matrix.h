@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <cstring>
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Vec.h"

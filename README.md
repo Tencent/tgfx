@@ -33,8 +33,8 @@ and various video-editing apps.
 - OpenGL ES 3.0+
 - WebGL 2.0+
 - Metal 1.1+ (in progress)
-- Vulkan 1.1+ (in progress)
-- WebGPU (in progress)
+- Vulkan 1.1+
+- WebGPU 1.0
 
 ## Build Prerequisites
 
@@ -47,8 +47,8 @@ TGFX uses **C++17** features. Here are the minimum tools needed to build TGFX on
 - Ninja 1.9.0+
 - CMake 3.13.0+
 - QT 6.2.0+
-- NDK 20+ (**20.1.5948944 recommended**)
-- Emscripten 3.1.58+ 
+- NDK 25+ (**25.2.9519653 recommended**)
+- Emscripten 4.0.15 (via [emsdk](https://github.com/emscripten-core/emsdk))
 
 
 Please note the following additional notices:
@@ -92,7 +92,7 @@ Then, run `depsync` in the project's root directory.
 depsync
 ```
 
-You might need to enter your Git account and password during synchronization. Make sure you’ve 
+You might need to enter your Git account and password during synchronization. Make sure you've 
 enabled the `git-credential-store` so that `CMakeLists.txt` can automatically trigger synchronization 
 next time.
 
@@ -111,7 +111,7 @@ These will guide you through the necessary steps to set up your development envi
 
 ### Android
 
-The Android demo project requires the **Android NDK**. We recommend using version **20.1.5948944**,
+The Android demo project requires the **Android NDK**. We recommend using version **25.2.9519653**,
 which has been fully tested with the TGFX library. If you open the project with Android Studio, it
 will automatically download the NDK during Gradle synchronization. Alternatively, you can download 
 it from the [NDK Downloads](https://developer.android.com/ndk/downloads) page.
@@ -120,13 +120,13 @@ If you choose to manually download the Android NDK, please extract it to the def
 On macOS, this would be:
 
 ```
-/Users/yourname/Library/Android/sdk/ndk/20.1.5948944
+/Users/yourname/Library/Android/sdk/ndk/25.2.9519653
 ```
 
 On Windows, it would be：
 
 ```
-C:\Users\yourname\AppData\Local\Android\Sdk\ndk\20.1.5948944
+C:\Users\yourname\AppData\Local\Android\Sdk\ndk\25.2.9519653
 ```
 
 Alternatively, you can set one of the following environment variables to help tgfx locate the NDK:
@@ -141,6 +141,15 @@ version upgrades. If you have, undo the changes and try synchronizing again. If 
 to your IDE configuration, search for a solution on Google. If you believe the problem is with the 
 project configuration, you can open an [Issue](https://github.com/Tencent/tgfx/issues/new/choose) to
 address it.
+
+By default, the demo uses OpenGL ES as the rendering backend. To build with the **Vulkan** backend
+instead, run the following command in the `android/` directory:
+
+```
+./gradlew assembleDebug -PcmakeArgs="-DTGFX_USE_VULKAN=ON"
+```
+
+Note: Vulkan requires Android 7.0 (API 24) or above.
 
 ### iOS
 
@@ -200,13 +209,20 @@ Finally, open Xcode and launch the `mac/Hello2D.xcworkspace`. You are all set!
 
 ### Web
 
-To run the web demo, you need the **Emscripten SDK**. You can download and install it from the 
-[official website](https://emscripten.org/). We recommend using the latest version. If you’re on 
-macOS, you can also install it using the following script:
+To run the web demo, you need the **Emscripten SDK (emsdk)**. Install and activate a specific version
+to ensure consistent builds across all backends (including WebGPU):
 
 ```
-brew install emscripten
+git clone https://github.com/emscripten-core/emsdk.git
+cd emsdk && ./emsdk install 4.0.15 && ./emsdk activate 4.0.15
+source ./emsdk_env.sh
 ```
+
+> **Note:** Emscripten >= 4.0.18 removed `-sUSE_WEBGPU` in favor of `--use-port=emdawnwebgpu`.
+> Always use emsdk 4.0.15 (the last version with working `-sUSE_WEBGPU`) until the project
+> migrates to emdawnwebgpu. The build scripts (`web/setup_emsdk.sh`) will auto-detect emsdk
+> at `~/emsdk`, `/opt/emsdk`, or `~/.emsdk`. If your emsdk is elsewhere, either run
+> `source <path-to-emsdk>/emsdk_env.sh` manually or set the `EMSDK` environment variable.
 
 To get started, go to the `web/` directory and run the following command to install the necessary
 node modules:
@@ -228,8 +244,22 @@ Next, you can start an HTTP server by running the following command:
 npm run server
 ```
 
-This will open [http://localhost:8081/web/demo/index.html](http://localhost:8081/web/demo/index.html) 
+This will open [http://localhost:8081/index.html](http://localhost:8081/index.html) 
 in your default browser. You can also open it manually to view the demo.
+
+To build and run the **WebGPU** version:
+
+```
+npm run build:webgpu
+npm run server:webgpu
+```
+
+To build a single-threaded WebGL version:
+
+```
+npm run build:st
+npm run server:st
+```
 
 To debug the C++ code, install the browser plugin:
 [**C/C++ DevTools Support (DWARF)**](https://chromewebstore.google.com/detail/cc++-devtools-support-dwa/pdcpmagijalfljmkmjngeonclgbbannb).
@@ -269,14 +299,6 @@ After modification:
      name: "em-pthread"
     });
 ```
-
-To build a single-threaded version, just add the suffix ":st" to each command. For example:
-
-```
-npm run build:st
-npm run build:st:debug
-npm run server:st
-``` 
 
 To build the demo project in CLion, open the `Settings` panel and go to `Build, Execution, Deployment` > `CMake`.
 Create a new build target and set the `CMake options` to:
@@ -335,7 +357,7 @@ a project for the `x86` architecture with the `Release` configuration, open the
 cmake -G "Visual Studio 16 2019" -A Win32 -DCMAKE_CONFIGURATION_TYPES="Release" -B ./Release-x86
 ```
 
-Finally, open the `Hello2D.sln` file in the `Debug-x64/` or `Release-x86/` directory, and you’re all
+Finally, open the `Hello2D.sln` file in the `Debug-x64/` or `Release-x86/` directory, and you're all
 set!
 
 ### QT

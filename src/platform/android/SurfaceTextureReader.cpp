@@ -17,6 +17,26 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/platform/android/SurfaceTextureReader.h"
+#ifdef TGFX_USE_VULKAN
+
+namespace tgfx {
+std::shared_ptr<SurfaceTextureReader> SurfaceTextureReader::Make(int, int, jobject) {
+  return nullptr;
+}
+
+SurfaceTextureReader::SurfaceTextureReader(std::shared_ptr<ImageStream> stream)
+    : ImageReader(std::move(stream)) {
+}
+
+jobject SurfaceTextureReader::getInputSurface() const {
+  return nullptr;
+}
+
+void SurfaceTextureReader::notifyFrameAvailable() {
+}
+}  // namespace tgfx
+
+#else
 #include <chrono>
 #include "platform/android/SurfaceTexture.h"
 
@@ -48,3 +68,4 @@ void SurfaceTextureReader::notifyFrameAvailable() {
   std::static_pointer_cast<SurfaceTexture>(stream)->notifyFrameAvailable();
 }
 }  // namespace tgfx
+#endif

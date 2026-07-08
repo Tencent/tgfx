@@ -41,7 +41,6 @@ std::shared_ptr<ImageFilter> ImageFilter::InnerShadowOnly(float dx, float dy, fl
 InnerShadowImageFilter::InnerShadowImageFilter(float dx, float dy, float blurrinessX,
                                                float blurrinessY, const Color& color,
                                                bool shadowOnly)
-
     : dx(dx), dy(dy), blurFilter(ImageFilter::Blur(blurrinessX, blurrinessY)), color(color),
       shadowOnly(shadowOnly) {
 }

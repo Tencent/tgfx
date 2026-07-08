@@ -94,6 +94,8 @@ export class ScalerContext {
     private readonly fontName: string;
     private readonly fontStyle: string;
     private readonly size: number;
+    private readonly backingSize: number;
+    private readonly textScale: number;
     private fontMetrics!: {
         ascent: number;
         descent: number;
@@ -106,10 +108,18 @@ export class ScalerContext {
     // effectively a one-slot memoization and does not need a Map keyed by name.
     private fontMeasureCache: Rect | undefined = undefined;
 
+    // Browsers may silently clamp very large Canvas font sizes, which makes measureText return
+    // bounds for the clamped size instead of the requested size. Keep Canvas measurements at a
+    // conservative backing size and scale all metrics back to the requested size, matching the
+    // "clamped backing size + extra scale" model used by native font backends.
+    private static readonly MaxCanvasFontSize = 8192;
+
     public constructor(fontName: string, fontStyle: string, size: number) {
         this.fontName = fontName;
         this.fontStyle = fontStyle;
         this.size = size;
+        this.backingSize = Math.min(size, ScalerContext.MaxCanvasFontSize);
+        this.textScale = this.backingSize > 0 ? size / this.backingSize : 1.0;
         this.loadCanvas();
     }
 
@@ -124,7 +134,7 @@ export class ScalerContext {
             attributes.push('bold');
         }
         // css font-size
-        attributes.push(`${this.size}px`);
+        attributes.push(`${this.backingSize}px`);
         // css font-family
         const fallbackFontNames = defaultFontNames.concat();
         fallbackFontNames.unshift(...getFontFamilies(this.fontName, this.fontStyle));
@@ -139,12 +149,12 @@ export class ScalerContext {
         const {context} = ScalerContext;
         context.font = this.fontString(false, false);
         const metrics = this.measureText(context, 'H');
-        const capHeight = metrics.actualBoundingBoxAscent;
+        const capHeight = metrics.actualBoundingBoxAscent * this.textScale;
         const xMetrics = this.measureText(context, 'x');
-        const xHeight = xMetrics.actualBoundingBoxAscent;
+        const xHeight = xMetrics.actualBoundingBoxAscent * this.textScale;
         this.fontMetrics = {
-            ascent: -metrics.fontBoundingBoxAscent,
-            descent: metrics.fontBoundingBoxDescent,
+            ascent: -metrics.fontBoundingBoxAscent * this.textScale,
+            descent: metrics.fontBoundingBoxDescent * this.textScale,
             xHeight,
             capHeight,
         };
@@ -167,13 +177,20 @@ export class ScalerContext {
             bounds.right = 0;
             bounds.bottom = 0;
         }
+        const scale = this.textScale;
+        if (scale !== 1.0) {
+            bounds.left = Math.floor(bounds.left * scale);
+            bounds.top = Math.floor(bounds.top * scale);
+            bounds.right = Math.ceil(bounds.right * scale);
+            bounds.bottom = Math.ceil(bounds.bottom * scale);
+        }
         return bounds;
     }
 
     public getAdvance(text: string) {
         const {context} = ScalerContext;
         context.font = this.fontString(false, false);
-        return context.measureText(text).width;
+        return context.measureText(text).width * this.textScale;
     }
 
     public readPixels(
@@ -197,17 +214,20 @@ export class ScalerContext {
             provider.releaseCanvas2D(canvas);
             return null;
         }
+        context.setTransform(1, 0, 0, 1, 0, 0);
         context.clearRect(0, 0, width, height);
         context.font = this.fontString(fauxBold, false);
+        context.setTransform(this.textScale, 0, 0, this.textScale, -bounds.left, -bounds.top);
         if (stroke){
             context.lineJoin = ScalerContext.getLineJoin(stroke.join);
             context.miterLimit = stroke.miterLimit;
             context.lineCap = ScalerContext.getLineCap(stroke.cap);
-            context.lineWidth = stroke.width;
-            context.strokeText(text, -bounds.left, -bounds.top);
+            context.lineWidth = stroke.width / this.textScale;
+            context.strokeText(text, 0, 0);
         } else {
-            context.fillText(text, -bounds.left, -bounds.top);
+            context.fillText(text, 0, 0);
         }
+        context.setTransform(1, 0, 0, 1, 0, 0);
         const {data} = context.getImageData(0, 0, width, height);
         provider.releaseCanvas2D(canvas);
         return new Uint8Array(data);
@@ -240,19 +260,23 @@ export class ScalerContext {
             provider.releaseCanvas2D(canvas);
             return null;
         }
+        context.setTransform(1, 0, 0, 1, 0, 0);
         context.clearRect(0, 0, width, height);
         context.font = this.fontString(fauxBold, false);
+        context.setTransform(
+            this.textScale, 0, 0, this.textScale, padding - bounds.left, padding - bounds.top);
         if (stroke) {
             context.strokeStyle = "#FFFFFF";
             context.lineJoin = ScalerContext.getLineJoin(stroke.join);
             context.miterLimit = stroke.miterLimit;
             context.lineCap = ScalerContext.getLineCap(stroke.cap);
-            context.lineWidth = stroke.width;
-            context.strokeText(text, -bounds.left + padding, -bounds.top + padding);
+            context.lineWidth = stroke.width / this.textScale;
+            context.strokeText(text, 0, 0);
         } else {
             context.fillStyle = "#FFFFFF";
-            context.fillText(text, -bounds.left + padding, -bounds.top + padding);
+            context.fillText(text, 0, 0);
         }
+        context.setTransform(1, 0, 0, 1, 0, 0);
         return canvas;
     }
 
@@ -292,7 +316,7 @@ export class ScalerContext {
         // incur a resize on every call. The canvas side is ceiled to an
         // integer because both canvas.width/height and getImageData(sw, sh)
         // require integer arguments.
-        const side = Math.ceil(this.size * 1.5);
+        const side = Math.ceil(this.backingSize * 1.5);
         const provider = getCanvasProvider();
         const tmpCanvas = provider.getCanvas2D(side, side);
         const tmpCtx = tmpCanvas.getContext('2d', {willReadFrequently: true}) as
@@ -320,7 +344,7 @@ export class ScalerContext {
         // Baseline origin: drawing starts at x=0, with y=size so the glyph
         // can extend both upwards (ascent) and downwards (descent) inside
         // the temp canvas without clipping.
-        const baselineY = this.size;
+        const baselineY = this.backingSize;
         tmpCtx.clearRect(0, 0, side, side);
         tmpCtx.fillText(text, 0, baselineY);
         const imageData = tmpCtx.getImageData(0, 0, side, side);

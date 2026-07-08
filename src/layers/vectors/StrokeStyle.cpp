@@ -25,6 +25,8 @@
 
 namespace tgfx {
 
+static constexpr float MIN_BOUND_EXTENT_FOR_BOOLEAN_OP = 0.5f;
+
 static float BlendStrokeWidth(float base, const GlyphStyle& style) {
   if (style.strokeWidthFactor <= 0.0f) {
     return base;
@@ -156,7 +158,21 @@ class StrokePainter : public Painter {
       return nullptr;
     }
     auto op = strokeAlign == StrokeAlign::Inside ? PathOp::Intersect : PathOp::Difference;
+    if (op == PathOp::Difference && originalShape != nullptr) {
+      // Skip the boolean op when the original shape's bounds are sub-pixel thin: the path-op
+      // subtraction is numerically unstable on such input and can produce spurious geometry.
+      // At sub-pixel scale the original shape is invisible anyway, so omitting it is harmless.
+      const auto bounds = originalShape->getBounds();
+      if (bounds.width() < MIN_BOUND_EXTENT_FOR_BOOLEAN_OP ||
+          bounds.height() < MIN_BOUND_EXTENT_FOR_BOOLEAN_OP) {
+        return shape;
+      }
+    }
     return Shape::Merge(std::move(shape), std::move(originalShape), op);
+  }
+
+  PainterStyle onGetStyle() const override {
+    return {PaintStyle::Stroke, stroke.width, strokeAlign};
   }
 };
 

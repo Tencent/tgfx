@@ -1920,6 +1920,29 @@ TGFX_TEST(CanvasTest, NonAARRectOpStroke) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NonAARRectOpStroke"));
 }
 
+TGFX_TEST(CanvasTest, AARRectOpZeroInnerRadius) {
+  // Verifies the boundary case where the stroke half-width exactly equals the corner radius,
+  // making the inner radius zero. The AA stroke path must still treat this as stroked rather
+  // than falling back to a filled shape.
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 190);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Paint paint;
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStroke(Stroke(30));
+  paint.setColor(Color::Red());
+  // RRect 270x60 with corner radius 15. halfStroke (15) equals the corner radius, so the inner
+  // radius is exactly zero, exercising the >= boundary in AARRectsVertexProvider.
+  canvas->drawRRect(RRect::MakeRectXY(Rect::MakeXYWH(65, 65, 270, 60), 15, 15), paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/AARRectOpZeroInnerRadius"));
+}
+
 TGFX_TEST(CanvasTest, NonAARRectOpTransform) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -2819,6 +2842,29 @@ TGFX_TEST(CanvasTest, NoiseShaderParameterValidation) {
   ASSERT_TRUE(clamped != nullptr);
   auto noiseShader = static_cast<PerlinNoiseShader*>(clamped.get());
   EXPECT_EQ(noiseShader->numOctaves, PerlinNoiseShader::MAX_OCTAVES);
+}
+
+// Renders FractalNoise at the high-frequency boundary baseFrequency=1 (one full noise period
+// per pixel) with a 100x100 stitch tile to match the SVG feTurbulence reference at
+// baseFrequency="1 1" stitchTiles="stitch". The 100x100 noise patch is centred in a 200x200
+// surface with the standard 50px padding.
+TGFX_TEST(CanvasTest, FractalNoiseFreqOne) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  auto* canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  ISize tileSize = {100, 100};
+  auto noise = Shader::MakeFractalNoise(1.0f, 1.0f, 3, 1379, &tileSize);
+  ASSERT_TRUE(noise != nullptr);
+  Paint paint;
+  paint.setShader(std::move(noise));
+  canvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/FractalNoiseFreqOne"));
 }
 
 TGFX_TEST_PRIVATE(CanvasTest, NoiseShaderIsEqual) {

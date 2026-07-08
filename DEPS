@@ -22,7 +22,7 @@
       },
       {
         "url": "https://github.com/madler/zlib.git",
-        "commit": "51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf",
+        "commit": "da607da739fa6047df13e66a2af6b8bec7c2a498",
         "dir": "third_party/zlib"
       },
       {
@@ -66,11 +66,6 @@
         "dir": "third_party/expat"
       },
       {
-        "url": "https://github.com/google/flatbuffers.git",
-        "commit": "1c514626e83c20fffa8557e75641848e1e15cd5e",
-        "dir": "third_party/flatbuffers"
-      },
-      {
          "url": "https://github.com/cameron314/concurrentqueue.git",
          "commit": "6dd38b8a1dbaa7863aa907045f32308a56a6ff5d",
          "dir": "third_party/concurrentqueue"
@@ -79,11 +74,6 @@
         "url": "https://github.com/google/highway.git",
         "commit": "a523516d35e22a4ba8e2e70a319062cb87352de6",
         "dir": "third_party/highway"
-      },
-      {
-        "url": "https://github.com/lz4/lz4.git",
-        "commit": "cacca37747572717ceb1f156eb9840644205ca4f",
-        "dir": "third_party/lz4"
       },
       {
         "url": "https://github.com/google/shaderc.git",
@@ -109,6 +99,16 @@
         "url": "https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git",
         "commit": "1d8f600fd424278486eade7ed3e877c99f0846b1",
         "dir": "third_party/VulkanMemoryAllocator"
+      },
+      {
+        "url": "https://dawn.googlesource.com/tint",
+        "commit": "f744c741427a2ea8623c089e531fb73db9948f80",
+        "dir": "third_party/tint"
+      },
+      {
+        "url": "https://chromium.googlesource.com/chromium/src/third_party/abseil-cpp",
+        "commit": "4ef9b33175828ea46d091e7e5ec28259d39a8ba5",
+        "dir": "third_party/tint/third_party/abseil-cpp"
       }
     ]
   },

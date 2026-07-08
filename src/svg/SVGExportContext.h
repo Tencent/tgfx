@@ -75,7 +75,8 @@ class SVGExportContext : public DrawContext {
 
   void drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
                      const SamplingOptions& sampling, const Matrix& matrix, const ClipStack& clip,
-                     const Brush& brush, SrcRectConstraint constraint) override;
+                     const Brush& brush, SrcRectConstraint constraint,
+                     const Rect* strictRect = nullptr) override;
 
   void drawTextBlob(std::shared_ptr<TextBlob> textBlob, const Matrix& matrix, const ClipStack& clip,
                     const Brush& brush, const Stroke* stroke) override;
@@ -99,6 +100,13 @@ class SVGExportContext : public DrawContext {
    * Returns the encoded pixel data if the image was created from a supported encoded format.
    */
   static std::shared_ptr<Data> ImageToEncodedData(const std::shared_ptr<Image>& image);
+
+  /**
+   * Encodes an image to a data URI string. Tries to use the original encoded data if available
+   * (JPEG/PNG), otherwise rasterizes via the GPU context and encodes as PNG.
+   */
+  static std::shared_ptr<Data> EncodeImageToDataUri(const std::shared_ptr<Image>& image,
+                                                    Context* context);
 
  private:
   /**
@@ -137,6 +145,10 @@ class SVGExportContext : public DrawContext {
   void applyClipPath(const Path& clipPath);
 
   std::string defineClipPath(const Path& clipPath);
+
+  std::vector<std::unique_ptr<ElementWriter>> buildFilterGroupElements(
+      const std::vector<std::string>& filterIDs, const std::string& singleFilterRef,
+      const std::string& clipID, const std::string& blendStyle, float alpha);
 
   static SVGPathParser::PathEncoding PathEncodingType();
 

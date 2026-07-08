@@ -20,14 +20,31 @@ struct Index {
   aboutToAppear(): void {
     let displayInfo = display.getDefaultDisplaySync();
     hello2d.updateDensity(displayInfo.densityPixels);
-    getContext(this).resourceManager.getRawFileContent("bridge.jpg", async (error, value) => {
-      if (error) {
-        return;
+    // Load all image resources before starting the draw loop. The native LayerBuilders require
+    // both "bridge" and "TGFX" images to be registered; starting the loop before they are ready
+    // causes null-pointer crashes in the layer tree construction.
+    let loadedCount = 0;
+    const totalImages = 2;
+    const onImageLoaded = () => {
+      loadedCount++;
+      if (loadedCount >= totalImages) {
+        hello2d.startDrawLoop();
       }
-      const buffer = value.buffer.slice(0);
-      hello2d.addImageFromEncoded("bridge", buffer);
+    };
+    getContext(this).resourceManager.getRawFileContent("bridge.jpg", async (error, value) => {
+      if (!error) {
+        const buffer = value.buffer.slice(0);
+        hello2d.addImageFromEncoded("bridge", buffer);
+      }
+      onImageLoaded();
     });
-    hello2d.startDrawLoop();
+    getContext(this).resourceManager.getRawFileContent("tgfx.png", async (error, value) => {
+      if (!error) {
+        const buffer = value.buffer.slice(0);
+        hello2d.addImageFromEncoded("TGFX", buffer);
+      }
+      onImageLoaded();
+    });
   }
 
   onPageHide(): void {

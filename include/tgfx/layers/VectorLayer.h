@@ -63,6 +63,8 @@ class VectorLayer : public Layer {
 
   void onUpdateContent(LayerRecorder* recorder) override;
 
+  std::optional<StyledShape> onGetContentShape() override;
+
  private:
   std::vector<std::shared_ptr<VectorElement>> _contents = {};
 };

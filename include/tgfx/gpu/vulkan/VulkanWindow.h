@@ -28,6 +28,15 @@ struct HWND__;
 typedef HWND__* HWND;
 #endif
 
+#ifdef __OHOS__
+struct NativeWindow;
+typedef struct NativeWindow OHNativeWindow;
+#endif
+
+#ifdef __ANDROID__
+struct ANativeWindow;
+#endif
+
 namespace tgfx {
 
 /**
@@ -44,6 +53,32 @@ class VulkanWindow : public Window {
    * HDR / Display-P3 support will be added in a follow-up.
    */
   static std::shared_ptr<VulkanWindow> MakeFrom(HWND hwnd, std::shared_ptr<VulkanDevice> device,
+                                                std::shared_ptr<ColorSpace> colorSpace = nullptr);
+#endif
+
+#ifdef __OHOS__
+  /**
+   * Creates a VulkanWindow from an OHOS NativeWindow. Returns nullptr if the Vulkan surface or
+   * swapchain cannot be created. Note: only sRGB output is currently supported.
+   */
+  static std::shared_ptr<VulkanWindow> MakeFrom(OHNativeWindow* nativeWindow,
+                                                std::shared_ptr<VulkanDevice> device,
+                                                std::shared_ptr<ColorSpace> colorSpace = nullptr);
+#endif
+
+#ifdef __ANDROID__
+  /**
+   * Creates a VulkanWindow from an Android ANativeWindow. Returns nullptr if the Vulkan surface or
+   * swapchain cannot be created. Note: only sRGB output is currently supported; a non-sRGB
+   * colorSpace value is ignored with a warning. HDR / Display-P3 support will be added later.
+   * @param nativeWindow The Android ANativeWindow to render into. Returns nullptr if null.
+   * @param device The VulkanDevice used to create the surface and swapchain. Returns nullptr if
+   * null.
+   * @param colorSpace The desired color space for the swapchain images. Defaults to sRGB when
+   * nullptr is passed.
+   */
+  static std::shared_ptr<VulkanWindow> MakeFrom(ANativeWindow* nativeWindow,
+                                                std::shared_ptr<VulkanDevice> device,
                                                 std::shared_ptr<ColorSpace> colorSpace = nullptr);
 #endif
 

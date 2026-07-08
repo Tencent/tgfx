@@ -17,11 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/DisplayList.h"
+#include <algorithm>
 #include "core/utils/DecomposeRects.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/TileSortCompareFunc.h"
-#include "inspect/InspectorMark.h"
 #include "layers/BackgroundHandler.h"
 #include "layers/BackgroundSnapshotMap.h"
 #include "layers/BackgroundSource.h"
@@ -72,6 +72,10 @@ class DrawTask {
     return _tileRect;
   }
 
+  const Rect& strictRect() const {
+    return _strictRect;
+  }
+
   const std::vector<std::shared_ptr<Tile>>& getTiles() const {
     return tiles;
   }
@@ -85,6 +89,7 @@ class DrawTask {
   std::vector<std::shared_ptr<Tile>> tiles = {};
   Rect _sourceRect = {};
   Rect _tileRect = {};
+  Rect _strictRect = {};
   bool _identityScale = true;
 
   void calculateRects(int tileSize, const Rect& drawRect, float scale) {
@@ -94,19 +99,12 @@ class DrawTask {
     }));
     auto& tile = tiles.front();
     _tileRect = drawRect.isEmpty() ? tile->getTileRect(tileSize) : drawRect;
-    // For fallback rendering, round to integers to ensure precise pixel mapping with sourceRect.
-    if (!_identityScale) {
-      _tileRect.roundOut();
-    }
     _sourceRect = _tileRect;
     auto offsetX = (tile->sourceX - tile->tileX) * tileSize;
     auto offsetY = (tile->sourceY - tile->tileY) * tileSize;
     _sourceRect.offset(static_cast<float>(offsetX), static_cast<float>(offsetY));
     _tileRect.scale(scale, scale);
-    // Round to pixel boundaries for 1:1 mapping; fallback uses linear sampling with float coords.
-    if (_identityScale) {
-      _tileRect.round();
-    }
+    _strictRect = tile->getSourceRect(tileSize);
   }
 };
 
@@ -179,7 +177,6 @@ static std::vector<std::pair<int, int>> GetSortedTiles(int startX, int endX, int
 
 DisplayList::DisplayList() : _root(RootLayer::Make()) {
   _root->_root = _root.get();
-  SET_DISPLAY_LIST(this);
 }
 
 DisplayList::~DisplayList() {
@@ -277,14 +274,13 @@ void DisplayList::setMaxTileCount(int count) {
   resetCaches();
 }
 
-Color DisplayList::backgroundColor() const {
-  return _root->backgroundColor();
-}
-
 void DisplayList::setBackgroundColor(const Color& color) {
-  if (_root->setBackgroundColor(color)) {
-    resetCaches();
+  if (_backgroundColor == color) {
+    return;
   }
+  _backgroundColor = color;
+  _root->invalidateContent();
+  resetCaches();
 }
 
 void DisplayList::setSubtreeCacheMaxSize(int maxSize) {
@@ -323,7 +319,6 @@ void DisplayList::render(Surface* surface, bool autoClear) {
   if (!surface) {
     return;
   }
-  RENDER_VISABLE_OBJECT(surface->getContext());
   _hasContentChanged = false;
   auto dirtyRegions = _root->updateDirtyRegions();
   if (_zoomScaleInt == 0) {
@@ -442,8 +437,12 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   }
   checkTileCount(surface);
   auto tileTasks = invalidateTileCaches(dirtyRegions);
-  auto screenTasks = collectScreenTasks(surface, &tileTasks);
-  if (screenTasks.empty()) {
+  std::vector<Rect> skippedRects = {};
+  std::vector<DrawTask> throttleScreenTasks = {};
+  auto screenTasks = collectScreenTasks(surface, !dirtyRegions.empty(), autoClear, &tileTasks,
+                                        &skippedRects, &throttleScreenTasks);
+  // Throttle tasks and skipped rects must keep the tiled path; only fall back when all are empty.
+  if (screenTasks.empty() && throttleScreenTasks.empty() && skippedRects.empty()) {
     recycleCurrentTileTasks(tileTasks);
     return renderDirect(surface, autoClear);
   }
@@ -469,7 +468,8 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
       dirtyRects.emplace_back(dirtyRect);
     }
   }
-  drawScreenTasks(std::move(screenTasks), surface, autoClear);
+  drawScreenTasks(std::move(screenTasks), std::move(skippedRects), surface, autoClear);
+  drawThrottleScreenTasks(std::move(throttleScreenTasks), surface, autoClear);
   return dirtyRects;
 }
 
@@ -577,16 +577,18 @@ void DisplayList::invalidateCurrentTileCache(const TileCache* tileCache,
   }
 }
 
-std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
-                                                      std::vector<DrawTask>* tileTasks) {
-  auto maxRefinedCount = _maxTilesRefinedPerFrame;
+std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface, bool hasDirtyRegions,
+                                                      bool autoClear,
+                                                      std::vector<DrawTask>* tileTasks,
+                                                      std::vector<Rect>* skippedRects,
+                                                      std::vector<DrawTask>* throttleScreenTasks) {
+  auto maxBudget = _maxTilesRefinedPerFrame;
+  const auto useFallback = _tileUpdateMode != TileUpdateMode::Immediate;
   if (lastContentOffset != _contentOffset || lastZoomScaleInt != _zoomScaleInt) {
     updateMousePosition();
     lastContentOffset = _contentOffset;
     lastZoomScaleInt = _zoomScaleInt;
-    // To ensure smooth user interactions, we skip refinement when the offset or zoom scale is
-    // changing.
-    maxRefinedCount = 0;
+    maxBudget = 0;
   }
   hasZoomBlurTiles = false;
   TileCache* currentTileCache = nullptr;
@@ -630,27 +632,50 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
     if (tile != nullptr) {
       auto tileRect = tile->getTileRect(_tileSize, &renderRect);
       screenTasks.emplace_back(tile, _tileSize, tileRect);
-    } else {
-      if (_allowZoomBlur) {
-        auto fallbackTasks = getFallbackDrawTasks(tileX, tileY, fallbackTileCaches);
-        if (!fallbackTasks.empty()) {
-          if (maxRefinedCount <= 0) {
-            screenTasks.insert(screenTasks.end(), fallbackTasks.begin(), fallbackTasks.end());
-            hasZoomBlurTiles = true;
-            continue;
-          }
-          maxRefinedCount--;
-        }
+      continue;
+    }
+    if (!useFallback || maxBudget > 0) {
+      if (useFallback) {
+        maxBudget--;
       }
       dirtyGrids.emplace_back(tileX, tileY);
+    } else {
+      auto fallbackTasks = getFallbackDrawTasks(tileX, tileY, fallbackTileCaches);
+      if (!fallbackTasks.empty()) {
+        hasZoomBlurTiles = true;
+        screenTasks.insert(screenTasks.end(), fallbackTasks.begin(), fallbackTasks.end());
+        continue;
+      }
+      // Rasterize in Smooth mode, or when this frame has dirty regions: dirty regions also
+      // clear fallback tiles at other scales, so a skipRect would render as background color.
+      if (_tileUpdateMode == TileUpdateMode::Smooth || hasDirtyRegions) {
+        dirtyGrids.emplace_back(tileX, tileY);
+        continue;
+      }
+      hasZoomBlurTiles = true;
+      skippedRects->emplace_back(
+          Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize));
+      if (!autoClear) {
+        // Under autoClear=false, throttle fallback tiles are not drawn because SrcOver blending
+        // would let farther tiles bleed through near-tile alpha edges, producing cross-scale
+        // artifacts. Skip collection entirely to avoid wasted work.
+        continue;
+      }
+      auto throttleFallback = getThrottleFallbackTasks(tileX, tileY, fallbackTileCaches);
+      if (!throttleFallback.empty()) {
+        throttleScreenTasks->insert(throttleScreenTasks->end(), throttleFallback.begin(),
+                                    throttleFallback.end());
+      }
     }
   }
   std::vector<std::shared_ptr<Tile>> freeTiles = {};
   bool continuous = false;
-  if (screenTasks.empty()) {
+  if (screenTasks.empty() && throttleScreenTasks->empty()) {
     freeTiles = createContinuousTiles(surface, endX - startX, endY - startY);
     continuous = !freeTiles.empty();
     dirtyGrids = GenerateGridTiles(startX, endX, startY, endY);
+    skippedRects->clear();
+    hasZoomBlurTiles = false;
   }
   if (freeTiles.empty()) {
     freeTiles = getFreeTiles(surface, dirtyGrids.size(), sortedCaches);
@@ -671,7 +696,7 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
     screenTasks.emplace_back(tile, _tileSize, tileRect);
     currentTileCache->addTile(tile);
   }
-  if (continuous && !hasZoomBlurTiles) {
+  if (continuous) {
     // If we have continuous tiles, we can draw a single rectangle for the entire area.
     auto drawRect = Rect::MakeXYWH(startX * _tileSize, startY * _tileSize,
                                    (endX - startX) * _tileSize, (endY - startY) * _tileSize);
@@ -708,7 +733,7 @@ std::vector<std::pair<float, TileCache*>> DisplayList::getSortedTileCaches() con
 
 std::vector<std::pair<float, TileCache*>> DisplayList::getFallbackTileCaches(
     const std::vector<std::pair<float, TileCache*>>& sortedCaches) const {
-  if (!_allowZoomBlur) {
+  if (_tileUpdateMode == TileUpdateMode::Immediate) {
     return {};
   }
   auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
@@ -775,6 +800,55 @@ std::vector<DrawTask> DisplayList::getFallbackDrawTasks(
       }
       if (!found) {
         return {};
+      }
+    }
+  }
+  return tasks;
+}
+
+std::vector<DrawTask> DisplayList::getThrottleFallbackTasks(
+    int tileX, int tileY, const std::vector<std::pair<float, TileCache*>>& fallbackCaches) const {
+  auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
+  DEBUG_ASSERT(currentZoomScale != 0.0f);
+  auto tileRect = Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize);
+  auto renderBounds = _root->renderBounds;
+  renderBounds.scale(currentZoomScale, currentZoomScale);
+  renderBounds.roundOut();
+  if (!tileRect.intersect(renderBounds)) {
+    return {};
+  }
+  // Sort fallback caches farthest-first so that nearer (higher-quality) tiles are drawn on top
+  // of farther (lower-quality) ones during rendering. When two caches have the same ScaleRatio
+  // (e.g. 0.5x and 2.0x relative to 1.0x), the upsample cache is placed before the downsample
+  // cache so the downsample output (sharper) overlays the upsample output (blurrier).
+  auto orderedCaches = fallbackCaches;
+  std::sort(orderedCaches.begin(), orderedCaches.end(),
+            [currentZoomScale](const std::pair<float, TileCache*>& a,
+                               const std::pair<float, TileCache*>& b) {
+              auto ratioA = ScaleRatio(a.first, currentZoomScale);
+              auto ratioB = ScaleRatio(b.first, currentZoomScale);
+              if (ratioA != ratioB) {
+                return ratioA > ratioB;
+              }
+              return a.first < b.first;
+            });
+  std::vector<DrawTask> tasks = {};
+  for (auto& [scale, tileCache] : orderedCaches) {
+    if (scale == currentZoomScale || tileCache->empty()) {
+      continue;
+    }
+    auto scaleRatio = scale / currentZoomScale;
+    DEBUG_ASSERT(scaleRatio != 0.0f);
+    auto zoomedRect = tileRect;
+    zoomedRect.scale(scaleRatio, scaleRatio);
+    auto covering = tileCache->getTilesUnderRect(zoomedRect, false);
+    if (covering.empty()) {
+      continue;
+    }
+    for (auto& t : covering) {
+      auto drawRect = t->getTileRect(_tileSize);
+      if (drawRect.intersect(zoomedRect)) {
+        tasks.emplace_back(t, _tileSize, drawRect, 1.0f / scaleRatio);
       }
     }
   }
@@ -936,7 +1010,7 @@ int DisplayList::getMaxTileCountPerAtlas(Context* context) const {
   return (maxTextureSize / _tileSize) * (maxTextureSize / _tileSize);
 }
 
-void DisplayList::drawTileTask(const DrawTask& task, const BackgroundSnapshotMap* snapshots) const {
+void DisplayList::drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snapshots) const {
   auto surface = surfaceCaches[task.sourceIndex()].get();
   DEBUG_ASSERT(surface != nullptr);
   auto canvas = surface->getCanvas();
@@ -954,8 +1028,8 @@ void DisplayList::drawTileTask(const DrawTask& task, const BackgroundSnapshotMap
   drawRootLayer(surface, clipRect, viewMatrix, true, snapshots);
 }
 
-void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* surface,
-                                  bool autoClear) const {
+void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, std::vector<Rect> skippedRects,
+                                  Surface* surface, bool autoClear) const {
   // Sort tasks by surface index to ensure they are drawn in batches.
   std::sort(screenTasks.begin(), screenTasks.end(),
             [](const DrawTask& a, const DrawTask& b) { return a.sourceIndex() < b.sourceIndex(); });
@@ -976,12 +1050,19 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* su
     auto image = surfaceCache->makeImageSnapshot();
     auto& sampling = task.identityScale() ? nearestSampling : linearSampling;
     canvas->drawImageRect(image, task.sourceRect(), task.tileRect(), sampling, &paint,
-                          SrcRectConstraint::Strict);
+                          SrcRectConstraint::Strict, &task.strictRect());
     tileRect.join(task.tileRect());
   }
 
   auto screenRect = Rect::MakeWH(surface->width(), surface->height());
   screenRect.offset(-_contentOffset.x, -_contentOffset.y);
+
+  paint.setColor(_backgroundColor);
+  for (auto& rect : skippedRects) {
+    canvas->drawRect(rect, paint);
+    tileRect.join(rect);
+  }
+
   if (tileRect.contains(screenRect)) {
     return;
   }
@@ -993,10 +1074,31 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* su
   // Clip to render bounds because fallback tiles may extend beyond content due to roundOut.
   tileRect.intersect(renderBounds);
 
-  paint.setColor(_root->backgroundColor());
+  paint.setColor(_backgroundColor);
   auto backgroundRect = GetNonIntersectingRects(screenRect, tileRect);
   for (auto& rect : backgroundRect) {
     canvas->drawRect(rect, paint);
+  }
+}
+
+void DisplayList::drawThrottleScreenTasks(std::vector<DrawTask> throttleScreenTasks,
+                                          Surface* surface, bool autoClear) const {
+  if (throttleScreenTasks.empty()) {
+    return;
+  }
+  auto canvas = surface->getCanvas();
+  AutoCanvasRestore autoRestore(canvas);
+  canvas->setMatrix(Matrix::MakeTrans(_contentOffset.x, _contentOffset.y));
+  Paint paint = {};
+  paint.setAntiAlias(false);
+  paint.setBlendMode(autoClear ? BlendMode::Src : BlendMode::SrcOver);
+  static SamplingOptions linearSampling(FilterMode::Linear, MipmapMode::None);
+  for (auto& task : throttleScreenTasks) {
+    auto surfaceCache = surfaceCaches[task.sourceIndex()];
+    DEBUG_ASSERT(surfaceCache != nullptr);
+    auto image = surfaceCache->makeImageSnapshot();
+    canvas->drawImageRect(std::move(image), task.sourceRect(), task.tileRect(), linearSampling,
+                          &paint, SrcRectConstraint::Strict, &task.strictRect());
   }
 }
 
@@ -1038,7 +1140,7 @@ void DisplayList::resetCaches() {
 }
 
 void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
-                                bool autoClear, const BackgroundSnapshotMap* snapshots) const {
+                                bool autoClear, BackgroundSnapshotMap* snapshots) const {
   DEBUG_ASSERT(surface != nullptr);
   auto canvas = surface->getCanvas();
   auto context = surface->getContext();
@@ -1062,6 +1164,9 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   args.renderRects = &renderRectsVec;
   args.dstColorSpace = surface->colorSpace();
   args.subtreeCacheMaxSize = _subtreeCacheMaxSize;
+  // Draw background color before the layer tree. This ensures backgroundColor is only rendered
+  // through the DisplayList::render() path, not when calling Layer::draw() directly.
+  canvas->drawColor(_backgroundColor, BlendMode::SrcOver);
   // Consume pass: replay snapshots produced by the capture pass. When the tree has no
   // background-sourced styles, snapshots is null and we fall back to NoOp, which makes
   // background-sourced styles (if any show up unexpectedly) silently no-op — matching the
@@ -1119,6 +1224,11 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
     return nullptr;
   }
   auto snapshotMap = std::make_unique<BackgroundSnapshotMap>();
+  // Draw backgroundColor before the layer tree so that the capture pass includes it as part of
+  // the background for blur/backdrop effects.
+  if (_backgroundColor != Color::Transparent()) {
+    bgSource->getCanvas()->drawColor(_backgroundColor, BlendMode::SrcOver);
+  }
   BackgroundCapturer::Run(_root.get(), args, std::move(bgSource), snapshotMap.get(), worldRects);
   return snapshotMap;
 }

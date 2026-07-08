@@ -9,8 +9,8 @@ const fileHeaderPath = path.resolve(__dirname, '../../.idea/fileTemplates/includ
 const banner = readFileSync(fileHeaderPath, 'utf-8');
 
 const arch = process.env.ARCH;
-var fileName = (arch === 'wasm-mt'? 'index': 'index-st');
-var filePath = (arch === 'wasm-mt'? 'wasm-mt': 'wasm');
+var fileName = (arch === 'wasm-mt' ? 'index' : arch === 'wasm-webgpu' ? 'index-webgpu' : 'index-st');
+var filePath = (arch === 'wasm-mt' ? 'wasm-mt' : 'wasm');
 
 const plugins = [
     esbuild({tsconfig: "tsconfig.json", minify: false}),

@@ -323,7 +323,7 @@ void RenderContext::drawMesh(std::shared_ptr<Mesh> mesh, const Matrix& matrix,
 void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
                                   const Rect& dstRect, const SamplingOptions& sampling,
                                   const Matrix& matrix, const ClipStack& clip, const Brush& brush,
-                                  SrcRectConstraint constraint) {
+                                  SrcRectConstraint constraint, const Rect* strictRect) {
   DEBUG_ASSERT(image != nullptr);
   DEBUG_ASSERT(image->isAlphaOnly() || brush.shader == nullptr);
   auto compositor = getOpsCompositor();
@@ -340,7 +340,7 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcR
     samplingOptions.mipmapMode = MipmapMode::None;
   }
   compositor->fillImageRect(std::move(image), srcRect, dstRect, samplingOptions, matrix, clip,
-                            brush, constraint);
+                            brush, constraint, strictRect);
 }
 
 void RenderContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const Matrix& matrix,

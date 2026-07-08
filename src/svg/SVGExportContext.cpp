@@ -22,14 +22,21 @@
 #include "SVGUtils.h"
 #include "core/GlyphTransform.h"
 #include "core/RunRecord.h"
+#include "core/codecs/jpeg/JpegCodec.h"
+#include "core/codecs/png/PngCodec.h"
+#include "core/filters/GaussianBlurImageFilter.h"
+#include "core/filters/ShaderMaskFilter.h"
 #include "core/images/CodecImage.h"
 #include "core/images/FilterImage.h"
 #include "core/images/PictureImage.h"
 #include "core/images/SubsetImage.h"
+#include "core/shaders/ImageShader.h"
+#include "core/shaders/MatrixShader.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/RectToRectMatrix.h"
 #include "core/utils/ShapeUtils.h"
+#include "core/utils/StrokeUtils.h"
 #include "core/utils/Types.h"
 #include "svg/SVGTextBuilder.h"
 #include "tgfx/core/Bitmap.h"
@@ -52,6 +59,52 @@
 #include "tgfx/svg/SVGPathParser.h"
 
 namespace tgfx {
+
+// Detects the (BlendMode::Src + FilterImage<Blur> + ShaderMaskFilter) draw pattern produced by
+// BackgroundBlurStyle's lower path.
+static bool IsBackgroundBlurStylePattern(const Brush& brush, const Image* image) {
+  if (brush.blendMode != BlendMode::Src) {
+    return false;
+  }
+  if (!brush.maskFilter) {
+    return false;
+  }
+  if (Types::Get(brush.maskFilter.get()) != Types::MaskFilterType::Shader) {
+    return false;
+  }
+  if (Types::Get(image) != Types::ImageType::Filter) {
+    return false;
+  }
+  const auto* filterImage = static_cast<const FilterImage*>(image);
+  return filterImage->filter &&
+         Types::Get(filterImage->filter.get()) == Types::ImageFilterType::Blur;
+}
+
+// Extracts the content PictureImage and accumulated shader matrix from a ShaderMaskFilter's
+// shader chain. Returns nullptr if the chain does not lead to an ImageShader wrapping a
+// PictureImage. Accumulates all MatrixShader transforms into shaderMatrix.
+static const PictureImage* GetContentPictureImage(const MaskFilter* maskFilter,
+                                                  Matrix* shaderMatrix) {
+  if (Types::Get(maskFilter) != Types::MaskFilterType::Shader) {
+    return nullptr;
+  }
+  auto shader = static_cast<const ShaderMaskFilter*>(maskFilter)->getShader();
+  // Unwrap MatrixShader wrappers, accumulating their transforms.
+  *shaderMatrix = Matrix::I();
+  while (shader && Types::Get(shader.get()) == Types::ShaderType::Matrix) {
+    auto* matrixShader = static_cast<const MatrixShader*>(shader.get());
+    shaderMatrix->preConcat(matrixShader->matrix);
+    shader = matrixShader->source;
+  }
+  if (!shader || Types::Get(shader.get()) != Types::ShaderType::Image) {
+    return nullptr;
+  }
+  auto image = static_cast<const ImageShader*>(shader.get())->image;
+  if (image && Types::Get(image.get()) == Types::ImageType::Picture) {
+    return static_cast<const PictureImage*>(image.get());
+  }
+  return nullptr;
+}
 
 SVGExportContext::SVGExportContext(Context* context, const Rect& viewBox,
                                    std::unique_ptr<XMLWriter> inputXmlWriter, uint32_t exportFlags,
@@ -88,7 +141,7 @@ void SVGExportContext::drawFill(const Brush& brush) {
 }
 
 void SVGExportContext::drawRect(const Rect& rect, const Matrix& matrix, const ClipStack& clip,
-                                const Brush& brush, const Stroke*) {
+                                const Brush& brush, const Stroke* stroke) {
   std::unique_ptr<ElementWriter> svg;
   if (RequiresViewportReset(brush)) {
     svg =
@@ -98,10 +151,14 @@ void SVGExportContext::drawRect(const Rect& rect, const Matrix& matrix, const Cl
     svg->addRectAttributes(rect);
   }
 
-  applyClip(clip, matrix.mapRect(rect));
+  auto contentBounds = rect;
+  if (stroke) {
+    ApplyStrokeToBounds(*stroke, &contentBounds, matrix);
+  }
+  applyClip(clip, matrix.mapRect(contentBounds));
 
   ElementWriter rectElement("rect", context, this, xmlWriter.get(), resourceBucket.get(),
-                            exportFlags & SVGExportFlags::DisableWarnings, matrix, brush, nullptr,
+                            exportFlags & SVGExportFlags::DisableWarnings, matrix, brush, stroke,
                             _targetColorSpace, _assignColorSpace);
 
   if (svg) {
@@ -115,30 +172,41 @@ void SVGExportContext::drawRect(const Rect& rect, const Matrix& matrix, const Cl
 }
 
 void SVGExportContext::drawRRect(const RRect& roundRect, const Matrix& matrix,
-                                 const ClipStack& clip, const Brush& brush, const Stroke*) {
-  applyClip(clip, matrix.mapRect(roundRect.rect()));
+                                 const ClipStack& clip, const Brush& brush, const Stroke* stroke) {
+  if (roundRect.isComplex()) {
+    // SVG <rect> only supports uniform rx/ry; complex RRects must be exported as <path>.
+    // With stroke, route through drawShape so the generic stroker handles it.
+    Path path = {};
+    path.addRRect(roundRect);
+    if (stroke) {
+      drawShape(Shape::MakeFrom(std::move(path)), matrix, clip, brush, stroke);
+    } else {
+      drawPath(path, matrix, clip, brush);
+    }
+    return;
+  }
+
+  auto contentBounds = roundRect.rect();
+  if (stroke) {
+    ApplyStrokeToBounds(*stroke, &contentBounds, matrix);
+  }
+  applyClip(clip, matrix.mapRect(contentBounds));
   if (roundRect.isOval()) {
     if (roundRect.rect().width() == roundRect.rect().height()) {
       ElementWriter circleElement("circle", context, this, xmlWriter.get(), resourceBucket.get(),
                                   exportFlags & SVGExportFlags::DisableWarnings, matrix, brush,
-                                  nullptr, _targetColorSpace, _assignColorSpace);
+                                  stroke, _targetColorSpace, _assignColorSpace);
       circleElement.addCircleAttributes(roundRect.rect());
-      return;
     } else {
       ElementWriter ovalElement("ellipse", context, this, xmlWriter.get(), resourceBucket.get(),
                                 exportFlags & SVGExportFlags::DisableWarnings, matrix, brush,
-                                nullptr, _targetColorSpace, _assignColorSpace);
+                                stroke, _targetColorSpace, _assignColorSpace);
       ovalElement.addEllipseAttributes(roundRect.rect());
     }
-  } else if (roundRect.isComplex()) {
-    // SVG <rect> only supports uniform rx/ry. Complex RRects must be exported as <path>.
-    Path path = {};
-    path.addRRect(roundRect);
-    drawPath(path, matrix, clip, brush);
   } else {
     ElementWriter rrectElement("rect", context, this, xmlWriter.get(), resourceBucket.get(),
-                               exportFlags & SVGExportFlags::DisableWarnings, matrix, brush,
-                               nullptr, _targetColorSpace, _assignColorSpace);
+                               exportFlags & SVGExportFlags::DisableWarnings, matrix, brush, stroke,
+                               _targetColorSpace, _assignColorSpace);
     rrectElement.addRoundRectAttributes(roundRect);
   }
 }
@@ -221,47 +289,167 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
   } else if (type == Types::ImageType::Filter) {
     const auto filterImage = static_cast<const FilterImage*>(image.get());
     auto filter = filterImage->filter;
+
+    // BackgroundBlurStyle lowers to (BlendMode::Src + FilterImage<Blur> + ShaderMaskFilter).
+    // Output as <foreignObject> with backdrop-filter:blur() for native SVG backdrop blur.
+    if (IsBackgroundBlurStylePattern(brush, image.get())) {
+      Matrix shaderMatrix = Matrix::I();
+      auto* contentPictureImage = GetContentPictureImage(brush.maskFilter.get(), &shaderMatrix);
+      if (contentPictureImage) {
+        const auto* blurFilter = static_cast<const GaussianBlurImageFilter*>(filter.get());
+        auto contentBounds =
+            Rect::MakeWH(contentPictureImage->width(), contentPictureImage->height());
+        // Apply the PictureImage's matrix and the accumulated shader matrix to get the content
+        // bounds in the draw coordinate space. The shader matrix captures the inverse of the
+        // drawImage offset, which compensates for the backdrop blur image's offset relative to
+        // the layer's content position.
+        auto contentMatrix = matrix;
+        contentMatrix.preConcat(shaderMatrix);
+        if (contentPictureImage->matrix) {
+          contentMatrix.preConcat(*contentPictureImage->matrix);
+        }
+        auto mappedContentBounds = contentMatrix.mapRect(contentBounds);
+
+        // foreignObject must extend beyond the content bounds by the blur outset so the blur
+        // has room to render outside the clipped area. Compute the blur outset in SVG user space.
+        auto canvasScale = contentMatrix.getMaxScale();
+        // blurFilter->blurrinessX/Y are in pixel space (sigma * contentScale).
+        // canvasScale ≈ 1/contentScale, so user-space sigma ≈ blurriness * canvasScale.
+        auto userSigmaX = FloatNearlyZero(canvasScale) ? blurFilter->blurrinessX
+                                                       : blurFilter->blurrinessX * canvasScale;
+        auto userSigmaY = FloatNearlyZero(canvasScale) ? blurFilter->blurrinessY
+                                                       : blurFilter->blurrinessY * canvasScale;
+        // onFilterBounds outsets by 2*sigma per side.
+        auto foBounds = mappedContentBounds;
+        foBounds.outset(2.0f * userSigmaX, 2.0f * userSigmaY);
+
+        // Close any active clip group before emitting resources.
+        clipGroupElement = nullptr;
+        currentClipPath = {};
+
+        // Define clipPath from content picture's vector shape.
+        auto clipID = resourceBucket->addClip();
+        {
+          ElementWriter defsElement("defs", xmlWriter);
+          ElementWriter clipPathElement("clipPath", xmlWriter);
+          clipPathElement.addAttribute("id", clipID);
+          // The clipPath coordinates are in the foreignObject's local space, so translate by
+          // the foreignObject origin offset.
+          auto foOffset = Point::Make(foBounds.x(), foBounds.y());
+          clipPathElement.addAttribute("transform",
+                                       ToSVGTransform(Matrix::MakeTrans(-foOffset.x, -foOffset.y)));
+          // Playback the content picture to generate vector clip shapes. SVG <clipPath> only
+          // recognizes basic shape elements (path/rect/circle/etc.) as clip geometry; brush
+          // attributes (fill/stroke/filter) are ignored, and non-shape descendants (e.g.
+          // <image>, nested <filter>) are not portable across renderers. Works reliably for
+          // BackgroundBlurStyle's typical use (single ShapeLayer content). Layers with
+          // image/text/filter content under backdrop blur may render inconsistently — fall
+          // through to raster fallback if richer content support is needed.
+          drawPicture(contentPictureImage->picture, contentMatrix, ClipStack());
+        }
+
+        // Output <foreignObject> with backdrop-filter:blur().
+        // CSS blur() parameter is the Gaussian sigma in the foreignObject's coordinate space.
+        xmlWriter->startElement("foreignObject");
+        xmlWriter->addScalarAttribute("x", foBounds.x());
+        xmlWriter->addScalarAttribute("y", foBounds.y());
+        xmlWriter->addScalarAttribute("width", foBounds.width());
+        xmlWriter->addScalarAttribute("height", foBounds.height());
+        {
+          xmlWriter->startElement("div");
+          xmlWriter->addAttribute("xmlns", "http://www.w3.org/1999/xhtml");
+          // CSS backdrop-filter:blur() accepts only a single (isotropic) radius. When the
+          // source filter is anisotropic (sigmaX != sigmaY), take the larger axis as a
+          // best-effort approximation — exact anisotropy cannot be expressed in CSS.
+          auto blurSigma = std::max(userSigmaX, userSigmaY);
+          std::string style = "backdrop-filter:blur(" + FloatToString(blurSigma) + "px);" +
+                              "clip-path:url(#" + clipID + ");height:100%;width:100%";
+          xmlWriter->addAttribute("style", style);
+          xmlWriter->addText("");
+          xmlWriter->endElement();  // div
+        }
+        xmlWriter->endElement();  // foreignObject
+
+        clipGroupElement = nullptr;
+        currentClipPath = {};
+        return;
+      }
+      // Fallback: content image is not a PictureImage, cannot extract vector clip path.
+      // Fall through to the default FilterImage rasterization path.
+    }
+
     auto bound = Rect::MakeWH(filterImage->source->width(), filterImage->source->height());
     auto filtBound = filterImage->bounds;
     auto outer = Point::Make((filtBound.width() - bound.width()) / 2,
                              (filtBound.height() - bound.height()) / 2);
     auto offset =
         Point::Make((filtBound.centerX() - bound.centerX()), filtBound.centerY() - bound.centerY());
-    bound = matrix.mapRect(bound);
+    // Source is drawn with the matrix preTranslated by (outer - offset) below (see innerMatrix).
+    // The filter region must follow the same matrix to stay aligned in user space; using the raw
+    // `matrix` here would place the <filter> region at the pre-compensation location while the
+    // content renders at the compensated location, leaving the filter region clipped on one side
+    // (cutting off the blur halo) and extending into empty sandbox space on the other (creating
+    // hard-edged banding from the implicit source edge at the sandbox boundary).
+    auto contentMatrix = matrix;
+    contentMatrix.preTranslate(outer.x - offset.x, outer.y - offset.y);
+    bound = contentMatrix.mapRect(bound);
 
     Resources resources;
+    std::vector<std::string> filterIDs;
     if (filter) {
       ElementWriter defs("defs", xmlWriter, resourceBucket.get(), _targetColorSpace,
                          _assignColorSpace);
-      resources = defs.addImageFilterResource(filter, bound, customWriter);
+      filterIDs = defs.addImageFilterChain(filter, bound, customWriter, context);
+      if (filterIDs.size() == 1) {
+        resources.filter = "url(#" + filterIDs[0] + ")";
+      }
     }
     auto clipPath = clip.getClipPath();
     bool needsClip = !clipPath.isEmpty() && !clipPath.contains(bound);
+    // Close any active clip group from prior draws BEFORE emitting our own <clipPath> resource
+    // and brush <g>. Otherwise the <clipPath> definition would be nested inside the stale wrapper
+    // and the new <g> would sit at the wrong XML depth. On exit, leave both members cleared so
+    // the next applyClipPath rebuilds the clip group instead of short-circuiting on a matching
+    // currentClipPath.
+    clipGroupElement = nullptr;
+    currentClipPath = {};
     std::string clipID;
     if (needsClip) {
       clipID = defineClipPath(clipPath);
     }
+    // Collapse clip-path, filter, mix-blend-mode and opacity onto a single <g>. Wrapping the
+    // mix-blend-mode element in any extra parent <g> (e.g. one that only carries clip-path)
+    // would make its backdrop the empty content of that wrapper instead of the real previous
+    // siblings, causing the blend to silently fail. SVG/CSS painting model applies clip before
+    // filter on the same element, so co-locating them is semantically equivalent to nesting.
+    std::string outerBlendStyle;
+    if (brush.blendMode != BlendMode::SrcOver) {
+      auto svgBlendMode = ToSVGBlendMode(brush.blendMode);
+      if (!svgBlendMode.empty() && svgBlendMode != "normal") {
+        outerBlendStyle = "mix-blend-mode: " + svgBlendMode;
+      }
+    }
+    float outerAlpha = brush.color.alpha;
     {
-      // Close any active clip group from prior draws so the local clip/transform/filter
-      // groups below sit at the correct parent level. On exit, leave both members cleared
-      // so the next applyClipPath rebuilds the clip group instead of short-circuiting on
-      // a matching currentClipPath.
-      clipGroupElement = nullptr;
-      currentClipPath = {};
-      std::unique_ptr<ElementWriter> clipElement;
-      if (needsClip) {
-        clipElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
-        clipElement->addAttribute("clip-path", "url(#" + clipID + ")");
+      auto groupElements = buildFilterGroupElements(
+          filterIDs, resources.filter, needsClip ? clipID : "", outerBlendStyle, outerAlpha);
+      // Strip lifted effects from the inner brush so the recursive draw does not re-emit them
+      // on a nested <g>, which would both double the effect and reintroduce the isolation issue.
+      Brush innerBrush = brush;
+      if (!outerBlendStyle.empty()) {
+        innerBrush.blendMode = BlendMode::SrcOver;
       }
-      auto groupElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
-      if (!outer.isZero()) {
-        groupElement->addAttribute(
-            "transform", ToSVGTransform(Matrix::MakeTrans(outer.x - offset.x, outer.y - offset.y)));
+      if (outerAlpha != 1.0f) {
+        innerBrush.color.alpha = 1.0f;
       }
-      if (filter) {
-        groupElement->addAttribute("filter", resources.filter);
-      }
-      drawImage(filterImage->source, sampling, matrix, needsClip ? ClipStack{} : clip, brush);
+      // contentMatrix already pre-translates by (outer - offset) so the source is drawn at its
+      // intended user-space position. Pre-concatenating this offset into the matrix (instead of
+      // writing it as the group's transform) keeps the source-local offset correctly oriented
+      // under any rotation/scale in the layer matrix, matching the raster pipeline in
+      // Canvas::drawLayer (which uses drawMatrix.preTranslate(filterOffset)).
+      drawImage(filterImage->source, sampling, contentMatrix, needsClip ? ClipStack{} : clip,
+                innerBrush);
+      groupElements.clear();
       clipGroupElement = nullptr;
       currentClipPath = {};
     }
@@ -291,7 +479,8 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
 void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
                                      const Rect& dstRect, const SamplingOptions&,
                                      const Matrix& matrix, const ClipStack& clip,
-                                     const Brush& brush, SrcRectConstraint) {
+                                     const Brush& brush, SrcRectConstraint,
+                                     const Rect* /*strictRect*/) {
   DEBUG_ASSERT(image != nullptr);
   auto modifyImage = ConvertImageColorSpace(image, context, _targetColorSpace, _assignColorSpace);
   auto subsetImage = modifyImage->makeSubset(srcRect);
@@ -498,16 +687,55 @@ void SVGExportContext::exportPictureImageAsVector(const PictureImage* pictureIma
   }
 }
 
+static void ApplyGroupAttributes(ElementWriter* element, const std::string& clipID,
+                                 const std::string& filterRef, const std::string& blendStyle,
+                                 float alpha) {
+  if (!clipID.empty()) {
+    element->addAttribute("clip-path", "url(#" + clipID + ")");
+  }
+  if (!filterRef.empty()) {
+    element->addAttribute("filter", filterRef);
+  }
+  if (!blendStyle.empty()) {
+    element->addAttribute("style", blendStyle);
+  }
+  if (alpha != 1.0f) {
+    element->addAttribute("opacity", alpha);
+  }
+}
+
+std::vector<std::unique_ptr<ElementWriter>> SVGExportContext::buildFilterGroupElements(
+    const std::vector<std::string>& filterIDs, const std::string& singleFilterRef,
+    const std::string& clipID, const std::string& blendStyle, float alpha) {
+  std::vector<std::unique_ptr<ElementWriter>> groupElements;
+  if (filterIDs.size() > 1) {
+    auto outermost = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
+    ApplyGroupAttributes(outermost.get(), clipID, "url(#" + filterIDs.back() + ")", blendStyle,
+                         alpha);
+    groupElements.push_back(std::move(outermost));
+    for (size_t i = filterIDs.size() - 1; i > 0; --i) {
+      auto inner = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
+      inner->addAttribute("filter", "url(#" + filterIDs[i - 1] + ")");
+      groupElements.push_back(std::move(inner));
+    }
+  } else {
+    auto groupElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
+    ApplyGroupAttributes(groupElement.get(), clipID, singleFilterRef, blendStyle, alpha);
+    groupElements.push_back(std::move(groupElement));
+  }
+  return groupElements;
+}
+
 void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
                                  std::shared_ptr<ImageFilter> imageFilter, const Matrix& matrix,
-                                 const ClipStack& clip, const Brush&) {
+                                 const ClipStack& clip, const Brush& brush) {
   DEBUG_ASSERT(picture != nullptr);
-  Resources resources;
+  std::vector<std::string> filterIDs;
   auto bound = matrix.mapRect(picture->getBounds());
   if (imageFilter) {
     ElementWriter defs("defs", xmlWriter, resourceBucket.get(), _targetColorSpace,
                        _assignColorSpace);
-    resources = defs.addImageFilterResource(imageFilter, picture->getBounds(), customWriter);
+    filterIDs = defs.addImageFilterChain(imageFilter, bound, customWriter, context);
   }
   auto clipPath = clip.getClipPath();
   bool needsClip = !clipPath.isEmpty() && !clipPath.contains(bound);
@@ -520,14 +748,21 @@ void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
     // left cleared on exit instead of being saved and restored.
     clipGroupElement = nullptr;
     currentClipPath = {};
-    auto groupElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
-    if (needsClip) {
-      groupElement->addAttribute("clip-path", "url(#" + clipID + ")");
+    std::string blendStyle;
+    if (brush.blendMode != BlendMode::SrcOver) {
+      auto svgBlendMode = ToSVGBlendMode(brush.blendMode);
+      if (!svgBlendMode.empty() && svgBlendMode != "normal") {
+        blendStyle = "mix-blend-mode: " + svgBlendMode;
+      }
     }
-    if (imageFilter) {
-      groupElement->addAttribute("filter", resources.filter);
+    std::string singleFilterRef;
+    if (!filterIDs.empty()) {
+      singleFilterRef = "url(#" + filterIDs[0] + ")";
     }
+    auto groupElements = buildFilterGroupElements(
+        filterIDs, singleFilterRef, needsClip ? clipID : "", blendStyle, brush.color.alpha);
     picture->playback(this, matrix, needsClip ? ClipStack{} : clip);
+    groupElements.clear();
     clipGroupElement = nullptr;
     currentClipPath = {};
   }
@@ -639,6 +874,21 @@ std::shared_ptr<Data> SVGExportContext::ImageToEncodedData(const std::shared_ptr
   const auto codecImage = static_cast<const CodecImage*>(image.get());
   auto imageCodec = codecImage->getCodec();
   return imageCodec->getEncodedData();
+}
+
+std::shared_ptr<Data> SVGExportContext::EncodeImageToDataUri(const std::shared_ptr<Image>& image,
+                                                             Context* context) {
+  auto data = ImageToEncodedData(image);
+  if (data && (JpegCodec::IsJpeg(data) || PngCodec::IsPng(data))) {
+    return AsDataUri(data);
+  }
+  if (context) {
+    Bitmap bitmap = ImageExportToBitmap(context, image);
+    if (!bitmap.isEmpty()) {
+      return AsDataUri(Pixmap(bitmap));
+    }
+  }
+  return nullptr;
 }
 
 }  // namespace tgfx

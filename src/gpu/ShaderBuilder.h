@@ -27,6 +27,7 @@
 namespace tgfx {
 class ProgramBuilder;
 class ProgramInfo;
+class ShaderCaps;
 
 /**
  * Features that should only be enabled internally by the builders.
@@ -42,6 +43,8 @@ class ShaderBuilder {
   explicit ShaderBuilder(ProgramBuilder* builder);
 
   const ProgramInfo* getProgramInfo() const;
+
+  const ShaderCaps* shaderCaps() const;
 
   virtual ~ShaderBuilder() = default;
 

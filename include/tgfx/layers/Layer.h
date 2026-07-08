@@ -29,6 +29,7 @@
 #include "tgfx/layers/LayerType.h"
 #include "tgfx/layers/filters/LayerFilter.h"
 #include "tgfx/layers/layerstyles/LayerStyle.h"
+#include "tgfx/layers/layerstyles/StyledShape.h"
 
 namespace tgfx {
 class LayerContent;
@@ -589,6 +590,13 @@ class Layer : public std::enable_shared_from_this<Layer> {
    */
   void detachProperty(LayerProperty* property);
 
+  /**
+   * Returns the content shape of this layer.
+   * The base class generates a shape from the content's bounding rect. Subclasses can override
+   * this to provide a more precise shape.
+   */
+  virtual std::optional<StyledShape> onGetContentShape();
+
  private:
   /**
    * Marks the layer as needing to be redrawn. Unlike invalidateContent(), this method only marks
@@ -605,7 +613,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   Rect getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTightBounds);
 
-  Rect computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBounds);
+  Rect computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBounds,
+                     bool excludeEffects = false);
 
   void onAttachToRoot(RootLayer* rootLayer);
 
@@ -621,7 +630,12 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   LayerContent* getContent();
 
-  std::shared_ptr<ImageFilter> getImageFilter(float contentScale);
+  Rect mapContentBoundsToImage(float scale, const Rect& imageBounds);
+
+  Rect mapOutputBoundsToInput(const Rect& srcRect, float contentScale);
+
+  std::shared_ptr<Image> applyFilters(std::shared_ptr<Image> image, float contentScale,
+                                      const Rect& contentBounds, Point* offset);
 
   virtual bool drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 
@@ -644,11 +658,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
   using LayerDrawFunc = bool (Layer::*)(const DrawArgs&, Canvas*, float, BlendMode);
 
   void drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, const Matrix3D& matrix3D,
-                               LayerDrawFunc drawFunc, float alpha, BlendMode blendMode);
-
-  std::optional<DrawArgs> createChildArgs(const DrawArgs& args, Canvas* canvas, Layer* child);
-
-  bool drawChild(const DrawArgs& childArgs, Canvas* canvas, Layer* child, float alpha,
+                               LayerDrawFunc drawFunc, float alpha);
+  bool drawChild(const DrawArgs& args, Canvas* canvas, Layer* child, float alpha,
                  LayerDrawFunc drawFunc);
 
   std::unique_ptr<LayerStyleSource> getLayerStyleSource(const DrawArgs& args, const Matrix& matrix);
@@ -725,6 +736,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void updateStaticSubtreeFlags();
 
+  std::optional<StyledShape> getContentShape();
+
   struct {
     bool dirtyContent : 1;        // layer's content needs updating
     bool dirtyContentBounds : 1;  // layer's content bounds needs updating
@@ -770,7 +783,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   friend class BackgroundCapturer;
   friend class BackgroundConsumer;
   friend class LayerProperty;
-  friend class LayerSerialization;
   friend class OffscreenRenderer;
+  friend class Layer3DContext;
 };
 }  // namespace tgfx

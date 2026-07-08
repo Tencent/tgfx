@@ -106,16 +106,8 @@ void GLSLQuadPerEdgeAAGeometryProcessor::onEmitTransform(EmitArgs& args,
     vertexBuilder->emitTransformedPoint(perspLT, srcLT, subsetMatrixName, hasPerspective);
     vertexBuilder->emitTransformedPoint(perspRB, srcRB, subsetMatrixName, hasPerspective);
     vertexBuilder->codeAppend("highp vec4 subset = vec4(" + perspLT + ", " + perspRB + ");");
-    vertexBuilder->codeAppend("if (subset.x > subset.z) {");
-    vertexBuilder->codeAppend("  highp float tmp = subset.x;");
-    vertexBuilder->codeAppend("  subset.x = subset.z;");
-    vertexBuilder->codeAppend("  subset.z = tmp;");
-    vertexBuilder->codeAppend("}");
-    vertexBuilder->codeAppend("if (subset.y > subset.w) {");
-    vertexBuilder->codeAppend("  highp float tmp = subset.y;");
-    vertexBuilder->codeAppend("  subset.y = subset.w;");
-    vertexBuilder->codeAppend("  subset.w = tmp;");
-    vertexBuilder->codeAppend("}");
+    vertexBuilder->codeAppend(
+        "subset = vec4(min(subset.xy, subset.zw), max(subset.xy, subset.zw));");
     vertexBuilder->codeAppendf("%s = subset;", varying.vsOut().c_str());
     *args.outputSubset = varying.fsIn();
   }

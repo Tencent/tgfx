@@ -67,27 +67,28 @@ void GLSLRectEffect::emitCode(EmitArgs& args) const {
   if (needTransform()) {
     const auto deviceToLocalName =
         uniformHandler->addUniform("DeviceToLocal", UniformFormat::Float3x3, ShaderStage::Fragment);
-    fragBuilder->codeAppendf("vec3 hl = %s * vec3(gl_FragCoord.xy, 1.0);",
+    fragBuilder->codeAppendf("highp vec3 hl = %s * vec3(gl_FragCoord.xy, 1.0);",
                              deviceToLocalName.c_str());
-    fragBuilder->codeAppend("vec2 local = hl.xy / hl.z;");
+    fragBuilder->codeAppend("highp vec2 local = hl.xy / hl.z;");
   } else {
-    fragBuilder->codeAppend("vec2 local = gl_FragCoord.xy;");
+    fragBuilder->codeAppend("highp vec2 local = gl_FragCoord.xy;");
   }
 
   // Step 2: separable 1D coverage product. Clamp the signed distance to each edge into a half-pixel
   // band, giving each axis a coverage of 0.5 on the edge, 1.0 inside, and 0.0 outside.
-  fragBuilder->codeAppendf("vec4 dAA = clamp(vec4(local - %s.xy, %s.zw - local), -0.5, 0.5);",
+  fragBuilder->codeAppendf("highp vec4 dAA = clamp(vec4(local - %s.xy, %s.zw - local), -0.5, 0.5);",
                            rectName.c_str(), rectName.c_str());
-  fragBuilder->codeAppend("vec2 aaCovXY = dAA.xy + dAA.zw;");
+  fragBuilder->codeAppend("highp vec2 aaCovXY = dAA.xy + dAA.zw;");
   // box-filter coverage: the product of the two axis coverages, giving 0.25 at the rectangle's
   // vertex where a quarter of the pixel is inside.
-  fragBuilder->codeAppend("float aaCov = aaCovXY.x * aaCovXY.y;");
+  fragBuilder->codeAppend("highp float aaCov = aaCovXY.x * aaCovXY.y;");
   // NonAA coverage uses hard step at the original edge.
   fragBuilder->codeAppendf(
-      "float nonAACov = step(%s.x, local.x) * step(local.x, %s.z) * "
+      "highp float nonAACov = step(%s.x, local.x) * step(local.x, %s.z) * "
       "step(%s.y, local.y) * step(local.y, %s.w);",
       rectName.c_str(), rectName.c_str(), rectName.c_str(), rectName.c_str());
-  fragBuilder->codeAppendf("float coverage = mix(nonAACov, aaCov, %s);", antiAliasName.c_str());
+  fragBuilder->codeAppendf("highp float coverage = mix(nonAACov, aaCov, %s);",
+                           antiAliasName.c_str());
   fragBuilder->codeAppendf("%s = %s * coverage;", args.outputColor.c_str(),
                            args.inputColor.c_str());
 }

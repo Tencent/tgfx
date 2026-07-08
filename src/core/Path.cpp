@@ -194,6 +194,11 @@ Rect Path::getBounds() const {
   return pathRef->getBounds();
 }
 
+Rect Path::computeTightBounds() const {
+  auto skRect = pathRef->path.computeTightBounds();
+  return {skRect.fLeft, skRect.fTop, skRect.fRight, skRect.fBottom};
+}
+
 bool Path::isEmpty() const {
   return pathRef->path.isEmpty();
 }
@@ -489,7 +494,13 @@ void Path::addArc(const Rect& oval, float startAngle, float sweepAngle) {
   auto path = &(writableRef()->path);
   path->moveTo(iter.current());
   for (int i = 0; i < numBeziers; i++) {
-    path->cubicTo(iter.next(), iter.next(), iter.next());
+    // Bind each iter.next() to a local first; argument evaluation order is unspecified, and MSVC
+    // evaluates right-to-left while Clang/GCC go left-to-right, which would otherwise reverse the
+    // (c1, c2, end) order on Windows and produce a corrupted path.
+    auto c1 = iter.next();
+    auto c2 = iter.next();
+    auto end = iter.next();
+    path->cubicTo(c1, c2, end);
   }
 }
 

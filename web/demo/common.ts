@@ -18,6 +18,8 @@
 
 import * as types from '../types/types';
 
+declare const Module: any;
+
 export const MIN_ZOOM = 0.001;
 export const MAX_ZOOM = 1000.0;
 
@@ -26,6 +28,8 @@ export class TGFXBaseView {
     public updateLayerTree: (drawIndex: number) => void;
     public updateZoomScaleAndOffset: (zoom: number, offsetX: number, offsetY: number) => void;
     public draw: () => void;
+    public startReadback: (x: number, y: number, w: number, h: number) => any;
+    public finishReadback: () => Uint8Array | null;
 }
 
 export class ShareData {
@@ -316,4 +320,38 @@ export function bindCanvasZoomAndPanEvents(canvas: HTMLElement, shareData: Share
         e.preventDefault();
         gestureManager.onWheel(e, canvas, shareData);
     }, { passive: false });
+}
+
+/**
+ * Asynchronously reads pixels from the view's current surface. Returns a Promise that resolves
+ * to a Uint8Array containing RGBA pixel data in top-left origin format.
+ * For WebGPU, this uses the three-phase async readback (start → JS await mapAsync → finish)
+ * to avoid Asyncify stack overhead.
+ * For WebGL, the readback is performed synchronously and wrapped in a resolved Promise.
+ */
+export async function readPixelsAsync(view: TGFXBaseView, x: number, y: number,
+                                      w: number, h: number): Promise<Uint8Array | null> {
+    const result = view.startReadback(x, y, w, h);
+    if (!result) {
+        return null;
+    }
+    if (result.ready) {
+        // WebGL path: pixels already available
+        return result.pixels;
+    }
+    // WebGPU path: await buffer mapping in JS (no C++ stack alive)
+    const bufferHandle = result.bufferHandle;
+    const bufferSize = result.bufferSize;
+    if (bufferHandle && bufferSize > 0) {
+        const WebGPU = (Module as any).WebGPU;
+        if (WebGPU) {
+            const gpuBuffer = WebGPU.mgrBuffer.get(bufferHandle);
+            if (gpuBuffer) {
+                await gpuBuffer.mapAsync(1 /* GPUMapMode.READ */, 0, bufferSize);
+            }
+        }
+    }
+    // Phase C: copy mapped data to Uint8Array
+    const pixels = view.finishReadback();
+    return pixels;
 }

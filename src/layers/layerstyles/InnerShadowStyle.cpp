@@ -17,13 +17,20 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
+#include "core/utils/Log.h"
+#include "core/utils/MathExtra.h"
+#include "layers/SpreadUtils.h"
+#include "tgfx/core/Canvas.h"
+#include "tgfx/core/ColorFilter.h"
+#include "tgfx/core/ImageFilter.h"
+#include "tgfx/core/MaskFilter.h"
+#include "tgfx/core/Shader.h"
 
 namespace tgfx {
 
 std::shared_ptr<InnerShadowStyle> InnerShadowStyle::Make(float offsetX, float offsetY,
                                                          float blurrinessX, float blurrinessY,
                                                          const Color& color) {
-
   return std::shared_ptr<InnerShadowStyle>(
       new InnerShadowStyle(offsetX, offsetY, blurrinessX, blurrinessY, color));
 }
@@ -68,6 +75,16 @@ void InnerShadowStyle::setColor(const Color& color) {
   invalidateFilter();
 }
 
+void InnerShadowStyle::setSpread(float spread) {
+  if (_spread == spread) {
+    return;
+  }
+  _spread = spread;
+  // Spread does not affect the cached ImageFilter. Only trigger a redraw to regenerate the
+  // spread shape image.
+  invalidateTransform();
+}
+
 InnerShadowStyle::InnerShadowStyle(float offsetX, float offsetY, float blurrinessX,
                                    float blurrinessY, const Color& color)
     : _offsetX(offsetX), _offsetY(offsetY), _blurrinessX(blurrinessX), _blurrinessY(blurrinessY),
@@ -75,6 +92,12 @@ InnerShadowStyle::InnerShadowStyle(float offsetX, float offsetY, float blurrines
 }
 
 Rect InnerShadowStyle::filterBounds(const Rect& srcRect, float contentScale) {
+  // When spread is non-zero, the shadow is drawn via a custom path without using the cached
+  // filter. Inner shadow never expands the content bounds regardless of spread.
+  if (!FloatNearlyZero(_spread)) {
+    return srcRect;
+  }
+
   auto filter = getShadowFilter(contentScale);
   if (!filter) {
     return srcRect;
@@ -82,13 +105,28 @@ Rect InnerShadowStyle::filterBounds(const Rect& srcRect, float contentScale) {
   return filter->filterBounds(srcRect);
 }
 
-void InnerShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                              float alpha, BlendMode blendMode) {
-  auto filter = getShadowFilter(contentScale);
+LayerStyleExtraSourceType InnerShadowStyle::extraSourceType() const {
+  return !FloatNearlyZero(_spread) ? LayerStyleExtraSourceType::Contour
+                                   : LayerStyleExtraSourceType::None;
+}
+
+void InnerShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alpha,
+                              BlendMode blendMode) {
+  if (!FloatNearlyZero(_spread)) {
+    drawWithSpread(canvas, input, alpha, blendMode);
+    return;
+  }
+
+  auto filter = getShadowFilter(input.contentScale);
   if (!filter) {
     return;
   }
-  content = content->makeWithFilter(filter);
+  auto content = input.content->makeWithFilter(filter);
+  DEBUG_ASSERT(content != nullptr);
+  if (content == nullptr) {
+    return;
+  }
+
   Paint paint = {};
   paint.setBlendMode(blendMode);
   paint.setAlpha(alpha);
@@ -96,21 +134,79 @@ void InnerShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, fl
   // interpolation. When the texture is scaled up, linear filtering produces intermediate alpha
   // values at edges, which causes visible gray borders in the inner shadow.
   auto sampling = SamplingOptions();
-  if (_blurrinessX == 0 && _blurrinessY == 0) {
+  if (FloatNearlyZero(_blurrinessX) && FloatNearlyZero(_blurrinessY)) {
     sampling = SamplingOptions(FilterMode::Nearest, MipmapMode::None);
   }
   canvas->drawImage(content, sampling, &paint);
+}
+
+void InnerShadowStyle::drawWithSpread(Canvas* canvas, const LayerStyleInput& input, float alpha,
+                                      BlendMode blendMode) {
+  auto shapeResult = SpreadUtils::MakeSpreadShapeImage(input, 0);
+  auto spreadShapeResult = SpreadUtils::MakeSpreadShapeImage(input, -_spread);
+
+  // Use nearest filtering when there's no blur to avoid edge artifacts caused by linear
+  // interpolation. When the texture is scaled up, linear filtering produces intermediate alpha
+  // values at edges, which causes visible gray borders in the inner shadow.
+  auto sampling = SamplingOptions();
+  if (FloatNearlyZero(_blurrinessX) && FloatNearlyZero(_blurrinessY)) {
+    sampling = SamplingOptions(FilterMode::Nearest, MipmapMode::None);
+  }
+
+  if (spreadShapeResult.collapsed) {
+    // The mask fully collapsed — shadow fills the entire content area.
+    if (!shapeResult.image) {
+      return;
+    }
+    Paint paint = {};
+    paint.setBlendMode(blendMode);
+    paint.setAlpha(alpha);
+    paint.setColorFilter(ColorFilter::Blend(_color, BlendMode::SrcIn));
+    canvas->drawImage(shapeResult.image, shapeResult.offset.x, shapeResult.offset.y, sampling,
+                      &paint);
+    return;
+  }
+  if (!shapeResult.image || !spreadShapeResult.image) {
+    return;
+  }
+
+  auto scale = input.contentScale;
+  auto blurFilter = ImageFilter::Blur(_blurrinessX * scale, _blurrinessY * scale);
+  auto maskImage = spreadShapeResult.image;
+  auto maskOffset = spreadShapeResult.offset;
+  if (blurFilter) {
+    Point blurOffset = {};
+    auto filtered = spreadShapeResult.image->makeWithFilter(blurFilter, &blurOffset);
+    if (filtered) {
+      maskImage = filtered;
+      maskOffset.offset(blurOffset.x, blurOffset.y);
+    }
+  }
+
+  // The mask shader samples in content-local coordinates. maskOffset positions the mask image
+  // relative to the content origin, and the shadow offset shifts it further.
+  auto maskShader = Shader::MakeImageShader(maskImage, TileMode::Decal, TileMode::Decal, sampling);
+  auto offsetX = maskOffset.x + _offsetX * scale;
+  auto offsetY = maskOffset.y + _offsetY * scale;
+  auto offsetMaskShader = maskShader->makeWithMatrix(Matrix::MakeTrans(offsetX, offsetY));
+
+  // Draw shape with shadow color, masked by the inverted blurred spread shape.
+  Paint paint = {};
+  paint.setBlendMode(blendMode);
+  paint.setAlpha(alpha);
+  paint.setColorFilter(ColorFilter::Blend(_color, BlendMode::SrcIn));
+  paint.setMaskFilter(MaskFilter::MakeShader(offsetMaskShader, true));
+  canvas->drawImage(shapeResult.image, shapeResult.offset.x, shapeResult.offset.y, sampling,
+                    &paint);
 }
 
 std::shared_ptr<ImageFilter> InnerShadowStyle::getShadowFilter(float scale) {
   if (shadowFilter && scale == currentScale) {
     return shadowFilter;
   }
-
   shadowFilter = ImageFilter::InnerShadowOnly(_offsetX * scale, _offsetY * scale,
                                               _blurrinessX * scale, _blurrinessY * scale, _color);
   currentScale = scale;
-
   return shadowFilter;
 }
 
