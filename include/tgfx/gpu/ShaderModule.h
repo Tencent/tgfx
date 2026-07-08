@@ -18,19 +18,59 @@
 
 #pragma once
 
+#include <cstdint>
 #include <string>
+#include <vector>
 #include "tgfx/gpu/ShaderStage.h"
 
 namespace tgfx {
+
+/**
+ * Describes the format of shader code stored in a ShaderModuleDescriptor.
+ */
+enum class ShaderCodeFormat {
+  /**
+   * GLSL text source code. This is the default format used by ProgramBuilder.
+   */
+  GLSL,
+  /**
+   * Pre-compiled SPIR-V binary. Used by the Vulkan backend to skip runtime GLSL-to-SPIRV
+   * compilation.
+   */
+  SPIRV,
+  /**
+   * Metal Shading Language text source code. Used by the Metal backend when loading precompiled
+   * shader source.
+   */
+  MSL,
+  /**
+   * WebGPU Shading Language text source code. Used by the WebGPU backend when loading precompiled
+   * shader source.
+   */
+  WGSL,
+};
+
 /**
  * ShaderModuleDescriptor describes the properties required to create a ShaderModule.
  */
 class ShaderModuleDescriptor {
  public:
   /**
-   * The shader code to be compiled into a ShaderModule.
+   * The shader text source code (GLSL, MSL, or WGSL). When format is SPIRV, this field is ignored
+   * and binaryData is used instead.
    */
   std::string code;
+
+  /**
+   * Pre-compiled shader binary data (e.g. SPIR-V). Only used when format is SPIRV.
+   */
+  std::vector<uint8_t> binaryData;
+
+  /**
+   * The format of the shader code or binary. Defaults to GLSL for backward compatibility with the
+   * existing ProgramBuilder path.
+   */
+  ShaderCodeFormat format = ShaderCodeFormat::GLSL;
 
   /**
    * Specifies the shader stage (e.g., vertex, fragment, compute). Only relevant for the OpenGL

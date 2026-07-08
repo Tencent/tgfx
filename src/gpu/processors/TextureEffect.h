@@ -43,6 +43,18 @@ class TextureEffect : public FragmentProcessor {
     return "TextureEffect";
   }
 
+  bool isYUV() const;
+
+  bool isAlphaOnly() const;
+
+  bool hasRGBAAA() const {
+    return alphaStart != Point::Zero();
+  }
+
+  bool hasSubset() const {
+    return needSubset();
+  }
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 

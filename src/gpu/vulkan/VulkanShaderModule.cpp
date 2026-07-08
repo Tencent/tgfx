@@ -36,17 +36,23 @@ std::shared_ptr<VulkanShaderModule> VulkanShaderModule::Make(
 }
 
 VulkanShaderModule::VulkanShaderModule(VulkanGPU* gpu, const ShaderModuleDescriptor& descriptor) {
-  std::string vulkanGLSL = PreprocessGLSL(descriptor.code);
-  auto spirvBinary = CompileGLSLToSPIRV(gpu->shaderCompiler(), vulkanGLSL, descriptor.stage);
-  if (spirvBinary.empty()) {
-    LOGE("VulkanShaderModule: GLSL to SPIR-V compilation failed.");
-    return;
-  }
-
   VkShaderModuleCreateInfo createInfo = {};
   createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-  createInfo.codeSize = spirvBinary.size() * sizeof(uint32_t);
-  createInfo.pCode = spirvBinary.data();
+
+  std::vector<uint32_t> compiledSPIRV;
+  if (descriptor.format == ShaderCodeFormat::SPIRV) {
+    createInfo.codeSize = descriptor.binaryData.size();
+    createInfo.pCode = reinterpret_cast<const uint32_t*>(descriptor.binaryData.data());
+  } else {
+    std::string vulkanGLSL = PreprocessGLSL(descriptor.code);
+    compiledSPIRV = CompileGLSLToSPIRV(gpu->shaderCompiler(), vulkanGLSL, descriptor.stage);
+    if (compiledSPIRV.empty()) {
+      LOGE("VulkanShaderModule: GLSL to SPIR-V compilation failed.");
+      return;
+    }
+    createInfo.codeSize = compiledSPIRV.size() * sizeof(uint32_t);
+    createInfo.pCode = compiledSPIRV.data();
+  }
 
   auto result = vkCreateShaderModule(gpu->device(), &createInfo, nullptr, &shaderModule);
   if (result != VK_SUCCESS) {

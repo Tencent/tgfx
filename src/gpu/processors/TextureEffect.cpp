@@ -99,6 +99,14 @@ YUVTextureView* TextureEffect::getYUVTexture() const {
   return nullptr;
 }
 
+bool TextureEffect::isYUV() const {
+  return getYUVTexture() != nullptr;
+}
+
+bool TextureEffect::isAlphaOnly() const {
+  return textureProxy->isAlphaOnly();
+}
+
 bool TextureEffect::needSubset() const {
   auto bounds = Rect::MakeWH(textureProxy->width(), textureProxy->height());
   if (subset.has_value() && !(*subset).contains(bounds)) {

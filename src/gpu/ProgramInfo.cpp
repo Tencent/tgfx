@@ -20,6 +20,7 @@
 #include "AlignTo.h"
 #include "gpu/BlendFormula.h"
 #include "gpu/GlobalCache.h"
+#include "gpu/PrecompiledProgramCreator.h"
 #include "gpu/ProgramBuilder.h"
 #include "gpu/resources/RenderTarget.h"
 #include "tgfx/gpu/GPU.h"
@@ -161,7 +162,10 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
 
   auto program = context->globalCache()->findProgram(programKey);
   if (program == nullptr) {
-    program = ProgramBuilder::CreateProgram(context, this);
+    program = PrecompiledProgramCreator::CreateProgram(context, this);
+    if (program == nullptr) {
+      program = ProgramBuilder::CreateProgram(context, this);
+    }
     if (program == nullptr) {
       LOGE("ProgramInfo::getProgram() Failed to create the program!");
       return nullptr;

@@ -22,12 +22,16 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "gpu/Uniform.h"
 
 namespace tgfx {
 
 struct ShaderBlob {
   std::vector<uint8_t> vertexData;
   std::vector<uint8_t> fragmentData;
+  std::vector<Uniform> vertexUniforms;
+  std::vector<Uniform> fragmentUniforms;
+  std::vector<Uniform> samplers;
 };
 
 /// Runtime cache that loads precompiled shader bundles and provides O(1) lookup by ShaderKey hash.
@@ -51,7 +55,13 @@ class PrecompiledShaderCache {
     return entries.size();
   }
 
+  /// Returns the profile tag from the loaded bundle header (e.g. "vulkan-android").
+  const std::string& profileTag() const {
+    return _profileTag;
+  }
+
  private:
+  std::string _profileTag;
   struct HashKey {
     uint64_t hi;
     uint64_t lo;

@@ -25,7 +25,7 @@ namespace tgfx {
 
 // Must match BundleWriter's header layout (explicit LE serialization).
 static uint16_t ReadU16LE(const uint8_t* p) {
-  return static_cast<uint16_t>(p[0]) | (static_cast<uint16_t>(p[1]) << 8);
+  return static_cast<uint16_t>(static_cast<uint16_t>(p[0]) | (static_cast<uint16_t>(p[1]) << 8));
 }
 
 static uint32_t ReadU32LE(const uint8_t* p) {
@@ -81,6 +81,10 @@ bool PrecompiledShaderCache::loadBundle(const std::string& path) {
   uint32_t entryCount = ReadU32LE(ptr + 20);
   uint32_t shaderDataOffset = ReadU32LE(ptr + 28);
   // uint32_t shaderDataSize = ReadU32LE(ptr + 32);
+
+  // Parse profileTag (32 bytes at offset 36)
+  const char* tagPtr = reinterpret_cast<const char*>(ptr + 36);
+  _profileTag = std::string(tagPtr, strnlen(tagPtr, 32));
 
   // Validate sizes
   size_t expectedMinSize = HEADER_SIZE + static_cast<size_t>(entryCount) * INDEX_ENTRY_SIZE;
