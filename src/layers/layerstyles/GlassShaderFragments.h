@@ -255,12 +255,11 @@ static constexpr char GLASS_SHADER_MAIN[] = R"(
 
                 // Step 4: Offset distance based on edge proximity (1 - height).
                 // height≈0 at edge → full strength, height≈max at center → 0.
-                float refDist = halfW * (0.5f * refractionFactor + 0.5f * depthRatio);
                 float edgeProximity = 1.0 - height;
-                float offsetDist = refDist * edgeProximity;
+                float offsetDist = refractionFactor * depthRatio * edgeProximity;
 
-                vec2 sn = mixedDir * offsetDist;
-                vec2 sk = vec2(0.999) * refDist;
+                vec2 sn = mixedDir * offsetDist * halfW;
+                vec2 sk = vec2(0.999) * halfW;
                 sn = clamp(sn, -sk, sk);
 
                 uvOffset = vec2(sn.x * invSourceW, -sn.y * invSourceH);
@@ -280,9 +279,7 @@ static constexpr char GLASS_SHADER_MAIN[] = R"(
         float g = texture(uSource, uvG).g;
         float b = texture(uSource, uvB).b;
         float a = texture(uSource, uvG).a;
-        // Debug: visualize UDF height map.
-        float height = sampleHeight(px, py);
-        tgfx_FragColor = vec4(height, height, height, a);
+        tgfx_FragColor = vec4(r, g, b, a);
     }
 )";
 

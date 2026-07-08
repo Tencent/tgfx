@@ -4482,7 +4482,7 @@ TGFX_TEST(LayerTest, GlassStyleSingle) {
   glassLayer->setPath(starPath);
   glassLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 128)));
 
-  auto style = GlassStyle::Make(70, 80, 0, 0, 0, 135, 0);
+  auto style = GlassStyle::Make(50, 100, 0, 0, 100, 135, 0);
   glassLayer->setLayerStyles({style});
   displayList->root()->addChild(glassLayer);
 
