@@ -25,6 +25,7 @@
 #include <string>
 #include <vector>
 #include "BundleWriter.h"
+#include "ReflectionExtractor.h"
 #include "ShaderCompiler.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/level1/TextureFillShader.h"
@@ -109,8 +110,7 @@ static std::string ReadFileContents(const std::string& path) {
   return buffer.str();
 }
 
-static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info,
-                                     const BuildOptions& options,
+static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const BuildOptions& options,
                                      std::vector<VariantData>* outVariants) {
   ShaderReport report;
   report.name = info.name;
@@ -147,21 +147,25 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info,
     auto expandedVert = PrependDefines(vertSource, defines);
     auto expandedFrag = PrependDefines(fragSource, defines);
 
+    // Compile GLSL to SPIR-V once (shared across backends)
+    auto vertResult = CompileGLSL(expandedVert, ShaderStageType::Vertex, info.name, i);
+    if (!vertResult.success) {
+      std::cerr << "  " << vertResult.error << "\n";
+      report.errorCount++;
+      continue;
+    }
+    auto fragResult = CompileGLSL(expandedFrag, ShaderStageType::Fragment, info.name, i);
+    if (!fragResult.success) {
+      std::cerr << "  " << fragResult.error << "\n";
+      report.errorCount++;
+      continue;
+    }
+
+    // Extract reflection from SPIR-V (shared across backends)
+    auto reflection = ExtractReflection(vertResult.spirv, fragResult.spirv);
+
     for (const auto& backend : options.backends) {
       if (backend == "vulkan" || backend == "metal" || backend == "webgpu") {
-        auto vertResult = CompileGLSL(expandedVert, ShaderStageType::Vertex, info.name, i);
-        if (!vertResult.success) {
-          std::cerr << "  " << vertResult.error << "\n";
-          report.errorCount++;
-          continue;
-        }
-        auto fragResult = CompileGLSL(expandedFrag, ShaderStageType::Fragment, info.name, i);
-        if (!fragResult.success) {
-          std::cerr << "  " << fragResult.error << "\n";
-          report.errorCount++;
-          continue;
-        }
-
         std::vector<uint8_t> vertBlob;
         std::vector<uint8_t> fragBlob;
 
@@ -200,6 +204,7 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info,
         variant.profileTag = backend;
         variant.vertexBlob = std::move(vertBlob);
         variant.fragmentBlob = std::move(fragBlob);
+        variant.reflection = reflection;
         outVariants->push_back(std::move(variant));
       }
     }
