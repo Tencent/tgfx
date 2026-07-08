@@ -199,7 +199,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
     // 2. Pack the float result into RGBA8 (32-bit precision) via GlassMaskEffect
     std::shared_ptr<Image> maskImage = nullptr;
     if (effectiveShapeType == GlassShapeType::AlphaMask) {
-      float blurSigma = minHalf * (0.2f + (_depth / 100.0f) * 0.2f);
+      float blurSigma = minHalf * (_depth / 100.0f) * 0.2f;
       auto blurFilter = ImageFilter::Blur(blurSigma, blurSigma, TileMode::Decal);
       Point blurMaskOffset = {};
       auto maskClipRect =

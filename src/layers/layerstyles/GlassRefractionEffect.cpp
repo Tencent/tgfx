@@ -45,6 +45,7 @@ static constexpr char MASK_FRAGMENT_SHADER[] = R"(
     void main() {
         float value = texture(uSource, vTexCoord).a;
         // Pack float [0,1] into RGBA8 channels for 32-bit precision.
+        value = clamp(value, 0.0, 0.999999);
         vec4 enc = vec4(1.0, 255.0, 65025.0, 16581375.0) * value;
         enc = fract(enc);
         enc -= enc.yzww * vec4(1.0 / 255.0, 1.0 / 255.0, 1.0 / 255.0, 0.0);
@@ -225,10 +226,7 @@ std::string GlassRefractionEffect::buildFragmentShader(bool isDesktop) const {
       code += "#define GLASS_USE_AXIS_MIX\n";
       code += GLASS_SDF_ELLIPSE;
       break;
-    case GlassShapeType::Star:
-      code += "#define GLASS_USE_AXIS_MIX\n";
-      code += GLASS_SDF_STAR;
-      break;
+
     case GlassShapeType::AlphaMask:
       code += GLASS_SDF_ALPHA_MASK;
       break;
