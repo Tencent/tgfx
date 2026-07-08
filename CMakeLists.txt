@@ -755,6 +755,28 @@ if (TGFX_BUILD_FRAMEWORK)
 endif ()
 
 
+if (TGFX_BUILD_TESTS)
+    file(GLOB_RECURSE TGFX_SHADER_DECL_FILES
+            src/gpu/shaders/ShaderPermutation.*
+            src/gpu/shaders/PrecompiledShader.*
+            src/gpu/shaders/level1/*.h)
+    add_library(tgfx_shader_declarations STATIC ${TGFX_SHADER_DECL_FILES})
+    set_target_properties(tgfx_shader_declarations PROPERTIES PREFIX "")
+    target_compile_options(tgfx_shader_declarations PRIVATE ${TGFX_COMPILE_OPTIONS})
+    target_include_directories(tgfx_shader_declarations PUBLIC src include)
+
+    add_executable(shader_build_tool tools/shader_build_tool/main.cpp)
+    target_link_libraries(shader_build_tool PRIVATE tgfx_shader_declarations)
+    target_compile_options(shader_build_tool PRIVATE ${TGFX_COMPILE_OPTIONS})
+
+    add_custom_command(
+            OUTPUT ${CMAKE_BINARY_DIR}/shader_build_report.json
+            COMMAND shader_build_tool --report-only --out-dir ${CMAKE_BINARY_DIR}
+            DEPENDS shader_build_tool
+            COMMENT "Generating shader build report")
+    add_custom_target(tgfx_shader_bundles DEPENDS ${CMAKE_BINARY_DIR}/shader_build_report.json)
+endif ()
+
 if (TGFX_BUILD_HELLO2D)
     file(GLOB_RECURSE DRAWER_FILES hello2d/src/*.*)
     add_library(tgfx-hello2d STATIC ${DRAWER_FILES})
