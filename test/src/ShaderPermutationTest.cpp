@@ -157,8 +157,10 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistry) {
     auto shaderInfo = shader->info();
     if (shaderInfo.name == "TextureFillShader") {
       foundTextureFill = true;
-      EXPECT_EQ(shaderInfo.domain.totalCount(), 16u);
-      EXPECT_EQ(shaderInfo.domain.dimensionCount(), 4u);
+      EXPECT_EQ(shaderInfo.vertDomain.totalCount(), 16u);
+      EXPECT_EQ(shaderInfo.vertDomain.dimensionCount(), 4u);
+      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 16u);
+      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 4u);
       EXPECT_EQ(shaderInfo.vertexFile, "level1/texture_fill.vert");
       EXPECT_EQ(shaderInfo.fragmentFile, "level1/texture_fill.frag");
     }
@@ -179,10 +181,13 @@ TGFX_TEST(ShaderPermutationTest, ShouldCompile) {
     // hasYuv=1 && hasRgbaaa=1: 4 combos
     // Union: hasYuv=1 && (alphaOnly=1 || hasRgbaaa=1) = 6 combos excluded
     int compiledCount = 0;
-    for (uint32_t i = 0; i < shaderInfo.domain.totalCount(); i++) {
-      auto values = shaderInfo.domain.decode(i);
-      if (shaderInfo.shouldCompile(values)) {
-        compiledCount++;
+    for (uint32_t vi = 0; vi < shaderInfo.vertDomain.totalCount(); vi++) {
+      auto vertValues = shaderInfo.vertDomain.decode(vi);
+      for (uint32_t fi = 0; fi < shaderInfo.fragDomain.totalCount(); fi++) {
+        auto fragValues = shaderInfo.fragDomain.decode(fi);
+        if (shaderInfo.shouldCompile(vi, fi, vertValues, fragValues)) {
+          compiledCount++;
+        }
       }
     }
     EXPECT_EQ(compiledCount, 6);

@@ -33,6 +33,7 @@ class TextureFillShader : public PrecompiledShader {
             "level1/texture_fill.vert",
             "level1/texture_fill.frag",
             D::domain(),
+            D::domain(),
             PermutationDomain({}),
             "",
             "",
@@ -40,15 +41,20 @@ class TextureFillShader : public PrecompiledShader {
   }
 
  private:
-  static bool ShouldCompile(const std::vector<int>& v) {
+  static bool ShouldCompile(uint32_t vertIndex, uint32_t fragIndex, const std::vector<int>&,
+                            const std::vector<int>& fragValues) {
+    // Both stages currently share the same domain and defines, so only compile matching pairs.
+    if (vertIndex != fragIndex) {
+      return false;
+    }
     // YUV textures require additional dimensions (Limited/Full range, I420/NV12 format) that are
     // not yet modeled. Skip all YUV variants — they fall back to ProgramBuilder at runtime.
-    bool hasYuv = v[D::HAS_YUV] != 0;
+    bool hasYuv = fragValues[D::HAS_YUV] != 0;
     if (hasYuv) {
       return false;
     }
-    bool alphaOnly = v[D::ALPHA_ONLY] != 0;
-    bool hasRgbaaa = v[D::HAS_RGBAAA] != 0;
+    bool alphaOnly = fragValues[D::ALPHA_ONLY] != 0;
+    bool hasRgbaaa = fragValues[D::HAS_RGBAAA] != 0;
     // ALPHA_ONLY and HAS_RGBAAA are mutually exclusive in practice.
     return !(alphaOnly && hasRgbaaa);
   }

@@ -36,7 +36,8 @@ struct StageReflectionData {
 
 struct VariantData {
   std::string shaderName;
-  uint32_t permutationIndex = 0;
+  uint32_t vertPermutationIndex = 0;
+  uint32_t fragPermutationIndex = 0;
   std::string profileTag;
   std::vector<uint8_t> vertexBlob;
   std::vector<uint8_t> fragmentBlob;

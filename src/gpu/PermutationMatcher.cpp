@@ -46,15 +46,16 @@ static std::optional<PermutationMatchResult> TryMatchTextureFill(const ProgramIn
   if (te->isYUV()) {
     return std::nullopt;
   }
-  auto domain = TextureFillShader::D::domain();
+  auto vertDomain = TextureFillShader::D::domain();
+  auto fragDomain = TextureFillShader::D::domain();
   std::vector<int> values(TextureFillShader::D::COUNT);
   values[TextureFillShader::D::HAS_YUV] = 0;
   values[TextureFillShader::D::ALPHA_ONLY] = te->isAlphaOnly() ? 1 : 0;
   values[TextureFillShader::D::HAS_RGBAAA] = te->hasRGBAAA() ? 1 : 0;
   values[TextureFillShader::D::HAS_SUBSET] = te->hasSubset() ? 1 : 0;
-  auto index = domain.encode(values);
-  // TextureFillShader uses the same domain for both vert and frag.
-  return PermutationMatchResult{"TextureFillShader", index, index};
+  auto vertIndex = vertDomain.encode(values);
+  auto fragIndex = fragDomain.encode(values);
+  return PermutationMatchResult{"TextureFillShader", vertIndex, fragIndex};
 }
 
 std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* programInfo) {

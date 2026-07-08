@@ -34,11 +34,14 @@ struct PrecompiledShaderInfo {
   std::string name;
   std::string vertexFile;
   std::string fragmentFile;
-  PermutationDomain domain;
+  PermutationDomain vertDomain;
+  PermutationDomain fragDomain;
   PermutationDomain gpDomain;
   std::string gpClassName;
   std::string declarationFile;
-  std::function<bool(const std::vector<int>&)> shouldCompile;
+  std::function<bool(uint32_t vertIndex, uint32_t fragIndex, const std::vector<int>& vertValues,
+                     const std::vector<int>& fragValues)>
+      shouldCompile;
 };
 
 /**

@@ -155,8 +155,9 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
   std::set<ShaderKeyHash, HashKeyLess> fragSeen;
 
   for (const auto& v : variants) {
-    // Vertex entry: key = hash(shaderName + "_Vert", permutationIndex, profileTag)
-    auto vertHash = ComputeShaderKeyHash(v.shaderName + "_Vert", v.permutationIndex, v.profileTag);
+    // Vertex entry: key = hash(shaderName + "_Vert", vertPermutationIndex, profileTag)
+    auto vertHash =
+        ComputeShaderKeyHash(v.shaderName + "_Vert", v.vertPermutationIndex, v.profileTag);
     if (vertSeen.find(vertHash) == vertSeen.end()) {
       vertSeen.insert(vertHash);
       PoolEntry entry;
@@ -170,8 +171,9 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
       vertPool.push_back(entry);
     }
 
-    // Fragment entry: key = hash(shaderName + "_Frag", permutationIndex, profileTag)
-    auto fragHash = ComputeShaderKeyHash(v.shaderName + "_Frag", v.permutationIndex, v.profileTag);
+    // Fragment entry: key = hash(shaderName + "_Frag", fragPermutationIndex, profileTag)
+    auto fragHash =
+        ComputeShaderKeyHash(v.shaderName + "_Frag", v.fragPermutationIndex, v.profileTag);
     if (fragSeen.find(fragHash) == fragSeen.end()) {
       fragSeen.insert(fragHash);
       PoolEntry entry;
