@@ -217,21 +217,53 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   EXPECT_EQ(cache->profileTag(), "vulkan");
 }
 
-TGFX_TEST(ShaderPermutationTest, PrecompiledRender) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto bundlePath = ProjectPath::Absolute("resources/shaders/shader_bundle.vulkan.bin");
-  auto* cache = context->precompiledShaderCache();
-  ASSERT_TRUE(cache->loadBundle(bundlePath));
-
+TGFX_TEST(ShaderPermutationTest, PrecompiledRenderConsistency) {
   auto image = MakeImage("resources/apitest/test_timestretch.png");
   ASSERT_TRUE(image != nullptr);
-  auto surface = Surface::Make(context, 200, 200);
-  ASSERT_TRUE(surface != nullptr);
-  auto canvas = surface->getCanvas();
-  canvas->drawImage(image, 0, 0);
-  EXPECT_TRUE(Baseline::Compare(surface, "ShaderPermutationTest/PrecompiledRender"));
+  int width = 200;
+  int height = 200;
+
+  // Pass 1: render with precompiled bundle loaded (PrecompiledProgramCreator path).
+  Bitmap bitmap1;
+  bitmap1.allocPixels(width, height);
+  {
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto bundlePath = ProjectPath::Absolute("resources/shaders/shader_bundle.vulkan.bin");
+    ASSERT_TRUE(context->precompiledShaderCache()->loadBundle(bundlePath));
+    auto surface = Surface::Make(context, width, height);
+    ASSERT_TRUE(surface != nullptr);
+    surface->getCanvas()->drawImage(image, 0, 0);
+    auto* pixels = bitmap1.lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(bitmap1.info(), pixels));
+    bitmap1.unlockPixels();
+  }
+
+  // Pass 2: render without bundle (ProgramBuilder path).
+  Bitmap bitmap2;
+  bitmap2.allocPixels(width, height);
+  {
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto surface = Surface::Make(context, width, height);
+    ASSERT_TRUE(surface != nullptr);
+    surface->getCanvas()->drawImage(image, 0, 0);
+    auto* pixels = bitmap2.lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(bitmap2.info(), pixels));
+    bitmap2.unlockPixels();
+  }
+
+  // Both paths must produce identical output.
+  size_t totalBytes = static_cast<size_t>(width) * static_cast<size_t>(height) * 4;
+  auto* p1 = bitmap1.lockPixels();
+  auto* p2 = bitmap2.lockPixels();
+  EXPECT_EQ(memcmp(p1, p2, totalBytes), 0);
+  bitmap1.unlockPixels();
+  bitmap2.unlockPixels();
 }
 
 }  // namespace tgfx
