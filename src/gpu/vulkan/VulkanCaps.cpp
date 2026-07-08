@@ -80,8 +80,8 @@ void VulkanCaps::initFeatures(VkPhysicalDevice, const VulkanExtensions& extensio
   _features.clampToBorder = true;
   // Vulkan has no glTextureBarrier() equivalent. Disable to force the copy path for dst reads.
   _features.textureBarrier = false;
-  // stencilCoverPathSupported is set in initFormatTable() after probing the actual
-  // depth/stencil format availability, because the feature must not be advertised when
+  // stencilAttachmentSupported is set in initFormatTable() after probing the actual
+  // depth/stencil format availability, because the capability must not be advertised when
   // no renderable D24S8 / D32S8 format exists on the device.
 
   frameBufferFetchSupported = extensions.rasterizationOrderAttachmentAccess;
@@ -160,12 +160,13 @@ void VulkanCaps::initFormatTable(VkPhysicalDevice physicalDevice,
     depthInfo = checkFormat(physicalDevice, VK_FORMAT_D32_SFLOAT_S8_UINT, properties);
   }
   formatTable[PixelFormat::DEPTH24_STENCIL8] = depthInfo;
-  // Only advertise stencilCoverPath when a depth/stencil format is actually renderable.
-  // SwiftShader (vendorID 0x1AE0) reports D24S8 as renderable but does not support it at
-  // runtime, and D32S8 stencil operations also crash (SwiftShader internally falls back to
-  // D24 and hits the same UNSUPPORTED path). Disable stencilCoverPath on SwiftShader until
-  // the root cause of the D32 stencil segfault is fully investigated and fixed.
-  _features.stencilCoverPathSupported = depthInfo.renderable && properties.vendorID != 0x1AE0;
+  // Only advertise the stencil attachment capability when a depth/stencil format is actually
+  // renderable. SwiftShader (vendorID 0x1AE0) reports D24S8 as renderable but does not
+  // support it at runtime, and D32S8 stencil operations also crash (SwiftShader internally
+  // falls back to D24 and hits the same UNSUPPORTED path). Treat SwiftShader as having no
+  // stencil attachment support until the root cause of the D32 stencil segfault is fully
+  // investigated and fixed.
+  _features.stencilAttachmentSupported = depthInfo.renderable && properties.vendorID != 0x1AE0;
 }
 
 }  // namespace tgfx

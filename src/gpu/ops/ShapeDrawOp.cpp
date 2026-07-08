@@ -81,10 +81,7 @@ PlacementPtr<GeometryProcessor> ShapeDrawOp::onMakeGeometryProcessor(RenderTarge
                                         renderTarget->height(), aa, viewMatrix, realUVMatrix);
 }
 
-void ShapeDrawOp::onDraw(RenderPass* renderPass, RenderTarget* renderTarget) {
-  if (!bindStandardPipeline(renderPass, renderTarget)) {
-    return;
-  }
+void ShapeDrawOp::onDraw(RenderPass* renderPass, RenderTarget* /*renderTarget*/) {
   auto vertexBuffer = shapeProxy->getTriangles();
   if (vertexBuffer != nullptr) {
     renderPass->setVertexBuffer(0, vertexBuffer->gpuBuffer());

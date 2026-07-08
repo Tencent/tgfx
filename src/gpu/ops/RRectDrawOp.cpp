@@ -81,7 +81,7 @@ PlacementPtr<GeometryProcessor> RRectDrawOp::onMakeGeometryProcessor(RenderTarge
                                         hasStroke, commonColor);
 }
 
-void RRectDrawOp::onDraw(RenderPass* renderPass, RenderTarget* renderTarget) {
+void RRectDrawOp::onDraw(RenderPass* renderPass, RenderTarget* /*renderTarget*/) {
   if (indexBufferProxy == nullptr || vertexBufferProxyView == nullptr) {
     return;
   }
@@ -91,9 +91,6 @@ void RRectDrawOp::onDraw(RenderPass* renderPass, RenderTarget* renderTarget) {
   }
   auto vertexBuffer = vertexBufferProxyView->getBuffer();
   if (vertexBuffer == nullptr) {
-    return;
-  }
-  if (!bindStandardPipeline(renderPass, renderTarget)) {
     return;
   }
   renderPass->setVertexBuffer(0, vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());

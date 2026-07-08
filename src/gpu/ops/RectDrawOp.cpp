@@ -91,7 +91,7 @@ static uint16_t GetNumIndicesPerQuad(AAType aaType, const std::optional<LineJoin
   }
 }
 
-void RectDrawOp::onDraw(RenderPass* renderPass, RenderTarget* renderTarget) {
+void RectDrawOp::onDraw(RenderPass* renderPass, RenderTarget* /*renderTarget*/) {
   std::shared_ptr<BufferResource> indexBuffer = nullptr;
   if (indexBufferProxy) {
     indexBuffer = indexBufferProxy->getBuffer();
@@ -101,9 +101,6 @@ void RectDrawOp::onDraw(RenderPass* renderPass, RenderTarget* renderTarget) {
   }
   auto vertexBuffer = vertexBufferProxyView ? vertexBufferProxyView->getBuffer() : nullptr;
   if (vertexBuffer == nullptr) {
-    return;
-  }
-  if (!bindStandardPipeline(renderPass, renderTarget)) {
     return;
   }
   renderPass->setVertexBuffer(0, vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());

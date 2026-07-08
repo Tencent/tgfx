@@ -65,7 +65,7 @@ PlacementPtr<GeometryProcessor> AtlasTextOp::onMakeGeometryProcessor(RenderTarge
   return AtlasTextGeometryProcessor::Make(allocator, textureProxy, aaType, commonColor, sampling);
 }
 
-void AtlasTextOp::onDraw(RenderPass* renderPass, RenderTarget* renderTarget) {
+void AtlasTextOp::onDraw(RenderPass* renderPass, RenderTarget* /*renderTarget*/) {
   std::shared_ptr<BufferResource> indexBuffer = nullptr;
   if (indexBufferProxy) {
     indexBuffer = indexBufferProxy->getBuffer();
@@ -75,9 +75,6 @@ void AtlasTextOp::onDraw(RenderPass* renderPass, RenderTarget* renderTarget) {
   }
   auto vertexBuffer = vertexBufferProxyView ? vertexBufferProxyView->getBuffer() : nullptr;
   if (vertexBuffer == nullptr) {
-    return;
-  }
-  if (!bindStandardPipeline(renderPass, renderTarget)) {
     return;
   }
   renderPass->setVertexBuffer(0, vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());

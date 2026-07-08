@@ -54,6 +54,14 @@ namespace tgfx {
  */
 class StencilCoverPathDrawOp : public DrawOp {
  public:
+  // Upper bound on the number of shapes OpsCompositor may accumulate in its
+  // pendingStencilCoverShapes queue before force-flushing. NOTE: each queued entry is
+  // still emitted as an individual StencilCoverPathDrawOp at flush time — the queue does
+  // not (yet) coalesce shapes into a single instanced draw. The cap exists purely to
+  // bound worst-case memory pressure of the pending queue until an instanced stencil-
+  // cover pipeline lands.
+  static constexpr size_t MaxNumBatched = 1024;
+
   static PlacementPtr<StencilCoverPathDrawOp> Make(
       std::shared_ptr<StencilCoverPathProxy> geometryProxy, PMColor color, const Matrix& viewMatrix,
       const Rect& coverLocalBounds, PathFillType fillType);
@@ -64,6 +72,10 @@ class StencilCoverPathDrawOp : public DrawOp {
 
   bool needsStencil() const override {
     return true;
+  }
+
+  bool usesStandardPipeline() const override {
+    return false;
   }
 
  protected:

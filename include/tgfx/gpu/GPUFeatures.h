@@ -41,10 +41,11 @@ class GPUFeatures {
   bool textureBarrier = false;
 
   /**
-   * Indicates whether the GPU supports the stencil-and-cover render path used to draw
-   * non-antialiased paths through stencil-based bezier coverage instead of CPU triangulation.
-   * When false, the path renderer falls back to the default triangulation pipeline.
+   * Indicates whether the GPU can allocate and render into a stencil attachment (typically
+   * DEPTH24_STENCIL8 or a D32S8 fallback). This is a pure hardware / driver capability bit;
+   * whether any particular renderer chooses to consume it (e.g. the stencil-and-cover path
+   * renderer) is decided by higher-level code, not by this field.
    */
-  bool stencilCoverPathSupported = false;
+  bool stencilAttachmentSupported = false;
 };
 }  // namespace tgfx

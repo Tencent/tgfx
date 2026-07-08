@@ -18,7 +18,7 @@
 
 // Consolidated tests for the stencil-and-cover render path. Cases are grouped by module
 // using a `<Module>_` prefix on the test name:
-//   - Caps_*                    : GPUFeatures::stencilCoverPathSupported (M2)
+//   - Caps_*                    : GPUFeatures::stencilAttachmentSupported (M2)
 //   - Rasterizer_*              : StencilCoverPathTessellator CPU geometry builder (M3)
 //   - Proxy_*                   : StencilCoverPathProxy + factory (M4)
 //   - DrawOp_*                  : StencilCoverPathDrawOp construction (M6)
@@ -45,6 +45,11 @@
 #include "tgfx/gpu/GPUFeatures.h"
 #include "utils/TestUtils.h"
 
+// The entire test file exercises the stencil-and-cover render path. When the master
+// compile-time switch is disabled, the feature is compiled out of the runtime and none of
+// these cases apply — skip the whole translation unit so it does not clutter the test suite.
+#ifdef TGFX_ENABLE_STENCIL_COVER_PATH
+
 // Set to 1 locally to render both legacy and bezier pipelines and dump each as a separate
 // webp under `test/out/StencilCoverPath/`. Must remain 0 in committed code so CI runs
 // the canonical single-pass baseline comparison.
@@ -52,7 +57,7 @@
 
 namespace tgfx {
 
-// RAII guard that overrides GPUFeatures::stencilCoverPathSupported for the lifetime of an
+// RAII guard that overrides GPUFeatures::stencilAttachmentSupported for the lifetime of an
 // instance. The previous value is captured on construction and restored on destruction, so a
 // test that hits a fatal Google Test ASSERT mid-body still puts the flag back instead of
 // leaking a polluted value into subsequent tests (which would otherwise break the deterministic
@@ -62,11 +67,11 @@ struct ScopedStencilCoverCaps {
   bool original;
   ScopedStencilCoverCaps(Context* context, bool value)
       : features(const_cast<GPUFeatures*>(context->gpu()->features())),
-        original(features->stencilCoverPathSupported) {
-    features->stencilCoverPathSupported = value;
+        original(features->stencilAttachmentSupported) {
+    features->stencilAttachmentSupported = value;
   }
   ~ScopedStencilCoverCaps() {
-    features->stencilCoverPathSupported = original;
+    features->stencilAttachmentSupported = original;
   }
 };
 
@@ -76,7 +81,7 @@ struct ScopedStencilCoverCaps {
 
 TGFX_TEST(StencilCoverPathTest, Caps_FieldDefaultsToFalse) {
   GPUFeatures features = {};
-  EXPECT_FALSE(features.stencilCoverPathSupported);
+  EXPECT_FALSE(features.stencilAttachmentSupported);
 }
 
 TGFX_TEST(StencilCoverPathTest, Caps_BackendReportsExpectedSupport) {
@@ -89,31 +94,31 @@ TGFX_TEST(StencilCoverPathTest, Caps_BackendReportsExpectedSupport) {
   // Verify the stencil-and-cover capability is reported per backend. Each backend is
   // listed explicitly so a regression on one backend cannot be hidden by an "any of the
   // three" disjunction. New backends added in the future hit the default branch and fail
-  // until they declare an expectation here, since GPUFeatures::stencilCoverPathSupported
+  // until they declare an expectation here, since GPUFeatures::stencilAttachmentSupported
   // defaults to false.
   auto gpuInfo = context->gpu()->info();
   auto backend = gpuInfo->backend;
   // SwiftShader (Vulkan software renderer, vendorID 0x1AE0) has stencil-operation bugs
-  // that cause segfaults, so VulkanCaps deliberately sets stencilCoverPathSupported = false
+  // that cause segfaults, so VulkanCaps deliberately sets stencilAttachmentSupported = false
   // for it. The test must accept that.
   bool isSwiftShader = gpuInfo->vendor == "6880";  // 0x1AE0 = 6880 decimal
   switch (backend) {
     case Backend::Metal:
-      EXPECT_TRUE(features->stencilCoverPathSupported);
+      EXPECT_TRUE(features->stencilAttachmentSupported);
       break;
     case Backend::OpenGL:
-      EXPECT_TRUE(features->stencilCoverPathSupported);
+      EXPECT_TRUE(features->stencilAttachmentSupported);
       break;
     case Backend::Vulkan:
       if (isSwiftShader) {
-        EXPECT_FALSE(features->stencilCoverPathSupported);
+        EXPECT_FALSE(features->stencilAttachmentSupported);
       } else {
-        EXPECT_TRUE(features->stencilCoverPathSupported);
+        EXPECT_TRUE(features->stencilAttachmentSupported);
       }
       break;
     default:
       ADD_FAILURE() << "Unhandled backend in Caps_BackendReportsExpectedSupport; declare "
-                       "the expected stencilCoverPathSupported value for this backend.";
+                       "the expected stencilAttachmentSupported value for this backend.";
       break;
   }
 }
@@ -398,7 +403,7 @@ TGFX_TEST(StencilCoverPathTest, DrawOp_AllFillTypesProduceValidOpWithExpectedSte
 // OpsCompositor dispatch + end-to-end (M7 + demo integration)
 // ====================================================================================
 
-// The stencil-and-cover dispatch is gated by GPUFeatures::stencilCoverPathSupported. The
+// The stencil-and-cover dispatch is gated by GPUFeatures::stencilAttachmentSupported. The
 // dispatch tests below confirm two things:
 //   1. With the flag forcibly disabled, drawing a non-AA path keeps using the legacy
 //      ShapeDrawOp pipeline. This is the "AA path zero regression" guarantee.
@@ -716,7 +721,7 @@ typedef void (*ApplyTransformFn)(Canvas* canvas);
 // Renders a single pipeline pass (`useBezier` decides which) into a fresh 300x300 surface.
 // `applyTransform` may be nullptr; when set, it is invoked between save/restore so the
 // canvas matrix change is local to this draw. Caller is responsible for toggling
-// GPUFeatures::stencilCoverPathSupported beforehand. Extracted from the double-pass helper
+// GPUFeatures::stencilAttachmentSupported beforehand. Extracted from the double-pass helper
 // so the two pipeline runs share one rendering implementation without a lambda.
 static std::shared_ptr<Surface> RenderSingleVisualPass(Context* context, const Path& path,
                                                        const Paint& paint, const Color& clearColor,
@@ -759,18 +764,18 @@ static void RenderPathAndCompareBaselines(Context* context, const Path& path, co
   // Debug-export mode: render both pipelines and dump each one. The legacy pass is a pure
   // visual reference (return value dropped on purpose — it has no canonical baseline and is
   // expected to drift relative to the bezier output); only the bezier pass is enforced.
-  capsGuard.features->stencilCoverPathSupported = false;
+  capsGuard.features->stencilAttachmentSupported = false;
   auto legacySurface = RenderSingleVisualPass(context, path, paint, clearColor, applyTransform);
   ASSERT_TRUE(legacySurface != nullptr);
   (void)Baseline::Compare(legacySurface, keyPrefix + "_Legacy");
 
-  capsGuard.features->stencilCoverPathSupported = true;
+  capsGuard.features->stencilAttachmentSupported = true;
   auto bezierSurface = RenderSingleVisualPass(context, path, paint, clearColor, applyTransform);
   ASSERT_TRUE(bezierSurface != nullptr);
   EXPECT_TRUE(Baseline::Compare(bezierSurface, keyPrefix + "_Bezier"));
 #else
   // Default mode: bezier-only, compared against the canonical baseline.
-  capsGuard.features->stencilCoverPathSupported = true;
+  capsGuard.features->stencilAttachmentSupported = true;
   auto surface = RenderSingleVisualPass(context, path, paint, clearColor, applyTransform);
   ASSERT_TRUE(surface != nullptr);
   EXPECT_TRUE(Baseline::Compare(surface, keyPrefix));
@@ -1615,7 +1620,7 @@ static void RenderTextAndCompareBaselines(Context* context,
   auto drawY = 50.f - textBounds.top;
 
 #if TGFX_BEZIER_VISUAL_DEBUG_EXPORT
-  capsGuard.features->stencilCoverPathSupported = false;
+  capsGuard.features->stencilAttachmentSupported = false;
   {
     auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
     ASSERT_TRUE(surface != nullptr);
@@ -1625,7 +1630,7 @@ static void RenderTextAndCompareBaselines(Context* context,
     context->flushAndSubmit();
     (void)Baseline::Compare(surface, keyPrefix + "_Legacy");
   }
-  capsGuard.features->stencilCoverPathSupported = true;
+  capsGuard.features->stencilAttachmentSupported = true;
   {
     auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
     ASSERT_TRUE(surface != nullptr);
@@ -1636,7 +1641,7 @@ static void RenderTextAndCompareBaselines(Context* context,
     EXPECT_TRUE(Baseline::Compare(surface, keyPrefix + "_Bezier"));
   }
 #else
-  capsGuard.features->stencilCoverPathSupported = true;
+  capsGuard.features->stencilAttachmentSupported = true;
   auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
@@ -1859,3 +1864,5 @@ TGFX_TEST(StencilCoverPathTest, Dispatch_StencilConfinedByCoverBoundsWithoutClip
 }
 
 }  // namespace tgfx
+
+#endif  // TGFX_ENABLE_STENCIL_COVER_PATH

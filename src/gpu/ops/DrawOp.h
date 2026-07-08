@@ -80,6 +80,17 @@ class DrawOp {
     return false;
   }
 
+  /**
+   * Returns true when execute() should build and bind the op's standard render pipeline
+   * before invoking onDraw(). Default is true so subclasses only need to bind buffers and
+   * issue the draw call. Multi-pass ops that manage their own pipelines (e.g.
+   * StencilCoverPathDrawOp) override this to opt out and take full responsibility for
+   * pipeline binding inside onDraw().
+   */
+  virtual bool usesStandardPipeline() const {
+    return true;
+  }
+
  protected:
   BlockAllocator* allocator = nullptr;
   AAType aaType = AAType::None;
@@ -116,11 +127,10 @@ class DrawOp {
   /**
    * Builds the op's standard render pipeline from its current geometry/fragment processor
    * configuration and binds it to the render pass, together with uniforms, samplers and the
-   * scissor rectangle. Subclasses must call this from onDraw() before issuing any draw call
-   * that should run through the standard pipeline. Multi-pass ops can call it again after
-   * temporarily switching to a self-managed pipeline (e.g. a stencil pass) to re-attach the
-   * standard pipeline. Returns false if program creation fails, in which case the caller
-   * should abort the draw.
+   * scissor rectangle. execute() invokes this automatically before onDraw() for ops that keep
+   * usesStandardPipeline() at its default true; multi-pass ops that opt out call this directly
+   * when they need to re-attach the standard pipeline after running a self-managed pass.
+   * Returns false if program creation fails, in which case the caller should abort the draw.
    */
   bool bindStandardPipeline(RenderPass* renderPass, RenderTarget* renderTarget);
 

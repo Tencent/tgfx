@@ -56,7 +56,7 @@ PlacementPtr<GeometryProcessor> HairlineLineOp::onMakeGeometryProcessor(
                                              aaType);
 }
 
-void HairlineLineOp::onDraw(RenderPass* renderPass, RenderTarget* renderTarget) {
+void HairlineLineOp::onDraw(RenderPass* renderPass, RenderTarget* /*renderTarget*/) {
   auto lineVertexBufferProxy = hairlineProxy->getLineVertexBufferProxy();
   if (lineVertexBufferProxy == nullptr || indexBufferProxy == nullptr) {
     return;
@@ -67,9 +67,6 @@ void HairlineLineOp::onDraw(RenderPass* renderPass, RenderTarget* renderTarget) 
   }
   auto indexBuffer = indexBufferProxy->getBuffer();
   if (indexBuffer == nullptr) {
-    return;
-  }
-  if (!bindStandardPipeline(renderPass, renderTarget)) {
     return;
   }
   auto totalLineCount = vertexBuffer->size() / (VerticesPerLine * BytesPerLineVertex);
