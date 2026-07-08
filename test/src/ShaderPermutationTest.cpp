@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <chrono>
 #include "base/TGFXTest.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/shaders/PrecompiledShader.h"
@@ -215,6 +216,51 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   ASSERT_TRUE(cache->loadBundle(bundlePath));
   EXPECT_EQ(cache->entryCount(), 6u);
   EXPECT_EQ(cache->profileTag(), "vulkan");
+}
+
+TGFX_TEST(ShaderPermutationTest, PrecompiledPerformance) {
+  auto image = MakeImage("resources/apitest/test_timestretch.png");
+  ASSERT_TRUE(image != nullptr);
+  int width = 200;
+  int height = 200;
+
+  // Measure ProgramBuilder path (no bundle).
+  auto startBuilder = std::chrono::steady_clock::now();
+  {
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto surface = Surface::Make(context, width, height);
+    ASSERT_TRUE(surface != nullptr);
+    surface->getCanvas()->drawImage(image, 0, 0);
+    context->flushAndSubmit(true);
+  }
+  auto endBuilder = std::chrono::steady_clock::now();
+
+  // Measure PrecompiledProgramCreator path (with bundle).
+  auto startPrecompiled = std::chrono::steady_clock::now();
+  {
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto bundlePath = ProjectPath::Absolute("resources/shaders/shader_bundle.vulkan.bin");
+    ASSERT_TRUE(context->precompiledShaderCache()->loadBundle(bundlePath));
+    auto surface = Surface::Make(context, width, height);
+    ASSERT_TRUE(surface != nullptr);
+    surface->getCanvas()->drawImage(image, 0, 0);
+    context->flushAndSubmit(true);
+  }
+  auto endPrecompiled = std::chrono::steady_clock::now();
+
+  auto builderUs =
+      std::chrono::duration_cast<std::chrono::microseconds>(endBuilder - startBuilder).count();
+  auto precompiledUs =
+      std::chrono::duration_cast<std::chrono::microseconds>(endPrecompiled - startPrecompiled)
+          .count();
+  printf("  ProgramBuilder path:  %lld us\n", static_cast<long long>(builderUs));
+  printf("  Precompiled path:     %lld us\n", static_cast<long long>(precompiledUs));
+  printf("  Speedup:              %.2fx\n",
+         static_cast<double>(builderUs) / static_cast<double>(precompiledUs));
 }
 
 TGFX_TEST(ShaderPermutationTest, PrecompiledRenderConsistency) {
