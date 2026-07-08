@@ -193,6 +193,7 @@ file(GLOB_RECURSE SRC_FILES
         src/gpu/processors/*.*
         src/gpu/proxies/*.*
         src/gpu/resources/*.*
+        src/gpu/shaders/*.*
         src/gpu/tasks/*.*)
 list(APPEND TGFX_FILES ${SRC_FILES})
 file(GLOB PLATFORM_COMMON_FILES
