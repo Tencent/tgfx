@@ -21,12 +21,36 @@
 
 namespace tgfx {
 
+struct ValueCountVisitor {
+  int operator()(const PermutationBool& d) const {
+    return d.valueCount();
+  }
+  int operator()(const PermutationEnum& d) const {
+    return d.valueCount();
+  }
+  int operator()(const PermutationInt& d) const {
+    return d.valueCount();
+  }
+};
+
+struct DefineNameVisitor {
+  const char* operator()(const PermutationBool& d) const {
+    return d.defineName;
+  }
+  const char* operator()(const PermutationEnum& d) const {
+    return d.defineName;
+  }
+  const char* operator()(const PermutationInt& d) const {
+    return d.defineName;
+  }
+};
+
 static int GetValueCount(const PermutationDimension& dim) {
-  return std::visit([](const auto& d) -> int { return d.valueCount(); }, dim);
+  return std::visit(ValueCountVisitor{}, dim);
 }
 
 static const char* GetDefineName(const PermutationDimension& dim) {
-  return std::visit([](const auto& d) -> const char* { return d.defineName; }, dim);
+  return std::visit(DefineNameVisitor{}, dim);
 }
 
 PermutationDomain::PermutationDomain(std::vector<PermutationDimension> dimensions)

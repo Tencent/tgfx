@@ -94,6 +94,16 @@ static void WriteU64LE(std::ofstream& out, uint64_t val) {
   out.write(reinterpret_cast<char*>(buf), 8);
 }
 
+static void WriteUniformEntries(std::vector<uint8_t>& blob,
+                                const std::vector<UniformEntry>& entries) {
+  for (const auto& entry : entries) {
+    auto nameLen = static_cast<uint8_t>(entry.name.size());
+    blob.push_back(nameLen);
+    blob.insert(blob.end(), entry.name.begin(), entry.name.end());
+    blob.push_back(entry.format);
+  }
+}
+
 // Serializes a single ReflectionData into a byte blob.
 // Format: [vertexUniformCount:u8][fragmentUniformCount:u8][samplerCount:u8][reserved:u8]
 //         For each uniform: [nameLen:u8][name:bytes][format:u8]
@@ -105,18 +115,9 @@ static std::vector<uint8_t> SerializeReflection(const ReflectionData& reflection
   blob.push_back(static_cast<uint8_t>(reflection.samplers.size()));
   blob.push_back(0);  // reserved padding
 
-  auto writeEntries = [&blob](const std::vector<UniformEntry>& entries) {
-    for (const auto& entry : entries) {
-      auto nameLen = static_cast<uint8_t>(entry.name.size());
-      blob.push_back(nameLen);
-      blob.insert(blob.end(), entry.name.begin(), entry.name.end());
-      blob.push_back(entry.format);
-    }
-  };
-
-  writeEntries(reflection.vertexUniforms);
-  writeEntries(reflection.fragmentUniforms);
-  writeEntries(reflection.samplers);
+  WriteUniformEntries(blob, reflection.vertexUniforms);
+  WriteUniformEntries(blob, reflection.fragmentUniforms);
+  WriteUniformEntries(blob, reflection.samplers);
   return blob;
 }
 

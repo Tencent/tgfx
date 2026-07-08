@@ -41,9 +41,14 @@ static std::optional<PermutationMatchResult> TryMatchTextureFill(const ProgramIn
     return std::nullopt;
   }
   auto* te = static_cast<const TextureEffect*>(fp);
+  // YUV textures require additional dimensions (Limited/Full range, I420/NV12 format) that are not
+  // yet covered by the precompiled shader. Fall back to ProgramBuilder for YUV.
+  if (te->isYUV()) {
+    return std::nullopt;
+  }
   auto domain = TextureFillShader::D::domain();
   std::vector<int> values(TextureFillShader::D::COUNT);
-  values[TextureFillShader::D::HAS_YUV] = te->isYUV() ? 1 : 0;
+  values[TextureFillShader::D::HAS_YUV] = 0;
   values[TextureFillShader::D::ALPHA_ONLY] = te->isAlphaOnly() ? 1 : 0;
   values[TextureFillShader::D::HAS_RGBAAA] = te->hasRGBAAA() ? 1 : 0;
   values[TextureFillShader::D::HAS_SUBSET] = te->hasSubset() ? 1 : 0;

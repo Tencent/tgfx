@@ -49,6 +49,26 @@ static constexpr size_t HEADER_SIZE = 68;
 //                  reflOff(4) = 36 bytes
 static constexpr size_t INDEX_ENTRY_SIZE = 36;
 
+// Reads a sequence of uniform entries from the reflection pool at the given offset.
+// Each entry: [nameLen:u8][name:bytes][format:u8]. Returns false on out-of-bounds.
+static bool ReadUniformEntries(const uint8_t* data, size_t maxLen, size_t* offset, uint8_t count,
+                               std::vector<Uniform>& out) {
+  for (uint8_t i = 0; i < count; i++) {
+    if (*offset >= maxLen) {
+      return false;
+    }
+    uint8_t nameLen = data[(*offset)++];
+    if (*offset + nameLen + 1 > maxLen) {
+      return false;
+    }
+    std::string name(reinterpret_cast<const char*>(data + *offset), nameLen);
+    *offset += nameLen;
+    auto format = static_cast<UniformFormat>(data[(*offset)++]);
+    out.emplace_back(std::move(name), format);
+  }
+  return true;
+}
+
 // Deserializes reflection data from the bundle's reflection pool into a ShaderBlob's
 // vertexUniforms, fragmentUniforms and samplers fields.
 // Format: [vertexUniformCount:u8][fragmentUniformCount:u8][samplerCount:u8][reserved:u8]
@@ -63,30 +83,13 @@ static bool ParseReflection(const uint8_t* data, size_t maxLen, ShaderBlob* blob
   uint8_t samplerCount = data[offset++];
   offset++;  // reserved
 
-  auto readEntries = [&](uint8_t count, std::vector<Uniform>& out) -> bool {
-    for (uint8_t i = 0; i < count; i++) {
-      if (offset >= maxLen) {
-        return false;
-      }
-      uint8_t nameLen = data[offset++];
-      if (offset + nameLen + 1 > maxLen) {
-        return false;
-      }
-      std::string name(reinterpret_cast<const char*>(data + offset), nameLen);
-      offset += nameLen;
-      auto format = static_cast<UniformFormat>(data[offset++]);
-      out.emplace_back(std::move(name), format);
-    }
-    return true;
-  };
-
-  if (!readEntries(vertexCount, blob->vertexUniforms)) {
+  if (!ReadUniformEntries(data, maxLen, &offset, vertexCount, blob->vertexUniforms)) {
     return false;
   }
-  if (!readEntries(fragmentCount, blob->fragmentUniforms)) {
+  if (!ReadUniformEntries(data, maxLen, &offset, fragmentCount, blob->fragmentUniforms)) {
     return false;
   }
-  if (!readEntries(samplerCount, blob->samplers)) {
+  if (!ReadUniformEntries(data, maxLen, &offset, samplerCount, blob->samplers)) {
     return false;
   }
   return true;

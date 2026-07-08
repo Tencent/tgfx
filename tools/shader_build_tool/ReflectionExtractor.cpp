@@ -19,58 +19,50 @@
 #include "ReflectionExtractor.h"
 #include <iostream>
 #include <spirv_cross.hpp>
+#include "gpu/Uniform.h"
 
 namespace tgfx {
 
-// Maps a spirv_cross base type + vector/matrix size to a UniformFormat enum value (stored as u8).
-// Must stay in sync with the UniformFormat enum in src/gpu/Uniform.h.
 static uint8_t MapSPIRVTypeToFormat(const spirv_cross::SPIRType& type) {
-  // UniformFormat values (from Uniform.h):
-  // Float=0, Float2=1, Float3=2, Float4=3,
-  // Float2x2=4, Float3x3=5, Float4x4=6,
-  // Int=7, Int2=8, Int3=9, Int4=10,
-  // Texture2DSampler=11, TextureExternalSampler=12, Texture2DRectSampler=13
   if (type.basetype == spirv_cross::SPIRType::Float) {
     if (type.columns > 1) {
-      // Matrix types
       if (type.columns == 2 && type.vecsize == 2) {
-        return 4;  // Float2x2
+        return static_cast<uint8_t>(UniformFormat::Float2x2);
       }
       if (type.columns == 3 && type.vecsize == 3) {
-        return 5;  // Float3x3
+        return static_cast<uint8_t>(UniformFormat::Float3x3);
       }
       if (type.columns == 4 && type.vecsize == 4) {
-        return 6;  // Float4x4
+        return static_cast<uint8_t>(UniformFormat::Float4x4);
       }
     } else {
-      // Vector/scalar types
       switch (type.vecsize) {
         case 1:
-          return 0;  // Float
+          return static_cast<uint8_t>(UniformFormat::Float);
         case 2:
-          return 1;  // Float2
+          return static_cast<uint8_t>(UniformFormat::Float2);
         case 3:
-          return 2;  // Float3
+          return static_cast<uint8_t>(UniformFormat::Float3);
         case 4:
-          return 3;  // Float4
+          return static_cast<uint8_t>(UniformFormat::Float4);
       }
     }
   } else if (type.basetype == spirv_cross::SPIRType::Int ||
              type.basetype == spirv_cross::SPIRType::UInt) {
     switch (type.vecsize) {
       case 1:
-        return 7;  // Int
+        return static_cast<uint8_t>(UniformFormat::Int);
       case 2:
-        return 8;  // Int2
+        return static_cast<uint8_t>(UniformFormat::Int2);
       case 3:
-        return 9;  // Int3
+        return static_cast<uint8_t>(UniformFormat::Int3);
       case 4:
-        return 10;  // Int4
+        return static_cast<uint8_t>(UniformFormat::Int4);
     }
   }
   std::cerr << "WARNING: Unknown SPIR-V type (basetype=" << static_cast<int>(type.basetype)
             << " vec=" << type.vecsize << " col=" << type.columns << ")\n";
-  return 0;
+  return static_cast<uint8_t>(UniformFormat::Float);
 }
 
 static std::vector<UniformEntry> ExtractUBOMembers(spirv_cross::Compiler& compiler,
@@ -104,11 +96,9 @@ static std::vector<UniformEntry> ExtractSamplers(spirv_cross::Compiler& compiler
   for (auto& sampler : resources.sampled_images) {
     std::string name = compiler.get_name(sampler.id);
     auto& type = compiler.get_type(sampler.type_id);
-    uint8_t format = 11;  // Default: Texture2DSampler
-    if (type.image.dim == spv::Dim2D) {
-      format = 11;  // Texture2DSampler
-    } else if (type.image.dim == spv::DimRect) {
-      format = 13;  // Texture2DRectSampler
+    uint8_t format = static_cast<uint8_t>(UniformFormat::Texture2DSampler);
+    if (type.image.dim == spv::DimRect) {
+      format = static_cast<uint8_t>(UniformFormat::Texture2DRectSampler);
     }
     result.push_back({name, format});
   }
