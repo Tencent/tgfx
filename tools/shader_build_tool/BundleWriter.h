@@ -51,12 +51,24 @@ struct BundleIndexEntry {
 
 #pragma pack(pop)
 
+struct UniformEntry {
+  std::string name;
+  uint8_t format = 0;  // UniformFormat enum value
+};
+
+struct ReflectionData {
+  std::vector<UniformEntry> vertexUniforms;
+  std::vector<UniformEntry> fragmentUniforms;
+  std::vector<UniformEntry> samplers;
+};
+
 struct VariantData {
   std::string shaderName;
   uint32_t permutationIndex = 0;
   std::string profileTag;
   std::vector<uint8_t> vertexBlob;
   std::vector<uint8_t> fragmentBlob;
+  ReflectionData reflection;
 };
 
 struct ShaderKeyHash {

@@ -49,6 +49,49 @@ static constexpr size_t HEADER_SIZE = 68;
 //                  reflOff(4) = 36 bytes
 static constexpr size_t INDEX_ENTRY_SIZE = 36;
 
+// Deserializes reflection data from the bundle's reflection pool into a ShaderBlob's
+// vertexUniforms, fragmentUniforms and samplers fields.
+// Format: [vertexUniformCount:u8][fragmentUniformCount:u8][samplerCount:u8][reserved:u8]
+//         For each entry: [nameLen:u8][name:bytes][format:u8]
+static bool ParseReflection(const uint8_t* data, size_t maxLen, ShaderBlob* blob) {
+  if (maxLen < 4) {
+    return false;
+  }
+  size_t offset = 0;
+  uint8_t vertexCount = data[offset++];
+  uint8_t fragmentCount = data[offset++];
+  uint8_t samplerCount = data[offset++];
+  offset++;  // reserved
+
+  auto readEntries = [&](uint8_t count, std::vector<Uniform>& out) -> bool {
+    for (uint8_t i = 0; i < count; i++) {
+      if (offset >= maxLen) {
+        return false;
+      }
+      uint8_t nameLen = data[offset++];
+      if (offset + nameLen + 1 > maxLen) {
+        return false;
+      }
+      std::string name(reinterpret_cast<const char*>(data + offset), nameLen);
+      offset += nameLen;
+      auto format = static_cast<UniformFormat>(data[offset++]);
+      out.emplace_back(std::move(name), format);
+    }
+    return true;
+  };
+
+  if (!readEntries(vertexCount, blob->vertexUniforms)) {
+    return false;
+  }
+  if (!readEntries(fragmentCount, blob->fragmentUniforms)) {
+    return false;
+  }
+  if (!readEntries(samplerCount, blob->samplers)) {
+    return false;
+  }
+  return true;
+}
+
 bool PrecompiledShaderCache::loadBundle(const std::string& path) {
   std::ifstream file(path, std::ios::binary | std::ios::ate);
   if (!file.is_open()) {
@@ -72,15 +115,14 @@ bool PrecompiledShaderCache::loadBundle(const std::string& path) {
     return false;
   }
   uint16_t formatVersion = ReadU16LE(ptr + 4);
-  (void)formatVersion;
   uint16_t compressionType = ReadU16LE(ptr + 6);
   if (compressionType != 0) {
     LOGE("PrecompiledShaderCache: Compressed bundles not yet supported");
     return false;
   }
   uint32_t entryCount = ReadU32LE(ptr + 20);
+  uint32_t reflectionOffset = ReadU32LE(ptr + 24);
   uint32_t shaderDataOffset = ReadU32LE(ptr + 28);
-  // uint32_t shaderDataSize = ReadU32LE(ptr + 32);
 
   // Parse profileTag (32 bytes at offset 36)
   const char* tagPtr = reinterpret_cast<const char*>(ptr + 36);
@@ -93,6 +135,8 @@ bool PrecompiledShaderCache::loadBundle(const std::string& path) {
     return false;
   }
 
+  bool hasReflection = (formatVersion >= 2 && reflectionOffset != 0);
+
   // Parse index entries
   const uint8_t* indexStart = ptr + HEADER_SIZE;
   for (uint32_t i = 0; i < entryCount; i++) {
@@ -103,6 +147,7 @@ bool PrecompiledShaderCache::loadBundle(const std::string& path) {
     uint32_t vertSize = ReadU32LE(entry + 20);
     uint32_t fragOff = ReadU32LE(entry + 24);
     uint32_t fragSize = ReadU32LE(entry + 28);
+    uint32_t reflOff = ReadU32LE(entry + 32);
 
     // Offsets are relative to shader data pool start
     size_t vertAbsOff = shaderDataOffset + vertOff;
@@ -116,11 +161,24 @@ bool PrecompiledShaderCache::loadBundle(const std::string& path) {
     blob.vertexData.assign(ptr + vertAbsOff, ptr + vertAbsOff + vertSize);
     blob.fragmentData.assign(ptr + fragAbsOff, ptr + fragAbsOff + fragSize);
 
+    // Parse reflection data if available
+    if (hasReflection) {
+      size_t reflAbsOff = static_cast<size_t>(reflectionOffset) + reflOff;
+      if (reflAbsOff < fileSize) {
+        size_t maxReflLen = fileSize - reflAbsOff;
+        if (!ParseReflection(ptr + reflAbsOff, maxReflLen, &blob)) {
+          LOGE("PrecompiledShaderCache: Failed to parse reflection for entry %u", i);
+          return false;
+        }
+      }
+    }
+
     HashKey key{hashHi, hashLo};
     entries[key] = std::move(blob);
   }
 
-  LOGI("PrecompiledShaderCache: Loaded %u entries from %s", entryCount, path.c_str());
+  LOGI("PrecompiledShaderCache: Loaded %u entries from %s (format v%u%s)", entryCount, path.c_str(),
+       formatVersion, hasReflection ? ", with reflection" : "");
   return true;
 }
 

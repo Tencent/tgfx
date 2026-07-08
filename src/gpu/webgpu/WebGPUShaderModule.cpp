@@ -211,6 +211,19 @@ std::shared_ptr<WebGPUShaderModule> WebGPUShaderModule::Make(
 
 WebGPUShaderModule::WebGPUShaderModule(WebGPUGPU* gpu, const ShaderModuleDescriptor& descriptor)
     : _stage(descriptor.stage) {
+  if (descriptor.format == ShaderCodeFormat::WGSL) {
+    // Precompiled WGSL text path: skip GLSL -> SPIR-V -> WGSL pipeline.
+    WGPUShaderModuleWGSLDescriptor wgslDescriptor = {};
+    wgslDescriptor.chain.sType = WGPUSType_ShaderModuleWGSLDescriptor;
+    wgslDescriptor.code = descriptor.code.c_str();
+    WGPUShaderModuleDescriptor moduleDesc = {};
+    moduleDesc.nextInChain = &wgslDescriptor.chain;
+    shaderModule = wgpuDeviceCreateShaderModule(gpu->device(), &moduleDesc);
+    if (shaderModule == nullptr) {
+      LOGE("WebGPUShaderModule: precompiled WGSL creation failed");
+    }
+    return;
+  }
   compileShader(gpu->device(), descriptor.code, descriptor.stage);
 }
 

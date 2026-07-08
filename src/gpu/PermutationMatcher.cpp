@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PermutationMatcher.h"
+#include "gpu/processors/EmptyXferProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/shaders/level1/TextureFillShader.h"
 
@@ -28,6 +29,11 @@ static std::optional<PermutationMatchResult> TryMatchTextureFill(const ProgramIn
     return std::nullopt;
   }
   if (programInfo->numFragmentProcessors() != 1) {
+    return std::nullopt;
+  }
+  // Only match when no custom XferProcessor is active. A non-empty XferProcessor changes the
+  // shader structure (e.g. dst texture sampling) which is incompatible with precompiled variants.
+  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
     return std::nullopt;
   }
   auto fp = programInfo->getFragmentProcessor(0);

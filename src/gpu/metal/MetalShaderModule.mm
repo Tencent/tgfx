@@ -155,6 +155,16 @@ std::shared_ptr<MetalShaderModule> MetalShaderModule::Make(
 MetalShaderModule::MetalShaderModule(MetalGPU* gpu, const ShaderModuleDescriptor& descriptor)
     : _stage(descriptor.stage),
       _glslCode(descriptor.stage == ShaderStage::Fragment ? descriptor.code : std::string{}) {
+  if (descriptor.format == ShaderCodeFormat::MSL) {
+    // Precompiled MSL text path: skip GLSL -> SPIR-V -> MSL pipeline.
+    NSString* mslSource = [NSString stringWithUTF8String:descriptor.code.c_str()];
+    NSError* error = nil;
+    library = [gpu->device() newLibraryWithSource:mslSource options:nil error:&error];
+    if (!library && error) {
+      LOGE("MetalShaderModule: precompiled MSL error: %s", error.localizedDescription.UTF8String);
+    }
+    return;
+  }
   compileShader(gpu->device(), gpu->shaderCompiler(), descriptor.code, descriptor.stage);
 }
 

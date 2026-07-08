@@ -94,6 +94,32 @@ static void WriteU64LE(std::ofstream& out, uint64_t val) {
   out.write(reinterpret_cast<char*>(buf), 8);
 }
 
+// Serializes a single ReflectionData into a byte blob.
+// Format: [vertexUniformCount:u8][fragmentUniformCount:u8][samplerCount:u8][reserved:u8]
+//         For each uniform: [nameLen:u8][name:bytes][format:u8]
+//         For each sampler: [nameLen:u8][name:bytes][format:u8]
+static std::vector<uint8_t> SerializeReflection(const ReflectionData& reflection) {
+  std::vector<uint8_t> blob;
+  blob.push_back(static_cast<uint8_t>(reflection.vertexUniforms.size()));
+  blob.push_back(static_cast<uint8_t>(reflection.fragmentUniforms.size()));
+  blob.push_back(static_cast<uint8_t>(reflection.samplers.size()));
+  blob.push_back(0);  // reserved padding
+
+  auto writeEntries = [&blob](const std::vector<UniformEntry>& entries) {
+    for (const auto& entry : entries) {
+      auto nameLen = static_cast<uint8_t>(entry.name.size());
+      blob.push_back(nameLen);
+      blob.insert(blob.end(), entry.name.begin(), entry.name.end());
+      blob.push_back(entry.format);
+    }
+  };
+
+  writeEntries(reflection.vertexUniforms);
+  writeEntries(reflection.fragmentUniforms);
+  writeEntries(reflection.samplers);
+  return blob;
+}
+
 bool WriteBundle(const std::string& outPath, const std::string& profileTag,
                  const std::vector<VariantData>& variants) {
   if (variants.empty()) {
@@ -132,14 +158,14 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
     }
   }
 
-  // Layout: FileHeader | IndexEntries[] | ShaderDataPool
-  // Compute shader data offsets
+  // Layout: FileHeader | IndexEntries[] | ShaderDataPool | ReflectionPool
   uint32_t headerSize = sizeof(BundleFileHeader);
   uint32_t indexSize = static_cast<uint32_t>(entries.size()) * sizeof(BundleIndexEntry);
   uint32_t shaderDataStart = headerSize + indexSize;
 
-  // Build shader data pool and record offsets
+  // Build shader data pool and reflection pool, record offsets
   std::vector<uint8_t> shaderDataPool;
+  std::vector<uint8_t> reflectionPool;
   std::vector<BundleIndexEntry> indexEntries(entries.size());
 
   for (size_t i = 0; i < entries.size(); i++) {
@@ -153,7 +179,11 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
     idx.fragmentBlobOffset = static_cast<uint32_t>(shaderDataPool.size());
     idx.fragmentBlobSize = static_cast<uint32_t>(v.fragmentBlob.size());
     shaderDataPool.insert(shaderDataPool.end(), v.fragmentBlob.begin(), v.fragmentBlob.end());
-    idx.reflectionOffset = 0;  // Reflection data not yet implemented
+
+    // Serialize reflection for this entry
+    auto reflBlob = SerializeReflection(v.reflection);
+    idx.reflectionOffset = static_cast<uint32_t>(reflectionPool.size());
+    reflectionPool.insert(reflectionPool.end(), reflBlob.begin(), reflBlob.end());
   }
 
   // Write file
@@ -163,11 +193,17 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
     return false;
   }
 
+  // Compute reflection pool file offset
+  uint32_t reflectionPoolFileOffset =
+      shaderDataStart + static_cast<uint32_t>(shaderDataPool.size());
+
   // Write header
   BundleFileHeader header;
+  header.formatVersion = 2;
   header.entryCount = static_cast<uint32_t>(entries.size());
   header.shaderDataOffset = shaderDataStart;
   header.shaderDataSize = static_cast<uint32_t>(shaderDataPool.size());
+  header.reflectionOffset = reflectionPool.empty() ? 0 : reflectionPoolFileOffset;
   std::strncpy(header.profileTag, profileTag.c_str(), sizeof(header.profileTag) - 1);
 
   WriteU32LE(file, header.magic);
@@ -195,6 +231,12 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
   // Write shader data pool
   file.write(reinterpret_cast<const char*>(shaderDataPool.data()),
              static_cast<std::streamsize>(shaderDataPool.size()));
+
+  // Write reflection pool
+  if (!reflectionPool.empty()) {
+    file.write(reinterpret_cast<const char*>(reflectionPool.data()),
+               static_cast<std::streamsize>(reflectionPool.size()));
+  }
 
   file.close();
   return true;
