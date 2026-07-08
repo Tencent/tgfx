@@ -20,8 +20,10 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
+#include "ShaderCompiler.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/level1/TextureFillShader.h"
 
@@ -38,6 +40,7 @@ struct ShaderReport {
   std::string name;
   uint32_t rawCount = 0;
   uint32_t compiledCount = 0;
+  uint32_t errorCount = 0;
 };
 
 struct BuildReport {
@@ -93,19 +96,86 @@ static bool ParseArgs(int argc, char** argv, BuildOptions* options) {
   return true;
 }
 
+static std::string ReadFileContents(const std::string& path) {
+  std::ifstream file(path);
+  if (!file.is_open()) {
+    return "";
+  }
+  std::stringstream buffer;
+  buffer << file.rdbuf();
+  return buffer.str();
+}
+
 static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info,
-                                     const BuildOptions& /*options*/) {
+                                     const BuildOptions& options) {
   ShaderReport report;
   report.name = info.name;
   auto domain = info.domain;
   report.rawCount = domain.totalCount();
   report.compiledCount = 0;
+  report.errorCount = 0;
+
+  std::string vertSource;
+  std::string fragSource;
+  if (!options.reportOnly && !options.shaderDir.empty()) {
+    vertSource = ReadFileContents(options.shaderDir + "/" + info.vertexFile);
+    fragSource = ReadFileContents(options.shaderDir + "/" + info.fragmentFile);
+    if (vertSource.empty()) {
+      std::cerr << "  WARNING: Cannot read vertex file: " << info.vertexFile << "\n";
+    }
+    if (fragSource.empty()) {
+      std::cerr << "  WARNING: Cannot read fragment file: " << info.fragmentFile << "\n";
+    }
+  }
+
   for (uint32_t i = 0; i < report.rawCount; i++) {
     auto values = domain.decode(i);
     if (info.shouldCompile && !info.shouldCompile(values)) {
       continue;
     }
     report.compiledCount++;
+
+    if (options.reportOnly || vertSource.empty() || fragSource.empty()) {
+      continue;
+    }
+
+    auto defines = domain.defineListFor(i);
+    auto expandedVert = PrependDefines(vertSource, defines);
+    auto expandedFrag = PrependDefines(fragSource, defines);
+
+    for (const auto& backend : options.backends) {
+      if (backend == "vulkan" || backend == "metal" || backend == "webgpu") {
+        auto vertResult = CompileGLSL(expandedVert, ShaderStageType::Vertex, info.name, i);
+        if (!vertResult.success) {
+          std::cerr << "  " << vertResult.error << "\n";
+          report.errorCount++;
+          continue;
+        }
+        auto fragResult = CompileGLSL(expandedFrag, ShaderStageType::Fragment, info.name, i);
+        if (!fragResult.success) {
+          std::cerr << "  " << fragResult.error << "\n";
+          report.errorCount++;
+          continue;
+        }
+        if (backend == "metal") {
+          auto mslVert = TranslateToMSL(vertResult.spirv);
+          auto mslFrag = TranslateToMSL(fragResult.spirv);
+          if (!mslVert.success || !mslFrag.success) {
+            std::cerr << "  MSL translation error: "
+                      << (mslVert.success ? mslFrag.error : mslVert.error) << "\n";
+            report.errorCount++;
+          }
+        } else if (backend == "webgpu") {
+          auto wgslVert = TranslateToWGSL(vertResult.spirv);
+          auto wgslFrag = TranslateToWGSL(fragResult.spirv);
+          if (!wgslVert.success || !wgslFrag.success) {
+            std::cerr << "  WGSL translation error: "
+                      << (wgslVert.success ? wgslFrag.error : wgslVert.error) << "\n";
+            report.errorCount++;
+          }
+        }
+      }
+    }
   }
   return report;
 }

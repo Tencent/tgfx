@@ -765,9 +765,17 @@ if (TGFX_BUILD_TESTS)
     target_compile_options(tgfx_shader_declarations PRIVATE ${TGFX_COMPILE_OPTIONS})
     target_include_directories(tgfx_shader_declarations PUBLIC src include)
 
-    add_executable(shader_build_tool tools/shader_build_tool/main.cpp)
+    file(GLOB SHADER_TOOL_FILES tools/shader_build_tool/*.cpp)
+    add_executable(shader_build_tool ${SHADER_TOOL_FILES})
     target_link_libraries(shader_build_tool PRIVATE tgfx_shader_declarations)
+    target_include_directories(shader_build_tool PRIVATE tools/shader_build_tool)
+    target_include_directories(shader_build_tool SYSTEM PRIVATE
+            third_party/shaderc/libshaderc/include
+            third_party/SPIRV-Cross)
     target_compile_options(shader_build_tool PRIVATE ${TGFX_COMPILE_OPTIONS})
+    add_dependencies(shader_build_tool tgfx-vendor)
+    find_vendor_libraries(tgfx-vendor STATIC SHADER_TOOL_VENDOR_LIBS)
+    target_link_libraries(shader_build_tool PRIVATE ${SHADER_TOOL_VENDOR_LIBS})
 
     add_custom_command(
             OUTPUT ${CMAKE_BINARY_DIR}/shader_build_report.json
