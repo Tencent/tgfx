@@ -793,12 +793,12 @@ TGFX_TEST(ClipTest, Overview) {
 
         // ---------- RRect single-element variants ----------
         case 2:
-          // Cell 2: Simple RRect AA, identity. Basic RRectEffect analytic FP.
+          // Cell 2: Simple RRect (uniform radii) AA, identity. RRectEffect identity variant.
           canvas->clipRRect(RRect::MakeRectXY(Rect::MakeXYWH(30, 30, 140, 140), 25, 25), true);
           canvas->drawRect(Rect::MakeWH(kCell, kCell), fillPaint);
           break;
         case 3:
-          // Cell 3: Complex RRect (4 distinct radii), identity, AA. Arc-box dispatch.
+          // Cell 3: Complex RRect (4 distinct radii), identity, AA. RRectEffect identity variant.
           canvas->clipRRect(RRect::MakeRectRadii(Rect::MakeXYWH(30, 30, 140, 140),
                                                  {{{50, 50}, {12, 30}, {8, 8}, {30, 15}}}),
                             true);
@@ -869,8 +869,7 @@ TGFX_TEST(ClipTest, Overview) {
           break;
         case 10: {
           // Cell 10: Duplicate non-rect Path clip. Two separately constructed Paths with
-          // identical geometry bypass isSame() elimination, forcing makeClipTexture to
-          // compose them via inverse-fill + DstOut.
+          // identical geometry bypass isSame() elimination, so both survive to the mask path.
           canvas->translate(kCell / 2.f, kCell / 2.f);
           auto pathA = MakePath({{0, -75}, {72, -23}, {44, 60}, {-44, 60}, {-72, -23}});
           auto pathB = MakePath({{0, -75}, {72, -23}, {44, 60}, {-44, 60}, {-72, -23}});
