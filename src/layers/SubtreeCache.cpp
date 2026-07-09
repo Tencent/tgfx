@@ -18,7 +18,6 @@
 
 #include "SubtreeCache.h"
 #include <algorithm>
-#include "core/SsaaDebugProbe.h"
 #include "core/images/TextureImage.h"
 #include "gpu/ProxyProvider.h"
 #include "tgfx/core/ColorSpace.h"
@@ -48,25 +47,7 @@ void SubtreeCache::addCache(Context* context, int longEdge, float scaleDivisor,
   auto proxyProvider = context->proxyProvider();
   proxyProvider->assignProxyUniqueKey(textureProxy, sizeUniqueKey);
   textureProxy->assignUniqueKey(sizeUniqueKey);
-  // [SSAA-DBG] Round 6: detect key jitter. If cacheEntries already has entries under a
-  // DIFFERENT key when we insert a new one, that means the same layer produced multiple
-  // (longEdge, divisor) keys across frames — direct proof of key instability.
-  const bool isNewKey = (cacheEntries.find(sizeUniqueKey) == cacheEntries.end());
   cacheEntries[sizeUniqueKey] = CacheEntry{imageMatrix, colorSpace};
-  if (ssaa_debug::gProbe.active) {
-    if (isNewKey && cacheEntries.size() >= 2) {
-      ++ssaa_debug::gProbe.builtSecondEntry;
-    }
-    // [SSAA-DBG] Round 7: builtFromEmpty = fresh SubtreeCache instance (just created after
-    // an invalidateSubtree) is receiving its very first entry. Distinguishes "first-ever
-    // cache for this layer / rebuild after invalidate" from "same layer accumulating more
-    // keys" (builtSecondEntry above).
-    if (isNewKey && cacheEntries.size() == 1) {
-      ++ssaa_debug::gProbe.builtFromEmpty;
-    }
-    ssaa_debug::gProbe.builtEntriesSizeSum +=
-        static_cast<int64_t>(cacheEntries.size());
-  }
 }
 
 bool SubtreeCache::hasCache(Context* context, int longEdge, float scaleDivisor) const {
@@ -76,17 +57,10 @@ bool SubtreeCache::hasCache(Context* context, int longEdge, float scaleDivisor) 
   auto sizeUniqueKey = makeSizeKey(longEdge, scaleDivisor);
   auto it = cacheEntries.find(sizeUniqueKey);
   if (it == cacheEntries.end()) {
-    if (ssaa_debug::gProbe.active) {
-      ++ssaa_debug::gProbe.hasCacheKeyMiss;
-    }
     return false;
   }
   auto proxyProvider = context->proxyProvider();
-  const bool hasProxy = proxyProvider->findOrWrapTextureProxy(sizeUniqueKey) != nullptr;
-  if (!hasProxy && ssaa_debug::gProbe.active) {
-    ++ssaa_debug::gProbe.hasCacheProxyMiss;
-  }
-  return hasProxy;
+  return proxyProvider->findOrWrapTextureProxy(sizeUniqueKey) != nullptr;
 }
 
 void SubtreeCache::draw(Context* context, int longEdge, float scaleDivisor, Canvas* canvas,

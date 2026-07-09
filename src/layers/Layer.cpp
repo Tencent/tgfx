@@ -19,7 +19,6 @@
 #include "tgfx/layers/Layer.h"
 #include <algorithm>
 #include <atomic>
-#include <chrono>
 #include <cmath>
 #include <unordered_map>
 #include <unordered_set>
@@ -33,7 +32,6 @@
 #include "core/utils/Types.h"
 #include "layers/BackgroundHandler.h"
 #include "layers/BackgroundSnapshotMap.h"
-#include "core/SsaaDebugProbe.h"
 #include "layers/BackgroundSource.h"
 #include "layers/DrawArgs.h"
 #include "layers/LayerStyleSource.h"
@@ -55,13 +53,6 @@ namespace tgfx {
 // mipmap levels that would be inefficient to cache.
 static constexpr int SUBTREE_CACHE_MIN_SIZE = 32;
 
-// [SSAA-DBG] Minimum physical (post-canvas-scale) longEdge required for a layer to be a
-// subtree-cache candidate. Layers smaller than this in screen pixels are direct-drawn instead
-// of cached. Rationale: at very low zoom (e.g. 0.02 whole-doc overview) a viewport tile can
-// contain hundreds of complex layers whose physical footprint is only a few pixels each;
-// building a cache image per layer costs far more than just redrawing them. Threshold is
-// intentionally macro-configurable so it can be tuned against per-scene bench data.
-//
 static std::atomic_bool AllowsEdgeAntialiasing = true;
 static std::atomic_bool AllowsGroupOpacity = false;
 
@@ -1191,22 +1182,6 @@ bool Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
       drawWithSubtreeCache(args, canvas, alpha, blendMode, maskFilter)) {
     return true;
   }
-  // [SSAA-DBG] Round 2: if we entered drawWithSubtreeCache but bailed (returned false), the
-  // reason is stashed in gProbe.lastMissReason. Time the fallback direct-draw here and bucket
-  // by reason so we can tell "Oversized fallback direct-draw time" apart from other fallbacks
-  // and from ineligible layers (which never even touched the subtree cache path). Chrono runs
-  // whenever probe is active; sync barriers only when gGpuSyncEnabled — see segment 1a
-  // rationale for CPU-record vs GPU-real semantics.
-  const auto missReason = ssaa_debug::gProbe.active
-                              ? ssaa_debug::gProbe.lastMissReason
-                              : ssaa_debug::Probe::LastMissReason::None;
-  const bool measureFallback = ssaa_debug::gProbe.active &&
-                               missReason != ssaa_debug::Probe::LastMissReason::None;
-  const bool syncFallback = measureFallback && ssaa_debug::gGpuSyncEnabled;
-  // Clear immediately so a downstream child layer's own draw() doesn't inherit our reason.
-  if (ssaa_debug::gProbe.active) {
-    ssaa_debug::gProbe.lastMissReason = ssaa_debug::Probe::LastMissReason::None;
-  }
 
   // For non-leaf layers in a 3D rendering context layer tree, direct rendering is always used.
   // Offscreen constraints (filters, styles, masks) are already checked by the parent layer at call
@@ -1218,41 +1193,12 @@ bool Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
                      (alpha < 1.0f && bitFields.allowsGroupOpacity) ||
                      (!_filters.empty() && !args.excludeEffects) || needsMaskFilter;
   }
-  if (syncFallback) {
-    args.context->flushAndSubmit(true);
-  }
-  auto fallbackT0 = std::chrono::steady_clock::now();
   if (needsOffscreen) {
     // Content and children are rendered together in an offscreen buffer.
     drawOffscreen(args, canvas, alpha, blendMode, maskFilter);
   } else {
     // Content and children are rendered independently.
     drawDirectly(args, canvas, alpha);
-  }
-  if (syncFallback) {
-    args.context->flushAndSubmit(true);
-  }
-  auto fallbackT1 = std::chrono::steady_clock::now();
-  if (measureFallback) {
-    auto fallbackUs =
-        std::chrono::duration_cast<std::chrono::microseconds>(fallbackT1 - fallbackT0).count();
-    if (missReason == ssaa_debug::Probe::LastMissReason::Oversized) {
-      ssaa_debug::gProbe.oversizedFallbackDrawUs += fallbackUs;
-      ++ssaa_debug::gProbe.oversizedFallbackDrawCount;
-    } else {
-      ssaa_debug::gProbe.otherFallbackDrawUs += fallbackUs;
-      ++ssaa_debug::gProbe.otherFallbackDrawCount;
-      // [SSAA-DBG] Round 5: split by whether we are nested inside a cache-image build.
-      // depth>0 means the enclosing seg1a chrono window already accounts for this time; the
-      // fallback body is only recording ops into a PictureRecorder (CPU work).
-      if (ssaa_debug::gProbe.cacheImageBuildDepth > 0) {
-        ssaa_debug::gProbe.otherFallbackInRecUs += fallbackUs;
-        ++ssaa_debug::gProbe.otherFallbackInRecCount;
-      } else {
-        ssaa_debug::gProbe.otherFallbackDirectUs += fallbackUs;
-        ++ssaa_debug::gProbe.otherFallbackDirectCount;
-      }
-    }
   }
   return true;
 }
@@ -1522,128 +1468,24 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
 SubtreeCache* Layer::getValidSubtreeCache(const DrawArgs& args, int longEdge,
                                           const Rect& layerBounds, int effectiveMaxSize) {
   if (subtreeCache->hasCache(args.context, longEdge, args.subtreeContentScaleDivisor)) {
-    if (ssaa_debug::gProbe.active) {
-      ++ssaa_debug::gProbe.subtreeCacheHit;
-      // Success path: clear miss reason so the outer draw() attributes time correctly.
-      ssaa_debug::gProbe.lastMissReason = ssaa_debug::Probe::LastMissReason::None;
-    }
     return subtreeCache.get();
   }
   if (args.renderFlags & RenderFlags::DisableCache || longEdge > effectiveMaxSize) {
-    if (ssaa_debug::gProbe.active) {
-      if (args.renderFlags & RenderFlags::DisableCache) {
-        ++ssaa_debug::gProbe.subtreeCacheDisabled;
-        ssaa_debug::gProbe.lastMissReason = ssaa_debug::Probe::LastMissReason::Disabled;
-      } else {
-        ++ssaa_debug::gProbe.subtreeCacheOversized;
-        ssaa_debug::gProbe.lastMissReason = ssaa_debug::Probe::LastMissReason::Oversized;
-        // Bucket oversized layers by physical longEdge (already 2x when SSAA=on) so we can
-        // read "how many layers would return to cache at various maxSize thresholds".
-        if (longEdge <= 2048) {
-          ++ssaa_debug::gProbe.oversizedBucket_le2048;
-        } else if (longEdge <= 3072) {
-          ++ssaa_debug::gProbe.oversizedBucket_2k_3k;
-        } else if (longEdge <= 4096) {
-          ++ssaa_debug::gProbe.oversizedBucket_3k_4k;
-        } else if (longEdge <= 6144) {
-          ++ssaa_debug::gProbe.oversizedBucket_4k_6k;
-        } else {
-          ++ssaa_debug::gProbe.oversizedBucket_6k_plus;
-        }
-        if (ssaa_debug::gProbe.oversizedMinLongEdge == 0 ||
-            longEdge < ssaa_debug::gProbe.oversizedMinLongEdge) {
-          ssaa_debug::gProbe.oversizedMinLongEdge = longEdge;
-        }
-        if (longEdge > ssaa_debug::gProbe.oversizedMaxLongEdge) {
-          ssaa_debug::gProbe.oversizedMaxLongEdge = longEdge;
-        }
-      }
-    }
     return nullptr;
   }
   auto maxBoundsSize = std::max(layerBounds.width(), layerBounds.height());
   if (FloatNearlyZero(maxBoundsSize)) {
-    if (ssaa_debug::gProbe.active) {
-      ++ssaa_debug::gProbe.subtreeCacheMissOther;
-      ssaa_debug::gProbe.lastMissReason = ssaa_debug::Probe::LastMissReason::MissOther;
-    }
     return nullptr;
   }
   auto cacheScale = static_cast<float>(longEdge) / maxBoundsSize;
   auto imageMatrix = Matrix::I();
-  // [SSAA-DBG] Segment 1a: timing of the 2x cache image build.
-  // - When gGpuSyncEnabled is true, wall-clock reflects real GPU cost (pipeline serialized).
-  // - When gGpuSyncEnabled is false, wall-clock reflects only CPU command-recording time
-  //   (GPU work is queued asynchronously); still useful as a "how dense are the ops" signal
-  //   because it scales with the amount of picture recording / offscreen setup done.
-  // Barriers only fire in sync mode; chrono always accumulates while probe is active.
-  const bool probeActive = ssaa_debug::gProbe.active;
-  const bool syncBuild = probeActive && ssaa_debug::gGpuSyncEnabled;
-  if (syncBuild) {
-    args.context->flushAndSubmit(true);
-  }
-  auto buildT0 = std::chrono::steady_clock::now();
-  if (probeActive) {
-    // [SSAA-DBG] Round 5: mark that we are inside a cache-image build so any Layer::draw
-    // fallback triggered by the recording's drawDirectly gets bucketed as "inRec" (CPU
-    // op-recording, overlapping with seg1a's wall-clock) instead of "direct" (tile main
-    // chain, independent of seg1a).
-    ++ssaa_debug::gProbe.cacheImageBuildDepth;
-  }
   auto image = createSubtreeCacheImage(args, cacheScale, layerBounds, &imageMatrix);
-  if (probeActive) {
-    --ssaa_debug::gProbe.cacheImageBuildDepth;
-  }
-  if (syncBuild) {
-    args.context->flushAndSubmit(true);
-  }
-  auto buildT1 = std::chrono::steady_clock::now();
-  if (probeActive) {
-    ssaa_debug::gProbe.subtreeCacheBuildUs +=
-        std::chrono::duration_cast<std::chrono::microseconds>(buildT1 - buildT0).count();
-    ++ssaa_debug::gProbe.subtreeCacheBuildCount;
-  }
   if (image == nullptr) {
-    if (ssaa_debug::gProbe.active) {
-      ++ssaa_debug::gProbe.subtreeCacheMissOther;
-      ssaa_debug::gProbe.lastMissReason = ssaa_debug::Probe::LastMissReason::MissOther;
-    }
     return nullptr;
   }
   auto textureProxy = std::static_pointer_cast<TextureImage>(image)->getTextureProxy();
   subtreeCache->addCache(args.context, longEdge, args.subtreeContentScaleDivisor, textureProxy,
                          imageMatrix, args.dstColorSpace);
-  if (ssaa_debug::gProbe.active) {
-    ++ssaa_debug::gProbe.subtreeCacheBuilt;
-    // Success: clear miss reason so the outer draw() sees "not a fallback" state.
-    ssaa_debug::gProbe.lastMissReason = ssaa_debug::Probe::LastMissReason::None;
-    // [SSAA-DBG] Round 4: bucket the physical longEdge (mipmap-rounded) of this successful
-    // build so we can see how many of the currently-cached layers cluster around each size
-    // band. Combined with per-build cost this identifies the real hotspot band. `longEdge`
-    // is already the physical (SSAA-included) mipmap-rounded value.
-    auto& probe = ssaa_debug::gProbe;
-    if (longEdge <= 64) {
-      ++probe.builtEdge_le64;
-    } else if (longEdge <= 128) {
-      ++probe.builtEdge_64_128;
-    } else if (longEdge <= 256) {
-      ++probe.builtEdge_128_256;
-    } else if (longEdge <= 512) {
-      ++probe.builtEdge_256_512;
-    } else if (longEdge <= 1024) {
-      ++probe.builtEdge_512_1024;
-    } else if (longEdge <= 2048) {
-      ++probe.builtEdge_1024_2048;
-    } else {
-      ++probe.builtEdge_2048_plus;
-    }
-    if (probe.builtEdgeMin == 0 || longEdge < probe.builtEdgeMin) {
-      probe.builtEdgeMin = longEdge;
-    }
-    if (longEdge > probe.builtEdgeMax) {
-      probe.builtEdgeMax = longEdge;
-    }
-  }
   return subtreeCache.get();
 }
 
@@ -1652,9 +1494,6 @@ bool Layer::drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alp
                                  const std::shared_ptr<MaskFilter>& maskFilter) {
   // Non-leaf nodes in 3D rendering context layer tree have caching disabled.
   DEBUG_ASSERT(!canPreserve3D());
-  if (ssaa_debug::gProbe.active) {
-    ++ssaa_debug::gProbe.subtreeCacheEligible;
-  }
   auto layerBounds = getBounds();
   auto contentScale = canvas->getMatrix().getMaxScale();
   // SSAA path: build the cache image at the same physical scale the canvas is using so the
@@ -1677,25 +1516,8 @@ bool Layer::drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alp
   paint.setAntiAlias(ResolveAntiAlias(args, bitFields.allowsEdgeAntialiasing));
   paint.setAlpha(alpha);
   paint.setBlendMode(blendMode);
-  // [SSAA-DBG] Segment 1b: timing of the cache-hit draw path. See segment 1a comment for the
-  // sync-on vs sync-off semantics.
-  const bool drawProbeActive = ssaa_debug::gProbe.active;
-  const bool syncDrawHit = drawProbeActive && ssaa_debug::gGpuSyncEnabled;
-  if (syncDrawHit) {
-    args.context->flushAndSubmit(true);
-  }
-  auto drawT0 = std::chrono::steady_clock::now();
   cache->draw(args.context, longEdge, args.subtreeContentScaleDivisor, canvas, paint,
               args.forceImageSamplingNearest);
-  if (syncDrawHit) {
-    args.context->flushAndSubmit(true);
-  }
-  auto drawT1 = std::chrono::steady_clock::now();
-  if (drawProbeActive) {
-    ssaa_debug::gProbe.subtreeCacheDrawHitUs +=
-        std::chrono::duration_cast<std::chrono::microseconds>(drawT1 - drawT0).count();
-    ++ssaa_debug::gProbe.subtreeCacheDrawHitCount;
-  }
   return true;
 }
 
@@ -1731,11 +1553,11 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   }
 
   canvas->concat(result.imageMatrix);
-  // [SSAA-DBG] SSAA path prefers nearest for the offscreen blit: the offscreen was rendered
-  // at the SSAA physical scale, so it lands 1:1 on the tile. The downstream SSAA downsample
-  // still supplies the box average needed for edge quality; a second Linear tap here would
-  // burn 4x fragment work with no visible gain. Filters/no-filter branches are unified under
-  // the SSAA override because filtered offscreens are also physically-sized under SSAA.
+  // SSAA path prefers nearest for the offscreen blit: the offscreen was rendered at the SSAA
+  // physical scale, so it lands 1:1 on the tile. The downstream SSAA downsample still supplies
+  // the box average needed for edge quality; a second Linear tap here would burn 4x fragment
+  // work with no visible gain. Filters/no-filter branches are unified under the SSAA override
+  // because filtered offscreens are also physically-sized under SSAA.
   auto filterMode = args.forceImageSamplingNearest
                         ? FilterMode::Nearest
                         : (!args.excludeEffects && !_filters.empty() ? FilterMode::Linear
@@ -2438,13 +2260,6 @@ bool Layer::canPreserve3D() const {
 }
 
 void Layer::invalidateSubtree() {
-  // [SSAA-DBG] Round 7: track invalidation churn. Count only when we actually drop a live
-  // SubtreeCache — turning "already null" into null adds no signal. Uses the module-global
-  // gInvalidateCounter (NOT gProbe) because Layer::invalidateSubtree fires during property
-  // mutation between renders, and gProbe gets zeroed every tile via `gProbe = {}`.
-  if (subtreeCache != nullptr) {
-    ++ssaa_debug::gInvalidateCounter;
-  }
   bitFields.staticSubtree = false;
   subtreeCache = nullptr;
   localBounds = nullptr;

@@ -81,8 +81,8 @@ class DrawArgs {
   // background snapshot (BackgroundCapturer), 3D leaf surfaces (Render3DContext), etc.
   bool forceNoEdgeAA = false;
 
-  // [SSAA-DBG] When true, every image sampling site inside a Layer draw path overrides its
-  // default sampling to nearest-neighbor. Rationale: SSAA renders to a 2x tile that is later
+  // When true, every image sampling site inside a Layer draw path overrides its default
+  // sampling to nearest-neighbor. Rationale: SSAA renders to a 2x tile that is later
   // Linear-downsampled to the atlas, so the SSAA downsample itself supplies the box-averaging
   // needed for anti-aliasing. Doing another 4-tap Linear sample when *entering* the SSAA tile
   // (subtree-cache hit blit, offscreen-filter result blit, etc.) burns fragment work with no

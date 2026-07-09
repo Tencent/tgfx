@@ -310,17 +310,6 @@ class DisplayList {
    */
   void setUseSSAA(bool use);
 
-  // [SSAA-DBG] Bench-only: propagate the current replay tag into the SSAA-DBG log line so runs
-  // captured with SSAA on/off can be aligned per replay event. Empty string disables the field.
-  static void setDebugTag(std::string tag);
-
-  // [SSAA-DBG] Bench-only: enable/disable GPU-synced timing barriers around SSAA hot-path
-  // segments (subtree cache build/hit, drawRootLayer, downsample, fallback direct-draw).
-  // When enabled the render pipeline is serialized and per-segment timings reflect real GPU
-  // cost; when disabled the barriers collapse to no-ops and the pipeline runs unmodified.
-  // Wire this to the existing benchmark measure-mode switch so there is a single toggle.
-  static void setDebugGpuSyncEnabled(bool enabled);
-
   /**
    * Sets whether to show dirty regions during rendering. When enabled, the dirty regions will be
    * highlighted in the rendered output. This is useful for debugging to visualize which parts of

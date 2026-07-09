@@ -47,9 +47,9 @@ class SubtreeCache {
 
   bool hasCache(Context* context, int longEdge, float scaleDivisor) const;
 
-  // [SSAA-DBG] When forceNearest is true the cached image is blit with FilterMode::Nearest
-  // instead of the canvas default Linear. Used by the SSAA tile path where the cache image is
-  // built at the tile's physical (2x) resolution and therefore samples 1:1 into the tile.
+  // When forceNearest is true the cached image is blit with FilterMode::Nearest instead of
+  // the canvas default Linear. Used by the SSAA tile path where the cache image is built at
+  // the tile's physical (2x) resolution and therefore samples 1:1 into the tile.
   void draw(Context* context, int longEdge, float scaleDivisor, Canvas* canvas,
             const Paint& paint, bool forceNearest = false) const;
 

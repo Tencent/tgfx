@@ -17,13 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Canvas.h"
-#include <chrono>
 #include "core/CanvasState.h"
 #include "core/ClipStack.h"
 #include "core/DrawContext.h"
 #include "core/LayerUnrollContext.h"
 #include "core/PictureContext.h"
-#include "core/SsaaDebugProbe.h"
 #include "core/shapes/StrokeShape.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -35,75 +33,6 @@
 #include "tgfx/core/Surface.h"
 
 namespace tgfx {
-
-// [SSAA-DBG] Classify the brush's shader (or lack thereof) into the corresponding probe bucket.
-// Called at each Canvas draw* op site so a single draw contributes one shader classification.
-// Kept as a free helper (not a Probe member) so the enum switch stays local to Canvas.cpp and
-// SsaaDebugProbe.h remains a plain data struct.
-static inline void ClassifyBrushShader(const Paint& paint) {
-  if (!ssaa_debug::gProbe.active) {
-    return;
-  }
-  auto& probe = ssaa_debug::gProbe;
-  const auto* shader = paint.getShader().get();
-  if (shader == nullptr) {
-    ++probe.shaderNone;
-    return;
-  }
-  switch (Types::Get(shader)) {
-    case Types::ShaderType::Color:        ++probe.shaderColor; break;
-    case Types::ShaderType::Image:        ++probe.shaderImage; break;
-    case Types::ShaderType::Gradient:     ++probe.shaderGradient; break;
-    case Types::ShaderType::ColorFilter:  ++probe.shaderColorFilter; break;
-    case Types::ShaderType::Matrix:       ++probe.shaderMatrix; break;
-    case Types::ShaderType::Blend:        ++probe.shaderBlend; break;
-    case Types::ShaderType::PerlinNoise:  ++probe.shaderPerlinNoise; break;
-    default:                              ++probe.shaderOther; break;
-  }
-}
-
-// [SSAA-DBG] Round 8: charge the elapsed GPU time of the currently-open op cluster to its
-// category and open a new cluster of the incoming type. Only active when both:
-//   1) gGpuSyncEnabled is true (bench harness explicitly asked for GPU sync)
-//   2) canvas has a live surface (recording canvases have no GPU work to attribute)
-// Category batching semantics: consecutive same-category ops keep sharing one flush window,
-// so intra-category batching survives; only category switches cost a barrier. This trades
-// per-op precision for realistic GPU cost — a "path burst" gets measured as its natural
-// batched cost, not the pathological "one path per drawcall".
-static inline void ChargeOpCategory(Canvas* canvas, signed char newCategory) {
-  auto& probe = ssaa_debug::gProbe;
-  if (!probe.active || !ssaa_debug::gGpuSyncEnabled) {
-    return;
-  }
-  if (newCategory == probe.currentOpCategory) {
-    return;  // same category — keep batching
-  }
-  auto* surface = canvas->getSurface();
-  if (surface == nullptr) {
-    return;  // recording canvas: no GPU work to time
-  }
-  auto* context = surface->getContext();
-  if (context == nullptr) {
-    return;
-  }
-  // Close previous category: flush pending GPU work and record its elapsed time.
-  if (probe.currentOpCategory != ssaa_debug::Probe::OpCatNone) {
-    context->flushAndSubmit(true);
-    auto now = std::chrono::steady_clock::now().time_since_epoch();
-    auto nowNs = std::chrono::duration_cast<std::chrono::nanoseconds>(now).count();
-    auto elapsedUs = (nowNs - probe.opCategoryT0Ns) / 1000;
-    if (probe.currentOpCategory >= 0
-        && probe.currentOpCategory < ssaa_debug::Probe::OpCatCount) {
-      probe.opGpuUs[probe.currentOpCategory] += elapsedUs;
-    }
-    ++probe.opGpuFlushCount;
-  }
-  // Start a fresh window for the new category.
-  probe.currentOpCategory = newCategory;
-  auto t0 = std::chrono::steady_clock::now().time_since_epoch();
-  probe.opCategoryT0Ns =
-      std::chrono::duration_cast<std::chrono::nanoseconds>(t0).count();
-}
 
 class AutoLayerForImageFilter {
  public:
@@ -158,9 +87,6 @@ int Canvas::save() {
 }
 
 int Canvas::saveLayer(const Paint* paint) {
-  if (ssaa_debug::gProbe.active) {
-    ++ssaa_debug::gProbe.saveLayerCount;
-  }
   auto layer = std::make_unique<CanvasLayer>(drawContext, paint);
   drawContext = layer->layerContext.get();
   stateStack.push(std::make_unique<CanvasState>(_matrix, std::move(layer)));
@@ -280,20 +206,10 @@ void Canvas::clear(const Color& color) {
 }
 
 void Canvas::drawColor(const Color& color, BlendMode blendMode) {
-  if (ssaa_debug::gProbe.active) {
-    ChargeOpCategory(this, ssaa_debug::Probe::OpCatFill);
-    ++ssaa_debug::gProbe.opFill;
-    ++ssaa_debug::gProbe.shaderNone;  // drawColor never carries a shader.
-  }
   drawFill(_matrix, *clipStack, {color, blendMode, false});
 }
 
 void Canvas::drawPaint(const Paint& paint) {
-  if (ssaa_debug::gProbe.active) {
-    ChargeOpCategory(this, ssaa_debug::Probe::OpCatFill);
-    ++ssaa_debug::gProbe.opFill;
-    ClassifyBrushShader(paint);
-  }
   SaveLayerForImageFilter(paint.getImageFilter());
   drawFill(_matrix, *clipStack, paint.getBrush());
 }
@@ -328,11 +244,6 @@ void Canvas::drawLine(const Point line[2], const Matrix& matrix, const ClipStack
 }
 
 void Canvas::drawRect(const Rect& rect, const Paint& paint) {
-  if (ssaa_debug::gProbe.active) {
-    ChargeOpCategory(this, ssaa_debug::Probe::OpCatRect);
-    ++ssaa_debug::gProbe.opRect;
-    ClassifyBrushShader(paint);
-  }
   if (rect.isEmpty()) {
     if (paint.getStyle() != PaintStyle::Stroke) {
       return;
@@ -465,11 +376,6 @@ static bool UseDrawPath(const Stroke* stroke, const RRect& rRect, bool hasSharpC
 }
 
 void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
-  if (ssaa_debug::gProbe.active) {
-    ChargeOpCategory(this, ssaa_debug::Probe::OpCatRRect);
-    ++ssaa_debug::gProbe.opRRect;
-    ClassifyBrushShader(paint);
-  }
   if (rRect.rect().isEmpty()) {
     drawRect(rRect.rect(), paint);
     return;
@@ -509,11 +415,6 @@ void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
 }
 
 void Canvas::drawPath(const Path& path, const Paint& paint) {
-  if (ssaa_debug::gProbe.active) {
-    ChargeOpCategory(this, ssaa_debug::Probe::OpCatPath);
-    ++ssaa_debug::gProbe.opPath;
-    ClassifyBrushShader(paint);
-  }
   SaveLayerForImageFilter(paint.getImageFilter());
   if (path.isEmpty()) {
     if (path.isInverseFillType()) {
@@ -576,11 +477,6 @@ void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
   if (shape == nullptr) {
     return;
   }
-  if (ssaa_debug::gProbe.active) {
-    ChargeOpCategory(this, ssaa_debug::Probe::OpCatShape);
-    ++ssaa_debug::gProbe.opShape;
-    ClassifyBrushShader(paint);
-  }
   SaveLayerForImageFilter(paint.getImageFilter());
   auto brush = paint.getBrush();
   auto drawMatrix = _matrix;
@@ -617,10 +513,6 @@ void Canvas::drawMesh(std::shared_ptr<Mesh> mesh, const Paint& paint) {
   if (mesh == nullptr) {
     return;
   }
-  if (ssaa_debug::gProbe.active) {
-    ChargeOpCategory(this, ssaa_debug::Probe::OpCatMesh);
-    ++ssaa_debug::gProbe.opMesh;
-  }
   SaveLayerForImageFilter(paint.getImageFilter());
   drawContext->drawMesh(std::move(mesh), _matrix, *clipStack, paint.getBrush());
 }
@@ -629,9 +521,6 @@ void Canvas::drawImage(std::shared_ptr<Image> image, const SamplingOptions& samp
                        const Paint* paint) {
   if (image == nullptr) {
     return;
-  }
-  if (ssaa_debug::gProbe.active && paint && paint->getImageFilter()) {
-    ++ssaa_debug::gProbe.drawImageFilterCount;
   }
   SaveLayerForImageFilter(paint ? paint->getImageFilter() : nullptr);
   auto brush = GetBrushForImage(paint, image.get());
@@ -642,9 +531,6 @@ void Canvas::drawImage(std::shared_ptr<Image> image, float left, float top,
                        const SamplingOptions& sampling, const Paint* paint) {
   if (image == nullptr) {
     return;
-  }
-  if (ssaa_debug::gProbe.active && paint && paint->getImageFilter()) {
-    ++ssaa_debug::gProbe.drawImageFilterCount;
   }
   SaveLayerForImageFilter(paint ? paint->getImageFilter() : nullptr);
   auto brush = GetBrushForImage(paint, image.get());
@@ -667,9 +553,6 @@ void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, co
   if (image == nullptr || srcRect.isEmpty() || dstRect.isEmpty()) {
     return;
   }
-  if (ssaa_debug::gProbe.active && paint && paint->getImageFilter()) {
-    ++ssaa_debug::gProbe.drawImageFilterCount;
-  }
   SaveLayerForImageFilter(paint ? paint->getImageFilter() : nullptr);
   auto brush = GetBrushForImage(paint, image.get());
   drawImageRect(std::move(image), srcRect, dstRect, sampling, brush, constraint, strictRect);
@@ -678,25 +561,6 @@ void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, co
 void Canvas::drawImage(std::shared_ptr<Image> image, const Brush& brush,
                        const SamplingOptions& sampling, const Matrix* dstMatrix) {
   DEBUG_ASSERT(image != nullptr);
-  if (ssaa_debug::gProbe.active) {
-    ChargeOpCategory(this, ssaa_debug::Probe::OpCatImage);
-    ++ssaa_debug::gProbe.opImage;
-    ++ssaa_debug::gProbe.drawImageCount;
-    const auto srcW = static_cast<int64_t>(image->width());
-    const auto srcH = static_cast<int64_t>(image->height());
-    ssaa_debug::gProbe.drawImageSrcPixels += srcW * srcH;
-    // dst covers the full image size in local space; concat _matrix (and optional dstMatrix)
-    // to obtain the covered area in surface (SSAA) pixels.
-    auto probeDst = _matrix;
-    if (dstMatrix) {
-      probeDst.preConcat(*dstMatrix);
-    }
-    auto localRect = Rect::MakeWH(image->width(), image->height());
-    auto mapped = probeDst.mapRect(localRect);
-    const auto dstArea = static_cast<int64_t>(std::max(0.0f, mapped.width())) *
-                         static_cast<int64_t>(std::max(0.0f, mapped.height()));
-    ssaa_debug::gProbe.drawImageDstPixels += dstArea;
-  }
   auto type = Types::Get(image.get());
   auto drawMatrix = _matrix;
   auto newBrush = brush;
@@ -727,18 +591,6 @@ void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, co
   DEBUG_ASSERT(image != nullptr);
   DEBUG_ASSERT(!srcRect.isEmpty());
   DEBUG_ASSERT(!dstRect.isEmpty());
-  if (ssaa_debug::gProbe.active) {
-    ChargeOpCategory(this, ssaa_debug::Probe::OpCatImage);
-    ++ssaa_debug::gProbe.opImage;
-    ++ssaa_debug::gProbe.drawImageCount;
-    ssaa_debug::gProbe.drawImageSrcPixels +=
-        static_cast<int64_t>(std::max(0.0f, srcRect.width())) *
-        static_cast<int64_t>(std::max(0.0f, srcRect.height()));
-    auto mapped = _matrix.mapRect(dstRect);
-    ssaa_debug::gProbe.drawImageDstPixels +=
-        static_cast<int64_t>(std::max(0.0f, mapped.width())) *
-        static_cast<int64_t>(std::max(0.0f, mapped.height()));
-  }
   auto type = Types::Get(image.get());
   if (type != Types::ImageType::Subset || image->hasMipmaps()) {
     drawContext->drawImageRect(std::move(image), srcRect, dstRect, sampling, _matrix, *clipStack,
@@ -782,11 +634,6 @@ void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t 
   if (glyphCount == 0) {
     return;
   }
-  if (ssaa_debug::gProbe.active) {
-    ChargeOpCategory(this, ssaa_debug::Probe::OpCatText);
-    ++ssaa_debug::gProbe.opText;
-    ClassifyBrushShader(paint);
-  }
   SaveLayerForImageFilter(paint.getImageFilter());
   auto textBlob = TextBlob::MakeFrom(glyphs, positions, glyphCount, font);
   if (textBlob == nullptr) {
@@ -800,11 +647,6 @@ void Canvas::drawTextBlob(std::shared_ptr<TextBlob> textBlob, float x, float y,
                           const Paint& paint) {
   if (textBlob == nullptr) {
     return;
-  }
-  if (ssaa_debug::gProbe.active) {
-    ChargeOpCategory(this, ssaa_debug::Probe::OpCatText);
-    ++ssaa_debug::gProbe.opText;
-    ClassifyBrushShader(paint);
   }
   SaveLayerForImageFilter(paint.getImageFilter());
   auto drawMatrix = _matrix;
@@ -849,10 +691,6 @@ void Canvas::drawLayer(std::shared_ptr<Picture> picture, const Matrix& matrix,
                        std::shared_ptr<ImageFilter> imageFilter) {
   DEBUG_ASSERT(brush.shader == nullptr);
   DEBUG_ASSERT(picture != nullptr);
-  if (ssaa_debug::gProbe.active) {
-    ChargeOpCategory(this, ssaa_debug::Probe::OpCatLayer);
-    ++ssaa_debug::gProbe.opLayer;
-  }
   if (imageFilter != nullptr) {
     Point offset = {};
     if (auto image = picture->asImage(&offset)) {
@@ -885,10 +723,6 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
   // TODO: Support blend mode, atlas as source, colors as destination, colors can be nullptr.
   if (atlas == nullptr || count == 0) {
     return;
-  }
-  if (ssaa_debug::gProbe.active) {
-    ChargeOpCategory(this, ssaa_debug::Probe::OpCatAtlas);
-    ++ssaa_debug::gProbe.opAtlas;
   }
   auto brush = GetBrushForImage(paint, atlas.get());
   SaveLayerForImageFilter(paint ? paint->getImageFilter() : nullptr);
