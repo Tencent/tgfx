@@ -17,21 +17,32 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PermutationMatcher.h"
+#include <skcms.h>
 #include "gpu/processors/AARectEffect.h"
+#include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ClampedGradientEffect.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
+#include "gpu/processors/ColorSpaceXFormEffect.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/EmptyXferProcessor.h"
+#include "gpu/processors/GaussianBlur1DFragmentProcessor.h"
+#include "gpu/processors/LumaFragmentProcessor.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/processors/UnrolledBinaryGradientColorizer.h"
+#include "gpu/processors/XfermodeFragmentProcessor.h"
+#include "gpu/shaders/level1/AlphaThresholdShader.h"
 #include "gpu/shaders/level1/AtlasTextFillShader.h"
+#include "gpu/shaders/level1/BlendMergeShader.h"
+#include "gpu/shaders/level1/ColorSpaceXformShader.h"
 #include "gpu/shaders/level1/ConstColorShader.h"
 #include "gpu/shaders/level1/DeviceSpaceTextureShader.h"
+#include "gpu/shaders/level1/GaussianBlur1DShader.h"
 #include "gpu/shaders/level1/GradientFillShader.h"
+#include "gpu/shaders/level1/LumaShader.h"
 #include "gpu/shaders/level1/QuadTextureFillShader.h"
 #include "gpu/shaders/level1/TextureClipShader.h"
 #include "gpu/shaders/level1/TextureColorMatrixShader.h"
@@ -359,6 +370,178 @@ static std::optional<PermutationMatchResult> TryMatchAtlasTextFill(const Program
   return PermutationMatchResult{"AtlasTextFillShader", index, index};
 }
 
+static std::optional<PermutationMatchResult> TryMatchAlphaThreshold(
+    const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp->name() != "DefaultGeometryProcessor") {
+    return std::nullopt;
+  }
+  if (programInfo->numFragmentProcessors() != 1) {
+    return std::nullopt;
+  }
+  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+    return std::nullopt;
+  }
+  auto fp = programInfo->getFragmentProcessor(0);
+  if (fp->name() != "AlphaStepFragmentProcessor") {
+    return std::nullopt;
+  }
+  return PermutationMatchResult{"AlphaThresholdShader", 0, 0};
+}
+
+static std::optional<PermutationMatchResult> TryMatchLuma(const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp->name() != "DefaultGeometryProcessor") {
+    return std::nullopt;
+  }
+  if (programInfo->numFragmentProcessors() != 1) {
+    return std::nullopt;
+  }
+  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+    return std::nullopt;
+  }
+  auto fp = programInfo->getFragmentProcessor(0);
+  if (fp->name() != "LumaFragmentProcessor") {
+    return std::nullopt;
+  }
+  return PermutationMatchResult{"LumaShader", 0, 0};
+}
+
+static int TFTypeToIndex(gfx::skcms_TFType type) {
+  switch (type) {
+    case gfx::skcms_TFType_sRGBish:
+      return 0;
+    case gfx::skcms_TFType_PQish:
+      return 1;
+    case gfx::skcms_TFType_HLGish:
+      return 2;
+    case gfx::skcms_TFType_HLGinvish:
+      return 3;
+    default:
+      return -1;
+  }
+}
+
+static std::optional<PermutationMatchResult> TryMatchColorSpaceXform(
+    const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp->name() != "DefaultGeometryProcessor") {
+    return std::nullopt;
+  }
+  if (programInfo->numFragmentProcessors() != 1) {
+    return std::nullopt;
+  }
+  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+    return std::nullopt;
+  }
+  auto fp = programInfo->getFragmentProcessor(0);
+  if (fp->name() != "ColorSpaceXformEffect") {
+    return std::nullopt;
+  }
+  auto* cse = static_cast<const ColorSpaceXformEffect*>(fp);
+  auto* xform = cse->colorXform();
+  if (!xform) {
+    return std::nullopt;
+  }
+
+  using FD = ColorSpaceXformShader::FD;
+  auto fragDomain = FD::domain();
+  std::vector<int> fragValues(FD::COUNT, 0);
+  fragValues[FD::UNPREMUL] = xform->flags.unPremul ? 1 : 0;
+  fragValues[FD::LINEARIZE] = xform->flags.linearize ? 1 : 0;
+  fragValues[FD::SRC_OOTF] = xform->flags.srcOOTF ? 1 : 0;
+  fragValues[FD::GAMUT_TRANSFORM] = xform->flags.gamutTransform ? 1 : 0;
+  fragValues[FD::DST_OOTF] = xform->flags.dstOOTF ? 1 : 0;
+  fragValues[FD::ENCODE] = xform->flags.encode ? 1 : 0;
+  fragValues[FD::PREMUL] = xform->flags.premul ? 1 : 0;
+
+  if (xform->flags.linearize) {
+    int srcIdx = TFTypeToIndex(gfx::skcms_TransferFunction_getType(
+        reinterpret_cast<const gfx::skcms_TransferFunction*>(&xform->srcTransferFunction)));
+    if (srcIdx < 0) {
+      return std::nullopt;
+    }
+    fragValues[FD::SRC_TF_TYPE] = srcIdx;
+  }
+  if (xform->flags.encode) {
+    int dstIdx = TFTypeToIndex(gfx::skcms_TransferFunction_getType(
+        reinterpret_cast<const gfx::skcms_TransferFunction*>(&xform->dstTransferFunctionInverse)));
+    if (dstIdx < 0) {
+      return std::nullopt;
+    }
+    fragValues[FD::DST_TF_TYPE] = dstIdx;
+  }
+
+  auto fragIndex = fragDomain.encode(fragValues);
+  return PermutationMatchResult{"ColorSpaceXformShader", 0, fragIndex};
+}
+
+static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
+    const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp->name() != "DefaultGeometryProcessor") {
+    return std::nullopt;
+  }
+  if (programInfo->numFragmentProcessors() != 1) {
+    return std::nullopt;
+  }
+  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+    return std::nullopt;
+  }
+  auto fp = programInfo->getFragmentProcessor(0);
+  if (fp->name() != "GaussianBlur1DFragmentProcessor") {
+    return std::nullopt;
+  }
+  auto* blur = static_cast<const GaussianBlur1DFragmentProcessor*>(fp);
+  int sigma = blur->getMaxSigma();
+  if (sigma < 1 || sigma > 10) {
+    return std::nullopt;
+  }
+  using FD = GaussianBlur1DShader::FD;
+  auto fragDomain = FD::domain();
+  std::vector<int> fragValues(FD::COUNT);
+  fragValues[FD::MAX_SIGMA] = sigma - 1;
+  auto fragIndex = fragDomain.encode(fragValues);
+  return PermutationMatchResult{"GaussianBlur1DShader", 0, fragIndex};
+}
+
+static std::optional<PermutationMatchResult> TryMatchBlendMerge(const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp->name() != "DefaultGeometryProcessor") {
+    return std::nullopt;
+  }
+  if (programInfo->numFragmentProcessors() != 1) {
+    return std::nullopt;
+  }
+  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+    return std::nullopt;
+  }
+  auto fp = programInfo->getFragmentProcessor(0);
+  auto fpName = fp->name();
+  int childType = -1;
+  if (fpName == "XfermodeFragmentProcessor - dst") {
+    childType = 0;
+  } else if (fpName == "XfermodeFragmentProcessor - src") {
+    childType = 1;
+  } else if (fpName == "XfermodeFragmentProcessor - two") {
+    childType = 2;
+  } else {
+    return std::nullopt;
+  }
+  auto* xfp = static_cast<const XfermodeFragmentProcessor*>(fp);
+  int blendMode = static_cast<int>(xfp->getMode());
+  if (blendMode < 0 || blendMode >= 30) {
+    return std::nullopt;
+  }
+  using FD = BlendMergeShader::FD;
+  auto fragDomain = FD::domain();
+  std::vector<int> fragValues(FD::COUNT);
+  fragValues[FD::BLEND_MODE] = blendMode;
+  fragValues[FD::CHILD_TYPE] = childType;
+  auto fragIndex = fragDomain.encode(fragValues);
+  return PermutationMatchResult{"BlendMergeShader", 0, fragIndex};
+}
+
 std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* programInfo) {
   if (auto result = TryMatchTextureFill(programInfo)) {
     return result;
@@ -385,6 +568,21 @@ std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* progra
     return result;
   }
   if (auto result = TryMatchAtlasTextFill(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchAlphaThreshold(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchLuma(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchColorSpaceXform(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchGaussianBlur1D(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchBlendMerge(programInfo)) {
     return result;
   }
   return std::nullopt;

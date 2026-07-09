@@ -54,6 +54,14 @@ class XfermodeFragmentProcessor : public FragmentProcessor {
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
+  BlendMode getMode() const {
+    return mode;
+  }
+
+  int getChildType() const {
+    return static_cast<int>(child);
+  }
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 

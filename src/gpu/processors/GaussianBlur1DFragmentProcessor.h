@@ -35,6 +35,10 @@ class GaussianBlur1DFragmentProcessor : public FragmentProcessor {
     return "GaussianBlur1DFragmentProcessor";
   }
 
+  int getMaxSigma() const {
+    return maxSigma;
+  }
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
