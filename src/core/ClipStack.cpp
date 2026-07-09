@@ -378,6 +378,9 @@ bool ClipElement::contains(const ClipElement& other) const {
 }
 
 void ClipElement::transform(const Matrix& matrix) {
+  if (matrix.isIdentity()) {
+    return;
+  }
   _matrix.postConcat(matrix);
   simplify();
 }
