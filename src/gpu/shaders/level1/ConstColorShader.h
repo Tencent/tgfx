@@ -38,30 +38,18 @@ class ConstColorShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 1, "Update ShouldCompile when fragment dimensions change.");
-
-  TGFX_DEFINE_DIMS(PLACEHOLDER_UNUSED);
-  using VD = Dims;
+  static_assert(FD::COUNT == 1, "Update info() when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
-    // Vertex shader has no permutation dimensions — shares a single trivial pass-through.
     return {"ConstColorShader",
             "level1/const_color.vert",
             "level1/const_color.frag",
-            PermutationDomain::FromBoolNames("PLACEHOLDER_UNUSED"),
+            PermutationDomain({}),
             FD::domain(),
             PermutationDomain({}),
             "",
             "",
-            ShouldCompile};
-  }
-
- private:
-  static bool ShouldCompile(uint32_t vertIndex, uint32_t /*fragIndex*/,
-                            const std::vector<int>& /*vertValues*/,
-                            const std::vector<int>& /*fragValues*/) {
-    // Only one vertex variant (index 0) is needed.
-    return vertIndex == 0;
+            nullptr};
   }
 };
 

@@ -130,7 +130,7 @@ static bool LoadPool(const uint8_t* fileData, size_t fileSize, uint32_t poolOffs
 }
 
 bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
-  if (size < HEADER_SIZE_V3) {
+  if (data == nullptr || size < HEADER_SIZE_V3) {
     LOGE("PrecompiledShaderCache: Bundle data too small (%zu bytes)", size);
     return false;
   }

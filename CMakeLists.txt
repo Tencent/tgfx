@@ -755,7 +755,13 @@ if (TGFX_BUILD_FRAMEWORK)
 endif ()
 
 
-if (TGFX_BUILD_TESTS)
+# --- Precompiled Shader Bundle generation and embedding ---
+# This section builds shader_build_tool, generates precompiled shader bundles, and embeds them
+# into libtgfx. It is independent of TGFX_BUILD_TESTS so that production builds also benefit
+# from precompiled shaders. Set TGFX_EMBED_SHADER_BUNDLES=OFF to disable embedding entirely.
+option(TGFX_EMBED_SHADER_BUNDLES "Embed precompiled shader bundles into libtgfx" ON)
+
+if (TGFX_EMBED_SHADER_BUNDLES)
     file(GLOB_RECURSE TGFX_SHADER_DECL_FILES
             src/gpu/shaders/ShaderPermutation.*
             src/gpu/shaders/PrecompiledShader.*
@@ -789,14 +795,12 @@ if (TGFX_BUILD_TESTS)
         list(APPEND TGFX_SHADER_BACKENDS "webgpu")
     endif ()
     if (NOT TGFX_SHADER_BACKENDS)
-        # OpenGL fallback: bundle contains GLSL text, still useful for eliminating emitCode()
         list(APPEND TGFX_SHADER_BACKENDS "opengl")
     endif ()
 
     set(TGFX_SHADER_BUNDLE_DIR "${CMAKE_BINARY_DIR}/generated/shaders")
     file(MAKE_DIRECTORY ${TGFX_SHADER_BUNDLE_DIR})
 
-    # Build actual bundles (not just report)
     set(TGFX_SHADER_BUNDLE_STAMP "${TGFX_SHADER_BUNDLE_DIR}/bundle_stamp")
     add_custom_command(
             OUTPUT ${TGFX_SHADER_BUNDLE_STAMP}
@@ -809,14 +813,12 @@ if (TGFX_BUILD_TESTS)
             COMMENT "Compiling precompiled shader bundles (${TGFX_SHADER_BACKENDS})")
     add_custom_target(tgfx_shader_bundles DEPENDS ${TGFX_SHADER_BUNDLE_STAMP})
 
-    # Convert bundle binaries to C++ source files for embedding into libtgfx
     set(TGFX_EMBEDDED_BUNDLE_DIR "${CMAKE_BINARY_DIR}/generated/embedded")
     file(MAKE_DIRECTORY ${TGFX_EMBEDDED_BUNDLE_DIR})
 
     foreach (B ${TGFX_SHADER_BACKENDS})
         set(BUNDLE_BIN "${TGFX_SHADER_BUNDLE_DIR}/shader_bundle.${B}.bin")
         string(REPLACE "-" "_" BUNDLE_VAR "kShaderBundle_${B}")
-        # Map lowercase backend name to Backend enum value
         if (B STREQUAL "metal")
             set(BACKEND_ENUM "Metal")
         elseif (B STREQUAL "vulkan")
@@ -836,12 +838,9 @@ if (TGFX_BUILD_TESTS)
         list(APPEND TGFX_EMBEDDED_BUNDLE_SOURCES ${BUNDLE_CPP})
     endforeach ()
 
-    # Add embedded bundle sources to the main tgfx library
-    if (TGFX_EMBEDDED_BUNDLE_SOURCES)
-        target_sources(tgfx PRIVATE ${TGFX_EMBEDDED_BUNDLE_SOURCES})
-        target_include_directories(tgfx PRIVATE ${TGFX_EMBEDDED_BUNDLE_DIR})
-        add_dependencies(tgfx tgfx_shader_bundles)
-    endif ()
+    target_sources(tgfx PRIVATE ${TGFX_EMBEDDED_BUNDLE_SOURCES})
+    target_include_directories(tgfx PRIVATE ${TGFX_EMBEDDED_BUNDLE_DIR})
+    add_dependencies(tgfx tgfx_shader_bundles)
 endif ()
 
 if (TGFX_BUILD_HELLO2D)

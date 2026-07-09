@@ -25,9 +25,18 @@ struct BundleEntry {
   size_t size = 0;
 };
 
+// Backend enum: Unknown=0, OpenGL=1, Metal=2, Vulkan=3, WebGPU=4
+static constexpr int BACKEND_COUNT = 5;
+static_assert(static_cast<int>(Backend::WebGPU) < BACKEND_COUNT, "Backend enum exceeds array size");
+
 static BundleEntry& GetEntry(Backend backend) {
-  static BundleEntry entries[4];  // Metal=0, OpenGL=1, Vulkan=2, WebGPU=3
-  return entries[static_cast<int>(backend)];
+  static BundleEntry entries[BACKEND_COUNT];
+  auto index = static_cast<int>(backend);
+  if (index < 0 || index >= BACKEND_COUNT) {
+    static BundleEntry empty;
+    return empty;
+  }
+  return entries[index];
 }
 
 void EmbeddedShaderBundles::Register(Backend backend, const uint8_t* data, size_t size) {

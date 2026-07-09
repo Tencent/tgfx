@@ -31,25 +31,18 @@ class DeviceSpaceTextureShader : public PrecompiledShader {
  public:
   TGFX_DEFINE_DIMS(ALPHA_ONLY);
   using FD = Dims;
-  static_assert(FD::COUNT == 1, "Update ShouldCompile when dimensions change.");
+  static_assert(FD::COUNT == 1, "Update info() when dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"DeviceSpaceTextureShader",
             "level1/device_space_texture.vert",
             "level1/device_space_texture.frag",
-            PermutationDomain::FromBoolNames("PLACEHOLDER_UNUSED"),
+            PermutationDomain({}),
             FD::domain(),
             PermutationDomain({}),
             "",
             "",
-            ShouldCompile};
-  }
-
- private:
-  static bool ShouldCompile(uint32_t vertIndex, uint32_t /*fragIndex*/,
-                            const std::vector<int>& /*vertValues*/,
-                            const std::vector<int>& /*fragValues*/) {
-    return vertIndex == 0;
+            nullptr};
   }
 };
 
