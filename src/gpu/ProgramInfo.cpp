@@ -147,7 +147,7 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
   // creation, they must also be encoded here.
   programKey.write(static_cast<uint32_t>(renderTarget->sampleCount()));
   // Pipelines that share shaders but differ in colour write mask or stencil configuration must
-  // resolve to distinct cache entries — otherwise the bezier rasterization stencil/cover passes
+  // resolve to distinct cache entries — otherwise the stencil-and-cover stencil/cover passes
   // would silently collapse onto a single program. Keep this section in sync with the fields that
   // are actually written into RenderPipelineDescriptor.
   programKey.write(colorWriteMask);

@@ -37,9 +37,12 @@ class PathUtils {
    *
    * cubicPoints is an array of 4 points defining the cubic curve.
    * tolerance is the maximum allowed deviation from the original curve.
+   * quads is the output buffer, appended to in-place; callers may reuse the same vector
+   * across multiple invocations to avoid repeated heap allocations. Each emitted quad takes
+   * three consecutive entries (start, control, end). The buffer is not cleared on entry.
    */
-  static std::vector<Point> ConvertCubicToQuads(const Point cubicPoints[4],
-                                                float tolerance = DefaultTolerance);
+  static void ConvertCubicToQuads(const Point cubicPoints[4], float tolerance,
+                                  std::vector<Point>* quads);
 
   /**
    * Subdivides a quadratic bezier curve at parameter t.

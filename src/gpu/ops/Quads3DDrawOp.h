@@ -19,7 +19,7 @@
 #pragma once
 
 #include <optional>
-#include "DrawOp.h"
+#include "StandardDrawOp.h"
 #include "core/utils/PlacementPtr.h"
 #include "gpu/QuadsVertexProvider.h"
 #include "gpu/proxies/GPUBufferProxy.h"
@@ -31,7 +31,7 @@ namespace tgfx {
 /**
  * Quads3DDrawOp draws a batch of 3D quads with per-edge anti-aliasing support.
  */
-class Quads3DDrawOp : public DrawOp {
+class Quads3DDrawOp : public StandardDrawOp {
  public:
   /**
    * Creates a new Quads3DDrawOp for the specified vertex provider.
@@ -45,7 +45,7 @@ class Quads3DDrawOp : public DrawOp {
 
   PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
 
-  void onDraw(RenderPass* renderPass) override;
+  void onDraw(RenderPass* renderPass, RenderTarget* renderTarget) override;
 
   Type type() override {
     return Type::Quads3DDrawOp;

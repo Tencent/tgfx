@@ -57,6 +57,7 @@ enum class PendingOpType {
   RRect,
   Shape,
   Atlas,
+  StencilCoverPath,
 };
 
 /**
@@ -165,6 +166,16 @@ class OpsCompositor {
   Matrix pendingShapeMatrix = {};
   std::vector<Point> pendingShapeOffsets = {};
   std::vector<Color> pendingShapeColors = {};
+  // Deferred queue for the stencil-and-cover path. NOTE: entries here are still emitted as
+  // one DrawOp per shape at flush time — no instanced merge is performed yet. The queue
+  // exists so that stencil-cover ops participate in the same "same clip+brush" batching
+  // gate as ShapeDrawOp / RectDrawOp (i.e. an intervening op with a different clip/brush
+  // forces a flush). A true instanced merge is a follow-up when the stencil GP is extended
+  // with per-instance transform / color streams; until then, MaxNumBatched is only a
+  // memory-pressure cap, not a real GPU batching limit.
+  std::vector<std::shared_ptr<Shape>> pendingStencilCoverShapes = {};
+  std::vector<Matrix> pendingStencilCoverMatrices = {};
+  std::vector<Color> pendingStencilCoverColors = {};
   std::optional<PMColor> clearColor = std::nullopt;
   std::vector<PlacementPtr<DrawOp>> drawOps = {};
   std::shared_ptr<ColorSpace> dstColorSpace = nullptr;
@@ -185,6 +196,8 @@ class OpsCompositor {
   void flushPendingOps(PendingOpType currentType = PendingOpType::Unknown,
                        ClipStack currentClip = {}, Brush currentBrush = {});
   void flushPendingShapeOps();
+  void flushPendingStencilCoverOps();
+  bool shouldUseStencilCover(const Brush& brush) const;
   void resetPendingOps(PendingOpType currentType = PendingOpType::Unknown,
                        ClipStack currentClip = {}, Brush currentBrush = {});
   AAType getAAType(const Brush& brush) const;

@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "gpu/ops/DrawOp.h"
+#include "gpu/ops/StandardDrawOp.h"
 #include "gpu/proxies/GPUBufferProxy.h"
 #include "gpu/proxies/GPUHairlineProxy.h"
 #include "tgfx/core/Color.h"
@@ -26,7 +26,7 @@
 
 namespace tgfx {
 
-class HairlineQuadOp final : public DrawOp {
+class HairlineQuadOp final : public StandardDrawOp {
  public:
   // BezierVertex = Point(2 floats) + quadCoord/conic/padding(4 floats) = 24 bytes
   static constexpr size_t BytesPerQuadVertex = 24;
@@ -41,7 +41,7 @@ class HairlineQuadOp final : public DrawOp {
  protected:
   PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
 
-  void onDraw(RenderPass* renderPass) override;
+  void onDraw(RenderPass* renderPass, RenderTarget* renderTarget) override;
 
   Type type() override {
     return Type::HairlineQuadOp;

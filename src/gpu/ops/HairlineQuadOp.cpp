@@ -42,7 +42,7 @@ HairlineQuadOp::HairlineQuadOp(BlockAllocator* allocator,
                                std::shared_ptr<GPUHairlineProxy> hairlineProxy,
                                std::shared_ptr<GPUBufferProxy> indexBufferProxy, PMColor color,
                                const Matrix& uvMatrix, float coverage, AAType aaType)
-    : DrawOp(allocator, aaType), hairlineProxy(std::move(hairlineProxy)),
+    : StandardDrawOp(allocator, aaType), hairlineProxy(std::move(hairlineProxy)),
       indexBufferProxy(std::move(indexBufferProxy)), color(color), uvMatrix(uvMatrix),
       coverage(coverage) {
 }
@@ -56,7 +56,7 @@ PlacementPtr<GeometryProcessor> HairlineQuadOp::onMakeGeometryProcessor(
                                              aaType);
 }
 
-void HairlineQuadOp::onDraw(RenderPass* renderPass) {
+void HairlineQuadOp::onDraw(RenderPass* renderPass, RenderTarget* /*renderTarget*/) {
   auto quadVertexBufferProxy = hairlineProxy->getQuadVertexBufferProxy();
   if (quadVertexBufferProxy == nullptr || indexBufferProxy == nullptr) {
     return;
