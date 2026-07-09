@@ -38,6 +38,19 @@
 
 namespace tgfx {
 
+#ifndef TGFX_BACKEND_NAME
+#define TGFX_BACKEND_NAME "opengl"
+#endif
+
+static std::string BundlePath() {
+  std::string backend = TGFX_BACKEND_NAME;
+  auto pos = backend.find('-');
+  if (pos != std::string::npos) {
+    backend = backend.substr(0, pos);
+  }
+  return "resources/shaders/shader_bundle." + backend + ".bin";
+}
+
 TGFX_TEST(ShaderPermutationTest, DimTypes) {
   PermutationBool boolDim("HAS_YUV");
   EXPECT_EQ(PermutationBool::valueCount(), 2);
@@ -225,12 +238,17 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto bundlePath = ProjectPath::Absolute("resources/shaders/shader_bundle.vulkan.bin");
+  auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
-  EXPECT_EQ(cache->vertexEntryCount(), 18u);
-  EXPECT_EQ(cache->fragmentEntryCount(), 337u);
-  EXPECT_EQ(cache->profileTag(), "vulkan");
+  EXPECT_EQ(cache->vertexEntryCount(), 73u);
+  EXPECT_EQ(cache->fragmentEntryCount(), 582u);
+  std::string expectedTag = TGFX_BACKEND_NAME;
+  auto dashPos = expectedTag.find('-');
+  if (dashPos != std::string::npos) {
+    expectedTag = expectedTag.substr(0, dashPos);
+  }
+  EXPECT_EQ(cache->profileTag(), expectedTag);
 }
 
 TGFX_TEST(ShaderPermutationTest, PrecompiledPerformance) {
@@ -258,7 +276,7 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledPerformance) {
     ContextScope scope;
     auto context = scope.getContext();
     ASSERT_TRUE(context != nullptr);
-    auto bundlePath = ProjectPath::Absolute("resources/shaders/shader_bundle.vulkan.bin");
+    auto bundlePath = ProjectPath::Absolute(BundlePath());
     ASSERT_TRUE(context->precompiledShaderCache()->loadBundle(bundlePath));
     auto surface = Surface::Make(context, width, height);
     ASSERT_TRUE(surface != nullptr);
@@ -291,7 +309,7 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledRenderConsistency) {
     ContextScope scope;
     auto context = scope.getContext();
     ASSERT_TRUE(context != nullptr);
-    auto bundlePath = ProjectPath::Absolute("resources/shaders/shader_bundle.vulkan.bin");
+    auto bundlePath = ProjectPath::Absolute(BundlePath());
     ASSERT_TRUE(context->precompiledShaderCache()->loadBundle(bundlePath));
     auto surface = Surface::Make(context, width, height);
     ASSERT_TRUE(surface != nullptr);
@@ -330,7 +348,7 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledRenderConsistency) {
 TGFX_TEST(ShaderPermutationTest, ShaderCacheStats) {
   // Unit test for the hit/miss counter mechanism in PrecompiledShaderCache.
   PrecompiledShaderCache cache;
-  auto bundlePath = ProjectPath::Absolute("resources/shaders/shader_bundle.vulkan.bin");
+  auto bundlePath = ProjectPath::Absolute(BundlePath());
   ASSERT_TRUE(cache.loadBundle(bundlePath));
 
   // Initial state: both counters at zero.
@@ -360,7 +378,7 @@ TGFX_TEST(ShaderPermutationTest, ShaderCacheStats) {
 TGFX_TEST(ShaderPermutationTest, EmbeddedBundleLoadFromMemory) {
   // Verify that PrecompiledShaderCache can load a bundle from in-memory data (the same interface
   // used by the embedded bundle mechanism in Context initialization).
-  auto bundlePath = ProjectPath::Absolute("resources/shaders/shader_bundle.vulkan.bin");
+  auto bundlePath = ProjectPath::Absolute(BundlePath());
   std::ifstream file(bundlePath, std::ios::binary | std::ios::ate);
   if (!file.is_open()) {
     GTEST_SKIP() << "Bundle file not found, skipping embedded load test";
@@ -378,7 +396,12 @@ TGFX_TEST(ShaderPermutationTest, EmbeddedBundleLoadFromMemory) {
   EXPECT_TRUE(cache.isLoaded());
   EXPECT_GT(cache.vertexEntryCount(), 0u);
   EXPECT_GT(cache.fragmentEntryCount(), 0u);
-  EXPECT_EQ(cache.profileTag(), "vulkan");
+  std::string expectedTag2 = TGFX_BACKEND_NAME;
+  auto dashPos2 = expectedTag2.find('-');
+  if (dashPos2 != std::string::npos) {
+    expectedTag2 = expectedTag2.substr(0, dashPos2);
+  }
+  EXPECT_EQ(cache.profileTag(), expectedTag2);
 }
 
 TGFX_TEST(ShaderPermutationTest, EmbeddedBundleInvalidData) {
@@ -414,7 +437,7 @@ static void TestWriteU16LE(uint8_t* p, uint16_t val) {
 
 TGFX_TEST(ShaderPermutationTest, CompressedBundleLoad) {
   // Load an uncompressed bundle, manually compress its data pool, then verify loading.
-  auto bundlePath = ProjectPath::Absolute("resources/shaders/shader_bundle.vulkan.bin");
+  auto bundlePath = ProjectPath::Absolute(BundlePath());
   std::ifstream file(bundlePath, std::ios::binary | std::ios::ate);
   if (!file.is_open()) {
     GTEST_SKIP() << "Bundle file not found";
@@ -487,7 +510,7 @@ TGFX_TEST(ShaderPermutationTest, DrawImageHitsPrecompiledCache) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto bundlePath = ProjectPath::Absolute("resources/shaders/shader_bundle.vulkan.bin");
+  auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
   cache->resetStats();
@@ -502,7 +525,7 @@ TGFX_TEST(ShaderPermutationTest, AlphaThresholdHitsPrecompiledCache) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto bundlePath = ProjectPath::Absolute("resources/shaders/shader_bundle.vulkan.bin");
+  auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
   cache->resetStats();
@@ -520,7 +543,7 @@ TGFX_TEST(ShaderPermutationTest, LumaHitsPrecompiledCache) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto bundlePath = ProjectPath::Absolute("resources/shaders/shader_bundle.vulkan.bin");
+  auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
   cache->resetStats();
@@ -540,7 +563,7 @@ TGFX_TEST(ShaderPermutationTest, GaussianBlurHitsPrecompiledCache) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto bundlePath = ProjectPath::Absolute("resources/shaders/shader_bundle.vulkan.bin");
+  auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
   cache->resetStats();
@@ -561,7 +584,7 @@ TGFX_TEST(ShaderPermutationTest, BlendMergeHitsPrecompiledCache) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto bundlePath = ProjectPath::Absolute("resources/shaders/shader_bundle.vulkan.bin");
+  auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
   cache->resetStats();
