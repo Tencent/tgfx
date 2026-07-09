@@ -67,10 +67,6 @@ class DrawOp {
     return !coverages.empty();
   }
 
-  std::vector<PlacementPtr<FragmentProcessor>>& colorProcessors() {
-    return colors;
-  }
-
   void execute(RenderPass* renderPass, RenderTarget* renderTarget);
 
  protected:

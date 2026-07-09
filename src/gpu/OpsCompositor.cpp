@@ -27,7 +27,6 @@
 #include "core/utils/RectToRectMatrix.h"
 #include "core/utils/StrokeUtils.h"
 #include "gpu/DrawingManager.h"
-#include "gpu/EffectDecomposer.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ops/AtlasTextOp.h"
 #include "gpu/ops/HairlineLineOp.h"
@@ -990,21 +989,6 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     } else {
       // if mask is empty, nothing to draw
       return;
-    }
-  }
-
-  // Attempt multi-pass decomposition when there are multiple color FPs that the precompiled
-  // shader system may not be able to match as a single program.
-  auto& colorFPs = op->colorProcessors();
-  if (colorFPs.size() > 1) {
-    auto drawingManager = context->drawingManager();
-    int rtWidth = renderTarget->width();
-    int rtHeight = renderTarget->height();
-    auto replacement = EffectDecomposer::TryDecompose(context, drawingManager, rtWidth, rtHeight,
-                                                      colorFPs, drawingAllocator());
-    if (replacement) {
-      colorFPs.clear();
-      colorFPs.emplace_back(std::move(replacement));
     }
   }
 
