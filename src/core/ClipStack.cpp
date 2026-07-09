@@ -392,10 +392,10 @@ void ClipElement::simplify() {
 
   // For a Rect or RRect under an axis-aligned matrix, fold the matrix into the geometry and reset
   // it to identity, simplifying later computations. Other cases keep the matrix on the element.
-  if (_shape.type() == ShapeType::Rect && _matrix.rectStaysRect()) {
+  if (_shape.type() == ShapeType::Rect && !_matrix.isIdentity() && _matrix.rectStaysRect()) {
     _shape.setRect(_matrix.mapRect(_shape.rect()));
     _matrix.setIdentity();
-  } else if (_shape.type() == ShapeType::RRect && _matrix.rectStaysRect()) {
+  } else if (_shape.type() == ShapeType::RRect && !_matrix.isIdentity() && _matrix.rectStaysRect()) {
     auto transformed = RRectUtils::TryAxisAlignedTransform(_shape.rRect(), _matrix);
     // A degenerate transform (e.g. a zero or non-finite scale that collapses the RRect to an empty
     // or infinite rect) makes TryAxisAlignedTransform return nullopt. Such a matrix is not expected
