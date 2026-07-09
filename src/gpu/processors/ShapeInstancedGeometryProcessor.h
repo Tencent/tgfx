@@ -33,6 +33,14 @@ class ShapeInstancedGeometryProcessor : public GeometryProcessor {
     return "ShapeInstancedGeometryProcessor";
   }
 
+  bool getHasColors() const {
+    return hasColors;
+  }
+
+  AAType getAAType() const {
+    return aa;
+  }
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 

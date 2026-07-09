@@ -24,13 +24,25 @@
 #include "gpu/processors/ClampedGradientEffect.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
 #include "gpu/processors/ColorSpaceXFormEffect.h"
+#include "gpu/processors/ComplexEllipseGeometryProcessor.h"
+#include "gpu/processors/ComplexNonAARRectGeometryProcessor.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
+#include "gpu/processors/DualIntervalGradientColorizer.h"
+#include "gpu/processors/EllipseGeometryProcessor.h"
 #include "gpu/processors/EmptyXferProcessor.h"
 #include "gpu/processors/GaussianBlur1DFragmentProcessor.h"
+#include "gpu/processors/HairlineLineGeometryProcessor.h"
+#include "gpu/processors/HairlineQuadGeometryProcessor.h"
 #include "gpu/processors/LumaFragmentProcessor.h"
+#include "gpu/processors/MeshGeometryProcessor.h"
+#include "gpu/processors/NonAARRectGeometryProcessor.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
+#include "gpu/processors/RoundStrokeRectGeometryProcessor.h"
+#include "gpu/processors/ShapeInstancedGeometryProcessor.h"
+#include "gpu/processors/SingleIntervalGradientColorizer.h"
 #include "gpu/processors/TextureEffect.h"
+#include "gpu/processors/TextureGradientColorizer.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/processors/UnrolledBinaryGradientColorizer.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
@@ -38,15 +50,27 @@
 #include "gpu/shaders/level1/AtlasTextFillShader.h"
 #include "gpu/shaders/level1/BlendMergeShader.h"
 #include "gpu/shaders/level1/ColorSpaceXformShader.h"
+#include "gpu/shaders/level1/ComplexEllipseFillShader.h"
+#include "gpu/shaders/level1/ComplexNonAARRectFillShader.h"
 #include "gpu/shaders/level1/ConstColorShader.h"
 #include "gpu/shaders/level1/DeviceSpaceTextureShader.h"
+#include "gpu/shaders/level1/DualIntervalGradientShader.h"
+#include "gpu/shaders/level1/EllipseFillShader.h"
 #include "gpu/shaders/level1/GaussianBlur1DShader.h"
 #include "gpu/shaders/level1/GradientFillShader.h"
+#include "gpu/shaders/level1/HairlineLineShader.h"
+#include "gpu/shaders/level1/HairlineQuadShader.h"
 #include "gpu/shaders/level1/LumaShader.h"
+#include "gpu/shaders/level1/MeshFillShader.h"
+#include "gpu/shaders/level1/NonAARRectFillShader.h"
 #include "gpu/shaders/level1/QuadTextureFillShader.h"
+#include "gpu/shaders/level1/RoundStrokeRectFillShader.h"
+#include "gpu/shaders/level1/ShapeInstancedFillShader.h"
+#include "gpu/shaders/level1/SingleIntervalGradientShader.h"
 #include "gpu/shaders/level1/TextureClipShader.h"
 #include "gpu/shaders/level1/TextureColorMatrixShader.h"
 #include "gpu/shaders/level1/TextureFillShader.h"
+#include "gpu/shaders/level1/TextureGradientShader.h"
 #include "gpu/shaders/level1/TiledTextureFillShader.h"
 
 namespace tgfx {
@@ -282,6 +306,126 @@ static std::optional<PermutationMatchResult> TryMatchGradientFill(const ProgramI
   fragValues[D::INTERVAL_COUNT] = intervalCount - 1;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"GradientFillShader", 0, fragIndex};
+}
+
+static std::optional<PermutationMatchResult> TryMatchSingleIntervalGradient(
+    const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp->name() != "DefaultGeometryProcessor") {
+    return std::nullopt;
+  }
+  if (programInfo->numFragmentProcessors() != 1) {
+    return std::nullopt;
+  }
+  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+    return std::nullopt;
+  }
+  auto fp = programInfo->getFragmentProcessor(0);
+  if (fp->name() != "ClampedGradientEffect") {
+    return std::nullopt;
+  }
+  if (fp->numChildProcessors() != 2) {
+    return std::nullopt;
+  }
+  auto colorizer = fp->childProcessor(0);
+  auto layout = fp->childProcessor(1);
+  if (colorizer->name() != "SingleIntervalGradientColorizer") {
+    return std::nullopt;
+  }
+  int layoutType = GradientLayoutTypeIndex(layout->name());
+  if (layoutType < 0) {
+    return std::nullopt;
+  }
+  if (layout->numCoordTransforms() > 0 && layout->coordTransform(0)->matrix.hasPerspective()) {
+    return std::nullopt;
+  }
+
+  using D = SingleIntervalGradientShader::Dims;
+  auto fragDomain = D::domain();
+  std::vector<int> fragValues(D::COUNT);
+  fragValues[D::LAYOUT_TYPE] = layoutType;
+  auto fragIndex = fragDomain.encode(fragValues);
+  return PermutationMatchResult{"SingleIntervalGradientShader", 0, fragIndex};
+}
+
+static std::optional<PermutationMatchResult> TryMatchDualIntervalGradient(
+    const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp->name() != "DefaultGeometryProcessor") {
+    return std::nullopt;
+  }
+  if (programInfo->numFragmentProcessors() != 1) {
+    return std::nullopt;
+  }
+  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+    return std::nullopt;
+  }
+  auto fp = programInfo->getFragmentProcessor(0);
+  if (fp->name() != "ClampedGradientEffect") {
+    return std::nullopt;
+  }
+  if (fp->numChildProcessors() != 2) {
+    return std::nullopt;
+  }
+  auto colorizer = fp->childProcessor(0);
+  auto layout = fp->childProcessor(1);
+  if (colorizer->name() != "DualIntervalGradientColorizer") {
+    return std::nullopt;
+  }
+  int layoutType = GradientLayoutTypeIndex(layout->name());
+  if (layoutType < 0) {
+    return std::nullopt;
+  }
+  if (layout->numCoordTransforms() > 0 && layout->coordTransform(0)->matrix.hasPerspective()) {
+    return std::nullopt;
+  }
+
+  using D = DualIntervalGradientShader::Dims;
+  auto fragDomain = D::domain();
+  std::vector<int> fragValues(D::COUNT);
+  fragValues[D::LAYOUT_TYPE] = layoutType;
+  auto fragIndex = fragDomain.encode(fragValues);
+  return PermutationMatchResult{"DualIntervalGradientShader", 0, fragIndex};
+}
+
+static std::optional<PermutationMatchResult> TryMatchTextureGradient(
+    const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp->name() != "DefaultGeometryProcessor") {
+    return std::nullopt;
+  }
+  if (programInfo->numFragmentProcessors() != 1) {
+    return std::nullopt;
+  }
+  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+    return std::nullopt;
+  }
+  auto fp = programInfo->getFragmentProcessor(0);
+  if (fp->name() != "ClampedGradientEffect") {
+    return std::nullopt;
+  }
+  if (fp->numChildProcessors() != 2) {
+    return std::nullopt;
+  }
+  auto colorizer = fp->childProcessor(0);
+  auto layout = fp->childProcessor(1);
+  if (colorizer->name() != "TextureGradientColorizer") {
+    return std::nullopt;
+  }
+  int layoutType = GradientLayoutTypeIndex(layout->name());
+  if (layoutType < 0) {
+    return std::nullopt;
+  }
+  if (layout->numCoordTransforms() > 0 && layout->coordTransform(0)->matrix.hasPerspective()) {
+    return std::nullopt;
+  }
+
+  using D = TextureGradientShader::Dims;
+  auto fragDomain = D::domain();
+  std::vector<int> fragValues(D::COUNT);
+  fragValues[D::LAYOUT_TYPE] = layoutType;
+  auto fragIndex = fragDomain.encode(fragValues);
+  return PermutationMatchResult{"TextureGradientShader", 0, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchTextureColorMatrix(
@@ -542,6 +686,150 @@ static std::optional<PermutationMatchResult> TryMatchBlendMerge(const ProgramInf
   return PermutationMatchResult{"BlendMergeShader", 0, fragIndex};
 }
 
+static std::optional<PermutationMatchResult> TryMatchHairlineLine(const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp->name() != "HairlineLineGeometryProcessor") {
+    return std::nullopt;
+  }
+  auto* hlgp = static_cast<const HairlineLineGeometryProcessor*>(gp);
+  using D = HairlineLineShader::Dims;
+  auto domain = D::domain();
+  std::vector<int> values(D::COUNT);
+  values[D::HAS_AA] = hlgp->getAAType() == AAType::Coverage ? 1 : 0;
+  auto index = domain.encode(values);
+  return PermutationMatchResult{"HairlineLineShader", index, index};
+}
+
+static std::optional<PermutationMatchResult> TryMatchHairlineQuad(const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp->name() != "HairlineQuadGeometryProcessor") {
+    return std::nullopt;
+  }
+  auto* hqgp = static_cast<const HairlineQuadGeometryProcessor*>(gp);
+  using D = HairlineQuadShader::Dims;
+  auto domain = D::domain();
+  std::vector<int> values(D::COUNT);
+  values[D::HAS_AA] = hqgp->getAAType() == AAType::Coverage ? 1 : 0;
+  auto index = domain.encode(values);
+  return PermutationMatchResult{"HairlineQuadShader", index, index};
+}
+
+static std::optional<PermutationMatchResult> TryMatchEllipseFill(const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp->name() != "EllipseGeometryProcessor") {
+    return std::nullopt;
+  }
+  auto* egp = static_cast<const EllipseGeometryProcessor*>(gp);
+  using D = EllipseFillShader::Dims;
+  auto domain = D::domain();
+  std::vector<int> values(D::COUNT);
+  values[D::STROKE] = egp->isStroke() ? 1 : 0;
+  values[D::HAS_COMMON_COLOR] = egp->hasCommonColor() ? 1 : 0;
+  auto index = domain.encode(values);
+  return PermutationMatchResult{"EllipseFillShader", index, index};
+}
+
+static std::optional<PermutationMatchResult> TryMatchComplexEllipseFill(
+    const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp->name() != "ComplexEllipseGeometryProcessor") {
+    return std::nullopt;
+  }
+  auto* cegp = static_cast<const ComplexEllipseGeometryProcessor*>(gp);
+  using D = ComplexEllipseFillShader::Dims;
+  auto domain = D::domain();
+  std::vector<int> values(D::COUNT);
+  values[D::STROKE] = cegp->isStroke() ? 1 : 0;
+  values[D::HAS_COMMON_COLOR] = cegp->hasCommonColor() ? 1 : 0;
+  auto index = domain.encode(values);
+  return PermutationMatchResult{"ComplexEllipseFillShader", index, index};
+}
+
+static std::optional<PermutationMatchResult> TryMatchNonAARRectFill(
+    const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp->name() != "NonAARRectGeometryProcessor") {
+    return std::nullopt;
+  }
+  auto* ngp = static_cast<const NonAARRectGeometryProcessor*>(gp);
+  using D = NonAARRectFillShader::Dims;
+  auto domain = D::domain();
+  std::vector<int> values(D::COUNT);
+  values[D::HAS_COMMON_COLOR] = ngp->hasCommonColor() ? 1 : 0;
+  values[D::STROKE] = ngp->isStroke() ? 1 : 0;
+  auto index = domain.encode(values);
+  return PermutationMatchResult{"NonAARRectFillShader", index, index};
+}
+
+static std::optional<PermutationMatchResult> TryMatchComplexNonAARRectFill(
+    const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp->name() != "ComplexNonAARRectGeometryProcessor") {
+    return std::nullopt;
+  }
+  auto* cngp = static_cast<const ComplexNonAARRectGeometryProcessor*>(gp);
+  using D = ComplexNonAARRectFillShader::Dims;
+  auto domain = D::domain();
+  std::vector<int> values(D::COUNT);
+  values[D::HAS_COMMON_COLOR] = cngp->hasCommonColor() ? 1 : 0;
+  values[D::STROKE] = cngp->isStroke() ? 1 : 0;
+  auto index = domain.encode(values);
+  return PermutationMatchResult{"ComplexNonAARRectFillShader", index, index};
+}
+
+static std::optional<PermutationMatchResult> TryMatchRoundStrokeRectFill(
+    const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp->name() != "RoundStrokeRectGeometryProcessor") {
+    return std::nullopt;
+  }
+  auto* rsgp = static_cast<const RoundStrokeRectGeometryProcessor*>(gp);
+  // Skip perspective UV transforms — not covered by precompiled variants.
+  if (rsgp->isUVPerspective()) {
+    return std::nullopt;
+  }
+  using D = RoundStrokeRectFillShader::Dims;
+  auto domain = D::domain();
+  std::vector<int> values(D::COUNT);
+  values[D::HAS_AA] = rsgp->getAAType() == AAType::Coverage ? 1 : 0;
+  values[D::HAS_COMMON_COLOR] = rsgp->hasCommonColor() ? 1 : 0;
+  values[D::HAS_UV_MATRIX] = rsgp->hasUVMatrixTransform() ? 1 : 0;
+  auto index = domain.encode(values);
+  return PermutationMatchResult{"RoundStrokeRectFillShader", index, index};
+}
+
+static std::optional<PermutationMatchResult> TryMatchShapeInstancedFill(
+    const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp->name() != "ShapeInstancedGeometryProcessor") {
+    return std::nullopt;
+  }
+  auto* sigp = static_cast<const ShapeInstancedGeometryProcessor*>(gp);
+  using D = ShapeInstancedFillShader::Dims;
+  auto domain = D::domain();
+  std::vector<int> values(D::COUNT);
+  values[D::HAS_COLORS] = sigp->getHasColors() ? 1 : 0;
+  values[D::HAS_AA] = sigp->getAAType() == AAType::Coverage ? 1 : 0;
+  auto index = domain.encode(values);
+  return PermutationMatchResult{"ShapeInstancedFillShader", index, index};
+}
+
+static std::optional<PermutationMatchResult> TryMatchMeshFill(const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp->name() != "MeshGeometryProcessor") {
+    return std::nullopt;
+  }
+  auto* mgp = static_cast<const MeshGeometryProcessor*>(gp);
+  using D = MeshFillShader::Dims;
+  auto domain = D::domain();
+  std::vector<int> values(D::COUNT);
+  values[D::HAS_TEX_COORDS] = mgp->getHasTexCoords() ? 1 : 0;
+  values[D::HAS_COLORS] = mgp->getHasColors() ? 1 : 0;
+  values[D::HAS_COVERAGE] = mgp->getHasCoverage() ? 1 : 0;
+  auto index = domain.encode(values);
+  return PermutationMatchResult{"MeshFillShader", index, index};
+}
+
 std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* programInfo) {
   if (auto result = TryMatchTextureFill(programInfo)) {
     return result;
@@ -559,6 +847,15 @@ std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* progra
     return result;
   }
   if (auto result = TryMatchGradientFill(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchSingleIntervalGradient(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchDualIntervalGradient(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchTextureGradient(programInfo)) {
     return result;
   }
   if (auto result = TryMatchTextureColorMatrix(programInfo)) {
@@ -583,6 +880,33 @@ std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* progra
     return result;
   }
   if (auto result = TryMatchBlendMerge(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchHairlineLine(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchHairlineQuad(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchEllipseFill(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchComplexEllipseFill(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchNonAARRectFill(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchComplexNonAARRectFill(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchRoundStrokeRectFill(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchShapeInstancedFill(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchMeshFill(programInfo)) {
     return result;
   }
   return std::nullopt;

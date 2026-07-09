@@ -44,6 +44,10 @@ class HairlineQuadGeometryProcessor : public GeometryProcessor {
     return "HairlineQuadGeometryProcessor";
   }
 
+  AAType getAAType() const {
+    return aaType;
+  }
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 

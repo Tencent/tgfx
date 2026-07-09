@@ -41,6 +41,14 @@ class ComplexEllipseGeometryProcessor : public GeometryProcessor {
     return "ComplexEllipseGeometryProcessor";
   }
 
+  bool isStroke() const {
+    return stroke;
+  }
+
+  bool hasCommonColor() const {
+    return commonColor.has_value();
+  }
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 

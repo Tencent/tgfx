@@ -37,6 +37,14 @@ class ComplexNonAARRectGeometryProcessor : public GeometryProcessor {
     return "ComplexNonAARRectGeometryProcessor";
   }
 
+  bool isStroke() const {
+    return stroke;
+  }
+
+  bool hasCommonColor() const {
+    return commonColor.has_value();
+  }
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 

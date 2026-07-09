@@ -34,6 +34,22 @@ class RoundStrokeRectGeometryProcessor : public GeometryProcessor {
     return "RoundStrokeRectGeometryProcessor";
   }
 
+  AAType getAAType() const {
+    return aaType;
+  }
+
+  bool hasCommonColor() const {
+    return commonColor.has_value();
+  }
+
+  bool hasUVMatrixTransform() const {
+    return uvMatrix.has_value();
+  }
+
+  bool isUVPerspective() const {
+    return uvMatrix.has_value() && (uvMatrix->getType() & Matrix::PerspectiveMask) != 0;
+  }
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
   RoundStrokeRectGeometryProcessor(AAType aa, std::optional<PMColor> commonColor,

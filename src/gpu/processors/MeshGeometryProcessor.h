@@ -36,6 +36,18 @@ class MeshGeometryProcessor : public GeometryProcessor {
     return "MeshGeometryProcessor";
   }
 
+  bool getHasTexCoords() const {
+    return hasTexCoords;
+  }
+
+  bool getHasColors() const {
+    return hasColors;
+  }
+
+  bool getHasCoverage() const {
+    return hasCoverage;
+  }
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
