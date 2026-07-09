@@ -20,13 +20,18 @@
 #include <fstream>
 #include <vector>
 #include "base/TGFXTest.h"
+#include "core/filters/GaussianBlurImageFilter.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/ShaderPermutation.h"
 #include "gpu/shaders/level1/QuadTextureFillShader.h"
 #include "gpu/shaders/level1/TextureFillShader.h"
 #include "gtest/gtest.h"
+#include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/Image.h"
+#include "tgfx/core/ImageFilter.h"
+#include "tgfx/core/Paint.h"
+#include "tgfx/core/Shader.h"
 #include "tgfx/core/Surface.h"
 #include "utils/TestUtils.h"
 #include "zlib.h"
@@ -489,6 +494,83 @@ TGFX_TEST(ShaderPermutationTest, DrawImageHitsPrecompiledCache) {
   auto surface = Surface::Make(context, 200, 200);
   ASSERT_TRUE(surface != nullptr);
   surface->getCanvas()->drawImage(image, 0, 0);
+  context->flushAndSubmit(true);
+  EXPECT_GT(cache->hitCount(), 0u);
+}
+
+TGFX_TEST(ShaderPermutationTest, AlphaThresholdHitsPrecompiledCache) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto bundlePath = ProjectPath::Absolute("resources/shaders/shader_bundle.vulkan.bin");
+  auto* cache = context->precompiledShaderCache();
+  ASSERT_TRUE(cache->loadBundle(bundlePath));
+  cache->resetStats();
+  auto surface = Surface::Make(context, 100, 100);
+  ASSERT_TRUE(surface != nullptr);
+  Paint paint;
+  paint.setColor(Color::FromRGBA(100, 0, 0, 128));
+  paint.setColorFilter(ColorFilter::AlphaThreshold(0.5f));
+  surface->getCanvas()->drawRect(Rect::MakeWH(100, 100), paint);
+  context->flushAndSubmit(true);
+  EXPECT_GT(cache->hitCount(), 0u);
+}
+
+TGFX_TEST(ShaderPermutationTest, LumaHitsPrecompiledCache) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto bundlePath = ProjectPath::Absolute("resources/shaders/shader_bundle.vulkan.bin");
+  auto* cache = context->precompiledShaderCache();
+  ASSERT_TRUE(cache->loadBundle(bundlePath));
+  cache->resetStats();
+  auto surface = Surface::Make(context, 100, 100);
+  ASSERT_TRUE(surface != nullptr);
+  Paint paint;
+  paint.setShader(Shader::MakeColorShader(Color::FromRGBA(125, 0, 255)));
+  paint.setColorFilter(ColorFilter::Luma());
+  surface->getCanvas()->drawPaint(paint);
+  context->flushAndSubmit(true);
+  EXPECT_GT(cache->hitCount(), 0u);
+}
+
+TGFX_TEST(ShaderPermutationTest, GaussianBlurHitsPrecompiledCache) {
+  auto image = MakeImage("resources/apitest/image_as_mask.png");
+  ASSERT_TRUE(image != nullptr);
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto bundlePath = ProjectPath::Absolute("resources/shaders/shader_bundle.vulkan.bin");
+  auto* cache = context->precompiledShaderCache();
+  ASSERT_TRUE(cache->loadBundle(bundlePath));
+  cache->resetStats();
+  int width = image->width() + 50;
+  int height = image->height() + 50;
+  auto surface = Surface::Make(context, width, height);
+  ASSERT_TRUE(surface != nullptr);
+  auto blurFilter = std::make_shared<GaussianBlurImageFilter>(3.0f, 3.0f, TileMode::Decal);
+  auto blurredImage = image->makeWithFilter(blurFilter);
+  surface->getCanvas()->drawImage(blurredImage, 25, 25);
+  context->flushAndSubmit(true);
+  EXPECT_GT(cache->hitCount(), 0u);
+}
+
+TGFX_TEST(ShaderPermutationTest, BlendMergeHitsPrecompiledCache) {
+  auto image = MakeImage("resources/apitest/test_timestretch.png");
+  ASSERT_TRUE(image != nullptr);
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto bundlePath = ProjectPath::Absolute("resources/shaders/shader_bundle.vulkan.bin");
+  auto* cache = context->precompiledShaderCache();
+  ASSERT_TRUE(cache->loadBundle(bundlePath));
+  cache->resetStats();
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  Paint paint;
+  paint.setColor(Color::Red());
+  paint.setColorFilter(ColorFilter::Blend(Color::Blue(), BlendMode::SrcOver));
+  surface->getCanvas()->drawRect(Rect::MakeWH(200, 200), paint);
   context->flushAndSubmit(true);
   EXPECT_GT(cache->hitCount(), 0u);
 }
