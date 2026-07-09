@@ -34,6 +34,10 @@ class UnrolledBinaryGradientColorizer : public FragmentProcessor {
     return "UnrolledBinaryGradientColorizer";
   }
 
+  int getIntervalCount() const {
+    return intervalCount;
+  }
+
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
  protected:

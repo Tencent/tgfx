@@ -17,14 +17,17 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PermutationMatcher.h"
+#include "gpu/processors/ClampedGradientEffect.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/EmptyXferProcessor.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
+#include "gpu/processors/UnrolledBinaryGradientColorizer.h"
 #include "gpu/shaders/level1/ConstColorShader.h"
 #include "gpu/shaders/level1/DeviceSpaceTextureShader.h"
+#include "gpu/shaders/level1/GradientFillShader.h"
 #include "gpu/shaders/level1/QuadTextureFillShader.h"
 #include "gpu/shaders/level1/TextureFillShader.h"
 #include "gpu/shaders/level1/TiledTextureFillShader.h"
@@ -202,6 +205,68 @@ static std::optional<PermutationMatchResult> TryMatchDeviceSpaceTexture(
   return PermutationMatchResult{"DeviceSpaceTextureShader", 0, fragIndex};
 }
 
+static int GradientLayoutTypeIndex(const std::string& layoutName) {
+  if (layoutName == "LinearGradientLayout") {
+    return 0;
+  }
+  if (layoutName == "RadialGradientLayout") {
+    return 1;
+  }
+  if (layoutName == "ConicGradientLayout") {
+    return 2;
+  }
+  if (layoutName == "DiamondGradientLayout") {
+    return 3;
+  }
+  return -1;
+}
+
+static std::optional<PermutationMatchResult> TryMatchGradientFill(const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp->name() != "DefaultGeometryProcessor") {
+    return std::nullopt;
+  }
+  if (programInfo->numFragmentProcessors() != 1) {
+    return std::nullopt;
+  }
+  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+    return std::nullopt;
+  }
+  auto fp = programInfo->getFragmentProcessor(0);
+  if (fp->name() != "ClampedGradientEffect") {
+    return std::nullopt;
+  }
+  if (fp->numChildProcessors() != 2) {
+    return std::nullopt;
+  }
+  auto colorizer = fp->childProcessor(0);
+  auto layout = fp->childProcessor(1);
+  if (colorizer->name() != "UnrolledBinaryGradientColorizer") {
+    return std::nullopt;
+  }
+  int layoutType = GradientLayoutTypeIndex(layout->name());
+  if (layoutType < 0) {
+    return std::nullopt;
+  }
+  // Bail out on perspective transforms — not covered by precompiled variants.
+  if (layout->numCoordTransforms() > 0 && layout->coordTransform(0)->matrix.hasPerspective()) {
+    return std::nullopt;
+  }
+  auto* ubgc = static_cast<const UnrolledBinaryGradientColorizer*>(colorizer);
+  int intervalCount = ubgc->getIntervalCount();
+  if (intervalCount < 1 || intervalCount > 8) {
+    return std::nullopt;
+  }
+
+  using D = GradientFillShader::Dims;
+  auto fragDomain = D::domain();
+  std::vector<int> fragValues(D::COUNT);
+  fragValues[D::LAYOUT_TYPE] = layoutType;
+  fragValues[D::INTERVAL_COUNT] = intervalCount - 1;
+  auto fragIndex = fragDomain.encode(fragValues);
+  return PermutationMatchResult{"GradientFillShader", 0, fragIndex};
+}
+
 std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* programInfo) {
   if (auto result = TryMatchTextureFill(programInfo)) {
     return result;
@@ -216,6 +281,9 @@ std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* progra
     return result;
   }
   if (auto result = TryMatchDeviceSpaceTexture(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchGradientFill(programInfo)) {
     return result;
   }
   return std::nullopt;
