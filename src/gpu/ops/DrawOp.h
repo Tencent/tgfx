@@ -63,6 +63,18 @@ class DrawOp {
     coverages.emplace_back(std::move(coverageProcessor));
   }
 
+  std::vector<PlacementPtr<FragmentProcessor>>& colorProcessors() {
+    return colors;
+  }
+
+  size_t numColorProcessors() const {
+    return colors.size();
+  }
+
+  bool hasXferProcessor() const {
+    return xferProcessor != nullptr;
+  }
+
   virtual bool hasCoverage() const {
     return !coverages.empty();
   }

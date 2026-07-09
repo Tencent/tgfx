@@ -27,6 +27,7 @@
 #include "core/utils/RectToRectMatrix.h"
 #include "core/utils/StrokeUtils.h"
 #include "gpu/DrawingManager.h"
+#include "gpu/EffectDecomposer.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ops/AtlasTextOp.h"
 #include "gpu/ops/HairlineLineOp.h"
@@ -1009,6 +1010,19 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     auto xferProcessor = PorterDuffXferProcessor::Make(drawingAllocator(), brush.blendMode,
                                                        std::move(dstTextureInfo));
     op->setXferProcessor(std::move(xferProcessor));
+  }
+  if (op->numColorProcessors() >= 3 && !op->hasXferProcessor()) {
+    auto& processors = op->colorProcessors();
+    auto savedProcessors = std::move(processors);
+    processors.clear();
+    auto replacement =
+        EffectDecomposer::TryDecompose(context, context->drawingManager(), renderTarget->width(),
+                                       renderTarget->height(), savedProcessors, drawingAllocator());
+    if (replacement) {
+      processors.emplace_back(std::move(replacement));
+    } else {
+      processors = std::move(savedProcessors);
+    }
   }
   drawOps.emplace_back(std::move(op));
 }

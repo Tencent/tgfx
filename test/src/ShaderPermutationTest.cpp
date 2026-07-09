@@ -28,6 +28,7 @@
 #include "gpu/shaders/level1/TextureFillShader.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/ColorFilter.h"
+#include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Paint.h"
@@ -648,6 +649,36 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureFillShouldCompile) {
     // Total = 8 vert * 6 frag = 48.
     EXPECT_EQ(compiledCount, 48);
   }
+}
+
+TGFX_TEST(ShaderPermutationTest, EffectDecomposerTripleFP) {
+  auto image = MakeImage("resources/apitest/test_timestretch.png");
+  ASSERT_TRUE(image != nullptr);
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200, false, 1, false, 0, ColorSpace::DisplayP3());
+  ASSERT_TRUE(surface != nullptr);
+  Paint paint;
+  paint.setColorFilter(ColorFilter::Luma());
+  surface->getCanvas()->drawImage(image, 0.f, 0.f, &paint);
+  context->flushAndSubmit(true);
+  Bitmap bitmap;
+  bitmap.allocPixels(200, 200);
+  auto* pixelData = bitmap.lockPixels();
+  ASSERT_TRUE(pixelData != nullptr);
+  ASSERT_TRUE(surface->readPixels(bitmap.info(), pixelData));
+  bitmap.unlockPixels();
+  auto* bytes = reinterpret_cast<const uint8_t*>(bitmap.lockPixels());
+  bool hasNonZero = false;
+  for (int i = 0; i < 200 * 200 * 4; i++) {
+    if (bytes[i] != 0) {
+      hasNonZero = true;
+      break;
+    }
+  }
+  bitmap.unlockPixels();
+  EXPECT_TRUE(hasNonZero);
 }
 
 }  // namespace tgfx
