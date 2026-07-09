@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <string>
 #include <unordered_map>
@@ -75,6 +76,32 @@ class PrecompiledShaderCache {
     return _profileTag;
   }
 
+  /// Returns the number of successful lookups (both vertex and fragment found).
+  uint32_t hitCount() const {
+    return _hitCount.load(std::memory_order_relaxed);
+  }
+
+  /// Returns the number of failed lookups (vertex or fragment not found, or match failed).
+  uint32_t missCount() const {
+    return _missCount.load(std::memory_order_relaxed);
+  }
+
+  /// Increments the hit counter by one.
+  void recordHit() {
+    _hitCount.fetch_add(1, std::memory_order_relaxed);
+  }
+
+  /// Increments the miss counter by one.
+  void recordMiss() {
+    _missCount.fetch_add(1, std::memory_order_relaxed);
+  }
+
+  /// Resets both hit and miss counters to zero.
+  void resetStats() {
+    _hitCount.store(0, std::memory_order_relaxed);
+    _missCount.store(0, std::memory_order_relaxed);
+  }
+
   struct HashKey {
     uint64_t hi;
     uint64_t lo;
@@ -93,6 +120,8 @@ class PrecompiledShaderCache {
   std::string _profileTag;
   std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> vertEntries;
   std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> fragEntries;
+  std::atomic<uint32_t> _hitCount{0};
+  std::atomic<uint32_t> _missCount{0};
 };
 
 }  // namespace tgfx

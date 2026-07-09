@@ -320,6 +320,36 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledRenderConsistency) {
   bitmap2.unlockPixels();
 }
 
+TGFX_TEST(ShaderPermutationTest, ShaderCacheStats) {
+  // Unit test for the hit/miss counter mechanism in PrecompiledShaderCache.
+  PrecompiledShaderCache cache;
+  auto bundlePath = ProjectPath::Absolute("resources/shaders/shader_bundle.vulkan.bin");
+  ASSERT_TRUE(cache.loadBundle(bundlePath));
+
+  // Initial state: both counters at zero.
+  EXPECT_EQ(cache.hitCount(), 0u);
+  EXPECT_EQ(cache.missCount(), 0u);
+
+  // Record hits and misses.
+  cache.recordHit();
+  cache.recordHit();
+  cache.recordMiss();
+  EXPECT_EQ(cache.hitCount(), 2u);
+  EXPECT_EQ(cache.missCount(), 1u);
+
+  // Verify resetStats clears both counters.
+  cache.resetStats();
+  EXPECT_EQ(cache.hitCount(), 0u);
+  EXPECT_EQ(cache.missCount(), 0u);
+
+  // Record after reset should start fresh.
+  cache.recordMiss();
+  cache.recordMiss();
+  cache.recordHit();
+  EXPECT_EQ(cache.hitCount(), 1u);
+  EXPECT_EQ(cache.missCount(), 2u);
+}
+
 TGFX_TEST(ShaderPermutationTest, EmbeddedBundleLoadFromMemory) {
   // Verify that PrecompiledShaderCache can load a bundle from in-memory data (the same interface
   // used by the embedded bundle mechanism in Context initialization).
