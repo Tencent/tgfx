@@ -226,7 +226,7 @@ std::string GlassRefractionEffect::buildFragmentShader(bool isDesktop) const {
       code += "#define GLASS_USE_AXIS_MIX\n";
       code += GLASS_SDF_ELLIPSE;
       break;
-
+    case GlassShapeType::Star:
     case GlassShapeType::AlphaMask:
       code += GLASS_SDF_ALPHA_MASK;
       break;

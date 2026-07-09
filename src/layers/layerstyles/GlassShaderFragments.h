@@ -280,8 +280,6 @@ static constexpr char GLASS_SHADER_MAIN[] = R"(
         float g = texture(uSource, uvG).g;
         float b = texture(uSource, uvB).b;
         float a = texture(uSource, uvG).a;
-        // Debug: visualize UDF height map.
-        float height = sampleHeight(px, py);
         tgfx_FragColor = vec4(r, g, b, a);
     }
 )";

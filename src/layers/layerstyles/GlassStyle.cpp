@@ -104,6 +104,14 @@ void GlassStyle::setCornerRadius(float radius) {
   invalidateTransform();
 }
 
+void GlassStyle::setShapeType(GlassShapeType type) {
+  if (_shapeType == type) {
+    return;
+  }
+  _shapeType = type;
+  invalidateTransform();
+}
+
 Rect GlassStyle::filterBackground(const Rect& srcRect, float contentScale) {
   auto filter = getFrostFilter(contentScale);
   if (filter) {
