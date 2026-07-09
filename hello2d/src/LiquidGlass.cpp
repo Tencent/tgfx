@@ -20,8 +20,8 @@
 #include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/ShapeLayer.h"
-#include "tgfx/layers/SolidLayer.h"
 #include "tgfx/layers/ShapeStyle.h"
+#include "tgfx/layers/SolidLayer.h"
 #include "tgfx/layers/layerstyles/GlassStyle.h"
 
 namespace hello2d {
@@ -56,8 +56,8 @@ std::shared_ptr<tgfx::Layer> LiquidGlass::onBuildLayerTree(const hello2d::AppHos
   // Blue rectangle for refraction contrast.
   auto blueRect = tgfx::ShapeLayer::Make();
   tgfx::Path bluePath = {};
-  bluePath.addRect(tgfx::Rect::MakeXYWH(CELL_SIZE * 0.15f, CELL_SIZE * 0.15f,
-                                        CELL_SIZE * 0.35f, CELL_SIZE * 0.35f));
+  bluePath.addRect(tgfx::Rect::MakeXYWH(CELL_SIZE * 0.15f, CELL_SIZE * 0.15f, CELL_SIZE * 0.35f,
+                                        CELL_SIZE * 0.35f));
   blueRect->setPath(bluePath);
   blueRect->setFillStyle(tgfx::ShapeStyle::Make(tgfx::Color::FromRGBA(0, 100, 255, 255)));
   root->addChild(blueRect);
@@ -65,40 +65,24 @@ std::shared_ptr<tgfx::Layer> LiquidGlass::onBuildLayerTree(const hello2d::AppHos
   // Green circle for refraction contrast.
   auto greenCircle = tgfx::ShapeLayer::Make();
   tgfx::Path greenPath = {};
-  greenPath.addOval(tgfx::Rect::MakeXYWH(CELL_SIZE * 0.45f, CELL_SIZE * 0.45f,
-                                        CELL_SIZE * 0.4f, CELL_SIZE * 0.4f));
+  greenPath.addOval(tgfx::Rect::MakeXYWH(CELL_SIZE * 0.45f, CELL_SIZE * 0.45f, CELL_SIZE * 0.4f,
+                                         CELL_SIZE * 0.4f));
   greenCircle->setPath(greenPath);
   greenCircle->setFillStyle(tgfx::ShapeStyle::Make(tgfx::Color::FromRGBA(50, 200, 80, 200)));
   root->addChild(greenCircle);
 
-  // Glass panel: star-shaped AlphaMask glass.
-  float glassSize = 500.0f;
+  // Glass panel: rounded rectangle for clear refraction visibility when dragging.
+  float glassSize = 200.0f;
 
-  auto glassLayer = tgfx::ShapeLayer::Make();
-  tgfx::Path starPath = {};
-  float halfSize = glassSize * 0.5f;
-  float outerR = halfSize * 0.9f;
-  float innerR = outerR * 0.382f;
-  float startAngle = -3.1415926f * 0.5f;
-  for (int i = 0; i < 5; i++) {
-    float outerAngle = startAngle + static_cast<float>(i) * 3.1415926f * 0.8f;
-    float innerAngle = outerAngle + 3.1415926f * 0.2f;
-    if (i == 0) {
-      starPath.moveTo(halfSize + outerR * cosf(outerAngle),
-                      halfSize + outerR * sinf(outerAngle));
-    } else {
-      starPath.lineTo(halfSize + outerR * cosf(outerAngle),
-                      halfSize + outerR * sinf(outerAngle));
-    }
-    starPath.lineTo(halfSize + innerR * cosf(innerAngle),
-                    halfSize + innerR * sinf(innerAngle));
-  }
-  starPath.close();
-  glassLayer->setPath(starPath);
-  glassLayer->setFillStyle(tgfx::ShapeStyle::Make(tgfx::Color::FromRGBA(255, 255, 255, 128)));
+  auto glassLayer = tgfx::SolidLayer::Make();
+  glassLayer->setColor(tgfx::Color::FromRGBA(255, 255, 255, 128));
+  glassLayer->setWidth(glassSize);
+  glassLayer->setHeight(glassSize);
+  glassLayer->setRadiusX(32);
+  glassLayer->setRadiusY(32);
   glassLayer->setMatrix(tgfx::Matrix::MakeTrans(glassPosX, glassPosY));
-  auto style = tgfx::GlassStyle::Make(50, 30, 0, 0, 0, 135, 0);
-  style->setShapeType(tgfx::GlassShapeType::AlphaMask);
+  auto style = tgfx::GlassStyle::Make(50, 30, 10, 0, 0, 135, 100);
+  style->setCornerRadius(32);
   glassLayer->setLayerStyles({style});
   root->addChild(glassLayer);
 

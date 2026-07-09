@@ -145,7 +145,9 @@ static constexpr char GLASS_SDF_ALPHA_MASK[] = R"(
         float right = sampleHeight(px + 1.0, py);
         float bottom = sampleHeight(px, py - 1.0);
         float top = sampleHeight(px, py + 1.0);
-        vec2 grad = vec2(right - left, top - bottom) * 0.5;
+        // sampleHeight increases towards center, so its gradient points inward. Negate to get
+        // the outward normal, consistent with analytical SDF shapeNormal (gradient of outerSDF).
+        vec2 grad = vec2(left - right, bottom - top) * 0.5;
         float len = length(grad);
         if (len > 0.0001) {
             return grad / len;
@@ -174,6 +176,8 @@ static constexpr char GLASS_SHADER_MAIN[] = R"(
         float invSourceH = uParams3.w;
         float splay = uParams4.x;
         float depthRatio = uParams4.y;
+        float lightAngleRad = uParams4.z;
+        float lightIntensity = uParams4.w;
 
         // Convert source UV to glass pixel coordinates centered at origin.
         vec2 glassUV = (vTexCoord - uParams0.xy) * uParams0.zw;
@@ -187,12 +191,18 @@ static constexpr char GLASS_SHADER_MAIN[] = R"(
         float outerSDF = outerShapeSDF(px, py);
         float innerSDF = innerShapeSDF(px, py);
 
+        // Edge weight: 1 near the outer edge, fading to 0 in the interior.
+        float edgeWeight = 0.0;
+
         // Apply refraction inside the shape.
         if (outerSDF < 0.0) {
 #ifdef GLASS_USE_AXIS_MIX
+            // Edge lighting: narrow band at the outermost edge, width = 1% of minHalf.
+            float edgeDist = -outerSDF;
+            edgeWeight = 1.0 - smoothstep(0.0, minHalf * 0.01, edgeDist);
+
             // Analytical SDF: use edge band between outer and inner.
             if (innerSDF >= 0.0) {
-                float edgeDist = -outerSDF;
                 float totalDist = edgeDist + innerSDF;
                 float xNorm = (totalDist > 0.001) ? edgeDist / totalDist : 0.0;
                 xNorm = min(xNorm, 1.0);
@@ -265,6 +275,11 @@ static constexpr char GLASS_SHADER_MAIN[] = R"(
 
                 uvOffset = vec2(sn.x * invSourceW, -sn.y * invSourceH);
             }
+
+            // Bevel SDF derived from the same blurred alpha height map:
+            // B = height * 2 - 1 ∈ [-1, +1] (Figma: texture2_.a × 2 - 1).
+            // Edge weight is 1 when height < 0.5, fades to 0 as height goes from 0.5 to 0.65.
+            edgeWeight = 1.0 - smoothstep(0.5, 0.65, height);
 #endif
         }
 
@@ -280,7 +295,24 @@ static constexpr char GLASS_SHADER_MAIN[] = R"(
         float g = texture(uSource, uvG).g;
         float b = texture(uSource, uvB).b;
         float a = texture(uSource, uvG).a;
-        tgfx_FragColor = vec4(r, g, b, a);
+
+        vec3 finalColor = vec3(r, g, b);
+
+        // Edge lighting: diffuse highlight on the light-facing side, rim light on the opposite side.
+        if (lightIntensity > 0.0 && edgeWeight > 0.0) {
+            vec2 N = shapeNormal(px, py);
+            // Light direction pointing towards the light source.
+            // lightAngle=0 → from above, 90 → from right, 180 → from below, 270 → from left.
+            vec2 lightDir = vec2(sin(lightAngleRad), cos(lightAngleRad));
+
+            float NdotL = dot(N, lightDir);
+            float diffuse = smoothstep(0.35, 1.0, NdotL) * edgeWeight * lightIntensity;
+            float rim = smoothstep(0.35, 1.0, -NdotL) * edgeWeight * lightIntensity * 0.6;
+
+            finalColor += vec3(diffuse + rim);
+        }
+
+        tgfx_FragColor = vec4(finalColor, a);
     }
 )";
 
