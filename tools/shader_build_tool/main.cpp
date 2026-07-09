@@ -28,6 +28,7 @@
 #include "ReflectionExtractor.h"
 #include "ShaderCompiler.h"
 #include "gpu/shaders/PrecompiledShader.h"
+#include "gpu/shaders/level1/ConstColorShader.h"
 #include "gpu/shaders/level1/TextureFillShader.h"
 #include "gpu/shaders/level1/TiledTextureFillShader.h"
 
