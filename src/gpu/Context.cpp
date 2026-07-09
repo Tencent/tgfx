@@ -24,6 +24,7 @@
 #include "core/utils/SingleOwner.h"
 #include "core/utils/SlidingWindowTracker.h"
 #include "gpu/DrawingManager.h"
+#include "gpu/EmbeddedShaderBundles.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProxyProvider.h"
@@ -48,6 +49,10 @@ Context::Context(Device* device, GPU* gpu) : _device(device), _gpu(gpu) {
   _atlasManager = new AtlasManager(this);
   _atlasStrikeCache = new AtlasStrikeCache();
   _precompiledShaderCache = new PrecompiledShaderCache();
+  auto [bundleData, bundleSize] = EmbeddedShaderBundles::GetBundle(_gpu->info()->backend);
+  if (bundleData != nullptr && bundleSize > 0) {
+    _precompiledShaderCache->loadBundle(bundleData, bundleSize);
+  }
 }
 
 Context::~Context() {

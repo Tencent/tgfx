@@ -129,25 +129,16 @@ static bool LoadPool(const uint8_t* fileData, size_t fileSize, uint32_t poolOffs
   return true;
 }
 
-bool PrecompiledShaderCache::loadBundle(const std::string& path) {
-  std::ifstream file(path, std::ios::binary | std::ios::ate);
-  if (!file.is_open()) {
+bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
+  if (size < HEADER_SIZE_V3) {
+    LOGE("PrecompiledShaderCache: Bundle data too small (%zu bytes)", size);
     return false;
   }
-  auto fileSize = static_cast<size_t>(file.tellg());
-  if (fileSize < HEADER_SIZE_V3) {
-    LOGE("PrecompiledShaderCache: Bundle too small: %s", path.c_str());
-    return false;
-  }
-  file.seekg(0);
-  std::vector<uint8_t> data(fileSize);
-  file.read(reinterpret_cast<char*>(data.data()), static_cast<std::streamsize>(fileSize));
-  file.close();
 
-  const uint8_t* ptr = data.data();
+  const uint8_t* ptr = data;
   uint32_t magic = ReadU32LE(ptr);
   if (magic != 0x54475346) {  // "TGSF"
-    LOGE("PrecompiledShaderCache: Invalid magic in %s", path.c_str());
+    LOGE("PrecompiledShaderCache: Invalid magic in bundle data");
     return false;
   }
   uint16_t formatVersion = ReadU16LE(ptr + 4);
@@ -174,18 +165,31 @@ bool PrecompiledShaderCache::loadBundle(const std::string& path) {
   const char* tagPtr = reinterpret_cast<const char*>(ptr + 48);
   _profileTag = std::string(tagPtr, strnlen(tagPtr, 32));
 
-  if (!LoadPool(ptr, fileSize, vertPoolOffset, vertPoolCount, dataOffset, reflectionOffset,
+  if (!LoadPool(ptr, size, vertPoolOffset, vertPoolCount, dataOffset, reflectionOffset,
                 vertEntries)) {
     return false;
   }
-  if (!LoadPool(ptr, fileSize, fragPoolOffset, fragPoolCount, dataOffset, reflectionOffset,
+  if (!LoadPool(ptr, size, fragPoolOffset, fragPoolCount, dataOffset, reflectionOffset,
                 fragEntries)) {
     return false;
   }
 
-  LOGI("PrecompiledShaderCache: Loaded %u vert + %u frag entries from %s (format v%u)",
-       vertPoolCount, fragPoolCount, path.c_str(), formatVersion);
+  LOGI("PrecompiledShaderCache: Loaded %u vert + %u frag entries (format v%u, profile=%s)",
+       vertPoolCount, fragPoolCount, formatVersion, _profileTag.c_str());
   return true;
+}
+
+bool PrecompiledShaderCache::loadBundle(const std::string& path) {
+  std::ifstream file(path, std::ios::binary | std::ios::ate);
+  if (!file.is_open()) {
+    return false;
+  }
+  auto fileSize = static_cast<size_t>(file.tellg());
+  file.seekg(0);
+  std::vector<uint8_t> data(fileSize);
+  file.read(reinterpret_cast<char*>(data.data()), static_cast<std::streamsize>(fileSize));
+  file.close();
+  return loadBundle(data.data(), fileSize);
 }
 
 const ShaderStageBlob* PrecompiledShaderCache::findVertex(uint64_t hashHi, uint64_t hashLo) const {

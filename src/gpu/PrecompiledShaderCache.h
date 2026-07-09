@@ -40,6 +40,10 @@ class PrecompiledShaderCache {
   /// Loads a bundle file from the given path. Returns true if the bundle was loaded successfully.
   bool loadBundle(const std::string& path);
 
+  /// Loads a bundle from in-memory data. The caller must ensure the data remains valid until
+  /// parsing completes. This overload is used for embedded bundles compiled into the library.
+  bool loadBundle(const uint8_t* data, size_t size);
+
   /// Looks up a vertex shader by its 128-bit hash. Returns nullptr if not found.
   const ShaderStageBlob* findVertex(uint64_t hashHi, uint64_t hashLo) const;
 

@@ -777,12 +777,71 @@ if (TGFX_BUILD_TESTS)
     find_vendor_libraries(tgfx-vendor STATIC SHADER_TOOL_VENDOR_LIBS)
     target_link_libraries(shader_build_tool PRIVATE ${SHADER_TOOL_VENDOR_LIBS})
 
+    # Determine which backends to compile based on enabled GPU backends
+    set(TGFX_SHADER_BACKENDS "")
+    if (TGFX_USE_VULKAN)
+        list(APPEND TGFX_SHADER_BACKENDS "vulkan")
+    endif ()
+    if (TGFX_USE_METAL)
+        list(APPEND TGFX_SHADER_BACKENDS "metal")
+    endif ()
+    if (TGFX_USE_WEBGPU)
+        list(APPEND TGFX_SHADER_BACKENDS "webgpu")
+    endif ()
+    if (NOT TGFX_SHADER_BACKENDS)
+        # OpenGL fallback: bundle contains GLSL text, still useful for eliminating emitCode()
+        list(APPEND TGFX_SHADER_BACKENDS "opengl")
+    endif ()
+
+    set(TGFX_SHADER_BUNDLE_DIR "${CMAKE_BINARY_DIR}/generated/shaders")
+    file(MAKE_DIRECTORY ${TGFX_SHADER_BUNDLE_DIR})
+
+    # Build actual bundles (not just report)
+    set(TGFX_SHADER_BUNDLE_STAMP "${TGFX_SHADER_BUNDLE_DIR}/bundle_stamp")
     add_custom_command(
-            OUTPUT ${CMAKE_BINARY_DIR}/shader_build_report.json
-            COMMAND shader_build_tool --report-only --out-dir ${CMAKE_BINARY_DIR}
+            OUTPUT ${TGFX_SHADER_BUNDLE_STAMP}
+            COMMAND shader_build_tool
+                    --shader-dir ${CMAKE_SOURCE_DIR}/src/gpu/shaders/glsl
+                    --out-dir ${TGFX_SHADER_BUNDLE_DIR}
+                    --backends ${TGFX_SHADER_BACKENDS}
+            COMMAND ${CMAKE_COMMAND} -E touch ${TGFX_SHADER_BUNDLE_STAMP}
             DEPENDS shader_build_tool
-            COMMENT "Generating shader build report")
-    add_custom_target(tgfx_shader_bundles DEPENDS ${CMAKE_BINARY_DIR}/shader_build_report.json)
+            COMMENT "Compiling precompiled shader bundles (${TGFX_SHADER_BACKENDS})")
+    add_custom_target(tgfx_shader_bundles DEPENDS ${TGFX_SHADER_BUNDLE_STAMP})
+
+    # Convert bundle binaries to C++ source files for embedding into libtgfx
+    set(TGFX_EMBEDDED_BUNDLE_DIR "${CMAKE_BINARY_DIR}/generated/embedded")
+    file(MAKE_DIRECTORY ${TGFX_EMBEDDED_BUNDLE_DIR})
+
+    foreach (B ${TGFX_SHADER_BACKENDS})
+        set(BUNDLE_BIN "${TGFX_SHADER_BUNDLE_DIR}/shader_bundle.${B}.bin")
+        string(REPLACE "-" "_" BUNDLE_VAR "kShaderBundle_${B}")
+        # Map lowercase backend name to Backend enum value
+        if (B STREQUAL "metal")
+            set(BACKEND_ENUM "Metal")
+        elseif (B STREQUAL "vulkan")
+            set(BACKEND_ENUM "Vulkan")
+        elseif (B STREQUAL "webgpu")
+            set(BACKEND_ENUM "WebGPU")
+        else ()
+            set(BACKEND_ENUM "OpenGL")
+        endif ()
+        set(BUNDLE_CPP "${TGFX_EMBEDDED_BUNDLE_DIR}/EmbeddedShaderBundle_${B}.cpp")
+        add_custom_command(
+                OUTPUT ${BUNDLE_CPP}
+                COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/cmake/BundleToCpp.cmake
+                        ${BUNDLE_BIN} ${BUNDLE_CPP} ${BUNDLE_VAR} ${BACKEND_ENUM}
+                DEPENDS ${TGFX_SHADER_BUNDLE_STAMP}
+                COMMENT "Embedding shader bundle: ${B}")
+        list(APPEND TGFX_EMBEDDED_BUNDLE_SOURCES ${BUNDLE_CPP})
+    endforeach ()
+
+    # Add embedded bundle sources to the main tgfx library
+    if (TGFX_EMBEDDED_BUNDLE_SOURCES)
+        target_sources(tgfx PRIVATE ${TGFX_EMBEDDED_BUNDLE_SOURCES})
+        target_include_directories(tgfx PRIVATE ${TGFX_EMBEDDED_BUNDLE_DIR})
+        add_dependencies(tgfx tgfx_shader_bundles)
+    endif ()
 endif ()
 
 if (TGFX_BUILD_HELLO2D)

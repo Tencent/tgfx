@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <chrono>
+#include <fstream>
+#include <vector>
 #include "base/TGFXTest.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/shaders/PrecompiledShader.h"
@@ -316,6 +318,47 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledRenderConsistency) {
   EXPECT_EQ(memcmp(p1, p2, totalBytes), 0);
   bitmap1.unlockPixels();
   bitmap2.unlockPixels();
+}
+
+TGFX_TEST(ShaderPermutationTest, EmbeddedBundleLoadFromMemory) {
+  // Verify that PrecompiledShaderCache can load a bundle from in-memory data (the same interface
+  // used by the embedded bundle mechanism in Context initialization).
+  auto bundlePath = ProjectPath::Absolute("resources/shaders/shader_bundle.vulkan.bin");
+  std::ifstream file(bundlePath, std::ios::binary | std::ios::ate);
+  if (!file.is_open()) {
+    GTEST_SKIP() << "Bundle file not found, skipping embedded load test";
+    return;
+  }
+  auto fileSize = static_cast<size_t>(file.tellg());
+  file.seekg(0);
+  std::vector<uint8_t> data(fileSize);
+  file.read(reinterpret_cast<char*>(data.data()), static_cast<std::streamsize>(fileSize));
+  file.close();
+
+  // Load from memory (simulates embedded bundle)
+  PrecompiledShaderCache cache;
+  ASSERT_TRUE(cache.loadBundle(data.data(), data.size()));
+  EXPECT_TRUE(cache.isLoaded());
+  EXPECT_GT(cache.vertexEntryCount(), 0u);
+  EXPECT_GT(cache.fragmentEntryCount(), 0u);
+  EXPECT_EQ(cache.profileTag(), "vulkan");
+}
+
+TGFX_TEST(ShaderPermutationTest, EmbeddedBundleInvalidData) {
+  // Verify that loadBundle rejects invalid data gracefully.
+  PrecompiledShaderCache cache;
+
+  // Empty data
+  EXPECT_FALSE(cache.loadBundle(nullptr, 0));
+
+  // Too small
+  uint8_t tooSmall[10] = {0};
+  EXPECT_FALSE(cache.loadBundle(tooSmall, sizeof(tooSmall)));
+
+  // Wrong magic
+  std::vector<uint8_t> badMagic(80, 0);
+  badMagic[0] = 0xFF;
+  EXPECT_FALSE(cache.loadBundle(badMagic.data(), badMagic.size()));
 }
 
 }  // namespace tgfx
