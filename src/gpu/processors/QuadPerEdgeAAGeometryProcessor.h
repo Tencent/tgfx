@@ -35,6 +35,26 @@ class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {
     return "QuadPerEdgeAAGeometryProcessor";
   }
 
+  AAType getAAType() const {
+    return aa;
+  }
+
+  bool hasCommonColor() const {
+    return commonColor.has_value();
+  }
+
+  bool hasUVMatrix() const {
+    return uvMatrix.has_value();
+  }
+
+  bool getHasSubset() const {
+    return hasSubset;
+  }
+
+  bool getHasUVPerspective() const {
+    return hasUVPerspective();
+  }
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
   QuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa,

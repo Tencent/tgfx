@@ -23,6 +23,7 @@
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/ShaderPermutation.h"
+#include "gpu/shaders/level1/QuadTextureFillShader.h"
 #include "gpu/shaders/level1/TextureFillShader.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Image.h"
@@ -473,6 +474,58 @@ TGFX_TEST(ShaderPermutationTest, CompressedBundleLoad) {
          compressed.size(),
          100.0 *
              (1.0 - static_cast<double>(compressed.size()) / static_cast<double>(original.size())));
+}
+
+TGFX_TEST(ShaderPermutationTest, QuadTextureFillShaderRegistry) {
+  auto& factories = ShaderRegistry::All();
+  bool found = false;
+  for (auto& factory : factories) {
+    auto shader = factory();
+    auto shaderInfo = shader->info();
+    if (shaderInfo.name == "QuadTextureFillShader") {
+      found = true;
+      EXPECT_EQ(shaderInfo.vertDomain.dimensionCount(), 5u);
+      EXPECT_EQ(shaderInfo.vertDomain.totalCount(), 32u);
+      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 4u);
+      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 16u);
+      EXPECT_EQ(shaderInfo.vertexFile, "level1/quad_texture_fill.vert");
+      EXPECT_EQ(shaderInfo.fragmentFile, "level1/quad_texture_fill.frag");
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+TGFX_TEST(ShaderPermutationTest, QuadTextureFillShouldCompile) {
+  auto& factories = ShaderRegistry::All();
+  for (auto& factory : factories) {
+    auto shader = factory();
+    auto shaderInfo = shader->info();
+    if (shaderInfo.name != "QuadTextureFillShader") {
+      continue;
+    }
+    int compiledCount = 0;
+    for (uint32_t vi = 0; vi < shaderInfo.vertDomain.totalCount(); vi++) {
+      auto vertValues = shaderInfo.vertDomain.decode(vi);
+      for (uint32_t fi = 0; fi < shaderInfo.fragDomain.totalCount(); fi++) {
+        auto fragValues = shaderInfo.fragDomain.decode(fi);
+        if (shaderInfo.shouldCompile(vi, fi, vertValues, fragValues)) {
+          compiledCount++;
+        }
+      }
+    }
+    // Vertex: HAS_COLOR=0, HAS_UV_PERSPECTIVE=0 -> 2(COVERAGE) * 2(UV_COORD) * 2(SUBSET) = 8
+    // Fragment: HAS_YUV=0, !(ALPHA_ONLY && HAS_RGBAAA) -> 2*2*2 - 2 = 5 valid combos (minus 1
+    // with both set for each SUBSET value... actually: ALPHA_ONLY x HAS_RGBAAA x HAS_SUBSET minus
+    // exclusion = (4-1)*2 = 6... Let's just verify the count is 8*5=40.
+    // Actually: frag valid = HAS_YUV=0 only, from 8 combos minus {ALPHA_ONLY=1,HAS_RGBAAA=1} x 2
+    // HAS_SUBSET = 6, but HAS_YUV is forced 0 so space is 8. Exclusion: ALPHA+RGBAAA=2. Valid=6.
+    // Wait: frag domain has HAS_YUV, so total is 16. With HAS_YUV=0: 8 combos.
+    // Of those 8, exclude ALPHA_ONLY=1 && HAS_RGBAAA=1 (2 combos for SUBSET=0,1). Valid frag = 6.
+    // But we also exclude HAS_YUV=1: that's 8 combos. So from 16 total, 8 with YUV=0, minus 2
+    // with mutual exclusion = 6 valid frag combos.
+    // Total = 8 vert * 6 frag = 48.
+    EXPECT_EQ(compiledCount, 48);
+  }
 }
 
 }  // namespace tgfx

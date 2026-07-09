@@ -20,10 +20,12 @@
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/EmptyXferProcessor.h"
+#include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/shaders/level1/ConstColorShader.h"
 #include "gpu/shaders/level1/DeviceSpaceTextureShader.h"
+#include "gpu/shaders/level1/QuadTextureFillShader.h"
 #include "gpu/shaders/level1/TextureFillShader.h"
 #include "gpu/shaders/level1/TiledTextureFillShader.h"
 
@@ -128,6 +130,53 @@ static std::optional<PermutationMatchResult> TryMatchConstColor(const ProgramInf
   return PermutationMatchResult{"ConstColorShader", 0, fragIndex};
 }
 
+static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
+    const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp->name() != "QuadPerEdgeAAGeometryProcessor") {
+    return std::nullopt;
+  }
+  if (programInfo->numFragmentProcessors() != 1) {
+    return std::nullopt;
+  }
+  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+    return std::nullopt;
+  }
+  auto fp = programInfo->getFragmentProcessor(0);
+  if (fp->name() != "TextureEffect") {
+    return std::nullopt;
+  }
+  auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
+  // Bail on unsupported variants — fall back to ProgramBuilder.
+  if (!quadGP->hasCommonColor()) {
+    return std::nullopt;
+  }
+  if (quadGP->getHasUVPerspective()) {
+    return std::nullopt;
+  }
+  auto* te = static_cast<const TextureEffect*>(fp);
+  if (te->isYUV()) {
+    return std::nullopt;
+  }
+
+  using VD = QuadTextureFillShader::VD;
+  auto vertDomain = VD::domain();
+  std::vector<int> vertValues(VD::COUNT, 0);
+  vertValues[VD::HAS_COVERAGE] = quadGP->getAAType() == AAType::Coverage ? 1 : 0;
+  vertValues[VD::HAS_UV_COORD] = !quadGP->hasUVMatrix() ? 1 : 0;
+  vertValues[VD::HAS_SUBSET] = quadGP->getHasSubset() ? 1 : 0;
+  auto vertIndex = vertDomain.encode(vertValues);
+
+  using FD = QuadTextureFillShader::FD;
+  auto fragDomain = FD::domain();
+  std::vector<int> fragValues(FD::COUNT, 0);
+  fragValues[FD::ALPHA_ONLY] = te->isAlphaOnly() ? 1 : 0;
+  fragValues[FD::HAS_RGBAAA] = te->hasRGBAAA() ? 1 : 0;
+  fragValues[FD::HAS_SUBSET] = te->hasSubset() ? 1 : 0;
+  auto fragIndex = fragDomain.encode(fragValues);
+  return PermutationMatchResult{"QuadTextureFillShader", vertIndex, fragIndex};
+}
+
 static std::optional<PermutationMatchResult> TryMatchDeviceSpaceTexture(
     const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
@@ -155,6 +204,9 @@ static std::optional<PermutationMatchResult> TryMatchDeviceSpaceTexture(
 
 std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* programInfo) {
   if (auto result = TryMatchTextureFill(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchQuadTextureFill(programInfo)) {
     return result;
   }
   if (auto result = TryMatchTiledTextureFill(programInfo)) {
