@@ -223,8 +223,8 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   auto bundlePath = ProjectPath::Absolute("resources/shaders/shader_bundle.vulkan.bin");
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
-  EXPECT_EQ(cache->vertexEntryCount(), 6u);
-  EXPECT_EQ(cache->fragmentEntryCount(), 6u);
+  EXPECT_EQ(cache->vertexEntryCount(), 18u);
+  EXPECT_EQ(cache->fragmentEntryCount(), 337u);
   EXPECT_EQ(cache->profileTag(), "vulkan");
 }
 
@@ -474,6 +474,23 @@ TGFX_TEST(ShaderPermutationTest, CompressedBundleLoad) {
          compressed.size(),
          100.0 *
              (1.0 - static_cast<double>(compressed.size()) / static_cast<double>(original.size())));
+}
+
+TGFX_TEST(ShaderPermutationTest, DrawImageHitsPrecompiledCache) {
+  auto image = MakeImage("resources/apitest/test_timestretch.png");
+  ASSERT_TRUE(image != nullptr);
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto bundlePath = ProjectPath::Absolute("resources/shaders/shader_bundle.vulkan.bin");
+  auto* cache = context->precompiledShaderCache();
+  ASSERT_TRUE(cache->loadBundle(bundlePath));
+  cache->resetStats();
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  surface->getCanvas()->drawImage(image, 0, 0);
+  context->flushAndSubmit(true);
+  EXPECT_GT(cache->hitCount(), 0u);
 }
 
 TGFX_TEST(ShaderPermutationTest, QuadTextureFillShaderRegistry) {
