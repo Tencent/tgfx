@@ -17,49 +17,84 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SubtreeCache.h"
+#include <algorithm>
+#include "core/SsaaDebugProbe.h"
 #include "core/images/TextureImage.h"
 #include "gpu/ProxyProvider.h"
 #include "tgfx/core/ColorSpace.h"
 
 namespace tgfx {
 
-UniqueKey SubtreeCache::makeSizeKey(int longEdge) const {
-  uint32_t sizeData[1] = {static_cast<uint32_t>(longEdge)};
-  UniqueKey newKey = _uniqueKey;
-  return UniqueKey::Append(newKey, sizeData, 1);
+// Encode divisor as a fixed-point integer (2 decimal places) so equal float divisors always
+// produce equal keys and the SSAA flag can't be lost to fp noise. 1.0 -> 100, 2.0 -> 200.
+static uint32_t EncodeScaleDivisor(float scaleDivisor) {
+  auto scaled = static_cast<int>(scaleDivisor * 100.0f + 0.5f);
+  return static_cast<uint32_t>(std::max(scaled, 0));
 }
 
-void SubtreeCache::addCache(Context* context, int longEdge,
+UniqueKey SubtreeCache::makeSizeKey(int longEdge, float scaleDivisor) const {
+  uint32_t sizeData[2] = {static_cast<uint32_t>(longEdge), EncodeScaleDivisor(scaleDivisor)};
+  UniqueKey newKey = _uniqueKey;
+  return UniqueKey::Append(newKey, sizeData, 2);
+}
+
+void SubtreeCache::addCache(Context* context, int longEdge, float scaleDivisor,
                             std::shared_ptr<TextureProxy> textureProxy, const Matrix& imageMatrix,
                             const std::shared_ptr<ColorSpace>& colorSpace) {
   if (context == nullptr || textureProxy == nullptr) {
     return;
   }
-  auto sizeUniqueKey = makeSizeKey(longEdge);
+  auto sizeUniqueKey = makeSizeKey(longEdge, scaleDivisor);
   auto proxyProvider = context->proxyProvider();
   proxyProvider->assignProxyUniqueKey(textureProxy, sizeUniqueKey);
   textureProxy->assignUniqueKey(sizeUniqueKey);
+  // [SSAA-DBG] Round 6: detect key jitter. If cacheEntries already has entries under a
+  // DIFFERENT key when we insert a new one, that means the same layer produced multiple
+  // (longEdge, divisor) keys across frames — direct proof of key instability.
+  const bool isNewKey = (cacheEntries.find(sizeUniqueKey) == cacheEntries.end());
   cacheEntries[sizeUniqueKey] = CacheEntry{imageMatrix, colorSpace};
+  if (ssaa_debug::gProbe.active) {
+    if (isNewKey && cacheEntries.size() >= 2) {
+      ++ssaa_debug::gProbe.builtSecondEntry;
+    }
+    // [SSAA-DBG] Round 7: builtFromEmpty = fresh SubtreeCache instance (just created after
+    // an invalidateSubtree) is receiving its very first entry. Distinguishes "first-ever
+    // cache for this layer / rebuild after invalidate" from "same layer accumulating more
+    // keys" (builtSecondEntry above).
+    if (isNewKey && cacheEntries.size() == 1) {
+      ++ssaa_debug::gProbe.builtFromEmpty;
+    }
+    ssaa_debug::gProbe.builtEntriesSizeSum +=
+        static_cast<int64_t>(cacheEntries.size());
+  }
 }
 
-bool SubtreeCache::hasCache(Context* context, int longEdge) const {
+bool SubtreeCache::hasCache(Context* context, int longEdge, float scaleDivisor) const {
   if (context == nullptr) {
     return false;
   }
-  auto sizeUniqueKey = makeSizeKey(longEdge);
+  auto sizeUniqueKey = makeSizeKey(longEdge, scaleDivisor);
   auto it = cacheEntries.find(sizeUniqueKey);
   if (it == cacheEntries.end()) {
+    if (ssaa_debug::gProbe.active) {
+      ++ssaa_debug::gProbe.hasCacheKeyMiss;
+    }
     return false;
   }
   auto proxyProvider = context->proxyProvider();
-  return proxyProvider->findOrWrapTextureProxy(sizeUniqueKey) != nullptr;
+  const bool hasProxy = proxyProvider->findOrWrapTextureProxy(sizeUniqueKey) != nullptr;
+  if (!hasProxy && ssaa_debug::gProbe.active) {
+    ++ssaa_debug::gProbe.hasCacheProxyMiss;
+  }
+  return hasProxy;
 }
 
-void SubtreeCache::draw(Context* context, int longEdge, Canvas* canvas, const Paint& paint) const {
+void SubtreeCache::draw(Context* context, int longEdge, float scaleDivisor, Canvas* canvas,
+                        const Paint& paint, bool forceNearest) const {
   if (context == nullptr) {
     return;
   }
-  auto sizeUniqueKey = makeSizeKey(longEdge);
+  auto sizeUniqueKey = makeSizeKey(longEdge, scaleDivisor);
   auto it = cacheEntries.find(sizeUniqueKey);
   if (it == cacheEntries.end()) {
     return;
@@ -84,7 +119,12 @@ void SubtreeCache::draw(Context* context, int longEdge, Canvas* canvas, const Pa
       drawPaint.setMaskFilter(maskFilter->makeWithMatrix(invertMatrix));
     }
   }
-  canvas->drawImage(image, &drawPaint);
+  if (forceNearest) {
+    static const SamplingOptions kNearest(FilterMode::Nearest, MipmapMode::None);
+    canvas->drawImage(image, kNearest, &drawPaint);
+  } else {
+    canvas->drawImage(image, &drawPaint);
+  }
   canvas->setMatrix(oldMatrix);
 }
 }  // namespace tgfx

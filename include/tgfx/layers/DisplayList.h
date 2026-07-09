@@ -305,11 +305,21 @@ class DisplayList {
    * disabled, then downsampled to the atlas with linear sampling. This eliminates the
    * edge-bleeding artifact that coverage-based AA causes when many semi-transparent layers
    * stack on top of each other, at the cost of roughly 4x fragment work per tile. Render modes
-   * other than Tiled silently ignore this setting.
+   * other than Tiled silently ignore this setting. Toggling this value drops any existing tile
+   * cache so the atlas is re-rasterized under the new mode; only one atlas is ever resident.
    */
-  void setUseSSAA(bool use) {
-    _useSSAA = use;
-  }
+  void setUseSSAA(bool use);
+
+  // [SSAA-DBG] Bench-only: propagate the current replay tag into the SSAA-DBG log line so runs
+  // captured with SSAA on/off can be aligned per replay event. Empty string disables the field.
+  static void setDebugTag(std::string tag);
+
+  // [SSAA-DBG] Bench-only: enable/disable GPU-synced timing barriers around SSAA hot-path
+  // segments (subtree cache build/hit, drawRootLayer, downsample, fallback direct-draw).
+  // When enabled the render pipeline is serialized and per-segment timings reflect real GPU
+  // cost; when disabled the barriers collapse to no-ops and the pipeline runs unmodified.
+  // Wire this to the existing benchmark measure-mode switch so there is a single toggle.
+  static void setDebugGpuSyncEnabled(bool enabled);
 
   /**
    * Sets whether to show dirty regions during rendering. When enabled, the dirty regions will be
@@ -424,7 +434,8 @@ class DisplayList {
 
   void drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
                      bool autoClear, BackgroundSnapshotMap* snapshots,
-                     bool forceNoEdgeAA = false) const;
+                     bool forceNoEdgeAA = false,
+                     float subtreeContentScaleDivisor = 1.0f) const;
 
   std::unique_ptr<BackgroundSnapshotMap> captureBackgrounds(Surface* surface,
                                                             const std::vector<Rect>& renderRects,
