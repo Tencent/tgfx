@@ -53,7 +53,8 @@ class LayerBuilder {
    * Sets the glass position for interactive builders (e.g., LiquidGlass).
    * Non-interactive builders ignore this call.
    */
-  virtual void setGlassPosition(float /*x*/, float /*y*/) {}
+  virtual void setGlassPosition(float /*x*/, float /*y*/) {
+  }
 
   explicit LayerBuilder(std::string name);
 

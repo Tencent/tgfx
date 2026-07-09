@@ -21,6 +21,7 @@
 #include <cmath>
 #include "GlassRefractionEffect.h"
 #include "core/utils/Log.h"
+#include "core/utils/MathExtra.h"
 #include "layers/contents/LayerContent.h"
 
 namespace tgfx {
@@ -45,7 +46,7 @@ void GlassStyle::setRefraction(float value) {
     return;
   }
   _refraction = value;
-  invalidateTransform();
+  invalidateFilter();
 }
 
 void GlassStyle::setDepth(float value) {
@@ -53,7 +54,7 @@ void GlassStyle::setDepth(float value) {
     return;
   }
   _depth = value;
-  invalidateTransform();
+  invalidateFilter();
 }
 
 void GlassStyle::setFrost(float value) {
@@ -61,7 +62,7 @@ void GlassStyle::setFrost(float value) {
     return;
   }
   _frost = value;
-  invalidateTransform();
+  invalidateFilter();
 }
 
 void GlassStyle::setDispersion(float value) {
@@ -69,7 +70,7 @@ void GlassStyle::setDispersion(float value) {
     return;
   }
   _dispersion = value;
-  invalidateTransform();
+  invalidateFilter();
 }
 
 void GlassStyle::setSplay(float value) {
@@ -77,7 +78,7 @@ void GlassStyle::setSplay(float value) {
     return;
   }
   _splay = value;
-  invalidateTransform();
+  invalidateFilter();
 }
 
 void GlassStyle::setLightAngle(float degrees) {
@@ -85,7 +86,7 @@ void GlassStyle::setLightAngle(float degrees) {
     return;
   }
   _lightAngle = degrees;
-  invalidateTransform();
+  invalidateFilter();
 }
 
 void GlassStyle::setLightIntensity(float value) {
@@ -93,7 +94,7 @@ void GlassStyle::setLightIntensity(float value) {
     return;
   }
   _lightIntensity = value;
-  invalidateTransform();
+  invalidateFilter();
 }
 
 void GlassStyle::setCornerRadius(float radius) {
@@ -101,7 +102,7 @@ void GlassStyle::setCornerRadius(float radius) {
     return;
   }
   _cornerRadius = radius;
-  invalidateTransform();
+  invalidateFilter();
 }
 
 void GlassStyle::setShapeType(GlassShapeType type) {
@@ -109,7 +110,7 @@ void GlassStyle::setShapeType(GlassShapeType type) {
     return;
   }
   _shapeType = type;
-  invalidateTransform();
+  invalidateFilter();
 }
 
 Rect GlassStyle::filterBackground(const Rect& srcRect, float contentScale) {
@@ -205,40 +206,53 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
     // For AlphaMask shape, generate a UDF height map:
     // 1. Gaussian-blur the binary alpha to approximate UDF
     // 2. Pack the float result into RGBA8 (32-bit precision) via GlassMaskEffect
+    // The maskImage itself is rebuilt every frame (input.content changes), but the
+    // GlassMaskEffect pipeline and mask blur filter are cached for reuse.
     std::shared_ptr<Image> maskImage = nullptr;
     if (effectiveShapeType == GlassShapeType::AlphaMask) {
       float blurSigma = minHalf * (_depth / 100.0f) * 0.2f;
-      auto blurFilter = ImageFilter::Blur(blurSigma, blurSigma, TileMode::Decal);
+      if (!maskBlurFilter || !FloatNearlyEqual(cachedMaskBlurSigma, blurSigma)) {
+        maskBlurFilter = ImageFilter::Blur(blurSigma, blurSigma, TileMode::Decal);
+        cachedMaskBlurSigma = blurSigma;
+      }
       Point blurMaskOffset = {};
       auto maskClipRect =
           Rect::MakeWH(static_cast<float>(layerWidth), static_cast<float>(layerHeight));
-      auto blurredMask = input.content->makeWithFilter(blurFilter, &blurMaskOffset, &maskClipRect);
+      auto blurredMask =
+          input.content->makeWithFilter(maskBlurFilter, &blurMaskOffset, &maskClipRect);
       if (!blurredMask) {
         LOGE("GlassStyle: Failed to blur alpha for UDF, falling back to content.");
         blurredMask = input.content;
       }
-      auto packEffect = std::make_shared<GlassMaskEffect>();
-      auto packFilter = ImageFilter::Runtime(packEffect);
+      if (!maskEffect) {
+        maskEffect = std::make_shared<GlassMaskEffect>();
+        maskPackFilter = ImageFilter::Runtime(maskEffect);
+      }
       Point packOffset = {};
       auto packClipRect = Rect::MakeWH(static_cast<float>(blurredMask->width()),
                                        static_cast<float>(blurredMask->height()));
-      maskImage = blurredMask->makeWithFilter(packFilter, &packOffset, &packClipRect);
+      maskImage = blurredMask->makeWithFilter(maskPackFilter, &packOffset, &packClipRect);
       if (!maskImage) {
         LOGE("GlassStyle: Failed to pack UDF height map, falling back to blurred.");
         maskImage = blurredMask;
       }
     }
-    auto refractionEffect = std::make_shared<GlassRefractionEffect>(
-        static_cast<float>(layerWidth), static_cast<float>(layerHeight), halfW, halfH, crRadius,
+    auto filter = getRefractionFilter(
+        layerWidth, layerHeight, input.contentScale, effectiveShapeType, crRadius, halfW, halfH,
         minHalf, innerHalfW, innerHalfH, innerRadius, glassThickness, refractionFactor,
-        channelOffset, splay, depthRatio, lightAngle, lightIntensity, effectiveShapeType,
-        maskImage);
-    auto refractionFilter = ImageFilter::Runtime(refractionEffect);
+        channelOffset, splay, depthRatio, lightAngle, lightIntensity);
+    // Inject the current frame's maskImage (or empty) into the cached effect via setExtraInputs.
+    // extraInputs is read by RuntimeImageFilter::lockTextureProxy during makeWithFilter, so this
+    // must be called before makeWithFilter.
+    if (effectiveShapeType == GlassShapeType::AlphaMask && maskImage) {
+      refractionEffect->setExtraInputs({maskImage});
+    } else {
+      refractionEffect->setExtraInputs({});
+    }
     Point refractOffset = {};
     auto clipRect = Rect::MakeWH(static_cast<float>(processedBg->width()),
                                  static_cast<float>(processedBg->height()));
-    auto refractedImage =
-        processedBg->makeWithFilter(std::move(refractionFilter), &refractOffset, &clipRect);
+    auto refractedImage = processedBg->makeWithFilter(filter, &refractOffset, &clipRect);
     if (refractedImage) {
       processedBg = refractedImage;
       processedOffset += refractOffset;
@@ -264,6 +278,44 @@ std::shared_ptr<ImageFilter> GlassStyle::getFrostFilter(float contentScale) {
   float sigma = (_frost / 100.0f) * MaxFrostSigma * contentScale;
   frostFilter = ImageFilter::Blur(sigma, sigma, TileMode::Mirror);
   return frostFilter;
+}
+
+void GlassStyle::invalidateFilter() {
+  frostFilter = nullptr;
+  refractionEffect = nullptr;
+  refractionFilter = nullptr;
+  maskEffect = nullptr;
+  maskPackFilter = nullptr;
+  maskBlurFilter = nullptr;
+  cachedLayerWidth = 0;
+  cachedLayerHeight = 0;
+  cachedContentScale = 0.0f;
+  cachedCornerRadius = 0.0f;
+  cachedMaskBlurSigma = 0.0f;
+  invalidateTransform();
+}
+
+std::shared_ptr<ImageFilter> GlassStyle::getRefractionFilter(
+    int layerWidth, int layerHeight, float contentScale, GlassShapeType shapeType,
+    float cornerRadius, float halfWidth, float halfHeight, float minHalf, float innerHalfWidth,
+    float innerHalfHeight, float innerRadius, float glassThickness, float refractionFactor,
+    float dispersion, float splay, float depthRatio, float lightAngle, float lightIntensity) {
+  if (refractionFilter && cachedLayerWidth == layerWidth && cachedLayerHeight == layerHeight &&
+      cachedContentScale == contentScale && cachedShapeType == shapeType &&
+      FloatNearlyEqual(cachedCornerRadius, cornerRadius)) {
+    return refractionFilter;
+  }
+  refractionEffect = std::make_shared<GlassRefractionEffect>(
+      static_cast<float>(layerWidth), static_cast<float>(layerHeight), halfWidth, halfHeight,
+      cornerRadius, minHalf, innerHalfWidth, innerHalfHeight, innerRadius, glassThickness,
+      refractionFactor, dispersion, splay, depthRatio, lightAngle, lightIntensity, shapeType);
+  refractionFilter = ImageFilter::Runtime(refractionEffect);
+  cachedLayerWidth = layerWidth;
+  cachedLayerHeight = layerHeight;
+  cachedContentScale = contentScale;
+  cachedShapeType = shapeType;
+  cachedCornerRadius = cornerRadius;
+  return refractionFilter;
 }
 
 }  // namespace tgfx

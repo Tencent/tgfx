@@ -29,6 +29,9 @@ enum class GlassShapeType {
   AlphaMask,
 };
 
+class GlassRefractionEffect;
+class GlassMaskEffect;
+
 /**
  * GlassStyle simulates the physical behavior of light passing through a glass surface, producing
  * refraction, chromatic dispersion, frosted blur, and specular highlights. It captures the
@@ -156,6 +159,14 @@ class GlassStyle : public LayerStyle {
 
   std::shared_ptr<ImageFilter> getFrostFilter(float contentScale);
 
+  void invalidateFilter();
+
+  std::shared_ptr<ImageFilter> getRefractionFilter(
+      int layerWidth, int layerHeight, float contentScale, GlassShapeType shapeType,
+      float cornerRadius, float halfWidth, float halfHeight, float minHalf, float innerHalfWidth,
+      float innerHalfHeight, float innerRadius, float glassThickness, float refractionFactor,
+      float dispersion, float splay, float depthRatio, float lightAngle, float lightIntensity);
+
   float _refraction = 50.0f;
   float _depth = 15.0f;
   float _frost = 10.0f;
@@ -168,6 +179,19 @@ class GlassStyle : public LayerStyle {
 
   std::shared_ptr<ImageFilter> frostFilter = nullptr;
   float currentFrostScale = 0.0f;
+
+  std::shared_ptr<GlassRefractionEffect> refractionEffect = nullptr;
+  std::shared_ptr<ImageFilter> refractionFilter = nullptr;
+  std::shared_ptr<GlassMaskEffect> maskEffect = nullptr;
+  std::shared_ptr<ImageFilter> maskPackFilter = nullptr;
+  std::shared_ptr<ImageFilter> maskBlurFilter = nullptr;
+
+  int cachedLayerWidth = 0;
+  int cachedLayerHeight = 0;
+  float cachedContentScale = 0.0f;
+  GlassShapeType cachedShapeType = GlassShapeType::RoundedRect;
+  float cachedCornerRadius = 0.0f;
+  float cachedMaskBlurSigma = 0.0f;
 };
 
 }  // namespace tgfx

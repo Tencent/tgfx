@@ -57,8 +57,7 @@ class GlassRefractionEffect : public RuntimeEffect {
                         float cornerRadius, float minHalf, float innerHalfWidth,
                         float innerHalfHeight, float innerRadius, float glassThickness,
                         float refractionFactor, float dispersion, float splay, float depthRatio,
-                        float lightAngle, float lightIntensity, GlassShapeType shapeType,
-                        std::shared_ptr<Image> maskImage = nullptr);
+                        float lightAngle, float lightIntensity, GlassShapeType shapeType);
 
  protected:
   bool onDraw(CommandEncoder* encoder, const std::vector<std::shared_ptr<Texture>>& inputTextures,
@@ -87,7 +86,6 @@ class GlassRefractionEffect : public RuntimeEffect {
   float _lightAngle = 0.0f;
   float _lightIntensity = 0.0f;
   GlassShapeType _shapeType = GlassShapeType::RoundedRect;
-  std::shared_ptr<Image> _maskImage = nullptr;
   mutable std::shared_ptr<RenderPipeline> cachedPipeline = nullptr;
 };
 

@@ -44,6 +44,17 @@ class RuntimeEffect {
   virtual ~RuntimeEffect() = default;
 
   /**
+   * Updates the extra input images for this effect. Call this before applying the filter to
+   * dynamically update the extra textures without rebuilding the effect object. This is useful
+   * when the effect is cached but the extra input (e.g. a mask image) changes every frame.
+   * @param inputs The new collection of additional input images. inputTextures[0] represents the
+   * source image for the ImageFilter, and extraInputs correspond to inputTextures[1...n] in order.
+   */
+  void setExtraInputs(const std::vector<std::shared_ptr<Image>>& inputs) {
+    extraInputs = inputs;
+  }
+
+  /**
    * Returns the bounds of the image that will be produced by this filter when it is applied to an
    * image of the given bounds. MapDirection::Forward is used to determine which pixels of the
    * destination canvas a source image rect would touch after filtering. MapDirection::Reverse

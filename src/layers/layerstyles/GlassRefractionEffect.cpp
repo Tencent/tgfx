@@ -201,16 +201,13 @@ GlassRefractionEffect::GlassRefractionEffect(float glassWidth, float glassHeight
                                              float innerRadius, float glassThickness,
                                              float refractionFactor, float dispersion, float splay,
                                              float depthRatio, float lightAngle,
-                                             float lightIntensity, GlassShapeType shapeType,
-                                             std::shared_ptr<Image> maskImage)
-    : RuntimeEffect(maskImage ? std::vector<std::shared_ptr<Image>>{maskImage}
-                              : std::vector<std::shared_ptr<Image>>{}),
-      _glassWidth(glassWidth), _glassHeight(glassHeight), _halfWidth(halfWidth),
+                                             float lightIntensity, GlassShapeType shapeType)
+    : RuntimeEffect({}), _glassWidth(glassWidth), _glassHeight(glassHeight), _halfWidth(halfWidth),
       _halfHeight(halfHeight), _cornerRadius(cornerRadius), _minHalf(minHalf),
       _innerHalfWidth(innerHalfWidth), _innerHalfHeight(innerHalfHeight), _innerRadius(innerRadius),
       _glassThickness(glassThickness), _refractionFactor(refractionFactor), _dispersion(dispersion),
       _splay(splay), _depthRatio(depthRatio), _lightAngle(lightAngle),
-      _lightIntensity(lightIntensity), _shapeType(shapeType), _maskImage(maskImage) {
+      _lightIntensity(lightIntensity), _shapeType(shapeType) {
 }
 
 std::string GlassRefractionEffect::buildFragmentShader(bool isDesktop) const {
