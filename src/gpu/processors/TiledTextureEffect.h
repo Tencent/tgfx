@@ -35,6 +35,19 @@ class TiledTextureEffect : public FragmentProcessor {
     return "TiledTextureEffect";
   }
 
+  /// Returns the ShaderMode for X/Y axes computed from the current sampling state.
+  void getShaderModes(int* outModeX, int* outModeY) const;
+
+  bool isAlphaOnly() const;
+
+  bool isStrict() const {
+    return constraint == SrcRectConstraint::Strict;
+  }
+
+  bool hasPerspective() const {
+    return coordTransform.matrix.hasPerspective();
+  }
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 

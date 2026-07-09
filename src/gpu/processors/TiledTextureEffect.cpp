@@ -142,6 +142,22 @@ TiledTextureEffect::TiledTextureEffect(std::shared_ptr<TextureProxy> proxy,
   addCoordTransform(&coordTransform);
 }
 
+void TiledTextureEffect::getShaderModes(int* outModeX, int* outModeY) const {
+  auto textureView = getTextureView();
+  if (textureView == nullptr) {
+    *outModeX = 0;
+    *outModeY = 0;
+    return;
+  }
+  Sampling sampling(textureView, samplerState, subset);
+  *outModeX = static_cast<int>(sampling.shaderModeX);
+  *outModeY = static_cast<int>(sampling.shaderModeY);
+}
+
+bool TiledTextureEffect::isAlphaOnly() const {
+  return textureProxy->isAlphaOnly();
+}
+
 void TiledTextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   auto textureView = getTextureView();
   if (textureView == nullptr) {

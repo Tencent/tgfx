@@ -33,6 +33,10 @@ class ConstColorProcessor : public FragmentProcessor {
     return "ConstColorProcessor";
   }
 
+  int getInputMode() const {
+    return static_cast<int>(inputMode);
+  }
+
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
  protected:

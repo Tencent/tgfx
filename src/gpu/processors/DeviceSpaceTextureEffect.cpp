@@ -24,6 +24,10 @@ DeviceSpaceTextureEffect::DeviceSpaceTextureEffect(std::shared_ptr<TextureProxy>
     : FragmentProcessor(ClassID()), textureProxy(std::move(textureProxy)), uvMatrix(uvMatrix) {
 }
 
+bool DeviceSpaceTextureEffect::isAlphaOnly() const {
+  return textureProxy->isAlphaOnly();
+}
+
 size_t DeviceSpaceTextureEffect::onCountTextureSamplers() const {
   return textureProxy->getTextureView() ? 1 : 0;
 }

@@ -17,9 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PermutationMatcher.h"
+#include "gpu/processors/ConstColorProcessor.h"
+#include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/EmptyXferProcessor.h"
 #include "gpu/processors/TextureEffect.h"
+#include "gpu/processors/TiledTextureEffect.h"
+#include "gpu/shaders/level1/ConstColorShader.h"
+#include "gpu/shaders/level1/DeviceSpaceTextureShader.h"
 #include "gpu/shaders/level1/TextureFillShader.h"
+#include "gpu/shaders/level1/TiledTextureFillShader.h"
 
 namespace tgfx {
 
@@ -58,8 +64,106 @@ static std::optional<PermutationMatchResult> TryMatchTextureFill(const ProgramIn
   return PermutationMatchResult{"TextureFillShader", vertIndex, fragIndex};
 }
 
+static std::optional<PermutationMatchResult> TryMatchTiledTextureFill(
+    const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp->name() != "DefaultGeometryProcessor") {
+    return std::nullopt;
+  }
+  if (programInfo->numFragmentProcessors() != 1) {
+    return std::nullopt;
+  }
+  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+    return std::nullopt;
+  }
+  auto fp = programInfo->getFragmentProcessor(0);
+  if (fp->name() != "TiledTextureEffect") {
+    return std::nullopt;
+  }
+  auto* tte = static_cast<const TiledTextureEffect*>(fp);
+  int modeX = 0;
+  int modeY = 0;
+  tte->getShaderModes(&modeX, &modeY);
+  if (modeX == 0 && modeY == 0) {
+    return std::nullopt;
+  }
+  using FD = TiledTextureFillShader::FragDims;
+  auto fragDomain = FD::domain();
+  std::vector<int> fragValues(FD::COUNT);
+  fragValues[FD::SHADER_MODE_X] = modeX;
+  fragValues[FD::SHADER_MODE_Y] = modeY;
+  fragValues[FD::ALPHA_ONLY] = tte->isAlphaOnly() ? 1 : 0;
+  fragValues[FD::HAS_STRICT] = tte->isStrict() ? 1 : 0;
+  auto fragIndex = fragDomain.encode(fragValues);
+
+  using VD = TiledTextureFillShader::Dims;
+  auto vertDomain = VD::domain();
+  std::vector<int> vertValues(VD::COUNT);
+  vertValues[VD::HAS_PERSPECTIVE] = tte->hasPerspective() ? 1 : 0;
+  auto vertIndex = vertDomain.encode(vertValues);
+  return PermutationMatchResult{"TiledTextureFillShader", vertIndex, fragIndex};
+}
+
+static std::optional<PermutationMatchResult> TryMatchConstColor(const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp->name() != "DefaultGeometryProcessor") {
+    return std::nullopt;
+  }
+  if (programInfo->numFragmentProcessors() != 1) {
+    return std::nullopt;
+  }
+  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+    return std::nullopt;
+  }
+  auto fp = programInfo->getFragmentProcessor(0);
+  if (fp->name() != "ConstColorProcessor") {
+    return std::nullopt;
+  }
+  auto* ccp = static_cast<const ConstColorProcessor*>(fp);
+  using FD = ConstColorShader::FragDims;
+  auto fragDomain = FD::domain();
+  std::vector<int> fragValues(FD::COUNT);
+  fragValues[FD::INPUT_MODE] = ccp->getInputMode();
+  auto fragIndex = fragDomain.encode(fragValues);
+  return PermutationMatchResult{"ConstColorShader", 0, fragIndex};
+}
+
+static std::optional<PermutationMatchResult> TryMatchDeviceSpaceTexture(
+    const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp->name() != "DefaultGeometryProcessor") {
+    return std::nullopt;
+  }
+  if (programInfo->numFragmentProcessors() != 1) {
+    return std::nullopt;
+  }
+  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+    return std::nullopt;
+  }
+  auto fp = programInfo->getFragmentProcessor(0);
+  if (fp->name() != "DeviceSpaceTextureEffect") {
+    return std::nullopt;
+  }
+  auto* dste = static_cast<const DeviceSpaceTextureEffect*>(fp);
+  using FD = DeviceSpaceTextureShader::Dims;
+  auto fragDomain = FD::domain();
+  std::vector<int> fragValues(FD::COUNT);
+  fragValues[FD::ALPHA_ONLY] = dste->isAlphaOnly() ? 1 : 0;
+  auto fragIndex = fragDomain.encode(fragValues);
+  return PermutationMatchResult{"DeviceSpaceTextureShader", 0, fragIndex};
+}
+
 std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* programInfo) {
   if (auto result = TryMatchTextureFill(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchTiledTextureFill(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchConstColor(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchDeviceSpaceTexture(programInfo)) {
     return result;
   }
   return std::nullopt;

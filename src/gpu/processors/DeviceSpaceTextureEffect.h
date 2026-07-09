@@ -31,6 +31,8 @@ class DeviceSpaceTextureEffect : public FragmentProcessor {
     return "DeviceSpaceTextureEffect";
   }
 
+  bool isAlphaOnly() const;
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
