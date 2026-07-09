@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PermutationMatcher.h"
+#include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ClampedGradientEffect.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
@@ -25,6 +26,7 @@
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/processors/UnrolledBinaryGradientColorizer.h"
+#include "gpu/shaders/level1/AtlasTextFillShader.h"
 #include "gpu/shaders/level1/ConstColorShader.h"
 #include "gpu/shaders/level1/DeviceSpaceTextureShader.h"
 #include "gpu/shaders/level1/GradientFillShader.h"
@@ -267,6 +269,28 @@ static std::optional<PermutationMatchResult> TryMatchGradientFill(const ProgramI
   return PermutationMatchResult{"GradientFillShader", 0, fragIndex};
 }
 
+static std::optional<PermutationMatchResult> TryMatchAtlasTextFill(const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp->name() != "AtlasTextGeometryProcessor") {
+    return std::nullopt;
+  }
+  if (programInfo->numFragmentProcessors() != 0) {
+    return std::nullopt;
+  }
+  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+    return std::nullopt;
+  }
+  auto* atgp = static_cast<const AtlasTextGeometryProcessor*>(gp);
+  using D = AtlasTextFillShader::D;
+  auto domain = D::domain();
+  std::vector<int> values(D::COUNT);
+  values[D::HAS_COVERAGE] = atgp->getAAType() == AAType::Coverage ? 1 : 0;
+  values[D::HAS_COMMON_COLOR] = atgp->hasCommonColor() ? 1 : 0;
+  values[D::ALPHA_ONLY] = atgp->isAlphaOnly() ? 1 : 0;
+  auto index = domain.encode(values);
+  return PermutationMatchResult{"AtlasTextFillShader", index, index};
+}
+
 std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* programInfo) {
   if (auto result = TryMatchTextureFill(programInfo)) {
     return result;
@@ -284,6 +308,9 @@ std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* progra
     return result;
   }
   if (auto result = TryMatchGradientFill(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchAtlasTextFill(programInfo)) {
     return result;
   }
   return std::nullopt;

@@ -34,6 +34,18 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
     return "AtlasTextGeometryProcessor";
   }
 
+  AAType getAAType() const {
+    return aa;
+  }
+
+  bool hasCommonColor() const {
+    return commonColor.has_value();
+  }
+
+  bool isAlphaOnly() const {
+    return textureProxy->isAlphaOnly();
+  }
+
   SamplerState onSamplerStateAt(size_t) const override {
     return samplerState;
   }
