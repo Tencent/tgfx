@@ -18,36 +18,26 @@
 
 #pragma once
 
-#include "StandardDrawOp.h"
-#include "gpu/proxies/GPUMeshProxy.h"
+#include "ResourceTask.h"
+#include "core/DataSource.h"
+#include "core/StencilCoverPathTessellator.h"
 
 namespace tgfx {
-
-class MeshDrawOp : public StandardDrawOp {
+/**
+ * StencilCoverPathUploadTask uploads the bezier vertex stream produced by
+ * StencilCoverPathTessellator into a GPU vertex buffer. When the rasterizer reports no drawable
+ * geometry, the task resolves to no resource and the bound vertex proxy stays unbacked, which
+ * allows the stencil-and-cover render path to gracefully fall back to the legacy pipeline.
+ */
+class StencilCoverPathUploadTask : public ResourceTask {
  public:
-  static PlacementPtr<MeshDrawOp> Make(std::shared_ptr<GPUMeshProxy> meshProxy, PMColor color,
-                                       const Matrix& viewMatrix);
-
-  bool hasCoverage() const override;
+  StencilCoverPathUploadTask(std::shared_ptr<ResourceProxy> vertexBufferProxy,
+                             std::unique_ptr<DataSource<StencilCoverVertexData>> source);
 
  protected:
-  PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
-
-  void onDraw(RenderPass* renderPass, RenderTarget* renderTarget) override;
-
-  Type type() override {
-    return Type::MeshDrawOp;
-  }
+  std::shared_ptr<Resource> onMakeResource(Context* context) override;
 
  private:
-  MeshDrawOp(BlockAllocator* allocator, std::shared_ptr<GPUMeshProxy> meshProxy, PMColor color,
-             const Matrix& viewMatrix);
-
-  std::shared_ptr<GPUMeshProxy> meshProxy = nullptr;
-  PMColor color = PMColor::Transparent();
-  Matrix viewMatrix = {};
-
-  friend class BlockAllocator;
+  std::unique_ptr<DataSource<StencilCoverVertexData>> source = nullptr;
 };
-
 }  // namespace tgfx

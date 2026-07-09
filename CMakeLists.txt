@@ -28,6 +28,7 @@ option(TGFX_USE_SWIFTSHADER "Enable building with the SwiftShader library" OFF)
 option(TGFX_USE_ANGLE "Enable building with the ANGLE library" OFF)
 option(TGFX_USE_VULKAN "Use Vulkan as the GPU backend" OFF)
 option(TGFX_USE_TEXT_GAMMA_CORRECTION "Enable gamma correction when rendering text" OFF)
+option(TGFX_ENABLE_STENCIL_COVER_PATH "Enable the stencil-and-cover GPU path renderer for non-antialiased fills" ON)
 
 # EMSCRIPTEN_PTHREADS can be set by vendor tools for building the wasm-mt architecture.
 if (NOT WEB OR EMSCRIPTEN_PTHREADS)
@@ -160,6 +161,7 @@ message("TGFX_USE_WEBP_ENCODE: ${TGFX_USE_WEBP_ENCODE}")
 message("TGFX_BUILD_TESTS: ${TGFX_BUILD_TESTS}")
 message("TGFX_BUILD_FRAMEWORK: ${TGFX_BUILD_FRAMEWORK}")
 message("TGFX_USE_TEXT_GAMMA_CORRECTION: ${TGFX_USE_TEXT_GAMMA_CORRECTION}")
+message("TGFX_ENABLE_STENCIL_COVER_PATH: ${TGFX_ENABLE_STENCIL_COVER_PATH}")
 
 if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
     if (DEPLOYMENT_TARGET)
@@ -317,6 +319,10 @@ endif ()
 
 if (TGFX_USE_THREADS)
     list(APPEND TGFX_DEFINES TGFX_USE_THREADS)
+endif ()
+
+if (TGFX_ENABLE_STENCIL_COVER_PATH)
+    list(APPEND TGFX_DEFINES TGFX_ENABLE_STENCIL_COVER_PATH)
 endif ()
 
 if (TGFX_USE_FREETYPE)

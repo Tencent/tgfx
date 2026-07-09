@@ -80,6 +80,9 @@ void VulkanCaps::initFeatures(VkPhysicalDevice, const VulkanExtensions& extensio
   _features.clampToBorder = true;
   // Vulkan has no glTextureBarrier() equivalent. Disable to force the copy path for dst reads.
   _features.textureBarrier = false;
+  // stencilAttachmentSupported is set in initFormatTable() after probing the actual
+  // depth/stencil format availability, because the capability must not be advertised when
+  // no renderable D24S8 / D32S8 format exists on the device.
 
   frameBufferFetchSupported = extensions.rasterizationOrderAttachmentAccess;
 }
@@ -145,11 +148,25 @@ void VulkanCaps::initFormatTable(VkPhysicalDevice physicalDevice,
       checkFormat(physicalDevice, VK_FORMAT_B8G8R8A8_UNORM, properties);
 
   // Prefer D24_UNORM_S8_UINT, fall back to D32_SFLOAT_S8_UINT if not supported.
-  auto depthInfo = checkFormat(physicalDevice, VK_FORMAT_D24_UNORM_S8_UINT, properties);
+  // SwiftShader (vendorID 0x1AE0 = 6880 decimal) reports D24S8 as renderable via
+  // vkGetPhysicalDeviceFormatProperties but does not actually support it at runtime,
+  // emitting "UNSUPPORTED: format 37" warnings and segfaulting on stencil operations.
+  // Skip D24 on SwiftShader and go straight to the D32 fallback.
+  FormatInfo depthInfo = {};
+  if (properties.vendorID != 0x1AE0) {
+    depthInfo = checkFormat(physicalDevice, VK_FORMAT_D24_UNORM_S8_UINT, properties);
+  }
   if (!depthInfo.renderable) {
     depthInfo = checkFormat(physicalDevice, VK_FORMAT_D32_SFLOAT_S8_UINT, properties);
   }
   formatTable[PixelFormat::DEPTH24_STENCIL8] = depthInfo;
+  // Only advertise the stencil attachment capability when a depth/stencil format is actually
+  // renderable. SwiftShader (vendorID 0x1AE0) reports D24S8 as renderable but does not
+  // support it at runtime, and D32S8 stencil operations also crash (SwiftShader internally
+  // falls back to D24 and hits the same UNSUPPORTED path). Treat SwiftShader as having no
+  // stencil attachment support until the root cause of the D32 stencil segfault is fully
+  // investigated and fixed.
+  _features.stencilAttachmentSupported = depthInfo.renderable && properties.vendorID != 0x1AE0;
 }
 
 }  // namespace tgfx
