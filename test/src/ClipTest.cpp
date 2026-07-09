@@ -849,7 +849,7 @@ TGFX_TEST(ClipTest, Overview) {
         // ---------- Multi-element combinations ----------
         case 8:
           // Cell 8: Two RRects with offset bounds. The intersection's TR/BL corners equal
-          // neither A's nor B's, so ConservativeIntersect falls back to CheckCornerContainment
+          // neither A's nor B's, so ConservativeIntersect falls back to IsInnerToCorners
           // and fails because the points lie outside both rounded corners. Both elements
           // survive and produce two FPs.
           canvas->clipRRect(RRect::MakeRectXY(Rect::MakeXYWH(20, 20, 140, 140), 50, 50), true);
@@ -882,8 +882,7 @@ TGFX_TEST(ClipTest, Overview) {
         case 11: {
           // Cell 11: Inverse-fill clip whose geometry covers the current clip bounds. Combined
           // with the cell-range clipRect, the keep-region collapses to empty and the drawRect
-          // is fully suppressed. Verifies the fast-path that retires the clip stack to Empty
-          // when an inverse-fill shape fully contains the current clip bounds.
+          // is fully suppressed via the fast-path that retires the clip stack to Empty.
           canvas->clipRect(Rect::MakeWH(kCell, kCell));
           Path inverseFill = {};
           inverseFill.addRect(Rect::MakeLTRB(-10, -10, kCell + 10, kCell + 10));
@@ -908,8 +907,8 @@ TGFX_TEST(ClipTest, Overview) {
 
         // ---------- State degeneracy ----------
         case 13: {
-          // Cell 13: Verifies that ClipStack updates its uniqueID when transitioning to the
-          // Empty state. Without that update, the second drawRect can be incorrectly batched
+          // Cell 13: ClipStack updates its uniqueID when transitioning to the Empty state.
+          // Without that update, the second drawRect can be incorrectly batched
           // with the first one's (Empty) clip via stale-uniqueID comparison and get fully
           // suppressed, even though after restore the clip is back to wide-open.
           canvas->save();

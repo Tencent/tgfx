@@ -48,7 +48,10 @@ namespace tgfx {
 #if DEBUG
 
 #define DEBUG_ASSERT(assertion) ASSERT(assertion)
-#define DEBUG_ASSERT_RESULT(expression) ASSERT(expression)
+#define DEBUG_ASSERT_RESULT(expression) \
+  if (!(expression)) {                  \
+    ABORT(#expression);                 \
+  }
 
 #else
 

@@ -397,6 +397,9 @@ void ClipElement::simplify() {
     _matrix.setIdentity();
   } else if (_shape.type() == ShapeType::RRect && _matrix.rectStaysRect()) {
     auto transformed = RRectUtils::TryAxisAlignedTransform(_shape.rRect(), _matrix);
+    // A degenerate transform (e.g. a zero or non-finite scale that collapses the RRect to an empty
+    // or infinite rect) makes TryAxisAlignedTransform return nullopt. Such a matrix is not expected
+    // for a clip element here; firing this assert means an illegal transform slipped in.
     DEBUG_ASSERT(transformed.has_value());
     if (transformed.has_value()) {
       _matrix.setIdentity();

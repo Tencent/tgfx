@@ -20,11 +20,11 @@
 
 namespace tgfx {
 
-// Only needTransform is keyed. The transform path adds a per-fragment matrix multiply, and a
-// perspective matrix further requires a per-fragment division, so a dedicated program that skips
-// this for the identity case is worth the extra program. The AA branch adds only a bounded amount
-// of work that does not grow with the input, so keeping antiAlias a runtime uniform and sharing one
-// program across AA and non-AA draws is a better trade-off than doubling the program count.
+// Only needTransform is keyed. The transform path adds a per-fragment matrix multiply, so a
+// dedicated program that skips this for the identity case is worth the extra program. The AA branch
+// adds only a bounded amount of work that does not grow with the input, so keeping antiAlias a
+// runtime uniform and sharing one program across AA and non-AA draws is a better trade-off than
+// doubling the program count.
 void RRectEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   bytesKey->write(static_cast<uint32_t>(_needTransform ? 1 : 0));
 }

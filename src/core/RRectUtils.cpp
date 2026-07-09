@@ -219,8 +219,9 @@ Rect RRectUtils::InnerBounds(const RRect& rr) {
   // The maximum inscribed rectangle at the corner ellipse has a corner at
   // sqrt(2)/2 * (rX, rY). Scale all corner shifts by (1 - sqrt(2)/2) to get the safe inset.
   // Add a small epsilon so the shifted corners stay safely inside the curves.
-  static constexpr float kScale = (1.0f - 0.70710678118f) + 1e-5f;
-  const auto innerArea = (innerBounds.width() - kScale * dw) * (innerBounds.height() - kScale * dh);
+  static constexpr float diagInsetScale = (1.0f - 0.70710678118f) + 1e-5f;
+  const auto innerArea =
+      (innerBounds.width() - diagInsetScale * dw) * (innerBounds.height() - diagInsetScale * dh);
 
   if (horizArea > vertArea && horizArea > innerArea) {
     innerBounds.left += leftShift;
@@ -229,10 +230,10 @@ Rect RRectUtils::InnerBounds(const RRect& rr) {
     innerBounds.top += topShift;
     innerBounds.bottom -= bottomShift;
   } else if (innerArea > 0.f) {
-    innerBounds.left += kScale * leftShift;
-    innerBounds.right -= kScale * rightShift;
-    innerBounds.top += kScale * topShift;
-    innerBounds.bottom -= kScale * bottomShift;
+    innerBounds.left += diagInsetScale * leftShift;
+    innerBounds.right -= diagInsetScale * rightShift;
+    innerBounds.top += diagInsetScale * topShift;
+    innerBounds.bottom -= diagInsetScale * bottomShift;
   } else {
     // Unreachable for a valid RRect: ScaleRadii keeps each side's adjacent radii within the side
     // length, so the diagonal inset area stays positive. Guard against a broken invariant.
