@@ -778,6 +778,10 @@ class Layer : public std::enable_shared_from_this<Layer> {
   float maxBackgroundOutset = 0.f;
   float minBackgroundOutset = std::numeric_limits<float>::max();
 
+  // Union of renderBounds of layers whose styles require full layer background (global coordinates).
+  // Used to expand the BackgroundSource surface beyond dirty tiles in tiled/partial rendering modes.
+  Rect fullBackgroundBounds = {};
+
   friend class RootLayer;
   friend class DisplayList;
   friend class BackgroundCapturer;

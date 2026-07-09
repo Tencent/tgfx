@@ -1210,6 +1210,15 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   if (worldRects.empty()) {
     return nullptr;
   }
+  // Expand the capture region to cover layers whose styles require full layer background (e.g.
+  // GlassStyle refraction samples across the entire layer bounds). Without this, dirty-tile-only
+  // capture would miss clean-tile areas, causing refraction to sample transparent pixels.
+  if (!_root->fullBackgroundBounds.isEmpty()) {
+    auto fullBgSurfaceRect = viewMatrix.mapRect(_root->fullBackgroundBounds);
+    fullBgSurfaceRect.roundOut();
+    surfaceUnion.join(fullBgSurfaceRect);
+    worldRects.push_back(_root->fullBackgroundBounds);
+  }
   // Expand by the max blur outset so layers whose bounds sit just outside the dirty rects but
   // still contribute pixels to the blur sampling region are not culled by the capture pass.
   for (auto& rect : worldRects) {

@@ -146,6 +146,17 @@ class LayerStyle : public LayerProperty {
   }
 
   /**
+   * Returns whether this layer style requires the background snapshot to cover the full layer
+   * bounds, not just the dirty regions in tiled/partial rendering modes. The default is false.
+   * Override to return true when the style samples the background across the entire layer area
+   * (e.g. GlassStyle refraction distorts background pixels throughout the layer bounds). Styles
+   * that only sample near the layer edge (e.g. blur, shadow) do not need to override this.
+   */
+  virtual bool requiresFullLayerBackground() const {
+    return false;
+  }
+
+  /**
    * Draws this layer style onto the canvas using the provided input data.
    * @param canvas The canvas to draw the layer style on.
    * @param input The input data for this layer style.

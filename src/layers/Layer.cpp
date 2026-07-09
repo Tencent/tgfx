@@ -2003,7 +2003,7 @@ bool Layer::hasValidMask() const {
 
 void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, bool forceDirty) {
   if (!forceDirty && !bitFields.dirtyDescendents) {
-    if (maxBackgroundOutset > 0 || bitFields.hasBlendMode) {
+    if (maxBackgroundOutset > 0 || bitFields.hasBlendMode || !fullBackgroundBounds.isEmpty()) {
       propagateLayerState();
       if (_root->hasDirtyRegions()) {
         checkBackgroundStyles(transformer);
@@ -2013,6 +2013,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   }
   maxBackgroundOutset = 0;
   minBackgroundOutset = std::numeric_limits<float>::max();
+  fullBackgroundBounds.setEmpty();
   auto contentScale = 1.0f;
   if (!_layerStyles.empty() || !_filters.empty()) {
     // Filters and styles interrupt 3D rendering context, so non-root layers inside 3D rendering
@@ -2104,6 +2105,16 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     child->bitFields.dirtyTransform = false;
     if (!child->maskOwner) {
       renderBounds.join(child->renderBounds);
+      fullBackgroundBounds.join(child->fullBackgroundBounds);
+    }
+  }
+  if (!renderBounds.isEmpty()) {
+    for (auto& style : _layerStyles) {
+      DEBUG_ASSERT(style != nullptr);
+      if (style->requiresFullLayerBackground()) {
+        fullBackgroundBounds.join(renderBounds);
+        break;
+      }
     }
   }
   auto backOutset = 0.f;
@@ -2181,6 +2192,13 @@ void Layer::propagateLayerState() {
     if (layer->minBackgroundOutset > minBackgroundOutset) {
       layer->minBackgroundOutset = minBackgroundOutset;
       change = true;
+    }
+    if (!fullBackgroundBounds.isEmpty()) {
+      auto prev = layer->fullBackgroundBounds;
+      layer->fullBackgroundBounds.join(fullBackgroundBounds);
+      if (layer->fullBackgroundBounds != prev) {
+        change = true;
+      }
     }
     // Only propagate hasBlendMode if this layer actually has a blend mode
     if (bitFields.hasBlendMode && !layer->bitFields.hasBlendMode) {
