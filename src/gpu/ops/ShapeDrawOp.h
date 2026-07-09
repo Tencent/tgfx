@@ -18,12 +18,12 @@
 
 #pragma once
 
-#include "DrawOp.h"
+#include "StandardDrawOp.h"
 #include "gpu/proxies/GPUShapeProxy.h"
 #include "gpu/proxies/VertexBufferView.h"
 
 namespace tgfx {
-class ShapeDrawOp : public DrawOp {
+class ShapeDrawOp : public StandardDrawOp {
  public:
   static PlacementPtr<ShapeDrawOp> Make(std::shared_ptr<GPUShapeProxy> shapeProxy, PMColor color,
                                         const Matrix& uvMatrix, AAType aaType);

@@ -52,7 +52,7 @@ PlacementPtr<Quads3DDrawOp> Quads3DDrawOp::Make(Context* context,
 }
 
 Quads3DDrawOp::Quads3DDrawOp(BlockAllocator* allocator, QuadsVertexProvider* provider)
-    : DrawOp(allocator, provider->aaType()), quadCount(provider->quadCount()) {
+    : StandardDrawOp(allocator, provider->aaType()), quadCount(provider->quadCount()) {
   if (!provider->hasUVCoord()) {
     auto matrix = provider->firstMatrix();
     if (!matrix.invert(&matrix)) {

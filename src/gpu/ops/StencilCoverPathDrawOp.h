@@ -37,7 +37,11 @@ namespace tgfx {
  * uses the implicit-curve test `k*k - l > 0 ⇒ discard` to obtain pixel-accurate coverage on
  * the GPU.
  *
- * Two passes are run inside the standard DrawOp::execute() flow:
+ * Because the op runs two pipelines (a stencil pass followed by a cover pass) within a single
+ * render pass, it does not inherit from StandardDrawOp — instead it derives from DrawOp
+ * directly and implements execute() itself, binding each pipeline in turn.
+ *
+ * Two passes are run inside execute():
  *
  *   1. Stencil pass — uses StencilCoverStencilPassGeometryProcessor to walk the Loop-Blinn
  *      vertex stream produced by StencilCoverPathTessellator. The fragment shader runs the
@@ -74,17 +78,9 @@ class StencilCoverPathDrawOp : public DrawOp {
     return true;
   }
 
-  bool usesStandardPipeline() const override {
-    return false;
-  }
+  void execute(RenderPass* renderPass, RenderTarget* renderTarget) override;
 
  protected:
-  PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
-
-  void onConfigureProgramInfo(ProgramInfo& programInfo) override;
-
-  void onDraw(RenderPass* renderPass, RenderTarget* renderTarget) override;
-
   Type type() override {
     return Type::StencilCoverPathDrawOp;
   }
@@ -107,13 +103,13 @@ class StencilCoverPathDrawOp : public DrawOp {
   Rect coverDeviceBounds = {};
   PathFillType fillType = PathFillType::Winding;
 
-  // Stencil-pass GP. Made once at construction time so onDraw() can reuse it instead of
+  // Stencil-pass GP. Made once at construction time so execute() can reuse it instead of
   // rebuilding the GP on every command-buffer encode pass.
   PlacementPtr<StencilCoverStencilPassGeometryProcessor> stencilGP = nullptr;
 
   // Pre-computed depth/stencil descriptors. Both depend only on `fillType`, so caching them
   // avoids running the small but per-op MakeStencilPassDS / MakeCoverPassDS branches each
-  // time onDraw() encodes the stencil and cover passes.
+  // time execute() encodes the stencil and cover passes.
   DepthStencilDescriptor stencilPassDS = {};
   DepthStencilDescriptor coverPassDS = {};
 
@@ -127,10 +123,19 @@ class StencilCoverPathDrawOp : public DrawOp {
 
   // Builds the stencil-pass ProgramInfo (stencil GP, no FP chain, no xfer processor, colour
   // writes disabled) and binds the resulting pipeline together with its uniforms and samplers
-  // to the render pass. Counterpart of DrawOp::bindStandardPipeline() for the cover pass —
-  // both helpers leave the render pass ready for vertex-buffer + draw calls. Returns false
-  // if program creation fails, in which case the caller should abort the stencil pass.
+  // to the render pass. Returns false if program creation fails, in which case the caller
+  // should abort the stencil pass. Also constrains the render pass scissor to the cover-quad
+  // device bounds so no stencil write escapes the region the cover pass will later zero.
   bool bindStencilPipeline(RenderPass* renderPass, RenderTarget* renderTarget);
+
+  // Builds the cover-pass ProgramInfo from the op's brush FP chain (colors/coverages) and
+  // xfer/blend state, materialises the pipeline, and binds it to the render pass together
+  // with uniforms, samplers and the op's scissor rectangle. Semantically equivalent to what
+  // StandardDrawOp does for single-pipeline ops, but kept as an independent implementation
+  // because StencilCoverPathDrawOp does not derive from StandardDrawOp — the two live on
+  // different rails and share only the underlying ProgramInfo/Program utilities. Returns
+  // false if program creation fails.
+  bool bindCoverPipeline(RenderPass* renderPass, RenderTarget* renderTarget);
 
   // Sets the render pass scissor to the intersection of the cover-pass device bounds and the
   // op's clip rect. This is stricter than DrawOp::applyScissor(): when the op has no user

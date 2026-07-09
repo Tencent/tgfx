@@ -48,7 +48,7 @@ PlacementPtr<RectDrawOp> RectDrawOp::Make(Context* context,
 }
 
 RectDrawOp::RectDrawOp(BlockAllocator* allocator, RectsVertexProvider* provider)
-    : DrawOp(allocator, provider->aaType()), rectCount(provider->rectCount()),
+    : StandardDrawOp(allocator, provider->aaType()), rectCount(provider->rectCount()),
       lineJoin(provider->lineJoin()) {
   if (!provider->hasUVCoord()) {
     auto matrix = provider->firstMatrix();

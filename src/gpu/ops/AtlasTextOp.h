@@ -21,13 +21,13 @@
 #include <optional>
 #include "gpu/ProxyProvider.h"
 #include "gpu/RectsVertexProvider.h"
-#include "gpu/ops/DrawOp.h"
+#include "gpu/ops/StandardDrawOp.h"
 #include "gpu/proxies/VertexBufferView.h"
 #include "tgfx/core/SamplingOptions.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
-class AtlasTextOp final : public DrawOp {
+class AtlasTextOp final : public StandardDrawOp {
  public:
   static PlacementPtr<AtlasTextOp> Make(Context* context,
                                         PlacementPtr<RectsVertexProvider> provider,

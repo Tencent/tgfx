@@ -20,6 +20,8 @@
 #include <algorithm>
 #include <cmath>
 #include "core/utils/Log.h"
+#include "gpu/Program.h"
+#include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RectsVertexProvider.h"
 #include "gpu/processors/StencilCoverCoverPassGeometryProcessor.h"
@@ -147,7 +149,7 @@ StencilCoverPathDrawOp::StencilCoverPathDrawOp(BlockAllocator* allocator,
   }
 
   // Pre-compute the per-op state that only depends on construction-time inputs. This keeps
-  // onDraw() limited to the work that genuinely needs the live RenderPass / RenderTarget.
+  // execute() limited to the work that genuinely needs the live RenderPass / RenderTarget.
   stencilGP = StencilCoverStencilPassGeometryProcessor::Make(allocator, viewMatrix);
   stencilPassDS = MakeStencilPassDS(fillType);
   coverPassDS = MakeCoverPassDS(fillType);
@@ -157,21 +159,6 @@ StencilCoverPathDrawOp::StencilCoverPathDrawOp(BlockAllocator* allocator,
   // region — any stencil write outside would leak into subsequent ops sharing the render
   // pass's depth/stencil attachment.
   coverDeviceBounds = viewMatrix.mapRect(coverLocalBounds);
-}
-
-PlacementPtr<GeometryProcessor> StencilCoverPathDrawOp::onMakeGeometryProcessor(
-    RenderTarget* /*renderTarget*/) {
-  // The cover pass owns the brush FP chain via DrawOp::execute(); it is therefore the GP that
-  // we hand back to the standard pipeline. The stencil pass GP is built on demand inside
-  // onDraw() so it can run with its own ProgramInfo and stencil configuration.
-  return StencilCoverCoverPassGeometryProcessor::Make(allocator, color, viewMatrix);
-}
-
-void StencilCoverPathDrawOp::onConfigureProgramInfo(ProgramInfo& programInfo) {
-  // Inject the cover-pass depth/stencil state into the standard ProgramInfo so the pipeline
-  // built by DrawOp::execute() reads the stencil buffer instead of ignoring it. Reuse the
-  // descriptor we already cached at construction time.
-  programInfo.setDepthStencil(coverPassDS);
 }
 
 bool StencilCoverPathDrawOp::bindStencilPipeline(RenderPass* renderPass,
@@ -207,6 +194,39 @@ bool StencilCoverPathDrawOp::bindStencilPipeline(RenderPass* renderPass,
   return true;
 }
 
+bool StencilCoverPathDrawOp::bindCoverPipeline(RenderPass* renderPass, RenderTarget* renderTarget) {
+  // Build the cover-pass GP. Runs the brush FP chain over a device-bounds quad; the
+  // Loop-Blinn curve test is not needed here because coverage is already locked into the
+  // stencil buffer by the stencil pass.
+  auto coverGP = StencilCoverCoverPassGeometryProcessor::Make(allocator, color, viewMatrix);
+  if (coverGP == nullptr) {
+    return false;
+  }
+  std::vector<FragmentProcessor*> fragmentProcessors = {};
+  fragmentProcessors.reserve(colors.size() + coverages.size());
+  for (auto& colorFP : colors) {
+    fragmentProcessors.emplace_back(colorFP.get());
+  }
+  for (auto& coverageFP : coverages) {
+    fragmentProcessors.emplace_back(coverageFP.get());
+  }
+  ProgramInfo coverInfo(renderTarget, coverGP.get(), std::move(fragmentProcessors), colors.size(),
+                        xferProcessor.get(), blendMode);
+  coverInfo.setCullMode(cullMode);
+  // Route the stencil buffer read through the cover pass. Without this the pipeline would
+  // ignore the stencil buffer and shade every fragment inside the cover quad.
+  coverInfo.setDepthStencil(coverPassDS);
+  auto coverProgram = coverInfo.getProgram();
+  if (coverProgram == nullptr) {
+    LOGE("StencilCoverPathDrawOp::bindCoverPipeline() Failed to get the program!");
+    return false;
+  }
+  renderPass->setPipeline(coverProgram->getPipeline());
+  coverInfo.setUniformsAndSamplers(renderPass, coverProgram.get());
+  applyScissor(renderPass, renderTarget);
+  return true;
+}
+
 void StencilCoverPathDrawOp::applyStencilScissor(RenderPass* renderPass,
                                                  RenderTarget* renderTarget) const {
   // Start from the cover-quad's device bounds — the cover pass's Zero stencil op only touches
@@ -232,7 +252,7 @@ void StencilCoverPathDrawOp::applyStencilScissor(RenderPass* renderPass,
   renderPass->setScissorRect(scissorX, scissorY, scissorWidth, scissorHeight);
 }
 
-void StencilCoverPathDrawOp::onDraw(RenderPass* renderPass, RenderTarget* renderTarget) {
+void StencilCoverPathDrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   if (geometryProxy == nullptr || coverQuadBuffer == nullptr) {
     return;
   }
@@ -266,10 +286,11 @@ void StencilCoverPathDrawOp::onDraw(RenderPass* renderPass, RenderTarget* render
 
   // ----- Cover pass -----
   // Always run the cover pass so inverse fills shade the path's exterior even when the
-  // stencil pass was skipped. The cover pipeline goes through the standard DrawOp path —
-  // bindStandardPipeline() builds it from the cover GP returned by onMakeGeometryProcessor()
-  // and the depth/stencil descriptor injected by onConfigureProgramInfo().
-  if (!bindStandardPipeline(renderPass, renderTarget)) {
+  // stencil pass was skipped. StencilCoverPathDrawOp assembles its own cover-pass pipeline
+  // (see bindCoverPipeline) rather than reusing StandardDrawOp's helper — the two rails are
+  // deliberately independent so the "self-managed multi-pass" contract stays visible in the
+  // class hierarchy.
+  if (!bindCoverPipeline(renderPass, renderTarget)) {
     return;
   }
   renderPass->setStencilReference(coverStencilRef);

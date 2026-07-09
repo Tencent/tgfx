@@ -38,7 +38,8 @@ PlacementPtr<ShapeDrawOp> ShapeDrawOp::Make(std::shared_ptr<GPUShapeProxy> shape
 
 ShapeDrawOp::ShapeDrawOp(BlockAllocator* allocator, std::shared_ptr<GPUShapeProxy> proxy,
                          PMColor color, const Matrix& uvMatrix, AAType aaType)
-    : DrawOp(allocator, aaType), shapeProxy(std::move(proxy)), color(color), uvMatrix(uvMatrix) {
+    : StandardDrawOp(allocator, aaType), shapeProxy(std::move(proxy)), color(color),
+      uvMatrix(uvMatrix) {
   auto context = shapeProxy->getContext();
   if (auto textureProxy = shapeProxy->getTextureProxy()) {
     auto maskRect = Rect::MakeWH(textureProxy->width(), textureProxy->height());

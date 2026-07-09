@@ -18,12 +18,12 @@
 
 #pragma once
 
-#include "DrawOp.h"
+#include "StandardDrawOp.h"
 #include "gpu/proxies/GPUMeshProxy.h"
 
 namespace tgfx {
 
-class MeshDrawOp : public DrawOp {
+class MeshDrawOp : public StandardDrawOp {
  public:
   static PlacementPtr<MeshDrawOp> Make(std::shared_ptr<GPUMeshProxy> meshProxy, PMColor color,
                                        const Matrix& viewMatrix);

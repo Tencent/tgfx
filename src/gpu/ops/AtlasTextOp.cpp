@@ -54,7 +54,7 @@ PlacementPtr<AtlasTextOp> AtlasTextOp::Make(Context* context,
 AtlasTextOp::AtlasTextOp(BlockAllocator* allocator, RectsVertexProvider* provider,
                          std::shared_ptr<TextureProxy> textureProxy,
                          const SamplingOptions& sampling)
-    : DrawOp(allocator, provider->aaType()), rectCount(provider->rectCount()),
+    : StandardDrawOp(allocator, provider->aaType()), rectCount(provider->rectCount()),
       textureProxy(std::move(textureProxy)), sampling(sampling) {
   if (!provider->hasColor()) {
     commonColor = ToPMColor(provider->firstColor(), provider->dstColorSpace());

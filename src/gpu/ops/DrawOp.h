@@ -19,10 +19,21 @@
 #pragma once
 
 #include "gpu/AAType.h"
-#include "gpu/ProgramInfo.h"
+#include "gpu/processors/FragmentProcessor.h"
+#include "gpu/processors/XferProcessor.h"
+#include "gpu/resources/RenderTarget.h"
 #include "tgfx/gpu/RenderPass.h"
 
 namespace tgfx {
+/**
+ * DrawOp is the minimal contract every deferred draw operation must satisfy. It exposes only
+ * what OpsRenderTask needs to schedule an op inside a render pass: an execute() entry point,
+ * plus flags such as needsStencil() that let the task set up the pass correctly. Concrete
+ * pipeline-binding strategies live in subclasses — StandardDrawOp handles the common
+ * "framework binds a single pipeline, subclass issues one draw call" pattern; ops that manage
+ * their own pipelines (e.g. StencilCoverPathDrawOp with its stencil + cover passes) inherit
+ * from DrawOp directly and implement execute() themselves.
+ */
 class DrawOp {
  public:
   enum class Type {
@@ -68,8 +79,6 @@ class DrawOp {
     return !coverages.empty();
   }
 
-  void execute(RenderPass* renderPass, RenderTarget* renderTarget);
-
   /**
    * Returns true when the op needs a depth/stencil attachment to be present on the render
    * pass. OpsRenderTask scans the op list with this hook before beginning the pass and attaches
@@ -81,15 +90,12 @@ class DrawOp {
   }
 
   /**
-   * Returns true when execute() should build and bind the op's standard render pipeline
-   * before invoking onDraw(). Default is true so subclasses only need to bind buffers and
-   * issue the draw call. Multi-pass ops that manage their own pipelines (e.g.
-   * StencilCoverPathDrawOp) override this to opt out and take full responsibility for
-   * pipeline binding inside onDraw().
+   * Encodes the op into the given render pass. Called by OpsRenderTask after the pass has
+   * been begun with the correct attachments. Concrete subclasses decide how the op reaches
+   * the GPU — StandardDrawOp does one bindPipeline + one draw call, while custom multi-pass
+   * ops build their own pipelines here.
    */
-  virtual bool usesStandardPipeline() const {
-    return true;
-  }
+  virtual void execute(RenderPass* renderPass, RenderTarget* renderTarget) = 0;
 
  protected:
   BlockAllocator* allocator = nullptr;
@@ -104,37 +110,15 @@ class DrawOp {
   DrawOp(BlockAllocator* allocator, AAType aaType) : allocator(allocator), aaType(aaType) {
   }
 
-  virtual PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) = 0;
-
-  /**
-   * Hook invoked by bindStandardPipeline() right before the program is materialised, giving the
-   * op a chance to inject pipeline-level overrides such as the depth/stencil descriptor or the
-   * colour write mask into the ProgramInfo. The default does nothing; only ops that opt into
-   * stencil-based rendering need to override.
-   */
-  virtual void onConfigureProgramInfo(ProgramInfo& /*programInfo*/) {
-  }
-
   /**
    * Applies the op's scissor rectangle to the render pass. An empty scissor expands to the
-   * full render target. bindStandardPipeline() calls this internally, but multi-pass ops that
-   * bind their own pipelines must call it for every pass — otherwise that pass writes outside
-   * the op's clip and may pollute the render pass for subsequent ops (especially relevant for
-   * stencil writes, which are not undone by the cover pass outside the cover scissor).
+   * full render target. StandardDrawOp calls this internally as part of pipeline binding;
+   * multi-pass ops that bind their own pipelines must call it (or a stricter variant) for
+   * every pass — otherwise that pass writes outside the op's clip and may pollute the render
+   * pass for subsequent ops (especially relevant for stencil writes, which are not undone by
+   * a cover pass outside the cover scissor).
    */
   void applyScissor(RenderPass* renderPass, RenderTarget* renderTarget) const;
-
-  /**
-   * Builds the op's standard render pipeline from its current geometry/fragment processor
-   * configuration and binds it to the render pass, together with uniforms, samplers and the
-   * scissor rectangle. execute() invokes this automatically before onDraw() for ops that keep
-   * usesStandardPipeline() at its default true; multi-pass ops that opt out call this directly
-   * when they need to re-attach the standard pipeline after running a self-managed pass.
-   * Returns false if program creation fails, in which case the caller should abort the draw.
-   */
-  bool bindStandardPipeline(RenderPass* renderPass, RenderTarget* renderTarget);
-
-  virtual void onDraw(RenderPass* renderPass, RenderTarget* renderTarget) = 0;
 
   virtual Type type() = 0;
 };

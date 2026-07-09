@@ -20,12 +20,12 @@
 
 #include <optional>
 #include "gpu/RectsVertexProvider.h"
-#include "gpu/ops/DrawOp.h"
+#include "gpu/ops/StandardDrawOp.h"
 #include "gpu/proxies/GPUBufferProxy.h"
 #include "gpu/proxies/VertexBufferView.h"
 
 namespace tgfx {
-class RectDrawOp : public DrawOp {
+class RectDrawOp : public StandardDrawOp {
  public:
   /**
    * The maximum number of rects that can be drawn in a single draw call.

@@ -18,19 +18,8 @@
 
 #include "DrawOp.h"
 #include <algorithm>
-#include "core/utils/Log.h"
-#include "gpu/Program.h"
 
 namespace tgfx {
-void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
-  if (usesStandardPipeline()) {
-    if (!bindStandardPipeline(renderPass, renderTarget)) {
-      return;
-    }
-  }
-  onDraw(renderPass, renderTarget);
-}
-
 void DrawOp::applyScissor(RenderPass* renderPass, RenderTarget* renderTarget) const {
   if (scissorRect.isEmpty()) {
     renderPass->setScissorRect(0, 0, renderTarget->width(), renderTarget->height());
@@ -48,33 +37,5 @@ void DrawOp::applyScissor(RenderPass* renderPass, RenderTarget* renderTarget) co
   int scissorWidth = std::max(0, scissorRight - scissorX);
   int scissorHeight = std::max(0, scissorBottom - scissorY);
   renderPass->setScissorRect(scissorX, scissorY, scissorWidth, scissorHeight);
-}
-
-bool DrawOp::bindStandardPipeline(RenderPass* renderPass, RenderTarget* renderTarget) {
-  auto geometryProcessor = onMakeGeometryProcessor(renderTarget);
-  if (geometryProcessor == nullptr) {
-    return false;
-  }
-  std::vector<FragmentProcessor*> fragmentProcessors = {};
-  fragmentProcessors.reserve(colors.size() + coverages.size());
-  for (auto& color : colors) {
-    fragmentProcessors.emplace_back(color.get());
-  }
-  for (auto& coverage : coverages) {
-    fragmentProcessors.emplace_back(coverage.get());
-  }
-  ProgramInfo programInfo(renderTarget, geometryProcessor.get(), std::move(fragmentProcessors),
-                          colors.size(), xferProcessor.get(), blendMode);
-  programInfo.setCullMode(cullMode);
-  onConfigureProgramInfo(programInfo);
-  auto program = programInfo.getProgram();
-  if (program == nullptr) {
-    LOGE("DrawOp::bindStandardPipeline() Failed to get the program!");
-    return false;
-  }
-  renderPass->setPipeline(program->getPipeline());
-  programInfo.setUniformsAndSamplers(renderPass, program.get());
-  applyScissor(renderPass, renderTarget);
-  return true;
 }
 }  // namespace tgfx

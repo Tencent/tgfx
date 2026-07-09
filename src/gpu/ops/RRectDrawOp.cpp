@@ -48,7 +48,7 @@ PlacementPtr<RRectDrawOp> RRectDrawOp::Make(Context* context,
 }
 
 RRectDrawOp::RRectDrawOp(BlockAllocator* allocator, RRectsVertexProvider* provider)
-    : DrawOp(allocator, provider->aaType()), rectCount(provider->rectCount()) {
+    : StandardDrawOp(allocator, provider->aaType()), rectCount(provider->rectCount()) {
   if (!provider->hasColor()) {
     commonColor = ToPMColor(provider->firstColor(), provider->dstColorSpace());
   }
