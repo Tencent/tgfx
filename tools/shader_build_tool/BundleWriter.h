@@ -55,7 +55,8 @@ ShaderKeyHash ComputeShaderKeyHash(const std::string& shaderName, uint32_t permu
                                    const std::string& profileTag);
 
 /// Writes a v3 shader bundle file with separate vertex and fragment pools.
+/// When compress is true, the data pool is zlib-compressed (compressionType=1 in header).
 bool WriteBundle(const std::string& outPath, const std::string& profileTag,
-                 const std::vector<VariantData>& variants);
+                 const std::vector<VariantData>& variants, bool compress = false);
 
 }  // namespace tgfx

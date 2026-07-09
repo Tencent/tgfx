@@ -20,6 +20,7 @@
 #include <cstring>
 #include <fstream>
 #include "core/utils/Log.h"
+#include "zlib.h"
 
 namespace tgfx {
 
@@ -147,8 +148,8 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
     return false;
   }
   uint16_t compressionType = ReadU16LE(ptr + 6);
-  if (compressionType != 0) {
-    LOGE("PrecompiledShaderCache: Compressed bundles not yet supported");
+  if (compressionType != 0 && compressionType != 1) {
+    LOGE("PrecompiledShaderCache: Unsupported compression type %u", compressionType);
     return false;
   }
   // offset 8: sourceHash(8), offset 16: toolchainVersion(4)
@@ -159,17 +160,48 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   uint32_t dataOffset = ReadU32LE(ptr + 36);
   uint32_t dataSize = ReadU32LE(ptr + 40);
   uint32_t reflectionOffset = ReadU32LE(ptr + 44);
-  (void)dataSize;
 
   // Parse profileTag (32 bytes at offset 48)
   const char* tagPtr = reinterpret_cast<const char*>(ptr + 48);
   _profileTag = std::string(tagPtr, strnlen(tagPtr, 32));
 
-  if (!LoadPool(ptr, size, vertPoolOffset, vertPoolCount, dataOffset, reflectionOffset,
+  const uint8_t* loadPtr = ptr;
+  size_t loadSize = size;
+  std::vector<uint8_t> decompressed;
+
+  if (compressionType == 1) {
+    // Only the data pool region is compressed. Compute compressed size from file layout.
+    size_t compressedEnd = reflectionOffset > 0 ? static_cast<size_t>(reflectionOffset) : size;
+    size_t compressedSize = compressedEnd - static_cast<size_t>(dataOffset);
+    if (dataOffset + compressedSize > size) {
+      LOGE("PrecompiledShaderCache: Compressed data region out of bounds");
+      return false;
+    }
+    // Decompress into a reassembled buffer: [header+pools | decompressed data | reflection]
+    decompressed.resize(dataOffset + dataSize + (reflectionOffset > 0 ? size - compressedEnd : 0));
+    std::memcpy(decompressed.data(), ptr, dataOffset);
+    uLongf destLen = static_cast<uLongf>(dataSize);
+    int ret =
+        uncompress(decompressed.data() + dataOffset, &destLen, ptr + dataOffset, compressedSize);
+    if (ret != Z_OK || destLen != static_cast<uLongf>(dataSize)) {
+      LOGE("PrecompiledShaderCache: zlib decompression failed (ret=%d)", ret);
+      return false;
+    }
+    // Copy reflection section after the decompressed data.
+    if (reflectionOffset > 0 && compressedEnd < size) {
+      size_t newReflOffset = dataOffset + dataSize;
+      std::memcpy(decompressed.data() + newReflOffset, ptr + compressedEnd, size - compressedEnd);
+      reflectionOffset = static_cast<uint32_t>(newReflOffset);
+    }
+    loadPtr = decompressed.data();
+    loadSize = decompressed.size();
+  }
+
+  if (!LoadPool(loadPtr, loadSize, vertPoolOffset, vertPoolCount, dataOffset, reflectionOffset,
                 vertEntries)) {
     return false;
   }
-  if (!LoadPool(ptr, size, fragPoolOffset, fragPoolCount, dataOffset, reflectionOffset,
+  if (!LoadPool(loadPtr, loadSize, fragPoolOffset, fragPoolCount, dataOffset, reflectionOffset,
                 fragEntries)) {
     return false;
   }

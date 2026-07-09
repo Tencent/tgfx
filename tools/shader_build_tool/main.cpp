@@ -40,6 +40,7 @@ struct BuildOptions {
   std::string outDir;
   std::vector<std::string> backends;
   bool reportOnly = false;
+  bool compress = false;
 };
 
 struct ShaderReport {
@@ -61,7 +62,8 @@ static void PrintUsage() {
             << "  --shader-dir <path>   Directory containing shader sources\n"
             << "  --out-dir <path>      Output directory for build artifacts\n"
             << "  --backends <list>     Comma-separated backend list (opengl,vulkan,metal,webgpu)\n"
-            << "  --report-only         Only enumerate and report, do not compile\n";
+            << "  --report-only         Only enumerate and report, do not compile\n"
+            << "  --compress            Compress data pool with zlib in output bundles\n";
 }
 
 static std::vector<std::string> SplitByComma(const std::string& input) {
@@ -91,6 +93,8 @@ static bool ParseArgs(int argc, char** argv, BuildOptions* options) {
       options->backends = SplitByComma(argv[++i]);
     } else if (std::strcmp(argv[i], "--report-only") == 0) {
       options->reportOnly = true;
+    } else if (std::strcmp(argv[i], "--compress") == 0) {
+      options->compress = true;
     } else {
       std::cerr << "Unknown option: " << argv[i] << "\n";
       PrintUsage();
@@ -316,7 +320,7 @@ int main(int argc, char** argv) {
     for (const auto& pair : byBackend) {
       std::string filename = "shader_bundle." + pair.first + ".bin";
       std::string path = options.outDir + "/" + filename;
-      if (!tgfx::WriteBundle(path, pair.first, pair.second)) {
+      if (!tgfx::WriteBundle(path, pair.first, pair.second, options.compress)) {
         std::cerr << "Failed to write bundle: " << path << "\n";
         return 1;
       }

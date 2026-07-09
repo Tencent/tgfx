@@ -28,6 +28,7 @@
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Surface.h"
 #include "utils/TestUtils.h"
+#include "zlib.h"
 
 namespace tgfx {
 
@@ -389,6 +390,89 @@ TGFX_TEST(ShaderPermutationTest, EmbeddedBundleInvalidData) {
   std::vector<uint8_t> badMagic(80, 0);
   badMagic[0] = 0xFF;
   EXPECT_FALSE(cache.loadBundle(badMagic.data(), badMagic.size()));
+}
+
+static uint16_t TestReadU16LE(const uint8_t* p) {
+  return static_cast<uint16_t>(static_cast<uint16_t>(p[0]) | (static_cast<uint16_t>(p[1]) << 8));
+}
+
+static uint32_t TestReadU32LE(const uint8_t* p) {
+  return static_cast<uint32_t>(p[0]) | (static_cast<uint32_t>(p[1]) << 8) |
+         (static_cast<uint32_t>(p[2]) << 16) | (static_cast<uint32_t>(p[3]) << 24);
+}
+
+static void TestWriteU16LE(uint8_t* p, uint16_t val) {
+  p[0] = static_cast<uint8_t>(val & 0xFF);
+  p[1] = static_cast<uint8_t>((val >> 8) & 0xFF);
+}
+
+TGFX_TEST(ShaderPermutationTest, CompressedBundleLoad) {
+  // Load an uncompressed bundle, manually compress its data pool, then verify loading.
+  auto bundlePath = ProjectPath::Absolute("resources/shaders/shader_bundle.vulkan.bin");
+  std::ifstream file(bundlePath, std::ios::binary | std::ios::ate);
+  if (!file.is_open()) {
+    GTEST_SKIP() << "Bundle file not found";
+    return;
+  }
+  auto fileSize = static_cast<size_t>(file.tellg());
+  file.seekg(0);
+  std::vector<uint8_t> original(fileSize);
+  file.read(reinterpret_cast<char*>(original.data()), static_cast<std::streamsize>(fileSize));
+  file.close();
+
+  // Verify it's uncompressed (compressionType at offset 6).
+  ASSERT_EQ(TestReadU16LE(original.data() + 6), 0u);
+
+  uint32_t dataOffset = TestReadU32LE(original.data() + 36);
+  uint32_t dataSize = TestReadU32LE(original.data() + 40);
+  uint32_t reflectionOffset = TestReadU32LE(original.data() + 44);
+  ASSERT_GT(dataSize, 0u);
+
+  // Compress the data pool section.
+  uLongf compBound = compressBound(static_cast<uLong>(dataSize));
+  std::vector<uint8_t> compressedData(compBound);
+  uLongf compSize = compBound;
+  int ret = compress2(compressedData.data(), &compSize, original.data() + dataOffset,
+                      static_cast<uLong>(dataSize), Z_BEST_COMPRESSION);
+  ASSERT_EQ(ret, Z_OK);
+  compressedData.resize(compSize);
+
+  // Build a new bundle: [header+pools | compressed data | reflection]
+  std::vector<uint8_t> compressed;
+  compressed.insert(compressed.end(), original.begin(), original.begin() + dataOffset);
+  compressed.insert(compressed.end(), compressedData.begin(), compressedData.end());
+  if (reflectionOffset > 0) {
+    compressed.insert(compressed.end(), original.begin() + reflectionOffset, original.end());
+  }
+
+  // Patch header: set compressionType=1 and update reflectionOffset.
+  TestWriteU16LE(compressed.data() + 6, 1);
+  if (reflectionOffset > 0) {
+    uint32_t newReflOffset = static_cast<uint32_t>(dataOffset + compSize);
+    compressed[44] = static_cast<uint8_t>(newReflOffset & 0xFF);
+    compressed[45] = static_cast<uint8_t>((newReflOffset >> 8) & 0xFF);
+    compressed[46] = static_cast<uint8_t>((newReflOffset >> 16) & 0xFF);
+    compressed[47] = static_cast<uint8_t>((newReflOffset >> 24) & 0xFF);
+  }
+
+  // Load the compressed bundle.
+  PrecompiledShaderCache compressedCache;
+  ASSERT_TRUE(compressedCache.loadBundle(compressed.data(), compressed.size()));
+  EXPECT_TRUE(compressedCache.isLoaded());
+
+  // Compare with uncompressed load.
+  PrecompiledShaderCache originalCache;
+  ASSERT_TRUE(originalCache.loadBundle(original.data(), original.size()));
+  EXPECT_EQ(compressedCache.vertexEntryCount(), originalCache.vertexEntryCount());
+  EXPECT_EQ(compressedCache.fragmentEntryCount(), originalCache.fragmentEntryCount());
+  EXPECT_EQ(compressedCache.profileTag(), originalCache.profileTag());
+
+  // Verify compressed size is smaller.
+  EXPECT_LT(compressed.size(), original.size());
+  printf("  CompressedBundle: %zu -> %zu bytes (%.1f%% reduction)\n", original.size(),
+         compressed.size(),
+         100.0 *
+             (1.0 - static_cast<double>(compressed.size()) / static_cast<double>(original.size())));
 }
 
 }  // namespace tgfx

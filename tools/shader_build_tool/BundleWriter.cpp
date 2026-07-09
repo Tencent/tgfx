@@ -22,6 +22,7 @@
 #include <fstream>
 #include <iostream>
 #include <set>
+#include "zlib.h"
 
 namespace tgfx {
 
@@ -132,7 +133,7 @@ static constexpr uint32_t HEADER_SIZE_V3 = 80;
 static constexpr uint32_t POOL_ENTRY_SIZE = 28;
 
 bool WriteBundle(const std::string& outPath, const std::string& profileTag,
-                 const std::vector<VariantData>& variants) {
+                 const std::vector<VariantData>& variants, bool compress) {
   if (variants.empty()) {
     return true;
   }
@@ -205,7 +206,6 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
   uint32_t fragPoolOffset = vertPoolOffset + vertPoolCount * POOL_ENTRY_SIZE;
   uint32_t dataOffset = fragPoolOffset + fragPoolCount * POOL_ENTRY_SIZE;
   uint32_t dataSize = static_cast<uint32_t>(dataPool.size());
-  uint32_t reflectionOffset = dataOffset + dataSize;
 
   // Write file
   std::ofstream file(outPath, std::ios::binary);
@@ -214,10 +214,34 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
     return false;
   }
 
+  // Optionally compress the data pool.
+  std::vector<uint8_t> compressedData;
+  uint16_t compressionFlag = 0;
+  const uint8_t* dataToWrite = dataPool.data();
+  size_t dataToWriteSize = dataPool.size();
+  if (compress && !dataPool.empty()) {
+    uLongf compBound = compressBound(static_cast<uLong>(dataPool.size()));
+    compressedData.resize(compBound);
+    uLongf compSize = compBound;
+    int ret = compress2(compressedData.data(), &compSize, dataPool.data(),
+                        static_cast<uLong>(dataPool.size()), Z_BEST_COMPRESSION);
+    if (ret == Z_OK && compSize < dataPool.size()) {
+      compressedData.resize(compSize);
+      dataToWrite = compressedData.data();
+      dataToWriteSize = compSize;
+      compressionFlag = 1;
+    }
+    // If compression didn't reduce size, fall back to uncompressed.
+  }
+
+  // Recompute reflectionOffset based on actual data written.
+  uint32_t actualReflectionOffset =
+      reflPool.empty() ? 0 : static_cast<uint32_t>(dataOffset + dataToWriteSize);
+
   // Header
   WriteU32LE(file, 0x54475346);       // magic "TGSF"
   WriteU16LE(file, 3);                // formatVersion
-  WriteU16LE(file, 0);                // compressionType
+  WriteU16LE(file, compressionFlag);  // compressionType
   WriteU64LE(file, 0);                // sourceHash (reserved)
   WriteU32LE(file, 0x00010000);       // toolchainVersion 1.0.0
   WriteU32LE(file, vertPoolCount);    // vertPoolCount
@@ -225,8 +249,8 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
   WriteU32LE(file, vertPoolOffset);   // vertPoolOffset
   WriteU32LE(file, fragPoolOffset);   // fragPoolOffset
   WriteU32LE(file, dataOffset);       // dataOffset
-  WriteU32LE(file, dataSize);         // dataSize
-  WriteU32LE(file, reflPool.empty() ? 0 : reflectionOffset);  // reflectionOffset
+  WriteU32LE(file, dataSize);         // dataSize (uncompressed)
+  WriteU32LE(file, actualReflectionOffset);  // reflectionOffset
   char tagBuf[32] = {};
   std::strncpy(tagBuf, profileTag.c_str(), sizeof(tagBuf) - 1);
   file.write(tagBuf, sizeof(tagBuf));
@@ -249,9 +273,9 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
     WriteU32LE(file, entry.reflOffset);
   }
 
-  // Data pool
-  file.write(reinterpret_cast<const char*>(dataPool.data()),
-             static_cast<std::streamsize>(dataPool.size()));
+  // Data pool (possibly compressed)
+  file.write(reinterpret_cast<const char*>(dataToWrite),
+             static_cast<std::streamsize>(dataToWriteSize));
 
   // Reflection pool
   if (!reflPool.empty()) {
