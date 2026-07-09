@@ -19,6 +19,7 @@
 #include "PermutationMatcher.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ClampedGradientEffect.h"
+#include "gpu/processors/ColorMatrixFragmentProcessor.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/EmptyXferProcessor.h"
@@ -31,6 +32,7 @@
 #include "gpu/shaders/level1/DeviceSpaceTextureShader.h"
 #include "gpu/shaders/level1/GradientFillShader.h"
 #include "gpu/shaders/level1/QuadTextureFillShader.h"
+#include "gpu/shaders/level1/TextureColorMatrixShader.h"
 #include "gpu/shaders/level1/TextureFillShader.h"
 #include "gpu/shaders/level1/TiledTextureFillShader.h"
 
@@ -269,6 +271,37 @@ static std::optional<PermutationMatchResult> TryMatchGradientFill(const ProgramI
   return PermutationMatchResult{"GradientFillShader", 0, fragIndex};
 }
 
+static std::optional<PermutationMatchResult> TryMatchTextureColorMatrix(
+    const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp->name() != "DefaultGeometryProcessor") {
+    return std::nullopt;
+  }
+  if (programInfo->numFragmentProcessors() != 2) {
+    return std::nullopt;
+  }
+  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+    return std::nullopt;
+  }
+  auto fp0 = programInfo->getFragmentProcessor(0);
+  auto fp1 = programInfo->getFragmentProcessor(1);
+  if (fp0->name() != "TextureEffect" || fp1->name() != "ColorMatrixFragmentProcessor") {
+    return std::nullopt;
+  }
+  auto* te = static_cast<const TextureEffect*>(fp0);
+  if (te->isYUV()) {
+    return std::nullopt;
+  }
+  using D = TextureColorMatrixShader::D;
+  auto fragDomain = D::domain();
+  std::vector<int> fragValues(D::COUNT);
+  fragValues[D::ALPHA_ONLY] = te->isAlphaOnly() ? 1 : 0;
+  fragValues[D::HAS_RGBAAA] = te->hasRGBAAA() ? 1 : 0;
+  fragValues[D::HAS_SUBSET] = te->hasSubset() ? 1 : 0;
+  auto fragIndex = fragDomain.encode(fragValues);
+  return PermutationMatchResult{"TextureColorMatrixShader", 0, fragIndex};
+}
+
 static std::optional<PermutationMatchResult> TryMatchAtlasTextFill(const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
   if (gp->name() != "AtlasTextGeometryProcessor") {
@@ -308,6 +341,9 @@ std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* progra
     return result;
   }
   if (auto result = TryMatchGradientFill(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchTextureColorMatrix(programInfo)) {
     return result;
   }
   if (auto result = TryMatchAtlasTextFill(programInfo)) {
