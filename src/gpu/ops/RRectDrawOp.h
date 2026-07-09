@@ -19,13 +19,13 @@
 #pragma once
 
 #include <optional>
-#include "DrawOp.h"
+#include "StandardDrawOp.h"
 #include "gpu/RRectsVertexProvider.h"
 #include "gpu/proxies/GPUBufferProxy.h"
 #include "gpu/proxies/VertexBufferView.h"
 
 namespace tgfx {
-class RRectDrawOp : public DrawOp {
+class RRectDrawOp : public StandardDrawOp {
  public:
   /**
    * The maximum number of round rects that can be drawn in a single draw call.
@@ -62,7 +62,7 @@ class RRectDrawOp : public DrawOp {
  protected:
   PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
 
-  void onDraw(RenderPass* renderPass) override;
+  void onDraw(RenderPass* renderPass, RenderTarget* renderTarget) override;
 
   Type type() override {
     return Type::RRectDrawOp;

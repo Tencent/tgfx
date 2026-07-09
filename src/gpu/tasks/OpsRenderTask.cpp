@@ -32,12 +32,46 @@ void OpsRenderTask::execute(CommandEncoder* encoder) {
       renderTarget->sampleCount() > 1 ? renderTarget->getSampleTexture() : nullptr;
   RenderPassDescriptor descriptor(renderTarget->getRenderTexture(), loadOp, StoreAction::Store,
                                   clearColor.value_or(PMColor::Transparent()), resolveTexture);
+  // Attach a depth/stencil texture only when at least one op opts in. The stencil is owned by
+  // the RenderTargetProxy itself (see RenderTargetProxy::getStencil), so all OpsRenderTasks
+  // targeting the same proxy share one stencil texture for the proxy's lifetime.
+  bool stencilAvailable = false;
+  for (auto& op : drawOps) {
+    if (op != nullptr && op->needsStencil()) {
+      auto stencilTexture = renderTargetProxy->getStencil(renderTarget->sampleCount());
+      if (stencilTexture == nullptr) {
+        // Stencil allocation failed (usually OOM). Continue the pass without a stencil
+        // attachment — the loop below skips ops whose needsStencil() is true so they do not
+        // execute against a pass missing the matching attachment, while non-stencil ops
+        // still produce their usual output.
+        LOGE(
+            "OpsRenderTask::execute() Failed to acquire stencil texture; "
+            "skipping stencil-aware ops in this pass.");
+        break;
+      }
+      descriptor.depthStencilAttachment.texture = std::move(stencilTexture);
+      descriptor.depthStencilAttachment.loadAction = LoadAction::Clear;
+      descriptor.depthStencilAttachment.storeAction = StoreAction::DontCare;
+      descriptor.depthStencilAttachment.depthClearValue = 1.0f;
+      descriptor.depthStencilAttachment.depthReadOnly = false;
+      descriptor.depthStencilAttachment.stencilClearValue = 0;
+      descriptor.depthStencilAttachment.stencilReadOnly = false;
+      stencilAvailable = true;
+      break;
+    }
+  }
   auto renderPass = encoder->beginRenderPass(descriptor);
   if (renderPass == nullptr) {
     LOGE("OpsRenderTask::execute() Failed to initialize the render pass!");
     return;
   }
   for (auto& op : drawOps) {
+    if (op != nullptr && !stencilAvailable && op->needsStencil()) {
+      // Drop stencil-aware ops when no stencil attachment was bound — running them would
+      // hit silent backend validation errors. Non-stencil ops continue to execute normally.
+      op = nullptr;
+      continue;
+    }
     op->execute(renderPass.get(), renderTarget.get());
     // Release the Op immediately after execution to maximize GPU resource reuse.
     op = nullptr;

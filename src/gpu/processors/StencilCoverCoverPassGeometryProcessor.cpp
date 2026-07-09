@@ -16,38 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "StandardDrawOp.h"
-#include "gpu/proxies/GPUMeshProxy.h"
+#include "StencilCoverCoverPassGeometryProcessor.h"
 
 namespace tgfx {
-
-class MeshDrawOp : public StandardDrawOp {
- public:
-  static PlacementPtr<MeshDrawOp> Make(std::shared_ptr<GPUMeshProxy> meshProxy, PMColor color,
-                                       const Matrix& viewMatrix);
-
-  bool hasCoverage() const override;
-
- protected:
-  PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
-
-  void onDraw(RenderPass* renderPass, RenderTarget* renderTarget) override;
-
-  Type type() override {
-    return Type::MeshDrawOp;
-  }
-
- private:
-  MeshDrawOp(BlockAllocator* allocator, std::shared_ptr<GPUMeshProxy> meshProxy, PMColor color,
-             const Matrix& viewMatrix);
-
-  std::shared_ptr<GPUMeshProxy> meshProxy = nullptr;
-  PMColor color = PMColor::Transparent();
-  Matrix viewMatrix = {};
-
-  friend class BlockAllocator;
-};
-
+StencilCoverCoverPassGeometryProcessor::StencilCoverCoverPassGeometryProcessor(
+    PMColor color, const Matrix& viewMatrix)
+    : GeometryProcessor(ClassID()), color(color), viewMatrix(viewMatrix) {
+  position = {"aPosition", VertexFormat::Float2};
+  setVertexAttributes(&position, 1);
+}
 }  // namespace tgfx
