@@ -203,50 +203,55 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
       }
 
       for (const auto& backend : options.backends) {
-        if (backend == "vulkan" || backend == "metal" || backend == "webgpu") {
-          std::vector<uint8_t> vertBlob;
-          std::vector<uint8_t> fragBlob;
+        std::vector<uint8_t> vertBlob;
+        std::vector<uint8_t> fragBlob;
 
-          if (backend == "vulkan") {
-            auto* vp = reinterpret_cast<const uint8_t*>(vertSpirv->data());
-            vertBlob.assign(vp, vp + vertSpirv->size() * 4);
-            auto* fp = reinterpret_cast<const uint8_t*>(fragResult.spirv.data());
-            fragBlob.assign(fp, fp + fragResult.spirv.size() * 4);
-          } else if (backend == "metal") {
-            auto mslVert = TranslateToMSL(*vertSpirv);
-            auto mslFrag = TranslateToMSL(fragResult.spirv);
-            if (!mslVert.success || !mslFrag.success) {
-              std::cerr << "  MSL translation error: "
-                        << (mslVert.success ? mslFrag.error : mslVert.error) << "\n";
-              report.errorCount++;
-              continue;
-            }
-            vertBlob.assign(mslVert.msl.begin(), mslVert.msl.end());
-            fragBlob.assign(mslFrag.msl.begin(), mslFrag.msl.end());
-          } else if (backend == "webgpu") {
-            auto wgslVert = TranslateToWGSL(*vertSpirv);
-            auto wgslFrag = TranslateToWGSL(fragResult.spirv);
-            if (!wgslVert.success || !wgslFrag.success) {
-              std::cerr << "  WGSL translation error: "
-                        << (wgslVert.success ? wgslFrag.error : wgslVert.error) << "\n";
-              report.errorCount++;
-              continue;
-            }
-            vertBlob.assign(wgslVert.wgsl.begin(), wgslVert.wgsl.end());
-            fragBlob.assign(wgslFrag.wgsl.begin(), wgslFrag.wgsl.end());
+        if (backend == "vulkan") {
+          auto* vp = reinterpret_cast<const uint8_t*>(vertSpirv->data());
+          vertBlob.assign(vp, vp + vertSpirv->size() * 4);
+          auto* fp = reinterpret_cast<const uint8_t*>(fragResult.spirv.data());
+          fragBlob.assign(fp, fp + fragResult.spirv.size() * 4);
+        } else if (backend == "metal") {
+          auto mslVert = TranslateToMSL(*vertSpirv);
+          auto mslFrag = TranslateToMSL(fragResult.spirv);
+          if (!mslVert.success || !mslFrag.success) {
+            std::cerr << "  MSL translation error: "
+                      << (mslVert.success ? mslFrag.error : mslVert.error) << "\n";
+            report.errorCount++;
+            continue;
           }
-
-          VariantData variant;
-          variant.shaderName = info.name;
-          variant.vertPermutationIndex = vi;
-          variant.fragPermutationIndex = fi;
-          variant.profileTag = backend;
-          variant.vertexBlob = std::move(vertBlob);
-          variant.fragmentBlob = std::move(fragBlob);
-          variant.vertexReflection = reflection.vertexReflection;
-          variant.fragmentReflection = reflection.fragmentReflection;
-          outVariants->push_back(std::move(variant));
+          vertBlob.assign(mslVert.msl.begin(), mslVert.msl.end());
+          fragBlob.assign(mslFrag.msl.begin(), mslFrag.msl.end());
+        } else if (backend == "webgpu") {
+          auto wgslVert = TranslateToWGSL(*vertSpirv);
+          auto wgslFrag = TranslateToWGSL(fragResult.spirv);
+          if (!wgslVert.success || !wgslFrag.success) {
+            std::cerr << "  WGSL translation error: "
+                      << (wgslVert.success ? wgslFrag.error : wgslVert.error) << "\n";
+            report.errorCount++;
+            continue;
+          }
+          vertBlob.assign(wgslVert.wgsl.begin(), wgslVert.wgsl.end());
+          fragBlob.assign(wgslFrag.wgsl.begin(), wgslFrag.wgsl.end());
+        } else if (backend == "opengl") {
+          auto glslVert = PrependDefines(vertSource, vertDefines);
+          auto glslFrag = PrependDefines(fragSource, fragDefines);
+          vertBlob.assign(glslVert.begin(), glslVert.end());
+          fragBlob.assign(glslFrag.begin(), glslFrag.end());
+        } else {
+          continue;
         }
+
+        VariantData variant;
+        variant.shaderName = info.name;
+        variant.vertPermutationIndex = vi;
+        variant.fragPermutationIndex = fi;
+        variant.profileTag = backend;
+        variant.vertexBlob = std::move(vertBlob);
+        variant.fragmentBlob = std::move(fragBlob);
+        variant.vertexReflection = reflection.vertexReflection;
+        variant.fragmentReflection = reflection.fragmentReflection;
+        outVariants->push_back(std::move(variant));
       }
     }
   }
