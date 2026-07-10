@@ -61,10 +61,11 @@ class ShapeContent : public DrawContent {
   // visible band after clipping matches the requested stroke width.
   std::shared_ptr<Shape> getExpandedStrokeShape() const;
 
-  // Path used by bounds/hit-test queries. For fill or Center-align stroke it is the naturally
-  // stroked path; for Inside/Outside it is the expanded-stroke path intersected with the raw
-  // path region (or the outside-of-path region for Outside).
-  Path getFilledPath() const;
+  // Path form of the stroke used by bounds/hit-test queries. For Center alignment this is the
+  // natural 1x stroke; for Inside/Outside the width is doubled so that combining with the
+  // original path (intersect / difference) yields a band whose visible half has the requested
+  // stroke width. Path effects (e.g. dash) are applied before stroking.
+  Path getStrokedPath() const;
 };
 
 }  // namespace tgfx

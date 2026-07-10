@@ -36,11 +36,10 @@
 
 namespace tgfx {
 
-// Rect/RRect/Path contents rasterize the geometry as-is and are unaware of stroke alignment or
-// path effects (dash). When either is active the recording MUST be routed to ShapeContent, which
-// applies the effect and expands the stroke for Inside/Outside alignment. This also keeps the
-// content's getBounds() consistent with StyledShape::getBounds() (which SpreadUtils relies on).
-static bool NeedsShapeContent(const LayerPaint& paint) {
+// A stroke style is "complex" when it carries a non-Center alignment or a path effect (e.g. dash).
+// Complex styles cannot be resolved by a plain Canvas stroke call and must be expanded into fill
+// geometry downstream (ShapeContent handles the clip-mask expansion and effect application).
+static bool ComplexStrokeStyle(const LayerPaint& paint) {
   return paint.style == PaintStyle::Stroke &&
          (paint.strokeAlign != StrokeAlign::Center || paint.pathEffect != nullptr);
 }
@@ -73,7 +72,7 @@ void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerP
   // TextContent does not consume strokeAlign or pathEffect. Callers that need Inside/Outside
   // alignment or a path effect on text must first convert the TextBlob into a Shape (see
   // StrokeStyle::prepareGlyphRun) and route it through addShape().
-  DEBUG_ASSERT(!NeedsShapeContent(paint));
+  DEBUG_ASSERT(!ComplexStrokeStyle(paint));
   flushPending();
   auto& list = paint.placement == LayerPlacement::Foreground ? foregrounds : contents;
   // The offset only affects the text position, while _matrix affects both
@@ -93,7 +92,7 @@ void LayerRecorder::addMesh(std::shared_ptr<Mesh> mesh, const LayerPaint& paint)
   }
   // MeshContent does not consume strokeAlign or pathEffect. There is no reasonable way to apply
   // stroke alignment or a path effect to a Mesh, so reject the paint here.
-  DEBUG_ASSERT(!NeedsShapeContent(paint));
+  DEBUG_ASSERT(!ComplexStrokeStyle(paint));
   flushPending();
   auto& list = paint.placement == LayerPlacement::Foreground ? foregrounds : contents;
   std::unique_ptr<GeometryContent> content = std::make_unique<MeshContent>(std::move(mesh), paint);
@@ -119,7 +118,7 @@ void LayerRecorder::addRect(const Rect& rect, const LayerPaint& paint, const Mat
   if (rect.isEmpty()) {
     return;
   }
-  if (NeedsShapeContent(paint)) {
+  if (ComplexStrokeStyle(paint)) {
     Path path = {};
     path.addRect(rect);
     flushPending(PendingType::Shape, paint, matrix);
@@ -140,7 +139,7 @@ void LayerRecorder::addRRect(const RRect& rRect, const LayerPaint& paint, const 
     addRect(rRect.rect(), paint, matrix);
     return;
   }
-  if (NeedsShapeContent(paint)) {
+  if (ComplexStrokeStyle(paint)) {
     Path path = {};
     path.addRRect(rRect);
     flushPending(PendingType::Shape, paint, matrix);
@@ -157,7 +156,7 @@ void LayerRecorder::addPath(const Path& path, const LayerPaint& paint, const Mat
   if (path.isEmpty()) {
     return;
   }
-  if (!NeedsShapeContent(paint) && tryAddSimplifiedPath(path, paint, matrix)) {
+  if (!ComplexStrokeStyle(paint) && tryAddSimplifiedPath(path, paint, matrix)) {
     return;
   }
   flushPending(PendingType::Shape, paint, matrix);
@@ -169,7 +168,7 @@ void LayerRecorder::addShape(std::shared_ptr<Shape> shape, const LayerPaint& pai
   if (shape == nullptr) {
     return;
   }
-  if (NeedsShapeContent(paint)) {
+  if (ComplexStrokeStyle(paint)) {
     flushPending(PendingType::Shape, paint, matrix);
     pendingShape = std::move(shape);
     return;
@@ -317,9 +316,9 @@ void LayerRecorder::flushPending(PendingType newType, const LayerPaint& newPaint
         pendingRRects = {};
         break;
       case PendingType::Shape:
-        // Route to ShapeContent whenever the paint requires effect/alignment awareness, even if
-        // the shape is a simple path. PathContent otherwise ignores strokeAlign and pathEffect.
-        if (pendingShape->isSimplePath() && !NeedsShapeContent(pendingPaint)) {
+        // Route to ShapeContent whenever the paint carries a complex stroke style, even if the
+        // shape is a simple path. PathContent otherwise ignores strokeAlign and pathEffect.
+        if (pendingShape->isSimplePath() && !ComplexStrokeStyle(pendingPaint)) {
           content = std::make_unique<PathContent>(pendingShape->getPath(), pendingPaint);
         } else {
           content = std::make_unique<ShapeContent>(std::move(pendingShape), pendingPaint);

@@ -62,7 +62,21 @@ Rect ShapeContent::getBounds() const {
 }
 
 Rect ShapeContent::getTightBounds(const Matrix& matrix) const {
-  auto strokedPath = getFilledPath();
+  auto originalPath = shape->getPath();
+  if (!stroke) {
+    originalPath.transform(matrix);
+    return originalPath.getBounds();
+  }
+  if (strokeAlign == StrokeAlign::Inside) {
+    // The Inside band lives entirely within the original path, so the transformed original
+    // path's bounds are already a tight upper bound: the outward edge of the band coincides
+    // with the original boundary, and the inward edge stays inside.
+    originalPath.transform(matrix);
+    return originalPath.getBounds();
+  }
+  // Center and Outside: extremum of the alignment-aware stroke path lives on the outward side
+  // of the band, so its transformed bounds are tight without any further clamping.
+  auto strokedPath = getStrokedPath();
   strokedPath.transform(matrix);
   return strokedPath.getBounds();
 }
@@ -71,7 +85,22 @@ bool ShapeContent::hitTestPoint(float localX, float localY) const {
   if (color.alpha <= 0) {
     return false;
   }
-  return getFilledPath().contains(localX, localY);
+  auto originalPath = shape->getPath();
+  if (!stroke) {
+    return originalPath.contains(localX, localY);
+  }
+  if (!getStrokedPath().contains(localX, localY)) {
+    return false;
+  }
+  switch (strokeAlign) {
+    case StrokeAlign::Center:
+      return true;
+    case StrokeAlign::Inside:
+      return originalPath.contains(localX, localY);
+    case StrokeAlign::Outside:
+      return !originalPath.contains(localX, localY);
+  }
+  return true;
 }
 
 Rect ShapeContent::onGetBounds() const {
@@ -142,46 +171,23 @@ std::shared_ptr<Shape> ShapeContent::getExpandedStrokeShape() const {
   return Shape::ApplyStroke(std::move(expanded), &doubled);
 }
 
-Path ShapeContent::getFilledPath() const {
-  // Boolean-op subtraction is numerically unstable when the original shape's bounds are sub-pixel
-  // thin, and can produce spurious geometry that misleads hit-test. At sub-pixel scale the raw
-  // shape is invisible anyway, so skipping the intersect/difference step is harmless. Matches the
-  // guard the legacy StrokeStyle::applyStrokeAndAlign used before this pipeline moved into
-  // ShapeContent.
-  static constexpr float MinBoundExtentForBooleanOp = 0.5f;
+Path ShapeContent::getStrokedPath() const {
   auto path = shape->getPath();
-  if (!stroke) {
-    return path;
-  }
   // Ignore filterPath's boolean result and keep `path` unchanged on rejection. This matches the
-  // semantics of EffectShape::onGetPath used by the GPU draw path, so hit-test and rasterization
-  // agree on the same geometry.
-  if (needsAlignmentClip()) {
-    // Build the visible stroke band: expanded stroke intersected with the kept side of the
-    // original path. For Outside we subtract the raw path region from the expanded outline.
-    Path effected = path;
-    if (pathEffect != nullptr) {
-      pathEffect->filterPath(&effected);
-    }
-    Stroke doubled = *stroke;
-    doubled.width *= 2;
-    doubled.applyToPath(&effected);
-    const auto rawBounds = path.getBounds();
-    if (rawBounds.width() < MinBoundExtentForBooleanOp ||
-        rawBounds.height() < MinBoundExtentForBooleanOp) {
-      return effected;
-    }
-    if (strokeAlign == StrokeAlign::Inside) {
-      effected.addPath(path, PathOp::Intersect);
-    } else {
-      effected.addPath(path, PathOp::Difference);
-    }
-    return effected;
-  }
+  // semantics of EffectShape::onGetPath used by the GPU draw path, so bounds/hit-test agree with
+  // rasterization on the same geometry.
   if (pathEffect != nullptr) {
     pathEffect->filterPath(&path);
   }
-  stroke->applyToPath(&path);
+  // Center: the natural 1x stroke already covers the visible band on both sides of the boundary
+  // by width/2. Inside/Outside: double the width so callers combining this path with the
+  // original geometry (intersect for Inside, difference for Outside) get a band whose visible
+  // half has the requested width.
+  Stroke strokeToApply = *stroke;
+  if (strokeAlign != StrokeAlign::Center) {
+    strokeToApply.width *= 2;
+  }
+  strokeToApply.applyToPath(&path);
   return path;
 }
 
