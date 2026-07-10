@@ -65,19 +65,6 @@ void LayerRecorder::addShape(std::shared_ptr<Shape> shape, const LayerPaint& pai
   addShape(std::move(shape), paint, _matrix);
 }
 
-void LayerRecorder::emitContent(std::unique_ptr<GeometryContent> content,
-                                LayerPlacement placement) {
-  if (content == nullptr) {
-    return;
-  }
-  flushPending();
-  if (!_matrix.isIdentity()) {
-    content = std::make_unique<MatrixContent>(std::move(content), _matrix);
-  }
-  auto& list = placement == LayerPlacement::Foreground ? foregrounds : contents;
-  list.push_back(std::move(content));
-}
-
 void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerPaint& paint,
                                 float x, float y) {
   if (textBlob == nullptr) {
