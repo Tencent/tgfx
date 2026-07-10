@@ -70,6 +70,10 @@ void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerP
   if (textBlob == nullptr) {
     return;
   }
+  // TextContent does not consume strokeAlign or pathEffect. Callers that need Inside/Outside
+  // alignment or a path effect on text must first convert the TextBlob into a Shape (see
+  // StrokeStyle::prepareGlyphRun) and route it through addShape().
+  DEBUG_ASSERT(!NeedsShapeContent(paint));
   flushPending();
   auto& list = paint.placement == LayerPlacement::Foreground ? foregrounds : contents;
   // The offset only affects the text position, while _matrix affects both
@@ -87,6 +91,9 @@ void LayerRecorder::addMesh(std::shared_ptr<Mesh> mesh, const LayerPaint& paint)
   if (mesh == nullptr) {
     return;
   }
+  // MeshContent does not consume strokeAlign or pathEffect. There is no reasonable way to apply
+  // stroke alignment or a path effect to a Mesh, so reject the paint here.
+  DEBUG_ASSERT(!NeedsShapeContent(paint));
   flushPending();
   auto& list = paint.placement == LayerPlacement::Foreground ? foregrounds : contents;
   std::unique_ptr<GeometryContent> content = std::make_unique<MeshContent>(std::move(mesh), paint);

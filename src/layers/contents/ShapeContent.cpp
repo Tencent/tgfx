@@ -143,22 +143,34 @@ std::shared_ptr<Shape> ShapeContent::getExpandedStrokeShape() const {
 }
 
 Path ShapeContent::getFilledPath() const {
+  // Boolean-op subtraction is numerically unstable when the original shape's bounds are sub-pixel
+  // thin, and can produce spurious geometry that misleads hit-test. At sub-pixel scale the raw
+  // shape is invisible anyway, so skipping the intersect/difference step is harmless. Matches the
+  // guard the legacy StrokeStyle::applyStrokeAndAlign used before this pipeline moved into
+  // ShapeContent.
+  static constexpr float MinBoundExtentForBooleanOp = 0.5f;
   auto path = shape->getPath();
   if (!stroke) {
     return path;
   }
+  // Ignore filterPath's boolean result and keep `path` unchanged on rejection. This matches the
+  // semantics of EffectShape::onGetPath used by the GPU draw path, so hit-test and rasterization
+  // agree on the same geometry.
   if (needsAlignmentClip()) {
     // Build the visible stroke band: expanded stroke intersected with the kept side of the
     // original path. For Outside we subtract the raw path region from the expanded outline.
     Path effected = path;
-    if (pathEffect != nullptr && !pathEffect->filterPath(&effected)) {
-      // Path effect declined to apply. Return an empty region so callers using this path for
-      // bounds/hit-test do not misinterpret it as a solid, unbroken stroke band.
-      return {};
+    if (pathEffect != nullptr) {
+      pathEffect->filterPath(&effected);
     }
     Stroke doubled = *stroke;
     doubled.width *= 2;
     doubled.applyToPath(&effected);
+    const auto rawBounds = path.getBounds();
+    if (rawBounds.width() < MinBoundExtentForBooleanOp ||
+        rawBounds.height() < MinBoundExtentForBooleanOp) {
+      return effected;
+    }
     if (strokeAlign == StrokeAlign::Inside) {
       effected.addPath(path, PathOp::Intersect);
     } else {
@@ -166,8 +178,8 @@ Path ShapeContent::getFilledPath() const {
     }
     return effected;
   }
-  if (pathEffect != nullptr && !pathEffect->filterPath(&path)) {
-    return {};
+  if (pathEffect != nullptr) {
+    pathEffect->filterPath(&path);
   }
   stroke->applyToPath(&path);
   return path;
