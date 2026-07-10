@@ -13,15 +13,15 @@ layout(location = 0) in vec2 TransformedCoords_0;
 
 layout(location = 0) out vec4 fragColor;
 
-layout(set = 0, binding = 1) uniform sampler2D TextureSampler_0_P1;
+layout(set = 0, binding = 1) uniform sampler2D TextureSampler_0;
 
 layout(std140, set = 0, binding = 2) uniform FragmentUniformBlock {
-  vec4 Color_P0;
+  vec4 Color;
 #if SHADER_MODE_X >= 2 || SHADER_MODE_Y >= 2
-  vec4 Subset_P1;
+  vec4 Subset;
 #endif
 #if SHADER_MODE_X >= 1 || SHADER_MODE_Y >= 1
-  vec4 Clamp_P1;
+  vec4 Clamp;
 #endif
 };
 
@@ -50,98 +50,98 @@ void main() {
   // --- X axis tiling ---
 #if SHADER_MODE_X == 1
   // Clamp
-  coord.x = clamp(coord.x, Clamp_P1.x, Clamp_P1.z);
+  coord.x = clamp(coord.x, Clamp.x, Clamp.z);
 #elif SHADER_MODE_X == 2
   // RepeatNearestNone
-  coord.x = tileRepeat(coord.x, Subset_P1.x, Subset_P1.z);
-  coord.x = clamp(coord.x, Clamp_P1.x, Clamp_P1.z);
+  coord.x = tileRepeat(coord.x, Subset.x, Subset.z);
+  coord.x = clamp(coord.x, Clamp.x, Clamp.z);
 #elif SHADER_MODE_X == 3
   // RepeatLinearNone
-  coord.x = tileRepeat(coord.x, Subset_P1.x, Subset_P1.z);
-  coord.x = clamp(coord.x, Clamp_P1.x, Clamp_P1.z);
+  coord.x = tileRepeat(coord.x, Subset.x, Subset.z);
+  coord.x = clamp(coord.x, Clamp.x, Clamp.z);
 #elif SHADER_MODE_X == 4
   // RepeatLinearMipmap
-  coord.x = tileRepeat(coord.x, Subset_P1.x, Subset_P1.z);
-  coord.x = clamp(coord.x, Clamp_P1.x, Clamp_P1.z);
+  coord.x = tileRepeat(coord.x, Subset.x, Subset.z);
+  coord.x = clamp(coord.x, Clamp.x, Clamp.z);
 #elif SHADER_MODE_X == 5
   // RepeatNearestMipmap
-  coord.x = tileRepeat(coord.x, Subset_P1.x, Subset_P1.z);
-  coord.x = clamp(coord.x, Clamp_P1.x, Clamp_P1.z);
+  coord.x = tileRepeat(coord.x, Subset.x, Subset.z);
+  coord.x = clamp(coord.x, Clamp.x, Clamp.z);
 #elif SHADER_MODE_X == 6
   // MirrorRepeat
-  coord.x = tileMirror(coord.x, Subset_P1.x, Subset_P1.z);
-  coord.x = clamp(coord.x, Clamp_P1.x, Clamp_P1.z);
+  coord.x = tileMirror(coord.x, Subset.x, Subset.z);
+  coord.x = clamp(coord.x, Clamp.x, Clamp.z);
 #elif SHADER_MODE_X == 7
   // ClampToBorderNearest
   // handled after sampling
 #elif SHADER_MODE_X == 8
   // ClampToBorderLinear
-  coord.x = clamp(coord.x, Clamp_P1.x, Clamp_P1.z);
+  coord.x = clamp(coord.x, Clamp.x, Clamp.z);
 #endif
 
   // --- Y axis tiling ---
 #if SHADER_MODE_Y == 1
-  coord.y = clamp(coord.y, Clamp_P1.y, Clamp_P1.w);
+  coord.y = clamp(coord.y, Clamp.y, Clamp.w);
 #elif SHADER_MODE_Y == 2
-  coord.y = tileRepeat(coord.y, Subset_P1.y, Subset_P1.w);
-  coord.y = clamp(coord.y, Clamp_P1.y, Clamp_P1.w);
+  coord.y = tileRepeat(coord.y, Subset.y, Subset.w);
+  coord.y = clamp(coord.y, Clamp.y, Clamp.w);
 #elif SHADER_MODE_Y == 3
-  coord.y = tileRepeat(coord.y, Subset_P1.y, Subset_P1.w);
-  coord.y = clamp(coord.y, Clamp_P1.y, Clamp_P1.w);
+  coord.y = tileRepeat(coord.y, Subset.y, Subset.w);
+  coord.y = clamp(coord.y, Clamp.y, Clamp.w);
 #elif SHADER_MODE_Y == 4
-  coord.y = tileRepeat(coord.y, Subset_P1.y, Subset_P1.w);
-  coord.y = clamp(coord.y, Clamp_P1.y, Clamp_P1.w);
+  coord.y = tileRepeat(coord.y, Subset.y, Subset.w);
+  coord.y = clamp(coord.y, Clamp.y, Clamp.w);
 #elif SHADER_MODE_Y == 5
-  coord.y = tileRepeat(coord.y, Subset_P1.y, Subset_P1.w);
-  coord.y = clamp(coord.y, Clamp_P1.y, Clamp_P1.w);
+  coord.y = tileRepeat(coord.y, Subset.y, Subset.w);
+  coord.y = clamp(coord.y, Clamp.y, Clamp.w);
 #elif SHADER_MODE_Y == 6
-  coord.y = tileMirror(coord.y, Subset_P1.y, Subset_P1.w);
-  coord.y = clamp(coord.y, Clamp_P1.y, Clamp_P1.w);
+  coord.y = tileMirror(coord.y, Subset.y, Subset.w);
+  coord.y = clamp(coord.y, Clamp.y, Clamp.w);
 #elif SHADER_MODE_Y == 7
   // ClampToBorderNearest - handled after sampling
 #elif SHADER_MODE_Y == 8
-  coord.y = clamp(coord.y, Clamp_P1.y, Clamp_P1.w);
+  coord.y = clamp(coord.y, Clamp.y, Clamp.w);
 #endif
 
 #if HAS_STRICT
   // Additional clamp for strict constraint
-  coord = clamp(coord, Clamp_P1.xy, Clamp_P1.zw);
+  coord = clamp(coord, Clamp.xy, Clamp.zw);
 #endif
 
   // --- Sample ---
-  vec4 color = texture(TextureSampler_0_P1, coord);
+  vec4 color = texture(TextureSampler_0, coord);
 
   // --- ClampToBorder post-processing ---
 #if SHADER_MODE_X == 7
   // ClampToBorderNearest X: if outside subset, output transparent
-  if (texCoord.x < Subset_P1.x || texCoord.x >= Subset_P1.z) {
+  if (texCoord.x < Subset.x || texCoord.x >= Subset.z) {
     color = vec4(0.0);
   }
 #endif
 #if SHADER_MODE_Y == 7
   // ClampToBorderNearest Y
-  if (texCoord.y < Subset_P1.y || texCoord.y >= Subset_P1.w) {
+  if (texCoord.y < Subset.y || texCoord.y >= Subset.w) {
     color = vec4(0.0);
   }
 #endif
 #if SHADER_MODE_X == 8
   // ClampToBorderLinear X: fade at edges
-  float fadeX = smoothstep(Subset_P1.x - 0.5, Subset_P1.x + 0.5, texCoord.x) *
-                (1.0 - smoothstep(Subset_P1.z - 0.5, Subset_P1.z + 0.5, texCoord.x));
+  float fadeX = smoothstep(Subset.x - 0.5, Subset.x + 0.5, texCoord.x) *
+                (1.0 - smoothstep(Subset.z - 0.5, Subset.z + 0.5, texCoord.x));
   color *= fadeX;
 #endif
 #if SHADER_MODE_Y == 8
   // ClampToBorderLinear Y: fade at edges
-  float fadeY = smoothstep(Subset_P1.y - 0.5, Subset_P1.y + 0.5, texCoord.y) *
-                (1.0 - smoothstep(Subset_P1.w - 0.5, Subset_P1.w + 0.5, texCoord.y));
+  float fadeY = smoothstep(Subset.y - 0.5, Subset.y + 0.5, texCoord.y) *
+                (1.0 - smoothstep(Subset.w - 0.5, Subset.w + 0.5, texCoord.y));
   color *= fadeY;
 #endif
 
   // --- Alpha-only and output ---
 #if ALPHA_ONLY
-  color = color.a * Color_P0;
+  color = color.a * Color;
 #else
-  color = color * Color_P0.a;
+  color = color * Color.a;
 #endif
 
   fragColor = color;

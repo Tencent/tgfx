@@ -1,5 +1,5 @@
 // MeshFillShader fragment shader
-// Processor layout: MeshGeometryProcessor(_P0) + EmptyXferProcessor(_P1)
+// Processor layout: MeshGeometryProcessor() + EmptyXferProcessor()
 // Permutation dimensions (injected as #define 0/1):
 //   HAS_TEX_COORDS: whether user-provided texture coordinates are present
 //   HAS_COLORS: whether per-vertex colors are present
@@ -15,7 +15,7 @@
 
 #if !HAS_COLORS
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
-  vec4 Color_P0;
+  vec4 Color;
 };
 #endif
 
@@ -33,7 +33,7 @@ void main() {
 #if HAS_COLORS
   vec4 outputColor = vColor;
 #else
-  vec4 outputColor = Color_P0;
+  vec4 outputColor = Color;
 #endif
 
 #if HAS_COVERAGE

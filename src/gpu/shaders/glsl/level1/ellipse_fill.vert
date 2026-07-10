@@ -1,5 +1,5 @@
 // EllipseFillShader vertex shader
-// Processor layout: EllipseGeometryProcessor(_P0) + EmptyXferProcessor(_P1)
+// Processor layout: EllipseGeometryProcessor() + EmptyXferProcessor()
 // Permutation dimensions (injected as #define 0/1):
 //   STROKE: whether stroke mode is enabled
 //   HAS_COMMON_COLOR: whether a common color uniform is used instead of per-vertex color

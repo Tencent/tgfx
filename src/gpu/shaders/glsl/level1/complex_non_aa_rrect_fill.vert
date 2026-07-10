@@ -1,5 +1,5 @@
 // ComplexNonAARRectFillShader vertex shader
-// Processor layout: ComplexNonAARRectGeometryProcessor(_P0) + EmptyXferProcessor(_P1)
+// Processor layout: ComplexNonAARRectGeometryProcessor() + EmptyXferProcessor()
 // Permutation dimensions (injected as #define 0/1):
 //   HAS_COMMON_COLOR: whether a common color uniform is used
 //   STROKE: whether stroke mode is enabled

@@ -1,5 +1,5 @@
 // NonAARRectFillShader vertex shader
-// Processor layout: NonAARRectGeometryProcessor(_P0) + EmptyXferProcessor(_P1)
+// Processor layout: NonAARRectGeometryProcessor() + EmptyXferProcessor()
 // Permutation dimensions (injected as #define 0/1):
 //   HAS_COMMON_COLOR: whether a common color uniform is used
 //   STROKE: whether stroke mode is enabled (adds stroke width attribute)

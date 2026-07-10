@@ -34,7 +34,7 @@
 #endif
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
-  vec4 Color_P0;
+  vec4 Color;
 #if LINEARIZE
   vec4 SrcTF0;
   vec4 SrcTF1;
@@ -117,7 +117,7 @@ float dst_tf(float x) {
 #endif
 
 void main() {
-  vec4 color = Color_P0;
+  vec4 color = Color;
 
 #if UNPREMUL
   float alpha = color.a;

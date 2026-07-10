@@ -12,14 +12,14 @@
 #endif
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
-  vec4 Color_P0;
+  vec4 Color;
 };
 
 layout(location = 0) in vec2 TransformedCoords_0;
 
-layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0_P1;
+layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
 #if CHILD_TYPE == 2
-layout(set = 1, binding = 1) uniform sampler2D TextureSampler_1_P1;
+layout(set = 1, binding = 1) uniform sampler2D TextureSampler_1;
 #endif
 
 layout(location = 0) out vec4 fragColor;
@@ -271,8 +271,8 @@ vec4 blendColors(vec4 S, vec4 D) {
 }
 
 void main() {
-  vec4 inputColor = Color_P0;
-  vec4 childColor = texture(TextureSampler_0_P1, TransformedCoords_0);
+  vec4 inputColor = Color;
+  vec4 childColor = texture(TextureSampler_0, TransformedCoords_0);
 
   vec4 srcColor;
   vec4 dstColor;
@@ -288,7 +288,7 @@ void main() {
 #elif CHILD_TYPE == 2
   // TwoChild: first texture is src, second texture is dst
   srcColor = childColor;
-  dstColor = texture(TextureSampler_1_P1, TransformedCoords_0);
+  dstColor = texture(TextureSampler_1, TransformedCoords_0);
 #endif
 
   fragColor = blendColors(srcColor, dstColor);

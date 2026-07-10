@@ -1,5 +1,5 @@
 // EllipseFillShader fragment shader
-// Processor layout: EllipseGeometryProcessor(_P0) + EmptyXferProcessor(_P1)
+// Processor layout: EllipseGeometryProcessor() + EmptyXferProcessor()
 // Permutation dimensions (injected as #define 0/1):
 //   STROKE: whether stroke mode is enabled (inner curve check)
 //   HAS_COMMON_COLOR: whether a common color uniform is used
@@ -14,7 +14,7 @@
 
 #if HAS_COMMON_COLOR
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
-  vec4 Color_P0;
+  vec4 Color;
 };
 #endif
 
@@ -28,7 +28,7 @@ layout(location = 0) out vec4 fragColor;
 
 void main() {
 #if HAS_COMMON_COLOR
-  vec4 outputColor = Color_P0;
+  vec4 outputColor = Color;
 #else
   vec4 outputColor = vColor;
 #endif

@@ -1,5 +1,5 @@
 // GradientFillShader fragment shader
-// Processor layout: DefaultGeometryProcessor(_P0) + ClampedGradientEffect(_P1) + EmptyXferProcessor(_P2)
+// Processor layout: DefaultGeometryProcessor() + ClampedGradientEffect() + EmptyXferProcessor()
 // Permutation dimensions (injected by build tool as #define):
 //   LAYOUT_TYPE: 0=LINEAR, 1=RADIAL, 2=CONIC, 3=DIAMOND
 //   INTERVAL_COUNT: 0..7 (maps to actual interval count 1..8)
@@ -16,60 +16,60 @@
 #define INTERVALS (INTERVAL_COUNT + 1)
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
-  vec4 Color_P0;
-  vec4 leftBorderColor_P1;
-  vec4 rightBorderColor_P1;
+  vec4 Color;
+  vec4 leftBorderColor;
+  vec4 rightBorderColor;
 #if LAYOUT_TYPE == 2
-  float Bias_P1;
-  float Scale_P1;
+  float Bias;
+  float Scale;
 #endif
   // Colorizer uniforms: thresholds always present
-  vec4 thresholds1_7_P1;
-  vec4 thresholds9_13_P1;
+  vec4 thresholds1_7;
+  vec4 thresholds9_13;
   // Scale/bias pairs: only those needed for the interval count
-  vec4 scale0_1_P1;
+  vec4 scale0_1;
 #if INTERVALS > 1
-  vec4 scale2_3_P1;
+  vec4 scale2_3;
 #endif
 #if INTERVALS > 2
-  vec4 scale4_5_P1;
+  vec4 scale4_5;
 #endif
 #if INTERVALS > 3
-  vec4 scale6_7_P1;
+  vec4 scale6_7;
 #endif
 #if INTERVALS > 4
-  vec4 scale8_9_P1;
+  vec4 scale8_9;
 #endif
 #if INTERVALS > 5
-  vec4 scale10_11_P1;
+  vec4 scale10_11;
 #endif
 #if INTERVALS > 6
-  vec4 scale12_13_P1;
+  vec4 scale12_13;
 #endif
 #if INTERVALS > 7
-  vec4 scale14_15_P1;
+  vec4 scale14_15;
 #endif
-  vec4 bias0_1_P1;
+  vec4 bias0_1;
 #if INTERVALS > 1
-  vec4 bias2_3_P1;
+  vec4 bias2_3;
 #endif
 #if INTERVALS > 2
-  vec4 bias4_5_P1;
+  vec4 bias4_5;
 #endif
 #if INTERVALS > 3
-  vec4 bias6_7_P1;
+  vec4 bias6_7;
 #endif
 #if INTERVALS > 4
-  vec4 bias8_9_P1;
+  vec4 bias8_9;
 #endif
 #if INTERVALS > 5
-  vec4 bias10_11_P1;
+  vec4 bias10_11;
 #endif
 #if INTERVALS > 6
-  vec4 bias12_13_P1;
+  vec4 bias12_13;
 #endif
 #if INTERVALS > 7
-  vec4 bias14_15_P1;
+  vec4 bias14_15;
 #endif
 };
 
@@ -88,7 +88,7 @@ float computeLayoutT(vec2 coord) {
 #elif LAYOUT_TYPE == 2
   // Conic: t = angle-based
   float angle = atan(-coord.y, -coord.x);
-  return ((angle * 0.15915494309180001 + 0.5) + Bias_P1) * Scale_P1;
+  return ((angle * 0.15915494309180001 + 0.5) + Bias) * Scale;
 #elif LAYOUT_TYPE == 3
   // Diamond: t = max(|x|, |y|)
   return max(abs(coord.x), abs(coord.y));
@@ -101,33 +101,33 @@ vec4 colorize(float t) {
 
 #if INTERVALS >= 4
   // Split at thresholds1_7.w (midpoint between intervals 0-7 and 8-15)
-  if (t < thresholds1_7_P1.w) {
+  if (t < thresholds1_7.w) {
 #endif
 
 #if INTERVALS >= 2
   // Split at thresholds1_7.y (midpoint between intervals 0-3 and 4-7)
-  if (t < thresholds1_7_P1.y) {
+  if (t < thresholds1_7.y) {
 #endif
   // Split at thresholds1_7.x (midpoint between intervals 0-1 and 2-3)
-  if (t < thresholds1_7_P1.x) {
-    scale = scale0_1_P1;
-    bias = bias0_1_P1;
+  if (t < thresholds1_7.x) {
+    scale = scale0_1;
+    bias = bias0_1;
 #if INTERVALS > 1
   } else {
-    scale = scale2_3_P1;
-    bias = bias2_3_P1;
+    scale = scale2_3;
+    bias = bias2_3;
 #endif
   }
 #if INTERVALS > 2
   } else {
   // Split at thresholds1_7.z (midpoint between intervals 4-5 and 6-7)
-  if (t < thresholds1_7_P1.z) {
-    scale = scale4_5_P1;
-    bias = bias4_5_P1;
+  if (t < thresholds1_7.z) {
+    scale = scale4_5;
+    bias = bias4_5;
 #if INTERVALS > 3
   } else {
-    scale = scale6_7_P1;
-    bias = bias6_7_P1;
+    scale = scale6_7;
+    bias = bias6_7;
 #endif
   }
 #endif
@@ -142,30 +142,30 @@ vec4 colorize(float t) {
 
 #if INTERVALS >= 6
   // Split at thresholds9_13.y (midpoint between intervals 8-11 and 12-15)
-  if (t < thresholds9_13_P1.y) {
+  if (t < thresholds9_13.y) {
 #endif
 #if INTERVALS >= 5
   // Split at thresholds9_13.x (midpoint between intervals 8-9 and 10-11)
-  if (t < thresholds9_13_P1.x) {
-    scale = scale8_9_P1;
-    bias = bias8_9_P1;
+  if (t < thresholds9_13.x) {
+    scale = scale8_9;
+    bias = bias8_9;
 #if INTERVALS > 5
   } else {
-    scale = scale10_11_P1;
-    bias = bias10_11_P1;
+    scale = scale10_11;
+    bias = bias10_11;
 #endif
   }
 #endif
 #if INTERVALS > 6
   } else {
   // Split at thresholds9_13.z (midpoint between intervals 12-13 and 14-15)
-  if (t < thresholds9_13_P1.z) {
-    scale = scale12_13_P1;
-    bias = bias12_13_P1;
+  if (t < thresholds9_13.z) {
+    scale = scale12_13;
+    bias = bias12_13;
 #if INTERVALS > 7
   } else {
-    scale = scale14_15_P1;
-    bias = bias14_15_P1;
+    scale = scale14_15;
+    bias = bias14_15;
 #endif
   }
 #endif
@@ -181,7 +181,7 @@ vec4 colorize(float t) {
 }
 
 void main() {
-  vec4 outputColor_P0 = Color_P0;
+  vec4 outputColor = Color;
   highp vec2 coord = TransformedCoords_0;
 
   // Layout: compute t
@@ -190,9 +190,9 @@ void main() {
   // ClampedGradientEffect: border clamping + colorization
   vec4 gradColor;
   if (t <= 0.0) {
-    gradColor = leftBorderColor_P1;
+    gradColor = leftBorderColor;
   } else if (t >= 1.0) {
-    gradColor = rightBorderColor_P1;
+    gradColor = rightBorderColor;
   } else {
     gradColor = colorize(t);
   }
@@ -200,7 +200,7 @@ void main() {
   // Premultiply alpha
   gradColor.rgb *= gradColor.a;
   // Multiply by input color alpha (from DefaultGeometryProcessor)
-  gradColor *= outputColor_P0.a;
+  gradColor *= outputColor.a;
 
   // EmptyXferProcessor — passthrough
   fragColor = gradColor;

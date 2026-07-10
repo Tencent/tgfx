@@ -1,5 +1,5 @@
 // ShapeInstancedFillShader vertex shader
-// Processor layout: ShapeInstancedGeometryProcessor(_P0) + EmptyXferProcessor(_P1)
+// Processor layout: ShapeInstancedGeometryProcessor() + EmptyXferProcessor()
 // Permutation dimensions (injected as #define 0/1):
 //   HAS_COLORS: whether per-instance colors are used
 //   HAS_AA: whether coverage-based AA is enabled
@@ -14,9 +14,9 @@
 
 layout(std140, set = 0, binding = 0) uniform VertexUniformBlock {
   vec4 tgfx_RTAdjust;
-  mat3 UVMatrix_P0;
-  mat3 ViewMatrix_P0;
-  mat3 CoordTransformMatrix_0_P0;
+  mat3 UVMatrix;
+  mat3 ViewMatrix;
+  mat3 CoordTransformMatrix_0;
 };
 
 // Vertex attributes
@@ -41,11 +41,11 @@ layout(location = 2) out vec4 vColor;
 
 void main() {
   // Recover local coords via UV matrix
-  highp vec2 local = (UVMatrix_P0 * vec3(aPosition, 1.0)).xy;
+  highp vec2 local = (UVMatrix * vec3(aPosition, 1.0)).xy;
   // Transform to device space + instance offset
-  highp vec2 position = (ViewMatrix_P0 * vec3(aPosition, 1.0)).xy + aOffset;
+  highp vec2 position = (ViewMatrix * vec3(aPosition, 1.0)).xy + aOffset;
   // Coord transform for FP sampling
-  TransformedCoords_0 = (CoordTransformMatrix_0_P0 * vec3(local, 1.0)).xy;
+  TransformedCoords_0 = (CoordTransformMatrix_0 * vec3(local, 1.0)).xy;
 #if HAS_AA
   vCoverage = inCoverage;
 #endif

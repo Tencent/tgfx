@@ -1,5 +1,5 @@
 // RoundStrokeRectFillShader vertex shader
-// Processor layout: RoundStrokeRectGeometryProcessor(_P0) + EmptyXferProcessor(_P1)
+// Processor layout: RoundStrokeRectGeometryProcessor() + EmptyXferProcessor()
 // Permutation dimensions (injected as #define 0/1):
 //   HAS_AA: whether coverage-based AA is enabled
 //   HAS_COMMON_COLOR: whether a common color uniform is used
@@ -19,7 +19,7 @@
 layout(std140, set = 0, binding = 0) uniform VertexUniformBlock {
   vec4 tgfx_RTAdjust;
 #if HAS_UV_MATRIX
-  mat3 CoordTransformMatrix_0_P0;
+  mat3 CoordTransformMatrix_0;
 #endif
 };
 
@@ -79,7 +79,7 @@ void main() {
   vColor = inColor;
 #endif
 #if HAS_UV_MATRIX
-  TransformedCoords_0 = (CoordTransformMatrix_0_P0 * vec3(inPosition, 1.0)).xy;
+  TransformedCoords_0 = (CoordTransformMatrix_0 * vec3(inPosition, 1.0)).xy;
 #endif
   gl_Position = vec4(inPosition.xy * tgfx_RTAdjust.xz + tgfx_RTAdjust.yw, 0.0, 1.0);
 }

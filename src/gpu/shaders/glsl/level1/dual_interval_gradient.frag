@@ -1,5 +1,5 @@
 // DualIntervalGradientShader fragment shader
-// Processor layout: DefaultGeometryProcessor(_P0) + ClampedGradientEffect(_P1) + EmptyXferProcessor(_P2)
+// Processor layout: DefaultGeometryProcessor() + ClampedGradientEffect() + EmptyXferProcessor()
 // Colorizer: DualIntervalGradientColorizer (3/4-stop gradient, piecewise linear)
 // Permutation dimensions (injected by build tool as #define):
 //   LAYOUT_TYPE: 0=LINEAR, 1=RADIAL, 2=CONIC, 3=DIAMOND
@@ -10,18 +10,18 @@
 #endif
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
-  vec4 Color_P0;
-  vec4 leftBorderColor_P1;
-  vec4 rightBorderColor_P1;
+  vec4 Color;
+  vec4 leftBorderColor;
+  vec4 rightBorderColor;
 #if LAYOUT_TYPE == 2
-  float Bias_P1;
-  float Scale_P1;
+  float Bias;
+  float Scale;
 #endif
-  vec4 scale01_P1;
-  vec4 bias01_P1;
-  vec4 scale23_P1;
-  vec4 bias23_P1;
-  float threshold_P1;
+  vec4 scale01;
+  vec4 bias01;
+  vec4 scale23;
+  vec4 bias23;
+  float threshold;
 };
 
 layout(location = 0) in vec2 TransformedCoords_0;
@@ -38,7 +38,7 @@ float computeLayoutT(vec2 coord) {
 #elif LAYOUT_TYPE == 2
   // Conic: t = angle-based
   float angle = atan(-coord.y, -coord.x);
-  return ((angle * 0.15915494309180001 + 0.5) + Bias_P1) * Scale_P1;
+  return ((angle * 0.15915494309180001 + 0.5) + Bias) * Scale;
 #elif LAYOUT_TYPE == 3
   // Diamond: t = max(|x|, |y|)
   return max(abs(coord.x), abs(coord.y));
@@ -47,33 +47,33 @@ float computeLayoutT(vec2 coord) {
 
 vec4 colorize(float t) {
   vec4 scale, bias;
-  if (t < threshold_P1) {
-    scale = scale01_P1;
-    bias = bias01_P1;
+  if (t < threshold) {
+    scale = scale01;
+    bias = bias01;
   } else {
-    scale = scale23_P1;
-    bias = bias23_P1;
+    scale = scale23;
+    bias = bias23;
   }
   return vec4(t * scale + bias);
 }
 
 void main() {
-  vec4 outputColor_P0 = Color_P0;
+  vec4 outputColor = Color;
   highp vec2 coord = TransformedCoords_0;
 
   float t = computeLayoutT(coord);
 
   vec4 gradColor;
   if (t <= 0.0) {
-    gradColor = leftBorderColor_P1;
+    gradColor = leftBorderColor;
   } else if (t >= 1.0) {
-    gradColor = rightBorderColor_P1;
+    gradColor = rightBorderColor;
   } else {
     gradColor = colorize(t);
   }
 
   gradColor.rgb *= gradColor.a;
-  gradColor *= outputColor_P0.a;
+  gradColor *= outputColor.a;
 
   fragColor = gradColor;
 }

@@ -1,5 +1,5 @@
 // AtlasTextFillShader fragment shader
-// Processor layout: AtlasTextGeometryProcessor(_P0) + EmptyXferProcessor(_P1)
+// Processor layout: AtlasTextGeometryProcessor() + EmptyXferProcessor()
 // Permutation dimensions (injected as #define 0/1):
 //   HAS_COVERAGE, HAS_COMMON_COLOR, ALPHA_ONLY
 #version 450
@@ -14,11 +14,11 @@
 #define ALPHA_ONLY 0
 #endif
 
-layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #if HAS_COMMON_COLOR
-  vec4 Color_P0;
-#endif
+layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
+  vec4 Color;
 };
+#endif
 
 layout(location = 0) in vec2 vTextureCoords;
 #if HAS_COVERAGE
@@ -32,14 +32,14 @@ layout(location = 1) in vec4 vColor;
 #endif
 #endif
 
-layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0_P0;
+layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
 
 layout(location = 0) out vec4 fragColor;
 
 void main() {
   // Determine output color from GP
 #if HAS_COMMON_COLOR
-  vec4 outputColor = Color_P0;
+  vec4 outputColor = Color;
 #else
   vec4 outputColor = vColor;
 #endif
@@ -52,7 +52,7 @@ void main() {
 #endif
 
   // Sample atlas texture
-  vec4 texColor = texture(TextureSampler_0_P0, vTextureCoords);
+  vec4 texColor = texture(TextureSampler_0, vTextureCoords);
 
 #if ALPHA_ONLY
   // Alpha-only texture: coverage comes from texture alpha

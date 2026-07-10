@@ -5,19 +5,19 @@
 layout(location = 0) out vec4 fragColor;
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
-  vec4 Color_P0;
-  vec4 Color_P1;
+  vec4 Color;
+  vec4 ConstColor;
 };
 
 void main() {
-  vec4 color = Color_P1;
+  vec4 color = ConstColor;
 
 #if INPUT_MODE == 1
   // ModulateRGBA: multiply by input color from previous stage
-  color *= Color_P0;
+  color *= Color;
 #elif INPUT_MODE == 2
   // ModulateA: multiply by input alpha only
-  color *= Color_P0.a;
+  color *= Color.a;
 #endif
 
   fragColor = color;

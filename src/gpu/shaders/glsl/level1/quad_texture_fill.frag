@@ -81,6 +81,7 @@ void main() {
 
 #if HAS_SUBSET
   finalCoord = clamp(finalCoord, vTexSubset.xy, vTexSubset.zw);
+  finalCoord = clamp(finalCoord, Subset.xy, Subset.zw);
 #endif
 
   vec4 color = texture(TextureSampler_0, finalCoord);

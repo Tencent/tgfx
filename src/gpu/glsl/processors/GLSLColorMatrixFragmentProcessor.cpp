@@ -32,9 +32,9 @@ GLSLColorMatrixFragmentProcessor::GLSLColorMatrixFragmentProcessor(
 void GLSLColorMatrixFragmentProcessor::emitCode(EmitArgs& args) const {
   auto uniformHandler = args.uniformHandler;
   auto matrixUniformName =
-      uniformHandler->addUniform("Matrix", UniformFormat::Float4x4, ShaderStage::Fragment);
+      uniformHandler->addUniform("ColorMatrix", UniformFormat::Float4x4, ShaderStage::Fragment);
   auto vectorUniformName =
-      uniformHandler->addUniform("Vector", UniformFormat::Float4, ShaderStage::Fragment);
+      uniformHandler->addUniform("ColorVector", UniformFormat::Float4, ShaderStage::Fragment);
 
   auto fragBuilder = args.fragBuilder;
   fragBuilder->codeAppendf("%s = vec4(%s.rgb / max(%s.a, 9.9999997473787516e-05), %s.a);",
@@ -60,7 +60,7 @@ void GLSLColorMatrixFragmentProcessor::onSetData(UniformData* /*vertexUniformDat
       matrix[14],
       matrix[19],
   };
-  fragmentUniformData->setData("Matrix", m);
-  fragmentUniformData->setData("Vector", vec);
+  fragmentUniformData->setData("ColorMatrix", m);
+  fragmentUniformData->setData("ColorVector", vec);
 }
 }  // namespace tgfx

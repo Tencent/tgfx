@@ -128,6 +128,7 @@ class UniformData {
   size_t bufferSize = 0;
   std::vector<Uniform> _uniforms = {};
   std::string nameSuffix = "";
+  bool skipSuffix = false;
   std::unordered_map<std::string, Field> fieldMap = {};
   size_t cursor = 0;
 

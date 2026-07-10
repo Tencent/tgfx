@@ -1,5 +1,5 @@
 // HairlineQuadShader fragment shader
-// Processor layout: HairlineQuadGeometryProcessor(_P0) + EmptyXferProcessor(_P1)
+// Processor layout: HairlineQuadGeometryProcessor() + EmptyXferProcessor()
 // Permutation dimensions (injected as #define 0/1):
 //   HAS_AA: whether coverage-based anti-aliasing is enabled
 // Uses Loop-Blinn quadratic curve anti-aliasing: u^2 - v = 0 defines the curve.
@@ -10,8 +10,8 @@
 #endif
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
-  vec4 Color_P0;
-  float Coverage_P0;
+  vec4 Color;
+  float Coverage;
 };
 
 layout(location = 0) in vec4 vHairQuadEdge;
@@ -30,8 +30,8 @@ void main() {
   edgeAlpha = edgeAlpha >= 0.5 ? 1.0 : 0.0;
 #endif
 
-  vec4 outputColor = Color_P0;
-  vec4 outputCoverage = vec4(Coverage_P0 * edgeAlpha);
+  vec4 outputColor = Color;
+  vec4 outputCoverage = vec4(Coverage * edgeAlpha);
 
   fragColor = outputColor * outputCoverage;
 }

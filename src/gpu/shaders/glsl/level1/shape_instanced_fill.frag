@@ -1,5 +1,5 @@
 // ShapeInstancedFillShader fragment shader
-// Processor layout: ShapeInstancedGeometryProcessor(_P0) + EmptyXferProcessor(_P1)
+// Processor layout: ShapeInstancedGeometryProcessor() + EmptyXferProcessor()
 // Permutation dimensions (injected as #define 0/1):
 //   HAS_COLORS: whether per-instance colors are used
 //   HAS_AA: whether coverage-based AA is enabled

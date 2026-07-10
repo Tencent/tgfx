@@ -43,7 +43,7 @@ void UniformData::setBuffer(void* buffer) {
 void UniformData::onSetData(const std::string& name, const void* data, size_t size) const {
   DEBUG_ASSERT(_buffer != nullptr);
 
-  const auto& key = name + nameSuffix;
+  const auto& key = skipSuffix ? name : name + nameSuffix;
   auto field = findField(key);
 
   if (field == nullptr) {

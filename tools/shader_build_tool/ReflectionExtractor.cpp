@@ -73,6 +73,9 @@ static std::vector<UniformEntry> ExtractUBOMembers(spirv_cross::Compiler& compil
     auto& uboType = compiler.get_type(ubo.base_type_id);
     std::string name = compiler.get_name(ubo.id);
     if (name.empty()) {
+      name = compiler.get_name(ubo.base_type_id);
+    }
+    if (name.empty()) {
       name = compiler.get_fallback_name(ubo.id);
     }
     if (!blockName.empty() && name != blockName) {

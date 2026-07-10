@@ -31,7 +31,7 @@ GLSLConstColorProcessor::GLSLConstColorProcessor(PMColor color, InputMode mode)
 void GLSLConstColorProcessor::emitCode(EmitArgs& args) const {
   auto fragBuilder = args.fragBuilder;
   auto colorName =
-      args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
+      args.uniformHandler->addUniform("ConstColor", UniformFormat::Float4, ShaderStage::Fragment);
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
   switch (inputMode) {
     case InputMode::Ignore:
@@ -47,6 +47,6 @@ void GLSLConstColorProcessor::emitCode(EmitArgs& args) const {
 
 void GLSLConstColorProcessor::onSetData(UniformData* /*vertexUniformData*/,
                                         UniformData* fragmentUniformData) const {
-  fragmentUniformData->setData("Color", color);
+  fragmentUniformData->setData("ConstColor", color);
 }
 }  // namespace tgfx
