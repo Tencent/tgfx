@@ -25,14 +25,24 @@ namespace tgfx {
 /// Precompiled shader declaration for LumaFragmentProcessor. Extracts luminance from the input
 /// color using configurable coefficients (default ITU-R BT.709: kr=0.2126, kg=0.7152, kb=0.0722).
 ///
-/// No permutation dimensions — luma coefficients are passed as uniforms. Single variant.
+/// Vertex dimensions:
+///   GP_TYPE (int, 2 values): 0=DefaultGeometryProcessor, 1=QuadPerEdgeAAGeometryProcessor
 class LumaShader : public PrecompiledShader {
  public:
+  struct Dims {
+    enum : uint32_t { GP_TYPE, COUNT };
+    static PermutationDomain domain() {
+      return PermutationDomain({
+          PermutationInt("GP_TYPE", 2),
+      });
+    }
+  };
+
   PrecompiledShaderInfo info() const override {
     return {"LumaShader",
             "level1/luma.vert",
             "level1/luma.frag",
-            PermutationDomain({}),
+            Dims::domain(),
             PermutationDomain({}),
             PermutationDomain({}),
             "",

@@ -25,14 +25,24 @@ namespace tgfx {
 /// Precompiled shader declaration for AlphaThresholdFragmentProcessor. Discards pixels whose alpha
 /// falls below a uniform threshold by applying step(threshold, alpha).
 ///
-/// No permutation dimensions — all parameters are uniforms. Single variant.
+/// Vertex dimensions:
+///   GP_TYPE (int, 2 values): 0=DefaultGeometryProcessor, 1=QuadPerEdgeAAGeometryProcessor
 class AlphaThresholdShader : public PrecompiledShader {
  public:
+  struct Dims {
+    enum : uint32_t { GP_TYPE, COUNT };
+    static PermutationDomain domain() {
+      return PermutationDomain({
+          PermutationInt("GP_TYPE", 2),
+      });
+    }
+  };
+
   PrecompiledShaderInfo info() const override {
     return {"AlphaThresholdShader",
             "level1/alpha_threshold.vert",
             "level1/alpha_threshold.frag",
-            PermutationDomain({}),
+            Dims::domain(),
             PermutationDomain({}),
             PermutationDomain({}),
             "",

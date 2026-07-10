@@ -185,8 +185,11 @@ void DrawingManager::collectWindow(std::weak_ptr<Window> window) {
 }
 
 std::shared_ptr<DrawingBuffer> DrawingManager::flush() {
-  if (currentBuffer == nullptr) {
+  if (currentBuffer == nullptr && compositors.empty()) {
     return nullptr;
+  }
+  if (currentBuffer == nullptr) {
+    createDrawingBuffer();
   }
   while (!compositors.empty()) {
     auto compositor = compositors.back();

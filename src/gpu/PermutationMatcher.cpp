@@ -514,10 +514,22 @@ static std::optional<PermutationMatchResult> TryMatchAtlasTextFill(const Program
   return PermutationMatchResult{"AtlasTextFillShader", index, index};
 }
 
+static int GetGPType(const GeometryProcessor* gp) {
+  auto name = gp->name();
+  if (name == "DefaultGeometryProcessor") {
+    return 0;
+  }
+  if (name == "QuadPerEdgeAAGeometryProcessor") {
+    return 1;
+  }
+  return -1;
+}
+
 static std::optional<PermutationMatchResult> TryMatchAlphaThreshold(
     const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "DefaultGeometryProcessor") {
+  int gpType = GetGPType(gp);
+  if (gpType < 0) {
     return std::nullopt;
   }
   if (programInfo->numFragmentProcessors() != 1) {
@@ -530,12 +542,18 @@ static std::optional<PermutationMatchResult> TryMatchAlphaThreshold(
   if (fp->name() != "AlphaStepFragmentProcessor") {
     return std::nullopt;
   }
-  return PermutationMatchResult{"AlphaThresholdShader", 0, 0};
+  using D = AlphaThresholdShader::Dims;
+  auto vertDomain = D::domain();
+  std::vector<int> vertValues(D::COUNT);
+  vertValues[D::GP_TYPE] = gpType;
+  auto vertIndex = vertDomain.encode(vertValues);
+  return PermutationMatchResult{"AlphaThresholdShader", vertIndex, 0};
 }
 
 static std::optional<PermutationMatchResult> TryMatchLuma(const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "DefaultGeometryProcessor") {
+  int gpType = GetGPType(gp);
+  if (gpType < 0) {
     return std::nullopt;
   }
   if (programInfo->numFragmentProcessors() != 1) {
@@ -548,7 +566,12 @@ static std::optional<PermutationMatchResult> TryMatchLuma(const ProgramInfo* pro
   if (fp->name() != "LumaFragmentProcessor") {
     return std::nullopt;
   }
-  return PermutationMatchResult{"LumaShader", 0, 0};
+  using D = LumaShader::Dims;
+  auto vertDomain = D::domain();
+  std::vector<int> vertValues(D::COUNT);
+  vertValues[D::GP_TYPE] = gpType;
+  auto vertIndex = vertDomain.encode(vertValues);
+  return PermutationMatchResult{"LumaShader", vertIndex, 0};
 }
 
 static int TFTypeToIndex(gfx::skcms_TFType type) {
