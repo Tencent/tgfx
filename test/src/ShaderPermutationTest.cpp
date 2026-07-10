@@ -242,7 +242,7 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
-  EXPECT_EQ(cache->vertexEntryCount(), 79u);
+  EXPECT_EQ(cache->vertexEntryCount(), 80u);
   EXPECT_EQ(cache->fragmentEntryCount(), 586u);
   std::string expectedTag = TGFX_BACKEND_NAME;
   auto dashPos = expectedTag.find('-');
@@ -558,8 +558,7 @@ TGFX_TEST(ShaderPermutationTest, LumaHitsPrecompiledCache) {
   EXPECT_GT(cache->hitCount(), 0u);
 }
 
-// TODO: GaussianBlur fillRTWithFP uses QuadPerEdgeAAGP; needs QuadPerEdgeAA vert shader variant.
-TGFX_TEST(ShaderPermutationTest, DISABLED_GaussianBlurHitsPrecompiledCache) {
+TGFX_TEST(ShaderPermutationTest, GaussianBlurHitsPrecompiledCache) {
   auto image = MakeImage("resources/apitest/image_as_mask.png");
   ASSERT_TRUE(image != nullptr);
   ContextScope scope;

@@ -26,12 +26,25 @@ namespace tgfx {
 /// by sampling a child texture in a loop. The loop upper bound is determined at compile time by
 /// MAX_SIGMA, which controls the kernel radius (loop count = 4 * MAX_SIGMA + 1).
 ///
+/// Vertex dimensions:
+///   GP_TYPE (int, 2 values): 0=DefaultGeometryProcessor, 1=QuadPerEdgeAAGeometryProcessor
+///
 /// Fragment dimensions:
 ///   MAX_SIGMA (int, 10 values): maps to maxSigma 1~10 (index 0 → maxSigma=1, index 9 → maxSigma=10)
 ///
 /// Runtime uniforms: Sigma (float), Step (vec2 direction vector)
 class GaussianBlur1DShader : public PrecompiledShader {
  public:
+  struct VertDims {
+    enum : uint32_t { GP_TYPE, COUNT };
+    static PermutationDomain domain() {
+      return PermutationDomain({
+          PermutationInt("GP_TYPE", 2),
+      });
+    }
+  };
+  using VD = VertDims;
+
   struct FragDims {
     enum : uint32_t { MAX_SIGMA, COUNT };
     static PermutationDomain domain() {
@@ -47,7 +60,7 @@ class GaussianBlur1DShader : public PrecompiledShader {
     return {"GaussianBlur1DShader",
             "level1/gaussian_blur_1d.vert",
             "level1/gaussian_blur_1d.frag",
-            PermutationDomain({}),
+            VD::domain(),
             FD::domain(),
             PermutationDomain({}),
             "",

@@ -646,7 +646,8 @@ static std::optional<PermutationMatchResult> TryMatchColorSpaceXform(
 static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
     const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "DefaultGeometryProcessor") {
+  int gpType = GetGPType(gp);
+  if (gpType < 0) {
     return std::nullopt;
   }
   if (programInfo->numFragmentProcessors() != 1) {
@@ -664,12 +665,18 @@ static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
   if (sigma < 1 || sigma > 10) {
     return std::nullopt;
   }
+  using VD = GaussianBlur1DShader::VD;
+  auto vertDomain = VD::domain();
+  std::vector<int> vertValues(VD::COUNT);
+  vertValues[VD::GP_TYPE] = gpType;
+  auto vertIndex = vertDomain.encode(vertValues);
+
   using FD = GaussianBlur1DShader::FD;
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
   fragValues[FD::MAX_SIGMA] = sigma - 1;
   auto fragIndex = fragDomain.encode(fragValues);
-  return PermutationMatchResult{"GaussianBlur1DShader", 0, fragIndex};
+  return PermutationMatchResult{"GaussianBlur1DShader", vertIndex, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchBlendMerge(const ProgramInfo* programInfo) {
