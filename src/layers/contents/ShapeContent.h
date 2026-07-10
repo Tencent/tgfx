@@ -48,6 +48,16 @@ class ShapeContent : public DrawContent {
   bool onHasSameGeometry(const GeometryContent* other) const override;
 
  private:
+  // Cached `Shape::ApplyEffect(shape, pathEffect)` result when `pathEffect != nullptr`. Reused
+  // across frames so the resulting EffectShape keeps a stable per-instance unique key and the GPU
+  // triangulation/texture caches for the dashed geometry stay warm. Left null when `pathEffect`
+  // is null (the raw `shape` is used directly).
+  std::shared_ptr<Shape> effectedShape = nullptr;
+
+  // Returns `effectedShape` when path effect is active, otherwise the raw `shape`. Used by both
+  // the draw path and the expanded-stroke helper to share the same effect instance.
+  const std::shared_ptr<Shape>& drawShape() const;
+
   // Whether the stroke needs a clip-based alignment (Inside/Outside with a non-zero stroke width).
   bool needsAlignmentClip() const;
 
@@ -57,8 +67,8 @@ class ShapeContent : public DrawContent {
   Path getAlignmentClipPath() const;
 
   // Shape actually rasterized when the stroke is expanded via clip (Inside/Outside). It is
-  // `ApplyStroke(ApplyEffect(shape, pathEffect), stroke * 2)`. Note the width is doubled so the
-  // visible band after clipping matches the requested stroke width.
+  // `ApplyStroke(drawShape(), stroke * 2)`. Note the width is doubled so the visible band after
+  // clipping matches the requested stroke width.
   std::shared_ptr<Shape> getExpandedStrokeShape() const;
 
   // Path form of the stroke used by bounds/hit-test queries. For Center alignment this is the

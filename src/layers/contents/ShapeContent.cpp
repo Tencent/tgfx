@@ -25,6 +25,18 @@ namespace tgfx {
 ShapeContent::ShapeContent(std::shared_ptr<Shape> shape, const LayerPaint& paint)
     : DrawContent(paint), shape(std::move(shape)), pathEffect(paint.pathEffect),
       strokeAlign(paint.strokeAlign) {
+  // Build the effect-wrapped shape once at construction so its per-instance unique key stays
+  // stable across frames. Rebuilding the EffectShape on every onDraw would invalidate the GPU
+  // triangulation/texture caches downstream (StrokeShape's key is derived from the inner shape's
+  // key), producing a cache miss for dashed strokes on every frame. pathEffect is stroke-only,
+  // so skip the wrap on fill-only paints even if the caller mistakenly attached a pathEffect.
+  if (pathEffect != nullptr && stroke != nullptr) {
+    effectedShape = Shape::ApplyEffect(this->shape, pathEffect);
+  }
+}
+
+const std::shared_ptr<Shape>& ShapeContent::drawShape() const {
+  return effectedShape != nullptr ? effectedShape : shape;
 }
 
 Rect ShapeContent::getBounds() const {
@@ -118,18 +130,11 @@ void ShapeContent::onDraw(Canvas* canvas, const Paint& paint) const {
     canvas->drawShape(getExpandedStrokeShape(), fillPaint);
     return;
   }
-  // pathEffect is defined as stroke-only in LayerPaint. Guard the effect application so a Fill
-  // paint that accidentally carries a pathEffect does not silently mutate the fill geometry.
-  if (pathEffect != nullptr && stroke != nullptr) {
-    // Center-align stroke with a path effect (e.g. dash): apply the effect to the geometry
-    // before letting the canvas stroke it.
-    auto effected = Shape::ApplyEffect(shape, pathEffect);
-    if (effected != nullptr) {
-      canvas->drawShape(std::move(effected), paint);
-      return;
-    }
-  }
-  canvas->drawShape(shape, paint);
+  // Center stroke or fill: draw the (possibly effect-wrapped) shape directly. `drawShape()`
+  // returns the cached EffectShape when a dash-style path effect is active on a stroke; it
+  // returns the raw shape for fills (pathEffect is stroke-only, so no wrapping is done for
+  // fill-only paints).
+  canvas->drawShape(drawShape(), paint);
 }
 
 bool ShapeContent::onHasSameGeometry(const GeometryContent* other) const {
@@ -157,18 +162,12 @@ Path ShapeContent::getAlignmentClipPath() const {
 }
 
 std::shared_ptr<Shape> ShapeContent::getExpandedStrokeShape() const {
-  auto expanded = shape;
-  if (pathEffect != nullptr) {
-    expanded = Shape::ApplyEffect(expanded, pathEffect);
-    if (expanded == nullptr) {
-      return nullptr;
-    }
-  }
+  // Reuse the cached effect-wrapped shape (or the raw shape when no path effect is in play).
   // Double the stroke width so the clip mask trims the expanded outline back to a band of the
   // requested width on the kept side.
   Stroke doubled = *stroke;
   doubled.width *= 2;
-  return Shape::ApplyStroke(std::move(expanded), &doubled);
+  return Shape::ApplyStroke(drawShape(), &doubled);
 }
 
 Path ShapeContent::getStrokedPath() const {
