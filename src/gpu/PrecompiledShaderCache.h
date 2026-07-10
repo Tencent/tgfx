@@ -102,6 +102,14 @@ class PrecompiledShaderCache {
     _missCount.store(0, std::memory_order_relaxed);
   }
 
+  /// Unloads all entries and resets the cache to its initial state.
+  void unload() {
+    vertEntries.clear();
+    fragEntries.clear();
+    _profileTag.clear();
+    resetStats();
+  }
+
   struct HashKey {
     uint64_t hi;
     uint64_t lo;

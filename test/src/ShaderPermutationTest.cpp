@@ -251,6 +251,7 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
     expectedTag = expectedTag.substr(0, dashPos);
   }
   EXPECT_EQ(cache->profileTag(), expectedTag);
+  cache->unload();
 }
 
 TGFX_TEST(ShaderPermutationTest, PrecompiledPerformance) {
@@ -278,12 +279,14 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledPerformance) {
     ContextScope scope;
     auto context = scope.getContext();
     ASSERT_TRUE(context != nullptr);
+    auto* cache = context->precompiledShaderCache();
     auto bundlePath = ProjectPath::Absolute(BundlePath());
-    ASSERT_TRUE(context->precompiledShaderCache()->loadBundle(bundlePath));
+    ASSERT_TRUE(cache->loadBundle(bundlePath));
     auto surface = Surface::Make(context, width, height);
     ASSERT_TRUE(surface != nullptr);
     surface->getCanvas()->drawImage(image, 0, 0);
     context->flushAndSubmit(true);
+    cache->unload();
   }
   auto endPrecompiled = std::chrono::steady_clock::now();
 
@@ -311,8 +314,9 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledRenderConsistency) {
     ContextScope scope;
     auto context = scope.getContext();
     ASSERT_TRUE(context != nullptr);
+    auto* cache = context->precompiledShaderCache();
     auto bundlePath = ProjectPath::Absolute(BundlePath());
-    ASSERT_TRUE(context->precompiledShaderCache()->loadBundle(bundlePath));
+    ASSERT_TRUE(cache->loadBundle(bundlePath));
     auto surface = Surface::Make(context, width, height);
     ASSERT_TRUE(surface != nullptr);
     surface->getCanvas()->drawImage(image, 0, 0);
@@ -320,6 +324,7 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledRenderConsistency) {
     ASSERT_TRUE(pixels != nullptr);
     ASSERT_TRUE(surface->readPixels(bitmap1.info(), pixels));
     bitmap1.unlockPixels();
+    cache->unload();
   }
 
   // Pass 2: render without bundle (ProgramBuilder path).
@@ -522,6 +527,7 @@ TGFX_TEST(ShaderPermutationTest, DrawImageHitsPrecompiledCache) {
   surface->getCanvas()->drawImage(image, 0, 0);
   context->flushAndSubmit(true);
   EXPECT_GT(cache->hitCount(), 0u);
+  cache->unload();
 }
 
 TGFX_TEST(ShaderPermutationTest, AlphaThresholdHitsPrecompiledCache) {
@@ -540,6 +546,7 @@ TGFX_TEST(ShaderPermutationTest, AlphaThresholdHitsPrecompiledCache) {
   surface->getCanvas()->drawRect(Rect::MakeWH(100, 100), paint);
   context->flushAndSubmit(true);
   EXPECT_GT(cache->hitCount(), 0u);
+  cache->unload();
 }
 
 TGFX_TEST(ShaderPermutationTest, LumaHitsPrecompiledCache) {
@@ -558,6 +565,7 @@ TGFX_TEST(ShaderPermutationTest, LumaHitsPrecompiledCache) {
   surface->getCanvas()->drawRect(Rect::MakeWH(100, 100), paint);
   context->flushAndSubmit(true);
   EXPECT_GT(cache->hitCount(), 0u);
+  cache->unload();
 }
 
 TGFX_TEST(ShaderPermutationTest, GaussianBlurHitsPrecompiledCache) {
@@ -579,6 +587,7 @@ TGFX_TEST(ShaderPermutationTest, GaussianBlurHitsPrecompiledCache) {
   surface->getCanvas()->drawImage(blurredImage, 25, 25);
   context->flushAndSubmit(true);
   EXPECT_GT(cache->hitCount(), 0u);
+  cache->unload();
 }
 
 // TODO: BlendMerge frag assumes child FP output via texture, but ModeColorFilter inlines the
