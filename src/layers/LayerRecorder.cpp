@@ -36,6 +36,14 @@
 
 namespace tgfx {
 
+// A stroke style is "complex" when it carries a non-Center alignment or a path effect (e.g. dash).
+// Complex styles cannot be resolved by a plain Canvas stroke call and must be expanded into fill
+// geometry downstream (ShapeContent handles the clip-mask expansion and effect application).
+static bool ComplexStrokeStyle(const LayerPaint& paint) {
+  return paint.style == PaintStyle::Stroke &&
+         (paint.strokeAlign != StrokeAlign::Center || paint.pathEffect != nullptr);
+}
+
 LayerRecorder::LayerRecorder() = default;
 
 LayerRecorder::~LayerRecorder() = default;
@@ -61,6 +69,10 @@ void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerP
   if (textBlob == nullptr) {
     return;
   }
+  // TextContent does not consume strokeAlign or pathEffect. Callers that need Inside/Outside
+  // alignment or a path effect on text must first convert the TextBlob into a Shape (see
+  // StrokeStyle::prepareGlyphRun) and route it through addShape().
+  DEBUG_ASSERT(!ComplexStrokeStyle(paint));
   flushPending();
   auto& list = paint.placement == LayerPlacement::Foreground ? foregrounds : contents;
   // The offset only affects the text position, while _matrix affects both
@@ -78,6 +90,9 @@ void LayerRecorder::addMesh(std::shared_ptr<Mesh> mesh, const LayerPaint& paint)
   if (mesh == nullptr) {
     return;
   }
+  // MeshContent does not consume strokeAlign or pathEffect. There is no reasonable way to apply
+  // stroke alignment or a path effect to a Mesh, so reject the paint here.
+  DEBUG_ASSERT(!ComplexStrokeStyle(paint));
   flushPending();
   auto& list = paint.placement == LayerPlacement::Foreground ? foregrounds : contents;
   std::unique_ptr<GeometryContent> content = std::make_unique<MeshContent>(std::move(mesh), paint);
@@ -103,6 +118,13 @@ void LayerRecorder::addRect(const Rect& rect, const LayerPaint& paint, const Mat
   if (rect.isEmpty()) {
     return;
   }
+  if (ComplexStrokeStyle(paint)) {
+    Path path = {};
+    path.addRect(rect);
+    flushPending(PendingType::Shape, paint, matrix);
+    pendingShape = Shape::MakeFrom(std::move(path));
+    return;
+  }
   if (!canAppend(PendingType::Rect, paint, matrix)) {
     flushPending(PendingType::Rect, paint, matrix);
   }
@@ -117,6 +139,13 @@ void LayerRecorder::addRRect(const RRect& rRect, const LayerPaint& paint, const 
     addRect(rRect.rect(), paint, matrix);
     return;
   }
+  if (ComplexStrokeStyle(paint)) {
+    Path path = {};
+    path.addRRect(rRect);
+    flushPending(PendingType::Shape, paint, matrix);
+    pendingShape = Shape::MakeFrom(std::move(path));
+    return;
+  }
   if (!canAppend(PendingType::RRect, paint, matrix)) {
     flushPending(PendingType::RRect, paint, matrix);
   }
@@ -127,7 +156,7 @@ void LayerRecorder::addPath(const Path& path, const LayerPaint& paint, const Mat
   if (path.isEmpty()) {
     return;
   }
-  if (tryAddSimplifiedPath(path, paint, matrix)) {
+  if (!ComplexStrokeStyle(paint) && tryAddSimplifiedPath(path, paint, matrix)) {
     return;
   }
   flushPending(PendingType::Shape, paint, matrix);
@@ -137,6 +166,11 @@ void LayerRecorder::addPath(const Path& path, const LayerPaint& paint, const Mat
 void LayerRecorder::addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint,
                              const Matrix& matrix) {
   if (shape == nullptr) {
+    return;
+  }
+  if (ComplexStrokeStyle(paint)) {
+    flushPending(PendingType::Shape, paint, matrix);
+    pendingShape = std::move(shape);
     return;
   }
   if (shape->isSimplePath()) {
@@ -282,7 +316,9 @@ void LayerRecorder::flushPending(PendingType newType, const LayerPaint& newPaint
         pendingRRects = {};
         break;
       case PendingType::Shape:
-        if (pendingShape->isSimplePath()) {
+        // Route to ShapeContent whenever the paint carries a complex stroke style, even if the
+        // shape is a simple path. PathContent otherwise ignores strokeAlign and pathEffect.
+        if (pendingShape->isSimplePath() && !ComplexStrokeStyle(pendingPaint)) {
           content = std::make_unique<PathContent>(pendingShape->getPath(), pendingPaint);
         } else {
           content = std::make_unique<ShapeContent>(std::move(pendingShape), pendingPaint);

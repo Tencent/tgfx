@@ -19,6 +19,8 @@
 #pragma once
 
 #include "tgfx/core/Paint.h"
+#include "tgfx/core/PathEffect.h"
+#include "tgfx/layers/StrokeAlign.h"
 
 namespace tgfx {
 
@@ -94,6 +96,18 @@ class LayerPaint {
    * The stroke options if the style is set to PaintStyle::Stroke. Default is empty (width=0).
    */
   Stroke stroke = {};
+
+  /**
+   * The alignment of the stroke relative to the geometry boundary. Only meaningful when style is
+   * PaintStyle::Stroke. Default is StrokeAlign::Center.
+   */
+  StrokeAlign strokeAlign = StrokeAlign::Center;
+
+  /**
+   * Optional path effect (e.g. dash) applied to the geometry before stroking. Only meaningful when
+   * style is PaintStyle::Stroke. Default is nullptr.
+   */
+  std::shared_ptr<PathEffect> pathEffect = nullptr;
 
   /**
    * The placement of the content relative to the layer's children. Default is
