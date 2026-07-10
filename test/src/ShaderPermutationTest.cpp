@@ -21,6 +21,7 @@
 #include <vector>
 #include "base/TGFXTest.h"
 #include "core/filters/GaussianBlurImageFilter.h"
+#include "gpu/GlobalCache.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/ShaderPermutation.h"
@@ -511,6 +512,7 @@ TGFX_TEST(ShaderPermutationTest, DrawImageHitsPrecompiledCache) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
+  context->globalCache()->clearPrograms();
   auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));

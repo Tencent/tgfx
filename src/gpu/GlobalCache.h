@@ -67,6 +67,12 @@ class GlobalCache {
   void addProgram(const BytesKey& programKey, std::shared_ptr<Program> program);
 
   /**
+   * Removes all cached programs. Intended for testing scenarios where a fresh program compilation
+   * path needs to be exercised.
+   */
+  void clearPrograms();
+
+  /**
    * Returns a texture that represents a gradient created from the specified colors and positions.
    */
   std::shared_ptr<TextureProxy> getGradient(const Color* colors, const float* positions, int count);

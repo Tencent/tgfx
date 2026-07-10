@@ -198,6 +198,11 @@ void GlobalCache::addProgram(const BytesKey& programKey, std::shared_ptr<Program
   }
 }
 
+void GlobalCache::clearPrograms() {
+  programLRU.clear();
+  programMap.clear();
+}
+
 std::shared_ptr<TextureProxy> GlobalCache::getGradient(const Color* colors, const float* positions,
                                                        int count) {
   BytesKey bytesKey = {};
