@@ -19,7 +19,6 @@
 #include "tgfx/layers/ShapeLayer.h"
 #include "core/utils/MathExtra.h"
 #include "layers/DashEffect.h"
-#include "layers/contents/ShapeContent.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/layers/LayerPaint.h"
@@ -230,22 +229,11 @@ void ShapeLayer::onUpdateContent(LayerRecorder* recorder) {
   }
 
   if (!_strokeStyles.empty()) {
-    // Check if we can use simple stroke mode (pass stroke params to LayerPaint directly).
     auto strokeAlign = static_cast<StrokeAlign>(shapeBitFields.strokeAlign);
-    bool simpleStroke = _lineDashPattern.empty() && strokeAlign == StrokeAlign::Center;
-    std::shared_ptr<Shape> strokeShape = nullptr;
-    std::shared_ptr<Shape> clipShape = nullptr;
-    if (!simpleStroke) {
-      strokeShape = createStrokeShape();
-      // Inside/Outside replaces SkPathOps Intersect/Difference with a GPU clip mask: pair the
-      // 2x-expanded stroke from createStrokeShape with the original path (or its inverse).
-      if (strokeAlign == StrokeAlign::Inside) {
-        clipShape = _shape;
-      } else if (strokeAlign == StrokeAlign::Outside) {
-        auto inversePath = _shape->getPath();
-        inversePath.toggleInverseFillType();
-        clipShape = Shape::MakeFrom(std::move(inversePath));
-      }
+    std::shared_ptr<PathEffect> dashEffect = nullptr;
+    if (!_lineDashPattern.empty()) {
+      dashEffect = CreateDashPathEffect(_lineDashPattern, _lineDashPhase,
+                                        shapeBitFields.lineDashAdaptive, stroke);
     }
     for (const auto& style : _strokeStyles) {
       LayerPaint paint(style->color(), style->blendMode());
@@ -253,38 +241,13 @@ void ShapeLayer::onUpdateContent(LayerRecorder* recorder) {
       if (shapeBitFields.strokeOnTop) {
         paint.placement = LayerPlacement::Foreground;
       }
-      if (simpleStroke) {
-        paint.style = PaintStyle::Stroke;
-        paint.stroke = stroke;
-        recorder->addShape(_shape, paint);
-      } else if (clipShape) {
-        auto content = std::make_unique<ShapeContent>(strokeShape, clipShape, paint);
-        recorder->emitContent(std::move(content), paint.placement);
-      } else {
-        recorder->addShape(strokeShape, paint);
-      }
+      paint.style = PaintStyle::Stroke;
+      paint.stroke = stroke;
+      paint.strokeAlign = strokeAlign;
+      paint.pathEffect = dashEffect;
+      recorder->addShape(_shape, paint);
     }
   }
-}
-
-std::shared_ptr<Shape> ShapeLayer::createStrokeShape() const {
-  auto strokeShape = _shape;
-  auto strokeAlign = static_cast<StrokeAlign>(shapeBitFields.strokeAlign);
-  auto tempStroke = stroke;
-  if (strokeAlign != StrokeAlign::Center) {
-    // Double the stroke width so that, after clipping the expanded stroke against the original
-    // path, the visible band on the kept side has the requested width.
-    tempStroke.width *= 2;
-  }
-  if (!_lineDashPattern.empty()) {
-    auto dash = CreateDashPathEffect(_lineDashPattern, _lineDashPhase,
-                                     shapeBitFields.lineDashAdaptive, tempStroke);
-    if (dash) {
-      strokeShape = Shape::ApplyEffect(std::move(strokeShape), std::move(dash));
-    }
-  }
-  strokeShape = Shape::ApplyStroke(std::move(strokeShape), &tempStroke);
-  return strokeShape;
 }
 
 std::optional<StyledShape> ShapeLayer::onGetContentShape() {

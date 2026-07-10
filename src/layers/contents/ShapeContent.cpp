@@ -23,26 +23,39 @@
 namespace tgfx {
 
 ShapeContent::ShapeContent(std::shared_ptr<Shape> shape, const LayerPaint& paint)
-    : DrawContent(paint), shape(std::move(shape)) {
-}
-
-ShapeContent::ShapeContent(std::shared_ptr<Shape> shape, std::shared_ptr<Shape> clipShape,
-                           const LayerPaint& paint)
-    : DrawContent(paint), shape(std::move(shape)), clipShape(std::move(clipShape)) {
+    : DrawContent(paint), shape(std::move(shape)), pathEffect(paint.pathEffect),
+      strokeAlign(paint.strokeAlign) {
 }
 
 Rect ShapeContent::getBounds() const {
   auto bounds = onGetBounds();
-  if (stroke) {
-    // Shape may contain sharp corners, so we need to apply miter limit to the bounds.
-    ApplyStrokeToBounds(*stroke, &bounds, Matrix::I(), true);
+  if (!stroke) {
+    return bounds;
   }
-  // Inverse-fill clips (Outside-stroke) clip to the area outside the path; the stroke's own
-  // bounds are already the correct visible extent in that case, so skip the intersect.
-  if (clipShape && !clipShape->isInverseFillType()) {
-    auto clipBounds = clipShape->getBounds();
-    if (!bounds.intersect(clipBounds)) {
-      bounds.setEmpty();
+  switch (strokeAlign) {
+    case StrokeAlign::Center:
+      // ApplyStrokeToBounds outsets the raw path by half the stroke width plus miter/cap
+      // allowance for Center alignment.
+      ApplyStrokeToBounds(*stroke, &bounds, Matrix::I(), true);
+      break;
+    case StrokeAlign::Outside: {
+      // Outside alignment must match the bounds of an expanded fill shape produced with a
+      // doubled stroke width (this is what StrokeShape::onGetBounds would return if we baked
+      // the expansion into the shape). Apply the miter/cap-aware outset with the doubled width
+      // so callers such as SpreadUtils see a footprint consistent with StyledShape::getBounds().
+      Stroke doubled = *stroke;
+      doubled.width *= 2;
+      ApplyStrokeToBounds(doubled, &bounds, Matrix::I(), true);
+      break;
+    }
+    case StrokeAlign::Inside: {
+      ApplyStrokeToBounds(*stroke, &bounds, Matrix::I(), true);
+      // Inside stroke stays within the original path's fill region.
+      auto clipBounds = shape->getBounds();
+      if (!bounds.intersect(clipBounds)) {
+        bounds.setEmpty();
+      }
+      break;
     }
   }
   return bounds;
@@ -51,31 +64,14 @@ Rect ShapeContent::getBounds() const {
 Rect ShapeContent::getTightBounds(const Matrix& matrix) const {
   auto strokedPath = getFilledPath();
   strokedPath.transform(matrix);
-  auto bounds = strokedPath.getBounds();
-  if (clipShape && !clipShape->isInverseFillType()) {
-    auto clipBounds = clipShape->getPath().getBounds();
-    matrix.mapRect(&clipBounds);
-    if (!bounds.intersect(clipBounds)) {
-      bounds.setEmpty();
-    }
-  }
-  return bounds;
+  return strokedPath.getBounds();
 }
 
 bool ShapeContent::hitTestPoint(float localX, float localY) const {
   if (color.alpha <= 0) {
     return false;
   }
-  if (!getFilledPath().contains(localX, localY)) {
-    return false;
-  }
-  if (clipShape) {
-    auto inside = clipShape->getPath().contains(localX, localY);
-    // Inverse-fill clips (Outside-stroke) keep the area outside the path, so a point passes
-    // iff it is NOT inside the geometric path region.
-    return clipShape->isInverseFillType() ? !inside : inside;
-  }
-  return true;
+  return getFilledPath().contains(localX, localY);
 }
 
 Rect ShapeContent::onGetBounds() const {
@@ -83,11 +79,26 @@ Rect ShapeContent::onGetBounds() const {
 }
 
 void ShapeContent::onDraw(Canvas* canvas, const Paint& paint) const {
-  if (clipShape) {
+  if (needsAlignmentClip()) {
     AutoCanvasRestore autoRestore(canvas);
-    canvas->clipPath(clipShape->getPath(), paint.isAntiAlias());
-    canvas->drawShape(shape, paint);
+    canvas->clipPath(getAlignmentClipPath(), paint.isAntiAlias());
+    // Rasterize the pre-expanded stroke as a fill: alignment doubles the stroke width so the
+    // half kept by the clip has the requested visible width.
+    Paint fillPaint = paint;
+    fillPaint.setStyle(PaintStyle::Fill);
+    canvas->drawShape(getExpandedStrokeShape(), fillPaint);
     return;
+  }
+  // pathEffect is defined as stroke-only in LayerPaint. Guard the effect application so a Fill
+  // paint that accidentally carries a pathEffect does not silently mutate the fill geometry.
+  if (pathEffect != nullptr && stroke != nullptr) {
+    // Center-align stroke with a path effect (e.g. dash): apply the effect to the geometry
+    // before letting the canvas stroke it.
+    auto effected = Shape::ApplyEffect(shape, pathEffect);
+    if (effected != nullptr) {
+      canvas->drawShape(std::move(effected), paint);
+      return;
+    }
   }
   canvas->drawShape(shape, paint);
 }
@@ -97,14 +108,68 @@ bool ShapeContent::onHasSameGeometry(const GeometryContent* other) const {
   if (shape != otherShape->shape) {
     return false;
   }
-  return clipShape == otherShape->clipShape;
+  if (pathEffect != otherShape->pathEffect) {
+    return false;
+  }
+  return strokeAlign == otherShape->strokeAlign;
+}
+
+bool ShapeContent::needsAlignmentClip() const {
+  // Alignment clipping is only meaningful when there is an actual stroke to expand.
+  return stroke != nullptr && strokeAlign != StrokeAlign::Center;
+}
+
+Path ShapeContent::getAlignmentClipPath() const {
+  auto clipPath = shape->getPath();
+  if (strokeAlign == StrokeAlign::Outside) {
+    clipPath.toggleInverseFillType();
+  }
+  return clipPath;
+}
+
+std::shared_ptr<Shape> ShapeContent::getExpandedStrokeShape() const {
+  auto expanded = shape;
+  if (pathEffect != nullptr) {
+    expanded = Shape::ApplyEffect(expanded, pathEffect);
+    if (expanded == nullptr) {
+      return nullptr;
+    }
+  }
+  // Double the stroke width so the clip mask trims the expanded outline back to a band of the
+  // requested width on the kept side.
+  Stroke doubled = *stroke;
+  doubled.width *= 2;
+  return Shape::ApplyStroke(std::move(expanded), &doubled);
 }
 
 Path ShapeContent::getFilledPath() const {
   auto path = shape->getPath();
-  if (stroke) {
-    stroke->applyToPath(&path);
+  if (!stroke) {
+    return path;
   }
+  if (needsAlignmentClip()) {
+    // Build the visible stroke band: expanded stroke intersected with the kept side of the
+    // original path. For Outside we subtract the raw path region from the expanded outline.
+    Path effected = path;
+    if (pathEffect != nullptr && !pathEffect->filterPath(&effected)) {
+      // Path effect declined to apply. Return an empty region so callers using this path for
+      // bounds/hit-test do not misinterpret it as a solid, unbroken stroke band.
+      return {};
+    }
+    Stroke doubled = *stroke;
+    doubled.width *= 2;
+    doubled.applyToPath(&effected);
+    if (strokeAlign == StrokeAlign::Inside) {
+      effected.addPath(path, PathOp::Intersect);
+    } else {
+      effected.addPath(path, PathOp::Difference);
+    }
+    return effected;
+  }
+  if (pathEffect != nullptr && !pathEffect->filterPath(&path)) {
+    return {};
+  }
+  stroke->applyToPath(&path);
   return path;
 }
 

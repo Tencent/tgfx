@@ -36,6 +36,15 @@
 
 namespace tgfx {
 
+// Rect/RRect/Path contents rasterize the geometry as-is and are unaware of stroke alignment or
+// path effects (dash). When either is active the recording MUST be routed to ShapeContent, which
+// applies the effect and expands the stroke for Inside/Outside alignment. This also keeps the
+// content's getBounds() consistent with StyledShape::getBounds() (which SpreadUtils relies on).
+static bool NeedsShapeContent(const LayerPaint& paint) {
+  return paint.style == PaintStyle::Stroke &&
+         (paint.strokeAlign != StrokeAlign::Center || paint.pathEffect != nullptr);
+}
+
 LayerRecorder::LayerRecorder() = default;
 
 LayerRecorder::~LayerRecorder() = default;
@@ -116,6 +125,13 @@ void LayerRecorder::addRect(const Rect& rect, const LayerPaint& paint, const Mat
   if (rect.isEmpty()) {
     return;
   }
+  if (NeedsShapeContent(paint)) {
+    Path path = {};
+    path.addRect(rect);
+    flushPending(PendingType::Shape, paint, matrix);
+    pendingShape = Shape::MakeFrom(std::move(path));
+    return;
+  }
   if (!canAppend(PendingType::Rect, paint, matrix)) {
     flushPending(PendingType::Rect, paint, matrix);
   }
@@ -130,6 +146,13 @@ void LayerRecorder::addRRect(const RRect& rRect, const LayerPaint& paint, const 
     addRect(rRect.rect(), paint, matrix);
     return;
   }
+  if (NeedsShapeContent(paint)) {
+    Path path = {};
+    path.addRRect(rRect);
+    flushPending(PendingType::Shape, paint, matrix);
+    pendingShape = Shape::MakeFrom(std::move(path));
+    return;
+  }
   if (!canAppend(PendingType::RRect, paint, matrix)) {
     flushPending(PendingType::RRect, paint, matrix);
   }
@@ -140,7 +163,7 @@ void LayerRecorder::addPath(const Path& path, const LayerPaint& paint, const Mat
   if (path.isEmpty()) {
     return;
   }
-  if (tryAddSimplifiedPath(path, paint, matrix)) {
+  if (!NeedsShapeContent(paint) && tryAddSimplifiedPath(path, paint, matrix)) {
     return;
   }
   flushPending(PendingType::Shape, paint, matrix);
@@ -150,6 +173,11 @@ void LayerRecorder::addPath(const Path& path, const LayerPaint& paint, const Mat
 void LayerRecorder::addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint,
                              const Matrix& matrix) {
   if (shape == nullptr) {
+    return;
+  }
+  if (NeedsShapeContent(paint)) {
+    flushPending(PendingType::Shape, paint, matrix);
+    pendingShape = std::move(shape);
     return;
   }
   if (shape->isSimplePath()) {
@@ -295,7 +323,9 @@ void LayerRecorder::flushPending(PendingType newType, const LayerPaint& newPaint
         pendingRRects = {};
         break;
       case PendingType::Shape:
-        if (pendingShape->isSimplePath()) {
+        // Route to ShapeContent whenever the paint requires effect/alignment awareness, even if
+        // the shape is a simple path. PathContent otherwise ignores strokeAlign and pathEffect.
+        if (pendingShape->isSimplePath() && !NeedsShapeContent(pendingPaint)) {
           content = std::make_unique<PathContent>(pendingShape->getPath(), pendingPaint);
         } else {
           content = std::make_unique<ShapeContent>(std::move(pendingShape), pendingPaint);

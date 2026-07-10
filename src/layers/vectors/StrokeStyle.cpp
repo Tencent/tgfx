@@ -40,48 +40,23 @@ class StrokePainter : public Painter {
   Stroke stroke = {};
   std::shared_ptr<PathEffect> pathEffect = nullptr;
   StrokeAlign strokeAlign = StrokeAlign::Center;
-  std::vector<std::shared_ptr<Shape>> originalShapes = {};
 
   std::unique_ptr<Painter> clone() const override {
     return std::make_unique<StrokePainter>(*this);
   }
 
  protected:
-  std::shared_ptr<Shape> prepareShape(std::shared_ptr<Shape> innerShape, size_t index,
-                                      LayerPaint* paint,
-                                      std::shared_ptr<Shape>* outClipShape) override {
+  std::shared_ptr<Shape> prepareShape(std::shared_ptr<Shape> innerShape, size_t /*index*/,
+                                      LayerPaint* paint) override {
     // Derive the fit shader from the pre-stroke geometry bounds. SVG and Figma both compute
     // gradient fit boxes from the fill geometry only and ignore stroke width, so dash, stroke
     // alignment and stroke width never affect the fit region. Reading getPath() here also
     // primes Shape::getPath()'s atomic cache for the recorder's later use.
     paint->shader = wrapShaderWithFit(innerShape->getPath().getBounds());
-
-    if (pathEffect) {
-      innerShape = Shape::ApplyEffect(innerShape, pathEffect);
-      if (innerShape == nullptr) {
-        return nullptr;
-      }
-    }
-    if (strokeAlign != StrokeAlign::Center) {
-      // prepareShape is only invoked for non-text geometries. StrokeStyle::apply fills
-      // originalShapes with geometry->getShape() for those entries when strokeAlign is not
-      // Center (text geometries push a null placeholder, but prepareGlyphRun handles text).
-      DEBUG_ASSERT(originalShapes[index] != nullptr);
-      auto originalShape = Shape::ApplyMatrix(originalShapes[index], innerMatrices[index]);
-      innerShape = expandStrokeForAlignment(std::move(innerShape), stroke);
-      if (innerShape == nullptr) {
-        return nullptr;
-      }
-      // The clip mask shares the inner-group space with innerShape (originalShape has been
-      // mapped through innerMatrices[index] above). Toggle the inverse fill type for Outside
-      // alignment so the clip keeps the area outside the original path.
-      if (outClipShape != nullptr) {
-        *outClipShape = makeAlignmentClip(std::move(originalShape));
-      }
-    } else {
-      paint->style = PaintStyle::Stroke;
-      paint->stroke = stroke;
-    }
+    paint->style = PaintStyle::Stroke;
+    paint->stroke = stroke;
+    paint->strokeAlign = strokeAlign;
+    paint->pathEffect = pathEffect;
     return innerShape;
   }
 
@@ -96,35 +71,16 @@ class StrokePainter : public Painter {
     // Tight glyph bounds keep color glyphs intact (no text-to-shape conversion for measurement).
     auto baseShader = wrapShaderWithFit(run.textBlob->getTightBounds());
 
-    // Emit path: non-center alignment or an active path effect require expanding the text blob
-    // into a shape (alignment needs a clip mask against the original outline; path effects
-    // operate on path geometry). When neither applies keep the blob intact to preserve color
-    // glyphs (e.g. emoji) that cannot be reduced to a path.
-    std::shared_ptr<Shape> runShape = nullptr;
-    std::shared_ptr<Shape> runClipShape = nullptr;
+    // Emit path: non-center alignment or an active path effect require converting the text blob
+    // into a shape so that ShapeContent can drive the clip/expand pipeline. When neither applies
+    // keep the blob intact to preserve color glyphs (e.g. emoji) that cannot be reduced to a
+    // path.
     bool nonCenterAlign = strokeAlign != StrokeAlign::Center;
     if (pathEffect != nullptr || nonCenterAlign) {
-      runShape = Shape::MakeFrom(run.textBlob);
-      // Snapshot the un-effected outline as the clip mask. Shape is immutable, so the pre-effect
-      // shape remains a valid "original outline" and sharing it lets Shape::getPath()'s atomic
-      // cache serve both the clip mask and any subsequent path consumer.
-      auto originalShape = runShape;
-      if (runShape != nullptr && pathEffect != nullptr) {
-        runShape = Shape::ApplyEffect(runShape, pathEffect);
-      }
-      if (runShape != nullptr && nonCenterAlign) {
-        runShape = expandStrokeForAlignment(std::move(runShape), runStroke);
-        if (runShape != nullptr) {
-          runClipShape = makeAlignmentClip(std::move(originalShape));
-        }
-      }
-      if (runShape == nullptr) {
+      emit.shape = Shape::MakeFrom(run.textBlob);
+      if (emit.shape == nullptr) {
         return emit;
       }
-    }
-    if (runShape != nullptr) {
-      emit.shape = runShape;
-      emit.clipShape = runClipShape;
     } else {
       emit.textBlob = run.textBlob;
     }
@@ -132,53 +88,32 @@ class StrokePainter : public Painter {
     float blendFactor = run.style.strokeColor.alpha;
     float runAlpha = alpha * run.style.alpha;
     if (blendFactor < 1.0f) {
-      auto paint = makeBasePaint();
-      paint.color.alpha = runAlpha;
-      paint.shader = baseShader;
-      if (!nonCenterAlign) {
-        paint.style = PaintStyle::Stroke;
-        paint.stroke = runStroke;
-      }
-      emit.paints.push_back(std::move(paint));
+      auto p = makeBasePaint();
+      p.color.alpha = runAlpha;
+      p.shader = baseShader;
+      p.style = PaintStyle::Stroke;
+      p.stroke = runStroke;
+      p.strokeAlign = strokeAlign;
+      p.pathEffect = pathEffect;
+      emit.paints.push_back(std::move(p));
     }
     if (blendFactor > 0.0f) {
       const auto& strokeColor = run.style.strokeColor;
       auto overlayColor = Color{strokeColor.red, strokeColor.green, strokeColor.blue, blendFactor};
-      auto paint = makeBasePaint();
-      paint.blendMode = BlendMode::SrcOver;
-      paint.shader = Shader::MakeColorShader(overlayColor);
-      paint.color.alpha = runAlpha;
-      if (!nonCenterAlign) {
-        paint.style = PaintStyle::Stroke;
-        paint.stroke = runStroke;
-      }
-      emit.paints.push_back(std::move(paint));
+      auto p = makeBasePaint();
+      p.blendMode = BlendMode::SrcOver;
+      p.shader = Shader::MakeColorShader(overlayColor);
+      p.color.alpha = runAlpha;
+      p.style = PaintStyle::Stroke;
+      p.stroke = runStroke;
+      p.strokeAlign = strokeAlign;
+      p.pathEffect = pathEffect;
+      emit.paints.push_back(std::move(p));
     }
     return emit;
   }
 
  private:
-  std::shared_ptr<Shape> expandStrokeForAlignment(std::shared_ptr<Shape> shape,
-                                                  const Stroke& strokeToApply) const {
-    Stroke doubled = strokeToApply;
-    // 2x width: the clip mask in makeAlignmentClip trims the expanded outline back to a band of
-    // the requested width on the kept side.
-    doubled.width *= 2;
-    return Shape::ApplyStroke(std::move(shape), &doubled);
-  }
-
-  std::shared_ptr<Shape> makeAlignmentClip(std::shared_ptr<Shape> originalShape) const {
-    if (originalShape == nullptr) {
-      return nullptr;
-    }
-    if (strokeAlign == StrokeAlign::Inside) {
-      return originalShape;
-    }
-    auto inversePath = originalShape->getPath();
-    inversePath.toggleInverseFillType();
-    return Shape::MakeFrom(std::move(inversePath));
-  }
-
   PainterStyle onGetStyle() const override {
     return {PaintStyle::Stroke, stroke.width, strokeAlign};
   }
@@ -319,20 +254,6 @@ void StrokeStyle::apply(VectorContext* context) {
   }
   painter->pathEffect = _cachedDashEffect;
   painter->captureGeometries(context);
-  if (_strokeAlign != StrokeAlign::Center) {
-    painter->originalShapes.reserve(context->geometries.size());
-    for (auto& geometry : context->geometries) {
-      // Text geometries are handled entirely by prepareGlyphRun, which rebuilds the original
-      // outline from the run's textBlob. Push a null placeholder to keep index alignment with
-      // geometries while avoiding an eager text-to-shape conversion that would also pollute
-      // Geometry::shape cache.
-      if (geometry->hasText()) {
-        painter->originalShapes.push_back(nullptr);
-        continue;
-      }
-      painter->originalShapes.push_back(geometry->getShape());
-    }
-  }
   context->painters.push_back(std::move(painter));
 }
 

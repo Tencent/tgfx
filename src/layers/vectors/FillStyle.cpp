@@ -47,8 +47,7 @@ class FillPainter : public Painter {
 
  protected:
   std::shared_ptr<Shape> prepareShape(std::shared_ptr<Shape> innerShape, size_t /*index*/,
-                                      LayerPaint* paint,
-                                      std::shared_ptr<Shape>* /*outClipShape*/) override {
+                                      LayerPaint* paint) override {
     const auto bounds = innerShape->getPath().getBounds();
     // Skip sub-pixel paths. The geometry layer clamps zero-sized shapes to a sub-pixel
     // extent so the stroker can still produce cap/join geometry; fill should honor the

@@ -18,7 +18,6 @@
 
 #include "Painter.h"
 #include "VectorContext.h"
-#include "layers/contents/ShapeContent.h"
 #include "tgfx/layers/LayerRecorder.h"
 
 namespace tgfx {
@@ -50,12 +49,7 @@ void Painter::draw(LayerRecorder* recorder) {
         recorder->setMatrix(runMatrix);
         for (const auto& paint : emit.paints) {
           if (emit.shape != nullptr) {
-            if (emit.clipShape != nullptr) {
-              auto content = std::make_unique<ShapeContent>(emit.shape, emit.clipShape, paint);
-              recorder->emitContent(std::move(content), paint.placement);
-            } else {
-              recorder->addShape(emit.shape, paint);
-            }
+            recorder->addShape(emit.shape, paint);
           } else if (emit.textBlob != nullptr) {
             recorder->addTextBlob(emit.textBlob, paint);
           }
@@ -76,18 +70,12 @@ void Painter::draw(LayerRecorder* recorder) {
       continue;
     }
     auto paint = makeBasePaint();
-    std::shared_ptr<Shape> clipShape = nullptr;
-    shape = prepareShape(std::move(shape), i, &paint, &clipShape);
+    shape = prepareShape(std::move(shape), i, &paint);
     if (shape == nullptr) {
       continue;
     }
     recorder->setMatrix(outerMatrix);
-    if (clipShape != nullptr) {
-      auto content = std::make_unique<ShapeContent>(std::move(shape), std::move(clipShape), paint);
-      recorder->emitContent(std::move(content), paint.placement);
-    } else {
-      recorder->addShape(std::move(shape), paint);
-    }
+    recorder->addShape(std::move(shape), paint);
     recorder->resetMatrix();
   }
 }
