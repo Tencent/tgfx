@@ -291,28 +291,10 @@ static constexpr char GLASS_SHADER_MAIN[] = R"(
             uvG = clamp(vTexCoord + uvOffset, vec2(0.0), vec2(1.0));
             uvB = clamp(vTexCoord + uvOffset * (1.0 - dispersion), vec2(0.0), vec2(1.0));
         }
-        float r = texture(uSource, uvR).r;
-        float g = texture(uSource, uvG).g;
-        float b = texture(uSource, uvB).b;
-        float a = texture(uSource, uvG).a;
-
-        vec3 finalColor = vec3(r, g, b);
-
-        // Edge lighting: diffuse highlight on the light-facing side, rim light on the opposite side.
-        if (lightIntensity > 0.0 && edgeWeight > 0.0) {
-            vec2 N = shapeNormal(px, py);
-            // Light direction pointing towards the light source.
-            // lightAngle=0 → from above, 90 → from right, 180 → from below, 270 → from left.
-            vec2 lightDir = vec2(sin(lightAngleRad), cos(lightAngleRad));
-
-            float NdotL = dot(N, lightDir);
-            float diffuse = smoothstep(0.35, 1.0, NdotL) * edgeWeight * lightIntensity;
-            float rim = smoothstep(0.35, 1.0, -NdotL) * edgeWeight * lightIntensity * 0.6;
-
-            finalColor += vec3(diffuse + rim);
-        }
-
-        tgfx_FragColor = vec4(finalColor, a);
+        // DEBUG: visualize refraction direction (uvOffset) as color.
+        // R = offset.x, G = offset.y, B = magnitude.
+        tgfx_FragColor = vec4(uvOffset.x * 100.0 + 0.5, uvOffset.y * 100.0 + 0.5,
+                               length(uvOffset) * 100.0, 1.0);
     }
 )";
 

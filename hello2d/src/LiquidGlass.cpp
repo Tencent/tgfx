@@ -71,18 +71,33 @@ std::shared_ptr<tgfx::Layer> LiquidGlass::onBuildLayerTree(const hello2d::AppHos
   greenCircle->setFillStyle(tgfx::ShapeStyle::Make(tgfx::Color::FromRGBA(50, 200, 80, 200)));
   root->addChild(greenCircle);
 
-  // Glass panel: rounded rectangle for clear refraction visibility when dragging.
+  // Glass panel: star-shaped AlphaMask glass.
   float glassSize = 200.0f;
+  float halfSize = glassSize * 0.5f;
+  float outerR = halfSize * 0.9f;
+  float innerR = outerR * 0.382f;
+  float startAngle = -3.14159265358979323846f * 0.5f;
 
-  auto glassLayer = tgfx::SolidLayer::Make();
-  glassLayer->setColor(tgfx::Color::FromRGBA(255, 255, 255, 128));
-  glassLayer->setWidth(glassSize);
-  glassLayer->setHeight(glassSize);
-  glassLayer->setRadiusX(32);
-  glassLayer->setRadiusY(32);
+  auto glassLayer = tgfx::ShapeLayer::Make();
+  tgfx::Path starPath = {};
+  for (int i = 0; i < 5; i++) {
+    float outerAngle = startAngle + static_cast<float>(i) * 3.14159265358979323846f * 0.8f;
+    float innerAngle = outerAngle + 3.14159265358979323846f * 0.2f;
+    if (i == 0) {
+      starPath.moveTo(halfSize + outerR * cosf(outerAngle),
+                      halfSize + outerR * sinf(outerAngle));
+    } else {
+      starPath.lineTo(halfSize + outerR * cosf(outerAngle),
+                      halfSize + outerR * sinf(outerAngle));
+    }
+    starPath.lineTo(halfSize + innerR * cosf(innerAngle),
+                    halfSize + innerR * sinf(innerAngle));
+  }
+  starPath.close();
+  glassLayer->setPath(starPath);
+  glassLayer->setFillStyle(tgfx::ShapeStyle::Make(tgfx::Color::FromRGBA(255, 255, 255, 128)));
   glassLayer->setMatrix(tgfx::Matrix::MakeTrans(glassPosX, glassPosY));
   auto style = tgfx::GlassStyle::Make(50, 30, 10, 0, 0, 135, 100);
-  style->setCornerRadius(32);
   glassLayer->setLayerStyles({style});
   root->addChild(glassLayer);
 
