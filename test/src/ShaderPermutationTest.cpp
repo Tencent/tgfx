@@ -183,8 +183,8 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistry) {
       foundTextureFill = true;
       EXPECT_EQ(shaderInfo.vertDomain.totalCount(), 16u);
       EXPECT_EQ(shaderInfo.vertDomain.dimensionCount(), 4u);
-      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 16u);
-      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 4u);
+      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 32u);
+      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 5u);
       EXPECT_EQ(shaderInfo.vertexFile, "level1/texture_fill.vert");
       EXPECT_EQ(shaderInfo.fragmentFile, "level1/texture_fill.frag");
     }
@@ -214,7 +214,7 @@ TGFX_TEST(ShaderPermutationTest, ShouldCompile) {
         }
       }
     }
-    EXPECT_EQ(compiledCount, 6);
+    EXPECT_EQ(compiledCount, 12);
   }
 }
 
@@ -243,8 +243,8 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
-  EXPECT_EQ(cache->vertexEntryCount(), 93u);
-  EXPECT_EQ(cache->fragmentEntryCount(), 608u);
+  EXPECT_EQ(cache->vertexEntryCount(), 117u);
+  EXPECT_EQ(cache->fragmentEntryCount(), 747u);
   std::string expectedTag = TGFX_BACKEND_NAME;
   auto dashPos = expectedTag.find('-');
   if (dashPos != std::string::npos) {
@@ -622,8 +622,8 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureFillShaderRegistry) {
       found = true;
       EXPECT_EQ(shaderInfo.vertDomain.dimensionCount(), 5u);
       EXPECT_EQ(shaderInfo.vertDomain.totalCount(), 32u);
-      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 6u);
-      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 64u);
+      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 7u);
+      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 128u);
       EXPECT_EQ(shaderInfo.vertexFile, "level1/quad_texture_fill.vert");
       EXPECT_EQ(shaderInfo.fragmentFile, "level1/quad_texture_fill.frag");
     }
@@ -649,11 +649,8 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureFillShouldCompile) {
         }
       }
     }
-    // Vertex: HAS_UV_PERSPECTIVE=0 -> 2(COVERAGE) * 2(UV_COORD) * 2(COLOR) * 2(SUBSET) = 16
-    // Fragment: HAS_YUV=0, !(ALPHA_ONLY && HAS_RGBAAA), HAS_COVERAGE/HAS_COLOR must match vert.
-    // For each HAS_COLOR value (0 or 1): 8 vert combos * 6 valid frag combos = 48.
-    // Total = 48 * 2 (HAS_COLOR=0 and HAS_COLOR=1) = 96.
-    EXPECT_EQ(compiledCount, 96);
+    // Fragment adds HAS_XP dimension (×2) over the original 96 valid combinations.
+    EXPECT_EQ(compiledCount, 384);
   }
 }
 
