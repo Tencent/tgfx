@@ -83,10 +83,6 @@ class QuadTextureFillShader : public PrecompiledShader {
  private:
   static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>& vertValues,
                             const std::vector<int>& fragValues) {
-    // UV perspective is extremely rare — skip for now.
-    if (vertValues[VD::HAS_UV_PERSPECTIVE] != 0) {
-      return false;
-    }
     // YUV textures require additional dimensions not yet modeled.
     if (fragValues[FD::HAS_YUV] != 0) {
       return false;

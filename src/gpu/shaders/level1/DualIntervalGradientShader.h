@@ -24,7 +24,17 @@ namespace tgfx {
 
 class DualIntervalGradientShader : public PrecompiledShader {
  public:
-  struct Dims {
+  struct VertDims {
+    enum : uint32_t { GP_TYPE, COUNT };
+    static PermutationDomain domain() {
+      return PermutationDomain({
+          PermutationInt("GP_TYPE", 2),
+      });
+    }
+  };
+  using VD = VertDims;
+
+  struct FragDims {
     enum : uint32_t { LAYOUT_TYPE, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
@@ -32,14 +42,14 @@ class DualIntervalGradientShader : public PrecompiledShader {
       });
     }
   };
-  using D = Dims;
+  using FD = FragDims;
 
   PrecompiledShaderInfo info() const override {
     return {"DualIntervalGradientShader",
             "level1/gradient_fill.vert",
             "level1/dual_interval_gradient.frag",
-            PermutationDomain({}),
-            D::domain(),
+            VD::domain(),
+            FD::domain(),
             PermutationDomain({}),
             "",
             "",

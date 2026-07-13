@@ -214,10 +214,6 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
     return std::nullopt;
   }
   auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
-  // Bail on unsupported variants — fall back to ProgramBuilder.
-  if (quadGP->getHasUVPerspective()) {
-    return std::nullopt;
-  }
   auto* te = static_cast<const TextureEffect*>(fp);
   if (te->numTextureSamplers() == 0) {
     return std::nullopt;
@@ -244,6 +240,7 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   vertValues[VD::HAS_UV_COORD] = !quadGP->hasUVMatrix() ? 1 : 0;
   vertValues[VD::HAS_COLOR] = !quadGP->hasCommonColor() ? 1 : 0;
   vertValues[VD::HAS_SUBSET] = gpSubset ? 1 : 0;
+  vertValues[VD::HAS_UV_PERSPECTIVE] = quadGP->getHasUVPerspective() ? 1 : 0;
   auto vertIndex = vertDomain.encode(vertValues);
 
   using FD = QuadTextureFillShader::FD;
@@ -283,6 +280,17 @@ static std::optional<PermutationMatchResult> TryMatchDeviceSpaceTexture(
   return PermutationMatchResult{"DeviceSpaceTextureShader", 0, fragIndex};
 }
 
+static int GetGPType(const GeometryProcessor* gp) {
+  auto name = gp->name();
+  if (name == "DefaultGeometryProcessor") {
+    return 0;
+  }
+  if (name == "QuadPerEdgeAAGeometryProcessor") {
+    return 1;
+  }
+  return -1;
+}
+
 static int GradientLayoutTypeIndex(const std::string& layoutName) {
   if (layoutName == "LinearGradientLayout") {
     return 0;
@@ -301,8 +309,15 @@ static int GradientLayoutTypeIndex(const std::string& layoutName) {
 
 static std::optional<PermutationMatchResult> TryMatchGradientFill(const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "DefaultGeometryProcessor") {
+  int gpType = GetGPType(gp);
+  if (gpType < 0) {
     return std::nullopt;
+  }
+  if (gpType == 1) {
+    auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
+    if (!quadGP->hasUVMatrix()) {
+      return std::nullopt;
+    }
   }
   if (programInfo->numFragmentProcessors() != 1) {
     return std::nullopt;
@@ -326,7 +341,6 @@ static std::optional<PermutationMatchResult> TryMatchGradientFill(const ProgramI
   if (layoutType < 0) {
     return std::nullopt;
   }
-  // Bail out on perspective transforms — not covered by precompiled variants.
   if (layout->numCoordTransforms() > 0 && layout->coordTransform(0)->matrix.hasPerspective()) {
     return std::nullopt;
   }
@@ -336,20 +350,33 @@ static std::optional<PermutationMatchResult> TryMatchGradientFill(const ProgramI
     return std::nullopt;
   }
 
-  using D = GradientFillShader::Dims;
-  auto fragDomain = D::domain();
-  std::vector<int> fragValues(D::COUNT);
-  fragValues[D::LAYOUT_TYPE] = layoutType;
-  fragValues[D::INTERVAL_COUNT] = intervalCount - 1;
+  using VD = GradientFillShader::VD;
+  auto vertDomain = VD::domain();
+  std::vector<int> vertValues(VD::COUNT);
+  vertValues[VD::GP_TYPE] = gpType;
+  auto vertIndex = vertDomain.encode(vertValues);
+
+  using FD = GradientFillShader::FD;
+  auto fragDomain = FD::domain();
+  std::vector<int> fragValues(FD::COUNT);
+  fragValues[FD::LAYOUT_TYPE] = layoutType;
+  fragValues[FD::INTERVAL_COUNT] = intervalCount - 1;
   auto fragIndex = fragDomain.encode(fragValues);
-  return PermutationMatchResult{"GradientFillShader", 0, fragIndex};
+  return PermutationMatchResult{"GradientFillShader", vertIndex, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchSingleIntervalGradient(
     const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "DefaultGeometryProcessor") {
+  int gpType = GetGPType(gp);
+  if (gpType < 0) {
     return std::nullopt;
+  }
+  if (gpType == 1) {
+    auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
+    if (!quadGP->hasUVMatrix()) {
+      return std::nullopt;
+    }
   }
   if (programInfo->numFragmentProcessors() != 1) {
     return std::nullopt;
@@ -377,19 +404,32 @@ static std::optional<PermutationMatchResult> TryMatchSingleIntervalGradient(
     return std::nullopt;
   }
 
-  using D = SingleIntervalGradientShader::Dims;
-  auto fragDomain = D::domain();
-  std::vector<int> fragValues(D::COUNT);
-  fragValues[D::LAYOUT_TYPE] = layoutType;
+  using VD = SingleIntervalGradientShader::VD;
+  auto vertDomain = VD::domain();
+  std::vector<int> vertValues(VD::COUNT);
+  vertValues[VD::GP_TYPE] = gpType;
+  auto vertIndex = vertDomain.encode(vertValues);
+
+  using FD = SingleIntervalGradientShader::FD;
+  auto fragDomain = FD::domain();
+  std::vector<int> fragValues(FD::COUNT);
+  fragValues[FD::LAYOUT_TYPE] = layoutType;
   auto fragIndex = fragDomain.encode(fragValues);
-  return PermutationMatchResult{"SingleIntervalGradientShader", 0, fragIndex};
+  return PermutationMatchResult{"SingleIntervalGradientShader", vertIndex, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchDualIntervalGradient(
     const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "DefaultGeometryProcessor") {
+  int gpType = GetGPType(gp);
+  if (gpType < 0) {
     return std::nullopt;
+  }
+  if (gpType == 1) {
+    auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
+    if (!quadGP->hasUVMatrix()) {
+      return std::nullopt;
+    }
   }
   if (programInfo->numFragmentProcessors() != 1) {
     return std::nullopt;
@@ -417,19 +457,32 @@ static std::optional<PermutationMatchResult> TryMatchDualIntervalGradient(
     return std::nullopt;
   }
 
-  using D = DualIntervalGradientShader::Dims;
-  auto fragDomain = D::domain();
-  std::vector<int> fragValues(D::COUNT);
-  fragValues[D::LAYOUT_TYPE] = layoutType;
+  using VD = DualIntervalGradientShader::VD;
+  auto vertDomain = VD::domain();
+  std::vector<int> vertValues(VD::COUNT);
+  vertValues[VD::GP_TYPE] = gpType;
+  auto vertIndex = vertDomain.encode(vertValues);
+
+  using FD = DualIntervalGradientShader::FD;
+  auto fragDomain = FD::domain();
+  std::vector<int> fragValues(FD::COUNT);
+  fragValues[FD::LAYOUT_TYPE] = layoutType;
   auto fragIndex = fragDomain.encode(fragValues);
-  return PermutationMatchResult{"DualIntervalGradientShader", 0, fragIndex};
+  return PermutationMatchResult{"DualIntervalGradientShader", vertIndex, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchTextureGradient(
     const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "DefaultGeometryProcessor") {
+  int gpType = GetGPType(gp);
+  if (gpType < 0) {
     return std::nullopt;
+  }
+  if (gpType == 1) {
+    auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
+    if (!quadGP->hasUVMatrix()) {
+      return std::nullopt;
+    }
   }
   if (programInfo->numFragmentProcessors() != 1) {
     return std::nullopt;
@@ -457,12 +510,18 @@ static std::optional<PermutationMatchResult> TryMatchTextureGradient(
     return std::nullopt;
   }
 
-  using D = TextureGradientShader::Dims;
-  auto fragDomain = D::domain();
-  std::vector<int> fragValues(D::COUNT);
-  fragValues[D::LAYOUT_TYPE] = layoutType;
+  using VD = TextureGradientShader::VD;
+  auto vertDomain = VD::domain();
+  std::vector<int> vertValues(VD::COUNT);
+  vertValues[VD::GP_TYPE] = gpType;
+  auto vertIndex = vertDomain.encode(vertValues);
+
+  using FD = TextureGradientShader::FD;
+  auto fragDomain = FD::domain();
+  std::vector<int> fragValues(FD::COUNT);
+  fragValues[FD::LAYOUT_TYPE] = layoutType;
   auto fragIndex = fragDomain.encode(fragValues);
-  return PermutationMatchResult{"TextureGradientShader", 0, fragIndex};
+  return PermutationMatchResult{"TextureGradientShader", vertIndex, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchTextureColorMatrix(
@@ -549,17 +608,6 @@ static std::optional<PermutationMatchResult> TryMatchAtlasTextFill(const Program
   values[D::ALPHA_ONLY] = atgp->isAlphaOnly() ? 1 : 0;
   auto index = domain.encode(values);
   return PermutationMatchResult{"AtlasTextFillShader", index, index};
-}
-
-static int GetGPType(const GeometryProcessor* gp) {
-  auto name = gp->name();
-  if (name == "DefaultGeometryProcessor") {
-    return 0;
-  }
-  if (name == "QuadPerEdgeAAGeometryProcessor") {
-    return 1;
-  }
-  return -1;
 }
 
 static std::optional<PermutationMatchResult> TryMatchAlphaThreshold(
