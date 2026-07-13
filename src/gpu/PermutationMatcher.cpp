@@ -176,8 +176,7 @@ static std::optional<PermutationMatchResult> TryMatchConstColor(const ProgramInf
   return PermutationMatchResult{"ConstColorShader", 0, fragIndex};
 }
 
-static std::optional<PermutationMatchResult> TryMatchQuadColorFill(
-    const ProgramInfo* programInfo) {
+static std::optional<PermutationMatchResult> TryMatchQuadColorFill(const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
   if (gp->name() != "QuadPerEdgeAAGeometryProcessor") {
     return std::nullopt;
@@ -216,9 +215,6 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   }
   auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
   // Bail on unsupported variants — fall back to ProgramBuilder.
-  if (!quadGP->hasCommonColor()) {
-    return std::nullopt;
-  }
   if (quadGP->getHasUVPerspective()) {
     return std::nullopt;
   }
@@ -243,6 +239,7 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   std::vector<int> vertValues(VD::COUNT, 0);
   vertValues[VD::HAS_COVERAGE] = quadGP->getAAType() == AAType::Coverage ? 1 : 0;
   vertValues[VD::HAS_UV_COORD] = !quadGP->hasUVMatrix() ? 1 : 0;
+  vertValues[VD::HAS_COLOR] = !quadGP->hasCommonColor() ? 1 : 0;
   vertValues[VD::HAS_SUBSET] = gpSubset ? 1 : 0;
   auto vertIndex = vertDomain.encode(vertValues);
 

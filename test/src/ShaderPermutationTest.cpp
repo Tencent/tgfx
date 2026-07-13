@@ -243,8 +243,8 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
-  EXPECT_EQ(cache->vertexEntryCount(), 80u);
-  EXPECT_EQ(cache->fragmentEntryCount(), 592u);
+  EXPECT_EQ(cache->vertexEntryCount(), 92u);
+  EXPECT_EQ(cache->fragmentEntryCount(), 608u);
   std::string expectedTag = TGFX_BACKEND_NAME;
   auto dashPos = expectedTag.find('-');
   if (dashPos != std::string::npos) {
@@ -649,18 +649,11 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureFillShouldCompile) {
         }
       }
     }
-    // Vertex: HAS_COLOR=0, HAS_UV_PERSPECTIVE=0 -> 2(COVERAGE) * 2(UV_COORD) * 2(SUBSET) = 8
-    // Fragment: HAS_YUV=0, !(ALPHA_ONLY && HAS_RGBAAA) -> 2*2*2 - 2 = 5 valid combos (minus 1
-    // with both set for each SUBSET value... actually: ALPHA_ONLY x HAS_RGBAAA x HAS_SUBSET minus
-    // exclusion = (4-1)*2 = 6... Let's just verify the count is 8*5=40.
-    // Actually: frag valid = HAS_YUV=0 only, from 8 combos minus {ALPHA_ONLY=1,HAS_RGBAAA=1} x 2
-    // HAS_SUBSET = 6, but HAS_YUV is forced 0 so space is 8. Exclusion: ALPHA+RGBAAA=2. Valid=6.
-    // Wait: frag domain has HAS_YUV, so total is 16. With HAS_YUV=0: 8 combos.
-    // Of those 8, exclude ALPHA_ONLY=1 && HAS_RGBAAA=1 (2 combos for SUBSET=0,1). Valid frag = 6.
-    // But we also exclude HAS_YUV=1: that's 8 combos. So from 16 total, 8 with YUV=0, minus 2
-    // with mutual exclusion = 6 valid frag combos.
-    // Total = 8 vert * 6 frag = 48.
-    EXPECT_EQ(compiledCount, 48);
+    // Vertex: HAS_UV_PERSPECTIVE=0 -> 2(COVERAGE) * 2(UV_COORD) * 2(COLOR) * 2(SUBSET) = 16
+    // Fragment: HAS_YUV=0, !(ALPHA_ONLY && HAS_RGBAAA), HAS_COVERAGE/HAS_COLOR must match vert.
+    // For each HAS_COLOR value (0 or 1): 8 vert combos * 6 valid frag combos = 48.
+    // Total = 48 * 2 (HAS_COLOR=0 and HAS_COLOR=1) = 96.
+    EXPECT_EQ(compiledCount, 96);
   }
 }
 

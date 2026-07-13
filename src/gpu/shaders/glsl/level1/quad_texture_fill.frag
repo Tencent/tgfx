@@ -31,6 +31,7 @@
 #define HAS_UV_PERSPECTIVE 0
 #endif
 
+#if !HAS_COLOR || HAS_SUBSET || HAS_RGBAAA
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #if !HAS_COLOR
   vec4 Color;
@@ -42,6 +43,7 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec2 AlphaStart;
 #endif
 };
+#endif
 
 #if HAS_UV_PERSPECTIVE
 layout(location = 0) in vec3 TransformedCoords_0;
