@@ -94,6 +94,9 @@ static std::optional<PermutationMatchResult> TryMatchTextureFill(const ProgramIn
     return std::nullopt;
   }
   auto* te = static_cast<const TextureEffect*>(fp);
+  if (te->numTextureSamplers() == 0) {
+    return std::nullopt;
+  }
   // YUV textures require additional dimensions (Limited/Full range, I420/NV12 format) that are not
   // yet covered by the precompiled shader. Fall back to ProgramBuilder for YUV.
   if (te->isYUV()) {
@@ -197,6 +200,9 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
     return std::nullopt;
   }
   auto* te = static_cast<const TextureEffect*>(fp);
+  if (te->numTextureSamplers() == 0) {
+    return std::nullopt;
+  }
   if (te->isYUV()) {
     return std::nullopt;
   }
