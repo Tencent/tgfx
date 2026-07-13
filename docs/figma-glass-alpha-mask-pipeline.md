@@ -26,26 +26,22 @@ Figma 玻璃效果的 v1 变体不需要为每种形状写专门的 SDF，而是
        ↓ 光栅化（白色填充，仅 Alpha 通道有效）
   二值 Alpha 纹理 (内部=1, 外部=0, 边缘抗锯齿)
 
-阶段 2: 高斯模糊 → 高度图 (texture1_)
+阶段 2: 高斯模糊 → 高度图 (texture1_ = texture2_)
   二值 Alpha
        ↓ 水平高斯 Pass (σ 由 refractionDistance 决定)
        ↓ 垂直高斯 Pass
   模糊 Alpha → RGBA8 打包
-       = texture1_ (高度图)
+       = texture1_ (高度图) = texture2_ (bevel 纹理)
+  注：texture1_ 和 texture2_ 绑定同一个纹理，用不同 sampler + 不同 expansion scale 采样
 
-阶段 3: Bevel 纹理生成 (texture2_)
-  二值 Alpha / 模糊 Alpha
-       ↓ SDF 计算 + 法线检测
-  RGBA8: RGB=法线方向, A=归一化SDF
-       = texture2_ (bevel 纹理)
-
-阶段 4: 背景捕获 + 模糊
+阶段 3: 背景捕获 + 模糊
   玻璃层下方的全部内容
        ↓ 离屏渲染 + 可选 frost 模糊
   texture0_ = 模糊后的背景
 
-阶段 5: 玻璃着色器合成
-  texture1_(高度图) + texture0_(背景) + texture2_(bevel)
+阶段 4: 玻璃着色器合成
+  texture1_(高度图, bf解包) + texture0_(背景) + texture2_(bevel, .a读取)
+  注: texture1_ 和 texture2_ 是同一纹理，读取方式不同
        ↓ GlassRefractionEffect (se())
   最终输出
 ```
@@ -84,35 +80,73 @@ Figma 玻璃效果的 v1 变体不需要为每种形状写专门的 SDF，而是
 | 内部梯度 | **= 0 ✗ 无折射** | **≠ 0 ✓ 有折射** |
 | 中心 | 1.0 | ≈ 1.0（最大值） |
 
-### 3.3 texture2_ — Bevel 纹理（SDF + 法线）
+### 3.3 texture2_ — Bevel 纹理（与 texture1_ 同一纹理）
+
+> **重要发现：texture2_ 和 texture1_ 是同一个纹理**——都是模糊后的 Alpha 打包为 RGBA8。没有独立的 bevel 生成 Pass。区别仅在于**读取方式不同**。
 
 | 属性 | 值 |
 |------|-----|
-| 格式 | RGBA8 |
-| RGB | 形状法线方向（编码为颜色） |
-| A | 归一化有符号距离（SDF），范围 [0, 1] |
-| 生成 | 从 Alpha mask 派生：SDF 计算 + 边缘检测（Sobel 等） |
+| 格式 | RGBA8（与 texture1_ 相同的纹理） |
+| 绑定 | `@group(1) @binding(4) texture2_` + `@group(1) @binding(5) sampler t` |
 | 采样方式 | `qx(coord)` → `textureSample(texture2_, t, pp(coord, bevelExpansionScale)).a × 2.0 - 1.0` |
+| 读取区别 | 只读 **Alpha 通道**（8bit 精度），不使用 `bf()` 解包 |
 | 用途 | 计算边缘权重 → 折射强度衰减 |
 
-**Alpha 通道的 SDF 映射：**
+**为什么同一纹理可以当两种用途：**
+
+模糊后的 Alpha 值天然具有 SDF 的特性——Alpha=0.5 对应边界，Alpha>0.5 对应内部，Alpha<0.5 对应外部。因此 `.a × 2 − 1` 直接给出近似 SDF，无需额外计算。
+
+| 位置 | 模糊 Alpha | bf() 解包 (32bit) | .a × 2 − 1 (8bit SDF) |
+|------|-----------|-------------------|----------------------|
+| 外部远处 | ≈ 0.0 | ≈ 0.0 | ≈ −1.0 |
+| 边缘外侧 | ≈ 0.2 | ≈ 0.2 | ≈ −0.6 |
+| 边缘上 | ≈ 0.5 | ≈ 0.5 | ≈ 0.0 |
+| 边缘内侧 | ≈ 0.8 | ≈ 0.8 | ≈ +0.6 |
+| 内部深处 | ≈ 1.0 | ≈ 1.0 | ≈ +1.0 |
+
+**两种读取方式的精度差异：**
 
 ```
-.a = 1.0  →  SDF = +1  (形状内部深处)
-.a = 0.5  →  SDF =  0  (边界上)
-.a = 0.0  →  SDF = -1  (形状外部)
+原始 Alpha 值: 0.7234
+
+texture1_ (bf 解包, 32bit 精度):
+  bf(rgba) = R + G/255 + B/65025 + A/16581375 ≈ 0.7234
+  → 用于 rf() 梯度计算（需要高精度）
+
+texture2_ (.a 通道, 8bit 精度):
+  .a = A 通道值 / 255 ≈ 0.7234 的第 4 级小数部分
+  .a × 2 - 1 ≈ 粗略 SDF
+  → 用于 qx() 边缘权重（8bit 够用）
+```
+
+**为什么梯度计算需要高精度而边缘权重不需要：**
+- 梯度是两个相邻像素的差值，量化误差会被放大 → 需要 32bit
+- 边缘权重只判断"在边缘还是内部"，0.5 的阈值判断 8bit 足够
+
+**`heightExpansionScale` 和 `bevelExpansionScale` 可以不同：**
+
+虽然 texture1_ 和 texture2_ 是同一纹理，但通过不同的 expansion scale 采样，可以让梯度计算和边缘权重关注不同范围：
+
+```
+heightExpansionScale = 1.2  → 梯度采样范围较广
+bevelExpansionScale  = 1.5  → 边缘权重采样范围更广（边缘带更宽）
 ```
 
 **在 bevel composite shader 中的额外用途：**
 
 ```glsl
-vec3 normalRGB = texture2(_coord2).rgb;
-float normalStrength = sqrt(dot(normalRGB², luminance_weights));
-float sdf = texture2(_coord2).a;
-fig_FragColor = mix(texture1, texture0, sdf × normalStrength);
+vec3 a = texture2(_coord2).rgb;                    // 打包 float 的 R, G, B 通道
+float c = dot(a*a, vec3(0.299, 0.587, 0.114));     // 加权亮度
+float d = sqrt(c);                                  // 亮度度量
+fig_FragColor = mix(texture1, texture0, texture2.a * d);
 ```
 
-合成 shader 用 bevel 纹理将高度图和背景混合：内部用背景，边缘用高度图。
+> **注意：** `texture2.rgb` 不是法线方向，而是打包 float 的前 3 个通道（R=整数部分, G/B=小数部分）。`luminance(rgb²)` 是一个亮度度量，值越高表示 Alpha 越接近 1（内部深处）。
+
+合成逻辑：
+- 内部深处（Alpha≈1, rgb 亮, .a≈1）→ `mix` 权重高 → 用背景（texture0）
+- 边缘附近（Alpha≈0.5, rgb 中等, .a≈0.5）→ `mix` 权重中等 → 混合
+- 外部（Alpha≈0, rgb 暗, .a≈0）→ `mix` 权重低 → 用高度图（texture1）
 
 ---
 
@@ -399,31 +433,32 @@ W_{edge} = \text{smoothstep}(0,\, 0.5,\, 1 - B), \quad B = \text{texture}_2(p).a
 ## 8. 完整流程图
 
 ```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   背景内容       │    │    图层形状       │    │   边缘检测       │
-│ (所有下方图层)    │    │  (五角星Path)     │    │                 │
-└────────┬────────┘    └────────┬─────────┘    └────────┬────────┘
-         │                      │                       │
-         ▼ 离屏渲染             ▼ Alpha 光栅化            ▼ 
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│  背景 RGBA       │    │  二值 Alpha      │    │   边缘 Alpha     │
-└────────┬────────┘    │  (0/1)           │    └────────┬────────┘
-         │             └────────┬─────────┘             │
-         ▼ frost 模糊           ▼ 高斯模糊 (σ 大)         ▼ SDF + 法线检测
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   texture0_     │    │  模糊 Alpha      │    │   texture2_     │
-│  RGBA8 颜色      │    │  (≈ 归一化 UDF)   │    │  RGBA8          │
-│  (模糊背景)      │    └────────┬─────────┘    │  RGB=法线        │
-└────────┬────────┘             │              │  A=SDF           │
-         │                      ▼ RGBA8 打包    └────────┬────────┘
-         │             ┌──────────────────┐             │
-         │             │   texture1_      │             │
-         │             │  RGBA8 打包 float │             │
-         │             │  (高度图)         │             │
-         │             └────────┬─────────┘             │
-         │                      │                       │
-         │ tileExpansionScale   │ heightExpansionScale   │ bevelExpansionScale
-         ▼                      ▼                       ▼
+┌─────────────────┐    ┌──────────────────┐
+│   背景内容       │    │    图层形状       │
+│ (所有下方图层)    │    │  (五角星Path)     │
+└────────┬────────┘    └────────┬─────────┘
+         │                      │
+         ▼ 离屏渲染             ▼ Alpha 光栅化
+┌─────────────────┐    ┌──────────────────┐
+│  背景 RGBA       │    │  二值 Alpha      │
+└────────┬────────┘    │  (0/1)           │
+         │             └────────┬─────────┘
+         ▼ frost 模糊           ▼ 高斯模糊 (σ 大) + RGBA8 打包
+┌─────────────────┐    ┌──────────────────────────────────┐
+│   texture0_     │    │  texture1_ = texture2_           │
+│  RGBA8 颜色      │    │  RGBA8 打包 float (模糊 Alpha)    │
+│  (模糊背景)      │    │  (高度图 = bevel 纹理, 同一纹理)   │
+└────────┬────────┘    └────────────┬─────────────────────┘
+         │                          │
+         │ tileExpansionScale       │ ┌─────────────────────┐
+         │                          │ │ heightExpansionScale│ → texture1_ 读取
+         │                          │ │ bf() 解包 (32bit)   │   用于 rf() 梯度
+         │                          │ └─────────────────────┘
+         │                          │ ┌─────────────────────┐
+         │                          │ │ bevelExpansionScale │ → texture2_ 读取
+         │                          │ │ .a × 2 - 1 (8bit)   │   用于 qx() 边缘权重
+         │                          │ └─────────────────────┘
+         ▼                          ▼
     ┌─────────────────────────────────────────────────────────┐
     │                     着色器 se()                          │
     │                                                         │
@@ -577,10 +612,11 @@ h(p) \approx \Phi\left(\frac{d(p)}{\sigma}\right)
 | | v1（模糊 Alpha 高度图 / 本文档） | v2（SDF 解析） |
 |---|---|---|
 | 支持形状 | **任意形状** | 仅圆角矩形 |
-| 纹理数 | 3 | 1 |
+| 纹理数 | 2（背景 + 高度图/bevel 共用） | 1 |
 | 高度来源 | 模糊 Alpha（近似 UDF） | 解析 SDF |
 | 内部折射 | ✓（梯度非零） | ✓（SDF 梯度恒非零）|
-| 额外 Pass | 2 次模糊 Pass + Alpha 渲染 + Bevel 生成 | 无 |
+| 额外 Pass | 2 次模糊 Pass + Alpha 渲染 | 无 |
+| Bevel 来源 | 高度图同一纹理，.a 通道读取 | 解析 SDF |
 | 法线精度 | 受模糊核和纹理分辨率影响 | 数学精确 |
 | 中轴线行为 | 平滑（无跳变） | 需特殊处理 |
-| 性能 | 多纹理 + 模糊开销 | 解析计算，无额外纹理 |
+| 性能 | 2 纹理 + 模糊开销 | 解析计算，无额外纹理 |

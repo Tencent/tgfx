@@ -4003,7 +4003,7 @@ TGFX_TEST(LayerTest, GlassStyle) {
   auto bgImage = MakeImage("resources/apitest/checker_128.png");
 
   // Default values for unchanged parameters
-  float defRef = 50, defDepth = 20, defFrost = 0, defDisp = 0;
+  float defRef = 50, defDepth = 70, defFrost = 0, defDisp = 0;
   float defSplay = 50, defAngle = 135, defIntensity = 50, defRadius = 16;
 
   // Row 0: Refraction sweep (10 / 50 / 90)
@@ -4089,7 +4089,7 @@ TGFX_TEST(LayerTest, GlassStyleEllipse) {
   auto displayList = std::make_unique<DisplayList>();
   auto bgImage = MakeImage("resources/apitest/checker_128.png");
 
-  float defRef = 50, defDepth = 20, defFrost = 0, defDisp = 0;
+  float defRef = 50, defDepth = 70, defFrost = 0, defDisp = 0;
   float defSplay = 50, defAngle = 135, defIntensity = 50, defRadius = 16;
 
   // Row 0: Refraction sweep (10 / 50 / 90)
@@ -4176,7 +4176,7 @@ TGFX_TEST(LayerTest, GlassStyleStar) {
   auto displayList = std::make_unique<DisplayList>();
   auto bgImage = MakeImage("resources/apitest/checker_128.png");
 
-  float defRef = 50, defDepth = 20, defFrost = 0, defDisp = 0;
+  float defRef = 50, defDepth = 70, defFrost = 0, defDisp = 0;
   float defSplay = 50, defAngle = 135, defIntensity = 50, defRadius = 16;
 
   // Row 0: Refraction sweep (10 / 50 / 90)
@@ -4268,7 +4268,7 @@ TGFX_TEST(LayerTest, GlassStyleGrid) {
   auto bgImage = MakeImage("resources/apitest/checker_128.png");
 
   // Default values for unchanged parameters
-  float defRef = 50, defDepth = 20, defFrost = 0, defDisp = 0;
+  float defRef = 50, defDepth = 70, defFrost = 0, defDisp = 0;
   float defSplay = 50, defAngle = 135, defIntensity = 50, defRadius = 16;
 
   // Col 0: Refraction sweep (10 / 50 / 90) across 3 rows
@@ -4336,6 +4336,84 @@ TGFX_TEST(LayerTest, GlassStyleGrid) {
 
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleGrid"));
+}
+
+TGFX_TEST(LayerTest, GlassStyleGridStar) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // 3 rows x 7 columns: same layout as GlassStyleGrid but with star-shaped glass panels.
+  constexpr float cellSize = 200;
+  constexpr float gap = 10;
+  constexpr int cols = 7;
+  constexpr int rows = 3;
+  int surfaceW = static_cast<int>(cols * (cellSize + gap) + gap);
+  int surfaceH = static_cast<int>(rows * (cellSize + gap) + gap);
+  auto surface = Surface::Make(context, surfaceW, surfaceH);
+  auto displayList = std::make_unique<DisplayList>();
+  auto bgImage = MakeImage("resources/apitest/checker_128.png");
+
+  float defRef = 50, defDepth = 70, defFrost = 0, defDisp = 0;
+  float defSplay = 50, defAngle = 135, defIntensity = 50, defRadius = 16;
+
+  float refractionVals[] = {10, 50, 90};
+  for (int r = 0; r < rows; r++) {
+    AddGlassCell(displayList->root(), bgImage, gap, gap + static_cast<float>(r) * (cellSize + gap),
+                 cellSize, refractionVals[r], defDepth, defFrost, defDisp, defSplay, defAngle,
+                 defIntensity, defRadius, GlassShapeType::AlphaMask);
+  }
+
+  float depthVals[] = {5, 25, 60};
+  for (int r = 0; r < rows; r++) {
+    AddGlassCell(displayList->root(), bgImage, gap + (cellSize + gap),
+                 gap + static_cast<float>(r) * (cellSize + gap), cellSize, defRef, depthVals[r],
+                 defFrost, defDisp, defSplay, defAngle, defIntensity, defRadius,
+                 GlassShapeType::AlphaMask);
+  }
+
+  float frostVals[] = {0, 30, 80};
+  for (int r = 0; r < rows; r++) {
+    AddGlassCell(displayList->root(), bgImage, gap + 2 * (cellSize + gap),
+                 gap + static_cast<float>(r) * (cellSize + gap), cellSize, defRef, defDepth,
+                 frostVals[r], defDisp, defSplay, defAngle, defIntensity, defRadius,
+                 GlassShapeType::AlphaMask);
+  }
+
+  float dispVals[] = {0, 40, 90};
+  for (int r = 0; r < rows; r++) {
+    AddGlassCell(displayList->root(), bgImage, gap + 3 * (cellSize + gap),
+                 gap + static_cast<float>(r) * (cellSize + gap), cellSize, defRef, defDepth,
+                 defFrost, dispVals[r], defSplay, defAngle, defIntensity, defRadius,
+                 GlassShapeType::AlphaMask);
+  }
+
+  float splayVals[] = {0, 50, 100};
+  for (int r = 0; r < rows; r++) {
+    AddGlassCell(displayList->root(), bgImage, gap + 4 * (cellSize + gap),
+                 gap + static_cast<float>(r) * (cellSize + gap), cellSize, defRef, defDepth,
+                 defFrost, defDisp, splayVals[r], defAngle, defIntensity, defRadius,
+                 GlassShapeType::AlphaMask);
+  }
+
+  float angleVals[] = {0, 135, 270};
+  for (int r = 0; r < rows; r++) {
+    AddGlassCell(displayList->root(), bgImage, gap + 5 * (cellSize + gap),
+                 gap + static_cast<float>(r) * (cellSize + gap), cellSize, defRef, defDepth,
+                 defFrost, defDisp, defSplay, angleVals[r], defIntensity, defRadius,
+                 GlassShapeType::AlphaMask);
+  }
+
+  float intensityVals[] = {0, 50, 100};
+  for (int r = 0; r < rows; r++) {
+    AddGlassCell(displayList->root(), bgImage, gap + 6 * (cellSize + gap),
+                 gap + static_cast<float>(r) * (cellSize + gap), cellSize, defRef, defDepth,
+                 defFrost, defDisp, defSplay, defAngle, intensityVals[r], defRadius,
+                 GlassShapeType::AlphaMask);
+  }
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleGridStar"));
 }
 
 TGFX_TEST(LayerTest, GlassStyleRefraction) {
@@ -4482,7 +4560,7 @@ TGFX_TEST(LayerTest, GlassStyleSingle) {
   glassLayer->setPath(starPath);
   glassLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 128)));
 
-  auto style = GlassStyle::Make(50, 100, 0, 0, 100, 135, 0);
+  auto style = GlassStyle::Make(20, 50, 0, 0, 100, 135, 0);
   glassLayer->setLayerStyles({style});
   displayList->root()->addChild(glassLayer);
 

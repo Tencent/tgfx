@@ -26,6 +26,7 @@
 #include "compositing3d/Context3DCompositor.h"
 #include "compositing3d/Layer3DContext.h"
 #include "core/Matrix3DUtils.h"
+#include "core/filters/GaussianBlurImageFilter.h"
 #include "core/images/TextureImage.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -2003,7 +2004,7 @@ bool Layer::hasValidMask() const {
 
 void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, bool forceDirty) {
   if (!forceDirty && !bitFields.dirtyDescendents) {
-    if (maxBackgroundOutset > 0 || bitFields.hasBlendMode || !fullBackgroundBounds.isEmpty()) {
+    if (maxBackgroundOutset > 0 || bitFields.hasBlendMode) {
       propagateLayerState();
       if (_root->hasDirtyRegions()) {
         checkBackgroundStyles(transformer);
@@ -2013,7 +2014,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   }
   maxBackgroundOutset = 0;
   minBackgroundOutset = std::numeric_limits<float>::max();
-  fullBackgroundBounds.setEmpty();
+  backgroundLayerBounds.setEmpty();
   auto contentScale = 1.0f;
   if (!_layerStyles.empty() || !_filters.empty()) {
     // Filters and styles interrupt 3D rendering context, so non-root layers inside 3D rendering
@@ -2105,28 +2106,24 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     child->bitFields.dirtyTransform = false;
     if (!child->maskOwner) {
       renderBounds.join(child->renderBounds);
-      fullBackgroundBounds.join(child->fullBackgroundBounds);
-    }
-  }
-  if (!renderBounds.isEmpty()) {
-    for (auto& style : _layerStyles) {
-      DEBUG_ASSERT(style != nullptr);
-      if (style->requiresFullLayerBackground()) {
-        fullBackgroundBounds.join(renderBounds);
-        break;
-      }
+      backgroundLayerBounds.join(child->backgroundLayerBounds);
     }
   }
   auto backOutset = 0.f;
+  Rect bgFilterBounds = Rect::MakeEmpty();
   if (!renderBounds.isEmpty()) {
     for (auto& style : _layerStyles) {
       DEBUG_ASSERT(style != nullptr);
       if (style->extraSourceType() != LayerStyleExtraSourceType::Background) {
         continue;
       }
-      auto outset = style->filterBackground(Rect::MakeEmpty(), contentScale);
-      backOutset = std::max(backOutset, outset.right);
-      backOutset = std::max(backOutset, outset.bottom);
+      auto bgBounds = style->filterBackground(renderBounds, contentScale);
+      bgFilterBounds.join(bgBounds);
+      auto rightOutset = std::max(0.0f, bgBounds.right - renderBounds.right);
+      auto bottomOutset = std::max(0.0f, bgBounds.bottom - renderBounds.bottom);
+      auto leftOutset = std::max(0.0f, renderBounds.left - bgBounds.left);
+      auto topOutset = std::max(0.0f, renderBounds.top - bgBounds.top);
+      backOutset = std::max({backOutset, rightOutset, bottomOutset, leftOutset, topOutset});
     }
     // When a layer has both background styles and filters, the outer filter needs to sample
     // beyond the background content area. Expand the background outset to include the filter's
@@ -2142,7 +2139,14 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   }
   if (backOutset > 0) {
     maxBackgroundOutset = std::max(backOutset, maxBackgroundOutset);
-    minBackgroundOutset = std::min(backOutset, minBackgroundOutset);
+    // minBackgroundOutset controls surface downsampling. Only blur-based outsets should
+    // trigger downsampling. If the outset exceeds the blur budget (e.g. refraction needs
+    // a large capture area but doesn't need blur), clamp to the max single-pass blur budget
+    // to avoid unnecessary downsampling of the background.
+    auto blurBudget = GaussianBlurImageFilter::MaxSigma() * 3.0f;
+    auto minOutset = std::min(backOutset, blurBudget);
+    minBackgroundOutset = std::min(minOutset, minBackgroundOutset);
+    backgroundLayerBounds.join(bgFilterBounds);
     updateBackgroundBounds(contentScale, backgroundSourceRects);
   }
   if (bitFields.blendMode != static_cast<uint8_t>(BlendMode::SrcOver) ||
@@ -2193,10 +2197,10 @@ void Layer::propagateLayerState() {
       layer->minBackgroundOutset = minBackgroundOutset;
       change = true;
     }
-    if (!fullBackgroundBounds.isEmpty()) {
-      auto prev = layer->fullBackgroundBounds;
-      layer->fullBackgroundBounds.join(fullBackgroundBounds);
-      if (layer->fullBackgroundBounds != prev) {
+    if (!backgroundLayerBounds.isEmpty()) {
+      auto prev = layer->backgroundLayerBounds;
+      layer->backgroundLayerBounds.join(backgroundLayerBounds);
+      if (layer->backgroundLayerBounds != prev) {
         change = true;
       }
     }

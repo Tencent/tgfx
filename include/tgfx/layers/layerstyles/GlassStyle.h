@@ -149,10 +149,6 @@ class GlassStyle : public LayerStyle {
     return LayerStyleExtraSourceType::Background;
   }
 
-  bool requiresFullLayerBackground() const override {
-    return _refraction > 0 || _lightIntensity > 0;
-  }
-
  protected:
   void onDraw(Canvas* canvas, const LayerStyleInput& input, float alpha,
               BlendMode blendMode) override;

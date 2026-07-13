@@ -23,6 +23,7 @@
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "layers/contents/LayerContent.h"
+#include "tgfx/layers/filters/TentBlurFilter.h"
 
 namespace tgfx {
 
@@ -114,16 +115,29 @@ void GlassStyle::setShapeType(GlassShapeType type) {
 }
 
 Rect GlassStyle::filterBackground(const Rect& srcRect, float contentScale) {
+  auto result = srcRect;
+  // Frost blur outset (triggers blur-based surface downsampling when large).
   auto filter = getFrostFilter(contentScale);
   if (filter) {
-    return filter->filterBounds(srcRect);
+    result = filter->filterBounds(srcRect);
   }
-  // Even without frost, refraction still needs the background content. Return a slightly expanded
-  // rect so the Layer system triggers background capture.
+  // Refraction outset: expand the background capture area to cover the maximum UV offset.
+  // This increases maxBackgroundOutset (surface expansion) but the caller clamps
+  // minBackgroundOutset to the blur budget so refraction does not trigger downsampling.
   if (_refraction > 0 || _lightIntensity > 0) {
-    return srcRect.makeOutset(1.0f, 1.0f);
+    auto halfW = srcRect.width() * 0.5f;
+    auto halfH = srcRect.height() * 0.5f;
+    auto minHalf = std::min(halfW, halfH);
+    float refractionFactor = _refraction / 100.0f;
+    float depthRatio = _depth / 100.0f;
+    float glassThickness = (1.0f + depthRatio * (minHalf - 1.0f)) * (1.0f + refractionFactor);
+    float analyticalOffset = glassThickness * refractionFactor * 2.0f;
+    float alphaMaskOffset = halfW * (0.5f * refractionFactor + 0.5f * depthRatio);
+    float refractionOutset = std::max(analyticalOffset, alphaMaskOffset);
+    refractionOutset = std::max(refractionOutset, 1.0f);
+    result.join(srcRect.makeOutset(refractionOutset, refractionOutset));
   }
-  return srcRect;
+  return result;
 }
 
 void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, BlendMode) {
@@ -204,16 +218,17 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
     float lightAngle = _lightAngle;
     float lightIntensity = (_lightIntensity > 0) ? _lightIntensity / 100.0f : 0.0f;
     // For AlphaMask shape, generate a UDF height map:
-    // 1. Gaussian-blur the binary alpha to approximate UDF
+    // 1. Tent-blur the binary alpha to approximate UDF (triangular kernel gives more linear
+    //    transition than Gaussian, closer to a true distance field)
     // 2. Pack the float result into RGBA8 (32-bit precision) via GlassMaskEffect
     // The maskImage itself is rebuilt every frame (input.content changes), but the
     // GlassMaskEffect pipeline and mask blur filter are cached for reuse.
     std::shared_ptr<Image> maskImage = nullptr;
     if (effectiveShapeType == GlassShapeType::AlphaMask) {
-      float blurSigma = minHalf * (_depth / 100.0f) * 0.2f;
-      if (!maskBlurFilter || !FloatNearlyEqual(cachedMaskBlurSigma, blurSigma)) {
-        maskBlurFilter = ImageFilter::Blur(blurSigma, blurSigma, TileMode::Decal);
-        cachedMaskBlurSigma = blurSigma;
+      float blurRadius = minHalf * (_depth / 100.0f) * 0.2f;
+      if (!maskBlurFilter || !FloatNearlyEqual(cachedMaskBlurSigma, blurRadius)) {
+        maskBlurFilter = TentBlurFilter::MakeImageFilter(blurRadius);
+        cachedMaskBlurSigma = blurRadius;
       }
       Point blurMaskOffset = {};
       auto maskClipRect =

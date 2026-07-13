@@ -33,6 +33,18 @@ static std::shared_ptr<tgfx::Layer> glassLayerRef = nullptr;
 static float glassPosX = 110.0f;
 static float glassPosY = 110.0f;
 
+// Glass depth (updated by arrow keys).
+static float glassDepth = 30.0f;
+
+// Glass refraction (updated by arrow keys).
+static float glassRefraction = 50.0f;
+
+// Glass light angle (updated by Q/E keys).
+static float glassLightAngle = 135.0f;
+
+// Shared glass style for interactive parameter updates.
+static std::shared_ptr<tgfx::GlassStyle> glassStyleRef = nullptr;
+
 // Cell size matching GlassStyle test.
 static constexpr float CELL_SIZE = 720.0f;
 
@@ -84,20 +96,18 @@ std::shared_ptr<tgfx::Layer> LiquidGlass::onBuildLayerTree(const hello2d::AppHos
     float outerAngle = startAngle + static_cast<float>(i) * 3.14159265358979323846f * 0.8f;
     float innerAngle = outerAngle + 3.14159265358979323846f * 0.2f;
     if (i == 0) {
-      starPath.moveTo(halfSize + outerR * cosf(outerAngle),
-                      halfSize + outerR * sinf(outerAngle));
+      starPath.moveTo(halfSize + outerR * cosf(outerAngle), halfSize + outerR * sinf(outerAngle));
     } else {
-      starPath.lineTo(halfSize + outerR * cosf(outerAngle),
-                      halfSize + outerR * sinf(outerAngle));
+      starPath.lineTo(halfSize + outerR * cosf(outerAngle), halfSize + outerR * sinf(outerAngle));
     }
-    starPath.lineTo(halfSize + innerR * cosf(innerAngle),
-                    halfSize + innerR * sinf(innerAngle));
+    starPath.lineTo(halfSize + innerR * cosf(innerAngle), halfSize + innerR * sinf(innerAngle));
   }
   starPath.close();
   glassLayer->setPath(starPath);
   glassLayer->setFillStyle(tgfx::ShapeStyle::Make(tgfx::Color::FromRGBA(255, 255, 255, 128)));
   glassLayer->setMatrix(tgfx::Matrix::MakeTrans(glassPosX, glassPosY));
-  auto style = tgfx::GlassStyle::Make(50, 30, 10, 0, 0, 135, 100);
+  auto style = tgfx::GlassStyle::Make(glassRefraction, glassDepth, 0, 0, 0, glassLightAngle, 100);
+  glassStyleRef = style;
   glassLayer->setLayerStyles({style});
   root->addChild(glassLayer);
 
@@ -112,6 +122,30 @@ void LiquidGlass::setGlassPosition(float x, float y) {
   glassPosY = y;
   if (glassLayerRef) {
     glassLayerRef->setMatrix(tgfx::Matrix::MakeTrans(x, y));
+  }
+}
+
+void LiquidGlass::setDepth(float depth) {
+  glassDepth = std::clamp(depth, 0.0f, 100.0f);
+  if (glassStyleRef) {
+    glassStyleRef->setDepth(glassDepth);
+  }
+}
+
+void LiquidGlass::setRefraction(float refraction) {
+  glassRefraction = std::clamp(refraction, 0.0f, 100.0f);
+  if (glassStyleRef) {
+    glassStyleRef->setRefraction(glassRefraction);
+  }
+}
+
+void LiquidGlass::setLightAngle(float angle) {
+  glassLightAngle = std::fmod(angle, 360.0f);
+  if (glassLightAngle < 0.0f) {
+    glassLightAngle += 360.0f;
+  }
+  if (glassStyleRef) {
+    glassStyleRef->setLightAngle(glassLightAngle);
   }
 }
 

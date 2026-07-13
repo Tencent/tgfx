@@ -56,6 +56,27 @@ class LayerBuilder {
   virtual void setGlassPosition(float /*x*/, float /*y*/) {
   }
 
+  /**
+   * Sets the glass depth parameter for interactive builders (e.g., LiquidGlass).
+   * Non-interactive builders ignore this call.
+   */
+  virtual void setDepth(float /*depth*/) {
+  }
+
+  /**
+   * Sets the glass refraction parameter for interactive builders (e.g., LiquidGlass).
+   * Non-interactive builders ignore this call.
+   */
+  virtual void setRefraction(float /*refraction*/) {
+  }
+
+  /**
+   * Sets the glass light angle for interactive builders (e.g., LiquidGlass).
+   * Non-interactive builders ignore this call.
+   */
+  virtual void setLightAngle(float /*angle*/) {
+  }
+
   explicit LayerBuilder(std::string name);
 
   virtual ~LayerBuilder() = default;
