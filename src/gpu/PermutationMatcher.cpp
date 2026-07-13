@@ -766,21 +766,20 @@ static std::optional<PermutationMatchResult> TryMatchBlendMerge(const ProgramInf
   if (blendMode < 0 || blendMode >= 30) {
     return std::nullopt;
   }
-  // The precompiled BlendMerge shader only supports simple TextureEffect children (no subset,
-  // no DeviceSpaceTextureEffect). Reject if any child has unsupported uniforms.
+  // The precompiled BlendMerge shader only supports plain TextureEffect children (no subset,
+  // no YUV). Any other child FP type (ConstColorProcessor, TiledTextureEffect, etc.) has
+  // incompatible uniform layout.
   for (size_t i = 0; i < xfp->numChildProcessors(); i++) {
     auto child = xfp->childProcessor(i);
     if (child == nullptr) {
       continue;
     }
-    if (child->name() == "DeviceSpaceTextureEffect") {
+    if (child->name() != "TextureEffect") {
       return std::nullopt;
     }
-    if (child->name() == "TextureEffect") {
-      auto* childTE = static_cast<const TextureEffect*>(child);
-      if (childTE->numTextureSamplers() == 0 || childTE->hasSubset()) {
-        return std::nullopt;
-      }
+    auto* childTE = static_cast<const TextureEffect*>(child);
+    if (childTE->numTextureSamplers() == 0 || childTE->hasSubset() || childTE->isYUV()) {
+      return std::nullopt;
     }
   }
   using VD = BlendMergeShader::VD;
