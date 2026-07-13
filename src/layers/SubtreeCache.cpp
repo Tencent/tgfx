@@ -17,44 +17,36 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SubtreeCache.h"
-#include <algorithm>
 #include "core/images/TextureImage.h"
 #include "gpu/ProxyProvider.h"
 #include "tgfx/core/ColorSpace.h"
 
 namespace tgfx {
 
-// Encode divisor as a fixed-point integer (2 decimal places) so equal float divisors always
-// produce equal keys and the SSAA flag can't be lost to fp noise. 1.0 -> 100, 2.0 -> 200.
-static uint32_t EncodeScaleDivisor(float scaleDivisor) {
-  auto scaled = static_cast<int>(scaleDivisor * 100.0f + 0.5f);
-  return static_cast<uint32_t>(std::max(scaled, 0));
-}
-
-UniqueKey SubtreeCache::makeSizeKey(int longEdge, float scaleDivisor) const {
-  uint32_t sizeData[2] = {static_cast<uint32_t>(longEdge), EncodeScaleDivisor(scaleDivisor)};
+UniqueKey SubtreeCache::makeSizeKey(int longEdge) const {
+  uint32_t sizeData[1] = {static_cast<uint32_t>(longEdge)};
   UniqueKey newKey = _uniqueKey;
-  return UniqueKey::Append(newKey, sizeData, 2);
+  return UniqueKey::Append(newKey, sizeData, 1);
 }
 
-void SubtreeCache::addCache(Context* context, int longEdge, float scaleDivisor,
+void SubtreeCache::addCache(Context* context, int longEdge,
                             std::shared_ptr<TextureProxy> textureProxy, const Matrix& imageMatrix,
                             const std::shared_ptr<ColorSpace>& colorSpace) {
   if (context == nullptr || textureProxy == nullptr) {
     return;
   }
-  auto sizeUniqueKey = makeSizeKey(longEdge, scaleDivisor);
+  auto sizeUniqueKey = makeSizeKey(longEdge);
   auto proxyProvider = context->proxyProvider();
   proxyProvider->assignProxyUniqueKey(textureProxy, sizeUniqueKey);
   textureProxy->assignUniqueKey(sizeUniqueKey);
   cacheEntries[sizeUniqueKey] = CacheEntry{imageMatrix, colorSpace};
 }
 
-bool SubtreeCache::hasCache(Context* context, int longEdge, float scaleDivisor) const {
+bool SubtreeCache::hasCache(Context* context, int longEdge) const {
   if (context == nullptr) {
     return false;
   }
-  auto sizeUniqueKey = makeSizeKey(longEdge, scaleDivisor);
+  auto sizeUniqueKey = makeSizeKey(longEdge);
   auto it = cacheEntries.find(sizeUniqueKey);
   if (it == cacheEntries.end()) {
     return false;
@@ -63,12 +55,12 @@ bool SubtreeCache::hasCache(Context* context, int longEdge, float scaleDivisor) 
   return proxyProvider->findOrWrapTextureProxy(sizeUniqueKey) != nullptr;
 }
 
-void SubtreeCache::draw(Context* context, int longEdge, float scaleDivisor, Canvas* canvas,
-                        const Paint& paint, bool forceNearest) const {
+void SubtreeCache::draw(Context* context, int longEdge, Canvas* canvas, const Paint& paint,
+                        bool forceNearest) const {
   if (context == nullptr) {
     return;
   }
-  auto sizeUniqueKey = makeSizeKey(longEdge, scaleDivisor);
+  auto sizeUniqueKey = makeSizeKey(longEdge);
   auto it = cacheEntries.find(sizeUniqueKey);
   if (it == cacheEntries.end()) {
     return;

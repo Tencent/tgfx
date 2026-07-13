@@ -41,17 +41,16 @@ class SubtreeCache {
     return _maxSize;
   }
 
-  void addCache(Context* context, int longEdge, float scaleDivisor,
-                std::shared_ptr<TextureProxy> textureProxy, const Matrix& imageMatrix,
-                const std::shared_ptr<ColorSpace>& colorSpace);
+  void addCache(Context* context, int longEdge, std::shared_ptr<TextureProxy> textureProxy,
+                const Matrix& imageMatrix, const std::shared_ptr<ColorSpace>& colorSpace);
 
-  bool hasCache(Context* context, int longEdge, float scaleDivisor) const;
+  bool hasCache(Context* context, int longEdge) const;
 
   // When forceNearest is true the cached image is blit with FilterMode::Nearest instead of
   // the canvas default Linear. Used by the SSAA tile path where the cache image is built at
   // the tile's physical (2x) resolution and therefore samples 1:1 into the tile.
-  void draw(Context* context, int longEdge, float scaleDivisor, Canvas* canvas,
-            const Paint& paint, bool forceNearest = false) const;
+  void draw(Context* context, int longEdge, Canvas* canvas, const Paint& paint,
+            bool forceNearest = false) const;
 
  private:
   struct CacheEntry {
@@ -62,8 +61,6 @@ class SubtreeCache {
   UniqueKey _uniqueKey = UniqueKey::Make();
   ResourceKeyMap<CacheEntry> cacheEntries = {};
 
-  // Records size + SSAA-scale so SSAA-on and SSAA-off produce distinct keys and don't alias
-  // each other's physically-different cache images.
-  UniqueKey makeSizeKey(int longEdge, float scaleDivisor) const;
+  UniqueKey makeSizeKey(int longEdge) const;
 };
 }  // namespace tgfx

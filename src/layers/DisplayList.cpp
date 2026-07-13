@@ -1052,8 +1052,7 @@ void DisplayList::drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snap
       // well as every derived intermediate surface (layer style offscreen, background snapshot,
       // 3D leaf surface). All draws on this SSAA tile surface therefore go through with
       // AAType::None.
-      drawRootLayer(tileSurface, tileClipRect, viewMatrix, true, snapshots, true,
-                    static_cast<float>(SSAA_SCALE));
+      drawRootLayer(tileSurface, tileClipRect, viewMatrix, true, snapshots, true);
       auto image = tileSurface->makeImageSnapshot();
 
       // Downsample to the atlas with linear sampling.
@@ -1213,8 +1212,7 @@ void DisplayList::resetCaches() {
 
 void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
                                 bool autoClear, BackgroundSnapshotMap* snapshots,
-                                bool forceNoEdgeAA,
-                                float subtreeContentScaleDivisor) const {
+                                bool forceNoEdgeAA) const {
   DEBUG_ASSERT(surface != nullptr);
   auto canvas = surface->getCanvas();
   auto context = surface->getContext();
@@ -1233,7 +1231,6 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   // SSAA tile path also forces image sampling to nearest — reuses forceNoEdgeAA as the SSAA-only
   // signal (drawRootLayer is the only caller that flips it to true).
   args.forceImageSamplingNearest = forceNoEdgeAA;
-  args.subtreeContentScaleDivisor = subtreeContentScaleDivisor;
   DEBUG_ASSERT(viewMatrix.invertible());
   Matrix inverse = Matrix::I();
   viewMatrix.invert(&inverse);

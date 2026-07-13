@@ -423,8 +423,7 @@ class DisplayList {
 
   void drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
                      bool autoClear, BackgroundSnapshotMap* snapshots,
-                     bool forceNoEdgeAA = false,
-                     float subtreeContentScaleDivisor = 1.0f) const;
+                     bool forceNoEdgeAA = false) const;
 
   std::unique_ptr<BackgroundSnapshotMap> captureBackgrounds(Surface* surface,
                                                             const std::vector<Rect>& renderRects,

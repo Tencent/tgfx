@@ -1467,7 +1467,7 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
 
 SubtreeCache* Layer::getValidSubtreeCache(const DrawArgs& args, int longEdge,
                                           const Rect& layerBounds, int effectiveMaxSize) {
-  if (subtreeCache->hasCache(args.context, longEdge, args.subtreeContentScaleDivisor)) {
+  if (subtreeCache->hasCache(args.context, longEdge)) {
     return subtreeCache.get();
   }
   if (args.renderFlags & RenderFlags::DisableCache || longEdge > effectiveMaxSize) {
@@ -1484,8 +1484,7 @@ SubtreeCache* Layer::getValidSubtreeCache(const DrawArgs& args, int longEdge,
     return nullptr;
   }
   auto textureProxy = std::static_pointer_cast<TextureImage>(image)->getTextureProxy();
-  subtreeCache->addCache(args.context, longEdge, args.subtreeContentScaleDivisor, textureProxy,
-                         imageMatrix, args.dstColorSpace);
+  subtreeCache->addCache(args.context, longEdge, textureProxy, imageMatrix, args.dstColorSpace);
   return subtreeCache.get();
 }
 
@@ -1516,8 +1515,7 @@ bool Layer::drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alp
   paint.setAntiAlias(ResolveAntiAlias(args, bitFields.allowsEdgeAntialiasing));
   paint.setAlpha(alpha);
   paint.setBlendMode(blendMode);
-  cache->draw(args.context, longEdge, args.subtreeContentScaleDivisor, canvas, paint,
-              args.forceImageSamplingNearest);
+  cache->draw(args.context, longEdge, canvas, paint, args.forceImageSamplingNearest);
   return true;
 }
 

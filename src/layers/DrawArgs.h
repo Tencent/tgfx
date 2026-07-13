@@ -90,15 +90,5 @@ class DrawArgs {
   // is active; propagates along the DrawArgs copy chain. Non-SSAA callers keep the historical
   // Linear behavior (their single-pass raster has no downstream box-averaging to lean on).
   bool forceImageSamplingNearest = false;
-
-  // Extra scale factor propagated from the SSAA tile path. When > 1.0, subtree caches built
-  // during this pass are sized at physical (canvas-matrix) resolution rather than logical
-  // resolution, so the cached image carries the same sub-pixel information the SSAA path
-  // would have produced by supersampling. The value is also encoded into the subtree cache
-  // key, so SSAA-on and SSAA-off frames use separate cache entries (both may co-exist only
-  // if the caller keeps both modes alive; DisplayList::setUseSSAA drops the tile atlas which
-  // is the common trigger for the previous mode's images to become purgeable).
-  // Non-SSAA path leaves this at 1.0f.
-  float subtreeContentScaleDivisor = 1.0f;
 };
 }  // namespace tgfx
