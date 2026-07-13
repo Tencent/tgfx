@@ -42,6 +42,11 @@ void main() {
 
   vec4 texColor = texture(TextureSampler_0, finalCoord);
 
+#if ALPHA_ONLY
+  // Alpha-only textures use R8 format in Metal. Use .r to get the actual alpha value.
+  texColor = vec4(texColor.r);
+#endif
+
 #if HAS_RGBAAA
   texColor = clamp(texColor, 0.0, 1.0);
   highp vec2 alphaCoord = finalCoord + AlphaStart;

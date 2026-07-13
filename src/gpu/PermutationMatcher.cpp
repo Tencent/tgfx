@@ -223,6 +223,8 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   fragValues[FD::ALPHA_ONLY] = te->isAlphaOnly() ? 1 : 0;
   fragValues[FD::HAS_RGBAAA] = te->hasRGBAAA() ? 1 : 0;
   fragValues[FD::HAS_SUBSET] = teSubset ? 1 : 0;
+  fragValues[FD::HAS_COVERAGE] = quadGP->getAAType() == AAType::Coverage ? 1 : 0;
+  fragValues[FD::HAS_COLOR] = !quadGP->hasCommonColor() ? 1 : 0;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"QuadTextureFillShader", vertIndex, fragIndex};
 }

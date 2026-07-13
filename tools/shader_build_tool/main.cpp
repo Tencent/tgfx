@@ -234,8 +234,8 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
           auto* fp = reinterpret_cast<const uint8_t*>(fragResult.spirv.data());
           fragBlob.assign(fp, fp + fragResult.spirv.size() * 4);
         } else if (backend == "metal") {
-          auto mslVert = TranslateToMSL(*vertSpirv);
-          auto mslFrag = TranslateToMSL(fragResult.spirv);
+          auto mslVert = TranslateToMSL(*vertSpirv, ShaderStageType::Vertex);
+          auto mslFrag = TranslateToMSL(fragResult.spirv, ShaderStageType::Fragment);
           if (!mslVert.success || !mslFrag.success) {
             std::cerr << "  MSL translation error: "
                       << (mslVert.success ? mslFrag.error : mslVert.error) << "\n";

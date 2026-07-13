@@ -55,8 +55,9 @@ void main() {
   vec4 texColor = texture(TextureSampler_0, vTextureCoords);
 
 #if ALPHA_ONLY
-  // Alpha-only texture: coverage comes from texture alpha
-  outputCoverage = vec4(texColor.a);
+  // Alpha-only textures use R8 format in Metal. The sampler returns (r, 0, 0, 1).
+  // Use .r to get the actual alpha value.
+  outputCoverage = vec4(texColor.r);
 #else
   // Color texture (e.g. color emoji): extract color and coverage
   outputColor = clamp(vec4(texColor.rgb / texColor.a, 1.0), 0.0, 1.0);

@@ -13,9 +13,9 @@ layout(location = 0) in vec2 TransformedCoords_0;
 
 layout(location = 0) out vec4 fragColor;
 
-layout(set = 0, binding = 1) uniform sampler2D TextureSampler_0;
+layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
 
-layout(std140, set = 0, binding = 2) uniform FragmentUniformBlock {
+layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Color;
 #if SHADER_MODE_X >= 2 || SHADER_MODE_Y >= 2
   vec4 Subset;
@@ -139,6 +139,8 @@ void main() {
 
   // --- Alpha-only and output ---
 #if ALPHA_ONLY
+  // Alpha-only textures use R8 format in Metal. Use .r to get the actual alpha value.
+  color = vec4(color.r);
   color = color.a * Color;
 #else
   color = color * Color.a;
