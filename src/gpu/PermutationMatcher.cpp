@@ -64,6 +64,7 @@
 #include "gpu/shaders/level1/LumaShader.h"
 #include "gpu/shaders/level1/MeshFillShader.h"
 #include "gpu/shaders/level1/NonAARRectFillShader.h"
+#include "gpu/shaders/level1/QuadColorFillShader.h"
 #include "gpu/shaders/level1/QuadTextureFillShader.h"
 #include "gpu/shaders/level1/RoundStrokeRectFillShader.h"
 #include "gpu/shaders/level1/ShapeInstancedFillShader.h"
@@ -173,6 +174,28 @@ static std::optional<PermutationMatchResult> TryMatchConstColor(const ProgramInf
   fragValues[FD::INPUT_MODE] = ccp->getInputMode();
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"ConstColorShader", 0, fragIndex};
+}
+
+static std::optional<PermutationMatchResult> TryMatchQuadColorFill(
+    const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp->name() != "QuadPerEdgeAAGeometryProcessor") {
+    return std::nullopt;
+  }
+  if (programInfo->numFragmentProcessors() != 0) {
+    return std::nullopt;
+  }
+  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+    return std::nullopt;
+  }
+  auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
+  using D = QuadColorFillShader::D;
+  auto domain = D::domain();
+  std::vector<int> values(D::COUNT, 0);
+  values[D::HAS_COVERAGE] = quadGP->getAAType() == AAType::Coverage ? 1 : 0;
+  values[D::HAS_COLOR] = !quadGP->hasCommonColor() ? 1 : 0;
+  auto index = domain.encode(values);
+  return PermutationMatchResult{"QuadColorFillShader", index, index};
 }
 
 static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
@@ -965,6 +988,9 @@ std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* progra
     return std::nullopt;
   }
   if (auto result = TryMatchTextureFill(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchQuadColorFill(programInfo)) {
     return result;
   }
   if (auto result = TryMatchQuadTextureFill(programInfo)) {
