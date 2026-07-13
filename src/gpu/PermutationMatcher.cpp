@@ -684,6 +684,10 @@ static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
   if (childFP == nullptr || childFP->name() != "TextureEffect") {
     return std::nullopt;
   }
+  auto* childTE = static_cast<const TextureEffect*>(childFP);
+  if (childTE->numTextureSamplers() == 0 || childTE->hasSubset()) {
+    return std::nullopt;
+  }
   int sigma = blur->getMaxSigma();
   if (sigma < 1 || sigma > 10) {
     return std::nullopt;
@@ -729,6 +733,23 @@ static std::optional<PermutationMatchResult> TryMatchBlendMerge(const ProgramInf
   int blendMode = static_cast<int>(xfp->getMode());
   if (blendMode < 0 || blendMode >= 30) {
     return std::nullopt;
+  }
+  // The precompiled BlendMerge shader only supports simple TextureEffect children (no subset,
+  // no DeviceSpaceTextureEffect). Reject if any child has unsupported uniforms.
+  for (size_t i = 0; i < xfp->numChildProcessors(); i++) {
+    auto child = xfp->childProcessor(i);
+    if (child == nullptr) {
+      continue;
+    }
+    if (child->name() == "DeviceSpaceTextureEffect") {
+      return std::nullopt;
+    }
+    if (child->name() == "TextureEffect") {
+      auto* childTE = static_cast<const TextureEffect*>(child);
+      if (childTE->numTextureSamplers() == 0 || childTE->hasSubset()) {
+        return std::nullopt;
+      }
+    }
   }
   using FD = BlendMergeShader::FD;
   auto fragDomain = FD::domain();
