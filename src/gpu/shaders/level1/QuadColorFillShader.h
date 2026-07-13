@@ -27,16 +27,30 @@ namespace tgfx {
 /// Covers solid-color AA quad rendering with optional per-vertex coverage and per-vertex color.
 class QuadColorFillShader : public PrecompiledShader {
  public:
+  // Vertex dimensions (unchanged — XP does not affect vertex stage)
   TGFX_DEFINE_DIMS(HAS_COVERAGE, HAS_COLOR);
-  using D = Dims;
-  static_assert(D::COUNT == 2, "Update ShouldCompile below when dimensions change.");
+  using VD = Dims;
+
+  // Fragment dimensions (adds HAS_XP)
+  struct FragDims {
+    enum : uint32_t { HAS_COVERAGE, HAS_COLOR, HAS_XP, COUNT };
+    static PermutationDomain domain() {
+      return PermutationDomain({
+          PermutationBool("HAS_COVERAGE"),
+          PermutationBool("HAS_COLOR"),
+          PermutationBool("HAS_XP"),
+      });
+    }
+  };
+  using FD = FragDims;
+  static_assert(FD::COUNT == 3, "Update ShouldCompile below when dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"QuadColorFillShader",
             "level1/quad_color_fill.vert",
             "level1/quad_color_fill.frag",
-            D::domain(),
-            D::domain(),
+            VD::domain(),
+            FD::domain(),
             PermutationDomain({}),
             "QuadPerEdgeAAGeometryProcessor",
             "",
@@ -44,8 +58,15 @@ class QuadColorFillShader : public PrecompiledShader {
   }
 
  private:
-  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>&,
-                            const std::vector<int>&) {
+  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>& vertValues,
+                            const std::vector<int>& fragValues) {
+    // Vert and frag must agree on HAS_COVERAGE and HAS_COLOR.
+    if (vertValues[VD::HAS_COVERAGE] != fragValues[FD::HAS_COVERAGE]) {
+      return false;
+    }
+    if (vertValues[VD::HAS_COLOR] != fragValues[FD::HAS_COLOR]) {
+      return false;
+    }
     return true;
   }
 };

@@ -52,6 +52,10 @@
 #include "gpu/shaders/level1/SingleIntervalGradientShader.h"
 #include "gpu/shaders/level1/TextureClipShader.h"
 #include "gpu/shaders/level1/TextureColorMatrixShader.h"
+#include "gpu/shaders/level1/TexturedAlphaThresholdShader.h"
+#include "gpu/shaders/level1/TexturedColorMatrixShader.h"
+#include "gpu/shaders/level1/TexturedColorSpaceXformShader.h"
+#include "gpu/shaders/level1/TexturedLumaShader.h"
 #include "gpu/shaders/level1/TextureFillShader.h"
 #include "gpu/shaders/level1/TextureGradientShader.h"
 #include "gpu/shaders/level1/TiledTextureFillShader.h"
@@ -140,6 +144,32 @@ static std::string ReadFileContents(const std::string& path) {
   return buffer.str();
 }
 
+static std::string ResolveIncludes(const std::string& source, const std::string& baseDir) {
+  std::string result;
+  std::istringstream stream(source);
+  std::string line;
+  while (std::getline(stream, line)) {
+    auto trimmed = line;
+    auto firstNonSpace = trimmed.find_first_not_of(" \t");
+    if (firstNonSpace != std::string::npos && trimmed.substr(firstNonSpace, 9) == "#include ") {
+      auto quoteStart = trimmed.find('"', firstNonSpace + 9);
+      auto quoteEnd = trimmed.find('"', quoteStart + 1);
+      if (quoteStart != std::string::npos && quoteEnd != std::string::npos) {
+        auto includePath = trimmed.substr(quoteStart + 1, quoteEnd - quoteStart - 1);
+        auto fullPath = baseDir + "/" + includePath;
+        auto includeContent = ReadFileContents(fullPath);
+        if (includeContent.empty()) {
+          std::cerr << "  WARNING: Cannot resolve #include \"" << includePath << "\"\n";
+        }
+        result += includeContent + "\n";
+        continue;
+      }
+    }
+    result += line + "\n";
+  }
+  return result;
+}
+
 static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const BuildOptions& options,
                                      std::vector<VariantData>* outVariants) {
   ShaderReport report;
@@ -157,9 +187,17 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
     fragSource = ReadFileContents(options.shaderDir + "/" + info.fragmentFile);
     if (vertSource.empty()) {
       std::cerr << "  WARNING: Cannot read vertex file: " << info.vertexFile << "\n";
+    } else {
+      auto vertDir = options.shaderDir + "/" + info.vertexFile;
+      vertDir = vertDir.substr(0, vertDir.rfind('/'));
+      vertSource = ResolveIncludes(vertSource, vertDir);
     }
     if (fragSource.empty()) {
       std::cerr << "  WARNING: Cannot read fragment file: " << info.fragmentFile << "\n";
+    } else {
+      auto fragDir = options.shaderDir + "/" + info.fragmentFile;
+      fragDir = fragDir.substr(0, fragDir.rfind('/'));
+      fragSource = ResolveIncludes(fragSource, fragDir);
     }
   }
 

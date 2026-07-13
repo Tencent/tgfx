@@ -30,15 +30,16 @@ namespace tgfx {
 class ConstColorShader : public PrecompiledShader {
  public:
   struct FragDims {
-    enum : uint32_t { INPUT_MODE, COUNT };
+    enum : uint32_t { INPUT_MODE, HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("INPUT_MODE", 3),
+          PermutationBool("HAS_XP"),
       });
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 1, "Update info() when fragment dimensions change.");
+  static_assert(FD::COUNT == 2, "Update info() when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"ConstColorShader",

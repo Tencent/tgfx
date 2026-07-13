@@ -32,6 +32,10 @@ class PorterDuffXferProcessor : public XferProcessor {
     return "PorterDuffXferProcessor";
   }
 
+  BlendMode getBlendMode() const {
+    return blendMode;
+  }
+
   const TextureView* dstTextureView() const override;
 
   void computeProcessorKey(Context* context, BytesKey* bytesKey) const override;

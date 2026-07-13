@@ -24,16 +24,32 @@ namespace tgfx {
 
 class TextureFillShader : public PrecompiledShader {
  public:
+  // Vertex dimensions (unchanged — XP does not affect vertex stage)
   TGFX_DEFINE_DIMS(HAS_YUV, ALPHA_ONLY, HAS_RGBAAA, HAS_SUBSET);
-  using D = Dims;
-  static_assert(D::COUNT == 4, "Update ShouldCompile below when dimensions change.");
+  using VD = Dims;
+
+  // Fragment dimensions (adds HAS_XP for PorterDuff XferProcessor support)
+  struct FragDims {
+    enum : uint32_t { HAS_YUV, ALPHA_ONLY, HAS_RGBAAA, HAS_SUBSET, HAS_XP, COUNT };
+    static PermutationDomain domain() {
+      return PermutationDomain({
+          PermutationBool("HAS_YUV"),
+          PermutationBool("ALPHA_ONLY"),
+          PermutationBool("HAS_RGBAAA"),
+          PermutationBool("HAS_SUBSET"),
+          PermutationBool("HAS_XP"),
+      });
+    }
+  };
+  using FD = FragDims;
+  static_assert(FD::COUNT == 5, "Update ShouldCompile below when dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"TextureFillShader",
             "level1/texture_fill.vert",
             "level1/texture_fill.frag",
-            D::domain(),
-            D::domain(),
+            VD::domain(),
+            FD::domain(),
             PermutationDomain({}),
             "",
             "",
@@ -41,22 +57,25 @@ class TextureFillShader : public PrecompiledShader {
   }
 
  private:
-  static bool ShouldCompile(uint32_t vertIndex, uint32_t fragIndex, const std::vector<int>&,
+  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>& vertValues,
                             const std::vector<int>& fragValues) {
-    // Both stages currently share the same domain and defines, so only compile matching pairs.
-    if (vertIndex != fragIndex) {
+    // YUV textures require additional dimensions not yet modeled.
+    if (fragValues[FD::HAS_YUV] != 0) {
       return false;
     }
-    // YUV textures require additional dimensions (Limited/Full range, I420/NV12 format) that are
-    // not yet modeled. Skip all YUV variants — they fall back to ProgramBuilder at runtime.
-    bool hasYuv = fragValues[D::HAS_YUV] != 0;
-    if (hasYuv) {
-      return false;
-    }
-    bool alphaOnly = fragValues[D::ALPHA_ONLY] != 0;
-    bool hasRgbaaa = fragValues[D::HAS_RGBAAA] != 0;
     // ALPHA_ONLY and HAS_RGBAAA are mutually exclusive in practice.
-    return !(alphaOnly && hasRgbaaa);
+    if (fragValues[FD::ALPHA_ONLY] != 0 && fragValues[FD::HAS_RGBAAA] != 0) {
+      return false;
+    }
+    // Vertex domain does not include HAS_XP — vert variants must match frag base dimensions.
+    // Each vert variant pairs with both HAS_XP=0 and HAS_XP=1 frag variants.
+    if (vertValues[VD::HAS_YUV] != fragValues[FD::HAS_YUV] ||
+        vertValues[VD::ALPHA_ONLY] != fragValues[FD::ALPHA_ONLY] ||
+        vertValues[VD::HAS_RGBAAA] != fragValues[FD::HAS_RGBAAA] ||
+        vertValues[VD::HAS_SUBSET] != fragValues[FD::HAS_SUBSET]) {
+      return false;
+    }
+    return true;
   }
 };
 

@@ -98,5 +98,10 @@ void GLSLPorterDuffXferProcessor::setData(UniformData* /*vertexUniformData*/,
   }
   float scales[] = {1.f / static_cast<float>(width), 1.f / static_cast<float>(height)};
   fragmentUniformData->setData("DstTextureCoordScale", scales);
+  // For precompiled shaders, blend mode is passed as a uniform rather than baked into shader code.
+  if (fragmentUniformData->hasField("XPBlendMode")) {
+    int mode = static_cast<int>(blendMode);
+    fragmentUniformData->setData("XPBlendMode", mode);
+  }
 }
 }  // namespace tgfx

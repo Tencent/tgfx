@@ -27,6 +27,7 @@
 #include "gpu/processors/ColorSpaceXFormEffect.h"
 #include "gpu/processors/ComplexEllipseGeometryProcessor.h"
 #include "gpu/processors/ComplexNonAARRectGeometryProcessor.h"
+#include "gpu/processors/ComposeFragmentProcessor.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/DualIntervalGradientColorizer.h"
@@ -38,6 +39,7 @@
 #include "gpu/processors/LumaFragmentProcessor.h"
 #include "gpu/processors/MeshGeometryProcessor.h"
 #include "gpu/processors/NonAARRectGeometryProcessor.h"
+#include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/processors/RoundStrokeRectGeometryProcessor.h"
 #include "gpu/processors/ShapeInstancedGeometryProcessor.h"
@@ -73,9 +75,30 @@
 #include "gpu/shaders/level1/TextureColorMatrixShader.h"
 #include "gpu/shaders/level1/TextureFillShader.h"
 #include "gpu/shaders/level1/TextureGradientShader.h"
+#include "gpu/shaders/level1/TexturedAlphaThresholdShader.h"
+#include "gpu/shaders/level1/TexturedColorMatrixShader.h"
+#include "gpu/shaders/level1/TexturedColorSpaceXformShader.h"
+#include "gpu/shaders/level1/TexturedLumaShader.h"
 #include "gpu/shaders/level1/TiledTextureFillShader.h"
 
 namespace tgfx {
+
+// Returns 0 for EmptyXferProcessor, 1 for PorterDuffXferProcessor with dst texture (DST_TEX mode),
+// or -1 for unsupported XP types (including PorterDuff with framebuffer fetch).
+static int GetXPType(const ProgramInfo* programInfo) {
+  auto xp = programInfo->getXferProcessor();
+  if (xp == EmptyXferProcessor::GetInstance()) {
+    return 0;
+  }
+  if (xp->name() == "PorterDuffXferProcessor") {
+    // Only match DST_TEX mode (dstTextureView != nullptr). Framebuffer fetch mode (dstTextureView
+    // == nullptr) is not covered by precompiled shaders and falls back to ProgramBuilder.
+    if (xp->dstTextureView() != nullptr) {
+      return 1;
+    }
+  }
+  return -1;
+}
 
 static std::optional<PermutationMatchResult> TryMatchTextureFill(const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
@@ -85,9 +108,8 @@ static std::optional<PermutationMatchResult> TryMatchTextureFill(const ProgramIn
   if (programInfo->numFragmentProcessors() != 1) {
     return std::nullopt;
   }
-  // Only match when no custom XferProcessor is active. A non-empty XferProcessor changes the
-  // shader structure (e.g. dst texture sampling) which is incompatible with precompiled variants.
-  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
     return std::nullopt;
   }
   auto fp = programInfo->getFragmentProcessor(0);
@@ -103,15 +125,24 @@ static std::optional<PermutationMatchResult> TryMatchTextureFill(const ProgramIn
   if (te->isYUV()) {
     return std::nullopt;
   }
-  auto vertDomain = TextureFillShader::D::domain();
-  auto fragDomain = TextureFillShader::D::domain();
-  std::vector<int> values(TextureFillShader::D::COUNT);
-  values[TextureFillShader::D::HAS_YUV] = 0;
-  values[TextureFillShader::D::ALPHA_ONLY] = te->isAlphaOnly() ? 1 : 0;
-  values[TextureFillShader::D::HAS_RGBAAA] = te->hasRGBAAA() ? 1 : 0;
-  values[TextureFillShader::D::HAS_SUBSET] = te->hasSubset() ? 1 : 0;
-  auto vertIndex = vertDomain.encode(values);
-  auto fragIndex = fragDomain.encode(values);
+  using VD = TextureFillShader::VD;
+  auto vertDomain = VD::domain();
+  std::vector<int> vertValues(VD::COUNT);
+  vertValues[VD::HAS_YUV] = 0;
+  vertValues[VD::ALPHA_ONLY] = te->isAlphaOnly() ? 1 : 0;
+  vertValues[VD::HAS_RGBAAA] = te->hasRGBAAA() ? 1 : 0;
+  vertValues[VD::HAS_SUBSET] = te->hasSubset() ? 1 : 0;
+  auto vertIndex = vertDomain.encode(vertValues);
+
+  using FD = TextureFillShader::FD;
+  auto fragDomain = FD::domain();
+  std::vector<int> fragValues(FD::COUNT);
+  fragValues[FD::HAS_YUV] = 0;
+  fragValues[FD::ALPHA_ONLY] = te->isAlphaOnly() ? 1 : 0;
+  fragValues[FD::HAS_RGBAAA] = te->hasRGBAAA() ? 1 : 0;
+  fragValues[FD::HAS_SUBSET] = te->hasSubset() ? 1 : 0;
+  fragValues[FD::HAS_XP] = xpType;
+  auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"TextureFillShader", vertIndex, fragIndex};
 }
 
@@ -160,7 +191,8 @@ static std::optional<PermutationMatchResult> TryMatchConstColor(const ProgramInf
   if (programInfo->numFragmentProcessors() != 1) {
     return std::nullopt;
   }
-  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
     return std::nullopt;
   }
   auto fp = programInfo->getFragmentProcessor(0);
@@ -172,6 +204,7 @@ static std::optional<PermutationMatchResult> TryMatchConstColor(const ProgramInf
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
   fragValues[FD::INPUT_MODE] = ccp->getInputMode();
+  fragValues[FD::HAS_XP] = xpType;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"ConstColorShader", 0, fragIndex};
 }
@@ -184,17 +217,26 @@ static std::optional<PermutationMatchResult> TryMatchQuadColorFill(const Program
   if (programInfo->numFragmentProcessors() != 0) {
     return std::nullopt;
   }
-  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
     return std::nullopt;
   }
   auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
-  using D = QuadColorFillShader::D;
-  auto domain = D::domain();
-  std::vector<int> values(D::COUNT, 0);
-  values[D::HAS_COVERAGE] = quadGP->getAAType() == AAType::Coverage ? 1 : 0;
-  values[D::HAS_COLOR] = !quadGP->hasCommonColor() ? 1 : 0;
-  auto index = domain.encode(values);
-  return PermutationMatchResult{"QuadColorFillShader", index, index};
+  using VD = QuadColorFillShader::VD;
+  auto vertDomain = VD::domain();
+  std::vector<int> vertValues(VD::COUNT, 0);
+  vertValues[VD::HAS_COVERAGE] = quadGP->getAAType() == AAType::Coverage ? 1 : 0;
+  vertValues[VD::HAS_COLOR] = !quadGP->hasCommonColor() ? 1 : 0;
+  auto vertIndex = vertDomain.encode(vertValues);
+
+  using FD = QuadColorFillShader::FD;
+  auto fragDomain = FD::domain();
+  std::vector<int> fragValues(FD::COUNT, 0);
+  fragValues[FD::HAS_COVERAGE] = quadGP->getAAType() == AAType::Coverage ? 1 : 0;
+  fragValues[FD::HAS_COLOR] = !quadGP->hasCommonColor() ? 1 : 0;
+  fragValues[FD::HAS_XP] = xpType;
+  auto fragIndex = fragDomain.encode(fragValues);
+  return PermutationMatchResult{"QuadColorFillShader", vertIndex, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
@@ -206,7 +248,8 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   if (programInfo->numFragmentProcessors() != 1) {
     return std::nullopt;
   }
-  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
     return std::nullopt;
   }
   auto fp = programInfo->getFragmentProcessor(0);
@@ -251,6 +294,7 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   fragValues[FD::HAS_SUBSET] = gpSubset ? 1 : 0;
   fragValues[FD::HAS_COVERAGE] = quadGP->getAAType() == AAType::Coverage ? 1 : 0;
   fragValues[FD::HAS_COLOR] = !quadGP->hasCommonColor() ? 1 : 0;
+  fragValues[FD::HAS_XP] = xpType;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"QuadTextureFillShader", vertIndex, fragIndex};
 }
@@ -728,6 +772,104 @@ static std::optional<PermutationMatchResult> TryMatchColorSpaceXform(
   return PermutationMatchResult{"ColorSpaceXformShader", 0, fragIndex};
 }
 
+static std::optional<PermutationMatchResult> TryMatchComposedTexture(
+    const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp->name() != "DefaultGeometryProcessor" && gp->name() != "QuadPerEdgeAAGeometryProcessor") {
+    return std::nullopt;
+  }
+  if (programInfo->numFragmentProcessors() != 1) {
+    return std::nullopt;
+  }
+  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+    return std::nullopt;
+  }
+  auto fp = programInfo->getFragmentProcessor(0);
+  if (fp->name() != "ComposeFragmentProcessor") {
+    return std::nullopt;
+  }
+  if (fp->numChildProcessors() != 2) {
+    return std::nullopt;
+  }
+  auto child0 = fp->childProcessor(0);
+  auto child1 = fp->childProcessor(1);
+  if (child0->name() != "TextureEffect") {
+    return std::nullopt;
+  }
+  auto* te = static_cast<const TextureEffect*>(child0);
+  if (te->isYUV() || te->isAlphaOnly() || te->hasRGBAAA()) {
+    return std::nullopt;
+  }
+  int hasSubset = te->hasSubset() ? 1 : 0;
+
+  if (child1->name() == "ColorSpaceXformEffect") {
+    auto* cse = static_cast<const ColorSpaceXformEffect*>(child1);
+    auto* xform = cse->colorXform();
+    if (!xform) {
+      return std::nullopt;
+    }
+    using FD = TexturedColorSpaceXformShader::FD;
+    auto fragDomain = FD::domain();
+    std::vector<int> fragValues(FD::COUNT, 0);
+    fragValues[FD::HAS_SUBSET] = hasSubset;
+    fragValues[FD::UNPREMUL] = xform->flags.unPremul ? 1 : 0;
+    fragValues[FD::LINEARIZE] = xform->flags.linearize ? 1 : 0;
+    fragValues[FD::SRC_OOTF] = xform->flags.srcOOTF ? 1 : 0;
+    fragValues[FD::GAMUT_TRANSFORM] = xform->flags.gamutTransform ? 1 : 0;
+    fragValues[FD::DST_OOTF] = xform->flags.dstOOTF ? 1 : 0;
+    fragValues[FD::ENCODE] = xform->flags.encode ? 1 : 0;
+    fragValues[FD::PREMUL] = xform->flags.premul ? 1 : 0;
+    if (xform->flags.linearize) {
+      int srcIdx = TFTypeToIndex(gfx::skcms_TransferFunction_getType(
+          reinterpret_cast<const gfx::skcms_TransferFunction*>(&xform->srcTransferFunction)));
+      if (srcIdx < 0) {
+        return std::nullopt;
+      }
+      fragValues[FD::SRC_TF_TYPE] = srcIdx;
+    }
+    if (xform->flags.encode) {
+      int dstIdx = TFTypeToIndex(
+          gfx::skcms_TransferFunction_getType(reinterpret_cast<const gfx::skcms_TransferFunction*>(
+              &xform->dstTransferFunctionInverse)));
+      if (dstIdx < 0) {
+        return std::nullopt;
+      }
+      fragValues[FD::DST_TF_TYPE] = dstIdx;
+    }
+    auto fragIndex = fragDomain.encode(fragValues);
+    return PermutationMatchResult{"TexturedColorSpaceXformShader", 0, fragIndex};
+  }
+
+  if (child1->name() == "ColorMatrixFragmentProcessor") {
+    using D = TexturedColorMatrixShader::D;
+    auto fragDomain = D::domain();
+    std::vector<int> fragValues(D::COUNT, 0);
+    fragValues[D::HAS_SUBSET] = hasSubset;
+    auto fragIndex = fragDomain.encode(fragValues);
+    return PermutationMatchResult{"TexturedColorMatrixShader", 0, fragIndex};
+  }
+
+  if (child1->name() == "LumaFragmentProcessor") {
+    using D = TexturedLumaShader::D;
+    auto fragDomain = D::domain();
+    std::vector<int> fragValues(D::COUNT, 0);
+    fragValues[D::HAS_SUBSET] = hasSubset;
+    auto fragIndex = fragDomain.encode(fragValues);
+    return PermutationMatchResult{"TexturedLumaShader", 0, fragIndex};
+  }
+
+  if (child1->name() == "AlphaStepFragmentProcessor") {
+    using D = TexturedAlphaThresholdShader::D;
+    auto fragDomain = D::domain();
+    std::vector<int> fragValues(D::COUNT, 0);
+    fragValues[D::HAS_SUBSET] = hasSubset;
+    auto fragIndex = fragDomain.encode(fragValues);
+    return PermutationMatchResult{"TexturedAlphaThresholdShader", 0, fragIndex};
+  }
+
+  return std::nullopt;
+}
+
 static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
     const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
@@ -1080,6 +1222,9 @@ std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* progra
     return result;
   }
   if (auto result = TryMatchTextureColorMatrix(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchComposedTexture(programInfo)) {
     return result;
   }
   if (auto result = TryMatchTextureClip(programInfo)) {

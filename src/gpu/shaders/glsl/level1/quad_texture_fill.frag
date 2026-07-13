@@ -1,6 +1,7 @@
 // QuadTextureFillShader fragment shader
-// Processor layout: QuadPerEdgeAAGeometryProcessor + TextureEffect + EmptyXferProcessor
-// Permutation dimensions (frag): HAS_YUV, ALPHA_ONLY, HAS_RGBAAA, HAS_SUBSET
+// Processor layout: QuadPerEdgeAAGeometryProcessor + TextureEffect + EmptyXferProcessor/PorterDuffXP
+// Permutation dimensions (frag): HAS_YUV, ALPHA_ONLY, HAS_RGBAAA, HAS_SUBSET, HAS_COVERAGE,
+//                                HAS_COLOR, HAS_XP
 // Note: HAS_YUV is always 0 at runtime — YUV textures fall back to ProgramBuilder.
 // Vertex-driven varyings are controlled by vert permutation dimensions (HAS_COVERAGE, HAS_COLOR,
 // HAS_SUBSET) which are communicated via matching varying declarations.
@@ -30,8 +31,11 @@
 #ifndef HAS_UV_PERSPECTIVE
 #define HAS_UV_PERSPECTIVE 0
 #endif
+#ifndef HAS_XP
+#define HAS_XP 0
+#endif
 
-#if !HAS_COLOR || HAS_SUBSET || HAS_RGBAAA
+#if !HAS_COLOR || HAS_SUBSET || HAS_RGBAAA || HAS_XP
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #if !HAS_COLOR
   vec4 Color;
@@ -41,6 +45,11 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #endif
 #if HAS_RGBAAA
   vec2 AlphaStart;
+#endif
+#if HAS_XP
+  vec2 DstTextureUpperLeft;
+  vec2 DstTextureCoordScale;
+  int XPBlendMode;
 #endif
 };
 #endif
@@ -64,6 +73,9 @@ layout(location = 3) in vec4 vTexSubset;
 #endif
 
 layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
+
+#define XP_DST_TEX_BINDING 1
+#include "xp_porter_duff.inc"
 
 layout(location = 0) out vec4 fragColor;
 
@@ -108,10 +120,18 @@ void main() {
   color = color * outputColor.a;
 #endif
 
-  // Apply coverage modulation.
-#if HAS_COVERAGE
-  fragColor = color * vCoverage;
+#if HAS_XP
+  #if HAS_COVERAGE
+  fragColor = applyPorterDuffXP(color, vec4(vCoverage));
+  #else
+  fragColor = applyPorterDuffXP(color, vec4(1.0));
+  #endif
 #else
+  // Apply coverage modulation.
+  #if HAS_COVERAGE
+  fragColor = color * vCoverage;
+  #else
   fragColor = color;
+  #endif
 #endif
 }

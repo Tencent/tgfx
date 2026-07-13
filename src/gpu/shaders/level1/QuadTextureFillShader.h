@@ -64,9 +64,9 @@ class QuadTextureFillShader : public PrecompiledShader {
 
   // Fragment dimensions (includes vertex-driven HAS_COVERAGE and HAS_COLOR because the fragment
   // shader must declare matching varyings and apply coverage/color logic accordingly)
-  TGFX_DEFINE_DIMS(HAS_YUV, ALPHA_ONLY, HAS_RGBAAA, HAS_SUBSET, HAS_COVERAGE, HAS_COLOR);
+  TGFX_DEFINE_DIMS(HAS_YUV, ALPHA_ONLY, HAS_RGBAAA, HAS_SUBSET, HAS_COVERAGE, HAS_COLOR, HAS_XP);
   using FD = Dims;
-  static_assert(FD::COUNT == 6, "Update ShouldCompile when fragment dimensions change.");
+  static_assert(FD::COUNT == 7, "Update ShouldCompile when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"QuadTextureFillShader",

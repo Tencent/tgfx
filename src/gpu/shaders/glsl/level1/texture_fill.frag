@@ -1,7 +1,7 @@
 // TextureFillShader fragment shader (non-YUV path only)
-// Processor layout: DefaultGeometryProcessor() + TextureEffect() + EmptyXferProcessor()
+// Processor layout: DefaultGeometryProcessor() + TextureEffect() + EmptyXferProcessor/PorterDuffXP
 // Permutation dimensions (injected by build tool as #define 0/1):
-//   ALPHA_ONLY, HAS_RGBAAA, HAS_SUBSET
+//   ALPHA_ONLY, HAS_RGBAAA, HAS_SUBSET, HAS_XP
 // Note: HAS_YUV is always 0 at runtime — YUV textures fall back to ProgramBuilder.
 #version 450
 
@@ -14,6 +14,9 @@
 #ifndef HAS_SUBSET
 #define HAS_SUBSET 0
 #endif
+#ifndef HAS_XP
+#define HAS_XP 0
+#endif
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Color;
@@ -23,11 +26,19 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #if HAS_RGBAAA
   vec2 AlphaStart;
 #endif
+#if HAS_XP
+  vec2 DstTextureUpperLeft;
+  vec2 DstTextureCoordScale;
+  int XPBlendMode;
+#endif
 };
 
 layout(location = 0) in vec2 TransformedCoords_0;
 
 layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
+
+#define XP_DST_TEX_BINDING 1
+#include "xp_porter_duff.inc"
 
 layout(location = 0) out vec4 fragColor;
 
@@ -63,6 +74,10 @@ void main() {
   color = color * outputColor.a;
 #endif
 
+#if HAS_XP
+  fragColor = applyPorterDuffXP(color, vec4(1.0));
+#else
   // EmptyXferProcessor — passthrough (outputCoverage is always vec4(1.0))
   fragColor = color;
+#endif
 }
