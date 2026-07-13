@@ -29,7 +29,6 @@ namespace tgfx {
 // --- Shared vertex helpers ---
 
 static constexpr size_t GLASS_VERTEX_SIZE = 16 * sizeof(float);
-static constexpr int MSAA_SAMPLE_COUNT = 4;
 
 static constexpr char GLASS_VERTEX_SHADER[] = R"(
     in vec2 aPosition;
@@ -119,12 +118,6 @@ std::shared_ptr<RenderPipeline> GlassRefractionEffect::CreatePipeline(GPU* gpu,
   descriptor.vertex.module = vertexShader;
   descriptor.fragment.module = fragmentShader;
   descriptor.fragment.colorAttachments.push_back({});
-  // Only AlphaMask and Star shapes need MSAA for edge anti-aliasing.
-  // RoundedRect and Ellipse use smoothstep-based AA in the shader.
-  bool useMSAA = (shapeType == GlassShapeType::AlphaMask || shapeType == GlassShapeType::Star);
-  if (useMSAA) {
-    descriptor.multisample.count = MSAA_SAMPLE_COUNT;
-  }
   BindingEntry sourceBinding = {"uSource", 0};
   descriptor.layout.textureSamplers.push_back(sourceBinding);
   if (shapeType == GlassShapeType::AlphaMask) {
@@ -156,27 +149,12 @@ bool GlassRefractionEffect::onDraw(CommandEncoder* encoder,
     return false;
   }
 
-  // For MSAA shapes, create a multisampled render target and resolve to outputTexture.
-  // For non-MSAA shapes, render directly to outputTexture.
-  std::shared_ptr<RenderPass> renderPass;
-  std::shared_ptr<Texture> msaaTexture = nullptr;
-  if (needsMSAA()) {
-    TextureDescriptor textureDesc(outputTexture->width(), outputTexture->height(),
-                                  outputTexture->format(), false, MSAA_SAMPLE_COUNT,
-                                  TextureUsage::RENDER_ATTACHMENT);
-    msaaTexture = gpu->createTexture(textureDesc);
-    if (msaaTexture == nullptr) {
-      LOGE("GlassRefractionEffect: failed to create MSAA texture!");
-      return false;
-    }
-    RenderPassDescriptor renderPassDesc(msaaTexture, LoadAction::Clear, StoreAction::Store,
-                                        PMColor::Transparent(), outputTexture);
-    renderPass = encoder->beginRenderPass(renderPassDesc);
-  } else {
-    RenderPassDescriptor renderPassDesc(outputTexture, LoadAction::Clear, StoreAction::Store,
-                                        PMColor::Transparent());
-    renderPass = encoder->beginRenderPass(renderPassDesc);
-  }
+  // Render directly to outputTexture using Coverage AA (smoothstep in shader).
+  // This matches tgfx's standard AAType::Coverage approach, avoiding the 4x fragment
+  // and memory cost of MSAA textures.
+  RenderPassDescriptor renderPassDesc(outputTexture, LoadAction::Clear, StoreAction::Store,
+                                      PMColor::Transparent());
+  auto renderPass = encoder->beginRenderPass(renderPassDesc);
   if (renderPass == nullptr) {
     return false;
   }

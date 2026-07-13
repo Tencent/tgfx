@@ -46,10 +46,6 @@ class GlassRefractionEffect : public RuntimeEffect {
 
   static std::string BuildFragmentShader(GlassShapeType shapeType, bool isDesktop);
 
-  bool needsMSAA() const {
-    return _shapeType == GlassShapeType::AlphaMask || _shapeType == GlassShapeType::Star;
-  }
-
   float _glassWidth = 0.0f;
   float _glassHeight = 0.0f;
   float _halfWidth = 0.0f;

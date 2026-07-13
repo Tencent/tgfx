@@ -118,7 +118,15 @@ class TentBlurEffect : public RuntimeEffect {
   }
 
   Rect filterBounds(const Rect& srcRect, MapDirection) const override {
-    return srcRect.makeOutset(_effectiveRadius, _effectiveRadius);
+    // Clamp outset to prevent excessively large textures.
+    // The blur only needs to cover the edge transition region, not the full radius.
+    float maxOutset = std::min(srcRect.width(), srcRect.height()) * 0.25f;
+    float outset = std::min(_effectiveRadius, maxOutset);
+    // Only expand in the blur direction to avoid unnecessary texture growth.
+    if (_horizontal) {
+      return srcRect.makeOutset(outset, 0.0f);
+    }
+    return srcRect.makeOutset(0.0f, outset);
   }
 
  protected:

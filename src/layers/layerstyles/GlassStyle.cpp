@@ -23,6 +23,7 @@
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "layers/contents/LayerContent.h"
+#include "tgfx/core/SamplingOptions.h"
 #include "tgfx/layers/filters/TentBlurFilter.h"
 
 namespace tgfx {
@@ -223,20 +224,30 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
     // transition than Gaussian, closer to a true distance field).
     // The maskImage itself is rebuilt every frame (input.content changes), but the
     // mask blur filter is cached for reuse.
+    // UDF is capped at MAX_UDF_SIZE to prevent excessive texture allocation. The mask UVs
+    // are normalized (0-1), so lower resolution does not affect the refraction shader.
+    static constexpr float MAX_UDF_SIZE = 512.0f;
     std::shared_ptr<Image> maskImage = nullptr;
     if (effectiveShapeType == GlassShapeType::AlphaMask) {
       float blurRadius = minHalf * (_depth / 100.0f) * 0.2f;
-      if (!maskBlurFilter || !FloatNearlyEqual(cachedMaskBlurSigma, blurRadius)) {
-        maskBlurFilter = TentBlurFilter::MakeImageFilter(blurRadius);
-        cachedMaskBlurSigma = blurRadius;
+      float udfScale = std::min(1.0f, MAX_UDF_SIZE / static_cast<float>(std::max(layerWidth, layerHeight)));
+      int udfWidth = std::max(1, static_cast<int>(static_cast<float>(layerWidth) * udfScale));
+      int udfHeight = std::max(1, static_cast<int>(static_cast<float>(layerHeight) * udfScale));
+      std::shared_ptr<Image> udfContent = input.content;
+      if (udfScale < 1.0f) {
+        udfContent = input.content->makeScaled(udfWidth, udfHeight, SamplingOptions(FilterMode::Linear));
+      }
+      float udfBlurRadius = blurRadius * udfScale;
+      if (!maskBlurFilter || !FloatNearlyEqual(cachedMaskBlurSigma, udfBlurRadius)) {
+        maskBlurFilter = TentBlurFilter::MakeImageFilter(udfBlurRadius);
+        cachedMaskBlurSigma = udfBlurRadius;
       }
       Point blurMaskOffset = {};
-      auto maskClipRect =
-          Rect::MakeWH(static_cast<float>(layerWidth), static_cast<float>(layerHeight));
-      maskImage = input.content->makeWithFilter(maskBlurFilter, &blurMaskOffset, &maskClipRect);
+      auto maskClipRect = Rect::MakeWH(static_cast<float>(udfWidth), static_cast<float>(udfHeight));
+      maskImage = udfContent->makeWithFilter(maskBlurFilter, &blurMaskOffset, &maskClipRect);
       if (!maskImage) {
         LOGE("GlassStyle: Failed to blur alpha for UDF, falling back to content.");
-        maskImage = input.content;
+        maskImage = udfContent;
       }
     }
     auto filter = getRefractionFilter(
