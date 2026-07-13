@@ -1266,6 +1266,11 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
     return nullptr;
   }
   auto viewMatrix = getViewMatrix();
+  // TODO(richard): under SSAA (forceNoEdgeAA=true) the snapshot is still captured at 1x density
+  // while the SSAA tile it feeds into is 2x. This is intentional: backdrop capture always feeds a
+  // blur, and blur with sigma >= 1 fully hides the resulting 1x sampling artifacts, so paying 4-16x
+  // for 2x capture is not worth it. Revisit if a real bad case shows up with very small sigma
+  // (< 1) where the 1x aliasing becomes visible.
   DEBUG_ASSERT(viewMatrix.invertible());
   // createBackgroundSource takes a surface-pixel-space rect for sizing; BackgroundCapturer::Run
   // takes world-space renderRects (pre-outset by blur sampling range) for per-rect culling.
