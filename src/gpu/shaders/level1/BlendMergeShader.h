@@ -25,6 +25,9 @@ namespace tgfx {
 /// Precompiled shader declaration for XfermodeFragmentProcessor. Blends two color inputs using one
 /// of 30 blend modes. The child type determines how inputs are sourced.
 ///
+/// Vertex dimensions:
+///   GP_TYPE (int, 2 values): 0=DefaultGeometryProcessor, 1=QuadPerEdgeAAGeometryProcessor
+///
 /// Fragment dimensions:
 ///   BLEND_MODE (int, 30 values): BlendMode enum (0=Clear .. 29=PlusDarker)
 ///   CHILD_TYPE (int, 3 values): 0=DstChild, 1=SrcChild, 2=TwoChild
@@ -34,6 +37,16 @@ namespace tgfx {
 /// TwoChild: two child textures provide src and dst respectively
 class BlendMergeShader : public PrecompiledShader {
  public:
+  struct VertDims {
+    enum : uint32_t { GP_TYPE, COUNT };
+    static PermutationDomain domain() {
+      return PermutationDomain({
+          PermutationInt("GP_TYPE", 2),
+      });
+    }
+  };
+  using VD = VertDims;
+
   struct FragDims {
     enum : uint32_t { BLEND_MODE, CHILD_TYPE, COUNT };
     static PermutationDomain domain() {
@@ -50,7 +63,7 @@ class BlendMergeShader : public PrecompiledShader {
     return {"BlendMergeShader",
             "level1/blend_merge.vert",
             "level1/blend_merge.frag",
-            PermutationDomain({}),
+            VD::domain(),
             FD::domain(),
             PermutationDomain({}),
             "",

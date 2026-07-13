@@ -731,8 +731,17 @@ static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
 
 static std::optional<PermutationMatchResult> TryMatchBlendMerge(const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "DefaultGeometryProcessor") {
+  int gpType = GetGPType(gp);
+  if (gpType < 0) {
     return std::nullopt;
+  }
+  // QuadGP with per-vertex UV coordinates uses uvCoord (not aPosition) for coord transforms.
+  // The precompiled BlendMerge vertex shader only handles the simple case (no uvCoord).
+  if (gpType == 1) {
+    auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
+    if (!quadGP->hasUVMatrix()) {
+      return std::nullopt;
+    }
   }
   if (programInfo->numFragmentProcessors() != 1) {
     return std::nullopt;
@@ -774,13 +783,19 @@ static std::optional<PermutationMatchResult> TryMatchBlendMerge(const ProgramInf
       }
     }
   }
+  using VD = BlendMergeShader::VD;
+  auto vertDomain = VD::domain();
+  std::vector<int> vertValues(VD::COUNT);
+  vertValues[VD::GP_TYPE] = gpType;
+  auto vertIndex = vertDomain.encode(vertValues);
+
   using FD = BlendMergeShader::FD;
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
   fragValues[FD::BLEND_MODE] = blendMode;
   fragValues[FD::CHILD_TYPE] = childType;
   auto fragIndex = fragDomain.encode(fragValues);
-  return PermutationMatchResult{"BlendMergeShader", 0, fragIndex};
+  return PermutationMatchResult{"BlendMergeShader", vertIndex, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchHairlineLine(const ProgramInfo* programInfo) {
