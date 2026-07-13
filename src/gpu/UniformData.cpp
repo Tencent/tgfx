@@ -63,6 +63,11 @@ const UniformData::Field* UniformData::findField(const std::string& key) const {
   return nullptr;
 }
 
+bool UniformData::hasField(const std::string& name) const {
+  const auto& key = skipSuffix ? name : name + nameSuffix;
+  return findField(key) != nullptr;
+}
+
 size_t UniformData::alignCursor(size_t alignment) const {
   return (cursor + alignment - 1) / alignment * alignment;
 }

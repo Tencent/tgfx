@@ -110,6 +110,11 @@ class UniformData {
     return _uniforms;
   }
 
+  /**
+   * Returns true if a uniform field with the given name exists in this data.
+   */
+  bool hasField(const std::string& name) const;
+
  private:
   struct Field {
     std::string name = "";

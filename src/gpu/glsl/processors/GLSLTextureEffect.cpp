@@ -236,20 +236,26 @@ void GLSLTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
         break;
     }
   }
-  if (needSubset()) {
+  // Set the Subset uniform when the shader declares it. The precompiled shader may include the
+  // Subset uniform even when needSubset() is false (GP has subset attribute but TE determined
+  // subset clamping is unnecessary). In that case we use the full texture bounds so the clamp is
+  // a no-op.
+  if (needSubset() || fragmentUniformData->hasField("Subset")) {
     auto subsetRect = subset.value_or(Rect::MakeWH(textureProxy->width(), textureProxy->height()));
-    if (samplerState.magFilterMode == samplerState.minFilterMode &&
-        samplerState.magFilterMode == FilterMode::Nearest) {
-      subsetRect.roundOut();
+    if (needSubset()) {
+      if (samplerState.magFilterMode == samplerState.minFilterMode &&
+          samplerState.magFilterMode == FilterMode::Nearest) {
+        subsetRect.roundOut();
+      }
+      auto type = textureView->getTexture()->type();
+      // https://cs.android.com/android/platform/superproject/+/master:frameworks/native/libs/nativedisplay/surfacetexture/SurfaceTexture.cpp;l=275;drc=master;bpv=0;bpt=1
+      // https://stackoverflow.com/questions/6023400/opengl-es-texture-coordinates-slightly-off
+      // Normally this would just need to take 1/2 a texel off each end, but because the chroma
+      // channels of YUV420 images are subsampled we may need to shrink the crop region by a whole
+      // texel on each side.
+      auto inset = type == TextureType::External ? 1.0f : 0.5f;
+      subsetRect = subsetRect.makeInset(inset, inset);
     }
-    auto type = textureView->getTexture()->type();
-    // https://cs.android.com/android/platform/superproject/+/master:frameworks/native/libs/nativedisplay/surfacetexture/SurfaceTexture.cpp;l=275;drc=master;bpv=0;bpt=1
-    // https://stackoverflow.com/questions/6023400/opengl-es-texture-coordinates-slightly-off
-    // Normally this would just need to take 1/2 a texel off each end, but because the chroma
-    // channels of YUV420 images are subsampled we may need to shrink the crop region by a whole
-    // texel on each side.
-    auto inset = type == TextureType::External ? 1.0f : 0.5f;
-    subsetRect = subsetRect.makeInset(inset, inset);
     float rect[4] = {subsetRect.left, subsetRect.top, subsetRect.right, subsetRect.bottom};
     if (textureView->origin() == ImageOrigin::BottomLeft) {
       auto h = static_cast<float>(textureView->height());
@@ -257,6 +263,7 @@ void GLSLTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
       rect[3] = h - rect[3];
       std::swap(rect[1], rect[3]);
     }
+    auto type = textureView->getTexture()->type();
     if (type != TextureType::Rectangle) {
       auto lt = textureView->getTextureCoord(rect[0], rect[1]);
       auto rb = textureView->getTextureCoord(rect[2], rect[3]);

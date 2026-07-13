@@ -225,12 +225,15 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   if (te->isYUV()) {
     return std::nullopt;
   }
-  // Vertex and fragment subset flags must agree: the vertex shader outputs a subset varying only
-  // when HAS_SUBSET is set, and the fragment shader expects to read it only when its own
-  // HAS_SUBSET is set. A mismatch causes a pipeline creation failure or GPU hang.
+  // The vertex HAS_SUBSET is driven by the GP (whether the texSubset vertex attribute exists).
+  // The fragment also uses the GP's subset flag for its varying declaration — Metal requires
+  // vertex outputs and fragment inputs to match. When gpSubset=true but teSubset=false, the
+  // fragment shader still declares vTexSubset and Subset uniform; TextureEffect::onSetData fills
+  // Subset with full-texture-range coordinates so the clamp becomes a no-op.
   bool gpSubset = quadGP->getHasSubset();
   bool teSubset = te->hasSubset();
-  if (gpSubset != teSubset) {
+  // Reject the impossible case: GP has no subset attribute but TE expects subset clamping.
+  if (!gpSubset && teSubset) {
     return std::nullopt;
   }
 
@@ -248,7 +251,7 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   std::vector<int> fragValues(FD::COUNT, 0);
   fragValues[FD::ALPHA_ONLY] = te->isAlphaOnly() ? 1 : 0;
   fragValues[FD::HAS_RGBAAA] = te->hasRGBAAA() ? 1 : 0;
-  fragValues[FD::HAS_SUBSET] = teSubset ? 1 : 0;
+  fragValues[FD::HAS_SUBSET] = gpSubset ? 1 : 0;
   fragValues[FD::HAS_COVERAGE] = quadGP->getAAType() == AAType::Coverage ? 1 : 0;
   fragValues[FD::HAS_COLOR] = !quadGP->hasCommonColor() ? 1 : 0;
   auto fragIndex = fragDomain.encode(fragValues);
