@@ -802,6 +802,10 @@ if (TGFX_EMBED_SHADER_BUNDLES)
     file(MAKE_DIRECTORY ${TGFX_SHADER_BUNDLE_DIR})
 
     set(TGFX_SHADER_BUNDLE_STAMP "${TGFX_SHADER_BUNDLE_DIR}/bundle_stamp")
+    file(GLOB_RECURSE TGFX_SHADER_SOURCES
+            src/gpu/shaders/glsl/level1/*.frag
+            src/gpu/shaders/glsl/level1/*.vert
+            src/gpu/shaders/glsl/level1/*.inc)
     add_custom_command(
             OUTPUT ${TGFX_SHADER_BUNDLE_STAMP}
             COMMAND shader_build_tool
@@ -809,7 +813,7 @@ if (TGFX_EMBED_SHADER_BUNDLES)
                     --out-dir ${TGFX_SHADER_BUNDLE_DIR}
                     --backends ${TGFX_SHADER_BACKENDS}
             COMMAND ${CMAKE_COMMAND} -E touch ${TGFX_SHADER_BUNDLE_STAMP}
-            DEPENDS shader_build_tool
+            DEPENDS shader_build_tool ${TGFX_SHADER_SOURCES}
             COMMENT "Compiling precompiled shader bundles (${TGFX_SHADER_BACKENDS})")
     add_custom_target(tgfx_shader_bundles DEPENDS ${TGFX_SHADER_BUNDLE_STAMP})
 
@@ -838,9 +842,12 @@ if (TGFX_EMBED_SHADER_BUNDLES)
         list(APPEND TGFX_EMBEDDED_BUNDLE_SOURCES ${BUNDLE_CPP})
     endforeach ()
 
-    target_sources(tgfx PRIVATE ${TGFX_EMBEDDED_BUNDLE_SOURCES})
-    target_include_directories(tgfx PRIVATE ${TGFX_EMBEDDED_BUNDLE_DIR})
-    add_dependencies(tgfx tgfx_shader_bundles)
+    # Build embedded bundles as a separate static library so that -force_load can target only it
+    # (avoiding duplicate symbol issues from force-loading the entire libtgfx).
+    add_library(tgfx_embedded_bundles STATIC ${TGFX_EMBEDDED_BUNDLE_SOURCES})
+    target_include_directories(tgfx_embedded_bundles PRIVATE src include)
+    add_dependencies(tgfx_embedded_bundles tgfx_shader_bundles)
+    set(TGFX_EMBEDDED_BUNDLES_TARGET tgfx_embedded_bundles CACHE INTERNAL "")
 endif ()
 
 if (TGFX_BUILD_HELLO2D)
@@ -924,6 +931,15 @@ if (TGFX_BUILD_TESTS)
     endif ()
 
     list(APPEND TGFX_TEST_LIBS tgfx-hello2d tgfx ${TGFX_SHARED_LIBS})
+    if (TGFX_EMBED_SHADER_BUNDLES AND TARGET tgfx_embedded_bundles)
+        list(APPEND TGFX_TEST_LIBS tgfx_embedded_bundles)
+        if (APPLE)
+            list(APPEND TGFX_TEST_LINK_OPTIONS "LINKER:-force_load,$<TARGET_FILE:tgfx_embedded_bundles>")
+        elseif (UNIX)
+            list(APPEND TGFX_TEST_LINK_OPTIONS
+                    "LINKER:--whole-archive" "$<TARGET_FILE:tgfx_embedded_bundles>" "LINKER:--no-whole-archive")
+        endif ()
+    endif ()
     list(APPEND TGFX_TEST_INCLUDES src test/src hello2d/include third_party/json/include)
 
     add_vendor_target(test-vendor STATIC_VENDORS googletest)

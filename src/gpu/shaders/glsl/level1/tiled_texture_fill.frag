@@ -1,9 +1,13 @@
 // TiledTextureFillShader fragment shader
-// Permutation dimensions (frag): SHADER_MODE_X(0-8), SHADER_MODE_Y(0-8), ALPHA_ONLY, HAS_STRICT
+// Permutation dimensions (frag): SHADER_MODE_X(0-8), SHADER_MODE_Y(0-8), ALPHA_ONLY, HAS_STRICT, HAS_XP
 // ShaderMode values: 0=None, 1=Clamp, 2=RepeatNearestNone, 3=RepeatLinearNone,
 //   4=RepeatLinearMipmap, 5=RepeatNearestMipmap, 6=MirrorRepeat,
 //   7=ClampToBorderNearest, 8=ClampToBorderLinear
 #version 450
+
+#ifndef HAS_XP
+#define HAS_XP 0
+#endif
 
 #if HAS_PERSPECTIVE
 layout(location = 0) in vec3 TransformedCoords_0;
@@ -23,7 +27,11 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #if SHADER_MODE_X >= 1 || SHADER_MODE_Y >= 1
   vec4 Clamp;
 #endif
+#include "xp_uniforms.inc"
 };
+
+#define XP_DST_TEX_BINDING 1
+#include "xp_porter_duff.inc"
 
 // Tile a coordinate for repeat mode: result in [subset.lo, subset.hi)
 float tileRepeat(float coord, float lo, float hi) {
@@ -146,5 +154,6 @@ void main() {
   color = color * Color.a;
 #endif
 
-  fragColor = color;
+#define TGFX_XP_SRC_COLOR color
+#include "xp_output.inc"
 }

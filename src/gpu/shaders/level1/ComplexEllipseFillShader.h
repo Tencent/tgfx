@@ -26,14 +26,27 @@ class ComplexEllipseFillShader : public PrecompiledShader {
  public:
   TGFX_DEFINE_DIMS(STROKE, HAS_COMMON_COLOR);
   using D = Dims;
-  static_assert(D::COUNT == 2, "Update ShouldCompile below when dimensions change.");
+
+  struct FragDims {
+    enum : uint32_t { STROKE, HAS_COMMON_COLOR, HAS_XP, COUNT };
+    static PermutationDomain domain() {
+      return PermutationDomain({
+          PermutationBool("STROKE"),
+          PermutationBool("HAS_COMMON_COLOR"),
+          PermutationBool("HAS_XP"),
+      });
+    }
+  };
+  using FD = FragDims;
+  static_assert(D::COUNT == 2 && FD::COUNT == 3,
+                "Update ShouldCompile below when dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"ComplexEllipseFillShader",
             "level1/complex_ellipse_fill.vert",
             "level1/complex_ellipse_fill.frag",
             D::domain(),
-            D::domain(),
+            FD::domain(),
             PermutationDomain({}),
             "ComplexEllipseGeometryProcessor",
             "",
@@ -41,10 +54,10 @@ class ComplexEllipseFillShader : public PrecompiledShader {
   }
 
  private:
-  static bool ShouldCompile(uint32_t vertIndex, uint32_t fragIndex,
-                            const std::vector<int>& /*vertValues*/,
-                            const std::vector<int>& /*fragValues*/) {
-    return vertIndex == fragIndex;
+  static bool ShouldCompile(uint32_t, uint32_t,
+                            const std::vector<int>& vertValues,
+                            const std::vector<int>& fragValues) {
+    return vertValues[0] == fragValues[0] && vertValues[1] == fragValues[1];
   }
 };
 

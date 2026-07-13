@@ -1,8 +1,9 @@
 // RoundStrokeRectFillShader fragment shader
-// Processor layout: RoundStrokeRectGeometryProcessor() + EmptyXferProcessor()
+// Processor layout: RoundStrokeRectGeometryProcessor() + EmptyXferProcessor/PorterDuffXP
 // Permutation dimensions (injected as #define 0/1):
 //   HAS_AA: whether coverage-based AA is enabled (ellipse radii for SDF)
 //   HAS_COMMON_COLOR: whether a common color uniform is used
+//   HAS_XP: 0=passthrough, 1=PorterDuff XP (dst texture blend)
 //   HAS_UV_MATRIX: whether a UV matrix transform is used
 #version 450
 
@@ -12,10 +13,16 @@
 #ifndef HAS_COMMON_COLOR
 #define HAS_COMMON_COLOR 0
 #endif
+#ifndef HAS_XP
+#define HAS_XP 0
+#endif
 
-#if HAS_COMMON_COLOR
+#if HAS_COMMON_COLOR || HAS_XP
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
+#if HAS_COMMON_COLOR
   vec4 Color;
+#endif
+#include "xp_uniforms.inc"
 };
 #endif
 
@@ -31,6 +38,9 @@ layout(location = 3) in vec4 vColor;
 layout(location = 1) in vec4 vColor;
 #endif
 #endif
+
+#define XP_DST_TEX_BINDING 0
+#include "xp_porter_duff.inc"
 
 layout(location = 0) out vec4 fragColor;
 
@@ -60,5 +70,6 @@ void main() {
   vec4 outputCoverage = vec4(edgeAlpha);
 #endif
 
-  fragColor = outputColor * outputCoverage;
+#define TGFX_XP_SRC_COLOR (outputColor * outputCoverage)
+#include "xp_output.inc"
 }

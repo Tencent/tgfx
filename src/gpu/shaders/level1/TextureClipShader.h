@@ -24,9 +24,9 @@ namespace tgfx {
 
 class TextureClipShader : public PrecompiledShader {
  public:
-  TGFX_DEFINE_DIMS(ALPHA_ONLY, HAS_RGBAAA, HAS_SUBSET);
+  TGFX_DEFINE_DIMS(ALPHA_ONLY, HAS_RGBAAA, HAS_SUBSET, HAS_XP);
   using D = Dims;
-  static_assert(D::COUNT == 3, "Update ShouldCompile below when dimensions change.");
+  static_assert(D::COUNT == 4, "Update ShouldCompile below when dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"TextureClipShader",

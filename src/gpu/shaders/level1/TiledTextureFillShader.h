@@ -37,18 +37,19 @@ class TiledTextureFillShader : public PrecompiledShader {
  public:
   // Fragment dimensions
   struct FragDims {
-    enum : uint32_t { SHADER_MODE_X, SHADER_MODE_Y, ALPHA_ONLY, HAS_STRICT, COUNT };
+    enum : uint32_t { SHADER_MODE_X, SHADER_MODE_Y, ALPHA_ONLY, HAS_STRICT, HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("SHADER_MODE_X", 9),
           PermutationInt("SHADER_MODE_Y", 9),
           PermutationBool("ALPHA_ONLY"),
           PermutationBool("HAS_STRICT"),
+          PermutationBool("HAS_XP"),
       });
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 4, "Update ShouldCompile when fragment dimensions change.");
+  static_assert(FD::COUNT == 5, "Update ShouldCompile when fragment dimensions change.");
 
   // Vertex dimensions
   TGFX_DEFINE_DIMS(HAS_PERSPECTIVE);

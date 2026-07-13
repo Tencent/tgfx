@@ -26,19 +26,34 @@ class MeshFillShader : public PrecompiledShader {
  public:
   TGFX_DEFINE_DIMS(HAS_TEX_COORDS, HAS_COLORS, HAS_COVERAGE);
   using D = Dims;
-  static_assert(D::COUNT == 3, "Update ShouldCompile below when dimensions change.");
+
+  struct FragDims {
+    enum : uint32_t { HAS_TEX_COORDS, HAS_COLORS, HAS_COVERAGE, HAS_XP, COUNT };
+    static PermutationDomain domain() {
+      return PermutationDomain({
+          PermutationBool("HAS_TEX_COORDS"),
+          PermutationBool("HAS_COLORS"),
+          PermutationBool("HAS_COVERAGE"),
+          PermutationBool("HAS_XP"),
+      });
+    }
+  };
+  using FD = FragDims;
+  static_assert(D::COUNT == 3 && FD::COUNT == 4,
+                "Update ShouldCompile below when dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"MeshFillShader", "level1/mesh_fill.vert", "level1/mesh_fill.frag", D::domain(),
-            D::domain(),      PermutationDomain({}),   "MeshGeometryProcessor", "",
+            FD::domain(),     PermutationDomain({}),   "MeshGeometryProcessor", "",
             ShouldCompile};
   }
 
  private:
-  static bool ShouldCompile(uint32_t vertIndex, uint32_t fragIndex,
-                            const std::vector<int>& /*vertValues*/,
-                            const std::vector<int>& /*fragValues*/) {
-    return vertIndex == fragIndex;
+  static bool ShouldCompile(uint32_t, uint32_t,
+                            const std::vector<int>& vertValues,
+                            const std::vector<int>& fragValues) {
+    return vertValues[0] == fragValues[0] && vertValues[1] == fragValues[1] &&
+           vertValues[2] == fragValues[2];
   }
 };
 

@@ -155,7 +155,8 @@ static std::optional<PermutationMatchResult> TryMatchTiledTextureFill(
   if (programInfo->numFragmentProcessors() != 1) {
     return std::nullopt;
   }
-  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
     return std::nullopt;
   }
   auto fp = programInfo->getFragmentProcessor(0);
@@ -179,6 +180,7 @@ static std::optional<PermutationMatchResult> TryMatchTiledTextureFill(
   fragValues[FD::SHADER_MODE_Y] = modeY;
   fragValues[FD::ALPHA_ONLY] = tte->isAlphaOnly() ? 1 : 0;
   fragValues[FD::HAS_STRICT] = tte->isStrict() ? 1 : 0;
+  fragValues[FD::HAS_XP] = xpType;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"TiledTextureFillShader", 0, fragIndex};
 }
@@ -308,7 +310,8 @@ static std::optional<PermutationMatchResult> TryMatchDeviceSpaceTexture(
   if (programInfo->numFragmentProcessors() != 1) {
     return std::nullopt;
   }
-  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
     return std::nullopt;
   }
   auto fp = programInfo->getFragmentProcessor(0);
@@ -319,6 +322,7 @@ static std::optional<PermutationMatchResult> TryMatchDeviceSpaceTexture(
   using FD = DeviceSpaceTextureShader::Dims;
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
+  fragValues[FD::HAS_XP] = xpType;
   fragValues[FD::ALPHA_ONLY] = dste->isAlphaOnly() ? 1 : 0;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"DeviceSpaceTextureShader", 0, fragIndex};
@@ -366,7 +370,8 @@ static std::optional<PermutationMatchResult> TryMatchGradientFill(const ProgramI
   if (programInfo->numFragmentProcessors() != 1) {
     return std::nullopt;
   }
-  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
     return std::nullopt;
   }
   auto fp = programInfo->getFragmentProcessor(0);
@@ -403,6 +408,7 @@ static std::optional<PermutationMatchResult> TryMatchGradientFill(const ProgramI
   using FD = GradientFillShader::FD;
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
+  fragValues[FD::HAS_XP] = xpType;
   fragValues[FD::LAYOUT_TYPE] = layoutType;
   fragValues[FD::INTERVAL_COUNT] = intervalCount - 1;
   auto fragIndex = fragDomain.encode(fragValues);
@@ -425,7 +431,8 @@ static std::optional<PermutationMatchResult> TryMatchSingleIntervalGradient(
   if (programInfo->numFragmentProcessors() != 1) {
     return std::nullopt;
   }
-  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
     return std::nullopt;
   }
   auto fp = programInfo->getFragmentProcessor(0);
@@ -458,6 +465,7 @@ static std::optional<PermutationMatchResult> TryMatchSingleIntervalGradient(
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
   fragValues[FD::LAYOUT_TYPE] = layoutType;
+  fragValues[FD::HAS_XP] = xpType;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"SingleIntervalGradientShader", vertIndex, fragIndex};
 }
@@ -478,7 +486,8 @@ static std::optional<PermutationMatchResult> TryMatchDualIntervalGradient(
   if (programInfo->numFragmentProcessors() != 1) {
     return std::nullopt;
   }
-  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
     return std::nullopt;
   }
   auto fp = programInfo->getFragmentProcessor(0);
@@ -511,6 +520,7 @@ static std::optional<PermutationMatchResult> TryMatchDualIntervalGradient(
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
   fragValues[FD::LAYOUT_TYPE] = layoutType;
+  fragValues[FD::HAS_XP] = xpType;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"DualIntervalGradientShader", vertIndex, fragIndex};
 }
@@ -531,7 +541,8 @@ static std::optional<PermutationMatchResult> TryMatchTextureGradient(
   if (programInfo->numFragmentProcessors() != 1) {
     return std::nullopt;
   }
-  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
     return std::nullopt;
   }
   auto fp = programInfo->getFragmentProcessor(0);
@@ -564,6 +575,7 @@ static std::optional<PermutationMatchResult> TryMatchTextureGradient(
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
   fragValues[FD::LAYOUT_TYPE] = layoutType;
+  fragValues[FD::HAS_XP] = xpType;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"TextureGradientShader", vertIndex, fragIndex};
 }
@@ -577,7 +589,8 @@ static std::optional<PermutationMatchResult> TryMatchTextureColorMatrix(
   if (programInfo->numFragmentProcessors() != 2) {
     return std::nullopt;
   }
-  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
     return std::nullopt;
   }
   auto fp0 = programInfo->getFragmentProcessor(0);
@@ -595,6 +608,7 @@ static std::optional<PermutationMatchResult> TryMatchTextureColorMatrix(
   fragValues[D::ALPHA_ONLY] = te->isAlphaOnly() ? 1 : 0;
   fragValues[D::HAS_RGBAAA] = te->hasRGBAAA() ? 1 : 0;
   fragValues[D::HAS_SUBSET] = te->hasSubset() ? 1 : 0;
+  fragValues[D::HAS_XP] = xpType;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"TextureColorMatrixShader", 0, fragIndex};
 }
@@ -610,7 +624,8 @@ static std::optional<PermutationMatchResult> TryMatchTextureClip(const ProgramIn
   if (programInfo->numColorFragmentProcessors() != 1) {
     return std::nullopt;
   }
-  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
     return std::nullopt;
   }
   auto fp0 = programInfo->getFragmentProcessor(0);
@@ -628,6 +643,7 @@ static std::optional<PermutationMatchResult> TryMatchTextureClip(const ProgramIn
   fragValues[D::ALPHA_ONLY] = te->isAlphaOnly() ? 1 : 0;
   fragValues[D::HAS_RGBAAA] = te->hasRGBAAA() ? 1 : 0;
   fragValues[D::HAS_SUBSET] = te->hasSubset() ? 1 : 0;
+    fragValues[D::HAS_XP] = xpType;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"TextureClipShader", 0, fragIndex};
 }
@@ -640,7 +656,8 @@ static std::optional<PermutationMatchResult> TryMatchAtlasTextFill(const Program
   if (programInfo->numFragmentProcessors() != 0) {
     return std::nullopt;
   }
-  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
     return std::nullopt;
   }
   auto* atgp = static_cast<const AtlasTextGeometryProcessor*>(gp);
@@ -650,8 +667,16 @@ static std::optional<PermutationMatchResult> TryMatchAtlasTextFill(const Program
   values[D::HAS_COVERAGE] = atgp->getAAType() == AAType::Coverage ? 1 : 0;
   values[D::HAS_COMMON_COLOR] = atgp->hasCommonColor() ? 1 : 0;
   values[D::ALPHA_ONLY] = atgp->isAlphaOnly() ? 1 : 0;
-  auto index = domain.encode(values);
-  return PermutationMatchResult{"AtlasTextFillShader", index, index};
+  auto vertIndex = domain.encode(values);
+  using FD = AtlasTextFillShader::FD;
+  auto fragDomain = FD::domain();
+  std::vector<int> fragValues(FD::COUNT);
+  for (size_t i = 0; i < D::COUNT; ++i) {
+    fragValues[i] = values[i];
+  }
+  fragValues[FD::HAS_XP] = xpType;
+  auto fragIndex = fragDomain.encode(fragValues);
+  return PermutationMatchResult{"AtlasTextFillShader", vertIndex, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchAlphaThreshold(
@@ -664,7 +689,8 @@ static std::optional<PermutationMatchResult> TryMatchAlphaThreshold(
   if (programInfo->numFragmentProcessors() != 1) {
     return std::nullopt;
   }
-  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
     return std::nullopt;
   }
   auto fp = programInfo->getFragmentProcessor(0);
@@ -676,7 +702,12 @@ static std::optional<PermutationMatchResult> TryMatchAlphaThreshold(
   std::vector<int> vertValues(D::COUNT);
   vertValues[D::GP_TYPE] = gpType;
   auto vertIndex = vertDomain.encode(vertValues);
-  return PermutationMatchResult{"AlphaThresholdShader", vertIndex, 0};
+  using FD = AlphaThresholdShader::FD;
+  auto fragDomain = FD::domain();
+  std::vector<int> fragValues(FD::COUNT);
+  fragValues[FD::HAS_XP] = xpType;
+  auto fragIndex = fragDomain.encode(fragValues);
+  return PermutationMatchResult{"AlphaThresholdShader", vertIndex, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchLuma(const ProgramInfo* programInfo) {
@@ -688,7 +719,8 @@ static std::optional<PermutationMatchResult> TryMatchLuma(const ProgramInfo* pro
   if (programInfo->numFragmentProcessors() != 1) {
     return std::nullopt;
   }
-  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
     return std::nullopt;
   }
   auto fp = programInfo->getFragmentProcessor(0);
@@ -700,7 +732,12 @@ static std::optional<PermutationMatchResult> TryMatchLuma(const ProgramInfo* pro
   std::vector<int> vertValues(D::COUNT);
   vertValues[D::GP_TYPE] = gpType;
   auto vertIndex = vertDomain.encode(vertValues);
-  return PermutationMatchResult{"LumaShader", vertIndex, 0};
+  using FD = LumaShader::FD;
+  auto fragDomain = FD::domain();
+  std::vector<int> fragValues(FD::COUNT);
+  fragValues[FD::HAS_XP] = xpType;
+  auto fragIndex = fragDomain.encode(fragValues);
+  return PermutationMatchResult{"LumaShader", vertIndex, fragIndex};
 }
 
 static int TFTypeToIndex(gfx::skcms_TFType type) {
@@ -727,7 +764,8 @@ static std::optional<PermutationMatchResult> TryMatchColorSpaceXform(
   if (programInfo->numFragmentProcessors() != 1) {
     return std::nullopt;
   }
-  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
     return std::nullopt;
   }
   auto fp = programInfo->getFragmentProcessor(0);
@@ -760,6 +798,7 @@ static std::optional<PermutationMatchResult> TryMatchColorSpaceXform(
     fragValues[FD::SRC_TF_TYPE] = srcIdx;
   }
   if (xform->flags.encode) {
+    fragValues[FD::HAS_XP] = xpType;
     int dstIdx = TFTypeToIndex(gfx::skcms_TransferFunction_getType(
         reinterpret_cast<const gfx::skcms_TransferFunction*>(&xform->dstTransferFunctionInverse)));
     if (dstIdx < 0) {
@@ -781,7 +820,8 @@ static std::optional<PermutationMatchResult> TryMatchComposedTexture(
   if (programInfo->numFragmentProcessors() != 1) {
     return std::nullopt;
   }
-  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
     return std::nullopt;
   }
   auto fp = programInfo->getFragmentProcessor(0);
@@ -845,6 +885,7 @@ static std::optional<PermutationMatchResult> TryMatchComposedTexture(
     auto fragDomain = D::domain();
     std::vector<int> fragValues(D::COUNT, 0);
     fragValues[D::HAS_SUBSET] = hasSubset;
+    fragValues[D::HAS_XP] = xpType;
     auto fragIndex = fragDomain.encode(fragValues);
     return PermutationMatchResult{"TexturedColorMatrixShader", 0, fragIndex};
   }
@@ -854,6 +895,7 @@ static std::optional<PermutationMatchResult> TryMatchComposedTexture(
     auto fragDomain = D::domain();
     std::vector<int> fragValues(D::COUNT, 0);
     fragValues[D::HAS_SUBSET] = hasSubset;
+    fragValues[D::HAS_XP] = xpType;
     auto fragIndex = fragDomain.encode(fragValues);
     return PermutationMatchResult{"TexturedLumaShader", 0, fragIndex};
   }
@@ -863,6 +905,7 @@ static std::optional<PermutationMatchResult> TryMatchComposedTexture(
     auto fragDomain = D::domain();
     std::vector<int> fragValues(D::COUNT, 0);
     fragValues[D::HAS_SUBSET] = hasSubset;
+    fragValues[D::HAS_XP] = xpType;
     auto fragIndex = fragDomain.encode(fragValues);
     return PermutationMatchResult{"TexturedAlphaThresholdShader", 0, fragIndex};
   }
@@ -880,7 +923,8 @@ static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
   if (programInfo->numFragmentProcessors() != 1) {
     return std::nullopt;
   }
-  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
     return std::nullopt;
   }
   auto fp = programInfo->getFragmentProcessor(0);
@@ -915,6 +959,7 @@ static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
   fragValues[FD::MAX_SIGMA] = sigma - 1;
+  fragValues[FD::HAS_XP] = xpType;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"GaussianBlur1DShader", vertIndex, fragIndex};
 }
@@ -936,7 +981,8 @@ static std::optional<PermutationMatchResult> TryMatchBlendMerge(const ProgramInf
   if (programInfo->numFragmentProcessors() != 1) {
     return std::nullopt;
   }
-  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
     return std::nullopt;
   }
   auto fp = programInfo->getFragmentProcessor(0);
@@ -983,6 +1029,7 @@ static std::optional<PermutationMatchResult> TryMatchBlendMerge(const ProgramInf
   std::vector<int> fragValues(FD::COUNT);
   fragValues[FD::BLEND_MODE] = blendMode;
   fragValues[FD::CHILD_TYPE] = childType;
+  fragValues[FD::HAS_XP] = xpType;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"BlendMergeShader", vertIndex, fragIndex};
 }
@@ -995,7 +1042,8 @@ static std::optional<PermutationMatchResult> TryMatchHairlineLine(const ProgramI
   if (programInfo->numFragmentProcessors() != 0) {
     return std::nullopt;
   }
-  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
     return std::nullopt;
   }
   auto* hlgp = static_cast<const HairlineLineGeometryProcessor*>(gp);
@@ -1003,8 +1051,16 @@ static std::optional<PermutationMatchResult> TryMatchHairlineLine(const ProgramI
   auto domain = D::domain();
   std::vector<int> values(D::COUNT);
   values[D::HAS_AA] = hlgp->getAAType() == AAType::Coverage ? 1 : 0;
-  auto index = domain.encode(values);
-  return PermutationMatchResult{"HairlineLineShader", index, index};
+  auto vertIndex = domain.encode(values);
+  using FD = HairlineLineShader::FD;
+  auto fragDomain = FD::domain();
+  std::vector<int> fragValues(FD::COUNT);
+  for (size_t i = 0; i < D::COUNT; ++i) {
+    fragValues[i] = values[i];
+  }
+  fragValues[FD::HAS_XP] = xpType;
+  auto fragIndex = fragDomain.encode(fragValues);
+  return PermutationMatchResult{"HairlineLineShader", vertIndex, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchHairlineQuad(const ProgramInfo* programInfo) {
@@ -1015,7 +1071,8 @@ static std::optional<PermutationMatchResult> TryMatchHairlineQuad(const ProgramI
   if (programInfo->numFragmentProcessors() != 0) {
     return std::nullopt;
   }
-  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
     return std::nullopt;
   }
   auto* hqgp = static_cast<const HairlineQuadGeometryProcessor*>(gp);
@@ -1023,8 +1080,16 @@ static std::optional<PermutationMatchResult> TryMatchHairlineQuad(const ProgramI
   auto domain = D::domain();
   std::vector<int> values(D::COUNT);
   values[D::HAS_AA] = hqgp->getAAType() == AAType::Coverage ? 1 : 0;
-  auto index = domain.encode(values);
-  return PermutationMatchResult{"HairlineQuadShader", index, index};
+  auto vertIndex = domain.encode(values);
+  using FD = HairlineQuadShader::FD;
+  auto fragDomain = FD::domain();
+  std::vector<int> fragValues(FD::COUNT);
+  for (size_t i = 0; i < D::COUNT; ++i) {
+    fragValues[i] = values[i];
+  }
+  fragValues[FD::HAS_XP] = xpType;
+  auto fragIndex = fragDomain.encode(fragValues);
+  return PermutationMatchResult{"HairlineQuadShader", vertIndex, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchEllipseFill(const ProgramInfo* programInfo) {
@@ -1035,7 +1100,8 @@ static std::optional<PermutationMatchResult> TryMatchEllipseFill(const ProgramIn
   if (programInfo->numFragmentProcessors() != 0) {
     return std::nullopt;
   }
-  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
     return std::nullopt;
   }
   auto* egp = static_cast<const EllipseGeometryProcessor*>(gp);
@@ -1044,8 +1110,16 @@ static std::optional<PermutationMatchResult> TryMatchEllipseFill(const ProgramIn
   std::vector<int> values(D::COUNT);
   values[D::STROKE] = egp->isStroke() ? 1 : 0;
   values[D::HAS_COMMON_COLOR] = egp->hasCommonColor() ? 1 : 0;
-  auto index = domain.encode(values);
-  return PermutationMatchResult{"EllipseFillShader", index, index};
+  auto vertIndex = domain.encode(values);
+  using FD = EllipseFillShader::FD;
+  auto fragDomain = FD::domain();
+  std::vector<int> fragValues(FD::COUNT);
+  for (size_t i = 0; i < D::COUNT; ++i) {
+    fragValues[i] = values[i];
+  }
+  fragValues[FD::HAS_XP] = xpType;
+  auto fragIndex = fragDomain.encode(fragValues);
+  return PermutationMatchResult{"EllipseFillShader", vertIndex, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchComplexEllipseFill(
@@ -1057,7 +1131,8 @@ static std::optional<PermutationMatchResult> TryMatchComplexEllipseFill(
   if (programInfo->numFragmentProcessors() != 0) {
     return std::nullopt;
   }
-  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
     return std::nullopt;
   }
   auto* cegp = static_cast<const ComplexEllipseGeometryProcessor*>(gp);
@@ -1066,8 +1141,16 @@ static std::optional<PermutationMatchResult> TryMatchComplexEllipseFill(
   std::vector<int> values(D::COUNT);
   values[D::STROKE] = cegp->isStroke() ? 1 : 0;
   values[D::HAS_COMMON_COLOR] = cegp->hasCommonColor() ? 1 : 0;
-  auto index = domain.encode(values);
-  return PermutationMatchResult{"ComplexEllipseFillShader", index, index};
+  auto vertIndex = domain.encode(values);
+  using FD = ComplexEllipseFillShader::FD;
+  auto fragDomain = FD::domain();
+  std::vector<int> fragValues(FD::COUNT);
+  for (size_t i = 0; i < D::COUNT; ++i) {
+    fragValues[i] = values[i];
+  }
+  fragValues[FD::HAS_XP] = xpType;
+  auto fragIndex = fragDomain.encode(fragValues);
+  return PermutationMatchResult{"ComplexEllipseFillShader", vertIndex, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchNonAARRectFill(
@@ -1079,7 +1162,8 @@ static std::optional<PermutationMatchResult> TryMatchNonAARRectFill(
   if (programInfo->numFragmentProcessors() != 0) {
     return std::nullopt;
   }
-  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
     return std::nullopt;
   }
   auto* ngp = static_cast<const NonAARRectGeometryProcessor*>(gp);
@@ -1088,8 +1172,16 @@ static std::optional<PermutationMatchResult> TryMatchNonAARRectFill(
   std::vector<int> values(D::COUNT);
   values[D::HAS_COMMON_COLOR] = ngp->hasCommonColor() ? 1 : 0;
   values[D::STROKE] = ngp->isStroke() ? 1 : 0;
-  auto index = domain.encode(values);
-  return PermutationMatchResult{"NonAARRectFillShader", index, index};
+  auto vertIndex = domain.encode(values);
+  using FD = NonAARRectFillShader::FD;
+  auto fragDomain = FD::domain();
+  std::vector<int> fragValues(FD::COUNT);
+  for (size_t i = 0; i < D::COUNT; ++i) {
+    fragValues[i] = values[i];
+  }
+  fragValues[FD::HAS_XP] = xpType;
+  auto fragIndex = fragDomain.encode(fragValues);
+  return PermutationMatchResult{"NonAARRectFillShader", vertIndex, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchComplexNonAARRectFill(
@@ -1101,7 +1193,8 @@ static std::optional<PermutationMatchResult> TryMatchComplexNonAARRectFill(
   if (programInfo->numFragmentProcessors() != 0) {
     return std::nullopt;
   }
-  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
     return std::nullopt;
   }
   auto* cngp = static_cast<const ComplexNonAARRectGeometryProcessor*>(gp);
@@ -1110,8 +1203,16 @@ static std::optional<PermutationMatchResult> TryMatchComplexNonAARRectFill(
   std::vector<int> values(D::COUNT);
   values[D::HAS_COMMON_COLOR] = cngp->hasCommonColor() ? 1 : 0;
   values[D::STROKE] = cngp->isStroke() ? 1 : 0;
-  auto index = domain.encode(values);
-  return PermutationMatchResult{"ComplexNonAARRectFillShader", index, index};
+  auto vertIndex = domain.encode(values);
+  using FD = ComplexNonAARRectFillShader::FD;
+  auto fragDomain = FD::domain();
+  std::vector<int> fragValues(FD::COUNT);
+  for (size_t i = 0; i < D::COUNT; ++i) {
+    fragValues[i] = values[i];
+  }
+  fragValues[FD::HAS_XP] = xpType;
+  auto fragIndex = fragDomain.encode(fragValues);
+  return PermutationMatchResult{"ComplexNonAARRectFillShader", vertIndex, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchRoundStrokeRectFill(
@@ -1123,7 +1224,8 @@ static std::optional<PermutationMatchResult> TryMatchRoundStrokeRectFill(
   if (programInfo->numFragmentProcessors() != 0) {
     return std::nullopt;
   }
-  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
     return std::nullopt;
   }
   auto* rsgp = static_cast<const RoundStrokeRectGeometryProcessor*>(gp);
@@ -1137,8 +1239,16 @@ static std::optional<PermutationMatchResult> TryMatchRoundStrokeRectFill(
   values[D::HAS_AA] = rsgp->getAAType() == AAType::Coverage ? 1 : 0;
   values[D::HAS_COMMON_COLOR] = rsgp->hasCommonColor() ? 1 : 0;
   values[D::HAS_UV_MATRIX] = rsgp->hasUVMatrixTransform() ? 1 : 0;
-  auto index = domain.encode(values);
-  return PermutationMatchResult{"RoundStrokeRectFillShader", index, index};
+  auto vertIndex = domain.encode(values);
+  using FD = RoundStrokeRectFillShader::FD;
+  auto fragDomain = FD::domain();
+  std::vector<int> fragValues(FD::COUNT);
+  for (size_t i = 0; i < D::COUNT; ++i) {
+    fragValues[i] = values[i];
+  }
+  fragValues[FD::HAS_XP] = xpType;
+  auto fragIndex = fragDomain.encode(fragValues);
+  return PermutationMatchResult{"RoundStrokeRectFillShader", vertIndex, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchShapeInstancedFill(
@@ -1150,7 +1260,8 @@ static std::optional<PermutationMatchResult> TryMatchShapeInstancedFill(
   if (programInfo->numFragmentProcessors() != 0) {
     return std::nullopt;
   }
-  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
     return std::nullopt;
   }
   auto* sigp = static_cast<const ShapeInstancedGeometryProcessor*>(gp);
@@ -1159,8 +1270,16 @@ static std::optional<PermutationMatchResult> TryMatchShapeInstancedFill(
   std::vector<int> values(D::COUNT);
   values[D::HAS_COLORS] = sigp->getHasColors() ? 1 : 0;
   values[D::HAS_AA] = sigp->getAAType() == AAType::Coverage ? 1 : 0;
-  auto index = domain.encode(values);
-  return PermutationMatchResult{"ShapeInstancedFillShader", index, index};
+  auto vertIndex = domain.encode(values);
+  using FD = ShapeInstancedFillShader::FD;
+  auto fragDomain = FD::domain();
+  std::vector<int> fragValues(FD::COUNT);
+  for (size_t i = 0; i < D::COUNT; ++i) {
+    fragValues[i] = values[i];
+  }
+  fragValues[FD::HAS_XP] = xpType;
+  auto fragIndex = fragDomain.encode(fragValues);
+  return PermutationMatchResult{"ShapeInstancedFillShader", vertIndex, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchMeshFill(const ProgramInfo* programInfo) {
@@ -1171,7 +1290,8 @@ static std::optional<PermutationMatchResult> TryMatchMeshFill(const ProgramInfo*
   if (programInfo->numFragmentProcessors() != 0) {
     return std::nullopt;
   }
-  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
     return std::nullopt;
   }
   auto* mgp = static_cast<const MeshGeometryProcessor*>(gp);
@@ -1181,8 +1301,16 @@ static std::optional<PermutationMatchResult> TryMatchMeshFill(const ProgramInfo*
   values[D::HAS_TEX_COORDS] = mgp->getHasTexCoords() ? 1 : 0;
   values[D::HAS_COLORS] = mgp->getHasColors() ? 1 : 0;
   values[D::HAS_COVERAGE] = mgp->getHasCoverage() ? 1 : 0;
-  auto index = domain.encode(values);
-  return PermutationMatchResult{"MeshFillShader", index, index};
+  auto vertIndex = domain.encode(values);
+  using FD = MeshFillShader::FD;
+  auto fragDomain = FD::domain();
+  std::vector<int> fragValues(FD::COUNT);
+  for (size_t i = 0; i < D::COUNT; ++i) {
+    fragValues[i] = values[i];
+  }
+  fragValues[FD::HAS_XP] = xpType;
+  auto fragIndex = fragDomain.encode(fragValues);
+  return PermutationMatchResult{"MeshFillShader", vertIndex, fragIndex};
 }
 
 std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* programInfo) {

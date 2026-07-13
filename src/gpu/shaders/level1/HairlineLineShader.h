@@ -26,14 +26,26 @@ class HairlineLineShader : public PrecompiledShader {
  public:
   TGFX_DEFINE_DIMS(HAS_AA);
   using D = Dims;
-  static_assert(D::COUNT == 1, "Update ShouldCompile below when dimensions change.");
+
+  struct FragDims {
+    enum : uint32_t { HAS_AA, HAS_XP, COUNT };
+    static PermutationDomain domain() {
+      return PermutationDomain({
+          PermutationBool("HAS_AA"),
+          PermutationBool("HAS_XP"),
+      });
+    }
+  };
+  using FD = FragDims;
+  static_assert(D::COUNT == 1 && FD::COUNT == 2,
+                "Update ShouldCompile below when dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"HairlineLineShader",
             "level1/hairline_line.vert",
             "level1/hairline_line.frag",
             D::domain(),
-            D::domain(),
+            FD::domain(),
             PermutationDomain({}),
             "HairlineLineGeometryProcessor",
             "",
@@ -41,10 +53,10 @@ class HairlineLineShader : public PrecompiledShader {
   }
 
  private:
-  static bool ShouldCompile(uint32_t vertIndex, uint32_t fragIndex,
-                            const std::vector<int>& /*vertValues*/,
-                            const std::vector<int>& /*fragValues*/) {
-    return vertIndex == fragIndex;
+  static bool ShouldCompile(uint32_t, uint32_t,
+                            const std::vector<int>& vertValues,
+                            const std::vector<int>& fragValues) {
+    return vertValues[0] == fragValues[0];
   }
 };
 

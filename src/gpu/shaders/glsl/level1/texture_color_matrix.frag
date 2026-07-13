@@ -13,6 +13,9 @@
 #ifndef HAS_SUBSET
 #define HAS_SUBSET 0
 #endif
+#ifndef HAS_XP
+#define HAS_XP 0
+#endif
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Color;
@@ -24,11 +27,15 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #endif
   mat4 ColorMatrix;
   vec4 ColorVector;
+#include "xp_uniforms.inc"
 };
 
 layout(location = 0) in vec2 TransformedCoords_0;
 
 layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
+
+#define XP_DST_TEX_BINDING 1
+#include "xp_porter_duff.inc"
 
 layout(location = 0) out vec4 fragColor;
 
@@ -71,6 +78,6 @@ void main() {
   // Re-premultiply
   texColor.rgb *= texColor.a;
 
-  // EmptyXferProcessor — passthrough
-  fragColor = texColor;
+#define TGFX_XP_SRC_COLOR texColor
+#include "xp_output.inc"
 }

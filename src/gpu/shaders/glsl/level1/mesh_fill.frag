@@ -1,9 +1,10 @@
 // MeshFillShader fragment shader
-// Processor layout: MeshGeometryProcessor() + EmptyXferProcessor()
+// Processor layout: MeshGeometryProcessor() + EmptyXferProcessor/PorterDuffXP
 // Permutation dimensions (injected as #define 0/1):
 //   HAS_TEX_COORDS: whether user-provided texture coordinates are present
 //   HAS_COLORS: whether per-vertex colors are present
 //   HAS_COVERAGE: whether per-vertex coverage is present
+//   HAS_XP: 0=passthrough, 1=PorterDuff XP (dst texture blend)
 #version 450
 
 #ifndef HAS_COLORS
@@ -12,10 +13,16 @@
 #ifndef HAS_COVERAGE
 #define HAS_COVERAGE 0
 #endif
+#ifndef HAS_XP
+#define HAS_XP 0
+#endif
 
-#if !HAS_COLORS
+#if !HAS_COLORS || HAS_XP
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
+#if !HAS_COLORS
   vec4 Color;
+#endif
+#include "xp_uniforms.inc"
 };
 #endif
 
@@ -26,6 +33,9 @@ layout(location = 1) in vec4 vColor;
 #if HAS_COVERAGE
 layout(location = 2) in float vCoverage;
 #endif
+
+#define XP_DST_TEX_BINDING 0
+#include "xp_porter_duff.inc"
 
 layout(location = 0) out vec4 fragColor;
 
@@ -42,5 +52,6 @@ void main() {
   vec4 outputCoverage = vec4(1.0);
 #endif
 
-  fragColor = outputColor * outputCoverage;
+#define TGFX_XP_SRC_COLOR (outputColor * outputCoverage)
+#include "xp_output.inc"
 }

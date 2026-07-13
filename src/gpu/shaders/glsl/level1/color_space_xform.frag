@@ -32,6 +32,9 @@
 #ifndef DST_TF_TYPE
 #define DST_TF_TYPE 0
 #endif
+#ifndef HAS_XP
+#define HAS_XP 0
+#endif
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Color;
@@ -52,7 +55,11 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 DstTF0;
   vec4 DstTF1;
 #endif
+#include "xp_uniforms.inc"
 };
+
+#define XP_DST_TEX_BINDING 0
+#include "xp_porter_duff.inc"
 
 layout(location = 0) out vec4 fragColor;
 
@@ -154,5 +161,6 @@ void main() {
   color.rgb *= color.a;
 #endif
 
-  fragColor = color;
+#define TGFX_XP_SRC_COLOR color
+#include "xp_output.inc"
 }

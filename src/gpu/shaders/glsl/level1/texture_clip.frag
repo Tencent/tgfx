@@ -1,7 +1,7 @@
 // TextureClipShader fragment shader
-// Processor layout: DefaultGeometryProcessor() + TextureEffect(,color) + AARectEffect(,coverage) + EmptyXferProcessor()
+// Processor layout: DefaultGeometryProcessor() + TextureEffect(,color) + AARectEffect(,coverage) + EmptyXferProcessor/PorterDuffXP
 // Permutation dimensions (injected by build tool as #define 0/1):
-//   ALPHA_ONLY, HAS_RGBAAA, HAS_SUBSET
+//   ALPHA_ONLY, HAS_RGBAAA, HAS_SUBSET, HAS_XP
 #version 450
 
 #ifndef ALPHA_ONLY
@@ -13,6 +13,9 @@
 #ifndef HAS_SUBSET
 #define HAS_SUBSET 0
 #endif
+#ifndef HAS_XP
+#define HAS_XP 0
+#endif
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Color;
@@ -23,11 +26,15 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec2 AlphaStart;
 #endif
   vec4 Rect;
+#include "xp_uniforms.inc"
 };
 
 layout(location = 0) in vec2 TransformedCoords_0;
 
 layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
+
+#define XP_DST_TEX_BINDING 1
+#include "xp_porter_duff.inc"
 
 layout(location = 0) out vec4 fragColor;
 
@@ -69,6 +76,6 @@ void main() {
   highp float rectCoverage = dists2.x * dists2.y;
   vec4 outputCoverage = vec4(1.0) * rectCoverage;
 
-  // EmptyXferProcessor: final = color * coverage
-  fragColor = texColor * outputCoverage;
+#define TGFX_XP_SRC_COLOR (texColor * outputCoverage)
+#include "xp_output.inc"
 }

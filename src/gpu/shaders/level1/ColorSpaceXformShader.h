@@ -49,6 +49,7 @@ class ColorSpaceXformShader : public PrecompiledShader {
       PREMUL,
       SRC_TF_TYPE,
       DST_TF_TYPE,
+      HAS_XP,
       COUNT
     };
     static PermutationDomain domain() {
@@ -62,11 +63,12 @@ class ColorSpaceXformShader : public PrecompiledShader {
           PermutationBool("PREMUL"),
           PermutationInt("SRC_TF_TYPE", 4),
           PermutationInt("DST_TF_TYPE", 4),
+          PermutationBool("HAS_XP"),
       });
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 9, "Update ShouldCompile when fragment dimensions change.");
+  static_assert(FD::COUNT == 10, "Update ShouldCompile when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"ColorSpaceXformShader",

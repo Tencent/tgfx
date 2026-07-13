@@ -38,12 +38,22 @@ class LumaShader : public PrecompiledShader {
     }
   };
 
+  struct FragDims {
+    enum : uint32_t { HAS_XP, COUNT };
+    static PermutationDomain domain() {
+      return PermutationDomain({
+          PermutationBool("HAS_XP"),
+      });
+    }
+  };
+  using FD = FragDims;
+
   PrecompiledShaderInfo info() const override {
     return {"LumaShader",
             "level1/luma.vert",
             "level1/luma.frag",
             Dims::domain(),
-            PermutationDomain({}),
+            FD::domain(),
             PermutationDomain({}),
             "",
             "",

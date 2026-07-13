@@ -38,12 +38,22 @@ class AlphaThresholdShader : public PrecompiledShader {
     }
   };
 
+  struct FragDims {
+    enum : uint32_t { HAS_XP, COUNT };
+    static PermutationDomain domain() {
+      return PermutationDomain({
+          PermutationBool("HAS_XP"),
+      });
+    }
+  };
+  using FD = FragDims;
+
   PrecompiledShaderInfo info() const override {
     return {"AlphaThresholdShader",
             "level1/alpha_threshold.vert",
             "level1/alpha_threshold.frag",
             Dims::domain(),
-            PermutationDomain({}),
+            FD::domain(),
             PermutationDomain({}),
             "",
             "",

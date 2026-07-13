@@ -26,14 +26,28 @@ class RoundStrokeRectFillShader : public PrecompiledShader {
  public:
   TGFX_DEFINE_DIMS(HAS_AA, HAS_COMMON_COLOR, HAS_UV_MATRIX);
   using D = Dims;
-  static_assert(D::COUNT == 3, "Update ShouldCompile below when dimensions change.");
+
+  struct FragDims {
+    enum : uint32_t { HAS_AA, HAS_COMMON_COLOR, HAS_UV_MATRIX, HAS_XP, COUNT };
+    static PermutationDomain domain() {
+      return PermutationDomain({
+          PermutationBool("HAS_AA"),
+          PermutationBool("HAS_COMMON_COLOR"),
+          PermutationBool("HAS_UV_MATRIX"),
+          PermutationBool("HAS_XP"),
+      });
+    }
+  };
+  using FD = FragDims;
+  static_assert(D::COUNT == 3 && FD::COUNT == 4,
+                "Update ShouldCompile below when dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"RoundStrokeRectFillShader",
             "level1/round_stroke_rect_fill.vert",
             "level1/round_stroke_rect_fill.frag",
             D::domain(),
-            D::domain(),
+            FD::domain(),
             PermutationDomain({}),
             "RoundStrokeRectGeometryProcessor",
             "",
@@ -41,10 +55,11 @@ class RoundStrokeRectFillShader : public PrecompiledShader {
   }
 
  private:
-  static bool ShouldCompile(uint32_t vertIndex, uint32_t fragIndex,
-                            const std::vector<int>& /*vertValues*/,
-                            const std::vector<int>& /*fragValues*/) {
-    return vertIndex == fragIndex;
+  static bool ShouldCompile(uint32_t, uint32_t,
+                            const std::vector<int>& vertValues,
+                            const std::vector<int>& fragValues) {
+    return vertValues[0] == fragValues[0] && vertValues[1] == fragValues[1] &&
+           vertValues[2] == fragValues[2];
   }
 };
 

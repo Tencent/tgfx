@@ -46,15 +46,16 @@ class GaussianBlur1DShader : public PrecompiledShader {
   using VD = VertDims;
 
   struct FragDims {
-    enum : uint32_t { MAX_SIGMA, COUNT };
+    enum : uint32_t { MAX_SIGMA, HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("MAX_SIGMA", 10),
+          PermutationBool("HAS_XP"),
       });
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 1, "Update info() when fragment dimensions change.");
+  static_assert(FD::COUNT == 2, "Update info() when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"GaussianBlur1DShader",

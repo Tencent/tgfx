@@ -1,7 +1,7 @@
 // AtlasTextFillShader fragment shader
-// Processor layout: AtlasTextGeometryProcessor() + EmptyXferProcessor()
+// Processor layout: AtlasTextGeometryProcessor() + EmptyXferProcessor/PorterDuffXP
 // Permutation dimensions (injected as #define 0/1):
-//   HAS_COVERAGE, HAS_COMMON_COLOR, ALPHA_ONLY
+//   HAS_COVERAGE, HAS_COMMON_COLOR, ALPHA_ONLY, HAS_XP
 #version 450
 
 #ifndef HAS_COVERAGE
@@ -13,10 +13,16 @@
 #ifndef ALPHA_ONLY
 #define ALPHA_ONLY 0
 #endif
+#ifndef HAS_XP
+#define HAS_XP 0
+#endif
 
-#if HAS_COMMON_COLOR
+#if HAS_COMMON_COLOR || HAS_XP
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
+#if HAS_COMMON_COLOR
   vec4 Color;
+#endif
+#include "xp_uniforms.inc"
 };
 #endif
 
@@ -33,6 +39,9 @@ layout(location = 1) in vec4 vColor;
 #endif
 
 layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
+
+#define XP_DST_TEX_BINDING 1
+#include "xp_porter_duff.inc"
 
 layout(location = 0) out vec4 fragColor;
 
@@ -64,6 +73,6 @@ void main() {
   outputCoverage = vec4(texColor.a);
 #endif
 
-  // EmptyXferProcessor: final color = outputColor * outputCoverage
-  fragColor = outputColor * outputCoverage;
+#define TGFX_XP_SRC_COLOR (outputColor * outputCoverage)
+#include "xp_output.inc"
 }

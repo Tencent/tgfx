@@ -1,8 +1,9 @@
 // GradientFillShader fragment shader
-// Processor layout: DefaultGeometryProcessor() + ClampedGradientEffect() + EmptyXferProcessor()
+// Processor layout: DefaultGeometryProcessor() + ClampedGradientEffect() + EmptyXferProcessor/PorterDuffXP
 // Permutation dimensions (injected by build tool as #define):
 //   LAYOUT_TYPE: 0=LINEAR, 1=RADIAL, 2=CONIC, 3=DIAMOND
 //   INTERVAL_COUNT: 0..7 (maps to actual interval count 1..8)
+//   HAS_XP: 0=passthrough, 1=PorterDuff XP (dst texture blend)
 #version 450
 
 #ifndef LAYOUT_TYPE
@@ -10,6 +11,9 @@
 #endif
 #ifndef INTERVAL_COUNT
 #define INTERVAL_COUNT 0
+#endif
+#ifndef HAS_XP
+#define HAS_XP 0
 #endif
 
 // Actual interval count is the dimension value + 1 (dimension range [0,7] -> intervals [1,8])
@@ -71,9 +75,13 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #if INTERVALS > 7
   vec4 bias14_15;
 #endif
+#include "xp_uniforms.inc"
 };
 
 layout(location = 0) in vec2 TransformedCoords_0;
+
+#define XP_DST_TEX_BINDING 0
+#include "xp_porter_duff.inc"
 
 layout(location = 0) out vec4 fragColor;
 
@@ -202,6 +210,6 @@ void main() {
   // Multiply by input color alpha (from DefaultGeometryProcessor)
   gradColor *= outputColor.a;
 
-  // EmptyXferProcessor — passthrough
-  fragColor = gradColor;
+#define TGFX_XP_SRC_COLOR gradColor
+#include "xp_output.inc"
 }

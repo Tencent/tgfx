@@ -35,10 +35,11 @@ class TextureGradientShader : public PrecompiledShader {
   using VD = VertDims;
 
   struct FragDims {
-    enum : uint32_t { LAYOUT_TYPE, COUNT };
+    enum : uint32_t { LAYOUT_TYPE, HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationEnum("LAYOUT_TYPE", {"LINEAR", "RADIAL", "CONIC", "DIAMOND"}),
+          PermutationBool("HAS_XP"),
       });
     }
   };

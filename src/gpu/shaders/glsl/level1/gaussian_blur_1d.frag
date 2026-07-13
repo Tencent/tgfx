@@ -1,21 +1,28 @@
 // GaussianBlur1DShader fragment shader
-// Permutation dimensions (frag): MAX_SIGMA (0~9, maps to maxSigma 1~10)
+// Permutation dimensions (frag): MAX_SIGMA (0~9, maps to maxSigma 1~10), HAS_XP
 // Loop upper bound = 4 * (MAX_SIGMA + 1), covering the full Gaussian kernel radius.
 #version 450
 
 #ifndef MAX_SIGMA
 #define MAX_SIGMA 0
 #endif
+#ifndef HAS_XP
+#define HAS_XP 0
+#endif
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Color;
   float Sigma;
   vec2 Step;
+#include "xp_uniforms.inc"
 };
 
 layout(location = 0) in vec2 TransformedCoords_0;
 
 layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
+
+#define XP_DST_TEX_BINDING 1
+#include "xp_porter_duff.inc"
 
 layout(location = 0) out vec4 fragColor;
 
@@ -41,5 +48,7 @@ void main() {
     }
   }
 
-  fragColor = sum / total;
+  vec4 blurResult = sum / total;
+#define TGFX_XP_SRC_COLOR blurResult
+#include "xp_output.inc"
 }

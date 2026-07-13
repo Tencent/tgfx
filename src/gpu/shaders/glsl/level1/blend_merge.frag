@@ -10,9 +10,13 @@
 #ifndef CHILD_TYPE
 #define CHILD_TYPE 0
 #endif
+#ifndef HAS_XP
+#define HAS_XP 0
+#endif
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Color;
+#include "xp_uniforms.inc"
 };
 
 layout(location = 0) in vec2 TransformedCoords_0;
@@ -20,7 +24,11 @@ layout(location = 0) in vec2 TransformedCoords_0;
 layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
 #if CHILD_TYPE == 2
 layout(set = 1, binding = 1) uniform sampler2D TextureSampler_1;
+#define XP_DST_TEX_BINDING 2
+#else
+#define XP_DST_TEX_BINDING 1
 #endif
+#include "xp_porter_duff.inc"
 
 layout(location = 0) out vec4 fragColor;
 
@@ -291,5 +299,6 @@ void main() {
   dstColor = texture(TextureSampler_1, TransformedCoords_0);
 #endif
 
-  fragColor = blendColors(srcColor, dstColor);
+#define TGFX_XP_SRC_COLOR blendColors(srcColor, dstColor)
+#include "xp_output.inc"
 }

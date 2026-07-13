@@ -1011,17 +1011,29 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
                                                        std::move(dstTextureInfo));
     op->setXferProcessor(std::move(xferProcessor));
   }
-  if (op->numColorProcessors() >= 3 && !op->hasXferProcessor()) {
+  if (op->numColorProcessors() >= 2 && !op->hasXferProcessor()) {
     auto& processors = op->colorProcessors();
-    auto savedProcessors = std::move(processors);
-    processors.clear();
-    auto replacement =
-        EffectDecomposer::TryDecompose(context, context->drawingManager(), renderTarget->width(),
-                                       renderTarget->height(), savedProcessors, drawingAllocator());
-    if (replacement) {
-      processors.emplace_back(std::move(replacement));
-    } else {
-      processors = std::move(savedProcessors);
+    bool shouldDecompose = false;
+    if (processors.size() >= 3) {
+      shouldDecompose = true;
+    } else if (processors.size() == 2 && processors[0] &&
+               processors[0]->name() == "TextureEffect" && processors[1]) {
+      auto secondName = processors[1]->name();
+      shouldDecompose = secondName == "ColorSpaceXformEffect" ||
+                        secondName == "LumaFragmentProcessor" ||
+                        secondName == "AlphaStepFragmentProcessor";
+    }
+    if (shouldDecompose) {
+      auto savedProcessors = std::move(processors);
+      processors.clear();
+      auto replacement = EffectDecomposer::TryDecompose(
+          context, context->drawingManager(), renderTarget->width(), renderTarget->height(),
+          savedProcessors, drawingAllocator());
+      if (replacement) {
+        processors.emplace_back(std::move(replacement));
+      } else {
+        processors = std::move(savedProcessors);
+      }
     }
   }
   drawOps.emplace_back(std::move(op));

@@ -26,14 +26,28 @@ class AtlasTextFillShader : public PrecompiledShader {
  public:
   TGFX_DEFINE_DIMS(HAS_COVERAGE, HAS_COMMON_COLOR, ALPHA_ONLY);
   using D = Dims;
-  static_assert(D::COUNT == 3, "Update ShouldCompile below when dimensions change.");
+
+  struct FragDims {
+    enum : uint32_t { HAS_COVERAGE, HAS_COMMON_COLOR, ALPHA_ONLY, HAS_XP, COUNT };
+    static PermutationDomain domain() {
+      return PermutationDomain({
+          PermutationBool("HAS_COVERAGE"),
+          PermutationBool("HAS_COMMON_COLOR"),
+          PermutationBool("ALPHA_ONLY"),
+          PermutationBool("HAS_XP"),
+      });
+    }
+  };
+  using FD = FragDims;
+  static_assert(D::COUNT == 3 && FD::COUNT == 4,
+                "Update ShouldCompile below when dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"AtlasTextFillShader",
             "level1/atlas_text_fill.vert",
             "level1/atlas_text_fill.frag",
             D::domain(),
-            D::domain(),
+            FD::domain(),
             PermutationDomain({}),
             "",
             "",
@@ -41,10 +55,12 @@ class AtlasTextFillShader : public PrecompiledShader {
   }
 
  private:
-  static bool ShouldCompile(uint32_t vertIndex, uint32_t fragIndex, const std::vector<int>&,
-                            const std::vector<int>&) {
+  static bool ShouldCompile(uint32_t, uint32_t,
+                            const std::vector<int>& vertValues,
+                            const std::vector<int>& fragValues) {
     // Both stages share the same domain, so only compile matching pairs.
-    return vertIndex == fragIndex;
+    return vertValues[0] == fragValues[0] && vertValues[1] == fragValues[1] &&
+           vertValues[2] == fragValues[2];
   }
 };
 

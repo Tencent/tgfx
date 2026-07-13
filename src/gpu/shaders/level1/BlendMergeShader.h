@@ -48,16 +48,17 @@ class BlendMergeShader : public PrecompiledShader {
   using VD = VertDims;
 
   struct FragDims {
-    enum : uint32_t { BLEND_MODE, CHILD_TYPE, COUNT };
+    enum : uint32_t { BLEND_MODE, CHILD_TYPE, HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("BLEND_MODE", 30),
           PermutationInt("CHILD_TYPE", 3),
+          PermutationBool("HAS_XP"),
       });
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 2, "Update ShouldCompile when fragment dimensions change.");
+  static_assert(FD::COUNT == 3, "Update ShouldCompile when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"BlendMergeShader",

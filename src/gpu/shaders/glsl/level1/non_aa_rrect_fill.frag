@@ -1,8 +1,9 @@
 // NonAARRectFillShader fragment shader
-// Processor layout: NonAARRectGeometryProcessor() + EmptyXferProcessor()
+// Processor layout: NonAARRectGeometryProcessor() + EmptyXferProcessor/PorterDuffXP
 // Permutation dimensions (injected as #define 0/1):
 //   HAS_COMMON_COLOR: whether a common color uniform is used
 //   STROKE: whether stroke mode is enabled
+//   HAS_XP: 0=passthrough, 1=PorterDuff XP (dst texture blend)
 #version 450
 
 #ifndef HAS_COMMON_COLOR
@@ -11,10 +12,16 @@
 #ifndef STROKE
 #define STROKE 0
 #endif
+#ifndef HAS_XP
+#define HAS_XP 0
+#endif
 
-#if HAS_COMMON_COLOR
+#if HAS_COMMON_COLOR || HAS_XP
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
+#if HAS_COMMON_COLOR
   vec4 Color;
+#endif
+#include "xp_uniforms.inc"
 };
 #endif
 
@@ -31,6 +38,9 @@ layout(location = 4) in vec2 vStrokeWidth;
 layout(location = 3) in vec2 vStrokeWidth;
 #endif
 #endif
+
+#define XP_DST_TEX_BINDING 0
+#include "xp_porter_duff.inc"
 
 layout(location = 0) out vec4 fragColor;
 
@@ -66,5 +76,6 @@ void main() {
   highp float coverage = outerCoverage;
 #endif
 
-  fragColor = outputColor * coverage;
+#define TGFX_XP_SRC_COLOR (outputColor * coverage)
+#include "xp_output.inc"
 }

@@ -29,9 +29,9 @@ namespace tgfx {
 ///   ALPHA_ONLY (bool): whether the texture is alpha-only format
 class DeviceSpaceTextureShader : public PrecompiledShader {
  public:
-  TGFX_DEFINE_DIMS(ALPHA_ONLY);
+  TGFX_DEFINE_DIMS(ALPHA_ONLY, HAS_XP);
   using FD = Dims;
-  static_assert(FD::COUNT == 1, "Update info() when dimensions change.");
+  static_assert(FD::COUNT == 2, "Update info() when dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"DeviceSpaceTextureShader",

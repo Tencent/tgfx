@@ -35,11 +35,12 @@ class GradientFillShader : public PrecompiledShader {
   using VD = VertDims;
 
   struct FragDims {
-    enum : uint32_t { LAYOUT_TYPE, INTERVAL_COUNT, COUNT };
+    enum : uint32_t { LAYOUT_TYPE, INTERVAL_COUNT, HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationEnum("LAYOUT_TYPE", {"LINEAR", "RADIAL", "CONIC", "DIAMOND"}),
           PermutationInt("INTERVAL_COUNT", 8),
+          PermutationBool("HAS_XP"),
       });
     }
   };

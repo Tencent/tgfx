@@ -1,12 +1,16 @@
 // DualIntervalGradientShader fragment shader
-// Processor layout: DefaultGeometryProcessor() + ClampedGradientEffect() + EmptyXferProcessor()
+// Processor layout: DefaultGeometryProcessor() + ClampedGradientEffect() + EmptyXferProcessor/PorterDuffXP
 // Colorizer: DualIntervalGradientColorizer (3/4-stop gradient, piecewise linear)
 // Permutation dimensions (injected by build tool as #define):
 //   LAYOUT_TYPE: 0=LINEAR, 1=RADIAL, 2=CONIC, 3=DIAMOND
+//   HAS_XP: 0=passthrough, 1=PorterDuff XP (dst texture blend)
 #version 450
 
 #ifndef LAYOUT_TYPE
 #define LAYOUT_TYPE 0
+#endif
+#ifndef HAS_XP
+#define HAS_XP 0
 #endif
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
@@ -22,9 +26,13 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 scale23;
   vec4 bias23;
   float threshold;
+#include "xp_uniforms.inc"
 };
 
 layout(location = 0) in vec2 TransformedCoords_0;
+
+#define XP_DST_TEX_BINDING 0
+#include "xp_porter_duff.inc"
 
 layout(location = 0) out vec4 fragColor;
 
@@ -75,5 +83,6 @@ void main() {
   gradColor.rgb *= gradColor.a;
   gradColor *= outputColor.a;
 
-  fragColor = gradColor;
+#define TGFX_XP_SRC_COLOR gradColor
+#include "xp_output.inc"
 }
