@@ -104,13 +104,10 @@ static constexpr char GLASS_SDF_ELLIPSE[] = R"(
     }
 )";
 
-// SDF module: Alpha Mask (arbitrary shape via Gaussian-blurred UDF height map)
-// The mask texture stores the blurred alpha packed into RGBA8 for 32-bit precision.
-// Unpack with: dot(rgba, vec4(1.0, 1.0/255.0, 1.0/65025.0, 1.0/16581375.0))
+// SDF module: Alpha Mask (arbitrary shape via tent-blurred UDF height map)
+// The mask texture stores the blurred alpha channel directly (8-bit precision from TentBlur).
 static constexpr char GLASS_SDF_ALPHA_MASK[] = R"(
     uniform sampler2D uMask;
-
-    const vec4 UNPACK_FACTORS = vec4(1.0, 1.0 / 255.0, 1.0 / 65025.0, 1.0 / 16581375.0);
 
     vec2 maskPixelToUV(float px, float py) {
         float halfW = uParams1.x;
@@ -118,15 +115,8 @@ static constexpr char GLASS_SDF_ALPHA_MASK[] = R"(
         return vec2((px + halfW) / (halfW * 2.0), 1.0 - (py + halfH) / (halfH * 2.0));
     }
 
+    // Samples the blurred alpha height map directly.
     float sampleHeight(float px, float py) {
-        vec2 uv = maskPixelToUV(px, py);
-        vec4 packed = texture(uMask, uv);
-        return dot(packed, UNPACK_FACTORS);
-    }
-
-    // Samples the raw alpha channel (8-bit precision) of the mask texture.
-    // Used for edge weight where full 32-bit precision is unnecessary.
-    float sampleAlpha(float px, float py) {
         vec2 uv = maskPixelToUV(px, py);
         return texture(uMask, uv).a;
     }
@@ -247,13 +237,11 @@ static constexpr char GLASS_SHADER_MAIN[] = R"(
             // Use height to determine edge proximity: height≈0 at edge, height≈max at center.
             float height = sampleHeight(px, py);
 
-            // Central difference gradient (4 extra samples, reuses height).
+            // Forward difference gradient (2 extra samples, reuses height).
             float step = minHalf / 20.0 + 1.0;
-            float ml = sampleHeight(px - step, py);
             float mr = sampleHeight(px + step, py);
-            float bc = sampleHeight(px, py - step);
             float tc = sampleHeight(px, py + step);
-            vec2 grad = vec2(mr - ml, tc - bc) / (2.0 * step);
+            vec2 grad = vec2(mr - height, tc - height) / step;
             float gradLen = length(grad);
 
             if (gradLen > 0.0001) {

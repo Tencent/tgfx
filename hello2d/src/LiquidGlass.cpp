@@ -52,7 +52,6 @@ std::shared_ptr<tgfx::Layer> LiquidGlass::onBuildLayerTree(const hello2d::AppHos
   auto root = tgfx::Layer::Make();
 
   // Background: checker image scaled to fill cell.
-  // Use bridge image as fallback if checker not available.
   auto bgImage = host->getImage("checker");
   if (!bgImage) {
     bgImage = host->getImage("bridge");
@@ -84,7 +83,7 @@ std::shared_ptr<tgfx::Layer> LiquidGlass::onBuildLayerTree(const hello2d::AppHos
   root->addChild(greenCircle);
 
   // Glass panel: star-shaped AlphaMask glass.
-  float glassSize = 200.0f;
+  float glassSize = 400.0f;
   float halfSize = glassSize * 0.5f;
   float outerR = halfSize * 0.9f;
   float innerR = outerR * 0.382f;

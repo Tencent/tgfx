@@ -313,6 +313,42 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   isDraggingGlass = NO;
 }
 
+- (void)keyDown:(NSEvent*)event {
+  auto index = (self.drawIndex % hello2d::LayerBuilder::Count());
+  auto builder = hello2d::LayerBuilder::GetByIndex(static_cast<int>(index));
+  if (builder == nullptr) {
+    return;
+  }
+  static float depth = 30.0f;
+  static float refraction = 50.0f;
+  static float lightAngle = 135.0f;
+  if (event.keyCode == 126) {  // Up arrow
+    depth = std::clamp(depth + 5.0f, 0.0f, 100.0f);
+    builder->setDepth(depth);
+    presentImmediately = true;
+  } else if (event.keyCode == 125) {  // Down arrow
+    depth = std::clamp(depth - 5.0f, 0.0f, 100.0f);
+    builder->setDepth(depth);
+    presentImmediately = true;
+  } else if (event.keyCode == 123) {  // Left arrow
+    refraction = std::clamp(refraction - 5.0f, 0.0f, 100.0f);
+    builder->setRefraction(refraction);
+    presentImmediately = true;
+  } else if (event.keyCode == 124) {  // Right arrow
+    refraction = std::clamp(refraction + 5.0f, 0.0f, 100.0f);
+    builder->setRefraction(refraction);
+    presentImmediately = true;
+  } else if (event.keyCode == 12) {  // Q key
+    lightAngle = lightAngle - 15.0f;
+    builder->setLightAngle(lightAngle);
+    presentImmediately = true;
+  } else if (event.keyCode == 14) {  // E key
+    lightAngle = lightAngle + 15.0f;
+    builder->setLightAngle(lightAngle);
+    presentImmediately = true;
+  }
+}
+
 - (void)scrollWheel:(NSEvent*)event {
   BOOL isCommandPressed = (event.modifierFlags & NSEventModifierFlagCommand) != 0;
 

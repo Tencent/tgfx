@@ -30,7 +30,6 @@ enum class GlassShapeType {
 };
 
 class GlassRefractionEffect;
-class GlassMaskEffect;
 
 /**
  * GlassStyle simulates the physical behavior of light passing through a glass surface, producing
@@ -161,6 +160,12 @@ class GlassStyle : public LayerStyle {
 
   void invalidateFilter();
 
+  void invalidateRefractionFilter();
+
+  void invalidateFrostFilter();
+
+  void invalidateMaskFilter();
+
   std::shared_ptr<ImageFilter> getRefractionFilter(
       int layerWidth, int layerHeight, float contentScale, GlassShapeType shapeType,
       float cornerRadius, float halfWidth, float halfHeight, float minHalf, float innerHalfWidth,
@@ -182,8 +187,6 @@ class GlassStyle : public LayerStyle {
 
   std::shared_ptr<GlassRefractionEffect> refractionEffect = nullptr;
   std::shared_ptr<ImageFilter> refractionFilter = nullptr;
-  std::shared_ptr<GlassMaskEffect> maskEffect = nullptr;
-  std::shared_ptr<ImageFilter> maskPackFilter = nullptr;
   std::shared_ptr<ImageFilter> maskBlurFilter = nullptr;
 
   int cachedLayerWidth = 0;

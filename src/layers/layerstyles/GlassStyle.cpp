@@ -47,7 +47,7 @@ void GlassStyle::setRefraction(float value) {
     return;
   }
   _refraction = value;
-  invalidateFilter();
+  invalidateRefractionFilter();
 }
 
 void GlassStyle::setDepth(float value) {
@@ -55,7 +55,8 @@ void GlassStyle::setDepth(float value) {
     return;
   }
   _depth = value;
-  invalidateFilter();
+  invalidateRefractionFilter();
+  invalidateMaskFilter();
 }
 
 void GlassStyle::setFrost(float value) {
@@ -63,7 +64,7 @@ void GlassStyle::setFrost(float value) {
     return;
   }
   _frost = value;
-  invalidateFilter();
+  invalidateFrostFilter();
 }
 
 void GlassStyle::setDispersion(float value) {
@@ -71,7 +72,7 @@ void GlassStyle::setDispersion(float value) {
     return;
   }
   _dispersion = value;
-  invalidateFilter();
+  invalidateRefractionFilter();
 }
 
 void GlassStyle::setSplay(float value) {
@@ -79,7 +80,7 @@ void GlassStyle::setSplay(float value) {
     return;
   }
   _splay = value;
-  invalidateFilter();
+  invalidateRefractionFilter();
 }
 
 void GlassStyle::setLightAngle(float degrees) {
@@ -87,7 +88,7 @@ void GlassStyle::setLightAngle(float degrees) {
     return;
   }
   _lightAngle = degrees;
-  invalidateFilter();
+  invalidateRefractionFilter();
 }
 
 void GlassStyle::setLightIntensity(float value) {
@@ -95,7 +96,7 @@ void GlassStyle::setLightIntensity(float value) {
     return;
   }
   _lightIntensity = value;
-  invalidateFilter();
+  invalidateRefractionFilter();
 }
 
 void GlassStyle::setCornerRadius(float radius) {
@@ -103,7 +104,7 @@ void GlassStyle::setCornerRadius(float radius) {
     return;
   }
   _cornerRadius = radius;
-  invalidateFilter();
+  invalidateRefractionFilter();
 }
 
 void GlassStyle::setShapeType(GlassShapeType type) {
@@ -218,11 +219,10 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
     float lightAngle = _lightAngle;
     float lightIntensity = (_lightIntensity > 0) ? _lightIntensity / 100.0f : 0.0f;
     // For AlphaMask shape, generate a UDF height map:
-    // 1. Tent-blur the binary alpha to approximate UDF (triangular kernel gives more linear
-    //    transition than Gaussian, closer to a true distance field)
-    // 2. Pack the float result into RGBA8 (32-bit precision) via GlassMaskEffect
+    // Tent-blur the binary alpha to approximate UDF (triangular kernel gives more linear
+    // transition than Gaussian, closer to a true distance field).
     // The maskImage itself is rebuilt every frame (input.content changes), but the
-    // GlassMaskEffect pipeline and mask blur filter are cached for reuse.
+    // mask blur filter is cached for reuse.
     std::shared_ptr<Image> maskImage = nullptr;
     if (effectiveShapeType == GlassShapeType::AlphaMask) {
       float blurRadius = minHalf * (_depth / 100.0f) * 0.2f;
@@ -233,23 +233,10 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
       Point blurMaskOffset = {};
       auto maskClipRect =
           Rect::MakeWH(static_cast<float>(layerWidth), static_cast<float>(layerHeight));
-      auto blurredMask =
-          input.content->makeWithFilter(maskBlurFilter, &blurMaskOffset, &maskClipRect);
-      if (!blurredMask) {
-        LOGE("GlassStyle: Failed to blur alpha for UDF, falling back to content.");
-        blurredMask = input.content;
-      }
-      if (!maskEffect) {
-        maskEffect = std::make_shared<GlassMaskEffect>();
-        maskPackFilter = ImageFilter::Runtime(maskEffect);
-      }
-      Point packOffset = {};
-      auto packClipRect = Rect::MakeWH(static_cast<float>(blurredMask->width()),
-                                       static_cast<float>(blurredMask->height()));
-      maskImage = blurredMask->makeWithFilter(maskPackFilter, &packOffset, &packClipRect);
+      maskImage = input.content->makeWithFilter(maskBlurFilter, &blurMaskOffset, &maskClipRect);
       if (!maskImage) {
-        LOGE("GlassStyle: Failed to pack UDF height map, falling back to blurred.");
-        maskImage = blurredMask;
+        LOGE("GlassStyle: Failed to blur alpha for UDF, falling back to content.");
+        maskImage = input.content;
       }
     }
     auto filter = getRefractionFilter(
@@ -299,13 +286,32 @@ void GlassStyle::invalidateFilter() {
   frostFilter = nullptr;
   refractionEffect = nullptr;
   refractionFilter = nullptr;
-  maskEffect = nullptr;
-  maskPackFilter = nullptr;
   maskBlurFilter = nullptr;
   cachedLayerWidth = 0;
   cachedLayerHeight = 0;
   cachedContentScale = 0.0f;
   cachedCornerRadius = 0.0f;
+  cachedMaskBlurSigma = 0.0f;
+  invalidateTransform();
+}
+
+void GlassStyle::invalidateRefractionFilter() {
+  refractionEffect = nullptr;
+  refractionFilter = nullptr;
+  cachedLayerWidth = 0;
+  cachedLayerHeight = 0;
+  cachedContentScale = 0.0f;
+  cachedCornerRadius = 0.0f;
+  invalidateTransform();
+}
+
+void GlassStyle::invalidateFrostFilter() {
+  frostFilter = nullptr;
+  invalidateTransform();
+}
+
+void GlassStyle::invalidateMaskFilter() {
+  maskBlurFilter = nullptr;
   cachedMaskBlurSigma = 0.0f;
   invalidateTransform();
 }

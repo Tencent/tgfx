@@ -64,6 +64,11 @@
     imagePath = [[NSBundle mainBundle] pathForResource:@"tgfx" ofType:@"png"];
     image = tgfx::Image::MakeFromFile(imagePath.UTF8String);
     appHost->addImage("TGFX", image);
+    NSString* checkerPath = [[NSBundle mainBundle] pathForResource:@"checker_120" ofType:@"png"];
+    if (checkerPath) {
+      auto checkerImage = tgfx::Image::MakeFromFile(checkerPath.UTF8String);
+      appHost->addImage("checker", checkerImage);
+    }
     auto typeface = tgfx::Typeface::MakeFromName("PingFang SC", "");
     appHost->addTypeface("default", typeface);
     typeface = tgfx::Typeface::MakeFromName("Apple Color Emoji", "");

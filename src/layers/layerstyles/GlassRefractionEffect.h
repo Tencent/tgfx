@@ -19,6 +19,7 @@
 #pragma once
 
 #include "tgfx/gpu/RuntimeEffect.h"
+#include "tgfx/gpu/Sampler.h"
 #include "tgfx/layers/layerstyles/GlassStyle.h"
 
 namespace tgfx {
@@ -27,29 +28,6 @@ namespace tgfx {
  * A RuntimeEffect that performs glass refraction and edge lighting by computing the displacement
  * directly in the shader. Supports analytical SDF shapes (rounded rect, ellipse, star) and
  * alpha-mask-based shapes (arbitrary paths). Supports optional chromatic dispersion.
- */
-/**
- * Pass 1: Generates a packed gradient mask from an alpha mask image.
- * Output: R=alpha, G=gradient.x (packed to [0,1]), B=gradient.y (packed to [0,1])
- */
-class GlassMaskEffect : public RuntimeEffect {
- public:
-  GlassMaskEffect() : RuntimeEffect({}) {
-  }
-
- protected:
-  bool onDraw(CommandEncoder* encoder, const std::vector<std::shared_ptr<Texture>>& inputTextures,
-              std::shared_ptr<Texture> outputTexture, const Point& offset) const override;
-
- private:
-  std::shared_ptr<RenderPipeline> createPipeline(GPU* gpu) const;
-  void collectVertices(const Texture* source, const Texture* target, const Point& offset,
-                       float* vertices) const;
-  mutable std::shared_ptr<RenderPipeline> cachedPipeline = nullptr;
-};
-
-/**
- * Pass 2: Performs glass refraction and edge lighting using the packed gradient mask.
  */
 class GlassRefractionEffect : public RuntimeEffect {
  public:
@@ -64,10 +42,13 @@ class GlassRefractionEffect : public RuntimeEffect {
               std::shared_ptr<Texture> outputTexture, const Point& offset) const override;
 
  private:
-  std::string buildFragmentShader(bool isDesktop) const;
-  std::shared_ptr<RenderPipeline> createPipeline(GPU* gpu) const;
-  void collectVertices(const Texture* source, const Texture* target, const Point& offset,
-                       float* vertices) const;
+  static std::shared_ptr<RenderPipeline> CreatePipeline(GPU* gpu, GlassShapeType shapeType);
+
+  static std::string BuildFragmentShader(GlassShapeType shapeType, bool isDesktop);
+
+  bool needsMSAA() const {
+    return _shapeType == GlassShapeType::AlphaMask || _shapeType == GlassShapeType::Star;
+  }
 
   float _glassWidth = 0.0f;
   float _glassHeight = 0.0f;
@@ -86,7 +67,9 @@ class GlassRefractionEffect : public RuntimeEffect {
   float _lightAngle = 0.0f;
   float _lightIntensity = 0.0f;
   GlassShapeType _shapeType = GlassShapeType::RoundedRect;
-  mutable std::shared_ptr<RenderPipeline> cachedPipeline = nullptr;
+  // onDraw is a virtual const method in RuntimeEffect and cannot be made non-const.
+  // Sampler creation is lazy initialization that does not affect the filter's logical state.
+  mutable std::shared_ptr<Sampler> cachedSampler = nullptr;
 };
 
 }  // namespace tgfx
