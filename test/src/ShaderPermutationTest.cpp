@@ -244,7 +244,7 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
   EXPECT_EQ(cache->vertexEntryCount(), 80u);
-  EXPECT_EQ(cache->fragmentEntryCount(), 586u);
+  EXPECT_EQ(cache->fragmentEntryCount(), 592u);
   std::string expectedTag = TGFX_BACKEND_NAME;
   auto dashPos = expectedTag.find('-');
   if (dashPos != std::string::npos) {
@@ -582,7 +582,7 @@ TGFX_TEST(ShaderPermutationTest, GaussianBlurHitsPrecompiledCache) {
   int height = image->height() + 50;
   auto surface = Surface::Make(context, width, height);
   ASSERT_TRUE(surface != nullptr);
-  auto blurFilter = std::make_shared<GaussianBlurImageFilter>(3.0f, 3.0f, TileMode::Decal);
+  auto blurFilter = std::make_shared<GaussianBlurImageFilter>(3.0f, 3.0f, TileMode::Clamp);
   auto blurredImage = image->makeWithFilter(blurFilter);
   surface->getCanvas()->drawImage(blurredImage, 25, 25);
   context->flushAndSubmit(true);
@@ -622,8 +622,8 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureFillShaderRegistry) {
       found = true;
       EXPECT_EQ(shaderInfo.vertDomain.dimensionCount(), 5u);
       EXPECT_EQ(shaderInfo.vertDomain.totalCount(), 32u);
-      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 4u);
-      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 16u);
+      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 6u);
+      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 64u);
       EXPECT_EQ(shaderInfo.vertexFile, "level1/quad_texture_fill.vert");
       EXPECT_EQ(shaderInfo.fragmentFile, "level1/quad_texture_fill.frag");
     }
