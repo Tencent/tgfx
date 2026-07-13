@@ -18,6 +18,7 @@
 
 #include "PermutationMatcher.h"
 #include <skcms.h>
+#include "gpu/Swizzle.h"
 #include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
@@ -127,6 +128,9 @@ static std::optional<PermutationMatchResult> TryMatchTiledTextureFill(
     return std::nullopt;
   }
   auto* tte = static_cast<const TiledTextureEffect*>(fp);
+  if (tte->hasPerspective()) {
+    return std::nullopt;
+  }
   int modeX = 0;
   int modeY = 0;
   tte->getShaderModes(&modeX, &modeY);
@@ -141,13 +145,7 @@ static std::optional<PermutationMatchResult> TryMatchTiledTextureFill(
   fragValues[FD::ALPHA_ONLY] = tte->isAlphaOnly() ? 1 : 0;
   fragValues[FD::HAS_STRICT] = tte->isStrict() ? 1 : 0;
   auto fragIndex = fragDomain.encode(fragValues);
-
-  using VD = TiledTextureFillShader::Dims;
-  auto vertDomain = VD::domain();
-  std::vector<int> vertValues(VD::COUNT);
-  vertValues[VD::HAS_PERSPECTIVE] = tte->hasPerspective() ? 1 : 0;
-  auto vertIndex = vertDomain.encode(vertValues);
-  return PermutationMatchResult{"TiledTextureFillShader", vertIndex, fragIndex};
+  return PermutationMatchResult{"TiledTextureFillShader", 0, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchConstColor(const ProgramInfo* programInfo) {
@@ -202,13 +200,21 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   if (te->isYUV()) {
     return std::nullopt;
   }
+  // Vertex and fragment subset flags must agree: the vertex shader outputs a subset varying only
+  // when HAS_SUBSET is set, and the fragment shader expects to read it only when its own
+  // HAS_SUBSET is set. A mismatch causes a pipeline creation failure or GPU hang.
+  bool gpSubset = quadGP->getHasSubset();
+  bool teSubset = te->hasSubset();
+  if (gpSubset != teSubset) {
+    return std::nullopt;
+  }
 
   using VD = QuadTextureFillShader::VD;
   auto vertDomain = VD::domain();
   std::vector<int> vertValues(VD::COUNT, 0);
   vertValues[VD::HAS_COVERAGE] = quadGP->getAAType() == AAType::Coverage ? 1 : 0;
   vertValues[VD::HAS_UV_COORD] = !quadGP->hasUVMatrix() ? 1 : 0;
-  vertValues[VD::HAS_SUBSET] = quadGP->getHasSubset() ? 1 : 0;
+  vertValues[VD::HAS_SUBSET] = gpSubset ? 1 : 0;
   auto vertIndex = vertDomain.encode(vertValues);
 
   using FD = QuadTextureFillShader::FD;
@@ -216,7 +222,7 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   std::vector<int> fragValues(FD::COUNT, 0);
   fragValues[FD::ALPHA_ONLY] = te->isAlphaOnly() ? 1 : 0;
   fragValues[FD::HAS_RGBAAA] = te->hasRGBAAA() ? 1 : 0;
-  fragValues[FD::HAS_SUBSET] = te->hasSubset() ? 1 : 0;
+  fragValues[FD::HAS_SUBSET] = teSubset ? 1 : 0;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"QuadTextureFillShader", vertIndex, fragIndex};
 }
@@ -661,6 +667,15 @@ static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
     return std::nullopt;
   }
   auto* blur = static_cast<const GaussianBlur1DFragmentProcessor*>(fp);
+  // The precompiled blur shader inlines a simple texture() call for its child.
+  // It does NOT support TiledTextureEffect children (which need Subset/Clamp/Dimension uniforms).
+  if (blur->numChildProcessors() != 1) {
+    return std::nullopt;
+  }
+  auto childFP = blur->childProcessor(0);
+  if (childFP == nullptr || childFP->name() != "TextureEffect") {
+    return std::nullopt;
+  }
   int sigma = blur->getMaxSigma();
   if (sigma < 1 || sigma > 10) {
     return std::nullopt;
@@ -721,6 +736,12 @@ static std::optional<PermutationMatchResult> TryMatchHairlineLine(const ProgramI
   if (gp->name() != "HairlineLineGeometryProcessor") {
     return std::nullopt;
   }
+  if (programInfo->numFragmentProcessors() != 0) {
+    return std::nullopt;
+  }
+  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+    return std::nullopt;
+  }
   auto* hlgp = static_cast<const HairlineLineGeometryProcessor*>(gp);
   using D = HairlineLineShader::Dims;
   auto domain = D::domain();
@@ -735,6 +756,12 @@ static std::optional<PermutationMatchResult> TryMatchHairlineQuad(const ProgramI
   if (gp->name() != "HairlineQuadGeometryProcessor") {
     return std::nullopt;
   }
+  if (programInfo->numFragmentProcessors() != 0) {
+    return std::nullopt;
+  }
+  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+    return std::nullopt;
+  }
   auto* hqgp = static_cast<const HairlineQuadGeometryProcessor*>(gp);
   using D = HairlineQuadShader::Dims;
   auto domain = D::domain();
@@ -747,6 +774,12 @@ static std::optional<PermutationMatchResult> TryMatchHairlineQuad(const ProgramI
 static std::optional<PermutationMatchResult> TryMatchEllipseFill(const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
   if (gp->name() != "EllipseGeometryProcessor") {
+    return std::nullopt;
+  }
+  if (programInfo->numFragmentProcessors() != 0) {
+    return std::nullopt;
+  }
+  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
     return std::nullopt;
   }
   auto* egp = static_cast<const EllipseGeometryProcessor*>(gp);
@@ -765,6 +798,12 @@ static std::optional<PermutationMatchResult> TryMatchComplexEllipseFill(
   if (gp->name() != "ComplexEllipseGeometryProcessor") {
     return std::nullopt;
   }
+  if (programInfo->numFragmentProcessors() != 0) {
+    return std::nullopt;
+  }
+  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+    return std::nullopt;
+  }
   auto* cegp = static_cast<const ComplexEllipseGeometryProcessor*>(gp);
   using D = ComplexEllipseFillShader::Dims;
   auto domain = D::domain();
@@ -779,6 +818,12 @@ static std::optional<PermutationMatchResult> TryMatchNonAARRectFill(
     const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
   if (gp->name() != "NonAARRectGeometryProcessor") {
+    return std::nullopt;
+  }
+  if (programInfo->numFragmentProcessors() != 0) {
+    return std::nullopt;
+  }
+  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
     return std::nullopt;
   }
   auto* ngp = static_cast<const NonAARRectGeometryProcessor*>(gp);
@@ -797,6 +842,12 @@ static std::optional<PermutationMatchResult> TryMatchComplexNonAARRectFill(
   if (gp->name() != "ComplexNonAARRectGeometryProcessor") {
     return std::nullopt;
   }
+  if (programInfo->numFragmentProcessors() != 0) {
+    return std::nullopt;
+  }
+  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+    return std::nullopt;
+  }
   auto* cngp = static_cast<const ComplexNonAARRectGeometryProcessor*>(gp);
   using D = ComplexNonAARRectFillShader::Dims;
   auto domain = D::domain();
@@ -811,6 +862,12 @@ static std::optional<PermutationMatchResult> TryMatchRoundStrokeRectFill(
     const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
   if (gp->name() != "RoundStrokeRectGeometryProcessor") {
+    return std::nullopt;
+  }
+  if (programInfo->numFragmentProcessors() != 0) {
+    return std::nullopt;
+  }
+  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
     return std::nullopt;
   }
   auto* rsgp = static_cast<const RoundStrokeRectGeometryProcessor*>(gp);
@@ -834,6 +891,12 @@ static std::optional<PermutationMatchResult> TryMatchShapeInstancedFill(
   if (gp->name() != "ShapeInstancedGeometryProcessor") {
     return std::nullopt;
   }
+  if (programInfo->numFragmentProcessors() != 0) {
+    return std::nullopt;
+  }
+  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+    return std::nullopt;
+  }
   auto* sigp = static_cast<const ShapeInstancedGeometryProcessor*>(gp);
   using D = ShapeInstancedFillShader::Dims;
   auto domain = D::domain();
@@ -849,6 +912,12 @@ static std::optional<PermutationMatchResult> TryMatchMeshFill(const ProgramInfo*
   if (gp->name() != "MeshGeometryProcessor") {
     return std::nullopt;
   }
+  if (programInfo->numFragmentProcessors() != 0) {
+    return std::nullopt;
+  }
+  if (programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+    return std::nullopt;
+  }
   auto* mgp = static_cast<const MeshGeometryProcessor*>(gp);
   using D = MeshFillShader::Dims;
   auto domain = D::domain();
@@ -861,6 +930,11 @@ static std::optional<PermutationMatchResult> TryMatchMeshFill(const ProgramInfo*
 }
 
 std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* programInfo) {
+  // Precompiled shaders assume RGBA output. Non-RGBA render targets (e.g. ALPHA_8) require an
+  // output swizzle that the precompiled shader does not include. Fall back to ProgramBuilder.
+  if (programInfo->getOutputSwizzle() != Swizzle::RGBA()) {
+    return std::nullopt;
+  }
   if (auto result = TryMatchTextureFill(programInfo)) {
     return result;
   }

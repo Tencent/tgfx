@@ -70,7 +70,7 @@ CompileResult CompileGLSL(const std::string& source, ShaderStageType stage,
   return result;
 }
 
-CompileResult TranslateToMSL(const std::vector<uint32_t>& spirv) {
+CompileResult TranslateToMSL(const std::vector<uint32_t>& spirv, ShaderStageType stage) {
   CompileResult result;
   // spirv-cross uses C++ exceptions internally for error reporting. This catch block is a
   // necessary boundary isolation to convert third-party exceptions into return values, as
@@ -84,6 +84,41 @@ CompileResult TranslateToMSL(const std::vector<uint32_t>& spirv) {
     mslOptions.set_msl_version(2, 3);
     mslOptions.enable_decoration_binding = true;
     mslCompiler.set_msl_options(mslOptions);
+
+    auto commonOptions = mslCompiler.get_common_options();
+    commonOptions.vertex.flip_vert_y = true;
+    mslCompiler.set_common_options(commonOptions);
+
+    auto executionModel = (stage == ShaderStageType::Vertex) ? spv::ExecutionModelVertex
+                                                             : spv::ExecutionModelFragment;
+
+    // Map SPIR-V resource bindings to MSL buffer/texture/sampler indices.
+    // This must match the runtime MetalShaderModule::convertSPIRVToMSL logic:
+    // mslBuffer = spvBinding, mslTexture = spvBinding, mslSampler = spvBinding.
+    auto uboResources = mslCompiler.get_shader_resources().uniform_buffers;
+    for (auto& ubo : uboResources) {
+      uint32_t spvBinding = mslCompiler.get_decoration(ubo.id, spv::DecorationBinding);
+      uint32_t spvDescSet = mslCompiler.get_decoration(ubo.id, spv::DecorationDescriptorSet);
+      spirv_cross::MSLResourceBinding binding = {};
+      binding.stage = executionModel;
+      binding.desc_set = spvDescSet;
+      binding.binding = spvBinding;
+      binding.msl_buffer = spvBinding;
+      mslCompiler.add_msl_resource_binding(binding);
+    }
+
+    auto sampledImages = mslCompiler.get_shader_resources().sampled_images;
+    for (auto& image : sampledImages) {
+      uint32_t spvBinding = mslCompiler.get_decoration(image.id, spv::DecorationBinding);
+      uint32_t spvDescSet = mslCompiler.get_decoration(image.id, spv::DecorationDescriptorSet);
+      spirv_cross::MSLResourceBinding binding = {};
+      binding.stage = executionModel;
+      binding.desc_set = spvDescSet;
+      binding.binding = spvBinding;
+      binding.msl_texture = spvBinding;
+      binding.msl_sampler = spvBinding;
+      mslCompiler.add_msl_resource_binding(binding);
+    }
 
     result.msl = mslCompiler.compile();
     result.success = true;
