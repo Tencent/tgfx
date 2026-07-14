@@ -1,10 +1,18 @@
 // QuadTextureFillShader fragment shader
 // Processor layout: QuadPerEdgeAAGeometryProcessor + TextureEffect + EmptyXferProcessor/PorterDuffXP
 // Permutation dimensions (frag): HAS_YUV, ALPHA_ONLY, HAS_RGBAAA, HAS_SUBSET, HAS_COVERAGE,
-//                                HAS_COLOR, HAS_XP
+//                                HAS_COLOR, HAS_XP, HAS_UV_PERSPECTIVE, HAS_CLAMP_SUBSET
 // Note: HAS_YUV is always 0 at runtime — YUV textures fall back to ProgramBuilder.
 // Vertex-driven varyings are controlled by vert permutation dimensions (HAS_COVERAGE, HAS_COLOR,
 // HAS_SUBSET) which are communicated via matching varying declarations.
+//
+// Subset clamping modes:
+//   HAS_SUBSET=1: Full subset — vertex attribute provides per-quad vTexSubset varying, and Subset
+//                 uniform provides the half-pixel-inset safe range. Both are used for clamping.
+//   HAS_CLAMP_SUBSET=1 (with HAS_SUBSET=0): Uniform-only subset — no vertex attribute or varying.
+//                 TextureEffect needs subset clamping but the GP does not provide per-vertex subset
+//                 coordinates. Only the Subset uniform is used for clamping.
+//   Both 0: No subset clamping at all.
 #version 450
 
 #ifndef HAS_YUV
@@ -18,6 +26,9 @@
 #endif
 #ifndef HAS_SUBSET
 #define HAS_SUBSET 0
+#endif
+#ifndef HAS_CLAMP_SUBSET
+#define HAS_CLAMP_SUBSET 0
 #endif
 
 // These are driven by vertex shader permutation but the fragment shader must declare matching
@@ -35,12 +46,12 @@
 #define HAS_XP 0
 #endif
 
-#if !HAS_COLOR || HAS_SUBSET || HAS_RGBAAA || HAS_XP
+#if !HAS_COLOR || HAS_SUBSET || HAS_CLAMP_SUBSET || HAS_RGBAAA || HAS_XP
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #if !HAS_COLOR
   vec4 Color;
 #endif
-#if HAS_SUBSET
+#if HAS_SUBSET || HAS_CLAMP_SUBSET
   vec4 Subset;
 #endif
 #if HAS_RGBAAA
@@ -95,7 +106,11 @@ void main() {
   highp vec2 finalCoord = texCoord;
 
 #if HAS_SUBSET
+  // Full subset: clamp first by per-quad varying bounds, then by uniform safe range.
   finalCoord = clamp(finalCoord, vTexSubset.xy, vTexSubset.zw);
+  finalCoord = clamp(finalCoord, Subset.xy, Subset.zw);
+#elif HAS_CLAMP_SUBSET
+  // Uniform-only subset: GP has no subset vertex attribute, clamp only by uniform.
   finalCoord = clamp(finalCoord, Subset.xy, Subset.zw);
 #endif
 

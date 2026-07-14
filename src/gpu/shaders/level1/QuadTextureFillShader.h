@@ -74,6 +74,7 @@ class QuadTextureFillShader : public PrecompiledShader {
       HAS_COLOR,
       HAS_XP,
       HAS_UV_PERSPECTIVE,
+      HAS_CLAMP_SUBSET,
       COUNT
     };
     static PermutationDomain domain() {
@@ -86,11 +87,12 @@ class QuadTextureFillShader : public PrecompiledShader {
           PermutationBool("HAS_COLOR"),
           PermutationInt("HAS_XP", 3),
           PermutationBool("HAS_UV_PERSPECTIVE"),
+          PermutationBool("HAS_CLAMP_SUBSET"),
       });
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 8, "Update ShouldCompile when fragment dimensions change.");
+  static_assert(FD::COUNT == 9, "Update ShouldCompile when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"QuadTextureFillShader",
@@ -113,6 +115,16 @@ class QuadTextureFillShader : public PrecompiledShader {
     }
     // ALPHA_ONLY and HAS_RGBAAA are mutually exclusive in practice.
     if (fragValues[FD::ALPHA_ONLY] != 0 && fragValues[FD::HAS_RGBAAA] != 0) {
+      return false;
+    }
+    // HAS_SUBSET and HAS_CLAMP_SUBSET are mutually exclusive: HAS_SUBSET uses vertex varying +
+    // uniform, HAS_CLAMP_SUBSET uses uniform only. They cannot both be active.
+    if (fragValues[FD::HAS_SUBSET] != 0 && fragValues[FD::HAS_CLAMP_SUBSET] != 0) {
+      return false;
+    }
+    // When vertex has subset attribute (HAS_SUBSET in vert), fragment must use HAS_SUBSET=1.
+    // When vertex lacks subset attribute, fragment may use HAS_CLAMP_SUBSET=1 for uniform-only.
+    if (vertValues[VD::HAS_SUBSET] != fragValues[FD::HAS_SUBSET]) {
       return false;
     }
     // HAS_COVERAGE, HAS_COLOR, HAS_UV_PERSPECTIVE in frag must match vert (mirrored dimensions).

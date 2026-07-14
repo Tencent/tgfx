@@ -2,7 +2,14 @@
 // Permutation dimensions (frag):
 //   CHILD_TYPE (0~2): 0=DstChild, 1=SrcChild, 2=TwoChild
 //   HAS_XP (0~2): 0=Empty, 1=PorterDuff DST_TEX, 2=PorterDuff FBF
+//   CHILD0_MODE (0~1): 0=TextureEffect (sample from TextureSampler_0),
+//                       1=ConstColor (use ChildConstColor uniform, no texture)
+//
 // BLEND_MODE is a runtime uniform (not a compile-time permutation dimension).
+//
+// When CHILD0_MODE=1 (ConstColor), the first child processor is a ConstColorProcessor that
+// outputs a solid uniform color instead of sampling a texture. This is common for
+// ModeColorFilter (blend a solid color with the input) and DropShadow effects.
 #version 450
 
 #ifndef CHILD_TYPE
@@ -11,21 +18,38 @@
 #ifndef HAS_XP
 #define HAS_XP 0
 #endif
+#ifndef CHILD0_MODE
+#define CHILD0_MODE 0
+#endif
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Color;
   int BlendModeValue;
+#if CHILD0_MODE == 1
+  vec4 ChildConstColor;
+#endif
 #include "xp_uniforms.inc"
 };
 
 layout(location = 0) in vec2 TransformedCoords_0;
 
+// When CHILD0_MODE=1, no TextureSampler_0 is needed (ConstColor has no texture).
+#if CHILD0_MODE == 0
 layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
-#if CHILD_TYPE == 2
+  #if CHILD_TYPE == 2
 layout(set = 1, binding = 1) uniform sampler2D TextureSampler_1;
-#define XP_DST_TEX_BINDING 2
+    #define XP_DST_TEX_BINDING 2
+  #else
+    #define XP_DST_TEX_BINDING 1
+  #endif
 #else
-#define XP_DST_TEX_BINDING 1
+  // ConstColor child: first texture binding slot is freed.
+  #if CHILD_TYPE == 2
+layout(set = 1, binding = 0) uniform sampler2D TextureSampler_1;
+    #define XP_DST_TEX_BINDING 1
+  #else
+    #define XP_DST_TEX_BINDING 0
+  #endif
 #endif
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
@@ -208,21 +232,29 @@ vec4 blendColors(vec4 S, vec4 D) {
 
 void main() {
   vec4 inputColor = Color;
+
+  // Sample child[0] based on CHILD0_MODE.
+#if CHILD0_MODE == 0
   vec4 childColor = texture(TextureSampler_0, TransformedCoords_0);
+#elif CHILD0_MODE == 1
+  // ConstColorProcessor: output is just the uniform color modulated by input alpha.
+  // ConstColorProcessor uses ModulateA mode in ModeColorFilter contexts.
+  vec4 childColor = ChildConstColor * inputColor.a;
+#endif
 
   vec4 srcColor;
   vec4 dstColor;
 
 #if CHILD_TYPE == 0
-  // DstChild: input is src, child texture is dst
+  // DstChild: input is src, child[0] is dst.
   srcColor = inputColor;
   dstColor = childColor;
 #elif CHILD_TYPE == 1
-  // SrcChild: child texture is src, input is dst
+  // SrcChild: child[0] is src, input is dst.
   srcColor = childColor;
   dstColor = inputColor;
 #elif CHILD_TYPE == 2
-  // TwoChild: first texture is src, second texture is dst
+  // TwoChild: child[0] is src, child[1] (TextureSampler_1) is dst.
   srcColor = childColor;
   dstColor = texture(TextureSampler_1, TransformedCoords_0);
 #endif

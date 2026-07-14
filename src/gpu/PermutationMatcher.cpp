@@ -265,17 +265,18 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   if (te->isYUV()) {
     return std::nullopt;
   }
-  // The vertex HAS_SUBSET is driven by the GP (whether the texSubset vertex attribute exists).
-  // The fragment also uses the GP's subset flag for its varying declaration — Metal requires
-  // vertex outputs and fragment inputs to match. When gpSubset=true but teSubset=false, the
-  // fragment shader still declares vTexSubset and Subset uniform; TextureEffect::onSetData fills
-  // Subset with full-texture-range coordinates so the clamp becomes a no-op.
+  // Subset clamping logic:
+  //   gpSubset: GP provides per-vertex subset attribute (vTexSubset varying in shader).
+  //   teSubset: TextureEffect needs subset clamping (Subset uniform bounds).
+  //
+  // Three valid combinations:
+  //   gpSubset=true:  Vertex shader outputs vTexSubset varying. Fragment uses both vTexSubset
+  //                   and Subset uniform for double-clamp. (HAS_SUBSET=1, HAS_CLAMP_SUBSET=0)
+  //   gpSubset=false, teSubset=true: No vertex attribute. Fragment uses only Subset uniform
+  //                   for clamping. (HAS_SUBSET=0, HAS_CLAMP_SUBSET=1)
+  //   gpSubset=false, teSubset=false: No clamping at all. (HAS_SUBSET=0, HAS_CLAMP_SUBSET=0)
   bool gpSubset = quadGP->getHasSubset();
   bool teSubset = te->hasSubset();
-  // Reject the impossible case: GP has no subset attribute but TE expects subset clamping.
-  if (!gpSubset && teSubset) {
-    return std::nullopt;
-  }
 
   using VD = QuadTextureFillShader::VD;
   auto vertDomain = VD::domain();
@@ -297,6 +298,8 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   fragValues[FD::HAS_COLOR] = !quadGP->hasCommonColor() ? 1 : 0;
   fragValues[FD::HAS_XP] = xpType;
   fragValues[FD::HAS_UV_PERSPECTIVE] = quadGP->getHasUVPerspective() ? 1 : 0;
+  // Uniform-only subset: TE needs clamping but GP has no subset vertex attribute.
+  fragValues[FD::HAS_CLAMP_SUBSET] = (!gpSubset && teSubset) ? 1 : 0;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"QuadTextureFillShader", vertIndex, fragIndex};
 }
@@ -1002,12 +1005,27 @@ static std::optional<PermutationMatchResult> TryMatchBlendMerge(const ProgramInf
   if (blendMode < 0 || blendMode >= 30) {
     return std::nullopt;
   }
-  // The precompiled BlendMerge shader only supports plain TextureEffect children (no subset,
-  // no YUV). Any other child FP type (ConstColorProcessor, TiledTextureEffect, etc.) has
-  // incompatible uniform layout.
+
+  // Determine child[0] mode:
+  //   0 = TextureEffect (standard texture sampling)
+  //   1 = ConstColorProcessor (uniform color, no texture)
+  int child0Mode = 0;
+
+  // Validate each child processor. We support:
+  //   - TextureEffect (plain, no subset, no YUV): standard texture sampling
+  //   - ConstColorProcessor: uniform color output, only supported as child[0]
   for (size_t i = 0; i < xfp->numChildProcessors(); i++) {
     auto child = xfp->childProcessor(i);
     if (child == nullptr) {
+      continue;
+    }
+    if (child->name() == "ConstColorProcessor") {
+      // ConstColorProcessor is only supported as child[0]. If it appears as child[1] in TwoChild
+      // mode, we cannot handle it (child[1] always needs a texture sampler in our current layout).
+      if (i != 0) {
+        return std::nullopt;
+      }
+      child0Mode = 1;
       continue;
     }
     if (child->name() != "TextureEffect") {
@@ -1018,6 +1036,7 @@ static std::optional<PermutationMatchResult> TryMatchBlendMerge(const ProgramInf
       return std::nullopt;
     }
   }
+
   using VD = BlendMergeShader::VD;
   auto vertDomain = VD::domain();
   std::vector<int> vertValues(VD::COUNT);
@@ -1029,6 +1048,7 @@ static std::optional<PermutationMatchResult> TryMatchBlendMerge(const ProgramInf
   std::vector<int> fragValues(FD::COUNT);
   fragValues[FD::CHILD_TYPE] = childType;
   fragValues[FD::HAS_XP] = xpType;
+  fragValues[FD::CHILD0_MODE] = child0Mode;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"BlendMergeShader", vertIndex, fragIndex};
 }

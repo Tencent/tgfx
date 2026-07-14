@@ -48,16 +48,17 @@ class BlendMergeShader : public PrecompiledShader {
   using VD = VertDims;
 
   struct FragDims {
-    enum : uint32_t { CHILD_TYPE, HAS_XP, COUNT };
+    enum : uint32_t { CHILD_TYPE, HAS_XP, CHILD0_MODE, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("CHILD_TYPE", 3),
           PermutationInt("HAS_XP", 3),
+          PermutationInt("CHILD0_MODE", 2),
       });
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 2, "Update ShouldCompile when fragment dimensions change.");
+  static_assert(FD::COUNT == 3, "Update ShouldCompile when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"BlendMergeShader",
@@ -73,7 +74,11 @@ class BlendMergeShader : public PrecompiledShader {
 
  private:
   static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>&,
-                            const std::vector<int>&) {
+                            const std::vector<int>& fragValues) {
+    // CHILD0_MODE=1 (ConstColor) with CHILD_TYPE=2 (TwoChild) means child[0] is a const color
+    // and child[1] is a texture — this is a valid combination (e.g. blend const color with image).
+    // All combinations are valid, so no filtering needed.
+    (void)fragValues;
     return true;
   }
 };

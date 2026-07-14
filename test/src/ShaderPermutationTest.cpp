@@ -183,7 +183,8 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistry) {
       foundTextureFill = true;
       EXPECT_EQ(shaderInfo.vertDomain.totalCount(), 16u);
       EXPECT_EQ(shaderInfo.vertDomain.dimensionCount(), 4u);
-      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 32u);
+      // FragDims: 4 bools + 1 int(3) = 2^4 * 3 = 48 total permutations
+      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 48u);
       EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 5u);
       EXPECT_EQ(shaderInfo.vertexFile, "level1/texture_fill.vert");
       EXPECT_EQ(shaderInfo.fragmentFile, "level1/texture_fill.frag");
@@ -200,10 +201,13 @@ TGFX_TEST(ShaderPermutationTest, ShouldCompile) {
     if (shaderInfo.name != "TextureFillShader") {
       continue;
     }
-    // 4 bool dims = 16 raw combinations. ShouldCompile excludes hasYuv && (alphaOnly || hasRgbaaa).
-    // hasYuv=1 && alphaOnly=1: 4 combos (hasRgbaaa=0/1, hasSubset=0/1) but 2 overlap with below
-    // hasYuv=1 && hasRgbaaa=1: 4 combos
-    // Union: hasYuv=1 && (alphaOnly=1 || hasRgbaaa=1) = 6 combos excluded
+    // Vert: 4 bool = 16 raw. Frag: 4 bool + HAS_XP(int3) = 48 raw.
+    // ShouldCompile rules:
+    //   - HAS_YUV(frag) != 0 → excluded (YUV falls back to ProgramBuilder)
+    //   - ALPHA_ONLY && HAS_RGBAAA both set → excluded (mutually exclusive)
+    //   - Vert 4 dims must match frag first 4 dims
+    // Valid vert configs (HAS_YUV=0): 8, minus ALPHA_ONLY=1&&HAS_RGBAAA=1 = 6.
+    // Each valid vert matches 3 frag variants (HAS_XP=0,1,2) → 6 * 3 = 18.
     int compiledCount = 0;
     for (uint32_t vi = 0; vi < shaderInfo.vertDomain.totalCount(); vi++) {
       auto vertValues = shaderInfo.vertDomain.decode(vi);
@@ -214,7 +218,7 @@ TGFX_TEST(ShaderPermutationTest, ShouldCompile) {
         }
       }
     }
-    EXPECT_EQ(compiledCount, 12);
+    EXPECT_EQ(compiledCount, 18);
   }
 }
 
@@ -244,7 +248,7 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
   EXPECT_EQ(cache->vertexEntryCount(), 117u);
-  EXPECT_EQ(cache->fragmentEntryCount(), 747u);
+  EXPECT_EQ(cache->fragmentEntryCount(), 2106u);
   std::string expectedTag = TGFX_BACKEND_NAME;
   auto dashPos = expectedTag.find('-');
   if (dashPos != std::string::npos) {
@@ -622,8 +626,9 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureFillShaderRegistry) {
       found = true;
       EXPECT_EQ(shaderInfo.vertDomain.dimensionCount(), 5u);
       EXPECT_EQ(shaderInfo.vertDomain.totalCount(), 32u);
-      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 7u);
-      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 128u);
+      // FragDims: 8 bools + 1 int(3) = 2^8 * 3 = 768 total permutations
+      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 9u);
+      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 768u);
       EXPECT_EQ(shaderInfo.vertexFile, "level1/quad_texture_fill.vert");
       EXPECT_EQ(shaderInfo.fragmentFile, "level1/quad_texture_fill.frag");
     }
@@ -649,8 +654,8 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureFillShouldCompile) {
         }
       }
     }
-    // Fragment adds HAS_XP dimension (×2) over the original 96 valid combinations.
-    EXPECT_EQ(compiledCount, 384);
+    // After adding HAS_CLAMP_SUBSET dimension: 432 valid vert×frag pairs survive ShouldCompile.
+    EXPECT_EQ(compiledCount, 432);
   }
 }
 
