@@ -565,9 +565,7 @@ bool ClipStack::addElement(ClipElement&& toAdd) {
   }
   // Wrap cur.bounds as a non-inverse rect ClipElement so ResolveClipGeometry
   // can handle containment and intersection against toAdd uniformly.
-  Path curBoundsPath = {};
-  curBoundsPath.addRect(cur.bounds);
-  const ClipElement curElement(GeometryShape(curBoundsPath), Matrix::I(), false);
+  const ClipElement curElement(GeometryShape(cur.bounds), Matrix::I(), false);
   switch (ResolveClipGeometry(curElement, toAdd)) {
     case ClipGeometry::Empty:
       cur.state = ClipState::Empty;

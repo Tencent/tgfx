@@ -943,7 +943,7 @@ AppliedClip OpsCompositor::applyClip(const ClipStack& clipStack) {
 }
 
 std::pair<bool, PlacementPtr<FragmentProcessor>> OpsCompositor::tryApplyAnalyticFP(
-    const ClipElement& element, PlacementPtr<FragmentProcessor> inputFP) {
+    const ClipElement& element, PlacementPtr<FragmentProcessor> inputFP) const {
   // The shader reads gl_FragCoord in window space, so append the render-target-to-window-space
   // transform to the element's matrix.
   auto matrix = element.matrix();
