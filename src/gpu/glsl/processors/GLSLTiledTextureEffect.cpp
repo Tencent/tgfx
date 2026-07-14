@@ -470,11 +470,22 @@ void GLSLTiledTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
     }
     fragmentUniformData->setData(uni, rect);
   };
-  if (ShaderModeUsesSubset(sampling.shaderModeX) || ShaderModeUsesSubset(sampling.shaderModeY)) {
+  // Upload Subset/Clamp: always needed for precompiled shader (superset layout), conditionally
+  // for GLSL codegen path where the uniform may not be declared.
+  if (fragmentUniformData->hasField("Subset")) {
     pushRect(sampling.shaderSubset, "Subset");
   }
-  if (ShaderModeUsesClamp(sampling.shaderModeX) || ShaderModeUsesClamp(sampling.shaderModeY)) {
+  if (fragmentUniformData->hasField("Clamp")) {
     pushRect(sampling.shaderClamp, "Clamp");
+  }
+  // Upload ShaderModeX/ShaderModeY as runtime uniforms for precompiled shader path.
+  if (fragmentUniformData->hasField("ShaderModeX")) {
+    int modeXInt = static_cast<int>(sampling.shaderModeX);
+    fragmentUniformData->setData("ShaderModeX", modeXInt);
+  }
+  if (fragmentUniformData->hasField("ShaderModeY")) {
+    int modeYInt = static_cast<int>(sampling.shaderModeY);
+    fragmentUniformData->setData("ShaderModeY", modeYInt);
   }
 }
 }  // namespace tgfx

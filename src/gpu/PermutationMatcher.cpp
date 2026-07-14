@@ -175,8 +175,6 @@ static std::optional<PermutationMatchResult> TryMatchTiledTextureFill(
   using FD = TiledTextureFillShader::FragDims;
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
-  fragValues[FD::SHADER_MODE_X] = modeX;
-  fragValues[FD::SHADER_MODE_Y] = modeY;
   fragValues[FD::ALPHA_ONLY] = tte->isAlphaOnly() ? 1 : 0;
   fragValues[FD::HAS_STRICT] = tte->isStrict() ? 1 : 0;
   fragValues[FD::HAS_XP] = xpType;

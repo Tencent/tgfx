@@ -23,13 +23,14 @@
 namespace tgfx {
 
 /// Precompiled shader declaration for TiledTextureEffect. Handles texture sampling with various
-/// tiling modes (repeat, mirror, clamp-to-border, etc.) applied per-axis in shader code.
+/// tiling modes (repeat, mirror, clamp-to-border, etc.) applied per-axis via runtime uniform
+/// branches. ShaderModeX/ShaderModeY are passed as uniforms rather than compile-time permutations
+/// to dramatically reduce variant count (from 640 to 12).
 ///
 /// Fragment dimensions:
-///   SHADER_MODE_X (int, 9 values): X-axis tiling mode (None..ClampToBorderLinear)
-///   SHADER_MODE_Y (int, 9 values): Y-axis tiling mode
 ///   ALPHA_ONLY (bool): texture is alpha-only format
 ///   HAS_STRICT (bool): SrcRectConstraint::Strict is active
+///   HAS_XP (int, 3 values): XferProcessor type
 ///
 /// Vertex dimensions:
 ///   HAS_PERSPECTIVE (bool): coordinate transform has perspective
@@ -37,11 +38,9 @@ class TiledTextureFillShader : public PrecompiledShader {
  public:
   // Fragment dimensions
   struct FragDims {
-    enum : uint32_t { SHADER_MODE_X, SHADER_MODE_Y, ALPHA_ONLY, HAS_STRICT, HAS_XP, COUNT };
+    enum : uint32_t { ALPHA_ONLY, HAS_STRICT, HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationInt("SHADER_MODE_X", 9),
-          PermutationInt("SHADER_MODE_Y", 9),
           PermutationBool("ALPHA_ONLY"),
           PermutationBool("HAS_STRICT"),
           PermutationInt("HAS_XP", 3),
@@ -49,7 +48,7 @@ class TiledTextureFillShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 5, "Update ShouldCompile when fragment dimensions change.");
+  static_assert(FD::COUNT == 3, "Update info() when fragment dimensions change.");
 
   // Vertex dimensions
   TGFX_DEFINE_DIMS(HAS_PERSPECTIVE);
@@ -65,22 +64,7 @@ class TiledTextureFillShader : public PrecompiledShader {
             PermutationDomain({}),
             "",
             "",
-            ShouldCompile};
-  }
-
- private:
-  static bool ShouldCompile(uint32_t /*vertIndex*/, uint32_t /*fragIndex*/,
-                            const std::vector<int>& /*vertValues*/,
-                            const std::vector<int>& fragValues) {
-    int modeX = fragValues[FD::SHADER_MODE_X];
-    int modeY = fragValues[FD::SHADER_MODE_Y];
-    // When both axes are None, tiling is fully handled by hardware sampler — no shader needed.
-    // This combination never occurs in practice because TiledTextureEffect is only created when
-    // at least one axis requires shader-based tiling.
-    if (modeX == 0 && modeY == 0) {
-      return false;
-    }
-    return true;
+            nullptr};
   }
 };
 
