@@ -9,7 +9,9 @@
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Color;
-  vec3 LumaCoeffs;
+  float Kr;
+  float Kg;
+  float Kb;
 #include "xp_uniforms.inc"
 };
 
@@ -23,7 +25,7 @@ void main() {
   // Unpremultiply to get linear RGB
   vec3 rgb = (inputColor.a > 0.0) ? inputColor.rgb / inputColor.a : vec3(0.0);
   // Compute luminance using BT.709 or custom coefficients
-  float luma = dot(rgb, LumaCoeffs);
+  float luma = dot(rgb, vec3(Kr, Kg, Kb));
   // Output premultiplied grayscale
   vec4 result = vec4(luma * inputColor.a, luma * inputColor.a, luma * inputColor.a, inputColor.a);
 #define TGFX_XP_SRC_COLOR result

@@ -14,7 +14,7 @@
 layout(std140, set = 0, binding = 0) uniform VertexUniformBlock {
   vec4 tgfx_RTAdjust;
   mat3 Matrix;
-  vec2 AtlasSize;
+  vec2 atlasSizeInv;
 };
 
 layout(location = 0) in vec2 aPosition;
@@ -44,7 +44,7 @@ layout(location = 1) out vec4 vColor;
 #endif
 
 void main() {
-  vTextureCoords = maskCoord * AtlasSize;
+  vTextureCoords = maskCoord * atlasSizeInv;
 #if HAS_COVERAGE
   vCoverage = inCoverage;
 #endif
