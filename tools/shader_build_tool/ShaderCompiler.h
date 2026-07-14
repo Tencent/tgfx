@@ -39,7 +39,7 @@ CompileResult CompileGLSL(const std::string& source, ShaderStageType stage,
                           const std::string& shaderName, uint32_t variantIndex);
 
 /// Translates SPIR-V binary to Metal Shading Language via spirv-cross.
-CompileResult TranslateToMSL(const std::vector<uint32_t>& spirv);
+CompileResult TranslateToMSL(const std::vector<uint32_t>& spirv, ShaderStageType stage);
 
 /// Translates SPIR-V binary to WGSL via tint.
 CompileResult TranslateToWGSL(const std::vector<uint32_t>& spirv);

@@ -33,7 +33,7 @@ class EllipseFillShader : public PrecompiledShader {
       return PermutationDomain({
           PermutationBool("STROKE"),
           PermutationBool("HAS_COMMON_COLOR"),
-          PermutationBool("HAS_XP"),
+          PermutationInt("HAS_XP", 3),
       });
     }
   };

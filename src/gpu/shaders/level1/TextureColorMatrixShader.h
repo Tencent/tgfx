@@ -24,7 +24,17 @@ namespace tgfx {
 
 class TextureColorMatrixShader : public PrecompiledShader {
  public:
-  TGFX_DEFINE_DIMS(ALPHA_ONLY, HAS_RGBAAA, HAS_SUBSET, HAS_XP);
+  struct Dims {
+    enum : uint32_t { ALPHA_ONLY, HAS_RGBAAA, HAS_SUBSET, HAS_XP, COUNT };
+    static PermutationDomain domain() {
+      return PermutationDomain({
+          PermutationBool("ALPHA_ONLY"),
+          PermutationBool("HAS_RGBAAA"),
+          PermutationBool("HAS_SUBSET"),
+          PermutationInt("HAS_XP", 3),
+      });
+    }
+  };
   using D = Dims;
   static_assert(D::COUNT == 4, "Update ShouldCompile below when dimensions change.");
 

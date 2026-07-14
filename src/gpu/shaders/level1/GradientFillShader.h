@@ -40,7 +40,7 @@ class GradientFillShader : public PrecompiledShader {
       return PermutationDomain({
           PermutationEnum("LAYOUT_TYPE", {"LINEAR", "RADIAL", "CONIC", "DIAMOND"}),
           PermutationInt("INTERVAL_COUNT", 8),
-          PermutationBool("HAS_XP"),
+          PermutationInt("HAS_XP", 3),
       });
     }
   };

@@ -29,6 +29,7 @@ layout(set = 1, binding = 1) uniform sampler2D TextureSampler_1;
 #define XP_DST_TEX_BINDING 1
 #endif
 #include "xp_porter_duff.inc"
+#include "xp_porter_duff_fbf.inc"
 
 layout(location = 0) out vec4 fragColor;
 

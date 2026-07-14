@@ -33,6 +33,7 @@ layout(location = 0) in vec2 TransformedCoords_0;
 
 #define XP_DST_TEX_BINDING 0
 #include "xp_porter_duff.inc"
+#include "xp_porter_duff_fbf.inc"
 
 layout(location = 0) out vec4 fragColor;
 

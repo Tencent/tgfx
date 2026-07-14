@@ -53,7 +53,7 @@ class BlendMergeShader : public PrecompiledShader {
       return PermutationDomain({
           PermutationInt("BLEND_MODE", 30),
           PermutationInt("CHILD_TYPE", 3),
-          PermutationBool("HAS_XP"),
+          PermutationInt("HAS_XP", 3),
       });
     }
   };

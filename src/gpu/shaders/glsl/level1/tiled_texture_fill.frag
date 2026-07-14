@@ -32,6 +32,7 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 
 #define XP_DST_TEX_BINDING 1
 #include "xp_porter_duff.inc"
+#include "xp_porter_duff_fbf.inc"
 
 // Tile a coordinate for repeat mode: result in [subset.lo, subset.hi)
 float tileRepeat(float coord, float lo, float hi) {

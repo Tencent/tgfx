@@ -34,7 +34,7 @@ class ConstColorShader : public PrecompiledShader {
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("INPUT_MODE", 3),
-          PermutationBool("HAS_XP"),
+          PermutationInt("HAS_XP", 3),
       });
     }
   };

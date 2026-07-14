@@ -34,7 +34,7 @@ class AtlasTextFillShader : public PrecompiledShader {
           PermutationBool("HAS_COVERAGE"),
           PermutationBool("HAS_COMMON_COLOR"),
           PermutationBool("ALPHA_ONLY"),
-          PermutationBool("HAS_XP"),
+          PermutationInt("HAS_XP", 3),
       });
     }
   };

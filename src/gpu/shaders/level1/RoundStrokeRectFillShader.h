@@ -34,7 +34,7 @@ class RoundStrokeRectFillShader : public PrecompiledShader {
           PermutationBool("HAS_AA"),
           PermutationBool("HAS_COMMON_COLOR"),
           PermutationBool("HAS_UV_MATRIX"),
-          PermutationBool("HAS_XP"),
+          PermutationInt("HAS_XP", 3),
       });
     }
   };

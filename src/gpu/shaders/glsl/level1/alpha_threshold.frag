@@ -15,6 +15,7 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 
 #define XP_DST_TEX_BINDING 0
 #include "xp_porter_duff.inc"
+#include "xp_porter_duff_fbf.inc"
 
 layout(location = 0) out vec4 fragColor;
 

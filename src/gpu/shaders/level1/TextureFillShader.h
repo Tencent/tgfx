@@ -37,7 +37,7 @@ class TextureFillShader : public PrecompiledShader {
           PermutationBool("ALPHA_ONLY"),
           PermutationBool("HAS_RGBAAA"),
           PermutationBool("HAS_SUBSET"),
-          PermutationBool("HAS_XP"),
+          PermutationInt("HAS_XP", 3),
       });
     }
   };

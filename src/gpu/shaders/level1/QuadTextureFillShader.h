@@ -64,9 +64,32 @@ class QuadTextureFillShader : public PrecompiledShader {
 
   // Fragment dimensions (includes vertex-driven HAS_COVERAGE, HAS_COLOR, and HAS_UV_PERSPECTIVE
   // because the fragment shader must declare matching varyings)
-  TGFX_DEFINE_DIMS(HAS_YUV, ALPHA_ONLY, HAS_RGBAAA, HAS_SUBSET, HAS_COVERAGE, HAS_COLOR, HAS_XP,
-                   HAS_UV_PERSPECTIVE);
-  using FD = Dims;
+  struct FragDims {
+    enum : uint32_t {
+      HAS_YUV,
+      ALPHA_ONLY,
+      HAS_RGBAAA,
+      HAS_SUBSET,
+      HAS_COVERAGE,
+      HAS_COLOR,
+      HAS_XP,
+      HAS_UV_PERSPECTIVE,
+      COUNT
+    };
+    static PermutationDomain domain() {
+      return PermutationDomain({
+          PermutationBool("HAS_YUV"),
+          PermutationBool("ALPHA_ONLY"),
+          PermutationBool("HAS_RGBAAA"),
+          PermutationBool("HAS_SUBSET"),
+          PermutationBool("HAS_COVERAGE"),
+          PermutationBool("HAS_COLOR"),
+          PermutationInt("HAS_XP", 3),
+          PermutationBool("HAS_UV_PERSPECTIVE"),
+      });
+    }
+  };
+  using FD = FragDims;
   static_assert(FD::COUNT == 8, "Update ShouldCompile when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {

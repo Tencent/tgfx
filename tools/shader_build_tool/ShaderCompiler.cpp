@@ -83,6 +83,9 @@ CompileResult TranslateToMSL(const std::vector<uint32_t>& spirv, ShaderStageType
     spirv_cross::CompilerMSL::Options mslOptions;
     mslOptions.set_msl_version(2, 3);
     mslOptions.enable_decoration_binding = true;
+    if (stage == ShaderStageType::Fragment) {
+      mslOptions.use_framebuffer_fetch_subpasses = true;
+    }
     mslCompiler.set_msl_options(mslOptions);
 
     auto commonOptions = mslCompiler.get_common_options();
@@ -120,8 +123,14 @@ CompileResult TranslateToMSL(const std::vector<uint32_t>& spirv, ShaderStageType
       mslCompiler.add_msl_resource_binding(binding);
     }
 
+    // Note: subpass_inputs are NOT mapped here. When use_framebuffer_fetch_subpasses=true,
+    // spirv-cross automatically converts subpassInput to [[color(N)]] in MSL without
+    // needing explicit resource binding.
+
     result.msl = mslCompiler.compile();
     result.success = true;
+
+
   } catch (const spirv_cross::CompilerError& e) {
     result.success = false;
     result.error = std::string("spirv-cross MSL error: ") + e.what();

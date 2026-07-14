@@ -38,7 +38,7 @@ class QuadColorFillShader : public PrecompiledShader {
       return PermutationDomain({
           PermutationBool("HAS_COVERAGE"),
           PermutationBool("HAS_COLOR"),
-          PermutationBool("HAS_XP"),
+          PermutationInt("HAS_XP", 3),
       });
     }
   };

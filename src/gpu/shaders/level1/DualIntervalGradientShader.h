@@ -39,7 +39,7 @@ class DualIntervalGradientShader : public PrecompiledShader {
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationEnum("LAYOUT_TYPE", {"LINEAR", "RADIAL", "CONIC", "DIAMOND"}),
-          PermutationBool("HAS_XP"),
+          PermutationInt("HAS_XP", 3),
       });
     }
   };

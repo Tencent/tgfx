@@ -50,7 +50,7 @@ class GaussianBlur1DShader : public PrecompiledShader {
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("MAX_SIGMA", 10),
-          PermutationBool("HAS_XP"),
+          PermutationInt("HAS_XP", 3),
       });
     }
   };

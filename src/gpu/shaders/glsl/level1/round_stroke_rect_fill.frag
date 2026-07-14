@@ -41,6 +41,7 @@ layout(location = 1) in vec4 vColor;
 
 #define XP_DST_TEX_BINDING 0
 #include "xp_porter_duff.inc"
+#include "xp_porter_duff_fbf.inc"
 
 layout(location = 0) out vec4 fragColor;
 

@@ -34,7 +34,7 @@ class MeshFillShader : public PrecompiledShader {
           PermutationBool("HAS_TEX_COORDS"),
           PermutationBool("HAS_COLORS"),
           PermutationBool("HAS_COVERAGE"),
-          PermutationBool("HAS_XP"),
+          PermutationInt("HAS_XP", 3),
       });
     }
   };

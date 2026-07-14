@@ -63,7 +63,7 @@ class ColorSpaceXformShader : public PrecompiledShader {
           PermutationBool("PREMUL"),
           PermutationInt("SRC_TF_TYPE", 4),
           PermutationInt("DST_TF_TYPE", 4),
-          PermutationBool("HAS_XP"),
+          PermutationInt("HAS_XP", 3),
       });
     }
   };

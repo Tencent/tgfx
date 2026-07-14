@@ -32,7 +32,7 @@ class HairlineQuadShader : public PrecompiledShader {
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationBool("HAS_AA"),
-          PermutationBool("HAS_XP"),
+          PermutationInt("HAS_XP", 3),
       });
     }
   };

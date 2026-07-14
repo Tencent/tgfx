@@ -60,11 +60,15 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
   auto vertBlob = cache->findVertex(vertHash.hi, vertHash.lo);
   if (vertBlob == nullptr) {
     cache->recordMiss();
+    LOGE("PrecompiledShaderMiss: vert blob not found for %s[vert=%u]",
+         matchResult->shaderName.c_str(), matchResult->vertPermutationIndex);
     return nullptr;
   }
   auto fragBlob = cache->findFragment(fragHash.hi, fragHash.lo);
   if (fragBlob == nullptr) {
     cache->recordMiss();
+    LOGE("PrecompiledShaderMiss: frag blob not found for %s[frag=%u]",
+         matchResult->shaderName.c_str(), matchResult->fragPermutationIndex);
     return nullptr;
   }
 
@@ -144,6 +148,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
     LOGE("PrecompiledProgramCreator: Failed to create render pipeline for %s[vert=%u,frag=%u]",
          matchResult->shaderName.c_str(), matchResult->vertPermutationIndex,
          matchResult->fragPermutationIndex);
+
     cache->recordMiss();
     return nullptr;
   }

@@ -91,11 +91,10 @@ static int GetXPType(const ProgramInfo* programInfo) {
     return 0;
   }
   if (xp->name() == "PorterDuffXferProcessor") {
-    // Only match DST_TEX mode (dstTextureView != nullptr). Framebuffer fetch mode (dstTextureView
-    // == nullptr) is not covered by precompiled shaders and falls back to ProgramBuilder.
     if (xp->dstTextureView() != nullptr) {
-      return 1;
+      return 1;  // DST_TEX mode
     }
+    return 2;  // Framebuffer Fetch mode
   }
   return -1;
 }

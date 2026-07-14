@@ -33,7 +33,7 @@ class NonAARRectFillShader : public PrecompiledShader {
       return PermutationDomain({
           PermutationBool("HAS_COMMON_COLOR"),
           PermutationBool("STROKE"),
-          PermutationBool("HAS_XP"),
+          PermutationInt("HAS_XP", 3),
       });
     }
   };

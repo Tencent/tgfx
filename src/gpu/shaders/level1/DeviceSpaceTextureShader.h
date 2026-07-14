@@ -29,7 +29,15 @@ namespace tgfx {
 ///   ALPHA_ONLY (bool): whether the texture is alpha-only format
 class DeviceSpaceTextureShader : public PrecompiledShader {
  public:
-  TGFX_DEFINE_DIMS(ALPHA_ONLY, HAS_XP);
+  struct Dims {
+    enum : uint32_t { ALPHA_ONLY, HAS_XP, COUNT };
+    static PermutationDomain domain() {
+      return PermutationDomain({
+          PermutationBool("ALPHA_ONLY"),
+          PermutationInt("HAS_XP", 3),
+      });
+    }
+  };
   using FD = Dims;
   static_assert(FD::COUNT == 2, "Update info() when dimensions change.");
 

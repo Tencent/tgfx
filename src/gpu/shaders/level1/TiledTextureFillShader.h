@@ -44,7 +44,7 @@ class TiledTextureFillShader : public PrecompiledShader {
           PermutationInt("SHADER_MODE_Y", 9),
           PermutationBool("ALPHA_ONLY"),
           PermutationBool("HAS_STRICT"),
-          PermutationBool("HAS_XP"),
+          PermutationInt("HAS_XP", 3),
       });
     }
   };
