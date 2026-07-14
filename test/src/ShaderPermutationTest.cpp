@@ -616,6 +616,32 @@ TGFX_TEST(ShaderPermutationTest, DISABLED_BlendMergeHitsPrecompiledCache) {
   EXPECT_GT(cache->hitCount(), 0u);
 }
 
+TGFX_TEST(ShaderPermutationTest, BlendMergeClipHitsPrecompiledCache) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto bundlePath = ProjectPath::Absolute(BundlePath());
+  auto* cache = context->precompiledShaderCache();
+  ASSERT_TRUE(cache->loadBundle(bundlePath));
+  cache->resetStats();
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  // Draw with ColorFilter::Blend (produces XfermodeFragmentProcessor) + AA clip rect
+  // (produces AARectEffect as coverage FP). This is the BlendMerge + HAS_CLIP=1 scenario.
+  canvas->save();
+  canvas->clipRect(Rect::MakeLTRB(10.5f, 10.5f, 189.5f, 189.5f));
+  Paint paint;
+  paint.setColor(Color::Green());
+  paint.setColorFilter(ColorFilter::Blend(Color::Blue(), BlendMode::Multiply));
+  canvas->drawRect(Rect::MakeWH(200, 200), paint);
+  canvas->restore();
+  context->flushAndSubmit(true);
+  printf("  [BlendMergeClip] hit=%u miss=%u\n", cache->hitCount(), cache->missCount());
+  EXPECT_GT(cache->hitCount(), 0u);
+  cache->unload();
+}
+
 TGFX_TEST(ShaderPermutationTest, QuadTextureFillShaderRegistry) {
   auto& factories = ShaderRegistry::All();
   bool found = false;

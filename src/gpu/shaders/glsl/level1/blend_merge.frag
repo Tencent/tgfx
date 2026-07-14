@@ -35,7 +35,7 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Color;
   int BlendModeValue;
 #if CHILD0_MODE == 1
-  vec4 ChildConstColor;
+  vec4 ConstColor;
 #elif CHILD0_MODE == 2
   vec4 TiledSubset;
   vec4 TiledClamp;
@@ -43,7 +43,7 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   int TileModeY;
 #endif
 #if HAS_CLIP == 1
-  vec4 ClipRect;
+  vec4 Rect;
 #endif
 #include "xp_uniforms.inc"
 };
@@ -281,7 +281,7 @@ void main() {
   vec4 childColor = texture(TextureSampler_0, TransformedCoords_0);
 #elif CHILD0_MODE == 1
   // ConstColorProcessor: output is just the uniform color modulated by input alpha.
-  vec4 childColor = ChildConstColor * inputColor.a;
+  vec4 childColor = ConstColor * inputColor.a;
 #elif CHILD0_MODE == 2
   // TiledTextureEffect: apply per-axis tiling to coordinates before sampling.
   vec2 tiledCoord = TransformedCoords_0;
@@ -329,7 +329,7 @@ void main() {
 
 #if HAS_CLIP == 1
   // AARectEffect: compute coverage from fragment position relative to clip rect.
-  highp vec4 clipDists = clamp(vec4(1.0, 1.0, -1.0, -1.0) * vec4(gl_FragCoord.xyxy - ClipRect), 0.0, 1.0);
+  highp vec4 clipDists = clamp(vec4(1.0, 1.0, -1.0, -1.0) * vec4(gl_FragCoord.xyxy - Rect), 0.0, 1.0);
   highp vec2 clipDists2 = clipDists.xy + clipDists.zw - 1.0;
   highp float clipCoverage = clipDists2.x * clipDists2.y;
   blendResult *= clipCoverage;
