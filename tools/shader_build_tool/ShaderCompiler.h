@@ -35,8 +35,10 @@ struct CompileResult {
 };
 
 /// Compiles GLSL source (already with #defines prepended) to SPIR-V using shaderc.
+/// When optimize is true, applies performance-level optimization to reduce SPIR-V size.
 CompileResult CompileGLSL(const std::string& source, ShaderStageType stage,
-                          const std::string& shaderName, uint32_t variantIndex);
+                          const std::string& shaderName, uint32_t variantIndex,
+                          bool optimize = false);
 
 /// Translates SPIR-V binary to Metal Shading Language via spirv-cross.
 CompileResult TranslateToMSL(const std::vector<uint32_t>& spirv, ShaderStageType stage);

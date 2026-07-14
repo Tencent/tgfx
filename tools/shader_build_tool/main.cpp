@@ -268,10 +268,25 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
         std::vector<uint8_t> fragBlob;
 
         if (backend == "vulkan") {
-          auto* vp = reinterpret_cast<const uint8_t*>(vertSpirv->data());
-          vertBlob.assign(vp, vp + vertSpirv->size() * 4);
-          auto* fp = reinterpret_cast<const uint8_t*>(fragResult.spirv.data());
-          fragBlob.assign(fp, fp + fragResult.spirv.size() * 4);
+          // Re-compile with optimization for smaller SPIR-V output.
+          auto expandedVertOpt = PrependDefines(vertSource, vertDefines);
+          auto vertOpt =
+              CompileGLSL(expandedVertOpt, ShaderStageType::Vertex, info.name, vi, true);
+          auto expandedFragOpt = PrependDefines(fragSource, fragDefines);
+          auto fragOpt =
+              CompileGLSL(expandedFragOpt, ShaderStageType::Fragment, info.name, fi, true);
+          if (!vertOpt.success || !fragOpt.success) {
+            // Fallback to unoptimized if optimization fails.
+            auto* vp = reinterpret_cast<const uint8_t*>(vertSpirv->data());
+            vertBlob.assign(vp, vp + vertSpirv->size() * 4);
+            auto* fp = reinterpret_cast<const uint8_t*>(fragResult.spirv.data());
+            fragBlob.assign(fp, fp + fragResult.spirv.size() * 4);
+          } else {
+            auto* vp = reinterpret_cast<const uint8_t*>(vertOpt.spirv.data());
+            vertBlob.assign(vp, vp + vertOpt.spirv.size() * 4);
+            auto* fp = reinterpret_cast<const uint8_t*>(fragOpt.spirv.data());
+            fragBlob.assign(fp, fp + fragOpt.spirv.size() * 4);
+          }
         } else if (backend == "metal") {
           auto mslVert = TranslateToMSL(*vertSpirv, ShaderStageType::Vertex);
           auto mslFrag = TranslateToMSL(fragResult.spirv, ShaderStageType::Fragment);

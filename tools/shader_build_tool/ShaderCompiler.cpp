@@ -48,11 +48,12 @@ std::string PrependDefines(const std::string& source, const std::vector<std::str
 }
 
 CompileResult CompileGLSL(const std::string& source, ShaderStageType stage,
-                          const std::string& shaderName, uint32_t variantIndex) {
+                          const std::string& shaderName, uint32_t variantIndex, bool optimize) {
   CompileResult result;
   shaderc::Compiler compiler;
   shaderc::CompileOptions options;
-  options.SetOptimizationLevel(shaderc_optimization_level_zero);
+  options.SetOptimizationLevel(optimize ? shaderc_optimization_level_performance
+                                        : shaderc_optimization_level_zero);
   options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_0);
 
   auto shaderKind =
