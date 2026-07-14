@@ -156,7 +156,20 @@ MetalShaderModule::MetalShaderModule(MetalGPU* gpu, const ShaderModuleDescriptor
     : _stage(descriptor.stage),
       _glslCode(descriptor.stage == ShaderStage::Fragment ? descriptor.code : std::string{}) {
   if (descriptor.format == ShaderCodeFormat::MSL) {
-    // Precompiled MSL text path: skip GLSL -> SPIR-V -> MSL pipeline.
+    // Precompiled metallib binary path: load directly without runtime compilation.
+    if (!descriptor.binaryData.empty()) {
+      dispatch_data_t data =
+          dispatch_data_create(descriptor.binaryData.data(), descriptor.binaryData.size(),
+                               dispatch_get_global_queue(0, 0), DISPATCH_DATA_DESTRUCTOR_DEFAULT);
+      NSError* error = nil;
+      library = [gpu->device() newLibraryWithData:data error:&error];
+      dispatch_release(data);
+      if (!library && error) {
+        LOGE("MetalShaderModule: metallib load error: %s", error.localizedDescription.UTF8String);
+      }
+      return;
+    }
+    // Fallback: MSL text path (legacy bundles without metallib).
     NSString* mslSource = [NSString stringWithUTF8String:descriptor.code.c_str()];
     NSError* error = nil;
     library = [gpu->device() newLibraryWithSource:mslSource options:nil error:&error];

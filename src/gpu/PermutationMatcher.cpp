@@ -1452,6 +1452,18 @@ std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* progra
   if (auto result = TryMatchMeshFill(programInfo)) {
     return result;
   }
+  // Log unmatched pipeline for diagnostics.
+  std::string fpNames;
+  for (size_t i = 0; i < programInfo->numFragmentProcessors(); i++) {
+    if (i > 0) {
+      fpNames += " + ";
+    }
+    fpNames += programInfo->getFragmentProcessor(i)->name();
+  }
+  LOGE("PermutationMiss: GP=%s numFP=%zu(%zu color) FPs=[%s] XP=%s",
+       programInfo->getGeometryProcessor()->name().c_str(), programInfo->numFragmentProcessors(),
+       programInfo->numColorFragmentProcessors(), fpNames.c_str(),
+       programInfo->getXferProcessor()->name().c_str());
   return std::nullopt;
 }
 

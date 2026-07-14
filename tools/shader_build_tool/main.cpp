@@ -281,8 +281,14 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
             report.errorCount++;
             continue;
           }
-          vertBlob.assign(mslVert.msl.begin(), mslVert.msl.end());
-          fragBlob.assign(mslFrag.msl.begin(), mslFrag.msl.end());
+          vertBlob = CompileMSLToMetallib(mslVert.msl, ShaderStageType::Vertex);
+          fragBlob = CompileMSLToMetallib(mslFrag.msl, ShaderStageType::Fragment);
+          if (vertBlob.empty() || fragBlob.empty()) {
+            std::cerr << "  metallib compilation failed for " << info.name << " [vert=" << vi
+                      << " frag=" << fi << "]\n";
+            report.errorCount++;
+            continue;
+          }
         } else if (backend == "webgpu") {
           auto wgslVert = TranslateToWGSL(*vertSpirv);
           auto wgslFrag = TranslateToWGSL(fragResult.spirv);

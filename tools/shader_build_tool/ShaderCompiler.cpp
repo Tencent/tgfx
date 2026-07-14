@@ -17,6 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShaderCompiler.h"
+#include <cstdio>
+#include <cstdlib>
+#include <fstream>
 #include <shaderc/shaderc.hpp>
 #include <spirv_msl.hpp>
 #include <spirv_parser.hpp>
@@ -148,6 +151,64 @@ CompileResult TranslateToWGSL(const std::vector<uint32_t>& /*spirv*/) {
   result.success = false;
   result.error = "WGSL translation not yet implemented in build tool.";
   return result;
+}
+
+std::vector<uint8_t> CompileMSLToMetallib(const std::string& mslSource, ShaderStageType stage) {
+  // Use xcrun metal to compile MSL to AIR, then xcrun metallib to produce .metallib binary.
+  // Thread-safe via unique temp file names using the address of the source string.
+  auto addr = reinterpret_cast<uintptr_t>(&mslSource);
+  char tmpMsl[256];
+  char tmpAir[256];
+  char tmpLib[256];
+  snprintf(tmpMsl, sizeof(tmpMsl), "/tmp/tgfx_shader_%lx.metal", (unsigned long)addr);
+  snprintf(tmpAir, sizeof(tmpAir), "/tmp/tgfx_shader_%lx.air", (unsigned long)addr);
+  snprintf(tmpLib, sizeof(tmpLib), "/tmp/tgfx_shader_%lx.metallib", (unsigned long)addr);
+
+  // Write MSL source to temp file.
+  {
+    std::ofstream f(tmpMsl, std::ios::binary);
+    if (!f.is_open()) {
+      return {};
+    }
+    f.write(mslSource.data(), static_cast<std::streamsize>(mslSource.size()));
+  }
+
+  // Compile MSL to AIR.
+  char cmd[512];
+  const char* stageFlag = (stage == ShaderStageType::Vertex) ? "vertex" : "fragment";
+  snprintf(cmd, sizeof(cmd),
+           "xcrun -sdk macosx metal -std=macos-metal2.3 -O2 -c %s -o %s 2>/dev/null", tmpMsl,
+           tmpAir);
+  (void)stageFlag;
+  int ret = std::system(cmd);
+  std::remove(tmpMsl);
+  if (ret != 0) {
+    std::remove(tmpAir);
+    return {};
+  }
+
+  // Link AIR to metallib.
+  snprintf(cmd, sizeof(cmd), "xcrun -sdk macosx metallib %s -o %s 2>/dev/null", tmpAir, tmpLib);
+  ret = std::system(cmd);
+  std::remove(tmpAir);
+  if (ret != 0) {
+    std::remove(tmpLib);
+    return {};
+  }
+
+  // Read metallib binary.
+  std::ifstream libFile(tmpLib, std::ios::binary | std::ios::ate);
+  if (!libFile.is_open()) {
+    std::remove(tmpLib);
+    return {};
+  }
+  auto size = libFile.tellg();
+  libFile.seekg(0);
+  std::vector<uint8_t> data(static_cast<size_t>(size));
+  libFile.read(reinterpret_cast<char*>(data.data()), size);
+  libFile.close();
+  std::remove(tmpLib);
+  return data;
 }
 
 }  // namespace tgfx

@@ -78,7 +78,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
   ShaderModuleDescriptor vertexDesc = {};
   vertexDesc.format = format;
   vertexDesc.stage = ShaderStage::Vertex;
-  if (format == ShaderCodeFormat::SPIRV) {
+  if (format == ShaderCodeFormat::SPIRV || format == ShaderCodeFormat::MSL) {
     vertexDesc.binaryData = vertBlob->data;
   } else {
     vertexDesc.code = std::string(vertBlob->data.begin(), vertBlob->data.end());
@@ -87,7 +87,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
   ShaderModuleDescriptor fragmentDesc = {};
   fragmentDesc.format = format;
   fragmentDesc.stage = ShaderStage::Fragment;
-  if (format == ShaderCodeFormat::SPIRV) {
+  if (format == ShaderCodeFormat::SPIRV || format == ShaderCodeFormat::MSL) {
     fragmentDesc.binaryData = fragBlob->data;
   } else {
     fragmentDesc.code = std::string(fragBlob->data.begin(), fragBlob->data.end());

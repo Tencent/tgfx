@@ -44,6 +44,10 @@ CompileResult TranslateToMSL(const std::vector<uint32_t>& spirv, ShaderStageType
 /// Translates SPIR-V binary to WGSL via tint.
 CompileResult TranslateToWGSL(const std::vector<uint32_t>& spirv);
 
+/// Compiles MSL source text to Metal library binary (.metallib) using xcrun metal/metallib.
+/// Returns empty vector on failure.
+std::vector<uint8_t> CompileMSLToMetallib(const std::string& mslSource, ShaderStageType stage);
+
 /// Prepends #define directives to shader source from a list of "NAME=value" strings.
 std::string PrependDefines(const std::string& source, const std::vector<std::string>& defines);
 
