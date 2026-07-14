@@ -22,6 +22,7 @@
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "tgfx/core/PictureRecorder.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 
@@ -50,7 +51,8 @@ static float MaxBlurOutset() {
 }
 
 static TopLevelGeometry ComputeTopLevelGeometry(const Rect& drawRect, float maxOutset,
-                                                float minOutset, const Matrix& matrix) {
+                                                float minOutset, const Matrix& matrix,
+                                                int maxTextureSize) {
   TopLevelGeometry out;
   auto rect = drawRect;
   rect.outset(maxOutset, maxOutset);
@@ -60,6 +62,11 @@ static TopLevelGeometry ComputeTopLevelGeometry(const Rect& drawRect, float maxO
   auto maxBlurOutset = MaxBlurOutset();
   if (minOutset > maxBlurOutset) {
     out.surfaceScale = maxBlurOutset / minOutset;
+  }
+  // Further down-sample if the surface would exceed the GPU texture dimension limit.
+  auto scaledMaxDim = std::max(rect.width(), rect.height()) * out.surfaceScale;
+  if (scaledMaxDim > static_cast<float>(maxTextureSize)) {
+    out.surfaceScale *= static_cast<float>(maxTextureSize) / scaledMaxDim;
   }
   rect.scale(out.surfaceScale, out.surfaceScale);
   rect.roundOut();
@@ -172,7 +179,8 @@ std::shared_ptr<BackgroundSource> BackgroundSource::Make(Context* context, const
   if (context == nullptr) {
     return nullptr;
   }
-  auto geometry = ComputeTopLevelGeometry(drawRect, maxOutset, minOutset, matrix);
+  auto maxTextureSize = context->gpu()->limits()->maxTextureDimension2D;
+  auto geometry = ComputeTopLevelGeometry(drawRect, maxOutset, minOutset, matrix, maxTextureSize);
   if (!geometry.valid) {
     return nullptr;
   }

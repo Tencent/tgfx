@@ -25,10 +25,15 @@
 #include "layers/contents/LayerContent.h"
 #include "tgfx/core/SamplingOptions.h"
 #include "tgfx/layers/filters/TentBlurFilter.h"
+#include "tgfx/core/Surface.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 
 static constexpr float MaxFrostSigma = 50.0f;
+// Fallback when the GPU context is unavailable (e.g., picture-only canvas). 4096 is the minimum
+// maxTextureDimension2D across all supported platforms (older iOS devices).
+static constexpr int MAX_SAFE_TEXTURE_SIZE = 4096;
 
 std::shared_ptr<GlassStyle> GlassStyle::Make(float refraction, float depth, float frost,
                                              float dispersion, float splay, float lightAngle,
@@ -151,11 +156,30 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
   auto bgImage = input.extraSource->image();
   auto bgOffset = input.extraSource->imageOffset();
 
+  // Down-scale the background if it would exceed the GPU texture dimension limit. This prevents
+  // makeWithFilter (frost blur and refraction) from silently failing by creating an oversized
+  // RenderTarget. makeScaled on a picture-backed image rasterizes directly at the target
+  // resolution, so no full-size texture is ever allocated.
+  float bgScale = 1.0f;
+  auto maxDim = static_cast<float>(std::max(bgImage->width(), bgImage->height()));
+  auto surface = canvas->getSurface();
+  auto context = surface ? surface->getContext() : nullptr;
+  auto maxTextureSize =
+      context ? context->gpu()->limits()->maxTextureDimension2D : MAX_SAFE_TEXTURE_SIZE;
+  if (maxDim > static_cast<float>(maxTextureSize)) {
+    bgScale = static_cast<float>(maxTextureSize) / maxDim;
+    int scaledW = std::max(1, static_cast<int>(std::round(static_cast<float>(bgImage->width()) * bgScale)));
+    int scaledH = std::max(1, static_cast<int>(std::round(static_cast<float>(bgImage->height()) * bgScale)));
+    bgImage = bgImage->makeScaled(scaledW, scaledH, SamplingOptions(FilterMode::Linear));
+    bgOffset.x *= bgScale;
+    bgOffset.y *= bgScale;
+  }
+
   // Step 1: Frost - apply Gaussian blur to the background
   std::shared_ptr<Image> processedBg = bgImage;
   Point processedOffset = bgOffset;
   if (_frost > 0) {
-    auto blurFilter = getFrostFilter(input.contentScale);
+    auto blurFilter = getFrostFilter(input.contentScale * bgScale);
     if (blurFilter) {
       Point blurOffset = {};
       auto clipRect = Rect::MakeWH(bgImage->width(), bgImage->height());
@@ -166,13 +190,14 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
 
   // Step 2 & 3: Apply refraction with dispersion and lighting (computed entirely in GPU shader)
   if (_refraction > 0 || _lightIntensity > 0) {
-    int layerWidth = input.content->width();
-    int layerHeight = input.content->height();
+    int layerWidth = static_cast<int>(std::round(static_cast<float>(input.content->width()) * bgScale));
+    int layerHeight = static_cast<int>(std::round(static_cast<float>(input.content->height()) * bgScale));
 
     float halfW = static_cast<float>(layerWidth) * 0.5f;
     float halfH = static_cast<float>(layerHeight) * 0.5f;
     float minHalf = std::min(halfW, halfH);
-    float scaledRadius = _cornerRadius * input.contentScale;
+    float effectiveContentScale = input.contentScale * bgScale;
+    float scaledRadius = _cornerRadius * effectiveContentScale;
     float crRadius = std::min(scaledRadius, minHalf);
 
     // Auto-detect shape type from layerContent.
@@ -186,7 +211,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
           auto radii = rrect->radii();
           // Use the top-left corner radius as representative.
           float maxRadius = std::min(radii[0].x, radii[0].y);
-          crRadius = std::min(maxRadius * input.contentScale, minHalf);
+          crRadius = std::min(maxRadius * effectiveContentScale, minHalf);
         }
       } else if (contentType == LayerContent::Type::Rect) {
         effectiveShapeType = GlassShapeType::RoundedRect;
@@ -230,12 +255,14 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
     std::shared_ptr<Image> maskImage = nullptr;
     if (effectiveShapeType == GlassShapeType::AlphaMask) {
       float blurRadius = minHalf * (_depth / 100.0f) * 0.2f;
-      float udfScale = std::min(1.0f, MAX_UDF_SIZE / static_cast<float>(std::max(layerWidth, layerHeight)));
+      float udfScale =
+          std::min(1.0f, MAX_UDF_SIZE / static_cast<float>(std::max(layerWidth, layerHeight)));
       int udfWidth = std::max(1, static_cast<int>(static_cast<float>(layerWidth) * udfScale));
       int udfHeight = std::max(1, static_cast<int>(static_cast<float>(layerHeight) * udfScale));
       std::shared_ptr<Image> udfContent = input.content;
       if (udfScale < 1.0f) {
-        udfContent = input.content->makeScaled(udfWidth, udfHeight, SamplingOptions(FilterMode::Linear));
+        udfContent =
+            input.content->makeScaled(udfWidth, udfHeight, SamplingOptions(FilterMode::Linear));
       }
       float udfBlurRadius = blurRadius * udfScale;
       if (!maskBlurFilter || !FloatNearlyEqual(cachedMaskBlurSigma, udfBlurRadius)) {
@@ -251,7 +278,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
       }
     }
     auto filter = getRefractionFilter(
-        layerWidth, layerHeight, input.contentScale, effectiveShapeType, crRadius, halfW, halfH,
+        layerWidth, layerHeight, effectiveContentScale, effectiveShapeType, crRadius, halfW, halfH,
         minHalf, innerHalfW, innerHalfH, innerRadius, glassThickness, refractionFactor,
         channelOffset, splay, depthRatio, lightAngle, lightIntensity);
     // Inject the current frame's maskImage (or empty) into the cached effect via setExtraInputs.
@@ -272,12 +299,19 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
     }
   }
 
-  // Mask the processed background with the layer content shape
+  // Mask the processed background with the layer content shape.
+  // When bgScale < 1, the processed background is at a lower resolution than the content.
+  // Use drawImageRect to map it back to the original coordinate space so the mask (which uses
+  // input.content at original resolution) aligns correctly.
   auto maskShader = Shader::MakeImageShader(input.content, TileMode::Decal, TileMode::Decal);
   Paint paint = {};
   paint.setMaskFilter(MaskFilter::MakeShader(maskShader, false));
   paint.setBlendMode(BlendMode::Src);
-  canvas->drawImage(processedBg, processedOffset.x, processedOffset.y, &paint);
+  auto dstRect =
+      Rect::MakeXYWH(processedOffset.x / bgScale, processedOffset.y / bgScale,
+                     static_cast<float>(processedBg->width()) / bgScale,
+                     static_cast<float>(processedBg->height()) / bgScale);
+  canvas->drawImageRect(processedBg, dstRect, SamplingOptions(FilterMode::Linear), &paint);
 }
 
 std::shared_ptr<ImageFilter> GlassStyle::getFrostFilter(float contentScale) {
