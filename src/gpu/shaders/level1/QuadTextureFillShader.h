@@ -62,11 +62,12 @@ class QuadTextureFillShader : public PrecompiledShader {
   using VD = VertDims;
   static_assert(VD::COUNT == 5, "Update ShouldCompile when vertex dimensions change.");
 
-  // Fragment dimensions (includes vertex-driven HAS_COVERAGE and HAS_COLOR because the fragment
-  // shader must declare matching varyings and apply coverage/color logic accordingly)
-  TGFX_DEFINE_DIMS(HAS_YUV, ALPHA_ONLY, HAS_RGBAAA, HAS_SUBSET, HAS_COVERAGE, HAS_COLOR, HAS_XP);
+  // Fragment dimensions (includes vertex-driven HAS_COVERAGE, HAS_COLOR, and HAS_UV_PERSPECTIVE
+  // because the fragment shader must declare matching varyings)
+  TGFX_DEFINE_DIMS(HAS_YUV, ALPHA_ONLY, HAS_RGBAAA, HAS_SUBSET, HAS_COVERAGE, HAS_COLOR, HAS_XP,
+                   HAS_UV_PERSPECTIVE);
   using FD = Dims;
-  static_assert(FD::COUNT == 7, "Update ShouldCompile when fragment dimensions change.");
+  static_assert(FD::COUNT == 8, "Update ShouldCompile when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"QuadTextureFillShader",
@@ -91,11 +92,14 @@ class QuadTextureFillShader : public PrecompiledShader {
     if (fragValues[FD::ALPHA_ONLY] != 0 && fragValues[FD::HAS_RGBAAA] != 0) {
       return false;
     }
-    // HAS_COVERAGE and HAS_COLOR in frag must match vert (they are mirrored dimensions).
+    // HAS_COVERAGE, HAS_COLOR, HAS_UV_PERSPECTIVE in frag must match vert (mirrored dimensions).
     if (vertValues[VD::HAS_COVERAGE] != fragValues[FD::HAS_COVERAGE]) {
       return false;
     }
     if (vertValues[VD::HAS_COLOR] != fragValues[FD::HAS_COLOR]) {
+      return false;
+    }
+    if (vertValues[VD::HAS_UV_PERSPECTIVE] != fragValues[FD::HAS_UV_PERSPECTIVE]) {
       return false;
     }
     return true;

@@ -30,20 +30,68 @@ layout(std140, set = 0, binding = 0) uniform VertexUniformBlock {
 
 layout(location = 0) in vec2 aPosition;
 
+// Compute compact attribute locations: each optional attribute gets the next
+// available index after position (0). Order: coverage, uvCoord, color, subset.
 #if HAS_COVERAGE
-layout(location = 1) in float inCoverage;
+  #define LOC_COVERAGE 1
+  #define LOC_AFTER_COVERAGE 2
+#else
+  #define LOC_AFTER_COVERAGE 1
 #endif
 
 #if HAS_UV_COORD
-layout(location = 2) in vec2 uvCoord;
+  #if LOC_AFTER_COVERAGE == 1
+    #define LOC_UV_COORD 1
+    #define LOC_AFTER_UV_COORD 2
+  #else
+    #define LOC_UV_COORD 2
+    #define LOC_AFTER_UV_COORD 3
+  #endif
+#else
+  #define LOC_AFTER_UV_COORD LOC_AFTER_COVERAGE
 #endif
 
 #if HAS_COLOR
-layout(location = 3) in vec4 inColor;
+  #if LOC_AFTER_UV_COORD == 1
+    #define LOC_COLOR 1
+    #define LOC_AFTER_COLOR 2
+  #elif LOC_AFTER_UV_COORD == 2
+    #define LOC_COLOR 2
+    #define LOC_AFTER_COLOR 3
+  #else
+    #define LOC_COLOR 3
+    #define LOC_AFTER_COLOR 4
+  #endif
+#else
+  #define LOC_AFTER_COLOR LOC_AFTER_UV_COORD
 #endif
 
 #if HAS_SUBSET
-layout(location = 4) in vec4 texSubset;
+  #if LOC_AFTER_COLOR == 1
+    #define LOC_SUBSET 1
+  #elif LOC_AFTER_COLOR == 2
+    #define LOC_SUBSET 2
+  #elif LOC_AFTER_COLOR == 3
+    #define LOC_SUBSET 3
+  #else
+    #define LOC_SUBSET 4
+  #endif
+#endif
+
+#if HAS_COVERAGE
+layout(location = LOC_COVERAGE) in float inCoverage;
+#endif
+
+#if HAS_UV_COORD
+layout(location = LOC_UV_COORD) in vec2 uvCoord;
+#endif
+
+#if HAS_COLOR
+layout(location = LOC_COLOR) in vec4 inColor;
+#endif
+
+#if HAS_SUBSET
+layout(location = LOC_SUBSET) in vec4 texSubset;
 #endif
 
 #if HAS_UV_PERSPECTIVE
