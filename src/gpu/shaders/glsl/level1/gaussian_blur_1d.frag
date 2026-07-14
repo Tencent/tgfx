@@ -1,6 +1,10 @@
 // GaussianBlur1DShader fragment shader
-// Permutation dimensions (frag): MAX_SIGMA (0~9, maps to maxSigma 1~10), HAS_XP
-// Loop upper bound = 4 * (MAX_SIGMA + 1), covering the full Gaussian kernel radius.
+// Permutation dimensions (frag):
+//   MAX_SIGMA (0~9): maps to maxSigma 1~10. Loop upper bound = 4*(MAX_SIGMA+1).
+//   HAS_XP (0~2): 0=Empty, 1=PorterDuff DST_TEX, 2=PorterDuff FBF
+//   HAS_CHILD_SUBSET (bool): When 1, clamp each sample coordinate to the child texture's Subset
+//                            bounds before sampling. Used when TextureEffect.hasSubset()=true but
+//                            GP has no per-vertex subset attribute.
 #version 450
 
 #ifndef MAX_SIGMA
@@ -9,11 +13,17 @@
 #ifndef HAS_XP
 #define HAS_XP 0
 #endif
+#ifndef HAS_CHILD_SUBSET
+#define HAS_CHILD_SUBSET 0
+#endif
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Color;
   float Sigma;
   vec2 Step;
+#if HAS_CHILD_SUBSET
+  vec4 Subset;
+#endif
 #include "xp_uniforms.inc"
 };
 
@@ -41,6 +51,9 @@ void main() {
     total += weight;
 
     vec2 sampleCoord = TransformedCoords_0 + offset * float(i);
+#if HAS_CHILD_SUBSET
+    sampleCoord = clamp(sampleCoord, Subset.xy, Subset.zw);
+#endif
     vec4 texColor = texture(TextureSampler_0, sampleCoord);
     sum += texColor * weight;
 

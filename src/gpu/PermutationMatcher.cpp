@@ -945,13 +945,18 @@ static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
     return std::nullopt;
   }
   auto* childTE = static_cast<const TextureEffect*>(childFP);
-  if (childTE->numTextureSamplers() == 0 || childTE->hasSubset()) {
+  if (childTE->numTextureSamplers() == 0) {
     return std::nullopt;
   }
   int sigma = blur->getMaxSigma();
   if (sigma < 1 || sigma > 10) {
     return std::nullopt;
   }
+  // Determine if the child TextureEffect requires subset clamping. When hasSubset()=true, we use
+  // the Subset uniform in the blur loop to clamp each sample coordinate to the valid texel range,
+  // preventing edge bleeding artifacts.
+  bool childHasSubset = childTE->hasSubset();
+
   using VD = GaussianBlur1DShader::VD;
   auto vertDomain = VD::domain();
   std::vector<int> vertValues(VD::COUNT);
@@ -963,6 +968,7 @@ static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
   std::vector<int> fragValues(FD::COUNT);
   fragValues[FD::MAX_SIGMA] = sigma - 1;
   fragValues[FD::HAS_XP] = xpType;
+  fragValues[FD::HAS_CHILD_SUBSET] = childHasSubset ? 1 : 0;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"GaussianBlur1DShader", vertIndex, fragIndex};
 }
