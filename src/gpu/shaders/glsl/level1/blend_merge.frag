@@ -27,6 +27,9 @@
 #ifndef CHILD0_MODE
 #define CHILD0_MODE 0
 #endif
+#ifndef HAS_CLIP
+#define HAS_CLIP 0
+#endif
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Color;
@@ -38,6 +41,9 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 TiledClamp;
   int TileModeX;
   int TileModeY;
+#endif
+#if HAS_CLIP == 1
+  vec4 ClipRect;
 #endif
 #include "xp_uniforms.inc"
 };
@@ -319,6 +325,16 @@ void main() {
   dstColor = texture(TextureSampler_1, TransformedCoords_0);
 #endif
 
-#define TGFX_XP_SRC_COLOR blendColors(srcColor, dstColor)
+  vec4 blendResult = blendColors(srcColor, dstColor);
+
+#if HAS_CLIP == 1
+  // AARectEffect: compute coverage from fragment position relative to clip rect.
+  highp vec4 clipDists = clamp(vec4(1.0, 1.0, -1.0, -1.0) * vec4(gl_FragCoord.xyxy - ClipRect), 0.0, 1.0);
+  highp vec2 clipDists2 = clipDists.xy + clipDists.zw - 1.0;
+  highp float clipCoverage = clipDists2.x * clipDists2.y;
+  blendResult *= clipCoverage;
+#endif
+
+#define TGFX_XP_SRC_COLOR blendResult
 #include "xp_output.inc"
 }
