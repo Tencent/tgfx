@@ -53,8 +53,7 @@ class HairlineLineShader : public PrecompiledShader {
   }
 
  private:
-  static bool ShouldCompile(uint32_t, uint32_t,
-                            const std::vector<int>& vertValues,
+  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>& vertValues,
                             const std::vector<int>& fragValues) {
     return vertValues[0] == fragValues[0];
   }

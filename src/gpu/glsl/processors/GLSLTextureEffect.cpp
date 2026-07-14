@@ -200,7 +200,7 @@ void GLSLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
 void GLSLTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
                                   UniformData* fragmentUniformData) const {
   auto textureView = getTextureView();
-  if (textureView == nullptr) {
+  if (textureView == nullptr || fragmentUniformData == nullptr) {
     return;
   }
   if (alphaStart != Point::Zero()) {
@@ -240,7 +240,7 @@ void GLSLTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
   // Subset uniform even when needSubset() is false (GP has subset attribute but TE determined
   // subset clamping is unnecessary). In that case we use the full texture bounds so the clamp is
   // a no-op.
-  if (needSubset() || fragmentUniformData->hasField("Subset")) {
+  if (needSubset() || (fragmentUniformData != nullptr && fragmentUniformData->hasField("Subset"))) {
     auto subsetRect = subset.value_or(Rect::MakeWH(textureProxy->width(), textureProxy->height()));
     if (needSubset()) {
       if (samplerState.magFilterMode == samplerState.minFilterMode &&

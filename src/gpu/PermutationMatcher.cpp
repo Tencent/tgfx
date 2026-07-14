@@ -643,7 +643,7 @@ static std::optional<PermutationMatchResult> TryMatchTextureClip(const ProgramIn
   fragValues[D::ALPHA_ONLY] = te->isAlphaOnly() ? 1 : 0;
   fragValues[D::HAS_RGBAAA] = te->hasRGBAAA() ? 1 : 0;
   fragValues[D::HAS_SUBSET] = te->hasSubset() ? 1 : 0;
-    fragValues[D::HAS_XP] = xpType;
+  fragValues[D::HAS_XP] = xpType;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"TextureClipShader", 0, fragIndex};
 }
