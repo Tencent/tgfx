@@ -106,8 +106,8 @@ class Painter {
    * skips geometries whose ApplyMatrix result is null (degenerate innerMatrix). outerMatrix is
    * applied as CTM around the emit, and the shader wrapped via wrapShaderWithFit lives in the
    * same inner-group space as the bounds. Subclasses may further modify the shape and must
-   * populate paint.shader; style and stroke may be set when applicable. Return nullptr to skip
-   * emission.
+   * populate paint.shader; style, stroke, strokeAlign and pathEffect may be set when applicable.
+   * Return nullptr to skip emission.
    */
   virtual std::shared_ptr<Shape> prepareShape(std::shared_ptr<Shape> innerShape, size_t index,
                                               LayerPaint* paint) = 0;
@@ -118,8 +118,9 @@ class Painter {
    * from run.textBlob (e.g. getTightBounds()) are in run-local space and the shader returned by
    * wrapShaderWithFit must use the same space. A run emits at most one drawable kind — when
    * neither `textBlob` nor `shape` is set, populated paints are skipped; otherwise either the
-   * TextBlob or the stroke-expanded Shape is emitted, possibly with multiple paints (e.g. a base
-   * paint plus a fill-color overlay). Return with empty paints to skip emission explicitly.
+   * TextBlob or the Shape is emitted, possibly with multiple paints (e.g. a base paint plus a
+   * fill-color overlay). Stroke alignment and path effects are carried on each paint and applied
+   * by ShapeContent at draw time. Return with empty paints to skip emission explicitly.
    */
   struct GlyphRunEmit {
     std::shared_ptr<TextBlob> textBlob = nullptr;
