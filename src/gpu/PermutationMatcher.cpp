@@ -1013,13 +1013,15 @@ static std::optional<PermutationMatchResult> TryMatchBlendMerge(const ProgramInf
   }
 
   // Determine child[0] mode:
-  //   0 = TextureEffect (standard texture sampling)
+  //   0 = TextureEffect (standard texture sampling, no subset, no YUV)
   //   1 = ConstColorProcessor (uniform color, no texture)
+  //   2 = TiledTextureEffect (tiling via runtime uniforms TileModeX/TileModeY)
   int child0Mode = 0;
 
   // Validate each child processor. We support:
   //   - TextureEffect (plain, no subset, no YUV): standard texture sampling
   //   - ConstColorProcessor: uniform color output, only supported as child[0]
+  //   - TiledTextureEffect: tiled sampling with runtime mode selection, only as child[0]
   for (size_t i = 0; i < xfp->numChildProcessors(); i++) {
     auto child = xfp->childProcessor(i);
     if (child == nullptr) {
@@ -1032,6 +1034,15 @@ static std::optional<PermutationMatchResult> TryMatchBlendMerge(const ProgramInf
         return std::nullopt;
       }
       child0Mode = 1;
+      continue;
+    }
+    if (child->name() == "TiledTextureEffect") {
+      // TiledTextureEffect is only supported as child[0]. The tiling mode is handled at runtime
+      // via TileModeX/TileModeY uniforms to avoid 9*9 permutation explosion.
+      if (i != 0) {
+        return std::nullopt;
+      }
+      child0Mode = 2;
       continue;
     }
     if (child->name() != "TextureEffect") {
