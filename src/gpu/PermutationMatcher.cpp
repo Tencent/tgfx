@@ -1027,7 +1027,6 @@ static std::optional<PermutationMatchResult> TryMatchBlendMerge(const ProgramInf
   using FD = BlendMergeShader::FD;
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
-  fragValues[FD::BLEND_MODE] = blendMode;
   fragValues[FD::CHILD_TYPE] = childType;
   fragValues[FD::HAS_XP] = xpType;
   auto fragIndex = fragDomain.encode(fragValues);

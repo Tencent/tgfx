@@ -48,17 +48,16 @@ class BlendMergeShader : public PrecompiledShader {
   using VD = VertDims;
 
   struct FragDims {
-    enum : uint32_t { BLEND_MODE, CHILD_TYPE, HAS_XP, COUNT };
+    enum : uint32_t { CHILD_TYPE, HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationInt("BLEND_MODE", 30),
           PermutationInt("CHILD_TYPE", 3),
           PermutationInt("HAS_XP", 3),
       });
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 3, "Update ShouldCompile when fragment dimensions change.");
+  static_assert(FD::COUNT == 2, "Update ShouldCompile when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"BlendMergeShader",
@@ -73,24 +72,8 @@ class BlendMergeShader : public PrecompiledShader {
   }
 
  private:
-  static bool ShouldCompile(uint32_t /*vertIndex*/, uint32_t /*fragIndex*/,
-                            const std::vector<int>& /*vertValues*/,
-                            const std::vector<int>& fragValues) {
-    int blendMode = fragValues[FD::BLEND_MODE];
-    int childType = fragValues[FD::CHILD_TYPE];
-
-    // Clear (0) with any child type degenerates to transparent output — handled at runtime.
-    if (blendMode == 0) {
-      return false;
-    }
-    // Src (1) + DstChild (0): output = inputColor directly — no shader needed.
-    if (blendMode == 1 && childType == 0) {
-      return false;
-    }
-    // Dst (2) + SrcChild (1): output = inputColor directly — no shader needed.
-    if (blendMode == 2 && childType == 1) {
-      return false;
-    }
+  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>&,
+                            const std::vector<int>&) {
     return true;
   }
 };
