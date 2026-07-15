@@ -55,6 +55,16 @@ class TextureEffect : public FragmentProcessor {
     return needSubset();
   }
 
+  /**
+   * Computes the normalized subset rectangle used to clamp texture sample coordinates. The result
+   * is written to rect as {left, top, right, bottom}, matching the layout of the "Subset" uniform.
+   * The computation applies nearest-filter rounding, a half-texel inset (a full texel for external
+   * textures), bottom-left origin flipping, and normalization into texture coordinate space. It
+   * lets a parent processor populate a subset uniform declared by a precompiled shader on behalf of
+   * this child texture effect. Only meaningful when hasSubset() is true.
+   */
+  void computeSubsetRect(float rect[4]) const;
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 

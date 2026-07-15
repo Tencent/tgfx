@@ -241,37 +241,8 @@ void GLSLTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
   // subset clamping is unnecessary). In that case we use the full texture bounds so the clamp is
   // a no-op.
   if (needSubset() || (fragmentUniformData != nullptr && fragmentUniformData->hasField("Subset"))) {
-    auto subsetRect = subset.value_or(Rect::MakeWH(textureProxy->width(), textureProxy->height()));
-    if (needSubset()) {
-      if (samplerState.magFilterMode == samplerState.minFilterMode &&
-          samplerState.magFilterMode == FilterMode::Nearest) {
-        subsetRect.roundOut();
-      }
-      auto type = textureView->getTexture()->type();
-      // https://cs.android.com/android/platform/superproject/+/master:frameworks/native/libs/nativedisplay/surfacetexture/SurfaceTexture.cpp;l=275;drc=master;bpv=0;bpt=1
-      // https://stackoverflow.com/questions/6023400/opengl-es-texture-coordinates-slightly-off
-      // Normally this would just need to take 1/2 a texel off each end, but because the chroma
-      // channels of YUV420 images are subsampled we may need to shrink the crop region by a whole
-      // texel on each side.
-      auto inset = type == TextureType::External ? 1.0f : 0.5f;
-      subsetRect = subsetRect.makeInset(inset, inset);
-    }
-    float rect[4] = {subsetRect.left, subsetRect.top, subsetRect.right, subsetRect.bottom};
-    if (textureView->origin() == ImageOrigin::BottomLeft) {
-      auto h = static_cast<float>(textureView->height());
-      rect[1] = h - rect[1];
-      rect[3] = h - rect[3];
-      std::swap(rect[1], rect[3]);
-    }
-    auto type = textureView->getTexture()->type();
-    if (type != TextureType::Rectangle) {
-      auto lt = textureView->getTextureCoord(rect[0], rect[1]);
-      auto rb = textureView->getTextureCoord(rect[2], rect[3]);
-      rect[0] = lt.x;
-      rect[1] = lt.y;
-      rect[2] = rb.x;
-      rect[3] = rb.y;
-    }
+    float rect[4];
+    computeSubsetRect(rect);
     fragmentUniformData->setData("Subset", rect);
   }
 }

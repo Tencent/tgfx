@@ -17,8 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "XfermodeFragmentProcessor.h"
+#include <algorithm>
 #include "gpu/UniformData.h"
 #include "gpu/processors/ConstColorProcessor.h"
+#include "gpu/processors/TextureEffect.h"
 
 namespace tgfx {
 PlacementPtr<FragmentProcessor> XfermodeFragmentProcessor::MakeFromSrcProcessor(
@@ -72,6 +74,28 @@ void XfermodeFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
   if (fragmentUniformData->hasField("HasClip")) {
     int hasClip = 0;
     fragmentUniformData->setData("HasClip", hasClip);
+  }
+  // Populate the per-child subset uniforms declared by the precompiled BlendMergeShader. Each plain
+  // TextureEffect child that requires subset clamping writes its normalized subset rect into a
+  // dedicated uniform (Child0Subset for child[0], Child1Subset for child[1]). Distinct names are
+  // required because the precompiled path strips uniform name suffixes: if we relied on the
+  // children's own "Subset" emission, the two texture children would collide on a single field and
+  // the last writer would overwrite the first. On the ProgramBuilder path these fields do not
+  // exist, so hasField() returns false and the writes are skipped.
+  static const char* const subsetFieldNames[] = {"Child0Subset", "Child1Subset"};
+  size_t childCount = std::min<size_t>(numChildProcessors(), 2);
+  for (size_t i = 0; i < childCount; i++) {
+    auto childFP = childProcessor(i);
+    if (childFP == nullptr || childFP->name() != "TextureEffect") {
+      continue;
+    }
+    if (!fragmentUniformData->hasField(subsetFieldNames[i])) {
+      continue;
+    }
+    auto childTE = static_cast<const TextureEffect*>(childFP);
+    float rect[4];
+    childTE->computeSubsetRect(rect);
+    fragmentUniformData->setData(subsetFieldNames[i], rect);
   }
 }
 

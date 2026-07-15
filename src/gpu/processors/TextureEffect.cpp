@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureEffect.h"
+#include <algorithm>
 #include "core/utils/Log.h"
 #include "gpu/ProxyProvider.h"
 
@@ -120,6 +121,42 @@ bool TextureEffect::needSubset() const {
     return true;
   }
   return false;
+}
+
+void TextureEffect::computeSubsetRect(float rect[4]) const {
+  auto textureView = getTextureView();
+  auto subsetRect = subset.value_or(Rect::MakeWH(textureProxy->width(), textureProxy->height()));
+  if (needSubset()) {
+    if (samplerState.magFilterMode == samplerState.minFilterMode &&
+        samplerState.magFilterMode == FilterMode::Nearest) {
+      subsetRect.roundOut();
+    }
+    auto type = textureView->getTexture()->type();
+    // Normally this would just need to take 1/2 a texel off each end, but because the chroma
+    // channels of YUV420 images are subsampled we may need to shrink the crop region by a whole
+    // texel on each side for external textures.
+    auto inset = type == TextureType::External ? 1.0f : 0.5f;
+    subsetRect = subsetRect.makeInset(inset, inset);
+  }
+  rect[0] = subsetRect.left;
+  rect[1] = subsetRect.top;
+  rect[2] = subsetRect.right;
+  rect[3] = subsetRect.bottom;
+  if (textureView->origin() == ImageOrigin::BottomLeft) {
+    auto h = static_cast<float>(textureView->height());
+    rect[1] = h - rect[1];
+    rect[3] = h - rect[3];
+    std::swap(rect[1], rect[3]);
+  }
+  auto type = textureView->getTexture()->type();
+  if (type != TextureType::Rectangle) {
+    auto lt = textureView->getTextureCoord(rect[0], rect[1]);
+    auto rb = textureView->getTextureCoord(rect[2], rect[3]);
+    rect[0] = lt.x;
+    rect[1] = lt.y;
+    rect[2] = rb.x;
+    rect[3] = rb.y;
+  }
 }
 
 }  // namespace tgfx
