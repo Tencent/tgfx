@@ -260,31 +260,33 @@ void GLSLUnrolledBinaryGradientColorizer::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("%s = vec4(t * scale + bias);", args.outputColor.c_str());
 }
 
-void SetUniformData(UniformData* uniformData, const std::string& name, int intervalCount, int limit,
-                    const Color& value) {
-  if (intervalCount > limit) {
+static void SetColorUniform(UniformData* uniformData, const std::string& name, const Color& value) {
+  if (uniformData->hasField(name)) {
     uniformData->setData(name, value);
   }
 }
 
 void GLSLUnrolledBinaryGradientColorizer::onSetData(UniformData* /*vertexUniformData*/,
                                                     UniformData* fragmentUniformData) const {
-  SetUniformData(fragmentUniformData, "scale0_1", intervalCount, 0, scale0_1);
-  SetUniformData(fragmentUniformData, "scale2_3", intervalCount, 1, scale2_3);
-  SetUniformData(fragmentUniformData, "scale4_5", intervalCount, 2, scale4_5);
-  SetUniformData(fragmentUniformData, "scale6_7", intervalCount, 3, scale6_7);
-  SetUniformData(fragmentUniformData, "scale8_9", intervalCount, 4, scale8_9);
-  SetUniformData(fragmentUniformData, "scale10_11", intervalCount, 5, scale10_11);
-  SetUniformData(fragmentUniformData, "scale12_13", intervalCount, 6, scale12_13);
-  SetUniformData(fragmentUniformData, "scale14_15", intervalCount, 7, scale14_15);
-  SetUniformData(fragmentUniformData, "bias0_1", intervalCount, 0, bias0_1);
-  SetUniformData(fragmentUniformData, "bias2_3", intervalCount, 1, bias2_3);
-  SetUniformData(fragmentUniformData, "bias4_5", intervalCount, 2, bias4_5);
-  SetUniformData(fragmentUniformData, "bias6_7", intervalCount, 3, bias6_7);
-  SetUniformData(fragmentUniformData, "bias8_9", intervalCount, 4, bias8_9);
-  SetUniformData(fragmentUniformData, "bias10_11", intervalCount, 5, bias10_11);
-  SetUniformData(fragmentUniformData, "bias12_13", intervalCount, 6, bias12_13);
-  SetUniformData(fragmentUniformData, "bias14_15", intervalCount, 7, bias14_15);
+  if (fragmentUniformData->hasField("IntervalCount")) {
+    fragmentUniformData->setData("IntervalCount", intervalCount);
+  }
+  SetColorUniform(fragmentUniformData, "scale0_1", scale0_1);
+  SetColorUniform(fragmentUniformData, "scale2_3", scale2_3);
+  SetColorUniform(fragmentUniformData, "scale4_5", scale4_5);
+  SetColorUniform(fragmentUniformData, "scale6_7", scale6_7);
+  SetColorUniform(fragmentUniformData, "scale8_9", scale8_9);
+  SetColorUniform(fragmentUniformData, "scale10_11", scale10_11);
+  SetColorUniform(fragmentUniformData, "scale12_13", scale12_13);
+  SetColorUniform(fragmentUniformData, "scale14_15", scale14_15);
+  SetColorUniform(fragmentUniformData, "bias0_1", bias0_1);
+  SetColorUniform(fragmentUniformData, "bias2_3", bias2_3);
+  SetColorUniform(fragmentUniformData, "bias4_5", bias4_5);
+  SetColorUniform(fragmentUniformData, "bias6_7", bias6_7);
+  SetColorUniform(fragmentUniformData, "bias8_9", bias8_9);
+  SetColorUniform(fragmentUniformData, "bias10_11", bias10_11);
+  SetColorUniform(fragmentUniformData, "bias12_13", bias12_13);
+  SetColorUniform(fragmentUniformData, "bias14_15", bias14_15);
   fragmentUniformData->setData("thresholds1_7", thresholds1_7);
   fragmentUniformData->setData("thresholds9_13", thresholds9_13);
 }

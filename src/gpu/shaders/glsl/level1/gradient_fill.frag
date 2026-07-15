@@ -2,22 +2,16 @@
 // Processor layout: DefaultGeometryProcessor() + ClampedGradientEffect() + EmptyXferProcessor/PorterDuffXP
 // Permutation dimensions (injected by build tool as #define):
 //   LAYOUT_TYPE: 0=LINEAR, 1=RADIAL, 2=CONIC, 3=DIAMOND
-//   INTERVAL_COUNT: 0..7 (maps to actual interval count 1..8)
-//   HAS_XP: 0=passthrough, 1=PorterDuff XP (dst texture blend)
+//   HAS_XP: 0=passthrough, 1=PorterDuff XP (dst texture blend), 2=PorterDuff FBF
+// INTERVAL_COUNT is a runtime uniform (1~8), no longer a compile-time dimension.
 #version 450
 
 #ifndef LAYOUT_TYPE
 #define LAYOUT_TYPE 0
 #endif
-#ifndef INTERVAL_COUNT
-#define INTERVAL_COUNT 0
-#endif
 #ifndef HAS_XP
 #define HAS_XP 0
 #endif
-
-// Actual interval count is the dimension value + 1 (dimension range [0,7] -> intervals [1,8])
-#define INTERVALS (INTERVAL_COUNT + 1)
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Color;
@@ -27,54 +21,25 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   float Bias;
   float Scale;
 #endif
-  // Colorizer uniforms: thresholds always present
+  int IntervalCount;
   vec4 thresholds1_7;
   vec4 thresholds9_13;
-  // Scale/bias pairs: only those needed for the interval count
   vec4 scale0_1;
-#if INTERVALS > 1
   vec4 scale2_3;
-#endif
-#if INTERVALS > 2
   vec4 scale4_5;
-#endif
-#if INTERVALS > 3
   vec4 scale6_7;
-#endif
-#if INTERVALS > 4
   vec4 scale8_9;
-#endif
-#if INTERVALS > 5
   vec4 scale10_11;
-#endif
-#if INTERVALS > 6
   vec4 scale12_13;
-#endif
-#if INTERVALS > 7
   vec4 scale14_15;
-#endif
   vec4 bias0_1;
-#if INTERVALS > 1
   vec4 bias2_3;
-#endif
-#if INTERVALS > 2
   vec4 bias4_5;
-#endif
-#if INTERVALS > 3
   vec4 bias6_7;
-#endif
-#if INTERVALS > 4
   vec4 bias8_9;
-#endif
-#if INTERVALS > 5
   vec4 bias10_11;
-#endif
-#if INTERVALS > 6
   vec4 bias12_13;
-#endif
-#if INTERVALS > 7
   vec4 bias14_15;
-#endif
 #include "xp_uniforms.inc"
 };
 
@@ -105,86 +70,104 @@ float computeLayoutT(vec2 coord) {
 }
 
 // Unrolled binary gradient colorizer: maps t in [0,1] to a color using piecewise linear segments.
+// IntervalCount is a runtime uniform so all interval counts share the same shader variant.
+// The binary search tree structure mirrors the compile-time version exactly.
 vec4 colorize(float t) {
   vec4 scale, bias;
 
-#if INTERVALS >= 4
-  // Split at thresholds1_7.w (midpoint between intervals 0-7 and 8-15)
-  if (t < thresholds1_7.w) {
-#endif
-
-#if INTERVALS >= 2
-  // Split at thresholds1_7.y (midpoint between intervals 0-3 and 4-7)
-  if (t < thresholds1_7.y) {
-#endif
-  // Split at thresholds1_7.x (midpoint between intervals 0-1 and 2-3)
-  if (t < thresholds1_7.x) {
+  if (IntervalCount >= 4) {
+    // thresholds1_7.w splits intervals (0..7) from (8..15)
+    if (t < thresholds1_7.w) {
+      // thresholds1_7.y splits intervals (0..3) from (4..7)
+      if (t < thresholds1_7.y) {
+        // thresholds1_7.x splits intervals (0,1) from (2,3)
+        if (t < thresholds1_7.x) {
+          scale = scale0_1;
+          bias = bias0_1;
+        } else {
+          scale = scale2_3;
+          bias = bias2_3;
+        }
+      } else {
+        // thresholds1_7.z splits intervals (4,5) from (6,7)
+        if (t < thresholds1_7.z) {
+          scale = scale4_5;
+          bias = bias4_5;
+        } else {
+          scale = scale6_7;
+          bias = bias6_7;
+        }
+      }
+    } else {
+      if (IntervalCount >= 6) {
+        // thresholds9_13.y splits intervals (8..11) from (12..15)
+        if (t < thresholds9_13.y) {
+          // thresholds9_13.x splits intervals (8,9) from (10,11)
+          if (t < thresholds9_13.x) {
+            scale = scale8_9;
+            bias = bias8_9;
+          } else {
+            scale = scale10_11;
+            bias = bias10_11;
+          }
+        } else {
+          if (IntervalCount >= 7) {
+            // thresholds9_13.z splits intervals (12,13) from (14,15)
+            if (t < thresholds9_13.z) {
+              scale = scale12_13;
+              bias = bias12_13;
+            } else {
+              scale = scale14_15;
+              bias = bias14_15;
+            }
+          } else {
+            scale = scale12_13;
+            bias = bias12_13;
+          }
+        }
+      } else {
+        // IntervalCount is 4 or 5
+        // thresholds9_13.x splits intervals (8,9) from (10,11)
+        if (t < thresholds9_13.x) {
+          scale = scale8_9;
+          bias = bias8_9;
+        } else {
+          scale = scale10_11;
+          bias = bias10_11;
+        }
+      }
+    }
+  } else if (IntervalCount >= 2) {
+    // thresholds1_7.y splits intervals (0..3) from (4..7)
+    if (t < thresholds1_7.y) {
+      // thresholds1_7.x splits intervals (0,1) from (2,3)
+      if (t < thresholds1_7.x) {
+        scale = scale0_1;
+        bias = bias0_1;
+      } else {
+        scale = scale2_3;
+        bias = bias2_3;
+      }
+    } else {
+      if (IntervalCount >= 3) {
+        // thresholds1_7.z splits intervals (4,5) from (6,7)
+        if (t < thresholds1_7.z) {
+          scale = scale4_5;
+          bias = bias4_5;
+        } else {
+          scale = scale6_7;
+          bias = bias6_7;
+        }
+      } else {
+        scale = scale4_5;
+        bias = bias4_5;
+      }
+    }
+  } else {
+    // IntervalCount == 1: single interval covers full range
     scale = scale0_1;
     bias = bias0_1;
-#if INTERVALS > 1
-  } else {
-    scale = scale2_3;
-    bias = bias2_3;
-#endif
   }
-#if INTERVALS > 2
-  } else {
-  // Split at thresholds1_7.z (midpoint between intervals 4-5 and 6-7)
-  if (t < thresholds1_7.z) {
-    scale = scale4_5;
-    bias = bias4_5;
-#if INTERVALS > 3
-  } else {
-    scale = scale6_7;
-    bias = bias6_7;
-#endif
-  }
-#endif
-
-#if INTERVALS >= 2
-  }
-#endif
-
-#if INTERVALS > 4
-  } else {
-#endif
-
-#if INTERVALS >= 6
-  // Split at thresholds9_13.y (midpoint between intervals 8-11 and 12-15)
-  if (t < thresholds9_13.y) {
-#endif
-#if INTERVALS >= 5
-  // Split at thresholds9_13.x (midpoint between intervals 8-9 and 10-11)
-  if (t < thresholds9_13.x) {
-    scale = scale8_9;
-    bias = bias8_9;
-#if INTERVALS > 5
-  } else {
-    scale = scale10_11;
-    bias = bias10_11;
-#endif
-  }
-#endif
-#if INTERVALS > 6
-  } else {
-  // Split at thresholds9_13.z (midpoint between intervals 12-13 and 14-15)
-  if (t < thresholds9_13.z) {
-    scale = scale12_13;
-    bias = bias12_13;
-#if INTERVALS > 7
-  } else {
-    scale = scale14_15;
-    bias = bias14_15;
-#endif
-  }
-#endif
-#if INTERVALS >= 6
-  }
-#endif
-
-#if INTERVALS >= 4
-  }
-#endif
 
   return vec4(t * scale + bias);
 }

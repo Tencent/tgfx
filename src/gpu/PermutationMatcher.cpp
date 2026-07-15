@@ -411,7 +411,6 @@ static std::optional<PermutationMatchResult> TryMatchGradientFill(const ProgramI
   std::vector<int> fragValues(FD::COUNT);
   fragValues[FD::HAS_XP] = xpType;
   fragValues[FD::LAYOUT_TYPE] = layoutType;
-  fragValues[FD::INTERVAL_COUNT] = intervalCount - 1;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"GradientFillShader", vertIndex, fragIndex};
 }
