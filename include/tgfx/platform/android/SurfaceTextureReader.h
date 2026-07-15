@@ -40,12 +40,13 @@ class SurfaceTextureReader : public ImageReader {
   static std::shared_ptr<SurfaceTextureReader> Make(int width, int height, jobject listener);
 
   /**
-   * Creates a new Java Surface object connected to the underlying SurfaceTexture. Each call returns
-   * a fresh Surface as a JNI local reference. The caller owns the returned reference and is
-   * responsible for calling Surface.release() when done, following the standard Android Surface
-   * ownership convention.
+   * Creates a new Java Surface object connected to the underlying SurfaceTexture. Returns a JNI
+   * local reference allocated in the caller's JNIEnv frame; the caller owns it and is responsible
+   * for calling Surface.release() and DeleteLocalRef when done, following the standard Android
+   * Surface ownership convention. The caller must pass its own JNIEnv* so that the returned local
+   * reference lives in the caller's local frame.
    */
-  jobject createInputSurface() const;
+  jobject createInputSurface(JNIEnv* env) const;
 
   /**
    * Notifies that the previously returned ImageBuffer is now available for texture generation.

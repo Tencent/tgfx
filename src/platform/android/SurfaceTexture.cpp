@@ -184,9 +184,10 @@ SurfaceTexture::~SurfaceTexture() {
   env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_release);
 }
 
-jobject SurfaceTexture::createInputSurface() const {
-  JNIEnvironment environment;
-  auto env = environment.current();
+jobject SurfaceTexture::createInputSurface(JNIEnv* env) const {
+  // Use the caller's JNIEnv directly. Do NOT wrap this in a local JNIEnvironment: its destructor
+  // calls PopLocalFrame(nullptr), which would release the local ref returned by NewObject before
+  // the caller can use it, leaving the caller with a dangling handle.
   if (env == nullptr) {
     return nullptr;
   }
