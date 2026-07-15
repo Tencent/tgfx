@@ -35,9 +35,10 @@ class SingleIntervalGradientShader : public PrecompiledShader {
   using VD = VertDims;
 
   struct FragDims {
-    enum : uint32_t { LAYOUT_TYPE, HAS_XP, COUNT };
+    enum : uint32_t { GP_TYPE, LAYOUT_TYPE, HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
+          PermutationInt("GP_TYPE", 2),
           PermutationEnum("LAYOUT_TYPE", {"LINEAR", "RADIAL", "CONIC", "DIAMOND"}),
           PermutationInt("HAS_XP", 3),
       });
@@ -58,10 +59,9 @@ class SingleIntervalGradientShader : public PrecompiledShader {
   }
 
  private:
-  static bool ShouldCompile(uint32_t /*vertIndex*/, uint32_t /*fragIndex*/,
-                            const std::vector<int>& /*vertValues*/,
-                            const std::vector<int>& /*fragValues*/) {
-    return true;
+  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>& vertValues,
+                            const std::vector<int>& fragValues) {
+    return vertValues[VD::GP_TYPE] == fragValues[FD::GP_TYPE];
   }
 };
 

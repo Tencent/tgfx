@@ -464,6 +464,7 @@ static std::optional<PermutationMatchResult> TryMatchSingleIntervalGradient(
   using FD = SingleIntervalGradientShader::FD;
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
+  fragValues[FD::GP_TYPE] = gpType;
   fragValues[FD::LAYOUT_TYPE] = layoutType;
   fragValues[FD::HAS_XP] = xpType;
   auto fragIndex = fragDomain.encode(fragValues);
@@ -705,6 +706,7 @@ static std::optional<PermutationMatchResult> TryMatchAlphaThreshold(
   using FD = AlphaThresholdShader::FD;
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
+  fragValues[FD::GP_TYPE] = gpType;
   fragValues[FD::HAS_XP] = xpType;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"AlphaThresholdShader", vertIndex, fragIndex};
@@ -735,6 +737,7 @@ static std::optional<PermutationMatchResult> TryMatchLuma(const ProgramInfo* pro
   using FD = LumaShader::FD;
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
+  fragValues[FD::GP_TYPE] = gpType;
   fragValues[FD::HAS_XP] = xpType;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"LumaShader", vertIndex, fragIndex};

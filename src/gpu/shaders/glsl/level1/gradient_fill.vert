@@ -16,10 +16,19 @@ layout(std140, set = 0, binding = 0) uniform VertexUniformBlock {
 };
 
 layout(location = 0) in vec2 aPosition;
+#if GP_TYPE == 1
+layout(location = 1) in float inCoverage;
+#endif
 
 layout(location = 0) out vec2 TransformedCoords_0;
+#if GP_TYPE == 1
+layout(location = 1) out float vCoverage;
+#endif
 
 void main() {
+#if GP_TYPE == 1
+  vCoverage = inCoverage;
+#endif
 #if GP_TYPE == 0
   highp vec2 position = (Matrix * vec3(aPosition, 1.0)).xy;
 #else

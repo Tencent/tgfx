@@ -39,9 +39,10 @@ class AlphaThresholdShader : public PrecompiledShader {
   };
 
   struct FragDims {
-    enum : uint32_t { HAS_XP, COUNT };
+    enum : uint32_t { GP_TYPE, HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
+          PermutationInt("GP_TYPE", 2),
           PermutationInt("HAS_XP", 3),
       });
     }
@@ -57,7 +58,13 @@ class AlphaThresholdShader : public PrecompiledShader {
             PermutationDomain({}),
             "",
             "",
-            nullptr};
+            ShouldCompile};
+  }
+
+ private:
+  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>& vertValues,
+                            const std::vector<int>& fragValues) {
+    return vertValues[Dims::GP_TYPE] == fragValues[FD::GP_TYPE];
   }
 };
 
