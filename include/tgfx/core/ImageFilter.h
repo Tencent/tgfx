@@ -64,6 +64,16 @@ class ImageFilter {
                                            TileMode tileMode = TileMode::Decal);
 
   /**
+   * Create a filter that blurs its input using a tent (triangle) kernel by the separate X and Y
+   * radii. The provided tile mode is used when the blur kernel goes outside the input image.
+   * @param radiusX  The tent blur radius along the X axis, in pixels.
+   * @param radiusY  The tent blur radius along the Y axis, in pixels.
+   * @param tileMode The tile mode applied at edges.
+   */
+  static std::shared_ptr<ImageFilter> TentBlur(float radiusX, float radiusY,
+                                               TileMode tileMode = TileMode::Decal);
+
+  /**
    * Create a filter that draws a drop shadow under the input content. This filter produces an image
    * that includes the inputs' content.
    * @param dx            The X offset of the shadow.
@@ -141,7 +151,7 @@ class ImageFilter {
   Rect filterBounds(const Rect& rect, MapDirection mapDirection = MapDirection::Forward) const;
 
  protected:
-  enum class Type { Blur, DropShadow, InnerShadow, Color, Compose, Runtime, Blend };
+  enum class Type { Blur, TentBlur, DropShadow, InnerShadow, Color, Compose, Runtime, Blend };
 
   /**
    * Returns the type of this image filter.
