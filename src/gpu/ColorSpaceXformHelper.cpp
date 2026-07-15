@@ -18,6 +18,21 @@
 #include "ColorSpaceXformHelper.h"
 namespace tgfx {
 
+static int TFTypeToIndex(gfx::skcms_TFType type) {
+  switch (type) {
+    case gfx::skcms_TFType_sRGBish:
+      return 0;
+    case gfx::skcms_TFType_PQish:
+      return 1;
+    case gfx::skcms_TFType_HLGish:
+      return 2;
+    case gfx::skcms_TFType_HLGinvish:
+      return 3;
+    default:
+      return 0;
+  }
+}
+
 void ColorSpaceXformHelper::emitCode(UniformHandler* uniformHandler,
                                      const ColorSpaceXformSteps* colorSpaceXform,
                                      ShaderStage shaderStage) {
@@ -63,6 +78,12 @@ void ColorSpaceXformHelper::setData(UniformData* uniformData,
                          colorSpaceXform->srcTransferFunction.f, 0.0f};
       uniformData->setData("SrcTF0", srcTF0);
       uniformData->setData("SrcTF1", srcTF1);
+      if (uniformData->hasField("SrcTFType")) {
+        int srcType = TFTypeToIndex(gfx::skcms_TransferFunction_getType(
+            reinterpret_cast<const gfx::skcms_TransferFunction*>(
+                &colorSpaceXform->srcTransferFunction)));
+        uniformData->setData("SrcTFType", srcType);
+      }
     }
     if (this->applySrcOOTF()) {
       uniformData->setData("SrcOOTF", colorSpaceXform->srcOOTF);
@@ -83,6 +104,12 @@ void ColorSpaceXformHelper::setData(UniformData* uniformData,
                          colorSpaceXform->dstTransferFunctionInverse.f, 0.0f};
       uniformData->setData("DstTF0", dstTF0);
       uniformData->setData("DstTF1", dstTF1);
+      if (uniformData->hasField("DstTFType")) {
+        int dstType = TFTypeToIndex(gfx::skcms_TransferFunction_getType(
+            reinterpret_cast<const gfx::skcms_TransferFunction*>(
+                &colorSpaceXform->dstTransferFunctionInverse)));
+        uniformData->setData("DstTFType", dstType);
+      }
     }
   }
 }

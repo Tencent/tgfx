@@ -1,11 +1,17 @@
-// ColorSpaceXformShader fragment shader
+// TexturedColorSpaceXformShader fragment shader
+// Used in EffectDecomposer 2-pass pipeline: samples intermediate texture + color space xform.
+// Processor layout: ComposeFragmentProcessor(TextureEffect, ColorSpaceXformEffect)
 // Permutation dimensions (frag):
+//   HAS_SUBSET (bool): whether TextureEffect needs subset clamping
 //   UNPREMUL, LINEARIZE, SRC_OOTF, GAMUT_TRANSFORM, DST_OOTF, ENCODE, PREMUL (bool)
 // Runtime uniforms:
 //   SrcTFType (int): 0=sRGBish, 1=PQish, 2=HLGish, 3=HLGinvish
 //   DstTFType (int): 0=sRGBish, 1=PQish, 2=HLGish, 3=HLGinvish
 #version 450
 
+#ifndef HAS_SUBSET
+#define HAS_SUBSET 0
+#endif
 #ifndef UNPREMUL
 #define UNPREMUL 0
 #endif
@@ -33,6 +39,9 @@
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Color;
+#if HAS_SUBSET
+  vec4 Subset;
+#endif
 #if LINEARIZE
   vec4 SrcTF0;
   vec4 SrcTF1;
@@ -55,7 +64,11 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #include "xp_uniforms.inc"
 };
 
-#define XP_DST_TEX_BINDING 0
+layout(location = 0) in vec2 TransformedCoords_0;
+
+layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
+
+#define XP_DST_TEX_BINDING 1
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
 
@@ -108,8 +121,20 @@ float dst_tf(float x) {
 #endif
 
 void main() {
-  vec4 color = Color;
+  vec4 outputColor = Color;
+  highp vec2 texCoord = TransformedCoords_0;
+  highp vec2 finalCoord = texCoord;
 
+#if HAS_SUBSET
+  finalCoord = clamp(finalCoord, Subset.xy, Subset.zw);
+#endif
+
+  vec4 color = texture(TextureSampler_0, finalCoord);
+
+  // TextureEffect post-processing: intermediate is never alpha-only or RGBAAA
+  color = color * outputColor.a;
+
+  // ColorSpaceXformEffect: transform the sampled color
 #if UNPREMUL
   float alpha = color.a;
   color = (alpha > 0.0) ? vec4(color.rgb / alpha, alpha) : vec4(0.0);

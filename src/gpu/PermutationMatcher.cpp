@@ -789,6 +789,7 @@ static std::optional<PermutationMatchResult> TryMatchColorSpaceXform(
   fragValues[FD::DST_OOTF] = xform->flags.dstOOTF ? 1 : 0;
   fragValues[FD::ENCODE] = xform->flags.encode ? 1 : 0;
   fragValues[FD::PREMUL] = xform->flags.premul ? 1 : 0;
+  fragValues[FD::HAS_XP] = xpType;
 
   if (xform->flags.linearize) {
     int srcIdx = TFTypeToIndex(gfx::skcms_TransferFunction_getType(
@@ -796,16 +797,13 @@ static std::optional<PermutationMatchResult> TryMatchColorSpaceXform(
     if (srcIdx < 0) {
       return std::nullopt;
     }
-    fragValues[FD::SRC_TF_TYPE] = srcIdx;
   }
   if (xform->flags.encode) {
-    fragValues[FD::HAS_XP] = xpType;
     int dstIdx = TFTypeToIndex(gfx::skcms_TransferFunction_getType(
         reinterpret_cast<const gfx::skcms_TransferFunction*>(&xform->dstTransferFunctionInverse)));
     if (dstIdx < 0) {
       return std::nullopt;
     }
-    fragValues[FD::DST_TF_TYPE] = dstIdx;
   }
 
   auto fragIndex = fragDomain.encode(fragValues);
@@ -860,13 +858,13 @@ static std::optional<PermutationMatchResult> TryMatchComposedTexture(
     fragValues[FD::DST_OOTF] = xform->flags.dstOOTF ? 1 : 0;
     fragValues[FD::ENCODE] = xform->flags.encode ? 1 : 0;
     fragValues[FD::PREMUL] = xform->flags.premul ? 1 : 0;
+    fragValues[FD::HAS_XP] = xpType;
     if (xform->flags.linearize) {
       int srcIdx = TFTypeToIndex(gfx::skcms_TransferFunction_getType(
           reinterpret_cast<const gfx::skcms_TransferFunction*>(&xform->srcTransferFunction)));
       if (srcIdx < 0) {
         return std::nullopt;
       }
-      fragValues[FD::SRC_TF_TYPE] = srcIdx;
     }
     if (xform->flags.encode) {
       int dstIdx = TFTypeToIndex(
@@ -875,7 +873,6 @@ static std::optional<PermutationMatchResult> TryMatchComposedTexture(
       if (dstIdx < 0) {
         return std::nullopt;
       }
-      fragValues[FD::DST_TF_TYPE] = dstIdx;
     }
     auto fragIndex = fragDomain.encode(fragValues);
     return PermutationMatchResult{"TexturedColorSpaceXformShader", 0, fragIndex};
