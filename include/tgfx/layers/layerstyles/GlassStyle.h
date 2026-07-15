@@ -170,7 +170,8 @@ class GlassStyle : public LayerStyle {
       int layerWidth, int layerHeight, float contentScale, GlassShapeType shapeType,
       float cornerRadius, float halfWidth, float halfHeight, float minHalf, float innerHalfWidth,
       float innerHalfHeight, float innerRadius, float glassThickness, float refractionFactor,
-      float dispersion, float splay, float depthRatio, float lightAngle, float lightIntensity);
+      float dispersion, float splay, float depthRatio, float lightAngle, float lightIntensity,
+      float origMinHalf, float udfPixelToLayerPixel);
 
   float _refraction = 50.0f;
   float _depth = 15.0f;
@@ -194,7 +195,8 @@ class GlassStyle : public LayerStyle {
   float cachedContentScale = 0.0f;
   GlassShapeType cachedShapeType = GlassShapeType::RoundedRect;
   float cachedCornerRadius = 0.0f;
-  float cachedMaskBlurSigma = 0.0f;
+  float cachedMaskBlurRadiusX = 0.0f;
+  float cachedMaskBlurRadiusY = 0.0f;
 };
 
 }  // namespace tgfx

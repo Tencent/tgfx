@@ -29,7 +29,9 @@
 
 namespace tgfx {
 
-#define MAX_TENT_RADIUS 10.f
+// Align with Figma's MAX_TAPS (64) to avoid downsampling at large radii, which introduces
+// non-uniform X/Y step rounding and worsens the separable-kernel anisotropy.
+#define MAX_TENT_RADIUS 64.f
 
 std::shared_ptr<ImageFilter> ImageFilter::TentBlur(float radiusX, float radiusY,
                                                    TileMode tileMode) {
