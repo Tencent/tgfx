@@ -47,5 +47,9 @@ void GLSLAARectEffect::onSetData(UniformData* /*vertexUniformData*/,
   // to interpolate from 0 at a half pixel inset and 1 at a half pixel outset of rect.
   auto outRect = rect.makeOutset(0.5f, 0.5f);
   fragmentUniformData->setData("Rect", outRect);
+  if (fragmentUniformData->hasField("HasClip")) {
+    int hasClip = 1;
+    fragmentUniformData->setData("HasClip", hasClip);
+  }
 }
 }  // namespace tgfx

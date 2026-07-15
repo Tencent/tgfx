@@ -989,7 +989,6 @@ static std::optional<PermutationMatchResult> TryMatchBlendMerge(const ProgramInf
   if (numFP < 1 || numFP > 2) {
     return std::nullopt;
   }
-  bool hasClip = false;
   if (numFP == 2) {
     if (programInfo->numColorFragmentProcessors() != 1) {
       return std::nullopt;
@@ -998,7 +997,6 @@ static std::optional<PermutationMatchResult> TryMatchBlendMerge(const ProgramInf
     if (coverageFP->name() != "AARectEffect") {
       return std::nullopt;
     }
-    hasClip = true;
   }
   int xpType = GetXPType(programInfo);
   if (xpType < 0) {
@@ -1076,7 +1074,6 @@ static std::optional<PermutationMatchResult> TryMatchBlendMerge(const ProgramInf
   fragValues[FD::CHILD_TYPE] = childType;
   fragValues[FD::HAS_XP] = xpType;
   fragValues[FD::CHILD0_MODE] = child0Mode;
-  fragValues[FD::HAS_CLIP] = hasClip ? 1 : 0;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"BlendMergeShader", vertIndex, fragIndex};
 }

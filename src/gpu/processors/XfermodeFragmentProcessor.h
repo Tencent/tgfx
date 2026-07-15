@@ -62,6 +62,8 @@ class XfermodeFragmentProcessor : public FragmentProcessor {
     return static_cast<int>(child);
   }
 
+  void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 

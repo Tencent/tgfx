@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "XfermodeFragmentProcessor.h"
+#include "gpu/UniformData.h"
 #include "gpu/processors/ConstColorProcessor.h"
 
 namespace tgfx {
@@ -56,6 +57,21 @@ XfermodeFragmentProcessor::XfermodeFragmentProcessor(PlacementPtr<FragmentProces
   } else {
     child = Child::DstChild;
     registerChildProcessor(std::move(dst));
+  }
+}
+
+void XfermodeFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
+                                          UniformData* fragmentUniformData) const {
+  if (fragmentUniformData == nullptr) {
+    return;
+  }
+  if (fragmentUniformData->hasField("BlendModeValue")) {
+    int modeInt = static_cast<int>(mode);
+    fragmentUniformData->setData("BlendModeValue", modeInt);
+  }
+  if (fragmentUniformData->hasField("HasClip")) {
+    int hasClip = 0;
+    fragmentUniformData->setData("HasClip", hasClip);
   }
 }
 
