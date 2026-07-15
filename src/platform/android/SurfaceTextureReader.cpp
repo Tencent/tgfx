@@ -40,8 +40,8 @@ SurfaceTextureReader::SurfaceTextureReader(std::shared_ptr<ImageStream> stream)
     : ImageReader(std::move(stream)) {
 }
 
-jobject SurfaceTextureReader::getInputSurface() const {
-  return std::static_pointer_cast<SurfaceTexture>(stream)->getInputSurface();
+jobject SurfaceTextureReader::createInputSurface() const {
+  return std::static_pointer_cast<SurfaceTexture>(stream)->createInputSurface();
 }
 
 void SurfaceTextureReader::notifyFrameAvailable() {
