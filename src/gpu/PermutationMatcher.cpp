@@ -974,14 +974,10 @@ static std::optional<PermutationMatchResult> TryMatchBlendMerge(const ProgramInf
   if (gpType < 0) {
     return std::nullopt;
   }
-  // QuadGP with per-vertex UV coordinates uses uvCoord (not aPosition) for coord transforms.
-  // The precompiled BlendMerge vertex shader only handles the simple case (no uvCoord).
-  if (gpType == 1) {
-    auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
-    if (!quadGP->hasUVMatrix()) {
-      return std::nullopt;
-    }
-  }
+  // When gpType==1 (QuadPerEdgeAAGP), the coord transform source depends on hasUVMatrix():
+  //   hasUVMatrix()=true  -> uvCoord attribute is empty, uses aPosition as coord source
+  //   hasUVMatrix()=false -> uvCoord attribute exists, uses uvCoord as coord source
+  // The precompiled vert supports both cases via the HAS_UV_COORD dimension.
   auto numFP = programInfo->numFragmentProcessors();
   if (numFP < 1 || numFP > 2) {
     return std::nullopt;
@@ -1018,13 +1014,17 @@ static std::optional<PermutationMatchResult> TryMatchBlendMerge(const ProgramInf
   }
 
   // Determine child[0] mode:
-  //   0 = TextureEffect (standard texture sampling, no subset, no YUV)
+  //   0 = TextureEffect (standard texture sampling, no YUV)
   //   1 = ConstColorProcessor (uniform color, no texture)
   //   2 = TiledTextureEffect (tiling via runtime uniforms TileModeX/TileModeY)
   int child0Mode = 0;
+  // Bitmask of which plain TextureEffect children require subset clamping. bit0=child[0],
+  // bit1=child[1]. Each set bit selects a dedicated Child{N}Subset uniform in the frag shader,
+  // populated by XfermodeFragmentProcessor::onSetData.
+  int subsetMask = 0;
 
   // Validate each child processor. We support:
-  //   - TextureEffect (plain, no subset, no YUV): standard texture sampling
+  //   - TextureEffect (plain, no YUV; subset is supported via the Child{N}Subset uniforms)
   //   - ConstColorProcessor: uniform color output, only supported as child[0]
   //   - TiledTextureEffect: tiled sampling with runtime mode selection, only as child[0]
   for (size_t i = 0; i < xfp->numChildProcessors(); i++) {
@@ -1054,23 +1054,46 @@ static std::optional<PermutationMatchResult> TryMatchBlendMerge(const ProgramInf
       return std::nullopt;
     }
     auto* childTE = static_cast<const TextureEffect*>(child);
-    if (childTE->numTextureSamplers() == 0 || childTE->hasSubset() || childTE->isYUV()) {
+    // YUV children need the multi-plane sampling path, which the precompiled blend shader does not
+    // implement, so we still fall back for those.
+    if (childTE->numTextureSamplers() == 0 || childTE->isYUV()) {
       return std::nullopt;
     }
+    // A subset-bearing child clamps its sample coordinate to the Child{N}Subset uniform. Only two
+    // children exist (i is 0 or 1), matching the two subset bits.
+    if (childTE->hasSubset()) {
+      subsetMask |= (1 << i);
+    }
+  }
+
+  int hasCoverage = 0;
+  int hasColor = 0;
+  int hasUVCoord = 0;
+  if (gpType == 1) {
+    auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
+    hasCoverage = quadGP->getAAType() == AAType::Coverage ? 1 : 0;
+    hasColor = !quadGP->hasCommonColor() ? 1 : 0;
+    hasUVCoord = !quadGP->hasUVMatrix() ? 1 : 0;
   }
 
   using VD = BlendMergeShader::VD;
   auto vertDomain = VD::domain();
-  std::vector<int> vertValues(VD::COUNT);
+  std::vector<int> vertValues(VD::COUNT, 0);
   vertValues[VD::GP_TYPE] = gpType;
+  vertValues[VD::HAS_COVERAGE] = hasCoverage;
+  vertValues[VD::HAS_UV_COORD] = hasUVCoord;
+  vertValues[VD::HAS_COLOR] = hasColor;
   auto vertIndex = vertDomain.encode(vertValues);
 
   using FD = BlendMergeShader::FD;
   auto fragDomain = FD::domain();
-  std::vector<int> fragValues(FD::COUNT);
+  std::vector<int> fragValues(FD::COUNT, 0);
   fragValues[FD::CHILD_TYPE] = childType;
   fragValues[FD::HAS_XP] = xpType;
   fragValues[FD::CHILD0_MODE] = child0Mode;
+  fragValues[FD::HAS_CHILD_SUBSET] = subsetMask;
+  fragValues[FD::HAS_COVERAGE] = hasCoverage;
+  fragValues[FD::HAS_COLOR] = hasColor;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"BlendMergeShader", vertIndex, fragIndex};
 }
@@ -1354,7 +1377,7 @@ static std::optional<PermutationMatchResult> TryMatchMeshFill(const ProgramInfo*
   return PermutationMatchResult{"MeshFillShader", vertIndex, fragIndex};
 }
 
-std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* programInfo) {
+static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramInfo* programInfo) {
   // Precompiled shaders assume RGBA output. Non-RGBA render targets (e.g. ALPHA_8) require an
   // output swizzle that the precompiled shader does not include. Fall back to ProgramBuilder.
   if (programInfo->getOutputSwizzle() != Swizzle::RGBA()) {
@@ -1457,6 +1480,14 @@ std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* progra
        programInfo->numColorFragmentProcessors(), fpNames.c_str(),
        programInfo->getXferProcessor()->name().c_str());
   return std::nullopt;
+}
+
+std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* programInfo) {
+  auto result = MatchPermutationImpl(programInfo);
+  if (result) {
+    LOGE("PermutationHit: %s", result->shaderName.c_str());
+  }
+  return result;
 }
 
 }  // namespace tgfx
