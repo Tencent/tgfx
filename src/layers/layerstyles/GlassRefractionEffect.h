@@ -35,7 +35,8 @@ class GlassRefractionEffect : public RuntimeEffect {
                         float cornerRadius, float minHalf, float innerHalfWidth,
                         float innerHalfHeight, float innerRadius, float glassThickness,
                         float refractionFactor, float dispersion, float splay, float depthRatio,
-                        float lightAngle, float lightIntensity, GlassShapeType shapeType);
+                        float lightAngle, float lightIntensity, GlassShapeType shapeType,
+                        float origMinHalf, float udfPixelToLayerPixel);
 
  protected:
   bool onDraw(CommandEncoder* encoder, const std::vector<std::shared_ptr<Texture>>& inputTextures,
@@ -62,6 +63,8 @@ class GlassRefractionEffect : public RuntimeEffect {
   float _depthRatio = 0.0f;
   float _lightAngle = 0.0f;
   float _lightIntensity = 0.0f;
+  float _origMinHalf = 0.0f;
+  float _udfPixelToLayerPixel = 1.0f;
   GlassShapeType _shapeType = GlassShapeType::RoundedRect;
   // onDraw is a virtual const method in RuntimeEffect and cannot be made non-const.
   // Sampler creation is lazy initialization that does not affect the filter's logical state.

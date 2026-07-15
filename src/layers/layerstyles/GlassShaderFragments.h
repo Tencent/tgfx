@@ -31,6 +31,7 @@ static constexpr char GLASS_SHADER_HEADER[] = R"(
         vec4 uParams2;  // innerHalfW, innerHalfH, innerRadius, glassThickness
         vec4 uParams3;  // refractionFactor, dispersion, 1/sourceWidth, 1/sourceHeight
         vec4 uParams4;  // splay, depthRatio, lightAngleRad, lightIntensity
+        vec4 uParams5;  // origMinHalf, udfPixelToLayerPixel, 0, 0
     };
     out vec4 tgfx_FragColor;
 )";
@@ -175,6 +176,8 @@ static constexpr char GLASS_SHADER_MAIN[] = R"(
         float depthRatio = uParams4.y;
         float lightAngleRad = uParams4.z;
         float lightIntensity = uParams4.w;
+        float origMinHalf = uParams5.x;
+        float udfPixelToLayerPixel = uParams5.y;
 
         // Convert source UV to glass pixel coordinates centered at origin.
         vec2 glassUV = (vTexCoord - uParams0.xy) * uParams0.zw;
@@ -198,7 +201,7 @@ static constexpr char GLASS_SHADER_MAIN[] = R"(
 #ifdef GLASS_USE_AXIS_MIX
             // Edge lighting: narrow band at the outermost edge, width = 1% of minHalf.
             float edgeDist = -outerSDF;
-            edgeWeight = 1.0 - smoothstep(0.0, minHalf * 0.01, edgeDist);
+            edgeWeight = 1.0 - smoothstep(0.0, origMinHalf * 0.01, edgeDist);
 
             // Analytical SDF: use edge band between outer and inner.
             if (innerSDF >= 0.0) {
@@ -238,7 +241,9 @@ static constexpr char GLASS_SHADER_MAIN[] = R"(
             float height = sampleHeight(px, py);
 
             // Forward difference gradient (2 extra samples, reuses height).
-            float step = minHalf / 20.0 + 1.0;
+            // Fixed step in UDF pixel space, converted to layer pixel space.
+            float step = (origMinHalf / 20.0 + 1.0) * udfPixelToLayerPixel;
+            step = clamp(step, 1.0, 3.0 * udfPixelToLayerPixel);
             float mr = sampleHeight(px + step, py);
             float tc = sampleHeight(px, py + step);
             vec2 grad = vec2(mr - height, tc - height) / step;
@@ -267,10 +272,10 @@ static constexpr char GLASS_SHADER_MAIN[] = R"(
                 uvOffset = vec2(sn.x * invSourceW, -sn.y * invSourceH);
             }
 
-            // Bevel SDF from the height map. The UDF transition band width scales linearly with
-            // blur sigma ∝ depthRatio. Compensate by scaling the threshold range inversely with
-            // depthRatio to keep the edge light bandwidth constant.
-            float theta = 0.15 * (0.5 / max(depthRatio, 0.01));
+            // Bevel SDF from the height map. The UDF transition band width is passed as
+            // depthRatio (= udfBlurRadius / udfWidth). theta is a fraction of the transition band
+            // so edge light bandwidth scales proportionally with the actual UDF transition.
+            float theta = depthRatio * 0.3;
             theta = clamp(theta, 0.001, 0.15);
             edgeWeight = 1.0 - smoothstep(0.5, 0.5 + theta, height);
 #endif
@@ -290,6 +295,10 @@ static constexpr char GLASS_SHADER_MAIN[] = R"(
         float a = texture(uSource, uvG).a;
 
         vec3 finalColor = vec3(r, g, b);
+
+        // Debug: visualize refraction direction (glassNormal).
+        float debugHeight = sampleHeight(px, py);
+        finalColor = vec3(debugHeight, debugHeight, debugHeight);
 
         // Edge lighting: diffuse highlight on the light-facing side, rim light on the opposite side.
         if (lightIntensity > 0.0 && edgeWeight > 0.0) {

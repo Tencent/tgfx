@@ -52,13 +52,15 @@ GlassRefractionEffect::GlassRefractionEffect(float glassWidth, float glassHeight
                                              float innerRadius, float glassThickness,
                                              float refractionFactor, float dispersion, float splay,
                                              float depthRatio, float lightAngle,
-                                             float lightIntensity, GlassShapeType shapeType)
+                                             float lightIntensity, GlassShapeType shapeType,
+                                             float origMinHalf, float udfPixelToLayerPixel)
     : RuntimeEffect({}), _glassWidth(glassWidth), _glassHeight(glassHeight), _halfWidth(halfWidth),
       _halfHeight(halfHeight), _cornerRadius(cornerRadius), _minHalf(minHalf),
       _innerHalfWidth(innerHalfWidth), _innerHalfHeight(innerHalfHeight), _innerRadius(innerRadius),
       _glassThickness(glassThickness), _refractionFactor(refractionFactor), _dispersion(dispersion),
       _splay(splay), _depthRatio(depthRatio), _lightAngle(lightAngle),
-      _lightIntensity(lightIntensity), _shapeType(shapeType) {
+      _lightIntensity(lightIntensity), _origMinHalf(origMinHalf),
+      _udfPixelToLayerPixel(udfPixelToLayerPixel), _shapeType(shapeType) {
 }
 
 std::string GlassRefractionEffect::BuildFragmentShader(GlassShapeType shapeType, bool isDesktop) {
@@ -209,8 +211,8 @@ bool GlassRefractionEffect::onDraw(CommandEncoder* encoder,
   // Convert light angle from degrees to radians.
   float lightAngleRad = _lightAngle * 3.14159265358979323846f / 180.0f;
 
-  // std140 layout: 5 vec4s = 20 floats (80 bytes)
-  size_t uniformSize = 20 * sizeof(float);
+  // std140 layout: 6 vec4s = 24 floats (96 bytes)
+  size_t uniformSize = 24 * sizeof(float);
   auto uniformBuffer = gpu->createBuffer(uniformSize, GPUBufferUsage::UNIFORM);
   if (uniformBuffer == nullptr) {
     return false;
@@ -244,6 +246,11 @@ bool GlassRefractionEffect::onDraw(CommandEncoder* encoder,
   uniformData[17] = _depthRatio;
   uniformData[18] = lightAngleRad;
   uniformData[19] = _lightIntensity;
+  // uParams5: origMinHalf, udfPixelToLayerPixel, 0, 0
+  uniformData[20] = _origMinHalf;
+  uniformData[21] = _udfPixelToLayerPixel;
+  uniformData[22] = 0.0f;
+  uniformData[23] = 0.0f;
   uniformBuffer->unmap();
   renderPass->setUniformBuffer(0, uniformBuffer, 0, uniformSize);
 
