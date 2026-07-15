@@ -58,10 +58,10 @@ class SurfaceTexture : public ImageStream {
   }
 
   /**
-   * Returns the Surface object used as the input to the SurfaceTexture. The release() method of
-   * the returned Surface will be called when the SurfaceTexture is released.
+   * Creates a new Java Surface object connected to this SurfaceTexture. Each call returns a fresh
+   * Surface as a JNI local reference; the caller owns it and must call Surface.release() when done.
    */
-  jobject getInputSurface() const;
+  jobject createInputSurface() const;
 
   /**
    * Notifies the previously returned ImageBuffer is available for generating textures. The method
@@ -79,7 +79,6 @@ class SurfaceTexture : public ImageStream {
   int _width = 0;
   int _height = 0;
   std::condition_variable condition = {};
-  Global<jobject> surface;
   Global<jobject> surfaceTexture;
   bool frameAvailable = false;
 

@@ -38,7 +38,6 @@ static jmethodID SurfaceTexture_getTransformMatrix;
 static jmethodID SurfaceTexture_release;
 static Global<jclass> SurfaceClass;
 static jmethodID Surface_Constructor;
-static jmethodID Surface_release;
 static Global<jclass> HandlerClass;
 static jmethodID Handler_Constructor;
 static Global<jclass> EventHandlerClass;
@@ -84,7 +83,6 @@ void SurfaceTexture::JNIInit(JNIEnv* env) {
   SurfaceClass = env->FindClass("android/view/Surface");
   Surface_Constructor =
       env->GetMethodID(SurfaceClass.get(), "<init>", "(Landroid/graphics/SurfaceTexture;)V");
-  Surface_release = env->GetMethodID(SurfaceClass.get(), "release", "()V");
 }
 
 static std::mutex threadLocker = {};
@@ -152,10 +150,9 @@ std::shared_ptr<SurfaceTexture> SurfaceTexture::Make(int width, int height, jobj
   return std::shared_ptr<SurfaceTexture>(new SurfaceTexture(width, height, env, stObject));
 }
 
-SurfaceTexture::SurfaceTexture(int width, int height, JNIEnv* env, jobject st)
+SurfaceTexture::SurfaceTexture(int width, int height, JNIEnv*, jobject st)
     : _width(width), _height(height) {
   surfaceTexture = st;
-  surface = env->NewObject(SurfaceClass.get(), Surface_Constructor, st);
 }
 
 SurfaceTexture::~SurfaceTexture() {
@@ -164,12 +161,16 @@ SurfaceTexture::~SurfaceTexture() {
   if (env == nullptr) {
     return;
   }
-  env->CallVoidMethod(surface.get(), Surface_release);
   env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_release);
 }
 
-jobject SurfaceTexture::getInputSurface() const {
-  return surface.get();
+jobject SurfaceTexture::createInputSurface() const {
+  JNIEnvironment environment;
+  auto env = environment.current();
+  if (env == nullptr) {
+    return nullptr;
+  }
+  return env->NewObject(SurfaceClass.get(), Surface_Constructor, surfaceTexture.get());
 }
 
 void SurfaceTexture::notifyFrameAvailable() {
