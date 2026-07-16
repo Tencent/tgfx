@@ -48,6 +48,8 @@ class LiquidGlass : public hello2d::LayerBuilder {
   void setDepth(float depth) override;
   void setRefraction(float refraction) override;
   void setLightAngle(float angle) override;
+  void setFrost(float frost) override;
+  void setDispersion(float dispersion) override;
 
  protected:
   std::shared_ptr<tgfx::Layer> onBuildLayerTree(const hello2d::AppHost* host) override;

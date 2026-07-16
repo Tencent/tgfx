@@ -158,28 +158,31 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
   auto bgImage = input.extraSource->image();
   auto bgOffset = input.extraSource->imageOffset();
 
-  // Down-scale the background if it would exceed the GPU texture dimension limit. This prevents
-  // makeWithFilter (frost blur and refraction) from silently failing by creating an oversized
-  // RenderTarget. makeScaled on a picture-backed image rasterizes directly at the target
-  // resolution, so no full-size texture is ever allocated.
-  float bgScale = 1.0f;
-  auto maxDim = static_cast<float>(std::max(bgImage->width(), bgImage->height()));
+  // Down-scale the background to the layer's original bounds size (not contentScale-scaled).
+  // The background image from synthesizeBackgroundImage is recorded at contentScale, which can be
+  // very large when zoomed in. Since refraction only samples within layer bounds, we rasterize the
+  // picture-backed bgImage directly at the original bounds resolution. This avoids allocating
+  // huge GPU textures (e.g. 16000x16000 at zoom=50).
   auto surface = canvas->getSurface();
   auto context = surface ? surface->getContext() : nullptr;
   auto maxTextureSize =
       context ? context->gpu()->limits()->maxTextureDimension2D : MAX_SAFE_TEXTURE_SIZE;
-  // Save the original background dimensions before scaling so dstRect in the final draw can use
-  // exact original sizes, avoiding rounding gaps at tile boundaries.
-  auto origBgWidth = static_cast<float>(bgImage->width());
-  auto origBgHeight = static_cast<float>(bgImage->height());
-  if (maxDim > static_cast<float>(maxTextureSize)) {
-    bgScale = static_cast<float>(maxTextureSize) / maxDim;
-    int scaledW = std::max(1, static_cast<int>(std::round(origBgWidth * bgScale)));
-    int scaledH = std::max(1, static_cast<int>(std::round(origBgHeight * bgScale)));
-    bgImage = bgImage->makeScaled(scaledW, scaledH, SamplingOptions(FilterMode::Linear));
-    bgOffset.x *= bgScale;
-    bgOffset.y *= bgScale;
-  }
+  Rect origBounds = input.layerContent ? input.layerContent->getBounds() : Rect::MakeWH(0, 0);
+  float origMaxDim = std::max(origBounds.width(), origBounds.height());
+  // Background resolution = min(origBounds × contentScale, MAX_BG_SIZE).
+  // Preserves detail when zoomed in, but caps to avoid huge GPU textures.
+  static constexpr float MAX_BG_SIZE = 2048.0f;
+  float desiredMaxDim = origMaxDim * input.contentScale;
+  float targetMaxDim = std::min(desiredMaxDim, std::min(static_cast<float>(maxTextureSize), MAX_BG_SIZE));
+  float bgScale = targetMaxDim / desiredMaxDim;
+  int scaledW = std::max(1, static_cast<int>(std::round(origBounds.width() * input.contentScale * bgScale)));
+  int scaledH = std::max(1, static_cast<int>(std::round(origBounds.height() * input.contentScale * bgScale)));
+  // bgOffset is relative to input.content. Scale it proportionally with bgImage.
+  float scaleRatioX = static_cast<float>(scaledW) / static_cast<float>(bgImage->width());
+  float scaleRatioY = static_cast<float>(scaledH) / static_cast<float>(bgImage->height());
+  bgImage = bgImage->makeScaled(scaledW, scaledH, SamplingOptions(FilterMode::Linear));
+  bgOffset.x *= scaleRatioX;
+  bgOffset.y *= scaleRatioY;
 
   // Step 1: Frost - apply Gaussian blur to the background
   auto frostStartTime = std::chrono::high_resolution_clock::now();
@@ -201,10 +204,9 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
 
   // Step 2 & 3: Apply refraction with dispersion and lighting (computed entirely in GPU shader)
   if (_refraction > 0 || _lightIntensity > 0) {
-    int layerWidth =
-        static_cast<int>(std::round(static_cast<float>(input.content->width()) * bgScale));
-    int layerHeight =
-        static_cast<int>(std::round(static_cast<float>(input.content->height()) * bgScale));
+    // layerWidth/Height must match processedBg dimensions for correct UV mapping in shader.
+    int layerWidth = processedBg->width();
+    int layerHeight = processedBg->height();
 
     float halfW = static_cast<float>(layerWidth) * 0.5f;
     float halfH = static_cast<float>(layerHeight) * 0.5f;
@@ -387,22 +389,16 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
   Paint paint = {};
   paint.setMaskFilter(MaskFilter::MakeShader(maskShader, false));
   paint.setBlendMode(BlendMode::Src);
-  if (bgScale < 1.0f) {
-    auto dstX = processedOffset.x / bgScale;
-    auto dstY = processedOffset.y / bgScale;
-    auto dstW = origBgWidth;
-    auto dstH = origBgHeight;
-    auto dstRect = Rect::MakeXYWH(dstX, dstY, dstW, dstH);
-    // Use Clamp tile mode for the mask shader to avoid sub-pixel gaps at tile boundaries.
-    // The rounding error from makeScaled causes MakeRectToRectMatrix to slightly shrink the
-    // mask coordinate range; Clamp repeats edge pixels instead of fading to transparent.
-    maskShader = Shader::MakeImageShader(input.content, TileMode::Clamp, TileMode::Clamp);
-    maskShader = maskShader->makeWithMatrix(Matrix::MakeTrans(dstX, dstY));
-    paint.setMaskFilter(MaskFilter::MakeShader(maskShader, false));
-    canvas->drawImageRect(processedBg, dstRect, SamplingOptions(FilterMode::Linear), &paint);
-  } else {
-    canvas->drawImage(processedBg, processedOffset.x, processedOffset.y, &paint);
-  }
+  // Background was scaled to origBounds resolution. Map it back to input.content size in canvas space.
+  auto dstX = processedOffset.x / scaleRatioX;
+  auto dstY = processedOffset.y / scaleRatioY;
+  auto dstW = static_cast<float>(processedBg->width()) / scaleRatioX;
+  auto dstH = static_cast<float>(processedBg->height()) / scaleRatioY;
+  auto dstRect = Rect::MakeXYWH(dstX, dstY, dstW, dstH);
+  maskShader = Shader::MakeImageShader(input.content, TileMode::Clamp, TileMode::Clamp);
+  maskShader = maskShader->makeWithMatrix(Matrix::MakeTrans(dstX, dstY));
+  paint.setMaskFilter(MaskFilter::MakeShader(maskShader, false));
+  canvas->drawImageRect(processedBg, dstRect, SamplingOptions(FilterMode::Linear), &paint);
   auto drawEndTime = std::chrono::high_resolution_clock::now();
   LOGI("GlassStyle: total=%lldus, processedBg=%dx%d, layer=%dx%d",
        std::chrono::duration_cast<std::chrono::microseconds>(drawEndTime - drawStartTime).count(),

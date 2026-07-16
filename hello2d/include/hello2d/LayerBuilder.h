@@ -77,6 +77,20 @@ class LayerBuilder {
   virtual void setLightAngle(float /*angle*/) {
   }
 
+  /**
+   * Sets the glass frost parameter for interactive builders (e.g., LiquidGlass).
+   * Non-interactive builders ignore this call.
+   */
+  virtual void setFrost(float /*frost*/) {
+  }
+
+  /**
+   * Sets the glass dispersion parameter for interactive builders (e.g., LiquidGlass).
+   * Non-interactive builders ignore this call.
+   */
+  virtual void setDispersion(float /*dispersion*/) {
+  }
+
   explicit LayerBuilder(std::string name);
 
   virtual ~LayerBuilder() = default;

@@ -245,6 +245,8 @@
   static float depth = 30.0f;
   static float refraction = 50.0f;
   static float lightAngle = 135.0f;
+  static float frost = 0.0f;
+  static float dispersion = 0.0f;
   if (event.keyCode == 126) {  // Up arrow
     depth = std::clamp(depth + 1.0f, 0.0f, 100.0f);
     builder->setDepth(depth);
@@ -268,6 +270,22 @@
   } else if (event.keyCode == 14) {  // E key
     lightAngle = lightAngle + 15.0f;
     builder->setLightAngle(lightAngle);
+    presentImmediately = true;
+  } else if (event.keyCode == 13) {  // W key
+    frost = std::clamp(frost + 5.0f, 0.0f, 100.0f);
+    builder->setFrost(frost);
+    presentImmediately = true;
+  } else if (event.keyCode == 1) {  // S key
+    frost = std::clamp(frost - 5.0f, 0.0f, 100.0f);
+    builder->setFrost(frost);
+    presentImmediately = true;
+  } else if (event.keyCode == 0) {  // A key
+    dispersion = std::clamp(dispersion - 5.0f, 0.0f, 100.0f);
+    builder->setDispersion(dispersion);
+    presentImmediately = true;
+  } else if (event.keyCode == 2) {  // D key
+    dispersion = std::clamp(dispersion + 5.0f, 0.0f, 100.0f);
+    builder->setDispersion(dispersion);
     presentImmediately = true;
   }
 }

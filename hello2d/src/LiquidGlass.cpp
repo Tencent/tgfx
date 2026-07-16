@@ -42,6 +42,12 @@ static float glassRefraction = 50.0f;
 // Glass light angle (updated by Q/E keys).
 static float glassLightAngle = 135.0f;
 
+// Glass frost (updated by W/S keys).
+static float glassFrost = 0.0f;
+
+// Glass dispersion (updated by A/D keys).
+static float glassDispersion = 0.0f;
+
 // Shared glass style for interactive parameter updates.
 static std::shared_ptr<tgfx::GlassStyle> glassStyleRef = nullptr;
 
@@ -145,6 +151,20 @@ void LiquidGlass::setLightAngle(float angle) {
   }
   if (glassStyleRef) {
     glassStyleRef->setLightAngle(glassLightAngle);
+  }
+}
+
+void LiquidGlass::setFrost(float frost) {
+  glassFrost = std::clamp(frost, 0.0f, 100.0f);
+  if (glassStyleRef) {
+    glassStyleRef->setFrost(glassFrost);
+  }
+}
+
+void LiquidGlass::setDispersion(float dispersion) {
+  glassDispersion = std::clamp(dispersion, 0.0f, 100.0f);
+  if (glassStyleRef) {
+    glassStyleRef->setDispersion(glassDispersion);
   }
 }
 
