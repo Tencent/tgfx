@@ -49,6 +49,15 @@ class Text : public VectorElement {
   }
 
   /**
+   * Replaces the text blob to render, keeping this Text object's identity so parents holding it
+   * stay valid. Passing null leaves the current blob unchanged. anchors are the per-glyph offsets
+   * for the new blob (relative to each glyph's default anchor at advance * 0.5, 0); pass an empty
+   * vector to clear them. If the vector length does not match the new glyph count, it is resized
+   * (padded with zeros or truncated) and a warning is logged.
+   */
+  void setTextBlob(std::shared_ptr<TextBlob> textBlob, std::vector<Point> anchors = {});
+
+  /**
    * Returns the position of the text blob.
    */
   Point position() const {
