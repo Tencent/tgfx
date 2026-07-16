@@ -23,10 +23,12 @@
 #include <memory>
 #include <stack>
 #include <vector>
+#include "core/GeometryShape.h"
 #include "core/utils/GeometryExtra.h"
 #include "core/utils/Log.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
+#include "tgfx/core/RRect.h"
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
@@ -47,55 +49,52 @@ enum class ClipState {
 
 class ClipElement {
  public:
-  ClipElement() = default;
-  ClipElement(const Path& path, bool antiAlias);
+  ClipElement();
+  ClipElement(const GeometryShape& shape, const Matrix& matrix, bool antiAlias);
 
-  const Path& path() const {
-    return _path;
+  const GeometryShape& shape() const {
+    return _shape;
   }
 
-  bool isAntiAlias() const {
+  const Matrix& matrix() const {
+    return _matrix;
+  }
+
+  bool antiAlias() const {
     return _antiAlias;
   }
 
-  const Rect& bounds() const {
-    return _bounds;
+  const Rect& outerBounds() const {
+    return _outerBounds;
   }
 
-  bool isRect() const {
-    return _isRect;
+  const Rect& innerBounds() const {
+    return _innerBounds;
   }
+
+  ClipState clipState() const;
 
   bool isValid() const {
     return _invalidatedByIndex < 0;
   }
 
-  bool isPixelAligned() const {
-    return IsPixelAligned(_bounds.left) && IsPixelAligned(_bounds.top) &&
-           IsPixelAligned(_bounds.right) && IsPixelAligned(_bounds.bottom);
-  }
+  /**
+   * Returns a device-space Path representing this element's shape. The shape is converted to a path
+   * in its local space and transformed by the element's matrix.
+   */
+  Path getDevicePath() const;
 
   bool tryCombine(const ClipElement& other);
 
   /**
    * Returns whether this element's keep-region fully contains the keep-region of other.
    *
-   * A true result guarantees containment; a false result means containment could not be
-   * cheaply proven, so it may or may not actually hold. For example, when this is a concave
-   * path such as an L shape and other's bounds fit entirely inside the L, the geometric
-   * check cannot prove containment and returns false even though it does hold.
+   * The check is conservative: a true result guarantees containment, but a false result only
+   * means containment could not be cheaply proven and may or may not actually hold. For example,
+   * when this is a concave path such as an L shape and other's bounds fit entirely inside the L,
+   * the geometric check cannot prove containment and returns false even though it does hold.
    */
-  bool tightContains(const ClipElement& other) const;
-
-  /**
-   * Returns whether this element's keep-region intersects the keep-region of other.
-   *
-   * A false result guarantees disjointness; a true result means disjointness could not be
-   * cheaply proven, so the two regions may or may not actually overlap. For example, when
-   * this is a concave path and other fits entirely inside a concave gap of this, the AABB
-   * check still reports them as overlapping and returns true even though they are disjoint.
-   */
-  bool looseIntersects(const ClipElement& other) const;
+  bool contains(const ClipElement& other) const;
 
   void transform(const Matrix& matrix);
 
@@ -108,10 +107,17 @@ class ClipElement {
   }
 
  private:
-  Path _path = {};
+  void simplify();
+  void updateOuterInnerBounds();
+
+  GeometryShape _shape = {};
+  Matrix _matrix = Matrix::I();
+  // Device-space pixel box that bounds every pixel the clip may keep (conservative outer estimate).
+  Rect _outerBounds = {};
+  // Device-space pixel box guaranteed to be kept by the clip (conservative inner estimate); empty
+  // when it cannot be computed cheaply.
+  Rect _innerBounds = {};
   bool _antiAlias = false;
-  Rect _bounds = {};
-  bool _isRect = false;
   // The startIndex of the ClipRecord that invalidated this element. -1 means valid.
   int _invalidatedByIndex = -1;
 };
@@ -170,7 +176,11 @@ class ClipStack {
  public:
   ClipStack();
 
-  void clip(const Path& path, bool antiAlias);
+  void clipRect(const Rect& rect, const Matrix& matrix, bool antiAlias);
+
+  void clipRRect(const RRect& rRect, const Matrix& matrix, bool antiAlias);
+
+  void clipPath(const Path& path, const Matrix& matrix, bool antiAlias);
 
   void save();
 
@@ -212,6 +222,8 @@ class ClipStack {
   void transform(const Matrix& matrix);
 
  private:
+  void clipShape(GeometryShape&& shape, const Matrix& matrix, bool antiAlias);
+
   /**
    * Adds a clip element to the stack.
    * @return true if the element was actually added or affected the clip state, false if it was

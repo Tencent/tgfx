@@ -54,11 +54,28 @@ void PlaybackContext::setClip(const ClipStack& clip) {
     if (!element.isValid()) {
       continue;
     }
-    auto path = element.path();
+    // Both element.matrix() and initMatrix are transforms relative to the local space, applied in
+    // that order, so initMatrix is composed on the left: initMatrix * elemMatrix.
+    auto combined = element.matrix();
     if (hasInitMatrix) {
-      path.transform(initMatrix);
+      combined.postConcat(initMatrix);
     }
-    _clip.clip(path, element.isAntiAlias());
+    const auto& shape = element.shape();
+    // A valid clip element is never empty.
+    DEBUG_ASSERT(shape.type() != GeometryShape::Type::Empty);
+    switch (shape.type()) {
+      case GeometryShape::Type::Empty:
+        break;
+      case GeometryShape::Type::Rect:
+        _clip.clipRect(shape.rect(), combined, element.antiAlias());
+        break;
+      case GeometryShape::Type::RRect:
+        _clip.clipRRect(shape.rRect(), combined, element.antiAlias());
+        break;
+      case GeometryShape::Type::Path:
+        _clip.clipPath(shape.path(), combined, element.antiAlias());
+        break;
+    }
   }
 }
 

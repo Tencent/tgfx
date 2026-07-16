@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,19 +16,17 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <optional>
-#include "gpu/processors/AARectEffect.h"
+#include "RectEffect.h"
 
 namespace tgfx {
-class GLSLAARectEffect : public AARectEffect {
- public:
-  explicit GLSLAARectEffect(const Rect& rect);
 
-  void emitCode(EmitArgs& args) const override;
+// Only needTransform is keyed. The transform path adds a per-fragment matrix multiply, so a
+// dedicated program that skips this for the identity case is worth the extra program. The AA branch
+// adds only a bounded amount of work that does not grow with the input, so keeping antiAlias a
+// runtime uniform and sharing one program across AA and non-AA draws is a better trade-off than
+// doubling the program count.
+void RectEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
+  bytesKey->write(static_cast<uint32_t>(_needTransform ? 1 : 0));
+}
 
- private:
-  void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
-};
 }  // namespace tgfx

@@ -41,9 +41,7 @@ class SurfaceTextureReader : public ImageReader {
 
   /**
    * Creates a new Java Surface object connected to the underlying SurfaceTexture. Each call returns
-   * a fresh Surface as a JNI local reference. The caller owns the returned reference and is
-   * responsible for calling Surface.release() when done, following the standard Android Surface
-   * ownership convention.
+   * a fresh Surface. The caller owns the returned object and must call Surface.release() when done.
    */
   jobject createInputSurface() const;
 

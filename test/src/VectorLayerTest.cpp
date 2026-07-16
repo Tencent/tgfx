@@ -5414,4 +5414,47 @@ TGFX_TEST(VectorLayerTest, DegenerateStroke) {
   EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/DegenerateStroke"));
 }
 
+/**
+ * Test Text::setTextBlob: replacing a Text's blob in place must update the rendered output on the
+ * next draw, even though the parent VectorLayer keeps holding the same Text object. This verifies
+ * the in-place blob swap (used by runtime text reshaping) invalidates the layer content correctly
+ * without re-parenting or replacing the element.
+ */
+TGFX_TEST(VectorLayerTest, TextSetTextBlob) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 291, 120);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto vectorLayer = VectorLayer::Make();
+
+  auto typeface = GetTestTypeface();
+  if (typeface == nullptr) {
+    return;
+  }
+  Font font(typeface, 36.0f);
+
+  auto blob = TextBlob::MakeFrom("Hello", font);
+  auto textSpan = Text::Make(blob);
+  textSpan->setPosition({50, 80});
+  auto fill = MakeFillStyle(Color::Black());
+  vectorLayer->setContents({textSpan, fill});
+  displayList->root()->addChild(vectorLayer);
+
+  // First render establishes the parent VectorLayer's hold on the Text object with "Hello".
+  displayList->render(surface.get());
+
+  // Swap the blob in place. The parent still holds the same textSpan object; only its blob changes.
+  auto reshaped = TextBlob::MakeFrom("Reshaped", font);
+  textSpan->setTextBlob(reshaped);
+  ASSERT_EQ(textSpan->textBlob(), reshaped);
+
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/TextSetTextBlob"));
+}
+
 }  // namespace tgfx
