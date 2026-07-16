@@ -44,14 +44,28 @@ DrawingBuffer* DrawingManager::createDrawingBuffer() {
 }
 
 bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
-                                  PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags) {
+                                  PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags,
+                                  const Point& coordOffset) {
   if (renderTarget == nullptr || processor == nullptr) {
     return false;
   }
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
-  auto bounds = Rect::MakeWH(renderTarget->width(), renderTarget->height());
-  auto provider = RectsVertexProvider::MakeFrom(allocator, bounds, AAType::None);
+  auto width = static_cast<float>(renderTarget->width());
+  auto height = static_cast<float>(renderTarget->height());
+  PlacementPtr<RectsVertexProvider> provider = nullptr;
+  if (coordOffset.x == 0.0f && coordOffset.y == 0.0f) {
+    auto bounds = Rect::MakeWH(width, height);
+    provider = RectsVertexProvider::MakeFrom(allocator, bounds, AAType::None);
+  } else {
+    auto rect = Rect::MakeXYWH(coordOffset.x, coordOffset.y, width, height);
+    auto viewMatrix = Matrix::MakeTrans(-coordOffset.x, -coordOffset.y);
+    auto record = allocator->make<RectRecord>(rect, viewMatrix);
+    auto rects = std::vector<PlacementPtr<RectRecord>>();
+    rects.push_back(std::move(record));
+    provider = RectsVertexProvider::MakeFrom(allocator, std::move(rects), {}, {}, AAType::None,
+                                             false, UVSubsetMode::None, {});
+  }
   auto drawOp = RectDrawOp::Make(renderTarget->getContext(), std::move(provider), renderFlags);
   drawOp->addColorFP(std::move(processor));
   drawOp->setBlendMode(BlendMode::Src);

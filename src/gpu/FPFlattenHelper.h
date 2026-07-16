@@ -28,10 +28,11 @@ namespace tgfx {
 
 /**
  * Returns true if the given FragmentProcessor is simple enough to be used directly as a child of
- * XfermodeFragmentProcessor without causing a permutation miss. Simple types are: nullptr,
- * TextureEffect (non-YUV), ConstColorProcessor, and TiledTextureEffect.
+ * XfermodeFragmentProcessor without causing a permutation miss. The childIndex parameter specifies
+ * the position (0 = src, 1 = dst). ConstColorProcessor and TiledTextureEffect are only supported
+ * as child[0]; child[1] must be TextureEffect or nullptr.
  */
-static inline bool IsSimpleBlendChild(const FragmentProcessor* fp) {
+static inline bool IsSimpleBlendChild(const FragmentProcessor* fp, size_t childIndex = 0) {
   if (fp == nullptr) {
     return true;
   }
@@ -40,18 +41,22 @@ static inline bool IsSimpleBlendChild(const FragmentProcessor* fp) {
     auto* te = static_cast<const TextureEffect*>(fp);
     return !te->isYUV() && te->numTextureSamplers() > 0;
   }
-  if (fpName == "ConstColorProcessor") {
-    return true;
-  }
-  if (fpName == "TiledTextureEffect") {
-    return true;
+  if (childIndex == 0) {
+    if (fpName == "ConstColorProcessor") {
+      return true;
+    }
+    if (fpName == "TiledTextureEffect") {
+      return true;
+    }
   }
   return false;
 }
 
 /**
  * Renders a complex FragmentProcessor into an offscreen texture and returns a simple TextureEffect
- * that samples from it. Returns nullptr on failure.
+ * that samples from it. The FP's coordTransform expects to receive coordinates in the range
+ * [drawRect.x..right, drawRect.y..bottom], so a coordOffset is applied during offscreen rendering
+ * to ensure the FP sees the correct coordinate space. Returns nullptr on failure.
  */
 static inline PlacementPtr<FragmentProcessor> FlattenToTexture(const FPArgs& args,
                                                                PlacementPtr<FragmentProcessor> fp) {
@@ -69,7 +74,8 @@ static inline PlacementPtr<FragmentProcessor> FlattenToTexture(const FPArgs& arg
     return nullptr;
   }
   auto drawingManager = context->drawingManager();
-  if (!drawingManager->fillRTWithFP(renderTarget, std::move(fp), args.renderFlags)) {
+  auto coordOffset = Point::Make(drawRect.x(), drawRect.y());
+  if (!drawingManager->fillRTWithFP(renderTarget, std::move(fp), args.renderFlags, coordOffset)) {
     return nullptr;
   }
   auto textureProxy = renderTarget->asTextureProxy();
@@ -82,12 +88,13 @@ static inline PlacementPtr<FragmentProcessor> FlattenToTexture(const FPArgs& arg
 }
 
 /**
- * Ensures the given FragmentProcessor is simple for use as a blend child. If it's already simple,
- * returns it unchanged; otherwise flattens it to a texture. Returns nullptr on failure.
+ * Ensures the given FragmentProcessor is simple for use as a blend child at the specified position.
+ * If it's already simple for that position, returns it unchanged; otherwise flattens it to a
+ * texture. Returns nullptr on failure.
  */
 static inline PlacementPtr<FragmentProcessor> EnsureSimpleBlendChild(
-    const FPArgs& args, PlacementPtr<FragmentProcessor> fp) {
-  if (IsSimpleBlendChild(fp.get())) {
+    const FPArgs& args, PlacementPtr<FragmentProcessor> fp, size_t childIndex = 0) {
+  if (IsSimpleBlendChild(fp.get(), childIndex)) {
     return fp;
   }
   return FlattenToTexture(args, std::move(fp));

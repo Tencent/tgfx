@@ -64,7 +64,7 @@ PlacementPtr<FragmentProcessor> ColorFilterShader::asFragmentProcessor(
     return nullptr;
   }
   auto alphaSource = FragmentProcessor::Make(shader, args, uvMatrix, dstColorSpace);
-  alphaSource = EnsureSimpleBlendChild(args, std::move(alphaSource));
+  alphaSource = EnsureSimpleBlendChild(args, std::move(alphaSource), 1);
   if (alphaSource == nullptr) {
     return nullptr;
   }

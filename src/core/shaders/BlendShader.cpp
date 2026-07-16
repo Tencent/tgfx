@@ -71,12 +71,12 @@ PlacementPtr<FragmentProcessor> BlendShader::asFragmentProcessor(
   if (fpB == nullptr) {
     return nullptr;
   }
-  fpA = EnsureSimpleBlendChild(args, std::move(fpA));
-  if (fpA == nullptr) {
-    return nullptr;
-  }
   fpB = EnsureSimpleBlendChild(args, std::move(fpB));
   if (fpB == nullptr) {
+    return nullptr;
+  }
+  fpA = EnsureSimpleBlendChild(args, std::move(fpA), 1);
+  if (fpA == nullptr) {
     return nullptr;
   }
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(args.context->drawingAllocator(),

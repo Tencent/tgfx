@@ -19,6 +19,7 @@
 #include "InnerShadowImageFilter.h"
 #include "core/images/TextureImage.h"
 #include "core/utils/ColorHelper.h"
+#include "gpu/FPFlattenHelper.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
@@ -67,6 +68,10 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::getShadowFragmentProcess
     invertShadowMask =
         ConstColorProcessor::Make(allocator, PMColor::Transparent(), InputMode::Ignore);
   }
+  invertShadowMask = EnsureSimpleBlendChild(args, std::move(invertShadowMask), 1);
+  if (invertShadowMask == nullptr) {
+    return nullptr;
+  }
   auto dstColor = ToPMColor(color, source->colorSpace());
   auto colorProcessor = ConstColorProcessor::Make(allocator, dstColor, InputMode::Ignore);
 
@@ -96,9 +101,17 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
   auto allocator = args.context->drawingAllocator();
   auto blendMode = shadowOnly ? BlendMode::SrcIn : BlendMode::SrcATop;
 
-  return XfermodeFragmentProcessor::MakeFromTwoProcessors(
-      allocator, getShadowFragmentProcessor(source, args, sampling, constraint, uvMatrix),
-      std::move(imageProcessor), blendMode);
+  auto shadowFP = getShadowFragmentProcessor(source, args, sampling, constraint, uvMatrix);
+  shadowFP = EnsureSimpleBlendChild(args, std::move(shadowFP));
+  if (shadowFP == nullptr) {
+    return nullptr;
+  }
+  imageProcessor = EnsureSimpleBlendChild(args, std::move(imageProcessor), 1);
+  if (imageProcessor == nullptr) {
+    return nullptr;
+  }
+  return XfermodeFragmentProcessor::MakeFromTwoProcessors(allocator, std::move(shadowFP),
+                                                          std::move(imageProcessor), blendMode);
 }
 
 }  // namespace tgfx

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ColorImageFilter.h"
+#include "gpu/FPFlattenHelper.h"
 #include "gpu/processors/ComposeFragmentProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
@@ -52,7 +53,15 @@ PlacementPtr<FragmentProcessor> ColorImageFilter::asFragmentProcessor(
   }
   // The color filter transforms transparent pixels into non-transparent ones. Use the original
   // image alpha as a mask to prevent coloring transparent regions.
+  composed = EnsureSimpleBlendChild(args, std::move(composed));
+  if (composed == nullptr) {
+    return nullptr;
+  }
   auto alphaSource = FragmentProcessor::Make(source, args, sampling, constraint, uvMatrix);
+  alphaSource = EnsureSimpleBlendChild(args, std::move(alphaSource), 1);
+  if (alphaSource == nullptr) {
+    return nullptr;
+  }
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(allocator, std::move(composed),
                                                           std::move(alphaSource), BlendMode::SrcIn);
 }

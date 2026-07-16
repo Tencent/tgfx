@@ -50,10 +50,14 @@ class DrawingManager {
 
   /**
    * Fills the render target using the provided fragment processor, and automatically resolves the
-   * render target. Returns false if the render target or fragment processor is nullptr.
+   * render target. Returns false if the render target or fragment processor is nullptr. The
+   * optional coordOffset shifts the UV coordinates fed to the fragment processor so that it
+   * receives positions in [offset.x .. offset.x+w, offset.y .. offset.y+h] instead of [0..w,
+   * 0..h].
    */
   bool fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
-                    PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags);
+                    PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags,
+                    const Point& coordOffset = Point::Zero());
 
   std::shared_ptr<OpsCompositor> addOpsCompositor(std::shared_ptr<RenderTargetProxy> renderTarget,
                                                   uint32_t renderFlags,
