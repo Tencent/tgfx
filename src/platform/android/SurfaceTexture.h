@@ -44,12 +44,11 @@ class SurfaceTexture : public ImageStream {
   ~SurfaceTexture() override;
 
   /**
-   * Creates a new Java Surface object connected to this SurfaceTexture. Returns a JNI local
-   * reference allocated in the caller's local frame; the caller owns it and must call
-   * Surface.release() and DeleteLocalRef when done. Passing the caller's JNIEnv* is required to
-   * ensure the returned local reference lives in the caller's local frame.
+   * Creates a new Java Surface object connected to this SurfaceTexture. Each call returns a fresh
+   * Surface as a JNI local reference in the calling thread's current local frame; the caller owns
+   * it and must call Surface.release() when done.
    */
-  jobject createInputSurface(JNIEnv* env) const;
+  jobject createInputSurface() const;
 
   /**
    * Notifies the previously returned ImageBuffer is available for generating textures. The method

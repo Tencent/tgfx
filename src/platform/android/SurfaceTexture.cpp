@@ -184,10 +184,12 @@ SurfaceTexture::~SurfaceTexture() {
   env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_release);
 }
 
-jobject SurfaceTexture::createInputSurface(JNIEnv* env) const {
-  // Use the caller's JNIEnv directly. Do NOT wrap this in a local JNIEnvironment: its destructor
-  // calls PopLocalFrame(nullptr), which would release the local ref returned by NewObject before
-  // the caller can use it, leaving the caller with a dangling handle.
+jobject SurfaceTexture::createInputSurface() const {
+  // Use JNIEnvironment::Current() to fetch the thread-local JNIEnv without pushing a new local
+  // frame. Wrapping this in a stack JNIEnvironment would trigger PopLocalFrame(nullptr) on scope
+  // exit and release the local ref returned by NewObject before the caller can use it. The
+  // returned local ref instead lives in the caller's current local frame.
+  auto env = JNIEnvironment::Current();
   if (env == nullptr) {
     return nullptr;
   }
