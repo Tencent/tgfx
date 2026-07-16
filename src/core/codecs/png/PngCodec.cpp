@@ -138,7 +138,31 @@ static float PngInvertedFixedPointToFloat(png_fixed_point x) {
 static std::shared_ptr<ColorSpace> ReadColorProfile(png_structp pngPtr, png_infop infoPtr) {
 #if (PNG_LIBPNG_VER_MAJOR > 1) || (PNG_LIBPNG_VER_MAJOR == 1 && PNG_LIBPNG_VER_MINOR >= 6)
   /**
-   * First check for an ICC profile
+   * PNG v3 (2025) specifies that cICP takes precedence over iCCP, sRGB and cHRM+gAMA when present.
+   * cICP encodes the colour space via two H.273 code points (colour primaries and transfer
+   * function), so it is the most compact and unambiguous source when available.
+   */
+#ifdef PNG_cICP_SUPPORTED
+  png_byte colourPrimaries = 0;
+  png_byte transferFunction = 0;
+  png_byte matrixCoefficients = 0;
+  png_byte videoFullRangeFlag = 0;
+  if (PNG_INFO_cICP == png_get_cICP(pngPtr, infoPtr, &colourPrimaries, &transferFunction,
+                                    &matrixCoefficients, &videoFullRangeFlag)) {
+    // Only RGB with matrix_coefficients == 0 and full-range flag == 1 are valid for still images.
+    // Any other combination is treated as invalid and falls through to the next detector.
+    if (matrixCoefficients == 0 && videoFullRangeFlag == 1) {
+      auto cs = ColorSpace::MakeCICP(static_cast<ColorSpacePrimariesID>(colourPrimaries),
+                                     static_cast<TransferFunctionID>(transferFunction));
+      if (cs) {
+        return cs;
+      }
+    }
+  }
+#endif
+
+  /**
+   * Next check for an ICC profile.
    */
   png_bytep profile;
   png_uint_32 length;
