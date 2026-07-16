@@ -166,8 +166,11 @@ SurfaceTexture::~SurfaceTexture() {
 }
 
 jobject SurfaceTexture::createInputSurface() const {
-  JNIEnvironment environment;
-  auto env = environment.current();
+  // Use JNIEnvironment::Current() to fetch the thread-local JNIEnv without pushing a new local
+  // frame. Wrapping this in a stack JNIEnvironment would trigger PopLocalFrame(nullptr) on scope
+  // exit and release the local ref returned by NewObject before the caller can use it. The
+  // returned local ref instead lives in the caller's current local frame.
+  auto env = JNIEnvironment::Current();
   if (env == nullptr) {
     return nullptr;
   }
