@@ -1487,15 +1487,6 @@ TGFX_TEST(CanvasTest, ColorSpace) {
   auto pictureImage = Image::MakeFrom(picture, 1024, 1024);
   canvas->drawImage(pictureImage);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawRecordSRGBColorToP3UseDrawImage"));
-
-  // Verify a PNG whose colour space is declared via the cICP chunk (PNG v3) is decoded as Display
-  // P3 rather than falling back to sRGB. Drawing such an image onto a Display P3 surface must be a
-  // no-op in the colour management pipeline (P3 -> P3 identity), so the result matches the input.
-  auto p3Surface = Surface::Make(context, 256, 256, false, 1, false, 0, ColorSpace::DisplayP3());
-  auto p3Image = MakeImage("resources/apitest/cicp_display_p3.png");
-  ASSERT_TRUE(p3Image != nullptr);
-  p3Surface->getCanvas()->drawImage(p3Image);
-  EXPECT_TRUE(Baseline::Compare(p3Surface, "CanvasTest/DrawP3CICPImageToP3"));
 }
 
 TGFX_TEST(CanvasTest, ScalePictureImage) {

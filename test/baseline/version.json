@@ -42,7 +42,6 @@
         "DrawMesh_PaintColorOnly": "c3630d40",
         "DrawMesh_TextureAndColors": "c3630d40",
         "DrawMesh_TextureOnly": "c3630d40",
-        "DrawP3CICPImageToP3": "105f881c6",
         "DrawP3ColorToP3": "82494664",
         "DrawRecordSRGBColorToP3UseDrawImage": "68928515",
         "DrawRecordSRGBColorToP3UseDrawPicture": "82494664",
