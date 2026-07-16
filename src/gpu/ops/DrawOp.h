@@ -81,6 +81,8 @@ class DrawOp {
 
   void execute(RenderPass* renderPass, RenderTarget* renderTarget);
 
+  virtual Type type() const = 0;
+
  protected:
   BlockAllocator* allocator = nullptr;
   AAType aaType = AAType::None;
@@ -97,7 +99,5 @@ class DrawOp {
   virtual PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) = 0;
 
   virtual void onDraw(RenderPass* renderPass) = 0;
-
-  virtual Type type() = 0;
 };
 }  // namespace tgfx

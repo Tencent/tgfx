@@ -27,7 +27,7 @@
 #include "core/utils/RectToRectMatrix.h"
 #include "core/utils/StrokeUtils.h"
 #include "gpu/DrawingManager.h"
-#include "gpu/EffectDecomposer.h"
+#include "gpu/PipelineCanonicalizer.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ops/AtlasTextOp.h"
 #include "gpu/ops/HairlineLineOp.h"
@@ -36,7 +36,6 @@
 #include "gpu/ops/ShapeDrawOp.h"
 #include "gpu/ops/ShapeInstancedDrawOp.h"
 #include "gpu/processors/AARectEffect.h"
-#include "gpu/processors/ComposeFragmentProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "processors/ColorSpaceXFormEffect.h"
 #include "processors/PorterDuffXferProcessor.h"
@@ -1011,42 +1010,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
                                                        std::move(dstTextureInfo));
     op->setXferProcessor(std::move(xferProcessor));
   }
-  if (!op->hasXferProcessor()) {
-    auto& processors = op->colorProcessors();
-    // Unwrap a single ComposeFragmentProcessor into its constituent children so that the
-    // decompose logic below can process them as separate FPs.
-    if (processors.size() == 1 && processors[0] &&
-        processors[0]->name() == "ComposeFragmentProcessor") {
-      auto compose = static_cast<ComposeFragmentProcessor*>(processors[0].get());
-      auto children = compose->takeChildren();
-      processors.clear();
-      processors = std::move(children);
-    }
-    bool shouldDecompose = false;
-    if (processors.size() >= 3) {
-      shouldDecompose = true;
-    } else if (processors.size() == 2 && processors[0] && processors[1]) {
-      auto firstName = processors[0]->name();
-      auto secondName = processors[1]->name();
-      bool secondIsColorFilter = secondName == "ColorSpaceXformEffect" ||
-                                 secondName == "LumaFragmentProcessor" ||
-                                 secondName == "AlphaStepFragmentProcessor" ||
-                                 secondName == "ColorMatrixFragmentProcessor";
-      shouldDecompose = firstName == "TextureEffect" && secondIsColorFilter;
-    }
-    if (shouldDecompose) {
-      auto savedProcessors = std::move(processors);
-      processors.clear();
-      auto replacement = EffectDecomposer::TryDecompose(
-          context, context->drawingManager(), renderTarget->width(), renderTarget->height(),
-          savedProcessors, drawingAllocator());
-      if (replacement) {
-        processors.emplace_back(std::move(replacement));
-      } else {
-        processors = std::move(savedProcessors);
-      }
-    }
-  }
+  PipelineCanonicalizer::Canonicalize(context, op.get(), renderTarget);
   drawOps.emplace_back(std::move(op));
 }
 

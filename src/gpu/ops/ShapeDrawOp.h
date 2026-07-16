@@ -35,7 +35,7 @@ class ShapeDrawOp : public DrawOp {
 
   void onDraw(RenderPass* renderPass) override;
 
-  Type type() override {
+  Type type() const override {
     return Type::ShapeDrawOp;
   }
 

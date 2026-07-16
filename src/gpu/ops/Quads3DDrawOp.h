@@ -47,7 +47,7 @@ class Quads3DDrawOp : public DrawOp {
 
   void onDraw(RenderPass* renderPass) override;
 
-  Type type() override {
+  Type type() const override {
     return Type::Quads3DDrawOp;
   }
 
