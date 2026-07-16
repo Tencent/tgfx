@@ -12,6 +12,9 @@
 #ifndef HAS_XP
 #define HAS_XP 0
 #endif
+#ifndef HAS_COVERAGE
+#define HAS_COVERAGE 0
+#endif
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Color;
@@ -21,6 +24,7 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   float Bias;
   float Scale;
 #endif
+#include "coverage_uniforms.inc"
 #include "xp_uniforms.inc"
 };
 
@@ -28,7 +32,12 @@ layout(set = 1, binding = 0) uniform sampler2D GradientTexture;
 
 layout(location = 0) in vec2 TransformedCoords_0;
 
-#define XP_DST_TEX_BINDING 1
+#if HAS_COVERAGE == 2
+layout(set = 1, binding = 1) uniform sampler2D MaskTextureSampler;
+  #define XP_DST_TEX_BINDING 2
+#else
+  #define XP_DST_TEX_BINDING 1
+#endif
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
 
@@ -73,6 +82,7 @@ void main() {
   gradColor.rgb *= gradColor.a;
   gradColor *= outputColor.a;
 
-#define TGFX_XP_SRC_COLOR gradColor
+#define TGFX_COVERAGE_SRC_COLOR gradColor
+#include "coverage_output.inc"
 #include "xp_output.inc"
 }

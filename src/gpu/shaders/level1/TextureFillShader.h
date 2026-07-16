@@ -28,9 +28,13 @@ class TextureFillShader : public PrecompiledShader {
   TGFX_DEFINE_DIMS(HAS_YUV, ALPHA_ONLY, HAS_RGBAAA, HAS_SUBSET);
   using VD = Dims;
 
-  // Fragment dimensions (adds HAS_XP for PorterDuff XferProcessor support)
+  // Fragment dimensions:
+  //   HAS_COVERAGE (int, 3 values):
+  //     0 = no coverage
+  //     1 = AARectEffect only (rect clip via uniform)
+  //     2 = AARectEffect + MaskTexture (DeviceSpaceTextureEffect mask + rect clip)
   struct FragDims {
-    enum : uint32_t { HAS_YUV, ALPHA_ONLY, HAS_RGBAAA, HAS_SUBSET, HAS_XP, COUNT };
+    enum : uint32_t { HAS_YUV, ALPHA_ONLY, HAS_RGBAAA, HAS_SUBSET, HAS_XP, HAS_COVERAGE, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationBool("HAS_YUV"),
@@ -38,11 +42,12 @@ class TextureFillShader : public PrecompiledShader {
           PermutationBool("HAS_RGBAAA"),
           PermutationBool("HAS_SUBSET"),
           PermutationInt("HAS_XP", 3),
+          PermutationInt("HAS_COVERAGE", 3),
       });
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 5, "Update ShouldCompile below when dimensions change.");
+  static_assert(FD::COUNT == 6, "Update ShouldCompile below when dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"TextureFillShader",
@@ -67,8 +72,8 @@ class TextureFillShader : public PrecompiledShader {
     if (fragValues[FD::ALPHA_ONLY] != 0 && fragValues[FD::HAS_RGBAAA] != 0) {
       return false;
     }
-    // Vertex domain does not include HAS_XP — vert variants must match frag base dimensions.
-    // Each vert variant pairs with both HAS_XP=0 and HAS_XP=1 frag variants.
+    // Vertex domain does not include HAS_XP or HAS_COVERAGE — vert variants must match frag base
+    // dimensions. Each vert variant pairs with all HAS_XP and HAS_COVERAGE frag variants.
     if (vertValues[VD::HAS_YUV] != fragValues[FD::HAS_YUV] ||
         vertValues[VD::ALPHA_ONLY] != fragValues[FD::ALPHA_ONLY] ||
         vertValues[VD::HAS_RGBAAA] != fragValues[FD::HAS_RGBAAA] ||

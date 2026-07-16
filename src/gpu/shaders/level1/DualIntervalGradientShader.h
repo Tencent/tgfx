@@ -35,11 +35,12 @@ class DualIntervalGradientShader : public PrecompiledShader {
   using VD = VertDims;
 
   struct FragDims {
-    enum : uint32_t { LAYOUT_TYPE, HAS_XP, COUNT };
+    enum : uint32_t { LAYOUT_TYPE, HAS_XP, HAS_COVERAGE, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationEnum("LAYOUT_TYPE", {"LINEAR", "RADIAL", "CONIC", "DIAMOND"}),
           PermutationInt("HAS_XP", 3),
+          PermutationInt("HAS_COVERAGE", 3),
       });
     }
   };
