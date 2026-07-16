@@ -59,7 +59,7 @@ class SurfaceTexture : public ImageStream {
 
   /**
    * Creates a new Java Surface object connected to this SurfaceTexture. Each call returns a fresh
-   * Surface as a JNI local reference; the caller owns it and must call Surface.release() when done.
+   * Surface. The caller owns the returned object and must call Surface.release() when done.
    */
   jobject createInputSurface() const;
 

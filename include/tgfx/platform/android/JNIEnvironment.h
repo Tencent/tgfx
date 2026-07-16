@@ -61,5 +61,7 @@ class JNIEnvironment {
 
   template <typename T>
   friend class Global;
+
+  friend class SurfaceTexture;
 };
 }  // namespace tgfx
