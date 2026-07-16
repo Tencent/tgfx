@@ -29,7 +29,8 @@ class TentBlur1DFragmentProcessor : public FragmentProcessor {
   static PlacementPtr<FragmentProcessor> Make(BlockAllocator* allocator,
                                               PlacementPtr<FragmentProcessor> processor,
                                               float radius, TentBlurDirection direction,
-                                              float stepLength, int maxRadius);
+                                              float stepLength, int maxRadius,
+                                              bool inputIsPacked = false);
 
   std::string name() const override {
     return "TentBlur1DFragmentProcessor";
@@ -39,7 +40,8 @@ class TentBlur1DFragmentProcessor : public FragmentProcessor {
   DEFINE_PROCESSOR_CLASS_ID
 
   TentBlur1DFragmentProcessor(PlacementPtr<FragmentProcessor> processor, float radius,
-                              TentBlurDirection direction, float stepLength, int maxRadius);
+                              TentBlurDirection direction, float stepLength, int maxRadius,
+                              bool inputIsPacked);
 
   void onComputeProcessorKey(BytesKey*) const override;
 
@@ -47,5 +49,6 @@ class TentBlur1DFragmentProcessor : public FragmentProcessor {
   TentBlurDirection direction = TentBlurDirection::Horizontal;
   float stepLength = 1.f;
   int maxRadius = 10;
+  bool inputIsPacked = false;
 };
 }  // namespace tgfx

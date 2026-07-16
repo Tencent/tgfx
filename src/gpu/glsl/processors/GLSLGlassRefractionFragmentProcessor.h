@@ -16,22 +16,22 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "TentBlur1DFragmentProcessor.h"
+#pragma once
+
+#include "gpu/processors/GlassRefractionFragmentProcessor.h"
 
 namespace tgfx {
 
-TentBlur1DFragmentProcessor::TentBlur1DFragmentProcessor(PlacementPtr<FragmentProcessor> processor,
-                                                         float radius, TentBlurDirection direction,
-                                                         float stepLength, int maxRadius,
-                                                         bool inputIsPacked)
-    : FragmentProcessor(ClassID()), radius(radius), direction(direction), stepLength(stepLength),
-      maxRadius(maxRadius), inputIsPacked(inputIsPacked) {
-  registerChildProcessor(std::move(processor));
-}
+class GLSLGlassRefractionFragmentProcessor : public GlassRefractionFragmentProcessor {
+ public:
+  GLSLGlassRefractionFragmentProcessor(PlacementPtr<FragmentProcessor> source,
+                                       PlacementPtr<FragmentProcessor> mask,
+                                       const GlassRefractionParams& params);
 
-void TentBlur1DFragmentProcessor::onComputeProcessorKey(BytesKey* key) const {
-  key->write(maxRadius);
-  key->write(static_cast<uint32_t>(inputIsPacked));
-}
+  void emitCode(EmitArgs& args) const override;
+
+ private:
+  void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
+};
 
 }  // namespace tgfx

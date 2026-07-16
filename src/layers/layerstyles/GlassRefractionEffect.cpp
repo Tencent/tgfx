@@ -125,6 +125,8 @@ std::shared_ptr<RenderPipeline> GlassRefractionEffect::CreatePipeline(GPU* gpu,
   if (shapeType == GlassShapeType::AlphaMask) {
     BindingEntry maskBinding = {"uMask", 1};
     descriptor.layout.textureSamplers.push_back(maskBinding);
+    BindingEntry coarseMaskBinding = {"uEdgeLightMask", 2};
+    descriptor.layout.textureSamplers.push_back(coarseMaskBinding);
   }
   BindingEntry uniformBlockBinding = {"GlassUniforms", 0};
   descriptor.layout.uniformBlocks.push_back(uniformBlockBinding);
@@ -184,10 +186,22 @@ bool GlassRefractionEffect::onDraw(CommandEncoder* encoder,
   }
   renderPass->setTexture(0, inputTextures[0], cachedSampler);
 
-  // Bind mask texture (binding 1) for AlphaMask shape type
+  // Bind mask texture (binding 1) for AlphaMask shape type.
+  // The mask sampler uses ClampToBorder so that UVs outside [0,1] return transparent (0),
+  // preventing edge pixels from bleeding into the corners of the glass bounds.
   if (_shapeType == GlassShapeType::AlphaMask) {
     if (inputTextures.size() > 1) {
-      renderPass->setTexture(1, inputTextures[1], cachedSampler);
+      if (!cachedMaskSampler) {
+        SamplerDescriptor maskSamplerDesc(AddressMode::ClampToBorder,
+                                          AddressMode::ClampToBorder, FilterMode::Linear,
+                                          FilterMode::Linear, MipmapMode::None);
+        cachedMaskSampler = gpu->createSampler(maskSamplerDesc);
+      }
+      renderPass->setTexture(1, inputTextures[1], cachedMaskSampler);
+      // Bind coarse mask texture (binding 2) for edge lighting.
+      if (inputTextures.size() > 2) {
+        renderPass->setTexture(2, inputTextures[2], cachedMaskSampler);
+      }
     } else {
       LOGE("GlassRefractionEffect: AlphaMask but no mask texture in inputTextures! size=%zu",
            inputTextures.size());

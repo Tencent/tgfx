@@ -25,7 +25,8 @@ namespace tgfx {
 class GLSLTentBlur1DFragmentProcessor : public TentBlur1DFragmentProcessor {
  public:
   GLSLTentBlur1DFragmentProcessor(PlacementPtr<FragmentProcessor> processor, float radius,
-                                  TentBlurDirection direction, float stepLength, int maxRadius);
+                                  TentBlurDirection direction, float stepLength, int maxRadius,
+                                  bool inputIsPacked);
 
   void emitCode(EmitArgs& args) const override;
 

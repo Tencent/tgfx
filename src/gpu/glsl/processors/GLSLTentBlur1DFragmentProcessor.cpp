@@ -22,7 +22,7 @@ namespace tgfx {
 
 PlacementPtr<FragmentProcessor> TentBlur1DFragmentProcessor::Make(
     BlockAllocator* allocator, PlacementPtr<FragmentProcessor> processor, float radius,
-    TentBlurDirection direction, float stepLength, int maxRadius) {
+    TentBlurDirection direction, float stepLength, int maxRadius, bool inputIsPacked) {
   if (!processor) {
     return nullptr;
   }
@@ -34,13 +34,15 @@ PlacementPtr<FragmentProcessor> TentBlur1DFragmentProcessor::Make(
   }
 
   return allocator->make<GLSLTentBlur1DFragmentProcessor>(
-      std::move(processor), radius, direction, stepLength, static_cast<int>(ceil(maxRadius)));
+      std::move(processor), radius, direction, stepLength, static_cast<int>(ceil(maxRadius)),
+      inputIsPacked);
 }
 
 GLSLTentBlur1DFragmentProcessor::GLSLTentBlur1DFragmentProcessor(
     PlacementPtr<FragmentProcessor> processor, float radius, TentBlurDirection direction,
-    float stepLength, int maxRadius)
-    : TentBlur1DFragmentProcessor(std::move(processor), radius, direction, stepLength, maxRadius) {
+    float stepLength, int maxRadius, bool inputIsPacked)
+    : TentBlur1DFragmentProcessor(std::move(processor), radius, direction, stepLength, maxRadius,
+                                  inputIsPacked) {
 }
 
 void GLSLTentBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
@@ -55,8 +57,12 @@ void GLSLTentBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
 
   fragBuilder->codeAppendf("float radius = %s;", radiusName.c_str());
   fragBuilder->codeAppend("int iRadius = int(ceil(radius));");
-  fragBuilder->codeAppend("vec4 sum = vec4(0.0);");
+  fragBuilder->codeAppend("float sum = 0.0;");
   fragBuilder->codeAppend("float total = 0.0;");
+
+  // RGBA8 unpack constants: dot(rgba, UNPACK) recovers the original float.
+  fragBuilder->codeAppend(
+      "const vec4 UNPACK = vec4(1.0, 1.0/255.0, 1.0/65025.0, 1.0/16581375.0);");
 
   fragBuilder->codeAppendf("for (int j = 0; j <= %d; ++j) {", 2 * maxRadius);
   fragBuilder->codeAppend("int i = j - iRadius;");
@@ -68,10 +74,26 @@ void GLSLTentBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
     return "(" + std::string(coord) + " + offset * float(i))";
   });
 
-  fragBuilder->codeAppendf("sum += %s * weight;", tempColor.c_str());
+  // Unpack sample: if inputIsPacked, decode RGBA8 to float; otherwise read .a channel.
+  if (inputIsPacked) {
+    fragBuilder->codeAppendf("sum += dot(%s, UNPACK) * weight;", tempColor.c_str());
+  } else {
+    fragBuilder->codeAppendf("sum += %s.a * weight;", tempColor.c_str());
+  }
   fragBuilder->codeAppend("if (i == iRadius) { break; }");
   fragBuilder->codeAppend("}");
-  fragBuilder->codeAppendf("%s = sum / total;", args.outputColor.c_str());
+
+  // Normalize and pack result to RGBA8.
+  fragBuilder->codeAppend("float result = sum / total;");
+  // Pack float to RGBA8: 4 channels encode 32-bit precision.
+  fragBuilder->codeAppend("float v = clamp(result, 0.0, 1.0);");
+  fragBuilder->codeAppend("float r = floor(v * 255.0) / 255.0;");
+  fragBuilder->codeAppend("float g = (v - r) * 255.0;");
+  fragBuilder->codeAppend("float rg = r + floor(g * 255.0) / 65025.0;");
+  fragBuilder->codeAppend("float rem = (v - rg) * 65025.0;");
+  fragBuilder->codeAppend("float b = floor(rem * 255.0) / 255.0;");
+  fragBuilder->codeAppend("float a = (rem - b) * 255.0;");
+  fragBuilder->codeAppendf("%s = vec4(r, g, b, a);", args.outputColor.c_str());
 }
 
 void GLSLTentBlur1DFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,

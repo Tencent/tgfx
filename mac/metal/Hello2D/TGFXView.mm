@@ -246,11 +246,11 @@
   static float refraction = 50.0f;
   static float lightAngle = 135.0f;
   if (event.keyCode == 126) {  // Up arrow
-    depth = std::clamp(depth + 5.0f, 0.0f, 100.0f);
+    depth = std::clamp(depth + 1.0f, 0.0f, 100.0f);
     builder->setDepth(depth);
     presentImmediately = true;
   } else if (event.keyCode == 125) {  // Down arrow
-    depth = std::clamp(depth - 5.0f, 0.0f, 100.0f);
+    depth = std::clamp(depth - 1.0f, 0.0f, 100.0f);
     builder->setDepth(depth);
     presentImmediately = true;
   } else if (event.keyCode == 123) {  // Left arrow

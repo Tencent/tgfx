@@ -69,6 +69,7 @@ class GlassRefractionEffect : public RuntimeEffect {
   // onDraw is a virtual const method in RuntimeEffect and cannot be made non-const.
   // Sampler creation is lazy initialization that does not affect the filter's logical state.
   mutable std::shared_ptr<Sampler> cachedSampler = nullptr;
+  mutable std::shared_ptr<Sampler> cachedMaskSampler = nullptr;
 };
 
 }  // namespace tgfx

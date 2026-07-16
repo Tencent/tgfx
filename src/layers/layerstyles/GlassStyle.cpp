@@ -18,6 +18,7 @@
 
 #include "tgfx/layers/layerstyles/GlassStyle.h"
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include "GlassRefractionEffect.h"
 #include "core/utils/Log.h"
@@ -148,6 +149,7 @@ Rect GlassStyle::filterBackground(const Rect& srcRect, float contentScale) {
 }
 
 void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, BlendMode) {
+  auto drawStartTime = std::chrono::high_resolution_clock::now();
   if (input.extraSource == nullptr) {
     DEBUG_ASSERT(false);
     return;
@@ -180,6 +182,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
   }
 
   // Step 1: Frost - apply Gaussian blur to the background
+  auto frostStartTime = std::chrono::high_resolution_clock::now();
   std::shared_ptr<Image> processedBg = bgImage;
   Point processedOffset = bgOffset;
   if (_frost > 0) {
@@ -191,6 +194,10 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
       processedOffset += blurOffset;
     }
   }
+  auto frostEndTime = std::chrono::high_resolution_clock::now();
+  LOGI("GlassStyle: frost=%lldus, bgImage=%dx%d, contentScale=%.2f",
+       std::chrono::duration_cast<std::chrono::microseconds>(frostEndTime - frostStartTime).count(),
+       bgImage->width(), bgImage->height(), input.contentScale);
 
   // Step 2 & 3: Apply refraction with dispersion and lighting (computed entirely in GPU shader)
   if (_refraction > 0 || _lightIntensity > 0) {
@@ -265,10 +272,13 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
     // UDF is capped at MAX_UDF_SIZE to prevent excessive texture allocation. The mask UVs
     // are normalized (0-1), so lower resolution does not affect the refraction shader.
     static constexpr float MAX_UDF_SIZE = 1024.0f;
+    auto udfStartTime = std::chrono::high_resolution_clock::now();
     std::shared_ptr<Image> maskImage = nullptr;
+    std::shared_ptr<Image> coarseMaskImage = nullptr;
     if (effectiveShapeType == GlassShapeType::AlphaMask) {
       // Use original layer bounds (not zoom-affected) for blur radius calculation.
-      float blurRadius = std::min(origMinHalf * (_depth / 100.0f) * 0.5f, 500.0f);
+      // depth 1-100 maps linearly to blurRadius 1-50, minimum 5.
+      float blurRadius = std::max(std::min((_depth / 100.0f) * 50.0f, 50.0f), 5.0f);
       // UDF texture size is based on original (unscaled) bounds so that UDF resolution and blur
       // radius are zoom-invariant. If UDF size tracked the scaled layer size, integer rounding
       // would cause discrete jumps in effective blur range as contentScale changes.
@@ -291,13 +301,10 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
       // zoom-invariant.
       float udfBlurRadiusX = blurRadius * udfScale;
       float udfBlurRadiusY = blurRadius * udfScale;
-      // The ratio of UDF transition band width to UDF texture size.
-      // This is passed to the shader as depthRatio to compute theta directly.
-      float udfTransitionRatio = (udfBlurRadiusX + udfBlurRadiusY) * 0.5f / MAX_UDF_SIZE;
-      effectiveDepthRatio = udfTransitionRatio;
+      // depthRatio stays as _depth/100 for shader use (step calculation).
       if (!maskBlurFilter || !FloatNearlyEqual(cachedMaskBlurRadiusX, udfBlurRadiusX) ||
           !FloatNearlyEqual(cachedMaskBlurRadiusY, udfBlurRadiusY)) {
-        maskBlurFilter = ImageFilter::TentBlur(udfBlurRadiusX, udfBlurRadiusY, TileMode::Clamp);
+        maskBlurFilter = ImageFilter::TentBlur(udfBlurRadiusX, udfBlurRadiusY, TileMode::Decal);
         cachedMaskBlurRadiusX = udfBlurRadiusX;
         cachedMaskBlurRadiusY = udfBlurRadiusY;
       }
@@ -308,6 +315,40 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
         LOGE("GlassStyle: Failed to blur alpha for UDF, falling back to content.");
         maskImage = udfContent;
       }
+
+      // Edge light UDF: half the resolution of the fine UDF, fixed small blur radius.
+      // Used for edge lighting (edgeWeight) while the fine UDF is used for refraction direction.
+      static constexpr float EDGE_LIGHT_BLUR_RADIUS = 5.0f;
+      int edgeLightWidth = std::max(1, udfWidth / 2);
+      int edgeLightHeight = std::max(1, udfHeight / 2);
+      std::shared_ptr<Image> edgeLightContent = udfContent;
+      if (edgeLightWidth != udfWidth || edgeLightHeight != udfHeight) {
+        edgeLightContent =
+            udfContent->makeScaled(edgeLightWidth, edgeLightHeight, SamplingOptions(FilterMode::Linear));
+      }
+      float edgeLightRadiusX = EDGE_LIGHT_BLUR_RADIUS * udfScale;
+      float edgeLightRadiusY = EDGE_LIGHT_BLUR_RADIUS * udfScale;
+      if (!coarseMaskBlurFilter ||
+          !FloatNearlyEqual(cachedCoarseMaskBlurRadiusX, edgeLightRadiusX) ||
+          !FloatNearlyEqual(cachedCoarseMaskBlurRadiusY, edgeLightRadiusY)) {
+        coarseMaskBlurFilter =
+            ImageFilter::TentBlur(edgeLightRadiusX, edgeLightRadiusY, TileMode::Decal);
+        cachedCoarseMaskBlurRadiusX = edgeLightRadiusX;
+        cachedCoarseMaskBlurRadiusY = edgeLightRadiusY;
+      }
+      Point edgeLightBlurOffset = {};
+      auto edgeLightClipRect =
+          Rect::MakeWH(static_cast<float>(edgeLightWidth), static_cast<float>(edgeLightHeight));
+      coarseMaskImage =
+          edgeLightContent->makeWithFilter(coarseMaskBlurFilter, &edgeLightBlurOffset, &edgeLightClipRect);
+      if (!coarseMaskImage) {
+        LOGE("GlassStyle: Failed to blur alpha for edge light UDF, falling back to content.");
+        coarseMaskImage = udfContent;
+      }
+      auto udfEndTime = std::chrono::high_resolution_clock::now();
+      LOGI("GlassStyle: udf=%lldus, udfSize=%dx%d, content=%dx%d, blurRadius=%.1f",
+           std::chrono::duration_cast<std::chrono::microseconds>(udfEndTime - udfStartTime).count(),
+           udfWidth, udfHeight, input.content->width(), input.content->height(), blurRadius);
     }
     auto filter = getRefractionFilter(
         layerWidth, layerHeight, effectiveContentScale, effectiveShapeType, crRadius, halfW, halfH,
@@ -318,7 +359,11 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
     // extraInputs is read by RuntimeImageFilter::lockTextureProxy during makeWithFilter, so this
     // must be called before makeWithFilter.
     if (effectiveShapeType == GlassShapeType::AlphaMask && maskImage) {
-      refractionEffect->setExtraInputs({maskImage});
+      if (coarseMaskImage) {
+        refractionEffect->setExtraInputs({maskImage, coarseMaskImage});
+      } else {
+        refractionEffect->setExtraInputs({maskImage});
+      }
     } else {
       refractionEffect->setExtraInputs({});
     }
@@ -358,6 +403,11 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
   } else {
     canvas->drawImage(processedBg, processedOffset.x, processedOffset.y, &paint);
   }
+  auto drawEndTime = std::chrono::high_resolution_clock::now();
+  LOGI("GlassStyle: total=%lldus, processedBg=%dx%d, layer=%dx%d",
+       std::chrono::duration_cast<std::chrono::microseconds>(drawEndTime - drawStartTime).count(),
+       processedBg->width(), processedBg->height(),
+       input.content->width(), input.content->height());
 }
 
 std::shared_ptr<ImageFilter> GlassStyle::getFrostFilter(float contentScale) {
@@ -378,12 +428,15 @@ void GlassStyle::invalidateFilter() {
   refractionEffect = nullptr;
   refractionFilter = nullptr;
   maskBlurFilter = nullptr;
+  coarseMaskBlurFilter = nullptr;
   cachedLayerWidth = 0;
   cachedLayerHeight = 0;
   cachedContentScale = 0.0f;
   cachedCornerRadius = 0.0f;
   cachedMaskBlurRadiusX = 0.0f;
   cachedMaskBlurRadiusY = 0.0f;
+  cachedCoarseMaskBlurRadiusX = 0.0f;
+  cachedCoarseMaskBlurRadiusY = 0.0f;
   invalidateTransform();
 }
 
@@ -404,8 +457,11 @@ void GlassStyle::invalidateFrostFilter() {
 
 void GlassStyle::invalidateMaskFilter() {
   maskBlurFilter = nullptr;
+  coarseMaskBlurFilter = nullptr;
   cachedMaskBlurRadiusX = 0.0f;
   cachedMaskBlurRadiusY = 0.0f;
+  cachedCoarseMaskBlurRadiusX = 0.0f;
+  cachedCoarseMaskBlurRadiusY = 0.0f;
   invalidateTransform();
 }
 

@@ -51,7 +51,8 @@ TentBlurImageFilter::TentBlurImageFilter(float radiusX, float radiusY, TileMode 
 
 static void TentBlur1D(PlacementPtr<FragmentProcessor> source,
                        std::shared_ptr<RenderTargetProxy> renderTarget, float radius,
-                       TentBlurDirection direction, float stepLength, uint32_t renderFlags) {
+                       TentBlurDirection direction, float stepLength, uint32_t renderFlags,
+                       bool inputIsPacked = false) {
   if (!renderTarget) {
     return;
   }
@@ -59,7 +60,7 @@ static void TentBlur1D(PlacementPtr<FragmentProcessor> source,
   auto drawingManager = context->drawingManager();
   auto processor =
       TentBlur1DFragmentProcessor::Make(context->drawingAllocator(), std::move(source), radius,
-                                        direction, stepLength, MAX_TENT_RADIUS);
+                                        direction, stepLength, MAX_TENT_RADIUS, inputIsPacked);
   drawingManager->fillRTWithFP(std::move(renderTarget), std::move(processor), renderFlags);
 }
 
@@ -125,7 +126,7 @@ std::shared_ptr<TextureProxy> TentBlurImageFilter::lockTextureProxy(std::shared_
   auto allocator = args.context->drawingAllocator();
   if (blur2D) {
     TentBlur1D(std::move(sourceFragment), renderTarget, radX, TentBlurDirection::Horizontal, 1.0f,
-               args.renderFlags);
+               args.renderFlags, false);
 
     SamplingArgs samplingArgs = {tileMode, tileMode, {}, SrcRectConstraint::Fast};
     sourceFragment =
@@ -139,7 +140,7 @@ std::shared_ptr<TextureProxy> TentBlurImageFilter::lockTextureProxy(std::shared_
       return nullptr;
     }
     TentBlur1D(std::move(sourceFragment), renderTarget, radY, TentBlurDirection::Vertical, 1.0f,
-               args.renderFlags);
+               args.renderFlags, true);
   } else {
     const auto blurDirection =
         (radX > radY ? TentBlurDirection::Horizontal : TentBlurDirection::Vertical);

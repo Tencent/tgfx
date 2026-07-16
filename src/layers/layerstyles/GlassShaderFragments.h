@@ -109,6 +109,7 @@ static constexpr char GLASS_SDF_ELLIPSE[] = R"(
 // The mask texture stores the blurred alpha channel directly (8-bit precision from TentBlur).
 static constexpr char GLASS_SDF_ALPHA_MASK[] = R"(
     uniform sampler2D uMask;
+    uniform sampler2D uEdgeLightMask;
 
     vec2 maskPixelToUV(float px, float py) {
         float halfW = uParams1.x;
@@ -116,10 +117,23 @@ static constexpr char GLASS_SDF_ALPHA_MASK[] = R"(
         return vec2((px + halfW) / (halfW * 2.0), 1.0 - (py + halfH) / (halfH * 2.0));
     }
 
-    // Samples the blurred alpha height map directly.
+    // Samples the fine blurred alpha height map (used for refraction direction).
+    // UDF is stored as RGBA8-packed float for 32-bit precision.
     float sampleHeight(float px, float py) {
         vec2 uv = maskPixelToUV(px, py);
-        return texture(uMask, uv).a;
+        vec4 packed = texture(uMask, uv);
+        const vec4 UNPACK = vec4(1.0, 1.0/255.0, 1.0/65025.0, 1.0/16581375.0);
+        return dot(packed, UNPACK);
+    }
+
+    // Samples the edge light UDF height map (used for edge lighting).
+    // Uses a fixed small blur radius, producing a wider transition band
+    // that gives a smoother edge light band. Also RGBA8-packed.
+    float sampleCoarseHeight(float px, float py) {
+        vec2 uv = maskPixelToUV(px, py);
+        vec4 packed = texture(uEdgeLightMask, uv);
+        const vec4 UNPACK = vec4(1.0, 1.0/255.0, 1.0/65025.0, 1.0/16581375.0);
+        return dot(packed, UNPACK);
     }
 
     // SDF is negative inside the shape and positive outside.
@@ -195,6 +209,8 @@ static constexpr char GLASS_SHADER_MAIN[] = R"(
         float edgeWeight = 0.0;
         // Outward normal for edge lighting, derived from the refraction direction (negated).
         vec2 glassNormal = vec2(0.0);
+        // Edge light normal from edge light UDF (separate from refraction normal).
+        vec2 edgeLightNormal = vec2(0.0);
 
         // Apply refraction inside the shape.
         if (outerSDF < 0.0) {
@@ -241,15 +257,33 @@ static constexpr char GLASS_SHADER_MAIN[] = R"(
             float height = sampleHeight(px, py);
 
             // Forward difference gradient (2 extra samples, reuses height).
-            // Fixed step in UDF pixel space, converted to layer pixel space.
-            float step = (origMinHalf / 20.0 + 1.0) * udfPixelToLayerPixel;
-            step = clamp(step, 1.0, 3.0 * udfPixelToLayerPixel);
+            float step = (depthRatio * 3.0 + 1.0) * udfPixelToLayerPixel;
             float mr = sampleHeight(px + step, py);
             float tc = sampleHeight(px, py + step);
             vec2 grad = vec2(mr - height, tc - height) / step;
             float gradLen = length(grad);
 
-            if (gradLen > 0.0001) {
+            // Edge light UDF: used for edge weight AND edge light normal direction.
+            float edgeLightHeight = sampleCoarseHeight(px, py);
+            edgeWeight = 1.0 - smoothstep(0.5, 0.75, edgeLightHeight);
+
+            // Compute edge light normal from edge light UDF gradient (separate from refraction).
+            if (edgeWeight > 0.0) {
+                float elMr = sampleCoarseHeight(px + step, py);
+                float elTc = sampleCoarseHeight(px, py + step);
+                vec2 elGrad = vec2(elMr - edgeLightHeight, elTc - edgeLightHeight) / step;
+                float elGradLen = length(elGrad);
+                if (elGradLen > 0.000001) {
+                    vec2 elGradDir = elGrad / elGradLen;
+                    float dirLen = sqrt(px * px + py * py);
+                    vec2 centerDir = (dirLen > 0.001) ? vec2(-px / dirLen, -py / dirLen) : vec2(0.0);
+                    vec2 elMixedDir = mix(elGradDir, centerDir, splay);
+                    elMixedDir = normalize(elMixedDir);
+                    edgeLightNormal = -elMixedDir;
+                }
+            }
+
+            if (gradLen > 0.000001) {
                 vec2 gradDir = grad / gradLen;
 
                 // Step 3: Splay mixing (gradient direction vs center direction).
@@ -261,8 +295,10 @@ static constexpr char GLASS_SHADER_MAIN[] = R"(
 
                 // Step 4: Offset distance based on edge proximity (1 - height).
                 // height≈0 at edge → full strength, height≈max at center → 0.
-                float refDist = halfW * (0.5f * refractionFactor + 0.5f * depthRatio);
-                float edgeProximity = 1.0 - height;
+                // depthScale: 0 when depthRatio=0, ramps to 1 at depthRatio=0.1, then 1.
+                float depthScale = smoothstep(0.0, 0.1, depthRatio);
+                float refDist = halfW * refractionFactor * depthRatio * depthScale;
+                float edgeProximity = height * (1.0 - height);
                 float offsetDist = refDist * edgeProximity;
 
                 vec2 sn = mixedDir * offsetDist;
@@ -271,13 +307,6 @@ static constexpr char GLASS_SHADER_MAIN[] = R"(
 
                 uvOffset = vec2(sn.x * invSourceW, -sn.y * invSourceH);
             }
-
-            // Bevel SDF from the height map. The UDF transition band width is passed as
-            // depthRatio (= udfBlurRadius / udfWidth). theta is a fraction of the transition band
-            // so edge light bandwidth scales proportionally with the actual UDF transition.
-            float theta = depthRatio * 0.3;
-            theta = clamp(theta, 0.001, 0.15);
-            edgeWeight = 1.0 - smoothstep(0.5, 0.5 + theta, height);
 #endif
         }
 
@@ -296,13 +325,9 @@ static constexpr char GLASS_SHADER_MAIN[] = R"(
 
         vec3 finalColor = vec3(r, g, b);
 
-        // Debug: visualize refraction direction (glassNormal).
-        float debugHeight = sampleHeight(px, py);
-        finalColor = vec3(debugHeight, debugHeight, debugHeight);
-
         // Edge lighting: diffuse highlight on the light-facing side, rim light on the opposite side.
         if (lightIntensity > 0.0 && edgeWeight > 0.0) {
-            vec2 N = glassNormal;
+            vec2 N = edgeLightNormal;
             vec2 lightDir = vec2(sin(lightAngleRad), cos(lightAngleRad));
 
             float NdotL = dot(N, lightDir);

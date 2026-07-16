@@ -16,22 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "TentBlur1DFragmentProcessor.h"
+#include "GlassRefractionFragmentProcessor.h"
 
 namespace tgfx {
 
-TentBlur1DFragmentProcessor::TentBlur1DFragmentProcessor(PlacementPtr<FragmentProcessor> processor,
-                                                         float radius, TentBlurDirection direction,
-                                                         float stepLength, int maxRadius,
-                                                         bool inputIsPacked)
-    : FragmentProcessor(ClassID()), radius(radius), direction(direction), stepLength(stepLength),
-      maxRadius(maxRadius), inputIsPacked(inputIsPacked) {
-  registerChildProcessor(std::move(processor));
+GlassRefractionFragmentProcessor::GlassRefractionFragmentProcessor(
+    PlacementPtr<FragmentProcessor> source, PlacementPtr<FragmentProcessor> mask,
+    const GlassRefractionParams& params)
+    : FragmentProcessor(ClassID()), params(params) {
+  registerChildProcessor(std::move(source));
+  if (mask) {
+    registerChildProcessor(std::move(mask));
+  }
 }
 
-void TentBlur1DFragmentProcessor::onComputeProcessorKey(BytesKey* key) const {
-  key->write(maxRadius);
-  key->write(static_cast<uint32_t>(inputIsPacked));
+void GlassRefractionFragmentProcessor::onComputeProcessorKey(BytesKey* key) const {
+  key->write(static_cast<int>(params.shapeType));
+  key->write(params.hasMask ? 1 : 0);
 }
 
 }  // namespace tgfx

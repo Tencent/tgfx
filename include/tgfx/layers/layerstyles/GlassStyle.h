@@ -189,6 +189,7 @@ class GlassStyle : public LayerStyle {
   std::shared_ptr<GlassRefractionEffect> refractionEffect = nullptr;
   std::shared_ptr<ImageFilter> refractionFilter = nullptr;
   std::shared_ptr<ImageFilter> maskBlurFilter = nullptr;
+  std::shared_ptr<ImageFilter> coarseMaskBlurFilter = nullptr;
 
   int cachedLayerWidth = 0;
   int cachedLayerHeight = 0;
@@ -197,6 +198,8 @@ class GlassStyle : public LayerStyle {
   float cachedCornerRadius = 0.0f;
   float cachedMaskBlurRadiusX = 0.0f;
   float cachedMaskBlurRadiusY = 0.0f;
+  float cachedCoarseMaskBlurRadiusX = 0.0f;
+  float cachedCoarseMaskBlurRadiusY = 0.0f;
 };
 
 }  // namespace tgfx
