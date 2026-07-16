@@ -894,7 +894,6 @@ PlacementPtr<FragmentProcessor> OpsCompositor::makeMaskFP(
   }
   PlacementPtr<FragmentProcessor> maskFP =
       DeviceSpaceTextureEffect::Make(allocator, std::move(maskTexture), uvMatrix);
-  maskFP = FragmentProcessor::MulInputByChildAlpha(allocator, std::move(maskFP));
   if (!inputFP) {
     return maskFP;
   }
@@ -1021,7 +1020,8 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
       auto secondName = processors[1]->name();
       shouldDecompose = secondName == "ColorSpaceXformEffect" ||
                         secondName == "LumaFragmentProcessor" ||
-                        secondName == "AlphaStepFragmentProcessor";
+                        secondName == "AlphaStepFragmentProcessor" ||
+                        secondName == "ColorMatrixFragmentProcessor";
     }
     if (shouldDecompose) {
       auto savedProcessors = std::move(processors);

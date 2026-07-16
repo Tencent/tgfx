@@ -25,18 +25,19 @@ namespace tgfx {
 class TextureClipShader : public PrecompiledShader {
  public:
   struct Dims {
-    enum : uint32_t { ALPHA_ONLY, HAS_RGBAAA, HAS_SUBSET, HAS_XP, COUNT };
+    enum : uint32_t { ALPHA_ONLY, HAS_RGBAAA, HAS_SUBSET, HAS_XP, HAS_MASK_TEXTURE, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationBool("ALPHA_ONLY"),
           PermutationBool("HAS_RGBAAA"),
           PermutationBool("HAS_SUBSET"),
           PermutationInt("HAS_XP", 3),
+          PermutationBool("HAS_MASK_TEXTURE"),
       });
     }
   };
   using D = Dims;
-  static_assert(D::COUNT == 4, "Update ShouldCompile below when dimensions change.");
+  static_assert(D::COUNT == 5, "Update ShouldCompile below when dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"TextureClipShader",

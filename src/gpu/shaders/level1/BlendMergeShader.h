@@ -67,6 +67,7 @@ class BlendMergeShader : public PrecompiledShader {
       HAS_CHILD_SUBSET,
       HAS_COVERAGE,
       HAS_COLOR,
+      HAS_MASK_TEXTURE,
       COUNT
     };
     static PermutationDomain domain() {
@@ -77,11 +78,12 @@ class BlendMergeShader : public PrecompiledShader {
           PermutationInt("HAS_CHILD_SUBSET", 4),
           PermutationBool("HAS_COVERAGE"),
           PermutationBool("HAS_COLOR"),
+          PermutationBool("HAS_MASK_TEXTURE"),
       });
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 6, "Update ShouldCompile when fragment dimensions change.");
+  static_assert(FD::COUNT == 7, "Update ShouldCompile when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"BlendMergeShader",
@@ -123,6 +125,11 @@ class BlendMergeShader : public PrecompiledShader {
     int gpType = vertValues[VD::GP_TYPE];
     if (gpType == 0 && (vertValues[VD::HAS_COVERAGE] != 0 || vertValues[VD::HAS_UV_COORD] != 0 ||
                         vertValues[VD::HAS_COLOR] != 0)) {
+      return false;
+    }
+    // HAS_MASK_TEXTURE is only used with DefaultGP (GP_TYPE=0) in practice because mask clips
+    // go through DefaultGeometryProcessor paths.
+    if (fragValues[FD::HAS_MASK_TEXTURE] != 0 && gpType != 0) {
       return false;
     }
     return true;

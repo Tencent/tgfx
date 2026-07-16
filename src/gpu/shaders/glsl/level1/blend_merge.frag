@@ -47,6 +47,9 @@
 #ifndef HAS_COLOR
 #define HAS_COLOR 0
 #endif
+#ifndef HAS_MASK_TEXTURE
+#define HAS_MASK_TEXTURE 0
+#endif
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #if !HAS_COLOR
   vec4 Color;
@@ -71,6 +74,9 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #endif
   vec4 Rect;
   int HasClip;
+#if HAS_MASK_TEXTURE
+  mat3 DeviceCoordMatrix;
+#endif
 #include "xp_uniforms.inc"
 };
 
@@ -88,18 +94,25 @@ layout(location = 2) in vec4 vColor;
 layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
   #if CHILD_TYPE == 2
 layout(set = 1, binding = 1) uniform sampler2D TextureSampler_1;
-    #define XP_DST_TEX_BINDING 2
+    #define NEXT_BINDING 2
   #else
-    #define XP_DST_TEX_BINDING 1
+    #define NEXT_BINDING 1
   #endif
 #elif CHILD0_MODE == 1
   // ConstColor child: first texture binding slot is freed.
   #if CHILD_TYPE == 2
 layout(set = 1, binding = 0) uniform sampler2D TextureSampler_1;
-    #define XP_DST_TEX_BINDING 1
+    #define NEXT_BINDING 1
   #else
-    #define XP_DST_TEX_BINDING 0
+    #define NEXT_BINDING 0
   #endif
+#endif
+
+#if HAS_MASK_TEXTURE
+layout(set = 1, binding = NEXT_BINDING) uniform sampler2D MaskTextureSampler;
+  #define XP_DST_TEX_BINDING (NEXT_BINDING + 1)
+#else
+  #define XP_DST_TEX_BINDING NEXT_BINDING
 #endif
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
@@ -375,6 +388,12 @@ void main() {
 #endif
 
   vec4 blendResult = blendColors(srcColor, dstColor);
+
+#if HAS_MASK_TEXTURE
+  highp vec3 maskCoord = DeviceCoordMatrix * vec3(gl_FragCoord.xy, 1.0);
+  float maskAlpha = texture(MaskTextureSampler, maskCoord.xy).r;
+  blendResult *= maskAlpha;
+#endif
 
   if (HasClip == 1) {
     highp vec4 clipDists = clamp(vec4(1.0, 1.0, -1.0, -1.0) * vec4(gl_FragCoord.xyxy - Rect), 0.0, 1.0);

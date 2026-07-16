@@ -62,5 +62,9 @@ void GLSLDeviceSpaceTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
   auto scale = textureView->getTextureCoord(1, 1);
   deviceCoordMatrix.postScale(scale.x, scale.y);
   fragmentUniformData->setData("DeviceCoordMatrix", deviceCoordMatrix);
+  if (fragmentUniformData->hasField("HasClip")) {
+    int hasClip = 0;
+    fragmentUniformData->setData("HasClip", hasClip);
+  }
 }
 }  // namespace tgfx

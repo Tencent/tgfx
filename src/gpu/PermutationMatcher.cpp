@@ -630,12 +630,33 @@ static std::optional<PermutationMatchResult> TryMatchTextureClip(const ProgramIn
     return std::nullopt;
   }
   auto fp0 = programInfo->getFragmentProcessor(0);
-  auto fp1 = programInfo->getFragmentProcessor(1);
-  if (fp0->name() != "TextureEffect" || fp1->name() != "AARectEffect") {
+  if (fp0->name() != "TextureEffect") {
     return std::nullopt;
   }
   auto* te = static_cast<const TextureEffect*>(fp0);
   if (te->isYUV()) {
+    return std::nullopt;
+  }
+  auto fp1 = programInfo->getFragmentProcessor(1);
+  int hasMaskTexture = 0;
+  auto coverageName = fp1->name();
+  if (coverageName == "AARectEffect") {
+    // Rect coverage is hardcoded in the shader.
+  } else if (coverageName == "ComposeFragmentProcessor") {
+    if (fp1->numChildProcessors() != 2) {
+      return std::nullopt;
+    }
+    auto child0 = fp1->childProcessor(0);
+    auto child1 = fp1->childProcessor(1);
+    if (child0->name() != "DeviceSpaceTextureEffect" || child1->name() != "AARectEffect") {
+      return std::nullopt;
+    }
+    auto* dste = static_cast<const DeviceSpaceTextureEffect*>(child0);
+    if (!dste->isAlphaOnly()) {
+      return std::nullopt;
+    }
+    hasMaskTexture = 1;
+  } else {
     return std::nullopt;
   }
   using D = TextureClipShader::D;
@@ -645,6 +666,7 @@ static std::optional<PermutationMatchResult> TryMatchTextureClip(const ProgramIn
   fragValues[D::HAS_RGBAAA] = te->hasRGBAAA() ? 1 : 0;
   fragValues[D::HAS_SUBSET] = te->hasSubset() ? 1 : 0;
   fragValues[D::HAS_XP] = xpType;
+  fragValues[D::HAS_MASK_TEXTURE] = hasMaskTexture;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"TextureClipShader", 0, fragIndex};
 }
@@ -984,12 +1006,36 @@ static std::optional<PermutationMatchResult> TryMatchBlendMerge(const ProgramInf
   if (numFP < 1 || numFP > 2) {
     return std::nullopt;
   }
+  int hasMaskTexture = 0;
   if (numFP == 2) {
     if (programInfo->numColorFragmentProcessors() != 1) {
       return std::nullopt;
     }
     auto coverageFP = programInfo->getFragmentProcessor(1);
-    if (coverageFP->name() != "AARectEffect") {
+    auto coverageName = coverageFP->name();
+    if (coverageName == "AARectEffect") {
+      // Handled via HasClip runtime uniform in the shader.
+    } else if (coverageName == "DeviceSpaceTextureEffect") {
+      auto* dste = static_cast<const DeviceSpaceTextureEffect*>(coverageFP);
+      if (!dste->isAlphaOnly()) {
+        return std::nullopt;
+      }
+      hasMaskTexture = 1;
+    } else if (coverageName == "ComposeFragmentProcessor") {
+      if (coverageFP->numChildProcessors() != 2) {
+        return std::nullopt;
+      }
+      auto child0 = coverageFP->childProcessor(0);
+      auto child1 = coverageFP->childProcessor(1);
+      if (child0->name() != "DeviceSpaceTextureEffect" || child1->name() != "AARectEffect") {
+        return std::nullopt;
+      }
+      auto* dste = static_cast<const DeviceSpaceTextureEffect*>(child0);
+      if (!dste->isAlphaOnly()) {
+        return std::nullopt;
+      }
+      hasMaskTexture = 1;
+    } else {
       return std::nullopt;
     }
   }
@@ -1096,6 +1142,7 @@ static std::optional<PermutationMatchResult> TryMatchBlendMerge(const ProgramInf
   fragValues[FD::HAS_CHILD_SUBSET] = subsetMask;
   fragValues[FD::HAS_COVERAGE] = hasCoverage;
   fragValues[FD::HAS_COLOR] = hasColor;
+  fragValues[FD::HAS_MASK_TEXTURE] = hasMaskTexture;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"BlendMergeShader", vertIndex, fragIndex};
 }
