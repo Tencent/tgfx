@@ -351,6 +351,12 @@ class DisplayList {
   Point lastContentOffset = {};
   Point mousePosition = {};
   int totalTileCount = 0;
+  // SSAA per-frame diagnostics: reset at the start of render(), accumulated in drawTileTask(),
+  // summarized by logSSAAStatus(). lastSSAAStatusCode dedups the summary so it only logs on
+  // state transitions instead of every frame. -1 is the "never logged" sentinel.
+  int ssaaActiveTileCount = 0;
+  int ssaaFailedTileCount = 0;
+  int lastSSAAStatusCode = -1;
   std::vector<std::shared_ptr<Surface>> surfaceCaches = {};
   std::shared_ptr<Surface> ssaaTileSurface = nullptr;
   std::unordered_map<int64_t, TileCache*> tileCaches = {};
@@ -408,6 +414,8 @@ class DisplayList {
 
   Surface* getOrCreateSSAATileSurface(const Surface* renderSurface, int requiredWidth,
                                       int requiredHeight);
+
+  void logSSAAStatus();
 
   void drawScreenTasks(std::vector<DrawTask> screenTasks, std::vector<Rect> skippedRects,
                        Surface* surface, bool autoClear) const;
