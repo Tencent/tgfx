@@ -149,8 +149,10 @@ static std::shared_ptr<ColorSpace> ReadColorProfile(png_structp pngPtr, png_info
   png_byte videoFullRangeFlag = 0;
   if (PNG_INFO_cICP == png_get_cICP(pngPtr, infoPtr, &colourPrimaries, &transferFunction,
                                     &matrixCoefficients, &videoFullRangeFlag)) {
-    // Only RGB with matrix_coefficients == 0 and full-range flag == 1 are valid for still images.
-    // Any other combination is treated as invalid and falls through to the next detector.
+    // tgfx only supports full-range RGB cICP (matrix_coefficients == 0, video_full_range_flag ==
+    // 1). Narrow-range or non-identity matrix coefficients would require pixel value expansion
+    // that the PNG decoder does not implement, so such cICP configurations fall through to the
+    // next detector rather than being applied verbatim (which would render darker than expected).
     if (matrixCoefficients == 0 && videoFullRangeFlag == 1) {
       auto cs = ColorSpace::MakeCICP(static_cast<ColorSpacePrimariesID>(colourPrimaries),
                                      static_cast<TransferFunctionID>(transferFunction));
