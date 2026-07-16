@@ -201,6 +201,14 @@ class Canvas {
   void clipRect(const Rect& rect, bool antiAlias = true);
 
   /**
+   * Replaces the current clip with the intersection of the clip and the specified rounded
+   * rectangle. The rounded rectangle is transformed by the current matrix before clipping.
+   * @param rRect The rounded rectangle to intersect with the current clip.
+   * @param antiAlias If true, the clip edge will be anti-aliased.
+   */
+  void clipRRect(const RRect& rRect, bool antiAlias = true);
+
+  /**
    * Replaces the current clip with the intersection of the clip and the specified path. The path is
    * transformed by the current matrix before clipping.
    * @param path The path to intersect with the current clip.

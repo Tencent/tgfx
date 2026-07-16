@@ -47,6 +47,9 @@ local.properties
 *.local.json
 *.local.md
 
+# WorkBuddy
+.workbuddy/
+
 # Skill runtime cache
 .cr-cache/
 

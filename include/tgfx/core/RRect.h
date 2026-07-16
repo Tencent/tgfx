@@ -19,7 +19,6 @@
 #pragma once
 
 #include <array>
-#include "tgfx/core/Matrix.h"
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
@@ -28,6 +27,15 @@ namespace tgfx {
  */
 class RRect {
  public:
+  /**
+   * Returns an RRect representing a plain rectangle with zero corner radii.
+   */
+  static RRect MakeRect(const Rect& rect) {
+    RRect rr = {};
+    rr.setRect(rect);
+    return rr;
+  }
+
   /**
    * Returns an RRect with the same radii for all four corners. See setRectXY() for details.
    */
@@ -95,6 +103,12 @@ class RRect {
   }
 
   /**
+   * Sets to a plain rectangle with zero corner radii.
+   * @param rect  bounds of the rectangle
+   */
+  void setRect(const Rect& rect);
+
+  /**
    * Sets to rounded rectangle with the same radii for all four corners.
    * @param rect  bounds of rounded rectangle
    * @param radiusX  x-axis radius of corners
@@ -144,6 +158,20 @@ class RRect {
    */
   const std::array<Point, 4>& radii() const {
     return _radii;
+  }
+
+  /**
+   * Compares a and b; returns true if they have the same bounding rect and corner radii.
+   */
+  friend bool operator==(const RRect& a, const RRect& b) {
+    return a._rect == b._rect && a._radii == b._radii;
+  }
+
+  /**
+   * Compares a and b; returns true if they differ in bounding rect or any corner radius.
+   */
+  friend bool operator!=(const RRect& a, const RRect& b) {
+    return !(a == b);
   }
 
  private:
