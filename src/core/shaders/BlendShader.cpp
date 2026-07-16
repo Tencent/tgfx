@@ -18,60 +18,13 @@
 
 #include "BlendShader.h"
 #include "core/utils/Types.h"
-#include "gpu/DrawingManager.h"
+#include "gpu/FPFlattenHelper.h"
 #include "gpu/processors/FragmentProcessor.h"
-#include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
-#include "gpu/proxies/RenderTargetProxy.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 
-static bool IsSimpleBlendChild(const FragmentProcessor* fp) {
-  if (fp == nullptr) {
-    return true;
-  }
-  auto fpName = fp->name();
-  if (fpName == "TextureEffect") {
-    auto* te = static_cast<const TextureEffect*>(fp);
-    return !te->isYUV() && te->numTextureSamplers() > 0;
-  }
-  if (fpName == "ConstColorProcessor") {
-    return true;
-  }
-  if (fpName == "TiledTextureEffect") {
-    return true;
-  }
-  return false;
-}
-
-static PlacementPtr<FragmentProcessor> FlattenToTexture(const FPArgs& args,
-                                                        PlacementPtr<FragmentProcessor> fp) {
-  auto context = args.context;
-  auto drawRect = args.drawRect;
-  drawRect.roundOut();
-  int width = static_cast<int>(drawRect.width());
-  int height = static_cast<int>(drawRect.height());
-  if (width <= 0 || height <= 0) {
-    return nullptr;
-  }
-  auto renderTarget = RenderTargetProxy::Make(context, width, height, false, 1, false,
-                                              ImageOrigin::TopLeft, BackingFit::Approx);
-  if (renderTarget == nullptr) {
-    return nullptr;
-  }
-  auto drawingManager = context->drawingManager();
-  if (!drawingManager->fillRTWithFP(renderTarget, std::move(fp), args.renderFlags)) {
-    return nullptr;
-  }
-  auto textureProxy = renderTarget->asTextureProxy();
-  if (textureProxy == nullptr) {
-    return nullptr;
-  }
-  auto uvMatrix = Matrix::MakeTrans(-drawRect.x(), -drawRect.y());
-  auto allocator = context->drawingAllocator();
-  return TextureEffect::Make(allocator, std::move(textureProxy), {}, &uvMatrix);
-}
 std::shared_ptr<Shader> Shader::MakeBlend(BlendMode mode, std::shared_ptr<Shader> dst,
                                           std::shared_ptr<Shader> src) {
   switch (mode) {
@@ -118,17 +71,13 @@ PlacementPtr<FragmentProcessor> BlendShader::asFragmentProcessor(
   if (fpB == nullptr) {
     return nullptr;
   }
-  if (!IsSimpleBlendChild(fpA.get())) {
-    fpA = FlattenToTexture(args, std::move(fpA));
-    if (fpA == nullptr) {
-      return nullptr;
-    }
+  fpA = EnsureSimpleBlendChild(args, std::move(fpA));
+  if (fpA == nullptr) {
+    return nullptr;
   }
-  if (!IsSimpleBlendChild(fpB.get())) {
-    fpB = FlattenToTexture(args, std::move(fpB));
-    if (fpB == nullptr) {
-      return nullptr;
-    }
+  fpB = EnsureSimpleBlendChild(args, std::move(fpB));
+  if (fpB == nullptr) {
+    return nullptr;
   }
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(args.context->drawingAllocator(),
                                                           std::move(fpB), std::move(fpA), mode);

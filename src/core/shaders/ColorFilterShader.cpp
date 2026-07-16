@@ -18,6 +18,7 @@
 
 #include "ColorFilterShader.h"
 #include "core/utils/Types.h"
+#include "gpu/FPFlattenHelper.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
 
@@ -58,7 +59,15 @@ PlacementPtr<FragmentProcessor> ColorFilterShader::asFragmentProcessor(
   }
   // The color filter transforms transparent pixels into non-transparent ones. Use the original
   // shader alpha as a mask to prevent coloring transparent regions.
+  composed = EnsureSimpleBlendChild(args, std::move(composed));
+  if (composed == nullptr) {
+    return nullptr;
+  }
   auto alphaSource = FragmentProcessor::Make(shader, args, uvMatrix, dstColorSpace);
+  alphaSource = EnsureSimpleBlendChild(args, std::move(alphaSource));
+  if (alphaSource == nullptr) {
+    return nullptr;
+  }
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(allocator, std::move(composed),
                                                           std::move(alphaSource), BlendMode::SrcIn);
 }

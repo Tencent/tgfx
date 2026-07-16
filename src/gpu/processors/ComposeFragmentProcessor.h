@@ -34,6 +34,14 @@ class ComposeFragmentProcessor : public FragmentProcessor {
     return "ComposeFragmentProcessor";
   }
 
+  /**
+   * Moves all child processors out of this ComposeFragmentProcessor. After calling this method,
+   * the processor is left in an empty state and should not be used.
+   */
+  std::vector<PlacementPtr<FragmentProcessor>> takeChildren() {
+    return std::move(childProcessors);
+  }
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
