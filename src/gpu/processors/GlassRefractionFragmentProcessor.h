@@ -43,6 +43,8 @@ struct GlassRefractionParams {
   float lightIntensity = 0.0f;
   float origMinHalf = 0.0f;
   float udfPixelToLayerPixel = 1.0f;
+  float renderOffsetX = 0.0f;
+  float renderOffsetY = 0.0f;
   GlassShapeType shapeType = GlassShapeType::RoundedRect;
 };
 

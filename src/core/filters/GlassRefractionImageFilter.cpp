@@ -20,7 +20,6 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/TPArgs.h"
 #include "gpu/processors/GlassRefractionFragmentProcessor.h"
-#include "gpu/processors/TextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
@@ -32,20 +31,20 @@ GlassRefractionImageFilter::GlassRefractionImageFilter(const GlassRefractionPara
 }
 
 std::shared_ptr<TextureProxy> GlassRefractionImageFilter::lockTextureProxy(
-    std::shared_ptr<Image> source, const Rect& /*renderBounds*/, const TPArgs& args) const {
-  // Always render the full source extent. Glass refraction samples source pixels at offsets that
-  // can reach any part of the texture, so a clipped sub-region would miss data. The render target
-  // matches source dimensions and the returned texture covers the full source.
-  auto sourceWidth = source->width();
-  auto sourceHeight = source->height();
+    std::shared_ptr<Image> source, const Rect& renderBounds, const TPArgs& args) const {
+  // Render target covers only the visible sub-region (renderBounds), but source texture remains
+  // full-size so refraction offsets can sample any pixel. The render offset is passed to the
+  // shader to map render target pixel coords back to source global coords.
+  auto width = static_cast<int>(renderBounds.width());
+  auto height = static_cast<int>(renderBounds.height());
   auto renderTarget =
-      RenderTargetProxy::Make(args.context, sourceWidth, sourceHeight, source->isAlphaOnly(), 1,
-                              args.mipmapped, ImageOrigin::TopLeft, BackingFit::Exact);
+      RenderTargetProxy::Make(args.context, width, height, source->isAlphaOnly(), 1, args.mipmapped,
+                              ImageOrigin::TopLeft, BackingFit::Exact);
   if (renderTarget == nullptr) {
     return nullptr;
   }
 
-  // Lock source texture.
+  // Lock source texture at full size.
   TPArgs tpArgs(args.context, args.renderFlags, false, 1.0f, BackingFit::Exact);
   auto sourceProxy = source->lockTextureProxy(tpArgs);
   if (sourceProxy == nullptr) {
@@ -62,10 +61,15 @@ std::shared_ptr<TextureProxy> GlassRefractionImageFilter::lockTextureProxy(
     coarseMaskProxy = coarseMask->lockTextureProxy(tpArgs);
   }
 
+  // Pass render offset so the shader can map render target coords to source coords.
+  auto localParams = params;
+  localParams.renderOffsetX = renderBounds.left;
+  localParams.renderOffsetY = renderBounds.top;
+
   auto allocator = args.context->drawingAllocator();
   auto processor = GlassRefractionFragmentProcessor::Make(allocator, std::move(sourceProxy),
                                                           std::move(fineMaskProxy),
-                                                          std::move(coarseMaskProxy), params);
+                                                          std::move(coarseMaskProxy), localParams);
   if (processor == nullptr) {
     return nullptr;
   }
@@ -81,26 +85,7 @@ std::shared_ptr<TextureProxy> GlassRefractionImageFilter::lockTextureProxy(
 PlacementPtr<FragmentProcessor> GlassRefractionImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     SrcRectConstraint constraint, const Matrix* uvMatrix) const {
-  // Lock a full-size refraction texture (covers entire source, not a sub-region).
-  auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
-  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, 1.0f, BackingFit::Exact);
-  auto inputBounds = Rect::MakeWH(source->width(), source->height());
-  auto textureProxy = lockTextureProxy(std::move(source), inputBounds, tpArgs);
-  if (textureProxy == nullptr) {
-    return nullptr;
-  }
-  // The returned texture covers the full source. Build a TextureEffect with identity mapping
-  // (scaled to normalized coords), applying any incoming uvMatrix from the caller.
-  auto fpMatrix = Matrix::MakeScale(
-      static_cast<float>(textureProxy->width()) / inputBounds.width(),
-      static_cast<float>(textureProxy->height()) / inputBounds.height());
-  if (uvMatrix != nullptr) {
-    fpMatrix.preConcat(*uvMatrix);
-  }
-  SamplingArgs samplingArgs = {TileMode::Clamp, TileMode::Clamp, sampling, constraint};
-  auto allocator = args.context->drawingAllocator();
-  return TextureEffect::Make(allocator, std::move(textureProxy), samplingArgs, &fpMatrix,
-                             false);
+  return makeFPFromTextureProxy(source, args, sampling, constraint, uvMatrix);
 }
 
 }  // namespace tgfx

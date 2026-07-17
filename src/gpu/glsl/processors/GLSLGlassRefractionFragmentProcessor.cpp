@@ -106,8 +106,9 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("float halfH = %s.y;", p1.c_str());
   fragBuilder->codeAppendf("float invSourceW = %s.z;", p3.c_str());
   fragBuilder->codeAppendf("float invSourceH = %s.w;", p3.c_str());
-  fragBuilder->codeAppendf("vec2 sourceUV = %s * vec2(invSourceW, invSourceH);",
-                           texCoordName.c_str());
+  // Add render offset to convert from render target pixel coords to source pixel coords.
+  fragBuilder->codeAppendf("vec2 sourceUV = (%s + %s.zw) * vec2(invSourceW, invSourceH);",
+                           texCoordName.c_str(), p5.c_str());
 
   // Convert source UV to glass pixel coords centered at origin.
   fragBuilder->codeAppendf("vec2 glassUV = (sourceUV - %s.xy) * %s.zw;", p0.c_str(), p0.c_str());
@@ -375,8 +376,9 @@ void GLSLGlassRefractionFragmentProcessor::onSetData(UniformData* /*vertexUnifor
   float p4[4] = {params.splay, params.depthRatio, lightAngleRad, params.lightIntensity};
   fragmentUniformData->setData("GlassP4", p4);
 
-  // GlassP5: origMinHalf, udfPixelToLayerPixel, 0, 0
-  float p5[4] = {params.origMinHalf, params.udfPixelToLayerPixel, 0.0f, 0.0f};
+  // GlassP5: origMinHalf, udfPixelToLayerPixel, renderOffsetX, renderOffsetY
+  float p5[4] = {params.origMinHalf, params.udfPixelToLayerPixel, params.renderOffsetX,
+                 params.renderOffsetY};
   fragmentUniformData->setData("GlassP5", p5);
 }
 
