@@ -284,6 +284,11 @@ void QGLWindow::createDevice(QOpenGLContext* context) {
   surface->create();
   device = QGLDevice::MakeFrom(context, surface, true);
   if (renderThread != nullptr) {
+    // Detach the QScreen before moving the surface to the render thread. Otherwise, when the
+    // associated QScreen is destroyed (e.g. the window closes), Qt posts a screen-change event to
+    // the surface's thread, and the render thread would call setScreen() to disconnect from the
+    // already-destroyed QScreen, causing a crash.
+    surface->setScreen(nullptr);
     static_cast<QGLDevice*>(device.get())->moveToThread(renderThread);
   }
   QMetaObject::invokeMethod(quickItem, "update", Qt::AutoConnection);
