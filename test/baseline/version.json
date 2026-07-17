@@ -290,6 +290,7 @@
         "DropShadow": "5d735e2d2",
         "GetContourImage": "8db244c7",
         "GlassStyle": "de0df7d7",
+        "GlassStyleBlend": "de0df7d7",
         "GlassStyleDepth": "de0df7d7",
         "GlassStyleEllipse": "de0df7d7",
         "GlassStyleGrid": "de0df7d7",

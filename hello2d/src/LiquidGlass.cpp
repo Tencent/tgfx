@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "base/LayerBuilders.h"
+#include "tgfx/core/Shader.h"
 #include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/ShapeLayer.h"
@@ -109,7 +110,11 @@ std::shared_ptr<tgfx::Layer> LiquidGlass::onBuildLayerTree(const hello2d::AppHos
   }
   starPath.close();
   glassLayer->setPath(starPath);
-  glassLayer->setFillStyle(tgfx::ShapeStyle::Make(tgfx::Color::FromRGBA(255, 255, 255, 128)));
+  // Linear gradient fill: red transparent (left) to red opaque (right).
+  auto gradient = tgfx::Shader::MakeLinearGradient(
+      tgfx::Point::Make(0.0f, 0.0f), tgfx::Point::Make(glassSize, 0.0f),
+      {tgfx::Color::FromRGBA(255, 0, 0, 0), tgfx::Color::FromRGBA(255, 0, 0, 255)}, {});
+  glassLayer->setFillStyle(tgfx::ShapeStyle::Make(std::move(gradient), 1.0f));
   glassLayer->setMatrix(tgfx::Matrix::MakeTrans(glassPosX, glassPosY));
   auto style = tgfx::GlassStyle::Make(glassRefraction, glassDepth, 0, 0, 0, glassLightAngle, 100);
   glassStyleRef = style;

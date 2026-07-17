@@ -162,8 +162,8 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppend("    xNorm = min(xNorm, 1.0);");
     fragBuilder->codeAppend("    float edgeFactor = 1.0 - xNorm;");
     fragBuilder->codeAppend(
-        "    float offsetDist = glassThickness * refractionFactor * edgeFactor * edgeFactor * "
-        "2.0;");
+        "    float offsetDist = glassThickness * refractionFactor * edgeFactor * (1.0 - "
+        "edgeFactor) * 2.0;");
     fragBuilder->codeAppend("    float dirLen = sqrt(px * px + py * py);");
     fragBuilder->codeAppend("    if (dirLen > 0.001) {");
     fragBuilder->codeAppend("      vec2 radialDir = vec2(-px / dirLen, -py / dirLen);");

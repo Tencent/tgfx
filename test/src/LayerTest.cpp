@@ -4570,4 +4570,43 @@ TGFX_TEST(LayerTest, GlassStyleSingle) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleSingle"));
 }
 
+TGFX_TEST(LayerTest, GlassStyleBlend) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  int surfaceWidth = 300;
+  int surfaceHeight = 300;
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Background: checker pattern.
+  auto bgImage = MakeImage("resources/apitest/checker_128.png");
+  auto bgLayer = ImageLayer::Make();
+  bgLayer->setImage(bgImage);
+  auto bgScale = static_cast<float>(surfaceWidth) / static_cast<float>(bgImage->width());
+  bgLayer->setMatrix(Matrix::MakeScale(bgScale, bgScale));
+  displayList->root()->addChild(bgLayer);
+
+  // Glass layer: rectangle with linear gradient from red transparent to red opaque.
+  float glassW = 200;
+  float glassH = 200;
+  float glassX = (static_cast<float>(surfaceWidth) - glassW) * 0.5f;
+  float glassY = (static_cast<float>(surfaceHeight) - glassH) * 0.5f;
+
+  auto glassLayer = ShapeLayer::Make();
+  Path rectPath = {};
+  rectPath.addRect(Rect::MakeWH(glassW, glassH));
+  glassLayer->setPath(rectPath);
+  glassLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 0, 0, 128)));
+  glassLayer->setMatrix(Matrix::MakeTrans(glassX, glassY));
+
+  auto style = GlassStyle::Make(50, 30, 0, 0, 0, 135, 80);
+  glassLayer->setLayerStyles({style});
+  displayList->root()->addChild(glassLayer);
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleBlend"));
+}
+
 }  // namespace tgfx
