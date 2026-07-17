@@ -50,7 +50,6 @@
 #include "gpu/shaders/level1/RoundStrokeRectFillShader.h"
 #include "gpu/shaders/level1/ShapeInstancedFillShader.h"
 #include "gpu/shaders/level1/SingleIntervalGradientShader.h"
-#include "gpu/shaders/level1/TextureClipShader.h"
 #include "gpu/shaders/level1/TextureColorMatrixShader.h"
 #include "gpu/shaders/level1/TexturedAlphaThresholdShader.h"
 #include "gpu/shaders/level1/TexturedColorMatrixShader.h"
@@ -381,6 +380,7 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+  uint32_t totalErrors = 0;
   for (const auto& factory : factories) {
     auto shader = factory();
     auto info = shader->info();
@@ -391,10 +391,16 @@ int main(int argc, char** argv) {
       std::cout << " errors=" << shaderReport.errorCount;
     }
     std::cout << "\n";
+    totalErrors += shaderReport.errorCount;
     report.shaders.push_back(std::move(shaderReport));
   }
 
   if (!tgfx::WriteReportJson(report, options.outDir)) {
+    return 1;
+  }
+
+  if (totalErrors > 0) {
+    std::cerr << "Build failed: " << totalErrors << " shader compilation error(s).\n";
     return 1;
   }
 
