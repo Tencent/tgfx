@@ -18,7 +18,6 @@
 
 #include "tgfx/layers/layerstyles/GlassStyle.h"
 #include <algorithm>
-#include <chrono>
 #include <cmath>
 #include "core/filters/GlassRefractionImageFilter.h"
 #include "core/utils/Log.h"
@@ -138,8 +137,8 @@ Rect GlassStyle::filterBackground(const Rect& srcRect, float contentScale) {
     auto minHalf = std::min(halfW, halfH);
     float refractionFactor = _refraction / 100.0f;
     float depthRatio = _depth / 100.0f;
-    float glassThickness = (1.0f + depthRatio * (minHalf - 1.0f)) * (1.0f + refractionFactor);
-    float analyticalOffset = glassThickness * refractionFactor * 2.0f;
+    float glassThickness = 1.0f + depthRatio * (minHalf - 1.0f);
+    float analyticalOffset = glassThickness * refractionFactor;
     float alphaMaskOffset = halfW * (0.5f * refractionFactor + 0.5f * depthRatio);
     float refractionOutset = std::max(analyticalOffset, alphaMaskOffset);
     refractionOutset = std::max(refractionOutset, 1.0f);
@@ -149,7 +148,6 @@ Rect GlassStyle::filterBackground(const Rect& srcRect, float contentScale) {
 }
 
 void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, BlendMode) {
-  auto drawStartTime = std::chrono::high_resolution_clock::now();
   if (input.extraSource == nullptr) {
     DEBUG_ASSERT(false);
     return;
@@ -188,7 +186,6 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
   bgOffset.y *= scaleRatioY;
 
   // Step 1: Frost - apply Gaussian blur to the background
-  auto frostStartTime = std::chrono::high_resolution_clock::now();
   std::shared_ptr<Image> processedBg = bgImage;
   Point processedOffset = bgOffset;
   if (_frost > 0) {
@@ -200,11 +197,6 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
       processedOffset += blurOffset;
     }
   }
-  auto frostEndTime = std::chrono::high_resolution_clock::now();
-  LOGI("GlassStyle: frost=%lldus, bgImage=%dx%d, contentScale=%.2f",
-       std::chrono::duration_cast<std::chrono::microseconds>(frostEndTime - frostStartTime).count(),
-       bgImage->width(), bgImage->height(), input.contentScale);
-
   // Step 2 & 3: Apply refraction with dispersion and lighting (computed entirely in GPU shader)
   if (_refraction > 0 || _lightIntensity > 0) {
     // layerWidth/Height must match processedBg dimensions for correct UV mapping in shader.
@@ -215,8 +207,6 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
     float halfH = static_cast<float>(layerHeight) * 0.5f;
     float minHalf = std::min(halfW, halfH);
     // origMinHalf is based on original layer bounds, not zoom-affected content size.
-    // Used for parameters that should not change with zoom.
-    Rect origBounds = input.layerContent ? input.layerContent->getBounds() : Rect::MakeWH(0, 0);
     float origMinHalf = std::min(origBounds.width(), origBounds.height()) * 0.5f;
     float effectiveContentScale = input.contentScale * bgScale;
     float scaledRadius = _cornerRadius * effectiveContentScale;
@@ -252,15 +242,8 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
     float maxDepth = origMinHalf - 1.0f;
     float depthPx = (_depth / 100.0f) * maxDepth;
     float depthRatio = std::min(depthPx / maxDepth, 1.0f);
-    // refraction 0~100 applies an additional thickness multiplier of 1.0~2.0.
     float refractionFactor = _refraction / 100.0f;
-    float thicknessMultiplier = 1.0f + refractionFactor;
-    float glassThickness = (1.0f + depthRatio * (origMinHalf - 1.0f)) * thicknessMultiplier;
-    // depth 0~50 maps to flat region 100%~30%, depth 50~100 stays at 30%.
-    float flatRatio = (depthRatio <= 0.5f) ? (1.0f - depthRatio * 1.4f) : 0.3f;
-    float innerHalfW = halfW * flatRatio;
-    float innerHalfH = halfH * flatRatio;
-    float innerRadius = crRadius * flatRatio;
+    float glassThickness = 1.0f + depthRatio * (origMinHalf - 1.0f);
 
     float channelOffset = (_dispersion / 100.0f) * 0.2f;
     float splay = _splay / 100.0f;
@@ -277,7 +260,6 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
     // UDF is capped at MAX_UDF_SIZE to prevent excessive texture allocation. The mask UVs
     // are normalized (0-1), so lower resolution does not affect the refraction shader.
     static constexpr float MAX_UDF_SIZE = 1024.0f;
-    auto udfStartTime = std::chrono::high_resolution_clock::now();
     std::shared_ptr<Image> maskImage = nullptr;
     std::shared_ptr<Image> coarseMaskImage = nullptr;
     if (effectiveShapeType == GlassShapeType::AlphaMask) {
@@ -348,16 +330,12 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
         LOGE("GlassStyle: Failed to blur alpha for edge light UDF, falling back to content.");
         coarseMaskImage = udfContent;
       }
-      auto udfEndTime = std::chrono::high_resolution_clock::now();
-      LOGI("GlassStyle: udf=%lldus, udfSize=%dx%d, content=%dx%d, blurRadius=%.1f",
-           std::chrono::duration_cast<std::chrono::microseconds>(udfEndTime - udfStartTime).count(),
-           udfWidth, udfHeight, input.content->width(), input.content->height(), blurRadius);
     }
     auto filter = getRefractionFilter(
         layerWidth, layerHeight, effectiveContentScale, effectiveShapeType, crRadius, halfW, halfH,
-        minHalf, innerHalfW, innerHalfH, innerRadius, glassThickness, refractionFactor,
-        channelOffset, splay, effectiveDepthRatio, lightAngle, lightIntensity, origMinHalf,
-        udfPixelToLayerPixel, maskImage, coarseMaskImage);
+        minHalf, glassThickness, refractionFactor, channelOffset, splay, effectiveDepthRatio,
+        lightAngle, lightIntensity, origMinHalf, udfPixelToLayerPixel, maskImage,
+        coarseMaskImage);
     Point refractOffset = {};
     auto clipRect = Rect::MakeWH(static_cast<float>(processedBg->width()),
                                  static_cast<float>(processedBg->height()));
@@ -374,9 +352,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
   // dimensions (before makeScaled rounding) for dstRect to avoid sub-pixel gaps at tile boundaries.
   // drawImageRect evaluates the mask shader in dstRect local space (origin at dstRect.x/y), so we
   // must shift the mask shader by dstRect origin to align it with canvas global space.
-  auto maskShader = Shader::MakeImageShader(input.content, TileMode::Decal, TileMode::Decal);
   Paint paint = {};
-  paint.setMaskFilter(MaskFilter::MakeShader(maskShader, false));
   paint.setBlendMode(BlendMode::Src);
   // Background was scaled to origBounds resolution. Map it back to input.content size in canvas space.
   auto dstX = processedOffset.x / scaleRatioX;
@@ -384,15 +360,10 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
   auto dstW = static_cast<float>(processedBg->width()) / scaleRatioX;
   auto dstH = static_cast<float>(processedBg->height()) / scaleRatioY;
   auto dstRect = Rect::MakeXYWH(dstX, dstY, dstW, dstH);
-  maskShader = Shader::MakeImageShader(input.content, TileMode::Clamp, TileMode::Clamp);
+  auto maskShader = Shader::MakeImageShader(input.content, TileMode::Clamp, TileMode::Clamp);
   maskShader = maskShader->makeWithMatrix(Matrix::MakeTrans(dstX, dstY));
   paint.setMaskFilter(MaskFilter::MakeShader(maskShader, false));
   canvas->drawImageRect(processedBg, dstRect, SamplingOptions(FilterMode::Linear), &paint);
-  auto drawEndTime = std::chrono::high_resolution_clock::now();
-  LOGI("GlassStyle: total=%lldus, processedBg=%dx%d, layer=%dx%d",
-       std::chrono::duration_cast<std::chrono::microseconds>(drawEndTime - drawStartTime).count(),
-       processedBg->width(), processedBg->height(), input.content->width(),
-       input.content->height());
 }
 
 std::shared_ptr<ImageFilter> GlassStyle::getFrostFilter(float contentScale) {
@@ -450,11 +421,10 @@ void GlassStyle::invalidateMaskFilter() {
 
 std::shared_ptr<ImageFilter> GlassStyle::getRefractionFilter(
     int layerWidth, int layerHeight, float contentScale, GlassShapeType shapeType,
-    float cornerRadius, float halfWidth, float halfHeight, float minHalf, float innerHalfWidth,
-    float innerHalfHeight, float innerRadius, float glassThickness, float refractionFactor,
-    float dispersion, float splay, float depthRatio, float lightAngle, float lightIntensity,
-    float origMinHalf, float udfPixelToLayerPixel, std::shared_ptr<Image> maskImage,
-    std::shared_ptr<Image> coarseMaskImage) {
+    float cornerRadius, float halfWidth, float halfHeight, float minHalf, float glassThickness,
+    float refractionFactor, float dispersion, float splay, float depthRatio, float lightAngle,
+    float lightIntensity, float origMinHalf, float udfPixelToLayerPixel,
+    std::shared_ptr<Image> maskImage, std::shared_ptr<Image> coarseMaskImage) {
   // For AlphaMask shapes the mask changes each frame, so always recreate.
   // For analytical shapes we can cache when geometry params haven't changed.
   if (shapeType != GlassShapeType::AlphaMask && refractionFilter &&
@@ -470,9 +440,6 @@ std::shared_ptr<ImageFilter> GlassStyle::getRefractionFilter(
   params.halfH = halfHeight;
   params.cornerRadius = cornerRadius;
   params.minHalf = minHalf;
-  params.innerHalfW = innerHalfWidth;
-  params.innerHalfH = innerHalfHeight;
-  params.innerRadius = innerRadius;
   params.glassThickness = glassThickness;
   params.refractionFactor = refractionFactor;
   params.dispersion = dispersion;

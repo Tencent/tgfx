@@ -53,14 +53,7 @@ size_t GlassRefractionFragmentProcessor::onCountTextureSamplers() const {
 }
 
 std::shared_ptr<Texture> GlassRefractionFragmentProcessor::onTextureAt(size_t index) const {
-  std::shared_ptr<TextureProxy> proxy;
-  if (index == 0) {
-    proxy = sourceProxy;
-  } else if (index == 1) {
-    proxy = fineMaskProxy;
-  } else {
-    proxy = coarseMaskProxy;
-  }
+  const auto& proxy = (index == 0) ? sourceProxy : (index == 1) ? fineMaskProxy : coarseMaskProxy;
   if (proxy == nullptr) {
     return nullptr;
   }

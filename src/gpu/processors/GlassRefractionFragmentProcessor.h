@@ -25,26 +25,33 @@
 namespace tgfx {
 
 struct GlassRefractionParams {
+  // Glass geometry (in layer pixel space).
   float glassWidth = 0.0f;
   float glassHeight = 0.0f;
   float halfW = 0.0f;
   float halfH = 0.0f;
   float cornerRadius = 0.0f;
   float minHalf = 0.0f;
-  float innerHalfW = 0.0f;
-  float innerHalfH = 0.0f;
-  float innerRadius = 0.0f;
+
+  // Refraction parameters.
   float glassThickness = 0.0f;
   float refractionFactor = 0.0f;
   float dispersion = 0.0f;
   float splay = 0.0f;
   float depthRatio = 0.0f;
+
+  // Lighting.
   float lightAngle = 0.0f;
   float lightIntensity = 0.0f;
+
+  // UDF and scale factors.
   float origMinHalf = 0.0f;
   float udfPixelToLayerPixel = 1.0f;
+
+  // Render-time state (set per lockTextureProxy call, not cached).
   float renderOffsetX = 0.0f;
   float renderOffsetY = 0.0f;
+
   GlassShapeType shapeType = GlassShapeType::RoundedRect;
 };
 
