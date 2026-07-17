@@ -20,7 +20,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
-#include "GlassRefractionEffect.h"
+#include "core/filters/GlassRefractionImageFilter.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "layers/contents/LayerContent.h"
@@ -173,10 +173,13 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
   // Preserves detail when zoomed in, but caps to avoid huge GPU textures.
   static constexpr float MAX_BG_SIZE = 2048.0f;
   float desiredMaxDim = origMaxDim * input.contentScale;
-  float targetMaxDim = std::min(desiredMaxDim, std::min(static_cast<float>(maxTextureSize), MAX_BG_SIZE));
+  float targetMaxDim =
+      std::min(desiredMaxDim, std::min(static_cast<float>(maxTextureSize), MAX_BG_SIZE));
   float bgScale = targetMaxDim / desiredMaxDim;
-  int scaledW = std::max(1, static_cast<int>(std::round(origBounds.width() * input.contentScale * bgScale)));
-  int scaledH = std::max(1, static_cast<int>(std::round(origBounds.height() * input.contentScale * bgScale)));
+  int scaledW =
+      std::max(1, static_cast<int>(std::round(origBounds.width() * input.contentScale * bgScale)));
+  int scaledH =
+      std::max(1, static_cast<int>(std::round(origBounds.height() * input.contentScale * bgScale)));
   // bgOffset is relative to input.content. Scale it proportionally with bgImage.
   float scaleRatioX = static_cast<float>(scaledW) / static_cast<float>(bgImage->width());
   float scaleRatioY = static_cast<float>(scaledH) / static_cast<float>(bgImage->height());
@@ -286,10 +289,8 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
       // would cause discrete jumps in effective blur range as contentScale changes.
       float origMaxDim = std::max(origBounds.width(), origBounds.height());
       float udfScale = std::min(1.0f, MAX_UDF_SIZE / origMaxDim);
-      int udfWidth =
-          std::max(1, static_cast<int>(std::round(origBounds.width() * udfScale)));
-      int udfHeight =
-          std::max(1, static_cast<int>(std::round(origBounds.height() * udfScale)));
+      int udfWidth = std::max(1, static_cast<int>(std::round(origBounds.width() * udfScale)));
+      int udfHeight = std::max(1, static_cast<int>(std::round(origBounds.height() * udfScale)));
       // udfPixelToLayerPixel converts UDF pixel coordinates to layer pixel coordinates in the
       // shader. UDF size is fixed (origBounds-based), but layer size scales with contentScale.
       udfPixelToLayerPixel = static_cast<float>(layerWidth) / static_cast<float>(udfWidth);
@@ -325,8 +326,8 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
       int edgeLightHeight = std::max(1, udfHeight / 2);
       std::shared_ptr<Image> edgeLightContent = udfContent;
       if (edgeLightWidth != udfWidth || edgeLightHeight != udfHeight) {
-        edgeLightContent =
-            udfContent->makeScaled(edgeLightWidth, edgeLightHeight, SamplingOptions(FilterMode::Linear));
+        edgeLightContent = udfContent->makeScaled(edgeLightWidth, edgeLightHeight,
+                                                  SamplingOptions(FilterMode::Linear));
       }
       float edgeLightRadiusX = EDGE_LIGHT_BLUR_RADIUS * udfScale;
       float edgeLightRadiusY = EDGE_LIGHT_BLUR_RADIUS * udfScale;
@@ -341,8 +342,8 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
       Point edgeLightBlurOffset = {};
       auto edgeLightClipRect =
           Rect::MakeWH(static_cast<float>(edgeLightWidth), static_cast<float>(edgeLightHeight));
-      coarseMaskImage =
-          edgeLightContent->makeWithFilter(coarseMaskBlurFilter, &edgeLightBlurOffset, &edgeLightClipRect);
+      coarseMaskImage = edgeLightContent->makeWithFilter(coarseMaskBlurFilter, &edgeLightBlurOffset,
+                                                         &edgeLightClipRect);
       if (!coarseMaskImage) {
         LOGE("GlassStyle: Failed to blur alpha for edge light UDF, falling back to content.");
         coarseMaskImage = udfContent;
@@ -356,19 +357,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
         layerWidth, layerHeight, effectiveContentScale, effectiveShapeType, crRadius, halfW, halfH,
         minHalf, innerHalfW, innerHalfH, innerRadius, glassThickness, refractionFactor,
         channelOffset, splay, effectiveDepthRatio, lightAngle, lightIntensity, origMinHalf,
-        udfPixelToLayerPixel);
-    // Inject the current frame's maskImage (or empty) into the cached effect via setExtraInputs.
-    // extraInputs is read by RuntimeImageFilter::lockTextureProxy during makeWithFilter, so this
-    // must be called before makeWithFilter.
-    if (effectiveShapeType == GlassShapeType::AlphaMask && maskImage) {
-      if (coarseMaskImage) {
-        refractionEffect->setExtraInputs({maskImage, coarseMaskImage});
-      } else {
-        refractionEffect->setExtraInputs({maskImage});
-      }
-    } else {
-      refractionEffect->setExtraInputs({});
-    }
+        udfPixelToLayerPixel, maskImage, coarseMaskImage);
     Point refractOffset = {};
     auto clipRect = Rect::MakeWH(static_cast<float>(processedBg->width()),
                                  static_cast<float>(processedBg->height()));
@@ -402,8 +391,8 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
   auto drawEndTime = std::chrono::high_resolution_clock::now();
   LOGI("GlassStyle: total=%lldus, processedBg=%dx%d, layer=%dx%d",
        std::chrono::duration_cast<std::chrono::microseconds>(drawEndTime - drawStartTime).count(),
-       processedBg->width(), processedBg->height(),
-       input.content->width(), input.content->height());
+       processedBg->width(), processedBg->height(), input.content->width(),
+       input.content->height());
 }
 
 std::shared_ptr<ImageFilter> GlassStyle::getFrostFilter(float contentScale) {
@@ -421,7 +410,6 @@ std::shared_ptr<ImageFilter> GlassStyle::getFrostFilter(float contentScale) {
 
 void GlassStyle::invalidateFilter() {
   frostFilter = nullptr;
-  refractionEffect = nullptr;
   refractionFilter = nullptr;
   maskBlurFilter = nullptr;
   coarseMaskBlurFilter = nullptr;
@@ -437,7 +425,6 @@ void GlassStyle::invalidateFilter() {
 }
 
 void GlassStyle::invalidateRefractionFilter() {
-  refractionEffect = nullptr;
   refractionFilter = nullptr;
   cachedLayerWidth = 0;
   cachedLayerHeight = 0;
@@ -466,18 +453,38 @@ std::shared_ptr<ImageFilter> GlassStyle::getRefractionFilter(
     float cornerRadius, float halfWidth, float halfHeight, float minHalf, float innerHalfWidth,
     float innerHalfHeight, float innerRadius, float glassThickness, float refractionFactor,
     float dispersion, float splay, float depthRatio, float lightAngle, float lightIntensity,
-    float origMinHalf, float udfPixelToLayerPixel) {
-  if (refractionFilter && cachedLayerWidth == layerWidth && cachedLayerHeight == layerHeight &&
+    float origMinHalf, float udfPixelToLayerPixel, std::shared_ptr<Image> maskImage,
+    std::shared_ptr<Image> coarseMaskImage) {
+  // For AlphaMask shapes the mask changes each frame, so always recreate.
+  // For analytical shapes we can cache when geometry params haven't changed.
+  if (shapeType != GlassShapeType::AlphaMask && refractionFilter &&
+      cachedLayerWidth == layerWidth && cachedLayerHeight == layerHeight &&
       cachedContentScale == contentScale && cachedShapeType == shapeType &&
       FloatNearlyEqual(cachedCornerRadius, cornerRadius)) {
     return refractionFilter;
   }
-  refractionEffect = std::make_shared<GlassRefractionEffect>(
-      static_cast<float>(layerWidth), static_cast<float>(layerHeight), halfWidth, halfHeight,
-      cornerRadius, minHalf, innerHalfWidth, innerHalfHeight, innerRadius, glassThickness,
-      refractionFactor, dispersion, splay, depthRatio, lightAngle, lightIntensity, shapeType,
-      origMinHalf, udfPixelToLayerPixel);
-  refractionFilter = ImageFilter::Runtime(refractionEffect);
+  GlassRefractionParams params = {};
+  params.glassWidth = static_cast<float>(layerWidth);
+  params.glassHeight = static_cast<float>(layerHeight);
+  params.halfW = halfWidth;
+  params.halfH = halfHeight;
+  params.cornerRadius = cornerRadius;
+  params.minHalf = minHalf;
+  params.innerHalfW = innerHalfWidth;
+  params.innerHalfH = innerHalfHeight;
+  params.innerRadius = innerRadius;
+  params.glassThickness = glassThickness;
+  params.refractionFactor = refractionFactor;
+  params.dispersion = dispersion;
+  params.splay = splay;
+  params.depthRatio = depthRatio;
+  params.lightAngle = lightAngle;
+  params.lightIntensity = lightIntensity;
+  params.origMinHalf = origMinHalf;
+  params.udfPixelToLayerPixel = udfPixelToLayerPixel;
+  params.shapeType = shapeType;
+  refractionFilter = std::make_shared<GlassRefractionImageFilter>(params, std::move(maskImage),
+                                                                  std::move(coarseMaskImage));
   cachedLayerWidth = layerWidth;
   cachedLayerHeight = layerHeight;
   cachedContentScale = contentScale;

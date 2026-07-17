@@ -24,8 +24,9 @@ namespace tgfx {
 
 class GLSLGlassRefractionFragmentProcessor : public GlassRefractionFragmentProcessor {
  public:
-  GLSLGlassRefractionFragmentProcessor(PlacementPtr<FragmentProcessor> source,
-                                       PlacementPtr<FragmentProcessor> mask,
+  GLSLGlassRefractionFragmentProcessor(std::shared_ptr<TextureProxy> source,
+                                       std::shared_ptr<TextureProxy> fineMask,
+                                       std::shared_ptr<TextureProxy> coarseMask,
                                        const GlassRefractionParams& params);
 
   void emitCode(EmitArgs& args) const override;

@@ -61,8 +61,7 @@ void GLSLTentBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend("float total = 0.0;");
 
   // RGBA8 unpack constants: dot(rgba, UNPACK) recovers the original float.
-  fragBuilder->codeAppend(
-      "const vec4 UNPACK = vec4(1.0, 1.0/255.0, 1.0/65025.0, 1.0/16581375.0);");
+  fragBuilder->codeAppend("const vec4 UNPACK = vec4(1.0, 1.0/255.0, 1.0/65025.0, 1.0/16581375.0);");
 
   fragBuilder->codeAppendf("for (int j = 0; j <= %d; ++j) {", 2 * maxRadius);
   fragBuilder->codeAppend("int i = j - iRadius;");

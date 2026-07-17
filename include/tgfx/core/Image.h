@@ -377,6 +377,7 @@ class Image {
 
   friend class FragmentProcessor;
   friend class RuntimeImageFilter;
+  friend class GlassRefractionImageFilter;
   friend class TransformImage;
   friend class RGBAAAImage;
   friend class RasterizedImage;

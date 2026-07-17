@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "tgfx/core/Image.h"
 #include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
@@ -28,8 +29,6 @@ enum class GlassShapeType {
   Star,
   AlphaMask,
 };
-
-class GlassRefractionEffect;
 
 /**
  * GlassStyle simulates the physical behavior of light passing through a glass surface, producing
@@ -171,7 +170,8 @@ class GlassStyle : public LayerStyle {
       float cornerRadius, float halfWidth, float halfHeight, float minHalf, float innerHalfWidth,
       float innerHalfHeight, float innerRadius, float glassThickness, float refractionFactor,
       float dispersion, float splay, float depthRatio, float lightAngle, float lightIntensity,
-      float origMinHalf, float udfPixelToLayerPixel);
+      float origMinHalf, float udfPixelToLayerPixel, std::shared_ptr<Image> maskImage,
+      std::shared_ptr<Image> coarseMaskImage);
 
   float _refraction = 50.0f;
   float _depth = 15.0f;
@@ -186,7 +186,6 @@ class GlassStyle : public LayerStyle {
   std::shared_ptr<ImageFilter> frostFilter = nullptr;
   float currentFrostScale = 0.0f;
 
-  std::shared_ptr<GlassRefractionEffect> refractionEffect = nullptr;
   std::shared_ptr<ImageFilter> refractionFilter = nullptr;
   std::shared_ptr<ImageFilter> maskBlurFilter = nullptr;
   std::shared_ptr<ImageFilter> coarseMaskBlurFilter = nullptr;

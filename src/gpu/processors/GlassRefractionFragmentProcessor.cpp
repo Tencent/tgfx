@@ -16,23 +16,63 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GlassRefractionFragmentProcessor.h"
+#include "gpu/processors/GlassRefractionFragmentProcessor.h"
+#include "gpu/resources/TextureView.h"
 
 namespace tgfx {
 
 GlassRefractionFragmentProcessor::GlassRefractionFragmentProcessor(
-    PlacementPtr<FragmentProcessor> source, PlacementPtr<FragmentProcessor> mask,
-    const GlassRefractionParams& params)
-    : FragmentProcessor(ClassID()), params(params) {
-  registerChildProcessor(std::move(source));
-  if (mask) {
-    registerChildProcessor(std::move(mask));
-  }
+    std::shared_ptr<TextureProxy> source, std::shared_ptr<TextureProxy> fineMask,
+    std::shared_ptr<TextureProxy> coarseMask, const GlassRefractionParams& params)
+    : FragmentProcessor(ClassID()), sourceProxy(std::move(source)),
+      fineMaskProxy(std::move(fineMask)), coarseMaskProxy(std::move(coarseMask)), params(params) {
+  addCoordTransform(&coordTransform);
 }
 
-void GlassRefractionFragmentProcessor::onComputeProcessorKey(BytesKey* key) const {
-  key->write(static_cast<int>(params.shapeType));
-  key->write(params.hasMask ? 1 : 0);
+void GlassRefractionFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
+  bytesKey->write(static_cast<uint32_t>(params.shapeType));
+  uint32_t flags = 0;
+  if (fineMaskProxy != nullptr) {
+    flags |= 1;
+  }
+  if (coarseMaskProxy != nullptr) {
+    flags |= 2;
+  }
+  bytesKey->write(flags);
+}
+
+size_t GlassRefractionFragmentProcessor::onCountTextureSamplers() const {
+  size_t count = 1;
+  if (fineMaskProxy != nullptr) {
+    count++;
+  }
+  if (coarseMaskProxy != nullptr) {
+    count++;
+  }
+  return count;
+}
+
+std::shared_ptr<Texture> GlassRefractionFragmentProcessor::onTextureAt(size_t index) const {
+  std::shared_ptr<TextureProxy> proxy;
+  if (index == 0) {
+    proxy = sourceProxy;
+  } else if (index == 1) {
+    proxy = fineMaskProxy;
+  } else {
+    proxy = coarseMaskProxy;
+  }
+  if (proxy == nullptr) {
+    return nullptr;
+  }
+  auto textureView = proxy->getTextureView();
+  return textureView == nullptr ? nullptr : textureView->getTexture();
+}
+
+SamplerState GlassRefractionFragmentProcessor::onSamplerStateAt(size_t index) const {
+  if (index == 0) {
+    return SamplerState(TileMode::Clamp, TileMode::Clamp);
+  }
+  return SamplerState(TileMode::Decal, TileMode::Decal);
 }
 
 }  // namespace tgfx
