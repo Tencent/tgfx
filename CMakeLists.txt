@@ -28,6 +28,7 @@ option(TGFX_USE_SWIFTSHADER "Enable building with the SwiftShader library" OFF)
 option(TGFX_USE_ANGLE "Enable building with the ANGLE library" OFF)
 option(TGFX_USE_VULKAN "Use Vulkan as the GPU backend" OFF)
 option(TGFX_USE_TEXT_GAMMA_CORRECTION "Enable gamma correction when rendering text" OFF)
+option(TGFX_EMBED_SHADER_BUNDLES "Embed precompiled shader bundles into libtgfx" ON)
 
 # EMSCRIPTEN_PTHREADS can be set by vendor tools for building the wasm-mt architecture.
 if (NOT WEB OR EMSCRIPTEN_PTHREADS)
@@ -759,8 +760,6 @@ endif ()
 # This section builds shader_build_tool, generates precompiled shader bundles, and embeds them
 # into libtgfx. It is independent of TGFX_BUILD_TESTS so that production builds also benefit
 # from precompiled shaders. Set TGFX_EMBED_SHADER_BUNDLES=OFF to disable embedding entirely.
-option(TGFX_EMBED_SHADER_BUNDLES "Embed precompiled shader bundles into libtgfx" ON)
-
 if (TGFX_EMBED_SHADER_BUNDLES)
     file(GLOB_RECURSE TGFX_SHADER_DECL_FILES
             src/gpu/shaders/ShaderPermutation.*
@@ -779,8 +778,10 @@ if (TGFX_EMBED_SHADER_BUNDLES)
             third_party/shaderc/libshaderc/include
             third_party/SPIRV-Cross)
     target_compile_options(shader_build_tool PRIVATE ${TGFX_COMPILE_OPTIONS})
-    add_dependencies(shader_build_tool tgfx-vendor)
-    find_vendor_libraries(tgfx-vendor STATIC SHADER_TOOL_VENDOR_LIBS)
+    # Keep build-time compiler dependencies isolated from the runtime tgfx archive.
+    add_vendor_target(shader-tool-vendor STATIC_VENDORS shaderc SPIRV-Cross)
+    add_dependencies(shader_build_tool shader-tool-vendor)
+    find_vendor_libraries(shader-tool-vendor STATIC SHADER_TOOL_VENDOR_LIBS)
     target_link_libraries(shader_build_tool PRIVATE ${SHADER_TOOL_VENDOR_LIBS})
 
     # Determine which backends to compile based on enabled GPU backends
