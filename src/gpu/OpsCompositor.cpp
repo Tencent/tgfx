@@ -1015,13 +1015,19 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     bool shouldDecompose = false;
     if (processors.size() >= 3) {
       shouldDecompose = true;
-    } else if (processors.size() == 2 && processors[0] &&
-               processors[0]->name() == "TextureEffect" && processors[1]) {
+    } else if (processors.size() == 2 && processors[0] && processors[1]) {
+      auto firstName = processors[0]->name();
       auto secondName = processors[1]->name();
-      shouldDecompose = secondName == "ColorSpaceXformEffect" ||
-                        secondName == "LumaFragmentProcessor" ||
-                        secondName == "AlphaStepFragmentProcessor" ||
-                        secondName == "ColorMatrixFragmentProcessor";
+      bool firstDecomposable = firstName == "TextureEffect" ||
+                               firstName == "TiledTextureEffect" ||
+                               firstName == "DeviceSpaceTextureEffect" ||
+                               firstName == "ConstColorProcessor" ||
+                               firstName == "ClampedGradientEffect";
+      bool secondDecomposable = secondName == "ColorSpaceXformEffect" ||
+                                secondName == "LumaFragmentProcessor" ||
+                                secondName == "AlphaStepFragmentProcessor" ||
+                                secondName == "ColorMatrixFragmentProcessor";
+      shouldDecompose = firstDecomposable && secondDecomposable;
     }
     if (shouldDecompose) {
       auto savedProcessors = std::move(processors);
