@@ -334,8 +334,6 @@ void DisplayList::render(Surface* surface, bool autoClear) {
     return;
   }
   _hasContentChanged = false;
-  ssaaActiveTileCount = 0;
-  ssaaFailedTileCount = 0;
   auto dirtyRegions = _root->updateDirtyRegions();
   if (_zoomScaleInt == 0) {
     if (autoClear) {
@@ -358,48 +356,8 @@ void DisplayList::render(Surface* surface, bool autoClear) {
   if (_showDirtyRegions) {
     renderDirtyRegions(surface->getCanvas(), std::move(dirtyRegions));
   }
-  logSSAAStatus();
   _root->updateStaticSubtreeFlags();
 }
-
-void DisplayList::logSSAAStatus() {
-  if (!_useSSAA) {
-    if (lastSSAAStatusCode != 0) {
-      LOGI("[SSAA] disabled (setUseSSAA(false))");
-      lastSSAAStatusCode = 0;
-    }
-    return;
-  }
-  // SSAA only runs in Tiled mode; any other mode silently drops back to coverage-AA.
-  if (_renderMode != RenderMode::Tiled) {
-    if (lastSSAAStatusCode != 1) {
-      LOGI("[SSAA] IGNORED: setUseSSAA(true) has no effect because renderMode is not Tiled");
-      lastSSAAStatusCode = 1;
-    }
-    return;
-  }
-  if (ssaaFailedTileCount > 0) {
-    if (lastSSAAStatusCode != 2) {
-      LOGE(
-          "[SSAA] FAILED: SSAA tile surface creation failed (%d tile(s) this frame); those tiles "
-          "fell back to coverage-AA",
-          ssaaFailedTileCount);
-      lastSSAAStatusCode = 2;
-    }
-    return;
-  }
-  if (ssaaActiveTileCount > 0) {
-    if (lastSSAAStatusCode != 3) {
-      LOGI("[SSAA] active: supersampling tiles at %dx (%d tile(s) this frame)", SSAA_SCALE,
-           ssaaActiveTileCount);
-      lastSSAAStatusCode = 3;
-    }
-    return;
-  }
-  // No tile was re-rasterized this frame (static content / no dirty tiles): keep the previously
-  // reported state so idle frames don't spam or reset the diagnostic.
-}
-
 
 std::vector<Rect> DisplayList::renderDirect(Surface* surface, bool autoClear) const {
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
@@ -1085,7 +1043,6 @@ void DisplayList::drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snap
     const auto surfaceHeight = FloatCeilToInt(ssaaTileHeight);
     auto tileSurface = getOrCreateSSAATileSurface(renderSurface, surfaceWidth, surfaceHeight);
     if (tileSurface != nullptr) {
-      ssaaActiveTileCount++;
       // Render to the SSAA tile surface at 2x scale starting from (0, 0).
       auto viewMatrix = Matrix::MakeScale(currentZoomScale * SSAA_SCALE);
       viewMatrix.postTranslate(-tileRect.left * SSAA_SCALE, -tileRect.top * SSAA_SCALE);
@@ -1111,7 +1068,6 @@ void DisplayList::drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snap
       atlasSurface->renderContext->flush();
       return;
     }
-    ssaaFailedTileCount++;
   }
 
   // Non-SSAA path: render directly to atlas (forceNoEdgeAA defaults to false).
@@ -1137,14 +1093,7 @@ Surface* DisplayList::getOrCreateSSAATileSurface(const Surface* renderSurface, i
                                   ColorType::RGBA_8888, 1, false, renderSurface->renderFlags(),
                                   renderSurface->colorSpace());
   if (ssaaTileSurface == nullptr) {
-    int maxTextureSize = 0;
-    if (auto context = renderSurface->getContext()) {
-      maxTextureSize = context->gpu()->limits()->maxTextureDimension2D;
-    }
-    LOGE(
-        "DisplayList::getOrCreateSSAATileSurface() Failed to create %dx%d SSAA tile surface "
-        "(maxTextureDimension2D=%d); SSAA will fall back to coverage-AA",
-        requiredWidth, requiredHeight, maxTextureSize);
+    LOGE("DisplayList::getOrCreateSSAATileSurface() Failed to create SSAA tile surface!");
   }
   return ssaaTileSurface.get();
 }
