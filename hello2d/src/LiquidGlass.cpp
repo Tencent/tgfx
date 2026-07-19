@@ -89,32 +89,15 @@ std::shared_ptr<tgfx::Layer> LiquidGlass::onBuildLayerTree(const hello2d::AppHos
   greenCircle->setFillStyle(tgfx::ShapeStyle::Make(tgfx::Color::FromRGBA(50, 200, 80, 200)));
   root->addChild(greenCircle);
 
-  // Glass panel: star-shaped AlphaMask glass.
+  // Glass panel: ellipse-shaped glass.
   float glassSize = 400.0f;
-  float halfSize = glassSize * 0.5f;
-  float outerR = halfSize * 0.9f;
-  float innerR = outerR * 0.382f;
-  float startAngle = -3.14159265358979323846f * 0.5f;
 
   auto glassLayer = tgfx::ShapeLayer::Make();
-  tgfx::Path starPath = {};
-  for (int i = 0; i < 5; i++) {
-    float outerAngle = startAngle + static_cast<float>(i) * 3.14159265358979323846f * 0.8f;
-    float innerAngle = outerAngle + 3.14159265358979323846f * 0.2f;
-    if (i == 0) {
-      starPath.moveTo(halfSize + outerR * cosf(outerAngle), halfSize + outerR * sinf(outerAngle));
-    } else {
-      starPath.lineTo(halfSize + outerR * cosf(outerAngle), halfSize + outerR * sinf(outerAngle));
-    }
-    starPath.lineTo(halfSize + innerR * cosf(innerAngle), halfSize + innerR * sinf(innerAngle));
-  }
-  starPath.close();
-  glassLayer->setPath(starPath);
-  // Linear gradient fill: red transparent (left) to red opaque (right).
-  auto gradient = tgfx::Shader::MakeLinearGradient(
-      tgfx::Point::Make(0.0f, 0.0f), tgfx::Point::Make(glassSize, 0.0f),
-      {tgfx::Color::FromRGBA(255, 0, 0, 0), tgfx::Color::FromRGBA(255, 0, 0, 255)}, {});
-  glassLayer->setFillStyle(tgfx::ShapeStyle::Make(std::move(gradient), 1.0f));
+  tgfx::Path ellipsePath = {};
+  ellipsePath.addOval(tgfx::Rect::MakeWH(glassSize, glassSize * 0.7f));
+  glassLayer->setPath(ellipsePath);
+  // Semi-transparent gray fill so the glass refraction effect is clearly visible.
+  glassLayer->setFillStyle(tgfx::ShapeStyle::Make(tgfx::Color::FromRGBA(128, 128, 128, 128)));
   glassLayer->setMatrix(tgfx::Matrix::MakeTrans(glassPosX, glassPosY));
   auto style = tgfx::GlassStyle::Make(glassRefraction, glassDepth, 0, 0, 0, glassLightAngle, 100);
   glassStyleRef = style;

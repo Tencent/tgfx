@@ -46,6 +46,8 @@ struct GlassRefractionParams {
 
   // UDF and scale factors.
   float origMinHalf = 0.0f;
+  float origWidth = 0.0f;
+  float origHeight = 0.0f;
   float udfPixelToLayerPixel = 1.0f;
 
   // Render-time state (set per lockTextureProxy call, not cached).
