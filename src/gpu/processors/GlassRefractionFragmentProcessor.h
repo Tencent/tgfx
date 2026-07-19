@@ -62,7 +62,7 @@ class GlassRefractionFragmentProcessor : public FragmentProcessor {
   static PlacementPtr<GlassRefractionFragmentProcessor> Make(
       BlockAllocator* allocator, std::shared_ptr<TextureProxy> source,
       std::shared_ptr<TextureProxy> fineMask, std::shared_ptr<TextureProxy> coarseMask,
-      const GlassRefractionParams& params);
+      const GlassRefractionParams& params, const Matrix& coordMatrix = Matrix::I());
 
   std::string name() const override {
     return "GlassRefractionFragmentProcessor";
@@ -82,7 +82,7 @@ class GlassRefractionFragmentProcessor : public FragmentProcessor {
   GlassRefractionFragmentProcessor(std::shared_ptr<TextureProxy> source,
                                    std::shared_ptr<TextureProxy> fineMask,
                                    std::shared_ptr<TextureProxy> coarseMask,
-                                   const GlassRefractionParams& params);
+                                   const GlassRefractionParams& params, const Matrix& coordMatrix);
 
   std::shared_ptr<TextureProxy> sourceProxy;
   std::shared_ptr<TextureProxy> fineMaskProxy;

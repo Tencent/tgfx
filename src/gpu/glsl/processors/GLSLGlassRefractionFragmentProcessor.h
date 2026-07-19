@@ -27,7 +27,8 @@ class GLSLGlassRefractionFragmentProcessor : public GlassRefractionFragmentProce
   GLSLGlassRefractionFragmentProcessor(std::shared_ptr<TextureProxy> source,
                                        std::shared_ptr<TextureProxy> fineMask,
                                        std::shared_ptr<TextureProxy> coarseMask,
-                                       const GlassRefractionParams& params);
+                                       const GlassRefractionParams& params,
+                                       const Matrix& coordMatrix);
 
   void emitCode(EmitArgs& args) const override;
 

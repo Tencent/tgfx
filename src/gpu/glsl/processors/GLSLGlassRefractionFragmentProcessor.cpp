@@ -23,19 +23,20 @@ namespace tgfx {
 PlacementPtr<GlassRefractionFragmentProcessor> GlassRefractionFragmentProcessor::Make(
     BlockAllocator* allocator, std::shared_ptr<TextureProxy> source,
     std::shared_ptr<TextureProxy> fineMask, std::shared_ptr<TextureProxy> coarseMask,
-    const GlassRefractionParams& params) {
+    const GlassRefractionParams& params, const Matrix& coordMatrix) {
   if (allocator == nullptr || source == nullptr) {
     return nullptr;
   }
   return allocator->make<GLSLGlassRefractionFragmentProcessor>(
-      std::move(source), std::move(fineMask), std::move(coarseMask), params);
+      std::move(source), std::move(fineMask), std::move(coarseMask), params, coordMatrix);
 }
 
 GLSLGlassRefractionFragmentProcessor::GLSLGlassRefractionFragmentProcessor(
     std::shared_ptr<TextureProxy> source, std::shared_ptr<TextureProxy> fineMask,
-    std::shared_ptr<TextureProxy> coarseMask, const GlassRefractionParams& params)
+    std::shared_ptr<TextureProxy> coarseMask, const GlassRefractionParams& params,
+    const Matrix& coordMatrix)
     : GlassRefractionFragmentProcessor(std::move(source), std::move(fineMask),
-                                       std::move(coarseMask), params) {
+                                       std::move(coarseMask), params, coordMatrix) {
 }
 
 void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {

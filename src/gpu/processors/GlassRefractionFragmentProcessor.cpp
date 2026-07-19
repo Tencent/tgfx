@@ -23,9 +23,11 @@ namespace tgfx {
 
 GlassRefractionFragmentProcessor::GlassRefractionFragmentProcessor(
     std::shared_ptr<TextureProxy> source, std::shared_ptr<TextureProxy> fineMask,
-    std::shared_ptr<TextureProxy> coarseMask, const GlassRefractionParams& params)
+    std::shared_ptr<TextureProxy> coarseMask, const GlassRefractionParams& params,
+    const Matrix& coordMatrix)
     : FragmentProcessor(ClassID()), sourceProxy(std::move(source)),
-      fineMaskProxy(std::move(fineMask)), coarseMaskProxy(std::move(coarseMask)), params(params) {
+      fineMaskProxy(std::move(fineMask)), coarseMaskProxy(std::move(coarseMask)), params(params),
+      coordTransform(coordMatrix) {
   addCoordTransform(&coordTransform);
 }
 

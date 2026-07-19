@@ -343,25 +343,22 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
     }
   }
 
-  // Scale the processed background back to content image resolution and draw with mask,
-  // matching BackgroundBlurStyle's approach: drawImage + Decal mask, no coordinate remapping.
-  int finalW = std::max(
-      1, static_cast<int>(std::round(static_cast<float>(processedBg->width()) / scaleRatioX)));
-  int finalH = std::max(
-      1, static_cast<int>(std::round(static_cast<float>(processedBg->height()) / scaleRatioY)));
-  processedBg = processedBg->makeScaled(finalW, finalH, SamplingOptions(FilterMode::Linear));
   float finalOffsetX = processedOffset.x / scaleRatioX;
   float finalOffsetY = processedOffset.y / scaleRatioY;
+  float finalScaleX = 1.0f / scaleRatioX;
+  float finalScaleY = 1.0f / scaleRatioY;
 
   Paint paint = {};
   paint.setBlendMode(BlendMode::Src);
 
-  // Draw analytical shapes through the same vector primitive used by LayerContent. The current
-  // canvas is in content-image pixel space, so scale the geometry by contentScale and align the
-  // processed background shader with its final image offset.
+  // Keep the background and filter chain at their capped resolution. The shader matrix maps the
+  // low-resolution image into content pixel space, while the Glass FP executes per destination
+  // fragment when the vector shape is drawn.
   auto imageShader = Shader::MakeImageShader(processedBg, TileMode::Decal, TileMode::Decal,
                                              SamplingOptions(FilterMode::Linear));
-  imageShader = imageShader->makeWithMatrix(Matrix::MakeTrans(finalOffsetX, finalOffsetY));
+  auto imageMatrix =
+      Matrix::MakeAll(finalScaleX, 0.0f, finalOffsetX, 0.0f, finalScaleY, finalOffsetY);
+  imageShader = imageShader->makeWithMatrix(imageMatrix);
   paint.setShader(imageShader);
 
   bool drewAnalyticalShape = false;
@@ -394,8 +391,10 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
     paint.setShader(nullptr);
     auto maskShader = Shader::MakeImageShader(input.content, TileMode::Decal, TileMode::Decal);
     paint.setMaskFilter(MaskFilter::MakeShader(maskShader, false));
-    canvas->drawImage(processedBg, finalOffsetX, finalOffsetY, SamplingOptions(FilterMode::Linear),
-                      &paint);
+    auto dstRect = Rect::MakeXYWH(finalOffsetX, finalOffsetY,
+                                  static_cast<float>(processedBg->width()) * finalScaleX,
+                                  static_cast<float>(processedBg->height()) * finalScaleY);
+    canvas->drawImageRect(processedBg, dstRect, SamplingOptions(FilterMode::Linear), &paint);
   }
 }
 

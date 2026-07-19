@@ -83,9 +83,34 @@ std::shared_ptr<TextureProxy> GlassRefractionImageFilter::lockTextureProxy(
 }
 
 PlacementPtr<FragmentProcessor> GlassRefractionImageFilter::asFragmentProcessor(
-    std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-    SrcRectConstraint constraint, const Matrix* uvMatrix) const {
-  return makeFPFromTextureProxy(source, args, sampling, constraint, uvMatrix);
+    std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& /*sampling*/,
+    SrcRectConstraint /*constraint*/, const Matrix* uvMatrix) const {
+  if (source == nullptr || args.context == nullptr) {
+    return nullptr;
+  }
+
+  TPArgs tpArgs(args.context, args.renderFlags, false, 1.0f, BackingFit::Exact);
+  auto sourceProxy = source->lockTextureProxy(tpArgs);
+  if (sourceProxy == nullptr) {
+    return nullptr;
+  }
+
+  std::shared_ptr<TextureProxy> fineMaskProxy = nullptr;
+  std::shared_ptr<TextureProxy> coarseMaskProxy = nullptr;
+  if (fineMask != nullptr) {
+    fineMaskProxy = fineMask->lockTextureProxy(tpArgs);
+  }
+  if (coarseMask != nullptr) {
+    coarseMaskProxy = coarseMask->lockTextureProxy(tpArgs);
+  }
+
+  auto coordMatrix = uvMatrix != nullptr ? *uvMatrix : Matrix::I();
+  auto localParams = params;
+  localParams.renderOffsetX = 0.0f;
+  localParams.renderOffsetY = 0.0f;
+  return GlassRefractionFragmentProcessor::Make(
+      args.context->drawingAllocator(), std::move(sourceProxy), std::move(fineMaskProxy),
+      std::move(coarseMaskProxy), localParams, coordMatrix);
 }
 
 }  // namespace tgfx
