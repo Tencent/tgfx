@@ -190,24 +190,16 @@ static void ComputeGlyphRenderMatrix(const Rect& atlasLocation, const Matrix& st
   }
   outMatrix->postConcat(stateMatrix);
   if (needsPixelAlignment) {
-    // Round the full device-space X translation. Horizontal pixel misalignment is
-    // imperceptible per-glyph and the old behavior was correct.
     (*outMatrix)[2] = std::round((*outMatrix)[2]);
-
-    // For Y, decompose the device-space translation into shared baseline + per-glyph
-    // visual offset, and round only the shared part.
-    //   deviceY = maxScale * (scale * glyphOffset.y + position.y - scale * atlas.y) + stateTy
-    //           = maxScale * scale * glyphOffset.y + (maxScale * position.y + stateTy
-    //                                                  - maxScale * scale * atlas.y)
-    //           = perGlyphDeviceY                    + sharedDeviceY
-    // Rounding sharedDeviceY keeps all glyphs on the same baseline aligned to the same
-    // device pixel, while the per-glyph visual offset (glyphOffset.y) stays exact,
-    // avoiding the baseline misalignment that occurs when glyphs with different visual
-    // bounds (e.g. 'M' at -13 vs 'a' at -10) get independently rounded.
-    auto deviceScale = stateMatrix.getScaleX();
-    auto perGlyphDeviceY = deviceScale * scale * glyphOffset.y;
-    auto sharedDeviceY = (*outMatrix)[5] - perGlyphDeviceY;
-    (*outMatrix)[5] = std::round(sharedDeviceY) + perGlyphDeviceY;
+    if (HasComplexTransform(run)) {
+      (*outMatrix)[5] = std::round((*outMatrix)[5]);
+    } else {
+      auto position = GetGlyphPosition(run, index);
+      auto deviceScale = stateMatrix.getScaleX();
+      auto sharedDeviceY = deviceScale * position.y + stateMatrix.getTranslateY();
+      auto perGlyphDeviceY = deviceScale * scale * (glyphOffset.y - atlasLocation.y());
+      (*outMatrix)[5] = std::round(sharedDeviceY) + std::round(perGlyphDeviceY);
+    }
   }
 }
 
