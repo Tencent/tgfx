@@ -30,9 +30,16 @@ namespace hello2d {
 // Shared glass layer for mouse interaction.
 static std::shared_ptr<tgfx::Layer> glassLayerRef = nullptr;
 
+// Shared star glass layer for mouse interaction.
+static std::shared_ptr<tgfx::Layer> starGlassLayerRef = nullptr;
+
 // Glass position (updated by mouse drag).
 static float glassPosX = 110.0f;
 static float glassPosY = 110.0f;
+
+// Star glass position (updated by mouse drag, offset from main glass).
+static float starGlassOffsetX = 0.0f;
+static float starGlassOffsetY = 0.0f;
 
 // Glass depth (updated by arrow keys).
 static float glassDepth = 30.0f;
@@ -51,6 +58,9 @@ static float glassDispersion = 0.0f;
 
 // Shared glass style for interactive parameter updates.
 static std::shared_ptr<tgfx::GlassStyle> glassStyleRef = nullptr;
+
+// Shared star glass style for interactive parameter updates.
+static std::shared_ptr<tgfx::GlassStyle> starGlassStyleRef = nullptr;
 
 // Cell size matching GlassStyle test.
 static constexpr float CELL_SIZE = 720.0f;
@@ -107,6 +117,44 @@ std::shared_ptr<tgfx::Layer> LiquidGlass::onBuildLayerTree(const hello2d::AppHos
   // Store reference for mouse interaction.
   glassLayerRef = glassLayer;
 
+  // Star-shaped glass panel (uses AlphaMask path for arbitrary shapes).
+  float starSize = 280.0f;
+  float starHalf = starSize * 0.5f;
+  float outerRadius = starHalf * 0.9f;
+  float innerRadius = outerRadius * 0.382f;
+  float startAngle = -static_cast<float>(M_PI) * 0.5f;
+
+  auto starGlassLayer = tgfx::ShapeLayer::Make();
+  tgfx::Path starPath = {};
+  for (int i = 0; i < 5; i++) {
+    float outerAngle = startAngle + static_cast<float>(i) * static_cast<float>(M_PI) * 0.8f;
+    float innerAngle = outerAngle + static_cast<float>(M_PI) * 0.2f;
+    float outerX = starHalf + outerRadius * cosf(outerAngle);
+    float outerY = starHalf + outerRadius * sinf(outerAngle);
+    float innerX = starHalf + innerRadius * cosf(innerAngle);
+    float innerY = starHalf + innerRadius * sinf(innerAngle);
+    if (i == 0) {
+      starPath.moveTo(outerX, outerY);
+    } else {
+      starPath.lineTo(outerX, outerY);
+    }
+    starPath.lineTo(innerX, innerY);
+  }
+  starPath.close();
+  starGlassLayer->setPath(starPath);
+  starGlassLayer->setFillStyle(tgfx::ShapeStyle::Make(tgfx::Color::FromRGBA(128, 128, 128, 128)));
+  starGlassOffsetX = glassSize + 40.0f;
+  starGlassOffsetY = 0.0f;
+  starGlassLayer->setMatrix(
+      tgfx::Matrix::MakeTrans(glassPosX + starGlassOffsetX, glassPosY + starGlassOffsetY));
+  auto starStyle =
+      tgfx::GlassStyle::Make(glassRefraction, glassDepth, 0, 0, 0, glassLightAngle, 100);
+  starGlassStyleRef = starStyle;
+  starGlassLayer->setLayerStyles({starStyle});
+  root->addChild(starGlassLayer);
+
+  starGlassLayerRef = starGlassLayer;
+
   return root;
 }
 
@@ -116,6 +164,10 @@ void LiquidGlass::setGlassPosition(float x, float y) {
   if (glassLayerRef) {
     glassLayerRef->setMatrix(tgfx::Matrix::MakeTrans(x, y));
   }
+  if (starGlassLayerRef) {
+    starGlassLayerRef->setMatrix(
+        tgfx::Matrix::MakeTrans(x + starGlassOffsetX, y + starGlassOffsetY));
+  }
 }
 
 void LiquidGlass::setDepth(float depth) {
@@ -123,12 +175,18 @@ void LiquidGlass::setDepth(float depth) {
   if (glassStyleRef) {
     glassStyleRef->setDepth(glassDepth);
   }
+  if (starGlassStyleRef) {
+    starGlassStyleRef->setDepth(glassDepth);
+  }
 }
 
 void LiquidGlass::setRefraction(float refraction) {
   glassRefraction = std::clamp(refraction, 0.0f, 100.0f);
   if (glassStyleRef) {
     glassStyleRef->setRefraction(glassRefraction);
+  }
+  if (starGlassStyleRef) {
+    starGlassStyleRef->setRefraction(glassRefraction);
   }
 }
 
@@ -140,6 +198,9 @@ void LiquidGlass::setLightAngle(float angle) {
   if (glassStyleRef) {
     glassStyleRef->setLightAngle(glassLightAngle);
   }
+  if (starGlassStyleRef) {
+    starGlassStyleRef->setLightAngle(glassLightAngle);
+  }
 }
 
 void LiquidGlass::setFrost(float frost) {
@@ -147,12 +208,18 @@ void LiquidGlass::setFrost(float frost) {
   if (glassStyleRef) {
     glassStyleRef->setFrost(glassFrost);
   }
+  if (starGlassStyleRef) {
+    starGlassStyleRef->setFrost(glassFrost);
+  }
 }
 
 void LiquidGlass::setDispersion(float dispersion) {
   glassDispersion = std::clamp(dispersion, 0.0f, 100.0f);
   if (glassStyleRef) {
     glassStyleRef->setDispersion(glassDispersion);
+  }
+  if (starGlassStyleRef) {
+    starGlassStyleRef->setDispersion(glassDispersion);
   }
 }
 

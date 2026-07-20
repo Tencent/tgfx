@@ -9,8 +9,8 @@
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  unless required by applicable law or agreed to in writing, software distributed under
+//  the license is distributed on an "as is" basis, without warranties or conditions of any kind,
 //  either express or implied. see the license for the specific language governing permissions
 //  and limitations under the license.
 //
@@ -74,30 +74,31 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
   auto texCoordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[0]);
 
   // --- Emit SDF helper functions via addFunction (placed before main) ---
-  std::string outerFn;
+  std::string outerSdfFn;
   if (useAxisMix) {
     if (params.shapeType == GlassShapeType::RoundedRect) {
-      outerFn = fragBuilder->getMangledFunctionName("glass_outerSDF");
+      outerSdfFn = fragBuilder->getMangledFunctionName("glass_outerSDF");
 
       fragBuilder->addFunction(
-          "float " + outerFn +
+          "float " + outerSdfFn +
           "(float px, float py, float hw, float hh, float r) {\n"
-          "  float qx = abs(px) - hw + r;\n"
-          "  float qy = abs(py) - hh + r;\n"
-          "  float od = sqrt(max(qx,0.0)*max(qx,0.0)+max(qy,0.0)*max(qy,0.0));\n"
-          "  return od + min(max(qx,qy),0.0) - r;\n"
+          "  float distX = abs(px) - hw + r;\n"
+          "  float distY = abs(py) - hh + r;\n"
+          "  float outerDist = sqrt(max(distX,0.0)*max(distX,0.0)+max(distY,0.0)*max(distY,0.0));\n"
+          "  return outerDist + min(max(distX,distY),0.0) - r;\n"
           "}\n");
     } else {
       // Ellipse
-      outerFn = fragBuilder->getMangledFunctionName("glass_outerSDF");
+      outerSdfFn = fragBuilder->getMangledFunctionName("glass_outerSDF");
 
-      fragBuilder->addFunction("float " + outerFn +
-                               "(float px, float py, float hw, float hh) {\n"
-                               "  float t = length(vec2(px/hw, py/hh));\n"
-                               "  float gradLen = length(vec2(px/(hw*hw), py/(hh*hh)));\n"
-                               "  if (gradLen < 0.000001) return -min(hw, hh);\n"
-                               "  return t * (t - 1.0) / gradLen;\n"
-                               "}\n");
+      fragBuilder->addFunction(
+          "float " + outerSdfFn +
+          "(float px, float py, float hw, float hh) {\n"
+          "  float normalizedDist = length(vec2(px/hw, py/hh));\n"
+          "  float gradientLength = length(vec2(px/(hw*hw), py/(hh*hh)));\n"
+          "  if (gradientLength < 0.000001) return -min(hw, hh);\n"
+          "  return normalizedDist * (normalizedDist - 1.0) / gradientLength;\n"
+          "}\n");
     }
   }
 
@@ -123,9 +124,9 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
     if (params.shapeType == GlassShapeType::RoundedRect) {
       fragBuilder->codeAppendf("float cornerRadius = %s.z;", shapeParams.c_str());
       fragBuilder->codeAppendf("float outerSDF = %s(px, py, halfW, halfH, cornerRadius);",
-                               outerFn.c_str());
+                               outerSdfFn.c_str());
     } else {
-      fragBuilder->codeAppendf("float outerSDF = %s(px, py, halfW, halfH);", outerFn.c_str());
+      fragBuilder->codeAppendf("float outerSDF = %s(px, py, halfW, halfH);", outerSdfFn.c_str());
     }
   }
 
@@ -151,7 +152,7 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend("vec2 edgeLightNormal = vec2(0.0);");
 
   if (useAxisMix) {
-    // Analytical SDF refraction (GLASS_USE_AXIS_MIX path).
+    // Analytical SDF refraction path.
     fragBuilder->codeAppend("if (outerSDF < 0.0) {");
     fragBuilder->codeAppend("  float edgeDist = -outerSDF;");
     // Edge band width: depthRatio * origMinHalf, capped at 60 pixels.
@@ -162,15 +163,17 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
         "  float offsetDist = glassThickness * refractionFactor * edgeFactor * edgeFactor;");
     if (params.shapeType == GlassShapeType::Ellipse) {
       // Ellipse normal from SDF gradient: N = normalize(px/hw², py/hh²); radialDir points to center.
-      fragBuilder->codeAppend("  vec2 gradDir = vec2(px / (halfW * halfW), py / (halfH * halfH));");
-      fragBuilder->codeAppend("  float dirLen = length(gradDir);");
-      fragBuilder->codeAppend("  if (dirLen > 0.000001) {");
-      fragBuilder->codeAppend("    vec2 radialDir = -gradDir / dirLen;");
+      fragBuilder->codeAppend(
+          "  vec2 gradientDir = vec2(px / (halfW * halfW), py / (halfH * halfH));");
+      fragBuilder->codeAppend("  float gradientLength = length(gradientDir);");
+      fragBuilder->codeAppend("  if (gradientLength > 0.000001) {");
+      fragBuilder->codeAppend("    vec2 radialDir = -gradientDir / gradientLength;");
     } else {
       // RoundedRect: radial direction from center.
-      fragBuilder->codeAppend("  float dirLen = sqrt(px * px + py * py);");
-      fragBuilder->codeAppend("  if (dirLen > 0.001) {");
-      fragBuilder->codeAppend("    vec2 radialDir = vec2(-px / dirLen, -py / dirLen);");
+      fragBuilder->codeAppend("  float centerDistance = sqrt(px * px + py * py);");
+      fragBuilder->codeAppend("  if (centerDistance > 0.001) {");
+      fragBuilder->codeAppend(
+          "    vec2 radialDir = vec2(-px / centerDistance, -py / centerDistance);");
     }
     fragBuilder->codeAppend("    vec2 axisDir;");
     fragBuilder->codeAppend(
@@ -183,9 +186,10 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppend("    float axisWeight = smoothstep(axisThreshold, 1.0, maxAxisDot);");
     fragBuilder->codeAppend("    vec2 refractDir = mix(radialDir, axisDir, axisWeight);");
     fragBuilder->codeAppend("    glassNormal = -refractDir;");
-    fragBuilder->codeAppend("    float dispX = refractDir.x * offsetDist;");
-    fragBuilder->codeAppend("    float dispY = refractDir.y * offsetDist;");
-    fragBuilder->codeAppend("    uvOffset = vec2(dispX * invOrigW, -dispY * invOrigH);");
+    fragBuilder->codeAppend("    float displacementX = refractDir.x * offsetDist;");
+    fragBuilder->codeAppend("    float displacementY = refractDir.y * offsetDist;");
+    fragBuilder->codeAppend(
+        "    uvOffset = vec2(displacementX * invOrigW, -displacementY * invOrigH);");
     fragBuilder->codeAppend("  }");
     fragBuilder->codeAppend("}");
   } else if (hasMask) {
@@ -196,109 +200,116 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppend(
         "const vec4 UNPACK = vec4(1.0, 1.0/255.0, 1.0/65025.0, 1.0/16581375.0);");
 
-    // Inline sampleHeight: compute mask UV, sample, unpack RGBA8.
+    // Sample fine UDF height at current pixel.
     fragBuilder->codeAppend(
         "vec2 maskUV = vec2((px + halfW) / (halfW * 2.0), "
         "1.0 - (py + halfH) / (halfH * 2.0));");
-    fragBuilder->codeAppend("vec4 packedH = ");
+    fragBuilder->codeAppend("vec4 packedHeight = ");
     fragBuilder->appendTextureLookup(maskSampler, "maskUV");
     fragBuilder->codeAppend(";");
-    fragBuilder->codeAppend("float height = dot(packedH, UNPACK);");
+    fragBuilder->codeAppend("float height = dot(packedHeight, UNPACK);");
 
-    // Forward difference gradient.
-    fragBuilder->codeAppend("float step = (depthRatio * 3.0 + 1.0) * udfPixelToLayerPixel;");
+    // Forward difference gradient: sample right and up neighbors.
     fragBuilder->codeAppend(
-        "vec2 maskUV_mr = vec2((px + step + halfW) / (halfW * 2.0), "
+        "float gradientStep = (depthRatio * 3.0 + 1.0) * udfPixelToLayerPixel;");
+    fragBuilder->codeAppend(
+        "vec2 maskUVRight = vec2((px + gradientStep + halfW) / (halfW * 2.0), "
         "1.0 - (py + halfH) / (halfH * 2.0));");
-    fragBuilder->codeAppend("vec4 packedMr = ");
-    fragBuilder->appendTextureLookup(maskSampler, "maskUV_mr");
+    fragBuilder->codeAppend("vec4 packedRight = ");
+    fragBuilder->appendTextureLookup(maskSampler, "maskUVRight");
     fragBuilder->codeAppend(";");
-    fragBuilder->codeAppend("float mr = dot(packedMr, UNPACK);");
+    fragBuilder->codeAppend("float heightRight = dot(packedRight, UNPACK);");
 
     fragBuilder->codeAppend(
-        "vec2 maskUV_tc = vec2((px + halfW) / (halfW * 2.0), "
-        "1.0 - (py + step + halfH) / (halfH * 2.0));");
-    fragBuilder->codeAppend("vec4 packedTc = ");
-    fragBuilder->appendTextureLookup(maskSampler, "maskUV_tc");
+        "vec2 maskUVUp = vec2((px + halfW) / (halfW * 2.0), "
+        "1.0 - (py + gradientStep + halfH) / (halfH * 2.0));");
+    fragBuilder->codeAppend("vec4 packedUp = ");
+    fragBuilder->appendTextureLookup(maskSampler, "maskUVUp");
     fragBuilder->codeAppend(";");
-    fragBuilder->codeAppend("float tc = dot(packedTc, UNPACK);");
+    fragBuilder->codeAppend("float heightUp = dot(packedUp, UNPACK);");
 
-    fragBuilder->codeAppend("vec2 grad = vec2(mr - height, tc - height) / step;");
-    fragBuilder->codeAppend("float gradLen = length(grad);");
+    fragBuilder->codeAppend(
+        "vec2 gradient = vec2(heightRight - height, heightUp - height) / gradientStep;");
+    fragBuilder->codeAppend("float gradientLength = length(gradient);");
 
-    // Edge light UDF sampling.
+    // Edge light UDF sampling from coarse mask.
     if (hasCoarseMask) {
       auto& coarseSampler = (*args.textureSamplers)[2];
-      fragBuilder->codeAppend("vec4 packedEL = ");
+      fragBuilder->codeAppend("vec4 packedEdgeHeight = ");
       fragBuilder->appendTextureLookup(coarseSampler, "maskUV");
       fragBuilder->codeAppend(";");
-      fragBuilder->codeAppend("float edgeLightHeight = dot(packedEL, UNPACK);");
+      fragBuilder->codeAppend("float edgeLightHeight = dot(packedEdgeHeight, UNPACK);");
       fragBuilder->codeAppend("edgeWeight = 1.0 - smoothstep(0.5, 0.75, edgeLightHeight);");
 
       // Edge light normal from coarse UDF gradient.
       fragBuilder->codeAppend("if (edgeWeight > 0.0) {");
       fragBuilder->codeAppend(
-          "  vec2 elUV_mr = vec2((px + step + halfW) / (halfW * 2.0), "
+          "  vec2 edgeUVRight = vec2((px + gradientStep + halfW) / (halfW * 2.0), "
           "1.0 - (py + halfH) / (halfH * 2.0));");
-      fragBuilder->codeAppend("  vec4 elPackedMr = ");
-      fragBuilder->appendTextureLookup(coarseSampler, "elUV_mr");
+      fragBuilder->codeAppend("  vec4 edgePackedRight = ");
+      fragBuilder->appendTextureLookup(coarseSampler, "edgeUVRight");
       fragBuilder->codeAppend(";");
-      fragBuilder->codeAppend("  float elMr = dot(elPackedMr, UNPACK);");
+      fragBuilder->codeAppend("  float edgeHeightRight = dot(edgePackedRight, UNPACK);");
 
       fragBuilder->codeAppend(
-          "  vec2 elUV_tc = vec2((px + halfW) / (halfW * 2.0), "
-          "1.0 - (py + step + halfH) / (halfH * 2.0));");
-      fragBuilder->codeAppend("  vec4 elPackedTc = ");
-      fragBuilder->appendTextureLookup(coarseSampler, "elUV_tc");
+          "  vec2 edgeUVUp = vec2((px + halfW) / (halfW * 2.0), "
+          "1.0 - (py + gradientStep + halfH) / (halfH * 2.0));");
+      fragBuilder->codeAppend("  vec4 edgePackedUp = ");
+      fragBuilder->appendTextureLookup(coarseSampler, "edgeUVUp");
       fragBuilder->codeAppend(";");
-      fragBuilder->codeAppend("  float elTc = dot(elPackedTc, UNPACK);");
+      fragBuilder->codeAppend("  float edgeHeightUp = dot(edgePackedUp, UNPACK);");
 
       fragBuilder->codeAppend(
-          "  vec2 elGrad = vec2(elMr - edgeLightHeight, elTc - edgeLightHeight) / step;");
-      fragBuilder->codeAppend("  float elGradLen = length(elGrad);");
-      fragBuilder->codeAppend("  if (elGradLen > 0.000001) {");
-      fragBuilder->codeAppend("    vec2 elGradDir = elGrad / elGradLen;");
-      fragBuilder->codeAppend("    float dirLen = sqrt(px * px + py * py);");
+          "  vec2 edgeGradient = vec2(edgeHeightRight - edgeLightHeight, edgeHeightUp - "
+          "edgeLightHeight) / gradientStep;");
+      fragBuilder->codeAppend("  float edgeGradientLength = length(edgeGradient);");
+      fragBuilder->codeAppend("  if (edgeGradientLength > 0.000001) {");
+      fragBuilder->codeAppend("    vec2 edgeGradientDir = edgeGradient / edgeGradientLength;");
+      fragBuilder->codeAppend("    float centerDistance = sqrt(px * px + py * py);");
       fragBuilder->codeAppend(
-          "    vec2 centerDir = (dirLen > 0.001) ? vec2(-px / dirLen, -py / dirLen) : vec2(0.0);");
-      fragBuilder->codeAppend("    vec2 elMixedDir = mix(elGradDir, centerDir, splay);");
-      fragBuilder->codeAppend("    elMixedDir = normalize(elMixedDir);");
-      fragBuilder->codeAppend("    edgeLightNormal = -elMixedDir;");
+          "    vec2 centerDir = (centerDistance > 0.001) ? vec2(-px / centerDistance, -py / "
+          "centerDistance) : vec2(0.0);");
+      fragBuilder->codeAppend("    vec2 edgeMixedDir = mix(edgeGradientDir, centerDir, splay);");
+      fragBuilder->codeAppend("    edgeMixedDir = normalize(edgeMixedDir);");
+      fragBuilder->codeAppend("    edgeLightNormal = -edgeMixedDir;");
       fragBuilder->codeAppend("  }");
       fragBuilder->codeAppend("}");
     }
 
-    // Refraction from UDF gradient.
-    fragBuilder->codeAppend("if (gradLen > 0.000001) {");
-    fragBuilder->codeAppend("  vec2 gradDir = grad / gradLen;");
-    fragBuilder->codeAppend("  float dirLen = sqrt(px * px + py * py);");
+    // Refraction from fine UDF gradient.
+    fragBuilder->codeAppend("if (gradientLength > 0.000001) {");
+    fragBuilder->codeAppend("  vec2 gradientDir = gradient / gradientLength;");
+    fragBuilder->codeAppend("  float centerDistance = sqrt(px * px + py * py);");
     fragBuilder->codeAppend(
-        "  vec2 centerDir = (dirLen > 0.001) ? vec2(-px / dirLen, -py / dirLen) : vec2(0.0);");
-    fragBuilder->codeAppend("  vec2 mixedDir = mix(gradDir, centerDir, splay);");
+        "  vec2 centerDir = (centerDistance > 0.001) ? vec2(-px / centerDistance, -py / "
+        "centerDistance) : vec2(0.0);");
+    fragBuilder->codeAppend("  vec2 mixedDir = mix(gradientDir, centerDir, splay);");
     fragBuilder->codeAppend("  mixedDir = normalize(mixedDir);");
     fragBuilder->codeAppend("  glassNormal = -mixedDir;");
     fragBuilder->codeAppend("  float depthScale = smoothstep(0.0, 0.1, depthRatio);");
     fragBuilder->codeAppend(
-        "  float refDist = halfW * refractionFactor * depthRatio * depthScale;");
+        "  float refractionDistance = halfW * refractionFactor * depthRatio * depthScale;");
     fragBuilder->codeAppend("  float edgeProximity = height * (1.0 - height);");
-    fragBuilder->codeAppend("  float offsetDist = refDist * edgeProximity;");
-    fragBuilder->codeAppend("  vec2 sn = mixedDir * offsetDist;");
-    fragBuilder->codeAppend("  vec2 sk = vec2(0.999) * refDist;");
-    fragBuilder->codeAppend("  sn = clamp(sn, -sk, sk);");
-    fragBuilder->codeAppend("  uvOffset = vec2(sn.x * invOrigW, -sn.y * invOrigH);");
+    fragBuilder->codeAppend("  float offsetDist = refractionDistance * edgeProximity;");
+    fragBuilder->codeAppend("  vec2 displacement = mixedDir * offsetDist;");
+    fragBuilder->codeAppend("  vec2 maxDisplacement = vec2(0.999) * refractionDistance;");
+    fragBuilder->codeAppend(
+        "  displacement = clamp(displacement, -maxDisplacement, maxDisplacement);");
+    fragBuilder->codeAppend(
+        "  uvOffset = vec2(displacement.x * invOrigW, -displacement.y * invOrigH);");
     fragBuilder->codeAppend("}");
   }
 
   // Dispersion and source sampling.
   fragBuilder->codeAppend("vec3 finalColor;");
-  fragBuilder->codeAppend("float aCh;");
+  fragBuilder->codeAppend("float srcAlpha;");
   fragBuilder->codeAppend("if (dispersion < 0.01) {");
-  fragBuilder->codeAppend("  vec2 uv = clamp(sourceUV + uvOffset, vec2(0.0), vec2(1.0));");
-  fragBuilder->codeAppend("  vec4 col = ");
-  fragBuilder->appendTextureLookup(sourceSampler, "uv");
+  fragBuilder->codeAppend("  vec2 sampleUV = clamp(sourceUV + uvOffset, vec2(0.0), vec2(1.0));");
+  fragBuilder->codeAppend("  vec4 srcColor = ");
+  fragBuilder->appendTextureLookup(sourceSampler, "sampleUV");
   fragBuilder->codeAppend(";");
-  fragBuilder->codeAppend("  finalColor = col.rgb;");
-  fragBuilder->codeAppend("  aCh = col.a;");
+  fragBuilder->codeAppend("  finalColor = srcColor.rgb;");
+  fragBuilder->codeAppend("  srcAlpha = srcColor.a;");
   fragBuilder->codeAppend("} else {");
   fragBuilder->codeAppend(
       "  vec2 uvR = clamp(sourceUV + uvOffset * (1.0 + dispersion), vec2(0.0), vec2(1.0));");
@@ -314,7 +325,7 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend("  finalColor.b = ");
   fragBuilder->appendTextureLookup(sourceSampler, "uvB");
   fragBuilder->codeAppend(".b;");
-  fragBuilder->codeAppend("  aCh = ");
+  fragBuilder->codeAppend("  srcAlpha = ");
   fragBuilder->appendTextureLookup(sourceSampler, "uvG");
   fragBuilder->codeAppend(".a;");
   fragBuilder->codeAppend("}");
@@ -322,12 +333,12 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
   // Edge lighting.
   fragBuilder->codeAppend("if (lightIntensity > 0.0 && edgeWeight > 0.0) {");
   if (useAxisMix) {
-    fragBuilder->codeAppend("  vec2 N = glassNormal;");
+    fragBuilder->codeAppend("  vec2 surfaceNormal = glassNormal;");
   } else {
-    fragBuilder->codeAppend("  vec2 N = edgeLightNormal;");
+    fragBuilder->codeAppend("  vec2 surfaceNormal = edgeLightNormal;");
   }
   fragBuilder->codeAppend("  vec2 lightDir = vec2(sin(lightAngleRad), cos(lightAngleRad));");
-  fragBuilder->codeAppend("  float NdotL = dot(N, lightDir);");
+  fragBuilder->codeAppend("  float NdotL = dot(surfaceNormal, lightDir);");
   fragBuilder->codeAppend(
       "  float diffuse = smoothstep(0.35, 1.0, NdotL) * edgeWeight * lightIntensity;");
   fragBuilder->codeAppend(
@@ -335,7 +346,7 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend("  finalColor += vec3(diffuse + rim);");
   fragBuilder->codeAppend("}");
 
-  fragBuilder->codeAppendf("%s = vec4(finalColor, aCh);", args.outputColor.c_str());
+  fragBuilder->codeAppendf("%s = vec4(finalColor, srcAlpha);", args.outputColor.c_str());
 }
 
 void GLSLGlassRefractionFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
