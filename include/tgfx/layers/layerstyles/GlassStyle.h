@@ -23,11 +23,7 @@
 
 namespace tgfx {
 
-enum class GlassShapeType {
-  RoundedRect,
-  Ellipse,
-  AlphaMask,
-};
+enum class GlassShapeType;
 
 /**
  * GlassStyle simulates the physical behavior of light passing through a glass surface, producing
@@ -156,10 +152,12 @@ class GlassStyle : public LayerStyle {
 
   void invalidateMaskFilter();
 
-  std::shared_ptr<ImageFilter> getRefractionFilter(
-      int layerWidth, int layerHeight, float contentScale, GlassShapeType shapeType,
-      float cornerRadius, float halfWidth, float halfHeight, float udfPixelToLayerPixel,
-      std::shared_ptr<Image> maskImage, std::shared_ptr<Image> coarseMaskImage);
+  std::shared_ptr<ImageFilter> getRefractionFilter(int layerWidth, int layerHeight,
+                                                   float contentScale, GlassShapeType shapeType,
+                                                   float cornerRadius, float halfWidth,
+                                                   float halfHeight, float udfPixelToLayerPixel,
+                                                   std::shared_ptr<Image> maskImage,
+                                                   std::shared_ptr<Image> coarseMaskImage);
 
   float _refraction = 50.0f;
   float _depth = 15.0f;

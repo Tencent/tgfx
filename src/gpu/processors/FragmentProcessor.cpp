@@ -20,6 +20,7 @@
 #include "ComposeFragmentProcessor.h"
 #include "core/utils/Log.h"
 #include "gpu/ProgramInfo.h"
+#include "gpu/TPArgs.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Shader.h"
@@ -49,6 +50,14 @@ PlacementPtr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Image> i
                                                         const Matrix* uvMatrix) {
   DEBUG_ASSERT(image != nullptr);
   return image->asFragmentProcessor(args, samplingArgs, uvMatrix);
+}
+
+std::shared_ptr<TextureProxy> FragmentProcessor::LockTextureProxy(const Image* image,
+                                                                   const TPArgs& args) {
+  if (image == nullptr) {
+    return nullptr;
+  }
+  return image->lockTextureProxy(args);
 }
 
 PlacementPtr<FragmentProcessor> FragmentProcessor::Make(

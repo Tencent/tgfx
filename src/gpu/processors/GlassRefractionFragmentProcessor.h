@@ -20,9 +20,14 @@
 
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/proxies/TextureProxy.h"
-#include "tgfx/layers/layerstyles/GlassStyle.h"
 
 namespace tgfx {
+
+enum class GlassShapeType {
+  RoundedRect,
+  Ellipse,
+  AlphaMask,
+};
 
 struct GlassRefractionParams {
   // Glass geometry (in layer pixel space).

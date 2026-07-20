@@ -19,14 +19,14 @@
 #include "tgfx/layers/layerstyles/GlassStyle.h"
 #include <algorithm>
 #include <cmath>
-#include "core/filters/GlassRefractionImageFilter.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/Types.h"
 #include "layers/contents/LayerContent.h"
 #include "layers/contents/PathContent.h"
-#include "layers/contents/RectContent.h"
 #include "layers/contents/RRectContent.h"
+#include "layers/contents/RectContent.h"
+#include "layers/filters/GlassRefractionImageFilter.h"
 #include "layers/filters/TentBlurImageFilter.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/SamplingOptions.h"
@@ -311,9 +311,8 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       if (!coarseMaskBlurFilter ||
           !FloatNearlyEqual(cachedCoarseMaskBlurRadiusX, edgeLightRadiusX) ||
           !FloatNearlyEqual(cachedCoarseMaskBlurRadiusY, edgeLightRadiusY)) {
-        coarseMaskBlurFilter = std::make_shared<TentBlurImageFilter>(edgeLightRadiusX,
-                                                                       edgeLightRadiusY,
-                                                                       TileMode::Decal);
+        coarseMaskBlurFilter = std::make_shared<TentBlurImageFilter>(
+            edgeLightRadiusX, edgeLightRadiusY, TileMode::Decal);
         cachedCoarseMaskBlurRadiusX = edgeLightRadiusX;
         cachedCoarseMaskBlurRadiusY = edgeLightRadiusY;
       }
@@ -327,9 +326,9 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
         coarseMaskImage = udfContent;
       }
     }
-    auto filter = getRefractionFilter(
-        layerWidth, layerHeight, effectiveContentScale, effectiveShapeType, crRadius, halfW, halfH,
-        udfPixelToLayerPixel, maskImage, coarseMaskImage);
+    auto filter = getRefractionFilter(layerWidth, layerHeight, effectiveContentScale,
+                                      effectiveShapeType, crRadius, halfW, halfH,
+                                      udfPixelToLayerPixel, maskImage, coarseMaskImage);
     Point refractOffset = {};
     auto clipRect = Rect::MakeWH(static_cast<float>(processedBg->width()),
                                  static_cast<float>(processedBg->height()));

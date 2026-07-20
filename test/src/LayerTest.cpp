@@ -21,6 +21,7 @@
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/shaders/GradientShader.h"
 #include "core/utils/MathExtra.h"
+#include "gpu/processors/GlassRefractionFragmentProcessor.h"
 #include "layers/DrawArgs.h"
 #include "layers/OpaqueContext.h"
 #include "layers/RootLayer.h"
