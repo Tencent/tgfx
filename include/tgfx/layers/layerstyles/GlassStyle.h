@@ -158,9 +158,7 @@ class GlassStyle : public LayerStyle {
 
   std::shared_ptr<ImageFilter> getRefractionFilter(
       int layerWidth, int layerHeight, float contentScale, GlassShapeType shapeType,
-      float cornerRadius, float halfWidth, float halfHeight, float minHalf, float glassThickness,
-      float refractionFactor, float dispersion, float splay, float depthRatio, float lightAngle,
-      float lightIntensity, float origMinHalf, float udfPixelToLayerPixel,
+      float cornerRadius, float halfWidth, float halfHeight, float udfPixelToLayerPixel,
       std::shared_ptr<Image> maskImage, std::shared_ptr<Image> coarseMaskImage);
 
   float _refraction = 50.0f;

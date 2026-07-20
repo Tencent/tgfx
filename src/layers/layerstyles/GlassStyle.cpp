@@ -136,7 +136,11 @@ Rect GlassStyle::filterBackground(const Rect& srcRect, float contentScale) {
     float depthRatio = std::clamp(_depth / 100.0f, 0.0f, 1.0f);
     float glassThickness = 1.0f + depthRatio * std::max(minHalf - 1.0f, 0.0f);
     float analyticalOffset = glassThickness * refractionFactor;
-    float alphaMaskOffset = halfW * (0.5f * refractionFactor + 0.5f * depthRatio);
+    // Match the shader's AlphaMask max displacement: halfW * refractionFactor * depthRatio *
+    // depthScale, where depthScale = smoothstep(0.0, 0.1, depthRatio).
+    float depthT = std::clamp(depthRatio / 0.1f, 0.0f, 1.0f);
+    float depthScale = depthT * depthT * (3.0f - 2.0f * depthT);
+    float alphaMaskOffset = halfW * refractionFactor * depthRatio * depthScale;
     float refractionOutset = std::max(analyticalOffset, alphaMaskOffset);
     refractionOutset = std::max(refractionOutset, 1.0f);
     result.join(srcRect.makeOutset(refractionOutset, refractionOutset));
@@ -203,11 +207,9 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
     float halfW = origBounds.width() * 0.5f;
     float halfH = origBounds.height() * 0.5f;
     float minHalf = std::min(halfW, halfH);
-    // origMinHalf is based on original layer bounds, not zoom-affected content size.
-    float origMinHalf = minHalf;
     float effectiveContentScale = input.contentScale * bgScale;
     float scaledRadius = _cornerRadius * effectiveContentScale;
-    float crRadius = std::min(scaledRadius, origMinHalf);
+    float crRadius = std::min(scaledRadius, minHalf);
 
     // Auto-detect shape type from layerContent.
     GlassShapeType effectiveShapeType = GlassShapeType::AlphaMask;
@@ -222,7 +224,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
           auto radii = rRect.radii();
           // The analytical SDF currently supports a single scalar corner radius.
           float representativeRadius = std::min(radii[0].x, radii[0].y);
-          crRadius = std::min(representativeRadius * effectiveContentScale, origMinHalf);
+          crRadius = std::min(representativeRadius * effectiveContentScale, minHalf);
         }
       } else if (contentType == Types::LayerContentType::Rect) {
         effectiveShapeType = GlassShapeType::RoundedRect;
@@ -239,16 +241,6 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       }
     }
 
-    float depthRatio = std::clamp(_depth / 100.0f, 0.0f, 1.0f);
-    float refractionFactor = std::clamp(_refraction / 100.0f, 0.0f, 1.0f);
-    float glassThickness = 1.0f + depthRatio * std::max(origMinHalf - 1.0f, 0.0f);
-
-    float channelOffset = (_dispersion / 100.0f) * 0.2f;
-    float splay = _splay / 100.0f;
-    float lightAngle = _lightAngle;
-    float lightIntensity = (_lightIntensity > 0) ? _lightIntensity / 100.0f : 0.0f;
-    // For AlphaMask, depthRatio is replaced with udfTransitionRatio for theta calculation.
-    float effectiveDepthRatio = depthRatio;
     float udfPixelToLayerPixel = 1.0f;
     // For AlphaMask shape, generate a UDF height map:
     // Tent-blur the binary alpha to approximate UDF (triangular kernel gives more linear
@@ -334,8 +326,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
     }
     auto filter = getRefractionFilter(
         layerWidth, layerHeight, effectiveContentScale, effectiveShapeType, crRadius, halfW, halfH,
-        minHalf, glassThickness, refractionFactor, channelOffset, splay, effectiveDepthRatio,
-        lightAngle, lightIntensity, origMinHalf, udfPixelToLayerPixel, maskImage, coarseMaskImage);
+        udfPixelToLayerPixel, maskImage, coarseMaskImage);
     Point refractOffset = {};
     auto clipRect = Rect::MakeWH(static_cast<float>(processedBg->width()),
                                  static_cast<float>(processedBg->height()));
@@ -344,6 +335,11 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       processedBg = refractedImage;
       processedOffset += refractOffset;
     }
+  }
+
+  // Early exit when neither analytical shape nor content mask is available.
+  if (input.layerContent == nullptr && input.content == nullptr) {
+    return;
   }
 
   float finalOffsetX = processedOffset.x / scaleRatioX;
@@ -412,7 +408,7 @@ std::shared_ptr<ImageFilter> GlassStyle::getFrostFilter(float contentScale) {
   if (_frost <= 0) {
     return nullptr;
   }
-  if (frostFilter && contentScale == currentFrostScale) {
+  if (frostFilter && FloatNearlyEqual(currentFrostScale, contentScale)) {
     return frostFilter;
   }
   currentFrostScale = contentScale;
@@ -463,9 +459,7 @@ void GlassStyle::invalidateMaskFilter() {
 
 std::shared_ptr<ImageFilter> GlassStyle::getRefractionFilter(
     int layerWidth, int layerHeight, float contentScale, GlassShapeType shapeType,
-    float cornerRadius, float halfWidth, float halfHeight, float minHalf, float glassThickness,
-    float refractionFactor, float dispersion, float splay, float depthRatio, float lightAngle,
-    float lightIntensity, float origMinHalf, float udfPixelToLayerPixel,
+    float cornerRadius, float halfWidth, float halfHeight, float udfPixelToLayerPixel,
     std::shared_ptr<Image> maskImage, std::shared_ptr<Image> coarseMaskImage) {
   // For AlphaMask shapes the mask changes each frame, so always recreate.
   // For analytical shapes we can cache when geometry params haven't changed.
@@ -474,6 +468,9 @@ std::shared_ptr<ImageFilter> GlassStyle::getRefractionFilter(
       cachedContentScale == contentScale && FloatNearlyEqual(cachedCornerRadius, cornerRadius)) {
     return refractionFilter;
   }
+  float minHalf = std::min(halfWidth, halfHeight);
+  float depthRatio = std::clamp(_depth / 100.0f, 0.0f, 1.0f);
+  float glassThickness = 1.0f + depthRatio * std::max(minHalf - 1.0f, 0.0f);
   GlassRefractionParams params = {};
   params.glassWidth = static_cast<float>(layerWidth);
   params.glassHeight = static_cast<float>(layerHeight);
@@ -482,13 +479,13 @@ std::shared_ptr<ImageFilter> GlassStyle::getRefractionFilter(
   params.cornerRadius = cornerRadius;
   params.minHalf = minHalf;
   params.glassThickness = glassThickness;
-  params.refractionFactor = refractionFactor;
-  params.dispersion = dispersion;
-  params.splay = splay;
+  params.refractionFactor = std::clamp(_refraction / 100.0f, 0.0f, 1.0f);
+  params.dispersion = (_dispersion / 100.0f) * 0.2f;
+  params.splay = _splay / 100.0f;
   params.depthRatio = depthRatio;
-  params.lightAngle = lightAngle;
-  params.lightIntensity = lightIntensity;
-  params.origMinHalf = origMinHalf;
+  params.lightAngle = _lightAngle;
+  params.lightIntensity = (_lightIntensity > 0) ? _lightIntensity / 100.0f : 0.0f;
+  params.origMinHalf = minHalf;
   params.origWidth = halfWidth * 2.0f;
   params.origHeight = halfHeight * 2.0f;
   params.udfPixelToLayerPixel = udfPixelToLayerPixel;
