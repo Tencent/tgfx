@@ -179,13 +179,13 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistry) {
   for (auto& factory : factories) {
     auto shader = factory();
     auto shaderInfo = shader->info();
-    if (shaderInfo.name == "TextureFillShader") {
+    if (shaderInfo.name == TextureFillShader::Name()) {
       foundTextureFill = true;
       EXPECT_EQ(shaderInfo.vertDomain.totalCount(), 16u);
       EXPECT_EQ(shaderInfo.vertDomain.dimensionCount(), 4u);
-      // FragDims: 4 bools + 1 int(3) = 2^4 * 3 = 48 total permutations
-      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 48u);
-      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 5u);
+      // FragDims: 4 bools + HAS_XP(int3) + HAS_COVERAGE(int3) = 144 permutations.
+      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 144u);
+      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 6u);
       EXPECT_EQ(shaderInfo.vertexFile, "level1/texture_fill.vert");
       EXPECT_EQ(shaderInfo.fragmentFile, "level1/texture_fill.frag");
     }
@@ -198,16 +198,16 @@ TGFX_TEST(ShaderPermutationTest, ShouldCompile) {
   for (auto& factory : factories) {
     auto shader = factory();
     auto shaderInfo = shader->info();
-    if (shaderInfo.name != "TextureFillShader") {
+    if (shaderInfo.name != TextureFillShader::Name()) {
       continue;
     }
-    // Vert: 4 bool = 16 raw. Frag: 4 bool + HAS_XP(int3) = 48 raw.
+    // Vert: 4 bool = 16 raw. Frag: 4 bool + HAS_XP(int3) + HAS_COVERAGE(int3) = 144 raw.
     // ShouldCompile rules:
     //   - HAS_YUV(frag) != 0 → excluded (YUV falls back to ProgramBuilder)
     //   - ALPHA_ONLY && HAS_RGBAAA both set → excluded (mutually exclusive)
     //   - Vert 4 dims must match frag first 4 dims
     // Valid vert configs (HAS_YUV=0): 8, minus ALPHA_ONLY=1&&HAS_RGBAAA=1 = 6.
-    // Each valid vert matches 3 frag variants (HAS_XP=0,1,2) → 6 * 3 = 18.
+    // Each valid vert matches 9 fragment combinations → 6 * 9 = 54.
     int compiledCount = 0;
     for (uint32_t vi = 0; vi < shaderInfo.vertDomain.totalCount(); vi++) {
       auto vertValues = shaderInfo.vertDomain.decode(vi);
@@ -218,7 +218,7 @@ TGFX_TEST(ShaderPermutationTest, ShouldCompile) {
         }
       }
     }
-    EXPECT_EQ(compiledCount, 18);
+    EXPECT_EQ(compiledCount, 54);
   }
 }
 
@@ -238,6 +238,32 @@ TGFX_TEST(ShaderPermutationTest, EncodeWithBitShift) {
   EXPECT_EQ(domain.encode({0, 0, 0, 1}), 1u << D::HAS_SUBSET);
   // HAS_YUV=1, HAS_SUBSET=1 -> index = (1<<0) | (1<<3) = 9
   EXPECT_EQ(domain.encode({1, 0, 0, 1}), (1u << D::HAS_YUV) | (1u << D::HAS_SUBSET));
+}
+
+TGFX_TEST(ShaderPermutationTest, TextureFillTypedEncodingMatchesDomains) {
+  auto vertexDomain = TextureFillShader::VD::domain();
+  for (uint32_t index = 0; index < vertexDomain.totalCount(); index++) {
+    auto values = vertexDomain.decode(index);
+    TextureFillShader::VertexValues typedValues = {};
+    typedValues.hasYUV = values[TextureFillShader::VD::HAS_YUV] != 0;
+    typedValues.alphaOnly = values[TextureFillShader::VD::ALPHA_ONLY] != 0;
+    typedValues.hasRGBAAA = values[TextureFillShader::VD::HAS_RGBAAA] != 0;
+    typedValues.hasSubset = values[TextureFillShader::VD::HAS_SUBSET] != 0;
+    EXPECT_EQ(TextureFillShader::EncodeVertex(typedValues), index);
+  }
+
+  auto fragmentDomain = TextureFillShader::FD::domain();
+  for (uint32_t index = 0; index < fragmentDomain.totalCount(); index++) {
+    auto values = fragmentDomain.decode(index);
+    TextureFillShader::FragmentValues typedValues = {};
+    typedValues.hasYUV = values[TextureFillShader::FD::HAS_YUV] != 0;
+    typedValues.alphaOnly = values[TextureFillShader::FD::ALPHA_ONLY] != 0;
+    typedValues.hasRGBAAA = values[TextureFillShader::FD::HAS_RGBAAA] != 0;
+    typedValues.hasSubset = values[TextureFillShader::FD::HAS_SUBSET] != 0;
+    typedValues.xp = static_cast<uint32_t>(values[TextureFillShader::FD::HAS_XP]);
+    typedValues.coverage = static_cast<uint32_t>(values[TextureFillShader::FD::HAS_COVERAGE]);
+    EXPECT_EQ(TextureFillShader::EncodeFragment(typedValues), index);
+  }
 }
 
 TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {

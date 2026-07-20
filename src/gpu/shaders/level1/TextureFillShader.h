@@ -47,10 +47,48 @@ class TextureFillShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 6, "Update ShouldCompile below when dimensions change.");
+  static_assert(VD::COUNT == 4 && FD::COUNT == 6,
+                "Update the encoders and ShouldCompile when dimensions change.");
+
+  struct VertexValues {
+    bool hasYUV = false;
+    bool alphaOnly = false;
+    bool hasRGBAAA = false;
+    bool hasSubset = false;
+  };
+
+  struct FragmentValues {
+    bool hasYUV = false;
+    bool alphaOnly = false;
+    bool hasRGBAAA = false;
+    bool hasSubset = false;
+    uint32_t xp = 0;
+    uint32_t coverage = 0;
+  };
+
+  /** Returns the stable template name used by both bundle generation and runtime lookup. */
+  static constexpr const char* Name() {
+    return "TextureFillShader";
+  }
+
+  /** Encodes vertex values with the same mixed-radix layout as VD::domain() without allocation. */
+  static constexpr uint32_t EncodeVertex(const VertexValues& values) {
+    return static_cast<uint32_t>(values.hasYUV) | (static_cast<uint32_t>(values.alphaOnly) << 1u) |
+           (static_cast<uint32_t>(values.hasRGBAAA) << 2u) |
+           (static_cast<uint32_t>(values.hasSubset) << 3u);
+  }
+
+  /** Encodes fragment values with the same mixed-radix layout as FD::domain() without allocation. */
+  static constexpr uint32_t EncodeFragment(const FragmentValues& values) {
+    auto base = static_cast<uint32_t>(values.hasYUV) |
+                (static_cast<uint32_t>(values.alphaOnly) << 1u) |
+                (static_cast<uint32_t>(values.hasRGBAAA) << 2u) |
+                (static_cast<uint32_t>(values.hasSubset) << 3u);
+    return base + values.xp * 16u + values.coverage * 48u;
+  }
 
   PrecompiledShaderInfo info() const override {
-    return {"TextureFillShader",
+    return {Name(),
             "level1/texture_fill.vert",
             "level1/texture_fill.frag",
             VD::domain(),

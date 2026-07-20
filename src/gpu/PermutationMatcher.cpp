@@ -171,26 +171,20 @@ static std::optional<PermutationMatchResult> TryMatchTextureFill(const ProgramIn
   if (te->isYUV()) {
     return std::nullopt;
   }
-  using VD = TextureFillShader::VD;
-  auto vertDomain = VD::domain();
-  std::vector<int> vertValues(VD::COUNT);
-  vertValues[VD::HAS_YUV] = 0;
-  vertValues[VD::ALPHA_ONLY] = te->isAlphaOnly() ? 1 : 0;
-  vertValues[VD::HAS_RGBAAA] = te->hasRGBAAA() ? 1 : 0;
-  vertValues[VD::HAS_SUBSET] = te->hasSubset() ? 1 : 0;
-  auto vertIndex = vertDomain.encode(vertValues);
+  TextureFillShader::VertexValues vertexValues = {};
+  vertexValues.alphaOnly = te->isAlphaOnly();
+  vertexValues.hasRGBAAA = te->hasRGBAAA();
+  vertexValues.hasSubset = te->hasSubset();
+  auto vertIndex = TextureFillShader::EncodeVertex(vertexValues);
 
-  using FD = TextureFillShader::FD;
-  auto fragDomain = FD::domain();
-  std::vector<int> fragValues(FD::COUNT);
-  fragValues[FD::HAS_YUV] = 0;
-  fragValues[FD::ALPHA_ONLY] = te->isAlphaOnly() ? 1 : 0;
-  fragValues[FD::HAS_RGBAAA] = te->hasRGBAAA() ? 1 : 0;
-  fragValues[FD::HAS_SUBSET] = te->hasSubset() ? 1 : 0;
-  fragValues[FD::HAS_XP] = xpType;
-  fragValues[FD::HAS_COVERAGE] = coverageType;
-  auto fragIndex = fragDomain.encode(fragValues);
-  return PermutationMatchResult{"TextureFillShader", vertIndex, fragIndex};
+  TextureFillShader::FragmentValues fragmentValues = {};
+  fragmentValues.alphaOnly = te->isAlphaOnly();
+  fragmentValues.hasRGBAAA = te->hasRGBAAA();
+  fragmentValues.hasSubset = te->hasSubset();
+  fragmentValues.xp = static_cast<uint32_t>(xpType);
+  fragmentValues.coverage = static_cast<uint32_t>(coverageType);
+  auto fragIndex = TextureFillShader::EncodeFragment(fragmentValues);
+  return PermutationMatchResult{TextureFillShader::Name(), vertIndex, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchTiledTextureFill(

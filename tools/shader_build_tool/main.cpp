@@ -320,7 +320,7 @@ static ShaderReport CompileOneShader(
         if (!vertResult.success) {
           std::cerr << "  " << vertResult.error << "\n";
           report.errorCount++;
-          RecordCommonArtifactError(options.backends, profileErrorCounts);
+          RecordCommonArtifactError(profileErrorCounts);
           continue;
         }
         // Store a dummy reflection for now; we'll fill it after frag compilation
@@ -336,7 +336,7 @@ static ShaderReport CompileOneShader(
       if (!fragResult.success) {
         std::cerr << "  " << fragResult.error << "\n";
         report.errorCount++;
-        RecordCommonArtifactError(options.backends, profileErrorCounts);
+        RecordCommonArtifactError(profileErrorCounts);
         continue;
       }
 
