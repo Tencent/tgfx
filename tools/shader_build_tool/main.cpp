@@ -185,14 +185,17 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
     vertSource = ReadFileContents(options.shaderDir + "/" + info.vertexFile);
     fragSource = ReadFileContents(options.shaderDir + "/" + info.fragmentFile);
     if (vertSource.empty()) {
-      std::cerr << "  WARNING: Cannot read vertex file: " << info.vertexFile << "\n";
+      std::cerr << "  ERROR: Cannot read vertex file or file is empty: " << info.vertexFile << "\n";
+      report.errorCount++;
     } else {
       auto vertDir = options.shaderDir + "/" + info.vertexFile;
       vertDir = vertDir.substr(0, vertDir.rfind('/'));
       vertSource = ResolveIncludes(vertSource, vertDir);
     }
     if (fragSource.empty()) {
-      std::cerr << "  WARNING: Cannot read fragment file: " << info.fragmentFile << "\n";
+      std::cerr << "  ERROR: Cannot read fragment file or file is empty: " << info.fragmentFile
+                << "\n";
+      report.errorCount++;
     } else {
       auto fragDir = options.shaderDir + "/" + info.fragmentFile;
       fragDir = fragDir.substr(0, fragDir.rfind('/'));
