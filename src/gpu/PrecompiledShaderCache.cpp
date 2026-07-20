@@ -19,6 +19,7 @@
 #include "PrecompiledShaderCache.h"
 #include <cstring>
 #include <fstream>
+#include <limits>
 #include "core/utils/Log.h"
 #include "zlib.h"
 
@@ -172,13 +173,19 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   if (compressionType == 1) {
     // Only the data pool region is compressed. Compute compressed size from file layout.
     size_t compressedEnd = reflectionOffset > 0 ? static_cast<size_t>(reflectionOffset) : size;
-    size_t compressedSize = compressedEnd - static_cast<size_t>(dataOffset);
-    if (dataOffset + compressedSize > size) {
+    if (dataOffset > size || compressedEnd > size || compressedEnd < dataOffset) {
       LOGE("PrecompiledShaderCache: Compressed data region out of bounds");
       return false;
     }
+    size_t compressedSize = compressedEnd - static_cast<size_t>(dataOffset);
+    size_t reflectionSize = reflectionOffset > 0 ? size - compressedEnd : 0;
+    if (dataSize > std::numeric_limits<size_t>::max() - dataOffset ||
+        reflectionSize > std::numeric_limits<size_t>::max() - dataOffset - dataSize) {
+      LOGE("PrecompiledShaderCache: Decompressed bundle size overflow");
+      return false;
+    }
     // Decompress into a reassembled buffer: [header+pools | decompressed data | reflection]
-    decompressed.resize(dataOffset + dataSize + (reflectionOffset > 0 ? size - compressedEnd : 0));
+    decompressed.resize(dataOffset + dataSize + reflectionSize);
     std::memcpy(decompressed.data(), ptr, dataOffset);
     uLongf destLen = static_cast<uLongf>(dataSize);
     int ret =

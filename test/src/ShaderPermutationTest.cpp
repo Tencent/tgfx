@@ -446,6 +446,27 @@ static void TestWriteU16LE(uint8_t* p, uint16_t val) {
   p[1] = static_cast<uint8_t>((val >> 8) & 0xFF);
 }
 
+static void TestWriteU32LE(uint8_t* p, uint32_t val) {
+  p[0] = static_cast<uint8_t>(val & 0xFF);
+  p[1] = static_cast<uint8_t>((val >> 8) & 0xFF);
+  p[2] = static_cast<uint8_t>((val >> 16) & 0xFF);
+  p[3] = static_cast<uint8_t>((val >> 24) & 0xFF);
+}
+
+TGFX_TEST(ShaderPermutationTest, CompressedBundleRejectsInvalidOffsetOrder) {
+  std::vector<uint8_t> bundle(80, 0);
+  TestWriteU32LE(bundle.data(), 0x54475346);
+  TestWriteU16LE(bundle.data() + 4, 3);
+  TestWriteU16LE(bundle.data() + 6, 1);
+  TestWriteU32LE(bundle.data() + 36, 80);
+  TestWriteU32LE(bundle.data() + 40, 1);
+  TestWriteU32LE(bundle.data() + 44, 64);
+
+  PrecompiledShaderCache cache;
+  EXPECT_FALSE(cache.loadBundle(bundle.data(), bundle.size()));
+  EXPECT_FALSE(cache.isLoaded());
+}
+
 TGFX_TEST(ShaderPermutationTest, CompressedBundleLoad) {
   // Load an uncompressed bundle, manually compress its data pool, then verify loading.
   auto bundlePath = ProjectPath::Absolute(BundlePath());
