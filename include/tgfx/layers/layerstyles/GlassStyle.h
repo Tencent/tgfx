@@ -24,9 +24,9 @@
 namespace tgfx {
 
 enum class GlassShapeType {
+  Auto,
   RoundedRect,
   Ellipse,
-  Star,
   AlphaMask,
 };
 
@@ -180,7 +180,7 @@ class GlassStyle : public LayerStyle {
   float _lightAngle = 135.0f;
   float _lightIntensity = 50.0f;
   float _cornerRadius = 0.0f;
-  GlassShapeType _shapeType = GlassShapeType::RoundedRect;
+  GlassShapeType _shapeType = GlassShapeType::Auto;
 
   std::shared_ptr<ImageFilter> frostFilter = nullptr;
   float currentFrostScale = 0.0f;

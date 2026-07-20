@@ -316,18 +316,17 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend("  vec2 uvG = clamp(sourceUV + uvOffset, vec2(0.0), vec2(1.0));");
   fragBuilder->codeAppend(
       "  vec2 uvB = clamp(sourceUV + uvOffset * (1.0 - dispersion), vec2(0.0), vec2(1.0));");
+  fragBuilder->codeAppend("  vec4 srcG = ");
+  fragBuilder->appendTextureLookup(sourceSampler, "uvG");
+  fragBuilder->codeAppend(";");
   fragBuilder->codeAppend("  finalColor.r = ");
   fragBuilder->appendTextureLookup(sourceSampler, "uvR");
   fragBuilder->codeAppend(".r;");
-  fragBuilder->codeAppend("  finalColor.g = ");
-  fragBuilder->appendTextureLookup(sourceSampler, "uvG");
-  fragBuilder->codeAppend(".g;");
+  fragBuilder->codeAppend("  finalColor.g = srcG.g;");
   fragBuilder->codeAppend("  finalColor.b = ");
   fragBuilder->appendTextureLookup(sourceSampler, "uvB");
   fragBuilder->codeAppend(".b;");
-  fragBuilder->codeAppend("  srcAlpha = ");
-  fragBuilder->appendTextureLookup(sourceSampler, "uvG");
-  fragBuilder->codeAppend(".a;");
+  fragBuilder->codeAppend("  srcAlpha = srcG.a;");
   fragBuilder->codeAppend("}");
 
   // Edge lighting.

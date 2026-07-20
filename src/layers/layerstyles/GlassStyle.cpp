@@ -123,9 +123,12 @@ void GlassStyle::setShapeType(GlassShapeType type) {
 
 Rect GlassStyle::filterBackground(const Rect& srcRect, float contentScale) {
   auto result = srcRect;
-  // Frost blur outset (triggers blur-based surface downsampling when large).
-  auto filter = getFrostFilter(contentScale);
-  if (filter) {
+  // Compute frost outset without caching the filter, since onDraw applies frost at a different
+  // scale (contentScale * bgScale) to the downsampled background image. Caching here would be
+  // invalidated immediately by onDraw.
+  if (_frost > 0) {
+    float sigma = (_frost / 100.0f) * MaxFrostSigma * contentScale;
+    auto filter = ImageFilter::Blur(sigma, sigma, TileMode::Mirror);
     result = filter->filterBounds(srcRect);
   }
   // Refraction outset: expand the background capture area to cover the maximum UV offset.
@@ -145,13 +148,17 @@ Rect GlassStyle::filterBackground(const Rect& srcRect, float contentScale) {
   return result;
 }
 
-void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, BlendMode) {
+void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alpha,
+                        BlendMode blendMode) {
   if (input.extraSource == nullptr) {
     DEBUG_ASSERT(false);
     return;
   }
 
   auto bgImage = input.extraSource->image();
+  if (bgImage == nullptr) {
+    return;
+  }
   auto bgOffset = input.extraSource->imageOffset();
 
   // Down-scale the background to avoid huge GPU textures when zoomed in.
@@ -206,39 +213,42 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
     float scaledRadius = _cornerRadius * effectiveContentScale;
     float crRadius = std::min(scaledRadius, origMinHalf);
 
-    // Auto-detect shape type from layerContent.
-    GlassShapeType effectiveShapeType = GlassShapeType::AlphaMask;
-    if (input.layerContent != nullptr) {
-      auto contentType = input.layerContent->getType();
-      if (contentType == LayerContent::Type::RRect) {
-        auto rrect = input.layerContent->getRRect();
-        if (rrect.has_value() && rrect->isOval()) {
-          effectiveShapeType = GlassShapeType::Ellipse;
-        } else {
-          effectiveShapeType = GlassShapeType::RoundedRect;
-          if (rrect.has_value()) {
-            auto radii = rrect->radii();
-            // The analytical SDF currently supports a single scalar corner radius.
-            float representativeRadius = std::min(radii[0].x, radii[0].y);
-            crRadius = std::min(representativeRadius * effectiveContentScale, origMinHalf);
+    // Auto-detect shape type from layerContent when _shapeType is Auto.
+    GlassShapeType effectiveShapeType = _shapeType;
+    if (effectiveShapeType == GlassShapeType::Auto) {
+      effectiveShapeType = GlassShapeType::AlphaMask;
+      if (input.layerContent != nullptr) {
+        auto contentType = input.layerContent->getType();
+        if (contentType == LayerContent::Type::RRect) {
+          auto rrect = input.layerContent->getRRect();
+          if (rrect.has_value() && rrect->isOval()) {
+            effectiveShapeType = GlassShapeType::Ellipse;
+          } else {
+            effectiveShapeType = GlassShapeType::RoundedRect;
+            if (rrect.has_value()) {
+              auto radii = rrect->radii();
+              // The analytical SDF currently supports a single scalar corner radius.
+              float representativeRadius = std::min(radii[0].x, radii[0].y);
+              crRadius = std::min(representativeRadius * effectiveContentScale, origMinHalf);
+            }
           }
-        }
-      } else if (contentType == LayerContent::Type::Rect) {
-        effectiveShapeType = GlassShapeType::RoundedRect;
-        crRadius = 0.0f;
-      } else if (contentType == LayerContent::Type::Path ||
-                 contentType == LayerContent::Type::Shape) {
-        // Check if the path is an oval (ellipse).
-        if (input.layerContent->getOval().has_value()) {
-          effectiveShapeType = GlassShapeType::Ellipse;
-        } else {
-          effectiveShapeType = GlassShapeType::AlphaMask;
+        } else if (contentType == LayerContent::Type::Rect) {
+          effectiveShapeType = GlassShapeType::RoundedRect;
+          crRadius = 0.0f;
+        } else if (contentType == LayerContent::Type::Path ||
+                   contentType == LayerContent::Type::Shape) {
+          // Check if the path is an oval (ellipse).
+          if (input.layerContent->getOval().has_value()) {
+            effectiveShapeType = GlassShapeType::Ellipse;
+          } else {
+            effectiveShapeType = GlassShapeType::AlphaMask;
+          }
         }
       }
     }
 
     float depthRatio = std::clamp(_depth / 100.0f, 0.0f, 1.0f);
-    float refractionFactor = _refraction / 100.0f;
+    float refractionFactor = std::clamp(_refraction / 100.0f, 0.0f, 1.0f);
     float glassThickness = 1.0f + depthRatio * std::max(origMinHalf - 1.0f, 0.0f);
 
     float channelOffset = (_dispersion / 100.0f) * 0.2f;
@@ -259,6 +269,9 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
     std::shared_ptr<Image> maskImage = nullptr;
     std::shared_ptr<Image> coarseMaskImage = nullptr;
     if (effectiveShapeType == GlassShapeType::AlphaMask) {
+      if (input.content == nullptr) {
+        return;
+      }
       // Use original layer bounds (not zoom-affected) for blur radius calculation.
       // depth 1-100 maps linearly to blurRadius 1-50, minimum 5.
       float blurRadius = std::max(std::min((_depth / 100.0f) * 50.0f, 50.0f), 5.0f);
@@ -347,9 +360,8 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
   float finalScaleY = 1.0f / scaleRatioY;
 
   Paint paint = {};
-  // Src can clear the top and left AA fringe of pixel-aligned rectangles because RectDrawOp's
-  // expanded coverage bounds include zero-coverage pixels. SrcOver preserves the backdrop there.
-  paint.setBlendMode(BlendMode::SrcOver);
+  paint.setBlendMode(blendMode);
+  paint.setAlpha(alpha);
 
   // Keep the background and filter chain at their capped resolution. The shader matrix maps the
   // low-resolution image into content pixel space, while the Glass FP executes per destination
@@ -388,6 +400,9 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
   }
 
   if (!drewAnalyticalShape) {
+    if (input.content == nullptr) {
+      return;
+    }
     // Keep imageShader on paint so the refraction filter is inlined as a fragment processor
     // (per-destination-fragment computation), matching the SDF path. Using drawImageRect would
     // pass no UV matrix to FilterImage::asFragmentProcessor, causing the containment check to
