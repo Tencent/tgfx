@@ -27,6 +27,7 @@
 #include "layers/contents/PathContent.h"
 #include "layers/contents/RectContent.h"
 #include "layers/contents/RRectContent.h"
+#include "layers/filters/TentBlurImageFilter.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/SamplingOptions.h"
 #include "tgfx/core/Surface.h"
@@ -282,7 +283,8 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       // depthRatio stays as _depth/100 for shader use (step calculation).
       if (!maskBlurFilter || !FloatNearlyEqual(cachedMaskBlurRadiusX, udfBlurRadiusX) ||
           !FloatNearlyEqual(cachedMaskBlurRadiusY, udfBlurRadiusY)) {
-        maskBlurFilter = ImageFilter::TentBlur(udfBlurRadiusX, udfBlurRadiusY, TileMode::Decal);
+        maskBlurFilter =
+            std::make_shared<TentBlurImageFilter>(udfBlurRadiusX, udfBlurRadiusY, TileMode::Decal);
         cachedMaskBlurRadiusX = udfBlurRadiusX;
         cachedMaskBlurRadiusY = udfBlurRadiusY;
       }
@@ -309,8 +311,9 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       if (!coarseMaskBlurFilter ||
           !FloatNearlyEqual(cachedCoarseMaskBlurRadiusX, edgeLightRadiusX) ||
           !FloatNearlyEqual(cachedCoarseMaskBlurRadiusY, edgeLightRadiusY)) {
-        coarseMaskBlurFilter =
-            ImageFilter::TentBlur(edgeLightRadiusX, edgeLightRadiusY, TileMode::Decal);
+        coarseMaskBlurFilter = std::make_shared<TentBlurImageFilter>(edgeLightRadiusX,
+                                                                       edgeLightRadiusY,
+                                                                       TileMode::Decal);
         cachedCoarseMaskBlurRadiusX = edgeLightRadiusX;
         cachedCoarseMaskBlurRadiusY = edgeLightRadiusY;
       }

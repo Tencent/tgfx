@@ -4609,4 +4609,134 @@ TGFX_TEST(LayerTest, GlassStyleBlend) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleBlend"));
 }
 
+TGFX_TEST(LayerTest, GlassStyleNested) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  int surfaceWidth = 630;
+  int surfaceHeight = 220;
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Background: checker pattern.
+  auto bgImage = MakeImage("resources/apitest/checker_128.png");
+  auto bgLayer = ImageLayer::Make();
+  bgLayer->setImage(bgImage);
+  auto bgScale = static_cast<float>(surfaceWidth) / static_cast<float>(bgImage->width());
+  bgLayer->setMatrix(Matrix::MakeScale(bgScale, bgScale));
+  displayList->root()->addChild(bgLayer);
+
+  float cellSize = 200;
+  float gap = 10;
+  float glassSize = 150;
+  float glassOffset = (cellSize - glassSize) * 0.5f;
+
+  // Cell 1 (left): Glass on Glass.
+  // Top glass sees raw checker through bottom glass (two-pass snapshot model).
+  {
+    auto cell = Layer::Make();
+    cell->setMatrix(Matrix::MakeTrans(gap, gap));
+
+    auto bottomGlass = SolidLayer::Make();
+    bottomGlass->setColor(Color::FromRGBA(255, 255, 255, 128));
+    bottomGlass->setWidth(glassSize);
+    bottomGlass->setHeight(glassSize);
+    bottomGlass->setRadiusX(16);
+    bottomGlass->setRadiusY(16);
+    bottomGlass->setMatrix(Matrix::MakeTrans(glassOffset, glassOffset));
+    auto bottomStyle = GlassStyle::Make(80, 60, 0, 0, 0, 135, 60);
+    bottomStyle->setCornerRadius(16);
+    bottomGlass->setLayerStyles({bottomStyle});
+    cell->addChild(bottomGlass);
+
+    float topSize = 80;
+    float topOff = (cellSize - topSize) * 0.5f;
+    auto topGlass = SolidLayer::Make();
+    topGlass->setColor(Color::FromRGBA(255, 255, 255, 128));
+    topGlass->setWidth(topSize);
+    topGlass->setHeight(topSize);
+    topGlass->setRadiusX(12);
+    topGlass->setRadiusY(12);
+    topGlass->setMatrix(Matrix::MakeTrans(topOff, topOff));
+    auto topStyle = GlassStyle::Make(80, 60, 0, 0, 0, 135, 60);
+    topStyle->setCornerRadius(12);
+    topGlass->setLayerStyles({topStyle});
+    cell->addChild(topGlass);
+
+    displayList->root()->addChild(cell);
+  }
+
+  // Cell 2 (middle): BackgroundBlur on Glass.
+  // Blur uses BlendMode::Src which overwrites the glass rendering below it.
+  {
+    auto cell = Layer::Make();
+    cell->setMatrix(Matrix::MakeTrans(gap + cellSize + gap, gap));
+
+    auto bottomGlass = SolidLayer::Make();
+    bottomGlass->setColor(Color::FromRGBA(255, 255, 255, 128));
+    bottomGlass->setWidth(glassSize);
+    bottomGlass->setHeight(glassSize);
+    bottomGlass->setRadiusX(16);
+    bottomGlass->setRadiusY(16);
+    bottomGlass->setMatrix(Matrix::MakeTrans(glassOffset, glassOffset));
+    auto bottomStyle = GlassStyle::Make(80, 60, 0, 0, 0, 135, 60);
+    bottomStyle->setCornerRadius(16);
+    bottomGlass->setLayerStyles({bottomStyle});
+    cell->addChild(bottomGlass);
+
+    float topSize = 80;
+    float topOff = (cellSize - topSize) * 0.5f;
+    auto topBlur = SolidLayer::Make();
+    topBlur->setColor(Color::FromRGBA(255, 255, 255, 128));
+    topBlur->setWidth(topSize);
+    topBlur->setHeight(topSize);
+    topBlur->setRadiusX(12);
+    topBlur->setRadiusY(12);
+    topBlur->setMatrix(Matrix::MakeTrans(topOff, topOff));
+    auto blurStyle = BackgroundBlurStyle::Make(30, 30, TileMode::Mirror);
+    topBlur->setLayerStyles({blurStyle});
+    cell->addChild(topBlur);
+
+    displayList->root()->addChild(cell);
+  }
+
+  // Cell 3 (right): Glass on BackgroundBlur.
+  // Glass renders normally; its captured background does not include the blur effect.
+  {
+    auto cell = Layer::Make();
+    cell->setMatrix(Matrix::MakeTrans(gap + 2 * (cellSize + gap), gap));
+
+    auto bottomBlur = SolidLayer::Make();
+    bottomBlur->setColor(Color::FromRGBA(255, 255, 255, 128));
+    bottomBlur->setWidth(glassSize);
+    bottomBlur->setHeight(glassSize);
+    bottomBlur->setRadiusX(16);
+    bottomBlur->setRadiusY(16);
+    bottomBlur->setMatrix(Matrix::MakeTrans(glassOffset, glassOffset));
+    auto blurStyle = BackgroundBlurStyle::Make(30, 30, TileMode::Mirror);
+    bottomBlur->setLayerStyles({blurStyle});
+    cell->addChild(bottomBlur);
+
+    float topSize = 80;
+    float topOff = (cellSize - topSize) * 0.5f;
+    auto topGlass = SolidLayer::Make();
+    topGlass->setColor(Color::FromRGBA(255, 255, 255, 128));
+    topGlass->setWidth(topSize);
+    topGlass->setHeight(topSize);
+    topGlass->setRadiusX(12);
+    topGlass->setRadiusY(12);
+    topGlass->setMatrix(Matrix::MakeTrans(topOff, topOff));
+    auto topStyle = GlassStyle::Make(80, 60, 0, 0, 0, 135, 60);
+    topStyle->setCornerRadius(12);
+    topGlass->setLayerStyles({topStyle});
+    cell->addChild(topGlass);
+
+    displayList->root()->addChild(cell);
+  }
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleNested"));
+}
+
 }  // namespace tgfx

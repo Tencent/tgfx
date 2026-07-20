@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/filters/TentBlurFilter.h"
+#include "TentBlurImageFilter.h"
 
 namespace tgfx {
 
@@ -24,7 +25,7 @@ std::shared_ptr<ImageFilter> TentBlurFilter::MakeImageFilter(float radius, TileM
   if (radius < 1.0f) {
     return nullptr;
   }
-  return ImageFilter::TentBlur(radius, radius, tileMode);
+  return std::make_shared<TentBlurImageFilter>(radius, radius, tileMode);
 }
 
 std::shared_ptr<TentBlurFilter> TentBlurFilter::Make(float blurrinessX, float blurrinessY,
@@ -61,7 +62,8 @@ TentBlurFilter::TentBlurFilter(float blurrinessX, float blurrinessY, TileMode ti
 }
 
 std::shared_ptr<ImageFilter> TentBlurFilter::onCreateImageFilter(float scale) {
-  return ImageFilter::TentBlur(_blurrinessX * scale, _blurrinessY * scale, _tileMode);
+  return std::make_shared<TentBlurImageFilter>(_blurrinessX * scale, _blurrinessY * scale,
+                                               _tileMode);
 }
 
 }  // namespace tgfx

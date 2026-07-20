@@ -33,14 +33,6 @@ namespace tgfx {
 // non-uniform X/Y step rounding and worsens the separable-kernel anisotropy.
 #define MAX_TENT_RADIUS 64.f
 
-std::shared_ptr<ImageFilter> ImageFilter::TentBlur(float radiusX, float radiusY,
-                                                   TileMode tileMode) {
-  if (radiusX < 0 || radiusY < 0 || (radiusX == 0 && radiusY == 0)) {
-    return nullptr;
-  }
-  return std::make_shared<TentBlurImageFilter>(radiusX, radiusY, tileMode);
-}
-
 float TentBlurImageFilter::MaxRadius() {
   return MAX_TENT_RADIUS;
 }
