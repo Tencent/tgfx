@@ -38,11 +38,14 @@ struct ShaderStageBlob {
 /// enabling M+N storage instead of M*N.
 class PrecompiledShaderCache {
  public:
-  /// Loads a bundle file from the given path. Returns true if the bundle was loaded successfully.
+  /// Loads a bundle file from the given path. On success, the bundle completely replaces any
+  /// previously loaded entries. On failure, the existing cache remains unchanged.
   bool loadBundle(const std::string& path);
 
-  /// Loads a bundle from in-memory data. The caller must ensure the data remains valid until
-  /// parsing completes. This overload is used for embedded bundles compiled into the library.
+  /// Loads a bundle from in-memory data. On success, the bundle completely replaces any previously
+  /// loaded entries. On failure, the existing cache remains unchanged. The caller must ensure the
+  /// data remains valid until parsing completes. This overload is used for embedded bundles
+  /// compiled into the library.
   bool loadBundle(const uint8_t* data, size_t size);
 
   /// Looks up a vertex shader by its 128-bit hash. Returns nullptr if not found.

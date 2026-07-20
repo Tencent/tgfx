@@ -164,7 +164,7 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
 
   // Parse profileTag (32 bytes at offset 48)
   const char* tagPtr = reinterpret_cast<const char*>(ptr + 48);
-  _profileTag = std::string(tagPtr, strnlen(tagPtr, 32));
+  std::string profileTag(tagPtr, strnlen(tagPtr, 32));
 
   const uint8_t* loadPtr = ptr;
   size_t loadSize = size;
@@ -204,15 +204,20 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
     loadSize = decompressed.size();
   }
 
+  std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> newVertEntries;
+  std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> newFragEntries;
   if (!LoadPool(loadPtr, loadSize, vertPoolOffset, vertPoolCount, dataOffset, reflectionOffset,
-                vertEntries)) {
+                newVertEntries)) {
     return false;
   }
   if (!LoadPool(loadPtr, loadSize, fragPoolOffset, fragPoolCount, dataOffset, reflectionOffset,
-                fragEntries)) {
+                newFragEntries)) {
     return false;
   }
 
+  _profileTag = std::move(profileTag);
+  vertEntries = std::move(newVertEntries);
+  fragEntries = std::move(newFragEntries);
   LOGI("PrecompiledShaderCache: Loaded %u vert + %u frag entries (format v%u, profile=%s)",
        vertPoolCount, fragPoolCount, formatVersion, _profileTag.c_str());
   return true;

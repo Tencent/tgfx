@@ -467,6 +467,60 @@ TGFX_TEST(ShaderPermutationTest, CompressedBundleRejectsInvalidOffsetOrder) {
   EXPECT_FALSE(cache.isLoaded());
 }
 
+TGFX_TEST(ShaderPermutationTest, FailedBundleReloadPreservesCache) {
+  auto bundlePath = ProjectPath::Absolute(BundlePath());
+  std::ifstream file(bundlePath, std::ios::binary | std::ios::ate);
+  if (!file.is_open()) {
+    GTEST_SKIP() << "Bundle file not found";
+    return;
+  }
+  auto fileSize = static_cast<size_t>(file.tellg());
+  file.seekg(0);
+  std::vector<uint8_t> bundle(fileSize);
+  file.read(reinterpret_cast<char*>(bundle.data()), static_cast<std::streamsize>(fileSize));
+  file.close();
+
+  PrecompiledShaderCache cache;
+  ASSERT_TRUE(cache.loadBundle(bundle.data(), bundle.size()));
+  auto vertexCount = cache.vertexEntryCount();
+  auto fragmentCount = cache.fragmentEntryCount();
+  auto profileTag = cache.profileTag();
+
+  for (size_t index = 0; index < 32; ++index) {
+    bundle[48 + index] = 0;
+  }
+  const std::string failedTag = "failed";
+  for (size_t index = 0; index < failedTag.size(); ++index) {
+    bundle[48 + index] = static_cast<uint8_t>(failedTag[index]);
+  }
+  TestWriteU32LE(bundle.data() + 32, static_cast<uint32_t>(bundle.size() - 1));
+  EXPECT_FALSE(cache.loadBundle(bundle.data(), bundle.size()));
+  EXPECT_EQ(cache.vertexEntryCount(), vertexCount);
+  EXPECT_EQ(cache.fragmentEntryCount(), fragmentCount);
+  EXPECT_EQ(cache.profileTag(), profileTag);
+}
+
+TGFX_TEST(ShaderPermutationTest, SuccessfulBundleReloadReplacesCache) {
+  auto bundlePath = ProjectPath::Absolute(BundlePath());
+  PrecompiledShaderCache cache;
+  ASSERT_TRUE(cache.loadBundle(bundlePath));
+  ASSERT_TRUE(cache.isLoaded());
+
+  std::vector<uint8_t> replacement(80, 0);
+  TestWriteU32LE(replacement.data(), 0x54475346);
+  TestWriteU16LE(replacement.data() + 4, 3);
+  const std::string replacementTag = "replacement";
+  for (size_t index = 0; index < replacementTag.size(); ++index) {
+    replacement[48 + index] = static_cast<uint8_t>(replacementTag[index]);
+  }
+
+  ASSERT_TRUE(cache.loadBundle(replacement.data(), replacement.size()));
+  EXPECT_FALSE(cache.isLoaded());
+  EXPECT_EQ(cache.vertexEntryCount(), 0u);
+  EXPECT_EQ(cache.fragmentEntryCount(), 0u);
+  EXPECT_EQ(cache.profileTag(), replacementTag);
+}
+
 TGFX_TEST(ShaderPermutationTest, CompressedBundleLoad) {
   // Load an uncompressed bundle, manually compress its data pool, then verify loading.
   auto bundlePath = ProjectPath::Absolute(BundlePath());
