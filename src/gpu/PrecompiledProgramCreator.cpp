@@ -67,7 +67,7 @@ static void AppendFragmentProcessor(std::stringstream& stream, const FragmentPro
   stream << ")";
 }
 
-static std::string BuildPipelineSignature(const ProgramInfo* programInfo) {
+static std::string BuildEffectSignature(const ProgramInfo* programInfo) {
   std::stringstream stream;
   stream << "GP=" << programInfo->getGeometryProcessor()->name() << ";ColorFP=[";
   for (size_t i = 0; i < programInfo->numColorFragmentProcessors(); ++i) {
@@ -84,14 +84,42 @@ static std::string BuildPipelineSignature(const ProgramInfo* programInfo) {
     }
     AppendFragmentProcessor(stream, programInfo->getFragmentProcessor(i));
   }
-  auto colorAttachment = programInfo->getPipelineColorAttachment();
-  stream << "];XP=" << programInfo->getXferProcessor()->name()
+  stream << "];XP=" << programInfo->getXferProcessor()->name();
+  return stream.str();
+}
+
+static void AppendStencilSignature(std::stringstream& stream, const char* name,
+                                   const StencilDescriptor& stencil) {
+  stream << ";" << name << "Compare=" << static_cast<uint32_t>(stencil.compare)
+         << ";" << name << "Fail=" << static_cast<uint32_t>(stencil.failOp)
+         << ";" << name << "DepthFail=" << static_cast<uint32_t>(stencil.depthFailOp)
+         << ";" << name << "Pass=" << static_cast<uint32_t>(stencil.passOp);
+}
+
+static std::string BuildPipelineSignature(const ProgramInfo* programInfo) {
+  std::stringstream stream;
+  const auto colorAttachment = programInfo->getPipelineColorAttachment();
+  const auto& depthStencil = programInfo->getDepthStencil();
+  stream << BuildEffectSignature(programInfo)
          << ";Swizzle=" << programInfo->getOutputSwizzle().c_str()
          << ";Format=" << static_cast<uint32_t>(colorAttachment.format)
+         << ";BlendEnable=" << static_cast<uint32_t>(colorAttachment.blendEnable)
+         << ";SrcColorBlend=" << static_cast<uint32_t>(colorAttachment.srcColorBlendFactor)
+         << ";DstColorBlend=" << static_cast<uint32_t>(colorAttachment.dstColorBlendFactor)
+         << ";ColorBlendOp=" << static_cast<uint32_t>(colorAttachment.colorBlendOp)
+         << ";SrcAlphaBlend=" << static_cast<uint32_t>(colorAttachment.srcAlphaBlendFactor)
+         << ";DstAlphaBlend=" << static_cast<uint32_t>(colorAttachment.dstAlphaBlendFactor)
+         << ";AlphaBlendOp=" << static_cast<uint32_t>(colorAttachment.alphaBlendOp)
          << ";Samples=" << programInfo->getSampleCount()
          << ";Cull=" << static_cast<uint32_t>(programInfo->getCullMode())
-         << ";ColorWriteMask=" << programInfo->getColorWriteMask()
-         << ";DepthStencilFormat=" << static_cast<uint32_t>(programInfo->getDepthStencil().format);
+         << ";ColorWriteMask=" << colorAttachment.colorWriteMask
+         << ";DepthStencilFormat=" << static_cast<uint32_t>(depthStencil.format)
+         << ";DepthCompare=" << static_cast<uint32_t>(depthStencil.depthCompare)
+         << ";DepthWrite=" << static_cast<uint32_t>(depthStencil.depthWriteEnabled)
+         << ";StencilReadMask=" << depthStencil.stencilReadMask
+         << ";StencilWriteMask=" << depthStencil.stencilWriteMask;
+  AppendStencilSignature(stream, "StencilFront", depthStencil.stencilFront);
+  AppendStencilSignature(stream, "StencilBack", depthStencil.stencilBack);
   return stream.str();
 }
 
@@ -102,12 +130,28 @@ static PrecompiledFallbackRecord MakeFallbackRecord(
   if (!cache->diagnosticRecordingEnabled()) {
     return record;
   }
+  record.effectSignature = BuildEffectSignature(programInfo);
   record.pipelineSignature = BuildPipelineSignature(programInfo);
   if (matchResult != nullptr) {
     record.shaderName = matchResult->shaderName;
     record.vertPermutationIndex = matchResult->vertPermutationIndex;
     record.fragPermutationIndex = matchResult->fragPermutationIndex;
   }
+  return record;
+}
+
+static PrecompiledHitRecord MakeHitRecord(const PrecompiledShaderCache* cache,
+                                          const ProgramInfo* programInfo,
+                                          const PermutationMatchResult& matchResult) {
+  PrecompiledHitRecord record;
+  if (!cache->diagnosticRecordingEnabled()) {
+    return record;
+  }
+  record.effectSignature = BuildEffectSignature(programInfo);
+  record.pipelineSignature = BuildPipelineSignature(programInfo);
+  record.shaderName = matchResult.shaderName;
+  record.vertPermutationIndex = matchResult.vertPermutationIndex;
+  record.fragPermutationIndex = matchResult.fragPermutationIndex;
   return record;
 }
 
@@ -126,11 +170,13 @@ static PrecompiledFallbackReason ToFallbackReason(PermutationMatchFailure failur
 std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* context,
                                                                   const ProgramInfo* programInfo) {
   auto cache = context->precompiledShaderCache();
+  cache->recordAOTStage(PrecompiledAOTStage::Attempt);
   if (!cache->isLoaded()) {
     cache->recordArtifactMiss(PrecompiledFallbackReason::CacheNotLoaded,
                               MakeFallbackRecord(cache, programInfo));
     return nullptr;
   }
+  cache->recordAOTStage(PrecompiledAOTStage::CacheAvailable);
 
   PermutationMatchFailure matchFailure = PermutationMatchFailure::None;
   auto matchResult = MatchPermutation(programInfo, &matchFailure);
@@ -139,6 +185,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
     cache->recordArtifactMiss(reason, MakeFallbackRecord(cache, programInfo));
     return nullptr;
   }
+  cache->recordAOTStage(PrecompiledAOTStage::PermutationMatched);
 
   auto vertHash = ComputeVertexKeyHash(matchResult->shaderName, matchResult->vertPermutationIndex,
                                        cache->profileTag());
@@ -161,7 +208,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
          matchResult->shaderName.c_str(), matchResult->fragPermutationIndex);
     return nullptr;
   }
-  cache->recordHit();
+  cache->recordArtifactHit();
 
   auto gpu = context->gpu();
   auto format = FormatForBackend(context->backend());
@@ -192,6 +239,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
          matchResult->shaderName.c_str(), matchResult->vertPermutationIndex);
     return nullptr;
   }
+  cache->recordAOTStage(PrecompiledAOTStage::VertexModuleCreated);
   auto fragmentShader = gpu->createShaderModule(fragmentDesc);
   if (fragmentShader == nullptr) {
     cache->recordFailure(PrecompiledFallbackReason::FragmentModuleCreationFailed,
@@ -200,6 +248,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
          matchResult->shaderName.c_str(), matchResult->fragPermutationIndex);
     return nullptr;
   }
+  cache->recordAOTStage(PrecompiledAOTStage::FragmentModuleCreated);
 
   RenderPipelineDescriptor descriptor = {};
   VertexBufferLayout vertexLayout(programInfo->getVertexAttributes());
@@ -249,6 +298,8 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
                          MakeFallbackRecord(cache, programInfo, &*matchResult));
     return nullptr;
   }
+  cache->recordAOTStage(PrecompiledAOTStage::PipelineCreated,
+                        MakeHitRecord(cache, programInfo, *matchResult));
 
   ProgramProvenance provenance = {
       ArtifactOriginForBackend(context->backend(), vertexDesc, fragmentDesc),
