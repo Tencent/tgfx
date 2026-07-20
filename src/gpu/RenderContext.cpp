@@ -191,7 +191,15 @@ static void ComputeGlyphRenderMatrix(const Rect& atlasLocation, const Matrix& st
   outMatrix->postConcat(stateMatrix);
   if (needsPixelAlignment) {
     (*outMatrix)[2] = std::round((*outMatrix)[2]);
-    (*outMatrix)[5] = std::round((*outMatrix)[5]);
+    if (HasComplexTransform(run)) {
+      (*outMatrix)[5] = std::round((*outMatrix)[5]);
+    } else {
+      auto position = GetGlyphPosition(run, index);
+      auto deviceScale = stateMatrix.getScaleX();
+      auto sharedDeviceY = deviceScale * position.y + stateMatrix.getTranslateY();
+      auto perGlyphDeviceY = deviceScale * scale * (glyphOffset.y - atlasLocation.y());
+      (*outMatrix)[5] = std::round(sharedDeviceY) + std::round(perGlyphDeviceY);
+    }
   }
 }
 
