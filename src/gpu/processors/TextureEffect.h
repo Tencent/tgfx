@@ -65,6 +65,8 @@ class TextureEffect : public FragmentProcessor {
    */
   void computeSubsetRect(float rect[4]) const;
 
+  bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 

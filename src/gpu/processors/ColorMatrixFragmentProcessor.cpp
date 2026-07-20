@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,30 +16,19 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <array>
-#include "gpu/processors/FragmentProcessor.h"
+#include "gpu/processors/ColorMatrixFragmentProcessor.h"
+#include "gpu/AOTEffect.h"
 
 namespace tgfx {
-class ColorMatrixFragmentProcessor : public FragmentProcessor {
- public:
-  static PlacementPtr<ColorMatrixFragmentProcessor> Make(BlockAllocator* allocator,
-                                                         const std::array<float, 20>& matrix);
 
-  std::string name() const override {
-    return "ColorMatrixFragmentProcessor";
+bool ColorMatrixFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
+                                              AOTNodeID* output) const {
+  if (builder == nullptr || output == nullptr) {
+    return false;
   }
+  AOTColorMatrixParameters parameters = {};
+  parameters.matrix = matrix;
+  return builder->addColorMatrix(input, parameters, output);
+}
 
-  bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
-
- protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
-  explicit ColorMatrixFragmentProcessor(const std::array<float, 20>& matrix)
-      : FragmentProcessor(ClassID()), matrix(matrix) {
-  }
-
-  std::array<float, 20> matrix;
-};
 }  // namespace tgfx

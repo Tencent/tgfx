@@ -32,6 +32,8 @@
 #include "tgfx/core/Image.h"
 
 namespace tgfx {
+class AOTNodeBuilder;
+class AOTNodeID;
 class ProgramInfo;
 class Image;
 class Shader;
@@ -125,6 +127,8 @@ class FragmentProcessor : public Processor {
   }
 
   void computeProcessorKey(Context* context, BytesKey* bytesKey) const override;
+
+  virtual bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const;
 
   size_t numChildProcessors() const {
     return childProcessors.size();

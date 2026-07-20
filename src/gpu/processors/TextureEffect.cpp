@@ -19,6 +19,7 @@
 #include "TextureEffect.h"
 #include <algorithm>
 #include "core/utils/Log.h"
+#include "gpu/AOTEffect.h"
 #include "gpu/ProxyProvider.h"
 
 namespace tgfx {
@@ -44,6 +45,26 @@ TextureEffect::TextureEffect(std::shared_ptr<TextureProxy> proxy, const Sampling
       constraint(constraint), alphaStart(alphaStart),
       coordTransform(uvMatrix, textureProxy.get(), alphaStart), subset(subset) {
   addCoordTransform(&coordTransform);
+}
+
+bool TextureEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const {
+  auto textureView = getTextureView();
+  if (builder == nullptr || output == nullptr || textureView == nullptr) {
+    return false;
+  }
+  AOTTextureParameters parameters = {};
+  parameters.textureProxy = textureProxy;
+  parameters.samplerState = samplerState;
+  parameters.constraint = constraint;
+  parameters.uvMatrix = coordTransform.matrix;
+  parameters.subset = subset;
+  parameters.alphaStart = alphaStart;
+  parameters.isYUV = textureView->isYUV();
+  parameters.isAlphaOnly = textureProxy->isAlphaOnly();
+  parameters.hasRGBAAA = alphaStart != Point::Zero();
+  parameters.hasSubset = needSubset();
+  parameters.hasPerspective = coordTransform.matrix.hasPerspective();
+  return builder->addTextureSource(input, parameters, output);
 }
 
 void TextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
