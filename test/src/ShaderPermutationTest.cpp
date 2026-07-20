@@ -453,6 +453,42 @@ static void TestWriteU32LE(uint8_t* p, uint32_t val) {
   p[3] = static_cast<uint8_t>((val >> 24) & 0xFF);
 }
 
+static std::vector<uint8_t> MakeTestBundle(const std::string& profileTag, uint32_t vertCount,
+                                           uint32_t fragCount, uint32_t hashSeed) {
+  constexpr uint32_t HeaderSize = 80;
+  constexpr uint32_t PoolEntrySize = 28;
+  auto fragPoolOffset = HeaderSize + vertCount * PoolEntrySize;
+  auto dataOffset = fragPoolOffset + fragCount * PoolEntrySize;
+  auto dataSize = vertCount + fragCount;
+  std::vector<uint8_t> bundle(dataOffset + dataSize, 0);
+  TestWriteU32LE(bundle.data(), 0x54475346);
+  TestWriteU16LE(bundle.data() + 4, 3);
+  TestWriteU32LE(bundle.data() + 20, vertCount);
+  TestWriteU32LE(bundle.data() + 24, fragCount);
+  TestWriteU32LE(bundle.data() + 28, HeaderSize);
+  TestWriteU32LE(bundle.data() + 32, fragPoolOffset);
+  TestWriteU32LE(bundle.data() + 36, dataOffset);
+  TestWriteU32LE(bundle.data() + 40, dataSize);
+  for (size_t index = 0; index < profileTag.size() && index < 31; ++index) {
+    bundle[48 + index] = static_cast<uint8_t>(profileTag[index]);
+  }
+  for (uint32_t index = 0; index < vertCount; ++index) {
+    auto entryOffset = HeaderSize + index * PoolEntrySize;
+    TestWriteU32LE(bundle.data() + entryOffset, hashSeed + index);
+    TestWriteU32LE(bundle.data() + entryOffset + 16, index);
+    TestWriteU32LE(bundle.data() + entryOffset + 20, 1);
+    bundle[dataOffset + index] = static_cast<uint8_t>(index + 1);
+  }
+  for (uint32_t index = 0; index < fragCount; ++index) {
+    auto entryOffset = fragPoolOffset + index * PoolEntrySize;
+    TestWriteU32LE(bundle.data() + entryOffset, hashSeed + 0x100 + index);
+    TestWriteU32LE(bundle.data() + entryOffset + 16, vertCount + index);
+    TestWriteU32LE(bundle.data() + entryOffset + 20, 1);
+    bundle[dataOffset + vertCount + index] = static_cast<uint8_t>(index + 1);
+  }
+  return bundle;
+}
+
 TGFX_TEST(ShaderPermutationTest, CompressedBundleRejectsInvalidOffsetOrder) {
   std::vector<uint8_t> bundle(80, 0);
   TestWriteU32LE(bundle.data(), 0x54475346);
@@ -468,57 +504,40 @@ TGFX_TEST(ShaderPermutationTest, CompressedBundleRejectsInvalidOffsetOrder) {
 }
 
 TGFX_TEST(ShaderPermutationTest, FailedBundleReloadPreservesCache) {
-  auto bundlePath = ProjectPath::Absolute(BundlePath());
-  std::ifstream file(bundlePath, std::ios::binary | std::ios::ate);
-  if (!file.is_open()) {
-    GTEST_SKIP() << "Bundle file not found";
-    return;
-  }
-  auto fileSize = static_cast<size_t>(file.tellg());
-  file.seekg(0);
-  std::vector<uint8_t> bundle(fileSize);
-  file.read(reinterpret_cast<char*>(bundle.data()), static_cast<std::streamsize>(fileSize));
-  file.close();
-
+  auto original = MakeTestBundle("original", 1, 1, 10);
   PrecompiledShaderCache cache;
-  ASSERT_TRUE(cache.loadBundle(bundle.data(), bundle.size()));
-  auto vertexCount = cache.vertexEntryCount();
-  auto fragmentCount = cache.fragmentEntryCount();
-  auto profileTag = cache.profileTag();
+  ASSERT_TRUE(cache.loadBundle(original.data(), original.size()));
+  ASSERT_TRUE(cache.findVertex(10, 0) != nullptr);
+  ASSERT_TRUE(cache.findFragment(10 + 0x100, 0) != nullptr);
 
-  for (size_t index = 0; index < 32; ++index) {
-    bundle[48 + index] = 0;
-  }
-  const std::string failedTag = "failed";
-  for (size_t index = 0; index < failedTag.size(); ++index) {
-    bundle[48 + index] = static_cast<uint8_t>(failedTag[index]);
-  }
-  TestWriteU32LE(bundle.data() + 32, static_cast<uint32_t>(bundle.size() - 1));
-  EXPECT_FALSE(cache.loadBundle(bundle.data(), bundle.size()));
-  EXPECT_EQ(cache.vertexEntryCount(), vertexCount);
-  EXPECT_EQ(cache.fragmentEntryCount(), fragmentCount);
-  EXPECT_EQ(cache.profileTag(), profileTag);
+  auto invalid = MakeTestBundle("failed", 2, 1, 30);
+  TestWriteU32LE(invalid.data() + 32, static_cast<uint32_t>(invalid.size() - 1));
+  EXPECT_FALSE(cache.loadBundle(invalid.data(), invalid.size()));
+  EXPECT_EQ(cache.vertexEntryCount(), 1u);
+  EXPECT_EQ(cache.fragmentEntryCount(), 1u);
+  EXPECT_EQ(cache.profileTag(), "original");
+  EXPECT_TRUE(cache.findVertex(10, 0) != nullptr);
+  EXPECT_TRUE(cache.findFragment(10 + 0x100, 0) != nullptr);
+  EXPECT_TRUE(cache.findVertex(30, 0) == nullptr);
 }
 
 TGFX_TEST(ShaderPermutationTest, SuccessfulBundleReloadReplacesCache) {
-  auto bundlePath = ProjectPath::Absolute(BundlePath());
+  auto original = MakeTestBundle("original", 2, 2, 10);
   PrecompiledShaderCache cache;
-  ASSERT_TRUE(cache.loadBundle(bundlePath));
-  ASSERT_TRUE(cache.isLoaded());
+  ASSERT_TRUE(cache.loadBundle(original.data(), original.size()));
+  ASSERT_EQ(cache.vertexEntryCount(), 2u);
+  ASSERT_EQ(cache.fragmentEntryCount(), 2u);
 
-  std::vector<uint8_t> replacement(80, 0);
-  TestWriteU32LE(replacement.data(), 0x54475346);
-  TestWriteU16LE(replacement.data() + 4, 3);
-  const std::string replacementTag = "replacement";
-  for (size_t index = 0; index < replacementTag.size(); ++index) {
-    replacement[48 + index] = static_cast<uint8_t>(replacementTag[index]);
-  }
-
+  auto replacement = MakeTestBundle("replacement", 1, 1, 30);
   ASSERT_TRUE(cache.loadBundle(replacement.data(), replacement.size()));
-  EXPECT_FALSE(cache.isLoaded());
-  EXPECT_EQ(cache.vertexEntryCount(), 0u);
-  EXPECT_EQ(cache.fragmentEntryCount(), 0u);
-  EXPECT_EQ(cache.profileTag(), replacementTag);
+  EXPECT_TRUE(cache.isLoaded());
+  EXPECT_EQ(cache.vertexEntryCount(), 1u);
+  EXPECT_EQ(cache.fragmentEntryCount(), 1u);
+  EXPECT_EQ(cache.profileTag(), "replacement");
+  EXPECT_TRUE(cache.findVertex(30, 0) != nullptr);
+  EXPECT_TRUE(cache.findFragment(0x130, 0) != nullptr);
+  EXPECT_TRUE(cache.findVertex(10, 0) == nullptr);
+  EXPECT_TRUE(cache.findFragment(0x110, 0) == nullptr);
 }
 
 TGFX_TEST(ShaderPermutationTest, CompressedBundleLoad) {
