@@ -113,14 +113,6 @@ void GlassStyle::setCornerRadius(float radius) {
   invalidateRefractionFilter();
 }
 
-void GlassStyle::setShapeType(GlassShapeType type) {
-  if (_shapeType == type) {
-    return;
-  }
-  _shapeType = type;
-  invalidateFilter();
-}
-
 Rect GlassStyle::filterBackground(const Rect& srcRect, float contentScale) {
   auto result = srcRect;
   // Compute frost outset without caching the filter, since onDraw applies frost at a different
@@ -213,36 +205,33 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
     float scaledRadius = _cornerRadius * effectiveContentScale;
     float crRadius = std::min(scaledRadius, origMinHalf);
 
-    // Auto-detect shape type from layerContent when _shapeType is Auto.
-    GlassShapeType effectiveShapeType = _shapeType;
-    if (effectiveShapeType == GlassShapeType::Auto) {
-      effectiveShapeType = GlassShapeType::AlphaMask;
-      if (input.layerContent != nullptr) {
-        auto contentType = input.layerContent->getType();
-        if (contentType == LayerContent::Type::RRect) {
-          auto rrect = input.layerContent->getRRect();
-          if (rrect.has_value() && rrect->isOval()) {
-            effectiveShapeType = GlassShapeType::Ellipse;
-          } else {
-            effectiveShapeType = GlassShapeType::RoundedRect;
-            if (rrect.has_value()) {
-              auto radii = rrect->radii();
-              // The analytical SDF currently supports a single scalar corner radius.
-              float representativeRadius = std::min(radii[0].x, radii[0].y);
-              crRadius = std::min(representativeRadius * effectiveContentScale, origMinHalf);
-            }
-          }
-        } else if (contentType == LayerContent::Type::Rect) {
+    // Auto-detect shape type from layerContent.
+    GlassShapeType effectiveShapeType = GlassShapeType::AlphaMask;
+    if (input.layerContent != nullptr) {
+      auto contentType = input.layerContent->getType();
+      if (contentType == LayerContent::Type::RRect) {
+        auto rrect = input.layerContent->getRRect();
+        if (rrect.has_value() && rrect->isOval()) {
+          effectiveShapeType = GlassShapeType::Ellipse;
+        } else {
           effectiveShapeType = GlassShapeType::RoundedRect;
-          crRadius = 0.0f;
-        } else if (contentType == LayerContent::Type::Path ||
-                   contentType == LayerContent::Type::Shape) {
-          // Check if the path is an oval (ellipse).
-          if (input.layerContent->getOval().has_value()) {
-            effectiveShapeType = GlassShapeType::Ellipse;
-          } else {
-            effectiveShapeType = GlassShapeType::AlphaMask;
+          if (rrect.has_value()) {
+            auto radii = rrect->radii();
+            // The analytical SDF currently supports a single scalar corner radius.
+            float representativeRadius = std::min(radii[0].x, radii[0].y);
+            crRadius = std::min(representativeRadius * effectiveContentScale, origMinHalf);
           }
+        }
+      } else if (contentType == LayerContent::Type::Rect) {
+        effectiveShapeType = GlassShapeType::RoundedRect;
+        crRadius = 0.0f;
+      } else if (contentType == LayerContent::Type::Path ||
+                 contentType == LayerContent::Type::Shape) {
+        // Check if the path is an oval (ellipse).
+        if (input.layerContent->getOval().has_value()) {
+          effectiveShapeType = GlassShapeType::Ellipse;
+        } else {
+          effectiveShapeType = GlassShapeType::AlphaMask;
         }
       }
     }
@@ -479,8 +468,7 @@ std::shared_ptr<ImageFilter> GlassStyle::getRefractionFilter(
   // For analytical shapes we can cache when geometry params haven't changed.
   if (shapeType != GlassShapeType::AlphaMask && refractionFilter &&
       cachedLayerWidth == layerWidth && cachedLayerHeight == layerHeight &&
-      cachedContentScale == contentScale && cachedShapeType == shapeType &&
-      FloatNearlyEqual(cachedCornerRadius, cornerRadius)) {
+      cachedContentScale == contentScale && FloatNearlyEqual(cachedCornerRadius, cornerRadius)) {
     return refractionFilter;
   }
   GlassRefractionParams params = {};
@@ -507,7 +495,6 @@ std::shared_ptr<ImageFilter> GlassStyle::getRefractionFilter(
   cachedLayerWidth = layerWidth;
   cachedLayerHeight = layerHeight;
   cachedContentScale = contentScale;
-  cachedShapeType = shapeType;
   cachedCornerRadius = cornerRadius;
   return refractionFilter;
 }

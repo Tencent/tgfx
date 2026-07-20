@@ -24,7 +24,6 @@
 namespace tgfx {
 
 enum class GlassShapeType {
-  Auto,
   RoundedRect,
   Ellipse,
   AlphaMask,
@@ -125,14 +124,6 @@ class GlassStyle : public LayerStyle {
   /** Sets the corner radius for the glass surface shape. */
   void setCornerRadius(float radius);
 
-  /** The shape type of the glass surface. */
-  GlassShapeType shapeType() const {
-    return _shapeType;
-  }
-
-  /** Sets the shape type of the glass surface. */
-  void setShapeType(GlassShapeType type);
-
   LayerStylePosition position() const override {
     return LayerStylePosition::Below;
   }
@@ -180,7 +171,6 @@ class GlassStyle : public LayerStyle {
   float _lightAngle = 135.0f;
   float _lightIntensity = 50.0f;
   float _cornerRadius = 0.0f;
-  GlassShapeType _shapeType = GlassShapeType::Auto;
 
   std::shared_ptr<ImageFilter> frostFilter = nullptr;
   float currentFrostScale = 0.0f;
@@ -192,7 +182,6 @@ class GlassStyle : public LayerStyle {
   int cachedLayerWidth = 0;
   int cachedLayerHeight = 0;
   float cachedContentScale = 0.0f;
-  GlassShapeType cachedShapeType = GlassShapeType::RoundedRect;
   float cachedCornerRadius = 0.0f;
   float cachedMaskBlurRadiusX = 0.0f;
   float cachedMaskBlurRadiusY = 0.0f;
