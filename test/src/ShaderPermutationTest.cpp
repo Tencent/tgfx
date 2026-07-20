@@ -390,38 +390,65 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledRenderConsistency) {
 TGFX_TEST(ShaderPermutationTest, ShaderCacheStats) {
   PrecompiledShaderCache cache;
 
-  // Initial state: all counters are zero.
   EXPECT_EQ(cache.hitCount(), 0u);
   EXPECT_EQ(cache.missCount(), 0u);
+  EXPECT_EQ(cache.aotStageCount(PrecompiledAOTStage::Attempt), 0u);
 
-  // Record artifact hits, misses, and optional diagnostics.
   cache.setDiagnosticRecordingEnabled(true);
-  cache.recordHit();
-  cache.recordHit();
-  PrecompiledFallbackRecord record;
-  record.pipelineSignature = "GP=Test;ColorFP=[];CoverageFP=[];XP=Test";
-  cache.recordArtifactMiss(PrecompiledFallbackReason::NoMatchingRule, record);
-  EXPECT_EQ(cache.hitCount(), 2u);
-  EXPECT_EQ(cache.missCount(), 1u);
-  EXPECT_EQ(cache.fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 1u);
-  EXPECT_EQ(cache.fallbackCount(PrecompiledFallbackReason::VertexArtifactMissing), 0u);
-  auto records = cache.fallbackRecords();
-  ASSERT_EQ(records.size(), 1u);
-  EXPECT_EQ(records[0].reason, PrecompiledFallbackReason::NoMatchingRule);
-  EXPECT_EQ(records[0].pipelineSignature, record.pipelineSignature);
+  cache.recordAOTStage(PrecompiledAOTStage::Attempt);
+  cache.recordAOTStage(PrecompiledAOTStage::CacheAvailable);
+  cache.recordAOTStage(PrecompiledAOTStage::PermutationMatched);
+  cache.recordArtifactHit();
+  cache.recordAOTStage(PrecompiledAOTStage::VertexModuleCreated);
+  cache.recordAOTStage(PrecompiledAOTStage::FragmentModuleCreated);
+  PrecompiledHitRecord hitRecord;
+  hitRecord.shaderName = "TestShader";
+  hitRecord.pipelineSignature = "GP=Test;ColorFP=[];CoverageFP=[];XP=Test";
+  hitRecord.vertPermutationIndex = 1;
+  hitRecord.fragPermutationIndex = 2;
+  cache.recordAOTStage(PrecompiledAOTStage::PipelineCreated, hitRecord);
 
-  // Verify resetStats clears all counters and diagnostics.
+  cache.recordAOTStage(PrecompiledAOTStage::Attempt);
+  cache.recordAOTStage(PrecompiledAOTStage::CacheAvailable);
+  PrecompiledFallbackRecord fallbackRecord;
+  fallbackRecord.pipelineSignature = "GP=Test;ColorFP=[];CoverageFP=[];XP=Test";
+  cache.recordArtifactMiss(PrecompiledFallbackReason::NoMatchingRule, fallbackRecord);
+
+  EXPECT_EQ(cache.hitCount(), 1u);
+  EXPECT_EQ(cache.missCount(), 1u);
+  EXPECT_EQ(cache.aotStageCount(PrecompiledAOTStage::Attempt), 2u);
+  EXPECT_EQ(cache.aotStageCount(PrecompiledAOTStage::CacheAvailable), 2u);
+  EXPECT_EQ(cache.aotStageCount(PrecompiledAOTStage::PermutationMatched), 1u);
+  EXPECT_EQ(cache.aotStageCount(PrecompiledAOTStage::ArtifactsFound), 1u);
+  EXPECT_EQ(cache.aotStageCount(PrecompiledAOTStage::VertexModuleCreated), 1u);
+  EXPECT_EQ(cache.aotStageCount(PrecompiledAOTStage::FragmentModuleCreated), 1u);
+  EXPECT_EQ(cache.aotStageCount(PrecompiledAOTStage::PipelineCreated), 1u);
+  EXPECT_EQ(cache.fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 1u);
+  auto hitRecords = cache.hitRecords();
+  ASSERT_EQ(hitRecords.size(), 1u);
+  EXPECT_EQ(hitRecords[0].shaderName, hitRecord.shaderName);
+  EXPECT_EQ(hitRecords[0].pipelineSignature, hitRecord.pipelineSignature);
+  auto fallbackRecords = cache.fallbackRecords();
+  ASSERT_EQ(fallbackRecords.size(), 1u);
+  EXPECT_EQ(fallbackRecords[0].reason, PrecompiledFallbackReason::NoMatchingRule);
+
+  cache.unload();
+  EXPECT_EQ(cache.aotStageCount(PrecompiledAOTStage::PipelineCreated), 1u);
+  EXPECT_EQ(cache.hitRecords().size(), 1u);
+  EXPECT_EQ(cache.fallbackRecords().size(), 1u);
+
   cache.resetStats();
   EXPECT_EQ(cache.hitCount(), 0u);
   EXPECT_EQ(cache.missCount(), 0u);
+  EXPECT_EQ(cache.aotStageCount(PrecompiledAOTStage::Attempt), 0u);
   EXPECT_EQ(cache.fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+  EXPECT_TRUE(cache.hitRecords().empty());
   EXPECT_TRUE(cache.fallbackRecords().empty());
 
-  // Record after reset should start fresh.
   cache.recordArtifactMiss(PrecompiledFallbackReason::VertexArtifactMissing);
   cache.recordFailure(PrecompiledFallbackReason::VertexModuleCreationFailed);
   cache.recordFailure(PrecompiledFallbackReason::PipelineCreationFailed);
-  cache.recordHit();
+  cache.recordArtifactHit();
   EXPECT_EQ(cache.hitCount(), 1u);
   EXPECT_EQ(cache.missCount(), 1u);
   EXPECT_EQ(cache.fallbackCount(PrecompiledFallbackReason::VertexArtifactMissing), 1u);
@@ -626,6 +653,52 @@ TGFX_TEST(ShaderPermutationTest, SuccessfulBundleReloadReplacesCache) {
   EXPECT_TRUE(cache.findFragment(10 + 0x100, 0) == nullptr);
 }
 
+TGFX_TEST(ShaderPermutationTest, CreatorFunnelRecordsArtifactMiss) {
+  auto image = MakeImage("resources/apitest/test_timestretch.png");
+  ASSERT_TRUE(image != nullptr);
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  auto unrelatedBundle = MakeTestBundle("missing-artifacts", 1, 1, 10);
+  ASSERT_TRUE(cache->loadBundle(unrelatedBundle.data(), unrelatedBundle.size()));
+  context->globalCache()->clearPrograms();
+  context->globalCache()->resetProgramStats();
+  cache->resetStats();
+  cache->setDiagnosticRecordingEnabled(true);
+
+  surface->getCanvas()->drawImage(image, 0, 0);
+  context->flushAndSubmit(true);
+
+  EXPECT_EQ(cache->aotStageCount(PrecompiledAOTStage::Attempt), 1u);
+  EXPECT_EQ(cache->aotStageCount(PrecompiledAOTStage::CacheAvailable), 1u);
+  EXPECT_EQ(cache->aotStageCount(PrecompiledAOTStage::PermutationMatched), 1u);
+  EXPECT_EQ(cache->aotStageCount(PrecompiledAOTStage::ArtifactsFound), 0u);
+  EXPECT_EQ(cache->aotStageCount(PrecompiledAOTStage::VertexModuleCreated), 0u);
+  EXPECT_EQ(cache->aotStageCount(PrecompiledAOTStage::FragmentModuleCreated), 0u);
+  EXPECT_EQ(cache->aotStageCount(PrecompiledAOTStage::PipelineCreated), 0u);
+  EXPECT_EQ(cache->hitCount(), 0u);
+  EXPECT_EQ(cache->missCount(), 1u);
+  EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::VertexArtifactMissing), 1u);
+  auto fallbackRecords = cache->fallbackRecords();
+  EXPECT_EQ(fallbackRecords.size(), 1u);
+  if (!fallbackRecords.empty()) {
+    EXPECT_EQ(fallbackRecords[0].reason, PrecompiledFallbackReason::VertexArtifactMissing);
+    EXPECT_FALSE(fallbackRecords[0].shaderName.empty());
+    EXPECT_FALSE(fallbackRecords[0].effectSignature.empty());
+    EXPECT_FALSE(fallbackRecords[0].pipelineSignature.empty());
+  }
+  const auto& programStats = context->globalCache()->programStats();
+  EXPECT_EQ(programStats.cacheMisses, 1u);
+  EXPECT_EQ(programStats.precompiledArtifactCreations, 0u);
+  EXPECT_EQ(programStats.programBuilderCreations, 1u);
+
+  cache->setDiagnosticRecordingEnabled(false);
+  cache->unload();
+}
+
 TGFX_TEST(ShaderPermutationTest, CompressedBundleLoad) {
   // Load an uncompressed bundle, manually compress its data pool, then verify loading.
   auto bundlePath = ProjectPath::Absolute(BundlePath());
@@ -701,16 +774,41 @@ TGFX_TEST(ShaderPermutationTest, DrawImageHitsPrecompiledCache) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  context->globalCache()->clearPrograms();
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
   auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
+  context->globalCache()->clearPrograms();
+  context->globalCache()->resetProgramStats();
   cache->resetStats();
-  auto surface = Surface::Make(context, 200, 200);
-  ASSERT_TRUE(surface != nullptr);
+  cache->setDiagnosticRecordingEnabled(true);
+
   surface->getCanvas()->drawImage(image, 0, 0);
   context->flushAndSubmit(true);
-  EXPECT_GT(cache->hitCount(), 0u);
+
+  EXPECT_EQ(cache->aotStageCount(PrecompiledAOTStage::Attempt), 1u);
+  EXPECT_EQ(cache->aotStageCount(PrecompiledAOTStage::CacheAvailable), 1u);
+  EXPECT_EQ(cache->aotStageCount(PrecompiledAOTStage::PermutationMatched), 1u);
+  EXPECT_EQ(cache->aotStageCount(PrecompiledAOTStage::ArtifactsFound), 1u);
+  EXPECT_EQ(cache->aotStageCount(PrecompiledAOTStage::VertexModuleCreated), 1u);
+  EXPECT_EQ(cache->aotStageCount(PrecompiledAOTStage::FragmentModuleCreated), 1u);
+  EXPECT_EQ(cache->aotStageCount(PrecompiledAOTStage::PipelineCreated), 1u);
+  EXPECT_EQ(cache->hitCount(), 1u);
+  EXPECT_EQ(cache->missCount(), 0u);
+  auto hitRecords = cache->hitRecords();
+  EXPECT_EQ(hitRecords.size(), 1u);
+  if (!hitRecords.empty()) {
+    EXPECT_FALSE(hitRecords[0].shaderName.empty());
+    EXPECT_FALSE(hitRecords[0].effectSignature.empty());
+    EXPECT_FALSE(hitRecords[0].pipelineSignature.empty());
+  }
+  const auto& programStats = context->globalCache()->programStats();
+  EXPECT_EQ(programStats.cacheMisses, 1u);
+  EXPECT_EQ(programStats.precompiledArtifactCreations, 1u);
+  EXPECT_EQ(programStats.programBuilderCreations, 0u);
+
+  cache->setDiagnosticRecordingEnabled(false);
   cache->unload();
 }
 
