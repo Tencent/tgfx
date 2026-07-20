@@ -139,13 +139,74 @@ static nlohmann::json AOTStageCountsToJSON(const std::array<uint32_t, AOT_STAGE_
   return result;
 }
 
-static bool AOTStagesAreMonotonic(const std::array<uint64_t, AOT_STAGE_COUNT>& counts) {
+template <typename Count>
+static bool AOTStagesAreMonotonic(const std::array<Count, AOT_STAGE_COUNT>& counts) {
   for (size_t i = 1; i < counts.size(); ++i) {
     if (counts[i] > counts[i - 1]) {
       return false;
     }
   }
   return true;
+}
+
+struct ConsistencyResult {
+  bool consistent = false;
+  nlohmann::json checks = {};
+};
+
+template <typename Count>
+static ConsistencyResult BuildConsistencyChecks(
+    const ProgramCacheStats& programStats, uint64_t artifactHits,
+    const std::array<Count, AOT_STAGE_COUNT>& aotStageCounts,
+    const std::array<Count, FALLBACK_REASON_COUNT>& fallbackCounts, uint64_t hitRecordCount,
+    uint64_t fallbackRecordCount) {
+  uint64_t fallbackEventCount = 0;
+  for (auto count : fallbackCounts) {
+    fallbackEventCount += count;
+  }
+  const auto attempts =
+      static_cast<uint64_t>(aotStageCounts[static_cast<size_t>(PrecompiledAOTStage::Attempt)]);
+  const auto artifactsFound =
+      static_cast<uint64_t>(aotStageCounts[static_cast<size_t>(PrecompiledAOTStage::ArtifactsFound)]);
+  const auto pipelinesCreated = static_cast<uint64_t>(
+      aotStageCounts[static_cast<size_t>(PrecompiledAOTStage::PipelineCreated)]);
+  const bool stagesMonotonic = AOTStagesAreMonotonic(aotStageCounts);
+  const bool attemptsMatch = attempts == programStats.cacheMisses;
+  const bool artifactHitsMatch = artifactHits == artifactsFound;
+  const bool pipelineCreationsMatch = pipelinesCreated == programStats.precompiledArtifactCreations;
+  const bool hitRecordsMatch = hitRecordCount == pipelinesCreated;
+  const bool fallbackEventsMatch = fallbackEventCount == programStats.programBuilderCreations;
+  const bool fallbackRecordsMatch = fallbackRecordCount == fallbackEventCount;
+
+  ConsistencyResult result;
+  result.consistent = stagesMonotonic && attemptsMatch && artifactHitsMatch &&
+                      pipelineCreationsMatch && hitRecordsMatch && fallbackEventsMatch &&
+                      fallbackRecordsMatch;
+  result.checks = {
+      {"consistent", result.consistent},
+      {"aotStagesMonotonic", stagesMonotonic},
+      {"aotAttemptsMatchProgramCacheMisses", attemptsMatch},
+      {"artifactHitsMatchArtifactsFound", artifactHitsMatch},
+      {"pipelineCreationsMatchPrecompiledPrograms", pipelineCreationsMatch},
+      {"hitRecordsMatchPipelineCreations", hitRecordsMatch},
+      {"fallbackEventsMatchProgramBuilderCreations", fallbackEventsMatch},
+      {"fallbackRecordsMatchFallbackEvents", fallbackRecordsMatch},
+      {"deltas",
+       {{"aotAttemptsMinusProgramCacheMisses",
+         static_cast<int64_t>(attempts) - static_cast<int64_t>(programStats.cacheMisses)},
+        {"artifactHitsMinusArtifactsFound",
+         static_cast<int64_t>(artifactHits) - static_cast<int64_t>(artifactsFound)},
+        {"pipelineCreationsMinusPrecompiledPrograms",
+         static_cast<int64_t>(pipelinesCreated) -
+             static_cast<int64_t>(programStats.precompiledArtifactCreations)},
+        {"hitRecordsMinusPipelineCreations",
+         static_cast<int64_t>(hitRecordCount) - static_cast<int64_t>(pipelinesCreated)},
+        {"fallbackEventsMinusProgramBuilderCreations",
+         static_cast<int64_t>(fallbackEventCount) -
+             static_cast<int64_t>(programStats.programBuilderCreations)},
+        {"fallbackRecordsMinusFallbackEvents",
+         static_cast<int64_t>(fallbackRecordCount) - static_cast<int64_t>(fallbackEventCount)}}}};
+  return result;
 }
 
 static nlohmann::json FallbackCountsToJSON(
@@ -338,6 +399,7 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
     uint64_t testsWithColdPrograms = 0;
     uint64_t testsWithAOTHits = 0;
     uint64_t testsWithFallbacks = 0;
+    uint64_t inconsistentTestCount = 0;
     uint64_t hitRecordCount = 0;
     uint64_t fallbackRecordCount = 0;
     std::map<std::string, AggregatedShader> shaderMap;
@@ -411,6 +473,12 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
         aggregate.count++;
         aggregate.tests.insert(testResult.testName);
       }
+      auto testConsistency = BuildConsistencyChecks(
+          testResult.programStats, testResult.artifactHits, testResult.aotStageCounts,
+          testResult.fallbackCounts, testResult.hitRecords.size(), testResult.fallbackRecords.size());
+      if (!testConsistency.consistent) {
+        inconsistentTestCount++;
+      }
       testsJSON.push_back(
           {{"name", testResult.testName},
            {"passed", testResult.passed},
@@ -423,6 +491,7 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
            {"aotStages", AOTStageCountsToJSON(testResult.aotStageCounts)},
            {"artifactLookups",
             {{"hits", testResult.artifactHits}, {"misses", testResult.artifactMisses}}},
+           {"consistencyChecks", std::move(testConsistency.checks)},
            {"hitRecords", std::move(hitRecordsJSON)},
            {"fallbackReasons", FallbackCountsToJSON(testResult.fallbackCounts)},
            {"fallbackRecords", std::move(fallbackRecordsJSON)}});
@@ -516,43 +585,12 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
       fallbackStructuresJSON.push_back(std::move(json));
     }
 
-    uint64_t fallbackEventCount = 0;
-    for (auto count : summary.fallbackCounts) {
-      fallbackEventCount += count;
-    }
-    auto coldCreations = summary.programStats.precompiledArtifactCreations +
-                         summary.programStats.programBuilderCreations;
-    auto artifactLookups = summary.artifactHits + summary.artifactMisses;
-    auto attempts = summary.aotStageCounts[static_cast<size_t>(PrecompiledAOTStage::Attempt)];
-    auto artifactsFound =
-        summary.aotStageCounts[static_cast<size_t>(PrecompiledAOTStage::ArtifactsFound)];
-    auto pipelinesCreated =
-        summary.aotStageCounts[static_cast<size_t>(PrecompiledAOTStage::PipelineCreated)];
-    nlohmann::json consistencyChecks = {
-        {"aotStagesMonotonic", AOTStagesAreMonotonic(summary.aotStageCounts)},
-        {"aotAttemptsMatchProgramCacheMisses", attempts == summary.programStats.cacheMisses},
-        {"artifactHitsMatchArtifactsFound", summary.artifactHits == artifactsFound},
-        {"pipelineCreationsMatchPrecompiledPrograms",
-         pipelinesCreated == summary.programStats.precompiledArtifactCreations},
-        {"hitRecordsMatchPipelineCreations", hitRecordCount == pipelinesCreated},
-        {"fallbackEventsMatchProgramBuilderCreations",
-         fallbackEventCount == summary.programStats.programBuilderCreations},
-        {"fallbackRecordsMatchFallbackEvents", fallbackRecordCount == fallbackEventCount},
-        {"deltas",
-         {{"aotAttemptsMinusProgramCacheMisses",
-           static_cast<int64_t>(attempts) - static_cast<int64_t>(summary.programStats.cacheMisses)},
-          {"artifactHitsMinusArtifactsFound",
-           static_cast<int64_t>(summary.artifactHits) - static_cast<int64_t>(artifactsFound)},
-          {"pipelineCreationsMinusPrecompiledPrograms",
-           static_cast<int64_t>(pipelinesCreated) -
-               static_cast<int64_t>(summary.programStats.precompiledArtifactCreations)},
-          {"hitRecordsMinusPipelineCreations",
-           static_cast<int64_t>(hitRecordCount) - static_cast<int64_t>(pipelinesCreated)},
-          {"fallbackEventsMinusProgramBuilderCreations",
-           static_cast<int64_t>(fallbackEventCount) -
-               static_cast<int64_t>(summary.programStats.programBuilderCreations)},
-          {"fallbackRecordsMinusFallbackEvents",
-           static_cast<int64_t>(fallbackRecordCount) - static_cast<int64_t>(fallbackEventCount)}}}};
+    const auto coldCreations = summary.programStats.precompiledArtifactCreations +
+                               summary.programStats.programBuilderCreations;
+    const auto artifactLookups = summary.artifactHits + summary.artifactMisses;
+    auto globalConsistency =
+        BuildConsistencyChecks(summary.programStats, summary.artifactHits, summary.aotStageCounts,
+                               summary.fallbackCounts, hitRecordCount, fallbackRecordCount);
 
     nlohmann::json report = {
         {"backend", TGFX_BACKEND_NAME},
@@ -568,6 +606,8 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
          {{"testCount", testResults.size()},
           {"failedTestCount", failedTestCount},
           {"skippedTestCount", skippedTestCount},
+          {"allTestsConsistent", inconsistentTestCount == 0},
+          {"inconsistentTestCount", inconsistentTestCount},
           {"testsWithColdPrograms", testsWithColdPrograms},
           {"testsWithAOTHits", testsWithAOTHits},
           {"testsWithFallbacks", testsWithFallbacks},
@@ -588,7 +628,7 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
           {"fallbackReasons", FallbackCountsToJSON(summary.fallbackCounts)},
           {"uniqueFallbackEffects", fallbackEffectKeys.size()},
           {"uniqueFallbackStructures", sortedFallbacks.size()}}},
-        {"consistencyChecks", std::move(consistencyChecks)},
+        {"consistencyChecks", std::move(globalConsistency.checks)},
         {"successfulShaders", std::move(successfulShadersJSON)},
         {"successfulPermutations", std::move(successfulPermutationsJSON)},
         {"successfulEffects", std::move(successfulEffectsJSON)},
