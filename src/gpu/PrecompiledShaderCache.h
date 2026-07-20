@@ -49,8 +49,28 @@ enum class PrecompiledFallbackReason : uint8_t {
   Count,
 };
 
+enum class PrecompiledAOTStage : uint8_t {
+  Attempt,
+  CacheAvailable,
+  PermutationMatched,
+  ArtifactsFound,
+  VertexModuleCreated,
+  FragmentModuleCreated,
+  PipelineCreated,
+  Count,
+};
+
+struct PrecompiledHitRecord {
+  std::string effectSignature;
+  std::string pipelineSignature;
+  std::string shaderName;
+  uint32_t vertPermutationIndex = std::numeric_limits<uint32_t>::max();
+  uint32_t fragPermutationIndex = std::numeric_limits<uint32_t>::max();
+};
+
 struct PrecompiledFallbackRecord {
   PrecompiledFallbackReason reason = PrecompiledFallbackReason::Unspecified;
+  std::string effectSignature;
   std::string pipelineSignature;
   std::string shaderName;
   uint32_t vertPermutationIndex = std::numeric_limits<uint32_t>::max();
@@ -58,6 +78,7 @@ struct PrecompiledFallbackRecord {
 };
 
 const char* PrecompiledFallbackReasonName(PrecompiledFallbackReason reason);
+const char* PrecompiledAOTStageName(PrecompiledAOTStage stage);
 
 /// Runtime cache that loads precompiled shader bundles and provides O(1) lookup by ShaderKey hash.
 /// Each Context holds one instance. Bundle v3 stores vertex and fragment shaders in separate pools,
@@ -105,7 +126,7 @@ class PrecompiledShaderCache {
     return _profileTag;
   }
 
-  /// Returns the number of successful lookups (both vertex and fragment found).
+  /// Returns the number of successful lookups where both vertex and fragment artifacts were found.
   uint32_t hitCount() const {
     return _hitCount.load(std::memory_order_relaxed);
   }
@@ -115,10 +136,8 @@ class PrecompiledShaderCache {
     return _missCount.load(std::memory_order_relaxed);
   }
 
-  /// Increments the artifact-lookup hit counter by one.
-  void recordHit() {
-    _hitCount.fetch_add(1, std::memory_order_relaxed);
-  }
+  /// Records that both vertex and fragment artifacts were found for one AOT attempt.
+  void recordArtifactHit();
 
   /// Records one artifact-lookup miss without assigning a more specific reason.
   void recordMiss() {
@@ -132,6 +151,19 @@ class PrecompiledShaderCache {
   /// Records a module or pipeline failure without changing artifact lookup counters.
   void recordFailure(PrecompiledFallbackReason reason,
                      const PrecompiledFallbackRecord& record = {});
+
+  /// Records successful progress through one stage of the AOT program-creation pipeline. A
+  /// PipelineCreated event optionally stores its full diagnostic record when recording is enabled.
+  void recordAOTStage(PrecompiledAOTStage stage, const PrecompiledHitRecord& record = {});
+
+  /// Returns the number of AOT attempts that successfully completed the specified stage.
+  uint32_t aotStageCount(PrecompiledAOTStage stage) const {
+    auto index = static_cast<size_t>(stage);
+    if (index >= aotStageCounts.size()) {
+      return 0;
+    }
+    return aotStageCounts[index].load(std::memory_order_relaxed);
+  }
 
   /// Returns the number of failed attempts for the specified fallback reason.
   uint32_t fallbackCount(PrecompiledFallbackReason reason) const {
@@ -151,13 +183,16 @@ class PrecompiledShaderCache {
     return diagnosticsEnabled.load(std::memory_order_relaxed);
   }
 
+  /// Returns a snapshot of successful AOT pipeline records collected since the last reset.
+  std::vector<PrecompiledHitRecord> hitRecords() const;
+
   /// Returns a snapshot of detailed fallback records collected since the last reset.
   std::vector<PrecompiledFallbackRecord> fallbackRecords() const;
 
-  /// Resets hit, miss, fallback-reason counters, and detailed records to zero.
+  /// Resets AOT stages, artifact lookups, fallback counters, and detailed records to zero.
   void resetStats();
 
-  /// Unloads all entries and resets the cache to its initial state.
+  /// Unloads all bundle entries without discarding diagnostic statistics from the current session.
   void unload();
 
   struct HashKey {
@@ -180,10 +215,13 @@ class PrecompiledShaderCache {
   std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> fragEntries;
   std::atomic<uint32_t> _hitCount{0};
   std::atomic<uint32_t> _missCount{0};
+  std::array<std::atomic<uint32_t>, static_cast<size_t>(PrecompiledAOTStage::Count)>
+      aotStageCounts = {};
   std::array<std::atomic<uint32_t>, static_cast<size_t>(PrecompiledFallbackReason::Count)>
       fallbackCounts = {};
   std::atomic<bool> diagnosticsEnabled{false};
   mutable std::mutex diagnosticsMutex = {};
+  std::vector<PrecompiledHitRecord> _hitRecords = {};
   std::vector<PrecompiledFallbackRecord> _fallbackRecords = {};
 };
 

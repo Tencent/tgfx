@@ -90,10 +90,10 @@ static std::string BuildEffectSignature(const ProgramInfo* programInfo) {
 
 static void AppendStencilSignature(std::stringstream& stream, const char* name,
                                    const StencilDescriptor& stencil) {
-  stream << ";" << name << "Compare=" << static_cast<uint32_t>(stencil.compare)
-         << ";" << name << "Fail=" << static_cast<uint32_t>(stencil.failOp)
-         << ";" << name << "DepthFail=" << static_cast<uint32_t>(stencil.depthFailOp)
-         << ";" << name << "Pass=" << static_cast<uint32_t>(stencil.passOp);
+  stream << ";" << name << "Compare=" << static_cast<uint32_t>(stencil.compare) << ";" << name
+         << "Fail=" << static_cast<uint32_t>(stencil.failOp) << ";" << name
+         << "DepthFail=" << static_cast<uint32_t>(stencil.depthFailOp) << ";" << name
+         << "Pass=" << static_cast<uint32_t>(stencil.passOp);
 }
 
 static std::string BuildPipelineSignature(const ProgramInfo* programInfo) {

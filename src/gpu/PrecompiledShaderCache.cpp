@@ -51,6 +51,33 @@ const char* PrecompiledFallbackReasonName(PrecompiledFallbackReason reason) {
   return "Unknown";
 }
 
+const char* PrecompiledAOTStageName(PrecompiledAOTStage stage) {
+  switch (stage) {
+    case PrecompiledAOTStage::Attempt:
+      return "attempts";
+    case PrecompiledAOTStage::CacheAvailable:
+      return "cacheAvailable";
+    case PrecompiledAOTStage::PermutationMatched:
+      return "permutationMatched";
+    case PrecompiledAOTStage::ArtifactsFound:
+      return "artifactsFound";
+    case PrecompiledAOTStage::VertexModuleCreated:
+      return "vertexModuleCreated";
+    case PrecompiledAOTStage::FragmentModuleCreated:
+      return "fragmentModuleCreated";
+    case PrecompiledAOTStage::PipelineCreated:
+      return "pipelineCreated";
+    case PrecompiledAOTStage::Count:
+      return "count";
+  }
+  return "unknown";
+}
+
+void PrecompiledShaderCache::recordArtifactHit() {
+  _hitCount.fetch_add(1, std::memory_order_relaxed);
+  recordAOTStage(PrecompiledAOTStage::ArtifactsFound);
+}
+
 void PrecompiledShaderCache::recordArtifactMiss(PrecompiledFallbackReason reason,
                                                 const PrecompiledFallbackRecord& record) {
   _missCount.fetch_add(1, std::memory_order_relaxed);
@@ -72,6 +99,25 @@ void PrecompiledShaderCache::recordFailure(PrecompiledFallbackReason reason,
   _fallbackRecords.push_back(std::move(savedRecord));
 }
 
+void PrecompiledShaderCache::recordAOTStage(PrecompiledAOTStage stage,
+                                            const PrecompiledHitRecord& record) {
+  auto index = static_cast<size_t>(stage);
+  if (index >= aotStageCounts.size()) {
+    return;
+  }
+  aotStageCounts[index].fetch_add(1, std::memory_order_relaxed);
+  if (stage != PrecompiledAOTStage::PipelineCreated || !diagnosticRecordingEnabled()) {
+    return;
+  }
+  std::lock_guard<std::mutex> autoLock(diagnosticsMutex);
+  _hitRecords.push_back(record);
+}
+
+std::vector<PrecompiledHitRecord> PrecompiledShaderCache::hitRecords() const {
+  std::lock_guard<std::mutex> autoLock(diagnosticsMutex);
+  return _hitRecords;
+}
+
 std::vector<PrecompiledFallbackRecord> PrecompiledShaderCache::fallbackRecords() const {
   std::lock_guard<std::mutex> autoLock(diagnosticsMutex);
   return _fallbackRecords;
@@ -80,10 +126,14 @@ std::vector<PrecompiledFallbackRecord> PrecompiledShaderCache::fallbackRecords()
 void PrecompiledShaderCache::resetStats() {
   _hitCount.store(0, std::memory_order_relaxed);
   _missCount.store(0, std::memory_order_relaxed);
+  for (auto& count : aotStageCounts) {
+    count.store(0, std::memory_order_relaxed);
+  }
   for (auto& count : fallbackCounts) {
     count.store(0, std::memory_order_relaxed);
   }
   std::lock_guard<std::mutex> autoLock(diagnosticsMutex);
+  _hitRecords.clear();
   _fallbackRecords.clear();
 }
 
@@ -91,7 +141,6 @@ void PrecompiledShaderCache::unload() {
   vertEntries.clear();
   fragEntries.clear();
   _profileTag.clear();
-  resetStats();
 }
 
 static uint16_t ReadU16LE(const uint8_t* p) {

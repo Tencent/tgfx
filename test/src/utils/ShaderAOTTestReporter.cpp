@@ -166,8 +166,8 @@ static ConsistencyResult BuildConsistencyChecks(
   }
   const auto attempts =
       static_cast<uint64_t>(aotStageCounts[static_cast<size_t>(PrecompiledAOTStage::Attempt)]);
-  const auto artifactsFound =
-      static_cast<uint64_t>(aotStageCounts[static_cast<size_t>(PrecompiledAOTStage::ArtifactsFound)]);
+  const auto artifactsFound = static_cast<uint64_t>(
+      aotStageCounts[static_cast<size_t>(PrecompiledAOTStage::ArtifactsFound)]);
   const auto pipelinesCreated = static_cast<uint64_t>(
       aotStageCounts[static_cast<size_t>(PrecompiledAOTStage::PipelineCreated)]);
   const bool stagesMonotonic = AOTStagesAreMonotonic(aotStageCounts);
@@ -473,9 +473,10 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
         aggregate.count++;
         aggregate.tests.insert(testResult.testName);
       }
-      auto testConsistency = BuildConsistencyChecks(
-          testResult.programStats, testResult.artifactHits, testResult.aotStageCounts,
-          testResult.fallbackCounts, testResult.hitRecords.size(), testResult.fallbackRecords.size());
+      auto testConsistency =
+          BuildConsistencyChecks(testResult.programStats, testResult.artifactHits,
+                                 testResult.aotStageCounts, testResult.fallbackCounts,
+                                 testResult.hitRecords.size(), testResult.fallbackRecords.size());
       if (!testConsistency.consistent) {
         inconsistentTestCount++;
       }
