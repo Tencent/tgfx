@@ -22,7 +22,11 @@
 #include "core/filters/GlassRefractionImageFilter.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/Types.h"
 #include "layers/contents/LayerContent.h"
+#include "layers/contents/PathContent.h"
+#include "layers/contents/RectContent.h"
+#include "layers/contents/RRectContent.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/SamplingOptions.h"
 #include "tgfx/core/Surface.h"
@@ -208,30 +212,29 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
     // Auto-detect shape type from layerContent.
     GlassShapeType effectiveShapeType = GlassShapeType::AlphaMask;
     if (input.layerContent != nullptr) {
-      auto contentType = input.layerContent->getType();
-      if (contentType == LayerContent::Type::RRect) {
-        auto rrect = input.layerContent->getRRect();
-        if (rrect.has_value() && rrect->isOval()) {
+      auto contentType = Types::Get(input.layerContent);
+      if (contentType == Types::LayerContentType::RRect) {
+        const auto& rRect = static_cast<const RRectContent*>(input.layerContent)->rRect;
+        if (rRect.isOval()) {
           effectiveShapeType = GlassShapeType::Ellipse;
         } else {
           effectiveShapeType = GlassShapeType::RoundedRect;
-          if (rrect.has_value()) {
-            auto radii = rrect->radii();
-            // The analytical SDF currently supports a single scalar corner radius.
-            float representativeRadius = std::min(radii[0].x, radii[0].y);
-            crRadius = std::min(representativeRadius * effectiveContentScale, origMinHalf);
-          }
+          auto radii = rRect.radii();
+          // The analytical SDF currently supports a single scalar corner radius.
+          float representativeRadius = std::min(radii[0].x, radii[0].y);
+          crRadius = std::min(representativeRadius * effectiveContentScale, origMinHalf);
         }
-      } else if (contentType == LayerContent::Type::Rect) {
+      } else if (contentType == Types::LayerContentType::Rect) {
         effectiveShapeType = GlassShapeType::RoundedRect;
         crRadius = 0.0f;
-      } else if (contentType == LayerContent::Type::Path ||
-                 contentType == LayerContent::Type::Shape) {
+      } else if (contentType == Types::LayerContentType::Path ||
+                 contentType == Types::LayerContentType::Shape) {
         // Check if the path is an oval (ellipse).
-        if (input.layerContent->getOval().has_value()) {
-          effectiveShapeType = GlassShapeType::Ellipse;
-        } else {
-          effectiveShapeType = GlassShapeType::AlphaMask;
+        if (contentType == Types::LayerContentType::Path) {
+          Rect oval = {};
+          if (static_cast<const PathContent*>(input.layerContent)->path.isOval(&oval)) {
+            effectiveShapeType = GlassShapeType::Ellipse;
+          }
         }
       }
     }
@@ -364,26 +367,26 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
 
   bool drewAnalyticalShape = false;
   if (input.layerContent != nullptr) {
-    auto rrect = input.layerContent->getRRect();
-    if (rrect.has_value()) {
-      rrect->scale(input.contentScale, input.contentScale);
-      canvas->drawRRect(*rrect, paint);
+    auto contentType = Types::Get(input.layerContent);
+    if (contentType == Types::LayerContentType::RRect) {
+      auto rRect = static_cast<const RRectContent*>(input.layerContent)->rRect;
+      rRect.scale(input.contentScale, input.contentScale);
+      canvas->drawRRect(rRect, paint);
       drewAnalyticalShape = true;
-    } else {
-      auto oval = input.layerContent->getOval();
-      if (oval.has_value()) {
+    } else if (contentType == Types::LayerContentType::Rect) {
+      auto rect = static_cast<const RectContent*>(input.layerContent)->rect;
+      rect.scale(input.contentScale, input.contentScale);
+      canvas->drawRect(rect, paint);
+      drewAnalyticalShape = true;
+    } else if (contentType == Types::LayerContentType::Path) {
+      Rect oval = {};
+      auto& path = static_cast<const PathContent*>(input.layerContent)->path;
+      if (path.isOval(&oval)) {
         RRect ovalRRect = {};
-        ovalRRect.setOval(*oval);
+        ovalRRect.setOval(oval);
         ovalRRect.scale(input.contentScale, input.contentScale);
         canvas->drawRRect(ovalRRect, paint);
         drewAnalyticalShape = true;
-      } else {
-        auto rect = input.layerContent->getRect();
-        if (rect.has_value()) {
-          rect->scale(input.contentScale, input.contentScale);
-          canvas->drawRect(*rect, paint);
-          drewAnalyticalShape = true;
-        }
       }
     }
   }

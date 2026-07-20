@@ -33,14 +33,6 @@ class PathContent : public DrawContent {
 
   Path path = {};
 
-  std::optional<Rect> getOval() const override {
-    Rect rect;
-    if (path.isOval(&rect)) {
-      return rect;
-    }
-    return std::nullopt;
-  }
-
  protected:
   Type type() const override {
     return Type::Path;

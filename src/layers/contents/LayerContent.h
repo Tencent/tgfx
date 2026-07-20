@@ -18,10 +18,8 @@
 
 #pragma once
 
-#include <optional>
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Matrix.h"
-#include "tgfx/core/RRect.h"
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
@@ -84,9 +82,7 @@ class LayerContent {
    */
   virtual void drawForeground(Canvas* canvas, float alpha, bool antiAlias) const = 0;
 
-  /**
-   * The type of geometry this content represents.
-   */
+ protected:
   enum class Type {
     Rect,
     RRect,
@@ -100,35 +96,6 @@ class LayerContent {
     Mesh,
   };
 
-  /**
-   * Returns the type of this content.
-   */
-  Type getType() const {
-    return type();
-  }
-
-  /**
-   * Returns the RRect if this content is a rounded rectangle, or nullopt otherwise.
-   */
-  virtual std::optional<RRect> getRRect() const {
-    return std::nullopt;
-  }
-
-  /**
-   * Returns the Rect if this content is a plain rectangle, or nullopt otherwise.
-   */
-  virtual std::optional<Rect> getRect() const {
-    return std::nullopt;
-  }
-
-  /**
-   * Returns the oval bounding Rect if this content is an ellipse, or nullopt otherwise.
-   */
-  virtual std::optional<Rect> getOval() const {
-    return std::nullopt;
-  }
-
- protected:
   /**
    * Returns the type of this content.
    */

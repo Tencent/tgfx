@@ -32,10 +32,6 @@ class RectContent : public DrawContent {
 
   Rect rect = {};
 
-  std::optional<Rect> getRect() const override {
-    return rect;
-  }
-
  protected:
   Type type() const override {
     return Type::Rect;
