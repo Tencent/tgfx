@@ -798,6 +798,8 @@ if (TGFX_EMBED_SHADER_BUNDLES)
     if (NOT TGFX_SHADER_BACKENDS)
         list(APPEND TGFX_SHADER_BACKENDS "opengl")
     endif ()
+    # Pass all backends as the single comma-separated argument expected by shader_build_tool.
+    string(JOIN "," TGFX_SHADER_BACKENDS_ARG ${TGFX_SHADER_BACKENDS})
 
     set(TGFX_SHADER_BUNDLE_DIR "${CMAKE_BINARY_DIR}/generated/shaders")
     file(MAKE_DIRECTORY ${TGFX_SHADER_BUNDLE_DIR})
@@ -812,7 +814,7 @@ if (TGFX_EMBED_SHADER_BUNDLES)
             COMMAND shader_build_tool
                     --shader-dir ${CMAKE_SOURCE_DIR}/src/gpu/shaders/glsl
                     --out-dir ${TGFX_SHADER_BUNDLE_DIR}
-                    --backends ${TGFX_SHADER_BACKENDS}
+                    --backends ${TGFX_SHADER_BACKENDS_ARG}
             COMMAND ${CMAKE_COMMAND} -E touch ${TGFX_SHADER_BUNDLE_STAMP}
             DEPENDS shader_build_tool ${TGFX_SHADER_SOURCES}
             COMMENT "Compiling precompiled shader bundles (${TGFX_SHADER_BACKENDS})")
