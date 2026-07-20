@@ -535,9 +535,9 @@ TGFX_TEST(ShaderPermutationTest, SuccessfulBundleReloadReplacesCache) {
   EXPECT_EQ(cache.fragmentEntryCount(), 1u);
   EXPECT_EQ(cache.profileTag(), "replacement");
   EXPECT_TRUE(cache.findVertex(30, 0) != nullptr);
-  EXPECT_TRUE(cache.findFragment(0x130, 0) != nullptr);
+  EXPECT_TRUE(cache.findFragment(30 + 0x100, 0) != nullptr);
   EXPECT_TRUE(cache.findVertex(10, 0) == nullptr);
-  EXPECT_TRUE(cache.findFragment(0x110, 0) == nullptr);
+  EXPECT_TRUE(cache.findFragment(10 + 0x100, 0) == nullptr);
 }
 
 TGFX_TEST(ShaderPermutationTest, CompressedBundleLoad) {
