@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PrecompiledProgramCreator.h"
+#include <sstream>
 #include "core/utils/Log.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/PermutationMatcher.h"
@@ -51,17 +52,91 @@ static ShaderArtifactOrigin ArtifactOriginForBackend(
   return ShaderArtifactOrigin::OfflineSource;
 }
 
+static void AppendFragmentProcessor(std::stringstream& stream, const FragmentProcessor* processor) {
+  stream << processor->name();
+  if (processor->numChildProcessors() == 0) {
+    return;
+  }
+  stream << "(";
+  for (size_t i = 0; i < processor->numChildProcessors(); ++i) {
+    if (i > 0) {
+      stream << ",";
+    }
+    AppendFragmentProcessor(stream, processor->childProcessor(i));
+  }
+  stream << ")";
+}
+
+static std::string BuildPipelineSignature(const ProgramInfo* programInfo) {
+  std::stringstream stream;
+  stream << "GP=" << programInfo->getGeometryProcessor()->name() << ";ColorFP=[";
+  for (size_t i = 0; i < programInfo->numColorFragmentProcessors(); ++i) {
+    if (i > 0) {
+      stream << ",";
+    }
+    AppendFragmentProcessor(stream, programInfo->getFragmentProcessor(i));
+  }
+  stream << "];CoverageFP=[";
+  for (size_t i = programInfo->numColorFragmentProcessors();
+       i < programInfo->numFragmentProcessors(); ++i) {
+    if (i > programInfo->numColorFragmentProcessors()) {
+      stream << ",";
+    }
+    AppendFragmentProcessor(stream, programInfo->getFragmentProcessor(i));
+  }
+  auto colorAttachment = programInfo->getPipelineColorAttachment();
+  stream << "];XP=" << programInfo->getXferProcessor()->name()
+         << ";Swizzle=" << programInfo->getOutputSwizzle().c_str()
+         << ";Format=" << static_cast<uint32_t>(colorAttachment.format)
+         << ";Samples=" << programInfo->getSampleCount()
+         << ";Cull=" << static_cast<uint32_t>(programInfo->getCullMode())
+         << ";ColorWriteMask=" << programInfo->getColorWriteMask()
+         << ";DepthStencilFormat=" << static_cast<uint32_t>(programInfo->getDepthStencil().format);
+  return stream.str();
+}
+
+static PrecompiledFallbackRecord MakeFallbackRecord(
+    const PrecompiledShaderCache* cache, const ProgramInfo* programInfo,
+    const PermutationMatchResult* matchResult = nullptr) {
+  PrecompiledFallbackRecord record;
+  if (!cache->diagnosticRecordingEnabled()) {
+    return record;
+  }
+  record.pipelineSignature = BuildPipelineSignature(programInfo);
+  if (matchResult != nullptr) {
+    record.shaderName = matchResult->shaderName;
+    record.vertPermutationIndex = matchResult->vertPermutationIndex;
+    record.fragPermutationIndex = matchResult->fragPermutationIndex;
+  }
+  return record;
+}
+
+static PrecompiledFallbackReason ToFallbackReason(PermutationMatchFailure failure) {
+  switch (failure) {
+    case PermutationMatchFailure::UnsupportedOutputSwizzle:
+      return PrecompiledFallbackReason::UnsupportedOutputSwizzle;
+    case PermutationMatchFailure::NoMatchingRule:
+      return PrecompiledFallbackReason::NoMatchingRule;
+    case PermutationMatchFailure::None:
+      return PrecompiledFallbackReason::Unspecified;
+  }
+  return PrecompiledFallbackReason::Unspecified;
+}
+
 std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* context,
                                                                   const ProgramInfo* programInfo) {
   auto cache = context->precompiledShaderCache();
   if (!cache->isLoaded()) {
-    cache->recordArtifactMiss(PrecompiledFallbackReason::CacheNotLoaded);
+    cache->recordArtifactMiss(PrecompiledFallbackReason::CacheNotLoaded,
+                              MakeFallbackRecord(cache, programInfo));
     return nullptr;
   }
 
-  auto matchResult = MatchPermutation(programInfo);
+  PermutationMatchFailure matchFailure = PermutationMatchFailure::None;
+  auto matchResult = MatchPermutation(programInfo, &matchFailure);
   if (!matchResult) {
-    cache->recordArtifactMiss(PrecompiledFallbackReason::NoPermutationMatch);
+    auto reason = ToFallbackReason(matchFailure);
+    cache->recordArtifactMiss(reason, MakeFallbackRecord(cache, programInfo));
     return nullptr;
   }
 
@@ -72,14 +147,16 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
 
   auto vertBlob = cache->findVertex(vertHash.hi, vertHash.lo);
   if (vertBlob == nullptr) {
-    cache->recordArtifactMiss(PrecompiledFallbackReason::VertexArtifactMissing);
+    cache->recordArtifactMiss(PrecompiledFallbackReason::VertexArtifactMissing,
+                              MakeFallbackRecord(cache, programInfo, &*matchResult));
     LOGE("PrecompiledShaderMiss: vert blob not found for %s[vert=%u]",
          matchResult->shaderName.c_str(), matchResult->vertPermutationIndex);
     return nullptr;
   }
   auto fragBlob = cache->findFragment(fragHash.hi, fragHash.lo);
   if (fragBlob == nullptr) {
-    cache->recordArtifactMiss(PrecompiledFallbackReason::FragmentArtifactMissing);
+    cache->recordArtifactMiss(PrecompiledFallbackReason::FragmentArtifactMissing,
+                              MakeFallbackRecord(cache, programInfo, &*matchResult));
     LOGE("PrecompiledShaderMiss: frag blob not found for %s[frag=%u]",
          matchResult->shaderName.c_str(), matchResult->fragPermutationIndex);
     return nullptr;
@@ -109,14 +186,16 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
 
   auto vertexShader = gpu->createShaderModule(vertexDesc);
   if (vertexShader == nullptr) {
-    cache->recordFailure(PrecompiledFallbackReason::VertexModuleCreationFailed);
+    cache->recordFailure(PrecompiledFallbackReason::VertexModuleCreationFailed,
+                         MakeFallbackRecord(cache, programInfo, &*matchResult));
     LOGE("PrecompiledProgramCreator: Failed to create vertex shader module for %s[vert=%u]",
          matchResult->shaderName.c_str(), matchResult->vertPermutationIndex);
     return nullptr;
   }
   auto fragmentShader = gpu->createShaderModule(fragmentDesc);
   if (fragmentShader == nullptr) {
-    cache->recordFailure(PrecompiledFallbackReason::FragmentModuleCreationFailed);
+    cache->recordFailure(PrecompiledFallbackReason::FragmentModuleCreationFailed,
+                         MakeFallbackRecord(cache, programInfo, &*matchResult));
     LOGE("PrecompiledProgramCreator: Failed to create fragment shader module for %s[frag=%u]",
          matchResult->shaderName.c_str(), matchResult->fragPermutationIndex);
     return nullptr;
@@ -166,7 +245,8 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
          matchResult->shaderName.c_str(), matchResult->vertPermutationIndex,
          matchResult->fragPermutationIndex);
 
-    cache->recordFailure(PrecompiledFallbackReason::PipelineCreationFailed);
+    cache->recordFailure(PrecompiledFallbackReason::PipelineCreationFailed,
+                         MakeFallbackRecord(cache, programInfo, &*matchResult));
     return nullptr;
   }
 

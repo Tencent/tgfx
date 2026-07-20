@@ -25,6 +25,75 @@
 
 namespace tgfx {
 
+const char* PrecompiledFallbackReasonName(PrecompiledFallbackReason reason) {
+  switch (reason) {
+    case PrecompiledFallbackReason::CacheNotLoaded:
+      return "CacheNotLoaded";
+    case PrecompiledFallbackReason::UnsupportedOutputSwizzle:
+      return "UnsupportedOutputSwizzle";
+    case PrecompiledFallbackReason::NoMatchingRule:
+      return "NoMatchingRule";
+    case PrecompiledFallbackReason::VertexArtifactMissing:
+      return "VertexArtifactMissing";
+    case PrecompiledFallbackReason::FragmentArtifactMissing:
+      return "FragmentArtifactMissing";
+    case PrecompiledFallbackReason::VertexModuleCreationFailed:
+      return "VertexModuleCreationFailed";
+    case PrecompiledFallbackReason::FragmentModuleCreationFailed:
+      return "FragmentModuleCreationFailed";
+    case PrecompiledFallbackReason::PipelineCreationFailed:
+      return "PipelineCreationFailed";
+    case PrecompiledFallbackReason::Unspecified:
+      return "Unspecified";
+    case PrecompiledFallbackReason::Count:
+      return "Count";
+  }
+  return "Unknown";
+}
+
+void PrecompiledShaderCache::recordArtifactMiss(PrecompiledFallbackReason reason,
+                                                const PrecompiledFallbackRecord& record) {
+  _missCount.fetch_add(1, std::memory_order_relaxed);
+  recordFailure(reason, record);
+}
+
+void PrecompiledShaderCache::recordFailure(PrecompiledFallbackReason reason,
+                                           const PrecompiledFallbackRecord& record) {
+  auto index = static_cast<size_t>(reason);
+  if (index < fallbackCounts.size()) {
+    fallbackCounts[index].fetch_add(1, std::memory_order_relaxed);
+  }
+  if (!diagnosticRecordingEnabled()) {
+    return;
+  }
+  auto savedRecord = record;
+  savedRecord.reason = reason;
+  std::lock_guard<std::mutex> autoLock(diagnosticsMutex);
+  _fallbackRecords.push_back(std::move(savedRecord));
+}
+
+std::vector<PrecompiledFallbackRecord> PrecompiledShaderCache::fallbackRecords() const {
+  std::lock_guard<std::mutex> autoLock(diagnosticsMutex);
+  return _fallbackRecords;
+}
+
+void PrecompiledShaderCache::resetStats() {
+  _hitCount.store(0, std::memory_order_relaxed);
+  _missCount.store(0, std::memory_order_relaxed);
+  for (auto& count : fallbackCounts) {
+    count.store(0, std::memory_order_relaxed);
+  }
+  std::lock_guard<std::mutex> autoLock(diagnosticsMutex);
+  _fallbackRecords.clear();
+}
+
+void PrecompiledShaderCache::unload() {
+  vertEntries.clear();
+  fragEntries.clear();
+  _profileTag.clear();
+  resetStats();
+}
+
 static uint16_t ReadU16LE(const uint8_t* p) {
   return static_cast<uint16_t>(static_cast<uint16_t>(p[0]) | (static_cast<uint16_t>(p[1]) << 8));
 }

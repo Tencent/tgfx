@@ -18,30 +18,8 @@
 
 #pragma once
 
-#include <optional>
-#include <string>
-#include "gpu/ProgramInfo.h"
-
 namespace tgfx {
 
-struct PermutationMatchResult {
-  std::string shaderName;
-  uint32_t vertPermutationIndex;
-  uint32_t fragPermutationIndex;
-};
-
-enum class PermutationMatchFailure {
-  None,
-  UnsupportedOutputSwizzle,
-  NoMatchingRule,
-};
-
-/**
- * Attempts to match a ProgramInfo's processor combination against known precompiled shader
- * patterns. Returns the shader name and permutation index if matched, or nullopt if no precompiled
- * variant covers this combination. When failure is not null, it receives the failure category.
- */
-std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* programInfo,
-                                                       PermutationMatchFailure* failure = nullptr);
+void InstallShaderAOTTestReporter();
 
 }  // namespace tgfx

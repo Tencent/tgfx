@@ -21,6 +21,8 @@
 #include <array>
 #include <atomic>
 #include <cstdint>
+#include <limits>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -36,7 +38,8 @@ struct ShaderStageBlob {
 
 enum class PrecompiledFallbackReason : uint8_t {
   CacheNotLoaded,
-  NoPermutationMatch,
+  UnsupportedOutputSwizzle,
+  NoMatchingRule,
   VertexArtifactMissing,
   FragmentArtifactMissing,
   VertexModuleCreationFailed,
@@ -45,6 +48,16 @@ enum class PrecompiledFallbackReason : uint8_t {
   Unspecified,
   Count,
 };
+
+struct PrecompiledFallbackRecord {
+  PrecompiledFallbackReason reason = PrecompiledFallbackReason::Unspecified;
+  std::string pipelineSignature;
+  std::string shaderName;
+  uint32_t vertPermutationIndex = std::numeric_limits<uint32_t>::max();
+  uint32_t fragPermutationIndex = std::numeric_limits<uint32_t>::max();
+};
+
+const char* PrecompiledFallbackReasonName(PrecompiledFallbackReason reason);
 
 /// Runtime cache that loads precompiled shader bundles and provides O(1) lookup by ShaderKey hash.
 /// Each Context holds one instance. Bundle v3 stores vertex and fragment shaders in separate pools,
@@ -113,18 +126,12 @@ class PrecompiledShaderCache {
   }
 
   /// Records one artifact-lookup miss using a fixed low-cardinality reason.
-  void recordArtifactMiss(PrecompiledFallbackReason reason) {
-    _missCount.fetch_add(1, std::memory_order_relaxed);
-    recordFailure(reason);
-  }
+  void recordArtifactMiss(PrecompiledFallbackReason reason,
+                          const PrecompiledFallbackRecord& record = {});
 
   /// Records a module or pipeline failure without changing artifact lookup counters.
-  void recordFailure(PrecompiledFallbackReason reason) {
-    auto index = static_cast<size_t>(reason);
-    if (index < fallbackCounts.size()) {
-      fallbackCounts[index].fetch_add(1, std::memory_order_relaxed);
-    }
-  }
+  void recordFailure(PrecompiledFallbackReason reason,
+                     const PrecompiledFallbackRecord& record = {});
 
   /// Returns the number of failed attempts for the specified fallback reason.
   uint32_t fallbackCount(PrecompiledFallbackReason reason) const {
@@ -135,22 +142,23 @@ class PrecompiledShaderCache {
     return fallbackCounts[index].load(std::memory_order_relaxed);
   }
 
-  /// Resets hit, miss, and fallback-reason counters to zero.
-  void resetStats() {
-    _hitCount.store(0, std::memory_order_relaxed);
-    _missCount.store(0, std::memory_order_relaxed);
-    for (auto& count : fallbackCounts) {
-      count.store(0, std::memory_order_relaxed);
-    }
+  /// Enables or disables detailed fallback recording without affecting aggregate counters.
+  void setDiagnosticRecordingEnabled(bool enabled) {
+    diagnosticsEnabled.store(enabled, std::memory_order_relaxed);
   }
 
-  /// Unloads all entries and resets the cache to its initial state.
-  void unload() {
-    vertEntries.clear();
-    fragEntries.clear();
-    _profileTag.clear();
-    resetStats();
+  bool diagnosticRecordingEnabled() const {
+    return diagnosticsEnabled.load(std::memory_order_relaxed);
   }
+
+  /// Returns a snapshot of detailed fallback records collected since the last reset.
+  std::vector<PrecompiledFallbackRecord> fallbackRecords() const;
+
+  /// Resets hit, miss, fallback-reason counters, and detailed records to zero.
+  void resetStats();
+
+  /// Unloads all entries and resets the cache to its initial state.
+  void unload();
 
   struct HashKey {
     uint64_t hi;
@@ -174,6 +182,9 @@ class PrecompiledShaderCache {
   std::atomic<uint32_t> _missCount{0};
   std::array<std::atomic<uint32_t>, static_cast<size_t>(PrecompiledFallbackReason::Count)>
       fallbackCounts = {};
+  std::atomic<bool> diagnosticsEnabled{false};
+  mutable std::mutex diagnosticsMutex = {};
+  std::vector<PrecompiledFallbackRecord> _fallbackRecords = {};
 };
 
 }  // namespace tgfx

@@ -296,6 +296,8 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledPerformance) {
     ContextScope scope;
     auto context = scope.getContext();
     ASSERT_TRUE(context != nullptr);
+    context->precompiledShaderCache()->unload();
+    context->globalCache()->clearPrograms();
     auto surface = Surface::Make(context, width, height);
     ASSERT_TRUE(surface != nullptr);
     surface->getCanvas()->drawImage(image, 0, 0);
@@ -312,6 +314,7 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledPerformance) {
     auto* cache = context->precompiledShaderCache();
     auto bundlePath = ProjectPath::Absolute(BundlePath());
     ASSERT_TRUE(cache->loadBundle(bundlePath));
+    context->globalCache()->clearPrograms();
     auto surface = Surface::Make(context, width, height);
     ASSERT_TRUE(surface != nullptr);
     surface->getCanvas()->drawImage(image, 0, 0);
@@ -347,6 +350,7 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledRenderConsistency) {
     auto* cache = context->precompiledShaderCache();
     auto bundlePath = ProjectPath::Absolute(BundlePath());
     ASSERT_TRUE(cache->loadBundle(bundlePath));
+    context->globalCache()->clearPrograms();
     auto surface = Surface::Make(context, width, height);
     ASSERT_TRUE(surface != nullptr);
     surface->getCanvas()->drawImage(image, 0, 0);
@@ -364,6 +368,7 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledRenderConsistency) {
     ContextScope scope;
     auto context = scope.getContext();
     ASSERT_TRUE(context != nullptr);
+    context->globalCache()->clearPrograms();
     auto surface = Surface::Make(context, width, height);
     ASSERT_TRUE(surface != nullptr);
     surface->getCanvas()->drawImage(image, 0, 0);
@@ -389,20 +394,28 @@ TGFX_TEST(ShaderPermutationTest, ShaderCacheStats) {
   EXPECT_EQ(cache.hitCount(), 0u);
   EXPECT_EQ(cache.missCount(), 0u);
 
-  // Record artifact hits and misses.
+  // Record artifact hits, misses, and optional diagnostics.
+  cache.setDiagnosticRecordingEnabled(true);
   cache.recordHit();
   cache.recordHit();
-  cache.recordArtifactMiss(PrecompiledFallbackReason::NoPermutationMatch);
+  PrecompiledFallbackRecord record;
+  record.pipelineSignature = "GP=Test;ColorFP=[];CoverageFP=[];XP=Test";
+  cache.recordArtifactMiss(PrecompiledFallbackReason::NoMatchingRule, record);
   EXPECT_EQ(cache.hitCount(), 2u);
   EXPECT_EQ(cache.missCount(), 1u);
-  EXPECT_EQ(cache.fallbackCount(PrecompiledFallbackReason::NoPermutationMatch), 1u);
+  EXPECT_EQ(cache.fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 1u);
   EXPECT_EQ(cache.fallbackCount(PrecompiledFallbackReason::VertexArtifactMissing), 0u);
+  auto records = cache.fallbackRecords();
+  ASSERT_EQ(records.size(), 1u);
+  EXPECT_EQ(records[0].reason, PrecompiledFallbackReason::NoMatchingRule);
+  EXPECT_EQ(records[0].pipelineSignature, record.pipelineSignature);
 
-  // Verify resetStats clears all counters.
+  // Verify resetStats clears all counters and diagnostics.
   cache.resetStats();
   EXPECT_EQ(cache.hitCount(), 0u);
   EXPECT_EQ(cache.missCount(), 0u);
-  EXPECT_EQ(cache.fallbackCount(PrecompiledFallbackReason::NoPermutationMatch), 0u);
+  EXPECT_EQ(cache.fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+  EXPECT_TRUE(cache.fallbackRecords().empty());
 
   // Record after reset should start fresh.
   cache.recordArtifactMiss(PrecompiledFallbackReason::VertexArtifactMissing);
