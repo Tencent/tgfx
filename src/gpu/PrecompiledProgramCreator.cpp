@@ -18,6 +18,7 @@
 
 #include "PrecompiledProgramCreator.h"
 #include "core/utils/Log.h"
+#include "gpu/GlobalCache.h"
 #include "gpu/PermutationMatcher.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ShaderKeyHash.h"
@@ -39,16 +40,28 @@ static ShaderCodeFormat FormatForBackend(Backend backend) {
   }
 }
 
+static ShaderArtifactOrigin ArtifactOriginForBackend(
+    Backend backend, const ShaderModuleDescriptor& vertexDescriptor,
+    const ShaderModuleDescriptor& fragmentDescriptor) {
+  auto hasOfflineBinary =
+      !vertexDescriptor.binaryData.empty() && !fragmentDescriptor.binaryData.empty();
+  if ((backend == Backend::Vulkan || backend == Backend::Metal) && hasOfflineBinary) {
+    return ShaderArtifactOrigin::OfflineBinary;
+  }
+  return ShaderArtifactOrigin::OfflineSource;
+}
+
 std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* context,
                                                                   const ProgramInfo* programInfo) {
   auto cache = context->precompiledShaderCache();
   if (!cache->isLoaded()) {
+    cache->recordArtifactMiss(PrecompiledFallbackReason::CacheNotLoaded);
     return nullptr;
   }
 
   auto matchResult = MatchPermutation(programInfo);
   if (!matchResult) {
-    cache->recordMiss();
+    cache->recordArtifactMiss(PrecompiledFallbackReason::NoPermutationMatch);
     return nullptr;
   }
 
@@ -59,18 +72,19 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
 
   auto vertBlob = cache->findVertex(vertHash.hi, vertHash.lo);
   if (vertBlob == nullptr) {
-    cache->recordMiss();
+    cache->recordArtifactMiss(PrecompiledFallbackReason::VertexArtifactMissing);
     LOGE("PrecompiledShaderMiss: vert blob not found for %s[vert=%u]",
          matchResult->shaderName.c_str(), matchResult->vertPermutationIndex);
     return nullptr;
   }
   auto fragBlob = cache->findFragment(fragHash.hi, fragHash.lo);
   if (fragBlob == nullptr) {
-    cache->recordMiss();
+    cache->recordArtifactMiss(PrecompiledFallbackReason::FragmentArtifactMissing);
     LOGE("PrecompiledShaderMiss: frag blob not found for %s[frag=%u]",
          matchResult->shaderName.c_str(), matchResult->fragPermutationIndex);
     return nullptr;
   }
+  cache->recordHit();
 
   auto gpu = context->gpu();
   auto format = FormatForBackend(context->backend());
@@ -95,12 +109,14 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
 
   auto vertexShader = gpu->createShaderModule(vertexDesc);
   if (vertexShader == nullptr) {
+    cache->recordFailure(PrecompiledFallbackReason::VertexModuleCreationFailed);
     LOGE("PrecompiledProgramCreator: Failed to create vertex shader module for %s[vert=%u]",
          matchResult->shaderName.c_str(), matchResult->vertPermutationIndex);
     return nullptr;
   }
   auto fragmentShader = gpu->createShaderModule(fragmentDesc);
   if (fragmentShader == nullptr) {
+    cache->recordFailure(PrecompiledFallbackReason::FragmentModuleCreationFailed);
     LOGE("PrecompiledProgramCreator: Failed to create fragment shader module for %s[frag=%u]",
          matchResult->shaderName.c_str(), matchResult->fragPermutationIndex);
     return nullptr;
@@ -144,18 +160,21 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
   descriptor.depthStencil = programInfo->getDepthStencil();
 
   auto pipeline = gpu->createRenderPipeline(descriptor);
+  context->globalCache()->recordRuntimePipelineCreation(pipeline != nullptr);
   if (pipeline == nullptr) {
     LOGE("PrecompiledProgramCreator: Failed to create render pipeline for %s[vert=%u,frag=%u]",
          matchResult->shaderName.c_str(), matchResult->vertPermutationIndex,
          matchResult->fragPermutationIndex);
 
-    cache->recordMiss();
+    cache->recordFailure(PrecompiledFallbackReason::PipelineCreationFailed);
     return nullptr;
   }
 
-  cache->recordHit();
+  ProgramProvenance provenance = {
+      ArtifactOriginForBackend(context->backend(), vertexDesc, fragmentDesc),
+      ProgramOrigin::PrecompiledArtifact, PipelineOrigin::RuntimeCreation};
   return std::make_shared<Program>(std::move(pipeline), std::move(vertexUniformData),
-                                   std::move(fragmentUniformData));
+                                   std::move(fragmentUniformData), provenance);
 }
 
 }  // namespace tgfx

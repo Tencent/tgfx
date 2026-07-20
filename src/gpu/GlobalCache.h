@@ -30,6 +30,18 @@
 #include "tgfx/core/Stroke.h"
 
 namespace tgfx {
+
+struct ProgramCacheStats {
+  uint64_t requests = 0;
+  uint64_t cacheHits = 0;
+  uint64_t cacheMisses = 0;
+  uint64_t precompiledArtifactCreations = 0;
+  uint64_t programBuilderCreations = 0;
+  uint64_t runtimePipelineCreationAttempts = 0;
+  uint64_t runtimePipelineCreationSuccesses = 0;
+  uint64_t runtimePipelineCreationFailures = 0;
+};
+
 /**
  * GlobalCache manages GPU resources that need to stay alive for the lifetime of the Context.
  */
@@ -71,6 +83,27 @@ class GlobalCache {
    * path needs to be exercised.
    */
   void clearPrograms();
+
+  /**
+   * Returns program request and initial-creation counters. These counters are independent from
+   * cache contents so eviction or clearPrograms() does not rewrite historical provenance.
+   */
+  const ProgramCacheStats& programStats() const {
+    return _programStats;
+  }
+
+  /**
+   * Records the result of one runtime render-pipeline creation attempt.
+   */
+  void recordRuntimePipelineCreation(bool succeeded);
+
+  /**
+   * Resets program request, creation, and runtime pipeline counters without changing cached
+   * programs.
+   */
+  void resetProgramStats() {
+    _programStats = {};
+  }
 
   /**
    * Returns a texture that represents a gradient created from the specified colors and positions.
@@ -137,6 +170,7 @@ class GlobalCache {
   Context* context = nullptr;
   std::list<Program*> programLRU = {};
   BytesKeyMap<std::shared_ptr<Program>> programMap = {};
+  ProgramCacheStats _programStats = {};
   std::list<GradientTexture*> gradientLRU = {};
   BytesKeyMap<std::unique_ptr<GradientTexture>> gradientTextures = {};
   std::shared_ptr<GPUBufferProxy> aaQuadIndexBuffer = nullptr;

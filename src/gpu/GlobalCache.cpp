@@ -58,14 +58,17 @@ GlobalCache::GlobalCache(Context* context) : context(context) {
 }
 
 std::shared_ptr<Program> GlobalCache::findProgram(const BytesKey& programKey) {
+  _programStats.requests++;
   auto result = programMap.find(programKey);
   if (result != programMap.end()) {
+    _programStats.cacheHits++;
     auto program = result->second;
     programLRU.erase(program->cachedPosition);
     programLRU.push_front(program.get());
     program->cachedPosition = programLRU.begin();
     return program;
   }
+  _programStats.cacheMisses++;
   return nullptr;
 }
 
@@ -188,6 +191,11 @@ void GlobalCache::addProgram(const BytesKey& programKey, std::shared_ptr<Program
     return;
   }
   program->programKey = programKey;
+  if (program->getProvenance().program == ProgramOrigin::PrecompiledArtifact) {
+    _programStats.precompiledArtifactCreations++;
+  } else {
+    _programStats.programBuilderCreations++;
+  }
   programLRU.push_front(program.get());
   program->cachedPosition = programLRU.begin();
   programMap[programKey] = std::move(program);
@@ -201,6 +209,15 @@ void GlobalCache::addProgram(const BytesKey& programKey, std::shared_ptr<Program
 void GlobalCache::clearPrograms() {
   programLRU.clear();
   programMap.clear();
+}
+
+void GlobalCache::recordRuntimePipelineCreation(bool succeeded) {
+  _programStats.runtimePipelineCreationAttempts++;
+  if (succeeded) {
+    _programStats.runtimePipelineCreationSuccesses++;
+  } else {
+    _programStats.runtimePipelineCreationFailures++;
+  }
 }
 
 std::shared_ptr<TextureProxy> GlobalCache::getGradient(const Color* colors, const float* positions,

@@ -18,6 +18,7 @@
 
 #include "GLSLProgramBuilder.h"
 #include <string>
+#include "gpu/GlobalCache.h"
 #include "gpu/UniformData.h"
 #include "tgfx/gpu/GPU.h"
 
@@ -222,11 +223,14 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
   // stencil writes keep their previous behaviour.
   descriptor.depthStencil = programInfo->getDepthStencil();
   auto pipeline = gpu->createRenderPipeline(descriptor);
+  context->globalCache()->recordRuntimePipelineCreation(pipeline != nullptr);
   if (pipeline == nullptr) {
     return nullptr;
   }
+  ProgramProvenance provenance = {ShaderArtifactOrigin::RuntimeGeneratedSource,
+                                  ProgramOrigin::ProgramBuilder, PipelineOrigin::RuntimeCreation};
   return std::make_shared<Program>(std::move(pipeline), std::move(vertexUniformData),
-                                   std::move(fragmentUniformData));
+                                   std::move(fragmentUniformData), provenance);
 }
 
 bool GLSLProgramBuilder::checkSamplerCounts() {

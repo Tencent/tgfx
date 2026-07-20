@@ -357,33 +357,80 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledRenderConsistency) {
 }
 
 TGFX_TEST(ShaderPermutationTest, ShaderCacheStats) {
-  // Unit test for the hit/miss counter mechanism in PrecompiledShaderCache.
   PrecompiledShaderCache cache;
-  auto bundlePath = ProjectPath::Absolute(BundlePath());
-  ASSERT_TRUE(cache.loadBundle(bundlePath));
 
-  // Initial state: both counters at zero.
+  // Initial state: all counters are zero.
   EXPECT_EQ(cache.hitCount(), 0u);
   EXPECT_EQ(cache.missCount(), 0u);
 
-  // Record hits and misses.
+  // Record artifact hits and misses.
   cache.recordHit();
   cache.recordHit();
-  cache.recordMiss();
+  cache.recordArtifactMiss(PrecompiledFallbackReason::NoPermutationMatch);
   EXPECT_EQ(cache.hitCount(), 2u);
   EXPECT_EQ(cache.missCount(), 1u);
+  EXPECT_EQ(cache.fallbackCount(PrecompiledFallbackReason::NoPermutationMatch), 1u);
+  EXPECT_EQ(cache.fallbackCount(PrecompiledFallbackReason::VertexArtifactMissing), 0u);
 
-  // Verify resetStats clears both counters.
+  // Verify resetStats clears all counters.
   cache.resetStats();
   EXPECT_EQ(cache.hitCount(), 0u);
   EXPECT_EQ(cache.missCount(), 0u);
+  EXPECT_EQ(cache.fallbackCount(PrecompiledFallbackReason::NoPermutationMatch), 0u);
 
   // Record after reset should start fresh.
-  cache.recordMiss();
-  cache.recordMiss();
+  cache.recordArtifactMiss(PrecompiledFallbackReason::VertexArtifactMissing);
+  cache.recordFailure(PrecompiledFallbackReason::VertexModuleCreationFailed);
+  cache.recordFailure(PrecompiledFallbackReason::PipelineCreationFailed);
   cache.recordHit();
   EXPECT_EQ(cache.hitCount(), 1u);
-  EXPECT_EQ(cache.missCount(), 2u);
+  EXPECT_EQ(cache.missCount(), 1u);
+  EXPECT_EQ(cache.fallbackCount(PrecompiledFallbackReason::VertexArtifactMissing), 1u);
+  EXPECT_EQ(cache.fallbackCount(PrecompiledFallbackReason::VertexModuleCreationFailed), 1u);
+  EXPECT_EQ(cache.fallbackCount(PrecompiledFallbackReason::PipelineCreationFailed), 1u);
+}
+
+TGFX_TEST(ShaderPermutationTest, ProgramProvenanceSurvivesCacheHits) {
+  GlobalCache cache(nullptr);
+  BytesKey precompiledKey;
+  precompiledKey.write(1u);
+  ProgramProvenance precompiledProvenance = {ShaderArtifactOrigin::OfflineBinary,
+                                             ProgramOrigin::PrecompiledArtifact,
+                                             PipelineOrigin::RuntimeCreation};
+  auto precompiledProgram =
+      std::make_shared<Program>(nullptr, nullptr, nullptr, precompiledProvenance);
+  cache.addProgram(precompiledKey, precompiledProgram);
+
+  BytesKey dynamicKey;
+  dynamicKey.write(2u);
+  ProgramProvenance dynamicProvenance = {ShaderArtifactOrigin::RuntimeGeneratedSource,
+                                         ProgramOrigin::ProgramBuilder,
+                                         PipelineOrigin::RuntimeCreation};
+  auto dynamicProgram = std::make_shared<Program>(nullptr, nullptr, nullptr, dynamicProvenance);
+  cache.addProgram(dynamicKey, dynamicProgram);
+
+  auto cachedPrecompiled = cache.findProgram(precompiledKey);
+  auto cachedDynamic = cache.findProgram(dynamicKey);
+  ASSERT_TRUE(cachedPrecompiled != nullptr);
+  ASSERT_TRUE(cachedDynamic != nullptr);
+  EXPECT_EQ(cachedPrecompiled->getProvenance().program, ProgramOrigin::PrecompiledArtifact);
+  EXPECT_EQ(cachedDynamic->getProvenance().program, ProgramOrigin::ProgramBuilder);
+  EXPECT_EQ(cachedPrecompiled->getProvenance().shaderArtifact, ShaderArtifactOrigin::OfflineBinary);
+  EXPECT_EQ(cachedDynamic->getProvenance().shaderArtifact,
+            ShaderArtifactOrigin::RuntimeGeneratedSource);
+
+  cache.recordRuntimePipelineCreation(true);
+  cache.recordRuntimePipelineCreation(true);
+  cache.recordRuntimePipelineCreation(false);
+  const auto& stats = cache.programStats();
+  EXPECT_EQ(stats.requests, 2u);
+  EXPECT_EQ(stats.cacheHits, 2u);
+  EXPECT_EQ(stats.cacheMisses, 0u);
+  EXPECT_EQ(stats.precompiledArtifactCreations, 1u);
+  EXPECT_EQ(stats.programBuilderCreations, 1u);
+  EXPECT_EQ(stats.runtimePipelineCreationAttempts, 3u);
+  EXPECT_EQ(stats.runtimePipelineCreationSuccesses, 2u);
+  EXPECT_EQ(stats.runtimePipelineCreationFailures, 1u);
 }
 
 TGFX_TEST(ShaderPermutationTest, EmbeddedBundleLoadFromMemory) {

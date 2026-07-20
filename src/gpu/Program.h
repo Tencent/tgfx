@@ -24,10 +24,32 @@
 #include "tgfx/gpu/RenderPipeline.h"
 
 namespace tgfx {
+
+enum class ShaderArtifactOrigin : uint8_t {
+  RuntimeGeneratedSource,
+  OfflineSource,
+  OfflineBinary,
+};
+
+enum class ProgramOrigin : uint8_t {
+  ProgramBuilder,
+  PrecompiledArtifact,
+};
+
+enum class PipelineOrigin : uint8_t {
+  RuntimeCreation,
+};
+
+struct ProgramProvenance {
+  ShaderArtifactOrigin shaderArtifact = ShaderArtifactOrigin::RuntimeGeneratedSource;
+  ProgramOrigin program = ProgramOrigin::ProgramBuilder;
+  PipelineOrigin pipeline = PipelineOrigin::RuntimeCreation;
+};
+
 class Program {
  public:
   Program(std::shared_ptr<RenderPipeline> pipeline, std::unique_ptr<UniformData> vertexUniformData,
-          std::unique_ptr<UniformData> fragmentUniformData);
+          std::unique_ptr<UniformData> fragmentUniformData, ProgramProvenance provenance);
 
   std::shared_ptr<RenderPipeline> getPipeline() const {
     return pipeline;
@@ -35,12 +57,17 @@ class Program {
 
   UniformData* getUniformData(ShaderStage stage) const;
 
+  const ProgramProvenance& getProvenance() const {
+    return provenance;
+  }
+
  private:
   BytesKey programKey = {};
   std::list<Program*>::iterator cachedPosition;
   std::shared_ptr<RenderPipeline> pipeline = nullptr;
   std::unique_ptr<UniformData> vertexUniformData = nullptr;
   std::unique_ptr<UniformData> fragmentUniformData = nullptr;
+  ProgramProvenance provenance = {};
 
   friend class GlobalCache;
 };

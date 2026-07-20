@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <array>
 #include <atomic>
 #include <cstdint>
 #include <string>
@@ -31,6 +32,18 @@ struct ShaderStageBlob {
   std::vector<uint8_t> data;
   std::vector<Uniform> uniforms;
   std::vector<Uniform> samplers;
+};
+
+enum class PrecompiledFallbackReason : uint8_t {
+  CacheNotLoaded,
+  NoPermutationMatch,
+  VertexArtifactMissing,
+  FragmentArtifactMissing,
+  VertexModuleCreationFailed,
+  FragmentModuleCreationFailed,
+  PipelineCreationFailed,
+  Unspecified,
+  Count,
 };
 
 /// Runtime cache that loads precompiled shader bundles and provides O(1) lookup by ShaderKey hash.
@@ -84,25 +97,51 @@ class PrecompiledShaderCache {
     return _hitCount.load(std::memory_order_relaxed);
   }
 
-  /// Returns the number of failed lookups (vertex or fragment not found, or match failed).
+  /// Returns the number of failed artifact lookups.
   uint32_t missCount() const {
     return _missCount.load(std::memory_order_relaxed);
   }
 
-  /// Increments the hit counter by one.
+  /// Increments the artifact-lookup hit counter by one.
   void recordHit() {
     _hitCount.fetch_add(1, std::memory_order_relaxed);
   }
 
-  /// Increments the miss counter by one.
+  /// Records one artifact-lookup miss without assigning a more specific reason.
   void recordMiss() {
-    _missCount.fetch_add(1, std::memory_order_relaxed);
+    recordArtifactMiss(PrecompiledFallbackReason::Unspecified);
   }
 
-  /// Resets both hit and miss counters to zero.
+  /// Records one artifact-lookup miss using a fixed low-cardinality reason.
+  void recordArtifactMiss(PrecompiledFallbackReason reason) {
+    _missCount.fetch_add(1, std::memory_order_relaxed);
+    recordFailure(reason);
+  }
+
+  /// Records a module or pipeline failure without changing artifact lookup counters.
+  void recordFailure(PrecompiledFallbackReason reason) {
+    auto index = static_cast<size_t>(reason);
+    if (index < fallbackCounts.size()) {
+      fallbackCounts[index].fetch_add(1, std::memory_order_relaxed);
+    }
+  }
+
+  /// Returns the number of failed attempts for the specified fallback reason.
+  uint32_t fallbackCount(PrecompiledFallbackReason reason) const {
+    auto index = static_cast<size_t>(reason);
+    if (index >= fallbackCounts.size()) {
+      return 0;
+    }
+    return fallbackCounts[index].load(std::memory_order_relaxed);
+  }
+
+  /// Resets hit, miss, and fallback-reason counters to zero.
   void resetStats() {
     _hitCount.store(0, std::memory_order_relaxed);
     _missCount.store(0, std::memory_order_relaxed);
+    for (auto& count : fallbackCounts) {
+      count.store(0, std::memory_order_relaxed);
+    }
   }
 
   /// Unloads all entries and resets the cache to its initial state.
@@ -133,6 +172,8 @@ class PrecompiledShaderCache {
   std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> fragEntries;
   std::atomic<uint32_t> _hitCount{0};
   std::atomic<uint32_t> _missCount{0};
+  std::array<std::atomic<uint32_t>, static_cast<size_t>(PrecompiledFallbackReason::Count)>
+      fallbackCounts = {};
 };
 
 }  // namespace tgfx

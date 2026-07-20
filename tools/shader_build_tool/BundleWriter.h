@@ -54,6 +54,9 @@ struct ShaderKeyHash {
 ShaderKeyHash ComputeShaderKeyHash(const std::string& shaderName, uint32_t permutationIndex,
                                    const std::string& profileTag);
 
+/// Computes a stable 128-bit content hash without copying the blob.
+ShaderKeyHash ComputeBlobHash(const std::vector<uint8_t>& blob);
+
 /// Writes a v3 shader bundle file with separate vertex and fragment pools.
 /// When compress is true, the data pool is zlib-compressed (compressionType=1 in header).
 bool WriteBundle(const std::string& outPath, const std::string& profileTag,

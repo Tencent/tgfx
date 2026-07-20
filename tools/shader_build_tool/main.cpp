@@ -21,8 +21,10 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <set>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 #include "BundleWriter.h"
 #include "ReflectionExtractor.h"
@@ -79,9 +81,83 @@ struct ShaderReport {
 struct BuildReport {
   std::vector<ShaderReport> shaders;
   std::vector<VariantData> variants;
+  std::map<std::string, uint64_t> profileErrorCounts;
   bool hasErrors = false;
   std::string errorMessage;
 };
+
+struct ShaderKeyHashLess {
+  bool operator()(const ShaderKeyHash& left, const ShaderKeyHash& right) const {
+    if (left.hi != right.hi) {
+      return left.hi < right.hi;
+    }
+    return left.lo < right.lo;
+  }
+};
+
+struct StageContentStats {
+  uint64_t uniqueCount = 0;
+  uint64_t uniqueBytes = 0;
+  std::map<ShaderKeyHash, std::vector<const std::vector<uint8_t>*>, ShaderKeyHashLess> buckets;
+
+  void add(const std::vector<uint8_t>& blob) {
+    auto hash = ComputeBlobHash(blob);
+    auto& bucket = buckets[hash];
+    for (const auto* existing : bucket) {
+      if (*existing == blob) {
+        return;
+      }
+    }
+    bucket.push_back(&blob);
+    uniqueCount++;
+    uniqueBytes += blob.size();
+  }
+};
+
+struct ProfileArtifactStats {
+  std::set<std::pair<std::string, uint32_t>> logicalVertices;
+  std::set<std::pair<std::string, uint32_t>> logicalFragments;
+  uint64_t logicalVertexBytes = 0;
+  uint64_t logicalFragmentBytes = 0;
+  uint64_t errorCount = 0;
+  StageContentStats vertexContents;
+  StageContentStats fragmentContents;
+};
+
+static std::map<std::string, ProfileArtifactStats> CollectArtifactStats(
+    const std::vector<VariantData>& variants,
+    const std::map<std::string, uint64_t>& profileErrorCounts) {
+  std::map<std::string, ProfileArtifactStats> result;
+  for (const auto& profile : profileErrorCounts) {
+    result[profile.first].errorCount = profile.second;
+  }
+  for (const auto& variant : variants) {
+    auto& stats = result[variant.profileTag];
+    auto vertexKey = std::make_pair(variant.shaderName, variant.vertPermutationIndex);
+    if (stats.logicalVertices.insert(vertexKey).second) {
+      stats.logicalVertexBytes += variant.vertexBlob.size();
+      stats.vertexContents.add(variant.vertexBlob);
+    }
+    auto fragmentKey = std::make_pair(variant.shaderName, variant.fragPermutationIndex);
+    if (stats.logicalFragments.insert(fragmentKey).second) {
+      stats.logicalFragmentBytes += variant.fragmentBlob.size();
+      stats.fragmentContents.add(variant.fragmentBlob);
+    }
+  }
+  return result;
+}
+
+static void RecordCommonArtifactError(
+    std::map<std::string, uint64_t>* profileErrorCounts) {
+  for (auto& profile : *profileErrorCounts) {
+    profile.second++;
+  }
+}
+
+static void RecordBackendArtifactError(
+    const std::string& backend, std::map<std::string, uint64_t>* profileErrorCounts) {
+  (*profileErrorCounts)[backend]++;
+}
 
 static void PrintUsage() {
   std::cerr << "Usage: shader_build_tool [options]\n"
@@ -169,8 +245,10 @@ static std::string ResolveIncludes(const std::string& source, const std::string&
   return result;
 }
 
-static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const BuildOptions& options,
-                                     std::vector<VariantData>* outVariants) {
+static ShaderReport CompileOneShader(
+    const PrecompiledShaderInfo& info, const BuildOptions& options,
+    std::vector<VariantData>* outVariants,
+    std::map<std::string, uint64_t>* profileErrorCounts) {
   ShaderReport report;
   report.name = info.name;
   auto vertDomain = info.vertDomain;
@@ -187,6 +265,7 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
     if (vertSource.empty()) {
       std::cerr << "  ERROR: Cannot read vertex file or file is empty: " << info.vertexFile << "\n";
       report.errorCount++;
+      RecordCommonArtifactError(profileErrorCounts);
     } else {
       auto vertDir = options.shaderDir + "/" + info.vertexFile;
       vertDir = vertDir.substr(0, vertDir.rfind('/'));
@@ -196,6 +275,7 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
       std::cerr << "  ERROR: Cannot read fragment file or file is empty: " << info.fragmentFile
                 << "\n";
       report.errorCount++;
+      RecordCommonArtifactError(profileErrorCounts);
     } else {
       auto fragDir = options.shaderDir + "/" + info.fragmentFile;
       fragDir = fragDir.substr(0, fragDir.rfind('/'));
@@ -240,6 +320,7 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
         if (!vertResult.success) {
           std::cerr << "  " << vertResult.error << "\n";
           report.errorCount++;
+          RecordCommonArtifactError(options.backends, profileErrorCounts);
           continue;
         }
         // Store a dummy reflection for now; we'll fill it after frag compilation
@@ -255,6 +336,7 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
       if (!fragResult.success) {
         std::cerr << "  " << fragResult.error << "\n";
         report.errorCount++;
+        RecordCommonArtifactError(options.backends, profileErrorCounts);
         continue;
       }
 
@@ -296,6 +378,7 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
             std::cerr << "  MSL translation error: "
                       << (mslVert.success ? mslFrag.error : mslVert.error) << "\n";
             report.errorCount++;
+            RecordBackendArtifactError(backend, profileErrorCounts);
             continue;
           }
           vertBlob = CompileMSLToMetallib(mslVert.msl, ShaderStageType::Vertex);
@@ -304,6 +387,7 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
             std::cerr << "  metallib compilation failed for " << info.name << " [vert=" << vi
                       << " frag=" << fi << "]\n";
             report.errorCount++;
+            RecordBackendArtifactError(backend, profileErrorCounts);
             continue;
           }
         } else if (backend == "webgpu") {
@@ -313,6 +397,7 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
             std::cerr << "  WGSL translation error: "
                       << (wgslVert.success ? wgslFrag.error : wgslVert.error) << "\n";
             report.errorCount++;
+            RecordBackendArtifactError(backend, profileErrorCounts);
             continue;
           }
           vertBlob.assign(wgslVert.wgsl.begin(), wgslVert.wgsl.end());
@@ -349,15 +434,39 @@ static bool WriteReportJson(const BuildReport& report, const std::string& outDir
     std::cerr << "Failed to open output file: " << path << "\n";
     return false;
   }
+  auto artifactStats = CollectArtifactStats(report.variants, report.profileErrorCounts);
   file << "{\n  \"shaders\": [\n";
   for (size_t i = 0; i < report.shaders.size(); i++) {
     const auto& shader = report.shaders[i];
     file << "    {\n";
     file << "      \"name\": \"" << shader.name << "\",\n";
     file << "      \"rawCount\": " << shader.rawCount << ",\n";
-    file << "      \"compiledCount\": " << shader.compiledCount << "\n";
+    file << "      \"compiledCount\": " << shader.compiledCount << ",\n";
+    file << "      \"errorCount\": " << shader.errorCount << "\n";
     file << "    }";
     if (i + 1 < report.shaders.size()) {
+      file << ",";
+    }
+    file << "\n";
+  }
+  file << "  ],\n  \"artifactProfiles\": [\n";
+  size_t profileIndex = 0;
+  for (const auto& profile : artifactStats) {
+    const auto& stats = profile.second;
+    file << "    {\n";
+    file << "      \"profile\": \"" << profile.first << "\",\n";
+    file << "      \"logicalVertexCount\": " << stats.logicalVertices.size() << ",\n";
+    file << "      \"uniqueVertexCount\": " << stats.vertexContents.uniqueCount << ",\n";
+    file << "      \"logicalVertexBytes\": " << stats.logicalVertexBytes << ",\n";
+    file << "      \"uniqueVertexBytes\": " << stats.vertexContents.uniqueBytes << ",\n";
+    file << "      \"logicalFragmentCount\": " << stats.logicalFragments.size() << ",\n";
+    file << "      \"uniqueFragmentCount\": " << stats.fragmentContents.uniqueCount << ",\n";
+    file << "      \"logicalFragmentBytes\": " << stats.logicalFragmentBytes << ",\n";
+    file << "      \"uniqueFragmentBytes\": " << stats.fragmentContents.uniqueBytes << ",\n";
+    file << "      \"errorCount\": " << stats.errorCount << "\n";
+    file << "    }";
+    profileIndex++;
+    if (profileIndex < artifactStats.size()) {
       file << ",";
     }
     file << "\n";
@@ -377,6 +486,9 @@ int main(int argc, char** argv) {
   }
 
   tgfx::BuildReport report;
+  for (const auto& backend : options.backends) {
+    report.profileErrorCounts.emplace(backend, 0);
+  }
   const auto& factories = tgfx::ShaderRegistry::All();
   if (factories.empty()) {
     std::cerr << "No shaders registered in ShaderRegistry.\n";
@@ -387,7 +499,8 @@ int main(int argc, char** argv) {
   for (const auto& factory : factories) {
     auto shader = factory();
     auto info = shader->info();
-    auto shaderReport = tgfx::CompileOneShader(info, options, &report.variants);
+    auto shaderReport = tgfx::CompileOneShader(info, options, &report.variants,
+                                               &report.profileErrorCounts);
     std::cout << "[" << shaderReport.name << "] raw=" << shaderReport.rawCount
               << " compiled=" << shaderReport.compiledCount;
     if (shaderReport.errorCount > 0) {
