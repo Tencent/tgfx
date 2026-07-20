@@ -133,9 +133,9 @@ Rect GlassStyle::filterBackground(const Rect& srcRect, float contentScale) {
     auto halfW = srcRect.width() * 0.5f;
     auto halfH = srcRect.height() * 0.5f;
     auto minHalf = std::min(halfW, halfH);
-    float refractionFactor = _refraction / 100.0f;
-    float depthRatio = _depth / 100.0f;
-    float glassThickness = 1.0f + depthRatio * (minHalf - 1.0f);
+    float refractionFactor = std::clamp(_refraction / 100.0f, 0.0f, 1.0f);
+    float depthRatio = std::clamp(_depth / 100.0f, 0.0f, 1.0f);
+    float glassThickness = 1.0f + depthRatio * std::max(minHalf - 1.0f, 0.0f);
     float analyticalOffset = glassThickness * refractionFactor;
     float alphaMaskOffset = halfW * (0.5f * refractionFactor + 0.5f * depthRatio);
     float refractionOutset = std::max(analyticalOffset, alphaMaskOffset);
@@ -218,9 +218,9 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
           effectiveShapeType = GlassShapeType::RoundedRect;
           if (rrect.has_value()) {
             auto radii = rrect->radii();
-            // Use the top-left corner radius as representative.
-            float maxRadius = std::min(radii[0].x, radii[0].y);
-            crRadius = std::min(maxRadius * effectiveContentScale, origMinHalf);
+            // The analytical SDF currently supports a single scalar corner radius.
+            float representativeRadius = std::min(radii[0].x, radii[0].y);
+            crRadius = std::min(representativeRadius * effectiveContentScale, origMinHalf);
           }
         }
       } else if (contentType == LayerContent::Type::Rect) {
@@ -237,11 +237,9 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
       }
     }
 
-    float maxDepth = origMinHalf - 1.0f;
-    float depthPx = (_depth / 100.0f) * maxDepth;
-    float depthRatio = std::min(depthPx / maxDepth, 1.0f);
+    float depthRatio = std::clamp(_depth / 100.0f, 0.0f, 1.0f);
     float refractionFactor = _refraction / 100.0f;
-    float glassThickness = 1.0f + depthRatio * (origMinHalf - 1.0f);
+    float glassThickness = 1.0f + depthRatio * std::max(origMinHalf - 1.0f, 0.0f);
 
     float channelOffset = (_dispersion / 100.0f) * 0.2f;
     float splay = _splay / 100.0f;
