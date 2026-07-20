@@ -347,7 +347,9 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
   float finalScaleY = 1.0f / scaleRatioY;
 
   Paint paint = {};
-  paint.setBlendMode(BlendMode::Src);
+  // Src can clear the top and left AA fringe of pixel-aligned rectangles because RectDrawOp's
+  // expanded coverage bounds include zero-coverage pixels. SrcOver preserves the backdrop there.
+  paint.setBlendMode(BlendMode::SrcOver);
 
   // Keep the background and filter chain at their capped resolution. The shader matrix maps the
   // low-resolution image into content pixel space, while the Glass FP executes per destination
@@ -386,13 +388,16 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, Ble
   }
 
   if (!drewAnalyticalShape) {
-    paint.setShader(nullptr);
+    // Keep imageShader on paint so the refraction filter is inlined as a fragment processor
+    // (per-destination-fragment computation), matching the SDF path. Using drawImageRect would
+    // pass no UV matrix to FilterImage::asFragmentProcessor, causing the containment check to
+    // fail and the filter to be pre-rasterized at processedBg resolution, producing seams when
+    // zoomed in.
     auto maskShader = Shader::MakeImageShader(input.content, TileMode::Decal, TileMode::Decal);
     paint.setMaskFilter(MaskFilter::MakeShader(maskShader, false));
-    auto dstRect = Rect::MakeXYWH(finalOffsetX, finalOffsetY,
-                                  static_cast<float>(processedBg->width()) * finalScaleX,
-                                  static_cast<float>(processedBg->height()) * finalScaleY);
-    canvas->drawImageRect(processedBg, dstRect, SamplingOptions(FilterMode::Linear), &paint);
+    auto contentRect = Rect::MakeWH(static_cast<float>(input.content->width()),
+                                    static_cast<float>(input.content->height()));
+    canvas->drawRect(contentRect, paint);
   }
 }
 
