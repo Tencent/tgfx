@@ -779,7 +779,7 @@ if (TGFX_EMBED_SHADER_BUNDLES)
             third_party/SPIRV-Cross)
     target_compile_options(shader_build_tool PRIVATE ${TGFX_COMPILE_OPTIONS})
     # Keep build-time compiler dependencies isolated from the runtime tgfx archive.
-    add_vendor_target(shader-tool-vendor STATIC_VENDORS shaderc SPIRV-Cross)
+    add_vendor_target(shader-tool-vendor STATIC_VENDORS shaderc SPIRV-Cross zlib)
     add_dependencies(shader_build_tool shader-tool-vendor)
     find_vendor_libraries(shader-tool-vendor STATIC SHADER_TOOL_VENDOR_LIBS)
     target_link_libraries(shader_build_tool PRIVATE ${SHADER_TOOL_VENDOR_LIBS})
