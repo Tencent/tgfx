@@ -20,6 +20,7 @@
 #include <QApplication>
 #include <QColorSpace>
 #include <QQuickWindow>
+#include <QScreen>
 #include <QThread>
 #include "QGLDrawableProxy.h"
 #include "core/utils/ColorSpaceHelper.h"
@@ -284,11 +285,14 @@ void QGLWindow::createDevice(QOpenGLContext* context) {
   surface->create();
   device = QGLDevice::MakeFrom(context, surface, true);
   if (renderThread != nullptr) {
-    // Detach the QScreen before moving the surface to the render thread. Otherwise, when the
-    // associated QScreen is destroyed (e.g. the window closes), Qt posts a screen-change event to
-    // the surface's thread, and the render thread would call setScreen() to disconnect from the
-    // already-destroyed QScreen, causing a crash.
-    surface->setScreen(nullptr);
+    // Disconnect the surface from its QScreen's destroyed() signal before moving the device (which
+    // owns the surface) to the render thread. QOffscreenSurface connects this signal in its
+    // constructor, and when the associated QScreen is destroyed (e.g. the window closes), Qt would
+    // invoke the surface's screenDestroyed() slot from the GUI thread, touching the surface object
+    // that now lives on the render thread and causing a crash. Calling setScreen(nullptr) is not a
+    // reliable fix: it falls back to primaryScreen and skips the disconnect when the surface is
+    // already bound to the primary screen.
+    QObject::disconnect(surface->screen(), SIGNAL(destroyed(QObject*)), surface, nullptr);
     static_cast<QGLDevice*>(device.get())->moveToThread(renderThread);
   }
   QMetaObject::invokeMethod(quickItem, "update", Qt::AutoConnection);
