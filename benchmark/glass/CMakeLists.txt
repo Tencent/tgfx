@@ -1,0 +1,12 @@
+add_executable(GlassStyleBenchmark src/GlassStyleBenchmark.cpp)
+target_compile_definitions(GlassStyleBenchmark PRIVATE ${TGFX_DEFINES})
+target_compile_options(GlassStyleBenchmark PRIVATE ${TGFX_COMPILE_OPTIONS})
+target_link_libraries(GlassStyleBenchmark PRIVATE tgfx)
+
+if (TGFX_USE_METAL)
+    target_compile_definitions(GlassStyleBenchmark PRIVATE TGFX_BENCHMARK_USE_METAL)
+elseif (TGFX_USE_OPENGL)
+    target_compile_definitions(GlassStyleBenchmark PRIVATE TGFX_BENCHMARK_USE_OPENGL)
+else ()
+    message(FATAL_ERROR "GlassStyleBenchmark requires the Metal or OpenGL backend.")
+endif ()
