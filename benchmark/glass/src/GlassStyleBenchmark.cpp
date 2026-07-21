@@ -64,23 +64,49 @@ enum class Motion {
   Static,
   Glass,
   Background,
+  Viewport,
+  Zoom,
   Parameters,
 };
 
 enum class Mode {
   Direct,
+  Partial,
   Tiled,
+};
+
+enum class TileUpdate {
+  Immediate,
+  Smooth,
+  Fast,
+};
+
+enum class Parameter {
+  Refraction,
+  Depth,
+  Frost,
+  Dispersion,
+  Splay,
+  LightAngle,
+  LightIntensity,
+  All,
 };
 
 struct BenchmarkConfig {
   Scene scene = Scene::RoundedRect;
   Motion motion = Motion::Static;
   Mode mode = Mode::Direct;
+  TileUpdate tileUpdate = TileUpdate::Smooth;
+  Parameter parameter = Parameter::Refraction;
   int width = 1920;
   int height = 1080;
   int warmupFrames = 300;
   int sampleFrames = 900;
   int sampleDurationMs = 0;
+  int parameterPeriod = 30;
+  int tileSize = 256;
+  int maxTileCount = 512;
+  int maxTilesRefinedPerFrame = 5;
   float refraction = 50.0f;
   float depth = 35.0f;
   float frost = 25.0f;
@@ -91,13 +117,24 @@ struct BenchmarkConfig {
 };
 
 struct FrameSample {
+  int64_t updateUs = 0;
   int64_t recordingUs = 0;
   int64_t endToEndUs = 0;
+  size_t memoryBytes = 0;
+  size_t purgeableBytes = 0;
 };
 
 struct Statistics {
   size_t sampleCount = 0;
   int64_t sampleDurationUs = 0;
+  int64_t firstUpdateUs = 0;
+  int64_t firstRecordingUs = 0;
+  int64_t firstEndToEndUs = 0;
+  size_t memoryBeforeBytes = 0;
+  size_t memoryPeakBytes = 0;
+  size_t memoryAfterBytes = 0;
+  size_t purgeableAfterBytes = 0;
+  double updateMeanUs = 0.0;
   double recordingMeanUs = 0.0;
   double endToEndMeanUs = 0.0;
   int64_t recordingP50Us = 0;
@@ -146,6 +183,10 @@ const char* MotionName(Motion motion) {
       return "glass";
     case Motion::Background:
       return "background";
+    case Motion::Viewport:
+      return "viewport";
+    case Motion::Zoom:
+      return "zoom";
     case Motion::Parameters:
       return "parameters";
   }
@@ -156,8 +197,44 @@ const char* ModeName(Mode mode) {
   switch (mode) {
     case Mode::Direct:
       return "direct";
+    case Mode::Partial:
+      return "partial";
     case Mode::Tiled:
       return "tiled";
+  }
+  return "unknown";
+}
+
+const char* TileUpdateName(TileUpdate tileUpdate) {
+  switch (tileUpdate) {
+    case TileUpdate::Immediate:
+      return "immediate";
+    case TileUpdate::Smooth:
+      return "smooth";
+    case TileUpdate::Fast:
+      return "fast";
+  }
+  return "unknown";
+}
+
+const char* ParameterName(Parameter parameter) {
+  switch (parameter) {
+    case Parameter::Refraction:
+      return "refraction";
+    case Parameter::Depth:
+      return "depth";
+    case Parameter::Frost:
+      return "frost";
+    case Parameter::Dispersion:
+      return "dispersion";
+    case Parameter::Splay:
+      return "splay";
+    case Parameter::LightAngle:
+      return "light-angle";
+    case Parameter::LightIntensity:
+      return "light-intensity";
+    case Parameter::All:
+      return "all";
   }
   return "unknown";
 }
@@ -173,8 +250,12 @@ const char* BackendName() {
 void PrintUsage() {
   std::cout << "Usage: GlassStyleBenchmark [options]\n"
             << "  --scene plain|rounded-rect|ellipse|star|grid|coverage-10|coverage-25|coverage-50\n"
-            << "  --motion static|glass|background|parameters\n"
-            << "  --mode direct|tiled\n"
+            << "  --motion static|glass|background|viewport|zoom|parameters\n"
+            << "  --mode direct|partial|tiled\n"
+            << "  --tile-update immediate|smooth|fast --tile-size <16-2048>\n"
+            << "  --max-tiles <0-4096> --max-refined-tiles <0-4096>\n"
+            << "  --parameter refraction|depth|frost|dispersion|splay|light-angle|light-intensity|all\n"
+            << "  --parameter-period <1-100000>\n"
             << "  --width <128-4096> --height <128-4096>\n"
             << "  --warmup <0-100000>\n"
             << "  --frames <1-100000> or --duration-ms <1-600000>\n"
@@ -238,6 +319,10 @@ bool ParseMotion(const char* text, Motion* motion) {
     *motion = Motion::Glass;
   } else if (value == "background") {
     *motion = Motion::Background;
+  } else if (value == "viewport") {
+    *motion = Motion::Viewport;
+  } else if (value == "zoom") {
+    *motion = Motion::Zoom;
   } else if (value == "parameters") {
     *motion = Motion::Parameters;
   } else {
@@ -250,8 +335,48 @@ bool ParseMode(const char* text, Mode* mode) {
   std::string value = text;
   if (value == "direct") {
     *mode = Mode::Direct;
+  } else if (value == "partial") {
+    *mode = Mode::Partial;
   } else if (value == "tiled") {
     *mode = Mode::Tiled;
+  } else {
+    return false;
+  }
+  return true;
+}
+
+bool ParseTileUpdate(const char* text, TileUpdate* tileUpdate) {
+  std::string value = text;
+  if (value == "immediate") {
+    *tileUpdate = TileUpdate::Immediate;
+  } else if (value == "smooth") {
+    *tileUpdate = TileUpdate::Smooth;
+  } else if (value == "fast") {
+    *tileUpdate = TileUpdate::Fast;
+  } else {
+    return false;
+  }
+  return true;
+}
+
+bool ParseParameter(const char* text, Parameter* parameter) {
+  std::string value = text;
+  if (value == "refraction") {
+    *parameter = Parameter::Refraction;
+  } else if (value == "depth") {
+    *parameter = Parameter::Depth;
+  } else if (value == "frost") {
+    *parameter = Parameter::Frost;
+  } else if (value == "dispersion") {
+    *parameter = Parameter::Dispersion;
+  } else if (value == "splay") {
+    *parameter = Parameter::Splay;
+  } else if (value == "light-angle") {
+    *parameter = Parameter::LightAngle;
+  } else if (value == "light-intensity") {
+    *parameter = Parameter::LightIntensity;
+  } else if (value == "all") {
+    *parameter = Parameter::All;
   } else {
     return false;
   }
@@ -282,6 +407,10 @@ ParseResult ParseCommandLine(int argc, char* argv[], BenchmarkConfig* config) {
       parsed = ParseMotion(value, &config->motion);
     } else if (option == "--mode") {
       parsed = ParseMode(value, &config->mode);
+    } else if (option == "--tile-update") {
+      parsed = ParseTileUpdate(value, &config->tileUpdate);
+    } else if (option == "--parameter") {
+      parsed = ParseParameter(value, &config->parameter);
     } else if (option == "--width") {
       parsed = ParseInteger(value, &config->width);
     } else if (option == "--height") {
@@ -294,6 +423,14 @@ ParseResult ParseCommandLine(int argc, char* argv[], BenchmarkConfig* config) {
     } else if (option == "--duration-ms") {
       parsed = ParseInteger(value, &config->sampleDurationMs);
       hasDuration = true;
+    } else if (option == "--parameter-period") {
+      parsed = ParseInteger(value, &config->parameterPeriod);
+    } else if (option == "--tile-size") {
+      parsed = ParseInteger(value, &config->tileSize);
+    } else if (option == "--max-tiles") {
+      parsed = ParseInteger(value, &config->maxTileCount);
+    } else if (option == "--max-refined-tiles") {
+      parsed = ParseInteger(value, &config->maxTilesRefinedPerFrame);
     } else if (option == "--refraction") {
       parsed = ParseFloat(value, &config->refraction);
     } else if (option == "--depth") {
@@ -325,6 +462,9 @@ ParseResult ParseCommandLine(int argc, char* argv[], BenchmarkConfig* config) {
       config->height > 4096 || config->warmupFrames < 0 || config->warmupFrames > 100000 ||
       config->sampleFrames < 1 || config->sampleFrames > 100000 ||
       (hasDuration && (config->sampleDurationMs < 1 || config->sampleDurationMs > 600000)) ||
+      config->parameterPeriod < 1 || config->parameterPeriod > 100000 || config->tileSize < 16 ||
+      config->tileSize > 2048 || config->maxTileCount < 0 || config->maxTileCount > 4096 ||
+      config->maxTilesRefinedPerFrame < 0 || config->maxTilesRefinedPerFrame > 4096 ||
       !IsGlassParameter(config->refraction) || !IsGlassParameter(config->depth) ||
       !IsGlassParameter(config->frost) || !IsGlassParameter(config->dispersion) ||
       !IsGlassParameter(config->splay) || config->lightAngle < 0.0f ||
@@ -358,11 +498,12 @@ class BenchmarkScene {
  public:
   BenchmarkScene(const BenchmarkConfig& config, bool glassEnabled)
       : config(config), glassEnabled(glassEnabled) {
-    displayList.setRenderMode(config.mode == Mode::Direct ? tgfx::RenderMode::Direct
-                                                           : tgfx::RenderMode::Tiled);
+    displayList.setRenderMode(ToRenderMode(config.mode));
     if (config.mode == Mode::Tiled) {
-      displayList.setTileUpdateMode(tgfx::TileUpdateMode::Smooth);
-      displayList.setMaxTileCount(512);
+      displayList.setTileSize(config.tileSize);
+      displayList.setTileUpdateMode(ToTileUpdateMode(config.tileUpdate));
+      displayList.setMaxTileCount(config.maxTileCount);
+      displayList.setMaxTilesRefinedPerFrame(config.maxTilesRefinedPerFrame);
     }
     buildBackground();
     buildGlassPanels();
@@ -370,6 +511,7 @@ class BenchmarkScene {
 
   bool renderFrame(tgfx::Context* context, tgfx::Surface* surface, int frameIndex,
                    FrameSample* sample) {
+    auto updateStartTime = tgfx::Clock::Now();
     updateFrame(frameIndex);
     auto startTime = tgfx::Clock::Now();
     surface->getCanvas()->clear();
@@ -383,13 +525,40 @@ class BenchmarkScene {
     context->submit(std::move(recording), true);
     auto completedTime = tgfx::Clock::Now();
     if (sample != nullptr) {
+      sample->updateUs = startTime - updateStartTime;
       sample->recordingUs = recordingTime - startTime;
       sample->endToEndUs = completedTime - startTime;
+      sample->memoryBytes = context->memoryUsage();
+      sample->purgeableBytes = context->purgeableBytes();
     }
     return true;
   }
 
  private:
+  static tgfx::RenderMode ToRenderMode(Mode mode) {
+    switch (mode) {
+      case Mode::Direct:
+        return tgfx::RenderMode::Direct;
+      case Mode::Partial:
+        return tgfx::RenderMode::Partial;
+      case Mode::Tiled:
+        return tgfx::RenderMode::Tiled;
+    }
+    return tgfx::RenderMode::Direct;
+  }
+
+  static tgfx::TileUpdateMode ToTileUpdateMode(TileUpdate tileUpdate) {
+    switch (tileUpdate) {
+      case TileUpdate::Immediate:
+        return tgfx::TileUpdateMode::Immediate;
+      case TileUpdate::Smooth:
+        return tgfx::TileUpdateMode::Smooth;
+      case TileUpdate::Fast:
+        return tgfx::TileUpdateMode::Fast;
+    }
+    return tgfx::TileUpdateMode::Immediate;
+  }
+
   void buildBackground() {
     backgroundLayer = tgfx::Layer::Make();
     backgroundLayer->addChild(MakeSolidLayer(static_cast<float>(config.width),
@@ -594,14 +763,66 @@ class BenchmarkScene {
       }
     } else if (config.motion == Motion::Background) {
       backgroundLayer->setMatrix(tgfx::Matrix::MakeTrans(-offset, 0.0f));
+    } else if (config.motion == Motion::Viewport) {
+      displayList.setContentOffset(-offset, 0.0f);
+    } else if (config.motion == Motion::Zoom) {
+      displayList.setZoomScale(1.0f + offset / 600.0f);
     } else if (config.motion == Motion::Parameters && glassEnabled) {
-      auto alternate = config.refraction <= 50.0f ? std::min(100.0f, config.refraction + 20.0f)
-                                                   : std::max(0.0f, config.refraction - 20.0f);
-      auto value = ((frameIndex / 30) % 2 == 0) ? config.refraction : alternate;
+      auto value = ((frameIndex / config.parameterPeriod) % 2 == 0);
       for (const auto& style : glassStyles) {
-        style->setRefraction(value);
+        updateStyleParameter(style, value);
       }
     }
+  }
+
+  void updateStyleParameter(const std::shared_ptr<tgfx::GlassStyle>& style, bool useInitialValue) {
+    switch (config.parameter) {
+      case Parameter::Refraction:
+        style->setRefraction(AlternateGlassValue(config.refraction, useInitialValue));
+        break;
+      case Parameter::Depth:
+        style->setDepth(AlternateGlassValue(config.depth, useInitialValue));
+        break;
+      case Parameter::Frost:
+        style->setFrost(AlternateGlassValue(config.frost, useInitialValue));
+        break;
+      case Parameter::Dispersion:
+        style->setDispersion(AlternateGlassValue(config.dispersion, useInitialValue));
+        break;
+      case Parameter::Splay:
+        style->setSplay(AlternateGlassValue(config.splay, useInitialValue));
+        break;
+      case Parameter::LightAngle:
+        style->setLightAngle(AlternateLightAngle(config.lightAngle, useInitialValue));
+        break;
+      case Parameter::LightIntensity:
+        style->setLightIntensity(AlternateGlassValue(config.lightIntensity, useInitialValue));
+        break;
+      case Parameter::All:
+        style->setRefraction(AlternateGlassValue(config.refraction, useInitialValue));
+        style->setDepth(AlternateGlassValue(config.depth, useInitialValue));
+        style->setFrost(AlternateGlassValue(config.frost, useInitialValue));
+        style->setDispersion(AlternateGlassValue(config.dispersion, useInitialValue));
+        style->setSplay(AlternateGlassValue(config.splay, useInitialValue));
+        style->setLightAngle(AlternateLightAngle(config.lightAngle, useInitialValue));
+        style->setLightIntensity(AlternateGlassValue(config.lightIntensity, useInitialValue));
+        break;
+    }
+  }
+
+  static float AlternateGlassValue(float initialValue, bool useInitialValue) {
+    if (useInitialValue) {
+      return initialValue;
+    }
+    return initialValue <= 50.0f ? std::min(100.0f, initialValue + 20.0f)
+                                 : std::max(0.0f, initialValue - 20.0f);
+  }
+
+  static float AlternateLightAngle(float initialValue, bool useInitialValue) {
+    if (useInitialValue) {
+      return initialValue;
+    }
+    return std::fmod(initialValue + 45.0f, 360.0f);
   }
 
   static float animationOffset(int frameIndex) {
@@ -620,13 +841,14 @@ class BenchmarkScene {
 
 bool RunScene(tgfx::Context* context, tgfx::Surface* surface, BenchmarkScene* scene,
               const BenchmarkConfig& config, std::vector<FrameSample>* samples,
-              int64_t* sampleDurationUs) {
+              int64_t* sampleDurationUs, size_t* memoryBeforeBytes) {
   FrameSample ignored = {};
   for (int frame = 0; frame < config.warmupFrames; ++frame) {
     if (!scene->renderFrame(context, surface, frame, &ignored)) {
       return false;
     }
   }
+  *memoryBeforeBytes = context->memoryUsage();
   samples->clear();
   if (config.sampleDurationMs == 0) {
     samples->reserve(static_cast<size_t>(config.sampleFrames));
@@ -667,21 +889,28 @@ int64_t Percentile(std::vector<int64_t> values, double percentile) {
   return values[index];
 }
 
-Statistics CollectStatistics(const std::vector<FrameSample>& samples, int64_t sampleDurationUs) {
+Statistics CollectStatistics(const std::vector<FrameSample>& samples, int64_t sampleDurationUs,
+                             size_t memoryBeforeBytes) {
   Statistics statistics = {};
   statistics.sampleCount = samples.size();
   statistics.sampleDurationUs = sampleDurationUs;
+  statistics.memoryBeforeBytes = memoryBeforeBytes;
   std::vector<int64_t> recording = {};
   std::vector<int64_t> endToEnd = {};
   recording.reserve(samples.size());
   endToEnd.reserve(samples.size());
+  int64_t updateSum = 0;
   int64_t recordingSum = 0;
   int64_t endToEndSum = 0;
   for (const auto& sample : samples) {
     recording.push_back(sample.recordingUs);
     endToEnd.push_back(sample.endToEndUs);
+    updateSum += sample.updateUs;
     recordingSum += sample.recordingUs;
     endToEndSum += sample.endToEndUs;
+    statistics.memoryPeakBytes = std::max(statistics.memoryPeakBytes, sample.memoryBytes);
+    statistics.memoryAfterBytes = sample.memoryBytes;
+    statistics.purgeableAfterBytes = sample.purgeableBytes;
     if (sample.endToEndUs > 16667) {
       ++statistics.over60HzBudget;
     }
@@ -690,7 +919,12 @@ Statistics CollectStatistics(const std::vector<FrameSample>& samples, int64_t sa
     }
   }
   if (!samples.empty()) {
+    const auto& firstSample = samples.front();
+    statistics.firstUpdateUs = firstSample.updateUs;
+    statistics.firstRecordingUs = firstSample.recordingUs;
+    statistics.firstEndToEndUs = firstSample.endToEndUs;
     auto count = static_cast<double>(samples.size());
+    statistics.updateMeanUs = static_cast<double>(updateSum) / count;
     statistics.recordingMeanUs = static_cast<double>(recordingSum) / count;
     statistics.endToEndMeanUs = static_cast<double>(endToEndSum) / count;
   }
@@ -704,11 +938,14 @@ Statistics CollectStatistics(const std::vector<FrameSample>& samples, int64_t sa
 }
 
 void PrintCsvHeader() {
-  std::cout << "role,backend,scene,motion,mode,width,height,warmup_frames,sample_frames,"
-            << "sample_duration_ms,refraction,depth,frost,dispersion,splay,light_angle,"
-            << "light_intensity,recording_mean_us,recording_p50_us,recording_p95_us,"
+  std::cout << "role,backend,scene,motion,mode,tile_update,parameter,width,height,"
+            << "warmup_frames,sample_frames,sample_duration_ms,tile_size,max_tiles,"
+            << "max_refined_tiles,refraction,depth,frost,dispersion,splay,light_angle,"
+            << "light_intensity,first_update_us,first_recording_us,first_end_to_end_us,"
+            << "update_mean_us,recording_mean_us,recording_p50_us,recording_p95_us,"
             << "recording_p99_us,end_to_end_mean_us,end_to_end_p50_us,end_to_end_p95_us,"
-            << "end_to_end_p99_us,over_60hz_budget,over_120hz_budget,"
+            << "end_to_end_p99_us,memory_before_bytes,memory_peak_bytes,memory_after_bytes,"
+            << "purgeable_after_bytes,over_60hz_budget,over_120hz_budget,"
             << "baseline_end_to_end_mean_us,delta_end_to_end_mean_us,"
             << "delta_end_to_end_p95_us\n";
 }
@@ -717,17 +954,23 @@ void PrintCsvRow(const char* role, const BenchmarkConfig& config, const Statisti
                  const Statistics& baseline) {
   std::cout << std::fixed << std::setprecision(3) << role << ',' << BackendName() << ','
             << SceneName(config.scene) << ',' << MotionName(config.motion) << ','
-            << ModeName(config.mode) << ',' << config.width << ',' << config.height << ','
+            << ModeName(config.mode) << ',' << TileUpdateName(config.tileUpdate) << ','
+            << ParameterName(config.parameter) << ',' << config.width << ',' << config.height << ','
             << config.warmupFrames << ',' << statistics.sampleCount << ','
-            << static_cast<double>(statistics.sampleDurationUs) / 1000.0 << ',' << config.refraction
-            << ',' << config.depth << ',' << config.frost << ',' << config.dispersion << ','
-            << config.splay << ',' << config.lightAngle << ',' << config.lightIntensity << ','
-            << statistics.recordingMeanUs << ',' << statistics.recordingP50Us << ','
-            << statistics.recordingP95Us << ',' << statistics.recordingP99Us << ','
-            << statistics.endToEndMeanUs << ',' << statistics.endToEndP50Us << ','
-            << statistics.endToEndP95Us << ',' << statistics.endToEndP99Us << ','
-            << statistics.over60HzBudget << ',' << statistics.over120HzBudget << ','
-            << baseline.endToEndMeanUs << ','
+            << static_cast<double>(statistics.sampleDurationUs) / 1000.0 << ',' << config.tileSize
+            << ',' << config.maxTileCount << ',' << config.maxTilesRefinedPerFrame << ','
+            << config.refraction << ',' << config.depth << ',' << config.frost << ','
+            << config.dispersion << ',' << config.splay << ',' << config.lightAngle << ','
+            << config.lightIntensity << ',' << statistics.firstUpdateUs << ','
+            << statistics.firstRecordingUs << ',' << statistics.firstEndToEndUs << ','
+            << statistics.updateMeanUs << ',' << statistics.recordingMeanUs << ','
+            << statistics.recordingP50Us << ',' << statistics.recordingP95Us << ','
+            << statistics.recordingP99Us << ',' << statistics.endToEndMeanUs << ','
+            << statistics.endToEndP50Us << ',' << statistics.endToEndP95Us << ','
+            << statistics.endToEndP99Us << ',' << statistics.memoryBeforeBytes << ','
+            << statistics.memoryPeakBytes << ',' << statistics.memoryAfterBytes << ','
+            << statistics.purgeableAfterBytes << ',' << statistics.over60HzBudget << ','
+            << statistics.over120HzBudget << ',' << baseline.endToEndMeanUs << ','
             << statistics.endToEndMeanUs - baseline.endToEndMeanUs << ','
             << statistics.endToEndP95Us - baseline.endToEndP95Us << '\n';
 }
@@ -773,27 +1016,31 @@ int main(int argc, char* argv[]) {
 
   std::vector<FrameSample> baselineSamples = {};
   int64_t baselineDurationUs = 0;
+  size_t baselineMemoryBeforeBytes = 0;
   BenchmarkScene baselineScene(config, false);
   if (!RunScene(context, surface.get(), &baselineScene, config, &baselineSamples,
-                &baselineDurationUs)) {
+                &baselineDurationUs, &baselineMemoryBeforeBytes)) {
     std::cerr << "The plain baseline produced no GPU recording.\n";
     device->unlock();
     return 1;
   }
-  auto baseline = CollectStatistics(baselineSamples, baselineDurationUs);
+  auto baseline =
+      CollectStatistics(baselineSamples, baselineDurationUs, baselineMemoryBeforeBytes);
 
   PrintCsvHeader();
   PrintCsvRow("baseline", config, baseline, baseline);
   if (config.scene != Scene::Plain) {
     std::vector<FrameSample> glassSamples = {};
     int64_t glassDurationUs = 0;
+    size_t glassMemoryBeforeBytes = 0;
     BenchmarkScene glassScene(config, true);
-    if (!RunScene(context, surface.get(), &glassScene, config, &glassSamples, &glassDurationUs)) {
+    if (!RunScene(context, surface.get(), &glassScene, config, &glassSamples, &glassDurationUs,
+                  &glassMemoryBeforeBytes)) {
       std::cerr << "The GlassStyle scene produced no GPU recording.\n";
       device->unlock();
       return 1;
     }
-    auto glass = CollectStatistics(glassSamples, glassDurationUs);
+    auto glass = CollectStatistics(glassSamples, glassDurationUs, glassMemoryBeforeBytes);
     PrintCsvRow("glass", config, glass, baseline);
   }
 
