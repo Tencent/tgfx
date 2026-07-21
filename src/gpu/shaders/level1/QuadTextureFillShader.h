@@ -30,7 +30,8 @@ namespace tgfx {
 ///   HAS_UV_COORD       (bool): explicit UV coordinate attribute present
 ///   HAS_COLOR          (bool): per-vertex color attribute present
 ///   HAS_SUBSET         (bool): texture subset attribute present
-///   HAS_UV_PERSPECTIVE (bool): UV transform includes perspective
+///   (Perspective is handled uniformly: the coord is always emitted as vec3 and divided in the
+///    fragment shader; affine transforms yield z=1 so the divide is a no-op.)
 ///
 /// Fragment dimensions (same semantics as TextureFillShader):
 ///   HAS_YUV    (bool): YUV texture (not compiled — falls back to ProgramBuilder)
@@ -46,7 +47,6 @@ class QuadTextureFillShader : public PrecompiledShader {
       HAS_UV_COORD,
       HAS_COLOR,
       HAS_SUBSET,
-      HAS_UV_PERSPECTIVE,
       COUNT
     };
     static PermutationDomain domain() {
@@ -55,12 +55,11 @@ class QuadTextureFillShader : public PrecompiledShader {
           PermutationBool("HAS_UV_COORD"),
           PermutationBool("HAS_COLOR"),
           PermutationBool("HAS_SUBSET"),
-          PermutationBool("HAS_UV_PERSPECTIVE"),
       });
     }
   };
   using VD = VertDims;
-  static_assert(VD::COUNT == 5, "Update ShouldCompile when vertex dimensions change.");
+  static_assert(VD::COUNT == 4, "Update ShouldCompile when vertex dimensions change.");
 
   // Fragment dimensions (includes vertex-driven HAS_COVERAGE, HAS_COLOR, and HAS_UV_PERSPECTIVE
   // because the fragment shader must declare matching varyings)
@@ -73,8 +72,8 @@ class QuadTextureFillShader : public PrecompiledShader {
       HAS_COVERAGE,
       HAS_COLOR,
       HAS_XP,
-      HAS_UV_PERSPECTIVE,
       HAS_CLAMP_SUBSET,
+      HAS_MASK_TEXTURE,
       COUNT
     };
     static PermutationDomain domain() {
@@ -86,8 +85,8 @@ class QuadTextureFillShader : public PrecompiledShader {
           PermutationBool("HAS_COVERAGE"),
           PermutationBool("HAS_COLOR"),
           PermutationInt("HAS_XP", 3),
-          PermutationBool("HAS_UV_PERSPECTIVE"),
           PermutationBool("HAS_CLAMP_SUBSET"),
+          PermutationBool("HAS_MASK_TEXTURE"),
       });
     }
   };
@@ -127,14 +126,18 @@ class QuadTextureFillShader : public PrecompiledShader {
     if (vertValues[VD::HAS_SUBSET] != fragValues[FD::HAS_SUBSET]) {
       return false;
     }
-    // HAS_COVERAGE, HAS_COLOR, HAS_UV_PERSPECTIVE in frag must match vert (mirrored dimensions).
+    // HAS_COVERAGE, HAS_COLOR in frag must match vert (mirrored dimensions).
     if (vertValues[VD::HAS_COVERAGE] != fragValues[FD::HAS_COVERAGE]) {
       return false;
     }
     if (vertValues[VD::HAS_COLOR] != fragValues[FD::HAS_COLOR]) {
       return false;
     }
-    if (vertValues[VD::HAS_UV_PERSPECTIVE] != fragValues[FD::HAS_UV_PERSPECTIVE]) {
+    // A device-space mask (HAS_MASK_TEXTURE) is a clip/layer coverage applied to a plain textured
+    // fill. It does not co-occur with RGBAAA (packed alpha) sources, so prune that cartesian branch
+    // to keep the variant count bounded — adding the mask dimension would otherwise double the
+    // whole 9-dimension product.
+    if (fragValues[FD::HAS_MASK_TEXTURE] != 0 && fragValues[FD::HAS_RGBAAA] != 0) {
       return false;
     }
     return true;

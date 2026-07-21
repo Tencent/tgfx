@@ -1,7 +1,9 @@
 // QuadTextureFillShader vertex shader
 // Processor layout: QuadPerEdgeAAGeometryProcessor + TextureEffect + EmptyXferProcessor
-// Permutation dimensions (vert): HAS_COVERAGE, HAS_UV_COORD, HAS_COLOR, HAS_SUBSET,
-//                                HAS_UV_PERSPECTIVE
+// Permutation dimensions (vert): HAS_COVERAGE, HAS_UV_COORD, HAS_COLOR, HAS_SUBSET
+// The transformed coordinate is always emitted as a vec3 and perspective-divided in the fragment
+// shader. For affine transforms the third row of CoordTransformMatrix_0 is [0,0,1], so the divisor
+// is 1.0 and the division is a no-op; this lets one shader serve both affine and perspective.
 #version 450
 
 #ifndef HAS_COVERAGE
@@ -15,9 +17,6 @@
 #endif
 #ifndef HAS_SUBSET
 #define HAS_SUBSET 0
-#endif
-#ifndef HAS_UV_PERSPECTIVE
-#define HAS_UV_PERSPECTIVE 0
 #endif
 
 layout(std140, set = 0, binding = 0) uniform VertexUniformBlock {
@@ -94,11 +93,7 @@ layout(location = LOC_COLOR) in vec4 inColor;
 layout(location = LOC_SUBSET) in vec4 texSubset;
 #endif
 
-#if HAS_UV_PERSPECTIVE
 layout(location = 0) out vec3 TransformedCoords_0;
-#else
-layout(location = 0) out vec2 TransformedCoords_0;
-#endif
 
 #if HAS_COVERAGE
 layout(location = 1) out float vCoverage;
@@ -129,11 +124,7 @@ void main() {
   vec3 coordResult = CoordTransformMatrix_0 * vec3(aPosition, 1.0);
 #endif
 
-#if HAS_UV_PERSPECTIVE
   TransformedCoords_0 = coordResult;
-#else
-  TransformedCoords_0 = coordResult.xy;
-#endif
 
   // Transform subset bounds to texture space.
 #if HAS_SUBSET

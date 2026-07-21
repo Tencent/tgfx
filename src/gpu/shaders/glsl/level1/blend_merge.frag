@@ -5,14 +5,12 @@
 //   CHILD0_MODE (0~2): 0=TextureEffect (sample from TextureSampler_0),
 //                       1=ConstColor (use ChildConstColor uniform, no texture),
 //                       2=TiledTextureEffect (tiling via runtime uniforms TileModeX/Y)
-//   HAS_CHILD_SUBSET (0~3): bitmask of which plain TextureEffect children need subset clamping.
-//                       bit0=1 -> clamp child[0]'s coordinate to Child0Subset before sampling
-//                                 TextureSampler_0 (only valid when CHILD0_MODE=0).
-//                       bit1=1 -> clamp child[1]'s coordinate to Child1Subset before sampling
-//                                 TextureSampler_1 (only valid when CHILD_TYPE=2, TwoChild).
-//                       Two separate uniforms are used (instead of a shared "Subset") because the
-//                       precompiled path strips uniform name suffixes, so the two texture children
-//                       would otherwise collide on a single field.
+//   Subset clamping is always applied for plain TextureEffect children via the Child0Subset /
+//   Child1Subset uniforms (populated by XfermodeFragmentProcessor::onSetData through
+//   computeSubsetRect). When a source has no real subset the bounds are the full [0,1] range, so
+//   the clamp degenerates to a no-op. Two separate uniforms are used (instead of a shared "Subset")
+//   because the precompiled path strips uniform name suffixes, so the two texture children would
+//   otherwise collide on a single field.
 //   HAS_COVERAGE (0/1): whether per-vertex AA coverage is provided via vCoverage varying.
 //   HAS_COLOR (0/1): whether per-vertex color is provided via vColor varying (replaces Color
 //                     uniform).
@@ -38,9 +36,6 @@
 #ifndef CHILD0_MODE
 #define CHILD0_MODE 0
 #endif
-#ifndef HAS_CHILD_SUBSET
-#define HAS_CHILD_SUBSET 0
-#endif
 #ifndef HAS_COVERAGE
 #define HAS_COVERAGE 0
 #endif
@@ -63,13 +58,16 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   int TileModeX;
   int TileModeY;
 #endif
-#if (HAS_CHILD_SUBSET & 1) != 0
+#if CHILD0_MODE == 0
   // Normalized subset bounds for child[0]'s TextureEffect (populated by
-  // XfermodeFragmentProcessor::onSetData). Layout: {left, top, right, bottom}.
+  // XfermodeFragmentProcessor::onSetData via computeSubsetRect). Layout: {left, top, right, bottom}.
+  // Always present for a plain TextureEffect child; when the source has no real subset the bounds
+  // are the full [0,1] range, making the clamp below a no-op.
   vec4 Child0Subset;
 #endif
-#if (HAS_CHILD_SUBSET & 2) != 0
-  // Normalized subset bounds for child[1]'s TextureEffect in TwoChild mode.
+#if CHILD_TYPE == 2
+  // Normalized subset bounds for child[1]'s TextureEffect in TwoChild mode (full [0,1] when the
+  // source has no real subset).
   vec4 Child1Subset;
 #endif
   vec4 Rect;
@@ -330,11 +328,10 @@ void main() {
   // Sample child[0] based on CHILD0_MODE.
 #if CHILD0_MODE == 0
   vec2 coord0 = TransformedCoords_0;
-  #if (HAS_CHILD_SUBSET & 1) != 0
   // Clamp to child[0]'s subset bounds to prevent sampling outside the valid texel region (e.g. when
-  // drawing a sub-rect of an atlas or a non-power-of-two image).
+  // drawing a sub-rect of an atlas or a non-power-of-two image). Full [0,1] bounds make this a
+  // no-op for plain textures.
   coord0 = clamp(coord0, Child0Subset.xy, Child0Subset.zw);
-  #endif
   vec4 childColor = texture(TextureSampler_0, coord0);
 #elif CHILD0_MODE == 1
   // ConstColorProcessor: output is just the uniform color modulated by input alpha.
@@ -380,10 +377,8 @@ void main() {
   // TwoChild: child[0] is src, child[1] (TextureSampler_1) is dst.
   srcColor = childColor;
   vec2 coord1 = TransformedCoords_0;
-  #if (HAS_CHILD_SUBSET & 2) != 0
-  // Clamp to child[1]'s subset bounds (same rationale as child[0]).
+  // Clamp to child[1]'s subset bounds (same rationale as child[0]; full [0,1] = no-op).
   coord1 = clamp(coord1, Child1Subset.xy, Child1Subset.zw);
-  #endif
   dstColor = texture(TextureSampler_1, coord1);
 #endif
 

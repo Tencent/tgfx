@@ -273,8 +273,8 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
-  EXPECT_EQ(cache->vertexEntryCount(), 124u);
-  EXPECT_EQ(cache->fragmentEntryCount(), 1005u);
+  EXPECT_EQ(cache->vertexEntryCount(), 107u);
+  EXPECT_EQ(cache->fragmentEntryCount(), 954u);
   std::string expectedTag = TGFX_BACKEND_NAME;
   auto dashPos = expectedTag.find('-');
   if (dashPos != std::string::npos) {
@@ -928,9 +928,10 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureFillShaderRegistry) {
     auto shaderInfo = shader->info();
     if (shaderInfo.name == "QuadTextureFillShader") {
       found = true;
-      EXPECT_EQ(shaderInfo.vertDomain.dimensionCount(), 5u);
-      EXPECT_EQ(shaderInfo.vertDomain.totalCount(), 32u);
+      EXPECT_EQ(shaderInfo.vertDomain.dimensionCount(), 4u);
+      EXPECT_EQ(shaderInfo.vertDomain.totalCount(), 16u);
       // FragDims: 8 bools + 1 int(3) = 2^8 * 3 = 768 total permutations
+      // (HAS_UV_PERSPECTIVE removed: perspective handled uniformly via vec3 + divide).
       EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 9u);
       EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 768u);
       EXPECT_EQ(shaderInfo.vertexFile, "level1/quad_texture_fill.vert");
@@ -958,8 +959,8 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureFillShouldCompile) {
         }
       }
     }
-    // After adding HAS_CLAMP_SUBSET dimension: 432 valid vert×frag pairs survive ShouldCompile.
-    EXPECT_EQ(compiledCount, 432);
+    // HAS_UV_PERSPECTIVE removed (perspective handled uniformly), halving the prior 720 to 360.
+    EXPECT_EQ(compiledCount, 360);
   }
 }
 

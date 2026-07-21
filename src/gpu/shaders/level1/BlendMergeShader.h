@@ -35,9 +35,6 @@ namespace tgfx {
 ///   CHILD_TYPE (int, 3 values): 0=DstChild, 1=SrcChild, 2=TwoChild
 ///   HAS_XP (int, 3 values): 0=Empty, 1=PorterDuff DST_TEX, 2=PorterDuff FBF
 ///   CHILD0_MODE (int, 3 values): 0=TextureEffect, 1=ConstColor, 2=TiledTextureEffect
-///   HAS_CHILD_SUBSET (int, 4 values): bitmask of which texture children need subset clamping.
-///     bit0 -> child[0] (valid only when CHILD0_MODE=0), bit1 -> child[1] (valid only when
-///     CHILD_TYPE=2). See blend_merge.frag for details.
 ///   HAS_COVERAGE (bool): matches vert dimension, controls vCoverage varying input
 ///   HAS_COLOR (bool): matches vert dimension, controls vColor varying input
 ///
@@ -64,7 +61,6 @@ class BlendMergeShader : public PrecompiledShader {
       CHILD_TYPE,
       HAS_XP,
       CHILD0_MODE,
-      HAS_CHILD_SUBSET,
       HAS_COVERAGE,
       HAS_COLOR,
       HAS_MASK_TEXTURE,
@@ -75,7 +71,6 @@ class BlendMergeShader : public PrecompiledShader {
           PermutationInt("CHILD_TYPE", 3),
           PermutationInt("HAS_XP", 3),
           PermutationInt("CHILD0_MODE", 3),
-          PermutationInt("HAS_CHILD_SUBSET", 4),
           PermutationBool("HAS_COVERAGE"),
           PermutationBool("HAS_COLOR"),
           PermutationBool("HAS_MASK_TEXTURE"),
@@ -83,7 +78,7 @@ class BlendMergeShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 7, "Update ShouldCompile when fragment dimensions change.");
+  static_assert(FD::COUNT == 6, "Update ShouldCompile when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"BlendMergeShader",
@@ -100,19 +95,6 @@ class BlendMergeShader : public PrecompiledShader {
  private:
   static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>& vertValues,
                             const std::vector<int>& fragValues) {
-    int childType = fragValues[FD::CHILD_TYPE];
-    int child0Mode = fragValues[FD::CHILD0_MODE];
-    int subsetMask = fragValues[FD::HAS_CHILD_SUBSET];
-    // bit0 (child[0] subset) is only meaningful for a plain TextureEffect child (CHILD0_MODE=0);
-    // ConstColor and TiledTextureEffect children have no plain subset uniform.
-    if ((subsetMask & 1) != 0 && child0Mode != 0) {
-      return false;
-    }
-    // bit1 (child[1] subset) is only meaningful in TwoChild mode (CHILD_TYPE=2), where child[1] is
-    // sampled via TextureSampler_1.
-    if ((subsetMask & 2) != 0 && childType != 2) {
-      return false;
-    }
     // HAS_COVERAGE and HAS_COLOR must match between vert and frag (varying declarations must agree).
     if (vertValues[VD::HAS_COVERAGE] != fragValues[FD::HAS_COVERAGE]) {
       return false;

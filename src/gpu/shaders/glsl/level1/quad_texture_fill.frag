@@ -1,7 +1,7 @@
 // QuadTextureFillShader fragment shader
 // Processor layout: QuadPerEdgeAAGeometryProcessor + TextureEffect + EmptyXferProcessor/PorterDuffXP
 // Permutation dimensions (frag): HAS_YUV, ALPHA_ONLY, HAS_RGBAAA, HAS_SUBSET, HAS_COVERAGE,
-//                                HAS_COLOR, HAS_XP, HAS_UV_PERSPECTIVE, HAS_CLAMP_SUBSET
+//                                HAS_COLOR, HAS_XP, HAS_CLAMP_SUBSET
 // Note: HAS_YUV is always 0 at runtime — YUV textures fall back to ProgramBuilder.
 // Vertex-driven varyings are controlled by vert permutation dimensions (HAS_COVERAGE, HAS_COLOR,
 // HAS_SUBSET) which are communicated via matching varying declarations.
@@ -39,14 +39,14 @@
 #ifndef HAS_COLOR
 #define HAS_COLOR 0
 #endif
-#ifndef HAS_UV_PERSPECTIVE
-#define HAS_UV_PERSPECTIVE 0
-#endif
 #ifndef HAS_XP
 #define HAS_XP 0
 #endif
+#ifndef HAS_MASK_TEXTURE
+#define HAS_MASK_TEXTURE 0
+#endif
 
-#if !HAS_COLOR || HAS_SUBSET || HAS_CLAMP_SUBSET || HAS_RGBAAA || HAS_XP
+#if !HAS_COLOR || HAS_SUBSET || HAS_CLAMP_SUBSET || HAS_RGBAAA || HAS_XP || HAS_MASK_TEXTURE
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #if !HAS_COLOR
   vec4 Color;
@@ -57,6 +57,9 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #if HAS_RGBAAA
   vec2 AlphaStart;
 #endif
+#if HAS_MASK_TEXTURE
+  mat3 DeviceCoordMatrix;
+#endif
 #if HAS_XP
   vec2 DstTextureUpperLeft;
   vec2 DstTextureCoordScale;
@@ -65,11 +68,7 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 };
 #endif
 
-#if HAS_UV_PERSPECTIVE
 layout(location = 0) in vec3 TransformedCoords_0;
-#else
-layout(location = 0) in vec2 TransformedCoords_0;
-#endif
 
 #if HAS_COVERAGE
 layout(location = 1) in float vCoverage;
@@ -85,7 +84,13 @@ layout(location = 3) in vec4 vTexSubset;
 
 layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
 
-#define XP_DST_TEX_BINDING 1
+// Device-space mask coverage occupies binding 1; the XP dst texture, if any, follows at 2.
+#if HAS_MASK_TEXTURE
+layout(set = 1, binding = 1) uniform sampler2D MaskTextureSampler;
+  #define XP_DST_TEX_BINDING 2
+#else
+  #define XP_DST_TEX_BINDING 1
+#endif
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
 
@@ -98,11 +103,9 @@ void main() {
   vec4 outputColor = Color;
 #endif
 
-#if HAS_UV_PERSPECTIVE
+  // Perspective divide. For affine transforms z is 1.0 (no-op); for perspective it applies the
+  // correct division.
   highp vec2 texCoord = TransformedCoords_0.xy / TransformedCoords_0.z;
-#else
-  highp vec2 texCoord = TransformedCoords_0;
-#endif
   highp vec2 finalCoord = texCoord;
 
 #if HAS_SUBSET
@@ -134,6 +137,14 @@ void main() {
   color = color.a * outputColor;
 #else
   color = color * outputColor.a;
+#endif
+
+#if HAS_MASK_TEXTURE
+  // Device-space mask coverage: multiply the sampled mask value into the color. Geometry AA
+  // (vCoverage) is applied separately below, so the two coverage sources compose.
+  highp vec3 maskCoord = DeviceCoordMatrix * vec3(gl_FragCoord.xy, 1.0);
+  float maskAlpha = texture(MaskTextureSampler, maskCoord.xy).r;
+  color *= maskAlpha;
 #endif
 
 #if HAS_XP

@@ -255,8 +255,19 @@ static std::optional<PermutationMatchResult> TryMatchQuadColorFill(const Program
   if (gp->name() != "QuadPerEdgeAAGeometryProcessor") {
     return std::nullopt;
   }
+  // Accept either zero fragment processors (plain colored quad) or a single device-space mask
+  // coverage FP. ClassifyCoverageFP returns 2 for a device-space mask (which this shader samples via
+  // HAS_MASK_TEXTURE); value 1 (analytic AARect) is not supported here because QuadColorFill has no
+  // AARect path, only per-vertex geometry AA.
+  bool hasMaskTexture = false;
   if (programInfo->numFragmentProcessors() != 0) {
-    return std::nullopt;
+    if (programInfo->numColorFragmentProcessors() != 0) {
+      return std::nullopt;
+    }
+    if (ClassifyCoverageFP(programInfo) != 2) {
+      return std::nullopt;
+    }
+    hasMaskTexture = true;
   }
   int xpType = GetXPType(programInfo);
   if (xpType < 0) {
@@ -276,6 +287,7 @@ static std::optional<PermutationMatchResult> TryMatchQuadColorFill(const Program
   fragValues[FD::HAS_COVERAGE] = quadGP->getAAType() == AAType::Coverage ? 1 : 0;
   fragValues[FD::HAS_COLOR] = !quadGP->hasCommonColor() ? 1 : 0;
   fragValues[FD::HAS_XP] = xpType;
+  fragValues[FD::HAS_MASK_TEXTURE] = hasMaskTexture ? 1 : 0;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"QuadColorFillShader", vertIndex, fragIndex};
 }
@@ -286,8 +298,17 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   if (gp->name() != "QuadPerEdgeAAGeometryProcessor") {
     return std::nullopt;
   }
-  if (programInfo->numFragmentProcessors() != 1) {
+  // Color must be exactly one TextureEffect. Coverage is optional: either none, or a single
+  // device-space mask (ClassifyCoverageFP == 2), which the shader samples via HAS_MASK_TEXTURE.
+  if (programInfo->numColorFragmentProcessors() != 1) {
     return std::nullopt;
+  }
+  bool hasMaskTexture = false;
+  if (programInfo->numFragmentProcessors() != 1) {
+    if (ClassifyCoverageFP(programInfo) != 2) {
+      return std::nullopt;
+    }
+    hasMaskTexture = true;
   }
   int xpType = GetXPType(programInfo);
   if (xpType < 0) {
@@ -325,7 +346,6 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   vertValues[VD::HAS_UV_COORD] = !quadGP->hasUVMatrix() ? 1 : 0;
   vertValues[VD::HAS_COLOR] = !quadGP->hasCommonColor() ? 1 : 0;
   vertValues[VD::HAS_SUBSET] = gpSubset ? 1 : 0;
-  vertValues[VD::HAS_UV_PERSPECTIVE] = quadGP->getHasUVPerspective() ? 1 : 0;
   auto vertIndex = vertDomain.encode(vertValues);
 
   using FD = QuadTextureFillShader::FD;
@@ -337,9 +357,9 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   fragValues[FD::HAS_COVERAGE] = quadGP->getAAType() == AAType::Coverage ? 1 : 0;
   fragValues[FD::HAS_COLOR] = !quadGP->hasCommonColor() ? 1 : 0;
   fragValues[FD::HAS_XP] = xpType;
-  fragValues[FD::HAS_UV_PERSPECTIVE] = quadGP->getHasUVPerspective() ? 1 : 0;
   // Uniform-only subset: TE needs clamping but GP has no subset vertex attribute.
   fragValues[FD::HAS_CLAMP_SUBSET] = (!gpSubset && teSubset) ? 1 : 0;
+  fragValues[FD::HAS_MASK_TEXTURE] = hasMaskTexture ? 1 : 0;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"QuadTextureFillShader", vertIndex, fragIndex};
 }
@@ -976,6 +996,9 @@ static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
   if (childTE->numTextureSamplers() == 0) {
     return std::nullopt;
   }
+  // Sigma is now a runtime uniform, not a variant dimension. The precompiled shader uses a fixed
+  // maximum kernel (MAX_SIGMA=9 → radius up to 10) and breaks early at the runtime radius, so any
+  // sigma in [1,10] maps to the same variant. Sigma > 10 exceeds the fixed kernel and falls back.
   int sigma = blur->getMaxSigma();
   if (sigma < 1 || sigma > 10) {
     return std::nullopt;
@@ -994,7 +1017,6 @@ static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
   using FD = GaussianBlur1DShader::FD;
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
-  fragValues[FD::MAX_SIGMA] = sigma - 1;
   fragValues[FD::HAS_XP] = xpType;
   fragValues[FD::HAS_CHILD_SUBSET] = childHasSubset ? 1 : 0;
   fragValues[FD::HAS_COVERAGE] = coverageType;
@@ -1076,10 +1098,6 @@ static std::optional<PermutationMatchResult> TryMatchBlendMerge(const ProgramInf
   //   1 = ConstColorProcessor (uniform color, no texture)
   //   2 = TiledTextureEffect (tiling via runtime uniforms TileModeX/TileModeY)
   int child0Mode = 0;
-  // Bitmask of which plain TextureEffect children require subset clamping. bit0=child[0],
-  // bit1=child[1]. Each set bit selects a dedicated Child{N}Subset uniform in the frag shader,
-  // populated by XfermodeFragmentProcessor::onSetData.
-  int subsetMask = 0;
 
   // Validate each child processor. We support:
   //   - TextureEffect (plain, no YUV; subset is supported via the Child{N}Subset uniforms)
@@ -1117,11 +1135,10 @@ static std::optional<PermutationMatchResult> TryMatchBlendMerge(const ProgramInf
     if (childTE->numTextureSamplers() == 0 || childTE->isYUV()) {
       return std::nullopt;
     }
-    // A subset-bearing child clamps its sample coordinate to the Child{N}Subset uniform. Only two
-    // children exist (i is 0 or 1), matching the two subset bits.
-    if (childTE->hasSubset()) {
-      subsetMask |= (1 << i);
-    }
+    // Subset clamping is unconditional in the shader: the Child{N}Subset uniform is always present
+    // for a plain TextureEffect child and is populated from computeSubsetRect (full [0,1] bounds
+    // when the source has no real subset, making the clamp a no-op). No permutation dimension is
+    // needed to gate it.
   }
 
   int hasCoverage = 0;
@@ -1149,7 +1166,6 @@ static std::optional<PermutationMatchResult> TryMatchBlendMerge(const ProgramInf
   fragValues[FD::CHILD_TYPE] = childType;
   fragValues[FD::HAS_XP] = xpType;
   fragValues[FD::CHILD0_MODE] = child0Mode;
-  fragValues[FD::HAS_CHILD_SUBSET] = subsetMask;
   fragValues[FD::HAS_COVERAGE] = hasCoverage;
   fragValues[FD::HAS_COLOR] = hasColor;
   fragValues[FD::HAS_MASK_TEXTURE] = hasMaskTexture;
