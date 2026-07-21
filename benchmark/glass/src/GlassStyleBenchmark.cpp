@@ -77,6 +77,7 @@ struct BenchmarkConfig {
   int height = 1080;
   int warmupFrames = 300;
   int sampleFrames = 900;
+  int sampleDurationMs = 0;
   float refraction = 50.0f;
   float depth = 35.0f;
   float frost = 25.0f;
@@ -92,6 +93,8 @@ struct FrameSample {
 };
 
 struct Statistics {
+  size_t sampleCount = 0;
+  int64_t sampleDurationUs = 0;
   double recordingMeanUs = 0.0;
   double endToEndMeanUs = 0.0;
   int64_t recordingP50Us = 0;
@@ -164,7 +167,8 @@ void PrintUsage() {
             << "  --motion static|glass|background|parameters\n"
             << "  --mode direct|tiled\n"
             << "  --width <128-4096> --height <128-4096>\n"
-            << "  --warmup <0-100000> --frames <1-100000>\n"
+            << "  --warmup <0-100000>\n"
+            << "  --frames <1-100000> or --duration-ms <1-600000>\n"
             << "  --refraction <0-100> --depth <0-100> --frost <0-100>\n"
             << "  --dispersion <0-100> --splay <0-100>\n"
             << "  --light-angle <0-360> --light-intensity <0-100>\n";
@@ -244,6 +248,8 @@ bool IsGlassParameter(float value) {
 }
 
 ParseResult ParseCommandLine(int argc, char* argv[], BenchmarkConfig* config) {
+  bool hasFrameCount = false;
+  bool hasDuration = false;
   for (int index = 1; index < argc; ++index) {
     std::string option = argv[index];
     if (option == "--help") {
@@ -269,6 +275,10 @@ ParseResult ParseCommandLine(int argc, char* argv[], BenchmarkConfig* config) {
       parsed = ParseInteger(value, &config->warmupFrames);
     } else if (option == "--frames") {
       parsed = ParseInteger(value, &config->sampleFrames);
+      hasFrameCount = true;
+    } else if (option == "--duration-ms") {
+      parsed = ParseInteger(value, &config->sampleDurationMs);
+      hasDuration = true;
     } else if (option == "--refraction") {
       parsed = ParseFloat(value, &config->refraction);
     } else if (option == "--depth") {
@@ -292,9 +302,14 @@ ParseResult ParseCommandLine(int argc, char* argv[], BenchmarkConfig* config) {
       return ParseResult::Error;
     }
   }
+  if (hasFrameCount && hasDuration) {
+    std::cerr << "--frames and --duration-ms cannot be used together.\n";
+    return ParseResult::Error;
+  }
   if (config->width < 128 || config->width > 4096 || config->height < 128 ||
       config->height > 4096 || config->warmupFrames < 0 || config->warmupFrames > 100000 ||
       config->sampleFrames < 1 || config->sampleFrames > 100000 ||
+      (hasDuration && (config->sampleDurationMs < 1 || config->sampleDurationMs > 600000)) ||
       !IsGlassParameter(config->refraction) || !IsGlassParameter(config->depth) ||
       !IsGlassParameter(config->frost) || !IsGlassParameter(config->dispersion) ||
       !IsGlassParameter(config->splay) || config->lightAngle < 0.0f ||
@@ -545,7 +560,8 @@ class BenchmarkScene {
 };
 
 bool RunScene(tgfx::Context* context, tgfx::Surface* surface, BenchmarkScene* scene,
-              const BenchmarkConfig& config, std::vector<FrameSample>* samples) {
+              const BenchmarkConfig& config, std::vector<FrameSample>* samples,
+              int64_t* sampleDurationUs) {
   FrameSample ignored = {};
   for (int frame = 0; frame < config.warmupFrames; ++frame) {
     if (!scene->renderFrame(context, surface, frame, &ignored)) {
@@ -553,14 +569,32 @@ bool RunScene(tgfx::Context* context, tgfx::Surface* surface, BenchmarkScene* sc
     }
   }
   samples->clear();
-  samples->reserve(static_cast<size_t>(config.sampleFrames));
-  for (int frame = 0; frame < config.sampleFrames; ++frame) {
-    FrameSample sample = {};
-    if (!scene->renderFrame(context, surface, config.warmupFrames + frame, &sample)) {
-      return false;
-    }
-    samples->push_back(sample);
+  if (config.sampleDurationMs == 0) {
+    samples->reserve(static_cast<size_t>(config.sampleFrames));
   }
+  auto sampleStartTime = tgfx::Clock::Now();
+  auto frameIndex = config.warmupFrames;
+  if (config.sampleDurationMs > 0) {
+    auto requestedDurationUs = static_cast<int64_t>(config.sampleDurationMs) * 1000;
+    do {
+      FrameSample sample = {};
+      if (!scene->renderFrame(context, surface, frameIndex, &sample)) {
+        return false;
+      }
+      samples->push_back(sample);
+      ++frameIndex;
+    } while (tgfx::Clock::Now() - sampleStartTime < requestedDurationUs);
+  } else {
+    for (int frame = 0; frame < config.sampleFrames; ++frame) {
+      FrameSample sample = {};
+      if (!scene->renderFrame(context, surface, frameIndex, &sample)) {
+        return false;
+      }
+      samples->push_back(sample);
+      ++frameIndex;
+    }
+  }
+  *sampleDurationUs = tgfx::Clock::Now() - sampleStartTime;
   return true;
 }
 
@@ -574,8 +608,10 @@ int64_t Percentile(std::vector<int64_t> values, double percentile) {
   return values[index];
 }
 
-Statistics CollectStatistics(const std::vector<FrameSample>& samples) {
+Statistics CollectStatistics(const std::vector<FrameSample>& samples, int64_t sampleDurationUs) {
   Statistics statistics = {};
+  statistics.sampleCount = samples.size();
+  statistics.sampleDurationUs = sampleDurationUs;
   std::vector<int64_t> recording = {};
   std::vector<int64_t> endToEnd = {};
   recording.reserve(samples.size());
@@ -610,11 +646,12 @@ Statistics CollectStatistics(const std::vector<FrameSample>& samples) {
 
 void PrintCsvHeader() {
   std::cout << "role,backend,scene,motion,mode,width,height,warmup_frames,sample_frames,"
-            << "refraction,depth,frost,dispersion,splay,light_angle,light_intensity,"
-            << "recording_mean_us,recording_p50_us,recording_p95_us,recording_p99_us,"
-            << "end_to_end_mean_us,end_to_end_p50_us,end_to_end_p95_us,end_to_end_p99_us,"
-            << "over_60hz_budget,over_120hz_budget,baseline_end_to_end_mean_us,"
-            << "delta_end_to_end_mean_us,delta_end_to_end_p95_us\n";
+            << "sample_duration_ms,refraction,depth,frost,dispersion,splay,light_angle,"
+            << "light_intensity,recording_mean_us,recording_p50_us,recording_p95_us,"
+            << "recording_p99_us,end_to_end_mean_us,end_to_end_p50_us,end_to_end_p95_us,"
+            << "end_to_end_p99_us,over_60hz_budget,over_120hz_budget,"
+            << "baseline_end_to_end_mean_us,delta_end_to_end_mean_us,"
+            << "delta_end_to_end_p95_us\n";
 }
 
 void PrintCsvRow(const char* role, const BenchmarkConfig& config, const Statistics& statistics,
@@ -622,9 +659,10 @@ void PrintCsvRow(const char* role, const BenchmarkConfig& config, const Statisti
   std::cout << std::fixed << std::setprecision(3) << role << ',' << BackendName() << ','
             << SceneName(config.scene) << ',' << MotionName(config.motion) << ','
             << ModeName(config.mode) << ',' << config.width << ',' << config.height << ','
-            << config.warmupFrames << ',' << config.sampleFrames << ',' << config.refraction << ','
-            << config.depth << ',' << config.frost << ',' << config.dispersion << ',' << config.splay
-            << ',' << config.lightAngle << ',' << config.lightIntensity << ','
+            << config.warmupFrames << ',' << statistics.sampleCount << ','
+            << static_cast<double>(statistics.sampleDurationUs) / 1000.0 << ',' << config.refraction
+            << ',' << config.depth << ',' << config.frost << ',' << config.dispersion << ','
+            << config.splay << ',' << config.lightAngle << ',' << config.lightIntensity << ','
             << statistics.recordingMeanUs << ',' << statistics.recordingP50Us << ','
             << statistics.recordingP95Us << ',' << statistics.recordingP99Us << ','
             << statistics.endToEndMeanUs << ',' << statistics.endToEndP50Us << ','
@@ -675,25 +713,28 @@ int main(int argc, char* argv[]) {
   }
 
   std::vector<FrameSample> baselineSamples = {};
+  int64_t baselineDurationUs = 0;
   BenchmarkScene baselineScene(config, false);
-  if (!RunScene(context, surface.get(), &baselineScene, config, &baselineSamples)) {
+  if (!RunScene(context, surface.get(), &baselineScene, config, &baselineSamples,
+                &baselineDurationUs)) {
     std::cerr << "The plain baseline produced no GPU recording.\n";
     device->unlock();
     return 1;
   }
-  auto baseline = CollectStatistics(baselineSamples);
+  auto baseline = CollectStatistics(baselineSamples, baselineDurationUs);
 
   PrintCsvHeader();
   PrintCsvRow("baseline", config, baseline, baseline);
   if (config.scene != Scene::Plain) {
     std::vector<FrameSample> glassSamples = {};
+    int64_t glassDurationUs = 0;
     BenchmarkScene glassScene(config, true);
-    if (!RunScene(context, surface.get(), &glassScene, config, &glassSamples)) {
+    if (!RunScene(context, surface.get(), &glassScene, config, &glassSamples, &glassDurationUs)) {
       std::cerr << "The GlassStyle scene produced no GPU recording.\n";
       device->unlock();
       return 1;
     }
-    auto glass = CollectStatistics(glassSamples);
+    auto glass = CollectStatistics(glassSamples, glassDurationUs);
     PrintCsvRow("glass", config, glass, baseline);
   }
 
