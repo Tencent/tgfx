@@ -61,8 +61,8 @@ class QuadTextureFillShader : public PrecompiledShader {
   using VD = VertDims;
   static_assert(VD::COUNT == 4, "Update ShouldCompile when vertex dimensions change.");
 
-  // Fragment dimensions (includes vertex-driven HAS_COVERAGE, HAS_COLOR, and HAS_UV_PERSPECTIVE
-  // because the fragment shader must declare matching varyings)
+  // Fragment dimensions (includes vertex-driven HAS_COVERAGE and HAS_COLOR because the fragment
+  // shader must declare matching varyings)
   struct FragDims {
     enum : uint32_t {
       HAS_YUV,
@@ -72,7 +72,6 @@ class QuadTextureFillShader : public PrecompiledShader {
       HAS_COVERAGE,
       HAS_COLOR,
       HAS_XP,
-      HAS_CLAMP_SUBSET,
       HAS_MASK_TEXTURE,
       COUNT
     };
@@ -85,13 +84,12 @@ class QuadTextureFillShader : public PrecompiledShader {
           PermutationBool("HAS_COVERAGE"),
           PermutationBool("HAS_COLOR"),
           PermutationInt("HAS_XP", 3),
-          PermutationBool("HAS_CLAMP_SUBSET"),
           PermutationBool("HAS_MASK_TEXTURE"),
       });
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 9, "Update ShouldCompile when fragment dimensions change.");
+  static_assert(FD::COUNT == 8, "Update ShouldCompile when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"QuadTextureFillShader",
@@ -116,13 +114,10 @@ class QuadTextureFillShader : public PrecompiledShader {
     if (fragValues[FD::ALPHA_ONLY] != 0 && fragValues[FD::HAS_RGBAAA] != 0) {
       return false;
     }
-    // HAS_SUBSET and HAS_CLAMP_SUBSET are mutually exclusive: HAS_SUBSET uses vertex varying +
-    // uniform, HAS_CLAMP_SUBSET uses uniform only. They cannot both be active.
-    if (fragValues[FD::HAS_SUBSET] != 0 && fragValues[FD::HAS_CLAMP_SUBSET] != 0) {
-      return false;
-    }
-    // When vertex has subset attribute (HAS_SUBSET in vert), fragment must use HAS_SUBSET=1.
-    // When vertex lacks subset attribute, fragment may use HAS_CLAMP_SUBSET=1 for uniform-only.
+    // When vertex has the subset attribute, fragment uses HAS_SUBSET=1 (per-quad varying + uniform
+    // double clamp). When it lacks it, fragment uses HAS_SUBSET=0 and always clamps by the Subset
+    // uniform alone; the uniform is populated with full texture bounds when no real subset applies,
+    // making that clamp a no-op.
     if (vertValues[VD::HAS_SUBSET] != fragValues[FD::HAS_SUBSET]) {
       return false;
     }
@@ -136,7 +131,7 @@ class QuadTextureFillShader : public PrecompiledShader {
     // A device-space mask (HAS_MASK_TEXTURE) is a clip/layer coverage applied to a plain textured
     // fill. It does not co-occur with RGBAAA (packed alpha) sources, so prune that cartesian branch
     // to keep the variant count bounded — adding the mask dimension would otherwise double the
-    // whole 9-dimension product.
+    // whole dimension product.
     if (fragValues[FD::HAS_MASK_TEXTURE] != 0 && fragValues[FD::HAS_RGBAAA] != 0) {
       return false;
     }

@@ -327,17 +327,13 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
     return std::nullopt;
   }
   // Subset clamping logic:
-  //   gpSubset: GP provides per-vertex subset attribute (vTexSubset varying in shader).
-  //   teSubset: TextureEffect needs subset clamping (Subset uniform bounds).
-  //
-  // Three valid combinations:
-  //   gpSubset=true:  Vertex shader outputs vTexSubset varying. Fragment uses both vTexSubset
-  //                   and Subset uniform for double-clamp. (HAS_SUBSET=1, HAS_CLAMP_SUBSET=0)
-  //   gpSubset=false, teSubset=true: No vertex attribute. Fragment uses only Subset uniform
-  //                   for clamping. (HAS_SUBSET=0, HAS_CLAMP_SUBSET=1)
-  //   gpSubset=false, teSubset=false: No clamping at all. (HAS_SUBSET=0, HAS_CLAMP_SUBSET=0)
+  //   gpSubset=true  -> HAS_SUBSET=1: vertex shader outputs vTexSubset varying, fragment double-
+  //                     clamps by the varying and the Subset uniform.
+  //   gpSubset=false -> HAS_SUBSET=0: fragment always clamps by the Subset uniform alone. The
+  //                     uniform is populated from computeSubsetRect, which yields the full texture
+  //                     bounds when the source has no real subset, so the clamp is a no-op. This
+  //                     subsumes the former HAS_CLAMP_SUBSET dimension.
   bool gpSubset = quadGP->getHasSubset();
-  bool teSubset = te->hasSubset();
 
   using VD = QuadTextureFillShader::VD;
   auto vertDomain = VD::domain();
@@ -357,8 +353,6 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   fragValues[FD::HAS_COVERAGE] = quadGP->getAAType() == AAType::Coverage ? 1 : 0;
   fragValues[FD::HAS_COLOR] = !quadGP->hasCommonColor() ? 1 : 0;
   fragValues[FD::HAS_XP] = xpType;
-  // Uniform-only subset: TE needs clamping but GP has no subset vertex attribute.
-  fragValues[FD::HAS_CLAMP_SUBSET] = (!gpSubset && teSubset) ? 1 : 0;
   fragValues[FD::HAS_MASK_TEXTURE] = hasMaskTexture ? 1 : 0;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"QuadTextureFillShader", vertIndex, fragIndex};

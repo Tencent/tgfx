@@ -1,7 +1,7 @@
 // QuadTextureFillShader fragment shader
 // Processor layout: QuadPerEdgeAAGeometryProcessor + TextureEffect + EmptyXferProcessor/PorterDuffXP
 // Permutation dimensions (frag): HAS_YUV, ALPHA_ONLY, HAS_RGBAAA, HAS_SUBSET, HAS_COVERAGE,
-//                                HAS_COLOR, HAS_XP, HAS_CLAMP_SUBSET
+//                                HAS_COLOR, HAS_XP
 // Note: HAS_YUV is always 0 at runtime — YUV textures fall back to ProgramBuilder.
 // Vertex-driven varyings are controlled by vert permutation dimensions (HAS_COVERAGE, HAS_COLOR,
 // HAS_SUBSET) which are communicated via matching varying declarations.
@@ -9,10 +9,10 @@
 // Subset clamping modes:
 //   HAS_SUBSET=1: Full subset — vertex attribute provides per-quad vTexSubset varying, and Subset
 //                 uniform provides the half-pixel-inset safe range. Both are used for clamping.
-//   HAS_CLAMP_SUBSET=1 (with HAS_SUBSET=0): Uniform-only subset — no vertex attribute or varying.
-//                 TextureEffect needs subset clamping but the GP does not provide per-vertex subset
-//                 coordinates. Only the Subset uniform is used for clamping.
-//   Both 0: No subset clamping at all.
+//   HAS_SUBSET=0: Uniform-only clamp — no per-vertex subset attribute. The Subset uniform is always
+//                 present and clamps the coordinate; when the source has no real subset it holds the
+//                 full texture bounds, so the clamp is a no-op. This subsumes the former
+//                 HAS_CLAMP_SUBSET dimension.
 #version 450
 
 #ifndef HAS_YUV
@@ -26,9 +26,6 @@
 #endif
 #ifndef HAS_SUBSET
 #define HAS_SUBSET 0
-#endif
-#ifndef HAS_CLAMP_SUBSET
-#define HAS_CLAMP_SUBSET 0
 #endif
 
 // These are driven by vertex shader permutation but the fragment shader must declare matching
@@ -46,14 +43,13 @@
 #define HAS_MASK_TEXTURE 0
 #endif
 
-#if !HAS_COLOR || HAS_SUBSET || HAS_CLAMP_SUBSET || HAS_RGBAAA || HAS_XP || HAS_MASK_TEXTURE
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #if !HAS_COLOR
   vec4 Color;
 #endif
-#if HAS_SUBSET || HAS_CLAMP_SUBSET
+  // Always present. For HAS_SUBSET=1 it provides the half-pixel-inset safe range; for HAS_SUBSET=0
+  // it is the sole clamp bound (full texture bounds when no real subset, so the clamp is a no-op).
   vec4 Subset;
-#endif
 #if HAS_RGBAAA
   vec2 AlphaStart;
 #endif
@@ -66,7 +62,6 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   int XPBlendMode;
 #endif
 };
-#endif
 
 layout(location = 0) in vec3 TransformedCoords_0;
 
@@ -112,8 +107,9 @@ void main() {
   // Full subset: clamp first by per-quad varying bounds, then by uniform safe range.
   finalCoord = clamp(finalCoord, vTexSubset.xy, vTexSubset.zw);
   finalCoord = clamp(finalCoord, Subset.xy, Subset.zw);
-#elif HAS_CLAMP_SUBSET
-  // Uniform-only subset: GP has no subset vertex attribute, clamp only by uniform.
+#else
+  // Uniform-only clamp. Subset holds the full texture bounds when no real subset applies, so this
+  // degenerates to a no-op; otherwise it bounds the sample to the valid texel region.
   finalCoord = clamp(finalCoord, Subset.xy, Subset.zw);
 #endif
 
