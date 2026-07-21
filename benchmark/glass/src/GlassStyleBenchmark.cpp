@@ -55,6 +55,9 @@ enum class Scene {
   Ellipse,
   Star,
   Grid,
+  Coverage10,
+  Coverage25,
+  Coverage50,
 };
 
 enum class Motion {
@@ -125,6 +128,12 @@ const char* SceneName(Scene scene) {
       return "star";
     case Scene::Grid:
       return "grid";
+    case Scene::Coverage10:
+      return "coverage-10";
+    case Scene::Coverage25:
+      return "coverage-25";
+    case Scene::Coverage50:
+      return "coverage-50";
   }
   return "unknown";
 }
@@ -163,7 +172,7 @@ const char* BackendName() {
 
 void PrintUsage() {
   std::cout << "Usage: GlassStyleBenchmark [options]\n"
-            << "  --scene plain|rounded-rect|ellipse|star|grid\n"
+            << "  --scene plain|rounded-rect|ellipse|star|grid|coverage-10|coverage-25|coverage-50\n"
             << "  --motion static|glass|background|parameters\n"
             << "  --mode direct|tiled\n"
             << "  --width <128-4096> --height <128-4096>\n"
@@ -209,6 +218,12 @@ bool ParseScene(const char* text, Scene* scene) {
     *scene = Scene::Star;
   } else if (value == "grid") {
     *scene = Scene::Grid;
+  } else if (value == "coverage-10") {
+    *scene = Scene::Coverage10;
+  } else if (value == "coverage-25") {
+    *scene = Scene::Coverage25;
+  } else if (value == "coverage-50") {
+    *scene = Scene::Coverage50;
   } else {
     return false;
   }
@@ -435,7 +450,50 @@ class BenchmarkScene {
         addSolidPanel(360.0f, 240.0f, 36.0f, 36.0f, false, 2);
         addSolidPanel(360.0f, 240.0f, 36.0f, 36.0f, false, 3);
         break;
+      case Scene::Coverage10:
+        addCoveragePanel(0.10f);
+        break;
+      case Scene::Coverage25:
+        addCoveragePanel(0.25f);
+        break;
+      case Scene::Coverage50:
+        addCoveragePanel(0.50f);
+        break;
     }
+  }
+
+  void addCoveragePanel(float coverage) {
+    constexpr float Pi = 3.14159265358979323846f;
+    constexpr float PreferredAspectRatio = 16.0f / 9.0f;
+    auto surfaceWidth = static_cast<float>(config.width);
+    auto surfaceHeight = static_cast<float>(config.height);
+    auto targetArea = surfaceWidth * surfaceHeight * coverage;
+    auto cornerRadius = std::min(48.0f, std::sqrt(targetArea) * 0.1f);
+    auto cornerCorrection = (4.0f - Pi) * cornerRadius * cornerRadius;
+    auto boundsArea = targetArea + cornerCorrection;
+    auto width = std::sqrt(boundsArea * PreferredAspectRatio);
+    auto height = boundsArea / width;
+    auto maxWidth = std::max(2.0f, surfaceWidth - 4.0f);
+    auto maxHeight = std::max(2.0f, surfaceHeight - 4.0f);
+    if (width > maxWidth) {
+      width = maxWidth;
+      height = boundsArea / width;
+    }
+    if (height > maxHeight) {
+      height = maxHeight;
+      width = boundsArea / height;
+    }
+    cornerRadius = std::min(cornerRadius, std::min(width, height) * 0.5f);
+    auto position = tgfx::Point::Make((surfaceWidth - width) * 0.5f,
+                                      (surfaceHeight - height) * 0.5f);
+    auto layer = MakeSolidLayer(width, height, tgfx::Color::FromRGBA(255, 255, 255, 46),
+                                position.x, position.y);
+    layer->setRadiusX(cornerRadius);
+    layer->setRadiusY(cornerRadius);
+    applyGlassStyle(layer, cornerRadius);
+    glassLayers.push_back(layer);
+    glassPositions.push_back(position);
+    displayList.root()->addChild(layer);
   }
 
   void addSolidPanel(float requestedWidth, float requestedHeight, float radiusX, float radiusY,
@@ -449,12 +507,7 @@ class BenchmarkScene {
                                 position.x, position.y);
     layer->setRadiusX(ellipse ? width * 0.5f : std::min(radiusX, width * 0.5f));
     layer->setRadiusY(ellipse ? height * 0.5f : std::min(radiusY, height * 0.5f));
-    if (glassEnabled) {
-      auto style = makeGlassStyle();
-      style->setCornerRadius(ellipse ? 0.0f : std::min(radiusX, radiusY));
-      layer->setLayerStyles({style});
-      glassStyles.push_back(style);
-    }
+    applyGlassStyle(layer, ellipse ? 0.0f : std::min(radiusX, radiusY));
     glassLayers.push_back(layer);
     glassPositions.push_back(position);
     displayList.root()->addChild(layer);
@@ -469,11 +522,7 @@ class BenchmarkScene {
     layer->setPath(makeStarPath(size));
     layer->setFillStyle(tgfx::ShapeStyle::Make(tgfx::Color::FromRGBA(255, 255, 255, 46)));
     layer->setMatrix(tgfx::Matrix::MakeTrans(position.x, position.y));
-    if (glassEnabled) {
-      auto style = makeGlassStyle();
-      layer->setLayerStyles({style});
-      glassStyles.push_back(style);
-    }
+    applyGlassStyle(layer, 0.0f);
     glassLayers.push_back(layer);
     glassPositions.push_back(position);
     displayList.root()->addChild(layer);
@@ -524,6 +573,16 @@ class BenchmarkScene {
   std::shared_ptr<tgfx::GlassStyle> makeGlassStyle() const {
     return tgfx::GlassStyle::Make(config.refraction, config.depth, config.frost, config.dispersion,
                                   config.splay, config.lightAngle, config.lightIntensity);
+  }
+
+  void applyGlassStyle(const std::shared_ptr<tgfx::Layer>& layer, float cornerRadius) {
+    if (!glassEnabled) {
+      return;
+    }
+    auto style = makeGlassStyle();
+    style->setCornerRadius(cornerRadius);
+    layer->setLayerStyles({style});
+    glassStyles.push_back(style);
   }
 
   void updateFrame(int frameIndex) {
