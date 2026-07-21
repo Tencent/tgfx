@@ -46,13 +46,22 @@ PlacementPtr<FragmentProcessor> GlassRefractionImageFilter::asFragmentProcessor(
   std::shared_ptr<TextureProxy> coarseMaskProxy = nullptr;
   if (fineMask != nullptr) {
     fineMaskProxy = FragmentProcessor::LockTextureProxy(fineMask.get(), tpArgs);
+    if (fineMaskProxy == nullptr) {
+      return nullptr;
+    }
   }
   if (coarseMask != nullptr) {
     coarseMaskProxy = FragmentProcessor::LockTextureProxy(coarseMask.get(), tpArgs);
+    if (coarseMaskProxy == nullptr) {
+      return nullptr;
+    }
   }
 
   auto coordMatrix = uvMatrix != nullptr ? *uvMatrix : Matrix::I();
   auto localParams = params;
+  // renderOffset is 0 in the inline path because coordinate translation is handled by
+  // coordMatrix (uvMatrix). The base class lockTextureProxy fallback passes
+  // uvMatrix = MakeTrans(renderBounds.left, renderBounds.top) to compensate.
   localParams.renderOffsetX = 0.0f;
   localParams.renderOffsetY = 0.0f;
   return GlassRefractionFragmentProcessor::Make(

@@ -34,8 +34,7 @@ PlacementPtr<FragmentProcessor> TentBlur1DFragmentProcessor::Make(
   }
 
   return allocator->make<GLSLTentBlur1DFragmentProcessor>(
-      std::move(processor), radius, direction, stepLength, static_cast<int>(ceil(maxRadius)),
-      inputIsPacked);
+      std::move(processor), radius, direction, stepLength, maxRadius, inputIsPacked);
 }
 
 GLSLTentBlur1DFragmentProcessor::GLSLTentBlur1DFragmentProcessor(

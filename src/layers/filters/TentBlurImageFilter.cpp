@@ -29,8 +29,8 @@
 
 namespace tgfx {
 
-// Align with Figma's MAX_TAPS (64) to avoid downsampling at large radii, which introduces
-// non-uniform X/Y step rounding and worsens the separable-kernel anisotropy.
+// Cap the tent blur radius to avoid downsampling at large radii, which introduces non-uniform
+// X/Y step rounding and worsens the separable-kernel anisotropy.
 #define MAX_TENT_RADIUS 64.f
 
 float TentBlurImageFilter::MaxRadius() {
@@ -131,6 +131,9 @@ std::shared_ptr<TextureProxy> TentBlurImageFilter::lockTextureProxy(std::shared_
     if (!renderTarget) {
       return nullptr;
     }
+    // The second pass input is the first pass output, which is an RGBA8 render target with float
+    // values packed into 4 channels. inputIsPacked=true tells the shader to unpack via
+    // dot(rgba, UNPACK) to recover float precision lost in the RGBA8 intermediate texture.
     TentBlur1D(std::move(sourceFragment), renderTarget, radY, TentBlurDirection::Vertical, 1.0f,
                args.renderFlags, true);
   } else {
@@ -192,6 +195,10 @@ PlacementPtr<FragmentProcessor> TentBlurImageFilter::getSourceFragmentProcessor(
   if (fp == nullptr) {
     return nullptr;
   }
+  // TentBlur1DFragmentProcessor samples its child via emitChild with a coordFunc, which requires
+  // the child to have exactly 1 CoordTransform. If the source FP has multiple transforms (e.g.,
+  // certain TiledTextureEffect modes), rasterize to a render target first and wrap as a simple
+  // TiledTextureEffect with a single transform.
   if (fp->numCoordTransforms() == 1) {
     return fp;
   }
