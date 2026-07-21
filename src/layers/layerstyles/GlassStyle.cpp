@@ -260,14 +260,16 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       // Use original layer bounds (not zoom-affected) for blur radius calculation.
       // depth 1-100 maps linearly to blurRadius 1-50, minimum 5.
       float blurRadius = std::max(std::min((_depth / 100.0f) * 50.0f, 50.0f), 5.0f);
-      // UDF texture size is based on original (unscaled) bounds so that UDF resolution and blur
-      // radius are zoom-invariant. If UDF size tracked the scaled layer size, integer rounding
-      // would cause discrete jumps in effective blur range as contentScale changes.
+      // UDF texture size is based on the smallest of: original bounds, on-screen pixel size
+      // (origBounds * contentScale), and MAX_UDF_SIZE. This avoids allocating a large UDF when
+      // the layer is zoomed out — the on-screen pixel count is the effective resolution limit.
+      // udfPixelToLayerPixel and blurRadius scale with udfScale, so the shader's refraction
+      // distance in layer space remains consistent regardless of UDF resolution.
       float origMaxDim = std::max(origBounds.width(), origBounds.height());
       if (origMaxDim <= 0.0f) {
         return;
       }
-      float udfScale = std::min(1.0f, MAX_UDF_SIZE / origMaxDim);
+      float udfScale = std::min({1.0f, input.contentScale, MAX_UDF_SIZE / origMaxDim});
       int udfWidth = std::max(1, static_cast<int>(std::round(origBounds.width() * udfScale)));
       int udfHeight = std::max(1, static_cast<int>(std::round(origBounds.height() * udfScale)));
       // udfPixelToLayerPixel converts UDF pixel coordinates to layer pixel coordinates in the
