@@ -1096,7 +1096,8 @@ static std::optional<PermutationMatchResult> TryMatchBlendMerge(const ProgramInf
   // Validate each child processor. We support:
   //   - TextureEffect (plain, no YUV; subset is supported via the Child{N}Subset uniforms)
   //   - ConstColorProcessor: uniform color output, only supported as child[0]
-  //   - TiledTextureEffect: tiled sampling with runtime mode selection, only as child[0]
+  // TiledTextureEffect children are NOT supported: the precompiled shader has no populated tiling
+  // uniforms, so such draws fall back to ProgramBuilder for a correct result.
   for (size_t i = 0; i < xfp->numChildProcessors(); i++) {
     auto child = xfp->childProcessor(i);
     if (child == nullptr) {
@@ -1109,15 +1110,6 @@ static std::optional<PermutationMatchResult> TryMatchBlendMerge(const ProgramInf
         return std::nullopt;
       }
       child0Mode = 1;
-      continue;
-    }
-    if (child->name() == "TiledTextureEffect") {
-      // TiledTextureEffect is only supported as child[0]. The tiling mode is handled at runtime
-      // via TileModeX/TileModeY uniforms to avoid 9*9 permutation explosion.
-      if (i != 0) {
-        return std::nullopt;
-      }
-      child0Mode = 2;
       continue;
     }
     if (child->name() != "TextureEffect") {

@@ -34,7 +34,7 @@ namespace tgfx {
 /// Fragment dimensions:
 ///   CHILD_TYPE (int, 3 values): 0=DstChild, 1=SrcChild, 2=TwoChild
 ///   HAS_XP (int, 3 values): 0=Empty, 1=PorterDuff DST_TEX, 2=PorterDuff FBF
-///   CHILD0_MODE (int, 3 values): 0=TextureEffect, 1=ConstColor, 2=TiledTextureEffect
+///   CHILD0_MODE (int, 2 values): 0=TextureEffect, 1=ConstColor
 ///   HAS_COVERAGE (bool): matches vert dimension, controls vCoverage varying input
 ///   HAS_COLOR (bool): matches vert dimension, controls vColor varying input
 ///
@@ -70,7 +70,7 @@ class BlendMergeShader : public PrecompiledShader {
       return PermutationDomain({
           PermutationInt("CHILD_TYPE", 3),
           PermutationInt("HAS_XP", 3),
-          PermutationInt("CHILD0_MODE", 3),
+          PermutationInt("CHILD0_MODE", 2),
           PermutationBool("HAS_COVERAGE"),
           PermutationBool("HAS_COLOR"),
           PermutationBool("HAS_MASK_TEXTURE"),

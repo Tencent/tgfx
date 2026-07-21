@@ -2,9 +2,8 @@
 // Permutation dimensions (frag):
 //   CHILD_TYPE (0~2): 0=DstChild, 1=SrcChild, 2=TwoChild
 //   HAS_XP (0~2): 0=Empty, 1=PorterDuff DST_TEX, 2=PorterDuff FBF
-//   CHILD0_MODE (0~2): 0=TextureEffect (sample from TextureSampler_0),
-//                       1=ConstColor (use ChildConstColor uniform, no texture),
-//                       2=TiledTextureEffect (tiling via runtime uniforms TileModeX/Y)
+//   CHILD0_MODE (0~1): 0=TextureEffect (sample from TextureSampler_0),
+//                       1=ConstColor (use ChildConstColor uniform, no texture)
 //   Subset clamping is always applied for plain TextureEffect children via the Child0Subset /
 //   Child1Subset uniforms (populated by XfermodeFragmentProcessor::onSetData through
 //   computeSubsetRect). When a source has no real subset the bounds are the full [0,1] range, so
@@ -16,15 +15,13 @@
 //                     uniform).
 //
 // BLEND_MODE is a runtime uniform (not a compile-time permutation dimension).
-// TileModeX/TileModeY are runtime uniforms when CHILD0_MODE=2 (values 0~8, same as ShaderMode).
 //
 // When CHILD0_MODE=1 (ConstColor), the first child processor is a ConstColorProcessor that
 // outputs a solid uniform color instead of sampling a texture. This is common for
 // ModeColorFilter (blend a solid color with the input) and DropShadow effects.
 //
-// When CHILD0_MODE=2 (TiledTexture), the first child is a TiledTextureEffect that applies
-// repeat/mirror/clamp-to-border tiling. The tiling mode per-axis is selected at runtime via
-// TileModeX/TileModeY uniforms to avoid permutation explosion (9*9=81 combinations).
+// TiledTextureEffect children are not supported by this precompiled shader; the matcher rejects
+// them so they fall back to ProgramBuilder.
 #version 450
 
 #ifndef CHILD_TYPE
@@ -52,11 +49,6 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   int BlendModeValue;
 #if CHILD0_MODE == 1
   vec4 ConstColor;
-#elif CHILD0_MODE == 2
-  vec4 TiledSubset;
-  vec4 TiledClamp;
-  int TileModeX;
-  int TileModeY;
 #endif
 #if CHILD0_MODE == 0
   // Normalized subset bounds for child[0]'s TextureEffect (populated by
@@ -88,7 +80,7 @@ layout(location = 1) in float vCoverage;
 layout(location = 2) in vec4 vColor;
 #endif
 
-#if CHILD0_MODE == 0 || CHILD0_MODE == 2
+#if CHILD0_MODE == 0
 layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
   #if CHILD_TYPE == 2
 layout(set = 1, binding = 1) uniform sampler2D TextureSampler_1;
@@ -116,33 +108,6 @@ layout(set = 1, binding = NEXT_BINDING) uniform sampler2D MaskTextureSampler;
 #include "xp_porter_duff_fbf.inc"
 
 layout(location = 0) out vec4 fragColor;
-
-// --- Tiling helper functions (used when CHILD0_MODE == 2) ---
-#if CHILD0_MODE == 2
-float tileRepeat(float coord, float lo, float hi) {
-  float len = hi - lo;
-  return mod(coord - lo, len) + lo;
-}
-
-float tileMirror(float coord, float lo, float hi) {
-  float len = hi - lo;
-  float t = mod(coord - lo, 2.0 * len);
-  return mix(lo + t, hi - (t - len), step(len, t));
-}
-
-float applyTileMode(float coord, int mode, float subLo, float subHi, float clampLo, float clampHi) {
-  if (mode == 1) {
-    return clamp(coord, clampLo, clampHi);
-  } else if (mode == 2 || mode == 3 || mode == 4 || mode == 5) {
-    return clamp(tileRepeat(coord, subLo, subHi), clampLo, clampHi);
-  } else if (mode == 6) {
-    return clamp(tileMirror(coord, subLo, subHi), clampLo, clampHi);
-  } else if (mode == 8) {
-    return clamp(coord, clampLo, clampHi);
-  }
-  return coord;
-}
-#endif
 
 // --- Blend helper functions ---
 
@@ -336,30 +301,6 @@ void main() {
 #elif CHILD0_MODE == 1
   // ConstColorProcessor: output is just the uniform color modulated by input alpha.
   vec4 childColor = ConstColor * inputColor.a;
-#elif CHILD0_MODE == 2
-  // TiledTextureEffect: apply per-axis tiling to coordinates before sampling.
-  vec2 tiledCoord = TransformedCoords_0;
-  tiledCoord.x = applyTileMode(tiledCoord.x, TileModeX, TiledSubset.x, TiledSubset.z, TiledClamp.x, TiledClamp.z);
-  tiledCoord.y = applyTileMode(tiledCoord.y, TileModeY, TiledSubset.y, TiledSubset.w, TiledClamp.y, TiledClamp.w);
-  vec4 childColor = texture(TextureSampler_0, tiledCoord);
-  // ClampToBorderNearest (mode 7): set to transparent if outside subset.
-  if (TileModeX == 7 && (TransformedCoords_0.x < TiledSubset.x || TransformedCoords_0.x >= TiledSubset.z)) {
-    childColor = vec4(0.0);
-  }
-  if (TileModeY == 7 && (TransformedCoords_0.y < TiledSubset.y || TransformedCoords_0.y >= TiledSubset.w)) {
-    childColor = vec4(0.0);
-  }
-  // ClampToBorderLinear (mode 8): fade at edges.
-  if (TileModeX == 8) {
-    float fadeX = smoothstep(TiledSubset.x - 0.5, TiledSubset.x + 0.5, TransformedCoords_0.x) *
-                  (1.0 - smoothstep(TiledSubset.z - 0.5, TiledSubset.z + 0.5, TransformedCoords_0.x));
-    childColor *= fadeX;
-  }
-  if (TileModeY == 8) {
-    float fadeY = smoothstep(TiledSubset.y - 0.5, TiledSubset.y + 0.5, TransformedCoords_0.y) *
-                  (1.0 - smoothstep(TiledSubset.w - 0.5, TiledSubset.w + 0.5, TransformedCoords_0.y));
-    childColor *= fadeY;
-  }
 #endif
 
   vec4 srcColor;
