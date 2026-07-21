@@ -33,8 +33,8 @@ PlacementPtr<FragmentProcessor> TentBlur1DFragmentProcessor::Make(
     return processor;
   }
 
-  return allocator->make<GLSLTentBlur1DFragmentProcessor>(
-      std::move(processor), radius, direction, stepLength, maxRadius, inputIsPacked);
+  return allocator->make<GLSLTentBlur1DFragmentProcessor>(std::move(processor), radius, direction,
+                                                          stepLength, maxRadius, inputIsPacked);
 }
 
 GLSLTentBlur1DFragmentProcessor::GLSLTentBlur1DFragmentProcessor(
@@ -55,21 +55,39 @@ void GLSLTentBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("vec2 offset = %s;", texelSizeName.c_str());
 
   fragBuilder->codeAppendf("float radius = %s;", radiusName.c_str());
-  fragBuilder->codeAppend("int iRadius = int(ceil(radius));");
   fragBuilder->codeAppend("float sum = 0.0;");
   fragBuilder->codeAppend("float total = 0.0;");
 
   // RGBA8 unpack constants: dot(rgba, UNPACK) recovers the original float.
   fragBuilder->codeAppend("const vec4 UNPACK = vec4(1.0, 1.0/255.0, 1.0/65025.0, 1.0/16581375.0);");
 
-  fragBuilder->codeAppendf("for (int j = 0; j <= %d; ++j) {", 2 * maxRadius);
-  fragBuilder->codeAppend("int i = j - iRadius;");
-  fragBuilder->codeAppend("float weight = max(0.0, radius - abs(float(i)));");
+  // Pairwise bilinear sampling: combine adjacent positions (k, k+1) into a single
+  // texture fetch via hardware bilinear filtering. The tent kernel's linear weights
+  // make this exact — no quality loss. Sample count: 2R+1 → R+1.
+  //
+  // Loop mapping: j=0 → center, j=1,2 → ±pair(k=1), j=3,4 → ±pair(k=3), ...
+  // k = 2*((j-1)/2)+1, sign = (j odd) ? +1 : -1.
+  // When w2=0 (unpaired tail), combined=w1 and offset=k (natural special case).
+  fragBuilder->codeAppendf("for (int j = 0; j <= %d; ++j) {", maxRadius);
+  fragBuilder->codeAppend("float offsetValue;");
+  fragBuilder->codeAppend("float weight;");
+  fragBuilder->codeAppend("if (j == 0) {");
+  fragBuilder->codeAppend("  offsetValue = 0.0;");
+  fragBuilder->codeAppend("  weight = radius;");
+  fragBuilder->codeAppend("} else {");
+  fragBuilder->codeAppend("  int k = 2 * ((j - 1) / 2) + 1;");
+  fragBuilder->codeAppend("  float s = (j % 2 == 1) ? 1.0 : -1.0;");
+  fragBuilder->codeAppend("  float w1 = max(0.0, radius - float(k));");
+  fragBuilder->codeAppend("  float w2 = max(0.0, radius - float(k + 1));");
+  fragBuilder->codeAppend("  weight = w1 + w2;");
+  fragBuilder->codeAppend("  offsetValue = (weight > 0.0) ? s * (float(k) + w2 / weight) : 0.0;");
+  fragBuilder->codeAppend("}");
+  fragBuilder->codeAppend("if (weight <= 0.0) { break; }");
   fragBuilder->codeAppend("total += weight;");
 
   std::string tempColor = "tempColor";
   emitChild(0, &tempColor, args, [](std::string_view coord) {
-    return "(" + std::string(coord) + " + offset * float(i))";
+    return "(" + std::string(coord) + " + offset * offsetValue)";
   });
 
   // Unpack sample: if inputIsPacked, decode RGBA8 to float; otherwise read .a channel.
@@ -78,7 +96,6 @@ void GLSLTentBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
   } else {
     fragBuilder->codeAppendf("sum += %s.a * weight;", tempColor.c_str());
   }
-  fragBuilder->codeAppend("if (i == iRadius) { break; }");
   fragBuilder->codeAppend("}");
 
   // Normalize and pack result to RGBA8.

@@ -250,7 +250,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
     // mask blur filter is cached for reuse.
     // UDF is capped at MAX_UDF_SIZE to prevent excessive texture allocation. The mask UVs
     // are normalized (0-1), so lower resolution does not affect the refraction shader.
-    static constexpr float MAX_UDF_SIZE = 1024.0f;
+    static constexpr float MAX_UDF_SIZE = 512.0f;
     std::shared_ptr<Image> maskImage = nullptr;
     std::shared_ptr<Image> coarseMaskImage = nullptr;
     if (effectiveShapeType == GlassShapeType::AlphaMask) {
