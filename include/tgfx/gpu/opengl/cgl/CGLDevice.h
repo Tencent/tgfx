@@ -46,9 +46,11 @@ class CGLDevice : public GLDevice {
 #pragma clang diagnostic pop
   CGLContextObj oldContext = nil;
 
-  static std::shared_ptr<CGLDevice> Wrap(CGLContextObj cglContext, bool externallyOwned);
+  static std::shared_ptr<CGLDevice> Wrap(CGLContextObj cglContext, bool externallyOwned,
+                                         std::shared_ptr<GLShareGroup> shareGroup = nullptr);
 
-  CGLDevice(std::unique_ptr<GPU> gpu, CGLContextObj cglContext);
+  CGLDevice(std::unique_ptr<GPU> gpu, CGLContextObj cglContext,
+            std::shared_ptr<GLShareGroup> shareGroup);
 
   friend class GLDevice;
   friend class CGLWindow;

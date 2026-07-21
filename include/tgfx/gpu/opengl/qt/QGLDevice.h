@@ -77,9 +77,10 @@ class QGLDevice : public GLDevice {
   QSurface* oldSurface = nullptr;
 
   static std::shared_ptr<QGLDevice> Wrap(QOpenGLContext* context, QSurface* surface,
-                                         bool externallyOwned);
+                                         bool externallyOwned,
+                                         std::shared_ptr<GLShareGroup> shareGroup = nullptr);
 
-  QGLDevice(std::unique_ptr<GPU> gpu, void* nativeHandle);
+  QGLDevice(std::unique_ptr<GPU> gpu, void* nativeHandle, std::shared_ptr<GLShareGroup> shareGroup);
 
   friend class GLDevice;
   friend class QGLWindow;

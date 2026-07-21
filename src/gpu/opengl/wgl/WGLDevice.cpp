@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/opengl/wgl/WGLDevice.h"
+#include "gpu/opengl/GLShareGroup.h"
 #include "gpu/opengl/wgl/WGLGPU.h"
 #include "gpu/opengl/wgl/WGLInterface.h"
 
@@ -186,7 +187,7 @@ std::shared_ptr<GLDevice> GLDevice::Current() {
     return std::static_pointer_cast<WGLDevice>(glDevice);
   }
   auto deviceContext = wglGetCurrentDC();
-  return WGLDevice::Wrap(deviceContext, glContext, nullptr, nullptr, nullptr, true);
+  return WGLDevice::Wrap(deviceContext, glContext, nullptr, nullptr, nullptr, true, nullptr);
 }
 
 std::shared_ptr<GLDevice> GLDevice::Make(void* sharedContext) {
@@ -221,8 +222,9 @@ std::shared_ptr<GLDevice> GLDevice::Make(void* sharedContext) {
   if (!result) {
     return nullptr;
   }
+  auto shareGroup = GLShareGroup::GetOrCreate(sharedContext);
   auto device = WGLDevice::Wrap(deviceContext, glContext, static_cast<HGLRC>(sharedContext),
-                                nullptr, pBuffer, false);
+                                nullptr, pBuffer, false, std::move(shareGroup));
   if (device == nullptr) {
     wglDeleteContext(glContext);
     auto wglInterface = WGLInterface::Get();
@@ -238,8 +240,9 @@ std::shared_ptr<WGLDevice> WGLDevice::MakeFrom(HWND nativeWindow, HGLRC sharedCo
   }
   auto deviceContext = GetDC(nativeWindow);
   auto glContext = CreateWGLContext(deviceContext, sharedContext);
-  auto device =
-      WGLDevice::Wrap(deviceContext, glContext, sharedContext, nativeWindow, nullptr, false);
+  auto shareGroup = GLShareGroup::GetOrCreate(sharedContext);
+  auto device = WGLDevice::Wrap(deviceContext, glContext, sharedContext, nativeWindow, nullptr,
+                                false, std::move(shareGroup));
   if (device == nullptr) {
     wglDeleteContext(glContext);
     ReleaseDC(nativeWindow, deviceContext);
@@ -249,7 +252,8 @@ std::shared_ptr<WGLDevice> WGLDevice::MakeFrom(HWND nativeWindow, HGLRC sharedCo
 
 std::shared_ptr<WGLDevice> WGLDevice::Wrap(HDC deviceContext, HGLRC glContext, HGLRC sharedContext,
                                            HWND nativeWindow, HPBUFFER pBuffer,
-                                           bool externallyOwned) {
+                                           bool externallyOwned,
+                                           std::shared_ptr<GLShareGroup> shareGroup) {
   auto glDevice = GLDevice::Get(glContext);
   if (glDevice != nullptr) {
     return std::static_pointer_cast<WGLDevice>(glDevice);
@@ -269,8 +273,12 @@ std::shared_ptr<WGLDevice> WGLDevice::Wrap(HDC deviceContext, HGLRC glContext, H
   std::shared_ptr<WGLDevice> device = nullptr;
   auto interface = GLInterface::GetNative();
   if (interface != nullptr) {
+    if (shareGroup == nullptr) {
+      shareGroup = GLShareGroup::GetOrCreate(sharedContext ? sharedContext : glContext);
+    }
     auto gpu = std::make_unique<WGLGPU>(std::move(interface));
-    device = std::shared_ptr<WGLDevice>(new WGLDevice(std::move(gpu), glContext));
+    device =
+        std::shared_ptr<WGLDevice>(new WGLDevice(std::move(gpu), glContext, std::move(shareGroup)));
     device->nativeWindow = nativeWindow;
     device->pBuffer = pBuffer;
     device->externallyOwned = externallyOwned;
@@ -287,8 +295,9 @@ std::shared_ptr<WGLDevice> WGLDevice::Wrap(HDC deviceContext, HGLRC glContext, H
   return device;
 }
 
-WGLDevice::WGLDevice(std::unique_ptr<GPU> gpu, HGLRC glContext)
-    : GLDevice(std::move(gpu), glContext), glContext(glContext) {
+WGLDevice::WGLDevice(std::unique_ptr<GPU> gpu, HGLRC glContext,
+                     std::shared_ptr<GLShareGroup> shareGroup)
+    : GLDevice(std::move(gpu), glContext, std::move(shareGroup)), glContext(glContext) {
 }
 
 WGLDevice::~WGLDevice() {

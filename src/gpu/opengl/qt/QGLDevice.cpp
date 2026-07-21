@@ -20,6 +20,7 @@
 #include <QApplication>
 #include <QThread>
 #include "core/utils/Log.h"
+#include "gpu/opengl/GLShareGroup.h"
 #include "gpu/opengl/qt/QGLGPU.h"
 
 namespace tgfx {
@@ -53,7 +54,8 @@ std::shared_ptr<QGLDevice> QGLDevice::Make(QOpenGLContext* sharedContext, QSurfa
   auto surface = new QOffscreenSurface();
   surface->setFormat(context->format());
   surface->create();
-  auto device = QGLDevice::Wrap(context, surface, false);
+  auto shareGroup = GLShareGroup::GetOrCreate(sharedContext);
+  auto device = QGLDevice::Wrap(context, surface, false, std::move(shareGroup));
   if (device == nullptr) {
     delete surface;
     delete context;
@@ -67,7 +69,8 @@ std::shared_ptr<QGLDevice> QGLDevice::MakeFrom(QOpenGLContext* context, QSurface
 }
 
 std::shared_ptr<QGLDevice> QGLDevice::Wrap(QOpenGLContext* qtContext, QSurface* qtSurface,
-                                           bool externallyOwned) {
+                                           bool externallyOwned,
+                                           std::shared_ptr<GLShareGroup> shareGroup) {
   auto glContext = GLDevice::Get(qtContext);
   if (glContext) {
     return std::static_pointer_cast<QGLDevice>(glContext);
@@ -85,8 +88,12 @@ std::shared_ptr<QGLDevice> QGLDevice::Wrap(QOpenGLContext* qtContext, QSurface* 
   std::shared_ptr<QGLDevice> device = nullptr;
   auto interface = GLInterface::GetNative();
   if (interface != nullptr) {
+    if (shareGroup == nullptr) {
+      shareGroup = GLShareGroup::GetOrCreate(qtContext);
+    }
     auto gpu = std::make_unique<QGLGPU>(std::move(interface));
-    device = std::shared_ptr<QGLDevice>(new QGLDevice(std::move(gpu), qtContext));
+    device =
+        std::shared_ptr<QGLDevice>(new QGLDevice(std::move(gpu), qtContext, std::move(shareGroup)));
     device->externallyOwned = externallyOwned;
     device->qtContext = qtContext;
     device->qtSurface = qtSurface;
@@ -101,8 +108,9 @@ std::shared_ptr<QGLDevice> QGLDevice::Wrap(QOpenGLContext* qtContext, QSurface* 
   return device;
 }
 
-QGLDevice::QGLDevice(std::unique_ptr<GPU> gpu, void* nativeHandle)
-    : GLDevice(std::move(gpu), nativeHandle) {
+QGLDevice::QGLDevice(std::unique_ptr<GPU> gpu, void* nativeHandle,
+                     std::shared_ptr<GLShareGroup> shareGroup)
+    : GLDevice(std::move(gpu), nativeHandle, std::move(shareGroup)) {
 }
 
 QGLDevice::~QGLDevice() {

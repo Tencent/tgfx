@@ -24,7 +24,9 @@
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
-Device::Device(std::unique_ptr<GPU> gpu) : _gpu(gpu.release()), _uniqueID(UniqueID::Next()) {
+Device::Device(std::unique_ptr<GPU> gpu, std::shared_ptr<std::mutex> externalLocker)
+    : locker(externalLocker ? std::move(externalLocker) : std::make_shared<std::mutex>()),
+      _gpu(gpu.release()), _uniqueID(UniqueID::Next()) {
   DEBUG_ASSERT(_gpu != nullptr);
 }
 
@@ -34,14 +36,14 @@ Device::~Device() {
 }
 
 Context* Device::lockContext() {
-  locker.lock();
+  locker->lock();
   if (_contextLost) {
-    locker.unlock();
+    locker->unlock();
     return nullptr;
   }
   contextLocked = onLockContext();
   if (!contextLocked) {
-    locker.unlock();
+    locker->unlock();
     return nullptr;
   }
   if (context == nullptr) {
@@ -57,7 +59,7 @@ void Device::unlock() {
     contextLocked = false;
     onUnlockContext();
   }
-  locker.unlock();
+  locker->unlock();
 }
 
 bool Device::onLockContext() {

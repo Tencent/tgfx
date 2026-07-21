@@ -19,6 +19,7 @@
 #include "tgfx/gpu/opengl/eagl/EAGLDevice.h"
 #import <OpenGLES/ES2/gl.h>
 #import <OpenGLES/ES3/glext.h>
+#include "gpu/opengl/GLShareGroup.h"
 #include "gpu/opengl/eagl/EAGLGPU.h"
 
 namespace tgfx {
@@ -133,7 +134,8 @@ std::shared_ptr<GLDevice> GLDevice::Make(void* sharedContext) {
   if (eaglContext == nil) {
     return nullptr;
   }
-  auto device = EAGLDevice::Wrap(eaglContext, false);
+  auto shareGroup = GLShareGroup::GetOrCreate(eaglShareContext);
+  auto device = EAGLDevice::Wrap(eaglContext, false, std::move(shareGroup));
   [eaglContext release];
   return device;
 }
@@ -145,7 +147,8 @@ std::shared_ptr<EAGLDevice> EAGLDevice::MakeFrom(EAGLContext* eaglContext) {
   return EAGLDevice::Wrap(eaglContext, true);
 }
 
-std::shared_ptr<EAGLDevice> EAGLDevice::Wrap(EAGLContext* eaglContext, bool externallyOwned) {
+std::shared_ptr<EAGLDevice> EAGLDevice::Wrap(EAGLContext* eaglContext, bool externallyOwned,
+                                             std::shared_ptr<GLShareGroup> shareGroup) {
   if (eaglContext == nil) {
     return nullptr;
   }
@@ -164,9 +167,13 @@ std::shared_ptr<EAGLDevice> EAGLDevice::Wrap(EAGLContext* eaglContext, bool exte
   std::shared_ptr<EAGLDevice> device = nullptr;
   auto interface = GLInterface::GetNative();
   if (interface != nullptr) {
+    if (shareGroup == nullptr) {
+      shareGroup = GLShareGroup::GetOrCreate(eaglContext);
+    }
     auto gpu = std::make_unique<EAGLGPU>(std::move(interface), eaglContext);
-    device = std::shared_ptr<EAGLDevice>(new EAGLDevice(std::move(gpu), eaglContext),
-                                         EAGLDevice::NotifyReferenceReachedZero);
+    device = std::shared_ptr<EAGLDevice>(
+        new EAGLDevice(std::move(gpu), eaglContext, std::move(shareGroup)),
+        EAGLDevice::NotifyReferenceReachedZero);
     device->externallyOwned = externallyOwned;
     device->weakThis = device;
   }
@@ -187,8 +194,9 @@ void EAGLDevice::NotifyReferenceReachedZero(EAGLDevice* device) {
   registry.delayPurgeList.push_back(device);
 }
 
-EAGLDevice::EAGLDevice(std::unique_ptr<GPU> gpu, EAGLContext* eaglContext)
-    : GLDevice(std::move(gpu), eaglContext), _eaglContext(eaglContext) {
+EAGLDevice::EAGLDevice(std::unique_ptr<GPU> gpu, EAGLContext* eaglContext,
+                       std::shared_ptr<GLShareGroup> shareGroup)
+    : GLDevice(std::move(gpu), eaglContext, std::move(shareGroup)), _eaglContext(eaglContext) {
   [_eaglContext retain];
   auto& registry = GetRegistry();
   std::lock_guard<std::mutex> autoLock(registry.deviceLocker);
@@ -264,7 +272,7 @@ void EAGLDevice::clearCurrent() {
 }
 
 void EAGLDevice::finish() {
-  std::lock_guard<std::mutex> autoLock(locker);
+  std::lock_guard<std::mutex> autoLock(*locker);
   if (makeCurrent(true)) {
     glFinish();
     clearCurrent();

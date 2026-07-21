@@ -51,10 +51,11 @@ class WGLDevice : public GLDevice {
   HDC oldDeviceContext = nullptr;
   HGLRC oldGLContext = nullptr;
 
-  WGLDevice(std::unique_ptr<GPU> gpu, HGLRC nativeHandle);
+  WGLDevice(std::unique_ptr<GPU> gpu, HGLRC nativeHandle, std::shared_ptr<GLShareGroup> shareGroup);
 
   static std::shared_ptr<WGLDevice> Wrap(HDC deviceContext, HGLRC glContext, HGLRC sharedContext,
-                                         HWND nativeWindow, HPBUFFER pBuffer, bool externallyOwned);
+                                         HWND nativeWindow, HPBUFFER pBuffer, bool externallyOwned,
+                                         std::shared_ptr<GLShareGroup> shareGroup = nullptr);
 
   friend class GLDevice;
   friend class WGLWindow;

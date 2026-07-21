@@ -71,10 +71,11 @@ class EGLDevice : public GLDevice {
   static std::shared_ptr<EGLDevice> Wrap(EGLDisplay eglDisplay, EGLSurface eglSurface,
                                          EGLContext eglContext, EGLContext shareContext,
                                          bool externallyOwned,
-                                         std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                                         std::shared_ptr<ColorSpace> colorSpace = nullptr,
+                                         std::shared_ptr<GLShareGroup> shareGroup = nullptr);
 
-  EGLDevice(std::unique_ptr<GPU> gpu, void* nativeHandle,
-            std::shared_ptr<ColorSpace> colorSpace = nullptr);
+  EGLDevice(std::unique_ptr<GPU> gpu, void* nativeHandle, std::shared_ptr<ColorSpace> colorSpace,
+            std::shared_ptr<GLShareGroup> shareGroup);
 
   bool recreateSurfaceIfNeeded(EGLNativeWindowType nativeWindow);
 

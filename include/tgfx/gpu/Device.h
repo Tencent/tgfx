@@ -56,7 +56,12 @@ class Device {
   void unlock();
 
  protected:
-  std::mutex locker = {};
+  /**
+   * The mutex guarding lockContext()/unlock(). Held as a shared_ptr so that subclasses can inject
+   * an externally shared mutex (e.g. all GLDevices belonging to the same OpenGL share group can
+   * share one instance to serialize concurrent GL command submission across contexts).
+   */
+  std::shared_ptr<std::mutex> locker;
   GPU* _gpu = nullptr;
   Context* context = nullptr;
   std::weak_ptr<Device> weakThis;
@@ -66,7 +71,7 @@ class Device {
    */
   std::atomic<bool> _contextLost{false};
 
-  explicit Device(std::unique_ptr<GPU> gpu);
+  explicit Device(std::unique_ptr<GPU> gpu, std::shared_ptr<std::mutex> externalLocker = nullptr);
   virtual bool onLockContext();
   virtual void onUnlockContext();
 

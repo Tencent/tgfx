@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/opengl/cgl/CGLDevice.h"
+#include "gpu/opengl/GLShareGroup.h"
 #include "gpu/opengl/cgl/CGLGPU.h"
 
 #pragma clang diagnostic push
@@ -55,7 +56,8 @@ std::shared_ptr<GLDevice> GLDevice::Make(void* sharedContext) {
   }
   GLint opacity = 0;
   CGLSetParameter(cglContext, kCGLCPSurfaceOpacity, &opacity);
-  auto device = CGLDevice::Wrap(cglContext, false);
+  auto shareGroup = GLShareGroup::GetOrCreate(cglShareContext);
+  auto device = CGLDevice::Wrap(cglContext, false, std::move(shareGroup));
   CGLReleaseContext(cglContext);
   return device;
 }
@@ -64,7 +66,8 @@ std::shared_ptr<CGLDevice> CGLDevice::MakeFrom(CGLContextObj cglContext) {
   return CGLDevice::Wrap(cglContext, true);
 }
 
-std::shared_ptr<CGLDevice> CGLDevice::Wrap(CGLContextObj cglContext, bool externallyOwned) {
+std::shared_ptr<CGLDevice> CGLDevice::Wrap(CGLContextObj cglContext, bool externallyOwned,
+                                           std::shared_ptr<GLShareGroup> shareGroup) {
   if (cglContext == nil) {
     return nullptr;
   }
@@ -83,8 +86,12 @@ std::shared_ptr<CGLDevice> CGLDevice::Wrap(CGLContextObj cglContext, bool extern
     std::shared_ptr<CGLDevice> device = nullptr;
     auto interface = GLInterface::GetNative();
     if (interface != nullptr) {
+      if (shareGroup == nullptr) {
+        shareGroup = GLShareGroup::GetOrCreate(cglContext);
+      }
       auto gpu = std::make_unique<CGLGPU>(std::move(interface), cglContext);
-      device = std::shared_ptr<CGLDevice>(new CGLDevice(std::move(gpu), cglContext));
+      device = std::shared_ptr<CGLDevice>(
+          new CGLDevice(std::move(gpu), cglContext, std::move(shareGroup)));
       device->externallyOwned = externallyOwned;
       device->weakThis = device;
     }
@@ -95,8 +102,9 @@ std::shared_ptr<CGLDevice> CGLDevice::Wrap(CGLContextObj cglContext, bool extern
   }
 }
 
-CGLDevice::CGLDevice(std::unique_ptr<GPU> gpu, CGLContextObj cglContext)
-    : GLDevice(std::move(gpu), cglContext) {
+CGLDevice::CGLDevice(std::unique_ptr<GPU> gpu, CGLContextObj cglContext,
+                     std::shared_ptr<GLShareGroup> shareGroup)
+    : GLDevice(std::move(gpu), cglContext, std::move(shareGroup)) {
   glContext = [[NSOpenGLContext alloc] initWithCGLContextObj:cglContext];
 }
 

@@ -20,6 +20,7 @@
 #include <thread>
 #include "gpu/ResourceCache.h"
 #include "gpu/opengl/GLGPU.h"
+#include "gpu/opengl/GLShareGroup.h"
 
 namespace tgfx {
 static std::mutex deviceMapLocker = {};
@@ -63,18 +64,30 @@ std::shared_ptr<GLDevice> GLDevice::Get(void* nativeHandle) {
   return nullptr;
 }
 
-GLDevice::GLDevice(std::unique_ptr<GPU> gpu, void* nativeHandle)
-    : Device(std::move(gpu)), nativeHandle(nativeHandle) {
-  std::lock_guard<std::mutex> autoLock(deviceMapLocker);
-  deviceMap[nativeHandle] = this;
+GLDevice::GLDevice(std::unique_ptr<GPU> gpu, void* nativeHandle,
+                   std::shared_ptr<GLShareGroup> group)
+    : Device(std::move(gpu), group ? group->locker() : nullptr), nativeHandle(nativeHandle),
+      shareGroup(std::move(group)) {
+  {
+    std::lock_guard<std::mutex> autoLock(deviceMapLocker);
+    deviceMap[nativeHandle] = this;
+  }
+  if (shareGroup) {
+    shareGroup->addMember(nativeHandle);
+  }
 }
 
 GLDevice::~GLDevice() {
   // Subclasses must call releaseAll() before GLDevice is destroyed to clean up all GPU resources in
   // the context. Otherwise, GPU resources may leak due to OpenGL context loss.
   DEBUG_ASSERT(context == nullptr);
-  std::lock_guard<std::mutex> autoLock(deviceMapLocker);
-  deviceMap.erase(nativeHandle);
+  {
+    std::lock_guard<std::mutex> autoLock(deviceMapLocker);
+    deviceMap.erase(nativeHandle);
+  }
+  if (shareGroup) {
+    shareGroup->removeMember(nativeHandle);
+  }
 }
 
 void GLDevice::MarkAllContextsLost() {
@@ -87,7 +100,7 @@ void GLDevice::MarkAllContextsLost() {
 }
 
 void GLDevice::releaseAll() {
-  std::lock_guard<std::mutex> autoLock(locker);
+  std::lock_guard<std::mutex> autoLock(*locker);
   if (context == nullptr) {
     // make sure all resources are released even there is no context.
     static_cast<GLGPU*>(_gpu)->releaseAll(false);

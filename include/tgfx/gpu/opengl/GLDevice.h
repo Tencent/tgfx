@@ -21,6 +21,8 @@
 #include "tgfx/gpu/Device.h"
 
 namespace tgfx {
+class GLShareGroup;
+
 /**
  * The OpenGL interface for drawing graphics.
  */
@@ -64,8 +66,10 @@ class GLDevice : public Device {
  protected:
   void* nativeHandle = nullptr;
   bool externallyOwned = false;
+  std::shared_ptr<GLShareGroup> shareGroup;
 
-  GLDevice(std::unique_ptr<GPU> gpu, void* nativeHandle);
+  GLDevice(std::unique_ptr<GPU> gpu, void* nativeHandle,
+           std::shared_ptr<GLShareGroup> shareGroup = nullptr);
 
   void releaseAll();
 

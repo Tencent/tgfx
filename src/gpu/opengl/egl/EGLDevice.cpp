@@ -22,6 +22,7 @@
 #include "gpu/opengl/GLDefines.h"
 #include "gpu/opengl/GLFunctions.h"
 #include "gpu/opengl/GLGPU.h"
+#include "gpu/opengl/GLShareGroup.h"
 #include "gpu/opengl/egl/EGLGPU.h"
 #include "tgfx/gpu/opengl/egl/EGLGlobals.h"
 
@@ -131,8 +132,9 @@ std::shared_ptr<GLDevice> GLDevice::Make(void* sharedContext) {
     eglDestroySurface(eglGlobals->display, eglSurface);
     return nullptr;
   }
-  auto device =
-      EGLDevice::Wrap(eglGlobals->display, eglSurface, eglContext, eglShareContext, false);
+  auto shareGroup = GLShareGroup::GetOrCreate(eglShareContext);
+  auto device = EGLDevice::Wrap(eglGlobals->display, eglSurface, eglContext, eglShareContext, false,
+                                nullptr, std::move(shareGroup));
   if (device == nullptr) {
     eglDestroyContext(eglGlobals->display, eglContext);
     eglDestroySurface(eglGlobals->display, eglSurface);
@@ -190,8 +192,9 @@ std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLNativeWindowType nativeWindow,
     eglDestroySurface(eglGlobals->display, eglSurface);
     return nullptr;
   }
+  auto shareGroup = GLShareGroup::GetOrCreate(sharedContext);
   auto device = EGLDevice::Wrap(eglGlobals->display, eglSurface, eglContext, sharedContext, false,
-                                std::move(colorSpace));
+                                std::move(colorSpace), std::move(shareGroup));
   if (device == nullptr) {
     eglDestroyContext(eglGlobals->display, eglContext);
     eglDestroySurface(eglGlobals->display, eglSurface);
@@ -202,7 +205,8 @@ std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLNativeWindowType nativeWindow,
 std::shared_ptr<EGLDevice> EGLDevice::Wrap(EGLDisplay eglDisplay, EGLSurface eglSurface,
                                            EGLContext eglContext, EGLContext shareContext,
                                            bool externallyOwned,
-                                           std::shared_ptr<ColorSpace> colorSpace) {
+                                           std::shared_ptr<ColorSpace> colorSpace,
+                                           std::shared_ptr<GLShareGroup> shareGroup) {
   auto glContext = GLDevice::Get(eglContext);
   if (glContext) {
     return std::static_pointer_cast<EGLDevice>(glContext);
@@ -228,9 +232,16 @@ std::shared_ptr<EGLDevice> EGLDevice::Wrap(EGLDisplay eglDisplay, EGLSurface egl
   std::shared_ptr<EGLDevice> device = nullptr;
   auto interface = GLInterface::GetNative();
   if (interface != nullptr) {
+    if (shareGroup == nullptr) {
+      // Wrap() may be called without an explicit share group (e.g. Current(), MakeFrom(display,
+      // surface, ctx, adopted), or MakeFrom(nativeWindow, sharedContext)). Resolve the group from
+      // the share context so that any GLDevices already made with the same share context reuse the
+      // same locker; if none exists yet, create a fresh group and register the context.
+      shareGroup = GLShareGroup::GetOrCreate(shareContext);
+    }
     auto gpu = std::make_unique<EGLGPU>(std::move(interface), eglDisplay);
     device = std::shared_ptr<EGLDevice>(
-        new EGLDevice(std::move(gpu), eglContext, std::move(colorSpace)));
+        new EGLDevice(std::move(gpu), eglContext, std::move(colorSpace), std::move(shareGroup)));
     device->externallyOwned = externallyOwned;
     device->eglDisplay = eglDisplay;
     device->eglSurface = eglSurface;
@@ -248,8 +259,10 @@ std::shared_ptr<EGLDevice> EGLDevice::Wrap(EGLDisplay eglDisplay, EGLSurface egl
 }
 
 EGLDevice::EGLDevice(std::unique_ptr<GPU> gpu, void* nativeHandle,
-                     std::shared_ptr<ColorSpace> colorSpace)
-    : GLDevice(std::move(gpu), nativeHandle), colorSpace(std::move(colorSpace)) {
+                     std::shared_ptr<ColorSpace> colorSpace,
+                     std::shared_ptr<GLShareGroup> shareGroup)
+    : GLDevice(std::move(gpu), nativeHandle, std::move(shareGroup)),
+      colorSpace(std::move(colorSpace)) {
 }
 
 EGLDevice::~EGLDevice() {

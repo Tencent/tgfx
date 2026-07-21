@@ -44,10 +44,12 @@ class EAGLDevice : public GLDevice {
   EAGLContext* oldContext = nil;
   size_t cacheArrayIndex = 0;
 
-  static std::shared_ptr<EAGLDevice> Wrap(EAGLContext* eaglContext, bool externallyOwned);
+  static std::shared_ptr<EAGLDevice> Wrap(EAGLContext* eaglContext, bool externallyOwned,
+                                          std::shared_ptr<GLShareGroup> shareGroup = nullptr);
   static void NotifyReferenceReachedZero(EAGLDevice* device);
 
-  EAGLDevice(std::unique_ptr<GPU> gpu, EAGLContext* eaglContext);
+  EAGLDevice(std::unique_ptr<GPU> gpu, EAGLContext* eaglContext,
+             std::shared_ptr<GLShareGroup> shareGroup);
   bool makeCurrent(bool force = false);
   void clearCurrent();
   void finish();
