@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/filters/TentBlurFilter.h"
+#include "TentBlurFilter.h"
 #include "TentBlurImageFilter.h"
 
 namespace tgfx {
