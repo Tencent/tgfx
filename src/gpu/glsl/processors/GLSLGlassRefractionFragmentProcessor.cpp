@@ -44,6 +44,8 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
   auto* uniformHandler = args.uniformHandler;
   const bool hasMask = (fineMaskProxy != nullptr);
   const bool hasCoarseMask = (coarseMaskProxy != nullptr);
+  const bool hasDispersion = (params.dispersion >= 0.01f);
+  const bool hasLightIntensity = (params.lightIntensity > 0.0f);
   const bool useAxisMix = (params.shapeType == GlassShapeType::RoundedRect ||
                            params.shapeType == GlassShapeType::Ellipse);
 
@@ -232,8 +234,8 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
         "vec2 gradient = vec2(heightRight - height, heightUp - height) / gradientStep;");
     fragBuilder->codeAppend("float gradientLength = length(gradient);");
 
-    // Edge light UDF sampling from coarse mask.
-    if (hasCoarseMask) {
+    // Edge light UDF sampling from coarse mask. Only needed when edge lighting is active.
+    if (hasCoarseMask && hasLightIntensity) {
       auto& coarseSampler = (*args.textureSamplers)[2];
       fragBuilder->codeAppend("vec4 packedEdgeHeight = ");
       fragBuilder->appendTextureLookup(coarseSampler, "maskUV");
@@ -298,48 +300,50 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
   // Dispersion and source sampling.
   fragBuilder->codeAppend("vec3 finalColor;");
   fragBuilder->codeAppend("float srcAlpha;");
-  fragBuilder->codeAppend("if (dispersion < 0.01) {");
-  fragBuilder->codeAppend("  vec2 sampleUV = clamp(sourceUV + uvOffset, vec2(0.0), vec2(1.0));");
-  fragBuilder->codeAppend("  vec4 srcColor = ");
-  fragBuilder->appendTextureLookup(sourceSampler, "sampleUV");
-  fragBuilder->codeAppend(";");
-  fragBuilder->codeAppend("  finalColor = srcColor.rgb;");
-  fragBuilder->codeAppend("  srcAlpha = srcColor.a;");
-  fragBuilder->codeAppend("} else {");
-  fragBuilder->codeAppend(
-      "  vec2 uvR = clamp(sourceUV + uvOffset * (1.0 + dispersion), vec2(0.0), vec2(1.0));");
-  fragBuilder->codeAppend("  vec2 uvG = clamp(sourceUV + uvOffset, vec2(0.0), vec2(1.0));");
-  fragBuilder->codeAppend(
-      "  vec2 uvB = clamp(sourceUV + uvOffset * (1.0 - dispersion), vec2(0.0), vec2(1.0));");
-  fragBuilder->codeAppend("  vec4 srcG = ");
-  fragBuilder->appendTextureLookup(sourceSampler, "uvG");
-  fragBuilder->codeAppend(";");
-  fragBuilder->codeAppend("  finalColor.r = ");
-  fragBuilder->appendTextureLookup(sourceSampler, "uvR");
-  fragBuilder->codeAppend(".r;");
-  fragBuilder->codeAppend("  finalColor.g = srcG.g;");
-  fragBuilder->codeAppend("  finalColor.b = ");
-  fragBuilder->appendTextureLookup(sourceSampler, "uvB");
-  fragBuilder->codeAppend(".b;");
-  // Alpha is unaffected by dispersion (only R/B UV offsets differ), so use the G channel's alpha.
-  fragBuilder->codeAppend("  srcAlpha = srcG.a;");
-  fragBuilder->codeAppend("}");
+  if (hasDispersion) {
+    fragBuilder->codeAppend(
+        "  vec2 uvR = clamp(sourceUV + uvOffset * (1.0 + dispersion), vec2(0.0), vec2(1.0));");
+    fragBuilder->codeAppend("  vec2 uvG = clamp(sourceUV + uvOffset, vec2(0.0), vec2(1.0));");
+    fragBuilder->codeAppend(
+        "  vec2 uvB = clamp(sourceUV + uvOffset * (1.0 - dispersion), vec2(0.0), vec2(1.0));");
+    fragBuilder->codeAppend("  vec4 srcG = ");
+    fragBuilder->appendTextureLookup(sourceSampler, "uvG");
+    fragBuilder->codeAppend(";");
+    fragBuilder->codeAppend("  finalColor.r = ");
+    fragBuilder->appendTextureLookup(sourceSampler, "uvR");
+    fragBuilder->codeAppend(".r;");
+    fragBuilder->codeAppend("  finalColor.g = srcG.g;");
+    fragBuilder->codeAppend("  finalColor.b = ");
+    fragBuilder->appendTextureLookup(sourceSampler, "uvB");
+    fragBuilder->codeAppend(".b;");
+    // Alpha is unaffected by dispersion (only R/B UV offsets differ), so use the G channel's alpha.
+    fragBuilder->codeAppend("  srcAlpha = srcG.a;");
+  } else {
+    fragBuilder->codeAppend("  vec2 sampleUV = clamp(sourceUV + uvOffset, vec2(0.0), vec2(1.0));");
+    fragBuilder->codeAppend("  vec4 srcColor = ");
+    fragBuilder->appendTextureLookup(sourceSampler, "sampleUV");
+    fragBuilder->codeAppend(";");
+    fragBuilder->codeAppend("  finalColor = srcColor.rgb;");
+    fragBuilder->codeAppend("  srcAlpha = srcColor.a;");
+  }
 
   // Edge lighting.
-  fragBuilder->codeAppend("if (lightIntensity > 0.0 && edgeWeight > 0.0) {");
-  if (useAxisMix) {
-    fragBuilder->codeAppend("  vec2 surfaceNormal = glassNormal;");
-  } else {
-    fragBuilder->codeAppend("  vec2 surfaceNormal = edgeLightNormal;");
+  if (hasLightIntensity) {
+    fragBuilder->codeAppend("if (edgeWeight > 0.0) {");
+    if (useAxisMix) {
+      fragBuilder->codeAppend("  vec2 surfaceNormal = glassNormal;");
+    } else {
+      fragBuilder->codeAppend("  vec2 surfaceNormal = edgeLightNormal;");
+    }
+    fragBuilder->codeAppend("  vec2 lightDir = vec2(sin(lightAngleRad), cos(lightAngleRad));");
+    fragBuilder->codeAppend("  float NdotL = dot(surfaceNormal, lightDir);");
+    fragBuilder->codeAppend(
+        "  float diffuse = smoothstep(0.35, 1.0, NdotL) * edgeWeight * lightIntensity;");
+    fragBuilder->codeAppend(
+        "  float rim = smoothstep(0.35, 1.0, -NdotL) * edgeWeight * lightIntensity * 0.6;");
+    fragBuilder->codeAppend("  finalColor += vec3(diffuse + rim);");
+    fragBuilder->codeAppend("}");
   }
-  fragBuilder->codeAppend("  vec2 lightDir = vec2(sin(lightAngleRad), cos(lightAngleRad));");
-  fragBuilder->codeAppend("  float NdotL = dot(surfaceNormal, lightDir);");
-  fragBuilder->codeAppend(
-      "  float diffuse = smoothstep(0.35, 1.0, NdotL) * edgeWeight * lightIntensity;");
-  fragBuilder->codeAppend(
-      "  float rim = smoothstep(0.35, 1.0, -NdotL) * edgeWeight * lightIntensity * 0.6;");
-  fragBuilder->codeAppend("  finalColor += vec3(diffuse + rim);");
-  fragBuilder->codeAppend("}");
 
   fragBuilder->codeAppendf("%s = vec4(finalColor, srcAlpha);", args.outputColor.c_str());
 }

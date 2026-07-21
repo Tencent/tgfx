@@ -53,7 +53,7 @@ PlacementPtr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Image> i
 }
 
 std::shared_ptr<TextureProxy> FragmentProcessor::LockTextureProxy(const Image* image,
-                                                                   const TPArgs& args) {
+                                                                  const TPArgs& args) {
   if (image == nullptr) {
     return nullptr;
   }

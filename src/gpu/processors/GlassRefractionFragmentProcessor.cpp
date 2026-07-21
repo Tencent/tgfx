@@ -40,6 +40,12 @@ void GlassRefractionFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey)
   if (coarseMaskProxy != nullptr) {
     flags |= 2;
   }
+  if (params.dispersion >= 0.01f) {
+    flags |= 4;
+  }
+  if (params.lightIntensity > 0.0f) {
+    flags |= 8;
+  }
   bytesKey->write(flags);
 }
 
