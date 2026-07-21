@@ -2142,7 +2142,8 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     // minBackgroundOutset controls surface downsampling. Only blur-based outsets should
     // trigger downsampling. If the outset exceeds the blur budget (e.g. refraction needs
     // a large capture area but doesn't need blur), clamp to the max single-pass blur budget
-    // to avoid unnecessary downsampling of the background.
+    // to avoid unnecessary downsampling of the background. The 3x factor follows the 3σ
+    // rule: a Gaussian kernel with MaxSigma covers ~99.7% of its distribution within 3σ.
     auto blurBudget = GaussianBlurImageFilter::MaxSigma() * 3.0f;
     auto minOutset = std::min(backOutset, blurBudget);
     minBackgroundOutset = std::min(minOutset, minBackgroundOutset);

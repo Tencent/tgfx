@@ -241,21 +241,16 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
       fragBuilder->codeAppend("float edgeLightHeight = dot(packedEdgeHeight, UNPACK);");
       fragBuilder->codeAppend("edgeWeight = 1.0 - smoothstep(0.5, 0.75, edgeLightHeight);");
 
-      // Edge light normal from coarse UDF gradient.
+      // Edge light normal from coarse UDF gradient. Reuse maskUVRight/maskUVUp since the
+      // sampling positions are identical to the fine UDF gradient neighbors.
       fragBuilder->codeAppend("if (edgeWeight > 0.0) {");
-      fragBuilder->codeAppend(
-          "  vec2 edgeUVRight = vec2((px + gradientStep + halfW) / (halfW * 2.0), "
-          "1.0 - (py + halfH) / (halfH * 2.0));");
       fragBuilder->codeAppend("  vec4 edgePackedRight = ");
-      fragBuilder->appendTextureLookup(coarseSampler, "edgeUVRight");
+      fragBuilder->appendTextureLookup(coarseSampler, "maskUVRight");
       fragBuilder->codeAppend(";");
       fragBuilder->codeAppend("  float edgeHeightRight = dot(edgePackedRight, UNPACK);");
 
-      fragBuilder->codeAppend(
-          "  vec2 edgeUVUp = vec2((px + halfW) / (halfW * 2.0), "
-          "1.0 - (py + gradientStep + halfH) / (halfH * 2.0));");
       fragBuilder->codeAppend("  vec4 edgePackedUp = ");
-      fragBuilder->appendTextureLookup(coarseSampler, "edgeUVUp");
+      fragBuilder->appendTextureLookup(coarseSampler, "maskUVUp");
       fragBuilder->codeAppend(";");
       fragBuilder->codeAppend("  float edgeHeightUp = dot(edgePackedUp, UNPACK);");
 
@@ -326,6 +321,7 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend("  finalColor.b = ");
   fragBuilder->appendTextureLookup(sourceSampler, "uvB");
   fragBuilder->codeAppend(".b;");
+  // Alpha is unaffected by dispersion (only R/B UV offsets differ), so use the G channel's alpha.
   fragBuilder->codeAppend("  srcAlpha = srcG.a;");
   fragBuilder->codeAppend("}");
 

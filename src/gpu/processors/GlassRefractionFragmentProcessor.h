@@ -23,6 +23,8 @@
 
 namespace tgfx {
 
+// Defines the glass shape geometry, which determines the SDF/refraction strategy used in the
+// shader. RoundedRect and Ellipse use analytical SDF; AlphaMask uses a UDF height texture.
 enum class GlassShapeType {
   RoundedRect,
   Ellipse,
@@ -55,7 +57,9 @@ struct GlassRefractionParams {
   float origHeight = 0.0f;
   float udfPixelToLayerPixel = 1.0f;
 
-  // Render-time state (set per lockTextureProxy call, not cached).
+  // Render-time state. In the inline asFragmentProcessor path, renderOffset is 0 because
+  // coordinate translation is handled by coordMatrix. The base class lockTextureProxy fallback
+  // passes uvMatrix = MakeTrans(renderBounds.left, renderBounds.top) to compensate.
   float renderOffsetX = 0.0f;
   float renderOffsetY = 0.0f;
 

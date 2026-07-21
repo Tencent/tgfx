@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include "tgfx/core/Image.h"
 #include "tgfx/layers/layerstyles/LayerStyle.h"
 
@@ -158,6 +159,18 @@ class GlassStyle : public LayerStyle {
                                                    float halfHeight, float udfPixelToLayerPixel,
                                                    std::shared_ptr<Image> maskImage,
                                                    std::shared_ptr<Image> coarseMaskImage);
+
+  float getRefractionFactor() const {
+    return std::clamp(_refraction / 100.0f, 0.0f, 1.0f);
+  }
+
+  float getDepthRatio() const {
+    return std::clamp(_depth / 100.0f, 0.0f, 1.0f);
+  }
+
+  float getGlassThickness(float minHalf) const {
+    return 1.0f + getDepthRatio() * std::max(minHalf - 1.0f, 0.0f);
+  }
 
   float _refraction = 50.0f;
   float _depth = 15.0f;

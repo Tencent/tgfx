@@ -133,9 +133,9 @@ Rect GlassStyle::filterBackground(const Rect& srcRect, float contentScale) {
     auto halfW = srcRect.width() * 0.5f;
     auto halfH = srcRect.height() * 0.5f;
     auto minHalf = std::min(halfW, halfH);
-    float refractionFactor = std::clamp(_refraction / 100.0f, 0.0f, 1.0f);
-    float depthRatio = std::clamp(_depth / 100.0f, 0.0f, 1.0f);
-    float glassThickness = 1.0f + depthRatio * std::max(minHalf - 1.0f, 0.0f);
+    float refractionFactor = getRefractionFactor();
+    float depthRatio = getDepthRatio();
+    float glassThickness = getGlassThickness(minHalf);
     float analyticalOffset = glassThickness * refractionFactor;
     // Match the shader's AlphaMask max displacement: halfW * refractionFactor * depthRatio *
     // depthScale, where depthScale = smoothstep(0.0, 0.1, depthRatio).
@@ -264,6 +264,9 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       // radius are zoom-invariant. If UDF size tracked the scaled layer size, integer rounding
       // would cause discrete jumps in effective blur range as contentScale changes.
       float origMaxDim = std::max(origBounds.width(), origBounds.height());
+      if (origMaxDim <= 0.0f) {
+        return;
+      }
       float udfScale = std::min(1.0f, MAX_UDF_SIZE / origMaxDim);
       int udfWidth = std::max(1, static_cast<int>(std::round(origBounds.width() * udfScale)));
       int udfHeight = std::max(1, static_cast<int>(std::round(origBounds.height() * udfScale)));
@@ -471,8 +474,8 @@ std::shared_ptr<ImageFilter> GlassStyle::getRefractionFilter(
     return refractionFilter;
   }
   float minHalf = std::min(halfWidth, halfHeight);
-  float depthRatio = std::clamp(_depth / 100.0f, 0.0f, 1.0f);
-  float glassThickness = 1.0f + depthRatio * std::max(minHalf - 1.0f, 0.0f);
+  float depthRatio = getDepthRatio();
+  float glassThickness = getGlassThickness(minHalf);
   GlassRefractionParams params = {};
   params.glassWidth = static_cast<float>(layerWidth);
   params.glassHeight = static_cast<float>(layerHeight);
@@ -482,6 +485,8 @@ std::shared_ptr<ImageFilter> GlassStyle::getRefractionFilter(
   params.minHalf = minHalf;
   params.glassThickness = glassThickness;
   params.refractionFactor = std::clamp(_refraction / 100.0f, 0.0f, 1.0f);
+  // Scale dispersion to [0, 0.2]: the shader offsets R/B UVs by uvOffset * (1 ± dispersion),
+  // so 0.2 means max 20% additional offset, keeping chromatic aberration subtle.
   params.dispersion = (_dispersion / 100.0f) * 0.2f;
   params.splay = _splay / 100.0f;
   params.depthRatio = depthRatio;
