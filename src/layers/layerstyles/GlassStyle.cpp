@@ -269,7 +269,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       if (origMaxDim <= 0.0f) {
         return;
       }
-      float udfScale = std::min({1.0f, input.contentScale, MAX_UDF_SIZE / origMaxDim});
+      float udfScale = std::min({1.0f, MAX_UDF_SIZE / origMaxDim});
       int udfWidth = std::max(1, static_cast<int>(std::round(origBounds.width() * udfScale)));
       int udfHeight = std::max(1, static_cast<int>(std::round(origBounds.height() * udfScale)));
       // udfPixelToLayerPixel converts UDF pixel coordinates to layer pixel coordinates in the
