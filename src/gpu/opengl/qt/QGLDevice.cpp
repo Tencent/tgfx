@@ -128,9 +128,12 @@ bool QGLDevice::sharableWith(void* nativeContext) const {
 void QGLDevice::moveToThread(QThread* targetThread) {
   ownerThread = targetThread;
   qtContext->moveToThread(targetThread);
-  if (qtSurface->surfaceClass() == QSurface::SurfaceClass::Offscreen) {
-    static_cast<QOffscreenSurface*>(qtSurface)->moveToThread(targetThread);
-  }
+  // Do not move the QOffscreenSurface to the target thread. Qt only requires the QOpenGLContext to
+  // live on the thread that calls makeCurrent(); the surface can stay on the GUI thread. Moving the
+  // surface exposes the QScreen destroyed() connection made in its constructor to cross-thread
+  // invocation, which crashes when the associated QScreen is destroyed while rendering on another
+  // thread. Keeping the surface on the GUI thread also stays consistent with destroying it on the
+  // main thread in the destructor.
 }
 
 bool QGLDevice::onLockContext() {
