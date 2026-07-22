@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GlassRefractionImageFilter.h"
+#include "core/images/TextureImage.h"
 #include "gpu/TPArgs.h"
-#include "gpu/processors/FragmentProcessor.h"
 #include "layers/processors/GlassRefractionFragmentProcessor.h"
 
 namespace tgfx {
@@ -29,6 +29,19 @@ GlassRefractionImageFilter::GlassRefractionImageFilter(const GlassRefractionPara
     : params(params), fineMask(std::move(fineMask)), coarseMask(std::move(coarseMask)) {
 }
 
+static std::shared_ptr<TextureProxy> MakeTextureProxy(Context* context,
+                                                      const std::shared_ptr<Image>& image) {
+  if (image == nullptr || context == nullptr) {
+    return nullptr;
+  }
+  auto textureImage = image->makeTextureImage(context);
+  if (textureImage == nullptr) {
+    return nullptr;
+  }
+  auto textureImageImpl = std::dynamic_pointer_cast<TextureImage>(textureImage);
+  return textureImageImpl ? textureImageImpl->getTextureProxy() : nullptr;
+}
+
 PlacementPtr<FragmentProcessor> GlassRefractionImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& /*sampling*/,
     SrcRectConstraint /*constraint*/, const Matrix* uvMatrix) const {
@@ -36,8 +49,7 @@ PlacementPtr<FragmentProcessor> GlassRefractionImageFilter::asFragmentProcessor(
     return nullptr;
   }
 
-  TPArgs tpArgs(args.context, args.renderFlags, false, 1.0f, BackingFit::Exact);
-  auto sourceProxy = FragmentProcessor::LockTextureProxy(source.get(), tpArgs);
+  auto sourceProxy = MakeTextureProxy(args.context, source);
   if (sourceProxy == nullptr) {
     return nullptr;
   }
@@ -45,13 +57,13 @@ PlacementPtr<FragmentProcessor> GlassRefractionImageFilter::asFragmentProcessor(
   std::shared_ptr<TextureProxy> fineMaskProxy = nullptr;
   std::shared_ptr<TextureProxy> coarseMaskProxy = nullptr;
   if (fineMask != nullptr) {
-    fineMaskProxy = FragmentProcessor::LockTextureProxy(fineMask.get(), tpArgs);
+    fineMaskProxy = MakeTextureProxy(args.context, fineMask);
     if (fineMaskProxy == nullptr) {
       return nullptr;
     }
   }
   if (coarseMask != nullptr) {
-    coarseMaskProxy = FragmentProcessor::LockTextureProxy(coarseMask.get(), tpArgs);
+    coarseMaskProxy = MakeTextureProxy(args.context, coarseMask);
     if (coarseMaskProxy == nullptr) {
       return nullptr;
     }
@@ -59,9 +71,6 @@ PlacementPtr<FragmentProcessor> GlassRefractionImageFilter::asFragmentProcessor(
 
   auto coordMatrix = uvMatrix != nullptr ? *uvMatrix : Matrix::I();
   auto localParams = params;
-  // renderOffset is 0 in the inline path because coordinate translation is handled by
-  // coordMatrix (uvMatrix). The base class lockTextureProxy fallback passes
-  // uvMatrix = MakeTrans(renderBounds.left, renderBounds.top) to compensate.
   localParams.renderOffsetX = 0.0f;
   localParams.renderOffsetY = 0.0f;
   return GlassRefractionFragmentProcessor::Make(

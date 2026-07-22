@@ -168,7 +168,9 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
         "  vec2 centerDir = (centerDistance > 0.001) ? vec2(-px / centerDistance, -py / "
         "centerDistance) : vec2(0.0);");
     fragBuilder->codeAppend("  vec2 mixedDir = mix(gradientDir, centerDir, splay);");
-    fragBuilder->codeAppend("  mixedDir = normalize(mixedDir);");
+    fragBuilder->codeAppend("  float mixedLen = length(mixedDir);");
+    fragBuilder->codeAppend("  if (mixedLen < 0.000001) { mixedDir = gradientDir; }");
+    fragBuilder->codeAppend("  else { mixedDir = mixedDir / mixedLen; }");
     fragBuilder->codeAppend("  glassNormal = -mixedDir;");
     if (hasCoarseMask && hasLightIntensity) {
       fragBuilder->codeAppend("  if (edgeWeight > 0.0) { edgeLightNormal = -mixedDir; }");

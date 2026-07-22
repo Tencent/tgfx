@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "TentBlur1DFragmentProcessor.h"
+#include "layers/processors/TentBlur1DFragmentProcessor.h"
 
 namespace tgfx {
 

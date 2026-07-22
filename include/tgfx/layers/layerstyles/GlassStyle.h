@@ -42,10 +42,9 @@ class GlassStyle : public LayerStyle {
    * @param lightAngle The direction of the light source in degrees, range [-179, 180].
    * @param lightIntensity The brightness of edge highlights, range [0, 100].
    */
-  static std::shared_ptr<GlassStyle> Make(float refraction = 80.0f, float depth = 20.0f,
-                                          float frost = 5.0f, float dispersion = 50.0f,
-                                          float splay = 0.0f, float lightAngle = 45.0f,
-                                          float lightIntensity = 80.0f);
+  static std::shared_ptr<GlassStyle> Make(float refraction, float depth, float frost,
+                                          float dispersion, float splay, float lightAngle,
+                                          float lightIntensity);
 
   LayerStyleType Type() const override {
     return LayerStyleType::Glass;

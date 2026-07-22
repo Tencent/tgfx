@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "gpu/processors/TentBlur1DFragmentProcessor.h"
+#include "layers/processors/TentBlur1DFragmentProcessor.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "tgfx/core/ImageFilter.h"
 

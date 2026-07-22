@@ -22,7 +22,7 @@
 #include "core/utils/MathExtra.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/TPArgs.h"
-#include "gpu/processors/TentBlur1DFragmentProcessor.h"
+#include "layers/processors/TentBlur1DFragmentProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
