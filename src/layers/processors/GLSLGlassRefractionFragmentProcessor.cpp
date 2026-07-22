@@ -55,7 +55,7 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
   // shapeParams: halfW, halfH, minHalf, unused
   auto shapeParams =
       uniformHandler->addUniform("GlassP1", UniformFormat::Float4, ShaderStage::Fragment);
-  // glassThicknessParam: invOrigW(.x), invOrigH(.y), lightDirX(.z), glassThickness(.w)
+  // imageParams: invOrigW(.x), invOrigH(.y), lightDirX(.z), glassThickness(.w, legacy SDF padding)
   auto glassThicknessParam =
       uniformHandler->addUniform("GlassP2", UniformFormat::Float4, ShaderStage::Fragment);
   // refractionParams: refractionFactor, dispersion, invSourceW, invSourceH
@@ -64,7 +64,8 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
   // lightParams: splay, depthRatio, lightDirY, lightIntensity
   auto lightParams =
       uniformHandler->addUniform("GlassP4", UniformFormat::Float4, ShaderStage::Fragment);
-  // miscParams: origMinHalf, udfPixelToLayerPixel, renderOffsetX, renderOffsetY
+  // miscParams: origMinHalf(.x, legacy SDF padding), udfPixelToLayerPixel(.y), renderOffsetX(.z),
+  // renderOffsetY(.w)
   auto miscParams =
       uniformHandler->addUniform("GlassP5", UniformFormat::Float4, ShaderStage::Fragment);
 

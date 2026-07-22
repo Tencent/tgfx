@@ -255,8 +255,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
     // For AlphaMask shape, generate a UDF height map:
     // Tent-blur the binary alpha to approximate UDF (triangular kernel gives more linear
     // transition than Gaussian, closer to a true distance field).
-    // The maskImage itself is rebuilt every frame (input.content changes), but the
-    // mask blur filter is cached for reuse.
+    // The maskImage is rebuilt every frame via MakeTentBlurImage (input.content changes).
     // UDF is capped at MAX_UDF_SIZE to prevent excessive texture allocation. The mask UVs
     // are normalized (0-1), so lower resolution does not affect the refraction shader.
     static constexpr float MAX_UDF_SIZE = 512.0f;
@@ -336,9 +335,8 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
   paint.setBlendMode(blendMode);
   paint.setAlpha(alpha);
 
-  // Keep the background and filter chain at their capped resolution. The shader matrix maps the
-  // low-resolution image into content pixel space, while the Glass FP executes per destination
-  // fragment through the content alpha mask.
+  // Draw the pre-rasterized refraction result (at capped resolution) into content pixel space,
+  // clipped to the layer shape via the content alpha mask.
   auto imageShader = Shader::MakeImageShader(processedBg, TileMode::Decal, TileMode::Decal,
                                              SamplingOptions(FilterMode::Linear));
   auto imageMatrix =
