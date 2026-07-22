@@ -50,7 +50,8 @@ class NoOpImpl : public BackgroundHandler {
 // Returns nullptr on failure (no context, over-budget, or non-invertible matrix).
 std::shared_ptr<Image> MakeDetachedBgCopy(Context* context, const std::shared_ptr<Image>& bgImage,
                                           const Matrix& bgPixelToLocal, const Rect& layerBounds,
-                                          Point* offset, std::shared_ptr<ColorSpace> colorSpace) {
+                                          Point* offset, std::shared_ptr<ColorSpace> colorSpace,
+                                          bool edgeAntiAlias) {
   Matrix localToBgPixel = Matrix::I();
   if (!bgPixelToLocal.invert(&localToBgPixel)) {
     return nullptr;
@@ -72,7 +73,12 @@ std::shared_ptr<Image> MakeDetachedBgCopy(Context* context, const std::shared_pt
   }
   auto* canvas = surface->getCanvas();
   canvas->translate(-bgPixelBounds.left, -bgPixelBounds.top);
-  canvas->drawImage(bgImage);
+  // SSAA capture path passes edgeAntiAlias=false so this integer-aligned blit doesn't drag in
+  // coverage AA (which would double-count against the outer supersample-then-downsample). Default
+  // Paint would leave antiAlias=true and trigger the SSAA leak counter.
+  Paint paint = {};
+  paint.setAntiAlias(edgeAntiAlias);
+  canvas->drawImage(bgImage, &paint);
   if (offset != nullptr) {
     *offset = {bgPixelBounds.left, bgPixelBounds.top};
   }
@@ -210,18 +216,22 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   bgPixelToLocal.preConcat(bgSource->backgroundMatrix());
   Point smallBgOffset = {};
   auto smallBgImage = MakeDetachedBgCopy(args.context, bgImage, bgPixelToLocal, layerBounds,
-                                         &smallBgOffset, args.dstColorSpace);
+                                         &smallBgOffset, args.dstColorSpace, !args.forceNoEdgeAA);
   PictureRecorder recorder = {};
   auto* recording = recorder.beginRecording();
   recording->scale(contentScale, contentScale);
   recording->concat(worldToLocal);
   recording->concat(bgSource->backgroundMatrix());
+  // Replay-time canvas is the SSAA tile canvas when args.forceNoEdgeAA is set; the recorded
+  // drawImage must inherit the AA suppression so the replay doesn't reintroduce the leak.
+  Paint replayPaint = {};
+  replayPaint.setAntiAlias(!args.forceNoEdgeAA);
   if (smallBgImage != nullptr) {
     recording->translate(smallBgOffset.x, smallBgOffset.y);
-    recording->drawImage(std::move(smallBgImage));
+    recording->drawImage(std::move(smallBgImage), &replayPaint);
   } else {
     // Fallback when detached copy is unavailable; original path may trigger COW.
-    recording->drawImage(bgImage);
+    recording->drawImage(bgImage, &replayPaint);
   }
   auto picture = recorder.finishRecordingAsPicture();
   if (picture == nullptr) {
@@ -336,6 +346,10 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   styleInput.content = contentEntry.image;
   styleInput.contentOffset = contentEntry.offset;
   styleInput.contentScale = source->contentScale;
+  // SSAA tile rasterization sets forceNoEdgeAA so image-rect edge coverage AA is skipped; the
+  // outer 2x supersample-then-downsample already provides edge AA and extra coverage AA would
+  // double-count. Mirrors Layer::drawLayerStyleDefault's non-background path.
+  styleInput.edgeAntiAlias = !args.forceNoEdgeAA;
   styleInput.extraSource = std::make_shared<StyleInputSource>(std::move(bgImage), backgroundOffset);
   style->draw(canvas, styleInput, alpha);
 }

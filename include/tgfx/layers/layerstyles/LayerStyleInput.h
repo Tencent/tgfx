@@ -134,6 +134,15 @@ struct LayerStyleInput {
    * normally rendered content below the current layer.
    */
   std::shared_ptr<StyleInputSource> extraSource = nullptr;
+
+  /**
+   * Whether the LayerStyle should enable coverage-based edge anti-aliasing when compositing its
+   * pre-rasterized image onto the canvas. The input image already carries baked-in edge alpha, so
+   * this flag only controls the extra coverage AA applied to the image's bounding-rect edges by
+   * the canvas. Set to false on SSAA paths where the outer supersample-then-downsample already
+   * provides edge AA and extra coverage AA would double-count.
+   */
+  bool edgeAntiAlias = true;
 };
 
 }  // namespace tgfx

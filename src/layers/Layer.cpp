@@ -1556,10 +1556,10 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   // the box average needed for edge quality; a second Linear tap here would burn 4x fragment
   // work with no visible gain. Filters/no-filter branches are unified under the SSAA override
   // because filtered offscreens are also physically-sized under SSAA.
-  auto filterMode = args.forceImageSamplingNearest
-                        ? FilterMode::Nearest
-                        : (!args.excludeEffects && !_filters.empty() ? FilterMode::Linear
-                                                                     : FilterMode::Nearest);
+  auto filterMode =
+      args.forceImageSamplingNearest
+          ? FilterMode::Nearest
+          : (!args.excludeEffects && !_filters.empty() ? FilterMode::Linear : FilterMode::Nearest);
   auto sampling = SamplingOptions{filterMode, MipmapMode::None};
   canvas->drawImage(result.image, 0.f, 0.f, sampling, &paint);
 }
@@ -1942,7 +1942,7 @@ std::shared_ptr<Image> Layer::synthesizeBackgroundImage(const DrawArgs& args, fl
   return ToImageWithOffset(std::move(picture), offset, &bounds, args.dstColorSpace);
 }
 
-void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, float alpha,
+void Layer::drawLayerStyleDefault(const DrawArgs& args, Canvas* canvas, float alpha,
                                   LayerStyle* layerStyle, const LayerStyleSource* source) {
   DEBUG_ASSERT(source != nullptr && !FloatNearlyZero(source->contentScale));
   DEBUG_ASSERT(layerStyle->extraSourceType() != LayerStyleExtraSourceType::Background);
@@ -1963,6 +1963,11 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
   styleInput.content = contentEntry.image;
   styleInput.contentOffset = contentEntry.offset;
   styleInput.contentScale = source->contentScale;
+  // SSAA tile rasterization sets forceNoEdgeAA to skip coverage AA on the image's bounding-rect
+  // edges; the outer 2x supersample-then-downsample already provides edge AA and extra coverage
+  // AA would double-count. Non-SSAA paths keep edge AA on so image-rect edges under non-integer
+  // CTMs (e.g. rotated parent transforms) stay smooth.
+  styleInput.edgeAntiAlias = !args.forceNoEdgeAA;
   if (layerStyle->extraSourceType() == LayerStyleExtraSourceType::Contour) {
     auto contourImage = group->contour.has_value() ? group->contour->image : nullptr;
     auto contourOffset =

@@ -83,6 +83,8 @@ void BackgroundBlurStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, f
   Paint paint = {};
   paint.setMaskFilter(MaskFilter::MakeShader(maskShader, false));
   paint.setBlendMode(BlendMode::Src);
+  // See DropShadowStyle::onDraw for the SSAA edge-AA rationale.
+  paint.setAntiAlias(input.edgeAntiAlias);
   canvas->drawImage(blurBackground, backgroundOffset.x, backgroundOffset.y, &paint);
 }
 

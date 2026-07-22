@@ -40,6 +40,34 @@ static constexpr int FALLBACK_GRID_SIZE = 64;
 static constexpr int MAX_ATLAS_SIZE = 8192;
 static constexpr int SSAA_SCALE = 2;
 
+// SSAA coverage-AA leak diagnostics.
+// When a SSAA tile is being rasterized, gSSAADebugActiveDepth > 0. Any code path that reaches
+// OpsCompositor::getAAType() and returns AAType::Coverage while the depth is > 0 counts as a
+// leak (the SSAA path should have flowed forceNoEdgeAA=true down to that draw). The depth is
+// incremented on the SSAA tile surface's drawRootLayer(); it stays >0 across every derived
+// intermediate surface reached from that entry, because those surfaces flush their ops on the
+// same thread inside the same call, i.e. before we decrement.
+//
+// This is a thread-local counter, not a global one, to keep multi-window / multi-thread
+// renderers safe.
+static thread_local int gSSAADebugActiveDepth = 0;
+static thread_local int gSSAADebugCoverageAALeakCount = 0;
+
+void SSAADebugEnter() {
+  ++gSSAADebugActiveDepth;
+}
+
+void SSAADebugLeave() {
+  DEBUG_ASSERT(gSSAADebugActiveDepth > 0);
+  --gSSAADebugActiveDepth;
+}
+
+void SSAADebugRecordCoverageAA() {
+  if (gSSAADebugActiveDepth > 0) {
+    ++gSSAADebugCoverageAALeakCount;
+  }
+}
+
 class DrawTask {
  public:
   DrawTask(std::shared_ptr<Tile> tile, int tileSize, const Rect& drawRect = {}, float scale = 1.0f)
@@ -334,6 +362,7 @@ void DisplayList::render(Surface* surface, bool autoClear) {
     return;
   }
   _hasContentChanged = false;
+  gSSAADebugCoverageAALeakCount = 0;
   auto dirtyRegions = _root->updateDirtyRegions();
   if (_zoomScaleInt == 0) {
     if (autoClear) {
@@ -355,6 +384,23 @@ void DisplayList::render(Surface* surface, bool autoClear) {
   }
   if (_showDirtyRegions) {
     renderDirtyRegions(surface->getCanvas(), std::move(dirtyRegions));
+  }
+  // Report SSAA coverage-AA leaks. Dedup by last-reported value so idle frames don't spam.
+  // A non-zero count means some draw inside a SSAA tile still ended up as AAType::Coverage,
+  // i.e. its brush.antiAlias survived the forceNoEdgeAA propagation and produced a coverage-AA
+  // op instead of falling back to AAType::None (the supersample-then-downsample path).
+  if (_useSSAA && _renderMode == RenderMode::Tiled) {
+    static thread_local int lastReportedLeakCount = -1;
+    if (gSSAADebugCoverageAALeakCount != lastReportedLeakCount) {
+      if (gSSAADebugCoverageAALeakCount > 0) {
+        LOGE("[SSAA] Coverage-AA leak: %d draw op(s) still went through coverage-AA inside SSAA "
+             "tile context this frame",
+             gSSAADebugCoverageAALeakCount);
+      } else {
+        LOGI("[SSAA] Coverage-AA leak: 0 (clean this frame)");
+      }
+      lastReportedLeakCount = gSSAADebugCoverageAALeakCount;
+    }
   }
   _root->updateStaticSubtreeFlags();
 }
@@ -1052,8 +1098,10 @@ void DisplayList::drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snap
       // well as every derived intermediate surface (layer style offscreen, background snapshot,
       // 3D leaf surface). All draws on this SSAA tile surface therefore go through with
       // AAType::None.
+      SSAADebugEnter();
       drawRootLayer(tileSurface, tileClipRect, viewMatrix, true, snapshots, true);
       auto image = tileSurface->makeImageSnapshot();
+      SSAADebugLeave();
 
       // Downsample to the atlas with linear sampling.
       auto atlasCanvas = atlasSurface->getCanvas();

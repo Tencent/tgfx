@@ -71,10 +71,14 @@ std::pair<std::shared_ptr<Shape>, Matrix> SpreadUtils::UnwrapMatrixShape(
 }
 
 static inline void DrawSpreadRRect(Canvas* canvas, const RRect& rRect, StyledShapeType type,
-                                   StrokeAlign strokeAlign, float strokeWidth, float spread) {
+                                   StrokeAlign strokeAlign, float strokeWidth, float spread,
+                                   bool antiAlias) {
   Paint paint = {};
   paint.setColor(Color::White());
-  paint.setAntiAlias(true);
+  // SSAA tile rasterization sets edgeAntiAlias=false so this recorded shape doesn't drag in
+  // coverage AA when the outer supersample-then-downsample already provides edge AA. Non-SSAA
+  // paths keep AA on for smooth edges under non-integer CTMs.
+  paint.setAntiAlias(antiAlias);
   switch (type) {
     case StyledShapeType::Fill:
     case StyledShapeType::FillStroke: {
@@ -181,9 +185,11 @@ SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInpu
   const auto strokeWidth = styledShape.strokeWidth;
   const auto strokeAlign = styledShape.strokeAlign;
   if (path.isOval(&rect)) {
-    DrawSpreadRRect(recordCanvas, RRect::MakeOval(rect), type, strokeAlign, strokeWidth, spread);
+    DrawSpreadRRect(recordCanvas, RRect::MakeOval(rect), type, strokeAlign, strokeWidth, spread,
+                    input.edgeAntiAlias);
   } else if (path.isRRect(&rRect)) {
-    DrawSpreadRRect(recordCanvas, rRect, type, strokeAlign, strokeWidth, spread);
+    DrawSpreadRRect(recordCanvas, rRect, type, strokeAlign, strokeWidth, spread,
+                    input.edgeAntiAlias);
   } else {
     if (!path.isRect(&rect)) {
       // Complex paths use their bounding rect as a fill approximation for the shadow source. A
@@ -197,7 +203,7 @@ SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInpu
       type = StyledShapeType::Fill;
     }
     DrawSpreadRRect(recordCanvas, RRect::MakeRectXY(rect, 0, 0), type, strokeAlign, strokeWidth,
-                    spread);
+                    spread, input.edgeAntiAlias);
   }
 
   auto picture = recorder.finishRecordingAsPicture();

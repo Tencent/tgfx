@@ -35,10 +35,16 @@ std::shared_ptr<Image> SnapshotOf(Canvas* canvas) {
   return surface->makeImageSnapshot();
 }
 
-void SeedBackdrop(Canvas* canvas, const std::shared_ptr<Image>& backdrop, const Rect& surfaceRect) {
+void SeedBackdrop(Canvas* canvas, const std::shared_ptr<Image>& backdrop, const Rect& surfaceRect,
+                  bool edgeAntiAlias) {
   canvas->save();
   canvas->setMatrix(Matrix::MakeTrans(-surfaceRect.x(), -surfaceRect.y()));
-  canvas->drawImage(backdrop);
+  // Backdrop seeding blits at an integer translate onto the offscreen surface; coverage AA does
+  // not help axis-aligned integer-offset image blits. SSAA paths pass edgeAntiAlias=false so this
+  // blit doesn't double-count against the outer supersample-then-downsample.
+  Paint paint = {};
+  paint.setAntiAlias(edgeAntiAlias);
+  canvas->drawImage(backdrop, &paint);
   canvas->restore();
 }
 
@@ -204,7 +210,7 @@ OffscreenResult OffscreenRenderer::RenderPassThroughOnSurface(
   localToSurface.postTranslate(-surfaceRect.x(), -surfaceRect.y());
 
   auto* canvas = surface->getCanvas();
-  SeedBackdrop(canvas, backdrop, surfaceRect);
+  SeedBackdrop(canvas, backdrop, surfaceRect, !args.forceNoEdgeAA);
   canvas->setMatrix(localToSurface);
 
   auto drawArgs = args;
@@ -242,7 +248,7 @@ OffscreenResult OffscreenRenderer::RenderPassThroughOnPicture(
   PictureRecorder recorder;
   auto* canvas = recorder.beginRecording();
   canvas->clipRect(Rect::MakeWH(surfaceRect.width(), surfaceRect.height()));
-  SeedBackdrop(canvas, backdrop, surfaceRect);
+  SeedBackdrop(canvas, backdrop, surfaceRect, !args.forceNoEdgeAA);
   canvas->setMatrix(localToSurface);
 
   layer->drawDirectly(args, canvas, 1.0f);

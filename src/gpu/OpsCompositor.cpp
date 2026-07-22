@@ -44,6 +44,12 @@
 
 namespace tgfx {
 
+// Declared and defined in layers/DisplayList.cpp. Called whenever an op resolves to
+// AAType::Coverage; if we are currently inside a SSAA tile draw, DisplayList counts it as a
+// leak and reports it at the end of the frame. Non-SSAA callers see zero cost (the depth
+// counter is 0, so the record function is a nop past the depth check).
+void SSAADebugRecordCoverageAA();
+
 static bool HasDifferentViewMatrix(const std::vector<PlacementPtr<RectRecord>>& rects) {
   if (rects.size() <= 1) {
     return false;
@@ -1097,6 +1103,13 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     auto xferProcessor = PorterDuffXferProcessor::Make(drawingAllocator(), brush.blendMode,
                                                        std::move(dstTextureInfo));
     op->setXferProcessor(std::move(xferProcessor));
+  }
+  // SSAA diagnostic: count coverage-AA ops that leak into the SSAA tile context. In the SSAA
+  // path all Layer draws should end up with AAType::None (supersample-then-downsample supplies
+  // the AA); a Coverage op here means some brush.antiAlias survived the forceNoEdgeAA
+  // propagation. No-op outside SSAA (depth counter guards it).
+  if (aaType == AAType::Coverage) {
+    SSAADebugRecordCoverageAA();
   }
   drawOps.emplace_back(std::move(op));
 }

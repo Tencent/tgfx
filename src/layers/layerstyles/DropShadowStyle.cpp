@@ -147,6 +147,11 @@ void DropShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float
                       ? SamplingOptions(FilterMode::Nearest, MipmapMode::None)
                       : SamplingOptions();
   Paint paint = {};
+  // Style images already carry baked-in edge alpha from the source layer's rasterization; extra
+  // coverage AA on the image bounding rect is only useful under non-integer CTMs. SSAA paths set
+  // input.edgeAntiAlias=false because the outer supersample-then-downsample already provides edge
+  // AA and stacking another coverage AA would double-count.
+  paint.setAntiAlias(input.edgeAntiAlias);
   if (!_showBehindLayer && input.extraSource != nullptr) {
     auto shader = Shader::MakeImageShader(input.extraSource->image(), TileMode::Decal,
                                           TileMode::Decal, sampling);

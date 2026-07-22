@@ -130,6 +130,9 @@ void InnerShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, floa
   Paint paint = {};
   paint.setBlendMode(blendMode);
   paint.setAlpha(alpha);
+  // See DropShadowStyle::onDraw for the SSAA edge-AA rationale; the inner shadow image already
+  // carries baked-in edge alpha from the source content rasterization.
+  paint.setAntiAlias(input.edgeAntiAlias);
   // Use nearest filtering when there's no blur to avoid edge artifacts caused by linear
   // interpolation. When the texture is scaled up, linear filtering produces intermediate alpha
   // values at edges, which causes visible gray borders in the inner shadow.
@@ -162,6 +165,7 @@ void InnerShadowStyle::drawWithSpread(Canvas* canvas, const LayerStyleInput& inp
     paint.setBlendMode(blendMode);
     paint.setAlpha(alpha);
     paint.setColorFilter(ColorFilter::Blend(_color, BlendMode::SrcIn));
+    paint.setAntiAlias(input.edgeAntiAlias);
     canvas->drawImage(shapeResult.image, shapeResult.offset.x, shapeResult.offset.y, sampling,
                       &paint);
     return;
@@ -196,6 +200,7 @@ void InnerShadowStyle::drawWithSpread(Canvas* canvas, const LayerStyleInput& inp
   paint.setAlpha(alpha);
   paint.setColorFilter(ColorFilter::Blend(_color, BlendMode::SrcIn));
   paint.setMaskFilter(MaskFilter::MakeShader(offsetMaskShader, true));
+  paint.setAntiAlias(input.edgeAntiAlias);
   canvas->drawImage(shapeResult.image, shapeResult.offset.x, shapeResult.offset.y, sampling,
                     &paint);
 }
