@@ -204,22 +204,22 @@ static void ComputeGlyphRenderMatrix(const Rect& atlasLocation, const Matrix& st
       (*outMatrix)[5] = std::round(deviceY) - (*outMatrix)[3] * atlasLocation.x() -
                         (*outMatrix)[4] * atlasLocation.y();
     } else {
-      // Round the slot-invariant device position (F = translation + atlasLocation) rather
-      // than the slot-dependent translation (F - atlasLocation). std::round rounds half
+      // Round the slot-invariant device position (F = matrix * atlasLocation) rather
+      // than the slot-dependent translation (F - matrix * atlasLocation). std::round rounds half
       // away from zero, so when F is a half-integer, round(F - atlasLocation) snaps to
       // F+0.5 or F-0.5 depending on the sign of (F - atlasLocation), i.e. on the slot.
       // Rendering an earlier text file shifts the slot and flips the snap by 1px.
-      auto deviceX = (*outMatrix)[2] + atlasLocation.x();
-      (*outMatrix)[2] = std::round(deviceX) - atlasLocation.x();
+      auto deviceX = (*outMatrix)[0] * atlasLocation.x() + (*outMatrix)[2];
+      (*outMatrix)[2] = std::round(deviceX) - (*outMatrix)[0] * atlasLocation.x();
       auto position = GetGlyphPosition(run, index);
       auto deviceScale = stateMatrix.getScaleX();
       auto sharedDeviceY = deviceScale * position.y + stateMatrix.getTranslateY();
       // Round only the slot-invariant part (deviceScale * scale * glyphOffset.y). The slot term
-      // (-deviceScale * scale * atlasLocation.y()) stays unrounded and cancels exactly with the
+      // (-(*outMatrix)[4] * atlasLocation.y()) stays unrounded and cancels exactly with the
       // matrix's own scale term, avoiding the same half-away-from-zero flip as the x component.
       auto perGlyphDeviceY = deviceScale * scale * glyphOffset.y;
       (*outMatrix)[5] = std::round(sharedDeviceY) + std::round(perGlyphDeviceY) -
-                        deviceScale * scale * atlasLocation.y();
+                        (*outMatrix)[4] * atlasLocation.y();
     }
   }
 }
