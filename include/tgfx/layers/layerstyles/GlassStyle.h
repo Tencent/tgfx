@@ -37,17 +37,17 @@ class GlassStyle : public LayerStyle {
   /**
    * Creates a new GlassStyle with the specified parameters.
    * @param refraction The amount of optical distortion along curved edges, range [0, 100].
-   * @param depth The inward extent of the refraction region from edges, range [0, 100].
+   * @param depth The inward extent of the refraction region from edges, range [1, 100].
    * @param frost The amount of background blur (frosted glass), range [0, 100].
    * @param dispersion The intensity of chromatic aberration (rainbow prism effect), range [0, 100].
    * @param splay The spread of projected light on the glass surface, range [0, 100].
-   * @param lightAngle The direction of the light source in degrees, range [0, 360].
+   * @param lightAngle The direction of the light source in degrees, range [-179, 180].
    * @param lightIntensity The brightness of edge highlights, range [0, 100].
    */
-  static std::shared_ptr<GlassStyle> Make(float refraction = 50.0f, float depth = 15.0f,
-                                          float frost = 10.0f, float dispersion = 0.0f,
-                                          float splay = 50.0f, float lightAngle = 135.0f,
-                                          float lightIntensity = 50.0f);
+  static std::shared_ptr<GlassStyle> Make(float refraction = 80.0f, float depth = 20.0f,
+                                          float frost = 5.0f, float dispersion = 50.0f,
+                                          float splay = 0.0f, float lightAngle = 45.0f,
+                                          float lightIntensity = 80.0f);
 
   LayerStyleType Type() const override {
     return LayerStyleType::Glass;
@@ -61,7 +61,7 @@ class GlassStyle : public LayerStyle {
   /** Sets the optical distortion strength. */
   void setRefraction(float value);
 
-  /** Inward extent of refraction region from edges in percentage. Range [0, 100]. */
+  /** Inward extent of refraction region from edges in percentage. Range [1, 100]. */
   float depth() const {
     return _depth;
   }
@@ -97,7 +97,7 @@ class GlassStyle : public LayerStyle {
   /** Sets the light spread amount. */
   void setSplay(float value);
 
-  /** Light source direction in degrees. Range [0, 360]. */
+  /** Light source direction in degrees. Range [-179, 180]. */
   float lightAngle() const {
     return _lightAngle;
   }
@@ -172,13 +172,13 @@ class GlassStyle : public LayerStyle {
     return 1.0f + getDepthRatio() * std::max(minHalf - 1.0f, 0.0f);
   }
 
-  float _refraction = 50.0f;
-  float _depth = 15.0f;
-  float _frost = 10.0f;
-  float _dispersion = 0.0f;
-  float _splay = 50.0f;
-  float _lightAngle = 135.0f;
-  float _lightIntensity = 50.0f;
+  float _refraction = 80.0f;
+  float _depth = 20.0f;
+  float _frost = 5.0f;
+  float _dispersion = 50.0f;
+  float _splay = 0.0f;
+  float _lightAngle = 45.0f;
+  float _lightIntensity = 80.0f;
   float _cornerRadius = 0.0f;
 
   std::shared_ptr<ImageFilter> frostFilter = nullptr;

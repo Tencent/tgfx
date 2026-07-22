@@ -39,7 +39,7 @@ class TentBlurImageFilter : public ImageFilter {
 
  protected:
   Type type() const override {
-    return Type::TentBlur;
+    return Type::Blur;
   }
 
   Rect onFilterBounds(const Rect& rect, MapDirection mapDirection) const override;
