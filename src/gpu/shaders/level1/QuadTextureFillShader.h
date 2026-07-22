@@ -57,13 +57,12 @@ class QuadTextureFillShader : public PrecompiledShader {
 
   // Fragment dimensions (includes vertex-driven HAS_COVERAGE and HAS_COLOR because the fragment
   // shader must declare matching varyings)
-  // ALPHA_ONLY is intentionally NOT a dimension: it is pure fragment math (replicate .r, scale by
-  // alpha), so it is a runtime uniform (AlphaOnly) rather than a compile-time permutation. This
-  // halves the fragment variant count.
+  // ALPHA_ONLY and HAS_RGBAAA are intentionally NOT dimensions: both are pure fragment math
+  // (alpha-only replicates .r; RGBAAA adds one coherent-branch alpha sample), so they are runtime
+  // uniforms (AlphaOnly / HasRgbaaa) rather than compile-time permutations, shrinking the variants.
   struct FragDims {
     enum : uint32_t {
       HAS_YUV,
-      HAS_RGBAAA,
       HAS_SUBSET,
       HAS_COVERAGE,
       HAS_COLOR,
@@ -74,7 +73,6 @@ class QuadTextureFillShader : public PrecompiledShader {
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationBool("HAS_YUV"),
-          PermutationBool("HAS_RGBAAA"),
           PermutationBool("HAS_SUBSET"),
           PermutationBool("HAS_COVERAGE"),
           PermutationBool("HAS_COLOR"),
@@ -84,7 +82,7 @@ class QuadTextureFillShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 7, "Update ShouldCompile when fragment dimensions change.");
+  static_assert(FD::COUNT == 6, "Update ShouldCompile when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"QuadTextureFillShader",
@@ -117,13 +115,6 @@ class QuadTextureFillShader : public PrecompiledShader {
       return false;
     }
     if (vertValues[VD::HAS_COLOR] != fragValues[FD::HAS_COLOR]) {
-      return false;
-    }
-    // A device-space mask (HAS_MASK_TEXTURE) is a clip/layer coverage applied to a plain textured
-    // fill. It does not co-occur with RGBAAA (packed alpha) sources, so prune that cartesian branch
-    // to keep the variant count bounded — adding the mask dimension would otherwise double the
-    // whole dimension product.
-    if (fragValues[FD::HAS_MASK_TEXTURE] != 0 && fragValues[FD::HAS_RGBAAA] != 0) {
       return false;
     }
     return true;

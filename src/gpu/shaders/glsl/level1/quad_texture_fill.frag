@@ -18,9 +18,6 @@
 #ifndef HAS_YUV
 #define HAS_YUV 0
 #endif
-#ifndef HAS_RGBAAA
-#define HAS_RGBAAA 0
-#endif
 #ifndef HAS_SUBSET
 #define HAS_SUBSET 0
 #endif
@@ -47,9 +44,9 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   // Always present. For HAS_SUBSET=1 it provides the half-pixel-inset safe range; for HAS_SUBSET=0
   // it is the sole clamp bound (full texture bounds when no real subset, so the clamp is a no-op).
   vec4 Subset;
-#if HAS_RGBAAA
+  // RGBAAA dual-plane alpha: always declared. Only read when HasRgbaaa != 0 (set at runtime), so it
+  // is a uniform branch rather than a compile-time permutation.
   vec2 AlphaStart;
-#endif
 #if HAS_MASK_TEXTURE
   mat3 DeviceCoordMatrix;
 #endif
@@ -58,9 +55,11 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec2 DstTextureCoordScale;
   int XPBlendMode;
 #endif
-  // Alpha-only source (R8 texture) is a runtime uniform rather than a compile-time permutation:
-  // it is pure fragment math, so folding it into a uniform branch halves the variant count.
+  // Alpha-only source (R8 texture) and RGBAAA dual-plane are runtime uniforms rather than
+  // compile-time permutations: both are pure fragment math (RGBAAA adds one coherent-branch sample),
+  // so folding them into uniform branches shrinks the variant count.
   int AlphaOnly;
+  int HasRgbaaa;
 };
 
 layout(location = 0) in vec3 TransformedCoords_0;
@@ -121,13 +120,15 @@ void main() {
     color = vec4(color.r);
   }
 
-#if HAS_RGBAAA
-  color = clamp(color, 0.0, 1.0);
-  highp vec2 alphaCoord = finalCoord + AlphaStart;
-  vec4 alpha = texture(TextureSampler_0, alphaCoord);
-  alpha = clamp(alpha, 0.0, 1.0);
-  color = vec4(color.rgb * alpha.r, alpha.r);
-#endif
+  if (HasRgbaaa != 0) {
+    // RGBAAA dual-plane: the alpha lives in a separate region reached by AlphaStart. This second
+    // sample is behind a uniform (coherent) branch, so non-RGBAAA draws skip it at no cost.
+    color = clamp(color, 0.0, 1.0);
+    highp vec2 alphaCoord = finalCoord + AlphaStart;
+    vec4 alpha = texture(TextureSampler_0, alphaCoord);
+    alpha = clamp(alpha, 0.0, 1.0);
+    color = vec4(color.rgb * alpha.r, alpha.r);
+  }
 
   if (AlphaOnly != 0) {
     color = color.a * outputColor;

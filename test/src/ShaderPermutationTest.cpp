@@ -277,7 +277,7 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
   EXPECT_EQ(cache->vertexEntryCount(), 111u);
-  EXPECT_EQ(cache->fragmentEntryCount(), 817u);
+  EXPECT_EQ(cache->fragmentEntryCount(), 793u);
   std::string expectedTag = TGFX_BACKEND_NAME;
   auto dashPos = expectedTag.find('-');
   if (dashPos != std::string::npos) {
@@ -979,10 +979,10 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureFillShaderRegistry) {
       found = true;
       EXPECT_EQ(shaderInfo.vertDomain.dimensionCount(), 4u);
       EXPECT_EQ(shaderInfo.vertDomain.totalCount(), 16u);
-      // FragDims: 6 bools + 1 int(3) = 2^6 * 3 = 192 total permutations
-      // (ALPHA_ONLY removed and handled as a runtime uniform, halving the fragment domain).
-      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 7u);
-      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 192u);
+      // FragDims: 5 bools + 1 int(3) = 2^5 * 3 = 96 total permutations
+      // (ALPHA_ONLY and HAS_RGBAAA removed and handled as runtime uniforms).
+      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 6u);
+      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 96u);
       EXPECT_EQ(shaderInfo.vertexFile, "level1/quad_texture_fill.vert");
       EXPECT_EQ(shaderInfo.fragmentFile, "level1/quad_texture_fill.frag");
     }
@@ -1008,9 +1008,9 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureFillShouldCompile) {
         }
       }
     }
-    // ALPHA_ONLY folded into a runtime uniform (removed the dimension and its RGBAAA mutual-exclusion
-    // prune): 240 -> 144.
-    EXPECT_EQ(compiledCount, 144);
+    // ALPHA_ONLY and HAS_RGBAAA folded into runtime uniforms (and the RGBAAA-related prunes removed):
+    // 240 -> 144 -> 96.
+    EXPECT_EQ(compiledCount, 96);
   }
 }
 

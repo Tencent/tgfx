@@ -252,6 +252,13 @@ void GLSLTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
     int alphaOnlyValue = isAlphaOnly() ? 1 : 0;
     fragmentUniformData->setData("AlphaOnly", alphaOnlyValue);
   }
+  // RGBAAA dual-plane is likewise a runtime uniform in the precompiled QuadTextureFillShader. Only
+  // fires on the AOT path where the field exists. AlphaStart (set above when non-zero) supplies the
+  // alpha-plane offset the shader reads when HasRgbaaa != 0.
+  if (fragmentUniformData->hasField("HasRgbaaa")) {
+    int hasRgbaaaValue = hasRGBAAA() ? 1 : 0;
+    fragmentUniformData->setData("HasRgbaaa", hasRgbaaaValue);
+  }
 }
 
 void GLSLTextureEffect::appendClamp(FragmentShaderBuilder* fragBuilder,
