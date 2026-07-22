@@ -29,6 +29,7 @@
 #include "gpu/processors/ComplexNonAARRectGeometryProcessor.h"
 #include "gpu/processors/ComposeFragmentProcessor.h"
 #include "gpu/processors/ConstColorProcessor.h"
+#include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/DualIntervalGradientColorizer.h"
 #include "gpu/processors/EllipseGeometryProcessor.h"
@@ -71,6 +72,7 @@
 #include "gpu/shaders/level1/RoundStrokeRectFillShader.h"
 #include "gpu/shaders/level1/ShapeInstancedFillShader.h"
 #include "gpu/shaders/level1/SingleIntervalGradientShader.h"
+#include "gpu/shaders/level1/SolidColorFillShader.h"
 #include "gpu/shaders/level1/TextureColorMatrixShader.h"
 #include "gpu/shaders/level1/TextureFillShader.h"
 #include "gpu/shaders/level1/TextureGradientShader.h"
@@ -222,6 +224,39 @@ static std::optional<PermutationMatchResult> TryMatchTiledTextureFill(
   fragValues[FD::HAS_XP] = xpType;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"TiledTextureFillShader", 0, fragIndex};
+}
+
+static std::optional<PermutationMatchResult> TryMatchSolidColorFill(
+    const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp->name() != "DefaultGeometryProcessor") {
+    return std::nullopt;
+  }
+  // Solid fill: no color and no coverage fragment processors. The fill color comes from the
+  // DefaultGeometryProcessor Color uniform.
+  if (programInfo->numFragmentProcessors() != 0) {
+    return std::nullopt;
+  }
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
+    return std::nullopt;
+  }
+  auto* dgp = static_cast<const DefaultGeometryProcessor*>(gp);
+  int hasCoverage = dgp->getAAType() == AAType::Coverage ? 1 : 0;
+
+  using VD = SolidColorFillShader::VD;
+  auto vertDomain = VD::domain();
+  std::vector<int> vertValues(VD::COUNT, 0);
+  vertValues[VD::HAS_COVERAGE] = hasCoverage;
+  auto vertIndex = vertDomain.encode(vertValues);
+
+  using FD = SolidColorFillShader::FD;
+  auto fragDomain = FD::domain();
+  std::vector<int> fragValues(FD::COUNT, 0);
+  fragValues[FD::HAS_COVERAGE] = hasCoverage;
+  fragValues[FD::HAS_XP] = xpType;
+  auto fragIndex = fragDomain.encode(fragValues);
+  return PermutationMatchResult{"SolidColorFillShader", vertIndex, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchConstColor(const ProgramInfo* programInfo) {
@@ -1454,6 +1489,9 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
     return result;
   }
   if (auto result = TryMatchTiledTextureFill(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchSolidColorFill(programInfo)) {
     return result;
   }
   if (auto result = TryMatchConstColor(programInfo)) {

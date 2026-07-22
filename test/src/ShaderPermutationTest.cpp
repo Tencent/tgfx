@@ -273,8 +273,8 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
-  EXPECT_EQ(cache->vertexEntryCount(), 107u);
-  EXPECT_EQ(cache->fragmentEntryCount(), 849u);
+  EXPECT_EQ(cache->vertexEntryCount(), 109u);
+  EXPECT_EQ(cache->fragmentEntryCount(), 855u);
   std::string expectedTag = TGFX_BACKEND_NAME;
   auto dashPos = expectedTag.find('-');
   if (dashPos != std::string::npos) {
@@ -962,6 +962,35 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureFillShouldCompile) {
     // HAS_UV_PERSPECTIVE and HAS_CLAMP_SUBSET removed (both handled uniformly): 720 -> 240.
     EXPECT_EQ(compiledCount, 240);
   }
+}
+
+TGFX_TEST(ShaderPermutationTest, SolidColorFillShouldCompile) {
+  auto& factories = ShaderRegistry::All();
+  bool found = false;
+  for (auto& factory : factories) {
+    auto shader = factory();
+    auto shaderInfo = shader->info();
+    if (shaderInfo.name != "SolidColorFillShader") {
+      continue;
+    }
+    found = true;
+    // Vert: HAS_COVERAGE(2). Frag: HAS_COVERAGE(2) x HAS_XP(3) = 12 raw, constrained to matching
+    // HAS_COVERAGE -> 2 * 3 = 6 compiled pairs.
+    EXPECT_EQ(shaderInfo.vertDomain.totalCount(), 2u);
+    EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 6u);
+    int compiledCount = 0;
+    for (uint32_t vi = 0; vi < shaderInfo.vertDomain.totalCount(); vi++) {
+      auto vertValues = shaderInfo.vertDomain.decode(vi);
+      for (uint32_t fi = 0; fi < shaderInfo.fragDomain.totalCount(); fi++) {
+        auto fragValues = shaderInfo.fragDomain.decode(fi);
+        if (shaderInfo.shouldCompile(vi, fi, vertValues, fragValues)) {
+          compiledCount++;
+        }
+      }
+    }
+    EXPECT_EQ(compiledCount, 6);
+  }
+  EXPECT_TRUE(found);
 }
 
 TGFX_TEST(ShaderPermutationTest, EffectDecomposerTripleFP) {

@@ -52,13 +52,14 @@
 #include "gpu/shaders/level1/RoundStrokeRectFillShader.h"
 #include "gpu/shaders/level1/ShapeInstancedFillShader.h"
 #include "gpu/shaders/level1/SingleIntervalGradientShader.h"
+#include "gpu/shaders/level1/SolidColorFillShader.h"
 #include "gpu/shaders/level1/TextureColorMatrixShader.h"
+#include "gpu/shaders/level1/TextureFillShader.h"
+#include "gpu/shaders/level1/TextureGradientShader.h"
 #include "gpu/shaders/level1/TexturedAlphaThresholdShader.h"
 #include "gpu/shaders/level1/TexturedColorMatrixShader.h"
 #include "gpu/shaders/level1/TexturedColorSpaceXformShader.h"
 #include "gpu/shaders/level1/TexturedLumaShader.h"
-#include "gpu/shaders/level1/TextureFillShader.h"
-#include "gpu/shaders/level1/TextureGradientShader.h"
 #include "gpu/shaders/level1/TiledTextureFillShader.h"
 
 namespace tgfx {
@@ -147,15 +148,14 @@ static std::map<std::string, ProfileArtifactStats> CollectArtifactStats(
   return result;
 }
 
-static void RecordCommonArtifactError(
-    std::map<std::string, uint64_t>* profileErrorCounts) {
+static void RecordCommonArtifactError(std::map<std::string, uint64_t>* profileErrorCounts) {
   for (auto& profile : *profileErrorCounts) {
     profile.second++;
   }
 }
 
-static void RecordBackendArtifactError(
-    const std::string& backend, std::map<std::string, uint64_t>* profileErrorCounts) {
+static void RecordBackendArtifactError(const std::string& backend,
+                                       std::map<std::string, uint64_t>* profileErrorCounts) {
   (*profileErrorCounts)[backend]++;
 }
 
@@ -245,10 +245,9 @@ static std::string ResolveIncludes(const std::string& source, const std::string&
   return result;
 }
 
-static ShaderReport CompileOneShader(
-    const PrecompiledShaderInfo& info, const BuildOptions& options,
-    std::vector<VariantData>* outVariants,
-    std::map<std::string, uint64_t>* profileErrorCounts) {
+static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const BuildOptions& options,
+                                     std::vector<VariantData>* outVariants,
+                                     std::map<std::string, uint64_t>* profileErrorCounts) {
   ShaderReport report;
   report.name = info.name;
   auto vertDomain = info.vertDomain;
@@ -354,8 +353,7 @@ static ShaderReport CompileOneShader(
         if (backend == "vulkan") {
           // Re-compile with optimization for smaller SPIR-V output.
           auto expandedVertOpt = PrependDefines(vertSource, vertDefines);
-          auto vertOpt =
-              CompileGLSL(expandedVertOpt, ShaderStageType::Vertex, info.name, vi, true);
+          auto vertOpt = CompileGLSL(expandedVertOpt, ShaderStageType::Vertex, info.name, vi, true);
           auto expandedFragOpt = PrependDefines(fragSource, fragDefines);
           auto fragOpt =
               CompileGLSL(expandedFragOpt, ShaderStageType::Fragment, info.name, fi, true);
@@ -499,8 +497,8 @@ int main(int argc, char** argv) {
   for (const auto& factory : factories) {
     auto shader = factory();
     auto info = shader->info();
-    auto shaderReport = tgfx::CompileOneShader(info, options, &report.variants,
-                                               &report.profileErrorCounts);
+    auto shaderReport =
+        tgfx::CompileOneShader(info, options, &report.variants, &report.profileErrorCounts);
     std::cout << "[" << shaderReport.name << "] raw=" << shaderReport.rawCount
               << " compiled=" << shaderReport.compiledCount;
     if (shaderReport.errorCount > 0) {

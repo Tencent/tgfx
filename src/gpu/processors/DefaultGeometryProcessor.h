@@ -33,6 +33,11 @@ class DefaultGeometryProcessor : public GeometryProcessor {
     return "DefaultGeometryProcessor";
   }
 
+  /// Returns the anti-aliasing type. Used by the AOT matcher to select the coverage permutation.
+  AAType getAAType() const {
+    return aa;
+  }
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
