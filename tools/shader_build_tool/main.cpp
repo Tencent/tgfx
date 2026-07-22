@@ -45,6 +45,7 @@
 #include "gpu/shaders/level1/HairlineLineShader.h"
 #include "gpu/shaders/level1/HairlineQuadShader.h"
 #include "gpu/shaders/level1/LumaShader.h"
+#include "gpu/shaders/level1/MaskFillShader.h"
 #include "gpu/shaders/level1/MeshFillShader.h"
 #include "gpu/shaders/level1/NonAARRectFillShader.h"
 #include "gpu/shaders/level1/QuadColorFillShader.h"

@@ -65,6 +65,7 @@
 #include "gpu/shaders/level1/HairlineLineShader.h"
 #include "gpu/shaders/level1/HairlineQuadShader.h"
 #include "gpu/shaders/level1/LumaShader.h"
+#include "gpu/shaders/level1/MaskFillShader.h"
 #include "gpu/shaders/level1/MeshFillShader.h"
 #include "gpu/shaders/level1/NonAARRectFillShader.h"
 #include "gpu/shaders/level1/QuadColorFillShader.h"
@@ -257,6 +258,39 @@ static std::optional<PermutationMatchResult> TryMatchSolidColorFill(
   fragValues[FD::HAS_XP] = xpType;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"SolidColorFillShader", vertIndex, fragIndex};
+}
+
+static std::optional<PermutationMatchResult> TryMatchMaskFill(const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp->name() != "DefaultGeometryProcessor") {
+    return std::nullopt;
+  }
+  // Solid color (from the DefaultGP Color uniform) masked by a single alpha-only coverage
+  // TextureEffect (a rasterized shape mask from ShapeDrawOp). No color fragment processors.
+  if (programInfo->numColorFragmentProcessors() != 0) {
+    return std::nullopt;
+  }
+  if (programInfo->numFragmentProcessors() != 1) {
+    return std::nullopt;
+  }
+  auto fp = programInfo->getFragmentProcessor(0);
+  if (fp->name() != "TextureEffect") {
+    return std::nullopt;
+  }
+  auto* te = static_cast<const TextureEffect*>(fp);
+  // Only the simple mask form is supported: a plain alpha-only texture with no subset, no packed
+  // alpha, no YUV. Anything else falls back to ProgramBuilder.
+  if (te->numTextureSamplers() == 0 || te->isYUV() || !te->isAlphaOnly() || te->hasRGBAAA() ||
+      te->hasSubset()) {
+    return std::nullopt;
+  }
+  // Only the empty transfer processor is supported. Porter-Duff blends over a shape mask require
+  // feeding the coverage into the blend's coverage lerp (and a framebuffer read), which this shader
+  // does not implement, so they fall back to ProgramBuilder.
+  if (GetXPType(programInfo) != 0) {
+    return std::nullopt;
+  }
+  return PermutationMatchResult{"MaskFillShader", 0, 0};
 }
 
 static std::optional<PermutationMatchResult> TryMatchConstColor(const ProgramInfo* programInfo) {
@@ -1492,6 +1526,9 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
     return result;
   }
   if (auto result = TryMatchSolidColorFill(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchMaskFill(programInfo)) {
     return result;
   }
   if (auto result = TryMatchConstColor(programInfo)) {

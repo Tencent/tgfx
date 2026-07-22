@@ -28,11 +28,14 @@
 #include "gpu/shaders/level1/QuadTextureFillShader.h"
 #include "gpu/shaders/level1/TextureFillShader.h"
 #include "gtest/gtest.h"
+#include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Paint.h"
+#include "tgfx/core/Path.h"
+#include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Surface.h"
 #include "utils/TestUtils.h"
@@ -273,8 +276,8 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
-  EXPECT_EQ(cache->vertexEntryCount(), 109u);
-  EXPECT_EQ(cache->fragmentEntryCount(), 855u);
+  EXPECT_EQ(cache->vertexEntryCount(), 110u);
+  EXPECT_EQ(cache->fragmentEntryCount(), 856u);
   std::string expectedTag = TGFX_BACKEND_NAME;
   auto dashPos = expectedTag.find('-');
   if (dashPos != std::string::npos) {
@@ -920,6 +923,52 @@ TGFX_TEST(ShaderPermutationTest, BlendMergeClipHitsPrecompiledCache) {
   cache->unload();
 }
 
+TGFX_TEST(ShaderPermutationTest, MaskFillHitsPrecompiledCache) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto bundlePath = ProjectPath::Absolute(BundlePath());
+  auto* cache = context->precompiledShaderCache();
+  ASSERT_TRUE(cache->loadBundle(bundlePath));
+  // hitRecords() is only populated when diagnostic recording is enabled.
+  cache->setDiagnosticRecordingEnabled(true);
+  cache->resetStats();
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  // A small filled path is rasterized to an alpha-only shape mask by ShapeDrawOp and drawn through
+  // DefaultGeometryProcessor with a single coverage TextureEffect — the MaskFillShader case.
+  Path path;
+  path.moveTo(20, 20);
+  path.lineTo(180, 40);
+  path.lineTo(100, 180);
+  path.close();
+  Paint paint;
+  paint.setColor(Color::Red());
+  canvas->drawPath(path, paint);
+  context->flushAndSubmit(true);
+  bool hitMaskFill = false;
+  for (const auto& record : cache->hitRecords()) {
+    if (record.shaderName == "MaskFillShader") {
+      hitMaskFill = true;
+      break;
+    }
+  }
+  printf("  [MaskFill] hit=%u miss=%u maskHit=%d\n", cache->hitCount(), cache->missCount(),
+         hitMaskFill);
+  EXPECT_TRUE(hitMaskFill);
+  // Read back a pixel inside the triangle (centroid ~ (100, 80)) to check the fill actually renders.
+  Bitmap bitmap(surface->width(), surface->height(), false, false, surface->colorSpace());
+  Pixmap pixmap(bitmap);
+  if (surface->readPixels(pixmap.info(), pixmap.writablePixels())) {
+    auto* px = static_cast<const uint8_t*>(pixmap.pixels());
+    size_t idx = (80 * static_cast<size_t>(pixmap.rowBytes())) + 100 * 4;
+    printf("  [MaskFill] centerPixel RGBA = %u,%u,%u,%u\n", px[idx], px[idx + 1], px[idx + 2],
+           px[idx + 3]);
+  }
+  cache->unload();
+}
+
 TGFX_TEST(ShaderPermutationTest, QuadTextureFillShaderRegistry) {
   auto& factories = ShaderRegistry::All();
   bool found = false;
@@ -989,6 +1038,23 @@ TGFX_TEST(ShaderPermutationTest, SolidColorFillShouldCompile) {
       }
     }
     EXPECT_EQ(compiledCount, 6);
+  }
+  EXPECT_TRUE(found);
+}
+
+TGFX_TEST(ShaderPermutationTest, MaskFillShouldCompile) {
+  auto& factories = ShaderRegistry::All();
+  bool found = false;
+  for (auto& factory : factories) {
+    auto shader = factory();
+    auto shaderInfo = shader->info();
+    if (shaderInfo.name != "MaskFillShader") {
+      continue;
+    }
+    found = true;
+    // Single variant: no vertex or fragment permutation dimensions (empty XP only).
+    EXPECT_EQ(shaderInfo.vertDomain.totalCount(), 1u);
+    EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 1u);
   }
   EXPECT_TRUE(found);
 }
