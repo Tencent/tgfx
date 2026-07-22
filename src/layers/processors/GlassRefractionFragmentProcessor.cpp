@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/processors/GlassRefractionFragmentProcessor.h"
+#include "layers/processors/GlassRefractionFragmentProcessor.h"
 #include "gpu/resources/TextureView.h"
 
 namespace tgfx {

@@ -21,7 +21,7 @@
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/shaders/GradientShader.h"
 #include "core/utils/MathExtra.h"
-#include "gpu/processors/GlassRefractionFragmentProcessor.h"
+#include "layers/processors/GlassRefractionFragmentProcessor.h"
 #include "layers/DrawArgs.h"
 #include "layers/OpaqueContext.h"
 #include "layers/RootLayer.h"
@@ -3961,7 +3961,6 @@ static void AddGlassCell(Layer* root, std::shared_ptr<Image> bgImage, float x, f
     glassLayer->setMatrix(Matrix::MakeTrans(10, 10));
     auto style =
         GlassStyle::Make(refraction, depth, frost, dispersion, splay, lightAngle, lightIntensity);
-    style->setCornerRadius(cornerRadius);
     glassLayer->setLayerStyles({style});
     container->addChild(glassLayer);
   } else {
@@ -3979,7 +3978,6 @@ static void AddGlassCell(Layer* root, std::shared_ptr<Image> bgImage, float x, f
     glassLayer->setMatrix(Matrix::MakeTrans(10, 10));
     auto style =
         GlassStyle::Make(refraction, depth, frost, dispersion, splay, lightAngle, lightIntensity);
-    style->setCornerRadius(cornerRadius);
     glassLayer->setLayerStyles({style});
     container->addChild(glassLayer);
   }

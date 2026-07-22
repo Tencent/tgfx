@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "gpu/processors/GlassRefractionFragmentProcessor.h"
+#include "layers/processors/GlassRefractionFragmentProcessor.h"
 #include "tgfx/core/ImageFilter.h"
 
 namespace tgfx {

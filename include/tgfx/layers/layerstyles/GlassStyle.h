@@ -24,13 +24,11 @@
 
 namespace tgfx {
 
-enum class GlassShapeType;
-
 /**
  * GlassStyle simulates the physical behavior of light passing through a glass surface, producing
  * refraction, chromatic dispersion, frosted blur, and specular highlights. It captures the
  * background content below the layer and renders it with optical distortion driven by a
- * displacement map derived from the layer's rounded-rectangle shape.
+ * displacement map derived from the layer content's alpha mask.
  */
 class GlassStyle : public LayerStyle {
  public:
@@ -113,14 +111,6 @@ class GlassStyle : public LayerStyle {
   /** Sets the edge highlight brightness. */
   void setLightIntensity(float value);
 
-  /** The corner radius used for the glass surface shape. */
-  float cornerRadius() const {
-    return _cornerRadius;
-  }
-
-  /** Sets the corner radius for the glass surface shape. */
-  void setCornerRadius(float radius);
-
   LayerStylePosition position() const override {
     return LayerStylePosition::Below;
   }
@@ -153,9 +143,7 @@ class GlassStyle : public LayerStyle {
 
   void invalidateMaskFilter();
 
-  std::shared_ptr<ImageFilter> getRefractionFilter(int layerWidth, int layerHeight,
-                                                   float contentScale, GlassShapeType shapeType,
-                                                   float cornerRadius, float halfWidth,
+  std::shared_ptr<ImageFilter> getRefractionFilter(int layerWidth, int layerHeight, float halfWidth,
                                                    float halfHeight, float udfPixelToLayerPixel,
                                                    std::shared_ptr<Image> maskImage,
                                                    std::shared_ptr<Image> coarseMaskImage);
@@ -179,7 +167,6 @@ class GlassStyle : public LayerStyle {
   float _splay = 0.0f;
   float _lightAngle = 45.0f;
   float _lightIntensity = 80.0f;
-  float _cornerRadius = 0.0f;
 
   std::shared_ptr<ImageFilter> frostFilter = nullptr;
   float currentFrostScale = 0.0f;
@@ -188,10 +175,6 @@ class GlassStyle : public LayerStyle {
   std::shared_ptr<ImageFilter> maskBlurFilter = nullptr;
   std::shared_ptr<ImageFilter> coarseMaskBlurFilter = nullptr;
 
-  int cachedLayerWidth = 0;
-  int cachedLayerHeight = 0;
-  float cachedContentScale = 0.0f;
-  float cachedCornerRadius = 0.0f;
   float cachedMaskBlurRadiusX = 0.0f;
   float cachedMaskBlurRadiusY = 0.0f;
   float cachedCoarseMaskBlurRadiusX = 0.0f;

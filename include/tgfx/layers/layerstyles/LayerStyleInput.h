@@ -26,8 +26,6 @@
 
 namespace tgfx {
 
-class LayerContent;
-
 /**
  * Extra input source that a LayerStyle may need beyond the primary content image.
  */
@@ -136,12 +134,6 @@ struct LayerStyleInput {
    * normally rendered content below the current layer.
    */
   std::shared_ptr<StyleInputSource> extraSource = nullptr;
-
-  /**
-   * The layer content object, providing access to the layer's geometric type (Rect, RRect, Path,
-   * etc.) and shape parameters. May be nullptr when the layer has no simple content.
-   */
-  const LayerContent* layerContent = nullptr;
 };
 
 }  // namespace tgfx

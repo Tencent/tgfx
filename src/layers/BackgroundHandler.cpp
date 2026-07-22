@@ -336,7 +336,6 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   styleInput.content = contentEntry.image;
   styleInput.contentOffset = contentEntry.offset;
   styleInput.contentScale = source->contentScale;
-  styleInput.layerContent = layer->getContent();
   styleInput.extraSource = std::make_shared<StyleInputSource>(std::move(bgImage), backgroundOffset);
   style->draw(canvas, styleInput, alpha);
 }
