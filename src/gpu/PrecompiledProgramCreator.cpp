@@ -19,9 +19,11 @@
 #include "PrecompiledProgramCreator.h"
 #include <sstream>
 #include "core/utils/Log.h"
+#include "gpu/AOTEffectDecomposer.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/PermutationMatcher.h"
 #include "gpu/PrecompiledShaderCache.h"
+#include "gpu/ProgramSignature.h"
 #include "gpu/ShaderKeyHash.h"
 #include "gpu/UniformData.h"
 #include "tgfx/gpu/GPU.h"
@@ -67,7 +69,7 @@ static void AppendFragmentProcessor(std::stringstream& stream, const FragmentPro
   stream << ")";
 }
 
-static std::string BuildEffectSignature(const ProgramInfo* programInfo) {
+std::string BuildEffectSignature(const ProgramInfo* programInfo) {
   std::stringstream stream;
   stream << "GP=" << programInfo->getGeometryProcessor()->name() << ";ColorFP=[";
   for (size_t i = 0; i < programInfo->numColorFragmentProcessors(); ++i) {
@@ -165,6 +167,46 @@ static PrecompiledFallbackReason ToFallbackReason(PermutationMatchFailure failur
       return PrecompiledFallbackReason::Unspecified;
   }
   return PrecompiledFallbackReason::Unspecified;
+}
+
+std::shared_ptr<Program> PrecompiledProgramCreator::CreateDecomposedProgram(
+    Context* context, const ProgramInfo* programInfo) {
+  auto cache = context->precompiledShaderCache();
+  // Gated off by default: unverified kernels never reach production. Every draw falls back to the
+  // plain route until decomposition is explicitly enabled (e.g. during cross-validation).
+  if (!cache->decompositionEnabled() || !cache->isLoaded()) {
+    return nullptr;
+  }
+  // Lower the color fragment-processor chain into a typed effect graph. Each FP lowers its own
+  // subtree via lowerToAOT(); any processor without an AOT lowering returns false, which aborts the
+  // whole decomposition and falls back to the plain route — a built-in safety gate against unknown
+  // effects.
+  std::vector<const FragmentProcessor*> colorProcessors;
+  auto colorCount = programInfo->numColorFragmentProcessors();
+  colorProcessors.reserve(colorCount);
+  for (size_t i = 0; i < colorCount; ++i) {
+    colorProcessors.push_back(programInfo->getFragmentProcessor(i));
+  }
+  AOTEffectGraph graph = {};
+  if (!AOTEffectDecomposer::Lower(colorProcessors, &graph)) {
+    return nullptr;
+  }
+  // Semantic guard (review #4): reject chains whose fusion would change pixels (e.g. a ColorMatrix
+  // that affects transparent black). Rejection falls back to the plain route.
+  if (!AOTEffectDecomposer::ValidateForFusion(graph)) {
+    return nullptr;
+  }
+  AOTEffectPlan plan = {};
+  if (!AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan)) {
+    return nullptr;
+  }
+  // The plan is valid, but the PointwiseChainShader (with its Opcode uniform layout) does not yet
+  // exist in the bundle (review #3, stage 2 remaining work). Until that shader and its bundle
+  // entries land, we must not fabricate a program with a mismatched layout: return nullptr so the
+  // atomic fallback in ProgramInfo::getProgram() serves this draw via the plain route. The
+  // decomposition and validation logic above is exercised now; only the artifact mapping is
+  // pending.
+  return nullptr;
 }
 
 std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* context,

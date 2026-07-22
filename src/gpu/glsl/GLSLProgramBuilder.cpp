@@ -17,8 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLProgramBuilder.h"
+#include <atomic>
+#include <cstdlib>
+#include <fstream>
 #include <string>
 #include "gpu/GlobalCache.h"
+#include "gpu/ProgramSignature.h"
 #include "gpu/UniformData.h"
 #include "tgfx/gpu/GPU.h"
 
@@ -209,6 +213,24 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
   int textureBinding = 0;
   for (const auto& sampler : _uniformHandler.getSamplers()) {
     descriptor.layout.textureSamplers.emplace_back(sampler.name(), textureBinding++);
+  }
+  // Diagnostics: when TGFX_SHADER_DUMP_DIR is set, dump the final runtime-generated GLSL, uniform
+  // blocks (inline in the GLSL), and sampler binding order so a handwritten AOT shader can be
+  // diffed against the runtime source. No behavior change when the variable is unset.
+  if (const char* dumpDir = std::getenv("TGFX_SHADER_DUMP_DIR")) {
+    static std::atomic<int> dumpCounter{0};
+    int index = dumpCounter++;
+    std::ofstream out(std::string(dumpDir) + "/" + std::to_string(index) + ".glsl");
+    if (out.is_open()) {
+      out << "// EFFECT: " << BuildEffectSignature(programInfo) << "\n";
+      out << "// ===== VERTEX =====\n" << vertexModule.code << "\n";
+      out << "// ===== FRAGMENT =====\n" << fragmentModule.code << "\n";
+      out << "// ===== SAMPLERS (binding order) =====\n";
+      int slot = 0;
+      for (const auto& sampler : _uniformHandler.getSamplers()) {
+        out << slot++ << ": " << sampler.name() << "\n";
+      }
+    }
   }
   // Although the vertexProvider constructs the rectangle in a counterclockwise order, the model
   // uses a coordinate system with the Y-axis pointing downward, which is opposite to OpenGL's
