@@ -611,7 +611,7 @@ class BenchmarkScene {
         addSolidPanel(480.0f, 320.0f, 240.0f, 160.0f, true, 0);
         break;
       case Scene::Star:
-        addStarPanel(360.0f, 0);
+        addStarPanel(1024.0f, 0);
         break;
       case Scene::Grid:
         addSolidPanel(360.0f, 240.0f, 36.0f, 36.0f, false, 0);
