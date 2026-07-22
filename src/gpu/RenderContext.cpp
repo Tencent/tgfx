@@ -190,15 +190,36 @@ static void ComputeGlyphRenderMatrix(const Rect& atlasLocation, const Matrix& st
   }
   outMatrix->postConcat(stateMatrix);
   if (needsPixelAlignment) {
-    (*outMatrix)[2] = std::round((*outMatrix)[2]);
     if (HasComplexTransform(run)) {
-      (*outMatrix)[5] = std::round((*outMatrix)[5]);
+      // Round the slot-invariant device position (matrix * atlasLocation) rather than the
+      // slot-dependent translation. Same half-away-from-zero issue as the non-complex branch:
+      // when the device position is a half-integer, round(F - atlasLocation) flips by 1px
+      // depending on the slot.
+      auto deviceX = (*outMatrix)[0] * atlasLocation.x() + (*outMatrix)[1] * atlasLocation.y() +
+                     (*outMatrix)[2];
+      auto deviceY = (*outMatrix)[3] * atlasLocation.x() + (*outMatrix)[4] * atlasLocation.y() +
+                     (*outMatrix)[5];
+      (*outMatrix)[2] = std::round(deviceX) - (*outMatrix)[0] * atlasLocation.x() -
+                        (*outMatrix)[1] * atlasLocation.y();
+      (*outMatrix)[5] = std::round(deviceY) - (*outMatrix)[3] * atlasLocation.x() -
+                        (*outMatrix)[4] * atlasLocation.y();
     } else {
+      // Round the slot-invariant device position (F = matrix * atlasLocation) rather
+      // than the slot-dependent translation (F - matrix * atlasLocation). std::round rounds half
+      // away from zero, so when F is a half-integer, round(F - atlasLocation) snaps to
+      // F+0.5 or F-0.5 depending on the sign of (F - atlasLocation), i.e. on the slot.
+      // Rendering an earlier text file shifts the slot and flips the snap by 1px.
+      auto deviceX = (*outMatrix)[0] * atlasLocation.x() + (*outMatrix)[2];
+      (*outMatrix)[2] = std::round(deviceX) - (*outMatrix)[0] * atlasLocation.x();
       auto position = GetGlyphPosition(run, index);
       auto deviceScale = stateMatrix.getScaleX();
       auto sharedDeviceY = deviceScale * position.y + stateMatrix.getTranslateY();
-      auto perGlyphDeviceY = deviceScale * scale * (glyphOffset.y - atlasLocation.y());
-      (*outMatrix)[5] = std::round(sharedDeviceY) + std::round(perGlyphDeviceY);
+      // Round only the slot-invariant part (deviceScale * scale * glyphOffset.y). The slot term
+      // (-(*outMatrix)[4] * atlasLocation.y()) stays unrounded and cancels exactly with the
+      // matrix's own scale term, avoiding the same half-away-from-zero flip as the x component.
+      auto perGlyphDeviceY = deviceScale * scale * glyphOffset.y;
+      (*outMatrix)[5] = std::round(sharedDeviceY) + std::round(perGlyphDeviceY) -
+                        (*outMatrix)[4] * atlasLocation.y();
     }
   }
 }
