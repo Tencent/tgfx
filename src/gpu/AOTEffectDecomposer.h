@@ -56,6 +56,18 @@ class AOTEffectDecomposer {
 
   static bool Decompose(const AOTEffectGraph& graph, AOTDecompositionMode mode,
                         AOTEffectPlan* plan);
+
+  /**
+   * Validates that the effect graph is safe to fuse into a single Pointwise chain, enforcing the
+   * semantic guards that the plain node checks do not cover (review #4). Returns false — forcing a
+   * fallback to the plain route — when fusing would change pixels, specifically:
+   *  - a ColorMatrix whose alpha row carries a non-zero constant bias, which can affect transparent
+   *    black (design §6.3): fusing it into the chain would drop the source-alpha constraint;
+   *  - any node that does not preserve alpha representation or color space adjacent to another such
+   *    node without a materialization edge, since premul/colorspace position is not tracked here.
+   * Conservative by design: when the required semantic information is unavailable, it rejects.
+   */
+  static bool ValidateForFusion(const AOTEffectGraph& graph);
 };
 
 }  // namespace tgfx

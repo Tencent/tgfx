@@ -23,14 +23,17 @@
 namespace tgfx {
 
 /// Precompiled shader declaration for GaussianBlur1DFragmentProcessor. Performs a 1D Gaussian blur
-/// by sampling a child texture in a loop. The loop upper bound is determined at compile time by
-/// MAX_SIGMA, which controls the kernel radius (loop count = 4 * MAX_SIGMA + 1).
+/// by sampling a child texture in a loop. The loop upper bound is a fixed compile-time constant
+/// (MAX_BLUR_SIGMA); the actual kernel radius is a runtime value derived from the Sigma uniform,
+/// and the loop breaks early once it is reached. Sigma is therefore a runtime parameter, NOT a
+/// compile-time permutation dimension — this keeps the variant count bounded (previously MAX_SIGMA
+/// multiplied the whole fragment domain by 10).
 ///
 /// Vertex dimensions:
 ///   GP_TYPE (int, 2 values): 0=DefaultGeometryProcessor, 1=QuadPerEdgeAAGeometryProcessor
 ///
 /// Fragment dimensions:
-///   MAX_SIGMA (int, 10 values): maps to maxSigma 1~10 (index 0 → maxSigma=1, index 9 → maxSigma=10)
+///   (MAX_SIGMA removed — sigma is now a uniform, not a variant dimension)
 ///
 /// Runtime uniforms: Sigma (float), Step (vec2 direction vector)
 class GaussianBlur1DShader : public PrecompiledShader {
@@ -46,10 +49,9 @@ class GaussianBlur1DShader : public PrecompiledShader {
   using VD = VertDims;
 
   struct FragDims {
-    enum : uint32_t { MAX_SIGMA, HAS_XP, HAS_CHILD_SUBSET, HAS_COVERAGE, COUNT };
+    enum : uint32_t { HAS_XP, HAS_CHILD_SUBSET, HAS_COVERAGE, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationInt("MAX_SIGMA", 10),
           PermutationInt("HAS_XP", 3),
           PermutationBool("HAS_CHILD_SUBSET"),
           PermutationInt("HAS_COVERAGE", 3),
@@ -57,7 +59,7 @@ class GaussianBlur1DShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 4, "Update info() when fragment dimensions change.");
+  static_assert(FD::COUNT == 3, "Update info() when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"GaussianBlur1DShader",

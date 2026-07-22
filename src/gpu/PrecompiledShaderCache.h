@@ -80,6 +80,26 @@ struct PrecompiledFallbackRecord {
 const char* PrecompiledFallbackReasonName(PrecompiledFallbackReason reason);
 const char* PrecompiledAOTStageName(PrecompiledAOTStage stage);
 
+/**
+ * Draw-level metrics for the bounded AOT decomposition path. Unlike the per-program-lookup counters
+ * above, these describe how one logical Draw decomposes: how many Kernel invocations it issues, how
+ * many offscreen targets and materialized edges it creates, and the intermediate/peak temporary
+ * bytes it consumes. A Draw counts as a complete AOT Draw only when every one of its invocations
+ * hits AOT (see design §9.2). These are populated by the decomposition executor (stage 2+); until
+ * then they remain zero.
+ */
+struct AOTDrawStats {
+  uint64_t draws = 0;
+  uint64_t completeAOTDraws = 0;
+  uint64_t kernelInvocations = 0;
+  uint64_t offscreenTargets = 0;
+  uint64_t materializedEdges = 0;
+  uint64_t renderTargetSwitches = 0;
+  uint64_t intermediateReadBytes = 0;
+  uint64_t intermediateWriteBytes = 0;
+  uint64_t peakTemporaryBytes = 0;
+};
+
 /// Runtime cache that loads precompiled shader bundles and provides O(1) lookup by ShaderKey hash.
 /// Each Context holds one instance. Bundle v3 stores vertex and fragment shaders in separate pools,
 /// enabling M+N storage instead of M*N.
@@ -183,13 +203,32 @@ class PrecompiledShaderCache {
     return diagnosticsEnabled.load(std::memory_order_relaxed);
   }
 
+  /// Enables or disables the bounded-AOT decomposition route. Off by default: the decomposition
+  /// executor is served only when explicitly enabled (e.g. during cross-validation), so unverified
+  /// kernels never reach production and every draw falls back to the plain matcher/builder path.
+  void setDecompositionEnabled(bool enabled) {
+    _decompositionEnabled.store(enabled, std::memory_order_relaxed);
+  }
+
+  bool decompositionEnabled() const {
+    return _decompositionEnabled.load(std::memory_order_relaxed);
+  }
+
   /// Returns a snapshot of successful AOT pipeline records collected since the last reset.
   std::vector<PrecompiledHitRecord> hitRecords() const;
 
   /// Returns a snapshot of detailed fallback records collected since the last reset.
   std::vector<PrecompiledFallbackRecord> fallbackRecords() const;
 
-  /// Resets AOT stages, artifact lookups, fallback counters, and detailed records to zero.
+  /// Records the decomposition outcome of one logical Draw. `complete` marks whether every Kernel
+  /// invocation of this Draw hit AOT. Called by the decomposition executor (stage 2+).
+  void recordDraw(const AOTDrawStats& delta, bool complete);
+
+  /// Returns a snapshot of accumulated Draw-level metrics since the last reset.
+  AOTDrawStats drawStats() const;
+
+  /// Resets AOT stages, artifact lookups, fallback counters, detailed records, and Draw-level
+  /// metrics to zero.
   void resetStats();
 
   /// Unloads all bundle entries without discarding diagnostic statistics from the current session.
@@ -220,9 +259,12 @@ class PrecompiledShaderCache {
   std::array<std::atomic<uint32_t>, static_cast<size_t>(PrecompiledFallbackReason::Count)>
       fallbackCounts = {};
   std::atomic<bool> diagnosticsEnabled{false};
+  std::atomic<bool> _decompositionEnabled{false};
   mutable std::mutex diagnosticsMutex = {};
   std::vector<PrecompiledHitRecord> _hitRecords = {};
   std::vector<PrecompiledFallbackRecord> _fallbackRecords = {};
+  mutable std::mutex drawStatsMutex = {};
+  AOTDrawStats _drawStats = {};
 };
 
 }  // namespace tgfx

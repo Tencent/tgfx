@@ -27,7 +27,6 @@
 #include "core/utils/RectToRectMatrix.h"
 #include "core/utils/StrokeUtils.h"
 #include "gpu/DrawingManager.h"
-#include "gpu/PipelineCanonicalizer.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ops/AtlasTextOp.h"
 #include "gpu/ops/HairlineLineOp.h"
@@ -1010,7 +1009,6 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
                                                        std::move(dstTextureInfo));
     op->setXferProcessor(std::move(xferProcessor));
   }
-  PipelineCanonicalizer::Canonicalize(context, op.get(), renderTarget);
   drawOps.emplace_back(std::move(op));
 }
 

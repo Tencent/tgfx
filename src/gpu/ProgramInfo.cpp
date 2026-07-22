@@ -21,6 +21,7 @@
 #include "gpu/BlendFormula.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/PrecompiledProgramCreator.h"
+#include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProgramBuilder.h"
 #include "gpu/resources/RenderTarget.h"
 #include "tgfx/gpu/GPU.h"
@@ -132,45 +133,83 @@ std::string ProgramInfo::getMangledSuffix(const Processor* processor) const {
 
 std::shared_ptr<Program> ProgramInfo::getProgram() const {
   auto context = renderTarget->getContext();
-  BytesKey programKey = {};
-  geometryProcessor->computeProcessorKey(context, &programKey);
-  for (const auto& processor : fragmentProcessors) {
-    processor->computeProcessorKey(context, &programKey);
-  }
-  if (xferProcessor != nullptr) {
-    xferProcessor->computeProcessorKey(context, &programKey);
-  }
-  programKey.write(static_cast<uint32_t>(blendMode));
-  programKey.write(static_cast<uint32_t>(getOutputSwizzle().asKey()));
-  programKey.write(static_cast<uint32_t>(cullMode));
-  programKey.write(static_cast<uint32_t>(renderTarget->format()));
-  // Note: if mask or alphaToCoverage from MultisampleDescriptor are used in the pipeline
-  // creation, they must also be encoded here.
-  programKey.write(static_cast<uint32_t>(renderTarget->sampleCount()));
-  // Pipelines that share shaders but differ in colour write mask or stencil configuration must
-  // resolve to distinct cache entries — otherwise the bezier rasterization stencil/cover passes
-  // would silently collapse onto a single program. Keep this section in sync with the fields that
-  // are actually written into RenderPipelineDescriptor.
-  programKey.write(colorWriteMask);
-  programKey.write(static_cast<uint32_t>(depthStencil.format));
-  programKey.write(static_cast<uint32_t>(depthStencil.depthCompare));
-  programKey.write(static_cast<uint32_t>(depthStencil.depthWriteEnabled ? 1 : 0));
-  programKey.write(depthStencil.stencilReadMask);
-  programKey.write(depthStencil.stencilWriteMask);
-  EncodeStencilFace(programKey, depthStencil.stencilFront);
-  EncodeStencilFace(programKey, depthStencil.stencilBack);
+  // Builds the program cache key for a given route. The route is the last field written so that a
+  // decomposed program (which binds an Opcode uniform layout) never collides with a plain program
+  // sharing the same processors and pipeline state. Keep the non-route fields in sync with the
+  // fields actually written into RenderPipelineDescriptor.
+  auto buildKey = [this, context](AOTDecompositionRoute route) {
+    BytesKey key = {};
+    geometryProcessor->computeProcessorKey(context, &key);
+    for (const auto& processor : fragmentProcessors) {
+      processor->computeProcessorKey(context, &key);
+    }
+    if (xferProcessor != nullptr) {
+      xferProcessor->computeProcessorKey(context, &key);
+    }
+    key.write(static_cast<uint32_t>(blendMode));
+    key.write(static_cast<uint32_t>(getOutputSwizzle().asKey()));
+    key.write(static_cast<uint32_t>(cullMode));
+    key.write(static_cast<uint32_t>(renderTarget->format()));
+    key.write(static_cast<uint32_t>(renderTarget->sampleCount()));
+    key.write(colorWriteMask);
+    key.write(static_cast<uint32_t>(depthStencil.format));
+    key.write(static_cast<uint32_t>(depthStencil.depthCompare));
+    key.write(static_cast<uint32_t>(depthStencil.depthWriteEnabled ? 1 : 0));
+    key.write(depthStencil.stencilReadMask);
+    key.write(depthStencil.stencilWriteMask);
+    EncodeStencilFace(key, depthStencil.stencilFront);
+    EncodeStencilFace(key, depthStencil.stencilBack);
+    key.write(static_cast<uint32_t>(route));
+    return key;
+  };
 
+  // Safety fallback contract (review #2): program creation is atomic and never caches a program
+  // whose uniform layout disagrees with the route it is stored under. `route` is a local copy — the
+  // const ProgramInfo is never mutated. When this draw opted into a decomposed route we try the
+  // decomposed creator first; if it yields nullptr (unsupported chain, invalid layout, or pipeline
+  // failure) we drop to the plain route entirely: recompute the key with route None and use the
+  // plain matcher/builder, so the plain program is cached only under the plain key. Correctness of a
+  // successfully created decomposed program is proven by offline cross-validation, not a runtime
+  // pixel check.
+  auto route = decompositionRoute;
+  auto programKey = buildKey(route);
   auto program = context->globalCache()->findProgram(programKey);
   if (program == nullptr) {
-    program = PrecompiledProgramCreator::CreateProgram(context, this);
-    if (program == nullptr) {
-      program = ProgramBuilder::CreateProgram(context, this);
+    if (route != AOTDecompositionRoute::None) {
+      program = PrecompiledProgramCreator::CreateDecomposedProgram(context, this);
+      if (program == nullptr) {
+        route = AOTDecompositionRoute::None;
+        programKey = buildKey(route);
+        program = context->globalCache()->findProgram(programKey);
+      }
     }
     if (program == nullptr) {
-      LOGE("ProgramInfo::getProgram() Failed to create the program!");
-      return nullptr;
+      program = PrecompiledProgramCreator::CreateProgram(context, this);
+      if (program == nullptr) {
+        program = ProgramBuilder::CreateProgram(context, this);
+      }
+      if (program == nullptr) {
+        LOGE("ProgramInfo::getProgram() Failed to create the program!");
+        return nullptr;
+      }
     }
     context->globalCache()->addProgram(programKey, program);
+  }
+  // Draw-level metric baseline point: each getProgram() call is one pass of one logical Draw. In
+  // the current single-pass world one Draw == one Kernel invocation. A Draw counts as a complete
+  // AOT Draw only when its program originated from a precompiled artifact rather than the
+  // ProgramBuilder fallback. The decomposition executor (stage 2+) will extend the delta with
+  // materialized edges and offscreen targets.
+  //
+  // Gated behind diagnostic recording so the production hot path stays free of the recordDraw lock:
+  // Draw metrics are only consumed during test/diagnostic runs (the reporter enables recording per
+  // test), so a disabled-by-default atomic check is all a normal draw pays here.
+  auto cache = context->precompiledShaderCache();
+  if (cache->diagnosticRecordingEnabled()) {
+    AOTDrawStats drawDelta = {};
+    drawDelta.kernelInvocations = 1;
+    bool completeAOTDraw = program->getProvenance().program == ProgramOrigin::PrecompiledArtifact;
+    cache->recordDraw(drawDelta, completeAOTDraw);
   }
   return program;
 }

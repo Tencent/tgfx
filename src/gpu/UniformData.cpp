@@ -40,14 +40,20 @@ void UniformData::setBuffer(void* buffer) {
   _buffer = static_cast<uint8_t*>(buffer);
 }
 
-void UniformData::onSetData(const std::string& name, const void* data, size_t size) const {
+void UniformData::onSetData(const std::string& name, const void* data, size_t size,
+                            bool optional) const {
   DEBUG_ASSERT(_buffer != nullptr);
 
   const auto& key = skipSuffix ? name : name + nameSuffix;
   auto field = findField(key);
 
   if (field == nullptr) {
-    LOGE("UniformData::onSetData() uniform '%s' not found!", name.c_str());
+    // A required uniform that is missing indicates a bug (e.g. a name typo), so it is logged. An
+    // optional uniform may be intentionally absent (present in the precompiled shader but not the
+    // runtime one), so it is silently ignored.
+    if (!optional) {
+      LOGE("UniformData::onSetData() uniform '%s' not found!", name.c_str());
+    }
     return;
   }
   DEBUG_ASSERT(field->size == size);

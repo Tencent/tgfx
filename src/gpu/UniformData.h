@@ -57,6 +57,22 @@ class UniformData {
   }
 
   /**
+   * Like setData(), but for a uniform that may legitimately be absent from this program. Precompiled
+   * shaders can declare uniforms (e.g. a Kernel's tile-mode) that the runtime-generated shader does
+   * not, because the runtime path expresses the same behaviour through generated code instead. When
+   * the field is absent this silently does nothing rather than logging an error, so a required-field
+   * typo is still caught while an intentionally-optional uniform is tolerated.
+   */
+  template <typename T>
+  std::enable_if_t<std::is_trivially_copyable_v<T> && !std::is_pointer_v<T> &&
+                       !std::is_same_v<std::decay_t<T>, Matrix> &&
+                       !std::is_same_v<std::decay_t<T>, ColorMatrix33>,
+                   void>
+  setDataOptional(const std::string& name, const T& value) const {
+    onSetData(name, &value, sizeof(value), true);
+  }
+
+  /**
    * Convenience method for copying a Matrix to a 3x3 matrix in column-major order.
    */
   template <typename T>
@@ -139,7 +155,8 @@ class UniformData {
 
   explicit UniformData(std::vector<Uniform> uniforms);
 
-  void onSetData(const std::string& name, const void* data, size_t size) const;
+  void onSetData(const std::string& name, const void* data, size_t size,
+                 bool optional = false) const;
 
   const Field* findField(const std::string& key) const;
 

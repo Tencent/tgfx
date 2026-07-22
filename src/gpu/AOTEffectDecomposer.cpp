@@ -49,6 +49,29 @@ bool AOTEffectDecomposer::Lower(const std::vector<const FragmentProcessor*>& pro
   return true;
 }
 
+bool AOTEffectDecomposer::ValidateForFusion(const AOTEffectGraph& graph) {
+  for (uint32_t index = 0; index < graph.nodeCount(); ++index) {
+    auto node = graph.nodeAt(AOTNodeID(index));
+    if (node == nullptr) {
+      return false;
+    }
+    if (node->kind == AOTEffectKind::ColorMatrix) {
+      auto parameters = std::get_if<AOTColorMatrixParameters>(&node->parameters);
+      if (parameters == nullptr) {
+        return false;
+      }
+      // Row-major 4x5 matrix; the alpha row is indices 15..19 and index 19 is its constant bias. A
+      // non-zero alpha bias means the matrix can produce non-zero alpha from transparent-black
+      // input (affectsTransparentBlack, design §6.3). Fusing it would silently drop the source
+      // alpha constraint, so reject and fall back to the plain route.
+      if (parameters->matrix[19] != 0.0f) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, AOTDecompositionMode mode,
                                     AOTEffectPlan* plan) {
   if (plan == nullptr || graph.nodeCount() < 2 || graph.root().index() + 1 != graph.nodeCount()) {

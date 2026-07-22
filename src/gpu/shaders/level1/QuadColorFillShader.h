@@ -31,19 +31,23 @@ class QuadColorFillShader : public PrecompiledShader {
   TGFX_DEFINE_DIMS(HAS_COVERAGE, HAS_COLOR);
   using VD = Dims;
 
-  // Fragment dimensions (adds HAS_XP)
+  // Fragment dimensions (adds HAS_XP and HAS_MASK_TEXTURE). HAS_MASK_TEXTURE is orthogonal to the
+  // per-vertex geometry AA coverage (HAS_COVERAGE): it samples a device-space mask texture and
+  // multiplies it into the color, composing with the geometry AA. Placed last to keep existing
+  // dimension indices stable.
   struct FragDims {
-    enum : uint32_t { HAS_COVERAGE, HAS_COLOR, HAS_XP, COUNT };
+    enum : uint32_t { HAS_COVERAGE, HAS_COLOR, HAS_XP, HAS_MASK_TEXTURE, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationBool("HAS_COVERAGE"),
           PermutationBool("HAS_COLOR"),
           PermutationInt("HAS_XP", 3),
+          PermutationBool("HAS_MASK_TEXTURE"),
       });
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 3, "Update ShouldCompile below when dimensions change.");
+  static_assert(FD::COUNT == 4, "Update ShouldCompile below when dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"QuadColorFillShader",

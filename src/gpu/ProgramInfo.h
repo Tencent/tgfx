@@ -35,6 +35,20 @@ struct SamplerInfo {
 };
 
 /**
+ * Identifies which shader-selection route a draw takes. It is part of the program cache key so a
+ * bounded-AOT-decomposed program (which binds an Opcode uniform layout) never collides with a
+ * non-decomposed program that shares the same fragment processors and pipeline state. Without this
+ * distinction the two routes would hash to the same key and a cached decomposed program could be
+ * returned to a draw expecting the plain layout, silently binding the wrong uniforms.
+ */
+enum class AOTDecompositionRoute : uint32_t {
+  /// The default route: the fragment processors are matched or built as-is (no decomposition).
+  None = 0,
+  /// The draw is served by a bounded-AOT PointwiseChain kernel with an Opcode uniform layout.
+  PointwiseChain = 1,
+};
+
+/**
  * This immutable object contains information needed to build a shader program and set API state for
  * a draw.
  */
@@ -150,6 +164,22 @@ class ProgramInfo {
     colorWriteMask = mask;
   }
 
+  /**
+   * Returns the shader-selection route this draw takes. Defaults to None (no decomposition).
+   */
+  AOTDecompositionRoute getDecompositionRoute() const {
+    return decompositionRoute;
+  }
+
+  /**
+   * Sets the shader-selection route for this draw. Must be called before getProgram() so the
+   * program cache key distinguishes the decomposed route from the plain route and avoids serving a
+   * cached program built for a different uniform layout.
+   */
+  void setDecompositionRoute(AOTDecompositionRoute route) {
+    decompositionRoute = route;
+  }
+
  private:
   RenderTarget* renderTarget = nullptr;
   GeometryProcessor* geometryProcessor = nullptr;
@@ -162,6 +192,7 @@ class ProgramInfo {
   CullMode cullMode = CullMode::None;
   DepthStencilDescriptor depthStencil = {};
   uint32_t colorWriteMask = ColorWriteMask::All;
+  AOTDecompositionRoute decompositionRoute = AOTDecompositionRoute::None;
 
   void updateProcessorIndices();
 

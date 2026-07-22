@@ -1,14 +1,18 @@
 // GaussianBlur1DShader fragment shader
+// MAX_SIGMA is a FIXED compile-time constant (max supported kernel), NOT a permutation dimension.
+// The loop upper bound is 4*(MAX_SIGMA+1); the actual radius comes from the Sigma uniform at runtime
+// and the loop breaks early once reached. Sigma being a uniform (not a variant) keeps the variant
+// count bounded — it previously multiplied the fragment domain by 10.
 // Permutation dimensions (frag):
-//   MAX_SIGMA (0~9): maps to maxSigma 1~10. Loop upper bound = 4*(MAX_SIGMA+1).
 //   HAS_XP (0~2): 0=Empty, 1=PorterDuff DST_TEX, 2=PorterDuff FBF
 //   HAS_CHILD_SUBSET (bool): When 1, clamp each sample coordinate to the child texture's Subset
 //                            bounds before sampling. Used when TextureEffect.hasSubset()=true but
 //                            GP has no per-vertex subset attribute.
 #version 450
 
+// Fixed maximum kernel: maxSigma=10 → loop upper bound 4*(9+1)=40. Runtime Sigma <= 10 breaks early.
 #ifndef MAX_SIGMA
-#define MAX_SIGMA 0
+#define MAX_SIGMA 9
 #endif
 #ifndef HAS_XP
 #define HAS_XP 0

@@ -42,13 +42,7 @@ class QuadTextureFillShader : public PrecompiledShader {
  public:
   // Vertex dimensions
   struct VertDims {
-    enum : uint32_t {
-      HAS_COVERAGE,
-      HAS_UV_COORD,
-      HAS_COLOR,
-      HAS_SUBSET,
-      COUNT
-    };
+    enum : uint32_t { HAS_COVERAGE, HAS_UV_COORD, HAS_COLOR, HAS_SUBSET, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationBool("HAS_COVERAGE"),

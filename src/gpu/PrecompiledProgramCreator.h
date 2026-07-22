@@ -31,6 +31,16 @@ namespace tgfx {
 class PrecompiledProgramCreator {
  public:
   static std::shared_ptr<Program> CreateProgram(Context* context, const ProgramInfo* programInfo);
+
+  /// Attempts to create a Program via bounded-AOT decomposition (e.g. a PointwiseChain kernel with
+  /// an Opcode uniform layout) for a draw that opted into a decomposed route. Returns nullptr when
+  /// the fragment-processor chain cannot be decomposed into a valid, closure-covered kernel plan,
+  /// in which case ProgramInfo::getProgram() falls back to the plain route (see review #2 atomicity
+  /// contract). Creation is atomic: a non-null return is a fully valid program whose uniform layout
+  /// matches the decomposed route. The decomposition executor is implemented in stage 2; until then
+  /// this always returns nullptr so behaviour is identical to the plain path.
+  static std::shared_ptr<Program> CreateDecomposedProgram(Context* context,
+                                                          const ProgramInfo* programInfo);
 };
 
 }  // namespace tgfx

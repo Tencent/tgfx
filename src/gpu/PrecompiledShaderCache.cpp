@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PrecompiledShaderCache.h"
+#include <algorithm>
 #include <cstring>
 #include <fstream>
 #include <limits>
@@ -123,6 +124,26 @@ std::vector<PrecompiledFallbackRecord> PrecompiledShaderCache::fallbackRecords()
   return _fallbackRecords;
 }
 
+void PrecompiledShaderCache::recordDraw(const AOTDrawStats& delta, bool complete) {
+  std::lock_guard<std::mutex> autoLock(drawStatsMutex);
+  _drawStats.draws++;
+  if (complete) {
+    _drawStats.completeAOTDraws++;
+  }
+  _drawStats.kernelInvocations += delta.kernelInvocations;
+  _drawStats.offscreenTargets += delta.offscreenTargets;
+  _drawStats.materializedEdges += delta.materializedEdges;
+  _drawStats.renderTargetSwitches += delta.renderTargetSwitches;
+  _drawStats.intermediateReadBytes += delta.intermediateReadBytes;
+  _drawStats.intermediateWriteBytes += delta.intermediateWriteBytes;
+  _drawStats.peakTemporaryBytes = std::max(_drawStats.peakTemporaryBytes, delta.peakTemporaryBytes);
+}
+
+AOTDrawStats PrecompiledShaderCache::drawStats() const {
+  std::lock_guard<std::mutex> autoLock(drawStatsMutex);
+  return _drawStats;
+}
+
 void PrecompiledShaderCache::resetStats() {
   _hitCount.store(0, std::memory_order_relaxed);
   _missCount.store(0, std::memory_order_relaxed);
@@ -131,6 +152,10 @@ void PrecompiledShaderCache::resetStats() {
   }
   for (auto& count : fallbackCounts) {
     count.store(0, std::memory_order_relaxed);
+  }
+  {
+    std::lock_guard<std::mutex> drawLock(drawStatsMutex);
+    _drawStats = {};
   }
   std::lock_guard<std::mutex> autoLock(diagnosticsMutex);
   _hitRecords.clear();
