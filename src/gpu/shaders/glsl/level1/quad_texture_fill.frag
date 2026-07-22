@@ -18,9 +18,6 @@
 #ifndef HAS_YUV
 #define HAS_YUV 0
 #endif
-#ifndef ALPHA_ONLY
-#define ALPHA_ONLY 0
-#endif
 #ifndef HAS_RGBAAA
 #define HAS_RGBAAA 0
 #endif
@@ -61,6 +58,9 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec2 DstTextureCoordScale;
   int XPBlendMode;
 #endif
+  // Alpha-only source (R8 texture) is a runtime uniform rather than a compile-time permutation:
+  // it is pure fragment math, so folding it into a uniform branch halves the variant count.
+  int AlphaOnly;
 };
 
 layout(location = 0) in vec3 TransformedCoords_0;
@@ -115,11 +115,11 @@ void main() {
 
   vec4 color = texture(TextureSampler_0, finalCoord);
 
-#if ALPHA_ONLY
-  // Alpha-only textures use R8 format in Metal. The sampler returns (r, 0, 0, 1).
-  // Replicate .r to all channels to get the actual alpha value.
-  color = vec4(color.r);
-#endif
+  if (AlphaOnly != 0) {
+    // Alpha-only textures use R8 format in Metal. The sampler returns (r, 0, 0, 1).
+    // Replicate .r to all channels to get the actual alpha value.
+    color = vec4(color.r);
+  }
 
 #if HAS_RGBAAA
   color = clamp(color, 0.0, 1.0);
@@ -129,11 +129,11 @@ void main() {
   color = vec4(color.rgb * alpha.r, alpha.r);
 #endif
 
-#if ALPHA_ONLY
-  color = color.a * outputColor;
-#else
-  color = color * outputColor.a;
-#endif
+  if (AlphaOnly != 0) {
+    color = color.a * outputColor;
+  } else {
+    color = color * outputColor.a;
+  }
 
 #if HAS_MASK_TEXTURE
   // Device-space mask coverage: multiply the sampled mask value into the color. Geometry AA

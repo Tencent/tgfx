@@ -245,6 +245,13 @@ void GLSLTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
     computeSubsetRect(rect);
     fragmentUniformData->setData("Subset", rect);
   }
+  // Alpha-only is a runtime uniform in the precompiled QuadTextureFillShader (folded out of the
+  // permutation set). The runtime GLSL codegen bakes it in and does not declare the field, so this
+  // only fires on the AOT path where the field exists.
+  if (fragmentUniformData->hasField("AlphaOnly")) {
+    int alphaOnlyValue = isAlphaOnly() ? 1 : 0;
+    fragmentUniformData->setData("AlphaOnly", alphaOnlyValue);
+  }
 }
 
 void GLSLTextureEffect::appendClamp(FragmentShaderBuilder* fragBuilder,

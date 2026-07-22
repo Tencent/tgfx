@@ -57,10 +57,12 @@ class QuadTextureFillShader : public PrecompiledShader {
 
   // Fragment dimensions (includes vertex-driven HAS_COVERAGE and HAS_COLOR because the fragment
   // shader must declare matching varyings)
+  // ALPHA_ONLY is intentionally NOT a dimension: it is pure fragment math (replicate .r, scale by
+  // alpha), so it is a runtime uniform (AlphaOnly) rather than a compile-time permutation. This
+  // halves the fragment variant count.
   struct FragDims {
     enum : uint32_t {
       HAS_YUV,
-      ALPHA_ONLY,
       HAS_RGBAAA,
       HAS_SUBSET,
       HAS_COVERAGE,
@@ -72,7 +74,6 @@ class QuadTextureFillShader : public PrecompiledShader {
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationBool("HAS_YUV"),
-          PermutationBool("ALPHA_ONLY"),
           PermutationBool("HAS_RGBAAA"),
           PermutationBool("HAS_SUBSET"),
           PermutationBool("HAS_COVERAGE"),
@@ -83,7 +84,7 @@ class QuadTextureFillShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 8, "Update ShouldCompile when fragment dimensions change.");
+  static_assert(FD::COUNT == 7, "Update ShouldCompile when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"QuadTextureFillShader",
@@ -102,10 +103,6 @@ class QuadTextureFillShader : public PrecompiledShader {
                             const std::vector<int>& fragValues) {
     // YUV textures require additional dimensions not yet modeled.
     if (fragValues[FD::HAS_YUV] != 0) {
-      return false;
-    }
-    // ALPHA_ONLY and HAS_RGBAAA are mutually exclusive in practice.
-    if (fragValues[FD::ALPHA_ONLY] != 0 && fragValues[FD::HAS_RGBAAA] != 0) {
       return false;
     }
     // When vertex has the subset attribute, fragment uses HAS_SUBSET=1 (per-quad varying + uniform

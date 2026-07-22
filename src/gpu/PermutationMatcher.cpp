@@ -451,7 +451,7 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   using FD = QuadTextureFillShader::FD;
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT, 0);
-  fragValues[FD::ALPHA_ONLY] = te->isAlphaOnly() ? 1 : 0;
+  // ALPHA_ONLY is now a runtime uniform (set by GLSLTextureEffect::onSetData), not a variant.
   fragValues[FD::HAS_RGBAAA] = te->hasRGBAAA() ? 1 : 0;
   fragValues[FD::HAS_SUBSET] = gpSubset ? 1 : 0;
   fragValues[FD::HAS_COVERAGE] = quadGP->getAAType() == AAType::Coverage ? 1 : 0;
