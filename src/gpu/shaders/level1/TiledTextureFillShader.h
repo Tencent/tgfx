@@ -51,9 +51,17 @@ class TiledTextureFillShader : public PrecompiledShader {
   static_assert(FD::COUNT == 3, "Update info() when fragment dimensions change.");
 
   // Vertex dimensions
-  TGFX_DEFINE_DIMS(HAS_PERSPECTIVE);
-  using VD = Dims;
-  static_assert(VD::COUNT == 1, "Update info() when vertex dimensions change.");
+  struct VertDims {
+    enum : uint32_t { GP_TYPE, HAS_PERSPECTIVE, COUNT };
+    static PermutationDomain domain() {
+      return PermutationDomain({
+          PermutationInt("GP_TYPE", 2),
+          PermutationBool("HAS_PERSPECTIVE"),
+      });
+    }
+  };
+  using VD = VertDims;
+  static_assert(VD::COUNT == 2, "Update info() when vertex dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"TiledTextureFillShader",
@@ -64,7 +72,19 @@ class TiledTextureFillShader : public PrecompiledShader {
             PermutationDomain({}),
             "",
             "",
-            nullptr};
+            ShouldCompile};
+  }
+
+ private:
+  static bool ShouldCompile(uint32_t /*vertIndex*/, uint32_t /*fragIndex*/,
+                            const std::vector<int>& vertValues,
+                            const std::vector<int>& /*fragValues*/) {
+    // The QuadPerEdgeAA path pre-transforms vertices to device space and carries no perspective
+    // coordinate; only the DefaultGeometryProcessor path emits a perspective coord.
+    if (vertValues[VD::GP_TYPE] == 1 && vertValues[VD::HAS_PERSPECTIVE] != 0) {
+      return false;
+    }
+    return true;
   }
 };
 

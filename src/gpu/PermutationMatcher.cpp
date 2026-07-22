@@ -190,10 +190,32 @@ static std::optional<PermutationMatchResult> TryMatchTextureFill(const ProgramIn
   return PermutationMatchResult{TextureFillShader::Name(), vertIndex, fragIndex};
 }
 
+// The precompiled tiled shader supports these ShaderMode values (matching tiled_texture_fill.frag):
+// None(0), Clamp(1), RepeatNearestNone(2), MirrorRepeat(6), ClampToBorderNearest(7),
+// ClampToBorderLinear(8). RepeatLinear/mipmap modes (3,4,5) need multi-sample blending the static
+// shader does not implement, so those fall back to ProgramBuilder.
+static bool TiledModeSupported(int mode) {
+  return mode == 0 || mode == 1 || mode == 2 || mode == 6 || mode == 7 || mode == 8;
+}
+
 static std::optional<PermutationMatchResult> TryMatchTiledTextureFill(
     const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "DefaultGeometryProcessor") {
+  int gpType = 0;
+  bool isQuad = false;
+  if (gp->name() == "DefaultGeometryProcessor") {
+    gpType = 0;
+  } else if (gp->name() == "QuadPerEdgeAAGeometryProcessor") {
+    auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
+    // The precompiled quad vert declares aPosition alone: no coverage/uvCoord/color/subset
+    // attributes. hasUVMatrix() means the coord comes from aPosition (no uvCoord attribute).
+    if (quadGP->getAAType() == AAType::Coverage || !quadGP->hasCommonColor() ||
+        !quadGP->hasUVMatrix() || quadGP->getHasSubset()) {
+      return std::nullopt;
+    }
+    gpType = 1;
+    isQuad = true;
+  } else {
     return std::nullopt;
   }
   if (programInfo->numFragmentProcessors() != 1) {
@@ -214,9 +236,22 @@ static std::optional<PermutationMatchResult> TryMatchTiledTextureFill(
   int modeX = 0;
   int modeY = 0;
   tte->getShaderModes(&modeX, &modeY);
-  if (modeX == 0 && modeY == 0) {
+  if (!TiledModeSupported(modeX) || !TiledModeSupported(modeY)) {
     return std::nullopt;
   }
+  // For the DefaultGeometryProcessor path a both-None (0/0) tiled effect reduces to a plain texture
+  // fill, which TryMatchTextureFill already handles, so reject it here. The QuadPerEdgeAA path has
+  // no such plain fallback for a TiledTextureEffect, so a 0/0 quad tiled fill must match here.
+  if (!isQuad && modeX == 0 && modeY == 0) {
+    return std::nullopt;
+  }
+  using VD = TiledTextureFillShader::VD;
+  auto vertDomain = VD::domain();
+  std::vector<int> vertValues(VD::COUNT, 0);
+  vertValues[VD::GP_TYPE] = gpType;
+  vertValues[VD::HAS_PERSPECTIVE] = 0;
+  auto vertIndex = vertDomain.encode(vertValues);
+
   using FD = TiledTextureFillShader::FragDims;
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
@@ -224,7 +259,7 @@ static std::optional<PermutationMatchResult> TryMatchTiledTextureFill(
   fragValues[FD::HAS_STRICT] = tte->isStrict() ? 1 : 0;
   fragValues[FD::HAS_XP] = xpType;
   auto fragIndex = fragDomain.encode(fragValues);
-  return PermutationMatchResult{"TiledTextureFillShader", 0, fragIndex};
+  return PermutationMatchResult{"TiledTextureFillShader", vertIndex, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchSolidColorFill(
