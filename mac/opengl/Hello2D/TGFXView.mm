@@ -43,9 +43,6 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   int lastSurfaceWidth;
   int lastSurfaceHeight;
   bool presentImmediately;
-  bool isDraggingGlass;
-  CGPoint glassDragOffset;
-  hello2d::LayerBuilder* currentBuilder;
 }
 
 - (BOOL)acceptsFirstResponder {
@@ -74,11 +71,6 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     NSString* imagePath = [[NSBundle mainBundle] pathForResource:@"bridge" ofType:@"jpg"];
     auto image = tgfx::Image::MakeFromFile(imagePath.UTF8String);
     appHost->addImage("bridge", image);
-    NSString* checkerPath = [[NSBundle mainBundle] pathForResource:@"checker_128" ofType:@"png"];
-    if (checkerPath) {
-      auto checkerImage = tgfx::Image::MakeFromFile(checkerPath.UTF8String);
-      appHost->addImage("checker", checkerImage);
-    }
     imagePath = [[NSBundle mainBundle] pathForResource:@"tgfx" ofType:@"png"];
     image = tgfx::Image::MakeFromFile(imagePath.UTF8String);
     appHost->addImage("TGFX", image);
@@ -167,9 +159,9 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   auto numBuilders = hello2d::LayerBuilder::Count();
   auto index = (self.drawIndex % numBuilders);
   if (index != lastDrawIndex || !contentLayer) {
-    currentBuilder = hello2d::LayerBuilder::GetByIndex(index);
-    if (currentBuilder) {
-      contentLayer = currentBuilder->buildLayerTree(appHost.get());
+    auto builder = hello2d::LayerBuilder::GetByIndex(index);
+    if (builder) {
+      contentLayer = builder->buildLayerTree(appHost.get());
       if (contentLayer) {
         displayList.root()->removeChildren();
         displayList.root()->addChild(contentLayer);
@@ -272,81 +264,11 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
 }
 
 - (void)mouseDown:(NSEvent*)event {
-  // Check if current builder supports drag interaction.
-  if (currentBuilder && currentBuilder->name() == "LiquidGlass") {
-    CGPoint mousePoint = [self convertPoint:event.locationInWindow fromView:nil];
-    mousePoint.y = self.bounds.size.height - mousePoint.y;
-    CGPoint backingPoint = [self convertPointToBacking:mousePoint];
-    float contentX = (backingPoint.x - self.contentOffset.x) / self.zoomScale;
-    float contentY = (backingPoint.y - self.contentOffset.y) / self.zoomScale;
-    // Glass is 500x500 at (110, 110). Check if click is inside.
-    if (contentX >= 110 && contentX <= 610 && contentY >= 110 && contentY <= 610) {
-      isDraggingGlass = YES;
-      glassDragOffset = CGPointMake(contentX - 110, contentY - 110);
-      return;
-    }
-  }
-  // Default: switch to next builder.
   self.drawIndex++;
   self.zoomScale = 1.0f;
   self.contentOffset = CGPointZero;
   [self updateZoomScaleAndOffset];
   [self updateLayerTree];
-}
-
-- (void)mouseDragged:(NSEvent*)event {
-  if (!isDraggingGlass || !currentBuilder) {
-    return;
-  }
-  CGPoint mousePoint = [self convertPoint:event.locationInWindow fromView:nil];
-  mousePoint.y = self.bounds.size.height - mousePoint.y;
-  CGPoint backingPoint = [self convertPointToBacking:mousePoint];
-  float contentX = (backingPoint.x - self.contentOffset.x) / self.zoomScale;
-  float contentY = (backingPoint.y - self.contentOffset.y) / self.zoomScale;
-  float glassX = contentX - glassDragOffset.x;
-  float glassY = contentY - glassDragOffset.y;
-  currentBuilder->setGlassPosition(glassX, glassY);
-  presentImmediately = true;
-}
-
-- (void)mouseUp:(NSEvent*)event {
-  isDraggingGlass = NO;
-}
-
-- (void)keyDown:(NSEvent*)event {
-  auto index = (self.drawIndex % hello2d::LayerBuilder::Count());
-  auto builder = hello2d::LayerBuilder::GetByIndex(static_cast<int>(index));
-  if (builder == nullptr) {
-    return;
-  }
-  static float depth = 30.0f;
-  static float refraction = 50.0f;
-  static float lightAngle = 135.0f;
-  if (event.keyCode == 126) {  // Up arrow
-    depth = std::clamp(depth + 5.0f, 0.0f, 100.0f);
-    builder->setDepth(depth);
-    presentImmediately = true;
-  } else if (event.keyCode == 125) {  // Down arrow
-    depth = std::clamp(depth - 5.0f, 0.0f, 100.0f);
-    builder->setDepth(depth);
-    presentImmediately = true;
-  } else if (event.keyCode == 123) {  // Left arrow
-    refraction = std::clamp(refraction - 5.0f, 0.0f, 100.0f);
-    builder->setRefraction(refraction);
-    presentImmediately = true;
-  } else if (event.keyCode == 124) {  // Right arrow
-    refraction = std::clamp(refraction + 5.0f, 0.0f, 100.0f);
-    builder->setRefraction(refraction);
-    presentImmediately = true;
-  } else if (event.keyCode == 12) {  // Q key
-    lightAngle = lightAngle - 15.0f;
-    builder->setLightAngle(lightAngle);
-    presentImmediately = true;
-  } else if (event.keyCode == 14) {  // E key
-    lightAngle = lightAngle + 15.0f;
-    builder->setLightAngle(lightAngle);
-    presentImmediately = true;
-  }
 }
 
 - (void)scrollWheel:(NSEvent*)event {

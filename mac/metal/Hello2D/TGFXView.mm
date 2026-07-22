@@ -64,11 +64,6 @@
     imagePath = [[NSBundle mainBundle] pathForResource:@"tgfx" ofType:@"png"];
     image = tgfx::Image::MakeFromFile(imagePath.UTF8String);
     appHost->addImage("TGFX", image);
-    NSString* checkerPath = [[NSBundle mainBundle] pathForResource:@"checker_120" ofType:@"png"];
-    if (checkerPath) {
-      auto checkerImage = tgfx::Image::MakeFromFile(checkerPath.UTF8String);
-      appHost->addImage("checker", checkerImage);
-    }
     auto typeface = tgfx::Typeface::MakeFromName("PingFang SC", "");
     appHost->addTypeface("default", typeface);
     typeface = tgfx::Typeface::MakeFromName("Apple Color Emoji", "");
@@ -204,90 +199,11 @@
 }
 
 - (void)mouseDown:(NSEvent*)event {
-  if ((event.modifierFlags & NSEventModifierFlagOption) != 0) {
-    [self dragGlass:event];
-  } else {
-    self.drawIndex++;
-    self.zoomScale = 1.0f;
-    self.contentOffset = CGPointZero;
-    [self updateZoomScaleAndOffset];
-    [self updateLayerTree];
-  }
-}
-
-- (void)mouseDragged:(NSEvent*)event {
-  if ((event.modifierFlags & NSEventModifierFlagOption) != 0) {
-    [self dragGlass:event];
-  }
-}
-
-- (void)dragGlass:(NSEvent*)event {
-  CGPoint mousePoint = [self convertPoint:event.locationInWindow fromView:nil];
-  mousePoint.y = self.bounds.size.height - mousePoint.y;
-  CGPoint backingPoint = [self convertPointToBacking:mousePoint];
-  float contentX = (backingPoint.x - self.contentOffset.x) / self.zoomScale;
-  float contentY = (backingPoint.y - self.contentOffset.y) / self.zoomScale;
-
-  auto index = (self.drawIndex % hello2d::LayerBuilder::Count());
-  auto builder = hello2d::LayerBuilder::GetByIndex(static_cast<int>(index));
-  if (builder) {
-    builder->setGlassPosition(contentX, contentY);
-  }
-  presentImmediately = true;
-}
-
-- (void)keyDown:(NSEvent*)event {
-  auto index = (self.drawIndex % hello2d::LayerBuilder::Count());
-  auto builder = hello2d::LayerBuilder::GetByIndex(static_cast<int>(index));
-  if (builder == nullptr) {
-    return;
-  }
-  static float depth = 30.0f;
-  static float refraction = 50.0f;
-  static float lightAngle = 135.0f;
-  static float frost = 0.0f;
-  static float dispersion = 0.0f;
-  if (event.keyCode == 126) {  // Up arrow
-    depth = std::clamp(depth + 1.0f, 0.0f, 100.0f);
-    builder->setDepth(depth);
-    presentImmediately = true;
-  } else if (event.keyCode == 125) {  // Down arrow
-    depth = std::clamp(depth - 1.0f, 0.0f, 100.0f);
-    builder->setDepth(depth);
-    presentImmediately = true;
-  } else if (event.keyCode == 123) {  // Left arrow
-    refraction = std::clamp(refraction - 5.0f, 0.0f, 100.0f);
-    builder->setRefraction(refraction);
-    presentImmediately = true;
-  } else if (event.keyCode == 124) {  // Right arrow
-    refraction = std::clamp(refraction + 5.0f, 0.0f, 100.0f);
-    builder->setRefraction(refraction);
-    presentImmediately = true;
-  } else if (event.keyCode == 12) {  // Q key
-    lightAngle = lightAngle - 15.0f;
-    builder->setLightAngle(lightAngle);
-    presentImmediately = true;
-  } else if (event.keyCode == 14) {  // E key
-    lightAngle = lightAngle + 15.0f;
-    builder->setLightAngle(lightAngle);
-    presentImmediately = true;
-  } else if (event.keyCode == 13) {  // W key
-    frost = std::clamp(frost + 5.0f, 0.0f, 100.0f);
-    builder->setFrost(frost);
-    presentImmediately = true;
-  } else if (event.keyCode == 1) {  // S key
-    frost = std::clamp(frost - 5.0f, 0.0f, 100.0f);
-    builder->setFrost(frost);
-    presentImmediately = true;
-  } else if (event.keyCode == 0) {  // A key
-    dispersion = std::clamp(dispersion - 5.0f, 0.0f, 100.0f);
-    builder->setDispersion(dispersion);
-    presentImmediately = true;
-  } else if (event.keyCode == 2) {  // D key
-    dispersion = std::clamp(dispersion + 5.0f, 0.0f, 100.0f);
-    builder->setDispersion(dispersion);
-    presentImmediately = true;
-  }
+  self.drawIndex++;
+  self.zoomScale = 1.0f;
+  self.contentOffset = CGPointZero;
+  [self updateZoomScaleAndOffset];
+  [self updateLayerTree];
 }
 
 - (void)scrollWheel:(NSEvent*)event {
