@@ -149,10 +149,6 @@ class GlassStyle : public LayerStyle {
     return std::clamp(_depth / 100.0f, 0.0f, 1.0f);
   }
 
-  float getGlassThickness(float minHalf) const {
-    return 1.0f + getDepthRatio() * std::max(minHalf - 1.0f, 0.0f);
-  }
-
   float _refraction = 80.0f;
   float _depth = 20.0f;
   float _frost = 5.0f;

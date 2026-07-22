@@ -20,6 +20,12 @@
 
 namespace tgfx {
 
+// Returns the shader expression for sampling the child at a coord offset by the tent blur kernel.
+// "offset" and "offsetValue" are shader variables declared in the emitted code.
+static std::string TentBlurOffsetCoordFunc(std::string_view coord) {
+  return "(" + std::string(coord) + " + offset * offsetValue)";
+}
+
 PlacementPtr<FragmentProcessor> TentBlur1DFragmentProcessor::Make(
     BlockAllocator* allocator, PlacementPtr<FragmentProcessor> processor, float radius,
     TentBlurDirection direction, float stepLength, int maxRadius, bool inputIsPacked) {
@@ -86,9 +92,7 @@ void GLSLTentBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend("total += weight;");
 
   std::string tempColor = "tempColor";
-  emitChild(0, &tempColor, args, [](std::string_view coord) {
-    return "(" + std::string(coord) + " + offset * offsetValue)";
-  });
+  emitChild(0, &tempColor, args, TentBlurOffsetCoordFunc);
 
   // Unpack sample: if inputIsPacked, decode RGBA8 to float; otherwise read .a channel.
   if (inputIsPacked) {

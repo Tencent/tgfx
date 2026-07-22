@@ -38,8 +38,8 @@ static std::shared_ptr<TextureProxy> MakeTextureProxy(Context* context,
   if (textureImage == nullptr) {
     return nullptr;
   }
-  auto textureImageImpl = std::dynamic_pointer_cast<TextureImage>(textureImage);
-  return textureImageImpl ? textureImageImpl->getTextureProxy() : nullptr;
+  auto textureImageImpl = std::static_pointer_cast<TextureImage>(textureImage);
+  return textureImageImpl->getTextureProxy();
 }
 
 PlacementPtr<FragmentProcessor> GlassRefractionImageFilter::asFragmentProcessor(

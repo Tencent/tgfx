@@ -48,9 +48,9 @@ struct GlassRefractionParams {
   float origHeight = 0.0f;
   float udfPixelToLayerPixel = 1.0f;
 
-  // Render-time state. In the inline asFragmentProcessor path, renderOffset is 0 because
-  // coordinate translation is handled by coordMatrix. The base class lockTextureProxy fallback
-  // passes uvMatrix = MakeTrans(renderBounds.left, renderBounds.top) to compensate.
+  // renderOffset is always 0: coordinate translation is handled by coordMatrix (which
+  // receives uvMatrix from the base class lockTextureProxy path). The fields are retained
+  // for GPU uniform layout stability.
   float renderOffsetX = 0.0f;
   float renderOffsetY = 0.0f;
 };

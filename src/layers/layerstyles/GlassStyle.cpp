@@ -226,6 +226,9 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
   float scaleRatioX = static_cast<float>(scaledW) / static_cast<float>(bgImage->width());
   float scaleRatioY = static_cast<float>(scaledH) / static_cast<float>(bgImage->height());
   bgImage = bgImage->makeScaled(scaledW, scaledH, SamplingOptions(FilterMode::Linear));
+  if (bgImage == nullptr) {
+    return;
+  }
   bgOffset.x *= scaleRatioX;
   bgOffset.y *= scaleRatioY;
 
@@ -282,6 +285,9 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
     if (udfWidth != input.content->width() || udfHeight != input.content->height()) {
       udfContent =
           input.content->makeScaled(udfWidth, udfHeight, SamplingOptions(FilterMode::Linear));
+      if (udfContent == nullptr) {
+        return;
+      }
     }
     // Blur radius in UDF pixel space. Since UDF size is origBounds-based, the radius is
     // zoom-invariant.
@@ -304,6 +310,9 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       if (edgeLightWidth != udfWidth || edgeLightHeight != udfHeight) {
         edgeLightContent = udfContent->makeScaled(edgeLightWidth, edgeLightHeight,
                                                   SamplingOptions(FilterMode::Linear));
+        if (edgeLightContent == nullptr) {
+          return;
+        }
       }
       float edgeLightRadiusX = EDGE_LIGHT_BLUR_RADIUS * udfScale;
       float edgeLightRadiusY = EDGE_LIGHT_BLUR_RADIUS * udfScale;
@@ -376,14 +385,15 @@ std::shared_ptr<ImageFilter> GlassStyle::getRefractionFilter(
     std::shared_ptr<Image> maskImage, std::shared_ptr<Image> coarseMaskImage) {
   float minHalf = std::min(halfWidth, halfHeight);
   float depthRatio = getDepthRatio();
-  float glassThickness = getGlassThickness(minHalf);
   GlassRefractionParams params = {};
   params.glassWidth = static_cast<float>(layerWidth);
   params.glassHeight = static_cast<float>(layerHeight);
   params.halfW = halfWidth;
   params.halfH = halfHeight;
   params.minHalf = minHalf;
-  params.glassThickness = glassThickness;
+  // glassThickness and origMinHalf are legacy SDF padding slots retained for GPU uniform
+  // layout stability. The shader no longer reads them, so they are set to 0.
+  params.glassThickness = 0.0f;
   params.refractionFactor = std::clamp(_refraction / 100.0f, 0.0f, 1.0f);
   // Scale dispersion to [0, 0.2]: the shader offsets R/B UVs by uvOffset * (1 ± dispersion),
   // so 0.2 means max 20% additional offset, keeping chromatic aberration subtle.
@@ -392,7 +402,7 @@ std::shared_ptr<ImageFilter> GlassStyle::getRefractionFilter(
   params.depthRatio = depthRatio;
   params.lightAngle = _lightAngle;
   params.lightIntensity = (_lightIntensity > 0) ? _lightIntensity / 100.0f : 0.0f;
-  params.origMinHalf = minHalf;
+  params.origMinHalf = 0.0f;
   params.origWidth = halfWidth * 2.0f;
   params.origHeight = halfHeight * 2.0f;
   params.udfPixelToLayerPixel = udfPixelToLayerPixel;

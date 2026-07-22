@@ -99,14 +99,12 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("float invOrigW = %s.x;", glassThicknessParam.c_str());
   fragBuilder->codeAppendf("float invOrigH = %s.y;", glassThicknessParam.c_str());
   fragBuilder->codeAppendf("float lightDirX = %s.z;", glassThicknessParam.c_str());
-  fragBuilder->codeAppendf("float glassThickness = %s.w;", glassThicknessParam.c_str());
   fragBuilder->codeAppendf("float refractionFactor = %s.x;", refractionParams.c_str());
   fragBuilder->codeAppendf("float dispersion = %s.y;", refractionParams.c_str());
   fragBuilder->codeAppendf("float splay = %s.x;", lightParams.c_str());
   fragBuilder->codeAppendf("float depthRatio = %s.y;", lightParams.c_str());
   fragBuilder->codeAppendf("float lightDirY = %s.z;", lightParams.c_str());
   fragBuilder->codeAppendf("float lightIntensity = %s.w;", lightParams.c_str());
-  fragBuilder->codeAppendf("float origMinHalf = %s.x;", miscParams.c_str());
   fragBuilder->codeAppendf("float udfPixelToLayerPixel = %s.y;", miscParams.c_str());
 
   // Edge weight and normals.

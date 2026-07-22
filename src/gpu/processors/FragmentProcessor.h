@@ -84,17 +84,6 @@ class FragmentProcessor : public Processor {
       const std::shared_ptr<ColorSpace>& dstColorSpace = nullptr);
 
   /**
-   * Locks a texture proxy from the given image. This is provided as a convenience for
-   * ImageFilter subclasses that need direct TextureProxy access (e.g., for multi-sample shaders
-   * that cannot use the standard FragmentProcessor::Make path). FragmentProcessor is a friend of
-   * Image, so it can access the protected lockTextureProxy method.
-   * @param image The source image to lock the texture from. Must not be nullptr.
-   * @param args The TPArgs used to create the texture proxy.
-   * @return The locked texture proxy, or nullptr on failure.
-   */
-  static std::shared_ptr<TextureProxy> LockTextureProxy(const Image* image, const TPArgs& args);
-
-  /**
    *  In many instances (e.g., Shader::asFragmentProcessor() implementations) it is desirable to
    *  only consider the input color's alpha. However, there is a competing desire to have reusable
    *  FragmentProcessor subclasses that can be used in other scenarios where the entire input
