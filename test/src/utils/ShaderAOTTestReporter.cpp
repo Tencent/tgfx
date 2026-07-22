@@ -66,6 +66,7 @@ struct ShaderAOTTestResult {
   std::array<uint32_t, FALLBACK_REASON_COUNT> fallbackCounts = {};
   std::vector<PrecompiledHitRecord> hitRecords = {};
   std::vector<PrecompiledFallbackRecord> fallbackRecords = {};
+  AOTDrawStats drawStats = {};
 };
 
 struct ShaderAOTSummary {
@@ -74,7 +75,32 @@ struct ShaderAOTSummary {
   uint64_t artifactMisses = 0;
   std::array<uint64_t, AOT_STAGE_COUNT> aotStageCounts = {};
   std::array<uint64_t, FALLBACK_REASON_COUNT> fallbackCounts = {};
+  AOTDrawStats drawStats = {};
 };
+
+static void AddDrawStats(AOTDrawStats* target, const AOTDrawStats& source) {
+  target->draws += source.draws;
+  target->completeAOTDraws += source.completeAOTDraws;
+  target->kernelInvocations += source.kernelInvocations;
+  target->offscreenTargets += source.offscreenTargets;
+  target->materializedEdges += source.materializedEdges;
+  target->renderTargetSwitches += source.renderTargetSwitches;
+  target->intermediateReadBytes += source.intermediateReadBytes;
+  target->intermediateWriteBytes += source.intermediateWriteBytes;
+  target->peakTemporaryBytes = std::max(target->peakTemporaryBytes, source.peakTemporaryBytes);
+}
+
+static nlohmann::json DrawStatsToJSON(const AOTDrawStats& stats) {
+  return {{"draws", stats.draws},
+          {"completeAOTDraws", stats.completeAOTDraws},
+          {"kernelInvocations", stats.kernelInvocations},
+          {"offscreenTargets", stats.offscreenTargets},
+          {"materializedEdges", stats.materializedEdges},
+          {"renderTargetSwitches", stats.renderTargetSwitches},
+          {"intermediateReadBytes", stats.intermediateReadBytes},
+          {"intermediateWriteBytes", stats.intermediateWriteBytes},
+          {"peakTemporaryBytes", stats.peakTemporaryBytes}};
+}
 
 struct AggregatedShader {
   std::string shaderName;
@@ -375,6 +401,7 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
         }
         result.hitRecords = cache->hitRecords();
         result.fallbackRecords = cache->fallbackRecords();
+        result.drawStats = cache->drawStats();
         cache->setDiagnosticRecordingEnabled(false);
         device->unlock();
       }
@@ -428,6 +455,7 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
         testsWithFallbacks++;
       }
       AddProgramStats(&summary.programStats, testResult.programStats);
+      AddDrawStats(&summary.drawStats, testResult.drawStats);
       summary.artifactHits += testResult.artifactHits;
       summary.artifactMisses += testResult.artifactMisses;
       for (size_t i = 0; i < AOT_STAGE_COUNT; ++i) {
@@ -490,6 +518,7 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
            {"profileTag", testResult.profileTag},
            {"program", ProgramStatsToJSON(testResult.programStats)},
            {"aotStages", AOTStageCountsToJSON(testResult.aotStageCounts)},
+           {"drawMetrics", DrawStatsToJSON(testResult.drawStats)},
            {"artifactLookups",
             {{"hits", testResult.artifactHits}, {"misses", testResult.artifactMisses}}},
            {"consistencyChecks", std::move(testConsistency.checks)},
@@ -614,6 +643,7 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
           {"testsWithFallbacks", testsWithFallbacks},
           {"program", ProgramStatsToJSON(summary.programStats)},
           {"aotStages", AOTStageCountsToJSON(summary.aotStageCounts)},
+          {"drawMetrics", DrawStatsToJSON(summary.drawStats)},
           {"coldProgramCreations", coldCreations},
           {"coldAOTHitRate",
            Percentage(summary.programStats.precompiledArtifactCreations, coldCreations)},
