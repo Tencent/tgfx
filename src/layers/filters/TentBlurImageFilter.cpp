@@ -100,7 +100,10 @@ std::shared_ptr<TextureProxy> TentBlurImageFilter::lockTextureProxy(std::shared_
 
   PlacementPtr<FragmentProcessor> sourceFragment = getSourceFragmentProcessor(
       source, args.context, args.renderFlags, srcSampleBounds, Point(blurDstScaleX, blurDstScaleY));
-  const auto isAlphaOnly = source->isAlphaOnly();
+  // The TentBlur1D shader packs a float into RGBA8 channels. When the source is alpha-only, the
+  // packed data would only occupy the A channel and the second-pass dot(rgba, UNPACK) decodes to
+  // ~0, silently breaking UDF/refraction. Always force an RGBA8 blur target.
+  const bool isAlphaOnly = false;
   const bool isBlurDstScaled = (!FloatNearlyEqual(blurDstWidth, dstDrawWidth) ||
                                 !FloatNearlyEqual(blurDstHeight, dstDrawHeight));
   const bool isBlurDstTrans =

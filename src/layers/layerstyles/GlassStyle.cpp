@@ -401,7 +401,6 @@ std::shared_ptr<ImageFilter> GlassStyle::getRefractionFilter(
   params.origWidth = halfWidth * 2.0f;
   params.origHeight = halfHeight * 2.0f;
   params.udfPixelToLayerPixel = udfPixelToLayerPixel;
-  params.shapeType = GlassShapeType::AlphaMask;
   refractionFilter = std::make_shared<GlassRefractionImageFilter>(params, std::move(maskImage),
                                                                   std::move(coarseMaskImage));
   return refractionFilter;

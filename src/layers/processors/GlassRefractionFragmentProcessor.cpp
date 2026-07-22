@@ -32,7 +32,6 @@ GlassRefractionFragmentProcessor::GlassRefractionFragmentProcessor(
 }
 
 void GlassRefractionFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
-  bytesKey->write(static_cast<uint32_t>(params.shapeType));
   uint32_t flags = 0;
   if (fineMaskProxy != nullptr) {
     flags |= 1;
