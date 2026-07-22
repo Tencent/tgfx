@@ -134,13 +134,7 @@ class GlassStyle : public LayerStyle {
 
   std::shared_ptr<ImageFilter> getFrostFilter(float contentScale);
 
-  void invalidateFilter();
-
-  void invalidateRefractionFilter();
-
   void invalidateFrostFilter();
-
-  void invalidateMaskFilter();
 
   std::shared_ptr<ImageFilter> getRefractionFilter(int layerWidth, int layerHeight, float halfWidth,
                                                    float halfHeight, float udfPixelToLayerPixel,
@@ -169,15 +163,6 @@ class GlassStyle : public LayerStyle {
 
   std::shared_ptr<ImageFilter> frostFilter = nullptr;
   float currentFrostScale = 0.0f;
-
-  std::shared_ptr<ImageFilter> refractionFilter = nullptr;
-  std::shared_ptr<ImageFilter> maskBlurFilter = nullptr;
-  std::shared_ptr<ImageFilter> coarseMaskBlurFilter = nullptr;
-
-  float cachedMaskBlurRadiusX = 0.0f;
-  float cachedMaskBlurRadiusY = 0.0f;
-  float cachedCoarseMaskBlurRadiusX = 0.0f;
-  float cachedCoarseMaskBlurRadiusY = 0.0f;
 };
 
 }  // namespace tgfx

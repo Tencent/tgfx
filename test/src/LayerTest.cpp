@@ -3977,11 +3977,6 @@ static void RunGlassStyleTest(const std::string& keySuffix, float zoomScale = 1.
   float angleVals[] = {0, 135, 270};
   float intensityVals[] = {0, 50, 100};
 
-  struct SweepRow {
-    float* vals;
-    float defValIndex;
-  };
-
   for (int r = 0; r < rows; r++) {
     for (int c = 0; c < cols; c++) {
       float cx = gap + static_cast<float>(c) * (cellSize + gap);

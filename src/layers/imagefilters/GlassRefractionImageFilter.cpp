@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GlassRefractionImageFilter.h"
+#include "layers/imagefilters/GlassRefractionImageFilter.h"
 #include "core/images/TextureImage.h"
 #include "gpu/TPArgs.h"
 #include "layers/processors/GlassRefractionFragmentProcessor.h"
