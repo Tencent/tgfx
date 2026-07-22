@@ -1215,13 +1215,6 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   for (auto& rect : worldRects) {
     rect.outset(_root->maxBackgroundOutset, _root->maxBackgroundOutset);
   }
-  // Clamp the BackgroundSource surface to areas where background styles actually exist,
-  // preventing oversized offscreen textures when outset extends beyond glass layer bounds.
-  if (!_root->backgroundLayerBounds.isEmpty()) {
-    auto bgSurfaceRect = viewMatrix.mapRect(_root->backgroundLayerBounds);
-    bgSurfaceRect.roundOut();
-    surfaceUnion.intersect(bgSurfaceRect);
-  }
   DrawArgs args(context);
   args.dstColorSpace = surface->colorSpace();
   args.subtreeCacheMaxSize = _subtreeCacheMaxSize;

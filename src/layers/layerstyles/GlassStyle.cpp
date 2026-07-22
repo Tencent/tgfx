@@ -32,6 +32,7 @@
 #include "tgfx/core/SamplingOptions.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/GPU.h"
+#include "tgfx/layers/Layer.h"
 
 namespace tgfx {
 
@@ -120,9 +121,17 @@ void GlassStyle::setCornerRadius(float radius) {
 
 Rect GlassStyle::filterBackground(const Rect& srcRect, float contentScale) {
   auto result = srcRect;
-  // Compute frost outset without caching the filter, since onDraw applies frost at a different
-  // scale (contentScale * bgScale) to the downsampled background image. Caching here would be
-  // invalidated immediately by onDraw.
+  auto sizeBounds = srcRect;
+  // Layer::updateRenderBounds passes an empty rectangle and reads right/bottom as pure outset
+  // amounts. Refraction depends on layer dimensions, so use the owner's bounds in root coordinates
+  // for that call. Non-empty rectangles come from dirty-region propagation and must retain their
+  // original position.
+  if (sizeBounds.isEmpty() && !owners.empty() && owners[0] != nullptr) {
+    auto owner = owners[0];
+    sizeBounds = owner->getBounds(owner->root(), false);
+  }
+  // Do not cache the frost filter: onDraw applies frost at a different scale
+  // (contentScale * bgScale) to the downsampled background image, invalidating any cache here.
   if (_frost > 0) {
     float sigma = (_frost / 100.0f) * MaxFrostSigma * contentScale;
     auto filter = ImageFilter::Blur(sigma, sigma, TileMode::Mirror);
@@ -130,8 +139,8 @@ Rect GlassStyle::filterBackground(const Rect& srcRect, float contentScale) {
   }
   // Refraction outset: expand the background capture area to cover the maximum UV offset.
   if (_refraction > 0 || _lightIntensity > 0) {
-    auto halfW = srcRect.width() * 0.5f;
-    auto halfH = srcRect.height() * 0.5f;
+    auto halfW = sizeBounds.width() * 0.5f;
+    auto halfH = sizeBounds.height() * 0.5f;
     auto minHalf = std::min(halfW, halfH);
     float refractionFactor = getRefractionFactor();
     float depthRatio = getDepthRatio();
