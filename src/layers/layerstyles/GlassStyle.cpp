@@ -133,11 +133,11 @@ Rect GlassStyle::filterBackground(const Rect& srcRect, float contentScale) {
     float depthRatio = getDepthRatio();
     float glassThickness = getGlassThickness(minHalf);
     float analyticalOffset = glassThickness * refractionFactor;
-    // Match the shader's AlphaMask max displacement: halfW * refractionFactor * depthRatio *
+    // Match the shader's AlphaMask max displacement: minHalf * refractionFactor * depthRatio *
     // depthScale, where depthScale = smoothstep(0.0, 0.1, depthRatio).
     float depthT = std::clamp(depthRatio / 0.1f, 0.0f, 1.0f);
     float depthScale = depthT * depthT * (3.0f - 2.0f * depthT);
-    float alphaMaskOffset = halfW * refractionFactor * depthRatio * depthScale;
+    float alphaMaskOffset = minHalf * refractionFactor * depthRatio * depthScale;
     float refractionOutset = std::max(analyticalOffset, alphaMaskOffset);
     refractionOutset = std::max(refractionOutset, 1.0f);
     result.join(srcRect.makeOutset(refractionOutset, refractionOutset));

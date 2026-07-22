@@ -260,7 +260,7 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppend(
         "  float refractionDistance = minHalf * refractionFactor * depthRatio * depthScale;");
     fragBuilder->codeAppend(
-        "  float edgeProximity = (1.0 - height * height) * (1.0 - height * height);");
+        "  float edgeProximity = (1.0 - height * height) * (1.0 - height * height) * 1.2;");
     fragBuilder->codeAppend("  float offsetDist = refractionDistance * edgeProximity;");
     fragBuilder->codeAppend("  vec2 displacement = mixedDir * offsetDist;");
     fragBuilder->codeAppend("  vec2 maxDisplacement = vec2(0.999) * refractionDistance;");
