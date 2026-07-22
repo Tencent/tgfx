@@ -49,17 +49,18 @@ class GaussianBlur1DShader : public PrecompiledShader {
   using VD = VertDims;
 
   struct FragDims {
-    enum : uint32_t { HAS_XP, HAS_CHILD_SUBSET, HAS_COVERAGE, COUNT };
+    enum : uint32_t { HAS_XP, HAS_CHILD_SUBSET, HAS_COVERAGE, HAS_TILED_CHILD, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("HAS_XP", 3),
           PermutationBool("HAS_CHILD_SUBSET"),
           PermutationInt("HAS_COVERAGE", 3),
+          PermutationBool("HAS_TILED_CHILD"),
       });
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 3, "Update info() when fragment dimensions change.");
+  static_assert(FD::COUNT == 4, "Update info() when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"GaussianBlur1DShader",
@@ -70,7 +71,19 @@ class GaussianBlur1DShader : public PrecompiledShader {
             PermutationDomain({}),
             "",
             "",
-            nullptr};
+            ShouldCompile};
+  }
+
+ private:
+  static bool ShouldCompile(uint32_t /*vertIndex*/, uint32_t /*fragIndex*/,
+                            const std::vector<int>& /*vertValues*/,
+                            const std::vector<int>& fragValues) {
+    // A tiled child carries its own tiling coordinate handling, so the plain-child subset clamp is
+    // never used at the same time; prune that redundant half of the cartesian product.
+    if (fragValues[FD::HAS_TILED_CHILD] != 0 && fragValues[FD::HAS_CHILD_SUBSET] != 0) {
+      return false;
+    }
+    return true;
   }
 };
 

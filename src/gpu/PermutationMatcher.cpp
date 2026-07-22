@@ -1081,17 +1081,37 @@ static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
     return std::nullopt;
   }
   auto* blur = static_cast<const GaussianBlur1DFragmentProcessor*>(fp);
-  // The precompiled blur shader inlines a simple texture() call for its child.
-  // It does NOT support TiledTextureEffect children (which need Subset/Clamp/Dimension uniforms).
   if (blur->numChildProcessors() != 1) {
     return std::nullopt;
   }
   auto childFP = blur->childProcessor(0);
-  if (childFP == nullptr || childFP->name() != "TextureEffect") {
+  if (childFP == nullptr) {
     return std::nullopt;
   }
-  auto* childTE = static_cast<const TextureEffect*>(childFP);
-  if (childTE->numTextureSamplers() == 0) {
+  // The blur child is either a plain TextureEffect (inlined texture() call) or a TiledTextureEffect,
+  // in which case the shared tiled_sample.inc tiling is applied per tap (HAS_TILED_CHILD). Tiled
+  // children are limited to the ShaderMode values tiled_sample.inc implements; others fall back.
+  bool childHasSubset = false;
+  bool tiledChild = false;
+  if (childFP->name() == "TextureEffect") {
+    auto* childTE = static_cast<const TextureEffect*>(childFP);
+    if (childTE->numTextureSamplers() == 0) {
+      return std::nullopt;
+    }
+    childHasSubset = childTE->hasSubset();
+  } else if (childFP->name() == "TiledTextureEffect") {
+    auto* childTiled = static_cast<const TiledTextureEffect*>(childFP);
+    if (childTiled->numTextureSamplers() == 0 || childTiled->hasPerspective()) {
+      return std::nullopt;
+    }
+    int modeX = 0;
+    int modeY = 0;
+    childTiled->getShaderModes(&modeX, &modeY);
+    if (!TiledModeSupported(modeX) || !TiledModeSupported(modeY)) {
+      return std::nullopt;
+    }
+    tiledChild = true;
+  } else {
     return std::nullopt;
   }
   // Sigma is now a runtime uniform, not a variant dimension. The precompiled shader uses a fixed
@@ -1101,10 +1121,6 @@ static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
   if (sigma < 1 || sigma > 10) {
     return std::nullopt;
   }
-  // Determine if the child TextureEffect requires subset clamping. When hasSubset()=true, we use
-  // the Subset uniform in the blur loop to clamp each sample coordinate to the valid texel range,
-  // preventing edge bleeding artifacts.
-  bool childHasSubset = childTE->hasSubset();
 
   using VD = GaussianBlur1DShader::VD;
   auto vertDomain = VD::domain();
@@ -1118,6 +1134,7 @@ static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
   fragValues[FD::HAS_XP] = xpType;
   fragValues[FD::HAS_CHILD_SUBSET] = childHasSubset ? 1 : 0;
   fragValues[FD::HAS_COVERAGE] = coverageType;
+  fragValues[FD::HAS_TILED_CHILD] = tiledChild ? 1 : 0;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"GaussianBlur1DShader", vertIndex, fragIndex};
 }
