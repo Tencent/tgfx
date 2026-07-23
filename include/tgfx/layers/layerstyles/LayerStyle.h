@@ -146,6 +146,16 @@ class LayerStyle : public LayerProperty {
   }
 
   /**
+   * Whether this style also needs the contour image in addition to whatever extraSourceType()
+   * requests. Allows Background-sourced styles to access the contour via
+   * LayerStyleInput::contourSource. Default is false. When extraSourceType() is already Contour,
+   * the contour is delivered via extraSource and this method has no effect.
+   */
+  virtual bool needsContour() const {
+    return false;
+  }
+
+  /**
    * Draws this layer style onto the canvas using the provided input data.
    * @param canvas The canvas to draw the layer style on.
    * @param input The input data for this layer style.
