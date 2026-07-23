@@ -90,6 +90,8 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
           "  return outerDist + min(max(distX,distY),0.0) - r;\n"
           "}\n");
     } else {
+      // Ellipse SDF: hw/hh are guaranteed > 0 by the onDraw isEmpty() guard in GlassStyle.cpp,
+      // so px/(hw*hw) cannot produce inf here.
       fragBuilder->addFunction(
           "float " + outerSdfFn +
           "(float px, float py, float hw, float hh) {\n"
@@ -155,7 +157,9 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
     // Analytical SDF refraction path.
     fragBuilder->codeAppend("if (outerSDF < 0.0) {");
     fragBuilder->codeAppend("  float edgeDist = -outerSDF;");
-    // Edge band width: depthRatio * origMinHalf, capped at 60 pixels.
+    // Edge band width: depthRatio * origMinHalf, capped at 60 pixels to limit the refraction
+    // influence zone on large layers. Note: this cap is unrelated to the blurRadius cap in
+    // GlassStyle.cpp (same value, different purpose).
     fragBuilder->codeAppend("  float edgeBandWidth = min(depthRatio * origMinHalf, 60.0);");
     fragBuilder->codeAppend("  edgeWeight = 1.0 - smoothstep(0.0, 5.0, edgeDist);");
     fragBuilder->codeAppend("  float edgeFactor = 1.0 - min(edgeDist / edgeBandWidth, 1.0);");

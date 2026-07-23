@@ -3937,6 +3937,8 @@ static void AddGlassCell(Layer* root, std::shared_ptr<Image> bgImage, float x, f
   // override to render a rounded rect or an ellipse with unequal dimensions, which exercise
   // the analytical SDF refraction path.
   float defaultSize = cellSize - 20;
+  // width/height use > 0 (zero size is invalid), but radius uses >= 0 (zero radius is a valid
+  // sharp rect).
   float gw = glassW > 0.0f ? glassW : defaultSize;
   float gh = glassH > 0.0f ? glassH : defaultSize;
   float rx = radiusX >= 0.0f ? radiusX : gw * 0.5f;
@@ -4035,7 +4037,7 @@ TGFX_TEST(LayerTest, GlassStyleZoom) {
 
 TGFX_TEST(LayerTest, GlassStyleRoundedRect) {
   // Rounded rectangle with unequal width/height (180x120, radius 30x30) exercises the SDF path.
-  RunGlassStyleTest("RoundedRect", 1.0f, 180, 120, 30, 30);
+  RunGlassStyleTest("RoundedRect", 1.0f, 180.0f, 120.0f, 30.0f, 30.0f);
 }
 
 TGFX_TEST(LayerTest, GlassStyleEllipseSDF) {

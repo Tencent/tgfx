@@ -149,7 +149,8 @@ class LayerStyle : public LayerProperty {
    * Whether this style also needs the contour image in addition to whatever extraSourceType()
    * requests. Allows Background-sourced styles to access the contour via
    * LayerStyleInput::contourSource. Default is false. When extraSourceType() is already Contour,
-   * the contour is delivered via extraSource and this method has no effect.
+   * the contour is delivered via extraSource and this method has no effect. Currently, only
+   * GlassStyle overrides this to return true.
    */
   virtual bool needsContour() const {
     return false;
