@@ -292,6 +292,7 @@
         "GetContourImage": "8db244c7",
         "GlassStyleEllipse": "cf1321d1",
         "GlassStyleEllipseSDF": "cf1321d1",
+        "GlassStyleEllipticalCorner": "3118baaa",
         "GlassStyleRoundedRect": "cf1321d1",
         "GlassStyleZoom": "cf1321d1",
         "HasContentChanged_Offset": "bedeb932",
