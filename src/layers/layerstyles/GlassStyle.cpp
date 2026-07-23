@@ -119,9 +119,15 @@ static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
     if (rRect.isOval()) {
       info.type = GlassShapeType::Ellipse;
     } else {
-      info.type = GlassShapeType::RoundedRect;
+      // Shader SDF assumes a single uniform circular radius (rx == ry) across all four corners.
+      // Non-uniform or elliptical corners fall back to AlphaMask for accuracy.
       auto radii = rRect.radii();
-      info.cornerRadius = std::min(radii[0].x, radii[0].y);
+      bool uniformCircular = radii[0] == radii[1] && radii[1] == radii[2] && radii[2] == radii[3] &&
+                             radii[0].x == radii[0].y;
+      if (uniformCircular) {
+        info.type = GlassShapeType::RoundedRect;
+        info.cornerRadius = radii[0].x;
+      }
     }
   } else if (path.isOval(&rect)) {
     info.type = GlassShapeType::Ellipse;
@@ -239,6 +245,7 @@ Rect GlassStyle::filterBackground(const Rect& srcRect, float contentScale) {
     // used by the SDF shader path (edgeFactor peaks at 1.0 near the shape edge).
     float glassThickness = getGlassThickness(minHalf);
     float analyticalOutset = glassThickness * refractionFactor * (1.0f + dispersion);
+    // filterBackground may run before shapeType is determined, so cover both paths conservatively.
     float refractionOutset = std::max(alphaMaskOutset, analyticalOutset);
     refractionOutset = std::max(refractionOutset, 1.0f);
     result.join(srcRect.makeOutset(refractionOutset, refractionOutset));
@@ -271,6 +278,9 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
   auto origWidth = static_cast<float>(input.content->width()) / input.contentScale;
   auto origHeight = static_cast<float>(input.content->height()) / input.contentScale;
   auto origBounds = Rect::MakeWH(origWidth, origHeight);
+  if (origBounds.isEmpty()) {
+    return;
+  }
   static constexpr float MAX_BG_SIZE = 2048.0f;
   float bgMaxDim = static_cast<float>(std::max(bgImage->width(), bgImage->height()));
   float targetMaxDim =

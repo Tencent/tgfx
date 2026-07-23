@@ -47,8 +47,7 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
   const bool hasCoarseMask = (coarseMaskProxy != nullptr);
   const bool hasDispersion = (params.dispersion >= 0.01f);
   const bool hasLightIntensity = (params.lightIntensity > 0.0f);
-  const bool useAxisMix = (params.shapeType == GlassShapeType::RoundedRect ||
-                           params.shapeType == GlassShapeType::Ellipse);
+  const bool useSDF = (params.shapeType != GlassShapeType::AlphaMask);
 
   // Register uniforms: 6 x vec4.
   // uvTransform: glassOffsetX, glassOffsetY, glassScaleX, glassScaleY
@@ -79,7 +78,7 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
 
   // Emit SDF helper functions (placed before main via addFunction).
   std::string outerSdfFn;
-  if (useAxisMix) {
+  if (useSDF) {
     outerSdfFn = fragBuilder->getMangledFunctionName("glass_outerSDF");
     if (params.shapeType == GlassShapeType::RoundedRect) {
       fragBuilder->addFunction(
@@ -120,7 +119,7 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend("float py = glassPixel.y - halfH;");
 
   // Evaluate SDF after px/py are available (analytical shapes only).
-  if (useAxisMix) {
+  if (useSDF) {
     if (params.shapeType == GlassShapeType::RoundedRect) {
       fragBuilder->codeAppendf("float cornerRadius = %s.z;", shapeParams.c_str());
       fragBuilder->codeAppendf("float outerSDF = %s(px, py, halfW, halfH, cornerRadius);",
@@ -152,7 +151,7 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend("vec2 glassNormal = vec2(0.0);");
   fragBuilder->codeAppend("vec2 edgeLightNormal = vec2(0.0);");
 
-  if (useAxisMix) {
+  if (useSDF) {
     // Analytical SDF refraction path.
     fragBuilder->codeAppend("if (outerSDF < 0.0) {");
     fragBuilder->codeAppend("  float edgeDist = -outerSDF;");
@@ -301,7 +300,7 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
   // Edge lighting.
   if (hasLightIntensity) {
     fragBuilder->codeAppend("if (edgeWeight > 0.0) {");
-    if (useAxisMix) {
+    if (useSDF) {
       fragBuilder->codeAppend("  vec2 surfaceNormal = glassNormal;");
     } else {
       fragBuilder->codeAppend("  vec2 surfaceNormal = edgeLightNormal;");
