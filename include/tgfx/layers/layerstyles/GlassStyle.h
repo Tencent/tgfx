@@ -27,8 +27,8 @@ namespace tgfx {
 /**
  * GlassStyle simulates the physical behavior of light passing through a glass surface, producing
  * refraction, chromatic dispersion, frosted blur, and specular highlights. It captures the
- * background content below the layer and renders it with optical distortion driven by a
- * displacement map derived from the layer content's alpha mask.
+ * background content below the layer and renders it with optical distortion shaped by the
+ * layer's content.
  */
 class GlassStyle : public LayerStyle {
  public:
@@ -38,8 +38,10 @@ class GlassStyle : public LayerStyle {
    * @param depth The inward extent of the refraction region from edges, range [1, 100].
    * @param frost The amount of background blur (frosted glass), range [0, 100].
    * @param dispersion The intensity of chromatic aberration (rainbow prism effect), range [0, 100].
-   * @param splay The blend factor between the UDF gradient direction and the radial direction used for refraction, range [0, 100].
-   * @param lightAngle The direction of the light source in degrees, range [-179, 180].
+   * @param splay The blend factor for the refraction direction, range [0, 100]. At 0, refraction
+   *              follows the curvature of the shape's edges; at 100, it points toward the shape center.
+   * @param lightAngle The direction of the light source in degrees. 0 means light from directly
+   *                   above, positive values rotate clockwise. Range [-179, 180].
    * @param lightIntensity The brightness of edge highlights, range [0, 100].
    */
   static std::shared_ptr<GlassStyle> Make(float refraction, float depth, float frost,
@@ -83,9 +85,8 @@ class GlassStyle : public LayerStyle {
   void setDispersion(float value);
 
   /**
-   * The blend factor between the UDF gradient direction and the radial (center-pointing)
-   * direction used for refraction. Range [0, 100]. At 0, refraction follows the surface
-   * curvature (UDF gradient); at 100, refraction points toward the shape center.
+   * The blend factor for the refraction direction. Range [0, 100]. At 0, refraction follows
+   * the curvature of the shape's edges; at 100, refraction points toward the shape center.
    */
   float splay() const {
     return _splay;
@@ -94,7 +95,10 @@ class GlassStyle : public LayerStyle {
   /** Sets the refraction direction blend factor. */
   void setSplay(float value);
 
-  /** Light source direction in degrees. Range [-179, 180]. */
+  /**
+   * Light source direction in degrees. 0 means light from directly above, positive values
+   * rotate clockwise. Range [-179, 180].
+   */
   float lightAngle() const {
     return _lightAngle;
   }
