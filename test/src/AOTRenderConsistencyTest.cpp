@@ -18,6 +18,7 @@
 
 #include <cstring>
 #include <string>
+#include <vector>
 #include "base/TGFXTest.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/PrecompiledShaderCache.h"
@@ -266,6 +267,36 @@ TGFX_TEST(AOTRenderConsistencyTest, ColorSpaceXformModes) {
   ExpectShaderConsistentP3("csx-srgb-image",
                            Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp), width,
                            height);
+}
+
+// Gradient layouts (linear/radial/conic/diamond) are now selected by the LayoutType runtime uniform
+// instead of a compile-time dimension. Each layout must still compute t identically to the runtime
+// layout FP, so a divergent LayoutType branch or a missing Bias/Scale would show up as a byte
+// mismatch here. Two-stop uses SingleInterval, multi-stop uses DualInterval/Texture colorizers.
+TGFX_TEST(AOTRenderConsistencyTest, GradientLayoutModes) {
+  int width = 200;
+  int height = 200;
+  Point center = Point::Make(100, 100);
+  std::vector<Color> twoStops = {Color::Green(), Color::Red()};
+  std::vector<Color> multiStops = {Color::Green(), Color::Blue(), Color::Red()};
+  std::vector<float> multiPositions = {0.0f, 0.4f, 1.0f};
+
+  ExpectShaderConsistent(
+      "grad-linear",
+      Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(200, 0), twoStops, {}), width,
+      height);
+  ExpectShaderConsistent("grad-radial", Shader::MakeRadialGradient(center, 100, twoStops, {}),
+                         width, height);
+  ExpectShaderConsistent("grad-conic", Shader::MakeConicGradient(center, 0, 360, twoStops, {}),
+                         width, height);
+  ExpectShaderConsistent("grad-diamond", Shader::MakeDiamondGradient(center, 100, twoStops, {}),
+                         width, height);
+  ExpectShaderConsistent("grad-radial-multi",
+                         Shader::MakeRadialGradient(center, 100, multiStops, multiPositions), width,
+                         height);
+  ExpectShaderConsistent("grad-conic-multi",
+                         Shader::MakeConicGradient(center, 0, 360, multiStops, multiPositions),
+                         width, height);
 }
 
 }  // namespace tgfx

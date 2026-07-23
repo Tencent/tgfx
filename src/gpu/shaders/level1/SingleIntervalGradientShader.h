@@ -35,11 +35,10 @@ class SingleIntervalGradientShader : public PrecompiledShader {
   using VD = VertDims;
 
   struct FragDims {
-    enum : uint32_t { GP_TYPE, LAYOUT_TYPE, HAS_XP, HAS_COVERAGE, COUNT };
+    enum : uint32_t { GP_TYPE, HAS_XP, HAS_COVERAGE, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("GP_TYPE", 2),
-          PermutationEnum("LAYOUT_TYPE", {"LINEAR", "RADIAL", "CONIC", "DIAMOND"}),
           PermutationInt("HAS_XP", 3),
           PermutationInt("HAS_COVERAGE", 3),
       });

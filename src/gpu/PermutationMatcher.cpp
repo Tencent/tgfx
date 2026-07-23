@@ -574,7 +574,6 @@ static std::optional<PermutationMatchResult> TryMatchGradientFill(const ProgramI
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
   fragValues[FD::HAS_XP] = xpType;
-  fragValues[FD::LAYOUT_TYPE] = layoutType;
   fragValues[FD::HAS_COVERAGE] = coverageType;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"GradientFillShader", vertIndex, fragIndex};
@@ -634,7 +633,6 @@ static std::optional<PermutationMatchResult> TryMatchSingleIntervalGradient(
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
   fragValues[FD::GP_TYPE] = gpType;
-  fragValues[FD::LAYOUT_TYPE] = layoutType;
   fragValues[FD::HAS_XP] = xpType;
   fragValues[FD::HAS_COVERAGE] = coverageType;
   auto fragIndex = fragDomain.encode(fragValues);
@@ -694,7 +692,6 @@ static std::optional<PermutationMatchResult> TryMatchDualIntervalGradient(
   using FD = DualIntervalGradientShader::FD;
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
-  fragValues[FD::LAYOUT_TYPE] = layoutType;
   fragValues[FD::HAS_XP] = xpType;
   fragValues[FD::HAS_COVERAGE] = coverageType;
   auto fragIndex = fragDomain.encode(fragValues);
@@ -754,7 +751,6 @@ static std::optional<PermutationMatchResult> TryMatchTextureGradient(
   using FD = TextureGradientShader::FD;
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
-  fragValues[FD::LAYOUT_TYPE] = layoutType;
   fragValues[FD::HAS_XP] = xpType;
   fragValues[FD::HAS_COVERAGE] = coverageType;
   auto fragIndex = fragDomain.encode(fragValues);

@@ -21,6 +21,21 @@
 #include "gpu/ShaderCaps.h"
 
 namespace tgfx {
+// Mirrors the gradient layout ordering used by the precompiled gradient shaders'
+// LayoutType uniform (see PermutationMatcher::GradientLayoutTypeIndex).
+static int LayoutTypeIndex(const std::string& layoutName) {
+  if (layoutName == "RadialGradientLayout") {
+    return 1;
+  }
+  if (layoutName == "ConicGradientLayout") {
+    return 2;
+  }
+  if (layoutName == "DiamondGradientLayout") {
+    return 3;
+  }
+  return 0;
+}
+
 PlacementPtr<ClampedGradientEffect> ClampedGradientEffect::Make(
     BlockAllocator* allocator, PlacementPtr<FragmentProcessor> colorizer,
     PlacementPtr<FragmentProcessor> gradLayout, Color leftBorderColor, Color rightBorderColor) {
@@ -86,5 +101,10 @@ void GLSLClampedGradientEffect::onSetData(UniformData* /*vertexUniformData*/,
                                           UniformData* fragmentUniformData) const {
   fragmentUniformData->setData("leftBorderColor", leftBorderColor);
   fragmentUniformData->setData("rightBorderColor", rightBorderColor);
+  // The precompiled gradient shaders fold the four layout maths into one variant selected by the
+  // LayoutType uniform. Runtime-generated shaders emit layout-specific code and declare no such
+  // field, so setDataOptional tolerates its absence there.
+  fragmentUniformData->setDataOptional("LayoutType",
+                                       LayoutTypeIndex(childProcessor(gradLayoutIndex)->name()));
 }
 }  // namespace tgfx
