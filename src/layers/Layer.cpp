@@ -1777,7 +1777,8 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   for (const auto& layerStyle : _layerStyles) {
     auto index = static_cast<int>(layerStyle->excludeChildEffects());
     needContent[index] = true;
-    if (layerStyle->extraSourceType() == LayerStyleExtraSourceType::Contour) {
+    if (layerStyle->extraSourceType() == LayerStyleExtraSourceType::Contour ||
+        layerStyle->needsContour()) {
       needContour[index] = true;
     }
   }
