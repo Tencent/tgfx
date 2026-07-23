@@ -38,11 +38,21 @@ class TexturedColorMatrixShader : public PrecompiledShader {
   };
   using D = FragDims;
 
+  struct VertDims {
+    enum : uint32_t { GP_TYPE, COUNT };
+    static PermutationDomain domain() {
+      return PermutationDomain({
+          PermutationInt("GP_TYPE", 2),
+      });
+    }
+  };
+  using VD = VertDims;
+
   PrecompiledShaderInfo info() const override {
     return {"TexturedColorMatrixShader",
             "level1/textured_color_matrix.vert",
             "level1/textured_color_matrix.frag",
-            PermutationDomain({}),
+            VD::domain(),
             D::domain(),
             PermutationDomain({}),
             "",

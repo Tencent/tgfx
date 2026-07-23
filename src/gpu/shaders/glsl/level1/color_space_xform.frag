@@ -1,57 +1,36 @@
 // ColorSpaceXformShader fragment shader
-// Permutation dimensions (frag):
-//   UNPREMUL, LINEARIZE, SRC_OOTF, GAMUT_TRANSFORM, DST_OOTF, ENCODE, PREMUL (bool)
+// The color-space pipeline steps are selected at runtime through the CSFlags bitmask uniform
+// (mirrors ColorSpaceXformSteps::Flags::mask()) instead of compile-time dimensions, so a single
+// precompiled variant covers every flag combination.
 // Runtime uniforms:
-//   SrcTFType (int): 0=sRGBish, 1=PQish, 2=HLGish, 3=HLGinvish
-//   DstTFType (int): 0=sRGBish, 1=PQish, 2=HLGish, 3=HLGinvish
+//   CSFlags (int): bit 0 unpremul, 1 linearize, 2 gamut, 3 encode, 4 premul, 5 srcOOTF, 6 dstOOTF
+//   SrcTFType / DstTFType (int): 0=sRGBish, 1=PQish, 2=HLGish, 3=HLGinvish
 #version 450
 
-#ifndef UNPREMUL
-#define UNPREMUL 0
-#endif
-#ifndef LINEARIZE
-#define LINEARIZE 0
-#endif
-#ifndef SRC_OOTF
-#define SRC_OOTF 0
-#endif
-#ifndef GAMUT_TRANSFORM
-#define GAMUT_TRANSFORM 0
-#endif
-#ifndef DST_OOTF
-#define DST_OOTF 0
-#endif
-#ifndef ENCODE
-#define ENCODE 0
-#endif
-#ifndef PREMUL
-#define PREMUL 0
-#endif
 #ifndef HAS_XP
 #define HAS_XP 0
 #endif
 
+#define CS_UNPREMUL 1
+#define CS_LINEARIZE 2
+#define CS_GAMUT 4
+#define CS_ENCODE 8
+#define CS_PREMUL 16
+#define CS_SRC_OOTF 32
+#define CS_DST_OOTF 64
+
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Color;
-#if LINEARIZE
+  int CSFlags;
   vec4 SrcTF0;
   vec4 SrcTF1;
   int SrcTFType;
-#endif
-#if SRC_OOTF
   vec4 SrcOOTF;
-#endif
-#if GAMUT_TRANSFORM
   mat3 ColorXform;
-#endif
-#if DST_OOTF
   vec4 DstOOTF;
-#endif
-#if ENCODE
   vec4 DstTF0;
   vec4 DstTF1;
   int DstTFType;
-#endif
 #include "xp_uniforms.inc"
 };
 
@@ -61,7 +40,6 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 
 layout(location = 0) out vec4 fragColor;
 
-#if LINEARIZE
 float src_tf(float x) {
   float s = sign(x);
   x = abs(x);
@@ -82,9 +60,7 @@ float src_tf(float x) {
   }
   return s * x;
 }
-#endif
 
-#if ENCODE
 float dst_tf(float x) {
   float s = sign(x);
   x = abs(x);
@@ -105,45 +81,44 @@ float dst_tf(float x) {
   }
   return s * x;
 }
-#endif
 
 void main() {
   vec4 color = Color;
 
-#if UNPREMUL
-  float alpha = color.a;
-  color = (alpha > 0.0) ? vec4(color.rgb / alpha, alpha) : vec4(0.0);
-#endif
+  if ((CSFlags & CS_UNPREMUL) != 0) {
+    float alpha = color.a;
+    color = (alpha > 0.0) ? vec4(color.rgb / alpha, alpha) : vec4(0.0);
+  }
 
-#if LINEARIZE
-  color.r = src_tf(color.r);
-  color.g = src_tf(color.g);
-  color.b = src_tf(color.b);
-#endif
+  if ((CSFlags & CS_LINEARIZE) != 0) {
+    color.r = src_tf(color.r);
+    color.g = src_tf(color.g);
+    color.b = src_tf(color.b);
+  }
 
-#if SRC_OOTF
-  float srcY = dot(color.rgb, SrcOOTF.rgb);
-  color.rgb *= sign(srcY) * pow(abs(srcY), SrcOOTF.a);
-#endif
+  if ((CSFlags & CS_SRC_OOTF) != 0) {
+    float srcY = dot(color.rgb, SrcOOTF.rgb);
+    color.rgb *= sign(srcY) * pow(abs(srcY), SrcOOTF.a);
+  }
 
-#if GAMUT_TRANSFORM
-  color.rgb = ColorXform * color.rgb;
-#endif
+  if ((CSFlags & CS_GAMUT) != 0) {
+    color.rgb = ColorXform * color.rgb;
+  }
 
-#if DST_OOTF
-  float dstY = dot(color.rgb, DstOOTF.rgb);
-  color.rgb *= sign(dstY) * pow(abs(dstY), DstOOTF.a);
-#endif
+  if ((CSFlags & CS_DST_OOTF) != 0) {
+    float dstY = dot(color.rgb, DstOOTF.rgb);
+    color.rgb *= sign(dstY) * pow(abs(dstY), DstOOTF.a);
+  }
 
-#if ENCODE
-  color.r = dst_tf(color.r);
-  color.g = dst_tf(color.g);
-  color.b = dst_tf(color.b);
-#endif
+  if ((CSFlags & CS_ENCODE) != 0) {
+    color.r = dst_tf(color.r);
+    color.g = dst_tf(color.g);
+    color.b = dst_tf(color.b);
+  }
 
-#if PREMUL
-  color.rgb *= color.a;
-#endif
+  if ((CSFlags & CS_PREMUL) != 0) {
+    color.rgb *= color.a;
+  }
 
 #define TGFX_XP_SRC_COLOR color
 #include "xp_output.inc"

@@ -24,48 +24,27 @@ namespace tgfx {
 
 /// Precompiled shader declaration for ColorSpaceXformEffect. Transforms colors through a
 /// configurable pipeline of: unpremul → linearize → srcOOTF → gamutTransform → dstOOTF →
-/// encode → premul. Each step is controlled by a boolean dimension.
+/// encode → premul.
+///
+/// The seven pipeline steps are selected at runtime through the CSFlags bitmask uniform
+/// (mirrors ColorSpaceXformSteps::Flags::mask()) instead of compile-time dimensions, so a single
+/// precompiled variant per HAS_XP covers every flag combination. SRC_TF_TYPE and DST_TF_TYPE are
+/// likewise runtime uniforms (SrcTFType / DstTFType).
 ///
 /// Fragment dimensions:
-///   UNPREMUL (bool): undo premultiplied alpha before processing
-///   LINEARIZE (bool): apply source transfer function to convert to linear
-///   SRC_OOTF (bool): apply source OOTF (HLG scenes)
-///   GAMUT_TRANSFORM (bool): apply 3x3 color gamut matrix
-///   DST_OOTF (bool): apply destination OOTF (HLG scenes)
-///   ENCODE (bool): apply destination inverse transfer function
-///   PREMUL (bool): re-premultiply alpha after processing
-///
-/// SRC_TF_TYPE and DST_TF_TYPE are runtime uniforms (SrcTFType / DstTFType) rather than
-/// compile-time dimensions to reduce variant count.
+///   HAS_XP (int, 3): destination-read blend mode class for the fixed-function output stage.
 class ColorSpaceXformShader : public PrecompiledShader {
  public:
   struct FragDims {
-    enum : uint32_t {
-      UNPREMUL,
-      LINEARIZE,
-      SRC_OOTF,
-      GAMUT_TRANSFORM,
-      DST_OOTF,
-      ENCODE,
-      PREMUL,
-      HAS_XP,
-      COUNT
-    };
+    enum : uint32_t { HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationBool("UNPREMUL"),
-          PermutationBool("LINEARIZE"),
-          PermutationBool("SRC_OOTF"),
-          PermutationBool("GAMUT_TRANSFORM"),
-          PermutationBool("DST_OOTF"),
-          PermutationBool("ENCODE"),
-          PermutationBool("PREMUL"),
           PermutationInt("HAS_XP", 3),
       });
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 8, "Update ShouldCompile when fragment dimensions change.");
+  static_assert(FD::COUNT == 1, "Update info() when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"ColorSpaceXformShader",
@@ -76,52 +55,7 @@ class ColorSpaceXformShader : public PrecompiledShader {
             PermutationDomain({}),
             "",
             "",
-            ShouldCompile};
-  }
-
- private:
-  static bool ShouldCompile(uint32_t /*vertIndex*/, uint32_t /*fragIndex*/,
-                            const std::vector<int>& /*vertValues*/,
-                            const std::vector<int>& fragValues) {
-    int unpremul = fragValues[FD::UNPREMUL];
-    int linearize = fragValues[FD::LINEARIZE];
-    int srcOotf = fragValues[FD::SRC_OOTF];
-    int gamutTransform = fragValues[FD::GAMUT_TRANSFORM];
-    int dstOotf = fragValues[FD::DST_OOTF];
-    int encode = fragValues[FD::ENCODE];
-    int premul = fragValues[FD::PREMUL];
-
-    // All flags zero is a no-op transform — never needed as a shader.
-    if (!unpremul && !linearize && !srcOotf && !gamutTransform && !dstOotf && !encode && !premul) {
-      return false;
-    }
-    // SRC_OOTF requires LINEARIZE=1 (HLGish source uses runtime SrcTFType check).
-    if (srcOotf && !linearize) {
-      return false;
-    }
-    // DST_OOTF requires ENCODE=1 (HLGinvish destination uses runtime DstTFType check).
-    if (dstOotf && !encode) {
-      return false;
-    }
-    // GAMUT_TRANSFORM requires at least LINEARIZE or ENCODE (gamut transform operates in linear
-    // space; if both src and dst are already linear, the runtime skips the shader entirely).
-    if (gamutTransform && !linearize && !encode) {
-      return false;
-    }
-    // UNPREMUL and PREMUL always appear together (non-opaque) or are both absent (opaque).
-    // The runtime optimizes away the asymmetric case.
-    if (unpremul != premul) {
-      return false;
-    }
-    // If only UNPREMUL+PREMUL without any color transform, runtime short-circuits (no shader).
-    if (unpremul && !linearize && !encode && !gamutTransform) {
-      return false;
-    }
-    // Any nonlinear operation (linearize/encode) requires unpremul+premul wrapping.
-    if ((linearize || encode) && !unpremul) {
-      return false;
-    }
-    return true;
+            nullptr};
   }
 };
 

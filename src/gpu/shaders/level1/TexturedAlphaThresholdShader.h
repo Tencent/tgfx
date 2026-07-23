@@ -38,11 +38,21 @@ class TexturedAlphaThresholdShader : public PrecompiledShader {
   };
   using D = FragDims;
 
+  struct VertDims {
+    enum : uint32_t { GP_TYPE, COUNT };
+    static PermutationDomain domain() {
+      return PermutationDomain({
+          PermutationInt("GP_TYPE", 2),
+      });
+    }
+  };
+  using VD = VertDims;
+
   PrecompiledShaderInfo info() const override {
     return {"TexturedAlphaThresholdShader",
             "level1/textured_alpha_threshold.vert",
             "level1/textured_alpha_threshold.frag",
-            PermutationDomain({}),
+            VD::domain(),
             D::domain(),
             PermutationDomain({}),
             "",

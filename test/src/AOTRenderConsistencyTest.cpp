@@ -24,6 +24,7 @@
 #include "gtest/gtest.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Canvas.h"
+#include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Shader.h"
@@ -121,9 +122,24 @@ static void ExpectBitmapsIdentical(const char* label, const Bitmap& aotBitmap,
   ASSERT_TRUE(aotPixels != nullptr && runtimePixels != nullptr);
   size_t totalBytes = static_cast<size_t>(width) * static_cast<size_t>(height) * 4;
   int cmp = std::memcmp(aotPixels, runtimePixels, totalBytes);
+  int maxDiff = 0;
+  size_t diffCount = 0;
+  auto* a = static_cast<const uint8_t*>(aotPixels);
+  auto* r = static_cast<const uint8_t*>(runtimePixels);
+  for (size_t i = 0; i < totalBytes; i++) {
+    int d = std::abs(static_cast<int>(a[i]) - static_cast<int>(r[i]));
+    if (d > 0) {
+      diffCount++;
+    }
+    if (d > maxDiff) {
+      maxDiff = d;
+    }
+  }
   const_cast<Bitmap&>(aotBitmap).unlockPixels();
   const_cast<Bitmap&>(runtimeBitmap).unlockPixels();
-  EXPECT_EQ(cmp, 0) << "AOT vs runtime render diverged for scene: " << label;
+  EXPECT_EQ(cmp, 0) << "AOT vs runtime render diverged for scene: " << label
+                    << " (maxChannelDiff=" << maxDiff << ", diffBytes=" << diffCount << "/"
+                    << totalBytes << ")";
 }
 
 static void ExpectShaderConsistent(const char* label, const std::shared_ptr<Shader>& shader,
@@ -135,6 +151,47 @@ static void ExpectShaderConsistent(const char* label, const std::shared_ptr<Shad
   Bitmap runtimeBitmap = {};
   RenderPaintOnce(paint, width, height, true, &aotBitmap);
   RenderPaintOnce(paint, width, height, false, &runtimeBitmap);
+  ExpectBitmapsIdentical(label, aotBitmap, runtimeBitmap, width, height);
+}
+
+// Renders the given paint into a Display-P3 surface, so any sRGB content is converted through a
+// ColorSpaceXformEffect (the shader whose pipeline flags were folded into the CSFlags uniform).
+static void RenderPaintToP3Once(const Paint& paint, int width, int height, bool useBundle,
+                                Bitmap* outBitmap) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  if (useBundle) {
+    ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+  } else {
+    cache->unload();
+  }
+  context->globalCache()->clearPrograms();
+  auto surface = Surface::Make(context, width, height, false, 1, false, 0, ColorSpace::DisplayP3());
+  ASSERT_TRUE(surface != nullptr);
+  surface->getCanvas()->drawRect(
+      Rect::MakeWH(static_cast<float>(width), static_cast<float>(height)), paint);
+  context->flushAndSubmit(true);
+  ASSERT_TRUE(outBitmap->allocPixels(width, height));
+  auto* pixels = outBitmap->lockPixels();
+  ASSERT_TRUE(pixels != nullptr);
+  ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+  outBitmap->unlockPixels();
+  if (useBundle) {
+    cache->unload();
+  }
+}
+
+static void ExpectShaderConsistentP3(const char* label, const std::shared_ptr<Shader>& shader,
+                                     int width, int height) {
+  ASSERT_TRUE(shader != nullptr);
+  Paint paint = {};
+  paint.setShader(shader);
+  Bitmap aotBitmap = {};
+  Bitmap runtimeBitmap = {};
+  RenderPaintToP3Once(paint, width, height, true, &aotBitmap);
+  RenderPaintToP3Once(paint, width, height, false, &runtimeBitmap);
   ExpectBitmapsIdentical(label, aotBitmap, runtimeBitmap, width, height);
 }
 
@@ -189,6 +246,26 @@ TGFX_TEST(AOTRenderConsistencyTest, GaussianBlurTileModes) {
                               width, height);
   ExpectImageFilterConsistent("blur-decal", image, ImageFilter::Blur(6, 6, TileMode::Decal), width,
                               height);
+}
+
+// Color-space conversions into a Display-P3 surface: exercises ColorSpaceXformShader and
+// TexturedColorSpaceXformShader, whose seven pipeline steps are now selected by the CSFlags runtime
+// uniform. A precompiled variant that reads a flag differently from the runtime codegen would show
+// up as a byte mismatch here.
+TGFX_TEST(AOTRenderConsistencyTest, ColorSpaceXformModes) {
+  int width = 200;
+  int height = 200;
+  ExpectShaderConsistentP3("csx-srgb-color", Shader::MakeColorShader(Color::Green()), width,
+                           height);
+  ExpectShaderConsistentP3("csx-srgb-linear",
+                           Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(200, 0),
+                                                      {Color::Green(), Color::Red()}, {}),
+                           width, height);
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_TRUE(image != nullptr);
+  ExpectShaderConsistentP3("csx-srgb-image",
+                           Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp), width,
+                           height);
 }
 
 }  // namespace tgfx

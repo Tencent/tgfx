@@ -929,15 +929,10 @@ static std::optional<PermutationMatchResult> TryMatchColorSpaceXform(
   using FD = ColorSpaceXformShader::FD;
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT, 0);
-  fragValues[FD::UNPREMUL] = xform->flags.unPremul ? 1 : 0;
-  fragValues[FD::LINEARIZE] = xform->flags.linearize ? 1 : 0;
-  fragValues[FD::SRC_OOTF] = xform->flags.srcOOTF ? 1 : 0;
-  fragValues[FD::GAMUT_TRANSFORM] = xform->flags.gamutTransform ? 1 : 0;
-  fragValues[FD::DST_OOTF] = xform->flags.dstOOTF ? 1 : 0;
-  fragValues[FD::ENCODE] = xform->flags.encode ? 1 : 0;
-  fragValues[FD::PREMUL] = xform->flags.premul ? 1 : 0;
   fragValues[FD::HAS_XP] = xpType;
 
+  // The pipeline flags are runtime uniforms (CSFlags), so any flag combination hits the same
+  // variant. Only the transfer-function type must still be in the supported 0-3 range.
   if (xform->flags.linearize) {
     int srcIdx = TFTypeToIndex(gfx::skcms_TransferFunction_getType(
         reinterpret_cast<const gfx::skcms_TransferFunction*>(&xform->srcTransferFunction)));
@@ -960,9 +955,24 @@ static std::optional<PermutationMatchResult> TryMatchColorSpaceXform(
 static std::optional<PermutationMatchResult> TryMatchComposedTexture(
     const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "DefaultGeometryProcessor" && gp->name() != "QuadPerEdgeAAGeometryProcessor") {
+  int gpType = 0;
+  if (gp->name() == "DefaultGeometryProcessor") {
+    gpType = 0;
+  } else if (gp->name() == "QuadPerEdgeAAGeometryProcessor") {
+    auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
+    // The precompiled quad vert declares aPosition alone and derives the texture coordinate from it
+    // via CoordTransformMatrix_0, so reject quads carrying coverage/color/uvCoord/subset attributes.
+    if (quadGP->getAAType() == AAType::Coverage || !quadGP->hasCommonColor() ||
+        !quadGP->hasUVMatrix() || quadGP->getHasSubset()) {
+      return std::nullopt;
+    }
+    gpType = 1;
+  } else {
     return std::nullopt;
   }
+  // Each textured Compose shader carries a single GP_TYPE vertex dimension, so the vertex index is
+  // simply the GP type.
+  uint32_t vertIndex = static_cast<uint32_t>(gpType);
   if (programInfo->numFragmentProcessors() != 1) {
     return std::nullopt;
   }
@@ -998,14 +1008,9 @@ static std::optional<PermutationMatchResult> TryMatchComposedTexture(
     auto fragDomain = FD::domain();
     std::vector<int> fragValues(FD::COUNT, 0);
     fragValues[FD::HAS_SUBSET] = hasSubset;
-    fragValues[FD::UNPREMUL] = xform->flags.unPremul ? 1 : 0;
-    fragValues[FD::LINEARIZE] = xform->flags.linearize ? 1 : 0;
-    fragValues[FD::SRC_OOTF] = xform->flags.srcOOTF ? 1 : 0;
-    fragValues[FD::GAMUT_TRANSFORM] = xform->flags.gamutTransform ? 1 : 0;
-    fragValues[FD::DST_OOTF] = xform->flags.dstOOTF ? 1 : 0;
-    fragValues[FD::ENCODE] = xform->flags.encode ? 1 : 0;
-    fragValues[FD::PREMUL] = xform->flags.premul ? 1 : 0;
     fragValues[FD::HAS_XP] = xpType;
+    // The pipeline flags are runtime uniforms (CSFlags), so any flag combination hits the same
+    // variant. Only the transfer-function type must still be in the supported 0-3 range.
     if (xform->flags.linearize) {
       int srcIdx = TFTypeToIndex(gfx::skcms_TransferFunction_getType(
           reinterpret_cast<const gfx::skcms_TransferFunction*>(&xform->srcTransferFunction)));
@@ -1022,7 +1027,7 @@ static std::optional<PermutationMatchResult> TryMatchComposedTexture(
       }
     }
     auto fragIndex = fragDomain.encode(fragValues);
-    return PermutationMatchResult{"TexturedColorSpaceXformShader", 0, fragIndex};
+    return PermutationMatchResult{"TexturedColorSpaceXformShader", vertIndex, fragIndex};
   }
 
   if (child1->name() == "ColorMatrixFragmentProcessor") {
@@ -1032,7 +1037,7 @@ static std::optional<PermutationMatchResult> TryMatchComposedTexture(
     fragValues[D::HAS_SUBSET] = hasSubset;
     fragValues[D::HAS_XP] = xpType;
     auto fragIndex = fragDomain.encode(fragValues);
-    return PermutationMatchResult{"TexturedColorMatrixShader", 0, fragIndex};
+    return PermutationMatchResult{"TexturedColorMatrixShader", vertIndex, fragIndex};
   }
 
   if (child1->name() == "LumaFragmentProcessor") {
@@ -1042,7 +1047,7 @@ static std::optional<PermutationMatchResult> TryMatchComposedTexture(
     fragValues[D::HAS_SUBSET] = hasSubset;
     fragValues[D::HAS_XP] = xpType;
     auto fragIndex = fragDomain.encode(fragValues);
-    return PermutationMatchResult{"TexturedLumaShader", 0, fragIndex};
+    return PermutationMatchResult{"TexturedLumaShader", vertIndex, fragIndex};
   }
 
   if (child1->name() == "AlphaStepFragmentProcessor") {
@@ -1052,7 +1057,7 @@ static std::optional<PermutationMatchResult> TryMatchComposedTexture(
     fragValues[D::HAS_SUBSET] = hasSubset;
     fragValues[D::HAS_XP] = xpType;
     auto fragIndex = fragDomain.encode(fragValues);
-    return PermutationMatchResult{"TexturedAlphaThresholdShader", 0, fragIndex};
+    return PermutationMatchResult{"TexturedAlphaThresholdShader", vertIndex, fragIndex};
   }
 
   return std::nullopt;
