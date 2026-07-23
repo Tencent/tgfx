@@ -162,29 +162,38 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppend(
         "  float offsetDist = glassThickness * refractionFactor * edgeFactor * edgeFactor;");
     if (params.shapeType == GlassShapeType::Ellipse) {
-      // Ellipse normal from SDF gradient: N = normalize(px/hw², py/hh²); radialDir points to center.
+      // Ellipse SDF gradient points outward; negate for inward normal.
       fragBuilder->codeAppend(
-          "  vec2 gradientDir = vec2(px / (halfW * halfW), py / (halfH * halfH));");
-      fragBuilder->codeAppend("  float gradientLength = length(gradientDir);");
+          "  vec2 sdfGradient = vec2(px / (halfW * halfW), py / (halfH * halfH));");
+      fragBuilder->codeAppend("  float gradientLength = length(sdfGradient);");
       fragBuilder->codeAppend("  if (gradientLength > 0.000001) {");
-      fragBuilder->codeAppend("    vec2 radialDir = -gradientDir / gradientLength;");
+      fragBuilder->codeAppend("    vec2 gradientDir = -sdfGradient / gradientLength;");
     } else {
-      // RoundedRect: radial direction from center.
-      fragBuilder->codeAppend("  float centerDistance = sqrt(px * px + py * py);");
-      fragBuilder->codeAppend("  if (centerDistance > 0.001) {");
+      // RoundedRect SDF gradient: corner region points from corner center outward, edge region
+      // is axial. Apply per-quadrant sign and negate for inward normal.
+      fragBuilder->codeAppend("  vec2 absP = vec2(abs(px), abs(py));");
+      fragBuilder->codeAppend("  float qx = absP.x - halfW + cornerRadius;");
+      fragBuilder->codeAppend("  float qy = absP.y - halfH + cornerRadius;");
+      fragBuilder->codeAppend("  vec2 grad;");
+      fragBuilder->codeAppend("  if (qx > 0.0 && qy > 0.0) {");
+      fragBuilder->codeAppend("    grad = normalize(vec2(qx, qy));");
+      fragBuilder->codeAppend("  } else {");
+      fragBuilder->codeAppend("    grad = (qx > qy) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);");
+      fragBuilder->codeAppend("  }");
+      fragBuilder->codeAppend("  float gradientLength = length(grad);");
+      fragBuilder->codeAppend("  if (gradientLength > 0.000001) {");
       fragBuilder->codeAppend(
-          "    vec2 radialDir = vec2(-px / centerDistance, -py / centerDistance);");
+          "    vec2 gradientDir = -vec2(sign(px) * grad.x, sign(py) * grad.y);");
     }
-    fragBuilder->codeAppend("    vec2 axisDir;");
+    // Mix SDF gradient with center radial direction by splay (consistent with AlphaMask path).
+    fragBuilder->codeAppend("    float centerDistance = sqrt(px * px + py * py);");
     fragBuilder->codeAppend(
-        "    if (abs(radialDir.x) > abs(radialDir.y)) { axisDir = vec2(sign(radialDir.x), "
-        "0.0); }");
-    fragBuilder->codeAppend("    else { axisDir = vec2(0.0, sign(radialDir.y)); }");
-    fragBuilder->codeAppend("    float maxAxisDot = max(abs(radialDir.x), abs(radialDir.y));");
-    fragBuilder->codeAppend("    float controlValue = depthRatio * splay;");
-    fragBuilder->codeAppend("    float axisThreshold = mix(0.9, 1.0, controlValue);");
-    fragBuilder->codeAppend("    float axisWeight = smoothstep(axisThreshold, 1.0, maxAxisDot);");
-    fragBuilder->codeAppend("    vec2 refractDir = mix(radialDir, axisDir, axisWeight);");
+        "    vec2 centerDir = (centerDistance > 0.001) ? vec2(-px / centerDistance, -py / "
+        "centerDistance) : gradientDir;");
+    fragBuilder->codeAppend("    vec2 refractDir = mix(gradientDir, centerDir, splay);");
+    fragBuilder->codeAppend("    float refractLen = length(refractDir);");
+    fragBuilder->codeAppend("    if (refractLen < 0.000001) { refractDir = gradientDir; }");
+    fragBuilder->codeAppend("    else { refractDir = refractDir / refractLen; }");
     fragBuilder->codeAppend("    glassNormal = -refractDir;");
     fragBuilder->codeAppend("    float displacementX = refractDir.x * offsetDist;");
     fragBuilder->codeAppend("    float displacementY = refractDir.y * offsetDist;");
