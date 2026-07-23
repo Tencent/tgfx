@@ -91,7 +91,7 @@ void VulkanCaps::initLimits(const VkPhysicalDeviceProperties& properties) {
   _limits.maxTextureDimension2D = static_cast<int>(properties.limits.maxImageDimension2D);
   _limits.maxSamplersPerShaderStage =
       static_cast<int>(properties.limits.maxPerStageDescriptorSamplers);
-  _limits.maxUniformBufferBindingSize = static_cast<int>(properties.limits.maxUniformBufferRange);
+  _limits.maxUniformBufferBindingSize = properties.limits.maxUniformBufferRange;
   _limits.minUniformBufferOffsetAlignment =
       static_cast<int>(properties.limits.minUniformBufferOffsetAlignment);
 }
