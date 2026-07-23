@@ -159,6 +159,11 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppend("  float edgeBandWidth = min(depthRatio * origMinHalf, 60.0);");
     fragBuilder->codeAppend("  edgeWeight = 1.0 - smoothstep(0.0, 5.0, edgeDist);");
     fragBuilder->codeAppend("  float edgeFactor = 1.0 - min(edgeDist / edgeBandWidth, 1.0);");
+    // SDF path uses glassThickness (physical glass depth) as the displacement magnitude base,
+    // driven by the exact geometric edge distance (edgeFactor). This differs from the AlphaMask
+    // path (below) which uses minHalf * depthRatio and clamps displacement, because SDF has
+    // precise geometry and does not need the UDF-based depthRatio modulation or sampling-bounds
+    // clamp.
     fragBuilder->codeAppend(
         "  float offsetDist = glassThickness * refractionFactor * edgeFactor * edgeFactor;");
     if (params.shapeType == GlassShapeType::Ellipse) {
@@ -254,7 +259,7 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppend("  float centerDistance = sqrt(px * px + py * py);");
     fragBuilder->codeAppend(
         "  vec2 centerDir = (centerDistance > 0.001) ? vec2(-px / centerDistance, -py / "
-        "centerDistance) : vec2(0.0);");
+        "centerDistance) : gradientDir;");
     fragBuilder->codeAppend("  vec2 mixedDir = mix(gradientDir, centerDir, splay);");
     fragBuilder->codeAppend("  float mixedLen = length(mixedDir);");
     fragBuilder->codeAppend("  if (mixedLen < 0.000001) { mixedDir = gradientDir; }");

@@ -478,7 +478,7 @@ std::shared_ptr<ImageFilter> GlassStyle::getRefractionFilter(
   // glassThickness and origMinHalf are used by the SDF shader path for edge band calculation.
   // For AlphaMask they are set to 0 since the shader does not read them.
   params.glassThickness = useSDF ? getGlassThickness(minHalf) : 0.0f;
-  params.refractionFactor = std::clamp(_refraction / 100.0f, 0.0f, 1.0f);
+  params.refractionFactor = getRefractionFactor();
   // Scale dispersion to [0, 0.2]: the shader offsets R/B UVs by uvOffset * (1 ± dispersion),
   // so 0.2 means max 20% additional offset, keeping chromatic aberration subtle.
   params.dispersion = (_dispersion / 100.0f) * 0.2f;

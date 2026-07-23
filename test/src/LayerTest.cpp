@@ -4040,7 +4040,13 @@ TGFX_TEST(LayerTest, GlassStyleRoundedRect) {
 
 TGFX_TEST(LayerTest, GlassStyleEllipseSDF) {
   // Ellipse with unequal width/height (180x120, radius = half dimensions) exercises the SDF path.
-  RunGlassStyleTest("EllipseSDF", 1.0f, 180, 120, 90, 60);
+  RunGlassStyleTest("EllipseSDF", 1.0f, 180.0f, 120.0f, 90.0f, 60.0f);
+}
+
+TGFX_TEST(LayerTest, GlassStyleEllipticalCorner) {
+  // Rounded rect with elliptical corners (radius 40x20, rx != ry) falls back to the AlphaMask
+  // path because the SDF shader only supports uniform circular corners (rx == ry).
+  RunGlassStyleTest("EllipticalCorner", 1.0f, 180.0f, 120.0f, 40.0f, 20.0f);
 }
 
 }  // namespace tgfx
