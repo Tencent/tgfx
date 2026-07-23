@@ -161,6 +161,17 @@ class GlassStyle : public LayerStyle {
     return std::clamp(_depth / 100.0f, 0.0f, 1.0f);
   }
 
+  // Scales dispersion to [0, 0.2]: the shader offsets R/B UVs by uvOffset * (1 ± dispersion),
+  // so 0.2 means max 20% additional offset.
+  float getDispersionFactor() const {
+    return std::clamp(_dispersion / 100.0f, 0.0f, 1.0f) * 0.2f;
+  }
+
+  // Scales lightIntensity to [0, 1] for the shader.
+  float getLightIntensityFactor() const {
+    return std::clamp(_lightIntensity / 100.0f, 0.0f, 1.0f);
+  }
+
   float getGlassThickness(float minHalf) const {
     return 1.0f + getDepthRatio() * std::max(minHalf - 1.0f, 0.0f);
   }

@@ -239,7 +239,7 @@ Rect GlassStyle::filterBackground(const Rect& srcRect, float contentScale) {
     float depthT = std::clamp(depthRatio / 0.1f, 0.0f, 1.0f);
     float depthScale = depthT * depthT * (3.0f - 2.0f * depthT);
     float refractionDistance = minHalf * refractionFactor * depthRatio * depthScale;
-    float dispersion = (_dispersion / 100.0f) * 0.2f;
+    float dispersion = getDispersionFactor();
     float alphaMaskOutset = 0.999f * refractionDistance * (1.0f + dispersion);
     // SDF analytical outset: glassThickness * refractionFactor covers the maximum displacement
     // used by the SDF shader path (edgeFactor peaks at 1.0 near the shape edge).
@@ -336,15 +336,18 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       // are normalized (0-1), so lower resolution does not affect the refraction shader.
       static constexpr float MAX_UDF_SIZE = 512.0f;
       // Use original layer bounds (not zoom-affected) for blur radius calculation.
-      // depth 1-100 maps linearly to blurRadius 1-60, minimum 5.
-      float blurRadius = std::max(std::min((_depth / 100.0f) * 60.0f, 60.0f), 5.0f);
+      // depth 1-100 maps linearly to blurRadius 5-60. The 60.0 cap is unrelated to the shader's
+      // edgeBandWidth cap (same value, different purpose: this limits UDF blur, that limits SDF
+      // edge influence zone).
+      static constexpr float MAX_BLUR_RADIUS = 60.0f;
+      static constexpr float MIN_BLUR_RADIUS = 5.0f;
+      float blurRadius =
+          std::max(std::min((_depth / 100.0f) * MAX_BLUR_RADIUS, MAX_BLUR_RADIUS), MIN_BLUR_RADIUS);
       // UDF texture size follows the original content bounds and is capped at MAX_UDF_SIZE.
       // udfPixelToLayerPixel and blurRadius scale with udfScale, so the shader's refraction
       // distance in layer space remains consistent regardless of UDF resolution.
+      // origMaxDim is guaranteed > 0 here because onDraw early-returns on origBounds.isEmpty().
       float origMaxDim = std::max(origBounds.width(), origBounds.height());
-      if (origMaxDim <= 0.0f) {
-        return;
-      }
       float udfScale = std::min({1.0f, MAX_UDF_SIZE / origMaxDim});
       int udfWidth = std::max(1, static_cast<int>(std::round(origBounds.width() * udfScale)));
       int udfHeight = std::max(1, static_cast<int>(std::round(origBounds.height() * udfScale)));
@@ -479,13 +482,11 @@ std::shared_ptr<ImageFilter> GlassStyle::getRefractionFilter(
   // For AlphaMask they are set to 0 since the shader does not read them.
   params.glassThickness = useSDF ? getGlassThickness(minHalf) : 0.0f;
   params.refractionFactor = getRefractionFactor();
-  // Scale dispersion to [0, 0.2]: the shader offsets R/B UVs by uvOffset * (1 ± dispersion),
-  // so 0.2 means max 20% additional offset, keeping chromatic aberration subtle.
-  params.dispersion = (_dispersion / 100.0f) * 0.2f;
+  params.dispersion = getDispersionFactor();
   params.splay = std::clamp(_splay / 100.0f, 0.0f, 1.0f);
   params.depthRatio = depthRatio;
   params.lightAngle = _lightAngle;
-  params.lightIntensity = _lightIntensity / 100.0f;
+  params.lightIntensity = getLightIntensityFactor();
   params.origMinHalf = useSDF ? minHalf : 0.0f;
   params.origWidth = halfWidth * 2.0f;
   params.origHeight = halfHeight * 2.0f;
