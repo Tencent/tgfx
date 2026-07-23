@@ -33,36 +33,45 @@ namespace tgfx {
 /// (the matcher rejects TiledTextureEffect::hasPerspective), so no perspective vertex dimension
 /// exists: the coordinate is always affine (vec2).
 ///
+/// HAS_COVERAGE is an independent structural dimension (mirrored vertex/fragment) driven by the
+/// geometry processor's AAType, exactly like QuadTextureFillShader: when the GP carries a per-vertex
+/// AA coverage attribute it is passed through as a varying and modulated into the output. It is NOT
+/// tied to GP_TYPE, so both AA and non-AA quads share the same GP_TYPE variant.
+///
 /// Fragment dimensions:
 ///   HAS_XP (int, 3 values): XferProcessor type
+///   HAS_COVERAGE (bool): per-vertex AA coverage varying present
 ///
 /// Vertex dimensions:
 ///   GP_TYPE (int, 2 values): 0=DefaultGeometryProcessor, 1=QuadPerEdgeAAGeometryProcessor
+///   HAS_COVERAGE (bool): per-vertex AA coverage attribute present
 class TiledTextureFillShader : public PrecompiledShader {
  public:
   // Fragment dimensions
   struct FragDims {
-    enum : uint32_t { HAS_XP, COUNT };
+    enum : uint32_t { HAS_XP, HAS_COVERAGE, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("HAS_XP", 3),
+          PermutationBool("HAS_COVERAGE"),
       });
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 1, "Update info() when fragment dimensions change.");
+  static_assert(FD::COUNT == 2, "Update info() when fragment dimensions change.");
 
   // Vertex dimensions
   struct VertDims {
-    enum : uint32_t { GP_TYPE, COUNT };
+    enum : uint32_t { GP_TYPE, HAS_COVERAGE, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("GP_TYPE", 2),
+          PermutationBool("HAS_COVERAGE"),
       });
     }
   };
   using VD = VertDims;
-  static_assert(VD::COUNT == 1, "Update info() when vertex dimensions change.");
+  static_assert(VD::COUNT == 2, "Update info() when vertex dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"TiledTextureFillShader",
@@ -73,7 +82,16 @@ class TiledTextureFillShader : public PrecompiledShader {
             PermutationDomain({}),
             "",
             "",
-            nullptr};
+            ShouldCompile};
+  }
+
+ private:
+  static bool ShouldCompile(uint32_t /*vertIndex*/, uint32_t /*fragIndex*/,
+                            const std::vector<int>& vertValues,
+                            const std::vector<int>& fragValues) {
+    // HAS_COVERAGE is mirrored: the vertex stage emits the varying only when the fragment stage
+    // consumes it, so vert and frag must agree.
+    return vertValues[VD::HAS_COVERAGE] == fragValues[FD::HAS_COVERAGE];
   }
 };
 

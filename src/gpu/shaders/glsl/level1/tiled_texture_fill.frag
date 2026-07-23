@@ -15,8 +15,14 @@
 #ifndef HAS_XP
 #define HAS_XP 0
 #endif
+#ifndef HAS_COVERAGE
+#define HAS_COVERAGE 0
+#endif
 
 layout(location = 0) in vec2 TransformedCoords_0;
+#if HAS_COVERAGE
+layout(location = 1) in float vCoverage;
+#endif
 
 layout(location = 0) out vec4 fragColor;
 
@@ -59,6 +65,17 @@ void main() {
     color = color * Color.a;
   }
 
-#define TGFX_XP_SRC_COLOR color
-#include "xp_output.inc"
+#if HAS_XP
+  #if HAS_COVERAGE
+  fragColor = applyPorterDuffXP(color, vec4(vCoverage));
+  #else
+  fragColor = applyPorterDuffXP(color, vec4(1.0));
+  #endif
+#else
+  #if HAS_COVERAGE
+  fragColor = color * vCoverage;
+  #else
+  fragColor = color;
+  #endif
+#endif
 }
