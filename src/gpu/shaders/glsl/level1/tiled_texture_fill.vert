@@ -1,5 +1,7 @@
 // TiledTextureFillShader vertex shader
-// Permutation dimensions (vert): GP_TYPE (0=DefaultGP, 1=QuadPerEdgeAAGP), HAS_PERSPECTIVE
+// Permutation dimensions (vert): GP_TYPE (0=DefaultGP, 1=QuadPerEdgeAAGP)
+// The coordinate is always affine (vec2); perspective TiledTextureEffect draws fall back to
+// ProgramBuilder, so no perspective path exists here.
 #version 450
 
 #ifndef GP_TYPE
@@ -16,11 +18,7 @@ layout(std140, set = 0, binding = 0) uniform VertexUniformBlock {
 
 layout(location = 0) in vec2 aPosition;
 
-#if HAS_PERSPECTIVE
-layout(location = 0) out vec3 TransformedCoords_0;
-#else
 layout(location = 0) out vec2 TransformedCoords_0;
-#endif
 
 void main() {
 #if GP_TYPE == 0
@@ -30,10 +28,6 @@ void main() {
   highp vec2 position = aPosition;
 #endif
   vec3 coordResult = CoordTransformMatrix_0 * vec3(aPosition, 1.0);
-#if HAS_PERSPECTIVE
-  TransformedCoords_0 = coordResult;
-#else
   TransformedCoords_0 = coordResult.xy;
-#endif
   gl_Position = vec4(position.xy * tgfx_RTAdjust.xz + tgfx_RTAdjust.yw, 0.0, 1.0);
 }

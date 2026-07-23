@@ -487,5 +487,14 @@ void GLSLTiledTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
     int modeYInt = static_cast<int>(sampling.shaderModeY);
     fragmentUniformData->setData("ShaderModeY", modeYInt);
   }
+  // Alpha-only and strict-subset are folded into runtime uniforms for the precompiled shader path.
+  if (fragmentUniformData->hasField("AlphaOnly")) {
+    int alphaOnlyValue = isAlphaOnly() ? 1 : 0;
+    fragmentUniformData->setData("AlphaOnly", alphaOnlyValue);
+  }
+  if (fragmentUniformData->hasField("Strict")) {
+    int strictValue = isStrict() ? 1 : 0;
+    fragmentUniformData->setData("Strict", strictValue);
+  }
 }
 }  // namespace tgfx

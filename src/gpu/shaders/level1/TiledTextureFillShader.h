@@ -25,43 +25,44 @@ namespace tgfx {
 /// Precompiled shader declaration for TiledTextureEffect. Handles texture sampling with various
 /// tiling modes (repeat, mirror, clamp-to-border, etc.) applied per-axis via runtime uniform
 /// branches. ShaderModeX/ShaderModeY are passed as uniforms rather than compile-time permutations
-/// to dramatically reduce variant count (from 640 to 12).
+/// to dramatically reduce variant count.
+///
+/// ALPHA_ONLY (alpha-only texture) and HAS_STRICT (SrcRectConstraint::Strict) are pure fragment
+/// math, so they are folded into runtime uniforms (AlphaOnly / Strict) rather than compile-time
+/// permutations, mirroring the QuadTextureFillShader approach. Perspective is never matched here
+/// (the matcher rejects TiledTextureEffect::hasPerspective), so no perspective vertex dimension
+/// exists: the coordinate is always affine (vec2).
 ///
 /// Fragment dimensions:
-///   ALPHA_ONLY (bool): texture is alpha-only format
-///   HAS_STRICT (bool): SrcRectConstraint::Strict is active
 ///   HAS_XP (int, 3 values): XferProcessor type
 ///
 /// Vertex dimensions:
-///   HAS_PERSPECTIVE (bool): coordinate transform has perspective
+///   GP_TYPE (int, 2 values): 0=DefaultGeometryProcessor, 1=QuadPerEdgeAAGeometryProcessor
 class TiledTextureFillShader : public PrecompiledShader {
  public:
   // Fragment dimensions
   struct FragDims {
-    enum : uint32_t { ALPHA_ONLY, HAS_STRICT, HAS_XP, COUNT };
+    enum : uint32_t { HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationBool("ALPHA_ONLY"),
-          PermutationBool("HAS_STRICT"),
           PermutationInt("HAS_XP", 3),
       });
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 3, "Update info() when fragment dimensions change.");
+  static_assert(FD::COUNT == 1, "Update info() when fragment dimensions change.");
 
   // Vertex dimensions
   struct VertDims {
-    enum : uint32_t { GP_TYPE, HAS_PERSPECTIVE, COUNT };
+    enum : uint32_t { GP_TYPE, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("GP_TYPE", 2),
-          PermutationBool("HAS_PERSPECTIVE"),
       });
     }
   };
   using VD = VertDims;
-  static_assert(VD::COUNT == 2, "Update info() when vertex dimensions change.");
+  static_assert(VD::COUNT == 1, "Update info() when vertex dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"TiledTextureFillShader",
@@ -72,19 +73,7 @@ class TiledTextureFillShader : public PrecompiledShader {
             PermutationDomain({}),
             "",
             "",
-            ShouldCompile};
-  }
-
- private:
-  static bool ShouldCompile(uint32_t /*vertIndex*/, uint32_t /*fragIndex*/,
-                            const std::vector<int>& vertValues,
-                            const std::vector<int>& /*fragValues*/) {
-    // The QuadPerEdgeAA path pre-transforms vertices to device space and carries no perspective
-    // coordinate; only the DefaultGeometryProcessor path emits a perspective coord.
-    if (vertValues[VD::GP_TYPE] == 1 && vertValues[VD::HAS_PERSPECTIVE] != 0) {
-      return false;
-    }
-    return true;
+            nullptr};
   }
 };
 

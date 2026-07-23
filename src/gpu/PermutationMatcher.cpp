@@ -245,18 +245,17 @@ static std::optional<PermutationMatchResult> TryMatchTiledTextureFill(
   if (!isQuad && modeX == 0 && modeY == 0) {
     return std::nullopt;
   }
+  // ALPHA_ONLY and HAS_STRICT are folded into runtime uniforms (AlphaOnly / Strict), set by
+  // GLSLTiledTextureEffect::onSetData; they are no longer compile-time dimensions.
   using VD = TiledTextureFillShader::VD;
   auto vertDomain = VD::domain();
   std::vector<int> vertValues(VD::COUNT, 0);
   vertValues[VD::GP_TYPE] = gpType;
-  vertValues[VD::HAS_PERSPECTIVE] = 0;
   auto vertIndex = vertDomain.encode(vertValues);
 
   using FD = TiledTextureFillShader::FragDims;
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
-  fragValues[FD::ALPHA_ONLY] = tte->isAlphaOnly() ? 1 : 0;
-  fragValues[FD::HAS_STRICT] = tte->isStrict() ? 1 : 0;
   fragValues[FD::HAS_XP] = xpType;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"TiledTextureFillShader", vertIndex, fragIndex};
