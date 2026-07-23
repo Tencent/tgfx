@@ -24,6 +24,8 @@
 
 namespace tgfx {
 
+enum class GlassShapeType;
+
 /**
  * GlassStyle simulates the physical behavior of light passing through a glass surface, producing
  * refraction, chromatic dispersion, frosted blur, and specular highlights. It captures the
@@ -128,6 +130,10 @@ class GlassStyle : public LayerStyle {
     return LayerStyleExtraSourceType::Background;
   }
 
+  bool needsContour() const override {
+    return true;
+  }
+
  protected:
   void onDraw(Canvas* canvas, const LayerStyleInput& input, float alpha,
               BlendMode blendMode) override;
@@ -140,8 +146,10 @@ class GlassStyle : public LayerStyle {
 
   void invalidateFrostFilter();
 
-  std::shared_ptr<ImageFilter> getRefractionFilter(int layerWidth, int layerHeight, float halfWidth,
-                                                   float halfHeight, float udfPixelToLayerPixel,
+  std::shared_ptr<ImageFilter> getRefractionFilter(int layerWidth, int layerHeight,
+                                                   GlassShapeType shapeType, float cornerRadius,
+                                                   float halfWidth, float halfHeight,
+                                                   float udfPixelToLayerPixel,
                                                    std::shared_ptr<Image> maskImage,
                                                    std::shared_ptr<Image> coarseMaskImage);
 
@@ -151,6 +159,10 @@ class GlassStyle : public LayerStyle {
 
   float getDepthRatio() const {
     return std::clamp(_depth / 100.0f, 0.0f, 1.0f);
+  }
+
+  float getGlassThickness(float minHalf) const {
+    return 1.0f + getDepthRatio() * std::max(minHalf - 1.0f, 0.0f);
   }
 
   float _refraction = 80.0f;

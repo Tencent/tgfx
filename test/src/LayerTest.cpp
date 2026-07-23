@@ -3901,7 +3901,9 @@ TGFX_TEST(LayerTest, InnerShadow) {
 // Creates a single glass cell: background image + colored rect + ellipse glass panel at (x, y).
 static void AddGlassCell(Layer* root, std::shared_ptr<Image> bgImage, float x, float y,
                          float cellSize, float refraction, float depth, float frost,
-                         float dispersion, float splay, float lightAngle, float lightIntensity) {
+                         float dispersion, float splay, float lightAngle, float lightIntensity,
+                         float glassW = -1.0f, float glassH = -1.0f, float radiusX = -1.0f,
+                         float radiusY = -1.0f) {
   auto container = Layer::Make();
   container->setMatrix(Matrix::MakeTrans(x, y));
 
@@ -3931,15 +3933,21 @@ static void AddGlassCell(Layer* root, std::shared_ptr<Image> bgImage, float x, f
   greenCircle->setFillStyle(ShapeStyle::Make(Color::FromRGBA(50, 200, 80, 200)));
   container->addChild(greenCircle);
 
-  // Glass panel goes through the AlphaMask UDF path.
-  float glassSize = cellSize - 20;
+  // Glass panel shape. Default is a circle (ellipse with equal width/height); callers can
+  // override to render a rounded rect or an ellipse with unequal dimensions, which exercise
+  // the analytical SDF refraction path.
+  float defaultSize = cellSize - 20;
+  float gw = glassW > 0.0f ? glassW : defaultSize;
+  float gh = glassH > 0.0f ? glassH : defaultSize;
+  float rx = radiusX >= 0.0f ? radiusX : gw * 0.5f;
+  float ry = radiusY >= 0.0f ? radiusY : gh * 0.5f;
   auto glassLayer = SolidLayer::Make();
   glassLayer->setColor(Color::FromRGBA(255, 255, 255, 128));
-  glassLayer->setWidth(glassSize);
-  glassLayer->setHeight(glassSize);
-  glassLayer->setRadiusX(glassSize * 0.5f);
-  glassLayer->setRadiusY(glassSize * 0.5f);
-  glassLayer->setMatrix(Matrix::MakeTrans(10, 10));
+  glassLayer->setWidth(gw);
+  glassLayer->setHeight(gh);
+  glassLayer->setRadiusX(rx);
+  glassLayer->setRadiusY(ry);
+  glassLayer->setMatrix(Matrix::MakeTrans((cellSize - gw) * 0.5f, (cellSize - gh) * 0.5f));
   auto style =
       GlassStyle::Make(refraction, depth, frost, dispersion, splay, lightAngle, lightIntensity);
   glassLayer->setLayerStyles({style});
@@ -3948,7 +3956,9 @@ static void AddGlassCell(Layer* root, std::shared_ptr<Image> bgImage, float x, f
   root->addChild(container);
 }
 
-static void RunGlassStyleTest(const std::string& keySuffix, float zoomScale = 1.0f) {
+static void RunGlassStyleTest(const std::string& keySuffix, float zoomScale = 1.0f,
+                              float glassW = -1.0f, float glassH = -1.0f, float radiusX = -1.0f,
+                              float radiusY = -1.0f) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -4007,7 +4017,7 @@ static void RunGlassStyleTest(const std::string& keySuffix, float zoomScale = 1.
           break;
       }
       AddGlassCell(displayList->root(), bgImage, cx, cy, cellSize, ref, depth, frost, disp, splay,
-                   angle, intensity);
+                   angle, intensity, glassW, glassH, radiusX, radiusY);
     }
   }
 
@@ -4021,6 +4031,16 @@ TGFX_TEST(LayerTest, GlassStyleEllipse) {
 
 TGFX_TEST(LayerTest, GlassStyleZoom) {
   RunGlassStyleTest("Zoom", 2.0f);
+}
+
+TGFX_TEST(LayerTest, GlassStyleRoundedRect) {
+  // Rounded rectangle with unequal width/height (180x120, radius 30x30) exercises the SDF path.
+  RunGlassStyleTest("RoundedRect", 1.0f, 180, 120, 30, 30);
+}
+
+TGFX_TEST(LayerTest, GlassStyleEllipseSDF) {
+  // Ellipse with unequal width/height (180x120, radius = half dimensions) exercises the SDF path.
+  RunGlassStyleTest("EllipseSDF", 1.0f, 180, 120, 90, 60);
 }
 
 }  // namespace tgfx

@@ -45,6 +45,9 @@ void GlassRefractionFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey)
   if (params.lightIntensity > 0.0f) {
     flags |= 8;
   }
+  // Shape type determines the shader code path (SDF vs AlphaMask), so it must be part of
+  // the processor key to avoid sharing cached programs between incompatible shader variants.
+  flags |= (static_cast<uint32_t>(params.shapeType) & 0x3) << 4;
   bytesKey->write(flags);
 }
 
