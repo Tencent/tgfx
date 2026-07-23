@@ -38,7 +38,7 @@ class GlassStyle : public LayerStyle {
    * @param depth The inward extent of the refraction region from edges, range [1, 100].
    * @param frost The amount of background blur (frosted glass), range [0, 100].
    * @param dispersion The intensity of chromatic aberration (rainbow prism effect), range [0, 100].
-   * @param splay The spread of projected light on the glass surface, range [0, 100].
+   * @param splay The blend factor between the UDF gradient direction and the radial direction used for refraction, range [0, 100].
    * @param lightAngle The direction of the light source in degrees, range [-179, 180].
    * @param lightIntensity The brightness of edge highlights, range [0, 100].
    */
@@ -83,15 +83,15 @@ class GlassStyle : public LayerStyle {
   void setDispersion(float value);
 
   /**
-   * The spread of projected light across the glass surface. Range [0, 100].
-   * Controls how wide the edge highlights diffuse. Higher values produce softer, broader
-   * highlights; lower values produce sharper, more concentrated specular reflections.
+   * The blend factor between the UDF gradient direction and the radial (center-pointing)
+   * direction used for refraction. Range [0, 100]. At 0, refraction follows the surface
+   * curvature (UDF gradient); at 100, refraction points toward the shape center.
    */
   float splay() const {
     return _splay;
   }
 
-  /** Sets the light spread amount. */
+  /** Sets the refraction direction blend factor. */
   void setSplay(float value);
 
   /** Light source direction in degrees. Range [-179, 180]. */

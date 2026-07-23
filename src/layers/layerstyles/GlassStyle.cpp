@@ -398,7 +398,7 @@ std::shared_ptr<ImageFilter> GlassStyle::getRefractionFilter(
   // Scale dispersion to [0, 0.2]: the shader offsets R/B UVs by uvOffset * (1 ± dispersion),
   // so 0.2 means max 20% additional offset, keeping chromatic aberration subtle.
   params.dispersion = (_dispersion / 100.0f) * 0.2f;
-  params.splay = _splay / 100.0f;
+  params.splay = std::clamp(_splay / 100.0f, 0.0f, 1.0f);
   params.depthRatio = depthRatio;
   params.lightAngle = _lightAngle;
   params.lightIntensity = (_lightIntensity > 0) ? _lightIntensity / 100.0f : 0.0f;
