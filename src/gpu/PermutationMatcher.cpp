@@ -968,22 +968,31 @@ static std::optional<PermutationMatchResult> TryMatchComposedTexture(
   // Each textured Compose shader carries a single GP_TYPE vertex dimension, so the vertex index is
   // simply the GP type.
   uint32_t vertIndex = static_cast<uint32_t>(gpType);
-  if (programInfo->numFragmentProcessors() != 1) {
-    return std::nullopt;
-  }
   int xpType = GetXPType(programInfo);
   if (xpType < 0) {
     return std::nullopt;
   }
-  auto fp = programInfo->getFragmentProcessor(0);
-  if (fp->name() != "ComposeFragmentProcessor") {
+  // Accept two structurally-equivalent forms of "texture followed by one pointwise transform":
+  //   (a) a single ComposeFragmentProcessor(TextureEffect, X), or
+  //   (b) two sequential top-level color processors [TextureEffect, X].
+  // Sequential color processors are chained (each consumes the previous output), so [A, B] produces
+  // the identical result to Compose(A, B) and maps to the same precompiled variant.
+  const FragmentProcessor* child0 = nullptr;
+  const FragmentProcessor* child1 = nullptr;
+  if (programInfo->numFragmentProcessors() == 1 && programInfo->numColorFragmentProcessors() == 1) {
+    auto fp = programInfo->getFragmentProcessor(0);
+    if (fp->name() != "ComposeFragmentProcessor" || fp->numChildProcessors() != 2) {
+      return std::nullopt;
+    }
+    child0 = fp->childProcessor(0);
+    child1 = fp->childProcessor(1);
+  } else if (programInfo->numFragmentProcessors() == 2 &&
+             programInfo->numColorFragmentProcessors() == 2) {
+    child0 = programInfo->getFragmentProcessor(0);
+    child1 = programInfo->getFragmentProcessor(1);
+  } else {
     return std::nullopt;
   }
-  if (fp->numChildProcessors() != 2) {
-    return std::nullopt;
-  }
-  auto child0 = fp->childProcessor(0);
-  auto child1 = fp->childProcessor(1);
   if (child0->name() != "TextureEffect") {
     return std::nullopt;
   }
