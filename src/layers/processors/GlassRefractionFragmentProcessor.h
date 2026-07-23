@@ -40,6 +40,8 @@ struct GlassRefractionParams {
   float glassHeight = 0.0f;
   float halfW = 0.0f;
   float halfH = 0.0f;
+  // Only consumed when shapeType == RoundedRect. Ignored by Ellipse (uses halfW/halfH) and
+  // AlphaMask (uses UDF mask).
   float cornerRadius = 0.0f;
   float minHalf = 0.0f;
 
