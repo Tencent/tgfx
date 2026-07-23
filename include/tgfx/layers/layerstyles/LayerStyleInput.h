@@ -134,6 +134,14 @@ struct LayerStyleInput {
    * normally rendered content below the current layer.
    */
   std::shared_ptr<StyleInputSource> extraSource = nullptr;
+
+  /**
+   * Optional contour source. Available when the LayerStyle's needsContour() returns true.
+   * Carries the contour image (with alpha=0 painters and solid-color gradient replacements)
+   * along with the layer's vector shape. When extraSourceType() is already Contour, this field
+   * is nullptr (the contour is available via extraSource instead).
+   */
+  std::shared_ptr<ContourInputSource> contourSource = nullptr;
 };
 
 }  // namespace tgfx
