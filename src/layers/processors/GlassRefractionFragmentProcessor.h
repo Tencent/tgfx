@@ -25,11 +25,14 @@ namespace tgfx {
 
 // Defines the glass shape geometry, which determines the refraction strategy used in the
 // shader. RoundedRect and Ellipse use analytical SDF; AlphaMask uses a UDF height texture.
+// Values must stay < 4: onComputeProcessorKey masks shapeType with 0x3 (2 bits).
 enum class GlassShapeType {
   RoundedRect,
   Ellipse,
   AlphaMask,
 };
+static_assert(static_cast<int>(GlassShapeType::AlphaMask) < 4,
+              "GlassShapeType must fit in 2 bits for processor key masking");
 
 struct GlassRefractionParams {
   // Glass geometry (in layer pixel space).
