@@ -1,9 +1,14 @@
 // LumaShader vertex shader
-// Permutation dimensions (vert): GP_TYPE (0=DefaultGP, 1=QuadPerEdgeAAGP)
+// Permutation dimensions (vert): GP_TYPE (0=DefaultGP, 1=QuadPerEdgeAAGP), HAS_COVERAGE
+// Unified varying contract: per-vertex AA coverage is gated by HAS_COVERAGE (driven by the GP's
+// AAType), independent of GP_TYPE. This lets both AA and non-AA quads share the GP_TYPE variant.
 #version 450
 
 #ifndef GP_TYPE
 #define GP_TYPE 0
+#endif
+#ifndef HAS_COVERAGE
+#define HAS_COVERAGE 0
 #endif
 
 layout(std140, set = 0, binding = 0) uniform VertexUniformBlock {
@@ -14,16 +19,16 @@ layout(std140, set = 0, binding = 0) uniform VertexUniformBlock {
 };
 
 layout(location = 0) in vec2 aPosition;
-#if GP_TYPE == 1
+#if HAS_COVERAGE
 layout(location = 1) in float inCoverage;
 #endif
 
-#if GP_TYPE == 1
+#if HAS_COVERAGE
 layout(location = 0) out float vCoverage;
 #endif
 
 void main() {
-#if GP_TYPE == 1
+#if HAS_COVERAGE
   vCoverage = inCoverage;
 #endif
 #if GP_TYPE == 0

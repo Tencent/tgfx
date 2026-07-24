@@ -27,23 +27,28 @@ namespace tgfx {
 ///
 /// Vertex dimensions:
 ///   GP_TYPE (int, 2 values): 0=DefaultGeometryProcessor, 1=QuadPerEdgeAAGeometryProcessor
+///   HAS_COVERAGE (bool): per-vertex AA coverage attribute present. Driven by the GP's AAType and
+///     kept independent of GP_TYPE (unified varying contract): both AA and non-AA quads share the
+///     same GP_TYPE variant. Fixes the former GP_TYPE-coupled coverage that broke pipeline creation
+///     for non-AA QuadPerEdgeAA luma draws.
 class LumaShader : public PrecompiledShader {
  public:
   struct Dims {
-    enum : uint32_t { GP_TYPE, COUNT };
+    enum : uint32_t { GP_TYPE, HAS_COVERAGE, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("GP_TYPE", 2),
+          PermutationBool("HAS_COVERAGE"),
       });
     }
   };
 
   struct FragDims {
-    enum : uint32_t { GP_TYPE, HAS_XP, COUNT };
+    enum : uint32_t { HAS_XP, HAS_COVERAGE, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationInt("GP_TYPE", 2),
           PermutationInt("HAS_XP", 3),
+          PermutationBool("HAS_COVERAGE"),
       });
     }
   };
@@ -64,7 +69,8 @@ class LumaShader : public PrecompiledShader {
  private:
   static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>& vertValues,
                             const std::vector<int>& fragValues) {
-    return vertValues[Dims::GP_TYPE] == fragValues[FD::GP_TYPE];
+    // HAS_COVERAGE is mirrored between vertex and fragment (unified varying contract).
+    return vertValues[Dims::HAS_COVERAGE] == fragValues[FD::HAS_COVERAGE];
   }
 };
 

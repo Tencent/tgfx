@@ -1,16 +1,17 @@
 // LumaShader fragment shader
-// Permutation dimensions: GP_TYPE, HAS_XP
+// Permutation dimensions: HAS_XP, HAS_COVERAGE
 // Computes luminance from input color using configurable coefficients.
+// Unified varying contract: coverage is gated by HAS_COVERAGE (independent of GP_TYPE).
 #version 450
 
-#ifndef GP_TYPE
-#define GP_TYPE 0
-#endif
 #ifndef HAS_XP
 #define HAS_XP 0
 #endif
+#ifndef HAS_COVERAGE
+#define HAS_COVERAGE 0
+#endif
 
-#if GP_TYPE == 1
+#if HAS_COVERAGE
 layout(location = 0) in float vCoverage;
 #endif
 
@@ -32,7 +33,7 @@ void main() {
   vec4 inputColor = Color;
   float luma = dot(inputColor.rgb, vec3(Kr, Kg, Kb));
   vec4 result = vec4(luma);
-#if GP_TYPE == 1
+#if HAS_COVERAGE
 #define TGFX_XP_SRC_COLOR (result * vCoverage)
 #define TGFX_XP_COVERAGE vec4(vCoverage)
 #else

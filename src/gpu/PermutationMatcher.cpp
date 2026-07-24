@@ -872,16 +872,26 @@ static std::optional<PermutationMatchResult> TryMatchLuma(const ProgramInfo* pro
   if (fp->name() != "LumaFragmentProcessor") {
     return std::nullopt;
   }
+  // Unified varying contract: per-vertex AA coverage is an independent HAS_COVERAGE dimension driven
+  // by the GP's AAType, not coupled to GP_TYPE.
+  int hasCoverage =
+      gp->name() == "DefaultGeometryProcessor"
+          ? (static_cast<const DefaultGeometryProcessor*>(gp)->getAAType() == AAType::Coverage ? 1
+                                                                                               : 0)
+          : (static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp)->getAAType() == AAType::Coverage
+                 ? 1
+                 : 0);
   using D = LumaShader::Dims;
   auto vertDomain = D::domain();
   std::vector<int> vertValues(D::COUNT);
   vertValues[D::GP_TYPE] = gpType;
+  vertValues[D::HAS_COVERAGE] = hasCoverage;
   auto vertIndex = vertDomain.encode(vertValues);
   using FD = LumaShader::FD;
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
-  fragValues[FD::GP_TYPE] = gpType;
   fragValues[FD::HAS_XP] = xpType;
+  fragValues[FD::HAS_COVERAGE] = hasCoverage;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"LumaShader", vertIndex, fragIndex};
 }
