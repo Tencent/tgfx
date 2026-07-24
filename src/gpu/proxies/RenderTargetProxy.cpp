@@ -21,6 +21,7 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/proxies/ExternalRenderTargetProxy.h"
+#include "gpu/resources/DepthStencilTextureView.h"
 
 namespace tgfx {
 std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFrom(
@@ -58,23 +59,30 @@ std::shared_ptr<RenderTargetProxy> RenderTargetProxy::makeRenderTargetProxy(int 
                                                                 sampleCount());
 }
 
-std::shared_ptr<Texture> RenderTargetProxy::getStencil(int sampleCount) {
-  return getOrAllocateStencil(width(), height(), sampleCount);
-}
-
-std::shared_ptr<Texture> RenderTargetProxy::getOrAllocateStencil(int width, int height,
-                                                                 int sampleCount) {
-  if (stencilTexture != nullptr) {
+std::shared_ptr<DepthStencilTextureView> RenderTargetProxy::getStencil(int sampleCount) {
+  if (stencilAttachment != nullptr) {
     // The cached entry must match the requested sample count; otherwise the caller is mixing
     // MSAA configurations on the same proxy, which would silently violate the "all attachments
     // share one sampleCount" rule that every backend enforces.
-    DEBUG_ASSERT(stencilTexture->sampleCount() == sampleCount);
-    return stencilTexture;
+    DEBUG_ASSERT(stencilAttachment->sampleCount() == sampleCount);
+    return stencilAttachment;
   }
-  TextureDescriptor descriptor(width, height, PixelFormat::DEPTH24_STENCIL8, false, sampleCount,
-                               TextureUsage::RENDER_ATTACHMENT);
-  stencilTexture = getContext()->gpu()->createTexture(descriptor);
-  return stencilTexture;
+  DepthStencilSpec spec = {stencilWidth(), stencilHeight(), sampleCount,
+                           PixelFormat::DEPTH24_STENCIL8};
+  auto key = DepthStencilTextureView::ComputeSharedAttachmentUniqueKey(spec);
+  stencilAttachment = Resource::Find<DepthStencilTextureView>(getContext(), key);
+  if (stencilAttachment == nullptr) {
+    stencilAttachment = Resource::Find<DepthStencilTextureView>(
+        getContext(), DepthStencilTextureView::ComputeDepthStencilScratchKey(spec));
+    if (stencilAttachment != nullptr) {
+      // An idle attachment downgraded to a scratch resource by cache pressure is promoted back
+      // to its shared identity.
+      stencilAttachment->assignUniqueKey(key);
+    } else {
+      stencilAttachment = DepthStencilTextureView::MakeFrom(getContext(), spec, key);
+    }
+  }
+  return stencilAttachment;
 }
 
 Matrix RenderTargetProxy::getOriginTransform() const {

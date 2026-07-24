@@ -22,8 +22,10 @@
 #include "MultisampleTestEffect.h"
 #include "StencilMaskRenderPass.h"
 #include "gpu/ProgramInfo.h"
+#include "gpu/ResourceCache.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "gpu/resources/DepthStencilTextureView.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/RenderPass.h"
@@ -162,8 +164,8 @@ TGFX_TEST(GPURenderTest, StencilMaskRenderPass) {
   EXPECT_EQ(cornerPixel, 0u) << "corner pixel was not the clear colour";
 }
 
-// Verifies RenderTargetProxy::getStencil() lazily allocates a stencil texture the first
-// time it is called and then returns the same instance on subsequent calls.
+// Lazily attaches the shared depth/stencil attachment on the first getStencil() call, then
+// returns the proxy-held instance on subsequent calls without allocating again.
 TGFX_TEST(GPURenderTest, RenderTargetProxyGetStencil) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -177,11 +179,81 @@ TGFX_TEST(GPURenderTest, RenderTargetProxyGetStencil) {
   EXPECT_EQ(first->width(), 96);
   EXPECT_EQ(first->height(), 64);
   EXPECT_EQ(first->sampleCount(), 1);
+  auto bytesAfterAttach = context->resourceCache()->getResourceBytes();
 
   auto second = proxy->getStencil(1);
   ASSERT_TRUE(second != nullptr);
-  // Lazy-init contract: subsequent calls return the cached instance, not a fresh texture.
   EXPECT_EQ(first.get(), second.get());
+  EXPECT_EQ(context->resourceCache()->getResourceBytes(), bytesAfterAttach);
+}
+
+// Two proxies with the same stencil spec resolve to the same shared attachment instance.
+TGFX_TEST(GPURenderTest, RenderTargetProxySharesStencilAcrossProxies) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto proxyA = RenderTargetProxy::Make(context, 96, 64, /*alphaOnly=*/false);
+  ASSERT_TRUE(proxyA != nullptr);
+  auto proxyB = RenderTargetProxy::Make(context, 96, 64, /*alphaOnly=*/false);
+  ASSERT_TRUE(proxyB != nullptr);
+
+  auto stencilA = proxyA->getStencil(1);
+  ASSERT_TRUE(stencilA != nullptr);
+  auto stencilB = proxyB->getStencil(1);
+  ASSERT_TRUE(stencilB != nullptr);
+  EXPECT_EQ(stencilA.get(), stencilB.get());
+}
+
+// Proxies with different stencil specs never share an attachment.
+TGFX_TEST(GPURenderTest, RenderTargetProxyStencilSpecIsolation) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto proxyA = RenderTargetProxy::Make(context, 96, 64, /*alphaOnly=*/false);
+  ASSERT_TRUE(proxyA != nullptr);
+  auto proxyB = RenderTargetProxy::Make(context, 128, 64, /*alphaOnly=*/false);
+  ASSERT_TRUE(proxyB != nullptr);
+
+  auto stencilA = proxyA->getStencil(1);
+  ASSERT_TRUE(stencilA != nullptr);
+  auto stencilB = proxyB->getStencil(1);
+  ASSERT_TRUE(stencilB != nullptr);
+  EXPECT_NE(stencilA.get(), stencilB.get());
+}
+
+// After a shared attachment loses its unique identity (as happens when cache pressure
+// downgrades it to a scratch resource), a new proxy with the same spec promotes it back via
+// the scratch key instead of allocating a new texture.
+TGFX_TEST(GPURenderTest, RenderTargetProxyStencilDowngradeReuse) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  // Drop leftovers cached by earlier tests so the reuse path below is deterministic.
+  context->resourceCache()->purgeUntilMemoryTo(0);
+
+  const DepthStencilTextureView* original = nullptr;
+  {
+    auto proxy = RenderTargetProxy::Make(context, 96, 64, /*alphaOnly=*/false);
+    ASSERT_TRUE(proxy != nullptr);
+    auto stencil = proxy->getStencil(1);
+    ASSERT_TRUE(stencil != nullptr);
+    original = stencil.get();
+    // Emulate the unique->scratch downgrade: strip the shared identity, leaving only the
+    // spec-derived scratch key.
+    stencil->removeUniqueKey();
+  }
+  // The released attachment has no unique identity and is only reachable via its scratch key.
+  DepthStencilSpec spec = {96, 64, 1, PixelFormat::DEPTH24_STENCIL8};
+  auto key = DepthStencilTextureView::ComputeSharedAttachmentUniqueKey(spec);
+  EXPECT_TRUE(Resource::Find<DepthStencilTextureView>(context, key) == nullptr);
+
+  auto proxy = RenderTargetProxy::Make(context, 96, 64, /*alphaOnly=*/false);
+  ASSERT_TRUE(proxy != nullptr);
+  auto stencil = proxy->getStencil(1);
+  ASSERT_TRUE(stencil != nullptr);
+  EXPECT_EQ(stencil.get(), original);
 }
 
 // Verifies the setter/getter pair for ProgramInfo's stencil and colour-write-mask state, and

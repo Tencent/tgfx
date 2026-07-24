@@ -1863,6 +1863,74 @@ TGFX_TEST(StencilCoverPathTest, Dispatch_StencilConfinedByCoverBoundsWithoutClip
       << "Op B inverse fill inside op A's half but outside op A's bbox must be red";
 }
 
+namespace {
+// Builds the pentagon drawn by the multi-pass stencil reuse test, centred at (centerX, centerY)
+// inside a 32x32 box. Pentagon paths bypass the Canvas rect/oval/rrect fast paths, so every
+// draw reaches the stencil-and-cover dispatch.
+Path BuildCellPentagon(int centerX, int centerY) {
+  static constexpr int OFFSETS[5][2] = {
+      {0, -16}, {15, -6}, {9, 12}, {-9, 12}, {-15, -6},
+  };
+  Path path;
+  path.moveTo(static_cast<float>(centerX + OFFSETS[0][0]),
+              static_cast<float>(centerY + OFFSETS[0][1]));
+  for (int index = 1; index < 5; ++index) {
+    path.lineTo(static_cast<float>(centerX + OFFSETS[index][0]),
+                static_cast<float>(centerY + OFFSETS[index][1]));
+  }
+  path.close();
+  return path;
+}
+}  // namespace
+
+// End-to-end check that many render passes sharing one depth/stencil attachment never observe
+// each other's stencil contents. Two same-spec surfaces alternate: each iteration draws one
+// masked pentagon into each surface and flushes, producing two render passes per flush that
+// attach the same shared stencil texture. 25 iterations x 2 surfaces = 50 passes, each
+// clearing the shared stencil on load; residue leaking across passes would corrupt later
+// pentagons and fail the baseline comparison.
+TGFX_TEST(StencilCoverPathTest, Dispatch_StencilReuseAcrossPasses) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  ScopedStencilCoverCaps capsGuard(context, true);
+
+  constexpr int SIZE = 300;
+  constexpr int GRID = 5;
+  constexpr int CELL = 40;
+  constexpr int MARGIN = 50;
+  auto surfaceA = Surface::Make(context, SIZE, SIZE);
+  ASSERT_TRUE(surfaceA != nullptr);
+  auto surfaceB = Surface::Make(context, SIZE, SIZE);
+  ASSERT_TRUE(surfaceB != nullptr);
+  surfaceA->getCanvas()->clear(Color{0.f, 0.f, 0.f, 1.f});
+  surfaceB->getCanvas()->clear(Color{0.f, 0.f, 0.f, 1.f});
+
+  Paint paint;
+  paint.setAntiAlias(false);
+  paint.setColor(Color{1.f, 0.f, 0.f, 1.f});
+
+  for (int index = 0; index < GRID * GRID; ++index) {
+    auto centerX = MARGIN + (index % GRID) * CELL + CELL / 2;
+    auto centerY = MARGIN + (index / GRID) * CELL + CELL / 2;
+    auto pathA = BuildCellPentagon(centerX, centerY);
+    pathA.setFillType(index % 2 == 0 ? PathFillType::Winding : PathFillType::EvenOdd);
+    surfaceA->getCanvas()->drawPath(pathA, paint);
+    // Surface B walks the grid in reverse order so the two surfaces carry different masks in
+    // the same flush.
+    auto reverse = GRID * GRID - 1 - index;
+    auto pathB = BuildCellPentagon(MARGIN + (reverse % GRID) * CELL + CELL / 2,
+                                   MARGIN + (reverse / GRID) * CELL + CELL / 2);
+    pathB.setFillType(reverse % 2 == 0 ? PathFillType::Winding : PathFillType::EvenOdd);
+    surfaceB->getCanvas()->drawPath(pathB, paint);
+    context->flushAndSubmit();
+  }
+
+  EXPECT_TRUE(Baseline::Compare(surfaceA, "StencilCoverPath/StencilReuseAcrossPassesA"));
+  EXPECT_TRUE(Baseline::Compare(surfaceB, "StencilCoverPath/StencilReuseAcrossPassesB"));
+}
+
 }  // namespace tgfx
 
 #endif  // TGFX_ENABLE_STENCIL_COVER_PATH

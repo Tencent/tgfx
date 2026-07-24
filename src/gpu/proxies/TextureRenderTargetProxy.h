@@ -68,8 +68,12 @@ class TextureRenderTargetProxy : public DefaultTextureProxy,
 
   std::shared_ptr<RenderTarget> getRenderTarget() const override;
 
-  std::shared_ptr<Texture> getStencil(int sampleCount) override {
-    return getOrAllocateStencil(_backingStoreWidth, _backingStoreHeight, sampleCount);
+  int stencilWidth() const override {
+    return _backingStoreWidth;
+  }
+
+  int stencilHeight() const override {
+    return _backingStoreHeight;
   }
 
  protected:
