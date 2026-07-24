@@ -40,6 +40,8 @@ void GLSLLumaFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
   fragmentUniformData->setData("Kr", _lumaFactor.kr);
   fragmentUniformData->setData("Kg", _lumaFactor.kg);
   fragmentUniformData->setData("Kb", _lumaFactor.kb);
+  // Select the Luma operator in the shared TexturedEffectShader (absent elsewhere).
+  fragmentUniformData->setDataOptional("OpType", 1);
 }
 
 }  // namespace tgfx

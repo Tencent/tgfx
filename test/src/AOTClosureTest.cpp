@@ -45,8 +45,7 @@ static std::string ClosureBundlePath() {
 // path is verifiably complete" for this Kernel set.
 static const std::vector<std::string>& Stage1Kernels() {
   static const std::vector<std::string> kernels = {"TextureFillShader", "QuadColorFillShader",
-                                                   "TexturedColorMatrixShader",
-                                                   "TexturedLumaShader", "SolidColorFillShader"};
+                                                   "TexturedEffectShader", "SolidColorFillShader"};
   return kernels;
 }
 

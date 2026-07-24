@@ -22,18 +22,17 @@
 
 namespace tgfx {
 
-/// Precompiled shader for the EffectDecomposer 2-pass pipeline when the second FP is
-/// ColorSpaceXformEffect. The intermediate texture from the first pass is sampled and then
-/// transformed through the color space conversion pipeline.
+/// Cold "uber" shader for the (1 sampler, no CoverageFP, RGBA) structural class: samples one
+/// intermediate texture then applies exactly one pointwise operator selected at runtime by the
+/// OpType uniform (0=ColorMatrix, 1=Luma, 2=AlphaThreshold, 3=ColorSpaceXform). Replaces the four
+/// former TexturedColorMatrix / TexturedLuma / TexturedAlphaThreshold / TexturedColorSpaceXform
+/// shaders, which had an identical structural skeleton and differed only in the operator. OpType
+/// and each operator's coefficients are set by the pointwise FP's onSetData (via setDataOptional),
+/// so no compile-time operator dimension is needed — the four shaders collapse into one.
 ///
-/// The color-space pipeline steps are selected at runtime through the CSFlags bitmask uniform
-/// (mirrors ColorSpaceXformSteps::Flags::mask()) instead of compile-time dimensions. SRC_TF_TYPE
-/// and DST_TF_TYPE are likewise runtime uniforms (SrcTFType / DstTFType).
-///
-/// Fragment dimensions:
-///   HAS_SUBSET (bool): whether the intermediate texture needs subset clamping
-///   HAS_XP (int, 3): destination-read blend mode class for the fixed-function output stage.
-class TexturedColorSpaceXformShader : public PrecompiledShader {
+/// Used both by the composed-texture matcher (ComposeFragmentProcessor(TextureEffect, op) and the
+/// equivalent sibling form) and, once wired, by the EffectDecomposer 2-pass pipeline.
+class TexturedEffectShader : public PrecompiledShader {
  public:
   struct FragDims {
     enum : uint32_t { HAS_SUBSET, HAS_XP, COUNT };
@@ -44,8 +43,7 @@ class TexturedColorSpaceXformShader : public PrecompiledShader {
       });
     }
   };
-  using FD = FragDims;
-  static_assert(FD::COUNT == 2, "Update info() when fragment dimensions change.");
+  using D = FragDims;
 
   struct VertDims {
     enum : uint32_t { GP_TYPE, COUNT };
@@ -56,14 +54,13 @@ class TexturedColorSpaceXformShader : public PrecompiledShader {
     }
   };
   using VD = VertDims;
-  static_assert(VD::COUNT == 1, "Update info() when vertex dimensions change.");
 
   PrecompiledShaderInfo info() const override {
-    return {"TexturedColorSpaceXformShader",
-            "level1/textured_color_space_xform.vert",
-            "level1/textured_color_space_xform.frag",
+    return {"TexturedEffectShader",
+            "level1/textured_effect.vert",
+            "level1/textured_effect.frag",
             VD::domain(),
-            FD::domain(),
+            D::domain(),
             PermutationDomain({}),
             "",
             "",
@@ -73,4 +70,4 @@ class TexturedColorSpaceXformShader : public PrecompiledShader {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER(tgfx::TexturedColorSpaceXformShader)
+TGFX_REGISTER_SHADER(tgfx::TexturedEffectShader)

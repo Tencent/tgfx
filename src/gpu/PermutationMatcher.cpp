@@ -77,10 +77,7 @@
 #include "gpu/shaders/level1/TextureColorMatrixShader.h"
 #include "gpu/shaders/level1/TextureFillShader.h"
 #include "gpu/shaders/level1/TextureGradientShader.h"
-#include "gpu/shaders/level1/TexturedAlphaThresholdShader.h"
-#include "gpu/shaders/level1/TexturedColorMatrixShader.h"
-#include "gpu/shaders/level1/TexturedColorSpaceXformShader.h"
-#include "gpu/shaders/level1/TexturedLumaShader.h"
+#include "gpu/shaders/level1/TexturedEffectShader.h"
 #include "gpu/shaders/level1/TiledTextureFillShader.h"
 
 namespace tgfx {
@@ -1008,17 +1005,24 @@ static std::optional<PermutationMatchResult> TryMatchComposedTexture(
   }
   int hasSubset = te->hasSubset() ? 1 : 0;
 
+  // All four pointwise operators (ColorMatrix / Luma / AlphaThreshold / ColorSpaceXform) share the
+  // same structural class (1 sampler, no CoverageFP, RGBA) and thus the same precompiled shader:
+  // TexturedEffectShader. The operator is selected at draw time by the OpType runtime uniform (set
+  // by the pointwise FP's onSetData), so it is not a compile-time dimension. The frag index only
+  // encodes the structural axes HAS_SUBSET and HAS_XP.
+  using D = TexturedEffectShader::D;
+  auto fragDomain = D::domain();
+  std::vector<int> fragValues(D::COUNT, 0);
+  fragValues[D::HAS_SUBSET] = hasSubset;
+  fragValues[D::HAS_XP] = xpType;
+  auto fragIndex = fragDomain.encode(fragValues);
+
   if (child1->name() == "ColorSpaceXformEffect") {
     auto* cse = static_cast<const ColorSpaceXformEffect*>(child1);
     auto* xform = cse->colorXform();
     if (!xform) {
       return std::nullopt;
     }
-    using FD = TexturedColorSpaceXformShader::FD;
-    auto fragDomain = FD::domain();
-    std::vector<int> fragValues(FD::COUNT, 0);
-    fragValues[FD::HAS_SUBSET] = hasSubset;
-    fragValues[FD::HAS_XP] = xpType;
     // The pipeline flags are runtime uniforms (CSFlags), so any flag combination hits the same
     // variant. Only the transfer-function type must still be in the supported 0-3 range.
     if (xform->flags.linearize) {
@@ -1036,38 +1040,12 @@ static std::optional<PermutationMatchResult> TryMatchComposedTexture(
         return std::nullopt;
       }
     }
-    auto fragIndex = fragDomain.encode(fragValues);
-    return PermutationMatchResult{"TexturedColorSpaceXformShader", vertIndex, fragIndex};
+    return PermutationMatchResult{"TexturedEffectShader", vertIndex, fragIndex};
   }
 
-  if (child1->name() == "ColorMatrixFragmentProcessor") {
-    using D = TexturedColorMatrixShader::D;
-    auto fragDomain = D::domain();
-    std::vector<int> fragValues(D::COUNT, 0);
-    fragValues[D::HAS_SUBSET] = hasSubset;
-    fragValues[D::HAS_XP] = xpType;
-    auto fragIndex = fragDomain.encode(fragValues);
-    return PermutationMatchResult{"TexturedColorMatrixShader", vertIndex, fragIndex};
-  }
-
-  if (child1->name() == "LumaFragmentProcessor") {
-    using D = TexturedLumaShader::D;
-    auto fragDomain = D::domain();
-    std::vector<int> fragValues(D::COUNT, 0);
-    fragValues[D::HAS_SUBSET] = hasSubset;
-    fragValues[D::HAS_XP] = xpType;
-    auto fragIndex = fragDomain.encode(fragValues);
-    return PermutationMatchResult{"TexturedLumaShader", vertIndex, fragIndex};
-  }
-
-  if (child1->name() == "AlphaStepFragmentProcessor") {
-    using D = TexturedAlphaThresholdShader::D;
-    auto fragDomain = D::domain();
-    std::vector<int> fragValues(D::COUNT, 0);
-    fragValues[D::HAS_SUBSET] = hasSubset;
-    fragValues[D::HAS_XP] = xpType;
-    auto fragIndex = fragDomain.encode(fragValues);
-    return PermutationMatchResult{"TexturedAlphaThresholdShader", vertIndex, fragIndex};
+  if (child1->name() == "ColorMatrixFragmentProcessor" ||
+      child1->name() == "LumaFragmentProcessor" || child1->name() == "AlphaStepFragmentProcessor") {
+    return PermutationMatchResult{"TexturedEffectShader", vertIndex, fragIndex};
   }
 
   return std::nullopt;

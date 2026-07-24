@@ -57,10 +57,7 @@
 #include "gpu/shaders/level1/TextureColorMatrixShader.h"
 #include "gpu/shaders/level1/TextureFillShader.h"
 #include "gpu/shaders/level1/TextureGradientShader.h"
-#include "gpu/shaders/level1/TexturedAlphaThresholdShader.h"
-#include "gpu/shaders/level1/TexturedColorMatrixShader.h"
-#include "gpu/shaders/level1/TexturedColorSpaceXformShader.h"
-#include "gpu/shaders/level1/TexturedLumaShader.h"
+#include "gpu/shaders/level1/TexturedEffectShader.h"
 #include "gpu/shaders/level1/TiledTextureFillShader.h"
 
 namespace tgfx {

@@ -44,6 +44,8 @@ void GLSLAlphaThresholdFragmentProcessor::emitCode(EmitArgs& args) const {
 void GLSLAlphaThresholdFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
                                                     UniformData* fragmentUniformData) const {
   fragmentUniformData->setData("Threshold", threshold);
+  // Select the AlphaThreshold operator in the shared TexturedEffectShader (absent elsewhere).
+  fragmentUniformData->setDataOptional("OpType", 2);
 }
 
 }  // namespace tgfx

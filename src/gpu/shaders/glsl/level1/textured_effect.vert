@@ -1,5 +1,7 @@
-// TexturedColorSpaceXformShader vertex shader
-// Used in EffectDecomposer 2-pass pipeline: samples intermediate texture + color space xform.
+// TexturedEffectShader vertex shader
+// Shared by the (S1, none, {noXP,XP}, RGBA) cold uber: samples an intermediate texture then applies
+// one runtime-selected pointwise operator. Identical to the former textured_{color_matrix,luma,
+// alpha_threshold,color_space_xform}.vert (they differed only in comments).
 // Permutation dimensions (vert): GP_TYPE (0=DefaultGP, 1=QuadPerEdgeAAGP)
 #version 450
 

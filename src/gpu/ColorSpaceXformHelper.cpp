@@ -78,6 +78,8 @@ void ColorSpaceXformHelper::setData(UniformData* uniformData,
   // steps get identity placeholders: their CSFlags bit is 0, so the shader never reads them.
   static const float kZero4[4] = {0.0f, 0.0f, 0.0f, 0.0f};
   uniformData->setDataOptional("CSFlags", static_cast<int>(flags.mask()));
+  // Select the ColorSpaceXform operator in the shared TexturedEffectShader (absent elsewhere).
+  uniformData->setDataOptional("OpType", 3);
 
   if (this->applySrcTF()) {
     float srcTF0[4] = {
