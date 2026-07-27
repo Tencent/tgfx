@@ -79,6 +79,14 @@ void GLSLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
 
 void GLSLPorterDuffXferProcessor::setData(UniformData* /*vertexUniformData*/,
                                           UniformData* fragmentUniformData) const {
+  // For precompiled shaders, blend mode is passed as a uniform rather than baked into shader code.
+  // This must be set before the dst-texture early return below: the framebuffer-fetch path has no
+  // dst texture yet still reads XPBlendMode, so setting it afterwards would leave it unwritten and
+  // the FBF blend would use a stale mode.
+  if (fragmentUniformData->hasField("XPBlendMode")) {
+    int mode = static_cast<int>(blendMode);
+    fragmentUniformData->setData("XPBlendMode", mode);
+  }
   if (dstTextureInfo.textureProxy == nullptr) {
     return;
   }
@@ -98,10 +106,5 @@ void GLSLPorterDuffXferProcessor::setData(UniformData* /*vertexUniformData*/,
   }
   float scales[] = {1.f / static_cast<float>(width), 1.f / static_cast<float>(height)};
   fragmentUniformData->setData("DstTextureCoordScale", scales);
-  // For precompiled shaders, blend mode is passed as a uniform rather than baked into shader code.
-  if (fragmentUniformData->hasField("XPBlendMode")) {
-    int mode = static_cast<int>(blendMode);
-    fragmentUniformData->setData("XPBlendMode", mode);
-  }
 }
 }  // namespace tgfx
