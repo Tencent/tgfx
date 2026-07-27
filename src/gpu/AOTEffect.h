@@ -68,7 +68,6 @@ enum class AOTEffectKind {
   TextureSource,
   ColorMatrix,
   Luma,
-  AlphaThreshold,
 };
 
 enum class EffectDomain {
@@ -118,13 +117,8 @@ struct AOTLumaParameters {
   float kb = 0.0722f;
 };
 
-struct AOTAlphaThresholdParameters {
-  float threshold = 0.0f;
-};
-
 using AOTEffectParameters =
-    std::variant<std::monostate, AOTTextureParameters, AOTColorMatrixParameters, AOTLumaParameters,
-                 AOTAlphaThresholdParameters>;
+    std::variant<std::monostate, AOTTextureParameters, AOTColorMatrixParameters, AOTLumaParameters>;
 
 struct AOTEffectNode {
   AOTEffectKind kind = AOTEffectKind::GeometryColor;
@@ -162,9 +156,6 @@ class AOTNodeBuilder {
                       AOTNodeID* output);
 
   bool addLuma(AOTNodeID input, const AOTLumaParameters& parameters, AOTNodeID* output);
-
-  bool addAlphaThreshold(AOTNodeID input, const AOTAlphaThresholdParameters& parameters,
-                         AOTNodeID* output);
 
   bool finish(AOTNodeID root, AOTEffectGraph* graph) const;
 

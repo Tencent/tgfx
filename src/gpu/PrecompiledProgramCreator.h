@@ -25,8 +25,6 @@
 
 namespace tgfx {
 
-struct PermutationMatchResult;
-
 /// Attempts to create a Program from a precompiled shader bundle. Returns nullptr if the
 /// PrecompiledShaderCache is empty, the ProgramInfo does not match any known permutation, or
 /// the bundle does not contain the required variant.
@@ -43,14 +41,6 @@ class PrecompiledProgramCreator {
   /// this always returns nullptr so behaviour is identical to the plain path.
   static std::shared_ptr<Program> CreateDecomposedProgram(Context* context,
                                                           const ProgramInfo* programInfo);
-
- private:
-  // Builds a Program from an already-resolved permutation match. Shared by the L3 (CreateProgram)
-  // and L2 (CreateDecomposedProgram) routes. A member so it inherits the UniformData friendship
-  // that lets it set skipSuffix on the precompiled uniform data.
-  static std::shared_ptr<Program> BuildProgramFromMatch(Context* context,
-                                                        const ProgramInfo* programInfo,
-                                                        const PermutationMatchResult& matchResult);
 };
 
 }  // namespace tgfx

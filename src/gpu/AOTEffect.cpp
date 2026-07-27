@@ -63,13 +63,6 @@ bool AOTNodeBuilder::addLuma(AOTNodeID input, const AOTLumaParameters& parameter
   return addUnaryNode(AOTEffectKind::Luma, input, traits, parameters, output);
 }
 
-bool AOTNodeBuilder::addAlphaThreshold(AOTNodeID input,
-                                       const AOTAlphaThresholdParameters& parameters,
-                                       AOTNodeID* output) {
-  EffectTraits traits = {EffectDomain::Pointwise, EffectInputUsage::ColorRGBA, false, false, true};
-  return addUnaryNode(AOTEffectKind::AlphaThreshold, input, traits, parameters, output);
-}
-
 bool AOTNodeBuilder::finish(AOTNodeID root, AOTEffectGraph* graph) const {
   if (graph == nullptr || !contains(root)) {
     return false;
