@@ -92,7 +92,8 @@ bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, AOTDecompositio
   for (uint32_t index = 2; index < graph.nodeCount(); ++index) {
     auto node = graph.nodeAt(AOTNodeID(index));
     if (node == nullptr || node->inputs.size() != 1 || node->inputs[0] != AOTNodeID(index - 1) ||
-        (node->kind != AOTEffectKind::ColorMatrix && node->kind != AOTEffectKind::Luma)) {
+        (node->kind != AOTEffectKind::ColorMatrix && node->kind != AOTEffectKind::Luma &&
+         node->kind != AOTEffectKind::AlphaThreshold)) {
       return false;
     }
   }
@@ -120,8 +121,13 @@ bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, AOTDecompositio
     auto nodeID = AOTNodeID(nodeIndex);
     auto node = graph.nodeAt(nodeID);
     AOTPassDescriptor pass = {};
-    pass.kernel = node->kind == AOTEffectKind::ColorMatrix ? AOTKernelKind::TexturedColorMatrix
-                                                           : AOTKernelKind::TexturedLuma;
+    if (node->kind == AOTEffectKind::ColorMatrix) {
+      pass.kernel = AOTKernelKind::TexturedColorMatrix;
+    } else if (node->kind == AOTEffectKind::AlphaThreshold) {
+      pass.kernel = AOTKernelKind::TexturedAlphaThreshold;
+    } else {
+      pass.kernel = AOTKernelKind::TexturedLuma;
+    }
     pass.nodes = {nodeID};
     pass.dependencies = {static_cast<uint32_t>(result.passes.size() - 1)};
     pass.output = nodeID;

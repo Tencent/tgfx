@@ -35,6 +35,7 @@ enum class AOTKernelKind {
   TextureColorMatrix,
   TexturedColorMatrix,
   TexturedLuma,
+  TexturedAlphaThreshold,
 };
 
 struct AOTPassDescriptor {

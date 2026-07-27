@@ -21,15 +21,21 @@
 #include "core/utils/BlockAllocator.h"
 #include "gpu/AOTEffect.h"
 #include "gpu/AOTEffectDecomposer.h"
+#include "gpu/PrecompiledProgramCreator.h"
+#include "gpu/PrecompiledShaderCache.h"
+#include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
+#include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/LumaFragmentProcessor.h"
 #include "gpu/processors/TextureEffect.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/PixelFormat.h"
+#include "utils/ProjectPath.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
@@ -201,6 +207,88 @@ TGFX_TEST(AOTEffectTest, DecompositionIsDeterministic) {
     EXPECT_EQ(first.passes[index].materializesOutput, second.passes[index].materializesOutput);
   }
   EXPECT_EQ(first.output, second.output);
+}
+
+static std::string DecomposeBundlePath() {
+  std::string backend = TGFX_BACKEND_NAME;
+  auto pos = backend.find('-');
+  if (pos != std::string::npos) {
+    backend = backend.substr(0, pos);
+  }
+  return "resources/shaders/shader_bundle." + backend + ".bin";
+}
+
+// L2 activation milestone: with decomposition enabled, CreateDecomposedProgram must turn a
+// texture+ColorMatrix draw into a real precompiled Program (not nullptr) by fusing it into a single
+// TextureColorMatrix pass and mapping to the existing TextureColorMatrixShader. This exercises the
+// full L2 route end to end: lowerToAOT -> Lower -> Decompose -> plan->program mapping ->
+// BuildProgramFromMatch. The produced program must originate from a precompiled artifact.
+TGFX_TEST(AOTEffectTest, DecomposedTextureColorMatrixProducesProgram) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(DecomposeBundlePath())));
+  cache->setDecompositionEnabled(true);
+
+  auto proxy = RenderTargetProxy::Make(context, 2, 2, /*alphaOnly=*/false);
+  ASSERT_NE(proxy, nullptr);
+  auto renderTarget = proxy->getRenderTarget();
+  ASSERT_NE(renderTarget, nullptr);
+  auto* allocator = context->drawingAllocator();
+  auto geometryProcessor =
+      DefaultGeometryProcessor::Make(allocator, {}, 2, 2, AAType::None, {}, {});
+  auto texture = MakeTextureProcessor(context, allocator, PixelFormat::RGBA_8888);
+  auto colorMatrix = ColorMatrixFragmentProcessor::Make(allocator, IdentityColorMatrix);
+  ASSERT_NE(geometryProcessor, nullptr);
+  ASSERT_NE(texture, nullptr);
+  ASSERT_NE(colorMatrix, nullptr);
+
+  std::vector<FragmentProcessor*> fragmentProcessors = {texture.get(), colorMatrix.get()};
+  ProgramInfo info(renderTarget.get(), geometryProcessor.get(), std::move(fragmentProcessors),
+                   /*numColorProcessors=*/2, /*xferProcessor=*/nullptr, BlendMode::SrcOver);
+
+  auto program = PrecompiledProgramCreator::CreateDecomposedProgram(context, &info);
+  ASSERT_NE(program, nullptr);
+  EXPECT_EQ(program->getProvenance().program, ProgramOrigin::PrecompiledArtifact);
+
+  cache->setDecompositionEnabled(false);
+  cache->unload();
+}
+
+// L2 single-pass mapping: with decomposition enabled, a lone plain-texture color chain must decompose
+// into a single TextureFill pass and map to the existing TextureFillShader, producing a program from
+// a precompiled artifact (no new variant). This mirrors TryMatchTextureFill's encoding via the L2
+// route rather than the L3 handwritten matcher.
+TGFX_TEST(AOTEffectTest, DecomposedTextureFillProducesProgram) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(DecomposeBundlePath())));
+  cache->setDecompositionEnabled(true);
+
+  auto proxy = RenderTargetProxy::Make(context, 2, 2, /*alphaOnly=*/false);
+  ASSERT_NE(proxy, nullptr);
+  auto renderTarget = proxy->getRenderTarget();
+  ASSERT_NE(renderTarget, nullptr);
+  auto* allocator = context->drawingAllocator();
+  auto geometryProcessor =
+      DefaultGeometryProcessor::Make(allocator, {}, 2, 2, AAType::None, {}, {});
+  auto texture = MakeTextureProcessor(context, allocator, PixelFormat::RGBA_8888);
+  ASSERT_NE(geometryProcessor, nullptr);
+  ASSERT_NE(texture, nullptr);
+
+  std::vector<FragmentProcessor*> fragmentProcessors = {texture.get()};
+  ProgramInfo info(renderTarget.get(), geometryProcessor.get(), std::move(fragmentProcessors),
+                   /*numColorProcessors=*/1, /*xferProcessor=*/nullptr, BlendMode::SrcOver);
+
+  auto program = PrecompiledProgramCreator::CreateDecomposedProgram(context, &info);
+  ASSERT_NE(program, nullptr);
+  EXPECT_EQ(program->getProvenance().program, ProgramOrigin::PrecompiledArtifact);
+
+  cache->setDecompositionEnabled(false);
+  cache->unload();
 }
 
 }  // namespace tgfx

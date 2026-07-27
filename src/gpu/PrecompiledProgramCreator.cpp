@@ -26,6 +26,10 @@
 #include "gpu/ProgramSignature.h"
 #include "gpu/ShaderKeyHash.h"
 #include "gpu/UniformData.h"
+#include "gpu/processors/DeviceSpaceTextureEffect.h"
+#include "gpu/processors/EmptyXferProcessor.h"
+#include "gpu/shaders/level1/TextureColorMatrixShader.h"
+#include "gpu/shaders/level1/TextureFillShader.h"
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
@@ -169,6 +173,59 @@ static PrecompiledFallbackReason ToFallbackReason(PermutationMatchFailure failur
   return PrecompiledFallbackReason::Unspecified;
 }
 
+// Mirrors GetXPType in PermutationMatcher.cpp so the L2 route derives the identical HAS_XP index as
+// the L3 route (0=Empty, 1=PorterDuff DST_TEX, 2=PorterDuff FBF, -1=unsupported).
+static int DecomposedXPType(const ProgramInfo* programInfo) {
+  auto xp = programInfo->getXferProcessor();
+  if (xp == EmptyXferProcessor::GetInstance()) {
+    return 0;
+  }
+  if (xp->name() == "PorterDuffXferProcessor") {
+    return xp->dstTextureView() != nullptr ? 1 : 2;
+  }
+  return -1;
+}
+
+// Mirrors ClassifyCoverageFP in PermutationMatcher.cpp so the L2 route derives the identical
+// coverage index as the L3 route. The decomposed graph only carries the color processors, so the
+// coverage FP (if any) is read straight off the ProgramInfo, exactly as the L3 matcher does.
+static int DecomposedCoverageType(const ProgramInfo* programInfo) {
+  auto numFP = programInfo->numFragmentProcessors();
+  auto numColorFP = programInfo->numColorFragmentProcessors();
+  if (numFP == numColorFP) {
+    return 0;
+  }
+  if (numFP != numColorFP + 1) {
+    return -1;
+  }
+  auto coverageFP = programInfo->getFragmentProcessor(numColorFP);
+  auto coverageName = coverageFP->name();
+  if (coverageName == "AARectEffect") {
+    return 1;
+  }
+  if (coverageName == "ComposeFragmentProcessor") {
+    if (coverageFP->numChildProcessors() != 2) {
+      return -1;
+    }
+    auto child0 = coverageFP->childProcessor(0);
+    auto child1 = coverageFP->childProcessor(1);
+    if (child0->name() != "DeviceSpaceTextureEffect" || child1->name() != "AARectEffect") {
+      return -1;
+    }
+    if (!static_cast<const DeviceSpaceTextureEffect*>(child0)->isAlphaOnly()) {
+      return -1;
+    }
+    return 2;
+  }
+  if (coverageName == "DeviceSpaceTextureEffect") {
+    if (!static_cast<const DeviceSpaceTextureEffect*>(coverageFP)->isAlphaOnly()) {
+      return -1;
+    }
+    return 2;
+  }
+  return -1;
+}
+
 std::shared_ptr<Program> PrecompiledProgramCreator::CreateDecomposedProgram(
     Context* context, const ProgramInfo* programInfo) {
   auto cache = context->precompiledShaderCache();
@@ -200,54 +257,104 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateDecomposedProgram(
   if (!AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan)) {
     return nullptr;
   }
-  // The plan is valid, but the PointwiseChainShader (with its Opcode uniform layout) does not yet
-  // exist in the bundle (review #3, stage 2 remaining work). Until that shader and its bundle
-  // entries land, we must not fabricate a program with a mismatched layout: return nullptr so the
-  // atomic fallback in ProgramInfo::getProgram() serves this draw via the plain route. The
-  // decomposition and validation logic above is exercised now; only the artifact mapping is
-  // pending.
-  return nullptr;
+  // Map the plan to a precompiled program.
+  //
+  // Supported form: a single-pass plain texture fill (TextureFill kernel), served by the existing
+  // TextureFillShader. The permutation index is derived independently from the plan's
+  // AOTTextureParameters + the transfer processor + the program's coverage FP, reproducing
+  // TryMatchTextureFill's encoding byte-for-byte (same EncodeVertex/EncodeFragment, same fields).
+  // This reuses an already-compiled artifact; no new shader variant is introduced.
+  if (plan.passes.size() == 1 && plan.passes[0].kernel == AOTKernelKind::TextureFill &&
+      !plan.passes[0].nodes.empty()) {
+    auto node = graph.nodeAt(plan.passes[0].nodes[0]);
+    if (node == nullptr || node->kind != AOTEffectKind::TextureSource) {
+      return nullptr;
+    }
+    auto params = std::get_if<AOTTextureParameters>(&node->parameters);
+    if (params == nullptr || params->isYUV) {
+      return nullptr;
+    }
+    int xpType = DecomposedXPType(programInfo);
+    int coverageType = DecomposedCoverageType(programInfo);
+    if (xpType < 0 || coverageType < 0) {
+      return nullptr;
+    }
+    TextureFillShader::VertexValues vertexValues = {};
+    vertexValues.alphaOnly = params->isAlphaOnly;
+    vertexValues.hasRGBAAA = params->hasRGBAAA;
+    vertexValues.hasSubset = params->hasSubset;
+    auto vertIndex = TextureFillShader::EncodeVertex(vertexValues);
+
+    TextureFillShader::FragmentValues fragmentValues = {};
+    fragmentValues.alphaOnly = params->isAlphaOnly;
+    fragmentValues.hasRGBAAA = params->hasRGBAAA;
+    fragmentValues.hasSubset = params->hasSubset;
+    fragmentValues.xp = static_cast<uint32_t>(xpType);
+    fragmentValues.coverage = static_cast<uint32_t>(coverageType);
+    auto fragIndex = TextureFillShader::EncodeFragment(fragmentValues);
+    PermutationMatchResult matchResult{TextureFillShader::Name(), vertIndex, fragIndex};
+    return BuildProgramFromMatch(context, programInfo, matchResult);
+  }
+  // Supported form (L2 activation milestone): a single fused TextureColorMatrix pass, served by the
+  // existing TextureColorMatrixShader. The permutation index is derived independently from the
+  // plan's AOTTextureParameters + the transfer processor, reproducing TryMatchTextureColorMatrix's
+  // encoding byte-for-byte (same D::domain, same fields). Any other plan shape is not yet mapped and
+  // falls back to the plain route.
+  if (plan.passes.size() != 1 || plan.passes[0].kernel != AOTKernelKind::TextureColorMatrix ||
+      plan.passes[0].nodes.empty()) {
+    return nullptr;
+  }
+  auto textureNode = graph.nodeAt(plan.passes[0].nodes[0]);
+  if (textureNode == nullptr || textureNode->kind != AOTEffectKind::TextureSource) {
+    return nullptr;
+  }
+  auto textureParams = std::get_if<AOTTextureParameters>(&textureNode->parameters);
+  if (textureParams == nullptr) {
+    return nullptr;
+  }
+  int xpType = DecomposedXPType(programInfo);
+  if (xpType < 0) {
+    return nullptr;
+  }
+  using D = TextureColorMatrixShader::D;
+  auto fragDomain = D::domain();
+  std::vector<int> fragValues(D::COUNT);
+  fragValues[D::ALPHA_ONLY] = textureParams->isAlphaOnly ? 1 : 0;
+  fragValues[D::HAS_RGBAAA] = textureParams->hasRGBAAA ? 1 : 0;
+  fragValues[D::HAS_SUBSET] = textureParams->hasSubset ? 1 : 0;
+  fragValues[D::HAS_XP] = xpType;
+  auto fragIndex = fragDomain.encode(fragValues);
+  PermutationMatchResult matchResult{"TextureColorMatrixShader", 0, fragIndex};
+  return BuildProgramFromMatch(context, programInfo, matchResult);
 }
 
-std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* context,
-                                                                  const ProgramInfo* programInfo) {
+// Builds a Program from an already-resolved permutation match (shaderName + vert/frag index).
+// Shared by the L3 handwritten-matcher route (CreateProgram) and the L2 decomposition route
+// (CreateDecomposedProgram): both, once they have decided which precompiled shader + permutation to
+// use, need the identical blob-lookup -> shader-module -> pipeline -> Program construction. The
+// diagnostic records (artifact miss/hit, pipeline failure) apply to both routes and stay here.
+std::shared_ptr<Program> PrecompiledProgramCreator::BuildProgramFromMatch(
+    Context* context, const ProgramInfo* programInfo, const PermutationMatchResult& matchResult) {
   auto cache = context->precompiledShaderCache();
-  cache->recordAOTStage(PrecompiledAOTStage::Attempt);
-  if (!cache->isLoaded()) {
-    cache->recordArtifactMiss(PrecompiledFallbackReason::CacheNotLoaded,
-                              MakeFallbackRecord(cache, programInfo));
-    return nullptr;
-  }
-  cache->recordAOTStage(PrecompiledAOTStage::CacheAvailable);
-
-  PermutationMatchFailure matchFailure = PermutationMatchFailure::None;
-  auto matchResult = MatchPermutation(programInfo, &matchFailure);
-  if (!matchResult) {
-    auto reason = ToFallbackReason(matchFailure);
-    cache->recordArtifactMiss(reason, MakeFallbackRecord(cache, programInfo));
-    return nullptr;
-  }
-  cache->recordAOTStage(PrecompiledAOTStage::PermutationMatched);
-
-  auto vertHash = ComputeVertexKeyHash(matchResult->shaderName, matchResult->vertPermutationIndex,
+  auto vertHash = ComputeVertexKeyHash(matchResult.shaderName, matchResult.vertPermutationIndex,
                                        cache->profileTag());
-  auto fragHash = ComputeFragmentKeyHash(matchResult->shaderName, matchResult->fragPermutationIndex,
+  auto fragHash = ComputeFragmentKeyHash(matchResult.shaderName, matchResult.fragPermutationIndex,
                                          cache->profileTag());
 
   auto vertBlob = cache->findVertex(vertHash.hi, vertHash.lo);
   if (vertBlob == nullptr) {
     cache->recordArtifactMiss(PrecompiledFallbackReason::VertexArtifactMissing,
-                              MakeFallbackRecord(cache, programInfo, &*matchResult));
+                              MakeFallbackRecord(cache, programInfo, &matchResult));
     LOGE("PrecompiledShaderMiss: vert blob not found for %s[vert=%u]",
-         matchResult->shaderName.c_str(), matchResult->vertPermutationIndex);
+         matchResult.shaderName.c_str(), matchResult.vertPermutationIndex);
     return nullptr;
   }
   auto fragBlob = cache->findFragment(fragHash.hi, fragHash.lo);
   if (fragBlob == nullptr) {
     cache->recordArtifactMiss(PrecompiledFallbackReason::FragmentArtifactMissing,
-                              MakeFallbackRecord(cache, programInfo, &*matchResult));
+                              MakeFallbackRecord(cache, programInfo, &matchResult));
     LOGE("PrecompiledShaderMiss: frag blob not found for %s[frag=%u]",
-         matchResult->shaderName.c_str(), matchResult->fragPermutationIndex);
+         matchResult.shaderName.c_str(), matchResult.fragPermutationIndex);
     return nullptr;
   }
   cache->recordArtifactHit();
@@ -276,18 +383,18 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
   auto vertexShader = gpu->createShaderModule(vertexDesc);
   if (vertexShader == nullptr) {
     cache->recordFailure(PrecompiledFallbackReason::VertexModuleCreationFailed,
-                         MakeFallbackRecord(cache, programInfo, &*matchResult));
+                         MakeFallbackRecord(cache, programInfo, &matchResult));
     LOGE("PrecompiledProgramCreator: Failed to create vertex shader module for %s[vert=%u]",
-         matchResult->shaderName.c_str(), matchResult->vertPermutationIndex);
+         matchResult.shaderName.c_str(), matchResult.vertPermutationIndex);
     return nullptr;
   }
   cache->recordAOTStage(PrecompiledAOTStage::VertexModuleCreated);
   auto fragmentShader = gpu->createShaderModule(fragmentDesc);
   if (fragmentShader == nullptr) {
     cache->recordFailure(PrecompiledFallbackReason::FragmentModuleCreationFailed,
-                         MakeFallbackRecord(cache, programInfo, &*matchResult));
+                         MakeFallbackRecord(cache, programInfo, &matchResult));
     LOGE("PrecompiledProgramCreator: Failed to create fragment shader module for %s[frag=%u]",
-         matchResult->shaderName.c_str(), matchResult->fragPermutationIndex);
+         matchResult.shaderName.c_str(), matchResult.fragPermutationIndex);
     return nullptr;
   }
   cache->recordAOTStage(PrecompiledAOTStage::FragmentModuleCreated);
@@ -333,21 +440,43 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
   context->globalCache()->recordRuntimePipelineCreation(pipeline != nullptr);
   if (pipeline == nullptr) {
     LOGE("PrecompiledProgramCreator: Failed to create render pipeline for %s[vert=%u,frag=%u]",
-         matchResult->shaderName.c_str(), matchResult->vertPermutationIndex,
-         matchResult->fragPermutationIndex);
+         matchResult.shaderName.c_str(), matchResult.vertPermutationIndex,
+         matchResult.fragPermutationIndex);
 
     cache->recordFailure(PrecompiledFallbackReason::PipelineCreationFailed,
-                         MakeFallbackRecord(cache, programInfo, &*matchResult));
+                         MakeFallbackRecord(cache, programInfo, &matchResult));
     return nullptr;
   }
   cache->recordAOTStage(PrecompiledAOTStage::PipelineCreated,
-                        MakeHitRecord(cache, programInfo, *matchResult));
+                        MakeHitRecord(cache, programInfo, matchResult));
 
   ProgramProvenance provenance = {
       ArtifactOriginForBackend(context->backend(), vertexDesc, fragmentDesc),
       ProgramOrigin::PrecompiledArtifact, PipelineOrigin::RuntimeCreation};
   return std::make_shared<Program>(std::move(pipeline), std::move(vertexUniformData),
                                    std::move(fragmentUniformData), provenance);
+}
+
+std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* context,
+                                                                  const ProgramInfo* programInfo) {
+  auto cache = context->precompiledShaderCache();
+  cache->recordAOTStage(PrecompiledAOTStage::Attempt);
+  if (!cache->isLoaded()) {
+    cache->recordArtifactMiss(PrecompiledFallbackReason::CacheNotLoaded,
+                              MakeFallbackRecord(cache, programInfo));
+    return nullptr;
+  }
+  cache->recordAOTStage(PrecompiledAOTStage::CacheAvailable);
+
+  PermutationMatchFailure matchFailure = PermutationMatchFailure::None;
+  auto matchResult = MatchPermutation(programInfo, &matchFailure);
+  if (!matchResult) {
+    auto reason = ToFallbackReason(matchFailure);
+    cache->recordArtifactMiss(reason, MakeFallbackRecord(cache, programInfo));
+    return nullptr;
+  }
+  cache->recordAOTStage(PrecompiledAOTStage::PermutationMatched);
+  return BuildProgramFromMatch(context, programInfo, *matchResult);
 }
 
 }  // namespace tgfx
