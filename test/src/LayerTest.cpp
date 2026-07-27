@@ -3903,7 +3903,8 @@ static void AddGlassCell(Layer* root, std::shared_ptr<Image> bgImage, float x, f
                          float cellSize, float refraction, float depth, float frost,
                          float dispersion, float splay, float lightAngle, float lightIntensity,
                          float glassW = -1.0f, float glassH = -1.0f, float radiusX = -1.0f,
-                         float radiusY = -1.0f) {
+                         float radiusY = -1.0f,
+                         Color rectColor = Color::FromRGBA(0, 100, 255, 255)) {
   auto container = Layer::Make();
   container->setMatrix(Matrix::MakeTrans(x, y));
 
@@ -3922,7 +3923,7 @@ static void AddGlassCell(Layer* root, std::shared_ptr<Image> bgImage, float x, f
   bluePath.addRect(
       Rect::MakeXYWH(cellSize * 0.15f, cellSize * 0.15f, cellSize * 0.35f, cellSize * 0.35f));
   blueRect->setPath(bluePath);
-  blueRect->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 100, 255, 255)));
+  blueRect->setFillStyle(ShapeStyle::Make(rectColor));
   container->addChild(blueRect);
 
   auto greenCircle = ShapeLayer::Make();
@@ -4049,6 +4050,56 @@ TGFX_TEST(LayerTest, GlassStyleEllipticalCorner) {
   // Rounded rect with elliptical corners (radius 40x20, rx != ry) falls back to the AlphaMask
   // path because the SDF shader only supports uniform circular corners (rx == ry).
   RunGlassStyleTest("EllipticalCorner", 1.0f, 180.0f, 120.0f, 40.0f, 20.0f);
+}
+
+TGFX_TEST(LayerTest, GlassStyleCustomRoundedRect) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  constexpr float cellSize = 200.0f;
+  constexpr float gap = 10.0f;
+  constexpr int count = 10;
+  int surfaceW = static_cast<int>(count * (cellSize + gap) + gap);
+  int surfaceH = static_cast<int>(cellSize + gap * 2.0f);
+  auto surface = Surface::Make(context, surfaceW, surfaceH);
+  auto displayList = std::make_unique<DisplayList>();
+  auto bgImage = MakeImage("resources/apitest/checker_128.png");
+  for (int i = 0; i < count; i++) {
+    float splay = static_cast<float>(i) * 100.0f / static_cast<float>(count - 1);
+    float x = gap + static_cast<float>(i) * (cellSize + gap);
+    AddGlassCell(displayList->root(), bgImage, x, gap, cellSize, 100.0f, 100.0f, 0.0f, 0.0f, splay,
+                 135.0f, 50.0f, 180.0f, 180.0f, 23.0f, 23.0f, Color::FromRGBA(57, 43, 219, 255));
+  }
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleCustomRoundedRect"));
+}
+
+// Verifies whether background downsampling affects the center region equally across the analytical
+// SDF path and the AlphaMask/UDF fallback path. Both cells share identical GlassStyle parameters
+// and the same BackgroundSource; only the corner radius differs so that the left cell uses the
+// RoundedRect SDF shader and the right cell falls back to the AlphaMask path.
+TGFX_TEST(LayerTest, GlassStylePathCompare) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  constexpr float cellSize = 200.0f;
+  constexpr float gap = 10.0f;
+  int surfaceW = static_cast<int>(2 * (cellSize + gap) + gap);
+  int surfaceH = static_cast<int>(cellSize + gap * 2.0f);
+  auto surface = Surface::Make(context, surfaceW, surfaceH);
+  auto displayList = std::make_unique<DisplayList>();
+  auto bgImage = MakeImage("resources/apitest/checker_128.png");
+  // Left: uniform circular corner (rx == ry) -> analytical RoundedRect SDF path.
+  AddGlassCell(displayList->root(), bgImage, gap, gap, cellSize, 100.0f, 100.0f, 0.0f, 0.0f, 0.0f,
+               135.0f, 50.0f, 180.0f, 180.0f, 23.0f, 23.0f, Color::FromRGBA(57, 43, 219, 255));
+  // Right: elliptical corner (rx != ry) -> AlphaMask/UDF fallback path.
+  AddGlassCell(displayList->root(), bgImage, gap + cellSize + gap, gap, cellSize, 100.0f, 100.0f,
+               0.0f, 0.0f, 0.0f, 135.0f, 50.0f, 180.0f, 180.0f, 23.0f, 22.0f,
+               Color::FromRGBA(57, 43, 219, 255));
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStylePathCompare"));
 }
 
 }  // namespace tgfx

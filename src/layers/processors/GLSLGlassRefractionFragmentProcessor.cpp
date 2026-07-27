@@ -169,7 +169,9 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
     // precise geometry and does not need the UDF-based depthRatio modulation or sampling-bounds
     // clamp.
     fragBuilder->codeAppend(
-        "  float offsetDist = glassThickness * refractionFactor * edgeFactor * edgeFactor;");
+        "  float offsetDist = glassThickness * refractionFactor * edgeFactor * edgeFactor * "
+        "edgeFactor * 1.2;");
+    fragBuilder->codeAppend("  float effectiveSplay = splay;");
     if (params.shapeType == GlassShapeType::Ellipse) {
       // Ellipse SDF gradient points outward; negate for inward normal.
       fragBuilder->codeAppend(
@@ -183,6 +185,17 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
       fragBuilder->codeAppend("  vec2 absP = vec2(abs(px), abs(py));");
       fragBuilder->codeAppend("  float qx = absP.x - halfW + cornerRadius;");
       fragBuilder->codeAppend("  float qy = absP.y - halfH + cornerRadius;");
+      // Blend toward the global radial direction along straight edges as they approach a corner,
+      // avoiding an abrupt directional change where the edge joins the corner arc.
+      fragBuilder->codeAppend("  if (cornerRadius > 0.0) {");
+      fragBuilder->codeAppend("    float straightHalfW = max(halfW - cornerRadius, 0.0001);");
+      fragBuilder->codeAppend("    float straightHalfH = max(halfH - cornerRadius, 0.0001);");
+      fragBuilder->codeAppend("    float cornerWeightX = smoothstep(0.0, straightHalfW, absP.x);");
+      fragBuilder->codeAppend("    float cornerWeightY = smoothstep(0.0, straightHalfH, absP.y);");
+      fragBuilder->codeAppend("    float cornerWeight = (qx > 0.0 && qy > 0.0) ? 1.0 :");
+      fragBuilder->codeAppend("        ((qx > qy) ? cornerWeightY : cornerWeightX);");
+      fragBuilder->codeAppend("    effectiveSplay = min(cornerWeight + splay, 1.0);");
+      fragBuilder->codeAppend("  }");
       fragBuilder->codeAppend("  vec2 grad;");
       fragBuilder->codeAppend("  if (qx > 0.0 && qy > 0.0) {");
       fragBuilder->codeAppend("    grad = normalize(vec2(qx, qy));");
@@ -199,7 +212,7 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppend(
         "    vec2 centerDir = (centerDistance > 0.001) ? vec2(-px / centerDistance, -py / "
         "centerDistance) : gradientDir;");
-    fragBuilder->codeAppend("    vec2 refractDir = mix(gradientDir, centerDir, splay);");
+    fragBuilder->codeAppend("    vec2 refractDir = mix(gradientDir, centerDir, effectiveSplay);");
     fragBuilder->codeAppend("    float refractLen = length(refractDir);");
     fragBuilder->codeAppend("    if (refractLen < 0.000001) { refractDir = gradientDir; }");
     fragBuilder->codeAppend("    else { refractDir = refractDir / refractLen; }");

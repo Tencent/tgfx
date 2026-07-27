@@ -2107,6 +2107,13 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     }
   }
   auto backOutset = 0.f;
+  // minBackgroundOutset decides whether the shared background surface may be down-sampled.
+  // GlassStyle's filterBackground outset describes dirty-region influence range (refraction
+  // displacement), not a blur radius that can be safely compressed by reducing surface
+  // resolution, so it must not contribute to downsampling. All other background styles keep
+  // their original contribution.
+  auto downsampleOutset = 0.f;
+  auto hasNonDownsampleableStyle = false;
   if (!renderBounds.isEmpty()) {
     for (auto& style : _layerStyles) {
       DEBUG_ASSERT(style != nullptr);
@@ -2116,6 +2123,12 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
       auto outset = style->filterBackground(Rect::MakeEmpty(), contentScale);
       backOutset = std::max(backOutset, outset.right);
       backOutset = std::max(backOutset, outset.bottom);
+      if (style->Type() == LayerStyleType::Glass) {
+        hasNonDownsampleableStyle = true;
+      } else {
+        downsampleOutset = std::max(downsampleOutset, outset.right);
+        downsampleOutset = std::max(downsampleOutset, outset.bottom);
+      }
     }
     // When a layer has both background styles and filters, the outer filter needs to sample
     // beyond the background content area. Expand the background outset to include the filter's
@@ -2126,12 +2139,16 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
         auto maxOutset =
             std::max({-baseBounds.left, -baseBounds.top, baseBounds.right, baseBounds.bottom});
         backOutset += maxOutset;
+        if (!hasNonDownsampleableStyle) {
+          downsampleOutset += maxOutset;
+        }
       }
     }
   }
   if (backOutset > 0) {
     maxBackgroundOutset = std::max(backOutset, maxBackgroundOutset);
-    minBackgroundOutset = std::min(backOutset, minBackgroundOutset);
+    auto layerDownsampleOutset = hasNonDownsampleableStyle ? 0.f : downsampleOutset;
+    minBackgroundOutset = std::min(layerDownsampleOutset, minBackgroundOutset);
     updateBackgroundBounds(contentScale, backgroundSourceRects);
   }
   if (bitFields.blendMode != static_cast<uint8_t>(BlendMode::SrcOver) ||
