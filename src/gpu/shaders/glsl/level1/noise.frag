@@ -1,16 +1,11 @@
 // NoiseShader fragment shader
 // Perlin noise implementation with two LUT textures (permutations + gradient vectors).
-// MAX_OCTAVES and noiseType are runtime uniforms, NOT permutation dimensions.
-// Using mix() with uniforms instead of #ifdef avoids multiplying the fragment domain.
+// MAX_OCTAVES, noiseType, and stitchTiles (via sentinel stitchData values) are runtime uniforms.
 // Permutation dimensions (frag):
-//   STITCH_TILES (bool): Whether tile stitching is enabled
 //   HAS_XP (0~2): 0=Empty, 1=PorterDuff DST_TEX, 2=PorterDuff FBF
 //   HAS_COVERAGE (0~2): 0=none, 1=AARectEffect, 2=AARectEffect+mask
 #version 450
 
-#ifndef STITCH_TILES
-#define STITCH_TILES 0
-#endif
 #ifndef HAS_XP
 #define HAS_XP 0
 #endif
@@ -26,9 +21,7 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec2 baseFrequency;
   float noiseType;
   float numOctaves;
-#if STITCH_TILES
   vec2 stitchData;
-#endif
 #include "coverage_uniforms.inc"
 #include "xp_uniforms.inc"
 };
@@ -59,9 +52,7 @@ void main() {
   highp vec2 noiseVec = TransformedCoords_0 * baseFrequency + vec2(0.0078125);
   vec4 color = vec4(0.0);
   float ratio = 1.0;
-#if STITCH_TILES
   highp vec2 stitchScale = stitchData;
-#endif
 
   int octaveCount = int(numOctaves);
 
@@ -78,9 +69,7 @@ void main() {
     // Hermite interpolation.
     vec2 noiseSmooth = smoothstep(0.0, 1.0, fractVal);
 
-#if STITCH_TILES
     floorVal -= step(stitchScale.xyxy, floorVal) * stitchScale.xyxy;
-#endif
 
     // Wrap floorVal into [0, 256) for LUT indexing.
     floorVal = mod(floorVal, 256.0);
@@ -177,9 +166,7 @@ void main() {
 
     noiseVec *= 2.0;
     ratio *= 0.5;
-#if STITCH_TILES
     stitchScale *= 2.0;
-#endif
   }
 
   // FractalNoise: map from [-1,1] to [0,1]. Turbulence skips this step.

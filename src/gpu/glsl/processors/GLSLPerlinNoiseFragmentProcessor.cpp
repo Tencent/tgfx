@@ -79,11 +79,8 @@ void GLSLPerlinNoiseFragmentProcessor::emitCode(EmitArgs& args) const {
   auto noiseTypeName =
       uniformHandler->addUniform("noiseType", UniformFormat::Float, ShaderStage::Fragment);
 
-  std::string stitchDataName;
-  if (stitchTiles) {
-    stitchDataName =
-        uniformHandler->addUniform("stitchData", UniformFormat::Float2, ShaderStage::Fragment);
-  }
+  auto stitchDataName =
+      uniformHandler->addUniform("stitchData", UniformFormat::Float2, ShaderStage::Fragment);
 
   auto texCoordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[0]);
 
@@ -107,9 +104,7 @@ void GLSLPerlinNoiseFragmentProcessor::emitCode(EmitArgs& args) const {
 
   fragBuilder->codeAppend("vec4 color = vec4(0.0);");
 
-  if (stitchTiles) {
-    fragBuilder->codeAppendf("highp vec2 stitchData = %s;", stitchDataName.c_str());
-  }
+  fragBuilder->codeAppendf("highp vec2 stitchScale = %s;", stitchDataName.c_str());
 
   fragBuilder->codeAppend("float ratio = 1.0;");
 
@@ -124,9 +119,8 @@ void GLSLPerlinNoiseFragmentProcessor::emitCode(EmitArgs& args) const {
   // Hermite interpolation
   fragBuilder->codeAppend("vec2 noiseSmooth = smoothstep(0.0, 1.0, fractVal);");
 
-  if (stitchTiles) {
-    fragBuilder->codeAppend("floorVal -= step(stitchData.xyxy, floorVal) * stitchData.xyxy;");
-  }
+  fragBuilder->codeAppend(
+      "floorVal -= step(stitchScale.xyxy, floorVal) * stitchScale.xyxy;");
 
   // Wrap floorVal into [0, 256) so that permutation and noise texture lookups stay in range
   // across octaves (where noiseVec doubles each iteration and can exceed 256).
@@ -210,9 +204,7 @@ void GLSLPerlinNoiseFragmentProcessor::emitCode(EmitArgs& args) const {
 
   fragBuilder->codeAppend("noiseVec *= 2.0;");
   fragBuilder->codeAppend("ratio *= 0.5;");
-  if (stitchTiles) {
-    fragBuilder->codeAppend("stitchData *= 2.0;");
-  }
+  fragBuilder->codeAppend("stitchScale *= 2.0;");
   fragBuilder->codeAppend("}");  // end octave loop
 
   // FractalNoise: map from [-1,1] to [0,1]. Turbulence skips this step.
@@ -239,6 +231,12 @@ void GLSLPerlinNoiseFragmentProcessor::onSetData(UniformData* /*vertexUniformDat
     float stitchDataValues[2] = {static_cast<float>(paintingData->stitchWidth),
                                  static_cast<float>(paintingData->stitchHeight)};
     fragmentUniformData->setData("stitchData", stitchDataValues);
+  } else {
+    // Sentinel values large enough that step(stitchScale, floorVal) always returns 0.
+    // floorVal is in [0, 256) before mod(), and stitchScale doubles each octave.
+    // 1e10 * 2^7 = 1.28e12, well within float32 max (~3.4e38).
+    float sentinel[2] = {1e10f, 1e10f};
+    fragmentUniformData->setData("stitchData", sentinel);
   }
 }
 }  // namespace tgfx
