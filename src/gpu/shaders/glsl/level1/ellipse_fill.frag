@@ -68,5 +68,7 @@ void main() {
 #endif
 
 #define TGFX_XP_SRC_COLOR (outputColor * edgeAlpha)
+#define TGFX_XP_SRC_UNPREMUL outputColor
+#define TGFX_XP_COVERAGE vec4(edgeAlpha)
 #include "xp_output.inc"
 }

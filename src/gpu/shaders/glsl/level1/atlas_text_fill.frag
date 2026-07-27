@@ -75,5 +75,7 @@ void main() {
 #endif
 
 #define TGFX_XP_SRC_COLOR (outputColor * outputCoverage)
+#define TGFX_XP_SRC_UNPREMUL outputColor
+#define TGFX_XP_COVERAGE outputCoverage
 #include "xp_output.inc"
 }
