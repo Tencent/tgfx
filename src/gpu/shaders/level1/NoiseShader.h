@@ -24,19 +24,19 @@ namespace tgfx {
 
 /// Precompiled shader declaration for PerlinNoiseFragmentProcessor. The fragment shader implements
 /// the full Perlin noise algorithm with two LUT textures (permutations + gradient vectors). The
-/// number of octaves is a runtime uniform (MAX_OCTAVES=8 loop bound with early break), keeping the
-/// variant count bounded — it would otherwise multiply the fragment domain by 8.
+/// number of octaves and the noise type (FractalNoise vs Turbulence) are runtime uniforms,
+/// keeping the variant count bounded.
 ///
 /// Vertex dimensions:
 ///   GP_TYPE (int, 2 values): 0=DefaultGeometryProcessor, 1=QuadPerEdgeAAGeometryProcessor
 ///
 /// Fragment dimensions:
-///   NOISE_TYPE (int, 2 values): 0=FractalNoise, 1=Turbulence
 ///   STITCH_TILES (bool, 2 values): Whether tile stitching is enabled
 ///   HAS_XP (int, 3 values): 0=EmptyXP, 1=PorterDuff DST_TEX, 2=PorterDuff FBF
 ///   HAS_COVERAGE (int, 3 values): 0=none, 1=AARectEffect, 2=AARectEffect+mask
 ///
-/// Runtime uniforms: baseFrequency (float2), stitchData (float2, if STITCH_TILES), numOctaves (int)
+/// Runtime uniforms: baseFrequency (float2), noiseType (float), numOctaves (float),
+///                   stitchData (float2, if STITCH_TILES)
 class NoiseShader : public PrecompiledShader {
  public:
   struct VertDims {
@@ -50,10 +50,9 @@ class NoiseShader : public PrecompiledShader {
   using VD = VertDims;
 
   struct FragDims {
-    enum : uint32_t { NOISE_TYPE, STITCH_TILES, HAS_XP, HAS_COVERAGE, COUNT };
+    enum : uint32_t { STITCH_TILES, HAS_XP, HAS_COVERAGE, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationInt("NOISE_TYPE", 2),
           PermutationBool("STITCH_TILES"),
           PermutationInt("HAS_XP", 3),
           PermutationInt("HAS_COVERAGE", 3),
@@ -61,7 +60,7 @@ class NoiseShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 4, "Update info() when fragment dimensions change.");
+  static_assert(FD::COUNT == 3, "Update info() when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"NoiseShader",

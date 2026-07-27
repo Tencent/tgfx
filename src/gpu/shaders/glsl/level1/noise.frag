@@ -1,19 +1,13 @@
 // NoiseShader fragment shader
 // Perlin noise implementation with two LUT textures (permutations + gradient vectors).
-// MAX_OCTAVES is a FIXED compile-time constant (max supported octaves), NOT a permutation dimension.
-// The loop bound is MAX_OCTAVES; the actual octave count comes from the NumOctaves uniform at
-// runtime and the loop breaks early once reached. Keeping octaves as a uniform (not a variant)
-// avoids multiplying the fragment domain by 8.
+// MAX_OCTAVES and noiseType are runtime uniforms, NOT permutation dimensions.
+// Using mix() with uniforms instead of #ifdef avoids multiplying the fragment domain.
 // Permutation dimensions (frag):
-//   NOISE_TYPE (0~1): 0=FractalNoise, 1=Turbulence
 //   STITCH_TILES (bool): Whether tile stitching is enabled
 //   HAS_XP (0~2): 0=Empty, 1=PorterDuff DST_TEX, 2=PorterDuff FBF
 //   HAS_COVERAGE (0~2): 0=none, 1=AARectEffect, 2=AARectEffect+mask
 #version 450
 
-#ifndef NOISE_TYPE
-#define NOISE_TYPE 0
-#endif
 #ifndef STITCH_TILES
 #define STITCH_TILES 0
 #endif
@@ -30,8 +24,8 @@
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Color;
   vec2 baseFrequency;
+  float noiseType;
   float numOctaves;
-  int padding_;
 #if STITCH_TILES
   vec2 stitchData;
 #endif
@@ -177,11 +171,9 @@ void main() {
     }
 
     // Accumulate this octave.
-#if NOISE_TYPE == 0
-    color += noiseResult * ratio;
-#else
-    color += abs(noiseResult) * ratio;
-#endif
+    // noiseType < 0.5 → FractalNoise (direct), noiseType >= 0.5 → Turbulence (abs).
+    vec4 contrib = mix(noiseResult, abs(noiseResult), step(0.5, noiseType));
+    color += contrib * ratio;
 
     noiseVec *= 2.0;
     ratio *= 0.5;
@@ -190,10 +182,8 @@ void main() {
 #endif
   }
 
-  // FractalNoise: map from [-1,1] to [0,1].
-#if NOISE_TYPE == 0
-  color = color * 0.5 + 0.5;
-#endif
+  // FractalNoise: map from [-1,1] to [0,1]. Turbulence skips this step.
+  color = mix(color * 0.5 + 0.5, color, step(0.5, noiseType));
 
   // Clamp each channel to [0,1], then output premultiplied RGBA.
   color = clamp(color, 0.0, 1.0);

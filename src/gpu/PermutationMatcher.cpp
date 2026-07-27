@@ -1588,7 +1588,6 @@ static std::optional<PermutationMatchResult> TryMatchNoise(const ProgramInfo* pr
     return std::nullopt;
   }
   auto* noise = static_cast<const PerlinNoiseFragmentProcessor*>(fp);
-  int noiseTypeValue = noise->getNoiseType() == PerlinNoiseType::FractalNoise ? 0 : 1;
   int stitchTilesValue = noise->getStitchTiles() ? 1 : 0;
 
   using VD = NoiseShader::VD;
@@ -1600,7 +1599,6 @@ static std::optional<PermutationMatchResult> TryMatchNoise(const ProgramInfo* pr
   using FD = NoiseShader::FD;
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
-  fragValues[FD::NOISE_TYPE] = noiseTypeValue;
   fragValues[FD::STITCH_TILES] = stitchTilesValue;
   fragValues[FD::HAS_XP] = xpType;
   fragValues[FD::HAS_COVERAGE] = coverageType;

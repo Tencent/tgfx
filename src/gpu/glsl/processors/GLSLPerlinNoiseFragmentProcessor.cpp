@@ -76,6 +76,9 @@ void GLSLPerlinNoiseFragmentProcessor::emitCode(EmitArgs& args) const {
   auto octavesName =
       uniformHandler->addUniform("numOctaves", UniformFormat::Float, ShaderStage::Fragment);
 
+  auto noiseTypeName =
+      uniformHandler->addUniform("noiseType", UniformFormat::Float, ShaderStage::Fragment);
+
   std::string stitchDataName;
   if (stitchTiles) {
     stitchDataName =
@@ -199,16 +202,11 @@ void GLSLPerlinNoiseFragmentProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppend("}");
   }
 
-  // Accumulate this octave
-  fragBuilder->codeAppend("color += ");
-  if (noiseType != PerlinNoiseType::FractalNoise) {
-    fragBuilder->codeAppend("abs(");
-  }
-  fragBuilder->codeAppend("noiseResult");
-  if (noiseType != PerlinNoiseType::FractalNoise) {
-    fragBuilder->codeAppend(")");
-  }
-  fragBuilder->codeAppend(" * ratio;");
+  // Accumulate this octave.
+  // noiseType < 0.5 → FractalNoise (direct), noiseType >= 0.5 → Turbulence (abs).
+  fragBuilder->codeAppendf(
+      "color += mix(noiseResult, abs(noiseResult), step(0.5, %s)) * ratio;",
+      noiseTypeName.c_str());
 
   fragBuilder->codeAppend("noiseVec *= 2.0;");
   fragBuilder->codeAppend("ratio *= 0.5;");
@@ -217,10 +215,9 @@ void GLSLPerlinNoiseFragmentProcessor::emitCode(EmitArgs& args) const {
   }
   fragBuilder->codeAppend("}");  // end octave loop
 
-  // FractalNoise: map from [-1,1] to [0,1]
-  if (noiseType == PerlinNoiseType::FractalNoise) {
-    fragBuilder->codeAppend("color = color * 0.5 + 0.5;");
-  }
+  // FractalNoise: map from [-1,1] to [0,1]. Turbulence skips this step.
+  fragBuilder->codeAppendf(
+      "color = mix(color * 0.5 + 0.5, color, step(0.5, %s));", noiseTypeName.c_str());
 
   // Clamp each channel to [0, 1], then output premultiplied RGBA. The fourth noise channel
   // serves as alpha and the RGB channels are premultiplied by it. Downstream filters consuming
@@ -235,6 +232,8 @@ void GLSLPerlinNoiseFragmentProcessor::onSetData(UniformData* /*vertexUniformDat
   float baseFreq[2] = {paintingData->baseFrequencyX, paintingData->baseFrequencyY};
   fragmentUniformData->setData("baseFrequency", baseFreq);
   fragmentUniformData->setData("numOctaves", static_cast<float>(numOctaves));
+  fragmentUniformData->setData("noiseType",
+                                noiseType == PerlinNoiseType::FractalNoise ? 0.0f : 1.0f);
 
   if (stitchTiles) {
     float stitchDataValues[2] = {static_cast<float>(paintingData->stitchWidth),
