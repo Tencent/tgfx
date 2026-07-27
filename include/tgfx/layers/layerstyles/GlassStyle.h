@@ -126,8 +126,9 @@ class GlassStyle : public LayerStyle {
 
   Rect filterBackground(const Rect& srcRect, float contentScale) override;
 
-  LayerStyleExtraSourceType extraSourceType() const override {
-    return LayerStyleExtraSourceType::BackgroundAndContour;
+  uint32_t extraSourceType() const override {
+    return static_cast<uint32_t>(LayerStyleExtraSourceType::Background) |
+           static_cast<uint32_t>(LayerStyleExtraSourceType::Contour);
   }
 
  protected:

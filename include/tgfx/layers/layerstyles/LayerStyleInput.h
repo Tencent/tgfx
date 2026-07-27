@@ -20,20 +20,12 @@
 
 #include <memory>
 #include <optional>
+#include <vector>
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/layers/layerstyles/StyledShape.h"
 
 namespace tgfx {
-
-/**
- * Contour image, offset and optional vector shape carried by a BackgroundAndContour source.
- */
-struct ContourData {
-  std::shared_ptr<Image> image = nullptr;
-  Point imageOffset = {};
-  std::optional<StyledShape> shape = std::nullopt;
-};
 
 /**
  * Extra input source that a LayerStyle may need beyond the primary content image.
@@ -45,22 +37,17 @@ class StyleInputSource {
    */
   enum class Type {
     /**
-     * A plain image source, such as the background content below the layer.
+     * The background content below the layer.
      */
-    Base,
+    Background,
     /**
-     * A contour source that additionally carries the layer's vector shape.
+     * The layer contour with optional vector shape information.
      */
-    Contour,
-    /**
-     * A combined source carrying both a background image (accessible via image()/imageOffset())
-     * and an optional contour (accessible via contour()).
-     */
-    BackgroundAndContour
+    Contour
   };
 
   StyleInputSource(std::shared_ptr<Image> image, Point imageOffset)
-      : _type(Type::Base), _image(std::move(image)), _imageOffset(imageOffset) {
+      : _type(Type::Background), _image(std::move(image)), _imageOffset(imageOffset) {
   }
 
   /**
@@ -84,43 +71,15 @@ class StyleInputSource {
     return _imageOffset;
   }
 
-  /**
-   * Creates a combined source carrying both a background image and an optional contour.
-   * The background image is accessible via image()/imageOffset(); the contour data is
-   * accessible via contour().
-   */
-  static std::shared_ptr<StyleInputSource> MakeBackgroundAndContour(
-      std::shared_ptr<Image> backgroundImage, Point backgroundOffset,
-      std::shared_ptr<Image> contourImage, Point contourOffset,
-      std::optional<StyledShape> shape = std::nullopt) {
-    ContourData data = {std::move(contourImage), contourOffset, std::move(shape)};
-    return std::shared_ptr<StyleInputSource>(
-        new StyleInputSource(std::move(backgroundImage), backgroundOffset, std::move(data)));
-  }
-
-  /**
-   * Returns the optional contour data when this source is BackgroundAndContour.
-   * Returns nullopt for plain Base or Contour sources.
-   */
-  const std::optional<ContourData>& contour() const {
-    return _contour;
-  }
-
  protected:
   StyleInputSource(Type type, std::shared_ptr<Image> image, Point imageOffset)
       : _type(type), _image(std::move(image)), _imageOffset(imageOffset) {
   }
 
  private:
-  StyleInputSource(std::shared_ptr<Image> image, Point imageOffset, ContourData contour)
-      : _type(Type::BackgroundAndContour), _image(std::move(image)), _imageOffset(imageOffset),
-        _contour(std::move(contour)) {
-  }
-
-  Type _type = Type::Base;
+  Type _type = Type::Background;
   std::shared_ptr<Image> _image;
   Point _imageOffset = {};
-  std::optional<ContourData> _contour = std::nullopt;
 };
 
 /**
@@ -169,13 +128,22 @@ struct LayerStyleInput {
   float contentScale = 1.0f;
 
   /**
-   * Optional extra source. The actual type depends on the LayerStyle's extraSourceType:
-   * ContourInputSource for Contour, StyleInputSource for Background, nullptr
-   * for None. For Contour the image is similar to content, but includes geometries from alpha=0
-   * painters and replaces gradient fills with solid colors. For Background the image is the
-   * normally rendered content below the current layer.
+   * Extra sources requested by the LayerStyle's extraSourceType() flags.
    */
-  std::shared_ptr<StyleInputSource> extraSource = nullptr;
+  std::vector<std::shared_ptr<StyleInputSource>> extraSources = {};
+
+  /**
+   * Returns the extra source with the specified type, or nullptr when it was not requested or
+   * could not be generated.
+   */
+  const StyleInputSource* findExtraSource(StyleInputSource::Type type) const {
+    for (const auto& source : extraSources) {
+      if (source != nullptr && source->type() == type) {
+        return source.get();
+      }
+    }
+    return nullptr;
+  }
 };
 
 }  // namespace tgfx

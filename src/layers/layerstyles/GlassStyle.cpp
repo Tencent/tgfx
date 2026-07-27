@@ -98,14 +98,12 @@ struct GlassShapeInfo {
 // FillStroke produce a different rendered outline than the fill path, so SDF would mismatch.
 static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
   GlassShapeInfo info;
-  if (input.extraSource == nullptr) {
+  auto source = input.findExtraSource(StyleInputSource::Type::Contour);
+  if (source == nullptr) {
     return info;
   }
-  const auto& contour = input.extraSource->contour();
-  if (!contour.has_value()) {
-    return info;
-  }
-  const auto& optShape = contour->shape;
+  auto* contour = static_cast<const ContourInputSource*>(source);
+  const auto& optShape = contour->shape();
   if (!optShape.has_value()) {
     return info;
   }
@@ -245,10 +243,10 @@ Rect GlassStyle::filterBackground(const Rect& srcRect, float contentScale) {
     float refractionDistance = minHalf * refractionFactor * depthRatio * depthScale;
     float dispersion = getDispersionFactor();
     float alphaMaskOutset = 0.999f * refractionDistance * (1.0f + dispersion);
-    // SDF analytical outset: glassThickness * refractionFactor covers the maximum displacement
-    // used by the SDF shader path (edgeFactor peaks at 1.0 near the shape edge).
+    // SDF analytical outset matches the maximum shader displacement: edgeFactor peaks at 1.0 and
+    // the SDF path applies an additional 1.2 edge-strength multiplier.
     float glassThickness = getGlassThickness(minHalf);
-    float analyticalOutset = glassThickness * refractionFactor * (1.0f + dispersion);
+    float analyticalOutset = glassThickness * refractionFactor * 1.2f * (1.0f + dispersion);
     // filterBackground may run before shapeType is determined, so cover both paths conservatively.
     float refractionOutset = std::max(alphaMaskOutset, analyticalOutset);
     refractionOutset = std::max(refractionOutset, 1.0f);
@@ -259,16 +257,17 @@ Rect GlassStyle::filterBackground(const Rect& srcRect, float contentScale) {
 
 void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alpha,
                         BlendMode blendMode) {
-  if (input.extraSource == nullptr) {
+  auto background = input.findExtraSource(StyleInputSource::Type::Background);
+  if (background == nullptr || background->image() == nullptr) {
     DEBUG_ASSERT(false);
     return;
   }
 
-  auto bgImage = input.extraSource->image();
-  if (bgImage == nullptr || input.content == nullptr || FloatNearlyZero(input.contentScale)) {
+  auto bgImage = background->image();
+  if (input.content == nullptr || FloatNearlyZero(input.contentScale)) {
     return;
   }
-  auto bgOffset = input.extraSource->imageOffset();
+  auto bgOffset = background->imageOffset();
 
   // Down-scale the background to avoid huge GPU textures when zoomed in.
   // The background image includes outset beyond layer content bounds (for refraction sampling).
@@ -434,10 +433,11 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
 
   if (shapeInfo.type != GlassShapeType::AlphaMask) {
     // SDF path: draw through the vector shape (RRect) so the glass effect is clipped to the
-    // layer's analytical outline. The shape is in layer-local coords and must be scaled to
-    // content pixel space.
+    // layer's analytical outline. Scale layer-local coordinates to content pixel space, then
+    // subtract contentOffset because the content image is cropped to its tight bounds.
     auto drawRRect = shapeInfo.shapeRRect;
     drawRRect.scale(input.contentScale, input.contentScale);
+    drawRRect.offset(-input.contentOffset.x, -input.contentOffset.y);
     canvas->drawRRect(drawRRect, paint);
   } else {
     // AlphaMask path: draw through the content alpha mask so the glass effect is clipped to

@@ -82,9 +82,10 @@ class BackgroundBlurStyle : public LayerStyle {
 
   Rect filterBackground(const Rect& srcRect, float contentScale) override;
 
-  LayerStyleExtraSourceType extraSourceType() const override {
-    return (_blurrinessX > 0 || _blurrinessY > 0) ? LayerStyleExtraSourceType::Background
-                                                  : LayerStyleExtraSourceType::None;
+  uint32_t extraSourceType() const override {
+    auto type = (_blurrinessX > 0 || _blurrinessY > 0) ? LayerStyleExtraSourceType::Background
+                                                       : LayerStyleExtraSourceType::None;
+    return static_cast<uint32_t>(type);
   }
 
  protected:

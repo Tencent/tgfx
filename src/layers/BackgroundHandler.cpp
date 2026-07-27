@@ -336,20 +336,14 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   styleInput.content = contentEntry.image;
   styleInput.contentOffset = contentEntry.offset;
   styleInput.contentScale = source->contentScale;
-  auto sourceType = style->extraSourceType();
-  if (sourceType == LayerStyleExtraSourceType::BackgroundAndContour) {
-    std::shared_ptr<Image> contourImage = nullptr;
-    Point contourOffset = {};
-    if (group->contour.has_value()) {
-      contourImage = group->contour->image;
-      contourOffset = group->contour->offset - contentEntry.offset;
-    }
-    styleInput.extraSource = StyleInputSource::MakeBackgroundAndContour(
-        std::move(bgImage), backgroundOffset, std::move(contourImage), contourOffset,
-        source->contentShape);
-  } else {
-    styleInput.extraSource =
-        std::make_shared<StyleInputSource>(std::move(bgImage), backgroundOffset);
+  auto sourceFlags = style->extraSourceType();
+  styleInput.extraSources.emplace_back(
+      std::make_shared<StyleInputSource>(std::move(bgImage), backgroundOffset));
+  if ((sourceFlags & static_cast<uint32_t>(LayerStyleExtraSourceType::Contour)) != 0 &&
+      group->contour.has_value()) {
+    auto contourOffset = group->contour->offset - contentEntry.offset;
+    styleInput.extraSources.emplace_back(std::make_shared<ContourInputSource>(
+        group->contour->image, contourOffset, source->contentShape));
   }
   style->draw(canvas, styleInput, alpha);
 }

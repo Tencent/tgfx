@@ -38,23 +38,19 @@ enum class LayerStylePosition {
   Below
 };
 
-enum class LayerStyleExtraSourceType {
+enum class LayerStyleExtraSourceType : uint32_t {
   /**
    * The layerStyle requires no extra source.
    */
-  None,
+  None = 0,
   /**
    * The layerStyle requires the layer contour to be drawn.
    */
-  Contour,
+  Contour = 1 << 0,
   /**
    * The layerStyle requires the background content.
    */
-  Background,
-  /**
-   * The layerStyle requires both the background content and the layer contour.
-   */
-  BackgroundAndContour
+  Background = 1 << 1
 };
 
 enum class LayerStyleType {
@@ -142,11 +138,11 @@ class LayerStyle : public LayerProperty {
   void setExcludeChildEffects(bool value);
 
   /**
-   * Returns the type of the extra source required by the layer style.
+   * Returns flags for the extra sources required by the layer style.
    * Default is LayerStyleExtraSourceType::None.
    */
-  virtual LayerStyleExtraSourceType extraSourceType() const {
-    return LayerStyleExtraSourceType::None;
+  virtual uint32_t extraSourceType() const {
+    return static_cast<uint32_t>(LayerStyleExtraSourceType::None);
   }
 
   /**
