@@ -40,6 +40,7 @@
 #include "gpu/processors/LumaFragmentProcessor.h"
 #include "gpu/processors/MeshGeometryProcessor.h"
 #include "gpu/processors/NonAARRectGeometryProcessor.h"
+#include "gpu/processors/PerlinNoiseFragmentProcessor.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/processors/RoundStrokeRectGeometryProcessor.h"
@@ -67,6 +68,7 @@
 #include "gpu/shaders/level1/LumaShader.h"
 #include "gpu/shaders/level1/MaskFillShader.h"
 #include "gpu/shaders/level1/MeshFillShader.h"
+#include "gpu/shaders/level1/NoiseShader.h"
 #include "gpu/shaders/level1/NonAARRectFillShader.h"
 #include "gpu/shaders/level1/QuadColorFillShader.h"
 #include "gpu/shaders/level1/QuadTextureFillShader.h"
@@ -1564,6 +1566,48 @@ static std::optional<PermutationMatchResult> TryMatchMeshFill(const ProgramInfo*
   return PermutationMatchResult{"MeshFillShader", vertIndex, fragIndex};
 }
 
+static std::optional<PermutationMatchResult> TryMatchNoise(const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  int gpType = GetGPType(gp);
+  if (gpType < 0) {
+    return std::nullopt;
+  }
+  if (programInfo->numColorFragmentProcessors() != 1) {
+    return std::nullopt;
+  }
+  int coverageType = ClassifyCoverageFP(programInfo);
+  if (coverageType < 0) {
+    return std::nullopt;
+  }
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
+    return std::nullopt;
+  }
+  auto fp = programInfo->getFragmentProcessor(0);
+  if (fp->name() != "PerlinNoiseFragmentProcessor") {
+    return std::nullopt;
+  }
+  auto* noise = static_cast<const PerlinNoiseFragmentProcessor*>(fp);
+  int noiseTypeValue = noise->getNoiseType() == PerlinNoiseType::FractalNoise ? 0 : 1;
+  int stitchTilesValue = noise->getStitchTiles() ? 1 : 0;
+
+  using VD = NoiseShader::VD;
+  auto vertDomain = VD::domain();
+  std::vector<int> vertValues(VD::COUNT);
+  vertValues[VD::GP_TYPE] = gpType;
+  auto vertIndex = vertDomain.encode(vertValues);
+
+  using FD = NoiseShader::FD;
+  auto fragDomain = FD::domain();
+  std::vector<int> fragValues(FD::COUNT);
+  fragValues[FD::NOISE_TYPE] = noiseTypeValue;
+  fragValues[FD::STITCH_TILES] = stitchTilesValue;
+  fragValues[FD::HAS_XP] = xpType;
+  fragValues[FD::HAS_COVERAGE] = coverageType;
+  auto fragIndex = fragDomain.encode(fragValues);
+  return PermutationMatchResult{"NoiseShader", vertIndex, fragIndex};
+}
+
 static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramInfo* programInfo) {
   // Precompiled shaders assume RGBA output. Non-RGBA render targets (e.g. ALPHA_8) require an
   // output swizzle that the precompiled shader does not include. Fall back to ProgramBuilder.
@@ -1626,6 +1670,9 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
     return result;
   }
   if (auto result = TryMatchGaussianBlur1D(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchNoise(programInfo)) {
     return result;
   }
   if (auto result = TryMatchBlendMerge(programInfo)) {

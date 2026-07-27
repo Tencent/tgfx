@@ -38,6 +38,18 @@ class PerlinNoiseFragmentProcessor : public FragmentProcessor {
     return "PerlinNoiseFragmentProcessor";
   }
 
+  PerlinNoiseType getNoiseType() const {
+    return noiseType;
+  }
+
+  int getNumOctaves() const {
+    return numOctaves;
+  }
+
+  bool getStitchTiles() const {
+    return stitchTiles;
+  }
+
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   size_t onCountTextureSamplers() const override {

@@ -73,6 +73,9 @@ void GLSLPerlinNoiseFragmentProcessor::emitCode(EmitArgs& args) const {
   auto baseFreqName =
       uniformHandler->addUniform("baseFrequency", UniformFormat::Float2, ShaderStage::Fragment);
 
+  auto octavesName =
+      uniformHandler->addUniform("numOctaves", UniformFormat::Float, ShaderStage::Fragment);
+
   std::string stitchDataName;
   if (stitchTiles) {
     stitchDataName =
@@ -107,7 +110,8 @@ void GLSLPerlinNoiseFragmentProcessor::emitCode(EmitArgs& args) const {
 
   fragBuilder->codeAppend("float ratio = 1.0;");
 
-  fragBuilder->codeAppendf("for (int octave = 0; octave < %d; ++octave) {", numOctaves);
+  fragBuilder->codeAppendf("for (int octave = 0; octave < int(%s); ++octave) {",
+                           octavesName.c_str());
 
   fragBuilder->codeAppend("highp vec4 floorVal;");
   fragBuilder->codeAppend("floorVal.xy = floor(noiseVec);");
@@ -230,6 +234,7 @@ void GLSLPerlinNoiseFragmentProcessor::onSetData(UniformData* /*vertexUniformDat
                                                  UniformData* fragmentUniformData) const {
   float baseFreq[2] = {paintingData->baseFrequencyX, paintingData->baseFrequencyY};
   fragmentUniformData->setData("baseFrequency", baseFreq);
+  fragmentUniformData->setData("numOctaves", static_cast<float>(numOctaves));
 
   if (stitchTiles) {
     float stitchDataValues[2] = {static_cast<float>(paintingData->stitchWidth),
