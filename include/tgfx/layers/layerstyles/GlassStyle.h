@@ -127,11 +127,7 @@ class GlassStyle : public LayerStyle {
   Rect filterBackground(const Rect& srcRect, float contentScale) override;
 
   LayerStyleExtraSourceType extraSourceType() const override {
-    return LayerStyleExtraSourceType::Background;
-  }
-
-  bool needsContour() const override {
-    return true;
+    return LayerStyleExtraSourceType::BackgroundAndContour;
   }
 
  protected:

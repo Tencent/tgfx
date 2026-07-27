@@ -50,8 +50,28 @@ enum class LayerStyleExtraSourceType {
   /**
    * The layerStyle requires the background content.
    */
-  Background
+  Background,
+  /**
+   * The layerStyle requires both the background content and the layer contour.
+   */
+  BackgroundAndContour
 };
+
+/**
+ * Returns true if the given source type includes a background source.
+ */
+inline bool HasBackgroundSource(LayerStyleExtraSourceType type) {
+  return type == LayerStyleExtraSourceType::Background ||
+         type == LayerStyleExtraSourceType::BackgroundAndContour;
+}
+
+/**
+ * Returns true if the given source type includes a contour source.
+ */
+inline bool HasContourSource(LayerStyleExtraSourceType type) {
+  return type == LayerStyleExtraSourceType::Contour ||
+         type == LayerStyleExtraSourceType::BackgroundAndContour;
+}
 
 enum class LayerStyleType {
   LayerStyle,
@@ -143,17 +163,6 @@ class LayerStyle : public LayerProperty {
    */
   virtual LayerStyleExtraSourceType extraSourceType() const {
     return LayerStyleExtraSourceType::None;
-  }
-
-  /**
-   * Whether this style also needs the contour image in addition to whatever extraSourceType()
-   * requests. Allows Background-sourced styles to access the contour via
-   * LayerStyleInput::contourSource. Default is false. When extraSourceType() is already Contour,
-   * the contour is delivered via extraSource and this method has no effect. Currently, only
-   * GlassStyle overrides this to return true.
-   */
-  virtual bool needsContour() const {
-    return false;
   }
 
   /**

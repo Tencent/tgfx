@@ -171,6 +171,8 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppend(
         "  float offsetDist = glassThickness * refractionFactor * edgeFactor * edgeFactor * "
         "edgeFactor * 1.2;");
+    // effectiveSplay defaults to splay; RoundedRect overrides it below with corner-proximity
+    // blending so that straight edges near corners also blend toward the radial direction.
     fragBuilder->codeAppend("  float effectiveSplay = splay;");
     if (params.shapeType == GlassShapeType::Ellipse) {
       // Ellipse SDF gradient points outward; negate for inward normal.

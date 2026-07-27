@@ -98,10 +98,14 @@ struct GlassShapeInfo {
 // FillStroke produce a different rendered outline than the fill path, so SDF would mismatch.
 static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
   GlassShapeInfo info;
-  if (input.contourSource == nullptr) {
+  if (input.extraSource == nullptr) {
     return info;
   }
-  const auto& optShape = input.contourSource->shape();
+  const auto& contour = input.extraSource->contour();
+  if (!contour.has_value()) {
+    return info;
+  }
+  const auto& optShape = contour->shape;
   if (!optShape.has_value()) {
     return info;
   }
@@ -260,11 +264,15 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
     return;
   }
 
-  auto bgImage = input.extraSource->image();
-  if (bgImage == nullptr || input.content == nullptr || FloatNearlyZero(input.contentScale)) {
+  const auto& background = input.extraSource->background();
+  if (!background.has_value() || background->image == nullptr) {
     return;
   }
-  auto bgOffset = input.extraSource->imageOffset();
+  auto bgImage = background->image;
+  if (input.content == nullptr || FloatNearlyZero(input.contentScale)) {
+    return;
+  }
+  auto bgOffset = background->imageOffset;
 
   // Down-scale the background to avoid huge GPU textures when zoomed in.
   // The background image includes outset beyond layer content bounds (for refraction sampling).

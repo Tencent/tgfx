@@ -27,81 +27,82 @@
 namespace tgfx {
 
 /**
+ * A background image source with its offset relative to the content image.
+ */
+struct StyleInputImage {
+  std::shared_ptr<Image> image = nullptr;
+  Point imageOffset = {};
+};
+
+/**
+ * A contour image source with its offset and optional vector shape information.
+ */
+struct StyleInputContour {
+  std::shared_ptr<Image> image = nullptr;
+  Point imageOffset = {};
+  std::optional<StyledShape> shape = std::nullopt;
+};
+
+/**
  * Extra input source that a LayerStyle may need beyond the primary content image.
+ * May carry a background image, a contour image, or both, depending on the
+ * LayerStyle's extraSourceType().
  */
 class StyleInputSource {
  public:
   /**
-   * The kind of extra source carried by this object.
+   * Creates a source carrying only a background image.
    */
-  enum class Type {
-    /**
-     * A plain image source, such as the background content below the layer.
-     */
-    Base,
-    /**
-     * A contour source that additionally carries the layer's vector shape.
-     */
-    Contour
-  };
-
-  StyleInputSource(std::shared_ptr<Image> image, Point imageOffset)
-      : _type(Type::Base), _image(std::move(image)), _imageOffset(imageOffset) {
+  static std::shared_ptr<StyleInputSource> MakeBackground(std::shared_ptr<Image> image,
+                                                          Point imageOffset) {
+    StyleInputImage bg = {std::move(image), imageOffset};
+    return std::shared_ptr<StyleInputSource>(new StyleInputSource(std::move(bg), std::nullopt));
   }
 
   /**
-   * The kind of this source.
+   * Creates a source carrying only a contour image with optional vector shape.
    */
-  Type type() const {
-    return _type;
+  static std::shared_ptr<StyleInputSource> MakeContour(
+      std::shared_ptr<Image> image, Point imageOffset,
+      std::optional<StyledShape> shape = std::nullopt) {
+    StyleInputContour ct = {std::move(image), imageOffset, std::move(shape)};
+    return std::shared_ptr<StyleInputSource>(new StyleInputSource(std::nullopt, std::move(ct)));
   }
 
   /**
-   * The source image.
+   * Creates a source carrying both a background image and a contour image.
    */
-  const std::shared_ptr<Image>& image() const {
-    return _image;
+  static std::shared_ptr<StyleInputSource> MakeBackgroundAndContour(
+      std::shared_ptr<Image> backgroundImage, Point backgroundOffset,
+      std::shared_ptr<Image> contourImage, Point contourOffset,
+      std::optional<StyledShape> shape = std::nullopt) {
+    StyleInputImage bg = {std::move(backgroundImage), backgroundOffset};
+    StyleInputContour ct = {std::move(contourImage), contourOffset, std::move(shape)};
+    return std::shared_ptr<StyleInputSource>(new StyleInputSource(std::move(bg), std::move(ct)));
   }
 
   /**
-   * The offset of the source image relative to the content image.
+   * Returns the optional background image source.
    */
-  Point imageOffset() const {
-    return _imageOffset;
+  const std::optional<StyleInputImage>& background() const {
+    return _background;
   }
 
- protected:
-  StyleInputSource(Type type, std::shared_ptr<Image> image, Point imageOffset)
-      : _type(type), _image(std::move(image)), _imageOffset(imageOffset) {
+  /**
+   * Returns the optional contour image source with vector shape.
+   */
+  const std::optional<StyleInputContour>& contour() const {
+    return _contour;
   }
 
  private:
-  Type _type = Type::Base;
-  std::shared_ptr<Image> _image;
-  Point _imageOffset = {};
-};
-
-/**
- * Contour input source with additional vector shape information.
- */
-class ContourInputSource : public StyleInputSource {
- public:
-  ContourInputSource(std::shared_ptr<Image> image, Point imageOffset,
-                     std::optional<StyledShape> shape = std::nullopt)
-      : StyleInputSource(Type::Contour, std::move(image), imageOffset), _shape(std::move(shape)) {
+  StyleInputSource(std::optional<StyleInputImage> background,
+                   std::optional<StyleInputContour> contour)
+      : _background(std::move(background)), _contour(std::move(contour)) {
   }
 
-  /**
-   * Returns the optional content shape of the layer. It is the layer's vector shape (e.g. Rect,
-   * Oval, or RRect with fill/stroke info) when extractable; otherwise it is std::nullopt and no
-   * fallback rect is substituted.
-   */
-  const std::optional<StyledShape>& shape() const {
-    return _shape;
-  }
-
- private:
-  std::optional<StyledShape> _shape = std::nullopt;
+  std::optional<StyleInputImage> _background = std::nullopt;
+  std::optional<StyleInputContour> _contour = std::nullopt;
 };
 
 /**
@@ -127,21 +128,13 @@ struct LayerStyleInput {
   float contentScale = 1.0f;
 
   /**
-   * Optional extra source. The actual type depends on the LayerStyle's extraSourceType:
-   * ContourInputSource for Contour, StyleInputSource for Background, nullptr
-   * for None. For Contour the image is similar to content, but includes geometries from alpha=0
-   * painters and replaces gradient fills with solid colors. For Background the image is the
-   * normally rendered content below the current layer.
+   * Optional extra source carrying background and/or contour images depending on the LayerStyle's
+   * extraSourceType(). nullptr when the style requires no extra source. For Contour the image is
+   * similar to content, but includes geometries from alpha=0 painters and replaces gradient fills
+   * with solid colors. For Background the image is the normally rendered content below the current
+   * layer. For BackgroundAndContour both background() and contour() are populated.
    */
   std::shared_ptr<StyleInputSource> extraSource = nullptr;
-
-  /**
-   * Optional contour source. Available when the LayerStyle's needsContour() returns true.
-   * Carries the contour image (with alpha=0 painters and solid-color gradient replacements)
-   * along with the layer's vector shape. When extraSourceType() is already Contour, this field
-   * is nullptr (the contour is available via extraSource instead).
-   */
-  std::shared_ptr<ContourInputSource> contourSource = nullptr;
 };
 
 }  // namespace tgfx
