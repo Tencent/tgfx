@@ -33,6 +33,12 @@ namespace tgfx {
 
 namespace {
 
+// Returns true if the given source type includes a background source.
+bool NeedsBackgroundSource(LayerStyleExtraSourceType type) {
+  return type == LayerStyleExtraSourceType::Background ||
+         type == LayerStyleExtraSourceType::BackgroundAndContour;
+}
+
 // A handler that does nothing for background-sourced styles. Used for intermediate artifacts and
 // 3D / contour paths where background styles must not produce output.
 class NoOpImpl : public BackgroundHandler {
@@ -337,14 +343,20 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   styleInput.contentOffset = contentEntry.offset;
   styleInput.contentScale = source->contentScale;
   auto sourceType = style->extraSourceType();
-  DEBUG_ASSERT(HasBackgroundSource(sourceType));
-  if (HasContourSource(sourceType) && group->contour.has_value()) {
-    auto contourOffset = group->contour->offset - contentEntry.offset;
+  DEBUG_ASSERT(NeedsBackgroundSource(sourceType));
+  if (sourceType == LayerStyleExtraSourceType::BackgroundAndContour) {
+    std::shared_ptr<Image> contourImage = nullptr;
+    Point contourOffset = {};
+    if (group->contour.has_value()) {
+      contourImage = group->contour->image;
+      contourOffset = group->contour->offset - contentEntry.offset;
+    }
     styleInput.extraSource = StyleInputSource::MakeBackgroundAndContour(
-        std::move(bgImage), backgroundOffset, group->contour->image, contourOffset,
+        std::move(bgImage), backgroundOffset, std::move(contourImage), contourOffset,
         source->contentShape);
   } else {
-    styleInput.extraSource = StyleInputSource::MakeBackground(std::move(bgImage), backgroundOffset);
+    styleInput.extraSource =
+        std::make_shared<StyleInputSource>(std::move(bgImage), backgroundOffset);
   }
   style->draw(canvas, styleInput, alpha);
 }

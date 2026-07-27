@@ -57,22 +57,6 @@ enum class LayerStyleExtraSourceType {
   BackgroundAndContour
 };
 
-/**
- * Returns true if the given source type includes a background source.
- */
-inline bool HasBackgroundSource(LayerStyleExtraSourceType type) {
-  return type == LayerStyleExtraSourceType::Background ||
-         type == LayerStyleExtraSourceType::BackgroundAndContour;
-}
-
-/**
- * Returns true if the given source type includes a contour source.
- */
-inline bool HasContourSource(LayerStyleExtraSourceType type) {
-  return type == LayerStyleExtraSourceType::Contour ||
-         type == LayerStyleExtraSourceType::BackgroundAndContour;
-}
-
 enum class LayerStyleType {
   LayerStyle,
   BackgroundBlur,

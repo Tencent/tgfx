@@ -264,15 +264,11 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
     return;
   }
 
-  const auto& background = input.extraSource->background();
-  if (!background.has_value() || background->image == nullptr) {
+  auto bgImage = input.extraSource->image();
+  if (bgImage == nullptr || input.content == nullptr || FloatNearlyZero(input.contentScale)) {
     return;
   }
-  auto bgImage = background->image;
-  if (input.content == nullptr || FloatNearlyZero(input.contentScale)) {
-    return;
-  }
-  auto bgOffset = background->imageOffset;
+  auto bgOffset = input.extraSource->imageOffset();
 
   // Down-scale the background to avoid huge GPU textures when zoomed in.
   // The background image includes outset beyond layer content bounds (for refraction sampling).

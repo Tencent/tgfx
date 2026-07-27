@@ -49,6 +49,18 @@
 
 namespace tgfx {
 
+// Returns true if the given source type includes a background source.
+static bool NeedsBackgroundSource(LayerStyleExtraSourceType type) {
+  return type == LayerStyleExtraSourceType::Background ||
+         type == LayerStyleExtraSourceType::BackgroundAndContour;
+}
+
+// Returns true if the given source type includes a contour source.
+static bool NeedsContourSource(LayerStyleExtraSourceType type) {
+  return type == LayerStyleExtraSourceType::Contour ||
+         type == LayerStyleExtraSourceType::BackgroundAndContour;
+}
+
 // The minimum size (longest edge) for subtree cache. This prevents creating excessively small
 // mipmap levels that would be inefficient to cache.
 static constexpr int SUBTREE_CACHE_MIN_SIZE = 32;
@@ -1777,7 +1789,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   for (const auto& layerStyle : _layerStyles) {
     auto index = static_cast<int>(layerStyle->excludeChildEffects());
     needContent[index] = true;
-    if (HasContourSource(layerStyle->extraSourceType())) {
+    if (NeedsContourSource(layerStyle->extraSourceType())) {
       needContour[index] = true;
     }
   }
@@ -1849,7 +1861,7 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
     if (layerStyle->position() != position) {
       continue;
     }
-    if (HasBackgroundSource(layerStyle->extraSourceType())) {
+    if (NeedsBackgroundSource(layerStyle->extraSourceType())) {
       BackgroundHandler::DispatchOrSkip(args, canvas, this, alpha, layerStyle.get(), source);
       continue;
     }
@@ -1922,7 +1934,7 @@ std::shared_ptr<Image> Layer::synthesizeBackgroundImage(const DrawArgs& args, fl
 void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, float alpha,
                                   LayerStyle* layerStyle, const LayerStyleSource* source) {
   DEBUG_ASSERT(source != nullptr && !FloatNearlyZero(source->contentScale));
-  DEBUG_ASSERT(!HasBackgroundSource(layerStyle->extraSourceType()));
+  DEBUG_ASSERT(!NeedsBackgroundSource(layerStyle->extraSourceType()));
   auto groupIndex = static_cast<int>(layerStyle->excludeChildEffects());
   auto* group = source->groups[groupIndex].get();
   if (group == nullptr) {
@@ -1940,14 +1952,14 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
   styleInput.content = contentEntry.image;
   styleInput.contentOffset = contentEntry.offset;
   styleInput.contentScale = source->contentScale;
-  if (HasContourSource(layerStyle->extraSourceType())) {
+  if (NeedsContourSource(layerStyle->extraSourceType())) {
     auto contourImage = group->contour.has_value() ? group->contour->image : nullptr;
     auto contourOffset =
         contourImage ? group->contour->offset - contentEntry.offset : Point::Zero();
     // contour shape may be nullopt when the layer has no simple vector content (e.g. a group
     // layer with only children).
-    styleInput.extraSource =
-        StyleInputSource::MakeContour(std::move(contourImage), contourOffset, source->contentShape);
+    styleInput.extraSource = std::make_shared<ContourInputSource>(
+        std::move(contourImage), contourOffset, source->contentShape);
   }
   layerStyle->draw(canvas, styleInput, alpha);
 }
@@ -2030,7 +2042,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   // The snapshot costs O(MAX_DIRTY_REGIONS) = O(1) per blur-capable layer.
   std::vector<Rect> backgroundSourceRects = {};
   for (const auto& style : _layerStyles) {
-    if (style && HasBackgroundSource(style->extraSourceType())) {
+    if (style && NeedsBackgroundSource(style->extraSourceType())) {
       backgroundSourceRects = _root->currentDirtyRects();
       break;
     }
@@ -2116,7 +2128,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   if (!renderBounds.isEmpty()) {
     for (auto& style : _layerStyles) {
       DEBUG_ASSERT(style != nullptr);
-      if (!HasBackgroundSource(style->extraSourceType())) {
+      if (!NeedsBackgroundSource(style->extraSourceType())) {
         continue;
       }
       auto outset = style->filterBackground(Rect::MakeEmpty(), contentScale);
@@ -2180,7 +2192,7 @@ void Layer::checkBackgroundStyles(std::shared_ptr<RegionTransformer> transformer
 void Layer::updateBackgroundBounds(float contentScale, const std::vector<Rect>& sourceRects) {
   for (auto& style : _layerStyles) {
     DEBUG_ASSERT(style != nullptr);
-    if (HasBackgroundSource(style->extraSourceType())) {
+    if (NeedsBackgroundSource(style->extraSourceType())) {
       _root->invalidateBackground(renderBounds, style.get(), contentScale, sourceRects);
     }
   }
@@ -2219,7 +2231,7 @@ bool Layer::hasBackgroundStyle() {
   }
   for (const auto& style : _layerStyles) {
     DEBUG_ASSERT(style != nullptr);
-    if (HasBackgroundSource(style->extraSourceType())) {
+    if (NeedsBackgroundSource(style->extraSourceType())) {
       return true;
     }
   }
