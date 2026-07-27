@@ -23,20 +23,31 @@
 namespace tgfx {
 
 /// Precompiled shader for a solid-color fill masked by an alpha-only coverage texture, drawn through
-/// DefaultGeometryProcessor with a single TextureEffect coverage fragment processor and the empty
-/// transfer processor. Covers the common ShapeDrawOp mask path (a rasterized shape used as
-/// coverage). The fill color comes from the geometry processor's Color uniform; the mask is sampled
-/// per-vertex via CoordTransformMatrix_0. Porter-Duff blends fall back to ProgramBuilder.
+/// DefaultGeometryProcessor with a single TextureEffect coverage fragment processor. Covers the
+/// common ShapeDrawOp mask path (a rasterized shape used as coverage). The fill color comes from the
+/// geometry processor's Color uniform; the mask is sampled per-vertex via CoordTransformMatrix_0.
 ///
-/// Single variant: no permutation dimensions.
+/// The mask coverage feeds the XferProcessor's coverage lerp, so Porter-Duff blends (DST_TEX and
+/// framebuffer-fetch) are supported via the HAS_XP fragment dimension, exactly like the other fill
+/// shaders. The empty transfer path keeps the original straight multiply (Color * maskCoverage).
 class MaskFillShader : public PrecompiledShader {
  public:
+  struct FragDims {
+    enum : uint32_t { HAS_XP, COUNT };
+    static PermutationDomain domain() {
+      return PermutationDomain({
+          PermutationInt("HAS_XP", 3),
+      });
+    }
+  };
+  using D = FragDims;
+
   PrecompiledShaderInfo info() const override {
     return {"MaskFillShader",
             "level1/mask_fill.vert",
             "level1/mask_fill.frag",
             PermutationDomain({}),
-            PermutationDomain({}),
+            D::domain(),
             PermutationDomain({}),
             "",
             "",

@@ -277,7 +277,7 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
   EXPECT_EQ(cache->vertexEntryCount(), 114u);
-  EXPECT_EQ(cache->fragmentEntryCount(), 505u);
+  EXPECT_EQ(cache->fragmentEntryCount(), 507u);
   std::string expectedTag = TGFX_BACKEND_NAME;
   auto dashPos = expectedTag.find('-');
   if (dashPos != std::string::npos) {
@@ -1053,9 +1053,10 @@ TGFX_TEST(ShaderPermutationTest, MaskFillShouldCompile) {
       continue;
     }
     found = true;
-    // Single variant: no vertex or fragment permutation dimensions (empty XP only).
+    // No vertex dimensions; the fragment stage carries a single HAS_XP dimension (3 values:
+    // none / PorterDuff DST_TEX / PorterDuff framebuffer-fetch).
     EXPECT_EQ(shaderInfo.vertDomain.totalCount(), 1u);
-    EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 1u);
+    EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 3u);
   }
   EXPECT_TRUE(found);
 }

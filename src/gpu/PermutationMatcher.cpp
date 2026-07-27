@@ -321,13 +321,18 @@ static std::optional<PermutationMatchResult> TryMatchMaskFill(const ProgramInfo*
       te->hasSubset()) {
     return std::nullopt;
   }
-  // Only the empty transfer processor is supported. Porter-Duff blends over a shape mask require
-  // feeding the coverage into the blend's coverage lerp (and a framebuffer read), which this shader
-  // does not implement, so they fall back to ProgramBuilder.
-  if (GetXPType(programInfo) != 0) {
+  // The mask coverage feeds the XferProcessor's coverage lerp, so Porter-Duff blends (DST_TEX and
+  // framebuffer-fetch) are supported via the HAS_XP fragment dimension. Only a genuinely
+  // unsupported transfer processor (xpType < 0) falls back to ProgramBuilder.
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
     return std::nullopt;
   }
-  return PermutationMatchResult{"MaskFillShader", 0, 0};
+  using D = MaskFillShader::D;
+  std::vector<int> fragValues(D::COUNT, 0);
+  fragValues[D::HAS_XP] = xpType;
+  auto fragIndex = D::domain().encode(fragValues);
+  return PermutationMatchResult{"MaskFillShader", 0, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchConstColor(const ProgramInfo* programInfo) {
