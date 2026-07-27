@@ -16,6 +16,9 @@
 #ifndef HAS_XP
 #define HAS_XP 0
 #endif
+#ifndef HAS_COVERAGE
+#define HAS_COVERAGE 0
+#endif
 
 #define OP_COLOR_MATRIX 0
 #define OP_LUMA 1
@@ -60,6 +63,9 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 };
 
 layout(location = 0) in vec2 TransformedCoords_0;
+#if HAS_COVERAGE
+layout(location = 1) in float vCoverage;
+#endif
 
 layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
 
@@ -171,6 +177,14 @@ void main() {
     result = color;
   }
 
+#if HAS_COVERAGE
+// Per-vertex AA coverage: keep the un-premultiplied result for the XferProcessor lerp and multiply
+// coverage into the non-XP output (matches the coverage contract in xp_output.inc).
+#define TGFX_XP_SRC_COLOR (result * vCoverage)
+#define TGFX_XP_SRC_UNPREMUL result
+#define TGFX_XP_COVERAGE vec4(vCoverage)
+#else
 #define TGFX_XP_SRC_COLOR result
+#endif
 #include "xp_output.inc"
 }

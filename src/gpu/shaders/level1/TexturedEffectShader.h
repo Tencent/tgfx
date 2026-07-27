@@ -35,25 +35,35 @@ namespace tgfx {
 class TexturedEffectShader : public PrecompiledShader {
  public:
   struct FragDims {
-    enum : uint32_t { HAS_SUBSET, HAS_XP, COUNT };
+    enum : uint32_t { HAS_SUBSET, HAS_XP, HAS_COVERAGE, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationBool("HAS_SUBSET"),
           PermutationInt("HAS_XP", 3),
+          PermutationBool("HAS_COVERAGE"),
       });
     }
   };
   using D = FragDims;
 
   struct VertDims {
-    enum : uint32_t { GP_TYPE, COUNT };
+    enum : uint32_t { GP_TYPE, HAS_COVERAGE, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("GP_TYPE", 2),
+          PermutationBool("HAS_COVERAGE"),
       });
     }
   };
   using VD = VertDims;
+
+  // HAS_COVERAGE is mirrored: the vertex stage emits the coverage varying only when the fragment
+  // stage consumes it, so vert and frag must agree.
+  static bool ShouldCompile(uint32_t /*vertIndex*/, uint32_t /*fragIndex*/,
+                            const std::vector<int>& vertValues,
+                            const std::vector<int>& fragValues) {
+    return vertValues[VD::HAS_COVERAGE] == fragValues[D::HAS_COVERAGE];
+  }
 
   PrecompiledShaderInfo info() const override {
     return {"TexturedEffectShader",
@@ -64,7 +74,7 @@ class TexturedEffectShader : public PrecompiledShader {
             PermutationDomain({}),
             "",
             "",
-            nullptr};
+            ShouldCompile};
   }
 };
 

@@ -964,23 +964,30 @@ static std::optional<PermutationMatchResult> TryMatchComposedTexture(
     const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
   int gpType = 0;
+  int hasCoverage = 0;
   if (gp->name() == "DefaultGeometryProcessor") {
     gpType = 0;
+    hasCoverage =
+        static_cast<const DefaultGeometryProcessor*>(gp)->getAAType() == AAType::Coverage ? 1 : 0;
   } else if (gp->name() == "QuadPerEdgeAAGeometryProcessor") {
     auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
     // The precompiled quad vert declares aPosition alone and derives the texture coordinate from it
-    // via CoordTransformMatrix_0, so reject quads carrying coverage/color/uvCoord/subset attributes.
-    if (quadGP->getAAType() == AAType::Coverage || !quadGP->hasCommonColor() ||
-        !quadGP->hasUVMatrix() || quadGP->getHasSubset()) {
+    // via CoordTransformMatrix_0, so reject quads carrying color/uvCoord/subset attributes. Per-
+    // vertex AA coverage is now supported via the HAS_COVERAGE dimension, so it is no longer
+    // rejected.
+    if (!quadGP->hasCommonColor() || !quadGP->hasUVMatrix() || quadGP->getHasSubset()) {
       return std::nullopt;
     }
     gpType = 1;
+    hasCoverage = quadGP->getAAType() == AAType::Coverage ? 1 : 0;
   } else {
     return std::nullopt;
   }
-  // Each textured Compose shader carries a single GP_TYPE vertex dimension, so the vertex index is
-  // simply the GP type.
-  uint32_t vertIndex = static_cast<uint32_t>(gpType);
+  using VD = TexturedEffectShader::VD;
+  std::vector<int> vertValues(VD::COUNT, 0);
+  vertValues[VD::GP_TYPE] = gpType;
+  vertValues[VD::HAS_COVERAGE] = hasCoverage;
+  auto vertIndex = VD::domain().encode(vertValues);
   int xpType = GetXPType(programInfo);
   if (xpType < 0) {
     return std::nullopt;
@@ -1025,6 +1032,7 @@ static std::optional<PermutationMatchResult> TryMatchComposedTexture(
   std::vector<int> fragValues(D::COUNT, 0);
   fragValues[D::HAS_SUBSET] = hasSubset;
   fragValues[D::HAS_XP] = xpType;
+  fragValues[D::HAS_COVERAGE] = hasCoverage;
   auto fragIndex = fragDomain.encode(fragValues);
 
   if (child1->name() == "ColorSpaceXformEffect") {
