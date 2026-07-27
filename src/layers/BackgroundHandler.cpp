@@ -33,12 +33,6 @@ namespace tgfx {
 
 namespace {
 
-// Returns true if the given source type includes a background source.
-bool NeedsBackgroundSource(LayerStyleExtraSourceType type) {
-  return type == LayerStyleExtraSourceType::Background ||
-         type == LayerStyleExtraSourceType::BackgroundAndContour;
-}
-
 // A handler that does nothing for background-sourced styles. Used for intermediate artifacts and
 // 3D / contour paths where background styles must not produce output.
 class NoOpImpl : public BackgroundHandler {
@@ -343,7 +337,6 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   styleInput.contentOffset = contentEntry.offset;
   styleInput.contentScale = source->contentScale;
   auto sourceType = style->extraSourceType();
-  DEBUG_ASSERT(NeedsBackgroundSource(sourceType));
   if (sourceType == LayerStyleExtraSourceType::BackgroundAndContour) {
     std::shared_ptr<Image> contourImage = nullptr;
     Point contourOffset = {};
