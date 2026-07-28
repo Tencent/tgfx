@@ -41,6 +41,8 @@
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Pixmap.h"
+#include "tgfx/core/SamplingOptions.h"
+#include "tgfx/core/Shader.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Context.h"
 #include "utils/AOTToleranceCompare.h"
@@ -143,6 +145,105 @@ TGFX_TEST(AOTL2AuditTest, ServedShapesMatchPlainPathWithinOneLSB) {
 
   cache->setDecompositionEnabled(false);
   cache->unload();
+}
+
+// Renders a full-surface rect painted with the given shader, twice differing only by the
+// decomposition gate. Used to exercise blend shaders (the drawImage helper cannot carry a
+// paint shader).
+static void RenderShaderScene(Context* context, PrecompiledShaderCache* cache,
+                              const std::shared_ptr<Shader>& shader, int width, int height,
+                              bool decompositionEnabled, Bitmap* outBitmap, uint32_t* outHits,
+                              uint32_t* outNoMatch) {
+  cache->setDecompositionEnabled(decompositionEnabled);
+  cache->resetStats();
+  context->globalCache()->clearPrograms();
+  auto surface = Surface::Make(context, width, height);
+  ASSERT_TRUE(surface != nullptr);
+  Paint paint = {};
+  paint.setShader(shader);
+  surface->getCanvas()->drawRect(Rect::MakeWH(width, height), paint);
+  context->flushAndSubmit(true);
+  ASSERT_TRUE(outBitmap->allocPixels(width, height));
+  auto pixels = outBitmap->lockPixels();
+  ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+  outBitmap->unlockPixels();
+  *outHits = cache->hitCount();
+  *outNoMatch = cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule);
+}
+
+// Measures the L2 error for the primary Xfermode+Tiled target: a blend whose dst child is a
+// repeat-tiled image shader (TiledTextureEffect). With decomposition enabled the tiled child is
+// materialized to an offscreen texture and the blend collapses to two(TextureEffect,TextureEffect)
+// which hits BlendMergeShader. This case quantifies whether that materialization + resample stays
+// within tolerance versus sampling the tiled child inline.
+TGFX_TEST(AOTL2AuditTest, TiledInBlendMatchesPlainPath) {
+  auto image = MakeImage("resources/apitest/test_timestretch.png");
+  ASSERT_TRUE(image != nullptr);
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
+
+  int width = image->width();
+  int height = image->height();
+  // Decisive test: a plain two-texture Multiply blend (NO tiling, NO flatten). BlendMerge accepts
+  // both TextureEffect children inline, so this hits BlendMergeShader when the cache is loaded and
+  // falls back to JIT when the cache is unloaded. Comparing the two isolates whether the precompiled
+  // BlendMerge kernel's Multiply math matches the runtime/JIT path.
+  // Clean L2 test: tiled (repeat, full-size) is the SRC/index-0 child so only the decomposition gate
+  // flattens it; the DST child is a same-size plain image so there is no child-size/coord mismatch.
+  // Gate OFF: inline two(Tiled,Texture) -> BlendMerge rejects tiled -> JIT (correct reference).
+  // Gate ON: tiled materialized full-size -> two(Texture,Texture) -> BlendMerge. Must be bit-exact.
+  auto image2 = MakeImage("resources/apitest/test_timestretch.png");
+  ASSERT_TRUE(image2 != nullptr);
+  auto tiled = Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Repeat);
+  auto plain = Shader::MakeImageShader(image2, TileMode::Clamp, TileMode::Clamp);
+  ASSERT_TRUE(tiled != nullptr && plain != nullptr);
+  auto blend = Shader::MakeBlend(BlendMode::Multiply, plain, tiled);
+  ASSERT_TRUE(blend != nullptr);
+
+  Bitmap warmupBitmap = {};
+  uint32_t warmupHits = 0;
+  uint32_t warmupNoMatch = 0;
+  RenderShaderScene(context, cache, blend, width, height, false, &warmupBitmap, &warmupHits,
+                    &warmupNoMatch);
+
+  // Reference = decomposition OFF (tiled inline -> JIT).
+  Bitmap referenceBitmap = {};
+  uint32_t referenceHits = 0;
+  uint32_t referenceNoMatch = 0;
+  RenderShaderScene(context, cache, blend, width, height, false, &referenceBitmap, &referenceHits,
+                    &referenceNoMatch);
+  // Candidate = decomposition ON (tiled materialized -> BlendMerge).
+  Bitmap candidateBitmap = {};
+  uint32_t candidateHits = 0;
+  uint32_t candidateNoMatch = 0;
+  RenderShaderScene(context, cache, blend, width, height, true, &candidateBitmap, &candidateHits,
+                    &candidateNoMatch);
+
+  Pixmap referencePixmap(referenceBitmap);
+  Pixmap candidatePixmap(candidateBitmap);
+  SaveImage(referencePixmap, "AOTL2AuditTest/BlendMergeMultiply_jit");
+  SaveImage(candidatePixmap, "AOTL2AuditTest/BlendMergeMultiply_aot");
+  AOTToleranceSpec spec = {};
+  spec.maxChannelDiff = 1;
+  spec.maxDiffPixelRatio = 1.0;
+  spec.structuralChannelDiff = 2;
+  auto result = AOTToleranceCompare::Compare(referencePixmap, candidatePixmap, spec);
+  LOGI(
+      "[L2AUDIT] backend=%s shape=BlendMergeMultiply jitHits=%u aotHits=%u maxDelta=%d "
+      "diffPixels=%d "
+      "totalPixels=%d pass=%d",
+      TGFX_BACKEND_NAME, referenceHits, candidateHits, result.maxChannelDiff,
+      static_cast<int>(result.diffPixelCount), static_cast<int>(result.totalPixelCount),
+      result.passed ? 1 : 0);
+
+  cache->setDecompositionEnabled(false);
+  cache->unload();
+
+  EXPECT_TRUE(result.passed) << "AOT BlendMerge Multiply diverges from JIT, maxDelta="
+                             << result.maxChannelDiff;
 }
 
 }  // namespace tgfx

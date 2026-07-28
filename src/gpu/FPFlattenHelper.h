@@ -18,7 +18,9 @@
 
 #pragma once
 
+#include "gpu/AOTMaterializationPolicy.h"
 #include "gpu/DrawingManager.h"
+#include "gpu/PrecompiledShaderCache.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
@@ -57,6 +59,11 @@ static inline bool IsSimpleBlendChild(const FragmentProcessor* fp, size_t childI
  * that samples from it. The FP's coordTransform expects to receive coordinates in the range
  * [drawRect.x..right, drawRect.y..bottom], so a coordOffset is applied during offscreen rendering
  * to ensure the FP sees the correct coordinate space. Returns nullptr on failure.
+ *
+ * The offscreen render target uses BackingFit::Exact: the returned TextureEffect samples with a
+ * plain translate-only uvMatrix, which is only correct when the backing texture is exactly
+ * width x height. An Approx (rounded-up) backing would make the normalized texture coordinates
+ * sample a scaled/offset region (reading uninitialized padding), producing corrupted output.
  */
 static inline PlacementPtr<FragmentProcessor> FlattenToTexture(const FPArgs& args,
                                                                PlacementPtr<FragmentProcessor> fp) {
@@ -69,7 +76,7 @@ static inline PlacementPtr<FragmentProcessor> FlattenToTexture(const FPArgs& arg
     return nullptr;
   }
   auto renderTarget = RenderTargetProxy::Make(context, width, height, false, 1, false,
-                                              ImageOrigin::TopLeft, BackingFit::Approx);
+                                              ImageOrigin::TopLeft, BackingFit::Exact);
   if (renderTarget == nullptr) {
     return nullptr;
   }
@@ -91,13 +98,28 @@ static inline PlacementPtr<FragmentProcessor> FlattenToTexture(const FPArgs& arg
  * Ensures the given FragmentProcessor is simple for use as a blend child at the specified position.
  * If it's already simple for that position, returns it unchanged; otherwise flattens it to a
  * texture. Returns nullptr on failure.
+ *
+ * Two independent reasons trigger flattening:
+ *  - Correctness: the child is too complex to be a valid XfermodeFragmentProcessor child
+ *    (IsSimpleBlendChild returns false). This always flattens, regardless of any AOT setting.
+ *  - AOT matchability: the child is valid inline but its permutation has no precompiled artifact
+ *    (e.g. a TiledTextureEffect src). This flattens only when the decomposition route is enabled,
+ *    so the default path is byte-for-byte identical to before and no baseline shifts.
  */
 static inline PlacementPtr<FragmentProcessor> EnsureSimpleBlendChild(
     const FPArgs& args, PlacementPtr<FragmentProcessor> fp, size_t childIndex = 0) {
-  if (IsSimpleBlendChild(fp.get(), childIndex)) {
-    return fp;
+  if (!IsSimpleBlendChild(fp.get(), childIndex)) {
+    return FlattenToTexture(args, std::move(fp));
   }
-  return FlattenToTexture(args, std::move(fp));
+  auto cache = args.context->precompiledShaderCache();
+  if (cache != nullptr && cache->decompositionEnabled()) {
+    auto decision = AOTMaterializationPolicy::Evaluate(
+        fp.get(), MaterializationConsumer::PointwiseBlend, childIndex);
+    if (decision.shouldFlatten) {
+      return FlattenToTexture(args, std::move(fp));
+    }
+  }
+  return fp;
 }
 
 }  // namespace tgfx
