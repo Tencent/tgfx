@@ -23,6 +23,9 @@
 
 namespace tgfx {
 
+// Bytes per pixel of the DEPTH24_STENCIL8 format used by all depth/stencil attachments.
+static constexpr size_t DEPTH_STENCIL_BYTES_PER_PIXEL = 4;
+
 static UniqueKey ComputeDepthStencilUniqueKey(int width, int height, int sampleCount) {
   static const UniqueKey DepthStencilDomain = UniqueKey::Make();
   uint32_t data[] = {static_cast<uint32_t>(width), static_cast<uint32_t>(height),
@@ -31,8 +34,8 @@ static UniqueKey ComputeDepthStencilUniqueKey(int width, int height, int sampleC
 }
 
 size_t DepthStencilTextureView::memoryUsage() const {
-  return static_cast<size_t>(width()) * static_cast<size_t>(height()) * 4 *
-         static_cast<size_t>(_texture->sampleCount());
+  return static_cast<size_t>(width()) * static_cast<size_t>(height()) *
+         DEPTH_STENCIL_BYTES_PER_PIXEL * static_cast<size_t>(_texture->sampleCount());
 }
 
 std::shared_ptr<DepthStencilTextureView> DepthStencilTextureView::Make(Context* context, int width,
