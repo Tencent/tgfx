@@ -18,6 +18,9 @@
 #ifndef HAS_COVERAGE
 #define HAS_COVERAGE 0
 #endif
+#ifndef HAS_VCOVERAGE
+#define HAS_VCOVERAGE 0
+#endif
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Color;
@@ -33,7 +36,7 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 };
 
 layout(location = 0) in vec2 TransformedCoords_0;
-#if GP_TYPE == 1
+#if HAS_VCOVERAGE
 layout(location = 1) in float vCoverage;
 #endif
 
@@ -86,7 +89,7 @@ void main() {
   gradColor.rgb *= gradColor.a;
   gradColor *= outputColor.a;
 
-#if GP_TYPE == 1
+#if HAS_VCOVERAGE
 #define TGFX_COVERAGE_SRC_COLOR (gradColor * vCoverage)
 #define TGFX_XP_COVERAGE vec4(vCoverage)
 #else

@@ -516,6 +516,23 @@ static int GetGPType(const GeometryProcessor* gp) {
   return -1;
 }
 
+// Returns 1 if the geometry processor supplies a per-vertex AA coverage attribute (inCoverage), 0
+// otherwise. Coverage is orthogonal to the GP type: both DefaultGP and QuadPerEdgeAAGP emit it only
+// when their AA type is Coverage.
+static int GetGPCoverage(const GeometryProcessor* gp) {
+  auto name = gp->name();
+  if (name == "DefaultGeometryProcessor") {
+    return static_cast<const DefaultGeometryProcessor*>(gp)->getAAType() == AAType::Coverage ? 1
+                                                                                             : 0;
+  }
+  if (name == "QuadPerEdgeAAGeometryProcessor") {
+    return static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp)->getAAType() == AAType::Coverage
+               ? 1
+               : 0;
+  }
+  return 0;
+}
+
 static int GradientLayoutTypeIndex(const std::string& layoutName) {
   if (layoutName == "LinearGradientLayout") {
     return 0;
@@ -580,6 +597,12 @@ static std::optional<PermutationMatchResult> TryMatchGradientFill(const ProgramI
     return std::nullopt;
   }
 
+  // This kernel does not consume per-vertex AA coverage and its shared vertex shader (HAS_VCOVERAGE
+  // defaults to 0 here) declares no inCoverage attribute, so reject coverage-carrying draws.
+  if (GetGPCoverage(gp)) {
+    return std::nullopt;
+  }
+
   using VD = GradientFillShader::VD;
   auto vertDomain = VD::domain();
   std::vector<int> vertValues(VD::COUNT);
@@ -639,10 +662,13 @@ static std::optional<PermutationMatchResult> TryMatchSingleIntervalGradient(
     return std::nullopt;
   }
 
+  int vCoverage = GetGPCoverage(gp);
+
   using VD = SingleIntervalGradientShader::VD;
   auto vertDomain = VD::domain();
   std::vector<int> vertValues(VD::COUNT);
   vertValues[VD::GP_TYPE] = gpType;
+  vertValues[VD::HAS_VCOVERAGE] = vCoverage;
   auto vertIndex = vertDomain.encode(vertValues);
 
   using FD = SingleIntervalGradientShader::FD;
@@ -651,6 +677,7 @@ static std::optional<PermutationMatchResult> TryMatchSingleIntervalGradient(
   fragValues[FD::GP_TYPE] = gpType;
   fragValues[FD::HAS_XP] = xpType;
   fragValues[FD::HAS_COVERAGE] = coverageType;
+  fragValues[FD::HAS_VCOVERAGE] = vCoverage;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"SingleIntervalGradientShader", vertIndex, fragIndex};
 }
@@ -696,6 +723,12 @@ static std::optional<PermutationMatchResult> TryMatchDualIntervalGradient(
     return std::nullopt;
   }
   if (layout->numCoordTransforms() > 0 && layout->coordTransform(0)->matrix.hasPerspective()) {
+    return std::nullopt;
+  }
+
+  // This kernel does not consume per-vertex AA coverage and its shared vertex shader (HAS_VCOVERAGE
+  // defaults to 0 here) declares no inCoverage attribute, so reject coverage-carrying draws.
+  if (GetGPCoverage(gp)) {
     return std::nullopt;
   }
 
@@ -755,6 +788,12 @@ static std::optional<PermutationMatchResult> TryMatchTextureGradient(
     return std::nullopt;
   }
   if (layout->numCoordTransforms() > 0 && layout->coordTransform(0)->matrix.hasPerspective()) {
+    return std::nullopt;
+  }
+
+  // This kernel does not consume per-vertex AA coverage and its shared vertex shader (HAS_VCOVERAGE
+  // defaults to 0 here) declares no inCoverage attribute, so reject coverage-carrying draws.
+  if (GetGPCoverage(gp)) {
     return std::nullopt;
   }
 

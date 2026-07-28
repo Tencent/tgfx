@@ -25,22 +25,24 @@ namespace tgfx {
 class SingleIntervalGradientShader : public PrecompiledShader {
  public:
   struct VertDims {
-    enum : uint32_t { GP_TYPE, COUNT };
+    enum : uint32_t { GP_TYPE, HAS_VCOVERAGE, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("GP_TYPE", 2),
+          PermutationBool("HAS_VCOVERAGE"),
       });
     }
   };
   using VD = VertDims;
 
   struct FragDims {
-    enum : uint32_t { GP_TYPE, HAS_XP, HAS_COVERAGE, COUNT };
+    enum : uint32_t { GP_TYPE, HAS_XP, HAS_COVERAGE, HAS_VCOVERAGE, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("GP_TYPE", 2),
           PermutationInt("HAS_XP", 3),
           PermutationInt("HAS_COVERAGE", 3),
+          PermutationBool("HAS_VCOVERAGE"),
       });
     }
   };
@@ -59,9 +61,12 @@ class SingleIntervalGradientShader : public PrecompiledShader {
   }
 
  private:
+  // GP_TYPE and HAS_VCOVERAGE are mirrored across stages: the vertex shader emits the coverage
+  // varying only when the fragment shader consumes it, and both must agree on the position transform.
   static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>& vertValues,
                             const std::vector<int>& fragValues) {
-    return vertValues[VD::GP_TYPE] == fragValues[FD::GP_TYPE];
+    return vertValues[VD::GP_TYPE] == fragValues[FD::GP_TYPE] &&
+           vertValues[VD::HAS_VCOVERAGE] == fragValues[FD::HAS_VCOVERAGE];
   }
 };
 
