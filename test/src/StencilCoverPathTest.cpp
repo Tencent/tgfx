@@ -1909,9 +1909,9 @@ TGFX_TEST(StencilCoverPathTest, Dispatch_StencilReuseAcrossPasses) {
   EXPECT_TRUE(Baseline::Compare(surface, "StencilCoverPath/ReuseOverpasses"));
 
   canvas->clear();
-  auto referee = BuildCellPentagon(Size / 2, Size / 2);
-  referee.setFillType(PathFillType::EvenOdd);
-  canvas->drawPath(referee, paint);
+  auto redrawPath = BuildCellPentagon(Size / 2, Size / 2);
+  redrawPath.setFillType(PathFillType::EvenOdd);
+  canvas->drawPath(redrawPath, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "StencilCoverPath/ReuseOverpasses_Redraw"));
 }
 

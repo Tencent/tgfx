@@ -32,7 +32,7 @@ static UniqueKey ComputeDepthStencilUniqueKey(int width, int height, int sampleC
 
 size_t DepthStencilTextureView::memoryUsage() const {
   return static_cast<size_t>(width()) * static_cast<size_t>(height()) * 4 *
-         static_cast<size_t>(_sampleCount);
+         static_cast<size_t>(_texture->sampleCount());
 }
 
 std::shared_ptr<DepthStencilTextureView> DepthStencilTextureView::Make(Context* context, int width,
@@ -55,14 +55,13 @@ std::shared_ptr<DepthStencilTextureView> DepthStencilTextureView::Make(Context* 
   if (texture == nullptr) {
     return nullptr;
   }
-  attachment =
-      Resource::AddToCache(context, new DepthStencilTextureView(std::move(texture), sampleCount));
+  attachment = Resource::AddToCache(context, new DepthStencilTextureView(std::move(texture)));
   attachment->assignUniqueKey(uniqueKey);
   return attachment;
 }
 
-DepthStencilTextureView::DepthStencilTextureView(std::shared_ptr<Texture> texture, int sampleCount)
-    : DefaultTextureView(std::move(texture)), _sampleCount(sampleCount) {
+DepthStencilTextureView::DepthStencilTextureView(std::shared_ptr<Texture> texture)
+    : DefaultTextureView(std::move(texture)) {
 }
 
 }  // namespace tgfx

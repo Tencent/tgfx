@@ -46,13 +46,11 @@ class DepthStencilTextureView : public DefaultTextureView {
    * Returns the sample count of the depth/stencil texture.
    */
   int sampleCount() const {
-    return _sampleCount;
+    return _texture->sampleCount();
   }
 
  private:
-  DepthStencilTextureView(std::shared_ptr<Texture> texture, int sampleCount);
-
-  int _sampleCount = 1;
+  DepthStencilTextureView(std::shared_ptr<Texture> texture);
 };
 
 }  // namespace tgfx

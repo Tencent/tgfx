@@ -22,7 +22,6 @@
 #include "MultisampleTestEffect.h"
 #include "StencilMaskRenderPass.h"
 #include "gpu/ProgramInfo.h"
-#include "gpu/ResourceCache.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/resources/DepthStencilTextureView.h"
