@@ -259,7 +259,7 @@ class PrecompiledShaderCache {
   std::array<std::atomic<uint32_t>, static_cast<size_t>(PrecompiledFallbackReason::Count)>
       fallbackCounts = {};
   std::atomic<bool> diagnosticsEnabled{false};
-  std::atomic<bool> _decompositionEnabled{false};
+  std::atomic<bool> _decompositionEnabled{true};
   mutable std::mutex diagnosticsMutex = {};
   std::vector<PrecompiledHitRecord> _hitRecords = {};
   std::vector<PrecompiledFallbackRecord> _fallbackRecords = {};

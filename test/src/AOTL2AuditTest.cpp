@@ -39,6 +39,8 @@
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/Image.h"
+#include "tgfx/core/ImageFilter.h"
+#include "tgfx/core/MaskFilter.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/SamplingOptions.h"
@@ -143,7 +145,7 @@ TGFX_TEST(AOTL2AuditTest, ServedShapesMatchPlainPathWithinOneLSB) {
     AuditCase(context, cache, image, paint, "TextureColorMatrix");
   }
 
-  cache->setDecompositionEnabled(false);
+  cache->setDecompositionEnabled(true);  // restore production default (gate on)
   cache->unload();
 }
 
@@ -239,10 +241,90 @@ TGFX_TEST(AOTL2AuditTest, TiledInBlendMatchesPlainPath) {
       static_cast<int>(result.diffPixelCount), static_cast<int>(result.totalPixelCount),
       result.passed ? 1 : 0);
 
-  cache->setDecompositionEnabled(false);
+  cache->setDecompositionEnabled(true);  // restore production default (gate on)
   cache->unload();
 
   EXPECT_TRUE(result.passed) << "AOT BlendMerge Multiply diverges from JIT, maxDelta="
+                             << result.maxChannelDiff;
+}
+
+// Renders the DropShadow-with-tiled-source scene (a gradient masked by a Decal image shader, with a
+// drop-shadow image filter). The Decal mask shader becomes a TiledTextureEffect that DropShadow
+// composes with the shadow via Xfermode-two, i.e. the two(TiledTextureEffect,TextureEffect) case.
+static void RenderDropShadowTiledScene(Context* context, PrecompiledShaderCache* cache,
+                                       const std::shared_ptr<Image>& image, int width, int height,
+                                       bool decompositionEnabled, Bitmap* outBitmap,
+                                       uint32_t* outNoMatch) {
+  cache->setDecompositionEnabled(decompositionEnabled);
+  cache->resetStats();
+  context->globalCache()->clearPrograms();
+  auto surface = Surface::Make(context, width, height);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  Paint paint = {};
+  paint.setShader(Shader::MakeRadialGradient({width / 2.0f, height / 2.0f}, width / 2.0f,
+                                             {Color::Green(), Color::Blue()}, {}));
+  auto maskShader = Shader::MakeImageShader(image, TileMode::Decal, TileMode::Decal);
+  paint.setMaskFilter(MaskFilter::MakeShader(maskShader));
+  paint.setImageFilter(ImageFilter::DropShadow(-10, -10, 10, 10, Color::Black()));
+  canvas->drawRect(Rect::MakeWH(width, height), paint);
+  context->flushAndSubmit(true);
+  ASSERT_TRUE(outBitmap->allocPixels(width, height));
+  auto pixels = outBitmap->lockPixels();
+  ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+  outBitmap->unlockPixels();
+  *outNoMatch = cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule);
+}
+
+// A-color quantification: the drop-shadow-over-tiled-source draw produces a
+// two(TiledTextureEffect,TextureEffect) blend that misses inline (NoMatchingRule). With the
+// decomposition gate on, DropShadow's EnsureSimpleBlendChild materializes the tiled source, the
+// blend collapses to two(TextureEffect,TextureEffect) and hits BlendMerge. Verifies the miss is
+// eliminated AND the result stays pixel-identical. Uses explicit gate off/on on one context and
+// restores the gate default at the end (the test context is shared process-wide).
+TGFX_TEST(AOTL2AuditTest, DropShadowTiledSrcMaterializes) {
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
+
+  int width = 160;
+  int height = 160;
+  Bitmap warmupBitmap = {};
+  uint32_t warmupNoMatch = 0;
+  RenderDropShadowTiledScene(context, cache, image, width, height, false, &warmupBitmap,
+                             &warmupNoMatch);
+
+  Bitmap referenceBitmap = {};
+  uint32_t referenceNoMatch = 0;
+  RenderDropShadowTiledScene(context, cache, image, width, height, false, &referenceBitmap,
+                             &referenceNoMatch);
+  Bitmap candidateBitmap = {};
+  uint32_t candidateNoMatch = 0;
+  RenderDropShadowTiledScene(context, cache, image, width, height, true, &candidateBitmap,
+                             &candidateNoMatch);
+
+  Pixmap referencePixmap(referenceBitmap);
+  Pixmap candidatePixmap(candidateBitmap);
+  AOTToleranceSpec spec = {};
+  spec.maxChannelDiff = 1;
+  spec.maxDiffPixelRatio = 1.0;
+  spec.structuralChannelDiff = 2;
+  auto result = AOTToleranceCompare::Compare(referencePixmap, candidatePixmap, spec);
+  LOGI(
+      "[L2AUDIT] backend=%s shape=DropShadowTiled refNoMatch=%u candNoMatch=%u maxDelta=%d pass=%d",
+      TGFX_BACKEND_NAME, referenceNoMatch, candidateNoMatch, result.maxChannelDiff,
+      result.passed ? 1 : 0);
+
+  cache->setDecompositionEnabled(true);  // restore production default (gate on)
+  cache->unload();
+
+  EXPECT_LT(candidateNoMatch, referenceNoMatch)
+      << "decomposition did not reduce the tiled-in-blend NoMatchingRule fallback";
+  EXPECT_TRUE(result.passed) << "materialized drop-shadow diverges, maxDelta="
                              << result.maxChannelDiff;
 }
 
