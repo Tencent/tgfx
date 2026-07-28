@@ -332,9 +332,43 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
   auto pipeline = gpu->createRenderPipeline(descriptor);
   context->globalCache()->recordRuntimePipelineCreation(pipeline != nullptr);
   if (pipeline == nullptr) {
-    LOGE("PrecompiledProgramCreator: Failed to create render pipeline for %s[vert=%u,frag=%u]",
-         matchResult->shaderName.c_str(), matchResult->vertPermutationIndex,
-         matchResult->fragPermutationIndex);
+    // The same shader variant (identical vert/frag artifact) can create successfully for some draws
+    // and fail for others, so the mismatch must live in the runtime-derived pipeline state rather
+    // than the compiled modules. Dump every state field the descriptor carries so a failing draw
+    // can be diffed against a succeeding one (the backend logs the underlying error separately).
+    std::ostringstream diag;
+    diag << "PrecompiledProgramCreator: Failed to create render pipeline for "
+         << matchResult->shaderName << "[vert=" << matchResult->vertPermutationIndex
+         << ",frag=" << matchResult->fragPermutationIndex << "]";
+    if (!descriptor.fragment.colorAttachments.empty()) {
+      const auto& color = descriptor.fragment.colorAttachments[0];
+      diag << " colorFormat=" << static_cast<int>(color.format)
+           << " blendEnable=" << (color.blendEnable ? 1 : 0) << " blend=("
+           << static_cast<int>(color.srcColorBlendFactor) << ","
+           << static_cast<int>(color.dstColorBlendFactor) << ",op"
+           << static_cast<int>(color.colorBlendOp) << " / "
+           << static_cast<int>(color.srcAlphaBlendFactor) << ","
+           << static_cast<int>(color.dstAlphaBlendFactor) << ",op"
+           << static_cast<int>(color.alphaBlendOp) << ") writeMask=0x" << std::hex
+           << color.colorWriteMask << std::dec;
+    }
+    diag << " sampleCount=" << descriptor.multisample.count
+         << " depthStencilFormat=" << static_cast<int>(descriptor.depthStencil.format)
+         << " depthCompare=" << static_cast<int>(descriptor.depthStencil.depthCompare)
+         << " depthWrite=" << (descriptor.depthStencil.depthWriteEnabled ? 1 : 0)
+         << " uniformBlocks=" << descriptor.layout.uniformBlocks.size()
+         << " samplers=" << descriptor.layout.textureSamplers.size()
+         << " vertexBuffers=" << descriptor.vertex.bufferLayouts.size();
+    for (size_t i = 0; i < descriptor.vertex.bufferLayouts.size(); ++i) {
+      const auto& layout = descriptor.vertex.bufferLayouts[i];
+      diag << " buffer" << i << "(step=" << static_cast<int>(layout.stepMode)
+           << ",stride=" << layout.stride << ",attrs=";
+      for (const auto& attr : layout.attributes) {
+        diag << attr.name() << ":" << static_cast<int>(attr.format()) << " ";
+      }
+      diag << ")";
+    }
+    LOGE("%s", diag.str().c_str());
 
     cache->recordFailure(PrecompiledFallbackReason::PipelineCreationFailed,
                          MakeFallbackRecord(cache, programInfo, &*matchResult));
