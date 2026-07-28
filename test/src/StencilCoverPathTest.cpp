@@ -1863,6 +1863,58 @@ TGFX_TEST(StencilCoverPathTest, Dispatch_StencilConfinedByCoverBoundsWithoutClip
       << "Op B inverse fill inside op A's half but outside op A's bbox must be red";
 }
 
+// Builds a convex pentagon centred at (centerX, centerY) inside a 20x20 box.
+static Path BuildCellPentagon(int centerX, int centerY) {
+  static constexpr int OFFSETS[5][2] = {
+      {0, -10}, {9, -4}, {6, 8}, {-6, 8}, {-9, -4},
+  };
+  Path path;
+  path.moveTo(static_cast<float>(centerX + OFFSETS[0][0]),
+              static_cast<float>(centerY + OFFSETS[0][1]));
+  for (int index = 1; index < 5; ++index) {
+    path.lineTo(static_cast<float>(centerX + OFFSETS[index][0]),
+                static_cast<float>(centerY + OFFSETS[index][1]));
+  }
+  path.close();
+  return path;
+}
+
+// Draws a 3x3 pentagon grid with one render pass per draw, then clears the surface and
+// redraws the centre pentagon with EvenOdd. Any stencil residue left between passes sharing
+// one depth/stencil attachment hollows out the redrawn pentagon.
+TGFX_TEST(StencilCoverPathTest, Dispatch_StencilReuseAcrossPasses) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  ScopedStencilCoverCaps capsGuard(context, true);
+  constexpr int Size = 100;
+  constexpr int Grid = 3;
+  constexpr int Cell = 28;
+  constexpr int Margin = 8;
+  auto surface = Surface::Make(context, Size, Size);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+  Paint paint;
+  paint.setAntiAlias(false);
+  paint.setColor(Color{1.f, 0.f, 0.f, 1.f});
+  for (int index = 0; index < Grid * Grid; ++index) {
+    auto path = BuildCellPentagon(Margin + (index % Grid) * Cell + Cell / 2,
+                                  Margin + (index / Grid) * Cell + Cell / 2);
+    path.setFillType(index % 2 == 0 ? PathFillType::Winding : PathFillType::EvenOdd);
+    canvas->drawPath(path, paint);
+    context->flushAndSubmit();
+  }
+  EXPECT_TRUE(Baseline::Compare(surface, "StencilCoverPath/ReuseOverpasses"));
+
+  canvas->clear();
+  auto referee = BuildCellPentagon(Size / 2, Size / 2);
+  referee.setFillType(PathFillType::EvenOdd);
+  canvas->drawPath(referee, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "StencilCoverPath/ReuseOverpasses_Redraw"));
+}
+
 }  // namespace tgfx
 
 #endif  // TGFX_ENABLE_STENCIL_COVER_PATH
