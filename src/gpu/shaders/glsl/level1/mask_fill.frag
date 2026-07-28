@@ -18,6 +18,7 @@
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Color;
+  int OutputAlphaSwizzle;
 #include "xp_uniforms.inc"
 };
 
@@ -39,4 +40,5 @@ void main() {
 #define TGFX_XP_SRC_UNPREMUL Color
 #define TGFX_XP_COVERAGE vec4(maskCoverage)
 #include "xp_output.inc"
+#include "output_swizzle.inc"
 }

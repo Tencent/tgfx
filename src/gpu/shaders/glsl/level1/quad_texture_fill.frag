@@ -60,6 +60,7 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   // so folding them into uniform branches shrinks the variant count.
   int AlphaOnly;
   int HasRgbaaa;
+  int OutputAlphaSwizzle;
 };
 
 layout(location = 0) in vec3 TransformedCoords_0;
@@ -158,4 +159,5 @@ void main() {
   fragColor = color;
   #endif
 #endif
+#include "output_swizzle.inc"
 }

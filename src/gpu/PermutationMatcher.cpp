@@ -1623,9 +1623,24 @@ static std::optional<PermutationMatchResult> TryMatchPerlin(const ProgramInfo* p
 }
 
 static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramInfo* programInfo) {
-  // Precompiled shaders assume RGBA output. Non-RGBA render targets (e.g. ALPHA_8) require an
-  // output swizzle that the precompiled shader does not include. Fall back to ProgramBuilder.
-  if (programInfo->getOutputSwizzle() != Swizzle::RGBA()) {
+  // Only RGBA and alpha-only (AAAA, Swizzle::ForWrite(ALPHA_8)) render targets are supported. Any
+  // other write swizzle would need a mapping the precompiled shaders do not implement.
+  auto outputSwizzle = programInfo->getOutputSwizzle();
+  if (outputSwizzle != Swizzle::RGBA() && outputSwizzle != Swizzle::AAAA()) {
+    return std::nullopt;
+  }
+  if (outputSwizzle == Swizzle::AAAA()) {
+    // Alpha-only targets: only the fill kernels that apply the write swizzle at output (via the
+    // OutputAlphaSwizzle uniform) may serve the draw. Other kernels assume RGBA output.
+    if (auto result = TryMatchSolidColorFill(programInfo)) {
+      return result;
+    }
+    if (auto result = TryMatchMaskFill(programInfo)) {
+      return result;
+    }
+    if (auto result = TryMatchQuadTextureFill(programInfo)) {
+      return result;
+    }
     return std::nullopt;
   }
   if (auto result = TryMatchTextureFill(programInfo)) {
@@ -1725,7 +1740,8 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
 
 std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* programInfo,
                                                        PermutationMatchFailure* failure) {
-  if (programInfo->getOutputSwizzle() != Swizzle::RGBA()) {
+  auto outputSwizzle = programInfo->getOutputSwizzle();
+  if (outputSwizzle != Swizzle::RGBA() && outputSwizzle != Swizzle::AAAA()) {
     if (failure != nullptr) {
       *failure = PermutationMatchFailure::UnsupportedOutputSwizzle;
     }

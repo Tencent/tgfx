@@ -311,6 +311,14 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
   if (vertexUniformData != nullptr) {
     vertexUniformData->setData(RTAdjustName, array);
   }
+  if (fragmentUniformData != nullptr) {
+    // Precompiled fill kernels apply the render-target write swizzle at output via this uniform.
+    // Only the alpha-only (AAAA) case is non-identity; RGBA targets leave it 0 (no-op). The
+    // runtime-generated shader bakes the swizzle into code and does not declare it, so set it
+    // optionally. Set in the base (unmangled) context, like RTAdjust.
+    int outputAlphaSwizzle = getOutputSwizzle() == Swizzle::AAAA() ? 1 : 0;
+    fragmentUniformData->setDataOptional("OutputAlphaSwizzle", outputAlphaSwizzle);
+  }
   updateUniformDataSuffix(vertexUniformData, fragmentUniformData, geometryProcessor);
 
   FragmentProcessor::CoordTransformIter coordTransformIter(this);

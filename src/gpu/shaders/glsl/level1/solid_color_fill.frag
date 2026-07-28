@@ -18,6 +18,7 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec2 DstTextureCoordScale;
   int XPBlendMode;
 #endif
+  int OutputAlphaSwizzle;
 };
 
 #if HAS_COVERAGE
@@ -46,4 +47,5 @@ void main() {
   fragColor = outputColor;
   #endif
 #endif
+#include "output_swizzle.inc"
 }
