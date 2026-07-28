@@ -22,6 +22,9 @@
 
 namespace tgfx {
 void StandardDrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
+  if (!onPrepare()) {
+    return;
+  }
   if (!bindStandardPipeline(renderPass, renderTarget)) {
     return;
   }
