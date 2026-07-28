@@ -22,7 +22,6 @@
 #include "gpu/BackingFit.h"
 #include "gpu/resources/RenderTarget.h"
 #include "tgfx/core/Matrix.h"
-#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
 class DepthStencilTextureView;
