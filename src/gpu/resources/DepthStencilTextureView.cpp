@@ -24,10 +24,10 @@
 namespace tgfx {
 
 static UniqueKey ComputeDepthStencilUniqueKey(int width, int height, int sampleCount) {
-  static const UniqueKey domain = UniqueKey::Make();
+  static const UniqueKey DepthStencilDomain = UniqueKey::Make();
   uint32_t data[] = {static_cast<uint32_t>(width), static_cast<uint32_t>(height),
                      static_cast<uint32_t>(sampleCount)};
-  return UniqueKey::Append(domain, data, 3);
+  return UniqueKey::Append(DepthStencilDomain, data, 3);
 }
 
 size_t DepthStencilTextureView::memoryUsage() const {
