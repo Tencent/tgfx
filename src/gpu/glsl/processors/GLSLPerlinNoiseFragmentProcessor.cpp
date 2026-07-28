@@ -231,10 +231,20 @@ void GLSLPerlinNoiseFragmentProcessor::onSetData(UniformData* /*vertexUniformDat
   float baseFreq[2] = {paintingData->baseFrequencyX, paintingData->baseFrequencyY};
   fragmentUniformData->setData("baseFrequency", baseFreq);
 
+  // stitchData is declared unconditionally by the precompiled shader but only when stitchTiles is
+  // set by the runtime-generated shader, so feed it optionally (zero when not stitching).
+  float stitchDataValues[2] = {0.0f, 0.0f};
   if (stitchTiles) {
-    float stitchDataValues[2] = {static_cast<float>(paintingData->stitchWidth),
-                                 static_cast<float>(paintingData->stitchHeight)};
-    fragmentUniformData->setData("stitchData", stitchDataValues);
+    stitchDataValues[0] = static_cast<float>(paintingData->stitchWidth);
+    stitchDataValues[1] = static_cast<float>(paintingData->stitchHeight);
   }
+  fragmentUniformData->setDataOptional("stitchData", stitchDataValues);
+
+  // The precompiled PerlinNoiseFillShader folds noiseType / numOctaves / stitchTiles into these runtime
+  // uniforms; the runtime-generated shader bakes them into code and does not declare them, so set
+  // them optionally.
+  fragmentUniformData->setDataOptional("NoiseType", static_cast<int>(noiseType));
+  fragmentUniformData->setDataOptional("NumOctaves", numOctaves);
+  fragmentUniformData->setDataOptional("StitchTiles", stitchTiles ? 1 : 0);
 }
 }  // namespace tgfx

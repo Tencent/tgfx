@@ -276,8 +276,8 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
-  EXPECT_EQ(cache->vertexEntryCount(), 114u);
-  EXPECT_EQ(cache->fragmentEntryCount(), 507u);
+  EXPECT_EQ(cache->vertexEntryCount(), 118u);
+  EXPECT_EQ(cache->fragmentEntryCount(), 513u);
   std::string expectedTag = TGFX_BACKEND_NAME;
   auto dashPos = expectedTag.find('-');
   if (dashPos != std::string::npos) {

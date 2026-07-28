@@ -68,6 +68,7 @@
 #include "gpu/shaders/level1/MaskFillShader.h"
 #include "gpu/shaders/level1/MeshFillShader.h"
 #include "gpu/shaders/level1/NonAARRectFillShader.h"
+#include "gpu/shaders/level1/PerlinNoiseFillShader.h"
 #include "gpu/shaders/level1/QuadColorFillShader.h"
 #include "gpu/shaders/level1/QuadTextureFillShader.h"
 #include "gpu/shaders/level1/RoundStrokeRectFillShader.h"
@@ -1575,6 +1576,52 @@ static std::optional<PermutationMatchResult> TryMatchMeshFill(const ProgramInfo*
   return PermutationMatchResult{"MeshFillShader", vertIndex, fragIndex};
 }
 
+static std::optional<PermutationMatchResult> TryMatchPerlin(const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  int gpType = 0;
+  int hasCoverage = 0;
+  if (gp->name() == "DefaultGeometryProcessor") {
+    gpType = 0;
+    hasCoverage =
+        static_cast<const DefaultGeometryProcessor*>(gp)->getAAType() == AAType::Coverage ? 1 : 0;
+  } else if (gp->name() == "QuadPerEdgeAAGeometryProcessor") {
+    auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
+    // The precompiled vert derives the noise coordinate from aPosition via CoordTransformMatrix_0,
+    // so reject quads carrying color/uvCoord/subset attributes (same constraint as the textured
+    // matchers). Per-vertex AA coverage is supported via HAS_COVERAGE.
+    if (!quadGP->hasCommonColor() || !quadGP->hasUVMatrix() || quadGP->getHasSubset()) {
+      return std::nullopt;
+    }
+    gpType = 1;
+    hasCoverage = quadGP->getAAType() == AAType::Coverage ? 1 : 0;
+  } else {
+    return std::nullopt;
+  }
+  // A single PerlinNoiseFragmentProcessor as the only color processor. noiseType / numOctaves /
+  // stitchTiles are runtime uniforms in the precompiled shader, so they are not structural axes.
+  if (programInfo->numFragmentProcessors() != 1 || programInfo->numColorFragmentProcessors() != 1) {
+    return std::nullopt;
+  }
+  if (programInfo->getFragmentProcessor(0)->name() != "PerlinNoiseFragmentProcessor") {
+    return std::nullopt;
+  }
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
+    return std::nullopt;
+  }
+  using VD = PerlinNoiseFillShader::VD;
+  std::vector<int> vertValues(VD::COUNT, 0);
+  vertValues[VD::GP_TYPE] = gpType;
+  vertValues[VD::HAS_COVERAGE] = hasCoverage;
+  auto vertIndex = VD::domain().encode(vertValues);
+  using D = PerlinNoiseFillShader::D;
+  std::vector<int> fragValues(D::COUNT, 0);
+  fragValues[D::HAS_XP] = xpType;
+  fragValues[D::HAS_COVERAGE] = hasCoverage;
+  auto fragIndex = D::domain().encode(fragValues);
+  return PermutationMatchResult{"PerlinNoiseFillShader", vertIndex, fragIndex};
+}
+
 static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramInfo* programInfo) {
   // Precompiled shaders assume RGBA output. Non-RGBA render targets (e.g. ALPHA_8) require an
   // output swizzle that the precompiled shader does not include. Fall back to ProgramBuilder.
@@ -1621,6 +1668,10 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
     return result;
   }
   if (auto result = TryMatchComposedTexture(programInfo)) {
+    return result;
+  }
+
+  if (auto result = TryMatchPerlin(programInfo)) {
     return result;
   }
 
