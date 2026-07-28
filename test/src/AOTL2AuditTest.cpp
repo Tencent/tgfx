@@ -31,9 +31,14 @@
 
 #include <string>
 #include "base/TGFXTest.h"
+#include "core/utils/BlockAllocator.h"
 #include "core/utils/Log.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/PrecompiledShaderCache.h"
+#include "gpu/ProxyProvider.h"
+#include "gpu/SamplingArgs.h"
+#include "gpu/processors/FragmentProcessor.h"
+#include "gpu/processors/TextureEffect.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Canvas.h"
@@ -47,6 +52,7 @@
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Context.h"
+#include "tgfx/gpu/PixelFormat.h"
 #include "utils/AOTToleranceCompare.h"
 #include "utils/TestUtils.h"
 
@@ -326,6 +332,147 @@ TGFX_TEST(AOTL2AuditTest, DropShadowTiledSrcMaterializes) {
       << "decomposition did not reduce the tiled-in-blend NoMatchingRule fallback";
   EXPECT_TRUE(result.passed) << "materialized drop-shadow diverges, maxDelta="
                              << result.maxChannelDiff;
+}
+
+// Minimal reproduction of the coverage-path tiled-in-blend class: a plain image color (TextureEffect)
+// with a REPEAT-tiled image shader used as a mask filter. ShaderMaskFilter wraps the mask shader via
+// MulInputByChildAlpha -> XfermodeFragmentProcessor-dst, so the coverage FP becomes
+// CoverageFP=[Xfermode-dst(TiledTextureEffect)] — the exact structure of the 44 remaining misses
+// (LayerMask/BackgroundBlur). These are produced by the clip/coverage path (addCoverageFP) and never
+// pass through the color-blend materialization hook, and ClassifyCoverageFP does not accept an
+// Xfermode-dst(...) coverage, so they miss even with the decomposition gate on. This test documents
+// that gap (it will become a bit-exact materialization guard once coverage materialization lands).
+TGFX_TEST(AOTL2AuditTest, CoverageTiledMaskCurrentlyMisses) {
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
+
+  int width = 160;
+  int height = 160;
+  cache->setDecompositionEnabled(true);
+  cache->resetStats();
+  context->globalCache()->clearPrograms();
+  auto surface = Surface::Make(context, width, height);
+  ASSERT_TRUE(surface != nullptr);
+  Paint paint = {};
+  paint.setShader(Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp));
+  auto maskShader = Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Repeat);
+  paint.setMaskFilter(MaskFilter::MakeShader(maskShader));
+  surface->getCanvas()->drawRect(Rect::MakeWH(width, height), paint);
+  context->flushAndSubmit(true);
+  uint32_t noMatch = cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule);
+  LOGI("[L2COV] backend=%s shape=CoverageTiledMask noMatch=%u", TGFX_BACKEND_NAME, noMatch);
+
+  cache->setDecompositionEnabled(true);
+  cache->unload();
+
+  // Documents the current gap: coverage-path tiled masks are not materialized and still miss.
+  EXPECT_GT(noMatch, 0u) << "expected coverage Xfermode-dst(Tiled) to miss (not yet materialized)";
+}
+
+// Walks a fragment-processor tree in the same pre-order the GP uses when it assigns coordTransform
+// indices, logging each node. Accumulates, via *coordCursor, the running global coordTransform index
+// (shared across the color and coverage forests exactly as ProgramInfo's CoordTransformIter does),
+// counts how many TextureEffect leaves declare a Subset uniform, and records the global index of the
+// coverage tiled texture's transform when isCoverage is set.
+static void WalkCoverageStructure(const FragmentProcessor* root, const char* label,
+                                  int* coordCursor, int* subsetCount, bool isCoverage,
+                                  int* tiledCoordIndex, int* textureEffectCount) {
+  FragmentProcessor::Iter iter(root);
+  const FragmentProcessor* fp = iter.next();
+  while (fp != nullptr) {
+    LOGI("[L2COVFP] %s fp=%s coordTransforms=%zu samplers=%zu firstCoordIndex=%d", label,
+         fp->name().c_str(), fp->numCoordTransforms(), fp->numTextureSamplers(), *coordCursor);
+    if (fp->name() == "TextureEffect") {
+      (*textureEffectCount)++;
+      auto* te = static_cast<const TextureEffect*>(fp);
+      if (te->hasSubset()) {
+        (*subsetCount)++;
+      }
+      if (isCoverage && fp->numCoordTransforms() > 0 && *tiledCoordIndex < 0) {
+        *tiledCoordIndex = *coordCursor;
+      }
+    }
+    *coordCursor += static_cast<int>(fp->numCoordTransforms());
+    fp = iter.next();
+  }
+}
+
+// Structural verification for the "coverage local-texture-mask" (type=3) feasibility question. The
+// remaining coverage misses are color=TextureEffect with coverage=Xfermode-dst(TiledTextureEffect).
+// Serving them through a shared QuadTextureFill-style uniform block requires the coverage texture's
+// uniforms to coexist with the color texture's. This test builds the EXACT color + coverage FP
+// forest the render path produces and inspects it to answer two questions with measured data rather
+// than assumption:
+//   (1) coordTransform indexing: the GP assigns indices per transform in FP-tree order across the
+//       whole forest, so the color texture's transform is index 0 and the coverage texture's is a
+//       later distinct index -> distinct uniform names (CoordTransformMatrix_0 / _N). Coordinate
+//       binding is therefore NOT the blocker.
+//   (2) Subset uniform: GLSLTextureEffect emits a base-named "Subset" uniform when hasSubset() is
+//       true, and the precompiled binding mode strips the per-processor suffix (skipSuffix), so two
+//       Subset-carrying textures would write the same slot -> collision. The test reports how many
+//       of the two textures declare a Subset so the collision risk is measured.
+TGFX_TEST(AOTL2AuditTest, CoverageTiledMaskFPStructure) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  BlockAllocator allocator;
+
+  // Reconstruct the exact processor forest the render path builds for the remaining coverage misses:
+  //   color    = TextureEffect (the image being drawn)
+  //   coverage = MulInputByChildAlpha(TextureEffect) == XfermodeFragmentProcessor-dst wrapping the
+  //              mask image, which is precisely what ShaderMaskFilter::asFragmentProcessor produces.
+  // The two textures are intentionally different sizes: if a shared QuadTextureFill-style uniform
+  // block declared a single "Subset" slot, both TextureEffects would write it (GLSLTextureEffect
+  // sets Subset whenever the field exists, using full texture bounds), and the two differing bounds
+  // would alias under skipSuffix. Distinct sizes make that aliasing concrete.
+  auto colorProxy =
+      context->proxyProvider()->createTextureProxy({}, 16, 16, PixelFormat::RGBA_8888);
+  auto maskProxy = context->proxyProvider()->createTextureProxy({}, 8, 8, PixelFormat::ALPHA_8);
+  ASSERT_TRUE(colorProxy != nullptr && colorProxy->getTextureView() != nullptr);
+  ASSERT_TRUE(maskProxy != nullptr && maskProxy->getTextureView() != nullptr);
+
+  SamplingArgs colorSampling(TileMode::Clamp, TileMode::Clamp, {}, SrcRectConstraint::Fast);
+  SamplingArgs maskSampling(TileMode::Decal, TileMode::Decal, {}, SrcRectConstraint::Fast);
+  auto colorFP = TextureEffect::Make(&allocator, colorProxy, colorSampling);
+  auto maskTE = TextureEffect::Make(&allocator, maskProxy, maskSampling);
+  ASSERT_TRUE(colorFP != nullptr && maskTE != nullptr);
+  auto coverageFP = FragmentProcessor::MulInputByChildAlpha(&allocator, std::move(maskTE), false);
+  ASSERT_TRUE(coverageFP != nullptr);
+
+  int coordCursor = 0;
+  int colorSubsetCount = 0;
+  int coverageSubsetCount = 0;
+  int coverageTiledCoordIndex = -1;
+  int colorTextureCount = 0;
+  int coverageTextureCount = 0;
+  WalkCoverageStructure(colorFP.get(), "color", &coordCursor, &colorSubsetCount, false,
+                        &coverageTiledCoordIndex, &colorTextureCount);
+  WalkCoverageStructure(coverageFP.get(), "coverage", &coordCursor, &coverageSubsetCount, true,
+                        &coverageTiledCoordIndex, &coverageTextureCount);
+
+  LOGI(
+      "[L2COVFP] backend=%s coverageRoot=%s totalCoordTransforms=%d "
+      "colorSubset=%d coverageSubset=%d coverageTiledCoordIndex=%d",
+      TGFX_BACKEND_NAME, coverageFP->name().c_str(), coordCursor, colorSubsetCount,
+      coverageSubsetCount, coverageTiledCoordIndex);
+
+  // (1) The coverage FP is the Xfermode-dst wrapper documented in CoverageTiledMaskCurrentlyMisses.
+  EXPECT_NE(coverageFP->name().find("Xfermode"), std::string::npos) << coverageFP->name();
+  // (2) Coordinate binding is collision-free: the coverage texture's transform lands at a global
+  // index strictly after the color texture's (index 0), so they map to distinct CoordTransformMatrix
+  // uniforms. A value > 0 proves the coverage transform is separately addressable — coordinate
+  // binding is NOT the type=3 blocker.
+  EXPECT_GT(coverageTiledCoordIndex, 0)
+      << "coverage tiled texture transform must be a distinct (non-zero) global coord index";
+  // Exactly one textured leaf on each side (the color image and the mask image), each with its own
+  // sampler. Both samplers bind by traversal order, so they occupy distinct binding points.
+  EXPECT_EQ(colorTextureCount, 1);
+  EXPECT_EQ(coverageTextureCount, 1);
 }
 
 }  // namespace tgfx
