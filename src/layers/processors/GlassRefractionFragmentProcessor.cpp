@@ -22,60 +22,37 @@
 namespace tgfx {
 
 GlassRefractionFragmentProcessor::GlassRefractionFragmentProcessor(
-    std::shared_ptr<TextureProxy> source, std::shared_ptr<TextureProxy> fineMask,
-    std::shared_ptr<TextureProxy> coarseMask, const GlassRefractionParams& params,
+    std::shared_ptr<TextureProxy> source,
+    PlacementPtr<GlassShapeGeometryFragmentProcessor> geometry, const GlassRefractionParams& params,
     const Matrix& coordMatrix)
-    : FragmentProcessor(ClassID()), sourceProxy(std::move(source)),
-      fineMaskProxy(std::move(fineMask)), coarseMaskProxy(std::move(coarseMask)), params(params),
+    : FragmentProcessor(ClassID()), sourceProxy(std::move(source)), params(params),
       coordTransform(coordMatrix) {
   addCoordTransform(&coordTransform);
+  geometryIndex = registerChildProcessor(std::move(geometry));
 }
 
 void GlassRefractionFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   uint32_t flags = 0;
-  if (fineMaskProxy != nullptr) {
+  if (params.dispersion >= 0.01f) {
     flags |= 1;
   }
-  if (coarseMaskProxy != nullptr) {
+  if (params.lightIntensity > 0.0f) {
     flags |= 2;
   }
-  if (params.dispersion >= 0.01f) {
-    flags |= 4;
-  }
-  if (params.lightIntensity > 0.0f) {
-    flags |= 8;
-  }
-  // Shape type determines the shader code path (SDF vs AlphaMask), so it must be part of
-  // the processor key to avoid sharing cached programs between incompatible shader variants.
-  flags |= (static_cast<uint32_t>(params.shapeType) & 0x3) << 4;
   bytesKey->write(flags);
 }
 
 size_t GlassRefractionFragmentProcessor::onCountTextureSamplers() const {
-  size_t count = 1;
-  if (fineMaskProxy != nullptr) {
-    count++;
-  }
-  if (coarseMaskProxy != nullptr) {
-    count++;
-  }
-  return count;
+  return 1;
 }
 
-std::shared_ptr<Texture> GlassRefractionFragmentProcessor::onTextureAt(size_t index) const {
-  const auto& proxy = (index == 0) ? sourceProxy : (index == 1) ? fineMaskProxy : coarseMaskProxy;
-  if (proxy == nullptr) {
-    return nullptr;
-  }
-  auto textureView = proxy->getTextureView();
+std::shared_ptr<Texture> GlassRefractionFragmentProcessor::onTextureAt(size_t) const {
+  auto textureView = sourceProxy->getTextureView();
   return textureView == nullptr ? nullptr : textureView->getTexture();
 }
 
-SamplerState GlassRefractionFragmentProcessor::onSamplerStateAt(size_t index) const {
-  if (index == 0) {
-    return SamplerState(TileMode::Clamp, TileMode::Clamp);
-  }
-  return SamplerState(TileMode::Decal, TileMode::Decal);
+SamplerState GlassRefractionFragmentProcessor::onSamplerStateAt(size_t) const {
+  return SamplerState(TileMode::Clamp, TileMode::Clamp);
 }
 
 }  // namespace tgfx

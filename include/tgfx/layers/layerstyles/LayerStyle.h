@@ -50,7 +50,11 @@ enum class LayerStyleExtraSourceType : uint32_t {
   /**
    * The layerStyle requires the background content.
    */
-  Background = 1 << 1
+  Background = 1 << 1,
+  /**
+   * The layerStyle requires the optional vector shape of the layer content without a contour image.
+   */
+  Shape = 1 << 2
 };
 
 enum class LayerStyleType {
@@ -114,13 +118,13 @@ class LayerStyle : public LayerProperty {
   virtual Rect filterBounds(const Rect& srcRect, float contentScale) = 0;
 
   /**
-   * Returns the bounds of the background content after applying the layer style.
+   * Returns the union of the soft and sharp background bounds required by this layer style.
    * @param srcRect The scaled bounds of the background content.
    * @param contentScale The scale factor of the background bounds relative to its original size.
    * Some layerStyles have size-related parameters that must be adjusted with this scale factor.
-   * @return The bounds of the background content.
+   * @return The complete bounds of the background content required by this style.
    */
-  virtual Rect filterBackground(const Rect& srcRect, float contentScale);
+  Rect filterBackground(const Rect& srcRect, float contentScale);
 
   /**
    * Whether to exclude child effects when generating the source images for this layer style.
@@ -156,11 +160,25 @@ class LayerStyle : public LayerProperty {
   }
 
  protected:
+  /**
+   * Returns resolution-insensitive background bounds that may be represented by downsampling.
+   * The default implementation returns srcRect without expansion.
+   */
+  virtual Rect filterBackgroundSoft(const Rect& srcRect, float contentScale);
+
+  /**
+   * Returns background bounds that require full-resolution sampling.
+   * The default implementation returns srcRect without expansion.
+   */
+  virtual Rect filterBackgroundSharp(const Rect& srcRect, float contentScale);
+
   virtual void onDraw(Canvas* canvas, const LayerStyleInput& input, float alpha,
                       BlendMode blendMode) = 0;
 
  private:
   BlendMode _blendMode = BlendMode::SrcOver;
   bool _excludeChildEffects = false;
+
+  friend class Layer;
 };
 }  // namespace tgfx

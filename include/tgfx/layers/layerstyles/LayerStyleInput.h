@@ -41,9 +41,13 @@ class StyleInputSource {
      */
     Background,
     /**
-     * The layer contour with optional vector shape information.
+     * The rasterized layer contour.
      */
-    Contour
+    Contour,
+    /**
+     * The optional vector shape of the layer content.
+     */
+    Shape
   };
 
   StyleInputSource(std::shared_ptr<Image> image, Point imageOffset)
@@ -71,38 +75,50 @@ class StyleInputSource {
     return _imageOffset;
   }
 
+  /**
+   * Returns the optional vector shape carried by a Shape source. Other source types return nullopt.
+   */
+  const std::optional<StyledShape>& shape() const {
+    return _shape;
+  }
+
  protected:
-  StyleInputSource(Type type, std::shared_ptr<Image> image, Point imageOffset)
-      : _type(type), _image(std::move(image)), _imageOffset(imageOffset) {
+  StyleInputSource(Type type, std::shared_ptr<Image> image, Point imageOffset,
+                   std::optional<StyledShape> shape = std::nullopt)
+      : _type(type), _image(std::move(image)), _imageOffset(imageOffset), _shape(std::move(shape)) {
   }
 
  private:
   Type _type = Type::Background;
   std::shared_ptr<Image> _image;
   Point _imageOffset = {};
+  std::optional<StyledShape> _shape = std::nullopt;
 };
 
 /**
- * Contour input source with additional vector shape information.
+ * Rasterized contour input source.
  */
 class ContourInputSource : public StyleInputSource {
  public:
-  ContourInputSource(std::shared_ptr<Image> image, Point imageOffset,
-                     std::optional<StyledShape> shape = std::nullopt)
-      : StyleInputSource(Type::Contour, std::move(image), imageOffset), _shape(std::move(shape)) {
-  }
-
   /**
-   * Returns the optional content shape of the layer. It is the layer's vector shape (e.g. Rect,
-   * Oval, or RRect with fill/stroke info) when extractable; otherwise it is std::nullopt and no
-   * fallback rect is substituted.
+   * Creates a contour source with its image and offset relative to the content image.
    */
-  const std::optional<StyledShape>& shape() const {
-    return _shape;
+  ContourInputSource(std::shared_ptr<Image> image, Point imageOffset)
+      : StyleInputSource(Type::Contour, std::move(image), imageOffset) {
   }
+};
 
- private:
-  std::optional<StyledShape> _shape = std::nullopt;
+/**
+ * Optional vector shape input source. The source does not carry a rasterized image.
+ */
+class ShapeInputSource : public StyleInputSource {
+ public:
+  /**
+   * Creates a shape source. A nullopt shape means the layer has no extractable vector shape.
+   */
+  explicit ShapeInputSource(std::optional<StyledShape> shape)
+      : StyleInputSource(Type::Shape, nullptr, {}, std::move(shape)) {
+  }
 };
 
 /**

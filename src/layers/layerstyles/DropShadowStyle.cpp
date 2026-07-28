@@ -108,9 +108,14 @@ Rect DropShadowStyle::filterBounds(const Rect& srcRect, float contentScale) {
 }
 
 uint32_t DropShadowStyle::extraSourceType() const {
-  auto type = (!_showBehindLayer || !FloatNearlyZero(_spread)) ? LayerStyleExtraSourceType::Contour
-                                                               : LayerStyleExtraSourceType::None;
-  return static_cast<uint32_t>(type);
+  uint32_t sourceFlags = static_cast<uint32_t>(LayerStyleExtraSourceType::None);
+  if (!_showBehindLayer) {
+    sourceFlags |= static_cast<uint32_t>(LayerStyleExtraSourceType::Contour);
+  }
+  if (!FloatNearlyZero(_spread)) {
+    sourceFlags |= static_cast<uint32_t>(LayerStyleExtraSourceType::Shape);
+  }
+  return sourceFlags;
 }
 
 void DropShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alpha,

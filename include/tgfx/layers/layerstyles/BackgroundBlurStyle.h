@@ -80,8 +80,6 @@ class BackgroundBlurStyle : public LayerStyle {
     return srcRect;
   }
 
-  Rect filterBackground(const Rect& srcRect, float contentScale) override;
-
   uint32_t extraSourceType() const override {
     auto type = (_blurrinessX > 0 || _blurrinessY > 0) ? LayerStyleExtraSourceType::Background
                                                        : LayerStyleExtraSourceType::None;
@@ -89,6 +87,8 @@ class BackgroundBlurStyle : public LayerStyle {
   }
 
  protected:
+  Rect filterBackgroundSoft(const Rect& srcRect, float contentScale) override;
+
   void onDraw(Canvas* canvas, const LayerStyleInput& input, float alpha,
               BlendMode blendMode) override;
 

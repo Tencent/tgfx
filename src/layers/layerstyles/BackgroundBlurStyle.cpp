@@ -51,7 +51,7 @@ void BackgroundBlurStyle::setTileMode(TileMode tileMode) {
   invalidateTransform();
 }
 
-Rect BackgroundBlurStyle::filterBackground(const Rect& srcRect, float contentScale) {
+Rect BackgroundBlurStyle::filterBackgroundSoft(const Rect& srcRect, float contentScale) {
   auto filter = getBackgroundFilter(contentScale);
   if (!filter) {
     return srcRect;

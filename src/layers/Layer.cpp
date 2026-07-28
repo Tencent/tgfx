@@ -1776,15 +1776,18 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
     return nullptr;
   }
 
-  // Collect which excludeChildEffects values need content and/or contour.
+  // Collect which excludeChildEffects values need content and/or a rasterized contour.
   bool needContent[2] = {false, false};
   bool needContour[2] = {false, false};
+  bool needShape = false;
   for (const auto& layerStyle : _layerStyles) {
     auto index = static_cast<int>(layerStyle->excludeChildEffects());
     needContent[index] = true;
-    if (HasExtraSource(layerStyle->extraSourceType(), LayerStyleExtraSourceType::Contour)) {
+    auto sourceFlags = layerStyle->extraSourceType();
+    if (HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Contour)) {
       needContour[index] = true;
     }
+    needShape = needShape || HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Shape);
   }
 
   auto source = std::make_unique<LayerStyleSource>();
@@ -1833,13 +1836,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
     source->groups[i] = std::move(group);
   }
 
-  if (needContour[0] || needContour[1]) {
-    // TODO: The contour shape should have the same semantics as the contour image,
-    // covering the entire subtree content. Contour should be encapsulated as a composite
-    // class that records Picture data containing draw instructions, with a new interface
-    // to parse Shape from the Picture data. This ensures the Image and Shape inside
-    // Contour have consistent semantics. The layer's clip region should also be stored
-    // within Contour.
+  if (needShape) {
     source->contentShape = getContentShape();
   }
 
@@ -1946,14 +1943,16 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
   styleInput.content = contentEntry.image;
   styleInput.contentOffset = contentEntry.offset;
   styleInput.contentScale = source->contentScale;
-  if (HasExtraSource(layerStyle->extraSourceType(), LayerStyleExtraSourceType::Contour)) {
+  auto sourceFlags = layerStyle->extraSourceType();
+  if (HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Contour)) {
     auto contourImage = group->contour.has_value() ? group->contour->image : nullptr;
     auto contourOffset =
         contourImage ? group->contour->offset - contentEntry.offset : Point::Zero();
-    // contour shape may be nullopt when the layer has no simple vector content (e.g. a group
-    // layer with only children).
-    styleInput.extraSources.emplace_back(std::make_shared<ContourInputSource>(
-        std::move(contourImage), contourOffset, source->contentShape));
+    styleInput.extraSources.emplace_back(
+        std::make_shared<ContourInputSource>(std::move(contourImage), contourOffset));
+  }
+  if (HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Shape)) {
+    styleInput.extraSources.emplace_back(std::make_shared<ShapeInputSource>(source->contentShape));
   }
   layerStyle->draw(canvas, styleInput, alpha);
 }
@@ -2112,46 +2111,31 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     }
   }
   auto backOutset = 0.f;
-  // maxBackgroundOutset and minBackgroundOutset serve different purposes:
-  // - maxBackgroundOutset: determines how far the background capture surface must extend so that
-  //   all background styles can sample beyond layer bounds. All background styles contribute,
-  //   including GlassStyle (refraction displacement needs background pixels outside content).
-  // - minBackgroundOutset: determines whether the shared background surface may be down-sampled.
-  //   Only blur-based styles (e.g. BackgroundBlurStyle) should contribute, because their outset
-  //   is a compressible blur radius. GlassStyle's filterBackground outset is dirty-region
-  //   influence range (refraction displacement), not a blur radius — reducing background
-  //   resolution would degrade refraction sampling without any blur benefit.
+  // maxBackgroundOutset includes every background dependency, while minBackgroundOutset only
+  // includes resolution-insensitive effects such as blur. Each LayerStyle classifies its own
+  // background bounds as soft or sharp so this aggregation does not depend on concrete types.
   auto downsampleOutset = 0.f;
-  auto hasNonDownsampleableStyle = false;
   if (!renderBounds.isEmpty()) {
     for (auto& style : _layerStyles) {
       DEBUG_ASSERT(style != nullptr);
       if (!HasExtraSource(style->extraSourceType(), LayerStyleExtraSourceType::Background)) {
         continue;
       }
-      auto outset = style->filterBackground(Rect::MakeEmpty(), contentScale);
-      backOutset = std::max(backOutset, outset.right);
-      backOutset = std::max(backOutset, outset.bottom);
-      // Blacklist: GlassStyle's filterBackground outset is dirty-region influence range
-      // (refraction displacement), not a compressible blur radius. If a future background style
-      // has the same property, add its LayerStyleType here.
-      if (style->Type() == LayerStyleType::Glass) {
-        hasNonDownsampleableStyle = true;
-      } else {
-        downsampleOutset = std::max(downsampleOutset, outset.right);
-        downsampleOutset = std::max(downsampleOutset, outset.bottom);
-      }
+      auto bounds = style->filterBackground(Rect::MakeEmpty(), contentScale);
+      backOutset = std::max({backOutset, bounds.right, bounds.bottom});
+      auto softBounds = style->filterBackgroundSoft(Rect::MakeEmpty(), contentScale);
+      downsampleOutset = std::max({downsampleOutset, softBounds.right, softBounds.bottom});
     }
     // When a layer has both background styles and filters, the outer filter needs to sample
-    // beyond the background content area. Expand the background outset to include the filter's
-    // sampling range. Use Reverse direction to calculate required input bounds.
+    // beyond the background content area. Expand both ranges only when a soft background effect
+    // already permits downsampling; filter bounds alone do not imply a low-pass effect.
     if (backOutset > 0 && !_filters.empty()) {
       auto baseBounds = mapOutputBoundsToInput(Rect::MakeEmpty(), contentScale);
       if (!baseBounds.isEmpty()) {
         auto maxOutset =
             std::max({-baseBounds.left, -baseBounds.top, baseBounds.right, baseBounds.bottom});
         backOutset += maxOutset;
-        if (!hasNonDownsampleableStyle) {
+        if (downsampleOutset > 0) {
           downsampleOutset += maxOutset;
         }
       }
@@ -2159,8 +2143,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   }
   if (backOutset > 0) {
     maxBackgroundOutset = std::max(backOutset, maxBackgroundOutset);
-    auto layerDownsampleOutset = hasNonDownsampleableStyle ? 0.f : downsampleOutset;
-    minBackgroundOutset = std::min(layerDownsampleOutset, minBackgroundOutset);
+    minBackgroundOutset = std::min(downsampleOutset, minBackgroundOutset);
     updateBackgroundBounds(contentScale, backgroundSourceRects);
   }
   if (bitFields.blendMode != static_cast<uint8_t>(BlendMode::SrcOver) ||

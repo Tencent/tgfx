@@ -93,17 +93,16 @@ struct GlassShapeInfo {
   RRect shapeRRect = {};
 };
 
-// Detects whether the layer's contour shape is a regular shape (RoundedRect or Ellipse)
+// Detects whether the layer's vector shape is a regular shape (RoundedRect or Ellipse)
 // that can use the analytical SDF path. Only Fill-type shapes are supported; Stroke and
 // FillStroke produce a different rendered outline than the fill path, so SDF would mismatch.
 static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
   GlassShapeInfo info;
-  auto source = input.findExtraSource(StyleInputSource::Type::Contour);
+  auto source = input.findExtraSource(StyleInputSource::Type::Shape);
   if (source == nullptr) {
     return info;
   }
-  auto* contour = static_cast<const ContourInputSource*>(source);
-  const auto& optShape = contour->shape();
+  const auto& optShape = source->shape();
   if (!optShape.has_value()) {
     return info;
   }
@@ -211,48 +210,50 @@ void GlassStyle::setLightIntensity(float value) {
   invalidateTransform();
 }
 
-Rect GlassStyle::filterBackground(const Rect& srcRect, float contentScale) {
-  auto result = srcRect;
-  auto sizeBounds = srcRect;
-  // Layer::updateRenderBounds passes an empty rectangle and reads right/bottom as pure outset
-  // amounts. Refraction depends on layer dimensions, so use the owner's bounds in root coordinates
-  // for that call. Non-empty rectangles come from dirty-region propagation and must retain their
-  // original position.
-  if (sizeBounds.isEmpty() && !owners.empty() && owners[0] != nullptr) {
-    auto owner = owners[0];
-    sizeBounds = owner->getBounds(owner->root(), false);
+Rect GlassStyle::filterBackgroundSoft(const Rect& srcRect, float contentScale) {
+  if (_frost <= 0) {
+    return srcRect;
   }
   // Do not cache the frost filter: onDraw applies frost at a different scale
   // (contentScale * bgScale) to the downsampled background image, invalidating any cache here.
-  if (_frost > 0) {
-    float sigma = (_frost / 100.0f) * MaxFrostSigma * contentScale;
-    auto filter = ImageFilter::Blur(sigma, sigma, TileMode::Mirror);
-    result = filter->filterBounds(srcRect);
+  float sigma = (_frost / 100.0f) * MaxFrostSigma * contentScale;
+  auto filter = ImageFilter::Blur(sigma, sigma, TileMode::Mirror);
+  return filter->filterBounds(srcRect);
+}
+
+Rect GlassStyle::filterBackgroundSharp(const Rect& srcRect, float) {
+  if (_refraction <= 0 && _lightIntensity <= 0) {
+    return srcRect;
   }
-  // Refraction outset: cover the shader's clamped displacement for the most offset chromatic
-  // channel. The shader clamps each displacement component to 0.999 * refractionDistance before
-  // multiplying R/B offsets by (1 +/- dispersion).
-  if (_refraction > 0 || _lightIntensity > 0) {
-    auto halfW = sizeBounds.width() * 0.5f;
-    auto halfH = sizeBounds.height() * 0.5f;
-    auto minHalf = std::min(halfW, halfH);
-    float refractionFactor = getRefractionFactor();
-    float depthRatio = getDepthRatio();
-    float depthT = std::clamp(depthRatio / 0.1f, 0.0f, 1.0f);
-    float depthScale = depthT * depthT * (3.0f - 2.0f * depthT);
-    float refractionDistance = minHalf * refractionFactor * depthRatio * depthScale;
-    float dispersion = getDispersionFactor();
-    float alphaMaskOutset = 0.999f * refractionDistance * (1.0f + dispersion);
-    // SDF analytical outset matches the maximum shader displacement: edgeFactor peaks at 1.0 and
-    // the SDF path applies an additional 1.2 edge-strength multiplier.
-    float glassThickness = getGlassThickness(minHalf);
-    float analyticalOutset = glassThickness * refractionFactor * 1.2f * (1.0f + dispersion);
-    // filterBackground may run before shapeType is determined, so cover both paths conservatively.
-    float refractionOutset = std::max(alphaMaskOutset, analyticalOutset);
-    refractionOutset = std::max(refractionOutset, 1.0f);
-    result.join(srcRect.makeOutset(refractionOutset, refractionOutset));
+  float maxWidth = srcRect.width();
+  float maxHeight = srcRect.height();
+  // Refraction displacement depends on the glass dimensions rather than the size of the dirty
+  // background rectangle. A style may be shared by multiple layers, so conservatively cover every
+  // owner instead of assuming the first owner matches the current filterBackground() call.
+  for (auto owner : owners) {
+    if (owner == nullptr) {
+      continue;
+    }
+    auto ownerBounds = owner->getBounds(owner->root(), false);
+    maxWidth = std::max(maxWidth, ownerBounds.width());
+    maxHeight = std::max(maxHeight, ownerBounds.height());
   }
-  return result;
+  // filterBackground() may run before shapeType is determined, so cover both paths.
+  auto halfW = maxWidth * 0.5f;
+  auto halfH = maxHeight * 0.5f;
+  auto minHalf = std::min(halfW, halfH);
+  float refractionFactor = getRefractionFactor();
+  float depthRatio = getDepthRatio();
+  float depthT = std::clamp(depthRatio / 0.1f, 0.0f, 1.0f);
+  float depthScale = depthT * depthT * (3.0f - 2.0f * depthT);
+  float refractionDistance = minHalf * refractionFactor * depthRatio * depthScale;
+  float dispersion = getDispersionFactor();
+  float alphaMaskOutset = 0.999f * refractionDistance * (1.0f + dispersion);
+  float glassThickness = getGlassThickness(minHalf);
+  float analyticalOutset = glassThickness * refractionFactor * 1.2f * (1.0f + dispersion);
+  float refractionOutset = std::max(alphaMaskOutset, analyticalOutset);
+  refractionOutset = std::max(refractionOutset, 1.0f);
+  return srcRect.makeOutset(refractionOutset, refractionOutset);
 }
 
 void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alpha,
@@ -314,7 +315,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       processedOffset += blurOffset;
     }
   }
-  // Detect whether the contour shape supports the analytical SDF path.
+  // Detect whether the vector shape supports the analytical SDF path.
   auto shapeInfo = DetectGlassShape(input);
 
   // Step 2 & 3: Apply refraction with dispersion and lighting (computed entirely in GPU shader)
@@ -495,6 +496,13 @@ std::shared_ptr<ImageFilter> GlassStyle::getRefractionFilter(
   params.origWidth = halfWidth * 2.0f;
   params.origHeight = halfHeight * 2.0f;
   params.udfPixelToLayerPixel = udfPixelToLayerPixel;
+  if (useSDF) {
+    params.maxDisplacement = 1.0e20f;
+  } else {
+    float depthScale = std::clamp(depthRatio / 0.1f, 0.0f, 1.0f);
+    depthScale = depthScale * depthScale * (3.0f - 2.0f * depthScale);
+    params.maxDisplacement = 0.999f * minHalf * params.refractionFactor * depthRatio * depthScale;
+  }
   params.shapeType = shapeType;
   return std::make_shared<GlassRefractionImageFilter>(params, std::move(maskImage),
                                                       std::move(coarseMaskImage));

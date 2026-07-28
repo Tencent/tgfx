@@ -124,14 +124,16 @@ class GlassStyle : public LayerStyle {
     return srcRect;
   }
 
-  Rect filterBackground(const Rect& srcRect, float contentScale) override;
-
   uint32_t extraSourceType() const override {
     return static_cast<uint32_t>(LayerStyleExtraSourceType::Background) |
-           static_cast<uint32_t>(LayerStyleExtraSourceType::Contour);
+           static_cast<uint32_t>(LayerStyleExtraSourceType::Shape);
   }
 
  protected:
+  Rect filterBackgroundSoft(const Rect& srcRect, float contentScale) override;
+
+  Rect filterBackgroundSharp(const Rect& srcRect, float contentScale) override;
+
   void onDraw(Canvas* canvas, const LayerStyleInput& input, float alpha,
               BlendMode blendMode) override;
 

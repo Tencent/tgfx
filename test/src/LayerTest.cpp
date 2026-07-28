@@ -22,6 +22,7 @@
 #include "core/shaders/GradientShader.h"
 #include "core/utils/MathExtra.h"
 #include "layers/DrawArgs.h"
+#include "layers/LayerStyleSource.h"
 #include "layers/OpaqueContext.h"
 #include "layers/RootLayer.h"
 #include "layers/SubtreeCache.h"
@@ -4026,6 +4027,66 @@ static void RunGlassStyleTest(const std::string& keySuffix, float zoomScale = 1.
 
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyle" + keySuffix));
+}
+
+TGFX_TEST_PRIVATE(LayerTest, GlassStyleUsesShapeOnlySource) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto layer = SolidLayer::Make();
+  layer->setWidth(100);
+  layer->setHeight(80);
+  auto glassStyle = GlassStyle::Make(80, 50, 0, 50, 0, 0, 0);
+  layer->setLayerStyles({glassStyle});
+
+  auto sourceFlags = glassStyle->extraSourceType();
+  EXPECT_NE(sourceFlags & static_cast<uint32_t>(LayerStyleExtraSourceType::Background), 0u);
+  EXPECT_NE(sourceFlags & static_cast<uint32_t>(LayerStyleExtraSourceType::Shape), 0u);
+  EXPECT_EQ(sourceFlags & static_cast<uint32_t>(LayerStyleExtraSourceType::Contour), 0u);
+
+  DrawArgs drawArgs(context);
+  TGFX_PRIVATE_ACCESS(auto source = layer->getLayerStyleSource(drawArgs, Matrix::I());
+                      ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[0] != nullptr);
+                      EXPECT_FALSE(source->groups[0]->contour.has_value());
+                      EXPECT_TRUE(source->contentShape.has_value());)
+}
+
+TGFX_TEST(LayerTest, GlassStyleBackgroundOutsets) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 600, 200);
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto sharpLayer = SolidLayer::Make();
+  sharpLayer->setWidth(150);
+  sharpLayer->setHeight(100);
+  sharpLayer->setLayerStyles({GlassStyle::Make(80, 50, 0, 50, 0, 0, 0)});
+  displayList->root()->addChild(sharpLayer);
+
+  auto softLayer = SolidLayer::Make();
+  softLayer->setWidth(150);
+  softLayer->setHeight(100);
+  softLayer->setMatrix(Matrix::MakeTrans(200, 0));
+  softLayer->setLayerStyles({GlassStyle::Make(0, 50, 100, 0, 0, 0, 0)});
+  displayList->root()->addChild(softLayer);
+
+  auto combinedLayer = SolidLayer::Make();
+  combinedLayer->setWidth(150);
+  combinedLayer->setHeight(100);
+  combinedLayer->setMatrix(Matrix::MakeTrans(400, 0));
+  combinedLayer->setLayerStyles({GlassStyle::Make(80, 50, 100, 50, 0, 0, 0)});
+  displayList->root()->addChild(combinedLayer);
+
+  displayList->render(surface.get());
+
+  TGFX_PRIVATE_ACCESS(EXPECT_GT(sharpLayer->maxBackgroundOutset, 0.0f);
+                      EXPECT_EQ(sharpLayer->minBackgroundOutset, 0.0f);
+                      EXPECT_GT(softLayer->minBackgroundOutset, 0.0f);
+                      EXPECT_EQ(softLayer->maxBackgroundOutset, softLayer->minBackgroundOutset);
+                      EXPECT_GT(combinedLayer->maxBackgroundOutset, 0.0f);
+                      EXPECT_GT(combinedLayer->minBackgroundOutset, 0.0f);)
 }
 
 TGFX_TEST(LayerTest, GlassStyleEllipse) {
