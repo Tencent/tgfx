@@ -50,6 +50,7 @@
 #include "tgfx/core/Stroke.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/TextBlob.h"
+#include "tgfx/core/TextBlobBuilder.h"
 #include "utils/TestUtils.h"
 #include "utils/common.h"
 
@@ -3155,6 +3156,60 @@ TGFX_TEST(CanvasTest, EmptyRectStroke) {
   }
 
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/EmptyRectStroke"));
+}
+
+TGFX_TEST(CanvasTest, GlyphBaselineTear) {
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_TRUE(typeface != nullptr);
+  Font font(typeface, 16.0f);
+  font.setFauxBold(true);
+
+  constexpr size_t GlyphCount = 7;
+  const std::string text = "MagSafe";
+  GlyphID glyphs[GlyphCount] = {};
+  float positions[GlyphCount] = {};
+  float advance = 0.0f;
+  for (size_t i = 0; i < GlyphCount; i++) {
+    glyphs[i] = font.getGlyphID(std::string(1, text[i]));
+    positions[i] = advance;
+    advance += font.getAdvance(glyphs[i]);
+  }
+  TextBlobBuilder builder;
+  const auto& buffer = builder.allocRunPos(font, GlyphCount);
+  for (size_t i = 0; i < GlyphCount; i++) {
+    buffer.glyphs[i] = glyphs[i];
+    reinterpret_cast<Point*>(buffer.positions)[i] = Point::Make(positions[i], 17.0f);
+  }
+
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  constexpr float Scale = 1.1f;
+  constexpr float TranslateX = 20.0f;
+  constexpr float TranslateY = 0.8f;
+  constexpr int SurfaceWidth = 140;
+  constexpr int SurfaceHeight = 60;
+  auto surface = Surface::Make(context, SurfaceWidth, SurfaceHeight);
+  auto canvas = surface->getCanvas();
+  Paint paint;
+  paint.setColor(Color::Red());
+  auto textBlob = builder.build();
+
+  // Populate the atlas with smaller strikes before rendering the target run. An empty atlas
+  // usually places all target glyphs on the same atlas row, giving them identical atlasLocation.y()
+  // values and hiding the baseline-rounding bug. The real PAGX scene contains many earlier text
+  // runs, so the MagSafe glyphs are distributed across different atlas rows. Stop below the target
+  // scale (1.1) to ensure its strike is created only by the target draw below.
+  for (int scaleIndex = 50; scaleIndex < 110; scaleIndex += 2) {
+    float warmScale = static_cast<float>(scaleIndex) / 100.0f;
+    canvas->setMatrix(Matrix::MakeScale(warmScale));
+    canvas->drawTextBlob(textBlob, 0, 0, paint);
+  }
+  canvas->clear(Color::Transparent());
+  canvas->setMatrix(Matrix::MakeAll(Scale, 0.0f, TranslateX, 0.0f, Scale, TranslateY));
+  canvas->drawTextBlob(textBlob, 0, 0, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/GlyphBaseline"));
 }
 
 }  // namespace tgfx

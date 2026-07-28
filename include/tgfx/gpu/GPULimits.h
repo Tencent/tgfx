@@ -39,7 +39,7 @@ class GPULimits {
   /**
    * Returns the maximum size in bytes of a uniform buffer binding.
    */
-  int maxUniformBufferBindingSize = 0;
+  int64_t maxUniformBufferBindingSize = 0;
 
   /**
    * Returns the minimum required alignment in bytes for uniform buffer offsets.

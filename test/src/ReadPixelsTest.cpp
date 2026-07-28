@@ -18,6 +18,7 @@
 
 #include <vector>
 #include "tgfx/core/Buffer.h"
+#include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Surface.h"
@@ -328,6 +329,34 @@ TGFX_TEST(ReadPixelsTest, PngCodec) {
   buffer.clear();
   EXPECT_TRUE(codec->readPixels(RGB565Info, pixels));
   CHECK_PIXELS(RGB565Info, pixels, "PngCodec_Encode_RGB565");
+}
+
+TGFX_TEST(ReadPixelsTest, PngCICPColorSpace) {
+  // The test image declares Display P3 via a PNG v3 cICP chunk (colour_primaries=12,
+  // transfer_function=13, matrix_coefficients=0, video_full_range_flag=1) and carries no iCCP or
+  // sRGB chunks. The decoder must recognise the cICP chunk and report Display P3 primaries with
+  // the sRGB transfer function, instead of falling back to sRGB.
+  auto codec = MakeImageCodec("resources/apitest/cicp_display_p3.png");
+  ASSERT_TRUE(codec != nullptr);
+  auto colorSpace = codec->colorSpace();
+  ASSERT_TRUE(colorSpace != nullptr);
+  EXPECT_TRUE(colorSpace->gammaCloseToSRGB());
+  // Gamut must not match sRGB: otherwise the cICP was silently ignored and the decoder fell back
+  // to the plain sRGB profile.
+  EXPECT_NE(colorSpace->toXYZD50Hash(), ColorSpace::SRGB()->toXYZD50Hash());
+  // Gamut must match Display P3 within floating-point tolerance. `MakeCICP` derives the toXYZD50
+  // matrix from chromaticity coordinates, so it does not exactly equal the hard-coded matrix used
+  // by `ColorSpace::DisplayP3()`; compare each entry with a loose tolerance instead of using the
+  // exact hash equality.
+  ColorMatrix33 actualMatrix = {};
+  ColorMatrix33 expectedMatrix = {};
+  ASSERT_TRUE(colorSpace->toXYZD50(&actualMatrix));
+  ASSERT_TRUE(ColorSpace::DisplayP3()->toXYZD50(&expectedMatrix));
+  for (int row = 0; row < 3; ++row) {
+    for (int col = 0; col < 3; ++col) {
+      EXPECT_NEAR(actualMatrix.values[row][col], expectedMatrix.values[row][col], 1e-3f);
+    }
+  }
 }
 
 TGFX_TEST(ReadPixelsTest, WebpCodec) {

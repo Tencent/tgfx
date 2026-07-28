@@ -153,7 +153,9 @@ GLCaps::GLCaps(const GLInfo& info) {
   _features.stencilAttachmentSupported = standard != GLStandard::None;
   info.getIntegerv(GL_MAX_TEXTURE_SIZE, &_limits.maxTextureDimension2D);
   info.getIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &_limits.maxSamplersPerShaderStage);
-  info.getIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &_limits.maxUniformBufferBindingSize);
+  int maxUniformBlockSize = 0;
+  info.getIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &maxUniformBlockSize);
+  _limits.maxUniformBufferBindingSize = maxUniformBlockSize;
   info.getIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &_limits.minUniformBufferOffsetAlignment);
   if (vendor == GLVendor::Qualcomm) {
     // https://skia-review.googlesource.com/c/skia/+/571418

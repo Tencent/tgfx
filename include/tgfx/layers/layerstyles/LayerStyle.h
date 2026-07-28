@@ -60,7 +60,8 @@ enum class LayerStyleType {
   InnerShadow,
   MonoNoise,
   DuoNoise,
-  MultiNoise
+  MultiNoise,
+  Glass
 };
 
 /**
