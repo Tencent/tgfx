@@ -24,11 +24,13 @@
 namespace tgfx {
 /**
  * StandardDrawOp is the base class for ops that follow the "framework binds one pipeline,
- * subclass issues one draw call" pattern. execute() is final: it builds the op's ProgramInfo
- * from the geometry processor supplied by onMakeGeometryProcessor() and the color/coverage
- * fragment processors accumulated on DrawOp, gives subclasses a chance to tweak the resulting
- * ProgramInfo via onConfigureProgramInfo(), then binds the pipeline (together with uniforms,
- * samplers and scissor) before delegating the actual draw call to onDraw().
+ * subclass issues one draw call" pattern. execute() is final: it first gives the subclass a
+ * chance to veto the whole execution via onPrepare() when runtime inputs turn out to be
+ * unusable, then builds the op's ProgramInfo from the geometry processor supplied by
+ * onMakeGeometryProcessor() and the color/coverage fragment processors accumulated on DrawOp,
+ * gives subclasses a chance to tweak the resulting ProgramInfo via onConfigureProgramInfo(),
+ * then binds the pipeline (together with uniforms, samplers and scissor) before delegating
+ * the actual draw call to onDraw().
  *
  * Ops that need to run multiple pipelines within a single render pass (for example
  * StencilCoverPathDrawOp, which runs a stencil pass followed by a cover pass) must not derive
