@@ -6,9 +6,13 @@
 // call tiledApplyBorder() on the result. This lets both a single tiled fill and the per-tap loop of
 // a blur reuse identical tiling math.
 //
-// Supported ShaderMode values: None(0), Clamp(1), RepeatNearestNone(2), MirrorRepeat(6),
-// ClampToBorderNearest(7), ClampToBorderLinear(8). RepeatLinear/mipmap modes (3,4,5) need
-// multi-sample blending not implemented here and must fall back to ProgramBuilder.
+// Supported single-tap ShaderMode values: None(0), Clamp(1), RepeatNearestNone(2),
+// RepeatLinearNone(3), MirrorRepeat(6), ClampToBorderNearest(7), ClampToBorderLinear(8).
+// RepeatLinearNone(3) shares RepeatNearestNone(2)'s coordinate math — the linear vs nearest
+// difference is the sampler filter (runtime SamplerState), not shader code — so it needs no extra
+// work here. The mipmap-repeat modes (4,5) need a 4-tap seam blend that the single-tap helpers here
+// do not provide; tiled_texture_fill.frag implements those inline, and blur/blend-merge still fall
+// back for 4/5.
 
 // ClampToBorder modes require unnormalized (pixel-space) coordinates: the incoming coord is divided
 // by Dimension before tiling and multiplied back when sampling.
@@ -19,13 +23,17 @@ bool tiledUsesUnorm(int mode) {
 // Clamp, RepeatNearest, MirrorRepeat and ClampToBorderLinear clamp the tiled coordinate to the Clamp
 // rect; None and ClampToBorderNearest do not. Matches ShaderModeUsesClamp().
 bool tiledUsesClamp(int mode) {
-  return mode == 1 || mode == 2 || mode == 6 || mode == 8;
+  // Matches ShaderModeUsesClamp(): Clamp, RepeatNearest/Linear(None+Mipmap), MirrorRepeat and
+  // ClampToBorderLinear clamp; None and ClampToBorderNearest do not. Modes 4/5 are only reached by
+  // tiled_texture_fill.frag's 4-tap path.
+  return mode == 1 || mode == 2 || mode == 3 || mode == 4 || mode == 5 || mode == 6 || mode == 8;
 }
 
 // Computes the pre-clamp subset coordinate for a single axis, matching the runtime subsetCoord().
 float tiledSubsetCoord(float coord, float subLo, float subHi, int mode) {
-  if (mode == 2) {
-    // RepeatNearestNone: wrap into [subLo, subHi)
+  if (mode == 2 || mode == 3) {
+    // RepeatNearestNone(2) / RepeatLinearNone(3): wrap into [subLo, subHi). The two share this
+    // coordinate; nearest vs linear is the sampler filter, not shader math.
     return mod(coord - subLo, subHi - subLo) + subLo;
   }
   if (mode == 6) {

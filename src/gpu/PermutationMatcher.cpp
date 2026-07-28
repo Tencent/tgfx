@@ -188,12 +188,20 @@ static std::optional<PermutationMatchResult> TryMatchTextureFill(const ProgramIn
   return PermutationMatchResult{TextureFillShader::Name(), vertIndex, fragIndex};
 }
 
-// The precompiled tiled shader supports these ShaderMode values (matching tiled_texture_fill.frag):
-// None(0), Clamp(1), RepeatNearestNone(2), MirrorRepeat(6), ClampToBorderNearest(7),
-// ClampToBorderLinear(8). RepeatLinear/mipmap modes (3,4,5) need multi-sample blending the static
-// shader does not implement, so those fall back to ProgramBuilder.
+// ShaderMode values the shared single-tap tiled_sample.inc handles for the blur tap loop and the
+// blend-merge tiled child: None(0), Clamp(1), RepeatNearestNone(2), MirrorRepeat(6),
+// ClampToBorderNearest(7), ClampToBorderLinear(8). The RepeatLinear/mipmap modes 3/4/5 are only
+// implemented by the tiled fill kernel (see TiledFillModeSupported); blur and blend-merge keep
+// falling back for those to avoid diverging from the runtime path in those consumers.
 static bool TiledModeSupported(int mode) {
   return mode == 0 || mode == 1 || mode == 2 || mode == 6 || mode == 7 || mode == 8;
+}
+
+// The tiled fill kernel additionally handles RepeatLinearNone(3) — shares mode 2's coordinate, the
+// linear vs nearest difference being the sampler filter — and the mipmap-repeat modes 4/5 via an
+// inline 4-tap seam blend. So it accepts every mode.
+static bool TiledFillModeSupported(int mode) {
+  return TiledModeSupported(mode) || mode == 3 || mode == 4 || mode == 5;
 }
 
 static std::optional<PermutationMatchResult> TryMatchTiledTextureFill(
@@ -238,7 +246,7 @@ static std::optional<PermutationMatchResult> TryMatchTiledTextureFill(
   int modeX = 0;
   int modeY = 0;
   tte->getShaderModes(&modeX, &modeY);
-  if (!TiledModeSupported(modeX) || !TiledModeSupported(modeY)) {
+  if (!TiledFillModeSupported(modeX) || !TiledFillModeSupported(modeY)) {
     return std::nullopt;
   }
   // For the DefaultGeometryProcessor path a both-None (0/0) tiled effect reduces to a plain texture

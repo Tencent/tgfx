@@ -1,8 +1,10 @@
 // TiledTextureFillShader fragment shader
 // Permutation dimensions (frag): HAS_XP
-// ShaderModeX/ShaderModeY are runtime uniforms. Supported values (others fall back):
-//   0=None, 1=Clamp, 2=RepeatNearestNone, 6=MirrorRepeat,
-//   7=ClampToBorderNearest, 8=ClampToBorderLinear
+// ShaderModeX/ShaderModeY are runtime uniforms. All nine modes are supported here:
+//   0=None, 1=Clamp, 2=RepeatNearestNone, 3=RepeatLinearNone, 4=RepeatNearestMipmap,
+//   5=RepeatLinearMipmap, 6=MirrorRepeat, 7=ClampToBorderNearest, 8=ClampToBorderLinear.
+// Modes 0-3,6-8 use the single-tap shared tiled_sample.inc; modes 4/5 (mipmap-repeat) use the
+// inline 4-tap seam blend below.
 // AlphaOnly (alpha-only source) and Strict (SrcRectConstraint::Strict) are runtime uniforms rather
 // than compile-time permutations: both are pure fragment math, so folding them into coherent
 // uniform branches shrinks the variant count (mirrors QuadTextureFillShader).
@@ -47,15 +49,75 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #include "xp_porter_duff_fbf.inc"
 #include "tiled_sample.inc"
 
+// Per-axis coordinate for the mipmap-repeat modes (RepeatNearestMipmap(4), RepeatLinearMipmap(5)),
+// ported verbatim from GLSLTiledTextureEffect::subsetCoord. Produces the wrapped subset coord, the
+// seam-neighbour coord and the blend weight for a 4-tap seam blend. For every other mode the extra
+// tap collapses (extra == subset, weight == 0) so the shared 4-tap math reduces to a single tap.
+void tiledMipmapAxis(float coord, float subLo, float subHi, int mode, out float subsetCoord,
+                     out float extraCoord, out float weight) {
+  if (mode == 4 || mode == 5) {
+    highp float w = subHi - subLo;
+    highp float w2 = 2.0 * w;
+    highp float d = coord - subLo;
+    highp float m = mod(d, w2);
+    highp float o = mix(m, w2 - m, step(w, m));
+    subsetCoord = o + subLo;
+    extraCoord = w - o + subLo;
+    highp float hw = w / 2.0;
+    highp float n = mod(d - hw, w2);
+    weight = clamp(mix(n, w2 - n, step(w, n)) - hw + 0.5, 0.0, 1.0);
+  } else {
+    subsetCoord = tiledSubsetCoord(coord, subLo, subHi, mode);
+    extraCoord = subsetCoord;
+    weight = 0.0;
+  }
+}
+
 void main() {
   vec2 texCoord = TransformedCoords_0;
 
-  vec2 inCoord;
-  vec2 subsetCoord;
-  vec2 clampedCoord;
-  vec2 sampleCoord = tiledMapCoord(texCoord, Strict != 0, inCoord, subsetCoord, clampedCoord);
-  vec4 color = texture(TextureSampler_0, sampleCoord);
-  color = tiledApplyBorder(color, inCoord, subsetCoord, clampedCoord);
+  vec4 color;
+  bool fourTap =
+      ShaderModeX == 4 || ShaderModeX == 5 || ShaderModeY == 4 || ShaderModeY == 5;
+  if (fourTap) {
+    // Mipmap-repeat 4-tap seam blend (mirrors the runtime GLSLTiledTextureEffect mipmapRepeat path).
+    bool unorm = tiledUsesUnorm(ShaderModeX) || tiledUsesUnorm(ShaderModeY);
+    vec2 inC = unorm ? texCoord / Dimension : texCoord;
+    float subX, extraX, weightX;
+    float subY, extraY, weightY;
+    tiledMipmapAxis(inC.x, Subset.x, Subset.z, ShaderModeX, subX, extraX, weightX);
+    tiledMipmapAxis(inC.y, Subset.y, Subset.w, ShaderModeY, subY, extraY, weightY);
+    vec2 clampedCoord =
+        vec2(tiledUsesClamp(ShaderModeX) ? clamp(subX, Clamp.x, Clamp.z) : subX,
+             tiledUsesClamp(ShaderModeY) ? clamp(subY, Clamp.y, Clamp.w) : subY);
+    vec2 extraCoord = vec2(clamp(extraX, Clamp.x, Clamp.z), clamp(extraY, Clamp.y, Clamp.w));
+    if (Strict != 0) {
+      clampedCoord = clamp(clampedCoord, Clamp.xy, Clamp.zw);
+      extraCoord = clamp(extraCoord, Clamp.xy, Clamp.zw);
+    }
+    vec2 s1 = clampedCoord;
+    vec2 s2 = vec2(extraCoord.x, clampedCoord.y);
+    vec2 s3 = vec2(clampedCoord.x, extraCoord.y);
+    vec2 s4 = vec2(extraCoord.x, extraCoord.y);
+    if (unorm) {
+      s1 *= Dimension;
+      s2 *= Dimension;
+      s3 *= Dimension;
+      s4 *= Dimension;
+    }
+    vec4 c1 = texture(TextureSampler_0, s1);
+    vec4 c2 = texture(TextureSampler_0, s2);
+    vec4 c3 = texture(TextureSampler_0, s3);
+    vec4 c4 = texture(TextureSampler_0, s4);
+    color = mix(mix(c1, c2, weightX), mix(c3, c4, weightX), weightY);
+  } else {
+    vec2 inCoord;
+    vec2 subsetCoord;
+    vec2 clampedCoord;
+    vec2 sampleCoord = tiledMapCoord(texCoord, Strict != 0, inCoord, subsetCoord, clampedCoord);
+    color = texture(TextureSampler_0, sampleCoord);
+    color = tiledApplyBorder(color, inCoord, subsetCoord, clampedCoord);
+  }
 
   if (AlphaOnly != 0) {
     // Alpha-only textures use R8 format in Metal. Use .r to get the actual alpha value.
