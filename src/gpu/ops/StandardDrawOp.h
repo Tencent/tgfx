@@ -44,6 +44,24 @@ class StandardDrawOp : public DrawOp {
   }
 
   /**
+   * Optional hook invoked at the start of execute(), before any pipeline binding takes place.
+   * Return false to skip this op entirely — no geometry processor, pipeline binding, uniform
+   * upload, sampler binding or draw call will be issued. This is the right place to reject an
+   * op whose runtime inputs (e.g. an asynchronously produced vertex buffer) turned out to be
+   * empty, so it does not leave dirty pipeline state behind for the next op. The default
+   * returns true.
+   *
+   * Contract with onDraw(): any resource this method validates as non-null MAY be used
+   * unconditionally by the subsequent onDraw() call without re-checking. Both hooks run
+   * synchronously on the same thread inside a single execute() invocation, so a resource
+   * cannot transition from ready to null between them. Subclasses that add null-checks here
+   * are therefore free to omit the corresponding checks in onDraw().
+   */
+  virtual bool onPrepare() {
+    return true;
+  }
+
+  /**
    * Builds the geometry processor that drives this op's pipeline. Called once per execute().
    */
   virtual PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) = 0;
