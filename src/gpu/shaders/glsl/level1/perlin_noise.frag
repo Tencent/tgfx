@@ -25,6 +25,7 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   int NoiseType;
   int NumOctaves;
   int StitchTiles;
+#include "pointwise_op_uniforms.inc"
 #include "xp_uniforms.inc"
 };
 
@@ -43,6 +44,8 @@ layout(set = 1, binding = 1) uniform sampler2D TextureSampler_1;  // noise (RGBA
 #include "xp_porter_duff_fbf.inc"
 
 layout(location = 0) out vec4 fragColor;
+
+#include "pointwise_op.inc"
 
 void main() {
   // Sub-lattice bias (1/128) keeps fract(noiseVec) away from 0 at integer baseFrequency; see the
@@ -101,7 +104,9 @@ void main() {
     color = color * 0.5 + 0.5;
   }
   color = clamp(color, 0.0, 1.0);
-  vec4 result = vec4(color.rgb * color.aaa, color.a);
+  // Premultiply the raw noise, then apply the optional composed pointwise operator (OpType == OP_NONE
+  // when no operator FP is composed on top of this shader).
+  vec4 result = applyPointwiseOp(vec4(color.rgb * color.aaa, color.a));
 
 #if HAS_COVERAGE
 #define TGFX_XP_SRC_COLOR (result * vCoverage)

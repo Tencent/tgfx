@@ -1,0 +1,117 @@
+// Shared pointwise-operator logic. Provides applyPointwiseOp(vec4), which applies exactly one
+// premultiplied-in/premultiplied-out pointwise operator selected at runtime by the OpType uniform:
+//   0 = ColorMatrix, 1 = Luma, 2 = AlphaThreshold, 3 = ColorSpaceXform, 4 = None (passthrough).
+// OP_NONE lets a producer kernel (e.g. PerlinNoiseFillShader) emit its raw premultiplied output when
+// no operator FP is composed on top of it, while the same OpType uniform absorbs the composed case.
+// Requires the pointwise_op_uniforms.inc fields to be present in the FragmentUniformBlock.
+#define OP_COLOR_MATRIX 0
+#define OP_LUMA 1
+#define OP_ALPHA_THRESHOLD 2
+#define OP_COLOR_SPACE_XFORM 3
+#define OP_NONE 4
+
+#define CS_UNPREMUL 1
+#define CS_LINEARIZE 2
+#define CS_GAMUT 4
+#define CS_ENCODE 8
+#define CS_PREMUL 16
+#define CS_SRC_OOTF 32
+#define CS_DST_OOTF 64
+
+// ColorSpaceXform transfer functions (verbatim from textured_color_space_xform.frag).
+float src_tf(float x) {
+  float s = sign(x);
+  x = abs(x);
+  float A = SrcTF0[1], B = SrcTF0[2], C = SrcTF0[3];
+  float D = SrcTF1[0], E = SrcTF1[1], F = SrcTF1[2];
+  if (SrcTFType == 0) {
+    float G = SrcTF0[0];
+    x = (x < D) ? (C * x + F) : (pow(A * x + B, G) + E);
+  } else if (SrcTFType == 1) {
+    float xC = pow(x, C);
+    x = pow(max(A + B * xC, 0.0) / (D + E * xC), F);
+  } else if (SrcTFType == 2) {
+    x = (x * A <= 1.0) ? pow(x * A, B) : exp((x - E) * C) + D;
+    x *= (F + 1.0);
+  } else {
+    x /= (F + 1.0);
+    x = (x <= 1.0) ? A * pow(x, B) : C * log(x - D) + E;
+  }
+  return s * x;
+}
+
+float dst_tf(float x) {
+  float s = sign(x);
+  x = abs(x);
+  float A = DstTF0[1], B = DstTF0[2], C = DstTF0[3];
+  float D = DstTF1[0], E = DstTF1[1], F = DstTF1[2];
+  if (DstTFType == 0) {
+    float G = DstTF0[0];
+    x = (x < D) ? (C * x + F) : (pow(A * x + B, G) + E);
+  } else if (DstTFType == 1) {
+    float xC = pow(x, C);
+    x = pow(max(A + B * xC, 0.0) / (D + E * xC), F);
+  } else if (DstTFType == 2) {
+    x = (x * A <= 1.0) ? pow(x * A, B) : exp((x - E) * C) + D;
+    x *= (F + 1.0);
+  } else {
+    x /= (F + 1.0);
+    x = (x <= 1.0) ? A * pow(x, B) : C * log(x - D) + E;
+  }
+  return s * x;
+}
+
+// Applies the selected pointwise operator to a premultiplied color and returns a premultiplied color.
+vec4 applyPointwiseOp(vec4 color) {
+  if (OpType == OP_NONE) {
+    return color;
+  }
+  vec4 result;
+  if (OpType == OP_COLOR_MATRIX) {
+    // Unpremultiply, apply matrix + vector, clamp, re-premultiply.
+    color = vec4(color.rgb / max(color.a, 9.9999997473787516e-05), color.a);
+    color = clamp(ColorMatrix * color + ColorVector, 0.0, 1.0);
+    color.rgb *= color.a;
+    result = color;
+  } else if (OpType == OP_LUMA) {
+    result = vec4(dot(color.rgb, vec3(Kr, Kg, Kb)));
+  } else if (OpType == OP_ALPHA_THRESHOLD) {
+    result = vec4(0.0);
+    if (color.a > 0.0) {
+      result.rgb = color.rgb / color.a;
+      result.a = step(Threshold, color.a);
+      result = clamp(result, 0.0, 1.0);
+    }
+  } else {  // OP_COLOR_SPACE_XFORM
+    if ((CSFlags & CS_UNPREMUL) != 0) {
+      float a = color.a;
+      color = (a > 0.0) ? vec4(color.rgb / a, a) : vec4(0.0);
+    }
+    if ((CSFlags & CS_LINEARIZE) != 0) {
+      color.r = src_tf(color.r);
+      color.g = src_tf(color.g);
+      color.b = src_tf(color.b);
+    }
+    if ((CSFlags & CS_SRC_OOTF) != 0) {
+      float srcY = dot(color.rgb, SrcOOTF.rgb);
+      color.rgb *= sign(srcY) * pow(abs(srcY), SrcOOTF.a);
+    }
+    if ((CSFlags & CS_GAMUT) != 0) {
+      color.rgb = ColorXform * color.rgb;
+    }
+    if ((CSFlags & CS_DST_OOTF) != 0) {
+      float dstY = dot(color.rgb, DstOOTF.rgb);
+      color.rgb *= sign(dstY) * pow(abs(dstY), DstOOTF.a);
+    }
+    if ((CSFlags & CS_ENCODE) != 0) {
+      color.r = dst_tf(color.r);
+      color.g = dst_tf(color.g);
+      color.b = dst_tf(color.b);
+    }
+    if ((CSFlags & CS_PREMUL) != 0) {
+      color.rgb *= color.a;
+    }
+    result = color;
+  }
+  return result;
+}

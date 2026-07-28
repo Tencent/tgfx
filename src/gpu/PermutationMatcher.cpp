@@ -974,6 +974,39 @@ static std::optional<PermutationMatchResult> TryMatchColorSpaceXform(
   return PermutationMatchResult{"ColorSpaceXformShader", 0, fragIndex};
 }
 
+// Returns true if fp is one of the four pointwise operators that share the runtime OpType uniform
+// (ColorMatrix / Luma / AlphaThreshold / ColorSpaceXform). For ColorSpaceXform the transfer-function
+// type must be in the supported 0-3 range; the pipeline flags themselves are runtime uniforms.
+static bool IsSupportedPointwiseOp(const FragmentProcessor* fp) {
+  if (fp->name() == "ColorMatrixFragmentProcessor" || fp->name() == "LumaFragmentProcessor" ||
+      fp->name() == "AlphaStepFragmentProcessor") {
+    return true;
+  }
+  if (fp->name() != "ColorSpaceXformEffect") {
+    return false;
+  }
+  auto* cse = static_cast<const ColorSpaceXformEffect*>(fp);
+  auto* xform = cse->colorXform();
+  if (!xform) {
+    return false;
+  }
+  if (xform->flags.linearize) {
+    int srcIdx = TFTypeToIndex(gfx::skcms_TransferFunction_getType(
+        reinterpret_cast<const gfx::skcms_TransferFunction*>(&xform->srcTransferFunction)));
+    if (srcIdx < 0) {
+      return false;
+    }
+  }
+  if (xform->flags.encode) {
+    int dstIdx = TFTypeToIndex(gfx::skcms_TransferFunction_getType(
+        reinterpret_cast<const gfx::skcms_TransferFunction*>(&xform->dstTransferFunctionInverse)));
+    if (dstIdx < 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
 static std::optional<PermutationMatchResult> TryMatchComposedTexture(
     const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
@@ -1049,38 +1082,10 @@ static std::optional<PermutationMatchResult> TryMatchComposedTexture(
   fragValues[D::HAS_COVERAGE] = hasCoverage;
   auto fragIndex = fragDomain.encode(fragValues);
 
-  if (child1->name() == "ColorSpaceXformEffect") {
-    auto* cse = static_cast<const ColorSpaceXformEffect*>(child1);
-    auto* xform = cse->colorXform();
-    if (!xform) {
-      return std::nullopt;
-    }
-    // The pipeline flags are runtime uniforms (CSFlags), so any flag combination hits the same
-    // variant. Only the transfer-function type must still be in the supported 0-3 range.
-    if (xform->flags.linearize) {
-      int srcIdx = TFTypeToIndex(gfx::skcms_TransferFunction_getType(
-          reinterpret_cast<const gfx::skcms_TransferFunction*>(&xform->srcTransferFunction)));
-      if (srcIdx < 0) {
-        return std::nullopt;
-      }
-    }
-    if (xform->flags.encode) {
-      int dstIdx = TFTypeToIndex(
-          gfx::skcms_TransferFunction_getType(reinterpret_cast<const gfx::skcms_TransferFunction*>(
-              &xform->dstTransferFunctionInverse)));
-      if (dstIdx < 0) {
-        return std::nullopt;
-      }
-    }
-    return PermutationMatchResult{"TexturedEffectShader", vertIndex, fragIndex};
+  if (!IsSupportedPointwiseOp(child1)) {
+    return std::nullopt;
   }
-
-  if (child1->name() == "ColorMatrixFragmentProcessor" ||
-      child1->name() == "LumaFragmentProcessor" || child1->name() == "AlphaStepFragmentProcessor") {
-    return PermutationMatchResult{"TexturedEffectShader", vertIndex, fragIndex};
-  }
-
-  return std::nullopt;
+  return PermutationMatchResult{"TexturedEffectShader", vertIndex, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
@@ -1605,12 +1610,29 @@ static std::optional<PermutationMatchResult> TryMatchPerlin(const ProgramInfo* p
   } else {
     return std::nullopt;
   }
-  // A single PerlinNoiseFragmentProcessor as the only color processor. noiseType / numOctaves /
-  // stitchTiles are runtime uniforms in the precompiled shader, so they are not structural axes.
-  if (programInfo->numFragmentProcessors() != 1 || programInfo->numColorFragmentProcessors() != 1) {
-    return std::nullopt;
+  // Accept a PerlinNoiseFragmentProcessor optionally followed by one pointwise operator, in the
+  // same two structurally-equivalent forms as TryMatchComposedTexture:
+  //   (a) a bare PerlinNoiseFragmentProcessor (OpType == OP_NONE, set by the Perlin FP), or
+  //   (b) Compose(Perlin, op) / sequential [Perlin, op] where op is a supported pointwise operator.
+  // The operator is folded into the shared OpType runtime uniform, so the composed case hits the
+  // same PerlinNoiseFillShader variant losslessly (no materialization, no extra compile-time axis).
+  const FragmentProcessor* perlin = nullptr;
+  if (programInfo->numFragmentProcessors() == 1 && programInfo->numColorFragmentProcessors() == 1) {
+    auto fp = programInfo->getFragmentProcessor(0);
+    if (fp->name() == "PerlinNoiseFragmentProcessor") {
+      perlin = fp;
+    } else if (fp->name() == "ComposeFragmentProcessor" && fp->numChildProcessors() == 2 &&
+               fp->childProcessor(0)->name() == "PerlinNoiseFragmentProcessor" &&
+               IsSupportedPointwiseOp(fp->childProcessor(1))) {
+      perlin = fp->childProcessor(0);
+    }
+  } else if (programInfo->numFragmentProcessors() == 2 &&
+             programInfo->numColorFragmentProcessors() == 2 &&
+             programInfo->getFragmentProcessor(0)->name() == "PerlinNoiseFragmentProcessor" &&
+             IsSupportedPointwiseOp(programInfo->getFragmentProcessor(1))) {
+    perlin = programInfo->getFragmentProcessor(0);
   }
-  if (programInfo->getFragmentProcessor(0)->name() != "PerlinNoiseFragmentProcessor") {
+  if (perlin == nullptr) {
     return std::nullopt;
   }
   int xpType = GetXPType(programInfo);

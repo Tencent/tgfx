@@ -246,5 +246,10 @@ void GLSLPerlinNoiseFragmentProcessor::onSetData(UniformData* /*vertexUniformDat
   fragmentUniformData->setDataOptional("NoiseType", static_cast<int>(noiseType));
   fragmentUniformData->setDataOptional("NumOctaves", numOctaves);
   fragmentUniformData->setDataOptional("StitchTiles", stitchTiles ? 1 : 0);
+
+  // Default the shared pointwise operator to NONE (passthrough). When a pointwise operator FP is
+  // composed on top of this shader it is visited after this child in FragmentProcessor::Iter and
+  // overwrites OpType with its own value, so this only takes effect for the pure-noise case.
+  fragmentUniformData->setDataOptional("OpType", static_cast<int>(4));
 }
 }  // namespace tgfx
