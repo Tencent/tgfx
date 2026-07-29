@@ -125,8 +125,7 @@ class GlassStyle : public LayerStyle {
   }
 
   uint32_t extraSourceType() const override {
-    return static_cast<uint32_t>(LayerStyleExtraSourceType::Background) |
-           static_cast<uint32_t>(LayerStyleExtraSourceType::Shape);
+    return static_cast<uint32_t>(LayerStyleExtraSourceType::BackgroundAndContour);
   }
 
  protected:

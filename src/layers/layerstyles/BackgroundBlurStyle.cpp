@@ -63,7 +63,7 @@ void BackgroundBlurStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, f
   if (_blurrinessX <= 0 && _blurrinessY <= 0) {
     return;
   }
-  auto background = input.findExtraSource(StyleInputSource::Type::Background);
+  auto background = input.extraSource;
   if (background == nullptr || background->image() == nullptr) {
     DEBUG_ASSERT(false);
     return;

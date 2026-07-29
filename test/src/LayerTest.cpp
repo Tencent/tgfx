@@ -4029,7 +4029,7 @@ static void RunGlassStyleTest(const std::string& keySuffix, float zoomScale = 1.
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyle" + keySuffix));
 }
 
-TGFX_TEST_PRIVATE(LayerTest, GlassStyleUsesShapeOnlySource) {
+TGFX_TEST_PRIVATE(LayerTest, GlassStyleUsesBackgroundAndContourSource) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -4040,15 +4040,13 @@ TGFX_TEST_PRIVATE(LayerTest, GlassStyleUsesShapeOnlySource) {
   auto glassStyle = GlassStyle::Make(80, 50, 0, 50, 0, 0, 0);
   layer->setLayerStyles({glassStyle});
 
-  auto sourceFlags = glassStyle->extraSourceType();
-  EXPECT_NE(sourceFlags & static_cast<uint32_t>(LayerStyleExtraSourceType::Background), 0u);
-  EXPECT_NE(sourceFlags & static_cast<uint32_t>(LayerStyleExtraSourceType::Shape), 0u);
-  EXPECT_EQ(sourceFlags & static_cast<uint32_t>(LayerStyleExtraSourceType::Contour), 0u);
+  EXPECT_EQ(glassStyle->extraSourceType(),
+            static_cast<uint32_t>(LayerStyleExtraSourceType::BackgroundAndContour));
 
   DrawArgs drawArgs(context);
   TGFX_PRIVATE_ACCESS(auto source = layer->getLayerStyleSource(drawArgs, Matrix::I());
                       ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[0] != nullptr);
-                      EXPECT_FALSE(source->groups[0]->contour.has_value());
+                      EXPECT_TRUE(source->groups[0]->contour.has_value());
                       EXPECT_TRUE(source->contentShape.has_value());)
 }
 

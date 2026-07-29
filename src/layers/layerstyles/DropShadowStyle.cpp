@@ -108,14 +108,10 @@ Rect DropShadowStyle::filterBounds(const Rect& srcRect, float contentScale) {
 }
 
 uint32_t DropShadowStyle::extraSourceType() const {
-  uint32_t sourceFlags = static_cast<uint32_t>(LayerStyleExtraSourceType::None);
-  if (!_showBehindLayer) {
-    sourceFlags |= static_cast<uint32_t>(LayerStyleExtraSourceType::Contour);
+  if (!_showBehindLayer || !FloatNearlyZero(_spread)) {
+    return static_cast<uint32_t>(LayerStyleExtraSourceType::Contour);
   }
-  if (!FloatNearlyZero(_spread)) {
-    sourceFlags |= static_cast<uint32_t>(LayerStyleExtraSourceType::Shape);
-  }
-  return sourceFlags;
+  return static_cast<uint32_t>(LayerStyleExtraSourceType::None);
 }
 
 void DropShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alpha,
@@ -153,7 +149,7 @@ void DropShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float
                       ? SamplingOptions(FilterMode::Nearest, MipmapMode::None)
                       : SamplingOptions();
   Paint paint = {};
-  auto contour = input.findExtraSource(StyleInputSource::Type::Contour);
+  auto contour = input.extraSource;
   if (!_showBehindLayer && contour != nullptr && contour->image() != nullptr) {
     auto shader =
         Shader::MakeImageShader(contour->image(), TileMode::Decal, TileMode::Decal, sampling);

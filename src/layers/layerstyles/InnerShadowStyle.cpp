@@ -106,7 +106,7 @@ Rect InnerShadowStyle::filterBounds(const Rect& srcRect, float contentScale) {
 }
 
 uint32_t InnerShadowStyle::extraSourceType() const {
-  auto type = !FloatNearlyZero(_spread) ? LayerStyleExtraSourceType::Shape
+  auto type = !FloatNearlyZero(_spread) ? LayerStyleExtraSourceType::Contour
                                         : LayerStyleExtraSourceType::None;
   return static_cast<uint32_t>(type);
 }

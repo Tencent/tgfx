@@ -52,9 +52,9 @@ enum class LayerStyleExtraSourceType : uint32_t {
    */
   Background = 1 << 1,
   /**
-   * The layerStyle requires the optional vector shape of the layer content without a contour image.
+   * The layerStyle requires both the background content and the layer contour.
    */
-  Shape = 1 << 2
+  BackgroundAndContour = 1 << 2
 };
 
 enum class LayerStyleType {

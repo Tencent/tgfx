@@ -336,17 +336,20 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   styleInput.content = contentEntry.image;
   styleInput.contentOffset = contentEntry.offset;
   styleInput.contentScale = source->contentScale;
-  auto sourceFlags = style->extraSourceType();
-  styleInput.extraSources.emplace_back(
-      std::make_shared<StyleInputSource>(std::move(bgImage), backgroundOffset));
-  if ((sourceFlags & static_cast<uint32_t>(LayerStyleExtraSourceType::Contour)) != 0 &&
-      group->contour.has_value()) {
-    auto contourOffset = group->contour->offset - contentEntry.offset;
-    styleInput.extraSources.emplace_back(
-        std::make_shared<ContourInputSource>(group->contour->image, contourOffset));
-  }
-  if ((sourceFlags & static_cast<uint32_t>(LayerStyleExtraSourceType::Shape)) != 0) {
-    styleInput.extraSources.emplace_back(std::make_shared<ShapeInputSource>(source->contentShape));
+  if ((style->extraSourceType() &
+       static_cast<uint32_t>(LayerStyleExtraSourceType::BackgroundAndContour)) != 0) {
+    std::shared_ptr<Image> contourImage = nullptr;
+    Point contourOffset = {};
+    if (group->contour.has_value()) {
+      contourImage = group->contour->image;
+      contourOffset = group->contour->offset - contentEntry.offset;
+    }
+    styleInput.extraSource = StyleInputSource::MakeBackgroundAndContour(
+        std::move(bgImage), backgroundOffset, std::move(contourImage), contourOffset,
+        source->contentShape);
+  } else {
+    styleInput.extraSource =
+        std::make_shared<StyleInputSource>(std::move(bgImage), backgroundOffset);
   }
   style->draw(canvas, styleInput, alpha);
 }

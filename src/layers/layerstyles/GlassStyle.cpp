@@ -98,11 +98,10 @@ struct GlassShapeInfo {
 // FillStroke produce a different rendered outline than the fill path, so SDF would mismatch.
 static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
   GlassShapeInfo info;
-  auto source = input.findExtraSource(StyleInputSource::Type::Shape);
-  if (source == nullptr) {
+  if (input.extraSource == nullptr || !input.extraSource->contour().has_value()) {
     return info;
   }
-  const auto& optShape = source->shape();
+  const auto& optShape = input.extraSource->contour()->shape;
   if (!optShape.has_value()) {
     return info;
   }
@@ -258,7 +257,7 @@ Rect GlassStyle::filterBackgroundSharp(const Rect& srcRect, float) {
 
 void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alpha,
                         BlendMode blendMode) {
-  auto background = input.findExtraSource(StyleInputSource::Type::Background);
+  auto background = input.extraSource;
   if (background == nullptr || background->image() == nullptr) {
     DEBUG_ASSERT(false);
     return;
