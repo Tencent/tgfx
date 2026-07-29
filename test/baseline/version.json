@@ -294,6 +294,7 @@
         "GlassStyleEllipseSDF": "16c8e103",
         "GlassStyleEllipticalCorner": "3118baaa",
         "GlassStyleRoundedRect": "16c8e103",
+        "GlassStyleShapeLayerContentOffset": "3c78c54d",
         "GlassStyleZoom": "16c8e103",
         "HasContentChanged_Offset": "bedeb932",
         "HasContentChanged_Org": "bedeb932",
