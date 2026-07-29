@@ -88,10 +88,7 @@ std::shared_ptr<VulkanTexture> VulkanTexture::Make(VulkanGPU* gpu,
   viewInfo.format = vkFormat;
   viewInfo.subresourceRange.aspectMask = VkFormatToAspectFlags(vkFormat);
   viewInfo.subresourceRange.baseMipLevel = 0;
-  // Framebuffer attachments require levelCount=1. Use full mip chain only for pure sampling views.
-  viewInfo.subresourceRange.levelCount = (descriptor.usage & TextureUsage::RENDER_ATTACHMENT)
-                                             ? 1
-                                             : static_cast<uint32_t>(descriptor.mipLevelCount);
+  viewInfo.subresourceRange.levelCount = static_cast<uint32_t>(descriptor.mipLevelCount);
   viewInfo.subresourceRange.baseArrayLayer = 0;
   viewInfo.subresourceRange.layerCount = 1;
 
@@ -103,8 +100,23 @@ std::shared_ptr<VulkanTexture> VulkanTexture::Make(VulkanGPU* gpu,
     return nullptr;
   }
 
-  return gpu->makeResource<VulkanTexture>(descriptor, vkImage, vkImageView, vmaAllocation, vkFormat,
-                                          false, VK_IMAGE_LAYOUT_UNDEFINED);
+  // Framebuffer attachments require levelCount=1. Create a separate render view when the texture
+  // has multiple mip levels and is also used as a render attachment.
+  VkImageView vkRenderImageView = VK_NULL_HANDLE;
+  if ((descriptor.usage & TextureUsage::RENDER_ATTACHMENT) && descriptor.mipLevelCount > 1) {
+    viewInfo.subresourceRange.levelCount = 1;
+    result = vkCreateImageView(gpu->device(), &viewInfo, nullptr, &vkRenderImageView);
+    if (result != VK_SUCCESS) {
+      LOGE("VulkanTexture::Make() vkCreateImageView (render) failed: %s", VkResultToString(result));
+      vkDestroyImageView(gpu->device(), vkImageView, nullptr);
+      vmaDestroyImage(gpu->allocator(), vkImage, vmaAllocation);
+      return nullptr;
+    }
+  }
+
+  return gpu->makeResource<VulkanTexture>(descriptor, vkImage, vkImageView, vkRenderImageView,
+                                          vmaAllocation, vkFormat, false,
+                                          VK_IMAGE_LAYOUT_UNDEFINED);
 }
 
 std::shared_ptr<VulkanTexture> VulkanTexture::MakeFrom(VulkanGPU* gpu, VkImage image,
@@ -139,19 +151,24 @@ std::shared_ptr<VulkanTexture> VulkanTexture::MakeFrom(VulkanGPU* gpu, VkImage i
     return nullptr;
   }
 
-  return gpu->makeResource<VulkanTexture>(descriptor, image, imageView, VK_NULL_HANDLE, format,
-                                          adopted, initialLayout);
+  return gpu->makeResource<VulkanTexture>(descriptor, image, imageView, VK_NULL_HANDLE,
+                                          VK_NULL_HANDLE, format, adopted, initialLayout);
 }
 
 VulkanTexture::VulkanTexture(const TextureDescriptor& descriptor, VkImage image,
-                             VkImageView imageView, VmaAllocation allocation, VkFormat format,
-                             bool adopted, VkImageLayout initialLayout)
-    : Texture(descriptor), image(image), imageView(imageView), allocation(allocation),
-      format(format), adopted(adopted) {
+                             VkImageView imageView, VkImageView renderImageView,
+                             VmaAllocation allocation, VkFormat format, bool adopted,
+                             VkImageLayout initialLayout)
+    : Texture(descriptor), image(image), imageView(imageView), renderImageView(renderImageView),
+      allocation(allocation), format(format), adopted(adopted) {
   layout = initialLayout;
 }
 
 void VulkanTexture::onRelease(VulkanGPU* gpu) {
+  if (renderImageView != VK_NULL_HANDLE) {
+    vkDestroyImageView(gpu->device(), renderImageView, nullptr);
+    renderImageView = VK_NULL_HANDLE;
+  }
   if (imageView != VK_NULL_HANDLE) {
     vkDestroyImageView(gpu->device(), imageView, nullptr);
     imageView = VK_NULL_HANDLE;

@@ -194,6 +194,11 @@ Rect Path::getBounds() const {
   return pathRef->getBounds();
 }
 
+Rect Path::computeTightBounds() const {
+  auto skRect = pathRef->path.computeTightBounds();
+  return {skRect.fLeft, skRect.fTop, skRect.fRight, skRect.fBottom};
+}
+
 bool Path::isEmpty() const {
   return pathRef->path.isEmpty();
 }
@@ -204,6 +209,14 @@ bool Path::contains(float x, float y) const {
 
 bool Path::contains(const Rect& rect) const {
   return pathRef->path.conservativelyContainsRect(ToSkRect(rect));
+}
+
+bool Path::isConvex() const {
+  return pathRef->path.isConvex();
+}
+
+bool Path::isLastContourClosed() const {
+  return pathRef->path.isLastContourClosed();
 }
 
 void Path::moveTo(float x, float y) {

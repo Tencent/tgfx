@@ -23,12 +23,31 @@
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/layers/LayerPaint.h"
+#include "tgfx/layers/StrokeAlign.h"
 #include "tgfx/layers/vectors/ColorSource.h"
 
 namespace tgfx {
 
 class LayerRecorder;
 class VectorContext;
+
+/**
+ * Describes the fill/stroke style of a drawing operation.
+ */
+struct PainterStyle {
+  /**
+   * Whether the geometry is filled or stroked.
+   */
+  PaintStyle style = PaintStyle::Fill;
+  /**
+   * The width of the stroke. Only meaningful when style is Stroke.
+   */
+  float strokeWidth = 0.0f;
+  /**
+   * The alignment of the stroke relative to the shape boundary.
+   */
+  StrokeAlign strokeAlign = StrokeAlign::Center;
+};
 
 /**
  * Painter is the base class for objects that perform draw operations on a list of Geometries.
@@ -66,6 +85,11 @@ class Painter {
    */
   virtual std::unique_ptr<Painter> clone() const = 0;
 
+  /**
+   * Returns the fill/stroke style of this painter.
+   */
+  PainterStyle getStyle() const;
+
   std::shared_ptr<Shader> shader = nullptr;
   std::shared_ptr<ColorSource> colorSource = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
@@ -82,8 +106,8 @@ class Painter {
    * skips geometries whose ApplyMatrix result is null (degenerate innerMatrix). outerMatrix is
    * applied as CTM around the emit, and the shader wrapped via wrapShaderWithFit lives in the
    * same inner-group space as the bounds. Subclasses may further modify the shape and must
-   * populate paint.shader; style and stroke may be set when applicable. Return nullptr to skip
-   * emission.
+   * populate paint.shader; style, stroke, strokeAlign and pathEffect may be set when applicable.
+   * Return nullptr to skip emission.
    */
   virtual std::shared_ptr<Shape> prepareShape(std::shared_ptr<Shape> innerShape, size_t index,
                                               LayerPaint* paint) = 0;
@@ -94,8 +118,9 @@ class Painter {
    * from run.textBlob (e.g. getTightBounds()) are in run-local space and the shader returned by
    * wrapShaderWithFit must use the same space. A run emits at most one drawable kind — when
    * neither `textBlob` nor `shape` is set, populated paints are skipped; otherwise either the
-   * TextBlob or the stroke-expanded Shape is emitted, possibly with multiple paints (e.g. a base
-   * paint plus a fill-color overlay). Return with empty paints to skip emission explicitly.
+   * TextBlob or the Shape is emitted, possibly with multiple paints (e.g. a base paint plus a
+   * fill-color overlay). Stroke alignment and path effects are carried on each paint and applied
+   * by ShapeContent at draw time. Return with empty paints to skip emission explicitly.
    */
   struct GlyphRunEmit {
     std::shared_ptr<TextBlob> textBlob = nullptr;
@@ -116,6 +141,11 @@ class Painter {
    * Builds a base LayerPaint pre-populated with the painter's blendMode/alpha/placement.
    */
   LayerPaint makeBasePaint() const;
+
+  /**
+   * Returns the fill/stroke style of this painter.
+   */
+  virtual PainterStyle onGetStyle() const = 0;
 
  private:
   /**

@@ -1,0 +1,73 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making tgfx available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+//  in compliance with the License. You may obtain a copy of the License at
+//
+//      https://opensource.org/licenses/BSD-3-Clause
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#pragma once
+
+#include <webgpu/webgpu.h>
+#include "WebGPUResource.h"
+#include "tgfx/gpu/Texture.h"
+
+namespace tgfx {
+
+class WebGPUGPU;
+
+class WebGPUTexture : public Texture, public WebGPUResource {
+ public:
+  static std::shared_ptr<WebGPUTexture> Make(WebGPUGPU* gpu, const TextureDescriptor& descriptor);
+
+  static std::shared_ptr<WebGPUTexture> MakeFrom(WebGPUGPU* gpu, WGPUTexture texture,
+                                                 uint32_t usage, bool adopted);
+
+  WGPUTexture webgpuTexture() const {
+    return texture;
+  }
+
+  WGPUTextureView webgpuTextureView() const {
+    return textureView;
+  }
+
+  // Returns a view suitable for use as a render target attachment (single mip level).
+  // Falls back to the default textureView if no separate render view exists.
+  WGPUTextureView webgpuRenderView() const {
+    return renderView != nullptr ? renderView : textureView;
+  }
+
+  WGPUTextureFormat webgpuFormat() const {
+    return wgpuFormat;
+  }
+
+  BackendTexture getBackendTexture() const override;
+
+  BackendRenderTarget getBackendRenderTarget() const override;
+
+  void onRelease(WebGPUGPU* gpu) override;
+
+ private:
+  WebGPUTexture(WGPUTexture texture, WGPUTextureView textureView, WGPUTextureFormat format,
+                const TextureDescriptor& descriptor, bool adopted);
+
+  WGPUTexture texture = nullptr;
+  WGPUTextureView textureView = nullptr;
+  WGPUTextureView renderView = nullptr;  // single mip level view for render targets
+  WGPUTextureFormat wgpuFormat = WGPUTextureFormat_RGBA8Unorm;
+  bool adopted = false;
+
+  friend class WebGPUGPU;
+};
+
+}  // namespace tgfx

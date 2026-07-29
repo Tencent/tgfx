@@ -64,6 +64,10 @@ void MetalCaps::initFeatureSet(id<MTLDevice> device) {
   // Metal always supports semaphore (MTLEvent) synchronization
   _features.semaphore = true;
 
+  // Metal universally supports stencil and DEPTH24_STENCIL8 (or D32S8 fallback), so the
+  // stencil attachment capability is unconditionally available.
+  _features.stencilAttachmentSupported = true;
+
   // Check for clamp to border support
 #if TARGET_OS_OSX
   if (@available(macOS 10.15, *)) {

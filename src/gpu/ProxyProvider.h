@@ -27,6 +27,7 @@
 #include "gpu/proxies/GPUMeshProxy.h"
 #include "gpu/proxies/GPUShapeProxy.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "gpu/proxies/StencilCoverPathProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/proxies/VertexBufferView.h"
 #include "tgfx/core/ImageGenerator.h"
@@ -86,6 +87,16 @@ class ProxyProvider {
   std::shared_ptr<GPUShapeProxy> createGPUShapeProxy(std::shared_ptr<Shape> shape, AAType aaType,
                                                      const Rect& clipBounds,
                                                      uint32_t renderFlags = 0);
+
+  /**
+   * Creates a StencilCoverPathProxy for the given Shape. The shape's geometry is
+   * decomposed into a bezier vertex stream by StencilCoverPathTessellator in the background and
+   * uploaded to a vertex buffer. The cache key is derived from the shape geometry alone, so
+   * different draws of the same shape that only differ in transform or color hit the same GPU
+   * resource.
+   */
+  std::shared_ptr<StencilCoverPathProxy> createStencilCoverPathProxy(std::shared_ptr<Shape> shape,
+                                                                     uint32_t renderFlags = 0);
 
   /**
    * Creates a GPUHairlineProxy for the given Path. The hairline vertex data will be generated

@@ -20,8 +20,10 @@
 
 #include <unordered_map>
 #include <unordered_set>
+#include "core/utils/Log.h"
 #include "gpu/vulkan/VulkanAPI.h"
 #include "gpu/vulkan/VulkanResource.h"
+#include "tgfx/gpu/RenderPass.h"
 #include "tgfx/gpu/RenderPipeline.h"
 
 namespace tgfx {
@@ -40,26 +42,36 @@ class VulkanRenderPipeline : public RenderPipeline, public VulkanResource {
     return pipeline;
   }
 
+  /// Returns the VkPipeline matching the given primitive type. When extendedDynamicState is
+  /// unavailable, a separate TriangleStrip pipeline variant is created at construction time.
+  VkPipeline vulkanPipeline(PrimitiveType type) const {
+    if (type == PrimitiveType::TriangleStrip) {
+      DEBUG_ASSERT(stripPipeline != VK_NULL_HANDLE);
+      return stripPipeline;
+    }
+    return pipeline;
+  }
+
   VkPipelineLayout vulkanPipelineLayout() const {
     return pipelineLayout;
   }
 
-  VkDescriptorSetLayout vulkanDescriptorSetLayout() const {
-    return descriptorSetLayout;
+  /// Returns the descriptor set layout for UBO bindings (set 0).
+  VkDescriptorSetLayout vulkanUboSetLayout() const {
+    return uboSetLayout;
+  }
+
+  /// Returns the descriptor set layout for texture/sampler bindings (set 1).
+  VkDescriptorSetLayout vulkanTextureSetLayout() const {
+    return textureSetLayout;
   }
 
   unsigned getTextureIndex(unsigned binding) const;
-
-  unsigned getDescriptorBinding(unsigned binding) const;
 
   uint32_t getUniformBlockVisibility(unsigned binding) const;
 
   bool hasUniformBinding(unsigned binding) const {
     return uniformBindingSet.count(binding) > 0;
-  }
-
-  bool hasTextureBinding(unsigned binding) const {
-    return textureBindingSet.count(binding) > 0;
   }
 
   const std::unordered_set<unsigned>& getTextureBindings() const {
@@ -73,15 +85,19 @@ class VulkanRenderPipeline : public RenderPipeline, public VulkanResource {
   VulkanRenderPipeline(VulkanGPU* gpu, const RenderPipelineDescriptor& descriptor);
   ~VulkanRenderPipeline() override = default;
 
-  bool createDescriptorSetLayout(VulkanGPU* gpu, const RenderPipelineDescriptor& descriptor);
+  bool createDescriptorSetLayouts(VulkanGPU* gpu, const RenderPipelineDescriptor& descriptor);
   bool createPipelineLayout(VulkanGPU* gpu);
-  bool createPipeline(VulkanGPU* gpu, const RenderPipelineDescriptor& descriptor);
+  bool createPipeline(VulkanGPU* gpu, const RenderPipelineDescriptor& descriptor,
+                      VkPrimitiveTopology topology, VkPipeline* outPipeline);
 
   VkPipeline pipeline = VK_NULL_HANDLE;
+  VkPipeline stripPipeline = VK_NULL_HANDLE;
   VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
-  VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
+  // Descriptor set 0: UBO bindings (vertex UBO at binding 0, fragment UBO at binding 1).
+  VkDescriptorSetLayout uboSetLayout = VK_NULL_HANDLE;
+  // Descriptor set 1: texture/sampler bindings (binding 0, 1, 2, ...).
+  VkDescriptorSetLayout textureSetLayout = VK_NULL_HANDLE;
   std::unordered_map<unsigned, unsigned> textureUnits = {};
-  std::unordered_map<unsigned, unsigned> textureDescriptorBindings = {};
   std::unordered_map<unsigned, uint32_t> uniformBlockVisibility = {};
   std::unordered_set<unsigned> uniformBindingSet = {};
   std::unordered_set<unsigned> textureBindingSet = {};

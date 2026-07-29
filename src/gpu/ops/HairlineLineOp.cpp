@@ -42,7 +42,7 @@ HairlineLineOp::HairlineLineOp(BlockAllocator* allocator,
                                std::shared_ptr<GPUHairlineProxy> hairlineProxy,
                                std::shared_ptr<GPUBufferProxy> indexBufferProxy, PMColor color,
                                const Matrix& uvMatrix, float coverage, AAType aaType)
-    : DrawOp(allocator, aaType), hairlineProxy(std::move(hairlineProxy)),
+    : StandardDrawOp(allocator, aaType), hairlineProxy(std::move(hairlineProxy)),
       indexBufferProxy(std::move(indexBufferProxy)), color(color), uvMatrix(uvMatrix),
       coverage(coverage) {
 }
@@ -56,19 +56,24 @@ PlacementPtr<GeometryProcessor> HairlineLineOp::onMakeGeometryProcessor(
                                              aaType);
 }
 
-void HairlineLineOp::onDraw(RenderPass* renderPass) {
+bool HairlineLineOp::onPrepare() {
+  // The hairline vertex buffer is produced asynchronously and may be empty when the path has
+  // no line segments after decomposition. The index buffer comes from the global cache and is
+  // also uploaded asynchronously. Skip the op entirely if either resource is unavailable so the
+  // pipeline is not bound and no dirty state is left for the next op.
   auto lineVertexBufferProxy = hairlineProxy->getLineVertexBufferProxy();
-  if (lineVertexBufferProxy == nullptr || indexBufferProxy == nullptr) {
-    return;
+  if (lineVertexBufferProxy == nullptr || lineVertexBufferProxy->getBuffer() == nullptr) {
+    return false;
   }
-  auto vertexBuffer = lineVertexBufferProxy->getBuffer();
-  if (vertexBuffer == nullptr) {
-    return;
+  if (indexBufferProxy == nullptr || indexBufferProxy->getBuffer() == nullptr) {
+    return false;
   }
+  return true;
+}
+
+void HairlineLineOp::onDraw(RenderPass* renderPass, RenderTarget* /*renderTarget*/) {
   auto indexBuffer = indexBufferProxy->getBuffer();
-  if (indexBuffer == nullptr) {
-    return;
-  }
+  auto vertexBuffer = hairlineProxy->getLineVertexBufferProxy()->getBuffer();
   auto totalLineCount = vertexBuffer->size() / (VerticesPerLine * BytesPerLineVertex);
   size_t vertexOffset = 0;
   renderPass->setIndexBuffer(indexBuffer->gpuBuffer(), IndexFormat::UInt16);

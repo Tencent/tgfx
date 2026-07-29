@@ -24,18 +24,22 @@
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/ColorFilter.h"
+#include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Rect.h"
+#include "tgfx/core/Shader.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/WriteStream.h"
 #include "tgfx/layers/DisplayList.h"
+#include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/ShapeStyle.h"
 #include "tgfx/layers/filters/BlurFilter.h"
+#include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
 #include "tgfx/svg/SVGExporter.h"
@@ -326,7 +330,8 @@ TGFX_TEST(SVGExportTest, StrokeWidth) {
   std::string compareString =
       "<?xml version=\"1.0\" encoding=\"utf-8\" ?><svg xmlns=\"http://www.w3.org/2000/svg\" "
       "xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"200\" height=\"200\"><rect "
-      "fill=\"#F00\" x=\"50\" y=\"50\" width=\"100\" height=\"100\"/></svg>";
+      "fill=\"none\" stroke=\"#F00\" stroke-width=\"5\" x=\"50\" y=\"50\" width=\"100\" "
+      "height=\"100\"/></svg>";
 
   ContextScope scope;
   auto context = scope.getContext();
@@ -1230,4 +1235,365 @@ TGFX_TEST(SVGExportTest, ClipShortCircuitWithStaleGroup) {
   exporter->close();
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/ClipShortCircuitWithStaleGroup"));
 }
+
+TGFX_TEST(SVGExportTest, BackgroundBlur) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(300, 300));
+  auto canvas = exporter->getCanvas();
+
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Red background rect.
+  auto backgroundLayer = ShapeLayer::Make();
+  backgroundLayer->setMatrix(Matrix::MakeTrans(50, 50));
+  Path rectPath;
+  rectPath.addRect(Rect::MakeWH(150, 150));
+  backgroundLayer->setPath(rectPath);
+  backgroundLayer->setFillStyle(ShapeStyle::Make(Color::Red()));
+  displayList->root()->addChild(backgroundLayer);
+
+  // Same-sized rect offset to overlap, with background blur.
+  auto overlayLayer = ShapeLayer::Make();
+  overlayLayer->setMatrix(Matrix::MakeTrans(100, 100));
+  overlayLayer->setPath(rectPath);
+  overlayLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 100)));
+  auto backgroundBlur = BackgroundBlurStyle::Make(15, 15);
+  overlayLayer->setLayerStyles({backgroundBlur});
+  displayList->root()->addChild(overlayLayer);
+
+  displayList->root()->draw(canvas);
+
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/BackgroundBlur"));
+}
+
+TGFX_TEST(SVGExportTest, BackgroundBlurWithDropShadow) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(300, 300));
+  auto canvas = exporter->getCanvas();
+
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Red background rect.
+  auto backgroundLayer = ShapeLayer::Make();
+  backgroundLayer->setMatrix(Matrix::MakeTrans(50, 50));
+  Path rectPath;
+  rectPath.addRect(Rect::MakeWH(150, 150));
+  backgroundLayer->setPath(rectPath);
+  backgroundLayer->setFillStyle(ShapeStyle::Make(Color::Red()));
+  displayList->root()->addChild(backgroundLayer);
+
+  // Same-sized rect offset to overlap, with background blur and drop shadow.
+  auto overlayLayer = ShapeLayer::Make();
+  overlayLayer->setMatrix(Matrix::MakeTrans(100, 100));
+  overlayLayer->setPath(rectPath);
+  overlayLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 100)));
+  auto backgroundBlur = BackgroundBlurStyle::Make(15, 15);
+  auto dropShadow = DropShadowStyle::Make(5, 5, 8, 8, Color::Black(), true);
+  overlayLayer->setLayerStyles({backgroundBlur, dropShadow});
+  displayList->root()->addChild(overlayLayer);
+
+  displayList->root()->draw(canvas);
+
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/BackgroundBlurWithDropShadow"));
+}
+TGFX_TEST(SVGExportTest, BlurFilterWithRotation) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  int width = 530;
+  int height = 300;
+
+  auto displayList = std::make_unique<DisplayList>();
+
+  Path rect200;
+  rect200.addRect(Rect::MakeWH(200, 200));
+  Path rect100;
+  rect100.addRect(Rect::MakeWH(100, 100));
+
+  // Left group: overlay without rotation.
+  auto leftBg = ShapeLayer::Make();
+  leftBg->setMatrix(Matrix::MakeTrans(50, 50));
+  leftBg->setPath(rect200);
+  leftBg->setFillStyle(ShapeStyle::Make(Color::Red()));
+  displayList->root()->addChild(leftBg);
+
+  auto leftOverlay = ShapeLayer::Make();
+  leftOverlay->setMatrix(Matrix::MakeTrans(50, 50));
+  leftOverlay->setPath(rect100);
+  leftOverlay->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 240)));
+  leftOverlay->setFilters({BlurFilter::Make(15, 15)});
+  displayList->root()->addChild(leftOverlay);
+
+  // Right group: overlay with 180-degree rotation. The overlay is translated by its own
+  // size (100,100) then rotated 180°, which maps the local (0,0)-(100,100) rect back to
+  // the same canvas position as the non-rotated case.
+  auto rightBg = ShapeLayer::Make();
+  rightBg->setMatrix(Matrix::MakeTrans(280, 50));
+  rightBg->setPath(rect200);
+  rightBg->setFillStyle(ShapeStyle::Make(Color::Red()));
+  displayList->root()->addChild(rightBg);
+
+  auto rightOverlay = ShapeLayer::Make();
+  auto rightMatrix = Matrix::MakeTrans(380, 150);
+  rightMatrix.preRotate(180);
+  rightOverlay->setMatrix(rightMatrix);
+  rightOverlay->setPath(rect100);
+  rightOverlay->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 240)));
+  rightOverlay->setFilters({BlurFilter::Make(15, 15)});
+  displayList->root()->addChild(rightOverlay);
+
+  // Export as SVG.
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(width, height));
+  displayList->root()->draw(exporter->getCanvas());
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/BlurFilterWithRotation"));
+}
+
+TGFX_TEST(SVGExportTest, FilterImageWithBlendMode) {
+  // When a raster ImageLayer carries both a BlurFilter and a non-SrcOver BlendMode, filter and
+  // mix-blend-mode must share the same <g>; otherwise the filter's isolation group would erase
+  // the blend. Uses a real image asset so the inner content stays raster (rendered as
+  // <rect fill="url(#pattern)">), matching the failing scenario from real exports.
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto image = MakeImage("resources/assets/bridge.jpg");
+  ASSERT_TRUE(image != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200));
+
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto background = ShapeLayer::Make();
+  Path bgPath;
+  bgPath.addRect(Rect::MakeWH(200, 200));
+  background->setPath(bgPath);
+  background->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 200, 0)));
+  displayList->root()->addChild(background);
+
+  auto overlay = ImageLayer::Make();
+  overlay->setMatrix(Matrix::MakeTrans(50, 50) *
+                     Matrix::MakeScale(100.f / static_cast<float>(image->width()),
+                                       100.f / static_cast<float>(image->height())));
+  overlay->setImage(image);
+  overlay->setFilters({BlurFilter::Make(4, 4)});
+  overlay->setBlendMode(BlendMode::Color);
+  displayList->root()->addChild(overlay);
+
+  displayList->root()->draw(exporter->getCanvas());
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/FilterImageWithBlendMode"));
+}
+
+TGFX_TEST(SVGExportTest, FilterImageWithBlendModeAndClip) {
+  // Same as FilterImageWithBlendMode but with an active clip on the canvas. Verifies that
+  // clip-path, filter and mix-blend-mode all collapse onto a single <g>: an extra <g clip-path>
+  // wrapper around the blend element would isolate it from its real previous siblings and
+  // silently drop the blend.
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto image = MakeImage("resources/assets/bridge.jpg");
+  ASSERT_TRUE(image != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200));
+  auto canvas = exporter->getCanvas();
+  // Tight clip that actually crops the overlay (which spans 30..170) so needsClip is true on
+  // the FilterImage export path.
+  canvas->clipRect(Rect::MakeXYWH(60, 60, 80, 80));
+
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto background = ShapeLayer::Make();
+  Path bgPath;
+  bgPath.addRect(Rect::MakeWH(200, 200));
+  background->setPath(bgPath);
+  background->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 200, 0)));
+  displayList->root()->addChild(background);
+
+  auto overlay = ImageLayer::Make();
+  overlay->setMatrix(Matrix::MakeTrans(30, 30) *
+                     Matrix::MakeScale(140.f / static_cast<float>(image->width()),
+                                       140.f / static_cast<float>(image->height())));
+  overlay->setImage(image);
+  overlay->setFilters({BlurFilter::Make(4, 4)});
+  overlay->setBlendMode(BlendMode::Color);
+  displayList->root()->addChild(overlay);
+
+  displayList->root()->draw(canvas);
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/FilterImageWithBlendModeAndClip"));
+}
+TGFX_TEST(SVGExportTest, FilterAndShaderExport) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(800, 600),
+                                    SVGExportFlags::DisablePrettyXML);
+  auto canvas = exporter->getCanvas();
+
+  // 1. BlendImageFilter + Gradient: white rect with red-green gradient multiplied.
+  Paint blendGradPaint;
+  blendGradPaint.setColor(Color::White());
+  auto gradShader = Shader::MakeLinearGradient({0, 0}, {200, 200}, {Color::Red(), Color::Green()});
+  blendGradPaint.setImageFilter(ImageFilter::Blend(BlendMode::Multiply, gradShader));
+  canvas->drawRect(Rect::MakeXYWH(25, 25, 150, 150), blendGradPaint);
+
+  // 2. BlendImageFilter + Image (Screen): original image vs brown+Screen blend.
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_TRUE(image != nullptr);
+  auto imageShader = Shader::MakeImageShader(image);
+  canvas->drawImageRect(image, Rect::MakeXYWH(200, 36, 128, 128));
+  Paint blendImgPaint;
+  blendImgPaint.setColor(Color::FromRGBA(101, 67, 33));
+  blendImgPaint.setImageFilter(ImageFilter::Blend(BlendMode::Screen, imageShader));
+  canvas->drawRect(Rect::MakeXYWH(350, 36, 128, 128), blendImgPaint);
+
+  // 3. ColorFilterShader: gradient with green overlay.
+  auto cfGradient = Shader::MakeLinearGradient({500, 0}, {700, 0}, {Color::Red(), Color::Blue()});
+  auto cfFilter = ColorFilter::Blend(Color::FromRGBA(0, 255, 0, 128), BlendMode::SrcOver);
+  Paint cfsPaint;
+  cfsPaint.setShader(cfGradient->makeWithColorFilter(cfFilter));
+  canvas->drawRect(Rect::MakeXYWH(500, 25, 150, 150), cfsPaint);
+
+  // 4. PerlinNoise shader.
+  Paint noisePaint;
+  noisePaint.setShader(Shader::MakeFractalNoise(0.05f, 0.05f, 3, 42));
+  canvas->drawRect(Rect::MakeXYWH(25, 225, 150, 150), noisePaint);
+
+  // 5. Luma ColorFilter: black-to-white gradient converted to grayscale.
+  Paint lumaPaint;
+  lumaPaint.setShader(
+      Shader::MakeLinearGradient({200, 0}, {400, 0}, {Color::Black(), Color::White()}));
+  lumaPaint.setColorFilter(ColorFilter::Luma());
+  canvas->drawRect(Rect::MakeXYWH(200, 225, 150, 150), lumaPaint);
+
+  // 6. AlphaThreshold: alpha gradient + noise with threshold cutoff.
+  auto alphaGrad = Shader::MakeLinearGradient(
+      {400, 0}, {475, 0}, {Color::FromRGBA(0, 0, 255, 0), Color::FromRGBA(0, 0, 255, 255)});
+  Paint atPaint;
+  atPaint.setShader(alphaGrad);
+  atPaint.setColorFilter(ColorFilter::AlphaThreshold(0.5f));
+  canvas->drawRect(Rect::MakeXYWH(400, 225, 75, 150), atPaint);
+  Paint atNoisePaint;
+  atNoisePaint.setShader(Shader::MakeFractalNoise(0.05f, 0.05f, 4, 0));
+  atNoisePaint.setColorFilter(ColorFilter::AlphaThreshold(0.5f));
+  canvas->drawRect(Rect::MakeXYWH(485, 225, 75, 150), atNoisePaint);
+
+  // 7. ComposeImageFilter: blur + dropShadowOnly + innerShadow + colorFilter composed together.
+  auto blurFilter = ImageFilter::Blur(5, 5);
+  auto dropShadowOnlyFilter = ImageFilter::DropShadowOnly(5, 5, 10, 10, Color::Black());
+  auto innerShadowFilter = ImageFilter::InnerShadow(-5, -5, 3, 3, Color::White());
+  auto colorImageFilter =
+      ImageFilter::ColorFilter(ColorFilter::Blend(Color::Red(), BlendMode::Multiply));
+  auto composeFilter =
+      ImageFilter::Compose({blurFilter, dropShadowOnlyFilter, innerShadowFilter, colorImageFilter});
+  Paint composePaint;
+  composePaint.setColor(Color::Blue());
+  composePaint.setImageFilter(composeFilter);
+  canvas->drawRect(Rect::MakeXYWH(600, 225, 150, 150), composePaint);
+
+  // 8. ComposeColorFilter with non-Multiply Blend outer: Compose(Luma, Screen(red)).
+  // Verifies the Compose chain correctly bridges inner's output to outer's feBlend input.
+  auto composeColorFilter = ColorFilter::Compose(
+      ColorFilter::Luma(), ColorFilter::Blend(Color::Red(), BlendMode::Screen));
+  Paint composeBlendPaint;
+  composeBlendPaint.setColor(Color::Blue());
+  composeBlendPaint.setColorFilter(composeColorFilter);
+  canvas->drawRect(Rect::MakeXYWH(25, 425, 150, 150), composeBlendPaint);
+
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/FilterAndShaderExport"));
+}
+
+TGFX_TEST(SVGExportTest, BlendImageFilterWithColorFilterShader) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(700, 200),
+                                    SVGExportFlags::DisablePrettyXML);
+  auto canvas = exporter->getCanvas();
+
+  // ColorFilterShader = inner shader + colorFilter applied on top.
+  // Test all four inner shader types with a Multiply colorFilter and Multiply blend mode.
+  // Use dark blue base color to make the overlay effects visible.
+  auto cf = ColorFilter::Blend(Color::FromRGBA(255, 128, 0), BlendMode::Multiply);
+
+  // 1. Inner = ColorShader (green) + Multiply(orange), Multiply blended onto blue.
+  auto colorShader = Shader::MakeColorShader(Color::Green())->makeWithColorFilter(cf);
+  Paint paint1;
+  paint1.setColor(Color::FromRGBA(50, 50, 200));
+  paint1.setImageFilter(ImageFilter::Blend(BlendMode::Multiply, colorShader));
+  canvas->drawRect(Rect::MakeXYWH(25, 25, 150, 150), paint1);
+
+  // 2. Inner = PerlinNoise + Multiply(orange), Multiply blended onto blue.
+  auto noiseShader = Shader::MakeFractalNoise(0.05f, 0.05f, 2, 7)->makeWithColorFilter(cf);
+  Paint paint2;
+  paint2.setColor(Color::FromRGBA(50, 50, 200));
+  paint2.setImageFilter(ImageFilter::Blend(BlendMode::Multiply, noiseShader));
+  canvas->drawRect(Rect::MakeXYWH(200, 25, 150, 150), paint2);
+
+  // 3. Inner = LinearGradient (red→blue) + Multiply(orange), Multiply blended onto blue.
+  auto gradShader = Shader::MakeLinearGradient({0, 0}, {150, 150}, {Color::Red(), Color::Blue()})
+                        ->makeWithColorFilter(cf);
+  Paint paint3;
+  paint3.setColor(Color::FromRGBA(50, 50, 200));
+  paint3.setImageFilter(ImageFilter::Blend(BlendMode::Multiply, gradShader));
+  canvas->drawRect(Rect::MakeXYWH(375, 25, 150, 150), paint3);
+
+  // 4. Inner = ImageShader + Multiply(orange), Multiply blended onto blue.
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_TRUE(image != nullptr);
+  image = image->makeScaled(150, 150);
+  auto imgShader = Shader::MakeImageShader(image)->makeWithColorFilter(cf);
+  Paint paint4;
+  paint4.setColor(Color::FromRGBA(50, 50, 200));
+  paint4.setImageFilter(ImageFilter::Blend(BlendMode::Multiply, imgShader));
+  canvas->drawRect(Rect::MakeXYWH(550, 25, 150, 150), paint4);
+
+  exporter->close();
+
+  auto data = SVGStream->readData();
+  SaveFile(data, "SVGExportTest/BlendImageFilterWithColorFilterShader.svg");
+  std::string svgText(static_cast<const char*>(data->data()), data->size());
+
+  // Verify ColorFilterShader is properly decomposed (not reported as unsupported).
+  EXPECT_TRUE(svgText.find("Unsupported") == std::string::npos);
+  // Verify all four blend filters are present.
+  EXPECT_TRUE(svgText.find("feFlood") != std::string::npos);
+  EXPECT_TRUE(svgText.find("feTurbulence") != std::string::npos);
+  EXPECT_TRUE(svgText.find("feImage") != std::string::npos);
+  EXPECT_TRUE(svgText.find("feBlend") != std::string::npos);
+
+  // Also render GPU result for visual comparison.
+  auto surface = Surface::Make(context, 700, 200);
+  auto gpuCanvas = surface->getCanvas();
+  gpuCanvas->drawRect(Rect::MakeXYWH(25, 25, 150, 150), paint1);
+  gpuCanvas->drawRect(Rect::MakeXYWH(200, 25, 150, 150), paint2);
+  gpuCanvas->drawRect(Rect::MakeXYWH(375, 25, 150, 150), paint3);
+  gpuCanvas->drawRect(Rect::MakeXYWH(550, 25, 150, 150), paint4);
+  context->flushAndSubmit();
+  Baseline::Compare(surface, "SVGExportTest/BlendImageFilterWithColorFilterShader");
+}
+
 }  // namespace tgfx

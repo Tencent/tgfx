@@ -332,8 +332,24 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   matrix.preTranslate(contentEntry.offset.x, contentEntry.offset.y);
   canvas->concat(matrix);
   auto backgroundOffset = bgOffset - contentEntry.offset;
-  style->drawWithExtraSource(canvas, contentEntry.image, source->contentScale, std::move(bgImage),
-                             backgroundOffset, alpha);
+  LayerStyleInput styleInput = {};
+  styleInput.content = contentEntry.image;
+  styleInput.contentOffset = contentEntry.offset;
+  styleInput.contentScale = source->contentScale;
+  auto sourceFlags = style->extraSourceType();
+  styleInput.extraSources.push_back(
+      std::make_shared<StyleInputSource>(std::move(bgImage), backgroundOffset));
+  if ((sourceFlags & static_cast<uint32_t>(LayerStyleExtraSourceType::Contour)) != 0) {
+    std::shared_ptr<Image> contourImage = nullptr;
+    Point contourOffset = {};
+    if (group->contour.has_value()) {
+      contourImage = group->contour->image;
+      contourOffset = group->contour->offset - contentEntry.offset;
+    }
+    styleInput.extraSources.push_back(std::make_shared<ContourInputSource>(
+        std::move(contourImage), contourOffset, source->contentShape));
+  }
+  style->draw(canvas, styleInput, alpha);
 }
 
 void BackgroundCapturer::Run(Layer* captureRoot, const DrawArgs& baseArgs,
@@ -348,8 +364,8 @@ void BackgroundCapturer::Run(Layer* captureRoot, const DrawArgs& baseArgs,
   }
 
   auto* bgCanvas = bgSource->getCanvas();
-  AutoCanvasRestore autoRestore(bgCanvas);
   BackgroundCapturer capturer(snapshots, std::move(bgSource));
+  AutoCanvasRestore autoRestore(bgCanvas);
   DrawArgs captureArgs = baseArgs;
   captureArgs.backgroundHandler = &capturer;
   captureArgs.renderRects = &renderRects;

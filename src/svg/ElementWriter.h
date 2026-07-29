@@ -18,7 +18,10 @@
 
 #pragma once
 
+#include <vector>
 #include "ResourceStore.h"
+#include "core/filters/BlendImageFilter.h"
+#include "core/filters/ColorImageFilter.h"
 #include "core/filters/DropShadowImageFilter.h"
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/filters/InnerShadowImageFilter.h"
@@ -75,8 +78,16 @@ class ElementWriter {
   void addEllipseAttributes(const Rect& bound);
   void addPathAttributes(const Path& path, SVGPathParser::PathEncoding encoding);
 
-  Resources addImageFilterResource(const std::shared_ptr<ImageFilter>& imageFilter, Rect bound,
-                                   const std::shared_ptr<SVGCustomWriter>& exportWriter);
+  /**
+   * Emits SVG <filter> resources for the given image filter and returns all filter IDs. For a
+   * Compose filter, each sub-filter gets its own <filter> element, and all IDs are returned in
+   * application order (innermost first). The caller can use these IDs to create nested <g>
+   * elements. Must be called within a parent <defs> element.
+   */
+  std::vector<std::string> addImageFilterChain(const std::shared_ptr<ImageFilter>& imageFilter,
+                                               const Rect& bound,
+                                               const std::shared_ptr<SVGCustomWriter>& exportWriter,
+                                               Context* context);
 
   /**
    * Emits an SVG <filter> resource that reproduces the given color filter and returns its
@@ -91,16 +102,25 @@ class ElementWriter {
 
   void addShaderResources(const std::shared_ptr<Shader>& shader, Context* context,
                           Resources* resources);
+  void addShaderFilterPrimitives(const Shader* shader);
+  void addPerlinNoisePrimitives(const Shader* noiseShader, const std::string& resultName = "");
   void addColorShaderResources(const ColorShader* shader, Resources* resources);
   void addGradientShaderResources(const GradientShader* shader, const Matrix& matrix,
                                   Resources* resources);
   void addImageShaderResources(const ImageShader* shader, const Matrix& matrix, Context* context,
                                Resources* resources);
 
-  void addBlendColorFilterResources(const ModeColorFilter* modeColorFilter, Resources* resources);
+  void addMatrixColorFilterPrimitives(const MatrixColorFilter* matrixColorFilter,
+                                      const std::string& inputResult = "",
+                                      const std::string& outputResult = "");
 
-  void addMatrixColorFilterResources(const MatrixColorFilter* matrixColorFilter,
-                                     Resources* resources);
+  void addBlendColorFilterPrimitives(const ModeColorFilter* modeColorFilter,
+                                     const std::string& inputResult = "",
+                                     const std::string& outputResult = "");
+
+  bool addColorFilterPrimitives(const std::shared_ptr<ColorFilter>& colorFilter,
+                                const std::string& inputResult = "",
+                                const std::string& outputResult = "");
 
   void addMaskResources(const std::shared_ptr<MaskFilter>& maskFilter, Resources* resources,
                         Context* context, SVGExportContext* svgContext);
@@ -124,8 +144,16 @@ class ElementWriter {
   std::string addRadialGradientDef(const GradientInfo& info, const Matrix& matrix);
   std::string addUnsupportedGradientDef(const GradientInfo& info, const Matrix& matrix);
 
-  std::string addImageFilter(const std::shared_ptr<ImageFilter>& imageFilter, Rect bound,
-                             const std::shared_ptr<SVGCustomWriter>& exportWriter);
+  std::string addImageFilter(const std::shared_ptr<ImageFilter>& imageFilter, const Rect& bound,
+                             const std::shared_ptr<SVGCustomWriter>& exportWriter,
+                             Context* context);
+  std::string emitFilterElement(const std::shared_ptr<ImageFilter>& imageFilter, const Rect& bound,
+                                const std::shared_ptr<SVGCustomWriter>& exportWriter,
+                                Context* context, bool preserveSoftAlpha = false);
+  bool writeFilterPrimitives(const std::shared_ptr<ImageFilter>& imageFilter,
+                             ElementWriter& filterElement,
+                             const std::shared_ptr<SVGCustomWriter>& exportWriter,
+                             const Rect& bound, Context* context, bool preserveSoftAlpha);
   void callbackBlurImageFilter(const GaussianBlurImageFilter* filter,
                                const std::shared_ptr<SVGCustomWriter>& exportWriter,
                                ElementWriter& filterElement);
@@ -135,9 +163,23 @@ class ElementWriter {
   void callbackInnerShadowImageFilter(const InnerShadowImageFilter* filter,
                                       const std::shared_ptr<SVGCustomWriter>& exportWriter,
                                       ElementWriter& filterElement);
-  void addBlurImageFilter(const GaussianBlurImageFilter* filter);
-  void addDropShadowImageFilter(const DropShadowImageFilter* filter);
-  void addInnerShadowImageFilter(const InnerShadowImageFilter* filter);
+
+  void addHardAlphaElement();
+  void addSoftAlphaElement();
+  void addBlurImageFilter(const GaussianBlurImageFilter* filter,
+                          const std::string& inputResult = "");
+  void addDropShadowImageFilter(const DropShadowImageFilter* filter,
+                                const std::string& inputResult = "",
+                                bool preserveSoftAlpha = false);
+  void addInnerShadowImageFilter(const InnerShadowImageFilter* filter,
+                                 const std::string& inputResult = "",
+                                 bool preserveSoftAlpha = false);
+  void addColorImageFilter(const ColorImageFilter* filter, const std::string& inputResult = "");
+  void addBlendImageFilter(const BlendImageFilter* filter, const std::string& inputResult,
+                           const Rect* filterBounds, Context* context);
+
+  std::string emitShaderAsPrimitive(const Shader* shader, const Matrix& shaderMatrix,
+                                    const Rect* filterBounds, Context* context);
 
   void reportUnsupportedElement(const char* message) const;
 

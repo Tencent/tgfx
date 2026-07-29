@@ -382,12 +382,7 @@ void PDFDocumentImpl::onEndPage() {
                   static_cast<float>(drawContext->pageSize().height) * inverseRasterScale);
   auto pageContent = drawContext->getContent();
 
-  auto resourceDict = drawContext->makeResourceDict();
-  if (_colorSpaceRef) {
-    auto colorSpaceDic = PDFDictionary::Make();
-    colorSpaceDic->insertRef("CS", _colorSpaceRef);
-    resourceDict->insertObject("ColorSpace", std::move(colorSpaceDic));
-  }
+  auto resourceDict = drawContext->makeResourceDictionary();
   DEBUG_ASSERT(!pageRefs.empty());
 
   page->insertObject("Resources", std::move(resourceDict));

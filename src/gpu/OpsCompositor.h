@@ -57,6 +57,7 @@ enum class PendingOpType {
   RRect,
   Shape,
   Atlas,
+  StencilCoverPath,
 };
 
 /**
@@ -83,7 +84,8 @@ class OpsCompositor {
    */
   void fillImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
                      const SamplingOptions& sampling, const Matrix& matrix, const ClipStack& clip,
-                     const Brush& brush, SrcRectConstraint constraint);
+                     const Brush& brush, SrcRectConstraint constraint,
+                     const Rect* strictRect = nullptr);
 
   /**
    * Fills the given rect with the given state, fill and optional stroke.
@@ -157,12 +159,23 @@ class OpsCompositor {
   std::shared_ptr<TextureProxy> pendingAtlasTexture = nullptr;
   std::vector<PlacementPtr<RectRecord>> pendingRects = {};
   std::vector<PlacementPtr<Rect>> pendingUVRects = {};
+  std::vector<PlacementPtr<Rect>> pendingSubsetRects = {};
   std::vector<PlacementPtr<RRectRecord>> pendingRRects = {};
   std::vector<PlacementPtr<Stroke>> pendingStrokes = {};
   std::shared_ptr<Shape> pendingShape = nullptr;
   Matrix pendingShapeMatrix = {};
   std::vector<Point> pendingShapeOffsets = {};
   std::vector<Color> pendingShapeColors = {};
+  // Deferred queue for the stencil-and-cover path. NOTE: entries here are still emitted as
+  // one DrawOp per shape at flush time — no instanced merge is performed yet. The queue
+  // exists so that stencil-cover ops participate in the same "same clip+brush" batching
+  // gate as ShapeDrawOp / RectDrawOp (i.e. an intervening op with a different clip/brush
+  // forces a flush). A true instanced merge is a follow-up when the stencil GP is extended
+  // with per-instance transform / color streams; until then, MaxNumBatched is only a
+  // memory-pressure cap, not a real GPU batching limit.
+  std::vector<std::shared_ptr<Shape>> pendingStencilCoverShapes = {};
+  std::vector<Matrix> pendingStencilCoverMatrices = {};
+  std::vector<Color> pendingStencilCoverColors = {};
   std::optional<PMColor> clearColor = std::nullopt;
   std::vector<PlacementPtr<DrawOp>> drawOps = {};
   std::shared_ptr<ColorSpace> dstColorSpace = nullptr;
@@ -183,6 +196,8 @@ class OpsCompositor {
   void flushPendingOps(PendingOpType currentType = PendingOpType::Unknown,
                        ClipStack currentClip = {}, Brush currentBrush = {});
   void flushPendingShapeOps();
+  void flushPendingStencilCoverOps();
+  bool shouldUseStencilCover(const Brush& brush) const;
   void resetPendingOps(PendingOpType currentType = PendingOpType::Unknown,
                        ClipStack currentClip = {}, Brush currentBrush = {});
   AAType getAAType(const Brush& brush) const;
@@ -191,8 +206,8 @@ class OpsCompositor {
                                           bool hasImageFill = false);
   Rect getClipBounds(const ClipStack& clip) const;
   AppliedClip applyClip(const ClipStack& clipStack);
-  PlacementPtr<FragmentProcessor> makeAnalyticFP(const ClipElement& element,
-                                                 PlacementPtr<FragmentProcessor> inputFP);
+  std::pair<bool, PlacementPtr<FragmentProcessor>> tryApplyAnalyticFP(
+      const ClipElement& element, PlacementPtr<FragmentProcessor> inputFP) const;
   PlacementPtr<FragmentProcessor> getClipMaskFP(const std::vector<const ClipElement*>& elements,
                                                 uint32_t uniqueID, const Rect& clipBound,
                                                 PlacementPtr<FragmentProcessor> inputFP);

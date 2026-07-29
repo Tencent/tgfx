@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/opengl/eagl/EAGLWindow.h"
+#import <Foundation/Foundation.h>
 #include "core/utils/Log.h"
 #include "gpu/opengl/GLFunctions.h"
 #include "gpu/opengl/eagl/EAGLLayerTexture.h"
@@ -49,6 +50,11 @@ EAGLWindow::EAGLWindow(std::shared_ptr<Device> device, CAEAGLLayer* layer,
 }
 
 std::shared_ptr<RenderTargetProxy> EAGLWindow::onCreateRenderTarget(Context* context) {
+  if (![NSThread isMainThread]) {
+    LOGE("EAGLWindow::onCreateRenderTarget() must be called on the main thread because it "
+         "reads CAEAGLLayer geometry. Create the Surface on the main thread, then render on "
+         "any thread.");
+  }
   if (layerTexture != nullptr) {
     // Immediately release the previous layer texture to prevent new texture creation from failing
     // due to repeated binding of the same layer.

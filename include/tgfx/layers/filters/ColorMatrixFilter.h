@@ -18,14 +18,14 @@
 
 #pragma once
 
-#include "tgfx/layers/filters/LayerFilter.h"
+#include "tgfx/layers/filters/LayerImageFilter.h"
 
 namespace tgfx {
 
 /**
  * A filter that transforms the color using the given 4x5 matrix.
  */
-class ColorMatrixFilter : public LayerFilter {
+class ColorMatrixFilter : public LayerImageFilter {
  public:
   /**
    * Creates a new ColorMatrixFilter that transforms the color using the given 4x5 matrix. The matrix can
@@ -73,6 +73,7 @@ class ColorMatrixFilter : public LayerFilter {
 
  private:
   ColorMatrixFilter(const std::array<float, 20>& matrix);
+
   std::array<float, 20> _matrix;
 };
 }  // namespace tgfx

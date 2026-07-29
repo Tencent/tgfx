@@ -10,3 +10,5 @@
 /.clang-tidy
 **/.test
 /.appanalyzer
+**/resources/rawfile/tgfx.png
+**/resources/rawfile/bridge.jpg

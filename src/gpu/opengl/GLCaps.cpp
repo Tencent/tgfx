@@ -146,9 +146,16 @@ GLCaps::GLCaps(const GLInfo& info) {
       break;
   }
   _features.semaphore = true;
+  // Stencil attachments require DEPTH24_STENCIL8 support, which is guaranteed by tgfx's
+  // minimum GL versions (desktop GL >= 3.2, GLES >= 3.0, WebGL >= 2.0). Every concrete
+  // GLStandard qualifies; GLStandard::None means version-string parsing failed earlier in
+  // init() and should never reach this branch.
+  _features.stencilAttachmentSupported = standard != GLStandard::None;
   info.getIntegerv(GL_MAX_TEXTURE_SIZE, &_limits.maxTextureDimension2D);
   info.getIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &_limits.maxSamplersPerShaderStage);
-  info.getIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &_limits.maxUniformBufferBindingSize);
+  int maxUniformBlockSize = 0;
+  info.getIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &maxUniformBlockSize);
+  _limits.maxUniformBufferBindingSize = maxUniformBlockSize;
   info.getIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &_limits.minUniformBufferOffsetAlignment);
   if (vendor == GLVendor::Qualcomm) {
     // https://skia-review.googlesource.com/c/skia/+/571418

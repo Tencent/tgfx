@@ -17,12 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/vectors/Polystar.h"
+#include <algorithm>
 #include <cmath>
 #include "VectorContext.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 
 namespace tgfx {
+
+static constexpr float POLYSTAR_MIN_EXTENT = 5e-3f;
 
 static void AddCurveToPath(Path* path, float centerX, float centerY, float angleDelta, float dx1,
                            float dy1, float roundness1, float dx2, float dy2, float roundness2) {
@@ -263,9 +266,15 @@ void Polystar::setReversed(bool value) {
 void Polystar::apply(VectorContext* context) {
   DEBUG_ASSERT(context != nullptr);
   if (_cachedShape == nullptr) {
+    // Clamp to a non-zero extent so the generated polygon/star remains a well-defined path
+    // with valid tangents and length for downstream stroke/dash/measure operations. The value
+    // sits above the stroker's internal precision threshold so each edge is not treated as a
+    // tiny segment, yet far below any sampling grid so the shape stays visually invisible.
+    const auto outerRadius = std::max(_outerRadius, POLYSTAR_MIN_EXTENT);
+    const auto innerRadius = std::max(_innerRadius, POLYSTAR_MIN_EXTENT);
     auto pathProvider = std::make_shared<PolystarPathProvider>(
-        _position, _polystarType, _pointCount, _rotation, _outerRadius, _outerRoundness,
-        _innerRadius, _innerRoundness, _reversed);
+        _position, _polystarType, _pointCount, _rotation, outerRadius, _outerRoundness, innerRadius,
+        _innerRoundness, _reversed);
     _cachedShape = Shape::MakeFrom(std::move(pathProvider));
   }
   if (_cachedShape) {

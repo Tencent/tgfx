@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Task.h"
+#include <chrono>
 #include "core/utils/TaskGroup.h"
 
 namespace tgfx {
@@ -66,10 +67,10 @@ void Task::cancel() {
   }
 }
 
-void Task::wait() {
+bool Task::wait(uint64_t timeout) {
   auto oldStatus = _status.load(std::memory_order_acquire);
   if (oldStatus == TaskStatus::Canceled || oldStatus == TaskStatus::Finished) {
-    return;
+    return true;
   }
   // If wait() is called from the thread pool, all threads might block, leaving no thread to execute
   // this task. To avoid deadlock, execute the task directly on the current thread if it's queued.
@@ -81,13 +82,19 @@ void Task::wait() {
       while (!_status.compare_exchange_weak(oldStatus, TaskStatus::Finished,
                                             std::memory_order_acq_rel, std::memory_order_relaxed)) {
       }
-      return;
+      return true;
     }
   }
   std::unique_lock<std::mutex> autoLock(locker);
   if (_status.load(std::memory_order_acquire) == TaskStatus::Executing) {
-    condition.wait(autoLock);
+    if (timeout == 0) {
+      condition.wait(autoLock);
+      return true;
+    }
+    auto chronoTimeout = std::chrono::milliseconds(timeout);
+    return condition.wait_for(autoLock, chronoTimeout) == std::cv_status::no_timeout;
   }
+  return true;
 }
 
 void Task::execute() {

@@ -68,20 +68,20 @@ void GLSLRoundStrokeRectGeometryProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorVar.fsIn().c_str());
   }
 
-  fragBuilder->codeAppendf("vec2 offset = %s;", ellipseOffsets.fsIn().c_str());
+  fragBuilder->codeAppendf("highp vec2 offset = %s;", ellipseOffsets.fsIn().c_str());
   if (aaType == AAType::Coverage) {
-    fragBuilder->codeAppend("float test = dot(offset, offset) - 1.0;");
+    fragBuilder->codeAppend("highp float test = dot(offset, offset) - 1.0;");
     fragBuilder->codeAppend("if (test > -0.5) {");
-    fragBuilder->codeAppendf("vec2 grad = 2.0 * offset * %s;", ellipseRadii.fsIn().c_str());
-    fragBuilder->codeAppend("float grad_dot = dot(grad, grad);");
+    fragBuilder->codeAppendf("highp vec2 grad = 2.0 * offset * %s;", ellipseRadii.fsIn().c_str());
+    fragBuilder->codeAppend("highp float grad_dot = dot(grad, grad);");
     fragBuilder->codeAppend("grad_dot = max(grad_dot, 1.1755e-38);");
-    fragBuilder->codeAppend("float invlen = inversesqrt(grad_dot);");
-    fragBuilder->codeAppend("float edgeAlpha = clamp(0.5 - test * invlen, 0.0, 1.0);");
+    fragBuilder->codeAppend("highp float invlen = inversesqrt(grad_dot);");
+    fragBuilder->codeAppend("highp float edgeAlpha = clamp(0.5 - test * invlen, 0.0, 1.0);");
     fragBuilder->codeAppendf("%s *= edgeAlpha;", args.outputCoverage.c_str());
     fragBuilder->codeAppendf("}");
   } else {
-    fragBuilder->codeAppend("float test = dot(offset, offset);");
-    fragBuilder->codeAppend("float edgeAlpha = step(test, 1.0);");
+    fragBuilder->codeAppend("highp float test = dot(offset, offset);");
+    fragBuilder->codeAppend("highp float edgeAlpha = step(test, 1.0);");
     fragBuilder->codeAppendf("%s *= edgeAlpha;", args.outputCoverage.c_str());
   }
 

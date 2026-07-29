@@ -20,6 +20,7 @@
 
 #include "tgfx/core/Canvas.h"
 #include "tgfx/layers/LayerProperty.h"
+#include "tgfx/layers/layerstyles/LayerStyleInput.h"
 
 namespace tgfx {
 
@@ -37,22 +38,31 @@ enum class LayerStylePosition {
   Below
 };
 
-enum class LayerStyleExtraSourceType {
+enum class LayerStyleExtraSourceType : uint32_t {
   /**
    * The layerStyle requires no extra source.
    */
-  None,
+  None = 0,
   /**
    * The layerStyle requires the layer contour to be drawn.
    */
-  Contour,
+  Contour = 1 << 0,
   /**
    * The layerStyle requires the background content.
    */
-  Background
+  Background = 1 << 1
 };
 
-enum class LayerStyleType { LayerStyle, BackgroundBlur, DropShadow, InnerShadow };
+enum class LayerStyleType {
+  LayerStyle,
+  BackgroundBlur,
+  DropShadow,
+  InnerShadow,
+  MonoNoise,
+  DuoNoise,
+  MultiNoise,
+  Glass
+};
 
 /**
  * LayerStyle is used to change the appearance of a layer. Unlike LayerFilter, it does not create a
@@ -104,26 +114,14 @@ class LayerStyle : public LayerProperty {
   virtual Rect filterBounds(const Rect& srcRect, float contentScale) = 0;
 
   /**
-   * Returns the bounds of the background content after applying the layer style.
+   * Returns the complete background bounds affected by this layer style, used for background
+   * capture and dirty region expansion.
    * @param srcRect The scaled bounds of the background content.
    * @param contentScale The scale factor of the background bounds relative to its original size.
    * Some layerStyles have size-related parameters that must be adjusted with this scale factor.
-   * @return The bounds of the background content.
+   * @return The complete bounds of the background content required by this style.
    */
-  virtual Rect filterBackground(const Rect& srcRect, float contentScale);
-
-  /**
-   * Applies the layer style to the scaled image of the layer content and draws it on the canvas.
-   * @param canvas The canvas to draw the layer style on.
-   * @param content The opaque layer content image. Rendered with normal fills, then all
-   * semi-transparent pixels converted to fully opaque (fully transparent pixels preserved).
-   * @param contentScale The scale factor of the layer content relative to its original size.
-   * Some layer styles have size-related parameters that must be adjusted with this scale factor.
-   * @param alpha The alpha transparency value used for drawing the layer style.
-   */
-  void draw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale, float alpha) {
-    onDraw(canvas, std::move(content), contentScale, alpha, _blendMode);
-  }
+  Rect filterBackground(const Rect& srcRect, float contentScale);
 
   /**
    * Whether to exclude child effects when generating the source images for this layer style.
@@ -141,71 +139,55 @@ class LayerStyle : public LayerProperty {
   void setExcludeChildEffects(bool value);
 
   /**
-   * Returns the type of the extra source required by the layer style.
+   * Returns flags for the extra sources required by the layer style.
    * Default is LayerStyleExtraSourceType::None.
    */
-  virtual LayerStyleExtraSourceType extraSourceType() const {
-    return LayerStyleExtraSourceType::None;
+  virtual uint32_t extraSourceType() const {
+    return static_cast<uint32_t>(LayerStyleExtraSourceType::None);
   }
 
   /**
-   * Applies the layer style with the layer contour to the scaled image of the layer content and
-   * draws it on the canvas.
+   * Draws this layer style onto the canvas using the provided input data.
    * @param canvas The canvas to draw the layer style on.
-   * @param content The opaque layer content image. Rendered with normal fills, then all
-   * semi-transparent pixels converted to fully opaque (fully transparent pixels preserved).
-   * @param contentScale The scale factor of the layer content relative to its original size.
-   * Some layer styles have size-related parameters that must be adjusted with this scale factor.
-   * @param extraSource The extra source image. For Contour type: similar to content, but includes
-   * geometries from alpha=0 painters and replaces gradient fills with solid colors. For Background
-   * type: the normally rendered content below the current layer.
-   * @param extraSourceOffset The offset of the extra image relative to the layer content.
+   * @param input The input data for this layer style.
    * @param alpha The alpha transparency value used for drawing the layer style.
    */
-  void drawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                           std::shared_ptr<Image> extraSource, const Point& extraSourceOffset,
-                           float alpha) {
-    onDrawWithExtraSource(canvas, std::move(content), contentScale, std::move(extraSource),
-                          extraSourceOffset, alpha, _blendMode);
+  void draw(Canvas* canvas, const LayerStyleInput& input, float alpha) {
+    onDraw(canvas, input, alpha, _blendMode);
   }
 
  protected:
   /**
-   * Applies the layer style to the opaque layer content image and draws it on the canvas.
-   * @param canvas The canvas to draw the layer style on.
-   * @param content The opaque layer content image. Rendered with normal fills, then all
-   * semi-transparent pixels converted to fully opaque (fully transparent pixels preserved).
-   * @param contentScale The scale factor of the layer content relative to its original size.
-   * Some layer styles have size-related parameters that must be adjusted with this scale factor.
-   * @param alpha The alpha transparency value used for drawing the layer style.
-   * @param blendMode The blend mode used to composite the layer style with the existing content on
-   * the canvas.
+   * Returns resolution-insensitive background bounds that may be represented by downsampling.
+   * The non-virtual filterBackground() unions this with filterBackgroundSharp(), so implementers
+   * do not need to compute the total. Only include outsets where the visual result remains
+   * correct after the shared background surface is downsampled (e.g. blur radius).
+   * @param srcRect The scaled bounds of the background content.
+   * @param contentScale The scale factor of the background bounds relative to its original size.
+   * @return The soft background bounds. The default implementation returns srcRect without
+   * expansion.
    */
-  virtual void onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                      float alpha, BlendMode blendMode) = 0;
+  virtual Rect filterBackgroundSoft(const Rect& srcRect, float contentScale);
 
   /**
-   * Applies the layer style with extra source to the opaque layer content image and draws
-   * it on the canvas.
-   * The default implementation calls onDraw with the layer content only.
-   * @param canvas The canvas to draw the layer style on.
-   * @param content The opaque layer content image. Rendered with normal fills, then all
-   * semi-transparent pixels converted to fully opaque (fully transparent pixels preserved).
-   * @param contentScale The scale factor of the layer content relative to its original size.
-   * Some layer styles have size-related parameters that must be adjusted with this scale factor.
-   * @param extraSource The extra source image. For Contour type: similar to content, but includes
-   * geometries from alpha=0 painters and replaces gradient fills with solid colors. For Background
-   * type: the normally rendered content below the current layer.
-   * @param extraSourceOffset The offset of the extra source relative to the layer content.
-   * @param alpha The alpha transparency value used for drawing the layer style.
+   * Returns background bounds that require full-resolution sampling.
+   * The non-virtual filterBackground() unions this with filterBackgroundSoft(), so implementers
+   * do not need to compute the total. Include outsets that must be sampled at full resolution
+   * (e.g. refraction displacement).
+   * @param srcRect The scaled bounds of the background content.
+   * @param contentScale The scale factor of the background bounds relative to its original size.
+   * @return The sharp background bounds. The default implementation returns srcRect without
+   * expansion.
    */
-  virtual void onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> content,
-                                     float contentScale, std::shared_ptr<Image> extraSource,
-                                     const Point& extraSourceOffset, float alpha,
-                                     BlendMode blendMode);
+  virtual Rect filterBackgroundSharp(const Rect& srcRect, float contentScale);
+
+  virtual void onDraw(Canvas* canvas, const LayerStyleInput& input, float alpha,
+                      BlendMode blendMode) = 0;
 
  private:
   BlendMode _blendMode = BlendMode::SrcOver;
   bool _excludeChildEffects = false;
+
+  friend class Layer;
 };
 }  // namespace tgfx

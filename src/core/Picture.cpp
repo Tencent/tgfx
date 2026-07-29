@@ -93,17 +93,25 @@ static bool GetHardClipRect(const ClipStack& clip, const Matrix* matrix, Rect* c
     case ClipState::Rect:
       break;
   }
-  auto& elements = clip.elements();
-  for (size_t i = clip.oldestValidIndex(); i < elements.size(); ++i) {
-    const auto& element = elements[i];
-    // Skip invalid elements or pixel-aligned rectangles (hard edges even with anti-aliasing).
-    if (!element.isValid() || (element.isRect() && element.isPixelAligned())) {
-      continue;
-    }
-    if (element.isAntiAlias()) {
-      return false;
-    }
+  // In the Rect state the only valid element is the most recently added one: an axis-aligned rect
+  // under an identity matrix, sitting at the back of the stack.
+  const auto& elements = clip.elements();
+  DEBUG_ASSERT(!elements.empty());
+  if (elements.empty()) {
+    return false;
   }
+  const auto& element = elements.back();
+  DEBUG_ASSERT(element.isValid() && element.shape().isRect() && element.matrix().isIdentity());
+  if (!element.isValid() || !element.shape().isRect() || !element.matrix().isIdentity()) {
+    return false;
+  }
+  // A pixel-aligned rect has hard edges even with anti-aliasing, so only a non-aligned AA rect
+  // produces soft edges that cannot be represented as an integer clip rect.
+  if (element.antiAlias() && !IsClipPixelAligned(element.shape().rect())) {
+    return false;
+  }
+  // Use the clip's accumulated bounds: unlike the element's raw rect, they are already snapped to
+  // the pixel grid according to whether AA is enabled, and are thus integer-valued.
   auto rect = clip.bounds();
   if (matrix != nullptr) {
     if (!matrix->rectStaysRect()) {

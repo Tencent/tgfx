@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include "tgfx/gpu/GPU.h"
 
@@ -84,11 +85,17 @@ class ShaderCaps {
    * Returns the maximum size in bytes of a uniform buffer object (UBO) supported by the
    * shader language.
    */
-  int maxUBOSize = 0;
+  int64_t maxUBOSize = 0;
 
   /**
    * Returns the required alignment in bytes for offsets within a uniform buffer object (UBO).
    */
   int uboOffsetAlignment = 1;
+
+  /**
+   * Whether texture sampling must occur in uniform control flow (not inside divergent branches).
+   * Required by WebGPU/WGSL; not required by GLSL/Metal.
+   */
+  bool requiresUniformControlFlow = false;
 };
 }  // namespace tgfx

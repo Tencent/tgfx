@@ -89,23 +89,24 @@ void GLSLComplexEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
   // In the corner branch, offset is clamped to a small minimum before the ellipse computation
   // to avoid division-by-zero in inversesqrt().
 
-  fragBuilder->codeAppendf("vec2 offset = %s.xy;", ellipseOffsets.fsIn().c_str());
-  fragBuilder->codeAppendf("vec2 eDist = %s;", edgeDist.fsIn().c_str());
+  fragBuilder->codeAppendf("highp vec2 offset = %s.xy;", ellipseOffsets.fsIn().c_str());
+  fragBuilder->codeAppendf("highp vec2 eDist = %s;", edgeDist.fsIn().c_str());
 
   fragBuilder->codeAppend("bool hasXCurve = offset.x > 0.0;");
   fragBuilder->codeAppend("bool hasYCurve = offset.y > 0.0;");
 
-  fragBuilder->codeAppend("float outerAlpha;");
+  fragBuilder->codeAppend("highp float outerAlpha;");
   fragBuilder->codeAppend("if (hasXCurve && hasYCurve) {");
   // Corner region: clamp offset to avoid zero in gradient computation
-  fragBuilder->codeAppend("  vec2 safeOffset = max(offset, vec2(1.0/4096.0));");
+  fragBuilder->codeAppend("  highp vec2 safeOffset = max(offset, vec2(1.0/4096.0));");
   if (stroke) {
     fragBuilder->codeAppendf("  safeOffset *= %s.xy;", ellipseRadii.fsIn().c_str());
   }
-  fragBuilder->codeAppend("  float test = dot(safeOffset, safeOffset) - 1.0;");
-  fragBuilder->codeAppendf("  vec2 grad = 2.0*safeOffset*%s.xy;", ellipseRadii.fsIn().c_str());
-  fragBuilder->codeAppend("  float gradDot = max(dot(grad, grad), 1.1755e-38);");
-  fragBuilder->codeAppend("  float invlen = inversesqrt(gradDot);");
+  fragBuilder->codeAppend("  highp float test = dot(safeOffset, safeOffset) - 1.0;");
+  fragBuilder->codeAppendf("  highp vec2 grad = 2.0*safeOffset*%s.xy;",
+                           ellipseRadii.fsIn().c_str());
+  fragBuilder->codeAppend("  highp float gradDot = max(dot(grad, grad), 1.1755e-38);");
+  fragBuilder->codeAppend("  highp float invlen = inversesqrt(gradDot);");
   fragBuilder->codeAppend("  outerAlpha = clamp(0.5-test*invlen, 0.0, 1.0);");
   fragBuilder->codeAppend("} else if (hasYCurve) {");
   // Horizontal edge region (top/bottom): use vertical edge distance
@@ -120,17 +121,18 @@ void GLSLComplexEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
 
   // Inner ellipse (stroke mode)
   if (stroke) {
-    fragBuilder->codeAppendf("vec2 sw = %s;", strokeWidthVarying.fsIn().c_str());
-    fragBuilder->codeAppend("float innerAlpha;");
+    fragBuilder->codeAppendf("highp vec2 sw = %s;", strokeWidthVarying.fsIn().c_str());
+    fragBuilder->codeAppend("highp float innerAlpha;");
     fragBuilder->codeAppend("if (hasXCurve && hasYCurve) {");
     // Corner region: inner ellipse Sampson distance
-    fragBuilder->codeAppendf("  vec2 innerOffset = max(offset, vec2(1.0/4096.0)) * %s.zw;",
+    fragBuilder->codeAppendf("  highp vec2 innerOffset = max(offset, vec2(1.0/4096.0)) * %s.zw;",
                              ellipseRadii.fsIn().c_str());
-    fragBuilder->codeAppend("  float innerTest = dot(innerOffset, innerOffset) - 1.0;");
-    fragBuilder->codeAppendf("  vec2 innerGrad = 2.0*innerOffset*%s.zw;",
+    fragBuilder->codeAppend("  highp float innerTest = dot(innerOffset, innerOffset) - 1.0;");
+    fragBuilder->codeAppendf("  highp vec2 innerGrad = 2.0*innerOffset*%s.zw;",
                              ellipseRadii.fsIn().c_str());
-    fragBuilder->codeAppend("  float innerGradDot = max(dot(innerGrad, innerGrad), 1.1755e-38);");
-    fragBuilder->codeAppend("  float innerInvlen = inversesqrt(innerGradDot);");
+    fragBuilder->codeAppend(
+        "  highp float innerGradDot = max(dot(innerGrad, innerGrad), 1.1755e-38);");
+    fragBuilder->codeAppend("  highp float innerInvlen = inversesqrt(innerGradDot);");
     fragBuilder->codeAppend("  innerAlpha = clamp(0.5+innerTest*innerInvlen, 0.0, 1.0);");
     fragBuilder->codeAppend("} else if (hasYCurve) {");
     // Horizontal edge: inner coverage from edgeDist.y minus full stroke width
@@ -140,8 +142,8 @@ void GLSLComplexEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppend("  innerAlpha = clamp(0.5 - (eDist.x - 2.0*sw.x), 0.0, 1.0);");
     fragBuilder->codeAppend("} else {");
     // Center region: use min of both inner edge distances
-    fragBuilder->codeAppend("  float innerEdgeX = eDist.x - 2.0*sw.x;");
-    fragBuilder->codeAppend("  float innerEdgeY = eDist.y - 2.0*sw.y;");
+    fragBuilder->codeAppend("  highp float innerEdgeX = eDist.x - 2.0*sw.x;");
+    fragBuilder->codeAppend("  highp float innerEdgeY = eDist.y - 2.0*sw.y;");
     fragBuilder->codeAppend("  innerAlpha = clamp(0.5 - min(innerEdgeX, innerEdgeY), 0.0, 1.0);");
     fragBuilder->codeAppend("}");
     fragBuilder->codeAppend("outerAlpha *= innerAlpha;");

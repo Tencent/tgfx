@@ -1,3 +1,5 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
 //  Copyright (C) 2025 Tencent. All rights reserved.
@@ -15,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
 
@@ -48,7 +51,7 @@ void BackgroundBlurStyle::setTileMode(TileMode tileMode) {
   invalidateTransform();
 }
 
-Rect BackgroundBlurStyle::filterBackground(const Rect& srcRect, float contentScale) {
+Rect BackgroundBlurStyle::filterBackgroundSoft(const Rect& srcRect, float contentScale) {
   auto filter = getBackgroundFilter(contentScale);
   if (!filter) {
     return srcRect;
@@ -56,22 +59,25 @@ Rect BackgroundBlurStyle::filterBackground(const Rect& srcRect, float contentSca
   return filter->filterBounds(srcRect);
 }
 
-void BackgroundBlurStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> content,
-                                                float contentScale,
-                                                std::shared_ptr<Image> extraSource,
-                                                const Point& extraSourceOffset, float, BlendMode) {
+void BackgroundBlurStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float, BlendMode) {
   if (_blurrinessX <= 0 && _blurrinessY <= 0) {
+    return;
+  }
+  auto* background = input.findExtraSource(StyleInputSource::Type::Base);
+  if (background == nullptr || background->image() == nullptr) {
+    DEBUG_ASSERT(false);
     return;
   }
 
   // create blurred background
-  auto blurFilter = getBackgroundFilter(contentScale);
+  auto blurFilter = getBackgroundFilter(input.contentScale);
   Point backgroundOffset = {};
-  auto clipRect = Rect::MakeWH(extraSource->width(), extraSource->height());
-  auto blurBackground = extraSource->makeWithFilter(blurFilter, &backgroundOffset, &clipRect);
-  backgroundOffset += extraSourceOffset;
+  auto clipRect = Rect::MakeWH(background->image()->width(), background->image()->height());
+  auto blurBackground =
+      background->image()->makeWithFilter(blurFilter, &backgroundOffset, &clipRect);
+  backgroundOffset += background->imageOffset();
 
-  auto maskShader = Shader::MakeImageShader(content, TileMode::Decal, TileMode::Decal);
+  auto maskShader = Shader::MakeImageShader(input.content, TileMode::Decal, TileMode::Decal);
 
   // draw blurred background in the mask
   Paint paint = {};

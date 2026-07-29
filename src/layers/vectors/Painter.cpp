@@ -105,4 +105,8 @@ Matrix Painter::computeOuterMatrix(size_t index) const {
   return outer;
 }
 
+PainterStyle Painter::getStyle() const {
+  return onGetStyle();
+}
+
 }  // namespace tgfx

@@ -48,6 +48,24 @@ void Text::setPosition(const Point& value) {
   invalidateContent();
 }
 
+void Text::setTextBlob(std::shared_ptr<TextBlob> textBlob, std::vector<Point> anchors) {
+  if (textBlob == nullptr) {
+    return;
+  }
+  size_t glyphCount = 0;
+  for (auto run : *textBlob) {
+    glyphCount += run.glyphCount;
+  }
+  if (!anchors.empty() && anchors.size() != glyphCount) {
+    LOGE("Text::setTextBlob: anchors size (%zu) does not match glyph count (%zu)", anchors.size(),
+         glyphCount);
+    anchors.resize(glyphCount, Point::Zero());
+  }
+  _textBlob = std::move(textBlob);
+  _anchors = std::move(anchors);
+  invalidateContent();
+}
+
 void Text::apply(VectorContext* context) {
   DEBUG_ASSERT(context != nullptr);
   if (_textBlob == nullptr) {

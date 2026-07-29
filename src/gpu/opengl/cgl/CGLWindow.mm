@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/opengl/cgl/CGLWindow.h"
+#import <Foundation/Foundation.h>
 #include <thread>
 #include "core/utils/Log.h"
 #include "gpu/opengl/GLDefines.h"
@@ -61,6 +62,11 @@ CGLWindow::~CGLWindow() {
 }
 
 std::shared_ptr<RenderTargetProxy> CGLWindow::onCreateRenderTarget(Context* context) {
+  if (![NSThread isMainThread]) {
+    LOGE("CGLWindow::onCreateRenderTarget() must be called on the main thread because it "
+         "reads NSView geometry and binds the GL context to the view. Create the Surface on "
+         "the main thread, then render on any thread.");
+  }
   auto glContext = static_cast<CGLDevice*>(device.get())->glContext;
   [glContext update];
   CGSize size = [view convertSizeToBacking:view.bounds.size];

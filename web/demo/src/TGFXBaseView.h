@@ -22,8 +22,13 @@
 #include "hello2d/AppHost.h"
 #include "hello2d/LayerBuilder.h"
 #include "tgfx/core/Surface.h"
+#include "tgfx/core/SurfaceReadback.h"
 #include "tgfx/gpu/Recording.h"
+#ifdef TGFX_USE_WEBGPU
+#include "tgfx/gpu/webgpu/WebGPUWindow.h"
+#else
 #include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
+#endif
 #include "tgfx/layers/DisplayList.h"
 
 namespace hello2d {
@@ -42,6 +47,22 @@ class TGFXBaseView {
 
   void draw();
 
+  /**
+   * Starts an async readback operation. Submits the GPU copy command and returns a handle
+   * containing the buffer info needed for JS-side mapAsync. Returns an object with:
+   *   bufferHandle: int (WGPUBuffer id for JS WebGPU.mgrBuffer.get())
+   *   bufferSize: int
+   *   width: int, height: int, rowBytes: int
+   * Returns null/undefined if readback cannot be started.
+   */
+  emscripten::val startReadback(int srcX, int srcY, int width, int height);
+
+  /**
+   * Finishes a previously started readback. Assumes the buffer is already mapped (JS called
+   * mapAsync and it resolved). Returns a Uint8Array with the pixel data, or null on failure.
+   */
+  emscripten::val finishReadback();
+
  protected:
   std::shared_ptr<hello2d::AppHost> appHost = nullptr;
 
@@ -58,6 +79,9 @@ class TGFXBaseView {
   int lastSurfaceWidth = 0;
   int lastSurfaceHeight = 0;
   bool presentImmediately = true;
+
+  // Async readback state
+  std::shared_ptr<tgfx::SurfaceReadback> pendingReadback = nullptr;
 };
 
 }  // namespace hello2d

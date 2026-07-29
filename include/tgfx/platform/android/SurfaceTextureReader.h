@@ -40,10 +40,10 @@ class SurfaceTextureReader : public ImageReader {
   static std::shared_ptr<SurfaceTextureReader> Make(int width, int height, jobject listener);
 
   /**
-   * Returns the Surface object used as the input to the SurfaceTextureReader. The release() method
-   * of the returned Surface will be called when the SurfaceTextureReader is released.
+   * Creates a new Java Surface object connected to the underlying SurfaceTexture. Each call returns
+   * a fresh Surface. The caller owns the returned object and must call Surface.release() when done.
    */
-  jobject getInputSurface() const;
+  jobject createInputSurface() const;
 
   /**
    * Notifies that the previously returned ImageBuffer is now available for texture generation.

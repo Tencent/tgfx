@@ -49,6 +49,19 @@
 
 namespace tgfx {
 
+// Returns true if the given source flags include the requested source type.
+static bool HasExtraSource(uint32_t sourceFlags, LayerStyleExtraSourceType type) {
+  return (sourceFlags & static_cast<uint32_t>(type)) != 0;
+}
+
+static bool NeedsBackgroundSource(uint32_t sourceFlags) {
+  return HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Background);
+}
+
+static bool NeedsContourSource(uint32_t sourceFlags) {
+  return HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Contour);
+}
+
 // The minimum size (longest edge) for subtree cache. This prevents creating excessively small
 // mipmap levels that would be inefficient to cache.
 static constexpr int SUBTREE_CACHE_MIN_SIZE = 32;
@@ -717,9 +730,10 @@ static Rect ComputeContentBounds(const LayerContent& content, const Rect& conten
   return contentMatrix.mapRect(bounds);
 }
 
-Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBounds) {
+Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBounds,
+                          bool excludeEffects) {
   auto canPreserve3D = this->canPreserve3D();
-  bool hasEffects = !_layerStyles.empty() || !_filters.empty();
+  bool hasEffects = !excludeEffects && (!_layerStyles.empty() || !_filters.empty());
   // When preserving 3D, the matrix must be passed down to preserve 3D state.
   // Otherwise, when has effects, compute in local coordinates first, then apply matrix at end.
   bool isAffine = Matrix3DUtils::IsMatrix3DAffine(coordinateMatrix);
@@ -731,8 +745,9 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
     bool behindCamera =
         !isAffine && Matrix3DUtils::IsRectBehindCamera(contentBounds, coordinateMatrix);
     if (!behindCamera) {
-      bounds.join(ComputeContentBounds(*content, contentBounds, coordinateMatrix, applyMatrixAtEnd,
-                                       computeTightBounds));
+      auto computedBounds = ComputeContentBounds(*content, contentBounds, coordinateMatrix,
+                                                 applyMatrixAtEnd, computeTightBounds);
+      bounds.join(computedBounds);
     }
   }
 
@@ -1014,6 +1029,20 @@ void Layer::detachProperty(LayerProperty* property) {
   }
 }
 
+std::optional<StyledShape> Layer::onGetContentShape() {
+  auto* content = getContent();
+  if (content == nullptr) {
+    return std::nullopt;
+  }
+  auto bounds = content->getTightBounds(Matrix::I());
+  if (bounds.isEmpty()) {
+    return std::nullopt;
+  }
+  Path path = {};
+  path.addRect(bounds);
+  return StyledShape::Make(Shape::MakeFrom(path), StyledShapeType::Fill, 0, StrokeAlign::Center);
+}
+
 void Layer::onAttachToRoot(RootLayer* rootLayer) {
   _root = rootLayer;
   for (auto& child : _children) {
@@ -1088,18 +1117,46 @@ LayerContent* Layer::getContent() {
   return layerContent.get();
 }
 
-std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
-  if (_filters.empty()) {
-    return nullptr;
+std::shared_ptr<Image> Layer::applyFilters(std::shared_ptr<Image> image, float contentScale,
+                                           const Rect& contentBounds, Point* offset) {
+  if (!image || _filters.empty()) {
+    return image;
   }
-  std::vector<std::shared_ptr<ImageFilter>> filters;
+  // Each filter may shift the output image origin by filterOffset. Subsequent filters receive an
+  // image in the shifted coordinate system, so contentBounds must be translated by -filterOffset
+  // before being passed to the next filter, otherwise geometry-anchored filters would sample in a
+  // stale coordinate system.
+  Rect currentContentBounds = contentBounds;
   for (const auto& layerFilter : _filters) {
     DEBUG_ASSERT(layerFilter != nullptr);
-    if (auto filter = layerFilter->getImageFilter(contentScale)) {
-      filters.push_back(filter);
+    Point filterOffset = {};
+    image = layerFilter->filterImage(std::move(image), contentScale, currentContentBounds,
+                                     &filterOffset);
+    if (!image) {
+      return nullptr;
     }
+    if (offset) {
+      offset->offset(filterOffset.x, filterOffset.y);
+    }
+    currentContentBounds.offset(-filterOffset.x, -filterOffset.y);
   }
-  return ImageFilter::Compose(filters);
+  return image;
+}
+
+Rect Layer::mapContentBoundsToImage(float scale, const Rect& imageBounds) {
+  auto layerBounds = computeBounds(Matrix3D::I(), false, /*excludeEffects=*/true);
+  return Rect::MakeXYWH(layerBounds.left * scale - imageBounds.left,
+                        layerBounds.top * scale - imageBounds.top, layerBounds.width() * scale,
+                        layerBounds.height() * scale);
+}
+
+Rect Layer::mapOutputBoundsToInput(const Rect& srcRect, float contentScale) {
+  auto bounds = srcRect;
+  for (auto it = _filters.rbegin(); it != _filters.rend(); ++it) {
+    DEBUG_ASSERT(*it != nullptr);
+    bounds = (*it)->filterBounds(bounds, contentScale, MapDirection::Reverse);
+  }
+  return bounds;
 }
 
 bool Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
@@ -1321,13 +1378,9 @@ bool Layer::shouldPassThroughBackground(BlendMode blendMode) const {
 }
 
 bool Layer::canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode) {
-  // If the layer can start or extend a 3D rendering context, child layers need to maintain
-  // independent 3D states, so subtree caching is not supported.
   if (canPreserve3D()) {
     return false;
   }
-  // The cache stores Normal mode content. Since layers with BackgroundStyle are excluded from
-  // caching, the cached content can also be used for Background mode drawing.
   if (args.excludeEffects) {
     return false;
   }
@@ -1335,7 +1388,6 @@ bool Layer::canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode) {
     return false;
   }
   if (subtreeCache) {
-    // Recreate if maxSize has changed
     if (subtreeCache->maxSize() != args.subtreeCacheMaxSize) {
       subtreeCache = std::make_unique<SubtreeCache>(args.subtreeCacheMaxSize);
     }
@@ -1345,8 +1397,6 @@ bool Layer::canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode) {
     return false;
   }
   if (!bitFields.staticSubtree) {
-    // Skip caching on the first render to avoid caching content that is only displayed once.
-    // The cache is created on the second render when the layer is confirmed to be reused.
     return false;
   }
   // Skip caching for leaf nodes with basic shapes (Rect, RRect) that have no filters or layer
@@ -1383,10 +1433,8 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
 
   auto pictureBounds = layerBounds;
   pictureBounds.scale(contentScale, contentScale);
-  auto filterBounds = pictureBounds;
-  auto filter = getImageFilter(contentScale);
-  if (filter) {
-    auto reverseBounds = filter->filterBounds(pictureBounds, MapDirection::Reverse);
+  if (!_filters.empty()) {
+    auto reverseBounds = mapOutputBoundsToInput(pictureBounds, contentScale);
     pictureBounds.intersect(reverseBounds);
   }
   PictureRecorder recorder = {};
@@ -1405,10 +1453,12 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
     return nullptr;
   }
 
-  if (filter) {
-    filterBounds.offset(-offset.x, -offset.y);
+  if (!_filters.empty()) {
     Point filterOffset = {};
-    image = image->makeWithFilter(std::move(filter), &filterOffset, &filterBounds);
+    auto contentBounds = mapContentBoundsToImage(contentScale, pictureBounds);
+    contentBounds.offset(-(contentBounds.left + pictureBounds.left),
+                         -(contentBounds.top + pictureBounds.top));
+    image = applyFilters(std::move(image), contentScale, contentBounds, &filterOffset);
     offset += filterOffset;
   }
 
@@ -1507,11 +1557,8 @@ std::optional<Rect> Layer::computeContentBounds(const std::optional<Rect>& clipB
   auto inputBounds = getBounds();
   if (clipBounds.has_value()) {
     auto mappedClipBounds = *clipBounds;
-    if (!excludeEffects) {
-      auto filter = getImageFilter(1.0f);
-      if (filter) {
-        mappedClipBounds = filter->filterBounds(mappedClipBounds, MapDirection::Reverse);
-      }
+    if (!excludeEffects && !_filters.empty()) {
+      mappedClipBounds = mapOutputBoundsToInput(mappedClipBounds, 1.0f);
     }
     if (!inputBounds.intersect(mappedClipBounds)) {
       return std::nullopt;
@@ -1737,14 +1784,17 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
     return nullptr;
   }
 
-  // Collect which excludeChildEffects values need content and/or contour.
+  // Collect which excludeChildEffects values need content and/or a rasterized contour.
   bool needContent[2] = {false, false};
   bool needContour[2] = {false, false};
+  bool needsContentShape = false;
   for (const auto& layerStyle : _layerStyles) {
     auto index = static_cast<int>(layerStyle->excludeChildEffects());
     needContent[index] = true;
-    if (layerStyle->extraSourceType() == LayerStyleExtraSourceType::Contour) {
+    auto sourceFlags = layerStyle->extraSourceType();
+    if (NeedsContourSource(sourceFlags)) {
       needContour[index] = true;
+      needsContentShape = true;
     }
   }
 
@@ -1794,6 +1844,10 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
     source->groups[i] = std::move(group);
   }
 
+  if (needsContentShape) {
+    source->contentShape = getContentShape();
+  }
+
   return source;
 }
 
@@ -1805,7 +1859,7 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
     if (layerStyle->position() != position) {
       continue;
     }
-    if (layerStyle->extraSourceType() == LayerStyleExtraSourceType::Background) {
+    if (NeedsBackgroundSource(layerStyle->extraSourceType())) {
       BackgroundHandler::DispatchOrSkip(args, canvas, this, alpha, layerStyle.get(), source);
       continue;
     }
@@ -1878,12 +1932,13 @@ std::shared_ptr<Image> Layer::synthesizeBackgroundImage(const DrawArgs& args, fl
 void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, float alpha,
                                   LayerStyle* layerStyle, const LayerStyleSource* source) {
   DEBUG_ASSERT(source != nullptr && !FloatNearlyZero(source->contentScale));
-  DEBUG_ASSERT(layerStyle->extraSourceType() != LayerStyleExtraSourceType::Background);
+  DEBUG_ASSERT(!NeedsBackgroundSource(layerStyle->extraSourceType()));
   auto groupIndex = static_cast<int>(layerStyle->excludeChildEffects());
   auto* group = source->groups[groupIndex].get();
   if (group == nullptr) {
     return;
   }
+
   auto& contentEntry = group->content;
   // Apply the content transform matrix to canvas so that rendering happens at the final scale,
   // avoiding blurry results that would come from baking contentScale into a picture recording.
@@ -1891,22 +1946,19 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
   auto matrix = Matrix::MakeScale(1.f / source->contentScale, 1.f / source->contentScale);
   matrix.preTranslate(contentEntry.offset.x, contentEntry.offset.y);
   canvas->concat(matrix);
-  switch (layerStyle->extraSourceType()) {
-    case LayerStyleExtraSourceType::None:
-      layerStyle->draw(canvas, contentEntry.image, source->contentScale, alpha);
-      break;
-    case LayerStyleExtraSourceType::Background:
-      // Unreachable: Background-sourced styles are routed through BackgroundHandler.
-      DEBUG_ASSERT(false);
-      break;
-    case LayerStyleExtraSourceType::Contour:
-      if (group->contour.has_value()) {
-        auto contourOffset = group->contour->offset - contentEntry.offset;
-        layerStyle->drawWithExtraSource(canvas, contentEntry.image, source->contentScale,
-                                        group->contour->image, contourOffset, alpha);
-      }
-      break;
+  LayerStyleInput styleInput = {};
+  styleInput.content = contentEntry.image;
+  styleInput.contentOffset = contentEntry.offset;
+  styleInput.contentScale = source->contentScale;
+  auto sourceFlags = layerStyle->extraSourceType();
+  if (HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Contour)) {
+    auto contourImage = group->contour.has_value() ? group->contour->image : nullptr;
+    auto contourOffset =
+        contourImage ? group->contour->offset - contentEntry.offset : Point::Zero();
+    styleInput.extraSources.push_back(std::make_shared<ContourInputSource>(
+        std::move(contourImage), contourOffset, source->contentShape));
   }
+  layerStyle->draw(canvas, styleInput, alpha);
 }
 
 bool Layer::getLayersUnderPointInternal(float x, float y,
@@ -1987,7 +2039,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   // The snapshot costs O(MAX_DIRTY_REGIONS) = O(1) per blur-capable layer.
   std::vector<Rect> backgroundSourceRects = {};
   for (const auto& style : _layerStyles) {
-    if (style && style->extraSourceType() == LayerStyleExtraSourceType::Background) {
+    if (style && NeedsBackgroundSource(style->extraSourceType())) {
       backgroundSourceRects = _root->currentDirtyRects();
       break;
     }
@@ -2063,34 +2115,45 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     }
   }
   auto backOutset = 0.f;
+  // maxBackgroundOutset includes every background dependency, while minBackgroundOutset only
+  // includes resolution-insensitive effects such as blur. Each LayerStyle classifies its own
+  // background bounds as soft or sharp so this aggregation does not depend on concrete types.
+  auto downsampleOutset = std::numeric_limits<float>::max();
   if (!renderBounds.isEmpty()) {
     for (auto& style : _layerStyles) {
       DEBUG_ASSERT(style != nullptr);
-      if (style->extraSourceType() != LayerStyleExtraSourceType::Background) {
+      if (!NeedsBackgroundSource(style->extraSourceType())) {
         continue;
       }
-      auto outset = style->filterBackground(Rect::MakeEmpty(), contentScale);
-      backOutset = std::max(backOutset, outset.right);
-      backOutset = std::max(backOutset, outset.bottom);
+      auto bounds = style->filterBackground(Rect::MakeEmpty(), contentScale);
+      auto fullOutset = std::max({-bounds.left, -bounds.top, bounds.right, bounds.bottom});
+      if (fullOutset <= 0) {
+        continue;
+      }
+      backOutset = std::max(backOutset, fullOutset);
+      auto softBounds = style->filterBackgroundSoft(Rect::MakeEmpty(), contentScale);
+      auto softOutset =
+          std::max({-softBounds.left, -softBounds.top, softBounds.right, softBounds.bottom});
+      downsampleOutset = std::min(downsampleOutset, softOutset);
     }
     // When a layer has both background styles and filters, the outer filter needs to sample
-    // beyond the background content area. Expand the background outset to include the filter's
-    // sampling range. Use Reverse direction to calculate required input bounds.
+    // beyond the background content area. Expand both ranges only when a soft background effect
+    // already permits downsampling; filter bounds alone do not imply a low-pass effect.
     if (backOutset > 0 && !_filters.empty()) {
-      auto imageFilter = getImageFilter(contentScale);
-      if (imageFilter) {
-        auto baseBounds = imageFilter->filterBounds(Rect::MakeEmpty(), MapDirection::Reverse);
-        if (!baseBounds.isEmpty()) {
-          auto maxOutset =
-              std::max({-baseBounds.left, -baseBounds.top, baseBounds.right, baseBounds.bottom});
-          backOutset += maxOutset;
+      auto baseBounds = mapOutputBoundsToInput(Rect::MakeEmpty(), contentScale);
+      if (!baseBounds.isEmpty()) {
+        auto maxOutset =
+            std::max({-baseBounds.left, -baseBounds.top, baseBounds.right, baseBounds.bottom});
+        backOutset += maxOutset;
+        if (downsampleOutset > 0) {
+          downsampleOutset += maxOutset;
         }
       }
     }
   }
   if (backOutset > 0) {
     maxBackgroundOutset = std::max(backOutset, maxBackgroundOutset);
-    minBackgroundOutset = std::min(backOutset, minBackgroundOutset);
+    minBackgroundOutset = std::min(downsampleOutset, minBackgroundOutset);
     updateBackgroundBounds(contentScale, backgroundSourceRects);
   }
   if (bitFields.blendMode != static_cast<uint8_t>(BlendMode::SrcOver) ||
@@ -2120,7 +2183,7 @@ void Layer::checkBackgroundStyles(std::shared_ptr<RegionTransformer> transformer
 void Layer::updateBackgroundBounds(float contentScale, const std::vector<Rect>& sourceRects) {
   for (auto& style : _layerStyles) {
     DEBUG_ASSERT(style != nullptr);
-    if (style->extraSourceType() == LayerStyleExtraSourceType::Background) {
+    if (NeedsBackgroundSource(style->extraSourceType())) {
       _root->invalidateBackground(renderBounds, style.get(), contentScale, sourceRects);
     }
   }
@@ -2159,7 +2222,7 @@ bool Layer::hasBackgroundStyle() {
   }
   for (const auto& style : _layerStyles) {
     DEBUG_ASSERT(style != nullptr);
-    if (style->extraSourceType() == LayerStyleExtraSourceType::Background) {
+    if (NeedsBackgroundSource(style->extraSourceType())) {
       return true;
     }
   }
@@ -2208,6 +2271,10 @@ void Layer::updateStaticSubtreeFlags() {
   for (const auto& child : _children) {
     child->updateStaticSubtreeFlags();
   }
+}
+
+std::optional<StyledShape> Layer::getContentShape() {
+  return onGetContentShape();
 }
 
 }  // namespace tgfx

@@ -25,6 +25,8 @@
 
 namespace tgfx {
 
+static constexpr float FILL_MIN_EXTENT = 1e-2f;
+
 static PathFillType ToPathFillType(FillRule fillRule) {
   switch (fillRule) {
     case FillRule::Winding:
@@ -46,11 +48,18 @@ class FillPainter : public Painter {
  protected:
   std::shared_ptr<Shape> prepareShape(std::shared_ptr<Shape> innerShape, size_t /*index*/,
                                       LayerPaint* paint) override {
+    const auto bounds = innerShape->getPath().getBounds();
+    // Skip sub-pixel paths. The geometry layer clamps zero-sized shapes to a sub-pixel
+    // extent so the stroker can still produce cap/join geometry; fill should honor the
+    // user's zero-size intent and not draw. Threshold is twice the geometry MIN_EXTENT.
+    if (bounds.width() < FILL_MIN_EXTENT || bounds.height() < FILL_MIN_EXTENT) {
+      return nullptr;
+    }
     if (innerShape->fillType() == PathFillType::Winding) {
       innerShape = Shape::ApplyFillType(innerShape, fillRule);
     }
     // Use the resolved path bounds so the fit region matches the actual fill footprint rather than the conservative cover.
-    paint->shader = wrapShaderWithFit(innerShape->getPath().getBounds());
+    paint->shader = wrapShaderWithFit(bounds);
     return innerShape;
   }
 
@@ -80,6 +89,10 @@ class FillPainter : public Painter {
       emit.paints.push_back(std::move(paint));
     }
     return emit;
+  }
+
+  PainterStyle onGetStyle() const override {
+    return {PaintStyle::Fill, 0.0f, StrokeAlign::Center};
   }
 };
 

@@ -247,6 +247,8 @@ class ShapeLayer : public Layer {
 
   void onUpdateContent(LayerRecorder* recorder) override;
 
+  std::optional<StyledShape> onGetContentShape() override;
+
  private:
   std::shared_ptr<Shape> _shape = nullptr;
   std::vector<std::shared_ptr<ShapeStyle>> _fillStyles = {};
@@ -259,7 +261,5 @@ class ShapeLayer : public Layer {
     bool lineDashAdaptive : 1;
     uint8_t strokeAlign : 2;
   } shapeBitFields = {};
-
-  std::shared_ptr<Shape> createStrokeShape() const;
 };
 }  // namespace tgfx

@@ -71,23 +71,27 @@ std::shared_ptr<Program> GlobalCache::findProgram(const BytesKey& programKey) {
 
 std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformBuffer(size_t bufferSize,
                                                                   size_t* lastBufferOffset) {
-  auto maxUBOSize =
+  // The device limit only validates the size of a single request. The pool allocation size is
+  // a separate policy fixed at MAX_UNIFORM_BUFFER_SIZE, since some Vulkan devices report a
+  // maxUBOSize of several GB which must not be used as the allocation size.
+  auto maxRequestSize =
       std::max(static_cast<size_t>(context->shaderCaps()->maxUBOSize), MAX_UNIFORM_BUFFER_SIZE);
   auto uboOffsetAlignment = static_cast<size_t>(context->shaderCaps()->uboOffsetAlignment);
 
-  if (maxUBOSize == 0) {
-    LOGE("[GlobalCache::findOrCreateUniformBuffer] maxUBOSize is 0");
-    return nullptr;
-  }
-
   auto alignedBufferSize = AlignTo(bufferSize, uboOffsetAlignment);
 
-  if (bufferSize == 0 || alignedBufferSize > maxUBOSize) {
+  if (bufferSize == 0 || alignedBufferSize > maxRequestSize) {
     LOGE(
         "[GlobalCache::findOrCreateUniformBuffer] invalid request buffer size: %zu, max UBO "
         "size: %zu, %s:%d",
-        bufferSize, maxUBOSize, __FILE__, __LINE__);
+        bufferSize, maxRequestSize, __FILE__, __LINE__);
     return nullptr;
+  }
+
+  // Requests too large to fit in a pool buffer get a dedicated buffer instead.
+  if (alignedBufferSize > MAX_UNIFORM_BUFFER_SIZE) {
+    *lastBufferOffset = 0;
+    return context->gpu()->createBuffer(alignedBufferSize, GPUBufferUsage::UNIFORM);
   }
 
   auto& uniformBufferPacket = *activePacket;
@@ -101,7 +105,7 @@ std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformBuffer(size_t bufferS
   };
 
   if (uniformBufferPacket.gpuBuffers.empty()) {
-    auto buffer = context->gpu()->createBuffer(maxUBOSize, GPUBufferUsage::UNIFORM);
+    auto buffer = context->gpu()->createBuffer(MAX_UNIFORM_BUFFER_SIZE, GPUBufferUsage::UNIFORM);
     if (buffer == nullptr) {
       LOGE(
           "[GlobalCache::findOrCreateUniformBuffer] failed to create initial uniform buffer, "
@@ -130,7 +134,7 @@ std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformBuffer(size_t bufferS
 
   if (uniformBufferPacket.bufferIndex >= uniformBufferPacket.gpuBuffers.size()) {
     // Need to create a new buffer
-    auto buffer = context->gpu()->createBuffer(maxUBOSize, GPUBufferUsage::UNIFORM);
+    auto buffer = context->gpu()->createBuffer(MAX_UNIFORM_BUFFER_SIZE, GPUBufferUsage::UNIFORM);
     if (buffer == nullptr) {
       LOGE(
           "[GlobalCache::findOrCreateUniformBuffer] failed to create uniform buffer, request "

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -21,6 +21,7 @@
 #include "core/utils/Log.h"
 #include "gpu/proxies/GPUBufferProxy.h"
 #include "tgfx/gpu/GPU.h"
+#include "tgfx/gpu/GPUBuffer.h"
 
 namespace tgfx {
 SurfaceReadback::~SurfaceReadback() {
@@ -78,7 +79,21 @@ const void* SurfaceReadback::lockPixels(Context* context, bool flipY) {
     // to, resulting in stale or garbage pixel data (observed as test failures on Vulkan).
     context->gpu()->queue()->waitUntilCompleted();
   }
-  auto pixels = readbackBuffer->gpuBuffer()->map();
+  auto gpuBuffer = readbackBuffer->gpuBuffer();
+  // For async-only backends like WebGPU, trigger async mapping if not already started.
+  // With Asyncify enabled, requestMapAsync() will suspend the WASM stack when buffer.mapAsync()
+  // awaits, allowing the JS event loop to process the async operation and resume when complete.
+  if (!gpuBuffer->isReady()) {
+    gpuBuffer->requestMapAsync();
+    if (!gpuBuffer->isReady()) {
+      LOGE("SurfaceReadback::lockPixels() buffer mapping failed!");
+      return nullptr;
+    }
+  }
+  auto pixels = gpuBuffer->map();
+  if (pixels == nullptr) {
+    return nullptr;
+  }
   if (flipY) {
     flipYPixels = malloc(_info.byteSize());
     if (flipYPixels == nullptr) {
@@ -108,5 +123,21 @@ void SurfaceReadback::unlockPixels(Context* context) {
   auto readbackBuffer = proxy->getBuffer();
   DEBUG_ASSERT(readbackBuffer != nullptr);
   readbackBuffer->gpuBuffer()->unmap();
+}
+
+std::shared_ptr<GPUBuffer> SurfaceReadback::getGPUBuffer(Context* context) const {
+  if (context != proxy->getContext()) {
+    LOGE("SurfaceReadback::getGPUBuffer() Context mismatch!");
+    return nullptr;
+  }
+  auto readbackBuffer = proxy->getBuffer();
+  if (readbackBuffer == nullptr) {
+    context->flushAndSubmit(false);
+    readbackBuffer = proxy->getBuffer();
+    if (readbackBuffer == nullptr) {
+      return nullptr;
+    }
+  }
+  return readbackBuffer->gpuBuffer();
 }
 }  // namespace tgfx
