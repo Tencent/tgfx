@@ -26,6 +26,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "gpu/AOTEffectDecomposer.h"
 #include "gpu/Uniform.h"
 
 namespace tgfx {
@@ -75,6 +76,9 @@ struct PrecompiledFallbackRecord {
   std::string shaderName;
   uint32_t vertPermutationIndex = std::numeric_limits<uint32_t>::max();
   uint32_t fragPermutationIndex = std::numeric_limits<uint32_t>::max();
+  // Populated only for NoMatchingRule misses while diagnostic recording is enabled; drives the
+  // offline decomposition-coverage audit. Left at its all-Trivial default otherwise.
+  AOTDecomposeAnalysis decomposeAnalysis = {};
 };
 
 const char* PrecompiledFallbackReasonName(PrecompiledFallbackReason reason);

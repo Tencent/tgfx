@@ -63,6 +63,33 @@ bool AOTNodeBuilder::addLuma(AOTNodeID input, const AOTLumaParameters& parameter
   return addUnaryNode(AOTEffectKind::Luma, input, traits, parameters, output);
 }
 
+bool AOTNodeBuilder::addConstColor(AOTNodeID input, const AOTConstColorParameters& parameters,
+                                   AOTNodeID* output) {
+  // A constant color operand. Ignore mode is a self-contained source (it disregards its input);
+  // the modulate modes multiply the input, so conservatively mark it as consuming the input color
+  // and neither preserving alpha representation nor color space. It is not fusion-safe on its own
+  // (Ignore produces non-zero output from transparent-black input), which the fusion validator and
+  // the eventual pointwise kernel account for; recording accurate traits here keeps those decisions
+  // sound.
+  auto inputUsage = parameters.inputMode == 0
+                        ? EffectInputUsage::Ignore
+                        : (parameters.inputMode == 2 ? EffectInputUsage::ColorAlpha
+                                                     : EffectInputUsage::ColorRGBA);
+  bool selfContained = parameters.inputMode == 0;
+  EffectTraits traits = {EffectDomain::Pointwise, inputUsage, selfContained, false, false};
+  return addUnaryNode(AOTEffectKind::ConstColor, input, traits, parameters, output);
+}
+
+bool AOTNodeBuilder::addBlend(AOTNodeID src, AOTNodeID dst, const AOTBlendParameters& parameters,
+                              AOTNodeID* output) {
+  // A binary blend is a Composite node: both operands are sampled at the output coordinate. It does
+  // not preserve alpha representation or color space (the blend math mixes premultiplied operands),
+  // so downstream fusion/materialization decisions must treat it as a boundary.
+  EffectTraits traits = {EffectDomain::Composite, EffectInputUsage::SameCoordinateChild, false,
+                         false, false};
+  return addBinaryNode(AOTEffectKind::Blend, src, dst, traits, parameters, output);
+}
+
 bool AOTNodeBuilder::finish(AOTNodeID root, AOTEffectGraph* graph) const {
   if (graph == nullptr || !contains(root)) {
     return false;
@@ -89,6 +116,24 @@ bool AOTNodeBuilder::addUnaryNode(AOTEffectKind kind, AOTNodeID input, EffectTra
   AOTEffectNode node = {};
   node.kind = kind;
   node.inputs.push_back(input);
+  node.traits = traits;
+  node.parameters = std::move(parameters);
+  auto nodeID = AOTNodeID(static_cast<uint32_t>(nodes.size()));
+  nodes.push_back(std::move(node));
+  *output = nodeID;
+  return true;
+}
+
+bool AOTNodeBuilder::addBinaryNode(AOTEffectKind kind, AOTNodeID first, AOTNodeID second,
+                                   EffectTraits traits, AOTEffectParameters parameters,
+                                   AOTNodeID* output) {
+  if (output == nullptr || !contains(first) || !contains(second)) {
+    return false;
+  }
+  AOTEffectNode node = {};
+  node.kind = kind;
+  node.inputs.push_back(first);
+  node.inputs.push_back(second);
   node.traits = traits;
   node.parameters = std::move(parameters);
   auto nodeID = AOTNodeID(static_cast<uint32_t>(nodes.size()));

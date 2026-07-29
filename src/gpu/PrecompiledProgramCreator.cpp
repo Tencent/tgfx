@@ -224,7 +224,16 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
   auto matchResult = MatchPermutation(programInfo, &matchFailure);
   if (!matchResult) {
     auto reason = ToFallbackReason(matchFailure);
-    cache->recordArtifactMiss(reason, MakeFallbackRecord(cache, programInfo));
+    auto record = MakeFallbackRecord(cache, programInfo);
+    // Offline decomposition-coverage audit: for structural misses, classify (during diagnostic
+    // runs only) whether each effect axis could be reduced onto the existing AOT kernel basis. This
+    // is pure static analysis — no rendering, no state change — gated so the production hot path
+    // pays nothing.
+    if (reason == PrecompiledFallbackReason::NoMatchingRule &&
+        cache->diagnosticRecordingEnabled()) {
+      record.decomposeAnalysis = AOTEffectDecomposer::Analyze(programInfo);
+    }
+    cache->recordArtifactMiss(reason, record);
     return nullptr;
   }
   cache->recordAOTStage(PrecompiledAOTStage::PermutationMatched);

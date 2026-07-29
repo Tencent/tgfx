@@ -33,11 +33,9 @@ class ConstColorProcessor : public FragmentProcessor {
     return "ConstColorProcessor";
   }
 
-  int getInputMode() const {
-    return static_cast<int>(inputMode);
-  }
-
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
+
+  bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
  protected:
   DEFINE_PROCESSOR_CLASS_ID

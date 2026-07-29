@@ -18,6 +18,7 @@
 
 #include "XfermodeFragmentProcessor.h"
 #include <algorithm>
+#include "gpu/AOTEffect.h"
 #include "gpu/UniformData.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/TextureEffect.h"
@@ -101,5 +102,53 @@ void XfermodeFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
 
 void XfermodeFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   bytesKey->write(static_cast<uint32_t>(mode) | (static_cast<uint32_t>(child) << 16));
+}
+
+bool XfermodeFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
+                                           AOTNodeID* output) const {
+  if (builder == nullptr || output == nullptr) {
+    return false;
+  }
+  // Map the two blend operands onto builder nodes. The child registration order (see the
+  // constructor) is: DstChild -> child(0)=dst, src=input color; SrcChild -> child(0)=src, dst=input
+  // color; TwoChild -> child(0)=src, child(1)=dst, both fed the input color. Any child without an
+  // AOT lowering aborts the whole tree, falling back to the plain route.
+  AOTNodeID src = AOTNodeID::Invalid();
+  AOTNodeID dst = AOTNodeID::Invalid();
+  switch (child) {
+    case Child::DstChild:
+      if (numChildProcessors() != 1) {
+        return false;
+      }
+      src = input;
+      if (!childProcessor(0)->lowerToAOT(builder, input, &dst)) {
+        return false;
+      }
+      break;
+    case Child::SrcChild:
+      if (numChildProcessors() != 1) {
+        return false;
+      }
+      dst = input;
+      if (!childProcessor(0)->lowerToAOT(builder, input, &src)) {
+        return false;
+      }
+      break;
+    case Child::TwoChild:
+      if (numChildProcessors() != 2) {
+        return false;
+      }
+      if (!childProcessor(0)->lowerToAOT(builder, input, &src)) {
+        return false;
+      }
+      if (!childProcessor(1)->lowerToAOT(builder, input, &dst)) {
+        return false;
+      }
+      break;
+  }
+  AOTBlendParameters parameters = {};
+  parameters.blendMode = static_cast<int>(mode);
+  parameters.childType = static_cast<int>(child);
+  return builder->addBlend(src, dst, parameters, output);
 }
 }  // namespace tgfx

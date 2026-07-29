@@ -68,6 +68,8 @@ enum class AOTEffectKind {
   TextureSource,
   ColorMatrix,
   Luma,
+  ConstColor,
+  Blend,
 };
 
 enum class EffectDomain {
@@ -117,8 +119,25 @@ struct AOTLumaParameters {
   float kb = 0.0722f;
 };
 
+// Constant-color operand (ConstColorProcessor). color is premultiplied RGBA; inputMode mirrors
+// tgfx::InputMode (0=Ignore, 1=ModulateRGBA, 2=ModulateA) and is a runtime uniform in the fused
+// kernel rather than a structural axis.
+struct AOTConstColorParameters {
+  std::array<float, 4> color = {};
+  int inputMode = 0;
+};
+
+// Binary blend (XfermodeFragmentProcessor). blendMode mirrors tgfx::BlendMode; childType mirrors
+// XfermodeFragmentProcessor::Child (0=DstChild, 1=SrcChild, 2=TwoChild) and selects how the two
+// inputs map to the blend's src/dst operands. Both are runtime uniforms in the fused kernel.
+struct AOTBlendParameters {
+  int blendMode = 0;
+  int childType = 0;
+};
+
 using AOTEffectParameters =
-    std::variant<std::monostate, AOTTextureParameters, AOTColorMatrixParameters, AOTLumaParameters>;
+    std::variant<std::monostate, AOTTextureParameters, AOTColorMatrixParameters, AOTLumaParameters,
+                 AOTConstColorParameters, AOTBlendParameters>;
 
 struct AOTEffectNode {
   AOTEffectKind kind = AOTEffectKind::GeometryColor;
@@ -157,6 +176,12 @@ class AOTNodeBuilder {
 
   bool addLuma(AOTNodeID input, const AOTLumaParameters& parameters, AOTNodeID* output);
 
+  bool addConstColor(AOTNodeID input, const AOTConstColorParameters& parameters, AOTNodeID* output);
+
+  // Adds a binary blend node consuming two previously-built operands (src and dst node ids).
+  bool addBlend(AOTNodeID src, AOTNodeID dst, const AOTBlendParameters& parameters,
+                AOTNodeID* output);
+
   bool finish(AOTNodeID root, AOTEffectGraph* graph) const;
 
   size_t nodeCount() const {
@@ -166,6 +191,9 @@ class AOTNodeBuilder {
  private:
   bool addUnaryNode(AOTEffectKind kind, AOTNodeID input, EffectTraits traits,
                     AOTEffectParameters parameters, AOTNodeID* output);
+
+  bool addBinaryNode(AOTEffectKind kind, AOTNodeID first, AOTNodeID second, EffectTraits traits,
+                     AOTEffectParameters parameters, AOTNodeID* output);
 
   bool contains(AOTNodeID nodeID) const;
 

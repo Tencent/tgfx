@@ -17,9 +17,21 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/processors/ConstColorProcessor.h"
+#include "gpu/AOTEffect.h"
 
 namespace tgfx {
 void ConstColorProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   bytesKey->write(static_cast<uint32_t>(inputMode));
+}
+
+bool ConstColorProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
+                                     AOTNodeID* output) const {
+  if (builder == nullptr || output == nullptr) {
+    return false;
+  }
+  AOTConstColorParameters parameters = {};
+  parameters.color = {color.red, color.green, color.blue, color.alpha};
+  parameters.inputMode = static_cast<int>(inputMode);
+  return builder->addConstColor(input, parameters, output);
 }
 }  // namespace tgfx

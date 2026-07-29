@@ -17,9 +17,93 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/AOTEffectDecomposer.h"
+#include <unordered_set>
+#include "gpu/ProgramInfo.h"
 #include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
+
+// The set of fragment-processor classes that currently implement lowerToAOT. Kept next to Lower as
+// the single source of truth for blame attribution in Analyze; the pass/fail decision itself is
+// always taken from Lower's real result, so a drift here can only mislabel the blocking class, not
+// change the recovered/blocked verdict.
+static const std::unordered_set<std::string>& AOTLowerableNames() {
+  static const std::unordered_set<std::string> names = {
+      "TextureEffect", "ColorMatrixFragmentProcessor", "LumaFragmentProcessor",
+      "ComposeFragmentProcessor"};
+  return names;
+}
+
+// Depth-first search for the first fragment processor whose class has no AOT lowering. Returns an
+// empty string when every node in the tree is lowerable (in which case Lower's failure, if any, is
+// a shape issue rather than a missing lowering).
+static std::string FindBlockingProcessor(const FragmentProcessor* processor) {
+  if (processor == nullptr) {
+    return "null";
+  }
+  if (AOTLowerableNames().count(processor->name()) == 0) {
+    return processor->name();
+  }
+  for (size_t i = 0; i < processor->numChildProcessors(); ++i) {
+    auto blocking = FindBlockingProcessor(processor->childProcessor(i));
+    if (!blocking.empty()) {
+      return blocking;
+    }
+  }
+  return "";
+}
+
+// Counts texture-sampling leaves across the tree. A fused kernel needs one sampler per leaf, so
+// this is the sampler-budget input the audit reports.
+static int CountTextureLeaves(const FragmentProcessor* processor) {
+  if (processor == nullptr) {
+    return 0;
+  }
+  auto name = processor->name();
+  int count = (name == "TextureEffect" || name == "TiledTextureEffect" ||
+               name == "DeviceSpaceTextureEffect")
+                  ? 1
+                  : 0;
+  for (size_t i = 0; i < processor->numChildProcessors(); ++i) {
+    count += CountTextureLeaves(processor->childProcessor(i));
+  }
+  return count;
+}
+
+static AOTAxisAnalysis ClassifyAxis(const std::vector<const FragmentProcessor*>& processors) {
+  AOTAxisAnalysis analysis = {};
+  analysis.processorCount = static_cast<int>(processors.size());
+  if (processors.empty()) {
+    analysis.outcome = AOTDecomposeOutcome::Trivial;
+    return analysis;
+  }
+  for (auto processor : processors) {
+    analysis.textureLeafCount += CountTextureLeaves(processor);
+  }
+  AOTEffectGraph graph = {};
+  if (!AOTEffectDecomposer::Lower(processors, &graph)) {
+    analysis.outcome = AOTDecomposeOutcome::BlockedByLowering;
+    for (auto processor : processors) {
+      auto blocking = FindBlockingProcessor(processor);
+      if (!blocking.empty()) {
+        analysis.blockingProcessor = blocking;
+        break;
+      }
+    }
+    return analysis;
+  }
+  if (!AOTEffectDecomposer::ValidateForFusion(graph)) {
+    analysis.outcome = AOTDecomposeOutcome::BlockedByValidation;
+    return analysis;
+  }
+  AOTEffectPlan plan = {};
+  if (!AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan)) {
+    analysis.outcome = AOTDecomposeOutcome::UnsupportedShape;
+    return analysis;
+  }
+  analysis.outcome = AOTDecomposeOutcome::FusablePointwise;
+  return analysis;
+}
 
 bool AOTEffectDecomposer::Lower(const std::vector<const FragmentProcessor*>& processors,
                                 AOTEffectGraph* graph) {
@@ -135,6 +219,27 @@ bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, AOTDecompositio
   result.output = graph.root();
   *plan = std::move(result);
   return true;
+}
+
+AOTDecomposeAnalysis AOTEffectDecomposer::Analyze(const ProgramInfo* programInfo) {
+  AOTDecomposeAnalysis result = {};
+  if (programInfo == nullptr) {
+    return result;
+  }
+  auto total = programInfo->numFragmentProcessors();
+  auto colorCount = programInfo->numColorFragmentProcessors();
+  std::vector<const FragmentProcessor*> colorProcessors;
+  std::vector<const FragmentProcessor*> coverageProcessors;
+  colorProcessors.reserve(colorCount);
+  for (size_t i = 0; i < colorCount; ++i) {
+    colorProcessors.push_back(programInfo->getFragmentProcessor(i));
+  }
+  for (size_t i = colorCount; i < total; ++i) {
+    coverageProcessors.push_back(programInfo->getFragmentProcessor(i));
+  }
+  result.color = ClassifyAxis(colorProcessors);
+  result.coverage = ClassifyAxis(coverageProcessors);
+  return result;
 }
 
 }  // namespace tgfx
