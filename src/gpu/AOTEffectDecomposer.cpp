@@ -156,8 +156,11 @@ bool AOTEffectDecomposer::ValidateForFusion(const AOTEffectGraph& graph) {
   return true;
 }
 
-bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, AOTDecompositionMode mode,
-                                    AOTEffectPlan* plan) {
+// Existing narrow planner: a strictly linear TextureSource -> ColorMatrix/Luma chain, mapped onto
+// the TextureFill / TextureColorMatrix / TexturedColorMatrix / TexturedLuma kernels. Preserved
+// unchanged; the DAG planner below handles anything this rejects.
+static bool DecomposeLinearTextureChain(const AOTEffectGraph& graph, AOTDecompositionMode mode,
+                                        AOTEffectPlan* plan) {
   if (plan == nullptr || graph.nodeCount() < 2 || graph.root().index() + 1 != graph.nodeCount()) {
     return false;
   }
@@ -219,6 +222,79 @@ bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, AOTDecompositio
   result.output = graph.root();
   *plan = std::move(result);
   return true;
+}
+
+// The number of texture samplers a single fused pointwise pass can bind. A DAG with more texture
+// leaves than this cannot be evaluated in one kernel invocation and must be split by
+// materialization (a later stage), so the pointwise-DAG planner rejects it here rather than
+// producing a plan the fused kernel could not execute.
+static constexpr int kMaxFusedSamplers = 4;
+
+// New planner: a pointwise DAG whose only leaves are texture sources / const colors and whose
+// interior nodes are pure pointwise or blend ops. Such a DAG evaluates in a single fused pass (the
+// PointwiseChain kernel) with no intermediate materialization. Gather/neighborhood/external nodes
+// (tiling, blur, device-space, ...) are rejected — they require materialization, handled elsewhere.
+static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* plan) {
+  if (plan == nullptr || graph.nodeCount() < 2) {
+    return false;
+  }
+  auto geometryNode = graph.nodeAt(AOTNodeID(0));
+  if (geometryNode == nullptr || geometryNode->kind != AOTEffectKind::GeometryColor) {
+    return false;
+  }
+  int textureLeaves = 0;
+  for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
+    auto node = graph.nodeAt(AOTNodeID(index));
+    if (node == nullptr) {
+      return false;
+    }
+    switch (node->kind) {
+      case AOTEffectKind::TextureSource: {
+        auto parameters = std::get_if<AOTTextureParameters>(&node->parameters);
+        if (parameters == nullptr || parameters->isYUV ||
+            (parameters->isAlphaOnly && parameters->hasRGBAAA)) {
+          return false;
+        }
+        ++textureLeaves;
+        break;
+      }
+      case AOTEffectKind::ColorMatrix:
+      case AOTEffectKind::Luma:
+      case AOTEffectKind::ConstColor:
+      case AOTEffectKind::Blend:
+        break;
+      default:
+        // GeometryColor only legal at index 0; anything else (Gather/Neighborhood/External) is not
+        // fusable into one pass.
+        return false;
+    }
+  }
+  if (textureLeaves > kMaxFusedSamplers) {
+    return false;
+  }
+  AOTEffectPlan result = {};
+  AOTPassDescriptor pass = {};
+  pass.kernel = AOTKernelKind::PointwiseChain;
+  pass.output = graph.root();
+  pass.materializesOutput = false;
+  for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
+    pass.nodes.push_back(AOTNodeID(index));
+  }
+  result.passes.push_back(std::move(pass));
+  result.output = graph.root();
+  *plan = std::move(result);
+  return true;
+}
+
+bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, AOTDecompositionMode mode,
+                                    AOTEffectPlan* plan) {
+  // Prefer the narrow linear planner (it maps onto already-shipping kernels); fall back to the
+  // pointwise-DAG planner for blend trees and const-color chains that the linear form cannot
+  // represent.
+  if (DecomposeLinearTextureChain(graph, mode, plan)) {
+    return true;
+  }
+  return DecomposePointwiseDAG(graph, plan);
 }
 
 AOTDecomposeAnalysis AOTEffectDecomposer::Analyze(const ProgramInfo* programInfo) {

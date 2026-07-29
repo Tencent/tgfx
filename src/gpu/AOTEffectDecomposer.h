@@ -37,6 +37,10 @@ enum class AOTKernelKind {
   TextureColorMatrix,
   TexturedColorMatrix,
   TexturedLuma,
+  // A single fused pass that evaluates a pointwise DAG (texture/const-color leaves combined by
+  // color-matrix, luma and blend ops) via a runtime opcode chain. Produced by the pointwise-DAG
+  // planner; its kernel artifact is the upcoming PointwiseChainShader.
+  PointwiseChain,
 };
 
 struct AOTPassDescriptor {

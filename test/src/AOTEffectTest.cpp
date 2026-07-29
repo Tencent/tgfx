@@ -299,4 +299,63 @@ TGFX_TEST(AOTEffectTest, BuilderRejectsBlendWithInvalidOperand) {
   EXPECT_EQ(builder.nodeCount(), 1u);
 }
 
+TGFX_TEST(AOTEffectTest, BlendTreeDecomposesToPointwiseChain) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  auto src = MakeTextureProcessor(context, &allocator, PixelFormat::RGBA_8888);
+  auto dst = MakeTextureProcessor(context, &allocator, PixelFormat::RGBA_8888);
+  ASSERT_NE(src, nullptr);
+  ASSERT_NE(dst, nullptr);
+  auto xfermode = XfermodeFragmentProcessor::MakeFromTwoProcessors(
+      &allocator, std::move(src), std::move(dst), BlendMode::Screen);
+  ASSERT_NE(xfermode, nullptr);
+
+  AOTEffectGraph graph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower({xfermode.get()}, &graph));
+  // The linear planner cannot represent the two-input blend DAG; the pointwise-DAG planner folds
+  // the whole graph into a single PointwiseChain pass covering nodes 1..3.
+  AOTEffectPlan plan;
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan));
+  ASSERT_EQ(plan.passes.size(), 1u);
+  EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
+  EXPECT_FALSE(plan.passes[0].materializesOutput);
+  EXPECT_EQ(plan.passes[0].output, graph.root());
+  EXPECT_EQ(plan.passes[0].nodes.size(), 3u);
+  EXPECT_EQ(plan.output, graph.root());
+}
+
+TGFX_TEST(AOTEffectTest, ConstColorChainDecomposesToPointwiseChain) {
+  BlockAllocator allocator;
+  // A ConstColor(Ignore) source modulated by a color matrix: pure pointwise, no textures.
+  auto constColor =
+      ConstColorProcessor::Make(&allocator, PMColor{0.4f, 0.3f, 0.2f, 1.0f}, InputMode::Ignore);
+  auto colorMatrix = ColorMatrixFragmentProcessor::Make(&allocator, IdentityColorMatrix);
+  ASSERT_NE(constColor, nullptr);
+  ASSERT_NE(colorMatrix, nullptr);
+
+  AOTEffectGraph graph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower({constColor.get(), colorMatrix.get()}, &graph));
+  AOTEffectPlan plan;
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan));
+  ASSERT_EQ(plan.passes.size(), 1u);
+  EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
+}
+
+TGFX_TEST(AOTEffectTest, LinearTextureChainStillUsesNarrowPlanner) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  AOTEffectGraph graph;
+  ASSERT_TRUE(BuildTripleGraph(context, &allocator, &graph));
+  AOTEffectPlan plan;
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan));
+  // The narrow linear planner still wins for the texture->matrix->luma chain: it must NOT collapse
+  // into a single PointwiseChain pass (that path is reserved for blend/const-color DAGs).
+  EXPECT_GT(plan.passes.size(), 1u);
+  EXPECT_NE(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
+}
+
 }  // namespace tgfx
