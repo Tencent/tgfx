@@ -55,13 +55,11 @@ static bool HasExtraSource(uint32_t sourceFlags, LayerStyleExtraSourceType type)
 }
 
 static bool NeedsBackgroundSource(uint32_t sourceFlags) {
-  return HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Background) ||
-         HasExtraSource(sourceFlags, LayerStyleExtraSourceType::BackgroundAndContour);
+  return HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Background);
 }
 
 static bool NeedsContourSource(uint32_t sourceFlags) {
-  return HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Contour) ||
-         HasExtraSource(sourceFlags, LayerStyleExtraSourceType::BackgroundAndContour);
+  return HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Contour);
 }
 
 // The minimum size (longest edge) for subtree cache. This prevents creating excessively small
@@ -1957,8 +1955,8 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
     auto contourImage = group->contour.has_value() ? group->contour->image : nullptr;
     auto contourOffset =
         contourImage ? group->contour->offset - contentEntry.offset : Point::Zero();
-    styleInput.extraSource = std::make_shared<ContourInputSource>(
-        std::move(contourImage), contourOffset, source->contentShape);
+    styleInput.extraSources.push_back(std::make_shared<ContourInputSource>(
+        std::move(contourImage), contourOffset, source->contentShape));
   }
   layerStyle->draw(canvas, styleInput, alpha);
 }

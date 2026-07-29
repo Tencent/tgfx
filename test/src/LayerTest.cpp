@@ -4041,7 +4041,8 @@ TGFX_TEST_PRIVATE(LayerTest, GlassStyleUsesBackgroundAndContourSource) {
   layer->setLayerStyles({glassStyle});
 
   EXPECT_EQ(glassStyle->extraSourceType(),
-            static_cast<uint32_t>(LayerStyleExtraSourceType::BackgroundAndContour));
+            static_cast<uint32_t>(LayerStyleExtraSourceType::Background) |
+                static_cast<uint32_t>(LayerStyleExtraSourceType::Contour));
 
   DrawArgs drawArgs(context);
   TGFX_PRIVATE_ACCESS(auto source = layer->getLayerStyleSource(drawArgs, Matrix::I());

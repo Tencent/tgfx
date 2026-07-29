@@ -153,11 +153,11 @@ bool SpreadUtils::IsSpreadCollapsed(const Shape& shape, StyledShapeType type, fl
 
 SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInput& input,
                                                             float spread) {
-  auto source = input.extraSource;
-  if (source == nullptr || source->type() != StyleInputSource::Type::Contour) {
+  auto* source = input.findExtraSource(StyleInputSource::Type::Contour);
+  if (source == nullptr) {
     return {nullptr, {}, false};
   }
-  auto contour = std::static_pointer_cast<ContourInputSource>(source);
+  auto contour = static_cast<const ContourInputSource*>(source);
   if (!contour->shape().has_value()) {
     return {nullptr, {}, false};
   }

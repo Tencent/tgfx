@@ -149,7 +149,7 @@ void DropShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float
                       ? SamplingOptions(FilterMode::Nearest, MipmapMode::None)
                       : SamplingOptions();
   Paint paint = {};
-  auto contour = input.extraSource;
+  auto* contour = input.findExtraSource(StyleInputSource::Type::Contour);
   if (!_showBehindLayer && contour != nullptr && contour->image() != nullptr) {
     auto shader =
         Shader::MakeImageShader(contour->image(), TileMode::Decal, TileMode::Decal, sampling);

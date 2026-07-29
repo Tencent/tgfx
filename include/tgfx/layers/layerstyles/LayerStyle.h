@@ -50,11 +50,7 @@ enum class LayerStyleExtraSourceType : uint32_t {
   /**
    * The layerStyle requires the background content.
    */
-  Background = 1 << 1,
-  /**
-   * The layerStyle requires both the background content and the layer contour.
-   */
-  BackgroundAndContour = 1 << 2
+  Background = 1 << 1
 };
 
 enum class LayerStyleType {

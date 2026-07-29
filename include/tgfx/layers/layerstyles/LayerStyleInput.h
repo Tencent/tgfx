@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <optional>
+#include <vector>
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/layers/layerstyles/StyledShape.h"
@@ -27,26 +28,18 @@
 namespace tgfx {
 
 /**
- * Contour image, offset and optional vector shape carried by a BackgroundAndContour source.
- */
-struct ContourData {
-  std::shared_ptr<Image> image = nullptr;
-  Point imageOffset = {};
-  std::optional<StyledShape> shape = std::nullopt;
-};
-
-/**
  * Extra input source that a LayerStyle may need beyond the primary content image.
  */
 class StyleInputSource {
  public:
+  /**
+   * The kind of extra source carried by this object.
+   */
   enum class Type {
     /** A plain image source, such as the background content below the layer. */
     Base,
     /** A contour source that additionally carries the layer's vector shape. */
-    Contour,
-    /** A background image and an optional contour source. */
-    BackgroundAndContour
+    Contour
   };
 
   /**
@@ -73,45 +66,15 @@ class StyleInputSource {
     return _imageOffset;
   }
 
-  /**
-   * Creates a source carrying a background image and optional contour data.
-   * @param backgroundImage The captured background image.
-   * @param backgroundOffset The background image offset relative to the content image.
-   * @param contourImage The rasterized contour image, or nullptr when unavailable.
-   * @param contourOffset The contour image offset relative to the content image.
-   * @param shape The optional vector shape corresponding to the contour.
-   */
-  static std::shared_ptr<StyleInputSource> MakeBackgroundAndContour(
-      std::shared_ptr<Image> backgroundImage, Point backgroundOffset,
-      std::shared_ptr<Image> contourImage, Point contourOffset,
-      std::optional<StyledShape> shape = std::nullopt) {
-    ContourData data = {std::move(contourImage), contourOffset, std::move(shape)};
-    return std::shared_ptr<StyleInputSource>(
-        new StyleInputSource(std::move(backgroundImage), backgroundOffset, std::move(data)));
-  }
-
-  /**
-   * Returns contour data when type() is BackgroundAndContour; otherwise returns nullopt.
-   */
-  const std::optional<ContourData>& contour() const {
-    return _contour;
-  }
-
  protected:
   StyleInputSource(Type type, std::shared_ptr<Image> image, Point imageOffset)
       : _type(type), _image(std::move(image)), _imageOffset(imageOffset) {
   }
 
  private:
-  StyleInputSource(std::shared_ptr<Image> image, Point imageOffset, ContourData contour)
-      : _type(Type::BackgroundAndContour), _image(std::move(image)), _imageOffset(imageOffset),
-        _contour(std::move(contour)) {
-  }
-
   Type _type = Type::Base;
   std::shared_ptr<Image> _image;
   Point _imageOffset = {};
-  std::optional<ContourData> _contour = std::nullopt;
 };
 
 /**
@@ -153,11 +116,24 @@ struct LayerStyleInput {
   float contentScale = 1.0f;
 
   /**
-   * Extra source requested by LayerStyle::extraSourceType(). Contour styles receive a
-   * ContourInputSource. BackgroundAndContour styles receive a StyleInputSource whose primary image
-   * is the background and whose contour() contains the optional contour data.
+   * Extra sources requested by LayerStyle::extraSourceType() flags. Each source is an independent
+   * StyleInputSource (or ContourInputSource for contour sources). Use findExtraSource() to
+   * retrieve a source by type.
    */
-  std::shared_ptr<StyleInputSource> extraSource = nullptr;
+  std::vector<std::shared_ptr<StyleInputSource>> extraSources = {};
+
+  /**
+   * Returns the extra source with the specified type, or nullptr when it was not requested or
+   * could not be generated.
+   */
+  const StyleInputSource* findExtraSource(StyleInputSource::Type type) const {
+    for (const auto& source : extraSources) {
+      if (source != nullptr && source->type() == type) {
+        return source.get();
+      }
+    }
+    return nullptr;
+  }
 };
 
 }  // namespace tgfx
