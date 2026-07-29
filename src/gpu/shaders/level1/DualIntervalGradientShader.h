@@ -25,21 +25,23 @@ namespace tgfx {
 class DualIntervalGradientShader : public PrecompiledShader {
  public:
   struct VertDims {
-    enum : uint32_t { GP_TYPE, COUNT };
+    enum : uint32_t { GP_TYPE, HAS_VCOVERAGE, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("GP_TYPE", 2),
+          PermutationBool("HAS_VCOVERAGE"),
       });
     }
   };
   using VD = VertDims;
 
   struct FragDims {
-    enum : uint32_t { HAS_XP, HAS_COVERAGE, COUNT };
+    enum : uint32_t { HAS_XP, HAS_COVERAGE, HAS_VCOVERAGE, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("HAS_XP", 3),
           PermutationInt("HAS_COVERAGE", 3),
+          PermutationBool("HAS_VCOVERAGE"),
       });
     }
   };
@@ -58,10 +60,12 @@ class DualIntervalGradientShader : public PrecompiledShader {
   }
 
  private:
+  // HAS_VCOVERAGE is mirrored: the vertex shader emits the vCoverage varying only when the fragment
+  // shader consumes it, so a vertex/fragment mismatch would leave a dangling varying.
   static bool ShouldCompile(uint32_t /*vertIndex*/, uint32_t /*fragIndex*/,
-                            const std::vector<int>& /*vertValues*/,
-                            const std::vector<int>& /*fragValues*/) {
-    return true;
+                            const std::vector<int>& vertValues,
+                            const std::vector<int>& fragValues) {
+    return vertValues[VD::HAS_VCOVERAGE] == fragValues[FD::HAS_VCOVERAGE];
   }
 };
 

@@ -645,16 +645,16 @@ static std::optional<PermutationMatchResult> TryMatchGradientFill(const ProgramI
     return std::nullopt;
   }
 
-  // This kernel does not consume per-vertex AA coverage and its shared vertex shader (HAS_VCOVERAGE
-  // defaults to 0 here) declares no inCoverage attribute, so reject coverage-carrying draws.
-  if (GetGPCoverage(gp)) {
-    return std::nullopt;
-  }
+  // Per-vertex AA coverage is carried through the HAS_VCOVERAGE dimension (the shared vertex shader
+  // emits a vCoverage varying the fragment shader multiplies in), so coverage-carrying draws are
+  // served rather than rejected.
+  int vCoverage = GetGPCoverage(gp);
 
   using VD = GradientFillShader::VD;
   auto vertDomain = VD::domain();
   std::vector<int> vertValues(VD::COUNT);
   vertValues[VD::GP_TYPE] = gpType;
+  vertValues[VD::HAS_VCOVERAGE] = vCoverage;
   auto vertIndex = vertDomain.encode(vertValues);
 
   using FD = GradientFillShader::FD;
@@ -662,6 +662,7 @@ static std::optional<PermutationMatchResult> TryMatchGradientFill(const ProgramI
   std::vector<int> fragValues(FD::COUNT);
   fragValues[FD::HAS_XP] = xpType;
   fragValues[FD::HAS_COVERAGE] = coverageType;
+  fragValues[FD::HAS_VCOVERAGE] = vCoverage;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"GradientFillShader", vertIndex, fragIndex};
 }
@@ -774,16 +775,16 @@ static std::optional<PermutationMatchResult> TryMatchDualIntervalGradient(
     return std::nullopt;
   }
 
-  // This kernel does not consume per-vertex AA coverage and its shared vertex shader (HAS_VCOVERAGE
-  // defaults to 0 here) declares no inCoverage attribute, so reject coverage-carrying draws.
-  if (GetGPCoverage(gp)) {
-    return std::nullopt;
-  }
+  // Per-vertex AA coverage is carried through the HAS_VCOVERAGE dimension (the shared vertex shader
+  // emits a vCoverage varying the fragment shader multiplies in), so coverage-carrying draws are
+  // served rather than rejected.
+  int vCoverage = GetGPCoverage(gp);
 
   using VD = DualIntervalGradientShader::VD;
   auto vertDomain = VD::domain();
   std::vector<int> vertValues(VD::COUNT);
   vertValues[VD::GP_TYPE] = gpType;
+  vertValues[VD::HAS_VCOVERAGE] = vCoverage;
   auto vertIndex = vertDomain.encode(vertValues);
 
   using FD = DualIntervalGradientShader::FD;
@@ -791,6 +792,7 @@ static std::optional<PermutationMatchResult> TryMatchDualIntervalGradient(
   std::vector<int> fragValues(FD::COUNT);
   fragValues[FD::HAS_XP] = xpType;
   fragValues[FD::HAS_COVERAGE] = coverageType;
+  fragValues[FD::HAS_VCOVERAGE] = vCoverage;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"DualIntervalGradientShader", vertIndex, fragIndex};
 }

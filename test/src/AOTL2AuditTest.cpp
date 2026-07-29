@@ -516,4 +516,71 @@ TGFX_TEST(AOTL2AuditTest, CoverageTiledMaskFPStructure) {
   EXPECT_EQ(coverageTextureCount, 1);
 }
 
+// Renders a multi-stop linear gradient into an anti-aliased, pixel-unaligned rect. The AA edges make
+// the QuadPerEdgeAA GP emit a per-vertex coverage attribute, and a >2-stop gradient uses the
+// Dual/UnrolledBinary colorizer — the combination that previously missed (the gradient kernels
+// rejected coverage-carrying draws) and is now served via the HAS_VCOVERAGE dimension.
+static void RenderGradientCoverageScene(Context* context, int width, int height,
+                                        Bitmap* outBitmap) {
+  context->globalCache()->clearPrograms();
+  auto surface = Surface::Make(context, width, height);
+  ASSERT_TRUE(surface != nullptr);
+  Paint paint = {};
+  paint.setAntiAlias(true);
+  std::vector<Color> colors = {Color::Red(), Color::Green(), Color::Blue(), Color::White()};
+  paint.setShader(Shader::MakeLinearGradient({0, 0}, {static_cast<float>(width), 0}, colors, {}));
+  surface->getCanvas()->drawRect(Rect::MakeLTRB(10.5f, 10.5f, static_cast<float>(width) - 10.5f,
+                                                static_cast<float>(height) - 10.5f),
+                                 paint);
+  context->flushAndSubmit(true);
+  ASSERT_TRUE(outBitmap->allocPixels(width, height));
+  auto pixels = outBitmap->lockPixels();
+  ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+  outBitmap->unlockPixels();
+}
+
+// Validates the gradient HAS_VCOVERAGE fix: an anti-aliased multi-stop gradient draw must now hit a
+// precompiled artifact (zero NoMatchingRule) and render identically to the JIT path, proving the
+// per-vertex coverage varying is composited correctly in the Dual/UnrolledBinary gradient kernels.
+TGFX_TEST(AOTL2AuditTest, GradientCoverageMatchesJIT) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+
+  int width = 160;
+  int height = 160;
+
+  cache->resetStats();
+  Bitmap referenceBitmap = {};
+  RenderGradientCoverageScene(context, width, height, &referenceBitmap);
+
+  ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
+  cache->resetStats();
+  Bitmap candidateBitmap = {};
+  RenderGradientCoverageScene(context, width, height, &candidateBitmap);
+  uint32_t noMatch = cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule);
+  uint32_t hits = cache->hitCount();
+  cache->unload();
+
+  Pixmap referencePixmap(referenceBitmap);
+  Pixmap candidatePixmap(candidateBitmap);
+  AOTToleranceSpec spec = {};
+  spec.maxChannelDiff = 1;
+  spec.maxDiffPixelRatio = 1.0;
+  spec.structuralChannelDiff = 2;
+  auto result = AOTToleranceCompare::Compare(referencePixmap, candidatePixmap, spec);
+  LOGI("[L2GRAD] backend=%s shape=GradientCoverage noMatch=%u hits=%u maxDelta=%d pass=%d",
+       TGFX_BACKEND_NAME, noMatch, hits, result.maxChannelDiff, result.passed ? 1 : 0);
+
+  EXPECT_EQ(noMatch, 0u) << "anti-aliased multi-stop gradient still misses the precompiled cache";
+  EXPECT_FALSE(result.structuralDifference);
+  EXPECT_TRUE(result.passed) << "AOT gradient-with-coverage diverges from JIT, maxDelta="
+                             << result.maxChannelDiff;
+  std::string backend = TGFX_BACKEND_NAME;
+  if (backend.rfind("vulkan", 0) == 0 || backend == "metal") {
+    EXPECT_GT(hits, 0u) << "expected a precompiled artifact hit for the AA gradient draw";
+  }
+}
+
 }  // namespace tgfx
