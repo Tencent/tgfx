@@ -22,10 +22,8 @@
 namespace tgfx {
 
 GlassSDFGeometryFragmentProcessor::GlassSDFGeometryFragmentProcessor(
-    GlassShapeType shapeType, const GlassShapeGeometryParams& params, float sourceWidth,
-    float sourceHeight)
-    : GlassShapeGeometryFragmentProcessor(ClassID()), shapeType(shapeType), params(params),
-      sourceWidth(sourceWidth), sourceHeight(sourceHeight) {
+    GlassShapeType shapeType, const GlassSDFGeometryParams& params)
+    : GlassShapeGeometryFragmentProcessor(ClassID()), shapeType(shapeType), params(params) {
 }
 
 void GlassSDFGeometryFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
@@ -34,11 +32,10 @@ void GlassSDFGeometryFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey
 
 GlassUDFGeometryFragmentProcessor::GlassUDFGeometryFragmentProcessor(
     std::shared_ptr<TextureProxy> fineMask, std::shared_ptr<TextureProxy> coarseMask,
-    const GlassShapeGeometryParams& params, float sourceWidth, float sourceHeight,
-    bool enableEdgeLighting)
+    const GlassUDFGeometryParams& params, bool enableEdgeLighting)
     : GlassShapeGeometryFragmentProcessor(ClassID()), fineMaskProxy(std::move(fineMask)),
-      coarseMaskProxy(std::move(coarseMask)), params(params), sourceWidth(sourceWidth),
-      sourceHeight(sourceHeight), enableEdgeLighting(enableEdgeLighting) {
+      coarseMaskProxy(std::move(coarseMask)), params(params),
+      enableEdgeLighting(enableEdgeLighting) {
 }
 
 void GlassUDFGeometryFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {

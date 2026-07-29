@@ -217,7 +217,7 @@ Rect GlassStyle::filterBackgroundSoft(const Rect& srcRect, float contentScale) {
   // (contentScale * bgScale) to the downsampled background image, invalidating any cache here.
   float sigma = (_frost / 100.0f) * MaxFrostSigma * contentScale;
   auto filter = ImageFilter::Blur(sigma, sigma, TileMode::Mirror);
-  return filter->filterBounds(srcRect);
+  return filter == nullptr ? srcRect : filter->filterBounds(srcRect);
 }
 
 Rect GlassStyle::filterBackgroundSharp(const Rect& srcRect, float) {
@@ -310,8 +310,11 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
     if (blurFilter) {
       Point blurOffset = {};
       auto clipRect = Rect::MakeWH(bgImage->width(), bgImage->height());
-      processedBg = bgImage->makeWithFilter(blurFilter, &blurOffset, &clipRect);
-      processedOffset += blurOffset;
+      auto frostedImage = bgImage->makeWithFilter(blurFilter, &blurOffset, &clipRect);
+      if (frostedImage != nullptr) {
+        processedBg = frostedImage;
+        processedOffset += blurOffset;
+      }
     }
   }
   // Detect whether the vector shape supports the analytical SDF path.
@@ -319,15 +322,12 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
 
   // Step 2 & 3: Apply refraction with dispersion and lighting (computed entirely in GPU shader)
   if (_refraction > 0 || _lightIntensity > 0) {
-    // layerWidth/Height must match processedBg dimensions for correct UV mapping in shader.
-    int layerWidth = processedBg->width();
-    int layerHeight = processedBg->height();
-
     // Use origBounds (not zoom-affected) for all refraction parameters so the effect is
     // zoom-invariant regardless of bgScale downsampling.
     float halfW = origBounds.width() * 0.5f;
     float halfH = origBounds.height() * 0.5f;
-    float udfPixelToLayerPixel = 1.0f;
+    float udfPixelToLayerPixelX = 1.0f;
+    float udfPixelToLayerPixelY = 1.0f;
     std::shared_ptr<Image> maskImage = nullptr;
     std::shared_ptr<Image> coarseMaskImage = nullptr;
     if (shapeInfo.type == GlassShapeType::AlphaMask) {
@@ -347,16 +347,17 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       float blurRadius =
           std::max(std::min((_depth / 100.0f) * MAX_BLUR_RADIUS, MAX_BLUR_RADIUS), MIN_BLUR_RADIUS);
       // UDF texture size follows the original content bounds and is capped at MAX_UDF_SIZE.
-      // udfPixelToLayerPixel and blurRadius scale with udfScale, so the shader's refraction
-      // distance in layer space remains consistent regardless of UDF resolution.
+      // UDF pixel-to-layer ratios and blurRadius scale with udfScale, so refraction distances
+      // remain consistent in layer space regardless of UDF resolution.
       // origMaxDim is guaranteed > 0 here because onDraw early-returns on origBounds.isEmpty().
       float origMaxDim = std::max(origBounds.width(), origBounds.height());
       float udfScale = std::min({1.0f, MAX_UDF_SIZE / origMaxDim});
       int udfWidth = std::max(1, static_cast<int>(std::round(origBounds.width() * udfScale)));
       int udfHeight = std::max(1, static_cast<int>(std::round(origBounds.height() * udfScale)));
-      // udfPixelToLayerPixel converts UDF pixel coordinates to layer pixel coordinates in the
-      // shader. Both UDF size and layer params are origBounds-based, so the ratio is zoom-invariant.
-      udfPixelToLayerPixel = static_cast<float>(origBounds.width()) / static_cast<float>(udfWidth);
+      // The UDF dimensions are rounded independently, so each axis needs its own layer-pixel
+      // conversion ratio. Both values use origBounds and remain zoom-invariant.
+      udfPixelToLayerPixelX = origBounds.width() / static_cast<float>(udfWidth);
+      udfPixelToLayerPixelY = origBounds.height() / static_cast<float>(udfHeight);
       // Scale the content image to the fixed UDF resolution.
       std::shared_ptr<Image> udfContent = input.content;
       if (udfWidth != input.content->width() || udfHeight != input.content->height()) {
@@ -401,9 +402,9 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
         }
       }
     }
-    auto filter =
-        getRefractionFilter(layerWidth, layerHeight, shapeInfo.type, shapeInfo.cornerRadius, halfW,
-                            halfH, udfPixelToLayerPixel, maskImage, coarseMaskImage);
+    auto filter = getRefractionFilter(shapeInfo.type, shapeInfo.cornerRadius, halfW, halfH,
+                                      udfPixelToLayerPixelX, udfPixelToLayerPixelY, maskImage,
+                                      coarseMaskImage);
     Point refractOffset = {};
     auto clipRect = Rect::MakeWH(static_cast<float>(processedBg->width()),
                                  static_cast<float>(processedBg->height()));
@@ -469,42 +470,46 @@ void GlassStyle::invalidateFrostFilter() {
 }
 
 std::shared_ptr<ImageFilter> GlassStyle::getRefractionFilter(
-    int layerWidth, int layerHeight, GlassShapeType shapeType, float cornerRadius, float halfWidth,
-    float halfHeight, float udfPixelToLayerPixel, std::shared_ptr<Image> maskImage,
+    GlassShapeType shapeType, float cornerRadius, float halfWidth, float halfHeight,
+    float udfPixelToLayerPixelX, float udfPixelToLayerPixelY, std::shared_ptr<Image> maskImage,
     std::shared_ptr<Image> coarseMaskImage) {
   float minHalf = std::min(halfWidth, halfHeight);
   float depthRatio = getDepthRatio();
-  bool useSDF = (shapeType != GlassShapeType::AlphaMask);
+  float refractionFactor = getRefractionFactor();
+  float splay = std::clamp(_splay / 100.0f, 0.0f, 1.0f);
   GlassRefractionParams params = {};
-  params.glassWidth = static_cast<float>(layerWidth);
-  params.glassHeight = static_cast<float>(layerHeight);
-  params.halfW = halfWidth;
-  params.halfH = halfHeight;
-  params.cornerRadius = cornerRadius;
-  params.minHalf = minHalf;
-  // glassThickness and origMinHalf are used by the SDF shader path for edge band calculation.
-  // For AlphaMask they are set to 0 since the shader does not read them.
-  params.glassThickness = useSDF ? getGlassThickness(minHalf) : 0.0f;
-  params.refractionFactor = getRefractionFactor();
   params.dispersion = getDispersionFactor();
-  params.splay = std::clamp(_splay / 100.0f, 0.0f, 1.0f);
-  params.depthRatio = depthRatio;
   params.lightAngle = _lightAngle;
   params.lightIntensity = getLightIntensityFactor();
-  params.origMinHalf = useSDF ? minHalf : 0.0f;
   params.origWidth = halfWidth * 2.0f;
   params.origHeight = halfHeight * 2.0f;
-  params.udfPixelToLayerPixel = udfPixelToLayerPixel;
-  if (useSDF) {
+  params.shapeType = shapeType;
+
+  GlassSDFGeometryParams sdfParams = {};
+  GlassUDFGeometryParams udfParams = {};
+  if (shapeType != GlassShapeType::AlphaMask) {
+    sdfParams.halfW = halfWidth;
+    sdfParams.halfH = halfHeight;
+    sdfParams.cornerRadius = cornerRadius;
+    sdfParams.glassThickness = getGlassThickness(minHalf);
+    sdfParams.refractionFactor = refractionFactor;
+    sdfParams.splay = splay;
+    sdfParams.depthRatio = depthRatio;
     params.maxDisplacement = 1.0e20f;
   } else {
+    udfParams.halfW = halfWidth;
+    udfParams.halfH = halfHeight;
+    udfParams.refractionFactor = refractionFactor;
+    udfParams.splay = splay;
+    udfParams.depthRatio = depthRatio;
+    udfParams.udfPixelToLayerPixelX = udfPixelToLayerPixelX;
+    udfParams.udfPixelToLayerPixelY = udfPixelToLayerPixelY;
     float depthScale = std::clamp(depthRatio / 0.1f, 0.0f, 1.0f);
     depthScale = depthScale * depthScale * (3.0f - 2.0f * depthScale);
-    params.maxDisplacement = 0.999f * minHalf * params.refractionFactor * depthRatio * depthScale;
+    params.maxDisplacement = 0.999f * minHalf * refractionFactor * depthRatio * depthScale;
   }
-  params.shapeType = shapeType;
-  return std::make_shared<GlassRefractionImageFilter>(params, std::move(maskImage),
-                                                      std::move(coarseMaskImage));
+  return std::make_shared<GlassRefractionImageFilter>(
+      params, sdfParams, udfParams, std::move(maskImage), std::move(coarseMaskImage));
 }
 
 }  // namespace tgfx

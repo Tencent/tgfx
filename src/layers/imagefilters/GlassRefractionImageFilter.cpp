@@ -24,9 +24,12 @@
 namespace tgfx {
 
 GlassRefractionImageFilter::GlassRefractionImageFilter(const GlassRefractionParams& params,
+                                                       const GlassSDFGeometryParams& sdfParams,
+                                                       const GlassUDFGeometryParams& udfParams,
                                                        std::shared_ptr<Image> fineMask,
                                                        std::shared_ptr<Image> coarseMask)
-    : params(params), fineMask(std::move(fineMask)), coarseMask(std::move(coarseMask)) {
+    : params(params), sdfParams(sdfParams), udfParams(udfParams), fineMask(std::move(fineMask)),
+      coarseMask(std::move(coarseMask)) {
 }
 
 static std::shared_ptr<TextureProxy> MakeTextureProxy(Context* context,
@@ -70,41 +73,21 @@ PlacementPtr<FragmentProcessor> GlassRefractionImageFilter::asFragmentProcessor(
   }
 
   auto allocator = args.context->drawingAllocator();
-  GlassShapeGeometryParams geometryParams = {};
-  geometryParams.glassWidth = params.glassWidth;
-  geometryParams.glassHeight = params.glassHeight;
-  geometryParams.halfW = params.halfW;
-  geometryParams.halfH = params.halfH;
-  geometryParams.cornerRadius = params.cornerRadius;
-  geometryParams.minHalf = params.minHalf;
-  geometryParams.glassThickness = params.glassThickness;
-  geometryParams.refractionFactor = params.refractionFactor;
-  geometryParams.splay = params.splay;
-  geometryParams.depthRatio = params.depthRatio;
-  geometryParams.origMinHalf = params.origMinHalf;
-  geometryParams.udfPixelToLayerPixel = params.udfPixelToLayerPixel;
-
-  float sourceWidth = static_cast<float>(sourceProxy->width());
-  float sourceHeight = static_cast<float>(sourceProxy->height());
   PlacementPtr<GlassShapeGeometryFragmentProcessor> geometry = nullptr;
   if (params.shapeType == GlassShapeType::AlphaMask) {
-    geometry = GlassUDFGeometryFragmentProcessor::Make(
-        allocator, std::move(fineMaskProxy), std::move(coarseMaskProxy), geometryParams,
-        sourceWidth, sourceHeight, params.lightIntensity > 0.0f);
+    geometry = GlassUDFGeometryFragmentProcessor::Make(allocator, std::move(fineMaskProxy),
+                                                       std::move(coarseMaskProxy), udfParams,
+                                                       params.lightIntensity > 0.0f);
   } else {
-    geometry = GlassSDFGeometryFragmentProcessor::Make(allocator, params.shapeType, geometryParams,
-                                                       sourceWidth, sourceHeight);
+    geometry = GlassSDFGeometryFragmentProcessor::Make(allocator, params.shapeType, sdfParams);
   }
   if (geometry == nullptr) {
     return nullptr;
   }
 
   auto coordMatrix = uvMatrix != nullptr ? *uvMatrix : Matrix::I();
-  auto localParams = params;
-  localParams.renderOffsetX = 0.0f;
-  localParams.renderOffsetY = 0.0f;
   return GlassRefractionFragmentProcessor::Make(allocator, std::move(sourceProxy),
-                                                std::move(geometry), localParams, coordMatrix);
+                                                std::move(geometry), params, coordMatrix);
 }
 
 }  // namespace tgfx

@@ -2120,7 +2120,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   // maxBackgroundOutset includes every background dependency, while minBackgroundOutset only
   // includes resolution-insensitive effects such as blur. Each LayerStyle classifies its own
   // background bounds as soft or sharp so this aggregation does not depend on concrete types.
-  auto downsampleOutset = 0.f;
+  auto downsampleOutset = std::numeric_limits<float>::max();
   if (!renderBounds.isEmpty()) {
     for (auto& style : _layerStyles) {
       DEBUG_ASSERT(style != nullptr);
@@ -2128,9 +2128,15 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
         continue;
       }
       auto bounds = style->filterBackground(Rect::MakeEmpty(), contentScale);
-      backOutset = std::max({backOutset, bounds.right, bounds.bottom});
+      auto fullOutset = std::max({-bounds.left, -bounds.top, bounds.right, bounds.bottom});
+      if (fullOutset <= 0) {
+        continue;
+      }
+      backOutset = std::max(backOutset, fullOutset);
       auto softBounds = style->filterBackgroundSoft(Rect::MakeEmpty(), contentScale);
-      downsampleOutset = std::max({downsampleOutset, softBounds.right, softBounds.bottom});
+      auto softOutset =
+          std::max({-softBounds.left, -softBounds.top, softBounds.right, softBounds.bottom});
+      downsampleOutset = std::min(downsampleOutset, softOutset);
     }
     // When a layer has both background styles and filters, the outer filter needs to sample
     // beyond the background content area. Expand both ranges only when a soft background effect

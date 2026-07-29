@@ -144,10 +144,10 @@ class GlassStyle : public LayerStyle {
 
   void invalidateFrostFilter();
 
-  std::shared_ptr<ImageFilter> getRefractionFilter(int layerWidth, int layerHeight,
-                                                   GlassShapeType shapeType, float cornerRadius,
+  std::shared_ptr<ImageFilter> getRefractionFilter(GlassShapeType shapeType, float cornerRadius,
                                                    float halfWidth, float halfHeight,
-                                                   float udfPixelToLayerPixel,
+                                                   float udfPixelToLayerPixelX,
+                                                   float udfPixelToLayerPixelY,
                                                    std::shared_ptr<Image> maskImage,
                                                    std::shared_ptr<Image> coarseMaskImage);
 

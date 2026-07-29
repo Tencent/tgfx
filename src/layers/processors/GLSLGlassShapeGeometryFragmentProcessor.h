@@ -25,8 +25,7 @@ namespace tgfx {
 class GLSLGlassSDFGeometryFragmentProcessor : public GlassSDFGeometryFragmentProcessor {
  public:
   GLSLGlassSDFGeometryFragmentProcessor(GlassShapeType shapeType,
-                                        const GlassShapeGeometryParams& params, float sourceWidth,
-                                        float sourceHeight);
+                                        const GlassSDFGeometryParams& params);
 
   void emitCode(EmitArgs& args) const override;
 
@@ -38,8 +37,8 @@ class GLSLGlassUDFGeometryFragmentProcessor : public GlassUDFGeometryFragmentPro
  public:
   GLSLGlassUDFGeometryFragmentProcessor(std::shared_ptr<TextureProxy> fineMask,
                                         std::shared_ptr<TextureProxy> coarseMask,
-                                        const GlassShapeGeometryParams& params, float sourceWidth,
-                                        float sourceHeight, bool enableEdgeLighting);
+                                        const GlassUDFGeometryParams& params,
+                                        bool enableEdgeLighting);
 
   void emitCode(EmitArgs& args) const override;
 

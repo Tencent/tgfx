@@ -29,19 +29,22 @@ enum class GlassShapeType {
   AlphaMask,
 };
 
-struct GlassShapeGeometryParams {
-  float glassWidth = 0.0f;
-  float glassHeight = 0.0f;
+struct GlassGeometryParams {
   float halfW = 0.0f;
   float halfH = 0.0f;
-  float cornerRadius = 0.0f;
-  float minHalf = 0.0f;
-  float glassThickness = 0.0f;
   float refractionFactor = 0.0f;
   float splay = 0.0f;
   float depthRatio = 0.0f;
-  float origMinHalf = 0.0f;
-  float udfPixelToLayerPixel = 1.0f;
+};
+
+struct GlassSDFGeometryParams : public GlassGeometryParams {
+  float cornerRadius = 0.0f;
+  float glassThickness = 0.0f;
+};
+
+struct GlassUDFGeometryParams : public GlassGeometryParams {
+  float udfPixelToLayerPixelX = 1.0f;
+  float udfPixelToLayerPixelY = 1.0f;
 };
 
 /**
@@ -56,9 +59,9 @@ class GlassShapeGeometryFragmentProcessor : public FragmentProcessor {
 
 class GlassSDFGeometryFragmentProcessor : public GlassShapeGeometryFragmentProcessor {
  public:
-  static PlacementPtr<GlassSDFGeometryFragmentProcessor> Make(
-      BlockAllocator* allocator, GlassShapeType shapeType, const GlassShapeGeometryParams& params,
-      float sourceWidth, float sourceHeight);
+  static PlacementPtr<GlassSDFGeometryFragmentProcessor> Make(BlockAllocator* allocator,
+                                                              GlassShapeType shapeType,
+                                                              const GlassSDFGeometryParams& params);
 
   std::string name() const override {
     return "GlassSDFGeometryFragmentProcessor";
@@ -69,14 +72,10 @@ class GlassSDFGeometryFragmentProcessor : public GlassShapeGeometryFragmentProce
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  GlassSDFGeometryFragmentProcessor(GlassShapeType shapeType,
-                                    const GlassShapeGeometryParams& params, float sourceWidth,
-                                    float sourceHeight);
+  GlassSDFGeometryFragmentProcessor(GlassShapeType shapeType, const GlassSDFGeometryParams& params);
 
   GlassShapeType shapeType = GlassShapeType::RoundedRect;
-  GlassShapeGeometryParams params = {};
-  float sourceWidth = 0.0f;
-  float sourceHeight = 0.0f;
+  GlassSDFGeometryParams params = {};
 
   friend class GLSLGlassSDFGeometryFragmentProcessor;
 };
@@ -85,8 +84,8 @@ class GlassUDFGeometryFragmentProcessor : public GlassShapeGeometryFragmentProce
  public:
   static PlacementPtr<GlassUDFGeometryFragmentProcessor> Make(
       BlockAllocator* allocator, std::shared_ptr<TextureProxy> fineMask,
-      std::shared_ptr<TextureProxy> coarseMask, const GlassShapeGeometryParams& params,
-      float sourceWidth, float sourceHeight, bool enableEdgeLighting);
+      std::shared_ptr<TextureProxy> coarseMask, const GlassUDFGeometryParams& params,
+      bool enableEdgeLighting);
 
   std::string name() const override {
     return "GlassUDFGeometryFragmentProcessor";
@@ -105,14 +104,11 @@ class GlassUDFGeometryFragmentProcessor : public GlassShapeGeometryFragmentProce
 
   GlassUDFGeometryFragmentProcessor(std::shared_ptr<TextureProxy> fineMask,
                                     std::shared_ptr<TextureProxy> coarseMask,
-                                    const GlassShapeGeometryParams& params, float sourceWidth,
-                                    float sourceHeight, bool enableEdgeLighting);
+                                    const GlassUDFGeometryParams& params, bool enableEdgeLighting);
 
   std::shared_ptr<TextureProxy> fineMaskProxy;
   std::shared_ptr<TextureProxy> coarseMaskProxy;
-  GlassShapeGeometryParams params = {};
-  float sourceWidth = 0.0f;
-  float sourceHeight = 0.0f;
+  GlassUDFGeometryParams params = {};
   bool enableEdgeLighting = false;
 
   friend class GLSLGlassUDFGeometryFragmentProcessor;

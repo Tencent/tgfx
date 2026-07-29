@@ -21,30 +21,9 @@
 namespace tgfx {
 namespace {
 
-void SetGeometryUniforms(UniformData* fragmentUniformData, const GlassShapeGeometryParams& params,
-                         float sourceWidth, float sourceHeight) {
-  float offsetX =
-      params.glassWidth < sourceWidth ? (1.0f - params.glassWidth / sourceWidth) * 0.5f : 0.0f;
-  float offsetY =
-      params.glassHeight < sourceHeight ? (1.0f - params.glassHeight / sourceHeight) * 0.5f : 0.0f;
-  float scaleX = params.glassWidth > 0.0f ? sourceWidth / params.glassWidth : 1.0f;
-  float scaleY = params.glassHeight > 0.0f ? sourceHeight / params.glassHeight : 1.0f;
-  float transformData[4] = {offsetX, offsetY, scaleX, scaleY};
-  fragmentUniformData->setData("GlassShapeP0", transformData);
-
-  float shapeData[4] = {params.halfW, params.halfH, params.cornerRadius, params.minHalf};
-  fragmentUniformData->setData("GlassShapeP1", shapeData);
-
-  float effectData[4] = {params.glassThickness, params.refractionFactor, params.splay,
-                         params.depthRatio};
-  fragmentUniformData->setData("GlassShapeP2", effectData);
-}
-
 void EmitGeometryCoordinates(FragmentShaderBuilder* fragBuilder, const std::string& inputColor,
-                             const std::string& transform, const std::string& shape) {
-  fragBuilder->codeAppendf("vec2 sourceUV = %s.xy;", inputColor.c_str());
-  fragBuilder->codeAppendf("vec2 glassUV = (sourceUV - %s.xy) * %s.zw;", transform.c_str(),
-                           transform.c_str());
+                             const std::string& shape) {
+  fragBuilder->codeAppendf("vec2 glassUV = %s.xy;", inputColor.c_str());
   fragBuilder->codeAppend("glassUV = vec2(glassUV.x, 1.0 - glassUV.y);");
   fragBuilder->codeAppendf("float halfW = %s.x;", shape.c_str());
   fragBuilder->codeAppendf("float halfH = %s.y;", shape.c_str());
@@ -56,31 +35,24 @@ void EmitGeometryCoordinates(FragmentShaderBuilder* fragBuilder, const std::stri
 }  // namespace
 
 PlacementPtr<GlassSDFGeometryFragmentProcessor> GlassSDFGeometryFragmentProcessor::Make(
-    BlockAllocator* allocator, GlassShapeType shapeType, const GlassShapeGeometryParams& params,
-    float sourceWidth, float sourceHeight) {
+    BlockAllocator* allocator, GlassShapeType shapeType, const GlassSDFGeometryParams& params) {
   if (allocator == nullptr || shapeType == GlassShapeType::AlphaMask) {
     return nullptr;
   }
-  return allocator->make<GLSLGlassSDFGeometryFragmentProcessor>(shapeType, params, sourceWidth,
-                                                                sourceHeight);
+  return allocator->make<GLSLGlassSDFGeometryFragmentProcessor>(shapeType, params);
 }
 
 GLSLGlassSDFGeometryFragmentProcessor::GLSLGlassSDFGeometryFragmentProcessor(
-    GlassShapeType shapeType, const GlassShapeGeometryParams& params, float sourceWidth,
-    float sourceHeight)
-    : GlassSDFGeometryFragmentProcessor(shapeType, params, sourceWidth, sourceHeight) {
+    GlassShapeType shapeType, const GlassSDFGeometryParams& params)
+    : GlassSDFGeometryFragmentProcessor(shapeType, params) {
 }
 
 void GLSLGlassSDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
-  auto transform =
-      args.uniformHandler->addUniform("GlassShapeP0", UniformFormat::Float4, ShaderStage::Fragment);
   auto shape =
-      args.uniformHandler->addUniform("GlassShapeP1", UniformFormat::Float4, ShaderStage::Fragment);
+      args.uniformHandler->addUniform("GlassShapeP0", UniformFormat::Float4, ShaderStage::Fragment);
   auto effect =
-      args.uniformHandler->addUniform("GlassShapeP2", UniformFormat::Float4, ShaderStage::Fragment);
-  auto extra =
-      args.uniformHandler->addUniform("GlassShapeP3", UniformFormat::Float, ShaderStage::Fragment);
+      args.uniformHandler->addUniform("GlassShapeP1", UniformFormat::Float4, ShaderStage::Fragment);
 
   std::string sdfFunction = fragBuilder->getMangledFunctionName("glassShapeSDF");
   if (shapeType == GlassShapeType::RoundedRect) {
@@ -102,7 +74,7 @@ void GLSLGlassSDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
         "}\n");
   }
 
-  EmitGeometryCoordinates(fragBuilder, args.inputColor, transform, shape);
+  EmitGeometryCoordinates(fragBuilder, args.inputColor, shape);
   fragBuilder->codeAppendf("float cornerRadius = %s.z;", shape.c_str());
   if (shapeType == GlassShapeType::RoundedRect) {
     fragBuilder->codeAppendf("float outerSDF = %s(px, py, halfW, halfH, cornerRadius);",
@@ -113,14 +85,13 @@ void GLSLGlassSDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("%s = vec4(0.0);", args.outputColor.c_str());
   fragBuilder->codeAppend("if (outerSDF < 0.0) {");
   fragBuilder->codeAppend("  float edgeDist = -outerSDF;");
-  fragBuilder->codeAppendf("  float edgeBandWidth = min(%s.w * %s, 60.0);", effect.c_str(),
-                           extra.c_str());
+  fragBuilder->codeAppendf("  float edgeBandWidth = min(%s.w, 60.0);", shape.c_str());
   fragBuilder->codeAppend("  float edgeWeight = 1.0 - smoothstep(0.0, 5.0, edgeDist);");
   fragBuilder->codeAppend("  float edgeFactor = 1.0 - min(edgeDist / edgeBandWidth, 1.0);");
   fragBuilder->codeAppendf(
-      "  float offsetDist = %s.x * %s.y * edgeFactor * edgeFactor * edgeFactor * 1.2;",
-      effect.c_str(), effect.c_str());
-  fragBuilder->codeAppendf("  float effectiveSplay = %s.z;", effect.c_str());
+      "  float offsetDist = %s.w * %s.x * edgeFactor * edgeFactor * edgeFactor * 1.2;",
+      shape.c_str(), effect.c_str());
+  fragBuilder->codeAppendf("  float effectiveSplay = %s.y;", effect.c_str());
   if (shapeType == GlassShapeType::Ellipse) {
     fragBuilder->codeAppend(
         "  vec2 sdfGradient = vec2(px / (halfW * halfW), py / (halfH * halfH));");
@@ -138,7 +109,7 @@ void GLSLGlassSDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppend("    float cornerWeightY = smoothstep(0.0, straightHalfH, absP.y);");
     fragBuilder->codeAppend("    float cornerWeight = (qx > 0.0 && qy > 0.0) ? 1.0 :");
     fragBuilder->codeAppend("        ((qx > qy) ? cornerWeightY : cornerWeightX);");
-    fragBuilder->codeAppendf("    effectiveSplay = min(cornerWeight + %s.z, 1.0);", effect.c_str());
+    fragBuilder->codeAppendf("    effectiveSplay = min(cornerWeight + %s.y, 1.0);", effect.c_str());
     fragBuilder->codeAppend("  }");
     fragBuilder->codeAppend("  vec2 grad;");
     fragBuilder->codeAppend("  if (qx > 0.0 && qy > 0.0) {");
@@ -166,49 +137,47 @@ void GLSLGlassSDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
 
 void GLSLGlassSDFGeometryFragmentProcessor::onSetData(UniformData*,
                                                       UniformData* fragmentUniformData) const {
-  SetGeometryUniforms(fragmentUniformData, params, sourceWidth, sourceHeight);
-  fragmentUniformData->setData("GlassShapeP3", params.origMinHalf);
+  float shapeData[4] = {params.halfW, params.halfH, params.cornerRadius, params.glassThickness};
+  fragmentUniformData->setData("GlassShapeP0", shapeData);
+  float effectData[4] = {params.refractionFactor, params.splay, params.depthRatio, 0.0f};
+  fragmentUniformData->setData("GlassShapeP1", effectData);
 }
 
 PlacementPtr<GlassUDFGeometryFragmentProcessor> GlassUDFGeometryFragmentProcessor::Make(
     BlockAllocator* allocator, std::shared_ptr<TextureProxy> fineMask,
-    std::shared_ptr<TextureProxy> coarseMask, const GlassShapeGeometryParams& params,
-    float sourceWidth, float sourceHeight, bool enableEdgeLighting) {
+    std::shared_ptr<TextureProxy> coarseMask, const GlassUDFGeometryParams& params,
+    bool enableEdgeLighting) {
   if (allocator == nullptr || fineMask == nullptr) {
     return nullptr;
   }
   return allocator->make<GLSLGlassUDFGeometryFragmentProcessor>(
-      std::move(fineMask), std::move(coarseMask), params, sourceWidth, sourceHeight,
-      enableEdgeLighting);
+      std::move(fineMask), std::move(coarseMask), params, enableEdgeLighting);
 }
 
 GLSLGlassUDFGeometryFragmentProcessor::GLSLGlassUDFGeometryFragmentProcessor(
     std::shared_ptr<TextureProxy> fineMask, std::shared_ptr<TextureProxy> coarseMask,
-    const GlassShapeGeometryParams& params, float sourceWidth, float sourceHeight,
-    bool enableEdgeLighting)
+    const GlassUDFGeometryParams& params, bool enableEdgeLighting)
     : GlassUDFGeometryFragmentProcessor(std::move(fineMask), std::move(coarseMask), params,
-                                        sourceWidth, sourceHeight, enableEdgeLighting) {
+                                        enableEdgeLighting) {
 }
 
 void GLSLGlassUDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
-  auto transform =
-      args.uniformHandler->addUniform("GlassShapeP0", UniformFormat::Float4, ShaderStage::Fragment);
   auto shape =
-      args.uniformHandler->addUniform("GlassShapeP1", UniformFormat::Float4, ShaderStage::Fragment);
+      args.uniformHandler->addUniform("GlassShapeP0", UniformFormat::Float4, ShaderStage::Fragment);
   auto effect =
-      args.uniformHandler->addUniform("GlassShapeP2", UniformFormat::Float4, ShaderStage::Fragment);
+      args.uniformHandler->addUniform("GlassShapeP1", UniformFormat::Float4, ShaderStage::Fragment);
   auto& fineSampler = (*args.textureSamplers)[0];
 
-  EmitGeometryCoordinates(fragBuilder, args.inputColor, transform, shape);
+  EmitGeometryCoordinates(fragBuilder, args.inputColor, shape);
   fragBuilder->codeAppend("const vec4 UNPACK = vec4(1.0, 1.0/255.0, 1.0/65025.0, 1.0/16581375.0);");
   fragBuilder->codeAppend("vec2 maskUV = vec2(glassUV.x, 1.0 - glassUV.y);");
   fragBuilder->codeAppend("vec4 packedHeight = ");
   fragBuilder->appendTextureLookup(fineSampler, "maskUV");
   fragBuilder->codeAppend(";");
   fragBuilder->codeAppend("float height = dot(packedHeight, UNPACK);");
-  fragBuilder->codeAppendf("float gradientStep = (%s.w * 3.0 + 1.0) * %s.w;", effect.c_str(),
-                           shape.c_str());
+  fragBuilder->codeAppendf("float gradientBase = %s.z * 3.0 + 1.0;", effect.c_str());
+  fragBuilder->codeAppendf("vec2 gradientStep = gradientBase * %s.zw;", shape.c_str());
   fragBuilder->codeAppend("vec2 gradientUVStep = gradientStep * vec2(0.5 / halfW, 0.5 / halfH);");
   fragBuilder->codeAppend("vec4 packedRight = ");
   fragBuilder->appendTextureLookup(fineSampler, "maskUV + vec2(gradientUVStep.x, 0.0)");
@@ -234,13 +203,13 @@ void GLSLGlassUDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend("  float centerDistance = length(vec2(px, py));");
   fragBuilder->codeAppend(
       "  vec2 centerDir = centerDistance > 0.001 ? -vec2(px, py) / centerDistance : gradientDir;");
-  fragBuilder->codeAppendf("  vec2 refractDir = mix(gradientDir, centerDir, %s.z);",
+  fragBuilder->codeAppendf("  vec2 refractDir = mix(gradientDir, centerDir, %s.y);",
                            effect.c_str());
   fragBuilder->codeAppend("  float refractLength = length(refractDir);");
   fragBuilder->codeAppend(
       "  refractDir = refractLength < 0.000001 ? gradientDir : refractDir / refractLength;");
-  fragBuilder->codeAppendf("  float depthScale = smoothstep(0.0, 0.1, %s.w);", effect.c_str());
-  fragBuilder->codeAppendf("  float distance = %s.x * %s.y * %s.w * depthScale;", effect.c_str(),
+  fragBuilder->codeAppendf("  float depthScale = smoothstep(0.0, 0.1, %s.z);", effect.c_str());
+  fragBuilder->codeAppendf("  float distance = min(halfW, halfH) * %s.x * %s.z * depthScale;",
                            effect.c_str(), effect.c_str());
   fragBuilder->codeAppend(
       "  float proximity = (1.0 - height * height) * (1.0 - height * height) * 1.2;");
@@ -251,12 +220,11 @@ void GLSLGlassUDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
 
 void GLSLGlassUDFGeometryFragmentProcessor::onSetData(UniformData*,
                                                       UniformData* fragmentUniformData) const {
-  SetGeometryUniforms(fragmentUniformData, params, sourceWidth, sourceHeight);
-  float shapeData[4] = {params.halfW, params.halfH, params.cornerRadius,
-                        params.udfPixelToLayerPixel};
-  fragmentUniformData->setData("GlassShapeP1", shapeData);
-  float effectData[4] = {params.minHalf, params.refractionFactor, params.splay, params.depthRatio};
-  fragmentUniformData->setData("GlassShapeP2", effectData);
+  float shapeData[4] = {params.halfW, params.halfH, params.udfPixelToLayerPixelX,
+                        params.udfPixelToLayerPixelY};
+  fragmentUniformData->setData("GlassShapeP0", shapeData);
+  float effectData[4] = {params.refractionFactor, params.splay, params.depthRatio, 0.0f};
+  fragmentUniformData->setData("GlassShapeP1", effectData);
 }
 
 }  // namespace tgfx

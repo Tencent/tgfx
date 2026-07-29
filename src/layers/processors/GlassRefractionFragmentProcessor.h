@@ -25,26 +25,12 @@
 namespace tgfx {
 
 struct GlassRefractionParams {
-  float glassWidth = 0.0f;
-  float glassHeight = 0.0f;
-  float halfW = 0.0f;
-  float halfH = 0.0f;
-  float cornerRadius = 0.0f;
-  float minHalf = 0.0f;
-  float glassThickness = 0.0f;
-  float refractionFactor = 0.0f;
   float dispersion = 0.0f;
-  float splay = 0.0f;
-  float depthRatio = 0.0f;
   float lightAngle = 0.0f;
   float lightIntensity = 0.0f;
-  float origMinHalf = 0.0f;
   float origWidth = 0.0f;
   float origHeight = 0.0f;
-  float udfPixelToLayerPixel = 1.0f;
   float maxDisplacement = 0.0f;
-  float renderOffsetX = 0.0f;
-  float renderOffsetY = 0.0f;
   GlassShapeType shapeType = GlassShapeType::AlphaMask;
 };
 

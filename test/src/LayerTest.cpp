@@ -4070,12 +4070,13 @@ TGFX_TEST(LayerTest, GlassStyleBackgroundOutsets) {
   softLayer->setLayerStyles({GlassStyle::Make(0, 50, 100, 0, 0, 0, 0)});
   displayList->root()->addChild(softLayer);
 
-  auto combinedLayer = SolidLayer::Make();
-  combinedLayer->setWidth(150);
-  combinedLayer->setHeight(100);
-  combinedLayer->setMatrix(Matrix::MakeTrans(400, 0));
-  combinedLayer->setLayerStyles({GlassStyle::Make(80, 50, 100, 50, 0, 0, 0)});
-  displayList->root()->addChild(combinedLayer);
+  auto mixedLayer = SolidLayer::Make();
+  mixedLayer->setWidth(150);
+  mixedLayer->setHeight(100);
+  mixedLayer->setMatrix(Matrix::MakeTrans(400, 0));
+  mixedLayer->setLayerStyles(
+      {BackgroundBlurStyle::Make(100, 100), GlassStyle::Make(80, 50, 0, 50, 0, 0, 0)});
+  displayList->root()->addChild(mixedLayer);
 
   displayList->render(surface.get());
 
@@ -4083,8 +4084,34 @@ TGFX_TEST(LayerTest, GlassStyleBackgroundOutsets) {
                       EXPECT_EQ(sharpLayer->minBackgroundOutset, 0.0f);
                       EXPECT_GT(softLayer->minBackgroundOutset, 0.0f);
                       EXPECT_EQ(softLayer->maxBackgroundOutset, softLayer->minBackgroundOutset);
-                      EXPECT_GT(combinedLayer->maxBackgroundOutset, 0.0f);
-                      EXPECT_GT(combinedLayer->minBackgroundOutset, 0.0f);)
+                      EXPECT_GT(mixedLayer->maxBackgroundOutset, 0.0f);
+                      EXPECT_EQ(mixedLayer->minBackgroundOutset, 0.0f);)
+}
+
+TGFX_TEST(LayerTest, GlassStyleShapeLayerContentOffset) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 240, 220);
+  DisplayList displayList;
+
+  auto background = ImageLayer::Make();
+  background->setImage(MakeImage("resources/apitest/checker_128.png"));
+  background->setMatrix(Matrix::MakeScale(2));
+  displayList.root()->addChild(background);
+
+  Path glassPath;
+  glassPath.addRRect(RRect::MakeRectXY(Rect::MakeXYWH(75, 75, 90, 70), 20, 20));
+  EXPECT_EQ(glassPath.getBounds(), Rect::MakeXYWH(75, 75, 90, 70));
+
+  auto glassLayer = ShapeLayer::Make();
+  glassLayer->setPath(glassPath);
+  glassLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 128)));
+  glassLayer->setLayerStyles({GlassStyle::Make(80, 50, 0, 50, 0, 0, 0)});
+  displayList.root()->addChild(glassLayer);
+
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleShapeLayerContentOffset"));
 }
 
 TGFX_TEST(LayerTest, GlassStyleEllipse) {
@@ -4109,6 +4136,18 @@ TGFX_TEST(LayerTest, GlassStyleEllipticalCorner) {
   // Rounded rect with elliptical corners (radius 40x20, rx != ry) falls back to the AlphaMask
   // path because the SDF shader only supports uniform circular corners (rx == ry).
   RunGlassStyleTest("EllipticalCorner", 1.0f, 180.0f, 120.0f, 40.0f, 20.0f);
+}
+
+TGFX_TEST(LayerTest, GlassStyleExtremeAspectRatioUDF) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 700, 120);
+  auto displayList = std::make_unique<DisplayList>();
+  AddGlassCell(displayList->root(), MakeImage("resources/apitest/checker_128.png"), 0, -290, 700,
+               80, 70, 0, 50, 50, 135, 50, 600, 20, 20, 10);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleExtremeAspectRatioUDF"));
 }
 
 }  // namespace tgfx

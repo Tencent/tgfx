@@ -116,7 +116,7 @@ void GLSLGlassRefractionFragmentProcessor::onSetData(UniformData*,
   float lightingData[4] = {invOrigW, invOrigH, std::sin(angle), std::cos(angle)};
   fragmentUniformData->setData("GlassOpticsP1", lightingData);
 
-  float offsetData[4] = {params.renderOffsetX, params.renderOffsetY, params.lightIntensity, 0.0f};
+  float offsetData[4] = {0.0f, 0.0f, params.lightIntensity, 0.0f};
   fragmentUniformData->setData("GlassOpticsP2", offsetData);
 }
 
