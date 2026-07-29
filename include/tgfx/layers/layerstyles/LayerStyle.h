@@ -114,7 +114,8 @@ class LayerStyle : public LayerProperty {
   virtual Rect filterBounds(const Rect& srcRect, float contentScale) = 0;
 
   /**
-   * Returns the union of the soft and sharp background bounds required by this layer style.
+   * Returns the complete background bounds affected by this layer style, used for background
+   * capture and dirty region expansion.
    * @param srcRect The scaled bounds of the background content.
    * @param contentScale The scale factor of the background bounds relative to its original size.
    * Some layerStyles have size-related parameters that must be adjusted with this scale factor.
@@ -158,13 +159,25 @@ class LayerStyle : public LayerProperty {
  protected:
   /**
    * Returns resolution-insensitive background bounds that may be represented by downsampling.
-   * The default implementation returns srcRect without expansion.
+   * The non-virtual filterBackground() unions this with filterBackgroundSharp(), so implementers
+   * do not need to compute the total. Only include outsets where the visual result remains
+   * correct after the shared background surface is downsampled (e.g. blur radius).
+   * @param srcRect The scaled bounds of the background content.
+   * @param contentScale The scale factor of the background bounds relative to its original size.
+   * @return The soft background bounds. The default implementation returns srcRect without
+   * expansion.
    */
   virtual Rect filterBackgroundSoft(const Rect& srcRect, float contentScale);
 
   /**
    * Returns background bounds that require full-resolution sampling.
-   * The default implementation returns srcRect without expansion.
+   * The non-virtual filterBackground() unions this with filterBackgroundSoft(), so implementers
+   * do not need to compute the total. Include outsets that must be sampled at full resolution
+   * (e.g. refraction displacement).
+   * @param srcRect The scaled bounds of the background content.
+   * @param contentScale The scale factor of the background bounds relative to its original size.
+   * @return The sharp background bounds. The default implementation returns srcRect without
+   * expansion.
    */
   virtual Rect filterBackgroundSharp(const Rect& srcRect, float contentScale);
 

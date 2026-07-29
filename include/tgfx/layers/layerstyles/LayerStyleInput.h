@@ -106,13 +106,22 @@ class ContourInputSource : public StyleInputSource {
  * Contains the source data that a LayerStyle needs to perform its drawing.
  */
 struct LayerStyleInput {
-  /** The opaque layer content image. */
+  /**
+   * The opaque layer content image. Rendered with normal fills, then all semi-transparent pixels
+   * are converted to fully opaque (fully transparent pixels are preserved).
+   */
   std::shared_ptr<Image> content = nullptr;
 
-  /** The offset of the content image's top-left corner in scaled pixel coordinates. */
+  /**
+   * The offset of the content image's top-left corner in pixel coordinates (already scaled by
+   * contentScale). Styles that need a stable sampling origin use this to anchor their pattern.
+   */
   Point contentOffset = {};
 
-  /** The scale factor of the layer content relative to its original size. */
+  /**
+   * The scale factor of the layer content relative to its original size. Some layer styles have
+   * size-related parameters that must be adjusted with this scale factor.
+   */
   float contentScale = 1.0f;
 
   /**

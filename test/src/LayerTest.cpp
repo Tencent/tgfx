@@ -4143,10 +4143,51 @@ TGFX_TEST(LayerTest, GlassStyleExtremeAspectRatioUDF) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 700, 120);
+  auto surface = Surface::Make(context, 700, 180);
   auto displayList = std::make_unique<DisplayList>();
-  AddGlassCell(displayList->root(), MakeImage("resources/apitest/checker_128.png"), 0, -290, 700,
-               80, 70, 0, 50, 50, 135, 50, 600, 20, 20, 10);
+  auto bgImage = MakeImage("resources/apitest/checker_128.png");
+
+  // Single background layer spanning the full surface.
+  auto imgLayer = ImageLayer::Make();
+  imgLayer->setImage(bgImage);
+  auto scale = 700.0f / static_cast<float>(std::max(bgImage->width(), bgImage->height()));
+  imgLayer->setMatrix(Matrix::MakeScale(scale, scale));
+  displayList->root()->addChild(imgLayer);
+
+  // Colored shapes for refraction contrast.
+  auto blueRect = ShapeLayer::Make();
+  Path bluePath = {};
+  bluePath.addRect(Rect::MakeXYWH(50, 30, 245, 60));
+  blueRect->setPath(bluePath);
+  blueRect->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 100, 255, 255)));
+  displayList->root()->addChild(blueRect);
+
+  auto greenCircle = ShapeLayer::Make();
+  Path greenPath = {};
+  greenPath.addOval(Rect::MakeXYWH(400, 100, 280, 60));
+  greenCircle->setPath(greenPath);
+  greenCircle->setFillStyle(ShapeStyle::Make(Color::FromRGBA(50, 200, 80, 200)));
+  displayList->root()->addChild(greenCircle);
+
+  // Three glass panels with increasing widths, all using the UDF path (rx != ry).
+  float glassWidths[] = {200, 400, 600};
+  for (int i = 0; i < 3; i++) {
+    float gw = glassWidths[i];
+    float gh = 20;
+    auto glassLayer = SolidLayer::Make();
+    glassLayer->setColor(Color::FromRGBA(255, 255, 255, 128));
+    glassLayer->setWidth(gw);
+    glassLayer->setHeight(gh);
+    glassLayer->setRadiusX(20);
+    glassLayer->setRadiusY(10);
+    float glassX = (700.0f - gw) * 0.5f;
+    float glassY = 20.0f + static_cast<float>(i) * 60.0f;
+    glassLayer->setMatrix(Matrix::MakeTrans(glassX, glassY));
+    auto style = GlassStyle::Make(80, 70, 0, 50, 50, 135, 50);
+    glassLayer->setLayerStyles({style});
+    displayList->root()->addChild(glassLayer);
+  }
+
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleExtremeAspectRatioUDF"));
 }
