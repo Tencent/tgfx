@@ -44,7 +44,7 @@ void UniformData::onSetData(const std::string& name, const void* data, size_t si
                             bool optional) const {
   DEBUG_ASSERT(_buffer != nullptr);
 
-  const auto& key = skipSuffix ? name : name + nameSuffix;
+  const auto& key = skipSuffix ? name + structuralSuffix : name + nameSuffix;
   auto field = findField(key);
 
   if (field == nullptr) {
@@ -70,7 +70,7 @@ const UniformData::Field* UniformData::findField(const std::string& key) const {
 }
 
 bool UniformData::hasField(const std::string& name) const {
-  const auto& key = skipSuffix ? name : name + nameSuffix;
+  const auto& key = skipSuffix ? name + structuralSuffix : name + nameSuffix;
   return findField(key) != nullptr;
 }
 

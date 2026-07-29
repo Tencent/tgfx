@@ -42,18 +42,19 @@ class QuadTextureFillShader : public PrecompiledShader {
  public:
   // Vertex dimensions
   struct VertDims {
-    enum : uint32_t { HAS_COVERAGE, HAS_UV_COORD, HAS_COLOR, HAS_SUBSET, COUNT };
+    enum : uint32_t { HAS_COVERAGE, HAS_UV_COORD, HAS_COLOR, HAS_SUBSET, HAS_LOCAL_MASK, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationBool("HAS_COVERAGE"),
           PermutationBool("HAS_UV_COORD"),
           PermutationBool("HAS_COLOR"),
           PermutationBool("HAS_SUBSET"),
+          PermutationBool("HAS_LOCAL_MASK"),
       });
     }
   };
   using VD = VertDims;
-  static_assert(VD::COUNT == 4, "Update ShouldCompile when vertex dimensions change.");
+  static_assert(VD::COUNT == 5, "Update ShouldCompile when vertex dimensions change.");
 
   // Fragment dimensions (includes vertex-driven HAS_COVERAGE and HAS_COLOR because the fragment
   // shader must declare matching varyings)
@@ -68,6 +69,7 @@ class QuadTextureFillShader : public PrecompiledShader {
       HAS_COLOR,
       HAS_XP,
       HAS_MASK_TEXTURE,
+      HAS_LOCAL_MASK,
       COUNT
     };
     static PermutationDomain domain() {
@@ -78,11 +80,12 @@ class QuadTextureFillShader : public PrecompiledShader {
           PermutationBool("HAS_COLOR"),
           PermutationInt("HAS_XP", 3),
           PermutationBool("HAS_MASK_TEXTURE"),
+          PermutationBool("HAS_LOCAL_MASK"),
       });
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 6, "Update ShouldCompile when fragment dimensions change.");
+  static_assert(FD::COUNT == 7, "Update ShouldCompile when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"QuadTextureFillShader",
@@ -116,6 +119,23 @@ class QuadTextureFillShader : public PrecompiledShader {
     }
     if (vertValues[VD::HAS_COLOR] != fragValues[FD::HAS_COLOR]) {
       return false;
+    }
+    // HAS_LOCAL_MASK is a mirrored vertex/fragment dimension (the vertex emits the coverage-mask
+    // coordinate varying that the fragment samples).
+    if (vertValues[VD::HAS_LOCAL_MASK] != fragValues[FD::HAS_LOCAL_MASK]) {
+      return false;
+    }
+    if (fragValues[FD::HAS_LOCAL_MASK] != 0) {
+      // Local-space and device-space masks are mutually exclusive coverage sources.
+      if (fragValues[FD::HAS_MASK_TEXTURE] != 0) {
+        return false;
+      }
+      // The local-mask coverage class (Xfermode-dst(TextureEffect)) is produced by image draws with
+      // a shader mask filter: the color is a single TextureEffect with no per-vertex color. Restrict
+      // to that slice so the new dimension adds a bounded number of variants.
+      if (fragValues[FD::HAS_COLOR] != 0) {
+        return false;
+      }
     }
     return true;
   }

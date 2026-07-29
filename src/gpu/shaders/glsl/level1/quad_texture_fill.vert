@@ -18,12 +18,21 @@
 #ifndef HAS_SUBSET
 #define HAS_SUBSET 0
 #endif
+#ifndef HAS_LOCAL_MASK
+#define HAS_LOCAL_MASK 0
+#endif
 
 layout(std140, set = 0, binding = 0) uniform VertexUniformBlock {
   vec4 tgfx_RTAdjust;
   mat3 CoordTransformMatrix_0;
 #if HAS_SUBSET && !HAS_UV_COORD
   mat3 texSubsetMatrix;
+#endif
+#if HAS_LOCAL_MASK
+  // Second coordinate transform, driven by the coverage TextureEffect. The GP assigns it index 1
+  // (color texture is index 0), so it maps to a distinct uniform name and does not alias the color
+  // transform.
+  mat3 CoordTransformMatrix_1;
 #endif
 };
 
@@ -107,6 +116,12 @@ layout(location = 2) out vec4 vColor;
 layout(location = 3) out vec4 vTexSubset;
 #endif
 
+#if HAS_LOCAL_MASK
+// Local-space coverage-mask coordinate, emitted as vec3 and perspective-divided in the fragment
+// shader, mirroring TransformedCoords_0.
+layout(location = 4) out vec3 TransformedCoords_1;
+#endif
+
 void main() {
   // Position is already in device space (normalized window coordinates).
 #if HAS_COVERAGE
@@ -125,6 +140,15 @@ void main() {
 #endif
 
   TransformedCoords_0 = coordResult;
+
+#if HAS_LOCAL_MASK
+  // The coverage mask transform samples from the same source coordinate as the color transform.
+#if HAS_UV_COORD
+  TransformedCoords_1 = CoordTransformMatrix_1 * vec3(uvCoord, 1.0);
+#else
+  TransformedCoords_1 = CoordTransformMatrix_1 * vec3(aPosition, 1.0);
+#endif
+#endif
 
   // Transform subset bounds to texture space.
 #if HAS_SUBSET

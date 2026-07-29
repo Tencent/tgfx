@@ -149,6 +149,14 @@ class UniformData {
   size_t bufferSize = 0;
   std::vector<Uniform> _uniforms = {};
   std::string nameSuffix = "";
+  // On the precompiled (skipSuffix) path the runtime _P{processorIndex} suffix is dropped, so
+  // per-processor uniforms would collapse to a single base name (e.g. two TextureEffects both
+  // writing "Subset"). structuralSuffix restores a stable, kernel-structural disambiguator that the
+  // precompiled shader can predict: it is set from a processor's structural ordinal (e.g. the second
+  // texture in the kernel gets "_1"). Empty for the first/only processor of its kind, so existing
+  // single-texture kernels are byte-for-byte unchanged. Ignored when skipSuffix is false (the JIT
+  // path already disambiguates via nameSuffix).
+  std::string structuralSuffix = "";
   bool skipSuffix = false;
   std::unordered_map<std::string, Field> fieldMap = {};
   size_t cursor = 0;

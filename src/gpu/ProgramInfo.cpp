@@ -307,6 +307,16 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
   auto vertexUniformData = program->getUniformData(ShaderStage::Vertex);
   auto fragmentUniformData = program->getUniformData(ShaderStage::Fragment);
 
+  // UniformData is reused across draws, so clear the per-texture structural ordinal left over from a
+  // previous draw before writing the base-name uniforms below (RTAdjust / OutputAlphaSwizzle). A
+  // stale suffix would misdirect those writes (e.g. tgfx_RTAdjust_1) on the precompiled path.
+  if (vertexUniformData != nullptr) {
+    vertexUniformData->structuralSuffix = "";
+  }
+  if (fragmentUniformData != nullptr) {
+    fragmentUniformData->structuralSuffix = "";
+  }
+
   auto array = GetRTAdjustArray(renderTarget);
   if (vertexUniformData != nullptr) {
     vertexUniformData->setData(RTAdjustName, array);
@@ -324,11 +334,31 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
   FragmentProcessor::CoordTransformIter coordTransformIter(this);
   geometryProcessor->setData(vertexUniformData, fragmentUniformData, &coordTransformIter);
 
+  // Per-texture structural ordinal: on the precompiled path the runtime processor suffix is stripped
+  // (skipSuffix), so multiple TextureEffects would write the same base-named uniforms (Subset,
+  // AlphaOnly, ...) and clobber one another. Assigning each TextureEffect a stable ordinal (the
+  // first is 0, the next 1, ...) lets the precompiled shader address them by distinct names
+  // (Subset / Subset_1 / ...). Ordinal 0 keeps the base name, so single-texture kernels are
+  // unchanged. On the JIT path structuralSuffix is unused (nameSuffix already disambiguates).
+  int textureOrdinal = 0;
   for (auto& fragmentProcessor : fragmentProcessors) {
     FragmentProcessor::Iter iter(fragmentProcessor);
     const FragmentProcessor* fp = iter.next();
     while (fp) {
       updateUniformDataSuffix(vertexUniformData, fragmentUniformData, fp);
+      std::string structural = "";
+      if (fp->name() == "TextureEffect") {
+        if (textureOrdinal > 0) {
+          structural = "_" + std::to_string(textureOrdinal);
+        }
+        textureOrdinal++;
+      }
+      if (vertexUniformData != nullptr) {
+        vertexUniformData->structuralSuffix = structural;
+      }
+      if (fragmentUniformData != nullptr) {
+        fragmentUniformData->structuralSuffix = structural;
+      }
       fp->setData(vertexUniformData, fragmentUniformData);
       fp = iter.next();
     }
@@ -381,10 +411,14 @@ void ProgramInfo::updateUniformDataSuffix(UniformData* vertexUniformData,
   auto suffix = getMangledSuffix(processor);
   if (vertexUniformData != nullptr) {
     vertexUniformData->nameSuffix = suffix;
+    // Cleared by default; the fragment-processor loop reassigns it per TextureEffect. This keeps the
+    // geometry processor and xfer processor (and any non-texture FP) on the base uniform names.
+    vertexUniformData->structuralSuffix = "";
   }
 
   if (fragmentUniformData != nullptr) {
     fragmentUniformData->nameSuffix = suffix;
+    fragmentUniformData->structuralSuffix = "";
   }
 }
 }  // namespace tgfx

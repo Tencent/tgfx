@@ -36,6 +36,9 @@
 #ifndef HAS_MASK_TEXTURE
 #define HAS_MASK_TEXTURE 0
 #endif
+#ifndef HAS_LOCAL_MASK
+#define HAS_LOCAL_MASK 0
+#endif
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #if !HAS_COLOR
@@ -77,11 +80,19 @@ layout(location = 2) in vec4 vColor;
 layout(location = 3) in vec4 vTexSubset;
 #endif
 
+#if HAS_LOCAL_MASK
+layout(location = 4) in vec3 TransformedCoords_1;
+#endif
+
 layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
 
-// Device-space mask coverage occupies binding 1; the XP dst texture, if any, follows at 2.
+// A coverage mask (device-space or local-space) occupies binding 1; the XP dst texture, if any,
+// follows at 2. HAS_MASK_TEXTURE (device) and HAS_LOCAL_MASK (local) are mutually exclusive.
 #if HAS_MASK_TEXTURE
 layout(set = 1, binding = 1) uniform sampler2D MaskTextureSampler;
+  #define XP_DST_TEX_BINDING 2
+#elif HAS_LOCAL_MASK
+layout(set = 1, binding = 1) uniform sampler2D LocalMaskSampler;
   #define XP_DST_TEX_BINDING 2
 #else
   #define XP_DST_TEX_BINDING 1
@@ -145,14 +156,31 @@ void main() {
   color *= maskAlpha;
 #endif
 
+#if HAS_LOCAL_MASK
+  // Local-space texture-alpha mask coverage (coverage FP = Xfermode-dst(TextureEffect), i.e.
+  // color * mask.a). The mask alpha is a coverage source, so it must NOT be premultiplied into the
+  // color on the XP path (advanced blends composite coverage as coverage*blend + (1-coverage)*dst);
+  // it is folded into the coverage term below. The Decal tile mode is applied by the sampler's
+  // ClampToBorder address mode, so out-of-bounds samples return 0.
+  highp vec2 localMaskCoord = TransformedCoords_1.xy / TransformedCoords_1.z;
+  float localMaskAlpha = texture(LocalMaskSampler, localMaskCoord).a;
+#endif
+
 #if HAS_XP
-  #if HAS_COVERAGE
+  #if HAS_LOCAL_MASK && HAS_COVERAGE
+  fragColor = applyPorterDuffXP(color, vec4(localMaskAlpha * vCoverage));
+  #elif HAS_LOCAL_MASK
+  fragColor = applyPorterDuffXP(color, vec4(localMaskAlpha));
+  #elif HAS_COVERAGE
   fragColor = applyPorterDuffXP(color, vec4(vCoverage));
   #else
   fragColor = applyPorterDuffXP(color, vec4(1.0));
   #endif
 #else
   // Apply coverage modulation.
+  #if HAS_LOCAL_MASK
+  color *= localMaskAlpha;
+  #endif
   #if HAS_COVERAGE
   fragColor = color * vCoverage;
   #else

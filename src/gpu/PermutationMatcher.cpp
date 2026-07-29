@@ -99,10 +99,36 @@ static int GetXPType(const ProgramInfo* programInfo) {
   return -1;
 }
 
+// Determines whether a texture-based coverage child can be served by the local-space mask path
+// (HAS_LOCAL_MASK): the shader samples it via a coordinate-transform varying and takes .a, relying
+// on the hardware sampler for tiling. That is only valid for an RGBA texture (so .a is the alpha),
+// with no RGBAAA dual-plane and no shader-emitted subset/tile math. A plain TextureEffect always
+// qualifies (hardware tiling + a benign full-bounds Subset); a TiledTextureEffect qualifies only
+// when both axes resolve to the hardware path (ShaderMode::None == 0), i.e. no shader tile math.
+static bool IsLocalMaskChild(const FragmentProcessor* child) {
+  auto name = child->name();
+  if (name == "TextureEffect") {
+    auto* te = static_cast<const TextureEffect*>(child);
+    return !te->isYUV() && !te->isAlphaOnly() && !te->hasRGBAAA() && !te->hasSubset();
+  }
+  if (name == "TiledTextureEffect") {
+    auto* tte = static_cast<const TiledTextureEffect*>(child);
+    if (tte->isAlphaOnly()) {
+      return false;
+    }
+    int modeX = 0;
+    int modeY = 0;
+    tte->getShaderModes(&modeX, &modeY);
+    return modeX == 0 && modeY == 0;
+  }
+  return false;
+}
+
 // Classifies a coverage FP into HAS_COVERAGE dimension value:
 //   0 = no coverage FP
 //   1 = AARectEffect only
 //   2 = ComposeFragmentProcessor(DeviceSpaceTextureEffect[alphaOnly] + AARectEffect) = mask + rect
+//   3 = XfermodeFragmentProcessor-dst(texture) = local-space texture-alpha mask (input * mask.a)
 // Returns -1 if the coverage FP is not recognized.
 static int ClassifyCoverageFP(const ProgramInfo* programInfo) {
   auto numFP = programInfo->numFragmentProcessors();
@@ -117,6 +143,17 @@ static int ClassifyCoverageFP(const ProgramInfo* programInfo) {
   auto coverageName = coverageFP->name();
   if (coverageName == "AARectEffect") {
     return 1;
+  }
+  if (coverageName == "XfermodeFragmentProcessor - dst") {
+    // ShaderMaskFilter emits MulInputByChildAlpha(mask) == Xfermode-dst(mask, SrcIn), whose coverage
+    // is input * mask.a. A single texture child that the local-mask path can sample qualifies.
+    if (coverageFP->numChildProcessors() != 1) {
+      return -1;
+    }
+    if (!IsLocalMaskChild(coverageFP->childProcessor(0))) {
+      return -1;
+    }
+    return 3;
   }
   if (coverageName == "ComposeFragmentProcessor") {
     if (coverageFP->numChildProcessors() != 2) {
@@ -424,11 +461,16 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
     return std::nullopt;
   }
   bool hasMaskTexture = false;
+  bool hasLocalMask = false;
   if (programInfo->numFragmentProcessors() != 1) {
-    if (ClassifyCoverageFP(programInfo) != 2) {
+    int coverageType = ClassifyCoverageFP(programInfo);
+    if (coverageType == 2) {
+      hasMaskTexture = true;
+    } else if (coverageType == 3) {
+      hasLocalMask = true;
+    } else {
       return std::nullopt;
     }
-    hasMaskTexture = true;
   }
   int xpType = GetXPType(programInfo);
   if (xpType < 0) {
@@ -446,6 +488,10 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   if (te->isYUV()) {
     return std::nullopt;
   }
+  // No color-texture guards are needed for the local mask: the coverage texture writes its
+  // per-texture uniforms (Subset/AlphaOnly/HasRgbaaa) under a distinct structural ordinal
+  // (Subset_1, ...), so it can no longer clobber the color texture's Subset / AlphaOnly slots. The
+  // color may therefore carry a subset, be alpha-only, or use RGBAAA freely.
   // Subset clamping logic:
   //   gpSubset=true  -> HAS_SUBSET=1: vertex shader outputs vTexSubset varying, fragment double-
   //                     clamps by the varying and the Subset uniform.
@@ -462,6 +508,7 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   vertValues[VD::HAS_UV_COORD] = !quadGP->hasUVMatrix() ? 1 : 0;
   vertValues[VD::HAS_COLOR] = !quadGP->hasCommonColor() ? 1 : 0;
   vertValues[VD::HAS_SUBSET] = gpSubset ? 1 : 0;
+  vertValues[VD::HAS_LOCAL_MASK] = hasLocalMask ? 1 : 0;
   auto vertIndex = vertDomain.encode(vertValues);
 
   using FD = QuadTextureFillShader::FD;
@@ -474,6 +521,7 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   fragValues[FD::HAS_COLOR] = !quadGP->hasCommonColor() ? 1 : 0;
   fragValues[FD::HAS_XP] = xpType;
   fragValues[FD::HAS_MASK_TEXTURE] = hasMaskTexture ? 1 : 0;
+  fragValues[FD::HAS_LOCAL_MASK] = hasLocalMask ? 1 : 0;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"QuadTextureFillShader", vertIndex, fragIndex};
 }
