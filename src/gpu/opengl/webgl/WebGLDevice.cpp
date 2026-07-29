@@ -18,10 +18,10 @@
 #include "tgfx/gpu/opengl/webgl/WebGLDevice.h"
 #include <emscripten/val.h>
 #include "core/utils/Log.h"
+#include "gpu/WebColorSpace.h"
 #include "gpu/opengl/webgl/WebGLGPU.h"
 
 namespace tgfx {
-enum class WebNamedColorSpace { None = 0, SRGB = 1, DisplayP3 = 2, Others = 3 };
 
 void* GLDevice::CurrentNativeHandle() {
   return reinterpret_cast<void*>(emscripten_webgl_get_current_context());
@@ -66,14 +66,7 @@ std::shared_ptr<WebGLDevice> WebGLDevice::MakeFrom(const std::string& canvasID,
     }
     return nullptr;
   }
-  WebNamedColorSpace cs = WebNamedColorSpace::Others;
-  if (colorSpace == nullptr) {
-    cs = WebNamedColorSpace::None;
-  } else if (ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get())) {
-    cs = WebNamedColorSpace::SRGB;
-  } else if (ColorSpace::Equals(colorSpace.get(), ColorSpace::DisplayP3().get())) {
-    cs = WebNamedColorSpace::DisplayP3;
-  }
+  auto cs = ToWebNamedColorSpace(colorSpace);
   bool isColorSpaceSupport = emscripten::val::module_property("tgfx").call<bool>(
       "setColorSpace", emscripten::val::module_property("GL"), static_cast<int>(cs));
   if (!isColorSpaceSupport) {

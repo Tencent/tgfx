@@ -21,16 +21,20 @@
 #include "WebGPUDefines.h"
 #include "WebGPUDrawableProxy.h"
 #include "WebGPUGPU.h"
+#include "core/utils/Log.h"
+#include "gpu/WebColorSpace.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/html5.h>
 #include <emscripten/html5_webgpu.h>
+#include <emscripten/val.h>
 #endif
 
 namespace tgfx {
 
 std::shared_ptr<WebGPUWindow> WebGPUWindow::MakeFrom(const std::string& canvasSelector,
-                                                     std::shared_ptr<WebGPUDevice> device) {
+                                                     std::shared_ptr<WebGPUDevice> device,
+                                                     std::shared_ptr<ColorSpace> colorSpace) {
   if (canvasSelector.empty()) {
     return nullptr;
   }
@@ -84,14 +88,37 @@ std::shared_ptr<WebGPUWindow> WebGPUWindow::MakeFrom(const std::string& canvasSe
   config.alphaMode = WGPUCompositeAlphaMode_Premultiplied;
   wgpuSurfaceConfigure(surface, &config);
 
-  return std::shared_ptr<WebGPUWindow>(
-      new WebGPUWindow(std::move(device), surface, canvasWidth, canvasHeight, canvasSelector));
+  auto window = std::shared_ptr<WebGPUWindow>(
+      new WebGPUWindow(std::move(device), surface, canvasWidth, canvasHeight, canvasSelector,
+                       std::move(colorSpace)));
+  window->configureColorSpace();
+  return window;
 }
 
 WebGPUWindow::WebGPUWindow(std::shared_ptr<Device> device, void* surface, int width, int height,
-                           const std::string& canvasSelector)
-    : Window(std::move(device)), _canvasSelector(canvasSelector), _surface(surface), _width(width),
-      _height(height) {
+                           const std::string& canvasSelector,
+                           std::shared_ptr<ColorSpace> colorSpace)
+    : Window(std::move(device), std::move(colorSpace)), _canvasSelector(canvasSelector),
+      _surface(surface), _width(width), _height(height) {
+}
+
+void WebGPUWindow::configureColorSpace() {
+#ifdef __EMSCRIPTEN__
+  auto namedColorSpace = ToWebNamedColorSpace(colorSpace());
+  // Leave the default sRGB drawing buffer untouched to avoid a redundant reconfigure on the
+  // default rendering path.
+  if (namedColorSpace == WebNamedColorSpace::None) {
+    return;
+  }
+  bool supported = emscripten::val::module_property("tgfx").call<bool>(
+      "configureWebGPUColorSpace", emscripten::val(_canvasSelector),
+      static_cast<int>(namedColorSpace));
+  if (!supported) {
+    LOGE(
+        "WebGPUWindow::configureColorSpace() The specified ColorSpace is not supported on this "
+        "platform. Rendering may have color inaccuracies.");
+  }
+#endif
 }
 
 WebGPUWindow::~WebGPUWindow() {
@@ -134,6 +161,7 @@ std::shared_ptr<RenderTargetProxy> WebGPUWindow::onCreateRenderTarget(Context* c
     config.presentMode = WGPUPresentMode_Fifo;
     config.alphaMode = WGPUCompositeAlphaMode_Premultiplied;
     wgpuSurfaceConfigure(wgpuSurface, &config);
+    configureColorSpace();
     _configuredWidth = _width;
     _configuredHeight = _height;
   }

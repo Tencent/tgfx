@@ -162,6 +162,42 @@ export const setColorSpace = (
     }
 };
 
+// Configures the WebGPU canvas context to use the target color space. The emscripten surface
+// configuration (wgpuSurfaceConfigure) does not expose the colorSpace option, so we re-run
+// GPUCanvasContext.configure() here with the same parameters plus the desired color space.
+// getContext('webgpu') is idempotent and returns the same context object already used by the
+// emscripten WebGPU surface, so reconfiguring it only updates the color space.
+export const configureWebGPUColorSpace = (
+    canvasSelector: string,
+    colorSpace: WindowColorSpace
+) => {
+    if (colorSpace === WindowColorSpace.Others) {
+        return false;
+    }
+    const canvas = document.querySelector(canvasSelector) as HTMLCanvasElement | null;
+    if (!canvas) {
+        return false;
+    }
+    const context = canvas.getContext('webgpu') as any;
+    if (!context || typeof context.configure !== 'function') {
+        return false;
+    }
+    const device = (Module as any).preinitializedWebGPUDevice;
+    if (!device) {
+        return false;
+    }
+    const gpuTextureUsage = (globalThis as any).GPUTextureUsage;
+    const renderAttachment = gpuTextureUsage ? gpuTextureUsage.RENDER_ATTACHMENT : 0x10;
+    context.configure({
+        device: device,
+        format: 'bgra8unorm',
+        usage: renderAttachment,
+        alphaMode: 'premultiplied',
+        colorSpace: colorSpace === WindowColorSpace.DisplayP3 ? 'display-p3' : 'srgb',
+    });
+    return true;
+};
+
 export const isAndroidMiniprogram = () => {
     if (typeof wx !== 'undefined' && wx.getSystemInfoSync) {
         return wx.getSystemInfoSync().platform === 'android';
