@@ -24,9 +24,12 @@
 namespace tgfx {
 
 GlassRefractionImageFilter::GlassRefractionImageFilter(const GlassRefractionParams& params,
+                                                       const GlassSDFGeometryParams& sdfParams,
+                                                       const GlassUDFGeometryParams& udfParams,
                                                        std::shared_ptr<Image> fineMask,
                                                        std::shared_ptr<Image> coarseMask)
-    : params(params), fineMask(std::move(fineMask)), coarseMask(std::move(coarseMask)) {
+    : params(params), sdfParams(sdfParams), udfParams(udfParams), fineMask(std::move(fineMask)),
+      coarseMask(std::move(coarseMask)) {
 }
 
 static std::shared_ptr<TextureProxy> MakeTextureProxy(Context* context,
@@ -69,13 +72,22 @@ PlacementPtr<FragmentProcessor> GlassRefractionImageFilter::asFragmentProcessor(
     }
   }
 
+  auto allocator = args.context->drawingAllocator();
+  PlacementPtr<GlassShapeGeometryFragmentProcessor> geometry = nullptr;
+  if (params.shapeType == GlassShapeType::AlphaMask) {
+    geometry = GlassUDFGeometryFragmentProcessor::Make(allocator, std::move(fineMaskProxy),
+                                                       std::move(coarseMaskProxy), udfParams,
+                                                       params.lightIntensity > 0.0f);
+  } else {
+    geometry = GlassSDFGeometryFragmentProcessor::Make(allocator, params.shapeType, sdfParams);
+  }
+  if (geometry == nullptr) {
+    return nullptr;
+  }
+
   auto coordMatrix = uvMatrix != nullptr ? *uvMatrix : Matrix::I();
-  auto localParams = params;
-  localParams.renderOffsetX = 0.0f;
-  localParams.renderOffsetY = 0.0f;
-  return GlassRefractionFragmentProcessor::Make(
-      args.context->drawingAllocator(), std::move(sourceProxy), std::move(fineMaskProxy),
-      std::move(coarseMaskProxy), localParams, coordMatrix);
+  return GlassRefractionFragmentProcessor::Make(allocator, std::move(sourceProxy),
+                                                std::move(geometry), params, coordMatrix);
 }
 
 }  // namespace tgfx
