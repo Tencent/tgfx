@@ -518,9 +518,6 @@ void D3D12RenderPass::onEnd() {
     }
     auto& src = colorAttachments[i];
     auto& resolveDst = resolveTextures[i];
-    if (src == nullptr) {
-      continue;
-    }
     auto srcState = src->currentState();
     if (srcState != D3D12_RESOURCE_STATE_RESOLVE_SOURCE) {
       resolveBatch.addTransition(src->d3d12Resource(), srcState,
@@ -543,9 +540,6 @@ void D3D12RenderPass::onEnd() {
     }
     auto& src = colorAttachments[i];
     auto& resolveDst = resolveTextures[i];
-    if (src == nullptr) {
-      continue;
-    }
     commandList->ResolveSubresource(resolveDst->d3d12Resource(), 0, src->d3d12Resource(), 0,
                                     static_cast<DXGI_FORMAT>(src->dxgiFormat()));
     // The two zeros above are dst / src subresource indices. tgfx render targets are flat 2D
