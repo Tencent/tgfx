@@ -152,12 +152,14 @@ bool D3D12RenderPipeline::createRootSignature(D3D12GPU* gpu,
     uniformRootParameterIndex[entry.binding] = paramCursor++;
     uniformBlockVisibility[entry.binding] = entry.visibility;
     uniformBindingSet.insert(entry.binding);
-    // Encode visibility plus per-stage register indices in the shape key. Different stage-local
-    // register layouts must hit different cached root signatures; otherwise a pipeline whose
-    // fragment UBO ends up at b1 (because it has a sibling at b0) would reuse another
-    // pipeline's root signature that still places it at b0.
-    shapeKey.push_back(static_cast<uint8_t>(entry.visibility & 0xFF));
-    shapeKey.push_back(static_cast<uint8_t>((entry.visibility >> 8) & 0xFF));
+    // Encode the D3D12-mapped visibility plus per-stage register indices in the shape key.
+    // Different stage-local register layouts must hit different cached root signatures;
+    // otherwise a pipeline whose fragment UBO ends up at b1 (because it has a sibling at b0)
+    // would reuse another pipeline's root signature that still places it at b0.
+    // Use ToD3D12ShaderVisibility so that different ShaderVisibility values that map to the
+    // same D3D12_SHADER_VISIBILITY (e.g. VertexFragment and any future "All" flag) share the
+    // same cached root signature instead of creating duplicates.
+    shapeKey.push_back(static_cast<uint8_t>(ToD3D12ShaderVisibility(entry.visibility)));
     shapeKey.push_back(ubVertexRegister[i]);
     shapeKey.push_back(ubFragmentRegister[i]);
   }
@@ -171,11 +173,12 @@ bool D3D12RenderPipeline::createRootSignature(D3D12GPU* gpu,
     samplerRootParameterIndex[entry.binding] = samplerParamIndex;
     textureUnits[entry.binding] = textureUnit++;
     textureBindingSet.insert(entry.binding);
-    // Encode each sampler binding's visibility into the shape key. Without this two pipelines
-    // that differ only in vertex/fragment-only sampler visibility would collide on the cached
-    // root signature once the SRV/Sampler root parameters below honour entry.visibility.
-    shapeKey.push_back(static_cast<uint8_t>(entry.visibility & 0xFF));
-    shapeKey.push_back(static_cast<uint8_t>((entry.visibility >> 8) & 0xFF));
+    // Encode each sampler binding's D3D12-mapped visibility into the shape key. Without this
+    // two pipelines that differ only in vertex/fragment-only sampler visibility would collide
+    // on the cached root signature once the SRV/Sampler root parameters below honour
+    // entry.visibility. Using ToD3D12ShaderVisibility keeps the key collapsible when different
+    // source visibility values map to the same D3D12_SHADER_VISIBILITY.
+    shapeKey.push_back(static_cast<uint8_t>(ToD3D12ShaderVisibility(entry.visibility)));
   }
 
   // Cache hit: reuse the existing D3D12 root signature object. Different pipelines sharing the
