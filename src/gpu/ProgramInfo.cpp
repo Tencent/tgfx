@@ -334,25 +334,23 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
   FragmentProcessor::CoordTransformIter coordTransformIter(this);
   geometryProcessor->setData(vertexUniformData, fragmentUniformData, &coordTransformIter);
 
-  // Per-texture structural ordinal: on the precompiled path the runtime processor suffix is stripped
-  // (skipSuffix), so multiple TextureEffects would write the same base-named uniforms (Subset,
-  // AlphaOnly, ...) and clobber one another. Assigning each TextureEffect a stable ordinal (the
-  // first is 0, the next 1, ...) lets the precompiled shader address them by distinct names
-  // (Subset / Subset_1 / ...). Ordinal 0 keeps the base name, so single-texture kernels are
-  // unchanged. On the JIT path structuralSuffix is unused (nameSuffix already disambiguates).
-  int textureOrdinal = 0;
+  // Per-processor structural ordinal: on the precompiled path the runtime processor suffix is
+  // stripped (skipSuffix), so multiple processors of the same class would write the same base-named
+  // per-instance uniforms (a TextureEffect's Subset/AlphaOnly, an XfermodeFragmentProcessor's
+  // BlendModeValue, a ConstColorProcessor's ConstColor, ...) and clobber one another. Numbering each
+  // processor by its index among same-class processors (in traversal order) gives the precompiled
+  // shader stable, predictable names to address them by (Subset / Subset_1, BlendModeValue /
+  // BlendModeValue_1, ...). The first processor of each class keeps the base name, so kernels with
+  // at most one instance of a class are byte-for-byte unchanged. On the JIT path structuralSuffix is
+  // unused (nameSuffix already disambiguates by processor index).
+  std::unordered_map<std::string, int> classOrdinals;
   for (auto& fragmentProcessor : fragmentProcessors) {
     FragmentProcessor::Iter iter(fragmentProcessor);
     const FragmentProcessor* fp = iter.next();
     while (fp) {
       updateUniformDataSuffix(vertexUniformData, fragmentUniformData, fp);
-      std::string structural = "";
-      if (fp->name() == "TextureEffect") {
-        if (textureOrdinal > 0) {
-          structural = "_" + std::to_string(textureOrdinal);
-        }
-        textureOrdinal++;
-      }
+      int ordinal = classOrdinals[fp->name()]++;
+      std::string structural = ordinal > 0 ? "_" + std::to_string(ordinal) : "";
       if (vertexUniformData != nullptr) {
         vertexUniformData->structuralSuffix = structural;
       }
