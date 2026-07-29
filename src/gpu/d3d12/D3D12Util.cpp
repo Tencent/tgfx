@@ -270,8 +270,9 @@ D3D12_CULL_MODE ToD3D12CullMode(CullMode cullMode) {
       return D3D12_CULL_MODE_FRONT;
     case CullMode::Back:
       return D3D12_CULL_MODE_BACK;
+    default:
+      return D3D12_CULL_MODE_NONE;
   }
-  return D3D12_CULL_MODE_NONE;
 }
 
 bool ToD3D12FrontCounterClockwise(FrontFace frontFace) {
@@ -280,8 +281,9 @@ bool ToD3D12FrontCounterClockwise(FrontFace frontFace) {
       return true;
     case FrontFace::CW:
       return false;
+    default:
+      return true;
   }
-  return true;
 }
 
 D3D12_INDEX_BUFFER_STRIP_CUT_VALUE ToD3D12StripCutValue(IndexFormat indexFormat) {
