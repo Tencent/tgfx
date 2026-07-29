@@ -21,6 +21,7 @@
 #include <emscripten/bind.h>
 #include "hello2d/AppHost.h"
 #include "hello2d/LayerBuilder.h"
+#include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/SurfaceReadback.h"
 #include "tgfx/gpu/Recording.h"
@@ -44,6 +45,13 @@ class TGFXBaseView {
   void updateLayerTree(int drawIndex);
 
   void updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY);
+
+  /**
+   * Switches the target color space of the drawing buffer and recreates the window so the change
+   * takes effect on the next draw. The type maps to: 0 = default (nullptr, sRGB), 1 = sRGB,
+   * 2 = Display P3.
+   */
+  void setColorSpace(int type);
 
   void draw();
 
@@ -69,7 +77,10 @@ class TGFXBaseView {
  private:
   void applyCenteringTransform();
 
+  void ensureWindow();
+
   std::string canvasID = "";
+  std::shared_ptr<tgfx::ColorSpace> colorSpace = nullptr;
   std::shared_ptr<tgfx::Window> window = nullptr;
   std::shared_ptr<tgfx::Surface> surface = nullptr;
   tgfx::DisplayList displayList = {};

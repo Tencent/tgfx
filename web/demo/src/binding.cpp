@@ -29,6 +29,7 @@ EMSCRIPTEN_BINDINGS(TGFXDemo) {
       .function("updateSize", &TGFXBaseView::updateSize)
       .function("updateLayerTree", &TGFXBaseView::updateLayerTree)
       .function("updateZoomScaleAndOffset", &TGFXBaseView::updateZoomScaleAndOffset)
+      .function("setColorSpace", &TGFXBaseView::setColorSpace)
       .function("draw", &TGFXBaseView::draw)
       .function("startReadback", &TGFXBaseView::startReadback)
       .function("finishReadback", &TGFXBaseView::finishReadback);

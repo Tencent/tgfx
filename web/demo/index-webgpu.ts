@@ -73,6 +73,20 @@ if (typeof window !== 'undefined') {
             tgfxView.updateZoomScaleAndOffset(1.0, 0, 0);
             const canvas = document.getElementById('hello2d');
             bindCanvasZoomAndPanEvents(canvas, shareData);
+
+            const colorSpacePanel = document.getElementById('colorSpacePanel');
+            if (colorSpacePanel) {
+                // Prevent panel clicks from bubbling to window.onclick, which switches the drawing.
+                colorSpacePanel.addEventListener('click', (e) => e.stopPropagation());
+            }
+            const colorSpaceSelect = document.getElementById('colorSpaceSelect') as HTMLSelectElement;
+            if (colorSpaceSelect) {
+                colorSpaceSelect.addEventListener('change', () => {
+                    shareData.tgfxBaseView.setColorSpace(parseInt(colorSpaceSelect.value, 10));
+                    updateSize(shareData);
+                });
+            }
+
             animationLoop(shareData);
             setupVisibilityListeners(shareData);
         } catch (error) {
