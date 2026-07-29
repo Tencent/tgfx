@@ -38,10 +38,14 @@ std::shared_ptr<D3D12Sampler> D3D12Sampler::Make(D3D12GPU* gpu,
   samplerDesc.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
   // tgfx's public SamplerDescriptor does not expose a border colour today, so all three GPU
   // backends hardcode transparent black: VulkanSampler picks VK_BORDER_COLOR_FLOAT_TRANSPARENT_
-  // BLACK and MetalSampler picks MTLSamplerBorderColorTransparentBlack. If a borderColor field
-  // is ever added to SamplerDescriptor, this branch must thread it through and D3D12GPU::
-  // MakeSamplerKey must include it in the cache key (otherwise two samplers differing only in
-  // border colour would collide in samplerCache). Keep the three backends in sync.
+  // BLACK and MetalSampler picks MTLSamplerBorderColorTransparentBlack. D3D12 supports three
+  // static border colours (transparent-black / opaque-black / opaque-white via
+  // D3D12_STATIC_BORDER_COLOR) in addition to a custom float4; this implementation uses the
+  // custom float4 route and hardcodes transparent black to stay consistent with the other
+  // backends. If a borderColor field is ever added to SamplerDescriptor, this branch must
+  // thread it through and D3D12GPU::MakeSamplerKey must include it in the cache key (otherwise
+  // two samplers differing only in border colour would collide in samplerCache). Keep the
+  // three backends in sync.
   samplerDesc.BorderColor[0] = 0.0f;
   samplerDesc.BorderColor[1] = 0.0f;
   samplerDesc.BorderColor[2] = 0.0f;
