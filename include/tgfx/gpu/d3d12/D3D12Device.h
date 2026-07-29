@@ -43,8 +43,11 @@ class D3D12Device : public Device {
   static std::shared_ptr<D3D12Device> MakeWarp();
 
   /**
-   * Creates a new D3D12Device from an existing ID3D12Device. The device parameter is a pointer to
-   * an ID3D12Device object. Returns nullptr if the device is invalid.
+   * Creates a new D3D12Device from an existing ID3D12Device.
+   * @param device A pointer to an existing ID3D12Device. The caller retains ownership of the
+   * device; tgfx internally calls QueryInterface (which increments the reference count via AddRef)
+   * and releases its own reference when the returned D3D12Device is destroyed.
+   * Returns nullptr if device is nullptr or does not support the required D3D12 interfaces.
    */
   static std::shared_ptr<D3D12Device> MakeFrom(void* device);
 
