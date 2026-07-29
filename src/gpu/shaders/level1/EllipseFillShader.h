@@ -42,16 +42,15 @@ class EllipseFillShader : public PrecompiledShader {
                 "Update ShouldCompile below when dimensions change.");
 
   PrecompiledShaderInfo info() const override {
-    return {
-        "EllipseFillShader", "level1/ellipse_fill.vert", "level1/ellipse_fill.frag", D::domain(),
-        FD::domain(),        PermutationDomain({}),      "EllipseGeometryProcessor", "",
-        ShouldCompile};
-  }
-
- private:
-  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>& vertValues,
-                            const std::vector<int>& fragValues) {
-    return vertValues[0] == fragValues[0] && vertValues[1] == fragValues[1];
+    return {"EllipseFillShader",
+            "level1/ellipse_fill.vert",
+            "level1/ellipse_fill.frag",
+            D::domain(),
+            FD::domain(),
+            PermutationDomain({}),
+            "EllipseGeometryProcessor",
+            "",
+            nullptr};
   }
 };
 

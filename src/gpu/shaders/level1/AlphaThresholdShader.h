@@ -58,13 +58,7 @@ class AlphaThresholdShader : public PrecompiledShader {
             PermutationDomain({}),
             "",
             "",
-            ShouldCompile};
-  }
-
- private:
-  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>& vertValues,
-                            const std::vector<int>& fragValues) {
-    return vertValues[Dims::GP_TYPE] == fragValues[FD::GP_TYPE];
+            nullptr};
   }
 };
 

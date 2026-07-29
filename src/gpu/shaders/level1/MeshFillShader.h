@@ -45,14 +45,7 @@ class MeshFillShader : public PrecompiledShader {
   PrecompiledShaderInfo info() const override {
     return {"MeshFillShader", "level1/mesh_fill.vert", "level1/mesh_fill.frag", D::domain(),
             FD::domain(),     PermutationDomain({}),   "MeshGeometryProcessor", "",
-            ShouldCompile};
-  }
-
- private:
-  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>& vertValues,
-                            const std::vector<int>& fragValues) {
-    return vertValues[0] == fragValues[0] && vertValues[1] == fragValues[1] &&
-           vertValues[2] == fragValues[2];
+            nullptr};
   }
 };
 

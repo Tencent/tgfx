@@ -52,14 +52,7 @@ class AtlasTextFillShader : public PrecompiledShader {
             PermutationDomain({}),
             "",
             "",
-            ShouldCompile};
-  }
-
- private:
-  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>& vertValues,
-                            const std::vector<int>& fragValues) {
-    // Both stages share the leading dimensions, so only compile matching pairs.
-    return vertValues[0] == fragValues[0] && vertValues[1] == fragValues[1];
+            nullptr};
   }
 };
 

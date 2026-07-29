@@ -58,13 +58,7 @@ class TexturedEffectShader : public PrecompiledShader {
   using VD = VertDims;
 
   // HAS_COVERAGE is mirrored: the vertex stage emits the coverage varying only when the fragment
-  // stage consumes it, so vert and frag must agree.
-  static bool ShouldCompile(uint32_t /*vertIndex*/, uint32_t /*fragIndex*/,
-                            const std::vector<int>& vertValues,
-                            const std::vector<int>& fragValues) {
-    return vertValues[VD::HAS_COVERAGE] == fragValues[D::HAS_COVERAGE];
-  }
-
+  // stage consumes it, so vert and frag must agree. Enforced automatically by MirroredDimsAgree.
   PrecompiledShaderInfo info() const override {
     return {"TexturedEffectShader",
             "level1/textured_effect.vert",
@@ -74,7 +68,7 @@ class TexturedEffectShader : public PrecompiledShader {
             PermutationDomain({}),
             "",
             "",
-            ShouldCompile};
+            nullptr};
   }
 };
 

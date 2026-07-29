@@ -82,16 +82,7 @@ class TiledTextureFillShader : public PrecompiledShader {
             PermutationDomain({}),
             "",
             "",
-            ShouldCompile};
-  }
-
- private:
-  static bool ShouldCompile(uint32_t /*vertIndex*/, uint32_t /*fragIndex*/,
-                            const std::vector<int>& vertValues,
-                            const std::vector<int>& fragValues) {
-    // HAS_COVERAGE is mirrored: the vertex stage emits the varying only when the fragment stage
-    // consumes it, so vert and frag must agree.
-    return vertValues[VD::HAS_COVERAGE] == fragValues[FD::HAS_COVERAGE];
+            nullptr};
   }
 };
 

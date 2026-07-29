@@ -63,14 +63,7 @@ class LumaShader : public PrecompiledShader {
             PermutationDomain({}),
             "",
             "",
-            ShouldCompile};
-  }
-
- private:
-  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>& vertValues,
-                            const std::vector<int>& fragValues) {
-    // HAS_COVERAGE is mirrored between vertex and fragment (unified varying contract).
-    return vertValues[Dims::HAS_COVERAGE] == fragValues[FD::HAS_COVERAGE];
+            nullptr};
   }
 };
 

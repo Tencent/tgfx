@@ -66,14 +66,7 @@ class SolidColorFillShader : public PrecompiledShader {
             PermutationDomain({}),
             "",
             "",
-            ShouldCompile};
-  }
-
- private:
-  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>& vertValues,
-                            const std::vector<int>& fragValues) {
-    // The coverage varying declarations must agree between vertex and fragment stages.
-    return vertValues[VD::HAS_COVERAGE] == fragValues[FD::HAS_COVERAGE];
+            nullptr};
   }
 };
 

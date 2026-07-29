@@ -56,17 +56,12 @@ class DualIntervalGradientShader : public PrecompiledShader {
             PermutationDomain({}),
             "",
             "",
-            ShouldCompile};
+            nullptr};
   }
 
  private:
   // HAS_VCOVERAGE is mirrored: the vertex shader emits the vCoverage varying only when the fragment
   // shader consumes it, so a vertex/fragment mismatch would leave a dangling varying.
-  static bool ShouldCompile(uint32_t /*vertIndex*/, uint32_t /*fragIndex*/,
-                            const std::vector<int>& vertValues,
-                            const std::vector<int>& fragValues) {
-    return vertValues[VD::HAS_VCOVERAGE] == fragValues[FD::HAS_VCOVERAGE];
-  }
 };
 
 }  // namespace tgfx

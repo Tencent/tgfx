@@ -56,17 +56,13 @@ class SingleIntervalGradientShader : public PrecompiledShader {
             PermutationDomain({}),
             "",
             "",
-            ShouldCompile};
+            nullptr};
   }
 
  private:
   // HAS_VCOVERAGE is mirrored across stages: the vertex shader emits the coverage varying only when
   // the fragment shader consumes it. GP_TYPE is a vertex-only dimension — the fragment stage is
   // identical for all GP types, so it is not a fragment dimension.
-  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>& vertValues,
-                            const std::vector<int>& fragValues) {
-    return vertValues[VD::HAS_VCOVERAGE] == fragValues[FD::HAS_VCOVERAGE];
-  }
 };
 
 }  // namespace tgfx

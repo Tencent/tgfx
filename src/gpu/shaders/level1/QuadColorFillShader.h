@@ -58,20 +58,7 @@ class QuadColorFillShader : public PrecompiledShader {
             PermutationDomain({}),
             "QuadPerEdgeAAGeometryProcessor",
             "",
-            ShouldCompile};
-  }
-
- private:
-  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>& vertValues,
-                            const std::vector<int>& fragValues) {
-    // Vert and frag must agree on HAS_COVERAGE and HAS_COLOR.
-    if (vertValues[VD::HAS_COVERAGE] != fragValues[FD::HAS_COVERAGE]) {
-      return false;
-    }
-    if (vertValues[VD::HAS_COLOR] != fragValues[FD::HAS_COLOR]) {
-      return false;
-    }
-    return true;
+            nullptr};
   }
 };
 
