@@ -24,9 +24,12 @@
 #include "gpu/ProxyProvider.h"
 #include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
+#include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/LumaFragmentProcessor.h"
 #include "gpu/processors/TextureEffect.h"
+#include "gpu/processors/XfermodeFragmentProcessor.h"
 #include "gtest/gtest.h"
+#include "tgfx/core/BlendMode.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/PixelFormat.h"
@@ -201,6 +204,99 @@ TGFX_TEST(AOTEffectTest, DecompositionIsDeterministic) {
     EXPECT_EQ(first.passes[index].materializesOutput, second.passes[index].materializesOutput);
   }
   EXPECT_EQ(first.output, second.output);
+}
+
+TGFX_TEST(AOTEffectTest, ConstColorLowersToConstColorNode) {
+  BlockAllocator allocator;
+  PMColor color = {0.5f, 0.25f, 0.125f, 0.75f};
+  auto constColor = ConstColorProcessor::Make(&allocator, color, InputMode::ModulateRGBA);
+  ASSERT_NE(constColor, nullptr);
+
+  AOTNodeBuilder builder;
+  AOTNodeID geometry;
+  AOTNodeID node;
+  ASSERT_TRUE(builder.addGeometryColor(&geometry));
+  ASSERT_TRUE(constColor->lowerToAOT(&builder, geometry, &node));
+  AOTEffectGraph graph;
+  ASSERT_TRUE(builder.finish(node, &graph));
+
+  auto constNode = graph.nodeAt(node);
+  ASSERT_NE(constNode, nullptr);
+  EXPECT_EQ(constNode->kind, AOTEffectKind::ConstColor);
+  ASSERT_EQ(constNode->inputs.size(), 1u);
+  EXPECT_EQ(constNode->inputs[0], geometry);
+  auto parameters = std::get_if<AOTConstColorParameters>(&constNode->parameters);
+  ASSERT_NE(parameters, nullptr);
+  EXPECT_EQ(parameters->inputMode, static_cast<int>(InputMode::ModulateRGBA));
+  EXPECT_FLOAT_EQ(parameters->color[0], 0.5f);
+  EXPECT_FLOAT_EQ(parameters->color[3], 0.75f);
+}
+
+TGFX_TEST(AOTEffectTest, XfermodeDstLowersToBinaryBlend) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  auto dst = MakeTextureProcessor(context, &allocator, PixelFormat::RGBA_8888);
+  ASSERT_NE(dst, nullptr);
+  // DstChild: the input color is src, the child processor supplies dst.
+  auto xfermode = XfermodeFragmentProcessor::MakeFromDstProcessor(&allocator, std::move(dst),
+                                                                  BlendMode::Multiply);
+  ASSERT_NE(xfermode, nullptr);
+
+  AOTEffectGraph graph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower({xfermode.get()}, &graph));
+  // node0=geometry, node1=texture(dst), node2=blend(src=geometry, dst=texture).
+  ASSERT_EQ(graph.nodeCount(), 3u);
+  auto blend = graph.nodeAt(AOTNodeID(2));
+  ASSERT_NE(blend, nullptr);
+  EXPECT_EQ(blend->kind, AOTEffectKind::Blend);
+  ASSERT_EQ(blend->inputs.size(), 2u);
+  EXPECT_EQ(blend->inputs[0], AOTNodeID(0));  // src = input color
+  EXPECT_EQ(blend->inputs[1], AOTNodeID(1));  // dst = child texture
+  auto parameters = std::get_if<AOTBlendParameters>(&blend->parameters);
+  ASSERT_NE(parameters, nullptr);
+  EXPECT_EQ(parameters->childType, 0);
+  EXPECT_EQ(parameters->blendMode, static_cast<int>(BlendMode::Multiply));
+}
+
+TGFX_TEST(AOTEffectTest, XfermodeTwoLowersBothChildren) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  auto src = MakeTextureProcessor(context, &allocator, PixelFormat::RGBA_8888);
+  auto dst = MakeTextureProcessor(context, &allocator, PixelFormat::RGBA_8888);
+  ASSERT_NE(src, nullptr);
+  ASSERT_NE(dst, nullptr);
+  auto xfermode = XfermodeFragmentProcessor::MakeFromTwoProcessors(
+      &allocator, std::move(src), std::move(dst), BlendMode::Screen);
+  ASSERT_NE(xfermode, nullptr);
+
+  AOTEffectGraph graph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower({xfermode.get()}, &graph));
+  // node0=geometry, node1=src texture, node2=dst texture, node3=blend(src=1, dst=2).
+  ASSERT_EQ(graph.nodeCount(), 4u);
+  auto blend = graph.nodeAt(AOTNodeID(3));
+  ASSERT_NE(blend, nullptr);
+  EXPECT_EQ(blend->kind, AOTEffectKind::Blend);
+  ASSERT_EQ(blend->inputs.size(), 2u);
+  EXPECT_EQ(blend->inputs[0], AOTNodeID(1));  // src child
+  EXPECT_EQ(blend->inputs[1], AOTNodeID(2));  // dst child
+  auto parameters = std::get_if<AOTBlendParameters>(&blend->parameters);
+  ASSERT_NE(parameters, nullptr);
+  EXPECT_EQ(parameters->childType, 2);
+}
+
+TGFX_TEST(AOTEffectTest, BuilderRejectsBlendWithInvalidOperand) {
+  AOTNodeBuilder builder;
+  AOTNodeID geometry;
+  ASSERT_TRUE(builder.addGeometryColor(&geometry));
+  AOTBlendParameters parameters = {};
+  AOTNodeID output;
+  // Second operand references a non-existent node; addBlend must reject and add nothing.
+  EXPECT_FALSE(builder.addBlend(geometry, AOTNodeID(7), parameters, &output));
+  EXPECT_EQ(builder.nodeCount(), 1u);
 }
 
 }  // namespace tgfx
