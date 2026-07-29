@@ -40,7 +40,7 @@ namespace tgfx {
 // bit-for-bit on even-divided mip levels and follows GPU-driver edge handling on odd ones. The
 // older quincunx (four 0.25-texel offsets) effectively did a 16-tap blur and produced softer
 // mips than the other backends.
-static constexpr const char* kHLSLSource = R"(
+static constexpr const char* HLSL_SOURCE = R"(
 cbuffer MipmapCB : register(b0)
 {
     uint  OutMipWidth;
@@ -161,7 +161,7 @@ bool D3D12MipmapGenerator::createPipelineState(D3D12GPU* gpu) {
 #else
   compileFlags |= D3DCOMPILE_OPTIMIZATION_LEVEL3;
 #endif
-  auto hr = D3DCompile(kHLSLSource, strlen(kHLSLSource), nullptr, nullptr, nullptr, "main",
+  auto hr = D3DCompile(HLSL_SOURCE, strlen(HLSL_SOURCE), nullptr, nullptr, nullptr, "main",
                        "cs_5_0", compileFlags, 0, &csBlob, &errorBlob);
   if (FAILED(hr)) {
     LOGE("D3D12MipmapGenerator: D3DCompile failed (HRESULT=0x%08X): %s", static_cast<unsigned>(hr),
