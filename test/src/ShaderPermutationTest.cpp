@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <algorithm>
 #include <chrono>
 #include <fstream>
 #include <vector>
@@ -1078,6 +1079,74 @@ TGFX_TEST(ShaderPermutationTest, EffectDecomposerTripleFP) {
   }
   bitmap.unlockPixels();
   EXPECT_TRUE(hasNonZero);
+}
+
+// --- MirroredDim migration, phase 0: equivalence pre-validation ---------------------------------
+// A shader whose vertex and fragment stages share a dimension name must emit that dimension's
+// varying consistently on both stages, so the two values must be equal in every compiled variant.
+// Today each shader hand-writes a `vertValues[X] == fragValues[X]` guard for this. The migration
+// replaces those hand guards with a single framework rule derived automatically from same-named
+// dimensions. This test proves the auto-derived rule is behavior-preserving BEFORE any production
+// code changes, by checking, for every registered shader and every (vertIndex, fragIndex):
+//   (1) necessity  : shouldCompile(vi,fi) implies the auto mirror rule already holds, so adding the
+//                    rule never rejects a currently-compiled variant (no variants lost); and
+//   (2) idempotence: count(shouldCompile) == count(autoMirror && shouldCompile), so adding the rule
+//                    does not change the compiled variant set.
+// The complementary risk (removing the hand guards makes the auto rule too weak and ADDS variants)
+// is caught by the per-shader compiledCount baseline gate during the guard-removal phase.
+static const char* MirrorDimName(const PermutationDimension& dimension) {
+  return std::visit([](const auto& d) { return d.defineName; }, dimension);
+}
+
+static bool AutoMirrorDimsAgree(const PermutationDomain& vertDomain,
+                                const PermutationDomain& fragDomain,
+                                const std::vector<int>& vertValues,
+                                const std::vector<int>& fragValues) {
+  const auto& vertDims = vertDomain.getDimensions();
+  const auto& fragDims = fragDomain.getDimensions();
+  for (size_t fi = 0; fi < fragDims.size(); ++fi) {
+    auto fragName = MirrorDimName(fragDims[fi]);
+    for (size_t vi = 0; vi < vertDims.size(); ++vi) {
+      if (std::string(MirrorDimName(vertDims[vi])) == fragName) {
+        if (vertValues[vi] != fragValues[fi]) {
+          return false;
+        }
+      }
+    }
+  }
+  return true;
+}
+
+TGFX_TEST(ShaderPermutationTest, AutoMirrorEquivalentToHandGuards) {
+  for (const auto& factory : ShaderRegistry::All()) {
+    auto shader = factory();
+    auto info = shader->info();
+    const auto& vertDomain = info.vertDomain;
+    const auto& fragDomain = info.fragDomain;
+    auto vertTotal = std::max<uint32_t>(1, vertDomain.totalCount());
+    auto fragTotal = std::max<uint32_t>(1, fragDomain.totalCount());
+    uint64_t compiledCount = 0;
+    uint64_t mirrorAndCompiledCount = 0;
+    for (uint32_t vi = 0; vi < vertTotal; ++vi) {
+      auto vertValues = vertDomain.decode(vi);
+      for (uint32_t fi = 0; fi < fragTotal; ++fi) {
+        auto fragValues = fragDomain.decode(fi);
+        bool compiled = !info.shouldCompile || info.shouldCompile(vi, fi, vertValues, fragValues);
+        bool mirror = AutoMirrorDimsAgree(vertDomain, fragDomain, vertValues, fragValues);
+        if (compiled) {
+          ++compiledCount;
+          // (1) necessity: a currently-compiled variant must already satisfy mirror agreement.
+          EXPECT_TRUE(mirror) << info.name << " compiles a mirror-disagreeing variant vi=" << vi
+                              << " fi=" << fi;
+        }
+        if (mirror && compiled) {
+          ++mirrorAndCompiledCount;
+        }
+      }
+    }
+    // (2) idempotence: adding the auto mirror rule leaves the compiled set unchanged.
+    EXPECT_EQ(compiledCount, mirrorAndCompiledCount) << info.name;
+  }
 }
 
 }  // namespace tgfx
