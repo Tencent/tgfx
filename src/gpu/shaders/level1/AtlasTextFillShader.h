@@ -24,22 +24,23 @@ namespace tgfx {
 
 class AtlasTextFillShader : public PrecompiledShader {
  public:
-  TGFX_DEFINE_DIMS(HAS_COVERAGE, HAS_COMMON_COLOR, ALPHA_ONLY);
+  // ALPHA_ONLY is a runtime uniform (AlphaOnly), written by GLSLAtlasTextGeometryProcessor::setData,
+  // not a permutation dimension — the vertex stage never uses it.
+  TGFX_DEFINE_DIMS(HAS_COVERAGE, HAS_COMMON_COLOR);
   using D = Dims;
 
   struct FragDims {
-    enum : uint32_t { HAS_COVERAGE, HAS_COMMON_COLOR, ALPHA_ONLY, HAS_XP, COUNT };
+    enum : uint32_t { HAS_COVERAGE, HAS_COMMON_COLOR, HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationBool("HAS_COVERAGE"),
           PermutationBool("HAS_COMMON_COLOR"),
-          PermutationBool("ALPHA_ONLY"),
           PermutationInt("HAS_XP", 3),
       });
     }
   };
   using FD = FragDims;
-  static_assert(D::COUNT == 3 && FD::COUNT == 4,
+  static_assert(D::COUNT == 2 && FD::COUNT == 3,
                 "Update ShouldCompile below when dimensions change.");
 
   PrecompiledShaderInfo info() const override {
@@ -57,9 +58,8 @@ class AtlasTextFillShader : public PrecompiledShader {
  private:
   static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>& vertValues,
                             const std::vector<int>& fragValues) {
-    // Both stages share the same domain, so only compile matching pairs.
-    return vertValues[0] == fragValues[0] && vertValues[1] == fragValues[1] &&
-           vertValues[2] == fragValues[2];
+    // Both stages share the leading dimensions, so only compile matching pairs.
+    return vertValues[0] == fragValues[0] && vertValues[1] == fragValues[1];
   }
 };
 

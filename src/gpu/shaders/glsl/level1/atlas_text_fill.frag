@@ -1,7 +1,10 @@
 // AtlasTextFillShader fragment shader
 // Processor layout: AtlasTextGeometryProcessor() + EmptyXferProcessor/PorterDuffXP
 // Permutation dimensions (injected as #define 0/1):
-//   HAS_COVERAGE, HAS_COMMON_COLOR, ALPHA_ONLY, HAS_XP
+//   HAS_COVERAGE, HAS_COMMON_COLOR, HAS_XP
+// ALPHA_ONLY is a runtime uniform (AlphaOnly), written by GLSLAtlasTextGeometryProcessor::setData,
+// not a compile-time permutation: it is pure fragment math (the vertex stage never uses it), so
+// folding it into a uniform branch shrinks the variant count.
 #version 450
 
 #ifndef HAS_COVERAGE
@@ -10,21 +13,17 @@
 #ifndef HAS_COMMON_COLOR
 #define HAS_COMMON_COLOR 0
 #endif
-#ifndef ALPHA_ONLY
-#define ALPHA_ONLY 0
-#endif
 #ifndef HAS_XP
 #define HAS_XP 0
 #endif
 
-#if HAS_COMMON_COLOR || HAS_XP
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #if HAS_COMMON_COLOR
   vec4 Color;
 #endif
 #include "xp_uniforms.inc"
+  int AlphaOnly;
 };
-#endif
 
 layout(location = 0) in vec2 vTextureCoords;
 #if HAS_COVERAGE
@@ -64,15 +63,15 @@ void main() {
   // Sample atlas texture
   vec4 texColor = texture(TextureSampler_0, vTextureCoords);
 
-#if ALPHA_ONLY
-  // Alpha-only textures use R8 format in Metal. The sampler returns (r, 0, 0, 1).
-  // Use .r to get the actual alpha value.
-  outputCoverage = vec4(texColor.r);
-#else
-  // Color texture (e.g. color emoji): extract color and coverage
-  outputColor = clamp(vec4(texColor.rgb / texColor.a, 1.0), 0.0, 1.0);
-  outputCoverage = vec4(texColor.a);
-#endif
+  if (AlphaOnly != 0) {
+    // Alpha-only textures use R8 format in Metal. The sampler returns (r, 0, 0, 1).
+    // Use .r to get the actual alpha value.
+    outputCoverage = vec4(texColor.r);
+  } else {
+    // Color texture (e.g. color emoji): extract color and coverage
+    outputColor = clamp(vec4(texColor.rgb / texColor.a, 1.0), 0.0, 1.0);
+    outputCoverage = vec4(texColor.a);
+  }
 
 #define TGFX_XP_SRC_COLOR (outputColor * outputCoverage)
 #define TGFX_XP_SRC_UNPREMUL outputColor

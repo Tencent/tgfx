@@ -3,15 +3,12 @@
 // Colorizer: SingleIntervalGradientColorizer (2-stop gradient, simple mix)
 // The gradient layout is selected at runtime through the LayoutType uniform.
 // Permutation dimensions (injected by build tool as #define):
-//   GP_TYPE: 0=DefaultGP, 1=QuadPerEdgeAAGP
 //   HAS_XP: 0=passthrough, 1=PorterDuff XP (dst texture blend)
+// The fragment stage is identical for all GP types, so GP_TYPE is a vertex-only dimension.
 // Runtime uniforms:
 //   LayoutType (int): 0=LINEAR, 1=RADIAL, 2=CONIC, 3=DIAMOND
 #version 450
 
-#ifndef GP_TYPE
-#define GP_TYPE 0
-#endif
 #ifndef HAS_XP
 #define HAS_XP 0
 #endif

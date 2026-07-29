@@ -95,5 +95,11 @@ void GLSLAtlasTextGeometryProcessor::setData(UniformData* vertexUniformData,
   if (commonColor.has_value()) {
     fragmentUniformData->setData("Color", *commonColor);
   }
+  if (fragmentUniformData->hasField("AlphaOnly")) {
+    // Precompiled variants fold ALPHA_ONLY into a runtime uniform; the JIT program bakes it into
+    // emitCode and has no such field, so guard the write with hasField.
+    int alphaOnly = isAlphaOnly() ? 1 : 0;
+    fragmentUniformData->setData("AlphaOnly", alphaOnly);
+  }
 }
 }  // namespace tgfx

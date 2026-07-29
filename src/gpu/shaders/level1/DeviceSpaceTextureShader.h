@@ -25,21 +25,20 @@ namespace tgfx {
 /// Precompiled shader declaration for DeviceSpaceTextureEffect. Samples a texture using
 /// device-space (screen-space) coordinates derived from gl_FragCoord, rather than vertex UVs.
 ///
-/// Fragment dimensions:
-///   ALPHA_ONLY (bool): whether the texture is alpha-only format
+/// ALPHA_ONLY is a runtime uniform (AlphaOnly), written by GLSLDeviceSpaceTextureEffect::onSetData,
+/// not a compile-time permutation.
 class DeviceSpaceTextureShader : public PrecompiledShader {
  public:
   struct Dims {
-    enum : uint32_t { ALPHA_ONLY, HAS_XP, COUNT };
+    enum : uint32_t { HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationBool("ALPHA_ONLY"),
           PermutationInt("HAS_XP", 3),
       });
     }
   };
   using FD = Dims;
-  static_assert(FD::COUNT == 2, "Update info() when dimensions change.");
+  static_assert(FD::COUNT == 1, "Update info() when dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"DeviceSpaceTextureShader",

@@ -1,16 +1,14 @@
 // TextureFillShader fragment shader (non-YUV path only)
 // Processor layout: DefaultGeometryProcessor() + TextureEffect() + [coverage FP] + EmptyXferProcessor/PorterDuffXP
 // Permutation dimensions (injected by build tool as #define 0/1):
-//   ALPHA_ONLY, HAS_RGBAAA, HAS_SUBSET, HAS_XP, HAS_COVERAGE
+//   HAS_SUBSET, HAS_XP, HAS_COVERAGE
+// ALPHA_ONLY and HAS_RGBAAA are runtime uniforms (AlphaOnly / HasRgbaaa), not compile-time
+// permutations: both are pure fragment math (alpha-only replicates .r; RGBAAA adds one
+// coherent-branch alpha sample), so folding them into uniform branches shrinks the variant count.
+// This mirrors QuadTextureFillShader.
 // Note: HAS_YUV is always 0 at runtime — YUV textures fall back to ProgramBuilder.
 #version 450
 
-#ifndef ALPHA_ONLY
-#define ALPHA_ONLY 0
-#endif
-#ifndef HAS_RGBAAA
-#define HAS_RGBAAA 0
-#endif
 #ifndef HAS_SUBSET
 #define HAS_SUBSET 0
 #endif
@@ -26,11 +24,12 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #if HAS_SUBSET
   vec4 Subset;
 #endif
-#if HAS_RGBAAA
+  // RGBAAA dual-plane alpha offset: always declared, only read when HasRgbaaa != 0 (uniform branch).
   vec2 AlphaStart;
-#endif
 #include "coverage_uniforms.inc"
 #include "xp_uniforms.inc"
+  int AlphaOnly;
+  int HasRgbaaa;
 };
 
 layout(location = 0) in vec2 TransformedCoords_0;
@@ -59,26 +58,26 @@ void main() {
 
   vec4 color = texture(TextureSampler_0, finalCoord);
 
-#if ALPHA_ONLY
-  // Alpha-only textures use R8 format in Metal. The sampler returns (r, 0, 0, 1).
-  // Use .r (replicated to all channels) to get the actual alpha value.
-  color = vec4(color.r);
-#endif
+  if (AlphaOnly != 0) {
+    // Alpha-only textures use R8 format in Metal. The sampler returns (r, 0, 0, 1).
+    // Use .r (replicated to all channels) to get the actual alpha value.
+    color = vec4(color.r);
+  }
 
-#if HAS_RGBAAA
-  color = clamp(color, 0.0, 1.0);
-  highp vec2 alphaCoord = finalCoord + AlphaStart;
-  vec4 alpha = texture(TextureSampler_0, alphaCoord);
-  alpha = clamp(alpha, 0.0, 1.0);
-  color = vec4(color.rgb * alpha.r, alpha.r);
-#endif
+  if (HasRgbaaa != 0) {
+    color = clamp(color, 0.0, 1.0);
+    highp vec2 alphaCoord = finalCoord + AlphaStart;
+    vec4 alpha = texture(TextureSampler_0, alphaCoord);
+    alpha = clamp(alpha, 0.0, 1.0);
+    color = vec4(color.rgb * alpha.r, alpha.r);
+  }
 
   // Post-processing: alpha multiply
-#if ALPHA_ONLY
-  color = color.a * outputColor;
-#else
-  color = color * outputColor.a;
-#endif
+  if (AlphaOnly != 0) {
+    color = color.a * outputColor;
+  } else {
+    color = color * outputColor.a;
+  }
 
 #define TGFX_COVERAGE_SRC_COLOR color
 #include "coverage_output.inc"

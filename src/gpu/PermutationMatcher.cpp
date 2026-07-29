@@ -209,15 +209,13 @@ static std::optional<PermutationMatchResult> TryMatchTextureFill(const ProgramIn
   if (te->isYUV()) {
     return std::nullopt;
   }
+  // alphaOnly / hasRGBAAA are runtime uniforms (AlphaOnly / HasRgbaaa) written by
+  // GLSLTextureEffect::onSetData, not permutation dimensions.
   TextureFillShader::VertexValues vertexValues = {};
-  vertexValues.alphaOnly = te->isAlphaOnly();
-  vertexValues.hasRGBAAA = te->hasRGBAAA();
   vertexValues.hasSubset = te->hasSubset();
   auto vertIndex = TextureFillShader::EncodeVertex(vertexValues);
 
   TextureFillShader::FragmentValues fragmentValues = {};
-  fragmentValues.alphaOnly = te->isAlphaOnly();
-  fragmentValues.hasRGBAAA = te->hasRGBAAA();
   fragmentValues.hasSubset = te->hasSubset();
   fragmentValues.xp = static_cast<uint32_t>(xpType);
   fragmentValues.coverage = static_cast<uint32_t>(coverageType);
@@ -397,11 +395,10 @@ static std::optional<PermutationMatchResult> TryMatchConstColor(const ProgramInf
   if (fp->name() != "ConstColorProcessor") {
     return std::nullopt;
   }
-  auto* ccp = static_cast<const ConstColorProcessor*>(fp);
   using FD = ConstColorShader::FragDims;
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
-  fragValues[FD::INPUT_MODE] = ccp->getInputMode();
+  // inputMode is a runtime uniform (InputMode), not a permutation dimension.
   fragValues[FD::HAS_XP] = xpType;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"ConstColorShader", 0, fragIndex};
@@ -543,12 +540,11 @@ static std::optional<PermutationMatchResult> TryMatchDeviceSpaceTexture(
   if (fp->name() != "DeviceSpaceTextureEffect") {
     return std::nullopt;
   }
-  auto* dste = static_cast<const DeviceSpaceTextureEffect*>(fp);
   using FD = DeviceSpaceTextureShader::Dims;
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
+  // ALPHA_ONLY is a runtime uniform (AlphaOnly), not a permutation dimension.
   fragValues[FD::HAS_XP] = xpType;
-  fragValues[FD::ALPHA_ONLY] = dste->isAlphaOnly() ? 1 : 0;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"DeviceSpaceTextureShader", 0, fragIndex};
 }
@@ -723,7 +719,7 @@ static std::optional<PermutationMatchResult> TryMatchSingleIntervalGradient(
   using FD = SingleIntervalGradientShader::FD;
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
-  fragValues[FD::GP_TYPE] = gpType;
+  // GP_TYPE is a vertex-only dimension; the fragment stage is identical for all GP types.
   fragValues[FD::HAS_XP] = xpType;
   fragValues[FD::HAS_COVERAGE] = coverageType;
   fragValues[FD::HAS_VCOVERAGE] = vCoverage;
@@ -887,8 +883,7 @@ static std::optional<PermutationMatchResult> TryMatchTextureColorMatrix(
   using D = TextureColorMatrixShader::D;
   auto fragDomain = D::domain();
   std::vector<int> fragValues(D::COUNT);
-  fragValues[D::ALPHA_ONLY] = te->isAlphaOnly() ? 1 : 0;
-  fragValues[D::HAS_RGBAAA] = te->hasRGBAAA() ? 1 : 0;
+  // alphaOnly / hasRGBAAA are runtime uniforms (AlphaOnly / HasRgbaaa), not permutation dimensions.
   fragValues[D::HAS_SUBSET] = te->hasSubset() ? 1 : 0;
   fragValues[D::HAS_XP] = xpType;
   auto fragIndex = fragDomain.encode(fragValues);
@@ -913,7 +908,6 @@ static std::optional<PermutationMatchResult> TryMatchAtlasTextFill(const Program
   std::vector<int> values(D::COUNT);
   values[D::HAS_COVERAGE] = atgp->getAAType() == AAType::Coverage ? 1 : 0;
   values[D::HAS_COMMON_COLOR] = atgp->hasCommonColor() ? 1 : 0;
-  values[D::ALPHA_ONLY] = atgp->isAlphaOnly() ? 1 : 0;
   auto vertIndex = domain.encode(values);
   using FD = AtlasTextFillShader::FD;
   auto fragDomain = FD::domain();

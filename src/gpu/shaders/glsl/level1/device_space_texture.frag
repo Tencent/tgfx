@@ -1,5 +1,8 @@
 // DeviceSpaceTextureShader fragment shader
-// Permutation dimensions (frag): ALPHA_ONLY, HAS_XP
+// Permutation dimensions (frag): HAS_XP
+// ALPHA_ONLY is a runtime uniform (AlphaOnly), written by GLSLDeviceSpaceTextureEffect::onSetData,
+// not a compile-time permutation: it is pure fragment math, so folding it into a uniform branch
+// shrinks the variant count.
 // Samples texture using device-space (screen) coordinates via gl_FragCoord.
 #version 450
 
@@ -13,6 +16,7 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Color;
   mat3 DeviceCoordMatrix;
 #include "xp_uniforms.inc"
+  int AlphaOnly;
 };
 
 #define XP_DST_TEX_BINDING 1
@@ -25,13 +29,13 @@ void main() {
   highp vec3 deviceCoord = DeviceCoordMatrix * vec3(gl_FragCoord.xy, 1.0);
   vec4 color = texture(TextureSampler_0, deviceCoord.xy);
 
-#if ALPHA_ONLY
-  // Alpha-only textures use R8 format in Metal. Use .r to get the actual alpha value.
-  color = vec4(color.r);
-  color = color.a * Color;
-#else
-  color = color * Color.a;
-#endif
+  if (AlphaOnly != 0) {
+    // Alpha-only textures use R8 format in Metal. Use .r to get the actual alpha value.
+    color = vec4(color.r);
+    color = color.a * Color;
+  } else {
+    color = color * Color.a;
+  }
 
 #define TGFX_XP_SRC_COLOR color
 #include "xp_output.inc"

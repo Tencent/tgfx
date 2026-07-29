@@ -154,18 +154,16 @@ TGFX_TEST(ShaderPermutationTest, DefineListForZeroValue) {
 
 TGFX_TEST(ShaderPermutationTest, DefineDimsMacro) {
   using D = TextureFillShader::Dims;
-  EXPECT_EQ(D::COUNT, 4u);
+  EXPECT_EQ(D::COUNT, 2u);
   EXPECT_EQ(D::HAS_YUV, 0u);
-  EXPECT_EQ(D::ALPHA_ONLY, 1u);
-  EXPECT_EQ(D::HAS_RGBAAA, 2u);
-  EXPECT_EQ(D::HAS_SUBSET, 3u);
+  EXPECT_EQ(D::HAS_SUBSET, 1u);
 
   auto domain = D::domain();
   EXPECT_EQ(domain.dimensionCount(), static_cast<size_t>(D::COUNT));
-  EXPECT_EQ(domain.totalCount(), 16u);
+  EXPECT_EQ(domain.totalCount(), 4u);
 
   // Verify domain dimensions match
-  auto handDomain = PermutationDomain::FromBoolNames("HAS_YUV, ALPHA_ONLY, HAS_RGBAAA, HAS_SUBSET");
+  auto handDomain = PermutationDomain::FromBoolNames("HAS_YUV, HAS_SUBSET");
   EXPECT_EQ(handDomain.totalCount(), domain.totalCount());
   EXPECT_EQ(handDomain.dimensionCount(), domain.dimensionCount());
 
@@ -184,11 +182,11 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistry) {
     auto shaderInfo = shader->info();
     if (shaderInfo.name == TextureFillShader::Name()) {
       foundTextureFill = true;
-      EXPECT_EQ(shaderInfo.vertDomain.totalCount(), 16u);
-      EXPECT_EQ(shaderInfo.vertDomain.dimensionCount(), 4u);
-      // FragDims: 4 bools + HAS_XP(int3) + HAS_COVERAGE(int3) = 144 permutations.
-      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 144u);
-      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 6u);
+      EXPECT_EQ(shaderInfo.vertDomain.totalCount(), 4u);
+      EXPECT_EQ(shaderInfo.vertDomain.dimensionCount(), 2u);
+      // FragDims: 2 bools + HAS_XP(int3) + HAS_COVERAGE(int3) = 36 permutations.
+      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 36u);
+      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 4u);
       EXPECT_EQ(shaderInfo.vertexFile, "level1/texture_fill.vert");
       EXPECT_EQ(shaderInfo.fragmentFile, "level1/texture_fill.frag");
     }
@@ -204,13 +202,12 @@ TGFX_TEST(ShaderPermutationTest, ShouldCompile) {
     if (shaderInfo.name != TextureFillShader::Name()) {
       continue;
     }
-    // Vert: 4 bool = 16 raw. Frag: 4 bool + HAS_XP(int3) + HAS_COVERAGE(int3) = 144 raw.
+    // Vert: 2 bool = 4 raw. Frag: 2 bool + HAS_XP(int3) + HAS_COVERAGE(int3) = 36 raw.
     // ShouldCompile rules:
     //   - HAS_YUV(frag) != 0 → excluded (YUV falls back to ProgramBuilder)
-    //   - ALPHA_ONLY && HAS_RGBAAA both set → excluded (mutually exclusive)
-    //   - Vert 4 dims must match frag first 4 dims
-    // Valid vert configs (HAS_YUV=0): 8, minus ALPHA_ONLY=1&&HAS_RGBAAA=1 = 6.
-    // Each valid vert matches 9 fragment combinations → 6 * 9 = 54.
+    //   - Vert 2 dims must match frag first 2 dims
+    // Valid vert configs (HAS_YUV=0): 2 (HAS_SUBSET 0/1).
+    // Each valid vert matches 9 fragment combinations (HAS_XP×HAS_COVERAGE) → 2 * 9 = 18.
     int compiledCount = 0;
     for (uint32_t vi = 0; vi < shaderInfo.vertDomain.totalCount(); vi++) {
       auto vertValues = shaderInfo.vertDomain.decode(vi);
@@ -221,7 +218,7 @@ TGFX_TEST(ShaderPermutationTest, ShouldCompile) {
         }
       }
     }
-    EXPECT_EQ(compiledCount, 54);
+    EXPECT_EQ(compiledCount, 18);
   }
 }
 
@@ -232,15 +229,11 @@ TGFX_TEST(ShaderPermutationTest, EncodeWithBitShift) {
   auto domain = D::domain();
 
   // HAS_YUV=1, others=0 -> index = 1<<0 = 1
-  EXPECT_EQ(domain.encode({1, 0, 0, 0}), 1u << D::HAS_YUV);
-  // ALPHA_ONLY=1, others=0 -> index = 1<<1 = 2
-  EXPECT_EQ(domain.encode({0, 1, 0, 0}), 1u << D::ALPHA_ONLY);
-  // HAS_RGBAAA=1, others=0 -> index = 1<<2 = 4
-  EXPECT_EQ(domain.encode({0, 0, 1, 0}), 1u << D::HAS_RGBAAA);
-  // HAS_SUBSET=1, others=0 -> index = 1<<3 = 8
-  EXPECT_EQ(domain.encode({0, 0, 0, 1}), 1u << D::HAS_SUBSET);
-  // HAS_YUV=1, HAS_SUBSET=1 -> index = (1<<0) | (1<<3) = 9
-  EXPECT_EQ(domain.encode({1, 0, 0, 1}), (1u << D::HAS_YUV) | (1u << D::HAS_SUBSET));
+  EXPECT_EQ(domain.encode({1, 0}), 1u << D::HAS_YUV);
+  // HAS_SUBSET=1, others=0 -> index = 1<<1 = 2
+  EXPECT_EQ(domain.encode({0, 1}), 1u << D::HAS_SUBSET);
+  // HAS_YUV=1, HAS_SUBSET=1 -> index = (1<<0) | (1<<1) = 3
+  EXPECT_EQ(domain.encode({1, 1}), (1u << D::HAS_YUV) | (1u << D::HAS_SUBSET));
 }
 
 TGFX_TEST(ShaderPermutationTest, TextureFillTypedEncodingMatchesDomains) {
@@ -249,8 +242,6 @@ TGFX_TEST(ShaderPermutationTest, TextureFillTypedEncodingMatchesDomains) {
     auto values = vertexDomain.decode(index);
     TextureFillShader::VertexValues typedValues = {};
     typedValues.hasYUV = values[TextureFillShader::VD::HAS_YUV] != 0;
-    typedValues.alphaOnly = values[TextureFillShader::VD::ALPHA_ONLY] != 0;
-    typedValues.hasRGBAAA = values[TextureFillShader::VD::HAS_RGBAAA] != 0;
     typedValues.hasSubset = values[TextureFillShader::VD::HAS_SUBSET] != 0;
     EXPECT_EQ(TextureFillShader::EncodeVertex(typedValues), index);
   }
@@ -260,8 +251,6 @@ TGFX_TEST(ShaderPermutationTest, TextureFillTypedEncodingMatchesDomains) {
     auto values = fragmentDomain.decode(index);
     TextureFillShader::FragmentValues typedValues = {};
     typedValues.hasYUV = values[TextureFillShader::FD::HAS_YUV] != 0;
-    typedValues.alphaOnly = values[TextureFillShader::FD::ALPHA_ONLY] != 0;
-    typedValues.hasRGBAAA = values[TextureFillShader::FD::HAS_RGBAAA] != 0;
     typedValues.hasSubset = values[TextureFillShader::FD::HAS_SUBSET] != 0;
     typedValues.xp = static_cast<uint32_t>(values[TextureFillShader::FD::HAS_XP]);
     typedValues.coverage = static_cast<uint32_t>(values[TextureFillShader::FD::HAS_COVERAGE]);
@@ -276,8 +265,8 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
-  EXPECT_EQ(cache->vertexEntryCount(), 120u);
-  EXPECT_EQ(cache->fragmentEntryCount(), 531u);
+  EXPECT_EQ(cache->vertexEntryCount(), 124u);
+  EXPECT_EQ(cache->fragmentEntryCount(), 474u);
   std::string expectedTag = TGFX_BACKEND_NAME;
   auto dashPos = expectedTag.find('-');
   if (dashPos != std::string::npos) {

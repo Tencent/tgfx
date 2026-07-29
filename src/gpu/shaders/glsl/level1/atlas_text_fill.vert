@@ -1,7 +1,7 @@
 // AtlasTextFillShader vertex shader
 // Processor layout: AtlasTextGeometryProcessor() + EmptyXferProcessor()
 // Permutation dimensions (injected as #define 0/1):
-//   HAS_COVERAGE, HAS_COMMON_COLOR, ALPHA_ONLY
+//   HAS_COVERAGE, HAS_COMMON_COLOR
 #version 450
 
 #ifndef HAS_COVERAGE

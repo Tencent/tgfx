@@ -24,8 +24,8 @@ namespace tgfx {
 
 class TextureFillShader : public PrecompiledShader {
  public:
-  // Vertex dimensions (unchanged — XP does not affect vertex stage)
-  TGFX_DEFINE_DIMS(HAS_YUV, ALPHA_ONLY, HAS_RGBAAA, HAS_SUBSET);
+  // Vertex dimensions. ALPHA_ONLY / HAS_RGBAAA are runtime uniforms (see frag), not variants.
+  TGFX_DEFINE_DIMS(HAS_YUV, HAS_SUBSET);
   using VD = Dims;
 
   // Fragment dimensions:
@@ -33,13 +33,13 @@ class TextureFillShader : public PrecompiledShader {
   //     0 = no coverage
   //     1 = AARectEffect only (rect clip via uniform)
   //     2 = AARectEffect + MaskTexture (DeviceSpaceTextureEffect mask + rect clip)
+  // ALPHA_ONLY and HAS_RGBAAA are folded into runtime uniforms (AlphaOnly / HasRgbaaa), set by
+  // GLSLTextureEffect::onSetData, rather than compile-time permutations.
   struct FragDims {
-    enum : uint32_t { HAS_YUV, ALPHA_ONLY, HAS_RGBAAA, HAS_SUBSET, HAS_XP, HAS_COVERAGE, COUNT };
+    enum : uint32_t { HAS_YUV, HAS_SUBSET, HAS_XP, HAS_COVERAGE, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationBool("HAS_YUV"),
-          PermutationBool("ALPHA_ONLY"),
-          PermutationBool("HAS_RGBAAA"),
           PermutationBool("HAS_SUBSET"),
           PermutationInt("HAS_XP", 3),
           PermutationInt("HAS_COVERAGE", 3),
@@ -47,20 +47,16 @@ class TextureFillShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(VD::COUNT == 4 && FD::COUNT == 6,
+  static_assert(VD::COUNT == 2 && FD::COUNT == 4,
                 "Update the encoders and ShouldCompile when dimensions change.");
 
   struct VertexValues {
     bool hasYUV = false;
-    bool alphaOnly = false;
-    bool hasRGBAAA = false;
     bool hasSubset = false;
   };
 
   struct FragmentValues {
     bool hasYUV = false;
-    bool alphaOnly = false;
-    bool hasRGBAAA = false;
     bool hasSubset = false;
     uint32_t xp = 0;
     uint32_t coverage = 0;
@@ -73,18 +69,14 @@ class TextureFillShader : public PrecompiledShader {
 
   /** Encodes vertex values with the same mixed-radix layout as VD::domain() without allocation. */
   static constexpr uint32_t EncodeVertex(const VertexValues& values) {
-    return static_cast<uint32_t>(values.hasYUV) | (static_cast<uint32_t>(values.alphaOnly) << 1u) |
-           (static_cast<uint32_t>(values.hasRGBAAA) << 2u) |
-           (static_cast<uint32_t>(values.hasSubset) << 3u);
+    return static_cast<uint32_t>(values.hasYUV) | (static_cast<uint32_t>(values.hasSubset) << 1u);
   }
 
   /** Encodes fragment values with the same mixed-radix layout as FD::domain() without allocation. */
   static constexpr uint32_t EncodeFragment(const FragmentValues& values) {
-    auto base = static_cast<uint32_t>(values.hasYUV) |
-                (static_cast<uint32_t>(values.alphaOnly) << 1u) |
-                (static_cast<uint32_t>(values.hasRGBAAA) << 2u) |
-                (static_cast<uint32_t>(values.hasSubset) << 3u);
-    return base + values.xp * 16u + values.coverage * 48u;
+    auto base =
+        static_cast<uint32_t>(values.hasYUV) | (static_cast<uint32_t>(values.hasSubset) << 1u);
+    return base + values.xp * 4u + values.coverage * 12u;
   }
 
   PrecompiledShaderInfo info() const override {
@@ -106,15 +98,9 @@ class TextureFillShader : public PrecompiledShader {
     if (fragValues[FD::HAS_YUV] != 0) {
       return false;
     }
-    // ALPHA_ONLY and HAS_RGBAAA are mutually exclusive in practice.
-    if (fragValues[FD::ALPHA_ONLY] != 0 && fragValues[FD::HAS_RGBAAA] != 0) {
-      return false;
-    }
     // Vertex domain does not include HAS_XP or HAS_COVERAGE — vert variants must match frag base
     // dimensions. Each vert variant pairs with all HAS_XP and HAS_COVERAGE frag variants.
     if (vertValues[VD::HAS_YUV] != fragValues[FD::HAS_YUV] ||
-        vertValues[VD::ALPHA_ONLY] != fragValues[FD::ALPHA_ONLY] ||
-        vertValues[VD::HAS_RGBAAA] != fragValues[FD::HAS_RGBAAA] ||
         vertValues[VD::HAS_SUBSET] != fragValues[FD::HAS_SUBSET]) {
       return false;
     }

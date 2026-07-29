@@ -62,6 +62,12 @@ void GLSLDeviceSpaceTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
   auto scale = textureView->getTextureCoord(1, 1);
   deviceCoordMatrix.postScale(scale.x, scale.y);
   fragmentUniformData->setData("DeviceCoordMatrix", deviceCoordMatrix);
+  if (fragmentUniformData->hasField("AlphaOnly")) {
+    // Precompiled path folds ALPHA_ONLY into a runtime uniform; JIT emitCode bakes it at compile
+    // time and never declares this field.
+    int alphaOnly = textureProxy->isAlphaOnly() ? 1 : 0;
+    fragmentUniformData->setData("AlphaOnly", alphaOnly);
+  }
   if (fragmentUniformData->hasField("HasClip")) {
     int hasClip = 0;
     fragmentUniformData->setData("HasClip", hasClip);

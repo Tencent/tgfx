@@ -25,21 +25,20 @@ namespace tgfx {
 /// Precompiled shader declaration for ConstColorProcessor. Outputs a constant color uniform,
 /// optionally modulated by the input color from the previous pipeline stage.
 ///
-/// Fragment dimensions:
-///   INPUT_MODE (int, 3 values): 0=Ignore, 1=ModulateRGBA, 2=ModulateA
+/// INPUT_MODE (0=Ignore, 1=ModulateRGBA, 2=ModulateA) is a runtime uniform (InputMode), written by
+/// GLSLConstColorProcessor::onSetData, not a compile-time permutation.
 class ConstColorShader : public PrecompiledShader {
  public:
   struct FragDims {
-    enum : uint32_t { INPUT_MODE, HAS_XP, COUNT };
+    enum : uint32_t { HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationInt("INPUT_MODE", 3),
           PermutationInt("HAS_XP", 3),
       });
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 2, "Update info() when fragment dimensions change.");
+  static_assert(FD::COUNT == 1, "Update info() when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"ConstColorShader",

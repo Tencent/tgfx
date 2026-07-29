@@ -24,19 +24,19 @@ namespace tgfx {
 
 class TextureColorMatrixShader : public PrecompiledShader {
  public:
+  // ALPHA_ONLY / HAS_RGBAAA are folded into runtime uniforms (AlphaOnly / HasRgbaaa) written by
+  // GLSLTextureEffect::onSetData, not compile-time permutations.
   struct Dims {
-    enum : uint32_t { ALPHA_ONLY, HAS_RGBAAA, HAS_SUBSET, HAS_XP, COUNT };
+    enum : uint32_t { HAS_SUBSET, HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationBool("ALPHA_ONLY"),
-          PermutationBool("HAS_RGBAAA"),
           PermutationBool("HAS_SUBSET"),
           PermutationInt("HAS_XP", 3),
       });
     }
   };
   using D = Dims;
-  static_assert(D::COUNT == 4, "Update ShouldCompile below when dimensions change.");
+  static_assert(D::COUNT == 2, "Update the matcher when dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"TextureColorMatrixShader",
@@ -47,17 +47,7 @@ class TextureColorMatrixShader : public PrecompiledShader {
             PermutationDomain({}),
             "",
             "",
-            ShouldCompile};
-  }
-
- private:
-  static bool ShouldCompile(uint32_t /*vertIndex*/, uint32_t /*fragIndex*/,
-                            const std::vector<int>& /*vertValues*/,
-                            const std::vector<int>& fragValues) {
-    bool alphaOnly = fragValues[D::ALPHA_ONLY] != 0;
-    bool hasRgbaaa = fragValues[D::HAS_RGBAAA] != 0;
-    // ALPHA_ONLY and HAS_RGBAAA are mutually exclusive in practice.
-    return !(alphaOnly && hasRgbaaa);
+            {}};
   }
 };
 
