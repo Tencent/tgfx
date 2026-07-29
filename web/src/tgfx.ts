@@ -22,9 +22,9 @@ import {isInstanceOf} from './utils/type-utils';
 
 import {EmscriptenGL, TGFX, WindowColorSpace} from './types';
 import type {wx} from './wechat/interfaces';
+import {getTGFXModule} from './tgfx-module';
 
 declare const wx: wx;
-declare const Module: any;
 
 export const createImage = (source: string) => {
     return new Promise<HTMLImageElement | null>((resolve) => {
@@ -182,7 +182,7 @@ export const configureWebGPUColorSpace = (
     if (!context || typeof context.configure !== 'function') {
         return false;
     }
-    const device = (Module as any).preinitializedWebGPUDevice;
+    const device = (getTGFXModule() as any)?.preinitializedWebGPUDevice;
     if (!device) {
         return false;
     }
@@ -224,7 +224,7 @@ export const uploadVideoToWebGPUTexture = (source: HTMLVideoElement, texturePtr:
     }
     syncVideoFrame(source);
     // Emscripten maps WGPUTexture C pointers to JS GPUTexture objects via WebGPU.mgrTexture.
-    const WebGPU = (Module as any).WebGPU;
+    const WebGPU = (getTGFXModule() as any)?.WebGPU;
     if (!WebGPU) {
         return;
     }
@@ -232,7 +232,7 @@ export const uploadVideoToWebGPUTexture = (source: HTMLVideoElement, texturePtr:
     if (!gpuTexture) {
         return;
     }
-    const device: any = (Module as any).preinitializedWebGPUDevice;
+    const device: any = (getTGFXModule() as any)?.preinitializedWebGPUDevice;
     if (!device || !device.queue) {
         return;
     }
