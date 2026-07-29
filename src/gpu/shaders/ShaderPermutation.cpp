@@ -18,6 +18,7 @@
 
 #include "gpu/shaders/ShaderPermutation.h"
 #include <cassert>
+#include <cstring>
 
 namespace tgfx {
 
@@ -130,6 +131,22 @@ std::vector<std::string> PermutationDomain::defineListFor(uint32_t index) const 
     defines.push_back(std::move(entry));
   }
   return defines;
+}
+
+bool MirroredDimsAgree(const PermutationDomain& vertDomain, const PermutationDomain& fragDomain,
+                       const std::vector<int>& vertValues, const std::vector<int>& fragValues) {
+  const auto& vertDims = vertDomain.getDimensions();
+  const auto& fragDims = fragDomain.getDimensions();
+  for (size_t fi = 0; fi < fragDims.size(); ++fi) {
+    auto fragName = GetDefineName(fragDims[fi]);
+    for (size_t vi = 0; vi < vertDims.size(); ++vi) {
+      if (std::strcmp(GetDefineName(vertDims[vi]), fragName) == 0 &&
+          vertValues[vi] != fragValues[fi]) {
+        return false;
+      }
+    }
+  }
+  return true;
 }
 
 }  // namespace tgfx

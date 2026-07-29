@@ -293,6 +293,9 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
     auto vertValues = vertDomain.decode(vi);
     for (uint32_t fi = 0; fi < fragDomain.totalCount(); fi++) {
       auto fragValues = fragDomain.decode(fi);
+      if (!MirroredDimsAgree(vertDomain, fragDomain, vertValues, fragValues)) {
+        continue;
+      }
       if (info.shouldCompile && !info.shouldCompile(vi, fi, vertValues, fragValues)) {
         continue;
       }

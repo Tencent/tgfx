@@ -62,6 +62,9 @@ AOTClosureResult AOTClosureVerifier::Verify(const PrecompiledShaderCache* cache,
       auto vertValues = info.vertDomain.decode(vi);
       for (uint32_t fi = 0; fi < fragTotal; ++fi) {
         auto fragValues = info.fragDomain.decode(fi);
+        if (!MirroredDimsAgree(info.vertDomain, info.fragDomain, vertValues, fragValues)) {
+          continue;
+        }
         if (info.shouldCompile && !info.shouldCompile(vi, fi, vertValues, fragValues)) {
           continue;
         }
