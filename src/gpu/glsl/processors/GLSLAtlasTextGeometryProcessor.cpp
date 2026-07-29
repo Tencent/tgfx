@@ -95,9 +95,10 @@ void GLSLAtlasTextGeometryProcessor::setData(UniformData* vertexUniformData,
   if (commonColor.has_value()) {
     fragmentUniformData->setData("Color", *commonColor);
   }
-  if (fragmentUniformData->hasField("AlphaOnly")) {
+  if (fragmentUniformData != nullptr && fragmentUniformData->hasField("AlphaOnly")) {
     // Precompiled variants fold ALPHA_ONLY into a runtime uniform; the JIT program bakes it into
-    // emitCode and has no such field, so guard the write with hasField.
+    // emitCode and, for the no-common-color / no-XP case, emits no fragment uniform block at all
+    // (fragmentUniformData is null there), so both the null and hasField guards are required.
     int alphaOnly = isAlphaOnly() ? 1 : 0;
     fragmentUniformData->setData("AlphaOnly", alphaOnly);
   }
