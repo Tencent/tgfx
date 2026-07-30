@@ -1132,23 +1132,24 @@ struct EmittedStream {
 EmittedStream RunPDFStreamOut(const std::string& input,
                               PDFMetadata::CompressionLevel compressionLevel,
                               PDFSteamCompressionEnabled compressFlag) {
-  auto sink = MemoryWriteStream::Make();
-  PDFMetadata metadata;
-  metadata.compressionLevel = compressionLevel;
-  PDFDocumentImpl doc(sink, /*context=*/nullptr, metadata);
-  // PDFStreamOut routes through emitStream, which records object offsets via offsetMap. The full
-  // PDFDocument pipeline initializes baseOffset inside SerializeHeader during the first
-  // onBeginPage call; this fixture skips beginPage entirely, so initialize the offset map here so
-  // the DEBUG_ASSERT inside Difference does not fire.
-  doc.offsetMap.markStartOfDocument(sink);
+  TGFX_PRIVATE_ACCESS(
+      auto sink = MemoryWriteStream::Make(); PDFMetadata metadata;
+      metadata.compressionLevel = compressionLevel;
+      PDFDocumentImpl doc(sink, /*context=*/nullptr, metadata);
+      // PDFStreamOut routes through emitStream, which records object offsets via offsetMap. The full
+      // PDFDocument pipeline initializes baseOffset inside SerializeHeader during the first
+      // onBeginPage call; this fixture skips beginPage entirely, so initialize the offset map here so
+      // the DEBUG_ASSERT inside Difference does not fire.
+      doc.offsetMap.markStartOfDocument(sink);
 
-  auto inputData = Data::MakeWithCopy(input.data(), input.size());
-  auto inputStream = Stream::MakeFromData(inputData);
+      auto inputData = Data::MakeWithCopy(input.data(), input.size());
+      auto inputStream = Stream::MakeFromData(inputData);
 
-  auto dict = PDFDictionary::Make();
-  PDFIndirectReference ref =
-      PDFStreamOut(std::move(dict), std::move(inputStream), &doc, compressFlag);
-  return EmittedStream{sink->readData(), ref};
+      auto dict = PDFDictionary::Make();
+      PDFIndirectReference ref =
+          PDFStreamOut(std::move(dict), std::move(inputStream), &doc, compressFlag);
+      return EmittedStream{sink->readData(), ref};)
+  return EmittedStream{};
 }
 
 // Searches `bytes` for the byte sequence `needle` and returns its start offset, or
@@ -1221,41 +1222,43 @@ size_t MeasureActualPayload(const std::shared_ptr<Data>& bytes) {
 // FlateDecode actually saves bytes; expects /Length to equal the compressed payload size, not the
 // original input size. This is the case the PR fix targets directly.
 TGFX_TEST(PDFExportTest, PDFStreamOutWritesCompressedLength) {
-  // Highly redundant input compresses well; the 4096-byte block reliably exceeds MinimumSavings.
-  std::string input(4096, 'A');
-  auto emitted = RunPDFStreamOut(input, PDFMetadata::CompressionLevel::Default,
-                                 PDFSteamCompressionEnabled::Yes);
+  TGFX_PRIVATE_ACCESS(
+      // Highly redundant input compresses well; the 4096-byte block reliably exceeds MinimumSavings.
+      std::string input(4096, 'A');
+      auto emitted = RunPDFStreamOut(input, PDFMetadata::CompressionLevel::Default,
+                                     PDFSteamCompressionEnabled::Yes);
 
-  EXPECT_NE(IndexOf(emitted.bytes, "/Filter /FlateDecode"), std::string::npos)
+      EXPECT_NE(IndexOf(emitted.bytes, "/Filter /FlateDecode"), std::string::npos)
       << "Compressed branch should emit /Filter /FlateDecode.";
 
-  size_t declared = ReadDeclaredLength(emitted.bytes);
-  size_t actual = MeasureActualPayload(emitted.bytes);
+      size_t declared = ReadDeclaredLength(emitted.bytes);
+      size_t actual = MeasureActualPayload(emitted.bytes);
 
-  EXPECT_EQ(declared, actual) << "/Length must match the actual payload bytes (ISO 32000-1 "
-                                 "§7.3.8.2). declared="
-                              << declared << " actual=" << actual;
-  EXPECT_LT(declared, input.size())
+      EXPECT_EQ(declared, actual) << "/Length must match the actual payload bytes (ISO 32000-1 "
+                                     "§7.3.8.2). declared="
+                                  << declared << " actual=" << actual;
+      EXPECT_LT(declared, input.size())
       << "Compressed payload should be smaller than the uncompressed input; otherwise the test "
-         "input is not exercising the compression path.";
+         "input is not exercising the compression path.";)
 }
 
 // Bug 1 unit test, uncompressed branch (compression disabled by metadata). /Length must equal the
 // input size and no /Filter entry should be emitted.
 TGFX_TEST(PDFExportTest, PDFStreamOutWritesUncompressedLength) {
-  std::string input = "Hello, PDF stream length test.";
-  auto emitted =
-      RunPDFStreamOut(input, PDFMetadata::CompressionLevel::None, PDFSteamCompressionEnabled::Yes);
+  TGFX_PRIVATE_ACCESS(std::string input = "Hello, PDF stream length test.";
+                      auto emitted = RunPDFStreamOut(input, PDFMetadata::CompressionLevel::None,
+                                                     PDFSteamCompressionEnabled::Yes);
 
-  EXPECT_EQ(IndexOf(emitted.bytes, "/Filter"), std::string::npos)
-      << "Uncompressed branch must not emit a /Filter entry.";
+                      EXPECT_EQ(IndexOf(emitted.bytes, "/Filter"), std::string::npos)
+                      << "Uncompressed branch must not emit a /Filter entry.";
 
-  size_t declared = ReadDeclaredLength(emitted.bytes);
-  size_t actual = MeasureActualPayload(emitted.bytes);
+                      size_t declared = ReadDeclaredLength(emitted.bytes);
+                      size_t actual = MeasureActualPayload(emitted.bytes);
 
-  EXPECT_EQ(declared, actual) << "/Length must match the actual payload bytes. declared="
-                              << declared << " actual=" << actual;
-  EXPECT_EQ(declared, input.size());
+                      EXPECT_EQ(declared, actual)
+                      << "/Length must match the actual payload bytes. declared=" << declared
+                      << " actual=" << actual;
+                      EXPECT_EQ(declared, input.size());)
 }
 
 // Bug 1 unit test, "compression refused" branch: input is too short or too random for FlateDecode
@@ -1264,22 +1267,23 @@ TGFX_TEST(PDFExportTest, PDFStreamOutWritesUncompressedLength) {
 // this branch as well — making sure /Length still matches the actually-emitted payload (== input
 // size, since no Filter is written).
 TGFX_TEST(PDFExportTest, PDFStreamOutFallsBackWhenCompressionDoesNotSave) {
-  // 8 bytes is well under MinimumSavings (= strlen("/Filter_/FlateDecode_") = 21), so
-  // SerializeStream skips the deflate path entirely.
-  std::string input = "abcdefgh";
-  auto emitted = RunPDFStreamOut(input, PDFMetadata::CompressionLevel::Default,
-                                 PDFSteamCompressionEnabled::Yes);
+  TGFX_PRIVATE_ACCESS(
+      // 8 bytes is well under MinimumSavings (= strlen("/Filter_/FlateDecode_") = 21), so
+      // SerializeStream skips the deflate path entirely.
+      std::string input = "abcdefgh";
+      auto emitted = RunPDFStreamOut(input, PDFMetadata::CompressionLevel::Default,
+                                     PDFSteamCompressionEnabled::Yes);
 
-  EXPECT_EQ(IndexOf(emitted.bytes, "/Filter"), std::string::npos)
+      EXPECT_EQ(IndexOf(emitted.bytes, "/Filter"), std::string::npos)
       << "Short input below MinimumSavings should bypass FlateDecode.";
 
-  size_t declared = ReadDeclaredLength(emitted.bytes);
-  size_t actual = MeasureActualPayload(emitted.bytes);
+      size_t declared = ReadDeclaredLength(emitted.bytes);
+      size_t actual = MeasureActualPayload(emitted.bytes);
 
-  EXPECT_EQ(declared, actual) << "/Length must match the actual payload bytes even when the "
-                                 "compression path is skipped. declared="
-                              << declared << " actual=" << actual;
-  EXPECT_EQ(declared, input.size());
+      EXPECT_EQ(declared, actual) << "/Length must match the actual payload bytes even when the "
+                                     "compression path is skipped. declared="
+                                  << declared << " actual=" << actual;
+      EXPECT_EQ(declared, input.size());)
 }
 
 TGFX_TEST(PDFExportTest, NoiseEffects) {
