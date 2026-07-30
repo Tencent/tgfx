@@ -18,7 +18,7 @@
 
 import * as types from '../types/types';
 import {TGFXBind} from '../lib/tgfx';
-import Hello2D from './wasm/hello2d';
+import Hello2D from './wasm-mt/hello2d';
 import {
     ShareData,
     updateSize,
@@ -48,7 +48,8 @@ if (typeof window !== 'undefined') {
             }
 
             shareData.Hello2DModule = await Hello2D({
-                locateFile: (file: string) => './wasm/' + file,
+                locateFile: (file: string) => './wasm-mt/' + file,
+                mainScriptUrlOrBlob: './wasm-mt/hello2d.js',
                 preinitializedWebGPUDevice: device,
             });
             TGFXBind(shareData.Hello2DModule);

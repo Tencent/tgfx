@@ -110,6 +110,9 @@ void WebGPUWindow::configureColorSpace() {
   if (namedColorSpace == WebNamedColorSpace::None) {
     return;
   }
+  // Reconfigure the canvas WebGPU context with the desired color space via the JS side, since the
+  // WebGPU C API surface configuration does not expose a color space option. The JS side reuses the
+  // GPUDevice pre-initialized on the module (preinitializedWebGPUDevice).
   bool supported = emscripten::val::module_property("tgfx").call<bool>(
       "configureWebGPUColorSpace", emscripten::val(_canvasSelector),
       static_cast<int>(namedColorSpace));

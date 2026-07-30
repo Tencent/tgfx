@@ -90,6 +90,10 @@ class TGFXBaseView {
   int lastSurfaceWidth = 0;
   int lastSurfaceHeight = 0;
   bool presentImmediately = true;
+  // Forces draw() to render one frame even when the display list content is unchanged. Used after
+  // recreating the window/surface (e.g. on a color space switch), where the freshly created surface
+  // is blank and would otherwise be skipped by the content-change early-out.
+  bool forceRedraw = false;
 
   // Async readback state
   std::shared_ptr<tgfx::SurfaceReadback> pendingReadback = nullptr;

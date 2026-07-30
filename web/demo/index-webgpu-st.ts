@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,7 +18,7 @@
 
 import * as types from '../types/types';
 import {TGFXBind} from '../lib/tgfx';
-import Hello2D from './wasm-mt/hello2d';
+import Hello2D from './wasm/hello2d';
 import {
     ShareData,
     updateSize,
@@ -29,30 +29,45 @@ import {
     loadImage,
     bindCanvasZoomAndPanEvents
 } from "./common";
+
 let shareData: ShareData = new ShareData();
 
 if (typeof window !== 'undefined') {
     window.onload = async () => {
         try {
+            if (!navigator.gpu) {
+                throw new Error("WebGPU is not supported in this browser.");
+            }
+            const adapter = await navigator.gpu.requestAdapter();
+            if (!adapter) {
+                throw new Error("Failed to get WebGPU adapter.");
+            }
+            const device = await adapter.requestDevice();
+            if (!device) {
+                throw new Error("Failed to get WebGPU device.");
+            }
+
             shareData.Hello2DModule = await Hello2D({
-                locateFile: (file: string) => './wasm-mt/' + file ,
-                mainScriptUrlOrBlob: './wasm-mt/hello2d.js'
+                locateFile: (file: string) => './wasm/' + file,
+                preinitializedWebGPUDevice: device,
             });
             TGFXBind(shareData.Hello2DModule);
 
-            let tgfxView = shareData.Hello2DModule.TGFXThreadsView.MakeFrom('#hello2d');
+            let tgfxView = shareData.Hello2DModule.TGFXView.MakeFrom('#hello2d');
             shareData.tgfxBaseView = tgfxView;
             var image = await loadImage("resources/assets/bridge.jpg");
-            tgfxView.setImagePath("bridge",image);
+            tgfxView.setImagePath("bridge", image);
             image = await loadImage("resources/assets/tgfx.png");
-            tgfxView.setImagePath("TGFX",image);
-            var fontPath = "resources/font/NotoSansSC-Regular.otf";
-            const fontBuffer = await fetch(fontPath).then((response) => response.arrayBuffer());
-            const fontUIntArray = new Uint8Array(fontBuffer);
-            var emojiFontPath = "resources/font/NotoColorEmoji.ttf";
-            const emojiFontBuffer = await fetch(emojiFontPath).then((response) => response.arrayBuffer());
-            const emojiFontUIntArray = new Uint8Array(emojiFontBuffer);
-            tgfxView.registerFonts(fontUIntArray, emojiFontUIntArray);
+            tgfxView.setImagePath("TGFX", image);
+
+            var font = new FontFace('default', "url(resources/font/NotoSansSC-Regular.otf)");
+            var emojiFont = new FontFace('emoji', "url(resources/font/NotoColorEmoji.ttf)");
+            await Promise.all([font.load(), emojiFont.load()]).then(([loadedFont, loadedEmoji]) => {
+                document.fonts.add(loadedFont);
+                document.fonts.add(loadedEmoji);
+            });
+            tgfxView.registerFonts();
+
             updateSize(shareData);
             tgfxView.updateLayerTree(shareData.drawIndex);
             tgfxView.updateZoomScaleAndOffset(1.0, 0, 0);
@@ -76,7 +91,10 @@ if (typeof window !== 'undefined') {
             setupVisibilityListeners(shareData);
         } catch (error) {
             console.error(error);
-            throw new Error("Hello2D init failed. Please check the .wasm file path!.");
+            document.body.innerHTML = `<div style="color:red;padding:20px;font-size:18px;">
+                WebGPU initialization failed: ${error.message}<br><br>
+                Please use Chrome 113+ with WebGPU enabled.
+            </div>`;
         }
     };
 

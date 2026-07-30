@@ -182,6 +182,8 @@ export const configureWebGPUColorSpace = (
     if (!context || typeof context.configure !== 'function') {
         return false;
     }
+    // Reuse the same GPUDevice the C++ side rendered with. Hosts pre-initialize it on the module as
+    // preinitializedWebGPUDevice, which is what emscripten's WebGPU surface uses under the hood.
     const device = (getTGFXModule() as any)?.preinitializedWebGPUDevice;
     if (!device) {
         return false;

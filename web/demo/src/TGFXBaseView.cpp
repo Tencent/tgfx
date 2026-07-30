@@ -114,6 +114,7 @@ void TGFXBaseView::setColorSpace(int type) {
   lastSurfaceWidth = 0;
   lastSurfaceHeight = 0;
   presentImmediately = true;
+  forceRedraw = true;
 }
 
 void TGFXBaseView::updateLayerTree(int drawIndex) {
@@ -142,7 +143,7 @@ void TGFXBaseView::draw() {
   bool hasContentChanged = displayList.hasContentChanged();
   bool hasLastRecording = (lastRecording != nullptr);
 
-  if (!hasContentChanged && !hasLastRecording) {
+  if (!hasContentChanged && !hasLastRecording && !forceRedraw) {
     return;
   }
 
@@ -169,6 +170,7 @@ void TGFXBaseView::draw() {
   DrawBackground(canvas, surface->width(), surface->height(), density);
 
   displayList.render(surface.get(), false);
+  forceRedraw = false;
 
   auto recording = context->flush();
 
