@@ -36,6 +36,11 @@
 
 namespace tgfx {
 
+// Maximum time in milliseconds to wait for a fence to signal before declaring the context lost.
+// Sized generously so slow CI runners running the WARP software rasterizer can still finish a
+// heavy render frame before the wait aborts, while still guarding against a genuine device hang.
+static constexpr DWORD FENCE_WAIT_TIMEOUT_MS = 60000;
+
 bool HardwareBufferAvailable() {
   return false;
 }
@@ -737,7 +742,7 @@ void D3D12GPU::executeSubmission(SubmitRequest request) {
     auto& oldest = inflightSubmissions.front();
     if (_frameFence->GetCompletedValue() < oldest.fenceValue) {
       _frameFence->SetEventOnCompletion(oldest.fenceValue, _frameFenceEvent);
-      auto waitResult = WaitForSingleObject(_frameFenceEvent, 5000);
+      auto waitResult = WaitForSingleObject(_frameFenceEvent, FENCE_WAIT_TIMEOUT_MS);
       if (waitResult != WAIT_OBJECT_0) {
         LOGE(
             "D3D12GPU::executeSubmission: backpressure wait timed out (target=%llu), "
@@ -887,10 +892,10 @@ void D3D12GPU::waitAllInflightSubmissions() {
     if (_frameFence->GetCompletedValue() < last.fenceValue) {
       // Use a finite timeout instead of INFINITE so we never hang the application even if some
       // earlier submission had a corrupted command list that prevents the GPU from advancing.
-      // 5 seconds is well past any sensible draw frame budget; if it expires we fall through to
-      // the device-removal check below.
+      // The bound is well past any sensible draw frame budget (including WARP CI runners); if it
+      // expires we fall through to the device-removal check below.
       _frameFence->SetEventOnCompletion(last.fenceValue, _frameFenceEvent);
-      auto waitResult = WaitForSingleObject(_frameFenceEvent, 5000);
+      auto waitResult = WaitForSingleObject(_frameFenceEvent, FENCE_WAIT_TIMEOUT_MS);
       if (waitResult != WAIT_OBJECT_0) {
         LOGE(
             "D3D12GPU::waitAllInflightSubmissions: fence wait timed out (target=%llu), "
