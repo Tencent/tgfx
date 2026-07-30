@@ -21,7 +21,6 @@
 #include "D3D12GPU.h"
 #include "core/utils/Log.h"
 #include "gpu/ShaderCompiler.h"
-#include "gpu/UniformData.h"
 #ifdef TGFX_D3D12_PERF_TRACE
 #include "tgfx/core/Clock.h"
 #endif
@@ -43,9 +42,13 @@ namespace tgfx {
 //     namespaces are per-stage so the vertex stage and the pixel stage have independent b0
 //     packings; D3D12RenderPipeline's root signature mirrors this by giving each entry a
 //     stage-local register index.
-//   - Sampled images at SPIR-V bindings 2..N are mapped to (t{N-2}, s{N-2}). Shifting by
-//     TEXTURE_BINDING_POINT_START keeps the t/s register space dense starting at zero, which
-//     simplifies root-signature construction.
+//   - Sampled images are walked in the order SPIRV-Cross returns them — which is GLSL
+//     declaration order, and therefore matches the BindingLayout::textureSamplers order seen
+//     by the pipeline side — and assigned consecutive (t{K}, s{K}) register pairs. The value
+//     of the SPIR-V binding decoration is intentionally ignored: it depends on how the GLSL
+//     front-end numbers samplers (currently starting from 0 in descriptor set 1), which is a
+//     detail of the SPIR-V producer, whereas root-signature construction just needs a dense
+//     zero-based register space.
 static std::string convertSPIRVToHLSL(const std::vector<uint32_t>& spirvBinary, ShaderStage stage) {
   spirv_cross::Parser spvParser(spirvBinary.data(), spirvBinary.size());
   spvParser.parse();
@@ -84,14 +87,15 @@ static std::string convertSPIRVToHLSL(const std::vector<uint32_t>& spirvBinary, 
     hlslCompiler.add_hlsl_resource_binding(resourceBinding);
   }
 
-  // Map combined samplers: SPIR-V binding N -> (t{N - TEXTURE_BINDING_POINT_START},
-  // s{N - TEXTURE_BINDING_POINT_START}).
+  // Map combined samplers: walk the SPIR-V sampled images in declaration order and assign
+  // consecutive HLSL (t{K}, s{K}) register pairs starting from zero. This matches the
+  // rangeRegister++ sequence used by D3D12RenderPipeline::createRootSignature, so the shader's
+  // t/s slots line up one-to-one with the root signature's SRV/Sampler descriptor tables.
+  uint32_t srvRegister = 0;
   for (auto& image : resources.sampled_images) {
     uint32_t spvBinding = hlslCompiler.get_decoration(image.id, spv::DecorationBinding);
     uint32_t spvDescSet = hlslCompiler.get_decoration(image.id, spv::DecorationDescriptorSet);
-    uint32_t hlslSlot = (spvBinding >= static_cast<uint32_t>(TEXTURE_BINDING_POINT_START))
-                            ? spvBinding - static_cast<uint32_t>(TEXTURE_BINDING_POINT_START)
-                            : spvBinding;
+    uint32_t hlslSlot = srvRegister++;
     spirv_cross::HLSLResourceBinding resourceBinding = {};
     resourceBinding.stage = executionModel;
     resourceBinding.desc_set = spvDescSet;
