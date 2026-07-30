@@ -24,14 +24,14 @@ namespace tgfx {
 
 class ShapeInstancedFillShader : public PrecompiledShader {
  public:
-  TGFX_DEFINE_DIMS(HAS_COLORS, HAS_AA);
+  TGFX_DEFINE_DIMS(HAS_COLOR, HAS_AA);
   using D = Dims;
 
   struct FragDims {
-    enum : uint32_t { HAS_COLORS, HAS_AA, HAS_XP, COUNT };
+    enum : uint32_t { HAS_COLOR, HAS_AA, HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationBool("HAS_COLORS"),
+          PermutationBool("HAS_COLOR"),
           PermutationBool("HAS_AA"),
           PermutationInt("HAS_XP", 3),
       });

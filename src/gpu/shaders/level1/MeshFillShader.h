@@ -24,15 +24,15 @@ namespace tgfx {
 
 class MeshFillShader : public PrecompiledShader {
  public:
-  TGFX_DEFINE_DIMS(HAS_TEX_COORDS, HAS_COLORS, HAS_COVERAGE);
+  TGFX_DEFINE_DIMS(HAS_TEX_COORDS, HAS_COLOR, HAS_COVERAGE);
   using D = Dims;
 
   struct FragDims {
-    enum : uint32_t { HAS_TEX_COORDS, HAS_COLORS, HAS_COVERAGE, HAS_XP, COUNT };
+    enum : uint32_t { HAS_TEX_COORDS, HAS_COLOR, HAS_COVERAGE, HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationBool("HAS_TEX_COORDS"),
-          PermutationBool("HAS_COLORS"),
+          PermutationBool("HAS_COLOR"),
           PermutationBool("HAS_COVERAGE"),
           PermutationInt("HAS_XP", 3),
       });

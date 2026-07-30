@@ -1627,7 +1627,7 @@ static std::optional<PermutationMatchResult> TryMatchShapeInstancedFill(
   using D = ShapeInstancedFillShader::Dims;
   auto domain = D::domain();
   std::vector<int> values(D::COUNT);
-  values[D::HAS_COLORS] = sigp->getHasColors() ? 1 : 0;
+  values[D::HAS_COLOR] = sigp->getHasColors() ? 1 : 0;
   values[D::HAS_AA] = sigp->getAAType() == AAType::Coverage ? 1 : 0;
   auto vertIndex = domain.encode(values);
   using FD = ShapeInstancedFillShader::FD;
@@ -1658,7 +1658,7 @@ static std::optional<PermutationMatchResult> TryMatchMeshFill(const ProgramInfo*
   auto domain = D::domain();
   std::vector<int> values(D::COUNT);
   values[D::HAS_TEX_COORDS] = mgp->getHasTexCoords() ? 1 : 0;
-  values[D::HAS_COLORS] = mgp->getHasColors() ? 1 : 0;
+  values[D::HAS_COLOR] = mgp->getHasColors() ? 1 : 0;
   values[D::HAS_COVERAGE] = mgp->getHasCoverage() ? 1 : 0;
   auto vertIndex = domain.encode(values);
   using FD = MeshFillShader::FD;
