@@ -52,75 +52,79 @@ static Path MakePath(std::initializer_list<Point> points, bool close = true) {
 }
 
 TGFX_TEST(ClipTest, RectEffect) {
-  BlockAllocator allocator;
+  TGFX_PRIVATE_ACCESS(
+      BlockAllocator allocator;
 
-  // Case 1: Identity matrix produces identity variant.
-  {
-    auto fp = RectEffect::Make(&allocator, Rect::MakeWH(100, 80), Matrix::I(), true);
-    ASSERT_NE(fp, nullptr);
-    EXPECT_FALSE(fp->needTransform());
-    EXPECT_EQ(fp->localRect, Rect::MakeWH(100, 80));
-    EXPECT_TRUE(fp->deviceToLocal().isIdentity());
-  }
+      // Case 1: Identity matrix produces identity variant.
+      {
+        auto fp = RectEffect::Make(&allocator, Rect::MakeWH(100, 80), Matrix::I(), true);
+        ASSERT_NE(fp, nullptr);
+        EXPECT_FALSE(fp->needTransform());
+        EXPECT_EQ(fp->localRect, Rect::MakeWH(100, 80));
+        EXPECT_TRUE(fp->deviceToLocal().isIdentity());
+      }
 
-  // Case 2: Axis-aligned scale bakes into localRect, still identity variant.
-  {
-    auto fp = RectEffect::Make(&allocator, Rect::MakeWH(100, 80), Matrix::MakeScale(2, 3), true);
-    ASSERT_NE(fp, nullptr);
-    EXPECT_FALSE(fp->needTransform());
-    EXPECT_EQ(fp->localRect, Rect::MakeWH(200, 240));
-    EXPECT_TRUE(fp->deviceToLocal().isIdentity());
-  }
+      // Case 2: Axis-aligned scale bakes into localRect, still identity variant.
+      {
+        auto fp =
+            RectEffect::Make(&allocator, Rect::MakeWH(100, 80), Matrix::MakeScale(2, 3), true);
+        ASSERT_NE(fp, nullptr);
+        EXPECT_FALSE(fp->needTransform());
+        EXPECT_EQ(fp->localRect, Rect::MakeWH(200, 240));
+        EXPECT_TRUE(fp->deviceToLocal().isIdentity());
+      }
 
-  // Case 3: Non-axis-aligned matrix produces transform variant.
-  {
-    Matrix m = {};
-    m.setRotate(30);
-    auto fp = RectEffect::Make(&allocator, Rect::MakeWH(100, 80), m, true);
-    ASSERT_NE(fp, nullptr);
-    EXPECT_TRUE(fp->needTransform());
-    EXPECT_FALSE(fp->deviceToLocal().isIdentity());
-  }
+      // Case 3: Non-axis-aligned matrix produces transform variant.
+      {
+        Matrix m = {};
+        m.setRotate(30);
+        auto fp = RectEffect::Make(&allocator, Rect::MakeWH(100, 80), m, true);
+        ASSERT_NE(fp, nullptr);
+        EXPECT_TRUE(fp->needTransform());
+        EXPECT_FALSE(fp->deviceToLocal().isIdentity());
+      }
 
-  // Case 4: Zero-scale matrix returns nullptr.
-  {
-    auto fp = RectEffect::Make(&allocator, Rect::MakeWH(100, 80), Matrix::MakeScale(0, 1), true);
-    EXPECT_EQ(fp, nullptr);
-  }
+      // Case 4: Zero-scale matrix returns nullptr.
+      {
+        auto fp =
+            RectEffect::Make(&allocator, Rect::MakeWH(100, 80), Matrix::MakeScale(0, 1), true);
+        EXPECT_EQ(fp, nullptr);
+      })
 }
 
 TGFX_TEST(ClipTest, RRectEffect) {
-  BlockAllocator allocator;
+  TGFX_PRIVATE_ACCESS(
+      BlockAllocator allocator;
 
-  // Case 1: Simple RRect + identity produces identity variant.
-  {
-    const auto rRect = RRect::MakeRectXY(Rect::MakeWH(100, 80), 10, 12);
-    auto fp = RRectEffect::Make(&allocator, rRect, Matrix::I(), true);
-    ASSERT_NE(fp, nullptr);
-    EXPECT_FALSE(fp->needTransform());
-    EXPECT_EQ(fp->localRect, rRect.rect());
-    EXPECT_EQ(fp->radii[0], (Point{10, 12}));
-  }
+      // Case 1: Simple RRect + identity produces identity variant.
+      {
+        const auto rRect = RRect::MakeRectXY(Rect::MakeWH(100, 80), 10, 12);
+        auto fp = RRectEffect::Make(&allocator, rRect, Matrix::I(), true);
+        ASSERT_NE(fp, nullptr);
+        EXPECT_FALSE(fp->needTransform());
+        EXPECT_EQ(fp->localRect, rRect.rect());
+        EXPECT_EQ(fp->radii[0], (Point{10, 12}));
+      }
 
-  // Case 2: Scale matrix bakes axis scales into localRect and radii.
-  {
-    const auto rRect = RRect::MakeRectXY(Rect::MakeWH(100, 80), 10, 12);
-    auto fp = RRectEffect::Make(&allocator, rRect, Matrix::MakeScale(2, 3), true);
-    ASSERT_NE(fp, nullptr);
-    EXPECT_FALSE(fp->needTransform());
-    EXPECT_TRUE(fp->deviceToLocal().isIdentity());
-    EXPECT_FLOAT_EQ(fp->localRect.width(), 200.f);
-    EXPECT_FLOAT_EQ(fp->localRect.height(), 240.f);
-    EXPECT_FLOAT_EQ(fp->radii[0].x, 20.f);
-    EXPECT_FLOAT_EQ(fp->radii[0].y, 36.f);
-  }
+      // Case 2: Scale matrix bakes axis scales into localRect and radii.
+      {
+        const auto rRect = RRect::MakeRectXY(Rect::MakeWH(100, 80), 10, 12);
+        auto fp = RRectEffect::Make(&allocator, rRect, Matrix::MakeScale(2, 3), true);
+        ASSERT_NE(fp, nullptr);
+        EXPECT_FALSE(fp->needTransform());
+        EXPECT_TRUE(fp->deviceToLocal().isIdentity());
+        EXPECT_FLOAT_EQ(fp->localRect.width(), 200.f);
+        EXPECT_FLOAT_EQ(fp->localRect.height(), 240.f);
+        EXPECT_FLOAT_EQ(fp->radii[0].x, 20.f);
+        EXPECT_FLOAT_EQ(fp->radii[0].y, 36.f);
+      }
 
-  // Case 3: Zero-scale matrix returns nullptr.
-  {
-    auto fp = RRectEffect::Make(&allocator, RRect::MakeRectXY(Rect::MakeWH(100, 80), 10, 12),
-                                Matrix::MakeScale(0, 1), true);
-    EXPECT_EQ(fp, nullptr);
-  }
+      // Case 3: Zero-scale matrix returns nullptr.
+      {
+        auto fp = RRectEffect::Make(&allocator, RRect::MakeRectXY(Rect::MakeWH(100, 80), 10, 12),
+                                    Matrix::MakeScale(0, 1), true);
+        EXPECT_EQ(fp, nullptr);
+      })
 }
 
 TGFX_TEST(ClipTest, State) {

@@ -192,15 +192,15 @@ TGFX_TEST(LayerFilterTest, blurLayerFilter) {
   EXPECT_EQ(blur->blurrinessX(), 130.f);
   blur->setTileMode(TileMode::Clamp);
   EXPECT_EQ(blur->tileMode(), TileMode::Clamp);
-  auto imageFilter = std::static_pointer_cast<GaussianBlurImageFilter>(blur->getImageFilter(0.5f));
-  auto imageFilter2 = std::static_pointer_cast<GaussianBlurImageFilter>(
-      ImageFilter::Blur(65.f, 65.f, TileMode::Clamp));
-  TGFX_PRIVATE_ACCESS(EXPECT_EQ(imageFilter->blurrinessX, imageFilter2->blurrinessX);
+  TGFX_PRIVATE_ACCESS(auto imageFilter = std::static_pointer_cast<GaussianBlurImageFilter>(
+                          blur->getImageFilter(0.5f));
+                      auto imageFilter2 = std::static_pointer_cast<GaussianBlurImageFilter>(
+                          ImageFilter::Blur(65.f, 65.f, TileMode::Clamp));
+                      EXPECT_EQ(imageFilter->blurrinessX, imageFilter2->blurrinessX);
                       EXPECT_EQ(imageFilter->blurrinessY, imageFilter2->blurrinessY);
-                      EXPECT_EQ(imageFilter->tileMode, imageFilter2->tileMode);)
-
-  EXPECT_EQ(blur->getImageFilter(0.5f)->filterBounds(Rect::MakeWH(200, 200)),
-            imageFilter2->filterBounds(Rect::MakeWH(200, 200)));
+                      EXPECT_EQ(imageFilter->tileMode, imageFilter2->tileMode);
+                      EXPECT_EQ(blur->getImageFilter(0.5f)->filterBounds(Rect::MakeWH(200, 200)),
+                                imageFilter2->filterBounds(Rect::MakeWH(200, 200)));)
 }
 
 TGFX_TEST(LayerFilterTest, InnerShadowFilter) {
