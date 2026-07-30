@@ -9,9 +9,7 @@ const fileHeaderPath = path.resolve(__dirname, '../../.idea/fileTemplates/includ
 const banner = readFileSync(fileHeaderPath, 'utf-8');
 
 const arch = process.env.ARCH;
-// Default to the WebGL backend when BACKEND is not specified, so the WebGL build scripts
-// (build/build:st) that omit it still resolve a valid entry module.
-const backend = process.env.BACKEND || 'webgl';
+const backend = process.env.BACKEND;
 var filePath = (arch === 'wasm-mt' ? 'wasm-mt' : 'wasm');
 var fileName = '';
 if(backend === 'webgpu'){
