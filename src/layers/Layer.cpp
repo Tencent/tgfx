@@ -33,6 +33,7 @@
 #include "layers/BackgroundHandler.h"
 #include "layers/BackgroundSnapshotMap.h"
 #include "layers/BackgroundSource.h"
+#include "layers/CanvasUtils.h"
 #include "layers/DrawArgs.h"
 #include "layers/LayerStyleSource.h"
 #include "layers/MaskContext.h"
@@ -144,37 +145,6 @@ static void ComputeDirtyNodesForReordering(const std::vector<Layer*>& retainedCh
   }
 }
 
-static std::optional<Rect> GetClipBounds(const Canvas* canvas) {
-  if (canvas == nullptr) {
-    return std::nullopt;
-  }
-  const auto clipBound = canvas->getTotalClipBounds();
-  auto clipRect = Rect::MakeEmpty();
-  auto surface = canvas->getSurface();
-  if (!clipBound.has_value()) {
-    if (!surface) {
-      return std::nullopt;
-    }
-    clipRect = Rect::MakeWH(surface->width(), surface->height());
-  } else {
-    clipRect = *clipBound;
-    if (surface && !clipRect.intersect(Rect::MakeWH(surface->width(), surface->height()))) {
-      return Rect::MakeEmpty();
-    }
-  }
-  if (clipRect.isEmpty()) {
-    return Rect::MakeEmpty();
-  }
-  auto invert = Matrix::I();
-  auto viewMatrix = canvas->getMatrix();
-  if (!viewMatrix.invert(&invert)) {
-    return Rect::MakeEmpty();
-  }
-  clipRect = invert.mapRect(clipRect);
-  clipRect.roundOut();
-  return clipRect;
-}
-
 static int GetMipmapCacheLongEdge(int maxSize, float contentScale, const Rect& layerBounds) {
   auto maxBoundsSize = std::max(layerBounds.width(), layerBounds.height());
   auto scaleBoundsSize = FloatRoundToInt(maxBoundsSize * contentScale);
@@ -204,7 +174,7 @@ static std::shared_ptr<Layer3DContext> Create3DContext(const DrawArgs& args, Can
   }
 
   // The processing area of the compositor is consistent with the actual effective drawing area.
-  auto clipBounds = GetClipBounds(canvas);
+  auto clipBounds = GetCanvasLocalClipBounds(canvas);
 
   auto validRenderRect = bounds;
   // The clip bounds may be slightly larger than the dirty region.
@@ -883,7 +853,7 @@ bool Layer::hitTestPoint(float x, float y, bool shapeHitTest) {
 static Rect GetClippedBounds(const Rect& bounds, const Canvas* canvas) {
   DEBUG_ASSERT(canvas != nullptr);
   auto clippedBounds = bounds;
-  auto clipRect = GetClipBounds(canvas);
+  auto clipRect = GetCanvasLocalClipBounds(canvas);
   if (!clipRect.has_value()) {
     return clippedBounds;
   }
@@ -1212,7 +1182,7 @@ bool Layer::prepareMask(const DrawArgs& args, Canvas* canvas,
   if (!hasValidMask()) {
     return true;
   }
-  auto clipBounds = GetClipBounds(canvas);
+  auto clipBounds = GetCanvasLocalClipBounds(canvas);
   auto contentScale = canvas->getMatrix().getMaxScale();
   auto maskData = getMaskData(args, contentScale, clipBounds);
   if (maskData.maskFilter == nullptr) {
@@ -1522,7 +1492,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   // still invoke this path inside a 3D context — that's fine, render3DContext is irrelevant here.
   DEBUG_ASSERT(!canPreserve3D());
 
-  auto clipBounds = GetClipBounds(canvas);
+  auto clipBounds = GetCanvasLocalClipBounds(canvas);
   auto result = OffscreenResult{};
 
   if (shouldPassThroughBackground(blendMode) && canvas->getSurface()) {
@@ -1638,7 +1608,7 @@ bool Layer::drawContourInternal(const DrawArgs& args, Canvas* canvas, bool conte
   std::shared_ptr<MaskFilter> maskFilter = nullptr;
   if (!contentOnly && hasValidMask()) {
     auto contentScale = canvas->getMatrix().getMaxScale();
-    auto clipBounds = GetClipBounds(canvas);
+    auto clipBounds = GetCanvasLocalClipBounds(canvas);
     auto maskData = getMaskData(args, contentScale, clipBounds);
     if (maskData.maskFilter == nullptr) {
       if (maskData.clipPath.isEmpty() && !maskData.clipPath.isInverseFillType()) {

@@ -48,13 +48,16 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
                                                   ShaderStage::Fragment);
   auto offsets = args.uniformHandler->addUniform("GlassOpticsP2", UniformFormat::Float4,
                                                  ShaderStage::Fragment);
+  auto geometryMapping = args.uniformHandler->addUniform("GlassOpticsP3", UniformFormat::Float4,
+                                                         ShaderStage::Fragment);
   auto& sourceSampler = (*args.textureSamplers)[0];
   auto texCoordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[0]);
 
-  fragBuilder->codeAppendf("vec2 sourceUV = (%s + %s.xy) * %s.xy;", texCoordName.c_str(),
-                           offsets.c_str(), common.c_str());
+  fragBuilder->codeAppendf("vec2 sourceUV = %s * %s.xy;", texCoordName.c_str(), common.c_str());
+  fragBuilder->codeAppendf("vec2 glassUV = %s * %s.xy + %s.xy;", texCoordName.c_str(),
+                           offsets.c_str(), geometryMapping.c_str());
   std::string geometryOutput = "glassGeometry";
-  emitChild(geometryIndex, "vec4(sourceUV, 0.0, 0.0)", &geometryOutput, args);
+  emitChild(geometryIndex, "vec4(glassUV, 0.0, 0.0)", &geometryOutput, args);
   fragBuilder->codeAppendf("vec2 refractDir = %s.xy;", geometryOutput.c_str());
   fragBuilder->codeAppendf("float offsetDist = %s.z;", geometryOutput.c_str());
   fragBuilder->codeAppendf("float edgeWeight = %s.w;", geometryOutput.c_str());
@@ -111,13 +114,24 @@ void GLSLGlassRefractionFragmentProcessor::onSetData(UniformData*,
   fragmentUniformData->setData("GlassOpticsP0", commonData);
 
   float angle = params.lightAngle * static_cast<float>(M_PI) / 180.0f;
-  float invOrigW = params.origWidth > 0.0f ? 1.0f / params.origWidth : 1.0f / sourceWidth;
-  float invOrigH = params.origHeight > 0.0f ? 1.0f / params.origHeight : 1.0f / sourceHeight;
-  float lightingData[4] = {invOrigW, invOrigH, std::sin(angle), std::cos(angle)};
+  float layerToSourceX = params.layerPixelToSourcePixelX;
+  float layerToSourceY = params.layerPixelToSourcePixelY;
+  if (layerToSourceX <= 0.0f) {
+    layerToSourceX = params.origWidth > 0.0f ? sourceWidth / params.origWidth : 1.0f;
+  }
+  if (layerToSourceY <= 0.0f) {
+    layerToSourceY = params.origHeight > 0.0f ? sourceHeight / params.origHeight : 1.0f;
+  }
+  float lightingData[4] = {layerToSourceX / sourceWidth, layerToSourceY / sourceHeight,
+                           std::sin(angle), std::cos(angle)};
   fragmentUniformData->setData("GlassOpticsP1", lightingData);
 
-  float offsetData[4] = {0.0f, 0.0f, params.lightIntensity, 0.0f};
+  float glassUVScaleX = params.glassUVScaleX > 0.0f ? params.glassUVScaleX : 1.0f / sourceWidth;
+  float glassUVScaleY = params.glassUVScaleY > 0.0f ? params.glassUVScaleY : 1.0f / sourceHeight;
+  float offsetData[4] = {glassUVScaleX, glassUVScaleY, params.lightIntensity, 0.0f};
   fragmentUniformData->setData("GlassOpticsP2", offsetData);
+  float geometryMappingData[4] = {params.glassUVOffsetX, params.glassUVOffsetY, 0.0f, 0.0f};
+  fragmentUniformData->setData("GlassOpticsP3", geometryMappingData);
 }
 
 }  // namespace tgfx

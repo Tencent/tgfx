@@ -25,6 +25,7 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "layers/CanvasUtils.h"
 #include "layers/imagefilters/GlassRefractionImageFilter.h"
 #include "layers/processors/GlassRefractionFragmentProcessor.h"
 #include "layers/processors/TentBlur1DFragmentProcessor.h"
@@ -43,6 +44,17 @@ namespace tgfx {
 
 static constexpr float MaxFrostSigma = 50.0f;
 static constexpr int MaxTentRadius = 64;
+static constexpr float MaxBackgroundSize = 2048.0f;
+
+static float GetRefractionOutset(float width, float height, float refractionFactor,
+                                 float depthRatio, float dispersion, float glassThickness) {
+  auto minHalf = std::min(width, height) * 0.5f;
+  float depthScale = std::clamp(depthRatio / 0.1f, 0.0f, 1.0f);
+  depthScale = depthScale * depthScale * (3.0f - 2.0f * depthScale);
+  float udfOutset = 0.999f * minHalf * refractionFactor * depthRatio * depthScale;
+  float sdfOutset = glassThickness * refractionFactor * 1.2f;
+  return std::max(std::max(udfOutset, sdfOutset) * (1.0f + dispersion), 1.0f);
+}
 
 static std::shared_ptr<Image> MakeTentBlurImage(Context* context,
                                                 const std::shared_ptr<Image>& source, float radiusX,
@@ -225,41 +237,38 @@ Rect GlassStyle::filterBackgroundSoft(const Rect& srcRect, float contentScale) {
   // (contentScale * bgScale) to the downsampled background image, invalidating any cache here.
   float sigma = (_frost / 100.0f) * MaxFrostSigma * contentScale;
   auto filter = ImageFilter::Blur(sigma, sigma, TileMode::Mirror);
-  return filter == nullptr ? srcRect : filter->filterBounds(srcRect);
+  auto bounds = filter == nullptr ? srcRect : filter->filterBounds(srcRect);
+  return bounds.makeOutset(1.0f, 1.0f);
 }
 
-Rect GlassStyle::filterBackgroundSharp(const Rect& srcRect, float) {
+Rect GlassStyle::filterBackgroundSharp(const Rect& srcRect, float contentScale) {
   if (_refraction <= 0 && _lightIntensity <= 0) {
-    return srcRect;
+    return _frost > 0 ? srcRect.makeOutset(1.0f, 1.0f) : srcRect;
   }
-  float maxWidth = srcRect.width();
-  float maxHeight = srcRect.height();
-  // Refraction displacement depends on the glass dimensions rather than the size of the dirty
-  // background rectangle. A style may be shared by multiple layers, so conservatively cover every
-  // owner instead of assuming the first owner matches the current filterBackground() call.
+  float maxWidth = FloatNearlyZero(contentScale) ? srcRect.width() : srcRect.width() / contentScale;
+  float maxHeight =
+      FloatNearlyZero(contentScale) ? srcRect.height() : srcRect.height() / contentScale;
+  // Refraction displacement is defined in the Glass layer's local coordinates. Map the resulting
+  // local outset by contentScale instead of deriving it from a transformed AABB, which can
+  // underestimate the dependency under non-uniform scaling.
   for (auto owner : owners) {
     if (owner == nullptr) {
       continue;
     }
-    auto ownerBounds = owner->getBounds(owner->root(), false);
+    auto ownerBounds = owner->getBounds(owner, false);
     maxWidth = std::max(maxWidth, ownerBounds.width());
     maxHeight = std::max(maxHeight, ownerBounds.height());
   }
   // filterBackground() may run before shapeType is determined, so cover both paths.
-  auto halfW = maxWidth * 0.5f;
-  auto halfH = maxHeight * 0.5f;
-  auto minHalf = std::min(halfW, halfH);
-  float refractionFactor = getRefractionFactor();
-  float depthRatio = getDepthRatio();
-  float depthT = std::clamp(depthRatio / 0.1f, 0.0f, 1.0f);
-  float depthScale = depthT * depthT * (3.0f - 2.0f * depthT);
-  float refractionDistance = minHalf * refractionFactor * depthRatio * depthScale;
-  float dispersion = getDispersionFactor();
-  float alphaMaskOutset = 0.999f * refractionDistance * (1.0f + dispersion);
-  float glassThickness = getGlassThickness(minHalf);
-  float analyticalOutset = glassThickness * refractionFactor * 1.2f * (1.0f + dispersion);
-  float refractionOutset = std::max(alphaMaskOutset, analyticalOutset);
-  refractionOutset = std::max(refractionOutset, 1.0f);
+  auto minHalf = std::min(maxWidth, maxHeight) * 0.5f;
+  float refractionOutset =
+      GetRefractionOutset(maxWidth, maxHeight, getRefractionFactor(), getDepthRatio(),
+                          getDispersionFactor(), getGlassThickness(minHalf));
+  refractionOutset = refractionOutset * contentScale + 1.0f;
+  if (_frost > 0) {
+    float sigma = (_frost / 100.0f) * MaxFrostSigma * contentScale;
+    refractionOutset += sigma * 2.0f + 1.0f;
+  }
   return srcRect.makeOutset(refractionOutset, refractionOutset);
 }
 
@@ -276,48 +285,103 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
     return;
   }
   auto bgOffset = backgroundSource->imageOffset();
-
-  // Down-scale the background to avoid huge GPU textures when zoomed in.
-  // The background image includes outset beyond layer content bounds (for refraction sampling).
-  // Use bgImage's actual dimensions to compute scale ratio so coordinates stay aligned.
   auto surface = canvas->getSurface();
   auto context = surface ? surface->getContext() : nullptr;
   if (context == nullptr) {
     return;
   }
   auto maxTextureSize = context->gpu()->limits()->maxTextureDimension2D;
-  auto origWidth = static_cast<float>(input.content->width()) / input.contentScale;
-  auto origHeight = static_cast<float>(input.content->height()) / input.contentScale;
+  auto contentWidth = static_cast<float>(input.content->width());
+  auto contentHeight = static_cast<float>(input.content->height());
+  auto origWidth = contentWidth / input.contentScale;
+  auto origHeight = contentHeight / input.contentScale;
   auto origBounds = Rect::MakeWH(origWidth, origHeight);
   if (origBounds.isEmpty()) {
     return;
   }
-  static constexpr float MAX_BG_SIZE = 2048.0f;
-  float bgMaxDim = static_cast<float>(std::max(bgImage->width(), bgImage->height()));
-  float targetMaxDim =
-      std::min(bgMaxDim, std::min(static_cast<float>(maxTextureSize), MAX_BG_SIZE));
-  float bgScale = targetMaxDim / bgMaxDim;
-  int scaledW =
-      std::max(1, static_cast<int>(std::round(static_cast<float>(bgImage->width()) * bgScale)));
-  int scaledH =
-      std::max(1, static_cast<int>(std::round(static_cast<float>(bgImage->height()) * bgScale)));
-  float scaleRatioX = static_cast<float>(scaledW) / static_cast<float>(bgImage->width());
-  float scaleRatioY = static_cast<float>(scaledH) / static_cast<float>(bgImage->height());
-  bgImage = bgImage->makeScaled(scaledW, scaledH, SamplingOptions(FilterMode::Linear));
-  if (bgImage == nullptr) {
-    return;
-  }
-  bgOffset.x *= scaleRatioX;
-  bgOffset.y *= scaleRatioY;
 
-  // Step 1: Frost - apply Gaussian blur to the background
+  float scaleRatioX = 1.0f;
+  float scaleRatioY = 1.0f;
+  bool usesLocalEvaluation = false;
+  Rect visibleRect = {};
+  Rect refractInputRect = {};
+  auto evaluationLimit = std::min(static_cast<float>(maxTextureSize), MaxBackgroundSize);
+  bool backgroundExceedsLimit = static_cast<float>(bgImage->width()) > evaluationLimit ||
+                                static_cast<float>(bgImage->height()) > evaluationLimit;
+  auto clipBounds = GetCanvasLocalClipBounds(canvas);
+  if (backgroundExceedsLimit && clipBounds.has_value()) {
+    visibleRect = *clipBounds;
+    if (!visibleRect.intersect(Rect::MakeWH(contentWidth, contentHeight))) {
+      return;
+    }
+    visibleRect.roundOut();
+    refractInputRect = visibleRect;
+    if (_refraction > 0 || _lightIntensity > 0) {
+      auto minHalf = std::min(origWidth, origHeight) * 0.5f;
+      float refractionOutset =
+          GetRefractionOutset(origWidth, origHeight, getRefractionFactor(), getDepthRatio(),
+                              getDispersionFactor(), getGlassThickness(minHalf));
+      refractionOutset = std::ceil(refractionOutset * input.contentScale + 1.0f);
+      refractInputRect.outset(refractionOutset, refractionOutset);
+      refractInputRect.roundOut();
+    }
+    auto backgroundInputRect = refractInputRect;
+    auto fullResolutionBlur = getFrostFilter(input.contentScale);
+    if (fullResolutionBlur != nullptr) {
+      backgroundInputRect = fullResolutionBlur->filterBounds(refractInputRect);
+      backgroundInputRect.outset(1.0f, 1.0f);
+    }
+    backgroundInputRect.roundOut();
+    auto availableBackground =
+        Rect::MakeXYWH(bgOffset.x, bgOffset.y, static_cast<float>(bgImage->width()),
+                       static_cast<float>(bgImage->height()));
+    if (backgroundInputRect.intersect(availableBackground)) {
+      auto subsetRect = backgroundInputRect;
+      subsetRect.offset(-bgOffset.x, -bgOffset.y);
+      subsetRect.roundOut();
+      if (subsetRect.intersect(Rect::MakeWH(bgImage->width(), bgImage->height()))) {
+        if (subsetRect.width() <= evaluationLimit && subsetRect.height() <= evaluationLimit) {
+          auto subsetImage = bgImage->makeSubset(subsetRect);
+          if (subsetImage != nullptr) {
+            bgImage = std::move(subsetImage);
+            bgOffset += Point{subsetRect.left, subsetRect.top};
+            usesLocalEvaluation = true;
+          }
+        }
+      }
+    }
+  }
+
+  if (!usesLocalEvaluation) {
+    float bgMaxDim = static_cast<float>(std::max(bgImage->width(), bgImage->height()));
+    float targetMaxDim =
+        std::min(bgMaxDim, std::min(static_cast<float>(maxTextureSize), MaxBackgroundSize));
+    float bgScale = targetMaxDim / bgMaxDim;
+    int scaledW =
+        std::max(1, static_cast<int>(std::round(static_cast<float>(bgImage->width()) * bgScale)));
+    int scaledH =
+        std::max(1, static_cast<int>(std::round(static_cast<float>(bgImage->height()) * bgScale)));
+    scaleRatioX = static_cast<float>(scaledW) / static_cast<float>(bgImage->width());
+    scaleRatioY = static_cast<float>(scaledH) / static_cast<float>(bgImage->height());
+    bgImage = bgImage->makeScaled(scaledW, scaledH, SamplingOptions(FilterMode::Linear));
+    if (bgImage == nullptr) {
+      return;
+    }
+    bgOffset.x *= scaleRatioX;
+    bgOffset.y *= scaleRatioY;
+  }
+
   std::shared_ptr<Image> processedBg = bgImage;
   Point processedOffset = bgOffset;
   if (_frost > 0) {
-    auto blurFilter = getFrostFilter(input.contentScale * bgScale);
-    if (blurFilter) {
+    auto blurFilter = getFrostFilter(input.contentScale * scaleRatioX);
+    if (blurFilter != nullptr) {
       Point blurOffset = {};
       auto clipRect = Rect::MakeWH(bgImage->width(), bgImage->height());
+      if (usesLocalEvaluation) {
+        clipRect = refractInputRect;
+        clipRect.offset(-processedOffset.x, -processedOffset.y);
+      }
       auto frostedImage = bgImage->makeWithFilter(blurFilter, &blurOffset, &clipRect);
       if (frostedImage != nullptr) {
         processedBg = frostedImage;
@@ -418,12 +482,22 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
         }
       }
     }
+    Point sourceOrigin = {processedOffset.x / scaleRatioX, processedOffset.y / scaleRatioY};
+    Point sourcePixelToContentPixel = {1.0f / scaleRatioX, 1.0f / scaleRatioY};
+    Point layerPixelToSourcePixel = {input.contentScale * scaleRatioX,
+                                     input.contentScale * scaleRatioY};
     auto filter = getRefractionFilter(shapeInfo.type, shapeInfo.cornerRadius, halfW, halfH,
-                                      udfPixelToLayerPixelX, udfPixelToLayerPixelY, maskImage,
-                                      coarseMaskImage);
+                                      udfPixelToLayerPixelX, udfPixelToLayerPixelY, sourceOrigin,
+                                      sourcePixelToContentPixel, layerPixelToSourcePixel,
+                                      contentWidth, contentHeight, maskImage, coarseMaskImage);
     Point refractOffset = {};
     auto clipRect = Rect::MakeWH(static_cast<float>(processedBg->width()),
                                  static_cast<float>(processedBg->height()));
+    if (usesLocalEvaluation) {
+      clipRect = visibleRect;
+      clipRect.offset(-sourceOrigin.x, -sourceOrigin.y);
+      clipRect.scale(scaleRatioX, scaleRatioY);
+    }
     auto refractedImage = processedBg->makeWithFilter(filter, &refractOffset, &clipRect);
     if (refractedImage) {
       processedBg = refractedImage;
@@ -487,7 +561,9 @@ void GlassStyle::invalidateFrostFilter() {
 
 std::shared_ptr<ImageFilter> GlassStyle::getRefractionFilter(
     GlassShapeType shapeType, float cornerRadius, float halfWidth, float halfHeight,
-    float udfPixelToLayerPixelX, float udfPixelToLayerPixelY, std::shared_ptr<Image> maskImage,
+    float udfPixelToLayerPixelX, float udfPixelToLayerPixelY, const Point& sourceOrigin,
+    const Point& sourcePixelToContentPixel, const Point& layerPixelToSourcePixel,
+    float contentWidth, float contentHeight, std::shared_ptr<Image> maskImage,
     std::shared_ptr<Image> coarseMaskImage) {
   float minHalf = std::min(halfWidth, halfHeight);
   float depthRatio = getDepthRatio();
@@ -499,6 +575,12 @@ std::shared_ptr<ImageFilter> GlassStyle::getRefractionFilter(
   params.lightIntensity = getLightIntensityFactor();
   params.origWidth = halfWidth * 2.0f;
   params.origHeight = halfHeight * 2.0f;
+  params.glassUVScaleX = sourcePixelToContentPixel.x / contentWidth;
+  params.glassUVScaleY = sourcePixelToContentPixel.y / contentHeight;
+  params.glassUVOffsetX = sourceOrigin.x / contentWidth;
+  params.glassUVOffsetY = sourceOrigin.y / contentHeight;
+  params.layerPixelToSourcePixelX = layerPixelToSourcePixel.x;
+  params.layerPixelToSourcePixelY = layerPixelToSourcePixel.y;
   params.shapeType = shapeType;
 
   GlassSDFGeometryParams sdfParams = {};
