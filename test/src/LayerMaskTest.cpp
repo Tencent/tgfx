@@ -746,7 +746,7 @@ TGFX_TEST(LayerMaskTest, RoundRectMaskWithTiledRender) {
   displayList.setRenderMode(RenderMode::Tiled);
   displayList.render(surface.get());
   displayList.setZoomScale(1.603f);
-  displayList.setAllowZoomBlur(false);
+  displayList.setTileUpdateMode(TileUpdateMode::Immediate);
   displayList.setContentOffset(-200.179016f, -221.704529f);
   displayList.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerMaskTest/RoundRectMaskWithTiledRender"));

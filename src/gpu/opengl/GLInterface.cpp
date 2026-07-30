@@ -239,6 +239,8 @@ std::shared_ptr<GLInterface> GLInterface::MakeNativeInterface(const GLProcGetter
   functions->useProgram = reinterpret_cast<GLUseProgram*>(getter->getProcAddress("glUseProgram"));
   functions->vertexAttribPointer =
       reinterpret_cast<GLVertexAttribPointer*>(getter->getProcAddress("glVertexAttribPointer"));
+  functions->vertexAttribIPointer =
+      reinterpret_cast<GLVertexAttribIPointer*>(getter->getProcAddress("glVertexAttribIPointer"));
   functions->vertexAttribDivisor =
       reinterpret_cast<GLVertexAttribDivisor*>(getter->getProcAddress("glVertexAttribDivisor"));
   functions->viewport = reinterpret_cast<GLViewport*>(getter->getProcAddress("glViewport"));

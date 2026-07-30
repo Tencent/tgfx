@@ -24,6 +24,8 @@
 
 namespace tgfx {
 
+static constexpr float RECTANGLE_MIN_EXTENT = 5e-3f;
+
 std::shared_ptr<Rectangle> Rectangle::Make() {
   return std::shared_ptr<Rectangle>(new Rectangle());
 }
@@ -71,26 +73,23 @@ void Rectangle::setReversed(bool value) {
 void Rectangle::apply(VectorContext* context) {
   DEBUG_ASSERT(context != nullptr);
   if (_cachedShape == nullptr) {
-    // Replace zero-extent axes with a sub-pixel epsilon so a Rectangle with one or both
-    // sides collapsed to zero stays a closed area shape. The value sits just above the
-    // engine-wide FLOAT_NEARLY_ZERO (1/4096 ~ 2.44e-4) so stroker and path utility code
-    // keep treating the axis as non-zero, yet remains far below any sampling grid (GPUs
-    // sample at 1/16 px or coarser), so the geometry still reads as a line or point
-    // visually while the stroker can expand symmetrically on both sides and trim, dash,
-    // and inside/outside align all keep their well-defined area semantics.
-    constexpr float MinExtent = 5e-4f;
-    auto width = std::max(_size.width, MinExtent);
-    auto height = std::max(_size.height, MinExtent);
-    auto halfWidth = width * 0.5f;
-    auto halfHeight = height * 0.5f;
-    auto rect = Rect::MakeXYWH(_position.x - halfWidth, _position.y - halfHeight, width, height);
+    // Clamp to a non-zero extent so the generated rectangle remains a well-defined path with
+    // valid tangents and length for downstream stroke/dash/measure operations. The value sits
+    // above the stroker's internal precision threshold so each edge is not treated as a tiny
+    // segment, yet far below any sampling grid so the shape stays visually invisible.
+    const auto width = std::max(_size.width, RECTANGLE_MIN_EXTENT);
+    const auto height = std::max(_size.height, RECTANGLE_MIN_EXTENT);
+    const auto halfWidth = width * 0.5f;
+    const auto halfHeight = height * 0.5f;
+    const auto rect =
+        Rect::MakeXYWH(_position.x - halfWidth, _position.y - halfHeight, width, height);
     Path path;
-    std::array<Point, 4> radii = {{{_roundness[0], _roundness[0]},
-                                   {_roundness[1], _roundness[1]},
-                                   {_roundness[2], _roundness[2]},
-                                   {_roundness[3], _roundness[3]}}};
+    const std::array<Point, 4> radii = {{{_roundness[0], _roundness[0]},
+                                         {_roundness[1], _roundness[1]},
+                                         {_roundness[2], _roundness[2]},
+                                         {_roundness[3], _roundness[3]}}};
     // MakeRectRadii scales the radii down proportionally if adjacent corners overflow any edge.
-    auto rRect = RRect::MakeRectRadii(rect, radii);
+    const auto rRect = RRect::MakeRectRadii(rect, radii);
     path.addRRect(rRect, _reversed, 2);
     _cachedShape = Shape::MakeFrom(path);
   }

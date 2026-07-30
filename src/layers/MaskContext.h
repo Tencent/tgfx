@@ -74,7 +74,8 @@ class MaskContext : public DrawContext, public Picture::AbortCallback {
 
   void drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
                      const SamplingOptions& sampling, const Matrix& matrix, const ClipStack& clip,
-                     const Brush& brush, SrcRectConstraint constraint) override;
+                     const Brush& brush, SrcRectConstraint constraint,
+                     const Rect* strictRect = nullptr) override;
 
   void drawTextBlob(std::shared_ptr<TextBlob> textBlob, const Matrix& matrix, const ClipStack& clip,
                     const Brush& brush, const Stroke* stroke) override;

@@ -110,15 +110,14 @@ void OpaqueContext::drawImage(std::shared_ptr<Image> image, const SamplingOption
 void OpaqueContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
                                   const Rect& dstRect, const SamplingOptions& sampling,
                                   const Matrix& matrix, const ClipStack& clip, const Brush& brush,
-                                  SrcRectConstraint constraint) {
+                                  SrcRectConstraint constraint, const Rect* strictRect) {
   if (constraint != SrcRectConstraint::Strict) {
     auto newMatrix = matrix;
     newMatrix.preConcat(MakeRectToRectMatrix(srcRect, dstRect));
     auto path = Path();
     path.addRect(dstRect);
-    path.transform(matrix);
     auto newClip = clip;
-    newClip.clip(path, false);
+    newClip.clipPath(path, matrix, false);
     auto newBrush = brush;
     newBrush.shader = Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp, sampling);
     drawRect(dstRect, newMatrix, newClip, newBrush, nullptr);
@@ -129,7 +128,8 @@ void OpaqueContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcR
     return;
   }
   flushPendingContour();
-  pictureContext.drawImageRect(image, srcRect, dstRect, sampling, matrix, clip, brush, constraint);
+  pictureContext.drawImageRect(image, srcRect, dstRect, sampling, matrix, clip, brush, constraint,
+                               strictRect);
 }
 
 void OpaqueContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const Matrix& matrix,
@@ -294,9 +294,8 @@ void OpaqueContext::flushPendingContour(const Contour& contour, const Matrix& ma
     // Shrink opaque bounds to fully covered pixels if clip has AA edges. We conservatively shrink
     // all edges rather than checking each clip element's AA status per edge, as the cost is minimal
     // (fewer optimization opportunities).
-    auto hasAAClip =
-        std::any_of(pendingClip.elements().begin(), pendingClip.elements().end(),
-                    [](const ClipElement& e) { return e.isValid() && e.isAntiAlias(); });
+    auto hasAAClip = std::any_of(pendingClip.elements().begin(), pendingClip.elements().end(),
+                                 [](const ClipElement& e) { return e.isValid() && e.antiAlias(); });
     if (hasAAClip) {
       globalBounds.roundIn();
     }

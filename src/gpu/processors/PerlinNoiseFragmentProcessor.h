@@ -25,6 +25,7 @@
 namespace tgfx {
 class Context;
 class Texture;
+class TextureView;
 
 class PerlinNoiseFragmentProcessor : public FragmentProcessor {
  public:
@@ -52,15 +53,15 @@ class PerlinNoiseFragmentProcessor : public FragmentProcessor {
 
   PerlinNoiseFragmentProcessor(PerlinNoiseType noiseType, int numOctaves, bool stitchTiles,
                                std::unique_ptr<PerlinNoiseShader::PaintingData> paintingData,
-                               std::shared_ptr<Texture> permutationsTexture,
-                               std::shared_ptr<Texture> noiseTexture, const Matrix* uvMatrix);
+                               std::shared_ptr<TextureView> permutationsView,
+                               std::shared_ptr<TextureView> noiseView, const Matrix* uvMatrix);
 
   PerlinNoiseType noiseType;
   int numOctaves;
   bool stitchTiles;
   std::unique_ptr<PerlinNoiseShader::PaintingData> paintingData;
-  std::shared_ptr<Texture> permutationsTexture;
-  std::shared_ptr<Texture> noiseTexture;
+  std::shared_ptr<TextureView> permutationsView;
+  std::shared_ptr<TextureView> noiseView;
   CoordTransform coordTransform;
 };
 }  // namespace tgfx

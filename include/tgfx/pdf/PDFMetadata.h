@@ -190,8 +190,9 @@ struct PDFMetadata {
 
   /** 
    * Encoding quality controls the trade-off between size and quality. By default this is set to 101
-   * percent, which corresponds to lossless encoding. If this value is set to a value <= 100, and
-   * the image is opaque, it will be encoded (using JPEG) with that quality setting.
+   * percent, which corresponds to lossless encoding. If this value is set to a value <= 100, the
+   * image's RGB data will be encoded using JPEG with that quality setting; for images with an
+   * alpha channel, the alpha is stored separately as a Flate-encoded soft mask.
    */
   int encodingQuality = 101;
 

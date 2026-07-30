@@ -114,20 +114,4 @@ std::vector<Rect> RootLayer::updateDirtyRegions() {
   return std::move(dirtyRects);
 }
 
-bool RootLayer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
-  auto color = _backgroundColor;
-  color.alpha = color.alpha * alpha;
-  canvas->drawColor(color, blendMode);
-  return Layer::drawLayer(args, canvas, alpha, blendMode);
-}
-
-bool RootLayer::setBackgroundColor(const Color& color) {
-  if (_backgroundColor == color) {
-    return false;
-  }
-  _backgroundColor = color;
-  invalidateContent();
-  return true;
-}
-
 }  // namespace tgfx

@@ -18,14 +18,14 @@
 
 #pragma once
 
-#include "tgfx/layers/filters/LayerFilter.h"
+#include "tgfx/layers/filters/LayerImageFilter.h"
 
 namespace tgfx {
 
 /**
  * A filter that blurs its input by the separate X and Y blurriness.
  */
-class BlurFilter : public LayerFilter {
+class BlurFilter : public LayerImageFilter {
  public:
   /**
    * Create a filter that blurs its input by the separate X and Y blurriness. The provided tile mode
@@ -81,6 +81,7 @@ class BlurFilter : public LayerFilter {
 
  private:
   BlurFilter(float blurrinessX, float blurrinessY, TileMode tileMode);
+
   float _blurrinessX = 0.0f;
   float _blurrinessY = 0.0f;
   TileMode _tileMode = TileMode::Decal;

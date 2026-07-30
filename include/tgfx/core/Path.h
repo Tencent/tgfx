@@ -115,6 +115,16 @@ class Path {
   Rect getBounds() const;
 
   /**
+   * Returns the axis-aligned extrema (minimum and maximum values) of lines and curves in the Path.
+   * Returns (0, 0, 0, 0) if the Path contains no points. The bounds width and height may be larger
+   * or smaller than the area affected when drawing. Includes Point associated with kMove that
+   * define empty contours. Behaves identically to getBounds() when the Path contains only lines. If
+   * the Path contains curves, the computed bounds includes the maximum extent of the quad, conic, or
+   * cubic; is slower than getBounds(); and unlike getBounds(), does not cache the result.
+   */
+  Rect computeTightBounds() const;
+
+  /**
    * Returns true if Path is empty.
    */
   bool isEmpty() const;
@@ -129,6 +139,17 @@ class Path {
    * when rect is actually contained by Path. For now, only returns true if Path has one contour.
    */
   bool contains(const Rect& rect) const;
+
+  /**
+   * Returns true if the Path is convex. An unclosed path is treated as convex if it would be
+   * convex once closed; use isLastContourClosed() to additionally require a closed contour.
+   */
+  bool isConvex() const;
+
+  /**
+   * Returns true if the last contour of the Path is closed.
+   */
+  bool isLastContourClosed() const;
 
   /**
    * Adds beginning of contour at Point (x, y).

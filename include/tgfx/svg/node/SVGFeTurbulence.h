@@ -37,6 +37,7 @@ class SVGFeTurbulence : public SVGFe {
   SVG_ATTR(Seed, SVGNumberType, SVGNumberType(0))
   SVG_ATTR(TurbulenceType, SVGFeTurbulenceType,
            SVGFeTurbulenceType(SVGFeTurbulenceType::Type::Turbulence))
+  SVG_ATTR(StitchTiles, SVGFeStitchTiles, SVGFeStitchTiles(SVGFeStitchTiles::Type::NoStitch))
 
  protected:
   std::shared_ptr<ImageFilter> onMakeImageFilter(

@@ -37,6 +37,10 @@ bool GLRenderPass::begin() {
   bindFramebuffer();
   auto state = _gpu->state();
   auto gl = _gpu->functions();
+  // Disable scissor test before any clear. glClear is affected by the scissor test, so a scissor
+  // rect left enabled by a previous render pass would restrict the clear to that region, leaving
+  // stale values outside it.
+  state->setEnabled(GL_SCISSOR_TEST, false);
   auto& depthStencilAttachment = descriptor.depthStencilAttachment;
   if (depthStencilAttachment.texture != nullptr) {
     auto depthStencilTexture =
@@ -60,8 +64,6 @@ bool GLRenderPass::begin() {
   auto renderTexture = static_cast<GLTexture*>(colorAttachment.texture.get());
   // Set the viewport to cover the entire color attachment by default.
   state->setViewport(0, 0, renderTexture->width(), renderTexture->height());
-  // Disable scissor test by default.
-  state->setEnabled(GL_SCISSOR_TEST, false);
   if (colorAttachment.resolveTexture && _gpu->caps()->multisampleDisableSupport) {
     state->setEnabled(GL_MULTISAMPLE, true);
   }

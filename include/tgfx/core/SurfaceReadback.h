@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -22,6 +22,7 @@
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
+class GPUBuffer;
 class GPUBufferProxy;
 
 /**
@@ -67,6 +68,15 @@ class SurfaceReadback {
    * pointer returned by lockPixels() is no longer valid.
    */
   void unlockPixels(Context* context);
+
+  /**
+   * Returns the underlying GPU buffer used for readback. This is useful for platforms that need
+   * to perform async buffer mapping externally (e.g., WebGPU's mapAsync via JavaScript Promise).
+   * May trigger a flush if the buffer has not been created yet, but does NOT wait for GPU
+   * completion. The caller must use requestMapAsync() + isReady() or equivalent async mechanism
+   * before reading buffer contents. Returns nullptr on failure.
+   */
+  std::shared_ptr<GPUBuffer> getGPUBuffer(Context* context) const;
 
  private:
   ImageInfo _info = {};

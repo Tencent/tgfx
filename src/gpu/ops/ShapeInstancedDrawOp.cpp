@@ -59,7 +59,7 @@ ShapeInstancedDrawOp::ShapeInstancedDrawOp(BlockAllocator* allocator,
                                            bool hasInstanceColors, size_t count,
                                            const Matrix& uvMatrix, const Matrix& stateMatrix,
                                            AAType aaType)
-    : DrawOp(allocator, aaType), shapeProxy(std::move(proxy)),
+    : StandardDrawOp(allocator, aaType), shapeProxy(std::move(proxy)),
       instanceBufferProxy(std::move(instanceBuffer)), hasInstanceColors(hasInstanceColors),
       instanceCount(count), uvMatrix(uvMatrix), stateMatrix(stateMatrix) {
   auto context = shapeProxy->getContext();
@@ -106,7 +106,7 @@ PlacementPtr<GeometryProcessor> ShapeInstancedDrawOp::onMakeGeometryProcessor(
                                                realUVMatrix, viewMatrix);
 }
 
-void ShapeInstancedDrawOp::onDraw(RenderPass* renderPass) {
+void ShapeInstancedDrawOp::onDraw(RenderPass* renderPass, RenderTarget* /*renderTarget*/) {
   auto vertexBuffer = shapeProxy->getTriangles();
   auto instanceBuffer = instanceBufferProxy->getBuffer();
   if (instanceBuffer == nullptr) {

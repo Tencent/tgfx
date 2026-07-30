@@ -82,10 +82,10 @@ void GLSLComplexNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
                  ShaderVar(inPosition.name(), SLType::Float2));
 
   // Fragment shader - evaluate round rect shape using SDF with per-corner radii
-  fragBuilder->codeAppendf("vec2 localCoord = %s;", localCoordVarying.fsIn().c_str());
-  fragBuilder->codeAppendf("vec4 xR = %s;", xRadiiVarying.fsIn().c_str());
-  fragBuilder->codeAppendf("vec4 yR = %s;", yRadiiVarying.fsIn().c_str());
-  fragBuilder->codeAppendf("vec4 bounds = %s;", boundsVarying.fsIn().c_str());
+  fragBuilder->codeAppendf("highp vec2 localCoord = %s;", localCoordVarying.fsIn().c_str());
+  fragBuilder->codeAppendf("highp vec4 xR = %s;", xRadiiVarying.fsIn().c_str());
+  fragBuilder->codeAppendf("highp vec4 yR = %s;", yRadiiVarying.fsIn().c_str());
+  fragBuilder->codeAppendf("highp vec4 bounds = %s;", boundsVarying.fsIn().c_str());
 
   // For each corner, test whether the fragment lies in the axis-aligned box spanning from the
   // rect corner to that corner's arc center. Adjacent boxes can touch on a seam when two radii
@@ -93,55 +93,58 @@ void GLSLComplexNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
   // must guarantee that diagonal corner boxes do not overlap. Collapse inBox to one-hot so the
   // downstream dot() products read a single corner's center and radii.
   // xR/yR order: [TL, TR, BR, BL].
-  fragBuilder->codeAppend("vec4 cornersX = vec4(bounds.x, bounds.z, bounds.z, bounds.x);");
-  fragBuilder->codeAppend("vec4 cornersY = vec4(bounds.y, bounds.y, bounds.w, bounds.w);");
-  fragBuilder->codeAppend("vec4 signsX = vec4(1.0, -1.0, -1.0, 1.0);");
-  fragBuilder->codeAppend("vec4 signsY = vec4(1.0, 1.0, -1.0, -1.0);");
-  fragBuilder->codeAppend("vec4 dx = (vec4(localCoord.x) - cornersX) * signsX;");
-  fragBuilder->codeAppend("vec4 dy = (vec4(localCoord.y) - cornersY) * signsY;");
+  fragBuilder->codeAppend("highp vec4 cornersX = vec4(bounds.x, bounds.z, bounds.z, bounds.x);");
+  fragBuilder->codeAppend("highp vec4 cornersY = vec4(bounds.y, bounds.y, bounds.w, bounds.w);");
+  fragBuilder->codeAppend("highp vec4 signsX = vec4(1.0, -1.0, -1.0, 1.0);");
+  fragBuilder->codeAppend("highp vec4 signsY = vec4(1.0, 1.0, -1.0, -1.0);");
+  fragBuilder->codeAppend("highp vec4 dx = (vec4(localCoord.x) - cornersX) * signsX;");
+  fragBuilder->codeAppend("highp vec4 dy = (vec4(localCoord.y) - cornersY) * signsY;");
   // dx and dy are always non-negative because the quad covers exactly the (possibly
   // stroke-outset) rect, so the lower bound checks are omitted.
-  fragBuilder->codeAppend("vec4 inBox = step(dx, xR) * step(dy, yR);");
+  fragBuilder->codeAppend("highp vec4 inBox = step(dx, xR) * step(dy, yR);");
   // One-hot collapse: keep the first 1 in inBox and zero the rest. A slot stays 1 only when
   // the prefix sum of previous slots is still 0.
   fragBuilder->codeAppend(
-      "vec4 prefixSum = vec4(0.0, inBox.x, inBox.x + inBox.y, inBox.x + inBox.y + inBox.z);");
+      "highp vec4 prefixSum = vec4(0.0, inBox.x, inBox.x + inBox.y, inBox.x + inBox.y + inBox.z);");
   fragBuilder->codeAppend("inBox *= step(prefixSum, vec4(0.5));");
-  fragBuilder->codeAppend("float inAnyCorner = dot(inBox, vec4(1.0));");
+  fragBuilder->codeAppend("highp float inAnyCorner = dot(inBox, vec4(1.0));");
   // Selected corner's arc center and radii (in local coordinates).
-  fragBuilder->codeAppend("vec4 arcCentersX = cornersX + signsX * xR;");
-  fragBuilder->codeAppend("vec4 arcCentersY = cornersY + signsY * yR;");
+  fragBuilder->codeAppend("highp vec4 arcCentersX = cornersX + signsX * xR;");
+  fragBuilder->codeAppend("highp vec4 arcCentersY = cornersY + signsY * yR;");
   fragBuilder->codeAppend(
-      "vec2 arcCenter = vec2(dot(inBox, arcCentersX), dot(inBox, arcCentersY));");
-  fragBuilder->codeAppend("vec2 radii = max(vec2(dot(inBox, xR), dot(inBox, yR)), vec2(1e-6));");
+      "highp vec2 arcCenter = vec2(dot(inBox, arcCentersX), dot(inBox, arcCentersY));");
+  fragBuilder->codeAppend(
+      "highp vec2 radii = max(vec2(dot(inBox, xR), dot(inBox, yR)), vec2(1e-6));");
 
   // Outer coverage: inside the owning corner ellipse, or anywhere outside all corner boxes
   // (edge/center region).
-  fragBuilder->codeAppend("vec2 ellipseOffset = (localCoord - arcCenter) / radii;");
-  fragBuilder->codeAppend("float insideEllipse = step(dot(ellipseOffset, ellipseOffset), 1.0);");
-  fragBuilder->codeAppend("float outerCoverage = mix(1.0, insideEllipse, inAnyCorner);");
+  fragBuilder->codeAppend("highp vec2 ellipseOffset = (localCoord - arcCenter) / radii;");
+  fragBuilder->codeAppend(
+      "highp float insideEllipse = step(dot(ellipseOffset, ellipseOffset), 1.0);");
+  fragBuilder->codeAppend("highp float outerCoverage = mix(1.0, insideEllipse, inAnyCorner);");
 
   if (stroke) {
-    fragBuilder->codeAppendf("vec2 sw = %s;", strokeWidthVarying.fsIn().c_str());
+    fragBuilder->codeAppendf("highp vec2 sw = %s;", strokeWidthVarying.fsIn().c_str());
     // Inner coverage: for corner fragments, test the inner ellipse (same center, radii
     // shrunk by the full stroke width); for edge/center fragments, test the inner rect
     // (rect shrunk by the full stroke width on each side).
-    fragBuilder->codeAppend("vec2 innerRadii = max(radii - 2.0 * sw, vec2(1e-6));");
-    fragBuilder->codeAppend("vec2 innerEllipseOffset = (localCoord - arcCenter) / innerRadii;");
+    fragBuilder->codeAppend("highp vec2 innerRadii = max(radii - 2.0 * sw, vec2(1e-6));");
     fragBuilder->codeAppend(
-        "float insideInnerEllipse = step(dot(innerEllipseOffset, innerEllipseOffset), 1.0);");
-    fragBuilder->codeAppend("vec2 center = (bounds.xy + bounds.zw) * 0.5;");
-    fragBuilder->codeAppend("vec2 halfSize = (bounds.zw - bounds.xy) * 0.5;");
-    fragBuilder->codeAppend("vec2 innerHalfSize = halfSize - 2.0 * sw;");
-    fragBuilder->codeAppend("vec2 p = abs(localCoord - center);");
+        "highp vec2 innerEllipseOffset = (localCoord - arcCenter) / innerRadii;");
     fragBuilder->codeAppend(
-        "float insideInnerRect = step(0.0, innerHalfSize.x) * step(0.0, innerHalfSize.y)"
+        "highp float insideInnerEllipse = step(dot(innerEllipseOffset, innerEllipseOffset), 1.0);");
+    fragBuilder->codeAppend("highp vec2 center = (bounds.xy + bounds.zw) * 0.5;");
+    fragBuilder->codeAppend("highp vec2 halfSize = (bounds.zw - bounds.xy) * 0.5;");
+    fragBuilder->codeAppend("highp vec2 innerHalfSize = halfSize - 2.0 * sw;");
+    fragBuilder->codeAppend("highp vec2 p = abs(localCoord - center);");
+    fragBuilder->codeAppend(
+        "highp float insideInnerRect = step(0.0, innerHalfSize.x) * step(0.0, innerHalfSize.y)"
         " * step(p.x, innerHalfSize.x) * step(p.y, innerHalfSize.y);");
     fragBuilder->codeAppend(
-        "float innerCoverage = mix(insideInnerRect, insideInnerEllipse, inAnyCorner);");
-    fragBuilder->codeAppend("float coverage = outerCoverage * (1.0 - innerCoverage);");
+        "highp float innerCoverage = mix(insideInnerRect, insideInnerEllipse, inAnyCorner);");
+    fragBuilder->codeAppend("highp float coverage = outerCoverage * (1.0 - innerCoverage);");
   } else {
-    fragBuilder->codeAppend("float coverage = outerCoverage;");
+    fragBuilder->codeAppend("highp float coverage = outerCoverage;");
   }
 
   fragBuilder->codeAppendf("%s = vec4(coverage);", args.outputCoverage.c_str());

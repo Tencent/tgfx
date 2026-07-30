@@ -39,11 +39,17 @@ class GPULimits {
   /**
    * Returns the maximum size in bytes of a uniform buffer binding.
    */
-  int maxUniformBufferBindingSize = 0;
+  int64_t maxUniformBufferBindingSize = 0;
 
   /**
    * Returns the minimum required alignment in bytes for uniform buffer offsets.
    */
   int minUniformBufferOffsetAlignment = 0;
+
+  /**
+   * Returns the minimum required alignment in bytes for the bytesPerRow in buffer-texture copy
+   * operations. On WebGPU this is 256, on other backends it is typically 1 (no alignment).
+   */
+  int minBufferCopyRowAlignment = 1;
 };
 }  // namespace tgfx

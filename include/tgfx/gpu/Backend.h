@@ -23,6 +23,7 @@
 #include "tgfx/gpu/metal/MetalTypes.h"
 #include "tgfx/gpu/opengl/GLTypes.h"
 #include "tgfx/gpu/vulkan/VulkanTypes.h"
+#include "tgfx/gpu/webgpu/WebGPUTypes.h"
 
 namespace tgfx {
 /**
@@ -67,6 +68,13 @@ class BackendTexture {
    */
   explicit BackendTexture(const D3D12TextureInfo& d3d12Info, int width, int height)
       : _backend(Backend::D3D12), _width(width), _height(height), d3d12Info(d3d12Info) {
+  }
+
+  /**
+   * Creates a WebGPU backend texture.
+   */
+  explicit BackendTexture(const WebGPUTextureInfo& webgpuInfo, int width, int height)
+      : _backend(Backend::WebGPU), _width(width), _height(height), webgpuInfo(webgpuInfo) {
   }
 
   BackendTexture(const BackendTexture& that) {
@@ -132,6 +140,12 @@ class BackendTexture {
    */
   bool getD3D12TextureInfo(D3D12TextureInfo* d3d12TextureInfo) const;
 
+  /**
+   * If the backend API is WebGPU, copies a snapshot of the WebGPUTextureInfo struct into the passed
+   * in pointer and returns true. Otherwise, returns false if the backend API is not WebGPU.
+   */
+  bool getWebGPUTextureInfo(WebGPUTextureInfo* webgpuTextureInfo) const;
+
  private:
   Backend _backend = Backend::Unknown;
   int _width = 0;
@@ -142,6 +156,7 @@ class BackendTexture {
     MetalTextureInfo metalInfo;
     VulkanImageInfo vulkanInfo;
     D3D12TextureInfo d3d12Info;
+    WebGPUTextureInfo webgpuInfo;
   };
 };
 
@@ -182,6 +197,13 @@ class BackendRenderTarget {
    */
   explicit BackendRenderTarget(const D3D12TextureInfo& d3d12Info, int width, int height)
       : _backend(Backend::D3D12), _width(width), _height(height), d3d12Info(d3d12Info) {
+  }
+
+  /**
+   * Creates a WebGPU backend render target.
+   */
+  explicit BackendRenderTarget(const WebGPUTextureInfo& webgpuInfo, int width, int height)
+      : _backend(Backend::WebGPU), _width(width), _height(height), webgpuInfo(webgpuInfo) {
   }
 
   BackendRenderTarget(const BackendRenderTarget& that) {
@@ -247,6 +269,12 @@ class BackendRenderTarget {
    */
   bool getD3D12TextureInfo(D3D12TextureInfo* d3d12TextureInfo) const;
 
+  /**
+   * If the backend API is WebGPU, copies a snapshot of the WebGPUTextureInfo struct into the passed
+   * in pointer and returns true. Otherwise, returns false if the backend API is not WebGPU.
+   */
+  bool getWebGPUTextureInfo(WebGPUTextureInfo* webgpuTextureInfo) const;
+
  private:
   Backend _backend = Backend::Unknown;
   int _width = 0;
@@ -256,6 +284,7 @@ class BackendRenderTarget {
     MetalTextureInfo metalInfo;
     VulkanImageInfo vulkanInfo;
     D3D12TextureInfo d3d12Info;
+    WebGPUTextureInfo webgpuInfo;
   };
 };
 
@@ -296,6 +325,13 @@ class BackendSemaphore {
    */
   explicit BackendSemaphore(const D3D12SyncInfo& d3d12Info)
       : _backend(Backend::D3D12), d3d12SyncInfo(d3d12Info) {
+  }
+
+  /**
+   * Creates a WebGPU backend semaphore.
+   */
+  explicit BackendSemaphore(const WebGPUSyncInfo& webgpuInfo)
+      : _backend(Backend::WebGPU), webgpuSyncInfo(webgpuInfo) {
   }
 
   BackendSemaphore(const BackendSemaphore& that) {
@@ -340,6 +376,12 @@ class BackendSemaphore {
    */
   bool getD3D12Sync(D3D12SyncInfo* d3d12Info) const;
 
+  /**
+   * If the backend API is WebGPU, copies a snapshot of the WebGPUSyncInfo struct into the passed in
+   * pointer and returns true. Otherwise, returns false if the backend API is not WebGPU.
+   */
+  bool getWebGPUSync(WebGPUSyncInfo* webgpuInfo) const;
+
  private:
   Backend _backend = Backend::Unknown;
   union {
@@ -347,6 +389,7 @@ class BackendSemaphore {
     MetalSyncInfo metalSyncInfo;
     VulkanSyncInfo vulkanSyncInfo;
     D3D12SyncInfo d3d12SyncInfo;
+    WebGPUSyncInfo webgpuSyncInfo;
   };
 };
 }  // namespace tgfx

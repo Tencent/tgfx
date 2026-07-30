@@ -37,7 +37,7 @@ void GLSLDeviceSpaceTextureEffect::emitCode(EmitArgs& args) const {
   auto uniformHandler = args.uniformHandler;
   auto deviceCoordMatrixName = uniformHandler->addUniform(
       "DeviceCoordMatrix", UniformFormat::Float3x3, ShaderStage::Fragment);
-  fragBuilder->codeAppendf("vec3 deviceCoord = %s * vec3(gl_FragCoord.xy, 1.0);",
+  fragBuilder->codeAppendf("highp vec3 deviceCoord = %s * vec3(gl_FragCoord.xy, 1.0);",
                            deviceCoordMatrixName.c_str());
   std::string coordName = "deviceCoord.xy";
   fragBuilder->codeAppendf("%s = ", args.outputColor.c_str());

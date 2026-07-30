@@ -101,6 +101,8 @@ class SolidLayer : public Layer {
 
   void onUpdateContent(LayerRecorder* recorder) override;
 
+  std::optional<StyledShape> onGetContentShape() override;
+
  private:
   Color _color = {};
   float _width = 0;

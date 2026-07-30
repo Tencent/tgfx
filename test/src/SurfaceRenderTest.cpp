@@ -149,4 +149,44 @@ TGFX_TEST(SurfaceRenderTest, OutOfRenderTarget) {
   EXPECT_TRUE(Baseline::Compare(surface, "SurfaceRenderTest/OutOfRenderTarget"));
 }
 
+TGFX_TEST(SurfaceRenderTest, ClipPathOrigin) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto width = 200;
+  auto height = 300;
+
+  Path trianglePath;
+  trianglePath.moveTo(100, 50);
+  trianglePath.lineTo(150, 120);
+  trianglePath.lineTo(50, 120);
+  trianglePath.close();
+
+  Paint paint;
+  paint.setColor(Color::Red());
+
+  auto topLeftSurface = Surface::Make(context, width, height);
+  ASSERT_TRUE(topLeftSurface != nullptr);
+  auto canvas = topLeftSurface->getCanvas();
+  canvas->clear(Color::White());
+  canvas->save();
+  canvas->clipPath(trianglePath);
+  canvas->drawRect(Rect::MakeWH(width, height), paint);
+  canvas->restore();
+  EXPECT_TRUE(Baseline::Compare(topLeftSurface, "SurfaceRenderTest/ClipPathOrigin"));
+
+  auto texture = context->gpu()->createTexture({width, height, PixelFormat::RGBA_8888});
+  ASSERT_TRUE(texture != nullptr);
+  auto bottomLeftSurface =
+      Surface::MakeFrom(context, texture->getBackendTexture(), ImageOrigin::BottomLeft);
+  ASSERT_TRUE(bottomLeftSurface != nullptr);
+  canvas = bottomLeftSurface->getCanvas();
+  canvas->clear(Color::White());
+  canvas->save();
+  canvas->clipPath(trianglePath);
+  canvas->drawRect(Rect::MakeWH(width, height), paint);
+  canvas->restore();
+  EXPECT_TRUE(Baseline::Compare(bottomLeftSurface, "SurfaceRenderTest/ClipPathOrigin"));
+}
+
 }  // namespace tgfx

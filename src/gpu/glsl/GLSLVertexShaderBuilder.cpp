@@ -39,8 +39,8 @@ void GLSLVertexShaderBuilder::emitTransformedPoint(const std::string& dstPointNa
                                                    const std::string& transformName,
                                                    bool hasPerspective) {
   if (hasPerspective) {
-    codeAppendf("vec3 %sTemp = %s * vec3(%s, 1.0);", dstPointName.c_str(), transformName.c_str(),
-                srcPointName.c_str());
+    codeAppendf("highp vec3 %sTemp = %s * vec3(%s, 1.0);", dstPointName.c_str(),
+                transformName.c_str(), srcPointName.c_str());
     codeAppendf("highp vec2 %s = %sTemp.xy / %sTemp.z;", dstPointName.c_str(), dstPointName.c_str(),
                 dstPointName.c_str());
   } else {

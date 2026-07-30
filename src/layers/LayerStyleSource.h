@@ -27,6 +27,7 @@
 #include "tgfx/core/Picture.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
+#include "tgfx/layers/layerstyles/StyledShape.h"
 
 namespace tgfx {
 
@@ -58,9 +59,14 @@ struct LayerStyleSourceGroup {
  */
 struct LayerStyleSource {
   float contentScale = 1.0f;
+
   // groups[0]: excludeChildEffects = false
   // groups[1]: excludeChildEffects = true
   std::unique_ptr<LayerStyleSourceGroup> groups[2] = {};
+
+  // Simplified content shape of the layer for LayerStyles that need vector access (e.g. shadow
+  // spread). std::nullopt when no LayerStyle needs it.
+  std::optional<StyledShape> contentShape = std::nullopt;
 };
 
 /**

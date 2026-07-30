@@ -133,7 +133,7 @@ void PictureContext::drawImage(std::shared_ptr<Image> image, const SamplingOptio
 void PictureContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
                                    const Rect& dstRect, const SamplingOptions& sampling,
                                    const Matrix& matrix, const ClipStack& clip, const Brush& brush,
-                                   SrcRectConstraint constraint) {
+                                   SrcRectConstraint constraint, const Rect* strictRect) {
   DEBUG_ASSERT(image != nullptr);
   auto newMatrix = matrix;
   auto newBrush = brush;
@@ -149,13 +149,15 @@ void PictureContext::drawImageRect(std::shared_ptr<Image> image, const Rect& src
   recordAll(newMatrix, clip, newBrush);
   auto imageRect = Rect::MakeWH(image->width(), image->height());
   PlacementPtr<PictureRecord> record = nullptr;
+  Rect savedStrictRect = strictRect ? *strictRect : Rect::MakeEmpty();
   if (srcRect == imageRect && !needDstRect) {
     record = blockAllocator.make<DrawImage>(std::move(image), sampling);
   } else if (!needDstRect) {
-    record = blockAllocator.make<DrawImageRect>(std::move(image), srcRect, sampling, constraint);
+    record = blockAllocator.make<DrawImageRect>(std::move(image), srcRect, sampling, constraint,
+                                                savedStrictRect);
   } else {
     record = blockAllocator.make<DrawImageRectToRect>(std::move(image), srcRect, dstRect, sampling,
-                                                      constraint);
+                                                      constraint, savedStrictRect);
   }
   records.emplace_back(std::move(record));
   drawCount++;

@@ -83,7 +83,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     lastSurfaceHeight = 0;
     presentImmediately = true;
     displayList.setRenderMode(tgfx::RenderMode::Tiled);
-    displayList.setAllowZoomBlur(true);
+    displayList.setTileUpdateMode(tgfx::TileUpdateMode::Smooth);
     displayList.setMaxTileCount(512);
   }
   CGSize backingSize = [self convertSizeToBacking:self.bounds.size];

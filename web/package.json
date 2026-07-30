@@ -16,8 +16,11 @@
     "server": "node server.js wasm-mt",
     "build:st": "node script/cmake.demo.js -a wasm && npm run build:tgfx && rollup -c ./script/rollup.demo.js",
     "build:st:debug": "node script/cmake.demo.js -a wasm --debug && npm run build:tgfx && rollup -c ./script/rollup.demo.js",
+    "build:webgpu": "node script/cmake.demo.js -a wasm --webgpu && npm run build:tgfx && rollup -c ./script/rollup.demo.js --environment ARCH:wasm-webgpu",
+    "build:webgpu:debug": "node script/cmake.demo.js -a wasm --webgpu --debug && npm run build:tgfx && rollup -c ./script/rollup.demo.js --environment ARCH:wasm-webgpu",
     "dev:st": "npm run build:tgfx && rollup -c ./script/rollup.dev.js -w",
-    "server:st": "node server.js"
+    "server:st": "node server.js",
+    "server:webgpu": "node server.js webgpu"
   },
   "repository": {
     "type": "git",

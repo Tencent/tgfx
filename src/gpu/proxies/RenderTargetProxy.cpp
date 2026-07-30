@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RenderTargetProxy.h"
+#include "core/utils/Log.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/proxies/ExternalRenderTargetProxy.h"
@@ -55,6 +56,25 @@ std::shared_ptr<RenderTargetProxy> RenderTargetProxy::makeRenderTargetProxy(int 
                                                                             int height) const {
   return getContext()->proxyProvider()->createRenderTargetProxy({}, width, height, format(),
                                                                 sampleCount());
+}
+
+std::shared_ptr<Texture> RenderTargetProxy::getStencil(int sampleCount) {
+  return getOrAllocateStencil(width(), height(), sampleCount);
+}
+
+std::shared_ptr<Texture> RenderTargetProxy::getOrAllocateStencil(int width, int height,
+                                                                 int sampleCount) {
+  if (stencilTexture != nullptr) {
+    // The cached entry must match the requested sample count; otherwise the caller is mixing
+    // MSAA configurations on the same proxy, which would silently violate the "all attachments
+    // share one sampleCount" rule that every backend enforces.
+    DEBUG_ASSERT(stencilTexture->sampleCount() == sampleCount);
+    return stencilTexture;
+  }
+  TextureDescriptor descriptor(width, height, PixelFormat::DEPTH24_STENCIL8, false, sampleCount,
+                               TextureUsage::RENDER_ATTACHMENT);
+  stencilTexture = getContext()->gpu()->createTexture(descriptor);
+  return stencilTexture;
 }
 
 Matrix RenderTargetProxy::getOriginTransform() const {

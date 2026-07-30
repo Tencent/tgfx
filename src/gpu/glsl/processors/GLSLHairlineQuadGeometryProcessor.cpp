@@ -48,7 +48,7 @@ void GLSLHairlineQuadGeometryProcessor::emitCode(EmitArgs& args) const {
   auto matrixName =
       uniformHandler->addUniform("Matrix", UniformFormat::Float3x3, ShaderStage::Vertex);
   std::string positionName = "transformedPosition";
-  vertBuilder->codeAppendf("vec2 %s = (%s * vec3(%s, 1.0)).xy;", positionName.c_str(),
+  vertBuilder->codeAppendf("highp vec2 %s = (%s * vec3(%s, 1.0)).xy;", positionName.c_str(),
                            matrixName.c_str(), position.name().c_str());
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler,
                  ShaderVar(positionName, SLType::Float2));
@@ -61,14 +61,14 @@ void GLSLHairlineQuadGeometryProcessor::emitCode(EmitArgs& args) const {
   // The UV coordinates are set up so that the curve is defined by the implicit equation: u^2 - v = 0
   // Points where u^2 < v are inside the curve, u^2 > v are outside.
   const char* edge = edgeVarying.fsIn().c_str();
-  fragBuilder->codeAppendf("float edgeAlpha;");
+  fragBuilder->codeAppendf("highp float edgeAlpha;");
   // Compute screen-space partial derivatives of UV coordinates for gradient calculation
-  fragBuilder->codeAppendf("vec2 duvdx = vec2(dFdx(%s.xy));", edge);
-  fragBuilder->codeAppendf("vec2 duvdy = vec2(dFdy(%s.xy));", edge);
+  fragBuilder->codeAppendf("highp vec2 duvdx = vec2(dFdx(%s.xy));", edge);
+  fragBuilder->codeAppendf("highp vec2 duvdy = vec2(dFdy(%s.xy));", edge);
   // Compute gradient of the implicit function F(u,v) = u^2 - v
   // gradF = (dF/dx, dF/dy) where dF/dx = 2u * du/dx - dv/dx, dF/dy = 2u * du/dy - dv/dy
   fragBuilder->codeAppendf(
-      "vec2 gF = vec2(2.0 * %s.x * duvdx.x - duvdx.y,"
+      "highp vec2 gF = vec2(2.0 * %s.x * duvdx.x - duvdx.y,"
       "               2.0 * %s.x * duvdy.x - duvdy.y);",
       edge, edge);
   // Evaluate the implicit function: F = u^2 - v (positive outside, negative inside)

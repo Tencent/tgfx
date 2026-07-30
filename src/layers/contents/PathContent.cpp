@@ -17,12 +17,18 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PathContent.h"
+#include "core/utils/Log.h"
 #include "core/utils/StrokeUtils.h"
 
 namespace tgfx {
 
 PathContent::PathContent(Path path, const LayerPaint& paint)
     : DrawContent(paint), path(std::move(path)) {
+  // PathContent does not consume strokeAlign or pathEffect. Complex stroke styles must be routed
+  // to ShapeContent by LayerRecorder. Keep this predicate in sync with
+  // LayerRecorder::ComplexStrokeStyle.
+  DEBUG_ASSERT(paint.style != PaintStyle::Stroke ||
+               (paint.strokeAlign == StrokeAlign::Center && paint.pathEffect == nullptr));
 }
 
 Rect PathContent::getBounds() const {

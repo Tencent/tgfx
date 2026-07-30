@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/layerstyles/LayerStyle.h"
-#include <utility>
 
 namespace tgfx {
 void LayerStyle::setBlendMode(BlendMode blendMode) {
@@ -28,7 +27,17 @@ void LayerStyle::setBlendMode(BlendMode blendMode) {
   invalidateTransform();
 }
 
-Rect LayerStyle::filterBackground(const Rect& srcRect, float) {
+Rect LayerStyle::filterBackground(const Rect& srcRect, float contentScale) {
+  auto result = filterBackgroundSoft(srcRect, contentScale);
+  result.join(filterBackgroundSharp(srcRect, contentScale));
+  return result;
+}
+
+Rect LayerStyle::filterBackgroundSoft(const Rect& srcRect, float) {
+  return srcRect;
+}
+
+Rect LayerStyle::filterBackgroundSharp(const Rect& srcRect, float) {
   return srcRect;
 }
 
@@ -38,12 +47,6 @@ void LayerStyle::setExcludeChildEffects(bool value) {
   }
   _excludeChildEffects = value;
   invalidateTransform();
-}
-
-void LayerStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> content,
-                                       float contentScale, std::shared_ptr<Image>, const Point&,
-                                       float alpha, BlendMode blendMode) {
-  onDraw(canvas, std::move(content), contentScale, alpha, blendMode);
 }
 
 }  // namespace tgfx

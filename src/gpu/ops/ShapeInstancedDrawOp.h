@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "DrawOp.h"
+#include "StandardDrawOp.h"
 #include "gpu/proxies/GPUShapeProxy.h"
 #include "gpu/proxies/VertexBufferView.h"
 #include "tgfx/core/Color.h"
@@ -26,7 +26,7 @@
 #include "tgfx/core/Point.h"
 
 namespace tgfx {
-class ShapeInstancedDrawOp : public DrawOp {
+class ShapeInstancedDrawOp : public StandardDrawOp {
  public:
   /**
    * The maximum number of instances that can be drawn in a single draw call.
@@ -44,7 +44,7 @@ class ShapeInstancedDrawOp : public DrawOp {
  protected:
   PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
 
-  void onDraw(RenderPass* renderPass) override;
+  void onDraw(RenderPass* renderPass, RenderTarget* renderTarget) override;
 
   Type type() override {
     return Type::ShapeInstancedDrawOp;

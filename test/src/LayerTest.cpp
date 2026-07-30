@@ -22,6 +22,7 @@
 #include "core/shaders/GradientShader.h"
 #include "core/utils/MathExtra.h"
 #include "layers/DrawArgs.h"
+#include "layers/LayerStyleSource.h"
 #include "layers/OpaqueContext.h"
 #include "layers/RootLayer.h"
 #include "layers/SubtreeCache.h"
@@ -31,7 +32,9 @@
 #include "layers/contents/RRectsContent.h"
 #include "layers/contents/RectsContent.h"
 #include "layers/contents/TextContent.h"
+#include "layers/processors/GlassRefractionFragmentProcessor.h"
 #include "tgfx/core/Mesh.h"
+#include "tgfx/core/PathEffect.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/core/TextBlob.h"
 #include "tgfx/layers/DisplayList.h"
@@ -42,11 +45,22 @@
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/SolidLayer.h"
 #include "tgfx/layers/TextLayer.h"
+#include "tgfx/layers/VectorLayer.h"
 #include "tgfx/layers/filters/BlurFilter.h"
 #include "tgfx/layers/filters/DropShadowFilter.h"
 #include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
+#include "tgfx/layers/layerstyles/GlassStyle.h"
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
+#include "tgfx/layers/layerstyles/NoiseStyle.h"
+#include "tgfx/layers/vectors/Ellipse.h"
+#include "tgfx/layers/vectors/FillStyle.h"
+#include "tgfx/layers/vectors/ImagePattern.h"
+#include "tgfx/layers/vectors/Rectangle.h"
+#include "tgfx/layers/vectors/ShapePath.h"
+#include "tgfx/layers/vectors/SolidColor.h"
+#include "tgfx/layers/vectors/StrokeStyle.h"
+#include "tgfx/layers/vectors/VectorGroup.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
@@ -3363,6 +3377,819 @@ TGFX_TEST(LayerTest, BackgroundBlurWithFilter) {
   displayList.setRenderMode(RenderMode::Partial);
   displayList.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundBlurWithFilter_Partial"));
+}
+
+TGFX_TEST(LayerTest, BackgroundColor) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto bgColor = Color::FromRGBA(200, 50, 50);
+  const int surfaceWidth = 100;
+  const int surfaceHeight = 80;
+
+  // Test 1: DisplayList::render() should paint backgroundColor
+  {
+    auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+    ASSERT_TRUE(surface != nullptr);
+    auto displayList = std::make_unique<DisplayList>();
+    displayList->setBackgroundColor(bgColor);
+    displayList->render(surface.get());
+    context->flushAndSubmit();
+    EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundColor_Render"));
+  }
+
+  // Test 2: Layer::draw() on root layer should NOT paint backgroundColor
+  {
+    auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+    ASSERT_TRUE(surface != nullptr);
+    auto displayList = std::make_unique<DisplayList>();
+    displayList->setBackgroundColor(bgColor);
+    // Draw via Layer::draw() directly on root layer — backgroundColor must not appear
+    displayList->root()->draw(surface->getCanvas());
+    context->flushAndSubmit();
+    EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundColor_Draw"));
+  }
+}
+
+TGFX_TEST(LayerTest, TextDuoNoiseTransforms) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto root = Layer::Make();
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+
+  auto addText = [&](const std::string& text, const Matrix& matrix) {
+    auto textLayer = TextLayer::Make();
+    textLayer->setText(text);
+    textLayer->setTextColor(Color::FromRGBA(60, 120, 200));
+    textLayer->setFont(Font(typeface, 40.f));
+    textLayer->setMatrix(matrix);
+    textLayer->setAllowsEdgeAntialiasing(false);
+    textLayer->setLayerStyles({NoiseStyle::MakeDuo(8.f, 1.f, Color::FromRGBA(200, 50, 50),
+                                                   Color::FromRGBA(50, 200, 50), 42.f)});
+    root->addChild(textLayer);
+  };
+
+  // Text 1: normal (translation only).
+  addText("Hello", Matrix::MakeTrans(50.f, 50.f));
+
+  // Text 2: rotated 30 degrees.
+  auto rotMatrix = Matrix::MakeTrans(50.f, 150.f);
+  rotMatrix.preRotate(30.f, 50.f, 150.f);
+  addText("Hello", rotMatrix);
+
+  // Text 3: scaled 1.5x.
+  auto scaleMatrix = Matrix::MakeTrans(50.f, 250.f);
+  scaleMatrix.preScale(1.5f, 1.5f, 50.f, 250.f);
+  addText("Hello", scaleMatrix);
+
+  auto bounds = root->getBounds(nullptr, true);
+  auto surface = Surface::Make(context, static_cast<int>(bounds.width() + 100.f),
+                               static_cast<int>(bounds.height() + 100.f));
+  ASSERT_TRUE(surface != nullptr);
+  surface->getCanvas()->clear();
+  surface->getCanvas()->translate(-bounds.left + 50.f, -bounds.top + 50.f);
+  root->draw(surface->getCanvas());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/TextDuoNoiseTransforms"));
+}
+
+TGFX_TEST(LayerTest, ShapeLayerSmallOvalScaledUp) {
+  // Validates the HasSharpCorner device-space threshold via the ShapeLayer -> drawShape
+  // -> private drawPath path. A 0.9x0.9 oval under a 100x parent scale must stay round
+  // instead of being degenerated into a rectangle by the local-space half-pixel check.
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto container = Layer::Make();
+  auto containerMatrix = Matrix::MakeScale(100.f);
+  containerMatrix.postTranslate(50.f, 50.f);
+  container->setMatrix(containerMatrix);
+  displayList->root()->addChild(container);
+
+  auto shape = ShapeLayer::Make();
+  Path circle;
+  circle.addOval(Rect::MakeWH(0.9f, 0.9f));
+  shape->setPath(circle);
+  shape->setFillStyle(ShapeStyle::Make(Color::Red()));
+
+  container->addChild(shape);
+
+  auto surface = Surface::Make(context, 190, 190);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ShapeLayerSmallOvalScaledUp"));
+}
+
+TGFX_TEST(LayerTest, DrawRRectSmallOvalScaledUp) {
+  // Validates the Canvas::drawRRect device-space threshold directly, without going through
+  // ShapeLayer / drawShape. Guards regressions on the drawRRect entry point itself, which
+  // shares the same sub-half-pixel classification logic but is reached by a different path.
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 190, 190);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  canvas->translate(50.f, 50.f);
+  canvas->scale(100.f, 100.f);
+
+  Paint paint;
+  paint.setColor(Color::Red());
+  canvas->drawRRect(RRect::MakeOval(Rect::MakeWH(0.9f, 0.9f)), paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DrawRRectSmallOvalScaledUp"));
+}
+
+static const Color YELLOW_COLOR = {1.0f, 1.0f, 0.0f, 1.0f};
+
+enum class ShadowType { Drop, Inner };
+
+static inline std::shared_ptr<LayerStyle> MakeShadow(ShadowType type, float offsetX, float offsetY,
+                                                     float blurX, float blurY, const Color& color,
+                                                     float spread, bool dropBehindLayer = true) {
+  if (type == ShadowType::Drop) {
+    auto style = DropShadowStyle::Make(offsetX, offsetY, blurX, blurY, color, dropBehindLayer);
+    style->setSpread(spread);
+    return style;
+  }
+  auto style = InnerShadowStyle::Make(offsetX, offsetY, blurX, blurY, color);
+  style->setSpread(spread);
+  return style;
+}
+
+static inline Path MakeStarPath() {
+  Path path = {};
+  path.moveTo(50, 0);
+  path.lineTo(65, 22);
+  path.lineTo(100, 30);
+  path.lineTo(75, 45);
+  path.lineTo(80, 60);
+  path.lineTo(50, 50);
+  path.lineTo(20, 60);
+  path.lineTo(25, 45);
+  path.lineTo(0, 30);
+  path.lineTo(35, 22);
+  path.close();
+  return path;
+}
+
+static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType type, float cellW,
+                                         float cellH, float gap) {
+  const auto lItemXOffset = gap;
+  const auto rItemXOffset = gap + cellW / 2.0f;
+  auto image = MakeImage("resources/apitest/test_timestretch.png")->makeScaled(100, 60);
+
+  // Case 1: SolidLayer with roundness 10, spread=8
+  for (int i = 0; i < 2; ++i) {
+    auto layer = SolidLayer::Make();
+    layer->setColor(Color::Red());
+    layer->setWidth(100);
+    layer->setHeight(60);
+    layer->setRadiusX(10);
+    layer->setRadiusY(10);
+    layer->setMatrix(Matrix::MakeTrans(i == 0 ? lItemXOffset : rItemXOffset, gap));
+    layer->setLayerStyles({MakeShadow(type, 25, 25, 3, 3, YELLOW_COLOR, i == 0 ? 0.0f : 8.0f)});
+    displayList.root()->addChild(layer);
+  }
+
+  // Case 2: ImageLayer, spread=8
+  for (int i = 0; i < 2; ++i) {
+    auto layer = ImageLayer::Make();
+    layer->setImage(image);
+    layer->setMatrix(Matrix::MakeTrans(cellW + (i == 0 ? lItemXOffset : rItemXOffset), gap));
+    layer->setLayerStyles({MakeShadow(type, 25, 25, 3, 3, YELLOW_COLOR, i == 0 ? 0.0f : 8.0f)});
+    displayList.root()->addChild(layer);
+  }
+
+  // Case 3: ShapeLayer Oval fill, spread=8
+  for (int i = 0; i < 2; ++i) {
+    auto layer = ShapeLayer::Make();
+    Path path = {};
+    path.addOval(Rect::MakeXYWH(0.0f, 0.0f, 100.0f, 60.0f));
+    layer->setPath(path);
+    layer->setFillStyle(ShapeStyle::Make(Color::Red()));
+    layer->setMatrix(Matrix::MakeTrans(cellW * 2 + (i == 0 ? lItemXOffset : rItemXOffset), gap));
+    layer->setLayerStyles({MakeShadow(type, 25, 25, 3, 3, YELLOW_COLOR, i == 0 ? 0.0f : 8.0f)});
+    displayList.root()->addChild(layer);
+  }
+
+  // Case 4: ShapeLayer Oval stroke, spread=8
+  for (int i = 0; i < 2; ++i) {
+    auto layer = ShapeLayer::Make();
+    Path path = {};
+    path.addOval(Rect::MakeXYWH(0.0f, 0.0f, 100.0f, 60.0f));
+    layer->setPath(path);
+    layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 0)));
+    layer->setStrokeStyle(ShapeStyle::Make(Color::Blue()));
+    layer->setLineWidth(15);
+    layer->setMatrix(Matrix::MakeTrans(i == 0 ? lItemXOffset : rItemXOffset, cellH + gap));
+    layer->setLayerStyles(
+        {MakeShadow(type, 25, 25, 3, 3, Color::Green(), i == 0 ? 0.0f : 8.0f, false)});
+    displayList.root()->addChild(layer);
+  }
+
+  // Case 5: ShapeLayer star stroke, spread=8
+  for (int i = 0; i < 2; ++i) {
+    auto layer = ShapeLayer::Make();
+    layer->setPath(MakeStarPath());
+    layer->setStrokeStyle(ShapeStyle::Make(Color::Blue()));
+    layer->setLineWidth(6);
+    layer->setMatrix(
+        Matrix::MakeTrans(cellW + (i == 0 ? lItemXOffset : rItemXOffset), cellH + gap));
+    layer->setLayerStyles({MakeShadow(type, 25, 25, 3, 3, Color::Green(), i == 0 ? 0.0f : 8.0f)});
+    displayList.root()->addChild(layer);
+  }
+
+  // Case 6: ShapeLayer Rect + ImageShader fill, spread=8
+  for (int i = 0; i < 2; ++i) {
+    auto layer = ShapeLayer::Make();
+    Path path = {};
+    path.addRect(Rect::MakeXYWH(0.0f, 0.0f, 100.0f, 60.0f));
+    layer->setPath(path);
+    auto shader = Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp);
+    layer->setFillStyle(ShapeStyle::Make(shader));
+    layer->setMatrix(
+        Matrix::MakeTrans(cellW * 2 + (i == 0 ? lItemXOffset : rItemXOffset), cellH + gap));
+    layer->setLayerStyles({MakeShadow(type, 25, 25, 3, 3, YELLOW_COLOR, i == 0 ? 0.0f : 8.0f)});
+    displayList.root()->addChild(layer);
+  }
+
+  // Case 7: ShapeLayer Rect fill + Outside dashed stroke, spread=8
+  for (int i = 0; i < 2; ++i) {
+    auto layer = ShapeLayer::Make();
+    Path path = {};
+    path.addRect(Rect::MakeXYWH(0.0f, 0.0f, 100.0f, 60.0f));
+    layer->setPath(path);
+    layer->setFillStyle(ShapeStyle::Make(Color::Red()));
+    layer->setStrokeStyle(ShapeStyle::Make(Color::Blue()));
+    layer->setLineWidth(15);
+    layer->setStrokeAlign(StrokeAlign::Outside);
+    layer->setLineCap(LineCap::Round);
+    layer->setLineJoin(LineJoin::Bevel);
+    layer->setLineDashPattern({10, 30});
+    layer->setMatrix(Matrix::MakeTrans(i == 0 ? lItemXOffset : rItemXOffset, cellH * 2 + gap));
+    layer->setLayerStyles({MakeShadow(type, 25, 25, 3, 3, Color::Green(), i == 0 ? 0.0f : 8.0f)});
+    displayList.root()->addChild(layer);
+  }
+
+  // Case 8: ShapeLayer with an Inside dashed stroke baked into a fill path, spread=8
+  for (int i = 0; i < 2; ++i) {
+    auto layer = ShapeLayer::Make();
+    Path rectPath = {};
+    rectPath.addRect(Rect::MakeXYWH(0.0f, 0.0f, 100.0f, 60.0f));
+    auto rectShape = Shape::MakeFrom(rectPath);
+    const float intervals[] = {10.0f, 20.0f};
+    auto dashedShape = Shape::ApplyEffect(rectShape, PathEffect::MakeDash(intervals, 2, 0.0f));
+    auto doubled = Stroke(10.0f * 2.0f, LineCap::Butt, LineJoin::Miter);
+    auto strokedShape = Shape::ApplyStroke(dashedShape, &doubled);
+    auto insideShape = Shape::Merge(strokedShape, rectShape, PathOp::Intersect);
+    layer->setPath(insideShape->getPath());
+    layer->setFillStyle(ShapeStyle::Make(Color::Blue()));
+    layer->setMatrix(
+        Matrix::MakeTrans(cellW + (i == 0 ? lItemXOffset : rItemXOffset), cellH * 2 + gap));
+    auto child = ShapeLayer::Make();
+    child->setPath(rectPath);
+    child->setFillStyle(ShapeStyle::Make(Color::Transparent()));
+    layer->addChild(child);
+    layer->setLayerStyles(
+        {MakeShadow(type, 25, 25, 3, 3, Color::Green(), i == 0 ? 0.0f : 8.0f, false)});
+    displayList.root()->addChild(layer);
+  }
+
+  // Case 9: TextLayer with perspective, spread=8
+  {
+    auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+    for (int i = 0; i < 2; ++i) {
+      auto font = Font(typeface, 40);
+      font.setFauxBold(true);
+      auto layer = TextLayer::Make();
+      layer->setText("TGFX");
+      layer->setFont(font);
+      layer->setTextColor(Color::Red());
+      auto matrix =
+          Matrix::MakeTrans(cellW * 2 + (i == 0 ? lItemXOffset : rItemXOffset), cellH * 2 + gap);
+      matrix.preConcat(Matrix::MakeAll(1, 0, 0, 0, 1, 0, 0.002f, 0.001f, 1));
+      layer->setMatrix(matrix);
+      layer->setLayerStyles({MakeShadow(type, 25, 25, 3, 3, YELLOW_COLOR, i == 0 ? 0.0f : 8.0f)});
+      displayList.root()->addChild(layer);
+    }
+  }
+
+  // Case 10: VectorLayer RoundRect + ImagePattern fill, spread=-8
+  for (int i = 0; i < 2; ++i) {
+    auto vectorLayer = VectorLayer::Make();
+    auto group = VectorGroup::Make();
+    auto rect = Rectangle::Make();
+    rect->setSize({100, 60});
+    rect->setPosition({50, 30});
+    rect->setRoundness({10, 10, 10, 10});
+    auto pattern = ImagePattern::Make(image);
+    pattern->setScaleMode(ScaleMode::Zoom);
+    auto fill = FillStyle::Make(pattern);
+    group->setElements({rect, fill});
+    vectorLayer->setContents({group});
+    vectorLayer->setMatrix(
+        Matrix::MakeTrans(i == 0 ? lItemXOffset : rItemXOffset, cellH * 3 + gap));
+    vectorLayer->setLayerStyles(
+        {MakeShadow(type, 25, 25, 3, 3, YELLOW_COLOR, i == 0 ? 0.0f : -8.0f)});
+    displayList.root()->addChild(vectorLayer);
+  }
+
+  // Case 11: VectorLayer Ellipse + Center stroke 15px, spread=-10 (stroke collapse)
+  for (int i = 0; i < 2; ++i) {
+    auto vectorLayer = VectorLayer::Make();
+    auto group = VectorGroup::Make();
+    auto ellipse = Ellipse::Make();
+    ellipse->setPosition({50, 30});
+    ellipse->setSize({100, 60});
+    auto stroke = StrokeStyle::Make(SolidColor::Make(Color::Blue()));
+    stroke->setStrokeWidth(15);
+    group->setElements({ellipse, stroke});
+    vectorLayer->setContents({group});
+    vectorLayer->setMatrix(
+        Matrix::MakeTrans(cellW + (i == 0 ? lItemXOffset : rItemXOffset), cellH * 3 + gap));
+    vectorLayer->setLayerStyles(
+        {MakeShadow(type, 25, 25, 3, 3, Color::Green(), i == 0 ? 0.0f : -10.0f)});
+    displayList.root()->addChild(vectorLayer);
+  }
+
+  // Case 12: VectorLayer star fill, spread=8
+  for (int i = 0; i < 2; ++i) {
+    auto vectorLayer = VectorLayer::Make();
+    auto group = VectorGroup::Make();
+    auto star = ShapePath::Make();
+    star->setPath(MakeStarPath());
+    auto fill = FillStyle::Make(SolidColor::Make(Color::Red()));
+    group->setElements({star, fill});
+    vectorLayer->setContents({group});
+    vectorLayer->setMatrix(
+        Matrix::MakeTrans(cellW * 2 + (i == 0 ? lItemXOffset : rItemXOffset), cellH * 3 + gap));
+    vectorLayer->setLayerStyles(
+        {MakeShadow(type, 25, 25, 3, 3, Color::Green(), i == 0 ? 0.0f : 8.0f)});
+    displayList.root()->addChild(vectorLayer);
+  }
+
+  // Case 13: VectorLayer Rect+Ellipse + Inside stroke 8px, spread=5
+  for (int i = 0; i < 2; ++i) {
+    auto vectorLayer = VectorLayer::Make();
+    auto group = VectorGroup::Make();
+    auto rect = Rectangle::Make();
+    rect->setPosition({25, 30});
+    rect->setSize({50, 60});
+    auto ellipse = Ellipse::Make();
+    ellipse->setPosition({75, 30});
+    ellipse->setSize({50, 60});
+    auto stroke = StrokeStyle::Make(SolidColor::Make(Color::Blue()));
+    stroke->setStrokeWidth(8);
+    stroke->setStrokeAlign(StrokeAlign::Inside);
+    group->setElements({rect, ellipse, stroke});
+    vectorLayer->setContents({group});
+    vectorLayer->setMatrix(
+        Matrix::MakeTrans(i == 0 ? lItemXOffset : rItemXOffset, cellH * 4 + gap));
+    vectorLayer->setLayerStyles(
+        {MakeShadow(type, 25, 25, 3, 3, Color::Green(), i == 0 ? 0.0f : 5.0f)});
+    displayList.root()->addChild(vectorLayer);
+  }
+
+  // Case 14: VectorLayer Ellipse + Outside dashed stroke 8px + SolidLayer child, spread=8
+  for (int i = 0; i < 2; ++i) {
+    auto vectorLayer = VectorLayer::Make();
+    auto group = VectorGroup::Make();
+    auto ellipse = Ellipse::Make();
+    ellipse->setPosition({50, 30});
+    ellipse->setSize({100, 60});
+    auto stroke = StrokeStyle::Make(SolidColor::Make(Color::Blue()));
+    stroke->setStrokeWidth(8);
+    stroke->setStrokeAlign(StrokeAlign::Outside);
+    stroke->setLineCap(LineCap::Round);
+    stroke->setDashes({10, 25});
+    group->setElements({ellipse, stroke});
+    vectorLayer->setContents({group});
+    vectorLayer->setMatrix(
+        Matrix::MakeTrans(cellW + (i == 0 ? lItemXOffset : rItemXOffset), cellH * 4 + gap));
+    auto child = SolidLayer::Make();
+    child->setWidth(30);
+    child->setHeight(20);
+    child->setColor(Color::Red());
+    child->setMatrix(Matrix::MakeTrans(35, 20));
+    vectorLayer->addChild(child);
+    vectorLayer->setLayerStyles(
+        {MakeShadow(type, 25, 25, 3, 3, Color::Green(), i == 0 ? 0.0f : 8.0f)});
+    displayList.root()->addChild(vectorLayer);
+  }
+
+  // Case 15: VectorLayer Rect fill + Outside dashed stroke, spread=8
+  for (int i = 0; i < 2; ++i) {
+    auto vectorLayer = VectorLayer::Make();
+    auto group = VectorGroup::Make();
+    auto rect = Rectangle::Make();
+    rect->setSize({100, 60});
+    rect->setPosition({50, 30});
+    auto fill = FillStyle::Make(SolidColor::Make(Color::Red()));
+    auto stroke = StrokeStyle::Make(SolidColor::Make(Color::Blue()));
+    stroke->setStrokeWidth(15);
+    stroke->setStrokeAlign(StrokeAlign::Outside);
+    stroke->setLineCap(LineCap::Round);
+    stroke->setLineJoin(LineJoin::Bevel);
+    stroke->setDashes({10, 30});
+    group->setElements({rect, fill, stroke});
+    vectorLayer->setContents({group});
+    vectorLayer->setMatrix(
+        Matrix::MakeTrans(cellW * 2 + (i == 0 ? lItemXOffset : rItemXOffset), cellH * 4 + gap));
+    vectorLayer->setLayerStyles(
+        {MakeShadow(type, 25, 25, 3, 3, Color::Green(), i == 0 ? 0.0f : 8.0f)});
+    displayList.root()->addChild(vectorLayer);
+  }
+
+  // Case 16: VectorLayer Ellipse + Inside stroke 15px with compound transform, spread=-5
+  for (int i = 0; i < 2; ++i) {
+    auto vectorLayer = VectorLayer::Make();
+    auto innerGroup = VectorGroup::Make();
+    auto ellipse = Ellipse::Make();
+    ellipse->setPosition({50, 30});
+    ellipse->setSize({100, 60});
+    auto stroke = StrokeStyle::Make(SolidColor::Make(Color::Blue()));
+    stroke->setStrokeWidth(15);
+    stroke->setStrokeAlign(StrokeAlign::Inside);
+    auto fill = FillStyle::Make(SolidColor::Make(Color::Transparent()));
+    innerGroup->setElements({ellipse, stroke, fill});
+    innerGroup->setScale({1.5f, 1.5f});
+    innerGroup->setRotation(-30);
+    auto group = VectorGroup::Make();
+    group->setElements({innerGroup});
+    vectorLayer->setContents({group});
+    auto matrix = Matrix::MakeTrans(i == 0 ? lItemXOffset : rItemXOffset, cellH * 5 + gap);
+    matrix.preConcat(Matrix::MakeScale(0.8f));
+    matrix.preConcat(Matrix::MakeRotate(15));
+    matrix.preConcat(Matrix::MakeTrans(-10, 15));
+    vectorLayer->setMatrix(matrix);
+    vectorLayer->setLayerStyles(
+        {MakeShadow(type, 25, 25, 3, 3, Color::Green(), i == 0 ? 0.0f : -5.0f, false)});
+    displayList.root()->addChild(vectorLayer);
+  }
+
+  // Case 17: VectorLayer Ellipse + Outside dashed stroke 15px with transparent-fill child, spread=6
+  for (int i = 0; i < 2; ++i) {
+    auto vectorLayer = VectorLayer::Make();
+    auto group = VectorGroup::Make();
+    auto ellipse = Ellipse::Make();
+    ellipse->setPosition({50, 30});
+    ellipse->setSize({100, 60});
+    auto stroke = StrokeStyle::Make(SolidColor::Make(Color::Blue()));
+    stroke->setStrokeWidth(15);
+    stroke->setStrokeAlign(StrokeAlign::Outside);
+    stroke->setLineCap(LineCap::Butt);
+    stroke->setLineJoin(LineJoin::Miter);
+    stroke->setDashes({10, 20});
+    group->setElements({ellipse, stroke});
+    vectorLayer->setContents({group});
+    vectorLayer->setMatrix(
+        Matrix::MakeTrans(cellW + (i == 0 ? lItemXOffset : rItemXOffset), cellH * 5 + gap));
+    auto child = VectorLayer::Make();
+    auto childGroup = VectorGroup::Make();
+    auto childEllipse = Ellipse::Make();
+    childEllipse->setPosition({50, 30});
+    childEllipse->setSize({100, 60});
+    auto childFill = FillStyle::Make(SolidColor::Make(Color::Transparent()));
+    childGroup->setElements({childEllipse, childFill});
+    child->setContents({childGroup});
+    vectorLayer->addChild(child);
+    vectorLayer->setLayerStyles(
+        {MakeShadow(type, 25, 25, 3, 3, Color::Green(), i == 0 ? 0.0f : 6.0f, false)});
+    displayList.root()->addChild(vectorLayer);
+  }
+}
+
+TGFX_TEST(LayerTest, DropShadow) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  constexpr float cellW = 400.0f;
+  constexpr float cellH = 120.0f;
+  constexpr float gap = 30.0f;
+  auto surface =
+      Surface::Make(context, static_cast<int>(cellW * 3 + gap), static_cast<int>(cellH * 6 + gap));
+  auto displayList = std::make_unique<DisplayList>();
+  BuildShadowTestLayers(*displayList, ShadowType::Drop, cellW, cellH, gap);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DropShadow"));
+}
+
+TGFX_TEST(LayerTest, InnerShadow) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  constexpr float cellW = 400.0f;
+  constexpr float cellH = 120.0f;
+  constexpr float gap = 30.0f;
+  auto surface =
+      Surface::Make(context, static_cast<int>(cellW * 3 + gap), static_cast<int>(cellH * 6 + gap));
+  auto displayList = std::make_unique<DisplayList>();
+  BuildShadowTestLayers(*displayList, ShadowType::Inner, cellW, cellH, gap);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/InnerShadow"));
+}
+
+// Creates a single glass cell: background image + colored rect + ellipse glass panel at (x, y).
+static void AddGlassCell(Layer* root, std::shared_ptr<Image> bgImage, float x, float y,
+                         float cellSize, float refraction, float depth, float frost,
+                         float dispersion, float splay, float lightAngle, float lightIntensity,
+                         float glassW = -1.0f, float glassH = -1.0f, float radiusX = -1.0f,
+                         float radiusY = -1.0f,
+                         Color rectColor = Color::FromRGBA(0, 100, 255, 255)) {
+  auto container = Layer::Make();
+  container->setMatrix(Matrix::MakeTrans(x, y));
+
+  // Background image scaled to fill the cell
+  if (bgImage) {
+    auto imgLayer = ImageLayer::Make();
+    imgLayer->setImage(bgImage);
+    auto scale = cellSize / static_cast<float>(std::max(bgImage->width(), bgImage->height()));
+    imgLayer->setMatrix(Matrix::MakeScale(scale, scale));
+    container->addChild(imgLayer);
+  }
+
+  // Colored rectangles for refraction contrast
+  auto blueRect = ShapeLayer::Make();
+  Path bluePath = {};
+  bluePath.addRect(
+      Rect::MakeXYWH(cellSize * 0.15f, cellSize * 0.15f, cellSize * 0.35f, cellSize * 0.35f));
+  blueRect->setPath(bluePath);
+  blueRect->setFillStyle(ShapeStyle::Make(rectColor));
+  container->addChild(blueRect);
+
+  auto greenCircle = ShapeLayer::Make();
+  Path greenPath = {};
+  greenPath.addOval(
+      Rect::MakeXYWH(cellSize * 0.45f, cellSize * 0.45f, cellSize * 0.4f, cellSize * 0.4f));
+  greenCircle->setPath(greenPath);
+  greenCircle->setFillStyle(ShapeStyle::Make(Color::FromRGBA(50, 200, 80, 200)));
+  container->addChild(greenCircle);
+
+  // Glass panel shape. Default is a circle (ellipse with equal width/height); callers can
+  // override to render a rounded rect or an ellipse with unequal dimensions, which exercise
+  // the analytical SDF refraction path.
+  float defaultSize = cellSize - 20;
+  // width/height use > 0 (zero size is invalid), but radius uses >= 0 (zero radius is a valid
+  // sharp rect).
+  float gw = glassW > 0.0f ? glassW : defaultSize;
+  float gh = glassH > 0.0f ? glassH : defaultSize;
+  float rx = radiusX >= 0.0f ? radiusX : gw * 0.5f;
+  float ry = radiusY >= 0.0f ? radiusY : gh * 0.5f;
+  auto glassLayer = SolidLayer::Make();
+  glassLayer->setColor(Color::FromRGBA(255, 255, 255, 128));
+  glassLayer->setWidth(gw);
+  glassLayer->setHeight(gh);
+  glassLayer->setRadiusX(rx);
+  glassLayer->setRadiusY(ry);
+  glassLayer->setMatrix(Matrix::MakeTrans((cellSize - gw) * 0.5f, (cellSize - gh) * 0.5f));
+  auto style =
+      GlassStyle::Make(refraction, depth, frost, dispersion, splay, lightAngle, lightIntensity);
+  glassLayer->setLayerStyles({style});
+  container->addChild(glassLayer);
+
+  root->addChild(container);
+}
+
+static void RunGlassStyleTest(const std::string& keySuffix, float zoomScale = 1.0f,
+                              float glassW = -1.0f, float glassH = -1.0f, float radiusX = -1.0f,
+                              float radiusY = -1.0f) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  constexpr float cellSize = 200;
+  constexpr float gap = 10;
+  constexpr int cols = 3;
+  constexpr int rows = 7;
+  int surfaceW = static_cast<int>(cols * (cellSize + gap) + gap);
+  int surfaceH = static_cast<int>(rows * (cellSize + gap) + gap);
+  auto surface = Surface::Make(context, surfaceW, surfaceH);
+  auto displayList = std::make_unique<DisplayList>();
+  if (zoomScale != 1.0f) {
+    displayList->setZoomScale(zoomScale);
+  }
+  auto bgImage = MakeImage("resources/apitest/checker_128.png");
+
+  float defRef = 50, defDepth = 70, defFrost = 0, defDisp = 0;
+  float defSplay = 50, defAngle = 135, defIntensity = 50;
+
+  float refractionVals[] = {10, 50, 90};
+  float depthVals[] = {5, 25, 60};
+  float frostVals[] = {0, 30, 80};
+  float dispVals[] = {0, 40, 90};
+  float splayVals[] = {0, 50, 100};
+  float angleVals[] = {0, 135, 270};
+  float intensityVals[] = {0, 50, 100};
+
+  for (int r = 0; r < rows; r++) {
+    for (int c = 0; c < cols; c++) {
+      float cx = gap + static_cast<float>(c) * (cellSize + gap);
+      float cy = gap + static_cast<float>(r) * (cellSize + gap);
+      float ref = defRef, depth = defDepth, frost = defFrost, disp = defDisp;
+      float splay = defSplay, angle = defAngle, intensity = defIntensity;
+      switch (r) {
+        case 0:
+          ref = refractionVals[c];
+          break;
+        case 1:
+          depth = depthVals[c];
+          break;
+        case 2:
+          frost = frostVals[c];
+          break;
+        case 3:
+          disp = dispVals[c];
+          break;
+        case 4:
+          splay = splayVals[c];
+          break;
+        case 5:
+          angle = angleVals[c];
+          break;
+        case 6:
+          intensity = intensityVals[c];
+          break;
+      }
+      AddGlassCell(displayList->root(), bgImage, cx, cy, cellSize, ref, depth, frost, disp, splay,
+                   angle, intensity, glassW, glassH, radiusX, radiusY);
+    }
+  }
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyle" + keySuffix));
+}
+
+TGFX_TEST_PRIVATE(LayerTest, GlassStyleUsesBackgroundAndContourSource) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto layer = SolidLayer::Make();
+  layer->setWidth(100);
+  layer->setHeight(80);
+  auto glassStyle = GlassStyle::Make(80, 50, 0, 50, 0, 0, 0);
+  layer->setLayerStyles({glassStyle});
+
+  EXPECT_EQ(glassStyle->extraSourceType(),
+            static_cast<uint32_t>(LayerStyleExtraSourceType::Background) |
+                static_cast<uint32_t>(LayerStyleExtraSourceType::Contour));
+
+  DrawArgs drawArgs(context);
+  TGFX_PRIVATE_ACCESS(auto source = layer->getLayerStyleSource(drawArgs, Matrix::I());
+                      ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[0] != nullptr);
+                      EXPECT_TRUE(source->groups[0]->contour.has_value());
+                      EXPECT_TRUE(source->contentShape.has_value());)
+}
+
+TGFX_TEST(LayerTest, GlassStyleBackgroundOutsets) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 600, 200);
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto sharpLayer = SolidLayer::Make();
+  sharpLayer->setWidth(150);
+  sharpLayer->setHeight(100);
+  sharpLayer->setLayerStyles({GlassStyle::Make(80, 50, 0, 50, 0, 0, 0)});
+  displayList->root()->addChild(sharpLayer);
+
+  auto softLayer = SolidLayer::Make();
+  softLayer->setWidth(150);
+  softLayer->setHeight(100);
+  softLayer->setMatrix(Matrix::MakeTrans(200, 0));
+  softLayer->setLayerStyles({GlassStyle::Make(0, 50, 100, 0, 0, 0, 0)});
+  displayList->root()->addChild(softLayer);
+
+  auto mixedLayer = SolidLayer::Make();
+  mixedLayer->setWidth(150);
+  mixedLayer->setHeight(100);
+  mixedLayer->setMatrix(Matrix::MakeTrans(400, 0));
+  mixedLayer->setLayerStyles(
+      {BackgroundBlurStyle::Make(100, 100), GlassStyle::Make(80, 50, 0, 50, 0, 0, 0)});
+  displayList->root()->addChild(mixedLayer);
+
+  displayList->render(surface.get());
+
+  TGFX_PRIVATE_ACCESS(EXPECT_GT(sharpLayer->maxBackgroundOutset, 0.0f);
+                      EXPECT_EQ(sharpLayer->minBackgroundOutset, 0.0f);
+                      EXPECT_GT(softLayer->minBackgroundOutset, 0.0f);
+                      EXPECT_EQ(softLayer->maxBackgroundOutset, softLayer->minBackgroundOutset);
+                      EXPECT_GT(mixedLayer->maxBackgroundOutset, 0.0f);
+                      EXPECT_EQ(mixedLayer->minBackgroundOutset, 0.0f);)
+}
+
+TGFX_TEST(LayerTest, GlassStyleShapeLayerContentOffset) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 240, 220);
+  DisplayList displayList;
+
+  auto background = ImageLayer::Make();
+  background->setImage(MakeImage("resources/apitest/checker_128.png"));
+  background->setMatrix(Matrix::MakeScale(2));
+  displayList.root()->addChild(background);
+
+  Path glassPath;
+  glassPath.addRRect(RRect::MakeRectXY(Rect::MakeXYWH(75, 75, 90, 70), 20, 20));
+  EXPECT_EQ(glassPath.getBounds(), Rect::MakeXYWH(75, 75, 90, 70));
+
+  auto glassLayer = ShapeLayer::Make();
+  glassLayer->setPath(glassPath);
+  glassLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 128)));
+  glassLayer->setLayerStyles({GlassStyle::Make(80, 50, 0, 50, 0, 0, 0)});
+  displayList.root()->addChild(glassLayer);
+
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleShapeLayerContentOffset"));
+}
+
+TGFX_TEST(LayerTest, GlassStyleEllipse) {
+  RunGlassStyleTest("Ellipse");
+}
+
+TGFX_TEST(LayerTest, GlassStyleZoom) {
+  RunGlassStyleTest("Zoom", 2.0f);
+}
+
+TGFX_TEST(LayerTest, GlassStyleRoundedRect) {
+  // Rounded rectangle with unequal width/height (180x120, radius 30x30) exercises the SDF path.
+  RunGlassStyleTest("RoundedRect", 1.0f, 180.0f, 120.0f, 30.0f, 30.0f);
+}
+
+TGFX_TEST(LayerTest, GlassStyleEllipseSDF) {
+  // Ellipse with unequal width/height (180x120, radius = half dimensions) exercises the SDF path.
+  RunGlassStyleTest("EllipseSDF", 1.0f, 180.0f, 120.0f, 90.0f, 60.0f);
+}
+
+TGFX_TEST(LayerTest, GlassStyleEllipticalCorner) {
+  // Rounded rect with elliptical corners (radius 40x20, rx != ry) falls back to the AlphaMask
+  // path because the SDF shader only supports uniform circular corners (rx == ry).
+  RunGlassStyleTest("EllipticalCorner", 1.0f, 180.0f, 120.0f, 40.0f, 20.0f);
+}
+
+TGFX_TEST(LayerTest, GlassStyleExtremeAspectRatioUDF) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 700, 180);
+  auto displayList = std::make_unique<DisplayList>();
+  auto bgImage = MakeImage("resources/apitest/checker_128.png");
+
+  // Single background layer spanning the full surface.
+  auto imgLayer = ImageLayer::Make();
+  imgLayer->setImage(bgImage);
+  auto scale = 700.0f / static_cast<float>(std::max(bgImage->width(), bgImage->height()));
+  imgLayer->setMatrix(Matrix::MakeScale(scale, scale));
+  displayList->root()->addChild(imgLayer);
+
+  // Colored shapes for refraction contrast.
+  auto blueRect = ShapeLayer::Make();
+  Path bluePath = {};
+  bluePath.addRect(Rect::MakeXYWH(50, 30, 245, 60));
+  blueRect->setPath(bluePath);
+  blueRect->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 100, 255, 255)));
+  displayList->root()->addChild(blueRect);
+
+  auto greenCircle = ShapeLayer::Make();
+  Path greenPath = {};
+  greenPath.addOval(Rect::MakeXYWH(400, 100, 280, 60));
+  greenCircle->setPath(greenPath);
+  greenCircle->setFillStyle(ShapeStyle::Make(Color::FromRGBA(50, 200, 80, 200)));
+  displayList->root()->addChild(greenCircle);
+
+  // Three glass panels with increasing widths, all using the UDF path (rx != ry).
+  float glassWidths[] = {200, 400, 600};
+  for (int i = 0; i < 3; i++) {
+    float gw = glassWidths[i];
+    float gh = 20;
+    auto glassLayer = SolidLayer::Make();
+    glassLayer->setColor(Color::FromRGBA(255, 255, 255, 128));
+    glassLayer->setWidth(gw);
+    glassLayer->setHeight(gh);
+    glassLayer->setRadiusX(20);
+    glassLayer->setRadiusY(10);
+    float glassX = (700.0f - gw) * 0.5f;
+    float glassY = 20.0f + static_cast<float>(i) * 60.0f;
+    glassLayer->setMatrix(Matrix::MakeTrans(glassX, glassY));
+    auto style = GlassStyle::Make(80, 70, 0, 50, 50, 135, 50);
+    glassLayer->setLayerStyles({style});
+    displayList->root()->addChild(glassLayer);
+  }
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleExtremeAspectRatioUDF"));
 }
 
 }  // namespace tgfx

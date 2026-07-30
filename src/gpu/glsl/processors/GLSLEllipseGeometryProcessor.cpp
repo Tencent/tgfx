@@ -73,16 +73,16 @@ void GLSLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
   // by zero, then we scale the result back.
 
   // for outer curve
-  fragBuilder->codeAppendf("vec2 offset = %s.xy;", ellipseOffsets.fsIn().c_str());
+  fragBuilder->codeAppendf("highp vec2 offset = %s.xy;", ellipseOffsets.fsIn().c_str());
   if (stroke) {
     fragBuilder->codeAppendf("offset *= %s.xy;", ellipseRadii.fsIn().c_str());
   }
-  fragBuilder->codeAppend("float test = dot(offset, offset) - 1.0;");
-  fragBuilder->codeAppendf("vec2 grad = 2.0*offset*%s.xy;", ellipseRadii.fsIn().c_str());
-  fragBuilder->codeAppend("float grad_dot = dot(grad, grad);");
+  fragBuilder->codeAppend("highp float test = dot(offset, offset) - 1.0;");
+  fragBuilder->codeAppendf("highp vec2 grad = 2.0*offset*%s.xy;", ellipseRadii.fsIn().c_str());
+  fragBuilder->codeAppend("highp float grad_dot = dot(grad, grad);");
   fragBuilder->codeAppend("grad_dot = max(grad_dot, 1.1755e-38);");
-  fragBuilder->codeAppend("float invlen = inversesqrt(grad_dot);");
-  fragBuilder->codeAppend("float edgeAlpha = clamp(0.5-test*invlen, 0.0, 1.0);");
+  fragBuilder->codeAppend("highp float invlen = inversesqrt(grad_dot);");
+  fragBuilder->codeAppend("highp float edgeAlpha = clamp(0.5-test*invlen, 0.0, 1.0);");
 
   // for inner curve
   if (stroke) {

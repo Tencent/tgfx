@@ -30,7 +30,7 @@ GLSLRadialGradientLayout::GLSLRadialGradientLayout(Matrix matrix) : RadialGradie
 void GLSLRadialGradientLayout::emitCode(EmitArgs& args) const {
   auto fragBuilder = args.fragBuilder;
   const auto coordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[0]);
-  fragBuilder->codeAppendf("float t = length(%s);", coordName.c_str());
+  fragBuilder->codeAppendf("highp float t = length(%s);", coordName.c_str());
   fragBuilder->codeAppendf("%s = vec4(t, 1.0, 0.0, 0.0);", args.outputColor.c_str());
 }
 }  // namespace tgfx

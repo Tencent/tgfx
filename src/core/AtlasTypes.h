@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <list>
 #include "RectPackSkyline.h"
 #include "core/utils/Log.h"

@@ -20,27 +20,24 @@
 
 namespace tgfx {
 
-std::shared_ptr<ImageFilter> LayerFilter::getImageFilter(float scale) {
-  if (lastScale != scale || dirty) {
-    lastFilter = onCreateImageFilter(scale);
-    lastScale = scale;
-    dirty = false;
+std::shared_ptr<Image> LayerFilter::filterImage(std::shared_ptr<Image> input, float scale,
+                                                const Rect& contentBounds, Point* offset) {
+  if (!input) {
+    return nullptr;
   }
-  return lastFilter;
+  return onFilterImage(std::move(input), scale, contentBounds, offset);
 }
 
-Rect LayerFilter::filterBounds(const Rect& srcRect, float contentScale) {
-  auto filter = getImageFilter(contentScale);
-  if (!filter) {
-    return srcRect;
-  }
-  return filter->filterBounds(srcRect);
+Rect LayerFilter::filterBounds(const Rect& srcRect, float, MapDirection) {
+  return srcRect;
 }
 
 void LayerFilter::invalidateFilter() {
-  lastFilter = nullptr;
-  dirty = true;
+  onInvalidateFilter();
   invalidateTransform();
+}
+
+void LayerFilter::onInvalidateFilter() {
 }
 
 }  // namespace tgfx

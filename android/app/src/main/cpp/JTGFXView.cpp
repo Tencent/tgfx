@@ -26,7 +26,7 @@ JTGFXView::JTGFXView(ANativeWindow* nativeWindow, std::shared_ptr<tgfx::Window> 
                      std::unique_ptr<hello2d::AppHost> appHost)
     : nativeWindow(nativeWindow), window(std::move(window)), appHost(std::move(appHost)) {
   displayList.setRenderMode(tgfx::RenderMode::Tiled);
-  displayList.setAllowZoomBlur(true);
+  displayList.setTileUpdateMode(tgfx::TileUpdateMode::Smooth);
   displayList.setMaxTileCount(512);
   updateSize();
 }
@@ -160,7 +160,16 @@ JNIEXPORT jlong JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_setupFromS
     return 0;
   }
 
+#ifdef TGFX_USE_VULKAN
+  auto device = tgfx::VulkanDevice::Make();
+  if (device == nullptr) {
+    ANativeWindow_release(nativeWindow);
+    return 0;
+  }
+  auto window = tgfx::VulkanWindow::MakeFrom(nativeWindow, device);
+#else
   auto window = tgfx::EGLWindow::MakeFrom(nativeWindow);
+#endif
   if (window == nullptr) {
     ANativeWindow_release(nativeWindow);
     return 0;

@@ -24,4 +24,5 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../../../../ ./tgfx)
 
 file(GLOB_RECURSE HELLO_2D_FILES *.cpp)
 add_library(hello2d SHARED ${HELLO_2D_FILES})
+target_compile_definitions(hello2d PRIVATE ${TGFX_DEFINES})
 target_link_libraries(hello2d tgfx-hello2d tgfx ${TGFX_SHARED_LIBS} ${NATIVE_VSYNC_LIB})

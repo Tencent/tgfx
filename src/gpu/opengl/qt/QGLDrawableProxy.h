@@ -38,6 +38,7 @@ class QGLDrawableProxy : public RenderTargetProxy {
   std::shared_ptr<TextureView> getTextureView() const override;
   std::shared_ptr<TextureProxy> asTextureProxy() const override;
   std::shared_ptr<RenderTarget> getRenderTarget() const override;
+  std::shared_ptr<Texture> getStencil(int sampleCount) override;
 
   std::shared_ptr<RenderTargetProxy> getTextureTargetProxy() const;
   void releaseTexture();
@@ -48,7 +49,7 @@ class QGLDrawableProxy : public RenderTargetProxy {
   int _height = 0;
   PixelFormat _format = PixelFormat::RGBA_8888;
   int _sampleCount = 1;
-  ImageOrigin _origin = ImageOrigin::BottomLeft;
+  ImageOrigin _origin = ImageOrigin::TopLeft;
   QGLWindow* _window = nullptr;
   mutable std::shared_ptr<RenderTargetProxy> textureRTProxy = nullptr;
   std::weak_ptr<RenderTargetProxy> weakThis;

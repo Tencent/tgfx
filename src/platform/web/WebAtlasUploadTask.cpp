@@ -29,9 +29,9 @@ class DirectCellUploadTask : public CellUploadTask {
       : imageBuffer(std::move(imageBuffer)), offsetX(offsetX), offsetY(offsetY) {
   }
 
-  void upload(std::shared_ptr<Texture> texture, CommandQueue*) override {
+  void upload(std::shared_ptr<Texture> texture, CommandQueue* queue) override {
     auto webBuffer = std::static_pointer_cast<WebImageBuffer>(imageBuffer);
-    webBuffer->uploadToTexture(std::move(texture), offsetX, offsetY);
+    webBuffer->uploadToTexture(std::move(texture), queue, offsetX, offsetY);
   }
 
  private:

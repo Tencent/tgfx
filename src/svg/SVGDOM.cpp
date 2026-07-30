@@ -29,7 +29,6 @@
 #include "tgfx/core/Surface.h"
 #include "tgfx/svg/SVGLengthContext.h"
 #include "tgfx/svg/SVGTypes.h"
-#include "tgfx/svg/node/SVGContainer.h"
 #include "tgfx/svg/node/SVGNode.h"
 #include "tgfx/svg/xml/XMLDOM.h"
 

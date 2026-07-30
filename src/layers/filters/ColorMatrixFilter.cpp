@@ -32,12 +32,12 @@ void ColorMatrixFilter::setMatrix(const std::array<float, 20>& matrix) {
   invalidateFilter();
 }
 
-std::shared_ptr<ImageFilter> ColorMatrixFilter::onCreateImageFilter(float) {
-  return ImageFilter::ColorFilter(ColorFilter::Matrix(_matrix));
-}
-
 ColorMatrixFilter::ColorMatrixFilter(const std::array<float, 20>& matrix)
     : _matrix(std::move(matrix)) {
+}
+
+std::shared_ptr<ImageFilter> ColorMatrixFilter::onCreateImageFilter(float) {
+  return ImageFilter::ColorFilter(ColorFilter::Matrix(_matrix));
 }
 
 }  // namespace tgfx

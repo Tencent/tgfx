@@ -48,7 +48,7 @@ void GLSLHairlineLineGeometryProcessor::emitCode(EmitArgs& args) const {
   auto matrixName =
       uniformHandler->addUniform("Matrix", UniformFormat::Float3x3, ShaderStage::Vertex);
   std::string positionName = "transformedPosition";
-  vertBuilder->codeAppendf("vec2 %s = (%s * vec3(%s, 1.0)).xy;", positionName.c_str(),
+  vertBuilder->codeAppendf("highp vec2 %s = (%s * vec3(%s, 1.0)).xy;", positionName.c_str(),
                            matrixName.c_str(), position.name().c_str());
 
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler,
@@ -58,7 +58,7 @@ void GLSLHairlineLineGeometryProcessor::emitCode(EmitArgs& args) const {
   vertBuilder->codeAppendf("%s = %s;", edgeVarying.vsOut().c_str(), edgeDistance.name().c_str());
 
   // Fragment shader: calculate anti-aliasing based on edge distance
-  fragBuilder->codeAppendf("float edgeAlpha = abs(%s);", edgeVarying.fsIn().c_str());
+  fragBuilder->codeAppendf("highp float edgeAlpha = abs(%s);", edgeVarying.fsIn().c_str());
   fragBuilder->codeAppend("edgeAlpha = clamp(edgeAlpha, 0.0, 1.0);");
   if (aaType != AAType::Coverage) {
     // Non-coverage anti-aliasing

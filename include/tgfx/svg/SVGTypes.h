@@ -868,6 +868,20 @@ struct SVGFeTurbulenceType {
   }
 };
 
+struct SVGFeStitchTiles {
+  enum class Type {
+    NoStitch,
+    Stitch,
+  };
+
+  Type type = Type::NoStitch;
+
+  SVGFeStitchTiles() = default;
+
+  explicit SVGFeStitchTiles(Type inputType) : type(inputType) {
+  }
+};
+
 enum class SVGXmlSpace {
   Default,
   Preserve,

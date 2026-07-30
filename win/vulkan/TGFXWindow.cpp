@@ -285,7 +285,7 @@ void TGFXWindow::createAppHost() {
   appHost = std::make_unique<hello2d::AppHost>();
 
   displayList.setRenderMode(tgfx::RenderMode::Tiled);
-  displayList.setAllowZoomBlur(true);
+  displayList.setTileUpdateMode(tgfx::TileUpdateMode::Smooth);
   displayList.setMaxTileCount(512);
 
   std::filesystem::path filePath = __FILE__;
