@@ -251,11 +251,10 @@ bool OpsCompositor::shouldUseStencilCover(const Brush& brush, const Shape& shape
     return false;
   }
 
-  // Simple non-inverse geometry (empty path, rect, rrect, oval) is cheaper on the legacy
-  // triangulation path.
+  // Empty and rect paths are faster on the legacy triangulation path.
   if (shape.isSimplePath()) {
     auto path = shape.getPath();
-    if (path.isEmpty() || path.isRect() || path.isRRect(nullptr) || path.isOval()) {
+    if (path.isEmpty() || path.isRect()) {
       return false;
     }
   }
