@@ -4139,6 +4139,20 @@ TGFX_TEST(LayerTest, GlassStyleEllipticalCorner) {
   RunGlassStyleTest("EllipticalCorner", 1.0f, 180.0f, 120.0f, 40.0f, 20.0f);
 }
 
+TGFX_TEST(LayerTest, GlassStyleEllipticalCornerSingleCell) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  constexpr float cellSize = 200;
+  auto surface = Surface::Make(context, static_cast<int>(cellSize), static_cast<int>(cellSize));
+  auto displayList = std::make_unique<DisplayList>();
+  auto bgImage = MakeImage("resources/apitest/checker_128.png");
+  AddGlassCell(displayList->root(), bgImage, 0, 0, cellSize, 50, 100, 0, 0, 50, 135, 50, 180.0f,
+               120.0f, 40.0f, 20.0f);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleEllipticalCornerSingleCell"));
+}
+
 TGFX_TEST(LayerTest, GlassStyleExtremeAspectRatioUDF) {
   ContextScope scope;
   auto context = scope.getContext();

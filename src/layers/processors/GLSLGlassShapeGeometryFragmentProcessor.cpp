@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLGlassShapeGeometryFragmentProcessor.h"
+#include <cmath>
 
 namespace tgfx {
 namespace {
@@ -86,7 +87,7 @@ void GLSLGlassSDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend("if (outerSDF < 0.0) {");
   fragBuilder->codeAppend("  float edgeDist = -outerSDF;");
   fragBuilder->codeAppendf("  float edgeBandWidth = min(%s.w, 60.0);", shape.c_str());
-  fragBuilder->codeAppend("  float edgeWeight = 1.0 - smoothstep(0.0, 5.0, edgeDist);");
+  fragBuilder->codeAppend("  float edgeWeight = 1.0 - smoothstep(0.0, 1.0, edgeDist);");
   fragBuilder->codeAppend("  float edgeFactor = 1.0 - min(edgeDist / edgeBandWidth, 1.0);");
   fragBuilder->codeAppendf(
       "  float offsetDist = %s.w * %s.x * edgeFactor * edgeFactor * edgeFactor * 1.2;",
@@ -167,23 +168,29 @@ void GLSLGlassUDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
       args.uniformHandler->addUniform("GlassShapeP0", UniformFormat::Float4, ShaderStage::Fragment);
   auto effect =
       args.uniformHandler->addUniform("GlassShapeP1", UniformFormat::Float4, ShaderStage::Fragment);
+  auto fineMaskUV = args.uniformHandler->addUniform("GlassFineMaskUV", UniformFormat::Float4,
+                                                    ShaderStage::Fragment);
   auto& fineSampler = (*args.textureSamplers)[0];
 
   EmitGeometryCoordinates(fragBuilder, args.inputColor, shape);
   fragBuilder->codeAppend("const vec4 UNPACK = vec4(1.0, 1.0/255.0, 1.0/65025.0, 1.0/16581375.0);");
   fragBuilder->codeAppend("vec2 maskUV = vec2(glassUV.x, 1.0 - glassUV.y);");
+  fragBuilder->codeAppendf("vec2 fineUV = maskUV * %s.xy + %s.zw;", fineMaskUV.c_str(),
+                           fineMaskUV.c_str());
   fragBuilder->codeAppend("vec4 packedHeight = ");
-  fragBuilder->appendTextureLookup(fineSampler, "maskUV");
+  fragBuilder->appendTextureLookup(fineSampler, "fineUV");
   fragBuilder->codeAppend(";");
   fragBuilder->codeAppend("float height = dot(packedHeight, UNPACK);");
   fragBuilder->codeAppendf("float gradientBase = %s.z * 3.0 + 1.0;", effect.c_str());
   fragBuilder->codeAppendf("vec2 gradientStep = gradientBase * %s.zw;", shape.c_str());
-  fragBuilder->codeAppend("vec2 gradientUVStep = gradientStep * vec2(0.5 / halfW, 0.5 / halfH);");
+  fragBuilder->codeAppendf(
+      "vec2 gradientUVStep = gradientStep * vec2(0.5 / halfW, 0.5 / halfH) * %s.xy;",
+      fineMaskUV.c_str());
   fragBuilder->codeAppend("vec4 packedRight = ");
-  fragBuilder->appendTextureLookup(fineSampler, "maskUV + vec2(gradientUVStep.x, 0.0)");
+  fragBuilder->appendTextureLookup(fineSampler, "fineUV + vec2(gradientUVStep.x, 0.0)");
   fragBuilder->codeAppend(";");
   fragBuilder->codeAppend("vec4 packedUp = ");
-  fragBuilder->appendTextureLookup(fineSampler, "maskUV - vec2(0.0, gradientUVStep.y)");
+  fragBuilder->appendTextureLookup(fineSampler, "fineUV - vec2(0.0, gradientUVStep.y)");
   fragBuilder->codeAppend(";");
   fragBuilder->codeAppend("vec2 gradient = vec2(dot(packedRight, UNPACK) - height,");
   fragBuilder->codeAppend("    dot(packedUp, UNPACK) - height) / gradientStep;");
@@ -195,7 +202,7 @@ void GLSLGlassUDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->appendTextureLookup(coarseSampler, "maskUV");
     fragBuilder->codeAppend(";");
     fragBuilder->codeAppend(
-        "edgeWeight = 1.0 - smoothstep(0.5, 0.75, dot(packedEdgeHeight, UNPACK));");
+        "edgeWeight = 1.0 - smoothstep(0.5, 0.55, dot(packedEdgeHeight, UNPACK));");
   }
   fragBuilder->codeAppendf("%s = vec4(0.0);", args.outputColor.c_str());
   fragBuilder->codeAppend("if (gradientLength > 0.000001) {");
@@ -225,6 +232,14 @@ void GLSLGlassUDFGeometryFragmentProcessor::onSetData(UniformData*,
   fragmentUniformData->setData("GlassShapeP0", shapeData);
   float effectData[4] = {params.refractionFactor, params.splay, params.depthRatio, 0.0f};
   fragmentUniformData->setData("GlassShapeP1", effectData);
+  float textureWidth = static_cast<float>(fineMaskProxy->width());
+  float textureHeight = static_cast<float>(fineMaskProxy->height());
+  float coreWidth = std::round(params.halfW * 2.0f / params.udfPixelToLayerPixelX);
+  float coreHeight = std::round(params.halfH * 2.0f / params.udfPixelToLayerPixelY);
+  float scaleX = coreWidth / textureWidth;
+  float scaleY = coreHeight / textureHeight;
+  float maskUVData[4] = {scaleX, scaleY, (1.0f - scaleX) * 0.5f, (1.0f - scaleY) * 0.5f};
+  fragmentUniformData->setData("GlassFineMaskUV", maskUVData);
 }
 
 }  // namespace tgfx

@@ -46,8 +46,9 @@ static constexpr int MaxTentRadius = 64;
 
 static std::shared_ptr<Image> MakeTentBlurImage(Context* context,
                                                 const std::shared_ptr<Image>& source, float radiusX,
-                                                float radiusY) {
-  if (context == nullptr || source == nullptr || radiusX <= 0.0f || radiusY <= 0.0f) {
+                                                float radiusY, int paddingX = 0, int paddingY = 0) {
+  if (context == nullptr || source == nullptr || radiusX <= 0.0f || radiusY <= 0.0f ||
+      paddingX < 0 || paddingY < 0) {
     return nullptr;
   }
   auto textureImage = source->makeTextureImage(context);
@@ -57,9 +58,12 @@ static std::shared_ptr<Image> MakeTentBlurImage(Context* context,
   auto textureProxy = std::static_pointer_cast<TextureImage>(textureImage)->getTextureProxy();
   SamplingArgs samplingArgs = {TileMode::Decal, TileMode::Decal, {}, SrcRectConstraint::Fast};
   auto allocator = context->drawingAllocator();
-  auto sourceProcessor = TiledTextureEffect::Make(allocator, textureProxy, samplingArgs);
+  auto horizontalMatrix = Matrix::MakeTrans(-static_cast<float>(paddingX), 0.0f);
+  auto sourceProcessor =
+      TiledTextureEffect::Make(allocator, textureProxy, samplingArgs, &horizontalMatrix);
+  auto horizontalWidth = source->width() + paddingX * 2;
   auto horizontalTarget =
-      RenderTargetProxy::Make(context, source->width(), source->height(), false, 1, false,
+      RenderTargetProxy::Make(context, horizontalWidth, source->height(), false, 1, false,
                               ImageOrigin::TopLeft, BackingFit::Exact);
   if (sourceProcessor == nullptr || horizontalTarget == nullptr) {
     return nullptr;
@@ -71,10 +75,12 @@ static std::shared_ptr<Image> MakeTentBlurImage(Context* context,
                                                0)) {
     return nullptr;
   }
-  auto verticalSource =
-      TiledTextureEffect::Make(allocator, horizontalTarget->asTextureProxy(), samplingArgs);
-  auto verticalTarget = RenderTargetProxy::Make(context, source->width(), source->height(), false,
-                                                1, false, ImageOrigin::TopLeft, BackingFit::Exact);
+  auto verticalMatrix = Matrix::MakeTrans(0.0f, -static_cast<float>(paddingY));
+  auto verticalSource = TiledTextureEffect::Make(allocator, horizontalTarget->asTextureProxy(),
+                                                 samplingArgs, &verticalMatrix);
+  auto verticalHeight = source->height() + paddingY * 2;
+  auto verticalTarget = RenderTargetProxy::Make(context, horizontalWidth, verticalHeight, false, 1,
+                                                false, ImageOrigin::TopLeft, BackingFit::Exact);
   if (verticalSource == nullptr || verticalTarget == nullptr) {
     return nullptr;
   }
@@ -337,9 +343,10 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       // Tent-blur the binary alpha to approximate UDF (triangular kernel gives more linear
       // transition than Gaussian, closer to a true distance field).
       // The maskImage is rebuilt every frame via MakeTentBlurImage (input.content changes).
-      // UDF is capped at MAX_UDF_SIZE to prevent excessive texture allocation. The mask UVs
-      // are normalized (0-1), so lower resolution does not affect the refraction shader.
+      // The padded UDF is capped at MAX_UDF_SIZE to prevent excessive texture allocation. The
+      // mask UVs are normalized (0-1), so lower resolution does not affect the refraction shader.
       static constexpr float MAX_UDF_SIZE = 512.0f;
+      static constexpr int UDF_PADDING = 4;
       // Use original layer bounds (not zoom-affected) for blur radius calculation.
       // depth 1-100 maps linearly to blurRadius 5-60. The 60.0 cap is unrelated to the shader's
       // edgeBandWidth cap (same value, different purpose: this limits UDF blur, that limits SDF
@@ -348,12 +355,17 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       static constexpr float MIN_BLUR_RADIUS = 5.0f;
       float blurRadius =
           std::max(std::min((_depth / 100.0f) * MAX_BLUR_RADIUS, MAX_BLUR_RADIUS), MIN_BLUR_RADIUS);
-      // UDF texture size follows the original content bounds and is capped at MAX_UDF_SIZE.
-      // UDF pixel-to-layer ratios and blurRadius scale with udfScale, so refraction distances
-      // remain consistent in layer space regardless of UDF resolution.
-      // origMaxDim is guaranteed > 0 here because onDraw early-returns on origBounds.isEmpty().
+      // The UDF core follows the original content bounds while leaving room for the transparent
+      // halo inside the texture size cap. UDF pixel-to-layer ratios and blurRadius scale with
+      // udfScale, so refraction distances remain consistent in layer space regardless of UDF
+      // resolution. origMaxDim is guaranteed > 0 because onDraw rejects empty origBounds.
       float origMaxDim = std::max(origBounds.width(), origBounds.height());
-      float udfScale = std::min({1.0f, MAX_UDF_SIZE / origMaxDim});
+      float maxPaddedUDFSize = std::min(MAX_UDF_SIZE, static_cast<float>(maxTextureSize));
+      float maxCoreUDFSize = maxPaddedUDFSize - UDF_PADDING * 2.0f;
+      if (maxCoreUDFSize < 1.0f) {
+        return;
+      }
+      float udfScale = std::min({1.0f, maxCoreUDFSize / origMaxDim});
       int udfWidth = std::max(1, static_cast<int>(std::round(origBounds.width() * udfScale)));
       int udfHeight = std::max(1, static_cast<int>(std::round(origBounds.height() * udfScale)));
       // The UDF dimensions are rounded independently, so each axis needs its own layer-pixel
@@ -373,11 +385,13 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       // zoom-invariant.
       float udfBlurRadiusX = blurRadius * udfScale;
       float udfBlurRadiusY = blurRadius * udfScale;
-      // depthRatio stays as _depth/100 for shader use (step calculation).
-      maskImage = MakeTentBlurImage(context, udfContent, udfBlurRadiusX, udfBlurRadiusY);
+      // depthRatio stays as _depth/100 for shader use (step calculation). The transparent halo
+      // covers the shader's maximum four-texel forward-difference span.
+      maskImage = MakeTentBlurImage(context, udfContent, udfBlurRadiusX, udfBlurRadiusY,
+                                    UDF_PADDING, UDF_PADDING);
       if (!maskImage) {
-        LOGE("GlassStyle: Failed to blur alpha for UDF, falling back to content.");
-        maskImage = udfContent;
+        LOGE("GlassStyle: Failed to create padded alpha UDF.");
+        return;
       }
 
       if (_lightIntensity > 0) {
