@@ -531,9 +531,28 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
     drawRRect.offset(-input.contentOffset.x, -input.contentOffset.y);
     canvas->drawRRect(drawRRect, paint);
   } else {
-    // AlphaMask path: draw through the content alpha mask so the glass effect is clipped to
-    // the layer shape.
-    auto maskShader = Shader::MakeImageShader(input.content, TileMode::Decal, TileMode::Decal);
+    // AlphaMask path: preserve the complete shape while limiting its texture dimensions. Using a
+    // visible subset would make the mask depend on the current tile and change its edge semantics.
+    auto maskImage = input.content;
+    float maskScaleX = 1.0f;
+    float maskScaleY = 1.0f;
+    auto maskMaxDimension = std::max(maskImage->width(), maskImage->height());
+    if (maskMaxDimension > maxTextureSize) {
+      float maskScale = static_cast<float>(maxTextureSize) / static_cast<float>(maskMaxDimension);
+      int maskWidth = std::max(
+          1, static_cast<int>(std::round(static_cast<float>(maskImage->width()) * maskScale)));
+      int maskHeight = std::max(
+          1, static_cast<int>(std::round(static_cast<float>(maskImage->height()) * maskScale)));
+      maskImage = maskImage->makeScaled(maskWidth, maskHeight, SamplingOptions(FilterMode::Linear));
+      if (maskImage == nullptr) {
+        return;
+      }
+      maskScaleX = static_cast<float>(input.content->width()) / static_cast<float>(maskWidth);
+      maskScaleY = static_cast<float>(input.content->height()) / static_cast<float>(maskHeight);
+    }
+    auto maskShader = Shader::MakeImageShader(maskImage, TileMode::Decal, TileMode::Decal,
+                                              SamplingOptions(FilterMode::Linear));
+    maskShader = maskShader->makeWithMatrix(Matrix::MakeScale(maskScaleX, maskScaleY));
     paint.setMaskFilter(MaskFilter::MakeShader(maskShader, false));
     auto contentRect = Rect::MakeWH(static_cast<float>(input.content->width()),
                                     static_cast<float>(input.content->height()));
