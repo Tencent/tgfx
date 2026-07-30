@@ -419,17 +419,19 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       static constexpr float MIN_BLUR_RADIUS = 5.0f;
       float blurRadius =
           std::max(std::min((_depth / 100.0f) * MAX_BLUR_RADIUS, MAX_BLUR_RADIUS), MIN_BLUR_RADIUS);
-      // The UDF core follows the original content bounds while leaving room for the transparent
+      // The UDF core follows the original layer bounds while leaving room for the transparent
       // halo inside the texture size cap. UDF pixel-to-layer ratios and blurRadius scale with
       // udfScale, so refraction distances remain consistent in layer space regardless of UDF
-      // resolution. origMaxDim is guaranteed > 0 because onDraw rejects empty origBounds.
+      // resolution. A minimum source size of 128 prevents tiny glass panels from producing an
+      // overly coarse UDF. origMaxDim is guaranteed > 0 because onDraw rejects empty origBounds.
+      static constexpr float MIN_UDF_SOURCE_SIZE = 128.0f;
       float origMaxDim = std::max(origBounds.width(), origBounds.height());
       float maxPaddedUDFSize = std::min(MAX_UDF_SIZE, static_cast<float>(maxTextureSize));
       float maxCoreUDFSize = maxPaddedUDFSize - UDF_PADDING * 2.0f;
       if (maxCoreUDFSize < 1.0f) {
         return;
       }
-      float udfScale = std::min({1.0f, maxCoreUDFSize / origMaxDim});
+      float udfScale = std::min({1.0f, maxCoreUDFSize / std::max(origMaxDim, MIN_UDF_SOURCE_SIZE)});
       int udfWidth = std::max(1, static_cast<int>(std::round(origBounds.width() * udfScale)));
       int udfHeight = std::max(1, static_cast<int>(std::round(origBounds.height() * udfScale)));
       // The UDF dimensions are rounded independently, so each axis needs its own layer-pixel
