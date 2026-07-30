@@ -18,16 +18,27 @@
 
 #pragma once
 
-#include "layers/processors/GlassRefractionFragmentProcessor.h"
+#include "layers/processors/GlassShapeGeometryFragmentProcessor.h"
 
 namespace tgfx {
 
-class GLSLGlassRefractionFragmentProcessor : public GlassRefractionFragmentProcessor {
+class GLSLGlassSDFGeometryFragmentProcessor : public GlassSDFGeometryFragmentProcessor {
  public:
-  GLSLGlassRefractionFragmentProcessor(std::shared_ptr<TextureProxy> source,
-                                       PlacementPtr<GlassShapeGeometryFragmentProcessor> geometry,
-                                       const GlassRefractionParams& params,
-                                       const Matrix& coordMatrix);
+  GLSLGlassSDFGeometryFragmentProcessor(GlassShapeType shapeType,
+                                        const GlassSDFGeometryParams& params);
+
+  void emitCode(EmitArgs& args) const override;
+
+ private:
+  void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
+};
+
+class GLSLGlassUDFGeometryFragmentProcessor : public GlassUDFGeometryFragmentProcessor {
+ public:
+  GLSLGlassUDFGeometryFragmentProcessor(std::shared_ptr<TextureProxy> fineMask,
+                                        std::shared_ptr<TextureProxy> coarseMask,
+                                        const GlassUDFGeometryParams& params,
+                                        bool enableEdgeLighting);
 
   void emitCode(EmitArgs& args) const override;
 

@@ -121,7 +121,7 @@ class InnerShadowStyle : public LayerStyle {
 
   Rect filterBounds(const Rect& srcRect, float contentScale) override;
 
-  LayerStyleExtraSourceType extraSourceType() const override;
+  uint32_t extraSourceType() const override;
 
  private:
   InnerShadowStyle(float offsetX, float offsetY, float blurrinessX, float blurrinessY,

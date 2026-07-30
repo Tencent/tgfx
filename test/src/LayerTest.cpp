@@ -22,6 +22,7 @@
 #include "core/shaders/GradientShader.h"
 #include "core/utils/MathExtra.h"
 #include "layers/DrawArgs.h"
+#include "layers/LayerStyleSource.h"
 #include "layers/OpaqueContext.h"
 #include "layers/RootLayer.h"
 #include "layers/SubtreeCache.h"
@@ -3901,7 +3902,10 @@ TGFX_TEST(LayerTest, InnerShadow) {
 // Creates a single glass cell: background image + colored rect + ellipse glass panel at (x, y).
 static void AddGlassCell(Layer* root, std::shared_ptr<Image> bgImage, float x, float y,
                          float cellSize, float refraction, float depth, float frost,
-                         float dispersion, float splay, float lightAngle, float lightIntensity) {
+                         float dispersion, float splay, float lightAngle, float lightIntensity,
+                         float glassW = -1.0f, float glassH = -1.0f, float radiusX = -1.0f,
+                         float radiusY = -1.0f,
+                         Color rectColor = Color::FromRGBA(0, 100, 255, 255)) {
   auto container = Layer::Make();
   container->setMatrix(Matrix::MakeTrans(x, y));
 
@@ -3920,7 +3924,7 @@ static void AddGlassCell(Layer* root, std::shared_ptr<Image> bgImage, float x, f
   bluePath.addRect(
       Rect::MakeXYWH(cellSize * 0.15f, cellSize * 0.15f, cellSize * 0.35f, cellSize * 0.35f));
   blueRect->setPath(bluePath);
-  blueRect->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 100, 255, 255)));
+  blueRect->setFillStyle(ShapeStyle::Make(rectColor));
   container->addChild(blueRect);
 
   auto greenCircle = ShapeLayer::Make();
@@ -3931,15 +3935,23 @@ static void AddGlassCell(Layer* root, std::shared_ptr<Image> bgImage, float x, f
   greenCircle->setFillStyle(ShapeStyle::Make(Color::FromRGBA(50, 200, 80, 200)));
   container->addChild(greenCircle);
 
-  // Glass panel goes through the AlphaMask UDF path.
-  float glassSize = cellSize - 20;
+  // Glass panel shape. Default is a circle (ellipse with equal width/height); callers can
+  // override to render a rounded rect or an ellipse with unequal dimensions, which exercise
+  // the analytical SDF refraction path.
+  float defaultSize = cellSize - 20;
+  // width/height use > 0 (zero size is invalid), but radius uses >= 0 (zero radius is a valid
+  // sharp rect).
+  float gw = glassW > 0.0f ? glassW : defaultSize;
+  float gh = glassH > 0.0f ? glassH : defaultSize;
+  float rx = radiusX >= 0.0f ? radiusX : gw * 0.5f;
+  float ry = radiusY >= 0.0f ? radiusY : gh * 0.5f;
   auto glassLayer = SolidLayer::Make();
   glassLayer->setColor(Color::FromRGBA(255, 255, 255, 128));
-  glassLayer->setWidth(glassSize);
-  glassLayer->setHeight(glassSize);
-  glassLayer->setRadiusX(glassSize * 0.5f);
-  glassLayer->setRadiusY(glassSize * 0.5f);
-  glassLayer->setMatrix(Matrix::MakeTrans(10, 10));
+  glassLayer->setWidth(gw);
+  glassLayer->setHeight(gh);
+  glassLayer->setRadiusX(rx);
+  glassLayer->setRadiusY(ry);
+  glassLayer->setMatrix(Matrix::MakeTrans((cellSize - gw) * 0.5f, (cellSize - gh) * 0.5f));
   auto style =
       GlassStyle::Make(refraction, depth, frost, dispersion, splay, lightAngle, lightIntensity);
   glassLayer->setLayerStyles({style});
@@ -3948,7 +3960,9 @@ static void AddGlassCell(Layer* root, std::shared_ptr<Image> bgImage, float x, f
   root->addChild(container);
 }
 
-static void RunGlassStyleTest(const std::string& keySuffix, float zoomScale = 1.0f) {
+static void RunGlassStyleTest(const std::string& keySuffix, float zoomScale = 1.0f,
+                              float glassW = -1.0f, float glassH = -1.0f, float radiusX = -1.0f,
+                              float radiusY = -1.0f) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -4007,12 +4021,98 @@ static void RunGlassStyleTest(const std::string& keySuffix, float zoomScale = 1.
           break;
       }
       AddGlassCell(displayList->root(), bgImage, cx, cy, cellSize, ref, depth, frost, disp, splay,
-                   angle, intensity);
+                   angle, intensity, glassW, glassH, radiusX, radiusY);
     }
   }
 
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyle" + keySuffix));
+}
+
+TGFX_TEST_PRIVATE(LayerTest, GlassStyleUsesBackgroundAndContourSource) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto layer = SolidLayer::Make();
+  layer->setWidth(100);
+  layer->setHeight(80);
+  auto glassStyle = GlassStyle::Make(80, 50, 0, 50, 0, 0, 0);
+  layer->setLayerStyles({glassStyle});
+
+  EXPECT_EQ(glassStyle->extraSourceType(),
+            static_cast<uint32_t>(LayerStyleExtraSourceType::Background) |
+                static_cast<uint32_t>(LayerStyleExtraSourceType::Contour));
+
+  DrawArgs drawArgs(context);
+  TGFX_PRIVATE_ACCESS(auto source = layer->getLayerStyleSource(drawArgs, Matrix::I());
+                      ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[0] != nullptr);
+                      EXPECT_TRUE(source->groups[0]->contour.has_value());
+                      EXPECT_TRUE(source->contentShape.has_value());)
+}
+
+TGFX_TEST(LayerTest, GlassStyleBackgroundOutsets) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 600, 200);
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto sharpLayer = SolidLayer::Make();
+  sharpLayer->setWidth(150);
+  sharpLayer->setHeight(100);
+  sharpLayer->setLayerStyles({GlassStyle::Make(80, 50, 0, 50, 0, 0, 0)});
+  displayList->root()->addChild(sharpLayer);
+
+  auto softLayer = SolidLayer::Make();
+  softLayer->setWidth(150);
+  softLayer->setHeight(100);
+  softLayer->setMatrix(Matrix::MakeTrans(200, 0));
+  softLayer->setLayerStyles({GlassStyle::Make(0, 50, 100, 0, 0, 0, 0)});
+  displayList->root()->addChild(softLayer);
+
+  auto mixedLayer = SolidLayer::Make();
+  mixedLayer->setWidth(150);
+  mixedLayer->setHeight(100);
+  mixedLayer->setMatrix(Matrix::MakeTrans(400, 0));
+  mixedLayer->setLayerStyles(
+      {BackgroundBlurStyle::Make(100, 100), GlassStyle::Make(80, 50, 0, 50, 0, 0, 0)});
+  displayList->root()->addChild(mixedLayer);
+
+  displayList->render(surface.get());
+
+  TGFX_PRIVATE_ACCESS(EXPECT_GT(sharpLayer->maxBackgroundOutset, 0.0f);
+                      EXPECT_EQ(sharpLayer->minBackgroundOutset, 0.0f);
+                      EXPECT_GT(softLayer->minBackgroundOutset, 0.0f);
+                      EXPECT_EQ(softLayer->maxBackgroundOutset, softLayer->minBackgroundOutset);
+                      EXPECT_GT(mixedLayer->maxBackgroundOutset, 0.0f);
+                      EXPECT_EQ(mixedLayer->minBackgroundOutset, 0.0f);)
+}
+
+TGFX_TEST(LayerTest, GlassStyleShapeLayerContentOffset) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 240, 220);
+  DisplayList displayList;
+
+  auto background = ImageLayer::Make();
+  background->setImage(MakeImage("resources/apitest/checker_128.png"));
+  background->setMatrix(Matrix::MakeScale(2));
+  displayList.root()->addChild(background);
+
+  Path glassPath;
+  glassPath.addRRect(RRect::MakeRectXY(Rect::MakeXYWH(75, 75, 90, 70), 20, 20));
+  EXPECT_EQ(glassPath.getBounds(), Rect::MakeXYWH(75, 75, 90, 70));
+
+  auto glassLayer = ShapeLayer::Make();
+  glassLayer->setPath(glassPath);
+  glassLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 128)));
+  glassLayer->setLayerStyles({GlassStyle::Make(80, 50, 0, 50, 0, 0, 0)});
+  displayList.root()->addChild(glassLayer);
+
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleShapeLayerContentOffset"));
 }
 
 TGFX_TEST(LayerTest, GlassStyleEllipse) {
@@ -4021,6 +4121,75 @@ TGFX_TEST(LayerTest, GlassStyleEllipse) {
 
 TGFX_TEST(LayerTest, GlassStyleZoom) {
   RunGlassStyleTest("Zoom", 2.0f);
+}
+
+TGFX_TEST(LayerTest, GlassStyleRoundedRect) {
+  // Rounded rectangle with unequal width/height (180x120, radius 30x30) exercises the SDF path.
+  RunGlassStyleTest("RoundedRect", 1.0f, 180.0f, 120.0f, 30.0f, 30.0f);
+}
+
+TGFX_TEST(LayerTest, GlassStyleEllipseSDF) {
+  // Ellipse with unequal width/height (180x120, radius = half dimensions) exercises the SDF path.
+  RunGlassStyleTest("EllipseSDF", 1.0f, 180.0f, 120.0f, 90.0f, 60.0f);
+}
+
+TGFX_TEST(LayerTest, GlassStyleEllipticalCorner) {
+  // Rounded rect with elliptical corners (radius 40x20, rx != ry) falls back to the AlphaMask
+  // path because the SDF shader only supports uniform circular corners (rx == ry).
+  RunGlassStyleTest("EllipticalCorner", 1.0f, 180.0f, 120.0f, 40.0f, 20.0f);
+}
+
+TGFX_TEST(LayerTest, GlassStyleExtremeAspectRatioUDF) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 700, 180);
+  auto displayList = std::make_unique<DisplayList>();
+  auto bgImage = MakeImage("resources/apitest/checker_128.png");
+
+  // Single background layer spanning the full surface.
+  auto imgLayer = ImageLayer::Make();
+  imgLayer->setImage(bgImage);
+  auto scale = 700.0f / static_cast<float>(std::max(bgImage->width(), bgImage->height()));
+  imgLayer->setMatrix(Matrix::MakeScale(scale, scale));
+  displayList->root()->addChild(imgLayer);
+
+  // Colored shapes for refraction contrast.
+  auto blueRect = ShapeLayer::Make();
+  Path bluePath = {};
+  bluePath.addRect(Rect::MakeXYWH(50, 30, 245, 60));
+  blueRect->setPath(bluePath);
+  blueRect->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 100, 255, 255)));
+  displayList->root()->addChild(blueRect);
+
+  auto greenCircle = ShapeLayer::Make();
+  Path greenPath = {};
+  greenPath.addOval(Rect::MakeXYWH(400, 100, 280, 60));
+  greenCircle->setPath(greenPath);
+  greenCircle->setFillStyle(ShapeStyle::Make(Color::FromRGBA(50, 200, 80, 200)));
+  displayList->root()->addChild(greenCircle);
+
+  // Three glass panels with increasing widths, all using the UDF path (rx != ry).
+  float glassWidths[] = {200, 400, 600};
+  for (int i = 0; i < 3; i++) {
+    float gw = glassWidths[i];
+    float gh = 20;
+    auto glassLayer = SolidLayer::Make();
+    glassLayer->setColor(Color::FromRGBA(255, 255, 255, 128));
+    glassLayer->setWidth(gw);
+    glassLayer->setHeight(gh);
+    glassLayer->setRadiusX(20);
+    glassLayer->setRadiusY(10);
+    float glassX = (700.0f - gw) * 0.5f;
+    float glassY = 20.0f + static_cast<float>(i) * 60.0f;
+    glassLayer->setMatrix(Matrix::MakeTrans(glassX, glassY));
+    auto style = GlassStyle::Make(80, 70, 0, 50, 50, 135, 50);
+    glassLayer->setLayerStyles({style});
+    displayList->root()->addChild(glassLayer);
+  }
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleExtremeAspectRatioUDF"));
 }
 
 }  // namespace tgfx
