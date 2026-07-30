@@ -461,19 +461,10 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       }
 
       if (_lightIntensity > 0) {
-        // Edge light UDF: half the resolution of the fine UDF, fixed small blur radius.
+        // Edge light UDF: same resolution as the fine UDF, fixed small blur radius.
         // Used for edge lighting (edgeWeight) while the fine UDF is used for refraction direction.
         static constexpr float EDGE_LIGHT_BLUR_RADIUS = 5.0f;
-        int edgeLightWidth = std::max(1, udfWidth / 2);
-        int edgeLightHeight = std::max(1, udfHeight / 2);
         std::shared_ptr<Image> edgeLightContent = udfContent;
-        if (edgeLightWidth != udfWidth || edgeLightHeight != udfHeight) {
-          edgeLightContent = udfContent->makeScaled(edgeLightWidth, edgeLightHeight,
-                                                    SamplingOptions(FilterMode::Linear));
-          if (edgeLightContent == nullptr) {
-            return;
-          }
-        }
         float edgeLightRadiusX = EDGE_LIGHT_BLUR_RADIUS * udfScale;
         float edgeLightRadiusY = EDGE_LIGHT_BLUR_RADIUS * udfScale;
         coarseMaskImage =
