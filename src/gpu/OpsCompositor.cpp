@@ -240,16 +240,6 @@ bool OpsCompositor::shouldUseStencilCover(const Brush& brush, const Shape& shape
   USE(shape);
   return false;
 #else
-  // Simple non-inverse geometry (empty path, rect, rrect, oval) is cheaper on the legacy
-  // triangulation path. Inverse fill types must stay on stencil-cover because the legacy
-  // triangulation path does not support inverse fill (it only fills path interior, not the
-  // complement region that inverse fill requires).
-  if (shape.isSimplePath() && !shape.isInverseFillType()) {
-    auto path = shape.getPath();
-    if (path.isEmpty() || path.isRect() || path.isRRect(nullptr) || path.isOval()) {
-      return false;
-    }
-  }
   // Any brush requesting antialiasing keeps using the legacy triangulation path so the
   // existing coverage-AA / alpha-ramp visual contract is preserved without modification.
   // MSAA render targets are *not* excluded: the stencil pass evaluates the Loop-Blinn test
@@ -260,6 +250,16 @@ bool OpsCompositor::shouldUseStencilCover(const Brush& brush, const Shape& shape
   if (brush.antiAlias) {
     return false;
   }
+
+  // Simple non-inverse geometry (empty path, rect, rrect, oval) is cheaper on the legacy
+  // triangulation path.
+  if (shape.isSimplePath()) {
+    auto path = shape.getPath();
+    if (path.isEmpty() || path.isRect() || path.isRRect(nullptr) || path.isOval()) {
+      return false;
+    }
+  }
+
   // Hardware gate: the render path requires a renderable stencil attachment. All other
   // eligibility checks (this path being the tgfx-side choice for non-AA fills) are encoded
   // in this method, not in GPUFeatures.
