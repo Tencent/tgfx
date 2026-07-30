@@ -419,23 +419,26 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       static constexpr float MIN_BLUR_RADIUS = 5.0f;
       float blurRadius =
           std::max(std::min((_depth / 100.0f) * MAX_BLUR_RADIUS, MAX_BLUR_RADIUS), MIN_BLUR_RADIUS);
-      // The UDF core follows the original layer bounds while leaving room for the transparent
-      // halo inside the texture size cap. UDF pixel-to-layer ratios and blurRadius scale with
-      // udfScale, so refraction distances remain consistent in layer space regardless of UDF
+      // The UDF core follows the larger of the layer-local bounds and the on-screen content
+      // bounds, so zooming in produces a finer UDF while zooming out keeps the layer-local
       // resolution. A minimum source size of 128 prevents tiny glass panels from producing an
-      // overly coarse UDF. origMaxDim is guaranteed > 0 because onDraw rejects empty origBounds.
+      // overly coarse UDF. Values are guaranteed > 0 because onDraw rejects empty origBounds and
+      // contentScale is non-zero.
       static constexpr float MIN_UDF_SOURCE_SIZE = 128.0f;
-      float origMaxDim = std::max(origBounds.width(), origBounds.height());
+      float sourceWidth = std::max(origBounds.width(), contentWidth);
+      float sourceHeight = std::max(origBounds.height(), contentHeight);
+      float sourceMaxDim = std::max(sourceWidth, sourceHeight);
       float maxPaddedUDFSize = std::min(MAX_UDF_SIZE, static_cast<float>(maxTextureSize));
       float maxCoreUDFSize = maxPaddedUDFSize - UDF_PADDING * 2.0f;
       if (maxCoreUDFSize < 1.0f) {
         return;
       }
-      float udfScale = std::min({1.0f, maxCoreUDFSize / std::max(origMaxDim, MIN_UDF_SOURCE_SIZE)});
-      int udfWidth = std::max(1, static_cast<int>(std::round(origBounds.width() * udfScale)));
-      int udfHeight = std::max(1, static_cast<int>(std::round(origBounds.height() * udfScale)));
+      float udfScale =
+          std::min({1.0f, maxCoreUDFSize / std::max(sourceMaxDim, MIN_UDF_SOURCE_SIZE)});
+      int udfWidth = std::max(1, static_cast<int>(std::round(sourceWidth * udfScale)));
+      int udfHeight = std::max(1, static_cast<int>(std::round(sourceHeight * udfScale)));
       // The UDF dimensions are rounded independently, so each axis needs its own layer-pixel
-      // conversion ratio. Both values use origBounds and remain zoom-invariant.
+      // conversion ratio. Both values use origBounds so the shader still operates in layer space.
       udfPixelToLayerPixelX = origBounds.width() / static_cast<float>(udfWidth);
       udfPixelToLayerPixelY = origBounds.height() / static_cast<float>(udfHeight);
       // Scale the content image to the fixed UDF resolution.
@@ -447,10 +450,12 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
           return;
         }
       }
-      // Blur radius in UDF pixel space. Since UDF size is origBounds-based, the radius is
-      // zoom-invariant.
-      float udfBlurRadiusX = blurRadius * udfScale;
-      float udfBlurRadiusY = blurRadius * udfScale;
+      // Blur radius in UDF pixel space. The radius scales with udfScale relative to the chosen
+      // source size, keeping the layer-space radius constant.
+      float layerToSourceX = sourceWidth / origBounds.width();
+      float layerToSourceY = sourceHeight / origBounds.height();
+      float udfBlurRadiusX = blurRadius * udfScale * layerToSourceX;
+      float udfBlurRadiusY = blurRadius * udfScale * layerToSourceY;
       // depthRatio stays as _depth/100 for shader use (step calculation). The transparent halo
       // covers the shader's maximum four-texel forward-difference span.
       maskImage = MakeTentBlurImage(context, udfContent, udfBlurRadiusX, udfBlurRadiusY,
