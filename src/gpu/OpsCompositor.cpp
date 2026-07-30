@@ -250,7 +250,6 @@ bool OpsCompositor::shouldUseStencilCover(const Brush& brush, const Shape& shape
   if (brush.antiAlias) {
     return false;
   }
-
   // Empty and rect paths are faster on the legacy triangulation path.
   if (shape.isSimplePath()) {
     auto path = shape.getPath();
@@ -258,7 +257,6 @@ bool OpsCompositor::shouldUseStencilCover(const Brush& brush, const Shape& shape
       return false;
     }
   }
-
   // Hardware gate: the render path requires a renderable stencil attachment. All other
   // eligibility checks (this path being the tgfx-side choice for non-AA fills) are encoded
   // in this method, not in GPUFeatures.
