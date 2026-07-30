@@ -36,6 +36,10 @@ static constexpr int UBO_DESCRIPTOR_SET = 0;
 static constexpr int TEXTURE_DESCRIPTOR_SET = 1;
 static constexpr int VERTEX_UBO_BINDING_POINT = 0;
 static constexpr int FRAGMENT_UBO_BINDING_POINT = 1;
+// Starting binding index used by the WebGPU backend when it re-numbers sampler declarations
+// during the GLSL-to-WGSL rewrite. Not a general contract about where texture bindings live in
+// SPIR-V — the Vulkan/D3D12/Metal/OpenGL pipelines all number their textures from 0.
+static constexpr int TEXTURE_BINDING_POINT_START = 2;
 
 /**
  * An object representing the collection of uniform data in CPU side.
