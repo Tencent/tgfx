@@ -204,17 +204,22 @@ TGFX_TEST(ShaderPermutationTest, ShouldCompile) {
       continue;
     }
     // Vert: 2 bool = 4 raw. Frag: 2 bool + HAS_XP(int3) + HAS_COVERAGE(int3) = 36 raw.
-    // ShouldCompile rules:
-    //   - HAS_YUV(frag) != 0 → excluded (YUV falls back to ProgramBuilder)
-    //   - Vert 2 dims must match frag first 2 dims
-    // Valid vert configs (HAS_YUV=0): 2 (HAS_SUBSET 0/1).
-    // Each valid vert matches 9 fragment combinations (HAS_XP×HAS_COVERAGE) → 2 * 9 = 18.
+    // Compilation rules:
+    //   - HAS_YUV / HAS_SUBSET vert/frag agreement enforced by the framework (MirroredDimsAgree).
+    //   - HAS_YUV(frag) != 0 → excluded by the shader rule (YUV falls back to ProgramBuilder).
+    // Valid vert configs (HAS_YUV=0): 2 (HAS_SUBSET 0/1); each matches 9 fragment combinations
+    // (HAS_XP×HAS_COVERAGE) → 2 * 9 = 18.
     int compiledCount = 0;
     for (uint32_t vi = 0; vi < shaderInfo.vertDomain.totalCount(); vi++) {
       auto vertValues = shaderInfo.vertDomain.decode(vi);
       for (uint32_t fi = 0; fi < shaderInfo.fragDomain.totalCount(); fi++) {
         auto fragValues = shaderInfo.fragDomain.decode(fi);
-        if (shaderInfo.shouldCompile(vi, fi, vertValues, fragValues)) {
+        // Mirror the production enumeration: framework mirror rule first, then the shader rule.
+        if (!MirroredDimsAgree(shaderInfo.vertDomain, shaderInfo.fragDomain, vertValues,
+                               fragValues)) {
+          continue;
+        }
+        if (!shaderInfo.shouldCompile || shaderInfo.shouldCompile(vi, fi, vertValues, fragValues)) {
           compiledCount++;
         }
       }
@@ -967,12 +972,12 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureFillShaderRegistry) {
     auto shaderInfo = shader->info();
     if (shaderInfo.name == "QuadTextureFillShader") {
       found = true;
-      EXPECT_EQ(shaderInfo.vertDomain.dimensionCount(), 4u);
-      EXPECT_EQ(shaderInfo.vertDomain.totalCount(), 16u);
-      // FragDims: 5 bools + 1 int(3) = 2^5 * 3 = 96 total permutations
-      // (ALPHA_ONLY and HAS_RGBAAA removed and handled as runtime uniforms).
-      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 6u);
-      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 96u);
+      EXPECT_EQ(shaderInfo.vertDomain.dimensionCount(), 5u);
+      EXPECT_EQ(shaderInfo.vertDomain.totalCount(), 32u);
+      // FragDims: 6 bools + 1 int(3) = 2^6 * 3 = 192 total permutations. ALPHA_ONLY and HAS_RGBAAA
+      // are runtime uniforms; HAS_LOCAL_MASK (added later) is a mirror dimension.
+      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 7u);
+      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 192u);
       EXPECT_EQ(shaderInfo.vertexFile, "level1/quad_texture_fill.vert");
       EXPECT_EQ(shaderInfo.fragmentFile, "level1/quad_texture_fill.frag");
     }
@@ -993,14 +998,19 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureFillShouldCompile) {
       auto vertValues = shaderInfo.vertDomain.decode(vi);
       for (uint32_t fi = 0; fi < shaderInfo.fragDomain.totalCount(); fi++) {
         auto fragValues = shaderInfo.fragDomain.decode(fi);
-        if (shaderInfo.shouldCompile(vi, fi, vertValues, fragValues)) {
+        // Mirror the production enumeration: framework mirror rule first, then the shader rule.
+        if (!MirroredDimsAgree(shaderInfo.vertDomain, shaderInfo.fragDomain, vertValues,
+                               fragValues)) {
+          continue;
+        }
+        if (!shaderInfo.shouldCompile || shaderInfo.shouldCompile(vi, fi, vertValues, fragValues)) {
           compiledCount++;
         }
       }
     }
-    // ALPHA_ONLY and HAS_RGBAAA folded into runtime uniforms (and the RGBAAA-related prunes removed):
-    // 240 -> 144 -> 96.
-    EXPECT_EQ(compiledCount, 96);
+    // ALPHA_ONLY / HAS_RGBAAA are runtime uniforms; the four mirror dimensions plus the HAS_LOCAL_MASK
+    // business restriction leave 120 compiled variants.
+    EXPECT_EQ(compiledCount, 120);
   }
 }
 

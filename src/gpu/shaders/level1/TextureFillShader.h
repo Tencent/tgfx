@@ -92,16 +92,11 @@ class TextureFillShader : public PrecompiledShader {
   }
 
  private:
-  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>& vertValues,
+  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>&,
                             const std::vector<int>& fragValues) {
-    // YUV textures require additional dimensions not yet modeled.
+    // YUV textures require additional dimensions not yet modeled. HAS_YUV / HAS_SUBSET vertex and
+    // fragment agreement is enforced automatically by the framework (MirroredDimsAgree).
     if (fragValues[FD::HAS_YUV] != 0) {
-      return false;
-    }
-    // Vertex domain does not include HAS_XP or HAS_COVERAGE — vert variants must match frag base
-    // dimensions. Each vert variant pairs with all HAS_XP and HAS_COVERAGE frag variants.
-    if (vertValues[VD::HAS_YUV] != fragValues[FD::HAS_YUV] ||
-        vertValues[VD::HAS_SUBSET] != fragValues[FD::HAS_SUBSET]) {
       return false;
     }
     return true;

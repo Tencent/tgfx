@@ -100,29 +100,12 @@ class QuadTextureFillShader : public PrecompiledShader {
   }
 
  private:
-  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>& vertValues,
+  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>&,
                             const std::vector<int>& fragValues) {
-    // YUV textures require additional dimensions not yet modeled.
+    // YUV textures require additional dimensions not yet modeled. HAS_SUBSET / HAS_COVERAGE /
+    // HAS_COLOR / HAS_LOCAL_MASK vertex and fragment agreement is enforced automatically by the
+    // framework (MirroredDimsAgree).
     if (fragValues[FD::HAS_YUV] != 0) {
-      return false;
-    }
-    // When vertex has the subset attribute, fragment uses HAS_SUBSET=1 (per-quad varying + uniform
-    // double clamp). When it lacks it, fragment uses HAS_SUBSET=0 and always clamps by the Subset
-    // uniform alone; the uniform is populated with full texture bounds when no real subset applies,
-    // making that clamp a no-op.
-    if (vertValues[VD::HAS_SUBSET] != fragValues[FD::HAS_SUBSET]) {
-      return false;
-    }
-    // HAS_COVERAGE, HAS_COLOR in frag must match vert (mirrored dimensions).
-    if (vertValues[VD::HAS_COVERAGE] != fragValues[FD::HAS_COVERAGE]) {
-      return false;
-    }
-    if (vertValues[VD::HAS_COLOR] != fragValues[FD::HAS_COLOR]) {
-      return false;
-    }
-    // HAS_LOCAL_MASK is a mirrored vertex/fragment dimension (the vertex emits the coverage-mask
-    // coordinate varying that the fragment samples).
-    if (vertValues[VD::HAS_LOCAL_MASK] != fragValues[FD::HAS_LOCAL_MASK]) {
       return false;
     }
     if (fragValues[FD::HAS_LOCAL_MASK] != 0) {

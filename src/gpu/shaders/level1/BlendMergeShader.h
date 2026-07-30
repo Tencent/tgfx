@@ -95,13 +95,8 @@ class BlendMergeShader : public PrecompiledShader {
  private:
   static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>& vertValues,
                             const std::vector<int>& fragValues) {
-    // HAS_COVERAGE and HAS_COLOR must match between vert and frag (varying declarations must agree).
-    if (vertValues[VD::HAS_COVERAGE] != fragValues[FD::HAS_COVERAGE]) {
-      return false;
-    }
-    if (vertValues[VD::HAS_COLOR] != fragValues[FD::HAS_COLOR]) {
-      return false;
-    }
+    // HAS_COVERAGE / HAS_COLOR vertex and fragment agreement is enforced automatically by the
+    // framework (MirroredDimsAgree).
     // DefaultGP (GP_TYPE=0) never has per-vertex coverage, uvCoord, or color — those are
     // QuadGP-only features.
     int gpType = vertValues[VD::GP_TYPE];
