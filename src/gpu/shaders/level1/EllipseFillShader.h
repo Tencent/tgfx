@@ -28,18 +28,19 @@ class EllipseFillShader : public PrecompiledShader {
   using D = Dims;
 
   struct FragDims {
-    enum : uint32_t { STROKE, HAS_COMMON_COLOR, HAS_XP, COUNT };
+    enum : uint32_t { STROKE, HAS_COMMON_COLOR, HAS_XP, HAS_COVERAGE, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationBool("STROKE"),
           PermutationBool("HAS_COMMON_COLOR"),
           PermutationInt("HAS_XP", 3),
+          PermutationInt("HAS_COVERAGE", 3),
       });
     }
   };
   using FD = FragDims;
-  static_assert(D::COUNT == 2 && FD::COUNT == 3,
-                "Update ShouldCompile below when dimensions change.");
+  static_assert(D::COUNT == 2 && FD::COUNT == 4,
+                "Update the matcher below when dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"EllipseFillShader",

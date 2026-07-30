@@ -28,6 +28,7 @@
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Paint.h"
+#include "tgfx/core/Path.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Context.h"
@@ -297,6 +298,70 @@ TGFX_TEST(AOTRenderConsistencyTest, GradientLayoutModes) {
   ExpectShaderConsistent("grad-conic-multi",
                          Shader::MakeConicGradient(center, 0, 360, multiStops, multiPositions),
                          width, height);
+}
+
+// Renders an antialiased circle (EllipseGeometryProcessor) under an optional clip into outBitmap.
+// clipMode: 0 = no clip, 1 = antialiased clipRect (AARectEffect coverage), 2 = antialiased
+// non-rect clipPath (device-space mask texture coverage). This exercises the EllipseFillShader
+// HAS_COVERAGE dimension whose mask is sampled in device space via DeviceCoordMatrix * gl_FragCoord;
+// a divergent coordinate transform would show up as a byte mismatch against the runtime path.
+static void RenderClippedCircleOnce(int clipMode, int width, int height, bool useBundle,
+                                    Bitmap* outBitmap) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  if (useBundle) {
+    ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+  } else {
+    cache->unload();
+  }
+  context->globalCache()->clearPrograms();
+  auto surface = Surface::Make(context, width, height);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->save();
+  if (clipMode == 1) {
+    canvas->clipRect(Rect::MakeLTRB(20, 20, 180, 180));
+  } else if (clipMode == 2) {
+    Path clipPath = {};
+    clipPath.addOval(Rect::MakeLTRB(20, 20, 180, 180));
+    canvas->clipPath(clipPath);
+  }
+  Paint paint = {};
+  paint.setColor(Color::Red());
+  paint.setAntiAlias(true);
+  canvas->drawCircle(100, 100, 80, paint);
+  canvas->restore();
+  context->flushAndSubmit(true);
+  ASSERT_TRUE(outBitmap->allocPixels(width, height));
+  auto* pixels = outBitmap->lockPixels();
+  ASSERT_TRUE(pixels != nullptr);
+  ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+  outBitmap->unlockPixels();
+  if (useBundle) {
+    cache->unload();
+  }
+}
+
+static void ExpectClippedCircleConsistent(const char* label, int clipMode, int width, int height) {
+  Bitmap aotBitmap = {};
+  Bitmap runtimeBitmap = {};
+  RenderClippedCircleOnce(clipMode, width, height, true, &aotBitmap);
+  RenderClippedCircleOnce(clipMode, width, height, false, &runtimeBitmap);
+  ExpectBitmapsIdentical(label, aotBitmap, runtimeBitmap, width, height);
+}
+
+// EllipseFillShader HAS_COVERAGE dimension: an antialiased circle drawn under a clip pulls in a
+// coverage FP (AARectEffect for a rect clip, a device-space mask texture for a non-rect clip). The
+// AOT path samples that coverage in device space; this verifies it is byte-identical to the runtime
+// ProgramBuilder path, catching any DeviceCoordMatrix / gl_FragCoord misalignment.
+TGFX_TEST(AOTRenderConsistencyTest, EllipseFillCoverageModes) {
+  int width = 200;
+  int height = 200;
+  ExpectClippedCircleConsistent("ellipse-no-clip", 0, width, height);
+  ExpectClippedCircleConsistent("ellipse-aarect-clip", 1, width, height);
+  ExpectClippedCircleConsistent("ellipse-device-mask-clip", 2, width, height);
 }
 
 }  // namespace tgfx

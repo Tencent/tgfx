@@ -1456,7 +1456,14 @@ static std::optional<PermutationMatchResult> TryMatchEllipseFill(const ProgramIn
   if (gp->name() != "EllipseGeometryProcessor") {
     return std::nullopt;
   }
-  if (programInfo->numFragmentProcessors() != 0) {
+  if (programInfo->numColorFragmentProcessors() != 0) {
+    return std::nullopt;
+  }
+  // A clip/mask coverage FP is served through the HAS_COVERAGE dimension (device-space sampling in
+  // coverage_output.inc). Local-mask coverage (type 3) needs per-vertex UV the ellipse vert does not
+  // provide, so it still falls back.
+  int coverageType = ClassifyCoverageFP(programInfo);
+  if (coverageType < 0 || coverageType == 3) {
     return std::nullopt;
   }
   int xpType = GetXPType(programInfo);
@@ -1477,6 +1484,7 @@ static std::optional<PermutationMatchResult> TryMatchEllipseFill(const ProgramIn
     fragValues[i] = values[i];
   }
   fragValues[FD::HAS_XP] = xpType;
+  fragValues[FD::HAS_COVERAGE] = coverageType;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"EllipseFillShader", vertIndex, fragIndex};
 }
