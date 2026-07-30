@@ -138,7 +138,33 @@ static float PngInvertedFixedPointToFloat(png_fixed_point x) {
 static std::shared_ptr<ColorSpace> ReadColorProfile(png_structp pngPtr, png_infop infoPtr) {
 #if (PNG_LIBPNG_VER_MAJOR > 1) || (PNG_LIBPNG_VER_MAJOR == 1 && PNG_LIBPNG_VER_MINOR >= 6)
   /**
-   * First check for an ICC profile
+   * PNG v3 (2025) specifies that cICP takes precedence over iCCP, sRGB and cHRM+gAMA when present.
+   * cICP encodes the colour space via two H.273 code points (colour primaries and transfer
+   * function), so it is the most compact and unambiguous source when available.
+   */
+#ifdef PNG_cICP_SUPPORTED
+  png_byte colourPrimaries = 0;
+  png_byte transferFunction = 0;
+  png_byte matrixCoefficients = 0;
+  png_byte videoFullRangeFlag = 0;
+  if (PNG_INFO_cICP == png_get_cICP(pngPtr, infoPtr, &colourPrimaries, &transferFunction,
+                                    &matrixCoefficients, &videoFullRangeFlag)) {
+    // tgfx only supports full-range RGB cICP (matrix_coefficients == 0, video_full_range_flag ==
+    // 1). Narrow-range or non-identity matrix coefficients would require pixel value expansion
+    // that the PNG decoder does not implement, so such cICP configurations fall through to the
+    // next detector rather than being applied verbatim (which would render darker than expected).
+    if (matrixCoefficients == 0 && videoFullRangeFlag == 1) {
+      auto cs = ColorSpace::MakeCICP(static_cast<ColorSpacePrimariesID>(colourPrimaries),
+                                     static_cast<TransferFunctionID>(transferFunction));
+      if (cs) {
+        return cs;
+      }
+    }
+  }
+#endif
+
+  /**
+   * Next check for an ICC profile.
    */
   png_bytep profile;
   png_uint_32 length;

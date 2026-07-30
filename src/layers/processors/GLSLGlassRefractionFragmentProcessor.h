@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,37 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/layerstyles/LayerStyle.h"
+#pragma once
+
+#include "layers/processors/GlassRefractionFragmentProcessor.h"
 
 namespace tgfx {
-void LayerStyle::setBlendMode(BlendMode blendMode) {
-  if (_blendMode == blendMode) {
-    return;
-  }
-  _blendMode = blendMode;
-  invalidateTransform();
-}
 
-Rect LayerStyle::filterBackground(const Rect& srcRect, float contentScale) {
-  auto result = filterBackgroundSoft(srcRect, contentScale);
-  result.join(filterBackgroundSharp(srcRect, contentScale));
-  return result;
-}
+class GLSLGlassRefractionFragmentProcessor : public GlassRefractionFragmentProcessor {
+ public:
+  GLSLGlassRefractionFragmentProcessor(std::shared_ptr<TextureProxy> source,
+                                       PlacementPtr<GlassShapeGeometryFragmentProcessor> geometry,
+                                       const GlassRefractionParams& params,
+                                       const Matrix& coordMatrix);
 
-Rect LayerStyle::filterBackgroundSoft(const Rect& srcRect, float) {
-  return srcRect;
-}
+  void emitCode(EmitArgs& args) const override;
 
-Rect LayerStyle::filterBackgroundSharp(const Rect& srcRect, float) {
-  return srcRect;
-}
-
-void LayerStyle::setExcludeChildEffects(bool value) {
-  if (_excludeChildEffects == value) {
-    return;
-  }
-  _excludeChildEffects = value;
-  invalidateTransform();
-}
+ private:
+  void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
+};
 
 }  // namespace tgfx
