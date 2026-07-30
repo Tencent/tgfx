@@ -26,19 +26,6 @@ namespace tgfx {
 // integer values must stay in sync with the TypeScript definition.
 enum class WebNamedColorSpace { None = 0, SRGB = 1, DisplayP3 = 2, Others = 3 };
 
-static WebNamedColorSpace ToWebNamedColorSpace(const std::shared_ptr<ColorSpace>& colorSpace) {
-  if (colorSpace == nullptr) {
-    return WebNamedColorSpace::None;
-  }
-  if (ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get())) {
-    return WebNamedColorSpace::SRGB;
-  }
-  if (ColorSpace::Equals(colorSpace.get(), ColorSpace::DisplayP3().get())) {
-    return WebNamedColorSpace::DisplayP3;
-  }
-  return WebNamedColorSpace::Others;
-}
-
 void* GLDevice::CurrentNativeHandle() {
   return reinterpret_cast<void*>(emscripten_webgl_get_current_context());
 }
@@ -82,7 +69,14 @@ std::shared_ptr<WebGLDevice> WebGLDevice::MakeFrom(const std::string& canvasID,
     }
     return nullptr;
   }
-  auto cs = ToWebNamedColorSpace(colorSpace);
+  auto cs = WebNamedColorSpace::Others;
+  if (colorSpace == nullptr) {
+    cs = WebNamedColorSpace::None;
+  } else if (ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get())) {
+    cs = WebNamedColorSpace::SRGB;
+  } else if (ColorSpace::Equals(colorSpace.get(), ColorSpace::DisplayP3().get())) {
+    cs = WebNamedColorSpace::DisplayP3;
+  }
   bool isColorSpaceSupport = emscripten::val::module_property("tgfx").call<bool>(
       "setColorSpace", emscripten::val::module_property("GL"), static_cast<int>(cs));
   if (!isColorSpaceSupport) {
