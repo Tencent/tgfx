@@ -77,23 +77,13 @@ void main() {
   edgeAlpha *= clamp(0.5 + innerTest * innerInvlen, 0.0, 1.0);
 #endif
 
-  // Combine the ellipse's own edge antialiasing with any clip/mask coverage. HAS_COVERAGE is
-  // handled inline (not via coverage_output.inc) because a bare device-space mask (type 2) carries
-  // no AARect, so its Rect uniform is never uploaded — the shared include applies AARect
-  // unconditionally and would multiply by a garbage rect. Each coverage type is gated independently
-  // here: type 1 applies the AARect clip, type 2 samples the device-space mask.
-  highp float coverage = edgeAlpha;
-#if HAS_COVERAGE == 1
-  highp vec4 clipDists = clamp(vec4(1.0, 1.0, -1.0, -1.0) * vec4(gl_FragCoord.xyxy - Rect), 0.0, 1.0);
-  highp vec2 clipDists2 = clipDists.xy + clipDists.zw - 1.0;
-  coverage *= clipDists2.x * clipDists2.y;
-#elif HAS_COVERAGE == 2
-  highp vec3 maskCoord = DeviceCoordMatrix * vec3(gl_FragCoord.xy, 1.0);
-  coverage *= texture(MaskTextureSampler, maskCoord.xy).r;
-#endif
-
-#define TGFX_XP_SRC_COLOR (outputColor * coverage)
-#define TGFX_XP_SRC_UNPREMUL outputColor
-#define TGFX_XP_COVERAGE vec4(coverage)
+  // Bake the ellipse's own edge antialiasing into the source color and declare it as the XP
+  // coverage, mirroring how the gradient shaders handle vCoverage. coverage_output.inc then folds
+  // any clip (AARect) or device-space mask coverage on top. A bare device-space mask uploads a
+  // full-plane Rect (GLSLDeviceSpaceTextureEffect::onSetData), so the unconditional AARect term in
+  // the shared include evaluates to 1 and only the mask applies.
+#define TGFX_COVERAGE_SRC_COLOR (outputColor * edgeAlpha)
+#define TGFX_XP_COVERAGE vec4(edgeAlpha)
+#include "coverage_output.inc"
 #include "xp_output.inc"
 }
