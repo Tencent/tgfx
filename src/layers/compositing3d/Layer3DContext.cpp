@@ -30,8 +30,9 @@ std::shared_ptr<Layer3DContext> Layer3DContext::Make(bool opaqueMode, Context* c
   if (opaqueMode) {
     return std::make_shared<Opaque3DContext>(renderRect, contentScale, std::move(colorSpace));
   }
-  auto compositor = std::make_shared<Context3DCompositor>(
-      *context, static_cast<int>(renderRect.width()), static_cast<int>(renderRect.height()));
+  auto compositor =
+      std::make_shared<Context3DCompositor>(*context, static_cast<int>(renderRect.width()),
+                                            static_cast<int>(renderRect.height()), colorSpace);
   return std::make_shared<Render3DContext>(std::move(compositor), renderRect, contentScale,
                                            std::move(colorSpace));
 }
