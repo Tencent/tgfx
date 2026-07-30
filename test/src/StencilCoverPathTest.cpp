@@ -116,6 +116,9 @@ TGFX_TEST(StencilCoverPathTest, Caps_BackendReportsExpectedSupport) {
         EXPECT_TRUE(features->stencilAttachmentSupported);
       }
       break;
+    case Backend::D3D12:
+      EXPECT_TRUE(features->stencilAttachmentSupported);
+      break;
     default:
       ADD_FAILURE() << "Unhandled backend in Caps_BackendReportsExpectedSupport; declare "
                        "the expected stencilAttachmentSupported value for this backend.";
@@ -395,7 +398,7 @@ TGFX_TEST(StencilCoverPathTest, DrawOp_AllFillTypesProduceValidOpWithExpectedSte
     ASSERT_TRUE(op != nullptr) << c.name;
     EXPECT_TRUE(op->hasCoverage()) << c.name;
     EXPECT_TRUE(op->needsStencil()) << c.name;
-    EXPECT_EQ(op->coverStencilRef, c.expectedRef) << c.name;
+    TGFX_PRIVATE_ACCESS(EXPECT_EQ(op->coverStencilRef, c.expectedRef) << c.name;)
   }
 }
 

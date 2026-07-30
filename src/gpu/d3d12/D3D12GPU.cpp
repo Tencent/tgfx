@@ -222,6 +222,19 @@ void D3D12GPU::initInfo() {
   }
 }
 
+// True when the D3D12 device advertises DEPTH_STENCIL support for the given DXGI format. Mirrors
+// VulkanCaps::checkFormat's VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT probe: caps are only
+// advertised for formats the runtime actually accepts as a depth-stencil attachment.
+static bool IsDepthStencilFormatRenderable(ID3D12Device* device, DXGI_FORMAT format) {
+  D3D12_FEATURE_DATA_FORMAT_SUPPORT support = {};
+  support.Format = format;
+  if (FAILED(
+          device->CheckFeatureSupport(D3D12_FEATURE_FORMAT_SUPPORT, &support, sizeof(support)))) {
+    return false;
+  }
+  return (support.Support1 & D3D12_FORMAT_SUPPORT1_DEPTH_STENCIL) != 0;
+}
+
 void D3D12GPU::initFeatures() {
   _features.semaphore = true;
   _features.clampToBorder = true;
@@ -231,6 +244,17 @@ void D3D12GPU::initFeatures() {
   // OpsCompositor::makeDstTextureInfo falls back to the copy-to-temp-texture path whenever an
   // advanced blend mode (Lighten / Darken / etc.) needs to read the destination.
   _features.textureBarrier = false;
+
+  // Advertise stencil attachment support only when the device actually accepts a packed
+  // depth-stencil format as a depth-stencil attachment. Prefer D24_UNORM_S8_UINT (Feature
+  // Level 11.0 guarantees it) and fall back to D32_FLOAT_S8X24_UINT for the rare adapter
+  // that reports the D24 variant as unsupported. Mirrors VulkanCaps::initFormatTable so the
+  // stencil-and-cover path never activates on a device that would silently drop the DSV.
+  _features.stencilAttachmentSupported =
+      IsDepthStencilFormatRenderable(d3d12Device.Get(),
+                                     static_cast<DXGI_FORMAT>(DXGI_FORMAT_D24_UNORM_S8_UINT)) ||
+      IsDepthStencilFormatRenderable(d3d12Device.Get(),
+                                     static_cast<DXGI_FORMAT>(DXGI_FORMAT_D32_FLOAT_S8X24_UINT));
 }
 
 void D3D12GPU::initLimits() {
