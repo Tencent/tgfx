@@ -185,7 +185,7 @@ static bool MatrixOnlyDiffersInTranslation(const Matrix& a, const Matrix& b) {
 void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const Matrix& matrix,
                               const ClipStack& clip, const Brush& brush) {
   DEBUG_ASSERT(shape != nullptr);
-  if (shouldUseStencilCover(brush)) {
+  if (shouldUseStencilCover(brush, *shape)) {
     if (!canAppend(PendingOpType::StencilCoverPath, clip, brush)) {
       flushPendingOps(PendingOpType::StencilCoverPath, clip, brush);
     }
@@ -229,7 +229,7 @@ void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const Matrix& matrix
   pendingShapeColors.emplace_back(brush.color);
 }
 
-bool OpsCompositor::shouldUseStencilCover(const Brush& brush) const {
+bool OpsCompositor::shouldUseStencilCover(const Brush& brush, const Shape& shape) const {
 #ifndef TGFX_ENABLE_STENCIL_COVER_PATH
   // Compile-time master switch: shouldUseStencilCover returns false unconditionally when
   // TGFX_ENABLE_STENCIL_COVER_PATH is off, which removes the only caller of the stencil-cover
@@ -237,8 +237,19 @@ bool OpsCompositor::shouldUseStencilCover(const Brush& brush) const {
   // support files (tessellator, draw op, GPs, upload task) are still pulled in by the CMake
   // GLOB and rely on the linker's dead-code stripping to drop them from the final binary.
   USE(brush);
+  USE(shape);
   return false;
 #else
+  // Simple non-inverse geometry (empty path, rect, rrect, oval) is cheaper on the legacy
+  // triangulation path. Inverse fill types must stay on stencil-cover because the legacy
+  // triangulation path does not support inverse fill (it only fills path interior, not the
+  // complement region that inverse fill requires).
+  if (shape.isSimplePath() && !shape.isInverseFillType()) {
+    auto path = shape.getPath();
+    if (path.isEmpty() || path.isRect() || path.isRRect(nullptr) || path.isOval()) {
+      return false;
+    }
+  }
   // Any brush requesting antialiasing keeps using the legacy triangulation path so the
   // existing coverage-AA / alpha-ramp visual contract is preserved without modification.
   // MSAA render targets are *not* excluded: the stencil pass evaluates the Loop-Blinn test
