@@ -24,11 +24,13 @@
 namespace tgfx {
 /**
  * StandardDrawOp is the base class for ops that follow the "framework binds one pipeline,
- * subclass issues one draw call" pattern. execute() is final: it builds the op's ProgramInfo
- * from the geometry processor supplied by onMakeGeometryProcessor() and the color/coverage
- * fragment processors accumulated on DrawOp, gives subclasses a chance to tweak the resulting
- * ProgramInfo via onConfigureProgramInfo(), then binds the pipeline (together with uniforms,
- * samplers and scissor) before delegating the actual draw call to onDraw().
+ * subclass issues one draw call" pattern. execute() is final: it first gives the subclass a
+ * chance to veto the whole execution via onPrepare() when runtime inputs turn out to be
+ * unusable, then builds the op's ProgramInfo from the geometry processor supplied by
+ * onMakeGeometryProcessor() and the color/coverage fragment processors accumulated on DrawOp,
+ * gives subclasses a chance to tweak the resulting ProgramInfo via onConfigureProgramInfo(),
+ * then binds the pipeline (together with uniforms, samplers and scissor) before delegating
+ * the actual draw call to onDraw().
  *
  * Ops that need to run multiple pipelines within a single render pass (for example
  * StencilCoverPathDrawOp, which runs a stencil pass followed by a cover pass) must not derive
@@ -41,6 +43,24 @@ class StandardDrawOp : public DrawOp {
 
  protected:
   StandardDrawOp(BlockAllocator* allocator, AAType aaType) : DrawOp(allocator, aaType) {
+  }
+
+  /**
+   * Optional hook invoked at the start of execute(), before any pipeline binding takes place.
+   * Return false to skip this op entirely — no geometry processor, pipeline binding, uniform
+   * upload, sampler binding or draw call will be issued. This is the right place to reject an
+   * op whose runtime inputs (e.g. an asynchronously produced vertex buffer) turned out to be
+   * empty, so it does not leave dirty pipeline state behind for the next op. The default
+   * returns true.
+   *
+   * Contract with onDraw(): any resource this method validates as non-null MAY be used
+   * unconditionally by the subsequent onDraw() call without re-checking. Both hooks run
+   * synchronously on the same thread inside a single execute() invocation, so a resource
+   * cannot transition from ready to null between them. Subclasses that add null-checks here
+   * are therefore free to omit the corresponding checks in onDraw().
+   */
+  virtual bool onPrepare() {
+    return true;
   }
 
   /**

@@ -27,6 +27,7 @@
 #include "core/utils/PlacementPtr.h"
 #include "gpu/ops/DrawOp.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/Image.h"
 
 namespace tgfx {
@@ -43,7 +44,8 @@ class Layer;
  */
 class Context3DCompositor {
  public:
-  Context3DCompositor(const Context& context, int width, int height);
+  Context3DCompositor(const Context& context, int width, int height,
+                      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB());
 
   int width() const {
     return _width;
@@ -107,6 +109,7 @@ class Context3DCompositor {
 
   int _width = 0;
   int _height = 0;
+  std::shared_ptr<ColorSpace> _colorSpace = nullptr;
   std::shared_ptr<RenderTargetProxy> _targetColorProxy = nullptr;
   std::deque<std::unique_ptr<DrawPolygon3D>> _polygons = {};
   std::unique_ptr<BspTree> _bspTree = nullptr;

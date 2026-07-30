@@ -20,46 +20,25 @@
 
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/proxies/TextureProxy.h"
+#include "layers/processors/GlassShapeGeometryFragmentProcessor.h"
 
 namespace tgfx {
 
 struct GlassRefractionParams {
-  // Glass geometry (in layer pixel space).
-  float glassWidth = 0.0f;
-  float glassHeight = 0.0f;
-  float halfW = 0.0f;
-  float halfH = 0.0f;
-  float minHalf = 0.0f;
-
-  // Refraction parameters.
-  float glassThickness = 0.0f;
-  float refractionFactor = 0.0f;
   float dispersion = 0.0f;
-  float splay = 0.0f;
-  float depthRatio = 0.0f;
-
-  // Lighting.
   float lightAngle = 0.0f;
   float lightIntensity = 0.0f;
-
-  // UDF and scale factors.
-  float origMinHalf = 0.0f;
   float origWidth = 0.0f;
   float origHeight = 0.0f;
-  float udfPixelToLayerPixel = 1.0f;
-
-  // renderOffset is always 0: coordinate translation is handled by coordMatrix (which
-  // receives uvMatrix from the base class lockTextureProxy path). The fields are retained
-  // for GPU uniform layout stability.
-  float renderOffsetX = 0.0f;
-  float renderOffsetY = 0.0f;
+  float maxDisplacement = 0.0f;
+  GlassShapeType shapeType = GlassShapeType::AlphaMask;
 };
 
 class GlassRefractionFragmentProcessor : public FragmentProcessor {
  public:
   static PlacementPtr<GlassRefractionFragmentProcessor> Make(
       BlockAllocator* allocator, std::shared_ptr<TextureProxy> source,
-      std::shared_ptr<TextureProxy> fineMask, std::shared_ptr<TextureProxy> coarseMask,
+      PlacementPtr<GlassShapeGeometryFragmentProcessor> geometry,
       const GlassRefractionParams& params, const Matrix& coordMatrix = Matrix::I());
 
   std::string name() const override {
@@ -78,15 +57,13 @@ class GlassRefractionFragmentProcessor : public FragmentProcessor {
   DEFINE_PROCESSOR_CLASS_ID
 
   GlassRefractionFragmentProcessor(std::shared_ptr<TextureProxy> source,
-                                   std::shared_ptr<TextureProxy> fineMask,
-                                   std::shared_ptr<TextureProxy> coarseMask,
+                                   PlacementPtr<GlassShapeGeometryFragmentProcessor> geometry,
                                    const GlassRefractionParams& params, const Matrix& coordMatrix);
 
   std::shared_ptr<TextureProxy> sourceProxy;
-  std::shared_ptr<TextureProxy> fineMaskProxy;
-  std::shared_ptr<TextureProxy> coarseMaskProxy;
-  GlassRefractionParams params;
+  GlassRefractionParams params = {};
   CoordTransform coordTransform;
+  size_t geometryIndex = 0;
 
   friend class GLSLGlassRefractionFragmentProcessor;
 };
