@@ -12,16 +12,6 @@
 <body>
 <div id="container" class="container">
     <canvas class="canvas" id="hello2d"></canvas>
-    <div id="colorSpacePanel"
-         style="position:fixed;top:12px;right:12px;z-index:10;background:rgba(0,0,0,0.5);
-                color:#fff;padding:8px 10px;border-radius:6px;font-family:sans-serif;font-size:13px;">
-        <label for="colorSpaceSelect">Color Space:</label>
-        <select id="colorSpaceSelect">
-            <option value="0">Default (sRGB)</option>
-            <option value="1">sRGB</option>
-            <option value="2">Display P3</option>
-        </select>
-    </div>
 </div>
 <script type="module" src="./wasm/index-webgpu.js"></script>
 </body>

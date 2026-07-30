@@ -27,7 +27,6 @@ export class TGFXBaseView {
     public updateSize: () => void;
     public updateLayerTree: (drawIndex: number) => void;
     public updateZoomScaleAndOffset: (zoom: number, offsetX: number, offsetY: number) => void;
-    public setColorSpace: (type: number) => void;
     public draw: () => void;
     public startReadback: (x: number, y: number, w: number, h: number) => any;
     public finishReadback: () => Uint8Array | null;

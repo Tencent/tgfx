@@ -36,19 +36,14 @@ TGFXBaseView::TGFXBaseView(const std::string& canvasID) : canvasID(canvasID) {
   displayList.setMaxTileCount(512);
 }
 
-void TGFXBaseView::ensureWindow() {
-  if (window != nullptr) {
-    return;
-  }
-#ifdef TGFX_USE_WEBGPU
-  window = tgfx::WebGPUWindow::MakeFrom(canvasID, nullptr, colorSpace);
-#else
-  window = tgfx::WebGLWindow::MakeFrom(canvasID, colorSpace);
-#endif
-}
-
 void TGFXBaseView::updateSize() {
-  ensureWindow();
+  if (window == nullptr) {
+#ifdef TGFX_USE_WEBGPU
+    window = tgfx::WebGPUWindow::MakeFrom(canvasID);
+#else
+    window = tgfx::WebGLWindow::MakeFrom(canvasID);
+#endif
+  }
   if (window == nullptr) {
     return;
   }
@@ -90,33 +85,6 @@ void TGFXBaseView::updateZoomScaleAndOffset(float zoom, float offsetX, float off
   displayList.setContentOffset(offsetX, offsetY);
 }
 
-void TGFXBaseView::setColorSpace(int type) {
-  std::shared_ptr<tgfx::ColorSpace> newColorSpace = nullptr;
-  switch (type) {
-    case 1:
-      newColorSpace = tgfx::ColorSpace::SRGB();
-      break;
-    case 2:
-      newColorSpace = tgfx::ColorSpace::DisplayP3();
-      break;
-    default:
-      newColorSpace = nullptr;
-      break;
-  }
-  if (tgfx::ColorSpace::Equals(colorSpace.get(), newColorSpace.get())) {
-    return;
-  }
-  colorSpace = std::move(newColorSpace);
-  // Drop the current window and surface so ensureWindow() recreates them with the new color space
-  // on the next updateSize()/draw() call.
-  window = nullptr;
-  surface = nullptr;
-  lastSurfaceWidth = 0;
-  lastSurfaceHeight = 0;
-  presentImmediately = true;
-  forceRedraw = true;
-}
-
 void TGFXBaseView::updateLayerTree(int drawIndex) {
   auto numBuilders = hello2d::LayerBuilder::Count();
   auto index = drawIndex % numBuilders;
@@ -135,7 +103,13 @@ void TGFXBaseView::updateLayerTree(int drawIndex) {
 }
 
 void TGFXBaseView::draw() {
-  ensureWindow();
+  if (window == nullptr) {
+#ifdef TGFX_USE_WEBGPU
+    window = tgfx::WebGPUWindow::MakeFrom(canvasID);
+#else
+    window = tgfx::WebGLWindow::MakeFrom(canvasID);
+#endif
+  }
   if (window == nullptr) {
     return;
   }
@@ -143,7 +117,7 @@ void TGFXBaseView::draw() {
   bool hasContentChanged = displayList.hasContentChanged();
   bool hasLastRecording = (lastRecording != nullptr);
 
-  if (!hasContentChanged && !hasLastRecording && !forceRedraw) {
+  if (!hasContentChanged && !hasLastRecording) {
     return;
   }
 
@@ -170,7 +144,6 @@ void TGFXBaseView::draw() {
   DrawBackground(canvas, surface->width(), surface->height(), density);
 
   displayList.render(surface.get(), false);
-  forceRedraw = false;
 
   auto recording = context->flush();
 
