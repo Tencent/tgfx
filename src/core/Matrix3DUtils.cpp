@@ -40,14 +40,16 @@ struct ClipPlane {
   float c;
 };
 
-float SignedDistance(const ClipPlane& plane, const ClipVertex& vertex) {
+}  // namespace
+
+static float SignedDistance(const ClipPlane& plane, const ClipVertex& vertex) {
   return plane.a * vertex.x + plane.b * vertex.y + plane.c * vertex.w;
 }
 
 // Sutherland-Hodgman clip of `input` against `plane`, writing survivors to `output`. Boundary
 // crossings interpolate linearly in homogeneous space so the near-plane clip stays well defined.
-void ClipPolygonAgainstPlane(const std::vector<ClipVertex>& input, const ClipPlane& plane,
-                             std::vector<ClipVertex>* output) {
+static void ClipPolygonAgainstPlane(const std::vector<ClipVertex>& input, const ClipPlane& plane,
+                                    std::vector<ClipVertex>* output) {
   output->clear();
   const size_t count = input.size();
   if (count == 0) {
@@ -72,8 +74,6 @@ void ClipPolygonAgainstPlane(const std::vector<ClipVertex>& input, const ClipPla
     distancePrev = distanceCurrent;
   }
 }
-
-}  // namespace
 
 bool Matrix3DUtils::IsRectBehindCamera(const Rect& rect, const Matrix3D& matrix) {
   return matrix.mapHomogeneous(rect.left, rect.top, 0, 1).w <= 0 ||
