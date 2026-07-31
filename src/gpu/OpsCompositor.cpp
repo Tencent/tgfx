@@ -250,7 +250,17 @@ bool OpsCompositor::shouldUseStencilCover(const Brush& brush, const Shape& shape
   if (brush.antiAlias) {
     return false;
   }
-  // Empty and rect paths are faster on the legacy triangulation path.
+  // Route rect and empty paths away from stencil-cover:
+  //   - Rect paths triangulate to two triangles on the legacy path, avoiding the Loop-Blinn
+  //     tessellation and the stencil + cover two-pass pipeline of stencil-cover, which is
+  //     designed for curved paths where its per-fragment implicit-curve test wins over CPU
+  //     triangulation.
+  //   - Empty paths on the legacy path drop out at PathTriangulator::ToTriangles (zero
+  //     triangles → the op is not created), so no stencil attachment is allocated. On the
+  //     stencil-cover path they would still trigger needsStencil() → the pass allocates a
+  //     depth/stencil texture just to draw a 4-vertex cover quad.
+  // The isSimplePath() gate keeps this check off the hot path for shapes backed by expensive
+  // path ops (e.g. AppendShape) — those go through stencil-cover regardless.
   if (shape.isSimplePath()) {
     auto path = shape.getPath();
     if (path.isEmpty() || path.isRect()) {
