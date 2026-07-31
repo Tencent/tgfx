@@ -88,6 +88,43 @@ static void DrawPath(const Path& path, CGContextRef cgContext, const ImageInfo& 
   CGPathRelease(cgPath);
 }
 
+static bool DrawPathWithGammaCorrection(const Path& path, void* pixels, const ImageInfo& info,
+                                        float left, float top,
+                                        const std::array<uint8_t, 256>& gammaTable) {
+  auto cgContext = CreateBitmapContext(info, pixels);
+  if (cgContext == nullptr) {
+    return false;
+  }
+  CGContextTranslateCTM(cgContext, -left, -top);
+  DrawPath(path, cgContext, info);
+  CGContextFlush(cgContext);
+  auto* p = static_cast<uint8_t*>(pixels);
+  auto stride = info.rowBytes();
+  for (int y = 0; y < info.height(); ++y) {
+    for (int x = 0; x < info.width(); ++x) {
+      p[x] = gammaTable[p[x]];
+    }
+    p += stride;
+  }
+  CGContextSynchronize(cgContext);
+  CGContextRelease(cgContext);
+  return true;
+}
+
+static void CompositeA8Mask(const uint8_t* src, uint8_t* dst, int width, int height,
+                            size_t srcRowBytes, size_t dstRowBytes, int dstX, int dstY) {
+  dst += static_cast<size_t>(dstY) * dstRowBytes + static_cast<size_t>(dstX);
+  for (int y = 0; y < height; ++y) {
+    for (int x = 0; x < width; ++x) {
+      auto srcAlpha = src[x];
+      auto dstAlpha = dst[x];
+      dst[x] = static_cast<uint8_t>(srcAlpha + (dstAlpha * (255 - srcAlpha) + 127) / 255);
+    }
+    src += srcRowBytes;
+    dst += dstRowBytes;
+  }
+}
+
 void CGMask::onFillPath(const Path& path, const Matrix& matrix, bool needsGammaCorrection) {
   if (path.isEmpty()) {
     return;
@@ -112,18 +149,49 @@ void CGMask::onFillPath(const Path& path, const Matrix& matrix, bool needsGammaC
   bounds.roundOut();
   markContentDirty(bounds, true);
 
-  DrawPath(finalPath, cgContext, info);
-  if (needsGammaCorrection) {
-    auto* p = static_cast<uint8_t*>(pixels);
-    auto stride = info.rowBytes();
-    auto gammaTable = PixelRefMask::GammaTable();
-    for (int y = 0; y < info.height(); ++y) {
-      for (int x = 0; x < info.width(); ++x) {
-        p[x] = gammaTable[p[x]];
-      }
-      p += stride;
-    }
+  if (!needsGammaCorrection) {
+    DrawPath(finalPath, cgContext, info);
+    CGContextRelease(cgContext);
+    pixelRef->unlockPixels();
+    return;
   }
+
+  // Clear the destination to avoid double-gamma correction on existing content.
+  CGContextClearRect(cgContext, CGRectMake(0.f, 0.f, info.width(), info.height()));
+
+  auto clipBounds =
+      Rect::MakeWH(static_cast<float>(info.width()), static_cast<float>(info.height()));
+  if (!bounds.intersect(clipBounds)) {
+    CGContextRelease(cgContext);
+    pixelRef->unlockPixels();
+    return;
+  }
+  auto width = static_cast<int>(ceilf(bounds.width()));
+  auto height = static_cast<int>(ceilf(bounds.height()));
+  auto tempBuffer = PixelBuffer::Make(width, height, true, false);
+  if (tempBuffer == nullptr) {
+    CGContextRelease(cgContext);
+    pixelRef->unlockPixels();
+    return;
+  }
+  auto* tempPixels = tempBuffer->lockPixels();
+  if (tempPixels == nullptr) {
+    CGContextRelease(cgContext);
+    pixelRef->unlockPixels();
+    return;
+  }
+  memset(tempPixels, 0, tempBuffer->info().byteSize());
+  if (!DrawPathWithGammaCorrection(finalPath, tempPixels, tempBuffer->info(), bounds.left,
+                                   bounds.top, PixelRefMask::GammaTable())) {
+    tempBuffer->unlockPixels();
+    CGContextRelease(cgContext);
+    pixelRef->unlockPixels();
+    return;
+  }
+  CompositeA8Mask(static_cast<const uint8_t*>(tempPixels), static_cast<uint8_t*>(pixels), width,
+                  height, tempBuffer->info().rowBytes(), info.rowBytes(),
+                  static_cast<int>(bounds.left), static_cast<int>(bounds.top));
+  tempBuffer->unlockPixels();
   CGContextRelease(cgContext);
   pixelRef->unlockPixels();
 }
