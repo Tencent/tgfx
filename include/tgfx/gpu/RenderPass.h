@@ -174,9 +174,12 @@ class DepthStencilAttachment {
   bool stencilReadOnly = false;
 
   /**
-   * Optional scissor rectangle that confines the depth/stencil clear when loadAction is
-   * LoadAction::Clear. When set, only pixels inside this rect are cleared; when nullopt, the
-   * entire attachment is cleared. This does not affect draw-time scissor, which is controlled
+   * Optional best-effort hint that confines the depth/stencil clear to the given rectangle
+   * (in backend scissor space) when loadAction is LoadAction::Clear, allowing backends to
+   * skip clearing pixels the caller will not touch. When nullopt, the entire attachment is
+   * cleared. Currently honored only by the OpenGL backend; Metal, Vulkan, and WebGPU
+   * ignore this field and clear the whole attachment, which is functionally correct but
+   * forgoes the bandwidth saving. Does not affect draw-time scissor, which is controlled
    * by RenderPass::setScissorRect().
    */
   std::optional<Rect> clearScissor = std::nullopt;
