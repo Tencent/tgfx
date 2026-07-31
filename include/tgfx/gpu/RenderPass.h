@@ -19,7 +19,6 @@
 #pragma once
 
 #include <optional>
-
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/gpu/GPUBuffer.h"
