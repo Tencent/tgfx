@@ -30,16 +30,10 @@
 #include "tgfx/core/Image.h"
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Surface.h"
-#include "tgfx/gpu/GPU.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
-
-// Ceiling on the raster surface's largest dimension. Combined with the GPU's own texture-size
-// limit, this bounds any single 3D leaf's raster below what Surface::Make can allocate while
-// staying well inside memory pressure for pathological transforms.
-static constexpr int MaxRasterDimension = 4096;
 
 namespace {
 
@@ -105,8 +99,6 @@ void Render3DContext::finishAndDrawTo(const DrawArgs& args, Canvas* canvas) {
   // compositor actually samples for perspective-transformed leaves.
   const Rect compositorViewport = Rect::MakeWH(static_cast<float>(_compositor->width()),
                                                static_cast<float>(_compositor->height()));
-  const int gpuMax = args.context->gpu()->limits()->maxTextureDimension2D;
-  const int rasterMax = gpuMax > 0 ? std::min(gpuMax, MaxRasterDimension) : MaxRasterDimension;
   std::unordered_map<Layer*, RasterInfo> layerRasterInfo;
   layerRasterInfo.reserve(_pendingNodes.size());
   for (const auto& node : _pendingNodes) {
@@ -114,8 +106,7 @@ void Render3DContext::finishAndDrawTo(const DrawArgs& args, Canvas* canvas) {
     localToCompositor.postScale(_contentScale, _contentScale, 1.0f);
     localToCompositor.postTranslate(-_renderRect.left, -_renderRect.top, 0);
     RasterInfo info;
-    if (!ComputeRasterInfo(localToCompositor, node.localBounds, compositorViewport, rasterMax,
-                           &info)) {
+    if (!ComputeRasterInfo(localToCompositor, node.localBounds, compositorViewport, &info)) {
       continue;
     }
     layerRasterInfo.emplace(node.layer, info);
@@ -306,8 +297,7 @@ bool Render3DContext::primeCompositorFromOuterCanvas(Canvas* outerCanvas) {
 // footprint; over-approximation is safe here because the raster covers everything the compositor
 // can sample and never less.
 bool Render3DContext::ComputeRasterInfo(const Matrix3D& localToCompositor, const Rect& localBounds,
-                                        const Rect& compositorViewport, int rasterMax,
-                                        RasterInfo* info) {
+                                        const Rect& compositorViewport, RasterInfo* info) {
   if (Matrix3DUtils::IsRectBehindCamera(localBounds, localToCompositor)) {
     return false;
   }
@@ -320,21 +310,10 @@ bool Render3DContext::ComputeRasterInfo(const Matrix3D& localToCompositor, const
   if (!(density.x > 0.0f) || !(density.y > 0.0f)) {
     return false;
   }
-  int rasterWidth = std::max(1, static_cast<int>(std::ceil(visibleLocal.width() * density.x)));
-  int rasterHeight = std::max(1, static_cast<int>(std::ceil(visibleLocal.height() * density.y)));
-  // Defense in depth for pathological inputs. UV stays self-consistent because the compositor
-  // recomputes it from (texSize / localBounds), and density/rasterSize scale together.
-  if (rasterWidth > rasterMax || rasterHeight > rasterMax) {
-    const float shrinkX = static_cast<float>(rasterMax) / static_cast<float>(rasterWidth);
-    const float shrinkY = static_cast<float>(rasterMax) / static_cast<float>(rasterHeight);
-    const float shrink = std::min(shrinkX, shrinkY);
-    density.x *= shrink;
-    density.y *= shrink;
-    rasterWidth =
-        std::max(1, static_cast<int>(std::floor(static_cast<float>(rasterWidth) * shrink)));
-    rasterHeight =
-        std::max(1, static_cast<int>(std::floor(static_cast<float>(rasterHeight) * shrink)));
-  }
+  const int rasterWidth =
+      std::max(1, static_cast<int>(std::ceil(visibleLocal.width() * density.x)));
+  const int rasterHeight =
+      std::max(1, static_cast<int>(std::ceil(visibleLocal.height() * density.y)));
   Matrix densityMatrix = Matrix::MakeScale(density.x, density.y);
   densityMatrix.postTranslate(-visibleLocal.left * density.x, -visibleLocal.top * density.y);
   info->visibleLocal = visibleLocal;

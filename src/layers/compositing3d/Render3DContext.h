@@ -91,10 +91,10 @@ class Render3DContext : public Layer3DContext {
   bool primeCompositorFromOuterCanvas(Canvas* outerCanvas);
 
   // Fills `info` with a RasterInfo sized to the projection of `localBounds` through
-  // `localToCompositor`, clipped to `compositorViewport` and capped at `rasterMax` per axis.
-  // Returns false when the layer projects entirely outside the viewport or behind the camera.
+  // `localToCompositor`, clipped to `compositorViewport`. Returns false when the layer projects
+  // entirely outside the viewport or behind the camera.
   static bool ComputeRasterInfo(const Matrix3D& localToCompositor, const Rect& localBounds,
-                                const Rect& compositorViewport, int rasterMax, RasterInfo* info);
+                                const Rect& compositorViewport, RasterInfo* info);
 
   std::shared_ptr<Context3DCompositor> _compositor = nullptr;
   std::vector<PendingNode> _pendingNodes = {};
