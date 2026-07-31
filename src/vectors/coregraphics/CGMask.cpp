@@ -159,8 +159,8 @@ void CGMask::onFillPath(const Path& path, const Matrix& matrix, bool needsGammaC
   // Clear the destination to avoid double-gamma correction on existing content.
   CGContextClearRect(cgContext, CGRectMake(0.f, 0.f, info.width(), info.height()));
 
-  auto clipBounds =
-      Rect::MakeWH(static_cast<float>(info.width()), static_cast<float>(info.height()));
+  auto clipBounds = Rect::MakeWH(static_cast<float>(info.width()),
+                                 static_cast<float>(info.height()));
   if (!bounds.intersect(clipBounds)) {
     CGContextRelease(cgContext);
     pixelRef->unlockPixels();

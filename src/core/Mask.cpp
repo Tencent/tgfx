@@ -41,6 +41,7 @@ bool Mask::fillText(const TextBlob* textBlob, const Stroke* stroke) {
     return false;
   }
   auto runCount = textBlob->glyphRunCount();
+  Path fallbackPath = {};
   for (size_t i = 0; i < runCount; ++i) {
     auto glyphRun = textBlob->getGlyphRun(i);
     if (glyphRun->hasColor()) {
@@ -53,7 +54,10 @@ bool Mask::fillText(const TextBlob* textBlob, const Stroke* stroke) {
     if (!glyphRun->getPath(&path, matrix, stroke)) {
       return false;
     }
-    onFillPath(path, Matrix::I(), true);
+    fallbackPath.addPath(path);
+  }
+  if (!fallbackPath.isEmpty()) {
+    onFillPath(fallbackPath, Matrix::I(), true);
   }
   return true;
 }
