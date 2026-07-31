@@ -56,12 +56,7 @@ bool GLRenderPass::begin() {
       bool hasScissor = depthStencilAttachment.clearScissor.has_value() &&
                         !depthStencilAttachment.clearScissor->isEmpty();
       if (hasScissor) {
-        // roundOut so a caller passing a fractional rect (e.g. right=129.7) still clears the
-        // whole 130-pixel span the stencil pass may write to. Truncating the width via
-        // static_cast<int> would leave stale stencil in the last column/row and produce
-        // 1-pixel artefacts. Matches applyStencilScissor's floor/ceil convention.
-        auto s = *depthStencilAttachment.clearScissor;
-        s.roundOut();
+        auto& s = *depthStencilAttachment.clearScissor;
         state->setScissorRect(static_cast<int>(s.left), static_cast<int>(s.top),
                               static_cast<int>(s.width()), static_cast<int>(s.height()));
         state->setEnabled(GL_SCISSOR_TEST, true);
