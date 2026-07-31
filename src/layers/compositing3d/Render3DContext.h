@@ -57,6 +57,17 @@ class Render3DContext : public Layer3DContext {
     bool hasBackgroundStyle = false;
   };
 
+  // Raster parameters derived once per pending node in finishAndDrawTo and consumed by rasterLayer
+  // for every fragment that references the same node. Keeping these decoupled from PendingNode
+  // (and from the layer pointer) lets the emit phase stay unaware of the compositor viewport,
+  // contentScale, and derived density; only finishAndDrawTo needs those to size the surface.
+  struct RasterInfo {
+    Rect visibleLocal = {};
+    Matrix density = Matrix::I();  // local -> raster pixel
+    int rasterWidth = 0;
+    int rasterHeight = 0;
+  };
+
   void emitNode(Layer* layer, const Rect& localBounds, const Matrix3D& transform, float alpha,
                 int depth, bool hasBackgroundStyle) override;
   // Rasters the layer onto a fresh leaf surface and returns the snapshot. When `compositorSource`
@@ -64,9 +75,11 @@ class Render3DContext : public Layer3DContext {
   // and installs a fresh BackgroundCapturer on `leafArgs.backgroundHandler` so in-fragment
   // dispatches and any nested offscreen handlers walk the standard BackgroundCapturer pipeline.
   // `localToWorld` is the layer's matrix in this context's world space (== outer canvas-local at
-  // the top level; == enclosing leaf's local for nested 3D contexts).
-  std::shared_ptr<Image> rasterLayer(Layer* layer, const Rect& localBounds, float alpha,
-                                     BlendMode blendMode, DrawArgs& leafArgs,
+  // the top level; == enclosing leaf's local for nested 3D contexts). `info` carries the raster
+  // dimensions and local->raster density computed in finishAndDrawTo from the leaf's actual
+  // projection onto the compositor viewport.
+  std::shared_ptr<Image> rasterLayer(Layer* layer, float alpha, BlendMode blendMode,
+                                     DrawArgs& leafArgs, const RasterInfo& info,
                                      const std::shared_ptr<BackgroundSource>& compositorSource,
                                      BackgroundSnapshotMap* snapshots, const Matrix& localToWorld);
   // Snapshot the outer canvas and prime the compositor target with it so in-subtree
