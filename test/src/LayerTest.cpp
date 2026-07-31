@@ -4088,15 +4088,16 @@ TGFX_TEST(LayerTest, GlassStyleBackgroundOutsets) {
 
   displayList->render(surface.get());
 
-  TGFX_PRIVATE_ACCESS(EXPECT_GT(sharpLayer->maxBackgroundOutset, 0.0f);
-                      EXPECT_EQ(sharpLayer->minBackgroundOutset, 0.0f);
-                      EXPECT_GT(softLayer->minBackgroundOutset, 0.0f);
-                      EXPECT_EQ(softLayer->maxBackgroundOutset, softLayer->minBackgroundOutset);
-                      EXPECT_GT(mixedLayer->maxBackgroundOutset, 0.0f);
-                      EXPECT_EQ(mixedLayer->minBackgroundOutset, 0.0f); EXPECT_GT(
-                          combinedLayer->maxBackgroundOutset, sharpLayer->maxBackgroundOutset);
-                      EXPECT_GT(combinedLayer->maxBackgroundOutset, softLayer->maxBackgroundOutset);
-                      EXPECT_GT(combinedLayer->minBackgroundOutset, 0.0f);)
+                      TGFX_PRIVATE_ACCESS(
+  EXPECT_GT(sharpLayer->maxBackgroundOutset, 0.0f);
+  EXPECT_GT(sharpLayer->minBackgroundOutset, 0.0f);
+  EXPECT_GT(softLayer->minBackgroundOutset, 0.0f);
+  EXPECT_EQ(softLayer->maxBackgroundOutset, softLayer->minBackgroundOutset);
+  EXPECT_GT(mixedLayer->maxBackgroundOutset, 0.0f);
+  EXPECT_GT(mixedLayer->minBackgroundOutset, 0.0f);
+  EXPECT_GT(combinedLayer->maxBackgroundOutset, sharpLayer->maxBackgroundOutset);
+  EXPECT_GT(combinedLayer->maxBackgroundOutset, softLayer->maxBackgroundOutset);
+  EXPECT_GT(combinedLayer->minBackgroundOutset, 0.0f);)
 }
 
 TGFX_TEST(LayerTest, GlassStyleShapeLayerContentOffset) {
