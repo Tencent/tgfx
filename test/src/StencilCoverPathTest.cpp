@@ -26,7 +26,9 @@
 
 #include "core/StencilCoverPathTessellator.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/RenderContext.h"
 #include "gpu/ops/StencilCoverPathDrawOp.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Color.h"
@@ -1861,6 +1863,83 @@ TGFX_TEST(StencilCoverPathTest, Dispatch_StencilConfinedByCoverBoundsWithoutClip
   // plausible future regression pattern.
   EXPECT_EQ(ReadRedChannel(surface.get(), 1, 1), 0xFF)
       << "Op B inverse fill inside op A's half but outside op A's bbox must be red";
+}
+
+// Guards the shouldUseStencilCover early-out that routes empty paths back to the legacy
+// triangulation path. The concern is not raster correctness but resource cost: any op that
+// reports needsStencil() forces OpsRenderTask to call RenderTargetProxy::getStencil(),
+// which lazily allocates a DEPTH24_STENCIL8 texture sized to the whole render target (see
+// RenderTargetProxy.cpp:64). Canvas::clear under a non-WideOpen clip flows through
+// Canvas::drawFill → drawContext->drawPath(emptyInversePath) → RenderContext::drawPath →
+// drawShape → shouldUseStencilCover, which is exactly where the empty-path early-out lives.
+// If the early-out is ever removed the clear silently starts paying that allocation.
+TGFX_TEST(StencilCoverPathTest, Dispatch_EmptyPathBypassesStencilAttachmentAllocation) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  ScopedStencilCoverCaps capsGuard(context, true);
+
+  constexpr int SIZE = 64;
+
+  auto clearUnderClipAndPeekStencil = [&](bool useNonWideOpenClip) -> std::shared_ptr<Texture> {
+    auto surface = Surface::Make(context, SIZE, SIZE);
+    if (surface == nullptr) {
+      return nullptr;
+    }
+    auto canvas = surface->getCanvas();
+    if (useNonWideOpenClip) {
+      // Force clip.state() != WideOpen so Canvas::drawFill routes to drawContext->drawPath
+      // with an empty inverse-fill path, which is what reaches shouldUseStencilCover.
+      canvas->clipRect(Rect::MakeLTRB(4, 4, SIZE - 4, SIZE - 4));
+    }
+    canvas->clear(Color{0.f, 0.f, 0.f, 1.f});
+    // Add a second op so the render task actually flushes to GPU. Without it a lone clear
+    // may be short-circuited before OpsRenderTask executes and getStencil() is invoked.
+    Paint fillPaint;
+    fillPaint.setAntiAlias(false);
+    fillPaint.setColor(Color{1.f, 0.f, 0.f, 1.f});
+    canvas->drawRect(Rect::MakeLTRB(10, 10, 20, 20), fillPaint);
+    context->flushAndSubmit();
+    std::shared_ptr<Texture> stencil;
+    TGFX_PRIVATE_ACCESS(stencil = surface->renderContext->renderTarget->stencilTexture);
+    return stencil;
+  };
+
+  // Empty inverse-fill path routed through a non-WideOpen clip: the early-out must keep it
+  // on the legacy path so no stencil attachment is allocated.
+  auto clippedStencil = clearUnderClipAndPeekStencil(true);
+  EXPECT_EQ(clippedStencil, nullptr)
+      << "Canvas::clear under a rect clip must not allocate a stencil attachment "
+         "(empty path should be routed away from stencil-cover)";
+
+  // Control: draw a real curved path under the same caps to confirm the observation channel
+  // is functional — that shouldUseStencilCover *does* return true for non-trivial shapes and
+  // that OpsRenderTask *does* attach and cache the stencil texture on the render target
+  // proxy. Without this the assertion above could pass trivially if some future refactor
+  // stopped caching stencilTexture altogether.
+  auto surface = Surface::Make(context, SIZE, SIZE);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color{0.f, 0.f, 0.f, 1.f});
+  Path pentagon;
+  pentagon.moveTo(32, 8);
+  pentagon.lineTo(56, 26);
+  pentagon.lineTo(48, 56);
+  pentagon.lineTo(16, 56);
+  pentagon.lineTo(8, 26);
+  pentagon.close();
+  pentagon.setFillType(PathFillType::Winding);
+  Paint paint;
+  paint.setAntiAlias(false);
+  paint.setColor(Color{1.f, 0.f, 0.f, 1.f});
+  canvas->drawPath(pentagon, paint);
+  context->flushAndSubmit();
+  std::shared_ptr<Texture> controlStencil;
+  TGFX_PRIVATE_ACCESS(controlStencil = surface->renderContext->renderTarget->stencilTexture);
+  EXPECT_NE(controlStencil, nullptr)
+      << "Pentagon path must allocate a stencil attachment when stencil-cover caps are on "
+         "(control channel for the empty-bypass assertion above)";
 }
 
 }  // namespace tgfx

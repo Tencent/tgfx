@@ -250,21 +250,20 @@ bool OpsCompositor::shouldUseStencilCover(const Brush& brush, const Shape& shape
   if (brush.antiAlias) {
     return false;
   }
-  // Route rect and empty paths away from stencil-cover to avoid triggering stencil attachment
+  // Route empty paths away from stencil-cover to avoid triggering stencil attachment
   // allocation. Any op with needsStencil() forces OpsRenderTask to call
   // RenderTargetProxy::getStencil(), which lazily allocates a DEPTH24_STENCIL8 texture sized
   // to the full render target (4 bytes/pixel — ~8MB at 1080p, ~32MB at 4K, ~256MB at 8K) and
-  // caches it on the proxy for the rest of its lifetime. Rect and empty paths are trivial to
-  // draw on the legacy triangulation path (rect → two triangles; empty → the op drops out at
-  // PathTriangulator::ToTriangles) and gain nothing from stencil-cover's Loop-Blinn evaluation,
-  // so the stencil attachment they would force is pure overhead.
+  // caches it on the proxy for the rest of its lifetime. The main producer of an empty path
+  // reaching this dispatch is Canvas::drawFill() under a non-WideOpen clip, which forwards
+  // an empty inverse-fill path through RenderContext::drawPath → drawShape; without this
+  // early-out a plain Canvas::clear() under a clip would silently allocate the full-size
+  // stencil attachment. Rect paths are already routed to drawRect fast paths by Canvas
+  // before reaching this method, so no dedicated check for them is needed here.
   // The isSimplePath() gate keeps this check off the hot path for shapes backed by expensive
   // path ops (e.g. AppendShape) — those go through stencil-cover regardless.
-  if (shape.isSimplePath()) {
-    auto path = shape.getPath();
-    if (path.isEmpty() || path.isRect()) {
-      return false;
-    }
+  if (shape.isSimplePath() && shape.getPath().isEmpty()) {
+    return false;
   }
   // Hardware gate: the render path requires a renderable stencil attachment. All other
   // eligibility checks (this path being the tgfx-side choice for non-AA fills) are encoded
