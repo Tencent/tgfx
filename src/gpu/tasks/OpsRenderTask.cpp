@@ -36,6 +36,7 @@ void OpsRenderTask::execute(CommandEncoder* encoder) {
   // the RenderTargetProxy itself (see RenderTargetProxy::getStencil), so all OpsRenderTasks
   // targeting the same proxy share one stencil texture for the proxy's lifetime.
   bool stencilAvailable = false;
+  bool clearScissorUnknown = false;
   auto stencilClearBoundsRect = Rect::MakeEmpty();
   for (auto& op : drawOps) {
     if (op->needsStencil()) {
@@ -57,13 +58,18 @@ void OpsRenderTask::execute(CommandEncoder* encoder) {
         stencilAvailable = true;
       }
       auto bounds = op->getStencilResolveBounds();
-      if (!bounds.isEmpty()) {
+      if (bounds.isEmpty()) {
+        // An op that opts in to stencil but does not declare its write extent could touch
+        // anywhere in the attachment; a partial clear would risk leaving stale stencil in
+        // its untracked region. Fall back to a full clear for the whole pass.
+        clearScissorUnknown = true;
+      } else {
         stencilClearBoundsRect.join(bounds);
       }
     }
   }
   if (stencilAvailable) {
-    if (stencilClearBoundsRect.isEmpty()) {
+    if (clearScissorUnknown || stencilClearBoundsRect.isEmpty()) {
       descriptor.depthStencilAttachment.clearScissor = std::nullopt;
     } else {
       // Ops report their stencil write footprint in canvas top-left device space, but the

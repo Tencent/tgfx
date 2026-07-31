@@ -95,15 +95,17 @@ class DrawOp {
 
   /**
    * Returns the device-space region that must be cleared in the stencil buffer before this op
-   * executes. When the op has a user scissor (set by the clip system), the stencil clear is
-   * already confined to that area. When the clip is WideOpen, the scissor is not set and this
-   * method provides a fallback — subclasses that write to stencil (e.g. StencilCoverPathDrawOp)
-   * override it to return their actual stencil-write footprint so the clear is still scoped.
-   * Default returns the scissorRect, which is correct for ops that derive their stencil region
-   * from the clip alone.
+   * executes. The returned rect is in canvas top-left device space (the same space viewMatrix
+   * maps into and Path::getBounds reports in); OpsRenderTask joins these rects across the pass
+   * and applies the render target's origin transform once before handing them to the backend
+   * as clearScissor. Ops that write to stencil (e.g. StencilCoverPathDrawOp) must override
+   * this to return their actual stencil-write footprint — the default returns an empty rect,
+   * which excludes the op from the clear-scissor union and causes the pass to fall back to a
+   * full clear whenever such an op is present, keeping correctness at the cost of the
+   * optimisation. Only meaningful when needsStencil() returns true.
    */
   virtual Rect getStencilResolveBounds() const {
-    return scissorRect;
+    return Rect::MakeEmpty();
   }
 
   /**
