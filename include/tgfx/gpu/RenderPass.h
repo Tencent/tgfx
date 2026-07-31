@@ -256,6 +256,15 @@ class RenderPass {
   virtual GPU* gpu() const = 0;
 
   /**
+   * Returns the pixel format of the bound depth-stencil attachment, or PixelFormat::Unknown if
+   * this render pass has no depth-stencil attachment.
+   */
+  PixelFormat depthStencilFormat() const {
+    auto& texture = descriptor.depthStencilAttachment.texture;
+    return texture != nullptr ? texture->format() : PixelFormat::Unknown;
+  }
+
+  /**
    * Sets the viewport used during the rasterization stage to linearly map from normalized device
    * coordinates to viewport coordinates.
    */
