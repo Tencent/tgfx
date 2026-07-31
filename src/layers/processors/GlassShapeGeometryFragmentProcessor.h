@@ -45,6 +45,12 @@ struct GlassSDFGeometryParams : public GlassGeometryParams {
 struct GlassUDFGeometryParams : public GlassGeometryParams {
   float udfPixelToLayerPixelX = 1.0f;
   float udfPixelToLayerPixelY = 1.0f;
+  /**
+   * Layer-space distance between the two taps of the edge field's center difference. It must match
+   * the tent radius used to build that field, otherwise the reconstructed edge distance is scaled.
+   */
+  float edgeSpanX = 1.0f;
+  float edgeSpanY = 1.0f;
 };
 
 /**
@@ -82,10 +88,15 @@ class GlassSDFGeometryFragmentProcessor : public GlassShapeGeometryFragmentProce
 
 class GlassUDFGeometryFragmentProcessor : public GlassShapeGeometryFragmentProcessor {
  public:
-  static PlacementPtr<GlassUDFGeometryFragmentProcessor> Make(
-      BlockAllocator* allocator, std::shared_ptr<TextureProxy> fineMask,
-      std::shared_ptr<TextureProxy> coarseMask, const GlassUDFGeometryParams& params,
-      bool enableEdgeLighting);
+  /**
+   * @description Creates the processor.
+   * @param mask Single RGBA8 field where RGB carries the 24-bit refraction height and A carries the
+   * edge light height.
+   */
+  static PlacementPtr<GlassUDFGeometryFragmentProcessor> Make(BlockAllocator* allocator,
+                                                             std::shared_ptr<TextureProxy> mask,
+                                                             const GlassUDFGeometryParams& params,
+                                                             bool enableEdgeLighting);
 
   std::string name() const override {
     return "GlassUDFGeometryFragmentProcessor";
@@ -102,12 +113,10 @@ class GlassUDFGeometryFragmentProcessor : public GlassShapeGeometryFragmentProce
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  GlassUDFGeometryFragmentProcessor(std::shared_ptr<TextureProxy> fineMask,
-                                    std::shared_ptr<TextureProxy> coarseMask,
+  GlassUDFGeometryFragmentProcessor(std::shared_ptr<TextureProxy> mask,
                                     const GlassUDFGeometryParams& params, bool enableEdgeLighting);
 
-  std::shared_ptr<TextureProxy> fineMaskProxy;
-  std::shared_ptr<TextureProxy> coarseMaskProxy;
+  std::shared_ptr<TextureProxy> maskProxy;
   GlassUDFGeometryParams params = {};
   bool enableEdgeLighting = false;
 

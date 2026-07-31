@@ -28,7 +28,7 @@
 #include "layers/CanvasUtils.h"
 #include "layers/imagefilters/GlassRefractionImageFilter.h"
 #include "layers/processors/GlassRefractionFragmentProcessor.h"
-#include "layers/processors/TentBlur1DFragmentProcessor.h"
+#include "layers/processors/GlassUDFTentBlurFragmentProcessor.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/RRect.h"
@@ -56,11 +56,18 @@ static float GetRefractionOutset(float width, float height, float refractionFact
   return std::max(std::max(udfOutset, sdfOutset) * (1.0f + dispersion), 1.0f);
 }
 
-static std::shared_ptr<Image> MakeTentBlurImage(Context* context,
-                                                const std::shared_ptr<Image>& source, float radiusX,
-                                                float radiusY, int paddingX = 0, int paddingY = 0) {
-  if (context == nullptr || source == nullptr || radiusX <= 0.0f || radiusY <= 0.0f ||
-      paddingX < 0 || paddingY < 0) {
+// Blurs the coverage image twice with two tent radii and returns a single padded RGBA8 image:
+// RGB holds the wide field used for the refraction gradient, A holds the narrow field used for the
+// edge light. All radii are in destination texel units.
+static std::shared_ptr<Image> MakeGlassUDFImage(Context* context,
+                                                const std::shared_ptr<Image>& source,
+                                                const Point& fineRadius, const Point& coarseRadius,
+                                                int paddingX, int paddingY) {
+  if (context == nullptr || source == nullptr || paddingX < 0 || paddingY < 0) {
+    return nullptr;
+  }
+  if (fineRadius.x <= 0.0f || fineRadius.y <= 0.0f || coarseRadius.x <= 0.0f ||
+      coarseRadius.y <= 0.0f) {
     return nullptr;
   }
   auto textureImage = source->makeTextureImage(context);
@@ -71,35 +78,44 @@ static std::shared_ptr<Image> MakeTentBlurImage(Context* context,
   SamplingArgs samplingArgs = {TileMode::Decal, TileMode::Decal, {}, SrcRectConstraint::Fast};
   auto allocator = context->drawingAllocator();
   auto horizontalMatrix = Matrix::MakeTrans(-static_cast<float>(paddingX), 0.0f);
-  auto sourceProcessor =
+  // Both tent loops need their own child instance: emitting one child twice would redeclare its
+  // uniforms.
+  auto fineSource =
+      TiledTextureEffect::Make(allocator, textureProxy, samplingArgs, &horizontalMatrix);
+  auto coarseSource =
       TiledTextureEffect::Make(allocator, textureProxy, samplingArgs, &horizontalMatrix);
   auto horizontalWidth = source->width() + paddingX * 2;
   auto horizontalTarget =
       RenderTargetProxy::Make(context, horizontalWidth, source->height(), false, 1, false,
                               ImageOrigin::TopLeft, BackingFit::Exact);
-  if (sourceProcessor == nullptr || horizontalTarget == nullptr) {
+  if (horizontalTarget == nullptr) {
     return nullptr;
   }
-  auto horizontalProcessor =
-      TentBlur1DFragmentProcessor::Make(allocator, std::move(sourceProcessor), radiusX,
-                                        TentBlurDirection::Horizontal, 1.0f, MaxTentRadius, false);
-  if (!context->drawingManager()->fillRTWithFP(horizontalTarget, std::move(horizontalProcessor),
+  auto horizontalProcessor = GlassUDFTentBlurFragmentProcessor::Make(
+      allocator, std::move(fineSource), std::move(coarseSource), fineRadius.x, coarseRadius.x,
+      GlassUDFBlurDirection::Horizontal, MaxTentRadius, false);
+  if (horizontalProcessor == nullptr ||
+      !context->drawingManager()->fillRTWithFP(horizontalTarget, std::move(horizontalProcessor),
                                                0)) {
     return nullptr;
   }
   auto verticalMatrix = Matrix::MakeTrans(0.0f, -static_cast<float>(paddingY));
-  auto verticalSource = TiledTextureEffect::Make(allocator, horizontalTarget->asTextureProxy(),
-                                                 samplingArgs, &verticalMatrix);
+  auto horizontalProxy = horizontalTarget->asTextureProxy();
+  auto verticalFineSource =
+      TiledTextureEffect::Make(allocator, horizontalProxy, samplingArgs, &verticalMatrix);
+  auto verticalCoarseSource =
+      TiledTextureEffect::Make(allocator, horizontalProxy, samplingArgs, &verticalMatrix);
   auto verticalHeight = source->height() + paddingY * 2;
   auto verticalTarget = RenderTargetProxy::Make(context, horizontalWidth, verticalHeight, false, 1,
                                                 false, ImageOrigin::TopLeft, BackingFit::Exact);
-  if (verticalSource == nullptr || verticalTarget == nullptr) {
+  if (verticalTarget == nullptr) {
     return nullptr;
   }
-  auto verticalProcessor =
-      TentBlur1DFragmentProcessor::Make(allocator, std::move(verticalSource), radiusY,
-                                        TentBlurDirection::Vertical, 1.0f, MaxTentRadius, true);
-  if (!context->drawingManager()->fillRTWithFP(verticalTarget, std::move(verticalProcessor), 0)) {
+  auto verticalProcessor = GlassUDFTentBlurFragmentProcessor::Make(
+      allocator, std::move(verticalFineSource), std::move(verticalCoarseSource), fineRadius.y,
+      coarseRadius.y, GlassUDFBlurDirection::Vertical, MaxTentRadius, true);
+  if (verticalProcessor == nullptr ||
+      !context->drawingManager()->fillRTWithFP(verticalTarget, std::move(verticalProcessor), 0)) {
     return nullptr;
   }
   return TextureImage::Wrap(verticalTarget->asTextureProxy(), nullptr);
@@ -393,16 +409,15 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
     float halfH = origBounds.height() * 0.5f;
     float udfPixelToLayerPixelX = 1.0f;
     float udfPixelToLayerPixelY = 1.0f;
+    float edgeSpanX = 1.0f;
+    float edgeSpanY = 1.0f;
     std::shared_ptr<Image> maskImage = nullptr;
-    std::shared_ptr<Image> coarseMaskImage = nullptr;
     if (shapeInfo.type == GlassShapeType::AlphaMask) {
       // For AlphaMask shape, generate a UDF height map:
       // Tent-blur the binary alpha to approximate UDF (triangular kernel gives more linear
       // transition than Gaussian, closer to a true distance field).
-      // The maskImage is rebuilt every frame via MakeTentBlurImage (input.content changes).
-      // The padded UDF is capped at MAX_UDF_SIZE to prevent excessive texture allocation. The
-      // mask UVs are normalized (0-1), so lower resolution does not affect the refraction shader.
-      static constexpr float MAX_UDF_SIZE = 512.0f;
+      // The maskImage is rebuilt every frame via MakeGlassUDFImage (input.content changes).
+      // Padding is included in the GPU texture-size check; mask UVs address the unpadded core.
       static constexpr int UDF_PADDING = 4;
       // Use original layer bounds (not zoom-affected) for blur radius calculation.
       // depth 1-100 maps linearly to blurRadius 5-30. The 30.0 cap limits max UDF blur to avoid
@@ -413,18 +428,20 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
           std::max(std::min((_depth / 100.0f) * MAX_BLUR_RADIUS, MAX_BLUR_RADIUS), MIN_BLUR_RADIUS);
       float minHalf = std::min(origBounds.width(), origBounds.height()) * 0.5f;
       float effectiveBlurRadius = std::min(blurRadius, minHalf);
-      // The UDF core uses layer-local bounds and keeps enough samples for tiny glass shapes.
-      static constexpr float MIN_UDF_CORE_SIZE = 128.0f;
+      // Use two UDF texels per layer pixel so a 0.5 layer-pixel edge remains representable.
+      static constexpr float MIN_UDF_CORE_SIZE = 512.0f;
+      static constexpr float MAX_UDF_CORE_SIZE = 2048.0f;
       float sourceWidth = origBounds.width();
       float sourceHeight = origBounds.height();
       float sourceMaxDim = std::max(sourceWidth, sourceHeight);
-      float maxPaddedUDFSize = std::min(MAX_UDF_SIZE, static_cast<float>(maxTextureSize));
-      float maxCoreUDFSize = maxPaddedUDFSize - UDF_PADDING * 2.0f;
+      float maxCoreUDFSize = std::min(
+          MAX_UDF_CORE_SIZE, static_cast<float>(maxTextureSize) - UDF_PADDING * 2.0f);
       if (maxCoreUDFSize < 1.0f) {
         return;
       }
       float minCoreUDFSize = std::min(MIN_UDF_CORE_SIZE, maxCoreUDFSize);
-      float targetCoreUDFSize = std::clamp(sourceMaxDim, minCoreUDFSize, maxCoreUDFSize);
+      float targetCoreUDFSize =
+          std::clamp(sourceMaxDim * 2.0f, minCoreUDFSize, maxCoreUDFSize);
       float udfScale = targetCoreUDFSize / sourceMaxDim;
       int udfWidth = std::max(1, static_cast<int>(std::round(sourceWidth * udfScale)));
       int udfHeight = std::max(1, static_cast<int>(std::round(sourceHeight * udfScale)));
@@ -445,50 +462,37 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       // source size, keeping the layer-space radius constant.
       float layerToSourceX = sourceWidth / origBounds.width();
       float layerToSourceY = sourceHeight / origBounds.height();
-      float udfBlurRadiusX = effectiveBlurRadius * udfScale * layerToSourceX;
-      float udfBlurRadiusY = effectiveBlurRadius * udfScale * layerToSourceY;
+      Point fineRadius = {
+          std::min(effectiveBlurRadius * udfScale * layerToSourceX,
+                   static_cast<float>(MaxTentRadius)),
+          std::min(effectiveBlurRadius * udfScale * layerToSourceY,
+                   static_cast<float>(MaxTentRadius))};
+      // The edge field shares the fine texture, so its radius must satisfy the texel constraints of
+      // that resolution: below two texels the tent kernel degenerates to a single tap and the
+      // shader's center difference collapses inside one bilinear cell. Because the shader divides
+      // the height difference by the same span it samples, enlarging the radius leaves the
+      // reconstructed edge distance unchanged, so the layer-space light width stays stable.
+      static constexpr float MIN_EDGE_RADIUS_IN_TEXELS = 2.0f;
+      static constexpr float MIN_EDGE_RADIUS_IN_LAYER_PIXELS = 1.0f;
+      float layerPixelsPerTexel = std::max(udfPixelToLayerPixelX, udfPixelToLayerPixelY);
+      float edgeLayerRadius = std::max(MIN_EDGE_RADIUS_IN_LAYER_PIXELS,
+                                       MIN_EDGE_RADIUS_IN_TEXELS * layerPixelsPerTexel);
+      Point coarseRadius = {
+          std::clamp(edgeLayerRadius / udfPixelToLayerPixelX, MIN_EDGE_RADIUS_IN_TEXELS,
+                     static_cast<float>(MaxTentRadius)),
+          std::clamp(edgeLayerRadius / udfPixelToLayerPixelY, MIN_EDGE_RADIUS_IN_TEXELS,
+                     static_cast<float>(MaxTentRadius))};
+      // The span must come from the clamped radius, otherwise the shader would divide by a
+      // different distance than the one the blur actually produced.
+      edgeSpanX = coarseRadius.x * udfPixelToLayerPixelX;
+      edgeSpanY = coarseRadius.y * udfPixelToLayerPixelY;
       // depthRatio stays as _depth/100 for shader use (step calculation). The transparent halo
       // covers the shader's maximum four-texel forward-difference span.
-      maskImage = MakeTentBlurImage(context, udfContent, udfBlurRadiusX, udfBlurRadiusY,
-                                    UDF_PADDING, UDF_PADDING);
+      maskImage = MakeGlassUDFImage(context, udfContent, fineRadius, coarseRadius, UDF_PADDING,
+                                    UDF_PADDING);
       if (!maskImage) {
         LOGE("GlassStyle: Failed to create padded alpha UDF.");
         return;
-      }
-
-      if (_lightIntensity > 0) {
-        // The edge mask keeps a layer-local blur radius after texture scaling. The shader
-        // converts its height slope to layer-local distance, so the blur does not define width.
-        static constexpr float EDGE_LIGHT_BLUR_RADIUS = 1.0f;
-        static constexpr float MAX_EDGE_LIGHT_UDF_SIZE = 1024.0f;
-        float inputWidth = static_cast<float>(input.content->width());
-        float inputHeight = static_cast<float>(input.content->height());
-        float inputMaxDimension = std::max(inputWidth, inputHeight);
-        float coarseScale = std::min(1.0f, MAX_EDGE_LIGHT_UDF_SIZE / inputMaxDimension);
-        int coarseWidth = std::max(1, static_cast<int>(std::round(inputWidth * coarseScale)));
-        int coarseHeight = std::max(1, static_cast<int>(std::round(inputHeight * coarseScale)));
-        std::shared_ptr<Image> edgeLightContent = input.content;
-        if (coarseWidth != input.content->width() || coarseHeight != input.content->height()) {
-          auto scaledContent = input.content->makeScaled(coarseWidth, coarseHeight,
-                                                         SamplingOptions(FilterMode::Linear));
-          if (scaledContent != nullptr) {
-            edgeLightContent = std::move(scaledContent);
-          }
-        }
-        float coarsePixelsPerLayerX =
-            static_cast<float>(edgeLightContent->width()) / origBounds.width();
-        float coarsePixelsPerLayerY =
-            static_cast<float>(edgeLightContent->height()) / origBounds.height();
-        float edgeLightRadiusX = std::min(EDGE_LIGHT_BLUR_RADIUS * coarsePixelsPerLayerX,
-                                          static_cast<float>(MaxTentRadius));
-        float edgeLightRadiusY = std::min(EDGE_LIGHT_BLUR_RADIUS * coarsePixelsPerLayerY,
-                                          static_cast<float>(MaxTentRadius));
-        coarseMaskImage =
-            MakeTentBlurImage(context, edgeLightContent, edgeLightRadiusX, edgeLightRadiusY);
-        if (!coarseMaskImage) {
-          LOGE("GlassStyle: Failed to blur alpha for edge light UDF, falling back to content.");
-          coarseMaskImage = edgeLightContent;
-        }
       }
     }
     Point sourceOrigin = {processedOffset.x / scaleRatioX, processedOffset.y / scaleRatioY};
@@ -496,9 +500,10 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
     Point layerPixelToSourcePixel = {input.contentScale * scaleRatioX,
                                      input.contentScale * scaleRatioY};
     auto filter = getRefractionFilter(shapeInfo.type, shapeInfo.cornerRadius, halfW, halfH,
-                                      udfPixelToLayerPixelX, udfPixelToLayerPixelY, sourceOrigin,
-                                      sourcePixelToContentPixel, layerPixelToSourcePixel,
-                                      contentWidth, contentHeight, maskImage, coarseMaskImage);
+                                      udfPixelToLayerPixelX, udfPixelToLayerPixelY, edgeSpanX,
+                                      edgeSpanY, sourceOrigin, sourcePixelToContentPixel,
+                                      layerPixelToSourcePixel, contentWidth, contentHeight,
+                                      maskImage);
     Point refractOffset = {};
     auto clipRect = Rect::MakeWH(static_cast<float>(processedBg->width()),
                                  static_cast<float>(processedBg->height()));
@@ -586,10 +591,10 @@ void GlassStyle::invalidateFrostFilter() {
 
 std::shared_ptr<ImageFilter> GlassStyle::getRefractionFilter(
     GlassShapeType shapeType, float cornerRadius, float halfWidth, float halfHeight,
-    float udfPixelToLayerPixelX, float udfPixelToLayerPixelY, const Point& sourceOrigin,
-    const Point& sourcePixelToContentPixel, const Point& layerPixelToSourcePixel,
-    float contentWidth, float contentHeight, std::shared_ptr<Image> maskImage,
-    std::shared_ptr<Image> coarseMaskImage) {
+    float udfPixelToLayerPixelX, float udfPixelToLayerPixelY, float edgeSpanX, float edgeSpanY,
+    const Point& sourceOrigin, const Point& sourcePixelToContentPixel,
+    const Point& layerPixelToSourcePixel, float contentWidth, float contentHeight,
+    std::shared_ptr<Image> maskImage) {
   float minHalf = std::min(halfWidth, halfHeight);
   float depthRatio = getDepthRatio();
   float refractionFactor = getRefractionFactor();
@@ -627,12 +632,14 @@ std::shared_ptr<ImageFilter> GlassStyle::getRefractionFilter(
     udfParams.depthRatio = depthRatio;
     udfParams.udfPixelToLayerPixelX = udfPixelToLayerPixelX;
     udfParams.udfPixelToLayerPixelY = udfPixelToLayerPixelY;
+    udfParams.edgeSpanX = edgeSpanX;
+    udfParams.edgeSpanY = edgeSpanY;
     float depthScale = std::clamp(depthRatio / 0.1f, 0.0f, 1.0f);
     depthScale = depthScale * depthScale * (3.0f - 2.0f * depthScale);
     params.maxDisplacement = 0.999f * minHalf * refractionFactor * depthRatio * depthScale;
   }
-  return std::make_shared<GlassRefractionImageFilter>(
-      params, sdfParams, udfParams, std::move(maskImage), std::move(coarseMaskImage));
+  return std::make_shared<GlassRefractionImageFilter>(params, sdfParams, udfParams,
+                                                      std::move(maskImage));
 }
 
 }  // namespace tgfx
