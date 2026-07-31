@@ -230,12 +230,9 @@ void GlassStyle::setLightIntensity(float value) {
 }
 
 Rect GlassStyle::filterBackgroundSoft(const Rect& srcRect, float contentScale) {
-  if (_frost <= 0) {
-    return srcRect;
-  }
   // Do not cache the frost filter: onDraw applies frost at a different scale
   // (contentScale * bgScale) to the downsampled background image, invalidating any cache here.
-  float sigma = (_frost / 100.0f) * MaxFrostSigma * contentScale;
+  float sigma = std::max(0.5f, (_frost / 100.0f) * MaxFrostSigma) * contentScale;
   auto filter = ImageFilter::Blur(sigma, sigma, TileMode::Mirror);
   auto bounds = filter == nullptr ? srcRect : filter->filterBounds(srcRect);
   return bounds.makeOutset(1.0f, 1.0f);
@@ -243,7 +240,7 @@ Rect GlassStyle::filterBackgroundSoft(const Rect& srcRect, float contentScale) {
 
 Rect GlassStyle::filterBackgroundSharp(const Rect& srcRect, float contentScale) {
   if (_refraction <= 0 && _lightIntensity <= 0) {
-    return _frost > 0 ? srcRect.makeOutset(1.0f, 1.0f) : srcRect;
+    return srcRect.makeOutset(1.0f, 1.0f);
   }
   float maxWidth = FloatNearlyZero(contentScale) ? srcRect.width() : srcRect.width() / contentScale;
   float maxHeight =
@@ -265,10 +262,8 @@ Rect GlassStyle::filterBackgroundSharp(const Rect& srcRect, float contentScale) 
       GetRefractionOutset(maxWidth, maxHeight, getRefractionFactor(), getDepthRatio(),
                           getDispersionFactor(), getGlassThickness(minHalf));
   refractionOutset = refractionOutset * contentScale + 1.0f;
-  if (_frost > 0) {
-    float sigma = (_frost / 100.0f) * MaxFrostSigma * contentScale;
-    refractionOutset += sigma * 2.0f + 1.0f;
-  }
+  float sigma = std::max(0.5f, (_frost / 100.0f) * MaxFrostSigma) * contentScale;
+  refractionOutset += sigma * 2.0f + 1.0f;
   return srcRect.makeOutset(refractionOutset, refractionOutset);
 }
 
@@ -373,20 +368,18 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
 
   std::shared_ptr<Image> processedBg = bgImage;
   Point processedOffset = bgOffset;
-  if (_frost > 0) {
-    auto blurFilter = getFrostFilter(input.contentScale * scaleRatioX);
-    if (blurFilter != nullptr) {
-      Point blurOffset = {};
-      auto clipRect = Rect::MakeWH(bgImage->width(), bgImage->height());
-      if (usesLocalEvaluation) {
-        clipRect = refractInputRect;
-        clipRect.offset(-processedOffset.x, -processedOffset.y);
-      }
-      auto frostedImage = bgImage->makeWithFilter(blurFilter, &blurOffset, &clipRect);
-      if (frostedImage != nullptr) {
-        processedBg = frostedImage;
-        processedOffset += blurOffset;
-      }
+  auto blurFilter = getFrostFilter(input.contentScale * scaleRatioX);
+  if (blurFilter != nullptr) {
+    Point blurOffset = {};
+    auto clipRect = Rect::MakeWH(bgImage->width(), bgImage->height());
+    if (usesLocalEvaluation) {
+      clipRect = refractInputRect;
+      clipRect.offset(-processedOffset.x, -processedOffset.y);
+    }
+    auto frostedImage = bgImage->makeWithFilter(blurFilter, &blurOffset, &clipRect);
+    if (frostedImage != nullptr) {
+      processedBg = frostedImage;
+      processedOffset += blurOffset;
     }
   }
   // Detect whether the vector shape supports the analytical SDF path.
@@ -412,29 +405,27 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       static constexpr float MAX_UDF_SIZE = 512.0f;
       static constexpr int UDF_PADDING = 4;
       // Use original layer bounds (not zoom-affected) for blur radius calculation.
-      // depth 1-100 maps linearly to blurRadius 5-60. The 60.0 cap is unrelated to the shader's
-      // edgeBandWidth cap (same value, different purpose: this limits UDF blur, that limits SDF
-      // edge influence zone).
-      static constexpr float MAX_BLUR_RADIUS = 60.0f;
+      // depth 1-100 maps linearly to blurRadius 5-30. The 30.0 cap limits max UDF blur to avoid
+      // overly wide transitions on large depth values.
+      static constexpr float MAX_BLUR_RADIUS = 30.0f;
       static constexpr float MIN_BLUR_RADIUS = 5.0f;
       float blurRadius =
           std::max(std::min((_depth / 100.0f) * MAX_BLUR_RADIUS, MAX_BLUR_RADIUS), MIN_BLUR_RADIUS);
-      // The UDF core follows the larger of the layer-local bounds and the on-screen content
-      // bounds, so zooming in produces a finer UDF while zooming out keeps the layer-local
-      // resolution. A minimum source size of 128 prevents tiny glass panels from producing an
-      // overly coarse UDF. Values are guaranteed > 0 because onDraw rejects empty origBounds and
-      // contentScale is non-zero.
-      static constexpr float MIN_UDF_SOURCE_SIZE = 128.0f;
-      float sourceWidth = std::max(origBounds.width(), contentWidth);
-      float sourceHeight = std::max(origBounds.height(), contentHeight);
+      float minHalf = std::min(origBounds.width(), origBounds.height()) * 0.5f;
+      float effectiveBlurRadius = std::min(blurRadius, minHalf);
+      // The UDF core uses layer-local bounds and keeps enough samples for tiny glass shapes.
+      static constexpr float MIN_UDF_CORE_SIZE = 128.0f;
+      float sourceWidth = origBounds.width();
+      float sourceHeight = origBounds.height();
       float sourceMaxDim = std::max(sourceWidth, sourceHeight);
       float maxPaddedUDFSize = std::min(MAX_UDF_SIZE, static_cast<float>(maxTextureSize));
       float maxCoreUDFSize = maxPaddedUDFSize - UDF_PADDING * 2.0f;
       if (maxCoreUDFSize < 1.0f) {
         return;
       }
-      float udfScale =
-          std::min({1.0f, maxCoreUDFSize / std::max(sourceMaxDim, MIN_UDF_SOURCE_SIZE)});
+      float minCoreUDFSize = std::min(MIN_UDF_CORE_SIZE, maxCoreUDFSize);
+      float targetCoreUDFSize = std::clamp(sourceMaxDim, minCoreUDFSize, maxCoreUDFSize);
+      float udfScale = targetCoreUDFSize / sourceMaxDim;
       int udfWidth = std::max(1, static_cast<int>(std::round(sourceWidth * udfScale)));
       int udfHeight = std::max(1, static_cast<int>(std::round(sourceHeight * udfScale)));
       // The UDF dimensions are rounded independently, so each axis needs its own layer-pixel
@@ -454,8 +445,8 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       // source size, keeping the layer-space radius constant.
       float layerToSourceX = sourceWidth / origBounds.width();
       float layerToSourceY = sourceHeight / origBounds.height();
-      float udfBlurRadiusX = blurRadius * udfScale * layerToSourceX;
-      float udfBlurRadiusY = blurRadius * udfScale * layerToSourceY;
+      float udfBlurRadiusX = effectiveBlurRadius * udfScale * layerToSourceX;
+      float udfBlurRadiusY = effectiveBlurRadius * udfScale * layerToSourceY;
       // depthRatio stays as _depth/100 for shader use (step calculation). The transparent halo
       // covers the shader's maximum four-texel forward-difference span.
       maskImage = MakeTentBlurImage(context, udfContent, udfBlurRadiusX, udfBlurRadiusY,
@@ -466,12 +457,32 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       }
 
       if (_lightIntensity > 0) {
-        // Edge light UDF: same resolution as the fine UDF, fixed small blur radius.
-        // Used for edge lighting (edgeWeight) while the fine UDF is used for refraction direction.
-        static constexpr float EDGE_LIGHT_BLUR_RADIUS = 5.0f;
-        std::shared_ptr<Image> edgeLightContent = udfContent;
-        float edgeLightRadiusX = EDGE_LIGHT_BLUR_RADIUS * udfScale;
-        float edgeLightRadiusY = EDGE_LIGHT_BLUR_RADIUS * udfScale;
+        // The edge mask keeps a layer-local blur radius after texture scaling. The shader
+        // converts its height slope to layer-local distance, so the blur does not define width.
+        static constexpr float EDGE_LIGHT_BLUR_RADIUS = 1.0f;
+        static constexpr float MAX_EDGE_LIGHT_UDF_SIZE = 1024.0f;
+        float inputWidth = static_cast<float>(input.content->width());
+        float inputHeight = static_cast<float>(input.content->height());
+        float inputMaxDimension = std::max(inputWidth, inputHeight);
+        float coarseScale = std::min(1.0f, MAX_EDGE_LIGHT_UDF_SIZE / inputMaxDimension);
+        int coarseWidth = std::max(1, static_cast<int>(std::round(inputWidth * coarseScale)));
+        int coarseHeight = std::max(1, static_cast<int>(std::round(inputHeight * coarseScale)));
+        std::shared_ptr<Image> edgeLightContent = input.content;
+        if (coarseWidth != input.content->width() || coarseHeight != input.content->height()) {
+          auto scaledContent = input.content->makeScaled(coarseWidth, coarseHeight,
+                                                         SamplingOptions(FilterMode::Linear));
+          if (scaledContent != nullptr) {
+            edgeLightContent = std::move(scaledContent);
+          }
+        }
+        float coarsePixelsPerLayerX =
+            static_cast<float>(edgeLightContent->width()) / origBounds.width();
+        float coarsePixelsPerLayerY =
+            static_cast<float>(edgeLightContent->height()) / origBounds.height();
+        float edgeLightRadiusX = std::min(EDGE_LIGHT_BLUR_RADIUS * coarsePixelsPerLayerX,
+                                          static_cast<float>(MaxTentRadius));
+        float edgeLightRadiusY = std::min(EDGE_LIGHT_BLUR_RADIUS * coarsePixelsPerLayerY,
+                                          static_cast<float>(MaxTentRadius));
         coarseMaskImage =
             MakeTentBlurImage(context, edgeLightContent, edgeLightRadiusX, edgeLightRadiusY);
         if (!coarseMaskImage) {
@@ -559,14 +570,11 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
 }
 
 std::shared_ptr<ImageFilter> GlassStyle::getFrostFilter(float contentScale) {
-  if (_frost <= 0) {
-    return nullptr;
-  }
   if (frostFilter && FloatNearlyEqual(currentFrostScale, contentScale)) {
     return frostFilter;
   }
   currentFrostScale = contentScale;
-  float sigma = (_frost / 100.0f) * MaxFrostSigma * contentScale;
+  float sigma = std::max(0.5f, (_frost / 100.0f) * MaxFrostSigma) * contentScale;
   frostFilter = ImageFilter::Blur(sigma, sigma, TileMode::Mirror);
   return frostFilter;
 }

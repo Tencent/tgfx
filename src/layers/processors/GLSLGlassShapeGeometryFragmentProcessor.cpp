@@ -192,20 +192,45 @@ void GLSLGlassUDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend("vec4 packedUp = ");
   fragBuilder->appendTextureLookup(fineSampler, "fineUV - vec2(0.0, gradientUVStep.y)");
   fragBuilder->codeAppend(";");
-  fragBuilder->codeAppend("vec2 gradient = vec2(dot(packedRight, UNPACK) - height,");
-  fragBuilder->codeAppend("    dot(packedUp, UNPACK) - height) / gradientStep;");
+  fragBuilder->codeAppend("float deltaRight = dot(packedRight, UNPACK) - height;");
+  fragBuilder->codeAppend("float deltaUp = dot(packedUp, UNPACK) - height;");
+  fragBuilder->codeAppend("vec2 gradient = vec2(deltaRight, deltaUp) / gradientStep;");
   fragBuilder->codeAppend("float gradientLength = length(gradient);");
+  fragBuilder->codeAppend("float gradientSignal = max(abs(deltaRight), abs(deltaUp));");
+  fragBuilder->codeAppend("float gradientWeight = smoothstep(0.001, 0.005, gradientSignal);");
   fragBuilder->codeAppend("float edgeWeight = 0.0;");
   if (coarseMaskProxy != nullptr && enableEdgeLighting) {
     auto& coarseSampler = (*args.textureSamplers)[1];
     fragBuilder->codeAppend("vec4 packedEdgeHeight = ");
     fragBuilder->appendTextureLookup(coarseSampler, "maskUV");
     fragBuilder->codeAppend(";");
+    fragBuilder->codeAppend("float edgeHeight = dot(packedEdgeHeight, UNPACK);");
     fragBuilder->codeAppend(
-        "edgeWeight = 1.0 - smoothstep(0.5, 0.55, dot(packedEdgeHeight, UNPACK));");
+        "vec2 edgeUVStep = vec2(0.25 / max(halfW, 0.0001), 0.25 / max(halfH, 0.0001));");
+    fragBuilder->codeAppend("vec4 packedEdgeRight = ");
+    fragBuilder->appendTextureLookup(coarseSampler, "maskUV + vec2(edgeUVStep.x, 0.0)");
+    fragBuilder->codeAppend(";");
+    fragBuilder->codeAppend("vec4 packedEdgeLeft = ");
+    fragBuilder->appendTextureLookup(coarseSampler, "maskUV - vec2(edgeUVStep.x, 0.0)");
+    fragBuilder->codeAppend(";");
+    fragBuilder->codeAppend("vec4 packedEdgeUp = ");
+    fragBuilder->appendTextureLookup(coarseSampler, "maskUV - vec2(0.0, edgeUVStep.y)");
+    fragBuilder->codeAppend(";");
+    fragBuilder->codeAppend("vec4 packedEdgeDown = ");
+    fragBuilder->appendTextureLookup(coarseSampler, "maskUV + vec2(0.0, edgeUVStep.y)");
+    fragBuilder->codeAppend(";");
+    fragBuilder->codeAppend("float edgeRight = dot(packedEdgeRight, UNPACK);");
+    fragBuilder->codeAppend("float edgeLeft = dot(packedEdgeLeft, UNPACK);");
+    fragBuilder->codeAppend("float edgeUp = dot(packedEdgeUp, UNPACK);");
+    fragBuilder->codeAppend("float edgeDown = dot(packedEdgeDown, UNPACK);");
+    fragBuilder->codeAppend("vec2 edgeGradient = vec2(edgeRight - edgeLeft, edgeUp - edgeDown);");
+    fragBuilder->codeAppend("float edgeGradientLength = max(length(edgeGradient), 0.0001);");
+    fragBuilder->codeAppend(
+        "float edgeDistance = max((edgeHeight - 0.5) / edgeGradientLength, 0.0);");
+    fragBuilder->codeAppend("edgeWeight = 1.0 - smoothstep(0.0, 0.5, edgeDistance);");
   }
   fragBuilder->codeAppendf("%s = vec4(0.0);", args.outputColor.c_str());
-  fragBuilder->codeAppend("if (gradientLength > 0.000001) {");
+  fragBuilder->codeAppend("if (gradientLength > 0.000001 && gradientWeight > 0.000001) {");
   fragBuilder->codeAppend("  vec2 gradientDir = gradient / gradientLength;");
   fragBuilder->codeAppend("  float centerDistance = length(vec2(px, py));");
   fragBuilder->codeAppend(
@@ -216,8 +241,9 @@ void GLSLGlassUDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend(
       "  refractDir = refractLength < 0.000001 ? gradientDir : refractDir / refractLength;");
   fragBuilder->codeAppendf("  float depthScale = smoothstep(0.0, 0.1, %s.z);", effect.c_str());
-  fragBuilder->codeAppendf("  float distance = min(halfW, halfH) * %s.x * %s.z * depthScale;",
-                           effect.c_str(), effect.c_str());
+  fragBuilder->codeAppendf(
+      "  float distance = min(halfW, halfH) * %s.x * %s.z * depthScale * gradientWeight;",
+      effect.c_str(), effect.c_str());
   fragBuilder->codeAppend(
       "  float proximity = (1.0 - height * height) * (1.0 - height * height) * 1.2;");
   fragBuilder->codeAppendf("  %s = vec4(refractDir, distance * proximity, edgeWeight);",
