@@ -250,15 +250,14 @@ bool OpsCompositor::shouldUseStencilCover(const Brush& brush, const Shape& shape
   if (brush.antiAlias) {
     return false;
   }
-  // Route rect and empty paths away from stencil-cover:
-  //   - Rect paths triangulate to two triangles on the legacy path, avoiding the Loop-Blinn
-  //     tessellation and the stencil + cover two-pass pipeline of stencil-cover, which is
-  //     designed for curved paths where its per-fragment implicit-curve test wins over CPU
-  //     triangulation.
-  //   - Empty paths on the legacy path drop out at PathTriangulator::ToTriangles (zero
-  //     triangles → the op is not created), so no stencil attachment is allocated. On the
-  //     stencil-cover path they would still trigger needsStencil() → the pass allocates a
-  //     depth/stencil texture just to draw a 4-vertex cover quad.
+  // Route rect and empty paths away from stencil-cover to avoid triggering stencil attachment
+  // allocation. Any op with needsStencil() forces OpsRenderTask to call
+  // RenderTargetProxy::getStencil(), which lazily allocates a DEPTH24_STENCIL8 texture sized
+  // to the full render target (4 bytes/pixel — ~8MB at 1080p, ~32MB at 4K, ~256MB at 8K) and
+  // caches it on the proxy for the rest of its lifetime. Rect and empty paths are trivial to
+  // draw on the legacy triangulation path (rect → two triangles; empty → the op drops out at
+  // PathTriangulator::ToTriangles) and gain nothing from stencil-cover's Loop-Blinn evaluation,
+  // so the stencil attachment they would force is pure overhead.
   // The isSimplePath() gate keeps this check off the hot path for shapes backed by expensive
   // path ops (e.g. AppendShape) — those go through stencil-cover regardless.
   if (shape.isSimplePath()) {
