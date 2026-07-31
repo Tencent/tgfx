@@ -36,6 +36,11 @@
 
 namespace tgfx {
 
+// Ceiling on the raster surface's largest dimension. Combined with the GPU's own texture-size
+// limit, this bounds any single 3D leaf's raster below what Surface::Make can allocate while
+// staying well inside memory pressure for pathological transforms.
+static constexpr int MaxRasterDimension = 4096;
+
 namespace {
 
 // BackgroundSource implementation that delegates onGetOwnContents to a Context3DCompositor's
@@ -62,41 +67,6 @@ class Compositor3DBackgroundSource : public BackgroundSource {
  private:
   Context3DCompositor* _compositor = nullptr;
 };
-
-// Compute anisotropic raster density (compositor pixels per local unit) along X and Y so that
-// a raster surface sized visibleLocal x density preserves at least one compositor pixel of detail
-// per axis. Samples the center plus four corners of the visible region and takes the axis-wise
-// maximum of the Jacobian columns' magnitudes — this respects perspective (mapPoint divides by
-// w) without the overshoot of an isotropic max on axis-anisotropic transforms.
-void ComputeRasterDensity(const Matrix3D& localToCompositor, const Rect& visibleLocal,
-                          float* densityX, float* densityY) {
-  const Point samples[5] = {
-      {visibleLocal.centerX(), visibleLocal.centerY()},
-      {visibleLocal.left, visibleLocal.top},
-      {visibleLocal.right, visibleLocal.top},
-      {visibleLocal.right, visibleLocal.bottom},
-      {visibleLocal.left, visibleLocal.bottom},
-  };
-  // Step scaled to the visible extent so the finite-difference stays well-conditioned regardless
-  // of how large or small visibleLocal is in local units.
-  const float extent = std::min(visibleLocal.width(), visibleLocal.height());
-  const float step = std::max(1e-3f, extent * 1e-3f);
-  float maxDx = 0.0f;
-  float maxDy = 0.0f;
-  for (const auto& sample : samples) {
-    const auto center = localToCompositor.mapPoint(Vec3(sample.x, sample.y, 0.0f));
-    const auto shiftedX = localToCompositor.mapPoint(Vec3(sample.x + step, sample.y, 0.0f));
-    const auto shiftedY = localToCompositor.mapPoint(Vec3(sample.x, sample.y + step, 0.0f));
-    const float dxx = (shiftedX.x - center.x) / step;
-    const float dxy = (shiftedX.y - center.y) / step;
-    const float dyx = (shiftedY.x - center.x) / step;
-    const float dyy = (shiftedY.y - center.y) / step;
-    maxDx = std::max(maxDx, std::sqrt(dxx * dxx + dxy * dxy));
-    maxDy = std::max(maxDy, std::sqrt(dyx * dyx + dyy * dyy));
-  }
-  *densityX = maxDx;
-  *densityY = maxDy;
-}
 
 }  // namespace
 
@@ -127,86 +97,30 @@ void Render3DContext::finishAndDrawTo(const DrawArgs& args, Canvas* canvas) {
     return;
   }
 
-  // Register every collected node as a polygon. The compositor's BSP tree may split polygons
-  // further; each fragment carries the layer pointer and node alpha for the raster pass below.
-  // The compositor viewport in compositor-pixel space is used as the visibility bound. Reverse-
-  // mapping it through the local->compositor matrix and intersecting with node.localBounds keeps
-  // raster surfaces sized to the part actually visible in the target, avoiding the case where a
-  // large leaf at extreme zoom would allocate a texture whose usable region is a tiny corner.
+  // Register every collected node as a polygon and derive its raster info. The compositor's BSP
+  // tree may split polygons further; each fragment carries the layer pointer and node alpha for
+  // the raster pass below. Sizing rasters to the compositor viewport (not the full localBounds)
+  // avoids allocating textures whose usable region is a tiny corner under extreme zoom, and
+  // deriving the density from the projected footprint keeps sample rate aligned with what the
+  // compositor actually samples for perspective-transformed leaves.
   const Rect compositorViewport = Rect::MakeWH(static_cast<float>(_compositor->width()),
                                                static_cast<float>(_compositor->height()));
-  // Cap raster dimensions at the smaller of the GPU's max 2D texture size and a safety ceiling.
-  // Under the visible-clip + projected-density path above, the computed size normally lands well
-  // inside this cap; the shrink branch below is a defense-in-depth for pathological inputs.
-  constexpr int RASTER_HARD_MAX = 4096;
   const int gpuMax = args.context->gpu()->limits()->maxTextureDimension2D;
-  const int rasterMax = gpuMax > 0 ? std::min(gpuMax, RASTER_HARD_MAX) : RASTER_HARD_MAX;
+  const int rasterMax = gpuMax > 0 ? std::min(gpuMax, MaxRasterDimension) : MaxRasterDimension;
   std::unordered_map<Layer*, RasterInfo> layerRasterInfo;
   layerRasterInfo.reserve(_pendingNodes.size());
-  for (auto& node : _pendingNodes) {
-    Matrix3D finalTransform = node.transform;
-    finalTransform.postScale(_contentScale, _contentScale, 1.0f);
-    finalTransform.postTranslate(-_renderRect.left, -_renderRect.top, 0);
-    // Cull leaves entirely behind the camera; addPolygon would otherwise construct a polygon
-    // with a degenerate w-divide.
-    if (Matrix3DUtils::IsRectBehindCamera(node.localBounds, finalTransform)) {
-      node.localBounds = Rect::MakeEmpty();
-      continue;
-    }
-    // InverseMapRect drops the perspective row via asMatrix(), giving an affine over-approximation
-    // of the true visible region on the leaf's z=0 plane. Over-approximation is safe here: the
-    // raster covers everything the compositor can actually sample, and never less.
-    Rect visibleLocal = Matrix3DUtils::InverseMapRect(compositorViewport, finalTransform);
-    if (visibleLocal.isEmpty() || !visibleLocal.intersect(node.localBounds)) {
-      node.localBounds = Rect::MakeEmpty();
-      continue;
-    }
-    visibleLocal.roundOut();
-    node.localBounds = visibleLocal;
-    // Derive raster density from the leaf's actual projection instead of _contentScale. This
-    // couples raster pixel count to what the compositor will really sample: perspective-shrunken
-    // leaves get smaller surfaces, perspective-enlarged ones get bigger ones. Density is
-    // anisotropic (x and y independently) so long/thin projections don't waste the short axis.
-    float densityX = 0.0f;
-    float densityY = 0.0f;
-    ComputeRasterDensity(finalTransform, visibleLocal, &densityX, &densityY);
-    if (!(densityX > 0.0f) || !(densityY > 0.0f)) {
-      node.localBounds = Rect::MakeEmpty();
-      continue;
-    }
-    const int rasterWidth =
-        std::max(1, static_cast<int>(std::ceil(visibleLocal.width() * densityX)));
-    const int rasterHeight =
-        std::max(1, static_cast<int>(std::ceil(visibleLocal.height() * densityY)));
-    // Isotropic shrink if either axis exceeds the hardware cap. Keeps UV self-consistent since
-    // the compositor recomputes UV from (texSize / localBounds) — density and rasterSize scale
-    // together. This branch should not fire in normal 3D scenes now that raster is sized to the
-    // visible projection; it is a defense-in-depth backstop.
-    float finalDensityX = densityX;
-    float finalDensityY = densityY;
-    int finalWidth = rasterWidth;
-    int finalHeight = rasterHeight;
-    if (finalWidth > rasterMax || finalHeight > rasterMax) {
-      const float shrinkX = static_cast<float>(rasterMax) / static_cast<float>(finalWidth);
-      const float shrinkY = static_cast<float>(rasterMax) / static_cast<float>(finalHeight);
-      const float shrink = std::min(shrinkX, shrinkY);
-      finalDensityX *= shrink;
-      finalDensityY *= shrink;
-      finalWidth =
-          std::max(1, static_cast<int>(std::floor(static_cast<float>(finalWidth) * shrink)));
-      finalHeight =
-          std::max(1, static_cast<int>(std::floor(static_cast<float>(finalHeight) * shrink)));
-    }
-    Matrix density = Matrix::MakeScale(finalDensityX, finalDensityY);
-    density.postTranslate(-visibleLocal.left * finalDensityX, -visibleLocal.top * finalDensityY);
+  for (const auto& node : _pendingNodes) {
+    Matrix3D localToCompositor = node.transform;
+    localToCompositor.postScale(_contentScale, _contentScale, 1.0f);
+    localToCompositor.postTranslate(-_renderRect.left, -_renderRect.top, 0);
     RasterInfo info;
-    info.visibleLocal = visibleLocal;
-    info.density = density;
-    info.rasterWidth = finalWidth;
-    info.rasterHeight = finalHeight;
+    if (!ComputeRasterInfo(localToCompositor, node.localBounds, compositorViewport, rasterMax,
+                           &info)) {
+      continue;
+    }
     layerRasterInfo.emplace(node.layer, info);
-    _compositor->addPolygon(node.layer, visibleLocal, finalTransform, node.depth, node.alpha,
-                            node.antialiasing);
+    _compositor->addPolygon(node.layer, info.visibleLocal, localToCompositor, node.depth,
+                            node.alpha, node.antialiasing);
   }
 
   const auto& fragments = _compositor->prepareTraversal();
@@ -383,6 +297,50 @@ bool Render3DContext::primeCompositorFromOuterCanvas(Canvas* outerCanvas) {
   if (primeImage != nullptr) {
     _compositor->primeWithImage(primeImage);
   }
+  return true;
+}
+
+// Sizes a leaf raster to the projection of `localBounds` onto the compositor viewport. Returns
+// false when the leaf is not visible (behind the camera or outside the viewport). InverseMapRect
+// drops the perspective row via asMatrix() to yield an affine over-approximation of the visible
+// footprint; over-approximation is safe here because the raster covers everything the compositor
+// can sample and never less.
+bool Render3DContext::ComputeRasterInfo(const Matrix3D& localToCompositor, const Rect& localBounds,
+                                        const Rect& compositorViewport, int rasterMax,
+                                        RasterInfo* info) {
+  if (Matrix3DUtils::IsRectBehindCamera(localBounds, localToCompositor)) {
+    return false;
+  }
+  Rect visibleLocal = Matrix3DUtils::InverseMapRect(compositorViewport, localToCompositor);
+  if (visibleLocal.isEmpty() || !visibleLocal.intersect(localBounds)) {
+    return false;
+  }
+  visibleLocal.roundOut();
+  auto density = Matrix3DUtils::ProjectionDensity(localToCompositor, visibleLocal);
+  if (!(density.x > 0.0f) || !(density.y > 0.0f)) {
+    return false;
+  }
+  int rasterWidth = std::max(1, static_cast<int>(std::ceil(visibleLocal.width() * density.x)));
+  int rasterHeight = std::max(1, static_cast<int>(std::ceil(visibleLocal.height() * density.y)));
+  // Defense in depth for pathological inputs. UV stays self-consistent because the compositor
+  // recomputes it from (texSize / localBounds), and density/rasterSize scale together.
+  if (rasterWidth > rasterMax || rasterHeight > rasterMax) {
+    const float shrinkX = static_cast<float>(rasterMax) / static_cast<float>(rasterWidth);
+    const float shrinkY = static_cast<float>(rasterMax) / static_cast<float>(rasterHeight);
+    const float shrink = std::min(shrinkX, shrinkY);
+    density.x *= shrink;
+    density.y *= shrink;
+    rasterWidth =
+        std::max(1, static_cast<int>(std::floor(static_cast<float>(rasterWidth) * shrink)));
+    rasterHeight =
+        std::max(1, static_cast<int>(std::floor(static_cast<float>(rasterHeight) * shrink)));
+  }
+  Matrix densityMatrix = Matrix::MakeScale(density.x, density.y);
+  densityMatrix.postTranslate(-visibleLocal.left * density.x, -visibleLocal.top * density.y);
+  info->visibleLocal = visibleLocal;
+  info->density = densityMatrix;
+  info->rasterWidth = rasterWidth;
+  info->rasterHeight = rasterHeight;
   return true;
 }
 

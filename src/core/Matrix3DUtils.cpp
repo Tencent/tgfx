@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/Matrix3DUtils.h"
+#include <algorithm>
+#include <cmath>
 #include "utils/MathExtra.h"
 
 namespace tgfx {
@@ -62,6 +64,30 @@ Matrix3D Matrix3DUtils::ScaleAdaptedMatrix3D(const Matrix3D& matrix, float scale
   auto invScaleMatrix = Matrix3D::MakeScale(invScale, invScale, 1.0f);
   auto scaleMatrix = Matrix3D::MakeScale(scale, scale, 1.0f);
   return scaleMatrix * matrix * invScaleMatrix;
+}
+
+Point Matrix3DUtils::ProjectionDensity(const Matrix3D& matrix, const Rect& rect) {
+  const Point samples[5] = {
+      {rect.centerX(), rect.centerY()},   {rect.left, rect.top},   {rect.right, rect.top},
+      {rect.right, rect.bottom},          {rect.left, rect.bottom}};
+  // Finite-difference step scaled to the local extent keeps the Jacobian estimate well
+  // conditioned regardless of how large or small the rect is in local units.
+  const float extent = std::min(rect.width(), rect.height());
+  const float step = std::max(1e-3f, extent * 1e-3f);
+  float maxDx = 0.0f;
+  float maxDy = 0.0f;
+  for (const auto& sample : samples) {
+    const auto center = matrix.mapPoint(Vec3(sample.x, sample.y, 0.0f));
+    const auto shiftedX = matrix.mapPoint(Vec3(sample.x + step, sample.y, 0.0f));
+    const auto shiftedY = matrix.mapPoint(Vec3(sample.x, sample.y + step, 0.0f));
+    const float dxx = (shiftedX.x - center.x) / step;
+    const float dxy = (shiftedX.y - center.y) / step;
+    const float dyx = (shiftedY.x - center.x) / step;
+    const float dyy = (shiftedY.y - center.y) / step;
+    maxDx = std::max(maxDx, std::sqrt(dxx * dxx + dxy * dxy));
+    maxDy = std::max(maxDy, std::sqrt(dyx * dyx + dyy * dyy));
+  }
+  return Point::Make(maxDx, maxDy);
 }
 
 }  // namespace tgfx

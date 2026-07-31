@@ -20,6 +20,7 @@
 
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Matrix3D.h"
+#include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
@@ -84,6 +85,20 @@ class Matrix3DUtils {
    * @param scale The scale factor to apply to the projection result.
    */
   static Matrix3D ScaleAdaptedMatrix3D(const Matrix3D& matrix, float scale);
+
+  /**
+   * Estimates the anisotropic linear density of a 4x4 projection over a local-space rect: for
+   * each axis, samples the Jacobian magnitude of matrix.mapPoint at the rect center and four
+   * corners, and returns the maximum. The result answers "how many destination units does one
+   * local unit produce along X/Y anywhere in this rect", so callers sizing a raster surface to
+   * match a projected footprint can multiply local extents by the returned density without
+   * undersampling near the tightest corner. Because mapPoint divides by w, perspective is
+   * respected without needing an explicit split of the affine and projective parts.
+   * @param matrix The transformation from local space to the destination space whose sampling
+   * density is being measured.
+   * @param rect The local-space rect over which the density is estimated.
+   */
+  static Point ProjectionDensity(const Matrix3D& matrix, const Rect& rect);
 };
 
 }  // namespace tgfx
