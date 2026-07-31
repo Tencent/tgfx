@@ -250,18 +250,10 @@ bool OpsCompositor::shouldUseStencilCover(const Brush& brush, const Shape& shape
   if (brush.antiAlias) {
     return false;
   }
-  // Route empty paths away from stencil-cover to avoid triggering stencil attachment
-  // allocation. Any op with needsStencil() forces OpsRenderTask to call
-  // RenderTargetProxy::getStencil(), which lazily allocates a DEPTH24_STENCIL8 texture sized
-  // to the full render target (4 bytes/pixel — ~8MB at 1080p, ~32MB at 4K, ~256MB at 8K) and
-  // caches it on the proxy for the rest of its lifetime. The main producer of an empty path
-  // reaching this dispatch is Canvas::drawFill() under a non-WideOpen clip, which forwards
-  // an empty inverse-fill path through RenderContext::drawPath → drawShape; without this
-  // early-out a plain Canvas::clear() under a clip would silently allocate the full-size
-  // stencil attachment. Rect paths are already routed to drawRect fast paths by Canvas
-  // before reaching this method, so no dedicated check for them is needed here.
-  // The isSimplePath() gate keeps this check off the hot path for shapes backed by expensive
-  // path ops (e.g. AppendShape) — those go through stencil-cover regardless.
+  // Skip empty paths: Canvas::drawFill() under a non-WideOpen clip forwards an empty
+  // inverse-fill path here, and letting it enter stencil-cover would make a plain
+  // Canvas::clear() under a clip allocate a full-size DEPTH24_STENCIL8 attachment for
+  // nothing.
   if (shape.isSimplePath() && shape.getPath().isEmpty()) {
     return false;
   }
