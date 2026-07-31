@@ -55,6 +55,10 @@ class DrawOp {
     scissorRect = rect;
   }
 
+  const Rect& getScissorRect() const {
+    return scissorRect;
+  }
+
   void setBlendMode(BlendMode mode) {
     blendMode = mode;
   }
@@ -87,6 +91,19 @@ class DrawOp {
    */
   virtual bool needsStencil() const {
     return false;
+  }
+
+  /**
+   * Returns the device-space region that must be cleared in the stencil buffer before this op
+   * executes. When the op has a user scissor (set by the clip system), the stencil clear is
+   * already confined to that area. When the clip is WideOpen, the scissor is not set and this
+   * method provides a fallback — subclasses that write to stencil (e.g. StencilCoverPathDrawOp)
+   * override it to return their actual stencil-write footprint so the clear is still scoped.
+   * Default returns the scissorRect, which is correct for ops that derive their stencil region
+   * from the clip alone.
+   */
+  virtual Rect getStencilResolveBounds() const {
+    return scissorRect;
   }
 
   /**

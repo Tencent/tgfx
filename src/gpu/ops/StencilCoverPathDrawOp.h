@@ -78,6 +78,17 @@ class StencilCoverPathDrawOp : public DrawOp {
     return true;
   }
 
+  Rect getStencilResolveBounds() const override {
+    if (scissorRect.isEmpty()) {
+      return coverDeviceBounds;
+    }
+    auto clipped = coverDeviceBounds;
+    if (!clipped.intersect(scissorRect)) {
+      return Rect::MakeEmpty();
+    }
+    return clipped;
+  }
+
   void execute(RenderPass* renderPass, RenderTarget* renderTarget) override;
 
  protected:

@@ -36,29 +36,35 @@ void OpsRenderTask::execute(CommandEncoder* encoder) {
   // the RenderTargetProxy itself (see RenderTargetProxy::getStencil), so all OpsRenderTasks
   // targeting the same proxy share one stencil texture for the proxy's lifetime.
   bool stencilAvailable = false;
+  auto stencilClearBoundsRect = Rect::MakeEmpty();
   for (auto& op : drawOps) {
-    if (op != nullptr && op->needsStencil()) {
-      auto stencilTexture = renderTargetProxy->getStencil(renderTarget->sampleCount());
-      if (stencilTexture == nullptr) {
-        // Stencil allocation failed (usually OOM). Continue the pass without a stencil
-        // attachment — the loop below skips ops whose needsStencil() is true so they do not
-        // execute against a pass missing the matching attachment, while non-stencil ops
-        // still produce their usual output.
-        LOGE(
-            "OpsRenderTask::execute() Failed to acquire stencil texture; "
-            "skipping stencil-aware ops in this pass.");
-        break;
+    if (op->needsStencil()) {
+      if (!stencilAvailable) {
+        auto stencilTexture = renderTargetProxy->getStencil(renderTarget->sampleCount());
+        if (stencilTexture == nullptr) {
+          LOGE(
+              "OpsRenderTask::execute() Failed to acquire stencil texture; "
+              "skipping stencil-aware ops in this pass.");
+          break;
+        }
+        descriptor.depthStencilAttachment.texture = std::move(stencilTexture);
+        descriptor.depthStencilAttachment.loadAction = LoadAction::Clear;
+        descriptor.depthStencilAttachment.storeAction = StoreAction::DontCare;
+        descriptor.depthStencilAttachment.depthClearValue = 1.0f;
+        descriptor.depthStencilAttachment.depthReadOnly = false;
+        descriptor.depthStencilAttachment.stencilClearValue = 0;
+        descriptor.depthStencilAttachment.stencilReadOnly = false;
+        stencilAvailable = true;
       }
-      descriptor.depthStencilAttachment.texture = std::move(stencilTexture);
-      descriptor.depthStencilAttachment.loadAction = LoadAction::Clear;
-      descriptor.depthStencilAttachment.storeAction = StoreAction::DontCare;
-      descriptor.depthStencilAttachment.depthClearValue = 1.0f;
-      descriptor.depthStencilAttachment.depthReadOnly = false;
-      descriptor.depthStencilAttachment.stencilClearValue = 0;
-      descriptor.depthStencilAttachment.stencilReadOnly = false;
-      stencilAvailable = true;
-      break;
+      auto bounds = op->getStencilResolveBounds();
+      if (!bounds.isEmpty()) {
+        stencilClearBoundsRect.join(bounds);
+      }
     }
+  }
+  if (stencilAvailable) {
+    descriptor.depthStencilAttachment.clearScissor =
+        stencilClearBoundsRect.isEmpty() ? std::optional<Rect>() : stencilClearBoundsRect;
   }
   auto renderPass = encoder->beginRenderPass(descriptor);
   if (renderPass == nullptr) {

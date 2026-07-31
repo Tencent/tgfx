@@ -18,7 +18,10 @@
 
 #pragma once
 
+#include <optional>
+
 #include "tgfx/core/Color.h"
+#include "tgfx/core/Rect.h"
 #include "tgfx/gpu/GPUBuffer.h"
 #include "tgfx/gpu/RenderPipeline.h"
 #include "tgfx/gpu/Sampler.h"
@@ -170,6 +173,14 @@ class DepthStencilAttachment {
    * If set to true, the stencil component is read-only during the render pass.
    */
   bool stencilReadOnly = false;
+
+  /**
+   * Optional scissor rectangle that confines the depth/stencil clear when loadAction is
+   * LoadAction::Clear. When set, only pixels inside this rect are cleared; when nullopt, the
+   * entire attachment is cleared. This does not affect draw-time scissor, which is controlled
+   * by RenderPass::setScissorRect().
+   */
+  std::optional<Rect> clearScissor = std::nullopt;
 };
 
 /**
