@@ -58,14 +58,16 @@ void OpsRenderTask::execute(CommandEncoder* encoder) {
         stencilAvailable = true;
       }
       auto bounds = op->getStencilResolveBounds();
-      if (bounds.isEmpty()) {
-        // An op that opts in to stencil but does not declare its write extent could touch
-        // anywhere in the attachment; a partial clear would risk leaving stale stencil in
-        // its untracked region. Fall back to a full clear for the whole pass.
+      if (!bounds.has_value()) {
+        // The op has not declared its stencil-write extent, so it may touch anywhere in the
+        // attachment. A partial clear would risk leaving stale stencil in its untracked
+        // region — fall back to a full clear for the whole pass.
         clearScissorUnknown = true;
-      } else {
-        stencilClearBoundsRect.join(bounds);
+      } else if (!bounds->isEmpty()) {
+        stencilClearBoundsRect.join(*bounds);
       }
+      // An empty rect means the op is known to write no stencil (e.g. its cover region was
+      // fully clipped out); contribute nothing and keep the running union intact.
     }
   }
   if (stencilAvailable) {
