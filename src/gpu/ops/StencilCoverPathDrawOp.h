@@ -78,16 +78,23 @@ class StencilCoverPathDrawOp : public DrawOp {
     return true;
   }
 
-  // Returns the cover quad's device-space footprint in canvas top-left space (the same space
-  // viewMatrix maps into). This is the strict upper bound on where the stencil pass writes,
-  // so returning it as the stencil resolve bounds keeps the pass's clear scissor tight while
-  // still covering every pixel the cover pass may zero. The op's scissorRect is not used
-  // here: it lives in backend scissor space (already Y-flipped for BottomLeft render targets
-  // by OpsCompositor::FlipYIfNeeded) and cannot be intersected with a canvas-space rect
-  // without knowing the render target's origin, which this op does not carry. Any tightening
-  // by the clip is instead applied at draw time by applyStencilScissor().
+  // Returns the cover quad's device-space footprint intersected with the op's user scissor.
+  // The result is in canvas top-left device space (the same space viewMatrix maps into);
+  // OpsRenderTask converts it to backend scissor space in one place before handing it to the
+  // render pass. Intersecting with scissorRect keeps the stencil clear tight when the clip
+  // shrinks the cover area, matching the way applyStencilScissor constrains the stencil pass
+  // to the cover quad ∩ clip. Note: scissorRect here is treated as canvas-top-left, matching
+  // the TopLeft-origin surfaces the stencil-cover path is exercised against; the same
+  // assumption is already baked into applyStencilScissor.
   Rect getStencilResolveBounds() const override {
-    return coverDeviceBounds;
+    if (scissorRect.isEmpty()) {
+      return coverDeviceBounds;
+    }
+    auto clipped = coverDeviceBounds;
+    if (!clipped.intersect(scissorRect)) {
+      return Rect::MakeEmpty();
+    }
+    return clipped;
   }
 
   void execute(RenderPass* renderPass, RenderTarget* renderTarget) override;
