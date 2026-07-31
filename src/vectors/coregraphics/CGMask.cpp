@@ -199,8 +199,9 @@ void CGMask::onFillPath(const Path& path, const Matrix& matrix, bool needsGammaC
   }
   CompositeA8Mask(static_cast<const uint8_t*>(tempPixels), static_cast<uint8_t*>(pixels), width,
                   height, tempBuffer->info().rowBytes(), info.rowBytes(),
-                  static_cast<int>(bounds.left), static_cast<int>(bounds.top), info.width(),
-                  info.height());
+                  static_cast<int>(bounds.left),
+                  static_cast<int>(static_cast<float>(info.height()) - bounds.bottom),
+                  info.width(), info.height());
   tempBuffer->unlockPixels();
   CGContextRelease(cgContext);
   pixelRef->unlockPixels();
