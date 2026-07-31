@@ -230,8 +230,8 @@ std::shared_ptr<Image> Render3DContext::rasterLayer(
     // doesn't leave a dangling pointer to the previous iteration's stack-local capturer.
     leafArgs.backgroundHandler = BackgroundHandler::NoOp();
     auto worldBounds = localToWorld.mapRect(info.visibleLocal);
-    leafSource = compositorSource->createFromSurface(surface.get(), worldBounds, localToWorld,
-                                                     info.density);
+    leafSource =
+        compositorSource->createFromSurface(surface.get(), worldBounds, localToWorld, info.density);
     if (leafSource != nullptr) {
       leafCapturer = std::make_unique<BackgroundCapturer>(snapshots, leafSource);
       leafArgs.backgroundHandler = leafCapturer.get();
