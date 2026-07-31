@@ -56,10 +56,6 @@ class DrawOp {
     scissorRect = rect;
   }
 
-  const Rect& getScissorRect() const {
-    return scissorRect;
-  }
-
   void setBlendMode(BlendMode mode) {
     blendMode = mode;
   }
