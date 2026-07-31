@@ -91,12 +91,9 @@ void Render3DContext::finishAndDrawTo(const DrawArgs& args, Canvas* canvas) {
     return;
   }
 
-  // Register every collected node as a polygon and derive its raster info. The compositor's BSP
-  // tree may split polygons further; each fragment carries the layer pointer and node alpha for
-  // the raster pass below. Sizing rasters to the compositor viewport (not the full localBounds)
-  // avoids allocating textures whose usable region is a tiny corner under extreme zoom, and
-  // deriving the density from the projected footprint keeps sample rate aligned with what the
-  // compositor actually samples for perspective-transformed leaves.
+  // Sizing rasters to the compositor viewport (not the full localBounds) and deriving density
+  // from the projected footprint keeps texture sizes bounded and sample rate aligned with what
+  // the compositor actually samples for perspective-transformed leaves.
   const Rect compositorViewport = Rect::MakeWH(static_cast<float>(_compositor->width()),
                                                static_cast<float>(_compositor->height()));
   std::unordered_map<Layer*, RasterInfo> layerRasterInfo;
@@ -177,15 +174,13 @@ void Render3DContext::finishAndDrawTo(const DrawArgs& args, Canvas* canvas) {
     auto blendMode = layer->blendMode();
     std::shared_ptr<Image> image;
     if (perFragmentRaster) {
-      image =
-          rasterLayer(layer, rasterAlpha, blendMode, leafArgs, info, compositorSource,
-                      outerSnapshots, localToWorld);
+      image = rasterLayer(layer, rasterAlpha, blendMode, leafArgs, info, compositorSource,
+                          outerSnapshots, localToWorld);
     } else {
       auto cacheIt = layerImages.find(layer);
       if (cacheIt == layerImages.end()) {
-        image =
-            rasterLayer(layer, rasterAlpha, blendMode, leafArgs, info, compositorSource,
-                        outerSnapshots, localToWorld);
+        image = rasterLayer(layer, rasterAlpha, blendMode, leafArgs, info, compositorSource,
+                            outerSnapshots, localToWorld);
         layerImages.emplace(layer, image);
       } else {
         image = cacheIt->second;
@@ -291,35 +286,44 @@ bool Render3DContext::primeCompositorFromOuterCanvas(Canvas* outerCanvas) {
   return true;
 }
 
-// Sizes a leaf raster to the projection of `localBounds` onto the compositor viewport. Returns
-// false when the leaf is not visible (behind the camera or outside the viewport). InverseMapRect
-// drops the perspective row via asMatrix() to yield an affine over-approximation of the visible
-// footprint; over-approximation is safe here because the raster covers everything the compositor
-// can sample and never less.
 bool Render3DContext::ComputeRasterInfo(const Matrix3D& localToCompositor, const Rect& localBounds,
                                         const Rect& compositorViewport, RasterInfo* info) {
   if (Matrix3DUtils::IsRectBehindCamera(localBounds, localToCompositor)) {
     return false;
   }
-  Rect visibleLocal = Matrix3DUtils::InverseMapRect(compositorViewport, localToCompositor);
-  if (visibleLocal.isEmpty() || !visibleLocal.intersect(localBounds)) {
+  // Size the raster from the destination footprint (bounded by the viewport) and derive density
+  // from the (dest / local) ratio. The clip in ComputeVisibleFootprints keeps sample rate finite
+  // even when the visible region touches the near plane — a Jacobian sample at the singular
+  // boundary would otherwise blow up.
+  Rect localFootprint = {};
+  Rect destFootprint = {};
+  if (!Matrix3DUtils::ComputeVisibleFootprints(localBounds, compositorViewport, localToCompositor,
+                                               &localFootprint, &destFootprint)) {
     return false;
   }
-  visibleLocal.roundOut();
-  auto density = Matrix3DUtils::ProjectionDensity(localToCompositor, visibleLocal);
-  if (!(density.x > 0.0f) || !(density.y > 0.0f)) {
+  // Near-plane clipping can push clipped vertices a hair past localBounds when interpolating in
+  // homogeneous space; intersecting brings the footprint back into the leaf's declared range.
+  if (!localFootprint.intersect(localBounds)) {
     return false;
   }
-  const int rasterWidth =
-      std::max(1, static_cast<int>(std::ceil(visibleLocal.width() * density.x)));
-  const int rasterHeight =
-      std::max(1, static_cast<int>(std::ceil(visibleLocal.height() * density.y)));
-  Matrix densityMatrix = Matrix::MakeScale(density.x, density.y);
-  densityMatrix.postTranslate(-visibleLocal.left * density.x, -visibleLocal.top * density.y);
-  info->visibleLocal = visibleLocal;
-  info->density = densityMatrix;
-  info->rasterWidth = rasterWidth;
-  info->rasterHeight = rasterHeight;
+  localFootprint.roundOut();
+  destFootprint.roundOut();
+  const float localWidth = localFootprint.width();
+  const float localHeight = localFootprint.height();
+  const float destWidth = destFootprint.width();
+  const float destHeight = destFootprint.height();
+  if (!(localWidth > 0.0f) || !(localHeight > 0.0f) || !(destWidth > 0.0f) ||
+      !(destHeight > 0.0f)) {
+    return false;
+  }
+  const float densityX = destWidth / localWidth;
+  const float densityY = destHeight / localHeight;
+  Matrix density = Matrix::MakeScale(densityX, densityY);
+  density.postTranslate(-localFootprint.left * densityX, -localFootprint.top * densityY);
+  info->visibleLocal = localFootprint;
+  info->density = density;
+  info->rasterWidth = std::max(1, static_cast<int>(std::ceil(destWidth)));
+  info->rasterHeight = std::max(1, static_cast<int>(std::ceil(destHeight)));
   return true;
 }
 

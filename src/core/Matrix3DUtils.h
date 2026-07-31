@@ -20,7 +20,6 @@
 
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Matrix3D.h"
-#include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
@@ -78,6 +77,36 @@ class Matrix3DUtils {
   static Rect InverseMapRect(const Rect& rect, const Matrix3D& matrix);
 
   /**
+   * Computes the axis-aligned footprints of the intersection between `localBounds` (on the local
+   * z=0 plane) and `destRect` (in destination space), both in local space and in destination
+   * space, under the 3x3 homography embedded in `matrix`.
+   *
+   * Algorithm: forward-project the four corners of `localBounds` to homogeneous destination
+   * coordinates (X, Y, W), Sutherland-Hodgman clip the resulting quad against 5 planes
+   * (W > 0 near plane, plus the 4 viewport edges expressed as X ≥ 0·W, X ≤ destW·W, etc.),
+   * then for each surviving polygon vertex compute both:
+   *   - local (x, y) via the inverse homography → AABB → *localFootprint
+   *   - destination (X/W, Y/W) directly → AABB → *destFootprint
+   *
+   * The paired footprints are self-consistent: destFootprint always sits inside destRect, and
+   * ratios destFootprint.size / localFootprint.size give a numerically stable "how many
+   * destination pixels per local unit" estimate that stays finite even when the footprints touch
+   * the near plane, because the clip removes the singularity.
+   *
+   * Returns false when the homography is singular or the clipped polygon is empty (leaf not
+   * visible in `destRect`).
+   *
+   * @param localBounds The rect on the local z=0 plane whose visible footprint is being computed.
+   * @param destRect The visible region in destination space (typically the compositor viewport).
+   * @param matrix The 4x4 transformation from local space to destination space.
+   * @param localFootprint Output: AABB of clipped vertices in local space.
+   * @param destFootprint Output: AABB of clipped vertices in destination space.
+   */
+  static bool ComputeVisibleFootprints(const Rect& localBounds, const Rect& destRect,
+                                       const Matrix3D& matrix, Rect* localFootprint,
+                                       Rect* destFootprint);
+
+  /**
    * Adjusts a 3D transformation matrix so that the projection result can be correctly scaled.
    * This ensures the visual effect of "project first, then scale" rather than "scale first, then
    * project", which would cause incorrect perspective effects.
@@ -85,20 +114,6 @@ class Matrix3DUtils {
    * @param scale The scale factor to apply to the projection result.
    */
   static Matrix3D ScaleAdaptedMatrix3D(const Matrix3D& matrix, float scale);
-
-  /**
-   * Estimates the anisotropic linear density of a 4x4 projection over a local-space rect: for
-   * each axis, samples the Jacobian magnitude of matrix.mapPoint at the rect center and four
-   * corners, and returns the maximum. The result answers "how many destination units does one
-   * local unit produce along X/Y anywhere in this rect", so callers sizing a raster surface to
-   * match a projected footprint can multiply local extents by the returned density without
-   * undersampling near the tightest corner. Because mapPoint divides by w, perspective is
-   * respected without needing an explicit split of the affine and projective parts.
-   * @param matrix The transformation from local space to the destination space whose sampling
-   * density is being measured.
-   * @param rect The local-space rect over which the density is estimated.
-   */
-  static Point ProjectionDensity(const Matrix3D& matrix, const Rect& rect);
 };
 
 }  // namespace tgfx
