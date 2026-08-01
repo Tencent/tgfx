@@ -266,7 +266,8 @@ void GLSLGlassUDFGeometryFragmentProcessor::onSetData(UniformData*,
   float coreHeight = std::round(params.halfH * 2.0f / params.udfPixelToLayerPixelY);
   float scaleX = coreWidth / textureWidth;
   float scaleY = coreHeight / textureHeight;
-  float maskUVData[4] = {scaleX, scaleY, (1.0f - scaleX) * 0.5f, (1.0f - scaleY) * 0.5f};
+  float maskUVData[4] = {scaleX, scaleY, -params.textureOriginX / textureWidth,
+                         -params.textureOriginY / textureHeight};
   fragmentUniformData->setData("GlassFineMaskUV", maskUVData);
 }
 

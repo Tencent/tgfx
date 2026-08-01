@@ -51,6 +51,9 @@ struct GlassUDFGeometryParams : public GlassGeometryParams {
    */
   float edgeSpanX = 1.0f;
   float edgeSpanY = 1.0f;
+  // Top-left position of the physical texture in the full UDF texel coordinate space.
+  float textureOriginX = 0.0f;
+  float textureOriginY = 0.0f;
 };
 
 /**
