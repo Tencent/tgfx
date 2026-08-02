@@ -1,0 +1,44 @@
+// Restores the base pointwise-operator names after a slot binding established by
+// pointwise_slot_bind.inc. Undefining the per-slot TGFX_SLOT_* values as well lets the caller bind
+// the next slot with a fresh set of names.
+#undef OpType
+#undef ColorMatrix
+#undef ColorVector
+#undef Kr
+#undef Kg
+#undef Kb
+#undef Threshold
+#undef CSFlags
+#undef SrcTF0
+#undef SrcTF1
+#undef SrcTFType
+#undef SrcOOTF
+#undef ColorXform
+#undef DstOOTF
+#undef DstTF0
+#undef DstTF1
+#undef DstTFType
+#undef src_tf
+#undef dst_tf
+#undef applyPointwiseOp
+
+#undef TGFX_SLOT_OP_TYPE
+#undef TGFX_SLOT_COLOR_MATRIX
+#undef TGFX_SLOT_COLOR_VECTOR
+#undef TGFX_SLOT_KR
+#undef TGFX_SLOT_KG
+#undef TGFX_SLOT_KB
+#undef TGFX_SLOT_THRESHOLD
+#undef TGFX_SLOT_CS_FLAGS
+#undef TGFX_SLOT_SRC_TF0
+#undef TGFX_SLOT_SRC_TF1
+#undef TGFX_SLOT_SRC_TF_TYPE
+#undef TGFX_SLOT_SRC_OOTF
+#undef TGFX_SLOT_COLOR_XFORM
+#undef TGFX_SLOT_DST_OOTF
+#undef TGFX_SLOT_DST_TF0
+#undef TGFX_SLOT_DST_TF1
+#undef TGFX_SLOT_DST_TF_TYPE
+#undef TGFX_SLOT_SRC_TF_FUNC
+#undef TGFX_SLOT_DST_TF_FUNC
+#undef TGFX_SLOT_APPLY_FUNC

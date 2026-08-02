@@ -4,6 +4,12 @@
 // OP_NONE lets a producer kernel (e.g. PerlinNoiseFillShader) emit its raw premultiplied output when
 // no operator FP is composed on top of it, while the same OpType uniform absorbs the composed case.
 // Requires the pointwise_op_uniforms.inc fields to be present in the FragmentUniformBlock.
+//
+// A multi-slot kernel includes this file once per slot, with pointwise_slot_bind.inc redirecting the
+// uniform and function names to that slot beforehand. The operator/flag constants are therefore
+// guarded so repeated inclusion is a no-op rather than a redefinition.
+#ifndef TGFX_POINTWISE_OP_CONSTANTS
+#define TGFX_POINTWISE_OP_CONSTANTS
 #define OP_COLOR_MATRIX 0
 #define OP_LUMA 1
 #define OP_ALPHA_THRESHOLD 2
@@ -17,6 +23,7 @@
 #define CS_PREMUL 16
 #define CS_SRC_OOTF 32
 #define CS_DST_OOTF 64
+#endif
 
 // ColorSpaceXform transfer functions (verbatim from textured_color_space_xform.frag).
 float src_tf(float x) {
