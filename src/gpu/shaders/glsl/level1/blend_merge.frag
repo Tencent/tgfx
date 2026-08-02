@@ -1,6 +1,9 @@
 // BlendMergeShader fragment shader
 // Permutation dimensions (frag):
-//   CHILD_TYPE (0~2): 0=DstChild, 1=SrcChild, 2=TwoChild
+//   HAS_TWO_CHILDREN (0/1): whether a second child operand exists. This is a structural axis because
+//                       it adds a texture sampler and the Child1Subset uniform. When 0, the runtime
+//                       ChildType uniform selects whether the single child acts as dst or src, so
+//                       DstChild and SrcChild share one compiled variant instead of two.
 //   HAS_XP (0~2): 0=Empty, 1=PorterDuff DST_TEX, 2=PorterDuff FBF
 //   CHILD0_MODE (0~1): 0=TextureEffect (sample from TextureSampler_0),
 //                       1=ConstColor (use ChildConstColor uniform, no texture)
@@ -14,7 +17,7 @@
 //   HAS_COLOR (0/1): whether per-vertex color is provided via vColor varying (replaces Color
 //                     uniform).
 //
-// BLEND_MODE is a runtime uniform (not a compile-time permutation dimension).
+// BLEND_MODE and ChildType are runtime uniforms (not compile-time permutation dimensions).
 //
 // When CHILD0_MODE=1 (ConstColor), the first child processor is a ConstColorProcessor that
 // outputs a solid uniform color instead of sampling a texture. This is common for
@@ -24,8 +27,8 @@
 // them so they fall back to ProgramBuilder.
 #version 450
 
-#ifndef CHILD_TYPE
-#define CHILD_TYPE 0
+#ifndef HAS_TWO_CHILDREN
+#define HAS_TWO_CHILDREN 0
 #endif
 #ifndef HAS_XP
 #define HAS_XP 0
@@ -42,11 +45,21 @@
 #ifndef HAS_MASK_TEXTURE
 #define HAS_MASK_TEXTURE 0
 #endif
+
+// Runtime operand roles, matching XfermodeFragmentProcessor::Child.
+#define CHILD_DST 0
+#define CHILD_SRC 1
+#define CHILD_TWO 2
+
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #if !HAS_COLOR
   vec4 Color;
 #endif
   int BlendModeValue;
+  // Selects how the operands map onto the blend's src/dst. With HAS_TWO_CHILDREN=0 this
+  // distinguishes DstChild from SrcChild, which is pure operand assignment and needs no separate
+  // compiled variant.
+  int ChildType;
 #if CHILD0_MODE == 1
   vec4 ConstColor;
 #endif
@@ -57,9 +70,9 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   // are the full [0,1] range, making the clamp below a no-op.
   vec4 Child0Subset;
 #endif
-#if CHILD_TYPE == 2
-  // Normalized subset bounds for child[1]'s TextureEffect in TwoChild mode (full [0,1] when the
-  // source has no real subset).
+#if HAS_TWO_CHILDREN
+  // Normalized subset bounds for child[1]'s TextureEffect (full [0,1] when the source has no real
+  // subset).
   vec4 Child1Subset;
 #endif
   vec4 Rect;
@@ -82,7 +95,7 @@ layout(location = 2) in vec4 vColor;
 
 #if CHILD0_MODE == 0
 layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
-  #if CHILD_TYPE == 2
+  #if HAS_TWO_CHILDREN
 layout(set = 1, binding = 1) uniform sampler2D TextureSampler_1;
     #define NEXT_BINDING 2
   #else
@@ -90,7 +103,7 @@ layout(set = 1, binding = 1) uniform sampler2D TextureSampler_1;
   #endif
 #elif CHILD0_MODE == 1
   // ConstColor child: first texture binding slot is freed.
-  #if CHILD_TYPE == 2
+  #if HAS_TWO_CHILDREN
 layout(set = 1, binding = 0) uniform sampler2D TextureSampler_1;
     #define NEXT_BINDING 1
   #else
@@ -306,21 +319,23 @@ void main() {
   vec4 srcColor;
   vec4 dstColor;
 
-#if CHILD_TYPE == 0
-  // DstChild: input is src, child[0] is dst.
-  srcColor = inputColor;
-  dstColor = childColor;
-#elif CHILD_TYPE == 1
-  // SrcChild: child[0] is src, input is dst.
-  srcColor = childColor;
-  dstColor = inputColor;
-#elif CHILD_TYPE == 2
-  // TwoChild: child[0] is src, child[1] (TextureSampler_1) is dst.
+#if HAS_TWO_CHILDREN
+  // child[0] is src, child[1] (TextureSampler_1) is dst.
   srcColor = childColor;
   vec2 coord1 = TransformedCoords_0;
   // Clamp to child[1]'s subset bounds (same rationale as child[0]; full [0,1] = no-op).
   coord1 = clamp(coord1, Child1Subset.xy, Child1Subset.zw);
   dstColor = texture(TextureSampler_1, coord1);
+#else
+  // A single child operand: ChildType decides which side of the blend it feeds. Both roles share
+  // this compiled variant because the choice is pure operand assignment.
+  if (ChildType == CHILD_DST) {
+    srcColor = inputColor;
+    dstColor = childColor;
+  } else {
+    srcColor = childColor;
+    dstColor = inputColor;
+  }
 #endif
 
   vec4 blendResult = blendColors(srcColor, dstColor);

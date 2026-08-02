@@ -1440,7 +1440,7 @@ static std::optional<PermutationMatchResult> TryMatchBlendMerge(const ProgramInf
   using FD = BlendMergeShader::FD;
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT, 0);
-  fragValues[FD::CHILD_TYPE] = childType;
+  fragValues[FD::HAS_TWO_CHILDREN] = childType == 2 ? 1 : 0;
   fragValues[FD::HAS_XP] = xpType;
   fragValues[FD::CHILD0_MODE] = child0Mode;
   fragValues[FD::HAS_COVERAGE] = hasCoverage;

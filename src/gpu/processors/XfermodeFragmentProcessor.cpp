@@ -72,6 +72,13 @@ void XfermodeFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
     int modeInt = static_cast<int>(mode);
     fragmentUniformData->setData("BlendModeValue", modeInt);
   }
+  // Selects how the operands map onto the blend's src/dst in the precompiled BlendMergeShader. The
+  // single-child roles (DstChild/SrcChild) share one compiled variant and are told apart here, so
+  // this must be written on every draw rather than relying on the uniform buffer's prior contents.
+  if (fragmentUniformData->hasField("ChildType")) {
+    int childTypeValue = static_cast<int>(child);
+    fragmentUniformData->setData("ChildType", childTypeValue);
+  }
   if (fragmentUniformData->hasField("HasClip")) {
     int hasClip = 0;
     fragmentUniformData->setData("HasClip", hasClip);

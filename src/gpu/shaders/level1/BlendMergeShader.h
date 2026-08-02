@@ -23,7 +23,7 @@
 namespace tgfx {
 
 /// Precompiled shader declaration for XfermodeFragmentProcessor. Blends two color inputs using one
-/// of 30 blend modes. The child type determines how inputs are sourced.
+/// of 30 blend modes.
 ///
 /// Vertex dimensions:
 ///   GP_TYPE (int, 2 values): 0=DefaultGeometryProcessor, 1=QuadPerEdgeAAGeometryProcessor
@@ -32,15 +32,17 @@ namespace tgfx {
 ///   HAS_COLOR (bool): whether QuadGP provides per-vertex color attribute
 ///
 /// Fragment dimensions:
-///   CHILD_TYPE (int, 3 values): 0=DstChild, 1=SrcChild, 2=TwoChild
+///   HAS_TWO_CHILDREN (bool): whether a second child operand exists
 ///   HAS_XP (int, 3 values): 0=Empty, 1=PorterDuff DST_TEX, 2=PorterDuff FBF
 ///   CHILD0_MODE (int, 2 values): 0=TextureEffect, 1=ConstColor
 ///   HAS_COVERAGE (bool): matches vert dimension, controls vCoverage varying input
 ///   HAS_COLOR (bool): matches vert dimension, controls vColor varying input
 ///
-/// DstChild: input color is src, child texture provides dst
-/// SrcChild: child texture provides src, input color is dst
-/// TwoChild: two child textures provide src and dst respectively
+/// The blend mode and the operand roles are runtime uniforms (BlendModeValue, ChildType). Only the
+/// axes that change the pipeline interface stay compile-time: HAS_TWO_CHILDREN adds a sampler and the
+/// Child1Subset uniform, and CHILD0_MODE decides whether child[0] occupies a sampler or the
+/// ConstColor uniform. The former three-valued CHILD_TYPE dimension collapsed into
+/// HAS_TWO_CHILDREN because distinguishing DstChild from SrcChild is pure operand assignment.
 class BlendMergeShader : public PrecompiledShader {
  public:
   struct VertDims {
@@ -58,7 +60,7 @@ class BlendMergeShader : public PrecompiledShader {
 
   struct FragDims {
     enum : uint32_t {
-      CHILD_TYPE,
+      HAS_TWO_CHILDREN,
       HAS_XP,
       CHILD0_MODE,
       HAS_COVERAGE,
@@ -68,7 +70,7 @@ class BlendMergeShader : public PrecompiledShader {
     };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationInt("CHILD_TYPE", 3),
+          PermutationBool("HAS_TWO_CHILDREN"),
           PermutationInt("HAS_XP", 3),
           PermutationInt("CHILD0_MODE", 2),
           PermutationBool("HAS_COVERAGE"),
