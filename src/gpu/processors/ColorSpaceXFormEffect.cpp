@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ColorSpaceXFormEffect.h"
+#include "gpu/AOTEffect.h"
 
 namespace tgfx {
 
@@ -44,6 +45,15 @@ void ColorSpaceXformEffect::emitCode(EmitArgs& args) const {
 void ColorSpaceXformEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   uint32_t key = ColorSpaceXformSteps::XFormKey(colorSpaceXformSteps.get());
   bytesKey->write(key);
+}
+
+bool ColorSpaceXformEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
+                                       AOTNodeID* output) const {
+  if (builder == nullptr || output == nullptr) {
+    return false;
+  }
+  AOTColorSpaceXformParameters parameters = {colorSpaceXformSteps};
+  return builder->addColorSpaceXform(input, parameters, output);
 }
 
 ColorSpaceXformEffect::ColorSpaceXformEffect(std::shared_ptr<ColorSpaceXformSteps> colorXform)

@@ -17,41 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/AOTEffectDecomposer.h"
-#include <unordered_set>
 #include "gpu/ProgramInfo.h"
 #include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
-
-// The set of fragment-processor classes that currently implement lowerToAOT. Kept next to Lower as
-// the single source of truth for blame attribution in Analyze; the pass/fail decision itself is
-// always taken from Lower's real result, so a drift here can only mislabel the blocking class, not
-// change the recovered/blocked verdict.
-static const std::unordered_set<std::string>& AOTLowerableNames() {
-  static const std::unordered_set<std::string> names = {
-      "TextureEffect", "ColorMatrixFragmentProcessor", "LumaFragmentProcessor",
-      "ComposeFragmentProcessor"};
-  return names;
-}
-
-// Depth-first search for the first fragment processor whose class has no AOT lowering. Returns an
-// empty string when every node in the tree is lowerable (in which case Lower's failure, if any, is
-// a shape issue rather than a missing lowering).
-static std::string FindBlockingProcessor(const FragmentProcessor* processor) {
-  if (processor == nullptr) {
-    return "null";
-  }
-  if (AOTLowerableNames().count(processor->name()) == 0) {
-    return processor->name();
-  }
-  for (size_t i = 0; i < processor->numChildProcessors(); ++i) {
-    auto blocking = FindBlockingProcessor(processor->childProcessor(i));
-    if (!blocking.empty()) {
-      return blocking;
-    }
-  }
-  return "";
-}
 
 // Counts texture-sampling leaves across the tree. A fused kernel needs one sampler per leaf, so
 // this is the sampler-budget input the audit reports.
@@ -81,15 +50,9 @@ static AOTAxisAnalysis ClassifyAxis(const std::vector<const FragmentProcessor*>&
     analysis.textureLeafCount += CountTextureLeaves(processor);
   }
   AOTEffectGraph graph = {};
-  if (!AOTEffectDecomposer::Lower(processors, &graph)) {
-    analysis.outcome = AOTDecomposeOutcome::BlockedByLowering;
-    for (auto processor : processors) {
-      auto blocking = FindBlockingProcessor(processor);
-      if (!blocking.empty()) {
-        analysis.blockingProcessor = blocking;
-        break;
-      }
-    }
+  if (!AOTEffectDecomposer::Lower(processors, &graph, &analysis.blockingProcessor)) {
+    analysis.outcome = analysis.blockingProcessor.empty() ? AOTDecomposeOutcome::UnsupportedShape
+                                                          : AOTDecomposeOutcome::BlockedByLowering;
     return analysis;
   }
   if (!AOTEffectDecomposer::ValidateForFusion(graph)) {
@@ -106,7 +69,10 @@ static AOTAxisAnalysis ClassifyAxis(const std::vector<const FragmentProcessor*>&
 }
 
 bool AOTEffectDecomposer::Lower(const std::vector<const FragmentProcessor*>& processors,
-                                AOTEffectGraph* graph) {
+                                AOTEffectGraph* graph, std::string* blockingProcessor) {
+  if (blockingProcessor != nullptr) {
+    blockingProcessor->clear();
+  }
   if (graph == nullptr || processors.empty()) {
     return false;
   }
@@ -121,6 +87,10 @@ bool AOTEffectDecomposer::Lower(const std::vector<const FragmentProcessor*>& pro
     }
     AOTNodeID next = AOTNodeID::Invalid();
     if (!processor->lowerToAOT(&builder, current, &next)) {
+      auto missingLowering = builder.missingLoweringProcessor();
+      if (blockingProcessor != nullptr && missingLowering != nullptr) {
+        *blockingProcessor = missingLowering->name();
+      }
       return false;
     }
     current = next;
@@ -156,9 +126,74 @@ bool AOTEffectDecomposer::ValidateForFusion(const AOTEffectGraph& graph) {
   return true;
 }
 
+static bool IsPointwiseTailSource(const AOTEffectNode* node) {
+  if (node == nullptr || node->kind != AOTEffectKind::TextureSource || node->inputs.size() != 1 ||
+      node->inputs[0] != AOTNodeID(0)) {
+    return false;
+  }
+  auto parameters = std::get_if<AOTTextureParameters>(&node->parameters);
+  if (parameters == nullptr || parameters->isYUV || parameters->isAlphaOnly ||
+      parameters->hasRGBAAA || parameters->hasPerspective) {
+    return false;
+  }
+  return parameters->samplingKind == AOTTextureSamplingKind::Plain ||
+         parameters->samplingKind == AOTTextureSamplingKind::Device;
+}
+
+static bool IsPointwiseTailOp(const AOTEffectNode* node) {
+  return node != nullptr && node->inputs.size() == 1 &&
+         (node->kind == AOTEffectKind::ColorMatrix || node->kind == AOTEffectKind::Luma ||
+          node->kind == AOTEffectKind::AlphaThreshold ||
+          node->kind == AOTEffectKind::ColorSpaceXform);
+}
+
+static bool DecomposeLinearPointwiseTail(const AOTEffectGraph& graph, AOTEffectPlan* plan) {
+  if (plan == nullptr || graph.nodeCount() < 2 || graph.root().index() + 1 != graph.nodeCount()) {
+    return false;
+  }
+  auto geometryNode = graph.nodeAt(AOTNodeID(0));
+  if (geometryNode == nullptr || geometryNode->kind != AOTEffectKind::GeometryColor ||
+      !IsPointwiseTailSource(graph.nodeAt(AOTNodeID(1)))) {
+    return false;
+  }
+  for (uint32_t index = 2; index < graph.nodeCount(); ++index) {
+    auto node = graph.nodeAt(AOTNodeID(index));
+    if (!IsPointwiseTailOp(node) || node->inputs[0] != AOTNodeID(index - 1)) {
+      return false;
+    }
+  }
+
+  AOTEffectPlan result = {};
+  uint32_t nodeIndex = 1;
+  bool firstPass = true;
+  while (nodeIndex < graph.nodeCount()) {
+    AOTPassDescriptor pass = {};
+    pass.kernel = AOTKernelKind::PointwiseTail;
+    if (firstPass) {
+      pass.nodes.push_back(AOTNodeID(nodeIndex++));
+      firstPass = false;
+    } else {
+      pass.dependencies.push_back(static_cast<uint32_t>(result.passes.size() - 1));
+    }
+    size_t slotCount = 0;
+    while (nodeIndex < graph.nodeCount() && slotCount < 2) {
+      pass.nodes.push_back(AOTNodeID(nodeIndex++));
+      ++slotCount;
+    }
+    pass.output = pass.nodes.back();
+    result.passes.push_back(std::move(pass));
+  }
+  for (size_t index = 0; index < result.passes.size(); ++index) {
+    result.passes[index].materializesOutput = index + 1 < result.passes.size();
+  }
+  result.output = graph.root();
+  *plan = std::move(result);
+  return true;
+}
+
 // Existing narrow planner: a strictly linear TextureSource -> ColorMatrix/Luma chain, mapped onto
-// the TextureFill / TextureColorMatrix / TexturedColorMatrix / TexturedLuma kernels. Preserved
-// unchanged; the DAG planner below handles anything this rejects.
+// the TextureFill / TextureColorMatrix / TexturedColorMatrix / TexturedLuma kernels. Preserved as the
+// standard-plan and conservative fallback path.
 static bool DecomposeLinearTextureChain(const AOTEffectGraph& graph, AOTDecompositionMode mode,
                                         AOTEffectPlan* plan) {
   if (plan == nullptr || graph.nodeCount() < 2 || graph.root().index() + 1 != graph.nodeCount()) {
@@ -172,7 +207,9 @@ static bool DecomposeLinearTextureChain(const AOTEffectGraph& graph, AOTDecompos
     return false;
   }
   auto textureParameters = std::get_if<AOTTextureParameters>(&textureNode->parameters);
-  if (textureParameters == nullptr || textureParameters->isYUV ||
+  if (textureParameters == nullptr ||
+      textureParameters->samplingKind != AOTTextureSamplingKind::Plain ||
+      textureParameters->isYUV ||
       (textureParameters->isAlphaOnly && textureParameters->hasRGBAAA)) {
     return false;
   }
@@ -224,16 +261,10 @@ static bool DecomposeLinearTextureChain(const AOTEffectGraph& graph, AOTDecompos
   return true;
 }
 
-// The number of texture samplers a single fused pointwise pass can bind. A DAG with more texture
-// leaves than this cannot be evaluated in one kernel invocation and must be split by
-// materialization (a later stage), so the pointwise-DAG planner rejects it here rather than
-// producing a plan the fused kernel could not execute.
-static constexpr int kMaxFusedSamplers = 4;
-
 // New planner: a pointwise DAG whose only leaves are texture sources / const colors and whose
 // interior nodes are pure pointwise or blend ops. Such a DAG evaluates in a single fused pass (the
-// PointwiseChain kernel) with no intermediate materialization. Gather/neighborhood/external nodes
-// (tiling, blur, device-space, ...) are rejected — they require materialization, handled elsewhere.
+// PointwiseChain kernel) with no intermediate materialization. Resolved plain and tiled texture
+// leaves are supported; device-space and non-pointwise nodes require a different planner.
 static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* plan) {
   if (plan == nullptr || graph.nodeCount() < 2) {
     return false;
@@ -255,6 +286,12 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
             (parameters->isAlphaOnly && parameters->hasRGBAAA)) {
           return false;
         }
+        bool supportedSampling = parameters->samplingKind == AOTTextureSamplingKind::Plain ||
+                                 (parameters->samplingKind == AOTTextureSamplingKind::Tiled &&
+                                  parameters->tiledRecipe.has_value());
+        if (!supportedSampling) {
+          return false;
+        }
         ++textureLeaves;
         break;
       }
@@ -269,7 +306,7 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
         return false;
     }
   }
-  if (textureLeaves > kMaxFusedSamplers) {
+  if (textureLeaves > MaxFusedAOTSamplers) {
     return false;
   }
   AOTEffectPlan result = {};
@@ -288,9 +325,9 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
 
 bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, AOTDecompositionMode mode,
                                     AOTEffectPlan* plan) {
-  // Prefer the narrow linear planner (it maps onto already-shipping kernels); fall back to the
-  // pointwise-DAG planner for blend trees and const-color chains that the linear form cannot
-  // represent.
+  if (mode == AOTDecompositionMode::PreferFusion && DecomposeLinearPointwiseTail(graph, plan)) {
+    return true;
+  }
   if (DecomposeLinearTextureChain(graph, mode, plan)) {
     return true;
   }

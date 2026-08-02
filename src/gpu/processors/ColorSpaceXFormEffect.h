@@ -43,6 +43,8 @@ class ColorSpaceXformEffect : public FragmentProcessor {
 
   void emitCode(EmitArgs& args) const override;
 
+  bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
+
  private:
   DEFINE_PROCESSOR_CLASS_ID
   void onSetData(UniformData*, UniformData*) const override;

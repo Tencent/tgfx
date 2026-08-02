@@ -63,6 +63,27 @@ bool AOTNodeBuilder::addLuma(AOTNodeID input, const AOTLumaParameters& parameter
   return addUnaryNode(AOTEffectKind::Luma, input, traits, parameters, output);
 }
 
+bool AOTNodeBuilder::addAlphaThreshold(AOTNodeID input,
+                                       const AOTAlphaThresholdParameters& parameters,
+                                       AOTNodeID* output) {
+  // A step on the input alpha. It unpremultiplies, thresholds alpha, then leaves the result
+  // unpremultiplied-by-the-new-alpha, so it does not preserve the alpha representation of its input.
+  EffectTraits traits = {EffectDomain::Pointwise, EffectInputUsage::ColorRGBA, false, false, true};
+  return addUnaryNode(AOTEffectKind::AlphaThreshold, input, traits, parameters, output);
+}
+
+bool AOTNodeBuilder::addColorSpaceXform(AOTNodeID input,
+                                        const AOTColorSpaceXformParameters& parameters,
+                                        AOTNodeID* output) {
+  if (parameters.steps == nullptr) {
+    return false;
+  }
+  // The transform moves the color between color spaces and may unpremultiply/repremultiply around
+  // the transfer functions, so it preserves neither the alpha representation nor the color space.
+  EffectTraits traits = {EffectDomain::Pointwise, EffectInputUsage::ColorRGBA, false, false, false};
+  return addUnaryNode(AOTEffectKind::ColorSpaceXform, input, traits, parameters, output);
+}
+
 bool AOTNodeBuilder::addConstColor(AOTNodeID input, const AOTConstColorParameters& parameters,
                                    AOTNodeID* output) {
   // A constant color operand. Ignore mode is a self-contained source (it disregards its input);

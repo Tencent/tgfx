@@ -20,11 +20,13 @@
 #include <string>
 #include <vector>
 #include "base/TGFXTest.h"
+#include "gpu/EmbeddedShaderBundles.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Canvas.h"
+#include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Paint.h"
@@ -362,6 +364,213 @@ TGFX_TEST(AOTRenderConsistencyTest, EllipseFillCoverageModes) {
   ExpectClippedCircleConsistent("ellipse-no-clip", 0, width, height);
   ExpectClippedCircleConsistent("ellipse-aarect-clip", 1, width, height);
   ExpectClippedCircleConsistent("ellipse-device-mask-clip", 2, width, height);
+}
+
+struct ColorFilterRenderStats {
+  uint32_t hits = 0;
+  uint32_t pipelines = 0;
+  uint32_t noMatchingRule = 0;
+  AOTDrawStats draws = {};
+  ProgramCacheStats programs = {};
+};
+
+static void RenderImageWithColorFilterOnce(const std::shared_ptr<Image>& image,
+                                           const std::shared_ptr<ColorFilter>& colorFilter,
+                                           int width, int height, bool useBundle,
+                                           bool decompositionEnabled, bool useAnalyticClip,
+                                           bool forceTexture2D, Bitmap* outBitmap,
+                                           ColorFilterRenderStats* outStats) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  if (useBundle) {
+    auto [bundleData, bundleSize] = EmbeddedShaderBundles::GetBundle(context->backend());
+    ASSERT_NE(bundleData, nullptr);
+    ASSERT_GT(bundleSize, 0u);
+    ASSERT_TRUE(cache->loadBundle(bundleData, bundleSize));
+  } else {
+    cache->unload();
+  }
+  cache->setDiagnosticRecordingEnabled(false);
+  context->globalCache()->clearPrograms();
+  auto sourceImage = image;
+  std::shared_ptr<Surface> sourceSurface = nullptr;
+  if (forceTexture2D) {
+    sourceSurface = Surface::Make(context, width, height, false, 1, true);
+    ASSERT_TRUE(sourceSurface != nullptr);
+    sourceSurface->getCanvas()->drawImage(image, 0, 0);
+    sourceImage = sourceSurface->makeImageSnapshot();
+    ASSERT_TRUE(sourceImage != nullptr);
+    context->flushAndSubmit(true);
+  }
+  cache->setDecompositionEnabled(decompositionEnabled);
+  cache->setDiagnosticRecordingEnabled(true);
+  cache->resetStats();
+  context->globalCache()->clearPrograms();
+  context->globalCache()->resetProgramStats();
+  auto surface = Surface::Make(context, width, height);
+  ASSERT_TRUE(surface != nullptr);
+  Paint paint = {};
+  paint.setColorFilter(colorFilter);
+  auto canvas = surface->getCanvas();
+  if (useAnalyticClip) {
+    canvas->clipRect(Rect::MakeLTRB(8, 8, width - 8, height - 8), true);
+  }
+  canvas->drawImage(sourceImage, 0, 0, &paint);
+  context->flushAndSubmit(true);
+  ASSERT_TRUE(outBitmap->allocPixels(width, height));
+  auto* pixels = outBitmap->lockPixels();
+  ASSERT_TRUE(pixels != nullptr);
+  ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+  outBitmap->unlockPixels();
+  outStats->hits = cache->hitCount();
+  outStats->pipelines = cache->aotStageCount(PrecompiledAOTStage::PipelineCreated);
+  outStats->noMatchingRule = cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule);
+  outStats->draws = cache->drawStats();
+  outStats->programs = context->globalCache()->programStats();
+  cache->setDiagnosticRecordingEnabled(false);
+  cache->setDecompositionEnabled(true);
+  cache->unload();
+  context->globalCache()->clearPrograms();
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, TexturedEffect2D) {
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_TRUE(image != nullptr);
+  int width = image->width();
+  int height = image->height();
+  std::array<float, 20> swapRedBlue = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
+  auto colorFilter = ColorFilter::Matrix(swapRedBlue);
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  ColorFilterRenderStats referenceStats = {};
+  ColorFilterRenderStats candidateStats = {};
+  RenderImageWithColorFilterOnce(image, colorFilter, width, height, false, false, false, true,
+                                 &reference, &referenceStats);
+  RenderImageWithColorFilterOnce(image, colorFilter, width, height, true, false, false, true,
+                                 &candidate, &candidateStats);
+  EXPECT_GE(candidateStats.hits, 1u);
+  EXPECT_GE(candidateStats.pipelines, 1u);
+  EXPECT_GE(candidateStats.programs.precompiledArtifactCreations, 1u);
+  EXPECT_EQ(candidateStats.programs.programBuilderCreations, 0u);
+  EXPECT_EQ(candidateStats.noMatchingRule, 0u);
+  EXPECT_EQ(candidateStats.draws.draws, 1u);
+  EXPECT_EQ(candidateStats.draws.completeAOTDraws, 1u);
+  EXPECT_EQ(candidateStats.draws.atomicFallbacks, 0u);
+  EXPECT_EQ(candidateStats.draws.kernelInvocations, 1u);
+  EXPECT_EQ(candidateStats.draws.offscreenTargets, 0u);
+  EXPECT_EQ(candidateStats.draws.materializedEdges, 0u);
+  ExpectBitmapsIdentical("textured-effect-2d", candidate, reference, width, height);
+}
+
+// Three pointwise operators are packed into two fixed-slot passes: the first pass applies Matrix +
+// Luma, and the terminal device-space pass applies the final Matrix. This exercises both source
+// coordinate domains while requiring only one RGBA8 intermediate.
+TGFX_TEST(AOTRenderConsistencyTest, LinearChainMultiPass) {
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_TRUE(image != nullptr);
+  int width = image->width();
+  int height = image->height();
+  std::array<float, 20> swapRedBlue = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
+  std::array<float, 20> swapRedGreen = {0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0};
+  auto matrixThenLuma = ColorFilter::Compose(ColorFilter::Matrix(swapRedBlue), ColorFilter::Luma());
+  auto chain = ColorFilter::Compose(matrixThenLuma, ColorFilter::Matrix(swapRedGreen));
+  ASSERT_TRUE(chain != nullptr);
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  ColorFilterRenderStats referenceStats = {};
+  ColorFilterRenderStats candidateStats = {};
+  RenderImageWithColorFilterOnce(image, chain, width, height, false, false, false, true, &reference,
+                                 &referenceStats);
+  RenderImageWithColorFilterOnce(image, chain, width, height, true, true, false, true, &candidate,
+                                 &candidateStats);
+  EXPECT_GE(candidateStats.hits, 2u);
+  EXPECT_GE(candidateStats.pipelines, 2u);
+  EXPECT_GE(candidateStats.programs.precompiledArtifactCreations, 2u);
+  EXPECT_EQ(candidateStats.programs.programBuilderCreations, 0u);
+  EXPECT_EQ(candidateStats.noMatchingRule, 0u);
+  auto intermediateBytes = static_cast<uint64_t>(width) * static_cast<uint64_t>(height) * 4;
+  EXPECT_EQ(candidateStats.draws.draws, 1u);
+  EXPECT_EQ(candidateStats.draws.completeAOTDraws, 1u);
+  EXPECT_EQ(candidateStats.draws.atomicFallbacks, 0u);
+  EXPECT_EQ(candidateStats.draws.kernelInvocations, 2u);
+  EXPECT_EQ(candidateStats.draws.offscreenTargets, 1u);
+  EXPECT_EQ(candidateStats.draws.materializedEdges, 1u);
+  EXPECT_EQ(candidateStats.draws.renderTargetSwitches, 1u);
+  EXPECT_EQ(candidateStats.draws.intermediateReadBytes, intermediateBytes);
+  EXPECT_EQ(candidateStats.draws.intermediateWriteBytes, intermediateBytes);
+  EXPECT_EQ(candidateStats.draws.peakTemporaryBytes, intermediateBytes);
+  ExpectBitmapsIdentical("linear-chain-matrix-luma-matrix", candidate, reference, width, height);
+}
+
+// Proves AlphaThreshold reaches a fused pointwise slot. The operator was previously rejected by
+// AOTPointwiseTailProcessor::Make, so any chain containing it fell back to the runtime path; each
+// slot now carries the full operator parameter set.
+TGFX_TEST(AOTRenderConsistencyTest, AlphaThresholdChainFusesByteExact) {
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_TRUE(image != nullptr);
+  int width = image->width();
+  int height = image->height();
+  std::array<float, 20> swapRedBlue = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
+  auto chain =
+      ColorFilter::Compose(ColorFilter::Matrix(swapRedBlue), ColorFilter::AlphaThreshold(0.25f));
+  ASSERT_TRUE(chain != nullptr);
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  ColorFilterRenderStats referenceStats = {};
+  ColorFilterRenderStats candidateStats = {};
+  RenderImageWithColorFilterOnce(image, chain, width, height, false, false, false, true, &reference,
+                                 &referenceStats);
+  RenderImageWithColorFilterOnce(image, chain, width, height, true, true, false, true, &candidate,
+                                 &candidateStats);
+  EXPECT_EQ(candidateStats.programs.programBuilderCreations, 0u);
+  EXPECT_EQ(candidateStats.noMatchingRule, 0u);
+  // Matrix and AlphaThreshold occupy the two slots of one kernel, so this stays a single pass with
+  // no intermediate texture.
+  EXPECT_EQ(candidateStats.draws.draws, 1u);
+  EXPECT_EQ(candidateStats.draws.atomicFallbacks, 0u);
+  EXPECT_EQ(candidateStats.draws.offscreenTargets, 0u);
+  ExpectBitmapsIdentical("pointwise-matrix-alphathreshold", candidate, reference, width, height);
+}
+
+// Encoded images use GL_TEXTURE_RECTANGLE on macOS. The precompiled textured kernel accepts only
+// TextureType::TwoD, so strict preparation must reject the plan before any pass executes and render
+// the untouched original draw through the runtime fallback.
+TGFX_TEST(AOTRenderConsistencyTest, MultiPassUnsupportedSourceFallsBackAtomically) {
+  if (std::string(TGFX_BACKEND_NAME) != "opengl") {
+    GTEST_SKIP() << "This case relies on macOS OpenGL encoded images using Rectangle textures";
+  }
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_TRUE(image != nullptr);
+  int width = image->width();
+  int height = image->height();
+  std::array<float, 20> swapRedBlue = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
+  auto chain = ColorFilter::Compose(ColorFilter::Matrix(swapRedBlue), ColorFilter::Luma());
+  ASSERT_TRUE(chain != nullptr);
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  ColorFilterRenderStats referenceStats = {};
+  ColorFilterRenderStats candidateStats = {};
+  RenderImageWithColorFilterOnce(image, chain, width, height, false, false, false, false,
+                                 &reference, &referenceStats);
+  RenderImageWithColorFilterOnce(image, chain, width, height, true, true, false, false, &candidate,
+                                 &candidateStats);
+  EXPECT_GT(candidateStats.noMatchingRule, 0u);
+  EXPECT_EQ(candidateStats.programs.precompiledArtifactCreations, 0u);
+  EXPECT_GE(candidateStats.programs.programBuilderCreations, 1u);
+  EXPECT_EQ(candidateStats.draws.draws, 1u);
+  EXPECT_EQ(candidateStats.draws.completeAOTDraws, 0u);
+  EXPECT_EQ(candidateStats.draws.atomicFallbacks, 1u);
+  EXPECT_EQ(candidateStats.draws.kernelInvocations, 1u);
+  EXPECT_EQ(candidateStats.draws.offscreenTargets, 0u);
+  EXPECT_EQ(candidateStats.draws.materializedEdges, 0u);
+  EXPECT_EQ(candidateStats.draws.renderTargetSwitches, 0u);
+  EXPECT_EQ(candidateStats.draws.intermediateReadBytes, 0u);
+  EXPECT_EQ(candidateStats.draws.intermediateWriteBytes, 0u);
+  EXPECT_EQ(candidateStats.draws.peakTemporaryBytes, 0u);
+  ExpectBitmapsIdentical("linear-chain-unsupported-source-fallback", candidate, reference, width,
+                         height);
 }
 
 }  // namespace tgfx

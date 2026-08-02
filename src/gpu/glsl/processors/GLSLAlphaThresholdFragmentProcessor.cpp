@@ -17,11 +17,21 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLAlphaThresholdFragmentProcessor.h"
+#include "gpu/AOTEffect.h"
 
 namespace tgfx {
 PlacementPtr<AlphaThresholdFragmentProcessor> AlphaThresholdFragmentProcessor::Make(
     BlockAllocator* allocator, float threshold) {
   return allocator->make<GLSLAlphaThresholdFragmentProcessor>(threshold);
+}
+
+bool AlphaThresholdFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
+                                                 AOTNodeID* output) const {
+  if (builder == nullptr || output == nullptr) {
+    return false;
+  }
+  AOTAlphaThresholdParameters parameters = {threshold};
+  return builder->addAlphaThreshold(input, parameters, output);
 }
 
 void GLSLAlphaThresholdFragmentProcessor::emitCode(EmitArgs& args) const {

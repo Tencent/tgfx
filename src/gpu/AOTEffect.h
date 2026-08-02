@@ -25,12 +25,19 @@
 #include <optional>
 #include <variant>
 #include <vector>
+#include "core/ColorSpaceXformSteps.h"
 #include "gpu/SamplerState.h"
+#include "gpu/TiledTextureSampling.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Matrix.h"
 
 namespace tgfx {
+
+inline constexpr int MaxFusedAOTSamplers = 4;
+
+class AOTEffectDecomposer;
+class FragmentProcessor;
 
 class AOTNodeID {
  public:
@@ -68,6 +75,8 @@ enum class AOTEffectKind {
   TextureSource,
   ColorMatrix,
   Luma,
+  AlphaThreshold,
+  ColorSpaceXform,
   ConstColor,
   Blend,
 };
@@ -95,13 +104,23 @@ struct EffectTraits {
   bool preservesColorSpace = false;
 };
 
+enum class AOTTextureSamplingKind {
+  Plain,
+  Tiled,
+  Device,
+};
+
+using AOTTiledTextureRecipe = TiledTextureSampling;
+
 struct AOTTextureParameters {
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
+  AOTTextureSamplingKind samplingKind = AOTTextureSamplingKind::Plain;
   SamplerState samplerState = {};
   SrcRectConstraint constraint = SrcRectConstraint::Fast;
   Matrix uvMatrix = {};
   std::optional<Rect> subset = std::nullopt;
   Point alphaStart = {};
+  std::optional<AOTTiledTextureRecipe> tiledRecipe = std::nullopt;
   bool isYUV = false;
   bool isAlphaOnly = false;
   bool hasRGBAAA = false;
@@ -117,6 +136,19 @@ struct AOTLumaParameters {
   float kr = 0.2126f;
   float kg = 0.7152f;
   float kb = 0.0722f;
+};
+
+// Alpha-step operand (AlphaThresholdFragmentProcessor). threshold is compared against the input
+// alpha; it is a runtime uniform in the fused kernel rather than a structural axis.
+struct AOTAlphaThresholdParameters {
+  float threshold = 0.0f;
+};
+
+// Color-space transform operand (ColorSpaceXformEffect). The steps object is shared with the JIT
+// path so the fused kernel uploads byte-identical parameters through ColorSpaceXformHelper, which
+// keeps the AOT and runtime results in agreement.
+struct AOTColorSpaceXformParameters {
+  std::shared_ptr<ColorSpaceXformSteps> steps = nullptr;
 };
 
 // Constant-color operand (ConstColorProcessor). color is premultiplied RGBA; inputMode mirrors
@@ -137,7 +169,8 @@ struct AOTBlendParameters {
 
 using AOTEffectParameters =
     std::variant<std::monostate, AOTTextureParameters, AOTColorMatrixParameters, AOTLumaParameters,
-                 AOTConstColorParameters, AOTBlendParameters>;
+                 AOTAlphaThresholdParameters, AOTColorSpaceXformParameters, AOTConstColorParameters,
+                 AOTBlendParameters>;
 
 struct AOTEffectNode {
   AOTEffectKind kind = AOTEffectKind::GeometryColor;
@@ -176,6 +209,12 @@ class AOTNodeBuilder {
 
   bool addLuma(AOTNodeID input, const AOTLumaParameters& parameters, AOTNodeID* output);
 
+  bool addAlphaThreshold(AOTNodeID input, const AOTAlphaThresholdParameters& parameters,
+                         AOTNodeID* output);
+
+  bool addColorSpaceXform(AOTNodeID input, const AOTColorSpaceXformParameters& parameters,
+                          AOTNodeID* output);
+
   bool addConstColor(AOTNodeID input, const AOTConstColorParameters& parameters, AOTNodeID* output);
 
   // Adds a binary blend node consuming two previously-built operands (src and dst node ids).
@@ -189,6 +228,19 @@ class AOTNodeBuilder {
   }
 
  private:
+  friend class AOTEffectDecomposer;
+  friend class FragmentProcessor;
+
+  const FragmentProcessor* missingLoweringProcessor() const {
+    return missingLowering;
+  }
+
+  void recordMissingLowering(const FragmentProcessor* processor) {
+    if (missingLowering == nullptr) {
+      missingLowering = processor;
+    }
+  }
+
   bool addUnaryNode(AOTEffectKind kind, AOTNodeID input, EffectTraits traits,
                     AOTEffectParameters parameters, AOTNodeID* output);
 
@@ -198,6 +250,7 @@ class AOTNodeBuilder {
   bool contains(AOTNodeID nodeID) const;
 
   std::vector<AOTEffectNode> nodes = {};
+  const FragmentProcessor* missingLowering = nullptr;
 };
 
 }  // namespace tgfx

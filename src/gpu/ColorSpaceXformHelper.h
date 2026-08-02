@@ -18,15 +18,26 @@
 
 #pragma once
 #include <skcms.h>
+#include <string>
+#include <utility>
 #include "UniformData.h"
 #include "UniformHandler.h"
 #include "core/ColorSpaceXformSteps.h"
 #include "gpu/ShaderVar.h"
 
 namespace tgfx {
+/**
+ * Declares and uploads the uniforms of a color-space transform. All uniform names are prefixed with
+ * namePrefix, which lets a multi-slot kernel give each slot an independent parameter set
+ * (Slot0SrcTF0, Slot1SrcTF0, ...); an empty prefix yields the plain names used by the standalone
+ * ColorSpaceXformEffect.
+ */
 class ColorSpaceXformHelper {
  public:
   ColorSpaceXformHelper() = default;
+
+  explicit ColorSpaceXformHelper(std::string namePrefix) : prefix(std::move(namePrefix)) {
+  }
 
   void emitCode(UniformHandler* uniformHandler, const ColorSpaceXformSteps* colorSpaceXform,
                 ShaderStage shaderStage = ShaderStage::Fragment);
@@ -89,6 +100,7 @@ class ColorSpaceXformHelper {
   }
 
  private:
+  std::string prefix;
   std::string srcTFVar0;
   std::string srcTFVar1;
   std::string srcOOTFVar;
