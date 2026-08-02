@@ -37,6 +37,7 @@ struct GlassRefractionParams {
   float glassUVOffsetY = 0.0f;
   float layerPixelToSourcePixelX = 0.0f;
   float layerPixelToSourcePixelY = 0.0f;
+  float frost = 0.0f;
   GlassShapeType shapeType = GlassShapeType::AlphaMask;
 };
 

@@ -544,19 +544,14 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
                    static_cast<float>(MaxTentRadius)),
           std::min(effectiveBlurRadius * udfScale * layerToSourceY,
                    static_cast<float>(MaxTentRadius))};
-      // Edge light radius originates in content pixel space (layer bounds × contentScale) so the
-      // layer-space width stays constant as udfScale changes. Converting to UDF space via
-      // udfScale keeps the result independent of the MIN_SHORT_SIDE_TEXELS upscaling.
-      static constexpr float MIN_EDGE_RADIUS_IN_TEXELS = 10.0f;
-      static constexpr float MIN_EDGE_RADIUS_IN_LAYER_PIXELS = 1.0f;
-      float edgeContentRadius =
-          std::max(MIN_EDGE_RADIUS_IN_LAYER_PIXELS * layerToSourceX,
-                   MIN_EDGE_RADIUS_IN_TEXELS);
+      // Edge light radius is defined in layer space so the width stays constant across zoom.
+      static constexpr float EDGE_RADIUS_IN_LAYER_PIXELS = 1.0f;
+      float edgeContentRadius = EDGE_RADIUS_IN_LAYER_PIXELS * layerToSourceX;
       Point coarseRadius = {
-          std::clamp(edgeContentRadius * udfScale, MIN_EDGE_RADIUS_IN_TEXELS,
-                     static_cast<float>(MaxTentRadius)),
-          std::clamp(edgeContentRadius * udfScale, MIN_EDGE_RADIUS_IN_TEXELS,
-                     static_cast<float>(MaxTentRadius))};
+          std::min(edgeContentRadius * udfScale,
+                   static_cast<float>(MaxTentRadius)),
+          std::min(edgeContentRadius * udfScale,
+                   static_cast<float>(MaxTentRadius))};
       // The span must come from the clamped radius, otherwise the shader would divide by a
       // different distance than the one the blur actually produced.
       edgeSpanX = coarseRadius.x * udfPixelToLayerPixelX;
@@ -723,6 +718,7 @@ std::shared_ptr<ImageFilter> GlassStyle::getRefractionFilter(
   params.glassUVOffsetY = sourceOrigin.y / contentHeight;
   params.layerPixelToSourcePixelX = layerPixelToSourcePixel.x;
   params.layerPixelToSourcePixelY = layerPixelToSourcePixel.y;
+  params.frost = _frost;
   params.shapeType = shapeType;
 
   GlassSDFGeometryParams sdfParams = {};

@@ -128,7 +128,8 @@ void GLSLGlassRefractionFragmentProcessor::onSetData(UniformData*,
 
   float glassUVScaleX = params.glassUVScaleX > 0.0f ? params.glassUVScaleX : 1.0f / sourceWidth;
   float glassUVScaleY = params.glassUVScaleY > 0.0f ? params.glassUVScaleY : 1.0f / sourceHeight;
-  float offsetData[4] = {glassUVScaleX, glassUVScaleY, params.lightIntensity, 0.0f};
+  float offsetData[4] = {glassUVScaleX, glassUVScaleY, params.lightIntensity,
+                         params.frost / 100.0f};
   fragmentUniformData->setData("GlassOpticsP2", offsetData);
   float geometryMappingData[4] = {params.glassUVOffsetX, params.glassUVOffsetY, 0.0f, 0.0f};
   fragmentUniformData->setData("GlassOpticsP3", geometryMappingData);
