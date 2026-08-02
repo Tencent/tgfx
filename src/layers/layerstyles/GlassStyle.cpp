@@ -520,6 +520,13 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       float minCoreUDFSize = std::min(MIN_UDF_CORE_SIZE, maxCoreUDFSize);
       float targetCoreUDFSize = std::clamp(sourceMaxDim, minCoreUDFSize, maxCoreUDFSize);
       float udfScale = targetCoreUDFSize / sourceMaxDim;
+      // Ensure the shorter axis has at least 128 texels so the tent kernel and center-difference
+      // have enough resolution on extreme aspect ratios.
+      static constexpr float MIN_SHORT_SIDE_TEXELS = 128.0f;
+      float sourceMinDim = std::min(sourceWidth, sourceHeight);
+      if (sourceMinDim * udfScale < MIN_SHORT_SIDE_TEXELS) {
+        udfScale = MIN_SHORT_SIDE_TEXELS / sourceMinDim;
+      }
       int udfWidth = std::max(1, static_cast<int>(std::round(sourceWidth * udfScale)));
       int udfHeight = std::max(1, static_cast<int>(std::round(sourceHeight * udfScale)));
       // The UDF dimensions are rounded independently, so each axis needs its own layer-pixel
