@@ -252,10 +252,10 @@ TGFX_TEST(AOTRenderConsistencyTest, GaussianBlurTileModes) {
                               height);
 }
 
-// Color-space conversions into a Display-P3 surface: exercises ColorSpaceXformShader and
-// TexturedColorSpaceXformShader, whose seven pipeline steps are now selected by the CSFlags runtime
-// uniform. A precompiled variant that reads a flag differently from the runtime codegen would show
-// up as a byte mismatch here.
+// Color-space conversions into a Display-P3 surface: exercises the color-space operator of
+// PointwiseDirectShader and TexturedEffectShader, whose seven pipeline steps are selected by the
+// CSFlags runtime uniform. A precompiled variant that reads a flag differently from the runtime
+// codegen would show up as a byte mismatch here.
 TGFX_TEST(AOTRenderConsistencyTest, ColorSpaceXformModes) {
   int width = 200;
   int height = 200;

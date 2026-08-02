@@ -1,7 +1,6 @@
-// LumaShader vertex shader
-// Permutation dimensions (vert): GP_TYPE (0=DefaultGP, 1=QuadPerEdgeAAGP), HAS_COVERAGE
-// Unified varying contract: per-vertex AA coverage is gated by HAS_COVERAGE (driven by the GP's
-// AAType), independent of GP_TYPE. This lets both AA and non-AA quads share the GP_TYPE variant.
+// PointwiseDirectShader vertex shader.
+// Companion of pointwise_direct.frag: the kernel applies a pointwise operator straight to the input
+// color, so no texture coordinate is produced and vCoverage takes location 0.
 #version 450
 
 #ifndef GP_TYPE

@@ -30,25 +30,25 @@
 #include "ReflectionExtractor.h"
 #include "ShaderCompiler.h"
 #include "gpu/shaders/PrecompiledShader.h"
-#include "gpu/shaders/level1/AlphaThresholdShader.h"
 #include "gpu/shaders/level1/AtlasTextFillShader.h"
 #include "gpu/shaders/level1/BlendMergeShader.h"
-#include "gpu/shaders/level1/ColorSpaceXformShader.h"
 #include "gpu/shaders/level1/ComplexEllipseFillShader.h"
 #include "gpu/shaders/level1/ComplexNonAARRectFillShader.h"
 #include "gpu/shaders/level1/ConstColorShader.h"
 #include "gpu/shaders/level1/DeviceSpaceTextureShader.h"
+#include "gpu/shaders/level1/DeviceSpaceTexturedEffectShader.h"
 #include "gpu/shaders/level1/DualIntervalGradientShader.h"
 #include "gpu/shaders/level1/EllipseFillShader.h"
 #include "gpu/shaders/level1/GaussianBlur1DShader.h"
 #include "gpu/shaders/level1/GradientFillShader.h"
 #include "gpu/shaders/level1/HairlineLineShader.h"
 #include "gpu/shaders/level1/HairlineQuadShader.h"
-#include "gpu/shaders/level1/LumaShader.h"
 #include "gpu/shaders/level1/MaskFillShader.h"
 #include "gpu/shaders/level1/MeshFillShader.h"
 #include "gpu/shaders/level1/NonAARRectFillShader.h"
 #include "gpu/shaders/level1/PerlinNoiseFillShader.h"
+#include "gpu/shaders/level1/PointwiseDirectShader.h"
+#include "gpu/shaders/level1/PointwiseTailShader.h"
 #include "gpu/shaders/level1/QuadColorFillShader.h"
 #include "gpu/shaders/level1/QuadTextureFillShader.h"
 #include "gpu/shaders/level1/RoundStrokeRectFillShader.h"
@@ -290,13 +290,8 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
   std::map<uint32_t, VertCacheEntry> vertCache;
 
   for (uint32_t vi = 0; vi < vertDomain.totalCount(); vi++) {
-    auto vertValues = vertDomain.decode(vi);
     for (uint32_t fi = 0; fi < fragDomain.totalCount(); fi++) {
-      auto fragValues = fragDomain.decode(fi);
-      if (!MirroredDimsAgree(vertDomain, fragDomain, vertValues, fragValues)) {
-        continue;
-      }
-      if (info.shouldCompile && !info.shouldCompile(vi, fi, vertValues, fragValues)) {
+      if (!IsBuildablePermutation(info, vi, fi)) {
         continue;
       }
       report.compiledCount++;
@@ -403,10 +398,17 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
           vertBlob.assign(wgslVert.wgsl.begin(), wgslVert.wgsl.end());
           fragBlob.assign(wgslFrag.wgsl.begin(), wgslFrag.wgsl.end());
         } else if (backend == "opengl") {
-          auto glslVert = PrependDefines(vertSource, vertDefines);
-          auto glslFrag = PrependDefines(fragSource, fragDefines);
-          vertBlob.assign(glslVert.begin(), glslVert.end());
-          fragBlob.assign(glslFrag.begin(), glslFrag.end());
+          auto glslVert = TranslateToGLSL(*vertSpirv);
+          auto glslFrag = TranslateToGLSL(fragResult.spirv);
+          if (!glslVert.success || !glslFrag.success) {
+            std::cerr << "  GLSL translation error: "
+                      << (glslVert.success ? glslFrag.error : glslVert.error) << "\n";
+            report.errorCount++;
+            RecordBackendArtifactError(backend, profileErrorCounts);
+            continue;
+          }
+          vertBlob.assign(glslVert.glsl.begin(), glslVert.glsl.end());
+          fragBlob.assign(glslFrag.glsl.begin(), glslFrag.glsl.end());
         } else {
           continue;
         }

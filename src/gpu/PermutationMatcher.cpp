@@ -20,6 +20,7 @@
 #include <skcms.h>
 #include "gpu/Swizzle.h"
 #include "gpu/processors/AARectEffect.h"
+#include "gpu/processors/AOTPointwiseTailProcessor.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ClampedGradientEffect.h"
@@ -50,25 +51,25 @@
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/processors/UnrolledBinaryGradientColorizer.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
-#include "gpu/shaders/level1/AlphaThresholdShader.h"
 #include "gpu/shaders/level1/AtlasTextFillShader.h"
 #include "gpu/shaders/level1/BlendMergeShader.h"
-#include "gpu/shaders/level1/ColorSpaceXformShader.h"
 #include "gpu/shaders/level1/ComplexEllipseFillShader.h"
 #include "gpu/shaders/level1/ComplexNonAARRectFillShader.h"
 #include "gpu/shaders/level1/ConstColorShader.h"
 #include "gpu/shaders/level1/DeviceSpaceTextureShader.h"
+#include "gpu/shaders/level1/DeviceSpaceTexturedEffectShader.h"
 #include "gpu/shaders/level1/DualIntervalGradientShader.h"
 #include "gpu/shaders/level1/EllipseFillShader.h"
 #include "gpu/shaders/level1/GaussianBlur1DShader.h"
 #include "gpu/shaders/level1/GradientFillShader.h"
 #include "gpu/shaders/level1/HairlineLineShader.h"
 #include "gpu/shaders/level1/HairlineQuadShader.h"
-#include "gpu/shaders/level1/LumaShader.h"
 #include "gpu/shaders/level1/MaskFillShader.h"
 #include "gpu/shaders/level1/MeshFillShader.h"
 #include "gpu/shaders/level1/NonAARRectFillShader.h"
 #include "gpu/shaders/level1/PerlinNoiseFillShader.h"
+#include "gpu/shaders/level1/PointwiseDirectShader.h"
+#include "gpu/shaders/level1/PointwiseTailShader.h"
 #include "gpu/shaders/level1/QuadColorFillShader.h"
 #include "gpu/shaders/level1/QuadTextureFillShader.h"
 #include "gpu/shaders/level1/RoundStrokeRectFillShader.h"
@@ -124,60 +125,71 @@ static bool IsLocalMaskChild(const FragmentProcessor* child) {
   return false;
 }
 
-// Classifies a coverage FP into HAS_COVERAGE dimension value:
-//   0 = no coverage FP
-//   1 = AARectEffect only
-//   2 = ComposeFragmentProcessor(DeviceSpaceTextureEffect[alphaOnly] + AARectEffect) = mask + rect
-//   3 = XfermodeFragmentProcessor-dst(texture) = local-space texture-alpha mask (input * mask.a)
-// Returns -1 if the coverage FP is not recognized.
-static int ClassifyCoverageFP(const ProgramInfo* programInfo) {
+enum class CoverageKind {
+  None,
+  AARect,
+  DeviceMask,
+  LocalMask,
+};
+
+// Classifies coverage semantics independently of any shader's permutation layout. LocalMask is a
+// distinct capability: it needs a local-space varying and sampler and therefore cannot be encoded
+// in the shared three-value HAS_COVERAGE dimension.
+static std::optional<CoverageKind> ClassifyCoverageFP(const ProgramInfo* programInfo) {
   auto numFP = programInfo->numFragmentProcessors();
   auto numColorFP = programInfo->numColorFragmentProcessors();
   if (numFP == numColorFP) {
-    return 0;
+    return CoverageKind::None;
   }
   if (numFP != numColorFP + 1) {
-    return -1;
+    return std::nullopt;
   }
   auto coverageFP = programInfo->getFragmentProcessor(numColorFP);
   auto coverageName = coverageFP->name();
   if (coverageName == "AARectEffect") {
-    return 1;
+    return CoverageKind::AARect;
   }
   if (coverageName == "XfermodeFragmentProcessor - dst") {
-    // ShaderMaskFilter emits MulInputByChildAlpha(mask) == Xfermode-dst(mask, SrcIn), whose coverage
-    // is input * mask.a. A single texture child that the local-mask path can sample qualifies.
-    if (coverageFP->numChildProcessors() != 1) {
-      return -1;
+    // Only the non-inverted ShaderMaskFilter is input * mask.a (SrcIn). The inverted SrcOut form
+    // needs 1 - mask.a, which the local-mask kernel does not implement.
+    auto* xfermode = static_cast<const XfermodeFragmentProcessor*>(coverageFP);
+    if (xfermode->getMode() != BlendMode::SrcIn || coverageFP->numChildProcessors() != 1 ||
+        !IsLocalMaskChild(coverageFP->childProcessor(0))) {
+      return std::nullopt;
     }
-    if (!IsLocalMaskChild(coverageFP->childProcessor(0))) {
-      return -1;
-    }
-    return 3;
+    return CoverageKind::LocalMask;
   }
   if (coverageName == "ComposeFragmentProcessor") {
     if (coverageFP->numChildProcessors() != 2) {
-      return -1;
+      return std::nullopt;
     }
     auto child0 = coverageFP->childProcessor(0);
     auto child1 = coverageFP->childProcessor(1);
     if (child0->name() != "DeviceSpaceTextureEffect" || child1->name() != "AARectEffect") {
-      return -1;
+      return std::nullopt;
     }
     auto* dste = static_cast<const DeviceSpaceTextureEffect*>(child0);
     if (!dste->isAlphaOnly()) {
-      return -1;
+      return std::nullopt;
     }
-    return 2;
+    return CoverageKind::DeviceMask;
   }
   if (coverageName == "DeviceSpaceTextureEffect") {
     auto* dste = static_cast<const DeviceSpaceTextureEffect*>(coverageFP);
     if (!dste->isAlphaOnly()) {
-      return -1;
+      return std::nullopt;
     }
-    return 2;
+    return CoverageKind::DeviceMask;
   }
-  return -1;
+  return std::nullopt;
+}
+
+static std::optional<int> SharedCoverageValue(const ProgramInfo* programInfo) {
+  auto coverage = ClassifyCoverageFP(programInfo);
+  if (!coverage || *coverage == CoverageKind::LocalMask) {
+    return std::nullopt;
+  }
+  return static_cast<int>(*coverage);
 }
 
 static std::optional<PermutationMatchResult> TryMatchTextureFill(const ProgramInfo* programInfo) {
@@ -188,8 +200,8 @@ static std::optional<PermutationMatchResult> TryMatchTextureFill(const ProgramIn
   if (programInfo->numColorFragmentProcessors() != 1) {
     return std::nullopt;
   }
-  int coverageType = ClassifyCoverageFP(programInfo);
-  if (coverageType < 0) {
+  auto coverageType = SharedCoverageValue(programInfo);
+  if (!coverageType) {
     return std::nullopt;
   }
   int xpType = GetXPType(programInfo);
@@ -218,7 +230,7 @@ static std::optional<PermutationMatchResult> TryMatchTextureFill(const ProgramIn
   TextureFillShader::FragmentValues fragmentValues = {};
   fragmentValues.hasSubset = te->hasSubset();
   fragmentValues.xp = static_cast<uint32_t>(xpType);
-  fragmentValues.coverage = static_cast<uint32_t>(coverageType);
+  fragmentValues.coverage = static_cast<uint32_t>(*coverageType);
   auto fragIndex = TextureFillShader::EncodeFragment(fragmentValues);
   return PermutationMatchResult{TextureFillShader::Name(), vertIndex, fragIndex};
 }
@@ -410,15 +422,15 @@ static std::optional<PermutationMatchResult> TryMatchQuadColorFill(const Program
     return std::nullopt;
   }
   // Accept either zero fragment processors (plain colored quad) or a single device-space mask
-  // coverage FP. ClassifyCoverageFP returns 2 for a device-space mask (which this shader samples via
-  // HAS_MASK_TEXTURE); value 1 (analytic AARect) is not supported here because QuadColorFill has no
-  // AARect path, only per-vertex geometry AA.
+  // coverage FP, which this shader samples via HAS_MASK_TEXTURE. Analytic AARect and local-space
+  // masks are not supported here because QuadColorFill has no corresponding sampling path.
   bool hasMaskTexture = false;
   if (programInfo->numFragmentProcessors() != 0) {
     if (programInfo->numColorFragmentProcessors() != 0) {
       return std::nullopt;
     }
-    if (ClassifyCoverageFP(programInfo) != 2) {
+    auto coverage = ClassifyCoverageFP(programInfo);
+    if (!coverage || *coverage != CoverageKind::DeviceMask) {
       return std::nullopt;
     }
     hasMaskTexture = true;
@@ -452,18 +464,18 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   if (gp->name() != "QuadPerEdgeAAGeometryProcessor") {
     return std::nullopt;
   }
-  // Color must be exactly one TextureEffect. Coverage is optional: either none, or a single
-  // device-space mask (ClassifyCoverageFP == 2), which the shader samples via HAS_MASK_TEXTURE.
+  // Color must be exactly one TextureEffect. Coverage is optional: a device-space mask maps to
+  // HAS_MASK_TEXTURE, while a local-space texture-alpha mask maps to HAS_LOCAL_MASK.
   if (programInfo->numColorFragmentProcessors() != 1) {
     return std::nullopt;
   }
   bool hasMaskTexture = false;
   bool hasLocalMask = false;
   if (programInfo->numFragmentProcessors() != 1) {
-    int coverageType = ClassifyCoverageFP(programInfo);
-    if (coverageType == 2) {
+    auto coverage = ClassifyCoverageFP(programInfo);
+    if (coverage && *coverage == CoverageKind::DeviceMask) {
       hasMaskTexture = true;
-    } else if (coverageType == 3) {
+    } else if (coverage && *coverage == CoverageKind::LocalMask) {
       hasLocalMask = true;
     } else {
       return std::nullopt;
@@ -577,6 +589,119 @@ static int GetGPCoverage(const GeometryProcessor* gp) {
   return 0;
 }
 
+static std::optional<PermutationMatchResult> TryMatchPointwiseTail(const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  int gpType = GetGPType(gp);
+  if (gpType < 0 || programInfo->numColorFragmentProcessors() != 1 ||
+      programInfo->numFragmentProcessors() != 1) {
+    return std::nullopt;
+  }
+  if (gpType == 1) {
+    auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
+    if (!quadGP->hasCommonColor() || !quadGP->hasUVMatrix() || quadGP->getHasSubset()) {
+      return std::nullopt;
+    }
+  }
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
+    return std::nullopt;
+  }
+  auto fp = programInfo->getFragmentProcessor(0);
+  if (fp->name() != "AOTPointwiseTailProcessor" || fp->numChildProcessors() != 1) {
+    return std::nullopt;
+  }
+  auto* tail = static_cast<const AOTPointwiseTailProcessor*>(fp);
+  auto source = tail->source();
+  bool hasSubset = false;
+  if (tail->sourceKind() == AOTPointwiseTailProcessor::SourceKind::Plain) {
+    if (source->name() != "TextureEffect" || source->numTextureSamplers() != 1) {
+      return std::nullopt;
+    }
+    auto* texture = static_cast<const TextureEffect*>(source);
+    if (texture->isYUV() || texture->isAlphaOnly() || texture->hasRGBAAA() ||
+        source->coordTransform(0)->matrix.hasPerspective()) {
+      return std::nullopt;
+    }
+    hasSubset = texture->hasSubset();
+  } else {
+    if (source->name() != "DeviceSpaceTextureEffect" || source->numTextureSamplers() != 1) {
+      return std::nullopt;
+    }
+    auto* texture = static_cast<const DeviceSpaceTextureEffect*>(source);
+    if (texture->isAlphaOnly() || texture->hasPerspective()) {
+      return std::nullopt;
+    }
+  }
+
+  int hasCoverage = GetGPCoverage(gp);
+  using VD = PointwiseTailShader::VD;
+  std::vector<int> vertValues(VD::COUNT, 0);
+  vertValues[VD::GP_TYPE] = gpType;
+  vertValues[VD::HAS_COVERAGE] = hasCoverage;
+  auto vertIndex = VD::domain().encode(vertValues);
+
+  using FD = PointwiseTailShader::FD;
+  std::vector<int> fragValues(FD::COUNT, 0);
+  fragValues[FD::HAS_SUBSET] = hasSubset ? 1 : 0;
+  fragValues[FD::HAS_XP] = xpType;
+  fragValues[FD::HAS_COVERAGE] = hasCoverage;
+  auto fragIndex = FD::domain().encode(fragValues);
+  return PermutationMatchResult{"PointwiseTailShader", vertIndex, fragIndex};
+}
+
+static std::optional<PermutationMatchResult> TryMatchDeviceSpaceTexturedEffect(
+    const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  int gpType = GetGPType(gp);
+  if (gpType < 0) {
+    return std::nullopt;
+  }
+  if (gpType == 1) {
+    auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
+    if (!quadGP->hasCommonColor() || !quadGP->hasUVMatrix() || quadGP->getHasSubset()) {
+      return std::nullopt;
+    }
+  }
+  if (programInfo->numFragmentProcessors() != 1 || programInfo->numColorFragmentProcessors() != 1) {
+    return std::nullopt;
+  }
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
+    return std::nullopt;
+  }
+  auto composed = programInfo->getFragmentProcessor(0);
+  if (composed->name() != "ComposeFragmentProcessor" || composed->numChildProcessors() != 2) {
+    return std::nullopt;
+  }
+  auto source = composed->childProcessor(0);
+  auto pointwise = composed->childProcessor(1);
+  if (source->name() != "DeviceSpaceTextureEffect" || source->numTextureSamplers() != 1) {
+    return std::nullopt;
+  }
+  auto* deviceTexture = static_cast<const DeviceSpaceTextureEffect*>(source);
+  if (deviceTexture->isAlphaOnly()) {
+    return std::nullopt;
+  }
+  if (pointwise->name() != "ColorMatrixFragmentProcessor" &&
+      pointwise->name() != "LumaFragmentProcessor") {
+    return std::nullopt;
+  }
+
+  int hasCoverage = GetGPCoverage(gp);
+  using VD = DeviceSpaceTexturedEffectShader::VD;
+  std::vector<int> vertValues(VD::COUNT, 0);
+  vertValues[VD::GP_TYPE] = gpType;
+  vertValues[VD::HAS_COVERAGE] = hasCoverage;
+  auto vertIndex = VD::domain().encode(vertValues);
+
+  using FD = DeviceSpaceTexturedEffectShader::FD;
+  std::vector<int> fragValues(FD::COUNT, 0);
+  fragValues[FD::HAS_XP] = xpType;
+  fragValues[FD::HAS_COVERAGE] = hasCoverage;
+  auto fragIndex = FD::domain().encode(fragValues);
+  return PermutationMatchResult{"DeviceSpaceTexturedEffectShader", vertIndex, fragIndex};
+}
+
 static int GradientLayoutTypeIndex(const std::string& layoutName) {
   if (layoutName == "LinearGradientLayout") {
     return 0;
@@ -608,8 +733,8 @@ static std::optional<PermutationMatchResult> TryMatchGradientFill(const ProgramI
   if (programInfo->numColorFragmentProcessors() != 1) {
     return std::nullopt;
   }
-  int coverageType = ClassifyCoverageFP(programInfo);
-  if (coverageType < 0) {
+  auto coverageType = SharedCoverageValue(programInfo);
+  if (!coverageType) {
     return std::nullopt;
   }
   int xpType = GetXPType(programInfo);
@@ -657,7 +782,7 @@ static std::optional<PermutationMatchResult> TryMatchGradientFill(const ProgramI
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
   fragValues[FD::HAS_XP] = xpType;
-  fragValues[FD::HAS_COVERAGE] = coverageType;
+  fragValues[FD::HAS_COVERAGE] = *coverageType;
   fragValues[FD::HAS_VCOVERAGE] = vCoverage;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"GradientFillShader", vertIndex, fragIndex};
@@ -679,8 +804,8 @@ static std::optional<PermutationMatchResult> TryMatchSingleIntervalGradient(
   if (programInfo->numColorFragmentProcessors() != 1) {
     return std::nullopt;
   }
-  int coverageType = ClassifyCoverageFP(programInfo);
-  if (coverageType < 0) {
+  auto coverageType = SharedCoverageValue(programInfo);
+  if (!coverageType) {
     return std::nullopt;
   }
   int xpType = GetXPType(programInfo);
@@ -721,7 +846,7 @@ static std::optional<PermutationMatchResult> TryMatchSingleIntervalGradient(
   std::vector<int> fragValues(FD::COUNT);
   // GP_TYPE is a vertex-only dimension; the fragment stage is identical for all GP types.
   fragValues[FD::HAS_XP] = xpType;
-  fragValues[FD::HAS_COVERAGE] = coverageType;
+  fragValues[FD::HAS_COVERAGE] = *coverageType;
   fragValues[FD::HAS_VCOVERAGE] = vCoverage;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"SingleIntervalGradientShader", vertIndex, fragIndex};
@@ -743,8 +868,8 @@ static std::optional<PermutationMatchResult> TryMatchDualIntervalGradient(
   if (programInfo->numColorFragmentProcessors() != 1) {
     return std::nullopt;
   }
-  int coverageType = ClassifyCoverageFP(programInfo);
-  if (coverageType < 0) {
+  auto coverageType = SharedCoverageValue(programInfo);
+  if (!coverageType) {
     return std::nullopt;
   }
   int xpType = GetXPType(programInfo);
@@ -787,7 +912,7 @@ static std::optional<PermutationMatchResult> TryMatchDualIntervalGradient(
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
   fragValues[FD::HAS_XP] = xpType;
-  fragValues[FD::HAS_COVERAGE] = coverageType;
+  fragValues[FD::HAS_COVERAGE] = *coverageType;
   fragValues[FD::HAS_VCOVERAGE] = vCoverage;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"DualIntervalGradientShader", vertIndex, fragIndex};
@@ -809,8 +934,8 @@ static std::optional<PermutationMatchResult> TryMatchTextureGradient(
   if (programInfo->numColorFragmentProcessors() != 1) {
     return std::nullopt;
   }
-  int coverageType = ClassifyCoverageFP(programInfo);
-  if (coverageType < 0) {
+  auto coverageType = SharedCoverageValue(programInfo);
+  if (!coverageType) {
     return std::nullopt;
   }
   int xpType = GetXPType(programInfo);
@@ -853,7 +978,7 @@ static std::optional<PermutationMatchResult> TryMatchTextureGradient(
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
   fragValues[FD::HAS_XP] = xpType;
-  fragValues[FD::HAS_COVERAGE] = coverageType;
+  fragValues[FD::HAS_COVERAGE] = *coverageType;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"TextureGradientShader", vertIndex, fragIndex};
 }
@@ -920,79 +1045,6 @@ static std::optional<PermutationMatchResult> TryMatchAtlasTextFill(const Program
   return PermutationMatchResult{"AtlasTextFillShader", vertIndex, fragIndex};
 }
 
-static std::optional<PermutationMatchResult> TryMatchAlphaThreshold(
-    const ProgramInfo* programInfo) {
-  auto gp = programInfo->getGeometryProcessor();
-  int gpType = GetGPType(gp);
-  if (gpType < 0) {
-    return std::nullopt;
-  }
-  if (programInfo->numFragmentProcessors() != 1) {
-    return std::nullopt;
-  }
-  int xpType = GetXPType(programInfo);
-  if (xpType < 0) {
-    return std::nullopt;
-  }
-  auto fp = programInfo->getFragmentProcessor(0);
-  if (fp->name() != "AlphaStepFragmentProcessor") {
-    return std::nullopt;
-  }
-  using D = AlphaThresholdShader::Dims;
-  auto vertDomain = D::domain();
-  std::vector<int> vertValues(D::COUNT);
-  vertValues[D::GP_TYPE] = gpType;
-  auto vertIndex = vertDomain.encode(vertValues);
-  using FD = AlphaThresholdShader::FD;
-  auto fragDomain = FD::domain();
-  std::vector<int> fragValues(FD::COUNT);
-  fragValues[FD::GP_TYPE] = gpType;
-  fragValues[FD::HAS_XP] = xpType;
-  auto fragIndex = fragDomain.encode(fragValues);
-  return PermutationMatchResult{"AlphaThresholdShader", vertIndex, fragIndex};
-}
-
-static std::optional<PermutationMatchResult> TryMatchLuma(const ProgramInfo* programInfo) {
-  auto gp = programInfo->getGeometryProcessor();
-  int gpType = GetGPType(gp);
-  if (gpType < 0) {
-    return std::nullopt;
-  }
-  if (programInfo->numFragmentProcessors() != 1) {
-    return std::nullopt;
-  }
-  int xpType = GetXPType(programInfo);
-  if (xpType < 0) {
-    return std::nullopt;
-  }
-  auto fp = programInfo->getFragmentProcessor(0);
-  if (fp->name() != "LumaFragmentProcessor") {
-    return std::nullopt;
-  }
-  // Unified varying contract: per-vertex AA coverage is an independent HAS_COVERAGE dimension driven
-  // by the GP's AAType, not coupled to GP_TYPE.
-  int hasCoverage =
-      gp->name() == "DefaultGeometryProcessor"
-          ? (static_cast<const DefaultGeometryProcessor*>(gp)->getAAType() == AAType::Coverage ? 1
-                                                                                               : 0)
-          : (static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp)->getAAType() == AAType::Coverage
-                 ? 1
-                 : 0);
-  using D = LumaShader::Dims;
-  auto vertDomain = D::domain();
-  std::vector<int> vertValues(D::COUNT);
-  vertValues[D::GP_TYPE] = gpType;
-  vertValues[D::HAS_COVERAGE] = hasCoverage;
-  auto vertIndex = vertDomain.encode(vertValues);
-  using FD = LumaShader::FD;
-  auto fragDomain = FD::domain();
-  std::vector<int> fragValues(FD::COUNT);
-  fragValues[FD::HAS_XP] = xpType;
-  fragValues[FD::HAS_COVERAGE] = hasCoverage;
-  auto fragIndex = fragDomain.encode(fragValues);
-  return PermutationMatchResult{"LumaShader", vertIndex, fragIndex};
-}
-
 static int TFTypeToIndex(gfx::skcms_TFType type) {
   switch (type) {
     case gfx::skcms_TFType_sRGBish:
@@ -1008,13 +1060,14 @@ static int TFTypeToIndex(gfx::skcms_TFType type) {
   }
 }
 
-static std::optional<PermutationMatchResult> TryMatchColorSpaceXform(
+// Matches a single pointwise operator applied straight to the input color, with no texture source:
+// Luma, AlphaThreshold or ColorSpaceXform. These were three separate shaders whose skeletons were
+// identical; the operator is now the OpType runtime uniform of PointwiseDirectShader.
+static std::optional<PermutationMatchResult> TryMatchPointwiseDirect(
     const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "DefaultGeometryProcessor") {
-    return std::nullopt;
-  }
-  if (programInfo->numFragmentProcessors() != 1) {
+  int gpType = GetGPType(gp);
+  if (gpType < 0 || programInfo->numFragmentProcessors() != 1) {
     return std::nullopt;
   }
   int xpType = GetXPType(programInfo);
@@ -1022,39 +1075,43 @@ static std::optional<PermutationMatchResult> TryMatchColorSpaceXform(
     return std::nullopt;
   }
   auto fp = programInfo->getFragmentProcessor(0);
-  if (fp->name() != "ColorSpaceXformEffect") {
+  auto name = fp->name();
+  if (name != "LumaFragmentProcessor" && name != "AlphaStepFragmentProcessor" &&
+      name != "ColorSpaceXformEffect") {
     return std::nullopt;
   }
-  auto* cse = static_cast<const ColorSpaceXformEffect*>(fp);
-  auto* xform = cse->colorXform();
-  if (!xform) {
-    return std::nullopt;
+  if (name == "ColorSpaceXformEffect") {
+    auto* effect = static_cast<const ColorSpaceXformEffect*>(fp);
+    auto* xform = effect->colorXform();
+    if (xform == nullptr) {
+      return std::nullopt;
+    }
+    // The pipeline steps are runtime uniforms (CSFlags), so any flag combination hits the same
+    // variant. Only the transfer-function types must be in the range the shared operator encodes.
+    if (xform->flags.linearize &&
+        TFTypeToIndex(gfx::skcms_TransferFunction_getType(
+            reinterpret_cast<const gfx::skcms_TransferFunction*>(&xform->srcTransferFunction))) <
+            0) {
+      return std::nullopt;
+    }
+    if (xform->flags.encode && TFTypeToIndex(gfx::skcms_TransferFunction_getType(
+                                   reinterpret_cast<const gfx::skcms_TransferFunction*>(
+                                       &xform->dstTransferFunctionInverse))) < 0) {
+      return std::nullopt;
+    }
   }
-
-  using FD = ColorSpaceXformShader::FD;
-  auto fragDomain = FD::domain();
+  int hasCoverage = GetGPCoverage(gp);
+  using VD = PointwiseDirectShader::VD;
+  std::vector<int> vertValues(VD::COUNT, 0);
+  vertValues[VD::GP_TYPE] = gpType;
+  vertValues[VD::HAS_COVERAGE] = hasCoverage;
+  auto vertIndex = VD::domain().encode(vertValues);
+  using FD = PointwiseDirectShader::FD;
   std::vector<int> fragValues(FD::COUNT, 0);
   fragValues[FD::HAS_XP] = xpType;
-
-  // The pipeline flags are runtime uniforms (CSFlags), so any flag combination hits the same
-  // variant. Only the transfer-function type must still be in the supported 0-3 range.
-  if (xform->flags.linearize) {
-    int srcIdx = TFTypeToIndex(gfx::skcms_TransferFunction_getType(
-        reinterpret_cast<const gfx::skcms_TransferFunction*>(&xform->srcTransferFunction)));
-    if (srcIdx < 0) {
-      return std::nullopt;
-    }
-  }
-  if (xform->flags.encode) {
-    int dstIdx = TFTypeToIndex(gfx::skcms_TransferFunction_getType(
-        reinterpret_cast<const gfx::skcms_TransferFunction*>(&xform->dstTransferFunctionInverse)));
-    if (dstIdx < 0) {
-      return std::nullopt;
-    }
-  }
-
-  auto fragIndex = fragDomain.encode(fragValues);
-  return PermutationMatchResult{"ColorSpaceXformShader", 0, fragIndex};
+  fragValues[FD::HAS_COVERAGE] = hasCoverage;
+  auto fragIndex = FD::domain().encode(fragValues);
+  return PermutationMatchResult{"PointwiseDirectShader", vertIndex, fragIndex};
 }
 
 // Returns true if fp is one of the four pointwise operators that share the runtime OpType uniform
@@ -1181,8 +1238,8 @@ static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
   if (programInfo->numColorFragmentProcessors() != 1) {
     return std::nullopt;
   }
-  int coverageType = ClassifyCoverageFP(programInfo);
-  if (coverageType < 0) {
+  auto coverageType = SharedCoverageValue(programInfo);
+  if (!coverageType) {
     return std::nullopt;
   }
   int xpType = GetXPType(programInfo);
@@ -1246,7 +1303,7 @@ static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
   std::vector<int> fragValues(FD::COUNT);
   fragValues[FD::HAS_XP] = xpType;
   fragValues[FD::HAS_CHILD_SUBSET] = childHasSubset ? 1 : 0;
-  fragValues[FD::HAS_COVERAGE] = coverageType;
+  fragValues[FD::HAS_COVERAGE] = *coverageType;
   fragValues[FD::HAS_TILED_CHILD] = tiledChild ? 1 : 0;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"GaussianBlur1DShader", vertIndex, fragIndex};
@@ -1459,11 +1516,11 @@ static std::optional<PermutationMatchResult> TryMatchEllipseFill(const ProgramIn
   if (programInfo->numColorFragmentProcessors() != 0) {
     return std::nullopt;
   }
-  // A clip/mask coverage FP is served through the HAS_COVERAGE dimension (device-space sampling in
-  // coverage_output.inc). Local-mask coverage (type 3) needs per-vertex UV the ellipse vert does not
-  // provide, so it still falls back.
-  int coverageType = ClassifyCoverageFP(programInfo);
-  if (coverageType < 0 || coverageType == 3) {
+  // A clip/mask coverage FP is served through the shared HAS_COVERAGE dimension (device-space
+  // sampling in coverage_output.inc). LocalMask needs per-vertex UV the ellipse vertex shader does
+  // not provide, so SharedCoverageValue rejects it.
+  auto coverageType = SharedCoverageValue(programInfo);
+  if (!coverageType) {
     return std::nullopt;
   }
   int xpType = GetXPType(programInfo);
@@ -1484,7 +1541,7 @@ static std::optional<PermutationMatchResult> TryMatchEllipseFill(const ProgramIn
     fragValues[i] = values[i];
   }
   fragValues[FD::HAS_XP] = xpType;
-  fragValues[FD::HAS_COVERAGE] = coverageType;
+  fragValues[FD::HAS_COVERAGE] = *coverageType;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"EllipseFillShader", vertIndex, fragIndex};
 }
@@ -1743,7 +1800,71 @@ static std::optional<PermutationMatchResult> TryMatchPerlin(const ProgramInfo* p
   return PermutationMatchResult{"PerlinNoiseFillShader", vertIndex, fragIndex};
 }
 
+static bool IsOpenGLStage1Pointwise(const FragmentProcessor* processor) {
+  if (processor == nullptr) {
+    return false;
+  }
+  if (processor->name() == "LumaFragmentProcessor") {
+    return true;
+  }
+  return processor->name() == "ColorMatrixFragmentProcessor" &&
+         static_cast<const ColorMatrixFragmentProcessor*>(processor)->isChannelPermutation();
+}
+
+static bool IsOpenGLStage1Candidate(const ProgramInfo* programInfo) {
+  if (!programInfo->usesOpenGLDesktopAOTProfile() || !programInfo->samplersAre2D() ||
+      GetXPType(programInfo) != 0 ||
+      programInfo->numFragmentProcessors() != programInfo->numColorFragmentProcessors()) {
+    return false;
+  }
+  auto gp = programInfo->getGeometryProcessor();
+  auto colorCount = programInfo->numColorFragmentProcessors();
+  if (colorCount == 1 &&
+      programInfo->getFragmentProcessor(0)->name() == "AOTPointwiseTailProcessor") {
+    int gpType = GetGPType(gp);
+    if (gpType < 0) {
+      return false;
+    }
+    if (gpType == 1) {
+      auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
+      return quadGP->hasCommonColor() && quadGP->hasUVMatrix() && !quadGP->getHasSubset();
+    }
+    return true;
+  }
+  if (gp->name() != "QuadPerEdgeAAGeometryProcessor") {
+    return false;
+  }
+  auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
+  if (!quadGP->hasCommonColor() || !quadGP->hasUVMatrix() || quadGP->getHasSubset()) {
+    return false;
+  }
+  if (colorCount == 1) {
+    auto processor = programInfo->getFragmentProcessor(0);
+    if (processor->name() != "ComposeFragmentProcessor" || processor->numChildProcessors() != 2) {
+      return false;
+    }
+    auto source = processor->childProcessor(0);
+    auto pointwise = processor->childProcessor(1);
+    if (source->name() == "DeviceSpaceTextureEffect") {
+      return IsOpenGLStage1Pointwise(pointwise);
+    }
+    return source->name() == "TextureEffect" &&
+           pointwise->name() == "ColorMatrixFragmentProcessor" &&
+           IsOpenGLStage1Pointwise(pointwise);
+  }
+  auto pointwise = colorCount == 2 ? programInfo->getFragmentProcessor(1) : nullptr;
+  return pointwise != nullptr && programInfo->getFragmentProcessor(0)->name() == "TextureEffect" &&
+         pointwise->name() == "ColorMatrixFragmentProcessor" && IsOpenGLStage1Pointwise(pointwise);
+}
+
 static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramInfo* programInfo) {
+  // The first OpenGL AOT profile is intentionally limited to the exact texture and pointwise
+  // structures covered by pixel cross-validation. Other shader families stay on ProgramBuilder
+  // until their OpenGL variants are validated independently.
+  if (programInfo->backend() == Backend::OpenGL && !IsOpenGLStage1Candidate(programInfo)) {
+    return std::nullopt;
+  }
+
   // Only RGBA and alpha-only (AAAA, Swizzle::ForWrite(ALPHA_8)) render targets are supported. Any
   // other write swizzle would need a mapping the precompiled shaders do not implement.
   auto outputSwizzle = programInfo->getOutputSwizzle();
@@ -1785,6 +1906,12 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
   if (auto result = TryMatchConstColor(programInfo)) {
     return result;
   }
+  if (auto result = TryMatchPointwiseTail(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchDeviceSpaceTexturedEffect(programInfo)) {
+    return result;
+  }
   if (auto result = TryMatchDeviceSpaceTexture(programInfo)) {
     return result;
   }
@@ -1814,13 +1941,7 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
   if (auto result = TryMatchAtlasTextFill(programInfo)) {
     return result;
   }
-  if (auto result = TryMatchAlphaThreshold(programInfo)) {
-    return result;
-  }
-  if (auto result = TryMatchLuma(programInfo)) {
-    return result;
-  }
-  if (auto result = TryMatchColorSpaceXform(programInfo)) {
+  if (auto result = TryMatchPointwiseDirect(programInfo)) {
     return result;
   }
   if (auto result = TryMatchGaussianBlur1D(programInfo)) {
@@ -1869,6 +1990,13 @@ std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* progra
     return std::nullopt;
   }
   auto result = MatchPermutationImpl(programInfo);
+  if (result) {
+    auto info = ShaderRegistry::Find(result->shaderName);
+    if (info == nullptr || !IsBuildablePermutation(*info, result->vertPermutationIndex,
+                                                   result->fragPermutationIndex)) {
+      result.reset();
+    }
+  }
   if (failure != nullptr) {
     *failure = result ? PermutationMatchFailure::None : PermutationMatchFailure::NoMatchingRule;
   }

@@ -22,38 +22,52 @@
 
 namespace tgfx {
 
-/// Precompiled shader declaration for AlphaThresholdFragmentProcessor. Discards pixels whose alpha
-/// falls below a uniform threshold by applying step(threshold, alpha).
+/// Precompiled shader declaration for a pointwise operator applied directly to the input color, with
+/// no texture source. Serves LumaFragmentProcessor, AlphaThresholdFragmentProcessor and
+/// ColorSpaceXformEffect: their skeletons were identical and differed only in the operator, which is
+/// now the OpType runtime uniform instead of three separate shaders.
+///
+/// The operator kind and all of its parameters (luma coefficients, alpha threshold, color-space
+/// steps) are runtime uniforms. Only the geometry-processor kind, the coverage varying and the
+/// transfer-processor kind remain compile-time axes, because each changes the pipeline interface.
 ///
 /// Vertex dimensions:
 ///   GP_TYPE (int, 2 values): 0=DefaultGeometryProcessor, 1=QuadPerEdgeAAGeometryProcessor
-class AlphaThresholdShader : public PrecompiledShader {
+///   HAS_COVERAGE (bool): per-vertex AA coverage attribute present, driven by the GP's AAType and
+///     independent of GP_TYPE so AA and non-AA draws of the same GP share one variant.
+///
+/// Fragment dimensions:
+///   HAS_XP (int, 3 values): 0=Empty, 1=PorterDuff DST_TEX, 2=PorterDuff FBF
+///   HAS_COVERAGE (bool): mirrors the vertex dimension, controls the vCoverage varying input
+class PointwiseDirectShader : public PrecompiledShader {
  public:
-  struct Dims {
-    enum : uint32_t { GP_TYPE, COUNT };
+  struct VertDims {
+    enum : uint32_t { GP_TYPE, HAS_COVERAGE, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("GP_TYPE", 2),
+          PermutationBool("HAS_COVERAGE"),
       });
     }
   };
+  using VD = VertDims;
 
   struct FragDims {
-    enum : uint32_t { GP_TYPE, HAS_XP, COUNT };
+    enum : uint32_t { HAS_XP, HAS_COVERAGE, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationInt("GP_TYPE", 2),
           PermutationInt("HAS_XP", 3),
+          PermutationBool("HAS_COVERAGE"),
       });
     }
   };
   using FD = FragDims;
 
   PrecompiledShaderInfo info() const override {
-    return {"AlphaThresholdShader",
-            "level1/alpha_threshold.vert",
-            "level1/alpha_threshold.frag",
-            Dims::domain(),
+    return {"PointwiseDirectShader",
+            "level1/pointwise_direct.vert",
+            "level1/pointwise_direct.frag",
+            VD::domain(),
             FD::domain(),
             PermutationDomain({}),
             "",
@@ -64,4 +78,4 @@ class AlphaThresholdShader : public PrecompiledShader {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER(tgfx::AlphaThresholdShader)
+TGFX_REGISTER_SHADER(tgfx::PointwiseDirectShader)
