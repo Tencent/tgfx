@@ -377,11 +377,8 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
         frostDownscale = std::sqrt(MAX_FROST_AREA / fullArea);
       }
     } else {
-      float bgArea =
-          static_cast<float>(bgImage->width()) * static_cast<float>(bgImage->height());
-      if (bgArea > MAX_FROST_AREA) {
-        frostDownscale = std::sqrt(MAX_FROST_AREA / bgArea);
-      }
+      // The subset already bounds the frost blur region, so pre-scaling the zoomed-in
+      // background would only blur visible detail without reducing the actual blur work.
     }
     if (frostDownscale < 1.0f) {
       int scaledW = std::max(
@@ -503,25 +500,25 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
           std::max(std::min((_depth / 100.0f) * MAX_BLUR_RADIUS, MAX_BLUR_RADIUS), MIN_BLUR_RADIUS);
       float minHalf = std::min(origBounds.width(), origBounds.height()) * 0.5f;
       float effectiveBlurRadius = std::min(blurRadius, minHalf);
-      // Use one UDF texel per layer pixel so the one-layer-pixel edge remains representable.
-      static constexpr float MIN_UDF_CORE_SIZE = 512.0f;
-      static constexpr float MAX_UDF_CORE_SIZE = 2048.0f;
+      // UDF resolution matches content pixel dimensions (1 texel = 1 content pixel), so the
+      // effective resolution scales with zoom. The textureRect subset mechanism ensures only
+      // the visible region + halo is actually rasterized.
       static constexpr float MAX_UDF_SHADER_HALO = MaxTentRadius * 0.5f + 1.0f;
       static constexpr float MAX_UDF_BLUR_HALO = MaxTentRadius + 1.0f;
-      float sourceWidth = origBounds.width();
-      float sourceHeight = origBounds.height();
+      static constexpr float MAX_UDF_SIZE = 768.0f;
+      float sourceWidth = contentWidth;
+      float sourceHeight = contentHeight;
       float sourceMaxDim = std::max(sourceWidth, sourceHeight);
-      float maxCoreUDFSize =
-          std::min(MAX_UDF_CORE_SIZE, static_cast<float>(maxTextureSize) -
-                                             (MAX_UDF_SHADER_HALO + MAX_UDF_BLUR_HALO) * 2.0f);
-      if (maxCoreUDFSize < 1.0f) {
+      float maxAllowedDim =
+          std::min(static_cast<float>(maxTextureSize), MAX_UDF_SIZE) -
+          (MAX_UDF_SHADER_HALO + MAX_UDF_BLUR_HALO) * 2.0f;
+      if (maxAllowedDim < 1.0f) {
         return;
       }
-      float minCoreUDFSize = std::min(MIN_UDF_CORE_SIZE, maxCoreUDFSize);
-      float targetCoreUDFSize = std::clamp(sourceMaxDim, minCoreUDFSize, maxCoreUDFSize);
-      float udfScale = targetCoreUDFSize / sourceMaxDim;
-      // Ensure the shorter axis has at least 128 texels so the tent kernel and center-difference
-      // have enough resolution on extreme aspect ratios.
+      float udfScale = 1.0f;
+      if (sourceMaxDim > maxAllowedDim) {
+        udfScale = maxAllowedDim / sourceMaxDim;
+      }
       static constexpr float MIN_SHORT_SIDE_TEXELS = 128.0f;
       float sourceMinDim = std::min(sourceWidth, sourceHeight);
       if (sourceMinDim * udfScale < MIN_SHORT_SIDE_TEXELS) {
@@ -543,20 +540,18 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
                    static_cast<float>(MaxTentRadius)),
           std::min(effectiveBlurRadius * udfScale * layerToSourceY,
                    static_cast<float>(MaxTentRadius))};
-      // The edge field shares the fine texture, so its radius must satisfy the texel constraints of
-      // that resolution: below two texels the tent kernel degenerates to a single tap and the
-      // shader's center difference collapses inside one bilinear cell. Because the shader divides
-      // the height difference by the same span it samples, enlarging the radius leaves the
-      // reconstructed edge distance unchanged, so the layer-space light width stays stable.
+      // Edge light radius originates in content pixel space (layer bounds × contentScale) so the
+      // layer-space width stays constant as udfScale changes. Converting to UDF space via
+      // udfScale keeps the result independent of the MIN_SHORT_SIDE_TEXELS upscaling.
       static constexpr float MIN_EDGE_RADIUS_IN_TEXELS = 10.0f;
       static constexpr float MIN_EDGE_RADIUS_IN_LAYER_PIXELS = 1.0f;
-      float layerPixelsPerTexel = std::max(udfPixelToLayerPixelX, udfPixelToLayerPixelY);
-      float edgeLayerRadius = std::max(MIN_EDGE_RADIUS_IN_LAYER_PIXELS,
-                                       MIN_EDGE_RADIUS_IN_TEXELS * layerPixelsPerTexel);
+      float edgeContentRadius =
+          std::max(MIN_EDGE_RADIUS_IN_LAYER_PIXELS * layerToSourceX,
+                   MIN_EDGE_RADIUS_IN_TEXELS);
       Point coarseRadius = {
-          std::clamp(edgeLayerRadius / udfPixelToLayerPixelX, MIN_EDGE_RADIUS_IN_TEXELS,
+          std::clamp(edgeContentRadius * udfScale, MIN_EDGE_RADIUS_IN_TEXELS,
                      static_cast<float>(MaxTentRadius)),
-          std::clamp(edgeLayerRadius / udfPixelToLayerPixelY, MIN_EDGE_RADIUS_IN_TEXELS,
+          std::clamp(edgeContentRadius * udfScale, MIN_EDGE_RADIUS_IN_TEXELS,
                      static_cast<float>(MaxTentRadius))};
       // The span must come from the clamped radius, otherwise the shader would divide by a
       // different distance than the one the blur actually produced.
