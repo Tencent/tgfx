@@ -158,6 +158,8 @@ struct GlassShapeInfo {
   GlassShapeType type = GlassShapeType::AlphaMask;
   float cornerRadius = 0.0f;
   RRect shapeRRect = {};
+  Path shapePath = {};
+  bool hasPath = false;
 };
 
 // Detects whether the layer's vector shape is a regular shape (RoundedRect or Ellipse)
@@ -181,6 +183,8 @@ static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
     return info;
   }
   auto path = optShape->shape->getPath();
+  info.shapePath = path;
+  info.hasPath = true;
   RRect rRect = {};
   Rect rect = {};
   if (path.isRRect(&rRect)) {
@@ -505,7 +509,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       // the visible region + halo is actually rasterized.
       static constexpr float MAX_UDF_SHADER_HALO = MaxTentRadius * 0.5f + 1.0f;
       static constexpr float MAX_UDF_BLUR_HALO = MaxTentRadius + 1.0f;
-      static constexpr float MAX_UDF_SIZE = 768.0f;
+      static constexpr float MAX_UDF_SIZE = 1024.0f;
       float sourceWidth = contentWidth;
       float sourceHeight = contentHeight;
       float sourceMaxDim = std::max(sourceWidth, sourceHeight);
@@ -519,7 +523,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       if (sourceMaxDim > maxAllowedDim) {
         udfScale = maxAllowedDim / sourceMaxDim;
       }
-      static constexpr float MIN_SHORT_SIDE_TEXELS = 128.0f;
+      static constexpr float MIN_SHORT_SIDE_TEXELS = 256.0f;
       float sourceMinDim = std::min(sourceWidth, sourceHeight);
       if (sourceMinDim * udfScale < MIN_SHORT_SIDE_TEXELS) {
         udfScale = MIN_SHORT_SIDE_TEXELS / sourceMinDim;
@@ -645,32 +649,40 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
     drawRRect.offset(-input.contentOffset.x, -input.contentOffset.y);
     canvas->drawRRect(drawRRect, paint);
   } else {
-    // AlphaMask path: preserve the complete shape while limiting its texture dimensions. Using a
-    // visible subset would make the mask depend on the current tile and change its edge semantics.
-    auto maskImage = input.content;
-    float maskScaleX = 1.0f;
-    float maskScaleY = 1.0f;
-    auto maskMaxDimension = std::max(maskImage->width(), maskImage->height());
-    if (maskMaxDimension > maxTextureSize) {
-      float maskScale = static_cast<float>(maxTextureSize) / static_cast<float>(maskMaxDimension);
-      int maskWidth = std::max(
-          1, static_cast<int>(std::round(static_cast<float>(maskImage->width()) * maskScale)));
-      int maskHeight = std::max(
-          1, static_cast<int>(std::round(static_cast<float>(maskImage->height()) * maskScale)));
-      maskImage = maskImage->makeScaled(maskWidth, maskHeight, SamplingOptions(FilterMode::Linear));
-      if (maskImage == nullptr) {
-        return;
+    // AlphaMask path: use the vector path for GPU-native AA when available, avoiding the
+    // resolution-dependent alpha mask that produces stair-stepping on low-zoom diagonal edges.
+    if (shapeInfo.hasPath) {
+      auto drawPath = shapeInfo.shapePath;
+      auto pathMatrix = Matrix::MakeScale(input.contentScale, input.contentScale);
+      pathMatrix.postTranslate(-input.contentOffset.x, -input.contentOffset.y);
+      drawPath.transform(pathMatrix);
+      canvas->drawPath(drawPath, paint);
+    } else {
+      auto maskImage = input.content;
+      float maskScaleX = 1.0f;
+      float maskScaleY = 1.0f;
+      auto maskMaxDimension = std::max(maskImage->width(), maskImage->height());
+      if (maskMaxDimension > maxTextureSize) {
+        float maskScale = static_cast<float>(maxTextureSize) / static_cast<float>(maskMaxDimension);
+        int maskWidth = std::max(
+            1, static_cast<int>(std::round(static_cast<float>(maskImage->width()) * maskScale)));
+        int maskHeight = std::max(
+            1, static_cast<int>(std::round(static_cast<float>(maskImage->height()) * maskScale)));
+        maskImage = maskImage->makeScaled(maskWidth, maskHeight, SamplingOptions(FilterMode::Linear));
+        if (maskImage == nullptr) {
+          return;
+        }
+        maskScaleX = static_cast<float>(input.content->width()) / static_cast<float>(maskWidth);
+        maskScaleY = static_cast<float>(input.content->height()) / static_cast<float>(maskHeight);
       }
-      maskScaleX = static_cast<float>(input.content->width()) / static_cast<float>(maskWidth);
-      maskScaleY = static_cast<float>(input.content->height()) / static_cast<float>(maskHeight);
+      auto maskShader = Shader::MakeImageShader(maskImage, TileMode::Decal, TileMode::Decal,
+                                                SamplingOptions(FilterMode::Linear));
+      maskShader = maskShader->makeWithMatrix(Matrix::MakeScale(maskScaleX, maskScaleY));
+      paint.setMaskFilter(MaskFilter::MakeShader(maskShader, false));
+      auto contentRect = Rect::MakeWH(static_cast<float>(input.content->width()),
+                                      static_cast<float>(input.content->height()));
+      canvas->drawRect(contentRect, paint);
     }
-    auto maskShader = Shader::MakeImageShader(maskImage, TileMode::Decal, TileMode::Decal,
-                                              SamplingOptions(FilterMode::Linear));
-    maskShader = maskShader->makeWithMatrix(Matrix::MakeScale(maskScaleX, maskScaleY));
-    paint.setMaskFilter(MaskFilter::MakeShader(maskShader, false));
-    auto contentRect = Rect::MakeWH(static_cast<float>(input.content->width()),
-                                    static_cast<float>(input.content->height()));
-    canvas->drawRect(contentRect, paint);
   }
 }
 
