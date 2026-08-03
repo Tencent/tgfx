@@ -276,9 +276,23 @@ void D3D12CommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
       pendingFootprints.clear();
     } else {
       flushUploads(entry.commandList.Get(), session);
-      entry.commandList->Close();
-      session.auxAllocators.push_back(std::move(entry.allocator));
-      session.auxCommandLists.push_back(std::move(entry.commandList));
+      // Close() failure typically means the recorded commands are malformed or the device is
+      // removed. Submitting an unclosed list to ExecuteCommandLists is a hard driver error, so
+      // drop the aux list, log, and fall through to submitting only the main render list. The
+      // pending uploads are discarded because their staging bytes were charged against the
+      // upload ring under the assumption they would be consumed by this submission.
+      auto closeHr = entry.commandList->Close();
+      if (FAILED(closeHr)) {
+        LOGE(
+            "D3D12CommandQueue::submit: transient upload list Close failed (HRESULT=0x%08X), "
+            "dropping uploads.",
+            static_cast<unsigned>(closeHr));
+        pendingUploads.clear();
+        pendingFootprints.clear();
+      } else {
+        session.auxAllocators.push_back(std::move(entry.allocator));
+        session.auxCommandLists.push_back(std::move(entry.commandList));
+      }
     }
   }
 
@@ -323,15 +337,26 @@ void D3D12CommandQueue::waitUntilCompleted() {
     if (entry.valid()) {
       D3D12GPU::SubmitRequest request = {};
       flushUploads(entry.commandList.Get(), request.session);
-      entry.commandList->Close();
-
-      request.session.auxAllocators.push_back(std::move(entry.allocator));
-      request.session.auxCommandLists.push_back(std::move(entry.commandList));
-      request.uploads = std::move(pendingUploads);
-      request.frameTime = _frameTime;
-      pendingUploads.clear();
-      pendingFootprints.clear();
-      gpu->executeSubmission(std::move(request));
+      auto closeHr = entry.commandList->Close();
+      if (FAILED(closeHr)) {
+        // See the identical rationale in submit(): submitting an unclosed command list is a
+        // driver-level error, so drop the aux list and its pending uploads. Nothing to fall
+        // through to here — this branch only runs when there is no active session.
+        LOGE(
+            "D3D12CommandQueue::waitUntilCompleted: upload list Close failed (HRESULT=0x%08X), "
+            "dropping uploads.",
+            static_cast<unsigned>(closeHr));
+        pendingUploads.clear();
+        pendingFootprints.clear();
+      } else {
+        request.session.auxAllocators.push_back(std::move(entry.allocator));
+        request.session.auxCommandLists.push_back(std::move(entry.commandList));
+        request.uploads = std::move(pendingUploads);
+        request.frameTime = _frameTime;
+        pendingUploads.clear();
+        pendingFootprints.clear();
+        gpu->executeSubmission(std::move(request));
+      }
     } else {
       LOGE(
           "D3D12CommandQueue::waitUntilCompleted: failed to acquire upload list, dropping "
