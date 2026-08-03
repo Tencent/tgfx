@@ -601,8 +601,13 @@ void D3D12GPU::dumpDeviceRemovedExtendedData(const char* tag) {
     return;
   }
   // Some drivers populate DRED breadcrumb buffers asynchronously after the device transitions to
-  // a removed state. Sleep briefly so the breadcrumb / page-fault output is fully formed before
-  // we query it. Diagnostic-only path; cost is bounded to a couple of milliseconds at fault time.
+  // a removed state. Sleep briefly so the breadcrumb / page-fault output is fully formed before we
+  // query it. This 50ms is an empirical value recommended by D3D12 samples; GetAutoBreadcrumbsOutput
+  // has no readiness signal (an empty pHeadAutoBreadcrumbNode is a legal outcome when DRED was
+  // not enabled or when no command list executed before the fault), so polling would degenerate
+  // into "always time out". Diagnostic-only path invoked at most once per GPU (guarded by
+  // markContextLost's first-call check); the fixed 50ms cost occurs after the device is already
+  // removed, when no productive work is competing for this lock.
   Sleep(50);
   LOGE("[DRED %s] device removed, reason=0x%08X", tag, static_cast<unsigned>(reason));
 
