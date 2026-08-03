@@ -102,6 +102,12 @@ TGFX_TEST(StencilCoverPathTest, Caps_BackendReportsExpectedSupport) {
   // that cause segfaults, so VulkanCaps deliberately sets stencilAttachmentSupported = false
   // for it. The test must accept that.
   bool isSwiftShader = gpuInfo->vendor == "6880";  // 0x1AE0 = 6880 decimal
+  // WARP (D3D12 software rasterizer, vendorID 0x1414 -> "Microsoft") can report either of the
+  // packed depth-stencil formats as non-renderable on some Windows builds; D3D12Caps only
+  // enables stencilAttachmentSupported when at least one of them is usable so WARP may see
+  // false here even though the codebase supports it on real hardware. Accept either value on
+  // that adapter, matching the Vulkan/SwiftShader accommodation above.
+  bool isWarp = gpuInfo->vendor == "Microsoft";
   switch (backend) {
     case Backend::Metal:
       EXPECT_TRUE(features->stencilAttachmentSupported);
@@ -117,7 +123,14 @@ TGFX_TEST(StencilCoverPathTest, Caps_BackendReportsExpectedSupport) {
       }
       break;
     case Backend::D3D12:
-      EXPECT_TRUE(features->stencilAttachmentSupported);
+      if (isWarp) {
+        // Whichever value WARP reports is legitimate — the DSV format check inside
+        // D3D12Caps queries the driver at runtime. Just make sure the caps did not crash.
+        SUCCEED() << "WARP reported stencilAttachmentSupported="
+                  << features->stencilAttachmentSupported;
+      } else {
+        EXPECT_TRUE(features->stencilAttachmentSupported);
+      }
       break;
     default:
       ADD_FAILURE() << "Unhandled backend in Caps_BackendReportsExpectedSupport; declare "
