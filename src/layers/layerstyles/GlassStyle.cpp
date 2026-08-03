@@ -509,7 +509,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       // the visible region + halo is actually rasterized.
       static constexpr float MAX_UDF_SHADER_HALO = MaxTentRadius * 0.5f + 1.0f;
       static constexpr float MAX_UDF_BLUR_HALO = MaxTentRadius + 1.0f;
-      static constexpr float MAX_UDF_SIZE = 1024.0f;
+      static constexpr float MAX_UDF_SIZE = 2048.0f;
       float sourceWidth = contentWidth;
       float sourceHeight = contentHeight;
       float sourceMaxDim = std::max(sourceWidth, sourceHeight);
@@ -546,11 +546,10 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
                    static_cast<float>(MaxTentRadius))};
       // Edge light radius is defined in layer space so the width stays constant across zoom.
       static constexpr float EDGE_RADIUS_IN_LAYER_PIXELS = 1.0f;
-      float edgeContentRadius = EDGE_RADIUS_IN_LAYER_PIXELS * layerToSourceX;
       Point coarseRadius = {
-          std::min(edgeContentRadius * udfScale,
+          std::min(EDGE_RADIUS_IN_LAYER_PIXELS / udfPixelToLayerPixelX,
                    static_cast<float>(MaxTentRadius)),
-          std::min(edgeContentRadius * udfScale,
+          std::min(EDGE_RADIUS_IN_LAYER_PIXELS / udfPixelToLayerPixelY,
                    static_cast<float>(MaxTentRadius))};
       // The span must come from the clamped radius, otherwise the shader would divide by a
       // different distance than the one the blur actually produced.
