@@ -70,7 +70,7 @@ class TextureEffect : public FragmentProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  TextureEffect(std::shared_ptr<TextureProxy> proxy, const SamplingOptions& sampling,
+  TextureEffect(std::shared_ptr<TextureProxy> proxy, const SamplerState& samplerState,
                 SrcRectConstraint constraint, const Point& alphaStart, const Matrix& uvMatrix,
                 const std::optional<Rect>& subset);
 

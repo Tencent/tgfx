@@ -38,10 +38,10 @@ PlacementPtr<FragmentProcessor> TextureEffect::Make(BlockAllocator* allocator,
   return processor;
 }
 
-TextureEffect::TextureEffect(std::shared_ptr<TextureProxy> proxy, const SamplingOptions& sampling,
+TextureEffect::TextureEffect(std::shared_ptr<TextureProxy> proxy, const SamplerState& samplerState,
                              SrcRectConstraint constraint, const Point& alphaStart,
                              const Matrix& uvMatrix, const std::optional<Rect>& subset)
-    : FragmentProcessor(ClassID()), textureProxy(std::move(proxy)), samplerState(sampling),
+    : FragmentProcessor(ClassID()), textureProxy(std::move(proxy)), samplerState(samplerState),
       constraint(constraint), alphaStart(alphaStart),
       coordTransform(uvMatrix, textureProxy.get(), alphaStart), subset(subset) {
   addCoordTransform(&coordTransform);
@@ -54,6 +54,7 @@ bool TextureEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNode
   }
   AOTTextureParameters parameters = {};
   parameters.textureProxy = textureProxy;
+  parameters.samplingKind = AOTTextureSamplingKind::Plain;
   parameters.samplerState = samplerState;
   parameters.constraint = constraint;
   parameters.uvMatrix = coordTransform.matrix;
