@@ -783,11 +783,20 @@ void D3D12GPU::executeSubmission(SubmitRequest request) {
   }
 
   // Step 3: Optional cross-queue wait. D3D12Semaphore stores its target value as a host-readable
-  // member; the GPU side simply re-uses ID3D12CommandQueue::Wait().
+  // member; the GPU side simply re-uses ID3D12CommandQueue::Wait(). A Wait failure (typically
+  // DXGI_ERROR_DEVICE_REMOVED) means the queue can never resolve the wait, so tear the context
+  // down here rather than issuing subsequent work that will silently be dropped.
   if (request.waitSemaphore != nullptr) {
     auto fence = request.waitSemaphore->d3d12Fence();
     if (fence != nullptr) {
-      cmdQueue->Wait(fence, request.waitSemaphore->signalValue());
+      auto waitHr = cmdQueue->Wait(fence, request.waitSemaphore->signalValue());
+      if (FAILED(waitHr)) {
+        LOGE("D3D12GPU::executeSubmission: Wait on external semaphore failed (HRESULT=0x%08X).",
+             static_cast<unsigned>(waitHr));
+        markContextLost("executeSubmission Wait");
+        reclaimAbandonedSession(std::move(request.session));
+        return;
+      }
     }
   }
 
@@ -812,14 +821,23 @@ void D3D12GPU::executeSubmission(SubmitRequest request) {
 #endif
 
   // Step 5: Optional signal of an external semaphore. The semaphore exposes a fixed fence value
-  // assigned at creation time — we just signal that value on this queue. After signalling, bump
-  // the semaphore's internal value so a subsequent insertSemaphore() call would see a fresh
-  // generation if the same fence object is re-used.
+  // assigned at creation time — we just signal that value on this queue. commitSignalValue() must
+  // only run after the Signal command has been successfully enqueued on the GPU timeline;
+  // otherwise a Signal failure (e.g. device removed) would leave the semaphore's public
+  // signalValue advanced to a target the GPU never reaches, permanently deadlocking any caller
+  // that Waits on it. Matches VulkanGPU::submit() which also commits after submit success.
   if (request.signalSemaphore != nullptr) {
     auto fence = request.signalSemaphore->d3d12Fence();
     if (fence != nullptr) {
       auto target = request.signalSemaphore->nextSignalValue();
-      cmdQueue->Signal(fence, target);
+      auto signalHr = cmdQueue->Signal(fence, target);
+      if (FAILED(signalHr)) {
+        LOGE("D3D12GPU::executeSubmission: Signal on external semaphore failed (HRESULT=0x%08X).",
+             static_cast<unsigned>(signalHr));
+        markContextLost("executeSubmission signalSemaphore");
+        reclaimAbandonedSession(std::move(request.session));
+        return;
+      }
       request.signalSemaphore->commitSignalValue();
     }
     // Keep the semaphore alive until the GPU has consumed the Signal command. Without this
