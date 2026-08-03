@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/ImageFilter.h"
+#include "gpu/AOTMaterializationPolicy.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/RenderContext.h"
 #include "gpu/TPArgs.h"
@@ -54,7 +55,12 @@ std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Imag
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  FPArgs fpArgs(args.context, args.renderFlags,
+  // The filter's whole result lands in this one offscreen target, so a draw inside it must not
+  // materialize subtrees of its own: the extra RGBA8 round trip gains no precompiled match for the
+  // outer draw and its quantization accumulates across a filter chain, then gets amplified when the
+  // resulting image is scaled.
+  auto nestedRenderFlags = args.renderFlags | InternalRenderFlags::NestedRasterization;
+  FPArgs fpArgs(args.context, nestedRenderFlags,
                 Rect::MakeWH(renderTarget->width(), renderTarget->height()),
                 std::max(textureScaleX, textureScaleY));
   Matrix matrix = Matrix::MakeTrans(renderBounds.left, renderBounds.top);
