@@ -212,7 +212,11 @@ bool Baseline::Compare(const Pixmap& pixmap, const std::string& key) {
     SaveImage(pixmap, key + "_base");
   }
 #endif
-  return CompareVersionAndMd5(md5, key, [key, pixmap](bool result) {
+  // Pixmap has no copy-lock semantics; the compiler-synthesized copy would leave both instances
+  // thinking they own the underlying PixelRef lock and double-unlock on destruction (visible under
+  // MSVC debug STL as "unlock of unowned mutex"). CompareVersionAndMd5 invokes the callback
+  // synchronously before returning, so capturing pixmap by reference is safe.
+  return CompareVersionAndMd5(md5, key, [key, &pixmap](bool result) {
     if (result) {
       RemoveImage(key);
     } else {
