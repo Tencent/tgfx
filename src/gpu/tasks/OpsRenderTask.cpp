@@ -18,6 +18,7 @@
 
 #include "OpsRenderTask.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "gpu/resources/DepthStencilTextureView.h"
 #include "tgfx/gpu/RenderPass.h"
 
 namespace tgfx {
@@ -32,14 +33,13 @@ void OpsRenderTask::execute(CommandEncoder* encoder) {
       renderTarget->sampleCount() > 1 ? renderTarget->getSampleTexture() : nullptr;
   RenderPassDescriptor descriptor(renderTarget->getRenderTexture(), loadOp, StoreAction::Store,
                                   clearColor.value_or(PMColor::Transparent()), resolveTexture);
-  // Attach a depth/stencil texture only when at least one op opts in. The stencil is owned by
-  // the RenderTargetProxy itself (see RenderTargetProxy::getStencil), so all OpsRenderTasks
-  // targeting the same proxy share one stencil texture for the proxy's lifetime.
+  // Attach a depth/stencil texture only when at least one op opts in. The stencil is shared
+  // between all render targets with the same stencil spec (see RenderTargetProxy::getStencil).
   bool stencilAvailable = false;
   for (auto& op : drawOps) {
     if (op != nullptr && op->needsStencil()) {
-      auto stencilTexture = renderTargetProxy->getStencil(renderTarget->sampleCount());
-      if (stencilTexture == nullptr) {
+      auto stencil = renderTargetProxy->getStencil(renderTarget->sampleCount());
+      if (stencil == nullptr) {
         // Stencil allocation failed (usually OOM). Continue the pass without a stencil
         // attachment — the loop below skips ops whose needsStencil() is true so they do not
         // execute against a pass missing the matching attachment, while non-stencil ops
@@ -49,7 +49,7 @@ void OpsRenderTask::execute(CommandEncoder* encoder) {
             "skipping stencil-aware ops in this pass.");
         break;
       }
-      descriptor.depthStencilAttachment.texture = std::move(stencilTexture);
+      descriptor.depthStencilAttachment.texture = stencil->getTexture();
       descriptor.depthStencilAttachment.loadAction = LoadAction::Clear;
       descriptor.depthStencilAttachment.storeAction = StoreAction::DontCare;
       descriptor.depthStencilAttachment.depthClearValue = 1.0f;
