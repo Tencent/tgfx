@@ -361,14 +361,24 @@ TGFX_TEST(StencilCoverPathTest, DrawOp_MakeReturnsValidOp) {
   EXPECT_TRUE(op->needsStencil());
 }
 
+// Grants access to StencilCoverPathDrawOp::coverStencilRef so the fill-type test below can
+// verify CoverPassStencilReference without relying on -fno-access-control (which MSVC does not
+// support). Friended in StencilCoverPathDrawOp.h.
+class StencilCoverPathDrawOpTestAccess {
+ public:
+  static uint32_t CoverStencilRef(const StencilCoverPathDrawOp* op) {
+    return op->coverStencilRef;
+  }
+};
+
 // Verifies StencilCoverPathDrawOp::Make accepts every PathFillType value and the
 // per-fill-type cover-pass stencil reference is computed correctly. The reference value
 // drives the GPU stencil compare: non-inverse non-zero fills compare-not-equal against 0,
 // non-inverse even-odd fills compare-equal against 0xFF (interior leaves stencil at all
 // ones via Invert), and inverse fills always compare against 0 to shade the path's
-// exterior. Reads the private coverStencilRef via -fno-access-control. If a future change
-// to CoverPassStencilReference forgets a branch, this test catches it before the visual
-// dispatch tests do.
+// exterior. Reads the private coverStencilRef via StencilCoverPathDrawOpTestAccess so the
+// assertion also runs on MSVC. If a future change to CoverPassStencilReference forgets a
+// branch, this test catches it before the visual dispatch tests do.
 TGFX_TEST(StencilCoverPathTest, DrawOp_AllFillTypesProduceValidOpWithExpectedStencilRef) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -398,7 +408,8 @@ TGFX_TEST(StencilCoverPathTest, DrawOp_AllFillTypesProduceValidOpWithExpectedSte
     ASSERT_TRUE(op != nullptr) << c.name;
     EXPECT_TRUE(op->hasCoverage()) << c.name;
     EXPECT_TRUE(op->needsStencil()) << c.name;
-    TGFX_PRIVATE_ACCESS(EXPECT_EQ(op->coverStencilRef, c.expectedRef) << c.name;)
+    EXPECT_EQ(StencilCoverPathDrawOpTestAccess::CoverStencilRef(op.get()), c.expectedRef)
+        << c.name;
   }
 }
 
