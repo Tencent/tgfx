@@ -104,16 +104,6 @@ uint32_t D3D12RenderPipeline::getSamplerRootParameterIndex(unsigned binding) con
   return it != samplerRootParameterIndex.end() ? it->second : UINT32_MAX;
 }
 
-unsigned D3D12RenderPipeline::getTextureIndex(unsigned binding) const {
-  auto it = textureUnits.find(binding);
-  return it != textureUnits.end() ? it->second : binding;
-}
-
-uint32_t D3D12RenderPipeline::getUniformBlockVisibility(unsigned binding) const {
-  auto it = uniformBlockVisibility.find(binding);
-  return it != uniformBlockVisibility.end() ? it->second : ShaderVisibility::VertexFragment;
-}
-
 bool D3D12RenderPipeline::createRootSignature(D3D12GPU* gpu,
                                               const RenderPipelineDescriptor& descriptor) {
   // First, populate the per-binding index maps — those are needed for every pipeline regardless
@@ -150,8 +140,6 @@ bool D3D12RenderPipeline::createRootSignature(D3D12GPU* gpu,
   for (size_t i = 0; i < descriptor.layout.uniformBlocks.size(); i++) {
     const auto& entry = descriptor.layout.uniformBlocks[i];
     uniformRootParameterIndex[entry.binding] = paramCursor++;
-    uniformBlockVisibility[entry.binding] = entry.visibility;
-    uniformBindingSet.insert(entry.binding);
     // Encode the D3D12-mapped visibility plus per-stage register indices in the shape key.
     // Different stage-local register layouts must hit different cached root signatures;
     // otherwise a pipeline whose fragment UBO ends up at b1 (because it has a sibling at b0)
@@ -165,14 +153,11 @@ bool D3D12RenderPipeline::createRootSignature(D3D12GPU* gpu,
   }
 
   shapeKey.push_back(static_cast<uint8_t>(descriptor.layout.textureSamplers.size()));
-  unsigned textureUnit = 0;
   for (const auto& entry : descriptor.layout.textureSamplers) {
     uint32_t srvParamIndex = paramCursor++;
     uint32_t samplerParamIndex = paramCursor++;
     textureRootParameterIndex[entry.binding] = srvParamIndex;
     samplerRootParameterIndex[entry.binding] = samplerParamIndex;
-    textureUnits[entry.binding] = textureUnit++;
-    textureBindingSet.insert(entry.binding);
     // Encode each sampler binding's D3D12-mapped visibility into the shape key. Without this
     // two pipelines that differ only in vertex/fragment-only sampler visibility would collide
     // on the cached root signature once the SRV/Sampler root parameters below honour

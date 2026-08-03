@@ -19,7 +19,6 @@
 #pragma once
 
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 #include "D3D12Resource.h"
 #include "D3D12Util.h"
@@ -87,35 +86,11 @@ class D3D12RenderPipeline : public RenderPipeline, public D3D12Resource {
   uint32_t getSamplerRootParameterIndex(unsigned binding) const;
 
   /**
-   * Returns the dense 0-based texture unit index for a texture-sampler binding. Mirrors the
-   * VulkanRenderPipeline accessor used by RenderPass to map binding -> shader register.
-   */
-  unsigned getTextureIndex(unsigned binding) const;
-
-  /**
-   * Returns the visibility bitmask (ShaderVisibility::*) declared by the user for a uniform-block
-   * binding, or ShaderVisibility::VertexFragment if unspecified.
-   */
-  uint32_t getUniformBlockVisibility(unsigned binding) const;
-
-  /**
    * Returns the byte stride for the vertex buffer slot at the given index, as declared by the
    * pipeline's VertexBufferLayout. Returns 0 for slots that the pipeline does not consume.
    */
   uint32_t getVertexStride(unsigned slot) const {
     return slot < vertexStrides.size() ? vertexStrides[slot] : 0;
-  }
-
-  bool hasUniformBinding(unsigned binding) const {
-    return uniformBindingSet.count(binding) > 0;
-  }
-
-  bool hasTextureBinding(unsigned binding) const {
-    return textureBindingSet.count(binding) > 0;
-  }
-
-  const std::unordered_set<unsigned>& getTextureBindings() const {
-    return textureBindingSet;
   }
 
  protected:
@@ -134,10 +109,6 @@ class D3D12RenderPipeline : public RenderPipeline, public D3D12Resource {
   std::unordered_map<unsigned, uint32_t> uniformRootParameterIndex = {};
   std::unordered_map<unsigned, uint32_t> textureRootParameterIndex = {};
   std::unordered_map<unsigned, uint32_t> samplerRootParameterIndex = {};
-  std::unordered_map<unsigned, unsigned> textureUnits = {};
-  std::unordered_map<unsigned, uint32_t> uniformBlockVisibility = {};
-  std::unordered_set<unsigned> uniformBindingSet = {};
-  std::unordered_set<unsigned> textureBindingSet = {};
   std::vector<uint32_t> vertexStrides = {};
 
   friend class D3D12GPU;
