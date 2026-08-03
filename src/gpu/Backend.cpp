@@ -65,11 +65,11 @@ BackendTexture& BackendTexture::operator=(const BackendTexture& that) {
     case Backend::Vulkan:
       vulkanInfo = that.vulkanInfo;
       break;
-    case Backend::D3D12:
-      d3d12Info = that.d3d12Info;
-      break;
     case Backend::WebGPU:
       webgpuInfo = that.webgpuInfo;
+      break;
+    case Backend::D3D12:
+      d3d12Info = that.d3d12Info;
       break;
     default:
       break;
@@ -88,10 +88,10 @@ PixelFormat BackendTexture::format() const {
       return MetalPixelFormatToPixelFormat(metalInfo.format);
     case Backend::Vulkan:
       return VulkanFormatToPixelFormat(vulkanInfo.format);
-    case Backend::D3D12:
-      return DXGIFormatToPixelFormat(d3d12Info.format);
     case Backend::WebGPU:
       return WebGPUTextureFormatToPixelFormat(webgpuInfo.format);
+    case Backend::D3D12:
+      return DXGIFormatToPixelFormat(d3d12Info.format);
     default:
       break;
   }
@@ -156,11 +156,11 @@ BackendRenderTarget& BackendRenderTarget::operator=(const BackendRenderTarget& t
     case Backend::Vulkan:
       vulkanInfo = that.vulkanInfo;
       break;
-    case Backend::D3D12:
-      d3d12Info = that.d3d12Info;
-      break;
     case Backend::WebGPU:
       webgpuInfo = that.webgpuInfo;
+      break;
+    case Backend::D3D12:
+      d3d12Info = that.d3d12Info;
       break;
     default:
       break;
@@ -179,10 +179,10 @@ PixelFormat BackendRenderTarget::format() const {
       return MetalPixelFormatToPixelFormat(metalInfo.format);
     case Backend::Vulkan:
       return VulkanFormatToPixelFormat(vulkanInfo.format);
-    case Backend::D3D12:
-      return DXGIFormatToPixelFormat(d3d12Info.format);
     case Backend::WebGPU:
       return WebGPUTextureFormatToPixelFormat(webgpuInfo.format);
+    case Backend::D3D12:
+      return DXGIFormatToPixelFormat(d3d12Info.format);
     default:
       break;
   }
@@ -241,11 +241,11 @@ BackendSemaphore& BackendSemaphore::operator=(const BackendSemaphore& that) {
     case Backend::Vulkan:
       vulkanSyncInfo = that.vulkanSyncInfo;
       break;
-    case Backend::D3D12:
-      d3d12SyncInfo = that.d3d12SyncInfo;
-      break;
     case Backend::WebGPU:
       webgpuSyncInfo = that.webgpuSyncInfo;
+      break;
+    case Backend::D3D12:
+      d3d12SyncInfo = that.d3d12SyncInfo;
       break;
     default:
       break;
@@ -261,11 +261,11 @@ bool BackendSemaphore::isInitialized() const {
       return metalSyncInfo.event != nullptr;
     case Backend::Vulkan:
       return vulkanSyncInfo.semaphore != 0;
-    case Backend::D3D12:
-      return d3d12SyncInfo.fence != nullptr;
     case Backend::WebGPU:
       // WebGPU has no explicit semaphore handle; synchronization is managed by the browser.
       return true;
+    case Backend::D3D12:
+      return d3d12SyncInfo.fence != nullptr;
     default:
       break;
   }
