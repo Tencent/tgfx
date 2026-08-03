@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-// L2 cross-validation audit (design: docs/aot-l2-production-enablement-design.md, stage A).
+// L2 cross-validation audit.
 //
 // For every shape the L2 decomposition route can currently serve, render the SAME scene twice:
 //   reference = decomposition disabled (plain / JIT path),
@@ -47,6 +47,7 @@
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/MaskFilter.h"
 #include "tgfx/core/Paint.h"
+#include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/SamplingOptions.h"
 #include "tgfx/core/Shader.h"
@@ -69,6 +70,11 @@ static std::string AuditBundlePath() {
     backend = backend.substr(0, pos);
   }
   return "resources/shaders/shader_bundle." + backend + ".bin";
+}
+
+static bool IsOpenGLAuditBackend() {
+  std::string backend = TGFX_BACKEND_NAME;
+  return backend.rfind("opengl", 0) == 0;
 }
 
 // Renders one scene and reports its pixels + the AOT artifact hit count. The scene is built by the
@@ -257,10 +263,12 @@ TGFX_TEST(AOTL2AuditTest, TiledInBlendMatchesPlainPath) {
 // Renders the DropShadow-with-tiled-source scene (a gradient masked by a Decal image shader, with a
 // drop-shadow image filter). The Decal mask shader becomes a TiledTextureEffect that DropShadow
 // composes with the shadow via Xfermode-two, i.e. the two(TiledTextureEffect,TextureEffect) case.
-static void RenderDropShadowTiledScene(Context* context, PrecompiledShaderCache* cache,
-                                       const std::shared_ptr<Image>& image, int width, int height,
-                                       bool decompositionEnabled, Bitmap* outBitmap,
-                                       uint32_t* outNoMatch) {
+static void RenderShadowTiledScene(Context* context, PrecompiledShaderCache* cache,
+                                   const std::shared_ptr<Image>& image,
+                                   const std::shared_ptr<ImageFilter>& imageFilter, int width,
+                                   int height, bool decompositionEnabled, Bitmap* outBitmap,
+                                   uint32_t* outNoMatch, uint32_t* outVertexArtifactMissing,
+                                   uint32_t* outFragmentArtifactMissing) {
   cache->setDecompositionEnabled(decompositionEnabled);
   cache->resetStats();
   context->globalCache()->clearPrograms();
@@ -272,7 +280,7 @@ static void RenderDropShadowTiledScene(Context* context, PrecompiledShaderCache*
                                              {Color::Green(), Color::Blue()}, {}));
   auto maskShader = Shader::MakeImageShader(image, TileMode::Decal, TileMode::Decal);
   paint.setMaskFilter(MaskFilter::MakeShader(maskShader));
-  paint.setImageFilter(ImageFilter::DropShadow(-10, -10, 10, 10, Color::Black()));
+  paint.setImageFilter(imageFilter);
   canvas->drawRect(Rect::MakeWH(width, height), paint);
   context->flushAndSubmit(true);
   ASSERT_TRUE(outBitmap->allocPixels(width, height));
@@ -280,58 +288,201 @@ static void RenderDropShadowTiledScene(Context* context, PrecompiledShaderCache*
   ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
   outBitmap->unlockPixels();
   *outNoMatch = cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule);
+  *outVertexArtifactMissing =
+      cache->fallbackCount(PrecompiledFallbackReason::VertexArtifactMissing);
+  *outFragmentArtifactMissing =
+      cache->fallbackCount(PrecompiledFallbackReason::FragmentArtifactMissing);
 }
 
-// A-color quantification: the drop-shadow-over-tiled-source draw produces a
-// two(TiledTextureEffect,TextureEffect) blend that misses inline (NoMatchingRule). With the
-// decomposition gate on, DropShadow's EnsureSimpleBlendChild materializes the tiled source, the
-// blend collapses to two(TextureEffect,TextureEffect) and hits BlendMerge. Verifies the miss is
-// eliminated AND the result stays pixel-identical. Uses explicit gate off/on on one context and
-// restores the gate default at the end (the test context is shared process-wide).
-TGFX_TEST(AOTL2AuditTest, DropShadowTiledSrcMaterializes) {
+// DropShadow keeps its original nested Xfermode/TiledTexture processor tree. If no precompiled
+// shader covers the complete tree, loading a bundle must fall back to ProgramBuilder without first
+// materializing pointwise children into RGBA8 textures. The fallback must be byte-identical to the
+// no-bundle reference.
+TGFX_TEST(AOTL2AuditTest, DropShadowTiledSrcFallsBackByteExact) {
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
-  ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
-
   int width = 160;
   int height = 160;
-  Bitmap warmupBitmap = {};
-  uint32_t warmupNoMatch = 0;
-  RenderDropShadowTiledScene(context, cache, image, width, height, false, &warmupBitmap,
-                             &warmupNoMatch);
+  auto imageFilter = ImageFilter::DropShadow(-10, -10, 10, 10, Color::FromRGBA(0, 255, 0, 128));
+  ASSERT_TRUE(imageFilter != nullptr);
 
+  cache->unload();
   Bitmap referenceBitmap = {};
   uint32_t referenceNoMatch = 0;
-  RenderDropShadowTiledScene(context, cache, image, width, height, false, &referenceBitmap,
-                             &referenceNoMatch);
+  uint32_t referenceVertexArtifactMissing = 0;
+  uint32_t referenceFragmentArtifactMissing = 0;
+  RenderShadowTiledScene(context, cache, image, imageFilter, width, height, false, &referenceBitmap,
+                         &referenceNoMatch, &referenceVertexArtifactMissing,
+                         &referenceFragmentArtifactMissing);
+
+  ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
   Bitmap candidateBitmap = {};
   uint32_t candidateNoMatch = 0;
-  RenderDropShadowTiledScene(context, cache, image, width, height, true, &candidateBitmap,
-                             &candidateNoMatch);
+  uint32_t candidateVertexArtifactMissing = 0;
+  uint32_t candidateFragmentArtifactMissing = 0;
+  RenderShadowTiledScene(context, cache, image, imageFilter, width, height, true, &candidateBitmap,
+                         &candidateNoMatch, &candidateVertexArtifactMissing,
+                         &candidateFragmentArtifactMissing);
 
   Pixmap referencePixmap(referenceBitmap);
   Pixmap candidatePixmap(candidateBitmap);
   AOTToleranceSpec spec = {};
-  spec.maxChannelDiff = 1;
-  spec.maxDiffPixelRatio = 1.0;
-  spec.structuralChannelDiff = 2;
   auto result = AOTToleranceCompare::Compare(referencePixmap, candidatePixmap, spec);
   LOGI(
-      "[L2AUDIT] backend=%s shape=DropShadowTiled refNoMatch=%u candNoMatch=%u maxDelta=%d pass=%d",
-      TGFX_BACKEND_NAME, referenceNoMatch, candidateNoMatch, result.maxChannelDiff,
+      "[L2AUDIT] backend=%s shape=DropShadowTiledJITFallback refNoMatch=%u candNoMatch=%u "
+      "diffPixels=%llu maxDelta=%d pass=%d",
+      TGFX_BACKEND_NAME, referenceNoMatch, candidateNoMatch,
+      static_cast<unsigned long long>(result.diffPixelCount), result.maxChannelDiff,
       result.passed ? 1 : 0);
 
   cache->setDecompositionEnabled(true);  // restore production default (gate on)
   cache->unload();
+  context->globalCache()->clearPrograms();
 
-  EXPECT_LT(candidateNoMatch, referenceNoMatch)
-      << "decomposition did not reduce the tiled-in-blend NoMatchingRule fallback";
-  EXPECT_TRUE(result.passed) << "materialized drop-shadow diverges, maxDelta="
-                             << result.maxChannelDiff;
+  EXPECT_GT(candidateNoMatch, 0u) << "expected the complete DropShadow tree to fall back to JIT";
+  EXPECT_EQ(candidateVertexArtifactMissing, 0u);
+  EXPECT_EQ(candidateFragmentArtifactMissing, 0u);
+  EXPECT_FALSE(result.sizeMismatch);
+  EXPECT_EQ(result.diffPixelCount, 0u);
+  EXPECT_EQ(result.maxChannelDiff, 0);
+  EXPECT_TRUE(result.passed) << "DropShadow JIT fallback diverges from the no-bundle reference";
+}
+
+// InnerShadow preserves its nested SrcOut inside SrcATop/SrcIn tree. A bundle miss must execute the
+// untouched tree with ProgramBuilder rather than materializing either blend child into RGBA8.
+TGFX_TEST(AOTL2AuditTest, InnerShadowTiledSrcFallsBackByteExact) {
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  int width = 160;
+  int height = 160;
+  auto imageFilter = ImageFilter::InnerShadow(0, -10.5f, 2, 2, Color::FromRGBA(0, 255, 255, 128));
+  ASSERT_TRUE(imageFilter != nullptr);
+
+  cache->unload();
+  Bitmap referenceBitmap = {};
+  uint32_t referenceNoMatch = 0;
+  uint32_t referenceVertexArtifactMissing = 0;
+  uint32_t referenceFragmentArtifactMissing = 0;
+  RenderShadowTiledScene(context, cache, image, imageFilter, width, height, false, &referenceBitmap,
+                         &referenceNoMatch, &referenceVertexArtifactMissing,
+                         &referenceFragmentArtifactMissing);
+
+  ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
+  Bitmap candidateBitmap = {};
+  uint32_t candidateNoMatch = 0;
+  uint32_t candidateVertexArtifactMissing = 0;
+  uint32_t candidateFragmentArtifactMissing = 0;
+  RenderShadowTiledScene(context, cache, image, imageFilter, width, height, true, &candidateBitmap,
+                         &candidateNoMatch, &candidateVertexArtifactMissing,
+                         &candidateFragmentArtifactMissing);
+
+  Pixmap referencePixmap(referenceBitmap);
+  Pixmap candidatePixmap(candidateBitmap);
+  AOTToleranceSpec spec = {};
+  auto result = AOTToleranceCompare::Compare(referencePixmap, candidatePixmap, spec);
+  LOGI(
+      "[L2AUDIT] backend=%s shape=InnerShadowTiledJITFallback refNoMatch=%u candNoMatch=%u "
+      "diffPixels=%llu maxDelta=%d pass=%d",
+      TGFX_BACKEND_NAME, referenceNoMatch, candidateNoMatch,
+      static_cast<unsigned long long>(result.diffPixelCount), result.maxChannelDiff,
+      result.passed ? 1 : 0);
+
+  cache->setDecompositionEnabled(true);
+  cache->unload();
+  context->globalCache()->clearPrograms();
+
+  EXPECT_GT(candidateNoMatch, 0u) << "expected the complete InnerShadow tree to fall back to JIT";
+  EXPECT_EQ(candidateVertexArtifactMissing, 0u);
+  EXPECT_EQ(candidateFragmentArtifactMissing, 0u);
+  EXPECT_FALSE(result.sizeMismatch);
+  EXPECT_EQ(result.diffPixelCount, 0u);
+  EXPECT_EQ(result.maxChannelDiff, 0);
+  EXPECT_TRUE(result.passed) << "InnerShadow JIT fallback diverges from the no-bundle reference";
+}
+
+static void DrawDecalShaderMaskScene(Canvas* canvas, const std::shared_ptr<Image>& color,
+                                     const std::shared_ptr<Image>& mask, bool inverted) {
+  Paint paint = {};
+  paint.setShader(Shader::MakeImageShader(color, TileMode::Clamp, TileMode::Clamp));
+  auto maskShader = Shader::MakeImageShader(mask, TileMode::Decal, TileMode::Decal);
+  paint.setMaskFilter(MaskFilter::MakeShader(maskShader, inverted));
+  canvas->save();
+  canvas->translate(17.25f, 19.75f);
+  canvas->drawRect(Rect::MakeWH(140, 120), paint);
+  canvas->restore();
+}
+
+static void RenderDecalShaderMaskScene(Context* context, PrecompiledShaderCache* cache,
+                                       const std::shared_ptr<Image>& color,
+                                       const std::shared_ptr<Image>& mask, bool inverted,
+                                       bool usePicture, bool decompositionEnabled,
+                                       Bitmap* outBitmap, uint32_t* outNoMatch) {
+  cache->setDecompositionEnabled(decompositionEnabled);
+  cache->resetStats();
+  context->globalCache()->clearPrograms();
+  auto surface = Surface::Make(context, 180, 160);
+  ASSERT_TRUE(surface != nullptr);
+  if (usePicture) {
+    PictureRecorder recorder = {};
+    DrawDecalShaderMaskScene(recorder.beginRecording(), color, mask, inverted);
+    surface->getCanvas()->drawPicture(recorder.finishRecordingAsPicture());
+  } else {
+    DrawDecalShaderMaskScene(surface->getCanvas(), color, mask, inverted);
+  }
+  context->flushAndSubmit(true);
+  ASSERT_TRUE(outBitmap->allocPixels(surface->width(), surface->height()));
+  auto pixels = outBitmap->lockPixels();
+  ASSERT_TRUE(pixels != nullptr);
+  ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+  outBitmap->unlockPixels();
+  *outNoMatch = cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule);
+}
+
+TGFX_TEST(AOTL2AuditTest, ShaderMaskDecalFallsBackByteExact) {
+  auto color = MakeImage("resources/apitest/mandrill_128.png");
+  auto mask = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(color != nullptr && mask != nullptr);
+  ASSERT_FALSE(mask->isAlphaOnly());
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
+
+  for (bool usePicture : {false, true}) {
+    for (bool inverted : {false, true}) {
+      Bitmap reference = {};
+      Bitmap candidate = {};
+      uint32_t referenceNoMatch = 0;
+      uint32_t candidateNoMatch = 0;
+      RenderDecalShaderMaskScene(context, cache, color, mask, inverted, usePicture, false,
+                                 &reference, &referenceNoMatch);
+      RenderDecalShaderMaskScene(context, cache, color, mask, inverted, usePicture, true,
+                                 &candidate, &candidateNoMatch);
+      Pixmap referencePixmap(reference);
+      Pixmap candidatePixmap(candidate);
+      AOTToleranceSpec spec = {};
+      auto result = AOTToleranceCompare::Compare(referencePixmap, candidatePixmap, spec);
+      EXPECT_GT(referenceNoMatch, 0u);
+      EXPECT_GT(candidateNoMatch, 0u);
+      EXPECT_FALSE(result.sizeMismatch);
+      EXPECT_EQ(result.diffPixelCount, 0u);
+      EXPECT_EQ(result.maxChannelDiff, 0);
+      EXPECT_TRUE(result.passed);
+    }
+  }
+
+  cache->setDecompositionEnabled(true);
+  cache->unload();
+  context->globalCache()->clearPrograms();
 }
 
 // Renders an image (color = TextureEffect) masked by an image-shader mask filter. ShaderMaskFilter
@@ -375,6 +526,7 @@ TGFX_TEST(AOTL2AuditTest, CoverageTextureMaskMatchesJIT) {
   int height = 160;
 
   // Reference: cache not loaded -> ProgramBuilder (JIT) path.
+  cache->unload();
   cache->resetStats();
   Bitmap referenceBitmap = {};
   RenderCoverageMaskScene(context, color, mask, width, height, &referenceBitmap);
@@ -398,21 +550,19 @@ TGFX_TEST(AOTL2AuditTest, CoverageTextureMaskMatchesJIT) {
   LOGI("[L2COV] backend=%s shape=CoverageTextureMask noMatch=%u hits=%u maxDelta=%d pass=%d",
        TGFX_BACKEND_NAME, noMatch, hits, result.maxChannelDiff, result.passed ? 1 : 0);
 
-  // The matcher now recognizes the local-mask coverage on every backend (no NoMatchingRule), and the
-  // result must match the JIT path bit-for-bit.
-  EXPECT_EQ(noMatch, 0u)
-      << "coverage Xfermode-dst(TextureEffect) still misses the precompiled cache";
+  if (IsOpenGLAuditBackend()) {
+    // The first desktop OpenGL profile only admits unmasked Texture2D pointwise draws. Coverage
+    // texture masks stay on ProgramBuilder until their OpenGL permutation is pixel-validated.
+    EXPECT_GT(noMatch, 0u);
+    EXPECT_EQ(hits, 0u);
+  } else {
+    EXPECT_EQ(noMatch, 0u)
+        << "coverage Xfermode-dst(TextureEffect) still misses the precompiled cache";
+    EXPECT_GT(hits, 0u) << "expected a precompiled artifact hit for the local-mask coverage draw";
+  }
   EXPECT_FALSE(result.structuralDifference);
   EXPECT_TRUE(result.passed) << "AOT local-mask coverage diverges from JIT, maxDelta="
                              << result.maxChannelDiff;
-  // A real precompiled artifact hit only occurs on backends that load binary shader blobs (Metal
-  // metallib / Vulkan SPIR-V). The OpenGL test context here cannot compile the bundle's GLSL 450
-  // source, so every precompiled shader — not just this one — falls back to JIT; asserting a hit
-  // there would fail for reasons unrelated to the local-mask path.
-  std::string backend = TGFX_BACKEND_NAME;
-  if (backend.rfind("vulkan", 0) == 0 || backend == "metal") {
-    EXPECT_GT(hits, 0u) << "expected a precompiled artifact hit for the local-mask coverage draw";
-  }
 }
 
 // Walks a fragment-processor tree in the same pre-order the GP uses when it assigns coordTransform
@@ -551,6 +701,7 @@ TGFX_TEST(AOTL2AuditTest, GradientCoverageMatchesJIT) {
   int width = 160;
   int height = 160;
 
+  cache->unload();
   cache->resetStats();
   Bitmap referenceBitmap = {};
   RenderGradientCoverageScene(context, width, height, &referenceBitmap);
@@ -573,14 +724,16 @@ TGFX_TEST(AOTL2AuditTest, GradientCoverageMatchesJIT) {
   LOGI("[L2GRAD] backend=%s shape=GradientCoverage noMatch=%u hits=%u maxDelta=%d pass=%d",
        TGFX_BACKEND_NAME, noMatch, hits, result.maxChannelDiff, result.passed ? 1 : 0);
 
-  EXPECT_EQ(noMatch, 0u) << "anti-aliased multi-stop gradient still misses the precompiled cache";
+  if (IsOpenGLAuditBackend()) {
+    EXPECT_GT(noMatch, 0u);
+    EXPECT_EQ(hits, 0u);
+  } else {
+    EXPECT_EQ(noMatch, 0u) << "anti-aliased multi-stop gradient still misses the precompiled cache";
+    EXPECT_GT(hits, 0u) << "expected a precompiled artifact hit for the AA gradient draw";
+  }
   EXPECT_FALSE(result.structuralDifference);
   EXPECT_TRUE(result.passed) << "AOT gradient-with-coverage diverges from JIT, maxDelta="
                              << result.maxChannelDiff;
-  std::string backend = TGFX_BACKEND_NAME;
-  if (backend.rfind("vulkan", 0) == 0 || backend == "metal") {
-    EXPECT_GT(hits, 0u) << "expected a precompiled artifact hit for the AA gradient draw";
-  }
 }
 
 }  // namespace tgfx

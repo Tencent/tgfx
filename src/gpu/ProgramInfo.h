@@ -24,6 +24,7 @@
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/GeometryProcessor.h"
 #include "gpu/resources/RenderTarget.h"
+#include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/ColorWriteMask.h"
 #include "tgfx/gpu/RenderPass.h"
 #include "tgfx/gpu/RenderPipeline.h"
@@ -46,6 +47,16 @@ enum class AOTDecompositionRoute : uint32_t {
   None = 0,
   /// The draw is served by a bounded-AOT PointwiseChain kernel with an Opcode uniform layout.
   PointwiseChain = 1,
+};
+
+/**
+ * Controls whether a program lookup may fall back to runtime shader generation.
+ */
+enum class ProgramLookupMode {
+  /// Uses a precompiled artifact when available and otherwise falls back to ProgramBuilder.
+  AllowRuntimeFallback,
+  /// Returns only programs whose provenance is ProgramOrigin::PrecompiledArtifact.
+  PrecompiledOnly,
 };
 
 /**
@@ -98,7 +109,8 @@ class ProgramInfo {
 
   std::string getMangledSuffix(const Processor* processor) const;
 
-  std::shared_ptr<Program> getProgram() const;
+  std::shared_ptr<Program> getProgram(
+      ProgramLookupMode mode = ProgramLookupMode::AllowRuntimeFallback) const;
 
   std::shared_ptr<GPUBuffer> getUniformBuffer(const Program* program, size_t* vertexOffset,
                                               size_t* fragmentOffset) const;
@@ -180,6 +192,21 @@ class ProgramInfo {
     decompositionRoute = route;
   }
 
+  /**
+   * Returns the GPU backend used by this program's render target.
+   */
+  Backend backend() const;
+
+  /**
+   * Returns true when the OpenGL context uses the desktop GLSL 150 profile supported by AOT.
+   */
+  bool usesOpenGLDesktopAOTProfile() const;
+
+  /**
+   * Returns true when every texture sampled by this program uses the 2D texture type.
+   */
+  bool samplersAre2D() const;
+
  private:
   RenderTarget* renderTarget = nullptr;
   GeometryProcessor* geometryProcessor = nullptr;
@@ -195,6 +222,8 @@ class ProgramInfo {
   AOTDecompositionRoute decompositionRoute = AOTDecompositionRoute::None;
 
   void updateProcessorIndices();
+
+  BytesKey buildProgramKey(AOTDecompositionRoute route) const;
 
   std::vector<SamplerInfo> getSamplers() const;
 

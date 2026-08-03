@@ -21,7 +21,6 @@
 #include "gpu/BlendFormula.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/PrecompiledProgramCreator.h"
-#include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProgramBuilder.h"
 #include "gpu/resources/RenderTarget.h"
 #include "tgfx/gpu/GPU.h"
@@ -131,85 +130,86 @@ std::string ProgramInfo::getMangledSuffix(const Processor* processor) const {
   return "_P" + std::to_string(processorIndex);
 }
 
-std::shared_ptr<Program> ProgramInfo::getProgram() const {
+BytesKey ProgramInfo::buildProgramKey(AOTDecompositionRoute route) const {
+  BytesKey key = {};
   auto context = renderTarget->getContext();
-  // Builds the program cache key for a given route. The route is the last field written so that a
-  // decomposed program (which binds an Opcode uniform layout) never collides with a plain program
-  // sharing the same processors and pipeline state. Keep the non-route fields in sync with the
-  // fields actually written into RenderPipelineDescriptor.
-  auto buildKey = [this, context](AOTDecompositionRoute route) {
-    BytesKey key = {};
-    geometryProcessor->computeProcessorKey(context, &key);
-    for (const auto& processor : fragmentProcessors) {
-      processor->computeProcessorKey(context, &key);
-    }
-    if (xferProcessor != nullptr) {
-      xferProcessor->computeProcessorKey(context, &key);
-    }
-    key.write(static_cast<uint32_t>(blendMode));
-    key.write(static_cast<uint32_t>(getOutputSwizzle().asKey()));
-    key.write(static_cast<uint32_t>(cullMode));
-    key.write(static_cast<uint32_t>(renderTarget->format()));
-    key.write(static_cast<uint32_t>(renderTarget->sampleCount()));
-    key.write(colorWriteMask);
-    key.write(static_cast<uint32_t>(depthStencil.format));
-    key.write(static_cast<uint32_t>(depthStencil.depthCompare));
-    key.write(static_cast<uint32_t>(depthStencil.depthWriteEnabled ? 1 : 0));
-    key.write(depthStencil.stencilReadMask);
-    key.write(depthStencil.stencilWriteMask);
-    EncodeStencilFace(key, depthStencil.stencilFront);
-    EncodeStencilFace(key, depthStencil.stencilBack);
-    key.write(static_cast<uint32_t>(route));
-    return key;
-  };
+  geometryProcessor->computeProcessorKey(context, &key);
+  for (const auto& processor : fragmentProcessors) {
+    processor->computeProcessorKey(context, &key);
+  }
+  if (xferProcessor != nullptr) {
+    xferProcessor->computeProcessorKey(context, &key);
+  }
+  key.write(static_cast<uint32_t>(blendMode));
+  key.write(static_cast<uint32_t>(getOutputSwizzle().asKey()));
+  key.write(static_cast<uint32_t>(cullMode));
+  key.write(static_cast<uint32_t>(renderTarget->format()));
+  key.write(static_cast<uint32_t>(renderTarget->sampleCount()));
+  key.write(colorWriteMask);
+  key.write(static_cast<uint32_t>(depthStencil.format));
+  key.write(static_cast<uint32_t>(depthStencil.depthCompare));
+  key.write(static_cast<uint32_t>(depthStencil.depthWriteEnabled ? 1 : 0));
+  key.write(depthStencil.stencilReadMask);
+  key.write(depthStencil.stencilWriteMask);
+  EncodeStencilFace(key, depthStencil.stencilFront);
+  EncodeStencilFace(key, depthStencil.stencilBack);
+  key.write(static_cast<uint32_t>(route));
+  return key;
+}
 
-  // Safety fallback contract (review #2): program creation is atomic and never caches a program
-  // whose uniform layout disagrees with the route it is stored under. `route` is a local copy — the
-  // const ProgramInfo is never mutated. When this draw opted into a decomposed route we try the
-  // decomposed creator first; if it yields nullptr (unsupported chain, invalid layout, or pipeline
-  // failure) we drop to the plain route entirely: recompute the key with route None and use the
-  // plain matcher/builder, so the plain program is cached only under the plain key. Correctness of a
-  // successfully created decomposed program is proven by offline cross-validation, not a runtime
-  // pixel check.
+std::shared_ptr<Program> ProgramInfo::getProgram(ProgramLookupMode mode) const {
+  auto context = renderTarget->getContext();
+  auto globalCache = context->globalCache();
+
+  // Program creation is atomic and never caches a program whose uniform layout disagrees with the
+  // route it is stored under. `route` is a local copy, so the const ProgramInfo is never mutated.
+  // The default lookup may fall back from a decomposed route to the plain route under its own key.
+  // PrecompiledOnly is strict: a decomposed-route miss must fail instead of silently changing the
+  // requested route.
   auto route = decompositionRoute;
-  auto programKey = buildKey(route);
-  auto program = context->globalCache()->findProgram(programKey);
-  if (program == nullptr) {
-    if (route != AOTDecompositionRoute::None) {
-      program = PrecompiledProgramCreator::CreateDecomposedProgram(context, this);
-      if (program == nullptr) {
-        route = AOTDecompositionRoute::None;
-        programKey = buildKey(route);
-        program = context->globalCache()->findProgram(programKey);
-      }
-    }
+  auto programKey = buildProgramKey(route);
+  auto program = globalCache->findProgram(programKey);
+  bool cacheKeyOccupied = program != nullptr;
+  bool programCreated = false;
+  if (program != nullptr && mode == ProgramLookupMode::PrecompiledOnly &&
+      program->getProvenance().program != ProgramOrigin::PrecompiledArtifact) {
+    program = nullptr;
+  }
+  if (program == nullptr && route != AOTDecompositionRoute::None) {
+    program = PrecompiledProgramCreator::CreateDecomposedProgram(context, this);
+    programCreated = program != nullptr;
     if (program == nullptr) {
-      program = PrecompiledProgramCreator::CreateProgram(context, this);
-      if (program == nullptr) {
-        program = ProgramBuilder::CreateProgram(context, this);
-      }
-      if (program == nullptr) {
-        LOGE("ProgramInfo::getProgram() Failed to create the program!");
+      if (mode == ProgramLookupMode::PrecompiledOnly) {
+        LOGE("ProgramInfo::getProgram() Failed strict decomposed program lookup!");
         return nullptr;
       }
+      route = AOTDecompositionRoute::None;
+      programKey = buildProgramKey(route);
+      program = globalCache->findProgram(programKey);
+      cacheKeyOccupied = program != nullptr;
     }
-    context->globalCache()->addProgram(programKey, program);
   }
-  // Draw-level metric baseline point: each getProgram() call is one pass of one logical Draw. In
-  // the current single-pass world one Draw == one Kernel invocation. A Draw counts as a complete
-  // AOT Draw only when its program originated from a precompiled artifact rather than the
-  // ProgramBuilder fallback. The decomposition executor (stage 2+) will extend the delta with
-  // materialized edges and offscreen targets.
-  //
-  // Gated behind diagnostic recording so the production hot path stays free of the recordDraw lock:
-  // Draw metrics are only consumed during test/diagnostic runs (the reporter enables recording per
-  // test), so a disabled-by-default atomic check is all a normal draw pays here.
-  auto cache = context->precompiledShaderCache();
-  if (cache->diagnosticRecordingEnabled()) {
-    AOTDrawStats drawDelta = {};
-    drawDelta.kernelInvocations = 1;
-    bool completeAOTDraw = program->getProvenance().program == ProgramOrigin::PrecompiledArtifact;
-    cache->recordDraw(drawDelta, completeAOTDraw);
+  if (program == nullptr) {
+    program = PrecompiledProgramCreator::CreateProgram(context, this);
+    if (program == nullptr && mode == ProgramLookupMode::AllowRuntimeFallback) {
+      program = ProgramBuilder::CreateProgram(context, this);
+    }
+    programCreated = program != nullptr;
+    if (program == nullptr) {
+      LOGE("ProgramInfo::getProgram() Failed to create the program!");
+      return nullptr;
+    }
+  }
+  if (mode == ProgramLookupMode::PrecompiledOnly &&
+      program->getProvenance().program != ProgramOrigin::PrecompiledArtifact) {
+    LOGE("ProgramInfo::getProgram() Rejected a non-precompiled program!");
+    return nullptr;
+  }
+  // Lookup mode is intentionally not part of the key: a precompiled program is valid for both
+  // modes. If a runtime program already occupies the key, PrecompiledOnly may return a newly created
+  // artifact for this lookup but must not replace that cache entry and corrupt its LRU bookkeeping.
+  if (programCreated && !cacheKeyOccupied) {
+    globalCache->addProgram(programKey, program);
   }
   return program;
 }
@@ -378,6 +378,24 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
     auto sampler = gpu->createSampler(descriptor);
     renderPass->setTexture(textureBinding++, texture, sampler);
   }
+}
+
+Backend ProgramInfo::backend() const {
+  return renderTarget->getContext()->backend();
+}
+
+bool ProgramInfo::usesOpenGLDesktopAOTProfile() const {
+  auto shaderCaps = renderTarget->getContext()->shaderCaps();
+  return !shaderCaps->usesPrecisionModifiers && shaderCaps->versionDeclString == "#version 150";
+}
+
+bool ProgramInfo::samplersAre2D() const {
+  for (const auto& sampler : getSamplers()) {
+    if (sampler.texture == nullptr || sampler.texture->type() != TextureType::TwoD) {
+      return false;
+    }
+  }
+  return true;
 }
 
 std::vector<SamplerInfo> ProgramInfo::getSamplers() const {

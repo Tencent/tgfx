@@ -25,6 +25,10 @@ class GLSLLumaFragmentProcessor : public LumaFragmentProcessor {
   GLSLLumaFragmentProcessor(std::shared_ptr<ColorSpace> colorSpace = nullptr)
       : LumaFragmentProcessor(std::move(colorSpace)) {
   }
+
+  GLSLLumaFragmentProcessor(float kr, float kg, float kb) : LumaFragmentProcessor(kr, kg, kb) {
+  }
+
   void emitCode(EmitArgs& args) const override;
 
  protected:

@@ -33,14 +33,15 @@ enum class AOTDecompositionMode {
 };
 
 enum class AOTKernelKind {
-  TextureFill,
-  TextureColorMatrix,
-  TexturedColorMatrix,
-  TexturedLuma,
+  TextureFill = 0,
+  TextureColorMatrix = 1,
+  TexturedColorMatrix = 2,
+  TexturedLuma = 3,
   // A single fused pass that evaluates a pointwise DAG (texture/const-color leaves combined by
   // color-matrix, luma and blend ops) via a runtime opcode chain. Produced by the pointwise-DAG
   // planner; its kernel artifact is the upcoming PointwiseChainShader.
-  PointwiseChain,
+  PointwiseChain = 4,
+  PointwiseTail = 5,
 };
 
 struct AOTPassDescriptor {
@@ -69,7 +70,7 @@ enum class AOTDecomposeOutcome {
   /// and would be recovered by the fused-pointwise route once its kernel artifact lands.
   FusablePointwise,
   /// Some fragment processor in the tree has no AOT lowering yet. blockingProcessor names the first
-  /// such class encountered (depth-first) — the actionable "add lowerToAOT for X" signal.
+  /// one reported by the actual lowering call chain — the actionable "add lowerToAOT for X" signal.
   BlockedByLowering,
   /// The chain lowers but fusing it would change pixels (ValidateForFusion rejected it).
   BlockedByValidation,
@@ -97,7 +98,9 @@ struct AOTDecomposeAnalysis {
 
 class AOTEffectDecomposer {
  public:
-  static bool Lower(const std::vector<const FragmentProcessor*>& processors, AOTEffectGraph* graph);
+  /** Lowers a processor chain and optionally reports the first processor missing an implementation. */
+  static bool Lower(const std::vector<const FragmentProcessor*>& processors, AOTEffectGraph* graph,
+                    std::string* blockingProcessor = nullptr);
 
   static bool Decompose(const AOTEffectGraph& graph, AOTDecompositionMode mode,
                         AOTEffectPlan* plan);

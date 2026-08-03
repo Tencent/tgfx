@@ -49,11 +49,19 @@ class DrawingManager {
   }
 
   /**
-   * Fills the render target using the provided fragment processor, and automatically resolves the
-   * render target. Returns false if the render target or fragment processor is nullptr. The
-   * optional coordOffset shifts the UV coordinates fed to the fragment processor so that it
+   * Creates a full-rect draw operation using the provided fragment processor without enqueueing it.
+   * The optional coordOffset shifts the coordinates fed to the fragment processor so that it
    * receives positions in [offset.x .. offset.x+w, offset.y .. offset.y+h] instead of [0..w,
-   * 0..h].
+   * 0..h]. Returns nullptr if the render target or fragment processor is nullptr.
+   */
+  PlacementPtr<DrawOp> makeFillDrawOp(std::shared_ptr<RenderTargetProxy> renderTarget,
+                                      PlacementPtr<FragmentProcessor> processor,
+                                      uint32_t renderFlags,
+                                      const Point& coordOffset = Point::Zero());
+
+  /**
+   * Fills the render target using the provided fragment processor, and automatically resolves the
+   * render target. Returns false if the render target or fragment processor is nullptr.
    */
   bool fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
                     PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags,
@@ -78,6 +86,8 @@ class DrawingManager {
 
   void addTransferPixelsTask(std::shared_ptr<RenderTargetProxy> source, const Rect& srcRect,
                              std::shared_ptr<GPUBufferProxy> dest);
+
+  void addRenderTask(PlacementPtr<RenderTask> renderTask);
 
   void addResourceTask(PlacementPtr<ResourceTask> resourceTask);
 

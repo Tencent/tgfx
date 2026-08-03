@@ -98,7 +98,10 @@ void FragmentProcessor::computeProcessorKey(Context* context, BytesKey* bytesKey
   }
 }
 
-bool FragmentProcessor::lowerToAOT(AOTNodeBuilder*, AOTNodeID, AOTNodeID*) const {
+bool FragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID, AOTNodeID*) const {
+  if (builder != nullptr) {
+    builder->recordMissingLowering(this);
+  }
   return false;
 }
 

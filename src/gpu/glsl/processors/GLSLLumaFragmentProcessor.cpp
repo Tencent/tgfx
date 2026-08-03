@@ -24,6 +24,11 @@ PlacementPtr<FragmentProcessor> LumaFragmentProcessor::Make(
   return allocator->make<GLSLLumaFragmentProcessor>(std::move(colorSpace));
 }
 
+PlacementPtr<FragmentProcessor> LumaFragmentProcessor::Make(BlockAllocator* allocator, float kr,
+                                                            float kg, float kb) {
+  return allocator->make<GLSLLumaFragmentProcessor>(kr, kg, kb);
+}
+
 void GLSLLumaFragmentProcessor::emitCode(EmitArgs& args) const {
   auto uniformHandler = args.uniformHandler;
   auto kr = uniformHandler->addUniform("Kr", UniformFormat::Float, ShaderStage::Fragment);

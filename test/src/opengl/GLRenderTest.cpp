@@ -16,13 +16,27 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <array>
 #include <vector>
+#include "core/utils/BlockAllocator.h"
 #include "core/utils/PixelFormatUtil.h"
+#include "gpu/EmbeddedShaderBundles.h"
+#include "gpu/PermutationMatcher.h"
+#include "gpu/PrecompiledShaderCache.h"
+#include "gpu/ProxyProvider.h"
 #include "gpu/opengl/GLCaps.h"
 #include "gpu/opengl/GLFunctions.h"
 #include "gpu/opengl/GLGPU.h"
 #include "gpu/opengl/GLUtil.h"
+#include "gpu/processors/ColorMatrixFragmentProcessor.h"
+#include "gpu/processors/DefaultGeometryProcessor.h"
+#include "gpu/processors/DeviceSpaceTextureEffect.h"
+#include "gpu/processors/PorterDuffXferProcessor.h"
+#include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
+#include "gpu/processors/TextureEffect.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 #include "tgfx/core/Canvas.h"
+#include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Shader.h"
@@ -146,6 +160,132 @@ static GLTextureInfo CreateRectangleTexture(Context* context, int width, int hei
   gl->texImage2D(glInfo.target, 0, static_cast<int>(textureFormat.internalFormatTexImage), width,
                  height, 0, textureFormat.externalFormat, textureFormat.externalType, nullptr);
   return glInfo;
+}
+
+TGFX_TEST(GLRenderTest, AOTWhitelist) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  ASSERT_EQ(context->backend(), Backend::OpenGL);
+  auto renderTargetProxy = RenderTargetProxy::Make(context, 8, 8, false);
+  ASSERT_NE(renderTargetProxy, nullptr);
+  auto renderTarget = renderTargetProxy->getRenderTarget();
+  ASSERT_NE(renderTarget, nullptr);
+
+  {
+    BlockAllocator allocator;
+    auto gp = QuadPerEdgeAAGeometryProcessor::Make(&allocator, 8, 8, AAType::None, PMColor::White(),
+                                                   Matrix::I(), false);
+    auto textureProxy =
+        context->proxyProvider()->createTextureProxy({}, 2, 2, PixelFormat::RGBA_8888);
+    auto texture = TextureEffect::Make(&allocator, std::move(textureProxy));
+    std::array<float, 20> matrixValues = {1, 0, 0, 0, 0, 0, 1, 0, 0, 0,
+                                          0, 0, 1, 0, 0, 0, 0, 0, 1, 0};
+    auto matrix = ColorMatrixFragmentProcessor::Make(&allocator, matrixValues);
+    auto fp = FragmentProcessor::Compose(&allocator, std::move(texture), std::move(matrix));
+    ASSERT_NE(gp, nullptr);
+    ASSERT_NE(fp, nullptr);
+    ProgramInfo programInfo(renderTarget.get(), gp.get(), {fp.get()}, 1, nullptr,
+                            BlendMode::SrcOver);
+    EXPECT_TRUE(programInfo.usesOpenGLDesktopAOTProfile());
+    EXPECT_TRUE(MatchPermutation(&programInfo).has_value());
+  }
+
+  {
+    BlockAllocator allocator;
+    auto gp = QuadPerEdgeAAGeometryProcessor::Make(&allocator, 8, 8, AAType::None, PMColor::White(),
+                                                   Matrix::I(), false);
+    auto textureProxy =
+        context->proxyProvider()->createTextureProxy({}, 2, 2, PixelFormat::RGBA_8888);
+    auto fp = TextureEffect::Make(&allocator, std::move(textureProxy));
+    ASSERT_NE(gp, nullptr);
+    ASSERT_NE(fp, nullptr);
+    ProgramInfo programInfo(renderTarget.get(), gp.get(), {fp.get()}, 1, nullptr,
+                            BlendMode::SrcOver);
+    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
+  }
+
+  {
+    BlockAllocator allocator;
+    auto gp = DefaultGeometryProcessor::Make(&allocator, PMColor::White(), 8, 8, AAType::None,
+                                             Matrix::I(), Matrix::I());
+    auto glInfo = CreateRectangleTexture(context, 2, 2);
+    ASSERT_NE(glInfo.id, 0u);
+    auto textureProxy = context->proxyProvider()->wrapExternalTexture(BackendTexture(glInfo, 2, 2),
+                                                                      ImageOrigin::TopLeft, true);
+    auto fp = DeviceSpaceTextureEffect::Make(&allocator, std::move(textureProxy), Matrix::I());
+    ASSERT_NE(gp, nullptr);
+    ASSERT_NE(fp, nullptr);
+    ProgramInfo programInfo(renderTarget.get(), gp.get(), {fp.get()}, 1, nullptr,
+                            BlendMode::SrcOver);
+    EXPECT_FALSE(programInfo.samplersAre2D());
+    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
+  }
+
+  {
+    BlockAllocator allocator;
+    auto gp = QuadPerEdgeAAGeometryProcessor::Make(&allocator, 8, 8, AAType::None, PMColor::White(),
+                                                   Matrix::I(), false);
+    auto textureProxy =
+        context->proxyProvider()->createTextureProxy({}, 2, 2, PixelFormat::RGBA_8888);
+    auto texture = TextureEffect::Make(&allocator, std::move(textureProxy));
+    std::array<float, 20> matrixValues = {1, 0, 0, 0, 0, 0, 1, 0, 0, 0,
+                                          0, 0, 1, 0, 0, 0, 0, 0, 1, 0};
+    auto matrix = ColorMatrixFragmentProcessor::Make(&allocator, matrixValues);
+    auto fp = FragmentProcessor::Compose(&allocator, std::move(texture), std::move(matrix));
+    auto xp = PorterDuffXferProcessor::Make(&allocator, BlendMode::SrcOver, {});
+    ASSERT_NE(gp, nullptr);
+    ASSERT_NE(fp, nullptr);
+    ASSERT_NE(xp, nullptr);
+    ProgramInfo programInfo(renderTarget.get(), gp.get(), {fp.get()}, 1, xp.get(),
+                            BlendMode::SrcOver);
+    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
+  }
+}
+
+TGFX_TEST(GLRenderTest, InvalidShaderReturnsNull) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  ShaderModuleDescriptor descriptor = {};
+  descriptor.stage = ShaderStage::Vertex;
+  descriptor.code = "#version 150\ninvalid shader";
+  EXPECT_EQ(context->gpu()->createShaderModule(descriptor), nullptr);
+}
+
+TGFX_TEST(GLRenderTest, EmbeddedAOTCreatesPipeline) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto cache = context->precompiledShaderCache();
+  cache->unload();
+  auto sourceSurface = Surface::Make(context, 8, 8, false, 1, true);
+  ASSERT_NE(sourceSurface, nullptr);
+  sourceSurface->getCanvas()->clear(Color::Red());
+  auto sourceImage = sourceSurface->makeImageSnapshot();
+  ASSERT_NE(sourceImage, nullptr);
+  context->flushAndSubmit(true);
+
+  auto [bundleData, bundleSize] = EmbeddedShaderBundles::GetBundle(context->backend());
+  ASSERT_NE(bundleData, nullptr);
+  ASSERT_GT(bundleSize, 0u);
+  ASSERT_TRUE(cache->loadBundle(bundleData, bundleSize));
+  EXPECT_EQ(cache->profileTag(), "opengl");
+  cache->resetStats();
+
+  auto surface = Surface::Make(context, 8, 8);
+  ASSERT_NE(surface, nullptr);
+  std::array<float, 20> matrix = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
+  Paint paint;
+  paint.setColorFilter(ColorFilter::Matrix(matrix));
+  surface->getCanvas()->drawImage(sourceImage, 0, 0, &paint);
+  context->flushAndSubmit(true);
+
+  EXPECT_GT(cache->hitCount(), 0u);
+  EXPECT_EQ(cache->missCount(), 0u);
+  EXPECT_GT(cache->aotStageCount(PrecompiledAOTStage::VertexModuleCreated), 0u);
+  EXPECT_GT(cache->aotStageCount(PrecompiledAOTStage::FragmentModuleCreated), 0u);
+  EXPECT_GT(cache->aotStageCount(PrecompiledAOTStage::PipelineCreated), 0u);
 }
 
 TGFX_TEST(GLRenderTest, TileModeFallback) {

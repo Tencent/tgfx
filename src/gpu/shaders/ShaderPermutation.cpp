@@ -114,8 +114,10 @@ uint32_t PermutationDomain::encode(const std::vector<int>& values) const {
   uint32_t index = 0;
   uint32_t stride = 1;
   for (size_t i = 0; i < dimensions.size(); i++) {
+    auto radix = static_cast<uint32_t>(GetValueCount(dimensions[i]));
+    assert(values[i] >= 0 && static_cast<uint32_t>(values[i]) < radix);
     index += static_cast<uint32_t>(values[i]) * stride;
-    stride *= static_cast<uint32_t>(GetValueCount(dimensions[i]));
+    stride *= radix;
   }
   return index;
 }

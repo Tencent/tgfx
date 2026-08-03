@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/shaders/PrecompiledShader.h"
+#include <map>
 
 namespace tgfx {
 
@@ -25,12 +26,45 @@ static std::vector<ShaderRegistry::Factory>& GetFactories() {
   return factories;
 }
 
+static std::map<std::string, PrecompiledShaderInfo>& GetShaderInfos() {
+  static std::map<std::string, PrecompiledShaderInfo> shaderInfos;
+  return shaderInfos;
+}
+
+bool IsBuildablePermutation(const PrecompiledShaderInfo& info, uint32_t vertIndex,
+                            uint32_t fragIndex) {
+  if (vertIndex >= info.vertDomain.totalCount() || fragIndex >= info.fragDomain.totalCount()) {
+    return false;
+  }
+  auto vertValues = info.vertDomain.decode(vertIndex);
+  auto fragValues = info.fragDomain.decode(fragIndex);
+  if (!MirroredDimsAgree(info.vertDomain, info.fragDomain, vertValues, fragValues)) {
+    return false;
+  }
+  return !info.shouldCompile || info.shouldCompile(vertIndex, fragIndex, vertValues, fragValues);
+}
+
 void ShaderRegistry::Register(Factory factory) {
-  GetFactories().push_back(factory);
+  auto shader = factory();
+  if (shader == nullptr) {
+    return;
+  }
+  auto info = shader->info();
+  auto name = info.name;
+  auto result = GetShaderInfos().emplace(std::move(name), std::move(info));
+  if (result.second) {
+    GetFactories().push_back(factory);
+  }
 }
 
 const std::vector<ShaderRegistry::Factory>& ShaderRegistry::All() {
   return GetFactories();
+}
+
+const PrecompiledShaderInfo* ShaderRegistry::Find(const std::string& name) {
+  auto& shaderInfos = GetShaderInfos();
+  auto result = shaderInfos.find(name);
+  return result == shaderInfos.end() ? nullptr : &result->second;
 }
 
 }  // namespace tgfx

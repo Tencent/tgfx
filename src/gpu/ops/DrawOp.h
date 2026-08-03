@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include "gpu/AAType.h"
 #include "gpu/ProgramInfo.h"
 #include "tgfx/gpu/RenderPass.h"
@@ -25,6 +26,8 @@
 namespace tgfx {
 class DrawOp {
  public:
+  using ColorProcessorList = std::vector<PlacementPtr<FragmentProcessor>>;
+
   enum class Type {
     RectDrawOp,
     RRectDrawOp,
@@ -79,6 +82,21 @@ class DrawOp {
     return !coverages.empty();
   }
 
+  /**
+   * Prepares the geometry processor and program for a draw. When colorOverride is present, its
+   * processors replace the DrawOp's color processors without modifying them.
+   */
+  bool prepare(RenderTarget* renderTarget,
+               ProgramLookupMode mode = ProgramLookupMode::AllowRuntimeFallback,
+               std::optional<ColorProcessorList> colorOverride = std::nullopt);
+
+  /**
+   * Executes a successfully prepared draw and uploads its uniforms and texture samplers. Set
+   * recordDrawStats to false when a caller aggregates multiple prepared passes into one logical
+   * Draw-level record.
+   */
+  void executePrepared(RenderPass* renderPass, bool recordDrawStats = true);
+
   void execute(RenderPass* renderPass, RenderTarget* renderTarget);
 
   virtual Type type() const = 0;
@@ -99,5 +117,13 @@ class DrawOp {
   virtual PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) = 0;
 
   virtual void onDraw(RenderPass* renderPass) = 0;
+
+ private:
+  PlacementPtr<GeometryProcessor> geometryProcessor = nullptr;
+  bool geometryProcessorInitialized = false;
+  std::optional<ColorProcessorList> preparedColors = std::nullopt;
+  std::unique_ptr<ProgramInfo> preparedProgramInfo = nullptr;
+  std::shared_ptr<Program> preparedProgram = nullptr;
+  RenderTarget* preparedRenderTarget = nullptr;
 };
 }  // namespace tgfx

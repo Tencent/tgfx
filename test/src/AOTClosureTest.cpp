@@ -39,25 +39,16 @@ static std::string ClosureBundlePath() {
   return "resources/shaders/shader_bundle." + backend + ".bin";
 }
 
-// Stage 1 closure scope: the four straight-line (直筒) Kernel families. Every structural Key these
-// shaders can emit must exist in the bundle, otherwise the runtime matcher could produce a Key with
-// no artifact and silently fall back. Verifying missing == 0 is the standing definition of "the AOT
-// path is verifiably complete" for this Kernel set.
-static const std::vector<std::string>& Stage1Kernels() {
-  static const std::vector<std::string> kernels = {"TextureFillShader", "QuadColorFillShader",
-                                                   "TexturedEffectShader", "SolidColorFillShader"};
-  return kernels;
-}
-
-TGFX_TEST(AOTClosureTest, Stage1StraightLineKernelsAreClosed) {
+TGFX_TEST(AOTClosureTest, AllRegisteredShadersAreClosed) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ClosureBundlePath())));
 
-  auto result = AOTClosureVerifier::Verify(cache, Stage1Kernels());
+  auto result = AOTClosureVerifier::Verify(cache, {});
   EXPECT_GT(result.expectedCount, 0u);
+  EXPECT_EQ(result.expectedCount, cache->entryCount());
   for (const auto& entry : result.missing) {
     ADD_FAILURE() << "closure hole: " << entry.shaderName << (entry.isVertex ? " vert#" : " frag#")
                   << entry.permutationIndex;

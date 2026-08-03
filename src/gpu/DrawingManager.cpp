@@ -43,14 +43,14 @@ DrawingBuffer* DrawingManager::createDrawingBuffer() {
   return currentBuffer.get();
 }
 
-bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
-                                  PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags,
-                                  const Point& coordOffset) {
+PlacementPtr<DrawOp> DrawingManager::makeFillDrawOp(std::shared_ptr<RenderTargetProxy> renderTarget,
+                                                    PlacementPtr<FragmentProcessor> processor,
+                                                    uint32_t renderFlags,
+                                                    const Point& coordOffset) {
   if (renderTarget == nullptr || processor == nullptr) {
-    return false;
+    return nullptr;
   }
-  auto drawingBuffer = getDrawingBuffer();
-  auto allocator = &drawingBuffer->drawingAllocator;
+  auto allocator = drawingAllocator();
   auto width = static_cast<float>(renderTarget->width());
   auto height = static_cast<float>(renderTarget->height());
   PlacementPtr<RectsVertexProvider> provider = nullptr;
@@ -66,14 +66,32 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
     provider = RectsVertexProvider::MakeFrom(allocator, std::move(rects), {}, {}, AAType::None,
                                              false, UVSubsetMode::None, {});
   }
-  auto drawOp = RectDrawOp::Make(renderTarget->getContext(), std::move(provider), renderFlags);
+  if (provider == nullptr) {
+    return nullptr;
+  }
+  PlacementPtr<DrawOp> drawOp =
+      RectDrawOp::Make(renderTarget->getContext(), std::move(provider), renderFlags);
+  if (drawOp == nullptr) {
+    return nullptr;
+  }
   drawOp->addColorFP(std::move(processor));
   drawOp->setBlendMode(BlendMode::Src);
+  return drawOp;
+}
+
+bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
+                                  PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags,
+                                  const Point& coordOffset) {
+  auto drawOp = makeFillDrawOp(renderTarget, std::move(processor), renderFlags, coordOffset);
+  if (drawOp == nullptr) {
+    return false;
+  }
+  auto allocator = drawingAllocator();
   auto drawOps = allocator->makeArray<DrawOp>(&drawOp, 1);
   auto textureProxy = renderTarget->asTextureProxy();
   auto task = allocator->make<OpsRenderTask>(allocator, std::move(renderTarget), std::move(drawOps),
                                              std::nullopt);
-  drawingBuffer->renderTasks.emplace_back(std::move(task));
+  addRenderTask(std::move(task));
   addGenerateMipmapsTask(std::move(textureProxy));
   return true;
 }
@@ -153,6 +171,14 @@ void DrawingManager::addTransferPixelsTask(std::shared_ptr<RenderTargetProxy> so
   auto task =
       allocator->make<TransferPixelsTask>(allocator, std::move(source), srcRect, std::move(dest));
   drawingBuffer->renderTasks.emplace_back(std::move(task));
+}
+
+void DrawingManager::addRenderTask(PlacementPtr<RenderTask> renderTask) {
+  if (renderTask == nullptr) {
+    return;
+  }
+  auto drawingBuffer = getDrawingBuffer();
+  drawingBuffer->renderTasks.emplace_back(std::move(renderTask));
 }
 
 void DrawingManager::addResourceTask(PlacementPtr<ResourceTask> resourceTask) {

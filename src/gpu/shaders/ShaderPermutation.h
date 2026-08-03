@@ -105,7 +105,7 @@ class PermutationDomain {
 
   /**
    * Encodes per-dimension values into a flat variant index. The size of values must equal
-   * dimensionCount().
+   * dimensionCount(), and each value must be within its dimension's declared range.
    */
   uint32_t encode(const std::vector<int>& values) const;
 

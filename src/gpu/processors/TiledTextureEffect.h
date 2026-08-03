@@ -18,7 +18,9 @@
 
 #pragma once
 
+#include <optional>
 #include "gpu/SamplerState.h"
+#include "gpu/TiledTextureSampling.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/proxies/TextureProxy.h"
 
@@ -35,7 +37,13 @@ class TiledTextureEffect : public FragmentProcessor {
     return "TiledTextureEffect";
   }
 
-  /// Returns the ShaderMode for X/Y axes computed from the current sampling state.
+  using ShaderMode = TiledTextureShaderMode;
+  using ResolvedSampling = TiledTextureSampling;
+
+  /// Returns the immutable sampling snapshot shared by runtime shader setup and AOT lowering.
+  const ResolvedSampling* resolveSampling() const;
+
+  /// Returns the ShaderMode for X/Y axes computed from the resolved sampling state.
   void getShaderModes(int* outModeX, int* outModeY) const;
 
   bool isAlphaOnly() const;
@@ -48,25 +56,15 @@ class TiledTextureEffect : public FragmentProcessor {
     return coordTransform.matrix.hasPerspective();
   }
 
+  bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
-
-  enum class ShaderMode {
-    None,                 // Using HW mode
-    Clamp,                // Shader based clamp, no filter specialization
-    RepeatNearestNone,    // Simple repeat for nearest sampling, no mipmapping.
-    RepeatLinearNone,     // Filter the subset boundary for kRepeat mode, no mip mapping
-    RepeatLinearMipmap,   // Logic for linear filtering and LOD selection with kRepeat mode.
-    RepeatNearestMipmap,  // Logic for nearest filtering and LOD selection with kRepeat mode.
-    MirrorRepeat,         // Mirror repeat (doesn't depend on filter))
-    ClampToBorderNearest,
-    ClampToBorderLinear
-  };
 
   struct Sampling {
     Sampling(const TextureView* textureView, SamplerState sampler, const Rect& subset);
 
-    SamplerState hwSampler;
+    SamplerState hardwareSampler;
     ShaderMode shaderModeX = ShaderMode::None;
     ShaderMode shaderModeY = ShaderMode::None;
     Rect shaderSubset = {};
@@ -89,10 +87,13 @@ class TiledTextureEffect : public FragmentProcessor {
 
   static ShaderMode GetShaderMode(TileMode tileMode, FilterMode filter, MipmapMode mipmapMode);
 
+  static bool ShaderModeRequiresUnormCoord(ShaderMode mode);
+
   std::shared_ptr<TextureProxy> textureProxy;
   SamplerState samplerState;
   CoordTransform coordTransform;
   Rect subset = Rect::MakeEmpty();
   SrcRectConstraint constraint = SrcRectConstraint::Fast;
+  mutable std::optional<ResolvedSampling> resolvedSampling = std::nullopt;
 };
 }  // namespace tgfx

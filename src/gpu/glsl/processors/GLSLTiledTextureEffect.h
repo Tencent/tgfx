@@ -39,8 +39,6 @@ class GLSLTiledTextureEffect : public TiledTextureEffect {
 
   void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 
-  static bool ShaderModeRequiresUnormCoord(TiledTextureEffect::ShaderMode m);
-
   static bool ShaderModeUsesSubset(TiledTextureEffect::ShaderMode m);
 
   static bool ShaderModeUsesClamp(TiledTextureEffect::ShaderMode m);
@@ -59,7 +57,7 @@ class GLSLTiledTextureEffect : public TiledTextureEffect {
 
   void clampCoord(EmitArgs& args, const bool useClamp[2], const std::string& clampName) const;
 
-  UniformNames initUniform(EmitArgs& args, const TextureView* textureView, const Sampling& sampling,
+  UniformNames initUniform(EmitArgs& args, const ResolvedSampling& sampling,
                            const bool useClamp[2]) const;
 };
 }  // namespace tgfx

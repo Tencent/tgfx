@@ -45,6 +45,13 @@ struct PrecompiledShaderInfo {
 };
 
 /**
+ * Returns true when the vertex/fragment indices belong to the shader's declared domains, agree on
+ * every mirrored dimension, and pass its optional shouldCompile filter.
+ */
+bool IsBuildablePermutation(const PrecompiledShaderInfo& info, uint32_t vertIndex,
+                            uint32_t fragIndex);
+
+/**
  * Base class for all precompiled shader declarations. Each concrete shader must override info()
  * to provide its metadata.
  */
@@ -66,6 +73,9 @@ class ShaderRegistry {
   static void Register(Factory factory);
 
   static const std::vector<Factory>& All();
+
+  /** Returns the registered metadata for a shader name, or nullptr when no shader is registered. */
+  static const PrecompiledShaderInfo* Find(const std::string& name);
 };
 
 // Internal helper macros for unique name generation.

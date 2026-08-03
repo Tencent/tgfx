@@ -26,7 +26,10 @@
 #include "core/utils/MathExtra.h"
 #include "core/utils/RectToRectMatrix.h"
 #include "core/utils/StrokeUtils.h"
+#include "gpu/AOTEffectDecomposer.h"
+#include "gpu/AOTPlanExecutor.h"
 #include "gpu/DrawingManager.h"
+#include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ops/AtlasTextOp.h"
 #include "gpu/ops/HairlineLineOp.h"
@@ -718,6 +721,12 @@ std::pair<bool, bool> OpsCompositor::needComputeBounds(const Brush& brush, bool 
                                                        bool hasImageFill) {
   bool needLocalBounds = hasImageFill || brush.shader != nullptr || brush.maskFilter != nullptr;
   bool needDeviceBounds = false;
+  auto cache = context->precompiledShaderCache();
+  bool hasDecomposableColorSource = hasImageFill || brush.shader != nullptr;
+  if (cache != nullptr && cache->isLoaded() && cache->decompositionEnabled() &&
+      hasDecomposableColorSource && brush.colorFilter != nullptr) {
+    needDeviceBounds = true;
+  }
   if (BlendModeNeedDstTexture(brush.blendMode, hasCoverage)) {
     auto shaderCaps = context->shaderCaps();
     auto features = context->gpu()->features();
@@ -1008,6 +1017,31 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     auto xferProcessor = PorterDuffXferProcessor::Make(drawingAllocator(), brush.blendMode,
                                                        std::move(dstTextureInfo));
     op->setXferProcessor(std::move(xferProcessor));
+  }
+
+  auto cache = context->precompiledShaderCache();
+  if (cache != nullptr && cache->isLoaded() && cache->decompositionEnabled() &&
+      deviceBounds.has_value() && !deviceBounds->isEmpty()) {
+    std::vector<const FragmentProcessor*> colorProcessors;
+    colorProcessors.reserve(op->colorProcessors().size());
+    for (const auto& processor : op->colorProcessors()) {
+      colorProcessors.push_back(processor.get());
+    }
+    AOTEffectGraph graph = {};
+    AOTEffectPlan plan = {};
+    if (AOTEffectDecomposer::Lower(colorProcessors, &graph) &&
+        AOTEffectDecomposer::ValidateForFusion(graph) &&
+        AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan) &&
+        !plan.passes.empty() &&
+        (plan.passes.size() > 1 || plan.passes[0].kernel == AOTKernelKind::PointwiseTail)) {
+      auto task = AOTPlanExecutor::Make(context, renderFlags, graph, plan, *deviceBounds,
+                                        renderTarget, &op);
+      if (task != nullptr) {
+        submitDrawOps();
+        context->drawingManager()->addRenderTask(std::move(task));
+        return;
+      }
+    }
   }
   drawOps.emplace_back(std::move(op));
 }

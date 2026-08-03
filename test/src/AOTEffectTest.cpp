@@ -22,6 +22,8 @@
 #include "gpu/AOTEffect.h"
 #include "gpu/AOTEffectDecomposer.h"
 #include "gpu/AOTMaterializationPolicy.h"
+#include "gpu/AOTPlanExecutor.h"
+#include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
@@ -32,6 +34,7 @@
 #include "gpu/processors/XfermodeFragmentProcessor.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/BlendMode.h"
+#include "tgfx/core/BytesKey.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/PixelFormat.h"
@@ -43,6 +46,28 @@ static constexpr std::array<float, 20> IdentityColorMatrix = {
     1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0,
 };
 
+class ShapeRejectingFragmentProcessor : public FragmentProcessor {
+ public:
+  ShapeRejectingFragmentProcessor() : FragmentProcessor(0) {
+  }
+
+  std::string name() const override {
+    return "ShapeRejectingFragmentProcessor";
+  }
+
+  bool lowerToAOT(AOTNodeBuilder*, AOTNodeID, AOTNodeID*) const override {
+    return false;
+  }
+
+  void emitCode(EmitArgs&) const override {
+  }
+};
+
+static AOTAxisAnalysis AnalyzeColorProcessor(FragmentProcessor* processor) {
+  ProgramInfo programInfo(nullptr, nullptr, {processor}, 1, nullptr, BlendMode::SrcOver);
+  return AOTEffectDecomposer::Analyze(&programInfo).color;
+}
+
 static PlacementPtr<FragmentProcessor> MakeTextureProcessor(Context* context,
                                                             BlockAllocator* allocator,
                                                             PixelFormat format) {
@@ -53,6 +78,57 @@ static PlacementPtr<FragmentProcessor> MakeTextureProcessor(Context* context,
   return TextureEffect::Make(allocator, std::move(proxy));
 }
 
+static PlacementPtr<FragmentProcessor> MakeTiledTextureProcessor(
+    Context* context, BlockAllocator* allocator, TileMode tileModeX, TileMode tileModeY,
+    PixelFormat format, SrcRectConstraint constraint, const std::optional<Rect>& sampleArea,
+    const Matrix* uvMatrix = nullptr, ImageOrigin origin = ImageOrigin::TopLeft,
+    const SamplingOptions& sampling = SamplingOptions(), bool mipmapped = false) {
+  auto proxy = context->proxyProvider()->createTextureProxy({}, 8, 6, format, mipmapped, origin);
+  if (proxy == nullptr || proxy->getTextureView() == nullptr) {
+    return nullptr;
+  }
+  SamplingArgs args(tileModeX, tileModeY, sampling, constraint);
+  args.sampleArea = sampleArea;
+  auto processor = TiledTextureEffect::Make(allocator, std::move(proxy), args, uvMatrix);
+  if (processor == nullptr || processor->name() != "TiledTextureEffect") {
+    return nullptr;
+  }
+  return processor;
+}
+
+static void ExpectSamplerStateEquals(const SamplerState& actual, const SamplerState& expected) {
+  EXPECT_EQ(actual.tileModeX, expected.tileModeX);
+  EXPECT_EQ(actual.tileModeY, expected.tileModeY);
+  EXPECT_EQ(actual.minFilterMode, expected.minFilterMode);
+  EXPECT_EQ(actual.magFilterMode, expected.magFilterMode);
+  EXPECT_EQ(actual.mipmapMode, expected.mipmapMode);
+}
+
+static void ExpectResolvedSamplingMatchesLowering(
+    const TiledTextureEffect::ResolvedSampling& resolved, const AOTTextureParameters& parameters) {
+  ASSERT_EQ(parameters.samplingKind, AOTTextureSamplingKind::Tiled);
+  ASSERT_TRUE(parameters.tiledRecipe.has_value());
+  const auto& recipe = *parameters.tiledRecipe;
+  ExpectSamplerStateEquals(recipe.hardwareSampler, resolved.hardwareSampler);
+  ExpectSamplerStateEquals(parameters.samplerState, resolved.hardwareSampler);
+  EXPECT_EQ(recipe.shaderModeX, resolved.shaderModeX);
+  EXPECT_EQ(recipe.shaderModeY, resolved.shaderModeY);
+  EXPECT_EQ(recipe.shaderSubset, resolved.shaderSubset);
+  EXPECT_EQ(recipe.shaderClamp, resolved.shaderClamp);
+  EXPECT_EQ(recipe.shaderDimensions, resolved.shaderDimensions);
+  EXPECT_EQ(recipe.usesShaderDimensions, resolved.usesShaderDimensions);
+  EXPECT_EQ(recipe.strict, resolved.strict);
+  for (int index = 0; index < 9; ++index) {
+    EXPECT_FLOAT_EQ(recipe.coordMatrix[index], resolved.coordMatrix[index]);
+    EXPECT_FLOAT_EQ(parameters.uvMatrix[index], resolved.coordMatrix[index]);
+  }
+  EXPECT_EQ(recipe.hasPerspective, resolved.hasPerspective);
+  EXPECT_EQ(recipe.alphaOnly, resolved.alphaOnly);
+  EXPECT_EQ(recipe.textureOrigin, resolved.textureOrigin);
+  EXPECT_EQ(parameters.hasPerspective, resolved.hasPerspective);
+  EXPECT_EQ(parameters.isAlphaOnly, resolved.alphaOnly);
+}
+
 static bool BuildTripleGraph(Context* context, BlockAllocator* allocator, AOTEffectGraph* graph) {
   auto texture = MakeTextureProcessor(context, allocator, PixelFormat::RGBA_8888);
   auto colorMatrix = ColorMatrixFragmentProcessor::Make(allocator, IdentityColorMatrix);
@@ -61,6 +137,20 @@ static bool BuildTripleGraph(Context* context, BlockAllocator* allocator, AOTEff
     return false;
   }
   return AOTEffectDecomposer::Lower({texture.get(), colorMatrix.get(), luma.get()}, graph);
+}
+
+static PlacementPtr<FragmentProcessor> MakeTextureBlend(Context* context, BlockAllocator* allocator,
+                                                        int textureCount) {
+  auto result = MakeTextureProcessor(context, allocator, PixelFormat::RGBA_8888);
+  for (int index = 1; index < textureCount && result != nullptr; ++index) {
+    auto texture = MakeTextureProcessor(context, allocator, PixelFormat::RGBA_8888);
+    if (texture == nullptr) {
+      return nullptr;
+    }
+    result = XfermodeFragmentProcessor::MakeFromTwoProcessors(
+        allocator, std::move(result), std::move(texture), BlendMode::SrcOver);
+  }
+  return result;
 }
 
 TGFX_TEST(AOTEffectTest, BuilderRejectsInvalidInput) {
@@ -118,6 +208,11 @@ TGFX_TEST(AOTEffectTest, ProcessorChainLowersTypedParameters) {
   EXPECT_EQ(graph.nodeAt(AOTNodeID(2))->kind, AOTEffectKind::ColorMatrix);
   EXPECT_EQ(graph.nodeAt(AOTNodeID(3))->kind, AOTEffectKind::Luma);
 
+  auto textureParameters =
+      std::get_if<AOTTextureParameters>(&graph.nodeAt(AOTNodeID(1))->parameters);
+  ASSERT_NE(textureParameters, nullptr);
+  EXPECT_EQ(textureParameters->samplingKind, AOTTextureSamplingKind::Plain);
+  EXPECT_FALSE(textureParameters->tiledRecipe.has_value());
   auto matrixParameters =
       std::get_if<AOTColorMatrixParameters>(&graph.nodeAt(AOTNodeID(2))->parameters);
   auto lumaParameters = std::get_if<AOTLumaParameters>(&graph.nodeAt(AOTNodeID(3))->parameters);
@@ -129,6 +224,41 @@ TGFX_TEST(AOTEffectTest, ProcessorChainLowersTypedParameters) {
   EXPECT_FLOAT_EQ(lumaParameters->kb, 0.114f);
 }
 
+TGFX_TEST(AOTEffectTest, ChannelPermutationClassification) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  std::array<float, 20> swapRedBlue = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
+  auto permutation = ColorMatrixFragmentProcessor::Make(&allocator, swapRedBlue);
+  ASSERT_NE(permutation, nullptr);
+  EXPECT_TRUE(permutation->isChannelPermutation());
+
+  std::array<float, 20> scaleRed = IdentityColorMatrix;
+  scaleRed[0] = 0.5f;
+  auto scale = ColorMatrixFragmentProcessor::Make(&allocator, scaleRed);
+  ASSERT_NE(scale, nullptr);
+  EXPECT_FALSE(scale->isChannelPermutation());
+  BytesKey permutationKey = {};
+  BytesKey generalKey = {};
+  permutation->computeProcessorKey(context, &permutationKey);
+  scale->computeProcessorKey(context, &generalKey);
+  EXPECT_FALSE(permutationKey == generalKey);
+
+  std::array<float, 20> duplicateRed = IdentityColorMatrix;
+  duplicateRed[5] = 1.0f;
+  duplicateRed[6] = 0.0f;
+  auto duplicate = ColorMatrixFragmentProcessor::Make(&allocator, duplicateRed);
+  ASSERT_NE(duplicate, nullptr);
+  EXPECT_FALSE(duplicate->isChannelPermutation());
+
+  std::array<float, 20> biased = IdentityColorMatrix;
+  biased[4] = 0.1f;
+  auto bias = ColorMatrixFragmentProcessor::Make(&allocator, biased);
+  ASSERT_NE(bias, nullptr);
+  EXPECT_FALSE(bias->isChannelPermutation());
+}
+
 TGFX_TEST(AOTEffectTest, UnsupportedProcessorFailsAtomically) {
   BlockAllocator allocator;
   auto unsupported = AARectEffect::Make(&allocator, Rect::MakeWH(2, 2));
@@ -137,6 +267,213 @@ TGFX_TEST(AOTEffectTest, UnsupportedProcessorFailsAtomically) {
   EXPECT_FALSE(AOTEffectDecomposer::Lower({unsupported.get()}, &graph));
   EXPECT_EQ(graph.nodeCount(), 0u);
   EXPECT_FALSE(graph.root().isValid());
+}
+
+TGFX_TEST(AOTEffectTest, TiledHardwareSamplingSnapshotMatchesLowering) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  auto processor =
+      MakeTiledTextureProcessor(context, &allocator, TileMode::Repeat, TileMode::Clamp,
+                                PixelFormat::RGBA_8888, SrcRectConstraint::Fast, std::nullopt);
+  ASSERT_NE(processor, nullptr);
+  auto tiled = static_cast<TiledTextureEffect*>(processor.get());
+  auto resolved = tiled->resolveSampling();
+  ASSERT_NE(resolved, nullptr);
+  EXPECT_EQ(tiled->resolveSampling(), resolved);
+  BytesKey keyBeforeLowering = {};
+  processor->computeProcessorKey(context, &keyBeforeLowering);
+  EXPECT_EQ(resolved->shaderModeX, TiledTextureEffect::ShaderMode::None);
+  EXPECT_EQ(resolved->shaderModeY, TiledTextureEffect::ShaderMode::None);
+  EXPECT_EQ(resolved->hardwareSampler.tileModeX, TileMode::Repeat);
+  EXPECT_EQ(resolved->hardwareSampler.tileModeY, TileMode::Clamp);
+  EXPECT_FALSE(resolved->usesShaderDimensions);
+  ExpectSamplerStateEquals(processor->samplerStateAt(0), resolved->hardwareSampler);
+
+  AOTEffectGraph graph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower({processor.get()}, &graph));
+  auto parameters = std::get_if<AOTTextureParameters>(&graph.nodeAt(AOTNodeID(1))->parameters);
+  ASSERT_NE(parameters, nullptr);
+  ExpectResolvedSamplingMatchesLowering(*resolved, *parameters);
+  EXPECT_EQ(tiled->resolveSampling(), resolved);
+  BytesKey keyAfterLowering = {};
+  processor->computeProcessorKey(context, &keyAfterLowering);
+  EXPECT_TRUE(keyAfterLowering == keyBeforeLowering);
+  AOTEffectPlan plan;
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan));
+  ASSERT_EQ(plan.passes.size(), 1u);
+  EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
+  EXPECT_FALSE(AOTPlanExecutor::CanExecute(graph, plan));
+}
+
+TGFX_TEST(AOTEffectTest, TiledShaderModesAndStrictSubsetMatchLowering) {
+  struct ModeCase {
+    TileMode tileModeX;
+    TileMode tileModeY;
+    SamplingOptions sampling;
+    bool mipmapped;
+    TiledTextureEffect::ShaderMode shaderModeX;
+  };
+  const std::array<ModeCase, 8> cases = {
+      ModeCase{TileMode::Clamp, TileMode::Repeat,
+               SamplingOptions(FilterMode::Linear, MipmapMode::None), false,
+               TiledTextureEffect::ShaderMode::Clamp},
+      ModeCase{TileMode::Repeat, TileMode::Clamp,
+               SamplingOptions(FilterMode::Nearest, MipmapMode::None), false,
+               TiledTextureEffect::ShaderMode::RepeatNearestNone},
+      ModeCase{TileMode::Repeat, TileMode::Clamp,
+               SamplingOptions(FilterMode::Linear, MipmapMode::None), false,
+               TiledTextureEffect::ShaderMode::RepeatLinearNone},
+      ModeCase{TileMode::Repeat, TileMode::Clamp,
+               SamplingOptions(FilterMode::Linear, MipmapMode::Linear), true,
+               TiledTextureEffect::ShaderMode::RepeatLinearMipmap},
+      ModeCase{TileMode::Repeat, TileMode::Clamp,
+               SamplingOptions(FilterMode::Nearest, MipmapMode::Nearest), true,
+               TiledTextureEffect::ShaderMode::RepeatNearestMipmap},
+      ModeCase{TileMode::Mirror, TileMode::Clamp,
+               SamplingOptions(FilterMode::Linear, MipmapMode::None), false,
+               TiledTextureEffect::ShaderMode::MirrorRepeat},
+      ModeCase{TileMode::Decal, TileMode::Clamp,
+               SamplingOptions(FilterMode::Nearest, MipmapMode::None), false,
+               TiledTextureEffect::ShaderMode::ClampToBorderNearest},
+      ModeCase{TileMode::Decal, TileMode::Clamp,
+               SamplingOptions(FilterMode::Linear, MipmapMode::None), false,
+               TiledTextureEffect::ShaderMode::ClampToBorderLinear},
+  };
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  auto sampleArea = Rect::MakeXYWH(1, 1, 6, 4);
+  for (const auto& modeCase : cases) {
+    auto processor = MakeTiledTextureProcessor(
+        context, &allocator, modeCase.tileModeX, modeCase.tileModeY, PixelFormat::RGBA_8888,
+        SrcRectConstraint::Strict, sampleArea, nullptr, ImageOrigin::TopLeft, modeCase.sampling,
+        modeCase.mipmapped);
+    ASSERT_NE(processor, nullptr);
+    auto tiled = static_cast<TiledTextureEffect*>(processor.get());
+    auto resolved = tiled->resolveSampling();
+    ASSERT_NE(resolved, nullptr);
+    EXPECT_EQ(resolved->shaderModeX, modeCase.shaderModeX);
+    EXPECT_EQ(resolved->hardwareSampler.tileModeX, TileMode::Clamp);
+    EXPECT_EQ(resolved->hardwareSampler.minFilterMode, modeCase.sampling.minFilterMode);
+    EXPECT_EQ(resolved->hardwareSampler.magFilterMode, modeCase.sampling.magFilterMode);
+    EXPECT_EQ(resolved->hardwareSampler.mipmapMode, modeCase.sampling.mipmapMode);
+    EXPECT_TRUE(resolved->strict);
+
+    AOTEffectGraph graph;
+    ASSERT_TRUE(AOTEffectDecomposer::Lower({processor.get()}, &graph));
+    auto parameters = std::get_if<AOTTextureParameters>(&graph.nodeAt(AOTNodeID(1))->parameters);
+    ASSERT_NE(parameters, nullptr);
+    EXPECT_TRUE(parameters->hasSubset);
+    ExpectResolvedSamplingMatchesLowering(*resolved, *parameters);
+    AOTEffectPlan plan;
+    ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan));
+    ASSERT_EQ(plan.passes.size(), 1u);
+    EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
+    EXPECT_FALSE(AOTPlanExecutor::CanExecute(graph, plan));
+  }
+}
+
+TGFX_TEST(AOTEffectTest, TiledAlphaOnlySnapshotMatchesLowering) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  auto processor =
+      MakeTiledTextureProcessor(context, &allocator, TileMode::Repeat, TileMode::Clamp,
+                                PixelFormat::ALPHA_8, SrcRectConstraint::Fast, std::nullopt);
+  ASSERT_NE(processor, nullptr);
+  auto resolved = static_cast<TiledTextureEffect*>(processor.get())->resolveSampling();
+  ASSERT_NE(resolved, nullptr);
+  EXPECT_TRUE(resolved->alphaOnly);
+
+  AOTEffectGraph graph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower({processor.get()}, &graph));
+  auto parameters = std::get_if<AOTTextureParameters>(&graph.nodeAt(AOTNodeID(1))->parameters);
+  ASSERT_NE(parameters, nullptr);
+  ExpectResolvedSamplingMatchesLowering(*resolved, *parameters);
+}
+
+TGFX_TEST(AOTEffectTest, TiledPerspectiveSnapshotMatchesLowering) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  auto perspective = Matrix::MakeAll(1, 0, 0, 0, 1, 0, 0.01f, 0, 1);
+  auto processor = MakeTiledTextureProcessor(context, &allocator, TileMode::Repeat, TileMode::Clamp,
+                                             PixelFormat::RGBA_8888, SrcRectConstraint::Fast,
+                                             std::nullopt, &perspective);
+  ASSERT_NE(processor, nullptr);
+  auto resolved = static_cast<TiledTextureEffect*>(processor.get())->resolveSampling();
+  ASSERT_NE(resolved, nullptr);
+  EXPECT_TRUE(resolved->hasPerspective);
+
+  AOTEffectGraph graph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower({processor.get()}, &graph));
+  auto parameters = std::get_if<AOTTextureParameters>(&graph.nodeAt(AOTNodeID(1))->parameters);
+  ASSERT_NE(parameters, nullptr);
+  ExpectResolvedSamplingMatchesLowering(*resolved, *parameters);
+}
+
+TGFX_TEST(AOTEffectTest, TiledBottomLeftSnapshotResolvesUniformCoordinates) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  auto sampleArea = Rect::MakeXYWH(1, 1, 6, 3);
+  auto processor = MakeTiledTextureProcessor(context, &allocator, TileMode::Repeat, TileMode::Clamp,
+                                             PixelFormat::RGBA_8888, SrcRectConstraint::Strict,
+                                             sampleArea, nullptr, ImageOrigin::BottomLeft);
+  ASSERT_NE(processor, nullptr);
+  auto resolved = static_cast<TiledTextureEffect*>(processor.get())->resolveSampling();
+  ASSERT_NE(resolved, nullptr);
+  EXPECT_TRUE(resolved->usesShaderDimensions);
+  EXPECT_EQ(resolved->textureOrigin, ImageOrigin::BottomLeft);
+  EXPECT_FLOAT_EQ(resolved->shaderDimensions.x, 0.125f);
+  EXPECT_FLOAT_EQ(resolved->shaderDimensions.y, 1.0f / 6.0f);
+  EXPECT_EQ(resolved->shaderSubset, Rect::MakeLTRB(1, 2, 7, 5));
+  EXPECT_EQ(resolved->shaderClamp, Rect::MakeLTRB(1.5f, 2.5f, 6.5f, 4.5f));
+
+  AOTEffectGraph graph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower({processor.get()}, &graph));
+  auto parameters = std::get_if<AOTTextureParameters>(&graph.nodeAt(AOTNodeID(1))->parameters);
+  ASSERT_NE(parameters, nullptr);
+  ExpectResolvedSamplingMatchesLowering(*resolved, *parameters);
+}
+
+TGFX_TEST(AOTEffectTest, AnalysisAcceptsTiledTextureLowering) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  auto proxy = context->proxyProvider()->createTextureProxy({}, 2, 2, PixelFormat::RGBA_8888);
+  ASSERT_NE(proxy, nullptr);
+  ASSERT_NE(proxy->getTextureView(), nullptr);
+  SamplingArgs samplingArgs(TileMode::Repeat, TileMode::Clamp, SamplingOptions(),
+                            SrcRectConstraint::Fast);
+  auto tiled = TiledTextureEffect::Make(&allocator, std::move(proxy), samplingArgs);
+  ASSERT_NE(tiled, nullptr);
+  auto xfermode = XfermodeFragmentProcessor::MakeFromDstProcessor(&allocator, std::move(tiled),
+                                                                  BlendMode::Multiply);
+  auto constColor = ConstColorProcessor::Make(&allocator, PMColor::White(), InputMode::Ignore);
+  ASSERT_NE(xfermode, nullptr);
+  ASSERT_NE(constColor, nullptr);
+  auto composed =
+      FragmentProcessor::Compose(&allocator, std::move(constColor), std::move(xfermode));
+  ASSERT_NE(composed, nullptr);
+
+  auto analysis = AnalyzeColorProcessor(composed.get());
+  EXPECT_EQ(analysis.outcome, AOTDecomposeOutcome::FusablePointwise);
+  EXPECT_TRUE(analysis.blockingProcessor.empty());
+}
+
+TGFX_TEST(AOTEffectTest, LoweringShapeRejectionIsUnsupportedShape) {
+  ShapeRejectingFragmentProcessor processor;
+  auto analysis = AnalyzeColorProcessor(&processor);
+  EXPECT_EQ(analysis.outcome, AOTDecomposeOutcome::UnsupportedShape);
+  EXPECT_TRUE(analysis.blockingProcessor.empty());
 }
 
 TGFX_TEST(AOTEffectTest, ColorMatrixChainFusesToSinglePass) {
@@ -154,7 +491,7 @@ TGFX_TEST(AOTEffectTest, ColorMatrixChainFusesToSinglePass) {
   AOTEffectPlan plan;
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
-  EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::TextureColorMatrix);
+  EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseTail);
   EXPECT_EQ(plan.passes[0].nodes, std::vector<AOTNodeID>({AOTNodeID(1), AOTNodeID(2)}));
   EXPECT_FALSE(plan.passes[0].materializesOutput);
 }
@@ -170,12 +507,12 @@ TGFX_TEST(AOTEffectTest, TripleChainSupportsFusedAndStandardPlans) {
   AOTEffectPlan fusedPlan;
   ASSERT_TRUE(
       AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &fusedPlan));
-  ASSERT_EQ(fusedPlan.passes.size(), 2u);
-  EXPECT_EQ(fusedPlan.passes[0].kernel, AOTKernelKind::TextureColorMatrix);
-  EXPECT_EQ(fusedPlan.passes[1].kernel, AOTKernelKind::TexturedLuma);
-  EXPECT_TRUE(fusedPlan.passes[0].materializesOutput);
-  EXPECT_FALSE(fusedPlan.passes[1].materializesOutput);
-  EXPECT_EQ(fusedPlan.passes[1].dependencies, std::vector<uint32_t>({0}));
+  ASSERT_EQ(fusedPlan.passes.size(), 1u);
+  EXPECT_EQ(fusedPlan.passes[0].kernel, AOTKernelKind::PointwiseTail);
+  EXPECT_EQ(fusedPlan.passes[0].nodes,
+            std::vector<AOTNodeID>({AOTNodeID(1), AOTNodeID(2), AOTNodeID(3)}));
+  EXPECT_FALSE(fusedPlan.passes[0].materializesOutput);
+  EXPECT_TRUE(fusedPlan.passes[0].dependencies.empty());
 
   AOTEffectPlan standardPlan;
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::Standard, &standardPlan));
@@ -328,6 +665,31 @@ TGFX_TEST(AOTEffectTest, BlendTreeDecomposesToPointwiseChain) {
   EXPECT_EQ(plan.output, graph.root());
 }
 
+TGFX_TEST(AOTEffectTest, PointwiseDAGUsesProductionSamplerBudget) {
+  EXPECT_EQ(MaxFusedAOTSamplers, 4);
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+
+  BlockAllocator acceptedAllocator;
+  auto acceptedBlend = MakeTextureBlend(context, &acceptedAllocator, MaxFusedAOTSamplers);
+  ASSERT_NE(acceptedBlend, nullptr);
+  AOTEffectGraph acceptedGraph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower({acceptedBlend.get()}, &acceptedGraph));
+  AOTEffectPlan acceptedPlan;
+  EXPECT_TRUE(AOTEffectDecomposer::Decompose(acceptedGraph, AOTDecompositionMode::PreferFusion,
+                                             &acceptedPlan));
+
+  BlockAllocator rejectedAllocator;
+  auto rejectedBlend = MakeTextureBlend(context, &rejectedAllocator, MaxFusedAOTSamplers + 1);
+  ASSERT_NE(rejectedBlend, nullptr);
+  AOTEffectGraph rejectedGraph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower({rejectedBlend.get()}, &rejectedGraph));
+  AOTEffectPlan rejectedPlan;
+  EXPECT_FALSE(AOTEffectDecomposer::Decompose(rejectedGraph, AOTDecompositionMode::PreferFusion,
+                                              &rejectedPlan));
+}
+
 TGFX_TEST(AOTEffectTest, ConstColorChainDecomposesToPointwiseChain) {
   BlockAllocator allocator;
   // A ConstColor(Ignore) source modulated by a color matrix: pure pointwise, no textures.
@@ -343,9 +705,10 @@ TGFX_TEST(AOTEffectTest, ConstColorChainDecomposesToPointwiseChain) {
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
   EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
+  EXPECT_FALSE(AOTPlanExecutor::CanExecute(graph, plan));
 }
 
-TGFX_TEST(AOTEffectTest, LinearTextureChainStillUsesNarrowPlanner) {
+TGFX_TEST(AOTEffectTest, LinearTextureChainUsesPointwiseTailPlanner) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
@@ -354,10 +717,56 @@ TGFX_TEST(AOTEffectTest, LinearTextureChainStillUsesNarrowPlanner) {
   ASSERT_TRUE(BuildTripleGraph(context, &allocator, &graph));
   AOTEffectPlan plan;
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan));
-  // The narrow linear planner still wins for the texture->matrix->luma chain: it must NOT collapse
-  // into a single PointwiseChain pass (that path is reserved for blend/const-color DAGs).
-  EXPECT_GT(plan.passes.size(), 1u);
-  EXPECT_NE(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
+  ASSERT_EQ(plan.passes.size(), 1u);
+  EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseTail);
+  EXPECT_EQ(plan.passes[0].nodes,
+            std::vector<AOTNodeID>({AOTNodeID(1), AOTNodeID(2), AOTNodeID(3)}));
+  EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
+}
+
+// M1.0 geodesic probe: the multi-pass executor rebuilds a TextureEffect from the AOTTextureParameters
+// captured by lowerToAOT (rather than reusing the original FP). This verifies the round-trip is
+// lossless — the rebuilt effect must be byte-identical to the original, otherwise the AOT multi-pass
+// path would diverge from the JIT single-pass render. The processor key encodes sampler state,
+// subset, uv matrix, alphaStart and format, so equal keys prove equivalent shader + uniform layout.
+static PlacementPtr<FragmentProcessor> RebuildTextureFromAOTParameters(
+    BlockAllocator* allocator, const AOTTextureParameters& parameters) {
+  SamplingOptions sampling(parameters.samplerState.minFilterMode,
+                           parameters.samplerState.magFilterMode,
+                           parameters.samplerState.mipmapMode);
+  SamplingArgs args = {parameters.samplerState.tileModeX, parameters.samplerState.tileModeY,
+                       sampling, parameters.constraint};
+  args.sampleArea = parameters.subset;
+  auto uvMatrix = parameters.uvMatrix;
+  if (parameters.hasRGBAAA) {
+    return TextureEffect::MakeRGBAAA(allocator, parameters.textureProxy, args,
+                                     parameters.alphaStart, &uvMatrix);
+  }
+  return TextureEffect::Make(allocator, parameters.textureProxy, args, &uvMatrix);
+}
+
+TGFX_TEST(AOTEffectTest, TextureParametersRebuildIsLossless) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  auto original = MakeTextureProcessor(context, &allocator, PixelFormat::RGBA_8888);
+  ASSERT_NE(original, nullptr);
+
+  AOTEffectGraph graph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower({original.get()}, &graph));
+  ASSERT_EQ(graph.nodeCount(), 2u);
+  auto parameters = std::get_if<AOTTextureParameters>(&graph.nodeAt(AOTNodeID(1))->parameters);
+  ASSERT_NE(parameters, nullptr);
+
+  auto rebuilt = RebuildTextureFromAOTParameters(&allocator, *parameters);
+  ASSERT_NE(rebuilt, nullptr);
+
+  BytesKey originalKey = {};
+  BytesKey rebuiltKey = {};
+  original->computeProcessorKey(context, &originalKey);
+  rebuilt->computeProcessorKey(context, &rebuiltKey);
+  EXPECT_TRUE(originalKey == rebuiltKey);
 }
 
 static MaterializationDecision EvaluateBlendChild(const FragmentProcessor* child,
@@ -403,12 +812,10 @@ TGFX_TEST(AOTEffectTest, PointwiseBlendChildPolicy) {
   EXPECT_TRUE(constDst.shouldFlatten);
 
   // The one input where the two predicates disagree.
-  auto tiledProxy = context->proxyProvider()->createTextureProxy({}, 8, 6, PixelFormat::RGBA_8888);
-  ASSERT_NE(tiledProxy, nullptr);
-  SamplingArgs tiledArgs(TileMode::Repeat, TileMode::Repeat, {}, SrcRectConstraint::Fast);
-  auto tiled = TiledTextureEffect::Make(&allocator, std::move(tiledProxy), tiledArgs);
+  auto tiled =
+      MakeTiledTextureProcessor(context, &allocator, TileMode::Repeat, TileMode::Repeat,
+                                PixelFormat::RGBA_8888, SrcRectConstraint::Fast, std::nullopt);
   ASSERT_NE(tiled, nullptr);
-  ASSERT_EQ(tiled->name(), "TiledTextureEffect");
   auto tiledSrc = EvaluateBlendChild(tiled.get(), 0);
   EXPECT_FALSE(tiledSrc.requiredForCorrectness);
   EXPECT_TRUE(tiledSrc.shouldFlatten);

@@ -59,13 +59,8 @@ AOTClosureResult AOTClosureVerifier::Verify(const PrecompiledShaderCache* cache,
     auto vertTotal = info.vertDomain.totalCount();
     auto fragTotal = info.fragDomain.totalCount();
     for (uint32_t vi = 0; vi < vertTotal; ++vi) {
-      auto vertValues = info.vertDomain.decode(vi);
       for (uint32_t fi = 0; fi < fragTotal; ++fi) {
-        auto fragValues = info.fragDomain.decode(fi);
-        if (!MirroredDimsAgree(info.vertDomain, info.fragDomain, vertValues, fragValues)) {
-          continue;
-        }
-        if (info.shouldCompile && !info.shouldCompile(vi, fi, vertValues, fragValues)) {
+        if (!IsBuildablePermutation(info, vi, fi)) {
           continue;
         }
         vertIndices.insert(vi);

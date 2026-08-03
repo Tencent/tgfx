@@ -29,6 +29,7 @@ enum class ShaderStageType { Vertex, Fragment };
 struct CompileResult {
   bool success = false;
   std::vector<uint32_t> spirv;
+  std::string glsl;
   std::string msl;
   std::string wgsl;
   std::string error;
@@ -39,6 +40,9 @@ struct CompileResult {
 CompileResult CompileGLSL(const std::string& source, ShaderStageType stage,
                           const std::string& shaderName, uint32_t variantIndex,
                           bool optimize = false);
+
+/// Translates SPIR-V binary to desktop GLSL 150 via spirv-cross.
+CompileResult TranslateToGLSL(const std::vector<uint32_t>& spirv);
 
 /// Translates SPIR-V binary to Metal Shading Language via spirv-cross.
 CompileResult TranslateToMSL(const std::vector<uint32_t>& spirv, ShaderStageType stage);

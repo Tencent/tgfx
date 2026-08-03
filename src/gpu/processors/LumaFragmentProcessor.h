@@ -25,6 +25,9 @@ class LumaFragmentProcessor : public FragmentProcessor {
   static PlacementPtr<FragmentProcessor> Make(BlockAllocator* allocator,
                                               std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
+  static PlacementPtr<FragmentProcessor> Make(BlockAllocator* allocator, float kr, float kg,
+                                              float kb);
+
   std::string name() const override {
     return "LumaFragmentProcessor";
   }
@@ -37,6 +40,8 @@ class LumaFragmentProcessor : public FragmentProcessor {
   DEFINE_PROCESSOR_CLASS_ID
 
   LumaFragmentProcessor(std::shared_ptr<ColorSpace> colorSpace);
+
+  LumaFragmentProcessor(float kr, float kg, float kb);
 
   struct LumaFactor {
     /** default ITU-R Recommendation BT.709 at http://www.itu.int/rec/R-REC-BT.709/ .*/

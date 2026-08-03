@@ -17,9 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TiledTextureEffect.h"
+#include <algorithm>
 #include "ConstColorProcessor.h"
 #include "TextureEffect.h"
 #include "core/utils/MathExtra.h"
+#include "gpu/AOTEffect.h"
 #include "gpu/ProxyProvider.h"
 
 namespace tgfx {
@@ -58,6 +60,23 @@ TiledTextureEffect::ShaderMode TiledTextureEffect::GetShaderMode(TileMode tileMo
       }
   }
   return ShaderMode::None;
+}
+
+bool TiledTextureEffect::ShaderModeRequiresUnormCoord(ShaderMode mode) {
+  switch (mode) {
+    case ShaderMode::None:
+    case ShaderMode::Clamp:
+    case ShaderMode::RepeatNearestNone:
+    case ShaderMode::MirrorRepeat:
+      return false;
+    case ShaderMode::RepeatLinearNone:
+    case ShaderMode::RepeatNearestMipmap:
+    case ShaderMode::RepeatLinearMipmap:
+    case ShaderMode::ClampToBorderNearest:
+    case ShaderMode::ClampToBorderLinear:
+      return true;
+  }
+  return false;
 }
 
 TiledTextureEffect::Sampling::Sampling(const TextureView* textureView, SamplerState sampler,
@@ -123,8 +142,8 @@ TiledTextureEffect::Sampling::Sampling(const TextureView* textureView, SamplerSt
   auto x = resolve(textureView->width(), sampler.tileModeX, subsetX, 0.5f);
   Span subsetY{subset.top, subset.bottom};
   auto y = resolve(textureView->height(), sampler.tileModeY, subsetY, 0.5f);
-  hwSampler = SamplerState(x.hwMode, y.hwMode, sampler.minFilterMode, sampler.magFilterMode,
-                           sampler.mipmapMode);
+  hardwareSampler = SamplerState(x.hwMode, y.hwMode, sampler.minFilterMode, sampler.magFilterMode,
+                                 sampler.mipmapMode);
   shaderModeX = x.shaderMode;
   shaderModeY = y.shaderMode;
   shaderSubset = {x.shaderSubset.a, y.shaderSubset.a, x.shaderSubset.b, y.shaderSubset.b};
@@ -142,35 +161,104 @@ TiledTextureEffect::TiledTextureEffect(std::shared_ptr<TextureProxy> proxy,
   addCoordTransform(&coordTransform);
 }
 
-void TiledTextureEffect::getShaderModes(int* outModeX, int* outModeY) const {
+static Rect ResolveShaderRect(const TextureView* textureView, Rect rect,
+                              bool usesShaderDimensions) {
+  if (textureView->origin() == ImageOrigin::BottomLeft) {
+    auto height = static_cast<float>(textureView->height());
+    rect.top = height - rect.top;
+    rect.bottom = height - rect.bottom;
+    std::swap(rect.top, rect.bottom);
+  }
+  if (!usesShaderDimensions && textureView->getTexture()->type() != TextureType::Rectangle) {
+    auto leftTop = textureView->getTextureCoord(rect.left, rect.top);
+    auto rightBottom = textureView->getTextureCoord(rect.right, rect.bottom);
+    rect = {leftTop.x, leftTop.y, rightBottom.x, rightBottom.y};
+  }
+  return rect;
+}
+
+const TiledTextureEffect::ResolvedSampling* TiledTextureEffect::resolveSampling() const {
+  if (resolvedSampling.has_value()) {
+    return &*resolvedSampling;
+  }
   auto textureView = getTextureView();
   if (textureView == nullptr) {
+    return nullptr;
+  }
+  Sampling sampling(textureView, samplerState, subset);
+  ResolvedSampling resolved = {};
+  resolved.hardwareSampler = sampling.hardwareSampler;
+  resolved.shaderModeX = sampling.shaderModeX;
+  resolved.shaderModeY = sampling.shaderModeY;
+  resolved.usesShaderDimensions = (ShaderModeRequiresUnormCoord(resolved.shaderModeX) ||
+                                   ShaderModeRequiresUnormCoord(resolved.shaderModeY)) &&
+                                  textureView->getTexture()->type() != TextureType::Rectangle;
+  if (resolved.usesShaderDimensions) {
+    resolved.shaderDimensions = textureView->getTextureCoord(1.f, 1.f);
+  }
+  resolved.shaderSubset =
+      ResolveShaderRect(textureView, sampling.shaderSubset, resolved.usesShaderDimensions);
+  resolved.shaderClamp =
+      ResolveShaderRect(textureView, sampling.shaderClamp, resolved.usesShaderDimensions);
+  resolved.strict = constraint == SrcRectConstraint::Strict;
+  resolved.coordMatrix = coordTransform.matrix;
+  resolved.hasPerspective = coordTransform.matrix.hasPerspective();
+  resolved.alphaOnly = textureProxy->isAlphaOnly();
+  resolved.textureOrigin = textureView->origin();
+  resolvedSampling = resolved;
+  return &*resolvedSampling;
+}
+
+void TiledTextureEffect::getShaderModes(int* outModeX, int* outModeY) const {
+  auto sampling = resolveSampling();
+  if (sampling == nullptr) {
     *outModeX = 0;
     *outModeY = 0;
     return;
   }
-  Sampling sampling(textureView, samplerState, subset);
-  *outModeX = static_cast<int>(sampling.shaderModeX);
-  *outModeY = static_cast<int>(sampling.shaderModeY);
+  *outModeX = static_cast<int>(sampling->shaderModeX);
+  *outModeY = static_cast<int>(sampling->shaderModeY);
 }
 
 bool TiledTextureEffect::isAlphaOnly() const {
   return textureProxy->isAlphaOnly();
 }
 
-void TiledTextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
+bool TiledTextureEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
+                                    AOTNodeID* output) const {
   auto textureView = getTextureView();
-  if (textureView == nullptr) {
+  if (builder == nullptr || output == nullptr || textureView == nullptr ||
+      textureView->getTexture()->type() != TextureType::TwoD) {
+    return false;
+  }
+  auto resolved = resolveSampling();
+  if (resolved == nullptr) {
+    return false;
+  }
+  AOTTextureParameters parameters = {};
+  parameters.textureProxy = textureProxy;
+  parameters.samplingKind = AOTTextureSamplingKind::Tiled;
+  parameters.samplerState = resolved->hardwareSampler;
+  parameters.constraint = constraint;
+  parameters.uvMatrix = resolved->coordMatrix;
+  parameters.subset = subset;
+  parameters.tiledRecipe = *resolved;
+  parameters.isAlphaOnly = resolved->alphaOnly;
+  parameters.hasSubset = subset != Rect::MakeWH(textureProxy->width(), textureProxy->height());
+  parameters.hasPerspective = resolved->hasPerspective;
+  return builder->addTextureSource(input, parameters, output);
+}
+
+void TiledTextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
+  auto sampling = resolveSampling();
+  if (sampling == nullptr) {
     return;
   }
-  // Sometimes textureProxy->isAlphaOnly() != texture->isAlphaOnly(), we use
-  // textureProxy->isAlphaOnly() to determine the alpha-only flag.
-  bytesKey->write(textureProxy->isAlphaOnly());
-  Sampling sampling(textureView, samplerState, subset);
-  auto flags = static_cast<uint32_t>(sampling.shaderModeX);
-  flags |= static_cast<uint32_t>(sampling.shaderModeY) << 4;
-  flags |= constraint == SrcRectConstraint::Strict ? static_cast<uint32_t>(1) << 8 : 0;
-  flags |= coordTransform.matrix.hasPerspective() ? static_cast<uint32_t>(1) << 9 : 0;
+  bytesKey->write(sampling->alphaOnly);
+  auto flags = static_cast<uint32_t>(sampling->shaderModeX);
+  flags |= static_cast<uint32_t>(sampling->shaderModeY) << 4;
+  flags |= sampling->strict ? static_cast<uint32_t>(1) << 8 : 0;
+  flags |= sampling->hasPerspective ? static_cast<uint32_t>(1) << 9 : 0;
   bytesKey->write(flags);
 }
 
@@ -188,12 +276,8 @@ std::shared_ptr<Texture> TiledTextureEffect::onTextureAt(size_t) const {
 }
 
 SamplerState TiledTextureEffect::onSamplerStateAt(size_t) const {
-  auto textureView = getTextureView();
-  if (textureView == nullptr) {
-    return {};
-  }
-  Sampling sampling(textureView, samplerState, subset);
-  return sampling.hwSampler;
+  auto sampling = resolveSampling();
+  return sampling != nullptr ? sampling->hardwareSampler : SamplerState();
 }
 
 const TextureView* TiledTextureEffect::getTextureView() const {

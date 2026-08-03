@@ -42,6 +42,10 @@ LumaFragmentProcessor::LumaFragmentProcessor(std::shared_ptr<ColorSpace> colorSp
   _lumaFactor = AcquireLumaFactorFromColorSpace(tempColorMatrix);
 }
 
+LumaFragmentProcessor::LumaFragmentProcessor(float kr, float kg, float kb)
+    : FragmentProcessor(ClassID()), _lumaFactor({kr, kg, kb}) {
+}
+
 LumaFragmentProcessor::LumaFactor LumaFragmentProcessor::AcquireLumaFactorFromColorSpace(
     const ColorMatrix33& matrix) {
   ColorMatrix33 tempColorMatrix{};

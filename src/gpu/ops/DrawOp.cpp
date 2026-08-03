@@ -18,49 +18,85 @@
 
 #include "DrawOp.h"
 #include <algorithm>
-#include "gpu/AlignTo.h"
+#include "gpu/PrecompiledShaderCache.h"
 #include "gpu/Program.h"
 
 namespace tgfx {
-void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
-  auto geometryProcessor = onMakeGeometryProcessor(renderTarget);
-  if (geometryProcessor == nullptr) {
-    return;
+bool DrawOp::prepare(RenderTarget* renderTarget, ProgramLookupMode mode,
+                     std::optional<ColorProcessorList> colorOverride) {
+  if (!geometryProcessorInitialized) {
+    geometryProcessorInitialized = true;
+    geometryProcessor = onMakeGeometryProcessor(renderTarget);
   }
+  if (geometryProcessor == nullptr) {
+    return false;
+  }
+
+  preparedProgram = nullptr;
+  preparedProgramInfo = nullptr;
+  preparedRenderTarget = nullptr;
+  preparedColors = std::move(colorOverride);
+  auto& activeColors = preparedColors.has_value() ? *preparedColors : colors;
+
   std::vector<FragmentProcessor*> fragmentProcessors = {};
-  fragmentProcessors.reserve(colors.size() + coverages.size());
-  for (auto& color : colors) {
+  fragmentProcessors.reserve(activeColors.size() + coverages.size());
+  for (auto& color : activeColors) {
     fragmentProcessors.emplace_back(color.get());
   }
   for (auto& coverage : coverages) {
     fragmentProcessors.emplace_back(coverage.get());
   }
-  ProgramInfo programInfo(renderTarget, geometryProcessor.get(), std::move(fragmentProcessors),
-                          colors.size(), xferProcessor.get(), blendMode);
-  programInfo.setCullMode(cullMode);
-  auto program = programInfo.getProgram();
-  if (program == nullptr) {
-    LOGE("DrawOp::execute() Failed to get the program!");
+  preparedProgramInfo = std::make_unique<ProgramInfo>(
+      renderTarget, geometryProcessor.get(), std::move(fragmentProcessors), activeColors.size(),
+      xferProcessor.get(), blendMode);
+  preparedProgramInfo->setCullMode(cullMode);
+  preparedProgram = preparedProgramInfo->getProgram(mode);
+  if (preparedProgram == nullptr) {
+    LOGE("DrawOp::prepare() Failed to get the program!");
+    return false;
+  }
+  preparedRenderTarget = renderTarget;
+  return true;
+}
+
+void DrawOp::executePrepared(RenderPass* renderPass, bool recordDrawStats) {
+  if (preparedProgramInfo == nullptr || preparedProgram == nullptr ||
+      preparedRenderTarget == nullptr) {
+    LOGE("DrawOp::executePrepared() DrawOp is not prepared!");
     return;
   }
-  renderPass->setPipeline(program->getPipeline());
-
-  programInfo.setUniformsAndSamplers(renderPass, program.get());
+  renderPass->setPipeline(preparedProgram->getPipeline());
+  preparedProgramInfo->setUniformsAndSamplers(renderPass, preparedProgram.get());
 
   if (scissorRect.isEmpty()) {
-    renderPass->setScissorRect(0, 0, renderTarget->width(), renderTarget->height());
+    renderPass->setScissorRect(0, 0, preparedRenderTarget->width(), preparedRenderTarget->height());
   } else {
     // Clamp scissor rect to render target bounds
     int scissorX = std::max(0, static_cast<int>(scissorRect.x()));
     int scissorY = std::max(0, static_cast<int>(scissorRect.y()));
-    int scissorRight =
-        std::min(renderTarget->width(), static_cast<int>(scissorRect.x() + scissorRect.width()));
-    int scissorBottom =
-        std::min(renderTarget->height(), static_cast<int>(scissorRect.y() + scissorRect.height()));
+    int scissorRight = std::min(preparedRenderTarget->width(),
+                                static_cast<int>(scissorRect.x() + scissorRect.width()));
+    int scissorBottom = std::min(preparedRenderTarget->height(),
+                                 static_cast<int>(scissorRect.y() + scissorRect.height()));
     int scissorWidth = std::max(0, scissorRight - scissorX);
     int scissorHeight = std::max(0, scissorBottom - scissorY);
     renderPass->setScissorRect(scissorX, scissorY, scissorWidth, scissorHeight);
   }
   onDraw(renderPass);
+
+  auto cache = preparedRenderTarget->getContext()->precompiledShaderCache();
+  if (recordDrawStats && cache->diagnosticRecordingEnabled()) {
+    AOTDrawStats drawDelta = {};
+    drawDelta.kernelInvocations = 1;
+    bool completeAOTDraw =
+        preparedProgram->getProvenance().program == ProgramOrigin::PrecompiledArtifact;
+    cache->recordDraw(drawDelta, completeAOTDraw);
+  }
+}
+
+void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
+  if (prepare(renderTarget)) {
+    executePrepared(renderPass);
+  }
 }
 }  // namespace tgfx

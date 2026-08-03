@@ -33,12 +33,16 @@ class ColorMatrixFragmentProcessor : public FragmentProcessor {
 
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
+  bool isChannelPermutation() const;
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
   explicit ColorMatrixFragmentProcessor(const std::array<float, 20>& matrix)
       : FragmentProcessor(ClassID()), matrix(matrix) {
   }
+
+  void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   std::array<float, 20> matrix;
 };

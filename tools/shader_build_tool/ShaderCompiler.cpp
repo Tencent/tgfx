@@ -21,6 +21,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <shaderc/shaderc.hpp>
+#include <spirv_glsl.hpp>
 #include <spirv_msl.hpp>
 #include <spirv_parser.hpp>
 
@@ -71,6 +72,27 @@ CompileResult CompileGLSL(const std::string& source, ShaderStageType stage,
 
   result.success = true;
   result.spirv = {spvResult.cbegin(), spvResult.cend()};
+  return result;
+}
+
+CompileResult TranslateToGLSL(const std::vector<uint32_t>& spirv) {
+  CompileResult result;
+  // spirv-cross uses exceptions internally, so isolate them at the third-party API boundary.
+  try {
+    spirv_cross::CompilerGLSL compiler(spirv);
+    auto options = compiler.get_common_options();
+    options.version = 150;
+    options.es = false;
+    options.vulkan_semantics = false;
+    options.enable_420pack_extension = false;
+    compiler.set_common_options(options);
+    result.glsl = compiler.compile();
+    result.success = true;
+  } catch (const spirv_cross::CompilerError& e) {
+    result.error = std::string("spirv-cross GLSL error: ") + e.what();
+  } catch (const std::exception& e) {
+    result.error = std::string("spirv-cross exception: ") + e.what();
+  }
   return result;
 }
 
@@ -133,7 +155,6 @@ CompileResult TranslateToMSL(const std::vector<uint32_t>& spirv, ShaderStageType
 
     result.msl = mslCompiler.compile();
     result.success = true;
-
 
   } catch (const spirv_cross::CompilerError& e) {
     result.success = false;

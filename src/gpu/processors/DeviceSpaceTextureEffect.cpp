@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DeviceSpaceTextureEffect.h"
+#include "gpu/AOTEffect.h"
 
 namespace tgfx {
 DeviceSpaceTextureEffect::DeviceSpaceTextureEffect(std::shared_ptr<TextureProxy> textureProxy,
@@ -26,6 +27,20 @@ DeviceSpaceTextureEffect::DeviceSpaceTextureEffect(std::shared_ptr<TextureProxy>
 
 bool DeviceSpaceTextureEffect::isAlphaOnly() const {
   return textureProxy->isAlphaOnly();
+}
+
+bool DeviceSpaceTextureEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
+                                          AOTNodeID* output) const {
+  if (builder == nullptr || output == nullptr || textureProxy->getTextureView() == nullptr) {
+    return false;
+  }
+  AOTTextureParameters parameters = {};
+  parameters.textureProxy = textureProxy;
+  parameters.samplingKind = AOTTextureSamplingKind::Device;
+  parameters.uvMatrix = uvMatrix;
+  parameters.isAlphaOnly = textureProxy->isAlphaOnly();
+  parameters.hasPerspective = uvMatrix.hasPerspective();
+  return builder->addTextureSource(input, parameters, output);
 }
 
 size_t DeviceSpaceTextureEffect::onCountTextureSamplers() const {
