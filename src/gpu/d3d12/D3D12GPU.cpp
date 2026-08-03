@@ -707,9 +707,9 @@ void D3D12GPU::releaseAll(bool releaseGPU) {
 
 void D3D12GPU::reclaimAbandonedSession(D3D12FrameSession session) {
   // Letting the local go out of scope releases the command list and allocator via ComPtr, and
-  // drops every shared_ptr in retainedResources / retainedDescriptorHeaps. RTV / DSV descriptor
-  // slots used by this session live in D3D12GPU::_rtvRing / _dsvRing and will be reclaimed by
-  // their fence-based retire path; nothing is held here for them.
+  // drops every shared_ptr in retainedResources. RTV / DSV descriptor slots used by this
+  // session live in D3D12GPU::_rtvRing / _dsvRing and will be reclaimed by their fence-based
+  // retire path; nothing is held here for them.
   // Resources whose refcount reaches zero enter the ReturnQueue and will be destroyed by the
   // next processUnreferencedResources() call.
   //

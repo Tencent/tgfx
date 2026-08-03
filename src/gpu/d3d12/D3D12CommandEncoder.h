@@ -85,10 +85,6 @@ class D3D12CommandEncoder : public CommandEncoder, public D3D12Resource {
     session.retainedResources.push_back(std::move(resource));
   }
 
-  void retainDescriptorHeap(ComPtr<ID3D12DescriptorHeap> heap) {
-    session.retainedDescriptorHeaps.push_back(std::move(heap));
-  }
-
   /**
    * Updates a D3D12Texture's CPU-tracked _currentState and, on the first call for this texture
    * within the current session, snapshots the original state into session.initialTextureStates

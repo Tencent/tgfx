@@ -44,7 +44,8 @@ static constexpr unsigned D3D12_MIPMAP_THREAD_GROUP_SIZE = 8;
  *
  * The encoder is expected to:
  *   - Place the SRV / UAV pair into a shader-visible heap that lives long enough to cover the
- *     dispatch (added to the FrameSession's retainedDescriptorHeaps).
+ *     dispatch. In the current implementation these slots come from D3D12GPU's descriptor rings
+ *     and are recycled fence-side by their retire() path, so no per-session retention is needed.
  *   - Issue ResourceBarriers transitioning the parent texture's individual subresources between
  *     UNORDERED_ACCESS and PIXEL_SHADER_RESOURCE as the chain walks up.
  */

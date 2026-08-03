@@ -62,10 +62,6 @@ struct D3D12FrameSession {
   // When cleared after the fence signals, refcounts decrement; resources reaching zero enter the
   // ReturnQueue and are safely destroyed during processUnreferencedResources().
   std::vector<std::shared_ptr<D3D12Resource>> retainedResources;
-  // Shader-visible descriptor heaps (CBV/SRV/UAV and Sampler) created per render pass to back
-  // SetGraphicsRootDescriptorTable. They must outlive GPU execution because the GPU keeps reading
-  // their contents until the fence signals. Released after the fence signals.
-  std::vector<ComPtr<ID3D12DescriptorHeap>> retainedDescriptorHeaps;
   // Auxiliary command allocators/lists used to record one-off work (texture uploads) outside the
   // main command list. Captured here so they outlive GPU execution; freed after the fence signals.
   std::vector<ComPtr<ID3D12CommandAllocator>> auxAllocators;
