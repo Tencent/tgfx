@@ -47,7 +47,10 @@ static constexpr unsigned D3D12_MIPMAP_THREAD_GROUP_SIZE = 8;
  *     dispatch. In the current implementation these slots come from D3D12GPU's descriptor rings
  *     and are recycled fence-side by their retire() path, so no per-session retention is needed.
  *   - Issue ResourceBarriers transitioning the parent texture's individual subresources between
- *     UNORDERED_ACCESS and PIXEL_SHADER_RESOURCE as the chain walks up.
+ *     UNORDERED_ACCESS and NON_PIXEL_SHADER_RESOURCE as the chain walks up. NON_PIXEL is required
+ *     rather than PIXEL_SHADER_RESOURCE because the mip generation shader is a compute shader —
+ *     the D3D12 validation layer rejects CS sampling from resources parked in the pixel-only
+ *     state.
  */
 class D3D12MipmapGenerator {
  public:
