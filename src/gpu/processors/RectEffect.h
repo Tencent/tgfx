@@ -23,11 +23,18 @@
 
 namespace tgfx {
 
+// Test-only accessor forward-declaration. Friended by RectEffect so ClipTest.cpp can read the
+// protected localRect / deviceToLocal / needTransform without relying on -fno-access-control
+// (unavailable on MSVC). Not defined in production code; the definition lives in the test binary.
+class ClipTestAccess;
+
 /**
  * Coverage FragmentProcessor for an affine-mapped rectangle clip, in either AA or NonAA mode.
  * Perspective and degenerate matrices are not supported.
  */
 class RectEffect : public FragmentProcessor {
+  friend class ClipTestAccess;
+
  public:
   /**
    * @param localRect    The rectangle in local space.

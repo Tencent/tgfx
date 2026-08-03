@@ -33,6 +33,11 @@
 
 namespace tgfx {
 
+// Test-only accessor forward-declaration. Friended by ClipStack so ClipTest.cpp can reach the
+// private _data (specifically _data->records) without relying on -fno-access-control (unavailable
+// on MSVC). Not defined in production code; the definition lives in the test binary.
+class ClipTestAccess;
+
 /**
  * Represents the current state of the clip region.
  */
@@ -173,6 +178,8 @@ struct ClipData {
  * Uses Copy-on-Write for efficient copying.
  */
 class ClipStack {
+  friend class ClipTestAccess;
+
  public:
   ClipStack();
 

@@ -38,6 +38,11 @@ class DrawContext;
 class CanvasState;
 class ClipStack;
 
+// Test-only accessor forward-declaration. Friended by Canvas so ClipTest.cpp can reach the
+// private clipStack member without relying on -fno-access-control (unavailable on MSVC). Not
+// defined in production code; the definition lives in the test binary.
+class ClipTestAccess;
+
 /**
  * Canvas provides an interface for drawing, including how the drawing is clipped and transformed.
  * It maintains a stack of matrix and clip values. Each draw call on the Canvas transforms the
@@ -45,6 +50,8 @@ class ClipStack;
  * is then clipped by the intersection of all the clip values in the stack.
  */
 class Canvas {
+  friend class ClipTestAccess;
+
  public:
   ~Canvas();
 

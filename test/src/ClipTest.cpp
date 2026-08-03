@@ -36,7 +36,56 @@
 
 namespace tgfx {
 
-static Path MakePath(std::initializer_list<Point> points, bool close = true) {
+// Test-only accessor that reaches private/protected members of Canvas, ClipStack, RectEffect,
+// RRectEffect, and OpsCompositor. Declared as a friend in each of those classes (see the
+// respective headers) so it works on both MSVC and clang/gcc regardless of -fno-access-control
+// availability. All members are static; nothing is instantiated.
+class ClipTestAccess {
+ public:
+  // Canvas -> its private ClipStack.
+  static ClipStack* Stack(Canvas* canvas) {
+    return canvas->clipStack.get();
+  }
+
+  // ClipStack -> its private _data->records (used to observe record materialization).
+  static const std::stack<ClipRecord>& Records(const ClipStack* stack) {
+    return stack->_data->records;
+  }
+
+  // RectEffect protected getters / fields.
+  static bool NeedTransform(const RectEffect* fp) {
+    return fp->needTransform();
+  }
+  static const Matrix& DeviceToLocal(const RectEffect* fp) {
+    return fp->deviceToLocal();
+  }
+  static const Rect& LocalRect(const RectEffect* fp) {
+    return fp->localRect;
+  }
+
+  // RRectEffect protected getters / fields.
+  static bool NeedTransform(const RRectEffect* fp) {
+    return fp->needTransform();
+  }
+  static const Matrix& DeviceToLocal(const RRectEffect* fp) {
+    return fp->deviceToLocal();
+  }
+  static const Rect& LocalRect(const RRectEffect* fp) {
+    return fp->localRect;
+  }
+  static const std::array<Point, 4>& Radii(const RRectEffect* fp) {
+    return fp->radii;
+  }
+
+  // OpsCompositor::applyClip.
+  static AppliedClip Apply(OpsCompositor* compositor, const ClipStack& clip) {
+    return compositor->applyClip(clip);
+  }
+};
+
+namespace {
+
+Path MakePath(std::initializer_list<Point> points, bool close = true) {
   Path path;
   auto it = points.begin();
   if (it != points.end()) {
@@ -51,80 +100,78 @@ static Path MakePath(std::initializer_list<Point> points, bool close = true) {
   return path;
 }
 
+}  // namespace
+
 TGFX_TEST(ClipTest, RectEffect) {
-  TGFX_PRIVATE_ACCESS(
-      BlockAllocator allocator;
+  BlockAllocator allocator;
 
-      // Case 1: Identity matrix produces identity variant.
-      {
-        auto fp = RectEffect::Make(&allocator, Rect::MakeWH(100, 80), Matrix::I(), true);
-        ASSERT_NE(fp, nullptr);
-        EXPECT_FALSE(fp->needTransform());
-        EXPECT_EQ(fp->localRect, Rect::MakeWH(100, 80));
-        EXPECT_TRUE(fp->deviceToLocal().isIdentity());
-      }
+  // Case 1: Identity matrix produces identity variant.
+  {
+    auto fp = RectEffect::Make(&allocator, Rect::MakeWH(100, 80), Matrix::I(), true);
+    ASSERT_NE(fp, nullptr);
+    EXPECT_FALSE(ClipTestAccess::NeedTransform(fp.get()));
+    EXPECT_EQ(ClipTestAccess::LocalRect(fp.get()), Rect::MakeWH(100, 80));
+    EXPECT_TRUE(ClipTestAccess::DeviceToLocal(fp.get()).isIdentity());
+  }
 
-      // Case 2: Axis-aligned scale bakes into localRect, still identity variant.
-      {
-        auto fp =
-            RectEffect::Make(&allocator, Rect::MakeWH(100, 80), Matrix::MakeScale(2, 3), true);
-        ASSERT_NE(fp, nullptr);
-        EXPECT_FALSE(fp->needTransform());
-        EXPECT_EQ(fp->localRect, Rect::MakeWH(200, 240));
-        EXPECT_TRUE(fp->deviceToLocal().isIdentity());
-      }
+  // Case 2: Axis-aligned scale bakes into localRect, still identity variant.
+  {
+    auto fp = RectEffect::Make(&allocator, Rect::MakeWH(100, 80), Matrix::MakeScale(2, 3), true);
+    ASSERT_NE(fp, nullptr);
+    EXPECT_FALSE(ClipTestAccess::NeedTransform(fp.get()));
+    EXPECT_EQ(ClipTestAccess::LocalRect(fp.get()), Rect::MakeWH(200, 240));
+    EXPECT_TRUE(ClipTestAccess::DeviceToLocal(fp.get()).isIdentity());
+  }
 
-      // Case 3: Non-axis-aligned matrix produces transform variant.
-      {
-        Matrix m = {};
-        m.setRotate(30);
-        auto fp = RectEffect::Make(&allocator, Rect::MakeWH(100, 80), m, true);
-        ASSERT_NE(fp, nullptr);
-        EXPECT_TRUE(fp->needTransform());
-        EXPECT_FALSE(fp->deviceToLocal().isIdentity());
-      }
+  // Case 3: Non-axis-aligned matrix produces transform variant.
+  {
+    Matrix m = {};
+    m.setRotate(30);
+    auto fp = RectEffect::Make(&allocator, Rect::MakeWH(100, 80), m, true);
+    ASSERT_NE(fp, nullptr);
+    EXPECT_TRUE(ClipTestAccess::NeedTransform(fp.get()));
+    EXPECT_FALSE(ClipTestAccess::DeviceToLocal(fp.get()).isIdentity());
+  }
 
-      // Case 4: Zero-scale matrix returns nullptr.
-      {
-        auto fp =
-            RectEffect::Make(&allocator, Rect::MakeWH(100, 80), Matrix::MakeScale(0, 1), true);
-        EXPECT_EQ(fp, nullptr);
-      })
+  // Case 4: Zero-scale matrix returns nullptr.
+  {
+    auto fp = RectEffect::Make(&allocator, Rect::MakeWH(100, 80), Matrix::MakeScale(0, 1), true);
+    EXPECT_EQ(fp, nullptr);
+  }
 }
 
 TGFX_TEST(ClipTest, RRectEffect) {
-  TGFX_PRIVATE_ACCESS(
-      BlockAllocator allocator;
+  BlockAllocator allocator;
 
-      // Case 1: Simple RRect + identity produces identity variant.
-      {
-        const auto rRect = RRect::MakeRectXY(Rect::MakeWH(100, 80), 10, 12);
-        auto fp = RRectEffect::Make(&allocator, rRect, Matrix::I(), true);
-        ASSERT_NE(fp, nullptr);
-        EXPECT_FALSE(fp->needTransform());
-        EXPECT_EQ(fp->localRect, rRect.rect());
-        EXPECT_EQ(fp->radii[0], (Point{10, 12}));
-      }
+  // Case 1: Simple RRect + identity produces identity variant.
+  {
+    const auto rRect = RRect::MakeRectXY(Rect::MakeWH(100, 80), 10, 12);
+    auto fp = RRectEffect::Make(&allocator, rRect, Matrix::I(), true);
+    ASSERT_NE(fp, nullptr);
+    EXPECT_FALSE(ClipTestAccess::NeedTransform(fp.get()));
+    EXPECT_EQ(ClipTestAccess::LocalRect(fp.get()), rRect.rect());
+    EXPECT_EQ(ClipTestAccess::Radii(fp.get())[0], (Point{10, 12}));
+  }
 
-      // Case 2: Scale matrix bakes axis scales into localRect and radii.
-      {
-        const auto rRect = RRect::MakeRectXY(Rect::MakeWH(100, 80), 10, 12);
-        auto fp = RRectEffect::Make(&allocator, rRect, Matrix::MakeScale(2, 3), true);
-        ASSERT_NE(fp, nullptr);
-        EXPECT_FALSE(fp->needTransform());
-        EXPECT_TRUE(fp->deviceToLocal().isIdentity());
-        EXPECT_FLOAT_EQ(fp->localRect.width(), 200.f);
-        EXPECT_FLOAT_EQ(fp->localRect.height(), 240.f);
-        EXPECT_FLOAT_EQ(fp->radii[0].x, 20.f);
-        EXPECT_FLOAT_EQ(fp->radii[0].y, 36.f);
-      }
+  // Case 2: Scale matrix bakes axis scales into localRect and radii.
+  {
+    const auto rRect = RRect::MakeRectXY(Rect::MakeWH(100, 80), 10, 12);
+    auto fp = RRectEffect::Make(&allocator, rRect, Matrix::MakeScale(2, 3), true);
+    ASSERT_NE(fp, nullptr);
+    EXPECT_FALSE(ClipTestAccess::NeedTransform(fp.get()));
+    EXPECT_TRUE(ClipTestAccess::DeviceToLocal(fp.get()).isIdentity());
+    EXPECT_FLOAT_EQ(ClipTestAccess::LocalRect(fp.get()).width(), 200.f);
+    EXPECT_FLOAT_EQ(ClipTestAccess::LocalRect(fp.get()).height(), 240.f);
+    EXPECT_FLOAT_EQ(ClipTestAccess::Radii(fp.get())[0].x, 20.f);
+    EXPECT_FLOAT_EQ(ClipTestAccess::Radii(fp.get())[0].y, 36.f);
+  }
 
-      // Case 3: Zero-scale matrix returns nullptr.
-      {
-        auto fp = RRectEffect::Make(&allocator, RRect::MakeRectXY(Rect::MakeWH(100, 80), 10, 12),
-                                    Matrix::MakeScale(0, 1), true);
-        EXPECT_EQ(fp, nullptr);
-      })
+  // Case 3: Zero-scale matrix returns nullptr.
+  {
+    auto fp = RRectEffect::Make(&allocator, RRect::MakeRectXY(Rect::MakeWH(100, 80), 10, 12),
+                                Matrix::MakeScale(0, 1), true);
+    EXPECT_EQ(fp, nullptr);
+  }
 }
 
 TGFX_TEST(ClipTest, State) {
@@ -133,40 +180,35 @@ TGFX_TEST(ClipTest, State) {
   ASSERT_NE(context, nullptr);
   auto surface = Surface::Make(context, 100, 100);
   auto canvas = surface->getCanvas();
+  auto* clipStack = ClipTestAccess::Stack(canvas);
 
   // Case 1: WideOpen is the initial state.
-  TGFX_PRIVATE_ACCESS({
-    EXPECT_EQ(canvas->clipStack->state(), ClipState::WideOpen);
-    EXPECT_TRUE(canvas->clipStack->elements().empty());
-  });
+  EXPECT_EQ(clipStack->state(), ClipState::WideOpen);
+  EXPECT_TRUE(clipStack->elements().empty());
 
   // Case 2: Single rect clip transitions to Rect state.
   canvas->clipRect(Rect::MakeXYWH(10, 20, 80, 60), true);
-  TGFX_PRIVATE_ACCESS({
-    EXPECT_EQ(canvas->clipStack->state(), ClipState::Rect);
-    EXPECT_EQ(canvas->clipStack->bounds(), Rect::MakeXYWH(10, 20, 80, 60));
-  });
+  EXPECT_EQ(clipStack->state(), ClipState::Rect);
+  EXPECT_EQ(clipStack->bounds(), Rect::MakeXYWH(10, 20, 80, 60));
 
   // Case 3: Non-rect clip transitions to Complex state.
   canvas->save();
   Path path = {};
   path.addOval(Rect::MakeXYWH(20, 30, 40, 40));
   canvas->clipPath(path, true);
-  TGFX_PRIVATE_ACCESS({ EXPECT_EQ(canvas->clipStack->state(), ClipState::Complex); });
+  EXPECT_EQ(clipStack->state(), ClipState::Complex);
   canvas->restore();
 
   // Case 4: Disjoint clip transitions to Empty state.
   canvas->save();
   canvas->clipRect(Rect::MakeXYWH(300, 300, 10, 10), true);
-  TGFX_PRIVATE_ACCESS({ EXPECT_EQ(canvas->clipStack->state(), ClipState::Empty); });
+  EXPECT_EQ(clipStack->state(), ClipState::Empty);
   canvas->restore();
 
   // Case 5: Transforming ClipStack changes Rect state to Complex.
-  TGFX_PRIVATE_ACCESS({
-    EXPECT_EQ(canvas->clipStack->state(), ClipState::Rect);
-    canvas->clipStack->transform(Matrix::MakeRotate(45.0f));
-    EXPECT_EQ(canvas->clipStack->state(), ClipState::Complex);
-  });
+  EXPECT_EQ(clipStack->state(), ClipState::Rect);
+  clipStack->transform(Matrix::MakeRotate(45.0f));
+  EXPECT_EQ(clipStack->state(), ClipState::Complex);
 }
 
 TGFX_TEST(ClipTest, ElementType) {
@@ -175,18 +217,17 @@ TGFX_TEST(ClipTest, ElementType) {
   ASSERT_NE(context, nullptr);
   auto surface = Surface::Make(context, 100, 100);
   auto canvas = surface->getCanvas();
+  auto* clipStack = ClipTestAccess::Stack(canvas);
 
   // Case 1: clipRect -> Type::Rect.
   {
     canvas->save();
     canvas->clipRect(Rect::MakeXYWH(20, 30, 40, 40), true);
-    TGFX_PRIVATE_ACCESS({
-      const auto& elems = canvas->clipStack->elements();
-      ASSERT_EQ(elems.size(), 1u);
-      EXPECT_EQ(elems[0].shape().type(), GeometryShape::Type::Rect);
-      EXPECT_EQ(elems[0].shape().rect(), Rect::MakeXYWH(20, 30, 40, 40));
-      EXPECT_TRUE(elems[0].antiAlias());
-    });
+    const auto& elems = clipStack->elements();
+    ASSERT_EQ(elems.size(), 1u);
+    EXPECT_EQ(elems[0].shape().type(), GeometryShape::Type::Rect);
+    EXPECT_EQ(elems[0].shape().rect(), Rect::MakeXYWH(20, 30, 40, 40));
+    EXPECT_TRUE(elems[0].antiAlias());
     canvas->restore();
   }
 
@@ -194,12 +235,10 @@ TGFX_TEST(ClipTest, ElementType) {
   {
     canvas->save();
     canvas->clipRRect(RRect::MakeRectXY(Rect::MakeXYWH(20, 30, 40, 40), 8, 12), true);
-    TGFX_PRIVATE_ACCESS({
-      const auto& elems = canvas->clipStack->elements();
-      ASSERT_EQ(elems.size(), 1u);
-      EXPECT_EQ(elems[0].shape().type(), GeometryShape::Type::RRect);
-      EXPECT_EQ(elems[0].shape().rRect().type(), RRect::Type::Simple);
-    });
+    const auto& elems = clipStack->elements();
+    ASSERT_EQ(elems.size(), 1u);
+    EXPECT_EQ(elems[0].shape().type(), GeometryShape::Type::RRect);
+    EXPECT_EQ(elems[0].shape().rRect().type(), RRect::Type::Simple);
     canvas->restore();
   }
 
@@ -207,12 +246,10 @@ TGFX_TEST(ClipTest, ElementType) {
   {
     canvas->save();
     canvas->clipRRect(RRect::MakeRectXY(Rect::MakeWH(80, 60), 0, 0), true);
-    TGFX_PRIVATE_ACCESS({
-      const auto& elems = canvas->clipStack->elements();
-      ASSERT_EQ(elems.size(), 1u);
-      EXPECT_EQ(elems[0].shape().type(), GeometryShape::Type::Rect);
-      EXPECT_EQ(elems[0].shape().rect(), Rect::MakeWH(80, 60));
-    });
+    const auto& elems = clipStack->elements();
+    ASSERT_EQ(elems.size(), 1u);
+    EXPECT_EQ(elems[0].shape().type(), GeometryShape::Type::Rect);
+    EXPECT_EQ(elems[0].shape().rect(), Rect::MakeWH(80, 60));
     canvas->restore();
   }
 
@@ -222,12 +259,10 @@ TGFX_TEST(ClipTest, ElementType) {
     Path path = {};
     path.addRect(Rect::MakeXYWH(20, 30, 40, 40));
     canvas->clipPath(path, true);
-    TGFX_PRIVATE_ACCESS({
-      const auto& elems = canvas->clipStack->elements();
-      ASSERT_EQ(elems.size(), 1u);
-      EXPECT_EQ(elems[0].shape().type(), GeometryShape::Type::Rect);
-      EXPECT_EQ(elems[0].shape().rect(), Rect::MakeXYWH(20, 30, 40, 40));
-    });
+    const auto& elems = clipStack->elements();
+    ASSERT_EQ(elems.size(), 1u);
+    EXPECT_EQ(elems[0].shape().type(), GeometryShape::Type::Rect);
+    EXPECT_EQ(elems[0].shape().rect(), Rect::MakeXYWH(20, 30, 40, 40));
     canvas->restore();
   }
 
@@ -237,13 +272,11 @@ TGFX_TEST(ClipTest, ElementType) {
     Path path = {};
     path.addOval(Rect::MakeXYWH(20, 30, 60, 60));
     canvas->clipPath(path, false);
-    TGFX_PRIVATE_ACCESS({
-      const auto& elems = canvas->clipStack->elements();
-      ASSERT_EQ(elems.size(), 1u);
-      EXPECT_EQ(elems[0].shape().type(), GeometryShape::Type::RRect);
-      EXPECT_EQ(elems[0].shape().rRect().type(), RRect::Type::Oval);
-      EXPECT_FALSE(elems[0].antiAlias());
-    });
+    const auto& elems = clipStack->elements();
+    ASSERT_EQ(elems.size(), 1u);
+    EXPECT_EQ(elems[0].shape().type(), GeometryShape::Type::RRect);
+    EXPECT_EQ(elems[0].shape().rRect().type(), RRect::Type::Oval);
+    EXPECT_FALSE(elems[0].antiAlias());
     canvas->restore();
   }
 
@@ -253,12 +286,10 @@ TGFX_TEST(ClipTest, ElementType) {
     Path path = {};
     path.addRoundRect(Rect::MakeXYWH(20, 30, 40, 40), 8, 12);
     canvas->clipPath(path, true);
-    TGFX_PRIVATE_ACCESS({
-      const auto& elems = canvas->clipStack->elements();
-      ASSERT_EQ(elems.size(), 1u);
-      EXPECT_EQ(elems[0].shape().type(), GeometryShape::Type::RRect);
-      EXPECT_EQ(elems[0].shape().rRect().type(), RRect::Type::Simple);
-    });
+    const auto& elems = clipStack->elements();
+    ASSERT_EQ(elems.size(), 1u);
+    EXPECT_EQ(elems[0].shape().type(), GeometryShape::Type::RRect);
+    EXPECT_EQ(elems[0].shape().rRect().type(), RRect::Type::Simple);
     canvas->restore();
   }
 
@@ -267,11 +298,9 @@ TGFX_TEST(ClipTest, ElementType) {
     canvas->save();
     auto path = MakePath({{50, 10}, {90, 90}, {10, 90}});
     canvas->clipPath(path, true);
-    TGFX_PRIVATE_ACCESS({
-      const auto& elems = canvas->clipStack->elements();
-      ASSERT_EQ(elems.size(), 1u);
-      EXPECT_EQ(elems[0].shape().type(), GeometryShape::Type::Path);
-    });
+    const auto& elems = clipStack->elements();
+    ASSERT_EQ(elems.size(), 1u);
+    EXPECT_EQ(elems[0].shape().type(), GeometryShape::Type::Path);
     canvas->restore();
   }
 }
@@ -282,16 +311,15 @@ TGFX_TEST(ClipTest, Merge) {
   ASSERT_NE(context, nullptr);
   auto surface = Surface::Make(context, 100, 100);
   auto canvas = surface->getCanvas();
+  auto* clipStack = ClipTestAccess::Stack(canvas);
 
   // Case 1: Redundant clip is eliminated.
   {
     canvas->save();
     canvas->clipRect(Rect::MakeXYWH(10, 20, 80, 60), true);
     canvas->clipRect(Rect::MakeXYWH(0, 0, 200, 200), true);
-    TGFX_PRIVATE_ACCESS({
-      EXPECT_EQ(canvas->clipStack->elements().size(), 1u);
-      EXPECT_EQ(canvas->clipStack->bounds(), Rect::MakeXYWH(10, 20, 80, 60));
-    });
+    EXPECT_EQ(clipStack->elements().size(), 1u);
+    EXPECT_EQ(clipStack->bounds(), Rect::MakeXYWH(10, 20, 80, 60));
     canvas->restore();
   }
 
@@ -301,11 +329,9 @@ TGFX_TEST(ClipTest, Merge) {
     canvas->save();
     canvas->clipRect(Rect::MakeXYWH(10, 20, 80, 60), false);
     canvas->clipRect(Rect::MakeXYWH(50, 50, 100, 100), true);
-    TGFX_PRIVATE_ACCESS({
-      EXPECT_EQ(canvas->clipStack->elements().size(), 1u);
-      EXPECT_EQ(canvas->clipStack->bounds(), Rect::MakeXYWH(50, 50, 40, 30));
-      EXPECT_FALSE(canvas->clipStack->elements().front().antiAlias());
-    });
+    EXPECT_EQ(clipStack->elements().size(), 1u);
+    EXPECT_EQ(clipStack->bounds(), Rect::MakeXYWH(50, 50, 40, 30));
+    EXPECT_FALSE(clipStack->elements().front().antiAlias());
     canvas->restore();
   }
 
@@ -314,7 +340,7 @@ TGFX_TEST(ClipTest, Merge) {
     canvas->save();
     canvas->clipRect(Rect::MakeXYWH(10.5f, 20.5f, 50.0f, 50.0f), true);
     canvas->clipRect(Rect::MakeXYWH(20.5f, 30.5f, 50.0f, 50.0f), false);
-    TGFX_PRIVATE_ACCESS({ EXPECT_EQ(canvas->clipStack->elements().size(), 2u); });
+    EXPECT_EQ(clipStack->elements().size(), 2u);
     canvas->restore();
   }
 
@@ -324,11 +350,11 @@ TGFX_TEST(ClipTest, Merge) {
     Path path = {};
     path.addRoundRect(Rect::MakeLTRB(10, 10, 90, 90), 10, 10);
     canvas->clipPath(path);
-    TGFX_PRIVATE_ACCESS({ EXPECT_EQ(canvas->clipStack->elements().size(), 1u); });
+    EXPECT_EQ(clipStack->elements().size(), 1u);
     canvas->clipPath(path);
-    TGFX_PRIVATE_ACCESS({ EXPECT_EQ(canvas->clipStack->elements().size(), 1u); });
+    EXPECT_EQ(clipStack->elements().size(), 1u);
     canvas->clipPath(path, false);
-    TGFX_PRIVATE_ACCESS({ EXPECT_EQ(canvas->clipStack->elements().size(), 2u); });
+    EXPECT_EQ(clipStack->elements().size(), 2u);
     canvas->restore();
   }
 
@@ -337,24 +363,22 @@ TGFX_TEST(ClipTest, Merge) {
     canvas->save();
     canvas->clipRRect(RRect::MakeRectXY(Rect::MakeLTRB(0, 0, 80, 80), 10, 10));
     canvas->clipRRect(RRect::MakeRectXY(Rect::MakeLTRB(30, 30, 120, 120), 10, 10));
-    TGFX_PRIVATE_ACCESS({
-      const auto& elems = canvas->clipStack->elements();
-      size_t valid = 0;
-      const ClipElement* survivor = nullptr;
-      for (const auto& e : elems) {
-        if (e.isValid()) {
-          ++valid;
-          survivor = &e;
-        }
+    const auto& elems = clipStack->elements();
+    size_t valid = 0;
+    const ClipElement* survivor = nullptr;
+    for (const auto& e : elems) {
+      if (e.isValid()) {
+        ++valid;
+        survivor = &e;
       }
-      ASSERT_EQ(valid, 1u);
-      ASSERT_EQ(survivor->shape().type(), GeometryShape::Type::RRect);
-      EXPECT_EQ(survivor->shape().rRect().rect(), Rect::MakeLTRB(30, 30, 80, 80));
-      EXPECT_EQ(survivor->shape().rRect().radii()[0], (Point{10, 10}));
-      EXPECT_EQ(survivor->shape().rRect().radii()[1], (Point{0, 0}));
-      EXPECT_EQ(survivor->shape().rRect().radii()[2], (Point{10, 10}));
-      EXPECT_EQ(survivor->shape().rRect().radii()[3], (Point{0, 0}));
-    });
+    }
+    ASSERT_EQ(valid, 1u);
+    ASSERT_EQ(survivor->shape().type(), GeometryShape::Type::RRect);
+    EXPECT_EQ(survivor->shape().rRect().rect(), Rect::MakeLTRB(30, 30, 80, 80));
+    EXPECT_EQ(survivor->shape().rRect().radii()[0], (Point{10, 10}));
+    EXPECT_EQ(survivor->shape().rRect().radii()[1], (Point{0, 0}));
+    EXPECT_EQ(survivor->shape().rRect().radii()[2], (Point{10, 10}));
+    EXPECT_EQ(survivor->shape().rRect().radii()[3], (Point{0, 0}));
     canvas->restore();
   }
 
@@ -365,14 +389,12 @@ TGFX_TEST(ClipTest, Merge) {
         RRect::MakeRectRadii(Rect::MakeWH(100, 100), {{{20, 5}, {0, 0}, {0, 0}, {0, 0}}}));
     canvas->clipRRect(
         RRect::MakeRectRadii(Rect::MakeWH(100, 100), {{{5, 20}, {0, 0}, {0, 0}, {0, 0}}}));
-    TGFX_PRIVATE_ACCESS({
-      const auto& elems = canvas->clipStack->elements();
-      size_t valid = 0;
-      for (const auto& e : elems) {
-        if (e.isValid()) ++valid;
-      }
-      EXPECT_EQ(valid, 2u);
-    });
+    const auto& elems = clipStack->elements();
+    size_t valid = 0;
+    for (const auto& e : elems) {
+      if (e.isValid()) ++valid;
+    }
+    EXPECT_EQ(valid, 2u);
     canvas->restore();
   }
 
@@ -383,14 +405,12 @@ TGFX_TEST(ClipTest, Merge) {
         RRect::MakeRectRadii(Rect::MakeWH(100, 100), {{{60, 20}, {0, 0}, {0, 0}, {0, 0}}}));
     canvas->clipRRect(
         RRect::MakeRectRadii(Rect::MakeWH(100, 100), {{{0, 0}, {60, 20}, {0, 0}, {0, 0}}}));
-    TGFX_PRIVATE_ACCESS({
-      const auto& elems = canvas->clipStack->elements();
-      size_t valid = 0;
-      for (const auto& e : elems) {
-        if (e.isValid()) ++valid;
-      }
-      EXPECT_EQ(valid, 2u);
-    });
+    const auto& elems = clipStack->elements();
+    size_t valid = 0;
+    for (const auto& e : elems) {
+      if (e.isValid()) ++valid;
+    }
+    EXPECT_EQ(valid, 2u);
     canvas->restore();
   }
 
@@ -406,14 +426,12 @@ TGFX_TEST(ClipTest, Merge) {
     m2.setRotate(60);
     canvas->concat(m2);
     canvas->clipRRect(RRect::MakeRectXY(Rect::MakeWH(100, 100), 10, 10));
-    TGFX_PRIVATE_ACCESS({
-      const auto& elems = canvas->clipStack->elements();
-      size_t valid = 0;
-      for (const auto& e : elems) {
-        if (e.isValid()) ++valid;
-      }
-      EXPECT_EQ(valid, 2u);
-    });
+    const auto& elems = clipStack->elements();
+    size_t valid = 0;
+    for (const auto& e : elems) {
+      if (e.isValid()) ++valid;
+    }
+    EXPECT_EQ(valid, 2u);
     canvas->restore();
   }
 
@@ -422,14 +440,12 @@ TGFX_TEST(ClipTest, Merge) {
     canvas->save();
     canvas->clipRRect(RRect::MakeRectXY(Rect::MakeXYWH(10, 10, 80, 80), 10, 10), true);
     canvas->clipRRect(RRect::MakeRectXY(Rect::MakeXYWH(10, 10, 80, 80), 10, 10), false);
-    TGFX_PRIVATE_ACCESS({
-      const auto& elems = canvas->clipStack->elements();
-      size_t valid = 0;
-      for (const auto& e : elems) {
-        if (e.isValid()) ++valid;
-      }
-      EXPECT_EQ(valid, 2u);
-    });
+    const auto& elems = clipStack->elements();
+    size_t valid = 0;
+    for (const auto& e : elems) {
+      if (e.isValid()) ++valid;
+    }
+    EXPECT_EQ(valid, 2u);
     canvas->restore();
   }
 
@@ -438,18 +454,16 @@ TGFX_TEST(ClipTest, Merge) {
     canvas->save();
     canvas->clipRRect(RRect::MakeRectXY(Rect::MakeLTRB(0, 0, 100, 100), 10, 10));
     canvas->clipRRect(RRect::MakeRectXY(Rect::MakeLTRB(10, 10, 90, 90), 10, 10));
-    TGFX_PRIVATE_ACCESS({
-      const auto& elems = canvas->clipStack->elements();
-      size_t valid = 0;
-      for (const auto& e : elems) {
-        if (e.isValid()) {
-          ++valid;
-          EXPECT_FALSE(e.outerBounds().isEmpty());
-          EXPECT_FALSE(e.innerBounds().isEmpty());
-        }
+    const auto& elems = clipStack->elements();
+    size_t valid = 0;
+    for (const auto& e : elems) {
+      if (e.isValid()) {
+        ++valid;
+        EXPECT_FALSE(e.outerBounds().isEmpty());
+        EXPECT_FALSE(e.innerBounds().isEmpty());
       }
-      EXPECT_EQ(valid, 1u);
-    });
+    }
+    EXPECT_EQ(valid, 1u);
     canvas->restore();
   }
 
@@ -459,18 +473,16 @@ TGFX_TEST(ClipTest, Merge) {
     canvas->clipRRect(RRect::MakeRectRadii(Rect::MakeLTRB(0, 0, 300, 200),
                                            {{{10, 90}, {10, 90}, {20, 90}, {10, 90}}}));
     canvas->clipRect(Rect::MakeLTRB(280, 0, 300, 100));
-    TGFX_PRIVATE_ACCESS({
-      const auto& elems = canvas->clipStack->elements();
-      size_t valid = 0;
-      for (const auto& e : elems) {
-        if (e.isValid()) {
-          ++valid;
-          EXPECT_TRUE(e.innerBounds().isEmpty());
-          EXPECT_FALSE(e.outerBounds().isEmpty());
-        }
+    const auto& elems = clipStack->elements();
+    size_t valid = 0;
+    for (const auto& e : elems) {
+      if (e.isValid()) {
+        ++valid;
+        EXPECT_TRUE(e.innerBounds().isEmpty());
+        EXPECT_FALSE(e.outerBounds().isEmpty());
       }
-      EXPECT_EQ(valid, 1u);
-    });
+    }
+    EXPECT_EQ(valid, 1u);
     canvas->restore();
   }
 
@@ -490,20 +502,18 @@ TGFX_TEST(ClipTest, Merge) {
     outer.addRect(Rect::MakeLTRB(20, 20, 80, 80));
     outer.toggleInverseFillType();
     canvas->clipPath(outer);
-    TGFX_PRIVATE_ACCESS({
-      EXPECT_EQ(canvas->clipStack->state(), ClipState::Complex);
-      const auto& elems = canvas->clipStack->elements();
-      ASSERT_EQ(elems.size(), 2u);
-      // [0] is the initial clipRect, untouched.
-      EXPECT_TRUE(elems[0].isValid());
-      EXPECT_TRUE(elems[0].shape().isRect());
-      EXPECT_EQ(elems[0].outerBounds(), Rect::MakeWH(100, 100));
-      // [1] was inner originally; outer's BOnly verdict invalidated inner, and appendElement
-      // reused the freed slot for outer.
-      EXPECT_TRUE(elems[1].isValid());
-      EXPECT_TRUE(elems[1].shape().path().isInverseFillType());
-      EXPECT_EQ(elems[1].shape().path().getBounds(), Rect::MakeLTRB(20, 20, 80, 80));
-    });
+    EXPECT_EQ(clipStack->state(), ClipState::Complex);
+    const auto& elems = clipStack->elements();
+    ASSERT_EQ(elems.size(), 2u);
+    // [0] is the initial clipRect, untouched.
+    EXPECT_TRUE(elems[0].isValid());
+    EXPECT_TRUE(elems[0].shape().isRect());
+    EXPECT_EQ(elems[0].outerBounds(), Rect::MakeWH(100, 100));
+    // [1] was inner originally; outer's BOnly verdict invalidated inner, and appendElement
+    // reused the freed slot for outer.
+    EXPECT_TRUE(elems[1].isValid());
+    EXPECT_TRUE(elems[1].shape().path().isInverseFillType());
+    EXPECT_EQ(elems[1].shape().path().getBounds(), Rect::MakeLTRB(20, 20, 80, 80));
     canvas->restore();
   }
 
@@ -518,9 +528,9 @@ TGFX_TEST(ClipTest, Merge) {
     hole.addRect(Rect::MakeLTRB(20, 20, 80, 80));
     hole.toggleInverseFillType();
     canvas->clipPath(hole);
-    TGFX_PRIVATE_ACCESS({ EXPECT_EQ(canvas->clipStack->state(), ClipState::Complex); });
+    EXPECT_EQ(clipStack->state(), ClipState::Complex);
     canvas->clipRect(Rect::MakeLTRB(30, 30, 70, 70));
-    TGFX_PRIVATE_ACCESS({ EXPECT_EQ(canvas->clipStack->state(), ClipState::Empty); });
+    EXPECT_EQ(clipStack->state(), ClipState::Empty);
     canvas->restore();
   }
 
@@ -537,20 +547,18 @@ TGFX_TEST(ClipTest, Merge) {
     hole.toggleInverseFillType();
     canvas->clipPath(hole);
     canvas->clipRect(Rect::MakeLTRB(10, 10, 40, 40));
-    TGFX_PRIVATE_ACCESS({
-      EXPECT_EQ(canvas->clipStack->state(), ClipState::Complex);
-      const auto& elems = canvas->clipStack->elements();
-      ASSERT_EQ(elems.size(), 2u);
-      // [0] is the initial clipRect after tryCombine absorbed the new clipRect into it.
-      EXPECT_TRUE(elems[0].isValid());
-      EXPECT_TRUE(elems[0].shape().isRect());
-      EXPECT_EQ(elems[0].outerBounds(), Rect::MakeLTRB(10, 10, 40, 40));
-      // [1] is the inverse-fill hole. Both elements survive because the rect's bounds
-      // straddle the hole's boundary, and the hole's shape does not cover the rect.
-      EXPECT_TRUE(elems[1].isValid());
-      EXPECT_TRUE(elems[1].shape().path().isInverseFillType());
-      EXPECT_EQ(elems[1].shape().path().getBounds(), Rect::MakeLTRB(20, 20, 80, 80));
-    });
+    EXPECT_EQ(clipStack->state(), ClipState::Complex);
+    const auto& elems = clipStack->elements();
+    ASSERT_EQ(elems.size(), 2u);
+    // [0] is the initial clipRect after tryCombine absorbed the new clipRect into it.
+    EXPECT_TRUE(elems[0].isValid());
+    EXPECT_TRUE(elems[0].shape().isRect());
+    EXPECT_EQ(elems[0].outerBounds(), Rect::MakeLTRB(10, 10, 40, 40));
+    // [1] is the inverse-fill hole. Both elements survive because the rect's bounds
+    // straddle the hole's boundary, and the hole's shape does not cover the rect.
+    EXPECT_TRUE(elems[1].isValid());
+    EXPECT_TRUE(elems[1].shape().path().isInverseFillType());
+    EXPECT_EQ(elems[1].shape().path().getBounds(), Rect::MakeLTRB(20, 20, 80, 80));
     canvas->restore();
   }
 }
@@ -561,6 +569,7 @@ TGFX_TEST(ClipTest, Simplify) {
   ASSERT_NE(context, nullptr);
   auto surface = Surface::Make(context, 100, 100);
   auto canvas = surface->getCanvas();
+  auto* clipStack = ClipTestAccess::Stack(canvas);
 
   // Case 1: Axis-aligned matrix is baked into local geometry.
   {
@@ -568,12 +577,10 @@ TGFX_TEST(ClipTest, Simplify) {
     canvas->translate(10, 20);
     canvas->scale(2.0f, 3.0f);
     canvas->clipRect(Rect::MakeXYWH(0, 0, 30, 20));
-    TGFX_PRIVATE_ACCESS({
-      const auto& elem = canvas->clipStack->elements().back();
-      EXPECT_EQ(elem.shape().type(), GeometryShape::Type::Rect);
-      EXPECT_TRUE(elem.matrix().isIdentity());
-      EXPECT_EQ(elem.shape().rect(), Rect::MakeXYWH(10, 20, 60, 60));
-    });
+    const auto& elem = clipStack->elements().back();
+    EXPECT_EQ(elem.shape().type(), GeometryShape::Type::Rect);
+    EXPECT_TRUE(elem.matrix().isIdentity());
+    EXPECT_EQ(elem.shape().rect(), Rect::MakeXYWH(10, 20, 60, 60));
     canvas->restore();
   }
 
@@ -582,12 +589,10 @@ TGFX_TEST(ClipTest, Simplify) {
     canvas->save();
     canvas->rotate(45);
     canvas->clipRect(Rect::MakeWH(50, 50));
-    TGFX_PRIVATE_ACCESS({
-      const auto& elem = canvas->clipStack->elements().back();
-      EXPECT_EQ(elem.shape().type(), GeometryShape::Type::Rect);
-      EXPECT_FALSE(elem.matrix().isIdentity());
-      EXPECT_EQ(elem.shape().rect(), Rect::MakeWH(50, 50));
-    });
+    const auto& elem = clipStack->elements().back();
+    EXPECT_EQ(elem.shape().type(), GeometryShape::Type::Rect);
+    EXPECT_FALSE(elem.matrix().isIdentity());
+    EXPECT_EQ(elem.shape().rect(), Rect::MakeWH(50, 50));
     canvas->restore();
   }
 
@@ -598,15 +603,13 @@ TGFX_TEST(ClipTest, Simplify) {
     const auto rRect =
         RRect::MakeRectRadii(Rect::MakeWH(80, 60), {{{20, 10}, {30, 15}, {5, 5}, {15, 15}}});
     canvas->clipRRect(rRect);
-    TGFX_PRIVATE_ACCESS({
-      const auto& elem = canvas->clipStack->elements().back();
-      EXPECT_EQ(elem.shape().type(), GeometryShape::Type::RRect);
-      EXPECT_TRUE(elem.matrix().isIdentity());
-      EXPECT_EQ(elem.shape().rRect().radii()[0], (Point{30, 15}));
-      EXPECT_EQ(elem.shape().rRect().radii()[1], (Point{20, 10}));
-      EXPECT_EQ(elem.shape().rRect().radii()[2], (Point{15, 15}));
-      EXPECT_EQ(elem.shape().rRect().radii()[3], (Point{5, 5}));
-    });
+    const auto& elem = clipStack->elements().back();
+    EXPECT_EQ(elem.shape().type(), GeometryShape::Type::RRect);
+    EXPECT_TRUE(elem.matrix().isIdentity());
+    EXPECT_EQ(elem.shape().rRect().radii()[0], (Point{30, 15}));
+    EXPECT_EQ(elem.shape().rRect().radii()[1], (Point{20, 10}));
+    EXPECT_EQ(elem.shape().rRect().radii()[2], (Point{15, 15}));
+    EXPECT_EQ(elem.shape().rRect().radii()[3], (Point{5, 5}));
     canvas->restore();
   }
 
@@ -614,11 +617,9 @@ TGFX_TEST(ClipTest, Simplify) {
   {
     canvas->save();
     canvas->clipRRect(RRect::MakeRectXY(Rect::MakeWH(80, 60), 0, 0));
-    TGFX_PRIVATE_ACCESS({
-      const auto& elem = canvas->clipStack->elements().back();
-      EXPECT_EQ(elem.shape().type(), GeometryShape::Type::Rect);
-      EXPECT_EQ(elem.shape().rect(), Rect::MakeWH(80, 60));
-    });
+    const auto& elem = clipStack->elements().back();
+    EXPECT_EQ(elem.shape().type(), GeometryShape::Type::Rect);
+    EXPECT_EQ(elem.shape().rect(), Rect::MakeWH(80, 60));
     canvas->restore();
   }
 }
@@ -629,40 +630,32 @@ TGFX_TEST(ClipTest, SaveRestore) {
   ASSERT_NE(context, nullptr);
   auto surface = Surface::Make(context, 100, 100);
   auto canvas = surface->getCanvas();
+  auto* clipStack = ClipTestAccess::Stack(canvas);
 
   canvas->clipRect(Rect::MakeXYWH(0, 0, 100, 100), true);
-  uint32_t uniqueIDBefore = 0;
-  TGFX_PRIVATE_ACCESS({
-    uniqueIDBefore = canvas->clipStack->uniqueID();
-    EXPECT_EQ(canvas->clipStack->_data->records.size(), 1u);
-  });
+  uint32_t uniqueIDBefore = clipStack->uniqueID();
+  EXPECT_EQ(ClipTestAccess::Records(clipStack).size(), 1u);
 
   // Case 1: Three saves without clip modification do not materialize new records.
   canvas->save();
   canvas->save();
   canvas->save();
-  TGFX_PRIVATE_ACCESS({
-    EXPECT_EQ(canvas->clipStack->uniqueID(), uniqueIDBefore);
-    EXPECT_EQ(canvas->clipStack->_data->records.size(), 1u);
-  });
+  EXPECT_EQ(clipStack->uniqueID(), uniqueIDBefore);
+  EXPECT_EQ(ClipTestAccess::Records(clipStack).size(), 1u);
 
   // Case 2: A modifying clip materializes a new record.
   canvas->clipRect(Rect::MakeXYWH(20, 20, 60, 60), true);
-  TGFX_PRIVATE_ACCESS({
-    EXPECT_NE(canvas->clipStack->uniqueID(), uniqueIDBefore);
-    EXPECT_EQ(canvas->clipStack->_data->records.size(), 2u);
-    EXPECT_EQ(canvas->clipStack->bounds(), Rect::MakeXYWH(20, 20, 60, 60));
-  });
+  EXPECT_NE(clipStack->uniqueID(), uniqueIDBefore);
+  EXPECT_EQ(ClipTestAccess::Records(clipStack).size(), 2u);
+  EXPECT_EQ(clipStack->bounds(), Rect::MakeXYWH(20, 20, 60, 60));
 
   // Case 3: Restoring rewinds the materialized record.
   canvas->restore();
-  TGFX_PRIVATE_ACCESS({ EXPECT_EQ(canvas->clipStack->_data->records.size(), 1u); });
+  EXPECT_EQ(ClipTestAccess::Records(clipStack).size(), 1u);
   canvas->restore();
   canvas->restore();
-  TGFX_PRIVATE_ACCESS({
-    EXPECT_EQ(canvas->clipStack->_data->records.size(), 1u);
-    EXPECT_EQ(canvas->clipStack->bounds(), Rect::MakeXYWH(0, 0, 100, 100));
-  });
+  EXPECT_EQ(ClipTestAccess::Records(clipStack).size(), 1u);
+  EXPECT_EQ(clipStack->bounds(), Rect::MakeXYWH(0, 0, 100, 100));
 }
 
 TGFX_TEST(ClipTest, QueryClipAndBounds) {
@@ -700,13 +693,11 @@ TGFX_TEST(ClipTest, ScissorOnlyClip) {
   {
     ClipStack clip;
     clip.clipRect(Rect::MakeXYWH(10, 20, 40, 30), Matrix::I(), false);
-    TGFX_PRIVATE_ACCESS({
-      auto applied = compositor.applyClip(clip);
-      EXPECT_EQ(applied.status, AppliedClipStatus::Clipped);
-      EXPECT_EQ(applied.coverageFP, nullptr);
-      ASSERT_TRUE(applied.scissor.has_value());
-      EXPECT_EQ(applied.scissor.value(), Rect::MakeLTRB(10, 20, 50, 50));
-    });
+    auto applied = ClipTestAccess::Apply(&compositor, clip);
+    EXPECT_EQ(applied.status, AppliedClipStatus::Clipped);
+    EXPECT_EQ(applied.coverageFP, nullptr);
+    ASSERT_TRUE(applied.scissor.has_value());
+    EXPECT_EQ(applied.scissor.value(), Rect::MakeLTRB(10, 20, 50, 50));
   }
 
   // Case 2: A pixel-aligned AA rect also maps to an exact integer pixel box, so it too becomes a
@@ -714,13 +705,11 @@ TGFX_TEST(ClipTest, ScissorOnlyClip) {
   {
     ClipStack clip;
     clip.clipRect(Rect::MakeXYWH(10, 20, 40, 30), Matrix::I(), true);
-    TGFX_PRIVATE_ACCESS({
-      auto applied = compositor.applyClip(clip);
-      EXPECT_EQ(applied.status, AppliedClipStatus::Clipped);
-      EXPECT_EQ(applied.coverageFP, nullptr);
-      ASSERT_TRUE(applied.scissor.has_value());
-      EXPECT_EQ(applied.scissor.value(), Rect::MakeLTRB(10, 20, 50, 50));
-    });
+    auto applied = ClipTestAccess::Apply(&compositor, clip);
+    EXPECT_EQ(applied.status, AppliedClipStatus::Clipped);
+    EXPECT_EQ(applied.coverageFP, nullptr);
+    ASSERT_TRUE(applied.scissor.has_value());
+    EXPECT_EQ(applied.scissor.value(), Rect::MakeLTRB(10, 20, 50, 50));
   }
 
   // Case 3: A non-pixel-aligned AA rect has distinct inner and outer bounds, so it needs a coverage
@@ -728,13 +717,11 @@ TGFX_TEST(ClipTest, ScissorOnlyClip) {
   {
     ClipStack clip;
     clip.clipRect(Rect::MakeXYWH(10.5f, 20.5f, 40.0f, 30.0f), Matrix::I(), true);
-    TGFX_PRIVATE_ACCESS({
-      auto applied = compositor.applyClip(clip);
-      EXPECT_EQ(applied.status, AppliedClipStatus::Clipped);
-      EXPECT_NE(applied.coverageFP, nullptr);
-      ASSERT_TRUE(applied.scissor.has_value());
-      EXPECT_EQ(applied.scissor.value(), Rect::MakeLTRB(10, 20, 51, 51));
-    });
+    auto applied = ClipTestAccess::Apply(&compositor, clip);
+    EXPECT_EQ(applied.status, AppliedClipStatus::Clipped);
+    EXPECT_NE(applied.coverageFP, nullptr);
+    ASSERT_TRUE(applied.scissor.has_value());
+    EXPECT_EQ(applied.scissor.value(), Rect::MakeLTRB(10, 20, 51, 51));
   }
 }
 

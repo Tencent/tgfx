@@ -28,6 +28,11 @@
 
 namespace tgfx {
 
+// Test-only accessor forward-declaration. Friended by OpsCompositor so ClipTest.cpp can invoke
+// the private applyClip without relying on -fno-access-control (unavailable on MSVC). Not defined
+// in production code; the definition lives in the test binary.
+class ClipTestAccess;
+
 /**
  * AppliedClipStatus represents the result of applying a clip to a draw operation.
  */
@@ -225,5 +230,6 @@ class OpsCompositor {
 
   friend class DrawingManager;
   friend class PendingOpsAutoReset;
+  friend class ClipTestAccess;
 };
 }  // namespace tgfx
