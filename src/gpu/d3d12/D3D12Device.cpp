@@ -49,7 +49,7 @@ static void EnableD3D12DebugFeatures() {
     if (SUCCEEDED(dredHr)) {
       dredSettings->SetAutoBreadcrumbsEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
       dredSettings->SetPageFaultEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
-      LOGE("[DRED setup] Auto-breadcrumbs and page-fault tracking enabled.");
+      LOGI("[DRED setup] Auto-breadcrumbs and page-fault tracking enabled.");
     } else {
       LOGE(
           "[DRED setup] D3D12GetDebugInterface(ID3D12DeviceRemovedExtendedDataSettings) "
