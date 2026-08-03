@@ -603,14 +603,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
                                       sourcePixelToContentPixel, layerPixelToSourcePixel,
                                       contentWidth, contentHeight, maskImage);
     Point refractOffset = {};
-    auto clipRect = Rect::MakeWH(static_cast<float>(processedBg->width()),
-                                 static_cast<float>(processedBg->height()));
-    if (usesLocalEvaluation) {
-      clipRect = visibleRect;
-      clipRect.offset(-sourceOrigin.x, -sourceOrigin.y);
-      clipRect.scale(scaleRatioX, scaleRatioY);
-    }
-    auto refractedImage = processedBg->makeWithFilter(filter, &refractOffset, &clipRect);
+    auto refractedImage = processedBg->makeWithFilter(filter, &refractOffset, nullptr);
     if (refractedImage) {
       processedBg = refractedImage;
       processedOffset += refractOffset;
