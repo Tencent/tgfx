@@ -187,13 +187,14 @@ void D3D12CommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTextur
       dstRowBytes > 0 ? static_cast<uint32_t>(dstRowBytes) : copyWidth * bytesPerPixel;
 
   // D3D12 requires CopyTextureRegion's destination buffer footprint to use a row pitch that is a
-  // multiple of D3D12_TEXTURE_DATA_PITCH_ALIGNMENT (256). The caller's buffer is laid out tightly
-  // (one row immediately follows the previous), so when tightRowBytes happens to be unaligned we
-  // route the copy through a transient default-heap staging buffer with an aligned row pitch and
-  // then issue per-row CopyBufferRegion calls to repack the rows into the caller's buffer.
+  // multiple of D3D12_TEXTURE_DATA_PITCH_ALIGNMENT (256) and a placed footprint offset that is a
+  // multiple of D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT (512). When either constraint is violated we
+  // route the copy through a transient default-heap staging buffer with an aligned layout and then
+  // issue per-row CopyBufferRegion calls to repack the rows into the caller's buffer.
   uint32_t alignedRowPitch = (tightRowBytes + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1) &
                              ~(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1);
-  bool needsRepack = (alignedRowPitch != tightRowBytes);
+  bool needsRepack = (alignedRowPitch != tightRowBytes) ||
+                     ((dstOffset & (D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT - 1)) != 0);
 
   TransitionResourceState(cmd, d3d12Src->d3d12Resource(), d3d12Src->currentState(),
                           D3D12_RESOURCE_STATE_COPY_SOURCE);
