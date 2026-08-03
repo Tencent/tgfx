@@ -59,8 +59,13 @@ enum class MaterializationConsumer {
  * context.
  */
 struct MaterializationDecision {
+  /// True when the child cannot be consumed inline at all: the consumer has no valid form that
+  /// accepts it, so materializing is what makes the render correct. Holds regardless of any AOT
+  /// setting.
+  bool requiredForCorrectness = false;
   /// True when the child should be rendered into an offscreen texture and replaced by a plain
   /// TextureEffect so both the producer and the downstream consumer become AOT-matchable kernels.
+  /// This covers matchability only, so callers may honor it only while the decomposition route is on.
   bool shouldFlatten = false;
   /// Extra ring of pixels the materialized texture must carry around the draw bounds. The draw
   /// bounds describe the area being painted, not the area the consumer samples: a coordinate landing
@@ -98,9 +103,10 @@ struct MaterializedTarget {
 class AOTMaterializationPolicy {
  public:
   /**
-   * Decides whether the given child must be materialized to remain AOT-matchable when consumed in
-   * the given context. This reflects AOT matchability only; it does not consider correctness
-   * constraints that force flattening regardless (those are handled separately by the caller).
+   * Decides how the given child must be treated when consumed in the given context. The result
+   * separates the two independent reasons to materialize: requiredForCorrectness, when the consumer
+   * cannot accept the child inline at all, and shouldFlatten, when it could but the resulting
+   * permutation has no precompiled artifact.
    *
    * @param child       The child FragmentProcessor, or nullptr for an absent child.
    * @param consumer    How the child is consumed by its parent.

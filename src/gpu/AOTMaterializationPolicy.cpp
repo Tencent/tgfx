@@ -40,6 +40,16 @@ static bool IsPointwiseBlendLeafMatchable(const FragmentProcessor* fp, size_t ch
   return false;
 }
 
+// Whether XfermodeFragmentProcessor can take this child inline at all. Wider than matchability: a
+// TiledTextureEffect src is a valid child even though no precompiled blend kernel covers it, so it
+// is legal to keep inline but still worth materializing for AOT.
+static bool IsPointwiseBlendLeafLegal(const FragmentProcessor* fp, size_t childIndex) {
+  if (IsPointwiseBlendLeafMatchable(fp, childIndex)) {
+    return true;
+  }
+  return childIndex == 0 && fp != nullptr && fp->name() == "TiledTextureEffect";
+}
+
 MaterializationDecision AOTMaterializationPolicy::Evaluate(const FragmentProcessor* child,
                                                            MaterializationConsumer consumer,
                                                            size_t childIndex) {
@@ -51,6 +61,7 @@ MaterializationDecision AOTMaterializationPolicy::Evaluate(const FragmentProcess
       // the draw bounds, and without the apron that read clamps to the edge texels and turns the
       // transparent border opaque. Measured on the full Metal suite, a wider apron changes nothing,
       // so one pixel is the exact requirement rather than a safety margin.
+      decision.requiredForCorrectness = !IsPointwiseBlendLeafLegal(child, childIndex);
       decision.shouldFlatten = !IsPointwiseBlendLeafMatchable(child, childIndex);
       decision.apronRadius = 1.0f;
       break;
