@@ -938,10 +938,6 @@ void D3D12GPU::waitAllInflightSubmissions() {
   pollCompletedSubmissions();
 }
 
-uint64_t D3D12GPU::completedFenceValue() const {
-  return _frameFence != nullptr ? _frameFence->GetCompletedValue() : 0;
-}
-
 void D3D12GPU::pollCompletedSubmissions() {
   if (_frameFence == nullptr) {
     return;

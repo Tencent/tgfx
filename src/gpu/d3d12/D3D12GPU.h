@@ -171,12 +171,6 @@ class D3D12GPU : public GPU {
   void waitAllInflightSubmissions();
 
   /**
-   * Returns the latest fence value that the GPU has signalled. Used by D3D12Buffer::isReady() to
-   * answer "is the GPU done with this buffer?" without blocking.
-   */
-  uint64_t completedFenceValue() const;
-
-  /**
    * Returns the steady_clock::time_point at which the most recently completed inflight
    * submission was first submitted. Mirrors VulkanGPU::lastFenceSignalTime() and is used by
    * D3D12CommandQueue::completedFrameTime() to gate scratch-resource reuse — without this,
