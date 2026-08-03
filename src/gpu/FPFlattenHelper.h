@@ -96,6 +96,11 @@ static inline PlacementPtr<FragmentProcessor> FlattenToTexture(const FPArgs& arg
     return nullptr;
   }
   auto uvMatrix = Matrix::MakeTrans(-drawRect.x(), -drawRect.y());
+  auto cache = context->precompiledShaderCache();
+  if (cache != nullptr && cache->diagnosticRecordingEnabled()) {
+    auto bytes = static_cast<uint64_t>(width) * static_cast<uint64_t>(height) * 4;
+    cache->recordMaterializedEdge(bytes);
+  }
   auto allocator = context->drawingAllocator();
   return TextureEffect::Make(allocator, std::move(textureProxy), {}, &uvMatrix);
 }

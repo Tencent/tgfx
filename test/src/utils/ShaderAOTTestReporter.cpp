@@ -29,6 +29,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include "gpu/AOTEffect.h"
 #include "gpu/EmbeddedShaderBundles.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/PrecompiledShaderCache.h"
@@ -81,6 +82,7 @@ struct ShaderAOTSummary {
 static void AddDrawStats(AOTDrawStats* target, const AOTDrawStats& source) {
   target->draws += source.draws;
   target->completeAOTDraws += source.completeAOTDraws;
+  target->atomicFallbacks += source.atomicFallbacks;
   target->kernelInvocations += source.kernelInvocations;
   target->offscreenTargets += source.offscreenTargets;
   target->materializedEdges += source.materializedEdges;
@@ -93,6 +95,7 @@ static void AddDrawStats(AOTDrawStats* target, const AOTDrawStats& source) {
 static nlohmann::json DrawStatsToJSON(const AOTDrawStats& stats) {
   return {{"draws", stats.draws},
           {"completeAOTDraws", stats.completeAOTDraws},
+          {"atomicFallbacks", stats.atomicFallbacks},
           {"kernelInvocations", stats.kernelInvocations},
           {"offscreenTargets", stats.offscreenTargets},
           {"materializedEdges", stats.materializedEdges},
@@ -367,11 +370,6 @@ static nlohmann::json FallbackRecordToJSON(const PrecompiledFallbackRecord& reco
   return result;
 }
 
-// The sampler budget a single fused pointwise kernel can bind. A chain whose combined color +
-// coverage texture leaves exceed this cannot be served by one fused pass and would require a
-// materialization split, so the audit flags it separately from the plain fusable count.
-static constexpr int kFusedSamplerBudget = 8;
-
 // Aggregates the per-draw decomposition feasibility analysis (attached to NoMatchingRule fallback
 // records during diagnostic runs) into a machine-readable audit: per-axis outcome histograms, the
 // blocking-fragment-processor histogram ranked by how many misses each unimplemented lowering
@@ -409,7 +407,7 @@ static nlohmann::json BuildDecompositionAudit(const std::vector<AggregatedFallba
     bool coverageServable = coverage.outcome == AOTDecomposeOutcome::Trivial ||
                             coverage.outcome == AOTDecomposeOutcome::FusablePointwise;
     if (colorFusable && coverageServable) {
-      if (color.textureLeafCount + coverage.textureLeafCount > kFusedSamplerBudget) {
+      if (color.textureLeafCount + coverage.textureLeafCount > MaxFusedAOTSamplers) {
         samplerBudgetExceeded += count;
       } else {
         fusableNow += count;
@@ -440,7 +438,7 @@ static nlohmann::json BuildDecompositionAudit(const std::vector<AggregatedFallba
           {"colorOutcomes", colorOutcomes},
           {"coverageOutcomes", coverageOutcomes},
           {"blockingProcessorsRanked", std::move(blockingJSON)},
-          {"fusedSamplerBudget", kFusedSamplerBudget}};
+          {"fusedSamplerBudget", MaxFusedAOTSamplers}};
 }
 
 class ShaderAOTTestReporter : public testing::EmptyTestEventListener {

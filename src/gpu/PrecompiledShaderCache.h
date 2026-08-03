@@ -89,12 +89,13 @@ const char* PrecompiledAOTStageName(PrecompiledAOTStage stage);
  * above, these describe how one logical Draw decomposes: how many Kernel invocations it issues, how
  * many offscreen targets and materialized edges it creates, and the intermediate/peak temporary
  * bytes it consumes. A Draw counts as a complete AOT Draw only when every one of its invocations
- * hits AOT (see design §9.2). These are populated by the decomposition executor (stage 2+); until
- * then they remain zero.
+ * hits AOT (see design §9.2). Atomic fallbacks count planned AOT Draws that execute only the
+ * untouched original Draw after strict preparation rejects the whole plan.
  */
 struct AOTDrawStats {
   uint64_t draws = 0;
   uint64_t completeAOTDraws = 0;
+  uint64_t atomicFallbacks = 0;
   uint64_t kernelInvocations = 0;
   uint64_t offscreenTargets = 0;
   uint64_t materializedEdges = 0;
@@ -227,6 +228,12 @@ class PrecompiledShaderCache {
   /// Records the decomposition outcome of one logical Draw. `complete` marks whether every Kernel
   /// invocation of this Draw hit AOT. Called by the decomposition executor (stage 2+).
   void recordDraw(const AOTDrawStats& delta, bool complete);
+
+  /// Records one materialized edge produced outside the decomposition executor, i.e. by an
+  /// inline flatten that renders an FP subtree into an offscreen texture. Unlike recordDraw this
+  /// leaves the Draw-level counters untouched, because an inline flatten is one edge of a Draw
+  /// rather than a Draw of its own. `bytes` is the size of the offscreen target it allocated.
+  void recordMaterializedEdge(uint64_t bytes);
 
   /// Returns a snapshot of accumulated Draw-level metrics since the last reset.
   AOTDrawStats drawStats() const;

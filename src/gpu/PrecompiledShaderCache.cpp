@@ -130,6 +130,7 @@ void PrecompiledShaderCache::recordDraw(const AOTDrawStats& delta, bool complete
   if (complete) {
     _drawStats.completeAOTDraws++;
   }
+  _drawStats.atomicFallbacks += delta.atomicFallbacks;
   _drawStats.kernelInvocations += delta.kernelInvocations;
   _drawStats.offscreenTargets += delta.offscreenTargets;
   _drawStats.materializedEdges += delta.materializedEdges;
@@ -137,6 +138,15 @@ void PrecompiledShaderCache::recordDraw(const AOTDrawStats& delta, bool complete
   _drawStats.intermediateReadBytes += delta.intermediateReadBytes;
   _drawStats.intermediateWriteBytes += delta.intermediateWriteBytes;
   _drawStats.peakTemporaryBytes = std::max(_drawStats.peakTemporaryBytes, delta.peakTemporaryBytes);
+}
+
+void PrecompiledShaderCache::recordMaterializedEdge(uint64_t bytes) {
+  std::lock_guard<std::mutex> autoLock(drawStatsMutex);
+  _drawStats.materializedEdges++;
+  _drawStats.offscreenTargets++;
+  _drawStats.renderTargetSwitches++;
+  _drawStats.intermediateReadBytes += bytes;
+  _drawStats.intermediateWriteBytes += bytes;
 }
 
 AOTDrawStats PrecompiledShaderCache::drawStats() const {
