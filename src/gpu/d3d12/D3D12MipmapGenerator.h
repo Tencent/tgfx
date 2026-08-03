@@ -51,8 +51,6 @@ static constexpr unsigned D3D12_MIPMAP_THREAD_GROUP_SIZE = 8;
  */
 class D3D12MipmapGenerator {
  public:
-  static D3D12MipmapGenerator* Get(D3D12GPU* gpu);
-
   ID3D12RootSignature* rootSignature() const {
     return _rootSignature.Get();
   }

@@ -69,10 +69,6 @@ D3D12MipmapGenerator::D3D12MipmapGenerator(D3D12GPU* gpu) {
   }
 }
 
-D3D12MipmapGenerator* D3D12MipmapGenerator::Get(D3D12GPU* gpu) {
-  return gpu->mipmapGenerator();
-}
-
 bool D3D12MipmapGenerator::createRootSignature(D3D12GPU* gpu) {
   // Constants + SRV table + UAV table. A single static sampler (linear/clamp) means we don't have
   // to thread a sampler descriptor heap through generateMipmapsForTexture().
