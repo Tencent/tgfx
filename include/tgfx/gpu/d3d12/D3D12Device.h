@@ -53,11 +53,6 @@ class D3D12Device : public Device {
 
   ~D3D12Device() override;
 
-  /**
-   * Returns the underlying ID3D12Device as a raw pointer.
-   */
-  void* d3d12Device() const;
-
  protected:
   bool onLockContext() override;
   void onUnlockContext() override;

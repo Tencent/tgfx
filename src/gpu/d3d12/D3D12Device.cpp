@@ -153,10 +153,6 @@ D3D12Device::~D3D12Device() {
   static_cast<D3D12GPU*>(_gpu)->releaseAll(true);
 }
 
-void* D3D12Device::d3d12Device() const {
-  return static_cast<D3D12GPU*>(_gpu)->device();
-}
-
 bool D3D12Device::onLockContext() {
   // The base Device::lockContext() acquires the device mutex before calling us. If the GPU has
   // been removed (e.g. DXGI_ERROR_DEVICE_REMOVED on a previous Signal), every subsequent
