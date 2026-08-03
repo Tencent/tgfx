@@ -71,19 +71,36 @@ void D3D12CommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Rec
   }
   auto d3d12Tex = std::static_pointer_cast<D3D12Texture>(texture);
 
+  auto dstX = static_cast<int32_t>(rect.x());
+  auto dstY = static_cast<int32_t>(rect.y());
   auto width = static_cast<uint32_t>(rect.width());
   auto height = static_cast<uint32_t>(rect.height());
+  auto texW = static_cast<uint32_t>(d3d12Tex->width());
+  auto texH = static_cast<uint32_t>(d3d12Tex->height());
+
+  // Clamp copy region to destination texture bounds, matching copyTextureToTexture.
+  auto copyWidth = width;
+  auto copyHeight = height;
+  if (dstX + copyWidth > texW) {
+    copyWidth = texW > static_cast<uint32_t>(dstX) ? texW - static_cast<uint32_t>(dstX) : 0;
+  }
+  if (dstY + copyHeight > texH) {
+    copyHeight = texH > static_cast<uint32_t>(dstY) ? texH - static_cast<uint32_t>(dstY) : 0;
+  }
+
   auto bytesPerPixel = static_cast<uint32_t>(DXGIFormatBytesPerPixel(d3d12Tex->dxgiFormat()));
-  if (width == 0 || height == 0 || bytesPerPixel == 0) {
+  if (copyWidth == 0 || copyHeight == 0 || bytesPerPixel == 0) {
     return;
   }
 
   // D3D12 requires the row pitch of a placed footprint to be a multiple of
   // D3D12_TEXTURE_DATA_PITCH_ALIGNMENT (256). Caller-supplied stride may be larger or smaller.
+  // srcRowBytes uses the original width (not clamped) as the source pixel layout matches the
+  // caller's full rect dimensions.
   uint32_t srcRowBytes = rowBytes > 0 ? static_cast<uint32_t>(rowBytes) : width * bytesPerPixel;
   uint32_t alignedRowPitch = AlignUp<uint32_t>(
-      width * bytesPerPixel, static_cast<uint32_t>(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT));
-  uint64_t stagingSize = static_cast<uint64_t>(alignedRowPitch) * height;
+      copyWidth * bytesPerPixel, static_cast<uint32_t>(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT));
+  uint64_t stagingSize = static_cast<uint64_t>(alignedRowPitch) * copyHeight;
 
   // Fast path: sub-allocate from the GPU's process-wide UPLOAD ring. The ring resource is kept
   // alive by D3D12GPU and the bytes are reclaimed automatically once the owning fence signals,
@@ -139,8 +156,8 @@ void D3D12CommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Rec
   }
 
   auto src = static_cast<const uint8_t*>(pixels);
-  uint32_t tightRowBytes = width * bytesPerPixel;
-  for (uint32_t row = 0; row < height; row++) {
+  uint32_t tightRowBytes = copyWidth * bytesPerPixel;
+  for (uint32_t row = 0; row < copyHeight; row++) {
     memcpy(stagingCpu + row * alignedRowPitch, src + row * srcRowBytes, tightRowBytes);
   }
   if (fallbackResource != nullptr) {
@@ -161,14 +178,14 @@ void D3D12CommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Rec
   fp.stagingResource = stagingResource;
   fp.footprint.Offset = stagingOffset;
   fp.footprint.Footprint.Format = static_cast<DXGI_FORMAT>(d3d12Tex->dxgiFormat());
-  fp.footprint.Footprint.Width = width;
-  fp.footprint.Footprint.Height = height;
+  fp.footprint.Footprint.Width = copyWidth;
+  fp.footprint.Footprint.Height = copyHeight;
   fp.footprint.Footprint.Depth = 1;
   fp.footprint.Footprint.RowPitch = alignedRowPitch;
-  fp.dstX = static_cast<UINT>(rect.x());
-  fp.dstY = static_cast<UINT>(rect.y());
-  fp.srcWidth = width;
-  fp.srcHeight = height;
+  fp.dstX = static_cast<UINT>(dstX);
+  fp.dstY = static_cast<UINT>(dstY);
+  fp.srcWidth = copyWidth;
+  fp.srcHeight = copyHeight;
   pendingFootprints.push_back(fp);
 }
 
