@@ -186,8 +186,14 @@ D3D12_GPU_DESCRIPTOR_HANDLE D3D12GPU::allocatePermanentSamplerSlot(const D3D12_S
 }
 
 D3D12GPU::~D3D12GPU() {
-  DEBUG_ASSERT(returnQueue == nullptr);
-  DEBUG_ASSERT(resources.empty());
+  // releaseAll() is normally driven by D3D12Device::~D3D12Device, but Make() can return nullptr
+  // from a half-constructed instance (any init step below the ctor's early-return points may
+  // fail) and the resulting unique_ptr destruction never routes through D3D12Device. Do a
+  // best-effort teardown here so a failed Make() still leaves this instance in a clean state
+  // instead of leaking cached shader modules / root signatures / the return queue.
+  if (returnQueue != nullptr) {
+    releaseAll(true);
+  }
   if (_frameFenceEvent != nullptr) {
     CloseHandle(_frameFenceEvent);
     _frameFenceEvent = nullptr;
