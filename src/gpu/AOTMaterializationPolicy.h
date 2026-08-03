@@ -20,6 +20,10 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
+#include "gpu/proxies/RenderTargetProxy.h"
+#include "tgfx/core/Point.h"
+#include "tgfx/core/Rect.h"
 
 namespace tgfx {
 class FragmentProcessor;
@@ -68,6 +72,23 @@ struct MaterializationDecision {
 };
 
 /**
+ * The offscreen target one materialization edge renders into, together with the coordinate mapping
+ * that keeps the materialized subtree sampling the space it saw inline. An empty renderTarget marks
+ * a failed preparation.
+ */
+struct MaterializedTarget {
+  std::shared_ptr<RenderTargetProxy> renderTarget = nullptr;
+  /// The draw bounds after the apron outset and integer snapping. Its top-left drives both the
+  /// coordOffset below and the translation the consumer needs in its sampling matrix.
+  Rect bounds = {};
+  /// The translation handed to DrawingManager::makeFillDrawOp so the subtree keeps seeing its
+  /// original coordinate space while drawing into an origin-based offscreen target.
+  Point coordOffset = {};
+  /// The byte footprint of the allocated target, for whichever draw metric the caller maintains.
+  uint64_t byteSize = 0;
+};
+
+/**
  * AOTMaterializationPolicy is the single authority that decides where to insert materialization
  * edges to convert an otherwise unmatchable FragmentProcessor chain into a sequence of
  * AOT-matchable kernels. Callers at FragmentProcessor-build sites consult it instead of hand-coding
@@ -88,6 +109,24 @@ class AOTMaterializationPolicy {
    */
   static MaterializationDecision Evaluate(const FragmentProcessor* child,
                                           MaterializationConsumer consumer, size_t childIndex);
+
+  /**
+   * Allocates the offscreen target for one materialization edge covering drawBounds grown by
+   * apronRadius on every side. Returns a target whose renderTarget is null when the snapped size is
+   * degenerate or the allocation fails.
+   *
+   * This deliberately records no draw metrics. The two materialization routes count an edge at
+   * different moments: the decomposition executor only counts one once its whole plan survives
+   * strict preparation, while an inline flatten has already queued its render task and counts on
+   * creation. Each caller reports its own edge.
+   *
+   * @param context      The context that owns the offscreen target.
+   * @param drawBounds   The area the materialized subtree paints, before the apron.
+   * @param apronRadius  Extra ring of pixels to capture, from MaterializationDecision.
+   * @return             The prepared target, or an empty one on failure.
+   */
+  static MaterializedTarget PrepareTarget(Context* context, const Rect& drawBounds,
+                                          float apronRadius);
 };
 
 }  // namespace tgfx

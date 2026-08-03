@@ -19,6 +19,7 @@
 #include "AOTPlanExecutor.h"
 #include <utility>
 #include <vector>
+#include "gpu/AOTMaterializationPolicy.h"
 #include "gpu/BackingFit.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/PrecompiledShaderCache.h"
@@ -445,15 +446,8 @@ PlacementPtr<RenderTask> AOTPlanExecutor::Make(Context* context, uint32_t render
   }
   auto bounds = deviceBounds;
   bounds.roundOut();
-  int width = static_cast<int>(bounds.width());
-  int height = static_cast<int>(bounds.height());
-  if (width <= 0 || height <= 0) {
-    return nullptr;
-  }
-
   auto drawingManager = context->drawingManager();
   auto allocator = drawingManager->drawingAllocator();
-  auto coordOffset = Point::Make(bounds.left, bounds.top);
   std::vector<AOTIntermediatePass> intermediatePasses = {};
   intermediatePasses.reserve(plan.passes.size() - 1);
   std::shared_ptr<TextureProxy> previousTexture = nullptr;
@@ -481,13 +475,13 @@ PlacementPtr<RenderTask> AOTPlanExecutor::Make(Context* context, uint32_t render
       break;
     }
 
-    auto target = RenderTargetProxy::Make(context, width, height, false, 1, false,
-                                          ImageOrigin::TopLeft, BackingFit::Exact);
-    if (target == nullptr) {
+    auto materialized = AOTMaterializationPolicy::PrepareTarget(context, deviceBounds, 0.0f);
+    if (materialized.renderTarget == nullptr) {
       return nullptr;
     }
-    auto drawOp =
-        drawingManager->makeFillDrawOp(target, std::move(processor), renderFlags, coordOffset);
+    auto target = std::move(materialized.renderTarget);
+    auto drawOp = drawingManager->makeFillDrawOp(target, std::move(processor), renderFlags,
+                                                 materialized.coordOffset);
     if (drawOp == nullptr) {
       return nullptr;
     }

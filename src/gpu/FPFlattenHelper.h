@@ -61,45 +61,28 @@ static inline bool IsSimpleBlendChild(const FragmentProcessor* fp, size_t childI
  * to ensure the FP sees the correct coordinate space. apronRadius expands the captured area on every
  * side; pass the value the materialization policy produced for this consumer. Returns nullptr on
  * failure.
- *
- * The offscreen render target uses BackingFit::Exact: the returned TextureEffect samples with a
- * plain translate-only uvMatrix, which is only correct when the backing texture is exactly
- * width x height. An Approx (rounded-up) backing would make the normalized texture coordinates
- * sample a scaled/offset region (reading uninitialized padding), producing corrupted output.
  */
 static inline PlacementPtr<FragmentProcessor> FlattenToTexture(const FPArgs& args,
                                                                PlacementPtr<FragmentProcessor> fp,
                                                                float apronRadius = 0.0f) {
   auto context = args.context;
-  auto drawRect = args.drawRect;
-  // Grow the captured area by the consumer's apron so reads just outside the draw bounds return what
-  // the subtree produced there instead of clamping to the edge texels. See MaterializationDecision.
-  drawRect.outset(apronRadius, apronRadius);
-  drawRect.roundOut();
-  int width = static_cast<int>(drawRect.width());
-  int height = static_cast<int>(drawRect.height());
-  if (width <= 0 || height <= 0) {
-    return nullptr;
-  }
-  auto renderTarget = RenderTargetProxy::Make(context, width, height, false, 1, false,
-                                              ImageOrigin::TopLeft, BackingFit::Exact);
-  if (renderTarget == nullptr) {
+  auto target = AOTMaterializationPolicy::PrepareTarget(context, args.drawRect, apronRadius);
+  if (target.renderTarget == nullptr) {
     return nullptr;
   }
   auto drawingManager = context->drawingManager();
-  auto coordOffset = Point::Make(drawRect.x(), drawRect.y());
-  if (!drawingManager->fillRTWithFP(renderTarget, std::move(fp), args.renderFlags, coordOffset)) {
+  if (!drawingManager->fillRTWithFP(target.renderTarget, std::move(fp), args.renderFlags,
+                                    target.coordOffset)) {
     return nullptr;
   }
-  auto textureProxy = renderTarget->asTextureProxy();
+  auto textureProxy = target.renderTarget->asTextureProxy();
   if (textureProxy == nullptr) {
     return nullptr;
   }
-  auto uvMatrix = Matrix::MakeTrans(-drawRect.x(), -drawRect.y());
+  auto uvMatrix = Matrix::MakeTrans(-target.bounds.left, -target.bounds.top);
   auto cache = context->precompiledShaderCache();
   if (cache != nullptr && cache->diagnosticRecordingEnabled()) {
-    auto bytes = static_cast<uint64_t>(width) * static_cast<uint64_t>(height) * 4;
-    cache->recordMaterializedEdge(bytes);
+    cache->recordMaterializedEdge(target.byteSize);
   }
   auto allocator = context->drawingAllocator();
   return TextureEffect::Make(allocator, std::move(textureProxy), {}, &uvMatrix);

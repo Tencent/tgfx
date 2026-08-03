@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/AOTMaterializationPolicy.h"
+#include "gpu/BackingFit.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 
@@ -55,6 +56,36 @@ MaterializationDecision AOTMaterializationPolicy::Evaluate(const FragmentProcess
       break;
   }
   return decision;
+}
+
+MaterializedTarget AOTMaterializationPolicy::PrepareTarget(Context* context, const Rect& drawBounds,
+                                                           float apronRadius) {
+  if (context == nullptr) {
+    return {};
+  }
+  auto bounds = drawBounds;
+  bounds.outset(apronRadius, apronRadius);
+  bounds.roundOut();
+  auto width = static_cast<int>(bounds.width());
+  auto height = static_cast<int>(bounds.height());
+  if (width <= 0 || height <= 0) {
+    return {};
+  }
+  // BackingFit::Exact is required, not a preference: consumers sample this texture with a
+  // translate-only matrix, which is only correct when the backing texture is exactly width x height.
+  // An Approx (rounded-up) backing would make the normalized coordinates address a scaled region and
+  // read uninitialized padding.
+  auto renderTarget = RenderTargetProxy::Make(context, width, height, false, 1, false,
+                                              ImageOrigin::TopLeft, BackingFit::Exact);
+  if (renderTarget == nullptr) {
+    return {};
+  }
+  MaterializedTarget target = {};
+  target.renderTarget = std::move(renderTarget);
+  target.bounds = bounds;
+  target.coordOffset = Point::Make(bounds.left, bounds.top);
+  target.byteSize = static_cast<uint64_t>(width) * static_cast<uint64_t>(height) * 4;
+  return target;
 }
 
 }  // namespace tgfx
