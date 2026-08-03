@@ -21,12 +21,14 @@
 #include "core/utils/BlockAllocator.h"
 #include "gpu/AOTEffect.h"
 #include "gpu/AOTEffectDecomposer.h"
+#include "gpu/AOTMaterializationPolicy.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/LumaFragmentProcessor.h"
 #include "gpu/processors/TextureEffect.h"
+#include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/BlendMode.h"
@@ -356,6 +358,67 @@ TGFX_TEST(AOTEffectTest, LinearTextureChainStillUsesNarrowPlanner) {
   // into a single PointwiseChain pass (that path is reserved for blend/const-color DAGs).
   EXPECT_GT(plan.passes.size(), 1u);
   EXPECT_NE(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
+}
+
+static MaterializationDecision EvaluateBlendChild(const FragmentProcessor* child,
+                                                  size_t childIndex) {
+  return AOTMaterializationPolicy::Evaluate(child, MaterializationConsumer::PointwiseBlend,
+                                            childIndex);
+}
+
+// Locks the two predicates the materialization policy reports for a pointwise blend child. They
+// differ on exactly one input: a TiledTextureEffect at the src position is a legal inline child, so
+// correctness does not force materializing it, yet no precompiled blend kernel covers that
+// permutation, so AOT still wants it materialized. Nothing else may separate the two.
+TGFX_TEST(AOTEffectTest, PointwiseBlendChildPolicy) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+
+  // An absent child needs nothing.
+  for (size_t childIndex : {size_t(0), size_t(1)}) {
+    auto decision = EvaluateBlendChild(nullptr, childIndex);
+    EXPECT_FALSE(decision.requiredForCorrectness);
+    EXPECT_FALSE(decision.shouldFlatten);
+  }
+
+  // A plain sampled texture is both legal and matchable at either position.
+  auto texture = MakeTextureProcessor(context, &allocator, PixelFormat::RGBA_8888);
+  ASSERT_NE(texture, nullptr);
+  for (size_t childIndex : {size_t(0), size_t(1)}) {
+    auto decision = EvaluateBlendChild(texture.get(), childIndex);
+    EXPECT_FALSE(decision.requiredForCorrectness);
+    EXPECT_FALSE(decision.shouldFlatten);
+  }
+
+  // A constant color is a matchable src, but the kernels carry no constant-color dst.
+  auto constColor = ConstColorProcessor::Make(&allocator, PMColor::White(), InputMode::Ignore);
+  ASSERT_NE(constColor, nullptr);
+  auto constSrc = EvaluateBlendChild(constColor.get(), 0);
+  EXPECT_FALSE(constSrc.requiredForCorrectness);
+  EXPECT_FALSE(constSrc.shouldFlatten);
+  auto constDst = EvaluateBlendChild(constColor.get(), 1);
+  EXPECT_TRUE(constDst.requiredForCorrectness);
+  EXPECT_TRUE(constDst.shouldFlatten);
+
+  // The one input where the two predicates disagree.
+  auto tiledProxy = context->proxyProvider()->createTextureProxy({}, 8, 6, PixelFormat::RGBA_8888);
+  ASSERT_NE(tiledProxy, nullptr);
+  SamplingArgs tiledArgs(TileMode::Repeat, TileMode::Repeat, {}, SrcRectConstraint::Fast);
+  auto tiled = TiledTextureEffect::Make(&allocator, std::move(tiledProxy), tiledArgs);
+  ASSERT_NE(tiled, nullptr);
+  ASSERT_EQ(tiled->name(), "TiledTextureEffect");
+  auto tiledSrc = EvaluateBlendChild(tiled.get(), 0);
+  EXPECT_FALSE(tiledSrc.requiredForCorrectness);
+  EXPECT_TRUE(tiledSrc.shouldFlatten);
+  auto tiledDst = EvaluateBlendChild(tiled.get(), 1);
+  EXPECT_TRUE(tiledDst.requiredForCorrectness);
+  EXPECT_TRUE(tiledDst.shouldFlatten);
+
+  // The apron is a property of the consumer, so it holds whatever the child is.
+  EXPECT_EQ(EvaluateBlendChild(texture.get(), 0).apronRadius, 1.0f);
+  EXPECT_EQ(EvaluateBlendChild(nullptr, 1).apronRadius, 1.0f);
 }
 
 }  // namespace tgfx
