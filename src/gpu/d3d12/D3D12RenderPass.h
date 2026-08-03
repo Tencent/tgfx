@@ -36,8 +36,12 @@ class D3D12Texture;
  * D3D12 render pass implementation.
  *
  * On construction:
- *   - Allocates per-pass non-shader-visible RTV/DSV heaps and creates one descriptor per
- *     attachment. Issues ResourceBarrier transitions and OMSetRenderTargets.
+ *   - Sub-allocates RTV / DSV descriptor slots out of the GPU's process-wide non-shader-visible
+ *     D3D12DescriptorRing instances (D3D12GPU::rtvRing() / dsvRing()) and writes one descriptor
+ *     per attachment. The rings are committed to the current submission's fence value and later
+ *     reclaimed by retire(); no CreateDescriptorHeap call is issued per render pass, and the
+ *     FrameSession does not need to retain the heaps.
+ *   - Issues ResourceBarrier transitions and OMSetRenderTargets.
  *   - Performs ClearRenderTargetView / ClearDepthStencilView for any attachment with
  *     LoadAction::Clear.
  *
@@ -50,8 +54,11 @@ class D3D12Texture;
  *     never need to call it.
  *
  * On end:
- *   - Transitions color attachments back to COMMON so they can be sampled later. RTV/DSV heaps
- *     remain alive in the FrameSession until the fence signals.
+ *   - Transitions color attachments back to COMMON so they can be sampled later.
+ *   - If any color attachment was declared with a resolveTexture, executes ResolveSubresource
+ *     against it (with the necessary RESOLVE_SOURCE / RESOLVE_DEST transitions batched together).
+ *   - RTV / DSV descriptor slots remain owned by their ring and are released fence-side by the
+ *     ring's retire() path; there is no per-pass descriptor heap lifetime to manage.
  */
 class D3D12RenderPass : public RenderPass {
  public:
