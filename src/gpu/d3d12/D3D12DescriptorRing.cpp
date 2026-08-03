@@ -47,6 +47,7 @@ bool D3D12DescriptorRing::init(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE 
   head = 0;
   committedHead = 0;
   outstandingSlots = 0;
+  dirtySinceCommit = false;
   // Drop any inflight entries left over from a previous init() so the post-init state really is
   // "fresh", matching the resetForContextLost() invariant. There is no current re-init path,
   // but if one is added later (device-lost recovery, test teardown) those inflight entries
@@ -94,22 +95,29 @@ D3D12DescriptorRing::Range D3D12DescriptorRing::allocate(uint32_t count) {
     head = 0;
   }
   outstandingSlots += needed;
+  dirtySinceCommit = true;
   return range;
 }
 
 void D3D12DescriptorRing::commit(uint64_t fenceValue) {
+  // Skip the fence bookkeeping when no allocation happened since the last commit. Enqueuing
+  // an entry here would incorrectly charge either 0 or the whole capacity to this fence and
+  // corrupt the accounting once retire() runs — the head == committedHead condition inside the
+  // "whole-capacity allocation" fallback below is only valid when a real allocation drove head
+  // back onto committedHead, not when head simply never moved.
+  if (!dirtySinceCommit) {
+    return;
+  }
   // Compute slots consumed since the previous commit including any wrap-around skip. Comparing
   // (head, committedHead) directly fails the "first allocation took the entire capacity" case
-  // because head wraps right back to committedHead — guard that with outstandingSlots.
+  // because head wraps right back to committedHead — the dirty flag above rules out the
+  // "nothing allocated" ambiguity, so hitting head == committedHead here really does mean a
+  // capacity-spanning allocation.
   uint32_t slotsSinceCommit =
       (head >= committedHead) ? (head - committedHead) : (_capacity - (committedHead - head));
   if (slotsSinceCommit == 0) {
-    if (outstandingSlots == 0) {
-      // Truly nothing happened since the last commit; skip enqueuing an empty fence record.
-      return;
-    }
-    // The ring was filled to exactly capacity since the last commit, so head == committedHead
-    // again. Charge the entire capacity to this fence so retire() returns it eventually.
+    // Whole-capacity allocation case; bill the full ring to this fence so retire() drains
+    // outstandingSlots eventually.
     slotsSinceCommit = _capacity;
   }
   InflightRange entry = {};
@@ -117,6 +125,7 @@ void D3D12DescriptorRing::commit(uint64_t fenceValue) {
   entry.slots = slotsSinceCommit;
   inflight.push_back(entry);
   committedHead = head;
+  dirtySinceCommit = false;
 }
 
 void D3D12DescriptorRing::retire(uint64_t completedFenceValue) {
@@ -137,6 +146,7 @@ void D3D12DescriptorRing::resetForContextLost() {
   head = 0;
   committedHead = 0;
   outstandingSlots = 0;
+  dirtySinceCommit = false;
 }
 
 }  // namespace tgfx

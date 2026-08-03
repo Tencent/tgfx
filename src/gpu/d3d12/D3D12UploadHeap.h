@@ -125,6 +125,10 @@ class D3D12UploadHeap {
   // in use — head alone cannot distinguish "ring empty" from "ring full" when an allocation
   // wraps head right back to where it started.
   size_t outstandingBytes = 0;
+  // Set by allocate(), cleared by commit(). Distinguishes "no allocation since last commit"
+  // from "an allocation exactly filled the ring and wrapped head onto committedHead" so
+  // commit() does not bill zero-allocation submissions against a fence.
+  bool dirtySinceCommit = false;
 
   struct InflightRange {
     uint64_t fenceValue = 0;

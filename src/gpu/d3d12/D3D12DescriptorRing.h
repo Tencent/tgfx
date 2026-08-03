@@ -125,6 +125,11 @@ class D3D12DescriptorRing {
   // Slots currently held by either an as-yet-uncommitted allocation or an inflight commit
   // waiting on its fence. allocate() rejects the request when needed > capacity - outstanding.
   uint32_t outstandingSlots = 0;
+  // Set by allocate(), cleared by commit(). Distinguishes "nothing was allocated since the last
+  // commit" from "an allocation exactly filled the ring and wrapped head onto committedHead"
+  // — both would otherwise produce the ambiguous head == committedHead condition inside
+  // commit() and cause the whole-capacity fallback to run when it should not.
+  bool dirtySinceCommit = false;
 
   struct InflightRange {
     uint64_t fenceValue = 0;

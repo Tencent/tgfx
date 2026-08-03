@@ -72,6 +72,7 @@ bool D3D12UploadHeap::init(ID3D12Device* device, size_t capacity) {
   head = 0;
   committedHead = 0;
   outstandingBytes = 0;
+  dirtySinceCommit = false;
   // Drop any inflight entries left over from a previous init() so the post-init state really is
   // "fresh", matching the resetForContextLost() invariant. There is no current re-init path,
   // but if one is added later (device-lost recovery, test teardown) those inflight entries
@@ -120,21 +121,26 @@ D3D12UploadHeap::Allocation D3D12UploadHeap::allocate(size_t size, size_t alignm
     head = 0;
   }
   outstandingBytes += needed;
+  dirtySinceCommit = true;
   return result;
 }
 
 void D3D12UploadHeap::commit(uint64_t fenceValue) {
+  // Skip the fence bookkeeping when no allocation happened since the last commit. A submission
+  // that does not touch the upload ring (e.g. a depth-only pass) still calls commit() from
+  // D3D12GPU::executeSubmission; enqueuing an entry here would either bill zero bytes or, when
+  // outstandingBytes > 0 from earlier fences, incorrectly bill the whole capacity and corrupt
+  // retire() bookkeeping.
+  if (!dirtySinceCommit) {
+    return;
+  }
   // Pair the about-to-be-signalled fence with the bytes consumed since the last commit so
-  // retire() can give those bytes back when the GPU finishes with them. Compute the byte total
-  // first because the fast `head == committedHead` check is ambiguous: it triggers both when
-  // truly nothing was allocated and when a single allocation spanned the entire capacity and
-  // wrapped head right back to committedHead.
+  // retire() can give those bytes back when the GPU finishes with them. The dirty flag above
+  // rules out the "nothing allocated" case, so a subsequent head == committedHead really does
+  // mean an allocation spanned the entire capacity and wrapped head back around.
   size_t bytesSinceCommit =
       (head >= committedHead) ? (head - committedHead) : (_capacity - (committedHead - head));
   if (bytesSinceCommit == 0) {
-    if (outstandingBytes == 0) {
-      return;
-    }
     // Whole-capacity allocation case — bill the full ring to this fence so the retire() path
     // eventually drains outstandingBytes. Without this branch the bytes would leak and stop
     // the ring from accepting any further allocations once outstandingBytes saturates.
@@ -145,6 +151,7 @@ void D3D12UploadHeap::commit(uint64_t fenceValue) {
   entry.bytes = bytesSinceCommit;
   inflight.push_back(entry);
   committedHead = head;
+  dirtySinceCommit = false;
 }
 
 void D3D12UploadHeap::retire(uint64_t completedFenceValue) {
@@ -171,6 +178,7 @@ void D3D12UploadHeap::clear() {
   head = 0;
   committedHead = 0;
   outstandingBytes = 0;
+  dirtySinceCommit = false;
   inflight.clear();
 }
 
@@ -180,6 +188,7 @@ void D3D12UploadHeap::resetForContextLost() {
   head = 0;
   committedHead = 0;
   outstandingBytes = 0;
+  dirtySinceCommit = false;
   inflight.clear();
 }
 
