@@ -408,8 +408,7 @@ TGFX_TEST(StencilCoverPathTest, DrawOp_AllFillTypesProduceValidOpWithExpectedSte
     ASSERT_TRUE(op != nullptr) << c.name;
     EXPECT_TRUE(op->hasCoverage()) << c.name;
     EXPECT_TRUE(op->needsStencil()) << c.name;
-    EXPECT_EQ(StencilCoverPathDrawOpTestAccess::CoverStencilRef(op.get()), c.expectedRef)
-        << c.name;
+    EXPECT_EQ(StencilCoverPathDrawOpTestAccess::CoverStencilRef(op.get()), c.expectedRef) << c.name;
   }
 }
 

@@ -1239,8 +1239,8 @@ size_t MeasureActualPayload(const std::shared_ptr<Data>& bytes) {
 TGFX_TEST(PDFExportTest, PDFStreamOutWritesCompressedLength) {
   // Highly redundant input compresses well; the 4096-byte block reliably exceeds MinimumSavings.
   std::string input(4096, 'A');
-  auto emitted =
-      RunPDFStreamOut(input, PDFMetadata::CompressionLevel::Default, PDFSteamCompressionEnabled::Yes);
+  auto emitted = RunPDFStreamOut(input, PDFMetadata::CompressionLevel::Default,
+                                 PDFSteamCompressionEnabled::Yes);
 
   EXPECT_NE(IndexOf(emitted.bytes, "/Filter /FlateDecode"), std::string::npos)
       << "Compressed branch should emit /Filter /FlateDecode.";
@@ -1283,8 +1283,8 @@ TGFX_TEST(PDFExportTest, PDFStreamOutFallsBackWhenCompressionDoesNotSave) {
   // 8 bytes is well under MinimumSavings (= strlen("/Filter_/FlateDecode_") = 21), so
   // SerializeStream skips the deflate path entirely.
   std::string input = "abcdefgh";
-  auto emitted =
-      RunPDFStreamOut(input, PDFMetadata::CompressionLevel::Default, PDFSteamCompressionEnabled::Yes);
+  auto emitted = RunPDFStreamOut(input, PDFMetadata::CompressionLevel::Default,
+                                 PDFSteamCompressionEnabled::Yes);
 
   EXPECT_EQ(IndexOf(emitted.bytes, "/Filter"), std::string::npos)
       << "Short input below MinimumSavings should bypass FlateDecode.";

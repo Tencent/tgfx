@@ -209,9 +209,9 @@ TGFX_TEST(LayerFilterTest, blurLayerFilter) {
   EXPECT_EQ(imageFilter->blurrinessX, imageFilter2->blurrinessX);
   EXPECT_EQ(imageFilter->blurrinessY, imageFilter2->blurrinessY);
   EXPECT_EQ(imageFilter->tileMode, imageFilter2->tileMode);
-  EXPECT_EQ(LayerFilterTestAccess::GetImageFilter(blur.get(), 0.5f)
-                ->filterBounds(Rect::MakeWH(200, 200)),
-            imageFilter2->filterBounds(Rect::MakeWH(200, 200)));
+  EXPECT_EQ(
+      LayerFilterTestAccess::GetImageFilter(blur.get(), 0.5f)->filterBounds(Rect::MakeWH(200, 200)),
+      imageFilter2->filterBounds(Rect::MakeWH(200, 200)));
 }
 
 TGFX_TEST(LayerFilterTest, InnerShadowFilter) {
