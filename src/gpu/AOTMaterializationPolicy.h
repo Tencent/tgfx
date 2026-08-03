@@ -77,20 +77,40 @@ struct MaterializationDecision {
 };
 
 /**
- * The offscreen target one materialization edge renders into, together with the coordinate mapping
- * that keeps the materialized subtree sampling the space it saw inline. An empty renderTarget marks
- * a failed preparation.
+ * The pixel geometry of one materialization edge: the area to capture and the coordinate mapping
+ * that keeps the materialized subtree sampling the space it saw inline. Derived purely from the draw
+ * bounds and the apron, with no GPU resource attached, so a caller that issues several passes over
+ * the same area computes it once and every pass agrees on it. isEmpty() marks a degenerate area that
+ * cannot back a texture.
  */
-struct MaterializedTarget {
-  std::shared_ptr<RenderTargetProxy> renderTarget = nullptr;
+struct MaterializedGeometry {
   /// The draw bounds after the apron outset and integer snapping. Its top-left drives both the
-  /// coordOffset below and the translation the consumer needs in its sampling matrix.
+  /// coordOffset below and the translation a consumer needs in its sampling matrix.
   Rect bounds = {};
   /// The translation handed to DrawingManager::makeFillDrawOp so the subtree keeps seeing its
   /// original coordinate space while drawing into an origin-based offscreen target.
   Point coordOffset = {};
-  /// The byte footprint of the allocated target, for whichever draw metric the caller maintains.
-  uint64_t byteSize = 0;
+  int width = 0;
+  int height = 0;
+
+  bool isEmpty() const {
+    return width <= 0 || height <= 0;
+  }
+
+  /// The byte footprint an RGBA8 target of this size occupies, for whichever draw metric the caller
+  /// maintains.
+  uint64_t byteSize() const {
+    return static_cast<uint64_t>(width) * static_cast<uint64_t>(height) * 4;
+  }
+};
+
+/**
+ * The offscreen target one materialization edge renders into, paired with the geometry it was
+ * allocated for. A null renderTarget marks a failed allocation.
+ */
+struct MaterializedTarget {
+  std::shared_ptr<RenderTargetProxy> renderTarget = nullptr;
+  MaterializedGeometry geometry = {};
 };
 
 /**
@@ -117,19 +137,32 @@ class AOTMaterializationPolicy {
                                           MaterializationConsumer consumer, size_t childIndex);
 
   /**
-   * Allocates the offscreen target for one materialization edge covering drawBounds grown by
-   * apronRadius on every side. Returns a target whose renderTarget is null when the snapped size is
-   * degenerate or the allocation fails.
+   * Computes the pixel geometry of one materialization edge covering drawBounds grown by apronRadius
+   * on every side. A caller that renders several passes over the same area must call this once and
+   * reuse the result for every pass and for the consumer's sampling matrix, so the capture area and
+   * the coordinate mapping can never disagree.
+   *
+   * @param drawBounds   The area the materialized subtree paints, before the apron.
+   * @param apronRadius  Extra ring of pixels to capture, from MaterializationDecision.
+   * @return             The geometry; isEmpty() is true when the snapped area is degenerate.
+   */
+  static MaterializedGeometry PrepareGeometry(const Rect& drawBounds, float apronRadius);
+
+  /**
+   * Allocates one offscreen target for the given geometry. Returns a target whose renderTarget is
+   * null when the geometry is degenerate or the allocation fails.
    *
    * This deliberately records no draw metrics. The two materialization routes count an edge at
    * different moments: the decomposition executor only counts one once its whole plan survives
    * strict preparation, while an inline flatten has already queued its render task and counts on
    * creation. Each caller reports its own edge.
-   *
-   * @param context      The context that owns the offscreen target.
-   * @param drawBounds   The area the materialized subtree paints, before the apron.
-   * @param apronRadius  Extra ring of pixels to capture, from MaterializationDecision.
-   * @return             The prepared target, or an empty one on failure.
+   */
+  static MaterializedTarget AllocateTarget(Context* context, const MaterializedGeometry& geometry);
+
+  /**
+   * Convenience for the single-edge case: computes the geometry and allocates its target in one
+   * step. A caller issuing several passes over one area must use PrepareGeometry plus AllocateTarget
+   * instead, so all passes share one geometry.
    */
   static MaterializedTarget PrepareTarget(Context* context, const Rect& drawBounds,
                                           float apronRadius);

@@ -69,34 +69,42 @@ MaterializationDecision AOTMaterializationPolicy::Evaluate(const FragmentProcess
   return decision;
 }
 
-MaterializedTarget AOTMaterializationPolicy::PrepareTarget(Context* context, const Rect& drawBounds,
-                                                           float apronRadius) {
-  if (context == nullptr) {
-    return {};
-  }
+MaterializedGeometry AOTMaterializationPolicy::PrepareGeometry(const Rect& drawBounds,
+                                                               float apronRadius) {
   auto bounds = drawBounds;
   bounds.outset(apronRadius, apronRadius);
   bounds.roundOut();
-  auto width = static_cast<int>(bounds.width());
-  auto height = static_cast<int>(bounds.height());
-  if (width <= 0 || height <= 0) {
+  MaterializedGeometry geometry = {};
+  geometry.bounds = bounds;
+  geometry.coordOffset = Point::Make(bounds.left, bounds.top);
+  geometry.width = static_cast<int>(bounds.width());
+  geometry.height = static_cast<int>(bounds.height());
+  return geometry;
+}
+
+MaterializedTarget AOTMaterializationPolicy::AllocateTarget(Context* context,
+                                                            const MaterializedGeometry& geometry) {
+  if (context == nullptr || geometry.isEmpty()) {
     return {};
   }
   // BackingFit::Exact is required, not a preference: consumers sample this texture with a
   // translate-only matrix, which is only correct when the backing texture is exactly width x height.
   // An Approx (rounded-up) backing would make the normalized coordinates address a scaled region and
   // read uninitialized padding.
-  auto renderTarget = RenderTargetProxy::Make(context, width, height, false, 1, false,
-                                              ImageOrigin::TopLeft, BackingFit::Exact);
+  auto renderTarget = RenderTargetProxy::Make(context, geometry.width, geometry.height, false, 1,
+                                              false, ImageOrigin::TopLeft, BackingFit::Exact);
   if (renderTarget == nullptr) {
     return {};
   }
   MaterializedTarget target = {};
   target.renderTarget = std::move(renderTarget);
-  target.bounds = bounds;
-  target.coordOffset = Point::Make(bounds.left, bounds.top);
-  target.byteSize = static_cast<uint64_t>(width) * static_cast<uint64_t>(height) * 4;
+  target.geometry = geometry;
   return target;
+}
+
+MaterializedTarget AOTMaterializationPolicy::PrepareTarget(Context* context, const Rect& drawBounds,
+                                                           float apronRadius) {
+  return AllocateTarget(context, PrepareGeometry(drawBounds, apronRadius));
 }
 
 }  // namespace tgfx

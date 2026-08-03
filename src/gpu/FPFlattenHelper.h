@@ -46,17 +46,17 @@ static inline PlacementPtr<FragmentProcessor> FlattenToTexture(const FPArgs& arg
   }
   auto drawingManager = context->drawingManager();
   if (!drawingManager->fillRTWithFP(target.renderTarget, std::move(fp), args.renderFlags,
-                                    target.coordOffset)) {
+                                    target.geometry.coordOffset)) {
     return nullptr;
   }
   auto textureProxy = target.renderTarget->asTextureProxy();
   if (textureProxy == nullptr) {
     return nullptr;
   }
-  auto uvMatrix = Matrix::MakeTrans(-target.bounds.left, -target.bounds.top);
+  auto uvMatrix = Matrix::MakeTrans(-target.geometry.bounds.left, -target.geometry.bounds.top);
   auto cache = context->precompiledShaderCache();
   if (cache != nullptr && cache->diagnosticRecordingEnabled()) {
-    cache->recordMaterializedEdge(target.byteSize);
+    cache->recordMaterializedEdge(target.geometry.byteSize());
   }
   auto allocator = context->drawingAllocator();
   return TextureEffect::Make(allocator, std::move(textureProxy), {}, &uvMatrix);

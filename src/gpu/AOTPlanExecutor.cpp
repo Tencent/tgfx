@@ -444,8 +444,16 @@ PlacementPtr<RenderTask> AOTPlanExecutor::Make(Context* context, uint32_t render
       !CanExecute(graph, plan)) {
     return nullptr;
   }
-  auto bounds = deviceBounds;
-  bounds.roundOut();
+  // One geometry for the whole plan. Every intermediate pass renders into a target of exactly this
+  // size and the terminal draw samples the last one back with its top-left, so the capture area and
+  // the sampling translation are the same value by construction. The apron is zero here: all six
+  // kernel kinds are pointwise, so a pass reads its input at the output coordinate only, and each
+  // intermediate texture is pixel-aligned with the next target (uvMatrix is identity). A non-zero
+  // apron would break that alignment instead of fixing a sampling error.
+  auto geometry = AOTMaterializationPolicy::PrepareGeometry(deviceBounds, 0.0f);
+  if (geometry.isEmpty()) {
+    return nullptr;
+  }
   auto drawingManager = context->drawingManager();
   auto allocator = drawingManager->drawingAllocator();
   std::vector<AOTIntermediatePass> intermediatePasses = {};
@@ -459,7 +467,7 @@ PlacementPtr<RenderTask> AOTPlanExecutor::Make(Context* context, uint32_t render
       // Intermediate consumers run in offscreen-local coordinates. Only the terminal draw samples
       // that texture from the destination's device coordinates and needs the bounds translation.
       auto deviceMatrix = index + 1 == plan.passes.size()
-                              ? Matrix::MakeTrans(-bounds.left, -bounds.top)
+                              ? Matrix::MakeTrans(-geometry.bounds.left, -geometry.bounds.top)
                               : Matrix::I();
       source = DeviceSpaceTextureEffect::Make(allocator, previousTexture, deviceMatrix);
       if (source == nullptr) {
@@ -475,13 +483,13 @@ PlacementPtr<RenderTask> AOTPlanExecutor::Make(Context* context, uint32_t render
       break;
     }
 
-    auto materialized = AOTMaterializationPolicy::PrepareTarget(context, deviceBounds, 0.0f);
+    auto materialized = AOTMaterializationPolicy::AllocateTarget(context, geometry);
     if (materialized.renderTarget == nullptr) {
       return nullptr;
     }
     auto target = std::move(materialized.renderTarget);
     auto drawOp = drawingManager->makeFillDrawOp(target, std::move(processor), renderFlags,
-                                                 materialized.coordOffset);
+                                                 geometry.coordOffset);
     if (drawOp == nullptr) {
       return nullptr;
     }
