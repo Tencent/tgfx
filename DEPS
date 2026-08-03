@@ -27,7 +27,7 @@
       },
       {
         "url": "https://github.com/glennrp/libpng.git",
-        "commit": "872555f4ba910252783af1507f9e7fe1653be252",
+        "commit": "3061454d980de7d53608f594194cfac722721d2a",
         "dir": "third_party/libpng"
       },
       {
@@ -42,7 +42,7 @@
       },
       {
         "url": "https://github.com/freetype/freetype.git",
-        "commit": "42608f77f20749dd6ddc9e0536788eaad70ea4b5",
+        "commit": "0a0221a1347e2f1e07c395263540026e9a0aa7c7",
         "dir": "third_party/freetype"
       },
       {
