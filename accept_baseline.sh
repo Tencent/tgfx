@@ -63,7 +63,7 @@ case "$OS" in
     BACKENDS=("OpenGL:")
     ;;
   MINGW*|MSYS*|CYGWIN*|Windows_NT)
-    BACKENDS=("Vulkan:-DTGFX_USE_VULKAN=ON" "D3d12:-DTGFX_USE_D3D12=ON")
+    BACKENDS=("Vulkan:-DTGFX_USE_VULKAN=ON" "D3D12:-DTGFX_USE_D3D12=ON")
     ;;
   *)
     BACKENDS=("OpenGL:")

@@ -31,12 +31,12 @@ if /I "%~1"=="USE_OPENGL" (
 if /I "%~1"=="USE_D3D12" (
    set "CMAKE_BACKEND_ARGS=-DTGFX_USE_D3D12=ON"
    set "BACKEND_NAME=d3d12"
-   set "TARGET_SUFFIX=D3d12"
+   set "TARGET_SUFFIX=D3D12"
 )
 if /I "%~1"=="USE_D3D12_WARP" (
    set "CMAKE_BACKEND_ARGS=-DTGFX_USE_D3D12=ON -DTGFX_D3D12_USE_WARP=ON"
    set "BACKEND_NAME=d3d12-warp"
-   set "TARGET_SUFFIX=D3d12"
+   set "TARGET_SUFFIX=D3D12"
 )
 
 :: Check if cache is up to date
