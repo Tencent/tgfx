@@ -93,7 +93,7 @@ void* D3D12Buffer::map(size_t offset, size_t size) {
   if (size == GPU_BUFFER_WHOLE_SIZE) {
     size = _size - offset;
   }
-  if (offset + size > _size) {
+  if (offset > _size || size > _size - offset) {
     LOGE("D3D12Buffer::map() range out of bounds!");
     return nullptr;
   }
