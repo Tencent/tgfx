@@ -101,20 +101,20 @@ void D3D12DescriptorRing::commit(uint64_t fenceValue) {
   // Compute slots consumed since the previous commit including any wrap-around skip. Comparing
   // (head, committedHead) directly fails the "first allocation took the entire capacity" case
   // because head wraps right back to committedHead — guard that with outstandingSlots.
-  uint32_t bytesSinceCommit =
+  uint32_t slotsSinceCommit =
       (head >= committedHead) ? (head - committedHead) : (_capacity - (committedHead - head));
-  if (bytesSinceCommit == 0) {
+  if (slotsSinceCommit == 0) {
     if (outstandingSlots == 0) {
       // Truly nothing happened since the last commit; skip enqueuing an empty fence record.
       return;
     }
     // The ring was filled to exactly capacity since the last commit, so head == committedHead
     // again. Charge the entire capacity to this fence so retire() returns it eventually.
-    bytesSinceCommit = _capacity;
+    slotsSinceCommit = _capacity;
   }
   InflightRange entry = {};
   entry.fenceValue = fenceValue;
-  entry.slots = bytesSinceCommit;
+  entry.slots = slotsSinceCommit;
   inflight.push_back(entry);
   committedHead = head;
 }
