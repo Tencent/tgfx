@@ -1915,6 +1915,32 @@ TGFX_TEST(StencilCoverPathTest, Dispatch_StencilReuseAcrossPasses) {
   EXPECT_TRUE(Baseline::Compare(surface, "StencilCoverPath/ReuseOverpasses_Redraw"));
 }
 
+// Draws a stencil-cover pentagon together with plain rect ops in one flush, so all ops share a
+// single render pass carrying a depth/stencil attachment. The rect pipelines never touch the
+// stencil buffer but must still declare the pass's depth-stencil format; a pipeline without it
+// is rejected on backends that validate attachment formats.
+TGFX_TEST(StencilCoverPathTest, Dispatch_MixRectDrawOp) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  ScopedStencilCoverCaps capsGuard(context, true);
+  constexpr int Size = 64;
+  auto surface = Surface::Make(context, Size, Size);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  Paint paint;
+  paint.setAntiAlias(false);
+  paint.setColor(Color{0.f, 0.f, 0.f, 1.f});
+  canvas->drawRect(Rect::MakeWH(Size, Size), paint);
+  paint.setColor(Color{1.f, 0.f, 0.f, 1.f});
+  auto path = BuildCellPentagon(16, 32);
+  path.setFillType(PathFillType::Winding);
+  canvas->drawPath(path, paint);
+  canvas->drawRect(Rect::MakeXYWH(40, 20, 20, 24), paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "StencilCoverPath/MixRectDrawOp"));
+}
+
 }  // namespace tgfx
 
 #endif  // TGFX_ENABLE_STENCIL_COVER_PATH
