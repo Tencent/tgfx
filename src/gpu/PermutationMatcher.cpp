@@ -20,6 +20,7 @@
 #include <skcms.h>
 #include "gpu/Swizzle.h"
 #include "gpu/processors/AARectEffect.h"
+#include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/AOTPointwiseTailProcessor.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
@@ -68,6 +69,7 @@
 #include "gpu/shaders/level1/MeshFillShader.h"
 #include "gpu/shaders/level1/NonAARRectFillShader.h"
 #include "gpu/shaders/level1/PerlinNoiseFillShader.h"
+#include "gpu/shaders/level1/PointwiseChainShader.h"
 #include "gpu/shaders/level1/PointwiseDirectShader.h"
 #include "gpu/shaders/level1/PointwiseTailShader.h"
 #include "gpu/shaders/level1/QuadColorFillShader.h"
@@ -647,6 +649,76 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseTail(const Program
   fragValues[FD::HAS_COVERAGE] = hasCoverage;
   auto fragIndex = FD::domain().encode(fragValues);
   return PermutationMatchResult{"PointwiseTailShader", vertIndex, fragIndex};
+}
+
+// Matches the fused pointwise-DAG kernel. The chain processor carries the whole DAG in uniforms,
+// so this rule only validates the parts that are baked into the program: the GP, the leaf count
+// (sampler/varying layout), and that every leaf is a plain sampled texture.
+static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
+    const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  int gpType = GetGPType(gp);
+  if (gpType < 0 || programInfo->numColorFragmentProcessors() != 1 ||
+      programInfo->numFragmentProcessors() != 1) {
+    return std::nullopt;
+  }
+  if (gpType == 1) {
+    auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
+    if (!quadGP->hasCommonColor() || !quadGP->hasUVMatrix() || quadGP->getHasSubset()) {
+      return std::nullopt;
+    }
+  }
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
+    return std::nullopt;
+  }
+  auto fp = programInfo->getFragmentProcessor(0);
+  if (fp->name() != "AOTPointwiseChainProcessor") {
+    return std::nullopt;
+  }
+  auto* chain = static_cast<const AOTPointwiseChainProcessor*>(fp);
+  auto leafCount = chain->leafCount();
+  if (leafCount != 1 && leafCount != 2 && leafCount != 4) {
+    return std::nullopt;
+  }
+  // The kernel carries one shared chain-wide ColorSpaceXform parameter block, so a chain with two
+  // color-space ops cannot be represented and must fall back.
+  int colorSpaceXformCount = 0;
+  for (size_t index = 0; index < chain->slotCount(); ++index) {
+    if (chain->slot(index).op == AOTChainOp::ColorSpaceXform) {
+      ++colorSpaceXformCount;
+    }
+  }
+  if (colorSpaceXformCount > 1) {
+    return std::nullopt;
+  }
+  for (size_t index = 0; index < leafCount; ++index) {
+    auto leaf = chain->childProcessor(index);
+    if (leaf->name() != "TextureEffect" || leaf->numTextureSamplers() != 1) {
+      return std::nullopt;
+    }
+    auto* texture = static_cast<const TextureEffect*>(leaf);
+    if (texture->isYUV() || texture->isAlphaOnly() || texture->hasRGBAAA() ||
+        texture->hasSubset() || leaf->coordTransform(0)->matrix.hasPerspective()) {
+      return std::nullopt;
+    }
+  }
+  int textureCountValue = leafCount == 1 ? 0 : (leafCount == 2 ? 1 : 2);
+  int hasCoverage = GetGPCoverage(gp);
+  using VD = PointwiseChainShader::VD;
+  std::vector<int> vertValues(VD::COUNT, 0);
+  vertValues[VD::GP_TYPE] = gpType;
+  vertValues[VD::HAS_COVERAGE] = hasCoverage;
+  vertValues[VD::TEXTURE_COUNT] = textureCountValue;
+  auto vertIndex = VD::domain().encode(vertValues);
+
+  using FD = PointwiseChainShader::FD;
+  std::vector<int> fragValues(FD::COUNT, 0);
+  fragValues[FD::HAS_XP] = xpType;
+  fragValues[FD::HAS_COVERAGE] = hasCoverage;
+  fragValues[FD::TEXTURE_COUNT] = textureCountValue;
+  auto fragIndex = FD::domain().encode(fragValues);
+  return PermutationMatchResult{"PointwiseChainShader", vertIndex, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchDeviceSpaceTexturedEffect(
@@ -1907,6 +1979,9 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
     return result;
   }
   if (auto result = TryMatchPointwiseTail(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchPointwiseChain(programInfo)) {
     return result;
   }
   if (auto result = TryMatchDeviceSpaceTexturedEffect(programInfo)) {

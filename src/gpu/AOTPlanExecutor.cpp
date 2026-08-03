@@ -23,6 +23,7 @@
 #include "gpu/BackingFit.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/PrecompiledShaderCache.h"
+#include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/AOTPointwiseTailProcessor.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
@@ -267,6 +268,115 @@ static bool BuildPointwiseSlot(const AOTEffectNode* node, AOTPointwiseSlot* slot
   return false;
 }
 
+// Maps a DAG input edge onto a chain slot index. GeometryColor (node 0) is not a slot: it maps to
+// -1, the Color uniform. Anything unmapped is -2, which callers treat as a build error.
+static int MapChainInput(const std::vector<size_t>& slotOf, AOTNodeID input) {
+  if (input.index() == 0) {
+    return -1;
+  }
+  auto slot = slotOf[input.index()];
+  return slot == SIZE_MAX ? -2 : static_cast<int>(slot);
+}
+
+// Flattens a single-pass pointwise DAG into the fused chain processor. Texture leaves are placed
+// in the leading slots so that slot k pairs with TextureSampler_k, which keeps sampler indexing
+// static in the kernel; the remaining nodes follow in topological order.
+static PlacementPtr<FragmentProcessor> BuildChainFP(BlockAllocator* allocator,
+                                                    const AOTEffectGraph& graph,
+                                                    const AOTPassDescriptor& pass) {
+  std::vector<size_t> slotOf(graph.nodeCount(), SIZE_MAX);
+  std::vector<AOTNodeID> ordered = {};
+  ordered.reserve(pass.nodes.size());
+  for (auto nodeID : pass.nodes) {
+    auto node = graph.nodeAt(nodeID);
+    if (node == nullptr) {
+      return nullptr;
+    }
+    if (node->kind == AOTEffectKind::TextureSource) {
+      slotOf[nodeID.index()] = ordered.size();
+      ordered.push_back(nodeID);
+    }
+  }
+  size_t leafCount = ordered.size();
+  for (auto nodeID : pass.nodes) {
+    auto node = graph.nodeAt(nodeID);
+    if (node->kind != AOTEffectKind::TextureSource) {
+      slotOf[nodeID.index()] = ordered.size();
+      ordered.push_back(nodeID);
+    }
+  }
+  std::vector<PlacementPtr<FragmentProcessor>> leaves = {};
+  leaves.reserve(leafCount);
+  std::vector<AOTChainSlot> slots(ordered.size());
+  for (size_t index = 0; index < ordered.size(); ++index) {
+    auto node = graph.nodeAt(ordered[index]);
+    auto& slot = slots[index];
+    switch (node->kind) {
+      case AOTEffectKind::TextureSource: {
+        auto leaf = BuildFPForNode(allocator, node, nullptr);
+        if (leaf == nullptr || leaf->name() != "TextureEffect") {
+          return nullptr;
+        }
+        slot.op = AOTChainOp::Texture;
+        leaves.push_back(std::move(leaf));
+        break;
+      }
+      case AOTEffectKind::ConstColor: {
+        auto parameters = std::get_if<AOTConstColorParameters>(&node->parameters);
+        if (parameters == nullptr || node->inputs.size() != 1) {
+          return nullptr;
+        }
+        slot.op = AOTChainOp::ConstColor;
+        slot.constColor = *parameters;
+        slot.in0 = MapChainInput(slotOf, node->inputs[0]);
+        break;
+      }
+      case AOTEffectKind::ColorMatrix:
+      case AOTEffectKind::Luma:
+      case AOTEffectKind::AlphaThreshold:
+      case AOTEffectKind::ColorSpaceXform: {
+        if (node->inputs.size() != 1) {
+          return nullptr;
+        }
+        AOTPointwiseSlot pointwise = {};
+        if (!BuildPointwiseSlot(node, &pointwise)) {
+          return nullptr;
+        }
+        // AOTPointwiseOpType and AOTChainOp share values 0..4 by ABI (both mirror the OP_*
+        // constants), so the pointwise kinds convert directly.
+        slot.op = static_cast<AOTChainOp>(static_cast<int>(pointwise.type));
+        slot.colorMatrix = pointwise.colorMatrix;
+        slot.luma = pointwise.luma;
+        slot.alphaThreshold = pointwise.alphaThreshold;
+        slot.colorSpaceXform = pointwise.colorSpaceXform;
+        slot.in0 = MapChainInput(slotOf, node->inputs[0]);
+        break;
+      }
+      case AOTEffectKind::Blend: {
+        auto parameters = std::get_if<AOTBlendParameters>(&node->parameters);
+        if (parameters == nullptr || node->inputs.size() != 2) {
+          return nullptr;
+        }
+        slot.op = AOTChainOp::Blend;
+        slot.blend = *parameters;
+        slot.in0 = MapChainInput(slotOf, node->inputs[0]);
+        slot.in1 = MapChainInput(slotOf, node->inputs[1]);
+        break;
+      }
+      default:
+        return nullptr;
+    }
+    if (slot.op != AOTChainOp::Texture && slot.in0 == -2) {
+      return nullptr;
+    }
+  }
+  auto rootIndex = slotOf[pass.output.index()];
+  if (rootIndex == SIZE_MAX) {
+    return nullptr;
+  }
+  return AOTPointwiseChainProcessor::Make(allocator, std::move(leaves), slots, rootIndex);
+}
+
 static PlacementPtr<FragmentProcessor> BuildFPForPass(
     BlockAllocator* allocator, const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
     PlacementPtr<FragmentProcessor> sourceOverride) {
@@ -290,6 +400,9 @@ static PlacementPtr<FragmentProcessor> BuildFPForPass(
       slots.push_back(slot);
     }
     return AOTPointwiseTailProcessor::Make(allocator, std::move(current), slots);
+  }
+  if (pass.kernel == AOTKernelKind::PointwiseChain) {
+    return BuildChainFP(allocator, graph, pass);
   }
   for (size_t index = 0; index < pass.nodes.size(); ++index) {
     auto node = graph.nodeAt(pass.nodes[index]);
@@ -431,6 +544,33 @@ class AOTPlanRenderTask : public RenderTask {
 }  // namespace
 
 bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPlan& plan) {
+  // A PointwiseChain plan is a single fused pass over the whole DAG; the linear-pass invariants do
+  // not apply to it. Its structural checks live in BuildChainFP and AOTPointwiseChainProcessor::Make.
+  if (plan.passes.size() == 1 && plan.passes[0].kernel == AOTKernelKind::PointwiseChain) {
+    const auto& pass = plan.passes[0];
+    if (!plan.output.isValid() || plan.output != graph.root() || pass.output != plan.output ||
+        pass.materializesOutput || pass.nodes.empty() ||
+        pass.nodes.size() > AOTPointwiseChainProcessor::MaxSlots) {
+      return false;
+    }
+    // The fused kernel binds one sampler per texture leaf and only exists for 1, 2 or 4 plain
+    // (non-tiled, non-device) leaves; anything else must stay on the plain route.
+    size_t plainLeaves = 0;
+    for (auto nodeID : pass.nodes) {
+      auto node = graph.nodeAt(nodeID);
+      if (node == nullptr) {
+        return false;
+      }
+      if (node->kind == AOTEffectKind::TextureSource) {
+        auto parameters = std::get_if<AOTTextureParameters>(&node->parameters);
+        if (parameters == nullptr || parameters->samplingKind != AOTTextureSamplingKind::Plain) {
+          return false;
+        }
+        ++plainLeaves;
+      }
+    }
+    return plainLeaves == 1 || plainLeaves == 2 || plainLeaves == 4;
+  }
   return ValidateLinearPlan(graph, plan);
 }
 

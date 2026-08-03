@@ -47,6 +47,7 @@
 #include "gpu/shaders/level1/MeshFillShader.h"
 #include "gpu/shaders/level1/NonAARRectFillShader.h"
 #include "gpu/shaders/level1/PerlinNoiseFillShader.h"
+#include "gpu/shaders/level1/PointwiseChainShader.h"
 #include "gpu/shaders/level1/PointwiseDirectShader.h"
 #include "gpu/shaders/level1/PointwiseTailShader.h"
 #include "gpu/shaders/level1/QuadColorFillShader.h"
@@ -235,7 +236,11 @@ static std::string ResolveIncludes(const std::string& source, const std::string&
         if (includeContent.empty()) {
           std::cerr << "  WARNING: Cannot resolve #include \"" << includePath << "\"\n";
         }
-        result += includeContent + "\n";
+        // Recurse so included files may include others (e.g. xp_porter_duff.inc pulling in the
+        // shared blend math). Include guards in the sources prevent duplicate definitions;
+        // intentionally guardless files (the slot bind/unbind headers) are included repeatedly by
+        // design, so no visited-set is applied.
+        result += ResolveIncludes(includeContent, baseDir) + "\n";
         continue;
       }
     }
