@@ -38,7 +38,7 @@ class D3D12Semaphore : public Semaphore, public D3D12Resource {
   static std::shared_ptr<D3D12Semaphore> MakeFrom(D3D12GPU* gpu, ComPtr<ID3D12Fence> fence,
                                                   uint64_t value);
 
-  D3D12Semaphore(ComPtr<ID3D12Fence> fence, uint64_t value, bool adopted);
+  D3D12Semaphore(ComPtr<ID3D12Fence> fence, uint64_t value);
   ~D3D12Semaphore() override = default;
 
   ID3D12Fence* d3d12Fence() const {
@@ -65,7 +65,6 @@ class D3D12Semaphore : public Semaphore, public D3D12Resource {
  private:
   ComPtr<ID3D12Fence> _fence = nullptr;
   uint64_t _value = 0;
-  bool _adopted = false;
 
   friend class D3D12GPU;
 };
