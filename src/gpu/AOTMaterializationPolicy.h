@@ -19,9 +19,25 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 
 namespace tgfx {
 class FragmentProcessor;
+
+/**
+ * Internal render flags, carried alongside the public RenderFlags through the same uint32_t. They
+ * start high enough to never collide with the public bits.
+ */
+class InternalRenderFlags {
+ public:
+  /**
+   * Set while replaying a Picture into an offscreen texture. Every draw inside that replay is about
+   * to be rasterized into one RGBA8 target anyway, so materializing a subtree there buys no AOT
+   * match for the outer draw and only adds a second 8-bit quantization step — one that later scaling
+   * of the resulting image amplifies. Materialization for matchability is skipped under this flag.
+   */
+  static constexpr uint32_t NestedRasterization = 1u << 16;
+};
 
 /**
  * Identifies how a child FragmentProcessor is consumed by its parent. The consumer's effect domain
@@ -42,9 +58,12 @@ struct MaterializationDecision {
   /// True when the child should be rendered into an offscreen texture and replaced by a plain
   /// TextureEffect so both the producer and the downstream consumer become AOT-matchable kernels.
   bool shouldFlatten = false;
-  /// The consumer's sampling radius in pixels. The materialized texture must be expanded by this
-  /// much on every side (an apron) so a neighborhood consumer never samples past the valid region.
-  /// Zero for pointwise consumers.
+  /// Extra ring of pixels the materialized texture must carry around the draw bounds. The draw
+  /// bounds describe the area being painted, not the area the consumer samples: a coordinate landing
+  /// on the boundary can resolve just outside it once the offscreen target is snapped to integers
+  /// and its coordinates are normalized. Without the apron those reads clamp to the edge texels
+  /// instead of returning what the subtree produced there, turning a transparent border opaque. One
+  /// pixel covers that boundary case; a neighborhood consumer needs its full sampling radius.
   float apronRadius = 0.0f;
 };
 

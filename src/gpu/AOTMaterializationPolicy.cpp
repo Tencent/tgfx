@@ -45,11 +45,13 @@ MaterializationDecision AOTMaterializationPolicy::Evaluate(const FragmentProcess
   MaterializationDecision decision = {};
   switch (consumer) {
     case MaterializationConsumer::PointwiseBlend:
-      // A pointwise blend consumes the child at the output coordinate, so no apron is needed. Any
-      // child that is not an AOT-leaf-matchable shape (e.g. TiledTextureEffect) is flattened to a
-      // plain TextureEffect so the downstream Xfermode kernel matches a precompiled artifact.
+      // A pointwise blend consumes the child at the output coordinate, so it needs no sampling
+      // radius. It still needs the one-pixel boundary apron: an offset shadow mask reads just past
+      // the draw bounds, and without the apron that read clamps to the edge texels and turns the
+      // transparent border opaque. Measured on the full Metal suite, a wider apron changes nothing,
+      // so one pixel is the exact requirement rather than a safety margin.
       decision.shouldFlatten = !IsPointwiseBlendLeafMatchable(child, childIndex);
-      decision.apronRadius = 0.0f;
+      decision.apronRadius = 1.0f;
       break;
   }
   return decision;

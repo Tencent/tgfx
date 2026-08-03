@@ -58,7 +58,9 @@ static inline bool IsSimpleBlendChild(const FragmentProcessor* fp, size_t childI
  * Renders a complex FragmentProcessor into an offscreen texture and returns a simple TextureEffect
  * that samples from it. The FP's coordTransform expects to receive coordinates in the range
  * [drawRect.x..right, drawRect.y..bottom], so a coordOffset is applied during offscreen rendering
- * to ensure the FP sees the correct coordinate space. Returns nullptr on failure.
+ * to ensure the FP sees the correct coordinate space. apronRadius expands the captured area on every
+ * side; pass the value the materialization policy produced for this consumer. Returns nullptr on
+ * failure.
  *
  * The offscreen render target uses BackingFit::Exact: the returned TextureEffect samples with a
  * plain translate-only uvMatrix, which is only correct when the backing texture is exactly
@@ -66,9 +68,13 @@ static inline bool IsSimpleBlendChild(const FragmentProcessor* fp, size_t childI
  * sample a scaled/offset region (reading uninitialized padding), producing corrupted output.
  */
 static inline PlacementPtr<FragmentProcessor> FlattenToTexture(const FPArgs& args,
-                                                               PlacementPtr<FragmentProcessor> fp) {
+                                                               PlacementPtr<FragmentProcessor> fp,
+                                                               float apronRadius = 0.0f) {
   auto context = args.context;
   auto drawRect = args.drawRect;
+  // Grow the captured area by the consumer's apron so reads just outside the draw bounds return what
+  // the subtree produced there instead of clamping to the edge texels. See MaterializationDecision.
+  drawRect.outset(apronRadius, apronRadius);
   drawRect.roundOut();
   int width = static_cast<int>(drawRect.width());
   int height = static_cast<int>(drawRect.height());
@@ -103,21 +109,23 @@ static inline PlacementPtr<FragmentProcessor> FlattenToTexture(const FPArgs& arg
  *  - Correctness: the child is too complex to be a valid XfermodeFragmentProcessor child
  *    (IsSimpleBlendChild returns false). This always flattens, regardless of any AOT setting.
  *  - AOT matchability: the child is valid inline but its permutation has no precompiled artifact
- *    (e.g. a TiledTextureEffect src). This flattens only when the decomposition route is enabled,
- *    so the default path is byte-for-byte identical to before and no baseline shifts.
+ *    (e.g. a TiledTextureEffect src). This flattens only when the decomposition route is enabled and
+ *    the draw is not already inside a nested rasterization, so the default path is byte-for-byte
+ *    identical to before and no baseline shifts.
  */
 static inline PlacementPtr<FragmentProcessor> EnsureSimpleBlendChild(
     const FPArgs& args, PlacementPtr<FragmentProcessor> fp, size_t childIndex = 0) {
+  auto decision = AOTMaterializationPolicy::Evaluate(
+      fp.get(), MaterializationConsumer::PointwiseBlend, childIndex);
   if (!IsSimpleBlendChild(fp.get(), childIndex)) {
-    return FlattenToTexture(args, std::move(fp));
+    return FlattenToTexture(args, std::move(fp), decision.apronRadius);
+  }
+  if ((args.renderFlags & InternalRenderFlags::NestedRasterization) != 0) {
+    return fp;
   }
   auto cache = args.context->precompiledShaderCache();
-  if (cache != nullptr && cache->decompositionEnabled()) {
-    auto decision = AOTMaterializationPolicy::Evaluate(
-        fp.get(), MaterializationConsumer::PointwiseBlend, childIndex);
-    if (decision.shouldFlatten) {
-      return FlattenToTexture(args, std::move(fp));
-    }
+  if (cache != nullptr && cache->decompositionEnabled() && decision.shouldFlatten) {
+    return FlattenToTexture(args, std::move(fp), decision.apronRadius);
   }
   return fp;
 }

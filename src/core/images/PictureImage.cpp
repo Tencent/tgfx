@@ -19,6 +19,7 @@
 #include "PictureImage.h"
 #include "core/ClipStack.h"
 #include "core/utils/MathExtra.h"
+#include "gpu/AOTMaterializationPolicy.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/OpsCompositor.h"
 #include "gpu/ProxyProvider.h"
@@ -164,6 +165,10 @@ bool PictureImage::drawPicture(std::shared_ptr<RenderTargetProxy> renderTarget,
   if (renderTarget == nullptr) {
     return false;
   }
+  // The whole picture lands in this one offscreen target, so a draw inside it must not materialize
+  // subtrees of its own: the extra RGBA8 round trip gains no precompiled match for the outer draw
+  // and its quantization is amplified when the resulting image is scaled.
+  renderFlags |= InternalRenderFlags::NestedRasterization;
   RenderContext renderContext(std::move(renderTarget), renderFlags, true, nullptr, _colorSpace);
   Matrix totalMatrix = {};
   if (extraMatrix) {

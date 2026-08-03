@@ -1091,6 +1091,7 @@ TGFX_TEST_PRIVATE(StrokeTest, HairlineShaderProgramCacheReuse) {
     if (testCase.shouldReuseProgram) {
       EXPECT_EQ(currentCount, lastProgramCount);
     }
+    lastProgramCount = currentCount;
   }
 }
 
