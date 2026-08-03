@@ -23,23 +23,19 @@
 
 namespace tgfx {
 
-// Box-filter compute shader: each thread samples 2x2 source texels and writes one destination
-// texel. SamplePoint is required because textures we generate mipmaps on may not have linear
-// sampling enabled by the time this shader runs; sampling four corners with bilinear would
-// average twice and double the cost. The HLSL is intentionally inline and tiny so D3DCompile
-// finishes in well under a millisecond.
+// Box-filter compute shader: each thread samples the source mip at the destination texel
+// center using hardware linear filtering, which produces a 2x2 weighted average of the source
+// texels with the same weights MTLBlitCommandEncoder generateMipmapsForTexture and
+// vkCmdBlitImage(VK_FILTER_LINEAR) use. A single SampleLevel matches the Metal/Vulkan output
+// bit-for-bit on even-divided mip levels and follows GPU-driver edge handling on odd ones. The
+// older quincunx approach (four 0.25-texel offsets) effectively did a 16-tap blur and produced
+// softer mips than the other backends.
 //
 // Layout matches the root signature in createRootSignature():
 //   register(b0) — uint4 with mip dimensions and 1/dimensions
 //   register(t0) — input mip (mip[i])
-//   register(s0) — point sampler with clamp address mode
+//   register(s0) — linear clamp sampler
 //   register(u0) — output mip (mip[i+1])
-// Hardware linear sampling at the destination texel center performs a 2x2 weighted average of
-// the source texels with the same weights MTLBlitCommandEncoder generateMipmapsForTexture and
-// vkCmdBlitImage(VK_FILTER_LINEAR) use, so a single SampleLevel matches the Metal/Vulkan output
-// bit-for-bit on even-divided mip levels and follows GPU-driver edge handling on odd ones. The
-// older quincunx (four 0.25-texel offsets) effectively did a 16-tap blur and produced softer
-// mips than the other backends.
 static constexpr const char* HLSL_SOURCE = R"(
 cbuffer MipmapCB : register(b0)
 {
@@ -78,7 +74,7 @@ D3D12MipmapGenerator* D3D12MipmapGenerator::Get(D3D12GPU* gpu) {
 }
 
 bool D3D12MipmapGenerator::createRootSignature(D3D12GPU* gpu) {
-  // Constants + SRV table + UAV table. A single static sampler (point/clamp) means we don't have
+  // Constants + SRV table + UAV table. A single static sampler (linear/clamp) means we don't have
   // to thread a sampler descriptor heap through generateMipmapsForTexture().
   D3D12_DESCRIPTOR_RANGE srvRange = {};
   srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
