@@ -40,16 +40,21 @@ class D3D12GPU;
  *
  * The resulting DXBC blob is consumed by D3D12RenderPipeline via shaderBytecode().
  *
- * Resource binding mapping (SPIR-V binding -> HLSL register):
- *   - VertexUniformBlock   (binding 0) -> b0
- *   - FragmentUniformBlock (binding 1) -> b0  (HLSL b/t/s registers are per shader stage; both
- *                                              stages can use b0 without colliding because the
- *                                              D3D12 root signature distinguishes them via
- *                                              ShaderVisibility.)
- *   - sampler bindings (binding N >= 2) -> t{N-2} + s{N-2}
- *
- * SPIRV-Cross's default behaviour already matches CBV/SRV/Sampler register classes derived from
- * the SPIR-V resource type, so the only customisation we need is shifting samplers to register 0.
+ * HLSL register assignment:
+ *   - CBVs: each uniform_buffer entry SPIRV-Cross reports for this stage receives the next
+ *     free b{N} register (b0, b1, ...), assigned in declaration order (SPIRV-Cross iterates
+ *     resources by SPIR-V id, which matches the order they appear in the GLSL source).
+ *     Registers are per-stage: VS b0 and FS b0 do not collide because the D3D12 root signature
+ *     distinguishes them via ShaderVisibility.
+ *   - SRVs/Samplers: each sampled_image entry receives a paired (t{K}, s{K}) register slot
+ *     assigned in the same declaration order, again starting at 0.
+ *   - The SPIR-V binding number attached to the source declaration does not influence the HLSL
+ *     register number — SPIRV-Cross's default binding-derived mapping is fully overridden here
+ *     via add_hlsl_resource_binding. This dense ordering is intentional: it must stay in lock
+ *     step with the order D3D12RenderPipeline::createRootSignature walks
+ *     BindingLayout::uniformBlocks and BindingLayout::textureSamplers, so the shader's b/t/s
+ *     slots correspond one-to-one with the root parameter tables. Reordering either loop, or
+ *     changing SPIRV-Cross's resource iteration order, will silently mis-map bindings.
  */
 class D3D12ShaderModule : public ShaderModule, public D3D12Resource {
  public:
