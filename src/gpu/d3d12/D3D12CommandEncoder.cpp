@@ -77,18 +77,20 @@ void D3D12CommandEncoder::copyTextureToTexture(std::shared_ptr<Texture> srcTextu
   if (!srcTexture || !dstTexture) {
     return;
   }
-  // Clamp copy region to source bounds.
-  auto srcX = static_cast<int32_t>(srcRect.x());
-  auto srcY = static_cast<int32_t>(srcRect.y());
+  // Clamp copy region to source bounds. Negative srcX/srcY come in via RenderTargetCopyTask
+  // (bounds may extend past the origin after clipping); a plain static_cast<UINT> would wrap
+  // them to ~4G and produce an invalid D3D12_BOX where left > right.
+  auto srcX = srcRect.x() < 0 ? 0u : static_cast<uint32_t>(srcRect.x());
+  auto srcY = srcRect.y() < 0 ? 0u : static_cast<uint32_t>(srcRect.y());
   auto copyWidth = static_cast<uint32_t>(srcRect.width());
   auto copyHeight = static_cast<uint32_t>(srcRect.height());
   auto srcW = static_cast<uint32_t>(srcTexture->width());
   auto srcH = static_cast<uint32_t>(srcTexture->height());
   if (srcX + copyWidth > srcW) {
-    copyWidth = srcW > static_cast<uint32_t>(srcX) ? srcW - static_cast<uint32_t>(srcX) : 0;
+    copyWidth = srcW > srcX ? srcW - srcX : 0;
   }
   if (srcY + copyHeight > srcH) {
-    copyHeight = srcH > static_cast<uint32_t>(srcY) ? srcH - static_cast<uint32_t>(srcY) : 0;
+    copyHeight = srcH > srcY ? srcH - srcY : 0;
   }
 
   auto d3d12Src = std::static_pointer_cast<D3D12Texture>(srcTexture);
@@ -160,17 +162,17 @@ void D3D12CommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTextur
   if (!srcTexture || !dstBuffer) {
     return;
   }
-  auto srcX = static_cast<int32_t>(srcRect.x());
-  auto srcY = static_cast<int32_t>(srcRect.y());
+  auto srcX = srcRect.x() < 0 ? 0u : static_cast<uint32_t>(srcRect.x());
+  auto srcY = srcRect.y() < 0 ? 0u : static_cast<uint32_t>(srcRect.y());
   auto copyWidth = static_cast<uint32_t>(srcRect.width());
   auto copyHeight = static_cast<uint32_t>(srcRect.height());
   auto srcW = static_cast<uint32_t>(srcTexture->width());
   auto srcH = static_cast<uint32_t>(srcTexture->height());
   if (srcX + copyWidth > srcW) {
-    copyWidth = srcW > static_cast<uint32_t>(srcX) ? srcW - static_cast<uint32_t>(srcX) : 0;
+    copyWidth = srcW > srcX ? srcW - srcX : 0;
   }
   if (srcY + copyHeight > srcH) {
-    copyHeight = srcH > static_cast<uint32_t>(srcY) ? srcH - static_cast<uint32_t>(srcY) : 0;
+    copyHeight = srcH > srcY ? srcH - srcY : 0;
   }
   if (copyWidth == 0 || copyHeight == 0) {
     return;
