@@ -33,16 +33,6 @@ D3D12_PRIMITIVE_TOPOLOGY ToD3D12PrimitiveTopology(PrimitiveType primitiveType) {
   }
 }
 
-D3D12_PRIMITIVE_TOPOLOGY_TYPE ToD3D12PrimitiveTopologyType(PrimitiveType primitiveType) {
-  switch (primitiveType) {
-    case PrimitiveType::Triangles:
-    case PrimitiveType::TriangleStrip:
-      return D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-    default:
-      return D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-  }
-}
-
 DXGI_FORMAT ToD3D12VertexFormat(VertexFormat format) {
   switch (format) {
     case VertexFormat::Float:
@@ -284,16 +274,6 @@ bool ToD3D12FrontCounterClockwise(FrontFace frontFace) {
     default:
       return true;
   }
-}
-
-D3D12_INDEX_BUFFER_STRIP_CUT_VALUE ToD3D12StripCutValue(IndexFormat indexFormat) {
-  switch (indexFormat) {
-    case IndexFormat::UInt16:
-      return D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_0xFFFF;
-    case IndexFormat::UInt32:
-      return D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_0xFFFFFFFF;
-  }
-  return D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED;
 }
 
 void TransitionResourceState(ID3D12GraphicsCommandList* commandList, ID3D12Resource* resource,

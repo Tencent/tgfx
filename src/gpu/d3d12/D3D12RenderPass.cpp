@@ -27,11 +27,6 @@
 
 namespace tgfx {
 
-static D3D12_PRIMITIVE_TOPOLOGY ToD3D12Topology(PrimitiveType type) {
-  return type == PrimitiveType::TriangleStrip ? D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP
-                                              : D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-}
-
 std::shared_ptr<D3D12RenderPass> D3D12RenderPass::Make(D3D12CommandEncoder* encoder,
                                                        const RenderPassDescriptor& descriptor) {
   if (encoder == nullptr) {
@@ -474,7 +469,7 @@ void D3D12RenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount,
   if (!currentPipeline) {
     return;
   }
-  auto topology = ToD3D12Topology(primitiveType);
+  auto topology = ToD3D12PrimitiveTopology(primitiveType);
   if (!primitiveTopologySet || topology != currentTopology) {
     commandList->IASetPrimitiveTopology(topology);
     currentTopology = topology;
@@ -490,7 +485,7 @@ void D3D12RenderPass::drawIndexed(PrimitiveType primitiveType, uint32_t indexCou
   if (!currentPipeline) {
     return;
   }
-  auto topology = ToD3D12Topology(primitiveType);
+  auto topology = ToD3D12PrimitiveTopology(primitiveType);
   if (!primitiveTopologySet || topology != currentTopology) {
     commandList->IASetPrimitiveTopology(topology);
     currentTopology = topology;

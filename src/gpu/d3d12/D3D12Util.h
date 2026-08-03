@@ -38,8 +38,6 @@ using ComPtr = Microsoft::WRL::ComPtr<T>;
 
 D3D12_PRIMITIVE_TOPOLOGY ToD3D12PrimitiveTopology(PrimitiveType primitiveType);
 
-D3D12_PRIMITIVE_TOPOLOGY_TYPE ToD3D12PrimitiveTopologyType(PrimitiveType primitiveType);
-
 DXGI_FORMAT ToD3D12VertexFormat(VertexFormat format);
 
 D3D12_COMPARISON_FUNC ToD3D12CompareFunction(CompareFunction compareFunction);
@@ -65,8 +63,6 @@ D3D12_FILTER ToD3D12Filter(FilterMode minFilter, FilterMode magFilter, MipmapMod
 D3D12_CULL_MODE ToD3D12CullMode(CullMode cullMode);
 
 bool ToD3D12FrontCounterClockwise(FrontFace frontFace);
-
-D3D12_INDEX_BUFFER_STRIP_CUT_VALUE ToD3D12StripCutValue(IndexFormat indexFormat);
 
 /**
  * Records a single ID3D12Resource::ResourceBarrier(TRANSITION) on the given command list. No-op

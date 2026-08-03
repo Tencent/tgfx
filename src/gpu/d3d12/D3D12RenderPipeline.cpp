@@ -416,10 +416,10 @@ bool D3D12RenderPipeline::createPipelineState(D3D12GPU* gpu,
   //   * IBStripCutValue=DISABLED — matches Vulkan, which sets primitiveRestartEnable=false on
   //     its PSOs. No tgfx draw op relies on 0xFFFF/0xFFFFFFFF restarting a strip.
   //   * PrimitiveTopologyType=TRIANGLE — tgfx's PrimitiveType only carries Triangles and
-  //     TriangleStrip today and ToD3D12PrimitiveTopologyType already collapses both onto
-  //     TRIANGLE. Once tgfx adds LINE/POINT (or moves these fields onto PrimitiveDescriptor)
-  //     this branch must be revisited together with the matching IASetPrimitiveTopology call
-  //     in D3D12RenderPass; until then a single PSO topology type covers every draw call.
+  //     TriangleStrip today and both collapse onto TRIANGLE at the PSO level. Once tgfx adds
+  //     LINE/POINT (or moves these fields onto PrimitiveDescriptor) this branch must be
+  //     revisited together with the matching IASetPrimitiveTopology call in D3D12RenderPass;
+  //     until then a single PSO topology type covers every draw call.
   psoDesc.IBStripCutValue = D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED;
   psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
   psoDesc.NumRenderTargets = static_cast<UINT>(descriptor.fragment.colorAttachments.size());
