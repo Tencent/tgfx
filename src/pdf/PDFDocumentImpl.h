@@ -75,7 +75,14 @@ struct PDFLink {
   const int nodeId;
 };
 
+// Test-only accessor forward-declaration. The friend below grants PDFExportTest.cpp read/write
+// access to PDFDocumentImpl's private offsetMap without exposing an internal accessor on the
+// production API. Not defined in production code; the definition lives in the test binary.
+class PDFStreamOutTestAccess;
+
 class PDFDocumentImpl : public PDFDocument {
+  friend class PDFStreamOutTestAccess;
+
  public:
   PDFDocumentImpl(std::shared_ptr<WriteStream> stream, Context* context, PDFMetadata Metadata);
 
