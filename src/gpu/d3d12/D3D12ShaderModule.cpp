@@ -84,22 +84,26 @@ static std::string convertSPIRVToHLSL(const std::vector<uint32_t>& spirvBinary, 
     hlslCompiler.add_hlsl_resource_binding(resourceBinding);
   }
 
-  // Map combined samplers: walk the SPIR-V sampled images in declaration order and assign
-  // consecutive HLSL (t{K}, s{K}) register pairs starting from zero. This matches the
-  // rangeRegister++ sequence used by D3D12RenderPipeline::createRootSignature, so the shader's
-  // t/s slots line up one-to-one with the root signature's SRV/Sampler descriptor tables.
-  uint32_t srvRegister = 0;
+  // Map combined samplers: assign each SPIR-V sampled image an HLSL (t{K}, s{K}) register pair
+  // whose index equals the image's SPIR-V binding decoration. GLSL binding numbers are laid down
+  // by ShaderCompiler::assignSamplerBindings in declaration order (0, 1, 2, ...), which is the
+  // same order pipeline-side D3D12RenderPipeline::createRootSignature uses to assign SRV/Sampler
+  // root parameters. Using spvBinding directly (rather than a separate srvRegister++ counter
+  // driven by SPIRV-Cross iteration order) keeps the two sides aligned: get_shader_resources()
+  // returns sampled_images in an order that is not guaranteed to match SPIR-V binding order —
+  // observed in the GlassStyle AlphaMask path where 3–4 samplers in one FP graph come back with
+  // iter/binding pairs like (0, 1), (1, 2), (2, 0), (3, 3), which would silently bind wrong
+  // textures at t{K}.
   for (auto& image : resources.sampled_images) {
     uint32_t spvBinding = hlslCompiler.get_decoration(image.id, spv::DecorationBinding);
     uint32_t spvDescSet = hlslCompiler.get_decoration(image.id, spv::DecorationDescriptorSet);
-    uint32_t hlslSlot = srvRegister++;
     spirv_cross::HLSLResourceBinding resourceBinding = {};
     resourceBinding.stage = executionModel;
     resourceBinding.desc_set = spvDescSet;
     resourceBinding.binding = spvBinding;
-    resourceBinding.srv.register_binding = hlslSlot;
+    resourceBinding.srv.register_binding = spvBinding;
     resourceBinding.srv.register_space = 0;
-    resourceBinding.sampler.register_binding = hlslSlot;
+    resourceBinding.sampler.register_binding = spvBinding;
     resourceBinding.sampler.register_space = 0;
     hlslCompiler.add_hlsl_resource_binding(resourceBinding);
   }
@@ -114,11 +118,15 @@ static std::string convertSPIRVToHLSL(const std::vector<uint32_t>& spirvBinary, 
 // Compile HLSL source to a DXBC bytecode blob using D3DCompile with the appropriate stage profile.
 static ComPtr<ID3DBlob> compileHLSLToDXBC(const std::string& hlsl, ShaderStage stage) {
   const char* target = (stage == ShaderStage::Vertex) ? "vs_5_0" : "ps_5_0";
-  UINT flags = D3DCOMPILE_ENABLE_STRICTNESS;
+  // Use the same optimization level in Debug and Release so shader output is bit-stable across
+  // build configurations. Skipping optimization in Debug changes floating-point evaluation order
+  // (loop unrolling, FMA fusion, instruction reordering), which propagates through packed-float
+  // encoded intermediate textures (see TentBlur1DFragmentProcessor) and is then amplified by
+  // finite-difference gradient + normalize + distance scaling in the UDF refraction path,
+  // yielding visibly different results between Debug and Release builds.
+  UINT flags = D3DCOMPILE_ENABLE_STRICTNESS | D3DCOMPILE_OPTIMIZATION_LEVEL3;
 #ifdef _DEBUG
-  flags |= D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
-#else
-  flags |= D3DCOMPILE_OPTIMIZATION_LEVEL3;
+  flags |= D3DCOMPILE_DEBUG;
 #endif
 
   ComPtr<ID3DBlob> codeBlob = nullptr;
