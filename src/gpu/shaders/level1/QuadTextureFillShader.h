@@ -34,7 +34,6 @@ namespace tgfx {
 ///    fragment shader; affine transforms yield z=1 so the divide is a no-op.)
 ///
 /// Fragment dimensions (same semantics as TextureFillShader):
-///   HAS_YUV    (bool): YUV texture (not compiled — falls back to ProgramBuilder)
 ///   ALPHA_ONLY (bool): texture is alpha-only format
 ///   HAS_RGBAAA (bool): RGBAAA dual-plane alpha encoding
 ///   HAS_SUBSET (bool): subset clamping active
@@ -63,7 +62,6 @@ class QuadTextureFillShader : public PrecompiledShader {
   // uniforms (AlphaOnly / HasRgbaaa) rather than compile-time permutations, shrinking the variants.
   struct FragDims {
     enum : uint32_t {
-      HAS_YUV,
       HAS_SUBSET,
       HAS_COVERAGE,
       HAS_COLOR,
@@ -74,7 +72,6 @@ class QuadTextureFillShader : public PrecompiledShader {
     };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationBool("HAS_YUV"),
           PermutationBool("HAS_SUBSET"),
           PermutationBool("HAS_COVERAGE"),
           PermutationBool("HAS_COLOR"),
@@ -85,7 +82,7 @@ class QuadTextureFillShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 7, "Update ShouldCompile when fragment dimensions change.");
+  static_assert(FD::COUNT == 6, "Update ShouldCompile when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"QuadTextureFillShader",
@@ -102,12 +99,8 @@ class QuadTextureFillShader : public PrecompiledShader {
  private:
   static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>&,
                             const std::vector<int>& fragValues) {
-    // YUV textures require additional dimensions not yet modeled. HAS_SUBSET / HAS_COVERAGE /
-    // HAS_COLOR / HAS_LOCAL_MASK vertex and fragment agreement is enforced automatically by the
-    // framework (MirroredDimsAgree).
-    if (fragValues[FD::HAS_YUV] != 0) {
-      return false;
-    }
+    // HAS_SUBSET / HAS_COVERAGE / HAS_COLOR / HAS_LOCAL_MASK vertex and fragment agreement is
+    // enforced automatically by the framework (MirroredDimsAgree).
     if (fragValues[FD::HAS_LOCAL_MASK] != 0) {
       // Local-space and device-space masks are mutually exclusive coverage sources.
       if (fragValues[FD::HAS_MASK_TEXTURE] != 0) {

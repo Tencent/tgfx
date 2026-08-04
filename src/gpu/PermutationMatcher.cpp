@@ -224,10 +224,9 @@ static std::optional<PermutationMatchResult> TryMatchTextureFill(const ProgramIn
     return std::nullopt;
   }
   // alphaOnly / hasRGBAAA are runtime uniforms (AlphaOnly / HasRgbaaa) written by
-  // GLSLTextureEffect::onSetData, not permutation dimensions.
-  TextureFillShader::VertexValues vertexValues = {};
-  vertexValues.hasSubset = te->hasSubset();
-  auto vertIndex = TextureFillShader::EncodeVertex(vertexValues);
+  // GLSLTextureEffect::onSetData, not permutation dimensions. TextureFill's vertex interface is
+  // invariant: subset clamping is fragment-local, so every matching draw shares vertex artifact 0.
+  auto vertIndex = TextureFillShader::EncodeVertex();
 
   TextureFillShader::FragmentValues fragmentValues = {};
   fragmentValues.hasSubset = te->hasSubset();

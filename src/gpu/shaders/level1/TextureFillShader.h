@@ -24,9 +24,15 @@ namespace tgfx {
 
 class TextureFillShader : public PrecompiledShader {
  public:
-  // Vertex dimensions. ALPHA_ONLY / HAS_RGBAAA are runtime uniforms (see frag), not variants.
-  TGFX_DEFINE_DIMS(HAS_YUV, HAS_SUBSET);
-  using VD = Dims;
+  // ALPHA_ONLY / HAS_RGBAAA are runtime uniforms (see frag), not variants. The vertex shader has
+  // no structural axes: texture subset clamping is fragment-local and YUV falls back before
+  // matching, so neither may produce duplicate vertex artifacts.
+  struct VertDims {
+    static PermutationDomain domain() {
+      return PermutationDomain({});
+    }
+  };
+  using VD = VertDims;
 
   // Fragment dimensions:
   //   HAS_COVERAGE (int, 3 values):
@@ -36,10 +42,9 @@ class TextureFillShader : public PrecompiledShader {
   // ALPHA_ONLY and HAS_RGBAAA are folded into runtime uniforms (AlphaOnly / HasRgbaaa), set by
   // GLSLTextureEffect::onSetData, rather than compile-time permutations.
   struct FragDims {
-    enum : uint32_t { HAS_YUV, HAS_SUBSET, HAS_XP, HAS_COVERAGE, COUNT };
+    enum : uint32_t { HAS_SUBSET, HAS_XP, HAS_COVERAGE, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationBool("HAS_YUV"),
           PermutationBool("HAS_SUBSET"),
           PermutationInt("HAS_XP", 3),
           PermutationInt("HAS_COVERAGE", 3),
@@ -47,16 +52,9 @@ class TextureFillShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(VD::COUNT == 2 && FD::COUNT == 4,
-                "Update the encoders and ShouldCompile when dimensions change.");
-
-  struct VertexValues {
-    bool hasYUV = false;
-    bool hasSubset = false;
-  };
+  static_assert(FD::COUNT == 3, "Update the encoders and ShouldCompile when dimensions change.");
 
   struct FragmentValues {
-    bool hasYUV = false;
     bool hasSubset = false;
     uint32_t xp = 0;
     uint32_t coverage = 0;
@@ -67,16 +65,15 @@ class TextureFillShader : public PrecompiledShader {
     return "TextureFillShader";
   }
 
-  /** Encodes vertex values with the same mixed-radix layout as VD::domain() without allocation. */
-  static constexpr uint32_t EncodeVertex(const VertexValues& values) {
-    return static_cast<uint32_t>(values.hasYUV) | (static_cast<uint32_t>(values.hasSubset) << 1u);
+  /** TextureFill has one vertex artifact because its vertex interface is invariant. */
+  static constexpr uint32_t EncodeVertex() {
+    return 0;
   }
 
   /** Encodes fragment values with the same mixed-radix layout as FD::domain() without allocation. */
   static constexpr uint32_t EncodeFragment(const FragmentValues& values) {
-    auto base =
-        static_cast<uint32_t>(values.hasYUV) | (static_cast<uint32_t>(values.hasSubset) << 1u);
-    return base + values.xp * 4u + values.coverage * 12u;
+    auto base = static_cast<uint32_t>(values.hasSubset);
+    return base + values.xp * 2u + values.coverage * 6u;
   }
 
   PrecompiledShaderInfo info() const override {
@@ -92,13 +89,7 @@ class TextureFillShader : public PrecompiledShader {
   }
 
  private:
-  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>&,
-                            const std::vector<int>& fragValues) {
-    // YUV textures require additional dimensions not yet modeled. HAS_YUV / HAS_SUBSET vertex and
-    // fragment agreement is enforced automatically by the framework (MirroredDimsAgree).
-    if (fragValues[FD::HAS_YUV] != 0) {
-      return false;
-    }
+  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>&, const std::vector<int>&) {
     return true;
   }
 };

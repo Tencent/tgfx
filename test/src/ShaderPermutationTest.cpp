@@ -46,6 +46,7 @@
 #include "gpu/shaders/ShaderPermutation.h"
 #include "gpu/shaders/level1/DeviceSpaceTexturedEffectShader.h"
 #include "gpu/shaders/level1/QuadTextureFillShader.h"
+#include "gpu/shaders/level1/ShapeInstancedFillShader.h"
 #include "gpu/shaders/level1/SingleIntervalGradientShader.h"
 #include "gpu/shaders/level1/TextureFillShader.h"
 #include "gtest/gtest.h"
@@ -261,21 +262,21 @@ TGFX_TEST(ShaderPermutationTest, DefineListForZeroValue) {
 }
 
 TGFX_TEST(ShaderPermutationTest, DefineDimsMacro) {
-  using D = TextureFillShader::Dims;
+  using D = ShapeInstancedFillShader::Dims;
   EXPECT_EQ(D::COUNT, 2u);
-  EXPECT_EQ(D::HAS_YUV, 0u);
-  EXPECT_EQ(D::HAS_SUBSET, 1u);
+  EXPECT_EQ(D::HAS_COLOR, 0u);
+  EXPECT_EQ(D::HAS_AA, 1u);
 
   auto domain = D::domain();
   EXPECT_EQ(domain.dimensionCount(), static_cast<size_t>(D::COUNT));
   EXPECT_EQ(domain.totalCount(), 4u);
 
-  // Verify domain dimensions match
-  auto handDomain = PermutationDomain::FromBoolNames("HAS_YUV, HAS_SUBSET");
+  // Verify domain dimensions match.
+  auto handDomain = PermutationDomain::FromBoolNames("HAS_COLOR, HAS_AA");
   EXPECT_EQ(handDomain.totalCount(), domain.totalCount());
   EXPECT_EQ(handDomain.dimensionCount(), domain.dimensionCount());
 
-  // Verify encode/decode match between the two
+  // Verify encode/decode match between the two.
   for (uint32_t i = 0; i < domain.totalCount(); i++) {
     auto v = domain.decode(i);
     EXPECT_EQ(handDomain.encode(v), i);
@@ -290,11 +291,11 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistry) {
     auto shaderInfo = shader->info();
     if (shaderInfo.name == TextureFillShader::Name()) {
       foundTextureFill = true;
-      EXPECT_EQ(shaderInfo.vertDomain.totalCount(), 4u);
-      EXPECT_EQ(shaderInfo.vertDomain.dimensionCount(), 2u);
-      // FragDims: 2 bools + HAS_XP(int3) + HAS_COVERAGE(int3) = 36 permutations.
-      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 36u);
-      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 4u);
+      EXPECT_EQ(shaderInfo.vertDomain.totalCount(), 1u);
+      EXPECT_EQ(shaderInfo.vertDomain.dimensionCount(), 0u);
+      // FragDims: HAS_SUBSET(bool) + HAS_XP(int3) + HAS_COVERAGE(int3) = 18 permutations.
+      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 18u);
+      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 3u);
       EXPECT_EQ(shaderInfo.vertexFile, "level1/texture_fill.vert");
       EXPECT_EQ(shaderInfo.fragmentFile, "level1/texture_fill.frag");
     }
@@ -675,35 +676,22 @@ TGFX_TEST(ShaderPermutationTest, ShouldCompile) {
   }
 }
 
-TGFX_TEST(ShaderPermutationTest, EncodeWithBitShift) {
-  // Verify that 1u << D::DIM_NAME produces the same result as domain.encode({...})
-  // for an all-bool domain (each dim contributes a single bit).
-  using D = TextureFillShader::Dims;
-  auto domain = D::domain();
-
-  // HAS_YUV=1, others=0 -> index = 1<<0 = 1
-  EXPECT_EQ(domain.encode({1, 0}), 1u << D::HAS_YUV);
-  // HAS_SUBSET=1, others=0 -> index = 1<<1 = 2
-  EXPECT_EQ(domain.encode({0, 1}), 1u << D::HAS_SUBSET);
-  // HAS_YUV=1, HAS_SUBSET=1 -> index = (1<<0) | (1<<1) = 3
-  EXPECT_EQ(domain.encode({1, 1}), (1u << D::HAS_YUV) | (1u << D::HAS_SUBSET));
+TGFX_TEST(ShaderPermutationTest, TextureFillVertexDomainIsInvariant) {
+  auto domain = TextureFillShader::VD::domain();
+  EXPECT_EQ(domain.dimensionCount(), 0u);
+  EXPECT_EQ(domain.totalCount(), 1u);
+  EXPECT_EQ(TextureFillShader::EncodeVertex(), 0u);
 }
 
 TGFX_TEST(ShaderPermutationTest, TextureFillTypedEncodingMatchesDomains) {
   auto vertexDomain = TextureFillShader::VD::domain();
-  for (uint32_t index = 0; index < vertexDomain.totalCount(); index++) {
-    auto values = vertexDomain.decode(index);
-    TextureFillShader::VertexValues typedValues = {};
-    typedValues.hasYUV = values[TextureFillShader::VD::HAS_YUV] != 0;
-    typedValues.hasSubset = values[TextureFillShader::VD::HAS_SUBSET] != 0;
-    EXPECT_EQ(TextureFillShader::EncodeVertex(typedValues), index);
-  }
+  EXPECT_EQ(vertexDomain.totalCount(), 1u);
+  EXPECT_EQ(TextureFillShader::EncodeVertex(), 0u);
 
   auto fragmentDomain = TextureFillShader::FD::domain();
   for (uint32_t index = 0; index < fragmentDomain.totalCount(); index++) {
     auto values = fragmentDomain.decode(index);
     TextureFillShader::FragmentValues typedValues = {};
-    typedValues.hasYUV = values[TextureFillShader::FD::HAS_YUV] != 0;
     typedValues.hasSubset = values[TextureFillShader::FD::HAS_SUBSET] != 0;
     typedValues.xp = static_cast<uint32_t>(values[TextureFillShader::FD::HAS_XP]);
     typedValues.coverage = static_cast<uint32_t>(values[TextureFillShader::FD::HAS_COVERAGE]);
@@ -718,7 +706,7 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
-  EXPECT_EQ(cache->vertexEntryCount(), 141u);
+  EXPECT_EQ(cache->vertexEntryCount(), 140u);
   EXPECT_EQ(cache->fragmentEntryCount(), 495u);
   std::string expectedTag = TGFX_BACKEND_NAME;
   auto dashPos = expectedTag.find('-');
@@ -1448,10 +1436,11 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureFillShaderRegistry) {
       found = true;
       EXPECT_EQ(shaderInfo.vertDomain.dimensionCount(), 5u);
       EXPECT_EQ(shaderInfo.vertDomain.totalCount(), 32u);
-      // FragDims: 6 bools + 1 int(3) = 2^6 * 3 = 192 total permutations. ALPHA_ONLY and HAS_RGBAAA
-      // are runtime uniforms; HAS_LOCAL_MASK (added later) is a mirror dimension.
-      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 7u);
-      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 192u);
+      // FragDims: 5 bools + 1 int(3) = 2^5 * 3 = 96 total permutations. ALPHA_ONLY, HAS_RGBAAA
+      // and the unsupported YUV path are runtime/fallback concerns, not shader dimensions;
+      // HAS_LOCAL_MASK (added later) is a mirror dimension.
+      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 6u);
+      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 96u);
       EXPECT_EQ(shaderInfo.vertexFile, "level1/quad_texture_fill.vert");
       EXPECT_EQ(shaderInfo.fragmentFile, "level1/quad_texture_fill.frag");
     }
