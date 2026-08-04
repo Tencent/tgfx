@@ -30,13 +30,6 @@ GlassRefractionImageFilter::GlassRefractionImageFilter(const GlassRefractionPara
     : params(params), sdfParams(sdfParams), udfParams(udfParams), mask(std::move(mask)) {
 }
 
-Rect GlassRefractionImageFilter::onFilterBounds(const Rect&, MapDirection) const {
-  // Return a very large bounds so FilterImage::asFragmentProcessor always takes
-  // the direct asFragmentProcessor path (branch 1), avoiding the lockTextureProxy
-  // fallback that creates a low-resolution RT and causes edgeWeight stair-stepping.
-  return Rect::MakeLTRB(-1e6f, -1e6f, 1e6f, 1e6f);
-}
-
 static std::shared_ptr<TextureProxy> MakeTextureProxy(Context* context,
                                                       const std::shared_ptr<Image>& image) {
   if (image == nullptr || context == nullptr) {
