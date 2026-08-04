@@ -22,9 +22,10 @@
 #include "gpu/BackingFit.h"
 #include "gpu/resources/RenderTarget.h"
 #include "tgfx/core/Matrix.h"
-#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
+class DepthStencilTextureView;
+
 /**
  * This class defers the acquisition of render targets until they are actually required.
  */
@@ -115,19 +116,20 @@ class RenderTargetProxy {
   virtual std::shared_ptr<RenderTarget> getRenderTarget() const = 0;
 
   /**
-   * Returns the depth/stencil texture associated with this render target, lazily allocating it
-   * on the first call. `sampleCount` must match the colour attachment's sample count — every
+   * Returns the depth/stencil attachment associated with this render target, lazily allocating
+   * it on the first call. `sampleCount` must match the colour attachment's sample count — every
    * backend requires all attachments in a render pass to share the same sample count, so callers
    * are expected to query the colour render texture's sampleCount() and forward it here. The
-   * proxy keeps a strong reference so subsequent callers reuse the same allocation for the
+   * attachment is shared between all render targets with the same stencil size and sample count.
+   * The proxy keeps a strong reference so subsequent callers reuse the same allocation for the
    * proxy's lifetime; repeated calls must therefore pass the same `sampleCount` (debug-asserted),
    * because in practice the colour attachment's sample count is fixed for a given proxy.
-   * Returns nullptr if the underlying texture allocation fails. The default implementation
-   * sizes the stencil texture to width()/height(); subclasses whose colour attachment uses a
+   * Returns nullptr if the underlying texture allocation fails. The default implementation sizes
+   * the stencil attachment to width()/height(); subclasses whose colour attachment uses a
    * different storage size (e.g. approximate-fit texture proxies), or that route the request
    * elsewhere (e.g. a drawable proxy delegating to its backing texture proxy), override this.
    */
-  virtual std::shared_ptr<Texture> getStencil(int sampleCount);
+  virtual std::shared_ptr<DepthStencilTextureView> getStencil(int sampleCount);
 
   /**
    * Creates a compatible TextureProxy instance matches the properties of the RenderTargetProxy.
@@ -163,17 +165,18 @@ class RenderTargetProxy {
   Matrix getOriginTransform() const;
 
  protected:
-  // Cached stencil texture, lazily created by getStencil(). Held as a strong reference so the
-  // same allocation is reused across the proxy's lifetime.
-  std::shared_ptr<Texture> stencilTexture = nullptr;
+  // Cached stencil attachment, lazily created by getStencil(). Held as a strong reference so
+  // the same attachment is reused across the proxy's lifetime.
+  std::shared_ptr<DepthStencilTextureView> stencilAttachment = nullptr;
 
   /**
-   * Cache-or-allocate helper used by getStencil() implementations. Returns the cached stencil
-   * texture if present (asserting in debug that its sampleCount matches), otherwise creates a
-   * DEPTH24_STENCIL8 texture of the requested size and caches it. Subclasses override
+   * Cache-or-allocate helper used by getStencil() implementations. Returns the cached
+   * attachment if present (asserting in debug that its sampleCount matches), otherwise creates
+   * a DEPTH24_STENCIL8 attachment of the requested size and caches it. Subclasses override
    * getStencil() and forward to this helper with the size that matches their colour
    * attachment's true storage dimensions.
    */
-  std::shared_ptr<Texture> getOrAllocateStencil(int width, int height, int sampleCount);
+  std::shared_ptr<DepthStencilTextureView> getOrAllocateStencil(int width, int height,
+                                                                int sampleCount);
 };
 }  // namespace tgfx

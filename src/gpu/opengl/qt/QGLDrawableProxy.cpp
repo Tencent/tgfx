@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "QGLDrawableProxy.h"
+#include "gpu/resources/DepthStencilTextureView.h"
 #include "tgfx/gpu/opengl/qt/QGLWindow.h"
 
 namespace tgfx {
@@ -76,7 +77,7 @@ std::shared_ptr<RenderTarget> QGLDrawableProxy::getRenderTarget() const {
   return textureRTProxy ? textureRTProxy->getRenderTarget() : nullptr;
 }
 
-std::shared_ptr<Texture> QGLDrawableProxy::getStencil(int sampleCount) {
+std::shared_ptr<DepthStencilTextureView> QGLDrawableProxy::getStencil(int sampleCount) {
   ensureTextureRTProxy();
   return textureRTProxy ? textureRTProxy->getStencil(sampleCount) : nullptr;
 }

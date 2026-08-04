@@ -29,6 +29,7 @@
 #include "gpu/RenderContext.h"
 #include "gpu/ops/StencilCoverPathDrawOp.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "gpu/resources/DepthStencilTextureView.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Color.h"
@@ -1865,6 +1866,84 @@ TGFX_TEST(StencilCoverPathTest, Dispatch_StencilConfinedByCoverBoundsWithoutClip
       << "Op B inverse fill inside op A's half but outside op A's bbox must be red";
 }
 
+// Builds a convex pentagon centred at (centerX, centerY) inside a 20x20 box.
+static Path BuildCellPentagon(int centerX, int centerY) {
+  static constexpr int OFFSETS[5][2] = {
+      {0, -10}, {9, -4}, {6, 8}, {-6, 8}, {-9, -4},
+  };
+  Path path;
+  path.moveTo(static_cast<float>(centerX + OFFSETS[0][0]),
+              static_cast<float>(centerY + OFFSETS[0][1]));
+  for (int index = 1; index < 5; ++index) {
+    path.lineTo(static_cast<float>(centerX + OFFSETS[index][0]),
+                static_cast<float>(centerY + OFFSETS[index][1]));
+  }
+  path.close();
+  return path;
+}
+
+// Draws a 3x3 pentagon grid with one render pass per draw, then clears the surface and
+// redraws the centre pentagon with EvenOdd. Any stencil residue left between passes sharing
+// one depth/stencil attachment hollows out the redrawn pentagon.
+TGFX_TEST(StencilCoverPathTest, Dispatch_StencilReuseAcrossPasses) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  ScopedStencilCoverCaps capsGuard(context, true);
+  constexpr int Size = 100;
+  constexpr int Grid = 3;
+  constexpr int Cell = 28;
+  constexpr int Margin = 8;
+  auto surface = Surface::Make(context, Size, Size);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+  Paint paint;
+  paint.setAntiAlias(false);
+  paint.setColor(Color{1.f, 0.f, 0.f, 1.f});
+  for (int index = 0; index < Grid * Grid; ++index) {
+    auto path = BuildCellPentagon(Margin + (index % Grid) * Cell + Cell / 2,
+                                  Margin + (index / Grid) * Cell + Cell / 2);
+    path.setFillType(index % 2 == 0 ? PathFillType::Winding : PathFillType::EvenOdd);
+    canvas->drawPath(path, paint);
+    context->flushAndSubmit();
+  }
+  EXPECT_TRUE(Baseline::Compare(surface, "StencilCoverPath/ReuseOverpasses"));
+
+  canvas->clear();
+  auto redrawPath = BuildCellPentagon(Size / 2, Size / 2);
+  redrawPath.setFillType(PathFillType::EvenOdd);
+  canvas->drawPath(redrawPath, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "StencilCoverPath/ReuseOverpasses_Redraw"));
+}
+
+// Draws a stencil-cover pentagon together with plain rect ops in one flush, so all ops share a
+// single render pass carrying a depth/stencil attachment. The rect pipelines never touch the
+// stencil buffer but must still declare the pass's depth-stencil format; a pipeline without it
+// is rejected on backends that validate attachment formats.
+TGFX_TEST(StencilCoverPathTest, Dispatch_MixRectDrawOp) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  ScopedStencilCoverCaps capsGuard(context, true);
+  constexpr int Size = 64;
+  auto surface = Surface::Make(context, Size, Size);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  Paint paint;
+  paint.setAntiAlias(false);
+  paint.setColor(Color{0.f, 0.f, 0.f, 1.f});
+  canvas->drawRect(Rect::MakeWH(Size, Size), paint);
+  paint.setColor(Color{1.f, 0.f, 0.f, 1.f});
+  auto path = BuildCellPentagon(16, 32);
+  path.setFillType(PathFillType::Winding);
+  canvas->drawPath(path, paint);
+  canvas->drawRect(Rect::MakeXYWH(40, 20, 20, 24), paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "StencilCoverPath/MixRectDrawOp"));
+}
+
 // Guards the shouldUseStencilCover early-out that routes empty paths back to the legacy
 // triangulation path. The concern is not raster correctness but resource cost: any op that
 // reports needsStencil() forces OpsRenderTask to call RenderTargetProxy::getStencil(),
@@ -1882,7 +1961,8 @@ TGFX_TEST(StencilCoverPathTest, Dispatch_EmptyPathBypassesStencilAttachmentAlloc
 
   constexpr int SIZE = 64;
 
-  auto clearUnderClipAndPeekStencil = [&](bool useNonWideOpenClip) -> std::shared_ptr<Texture> {
+  auto clearUnderClipAndPeekStencil =
+      [&](bool useNonWideOpenClip) -> std::shared_ptr<DepthStencilTextureView> {
     auto surface = Surface::Make(context, SIZE, SIZE);
     if (surface == nullptr) {
       return nullptr;
@@ -1901,8 +1981,8 @@ TGFX_TEST(StencilCoverPathTest, Dispatch_EmptyPathBypassesStencilAttachmentAlloc
     fillPaint.setColor(Color{1.f, 0.f, 0.f, 1.f});
     canvas->drawRect(Rect::MakeLTRB(10, 10, 20, 20), fillPaint);
     context->flushAndSubmit();
-    std::shared_ptr<Texture> stencil;
-    TGFX_PRIVATE_ACCESS(stencil = surface->renderContext->renderTarget->stencilTexture);
+    std::shared_ptr<DepthStencilTextureView> stencil;
+    TGFX_PRIVATE_ACCESS(stencil = surface->renderContext->renderTarget->stencilAttachment);
     return stencil;
   };
 
@@ -1935,8 +2015,8 @@ TGFX_TEST(StencilCoverPathTest, Dispatch_EmptyPathBypassesStencilAttachmentAlloc
   paint.setColor(Color{1.f, 0.f, 0.f, 1.f});
   canvas->drawPath(pentagon, paint);
   context->flushAndSubmit();
-  std::shared_ptr<Texture> controlStencil;
-  TGFX_PRIVATE_ACCESS(controlStencil = surface->renderContext->renderTarget->stencilTexture);
+  std::shared_ptr<DepthStencilTextureView> controlStencil;
+  TGFX_PRIVATE_ACCESS(controlStencil = surface->renderContext->renderTarget->stencilAttachment);
   EXPECT_NE(controlStencil, nullptr)
       << "Pentagon path must allocate a stencil attachment when stencil-cover caps are on "
          "(control channel for the empty-bypass assertion above)";
