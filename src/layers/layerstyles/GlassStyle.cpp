@@ -376,6 +376,37 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
     }
     visibleRect.roundOut();
 
+    // Downscale the full background before subset so all tiles share the same downscaled source.
+    // Applying the scale to the subset would produce different sizes per tile.
+    static constexpr float MAX_FROST_AREA = 2048.0f * 2048.0f;
+    if (_refraction > 0 || _lightIntensity > 0) {
+      auto minHalf = std::min(origWidth, origHeight) * 0.5f;
+      float fullRefractionOutset =
+          GetRefractionOutset(origWidth, origHeight, getRefractionFactor(), getDepthRatio(),
+                              getDispersionFactor(), getGlassThickness(minHalf));
+      fullRefractionOutset = std::ceil(fullRefractionOutset * input.contentScale + 1.0f);
+      float fullWidth = contentWidth + 2.0f * fullRefractionOutset;
+      float fullHeight = contentHeight + 2.0f * fullRefractionOutset;
+      float fullArea = fullWidth * fullHeight;
+      if (fullArea > MAX_FROST_AREA) {
+        frostDownscale = std::sqrt(MAX_FROST_AREA / fullArea);
+      }
+    }
+    if (frostDownscale < 1.0f) {
+      int scaledW = std::max(
+          1, static_cast<int>(std::round(static_cast<float>(bgImage->width()) * frostDownscale)));
+      int scaledH = std::max(
+          1, static_cast<int>(std::round(static_cast<float>(bgImage->height()) * frostDownscale)));
+      auto scaledBg = bgImage->makeScaled(scaledW, scaledH, SamplingOptions(FilterMode::Linear));
+      if (scaledBg != nullptr) {
+        bgImage = std::move(scaledBg);
+        bgOffset.x *= frostDownscale;
+        bgOffset.y *= frostDownscale;
+        scaleRatioX *= frostDownscale;
+        scaleRatioY *= frostDownscale;
+      }
+    }
+
     refractInputRect = visibleRect;
     if (_refraction > 0 || _lightIntensity > 0) {
       auto minHalf = std::min(origWidth, origHeight) * 0.5f;
