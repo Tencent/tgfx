@@ -32,9 +32,10 @@ QuadPerEdgeAAGeometryProcessor::QuadPerEdgeAAGeometryProcessor(int width, int he
   if (!uvMatrix.has_value()) {
     uvCoord = {"uvCoord", VertexFormat::Float2};
   }
-  if (!commonColor.has_value()) {
-    color = {"inColor", VertexFormat::UByte4Normalized};
-  }
+  // The color attribute is unconditional: rect vertex providers always write a color slot
+  // (broadcasting the common color for uniform-color batches), so the fill kernels can take the
+  // per-vertex varying as their only color path.
+  color = {"inColor", VertexFormat::UByte4Normalized};
   if (hasSubset) {
     subset = {"texSubset", VertexFormat::Float4};
   }

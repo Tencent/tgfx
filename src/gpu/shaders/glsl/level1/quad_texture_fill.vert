@@ -1,6 +1,6 @@
 // QuadTextureFillShader vertex shader
 // Processor layout: QuadPerEdgeAAGeometryProcessor + TextureEffect + EmptyXferProcessor
-// Permutation dimensions (vert): HAS_COVERAGE, HAS_UV_COORD, HAS_COLOR, HAS_SUBSET
+// Permutation dimensions (vert): HAS_COVERAGE, HAS_UV_COORD, HAS_SUBSET (color is always a per-vertex attribute)
 // The transformed coordinate is always emitted as a vec3 and perspective-divided in the fragment
 // shader. For affine transforms the third row of CoordTransformMatrix_0 is [0,0,1], so the divisor
 // is 1.0 and the division is a no-op; this lets one shader serve both affine and perspective.
@@ -11,9 +11,6 @@
 #endif
 #ifndef HAS_UV_COORD
 #define HAS_UV_COORD 0
-#endif
-#ifndef HAS_COLOR
-#define HAS_COLOR 0
 #endif
 #ifndef HAS_SUBSET
 #define HAS_SUBSET 0
@@ -59,7 +56,8 @@ layout(location = 0) in vec2 aPosition;
   #define LOC_AFTER_UV_COORD LOC_AFTER_COVERAGE
 #endif
 
-#if HAS_COLOR
+// The color attribute is unconditional: rect providers always write a color slot (broadcasting
+// the record's paint color for uniform-color batches), so it always follows the uv attribute.
   #if LOC_AFTER_UV_COORD == 1
     #define LOC_COLOR 1
     #define LOC_AFTER_COLOR 2
@@ -70,9 +68,6 @@ layout(location = 0) in vec2 aPosition;
     #define LOC_COLOR 3
     #define LOC_AFTER_COLOR 4
   #endif
-#else
-  #define LOC_AFTER_COLOR LOC_AFTER_UV_COORD
-#endif
 
 #if HAS_SUBSET
   #if LOC_AFTER_COLOR == 1
@@ -94,9 +89,7 @@ layout(location = LOC_COVERAGE) in float inCoverage;
 layout(location = LOC_UV_COORD) in vec2 uvCoord;
 #endif
 
-#if HAS_COLOR
 layout(location = LOC_COLOR) in vec4 inColor;
-#endif
 
 #if HAS_SUBSET
 layout(location = LOC_SUBSET) in vec4 texSubset;
@@ -108,9 +101,7 @@ layout(location = 0) out vec3 TransformedCoords_0;
 layout(location = 1) out float vCoverage;
 #endif
 
-#if HAS_COLOR
 layout(location = 2) out vec4 vColor;
-#endif
 
 #if HAS_SUBSET
 layout(location = 3) out vec4 vTexSubset;
@@ -128,9 +119,7 @@ void main() {
   vCoverage = inCoverage;
 #endif
 
-#if HAS_COLOR
   vColor = inColor;
-#endif
 
   // Compute texture coordinates.
 #if HAS_UV_COORD

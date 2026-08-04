@@ -429,26 +429,22 @@ class NonAAQuadsVertexProvider : public QuadsVertexProvider {
     if (_hasUVCoord) {
       perVertexCount += 2;
     }
-    if (_hasColor) {
-      perVertexCount += 1;
-    }
+    perVertexCount +=
+        1;  // The color attribute is unconditional for QuadPerEdgeAAGeometryProcessor.
     return quads.size() * 4 * perVertexCount;
   }
 
   void getVertices(float* vertices) const override {
     size_t index = 0;
     std::unique_ptr<ColorSpaceXformSteps> steps = nullptr;
-    if (_hasColor && NeedConvertColorSpace(ColorSpace::SRGB(), _dstColorSpace)) {
+    if (NeedConvertColorSpace(ColorSpace::SRGB(), _dstColorSpace)) {
       steps =
           std::make_unique<ColorSpaceXformSteps>(ColorSpace::SRGB().get(), AlphaType::Premultiplied,
                                                  _dstColorSpace.get(), AlphaType::Premultiplied);
     }
     for (size_t i = 0; i < quads.size(); ++i) {
       auto& record = quads[i];
-      uint32_t uintColor = 0;
-      if (_hasColor) {
-        uintColor = ToUintPMColor(record->color, steps.get());
-      }
+      uint32_t uintColor = ToUintPMColor(record->color, steps.get());
       auto transformedQuad = record->quad;
       transformedQuad.transform(record->matrix);
       for (size_t j = 0; j < 4; ++j) {
@@ -460,9 +456,7 @@ class NonAAQuadsVertexProvider : public QuadsVertexProvider {
           vertices[index++] = uv.x;
           vertices[index++] = uv.y;
         }
-        if (_hasColor) {
-          std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
-        }
+        std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
       }
     }
   }
@@ -487,16 +481,15 @@ class AAQuadsVertexProvider : public QuadsVertexProvider {
     if (_hasUVCoord) {
       perVertexCount += 2;
     }
-    if (_hasColor) {
-      perVertexCount += 1;
-    }
+    perVertexCount +=
+        1;  // The color attribute is unconditional for QuadPerEdgeAAGeometryProcessor.
     return quads.size() * 8 * perVertexCount;
   }
 
   void getVertices(float* vertices) const override {
     size_t index = 0;
     std::unique_ptr<ColorSpaceXformSteps> steps = nullptr;
-    if (_hasColor && NeedConvertColorSpace(ColorSpace::SRGB(), _dstColorSpace)) {
+    if (NeedConvertColorSpace(ColorSpace::SRGB(), _dstColorSpace)) {
       steps =
           std::make_unique<ColorSpaceXformSteps>(ColorSpace::SRGB().get(), AlphaType::Premultiplied,
                                                  _dstColorSpace.get(), AlphaType::Premultiplied);
@@ -546,10 +539,8 @@ class AAQuadsVertexProvider : public QuadsVertexProvider {
       }
     }
 
-    std::optional<uint32_t> color = std::nullopt;
-    if (_hasColor) {
-      color = ToUintPMColor(record.color, steps);
-    }
+    // The color attribute is unconditional for QuadPerEdgeAAGeometryProcessor.
+    std::optional<uint32_t> color = ToUintPMColor(record.color, steps);
 
     WriteQuadVertices(vertices, index, insetCoord, 1.0f, insetUV, color);
     WriteQuadVertices(vertices, index, outsetCoord, 0.0f, outsetUV, color);

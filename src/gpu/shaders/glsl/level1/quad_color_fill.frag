@@ -1,13 +1,14 @@
 // QuadColorFillShader fragment shader
 // Processor layout: QuadPerEdgeAAGeometryProcessor + EmptyXferProcessor/PorterDuffXP (no FP)
-// Permutation dimensions: HAS_COVERAGE, HAS_COLOR, HAS_XP
+// Permutation dimensions: HAS_COVERAGE, HAS_XP
+//
+// Color comes only from the vColor varying: rect vertex providers always write a color slot,
+// broadcasting the record's paint color for uniform-color batches, so the Color uniform and the
+// HAS_COLOR dimension no longer exist here.
 #version 450
 
 #ifndef HAS_COVERAGE
 #define HAS_COVERAGE 0
-#endif
-#ifndef HAS_COLOR
-#define HAS_COLOR 0
 #endif
 #ifndef HAS_XP
 #define HAS_XP 0
@@ -16,11 +17,8 @@
 #define HAS_MASK_TEXTURE 0
 #endif
 
-#if !HAS_COLOR || HAS_XP || HAS_MASK_TEXTURE
+#if HAS_XP || HAS_MASK_TEXTURE
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
-#if !HAS_COLOR
-  vec4 Color;
-#endif
 #if HAS_MASK_TEXTURE
   mat3 DeviceCoordMatrix;
 #endif
@@ -36,9 +34,7 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 layout(location = 0) in float vCoverage;
 #endif
 
-#if HAS_COLOR
 layout(location = 1) in vec4 vColor;
-#endif
 
 // The mask texture (device-space coverage) occupies binding 0; the XP dst texture, if any, follows.
 #if HAS_MASK_TEXTURE
@@ -53,11 +49,7 @@ layout(set = 1, binding = 0) uniform sampler2D MaskTextureSampler;
 layout(location = 0) out vec4 fragColor;
 
 void main() {
-#if HAS_COLOR
   vec4 outputColor = vColor;
-#else
-  vec4 outputColor = Color;
-#endif
 
 #if HAS_MASK_TEXTURE
   // Device-space mask coverage: multiply the coverage sampled from the mask texture into the color.

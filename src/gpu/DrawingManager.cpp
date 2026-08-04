@@ -56,7 +56,7 @@ PlacementPtr<DrawOp> DrawingManager::makeFillDrawOp(std::shared_ptr<RenderTarget
   PlacementPtr<RectsVertexProvider> provider = nullptr;
   if (coordOffset.x == 0.0f && coordOffset.y == 0.0f) {
     auto bounds = Rect::MakeWH(width, height);
-    provider = RectsVertexProvider::MakeFrom(allocator, bounds, AAType::None);
+    provider = RectsVertexProvider::MakeFrom(allocator, bounds, AAType::None, true);
   } else {
     auto rect = Rect::MakeXYWH(coordOffset.x, coordOffset.y, width, height);
     auto viewMatrix = Matrix::MakeTrans(-coordOffset.x, -coordOffset.y);
@@ -64,7 +64,7 @@ PlacementPtr<DrawOp> DrawingManager::makeFillDrawOp(std::shared_ptr<RenderTarget
     auto rects = std::vector<PlacementPtr<RectRecord>>();
     rects.push_back(std::move(record));
     provider = RectsVertexProvider::MakeFrom(allocator, std::move(rects), {}, {}, AAType::None,
-                                             false, UVSubsetMode::None, {});
+                                             false, UVSubsetMode::None, {}, nullptr, true);
   }
   if (provider == nullptr) {
     return nullptr;

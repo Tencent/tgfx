@@ -702,8 +702,8 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
-  EXPECT_EQ(cache->vertexEntryCount(), 140u);
-  EXPECT_EQ(cache->fragmentEntryCount(), 462u);
+  EXPECT_EQ(cache->vertexEntryCount(), 130u);
+  EXPECT_EQ(cache->fragmentEntryCount(), 426u);
   std::string expectedTag = TGFX_BACKEND_NAME;
   auto dashPos = expectedTag.find('-');
   if (dashPos != std::string::npos) {
@@ -1430,13 +1430,13 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureFillShaderRegistry) {
     auto shaderInfo = shader->info();
     if (shaderInfo.name == "QuadTextureFillShader") {
       found = true;
-      EXPECT_EQ(shaderInfo.vertDomain.dimensionCount(), 5u);
-      EXPECT_EQ(shaderInfo.vertDomain.totalCount(), 32u);
-      // FragDims: 5 bools + 1 int(3) = 2^5 * 3 = 96 total permutations. ALPHA_ONLY, HAS_RGBAAA
+      EXPECT_EQ(shaderInfo.vertDomain.dimensionCount(), 4u);
+      EXPECT_EQ(shaderInfo.vertDomain.totalCount(), 16u);
+      // FragDims: 4 bools + 1 int(3) = 2^4 * 3 = 48 total permutations. ALPHA_ONLY, HAS_RGBAAA
       // and the unsupported YUV path are runtime/fallback concerns, not shader dimensions;
       // HAS_LOCAL_MASK (added later) is a mirror dimension.
-      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 6u);
-      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 96u);
+      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 5u);
+      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 48u);
       EXPECT_EQ(shaderInfo.vertexFile, "level1/quad_texture_fill.vert");
       EXPECT_EQ(shaderInfo.fragmentFile, "level1/quad_texture_fill.frag");
     }
@@ -1467,9 +1467,9 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureFillShouldCompile) {
         }
       }
     }
-    // ALPHA_ONLY / HAS_RGBAAA are runtime uniforms; the four mirror dimensions plus the HAS_LOCAL_MASK
-    // business restriction leave 120 compiled variants.
-    EXPECT_EQ(compiledCount, 120);
+    // ALPHA_ONLY / HAS_RGBAAA are runtime uniforms and per-vertex color is now unconditional;
+    // the remaining mirror dimensions plus the HAS_LOCAL_MASK restriction leave 72 variants.
+    EXPECT_EQ(compiledCount, 72);
   }
 }
 

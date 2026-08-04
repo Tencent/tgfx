@@ -70,7 +70,10 @@ void GLSLQuadPerEdgeAAGeometryProcessor::setData(UniformData* vertexUniformData,
                                                  UniformData* fragmentUniformData,
                                                  FPCoordTransformIter* transformIter) const {
   setTransformDataHelper(uvMatrix.value_or(Matrix::I()), vertexUniformData, transformIter);
-  if (commonColor.has_value()) {
+  if (commonColor.has_value() && fragmentUniformData != nullptr &&
+      fragmentUniformData->hasField("Color")) {
+    // The fill kernels take the broadcast per-vertex color instead, so a program with no fragment
+    // uniform block (plain color fill) skips this write entirely.
     fragmentUniformData->setData("Color", *commonColor);
   }
 }

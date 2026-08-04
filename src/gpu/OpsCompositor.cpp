@@ -536,7 +536,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, ClipStack clip, Brush br
       auto subsetRects = std::move(pendingSubsetRects);
       auto provider = RectsVertexProvider::MakeFrom(
           drawingAllocator(), std::move(pendingRects), std::move(uvRects), std::move(subsetRects),
-          aaType, needUVCoord, subsetMode, std::move(pendingStrokes), dstColorSpace);
+          aaType, needUVCoord, subsetMode, std::move(pendingStrokes), dstColorSpace, true);
       drawOp = RectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     case PendingOpType::RRect: {

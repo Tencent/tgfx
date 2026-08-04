@@ -51,7 +51,7 @@ class RectsVertexProvider : public VertexProvider {
    * Creates a new RectsVertexProvider from a single rect.
    */
   static PlacementPtr<RectsVertexProvider> MakeFrom(BlockAllocator* allocator, const Rect& rect,
-                                                    AAType aaType);
+                                                    AAType aaType, bool forceColor = false);
 
   /**
    * Creates a new RectsVertexProvider from a list of rect records.
@@ -60,8 +60,8 @@ class RectsVertexProvider : public VertexProvider {
       BlockAllocator* allocator, std::vector<PlacementPtr<RectRecord>>&& rects,
       std::vector<PlacementPtr<Rect>>&& uvRects, std::vector<PlacementPtr<Rect>>&& subsetRects,
       AAType aaType, bool needUVCoord, UVSubsetMode subsetMode,
-      std::vector<PlacementPtr<Stroke>>&& strokes,
-      std::shared_ptr<ColorSpace> colorSpace = nullptr);
+      std::vector<PlacementPtr<Stroke>>&& strokes, std::shared_ptr<ColorSpace> colorSpace = nullptr,
+      bool forceColor = false);
 
   /**
    * Returns the number of rects in the provider.
@@ -142,12 +142,15 @@ class RectsVertexProvider : public VertexProvider {
     bool hasUVCoord : 1;
     bool hasColor : 1;
     uint8_t subsetMode : 2;
+    // When true the color slot is written even for uniform-color batches, because the consuming
+    // geometry processor (QuadPerEdgeAA fill kernels) declares the color attribute unconditionally.
+    bool writeColor : 1;
   } bitFields = {};
 
   RectsVertexProvider(PlacementArray<RectRecord>&& rects, PlacementArray<Rect>&& uvRects,
                       PlacementArray<Rect>&& subsetRects, AAType aaType, bool hasUVCoord,
                       bool hasColor, UVSubsetMode subsetMode,
                       std::shared_ptr<BlockAllocator> reference,
-                      std::shared_ptr<ColorSpace> colorSpace);
+                      std::shared_ptr<ColorSpace> colorSpace, bool forceColor = false);
 };
 }  // namespace tgfx
