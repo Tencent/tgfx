@@ -26,6 +26,9 @@ class WebGLWindow : public Window {
  public:
   /**
    * Creates a new window from a canvas.
+   * On Web, the WebGL backend reads GL context state through the module's GL runtime export (e.g.
+   * for color space configuration and image/video texture uploads), so the final executable must
+   * link with -sEXPORTED_RUNTIME_METHODS=['GL','HEAPU8',...].
    */
   static std::shared_ptr<WebGLWindow> MakeFrom(const std::string& canvasID,
                                                std::shared_ptr<ColorSpace> colorSpace = nullptr);

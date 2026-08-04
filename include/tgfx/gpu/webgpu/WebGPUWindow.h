@@ -35,6 +35,9 @@ class WebGPUWindow : public Window {
    * correctly. The color space configuration resolves the underlying GPUDevice from this window's
    * device handle, so both the default device and devices passed in via WebGPUDevice::MakeFrom()
    * are supported.
+   * On Web, the color space configuration and video texture uploads resolve GPU objects through
+   * the module's WebGPU runtime export, so the final executable must link with
+   * -sEXPORTED_RUNTIME_METHODS=['GL','HEAPU8','WebGPU'].
    */
   static std::shared_ptr<WebGPUWindow> MakeFrom(const std::string& canvasSelector,
                                                 std::shared_ptr<WebGPUDevice> device = nullptr,

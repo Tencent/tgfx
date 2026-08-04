@@ -254,6 +254,29 @@ npm run build:webgpu
 npm run server:webgpu
 ```
 
+When integrating tgfx into your own Web build, the emscripten link options must export the runtime
+methods tgfx depends on. The library itself does not propagate these link options:
+
+- `GL`: required for the WebGL backend (color space configuration, image/video texture uploads).
+- `HEAPU8`: required for reading wasm memory (image decode and canvas pixel readback).
+- `WebGPU`: required for the WebGPU color space configuration and video frame uploads.
+
+Configure them on your final executable target with CMake:
+
+```cmake
+target_link_options(app PRIVATE -sEXPORTED_RUNTIME_METHODS=['GL','HEAPU8','WebGPU'])
+```
+
+or on the emcc command line:
+
+```bash
+emcc ... -sEXPORTED_RUNTIME_METHODS="['GL','HEAPU8','WebGPU']"
+```
+
+Note that `EXPORTED_RUNTIME_METHODS` is an overwrite-style list, not additive: list every runtime
+method your program needs. `-sUSE_WEBGPU=1` must also be set at link time when building the WebGPU
+backend, as the library's compile options do not propagate to the final link.
+
 To build a single-threaded WebGL version:
 
 ```
