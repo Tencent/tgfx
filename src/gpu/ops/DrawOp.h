@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include "gpu/AAType.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/XferProcessor.h"
@@ -87,6 +88,26 @@ class DrawOp {
    */
   virtual bool needsStencil() const {
     return false;
+  }
+
+  /**
+   * Returns the device-space region this op will write to the stencil buffer, so the pass can
+   * scope the initial stencil clear to just that area. The returned rect is in canvas top-left
+   * device space (the same space viewMatrix maps into and Path::getBounds reports in);
+   * OpsRenderTask joins these rects across the pass and applies the render target's origin
+   * transform once before handing them to the backend as clearScissor. Return values:
+   *   - std::nullopt: this op has not declared its stencil-write extent (default). The pass
+   *     conservatively falls back to a full-attachment clear whenever any stencil op returns
+   *     nullopt, since a partial clear could leave stale stencil values wherever the op
+   *     might touch.
+   *   - An empty rect: this op is known to write no stencil (e.g. its cover region was fully
+   *     clipped out). Contributes nothing to the clear union.
+   *   - A non-empty rect: the exact device-space footprint of the op's stencil writes.
+   * Ops that write to stencil (e.g. StencilCoverPathDrawOp) must override this to return an
+   * accurate rect so the clear stays tight. Only meaningful when needsStencil() returns true.
+   */
+  virtual std::optional<Rect> getStencilResolveBounds() const {
+    return std::nullopt;
   }
 
   /**

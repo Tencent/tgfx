@@ -18,8 +18,9 @@
 
 #include "StencilCoverPathDrawOp.h"
 #include <algorithm>
-#include <cmath>
 #include "core/utils/Log.h"
+#include "core/utils/MathExtra.h"
+#include "gpu/OriginFlip.h"
 #include "gpu/Program.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
@@ -230,21 +231,24 @@ void StencilCoverPathDrawOp::applyStencilScissor(RenderPass* renderPass,
   // Start from the cover-quad's device bounds — the cover pass's Zero stencil op only touches
   // fragments inside this rect, so any stencil write outside it would never be cleared.
   Rect stencilRect = coverDeviceBounds;
-  // Intersect with the op's user-supplied scissor (from clip) when present, matching the
-  // cover pass's effective visible area. When scissorRect is empty the cover pass falls back
-  // to "whole render target" — but we still keep the stencil writes clipped to coverDeviceBounds.
+  // Intersect with the op's user-supplied scissor (from clip) when present, matching the cover
+  // pass's effective visible area. Both operands live in canvas top-left device space (scissorRect
+  // is published by OpsCompositor::applyClip in that space; the Y-flip for BottomLeft targets is
+  // deferred to the backend boundary below), so the intersect result is a well-defined rect in
+  // the same space. When scissorRect is empty the cover pass falls back to "whole render target"
+  // — but we still keep the stencil writes clipped to coverDeviceBounds.
   if (!scissorRect.isEmpty() && !stencilRect.intersect(scissorRect)) {
     stencilRect.setEmpty();
   }
-  // Clamp to the render target extent and convert to integer pixel coordinates. Left/top use
-  // floor via truncation of positive values (max(0, ...) rules out negatives), right/bottom
-  // use ceil so no partial-pixel stencil write escapes the scissor.
-  int scissorX = std::max(0, static_cast<int>(stencilRect.left));
-  int scissorY = std::max(0, static_cast<int>(stencilRect.top));
-  int scissorRight =
-      std::min(renderTarget->width(), static_cast<int>(std::ceil(stencilRect.right)));
-  int scissorBottom =
-      std::min(renderTarget->height(), static_cast<int>(std::ceil(stencilRect.bottom)));
+  // Convert to the backend scissor origin (identity for TopLeft, Y-flip for BottomLeft) right
+  // before handing off. All math above stays in canvas top-left space.
+  FlipYIfNeeded(&stencilRect, renderTarget);
+  // Integer-align with a roundOut policy: floor left/top, ceil right/bottom, so no
+  // partial-pixel stencil write escapes the scissor. Then clamp to the render target extent.
+  int scissorX = std::max(0, FloatFloorToInt(stencilRect.left));
+  int scissorY = std::max(0, FloatFloorToInt(stencilRect.top));
+  int scissorRight = std::min(renderTarget->width(), FloatCeilToInt(stencilRect.right));
+  int scissorBottom = std::min(renderTarget->height(), FloatCeilToInt(stencilRect.bottom));
   int scissorWidth = std::max(0, scissorRight - scissorX);
   int scissorHeight = std::max(0, scissorBottom - scissorY);
   renderPass->setScissorRect(scissorX, scissorY, scissorWidth, scissorHeight);

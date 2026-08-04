@@ -26,7 +26,10 @@
 
 #include "core/StencilCoverPathTessellator.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/RenderContext.h"
 #include "gpu/ops/StencilCoverPathDrawOp.h"
+#include "gpu/proxies/RenderTargetProxy.h"
+#include "gpu/resources/DepthStencilTextureView.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Color.h"
@@ -1939,6 +1942,149 @@ TGFX_TEST(StencilCoverPathTest, Dispatch_MixRectDrawOp) {
   canvas->drawPath(path, paint);
   canvas->drawRect(Rect::MakeXYWH(40, 20, 20, 24), paint);
   EXPECT_TRUE(Baseline::Compare(surface, "StencilCoverPath/MixRectDrawOp"));
+}
+
+// Guards the shouldUseStencilCover early-out that routes empty paths back to the legacy
+// triangulation path. The concern is not raster correctness but resource cost: any op that
+// reports needsStencil() forces OpsRenderTask to call RenderTargetProxy::getStencil(),
+// which lazily allocates a DEPTH24_STENCIL8 texture sized to the whole render target (see
+// RenderTargetProxy.cpp:64). Canvas::clear under a non-WideOpen clip flows through
+// Canvas::drawFill → drawContext->drawPath(emptyInversePath) → RenderContext::drawPath →
+// drawShape → shouldUseStencilCover, which is exactly where the empty-path early-out lives.
+// If the early-out is ever removed the clear silently starts paying that allocation.
+TGFX_TEST(StencilCoverPathTest, Dispatch_EmptyPathBypassesStencilAttachmentAllocation) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  ScopedStencilCoverCaps capsGuard(context, true);
+
+  constexpr int SIZE = 64;
+
+  auto clearUnderClipAndPeekStencil =
+      [&](bool useNonWideOpenClip) -> std::shared_ptr<DepthStencilTextureView> {
+    auto surface = Surface::Make(context, SIZE, SIZE);
+    if (surface == nullptr) {
+      return nullptr;
+    }
+    auto canvas = surface->getCanvas();
+    if (useNonWideOpenClip) {
+      // Force clip.state() != WideOpen so Canvas::drawFill routes to drawContext->drawPath
+      // with an empty inverse-fill path, which is what reaches shouldUseStencilCover.
+      canvas->clipRect(Rect::MakeLTRB(4, 4, SIZE - 4, SIZE - 4));
+    }
+    canvas->clear(Color{0.f, 0.f, 0.f, 1.f});
+    // Add a second op so the render task actually flushes to GPU. Without it a lone clear
+    // may be short-circuited before OpsRenderTask executes and getStencil() is invoked.
+    Paint fillPaint;
+    fillPaint.setAntiAlias(false);
+    fillPaint.setColor(Color{1.f, 0.f, 0.f, 1.f});
+    canvas->drawRect(Rect::MakeLTRB(10, 10, 20, 20), fillPaint);
+    context->flushAndSubmit();
+    std::shared_ptr<DepthStencilTextureView> stencil;
+    TGFX_PRIVATE_ACCESS(stencil = surface->renderContext->renderTarget->stencilAttachment);
+    return stencil;
+  };
+
+  // Empty inverse-fill path routed through a non-WideOpen clip: the early-out must keep it
+  // on the legacy path so no stencil attachment is allocated.
+  auto clippedStencil = clearUnderClipAndPeekStencil(true);
+  EXPECT_EQ(clippedStencil, nullptr)
+      << "Canvas::clear under a rect clip must not allocate a stencil attachment "
+         "(empty path should be routed away from stencil-cover)";
+
+  // Control: draw a real curved path under the same caps to confirm the observation channel
+  // is functional — that shouldUseStencilCover *does* return true for non-trivial shapes and
+  // that OpsRenderTask *does* attach and cache the stencil texture on the render target
+  // proxy. Without this the assertion above could pass trivially if some future refactor
+  // stopped caching stencilTexture altogether.
+  auto surface = Surface::Make(context, SIZE, SIZE);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color{0.f, 0.f, 0.f, 1.f});
+  Path pentagon;
+  pentagon.moveTo(32, 8);
+  pentagon.lineTo(56, 26);
+  pentagon.lineTo(48, 56);
+  pentagon.lineTo(16, 56);
+  pentagon.lineTo(8, 26);
+  pentagon.close();
+  pentagon.setFillType(PathFillType::Winding);
+  Paint paint;
+  paint.setAntiAlias(false);
+  paint.setColor(Color{1.f, 0.f, 0.f, 1.f});
+  canvas->drawPath(pentagon, paint);
+  context->flushAndSubmit();
+  std::shared_ptr<DepthStencilTextureView> controlStencil;
+  TGFX_PRIVATE_ACCESS(controlStencil = surface->renderContext->renderTarget->stencilAttachment);
+  EXPECT_NE(controlStencil, nullptr)
+      << "Pentagon path must allocate a stencil attachment when stencil-cover caps are on "
+         "(control channel for the empty-bypass assertion above)";
+}
+
+// Cross-origin visual equivalence for the stencil-and-cover path. The StencilCoverPath test
+// suite otherwise exercises only TopLeft render targets (the default Surface::Make), leaving
+// the BottomLeft branch — which GL windows and hardware-backed textures use — completely
+// uncovered. This test renders the same clipped path on both a TopLeft surface and a
+// texture-backed BottomLeft surface, then checks each against a single shared baseline: any
+// visible drift between origins (or from the golden baseline itself) will trip at least one
+// of the two assertions.
+//
+// Scope: catches visible regressions in the coordinate-space handling along the
+// applyScissor / applyStencilScissor / clearScissor pipeline (see OriginFlip.h). Note that a
+// mixed-space bug affecting only the depth/stencil clearScissor tends to self-cancel visually
+// — stencil and cover passes consume the same offset and the visible pixels agree — so this
+// test does not exhaustively prove the coordinate-space contract, but it does guard against
+// any regression that ends up shifting or misclipping the rendered output.
+TGFX_TEST(StencilCoverPathTest, Dispatch_BottomLeftTargetMatchesTopLeftUnderClip) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  ScopedStencilCoverCaps capsGuard(context, true);
+
+  constexpr int SIZE = 64;
+
+  auto renderScene = [&](std::shared_ptr<Surface> surface) {
+    ASSERT_TRUE(surface != nullptr);
+    auto canvas = surface->getCanvas();
+    canvas->clear(Color{0.f, 0.f, 0.f, 1.f});
+
+    // A curved path large enough that its device bounds extend past every edge of the clip,
+    // so the intersect between coverDeviceBounds and the clip is non-trivial. Any shift in
+    // the effective scissor between the two origins would surface as a pixel difference.
+    Path path;
+    path.moveTo(8, 8);
+    path.quadTo(32, -16, 56, 8);
+    path.lineTo(56, 56);
+    path.lineTo(8, 56);
+    path.close();
+    Paint paint;
+    paint.setAntiAlias(false);
+    paint.setColor(Color{1.f, 0.f, 0.f, 1.f});
+
+    canvas->save();
+    // Non-WideOpen rect clip, deliberately asymmetric in Y so a wrong flip on either surface
+    // would show up as a shifted red region.
+    canvas->clipRect(Rect::MakeLTRB(12, 20, 52, 44));
+    canvas->drawPath(path, paint);
+    canvas->restore();
+    context->flushAndSubmit();
+  };
+
+  // TopLeft baseline via the default Surface::Make.
+  auto topLeftSurface = Surface::Make(context, SIZE, SIZE);
+  ASSERT_TRUE(topLeftSurface != nullptr);
+  renderScene(topLeftSurface);
+  EXPECT_TRUE(Baseline::Compare(topLeftSurface, "StencilCoverPath/BottomLeftEquivalence"));
+
+  // BottomLeft target built directly from a GPU texture, matching SurfaceRenderTest's pattern.
+  auto texture = context->gpu()->createTexture({SIZE, SIZE, PixelFormat::RGBA_8888});
+  ASSERT_TRUE(texture != nullptr);
+  auto bottomLeftSurface =
+      Surface::MakeFrom(context, texture->getBackendTexture(), ImageOrigin::BottomLeft);
+  ASSERT_TRUE(bottomLeftSurface != nullptr);
+  renderScene(bottomLeftSurface);
+  EXPECT_TRUE(Baseline::Compare(bottomLeftSurface, "StencilCoverPath/BottomLeftEquivalence"));
 }
 
 }  // namespace tgfx

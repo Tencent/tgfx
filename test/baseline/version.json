@@ -561,6 +561,7 @@
         "widegamut": "cd158924"
     },
     "StencilCoverPath": {
+        "BottomLeftEquivalence": "5e7bc5fdc",
         "BrushBlendModePlus": "05d517c72",
         "BrushColorFilterInvert": "05d517c72",
         "BrushScaleRotate": "05d517c72",
