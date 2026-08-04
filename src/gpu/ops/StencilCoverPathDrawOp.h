@@ -25,7 +25,6 @@
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/PathTypes.h"
 #include "tgfx/core/Rect.h"
-#include "tgfx/gpu/RenderPipeline.h"
 
 namespace tgfx {
 /**
@@ -106,12 +105,6 @@ class StencilCoverPathDrawOp : public DrawOp {
   // Stencil-pass GP. Made once at construction time so execute() can reuse it instead of
   // rebuilding the GP on every command-buffer encode pass.
   PlacementPtr<StencilCoverStencilPassGeometryProcessor> stencilGP = nullptr;
-
-  // Pre-computed depth/stencil descriptors. Both depend only on `fillType`, so caching them
-  // avoids running the small but per-op MakeStencilPassDS / MakeCoverPassDS branches each
-  // time execute() encodes the stencil and cover passes.
-  DepthStencilDescriptor stencilPassDS = {};
-  DepthStencilDescriptor coverPassDS = {};
 
   // Pre-computed cover-pass stencil reference value (depends only on fillType).
   uint32_t coverStencilRef = 0;

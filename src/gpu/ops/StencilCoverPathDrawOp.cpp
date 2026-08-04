@@ -43,9 +43,9 @@ bool IsInverse(PathFillType fillType) {
   return fillType == PathFillType::InverseWinding || fillType == PathFillType::InverseEvenOdd;
 }
 
-DepthStencilDescriptor MakeStencilPassDS(PathFillType fillType) {
+DepthStencilDescriptor MakeStencilPassDS(PathFillType fillType, PixelFormat format) {
   DepthStencilDescriptor ds = {};
-  ds.format = PixelFormat::DEPTH24_STENCIL8;
+  ds.format = format;
   ds.depthCompare = CompareFunction::Always;
   ds.depthWriteEnabled = false;
   ds.stencilReadMask = 0xFF;
@@ -75,9 +75,9 @@ DepthStencilDescriptor MakeStencilPassDS(PathFillType fillType) {
   return ds;
 }
 
-DepthStencilDescriptor MakeCoverPassDS(PathFillType fillType) {
+DepthStencilDescriptor MakeCoverPassDS(PathFillType fillType, PixelFormat format) {
   DepthStencilDescriptor ds = {};
-  ds.format = PixelFormat::DEPTH24_STENCIL8;
+  ds.format = format;
   ds.depthCompare = CompareFunction::Always;
   ds.depthWriteEnabled = false;
   ds.stencilReadMask = 0xFF;
@@ -151,8 +151,6 @@ StencilCoverPathDrawOp::StencilCoverPathDrawOp(BlockAllocator* allocator,
   // Pre-compute the per-op state that only depends on construction-time inputs. This keeps
   // execute() limited to the work that genuinely needs the live RenderPass / RenderTarget.
   stencilGP = StencilCoverStencilPassGeometryProcessor::Make(allocator, viewMatrix);
-  stencilPassDS = MakeStencilPassDS(fillType);
-  coverPassDS = MakeCoverPassDS(fillType);
   coverStencilRef = CoverPassStencilReference(fillType);
   // The cover quad's device-space footprint is the strict upper bound on where the cover
   // pass's Zero op will run, so the stencil pass must be scissored to (at most) the same
@@ -177,7 +175,7 @@ bool StencilCoverPathDrawOp::bindStencilPipeline(RenderPass* renderPass,
   // vs DecrementWrap) for the non-zero rule. Culling either side would break the winding
   // count, so the stencil pass is hard-wired to no culling regardless of the op's cullMode.
   stencilInfo.setCullMode(CullMode::None);
-  stencilInfo.setDepthStencil(stencilPassDS);
+  stencilInfo.setDepthStencil(MakeStencilPassDS(fillType, renderPass->depthStencilFormat()));
   // Drop colour writes — the stencil pass exists to update the stencil buffer only.
   stencilInfo.setColorWriteMask(0);
   auto stencilProgram = stencilInfo.getProgram();
@@ -215,7 +213,7 @@ bool StencilCoverPathDrawOp::bindCoverPipeline(RenderPass* renderPass, RenderTar
   coverInfo.setCullMode(cullMode);
   // Route the stencil buffer read through the cover pass. Without this the pipeline would
   // ignore the stencil buffer and shade every fragment inside the cover quad.
-  coverInfo.setDepthStencil(coverPassDS);
+  coverInfo.setDepthStencil(MakeCoverPassDS(fillType, renderPass->depthStencilFormat()));
   auto coverProgram = coverInfo.getProgram();
   if (coverProgram == nullptr) {
     LOGE("StencilCoverPathDrawOp::bindCoverPipeline() Failed to get the program!");
