@@ -225,13 +225,15 @@ export const getBytesFromPath = async (module: TGFX, path: string) => {
 };
 
 export const uploadVideoToWebGPUTexture = (source: HTMLVideoElement, texturePtr: number,
-                                           width: number, height: number) => {
+                                           width: number, height: number, deviceId?: number) => {
     if (!source || !texturePtr) {
         return;
     }
     syncVideoFrame(source);
-    // Emscripten maps WGPUTexture C pointers to JS GPUTexture objects via WebGPU.mgrTexture.
-    const WebGPU = (getTGFXModule() as any)?.WebGPU;
+    // Emscripten maps WGPUTexture C pointers to JS GPUTexture objects via WebGPU.mgrTexture,
+    // exported on the module through EXPORTED_RUNTIME_METHODS.
+    const module = getTGFXModule() as any;
+    const WebGPU = module?.WebGPU;
     if (!WebGPU) {
         return;
     }
@@ -239,7 +241,10 @@ export const uploadVideoToWebGPUTexture = (source: HTMLVideoElement, texturePtr:
     if (!gpuTexture) {
         return;
     }
-    const device: any = (getTGFXModule() as any)?.preinitializedWebGPUDevice;
+    // Resolve the GPUDevice that owns the texture. The C++ side passes its WGPUDevice handle so the
+    // queue used for upload matches the device the texture was created on. Fall back to the
+    // module's preinitializedWebGPUDevice for the default device path.
+    let device = (deviceId && WebGPU?.mgrDevice?.get(deviceId)) ?? module?.preinitializedWebGPUDevice;
     if (!device || !device.queue) {
         return;
     }
