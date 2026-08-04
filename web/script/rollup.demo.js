@@ -9,8 +9,14 @@ const fileHeaderPath = path.resolve(__dirname, '../../.idea/fileTemplates/includ
 const banner = readFileSync(fileHeaderPath, 'utf-8');
 
 const arch = process.env.ARCH;
-var fileName = (arch === 'wasm-mt' ? 'index' : arch === 'wasm-webgpu' ? 'index-webgpu' : 'index-st');
+const backend = process.env.BACKEND;
 var filePath = (arch === 'wasm-mt' ? 'wasm-mt' : 'wasm');
+var fileName = '';
+if(backend === 'webgpu'){
+    fileName = (arch === 'wasm-mt' ? 'index-webgpu':'index-webgpu-st');
+}else if(backend === 'webgl'){
+    fileName = (arch === 'wasm-mt' ? 'index':'index-st');
+}
 
 const plugins = [
     esbuild({tsconfig: "tsconfig.json", minify: false}),
