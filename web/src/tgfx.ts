@@ -169,7 +169,8 @@ export const setColorSpace = (
 // emscripten WebGPU surface, so reconfiguring it only updates the color space.
 export const configureWebGPUColorSpace = (
     canvasSelector: string,
-    colorSpace: WindowColorSpace
+    colorSpace: WindowColorSpace,
+    deviceId?: number
 ) => {
     if (colorSpace === WindowColorSpace.Others) {
         return false;
@@ -182,12 +183,13 @@ export const configureWebGPUColorSpace = (
     if (!context || typeof context.configure !== 'function') {
         return false;
     }
-    // Reuse the same GPUDevice the C++ side rendered with. This assumes the device passed to
-    // WebGPUWindow::MakeFrom() is the module's preinitializedWebGPUDevice, which is what
-    // emscripten's WebGPU surface uses under the hood. Passing a custom device via
-    // WebGPUDevice::MakeFrom() is currently unsupported here, because the canvas context would be
-    // configured on a different device than the one the C++ side submits to.
-    const device = (getTGFXModule() as any)?.preinitializedWebGPUDevice;
+    // Resolve the GPUDevice the C++ side renders with. The C++ side passes its WGPUDevice handle so
+    // this function can look up the same device object via the WebGPU runtime export
+    // (Module.WebGPU, exported via EXPORTED_RUNTIME_METHODS), which also covers devices passed in
+    // via WebGPUDevice::MakeFrom(). When the handle cannot be resolved, fall back to the module's
+    // preinitializedWebGPUDevice for the default device path.
+    const module = getTGFXModule() as any;
+    const device = (deviceId && module?.WebGPU?.mgrDevice?.get(deviceId)) ?? module?.preinitializedWebGPUDevice;
     if (!device) {
         return false;
     }

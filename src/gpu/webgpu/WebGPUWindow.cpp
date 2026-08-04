@@ -18,6 +18,7 @@
 
 #include "tgfx/gpu/webgpu/WebGPUWindow.h"
 #include <webgpu/webgpu.h>
+#include <cstdint>
 #include "WebGPUDefines.h"
 #include "WebGPUDrawableProxy.h"
 #include "WebGPUGPU.h"
@@ -111,11 +112,14 @@ void WebGPUWindow::configureColorSpace() {
     return;
   }
   // Reconfigure the canvas WebGPU context with the desired color space via the JS side, since the
-  // WebGPU C API surface configuration does not expose a color space option. The JS side reuses the
-  // GPUDevice pre-initialized on the module (preinitializedWebGPUDevice).
+  // WebGPU C API surface configuration does not expose a color space option. The JS side resolves
+  // the device from the handle below through the module's WebGPU runtime export, which also covers
+  // devices passed in via WebGPUDevice::MakeFrom().
+  auto wgpuDevice =
+      static_cast<WGPUDevice>(static_cast<WebGPUDevice*>(getDevice().get())->webgpuDevice());
   bool supported = emscripten::val::module_property("tgfx").call<bool>(
       "configureWebGPUColorSpace", emscripten::val(_canvasSelector),
-      static_cast<int>(namedColorSpace));
+      static_cast<int>(namedColorSpace), reinterpret_cast<uintptr_t>(wgpuDevice));
   if (!supported) {
     LOGE(
         "WebGPUWindow::configureColorSpace() The specified ColorSpace is not supported on this "

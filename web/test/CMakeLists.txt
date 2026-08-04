@@ -171,7 +171,7 @@ target_link_options(tgfx-test PRIVATE
     -sSTACK_SIZE=1MB
     -sEXPORT_NAME='TGFXTest'
     -sEXPORTED_FUNCTIONS=['_RunAllTests','_RunTest']
-    -sEXPORTED_RUNTIME_METHODS=['FS','ccall','cwrap','GL']
+    -sEXPORTED_RUNTIME_METHODS=['FS','ccall','cwrap','GL','WebGPU']
     -sMODULARIZE=1
     -sEXPORT_ES6=1
     -sENVIRONMENT=web,worker
