@@ -1942,6 +1942,71 @@ TGFX_TEST(StencilCoverPathTest, Dispatch_EmptyPathBypassesStencilAttachmentAlloc
          "(control channel for the empty-bypass assertion above)";
 }
 
+// Cross-origin visual equivalence for the stencil-and-cover path. The StencilCoverPath test
+// suite otherwise exercises only TopLeft render targets (the default Surface::Make), leaving
+// the BottomLeft branch — which GL windows and hardware-backed textures use — completely
+// uncovered. This test renders the same clipped path on both a TopLeft surface and a
+// texture-backed BottomLeft surface, then checks each against a single shared baseline: any
+// visible drift between origins (or from the golden baseline itself) will trip at least one
+// of the two assertions.
+//
+// Scope: catches visible regressions in the coordinate-space handling along the
+// applyScissor / applyStencilScissor / clearScissor pipeline (see OriginFlip.h). Note that a
+// mixed-space bug affecting only the depth/stencil clearScissor tends to self-cancel visually
+// — stencil and cover passes consume the same offset and the visible pixels agree — so this
+// test does not exhaustively prove the coordinate-space contract, but it does guard against
+// any regression that ends up shifting or misclipping the rendered output.
+TGFX_TEST(StencilCoverPathTest, Dispatch_BottomLeftTargetMatchesTopLeftUnderClip) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  ScopedStencilCoverCaps capsGuard(context, true);
+
+  constexpr int SIZE = 64;
+
+  auto renderScene = [&](std::shared_ptr<Surface> surface) {
+    ASSERT_TRUE(surface != nullptr);
+    auto canvas = surface->getCanvas();
+    canvas->clear(Color{0.f, 0.f, 0.f, 1.f});
+
+    // A curved path large enough that its device bounds extend past every edge of the clip,
+    // so the intersect between coverDeviceBounds and the clip is non-trivial. Any shift in
+    // the effective scissor between the two origins would surface as a pixel difference.
+    Path path;
+    path.moveTo(8, 8);
+    path.quadTo(32, -16, 56, 8);
+    path.lineTo(56, 56);
+    path.lineTo(8, 56);
+    path.close();
+    Paint paint;
+    paint.setAntiAlias(false);
+    paint.setColor(Color{1.f, 0.f, 0.f, 1.f});
+
+    canvas->save();
+    // Non-WideOpen rect clip, deliberately asymmetric in Y so a wrong flip on either surface
+    // would show up as a shifted red region.
+    canvas->clipRect(Rect::MakeLTRB(12, 20, 52, 44));
+    canvas->drawPath(path, paint);
+    canvas->restore();
+    context->flushAndSubmit();
+  };
+
+  // TopLeft baseline via the default Surface::Make.
+  auto topLeftSurface = Surface::Make(context, SIZE, SIZE);
+  ASSERT_TRUE(topLeftSurface != nullptr);
+  renderScene(topLeftSurface);
+  EXPECT_TRUE(Baseline::Compare(topLeftSurface, "StencilCoverPath/BottomLeftEquivalence"));
+
+  // BottomLeft target built directly from a GPU texture, matching SurfaceRenderTest's pattern.
+  auto texture = context->gpu()->createTexture({SIZE, SIZE, PixelFormat::RGBA_8888});
+  ASSERT_TRUE(texture != nullptr);
+  auto bottomLeftSurface =
+      Surface::MakeFrom(context, texture->getBackendTexture(), ImageOrigin::BottomLeft);
+  ASSERT_TRUE(bottomLeftSurface != nullptr);
+  renderScene(bottomLeftSurface);
+  EXPECT_TRUE(Baseline::Compare(bottomLeftSurface, "StencilCoverPath/BottomLeftEquivalence"));
+}
+
 }  // namespace tgfx
 
 #endif  // TGFX_ENABLE_STENCIL_COVER_PATH

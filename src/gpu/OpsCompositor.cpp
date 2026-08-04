@@ -891,16 +891,20 @@ AppliedClip OpsCompositor::applyClip(const ClipStack& clipStack) {
     return out;
   }
 
-  // Stage 2: Set initial scissor from clip bounds to restrict drawing area.
+  // Stage 2: Set initial scissor from clip bounds to restrict drawing area. The scissor is
+  // published to draw ops in canvas top-left device space — the same space viewMatrix,
+  // coverDeviceBounds and every other rect owned by a DrawOp live in. The Y-flip required for
+  // BottomLeft render targets is applied at the backend boundary (DrawOp::applyScissor,
+  // StencilCoverPathDrawOp::applyStencilScissor) via OriginFlip.h::FlipYIfNeeded, immediately
+  // before RenderPass::setScissorRect. Keeping the intermediate representation in one space
+  // avoids the mixed-space bug that used to affect getStencilResolveBounds's intersect.
   auto clipBounds = clipStack.bounds();
   if (!clipBounds.intersect(renderTarget->bounds())) {
     out.status = AppliedClipStatus::ClippedOut;
     return out;
   }
   clipBounds.roundOut();
-  auto scissorBounds = clipBounds;
-  FlipYIfNeeded(&scissorBounds, renderTarget.get());
-  out.scissor = scissorBounds;
+  out.scissor = clipBounds;
 
   // Stage 3: Iterate through valid elements.
   auto& elements = clipStack.elements();

@@ -79,15 +79,15 @@ class StencilCoverPathDrawOp : public DrawOp {
   }
 
   // Returns the cover quad's device-space footprint intersected with the op's user scissor,
-  // in canvas top-left device space (the same space viewMatrix maps into). OpsRenderTask
-  // converts it to backend scissor space in one place before handing it to the render pass.
+  // in canvas top-left device space. Both coverDeviceBounds and scissorRect are published in
+  // that space (scissorRect via OpsCompositor::applyClip, which no longer Y-flips upfront), so
+  // the intersect below is a well-defined rect in a single, consistent coordinate space.
   // Intersecting with scissorRect keeps the stencil clear tight when the clip shrinks the
   // cover area, matching the way applyStencilScissor constrains the stencil pass to the
   // cover quad ∩ clip. When the clip fully clips out the cover region an empty rect is
   // returned, signalling "known to write nothing" so the pass omits this op from the clear
-  // union without falling back to a full clear. Note: scissorRect here is treated as
-  // canvas-top-left, matching the TopLeft-origin surfaces the stencil-cover path is
-  // exercised against; the same assumption is already baked into applyStencilScissor.
+  // union without falling back to a full clear. OpsRenderTask converts the aggregated rect to
+  // backend scissor space in one place (right before setting clearScissor).
   std::optional<Rect> getStencilResolveBounds() const override {
     if (scissorRect.isEmpty()) {
       return coverDeviceBounds;
