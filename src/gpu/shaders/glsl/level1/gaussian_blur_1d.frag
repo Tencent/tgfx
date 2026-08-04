@@ -5,12 +5,10 @@
 // count bounded — it previously multiplied the fragment domain by 10.
 // Permutation dimensions (frag):
 //   HAS_XP (0~2): 0=Empty, 1=PorterDuff DST_TEX, 2=PorterDuff FBF
-//   HAS_CHILD_SUBSET (bool): When 1, clamp each sample coordinate to the child texture's Subset
-//                            bounds before sampling. Used when TextureEffect.hasSubset()=true but
-//                            GP has no per-vertex subset attribute.
 //   HAS_TILED_CHILD (bool): When 1, the child is a TiledTextureEffect: each tap is tiled through the
 //                           shared tiled_sample.inc logic (mirrors the runtime per-tap tiling).
-//                           Mutually exclusive with HAS_CHILD_SUBSET.
+//   Child subset clamping is always on: the kernel always clamps each tap to Subset, and a child
+//   without a real subset uploads the full texture bounds, so the clamp is a no-op.
 #version 450
 
 // Fixed maximum kernel: maxSigma=10 → loop upper bound 4*(9+1)=40. Runtime Sigma <= 10 breaks early.
@@ -19,9 +17,6 @@
 #endif
 #ifndef HAS_XP
 #define HAS_XP 0
-#endif
-#ifndef HAS_CHILD_SUBSET
-#define HAS_CHILD_SUBSET 0
 #endif
 #ifndef HAS_COVERAGE
 #define HAS_COVERAGE 0
@@ -34,9 +29,9 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Color;
   float Sigma;
   vec2 Step;
-#if HAS_CHILD_SUBSET || HAS_TILED_CHILD
+  // Always declared: plain-child taps clamp to it (no-op at full bounds); a tiled child uses it
+  // as the tiling domain.
   vec4 Subset;
-#endif
 #if HAS_TILED_CHILD
   int ShaderModeX;
   int ShaderModeY;
@@ -88,9 +83,7 @@ void main() {
     vec4 texColor = texture(TextureSampler_0, tapCoord);
     texColor = tiledApplyBorder(texColor, tapInCoord, tapSubsetCoord, tapClampedCoord);
 #else
-#if HAS_CHILD_SUBSET
     sampleCoord = clamp(sampleCoord, Subset.xy, Subset.zw);
-#endif
     vec4 texColor = texture(TextureSampler_0, sampleCoord);
 #endif
     sum += texColor * weight;

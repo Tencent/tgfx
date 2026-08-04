@@ -1329,14 +1329,12 @@ static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
   // The blur child is either a plain TextureEffect (inlined texture() call) or a TiledTextureEffect,
   // in which case the shared tiled_sample.inc tiling is applied per tap (HAS_TILED_CHILD). Tiled
   // children are limited to the ShaderMode values tiled_sample.inc implements; others fall back.
-  bool childHasSubset = false;
   bool tiledChild = false;
   if (childFP->name() == "TextureEffect") {
     auto* childTE = static_cast<const TextureEffect*>(childFP);
     if (childTE->numTextureSamplers() == 0) {
       return std::nullopt;
     }
-    childHasSubset = childTE->hasSubset();
   } else if (childFP->name() == "TiledTextureEffect") {
     auto* childTiled = static_cast<const TiledTextureEffect*>(childFP);
     if (childTiled->numTextureSamplers() == 0 || childTiled->hasPerspective()) {
@@ -1370,7 +1368,6 @@ static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
   fragValues[FD::HAS_XP] = xpType;
-  fragValues[FD::HAS_CHILD_SUBSET] = childHasSubset ? 1 : 0;
   fragValues[FD::HAS_COVERAGE] = *coverageType;
   fragValues[FD::HAS_TILED_CHILD] = tiledChild ? 1 : 0;
   auto fragIndex = fragDomain.encode(fragValues);
