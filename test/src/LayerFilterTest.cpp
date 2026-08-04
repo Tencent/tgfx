@@ -42,16 +42,6 @@
 
 namespace tgfx {
 
-// Test-only accessor that reaches the private getImageFilter of LayerImageFilter. Declared as a
-// friend inside LayerImageFilter (see LayerImageFilter.h) so it works on both MSVC and clang/gcc
-// regardless of -fno-access-control availability.
-class LayerFilterTestAccess {
- public:
-  static std::shared_ptr<ImageFilter> GetImageFilter(LayerImageFilter* filter, float scale) {
-    return filter->getImageFilter(scale);
-  }
-};
-
 TGFX_TEST(LayerFilterTest, FilterTest) {
   auto filter = DropShadowFilter::Make(-80, -80, 0, 0, Color::Black());
   auto filter2 = DropShadowFilter::Make(-40, -40, 0, 0, Color::Green());
@@ -202,16 +192,15 @@ TGFX_TEST(LayerFilterTest, blurLayerFilter) {
   EXPECT_EQ(blur->blurrinessX(), 130.f);
   blur->setTileMode(TileMode::Clamp);
   EXPECT_EQ(blur->tileMode(), TileMode::Clamp);
-  auto imageFilter = std::static_pointer_cast<GaussianBlurImageFilter>(
-      LayerFilterTestAccess::GetImageFilter(blur.get(), 0.5f));
-  auto imageFilter2 = std::static_pointer_cast<GaussianBlurImageFilter>(
-      ImageFilter::Blur(65.f, 65.f, TileMode::Clamp));
-  EXPECT_EQ(imageFilter->blurrinessX, imageFilter2->blurrinessX);
-  EXPECT_EQ(imageFilter->blurrinessY, imageFilter2->blurrinessY);
-  EXPECT_EQ(imageFilter->tileMode, imageFilter2->tileMode);
-  EXPECT_EQ(
-      LayerFilterTestAccess::GetImageFilter(blur.get(), 0.5f)->filterBounds(Rect::MakeWH(200, 200)),
-      imageFilter2->filterBounds(Rect::MakeWH(200, 200)));
+  TGFX_PRIVATE_ACCESS(auto imageFilter = std::static_pointer_cast<GaussianBlurImageFilter>(
+                          blur->getImageFilter(0.5f));
+                      auto imageFilter2 = std::static_pointer_cast<GaussianBlurImageFilter>(
+                          ImageFilter::Blur(65.f, 65.f, TileMode::Clamp));
+                      EXPECT_EQ(imageFilter->blurrinessX, imageFilter2->blurrinessX);
+                      EXPECT_EQ(imageFilter->blurrinessY, imageFilter2->blurrinessY);
+                      EXPECT_EQ(imageFilter->tileMode, imageFilter2->tileMode);
+                      EXPECT_EQ(blur->getImageFilter(0.5f)->filterBounds(Rect::MakeWH(200, 200)),
+                                imageFilter2->filterBounds(Rect::MakeWH(200, 200)));)
 }
 
 TGFX_TEST(LayerFilterTest, InnerShadowFilter) {

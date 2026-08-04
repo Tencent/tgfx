@@ -55,14 +55,7 @@ namespace tgfx {
  * Both passes share the same RenderPass; the depth/stencil texture is attached upstream by
  * OpsRenderTask when needsStencil() returns true.
  */
-// Test-only accessor forward-declaration. Friended below so StencilCoverPathTest can inspect
-// coverStencilRef on MSVC too, where -fno-access-control is unavailable. Not defined in
-// production code; the definition lives in the test binary.
-class StencilCoverPathDrawOpTestAccess;
-
 class StencilCoverPathDrawOp : public DrawOp {
-  friend class StencilCoverPathDrawOpTestAccess;
-
  public:
   // Upper bound on the number of shapes OpsCompositor may accumulate in its
   // pendingStencilCoverShapes queue before force-flushing. NOTE: each queued entry is

@@ -22,19 +22,12 @@
 
 namespace tgfx {
 
-// Test-only accessor forward-declaration. Friended by LayerImageFilter so LayerFilterTest.cpp can
-// invoke the private getImageFilter without relying on -fno-access-control (unavailable on MSVC).
-// Not defined in production code; the definition lives in the test binary.
-class LayerFilterTestAccess;
-
 /**
  * LayerImageFilter is the base class for layer filters whose effect is expressed as an
  * ImageFilter. Subclasses override onCreateImageFilter() to return the ImageFilter for a given
  * content scale.
  */
 class LayerImageFilter : public LayerFilter {
-  friend class LayerFilterTestAccess;
-
  public:
   Rect filterBounds(const Rect& srcRect, float contentScale,
                     MapDirection direction = MapDirection::Forward) override;
