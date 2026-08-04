@@ -7,18 +7,15 @@
 // variant count. This mirrors TextureFillShader.
 #version 450
 
-#ifndef HAS_SUBSET
-#define HAS_SUBSET 0
-#endif
 #ifndef HAS_XP
 #define HAS_XP 0
 #endif
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Color;
-#if HAS_SUBSET
+  // Always declared: a draw without a subset uploads the full texture bounds, making the clamp a
+  // no-op, so subset handling needs no compile-time dimension.
   vec4 Subset;
-#endif
   // RGBAAA dual-plane alpha offset: always declared, only read when HasRgbaaa != 0 (uniform branch).
   vec2 AlphaStart;
   mat4 ColorMatrix;
@@ -43,9 +40,7 @@ void main() {
   highp vec2 texCoord = TransformedCoords_0;
   highp vec2 finalCoord = texCoord;
 
-#if HAS_SUBSET
   finalCoord = clamp(finalCoord, Subset.xy, Subset.zw);
-#endif
 
   vec4 texColor = texture(TextureSampler_0, finalCoord);
 

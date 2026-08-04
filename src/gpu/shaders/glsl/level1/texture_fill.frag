@@ -1,7 +1,7 @@
 // TextureFillShader fragment shader (non-YUV path only)
 // Processor layout: DefaultGeometryProcessor() + TextureEffect() + [coverage FP] + EmptyXferProcessor/PorterDuffXP
 // Permutation dimensions (injected by build tool as #define 0/1):
-//   HAS_SUBSET, HAS_XP, HAS_COVERAGE
+//   HAS_XP, HAS_COVERAGE (Subset is an always-on runtime uniform)
 // ALPHA_ONLY and HAS_RGBAAA are runtime uniforms (AlphaOnly / HasRgbaaa), not compile-time
 // permutations: both are pure fragment math (alpha-only replicates .r; RGBAAA adds one
 // coherent-branch alpha sample), so folding them into uniform branches shrinks the variant count.
@@ -9,9 +9,6 @@
 // Note: HAS_YUV is always 0 at runtime — YUV textures fall back to ProgramBuilder.
 #version 450
 
-#ifndef HAS_SUBSET
-#define HAS_SUBSET 0
-#endif
 #ifndef HAS_XP
 #define HAS_XP 0
 #endif
@@ -21,9 +18,9 @@
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Color;
-#if HAS_SUBSET
+  // Always declared: a draw without a subset uploads the full texture bounds, making the clamp a
+  // no-op, so subset handling needs no compile-time dimension.
   vec4 Subset;
-#endif
   // RGBAAA dual-plane alpha offset: always declared, only read when HasRgbaaa != 0 (uniform branch).
   vec2 AlphaStart;
 #include "coverage_uniforms.inc"
@@ -52,9 +49,7 @@ void main() {
   highp vec2 texCoord = TransformedCoords_0;
   highp vec2 finalCoord = texCoord;
 
-#if HAS_SUBSET
   finalCoord = clamp(finalCoord, Subset.xy, Subset.zw);
-#endif
 
   vec4 color = texture(TextureSampler_0, finalCoord);
 

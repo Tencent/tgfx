@@ -229,7 +229,6 @@ static std::optional<PermutationMatchResult> TryMatchTextureFill(const ProgramIn
   auto vertIndex = TextureFillShader::EncodeVertex();
 
   TextureFillShader::FragmentValues fragmentValues = {};
-  fragmentValues.hasSubset = te->hasSubset();
   fragmentValues.xp = static_cast<uint32_t>(xpType);
   fragmentValues.coverage = static_cast<uint32_t>(*coverageType);
   auto fragIndex = TextureFillShader::EncodeFragment(fragmentValues);
@@ -613,7 +612,8 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseTail(const Program
   }
   auto* tail = static_cast<const AOTPointwiseTailProcessor*>(fp);
   auto source = tail->source();
-  bool hasSubset = false;
+  // Subset clamping is a runtime uniform now: the kernel always clamps by Subset, and the source
+  // uploads the full texture bounds when there is no real subset.
   if (tail->sourceKind() == AOTPointwiseTailProcessor::SourceKind::Plain) {
     if (source->name() != "TextureEffect" || source->numTextureSamplers() != 1) {
       return std::nullopt;
@@ -623,7 +623,6 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseTail(const Program
         source->coordTransform(0)->matrix.hasPerspective()) {
       return std::nullopt;
     }
-    hasSubset = texture->hasSubset();
   } else {
     if (source->name() != "DeviceSpaceTextureEffect" || source->numTextureSamplers() != 1) {
       return std::nullopt;
@@ -643,7 +642,6 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseTail(const Program
 
   using FD = PointwiseTailShader::FD;
   std::vector<int> fragValues(FD::COUNT, 0);
-  fragValues[FD::HAS_SUBSET] = hasSubset ? 1 : 0;
   fragValues[FD::HAS_XP] = xpType;
   fragValues[FD::HAS_COVERAGE] = hasCoverage;
   auto fragIndex = FD::domain().encode(fragValues);
@@ -1080,7 +1078,8 @@ static std::optional<PermutationMatchResult> TryMatchTextureColorMatrix(
   auto fragDomain = D::domain();
   std::vector<int> fragValues(D::COUNT);
   // alphaOnly / hasRGBAAA are runtime uniforms (AlphaOnly / HasRgbaaa), not permutation dimensions.
-  fragValues[D::HAS_SUBSET] = te->hasSubset() ? 1 : 0;
+  // Subset is also runtime: the shader always clamps by the Subset uniform, which the writer fills
+  // with the full texture bounds when there is no real subset.
   fragValues[D::HAS_XP] = xpType;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"TextureColorMatrixShader", 0, fragIndex};
@@ -1278,17 +1277,15 @@ static std::optional<PermutationMatchResult> TryMatchComposedTexture(
   if (te->isYUV() || te->isAlphaOnly() || te->hasRGBAAA()) {
     return std::nullopt;
   }
-  int hasSubset = te->hasSubset() ? 1 : 0;
 
   // All four pointwise operators (ColorMatrix / Luma / AlphaThreshold / ColorSpaceXform) share the
   // same structural class (1 sampler, no CoverageFP, RGBA) and thus the same precompiled shader:
   // TexturedEffectShader. The operator is selected at draw time by the OpType runtime uniform (set
   // by the pointwise FP's onSetData), so it is not a compile-time dimension. The frag index only
-  // encodes the structural axes HAS_SUBSET and HAS_XP.
+  // encodes the structural axes HAS_XP and HAS_COVERAGE; subset clamping is a runtime uniform.
   using D = TexturedEffectShader::D;
   auto fragDomain = D::domain();
   std::vector<int> fragValues(D::COUNT, 0);
-  fragValues[D::HAS_SUBSET] = hasSubset;
   fragValues[D::HAS_XP] = xpType;
   fragValues[D::HAS_COVERAGE] = hasCoverage;
   auto fragIndex = fragDomain.encode(fragValues);

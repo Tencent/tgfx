@@ -62,6 +62,16 @@ void GLSLDeviceSpaceTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
   auto scale = textureView->getTextureCoord(1, 1);
   deviceCoordMatrix.postScale(scale.x, scale.y);
   fragmentUniformData->setData("DeviceCoordMatrix", deviceCoordMatrix);
+  if (fragmentUniformData->hasField("Subset")) {
+    // Precompiled kernels declare Subset unconditionally and always clamp, so this source must
+    // upload a no-op full-bounds rect: normalized for 2D textures, pixel bounds for Rectangle.
+    float rect[4] = {0.0f, 0.0f, 1.0f, 1.0f};
+    if (textureView->getTexture()->type() == TextureType::Rectangle) {
+      rect[2] = static_cast<float>(textureView->width());
+      rect[3] = static_cast<float>(textureView->height());
+    }
+    fragmentUniformData->setData("Subset", rect);
+  }
   if (fragmentUniformData->hasField("AlphaOnly")) {
     // Precompiled path folds ALPHA_ONLY into a runtime uniform; JIT emitCode bakes it at compile
     // time and never declares this field.

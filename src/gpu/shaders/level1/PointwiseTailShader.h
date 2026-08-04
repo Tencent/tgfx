@@ -36,10 +36,11 @@ class PointwiseTailShader : public PrecompiledShader {
   using VD = VertDims;
 
   struct FragDims {
-    enum : uint32_t { HAS_SUBSET, HAS_XP, HAS_COVERAGE, COUNT };
+    // Subset clamping is runtime: the shader always declares Subset and clamps, and the writer
+    // uploads the full texture bounds when there is no real subset, so the clamp is a no-op.
+    enum : uint32_t { HAS_XP, HAS_COVERAGE, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationBool("HAS_SUBSET"),
           PermutationInt("HAS_XP", 3),
           PermutationBool("HAS_COVERAGE"),
       });

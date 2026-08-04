@@ -10,9 +10,6 @@
 // spelled out in the TGFX_SLOT_* defines below.
 #version 450
 
-#ifndef HAS_SUBSET
-#define HAS_SUBSET 0
-#endif
 #ifndef HAS_XP
 #define HAS_XP 0
 #endif
@@ -24,9 +21,9 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Color;
   int SourceKind;
   mat3 DeviceCoordMatrix;
-#if HAS_SUBSET
+  // Always declared: a draw without a subset uploads the full texture bounds, making the clamp a
+  // no-op, so subset handling needs no compile-time dimension.
   vec4 Subset;
-#endif
 
 #define TGFX_SLOT_OP_TYPE Slot0OpType
 #define TGFX_SLOT_COLOR_MATRIX Slot0ColorMatrix
@@ -145,9 +142,7 @@ void main() {
   if (SourceKind != 0) {
     finalCoord = (DeviceCoordMatrix * vec3(gl_FragCoord.xy, 1.0)).xy;
   }
-#if HAS_SUBSET
   finalCoord = clamp(finalCoord, Subset.xy, Subset.zw);
-#endif
   vec4 color = texture(TextureSampler_0, finalCoord) * Color.a;
   vec4 result = applyPointwiseSlot1(applyPointwiseSlot0(color));
 

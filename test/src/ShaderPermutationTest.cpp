@@ -293,9 +293,9 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistry) {
       foundTextureFill = true;
       EXPECT_EQ(shaderInfo.vertDomain.totalCount(), 1u);
       EXPECT_EQ(shaderInfo.vertDomain.dimensionCount(), 0u);
-      // FragDims: HAS_SUBSET(bool) + HAS_XP(int3) + HAS_COVERAGE(int3) = 18 permutations.
-      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 18u);
-      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 3u);
+      // FragDims: HAS_XP(int3) + HAS_COVERAGE(int3) = 9 permutations.
+      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 9u);
+      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 2u);
       EXPECT_EQ(shaderInfo.vertexFile, "level1/texture_fill.vert");
       EXPECT_EQ(shaderInfo.fragmentFile, "level1/texture_fill.frag");
     }
@@ -651,12 +651,9 @@ TGFX_TEST(ShaderPermutationTest, ShouldCompile) {
     if (shaderInfo.name != TextureFillShader::Name()) {
       continue;
     }
-    // Vert: 2 bool = 4 raw. Frag: 2 bool + HAS_XP(int3) + HAS_COVERAGE(int3) = 36 raw.
-    // Compilation rules:
-    //   - HAS_YUV / HAS_SUBSET vert/frag agreement enforced by the framework (MirroredDimsAgree).
-    //   - HAS_YUV(frag) != 0 → excluded by the shader rule (YUV falls back to ProgramBuilder).
-    // Valid vert configs (HAS_YUV=0): 2 (HAS_SUBSET 0/1); each matches 9 fragment combinations
-    // (HAS_XP×HAS_COVERAGE) → 2 * 9 = 18.
+    // Vert: no dimensions = 1 raw. Frag: HAS_XP(int3) + HAS_COVERAGE(int3) = 9 raw. YUV is
+    // rejected by the matcher before matching and subset clamping is a runtime uniform, so every
+    // enumerated combination is buildable: 1 * 9 = 9.
     int compiledCount = 0;
     for (uint32_t vi = 0; vi < shaderInfo.vertDomain.totalCount(); vi++) {
       auto vertValues = shaderInfo.vertDomain.decode(vi);
@@ -672,7 +669,7 @@ TGFX_TEST(ShaderPermutationTest, ShouldCompile) {
         }
       }
     }
-    EXPECT_EQ(compiledCount, 18);
+    EXPECT_EQ(compiledCount, 9);
   }
 }
 
@@ -692,7 +689,6 @@ TGFX_TEST(ShaderPermutationTest, TextureFillTypedEncodingMatchesDomains) {
   for (uint32_t index = 0; index < fragmentDomain.totalCount(); index++) {
     auto values = fragmentDomain.decode(index);
     TextureFillShader::FragmentValues typedValues = {};
-    typedValues.hasSubset = values[TextureFillShader::FD::HAS_SUBSET] != 0;
     typedValues.xp = static_cast<uint32_t>(values[TextureFillShader::FD::HAS_XP]);
     typedValues.coverage = static_cast<uint32_t>(values[TextureFillShader::FD::HAS_COVERAGE]);
     EXPECT_EQ(TextureFillShader::EncodeFragment(typedValues), index);
@@ -707,7 +703,7 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
   EXPECT_EQ(cache->vertexEntryCount(), 140u);
-  EXPECT_EQ(cache->fragmentEntryCount(), 495u);
+  EXPECT_EQ(cache->fragmentEntryCount(), 471u);
   std::string expectedTag = TGFX_BACKEND_NAME;
   auto dashPos = expectedTag.find('-');
   if (dashPos != std::string::npos) {

@@ -25,18 +25,19 @@ namespace tgfx {
 class TextureColorMatrixShader : public PrecompiledShader {
  public:
   // ALPHA_ONLY / HAS_RGBAAA are folded into runtime uniforms (AlphaOnly / HasRgbaaa) written by
-  // GLSLTextureEffect::onSetData, not compile-time permutations.
+  // GLSLTextureEffect::onSetData, not compile-time permutations. Subset clamping is also runtime:
+  // the shader always declares Subset and clamps, and the writer uploads the full texture bounds
+  // when there is no real subset, so the clamp degenerates to a no-op.
   struct Dims {
-    enum : uint32_t { HAS_SUBSET, HAS_XP, COUNT };
+    enum : uint32_t { HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationBool("HAS_SUBSET"),
           PermutationInt("HAS_XP", 3),
       });
     }
   };
   using D = Dims;
-  static_assert(D::COUNT == 2, "Update the matcher when dimensions change.");
+  static_assert(D::COUNT == 1, "Update the matcher when dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"TextureColorMatrixShader",

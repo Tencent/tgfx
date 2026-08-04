@@ -42,20 +42,20 @@ class TextureFillShader : public PrecompiledShader {
   // ALPHA_ONLY and HAS_RGBAAA are folded into runtime uniforms (AlphaOnly / HasRgbaaa), set by
   // GLSLTextureEffect::onSetData, rather than compile-time permutations.
   struct FragDims {
-    enum : uint32_t { HAS_SUBSET, HAS_XP, HAS_COVERAGE, COUNT };
+    // Subset clamping is runtime: the shader always declares Subset and clamps, and the writer
+    // uploads the full texture bounds when there is no real subset, so the clamp is a no-op.
+    enum : uint32_t { HAS_XP, HAS_COVERAGE, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationBool("HAS_SUBSET"),
           PermutationInt("HAS_XP", 3),
           PermutationInt("HAS_COVERAGE", 3),
       });
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 3, "Update the encoders and ShouldCompile when dimensions change.");
+  static_assert(FD::COUNT == 2, "Update the encoders and ShouldCompile when dimensions change.");
 
   struct FragmentValues {
-    bool hasSubset = false;
     uint32_t xp = 0;
     uint32_t coverage = 0;
   };
@@ -72,8 +72,7 @@ class TextureFillShader : public PrecompiledShader {
 
   /** Encodes fragment values with the same mixed-radix layout as FD::domain() without allocation. */
   static constexpr uint32_t EncodeFragment(const FragmentValues& values) {
-    auto base = static_cast<uint32_t>(values.hasSubset);
-    return base + values.xp * 2u + values.coverage * 6u;
+    return values.xp + values.coverage * 3u;
   }
 
   PrecompiledShaderInfo info() const override {

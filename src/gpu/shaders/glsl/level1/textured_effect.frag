@@ -5,14 +5,12 @@
 // shaders (identical skeleton, only the operator differed) into a single precompiled shader.
 // Processor layout: ComposeFragmentProcessor(TextureEffect, <pointwise op>) OR the sibling form
 //                   [TextureEffect, <pointwise op>].
-// Permutation dimensions (frag): HAS_SUBSET (bool), HAS_XP (int, 3)
+// Permutation dimensions (frag): HAS_XP (int, 3), HAS_COVERAGE (bool)
 // Runtime uniform OpType selects the operator (set by the pointwise FP's onSetData):
 //   0 = ColorMatrix, 1 = Luma, 2 = AlphaThreshold, 3 = ColorSpaceXform
+// Subset is always declared and clamped; a draw without one uploads the full texture bounds.
 #version 450
 
-#ifndef HAS_SUBSET
-#define HAS_SUBSET 0
-#endif
 #ifndef HAS_XP
 #define HAS_XP 0
 #endif
@@ -22,9 +20,7 @@
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Color;
-#if HAS_SUBSET
   vec4 Subset;
-#endif
 #include "pointwise_op_uniforms.inc"
 #include "xp_uniforms.inc"
 };
@@ -47,9 +43,7 @@ layout(location = 0) out vec4 fragColor;
 void main() {
   vec4 outputColor = Color;
   highp vec2 finalCoord = TransformedCoords_0;
-#if HAS_SUBSET
   finalCoord = clamp(finalCoord, Subset.xy, Subset.zw);
-#endif
 
   vec4 color = texture(TextureSampler_0, finalCoord);
   // TextureEffect post-processing: intermediate is never alpha-only or RGBAAA.
