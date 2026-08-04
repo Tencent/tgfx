@@ -26,6 +26,51 @@
 namespace tgfx {
 
 /**
+ * Binding-signature vocabulary for precompiled shader variants.
+ *
+ * A degree of freedom becomes a compile-time permutation dimension if and only if it changes GPU
+ * resource binding: the number or type of sampler bindings, the attachment configuration, or the
+ * varying/attribute layout. Everything else must be a runtime uniform. "The generated code would
+ * contain an if" is not a justification — branches over uniform data are coherent and free.
+ *
+ * Canonical axes (new kernels may only use these):
+ *
+ *   Binding axes:
+ *     TEXTURE_COUNT  (0/1/2/4)            each texture = one sampler binding + one coord varying
+ *     TEXTURE_KIND   (TwoD/Rect/YUV)      sampler type; YUV binds three planes
+ *     DST_KIND       (None/Texture/FBF)   dst-texture binding vs framebuffer-fetch attachment
+ *     MASK_KIND      (None/DeviceTexture) a device mask is one sampler binding
+ *
+ *   Interface axes (varying/attribute layout):
+ *     COVERAGE_KIND  (None/Vertex/LocalMask)
+ *     COLOR_KIND     (Uniform/Vertex)
+ *     GP_INTERFACE   (per-GP interface shape)
+ *
+ *   Output axis (reserved):
+ *     OUTPUT_KIND    (RGBA/AAAA)          currently the OutputAlphaSwizzle runtime uniform; the
+ *                                         name is reserved in case a swizzle ever needs compile
+ *                                         time handling
+ *
+ * These must never become dimensions (all are runtime uniforms with production precedent):
+ *   - subset rects        -> vec4 Subset uniform + unconditional clamp, full-bounds default
+ *                            (QuadTextureFillShader)
+ *   - tile modes          -> ShaderModeX/Y uniforms (TiledTextureFillShader)
+ *   - blend modes/roles   -> BlendModeValue uniform (BlendMergeShader)
+ *   - pointwise op kinds  -> OpType uniforms (PointwiseChainShader)
+ *   - alpha-only/RGBAAA   -> AlphaOnly uniform; swizzles are data, not bindings
+ *
+ * Naming: cardinalities are *_COUNT, type selectors are *_KIND. Naming a dimension after a
+ * processor or effect (a structural name) is prohibited for new kernels; legacy HAS_* dimensions
+ * stay until their kernel is otherwise modified, then they align to this vocabulary.
+ *
+ * Admission test for any proposed new dimension, in order:
+ *   1. Does it change the number or type of sampler bindings?        -> dimension
+ *   2. Does it change the attachment configuration?                  -> dimension
+ *   3. Does it change the varying/attribute layout?                  -> dimension
+ *   4. None of the above                                             -> runtime uniform
+ */
+
+/**
  * A boolean permutation dimension. Always has exactly 2 possible values (0 or 1).
  */
 class PermutationBool {
