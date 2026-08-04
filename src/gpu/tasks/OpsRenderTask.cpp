@@ -80,7 +80,7 @@ void OpsRenderTask::execute(CommandEncoder* encoder) {
     } else {
       // Ops report their stencil write footprint in canvas top-left device space, but the
       // backend scissor semantics follow the render target origin (GL windows are BottomLeft).
-      // Match the transform OpsCompositor::FlipYIfNeeded applies to draw-time scissors, and
+      // Match the transform OriginFlip.h::FlipYIfNeeded applies to draw-time scissors, and
       // roundOut so the integer scissor covers every pixel any stencil pass may touch — a
       // truncated edge would leave stale stencil values that the cover pass then treats as
       // hits, producing 1-pixel artefacts on rotated/scaled geometry.
