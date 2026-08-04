@@ -52,15 +52,15 @@ class Pixmap {
 
   /**
    * Creates a new Pixmap from the specified read-only Bitmap. Pixmap will lock pixels from the
-   * Bitmap and take a reference on its PixelRef object. The Bitmap will remain locked until the
-   * Pixmap goes out of scope or reset.
+   * Bitmap and take a reference on its PixelRef object. The Bitmap will remain locked until this
+   * Pixmap and all its copies go out of scope or are reset.
    */
   explicit Pixmap(const Bitmap& bitmap);
 
   /**
    * Creates a new Pixmap from the specified writable Bitmap. Pixmap will lock pixels from the
-   * Bitmap and take a reference on its PixelRef object. The Bitmap will remain locked until the
-   * Pixmap goes out of scope or reset.
+   * Bitmap and take a reference on its PixelRef object. The Bitmap will remain locked until this
+   * Pixmap and all its copies go out of scope or are reset.
    */
   explicit Pixmap(Bitmap& bitmap);
 
@@ -85,15 +85,15 @@ class Pixmap {
 
   /**
    * Sets the Pixmap to the specified read-only Bitmap. Pixmap will lock pixels from the Bitmap and
-   * take a reference on its PixelRef object. The Bitmap will remain locked until the Pixmap goes
-   * out of scope or reset.
+   * take a reference on its PixelRef object. The Bitmap will remain locked until this Pixmap
+   * and all its copies go out of scope or are reset.
    */
   void reset(const Bitmap& bitmap);
 
   /**
    * Sets the Pixmap to the specified writable Bitmap. Pixmap will lock pixels from the Bitmap and
-   * take a reference on its PixelRef object. The Bitmap will remain locked until the Pixmap goes
-   * out of scope or reset.
+   * take a reference on its PixelRef object. The Bitmap will remain locked until this Pixmap
+   * and all its copies go out of scope or are reset.
    */
   void reset(Bitmap& bitmap);
 
