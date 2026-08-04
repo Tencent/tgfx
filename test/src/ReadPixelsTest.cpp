@@ -194,12 +194,12 @@ TGFX_TEST(ReadPixelsTest, PixmapCopySharesLock) {
   Buffer readBuf(copy.info().byteSize());
   EXPECT_TRUE(copy.readPixels(copy.info(), readBuf.data()));
 
-  // Copy assignment path: assigning another Pixmap-from-Bitmap into an existing Pixmap must
-  // release the previous lock guard atomically without touching the shared one still held by
-  // copy. This exercises operator= and makes sure reset semantics stay symmetric.
-  Pixmap another(bitmap);
-  another = copy;
-  EXPECT_EQ(another.pixels(), originalPixels);
+  // Copy assignment path: assigning another live Pixmap-from-Bitmap into an empty Pixmap must
+  // participate in the same shared lock guard, so both instances hold a reference and neither
+  // releases the mutex until both are destroyed.
+  Pixmap assigned;
+  assigned = copy;
+  EXPECT_EQ(assigned.pixels(), originalPixels);
 }
 
 TGFX_TEST(ReadPixelsTest, Surface) {
