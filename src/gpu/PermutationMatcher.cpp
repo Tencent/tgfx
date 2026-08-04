@@ -439,17 +439,12 @@ static std::optional<PermutationMatchResult> TryMatchQuadColorFill(const Program
   if (xpType < 0) {
     return std::nullopt;
   }
-  auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
   using VD = QuadColorFillShader::VD;
-  auto vertDomain = VD::domain();
-  std::vector<int> vertValues(VD::COUNT, 0);
-  vertValues[VD::HAS_COVERAGE] = quadGP->getAAType() == AAType::Coverage ? 1 : 0;
-  auto vertIndex = vertDomain.encode(vertValues);
+  auto vertIndex = VD::domain().encode({});
 
   using FD = QuadColorFillShader::FD;
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT, 0);
-  fragValues[FD::HAS_COVERAGE] = quadGP->getAAType() == AAType::Coverage ? 1 : 0;
   fragValues[FD::HAS_XP] = xpType;
   fragValues[FD::HAS_MASK_TEXTURE] = hasMaskTexture ? 1 : 0;
   auto fragIndex = fragDomain.encode(fragValues);
@@ -511,7 +506,6 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   using VD = QuadTextureFillShader::VD;
   auto vertDomain = VD::domain();
   std::vector<int> vertValues(VD::COUNT, 0);
-  vertValues[VD::HAS_COVERAGE] = quadGP->getAAType() == AAType::Coverage ? 1 : 0;
   vertValues[VD::HAS_UV_COORD] = !quadGP->hasUVMatrix() ? 1 : 0;
   vertValues[VD::HAS_SUBSET] = gpSubset ? 1 : 0;
   vertValues[VD::HAS_LOCAL_MASK] = hasLocalMask ? 1 : 0;
@@ -523,7 +517,6 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   // ALPHA_ONLY and HAS_RGBAAA are now runtime uniforms (set by GLSLTextureEffect::onSetData), not
   // variants.
   fragValues[FD::HAS_SUBSET] = gpSubset ? 1 : 0;
-  fragValues[FD::HAS_COVERAGE] = quadGP->getAAType() == AAType::Coverage ? 1 : 0;
   fragValues[FD::HAS_XP] = xpType;
   fragValues[FD::HAS_MASK_TEXTURE] = hasMaskTexture ? 1 : 0;
   fragValues[FD::HAS_LOCAL_MASK] = hasLocalMask ? 1 : 0;

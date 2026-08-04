@@ -26,7 +26,8 @@ namespace tgfx {
 /// Covers the common drawImage path where vertices are pre-transformed to device space.
 ///
 /// Vertex dimensions (driven by QuadPerEdgeAAGeometryProcessor configuration):
-///   HAS_COVERAGE       (bool): AA coverage attribute present
+///   (per-vertex coverage is unconditional: providers emit 1.0 for non-AA draws, so the
+///    vCoverage varying is the only coverage path and HAS_COVERAGE no longer exists)
 ///   HAS_UV_COORD       (bool): explicit UV coordinate attribute present
 ///   (per-vertex color is unconditional: providers always write a color slot, broadcasting the
 ///    record's paint color for uniform-color batches)
@@ -42,10 +43,9 @@ class QuadTextureFillShader : public PrecompiledShader {
  public:
   // Vertex dimensions
   struct VertDims {
-    enum : uint32_t { HAS_COVERAGE, HAS_UV_COORD, HAS_SUBSET, HAS_LOCAL_MASK, COUNT };
+    enum : uint32_t { HAS_UV_COORD, HAS_SUBSET, HAS_LOCAL_MASK, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationBool("HAS_COVERAGE"),
           PermutationBool("HAS_UV_COORD"),
           PermutationBool("HAS_SUBSET"),
           PermutationBool("HAS_LOCAL_MASK"),
@@ -53,19 +53,17 @@ class QuadTextureFillShader : public PrecompiledShader {
     }
   };
   using VD = VertDims;
-  static_assert(VD::COUNT == 4, "Update ShouldCompile when vertex dimensions change.");
+  static_assert(VD::COUNT == 3, "Update ShouldCompile when vertex dimensions change.");
 
-  // Fragment dimensions (includes vertex-driven HAS_COVERAGE because the fragment
-  // shader must declare matching varyings)
+  // Fragment dimensions
   // ALPHA_ONLY and HAS_RGBAAA are intentionally NOT dimensions: both are pure fragment math
   // (alpha-only replicates .r; RGBAAA adds one coherent-branch alpha sample), so they are runtime
   // uniforms (AlphaOnly / HasRgbaaa) rather than compile-time permutations, shrinking the variants.
   struct FragDims {
-    enum : uint32_t { HAS_SUBSET, HAS_COVERAGE, HAS_XP, HAS_MASK_TEXTURE, HAS_LOCAL_MASK, COUNT };
+    enum : uint32_t { HAS_SUBSET, HAS_XP, HAS_MASK_TEXTURE, HAS_LOCAL_MASK, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationBool("HAS_SUBSET"),
-          PermutationBool("HAS_COVERAGE"),
           PermutationInt("HAS_XP", 3),
           PermutationBool("HAS_MASK_TEXTURE"),
           PermutationBool("HAS_LOCAL_MASK"),
@@ -73,7 +71,7 @@ class QuadTextureFillShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 5, "Update ShouldCompile when fragment dimensions change.");
+  static_assert(FD::COUNT == 4, "Update ShouldCompile when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"QuadTextureFillShader",
@@ -90,7 +88,7 @@ class QuadTextureFillShader : public PrecompiledShader {
  private:
   static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>&,
                             const std::vector<int>& fragValues) {
-    // HAS_SUBSET / HAS_COVERAGE / HAS_LOCAL_MASK vertex and fragment agreement is
+    // HAS_SUBSET / HAS_LOCAL_MASK vertex and fragment agreement is
     // enforced automatically by the framework (MirroredDimsAgree).
     if (fragValues[FD::HAS_LOCAL_MASK] != 0) {
       // Local-space and device-space masks are mutually exclusive coverage sources.

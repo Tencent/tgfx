@@ -27,26 +27,29 @@ namespace tgfx {
 /// Covers solid-color AA quad rendering with optional per-vertex coverage and per-vertex color.
 class QuadColorFillShader : public PrecompiledShader {
  public:
-  // Vertex dimensions (unchanged — XP does not affect vertex stage)
-  TGFX_DEFINE_DIMS(HAS_COVERAGE);
-  using VD = Dims;
+  // No vertex dimensions: coverage and color are both unconditional attributes.
+  struct VertDims {
+    static PermutationDomain domain() {
+      return PermutationDomain({});
+    }
+  };
+  using VD = VertDims;
 
   // Fragment dimensions (adds HAS_XP and HAS_MASK_TEXTURE). HAS_MASK_TEXTURE is orthogonal to the
   // per-vertex geometry AA coverage (HAS_COVERAGE): it samples a device-space mask texture and
   // multiplies it into the color, composing with the geometry AA. Placed last to keep existing
   // dimension indices stable.
   struct FragDims {
-    enum : uint32_t { HAS_COVERAGE, HAS_XP, HAS_MASK_TEXTURE, COUNT };
+    enum : uint32_t { HAS_XP, HAS_MASK_TEXTURE, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationBool("HAS_COVERAGE"),
           PermutationInt("HAS_XP", 3),
           PermutationBool("HAS_MASK_TEXTURE"),
       });
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 3, "Update ShouldCompile below when dimensions change.");
+  static_assert(FD::COUNT == 2, "Update ShouldCompile below when dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"QuadColorFillShader",

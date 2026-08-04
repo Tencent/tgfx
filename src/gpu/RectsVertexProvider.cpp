@@ -158,7 +158,12 @@ class NonAARectsVertexProvider : public RectsVertexProvider {
   }
 
   size_t vertexCount() const override {
-    size_t perVertexCount = bitFields.hasUVCoord ? 4 : 2;
+    // Coverage occupies a slot only when the consumer is a QuadPerEdgeAA fill kernel
+    // (writeCoverage); non-AA rects then emit 1.0.
+    size_t perVertexCount = bitFields.hasUVCoord ? 5 : 3;
+    if (!bitFields.writeCoverage) {
+      perVertexCount -= 1;
+    }
     if (bitFields.writeColor) {
       perVertexCount += 1;
     }
@@ -197,6 +202,9 @@ class NonAARectsVertexProvider : public RectsVertexProvider {
       for (size_t j = 4; j >= 1; --j) {
         vertices[index++] = quad.point(j - 1).x;
         vertices[index++] = quad.point(j - 1).y;
+        if (bitFields.writeCoverage) {
+          vertices[index++] = 1.0f;  // coverage: full for non-AA rects
+        }
         if (bitFields.hasUVCoord) {
           vertices[index++] = uvQuad.point(j - 1).x;
           vertices[index++] = uvQuad.point(j - 1).y;
@@ -439,6 +447,9 @@ class NonAAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
     for (size_t i = 0; i < 4; ++i) {
       vertices[index++] = quad.point(i).x;
       vertices[index++] = quad.point(i).y;
+      if (bitFields.writeCoverage) {
+        vertices[index++] = 1.0f;  // coverage: full for non-AA strokes
+      }
       if (bitFields.hasUVCoord) {
         vertices[index++] = uvQuad.point(i).x;
         vertices[index++] = uvQuad.point(i).y;
@@ -452,6 +463,9 @@ class NonAAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
   size_t vertexCount() const override {
     size_t perVertexCount = lineJoin() == LineJoin::Miter ? 8 : 12;  // outer edge only
     size_t perVertexDataSize = 2;                                    // x, y
+    if (bitFields.writeCoverage) {
+      perVertexDataSize += 1;
+    }
     if (bitFields.hasUVCoord) {
       perVertexDataSize += 2;
     }
@@ -849,6 +863,9 @@ PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(BlockAllocator* 
   }
   if (provider != nullptr) {
     provider->bitFields.writeColor = forceColor;
+    // Coverage follows the same contract: the slot exists iff the consumer is a QuadPerEdgeAA
+    // fill kernel (forceColor callers) or the draw itself is AA.
+    provider->bitFields.writeCoverage = forceColor || aaType == AAType::Coverage;
   }
   return provider;
 }
@@ -888,6 +905,7 @@ PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(
     }
     if (provider != nullptr) {
       provider->bitFields.writeColor = forceColor || hasColor;
+      provider->bitFields.writeCoverage = forceColor || aaType == AAType::Coverage;
     }
     return provider;
   }
@@ -922,6 +940,7 @@ PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(
       hasColor, allocator->addReference(), std::move(colorSpace));
   if (provider != nullptr) {
     provider->bitFields.writeColor = true;
+    provider->bitFields.writeCoverage = true;
   }
   return provider;
 }
@@ -939,5 +958,6 @@ RectsVertexProvider::RectsVertexProvider(PlacementArray<RectRecord>&& rects,
   bitFields.hasColor = hasColor;
   bitFields.subsetMode = static_cast<uint8_t>(subsetMode);
   bitFields.writeColor = forceColor || hasColor;
+  bitFields.writeCoverage = forceColor || aaType == AAType::Coverage;
 }
 }  // namespace tgfx

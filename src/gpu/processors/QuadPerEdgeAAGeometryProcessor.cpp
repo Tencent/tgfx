@@ -26,9 +26,9 @@ QuadPerEdgeAAGeometryProcessor::QuadPerEdgeAAGeometryProcessor(int width, int he
     : GeometryProcessor(ClassID()), width(width), height(height), aa(aa), commonColor(commonColor),
       uvMatrix(uvMatrix), hasSubset(hasSubset) {
   position = {"aPosition", VertexFormat::Float2};
-  if (aa == AAType::Coverage) {
-    coverage = {"inCoverage", VertexFormat::Float};
-  }
+  // The coverage attribute is unconditional: rect providers emit 1.0 for non-AA draws, so the
+  // fill kernels read the vCoverage varying on every path instead of branching on HAS_COVERAGE.
+  coverage = {"inCoverage", VertexFormat::Float};
   if (!uvMatrix.has_value()) {
     uvCoord = {"uvCoord", VertexFormat::Float2};
   }

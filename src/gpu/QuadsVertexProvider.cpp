@@ -424,13 +424,14 @@ class NonAAQuadsVertexProvider : public QuadsVertexProvider {
   }
 
   size_t vertexCount() const override {
-    // Each quad = 4 vertices, vertex data: position(2) + [uv(2)] + [color(1)]
-    size_t perVertexCount = 2;
+    // Each quad = 4 vertices, vertex data: position(2) + coverage(1) + [uv(2)] + [color(1)].
+    // Coverage and color are unconditional for QuadPerEdgeAAGeometryProcessor; non-AA quads emit
+    // coverage 1.0.
+    size_t perVertexCount = 3;
     if (_hasUVCoord) {
       perVertexCount += 2;
     }
-    perVertexCount +=
-        1;  // The color attribute is unconditional for QuadPerEdgeAAGeometryProcessor.
+    perVertexCount += 1;
     return quads.size() * 4 * perVertexCount;
   }
 
@@ -451,6 +452,7 @@ class NonAAQuadsVertexProvider : public QuadsVertexProvider {
         const auto& p = transformedQuad.point(j);
         vertices[index++] = p.x;
         vertices[index++] = p.y;
+        vertices[index++] = 1.0f;  // coverage: full for non-AA quads
         if (_hasUVCoord) {
           const auto& uv = record->quad.point(j);
           vertices[index++] = uv.x;

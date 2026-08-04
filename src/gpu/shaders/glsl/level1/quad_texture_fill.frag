@@ -1,9 +1,9 @@
 // QuadTextureFillShader fragment shader
 // Processor layout: QuadPerEdgeAAGeometryProcessor + TextureEffect + EmptyXferProcessor/PorterDuffXP
-// Permutation dimensions (frag): HAS_YUV, ALPHA_ONLY, HAS_RGBAAA, HAS_SUBSET, HAS_COVERAGE,
+// Permutation dimensions (frag): HAS_SUBSET, HAS_XP, HAS_MASK_TEXTURE, HAS_LOCAL_MASK (coverage is unconditional).
 //                                HAS_XP
 // Note: HAS_YUV is always 0 at runtime — YUV textures fall back to ProgramBuilder.
-// Vertex-driven varyings are controlled by vert permutation dimensions (HAS_COVERAGE,
+// Vertex-driven varyings are controlled by vert permutation dimensions (
 // HAS_SUBSET) which are communicated via matching varying declarations.
 //
 // Subset clamping modes:
@@ -24,9 +24,6 @@
 
 // These are driven by vertex shader permutation but the fragment shader must declare matching
 // varyings. The build tool defines them for each (vert, frag) pair.
-#ifndef HAS_COVERAGE
-#define HAS_COVERAGE 0
-#endif
 #ifndef HAS_XP
 #define HAS_XP 0
 #endif
@@ -62,9 +59,7 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 
 layout(location = 0) in vec3 TransformedCoords_0;
 
-#if HAS_COVERAGE
 layout(location = 1) in float vCoverage;
-#endif
 
 layout(location = 2) in vec4 vColor;
 
@@ -157,25 +152,18 @@ void main() {
 #endif
 
 #if HAS_XP
-  #if HAS_LOCAL_MASK && HAS_COVERAGE
+  // vCoverage is 1.0 for non-AA draws, so folding it in is a no-op there.
+  #if HAS_LOCAL_MASK
   fragColor = applyPorterDuffXP(color, vec4(localMaskAlpha * vCoverage));
-  #elif HAS_LOCAL_MASK
-  fragColor = applyPorterDuffXP(color, vec4(localMaskAlpha));
-  #elif HAS_COVERAGE
-  fragColor = applyPorterDuffXP(color, vec4(vCoverage));
   #else
-  fragColor = applyPorterDuffXP(color, vec4(1.0));
+  fragColor = applyPorterDuffXP(color, vec4(vCoverage));
   #endif
 #else
   // Apply coverage modulation.
   #if HAS_LOCAL_MASK
   color *= localMaskAlpha;
   #endif
-  #if HAS_COVERAGE
   fragColor = color * vCoverage;
-  #else
-  fragColor = color;
-  #endif
 #endif
 #include "output_swizzle.inc"
 }

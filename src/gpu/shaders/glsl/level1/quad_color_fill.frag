@@ -1,15 +1,12 @@
 // QuadColorFillShader fragment shader
 // Processor layout: QuadPerEdgeAAGeometryProcessor + EmptyXferProcessor/PorterDuffXP (no FP)
-// Permutation dimensions: HAS_COVERAGE, HAS_XP
+// Permutation dimensions: HAS_XP, HAS_MASK_TEXTURE
 //
-// Color comes only from the vColor varying: rect vertex providers always write a color slot,
-// broadcasting the record's paint color for uniform-color batches, so the Color uniform and the
-// HAS_COLOR dimension no longer exist here.
+// Color comes only from the vColor varying and coverage only from vCoverage: providers broadcast
+// the paint color for uniform-color batches and emit coverage=1.0 for non-AA draws, so neither
+// HAS_COLOR nor HAS_COVERAGE exists as a dimension.
 #version 450
 
-#ifndef HAS_COVERAGE
-#define HAS_COVERAGE 0
-#endif
 #ifndef HAS_XP
 #define HAS_XP 0
 #endif
@@ -30,10 +27,7 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 };
 #endif
 
-#if HAS_COVERAGE
 layout(location = 0) in float vCoverage;
-#endif
-
 layout(location = 1) in vec4 vColor;
 
 // The mask texture (device-space coverage) occupies binding 0; the XP dst texture, if any, follows.
@@ -60,17 +54,9 @@ void main() {
 #endif
 
 #if HAS_XP
-  #if HAS_COVERAGE
   fragColor = applyPorterDuffXP(outputColor, vec4(vCoverage));
-  #else
-  fragColor = applyPorterDuffXP(outputColor, vec4(1.0));
-  #endif
 #else
-  // EmptyXferProcessor: output = outputColor * outputCoverage
-  #if HAS_COVERAGE
+  // EmptyXferProcessor: output = outputColor * outputCoverage (1.0 for non-AA, so it is a no-op).
   fragColor = outputColor * vCoverage;
-  #else
-  fragColor = outputColor;
-  #endif
 #endif
 }

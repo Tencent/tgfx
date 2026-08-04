@@ -145,6 +145,9 @@ class RectsVertexProvider : public VertexProvider {
     // When true the color slot is written even for uniform-color batches, because the consuming
     // geometry processor (QuadPerEdgeAA fill kernels) declares the color attribute unconditionally.
     bool writeColor : 1;
+    // Same contract for coverage: QuadPerEdgeAA fill kernels always read vCoverage, so non-AA
+    // providers feeding them emit coverage 1.0. Providers for other GPs skip the slot entirely.
+    bool writeCoverage : 1;
   } bitFields = {};
 
   RectsVertexProvider(PlacementArray<RectRecord>&& rects, PlacementArray<Rect>&& uvRects,

@@ -1,14 +1,11 @@
 // QuadTextureFillShader vertex shader
 // Processor layout: QuadPerEdgeAAGeometryProcessor + TextureEffect + EmptyXferProcessor
-// Permutation dimensions (vert): HAS_COVERAGE, HAS_UV_COORD, HAS_SUBSET (color is always a per-vertex attribute)
+// Permutation dimensions (vert): HAS_UV_COORD, HAS_SUBSET (coverage and color are unconditional attributes)
 // The transformed coordinate is always emitted as a vec3 and perspective-divided in the fragment
 // shader. For affine transforms the third row of CoordTransformMatrix_0 is [0,0,1], so the divisor
 // is 1.0 and the division is a no-op; this lets one shader serve both affine and perspective.
 #version 450
 
-#ifndef HAS_COVERAGE
-#define HAS_COVERAGE 0
-#endif
 #ifndef HAS_UV_COORD
 #define HAS_UV_COORD 0
 #endif
@@ -36,13 +33,11 @@ layout(std140, set = 0, binding = 0) uniform VertexUniformBlock {
 layout(location = 0) in vec2 aPosition;
 
 // Compute compact attribute locations: each optional attribute gets the next
-// available index after position (0). Order: coverage, uvCoord, color, subset.
-#if HAS_COVERAGE
+// available index after position (0). Coverage is unconditional — QuadPerEdgeAAGeometryProcessor
+// always provides it (1.0 for non-AA draws) — so it always occupies location 1.
+// Order: coverage, uvCoord, color, subset.
   #define LOC_COVERAGE 1
   #define LOC_AFTER_COVERAGE 2
-#else
-  #define LOC_AFTER_COVERAGE 1
-#endif
 
 #if HAS_UV_COORD
   #if LOC_AFTER_COVERAGE == 1
@@ -81,9 +76,7 @@ layout(location = 0) in vec2 aPosition;
   #endif
 #endif
 
-#if HAS_COVERAGE
 layout(location = LOC_COVERAGE) in float inCoverage;
-#endif
 
 #if HAS_UV_COORD
 layout(location = LOC_UV_COORD) in vec2 uvCoord;
@@ -97,9 +90,7 @@ layout(location = LOC_SUBSET) in vec4 texSubset;
 
 layout(location = 0) out vec3 TransformedCoords_0;
 
-#if HAS_COVERAGE
 layout(location = 1) out float vCoverage;
-#endif
 
 layout(location = 2) out vec4 vColor;
 
@@ -115,9 +106,7 @@ layout(location = 4) out vec3 TransformedCoords_1;
 
 void main() {
   // Position is already in device space (normalized window coordinates).
-#if HAS_COVERAGE
   vCoverage = inCoverage;
-#endif
 
   vColor = inColor;
 
