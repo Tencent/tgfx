@@ -50,6 +50,25 @@ class DrawPolygon3D {
                 int sequenceIndex, float alpha, bool antiAlias);
 
   /**
+   * Constructs a polygon from an explicit clipped convex polygon on the local z=0 plane. Used for
+   * leaves that straddle the near plane: every vertex in `localPolygon` is guaranteed to project
+   * with w > 0 by the homogeneous clip, so re-projecting through `matrix` is safe. The polygon is
+   * marked as split so it renders through toQuads() fan decomposition instead of a single quad.
+   * @param layer The source layer; rasterized lazily during compositing.
+   * @param localBounds AABB bounding the polygon; also serves as the UV reference frame for the
+   * raster image in drawQuads.
+   * @param matrix The 3D transformation applied to the local-space vertices.
+   * @param localPolygon Clipped polygon vertices in local z=0 space, in clip order.
+   * @param depth The depth level in the layer tree (used for sorting coplanar polygons).
+   * @param sequenceIndex The sequence index within the same depth level.
+   * @param alpha Accumulated alpha through the layer's parent chain.
+   * @param antiAlias Whether edge antialiasing is requested.
+   */
+  DrawPolygon3D(Layer* layer, const Rect& localBounds, const Matrix3D& matrix,
+                std::vector<Point> localPolygon, int depth, int sequenceIndex, float alpha,
+                bool antiAlias);
+
+  /**
    * Splits the given polygon by this polygon's plane.
    * For coplanar polygons, larger sequenceIndex goes to front (drawn later, appears on top).
    * @param polygon The polygon to split (ownership will be transferred).

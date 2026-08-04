@@ -23,6 +23,7 @@
 #include <vector>
 #include "Layer3DContext.h"
 #include "tgfx/core/Image.h"
+#include "tgfx/core/Rect.h"
 
 namespace tgfx {
 
@@ -64,6 +65,14 @@ class Render3DContext : public Layer3DContext {
     Matrix density = Matrix::I();
     int rasterWidth = 0;
     int rasterHeight = 0;
+    // True when the leaf straddles the near plane (at least one corner has w <= 0). In that case
+    // `visiblePolygon` holds the clipped convex polygon and must be used as the compositing
+    // geometry: re-projecting the `visibleLocal` AABB corners could land behind the camera and
+    // mirror the quad.
+    bool straddlesNearPlane = false;
+    // Clipped polygon vertices on the local z=0 plane (visibleLocal AABB bounds them). Only
+    // populated when straddlesNearPlane is true.
+    std::vector<Point> visiblePolygon = {};
   };
 
   void emitNode(Layer* layer, const Rect& localBounds, const Matrix3D& transform, float alpha,

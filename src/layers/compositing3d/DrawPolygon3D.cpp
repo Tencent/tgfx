@@ -80,6 +80,21 @@ DrawPolygon3D::DrawPolygon3D(Layer* layer, const Rect& localBounds, const Matrix
 }
 
 DrawPolygon3D::DrawPolygon3D(Layer* layer, const Rect& localBounds, const Matrix3D& matrix,
+                             std::vector<Point> localPolygon, int depth, int sequenceIndex,
+                             float alpha, bool antiAlias)
+    : _depth(depth), _sequenceIndex(sequenceIndex), _isSplit(true), _alpha(alpha),
+      _antiAlias(antiAlias), _layer(layer), _localBounds(localBounds), _matrix(matrix) {
+  // localPolygon comes from the homogeneous near-plane clip, so every vertex projects with
+  // w > 0 — re-projecting is safe and produces the true visible quad/polygon, unlike deriving
+  // corners from the AABB which could land behind the camera.
+  _points.reserve(localPolygon.size());
+  for (const auto& point : localPolygon) {
+    _points.push_back(matrix.mapPoint(Vec3(point.x, point.y, 0.0f)));
+  }
+  constructNormal();
+}
+
+DrawPolygon3D::DrawPolygon3D(Layer* layer, const Rect& localBounds, const Matrix3D& matrix,
                              std::vector<Vec3> points, const Vec3& normal, int depth,
                              int sequenceIndex, float alpha, bool antiAlias)
     : _points(std::move(points)), _normal(normal), _depth(depth), _sequenceIndex(sequenceIndex),

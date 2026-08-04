@@ -68,6 +68,22 @@ class Context3DCompositor {
                   float alpha, bool antiAlias);
 
   /**
+   * Adds a polygon from an explicit clipped convex polygon instead of a rect. Used for leaves
+   * that straddle the near plane: `visiblePolygon` is the homogeneous-clipped visible region on
+   * the local z=0 plane, every vertex of which projects with w > 0. `visibleLocal` is the AABB
+   * that bounds the polygon and also serves as the UV reference frame for the raster image.
+   * @param layer The layer this polygon represents (used as image cache key during traversal).
+   * @param visiblePolygon Clipped polygon vertices in local z=0 space (clip order).
+   * @param visibleLocal AABB bounding `visiblePolygon`, used for UV mapping.
+   * @param matrix The 3D transformation applied to the local-space vertices.
+   * @param depth The depth level in the layer tree (used for sorting coplanar polygons).
+   * @param alpha The layer alpha for transparency.
+   * @param antiAlias Whether to enable edge antialiasing when MSAA is unavailable.
+   */
+  void addPolygon(Layer* layer, const std::vector<Point>& visiblePolygon, const Rect& visibleLocal,
+                  const Matrix3D& matrix, int depth, float alpha, bool antiAlias);
+
+  /**
    * Builds the BSP tree from added polygons and returns fragments in back-to-front paint order.
    * The returned vector is owned by the compositor; pointers stay valid until flushToImage.
    * Each fragment carries a Layer* identifying which layer's raster image should be sampled when
