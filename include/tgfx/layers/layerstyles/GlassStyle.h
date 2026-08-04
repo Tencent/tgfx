@@ -25,6 +25,7 @@
 namespace tgfx {
 
 enum class GlassShapeType;
+struct GlassRefractionParams;
 
 /**
  * GlassStyle simulates the physical behavior of light passing through a glass surface, producing
@@ -145,12 +146,20 @@ class GlassStyle : public LayerStyle {
 
   void invalidateFrostFilter();
 
-  std::shared_ptr<ImageFilter> getRefractionFilter(
-      GlassShapeType shapeType, float cornerRadius, float halfWidth, float halfHeight,
-      float udfPixelToLayerPixelX, float udfPixelToLayerPixelY, float edgeSpanX, float edgeSpanY,
-      const Point& udfTextureOrigin, const Point& sourceOrigin,
-      const Point& sourcePixelToContentPixel, const Point& layerPixelToSourcePixel,
-      float contentWidth, float contentHeight, std::shared_ptr<Image> maskImage);
+  struct BackgroundMapping;
+  struct UDFSampling;
+
+  GlassRefractionParams makeBaseRefractionParams(float halfW, float halfH,
+                                                 const BackgroundMapping& mapping) const;
+
+  std::shared_ptr<ImageFilter> getSDFRefractionFilter(GlassShapeType shapeType, float cornerRadius,
+                                                      float halfWidth, float halfHeight,
+                                                      const BackgroundMapping& mapping);
+
+  std::shared_ptr<ImageFilter> getUDFRefractionFilter(float halfWidth, float halfHeight,
+                                                      const UDFSampling& udf,
+                                                      const BackgroundMapping& mapping,
+                                                      std::shared_ptr<Image> maskImage);
 
   float getRefractionFactor() const {
     return std::clamp(_refraction / 100.0f, 0.0f, 1.0f);

@@ -16,19 +16,40 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <optional>
-#include "tgfx/core/Rect.h"
+#include "layers/CanvasUtils.h"
+#include "tgfx/core/Canvas.h"
+#include "tgfx/core/Surface.h"
 
 namespace tgfx {
 
-class Canvas;
-
-/**
- * Returns the canvas clip bounds in the layer's local coordinate space, or std::nullopt if the
- * canvas cannot provide a meaningful clip (e.g. no canvas or no surface to derive bounds from).
- */
-std::optional<Rect> GetClipBounds(const Canvas* canvas);
+std::optional<Rect> GetClipBounds(const Canvas* canvas) {
+  if (canvas == nullptr) {
+    return std::nullopt;
+  }
+  const auto clipBounds = canvas->getTotalClipBounds();
+  auto clipRect = Rect::MakeEmpty();
+  auto surface = canvas->getSurface();
+  if (!clipBounds.has_value()) {
+    if (!surface) {
+      return std::nullopt;
+    }
+    clipRect = Rect::MakeWH(surface->width(), surface->height());
+  } else {
+    clipRect = *clipBounds;
+    if (surface && !clipRect.intersect(Rect::MakeWH(surface->width(), surface->height()))) {
+      return Rect::MakeEmpty();
+    }
+  }
+  if (clipRect.isEmpty()) {
+    return Rect::MakeEmpty();
+  }
+  auto inverse = Matrix::I();
+  if (!canvas->getMatrix().invert(&inverse)) {
+    return Rect::MakeEmpty();
+  }
+  clipRect = inverse.mapRect(clipRect);
+  clipRect.roundOut();
+  return clipRect;
+}
 
 }  // namespace tgfx

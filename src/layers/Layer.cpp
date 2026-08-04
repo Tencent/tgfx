@@ -174,7 +174,7 @@ static std::shared_ptr<Layer3DContext> Create3DContext(const DrawArgs& args, Can
   }
 
   // The processing area of the compositor is consistent with the actual effective drawing area.
-  auto clipBounds = GetCanvasLocalClipBounds(canvas);
+  auto clipBounds = GetClipBounds(canvas);
 
   auto validRenderRect = bounds;
   // The clip bounds may be slightly larger than the dirty region.
@@ -853,7 +853,7 @@ bool Layer::hitTestPoint(float x, float y, bool shapeHitTest) {
 static Rect GetClippedBounds(const Rect& bounds, const Canvas* canvas) {
   DEBUG_ASSERT(canvas != nullptr);
   auto clippedBounds = bounds;
-  auto clipRect = GetCanvasLocalClipBounds(canvas);
+  auto clipRect = GetClipBounds(canvas);
   if (!clipRect.has_value()) {
     return clippedBounds;
   }
@@ -1182,7 +1182,7 @@ bool Layer::prepareMask(const DrawArgs& args, Canvas* canvas,
   if (!hasValidMask()) {
     return true;
   }
-  auto clipBounds = GetCanvasLocalClipBounds(canvas);
+  auto clipBounds = GetClipBounds(canvas);
   auto contentScale = canvas->getMatrix().getMaxScale();
   auto maskData = getMaskData(args, contentScale, clipBounds);
   if (maskData.maskFilter == nullptr) {
@@ -1492,7 +1492,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   // still invoke this path inside a 3D context — that's fine, render3DContext is irrelevant here.
   DEBUG_ASSERT(!canPreserve3D());
 
-  auto clipBounds = GetCanvasLocalClipBounds(canvas);
+  auto clipBounds = GetClipBounds(canvas);
   auto result = OffscreenResult{};
 
   if (shouldPassThroughBackground(blendMode) && canvas->getSurface()) {
@@ -1608,7 +1608,7 @@ bool Layer::drawContourInternal(const DrawArgs& args, Canvas* canvas, bool conte
   std::shared_ptr<MaskFilter> maskFilter = nullptr;
   if (!contentOnly && hasValidMask()) {
     auto contentScale = canvas->getMatrix().getMaxScale();
-    auto clipBounds = GetCanvasLocalClipBounds(canvas);
+    auto clipBounds = GetClipBounds(canvas);
     auto maskData = getMaskData(args, contentScale, clipBounds);
     if (maskData.maskFilter == nullptr) {
       if (maskData.clipPath.isEmpty() && !maskData.clipPath.isInverseFillType()) {
