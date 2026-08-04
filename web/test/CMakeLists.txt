@@ -125,8 +125,10 @@ target_compile_options(tgfx-test PRIVATE
 
 if (TGFX_USE_WEBGPU)
     set(WEB_GRAPHICS_LINK_OPTIONS -sUSE_WEBGPU=1)
+    set(WEB_EXPORTED_RUNTIME_METHODS "-sEXPORTED_RUNTIME_METHODS=['FS','ccall','cwrap','GL','WebGPU']")
 else ()
     set(WEB_GRAPHICS_LINK_OPTIONS -sMAX_WEBGL_VERSION=2)
+    set(WEB_EXPORTED_RUNTIME_METHODS "-sEXPORTED_RUNTIME_METHODS=['FS','ccall','cwrap','GL']")
 endif ()
 
 # Asyncify enables synchronous C++ code to await JS Promises.
@@ -171,7 +173,7 @@ target_link_options(tgfx-test PRIVATE
     -sSTACK_SIZE=1MB
     -sEXPORT_NAME='TGFXTest'
     -sEXPORTED_FUNCTIONS=['_RunAllTests','_RunTest']
-    -sEXPORTED_RUNTIME_METHODS=['FS','ccall','cwrap','GL','WebGPU']
+    ${WEB_EXPORTED_RUNTIME_METHODS}
     -sMODULARIZE=1
     -sEXPORT_ES6=1
     -sENVIRONMENT=web,worker
