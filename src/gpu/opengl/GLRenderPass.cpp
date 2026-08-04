@@ -37,7 +37,9 @@ bool GLRenderPass::begin() {
   bindFramebuffer();
   auto state = _gpu->state();
   auto gl = _gpu->functions();
-  // Scissor is only needed to limit stencil clear; draws and color clear don't benefit from it.
+  // Scissor starts disabled so a stale rect from a previous pass cannot restrict the clears
+  // below and leave stale pixels outside it. It is only enabled around the stencil clear when
+  // clearScissor is set, and re-applied per draw via setScissorRect().
   state->setEnabled(GL_SCISSOR_TEST, false);
   auto& depthStencilAttachment = descriptor.depthStencilAttachment;
   if (depthStencilAttachment.texture != nullptr) {
