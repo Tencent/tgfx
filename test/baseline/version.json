@@ -561,6 +561,7 @@
         "widegamut": "cd158924"
     },
     "StencilCoverPath": {
+        "BottomLeftEquivalence": "5e7bc5fdc",
         "BrushBlendModePlus": "05d517c72",
         "BrushColorFilterInvert": "05d517c72",
         "BrushScaleRotate": "05d517c72",
@@ -584,8 +585,11 @@
         "ImageShaderTransform": "05d517c72",
         "InversePentagon": "05d517c72",
         "Lollipop": "05d517c72",
+        "MixRectDrawOp": "be15d1024",
         "NarrowEllipse": "05d517c72",
         "NoiseShaderTransform": "05d517c72",
+        "ReuseOverpasses": "6d14558cd",
+        "ReuseOverpasses_Redraw": "6d14558cd",
         "RoundedRect": "05d517c72",
         "SemicircleQuad": "05d517c72",
         "SpiralCubic": "05d517c72",

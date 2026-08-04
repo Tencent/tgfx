@@ -202,7 +202,7 @@ class OpsCompositor {
                        ClipStack currentClip = {}, Brush currentBrush = {});
   void flushPendingShapeOps();
   void flushPendingStencilCoverOps();
-  bool shouldUseStencilCover(const Brush& brush) const;
+  bool shouldUseStencilCover(const Brush& brush, const Shape& shape) const;
   void resetPendingOps(PendingOpType currentType = PendingOpType::Unknown,
                        ClipStack currentClip = {}, Brush currentBrush = {});
   AAType getAAType(const Brush& brush) const;

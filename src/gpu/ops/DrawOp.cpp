@@ -18,6 +18,8 @@
 
 #include "DrawOp.h"
 #include <algorithm>
+#include "core/utils/MathExtra.h"
+#include "gpu/OriginFlip.h"
 
 namespace tgfx {
 void DrawOp::applyScissor(RenderPass* renderPass, RenderTarget* renderTarget) const {
@@ -25,15 +27,17 @@ void DrawOp::applyScissor(RenderPass* renderPass, RenderTarget* renderTarget) co
     renderPass->setScissorRect(0, 0, renderTarget->width(), renderTarget->height());
     return;
   }
-  // Clamp scissor rect to render target bounds. Without this clamping, an out-of-bounds
-  // scissor produced by clipping (e.g. when the clip extends past the device) can trip
-  // backend validation errors or be silently rejected by the driver.
-  int scissorX = std::max(0, static_cast<int>(scissorRect.x()));
-  int scissorY = std::max(0, static_cast<int>(scissorRect.y()));
-  int scissorRight =
-      std::min(renderTarget->width(), static_cast<int>(scissorRect.x() + scissorRect.width()));
-  int scissorBottom =
-      std::min(renderTarget->height(), static_cast<int>(scissorRect.y() + scissorRect.height()));
+  // scissorRect lives in canvas top-left device space. Flip it into the backend's scissor
+  // origin space just before handing off — GL windows use BottomLeft and expect the flipped
+  // rect, other backends (Metal/Vulkan/WebGPU) keep TopLeft and the helper is a no-op.
+  auto flipped = scissorRect;
+  FlipYIfNeeded(&flipped, renderTarget);
+  // roundOut + clamp to rt extent: partial-pixel truncation drops geometry; out-of-bounds
+  // scissors are silently rejected by some drivers.
+  int scissorX = std::max(0, FloatFloorToInt(flipped.left));
+  int scissorY = std::max(0, FloatFloorToInt(flipped.top));
+  int scissorRight = std::min(renderTarget->width(), FloatCeilToInt(flipped.right));
+  int scissorBottom = std::min(renderTarget->height(), FloatCeilToInt(flipped.bottom));
   int scissorWidth = std::max(0, scissorRight - scissorX);
   int scissorHeight = std::max(0, scissorBottom - scissorY);
   renderPass->setScissorRect(scissorX, scissorY, scissorWidth, scissorHeight);

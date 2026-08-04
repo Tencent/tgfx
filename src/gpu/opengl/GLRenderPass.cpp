@@ -37,9 +37,9 @@ bool GLRenderPass::begin() {
   bindFramebuffer();
   auto state = _gpu->state();
   auto gl = _gpu->functions();
-  // Disable scissor test before any clear. glClear is affected by the scissor test, so a scissor
-  // rect left enabled by a previous render pass would restrict the clear to that region, leaving
-  // stale values outside it.
+  // Scissor starts disabled so a stale rect from a previous pass cannot restrict the clears
+  // below and leave stale pixels outside it. It is only enabled around the stencil clear when
+  // clearScissor is set, and re-applied per draw via setScissorRect().
   state->setEnabled(GL_SCISSOR_TEST, false);
   auto& depthStencilAttachment = descriptor.depthStencilAttachment;
   if (depthStencilAttachment.texture != nullptr) {
@@ -55,9 +55,20 @@ bool GLRenderPass::begin() {
     }
 #endif
     if (depthStencilAttachment.loadAction == LoadAction::Clear) {
+      bool hasScissor = depthStencilAttachment.clearScissor.has_value() &&
+                        !depthStencilAttachment.clearScissor->isEmpty();
+      if (hasScissor) {
+        auto& s = *depthStencilAttachment.clearScissor;
+        state->setScissorRect(static_cast<int>(s.left), static_cast<int>(s.top),
+                              static_cast<int>(s.width()), static_cast<int>(s.height()));
+        state->setEnabled(GL_SCISSOR_TEST, true);
+      }
       gl->clearDepthf(depthStencilAttachment.depthClearValue);
       gl->clearStencil(static_cast<int>(depthStencilAttachment.stencilClearValue));
       gl->clear(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+      if (hasScissor) {
+        state->setEnabled(GL_SCISSOR_TEST, false);
+      }
     }
   }
   auto& colorAttachment = descriptor.colorAttachments[0];

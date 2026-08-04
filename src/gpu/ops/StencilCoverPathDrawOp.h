@@ -25,7 +25,6 @@
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/PathTypes.h"
 #include "tgfx/core/Rect.h"
-#include "tgfx/gpu/RenderPipeline.h"
 
 namespace tgfx {
 /**
@@ -85,6 +84,27 @@ class StencilCoverPathDrawOp : public DrawOp {
     return true;
   }
 
+  // Returns the cover quad's device-space footprint intersected with the op's user scissor,
+  // in canvas top-left device space. Both coverDeviceBounds and scissorRect are published in
+  // that space (scissorRect via OpsCompositor::applyClip, which no longer Y-flips upfront), so
+  // the intersect below is a well-defined rect in a single, consistent coordinate space.
+  // Intersecting with scissorRect keeps the stencil clear tight when the clip shrinks the
+  // cover area, matching the way applyStencilScissor constrains the stencil pass to the
+  // cover quad ∩ clip. When the clip fully clips out the cover region an empty rect is
+  // returned, signalling "known to write nothing" so the pass omits this op from the clear
+  // union without falling back to a full clear. OpsRenderTask converts the aggregated rect to
+  // backend scissor space in one place (right before setting clearScissor).
+  std::optional<Rect> getStencilResolveBounds() const override {
+    if (scissorRect.isEmpty()) {
+      return coverDeviceBounds;
+    }
+    auto clipped = coverDeviceBounds;
+    if (!clipped.intersect(scissorRect)) {
+      return Rect::MakeEmpty();
+    }
+    return clipped;
+  }
+
   void execute(RenderPass* renderPass, RenderTarget* renderTarget) override;
 
  protected:
@@ -113,12 +133,6 @@ class StencilCoverPathDrawOp : public DrawOp {
   // Stencil-pass GP. Made once at construction time so execute() can reuse it instead of
   // rebuilding the GP on every command-buffer encode pass.
   PlacementPtr<StencilCoverStencilPassGeometryProcessor> stencilGP = nullptr;
-
-  // Pre-computed depth/stencil descriptors. Both depend only on `fillType`, so caching them
-  // avoids running the small but per-op MakeStencilPassDS / MakeCoverPassDS branches each
-  // time execute() encodes the stencil and cover passes.
-  DepthStencilDescriptor stencilPassDS = {};
-  DepthStencilDescriptor coverPassDS = {};
 
   // Pre-computed cover-pass stencil reference value (depends only on fillType).
   uint32_t coverStencilRef = 0;
