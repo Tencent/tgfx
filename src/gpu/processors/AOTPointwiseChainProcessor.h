@@ -45,6 +45,10 @@ struct AOTChainSlot {
   AOTChainOp op = AOTChainOp::None;
   int in0 = -2;
   int in1 = -2;
+  // OP_TEXTURE only: 1 modulates the sample by the geometry color alpha (color sources fed
+  // directly from the paint color), 0 samples raw (blend operands such as coverage masks, which
+  // the runtime emits without input-alpha modulation).
+  int textureModulate = 0;
   AOTColorMatrixParameters colorMatrix = {};
   AOTLumaParameters luma = {};
   AOTAlphaThresholdParameters alphaThreshold = {};
@@ -66,10 +70,12 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
 
   static PlacementPtr<AOTPointwiseChainProcessor> Make(
       BlockAllocator* allocator, std::vector<PlacementPtr<FragmentProcessor>> textureLeaves,
-      const std::vector<AOTChainSlot>& slots, size_t rootSlot);
+      const std::vector<AOTChainSlot>& slots, size_t rootSlot, int tiledLeafIndex = -1,
+      const AOTTiledTextureRecipe* tiledRecipe = nullptr);
 
   AOTPointwiseChainProcessor(std::vector<PlacementPtr<FragmentProcessor>> textureLeaves,
-                             const std::vector<AOTChainSlot>& slots, size_t rootSlot);
+                             const std::vector<AOTChainSlot>& slots, size_t rootSlot,
+                             int tiledLeafIndex, const AOTTiledTextureRecipe* tiledRecipe);
 
   std::string name() const override {
     return "AOTPointwiseChainProcessor";
@@ -85,6 +91,16 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
 
   size_t root() const {
     return rootSlot;
+  }
+
+  // Index of the leaf that needs shader-side tiling (wrap/border emulation), or -1 when every
+  // leaf is plain. At most one tiled leaf is supported per chain.
+  int tiledLeaf() const {
+    return tiledLeafIndex;
+  }
+
+  const AOTTiledTextureRecipe& tiledRecipe() const {
+    return _tiledRecipe;
   }
 
   const AOTChainSlot& slot(size_t index) const {
@@ -103,6 +119,8 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
 
   size_t _slotCount = 0;
   size_t rootSlot = 0;
+  int tiledLeafIndex = -1;
+  AOTTiledTextureRecipe _tiledRecipe = {};
   std::array<AOTChainSlot, MaxSlots> slots = {};
 };
 

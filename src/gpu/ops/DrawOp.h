@@ -66,6 +66,18 @@ class DrawOp {
     coverages.emplace_back(std::move(coverageProcessor));
   }
 
+  /**
+   * Moves all coverage processors to the end of the color processor list. Used when a coverage
+   * effect is fused into the color chain (e.g., a local texture mask folded into a pointwise
+   * chain), which is only valid for blends that do not need a dst texture.
+   */
+  void moveCoveragesToColors() {
+    for (auto& coverage : coverages) {
+      colors.emplace_back(std::move(coverage));
+    }
+    coverages.clear();
+  }
+
   std::vector<PlacementPtr<FragmentProcessor>>& colorProcessors() {
     return colors;
   }

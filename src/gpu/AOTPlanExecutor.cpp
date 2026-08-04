@@ -158,6 +158,18 @@ static bool ValidateLinearPlan(const AOTEffectGraph& graph, const AOTEffectPlan&
   return plan.output == plan.passes.back().output;
 }
 
+// The chain kernel's tiled path implements the same single-tap wrap modes as tiled_sample.inc:
+// Clamp(1), RepeatNearest/LinearNone(2,3), MirrorRepeat(6) and ClampToBorderNearest/Linear(7,8).
+// The mipmap-repeat modes (4,5) need a 4-tap seam blend that the kernel does not provide.
+static bool IsChainCompatibleTiledMode(TiledTextureShaderMode mode) {
+  return mode == TiledTextureShaderMode::None || mode == TiledTextureShaderMode::Clamp ||
+         mode == TiledTextureShaderMode::RepeatNearestNone ||
+         mode == TiledTextureShaderMode::RepeatLinearNone ||
+         mode == TiledTextureShaderMode::MirrorRepeat ||
+         mode == TiledTextureShaderMode::ClampToBorderNearest ||
+         mode == TiledTextureShaderMode::ClampToBorderLinear;
+}
+
 static PlacementPtr<FragmentProcessor> BuildFPForNode(BlockAllocator* allocator,
                                                       const AOTEffectNode* node,
                                                       PlacementPtr<FragmentProcessor> input) {
@@ -170,6 +182,24 @@ static PlacementPtr<FragmentProcessor> BuildFPForNode(BlockAllocator* allocator,
       if (parameters->samplingKind == AOTTextureSamplingKind::Device) {
         return DeviceSpaceTextureEffect::Make(allocator, parameters->textureProxy,
                                               parameters->uvMatrix);
+      }
+      if (parameters->samplingKind == AOTTextureSamplingKind::Tiled) {
+        const auto& recipe = parameters->tiledRecipe;
+        if (!recipe.has_value() || !IsChainCompatibleTiledMode(recipe->shaderModeX) ||
+            !IsChainCompatibleTiledMode(recipe->shaderModeY)) {
+          return nullptr;
+        }
+        // The hardware sampler performs all tiling (wrap modes and clamp-to-border), so the leaf
+        // is a plain TextureEffect carrying the resolved sampler state. The huge sample area makes
+        // the chain kernel's always-on Subset clamp a no-op, which the wrap/border modes rely on.
+        SamplingOptions sampling(recipe->hardwareSampler.minFilterMode,
+                                 recipe->hardwareSampler.magFilterMode,
+                                 recipe->hardwareSampler.mipmapMode);
+        SamplingArgs args = {recipe->hardwareSampler.tileModeX, recipe->hardwareSampler.tileModeY,
+                             sampling, SrcRectConstraint::Fast};
+        args.sampleArea = Rect::MakeLTRB(-1e9f, -1e9f, 1e9f, 1e9f);
+        auto uvMatrix = parameters->uvMatrix;
+        return TextureEffect::Make(allocator, parameters->textureProxy, args, &uvMatrix);
       }
       if (parameters->samplingKind != AOTTextureSamplingKind::Plain) {
         return nullptr;
@@ -307,6 +337,8 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(BlockAllocator* allocator,
   }
   std::vector<PlacementPtr<FragmentProcessor>> leaves = {};
   leaves.reserve(leafCount);
+  int tiledLeafIndex = -1;
+  AOTTiledTextureRecipe tiledRecipe = {};
   std::vector<AOTChainSlot> slots(ordered.size());
   for (size_t index = 0; index < ordered.size(); ++index) {
     auto node = graph.nodeAt(ordered[index]);
@@ -318,6 +350,22 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(BlockAllocator* allocator,
           return nullptr;
         }
         slot.op = AOTChainOp::Texture;
+        // A texture fed directly by the geometry color is a color source and gets the paint-alpha
+        // modulation folded into its read (as the runtime's SrcIn wrap does). Any other texture —
+        // a coverage mask or a blend operand — must sample raw, matching the runtime emission.
+        slot.textureModulate = !node->inputs.empty() && node->inputs[0] == AOTNodeID(0) ? 1 : 0;
+        auto parameters = std::get_if<AOTTextureParameters>(&node->parameters);
+        if (parameters != nullptr && parameters->samplingKind == AOTTextureSamplingKind::Tiled &&
+            parameters->tiledRecipe.has_value() &&
+            (parameters->tiledRecipe->shaderModeX != TiledTextureShaderMode::None ||
+             parameters->tiledRecipe->shaderModeY != TiledTextureShaderMode::None)) {
+          // At most one shader-tiled leaf per chain; a second one cannot be represented.
+          if (tiledLeafIndex >= 0) {
+            return nullptr;
+          }
+          tiledLeafIndex = static_cast<int>(leaves.size());
+          tiledRecipe = *parameters->tiledRecipe;
+        }
         leaves.push_back(std::move(leaf));
         break;
       }
@@ -374,7 +422,9 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(BlockAllocator* allocator,
   if (rootIndex == SIZE_MAX) {
     return nullptr;
   }
-  return AOTPointwiseChainProcessor::Make(allocator, std::move(leaves), slots, rootIndex);
+  const AOTTiledTextureRecipe* recipePtr = tiledLeafIndex >= 0 ? &tiledRecipe : nullptr;
+  return AOTPointwiseChainProcessor::Make(allocator, std::move(leaves), slots, rootIndex,
+                                          tiledLeafIndex, recipePtr);
 }
 
 static PlacementPtr<FragmentProcessor> BuildFPForPass(
@@ -553,8 +603,10 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
         pass.nodes.size() > AOTPointwiseChainProcessor::MaxSlots) {
       return false;
     }
-    // The fused kernel binds one sampler per texture leaf and only exists for 1, 2 or 4 plain
-    // (non-tiled, non-device) leaves; anything else must stay on the plain route.
+    // The fused kernel binds one sampler per texture leaf and only exists for 1, 2 or 4 leaves
+    // that the kernel can sample directly: plain leaves, or tiled leaves whose wrap modes are
+    // fully resolved by the hardware sampler (no shader-mode emulation). Anything else must stay
+    // on the plain route.
     size_t plainLeaves = 0;
     for (auto nodeID : pass.nodes) {
       auto node = graph.nodeAt(nodeID);
@@ -563,7 +615,16 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
       }
       if (node->kind == AOTEffectKind::TextureSource) {
         auto parameters = std::get_if<AOTTextureParameters>(&node->parameters);
-        if (parameters == nullptr || parameters->samplingKind != AOTTextureSamplingKind::Plain) {
+        if (parameters == nullptr) {
+          return false;
+        }
+        if (parameters->samplingKind == AOTTextureSamplingKind::Tiled) {
+          const auto& recipe = parameters->tiledRecipe;
+          if (!recipe.has_value() || !IsChainCompatibleTiledMode(recipe->shaderModeX) ||
+              !IsChainCompatibleTiledMode(recipe->shaderModeY)) {
+            return false;
+          }
+        } else if (parameters->samplingKind != AOTTextureSamplingKind::Plain) {
           return false;
         }
         ++plainLeaves;

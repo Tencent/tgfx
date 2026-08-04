@@ -304,7 +304,9 @@ TGFX_TEST(AOTEffectTest, TiledHardwareSamplingSnapshotMatchesLowering) {
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
   EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
-  EXPECT_FALSE(AOTPlanExecutor::CanExecute(graph, plan));
+  // Hardware-resolved tiling (shader mode None on both axes) is chain-compatible: the kernel
+  // samples through the resolved hardware sampler with a no-op subset clamp.
+  EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
 }
 
 TGFX_TEST(AOTEffectTest, TiledShaderModesAndStrictSubsetMatchLowering) {
@@ -372,7 +374,12 @@ TGFX_TEST(AOTEffectTest, TiledShaderModesAndStrictSubsetMatchLowering) {
     ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan));
     ASSERT_EQ(plan.passes.size(), 1u);
     EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
-    EXPECT_FALSE(AOTPlanExecutor::CanExecute(graph, plan));
+    // The chain kernel's tiled path covers the single-tap wrap modes (Clamp, Repeat*None,
+    // MirrorRepeat, ClampToBorder*); only the mipmap-repeat modes (4,5) stay on the plain route.
+    bool chainCompatible =
+        modeCase.shaderModeX != TiledTextureEffect::ShaderMode::RepeatLinearMipmap &&
+        modeCase.shaderModeX != TiledTextureEffect::ShaderMode::RepeatNearestMipmap;
+    EXPECT_EQ(AOTPlanExecutor::CanExecute(graph, plan), chainCompatible);
   }
 }
 

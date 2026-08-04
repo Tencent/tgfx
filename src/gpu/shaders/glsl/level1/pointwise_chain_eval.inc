@@ -74,9 +74,13 @@ vec4 evalChainSlot() {
     return vec4(0.0);
   }
   if (Packed.x == OP_TEXTURE) {
-    // Leaf slots sample their own sampler/coords; the geometry color's alpha modulates the read
-    // exactly as PointwiseTailShader does for its texture source.
-    return chainTexFetch * Color.a;
+    vec4 texColor = chainTexFetch;
+    if (Packed.w != 0) {
+      // Color-source leaves are modulated by the geometry color's alpha, matching the runtime
+      // paint-alpha wrap. Mask and blend-operand leaves sample raw, as the runtime emits them.
+      texColor *= Color.a;
+    }
+    return texColor;
   }
   vec4 in0 = Packed.y == -1 ? Color : (Packed.y < 0 ? vec4(0.0) : chainResults[Packed.y]);
   if (Packed.x == OP_CONST_COLOR) {

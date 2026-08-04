@@ -39,6 +39,8 @@
 #include "gpu/ops/ShapeInstancedDrawOp.h"
 #include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
+#include "gpu/processors/TextureEffect.h"
+#include "gpu/processors/TiledTextureEffect.h"
 #include "processors/ColorSpaceXFormEffect.h"
 #include "processors/PorterDuffXferProcessor.h"
 #include "processors/XfermodeFragmentProcessor.h"
@@ -908,6 +910,40 @@ PlacementPtr<FragmentProcessor> OpsCompositor::makeMaskFP(
   return FragmentProcessor::Compose(allocator, std::move(maskFP), std::move(inputFP));
 }
 
+// Returns true if the coverage FP is a local texture mask whose texture can be fused into a
+// pointwise chain as an extra texture leaf (see the SrcIn/SrcOut check inside).
+static bool IsFoldableLocalMask(const FragmentProcessor* coverageFP) {
+  if (coverageFP == nullptr || coverageFP->name() != "XfermodeFragmentProcessor - dst" ||
+      coverageFP->numChildProcessors() != 1) {
+    return false;
+  }
+  auto* xfermode = static_cast<const XfermodeFragmentProcessor*>(coverageFP);
+  // Both the plain form (SrcIn: input * mask.a) and the inverted form (SrcOut: input *
+  // (1 - mask.a)) fold into a single blend node, which the chain kernel's blend table covers.
+  if (xfermode->getMode() != BlendMode::SrcIn && xfermode->getMode() != BlendMode::SrcOut) {
+    return false;
+  }
+  auto child = coverageFP->childProcessor(0);
+  auto name = child->name();
+  if (name == "TextureEffect") {
+    auto* textureEffect = static_cast<const TextureEffect*>(child);
+    return !textureEffect->isYUV() && !textureEffect->isAlphaOnly() && !textureEffect->hasRGBAAA();
+  }
+  if (name == "TiledTextureEffect") {
+    auto* tiledEffect = static_cast<const TiledTextureEffect*>(child);
+    if (tiledEffect->isAlphaOnly()) {
+      return false;
+    }
+    // The chain kernel's tiled path covers the single-tap wrap modes; only the mipmap-repeat
+    // modes (4,5) cannot fold.
+    int modeX = 0;
+    int modeY = 0;
+    tiledEffect->getShaderModes(&modeX, &modeY);
+    return modeX != 4 && modeX != 5 && modeY != 4 && modeY != 5;
+  }
+  return false;
+}
+
 DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AAType aaType) {
   if (context->shaderCaps()->frameBufferFetchSupport) {
     return {};
@@ -991,8 +1027,10 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
       op->addColorFP(std::move(processor));
     }
   }
+  const FragmentProcessor* maskCoverage = nullptr;
   if (brush.maskFilter) {
     if (auto processor = brush.maskFilter->asFragmentProcessor(args, nullptr)) {
+      maskCoverage = processor.get();
       op->addCoverageFP(std::move(processor));
     } else {
       // if mask is empty, nothing to draw
@@ -1026,6 +1064,41 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     colorProcessors.reserve(op->colorProcessors().size());
     for (const auto& processor : op->colorProcessors()) {
       colorProcessors.push_back(processor.get());
+    }
+    // A local texture mask is a pointwise multiply (input * mask.a), so it can be fused into the
+    // color chain as an extra blend node with its own texture leaf. Folding is only valid for
+    // blends that never need a dst texture: the PorterDuff XP path composites coverage separately,
+    // while EmptyXferProcessor draws produce identical pixels either way. When the fold is
+    // attempted, the color-only route is skipped: if fusion fails, the plain route still renders
+    // the mask correctly as a trailing color processor.
+    bool foldMask = appliedClip.coverageFP == nullptr && IsFoldableLocalMask(maskCoverage) &&
+                    !BlendModeNeedDstTexture(brush.blendMode, true);
+    if (foldMask) {
+      std::vector<const FragmentProcessor*> foldedProcessors = colorProcessors;
+      foldedProcessors.push_back(maskCoverage);
+      AOTEffectGraph foldedGraph = {};
+      AOTEffectPlan foldedPlan = {};
+      if (AOTEffectDecomposer::Lower(foldedProcessors, &foldedGraph) &&
+          AOTEffectDecomposer::ValidateForFusion(foldedGraph) &&
+          AOTEffectDecomposer::Decompose(foldedGraph, AOTDecompositionMode::PreferFusion,
+                                         &foldedPlan) &&
+          !foldedPlan.passes.empty() &&
+          (foldedPlan.passes.size() > 1 ||
+           foldedPlan.passes[0].kernel == AOTKernelKind::PointwiseTail ||
+           foldedPlan.passes[0].kernel == AOTKernelKind::PointwiseChain)) {
+        // The mask now travels inside the color chain, so the terminal draw must not apply it
+        // again as a coverage processor.
+        op->moveCoveragesToColors();
+        auto task = AOTPlanExecutor::Make(context, renderFlags, foldedGraph, foldedPlan,
+                                          *deviceBounds, renderTarget, &op);
+        if (task != nullptr) {
+          submitDrawOps();
+          context->drawingManager()->addRenderTask(std::move(task));
+          return;
+        }
+      }
+      drawOps.emplace_back(std::move(op));
+      return;
     }
     AOTEffectGraph graph = {};
     AOTEffectPlan plan = {};

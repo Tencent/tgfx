@@ -27,6 +27,9 @@ static void UploadChainSlot(UniformData* uniformData, size_t index, const AOTCha
   if (slot.op == AOTChainOp::ConstColor) {
     selector = slot.constColor.inputMode;
   }
+  if (slot.op == AOTChainOp::Texture) {
+    selector = slot.textureModulate;
+  }
   int packed[] = {static_cast<int>(slot.op), slot.in0, slot.in1, selector};
   uniformData->setDataOptional(prefix + "Packed", packed);
   switch (slot.op) {
@@ -66,7 +69,8 @@ static void UploadChainSlot(UniformData* uniformData, size_t index, const AOTCha
 
 PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
     BlockAllocator* allocator, std::vector<PlacementPtr<FragmentProcessor>> textureLeaves,
-    const std::vector<AOTChainSlot>& slots, size_t rootSlot) {
+    const std::vector<AOTChainSlot>& slots, size_t rootSlot, int tiledLeafIndex,
+    const AOTTiledTextureRecipe* tiledRecipe) {
   if (allocator == nullptr || slots.empty() || slots.size() > MaxSlots ||
       rootSlot >= slots.size()) {
     return nullptr;
@@ -74,6 +78,10 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
   auto leafCount = textureLeaves.size();
   if (leafCount == 0 || (leafCount != 1 && leafCount != 2 && leafCount != 4) ||
       leafCount > slots.size()) {
+    return nullptr;
+  }
+  if (tiledLeafIndex >= 0 &&
+      (static_cast<size_t>(tiledLeafIndex) >= leafCount || tiledRecipe == nullptr)) {
     return nullptr;
   }
   // Leaves pair slot-for-slot with samplers: slot k must be the leaf that samples TextureSampler_k.
@@ -94,13 +102,19 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
       return nullptr;
     }
   }
-  return allocator->make<AOTPointwiseChainProcessor>(std::move(textureLeaves), slots, rootSlot);
+  return allocator->make<AOTPointwiseChainProcessor>(std::move(textureLeaves), slots, rootSlot,
+                                                     tiledLeafIndex, tiledRecipe);
 }
 
 AOTPointwiseChainProcessor::AOTPointwiseChainProcessor(
     std::vector<PlacementPtr<FragmentProcessor>> textureLeaves,
-    const std::vector<AOTChainSlot>& newSlots, size_t rootSlot)
-    : FragmentProcessor(ClassID()), _slotCount(newSlots.size()), rootSlot(rootSlot) {
+    const std::vector<AOTChainSlot>& newSlots, size_t rootSlot, int tiledLeafIndex,
+    const AOTTiledTextureRecipe* tiledRecipe)
+    : FragmentProcessor(ClassID()), _slotCount(newSlots.size()), rootSlot(rootSlot),
+      tiledLeafIndex(tiledLeafIndex) {
+  if (tiledRecipe != nullptr) {
+    _tiledRecipe = *tiledRecipe;
+  }
   for (size_t index = 0; index < newSlots.size(); ++index) {
     slots[index] = newSlots[index];
   }
@@ -136,6 +150,24 @@ void AOTPointwiseChainProcessor::onSetData(UniformData*, UniformData* fragmentUn
     return;
   }
   fragmentUniformData->setDataOptional("RootIndex", static_cast<int>(rootSlot));
+  fragmentUniformData->setDataOptional("TiledLeafIndex", tiledLeafIndex);
+  if (tiledLeafIndex >= 0) {
+    int modeX = static_cast<int>(_tiledRecipe.shaderModeX);
+    int modeY = static_cast<int>(_tiledRecipe.shaderModeY);
+    fragmentUniformData->setDataOptional("TiledModeX", modeX);
+    fragmentUniformData->setDataOptional("TiledModeY", modeY);
+    float subsetRect[] = {_tiledRecipe.shaderSubset.left, _tiledRecipe.shaderSubset.top,
+                          _tiledRecipe.shaderSubset.right, _tiledRecipe.shaderSubset.bottom};
+    fragmentUniformData->setDataOptional("TiledSubset", subsetRect);
+    float clampRect[] = {_tiledRecipe.shaderClamp.left, _tiledRecipe.shaderClamp.top,
+                         _tiledRecipe.shaderClamp.right, _tiledRecipe.shaderClamp.bottom};
+    fragmentUniformData->setDataOptional("TiledClamp", clampRect);
+    if (_tiledRecipe.usesShaderDimensions) {
+      fragmentUniformData->setDataOptional("TiledDimension", _tiledRecipe.shaderDimensions);
+    }
+    int strict = _tiledRecipe.strict ? 1 : 0;
+    fragmentUniformData->setDataOptional("TiledStrict", strict);
+  }
   for (size_t index = 0; index < MaxSlots; ++index) {
     UploadChainSlot(fragmentUniformData, index, slots[index]);
   }
