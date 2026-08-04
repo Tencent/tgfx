@@ -3,8 +3,11 @@
 // statically expanded slots each carry a Packed ivec4 (op, two input-slot indices, blend/const
 // selector), so any topology with the same texture-leaf count shares one program variant. Texture
 // leaves occupy slots 0..NTEX-1 and each samples its own sampler, keeping sampler indexing static.
-// ColorSpaceXform parameters are one shared chain-wide block, so a chain may contain at most one
-// color-space op (enforced by the matcher). There is no opcode array, loop, or VM dispatch.
+// Leaf subset rects are runtime uniforms (Subset / Subset_1 / ... following the structural ordinal
+// convention); a leaf without a real subset uploads the full texture bounds, so the clamp is a
+// no-op. ColorSpaceXform parameters are one shared chain-wide block, so a chain may contain at
+// most one color-space op (enforced by the matcher). There is no opcode array, loop, or VM
+// dispatch.
 #version 450
 
 #ifndef HAS_XP
@@ -28,6 +31,15 @@
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Color;
   int RootIndex;
+  // Per-leaf subset rects, named for the structural ordinals the TextureEffect writers use.
+  vec4 Subset;
+#if NTEX >= 2
+  vec4 Subset_1;
+#endif
+#if NTEX >= 4
+  vec4 Subset_2;
+  vec4 Subset_3;
+#endif
   // Shared ColorSpaceXform parameters; at most one slot per chain may be OP_COLOR_SPACE_XFORM.
   int ChainCSFlags;
   vec4 ChainSrcTF0;
@@ -49,7 +61,8 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #define TGFX_CHAIN_DST_TF_FUNC chainDstTF0
 #define TGFX_CHAIN_EVAL_FUNC evalChainSlot0
 #if NTEX > 0
-#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_0, TransformedCoords_0)
+// Leaf subsets are runtime uniforms: a leaf without one uploads full bounds (no-op clamp).
+#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_0, clamp(TransformedCoords_0, Subset.xy, Subset.zw))
 #else
 // This slot is never a texture leaf at this texture count; the fetch is dead code.
 #define TGFX_CHAIN_TEX_FETCH vec4(0.0)
@@ -67,7 +80,8 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #define TGFX_CHAIN_DST_TF_FUNC chainDstTF1
 #define TGFX_CHAIN_EVAL_FUNC evalChainSlot1
 #if NTEX > 1
-#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_1, TransformedCoords_1)
+// Leaf subsets are runtime uniforms: a leaf without one uploads full bounds (no-op clamp).
+#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_1, clamp(TransformedCoords_1, Subset_1.xy, Subset_1.zw))
 #else
 // This slot is never a texture leaf at this texture count; the fetch is dead code.
 #define TGFX_CHAIN_TEX_FETCH vec4(0.0)
@@ -85,7 +99,8 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #define TGFX_CHAIN_DST_TF_FUNC chainDstTF2
 #define TGFX_CHAIN_EVAL_FUNC evalChainSlot2
 #if NTEX > 2
-#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_2, TransformedCoords_2)
+// Leaf subsets are runtime uniforms: a leaf without one uploads full bounds (no-op clamp).
+#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_2, clamp(TransformedCoords_2, Subset_2.xy, Subset_2.zw))
 #else
 // This slot is never a texture leaf at this texture count; the fetch is dead code.
 #define TGFX_CHAIN_TEX_FETCH vec4(0.0)
@@ -103,7 +118,8 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #define TGFX_CHAIN_DST_TF_FUNC chainDstTF3
 #define TGFX_CHAIN_EVAL_FUNC evalChainSlot3
 #if NTEX > 3
-#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_3, TransformedCoords_3)
+// Leaf subsets are runtime uniforms: a leaf without one uploads full bounds (no-op clamp).
+#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_3, clamp(TransformedCoords_3, Subset_3.xy, Subset_3.zw))
 #else
 // This slot is never a texture leaf at this texture count; the fetch is dead code.
 #define TGFX_CHAIN_TEX_FETCH vec4(0.0)
@@ -121,7 +137,8 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #define TGFX_CHAIN_DST_TF_FUNC chainDstTF4
 #define TGFX_CHAIN_EVAL_FUNC evalChainSlot4
 #if NTEX > 4
-#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_4, TransformedCoords_4)
+// Leaf subsets are runtime uniforms: a leaf without one uploads full bounds (no-op clamp).
+#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_4, clamp(TransformedCoords_4, Subset_4.xy, Subset_4.zw))
 #else
 // This slot is never a texture leaf at this texture count; the fetch is dead code.
 #define TGFX_CHAIN_TEX_FETCH vec4(0.0)
@@ -139,7 +156,8 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #define TGFX_CHAIN_DST_TF_FUNC chainDstTF5
 #define TGFX_CHAIN_EVAL_FUNC evalChainSlot5
 #if NTEX > 5
-#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_5, TransformedCoords_5)
+// Leaf subsets are runtime uniforms: a leaf without one uploads full bounds (no-op clamp).
+#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_5, clamp(TransformedCoords_5, Subset_5.xy, Subset_5.zw))
 #else
 // This slot is never a texture leaf at this texture count; the fetch is dead code.
 #define TGFX_CHAIN_TEX_FETCH vec4(0.0)
@@ -157,7 +175,8 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #define TGFX_CHAIN_DST_TF_FUNC chainDstTF6
 #define TGFX_CHAIN_EVAL_FUNC evalChainSlot6
 #if NTEX > 6
-#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_6, TransformedCoords_6)
+// Leaf subsets are runtime uniforms: a leaf without one uploads full bounds (no-op clamp).
+#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_6, clamp(TransformedCoords_6, Subset_6.xy, Subset_6.zw))
 #else
 // This slot is never a texture leaf at this texture count; the fetch is dead code.
 #define TGFX_CHAIN_TEX_FETCH vec4(0.0)
@@ -175,7 +194,8 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #define TGFX_CHAIN_DST_TF_FUNC chainDstTF7
 #define TGFX_CHAIN_EVAL_FUNC evalChainSlot7
 #if NTEX > 7
-#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_7, TransformedCoords_7)
+// Leaf subsets are runtime uniforms: a leaf without one uploads full bounds (no-op clamp).
+#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_7, clamp(TransformedCoords_7, Subset_7.xy, Subset_7.zw))
 #else
 // This slot is never a texture leaf at this texture count; the fetch is dead code.
 #define TGFX_CHAIN_TEX_FETCH vec4(0.0)
@@ -193,7 +213,8 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #define TGFX_CHAIN_DST_TF_FUNC chainDstTF8
 #define TGFX_CHAIN_EVAL_FUNC evalChainSlot8
 #if NTEX > 8
-#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_8, TransformedCoords_8)
+// Leaf subsets are runtime uniforms: a leaf without one uploads full bounds (no-op clamp).
+#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_8, clamp(TransformedCoords_8, Subset_8.xy, Subset_8.zw))
 #else
 // This slot is never a texture leaf at this texture count; the fetch is dead code.
 #define TGFX_CHAIN_TEX_FETCH vec4(0.0)
@@ -211,7 +232,8 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #define TGFX_CHAIN_DST_TF_FUNC chainDstTF9
 #define TGFX_CHAIN_EVAL_FUNC evalChainSlot9
 #if NTEX > 9
-#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_9, TransformedCoords_9)
+// Leaf subsets are runtime uniforms: a leaf without one uploads full bounds (no-op clamp).
+#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_9, clamp(TransformedCoords_9, Subset_9.xy, Subset_9.zw))
 #else
 // This slot is never a texture leaf at this texture count; the fetch is dead code.
 #define TGFX_CHAIN_TEX_FETCH vec4(0.0)
@@ -229,7 +251,8 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #define TGFX_CHAIN_DST_TF_FUNC chainDstTF10
 #define TGFX_CHAIN_EVAL_FUNC evalChainSlot10
 #if NTEX > 10
-#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_10, TransformedCoords_10)
+// Leaf subsets are runtime uniforms: a leaf without one uploads full bounds (no-op clamp).
+#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_10, clamp(TransformedCoords_10, Subset_10.xy, Subset_10.zw))
 #else
 // This slot is never a texture leaf at this texture count; the fetch is dead code.
 #define TGFX_CHAIN_TEX_FETCH vec4(0.0)
@@ -247,7 +270,8 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #define TGFX_CHAIN_DST_TF_FUNC chainDstTF11
 #define TGFX_CHAIN_EVAL_FUNC evalChainSlot11
 #if NTEX > 11
-#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_11, TransformedCoords_11)
+// Leaf subsets are runtime uniforms: a leaf without one uploads full bounds (no-op clamp).
+#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_11, clamp(TransformedCoords_11, Subset_11.xy, Subset_11.zw))
 #else
 // This slot is never a texture leaf at this texture count; the fetch is dead code.
 #define TGFX_CHAIN_TEX_FETCH vec4(0.0)
@@ -265,7 +289,8 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #define TGFX_CHAIN_DST_TF_FUNC chainDstTF12
 #define TGFX_CHAIN_EVAL_FUNC evalChainSlot12
 #if NTEX > 12
-#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_12, TransformedCoords_12)
+// Leaf subsets are runtime uniforms: a leaf without one uploads full bounds (no-op clamp).
+#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_12, clamp(TransformedCoords_12, Subset_12.xy, Subset_12.zw))
 #else
 // This slot is never a texture leaf at this texture count; the fetch is dead code.
 #define TGFX_CHAIN_TEX_FETCH vec4(0.0)
@@ -283,7 +308,8 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #define TGFX_CHAIN_DST_TF_FUNC chainDstTF13
 #define TGFX_CHAIN_EVAL_FUNC evalChainSlot13
 #if NTEX > 13
-#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_13, TransformedCoords_13)
+// Leaf subsets are runtime uniforms: a leaf without one uploads full bounds (no-op clamp).
+#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_13, clamp(TransformedCoords_13, Subset_13.xy, Subset_13.zw))
 #else
 // This slot is never a texture leaf at this texture count; the fetch is dead code.
 #define TGFX_CHAIN_TEX_FETCH vec4(0.0)
@@ -301,7 +327,8 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #define TGFX_CHAIN_DST_TF_FUNC chainDstTF14
 #define TGFX_CHAIN_EVAL_FUNC evalChainSlot14
 #if NTEX > 14
-#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_14, TransformedCoords_14)
+// Leaf subsets are runtime uniforms: a leaf without one uploads full bounds (no-op clamp).
+#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_14, clamp(TransformedCoords_14, Subset_14.xy, Subset_14.zw))
 #else
 // This slot is never a texture leaf at this texture count; the fetch is dead code.
 #define TGFX_CHAIN_TEX_FETCH vec4(0.0)
@@ -319,7 +346,8 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #define TGFX_CHAIN_DST_TF_FUNC chainDstTF15
 #define TGFX_CHAIN_EVAL_FUNC evalChainSlot15
 #if NTEX > 15
-#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_15, TransformedCoords_15)
+// Leaf subsets are runtime uniforms: a leaf without one uploads full bounds (no-op clamp).
+#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_15, clamp(TransformedCoords_15, Subset_15.xy, Subset_15.zw))
 #else
 // This slot is never a texture leaf at this texture count; the fetch is dead code.
 #define TGFX_CHAIN_TEX_FETCH vec4(0.0)
@@ -372,7 +400,8 @@ vec4 chainResults[16];
 #define TGFX_CHAIN_DST_TF_FUNC chainDstTF0
 #define TGFX_CHAIN_EVAL_FUNC evalChainSlot0
 #if NTEX > 0
-#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_0, TransformedCoords_0)
+// Leaf subsets are runtime uniforms: a leaf without one uploads full bounds (no-op clamp).
+#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_0, clamp(TransformedCoords_0, Subset.xy, Subset.zw))
 #else
 // This slot is never a texture leaf at this texture count; the fetch is dead code.
 #define TGFX_CHAIN_TEX_FETCH vec4(0.0)
@@ -390,7 +419,8 @@ vec4 chainResults[16];
 #define TGFX_CHAIN_DST_TF_FUNC chainDstTF1
 #define TGFX_CHAIN_EVAL_FUNC evalChainSlot1
 #if NTEX > 1
-#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_1, TransformedCoords_1)
+// Leaf subsets are runtime uniforms: a leaf without one uploads full bounds (no-op clamp).
+#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_1, clamp(TransformedCoords_1, Subset_1.xy, Subset_1.zw))
 #else
 // This slot is never a texture leaf at this texture count; the fetch is dead code.
 #define TGFX_CHAIN_TEX_FETCH vec4(0.0)
@@ -408,7 +438,8 @@ vec4 chainResults[16];
 #define TGFX_CHAIN_DST_TF_FUNC chainDstTF2
 #define TGFX_CHAIN_EVAL_FUNC evalChainSlot2
 #if NTEX > 2
-#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_2, TransformedCoords_2)
+// Leaf subsets are runtime uniforms: a leaf without one uploads full bounds (no-op clamp).
+#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_2, clamp(TransformedCoords_2, Subset_2.xy, Subset_2.zw))
 #else
 // This slot is never a texture leaf at this texture count; the fetch is dead code.
 #define TGFX_CHAIN_TEX_FETCH vec4(0.0)
@@ -426,7 +457,8 @@ vec4 chainResults[16];
 #define TGFX_CHAIN_DST_TF_FUNC chainDstTF3
 #define TGFX_CHAIN_EVAL_FUNC evalChainSlot3
 #if NTEX > 3
-#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_3, TransformedCoords_3)
+// Leaf subsets are runtime uniforms: a leaf without one uploads full bounds (no-op clamp).
+#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_3, clamp(TransformedCoords_3, Subset_3.xy, Subset_3.zw))
 #else
 // This slot is never a texture leaf at this texture count; the fetch is dead code.
 #define TGFX_CHAIN_TEX_FETCH vec4(0.0)
@@ -444,7 +476,8 @@ vec4 chainResults[16];
 #define TGFX_CHAIN_DST_TF_FUNC chainDstTF4
 #define TGFX_CHAIN_EVAL_FUNC evalChainSlot4
 #if NTEX > 4
-#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_4, TransformedCoords_4)
+// Leaf subsets are runtime uniforms: a leaf without one uploads full bounds (no-op clamp).
+#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_4, clamp(TransformedCoords_4, Subset_4.xy, Subset_4.zw))
 #else
 // This slot is never a texture leaf at this texture count; the fetch is dead code.
 #define TGFX_CHAIN_TEX_FETCH vec4(0.0)
@@ -462,7 +495,8 @@ vec4 chainResults[16];
 #define TGFX_CHAIN_DST_TF_FUNC chainDstTF5
 #define TGFX_CHAIN_EVAL_FUNC evalChainSlot5
 #if NTEX > 5
-#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_5, TransformedCoords_5)
+// Leaf subsets are runtime uniforms: a leaf without one uploads full bounds (no-op clamp).
+#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_5, clamp(TransformedCoords_5, Subset_5.xy, Subset_5.zw))
 #else
 // This slot is never a texture leaf at this texture count; the fetch is dead code.
 #define TGFX_CHAIN_TEX_FETCH vec4(0.0)
@@ -480,7 +514,8 @@ vec4 chainResults[16];
 #define TGFX_CHAIN_DST_TF_FUNC chainDstTF6
 #define TGFX_CHAIN_EVAL_FUNC evalChainSlot6
 #if NTEX > 6
-#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_6, TransformedCoords_6)
+// Leaf subsets are runtime uniforms: a leaf without one uploads full bounds (no-op clamp).
+#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_6, clamp(TransformedCoords_6, Subset_6.xy, Subset_6.zw))
 #else
 // This slot is never a texture leaf at this texture count; the fetch is dead code.
 #define TGFX_CHAIN_TEX_FETCH vec4(0.0)
@@ -498,7 +533,8 @@ vec4 chainResults[16];
 #define TGFX_CHAIN_DST_TF_FUNC chainDstTF7
 #define TGFX_CHAIN_EVAL_FUNC evalChainSlot7
 #if NTEX > 7
-#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_7, TransformedCoords_7)
+// Leaf subsets are runtime uniforms: a leaf without one uploads full bounds (no-op clamp).
+#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_7, clamp(TransformedCoords_7, Subset_7.xy, Subset_7.zw))
 #else
 // This slot is never a texture leaf at this texture count; the fetch is dead code.
 #define TGFX_CHAIN_TEX_FETCH vec4(0.0)
@@ -516,7 +552,8 @@ vec4 chainResults[16];
 #define TGFX_CHAIN_DST_TF_FUNC chainDstTF8
 #define TGFX_CHAIN_EVAL_FUNC evalChainSlot8
 #if NTEX > 8
-#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_8, TransformedCoords_8)
+// Leaf subsets are runtime uniforms: a leaf without one uploads full bounds (no-op clamp).
+#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_8, clamp(TransformedCoords_8, Subset_8.xy, Subset_8.zw))
 #else
 // This slot is never a texture leaf at this texture count; the fetch is dead code.
 #define TGFX_CHAIN_TEX_FETCH vec4(0.0)
@@ -534,7 +571,8 @@ vec4 chainResults[16];
 #define TGFX_CHAIN_DST_TF_FUNC chainDstTF9
 #define TGFX_CHAIN_EVAL_FUNC evalChainSlot9
 #if NTEX > 9
-#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_9, TransformedCoords_9)
+// Leaf subsets are runtime uniforms: a leaf without one uploads full bounds (no-op clamp).
+#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_9, clamp(TransformedCoords_9, Subset_9.xy, Subset_9.zw))
 #else
 // This slot is never a texture leaf at this texture count; the fetch is dead code.
 #define TGFX_CHAIN_TEX_FETCH vec4(0.0)
@@ -552,7 +590,8 @@ vec4 chainResults[16];
 #define TGFX_CHAIN_DST_TF_FUNC chainDstTF10
 #define TGFX_CHAIN_EVAL_FUNC evalChainSlot10
 #if NTEX > 10
-#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_10, TransformedCoords_10)
+// Leaf subsets are runtime uniforms: a leaf without one uploads full bounds (no-op clamp).
+#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_10, clamp(TransformedCoords_10, Subset_10.xy, Subset_10.zw))
 #else
 // This slot is never a texture leaf at this texture count; the fetch is dead code.
 #define TGFX_CHAIN_TEX_FETCH vec4(0.0)
@@ -570,7 +609,8 @@ vec4 chainResults[16];
 #define TGFX_CHAIN_DST_TF_FUNC chainDstTF11
 #define TGFX_CHAIN_EVAL_FUNC evalChainSlot11
 #if NTEX > 11
-#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_11, TransformedCoords_11)
+// Leaf subsets are runtime uniforms: a leaf without one uploads full bounds (no-op clamp).
+#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_11, clamp(TransformedCoords_11, Subset_11.xy, Subset_11.zw))
 #else
 // This slot is never a texture leaf at this texture count; the fetch is dead code.
 #define TGFX_CHAIN_TEX_FETCH vec4(0.0)
@@ -588,7 +628,8 @@ vec4 chainResults[16];
 #define TGFX_CHAIN_DST_TF_FUNC chainDstTF12
 #define TGFX_CHAIN_EVAL_FUNC evalChainSlot12
 #if NTEX > 12
-#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_12, TransformedCoords_12)
+// Leaf subsets are runtime uniforms: a leaf without one uploads full bounds (no-op clamp).
+#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_12, clamp(TransformedCoords_12, Subset_12.xy, Subset_12.zw))
 #else
 // This slot is never a texture leaf at this texture count; the fetch is dead code.
 #define TGFX_CHAIN_TEX_FETCH vec4(0.0)
@@ -606,7 +647,8 @@ vec4 chainResults[16];
 #define TGFX_CHAIN_DST_TF_FUNC chainDstTF13
 #define TGFX_CHAIN_EVAL_FUNC evalChainSlot13
 #if NTEX > 13
-#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_13, TransformedCoords_13)
+// Leaf subsets are runtime uniforms: a leaf without one uploads full bounds (no-op clamp).
+#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_13, clamp(TransformedCoords_13, Subset_13.xy, Subset_13.zw))
 #else
 // This slot is never a texture leaf at this texture count; the fetch is dead code.
 #define TGFX_CHAIN_TEX_FETCH vec4(0.0)
@@ -624,7 +666,8 @@ vec4 chainResults[16];
 #define TGFX_CHAIN_DST_TF_FUNC chainDstTF14
 #define TGFX_CHAIN_EVAL_FUNC evalChainSlot14
 #if NTEX > 14
-#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_14, TransformedCoords_14)
+// Leaf subsets are runtime uniforms: a leaf without one uploads full bounds (no-op clamp).
+#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_14, clamp(TransformedCoords_14, Subset_14.xy, Subset_14.zw))
 #else
 // This slot is never a texture leaf at this texture count; the fetch is dead code.
 #define TGFX_CHAIN_TEX_FETCH vec4(0.0)
@@ -642,7 +685,8 @@ vec4 chainResults[16];
 #define TGFX_CHAIN_DST_TF_FUNC chainDstTF15
 #define TGFX_CHAIN_EVAL_FUNC evalChainSlot15
 #if NTEX > 15
-#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_15, TransformedCoords_15)
+// Leaf subsets are runtime uniforms: a leaf without one uploads full bounds (no-op clamp).
+#define TGFX_CHAIN_TEX_FETCH texture(TextureSampler_15, clamp(TransformedCoords_15, Subset_15.xy, Subset_15.zw))
 #else
 // This slot is never a texture leaf at this texture count; the fetch is dead code.
 #define TGFX_CHAIN_TEX_FETCH vec4(0.0)
