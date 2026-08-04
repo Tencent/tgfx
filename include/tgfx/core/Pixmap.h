@@ -23,7 +23,6 @@
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
-class PixelRefLock;
 
 /**
  * Pixmap provides a utility to pair ImageInfo width pixels. Pixmap is a low-level class that
@@ -221,6 +220,8 @@ class Pixmap {
   std::shared_ptr<ColorSpace> colorSpace() const;
 
  private:
+  class PixelRefLock;
+
   ImageInfo _info = {};
   const void* _pixels = nullptr;
   void* _writablePixels = nullptr;

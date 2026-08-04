@@ -26,8 +26,9 @@ namespace tgfx {
 // RAII lock guard for a PixelRef. lockPixels/lockWritablePixels are called by the factory helpers
 // below; unlockPixels is called exactly once when the last shared owner is destroyed. Copies of a
 // Pixmap share the same PixelRefLock instance via shared_ptr, so the underlying mutex is unlocked
-// exactly once regardless of how many Pixmap copies exist.
-class PixelRefLock {
+// exactly once regardless of how many Pixmap copies exist. Defined as a nested class so it stays
+// an implementation detail of Pixmap and never appears in the public API surface.
+class Pixmap::PixelRefLock {
  public:
   static std::shared_ptr<PixelRefLock> Make(std::shared_ptr<PixelRef> pixelRef,
                                             const void*& pixels) {
