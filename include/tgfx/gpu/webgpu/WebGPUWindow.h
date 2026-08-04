@@ -29,6 +29,10 @@ class WebGPUWindow : public Window {
    * Creates a new window from an HTML canvas element selector with the specified device.
    * @param canvasSelector The CSS selector for the HTML canvas element (e.g., "#myCanvas").
    * @param device An optional WebGPUDevice. If nullptr, a default device is created automatically.
+   * When a non-null color space is provided, this device must be the module's
+   * preinitializedWebGPUDevice; passing a custom device is not yet supported together with color
+   * space configuration, because the canvas context would be configured on a different device than
+   * the one used for rendering.
    * @param colorSpace An optional target color space for the drawing buffer. If nullptr, the
    * default sRGB color space is used. When a non-null color space is provided, the canvas's WebGPU
    * context is configured accordingly so that the rendered content is displayed correctly.

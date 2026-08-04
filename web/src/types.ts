@@ -50,6 +50,8 @@ export const enum MatrixIndex {
     ty,
 }
 
+// Mirrors the WebNamedColorSpace enum defined on the C++ side (src/platform/web/WebNamedColorSpace.h),
+// which is the authoritative definition. The integer values must stay in sync with it.
 export const enum WindowColorSpace{
     None,
     SRGB,

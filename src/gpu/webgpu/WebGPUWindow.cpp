@@ -22,6 +22,7 @@
 #include "WebGPUDrawableProxy.h"
 #include "WebGPUGPU.h"
 #include "core/utils/Log.h"
+#include "platform/web/WebNamedColorSpace.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/html5.h>
@@ -30,12 +31,6 @@
 #endif
 
 namespace tgfx {
-
-#ifdef __EMSCRIPTEN__
-// Mirrors the WindowColorSpace enum defined in the web binding layer (see web/src/types.ts). The
-// integer values must stay in sync with the TypeScript definition.
-enum class WebNamedColorSpace { None = 0, SRGB = 1, DisplayP3 = 2, Others = 3 };
-#endif
 
 std::shared_ptr<WebGPUWindow> WebGPUWindow::MakeFrom(const std::string& canvasSelector,
                                                      std::shared_ptr<WebGPUDevice> device,
@@ -109,15 +104,7 @@ WebGPUWindow::WebGPUWindow(std::shared_ptr<Device> device, void* surface, int wi
 
 void WebGPUWindow::configureColorSpace() {
 #ifdef __EMSCRIPTEN__
-  auto namedColorSpace = WebNamedColorSpace::Others;
-  auto cs = colorSpace();
-  if (cs == nullptr) {
-    namedColorSpace = WebNamedColorSpace::None;
-  } else if (ColorSpace::Equals(cs.get(), ColorSpace::SRGB().get())) {
-    namedColorSpace = WebNamedColorSpace::SRGB;
-  } else if (ColorSpace::Equals(cs.get(), ColorSpace::DisplayP3().get())) {
-    namedColorSpace = WebNamedColorSpace::DisplayP3;
-  }
+  auto namedColorSpace = ToWebNamedColorSpace(colorSpace());
   // Leave the default sRGB drawing buffer untouched to avoid a redundant reconfigure on the
   // default rendering path.
   if (namedColorSpace == WebNamedColorSpace::None) {

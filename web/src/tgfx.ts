@@ -182,8 +182,11 @@ export const configureWebGPUColorSpace = (
     if (!context || typeof context.configure !== 'function') {
         return false;
     }
-    // Reuse the same GPUDevice the C++ side rendered with. Hosts pre-initialize it on the module as
-    // preinitializedWebGPUDevice, which is what emscripten's WebGPU surface uses under the hood.
+    // Reuse the same GPUDevice the C++ side rendered with. This assumes the device passed to
+    // WebGPUWindow::MakeFrom() is the module's preinitializedWebGPUDevice, which is what
+    // emscripten's WebGPU surface uses under the hood. Passing a custom device via
+    // WebGPUDevice::MakeFrom() is currently unsupported here, because the canvas context would be
+    // configured on a different device than the one the C++ side submits to.
     const device = (getTGFXModule() as any)?.preinitializedWebGPUDevice;
     if (!device) {
         return false;
