@@ -206,7 +206,8 @@ void GLSLGlassUDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
     // produced the edge field; dividing the height difference by that same span makes the
     // reconstructed distance independent of the radius.
     fragBuilder->codeAppendf(
-        "vec2 edgeUVStep = %s * vec2(0.25 / max(halfW, 0.0001), 0.25 / max(halfH, 0.0001)) * %s.xy;",
+        "vec2 edgeUVStep = %s * vec2(0.25 / max(halfW, 0.0001), 0.25 / max(halfH, 0.0001)) * "
+        "%s.xy;",
         edgeSpan.c_str(), fineMaskUV.c_str());
     fragBuilder->codeAppend("vec4 packedEdgeRight = ");
     fragBuilder->appendTextureLookup(maskSampler, "fineUV + vec2(edgeUVStep.x, 0.0)");
@@ -252,7 +253,7 @@ void GLSLGlassUDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
 }
 
 void GLSLGlassUDFGeometryFragmentProcessor::onSetData(UniformData*,
-                                                     UniformData* fragmentUniformData) const {
+                                                      UniformData* fragmentUniformData) const {
   float shapeData[4] = {params.halfW, params.halfH, params.udfPixelToLayerPixelX,
                         params.udfPixelToLayerPixelY};
   fragmentUniformData->setData("GlassShapeP0", shapeData);

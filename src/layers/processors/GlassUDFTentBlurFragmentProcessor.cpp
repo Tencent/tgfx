@@ -37,10 +37,9 @@ PlacementPtr<FragmentProcessor> GlassUDFTentBlurFragmentProcessor::Make(
   if (maxRadius < 1 || fineRadius <= 0.0f || coarseRadius <= 0.0f) {
     return nullptr;
   }
-  return allocator->make<GlassUDFTentBlurFragmentProcessor>(std::move(fineSource),
-                                                            std::move(coarseSource), fineRadius,
-                                                            coarseRadius, direction, maxRadius,
-                                                            inputIsPacked);
+  return allocator->make<GlassUDFTentBlurFragmentProcessor>(
+      std::move(fineSource), std::move(coarseSource), fineRadius, coarseRadius, direction,
+      maxRadius, inputIsPacked);
 }
 
 GlassUDFTentBlurFragmentProcessor::GlassUDFTentBlurFragmentProcessor(
@@ -97,8 +96,7 @@ void GlassUDFTentBlurFragmentProcessor::emitCode(EmitArgs& args) const {
     std::string tempColor = "tempColor";
     emitChild(childIndex, &tempColor, args, TentOffsetCoordFunc);
     if (decodePacked) {
-      fragBuilder->codeAppendf("%s += dot(%s.rgb, UNPACK24) * weight;", sumName,
-                               tempColor.c_str());
+      fragBuilder->codeAppendf("%s += dot(%s.rgb, UNPACK24) * weight;", sumName, tempColor.c_str());
     } else {
       fragBuilder->codeAppendf("%s += %s.a * weight;", sumName, tempColor.c_str());
     }

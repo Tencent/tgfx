@@ -59,9 +59,8 @@ static float GetRefractionOutset(float width, float height, float refractionFact
 // Blurs a window of the coverage image with two tent radii and returns one RGBA8 image. RGB holds
 // the refraction field and A holds the edge-light field. Coordinates remain in the full UDF space.
 static std::shared_ptr<Image> MakeGlassUDFImage(Context* context,
-                                                const std::shared_ptr<Image>& source,
-                                                int coreWidth, int coreHeight,
-                                                const Rect& textureRect,
+                                                const std::shared_ptr<Image>& source, int coreWidth,
+                                                int coreHeight, const Rect& textureRect,
                                                 const Point& fineRadius,
                                                 const Point& coarseRadius) {
   if (context == nullptr || source == nullptr || coreWidth <= 0 || coreHeight <= 0 ||
@@ -84,16 +83,15 @@ static std::shared_ptr<Image> MakeGlassUDFImage(Context* context,
   auto horizontalRect = textureRect.makeOutset(0.0f, verticalHalo);
   horizontalRect.roundOut();
   auto horizontalHeight = static_cast<int>(std::round(horizontalRect.height()));
-  auto horizontalTarget =
-      RenderTargetProxy::Make(context, textureWidth, horizontalHeight, false, 1, false,
-                              ImageOrigin::TopLeft, BackingFit::Exact);
+  auto horizontalTarget = RenderTargetProxy::Make(context, textureWidth, horizontalHeight, false, 1,
+                                                  false, ImageOrigin::TopLeft, BackingFit::Exact);
   if (horizontalTarget == nullptr) {
     return nullptr;
   }
   float horizontalHalo = std::ceil(std::max(fineRadius.x, coarseRadius.x)) + 1.0f;
-  auto sourceDrawRect = Rect::MakeLTRB(-horizontalHalo, -1.0f,
-                                       static_cast<float>(textureWidth) + horizontalHalo,
-                                       static_cast<float>(horizontalHeight) + 1.0f);
+  auto sourceDrawRect =
+      Rect::MakeLTRB(-horizontalHalo, -1.0f, static_cast<float>(textureWidth) + horizontalHalo,
+                     static_cast<float>(horizontalHeight) + 1.0f);
   Matrix horizontalMatrix = {};
   FPArgs sourceArgs = {};
   std::shared_ptr<Image> coreSource = nullptr;
@@ -113,9 +111,8 @@ static std::shared_ptr<Image> MakeGlassUDFImage(Context* context,
     // the visible UDF window directly from the full-resolution content.
     float sourceScaleX = static_cast<float>(source->width()) / static_cast<float>(coreWidth);
     float sourceScaleY = static_cast<float>(source->height()) / static_cast<float>(coreHeight);
-    horizontalMatrix =
-        Matrix::MakeAll(sourceScaleX, 0.0f, textureRect.left * sourceScaleX, 0.0f, sourceScaleY,
-                        horizontalRect.top * sourceScaleY);
+    horizontalMatrix = Matrix::MakeAll(sourceScaleX, 0.0f, textureRect.left * sourceScaleX, 0.0f,
+                                       sourceScaleY, horizontalRect.top * sourceScaleY);
     float sourceDrawScale =
         std::max(static_cast<float>(coreWidth) / static_cast<float>(source->width()),
                  static_cast<float>(coreHeight) / static_cast<float>(source->height()));
@@ -124,13 +121,13 @@ static std::shared_ptr<Image> MakeGlassUDFImage(Context* context,
   const auto& fpSource = coreSource != nullptr ? coreSource : source;
   // Each tent loop needs its own child because emitting one child twice redeclares its uniforms.
   auto fineSource = FragmentProcessor::Make(fpSource, sourceArgs, samplingArgs, &horizontalMatrix);
-  auto coarseSource = FragmentProcessor::Make(fpSource, sourceArgs, samplingArgs, &horizontalMatrix);
+  auto coarseSource =
+      FragmentProcessor::Make(fpSource, sourceArgs, samplingArgs, &horizontalMatrix);
   auto horizontalProcessor = GlassUDFTentBlurFragmentProcessor::Make(
       allocator, std::move(fineSource), std::move(coarseSource), fineRadius.x, coarseRadius.x,
       GlassUDFBlurDirection::Horizontal, MaxTentRadius, false);
-  if (horizontalProcessor == nullptr ||
-      !context->drawingManager()->fillRTWithFP(horizontalTarget, std::move(horizontalProcessor),
-                                               0)) {
+  if (horizontalProcessor == nullptr || !context->drawingManager()->fillRTWithFP(
+                                            horizontalTarget, std::move(horizontalProcessor), 0)) {
     return nullptr;
   }
   auto verticalMatrix = Matrix::MakeTrans(0.0f, textureRect.top - horizontalRect.top);
@@ -372,11 +369,11 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
           GetRefractionOutset(origWidth, origHeight, getRefractionFactor(), getDepthRatio(),
                               getDispersionFactor(), getGlassThickness(minHalf));
       refractionOutset = std::ceil(refractionOutset * input.contentScale + 1.0f);
-    refractInputRect.outset(refractionOutset, refractionOutset);
-    // Refraction samples toward the layer interior (UDF gradient points inward), so the
-    // sampling range never extends past the layer content bounds.
-    refractInputRect.intersect(Rect::MakeWH(contentWidth, contentHeight));
-    refractInputRect.roundOut();
+      refractInputRect.outset(refractionOutset, refractionOutset);
+      // Refraction samples toward the layer interior (UDF gradient points inward), so the
+      // sampling range never extends past the layer content bounds.
+      refractInputRect.intersect(Rect::MakeWH(contentWidth, contentHeight));
+      refractInputRect.roundOut();
     }
     auto backgroundInputRect = refractInputRect;
     auto fullResolutionBlur = getFrostFilter(input.contentScale * scaleRatioX);
@@ -472,9 +469,8 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       float sourceWidth = contentWidth;
       float sourceHeight = contentHeight;
       float sourceMaxDim = std::max(sourceWidth, sourceHeight);
-      float maxAllowedDim =
-          std::min(static_cast<float>(maxTextureSize), MAX_UDF_SIZE) -
-          (MAX_UDF_SHADER_HALO + MAX_UDF_BLUR_HALO) * 2.0f;
+      float maxAllowedDim = std::min(static_cast<float>(maxTextureSize), MAX_UDF_SIZE) -
+                            (MAX_UDF_SHADER_HALO + MAX_UDF_BLUR_HALO) * 2.0f;
       if (maxAllowedDim < 1.0f) {
         return;
       }
@@ -498,18 +494,16 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       // The radius scales with udfScale, keeping the layer-space radius constant.
       float layerToSourceX = sourceWidth / origBounds.width();
       float layerToSourceY = sourceHeight / origBounds.height();
-      Point fineRadius = {
-          std::min(effectiveBlurRadius * udfScale * layerToSourceX,
-                   static_cast<float>(MaxTentRadius)),
-          std::min(effectiveBlurRadius * udfScale * layerToSourceY,
-                   static_cast<float>(MaxTentRadius))};
+      Point fineRadius = {std::min(effectiveBlurRadius * udfScale * layerToSourceX,
+                                   static_cast<float>(MaxTentRadius)),
+                          std::min(effectiveBlurRadius * udfScale * layerToSourceY,
+                                   static_cast<float>(MaxTentRadius))};
       // Edge light radius is defined in layer space so the width stays constant across zoom.
       static constexpr float EDGE_RADIUS_IN_LAYER_PIXELS = 1.0f;
-      Point coarseRadius = {
-          std::min(EDGE_RADIUS_IN_LAYER_PIXELS / udfPixelToLayerPixelX,
-                   static_cast<float>(MaxTentRadius)),
-          std::min(EDGE_RADIUS_IN_LAYER_PIXELS / udfPixelToLayerPixelY,
-                   static_cast<float>(MaxTentRadius))};
+      Point coarseRadius = {std::min(EDGE_RADIUS_IN_LAYER_PIXELS / udfPixelToLayerPixelX,
+                                     static_cast<float>(MaxTentRadius)),
+                            std::min(EDGE_RADIUS_IN_LAYER_PIXELS / udfPixelToLayerPixelY,
+                                     static_cast<float>(MaxTentRadius))};
       // The span must come from the clamped radius, otherwise the shader would divide by a
       // different distance than the one the blur actually produced.
       edgeSpanX = coarseRadius.x * udfPixelToLayerPixelX;
@@ -521,19 +515,16 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       }
       float contentToUDFX = static_cast<float>(udfWidth) / contentWidth;
       float contentToUDFY = static_cast<float>(udfHeight) / contentHeight;
-      auto visibleUDFRect =
-          Rect::MakeLTRB(std::floor(visibleContentRect.left * contentToUDFX),
-                         std::floor(visibleContentRect.top * contentToUDFY),
-                         std::ceil(visibleContentRect.right * contentToUDFX),
-                         std::ceil(visibleContentRect.bottom * contentToUDFY));
+      auto visibleUDFRect = Rect::MakeLTRB(std::floor(visibleContentRect.left * contentToUDFX),
+                                           std::floor(visibleContentRect.top * contentToUDFY),
+                                           std::ceil(visibleContentRect.right * contentToUDFX),
+                                           std::ceil(visibleContentRect.bottom * contentToUDFY));
       float gradientSampleRadius = getDepthRatio() * 3.0f + 1.0f;
-      float shaderHaloX =
-          std::ceil(std::max(gradientSampleRadius, coarseRadius.x * 0.5f)) + 1.0f;
-      float shaderHaloY =
-          std::ceil(std::max(gradientSampleRadius, coarseRadius.y * 0.5f)) + 1.0f;
-      auto fullTextureRect = Rect::MakeLTRB(-shaderHaloX, -shaderHaloY,
-                                            static_cast<float>(udfWidth) + shaderHaloX,
-                                            static_cast<float>(udfHeight) + shaderHaloY);
+      float shaderHaloX = std::ceil(std::max(gradientSampleRadius, coarseRadius.x * 0.5f)) + 1.0f;
+      float shaderHaloY = std::ceil(std::max(gradientSampleRadius, coarseRadius.y * 0.5f)) + 1.0f;
+      auto fullTextureRect =
+          Rect::MakeLTRB(-shaderHaloX, -shaderHaloY, static_cast<float>(udfWidth) + shaderHaloX,
+                         static_cast<float>(udfHeight) + shaderHaloY);
       auto textureRect = visibleUDFRect.makeOutset(shaderHaloX, shaderHaloY);
       if (!textureRect.intersect(fullTextureRect)) {
         return;
@@ -556,11 +547,10 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
     Point sourcePixelToContentPixel = {1.0f / scaleRatioX, 1.0f / scaleRatioY};
     Point layerPixelToSourcePixel = {input.contentScale * scaleRatioX,
                                      input.contentScale * scaleRatioY};
-    auto filter = getRefractionFilter(shapeInfo.type, shapeInfo.cornerRadius, halfW, halfH,
-                                      udfPixelToLayerPixelX, udfPixelToLayerPixelY, edgeSpanX,
-                                      edgeSpanY, udfTextureOrigin, sourceOrigin,
-                                      sourcePixelToContentPixel, layerPixelToSourcePixel,
-                                      contentWidth, contentHeight, maskImage);
+    auto filter = getRefractionFilter(
+        shapeInfo.type, shapeInfo.cornerRadius, halfW, halfH, udfPixelToLayerPixelX,
+        udfPixelToLayerPixelY, edgeSpanX, edgeSpanY, udfTextureOrigin, sourceOrigin,
+        sourcePixelToContentPixel, layerPixelToSourcePixel, contentWidth, contentHeight, maskImage);
     Point refractOffset = {};
     auto refractedImage = processedBg->makeWithFilter(filter, &refractOffset, nullptr);
     if (refractedImage) {
@@ -614,7 +604,8 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
             1, static_cast<int>(std::round(static_cast<float>(maskImage->width()) * maskScale)));
         int maskHeight = std::max(
             1, static_cast<int>(std::round(static_cast<float>(maskImage->height()) * maskScale)));
-        maskImage = maskImage->makeScaled(maskWidth, maskHeight, SamplingOptions(FilterMode::Linear));
+        maskImage =
+            maskImage->makeScaled(maskWidth, maskHeight, SamplingOptions(FilterMode::Linear));
         if (maskImage == nullptr) {
           return;
         }

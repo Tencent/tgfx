@@ -97,9 +97,9 @@ class GlassUDFGeometryFragmentProcessor : public GlassShapeGeometryFragmentProce
    * edge light height.
    */
   static PlacementPtr<GlassUDFGeometryFragmentProcessor> Make(BlockAllocator* allocator,
-                                                             std::shared_ptr<TextureProxy> mask,
-                                                             const GlassUDFGeometryParams& params,
-                                                             bool enableEdgeLighting);
+                                                              std::shared_ptr<TextureProxy> mask,
+                                                              const GlassUDFGeometryParams& params,
+                                                              bool enableEdgeLighting);
 
   std::string name() const override {
     return "GlassUDFGeometryFragmentProcessor";
