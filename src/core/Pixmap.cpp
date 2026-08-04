@@ -22,6 +22,58 @@
 #include "core/utils/MathExtra.h"
 
 namespace tgfx {
+
+// RAII lock guard for a PixelRef. lockPixels/lockWritablePixels are called by the factory helpers
+// below; unlockPixels is called exactly once when the last shared owner is destroyed. Copies of a
+// Pixmap share the same PixelRefLock instance via shared_ptr, so the underlying mutex is unlocked
+// exactly once regardless of how many Pixmap copies exist. Defined as a nested class so it stays
+// an implementation detail of Pixmap and never appears in the public API surface.
+class Pixmap::PixelRefLock {
+ public:
+  static std::shared_ptr<PixelRefLock> Make(std::shared_ptr<PixelRef> pixelRef,
+                                            const void*& pixels) {
+    if (pixelRef == nullptr) {
+      pixels = nullptr;
+      return nullptr;
+    }
+    pixels = pixelRef->lockPixels();
+    if (pixels == nullptr) {
+      return nullptr;
+    }
+    return std::shared_ptr<PixelRefLock>(new PixelRefLock(std::move(pixelRef)));
+  }
+
+  static std::shared_ptr<PixelRefLock> MakeWritable(std::shared_ptr<PixelRef> pixelRef,
+                                                    void*& writablePixels) {
+    if (pixelRef == nullptr) {
+      writablePixels = nullptr;
+      return nullptr;
+    }
+    writablePixels = pixelRef->lockWritablePixels();
+    if (writablePixels == nullptr) {
+      return nullptr;
+    }
+    return std::shared_ptr<PixelRefLock>(new PixelRefLock(std::move(pixelRef)));
+  }
+
+  PixelRefLock(const PixelRefLock&) = delete;
+  PixelRefLock& operator=(const PixelRefLock&) = delete;
+
+  ~PixelRefLock() {
+    pixelRef->unlockPixels();
+  }
+
+  const ImageInfo& info() const {
+    return pixelRef->info();
+  }
+
+ private:
+  explicit PixelRefLock(std::shared_ptr<PixelRef> ref) : pixelRef(std::move(ref)) {
+  }
+
+  std::shared_ptr<PixelRef> pixelRef;
+};
+
 Pixmap::Pixmap(const ImageInfo& info, const void* pixels) : _info(info), _pixels(pixels) {
   if (_info.isEmpty() || _pixels == nullptr) {
     _info = {};
@@ -46,15 +98,10 @@ Pixmap::Pixmap(Bitmap& bitmap) {
   reset(bitmap);
 }
 
-Pixmap::~Pixmap() {
-  reset();
-}
+Pixmap::~Pixmap() = default;
 
 void Pixmap::reset() {
-  if (pixelRef != nullptr) {
-    pixelRef->unlockPixels();
-    pixelRef = nullptr;
-  }
+  lockGuard = nullptr;
   _pixels = nullptr;
   _writablePixels = nullptr;
   _info = {};
@@ -79,25 +126,25 @@ void Pixmap::reset(const ImageInfo& info, void* pixels) {
 
 void Pixmap::reset(const Bitmap& bitmap) {
   reset();
-  pixelRef = bitmap.pixelRef;
-  _pixels = pixelRef ? pixelRef->lockPixels() : nullptr;
-  if (_pixels == nullptr) {
-    pixelRef = nullptr;
+  const void* pixels = nullptr;
+  lockGuard = PixelRefLock::Make(bitmap.pixelRef, pixels);
+  if (lockGuard == nullptr) {
     return;
   }
-  _info = pixelRef->info();
+  _pixels = pixels;
+  _info = lockGuard->info();
 }
 
 void Pixmap::reset(Bitmap& bitmap) {
   reset();
-  pixelRef = bitmap.pixelRef;
-  _writablePixels = pixelRef ? pixelRef->lockWritablePixels() : nullptr;
-  if (_writablePixels == nullptr) {
-    pixelRef = nullptr;
+  void* writablePixels = nullptr;
+  lockGuard = PixelRefLock::MakeWritable(bitmap.pixelRef, writablePixels);
+  if (lockGuard == nullptr) {
     return;
   }
-  _pixels = _writablePixels;
-  _info = pixelRef->info();
+  _writablePixels = writablePixels;
+  _pixels = writablePixels;
+  _info = lockGuard->info();
 }
 
 RGBA4f<AlphaType::Unpremultiplied> Pixmap::getColor(
