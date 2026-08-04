@@ -18,10 +18,13 @@
 
 #pragma once
 
+#include <memory>
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
+class PixelRefLock;
+
 /**
  * Pixmap provides a utility to pair ImageInfo width pixels. Pixmap is a low-level class that
  * provides convenience functions to access raster destinations, which can convert the format of
@@ -221,6 +224,8 @@ class Pixmap {
   ImageInfo _info = {};
   const void* _pixels = nullptr;
   void* _writablePixels = nullptr;
-  std::shared_ptr<PixelRef> pixelRef = nullptr;
+  // Shared ownership of the PixelRef lock. Copies of a Pixmap share the same lock; unlockPixels
+  // runs only when the last owner is destroyed. Empty for Pixmaps constructed from raw pixels.
+  std::shared_ptr<PixelRefLock> lockGuard;
 };
 }  // namespace tgfx
