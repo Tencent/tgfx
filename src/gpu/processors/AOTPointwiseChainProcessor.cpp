@@ -89,7 +89,8 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
     if (slot.op == AOTChainOp::ColorSpaceXform && slot.colorSpaceXform.steps == nullptr) {
       return nullptr;
     }
-    if (slot.op == AOTChainOp::Blend && (slot.in0 < 0 || slot.in1 < 0)) {
+    // -1 (the geometry color) is a legitimate blend operand; only an unmapped edge (-2) is invalid.
+    if (slot.op == AOTChainOp::Blend && (slot.in0 == -2 || slot.in1 == -2)) {
       return nullptr;
     }
   }
