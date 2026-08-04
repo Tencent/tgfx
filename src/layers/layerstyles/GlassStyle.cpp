@@ -288,36 +288,31 @@ Rect GlassStyle::filterBackgroundSoft(const Rect& srcRect, float contentScale) {
   float sigma = std::max(0.5f, (_frost / 100.0f) * MaxFrostSigma) * contentScale;
   auto filter = ImageFilter::Blur(sigma, sigma, TileMode::Mirror);
   auto bounds = filter == nullptr ? srcRect : filter->filterBounds(srcRect);
+  if (_refraction > 0 || _lightIntensity > 0) {
+    float maxWidth =
+        FloatNearlyZero(contentScale) ? srcRect.width() : srcRect.width() / contentScale;
+    float maxHeight =
+        FloatNearlyZero(contentScale) ? srcRect.height() : srcRect.height() / contentScale;
+    for (auto owner : owners) {
+      if (owner == nullptr) {
+        continue;
+      }
+      auto ownerBounds = owner->getBounds(owner, false);
+      maxWidth = std::max(maxWidth, ownerBounds.width());
+      maxHeight = std::max(maxHeight, ownerBounds.height());
+    }
+    auto minHalf = std::min(maxWidth, maxHeight) * 0.5f;
+    float refractionOutset =
+        GetRefractionOutset(maxWidth, maxHeight, getRefractionFactor(), getDepthRatio(),
+                             getDispersionFactor(), getGlassThickness(minHalf));
+    refractionOutset = refractionOutset * contentScale + 1.0f;
+    bounds.outset(refractionOutset, refractionOutset);
+  }
   return bounds.makeOutset(1.0f, 1.0f);
 }
 
-Rect GlassStyle::filterBackgroundSharp(const Rect& srcRect, float contentScale) {
-  if (_refraction <= 0 && _lightIntensity <= 0) {
-    return srcRect.makeOutset(1.0f, 1.0f);
-  }
-  float maxWidth = FloatNearlyZero(contentScale) ? srcRect.width() : srcRect.width() / contentScale;
-  float maxHeight =
-      FloatNearlyZero(contentScale) ? srcRect.height() : srcRect.height() / contentScale;
-  // Refraction displacement is defined in the Glass layer's local coordinates. Map the resulting
-  // local outset by contentScale instead of deriving it from a transformed AABB, which can
-  // underestimate the dependency under non-uniform scaling.
-  for (auto owner : owners) {
-    if (owner == nullptr) {
-      continue;
-    }
-    auto ownerBounds = owner->getBounds(owner, false);
-    maxWidth = std::max(maxWidth, ownerBounds.width());
-    maxHeight = std::max(maxHeight, ownerBounds.height());
-  }
-  // filterBackground() may run before shapeType is determined, so cover both paths.
-  auto minHalf = std::min(maxWidth, maxHeight) * 0.5f;
-  float refractionOutset =
-      GetRefractionOutset(maxWidth, maxHeight, getRefractionFactor(), getDepthRatio(),
-                          getDispersionFactor(), getGlassThickness(minHalf));
-  refractionOutset = refractionOutset * contentScale + 1.0f;
-  float sigma = std::max(0.5f, (_frost / 100.0f) * MaxFrostSigma) * contentScale;
-  refractionOutset += sigma * 2.0f + 1.0f;
-  return srcRect.makeOutset(refractionOutset, refractionOutset);
+Rect GlassStyle::filterBackgroundSharp(const Rect& srcRect, float) {
+  return srcRect.makeOutset(1.0f, 1.0f);
 }
 
 void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alpha,
@@ -364,41 +359,6 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       return;
     }
     visibleRect.roundOut();
-
-    // Downscale the full background before subset so all tiles share the same downscaled source.
-    // Applying the scale to the subset would produce different sizes per tile.
-    static constexpr float MAX_FROST_AREA = 1024.0f * 1024.0f;
-    if (_refraction > 0 || _lightIntensity > 0) {
-      auto minHalf = std::min(origWidth, origHeight) * 0.5f;
-      float fullRefractionOutset =
-          GetRefractionOutset(origWidth, origHeight, getRefractionFactor(), getDepthRatio(),
-                              getDispersionFactor(), getGlassThickness(minHalf));
-      fullRefractionOutset = std::ceil(fullRefractionOutset * input.contentScale + 1.0f);
-      float fullWidth = contentWidth + 2.0f * fullRefractionOutset;
-      float fullHeight = contentHeight + 2.0f * fullRefractionOutset;
-      float fullArea = fullWidth * fullHeight;
-      if (fullArea > MAX_FROST_AREA) {
-        frostDownscale = std::sqrt(MAX_FROST_AREA / fullArea);
-      }
-    } else {
-      // The subset already bounds the frost blur region, so pre-scaling the zoomed-in
-      // background would only blur visible detail without reducing the actual blur work.
-    }
-    if (frostDownscale < 1.0f) {
-      int scaledW = std::max(
-          1, static_cast<int>(std::round(static_cast<float>(bgImage->width()) * frostDownscale)));
-      int scaledH = std::max(
-          1, static_cast<int>(std::round(static_cast<float>(bgImage->height()) * frostDownscale)));
-      auto scaledBg = bgImage->makeScaled(scaledW, scaledH, SamplingOptions(FilterMode::Linear));
-      if (scaledBg != nullptr) {
-        bgImage = std::move(scaledBg);
-        bgOffset.x *= frostDownscale;
-        bgOffset.y *= frostDownscale;
-        scaleRatioX *= frostDownscale;
-        scaleRatioY *= frostDownscale;
-        // visibleRect stays in content space; it is not affected by the downscale.
-      }
-    }
 
     refractInputRect = visibleRect;
     if (_refraction > 0 || _lightIntensity > 0) {
@@ -465,13 +425,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
   auto blurFilter = getFrostFilter(input.contentScale * scaleRatioX);
   if (blurFilter != nullptr) {
     Point blurOffset = {};
-    auto clipRect = Rect::MakeWH(bgImage->width(), bgImage->height());
-    if (usesLocalEvaluation) {
-      clipRect = refractInputRect;
-      clipRect.scale(frostDownscale, frostDownscale);
-      clipRect.offset(-processedOffset.x, -processedOffset.y);
-    }
-    auto frostedImage = bgImage->makeWithFilter(blurFilter, &blurOffset, &clipRect);
+    auto frostedImage = bgImage->makeWithFilter(blurFilter, &blurOffset, nullptr);
     if (frostedImage != nullptr) {
       processedBg = frostedImage;
       processedOffset += blurOffset;
