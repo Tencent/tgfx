@@ -288,31 +288,36 @@ Rect GlassStyle::filterBackgroundSoft(const Rect& srcRect, float contentScale) {
   float sigma = std::max(0.5f, (_frost / 100.0f) * MaxFrostSigma) * contentScale;
   auto filter = ImageFilter::Blur(sigma, sigma, TileMode::Mirror);
   auto bounds = filter == nullptr ? srcRect : filter->filterBounds(srcRect);
-  if (_refraction > 0 || _lightIntensity > 0) {
-    float maxWidth =
-        FloatNearlyZero(contentScale) ? srcRect.width() : srcRect.width() / contentScale;
-    float maxHeight =
-        FloatNearlyZero(contentScale) ? srcRect.height() : srcRect.height() / contentScale;
-    for (auto owner : owners) {
-      if (owner == nullptr) {
-        continue;
-      }
-      auto ownerBounds = owner->getBounds(owner, false);
-      maxWidth = std::max(maxWidth, ownerBounds.width());
-      maxHeight = std::max(maxHeight, ownerBounds.height());
-    }
-    auto minHalf = std::min(maxWidth, maxHeight) * 0.5f;
-    float refractionOutset =
-        GetRefractionOutset(maxWidth, maxHeight, getRefractionFactor(), getDepthRatio(),
-                             getDispersionFactor(), getGlassThickness(minHalf));
-    refractionOutset = refractionOutset * contentScale + 1.0f;
-    bounds.outset(refractionOutset, refractionOutset);
-  }
   return bounds.makeOutset(1.0f, 1.0f);
 }
 
-Rect GlassStyle::filterBackgroundSharp(const Rect& srcRect, float) {
-  return srcRect.makeOutset(1.0f, 1.0f);
+Rect GlassStyle::filterBackgroundSharp(const Rect& srcRect, float contentScale) {
+  if (_refraction <= 0 && _lightIntensity <= 0) {
+    return srcRect.makeOutset(1.0f, 1.0f);
+  }
+  float maxWidth = FloatNearlyZero(contentScale) ? srcRect.width() : srcRect.width() / contentScale;
+  float maxHeight =
+      FloatNearlyZero(contentScale) ? srcRect.height() : srcRect.height() / contentScale;
+  // Refraction displacement is defined in the Glass layer's local coordinates. Map the resulting
+  // local outset by contentScale instead of deriving it from a transformed AABB, which can
+  // underestimate the dependency under non-uniform scaling.
+  for (auto owner : owners) {
+    if (owner == nullptr) {
+      continue;
+    }
+    auto ownerBounds = owner->getBounds(owner, false);
+    maxWidth = std::max(maxWidth, ownerBounds.width());
+    maxHeight = std::max(maxHeight, ownerBounds.height());
+  }
+  // filterBackground() may run before shapeType is determined, so cover both paths.
+  auto minHalf = std::min(maxWidth, maxHeight) * 0.5f;
+  float refractionOutset =
+      GetRefractionOutset(maxWidth, maxHeight, getRefractionFactor(), getDepthRatio(),
+                          getDispersionFactor(), getGlassThickness(minHalf));
+  refractionOutset = refractionOutset * contentScale + 1.0f;
+  float sigma = std::max(0.5f, (_frost / 100.0f) * MaxFrostSigma) * contentScale;
+  refractionOutset += sigma * 2.0f + 1.0f;
+  return srcRect.makeOutset(refractionOutset, refractionOutset);
 }
 
 void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alpha,
