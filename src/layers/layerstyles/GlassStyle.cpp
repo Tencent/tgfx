@@ -404,6 +404,8 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
         bgOffset.y *= frostDownscale;
         scaleRatioX *= frostDownscale;
         scaleRatioY *= frostDownscale;
+      } else {
+        frostDownscale = 1.0f;
       }
     }
 
@@ -421,12 +423,12 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       refractInputRect.roundOut();
     }
     auto backgroundInputRect = refractInputRect;
-    auto fullResolutionBlur = getFrostFilter(input.contentScale * scaleRatioX);
-    if (fullResolutionBlur != nullptr) {
-      backgroundInputRect = fullResolutionBlur->filterBounds(refractInputRect);
+    backgroundInputRect.scale(frostDownscale, frostDownscale);
+    auto backgroundBlur = getFrostFilter(input.contentScale * scaleRatioX);
+    if (backgroundBlur != nullptr) {
+      backgroundInputRect = backgroundBlur->filterBounds(backgroundInputRect);
       backgroundInputRect.outset(1.0f, 1.0f);
     }
-    backgroundInputRect.scale(frostDownscale, frostDownscale);
     backgroundInputRect.roundOut();
     auto availableBackground =
         Rect::MakeXYWH(bgOffset.x, bgOffset.y, static_cast<float>(bgImage->width()),
@@ -457,14 +459,16 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
         std::max(1, static_cast<int>(std::round(static_cast<float>(bgImage->width()) * bgScale)));
     int scaledH =
         std::max(1, static_cast<int>(std::round(static_cast<float>(bgImage->height()) * bgScale)));
-    scaleRatioX = static_cast<float>(scaledW) / static_cast<float>(bgImage->width());
-    scaleRatioY = static_cast<float>(scaledH) / static_cast<float>(bgImage->height());
+    float bgScaleX = static_cast<float>(scaledW) / static_cast<float>(bgImage->width());
+    float bgScaleY = static_cast<float>(scaledH) / static_cast<float>(bgImage->height());
     bgImage = bgImage->makeScaled(scaledW, scaledH, SamplingOptions(FilterMode::Linear));
     if (bgImage == nullptr) {
       return;
     }
-    bgOffset.x *= scaleRatioX;
-    bgOffset.y *= scaleRatioY;
+    bgOffset.x *= bgScaleX;
+    bgOffset.y *= bgScaleY;
+    scaleRatioX *= bgScaleX;
+    scaleRatioY *= bgScaleY;
   }
 
   std::shared_ptr<Image> processedBg = bgImage;

@@ -77,6 +77,11 @@ void GlassUDFTentBlurFragmentProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppend("{");
     fragBuilder->codeAppendf("float radius = %s.%s;", radiusName.c_str(), radiusSwizzle);
     fragBuilder->codeAppend("float total = 0.0;");
+    // k and sign maintained incrementally to avoid integer division/modulo in the loop.
+    // Fixed maxRadius upper bound for GLSL ES 1.0 constant-loop constraints; actual
+    // exit is via the weight<=0 break at radius+1 iterations.
+    fragBuilder->codeAppend("int k = 1;");
+    fragBuilder->codeAppend("float s = 1.0;");
     fragBuilder->codeAppendf("for (int j = 0; j <= %d; ++j) {", maxRadius);
     fragBuilder->codeAppend("float offsetValue;");
     fragBuilder->codeAppend("float weight;");
@@ -84,8 +89,6 @@ void GlassUDFTentBlurFragmentProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppend("  offsetValue = 0.0;");
     fragBuilder->codeAppend("  weight = radius;");
     fragBuilder->codeAppend("} else {");
-    fragBuilder->codeAppend("  int k = 2 * ((j - 1) / 2) + 1;");
-    fragBuilder->codeAppend("  float s = (j % 2 == 1) ? 1.0 : -1.0;");
     fragBuilder->codeAppend("  float w1 = max(0.0, radius - float(k));");
     fragBuilder->codeAppend("  float w2 = max(0.0, radius - float(k + 1));");
     fragBuilder->codeAppend("  weight = w1 + w2;");
@@ -100,6 +103,10 @@ void GlassUDFTentBlurFragmentProcessor::emitCode(EmitArgs& args) const {
     } else {
       fragBuilder->codeAppendf("%s += %s.a * weight;", sumName, tempColor.c_str());
     }
+    fragBuilder->codeAppend("if (j > 0) {");
+    fragBuilder->codeAppend("  if (s < 0.0) { k += 2; }");
+    fragBuilder->codeAppend("  s = -s;");
+    fragBuilder->codeAppend("}");
     fragBuilder->codeAppend("}");
     fragBuilder->codeAppendf("%s /= total;", sumName);
     fragBuilder->codeAppend("}");

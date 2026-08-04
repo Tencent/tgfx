@@ -102,8 +102,10 @@ void GLSLTentBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
   } else {
     fragBuilder->codeAppendf("sum += %s.a * weight;", tempColor.c_str());
   }
+  fragBuilder->codeAppend("if (j > 0) {");
   fragBuilder->codeAppend("  if (s < 0.0) { k += 2; }");
   fragBuilder->codeAppend("  s = -s;");
+  fragBuilder->codeAppend("}");
   fragBuilder->codeAppend("}");
 
   // Normalize and pack result to RGBA8.
