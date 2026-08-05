@@ -162,14 +162,29 @@ export const setColorSpace = (
     }
 };
 
+// Resolves the GPUDevice from an emscripten manager id without throwing. Manager.get() aborts
+// (ASSERTIONS builds) or throws a TypeError (release builds) for unregistered ids, which would
+// bypass the preinitializedWebGPUDevice fallback below. Accessing the internal objects map is the
+// pattern emscripten's own libwebgpu.js uses (WebGPU.mgrDevice.objects[deviceId].object).
+const resolveWebGPUDevice = (module: any, deviceId?: number): any => {
+    const device = deviceId ? module?.WebGPU?.mgrDevice?.objects?.[deviceId]?.object : null;
+    return device ?? module?.preinitializedWebGPUDevice;
+};
+
 // Configures the WebGPU canvas context to use the target color space. The emscripten surface
 // configuration (wgpuSurfaceConfigure) does not expose the colorSpace option, so we re-run
 // GPUCanvasContext.configure() here with the same parameters plus the desired color space.
 // getContext('webgpu') is idempotent and returns the same context object already used by the
 // emscripten WebGPU surface, so reconfiguring it only updates the color space.
+// format, usage and alphaMode are passed in from the C++ side so that the WGPUSurfaceConfiguration
+// stays the single source of truth for the canvas configuration.
 export const configureWebGPUColorSpace = (
     canvasSelector: string,
-    colorSpace: WindowColorSpace
+    colorSpace: WindowColorSpace,
+    deviceId?: number,
+    format?: string,
+    usage?: number,
+    alphaMode?: string,
 ) => {
     if (colorSpace === WindowColorSpace.Others) {
         return false;
@@ -182,12 +197,12 @@ export const configureWebGPUColorSpace = (
     if (!context || typeof context.configure !== 'function') {
         return false;
     }
-    // Reuse the same GPUDevice the C++ side rendered with. This assumes the device passed to
-    // WebGPUWindow::MakeFrom() is the module's preinitializedWebGPUDevice, which is what
-    // emscripten's WebGPU surface uses under the hood. Passing a custom device via
-    // WebGPUDevice::MakeFrom() is currently unsupported here, because the canvas context would be
-    // configured on a different device than the one the C++ side submits to.
-    const device = (getTGFXModule() as any)?.preinitializedWebGPUDevice;
+    // Resolve the GPUDevice the C++ side renders with. The C++ side passes its WGPUDevice handle so
+    // this function can look up the same device object via the WebGPU runtime export
+    // (Module.WebGPU, exported via EXPORTED_RUNTIME_METHODS), which also covers devices passed in
+    // via WebGPUDevice::MakeFrom(). When the handle cannot be resolved, fall back to the module's
+    // preinitializedWebGPUDevice for the default device path.
+    const device = resolveWebGPUDevice(getTGFXModule(), deviceId);
     if (!device) {
         return false;
     }
@@ -195,9 +210,9 @@ export const configureWebGPUColorSpace = (
     const renderAttachment = gpuTextureUsage ? gpuTextureUsage.RENDER_ATTACHMENT : 0x10;
     context.configure({
         device: device,
-        format: 'bgra8unorm',
-        usage: renderAttachment,
-        alphaMode: 'premultiplied',
+        format: format ?? 'bgra8unorm',
+        usage: usage ?? renderAttachment,
+        alphaMode: alphaMode ?? 'premultiplied',
         colorSpace: colorSpace === WindowColorSpace.DisplayP3 ? 'display-p3' : 'srgb',
     });
     return true;
@@ -223,21 +238,26 @@ export const getBytesFromPath = async (module: TGFX, path: string) => {
 };
 
 export const uploadVideoToWebGPUTexture = (source: HTMLVideoElement, texturePtr: number,
-                                           width: number, height: number) => {
+                                           width: number, height: number, deviceId?: number) => {
     if (!source || !texturePtr) {
         return;
     }
     syncVideoFrame(source);
-    // Emscripten maps WGPUTexture C pointers to JS GPUTexture objects via WebGPU.mgrTexture.
-    const WebGPU = (getTGFXModule() as any)?.WebGPU;
+    // Emscripten maps WGPUTexture C pointers to JS GPUTexture objects via WebGPU.mgrTexture,
+    // exported on the module through EXPORTED_RUNTIME_METHODS.
+    const module = getTGFXModule() as any;
+    const WebGPU = module?.WebGPU;
     if (!WebGPU) {
         return;
     }
-    const gpuTexture = WebGPU.mgrTexture.get(texturePtr);
+    const gpuTexture = WebGPU.mgrTexture?.objects?.[texturePtr]?.object;
     if (!gpuTexture) {
         return;
     }
-    const device: any = (getTGFXModule() as any)?.preinitializedWebGPUDevice;
+    // Resolve the GPUDevice that owns the texture. The C++ side passes its WGPUDevice handle so the
+    // queue used for upload matches the device the texture was created on. Fall back to the
+    // module's preinitializedWebGPUDevice for the default device path.
+    const device = resolveWebGPUDevice(module, deviceId);
     if (!device || !device.queue) {
         return;
     }
