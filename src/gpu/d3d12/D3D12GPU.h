@@ -23,6 +23,7 @@
 #include <deque>
 #include <list>
 #include <memory>
+#include <string>
 #include <unordered_map>
 #include <vector>
 #include "D3D12CommandListPool.h"
@@ -326,22 +327,20 @@ class D3D12GPU : public GPU {
   std::shared_ptr<ReturnQueue> returnQueue = ReturnQueue::Make();
   std::unordered_map<uint32_t, std::shared_ptr<Sampler>> samplerCache = {};
 
-  // Process-wide cache of compiled shader modules keyed by (stage, hash(GLSL source)). The
-  // upper layer caches Programs by ProgramKey, but two unrelated programs frequently share
-  // the same vertex shader (or the same fragment shader template). Without this cache every
-  // program build re-runs GLSL -> SPIR-V -> HLSL -> DXBC even though the bytecode would be
-  // byte-identical. Empirical measurement on the test suite: 700 createShaderModule calls
-  // produce only 340 distinct sources (~51% redundancy).
+  // Cache compiled shader modules. The upper layer's Program cache does not deduplicate
+  // individual vertex/fragment stages, so unrelated programs sharing one stage would otherwise
+  // re-run the GLSL -> SPIR-V -> HLSL -> DXBC chain on every build.
   struct ShaderCacheKey {
     uint32_t stage = 0;
-    size_t sourceHash = 0;
+    std::string code;
     bool operator==(const ShaderCacheKey& other) const {
-      return stage == other.stage && sourceHash == other.sourceHash;
+      return stage == other.stage && code == other.code;
     }
   };
   struct ShaderCacheKeyHash {
     size_t operator()(const ShaderCacheKey& k) const noexcept {
-      return k.sourceHash ^ (static_cast<size_t>(k.stage) * 0x9E3779B97F4A7C15ull);
+      return std::hash<std::string>{}(k.code) ^
+             (static_cast<size_t>(k.stage) * 0x9E3779B97F4A7C15ull);
     }
   };
   std::unordered_map<ShaderCacheKey, std::shared_ptr<D3D12ShaderModule>, ShaderCacheKeyHash>

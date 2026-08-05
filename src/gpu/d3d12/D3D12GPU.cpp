@@ -386,19 +386,15 @@ uint32_t D3D12GPU::MakeSamplerKey(const SamplerDescriptor& descriptor) {
 
 std::shared_ptr<ShaderModule> D3D12GPU::createShaderModule(
     const ShaderModuleDescriptor& descriptor) {
-  // Cache compiled DXBC blobs by (stage, hash(GLSL source)). The upper layer's program cache
-  // works at the (vertex+fragment) tuple level, so two distinct programs sharing one of the two
-  // sources still hit our backend twice. Caching here lets the second hit skip the full
-  // GLSL -> SPIR-V -> HLSL -> DXBC chain.
   ShaderCacheKey key = {};
   key.stage = static_cast<uint32_t>(descriptor.stage);
-  key.sourceHash = std::hash<std::string>{}(descriptor.code);
+  key.code = descriptor.code;
   if (auto it = shaderModuleCache.find(key); it != shaderModuleCache.end()) {
     return it->second;
   }
   auto module = D3D12ShaderModule::Make(this, descriptor);
   if (module != nullptr) {
-    shaderModuleCache.emplace(key, module);
+    shaderModuleCache.emplace(std::move(key), module);
   }
   return module;
 }
