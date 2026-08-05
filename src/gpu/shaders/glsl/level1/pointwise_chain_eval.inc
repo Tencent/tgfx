@@ -76,7 +76,12 @@ vec4 evalChainSlot() {
   }
   if (Packed.x == OP_TEXTURE) {
     vec4 texColor = chainTexFetch;
-    if (Packed.w != 0) {
+    if ((Packed.w & 2) != 0) {
+      // Alpha-only leaf (R8 on Metal returns (r,0,0,1)): splat .r into every channel so the alpha
+      // channel carries the mask value, matching the runtime TextureEffect alpha-only readback.
+      texColor = vec4(texColor.r);
+    }
+    if ((Packed.w & 1) != 0) {
       // Color-source leaves are modulated by the geometry color's alpha, matching the runtime
       // paint-alpha wrap. Mask and blend-operand leaves sample raw, as the runtime emits them.
       texColor *= Color.a;

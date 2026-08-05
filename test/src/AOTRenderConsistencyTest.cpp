@@ -29,6 +29,7 @@
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/ImageFilter.h"
+#include "tgfx/core/MaskFilter.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Shader.h"
@@ -626,6 +627,66 @@ TGFX_TEST(AOTRenderConsistencyTest, AnalyticRectClipFoldsIntoChain) {
     }
   }
   ExpectBitmapsIdentical("aarect-clip-fold-chain", candidate, reference, width, height);
+}
+
+// An alpha-only texture mask (R8 on Metal) folded into the pointwise chain: the kernel must splat
+// the sampled .r into the alpha channel via the leaf's selector bit, otherwise the mask reads as
+// fully opaque. Byte-exact against the runtime path proves the splat matches the JIT emission.
+TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyMaskFoldsIntoChain) {
+  Bitmap maskBitmap = {};
+  ASSERT_TRUE(maskBitmap.allocPixels(64, 64, true));
+  auto* maskPixels = static_cast<uint8_t*>(maskBitmap.lockPixels());
+  ASSERT_TRUE(maskPixels != nullptr);
+  auto rowBytes = maskBitmap.rowBytes();
+  for (size_t y = 0; y < 64; ++y) {
+    for (size_t x = 0; x < 64; ++x) {
+      maskPixels[y * rowBytes + x] = static_cast<uint8_t>((x * 4 + y * 2) % 256);
+    }
+  }
+  maskBitmap.unlockPixels();
+  auto maskImage = Image::MakeFrom(maskBitmap);
+  ASSERT_TRUE(maskImage != nullptr);
+  auto maskFilter = MaskFilter::MakeShader(
+      Shader::MakeImageShader(maskImage, TileMode::Clamp, TileMode::Clamp));
+  ASSERT_TRUE(maskFilter != nullptr);
+  auto colorImage = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_TRUE(colorImage != nullptr);
+  int width = 100;
+  int height = 100;
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  for (int pass = 0; pass < 2; ++pass) {
+    bool useBundle = pass == 1;
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto* cache = context->precompiledShaderCache();
+    if (useBundle) {
+      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+    } else {
+      cache->unload();
+    }
+    context->globalCache()->clearPrograms();
+    auto surface = Surface::Make(context, width, height);
+    ASSERT_TRUE(surface != nullptr);
+    Paint paint = {};
+    // An image shader color source puts the draw on the decomposition route, so the alpha-only
+    // mask folds into the chain as a second texture leaf with the splat flag set.
+    paint.setShader(Shader::MakeImageShader(colorImage));
+    paint.setMaskFilter(maskFilter);
+    surface->getCanvas()->drawRect(Rect::MakeWH(100, 100), paint);
+    context->flushAndSubmit(true);
+    auto* outBitmap = useBundle ? &candidate : &reference;
+    ASSERT_TRUE(outBitmap->allocPixels(width, height));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+    if (useBundle) {
+      cache->unload();
+    }
+  }
+  ExpectBitmapsIdentical("alpha-only-mask-fold-chain", candidate, reference, width, height);
 }
 
 // Encoded images use GL_TEXTURE_RECTANGLE on macOS. The precompiled textured kernel accepts only

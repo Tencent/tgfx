@@ -684,8 +684,9 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
       return std::nullopt;
     }
     auto* texture = static_cast<const TextureEffect*>(leaf);
-    // A leaf subset is a runtime uniform (the kernel always clamps, full bounds when absent).
-    if (texture->isYUV() || texture->isAlphaOnly() || texture->hasRGBAAA() ||
+    // A leaf subset is a runtime uniform (the kernel always clamps, full bounds when absent), and
+    // an alpha-only leaf splats .r through its slot selector bit, so neither needs a variant.
+    if (texture->isYUV() || texture->hasRGBAAA() ||
         leaf->coordTransform(0)->matrix.hasPerspective()) {
       return std::nullopt;
     }

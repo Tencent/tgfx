@@ -953,15 +953,14 @@ static bool IsFoldableLocalMask(const FragmentProcessor* coverageFP) {
   auto name = child->name();
   if (name == "TextureEffect") {
     auto* textureEffect = static_cast<const TextureEffect*>(child);
-    return !textureEffect->isYUV() && !textureEffect->isAlphaOnly() && !textureEffect->hasRGBAAA();
+    // Alpha-only masks fold fine: the chain kernel splats .r into the alpha channel for such
+    // leaves via their slot selector bit.
+    return !textureEffect->isYUV() && !textureEffect->hasRGBAAA();
   }
   if (name == "TiledTextureEffect") {
     auto* tiledEffect = static_cast<const TiledTextureEffect*>(child);
-    if (tiledEffect->isAlphaOnly()) {
-      return false;
-    }
     // The chain kernel's tiled path covers the single-tap wrap modes; only the mipmap-repeat
-    // modes (4,5) cannot fold.
+    // modes (4,5) cannot fold. Alpha-only tiled masks fold via the same .r splat as plain ones.
     int modeX = 0;
     int modeY = 0;
     tiledEffect->getShaderModes(&modeX, &modeY);

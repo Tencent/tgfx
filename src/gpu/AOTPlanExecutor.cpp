@@ -424,6 +424,10 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(BlockAllocator* allocator,
         // modulation folded into its read (as the runtime's SrcIn wrap does). Any other texture —
         // a coverage mask or a blend operand — must sample raw, matching the runtime emission.
         slot.textureModulate = !node->inputs.empty() && node->inputs[0] == AOTNodeID(0) ? 1 : 0;
+        // Alpha-only leaves (e.g. shape masks) need the kernel to splat .r into all channels; the
+        // raw sample would otherwise read alpha as constant 1.
+        slot.textureAlphaOnly =
+            static_cast<const TextureEffect*>(leaf.get())->isAlphaOnly() ? 1 : 0;
         auto parameters = std::get_if<AOTTextureParameters>(&node->parameters);
         if (parameters != nullptr && parameters->samplingKind == AOTTextureSamplingKind::Tiled &&
             parameters->tiledRecipe.has_value() &&

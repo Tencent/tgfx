@@ -50,6 +50,11 @@ struct AOTChainSlot {
   // directly from the paint color), 0 samples raw (blend operands such as coverage masks, which
   // the runtime emits without input-alpha modulation).
   int textureModulate = 0;
+  // OP_TEXTURE only: 1 marks an alpha-only leaf (R8 on Metal, so the sampler returns (r,0,0,1)).
+  // The kernel splats .r into all channels so the alpha channel carries the mask value, matching
+  // the runtime TextureEffect readback. Uploaded as bit 1 of the slot selector; textureModulate
+  // remains bit 0.
+  int textureAlphaOnly = 0;
   AOTColorMatrixParameters colorMatrix = {};
   AOTLumaParameters luma = {};
   AOTAlphaThresholdParameters alphaThreshold = {};
