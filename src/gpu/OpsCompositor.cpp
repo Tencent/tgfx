@@ -736,9 +736,23 @@ std::pair<bool, bool> OpsCompositor::needComputeBounds(const Brush& brush, bool 
   bool hasShaderDerivedChain =
       brush.shader != nullptr && brush.shader->type() == Shader::Type::ColorFilter;
   bool hasDecomposableColorSource = hasImageFill || brush.shader != nullptr;
+  // An anti-aliased, non-pixel-aligned rect clip produces an AARectEffect coverage FP, which folds
+  // into the color chain as a rect-coverage node. Pixel-aligned or non-AA rect clips become a
+  // scissor instead and carry no coverage, so they do not need the evaluation.
+  bool clipProducesFoldableCoverage = false;
+  if (pendingClip.state() == ClipState::Rect) {
+    for (const auto& element : pendingClip.elements()) {
+      if (element.isValid()) {
+        clipProducesFoldableCoverage =
+            element.isRect() && element.isAntiAlias() && !element.isPixelAligned();
+        break;
+      }
+    }
+  }
   if (cache != nullptr && cache->isLoaded() && cache->decompositionEnabled() &&
       hasDecomposableColorSource &&
-      (brush.colorFilter != nullptr || hasShaderDerivedChain || brush.maskFilter != nullptr)) {
+      (brush.colorFilter != nullptr || hasShaderDerivedChain || brush.maskFilter != nullptr ||
+       clipProducesFoldableCoverage)) {
     needDeviceBounds = true;
   }
   if (BlendModeNeedDstTexture(brush.blendMode, hasCoverage)) {
@@ -1050,7 +1064,11 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     }
   }
 
+  const FragmentProcessor* clipCoverage = nullptr;
   if (appliedClip.coverageFP) {
+    // Keep a raw pointer for the fold evaluation below: addCoverageFP takes ownership, so
+    // appliedClip.coverageFP is null afterwards.
+    clipCoverage = appliedClip.coverageFP.get();
     op->addCoverageFP(std::move(appliedClip.coverageFP));
   }
   if (appliedClip.scissor.has_value()) {
@@ -1078,16 +1096,36 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
       colorProcessors.push_back(processor.get());
     }
     // A local texture mask is a pointwise multiply (input * mask.a), so it can be fused into the
-    // color chain as an extra blend node with its own texture leaf. Folding is only valid for
-    // blends that never need a dst texture: the PorterDuff XP path composites coverage separately,
-    // while EmptyXferProcessor draws produce identical pixels either way. When the fold is
-    // attempted, the color-only route is skipped: if fusion fails, the plain route still renders
-    // the mask correctly as a trailing color processor.
-    bool foldMask = appliedClip.coverageFP == nullptr && IsFoldableLocalMask(maskCoverage) &&
+    // color chain as an extra blend node with its own texture leaf; an analytic AA-rect clip is the
+    // same multiply with a coordinate-derived coverage, fusing as a rect-coverage node. Both forms
+    // may fold independently (mask from the brush, clip coverage from the clip stack), and both
+    // fold together when a draw carries the two. Folding is only valid for blends that never need
+    // a dst texture: the PorterDuff XP path composites coverage separately, while
+    // EmptyXferProcessor draws produce identical pixels either way. When the fold is attempted, the
+    // color-only route is skipped: if fusion fails, the plain route still renders the mask
+    // correctly as a trailing color processor.
+    std::vector<const FragmentProcessor*> foldedProcessors = colorProcessors;
+    bool foldBlocked = false;
+    if (maskCoverage != nullptr) {
+      if (IsFoldableLocalMask(maskCoverage)) {
+        foldedProcessors.push_back(maskCoverage);
+      } else {
+        foldBlocked = true;
+      }
+    }
+    if (clipCoverage != nullptr) {
+      // Only the analytic AA-rect clip coverage lowers into the chain today; a clip-mask texture
+      // (DeviceSpaceTextureEffect) is device-space sampled and stays a coverage FP, which blocks
+      // the fold entirely so the draw keeps the plain route.
+      if (clipCoverage->name() == "AARectEffect") {
+        foldedProcessors.push_back(clipCoverage);
+      } else {
+        foldBlocked = true;
+      }
+    }
+    bool foldMask = !foldBlocked && foldedProcessors.size() > colorProcessors.size() &&
                     !BlendModeNeedDstTexture(brush.blendMode, true);
     if (foldMask) {
-      std::vector<const FragmentProcessor*> foldedProcessors = colorProcessors;
-      foldedProcessors.push_back(maskCoverage);
       AOTEffectGraph foldedGraph = {};
       AOTEffectPlan foldedPlan = {};
       if (AOTEffectDecomposer::Lower(foldedProcessors, &foldedGraph) &&

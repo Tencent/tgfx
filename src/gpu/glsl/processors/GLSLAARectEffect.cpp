@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLAARectEffect.h"
+#include "gpu/AOTEffect.h"
 
 namespace tgfx {
 PlacementPtr<AARectEffect> AARectEffect::Make(BlockAllocator* allocator, const Rect& rect) {
@@ -24,6 +25,15 @@ PlacementPtr<AARectEffect> AARectEffect::Make(BlockAllocator* allocator, const R
 }
 
 GLSLAARectEffect::GLSLAARectEffect(const Rect& rect) : AARectEffect(rect) {
+}
+
+bool AARectEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const {
+  if (builder == nullptr || output == nullptr) {
+    return false;
+  }
+  AOTRectCoverageParameters parameters = {};
+  parameters.rect = {rect.left, rect.top, rect.right, rect.bottom};
+  return builder->addRectCoverage(input, parameters, output);
 }
 
 void GLSLAARectEffect::emitCode(EmitArgs& args) const {

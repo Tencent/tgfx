@@ -339,6 +339,7 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
       case AOTEffectKind::Luma:
       case AOTEffectKind::ConstColor:
       case AOTEffectKind::Blend:
+      case AOTEffectKind::RectCoverage:
         break;
       default:
         // GeometryColor only legal at index 0; anything else (Gather/Neighborhood/External) is not

@@ -408,6 +408,7 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(BlockAllocator* allocator,
   leaves.reserve(leafCount);
   int tiledLeafIndex = -1;
   AOTTiledTextureRecipe tiledRecipe = {};
+  bool hasRectCoverage = false;
   std::vector<AOTChainSlot> slots(ordered.size());
   for (size_t index = 0; index < ordered.size(); ++index) {
     auto node = graph.nodeAt(ordered[index]);
@@ -478,6 +479,22 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(BlockAllocator* allocator,
         slot.blend = *parameters;
         slot.in0 = MapChainInput(slotOf, node->inputs[0]);
         slot.in1 = MapChainInput(slotOf, node->inputs[1]);
+        break;
+      }
+      case AOTEffectKind::RectCoverage: {
+        auto parameters = std::get_if<AOTRectCoverageParameters>(&node->parameters);
+        if (parameters == nullptr || node->inputs.size() != 1) {
+          return nullptr;
+        }
+        // The kernel carries one chain-wide CoverageRect uniform, so a second rect-coverage node
+        // cannot be represented.
+        if (hasRectCoverage) {
+          return nullptr;
+        }
+        hasRectCoverage = true;
+        slot.op = AOTChainOp::AARectCoverage;
+        slot.rectCoverage = *parameters;
+        slot.in0 = MapChainInput(slotOf, node->inputs[0]);
         break;
       }
       default:

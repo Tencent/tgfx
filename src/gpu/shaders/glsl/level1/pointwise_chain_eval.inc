@@ -16,6 +16,7 @@
 #define OP_TEXTURE 5
 #define OP_CONST_COLOR 6
 #define OP_BLEND 7
+#define OP_AARECT_COVERAGE 8
 
 #define CS_UNPREMUL 1
 #define CS_LINEARIZE 2
@@ -95,6 +96,14 @@ vec4 evalChainSlot() {
   if (Packed.x == OP_BLEND) {
     vec4 in1 = Packed.z == -1 ? Color : (Packed.z < 0 ? vec4(0.0) : chainResults[Packed.z]);
     return xpBlendColors(in0, in1, Packed.w);
+  }
+  if (Packed.x == OP_AARECT_COVERAGE) {
+    // Analytic AA-rect coverage (identical math to GLSLAARectEffect): falloff from the fragment's
+    // distance to the rect edges, evaluated in destination device coordinates via gl_FragCoord.
+    highp vec4 dists4 =
+        clamp(vec4(1.0, 1.0, -1.0, -1.0) * vec4(gl_FragCoord.xyxy - CoverageRect), 0.0, 1.0);
+    highp vec2 dists2 = dists4.xy + dists4.zw - 1.0;
+    return in0 * (dists2.x * dists2.y);
   }
   vec4 color = in0;
   vec4 result;

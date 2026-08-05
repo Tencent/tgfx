@@ -264,10 +264,9 @@ TGFX_TEST(AOTEffectTest, ChannelPermutationClassification) {
 
 TGFX_TEST(AOTEffectTest, UnsupportedProcessorFailsAtomically) {
   BlockAllocator allocator;
-  auto unsupported = AARectEffect::Make(&allocator, Rect::MakeWH(2, 2));
-  ASSERT_NE(unsupported, nullptr);
+  ShapeRejectingFragmentProcessor unsupported;
   AOTEffectGraph graph;
-  EXPECT_FALSE(AOTEffectDecomposer::Lower({unsupported.get()}, &graph));
+  EXPECT_FALSE(AOTEffectDecomposer::Lower({&unsupported}, &graph));
   EXPECT_EQ(graph.nodeCount(), 0u);
   EXPECT_FALSE(graph.root().isValid());
 }
@@ -935,6 +934,34 @@ TGFX_TEST(AOTEffectTest, PerlinNoisePlusOneOpFusesToSinglePass) {
   EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PerlinNoiseFill);
   EXPECT_EQ(plan.passes[0].nodes, std::vector<AOTNodeID>({AOTNodeID(1), AOTNodeID(2)}));
   EXPECT_FALSE(plan.passes[0].materializesOutput);
+  EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
+}
+
+TGFX_TEST(AOTEffectTest, RectCoverageFoldsIntoPointwiseChain) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  auto texture = MakeTextureProcessor(context, &allocator, PixelFormat::RGBA_8888);
+  ASSERT_NE(texture, nullptr);
+  auto rectCoverage = AARectEffect::Make(&allocator, Rect::MakeLTRB(10.5f, 10.5f, 90.5f, 90.5f));
+  ASSERT_NE(rectCoverage, nullptr);
+
+  AOTEffectGraph graph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower({texture.get(), rectCoverage.get()}, &graph));
+  ASSERT_EQ(graph.nodeCount(), 3u);
+  auto node = graph.nodeAt(AOTNodeID(2));
+  ASSERT_NE(node, nullptr);
+  EXPECT_EQ(node->kind, AOTEffectKind::RectCoverage);
+  auto parameters = std::get_if<AOTRectCoverageParameters>(&node->parameters);
+  ASSERT_NE(parameters, nullptr);
+  EXPECT_FLOAT_EQ(parameters->rect[0], 10.5f);
+  EXPECT_FLOAT_EQ(parameters->rect[2], 90.5f);
+
+  AOTEffectPlan plan;
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan));
+  ASSERT_EQ(plan.passes.size(), 1u);
+  EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
   EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
 }
 

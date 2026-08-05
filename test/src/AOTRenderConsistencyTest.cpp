@@ -587,6 +587,47 @@ TGFX_TEST(AOTRenderConsistencyTest, PerlinNoiseLuminanceAlphaThreshold) {
   ExpectBitmapsIdentical("perlin-luminance-alphathreshold", candidate, reference, width, height);
 }
 
+// An anti-aliased, non-pixel-aligned rect clip produces an AARectEffect coverage FP. It must fold
+// into the pointwise chain as an OP_AARECT_COVERAGE node, so a clipped texture draw hits
+// PointwiseChainShader in one pass and stays byte-identical to the runtime path.
+TGFX_TEST(AOTRenderConsistencyTest, AnalyticRectClipFoldsIntoChain) {
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_TRUE(image != nullptr);
+  int width = 130;
+  int height = 130;
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  for (int pass = 0; pass < 2; ++pass) {
+    bool useBundle = pass == 1;
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto* cache = context->precompiledShaderCache();
+    if (useBundle) {
+      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+    } else {
+      cache->unload();
+    }
+    context->globalCache()->clearPrograms();
+    auto surface = Surface::Make(context, width, height);
+    ASSERT_TRUE(surface != nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clipRect(Rect::MakeLTRB(10.25f, 10.5f, 119.75f, 119.5f), true);
+    canvas->drawImage(image, 10, 10);
+    context->flushAndSubmit(true);
+    auto* outBitmap = useBundle ? &candidate : &reference;
+    ASSERT_TRUE(outBitmap->allocPixels(width, height));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+    if (useBundle) {
+      cache->unload();
+    }
+  }
+  ExpectBitmapsIdentical("aarect-clip-fold-chain", candidate, reference, width, height);
+}
+
 // Encoded images use GL_TEXTURE_RECTANGLE on macOS. The precompiled textured kernel accepts only
 // TextureType::TwoD, so strict preparation must reject the plan before any pass executes and render
 // the untouched original draw through the runtime fallback.

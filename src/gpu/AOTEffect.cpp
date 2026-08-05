@@ -123,6 +123,15 @@ bool AOTNodeBuilder::addPerlinNoiseSource(AOTNodeID input,
   return addUnaryNode(AOTEffectKind::PerlinNoiseSource, input, traits, parameters, output);
 }
 
+bool AOTNodeBuilder::addRectCoverage(AOTNodeID input, const AOTRectCoverageParameters& parameters,
+                                     AOTNodeID* output) {
+  // Analytic coverage read from gl_FragCoord: pointwise and consumes the input color, but
+  // multiplying alpha by the rect falloff changes the alpha representation, so mark it as
+  // preserving neither that nor the color space.
+  EffectTraits traits = {EffectDomain::Pointwise, EffectInputUsage::ColorRGBA, false, false, false};
+  return addUnaryNode(AOTEffectKind::RectCoverage, input, traits, parameters, output);
+}
+
 bool AOTNodeBuilder::finish(AOTNodeID root, AOTEffectGraph* graph) const {
   if (graph == nullptr || !contains(root)) {
     return false;

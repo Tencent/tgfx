@@ -36,6 +36,7 @@ enum class AOTChainOp : int {
   Texture = 5,
   ConstColor = 6,
   Blend = 7,
+  AARectCoverage = 8,
 };
 
 /// One node of a pointwise DAG after flattening into the fused kernel's slot array. in0/in1 are
@@ -55,6 +56,10 @@ struct AOTChainSlot {
   AOTColorSpaceXformParameters colorSpaceXform = {};
   AOTConstColorParameters constColor = {};
   AOTBlendParameters blend = {};
+  // OP_AARECT_COVERAGE only: the clip rect in device coordinates. The kernel reads the chain-wide
+  // CoverageRect uniform, so at most one slot per chain may carry this op (enforced by the
+  // builder).
+  AOTRectCoverageParameters rectCoverage = {};
 };
 
 /**

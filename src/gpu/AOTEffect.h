@@ -80,6 +80,7 @@ enum class AOTEffectKind {
   ConstColor,
   Blend,
   PerlinNoiseSource,
+  RectCoverage,
 };
 
 enum class EffectDomain {
@@ -187,10 +188,19 @@ struct AOTPerlinNoiseParameters {
   Matrix uvMatrix = {};
 };
 
+// Analytic anti-aliased rect coverage (AARectEffect, produced by AA rect clips). Multiplies the
+// input color by a per-fragment coverage computed from gl_FragCoord and the rect, so it is a
+// pointwise node that reads the destination device coordinate directly and needs no texture or
+// varying. rect is {left, top, right, bottom} in device coordinates, already origin-flipped by the
+// clip code; the 0.5 outset for the AA falloff is applied at uniform upload time.
+struct AOTRectCoverageParameters {
+  std::array<float, 4> rect = {};
+};
+
 using AOTEffectParameters =
     std::variant<std::monostate, AOTTextureParameters, AOTColorMatrixParameters, AOTLumaParameters,
                  AOTAlphaThresholdParameters, AOTColorSpaceXformParameters, AOTConstColorParameters,
-                 AOTBlendParameters, AOTPerlinNoiseParameters>;
+                 AOTBlendParameters, AOTPerlinNoiseParameters, AOTRectCoverageParameters>;
 
 // Runtime-selected pointwise operator applied by the fused kernels (PointwiseTail, PointwiseChain
 // and PerlinNoiseFill). The values mirror the OP_* constants in pointwise_op.inc: the kernels
@@ -265,6 +275,9 @@ class AOTNodeBuilder {
 
   bool addPerlinNoiseSource(AOTNodeID input, const AOTPerlinNoiseParameters& parameters,
                             AOTNodeID* output);
+
+  bool addRectCoverage(AOTNodeID input, const AOTRectCoverageParameters& parameters,
+                       AOTNodeID* output);
 
   bool finish(AOTNodeID root, AOTEffectGraph* graph) const;
 

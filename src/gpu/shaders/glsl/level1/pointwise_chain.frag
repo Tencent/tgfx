@@ -51,6 +51,9 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 ChainDstTF0;
   vec4 ChainDstTF1;
   int ChainDstTFType;
+  // Chain-wide AA-rect clip for OP_AARECT_COVERAGE (at most one such slot per chain). The rect is
+  // in destination device coordinates and already carries the 0.5 outset for the AA falloff.
+  vec4 CoverageRect;
 
 #define TGFX_CHAIN_PACKED Slot0Packed
 #define TGFX_CHAIN_CONST_COLOR Slot0ConstColor
