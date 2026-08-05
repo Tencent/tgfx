@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "D3D12CommandQueue.h"
+#include <unordered_set>
+#include "D3D12BarrierBatch.h"
 #include "D3D12Buffer.h"
 #include "D3D12CommandBuffer.h"
 #include "D3D12Defines.h"
@@ -194,21 +196,28 @@ void D3D12CommandQueue::flushUploads(ID3D12GraphicsCommandList* commandList,
   if (pendingUploads.empty() || commandList == nullptr) {
     return;
   }
+  // Batch transitions per unique texture: N uploads into the same atlas otherwise produce 2N
+  // ResourceBarrier calls, since the exit transition back to COMMON re-triggers the entry
+  // transition on the next upload (see AtlasUploadTask which uploads one cell per glyph).
+  D3D12BarrierBatch enterBatch;
+  std::unordered_set<D3D12Texture*> touchedTextures;
+  for (auto& up : pendingUploads) {
+    auto* tex = up.texture.get();
+    if (!touchedTextures.insert(tex).second) {
+      continue;
+    }
+    auto current = tex->currentState();
+    enterBatch.addTransition(tex->d3d12Resource(), current, D3D12_RESOURCE_STATE_COPY_DEST);
+    // Snapshot the CPU-tracked state on first touch so reclaimAbandonedSession can roll back
+    // if these copies never reach the GPU. emplace() preserves the earliest snapshot.
+    session.initialTextureStates.emplace(tex, current);
+    tex->setCurrentState(D3D12_RESOURCE_STATE_COPY_DEST);
+  }
+  enterBatch.flush(commandList);
+
   for (size_t i = 0; i < pendingUploads.size(); i++) {
     auto& up = pendingUploads[i];
     auto& fp = pendingFootprints[i];
-
-    auto current = up.texture->currentState();
-    if (current != D3D12_RESOURCE_STATE_COPY_DEST) {
-      TransitionResourceState(commandList, up.texture->d3d12Resource(), current,
-                              D3D12_RESOURCE_STATE_COPY_DEST);
-      // Snapshot the original CPU-tracked state on the first touch of this texture during the
-      // session so reclaimAbandonedSession() can roll _currentState back if the upload is
-      // never executed by the GPU. emplace() preserves the earliest snapshot on subsequent
-      // updates, exactly like D3D12CommandEncoder::recordTextureStateChange().
-      session.initialTextureStates.emplace(up.texture.get(), current);
-      up.texture->setCurrentState(D3D12_RESOURCE_STATE_COPY_DEST);
-    }
 
     D3D12_TEXTURE_COPY_LOCATION dstLoc = {};
     dstLoc.pResource = up.texture->d3d12Resource();
@@ -240,14 +249,16 @@ void D3D12CommandQueue::flushUploads(ID3D12GraphicsCommandList* commandList,
     srcBox.back = 1;
 
     commandList->CopyTextureRegion(&dstLoc, fp.dstX, fp.dstY, 0, &srcLoc, &srcBox);
-
-    TransitionResourceState(commandList, up.texture->d3d12Resource(),
-                            D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
-    // Already snapshotted at the COPY_DEST entry above; the second emplace is a no-op when the
-    // texture appears for the first time in this branch and a no-op-on-collision otherwise.
-    session.initialTextureStates.emplace(up.texture.get(), up.texture->currentState());
-    up.texture->setCurrentState(D3D12_RESOURCE_STATE_COMMON);
   }
+
+  D3D12BarrierBatch exitBatch;
+  for (auto* tex : touchedTextures) {
+    exitBatch.addTransition(tex->d3d12Resource(), D3D12_RESOURCE_STATE_COPY_DEST,
+                            D3D12_RESOURCE_STATE_COMMON);
+    tex->setCurrentState(D3D12_RESOURCE_STATE_COMMON);
+  }
+  exitBatch.flush(commandList);
+
   pendingFootprints.clear();
   // pendingUploads is moved into the SubmitRequest by the caller so its staging buffers outlive
   // GPU execution.
