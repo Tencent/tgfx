@@ -71,9 +71,13 @@ void GLSLTentBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
   // texture fetch via hardware bilinear filtering. The tent kernel's linear weights
   // make this exact — no quality loss. Sample count: 2R+1 → R+1.
   //
-  // Loop mapping: j=0 → center, j=1,2 → ±pair(k=1), j=3,4 → ±pair(k=3), ...
-  // k = 2*((j-1)/2)+1, sign = (j odd) ? +1 : -1.
+  // Loop mapping: j=0 → center, then pairs ±k for k=1,3,5,...
+  // k and sign are maintained incrementally to avoid integer division/modulo in the loop.
   // When w2=0 (unpaired tail), combined=w1 and offset=k (natural special case).
+  // Fixed 64-iteration upper bound for GLSL ES 1.0 constant-loop constraints; actual
+  // exit is via the weight<=0 break at radius+1 iterations.
+  fragBuilder->codeAppend("int k = 1;");
+  fragBuilder->codeAppend("float s = 1.0;");
   fragBuilder->codeAppendf("for (int j = 0; j <= %d; ++j) {", maxRadius);
   fragBuilder->codeAppend("float offsetValue;");
   fragBuilder->codeAppend("float weight;");
@@ -81,8 +85,6 @@ void GLSLTentBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend("  offsetValue = 0.0;");
   fragBuilder->codeAppend("  weight = radius;");
   fragBuilder->codeAppend("} else {");
-  fragBuilder->codeAppend("  int k = 2 * ((j - 1) / 2) + 1;");
-  fragBuilder->codeAppend("  float s = (j % 2 == 1) ? 1.0 : -1.0;");
   fragBuilder->codeAppend("  float w1 = max(0.0, radius - float(k));");
   fragBuilder->codeAppend("  float w2 = max(0.0, radius - float(k + 1));");
   fragBuilder->codeAppend("  weight = w1 + w2;");
@@ -100,6 +102,10 @@ void GLSLTentBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
   } else {
     fragBuilder->codeAppendf("sum += %s.a * weight;", tempColor.c_str());
   }
+  fragBuilder->codeAppend("if (j > 0) {");
+  fragBuilder->codeAppend("  if (s < 0.0) { k += 2; }");
+  fragBuilder->codeAppend("  s = -s;");
+  fragBuilder->codeAppend("}");
   fragBuilder->codeAppend("}");
 
   // Normalize and pack result to RGBA8.

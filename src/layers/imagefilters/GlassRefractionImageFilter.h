@@ -27,8 +27,7 @@ class GlassRefractionImageFilter : public ImageFilter {
  public:
   GlassRefractionImageFilter(const GlassRefractionParams& params,
                              const GlassSDFGeometryParams& sdfParams,
-                             const GlassUDFGeometryParams& udfParams,
-                             std::shared_ptr<Image> fineMask, std::shared_ptr<Image> coarseMask);
+                             const GlassUDFGeometryParams& udfParams, std::shared_ptr<Image> mask);
 
  protected:
   Type type() const override {
@@ -45,8 +44,7 @@ class GlassRefractionImageFilter : public ImageFilter {
   GlassRefractionParams params;
   GlassSDFGeometryParams sdfParams;
   GlassUDFGeometryParams udfParams;
-  std::shared_ptr<Image> fineMask;
-  std::shared_ptr<Image> coarseMask;
+  std::shared_ptr<Image> mask;
 };
 
 }  // namespace tgfx

@@ -25,9 +25,10 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "layers/CanvasUtils.h"
 #include "layers/imagefilters/GlassRefractionImageFilter.h"
 #include "layers/processors/GlassRefractionFragmentProcessor.h"
-#include "layers/processors/TentBlur1DFragmentProcessor.h"
+#include "layers/processors/GlassUDFTentBlurFragmentProcessor.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/RRect.h"
@@ -41,47 +42,124 @@
 
 namespace tgfx {
 
+// Coordinate mappings shared by both refraction paths: the background source texture's
+// origin in content pixels, its texel-to-content scale, and the layer-to-source scale.
+struct GlassStyle::BackgroundMapping {
+  Point sourceOrigin;
+  Point sourcePixelToContentPixel;
+  Point layerPixelToSourcePixel;
+  float contentWidth;
+  float contentHeight;
+};
+
+// Sampling parameters of the merged UDF texture.
+struct GlassStyle::UDFSampling {
+  Point pixelToLayerPixel;
+  Point edgeSpan;
+  Point textureOrigin;
+};
+
 static constexpr float MaxFrostSigma = 50.0f;
 static constexpr int MaxTentRadius = 64;
+static constexpr float MaxBackgroundSize = 2048.0f;
 
-static std::shared_ptr<Image> MakeTentBlurImage(Context* context,
-                                                const std::shared_ptr<Image>& source, float radiusX,
-                                                float radiusY) {
-  if (context == nullptr || source == nullptr || radiusX <= 0.0f || radiusY <= 0.0f) {
+// depthRatio below 0.1 scales the refraction magnitude down via smoothstep to avoid
+// abrupt visual transitions at very shallow depth values.
+static float GetDepthScale(float depthRatio) {
+  float depthScale = std::clamp(depthRatio / 0.1f, 0.0f, 1.0f);
+  return depthScale * depthScale * (3.0f - 2.0f * depthScale);
+}
+
+// Max UDF refraction displacement in layer pixels. Shared by GetRefractionOutset
+// (background sampling range) and getUDFRefractionFilter (shader maxDisplacement) to
+// guarantee both use the identical bound.
+static float GetUDFMaxDisplacement(float minHalf, float refractionFactor, float depthRatio) {
+  // 0.999 keeps displacement strictly inside the glass half-size so refraction
+  // sampling never reads past the layer boundary.
+  return 0.999f * minHalf * refractionFactor * depthRatio * GetDepthScale(depthRatio);
+}
+
+static float GetRefractionOutset(float width, float height, float refractionFactor,
+                                 float depthRatio, float dispersion, float glassThickness) {
+  auto minHalf = std::min(width, height) * 0.5f;
+  float udfOutset = GetUDFMaxDisplacement(minHalf, refractionFactor, depthRatio);
+  float sdfOutset = glassThickness * refractionFactor * 1.2f;
+  return std::max(std::max(udfOutset, sdfOutset) * (1.0f + dispersion), 1.0f);
+}
+
+// Blurs a window of the coverage image with two tent radii and returns one RGBA8 image. RGB holds
+// the refraction field and A holds the edge-light field. Coordinates remain in the full UDF space.
+static std::shared_ptr<Image> MakeGlassUDFImage(Context* context,
+                                                const std::shared_ptr<Image>& source, int coreWidth,
+                                                int coreHeight, const Rect& textureRect,
+                                                const Point& fineRadius,
+                                                const Point& coarseRadius) {
+  if (context == nullptr || source == nullptr || coreWidth <= 0 || coreHeight <= 0 ||
+      textureRect.isEmpty()) {
     return nullptr;
   }
-  auto textureImage = source->makeTextureImage(context);
-  if (textureImage == nullptr) {
+  if (fineRadius.x <= 0.0f || fineRadius.y <= 0.0f || coarseRadius.x <= 0.0f ||
+      coarseRadius.y <= 0.0f) {
     return nullptr;
   }
-  auto textureProxy = std::static_pointer_cast<TextureImage>(textureImage)->getTextureProxy();
-  SamplingArgs samplingArgs = {TileMode::Decal, TileMode::Decal, {}, SrcRectConstraint::Fast};
+  auto textureWidth = static_cast<int>(std::round(textureRect.width()));
+  auto textureHeight = static_cast<int>(std::round(textureRect.height()));
+  if (textureWidth <= 0 || textureHeight <= 0) {
+    return nullptr;
+  }
+  SamplingArgs samplingArgs = {TileMode::Decal, TileMode::Decal,
+                               SamplingOptions(FilterMode::Linear), SrcRectConstraint::Fast};
   auto allocator = context->drawingAllocator();
-  auto sourceProcessor = TiledTextureEffect::Make(allocator, textureProxy, samplingArgs);
-  auto horizontalTarget =
-      RenderTargetProxy::Make(context, source->width(), source->height(), false, 1, false,
-                              ImageOrigin::TopLeft, BackingFit::Exact);
-  if (sourceProcessor == nullptr || horizontalTarget == nullptr) {
+  float verticalHalo = std::ceil(std::max(fineRadius.y, coarseRadius.y)) + 1.0f;
+  auto horizontalRect = textureRect.makeOutset(0.0f, verticalHalo);
+  horizontalRect.roundOut();
+  auto horizontalHeight = static_cast<int>(std::round(horizontalRect.height()));
+  auto horizontalTarget = RenderTargetProxy::Make(context, textureWidth, horizontalHeight, false, 1,
+                                                  false, ImageOrigin::TopLeft, BackingFit::Exact);
+  if (horizontalTarget == nullptr) {
     return nullptr;
   }
-  auto horizontalProcessor =
-      TentBlur1DFragmentProcessor::Make(allocator, std::move(sourceProcessor), radiusX,
-                                        TentBlurDirection::Horizontal, 1.0f, MaxTentRadius, false);
-  if (!context->drawingManager()->fillRTWithFP(horizontalTarget, std::move(horizontalProcessor),
-                                               0)) {
+  float horizontalHalo = std::ceil(std::max(fineRadius.x, coarseRadius.x)) + 1.0f;
+  auto sourceDrawRect =
+      Rect::MakeLTRB(-horizontalHalo, -1.0f, static_cast<float>(textureWidth) + horizontalHalo,
+                     static_cast<float>(horizontalHeight) + 1.0f);
+  // Scale the source to UDF core density and rasterize uniformly for all Image subclasses,
+  // without probing their internal rasterization behavior.
+  auto coreSource = source->makeScaled(coreWidth, coreHeight, SamplingOptions(FilterMode::Linear))
+                        ->makeRasterized();
+  if (coreSource == nullptr) {
     return nullptr;
   }
-  auto verticalSource =
-      TiledTextureEffect::Make(allocator, horizontalTarget->asTextureProxy(), samplingArgs);
-  auto verticalTarget = RenderTargetProxy::Make(context, source->width(), source->height(), false,
-                                                1, false, ImageOrigin::TopLeft, BackingFit::Exact);
-  if (verticalSource == nullptr || verticalTarget == nullptr) {
+  auto horizontalMatrix = Matrix::MakeTrans(textureRect.left, horizontalRect.top);
+  FPArgs sourceArgs = FPArgs(context, 0, sourceDrawRect);
+  // Each tent loop needs its own child because emitting one child twice redeclares its uniforms.
+  auto fineSource =
+      FragmentProcessor::Make(coreSource, sourceArgs, samplingArgs, &horizontalMatrix);
+  auto coarseSource =
+      FragmentProcessor::Make(coreSource, sourceArgs, samplingArgs, &horizontalMatrix);
+  auto horizontalProcessor = GlassUDFTentBlurFragmentProcessor::Make(
+      allocator, std::move(fineSource), std::move(coarseSource), fineRadius.x, coarseRadius.x,
+      GlassUDFBlurDirection::Horizontal, MaxTentRadius, false);
+  if (horizontalProcessor == nullptr || !context->drawingManager()->fillRTWithFP(
+                                            horizontalTarget, std::move(horizontalProcessor), 0)) {
     return nullptr;
   }
-  auto verticalProcessor =
-      TentBlur1DFragmentProcessor::Make(allocator, std::move(verticalSource), radiusY,
-                                        TentBlurDirection::Vertical, 1.0f, MaxTentRadius, true);
-  if (!context->drawingManager()->fillRTWithFP(verticalTarget, std::move(verticalProcessor), 0)) {
+  auto verticalMatrix = Matrix::MakeTrans(0.0f, textureRect.top - horizontalRect.top);
+  auto horizontalProxy = horizontalTarget->asTextureProxy();
+  auto verticalFineSource =
+      TiledTextureEffect::Make(allocator, horizontalProxy, samplingArgs, &verticalMatrix);
+  auto verticalCoarseSource =
+      TiledTextureEffect::Make(allocator, horizontalProxy, samplingArgs, &verticalMatrix);
+  auto verticalTarget = RenderTargetProxy::Make(context, textureWidth, textureHeight, false, 1,
+                                                false, ImageOrigin::TopLeft, BackingFit::Exact);
+  if (verticalTarget == nullptr) {
+    return nullptr;
+  }
+  auto verticalProcessor = GlassUDFTentBlurFragmentProcessor::Make(
+      allocator, std::move(verticalFineSource), std::move(verticalCoarseSource), fineRadius.y,
+      coarseRadius.y, GlassUDFBlurDirection::Vertical, MaxTentRadius, true);
+  if (verticalProcessor == nullptr ||
+      !context->drawingManager()->fillRTWithFP(verticalTarget, std::move(verticalProcessor), 0)) {
     return nullptr;
   }
   return TextureImage::Wrap(verticalTarget->asTextureProxy(), nullptr);
@@ -91,6 +169,8 @@ struct GlassShapeInfo {
   GlassShapeType type = GlassShapeType::AlphaMask;
   float cornerRadius = 0.0f;
   RRect shapeRRect = {};
+  Path shapePath = {};
+  bool hasPath = false;
 };
 
 // Detects whether the layer's vector shape is a regular shape (RoundedRect or Ellipse)
@@ -114,6 +194,8 @@ static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
     return info;
   }
   auto path = optShape->shape->getPath();
+  info.shapePath = path;
+  info.hasPath = true;
   RRect rRect = {};
   Rect rect = {};
   if (path.isRRect(&rRect)) {
@@ -212,48 +294,40 @@ void GlassStyle::setLightIntensity(float value) {
 }
 
 Rect GlassStyle::filterBackgroundSoft(const Rect& srcRect, float contentScale) {
-  if (_frost <= 0) {
-    return srcRect;
-  }
   // Do not cache the frost filter: onDraw applies frost at a different scale
   // (contentScale * bgScale) to the downsampled background image, invalidating any cache here.
-  float sigma = (_frost / 100.0f) * MaxFrostSigma * contentScale;
+  float sigma = std::max(0.5f, (_frost / 100.0f) * MaxFrostSigma) * contentScale;
   auto filter = ImageFilter::Blur(sigma, sigma, TileMode::Mirror);
-  return filter == nullptr ? srcRect : filter->filterBounds(srcRect);
+  auto bounds = filter == nullptr ? srcRect : filter->filterBounds(srcRect);
+  return bounds.makeOutset(1.0f, 1.0f);
 }
 
-Rect GlassStyle::filterBackgroundSharp(const Rect& srcRect, float) {
+Rect GlassStyle::filterBackgroundSharp(const Rect& srcRect, float contentScale) {
   if (_refraction <= 0 && _lightIntensity <= 0) {
-    return srcRect;
+    return srcRect.makeOutset(1.0f, 1.0f);
   }
-  float maxWidth = srcRect.width();
-  float maxHeight = srcRect.height();
-  // Refraction displacement depends on the glass dimensions rather than the size of the dirty
-  // background rectangle. A style may be shared by multiple layers, so conservatively cover every
-  // owner instead of assuming the first owner matches the current filterBackground() call.
+  float maxWidth = FloatNearlyZero(contentScale) ? srcRect.width() : srcRect.width() / contentScale;
+  float maxHeight =
+      FloatNearlyZero(contentScale) ? srcRect.height() : srcRect.height() / contentScale;
+  // Refraction displacement is defined in the Glass layer's local coordinates. Map the resulting
+  // local outset by contentScale instead of deriving it from a transformed AABB, which can
+  // underestimate the dependency under non-uniform scaling.
   for (auto owner : owners) {
     if (owner == nullptr) {
       continue;
     }
-    auto ownerBounds = owner->getBounds(owner->root(), false);
+    auto ownerBounds = owner->getBounds(owner, false);
     maxWidth = std::max(maxWidth, ownerBounds.width());
     maxHeight = std::max(maxHeight, ownerBounds.height());
   }
   // filterBackground() may run before shapeType is determined, so cover both paths.
-  auto halfW = maxWidth * 0.5f;
-  auto halfH = maxHeight * 0.5f;
-  auto minHalf = std::min(halfW, halfH);
-  float refractionFactor = getRefractionFactor();
-  float depthRatio = getDepthRatio();
-  float depthT = std::clamp(depthRatio / 0.1f, 0.0f, 1.0f);
-  float depthScale = depthT * depthT * (3.0f - 2.0f * depthT);
-  float refractionDistance = minHalf * refractionFactor * depthRatio * depthScale;
-  float dispersion = getDispersionFactor();
-  float alphaMaskOutset = 0.999f * refractionDistance * (1.0f + dispersion);
-  float glassThickness = getGlassThickness(minHalf);
-  float analyticalOutset = glassThickness * refractionFactor * 1.2f * (1.0f + dispersion);
-  float refractionOutset = std::max(alphaMaskOutset, analyticalOutset);
-  refractionOutset = std::max(refractionOutset, 1.0f);
+  auto minHalf = std::min(maxWidth, maxHeight) * 0.5f;
+  float refractionOutset =
+      GetRefractionOutset(maxWidth, maxHeight, getRefractionFactor(), getDepthRatio(),
+                          getDispersionFactor(), getGlassThickness(minHalf));
+  refractionOutset = refractionOutset * contentScale + 1.0f;
+  float sigma = std::max(0.5f, (_frost / 100.0f) * MaxFrostSigma) * contentScale;
+  refractionOutset += sigma * 2.0f + 1.0f;
   return srcRect.makeOutset(refractionOutset, refractionOutset);
 }
 
@@ -270,53 +344,142 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
     return;
   }
   auto bgOffset = backgroundSource->imageOffset();
-
-  // Down-scale the background to avoid huge GPU textures when zoomed in.
-  // The background image includes outset beyond layer content bounds (for refraction sampling).
-  // Use bgImage's actual dimensions to compute scale ratio so coordinates stay aligned.
   auto surface = canvas->getSurface();
   auto context = surface ? surface->getContext() : nullptr;
   if (context == nullptr) {
     return;
   }
   auto maxTextureSize = context->gpu()->limits()->maxTextureDimension2D;
-  auto origWidth = static_cast<float>(input.content->width()) / input.contentScale;
-  auto origHeight = static_cast<float>(input.content->height()) / input.contentScale;
+  auto contentWidth = static_cast<float>(input.content->width());
+  auto contentHeight = static_cast<float>(input.content->height());
+  auto origWidth = contentWidth / input.contentScale;
+  auto origHeight = contentHeight / input.contentScale;
   auto origBounds = Rect::MakeWH(origWidth, origHeight);
   if (origBounds.isEmpty()) {
     return;
   }
-  static constexpr float MAX_BG_SIZE = 2048.0f;
-  float bgMaxDim = static_cast<float>(std::max(bgImage->width(), bgImage->height()));
-  float targetMaxDim =
-      std::min(bgMaxDim, std::min(static_cast<float>(maxTextureSize), MAX_BG_SIZE));
-  float bgScale = targetMaxDim / bgMaxDim;
-  int scaledW =
-      std::max(1, static_cast<int>(std::round(static_cast<float>(bgImage->width()) * bgScale)));
-  int scaledH =
-      std::max(1, static_cast<int>(std::round(static_cast<float>(bgImage->height()) * bgScale)));
-  float scaleRatioX = static_cast<float>(scaledW) / static_cast<float>(bgImage->width());
-  float scaleRatioY = static_cast<float>(scaledH) / static_cast<float>(bgImage->height());
-  bgImage = bgImage->makeScaled(scaledW, scaledH, SamplingOptions(FilterMode::Linear));
-  if (bgImage == nullptr) {
-    return;
-  }
-  bgOffset.x *= scaleRatioX;
-  bgOffset.y *= scaleRatioY;
 
-  // Step 1: Frost - apply Gaussian blur to the background
+  float scaleRatioX = 1.0f;
+  float scaleRatioY = 1.0f;
+  bool usesLocalEvaluation = false;
+  Rect visibleRect = {};
+  Rect refractInputRect = {};
+  float frostDownscale = 1.0f;
+  auto evaluationLimit = std::min(static_cast<float>(maxTextureSize), MaxBackgroundSize);
+  auto clipBounds = GetClipBounds(canvas);
+  // Frost and refraction have bounded sampling radii, so evaluate against the visible clip
+  // whenever it is known; subsets exceeding the texture limit fall back to the full background.
+  if (clipBounds.has_value() && !clipBounds->isEmpty()) {
+    visibleRect = *clipBounds;
+    if (!visibleRect.intersect(Rect::MakeWH(contentWidth, contentHeight))) {
+      return;
+    }
+    visibleRect.roundOut();
+
+    // Downscale the full background before subset so all tiles share the same downscaled source.
+    // Applying the scale to the subset would produce different sizes per tile.
+    static constexpr float MAX_FROST_AREA = 1024.0f * 1024.0f;
+    if (_refraction > 0 || _lightIntensity > 0) {
+      auto minHalf = std::min(origWidth, origHeight) * 0.5f;
+      float fullRefractionOutset =
+          GetRefractionOutset(origWidth, origHeight, getRefractionFactor(), getDepthRatio(),
+                              getDispersionFactor(), getGlassThickness(minHalf));
+      fullRefractionOutset = std::ceil(fullRefractionOutset * input.contentScale + 1.0f);
+      float fullWidth = contentWidth + 2.0f * fullRefractionOutset;
+      float fullHeight = contentHeight + 2.0f * fullRefractionOutset;
+      float fullArea = fullWidth * fullHeight;
+      if (fullArea > MAX_FROST_AREA) {
+        frostDownscale = std::sqrt(MAX_FROST_AREA / fullArea);
+      }
+    }
+    if (frostDownscale < 1.0f) {
+      int scaledW = std::max(
+          1, static_cast<int>(std::round(static_cast<float>(bgImage->width()) * frostDownscale)));
+      int scaledH = std::max(
+          1, static_cast<int>(std::round(static_cast<float>(bgImage->height()) * frostDownscale)));
+      auto scaledBg = bgImage->makeScaled(scaledW, scaledH, SamplingOptions(FilterMode::Linear));
+      if (scaledBg != nullptr) {
+        bgImage = std::move(scaledBg);
+        bgOffset.x *= frostDownscale;
+        bgOffset.y *= frostDownscale;
+        scaleRatioX *= frostDownscale;
+        scaleRatioY *= frostDownscale;
+      } else {
+        frostDownscale = 1.0f;
+      }
+    }
+
+    refractInputRect = visibleRect;
+    if (_refraction > 0 || _lightIntensity > 0) {
+      auto minHalf = std::min(origWidth, origHeight) * 0.5f;
+      float refractionOutset =
+          GetRefractionOutset(origWidth, origHeight, getRefractionFactor(), getDepthRatio(),
+                              getDispersionFactor(), getGlassThickness(minHalf));
+      refractionOutset = std::ceil(refractionOutset * input.contentScale + 1.0f);
+      refractInputRect.outset(refractionOutset, refractionOutset);
+      // Refraction samples toward the layer interior (UDF gradient points inward), so the
+      // sampling range never extends past the layer content bounds.
+      refractInputRect.intersect(Rect::MakeWH(contentWidth, contentHeight));
+      refractInputRect.roundOut();
+    }
+    auto backgroundInputRect = refractInputRect;
+    backgroundInputRect.scale(frostDownscale, frostDownscale);
+    auto backgroundBlur = getFrostFilter(input.contentScale * scaleRatioX);
+    if (backgroundBlur != nullptr) {
+      backgroundInputRect = backgroundBlur->filterBounds(backgroundInputRect);
+      backgroundInputRect.outset(1.0f, 1.0f);
+    }
+    backgroundInputRect.roundOut();
+    auto availableBackground =
+        Rect::MakeXYWH(bgOffset.x, bgOffset.y, static_cast<float>(bgImage->width()),
+                       static_cast<float>(bgImage->height()));
+    if (backgroundInputRect.intersect(availableBackground)) {
+      auto subsetRect = backgroundInputRect;
+      subsetRect.offset(-bgOffset.x, -bgOffset.y);
+      subsetRect.roundOut();
+      if (subsetRect.intersect(Rect::MakeWH(bgImage->width(), bgImage->height()))) {
+        if (subsetRect.width() <= evaluationLimit && subsetRect.height() <= evaluationLimit) {
+          auto subsetImage = bgImage->makeSubset(subsetRect);
+          if (subsetImage != nullptr) {
+            bgImage = std::move(subsetImage);
+            bgOffset += Point{subsetRect.left, subsetRect.top};
+            usesLocalEvaluation = true;
+          }
+        }
+      }
+    }
+  }
+
+  if (!usesLocalEvaluation) {
+    float bgMaxDim = static_cast<float>(std::max(bgImage->width(), bgImage->height()));
+    float targetMaxDim =
+        std::min(bgMaxDim, std::min(static_cast<float>(maxTextureSize), MaxBackgroundSize));
+    float bgScale = targetMaxDim / bgMaxDim;
+    int scaledW =
+        std::max(1, static_cast<int>(std::round(static_cast<float>(bgImage->width()) * bgScale)));
+    int scaledH =
+        std::max(1, static_cast<int>(std::round(static_cast<float>(bgImage->height()) * bgScale)));
+    float bgScaleX = static_cast<float>(scaledW) / static_cast<float>(bgImage->width());
+    float bgScaleY = static_cast<float>(scaledH) / static_cast<float>(bgImage->height());
+    bgImage = bgImage->makeScaled(scaledW, scaledH, SamplingOptions(FilterMode::Linear));
+    if (bgImage == nullptr) {
+      return;
+    }
+    bgOffset.x *= bgScaleX;
+    bgOffset.y *= bgScaleY;
+    scaleRatioX *= bgScaleX;
+    scaleRatioY *= bgScaleY;
+  }
+
   std::shared_ptr<Image> processedBg = bgImage;
   Point processedOffset = bgOffset;
-  if (_frost > 0) {
-    auto blurFilter = getFrostFilter(input.contentScale * bgScale);
-    if (blurFilter) {
-      Point blurOffset = {};
-      auto clipRect = Rect::MakeWH(bgImage->width(), bgImage->height());
-      auto frostedImage = bgImage->makeWithFilter(blurFilter, &blurOffset, &clipRect);
-      if (frostedImage != nullptr) {
-        processedBg = frostedImage;
-        processedOffset += blurOffset;
-      }
+  auto blurFilter = getFrostFilter(input.contentScale * scaleRatioX);
+  if (blurFilter != nullptr) {
+    Point blurOffset = {};
+    auto frostedImage = bgImage->makeWithFilter(blurFilter, &blurOffset, nullptr);
+    if (frostedImage != nullptr) {
+      processedBg = frostedImage;
+      processedOffset += blurOffset;
     }
   }
   // Detect whether the vector shape supports the analytical SDF path.
@@ -328,89 +491,125 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
     // zoom-invariant regardless of bgScale downsampling.
     float halfW = origBounds.width() * 0.5f;
     float halfH = origBounds.height() * 0.5f;
-    float udfPixelToLayerPixelX = 1.0f;
-    float udfPixelToLayerPixelY = 1.0f;
-    std::shared_ptr<Image> maskImage = nullptr;
-    std::shared_ptr<Image> coarseMaskImage = nullptr;
+    BackgroundMapping mapping = {};
+    mapping.sourceOrigin = {processedOffset.x / scaleRatioX, processedOffset.y / scaleRatioY};
+    mapping.sourcePixelToContentPixel = {1.0f / scaleRatioX, 1.0f / scaleRatioY};
+    mapping.layerPixelToSourcePixel = {input.contentScale * scaleRatioX,
+                                       input.contentScale * scaleRatioY};
+    mapping.contentWidth = contentWidth;
+    mapping.contentHeight = contentHeight;
+    std::shared_ptr<ImageFilter> filter = nullptr;
     if (shapeInfo.type == GlassShapeType::AlphaMask) {
-      // For AlphaMask shape, generate a UDF height map:
-      // Tent-blur the binary alpha to approximate UDF (triangular kernel gives more linear
-      // transition than Gaussian, closer to a true distance field).
-      // The maskImage is rebuilt every frame via MakeTentBlurImage (input.content changes).
-      // UDF is capped at MAX_UDF_SIZE to prevent excessive texture allocation. The mask UVs
-      // are normalized (0-1), so lower resolution does not affect the refraction shader.
-      static constexpr float MAX_UDF_SIZE = 512.0f;
+      float udfPixelToLayerPixelX = 1.0f;
+      float udfPixelToLayerPixelY = 1.0f;
+      float edgeSpanX = 1.0f;
+      float edgeSpanY = 1.0f;
+      Point udfTextureOrigin = {};
+      std::shared_ptr<Image> maskImage = nullptr;
+      // Tent blur approximates the UDF while the allocated texture covers only the visible window
+      // and the neighborhoods required by blur and shader sampling.
       // Use original layer bounds (not zoom-affected) for blur radius calculation.
-      // depth 1-100 maps linearly to blurRadius 5-60. The 60.0 cap is unrelated to the shader's
-      // edgeBandWidth cap (same value, different purpose: this limits UDF blur, that limits SDF
-      // edge influence zone).
-      static constexpr float MAX_BLUR_RADIUS = 60.0f;
+      // depth 1-100 maps linearly to blurRadius 5-30. The 30.0 cap limits max UDF blur to avoid
+      // overly wide transitions on large depth values.
+      static constexpr float MAX_BLUR_RADIUS = 30.0f;
       static constexpr float MIN_BLUR_RADIUS = 5.0f;
       float blurRadius =
           std::max(std::min((_depth / 100.0f) * MAX_BLUR_RADIUS, MAX_BLUR_RADIUS), MIN_BLUR_RADIUS);
-      // UDF texture size follows the original content bounds and is capped at MAX_UDF_SIZE.
-      // UDF pixel-to-layer ratios and blurRadius scale with udfScale, so refraction distances
-      // remain consistent in layer space regardless of UDF resolution.
-      // origMaxDim is guaranteed > 0 here because onDraw early-returns on origBounds.isEmpty().
-      float origMaxDim = std::max(origBounds.width(), origBounds.height());
-      float udfScale = std::min({1.0f, MAX_UDF_SIZE / origMaxDim});
-      int udfWidth = std::max(1, static_cast<int>(std::round(origBounds.width() * udfScale)));
-      int udfHeight = std::max(1, static_cast<int>(std::round(origBounds.height() * udfScale)));
+      float minHalf = std::min(origBounds.width(), origBounds.height()) * 0.5f;
+      float effectiveBlurRadius = std::min(blurRadius, minHalf);
+      // UDF resolution matches content pixel dimensions (1 texel = 1 content pixel), so the
+      // effective resolution scales with zoom. The textureRect subset mechanism ensures only
+      // the visible region + halo is actually rasterized.
+      static constexpr float MAX_UDF_SHADER_HALO = MaxTentRadius * 0.5f + 1.0f;
+      static constexpr float MAX_UDF_BLUR_HALO = MaxTentRadius + 1.0f;
+      static constexpr float MAX_UDF_SIZE = 2048.0f;
+      float sourceWidth = contentWidth;
+      float sourceHeight = contentHeight;
+      float sourceMaxDim = std::max(sourceWidth, sourceHeight);
+      float maxAllowedDim = std::min(static_cast<float>(maxTextureSize), MAX_UDF_SIZE) -
+                            (MAX_UDF_SHADER_HALO + MAX_UDF_BLUR_HALO) * 2.0f;
+      if (maxAllowedDim < 1.0f) {
+        return;
+      }
+      float udfScale = 1.0f;
+      if (sourceMaxDim > maxAllowedDim) {
+        udfScale = maxAllowedDim / sourceMaxDim;
+      }
+      static constexpr float MIN_SHORT_SIDE_TEXELS = 256.0f;
+      float sourceMinDim = std::min(sourceWidth, sourceHeight);
+      if (sourceMinDim * udfScale < MIN_SHORT_SIDE_TEXELS) {
+        udfScale = MIN_SHORT_SIDE_TEXELS / sourceMinDim;
+      }
+      int udfWidth = std::max(1, static_cast<int>(std::round(sourceWidth * udfScale)));
+      int udfHeight = std::max(1, static_cast<int>(std::round(sourceHeight * udfScale)));
       // The UDF dimensions are rounded independently, so each axis needs its own layer-pixel
-      // conversion ratio. Both values use origBounds and remain zoom-invariant.
+      // conversion ratio. Both values use origBounds so the shader still operates in layer space.
       udfPixelToLayerPixelX = origBounds.width() / static_cast<float>(udfWidth);
       udfPixelToLayerPixelY = origBounds.height() / static_cast<float>(udfHeight);
-      // Scale the content image to the fixed UDF resolution.
-      std::shared_ptr<Image> udfContent = input.content;
-      if (udfWidth != input.content->width() || udfHeight != input.content->height()) {
-        udfContent =
-            input.content->makeScaled(udfWidth, udfHeight, SamplingOptions(FilterMode::Linear));
-        if (udfContent == nullptr) {
-          return;
-        }
-      }
-      // Blur radius in UDF pixel space. Since UDF size is origBounds-based, the radius is
-      // zoom-invariant.
-      float udfBlurRadiusX = blurRadius * udfScale;
-      float udfBlurRadiusY = blurRadius * udfScale;
-      // depthRatio stays as _depth/100 for shader use (step calculation).
-      maskImage = MakeTentBlurImage(context, udfContent, udfBlurRadiusX, udfBlurRadiusY);
-      if (!maskImage) {
-        LOGE("GlassStyle: Failed to blur alpha for UDF, falling back to content.");
-        maskImage = udfContent;
-      }
+      // Blur radius in UDF pixel space. The horizontal pass samples input.content directly into
+      // the target UDF core, so resizing does not require an intermediate texture.
+      // The radius scales with udfScale, keeping the layer-space radius constant.
+      float layerToSourceX = sourceWidth / origBounds.width();
+      float layerToSourceY = sourceHeight / origBounds.height();
+      Point fineRadius = {std::min(effectiveBlurRadius * udfScale * layerToSourceX,
+                                   static_cast<float>(MaxTentRadius)),
+                          std::min(effectiveBlurRadius * udfScale * layerToSourceY,
+                                   static_cast<float>(MaxTentRadius))};
+      // Edge light radius is defined in layer space so the width stays constant across zoom.
+      static constexpr float EDGE_RADIUS_IN_LAYER_PIXELS = 1.0f;
+      Point coarseRadius = {std::min(EDGE_RADIUS_IN_LAYER_PIXELS / udfPixelToLayerPixelX,
+                                     static_cast<float>(MaxTentRadius)),
+                            std::min(EDGE_RADIUS_IN_LAYER_PIXELS / udfPixelToLayerPixelY,
+                                     static_cast<float>(MaxTentRadius))};
+      // The span must come from the clamped radius, otherwise the shader would divide by a
+      // different distance than the one the blur actually produced.
+      edgeSpanX = coarseRadius.x * udfPixelToLayerPixelX;
+      edgeSpanY = coarseRadius.y * udfPixelToLayerPixelY;
 
-      if (_lightIntensity > 0) {
-        // Edge light UDF: half the resolution of the fine UDF, fixed small blur radius.
-        // Used for edge lighting (edgeWeight) while the fine UDF is used for refraction direction.
-        static constexpr float EDGE_LIGHT_BLUR_RADIUS = 5.0f;
-        int edgeLightWidth = std::max(1, udfWidth / 2);
-        int edgeLightHeight = std::max(1, udfHeight / 2);
-        std::shared_ptr<Image> edgeLightContent = udfContent;
-        if (edgeLightWidth != udfWidth || edgeLightHeight != udfHeight) {
-          edgeLightContent = udfContent->makeScaled(edgeLightWidth, edgeLightHeight,
-                                                    SamplingOptions(FilterMode::Linear));
-          if (edgeLightContent == nullptr) {
-            return;
-          }
-        }
-        float edgeLightRadiusX = EDGE_LIGHT_BLUR_RADIUS * udfScale;
-        float edgeLightRadiusY = EDGE_LIGHT_BLUR_RADIUS * udfScale;
-        coarseMaskImage =
-            MakeTentBlurImage(context, edgeLightContent, edgeLightRadiusX, edgeLightRadiusY);
-        if (!coarseMaskImage) {
-          LOGE("GlassStyle: Failed to blur alpha for edge light UDF, falling back to content.");
-          coarseMaskImage = edgeLightContent;
-        }
+      auto visibleContentRect = Rect::MakeWH(contentWidth, contentHeight);
+      if (clipBounds.has_value() && !visibleContentRect.intersect(*clipBounds)) {
+        return;
       }
+      float contentToUDFX = static_cast<float>(udfWidth) / contentWidth;
+      float contentToUDFY = static_cast<float>(udfHeight) / contentHeight;
+      auto visibleUDFRect = Rect::MakeLTRB(std::floor(visibleContentRect.left * contentToUDFX),
+                                           std::floor(visibleContentRect.top * contentToUDFY),
+                                           std::ceil(visibleContentRect.right * contentToUDFX),
+                                           std::ceil(visibleContentRect.bottom * contentToUDFY));
+      float gradientSampleRadius = getDepthRatio() * 3.0f + 1.0f;
+      float shaderHaloX = std::ceil(std::max(gradientSampleRadius, coarseRadius.x * 0.5f)) + 1.0f;
+      float shaderHaloY = std::ceil(std::max(gradientSampleRadius, coarseRadius.y * 0.5f)) + 1.0f;
+      auto fullTextureRect =
+          Rect::MakeLTRB(-shaderHaloX, -shaderHaloY, static_cast<float>(udfWidth) + shaderHaloX,
+                         static_cast<float>(udfHeight) + shaderHaloY);
+      auto textureRect = visibleUDFRect.makeOutset(shaderHaloX, shaderHaloY);
+      if (!textureRect.intersect(fullTextureRect)) {
+        return;
+      }
+      textureRect.roundOut();
+      static constexpr float LOCAL_UDF_AREA_THRESHOLD = 0.7f;
+      if (textureRect.area() >= fullTextureRect.area() * LOCAL_UDF_AREA_THRESHOLD) {
+        textureRect = fullTextureRect;
+        textureRect.roundOut();
+      }
+      udfTextureOrigin = {textureRect.left, textureRect.top};
+      maskImage = MakeGlassUDFImage(context, input.content, udfWidth, udfHeight, textureRect,
+                                    fineRadius, coarseRadius);
+      if (!maskImage) {
+        LOGE("GlassStyle: Failed to create alpha UDF.");
+        return;
+      }
+      UDFSampling udf = {};
+      udf.pixelToLayerPixel = {udfPixelToLayerPixelX, udfPixelToLayerPixelY};
+      udf.edgeSpan = {edgeSpanX, edgeSpanY};
+      udf.textureOrigin = udfTextureOrigin;
+      filter = getUDFRefractionFilter(halfW, halfH, udf, mapping, std::move(maskImage));
+    } else {
+      filter =
+          getSDFRefractionFilter(shapeInfo.type, shapeInfo.cornerRadius, halfW, halfH, mapping);
     }
-    auto filter = getRefractionFilter(shapeInfo.type, shapeInfo.cornerRadius, halfW, halfH,
-                                      udfPixelToLayerPixelX, udfPixelToLayerPixelY, maskImage,
-                                      coarseMaskImage);
     Point refractOffset = {};
-    auto clipRect = Rect::MakeWH(static_cast<float>(processedBg->width()),
-                                 static_cast<float>(processedBg->height()));
-    auto refractedImage = processedBg->makeWithFilter(filter, &refractOffset, &clipRect);
+    auto refractedImage = processedBg->makeWithFilter(filter, &refractOffset, nullptr);
     if (refractedImage) {
       processedBg = refractedImage;
       processedOffset += refractOffset;
@@ -443,25 +642,50 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
     drawRRect.offset(-input.contentOffset.x, -input.contentOffset.y);
     canvas->drawRRect(drawRRect, paint);
   } else {
-    // AlphaMask path: draw through the content alpha mask so the glass effect is clipped to
-    // the layer shape.
-    auto maskShader = Shader::MakeImageShader(input.content, TileMode::Decal, TileMode::Decal);
-    paint.setMaskFilter(MaskFilter::MakeShader(maskShader, false));
-    auto contentRect = Rect::MakeWH(static_cast<float>(input.content->width()),
-                                    static_cast<float>(input.content->height()));
-    canvas->drawRect(contentRect, paint);
+    // AlphaMask path: use the vector path for GPU-native AA when available, avoiding the
+    // resolution-dependent alpha mask that produces stair-stepping on low-zoom diagonal edges.
+    if (shapeInfo.hasPath) {
+      auto drawPath = shapeInfo.shapePath;
+      auto pathMatrix = Matrix::MakeScale(input.contentScale, input.contentScale);
+      pathMatrix.postTranslate(-input.contentOffset.x, -input.contentOffset.y);
+      drawPath.transform(pathMatrix);
+      canvas->drawPath(drawPath, paint);
+    } else {
+      auto maskImage = input.content;
+      float maskScaleX = 1.0f;
+      float maskScaleY = 1.0f;
+      auto maskMaxDimension = std::max(maskImage->width(), maskImage->height());
+      if (maskMaxDimension > maxTextureSize) {
+        float maskScale = static_cast<float>(maxTextureSize) / static_cast<float>(maskMaxDimension);
+        int maskWidth = std::max(
+            1, static_cast<int>(std::round(static_cast<float>(maskImage->width()) * maskScale)));
+        int maskHeight = std::max(
+            1, static_cast<int>(std::round(static_cast<float>(maskImage->height()) * maskScale)));
+        maskImage =
+            maskImage->makeScaled(maskWidth, maskHeight, SamplingOptions(FilterMode::Linear));
+        if (maskImage == nullptr) {
+          return;
+        }
+        maskScaleX = static_cast<float>(input.content->width()) / static_cast<float>(maskWidth);
+        maskScaleY = static_cast<float>(input.content->height()) / static_cast<float>(maskHeight);
+      }
+      auto maskShader = Shader::MakeImageShader(maskImage, TileMode::Decal, TileMode::Decal,
+                                                SamplingOptions(FilterMode::Linear));
+      maskShader = maskShader->makeWithMatrix(Matrix::MakeScale(maskScaleX, maskScaleY));
+      paint.setMaskFilter(MaskFilter::MakeShader(maskShader, false));
+      auto contentRect = Rect::MakeWH(static_cast<float>(input.content->width()),
+                                      static_cast<float>(input.content->height()));
+      canvas->drawRect(contentRect, paint);
+    }
   }
 }
 
 std::shared_ptr<ImageFilter> GlassStyle::getFrostFilter(float contentScale) {
-  if (_frost <= 0) {
-    return nullptr;
-  }
   if (frostFilter && FloatNearlyEqual(currentFrostScale, contentScale)) {
     return frostFilter;
   }
   currentFrostScale = contentScale;
-  float sigma = (_frost / 100.0f) * MaxFrostSigma * contentScale;
+  float sigma = std::max(0.5f, (_frost / 100.0f) * MaxFrostSigma) * contentScale;
   frostFilter = ImageFilter::Blur(sigma, sigma, TileMode::Mirror);
   return frostFilter;
 }
@@ -471,47 +695,69 @@ void GlassStyle::invalidateFrostFilter() {
   invalidateTransform();
 }
 
-std::shared_ptr<ImageFilter> GlassStyle::getRefractionFilter(
-    GlassShapeType shapeType, float cornerRadius, float halfWidth, float halfHeight,
-    float udfPixelToLayerPixelX, float udfPixelToLayerPixelY, std::shared_ptr<Image> maskImage,
-    std::shared_ptr<Image> coarseMaskImage) {
-  float minHalf = std::min(halfWidth, halfHeight);
-  float depthRatio = getDepthRatio();
-  float refractionFactor = getRefractionFactor();
-  float splay = std::clamp(_splay / 100.0f, 0.0f, 1.0f);
+GlassRefractionParams GlassStyle::makeBaseRefractionParams(float halfW, float halfH,
+                                                           const BackgroundMapping& mapping) const {
   GlassRefractionParams params = {};
   params.dispersion = getDispersionFactor();
   params.lightAngle = _lightAngle;
   params.lightIntensity = getLightIntensityFactor();
-  params.origWidth = halfWidth * 2.0f;
-  params.origHeight = halfHeight * 2.0f;
-  params.shapeType = shapeType;
+  params.origWidth = halfW * 2.0f;
+  params.origHeight = halfH * 2.0f;
+  params.glassUVScaleX = mapping.sourcePixelToContentPixel.x / mapping.contentWidth;
+  params.glassUVScaleY = mapping.sourcePixelToContentPixel.y / mapping.contentHeight;
+  params.glassUVOffsetX = mapping.sourceOrigin.x / mapping.contentWidth;
+  params.glassUVOffsetY = mapping.sourceOrigin.y / mapping.contentHeight;
+  params.layerPixelToSourcePixelX = mapping.layerPixelToSourcePixel.x;
+  params.layerPixelToSourcePixelY = mapping.layerPixelToSourcePixel.y;
+  params.frost = _frost;
+  return params;
+}
 
+std::shared_ptr<ImageFilter> GlassStyle::getSDFRefractionFilter(GlassShapeType shapeType,
+                                                                float cornerRadius, float halfWidth,
+                                                                float halfHeight,
+                                                                const BackgroundMapping& mapping) {
+  auto params = makeBaseRefractionParams(halfWidth, halfHeight, mapping);
+  params.shapeType = shapeType;
+  // Analytical SDF is an exact model, so displacement does not need clamping.
+  params.maxDisplacement = 1.0e20f;
+
+  float minHalf = std::min(halfWidth, halfHeight);
   GlassSDFGeometryParams sdfParams = {};
+  sdfParams.halfW = halfWidth;
+  sdfParams.halfH = halfHeight;
+  sdfParams.cornerRadius = cornerRadius;
+  sdfParams.glassThickness = getGlassThickness(minHalf);
+  sdfParams.refractionFactor = getRefractionFactor();
+  sdfParams.splay = std::clamp(_splay / 100.0f, 0.0f, 1.0f);
+  sdfParams.depthRatio = getDepthRatio();
+  return std::make_shared<GlassRefractionImageFilter>(params, sdfParams, GlassUDFGeometryParams{},
+                                                      nullptr);
+}
+
+std::shared_ptr<ImageFilter> GlassStyle::getUDFRefractionFilter(float halfWidth, float halfHeight,
+                                                                const UDFSampling& udf,
+                                                                const BackgroundMapping& mapping,
+                                                                std::shared_ptr<Image> maskImage) {
+  auto params = makeBaseRefractionParams(halfWidth, halfHeight, mapping);
+  params.shapeType = GlassShapeType::AlphaMask;
+  float minHalf = std::min(halfWidth, halfHeight);
+  params.maxDisplacement = GetUDFMaxDisplacement(minHalf, getRefractionFactor(), getDepthRatio());
+
   GlassUDFGeometryParams udfParams = {};
-  if (shapeType != GlassShapeType::AlphaMask) {
-    sdfParams.halfW = halfWidth;
-    sdfParams.halfH = halfHeight;
-    sdfParams.cornerRadius = cornerRadius;
-    sdfParams.glassThickness = getGlassThickness(minHalf);
-    sdfParams.refractionFactor = refractionFactor;
-    sdfParams.splay = splay;
-    sdfParams.depthRatio = depthRatio;
-    params.maxDisplacement = 1.0e20f;
-  } else {
-    udfParams.halfW = halfWidth;
-    udfParams.halfH = halfHeight;
-    udfParams.refractionFactor = refractionFactor;
-    udfParams.splay = splay;
-    udfParams.depthRatio = depthRatio;
-    udfParams.udfPixelToLayerPixelX = udfPixelToLayerPixelX;
-    udfParams.udfPixelToLayerPixelY = udfPixelToLayerPixelY;
-    float depthScale = std::clamp(depthRatio / 0.1f, 0.0f, 1.0f);
-    depthScale = depthScale * depthScale * (3.0f - 2.0f * depthScale);
-    params.maxDisplacement = 0.999f * minHalf * refractionFactor * depthRatio * depthScale;
-  }
-  return std::make_shared<GlassRefractionImageFilter>(
-      params, sdfParams, udfParams, std::move(maskImage), std::move(coarseMaskImage));
+  udfParams.halfW = halfWidth;
+  udfParams.halfH = halfHeight;
+  udfParams.refractionFactor = getRefractionFactor();
+  udfParams.splay = std::clamp(_splay / 100.0f, 0.0f, 1.0f);
+  udfParams.depthRatio = getDepthRatio();
+  udfParams.udfPixelToLayerPixelX = udf.pixelToLayerPixel.x;
+  udfParams.udfPixelToLayerPixelY = udf.pixelToLayerPixel.y;
+  udfParams.edgeSpanX = udf.edgeSpan.x;
+  udfParams.edgeSpanY = udf.edgeSpan.y;
+  udfParams.textureOriginX = udf.textureOrigin.x;
+  udfParams.textureOriginY = udf.textureOrigin.y;
+  return std::make_shared<GlassRefractionImageFilter>(params, GlassSDFGeometryParams{}, udfParams,
+                                                      std::move(maskImage));
 }
 
 }  // namespace tgfx
