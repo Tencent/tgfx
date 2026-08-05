@@ -33,13 +33,10 @@ class WebGPUWindow : public Window {
    * @param colorSpace An optional target color space for the drawing buffer. If nullptr, the
    * default sRGB color space is used. When a non-null color space is provided, the canvas's WebGPU
    * context is reconfigured with the color space so that the rendered content is displayed
-   * correctly. The color space configuration resolves the underlying GPUDevice from this window's
-   * device handle, so both the default device and devices passed in via WebGPUDevice::MakeFrom()
-   * are supported.
-   * On Web, the color space configuration and video texture uploads resolve GPU objects through
-   * the module's WebGPU runtime export, so the final executable must link with
-   * -sEXPORTED_RUNTIME_METHODS=['HEAPU8','WebGPU']. The GL runtime method is only required for the
-   * WebGL backend.
+   * correctly. Both the default device and devices passed in via WebGPUDevice::MakeFrom() are
+   * supported.
+   * On Web, the final executable must export the WebGPU runtime method (see the Web build section
+   * in README.md); otherwise color space configuration and video texture uploads will not work.
    */
   static std::shared_ptr<WebGPUWindow> MakeFrom(const std::string& canvasSelector,
                                                 std::shared_ptr<WebGPUDevice> device = nullptr,

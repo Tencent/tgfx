@@ -37,9 +37,7 @@ class WebGPUDevice : public Device {
    * WGPUDevice object. The caller retains ownership of the device and must keep it alive for the
    * lifetime of the returned WebGPUDevice. tgfx will NOT release the device on shutdown.
    * On Web, the handle must be a device registered in the emscripten WebGPU runtime (e.g. from
-   * emscripten_webgpu_get_device() or emscripten_webgpu_import_device()), so that the color space
-   * configuration on the WebGPUWindow can resolve the same JS GPUDevice object via the module's
-   * WebGPU runtime export.
+   * emscripten_webgpu_get_device() or emscripten_webgpu_import_device()).
    * Note: This method sets the device's uncaptured error callback for internal error reporting. The
    * WebGPU spec provides only a single-slot callback, so any previously set callback will be
    * overwritten. The callback is not restored on destruction.
