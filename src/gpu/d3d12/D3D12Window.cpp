@@ -33,10 +33,8 @@
 
 namespace tgfx {
 
-// Number of backbuffers in the swap chain. Two is the minimum allowed by FLIP_DISCARD; using three
-// gives the OS one extra frame to compose, smoothing latency spikes under heavy GPU load. We pick
-// two for parity with Vulkan's MAX_FRAMES_IN_FLIGHT and to keep peak VRAM low for typical 4K
-// windows. The presentation engine still queues a small number of frames internally.
+// Number of backbuffers in the swap chain. Two matches Vulkan's MAX_FRAMES_IN_FLIGHT and keeps
+// peak VRAM low on typical 4K windows.
 static constexpr UINT BACKBUFFER_COUNT = 2;
 
 // Private RenderTargetProxy that exposes the swap chain's current backbuffer as an external
