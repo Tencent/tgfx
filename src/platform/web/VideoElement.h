@@ -19,6 +19,7 @@
 #pragma once
 
 #include <emscripten/val.h>
+#include <cstdint>
 #include "platform/ImageStream.h"
 
 namespace tgfx {

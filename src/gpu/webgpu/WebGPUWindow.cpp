@@ -33,6 +33,36 @@
 
 namespace tgfx {
 
+// Maps a WGPUTextureFormat to the WebGPU GPUTextureFormat string used by GPUCanvasContext.configure().
+static const char* ToWebGPUFormatString(WGPUTextureFormat format) {
+  switch (format) {
+    case WGPUTextureFormat_RGBA8Unorm:
+      return "rgba8unorm";
+    case WGPUTextureFormat_BGRA8Unorm:
+      return "bgra8unorm";
+    case WGPUTextureFormat_RGBA16Float:
+      return "rgba16float";
+    case WGPUTextureFormat_RGBA32Float:
+      return "rgba32float";
+    default:
+      LOGE("WebGPUWindow: Unsupported surface format (%d), falling back to bgra8unorm.",
+           static_cast<int>(format));
+      return "bgra8unorm";
+  }
+}
+
+// Maps a WGPUCompositeAlphaMode to the WebGPU alphaMode string used by GPUCanvasContext.configure().
+static const char* ToAlphaModeString(WGPUCompositeAlphaMode alphaMode) {
+  switch (alphaMode) {
+    case WGPUCompositeAlphaMode_Opaque:
+      return "opaque";
+    case WGPUCompositeAlphaMode_Unpremultiplied:
+      return "unpremultiplied";
+    default:
+      return "premultiplied";
+  }
+}
+
 std::shared_ptr<WebGPUWindow> WebGPUWindow::MakeFrom(const std::string& canvasSelector,
                                                      std::shared_ptr<WebGPUDevice> device,
                                                      std::shared_ptr<ColorSpace> colorSpace) {
@@ -92,7 +122,7 @@ std::shared_ptr<WebGPUWindow> WebGPUWindow::MakeFrom(const std::string& canvasSe
   auto window = std::shared_ptr<WebGPUWindow>(
       new WebGPUWindow(std::move(device), surface, canvasWidth, canvasHeight, canvasSelector,
                        std::move(colorSpace)));
-  window->configureColorSpace();
+  window->configureColorSpace(config.format, config.usage, config.alphaMode);
   return window;
 }
 
@@ -103,7 +133,8 @@ WebGPUWindow::WebGPUWindow(std::shared_ptr<Device> device, void* surface, int wi
       _surface(surface), _width(width), _height(height) {
 }
 
-void WebGPUWindow::configureColorSpace() {
+void WebGPUWindow::configureColorSpace(WGPUTextureFormat format, WGPUTextureUsageFlags usage,
+                                       WGPUCompositeAlphaMode alphaMode) {
 #ifdef __EMSCRIPTEN__
   auto namedColorSpace = ToWebNamedColorSpace(colorSpace());
   // Leave the default sRGB drawing buffer untouched to avoid a redundant reconfigure on the
@@ -114,12 +145,15 @@ void WebGPUWindow::configureColorSpace() {
   // Reconfigure the canvas WebGPU context with the desired color space via the JS side, since the
   // WebGPU C API surface configuration does not expose a color space option. The JS side resolves
   // the device from the handle below through the module's WebGPU runtime export, which also covers
-  // devices passed in via WebGPUDevice::MakeFrom().
+  // devices passed in via WebGPUDevice::MakeFrom(). The format, usage and alpha mode are passed
+  // along so that this WGPUSurfaceConfiguration stays the single source of truth for the canvas.
   auto wgpuDevice =
       static_cast<WGPUDevice>(static_cast<WebGPUDevice*>(getDevice().get())->webgpuDevice());
   bool supported = emscripten::val::module_property("tgfx").call<bool>(
       "configureWebGPUColorSpace", emscripten::val(_canvasSelector),
-      static_cast<int>(namedColorSpace), reinterpret_cast<uintptr_t>(wgpuDevice));
+      static_cast<int>(namedColorSpace), reinterpret_cast<uintptr_t>(wgpuDevice),
+      emscripten::val(ToWebGPUFormatString(format)), static_cast<unsigned>(usage),
+      emscripten::val(ToAlphaModeString(alphaMode)));
   if (!supported) {
     LOGE(
         "WebGPUWindow::configureColorSpace() The specified ColorSpace is not supported on this "
@@ -168,7 +202,7 @@ std::shared_ptr<RenderTargetProxy> WebGPUWindow::onCreateRenderTarget(Context* c
     config.presentMode = WGPUPresentMode_Fifo;
     config.alphaMode = WGPUCompositeAlphaMode_Premultiplied;
     wgpuSurfaceConfigure(wgpuSurface, &config);
-    configureColorSpace();
+    configureColorSpace(config.format, config.usage, config.alphaMode);
     _configuredWidth = _width;
     _configuredHeight = _height;
   }

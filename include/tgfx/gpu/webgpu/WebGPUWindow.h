@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <webgpu/webgpu.h>
 #include "tgfx/gpu/Window.h"
 #include "tgfx/gpu/webgpu/WebGPUDevice.h"
 
@@ -37,7 +38,8 @@ class WebGPUWindow : public Window {
    * are supported.
    * On Web, the color space configuration and video texture uploads resolve GPU objects through
    * the module's WebGPU runtime export, so the final executable must link with
-   * -sEXPORTED_RUNTIME_METHODS=['GL','HEAPU8','WebGPU'].
+   * -sEXPORTED_RUNTIME_METHODS=['HEAPU8','WebGPU']. The GL runtime method is only required for the
+   * WebGL backend.
    */
   static std::shared_ptr<WebGPUWindow> MakeFrom(const std::string& canvasSelector,
                                                 std::shared_ptr<WebGPUDevice> device = nullptr,
@@ -56,7 +58,8 @@ class WebGPUWindow : public Window {
   // Configures the canvas's WebGPU context to use the target color space. Must be called after
   // each wgpuSurfaceConfigure() call, since the emscripten surface configuration does not carry
   // the color space information.
-  void configureColorSpace();
+  void configureColorSpace(WGPUTextureFormat format, WGPUTextureUsageFlags usage,
+                           WGPUCompositeAlphaMode alphaMode);
 
   std::string _canvasSelector;
   void* _surface = nullptr;
