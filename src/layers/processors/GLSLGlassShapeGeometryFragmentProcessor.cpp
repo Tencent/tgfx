@@ -86,12 +86,13 @@ void GLSLGlassSDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("%s = vec4(0.0);", args.outputColor.c_str());
   fragBuilder->codeAppend("if (outerSDF < 0.0) {");
   fragBuilder->codeAppend("  float edgeDist = -outerSDF;");
-  fragBuilder->codeAppendf("  float edgeBandWidth = min(%s.w, 60.0);", shape.c_str());
   fragBuilder->codeAppend("  float edgeWeight = 1.0 - smoothstep(0.0, 1.0, edgeDist);");
-  fragBuilder->codeAppend("  float edgeFactor = 1.0 - min(edgeDist / edgeBandWidth, 1.0);");
+  // Figma profile with rd = glassThickness, bs = 0 (no bevel):
+  // offset = I * rd * pow(clamp((rd - d) / rd, 0, 1), 3.5), capped at 0.999 * rd.
+  fragBuilder->codeAppendf("  float rd = max(%s.w, 0.0001);", shape.c_str());
+  fragBuilder->codeAppend("  float heightT = clamp((rd - edgeDist) / rd, 0.0, 1.0);");
   fragBuilder->codeAppendf(
-      "  float offsetDist = %s.w * %s.x * edgeFactor * edgeFactor * edgeFactor * 1.2;",
-      shape.c_str(), effect.c_str());
+      "  float offsetDist = min(%s.x * rd * pow(heightT, 3.5), 0.999 * rd);", effect.c_str());
   fragBuilder->codeAppendf("  float effectiveSplay = %s.y;", effect.c_str());
   if (shapeType == GlassShapeType::Ellipse) {
     fragBuilder->codeAppend(
@@ -100,27 +101,28 @@ void GLSLGlassSDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppend("  if (gradientLength > 0.000001) {");
     fragBuilder->codeAppend("    vec2 gradientDir = -sdfGradient / gradientLength;");
   } else {
+    // Figma-style corner radius amplification: effective corner radius grows with
+    // refractionDistance (glassThickness), so larger refraction produces larger corner
+    // regions and more radial direction blending at corners.
     fragBuilder->codeAppend("  vec2 absP = abs(vec2(px, py));");
-    fragBuilder->codeAppend("  float qx = absP.x - halfW + cornerRadius;");
-    fragBuilder->codeAppend("  float qy = absP.y - halfH + cornerRadius;");
-    fragBuilder->codeAppend("  if (cornerRadius > 0.0) {");
-    fragBuilder->codeAppend("    float straightHalfW = max(halfW - cornerRadius, 0.0001);");
-    fragBuilder->codeAppend("    float straightHalfH = max(halfH - cornerRadius, 0.0001);");
-    fragBuilder->codeAppend("    float cornerWeightX = smoothstep(0.0, straightHalfW, absP.x);");
-    fragBuilder->codeAppend("    float cornerWeightY = smoothstep(0.0, straightHalfH, absP.y);");
-    fragBuilder->codeAppend("    float cornerWeight = (qx > 0.0 && qy > 0.0) ? 1.0 :");
+    fragBuilder->codeAppendf("  float refractionDistance = %s.w;", shape.c_str());
+    fragBuilder->codeAppend("  float r_effective = min(min(halfW, halfH), max(cornerRadius, refractionDistance));");
+    fragBuilder->codeAppend("  vec2 cornerCenter = vec2(halfW - r_effective, halfH - r_effective);");
+    fragBuilder->codeAppend("  vec2 relToCorner = absP - cornerCenter;");
+    fragBuilder->codeAppend("  float compensation = max(-min(relToCorner.x, relToCorner.y), 0.0);");
+    fragBuilder->codeAppend("  vec2 grad = relToCorner + vec2(compensation);");
+    fragBuilder->codeAppend("  float qx = absP.x - cornerCenter.x;");
+    fragBuilder->codeAppend("  float qy = absP.y - cornerCenter.y;");
+    fragBuilder->codeAppend("  float straightHalfW = max(cornerCenter.x, 0.0001);");
+    fragBuilder->codeAppend("  float straightHalfH = max(cornerCenter.y, 0.0001);");
+    fragBuilder->codeAppend("  float cornerWeightX = smoothstep(0.0, straightHalfW, absP.x);");
+    fragBuilder->codeAppend("  float cornerWeightY = smoothstep(0.0, straightHalfH, absP.y);");
+    fragBuilder->codeAppend("  float cornerWeight = (qx > 0.0 && qy > 0.0) ? 1.0 :");
     fragBuilder->codeAppend("        ((qx > qy) ? cornerWeightY : cornerWeightX);");
     fragBuilder->codeAppendf("    effectiveSplay = min(cornerWeight + %s.y, 1.0);", effect.c_str());
-    fragBuilder->codeAppend("  }");
-    fragBuilder->codeAppend("  vec2 grad;");
-    fragBuilder->codeAppend("  if (qx > 0.0 && qy > 0.0) {");
-    fragBuilder->codeAppend("    grad = normalize(vec2(qx, qy));");
-    fragBuilder->codeAppend("  } else {");
-    fragBuilder->codeAppend("    grad = (qx > qy) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);");
-    fragBuilder->codeAppend("  }");
     fragBuilder->codeAppend("  float gradientLength = length(grad);");
     fragBuilder->codeAppend("  if (gradientLength > 0.000001) {");
-    fragBuilder->codeAppend("    vec2 gradientDir = -vec2(sign(px) * grad.x, sign(py) * grad.y);");
+    fragBuilder->codeAppend("    vec2 gradientDir = -vec2(sign(px) * grad.x, sign(py) * grad.y) / gradientLength;");
   }
   fragBuilder->codeAppend("    float centerDistance = length(vec2(px, py));");
   fragBuilder->codeAppend(

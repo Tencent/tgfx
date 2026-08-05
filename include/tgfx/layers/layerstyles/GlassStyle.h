@@ -180,8 +180,10 @@ class GlassStyle : public LayerStyle {
     return std::clamp(_lightIntensity / 100.0f, 0.0f, 1.0f);
   }
 
+  // Figma-style refraction distance: depth maps 1:1 to layer-space pixels, capped at minHalf
+  // so the gradient band never exceeds the distance from edge to center.
   float getGlassThickness(float minHalf) const {
-    return 1.0f + getDepthRatio() * std::max(minHalf - 1.0f, 0.0f);
+    return std::clamp(_depth, 0.0f, minHalf);
   }
 
   float _refraction = 80.0f;
