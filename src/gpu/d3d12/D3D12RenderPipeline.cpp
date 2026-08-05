@@ -109,10 +109,10 @@ bool D3D12RenderPipeline::createRootSignature(D3D12GPU* gpu,
   // of whether the underlying ID3D12RootSignature is cached. Walk uniform blocks first, then
   // texture samplers, so the parameter indices line up with the order used when serialising.
   std::vector<uint8_t> shapeKey;
-  // Reserve roughly: 1 byte UBO count + 4 bytes per UBO (2 visibility + 1 vertex register +
-  // 1 fragment register) + 1 byte sampler count + 2 bytes per sampler (visibility).
-  shapeKey.reserve(2 + descriptor.layout.uniformBlocks.size() * 4 +
-                   descriptor.layout.textureSamplers.size() * 2);
+  // Reserve roughly: 1 byte UBO count + 3 bytes per UBO (visibility + vertex register +
+  // fragment register) + 1 byte sampler count + 1 byte per sampler (visibility).
+  shapeKey.reserve(2 + descriptor.layout.uniformBlocks.size() * 3 +
+                   descriptor.layout.textureSamplers.size());
 
   // Pre-scan uniform blocks to compute, for every entry, its 0-based register index inside the
   // vertex and fragment stages. SPIR-V binding K is mapped to HLSL register b{idx} where idx is
