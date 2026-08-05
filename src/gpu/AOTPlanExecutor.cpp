@@ -145,13 +145,18 @@ static bool ValidateLinearPlan(const AOTEffectGraph& graph, const AOTEffectPlan&
           return false;
         }
       } else if (pass.kernel == AOTKernelKind::PerlinNoiseFill) {
-        if (pass.nodes.empty() || pass.nodes.size() > 2 ||
+        // One fused pass: a perlin source plus up to two pointwise-operator slots, matching the
+        // two slot records the PerlinNoiseFillShader kernel carries.
+        if (pass.nodes.empty() || pass.nodes.size() > 3 ||
             !ValidatePerlinNoiseSource(graph, pass.nodes[0])) {
           return false;
         }
-        if (pass.nodes.size() == 2 &&
-            !ValidatePointwiseTailOp(graph, pass.nodes[1], pass.nodes[0])) {
-          return false;
+        AOTNodeID expectedInput = pass.nodes[0];
+        for (size_t opIndex = 1; opIndex < pass.nodes.size(); ++opIndex) {
+          if (!ValidatePointwiseTailOp(graph, pass.nodes[opIndex], expectedInput)) {
+            return false;
+          }
+          expectedInput = pass.nodes[opIndex];
         }
       } else {
         return false;
@@ -274,24 +279,17 @@ static PlacementPtr<FragmentProcessor> BuildFPForNode(BlockAllocator* allocator,
       auto xform = ColorSpaceXformEffect::Make(allocator, parameters->steps);
       return FragmentProcessor::Compose(allocator, std::move(input), std::move(xform));
     }
-    case AOTEffectKind::PerlinNoiseSource: {
-      auto parameters = std::get_if<AOTPerlinNoiseParameters>(&node->parameters);
-      if (parameters == nullptr) {
-        return nullptr;
-      }
-      auto paintingData = std::make_unique<PerlinNoiseShader::PaintingData>(
-          parameters->baseFrequencyX, parameters->baseFrequencyY, parameters->stitchWidth,
-          parameters->stitchHeight);
-      auto uvMatrix = parameters->uvMatrix;
-      return PerlinNoiseFragmentProcessor::MakeFromViews(
-          allocator, static_cast<PerlinNoiseType>(parameters->noiseType), parameters->numOctaves,
-          parameters->stitchTiles, std::move(paintingData), parameters->permutationsView,
-          parameters->noiseView, &uvMatrix);
-    }
     default:
       return nullptr;
   }
 }
+
+// Rebuilds the fused perlin-source processor of a PerlinNoiseFill pass: the noise source plus up
+// to two pointwise operators folded into the processor's own slot records, so the whole pass maps
+// onto one PerlinNoiseFillShader program with no Compose wrapper and no materialization.
+static PlacementPtr<FragmentProcessor> BuildPerlinNoiseFillFP(BlockAllocator* allocator,
+                                                              const AOTEffectGraph& graph,
+                                                              const AOTPassDescriptor& pass);
 
 static bool BuildPointwiseSlot(const AOTEffectNode* node, AOTPointwiseSlot* slot) {
   if (node == nullptr || slot == nullptr) {
@@ -334,6 +332,39 @@ static bool BuildPointwiseSlot(const AOTEffectNode* node, AOTPointwiseSlot* slot
     return true;
   }
   return false;
+}
+
+static PlacementPtr<FragmentProcessor> BuildPerlinNoiseFillFP(BlockAllocator* allocator,
+                                                              const AOTEffectGraph& graph,
+                                                              const AOTPassDescriptor& pass) {
+  if (pass.nodes.empty() || pass.nodes.size() > 3) {
+    return nullptr;
+  }
+  auto perlinNode = graph.nodeAt(pass.nodes[0]);
+  auto parameters = perlinNode != nullptr
+                        ? std::get_if<AOTPerlinNoiseParameters>(&perlinNode->parameters)
+                        : nullptr;
+  if (perlinNode == nullptr || perlinNode->kind != AOTEffectKind::PerlinNoiseSource ||
+      parameters == nullptr) {
+    return nullptr;
+  }
+  std::vector<AOTPointwiseSlot> slots = {};
+  slots.reserve(pass.nodes.size() - 1);
+  for (size_t index = 1; index < pass.nodes.size(); ++index) {
+    AOTPointwiseSlot slot = {};
+    if (!BuildPointwiseSlot(graph.nodeAt(pass.nodes[index]), &slot)) {
+      return nullptr;
+    }
+    slots.push_back(slot);
+  }
+  auto paintingData = std::make_unique<PerlinNoiseShader::PaintingData>(
+      parameters->baseFrequencyX, parameters->baseFrequencyY, parameters->stitchWidth,
+      parameters->stitchHeight);
+  auto uvMatrix = parameters->uvMatrix;
+  return PerlinNoiseFragmentProcessor::MakeFromViews(
+      allocator, static_cast<PerlinNoiseType>(parameters->noiseType), parameters->numOctaves,
+      parameters->stitchTiles, std::move(paintingData), parameters->permutationsView,
+      parameters->noiseView, &uvMatrix, slots);
 }
 
 // Maps a DAG input edge onto a chain slot index. GeometryColor (node 0) is not a slot: it maps to
@@ -491,6 +522,15 @@ static PlacementPtr<FragmentProcessor> BuildFPForPass(
   }
   if (pass.kernel == AOTKernelKind::PointwiseChain) {
     return BuildChainFP(allocator, graph, pass);
+  }
+  if (pass.kernel == AOTKernelKind::PerlinNoiseFill) {
+    // A PerlinNoiseFill pass is always the plan's first pass and consumes no upstream texture: the
+    // planner only emits it for a GeometryColor-fed noise source, so an incoming override would
+    // have nowhere to attach.
+    if (current != nullptr) {
+      return nullptr;
+    }
+    return BuildPerlinNoiseFillFP(allocator, graph, pass);
   }
   for (size_t index = 0; index < pass.nodes.size(); ++index) {
     auto node = graph.nodeAt(pass.nodes[index]);
@@ -687,7 +727,8 @@ PlacementPtr<RenderTask> AOTPlanExecutor::Make(Context* context, uint32_t render
                                                const AOTEffectGraph& graph,
                                                const AOTEffectPlan& plan, const Rect& deviceBounds,
                                                std::shared_ptr<RenderTargetProxy> destination,
-                                               PlacementPtr<DrawOp>* originalDraw) {
+                                               PlacementPtr<DrawOp>* originalDraw,
+                                               const Point& fpCoordOffset) {
   if (context == nullptr || destination == nullptr || destination->getContext() != context ||
       originalDraw == nullptr || *originalDraw == nullptr || deviceBounds.isEmpty() ||
       !CanExecute(graph, plan)) {
@@ -703,6 +744,13 @@ PlacementPtr<RenderTask> AOTPlanExecutor::Make(Context* context, uint32_t render
   if (geometry.isEmpty()) {
     return nullptr;
   }
+  // Intermediate fills must present the rebuilt chain with the same local coordinates the original
+  // processors see: the draw's own offset plus any FP-space translation the caller's geometry
+  // applies (zero for OpsCompositor draws; the coordOffset of an offscreen fill). The terminal
+  // draw samples the last intermediate back with trans(-geometry.coordOffset), which is exact for
+  // both cases: fragCoord + fpCoordOffset - (geometry.coordOffset + fpCoordOffset) maps a
+  // destination pixel to its intermediate texel with no leftover term.
+  auto intermediateOffset = geometry.coordOffset + fpCoordOffset;
   auto drawingManager = context->drawingManager();
   auto allocator = drawingManager->drawingAllocator();
   std::vector<AOTIntermediatePass> intermediatePasses = {};
@@ -738,7 +786,7 @@ PlacementPtr<RenderTask> AOTPlanExecutor::Make(Context* context, uint32_t render
     }
     auto target = std::move(materialized.renderTarget);
     auto drawOp = drawingManager->makeFillDrawOp(target, std::move(processor), renderFlags,
-                                                 geometry.coordOffset);
+                                                 intermediateOffset);
     if (drawOp == nullptr) {
       return nullptr;
     }

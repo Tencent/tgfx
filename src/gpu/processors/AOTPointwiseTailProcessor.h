@@ -25,22 +25,6 @@
 
 namespace tgfx {
 
-enum class AOTPointwiseOpType : int {
-  ColorMatrix = 0,
-  Luma = 1,
-  AlphaThreshold = 2,
-  ColorSpaceXform = 3,
-  None = 4,
-};
-
-struct AOTPointwiseSlot {
-  AOTPointwiseOpType type = AOTPointwiseOpType::None;
-  AOTColorMatrixParameters colorMatrix = {};
-  AOTLumaParameters luma = {};
-  AOTAlphaThresholdParameters alphaThreshold = {};
-  AOTColorSpaceXformParameters colorSpaceXform = {};
-};
-
 class AOTPointwiseTailProcessor : public FragmentProcessor {
  public:
   enum class SourceKind : int {

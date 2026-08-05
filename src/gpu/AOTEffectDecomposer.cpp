@@ -196,10 +196,10 @@ static bool IsPerlinNoiseSource(const AOTEffectNode* node) {
          node->inputs.size() == 1 && node->inputs[0] == AOTNodeID(0);
 }
 
-// Planner for a procedural-noise source: GeometryColor -> PerlinNoiseSource -> [0..2unary
-// pointwise ops]. PerlinNoiseFillShader carries exactly one OpType uniform, so at most one op
-// folds into the source pass losslessly; a second op needs a materialization edge into a
-// following PointwiseTail pass, mirroring DecomposeLinearPointwiseTail's multi-pass shape.
+// Planner for a procedural-noise source: GeometryColor -> PerlinNoiseSource -> [0..2 unary
+// pointwise ops]. PerlinNoiseFillShader carries two pointwise slots (a base OpType record shared
+// with a composed operator FP and a processor-owned Slot1 record), so up to two operators fold
+// into a single fused pass with no materialization.
 static bool DecomposePerlinNoiseChain(const AOTEffectGraph& graph, AOTEffectPlan* plan) {
   if (plan == nullptr || graph.nodeCount() < 2 || graph.nodeCount() > 4 ||
       graph.root().index() + 1 != graph.nodeCount()) {
@@ -218,28 +218,14 @@ static bool DecomposePerlinNoiseChain(const AOTEffectGraph& graph, AOTEffectPlan
   }
 
   AOTEffectPlan result = {};
-  AOTPassDescriptor firstPass = {};
-  firstPass.kernel = AOTKernelKind::PerlinNoiseFill;
-  firstPass.nodes.push_back(AOTNodeID(1));
-  uint32_t nodeIndex = 2;
-  if (nodeIndex < graph.nodeCount()) {
-    firstPass.nodes.push_back(AOTNodeID(nodeIndex++));
+  AOTPassDescriptor pass = {};
+  pass.kernel = AOTKernelKind::PerlinNoiseFill;
+  for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
+    pass.nodes.push_back(AOTNodeID(index));
   }
-  firstPass.output = firstPass.nodes.back();
-  result.passes.push_back(std::move(firstPass));
-
-  if (nodeIndex < graph.nodeCount()) {
-    AOTPassDescriptor tailPass = {};
-    tailPass.kernel = AOTKernelKind::PointwiseTail;
-    tailPass.dependencies.push_back(0);
-    tailPass.nodes.push_back(AOTNodeID(nodeIndex++));
-    tailPass.output = tailPass.nodes.back();
-    result.passes.push_back(std::move(tailPass));
-  }
-
-  for (size_t index = 0; index < result.passes.size(); ++index) {
-    result.passes[index].materializesOutput = index + 1 < result.passes.size();
-  }
+  pass.output = pass.nodes.back();
+  pass.materializesOutput = false;
+  result.passes.push_back(std::move(pass));
   result.output = graph.root();
   *plan = std::move(result);
   return true;

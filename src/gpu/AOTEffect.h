@@ -192,6 +192,28 @@ using AOTEffectParameters =
                  AOTAlphaThresholdParameters, AOTColorSpaceXformParameters, AOTConstColorParameters,
                  AOTBlendParameters, AOTPerlinNoiseParameters>;
 
+// Runtime-selected pointwise operator applied by the fused kernels (PointwiseTail, PointwiseChain
+// and PerlinNoiseFill). The values mirror the OP_* constants in pointwise_op.inc: the kernels
+// declare every operator's parameter block unconditionally and select at draw time via a uniform,
+// so the operator kind is never a compile-time permutation axis.
+enum class AOTPointwiseOpType : int {
+  ColorMatrix = 0,
+  Luma = 1,
+  AlphaThreshold = 2,
+  ColorSpaceXform = 3,
+  None = 4,
+};
+
+// One pointwise-operator slot of a fused kernel, carrying the full parameter set of whichever
+// operator it holds. Only the member matching type is read.
+struct AOTPointwiseSlot {
+  AOTPointwiseOpType type = AOTPointwiseOpType::None;
+  AOTColorMatrixParameters colorMatrix = {};
+  AOTLumaParameters luma = {};
+  AOTAlphaThresholdParameters alphaThreshold = {};
+  AOTColorSpaceXformParameters colorSpaceXform = {};
+};
+
 struct AOTEffectNode {
   AOTEffectKind kind = AOTEffectKind::GeometryColor;
   std::vector<AOTNodeID> inputs = {};

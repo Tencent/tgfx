@@ -19,6 +19,7 @@
 #include "DrawingManager.h"
 #include "ProxyProvider.h"
 #include "core/AtlasManager.h"
+#include "gpu/AOTMaterializationPolicy.h"
 #include "gpu/AOTPlanExecutor.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/proxies/RenderTargetProxy.h"
@@ -88,17 +89,30 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
                                   PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags,
                                   const Point& coordOffset, OffscreenFillSource source) {
   auto cache = context->precompiledShaderCache();
-  OffscreenFillKey diagnosticKey = InvalidOffscreenFillKey;
-  if (cache != nullptr && cache->diagnosticRecordingEnabled() && processor != nullptr) {
-    AOTEffectGraph graph = {};
-    AOTEffectPlan plan = {};
-    std::string blocker;
-    bool lowerSucceeded = AOTEffectDecomposer::Lower({processor.get()}, &graph, &blocker);
-    bool validateSucceeded = lowerSucceeded && AOTEffectDecomposer::ValidateForFusion(graph);
-    bool decomposeSucceeded =
+  // The decomposition route only pays off for chains the plain route cannot match directly: a
+  // composite processor tree (Compose/Xfermode children). A bare single-source fill is already
+  // served by the direct matchers, so it must skip the route and keep its single program lookup.
+  bool routeCandidate = cache != nullptr && cache->isLoaded() && cache->decompositionEnabled() &&
+                        processor != nullptr && processor->numChildProcessors() > 0;
+  bool analyze = processor != nullptr &&
+                 (routeCandidate || (cache != nullptr && cache->diagnosticRecordingEnabled()));
+  AOTEffectGraph graph = {};
+  AOTEffectPlan plan = {};
+  std::string blocker;
+  bool lowerSucceeded = false;
+  bool validateSucceeded = false;
+  bool decomposeSucceeded = false;
+  bool canExecute = false;
+  if (analyze) {
+    lowerSucceeded = AOTEffectDecomposer::Lower({processor.get()}, &graph, &blocker);
+    validateSucceeded = lowerSucceeded && AOTEffectDecomposer::ValidateForFusion(graph);
+    decomposeSucceeded =
         validateSucceeded &&
         AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan);
-    bool canExecute = decomposeSucceeded && AOTPlanExecutor::CanExecute(graph, plan);
+    canExecute = decomposeSucceeded && AOTPlanExecutor::CanExecute(graph, plan);
+  }
+  OffscreenFillKey diagnosticKey = InvalidOffscreenFillKey;
+  if (cache != nullptr && cache->diagnosticRecordingEnabled() && processor != nullptr) {
     std::vector<AOTKernelKind> kernels = {};
     kernels.reserve(plan.passes.size());
     for (const auto& pass : plan.passes) {
@@ -112,6 +126,28 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
       makeFillDrawOp(renderTarget, std::move(processor), renderFlags, coordOffset, diagnosticKey);
   if (drawOp == nullptr) {
     return false;
+  }
+  if (routeCandidate && decomposeSucceeded && canExecute && !plan.passes.empty()) {
+    const auto& firstPass = plan.passes.front();
+    bool kernelRoutable = firstPass.kernel == AOTKernelKind::PointwiseTail ||
+                          firstPass.kernel == AOTKernelKind::PointwiseChain ||
+                          firstPass.kernel == AOTKernelKind::PerlinNoiseFill;
+    // A nested rasterization must not add an RGBA8 quantization round trip of its own, so only
+    // single-pass plans (no intermediate texture, byte-identical to the plain fill) may route
+    // there. Top-level filter fills carry no such constraint.
+    bool nested = (renderFlags & InternalRenderFlags::NestedRasterization) != 0;
+    bool planAccepted = kernelRoutable && (plan.passes.size() == 1 || !nested);
+    if (planAccepted) {
+      auto deviceBounds = Rect::MakeWH(static_cast<float>(renderTarget->width()),
+                                       static_cast<float>(renderTarget->height()));
+      auto task = AOTPlanExecutor::Make(context, renderFlags, graph, plan, deviceBounds,
+                                        renderTarget, &drawOp, coordOffset);
+      if (task != nullptr) {
+        addRenderTask(std::move(task));
+        addGenerateMipmapsTask(renderTarget->asTextureProxy());
+        return true;
+      }
+    }
   }
   auto allocator = drawingAllocator();
   auto drawOps = allocator->makeArray<DrawOp>(&drawOp, 1);

@@ -1099,7 +1099,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
         // again as a coverage processor.
         op->moveCoveragesToColors();
         auto task = AOTPlanExecutor::Make(context, renderFlags, foldedGraph, foldedPlan,
-                                          *deviceBounds, renderTarget, &op);
+                                          *deviceBounds, renderTarget, &op, Point::Zero());
         if (task != nullptr) {
           submitDrawOps();
           context->drawingManager()->addRenderTask(std::move(task));
@@ -1119,7 +1119,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
          plan.passes[0].kernel == AOTKernelKind::PointwiseChain ||
          plan.passes[0].kernel == AOTKernelKind::PerlinNoiseFill)) {
       auto task = AOTPlanExecutor::Make(context, renderFlags, graph, plan, *deviceBounds,
-                                        renderTarget, &op);
+                                        renderTarget, &op, Point::Zero());
       if (task != nullptr) {
         submitDrawOps();
         context->drawingManager()->addRenderTask(std::move(task));

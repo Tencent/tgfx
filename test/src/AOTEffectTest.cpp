@@ -938,7 +938,7 @@ TGFX_TEST(AOTEffectTest, PerlinNoisePlusOneOpFusesToSinglePass) {
   EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
 }
 
-TGFX_TEST(AOTEffectTest, PerlinNoisePlusTwoOpsSplitsIntoPointwiseTailPass) {
+TGFX_TEST(AOTEffectTest, PerlinNoisePlusTwoOpsFusesToSinglePass) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
@@ -955,14 +955,11 @@ TGFX_TEST(AOTEffectTest, PerlinNoisePlusTwoOpsSplitsIntoPointwiseTailPass) {
       AOTEffectDecomposer::Lower({perlin.get(), colorMatrix.get(), alphaThreshold.get()}, &graph));
   AOTEffectPlan plan;
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan));
-  ASSERT_EQ(plan.passes.size(), 2u);
+  ASSERT_EQ(plan.passes.size(), 1u);
   EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PerlinNoiseFill);
-  EXPECT_EQ(plan.passes[0].nodes, std::vector<AOTNodeID>({AOTNodeID(1), AOTNodeID(2)}));
-  EXPECT_TRUE(plan.passes[0].materializesOutput);
-  EXPECT_EQ(plan.passes[1].kernel, AOTKernelKind::PointwiseTail);
-  EXPECT_EQ(plan.passes[1].nodes, std::vector<AOTNodeID>({AOTNodeID(3)}));
-  EXPECT_EQ(plan.passes[1].dependencies, std::vector<uint32_t>({0u}));
-  EXPECT_FALSE(plan.passes[1].materializesOutput);
+  EXPECT_EQ(plan.passes[0].nodes,
+            std::vector<AOTNodeID>({AOTNodeID(1), AOTNodeID(2), AOTNodeID(3)}));
+  EXPECT_FALSE(plan.passes[0].materializesOutput);
   EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
 }
 

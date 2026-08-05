@@ -7,6 +7,10 @@
 // Two per-draw lookup textures are bound as samplers: TextureSampler_0 = permutations (256x1 A8,
 // ForRead swizzle RRRR so the single stored channel reads through .r) and TextureSampler_1 = noise
 // (256x4 RGBA8888, identity swizzle). Output is premultiplied RGBA.
+// Two pointwise-operator slots follow the noise (same runtime-uniform design as
+// PointwiseTailShader): the base slot is shared with an operator FP composed on top of the perlin
+// processor (OpType == OP_NONE when there is none), while the Slot1 record is written only by the
+// processor's own slot storage, letting one kernel evaluate Perlin -> op -> op in a single pass.
 // Permutation dimensions (frag): HAS_XP (int, 3), HAS_COVERAGE (bool).
 #version 450
 
@@ -26,6 +30,30 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   int NumOctaves;
   int StitchTiles;
 #include "pointwise_op_uniforms.inc"
+
+#define TGFX_SLOT_OP_TYPE Slot1OpType
+#define TGFX_SLOT_COLOR_MATRIX Slot1ColorMatrix
+#define TGFX_SLOT_COLOR_VECTOR Slot1ColorVector
+#define TGFX_SLOT_KR Slot1Kr
+#define TGFX_SLOT_KG Slot1Kg
+#define TGFX_SLOT_KB Slot1Kb
+#define TGFX_SLOT_THRESHOLD Slot1Threshold
+#define TGFX_SLOT_CS_FLAGS Slot1CSFlags
+#define TGFX_SLOT_SRC_TF0 Slot1SrcTF0
+#define TGFX_SLOT_SRC_TF1 Slot1SrcTF1
+#define TGFX_SLOT_SRC_TF_TYPE Slot1SrcTFType
+#define TGFX_SLOT_SRC_OOTF Slot1SrcOOTF
+#define TGFX_SLOT_COLOR_XFORM Slot1ColorXform
+#define TGFX_SLOT_DST_OOTF Slot1DstOOTF
+#define TGFX_SLOT_DST_TF0 Slot1DstTF0
+#define TGFX_SLOT_DST_TF1 Slot1DstTF1
+#define TGFX_SLOT_DST_TF_TYPE Slot1DstTFType
+#define TGFX_SLOT_SRC_TF_FUNC perlinSlotSrcTF1
+#define TGFX_SLOT_DST_TF_FUNC perlinSlotDstTF1
+#define TGFX_SLOT_APPLY_FUNC applyPointwiseSlot1
+#include "pointwise_slot_bind.inc"
+#include "pointwise_op_uniforms.inc"
+#include "pointwise_slot_unbind.inc"
 #include "xp_uniforms.inc"
 };
 
@@ -46,6 +74,30 @@ layout(set = 1, binding = 1) uniform sampler2D TextureSampler_1;  // noise (RGBA
 layout(location = 0) out vec4 fragColor;
 
 #include "pointwise_op.inc"
+
+#define TGFX_SLOT_OP_TYPE Slot1OpType
+#define TGFX_SLOT_COLOR_MATRIX Slot1ColorMatrix
+#define TGFX_SLOT_COLOR_VECTOR Slot1ColorVector
+#define TGFX_SLOT_KR Slot1Kr
+#define TGFX_SLOT_KG Slot1Kg
+#define TGFX_SLOT_KB Slot1Kb
+#define TGFX_SLOT_THRESHOLD Slot1Threshold
+#define TGFX_SLOT_CS_FLAGS Slot1CSFlags
+#define TGFX_SLOT_SRC_TF0 Slot1SrcTF0
+#define TGFX_SLOT_SRC_TF1 Slot1SrcTF1
+#define TGFX_SLOT_SRC_TF_TYPE Slot1SrcTFType
+#define TGFX_SLOT_SRC_OOTF Slot1SrcOOTF
+#define TGFX_SLOT_COLOR_XFORM Slot1ColorXform
+#define TGFX_SLOT_DST_OOTF Slot1DstOOTF
+#define TGFX_SLOT_DST_TF0 Slot1DstTF0
+#define TGFX_SLOT_DST_TF1 Slot1DstTF1
+#define TGFX_SLOT_DST_TF_TYPE Slot1DstTFType
+#define TGFX_SLOT_SRC_TF_FUNC perlinSlotSrcTF1
+#define TGFX_SLOT_DST_TF_FUNC perlinSlotDstTF1
+#define TGFX_SLOT_APPLY_FUNC applyPointwiseSlot1
+#include "pointwise_slot_bind.inc"
+#include "pointwise_op.inc"
+#include "pointwise_slot_unbind.inc"
 
 void main() {
   // Sub-lattice bias (1/128) keeps fract(noiseVec) away from 0 at integer baseFrequency; see the
@@ -104,9 +156,10 @@ void main() {
     color = color * 0.5 + 0.5;
   }
   color = clamp(color, 0.0, 1.0);
-  // Premultiply the raw noise, then apply the optional composed pointwise operator (OpType == OP_NONE
-  // when no operator FP is composed on top of this shader).
-  vec4 result = applyPointwiseOp(vec4(color.rgb * color.aaa, color.a));
+  // Premultiply the raw noise, then apply both pointwise slots in order: the base OpType record
+  // (shared with an operator FP composed on top of this shader, OP_NONE when absent) followed by
+  // the processor-owned Slot1 record (OP_NONE when the processor carries fewer than two operators).
+  vec4 result = applyPointwiseSlot1(applyPointwiseOp(vec4(color.rgb * color.aaa, color.a)));
 
 #if HAS_COVERAGE
 #define TGFX_XP_SRC_COLOR (result * vCoverage)

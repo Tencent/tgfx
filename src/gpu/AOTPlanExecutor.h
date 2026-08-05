@@ -35,11 +35,20 @@ class AOTPlanExecutor {
   /**
    * Builds an atomic render task for a supported linear AOT plan without enqueueing it. On failure,
    * originalDraw remains unchanged. On success, ownership of originalDraw moves into the task.
+   *
+   * deviceBounds is the area the original draw covers on the destination, in destination device
+   * coordinates. fpCoordOffset is the translation the draw's geometry applies between destination
+   * device coordinates and the coordinate space the fragment processors evaluate in: zero for an
+   * OpsCompositor draw (FP local == device), or the caller's coordOffset for an offscreen fill
+   * (DrawingManager::fillRTWithFP), whose draw always lands at (0,0,w,h) while its processors see
+   * coords shifted by that offset. Intermediate passes add it to their fill offset so the rebuilt
+   * chain evaluates in the same space the original processors would have seen; the terminal
+   * sampling matrix is independent of it.
    */
   static PlacementPtr<RenderTask> Make(Context* context, uint32_t renderFlags,
                                        const AOTEffectGraph& graph, const AOTEffectPlan& plan,
                                        const Rect& deviceBounds,
                                        std::shared_ptr<RenderTargetProxy> destination,
-                                       PlacementPtr<DrawOp>* originalDraw);
+                                       PlacementPtr<DrawOp>* originalDraw, const Point& fpCoordOffset);
 };
 }  // namespace tgfx
