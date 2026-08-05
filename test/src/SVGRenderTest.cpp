@@ -820,66 +820,66 @@ TGFX_TEST_PRIVATE(SVGRenderTest, RenderContextCopyPreservesOpacityAndClip) {
   const float expectedOpacity = 0.375f;
   Path expectedClip;
   expectedClip.addRect(Rect::MakeXYWH(10.f, 20.f, 30.f, 40.f));
-  source.deferredPaintOpacity = expectedOpacity;
-  source._clipPath = expectedClip;
+  TGFX_PRIVATE_ACCESS(
+      source.deferredPaintOpacity = expectedOpacity; source._clipPath = expectedClip;
 
-  // 1-arg copy constructor.
-  {
-    SVGRenderContext copy(source);
-    EXPECT_FLOAT_EQ(copy.deferredPaintOpacity, expectedOpacity);
-    ASSERT_TRUE(copy._clipPath.has_value());
-    EXPECT_EQ(*copy._clipPath, expectedClip);
-  }
+      // 1-arg copy constructor.
+      {
+        SVGRenderContext copy(source);
+        EXPECT_FLOAT_EQ(copy.deferredPaintOpacity, expectedOpacity);
+        ASSERT_TRUE(copy._clipPath.has_value());
+        EXPECT_EQ(*copy._clipPath, expectedClip);
+      }
 
-  // 2-arg copy constructor (override canvas).
-  {
-    PictureRecorder otherRecorder;
-    auto* otherCanvas = otherRecorder.beginRecording();
-    SVGRenderContext copy(source, otherCanvas);
-    EXPECT_FLOAT_EQ(copy.deferredPaintOpacity, expectedOpacity);
-    ASSERT_TRUE(copy._clipPath.has_value());
-    EXPECT_EQ(*copy._clipPath, expectedClip);
-  }
+      // 2-arg copy constructor (override canvas).
+      {
+        PictureRecorder otherRecorder;
+        auto* otherCanvas = otherRecorder.beginRecording();
+        SVGRenderContext copy(source, otherCanvas);
+        EXPECT_FLOAT_EQ(copy.deferredPaintOpacity, expectedOpacity);
+        ASSERT_TRUE(copy._clipPath.has_value());
+        EXPECT_EQ(*copy._clipPath, expectedClip);
+      }
 
-  // 2-arg copy constructor (override length context).
-  {
-    SVGLengthContext otherLengthContext(Size::Make(200.f, 200.f));
-    SVGRenderContext copy(source, otherLengthContext);
-    EXPECT_FLOAT_EQ(copy.deferredPaintOpacity, expectedOpacity);
-    ASSERT_TRUE(copy._clipPath.has_value());
-    EXPECT_EQ(*copy._clipPath, expectedClip);
-  }
+      // 2-arg copy constructor (override length context).
+      {
+        SVGLengthContext otherLengthContext(Size::Make(200.f, 200.f));
+        SVGRenderContext copy(source, otherLengthContext);
+        EXPECT_FLOAT_EQ(copy.deferredPaintOpacity, expectedOpacity);
+        ASSERT_TRUE(copy._clipPath.has_value());
+        EXPECT_EQ(*copy._clipPath, expectedClip);
+      }
 
-  // 3-arg copy constructor (override canvas and length context).
-  {
-    PictureRecorder otherRecorder;
-    auto* otherCanvas = otherRecorder.beginRecording();
-    SVGLengthContext otherLengthContext(Size::Make(200.f, 200.f));
-    SVGRenderContext copy(source, otherCanvas, otherLengthContext);
-    EXPECT_FLOAT_EQ(copy.deferredPaintOpacity, expectedOpacity);
-    ASSERT_TRUE(copy._clipPath.has_value());
-    EXPECT_EQ(*copy._clipPath, expectedClip);
-  }
+      // 3-arg copy constructor (override canvas and length context).
+      {
+        PictureRecorder otherRecorder;
+        auto* otherCanvas = otherRecorder.beginRecording();
+        SVGLengthContext otherLengthContext(Size::Make(200.f, 200.f));
+        SVGRenderContext copy(source, otherCanvas, otherLengthContext);
+        EXPECT_FLOAT_EQ(copy.deferredPaintOpacity, expectedOpacity);
+        ASSERT_TRUE(copy._clipPath.has_value());
+        EXPECT_EQ(*copy._clipPath, expectedClip);
+      }
 
-  // 2-arg copy constructor (establish a new OBB scope for a node).
-  {
-    SVGRenderContext copy(source, static_cast<const SVGNode*>(nullptr));
-    EXPECT_FLOAT_EQ(copy.deferredPaintOpacity, expectedOpacity);
-    ASSERT_TRUE(copy._clipPath.has_value());
-    EXPECT_EQ(*copy._clipPath, expectedClip);
-  }
+      // 2-arg copy constructor (establish a new OBB scope for a node).
+      {
+        SVGRenderContext copy(source, static_cast<const SVGNode*>(nullptr));
+        EXPECT_FLOAT_EQ(copy.deferredPaintOpacity, expectedOpacity);
+        ASSERT_TRUE(copy._clipPath.has_value());
+        EXPECT_EQ(*copy._clipPath, expectedClip);
+      }
 
-  // Exact original bug path: CopyForPaint returns by value; both fields must survive the
-  // extra copy that MSVC Debug builds materialize without NRVO.
-  {
-    PictureRecorder otherRecorder;
-    auto* otherCanvas = otherRecorder.beginRecording();
-    SVGLengthContext otherLengthContext(Size::Make(200.f, 200.f));
-    auto copy = SVGRenderContext::CopyForPaint(source, otherCanvas, otherLengthContext);
-    EXPECT_FLOAT_EQ(copy.deferredPaintOpacity, expectedOpacity);
-    ASSERT_TRUE(copy._clipPath.has_value());
-    EXPECT_EQ(*copy._clipPath, expectedClip);
-  }
+      // Exact original bug path: CopyForPaint returns by value; both fields must survive the
+      // extra copy that MSVC Debug builds materialize without NRVO.
+      {
+        PictureRecorder otherRecorder;
+        auto* otherCanvas = otherRecorder.beginRecording();
+        SVGLengthContext otherLengthContext(Size::Make(200.f, 200.f));
+        auto copy = SVGRenderContext::CopyForPaint(source, otherCanvas, otherLengthContext);
+        EXPECT_FLOAT_EQ(copy.deferredPaintOpacity, expectedOpacity);
+        ASSERT_TRUE(copy._clipPath.has_value());
+        EXPECT_EQ(*copy._clipPath, expectedClip);
+      })
 }
 
 }  // namespace tgfx
