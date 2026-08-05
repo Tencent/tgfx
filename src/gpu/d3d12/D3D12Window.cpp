@@ -148,7 +148,11 @@ struct D3D12Window::PlatformState {
   D3D12SwapchainProxy* currentProxyRaw = nullptr;
 
   bool buildBackBuffers();
-  bool rebuild(int newWidth, int newHeight);
+  // Releases every tgfx-side owner of the backbuffers (proxy, ExternalRenderTargets in the
+  // ResourceCache, resources retained by recycled command lists). Must run before ResizeBuffers
+  // or swapchain release to avoid DXGI_ERROR_INVALID_CALL / OBJECT_DELETED_WHILE_STILL_IN_USE.
+  void drainBackBufferOwners(Context* context, D3D12GPU* gpu);
+  bool rebuild(Context* context, int newWidth, int newHeight);
 };
 
 bool D3D12Window::PlatformState::buildBackBuffers() {
@@ -165,22 +169,35 @@ bool D3D12Window::PlatformState::buildBackBuffers() {
   return true;
 }
 
-bool D3D12Window::PlatformState::rebuild(int newWidth, int newHeight) {
-  // Releasing every backbuffer reference is mandatory before ResizeBuffers; otherwise the call
-  // returns DXGI_ERROR_INVALID_CALL because the swapchain still owns outstanding references.
-  backBuffers.clear();
-  currentProxy = nullptr;
-  currentProxyRaw = nullptr;
+bool D3D12Window::PlatformState::rebuild(Context* context, int newWidth, int newHeight) {
+  // Just clearing backBuffers is not enough: ExternalRenderTargets in the ResourceCache and
+  // recycled command lists still hold refs on the old ID3D12Resources, so DXGI rejects
+  // ResizeBuffers. Route through drainBackBufferOwners which flushes both.
+  auto* gpu = static_cast<D3D12GPU*>(context->gpu());
+  drainBackBufferOwners(context, gpu);
   auto hr =
       swapChain->ResizeBuffers(BACKBUFFER_COUNT, static_cast<UINT>(newWidth),
                                static_cast<UINT>(newHeight), static_cast<DXGI_FORMAT>(format), 0);
   if (FAILED(hr)) {
     LOGE("D3D12Window: ResizeBuffers failed, HRESULT=0x%08X", static_cast<unsigned>(hr));
+    // Force the next onCreateRenderTarget to re-enter this path; otherwise a same-size WM_SIZE
+    // would skip rebuild forever and the window would stay black.
+    width = 0;
+    height = 0;
     return false;
   }
   width = newWidth;
   height = newHeight;
   return buildBackBuffers();
+}
+
+void D3D12Window::PlatformState::drainBackBufferOwners(Context* context, D3D12GPU* gpu) {
+  currentProxy = nullptr;
+  currentProxyRaw = nullptr;
+  backBuffers.clear();
+  context->purgeResourcesNotUsedSince(std::chrono::steady_clock::now());
+  gpu->processUnreferencedResources();
+  gpu->commandListPool().clear();
 }
 
 #ifdef _WIN32
@@ -323,15 +340,10 @@ D3D12Window::~D3D12Window() {
     }
 
     // 3. Drop tgfx-side owners of the backbuffers.
-    _platformState->currentProxy = nullptr;
-    _platformState->currentProxyRaw = nullptr;
-    context->purgeResourcesNotUsedSince(std::chrono::steady_clock::now());
-    d3d12GPU->processUnreferencedResources();
-    d3d12GPU->commandListPool().clear();
+    _platformState->drainBackBufferOwners(context, d3d12GPU);
 
-    // 4. Release the swap chain and our own backbuffer ComPtrs. The order between these two
-    //    is not important once the queue is idle and no tgfx object pins the backbuffers.
-    _platformState->backBuffers.clear();
+    // 4. Release the swap chain. Our own backbuffer ComPtrs were already cleared inside
+    //    drainBackBufferOwners.
     _platformState->swapChain = nullptr;
     device->unlock();
   } else {
@@ -360,7 +372,7 @@ std::shared_ptr<RenderTargetProxy> D3D12Window::onCreateRenderTarget(Context* co
     // Wait for the GPU to finish reading old backbuffers; ResizeBuffers cannot proceed while
     // any reference is outstanding, including in-flight command lists.
     context->gpu()->queue()->waitUntilCompleted();
-    if (!_platformState->rebuild(width, height)) {
+    if (!_platformState->rebuild(context, width, height)) {
       return nullptr;
     }
   }
