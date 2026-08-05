@@ -18,6 +18,7 @@
 
 #include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
 #include "core/utils/Log.h"
+#include "layers/CanvasUtils.h"
 
 namespace tgfx {
 
@@ -69,13 +70,39 @@ void BackgroundBlurStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, f
     return;
   }
 
-  // create blurred background
+  auto bgImage = background->image();
+  auto bgOffset = background->imageOffset();
+  auto contentWidth = static_cast<float>(bgImage->width());
+  auto contentHeight = static_cast<float>(bgImage->height());
+
   auto blurFilter = getBackgroundFilter(input.contentScale);
+
+  // Subset the background to the visible canvas clip + blur radius, so makeWithFilter
+  // only evaluates within the region that will actually be drawn.
+  auto visibleRect = Rect::MakeWH(contentWidth, contentHeight);
+  auto clipBounds = GetClipBounds(canvas);
+  if (clipBounds.has_value() && !clipBounds->isEmpty()) {
+    visibleRect = clipBounds.value();
+    if (!visibleRect.intersect(Rect::MakeWH(contentWidth, contentHeight))) {
+      return;
+    }
+    visibleRect.roundOut();
+  }
+
+  auto subsetImage = bgImage->makeSubset(visibleRect);
+  if (subsetImage == nullptr) {
+    subsetImage = bgImage;
+  } else {
+    bgOffset.x += visibleRect.left;
+    bgOffset.y += visibleRect.top;
+  }
+
   Point backgroundOffset = {};
-  auto clipRect = Rect::MakeWH(background->image()->width(), background->image()->height());
+  auto clipRect = Rect::MakeWH(subsetImage->width(), subsetImage->height());
   auto blurBackground =
-      background->image()->makeWithFilter(blurFilter, &backgroundOffset, &clipRect);
-  backgroundOffset += background->imageOffset();
+      subsetImage->makeWithFilter(blurFilter, &backgroundOffset, &clipRect);
+  backgroundOffset.x += bgOffset.x;
+  backgroundOffset.y += bgOffset.y;
 
   auto maskShader = Shader::MakeImageShader(input.content, TileMode::Decal, TileMode::Decal);
 
