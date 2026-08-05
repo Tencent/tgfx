@@ -22,6 +22,10 @@
 
 namespace tgfx {
 
+// Starting binding index used when re-numbering sampler declarations during the GLSL-to-WGSL
+// rewrite. Textures and their paired samplers are packed from this index in pairs.
+static constexpr int TEXTURE_BINDING_POINT_START = 2;
+
 // WGPUTextureFormat values copied from webgpu.h (Emscripten SDK).
 // These must match the WGPUTextureFormat enum in <webgpu/webgpu.h>.
 // If Emscripten updates enum values, compile will fail at static_assert in WebGPUUtil.cpp.

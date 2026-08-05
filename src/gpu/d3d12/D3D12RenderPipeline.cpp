@@ -22,7 +22,6 @@
 #include "D3D12GPU.h"
 #include "D3D12ShaderModule.h"
 #include "core/utils/Log.h"
-#include "gpu/UniformData.h"
 #include "tgfx/gpu/ColorWriteMask.h"
 #include "tgfx/gpu/ShaderVisibility.h"
 
