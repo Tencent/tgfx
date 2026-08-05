@@ -174,13 +174,42 @@ AOTDrawStats PrecompiledShaderCache::drawStats() const {
   return _drawStats;
 }
 
-void PrecompiledShaderCache::recordOffscreenFillAnalysis(
+static const char* OffscreenKernelName(AOTKernelKind kernel) {
+  switch (kernel) {
+    case AOTKernelKind::TextureFill:
+      return "TextureFill";
+    case AOTKernelKind::TextureColorMatrix:
+      return "TextureColorMatrix";
+    case AOTKernelKind::TexturedColorMatrix:
+      return "TexturedColorMatrix";
+    case AOTKernelKind::TexturedLuma:
+      return "TexturedLuma";
+    case AOTKernelKind::PointwiseChain:
+      return "PointwiseChain";
+    case AOTKernelKind::PointwiseTail:
+      return "PointwiseTail";
+  }
+  return "Unknown";
+}
+
+OffscreenFillKey PrecompiledShaderCache::recordOffscreenFillAnalysis(
     OffscreenFillSource source, bool coordOffsetNonZero, const std::string& topLevelProcessor,
     bool lowerSucceeded, const std::string& lowerBlocker, bool validateSucceeded,
-    bool decomposeSucceeded, bool canExecute, AOTKernelKind kernel, size_t passCount) {
+    bool decomposeSucceeded, bool canExecute, const std::vector<AOTKernelKind>& kernels) {
   if (!diagnosticRecordingEnabled()) {
-    return;
+    return InvalidOffscreenFillKey;
   }
+  std::string kernelSignature = "None";
+  if (!kernels.empty()) {
+    kernelSignature.clear();
+    for (size_t i = 0; i < kernels.size(); ++i) {
+      if (i != 0) {
+        kernelSignature += ">";
+      }
+      kernelSignature += OffscreenKernelName(kernels[i]);
+    }
+  }
+  auto key = _nextOffscreenFillKey.fetch_add(1, std::memory_order_relaxed);
   std::lock_guard<std::mutex> autoLock(offscreenFillStatsMutex);
   auto& stats = _offscreenFillStats[static_cast<size_t>(source)];
   stats.calls++;
@@ -190,47 +219,71 @@ void PrecompiledShaderCache::recordOffscreenFillAnalysis(
   stats.topLevelProcessors[topLevelProcessor]++;
   if (!lowerSucceeded) {
     stats.lowerBlockers[lowerBlocker.empty() ? "Unknown" : lowerBlocker]++;
-    return;
+  } else {
+    stats.lowerSucceeded++;
+    if (validateSucceeded) {
+      stats.validateSucceeded++;
+      if (decomposeSucceeded) {
+        stats.decomposeSucceeded++;
+        if (kernels.size() > 1) {
+          stats.multiPassPlans++;
+        } else if (kernels.size() == 1 && kernels[0] == AOTKernelKind::PointwiseChain) {
+          stats.pointwiseChainPlans++;
+        } else if (kernels.size() == 1 && kernels[0] == AOTKernelKind::PointwiseTail) {
+          stats.pointwiseTailPlans++;
+        }
+        if (canExecute) {
+          stats.canExecute++;
+        }
+      }
+    }
   }
-  stats.lowerSucceeded++;
-  if (!validateSucceeded) {
-    return;
-  }
-  stats.validateSucceeded++;
-  if (!decomposeSucceeded) {
-    return;
-  }
-  stats.decomposeSucceeded++;
-  if (passCount > 1) {
-    stats.multiPassPlans++;
-  } else if (kernel == AOTKernelKind::PointwiseChain) {
-    stats.pointwiseChainPlans++;
-  } else if (kernel == AOTKernelKind::PointwiseTail) {
-    stats.pointwiseTailPlans++;
-  }
+  std::string aggregateKey = std::string(OffscreenFillSourceName(source)) + "|" +
+                             topLevelProcessor + "|" + kernelSignature;
+  auto& aggregate = _offscreenFillCorrelations[aggregateKey];
+  aggregate.source = source;
+  aggregate.topLevelProcessor = topLevelProcessor;
+  aggregate.kernelSignature = kernelSignature;
+  aggregate.calls++;
   if (canExecute) {
-    stats.canExecute++;
+    aggregate.canExecute++;
   }
+  _offscreenFillRecords.emplace(
+      key, OffscreenFillStaticRecord{source, topLevelProcessor, kernelSignature, canExecute});
+  return key;
 }
 
-void PrecompiledShaderCache::recordOffscreenFillProgram(OffscreenFillSource source, bool canExecute,
+void PrecompiledShaderCache::recordOffscreenFillProgram(OffscreenFillKey key,
                                                         ProgramOrigin origin) {
-  if (!diagnosticRecordingEnabled()) {
+  if (!diagnosticRecordingEnabled() || key == InvalidOffscreenFillKey) {
     return;
   }
   std::lock_guard<std::mutex> autoLock(offscreenFillStatsMutex);
-  auto& stats = _offscreenFillStats[static_cast<size_t>(source)];
+  auto record = _offscreenFillRecords.find(key);
+  if (record == _offscreenFillRecords.end()) {
+    return;
+  }
+  auto& stats = _offscreenFillStats[static_cast<size_t>(record->second.source)];
+  std::string aggregateKey = std::string(OffscreenFillSourceName(record->second.source)) + "|" +
+                             record->second.topLevelProcessor + "|" +
+                             record->second.kernelSignature;
+  auto& aggregate = _offscreenFillCorrelations[aggregateKey];
   if (origin == ProgramOrigin::PrecompiledArtifact) {
     stats.precompiledPrograms++;
-    if (canExecute) {
+    aggregate.precompiledPrograms++;
+    if (record->second.canExecute) {
       stats.precompiledCanExecute++;
+      aggregate.precompiledCanExecute++;
     }
   } else {
     stats.programBuilderPrograms++;
-    if (canExecute) {
+    aggregate.programBuilderPrograms++;
+    if (record->second.canExecute) {
       stats.programBuilderCanExecute++;
+      aggregate.programBuilderCanExecute++;
     }
   }
+  _offscreenFillRecords.erase(record);
 }
 
 OffscreenFillStats PrecompiledShaderCache::offscreenFillStats() const {
@@ -260,6 +313,16 @@ OffscreenFillStats PrecompiledShaderCache::offscreenFillStats() const {
   return total;
 }
 
+std::vector<OffscreenFillCorrelation> PrecompiledShaderCache::offscreenFillCorrelations() const {
+  std::lock_guard<std::mutex> autoLock(offscreenFillStatsMutex);
+  std::vector<OffscreenFillCorrelation> result = {};
+  result.reserve(_offscreenFillCorrelations.size());
+  for (const auto& [key, correlation] : _offscreenFillCorrelations) {
+    result.push_back(correlation);
+  }
+  return result;
+}
+
 std::array<OffscreenFillStats, static_cast<size_t>(OffscreenFillSource::Count)>
 PrecompiledShaderCache::offscreenFillStatsBySource() const {
   std::lock_guard<std::mutex> autoLock(offscreenFillStatsMutex);
@@ -281,7 +344,10 @@ void PrecompiledShaderCache::resetStats() {
   }
   {
     std::lock_guard<std::mutex> offscreenLock(offscreenFillStatsMutex);
+    _nextOffscreenFillKey.store(1, std::memory_order_relaxed);
     _offscreenFillStats = {};
+    _offscreenFillRecords.clear();
+    _offscreenFillCorrelations.clear();
   }
   std::lock_guard<std::mutex> autoLock(diagnosticsMutex);
   _hitRecords.clear();

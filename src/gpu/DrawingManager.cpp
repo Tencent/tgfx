@@ -48,8 +48,7 @@ DrawingBuffer* DrawingManager::createDrawingBuffer() {
 PlacementPtr<DrawOp> DrawingManager::makeFillDrawOp(std::shared_ptr<RenderTargetProxy> renderTarget,
                                                     PlacementPtr<FragmentProcessor> processor,
                                                     uint32_t renderFlags, const Point& coordOffset,
-                                                    std::optional<OffscreenFillSource> source,
-                                                    bool canExecute) {
+                                                    OffscreenFillKey diagnosticKey) {
   if (renderTarget == nullptr || processor == nullptr) {
     return nullptr;
   }
@@ -79,8 +78,8 @@ PlacementPtr<DrawOp> DrawingManager::makeFillDrawOp(std::shared_ptr<RenderTarget
   }
   drawOp->addColorFP(std::move(processor));
   drawOp->setBlendMode(BlendMode::Src);
-  if (source.has_value()) {
-    drawOp->setOffscreenFillDiagnostic(*source, canExecute);
+  if (diagnosticKey != InvalidOffscreenFillKey) {
+    drawOp->setOffscreenFillDiagnostic(diagnosticKey);
   }
   return drawOp;
 }
@@ -89,7 +88,7 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
                                   PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags,
                                   const Point& coordOffset, OffscreenFillSource source) {
   auto cache = context->precompiledShaderCache();
-  bool canExecute = false;
+  OffscreenFillKey diagnosticKey = InvalidOffscreenFillKey;
   if (cache != nullptr && cache->diagnosticRecordingEnabled() && processor != nullptr) {
     AOTEffectGraph graph = {};
     AOTEffectPlan plan = {};
@@ -99,14 +98,18 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
     bool decomposeSucceeded =
         validateSucceeded &&
         AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan);
-    canExecute = decomposeSucceeded && AOTPlanExecutor::CanExecute(graph, plan);
-    auto kernel = plan.passes.empty() ? AOTKernelKind::TextureFill : plan.passes[0].kernel;
-    cache->recordOffscreenFillAnalysis(source, coordOffset != Point::Zero(), processor->name(),
-                                       lowerSucceeded, blocker, validateSucceeded,
-                                       decomposeSucceeded, canExecute, kernel, plan.passes.size());
+    bool canExecute = decomposeSucceeded && AOTPlanExecutor::CanExecute(graph, plan);
+    std::vector<AOTKernelKind> kernels = {};
+    kernels.reserve(plan.passes.size());
+    for (const auto& pass : plan.passes) {
+      kernels.push_back(pass.kernel);
+    }
+    diagnosticKey = cache->recordOffscreenFillAnalysis(
+        source, coordOffset != Point::Zero(), processor->name(), lowerSucceeded, blocker,
+        validateSucceeded, decomposeSucceeded, canExecute, kernels);
   }
-  auto drawOp = makeFillDrawOp(renderTarget, std::move(processor), renderFlags, coordOffset, source,
-                               canExecute);
+  auto drawOp =
+      makeFillDrawOp(renderTarget, std::move(processor), renderFlags, coordOffset, diagnosticKey);
   if (drawOp == nullptr) {
     return false;
   }

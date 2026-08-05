@@ -105,6 +105,21 @@ enum class OffscreenFillSource : uint8_t {
 
 const char* OffscreenFillSourceName(OffscreenFillSource source);
 
+using OffscreenFillKey = uint64_t;
+static constexpr OffscreenFillKey InvalidOffscreenFillKey = 0;
+
+struct OffscreenFillCorrelation {
+  OffscreenFillSource source = OffscreenFillSource::Unknown;
+  std::string topLevelProcessor = {};
+  std::string kernelSignature = {};
+  uint64_t calls = 0;
+  uint64_t canExecute = 0;
+  uint64_t precompiledPrograms = 0;
+  uint64_t programBuilderPrograms = 0;
+  uint64_t precompiledCanExecute = 0;
+  uint64_t programBuilderCanExecute = 0;
+};
+
 /// Diagnostic-only aggregate for fillRTWithFP() calls. Static planning fields are sampled before
 /// the processor is moved into a DrawOp; runtime provenance is recorded after DrawOp preparation.
 struct OffscreenFillStats {
@@ -271,14 +286,15 @@ class PrecompiledShaderCache {
   /// Returns a snapshot of accumulated Draw-level metrics since the last reset.
   AOTDrawStats drawStats() const;
 
-  void recordOffscreenFillAnalysis(OffscreenFillSource source, bool coordOffsetNonZero,
-                                   const std::string& topLevelProcessor, bool lowerSucceeded,
-                                   const std::string& lowerBlocker, bool validateSucceeded,
-                                   bool decomposeSucceeded, bool canExecute, AOTKernelKind kernel,
-                                   size_t passCount);
-  void recordOffscreenFillProgram(OffscreenFillSource source, bool canExecute,
-                                  ProgramOrigin origin);
+  OffscreenFillKey recordOffscreenFillAnalysis(OffscreenFillSource source, bool coordOffsetNonZero,
+                                               const std::string& topLevelProcessor,
+                                               bool lowerSucceeded, const std::string& lowerBlocker,
+                                               bool validateSucceeded, bool decomposeSucceeded,
+                                               bool canExecute,
+                                               const std::vector<AOTKernelKind>& kernels);
+  void recordOffscreenFillProgram(OffscreenFillKey key, ProgramOrigin origin);
   OffscreenFillStats offscreenFillStats() const;
+  std::vector<OffscreenFillCorrelation> offscreenFillCorrelations() const;
   std::array<OffscreenFillStats, static_cast<size_t>(OffscreenFillSource::Count)>
   offscreenFillStatsBySource() const;
 
@@ -320,7 +336,16 @@ class PrecompiledShaderCache {
   std::vector<PrecompiledFallbackRecord> _fallbackRecords = {};
   mutable std::mutex drawStatsMutex = {};
   AOTDrawStats _drawStats = {};
+  struct OffscreenFillStaticRecord {
+    OffscreenFillSource source = OffscreenFillSource::Unknown;
+    std::string topLevelProcessor = {};
+    std::string kernelSignature = {};
+    bool canExecute = false;
+  };
   mutable std::mutex offscreenFillStatsMutex = {};
+  std::atomic<OffscreenFillKey> _nextOffscreenFillKey{1};
+  std::unordered_map<OffscreenFillKey, OffscreenFillStaticRecord> _offscreenFillRecords = {};
+  std::unordered_map<std::string, OffscreenFillCorrelation> _offscreenFillCorrelations = {};
   std::array<OffscreenFillStats, static_cast<size_t>(OffscreenFillSource::Count)>
       _offscreenFillStats = {};
 };

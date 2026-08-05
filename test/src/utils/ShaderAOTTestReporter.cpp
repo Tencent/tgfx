@@ -71,6 +71,7 @@ struct ShaderAOTTestResult {
   std::vector<PrecompiledFallbackRecord> fallbackRecords = {};
   AOTDrawStats drawStats = {};
   std::array<OffscreenFillStats, OFFSCREEN_FILL_SOURCE_COUNT> offscreenFillStats = {};
+  std::vector<OffscreenFillCorrelation> offscreenFillCorrelations = {};
 };
 
 struct ShaderAOTSummary {
@@ -81,6 +82,7 @@ struct ShaderAOTSummary {
   std::array<uint64_t, FALLBACK_REASON_COUNT> fallbackCounts = {};
   AOTDrawStats drawStats = {};
   std::array<OffscreenFillStats, OFFSCREEN_FILL_SOURCE_COUNT> offscreenFillStats = {};
+  std::unordered_map<std::string, OffscreenFillCorrelation> offscreenFillCorrelations = {};
 };
 
 static void AddOffscreenFillStats(OffscreenFillStats* target, const OffscreenFillStats& source) {
@@ -103,6 +105,23 @@ static void AddOffscreenFillStats(OffscreenFillStats* target, const OffscreenFil
   for (const auto& [name, count] : source.topLevelProcessors) {
     target->topLevelProcessors[name] += count;
   }
+}
+
+static void AddOffscreenFillCorrelation(
+    std::unordered_map<std::string, OffscreenFillCorrelation>* target,
+    const OffscreenFillCorrelation& source) {
+  auto key = std::string(OffscreenFillSourceName(source.source)) + "|" + source.topLevelProcessor +
+             "|" + source.kernelSignature;
+  auto& value = (*target)[key];
+  value.source = source.source;
+  value.topLevelProcessor = source.topLevelProcessor;
+  value.kernelSignature = source.kernelSignature;
+  value.calls += source.calls;
+  value.canExecute += source.canExecute;
+  value.precompiledPrograms += source.precompiledPrograms;
+  value.programBuilderPrograms += source.programBuilderPrograms;
+  value.precompiledCanExecute += source.precompiledCanExecute;
+  value.programBuilderCanExecute += source.programBuilderCanExecute;
 }
 
 static void AddDrawStats(AOTDrawStats* target, const AOTDrawStats& source) {
@@ -547,6 +566,7 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
         result.fallbackRecords = cache->fallbackRecords();
         result.drawStats = cache->drawStats();
         result.offscreenFillStats = cache->offscreenFillStatsBySource();
+        result.offscreenFillCorrelations = cache->offscreenFillCorrelations();
         cache->setDiagnosticRecordingEnabled(false);
         device->unlock();
       }
@@ -603,6 +623,9 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
       AddDrawStats(&summary.drawStats, testResult.drawStats);
       for (size_t i = 0; i < OFFSCREEN_FILL_SOURCE_COUNT; ++i) {
         AddOffscreenFillStats(&summary.offscreenFillStats[i], testResult.offscreenFillStats[i]);
+      }
+      for (const auto& correlation : testResult.offscreenFillCorrelations) {
+        AddOffscreenFillCorrelation(&summary.offscreenFillCorrelations, correlation);
       }
       summary.artifactHits += testResult.artifactHits;
       summary.artifactMisses += testResult.artifactMisses;
@@ -787,6 +810,31 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
           OffscreenFillStatsToJSON(summary.offscreenFillStats[i]);
     }
 
+    std::vector<OffscreenFillCorrelation> sortedOffscreenCorrelations = {};
+    sortedOffscreenCorrelations.reserve(summary.offscreenFillCorrelations.size());
+    for (const auto& [key, correlation] : summary.offscreenFillCorrelations) {
+      sortedOffscreenCorrelations.push_back(correlation);
+    }
+    std::sort(sortedOffscreenCorrelations.begin(), sortedOffscreenCorrelations.end(),
+              [](const auto& a, const auto& b) {
+                return a.programBuilderCanExecute != b.programBuilderCanExecute
+                           ? a.programBuilderCanExecute > b.programBuilderCanExecute
+                           : a.calls > b.calls;
+              });
+    nlohmann::json offscreenFillCorrelations = nlohmann::json::array();
+    for (const auto& correlation : sortedOffscreenCorrelations) {
+      offscreenFillCorrelations.push_back(
+          {{"source", OffscreenFillSourceName(correlation.source)},
+           {"topLevelProcessor", correlation.topLevelProcessor},
+           {"kernel", correlation.kernelSignature},
+           {"calls", correlation.calls},
+           {"canExecute", correlation.canExecute},
+           {"precompiledPrograms", correlation.precompiledPrograms},
+           {"programBuilderPrograms", correlation.programBuilderPrograms},
+           {"precompiledCanExecute", correlation.precompiledCanExecute},
+           {"programBuilderCanExecute", correlation.programBuilderCanExecute}});
+    }
+
     nlohmann::json report = {
         {"backend", TGFX_BACKEND_NAME},
         {"iteration", currentIteration},
@@ -832,6 +880,7 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
         {"fallbackEffectsByReason", std::move(fallbackEffectsByReasonJSON)},
         {"fallbackStructures", std::move(fallbackStructuresJSON)},
         {"offscreenFillAudit", std::move(offscreenFillAudit)},
+        {"offscreenFillCorrelations", std::move(offscreenFillCorrelations)},
         {"decompositionAudit", std::move(decompositionAudit)},
         {"tests", std::move(testsJSON)}};
 

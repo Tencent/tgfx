@@ -67,10 +67,9 @@ void DrawOp::executePrepared(RenderPass* renderPass, bool recordDrawStats) {
   }
   renderPass->setPipeline(preparedProgram->getPipeline());
   preparedProgramInfo->setUniformsAndSamplers(renderPass, preparedProgram.get());
-  if (offscreenFillSource.has_value()) {
+  if (offscreenFillKey != InvalidOffscreenFillKey) {
     auto cache = preparedRenderTarget->getContext()->precompiledShaderCache();
-    cache->recordOffscreenFillProgram(*offscreenFillSource, offscreenFillCanExecute,
-                                      preparedProgram->getProvenance().program);
+    cache->recordOffscreenFillProgram(offscreenFillKey, preparedProgram->getProvenance().program);
   }
 
   if (scissorRect.isEmpty()) {
