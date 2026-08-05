@@ -33,6 +33,7 @@
 #include "layers/BackgroundHandler.h"
 #include "layers/BackgroundSnapshotMap.h"
 #include "layers/BackgroundSource.h"
+#include "layers/CanvasUtils.h"
 #include "layers/DrawArgs.h"
 #include "layers/LayerStyleSource.h"
 #include "layers/MaskContext.h"
@@ -142,37 +143,6 @@ static void ComputeDirtyNodesForReordering(const std::vector<Layer*>& retainedCh
       nodesToMarkDirty->push_back(retainedChildren[i]);
     }
   }
-}
-
-static std::optional<Rect> GetClipBounds(const Canvas* canvas) {
-  if (canvas == nullptr) {
-    return std::nullopt;
-  }
-  const auto clipBound = canvas->getTotalClipBounds();
-  auto clipRect = Rect::MakeEmpty();
-  auto surface = canvas->getSurface();
-  if (!clipBound.has_value()) {
-    if (!surface) {
-      return std::nullopt;
-    }
-    clipRect = Rect::MakeWH(surface->width(), surface->height());
-  } else {
-    clipRect = *clipBound;
-    if (surface && !clipRect.intersect(Rect::MakeWH(surface->width(), surface->height()))) {
-      return Rect::MakeEmpty();
-    }
-  }
-  if (clipRect.isEmpty()) {
-    return Rect::MakeEmpty();
-  }
-  auto invert = Matrix::I();
-  auto viewMatrix = canvas->getMatrix();
-  if (!viewMatrix.invert(&invert)) {
-    return Rect::MakeEmpty();
-  }
-  clipRect = invert.mapRect(clipRect);
-  clipRect.roundOut();
-  return clipRect;
 }
 
 static int GetMipmapCacheLongEdge(int maxSize, float contentScale, const Rect& layerBounds) {

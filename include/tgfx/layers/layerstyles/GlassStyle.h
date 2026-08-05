@@ -25,6 +25,7 @@
 namespace tgfx {
 
 enum class GlassShapeType;
+struct GlassRefractionParams;
 
 /**
  * GlassStyle simulates the physical behavior of light passing through a glass surface, producing
@@ -145,12 +146,20 @@ class GlassStyle : public LayerStyle {
 
   void invalidateFrostFilter();
 
-  std::shared_ptr<ImageFilter> getRefractionFilter(GlassShapeType shapeType, float cornerRadius,
-                                                   float halfWidth, float halfHeight,
-                                                   float udfPixelToLayerPixelX,
-                                                   float udfPixelToLayerPixelY,
-                                                   std::shared_ptr<Image> maskImage,
-                                                   std::shared_ptr<Image> coarseMaskImage);
+  struct BackgroundMapping;
+  struct UDFSampling;
+
+  GlassRefractionParams makeBaseRefractionParams(float halfW, float halfH,
+                                                 const BackgroundMapping& mapping) const;
+
+  std::shared_ptr<ImageFilter> getSDFRefractionFilter(GlassShapeType shapeType, float cornerRadius,
+                                                      float halfWidth, float halfHeight,
+                                                      const BackgroundMapping& mapping);
+
+  std::shared_ptr<ImageFilter> getUDFRefractionFilter(float halfWidth, float halfHeight,
+                                                      const UDFSampling& udf,
+                                                      const BackgroundMapping& mapping,
+                                                      std::shared_ptr<Image> maskImage);
 
   float getRefractionFactor() const {
     return std::clamp(_refraction / 100.0f, 0.0f, 1.0f);
@@ -171,8 +180,10 @@ class GlassStyle : public LayerStyle {
     return std::clamp(_lightIntensity / 100.0f, 0.0f, 1.0f);
   }
 
+  // Figma-style refraction distance: depth maps 1:1 to layer-space pixels, capped at minHalf
+  // so the gradient band never exceeds the distance from edge to center.
   float getGlassThickness(float minHalf) const {
-    return 1.0f + getDepthRatio() * std::max(minHalf - 1.0f, 0.0f);
+    return std::clamp(_depth, 0.0f, minHalf);
   }
 
   float _refraction = 80.0f;

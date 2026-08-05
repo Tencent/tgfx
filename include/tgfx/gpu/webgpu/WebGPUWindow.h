@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <webgpu/webgpu.h>
 #include "tgfx/gpu/Window.h"
 #include "tgfx/gpu/webgpu/WebGPUDevice.h"
 
@@ -29,13 +30,13 @@ class WebGPUWindow : public Window {
    * Creates a new window from an HTML canvas element selector with the specified device.
    * @param canvasSelector The CSS selector for the HTML canvas element (e.g., "#myCanvas").
    * @param device An optional WebGPUDevice. If nullptr, a default device is created automatically.
-   * When a non-null color space is provided, this device must be the module's
-   * preinitializedWebGPUDevice; passing a custom device is not yet supported together with color
-   * space configuration, because the canvas context would be configured on a different device than
-   * the one used for rendering.
    * @param colorSpace An optional target color space for the drawing buffer. If nullptr, the
    * default sRGB color space is used. When a non-null color space is provided, the canvas's WebGPU
-   * context is configured accordingly so that the rendered content is displayed correctly.
+   * context is reconfigured with the color space so that the rendered content is displayed
+   * correctly. Both the default device and devices passed in via WebGPUDevice::MakeFrom() are
+   * supported.
+   * On Web, the final executable must export the WebGPU runtime method (see the Web build section
+   * in README.md); otherwise color space configuration and video texture uploads will not work.
    */
   static std::shared_ptr<WebGPUWindow> MakeFrom(const std::string& canvasSelector,
                                                 std::shared_ptr<WebGPUDevice> device = nullptr,
@@ -54,7 +55,8 @@ class WebGPUWindow : public Window {
   // Configures the canvas's WebGPU context to use the target color space. Must be called after
   // each wgpuSurfaceConfigure() call, since the emscripten surface configuration does not carry
   // the color space information.
-  void configureColorSpace();
+  void configureColorSpace(WGPUTextureFormat format, WGPUTextureUsageFlags usage,
+                           WGPUCompositeAlphaMode alphaMode);
 
   std::string _canvasSelector;
   void* _surface = nullptr;
