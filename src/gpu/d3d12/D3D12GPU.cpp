@@ -735,7 +735,6 @@ void D3D12GPU::reclaimAbandonedSession(D3D12FrameSession session) {
       texture->setCurrentState(originalState);
     }
   }
-  (void)session;
 }
 
 void D3D12GPU::executeSubmission(SubmitRequest request) {
