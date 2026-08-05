@@ -79,11 +79,9 @@ if exist %BUILD_DIR% rd /s /q %BUILD_DIR%
 mkdir %BUILD_DIR%
 cd %BUILD_DIR%
 
-:: TODO(thunderllei): Debug builds currently crash inside the D3D12 backend on
-:: Windows. Until the root cause is investigated and fixed, we build the
-:: baseline generator in Release to keep local/CI baseline refresh runnable.
-:: When the crash is resolved this should be switched back to Debug so the
-:: Windows flow matches macOS (update_baseline.sh uses Debug).
+:: Windows Debug builds compile far slower than macOS, so this script (which is also driven by
+:: CI) builds the baseline generator in Release across all Windows backends to keep the refresh
+:: turnaround acceptable. macOS update_baseline.sh keeps Debug for better diagnostics.
 cmake -G Ninja %CMAKE_BACKEND_ARGS% -DTGFX_SKIP_GENERATE_BASELINE_IMAGES=ON -DTGFX_BUILD_TESTS=ON -DTGFX_SKIP_BASELINE_CHECK=ON -DCMAKE_BUILD_TYPE=Release ../
 if %errorlevel% neq 0 (
     echo CMake configuration failed
