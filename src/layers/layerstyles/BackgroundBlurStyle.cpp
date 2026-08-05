@@ -107,8 +107,7 @@ void BackgroundBlurStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, f
 
   Point backgroundOffset = {};
   auto clipRect = Rect::MakeWH(subsetImage->width(), subsetImage->height());
-  auto blurBackground =
-      subsetImage->makeWithFilter(blurFilter, &backgroundOffset, &clipRect);
+  auto blurBackground = subsetImage->makeWithFilter(blurFilter, &backgroundOffset, &clipRect);
   backgroundOffset.x += bgOffset.x;
   backgroundOffset.y += bgOffset.y;
 
