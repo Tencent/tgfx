@@ -26,9 +26,11 @@
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/processors/AARectEffect.h"
+#include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/LumaFragmentProcessor.h"
+#include "gpu/processors/PerlinNoiseFragmentProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
@@ -36,6 +38,7 @@
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/BytesKey.h"
 #include "tgfx/core/ColorSpace.h"
+#include "tgfx/core/Shader.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/PixelFormat.h"
 #include "utils/TestUtils.h"
@@ -863,6 +866,104 @@ TGFX_TEST(AOTEffectTest, PointwiseBlendChildPolicy) {
   // The apron is a property of the consumer, so it holds whatever the child is.
   EXPECT_EQ(EvaluateBlendChild(texture.get(), 0).apronRadius, 1.0f);
   EXPECT_EQ(EvaluateBlendChild(nullptr, 1).apronRadius, 1.0f);
+}
+
+static PlacementPtr<FragmentProcessor> MakePerlinProcessor(Context* context) {
+  auto shader = Shader::MakeTurbulence(0.05f, 0.05f, 3, 6903);
+  if (shader == nullptr) {
+    return nullptr;
+  }
+  FPArgs args(context, 0, Rect::MakeWH(64.0f, 64.0f));
+  return FragmentProcessor::Make(shader, args);
+}
+
+TGFX_TEST(AOTEffectTest, PerlinNoiseLowersToPerlinNoiseSourceNode) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  auto perlin = MakePerlinProcessor(context);
+  ASSERT_NE(perlin, nullptr);
+
+  AOTEffectGraph graph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower({perlin.get()}, &graph));
+  ASSERT_EQ(graph.nodeCount(), 2u);
+  auto node = graph.nodeAt(AOTNodeID(1));
+  ASSERT_NE(node, nullptr);
+  EXPECT_EQ(node->kind, AOTEffectKind::PerlinNoiseSource);
+  auto parameters = std::get_if<AOTPerlinNoiseParameters>(&node->parameters);
+  ASSERT_NE(parameters, nullptr);
+  EXPECT_NE(parameters->permutationsView, nullptr);
+  EXPECT_NE(parameters->noiseView, nullptr);
+  EXPECT_EQ(parameters->numOctaves, 3);
+}
+
+TGFX_TEST(AOTEffectTest, BarePerlinNoiseUsesPerlinNoiseFillPlanner) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  auto perlin = MakePerlinProcessor(context);
+  ASSERT_NE(perlin, nullptr);
+
+  AOTEffectGraph graph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower({perlin.get()}, &graph));
+  AOTEffectPlan plan;
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan));
+  ASSERT_EQ(plan.passes.size(), 1u);
+  EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PerlinNoiseFill);
+  EXPECT_EQ(plan.passes[0].nodes, std::vector<AOTNodeID>({AOTNodeID(1)}));
+  EXPECT_FALSE(plan.passes[0].materializesOutput);
+  EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
+}
+
+TGFX_TEST(AOTEffectTest, PerlinNoisePlusOneOpFusesToSinglePass) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  auto perlin = MakePerlinProcessor(context);
+  ASSERT_NE(perlin, nullptr);
+  auto colorMatrix = ColorMatrixFragmentProcessor::Make(&allocator, IdentityColorMatrix);
+  ASSERT_NE(colorMatrix, nullptr);
+
+  AOTEffectGraph graph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower({perlin.get(), colorMatrix.get()}, &graph));
+  AOTEffectPlan plan;
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan));
+  ASSERT_EQ(plan.passes.size(), 1u);
+  EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PerlinNoiseFill);
+  EXPECT_EQ(plan.passes[0].nodes, std::vector<AOTNodeID>({AOTNodeID(1), AOTNodeID(2)}));
+  EXPECT_FALSE(plan.passes[0].materializesOutput);
+  EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
+}
+
+TGFX_TEST(AOTEffectTest, PerlinNoisePlusTwoOpsSplitsIntoPointwiseTailPass) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  auto perlin = MakePerlinProcessor(context);
+  ASSERT_NE(perlin, nullptr);
+  auto colorMatrix = ColorMatrixFragmentProcessor::Make(&allocator, IdentityColorMatrix);
+  auto alphaThreshold = AlphaThresholdFragmentProcessor::Make(&allocator, 0.5f);
+  ASSERT_NE(colorMatrix, nullptr);
+  ASSERT_NE(alphaThreshold, nullptr);
+
+  AOTEffectGraph graph;
+  ASSERT_TRUE(
+      AOTEffectDecomposer::Lower({perlin.get(), colorMatrix.get(), alphaThreshold.get()}, &graph));
+  AOTEffectPlan plan;
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan));
+  ASSERT_EQ(plan.passes.size(), 2u);
+  EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PerlinNoiseFill);
+  EXPECT_EQ(plan.passes[0].nodes, std::vector<AOTNodeID>({AOTNodeID(1), AOTNodeID(2)}));
+  EXPECT_TRUE(plan.passes[0].materializesOutput);
+  EXPECT_EQ(plan.passes[1].kernel, AOTKernelKind::PointwiseTail);
+  EXPECT_EQ(plan.passes[1].nodes, std::vector<AOTNodeID>({AOTNodeID(3)}));
+  EXPECT_EQ(plan.passes[1].dependencies, std::vector<uint32_t>({0u}));
+  EXPECT_FALSE(plan.passes[1].materializesOutput);
+  EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
 }
 
 }  // namespace tgfx

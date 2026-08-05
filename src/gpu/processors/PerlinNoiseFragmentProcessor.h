@@ -34,6 +34,16 @@ class PerlinNoiseFragmentProcessor : public FragmentProcessor {
       bool stitchTiles, std::unique_ptr<PerlinNoiseShader::PaintingData> paintingData,
       const Matrix* uvMatrix);
 
+  // Rebuilds a PerlinNoiseFragmentProcessor from already-built lookup textures, skipping the
+  // TextureView::MakeAlpha/MakeRGBA upload that Make() performs. Used by AOTPlanExecutor to
+  // reconstruct the processor from a lowered AOTPerlinNoiseParameters, whose permutationsView and
+  // noiseView were captured at lowerToAOT() time and must not be regenerated.
+  static PlacementPtr<PerlinNoiseFragmentProcessor> MakeFromViews(
+      BlockAllocator* allocator, PerlinNoiseType noiseType, int numOctaves, bool stitchTiles,
+      std::unique_ptr<PerlinNoiseShader::PaintingData> paintingData,
+      std::shared_ptr<TextureView> permutationsView, std::shared_ptr<TextureView> noiseView,
+      const Matrix* uvMatrix);
+
   std::string name() const override {
     return "PerlinNoiseFragmentProcessor";
   }
@@ -47,6 +57,8 @@ class PerlinNoiseFragmentProcessor : public FragmentProcessor {
   std::shared_ptr<Texture> onTextureAt(size_t index) const override;
 
   SamplerState onSamplerStateAt(size_t index) const override;
+
+  bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
  protected:
   DEFINE_PROCESSOR_CLASS_ID

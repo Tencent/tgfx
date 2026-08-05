@@ -191,6 +191,60 @@ static bool DecomposeLinearPointwiseTail(const AOTEffectGraph& graph, AOTEffectP
   return true;
 }
 
+static bool IsPerlinNoiseSource(const AOTEffectNode* node) {
+  return node != nullptr && node->kind == AOTEffectKind::PerlinNoiseSource &&
+         node->inputs.size() == 1 && node->inputs[0] == AOTNodeID(0);
+}
+
+// Planner for a procedural-noise source: GeometryColor -> PerlinNoiseSource -> [0..2unary
+// pointwise ops]. PerlinNoiseFillShader carries exactly one OpType uniform, so at most one op
+// folds into the source pass losslessly; a second op needs a materialization edge into a
+// following PointwiseTail pass, mirroring DecomposeLinearPointwiseTail's multi-pass shape.
+static bool DecomposePerlinNoiseChain(const AOTEffectGraph& graph, AOTEffectPlan* plan) {
+  if (plan == nullptr || graph.nodeCount() < 2 || graph.nodeCount() > 4 ||
+      graph.root().index() + 1 != graph.nodeCount()) {
+    return false;
+  }
+  auto geometryNode = graph.nodeAt(AOTNodeID(0));
+  if (geometryNode == nullptr || geometryNode->kind != AOTEffectKind::GeometryColor ||
+      !IsPerlinNoiseSource(graph.nodeAt(AOTNodeID(1)))) {
+    return false;
+  }
+  for (uint32_t index = 2; index < graph.nodeCount(); ++index) {
+    auto node = graph.nodeAt(AOTNodeID(index));
+    if (!IsPointwiseTailOp(node) || node->inputs[0] != AOTNodeID(index - 1)) {
+      return false;
+    }
+  }
+
+  AOTEffectPlan result = {};
+  AOTPassDescriptor firstPass = {};
+  firstPass.kernel = AOTKernelKind::PerlinNoiseFill;
+  firstPass.nodes.push_back(AOTNodeID(1));
+  uint32_t nodeIndex = 2;
+  if (nodeIndex < graph.nodeCount()) {
+    firstPass.nodes.push_back(AOTNodeID(nodeIndex++));
+  }
+  firstPass.output = firstPass.nodes.back();
+  result.passes.push_back(std::move(firstPass));
+
+  if (nodeIndex < graph.nodeCount()) {
+    AOTPassDescriptor tailPass = {};
+    tailPass.kernel = AOTKernelKind::PointwiseTail;
+    tailPass.dependencies.push_back(0);
+    tailPass.nodes.push_back(AOTNodeID(nodeIndex++));
+    tailPass.output = tailPass.nodes.back();
+    result.passes.push_back(std::move(tailPass));
+  }
+
+  for (size_t index = 0; index < result.passes.size(); ++index) {
+    result.passes[index].materializesOutput = index + 1 < result.passes.size();
+  }
+  result.output = graph.root();
+  *plan = std::move(result);
+  return true;
+}
+
 // Existing narrow planner: a strictly linear TextureSource -> ColorMatrix/Luma chain, mapped onto
 // the TextureFill / TextureColorMatrix / TexturedColorMatrix / TexturedLuma kernels. Preserved as the
 // standard-plan and conservative fallback path.
@@ -326,6 +380,9 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
 bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, AOTDecompositionMode mode,
                                     AOTEffectPlan* plan) {
   if (mode == AOTDecompositionMode::PreferFusion && DecomposeLinearPointwiseTail(graph, plan)) {
+    return true;
+  }
+  if (DecomposePerlinNoiseChain(graph, plan)) {
     return true;
   }
   if (DecomposeLinearTextureChain(graph, mode, plan)) {

@@ -111,6 +111,18 @@ bool AOTNodeBuilder::addBlend(AOTNodeID src, AOTNodeID dst, const AOTBlendParame
   return addBinaryNode(AOTEffectKind::Blend, src, dst, traits, parameters, output);
 }
 
+bool AOTNodeBuilder::addPerlinNoiseSource(AOTNodeID input,
+                                          const AOTPerlinNoiseParameters& parameters,
+                                          AOTNodeID* output) {
+  if (parameters.permutationsView == nullptr || parameters.noiseView == nullptr) {
+    return false;
+  }
+  // The kernel ignores its input color entirely (perlin_noise.frag has no Color uniform), so this
+  // is a self-contained source, matching ConstColor's Ignore-mode traits.
+  EffectTraits traits = {EffectDomain::Pointwise, EffectInputUsage::Ignore, true, false, false};
+  return addUnaryNode(AOTEffectKind::PerlinNoiseSource, input, traits, parameters, output);
+}
+
 bool AOTNodeBuilder::finish(AOTNodeID root, AOTEffectGraph* graph) const {
   if (graph == nullptr || !contains(root)) {
     return false;

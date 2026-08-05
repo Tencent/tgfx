@@ -41,6 +41,13 @@ class PerlinNoiseShader : public Shader {
 
     PaintingData(const PaintingData& that);
 
+    // Lightweight reconstruction for the AOT executor: it rebuilds a PerlinNoiseFragmentProcessor
+    // from an already-lowered AOTPerlinNoiseParameters, whose two lookup textures are already
+    // built. latticeSelector/noise are never read by that path (the GLSL processor only reads
+    // baseFrequencyX/Y and the stitch fields from onSetData), so they are left zero-initialized
+    // rather than regenerated.
+    PaintingData(float baseFrequencyX, float baseFrequencyY, int stitchWidth, int stitchHeight);
+
     uint8_t latticeSelector[BLOCK_SIZE];
     uint16_t noise[4][BLOCK_SIZE][2];
     float baseFrequencyX;

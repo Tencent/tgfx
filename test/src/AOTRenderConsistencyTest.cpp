@@ -534,6 +534,59 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaThresholdChainFusesByteExact) {
   ExpectBitmapsIdentical("pointwise-matrix-alphathreshold", candidate, reference, width, height);
 }
 
+// SVG feTurbulence's main real-world shape: Perlin noise piped through luminanceToAlpha then
+// AlphaThreshold (CanvasTest.NoiseWithThreshold). The colorFilter must be set on Paint separately
+// from the shader (not via Shader::makeWithColorFilter) to hit OpsCompositor's decomposition gate,
+// which only activates when brush.shader and brush.colorFilter are both present as separate brush
+// fields (OpsCompositor::needComputeBounds). Matrix and AlphaThreshold occupy the PerlinNoiseFill
+// pass's OpType slot and a following PointwiseTail pass respectively.
+TGFX_TEST(AOTRenderConsistencyTest, PerlinNoiseLuminanceAlphaThreshold) {
+  constexpr std::array<float, 20> luminanceToAlpha = {
+      0.0f,    0.0f,    0.0f,    0.0f, 0.0f,  //
+      0.0f,    0.0f,    0.0f,    0.0f, 0.0f,  //
+      0.0f,    0.0f,    0.0f,    0.0f, 0.0f,  //
+      0.2126f, 0.7152f, 0.0722f, 0.0f, 0.0f,
+  };
+  auto composed = ColorFilter::Compose(ColorFilter::Matrix(luminanceToAlpha),
+                                       ColorFilter::AlphaThreshold(0.5f));
+  ASSERT_TRUE(composed != nullptr);
+  int width = 130;
+  int height = 130;
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  for (int pass = 0; pass < 2; ++pass) {
+    bool useBundle = pass == 1;
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto* cache = context->precompiledShaderCache();
+    if (useBundle) {
+      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+    } else {
+      cache->unload();
+    }
+    context->globalCache()->clearPrograms();
+    auto surface = Surface::Make(context, width, height);
+    ASSERT_TRUE(surface != nullptr);
+    Paint paint = {};
+    paint.setShader(Shader::MakeTurbulence(0.25f, 0.25f, 3, 6903));
+    paint.setColorFilter(composed);
+    surface->getCanvas()->drawRect(
+        Rect::MakeWH(static_cast<float>(width), static_cast<float>(height)), paint);
+    context->flushAndSubmit(true);
+    auto* outBitmap = useBundle ? &candidate : &reference;
+    ASSERT_TRUE(outBitmap->allocPixels(width, height));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+    if (useBundle) {
+      cache->unload();
+    }
+  }
+  ExpectBitmapsIdentical("perlin-luminance-alphathreshold", candidate, reference, width, height);
+}
+
 // Encoded images use GL_TEXTURE_RECTANGLE on macOS. The precompiled textured kernel accepts only
 // TextureType::TwoD, so strict preparation must reject the plan before any pass executes and render
 // the untouched original draw through the runtime fallback.

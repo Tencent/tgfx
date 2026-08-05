@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/processors/PerlinNoiseFragmentProcessor.h"
+#include "gpu/AOTEffect.h"
 #include "gpu/resources/TextureView.h"
 
 namespace tgfx {
@@ -58,5 +59,24 @@ std::shared_ptr<Texture> PerlinNoiseFragmentProcessor::onTextureAt(size_t index)
 
 SamplerState PerlinNoiseFragmentProcessor::onSamplerStateAt(size_t) const {
   return SamplerState(SamplingOptions(FilterMode::Nearest));
+}
+
+bool PerlinNoiseFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
+                                              AOTNodeID* output) const {
+  if (builder == nullptr || output == nullptr) {
+    return false;
+  }
+  AOTPerlinNoiseParameters parameters = {};
+  parameters.noiseType = static_cast<int>(noiseType);
+  parameters.numOctaves = numOctaves;
+  parameters.stitchTiles = stitchTiles;
+  parameters.permutationsView = permutationsView;
+  parameters.noiseView = noiseView;
+  parameters.baseFrequencyX = paintingData->baseFrequencyX;
+  parameters.baseFrequencyY = paintingData->baseFrequencyY;
+  parameters.stitchWidth = paintingData->stitchWidth;
+  parameters.stitchHeight = paintingData->stitchHeight;
+  parameters.uvMatrix = coordTransform.matrix;
+  return builder->addPerlinNoiseSource(input, parameters, output);
 }
 }  // namespace tgfx

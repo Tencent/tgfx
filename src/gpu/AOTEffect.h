@@ -79,6 +79,7 @@ enum class AOTEffectKind {
   ColorSpaceXform,
   ConstColor,
   Blend,
+  PerlinNoiseSource,
 };
 
 enum class EffectDomain {
@@ -167,10 +168,29 @@ struct AOTBlendParameters {
   int childType = 0;
 };
 
+// Procedural-noise source (PerlinNoiseFragmentProcessor). Unlike AOTTextureParameters, the two
+// texture views are internal lookup tables (a 256x1 permutation table and a 256x4 gradient table),
+// not a user-sampled image, so this carries the noise math parameters directly instead of texture
+// sampling semantics (tileMode/subset/uvMatrix are meaningless here beyond the coordinate matrix).
+// noiseType mirrors tgfx::PerlinNoiseType (0=FractalNoise, 1=Turbulence) and is a runtime uniform
+// in the fused kernel, matching PerlinNoiseFillShader.
+struct AOTPerlinNoiseParameters {
+  int noiseType = 0;
+  int numOctaves = 1;
+  bool stitchTiles = false;
+  std::shared_ptr<TextureView> permutationsView = nullptr;
+  std::shared_ptr<TextureView> noiseView = nullptr;
+  float baseFrequencyX = 0.0f;
+  float baseFrequencyY = 0.0f;
+  int stitchWidth = 0;
+  int stitchHeight = 0;
+  Matrix uvMatrix = {};
+};
+
 using AOTEffectParameters =
     std::variant<std::monostate, AOTTextureParameters, AOTColorMatrixParameters, AOTLumaParameters,
                  AOTAlphaThresholdParameters, AOTColorSpaceXformParameters, AOTConstColorParameters,
-                 AOTBlendParameters>;
+                 AOTBlendParameters, AOTPerlinNoiseParameters>;
 
 struct AOTEffectNode {
   AOTEffectKind kind = AOTEffectKind::GeometryColor;
@@ -220,6 +240,9 @@ class AOTNodeBuilder {
   // Adds a binary blend node consuming two previously-built operands (src and dst node ids).
   bool addBlend(AOTNodeID src, AOTNodeID dst, const AOTBlendParameters& parameters,
                 AOTNodeID* output);
+
+  bool addPerlinNoiseSource(AOTNodeID input, const AOTPerlinNoiseParameters& parameters,
+                            AOTNodeID* output);
 
   bool finish(AOTNodeID root, AOTEffectGraph* graph) const;
 

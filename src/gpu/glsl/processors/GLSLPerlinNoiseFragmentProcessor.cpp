@@ -55,6 +55,19 @@ PlacementPtr<PerlinNoiseFragmentProcessor> PerlinNoiseFragmentProcessor::Make(
       std::move(noiseView), uvMatrix);
 }
 
+PlacementPtr<PerlinNoiseFragmentProcessor> PerlinNoiseFragmentProcessor::MakeFromViews(
+    BlockAllocator* allocator, PerlinNoiseType noiseType, int numOctaves, bool stitchTiles,
+    std::unique_ptr<PerlinNoiseShader::PaintingData> paintingData,
+    std::shared_ptr<TextureView> permutationsView, std::shared_ptr<TextureView> noiseView,
+    const Matrix* uvMatrix) {
+  if (paintingData == nullptr || permutationsView == nullptr || noiseView == nullptr) {
+    return nullptr;
+  }
+  return allocator->make<GLSLPerlinNoiseFragmentProcessor>(
+      noiseType, numOctaves, stitchTiles, std::move(paintingData), std::move(permutationsView),
+      std::move(noiseView), uvMatrix);
+}
+
 GLSLPerlinNoiseFragmentProcessor::GLSLPerlinNoiseFragmentProcessor(
     PerlinNoiseType noiseType, int numOctaves, bool stitchTiles,
     std::unique_ptr<PerlinNoiseShader::PaintingData> paintingData,

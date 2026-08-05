@@ -110,6 +110,14 @@ PerlinNoiseShader::PaintingData::PaintingData(float seed, float baseFreqX, float
   }
 }
 
+PerlinNoiseShader::PaintingData::PaintingData(float baseFreqX, float baseFreqY, int stitchWidth,
+                                              int stitchHeight)
+    : baseFrequencyX(baseFreqX), baseFrequencyY(baseFreqY), stitchWidth(stitchWidth),
+      stitchHeight(stitchHeight) {
+  memset(latticeSelector, 0, sizeof(latticeSelector));
+  memset(noise, 0, sizeof(noise));
+}
+
 PerlinNoiseShader::PaintingData::PaintingData(const PaintingData& that)
     : baseFrequencyX(that.baseFrequencyX), baseFrequencyY(that.baseFrequencyY),
       stitchWidth(that.stitchWidth), stitchWrapX(that.stitchWrapX), stitchHeight(that.stitchHeight),

@@ -19,6 +19,7 @@
 #include "AOTPlanExecutor.h"
 #include <utility>
 #include <vector>
+#include "core/shaders/PerlinNoiseShader.h"
 #include "gpu/AOTMaterializationPolicy.h"
 #include "gpu/BackingFit.h"
 #include "gpu/DrawingManager.h"
@@ -30,6 +31,7 @@
 #include "gpu/processors/ColorSpaceXFormEffect.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/LumaFragmentProcessor.h"
+#include "gpu/processors/PerlinNoiseFragmentProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/resources/RenderTarget.h"
@@ -75,6 +77,19 @@ static bool ValidatePointwiseTailOp(const AOTEffectGraph& graph, AOTNodeID nodeI
          (node->kind == AOTEffectKind::ColorMatrix || node->kind == AOTEffectKind::Luma ||
           node->kind == AOTEffectKind::AlphaThreshold ||
           node->kind == AOTEffectKind::ColorSpaceXform);
+}
+
+static bool ValidatePerlinNoiseSource(const AOTEffectGraph& graph, AOTNodeID nodeID) {
+  auto node = graph.nodeAt(nodeID);
+  if (node == nullptr || node->kind != AOTEffectKind::PerlinNoiseSource ||
+      node->inputs.size() != 1) {
+    return false;
+  }
+  auto parameters = std::get_if<AOTPerlinNoiseParameters>(&node->parameters);
+  auto input = graph.nodeAt(node->inputs[0]);
+  return parameters != nullptr && parameters->permutationsView != nullptr &&
+         parameters->noiseView != nullptr && input != nullptr &&
+         input->kind == AOTEffectKind::GeometryColor;
 }
 
 static bool ValidateLinearPlan(const AOTEffectGraph& graph, const AOTEffectPlan& plan) {
@@ -127,6 +142,15 @@ static bool ValidateLinearPlan(const AOTEffectGraph& graph, const AOTEffectPlan&
         auto matrix = graph.nodeAt(pass.nodes[1]);
         if (matrix == nullptr || matrix->kind != AOTEffectKind::ColorMatrix ||
             matrix->inputs.size() != 1 || matrix->inputs[0] != pass.nodes[0]) {
+          return false;
+        }
+      } else if (pass.kernel == AOTKernelKind::PerlinNoiseFill) {
+        if (pass.nodes.empty() || pass.nodes.size() > 2 ||
+            !ValidatePerlinNoiseSource(graph, pass.nodes[0])) {
+          return false;
+        }
+        if (pass.nodes.size() == 2 &&
+            !ValidatePointwiseTailOp(graph, pass.nodes[1], pass.nodes[0])) {
           return false;
         }
       } else {
@@ -249,6 +273,20 @@ static PlacementPtr<FragmentProcessor> BuildFPForNode(BlockAllocator* allocator,
       }
       auto xform = ColorSpaceXformEffect::Make(allocator, parameters->steps);
       return FragmentProcessor::Compose(allocator, std::move(input), std::move(xform));
+    }
+    case AOTEffectKind::PerlinNoiseSource: {
+      auto parameters = std::get_if<AOTPerlinNoiseParameters>(&node->parameters);
+      if (parameters == nullptr) {
+        return nullptr;
+      }
+      auto paintingData = std::make_unique<PerlinNoiseShader::PaintingData>(
+          parameters->baseFrequencyX, parameters->baseFrequencyY, parameters->stitchWidth,
+          parameters->stitchHeight);
+      auto uvMatrix = parameters->uvMatrix;
+      return PerlinNoiseFragmentProcessor::MakeFromViews(
+          allocator, static_cast<PerlinNoiseType>(parameters->noiseType), parameters->numOctaves,
+          parameters->stitchTiles, std::move(paintingData), parameters->permutationsView,
+          parameters->noiseView, &uvMatrix);
     }
     default:
       return nullptr;
