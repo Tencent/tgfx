@@ -82,13 +82,6 @@ bool Matrix3DUtils::IsRectBehindCamera(const Rect& rect, const Matrix3D& matrix)
          matrix.mapHomogeneous(rect.right, rect.bottom, 0, 1).w <= 0;
 }
 
-bool Matrix3DUtils::IsRectFullyBehindCamera(const Rect& rect, const Matrix3D& matrix) {
-  return matrix.mapHomogeneous(rect.left, rect.top, 0, 1).w <= 0 &&
-         matrix.mapHomogeneous(rect.left, rect.bottom, 0, 1).w <= 0 &&
-         matrix.mapHomogeneous(rect.right, rect.top, 0, 1).w <= 0 &&
-         matrix.mapHomogeneous(rect.right, rect.bottom, 0, 1).w <= 0;
-}
-
 Matrix3D Matrix3DUtils::OriginAdaptedMatrix3D(const Matrix3D& matrix3D, const Point& newOrigin) {
   auto offsetMatrix = Matrix3D::MakeTranslate(newOrigin.x, newOrigin.y, 0);
   auto invOffsetMatrix = Matrix3D::MakeTranslate(-newOrigin.x, -newOrigin.y, 0);
@@ -117,8 +110,7 @@ Rect Matrix3DUtils::InverseMapRect(const Rect& rect, const Matrix3D& matrix) {
 
 bool Matrix3DUtils::ComputeVisibleFootprints(const Rect& localBounds, const Rect& destRect,
                                              const Matrix3D& matrix, Rect* localFootprint,
-                                             Rect* destFootprint,
-                                             std::vector<Point>* visibleLocalPolygon) {
+                                             Rect* destFootprint) {
   // 3x3 homography that maps local (x, y) on the z=0 plane to destination (X, Y, W). Rows and
   // columns 0, 1, 3 of the 4x4 matrix carry the projective part; the z axis is dropped since the
   // leaf lies on z=0.
@@ -169,9 +161,6 @@ bool Matrix3DUtils::ComputeVisibleFootprints(const Rect& localBounds, const Rect
   float destMaxX = 0.0f;
   float destMaxY = 0.0f;
   bool initialized = false;
-  if (visibleLocalPolygon != nullptr) {
-    visibleLocalPolygon->clear();
-  }
   for (const auto& vertex : polygon) {
     if (!(vertex.w > 0.0f)) {
       continue;
@@ -184,9 +173,6 @@ bool Matrix3DUtils::ComputeVisibleFootprints(const Rect& localBounds, const Rect
     }
     const float localX = local.x / local.z;
     const float localY = local.y / local.z;
-    if (visibleLocalPolygon != nullptr) {
-      visibleLocalPolygon->push_back(Point::Make(localX, localY));
-    }
     if (!initialized) {
       localMinX = localMaxX = localX;
       localMinY = localMaxY = localY;

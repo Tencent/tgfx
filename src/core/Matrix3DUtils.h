@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <vector>
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Matrix3D.h"
 #include "tgfx/core/Rect.h"
@@ -35,16 +34,6 @@ class Matrix3DUtils {
    * @param matrix The 3D transformation matrix containing camera and projection information.
    */
   static bool IsRectBehindCamera(const Rect& rect, const Matrix3D& matrix);
-
-  /**
-   * Checks if all vertices of the rect are behind the camera after applying the 3D transformation.
-   * Used as a cheap pre-cull: only when every corner has w <= 0 is the whole rect guaranteed to be
-   * invisible. A rect that straddles the near plane (mixed w signs) must still go through
-   * ComputeVisibleFootprints so the in-front portion survives.
-   * @param rect The rect in local coordinate system to be checked.
-   * @param matrix The 3D transformation matrix containing camera and projection information.
-   */
-  static bool IsRectFullyBehindCamera(const Rect& rect, const Matrix3D& matrix);
 
   /**
    * Returns an adapted transformation matrix for a new coordinate system established at the
@@ -104,11 +93,6 @@ class Matrix3DUtils {
    * destination pixels per local unit" estimate that stays finite even when the footprints touch
    * the near plane, because the clip removes the singularity.
    *
-   * When `visibleLocalPolygon` is non-null, the clipped polygon's surviving vertices (mapped back
-   * to the local z=0 plane, in clip order) are appended to it. This is the authoritative visible
-   * shape: unlike the AABB footprints, every vertex is guaranteed to project with w > 0, so it is
-   * safe to re-project those vertices through the original matrix for compositing.
-   *
    * Returns false when the homography is singular or the clipped polygon is empty (leaf not
    * visible in `destRect`).
    *
@@ -117,12 +101,10 @@ class Matrix3DUtils {
    * @param matrix The 4x4 transformation from local space to destination space.
    * @param localFootprint Output: AABB of clipped vertices in local space.
    * @param destFootprint Output: AABB of clipped vertices in destination space.
-   * @param visibleLocalPolygon Optional output: clipped polygon vertices in local z=0 space.
    */
   static bool ComputeVisibleFootprints(const Rect& localBounds, const Rect& destRect,
                                        const Matrix3D& matrix, Rect* localFootprint,
-                                       Rect* destFootprint,
-                                       std::vector<Point>* visibleLocalPolygon);
+                                       Rect* destFootprint);
 
   /**
    * Adjusts a 3D transformation matrix so that the projection result can be correctly scaled.

@@ -107,13 +107,8 @@ void Render3DContext::finishAndDrawTo(const DrawArgs& args, Canvas* canvas) {
       continue;
     }
     layerRasterInfo.emplace(node.layer, info);
-    if (info.straddlesNearPlane) {
-      _compositor->addPolygon(node.layer, info.visiblePolygon, info.visibleLocal, localToCompositor,
-                              node.depth, node.alpha, node.antialiasing);
-    } else {
-      _compositor->addPolygon(node.layer, info.visibleLocal, localToCompositor, node.depth,
-                              node.alpha, node.antialiasing);
-    }
+    _compositor->addPolygon(node.layer, info.visibleLocal, localToCompositor, node.depth,
+                            node.alpha, node.antialiasing);
   }
 
   const auto& fragments = _compositor->prepareTraversal();
@@ -293,13 +288,7 @@ bool Render3DContext::primeCompositorFromOuterCanvas(Canvas* outerCanvas) {
 
 bool Render3DContext::ComputeRasterInfo(const Matrix3D& localToCompositor, const Rect& localBounds,
                                         const Rect& compositorViewport, RasterInfo* info) {
-  // Only a rect fully behind the camera is culled here. A rect that straddles the near plane
-  // (some corners w <= 0, others w > 0) must proceed to the homogeneous clip below so its
-  // in-front portion survives; culling it wholesale would drop still-visible content. The
-  // straddle check short-circuits so fully-in-front leaves only pay one corner classification.
-  const bool straddlesNearPlane = Matrix3DUtils::IsRectBehindCamera(localBounds, localToCompositor);
-  if (straddlesNearPlane &&
-      Matrix3DUtils::IsRectFullyBehindCamera(localBounds, localToCompositor)) {
+  if (Matrix3DUtils::IsRectBehindCamera(localBounds, localToCompositor)) {
     return false;
   }
   // Size the raster from the destination footprint (bounded by the viewport) and derive density
@@ -308,11 +297,8 @@ bool Render3DContext::ComputeRasterInfo(const Matrix3D& localToCompositor, const
   // boundary would otherwise blow up.
   Rect localFootprint = {};
   Rect destFootprint = {};
-  std::vector<Point> visiblePolygon;
-  auto* visiblePolygonOutput = straddlesNearPlane ? &visiblePolygon : nullptr;
   if (!Matrix3DUtils::ComputeVisibleFootprints(localBounds, compositorViewport, localToCompositor,
-                                               &localFootprint, &destFootprint,
-                                               visiblePolygonOutput)) {
+                                               &localFootprint, &destFootprint)) {
     return false;
   }
   // Near-plane clipping can push clipped vertices a hair past localBounds when interpolating in
@@ -338,10 +324,6 @@ bool Render3DContext::ComputeRasterInfo(const Matrix3D& localToCompositor, const
   info->density = density;
   info->rasterWidth = std::max(1, static_cast<int>(std::ceil(destWidth)));
   info->rasterHeight = std::max(1, static_cast<int>(std::ceil(destHeight)));
-  info->straddlesNearPlane = straddlesNearPlane;
-  if (straddlesNearPlane) {
-    info->visiblePolygon = std::move(visiblePolygon);
-  }
   return true;
 }
 

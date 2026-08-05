@@ -140,15 +140,6 @@ void Context3DCompositor::addPolygon(Layer* layer, const Rect& localBounds, cons
   _polygons.push_back(std::move(polygon));
 }
 
-void Context3DCompositor::addPolygon(Layer* layer, const std::vector<Point>& visiblePolygon,
-                                     const Rect& visibleLocal, const Matrix3D& matrix, int depth,
-                                     float alpha, bool antiAlias) {
-  const auto sequenceIndex = _depthSequenceCounters[depth]++;
-  auto polygon = std::make_unique<DrawPolygon3D>(layer, visibleLocal, matrix, visiblePolygon, depth,
-                                                 sequenceIndex, alpha, antiAlias);
-  _polygons.push_back(std::move(polygon));
-}
-
 void Context3DCompositor::drawPolygon(const DrawPolygon3D* polygon,
                                       const std::shared_ptr<Image>& image) {
   if (image == nullptr) {
