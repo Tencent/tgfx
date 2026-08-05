@@ -724,9 +724,17 @@ std::pair<bool, bool> OpsCompositor::needComputeBounds(const Brush& brush, bool 
   bool needLocalBounds = hasImageFill || brush.shader != nullptr || brush.maskFilter != nullptr;
   bool needDeviceBounds = false;
   auto cache = context->precompiledShaderCache();
+  // The decomposition route only pays off for chains the plain route cannot match directly. A
+  // separate Paint color filter always produces such a chain, and so does a color filter baked
+  // into the shader via Shader::makeWithColorFilter (e.g. SVG feTurbulence's Perlin ->
+  // luminanceToAlpha -> threshold, a single Compose tree that no matcher rule covers). Bare
+  // single-source shaders are already served by the direct matchers, so they must keep skipping
+  // the route: evaluating them would reroute every bare fill onto the L2 kernels and double the
+  // program lookups on artifact misses.
+  bool hasShaderDerivedChain = brush.shader != nullptr && brush.shader->type() == Shader::Type::ColorFilter;
   bool hasDecomposableColorSource = hasImageFill || brush.shader != nullptr;
   if (cache != nullptr && cache->isLoaded() && cache->decompositionEnabled() &&
-      hasDecomposableColorSource && brush.colorFilter != nullptr) {
+      hasDecomposableColorSource && (brush.colorFilter != nullptr || hasShaderDerivedChain)) {
     needDeviceBounds = true;
   }
   if (BlendModeNeedDstTexture(brush.blendMode, hasCoverage)) {
