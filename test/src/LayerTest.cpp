@@ -4138,6 +4138,29 @@ TGFX_TEST(LayerTest, GlassStyleRoundedRect) {
   RunGlassStyleTest("RoundedRect", 1.0f, 180.0f, 120.0f, 30.0f, 30.0f);
 }
 
+TGFX_TEST(LayerTest, GlassStyleSplayCompare) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  constexpr float cellSize = 200;
+  constexpr float gap = 10;
+  constexpr int cols = 2;
+  int surfaceW = static_cast<int>(cols * (cellSize + gap) + gap);
+  int surfaceH = static_cast<int>(cellSize + 2 * gap);
+  auto surface = Surface::Make(context, surfaceW, surfaceH);
+  auto displayList = std::make_unique<DisplayList>();
+  auto bgImage = MakeImage("resources/apitest/checker_128.png");
+  // Square glass panel (180x180, sharp corners), refraction=100 and depth=50. Left cell uses
+  // splay=1, right cell uses splay=2, to compare the refraction direction blend at near-zero splay
+  // values.
+  AddGlassCell(displayList->root(), bgImage, gap, gap, cellSize, 100, 50, 0, 0, 1, 135, 50, 180.0f,
+               180.0f, 0.0f, 0.0f);
+  AddGlassCell(displayList->root(), bgImage, gap + cellSize + gap, gap, cellSize, 100, 50, 0, 0, 2,
+               135, 50, 180.0f, 180.0f, 0.0f, 0.0f);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleSplayCompare"));
+}
+
 TGFX_TEST(LayerTest, GlassStyleEllipseSDF) {
   // Ellipse with unequal width/height (180x120, radius = half dimensions) exercises the SDF path.
   RunGlassStyleTest("EllipseSDF", 1.0f, 180.0f, 120.0f, 90.0f, 60.0f);

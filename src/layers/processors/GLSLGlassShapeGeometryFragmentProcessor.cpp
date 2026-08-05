@@ -91,8 +91,8 @@ void GLSLGlassSDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
   // offset = I * rd * pow(clamp((rd - d) / rd, 0, 1), 3.5), capped at 0.999 * rd.
   fragBuilder->codeAppendf("  float rd = max(%s.w, 0.0001);", shape.c_str());
   fragBuilder->codeAppend("  float heightT = clamp((rd - edgeDist) / rd, 0.0, 1.0);");
-  fragBuilder->codeAppendf(
-      "  float offsetDist = min(%s.x * rd * pow(heightT, 3.5), 0.999 * rd);", effect.c_str());
+  fragBuilder->codeAppendf("  float offsetDist = min(%s.x * rd * pow(heightT, 3.5), 0.999 * rd);",
+                           effect.c_str());
   fragBuilder->codeAppendf("  float effectiveSplay = %s.y;", effect.c_str());
   if (shapeType == GlassShapeType::Ellipse) {
     fragBuilder->codeAppend(
@@ -106,8 +106,10 @@ void GLSLGlassSDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
     // regions and more radial direction blending at corners.
     fragBuilder->codeAppend("  vec2 absP = abs(vec2(px, py));");
     fragBuilder->codeAppendf("  float refractionDistance = %s.w;", shape.c_str());
-    fragBuilder->codeAppend("  float r_effective = min(min(halfW, halfH), max(cornerRadius, refractionDistance));");
-    fragBuilder->codeAppend("  vec2 cornerCenter = vec2(halfW - r_effective, halfH - r_effective);");
+    fragBuilder->codeAppend(
+        "  float r_effective = min(min(halfW, halfH), max(cornerRadius, refractionDistance));");
+    fragBuilder->codeAppend(
+        "  vec2 cornerCenter = vec2(halfW - r_effective, halfH - r_effective);");
     fragBuilder->codeAppend("  vec2 relToCorner = absP - cornerCenter;");
     fragBuilder->codeAppend("  float compensation = max(-min(relToCorner.x, relToCorner.y), 0.0);");
     fragBuilder->codeAppend("  vec2 grad = relToCorner + vec2(compensation);");
@@ -122,7 +124,8 @@ void GLSLGlassSDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppendf("    effectiveSplay = min(cornerWeight + %s.y, 1.0);", effect.c_str());
     fragBuilder->codeAppend("  float gradientLength = length(grad);");
     fragBuilder->codeAppend("  if (gradientLength > 0.000001) {");
-    fragBuilder->codeAppend("    vec2 gradientDir = -vec2(sign(px) * grad.x, sign(py) * grad.y) / gradientLength;");
+    fragBuilder->codeAppend(
+        "    vec2 gradientDir = -vec2(sign(px) * grad.x, sign(py) * grad.y) / gradientLength;");
   }
   fragBuilder->codeAppend("    float centerDistance = length(vec2(px, py));");
   fragBuilder->codeAppend(
