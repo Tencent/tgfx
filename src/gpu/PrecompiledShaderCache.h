@@ -119,6 +119,8 @@ struct OffscreenFillStats {
   uint64_t multiPassPlans = 0;
   uint64_t precompiledPrograms = 0;
   uint64_t programBuilderPrograms = 0;
+  uint64_t precompiledCanExecute = 0;
+  uint64_t programBuilderCanExecute = 0;
   std::unordered_map<std::string, uint64_t> lowerBlockers = {};
   std::unordered_map<std::string, uint64_t> topLevelProcessors = {};
 };
@@ -274,7 +276,8 @@ class PrecompiledShaderCache {
                                    const std::string& lowerBlocker, bool validateSucceeded,
                                    bool decomposeSucceeded, bool canExecute, AOTKernelKind kernel,
                                    size_t passCount);
-  void recordOffscreenFillProgram(OffscreenFillSource source, ProgramOrigin origin);
+  void recordOffscreenFillProgram(OffscreenFillSource source, bool canExecute,
+                                  ProgramOrigin origin);
   OffscreenFillStats offscreenFillStats() const;
   std::array<OffscreenFillStats, static_cast<size_t>(OffscreenFillSource::Count)>
   offscreenFillStatsBySource() const;

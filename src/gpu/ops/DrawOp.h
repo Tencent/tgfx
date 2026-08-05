@@ -67,8 +67,9 @@ class DrawOp {
     coverages.emplace_back(std::move(coverageProcessor));
   }
 
-  void setOffscreenFillSource(OffscreenFillSource source) {
+  void setOffscreenFillDiagnostic(OffscreenFillSource source, bool canExecute) {
     offscreenFillSource = source;
+    offscreenFillCanExecute = canExecute;
   }
 
   /**
@@ -143,5 +144,6 @@ class DrawOp {
   std::shared_ptr<Program> preparedProgram = nullptr;
   RenderTarget* preparedRenderTarget = nullptr;
   std::optional<OffscreenFillSource> offscreenFillSource = std::nullopt;
+  bool offscreenFillCanExecute = false;
 };
 }  // namespace tgfx

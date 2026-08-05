@@ -213,7 +213,7 @@ void PrecompiledShaderCache::recordOffscreenFillAnalysis(
   }
 }
 
-void PrecompiledShaderCache::recordOffscreenFillProgram(OffscreenFillSource source,
+void PrecompiledShaderCache::recordOffscreenFillProgram(OffscreenFillSource source, bool canExecute,
                                                         ProgramOrigin origin) {
   if (!diagnosticRecordingEnabled()) {
     return;
@@ -222,8 +222,14 @@ void PrecompiledShaderCache::recordOffscreenFillProgram(OffscreenFillSource sour
   auto& stats = _offscreenFillStats[static_cast<size_t>(source)];
   if (origin == ProgramOrigin::PrecompiledArtifact) {
     stats.precompiledPrograms++;
+    if (canExecute) {
+      stats.precompiledCanExecute++;
+    }
   } else {
     stats.programBuilderPrograms++;
+    if (canExecute) {
+      stats.programBuilderCanExecute++;
+    }
   }
 }
 
@@ -242,6 +248,8 @@ OffscreenFillStats PrecompiledShaderCache::offscreenFillStats() const {
     total.multiPassPlans += stats.multiPassPlans;
     total.precompiledPrograms += stats.precompiledPrograms;
     total.programBuilderPrograms += stats.programBuilderPrograms;
+    total.precompiledCanExecute += stats.precompiledCanExecute;
+    total.programBuilderCanExecute += stats.programBuilderCanExecute;
     for (const auto& [name, count] : stats.lowerBlockers) {
       total.lowerBlockers[name] += count;
     }

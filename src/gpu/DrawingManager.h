@@ -58,7 +58,8 @@ class DrawingManager {
                                       PlacementPtr<FragmentProcessor> processor,
                                       uint32_t renderFlags,
                                       const Point& coordOffset = Point::Zero(),
-                                      std::optional<OffscreenFillSource> source = std::nullopt);
+                                      std::optional<OffscreenFillSource> source = std::nullopt,
+                                      bool canExecute = false);
 
   /**
    * Fills the render target using the provided fragment processor, and automatically resolves the

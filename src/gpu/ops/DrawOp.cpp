@@ -69,7 +69,7 @@ void DrawOp::executePrepared(RenderPass* renderPass, bool recordDrawStats) {
   preparedProgramInfo->setUniformsAndSamplers(renderPass, preparedProgram.get());
   if (offscreenFillSource.has_value()) {
     auto cache = preparedRenderTarget->getContext()->precompiledShaderCache();
-    cache->recordOffscreenFillProgram(*offscreenFillSource,
+    cache->recordOffscreenFillProgram(*offscreenFillSource, offscreenFillCanExecute,
                                       preparedProgram->getProvenance().program);
   }
 

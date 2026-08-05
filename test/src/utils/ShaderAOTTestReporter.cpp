@@ -95,6 +95,8 @@ static void AddOffscreenFillStats(OffscreenFillStats* target, const OffscreenFil
   target->multiPassPlans += source.multiPassPlans;
   target->precompiledPrograms += source.precompiledPrograms;
   target->programBuilderPrograms += source.programBuilderPrograms;
+  target->precompiledCanExecute += source.precompiledCanExecute;
+  target->programBuilderCanExecute += source.programBuilderCanExecute;
   for (const auto& [name, count] : source.lowerBlockers) {
     target->lowerBlockers[name] += count;
   }
@@ -128,6 +130,8 @@ static nlohmann::json OffscreenFillStatsToJSON(const OffscreenFillStats& stats) 
           {"multiPassPlans", stats.multiPassPlans},
           {"precompiledPrograms", stats.precompiledPrograms},
           {"programBuilderPrograms", stats.programBuilderPrograms},
+          {"precompiledCanExecute", stats.precompiledCanExecute},
+          {"programBuilderCanExecute", stats.programBuilderCanExecute},
           {"lowerBlockers", stats.lowerBlockers},
           {"topLevelProcessors", stats.topLevelProcessors}};
 }
