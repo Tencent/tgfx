@@ -463,7 +463,12 @@ std::shared_ptr<Texture> D3D12GPU::importBackendTexture(const BackendTexture& ba
   if (resource == nullptr) {
     return nullptr;
   }
-  return D3D12Texture::MakeFrom(this, std::move(resource), d3d12Info.format, usage, adopted);
+  // QueryInterface added a new reference; if the caller handed off ownership, drop the
+  // original reference so the runtime destroys the resource once tgfx releases its ComPtr.
+  if (adopted) {
+    d3d12Resource->Release();
+  }
+  return D3D12Texture::MakeFrom(this, std::move(resource), d3d12Info.format, usage);
 }
 
 std::shared_ptr<Texture> D3D12GPU::importBackendRenderTarget(
@@ -487,7 +492,7 @@ std::shared_ptr<Texture> D3D12GPU::importBackendRenderTarget(
     return nullptr;
   }
   return D3D12Texture::MakeFrom(this, std::move(resource), d3d12Info.format,
-                                TextureUsage::RENDER_ATTACHMENT, false);
+                                TextureUsage::RENDER_ATTACHMENT);
 }
 
 std::shared_ptr<Semaphore> D3D12GPU::importBackendSemaphore(const BackendSemaphore& semaphore) {

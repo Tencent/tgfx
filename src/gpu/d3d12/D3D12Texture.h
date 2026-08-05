@@ -37,7 +37,7 @@ class D3D12Texture : public Texture, public D3D12Resource {
    * Creates a D3D12Texture wrapper from an external D3D12 resource.
    */
   static std::shared_ptr<D3D12Texture> MakeFrom(D3D12GPU* gpu, ComPtr<ID3D12Resource> resource,
-                                                unsigned dxgiFormat, uint32_t usage, bool adopted);
+                                                unsigned dxgiFormat, uint32_t usage);
 
   /**
    * Returns the underlying D3D12 resource.
