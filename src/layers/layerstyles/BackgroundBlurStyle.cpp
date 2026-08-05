@@ -72,37 +72,39 @@ void BackgroundBlurStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, f
 
   auto bgImage = background->image();
   auto bgOffset = background->imageOffset();
-  auto contentWidth = static_cast<float>(bgImage->width());
-  auto contentHeight = static_cast<float>(bgImage->height());
+  auto bgWidth = static_cast<float>(bgImage->width());
+  auto bgHeight = static_cast<float>(bgImage->height());
 
   auto blurFilter = getBackgroundFilter(input.contentScale);
 
   // Subset the background to the visible canvas clip + blur radius, so makeWithFilter
   // only evaluates within the region that will actually be drawn.
-  auto visibleRect = Rect::MakeWH(contentWidth, contentHeight);
+  auto imageRect = Rect::MakeWH(bgWidth, bgHeight);
   auto clipBounds = GetClipBounds(canvas);
   if (clipBounds.has_value() && !clipBounds->isEmpty()) {
-    visibleRect = clipBounds.value();
-    if (!visibleRect.intersect(Rect::MakeWH(contentWidth, contentHeight))) {
+    // clipBounds is in layer-local space; bgImage pixels are offset by bgOffset from that space.
+    imageRect = clipBounds.value();
+    imageRect.offset(-bgOffset.x, -bgOffset.y);
+    if (!imageRect.intersect(Rect::MakeWH(bgWidth, bgHeight))) {
       return;
     }
     // Expand by blur radius so makeWithFilter has source data on both sides of the visible edge.
     auto blurOutset = blurFilter ? blurFilter->filterBounds(Rect::MakeEmpty()) : Rect::MakeEmpty();
     float outsetX = std::max(-blurOutset.left, blurOutset.right);
     float outsetY = std::max(-blurOutset.top, blurOutset.bottom);
-    visibleRect.outset(outsetX, outsetY);
-    if (!visibleRect.intersect(Rect::MakeWH(contentWidth, contentHeight))) {
+    imageRect.outset(outsetX, outsetY);
+    if (!imageRect.intersect(Rect::MakeWH(bgWidth, bgHeight))) {
       return;
     }
-    visibleRect.roundOut();
+    imageRect.roundOut();
   }
 
-  auto subsetImage = bgImage->makeSubset(visibleRect);
+  auto subsetImage = bgImage->makeSubset(imageRect);
   if (subsetImage == nullptr) {
     subsetImage = bgImage;
   } else {
-    bgOffset.x += visibleRect.left;
-    bgOffset.y += visibleRect.top;
+    bgOffset.x += imageRect.left;
+    bgOffset.y += imageRect.top;
   }
 
   Point backgroundOffset = {};
