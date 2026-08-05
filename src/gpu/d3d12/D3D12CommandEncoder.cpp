@@ -233,13 +233,16 @@ void D3D12CommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTextur
           "D3D12CommandEncoder::copyTextureToBuffer: staging buffer creation failed, "
           "HRESULT=0x%08X",
           static_cast<unsigned>(hr));
-      // Fall back to direct copy with potentially wrong stride; better than dropping silently.
-      stagingBuffer = nullptr;
-      needsRepack = false;
-    } else {
-      footprintTarget = stagingBuffer.Get();
-      footprintOffset = 0;
+      // Falling back to a direct CopyTextureRegion would violate the 256/512 alignment
+      // contract that led us here (debug-layer error, UB on real drivers). Skip the copy,
+      // restore the source texture to COMMON, and let the LOGE surface the failure.
+      TransitionResourceState(cmd, d3d12Src->d3d12Resource(), D3D12_RESOURCE_STATE_COPY_SOURCE,
+                              D3D12_RESOURCE_STATE_COMMON);
+      recordTextureStateChange(d3d12Src.get(), D3D12_RESOURCE_STATE_COMMON);
+      return;
     }
+    footprintTarget = stagingBuffer.Get();
+    footprintOffset = 0;
   }
 
   D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint = {};
