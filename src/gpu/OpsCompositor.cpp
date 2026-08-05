@@ -727,14 +727,18 @@ std::pair<bool, bool> OpsCompositor::needComputeBounds(const Brush& brush, bool 
   // The decomposition route only pays off for chains the plain route cannot match directly. A
   // separate Paint color filter always produces such a chain, and so does a color filter baked
   // into the shader via Shader::makeWithColorFilter (e.g. SVG feTurbulence's Perlin ->
-  // luminanceToAlpha -> threshold, a single Compose tree that no matcher rule covers). Bare
+  // luminanceToAlpha -> threshold, a single Compose tree that no matcher rule covers). A mask
+  // filter needs the same evaluation: its texture mask folds into the color chain as a blend
+  // node, turning an otherwise unmatchable color+coverage draw into a single chain pass. Bare
   // single-source shaders are already served by the direct matchers, so they must keep skipping
   // the route: evaluating them would reroute every bare fill onto the L2 kernels and double the
   // program lookups on artifact misses.
-  bool hasShaderDerivedChain = brush.shader != nullptr && brush.shader->type() == Shader::Type::ColorFilter;
+  bool hasShaderDerivedChain =
+      brush.shader != nullptr && brush.shader->type() == Shader::Type::ColorFilter;
   bool hasDecomposableColorSource = hasImageFill || brush.shader != nullptr;
   if (cache != nullptr && cache->isLoaded() && cache->decompositionEnabled() &&
-      hasDecomposableColorSource && (brush.colorFilter != nullptr || hasShaderDerivedChain)) {
+      hasDecomposableColorSource &&
+      (brush.colorFilter != nullptr || hasShaderDerivedChain || brush.maskFilter != nullptr)) {
     needDeviceBounds = true;
   }
   if (BlendModeNeedDstTexture(brush.blendMode, hasCoverage)) {
@@ -1111,7 +1115,11 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     }
     AOTEffectGraph graph = {};
     AOTEffectPlan plan = {};
-    if (AOTEffectDecomposer::Lower(colorProcessors, &graph) &&
+    // The color-only route replaces the color processors with rebuilt Tail/Chain/Perlin FPs whose
+    // matchers are all single-FP, so a draw still carrying a coverage FP (clip coverage or an
+    // unfoldable mask) can never match: attempting the route would only waste a strict prepare
+    // before the atomic fallback replays the draw through the runtime path anyway.
+    if (!op->hasCoverage() && AOTEffectDecomposer::Lower(colorProcessors, &graph) &&
         AOTEffectDecomposer::ValidateForFusion(graph) &&
         AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan) &&
         !plan.passes.empty() &&
