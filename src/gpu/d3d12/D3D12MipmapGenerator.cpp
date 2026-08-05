@@ -18,6 +18,7 @@
 
 #include "D3D12MipmapGenerator.h"
 #include <d3dcompiler.h>
+#include <cstring>
 #include "D3D12GPU.h"
 #include "core/utils/Log.h"
 
