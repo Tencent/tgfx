@@ -270,7 +270,10 @@ void D3D12GPU::initLimits() {
   D3D12_FEATURE_DATA_D3D12_OPTIONS options = {};
   if (SUCCEEDED(d3d12Device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &options,
                                                  sizeof(options)))) {
-    // D3D12 resource binding tier determines sampler limits.
+    // Tier 1 hardware caps samplers at 16 per stage. Higher tiers are limited by the
+    // root-signature DWORD budget instead: 64 total - 2 root CBVs * 2 DWORD (vertex/fragment
+    // UBOs) leaves 60 DWORD, and each sampler consumes 2 DWORD (SRV + Sampler descriptor
+    // tables in D3D12RenderPipeline::createRootSignature), yielding 30.
     switch (options.ResourceBindingTier) {
       case D3D12_RESOURCE_BINDING_TIER_1:
         _limits.maxSamplersPerShaderStage = 16;
@@ -278,7 +281,7 @@ void D3D12GPU::initLimits() {
       case D3D12_RESOURCE_BINDING_TIER_2:
       case D3D12_RESOURCE_BINDING_TIER_3:
       default:
-        _limits.maxSamplersPerShaderStage = 2048;
+        _limits.maxSamplersPerShaderStage = 30;
         break;
     }
   } else {
