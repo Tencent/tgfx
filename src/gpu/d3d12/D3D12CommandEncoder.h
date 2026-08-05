@@ -51,10 +51,6 @@ class D3D12CommandEncoder : public CommandEncoder, public D3D12Resource {
     return session.commandList.Get();
   }
 
-  ID3D12CommandAllocator* d3d12CommandAllocator() const {
-    return session.commandAllocator.Get();
-  }
-
   GPU* gpu() const override;
 
   std::shared_ptr<RenderPass> onBeginRenderPass(const RenderPassDescriptor& descriptor) override;

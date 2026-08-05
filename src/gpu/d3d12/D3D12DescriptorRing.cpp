@@ -88,7 +88,6 @@ D3D12DescriptorRing::Range D3D12DescriptorRing::allocate(uint32_t count) {
   range.cpuStart.ptr += static_cast<SIZE_T>(startSlot) * _descriptorSize;
   range.gpuStart = gpuBase;
   range.gpuStart.ptr += static_cast<UINT64>(startSlot) * _descriptorSize;
-  range.startSlot = startSlot;
   range.count = count;
   head = startSlot + count;
   if (head == _capacity) {

@@ -67,12 +67,10 @@ std::shared_ptr<D3D12Sampler> D3D12Sampler::Make(D3D12GPU* gpu,
     return nullptr;
   }
 
-  return gpu->makeResource<D3D12Sampler>(samplerDesc, gpuHandle);
+  return gpu->makeResource<D3D12Sampler>(gpuHandle);
 }
 
-D3D12Sampler::D3D12Sampler(const D3D12_SAMPLER_DESC& samplerDesc,
-                           D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle)
-    : _samplerDesc(samplerDesc), _gpuHandle(gpuHandle) {
+D3D12Sampler::D3D12Sampler(D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle) : _gpuHandle(gpuHandle) {
 }
 
 void D3D12Sampler::onRelease(D3D12GPU*) {

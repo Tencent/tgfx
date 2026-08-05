@@ -51,7 +51,6 @@ class D3D12DescriptorRing {
   struct Range {
     D3D12_CPU_DESCRIPTOR_HANDLE cpuStart = {};
     D3D12_GPU_DESCRIPTOR_HANDLE gpuStart = {};
-    uint32_t startSlot = 0;
     uint32_t count = 0;
     bool valid() const {
       return count > 0;
@@ -104,10 +103,6 @@ class D3D12DescriptorRing {
 
   uint32_t descriptorSize() const {
     return _descriptorSize;
-  }
-
-  uint32_t capacity() const {
-    return _capacity;
   }
 
  private:

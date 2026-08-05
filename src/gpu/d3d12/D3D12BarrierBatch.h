@@ -72,14 +72,6 @@ class D3D12BarrierBatch {
    */
   void flush(ID3D12GraphicsCommandList* commandList);
 
-  bool empty() const {
-    return barriers.empty();
-  }
-
-  size_t size() const {
-    return barriers.size();
-  }
-
  private:
   std::vector<D3D12_RESOURCE_BARRIER> barriers;
 };

@@ -67,7 +67,6 @@ bool D3D12UploadHeap::init(ID3D12Device* device, size_t capacity) {
 
   _resource = std::move(resource);
   mappedCpu = mapped;
-  gpuVA = _resource->GetGPUVirtualAddress();
   _capacity = capacity;
   head = 0;
   committedHead = 0;
@@ -113,7 +112,6 @@ D3D12UploadHeap::Allocation D3D12UploadHeap::allocate(size_t size, size_t alignm
   Allocation result = {};
   result.resource = _resource.Get();
   result.cpu = static_cast<uint8_t*>(mappedCpu) + startOffset;
-  result.gpuVirtualAddress = gpuVA + startOffset;
   result.offsetInResource = startOffset;
   result.size = size;
   head = startOffset + size;
@@ -173,7 +171,6 @@ void D3D12UploadHeap::clear() {
   }
   _resource = nullptr;
   mappedCpu = nullptr;
-  gpuVA = 0;
   _capacity = 0;
   head = 0;
   committedHead = 0;
@@ -183,8 +180,8 @@ void D3D12UploadHeap::clear() {
 }
 
 void D3D12UploadHeap::resetForContextLost() {
-  // Keep _resource / mappedCpu / gpuVA / _capacity intact; the ring stays usable. Just drop
-  // every accounting entry that is waiting on a fence that is never going to advance.
+  // Keep _resource / mappedCpu / _capacity intact; the ring stays usable. Just drop every
+  // accounting entry that is waiting on a fence that is never going to advance.
   head = 0;
   committedHead = 0;
   outstandingBytes = 0;

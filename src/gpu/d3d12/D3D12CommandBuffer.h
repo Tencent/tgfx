@@ -50,14 +50,6 @@ class D3D12CommandBuffer : public CommandBuffer {
     return session;
   }
 
-  ID3D12GraphicsCommandList* d3d12CommandList() const {
-    return session.commandList.Get();
-  }
-
-  ID3D12CommandAllocator* d3d12CommandAllocator() const {
-    return session.commandAllocator.Get();
-  }
-
  private:
   D3D12GPU* _gpu = nullptr;
   D3D12FrameSession session;

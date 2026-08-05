@@ -60,7 +60,6 @@ class D3D12UploadHeap {
     // beyond the next D3D12GPU shutdown.
     ID3D12Resource* resource = nullptr;
     void* cpu = nullptr;
-    uint64_t gpuVirtualAddress = 0;
     uint64_t offsetInResource = 0;
     size_t size = 0;
     bool valid() const {
@@ -116,7 +115,6 @@ class D3D12UploadHeap {
  private:
   ComPtr<ID3D12Resource> _resource = nullptr;
   void* mappedCpu = nullptr;
-  uint64_t gpuVA = 0;
   size_t _capacity = 0;
   size_t head = 0;
   size_t committedHead = 0;

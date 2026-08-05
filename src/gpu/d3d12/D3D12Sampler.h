@@ -39,13 +39,6 @@ class D3D12Sampler : public Sampler, public D3D12Resource {
   static std::shared_ptr<D3D12Sampler> Make(D3D12GPU* gpu, const SamplerDescriptor& descriptor);
 
   /**
-   * Returns the D3D12 sampler description.
-   */
-  const D3D12_SAMPLER_DESC& samplerDesc() const {
-    return _samplerDesc;
-  }
-
-  /**
    * GPU descriptor handle pointing at this sampler's slot in the process-wide shader-visible
    * Sampler heap. Stable for the lifetime of the GPU instance.
    */
@@ -57,10 +50,9 @@ class D3D12Sampler : public Sampler, public D3D12Resource {
   void onRelease(D3D12GPU* gpu) override;
 
  private:
-  D3D12Sampler(const D3D12_SAMPLER_DESC& samplerDesc, D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle);
+  explicit D3D12Sampler(D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle);
   ~D3D12Sampler() override = default;
 
-  D3D12_SAMPLER_DESC _samplerDesc = {};
   D3D12_GPU_DESCRIPTOR_HANDLE _gpuHandle = {};
 
   friend class D3D12GPU;

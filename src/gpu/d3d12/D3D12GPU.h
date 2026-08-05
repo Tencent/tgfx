@@ -61,10 +61,6 @@ class D3D12GPU : public GPU {
     return d3d12Device.Get();
   }
 
-  IDXGIAdapter1* adapter() const {
-    return dxgiAdapter.Get();
-  }
-
   const GPUInfo* info() const override {
     return &_info;
   }
@@ -180,14 +176,6 @@ class D3D12GPU : public GPU {
    * execution (see RecordingTest.MultipleRecordingsInOrder).
    */
   std::chrono::steady_clock::time_point lastFenceSignalTime() const;
-
-  ID3D12Fence* frameFence() const {
-    return _frameFence.Get();
-  }
-
-  uint64_t lastSignalledFenceValue() const {
-    return _lastSignalledFenceValue;
-  }
 
   /**
    * Returns true once the GPU has reported a fatal error (e.g. DXGI_ERROR_DEVICE_REMOVED) or a
