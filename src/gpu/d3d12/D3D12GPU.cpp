@@ -843,13 +843,16 @@ void D3D12GPU::executeSubmission(SubmitRequest request) {
       auto target = request.signalSemaphore->nextSignalValue();
       auto signalHr = cmdQueue->Signal(fence, target);
       if (FAILED(signalHr)) {
+        // ExecuteCommandLists has already handed the command list to the GPU, so we cannot
+        // reclaim the session synchronously. Skip commitSignalValue() so downstream waiters
+        // never target a value the GPU may never reach, and fall through to the frame-fence
+        // Signal path which parks the session on the inflight queue.
         LOGE("D3D12GPU::executeSubmission: Signal on external semaphore failed (HRESULT=0x%08X).",
              static_cast<unsigned>(signalHr));
         markContextLost("executeSubmission signalSemaphore");
-        reclaimAbandonedSession(std::move(request.session));
-        return;
+      } else {
+        request.signalSemaphore->commitSignalValue();
       }
-      request.signalSemaphore->commitSignalValue();
     }
     // Keep the semaphore alive until the GPU has consumed the Signal command. Without this
     // retention the application could drop its last reference and the underlying ID3D12Fence
@@ -880,15 +883,20 @@ void D3D12GPU::executeSubmission(SubmitRequest request) {
   if (FAILED(signalHr) || FAILED(d3d12Device->GetDeviceRemovedReason())) {
     LOGE(
         "D3D12GPU::executeSubmission: Signal failed (HRESULT=0x%08X) or device removed; "
-        "marking context lost.",
+        "parking session for context-lost drain.",
         static_cast<unsigned>(signalHr));
     markContextLost("executeSubmission Signal");
-    reclaimAbandonedSession(std::move(request.session));
-    request.uploads.clear();
-    while (!inflightSubmissions.empty()) {
-      reclaimSubmission(inflightSubmissions.front());
-      inflightSubmissions.pop_front();
-    }
+    // ExecuteCommandLists already handed the command list to the GPU, so park the session on
+    // the inflight queue instead of reclaiming it here. waitAllInflightSubmissions() sees
+    // contextLost and drains everything via the synchronous path without waiting on a fence
+    // that may never advance.
+    InflightSubmission inflight = {};
+    inflight.fenceValue = _lastSignalledFenceValue;
+    inflight.frameTime = request.frameTime;
+    inflight.session = std::move(request.session);
+    inflight.uploads = std::move(request.uploads);
+    inflightSubmissions.push_back(std::move(inflight));
+    waitAllInflightSubmissions();
     return;
   }
 
