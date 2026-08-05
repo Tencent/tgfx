@@ -226,6 +226,11 @@ class SVGRenderContext {
   Path applyClip(const SVGFuncIRI& clip) const;
   std::shared_ptr<MaskFilter> applyMask(const SVGFuncIRI& mask);
 
+  // Copies fields that the base 7-argument constructor does not receive. Every copy-style
+  // constructor must call this after delegating so that the source object's opacity/clip state is
+  // preserved even when the compiler materializes an extra copy (e.g. Debug builds without NRVO).
+  void copyFieldsNotForwardedToBaseCtor(const SVGRenderContext& other);
+
   std::optional<Paint> commonPaint(const SVGPaint& paint, float opacity) const;
 
   std::shared_ptr<TextShaper> _textShaper;

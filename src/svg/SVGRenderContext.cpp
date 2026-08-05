@@ -117,28 +117,43 @@ SVGRenderContext::SVGRenderContext(Canvas* canvas, const std::shared_ptr<TextSha
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other)
     : SVGRenderContext(other._canvas, other._textShaper, other.nodeIDMapper, *other._lengthContext,
                        *other._presentationContext, other.scope, other._matrix) {
+  copyFieldsNotForwardedToBaseCtor(other);
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other, Canvas* canvas)
     : SVGRenderContext(canvas, other._textShaper, other.nodeIDMapper, *other._lengthContext,
                        *other._presentationContext, other.scope, other._matrix) {
+  copyFieldsNotForwardedToBaseCtor(other);
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other,
                                    const SVGLengthContext& lengthContext)
     : SVGRenderContext(other._canvas, other._textShaper, other.nodeIDMapper, lengthContext,
                        *other._presentationContext, other.scope, other._matrix) {
+  copyFieldsNotForwardedToBaseCtor(other);
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other, Canvas* canvas,
                                    const SVGLengthContext& lengthContext)
     : SVGRenderContext(canvas, other._textShaper, other.nodeIDMapper, lengthContext,
                        *other._presentationContext, other.scope, other._matrix) {
+  copyFieldsNotForwardedToBaseCtor(other);
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other, const SVGNode* node)
     : SVGRenderContext(other._canvas, other._textShaper, other.nodeIDMapper, *other._lengthContext,
                        *other._presentationContext, OBBScope{node, this}, other._matrix) {
+  copyFieldsNotForwardedToBaseCtor(other);
+}
+
+void SVGRenderContext::copyFieldsNotForwardedToBaseCtor(const SVGRenderContext& other) {
+  // The base 7-argument constructor takes canvas/textShaper/mapper/length/presentation/scope/matrix
+  // and does not receive these two fields, so every copy-style constructor must forward them here.
+  // Without this, MSVC Debug builds (which skip NRVO for the return-by-value in CopyForPaint)
+  // silently drop these fields on the extra copy that Release optimizes away, producing wrong
+  // opacity and clip results only in Debug builds.
+  deferredPaintOpacity = other.deferredPaintOpacity;
+  _clipPath = other._clipPath;
 }
 
 SVGRenderContext::~SVGRenderContext() {
