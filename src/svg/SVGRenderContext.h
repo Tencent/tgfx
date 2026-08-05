@@ -227,7 +227,8 @@ class SVGRenderContext {
   std::shared_ptr<MaskFilter> applyMask(const SVGFuncIRI& mask);
 
   // Copies node-scoped render state (clip path, deferred paint opacity) from other. Called by
-  // the replacement-style copy constructors, whose delegated base constructor drops these fields.
+  // the replacement-style copy constructors, whose delegated constructor does not carry these
+  // fields.
   void copyNodeRenderState(const SVGRenderContext& other);
 
   std::optional<Paint> commonPaint(const SVGPaint& paint, float opacity) const;
