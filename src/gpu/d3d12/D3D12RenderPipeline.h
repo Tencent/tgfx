@@ -44,13 +44,17 @@ class D3D12GPU;
  * Root signature layout produced for every pipeline (matches the SPIR-V -> HLSL register
  * convention used by D3D12ShaderModule):
  *
- *   root parameter 0 : CBV  (b0, visibility = Vertex)        [VertexUniformBlock, optional]
- *   root parameter 1 : CBV  (b0, visibility = Pixel)         [FragmentUniformBlock, optional]
- *   root parameter 2..N+1 : DescriptorTable {SRV t{i}, Sampler s{i}, visibility = Pixel}
- *                                                            [one per texture sampler binding]
+ *   root parameter 0 : CBV  (b0)                             [VertexUniformBlock, optional]
+ *   root parameter 1 : CBV  (b0)                             [FragmentUniformBlock, optional]
+ *   root parameter 2..2N+1 : per texture sampler binding, two consecutive DescriptorTables —
+ *                {SRV t{i}} then {Sampler s{i}}. SRV and Sampler descriptor tables
+ *                            cannot share one root parameter because they reference different
+ *                            descriptor heap types.
  *
- * UBO root parameters are CBVs with raw GPU virtual addresses, allowing the command queue to
- * dynamically supply per-draw uniform data without re-allocating descriptor heaps.
+ * ShaderVisibility for every root parameter comes from the BindingEntry's visibility field
+ * (ToD3D12ShaderVisibility), not a fixed stage. UBO root parameters are CBVs with raw GPU
+ * virtual addresses, allowing the command queue to dynamically supply per-draw uniform data
+ * without re-allocating descriptor heaps.
  */
 class D3D12RenderPipeline : public RenderPipeline, public D3D12Resource {
  public:
