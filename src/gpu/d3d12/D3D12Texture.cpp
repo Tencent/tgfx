@@ -100,17 +100,13 @@ std::shared_ptr<D3D12Texture> D3D12Texture::Make(D3D12GPU* gpu,
   resourceDesc.Flags = resourceFlags;
 
   // Optimised clear values let D3D12 fast-path ClearRenderTargetView / ClearDepthStencilView
-  // when the runtime-supplied clear matches. We don't know the clear colour at creation time
-  // (callers vary, e.g. RGBA transparent for offscreen surfaces, white for blur seed), so for
-  // colour render targets we pass nullptr — forcing the slow-but-deterministic clear path is
-  // preferable to a perpetual "clear values do not match" debug-layer warning that some drivers
-  // also turn into a stalled GPU clear. Depth-stencil keeps an optimised value because the test
-  // suite uses a single canonical (0.0 depth, 0 stencil) clear.
+  // when the runtime-supplied clear matches. Colour targets vary per caller so we pass nullptr;
+  // depth-stencil uses (1.0, 0) to match RenderPass::DepthStencilAttachment defaults.
   D3D12_CLEAR_VALUE* clearValue = nullptr;
   D3D12_CLEAR_VALUE clearValueStorage = {};
   if (isDepthStencil) {
     clearValueStorage.Format = dxgiFormat;
-    clearValueStorage.DepthStencil.Depth = 0.0f;
+    clearValueStorage.DepthStencil.Depth = 1.0f;
     clearValueStorage.DepthStencil.Stencil = 0;
     clearValue = &clearValueStorage;
   }
