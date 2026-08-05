@@ -378,7 +378,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
 
     // Downscale the full background before subset so all tiles share the same downscaled source.
     // Applying the scale to the subset would produce different sizes per tile.
-    static constexpr float MAX_FROST_AREA = 2048.0f * 2048.0f;
+    static constexpr float MAX_FROST_AREA = 1024.0f * 1024.0f;
     if (_refraction > 0 || _lightIntensity > 0) {
       auto minHalf = std::min(origWidth, origHeight) * 0.5f;
       float fullRefractionOutset =

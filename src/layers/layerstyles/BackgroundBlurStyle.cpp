@@ -86,6 +86,14 @@ void BackgroundBlurStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, f
     if (!visibleRect.intersect(Rect::MakeWH(contentWidth, contentHeight))) {
       return;
     }
+    // Expand by blur radius so makeWithFilter has source data on both sides of the visible edge.
+    auto blurOutset = blurFilter ? blurFilter->filterBounds(Rect::MakeEmpty()) : Rect::MakeEmpty();
+    float outsetX = std::max(-blurOutset.left, blurOutset.right);
+    float outsetY = std::max(-blurOutset.top, blurOutset.bottom);
+    visibleRect.outset(outsetX, outsetY);
+    if (!visibleRect.intersect(Rect::MakeWH(contentWidth, contentHeight))) {
+      return;
+    }
     visibleRect.roundOut();
   }
 
