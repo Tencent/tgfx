@@ -98,9 +98,10 @@ std::unique_ptr<D3D12GPU> D3D12GPU::Make(ComPtr<ID3D12Device> device) {
   }
   auto adapter = FindAdapter(device.Get());
   auto gpu = std::unique_ptr<D3D12GPU>(new D3D12GPU(std::move(device), std::move(adapter)));
-  if (gpu->commandQueue == nullptr || gpu->_frameFence == nullptr ||
-      gpu->_frameFenceEvent == nullptr || gpu->_srvRing.heap() == nullptr ||
-      gpu->_samplerHeap == nullptr || gpu->_uploadHeap.capacity() == 0) {
+  if (gpu->commandQueue == nullptr || gpu->commandQueue->d3d12CommandQueue() == nullptr ||
+      gpu->_frameFence == nullptr || gpu->_frameFenceEvent == nullptr ||
+      gpu->_srvRing.heap() == nullptr || gpu->_samplerHeap == nullptr ||
+      gpu->_uploadHeap.capacity() == 0) {
     return nullptr;
   }
   return gpu;
