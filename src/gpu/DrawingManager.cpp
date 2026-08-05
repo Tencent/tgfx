@@ -19,6 +19,8 @@
 #include "DrawingManager.h"
 #include "ProxyProvider.h"
 #include "core/AtlasManager.h"
+#include "gpu/AOTPlanExecutor.h"
+#include "gpu/PrecompiledShaderCache.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/tasks/GenerateMipmapsTask.h"
@@ -45,8 +47,8 @@ DrawingBuffer* DrawingManager::createDrawingBuffer() {
 
 PlacementPtr<DrawOp> DrawingManager::makeFillDrawOp(std::shared_ptr<RenderTargetProxy> renderTarget,
                                                     PlacementPtr<FragmentProcessor> processor,
-                                                    uint32_t renderFlags,
-                                                    const Point& coordOffset) {
+                                                    uint32_t renderFlags, const Point& coordOffset,
+                                                    std::optional<OffscreenFillSource> source) {
   if (renderTarget == nullptr || processor == nullptr) {
     return nullptr;
   }
@@ -76,13 +78,33 @@ PlacementPtr<DrawOp> DrawingManager::makeFillDrawOp(std::shared_ptr<RenderTarget
   }
   drawOp->addColorFP(std::move(processor));
   drawOp->setBlendMode(BlendMode::Src);
+  if (source.has_value()) {
+    drawOp->setOffscreenFillSource(*source);
+  }
   return drawOp;
 }
 
 bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
                                   PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags,
-                                  const Point& coordOffset) {
-  auto drawOp = makeFillDrawOp(renderTarget, std::move(processor), renderFlags, coordOffset);
+                                  const Point& coordOffset, OffscreenFillSource source) {
+  auto cache = context->precompiledShaderCache();
+  if (cache != nullptr && cache->diagnosticRecordingEnabled() && processor != nullptr) {
+    AOTEffectGraph graph = {};
+    AOTEffectPlan plan = {};
+    std::string blocker;
+    bool lowerSucceeded = AOTEffectDecomposer::Lower({processor.get()}, &graph, &blocker);
+    bool validateSucceeded = lowerSucceeded && AOTEffectDecomposer::ValidateForFusion(graph);
+    bool decomposeSucceeded =
+        validateSucceeded &&
+        AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan);
+    bool canExecute = decomposeSucceeded && AOTPlanExecutor::CanExecute(graph, plan);
+    auto kernel = plan.passes.empty() ? AOTKernelKind::TextureFill : plan.passes[0].kernel;
+    cache->recordOffscreenFillAnalysis(source, coordOffset != Point::Zero(), processor->name(),
+                                       lowerSucceeded, blocker, validateSucceeded,
+                                       decomposeSucceeded, canExecute, kernel, plan.passes.size());
+  }
+  auto drawOp =
+      makeFillDrawOp(renderTarget, std::move(processor), renderFlags, coordOffset, source);
   if (drawOp == nullptr) {
     return false;
   }

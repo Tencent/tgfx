@@ -51,6 +51,8 @@ namespace tgfx {
 static constexpr size_t FALLBACK_REASON_COUNT =
     static_cast<size_t>(PrecompiledFallbackReason::Count);
 static constexpr size_t AOT_STAGE_COUNT = static_cast<size_t>(PrecompiledAOTStage::Count);
+static constexpr size_t OFFSCREEN_FILL_SOURCE_COUNT =
+    static_cast<size_t>(OffscreenFillSource::Count);
 
 struct ShaderAOTTestResult {
   std::string testName;
@@ -68,6 +70,7 @@ struct ShaderAOTTestResult {
   std::vector<PrecompiledHitRecord> hitRecords = {};
   std::vector<PrecompiledFallbackRecord> fallbackRecords = {};
   AOTDrawStats drawStats = {};
+  std::array<OffscreenFillStats, OFFSCREEN_FILL_SOURCE_COUNT> offscreenFillStats = {};
 };
 
 struct ShaderAOTSummary {
@@ -77,7 +80,28 @@ struct ShaderAOTSummary {
   std::array<uint64_t, AOT_STAGE_COUNT> aotStageCounts = {};
   std::array<uint64_t, FALLBACK_REASON_COUNT> fallbackCounts = {};
   AOTDrawStats drawStats = {};
+  std::array<OffscreenFillStats, OFFSCREEN_FILL_SOURCE_COUNT> offscreenFillStats = {};
 };
+
+static void AddOffscreenFillStats(OffscreenFillStats* target, const OffscreenFillStats& source) {
+  target->calls += source.calls;
+  target->coordOffsetNonZero += source.coordOffsetNonZero;
+  target->lowerSucceeded += source.lowerSucceeded;
+  target->validateSucceeded += source.validateSucceeded;
+  target->decomposeSucceeded += source.decomposeSucceeded;
+  target->canExecute += source.canExecute;
+  target->pointwiseChainPlans += source.pointwiseChainPlans;
+  target->pointwiseTailPlans += source.pointwiseTailPlans;
+  target->multiPassPlans += source.multiPassPlans;
+  target->precompiledPrograms += source.precompiledPrograms;
+  target->programBuilderPrograms += source.programBuilderPrograms;
+  for (const auto& [name, count] : source.lowerBlockers) {
+    target->lowerBlockers[name] += count;
+  }
+  for (const auto& [name, count] : source.topLevelProcessors) {
+    target->topLevelProcessors[name] += count;
+  }
+}
 
 static void AddDrawStats(AOTDrawStats* target, const AOTDrawStats& source) {
   target->draws += source.draws;
@@ -90,6 +114,22 @@ static void AddDrawStats(AOTDrawStats* target, const AOTDrawStats& source) {
   target->intermediateReadBytes += source.intermediateReadBytes;
   target->intermediateWriteBytes += source.intermediateWriteBytes;
   target->peakTemporaryBytes = std::max(target->peakTemporaryBytes, source.peakTemporaryBytes);
+}
+
+static nlohmann::json OffscreenFillStatsToJSON(const OffscreenFillStats& stats) {
+  return {{"calls", stats.calls},
+          {"coordOffsetNonZero", stats.coordOffsetNonZero},
+          {"lowerSucceeded", stats.lowerSucceeded},
+          {"validateSucceeded", stats.validateSucceeded},
+          {"decomposeSucceeded", stats.decomposeSucceeded},
+          {"canExecute", stats.canExecute},
+          {"pointwiseChainPlans", stats.pointwiseChainPlans},
+          {"pointwiseTailPlans", stats.pointwiseTailPlans},
+          {"multiPassPlans", stats.multiPassPlans},
+          {"precompiledPrograms", stats.precompiledPrograms},
+          {"programBuilderPrograms", stats.programBuilderPrograms},
+          {"lowerBlockers", stats.lowerBlockers},
+          {"topLevelProcessors", stats.topLevelProcessors}};
 }
 
 static nlohmann::json DrawStatsToJSON(const AOTDrawStats& stats) {
@@ -502,6 +542,7 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
         result.hitRecords = cache->hitRecords();
         result.fallbackRecords = cache->fallbackRecords();
         result.drawStats = cache->drawStats();
+        result.offscreenFillStats = cache->offscreenFillStatsBySource();
         cache->setDiagnosticRecordingEnabled(false);
         device->unlock();
       }
@@ -556,6 +597,9 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
       }
       AddProgramStats(&summary.programStats, testResult.programStats);
       AddDrawStats(&summary.drawStats, testResult.drawStats);
+      for (size_t i = 0; i < OFFSCREEN_FILL_SOURCE_COUNT; ++i) {
+        AddOffscreenFillStats(&summary.offscreenFillStats[i], testResult.offscreenFillStats[i]);
+      }
       summary.artifactHits += testResult.artifactHits;
       summary.artifactMisses += testResult.artifactMisses;
       for (size_t i = 0; i < AOT_STAGE_COUNT; ++i) {
@@ -732,6 +776,13 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
     auto decompositionAudit =
         BuildDecompositionAudit(sortedFallbacks, &auditFusableNow, &auditNeedsLowering);
 
+    nlohmann::json offscreenFillAudit = nlohmann::json::object();
+    for (size_t i = 0; i < OFFSCREEN_FILL_SOURCE_COUNT; ++i) {
+      auto source = static_cast<OffscreenFillSource>(i);
+      offscreenFillAudit[OffscreenFillSourceName(source)] =
+          OffscreenFillStatsToJSON(summary.offscreenFillStats[i]);
+    }
+
     nlohmann::json report = {
         {"backend", TGFX_BACKEND_NAME},
         {"iteration", currentIteration},
@@ -776,6 +827,7 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
         {"successfulStructures", std::move(successfulStructuresJSON)},
         {"fallbackEffectsByReason", std::move(fallbackEffectsByReasonJSON)},
         {"fallbackStructures", std::move(fallbackStructuresJSON)},
+        {"offscreenFillAudit", std::move(offscreenFillAudit)},
         {"decompositionAudit", std::move(decompositionAudit)},
         {"tests", std::move(testsJSON)}};
 

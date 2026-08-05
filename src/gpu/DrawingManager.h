@@ -57,7 +57,8 @@ class DrawingManager {
   PlacementPtr<DrawOp> makeFillDrawOp(std::shared_ptr<RenderTargetProxy> renderTarget,
                                       PlacementPtr<FragmentProcessor> processor,
                                       uint32_t renderFlags,
-                                      const Point& coordOffset = Point::Zero());
+                                      const Point& coordOffset = Point::Zero(),
+                                      std::optional<OffscreenFillSource> source = std::nullopt);
 
   /**
    * Fills the render target using the provided fragment processor, and automatically resolves the
@@ -65,7 +66,8 @@ class DrawingManager {
    */
   bool fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
                     PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags,
-                    const Point& coordOffset = Point::Zero());
+                    const Point& coordOffset = Point::Zero(),
+                    OffscreenFillSource source = OffscreenFillSource::Unknown);
 
   std::shared_ptr<OpsCompositor> addOpsCompositor(std::shared_ptr<RenderTargetProxy> renderTarget,
                                                   uint32_t renderFlags,

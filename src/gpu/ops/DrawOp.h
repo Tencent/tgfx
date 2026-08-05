@@ -20,6 +20,7 @@
 
 #include <optional>
 #include "gpu/AAType.h"
+#include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProgramInfo.h"
 #include "tgfx/gpu/RenderPass.h"
 
@@ -64,6 +65,10 @@ class DrawOp {
 
   void addCoverageFP(PlacementPtr<FragmentProcessor> coverageProcessor) {
     coverages.emplace_back(std::move(coverageProcessor));
+  }
+
+  void setOffscreenFillSource(OffscreenFillSource source) {
+    offscreenFillSource = source;
   }
 
   /**
@@ -137,5 +142,6 @@ class DrawOp {
   std::unique_ptr<ProgramInfo> preparedProgramInfo = nullptr;
   std::shared_ptr<Program> preparedProgram = nullptr;
   RenderTarget* preparedRenderTarget = nullptr;
+  std::optional<OffscreenFillSource> offscreenFillSource = std::nullopt;
 };
 }  // namespace tgfx

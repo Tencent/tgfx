@@ -46,7 +46,7 @@ static inline PlacementPtr<FragmentProcessor> FlattenToTexture(const FPArgs& arg
   }
   auto drawingManager = context->drawingManager();
   if (!drawingManager->fillRTWithFP(target.renderTarget, std::move(fp), args.renderFlags,
-                                    target.geometry.coordOffset)) {
+                                    target.geometry.coordOffset, OffscreenFillSource::FPFlatten)) {
     return nullptr;
   }
   auto textureProxy = target.renderTarget->asTextureProxy();

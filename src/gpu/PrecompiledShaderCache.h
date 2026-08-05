@@ -27,6 +27,7 @@
 #include <unordered_map>
 #include <vector>
 #include "gpu/AOTEffectDecomposer.h"
+#include "gpu/Program.h"
 #include "gpu/Uniform.h"
 
 namespace tgfx {
@@ -92,6 +93,36 @@ const char* PrecompiledAOTStageName(PrecompiledAOTStage stage);
  * hits AOT (see design §9.2). Atomic fallbacks count planned AOT Draws that execute only the
  * untouched original Draw after strict preparation rejects the whole plan.
  */
+enum class OffscreenFillSource : uint8_t {
+  Unknown,
+  FPFlatten,
+  GaussianBlur,
+  ImageFilter,
+  TransformImage,
+  RGBAAAImage,
+  Count,
+};
+
+const char* OffscreenFillSourceName(OffscreenFillSource source);
+
+/// Diagnostic-only aggregate for fillRTWithFP() calls. Static planning fields are sampled before
+/// the processor is moved into a DrawOp; runtime provenance is recorded after DrawOp preparation.
+struct OffscreenFillStats {
+  uint64_t calls = 0;
+  uint64_t coordOffsetNonZero = 0;
+  uint64_t lowerSucceeded = 0;
+  uint64_t validateSucceeded = 0;
+  uint64_t decomposeSucceeded = 0;
+  uint64_t canExecute = 0;
+  uint64_t pointwiseChainPlans = 0;
+  uint64_t pointwiseTailPlans = 0;
+  uint64_t multiPassPlans = 0;
+  uint64_t precompiledPrograms = 0;
+  uint64_t programBuilderPrograms = 0;
+  std::unordered_map<std::string, uint64_t> lowerBlockers = {};
+  std::unordered_map<std::string, uint64_t> topLevelProcessors = {};
+};
+
 struct AOTDrawStats {
   uint64_t draws = 0;
   uint64_t completeAOTDraws = 0;
@@ -238,6 +269,16 @@ class PrecompiledShaderCache {
   /// Returns a snapshot of accumulated Draw-level metrics since the last reset.
   AOTDrawStats drawStats() const;
 
+  void recordOffscreenFillAnalysis(OffscreenFillSource source, bool coordOffsetNonZero,
+                                   const std::string& topLevelProcessor, bool lowerSucceeded,
+                                   const std::string& lowerBlocker, bool validateSucceeded,
+                                   bool decomposeSucceeded, bool canExecute, AOTKernelKind kernel,
+                                   size_t passCount);
+  void recordOffscreenFillProgram(OffscreenFillSource source, ProgramOrigin origin);
+  OffscreenFillStats offscreenFillStats() const;
+  std::array<OffscreenFillStats, static_cast<size_t>(OffscreenFillSource::Count)>
+  offscreenFillStatsBySource() const;
+
   /// Resets AOT stages, artifact lookups, fallback counters, detailed records, and Draw-level
   /// metrics to zero.
   void resetStats();
@@ -276,6 +317,9 @@ class PrecompiledShaderCache {
   std::vector<PrecompiledFallbackRecord> _fallbackRecords = {};
   mutable std::mutex drawStatsMutex = {};
   AOTDrawStats _drawStats = {};
+  mutable std::mutex offscreenFillStatsMutex = {};
+  std::array<OffscreenFillStats, static_cast<size_t>(OffscreenFillSource::Count)>
+      _offscreenFillStats = {};
 };
 
 }  // namespace tgfx

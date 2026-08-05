@@ -124,6 +124,26 @@ std::vector<PrecompiledFallbackRecord> PrecompiledShaderCache::fallbackRecords()
   return _fallbackRecords;
 }
 
+const char* OffscreenFillSourceName(OffscreenFillSource source) {
+  switch (source) {
+    case OffscreenFillSource::Unknown:
+      return "Unknown";
+    case OffscreenFillSource::FPFlatten:
+      return "FPFlatten";
+    case OffscreenFillSource::GaussianBlur:
+      return "GaussianBlur";
+    case OffscreenFillSource::ImageFilter:
+      return "ImageFilter";
+    case OffscreenFillSource::TransformImage:
+      return "TransformImage";
+    case OffscreenFillSource::RGBAAAImage:
+      return "RGBAAAImage";
+    case OffscreenFillSource::Count:
+      break;
+  }
+  return "Unknown";
+}
+
 void PrecompiledShaderCache::recordDraw(const AOTDrawStats& delta, bool complete) {
   std::lock_guard<std::mutex> autoLock(drawStatsMutex);
   _drawStats.draws++;
@@ -154,6 +174,90 @@ AOTDrawStats PrecompiledShaderCache::drawStats() const {
   return _drawStats;
 }
 
+void PrecompiledShaderCache::recordOffscreenFillAnalysis(
+    OffscreenFillSource source, bool coordOffsetNonZero, const std::string& topLevelProcessor,
+    bool lowerSucceeded, const std::string& lowerBlocker, bool validateSucceeded,
+    bool decomposeSucceeded, bool canExecute, AOTKernelKind kernel, size_t passCount) {
+  if (!diagnosticRecordingEnabled()) {
+    return;
+  }
+  std::lock_guard<std::mutex> autoLock(offscreenFillStatsMutex);
+  auto& stats = _offscreenFillStats[static_cast<size_t>(source)];
+  stats.calls++;
+  if (coordOffsetNonZero) {
+    stats.coordOffsetNonZero++;
+  }
+  stats.topLevelProcessors[topLevelProcessor]++;
+  if (!lowerSucceeded) {
+    stats.lowerBlockers[lowerBlocker.empty() ? "Unknown" : lowerBlocker]++;
+    return;
+  }
+  stats.lowerSucceeded++;
+  if (!validateSucceeded) {
+    return;
+  }
+  stats.validateSucceeded++;
+  if (!decomposeSucceeded) {
+    return;
+  }
+  stats.decomposeSucceeded++;
+  if (passCount > 1) {
+    stats.multiPassPlans++;
+  } else if (kernel == AOTKernelKind::PointwiseChain) {
+    stats.pointwiseChainPlans++;
+  } else if (kernel == AOTKernelKind::PointwiseTail) {
+    stats.pointwiseTailPlans++;
+  }
+  if (canExecute) {
+    stats.canExecute++;
+  }
+}
+
+void PrecompiledShaderCache::recordOffscreenFillProgram(OffscreenFillSource source,
+                                                        ProgramOrigin origin) {
+  if (!diagnosticRecordingEnabled()) {
+    return;
+  }
+  std::lock_guard<std::mutex> autoLock(offscreenFillStatsMutex);
+  auto& stats = _offscreenFillStats[static_cast<size_t>(source)];
+  if (origin == ProgramOrigin::PrecompiledArtifact) {
+    stats.precompiledPrograms++;
+  } else {
+    stats.programBuilderPrograms++;
+  }
+}
+
+OffscreenFillStats PrecompiledShaderCache::offscreenFillStats() const {
+  std::lock_guard<std::mutex> autoLock(offscreenFillStatsMutex);
+  OffscreenFillStats total = {};
+  for (const auto& stats : _offscreenFillStats) {
+    total.calls += stats.calls;
+    total.coordOffsetNonZero += stats.coordOffsetNonZero;
+    total.lowerSucceeded += stats.lowerSucceeded;
+    total.validateSucceeded += stats.validateSucceeded;
+    total.decomposeSucceeded += stats.decomposeSucceeded;
+    total.canExecute += stats.canExecute;
+    total.pointwiseChainPlans += stats.pointwiseChainPlans;
+    total.pointwiseTailPlans += stats.pointwiseTailPlans;
+    total.multiPassPlans += stats.multiPassPlans;
+    total.precompiledPrograms += stats.precompiledPrograms;
+    total.programBuilderPrograms += stats.programBuilderPrograms;
+    for (const auto& [name, count] : stats.lowerBlockers) {
+      total.lowerBlockers[name] += count;
+    }
+    for (const auto& [name, count] : stats.topLevelProcessors) {
+      total.topLevelProcessors[name] += count;
+    }
+  }
+  return total;
+}
+
+std::array<OffscreenFillStats, static_cast<size_t>(OffscreenFillSource::Count)>
+PrecompiledShaderCache::offscreenFillStatsBySource() const {
+  std::lock_guard<std::mutex> autoLock(offscreenFillStatsMutex);
+  return _offscreenFillStats;
+}
+
 void PrecompiledShaderCache::resetStats() {
   _hitCount.store(0, std::memory_order_relaxed);
   _missCount.store(0, std::memory_order_relaxed);
@@ -166,6 +270,10 @@ void PrecompiledShaderCache::resetStats() {
   {
     std::lock_guard<std::mutex> drawLock(drawStatsMutex);
     _drawStats = {};
+  }
+  {
+    std::lock_guard<std::mutex> offscreenLock(offscreenFillStatsMutex);
+    _offscreenFillStats = {};
   }
   std::lock_guard<std::mutex> autoLock(diagnosticsMutex);
   _hitRecords.clear();
