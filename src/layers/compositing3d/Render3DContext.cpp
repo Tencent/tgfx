@@ -309,8 +309,10 @@ bool Render3DContext::ComputeRasterInfo(const Matrix3D& localToCompositor, const
   Rect localFootprint = {};
   Rect destFootprint = {};
   std::vector<Point> visiblePolygon;
+  auto* visiblePolygonOutput = straddlesNearPlane ? &visiblePolygon : nullptr;
   if (!Matrix3DUtils::ComputeVisibleFootprints(localBounds, compositorViewport, localToCompositor,
-                                               &localFootprint, &destFootprint, &visiblePolygon)) {
+                                               &localFootprint, &destFootprint,
+                                               visiblePolygonOutput)) {
     return false;
   }
   // Near-plane clipping can push clipped vertices a hair past localBounds when interpolating in
@@ -337,7 +339,9 @@ bool Render3DContext::ComputeRasterInfo(const Matrix3D& localToCompositor, const
   info->rasterWidth = std::max(1, static_cast<int>(std::ceil(destWidth)));
   info->rasterHeight = std::max(1, static_cast<int>(std::ceil(destHeight)));
   info->straddlesNearPlane = straddlesNearPlane;
-  info->visiblePolygon = std::move(visiblePolygon);
+  if (straddlesNearPlane) {
+    info->visiblePolygon = std::move(visiblePolygon);
+  }
   return true;
 }
 

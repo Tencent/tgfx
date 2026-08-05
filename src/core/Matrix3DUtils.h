@@ -117,7 +117,7 @@ class Matrix3DUtils {
    * @param matrix The 4x4 transformation from local space to destination space.
    * @param localFootprint Output: AABB of clipped vertices in local space.
    * @param destFootprint Output: AABB of clipped vertices in destination space.
-   * @param visibleLocalPolygon Output: clipped polygon vertices in local z=0 space.
+   * @param visibleLocalPolygon Optional output: clipped polygon vertices in local z=0 space.
    */
   static bool ComputeVisibleFootprints(const Rect& localBounds, const Rect& destRect,
                                        const Matrix3D& matrix, Rect* localFootprint,
