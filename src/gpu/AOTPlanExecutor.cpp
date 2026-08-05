@@ -608,6 +608,7 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
     // fully resolved by the hardware sampler (no shader-mode emulation). Anything else must stay
     // on the plain route.
     size_t plainLeaves = 0;
+    size_t shaderTiledLeaves = 0;
     for (auto nodeID : pass.nodes) {
       auto node = graph.nodeAt(nodeID);
       if (node == nullptr) {
@@ -623,6 +624,15 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
           if (!recipe.has_value() || !IsChainCompatibleTiledMode(recipe->shaderModeX) ||
               !IsChainCompatibleTiledMode(recipe->shaderModeY)) {
             return false;
+          }
+          if (recipe->shaderModeX != TiledTextureShaderMode::None ||
+              recipe->shaderModeY != TiledTextureShaderMode::None) {
+            // PointwiseChainShader carries exactly one shared tiled-sampling uniform block.
+            // BuildChainFP cannot represent a second shader-tiled leaf, so reject before planning
+            // execution rather than letting construction fail after CanExecute promised success.
+            if (++shaderTiledLeaves > 1) {
+              return false;
+            }
           }
         } else if (parameters->samplingKind != AOTTextureSamplingKind::Plain) {
           return false;

@@ -383,6 +383,36 @@ TGFX_TEST(AOTEffectTest, TiledShaderModesAndStrictSubsetMatchLowering) {
   }
 }
 
+TGFX_TEST(AOTEffectTest, ChainRejectsTwoShaderTiledLeaves) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  auto sampleArea = Rect::MakeXYWH(1, 1, 6, 4);
+  // Decal over a strict subset resolves to ClampToBorderLinear on Metal: both leaves are
+  // individually chain-compatible, but PointwiseChainShader has only one shared tiled-uniform
+  // block. CanExecute must therefore agree with BuildChainFP and reject the pair.
+  auto src =
+      MakeTiledTextureProcessor(context, &allocator, TileMode::Decal, TileMode::Clamp,
+                                PixelFormat::RGBA_8888, SrcRectConstraint::Strict, sampleArea);
+  auto dst =
+      MakeTiledTextureProcessor(context, &allocator, TileMode::Decal, TileMode::Clamp,
+                                PixelFormat::RGBA_8888, SrcRectConstraint::Strict, sampleArea);
+  ASSERT_NE(src, nullptr);
+  ASSERT_NE(dst, nullptr);
+  auto blend = XfermodeFragmentProcessor::MakeFromTwoProcessors(&allocator, std::move(src),
+                                                                std::move(dst), BlendMode::SrcOver);
+  ASSERT_NE(blend, nullptr);
+
+  AOTEffectGraph graph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower({blend.get()}, &graph));
+  AOTEffectPlan plan;
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan));
+  ASSERT_EQ(plan.passes.size(), 1u);
+  EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
+  EXPECT_FALSE(AOTPlanExecutor::CanExecute(graph, plan));
+}
+
 TGFX_TEST(AOTEffectTest, TiledAlphaOnlySnapshotMatchesLowering) {
   ContextScope scope;
   auto context = scope.getContext();
