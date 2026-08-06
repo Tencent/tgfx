@@ -124,6 +124,19 @@ std::vector<PrecompiledFallbackRecord> PrecompiledShaderCache::fallbackRecords()
   return _fallbackRecords;
 }
 
+void PrecompiledShaderCache::recordJITProgram(const JITProgramRecord& record) {
+  if (!diagnosticRecordingEnabled()) {
+    return;
+  }
+  std::lock_guard<std::mutex> autoLock(diagnosticsMutex);
+  _jitProgramRecords.push_back(record);
+}
+
+std::vector<JITProgramRecord> PrecompiledShaderCache::jitProgramRecords() const {
+  std::lock_guard<std::mutex> autoLock(diagnosticsMutex);
+  return _jitProgramRecords;
+}
+
 const char* OffscreenFillSourceName(OffscreenFillSource source) {
   switch (source) {
     case OffscreenFillSource::Unknown:
@@ -354,6 +367,7 @@ void PrecompiledShaderCache::resetStats() {
   std::lock_guard<std::mutex> autoLock(diagnosticsMutex);
   _hitRecords.clear();
   _fallbackRecords.clear();
+  _jitProgramRecords.clear();
 }
 
 void PrecompiledShaderCache::unload() {

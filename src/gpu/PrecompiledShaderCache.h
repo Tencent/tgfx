@@ -72,6 +72,11 @@ struct PrecompiledHitRecord {
   uint32_t fragPermutationIndex = std::numeric_limits<uint32_t>::max();
 };
 
+struct JITProgramRecord {
+  std::string programKey;
+  uint32_t route = 0;
+};
+
 struct PrecompiledFallbackRecord {
   std::string programKey;
   uint32_t route = 0;
@@ -280,6 +285,8 @@ class PrecompiledShaderCache {
 
   /// Returns a snapshot of detailed fallback records collected since the last reset.
   std::vector<PrecompiledFallbackRecord> fallbackRecords() const;
+  void recordJITProgram(const JITProgramRecord& record);
+  std::vector<JITProgramRecord> jitProgramRecords() const;
 
   /// Records the decomposition outcome of one logical Draw. `complete` marks whether every Kernel
   /// invocation of this Draw hit AOT. Called by the decomposition executor (stage 2+).
@@ -342,6 +349,7 @@ class PrecompiledShaderCache {
   mutable std::mutex diagnosticsMutex = {};
   std::vector<PrecompiledHitRecord> _hitRecords = {};
   std::vector<PrecompiledFallbackRecord> _fallbackRecords = {};
+  std::vector<JITProgramRecord> _jitProgramRecords = {};
   mutable std::mutex drawStatsMutex = {};
   AOTDrawStats _drawStats = {};
   struct OffscreenFillStaticRecord {

@@ -17,10 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ProgramInfo.h"
+#include <iomanip>
+#include <sstream>
 #include "AlignTo.h"
 #include "gpu/BlendFormula.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/PrecompiledProgramCreator.h"
+#include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProgramBuilder.h"
 #include "gpu/resources/RenderTarget.h"
 #include "tgfx/gpu/GPU.h"
@@ -130,6 +133,15 @@ std::string ProgramInfo::getMangledSuffix(const Processor* processor) const {
   return "_P" + std::to_string(processorIndex);
 }
 
+static std::string DiagnosticProgramKey(const BytesKey& key) {
+  std::stringstream stream;
+  stream << key.size() << ":" << std::hex << std::setfill('0');
+  for (size_t index = 0; index < key.size(); ++index) {
+    stream << std::setw(8) << key.data()[index];
+  }
+  return stream.str();
+}
+
 BytesKey ProgramInfo::programKeyForDiagnostics(AOTDecompositionRoute route) const {
   return buildProgramKey(route);
 }
@@ -202,6 +214,11 @@ std::shared_ptr<Program> ProgramInfo::getProgram(ProgramLookupMode mode) const {
     if (program == nullptr) {
       LOGE("ProgramInfo::getProgram() Failed to create the program!");
       return nullptr;
+    }
+    if (programCreated && context->precompiledShaderCache()->diagnosticRecordingEnabled() &&
+        program->getProvenance().program != ProgramOrigin::PrecompiledArtifact) {
+      context->precompiledShaderCache()->recordJITProgram(
+          {DiagnosticProgramKey(programKey), static_cast<uint32_t>(route)});
     }
   }
   if (mode == ProgramLookupMode::PrecompiledOnly &&

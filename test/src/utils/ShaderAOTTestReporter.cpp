@@ -70,6 +70,7 @@ struct ShaderAOTTestResult {
   std::array<uint32_t, FALLBACK_REASON_COUNT> fallbackCounts = {};
   std::vector<PrecompiledHitRecord> hitRecords = {};
   std::vector<PrecompiledFallbackRecord> fallbackRecords = {};
+  std::vector<JITProgramRecord> jitProgramRecords = {};
   AOTDrawStats drawStats = {};
   std::array<OffscreenFillStats, OFFSCREEN_FILL_SOURCE_COUNT> offscreenFillStats = {};
   std::vector<OffscreenFillCorrelation> offscreenFillCorrelations = {};
@@ -662,6 +663,7 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
         }
         result.hitRecords = cache->hitRecords();
         result.fallbackRecords = cache->fallbackRecords();
+        result.jitProgramRecords = cache->jitProgramRecords();
         result.drawStats = cache->drawStats();
         result.offscreenFillStats = cache->offscreenFillStatsBySource();
         result.offscreenFillCorrelations = cache->offscreenFillCorrelations();
@@ -792,6 +794,13 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
             {{"hits", testResult.artifactHits}, {"misses", testResult.artifactMisses}}},
            {"consistencyChecks", std::move(testConsistency.checks)},
            {"hitRecords", std::move(hitRecordsJSON)},
+           {"jitProgramRecords", [&]() {
+              nlohmann::json records = nlohmann::json::array();
+              for (const auto& record : testResult.jitProgramRecords) {
+                records.push_back({{"programKey", record.programKey}, {"route", record.route}});
+              }
+              return records;
+            }()},
            {"fallbackReasons", FallbackCountsToJSON(testResult.fallbackCounts)},
            {"fallbackRecords", std::move(fallbackRecordsJSON)}});
     }
