@@ -332,6 +332,8 @@
         "PartialDrawLayer_shapeLayer": "e89967392",
         "PassThoughAndNormal": "43cd416",
         "PassThrough_Test": "7fa7fcb8",
+        "PerspectiveFloor10To210": "b42d31b8",
+        "PerspectiveFloorPartiallyClipped": "b42d31b8",
         "Preserve3DNestedLayers": "9e2c8c8ee",
         "RootLayerBackgroundColorWithBlurBackground": "2d1bbdbe",
         "ShapeLayerSmallOvalScaledUp": "cb7406af1",
@@ -519,10 +521,6 @@
         "MultipleRecordingsInOrder": "3c65b221",
         "OutOfOrderSubmission": "3c65b221",
         "RecordingWithSemaphore": "3c65b221"
-    },
-    "Render3DDensityTradeoffTest": {
-        "PerspectiveFloor10To210": "76857d22",
-        "PerspectiveFloorPartiallyClipped": "9bc4e432"
     },
     "SVGExportTest": {
         "AssignColorSpace": "b7f9b48c",
