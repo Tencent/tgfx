@@ -18,31 +18,17 @@
 
 #pragma once
 
-#include "layers/processors/GlassShapeGeometryFragmentProcessor.h"
+#include <optional>
+#include "tgfx/core/Rect.h"
 
 namespace tgfx {
 
-class GLSLGlassSDFGeometryFragmentProcessor : public GlassSDFGeometryFragmentProcessor {
- public:
-  GLSLGlassSDFGeometryFragmentProcessor(GlassShapeType shapeType,
-                                        const GlassSDFGeometryParams& params);
+class Canvas;
 
-  void emitCode(EmitArgs& args) const override;
-
- private:
-  void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
-};
-
-class GLSLGlassUDFGeometryFragmentProcessor : public GlassUDFGeometryFragmentProcessor {
- public:
-  GLSLGlassUDFGeometryFragmentProcessor(std::shared_ptr<TextureProxy> mask,
-                                        const GlassUDFGeometryParams& params,
-                                        bool enableEdgeLighting);
-
-  void emitCode(EmitArgs& args) const override;
-
- private:
-  void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
-};
+/**
+ * Returns the canvas clip bounds in the layer's local coordinate space, or std::nullopt if the
+ * canvas cannot provide a meaningful clip (e.g. no canvas or no surface to derive bounds from).
+ */
+std::optional<Rect> GetClipBounds(const Canvas* canvas);
 
 }  // namespace tgfx

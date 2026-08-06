@@ -19,7 +19,12 @@ app.get('/', (req, res) => {
 
 const port = 8081;
 const args = process.argv.slice(2);
-var fileName = args.includes('wasm-mt') ? 'index' : args.includes('webgpu') ? 'index-webgpu' : 'index-st';
+var fileName;
+if(args.includes('webgpu')){
+  fileName = args.includes('wasm-mt') ? 'index-webgpu':'index-webgpu-st';
+}else{
+  fileName = args.includes('wasm-mt') ? 'index':'index-st';
+}
 app.listen(port, () => {
   var url = `http://localhost:${port}/${fileName}.html`;
   var start = (process.platform == 'darwin'? 'open': 'start');

@@ -58,6 +58,7 @@ if (typeof window !== 'undefined') {
             tgfxView.updateZoomScaleAndOffset(1.0, 0, 0);
             const canvas = document.getElementById('hello2d');
             bindCanvasZoomAndPanEvents(canvas, shareData);
+
             animationLoop(shareData);
             setupVisibilityListeners(shareData);
         } catch (error) {

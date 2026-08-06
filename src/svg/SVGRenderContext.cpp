@@ -115,30 +115,46 @@ SVGRenderContext::SVGRenderContext(Canvas* canvas, const std::shared_ptr<TextSha
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other)
-    : SVGRenderContext(other._canvas, other._textShaper, other.nodeIDMapper, *other._lengthContext,
-                       *other._presentationContext, other.scope, other._matrix) {
+    : _textShaper(other._textShaper), nodeIDMapper(other.nodeIDMapper),
+      _lengthContext(*other._lengthContext), _presentationContext(*other._presentationContext),
+      _canvas(other._canvas), canvasSaveCount(other._canvas->getSaveCount()),
+      _clipPath(other._clipPath), deferredPaintOpacity(other.deferredPaintOpacity),
+      scope(other.scope), _matrix(other._matrix) {
+  // Track the canvas's current save level, not other.canvasSaveCount, to avoid popping
+  // other's saveOnce() layer on destruction.
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other, Canvas* canvas)
     : SVGRenderContext(canvas, other._textShaper, other.nodeIDMapper, *other._lengthContext,
                        *other._presentationContext, other.scope, other._matrix) {
+  copyNodeRenderState(other);
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other,
                                    const SVGLengthContext& lengthContext)
     : SVGRenderContext(other._canvas, other._textShaper, other.nodeIDMapper, lengthContext,
                        *other._presentationContext, other.scope, other._matrix) {
+  copyNodeRenderState(other);
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other, Canvas* canvas,
                                    const SVGLengthContext& lengthContext)
     : SVGRenderContext(canvas, other._textShaper, other.nodeIDMapper, lengthContext,
                        *other._presentationContext, other.scope, other._matrix) {
+  copyNodeRenderState(other);
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other, const SVGNode* node)
     : SVGRenderContext(other._canvas, other._textShaper, other.nodeIDMapper, *other._lengthContext,
                        *other._presentationContext, OBBScope{node, this}, other._matrix) {
+  copyNodeRenderState(other);
+}
+
+void SVGRenderContext::copyNodeRenderState(const SVGRenderContext& other) {
+  // The delegated 7-argument constructor does not carry these fields; the replacement-style
+  // copy constructors call this to keep them.
+  deferredPaintOpacity = other.deferredPaintOpacity;
+  _clipPath = other._clipPath;
 }
 
 SVGRenderContext::~SVGRenderContext() {
@@ -148,7 +164,6 @@ SVGRenderContext::~SVGRenderContext() {
 SVGRenderContext SVGRenderContext::CopyForPaint(const SVGRenderContext& context, Canvas* canvas,
                                                 const SVGLengthContext& lengthContext) {
   SVGRenderContext copyContext(context, canvas, lengthContext);
-  copyContext.deferredPaintOpacity = context.deferredPaintOpacity;
   return copyContext;
 }
 
