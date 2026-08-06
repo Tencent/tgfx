@@ -190,6 +190,112 @@ static void RenderShaderScene(Context* context, PrecompiledShaderCache* cache,
 // materialized to an offscreen texture and the blend collapses to two(TextureEffect,TextureEffect)
 // which hits BlendMergeShader. This case quantifies whether that materialization + resample stays
 // within tolerance versus sampling the tiled child inline.
+static std::shared_ptr<Image> MakeAlphaOnlyAuditImage() {
+  Bitmap bitmap = {};
+  if (!bitmap.allocPixels(64, 64, true)) {
+    return nullptr;
+  }
+  auto pixels = static_cast<uint8_t*>(bitmap.lockPixels());
+  if (pixels == nullptr) {
+    bitmap.unlockPixels();
+    return nullptr;
+  }
+  auto rowBytes = bitmap.rowBytes();
+  for (size_t y = 0; y < 64; ++y) {
+    for (size_t x = 0; x < 64; ++x) {
+      pixels[y * rowBytes + x] = static_cast<uint8_t>((x * 3 + y * 5) % 256);
+    }
+  }
+  bitmap.unlockPixels();
+  return Image::MakeFrom(bitmap);
+}
+
+static std::shared_ptr<Image> MakeColorAuditImage() {
+  Bitmap bitmap = {};
+  if (!bitmap.allocPixels(64, 64, false)) {
+    return nullptr;
+  }
+  auto pixels = static_cast<uint32_t*>(bitmap.lockPixels());
+  if (pixels == nullptr) {
+    bitmap.unlockPixels();
+    return nullptr;
+  }
+  for (size_t y = 0; y < 64; ++y) {
+    for (size_t x = 0; x < 64; ++x) {
+      auto r = static_cast<uint32_t>((x * 5) % 256);
+      auto g = static_cast<uint32_t>((y * 7) % 256);
+      auto b = static_cast<uint32_t>((x * 3 + y * 2) % 256);
+      pixels[y * 64 + x] = (255u << 24) | (b << 16) | (g << 8) | r;
+    }
+  }
+  bitmap.unlockPixels();
+  return Image::MakeFrom(bitmap);
+}
+
+static void ExpectBlendMergeAlphaOnlyExact(const std::shared_ptr<Shader>& shader,
+                                           const char* label, Context* context,
+                                           PrecompiledShaderCache* cache, int width, int height) {
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  uint32_t referenceHits = 0;
+  uint32_t referenceNoMatch = 0;
+  uint32_t candidateHits = 0;
+  uint32_t candidateNoMatch = 0;
+  // Keep decomposition disabled for both renders: this isolates the legacy BlendMergeShader
+  // matcher from the PointwiseChain route and proves the fixed shader's own AOT/JIT equivalence.
+  RenderShaderScene(context, cache, shader, width, height, false, &candidate, &candidateHits,
+                    &candidateNoMatch);
+  auto hits = cache->hitRecords();
+  bool blendMergeHit = false;
+  for (const auto& hit : hits) {
+    blendMergeHit = blendMergeHit || hit.shaderName == "BlendMergeShader";
+  }
+  EXPECT_TRUE(blendMergeHit) << label;
+  cache->unload();
+  RenderShaderScene(context, cache, shader, width, height, false, &reference, &referenceHits,
+                    &referenceNoMatch);
+  EXPECT_GT(candidateHits, 0u) << label;
+  EXPECT_EQ(candidateNoMatch, 0u) << label;
+  Pixmap referencePixmap(reference);
+  Pixmap candidatePixmap(candidate);
+  AOTToleranceSpec spec = {};
+  spec.maxChannelDiff = 0;
+  spec.maxDiffPixelRatio = 1.0;
+  spec.structuralChannelDiff = 2;
+  auto result = AOTToleranceCompare::Compare(referencePixmap, candidatePixmap, spec);
+  EXPECT_TRUE(result.passed) << label << " maxDelta=" << result.maxChannelDiff
+                             << " diffPixels=" << result.diffPixelCount;
+}
+
+TGFX_TEST(AOTL2AuditTest, BlendMergeAlphaOnlyChildrenMatchPlainPath) {
+  auto alphaImage = MakeAlphaOnlyAuditImage();
+  auto colorImage = MakeColorAuditImage();
+  ASSERT_TRUE(alphaImage != nullptr && colorImage != nullptr);
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
+  auto alpha = Shader::MakeImageShader(alphaImage, TileMode::Clamp, TileMode::Clamp);
+  auto color = Shader::MakeImageShader(colorImage, TileMode::Clamp, TileMode::Clamp);
+  ASSERT_TRUE(alpha != nullptr && color != nullptr);
+  int width = 64;
+  int height = 64;
+
+  // BlendShader::asFragmentProcessor registers child[0] as src and child[1] as dst.
+  auto srcAlphaDstColor = Shader::MakeBlend(BlendMode::Multiply, color, alpha);
+  auto srcColorDstAlpha = Shader::MakeBlend(BlendMode::Multiply, alpha, color);
+  ASSERT_TRUE(srcAlphaDstColor != nullptr && srcColorDstAlpha != nullptr);
+  // MakeBlend collapses null operands for modes where the result is independent of the missing side;
+  // use explicit two-child cases for the alpha semantic matrix below.
+  ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
+  ExpectBlendMergeAlphaOnlyExact(srcAlphaDstColor, "two-child-src-color-dst-alpha", context, cache,
+                                 width, height);
+  ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
+  ExpectBlendMergeAlphaOnlyExact(srcColorDstAlpha, "two-child-src-alpha-dst-color", context, cache,
+                                 width, height);
+}
+
 TGFX_TEST(AOTL2AuditTest, TiledInBlendMatchesPlainPath) {
   auto image = MakeImage("resources/apitest/test_timestretch.png");
   ASSERT_TRUE(image != nullptr);

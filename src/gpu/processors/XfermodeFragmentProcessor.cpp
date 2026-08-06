@@ -91,19 +91,23 @@ void XfermodeFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
   // the last writer would overwrite the first. On the ProgramBuilder path these fields do not
   // exist, so hasField() returns false and the writes are skipped.
   static const char* const subsetFieldNames[] = {"Child0Subset", "Child1Subset"};
+  static const char* const alphaOnlyFieldNames[] = {"Child0AlphaOnly", "Child1AlphaOnly"};
   size_t childCount = std::min<size_t>(numChildProcessors(), 2);
   for (size_t i = 0; i < childCount; i++) {
     auto childFP = childProcessor(i);
     if (childFP == nullptr || childFP->name() != "TextureEffect") {
       continue;
     }
-    if (!fragmentUniformData->hasField(subsetFieldNames[i])) {
-      continue;
-    }
     auto childTE = static_cast<const TextureEffect*>(childFP);
-    float rect[4];
-    childTE->computeSubsetRect(rect);
-    fragmentUniformData->setData(subsetFieldNames[i], rect);
+    if (fragmentUniformData->hasField(subsetFieldNames[i])) {
+      float rect[4];
+      childTE->computeSubsetRect(rect);
+      fragmentUniformData->setData(subsetFieldNames[i], rect);
+    }
+    // BlendMerge keeps alpha-only as a runtime semantic flag so the same compiled variant handles
+    // RGBA and R8 operands. ProgramBuilder layouts do not declare this field, hence the optional
+    // write; the precompiled layout receives the actual value on every draw.
+    fragmentUniformData->setDataOptional(alphaOnlyFieldNames[i], childTE->isAlphaOnly() ? 1 : 0);
   }
 }
 

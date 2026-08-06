@@ -69,11 +69,15 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   // Always present for a plain TextureEffect child; when the source has no real subset the bounds
   // are the full [0,1] range, making the clamp below a no-op.
   vec4 Child0Subset;
+  // R8/ALPHA_8 child[0] samples (r,0,0,1) on Metal; splat .r so blend math sees the mask alpha.
+  int Child0AlphaOnly;
 #endif
 #if HAS_TWO_CHILDREN
   // Normalized subset bounds for child[1]'s TextureEffect (full [0,1] when the source has no real
   // subset).
   vec4 Child1Subset;
+  // Same alpha-only normalization for the second TextureEffect operand.
+  int Child1AlphaOnly;
 #endif
   vec4 Rect;
   int HasClip;
@@ -311,6 +315,9 @@ void main() {
   // no-op for plain textures.
   coord0 = clamp(coord0, Child0Subset.xy, Child0Subset.zw);
   vec4 childColor = texture(TextureSampler_0, coord0);
+  if (Child0AlphaOnly != 0) {
+    childColor = vec4(childColor.r);
+  }
 #elif CHILD0_MODE == 1
   // ConstColorProcessor: output is just the uniform color modulated by input alpha.
   vec4 childColor = ConstColor * inputColor.a;
@@ -326,6 +333,9 @@ void main() {
   // Clamp to child[1]'s subset bounds (same rationale as child[0]; full [0,1] = no-op).
   coord1 = clamp(coord1, Child1Subset.xy, Child1Subset.zw);
   dstColor = texture(TextureSampler_1, coord1);
+  if (Child1AlphaOnly != 0) {
+    dstColor = vec4(dstColor.r);
+  }
 #else
   // A single child operand: ChildType decides which side of the blend it feeds. Both roles share
   // this compiled variant because the choice is pure operand assignment.
