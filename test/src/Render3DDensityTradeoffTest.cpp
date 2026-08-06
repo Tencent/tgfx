@@ -154,7 +154,7 @@ TGFX_TEST(Render3DDensityTradeoffTest, PerspectiveFloor10To210) {
 
   auto surface = RenderFloor(context, image, FloorScale);
   ASSERT_TRUE(surface != nullptr);
-  EXPECT_TRUE(Baseline::Compare(surface, "Render3DDensityTradeoffTest/PerspectiveFloor10To210"));
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PerspectiveFloor10To210"));
 }
 
 // A wider floor keeps the same z range but exceeds the compositor viewport horizontally. The
@@ -170,8 +170,7 @@ TGFX_TEST(Render3DDensityTradeoffTest, PerspectiveFloorPartiallyClipped) {
 
   auto surface = RenderFramedFloor(context, image, PartiallyClippedFloorScaleX);
   ASSERT_TRUE(surface != nullptr);
-  EXPECT_TRUE(
-      Baseline::Compare(surface, "Render3DDensityTradeoffTest/PerspectiveFloorPartiallyClipped"));
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PerspectiveFloorPartiallyClipped"));
 }
 
 }  // namespace tgfx
