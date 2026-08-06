@@ -31,15 +31,17 @@ namespace tgfx {
 
 namespace {
 
-// The review scenario: a long floor receding along the view direction with a strong perspective.
-// The near edge (z' = 400) renders at about 5x screen scale, the far edge (z' ≈ -1532) at about
-// 0.24x, exposing the "average density" weakness where the near end is undersampled.
+// The 2000x2000 source carries the dense 8px grid and text. The displayed plane is scaled to 20%
+// and rotated so its upper/lower edges sit at z=10 and z=210, a strong but not extreme perspective
+// that exposes the average-density raster sizing path.
 constexpr int FloorSize = 2000;
-constexpr int OutputWidth = 800;
-constexpr int OutputHeight = 600;
+constexpr int OutputWidth = 1200;
+constexpr int OutputHeight = 1000;
 constexpr float PerspectiveDepth = 500.0f;
-constexpr float NearEdgeDepth = 400.0f;
-constexpr float FloorRotationDegrees = -75.0f;
+constexpr float FloorScale = 0.2f;
+constexpr float TopEdgeZ = 10.0f;
+constexpr float BottomEdgeZ = 210.0f;
+constexpr float FloorRotationDegrees = 30.0f;
 constexpr int GridStep = 8;
 constexpr int BackgroundValue = 24;
 
@@ -72,7 +74,7 @@ static std::shared_ptr<Image> MakeFloorImage(Context* context) {
   }
   Paint textPaint;
   textPaint.setColor(Color::FromRGBA(255, 224, 64, 255));
-  // Labels live in the source patch that maps to the output near edge so text is visible there.
+  // Labels live in the source patch that maps to the output near edge so text stays visible.
   for (int y = 64; y < FloorSize; y += 160) {
     canvas->drawTextBlob(label, 1000, static_cast<float>(y), textPaint);
   }
@@ -82,16 +84,15 @@ static std::shared_ptr<Image> MakeFloorImage(Context* context) {
 static Matrix3D MakeFloorMatrix() {
   const float anchorX = static_cast<float>(FloorSize) * 0.5f;
   const auto offsetToAnchor = Matrix3D::MakeTranslate(-anchorX, 0, 0);
-  const auto invOffsetToAnchor = Matrix3D::MakeTranslate(anchorX, 0, 0);
-  // The near edge starts at z' = 400 (5x scale). Negative rotateX sends the far edge away from the
-  // camera to roughly 0.24x scale.
-  const auto modelMatrix = Matrix3D::MakeTranslate(0, 0, NearEdgeDepth) *
-                           Matrix3D::MakeRotate({1, 0, 0}, FloorRotationDegrees);
+  const auto scale = Matrix3D::MakeScale(FloorScale, FloorScale, 1.0f);
+  const auto rotation = Matrix3D::MakeRotate({1, 0, 0}, FloorRotationDegrees);
+  const auto translateZ = Matrix3D::MakeTranslate(0, 0, TopEdgeZ);
   auto perspectiveMatrix = Matrix3D::I();
   perspectiveMatrix.setRowColumn(3, 2, -1.0f / PerspectiveDepth);
-  // On the near edge, local x in [1000, 1040] maps to screen x in [200, 400] at 5x scale.
-  const auto originTranslate = Matrix3D::MakeTranslate(-960, 60, 0);
-  return originTranslate * invOffsetToAnchor * perspectiveMatrix * modelMatrix * offsetToAnchor;
+  // After scale+rotation, the upper and lower edges are z=10 and z=210 respectively. Their
+  // projected y range lands in the center of the output surface.
+  const auto originTranslate = Matrix3D::MakeTranslate(OutputWidth * 0.5f, 200, 0);
+  return originTranslate * perspectiveMatrix * translateZ * rotation * scale * offsetToAnchor;
 }
 
 static std::shared_ptr<Surface> RenderFloor(Context* context, const std::shared_ptr<Image>& image) {
@@ -117,10 +118,12 @@ static std::shared_ptr<Surface> RenderFloor(Context* context, const std::shared_
 
 }  // namespace
 
-// A preserve-3D floor with strong perspective receding along one axis (see the review). The near
-// edge is magnified about 5x while the far edge shrinks below 0.25x, exercising the average-density
-// raster sizing path.
-TGFX_TEST(Render3DDensityTradeoffTest, StrongPerspectiveFloor) {
+// A preserve-3D floor with a strong perspective spanning z=10 (upper edge) to z=210 (lower edge).
+// The near/far density ratio is noticeable but the whole plane stays comfortably within GPU limits,
+// exercising the average-density raster sizing path in a reproducible baseline.
+TGFX_TEST(Render3DDensityTradeoffTest, PerspectiveFloor10To210) {
+  // scale(0.2) followed by rotateX(30°) raises the 2000px lower edge by 200 in z.
+  EXPECT_FLOAT_EQ(TopEdgeZ + FloorSize * FloorScale * 0.5f, BottomEdgeZ);
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -129,7 +132,7 @@ TGFX_TEST(Render3DDensityTradeoffTest, StrongPerspectiveFloor) {
 
   auto surface = RenderFloor(context, image);
   ASSERT_TRUE(surface != nullptr);
-  EXPECT_TRUE(Baseline::Compare(surface, "Render3DDensityTradeoffTest/StrongPerspectiveFloor"));
+  EXPECT_TRUE(Baseline::Compare(surface, "Render3DDensityTradeoffTest/PerspectiveFloor10To210"));
 }
 
 }  // namespace tgfx
