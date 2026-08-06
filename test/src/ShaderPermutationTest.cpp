@@ -32,12 +32,15 @@
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 #include "gpu/processors/ClampedGradientEffect.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
+#include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/LumaFragmentProcessor.h"
+#include "gpu/processors/MeshGeometryProcessor.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/processors/RadialGradientLayout.h"
+#include "gpu/processors/ShapeInstancedGeometryProcessor.h"
 #include "gpu/processors/SingleIntervalGradientColorizer.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
@@ -703,8 +706,8 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
-  EXPECT_EQ(cache->vertexEntryCount(), 117u);
-  EXPECT_EQ(cache->fragmentEntryCount(), 342u);
+  EXPECT_EQ(cache->vertexEntryCount(), 121u);
+  EXPECT_EQ(cache->fragmentEntryCount(), 345u);
   std::string expectedTag = TGFX_BACKEND_NAME;
   auto dashPos = expectedTag.find('-');
   if (dashPos != std::string::npos) {
@@ -1526,6 +1529,292 @@ TGFX_TEST(ShaderPermutationTest, MaskFillShouldCompile) {
     // none / PorterDuff DST_TEX / PorterDuff framebuffer-fetch).
     EXPECT_EQ(shaderInfo.vertDomain.totalCount(), 1u);
     EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 3u);
+  }
+  EXPECT_TRUE(found);
+}
+
+TGFX_TEST(ShaderPermutationTest, QuadConstColorMatchesBothVertexLayouts) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  if (context->backend() == Backend::OpenGL) {
+    GTEST_SKIP() << "QuadConstColor is outside the OpenGL stage 1 whitelist";
+  }
+  auto renderTargetProxy = RenderTargetProxy::Make(context, 8, 8, false);
+  ASSERT_NE(renderTargetProxy, nullptr);
+  auto renderTarget = renderTargetProxy->getRenderTarget();
+  ASSERT_NE(renderTarget, nullptr);
+
+  for (bool hasUVCoord : {false, true}) {
+    for (auto inputMode : {InputMode::Ignore, InputMode::ModulateRGBA, InputMode::ModulateA}) {
+      BlockAllocator allocator;
+      std::optional<Matrix> uvMatrix = Matrix::I();
+      if (hasUVCoord) {
+        uvMatrix = std::nullopt;
+      }
+      auto gp = QuadPerEdgeAAGeometryProcessor::Make(&allocator, 8, 8, AAType::Coverage,
+                                                     PMColor::White(), uvMatrix, false);
+      auto fp = ConstColorProcessor::Make(&allocator, PMColor::Red(), inputMode);
+      ASSERT_NE(gp, nullptr);
+      ASSERT_NE(fp, nullptr);
+      ProgramInfo programInfo(renderTarget.get(), gp.get(), {fp.get()}, 1, nullptr,
+                              BlendMode::SrcOver);
+      auto match = MatchPermutation(&programInfo);
+      ASSERT_TRUE(match.has_value());
+      EXPECT_EQ(match->shaderName, "QuadConstColorShader");
+      EXPECT_EQ(match->vertPermutationIndex, hasUVCoord ? 1u : 0u);
+      EXPECT_EQ(match->fragPermutationIndex, 0u);
+    }
+  }
+}
+
+TGFX_TEST(ShaderPermutationTest, QuadConstColorShaderRegistry) {
+  bool found = false;
+  for (const auto& factory : ShaderRegistry::All()) {
+    auto shader = factory();
+    auto info = shader->info();
+    if (info.name != "QuadConstColorShader") {
+      continue;
+    }
+    found = true;
+    EXPECT_EQ(info.vertDomain.dimensionCount(), 1u);
+    EXPECT_EQ(info.vertDomain.totalCount(), 2u);
+    EXPECT_EQ(info.fragDomain.totalCount(), 1u);
+    EXPECT_EQ(info.vertexFile, "level1/quad_const_color.vert");
+    EXPECT_EQ(info.fragmentFile, "level1/quad_const_color.frag");
+  }
+  EXPECT_TRUE(found);
+}
+
+TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactContract) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  if (context->backend() == Backend::OpenGL) {
+    GTEST_SKIP() << "ShapeInstancedTextureCoverage is outside the OpenGL stage 1 whitelist";
+  }
+  auto renderTargetProxy = RenderTargetProxy::Make(context, 8, 8, false);
+  ASSERT_NE(renderTargetProxy, nullptr);
+  auto textureProxy = context->proxyProvider()->createTextureProxy({}, 8, 8, PixelFormat::ALPHA_8);
+  ASSERT_NE(textureProxy, nullptr);
+  ASSERT_NE(textureProxy->getTextureView(), nullptr);
+
+  {
+    BlockAllocator allocator;
+    auto gp = ShapeInstancedGeometryProcessor::Make(&allocator, 8, 8, AAType::None, true,
+                                                    Matrix::I(), Matrix::I());
+    auto coverage = TextureEffect::Make(&allocator, textureProxy);
+    ASSERT_NE(gp, nullptr);
+    ASSERT_NE(coverage, nullptr);
+    ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), {coverage.get()},
+                            0, nullptr, BlendMode::SrcOver);
+    auto match = MatchPermutation(&programInfo);
+    ASSERT_TRUE(match.has_value());
+    EXPECT_EQ(match->shaderName, "ShapeInstancedTextureCoverageShader");
+    EXPECT_EQ(match->vertPermutationIndex, 0u);
+    EXPECT_EQ(match->fragPermutationIndex, 0u);
+  }
+
+  {
+    BlockAllocator allocator;
+    auto gp = ShapeInstancedGeometryProcessor::Make(&allocator, 8, 8, AAType::None, false,
+                                                    Matrix::I(), Matrix::I());
+    auto coverage = TextureEffect::Make(&allocator, textureProxy);
+    ASSERT_NE(gp, nullptr);
+    ASSERT_NE(coverage, nullptr);
+    ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), {coverage.get()},
+                            0, nullptr, BlendMode::SrcOver);
+    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
+  }
+
+  {
+    BlockAllocator allocator;
+    auto gp = ShapeInstancedGeometryProcessor::Make(&allocator, 8, 8, AAType::Coverage, true,
+                                                    Matrix::I(), Matrix::I());
+    auto coverage = TextureEffect::Make(&allocator, textureProxy);
+    ASSERT_NE(gp, nullptr);
+    ASSERT_NE(coverage, nullptr);
+    ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), {coverage.get()},
+                            0, nullptr, BlendMode::SrcOver);
+    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
+  }
+
+  {
+    BlockAllocator allocator;
+    auto gp = ShapeInstancedGeometryProcessor::Make(&allocator, 8, 8, AAType::None, true,
+                                                    Matrix::I(), Matrix::I());
+    auto color = ConstColorProcessor::Make(&allocator, PMColor::Red(), InputMode::Ignore);
+    auto coverage = TextureEffect::Make(&allocator, textureProxy);
+    ASSERT_NE(gp, nullptr);
+    ASSERT_NE(color, nullptr);
+    ASSERT_NE(coverage, nullptr);
+    ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(),
+                            {color.get(), coverage.get()}, 1, nullptr, BlendMode::SrcOver);
+    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
+  }
+
+  {
+    BlockAllocator allocator;
+    auto gp = ShapeInstancedGeometryProcessor::Make(&allocator, 8, 8, AAType::None, true,
+                                                    Matrix::I(), Matrix::I());
+    auto coverage = TextureEffect::MakeRGBAAA(&allocator, textureProxy, {}, Point{1, 0});
+    ASSERT_NE(gp, nullptr);
+    ASSERT_NE(coverage, nullptr);
+    ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), {coverage.get()},
+                            0, nullptr, BlendMode::SrcOver);
+    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
+  }
+
+  {
+    BlockAllocator allocator;
+    auto gp = ShapeInstancedGeometryProcessor::Make(&allocator, 8, 8, AAType::None, true,
+                                                    Matrix::I(), Matrix::I());
+    auto coverage = TextureEffect::Make(&allocator, textureProxy);
+    auto xp = PorterDuffXferProcessor::Make(&allocator, BlendMode::SrcOver, {});
+    ASSERT_NE(gp, nullptr);
+    ASSERT_NE(coverage, nullptr);
+    ASSERT_NE(xp, nullptr);
+    ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), {coverage.get()},
+                            0, xp.get(), BlendMode::SrcOver);
+    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
+  }
+}
+
+TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageShaderRegistry) {
+  bool found = false;
+  for (const auto& factory : ShaderRegistry::All()) {
+    auto shader = factory();
+    auto info = shader->info();
+    if (info.name != "ShapeInstancedTextureCoverageShader") {
+      continue;
+    }
+    found = true;
+    EXPECT_EQ(info.vertDomain.totalCount(), 1u);
+    EXPECT_EQ(info.fragDomain.totalCount(), 1u);
+  }
+  EXPECT_TRUE(found);
+}
+
+TGFX_TEST(ShaderPermutationTest, MeshTextureFillMatchesOnlyExactContract) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  if (context->backend() == Backend::OpenGL) {
+    GTEST_SKIP() << "MeshTextureFill is outside the OpenGL stage 1 whitelist";
+  }
+  auto renderTargetProxy = RenderTargetProxy::Make(context, 8, 8, false);
+  ASSERT_NE(renderTargetProxy, nullptr);
+  auto textureProxy =
+      context->proxyProvider()->createTextureProxy({}, 8, 8, PixelFormat::RGBA_8888);
+  ASSERT_NE(textureProxy, nullptr);
+  ASSERT_NE(textureProxy->getTextureView(), nullptr);
+
+  {
+    BlockAllocator allocator;
+    auto gp =
+        MeshGeometryProcessor::Make(&allocator, true, false, false, PMColor::White(), Matrix::I());
+    auto fp = TextureEffect::Make(&allocator, textureProxy);
+    ASSERT_NE(gp, nullptr);
+    ASSERT_NE(fp, nullptr);
+    ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), {fp.get()}, 1,
+                            nullptr, BlendMode::SrcOver);
+    auto match = MatchPermutation(&programInfo);
+    ASSERT_TRUE(match.has_value());
+    EXPECT_EQ(match->shaderName, "MeshTextureFillShader");
+    EXPECT_EQ(match->vertPermutationIndex, 0u);
+    EXPECT_EQ(match->fragPermutationIndex, 0u);
+  }
+
+  {
+    BlockAllocator allocator;
+    auto gp =
+        MeshGeometryProcessor::Make(&allocator, false, false, false, PMColor::White(), Matrix::I());
+    auto fp = TextureEffect::Make(&allocator, textureProxy);
+    ASSERT_NE(gp, nullptr);
+    ASSERT_NE(fp, nullptr);
+    ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), {fp.get()}, 1,
+                            nullptr, BlendMode::SrcOver);
+    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
+  }
+
+  {
+    BlockAllocator allocator;
+    auto gp =
+        MeshGeometryProcessor::Make(&allocator, true, true, false, PMColor::White(), Matrix::I());
+    auto fp = TextureEffect::Make(&allocator, textureProxy);
+    ASSERT_NE(gp, nullptr);
+    ASSERT_NE(fp, nullptr);
+    ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), {fp.get()}, 1,
+                            nullptr, BlendMode::SrcOver);
+    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
+  }
+
+  {
+    BlockAllocator allocator;
+    auto gp =
+        MeshGeometryProcessor::Make(&allocator, true, false, true, PMColor::White(), Matrix::I());
+    auto fp = TextureEffect::Make(&allocator, textureProxy);
+    ASSERT_NE(gp, nullptr);
+    ASSERT_NE(fp, nullptr);
+    ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), {fp.get()}, 1,
+                            nullptr, BlendMode::SrcOver);
+    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
+  }
+
+  {
+    BlockAllocator allocator;
+    auto gp =
+        MeshGeometryProcessor::Make(&allocator, true, false, false, PMColor::White(), Matrix::I());
+    auto fp = TextureEffect::MakeRGBAAA(&allocator, textureProxy, {}, Point{1, 0});
+    ASSERT_NE(gp, nullptr);
+    ASSERT_NE(fp, nullptr);
+    ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), {fp.get()}, 1,
+                            nullptr, BlendMode::SrcOver);
+    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
+  }
+
+  {
+    BlockAllocator allocator;
+    auto gp =
+        MeshGeometryProcessor::Make(&allocator, true, false, false, PMColor::White(), Matrix::I());
+    auto fp = TextureEffect::Make(&allocator, textureProxy);
+    auto coverage = AARectEffect::Make(&allocator, Rect::MakeWH(8, 8));
+    ASSERT_NE(gp, nullptr);
+    ASSERT_NE(fp, nullptr);
+    ASSERT_NE(coverage, nullptr);
+    ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(),
+                            {fp.get(), coverage.get()}, 1, nullptr, BlendMode::SrcOver);
+    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
+  }
+
+  {
+    BlockAllocator allocator;
+    auto gp =
+        MeshGeometryProcessor::Make(&allocator, true, false, false, PMColor::White(), Matrix::I());
+    auto fp = TextureEffect::Make(&allocator, textureProxy);
+    auto xp = PorterDuffXferProcessor::Make(&allocator, BlendMode::SrcOver, {});
+    ASSERT_NE(gp, nullptr);
+    ASSERT_NE(fp, nullptr);
+    ASSERT_NE(xp, nullptr);
+    ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), {fp.get()}, 1,
+                            xp.get(), BlendMode::SrcOver);
+    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
+  }
+}
+
+TGFX_TEST(ShaderPermutationTest, MeshTextureFillShaderRegistry) {
+  bool found = false;
+  for (const auto& factory : ShaderRegistry::All()) {
+    auto shader = factory();
+    auto info = shader->info();
+    if (info.name != "MeshTextureFillShader") {
+      continue;
+    }
+    found = true;
+    EXPECT_EQ(info.vertDomain.totalCount(), 1u);
+    EXPECT_EQ(info.fragDomain.totalCount(), 1u);
+    EXPECT_EQ(info.vertexFile, "level1/mesh_texture_fill.vert");
+    EXPECT_EQ(info.fragmentFile, "level1/mesh_texture_fill.frag");
   }
   EXPECT_TRUE(found);
 }

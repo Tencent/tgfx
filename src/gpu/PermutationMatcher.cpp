@@ -67,15 +67,18 @@
 #include "gpu/shaders/level1/HairlineQuadShader.h"
 #include "gpu/shaders/level1/MaskFillShader.h"
 #include "gpu/shaders/level1/MeshFillShader.h"
+#include "gpu/shaders/level1/MeshTextureFillShader.h"
 #include "gpu/shaders/level1/NonAARRectFillShader.h"
 #include "gpu/shaders/level1/PerlinNoiseFillShader.h"
 #include "gpu/shaders/level1/PointwiseChainShader.h"
 #include "gpu/shaders/level1/PointwiseDirectShader.h"
 #include "gpu/shaders/level1/PointwiseTailShader.h"
 #include "gpu/shaders/level1/QuadColorFillShader.h"
+#include "gpu/shaders/level1/QuadConstColorShader.h"
 #include "gpu/shaders/level1/QuadTextureFillShader.h"
 #include "gpu/shaders/level1/RoundStrokeRectFillShader.h"
 #include "gpu/shaders/level1/ShapeInstancedFillShader.h"
+#include "gpu/shaders/level1/ShapeInstancedTextureCoverageShader.h"
 #include "gpu/shaders/level1/SingleIntervalGradientShader.h"
 #include "gpu/shaders/level1/SolidColorFillShader.h"
 #include "gpu/shaders/level1/TextureColorMatrixShader.h"
@@ -417,6 +420,26 @@ static std::optional<PermutationMatchResult> TryMatchConstColor(const ProgramInf
   fragValues[FD::HAS_XP] = xpType;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"ConstColorShader", 0, fragIndex};
+}
+
+static std::optional<PermutationMatchResult> TryMatchQuadConstColor(
+    const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp->name() != "QuadPerEdgeAAGeometryProcessor" ||
+      programInfo->numColorFragmentProcessors() != 1 || programInfo->numFragmentProcessors() != 1 ||
+      programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
+    return std::nullopt;
+  }
+  auto fp = programInfo->getFragmentProcessor(0);
+  if (fp->name() != "ConstColorProcessor") {
+    return std::nullopt;
+  }
+  auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
+  using VD = QuadConstColorShader::VD;
+  std::vector<int> vertValues(VD::COUNT, 0);
+  vertValues[VD::HAS_UV_COORD] = quadGP->hasUVMatrix() ? 0 : 1;
+  auto vertIndex = VD::domain().encode(vertValues);
+  return PermutationMatchResult{"QuadConstColorShader", vertIndex, 0};
 }
 
 static std::optional<PermutationMatchResult> TryMatchQuadColorFill(const ProgramInfo* programInfo) {
@@ -1713,6 +1736,29 @@ static std::optional<PermutationMatchResult> TryMatchRoundStrokeRectFill(
   return PermutationMatchResult{"RoundStrokeRectFillShader", vertIndex, fragIndex};
 }
 
+static std::optional<PermutationMatchResult> TryMatchShapeInstancedTextureCoverage(
+    const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp->name() != "ShapeInstancedGeometryProcessor" ||
+      programInfo->numColorFragmentProcessors() != 0 || programInfo->numFragmentProcessors() != 1 ||
+      GetXPType(programInfo) != 0) {
+    return std::nullopt;
+  }
+  auto fp = programInfo->getFragmentProcessor(0);
+  if (fp->name() != "TextureEffect") {
+    return std::nullopt;
+  }
+  auto* texture = static_cast<const TextureEffect*>(fp);
+  if (texture->numTextureSamplers() != 1 || texture->isYUV() || texture->hasRGBAAA()) {
+    return std::nullopt;
+  }
+  auto* shape = static_cast<const ShapeInstancedGeometryProcessor*>(gp);
+  if (!shape->getHasColors() || shape->getAAType() != AAType::None) {
+    return std::nullopt;
+  }
+  return PermutationMatchResult{"ShapeInstancedTextureCoverageShader", 0, 0};
+}
+
 static std::optional<PermutationMatchResult> TryMatchShapeInstancedFill(
     const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
@@ -1742,6 +1788,28 @@ static std::optional<PermutationMatchResult> TryMatchShapeInstancedFill(
   fragValues[FD::HAS_XP] = xpType;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"ShapeInstancedFillShader", vertIndex, fragIndex};
+}
+
+static std::optional<PermutationMatchResult> TryMatchMeshTextureFill(
+    const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp->name() != "MeshGeometryProcessor" || programInfo->numColorFragmentProcessors() != 1 ||
+      programInfo->numFragmentProcessors() != 1 || GetXPType(programInfo) != 0) {
+    return std::nullopt;
+  }
+  auto* mgp = static_cast<const MeshGeometryProcessor*>(gp);
+  if (!mgp->getHasTexCoords() || mgp->getHasColors() || mgp->getHasCoverage()) {
+    return std::nullopt;
+  }
+  auto fp = programInfo->getFragmentProcessor(0);
+  if (fp->name() != "TextureEffect") {
+    return std::nullopt;
+  }
+  auto* texture = static_cast<const TextureEffect*>(fp);
+  if (texture->numTextureSamplers() != 1 || texture->isYUV() || texture->hasRGBAAA()) {
+    return std::nullopt;
+  }
+  return PermutationMatchResult{"MeshTextureFillShader", 0, 0};
 }
 
 static std::optional<PermutationMatchResult> TryMatchMeshFill(const ProgramInfo* programInfo) {
@@ -1929,6 +1997,9 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
   if (auto result = TryMatchQuadColorFill(programInfo)) {
     return result;
   }
+  if (auto result = TryMatchQuadConstColor(programInfo)) {
+    return result;
+  }
   if (auto result = TryMatchQuadTextureFill(programInfo)) {
     return result;
   }
@@ -2012,7 +2083,13 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
   if (auto result = TryMatchRoundStrokeRectFill(programInfo)) {
     return result;
   }
+  if (auto result = TryMatchShapeInstancedTextureCoverage(programInfo)) {
+    return result;
+  }
   if (auto result = TryMatchShapeInstancedFill(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchMeshTextureFill(programInfo)) {
     return result;
   }
   if (auto result = TryMatchMeshFill(programInfo)) {
