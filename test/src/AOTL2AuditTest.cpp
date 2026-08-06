@@ -296,6 +296,32 @@ TGFX_TEST(AOTL2AuditTest, BlendMergeAlphaOnlyChildrenMatchPlainPath) {
                                  width, height);
 }
 
+TGFX_TEST(AOTL2AuditTest, CleanBlendPrefersPointwiseChain) {
+  auto imageA = MakeImage("resources/apitest/test_timestretch.png");
+  auto imageB = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_TRUE(imageA != nullptr && imageB != nullptr);
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
+  auto dst = Shader::MakeImageShader(imageA, TileMode::Clamp, TileMode::Clamp);
+  auto src = Shader::MakeImageShader(imageB, TileMode::Clamp, TileMode::Clamp);
+  auto blend = Shader::MakeBlend(BlendMode::Multiply, dst, src);
+  ASSERT_TRUE(blend != nullptr);
+  Bitmap candidate = {};
+  uint32_t hits = 0;
+  uint32_t noMatch = 0;
+  RenderShaderScene(context, cache, blend, imageA->width(), imageA->height(), true, &candidate, &hits,
+                    &noMatch);
+  EXPECT_EQ(noMatch, 0u);
+  bool chainHit = false;
+  for (const auto& record : cache->hitRecords()) {
+    chainHit = chainHit || record.shaderName == "PointwiseChainShader";
+  }
+  EXPECT_TRUE(chainHit);
+}
+
 TGFX_TEST(AOTL2AuditTest, TiledInBlendMatchesPlainPath) {
   auto image = MakeImage("resources/apitest/test_timestretch.png");
   ASSERT_TRUE(image != nullptr);
