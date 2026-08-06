@@ -486,6 +486,85 @@ static nlohmann::json BuildBlendMergeReachabilityAudit(
           {"deletionPolicy", "No deletion verdict from test absence alone"}};
 }
 
+static bool ContainsRootCause(const std::string& effect, const std::string& token) {
+  return effect.find(token) != std::string::npos;
+}
+
+static nlohmann::json BuildRootCauseProgramKeyAttribution(
+    const std::vector<ShaderAOTTestResult>& results) {
+  struct Row {
+    uint64_t fallbacks = 0;
+    uint64_t jitRecords = 0;
+    std::set<std::string> tests;
+    std::set<std::string> jitTests;
+    std::set<std::string> effects;
+    std::set<std::string> pipelines;
+  };
+  std::map<std::string, std::map<std::string, Row>> byCategory;
+  for (const auto& result : results) {
+    std::map<std::string, uint64_t> jitByKey;
+    for (const auto& jit : result.jitProgramRecords) {
+      jitByKey[jit.programKey + "\n" + std::to_string(jit.route)]++;
+    }
+    for (const auto& fallback : result.fallbackRecords) {
+      if (fallback.reason != PrecompiledFallbackReason::NoMatchingRule) {
+        continue;
+      }
+      std::string category;
+      if (ContainsRootCause(fallback.effectSignature, "Gradient")) {
+        category = "Gradient";
+      } else if (ContainsRootCause(fallback.effectSignature, "ConstColorProcessor")) {
+        category = "ConstColor";
+      } else {
+        continue;
+      }
+      auto key = fallback.programKey + "\n" + std::to_string(fallback.route);
+      auto& row = byCategory[category][key];
+      row.fallbacks++;
+      row.tests.insert(result.testName);
+      row.effects.insert(fallback.effectSignature);
+      row.pipelines.insert(fallback.pipelineSignature);
+      auto jit = jitByKey.find(key);
+      if (jit != jitByKey.end()) {
+        row.jitRecords += jit->second;
+        row.jitTests.insert(result.testName);
+      }
+    }
+  }
+  nlohmann::json output = nlohmann::json::object();
+  for (const auto& category : byCategory) {
+    uint64_t fallbacks = 0;
+    uint64_t jitRecords = 0;
+    uint64_t matchedKeys = 0;
+    nlohmann::json rows = nlohmann::json::array();
+    for (const auto& item : category.second) {
+      const auto& row = item.second;
+      fallbacks += row.fallbacks;
+      jitRecords += row.jitRecords;
+      if (row.jitRecords > 0) matchedKeys++;
+      auto keyEnd = item.first.find('\n');
+      auto key = item.first.substr(0, keyEnd);
+      auto route = std::stoul(item.first.substr(keyEnd + 1));
+      rows.push_back({{"programKey", key},
+                      {"route", route},
+                      {"fallbackOccurrences", row.fallbacks},
+                      {"jitCreationEvents", row.jitRecords},
+                      {"jitKeyMatched", row.jitRecords > 0},
+                      {"tests", row.tests},
+                      {"jitTests", row.jitTests},
+                      {"effects", row.effects},
+                      {"pipelines", row.pipelines}});
+    }
+    output[category.first] = {{"fallbackOccurrences", fallbacks},
+                              {"uniqueFallbackKeys", category.second.size()},
+                              {"matchedJITKeys", matchedKeys},
+                              {"jitCreationEvents", jitRecords},
+                              {"attributionConfidence", "key-match-same-test"},
+                              {"rows", std::move(rows)}};
+  }
+  return output;
+}
+
 static const char* AOTDecomposeOutcomeName(AOTDecomposeOutcome outcome) {
   switch (outcome) {
     case AOTDecomposeOutcome::Trivial:
@@ -911,6 +990,8 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
     auto decompositionAudit =
         BuildDecompositionAudit(sortedFallbacks, &auditFusableNow, &auditNeedsLowering);
     auto blendMergeReachability = BuildBlendMergeReachabilityAudit(permutationMap);
+    auto rootCauseProgramKeyAttribution =
+        BuildRootCauseProgramKeyAttribution(testResults);
 
     nlohmann::json offscreenFillAudit = nlohmann::json::object();
     for (size_t i = 0; i < OFFSCREEN_FILL_SOURCE_COUNT; ++i) {
@@ -992,6 +1073,7 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
         {"offscreenFillCorrelations", std::move(offscreenFillCorrelations)},
         {"decompositionAudit", std::move(decompositionAudit)},
         {"blendMergeReachability", std::move(blendMergeReachability)},
+        {"rootCauseProgramKeyAttribution", std::move(rootCauseProgramKeyAttribution)},
         {"tests", std::move(testsJSON)}};
 
     auto outputPath = ProjectPath::Absolute(std::string("test/out/shader_aot_report.") +
