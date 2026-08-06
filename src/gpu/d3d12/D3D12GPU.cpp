@@ -25,6 +25,7 @@
 #include "D3D12Buffer.h"
 #include "D3D12CommandEncoder.h"
 #include "D3D12CommandQueue.h"
+#include "D3D12HardwareTexture.h"
 #include "D3D12MipmapGenerator.h"
 #include "D3D12RenderPipeline.h"
 #include "D3D12Resource.h"
@@ -41,8 +42,18 @@ namespace tgfx {
 // heavy render frame before the wait aborts, while still guarding against a genuine device hang.
 static constexpr DWORD FENCE_WAIT_TIMEOUT_MS = 60000;
 
+// Maximum time in milliseconds we will wait for IDXGIKeyedMutex::AcquireSync(0) to grant D3D12
+// exclusive access to a shared D3D11 texture. If AcquireSync times out, the D3D11 producer very
+// likely forgot to ReleaseSync(0) after finishing its update. A shorter timeout than the fence
+// wait keeps that kind of application-side bug from stalling every subsequent submission on the
+// D3D12 queue: we lose the current context instead of blocking indefinitely.
+static constexpr DWORD KEYED_MUTEX_ACQUIRE_TIMEOUT_MS = 5000;
+
 bool HardwareBufferAvailable() {
-  return false;
+  // The D3D12 backend imports ID3D11Texture2D-based HardwareBufferRefs via a shared handle. The
+  // capability itself is always available; whether a specific texture can actually be imported
+  // depends on the flags it was created with (see D3D12HardwareTexture::MakeFrom for details).
+  return true;
 }
 
 #ifdef TGFX_D3D12_DEBUG_LAYER
@@ -444,10 +455,13 @@ int D3D12GPU::getSampleCount(int requestedCount, PixelFormat pixelFormat) const 
   return 1;
 }
 
-std::vector<std::shared_ptr<Texture>> D3D12GPU::importHardwareTextures(HardwareBufferRef,
-                                                                       uint32_t) {
-  // D3D12 hardware buffer import is not supported yet.
-  return {};
+std::vector<std::shared_ptr<Texture>> D3D12GPU::importHardwareTextures(
+    HardwareBufferRef hardwareBuffer, uint32_t usage) {
+  auto texture = D3D12HardwareTexture::MakeFrom(this, hardwareBuffer, usage);
+  if (texture == nullptr) {
+    return {};
+  }
+  return {std::move(texture)};
 }
 
 std::shared_ptr<Texture> D3D12GPU::importBackendTexture(const BackendTexture& backendTexture,
@@ -828,6 +842,47 @@ void D3D12GPU::executeSubmission(SubmitRequest request) {
   if (request.session.commandList != nullptr) {
     lists.push_back(request.session.commandList.Get());
   }
+
+  // Step 4a: Acquire every IDXGIKeyedMutex the session touched. This gives the D3D12 side
+  // exclusive ownership of the underlying shared memory before the GPU starts sampling it, and
+  // must sit right before ExecuteCommandLists. Failures (typically because the D3D11 producer
+  // never called ReleaseSync(0)) are treated as an unrecoverable context loss: any mutex that
+  // was successfully acquired before the failure is released so the D3D11 side is not left in
+  // a permanently-blocked state, and the session is abandoned instead of executed. Matching
+  // ReleaseSync calls for the fully-acquired case run in reclaimSubmission() after the fence
+  // signals, since the GPU is still reading the shared textures until then.
+  size_t acquiredMutexCount = 0;
+  bool acquireFailed = false;
+  for (auto* mutex : request.session.keyedMutexes) {
+    if (mutex == nullptr) {
+      continue;
+    }
+    auto hr = mutex->AcquireSync(0, KEYED_MUTEX_ACQUIRE_TIMEOUT_MS);
+    if (FAILED(hr) || hr == WAIT_TIMEOUT || hr == WAIT_ABANDONED) {
+      LOGE(
+          "D3D12GPU::executeSubmission: IDXGIKeyedMutex::AcquireSync(0, %ums) failed "
+          "(HRESULT=0x%08X). Common causes: the D3D11 producer did not ReleaseSync(0) after its "
+          "last update, or both D3D11 and D3D12 sides live in the same process (keyed mutexes "
+          "were designed for cross-process synchronisation and same-process re-acquires often "
+          "return DXGI_ERROR_INVALID_CALL / 0x887A0001 immediately instead of blocking). "
+          "Marking context as lost.",
+          KEYED_MUTEX_ACQUIRE_TIMEOUT_MS, static_cast<unsigned>(hr));
+      acquireFailed = true;
+      break;
+    }
+    ++acquiredMutexCount;
+  }
+  if (acquireFailed) {
+    for (size_t i = 0; i < acquiredMutexCount; ++i) {
+      if (auto* mutex = request.session.keyedMutexes[i]) {
+        mutex->ReleaseSync(0);
+      }
+    }
+    markContextLost("executeSubmission keyed mutex acquire");
+    reclaimAbandonedSession(std::move(request.session));
+    return;
+  }
+
   if (!lists.empty()) {
     cmdQueue->ExecuteCommandLists(static_cast<UINT>(lists.size()), lists.data());
   }
@@ -1011,6 +1066,21 @@ void D3D12GPU::reclaimSubmission(InflightSubmission& submission) {
       entry.allocator = std::move(submission.session.auxAllocators[i]);
       entry.commandList = std::move(submission.session.auxCommandLists[i]);
       _commandListPool.release(std::move(entry));
+    }
+  }
+  // Release every keyed mutex that executeSubmission acquired for this submission. The GPU has
+  // now finished sampling the shared textures (fence has signalled), so it is safe to hand the
+  // memory back to the D3D11 producer with key 0. Failures here are only logged: the resource
+  // is going away regardless, and there is no meaningful recovery path once the fence signal
+  // has been observed.
+  for (auto* mutex : submission.session.keyedMutexes) {
+    if (mutex == nullptr) {
+      continue;
+    }
+    auto hr = mutex->ReleaseSync(0);
+    if (FAILED(hr)) {
+      LOGE("D3D12GPU::reclaimSubmission: IDXGIKeyedMutex::ReleaseSync(0) failed (HRESULT=0x%08X).",
+           static_cast<unsigned>(hr));
     }
   }
   // The remaining ComPtr / shared_ptr destructors in FrameSession handle descriptor heaps,

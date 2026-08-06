@@ -455,8 +455,18 @@ void D3D12CommandEncoder::recordTextureStateChange(D3D12Texture* texture,
   // Snapshot the original state on the first call for this texture inside the current session.
   // unordered_map::emplace inserts only when the key is not present, leaving subsequent calls
   // for the same texture as cheap O(1) lookups that do not overwrite the saved value.
-  session.initialTextureStates.emplace(texture, texture->currentState());
+  bool firstTouch = session.initialTextureStates.emplace(texture, texture->currentState()).second;
   texture->setCurrentState(newState);
+  // On the first time we touch this texture in this session, remember its keyed mutex (if any)
+  // so executeSubmission can acquire/release it around ExecuteCommandLists. Only D3D12Hardware-
+  // Texture returns a non-null mutex; every other texture short-circuits with zero overhead. We
+  // use the map's insertion flag as the de-dup source of truth to avoid scanning keyedMutexes
+  // on every barrier call.
+  if (firstTouch) {
+    if (auto* mutex = texture->keyedMutex()) {
+      session.keyedMutexes.push_back(mutex);
+    }
+  }
 }
 
 void D3D12CommandEncoder::onRelease(D3D12GPU* gpu) {

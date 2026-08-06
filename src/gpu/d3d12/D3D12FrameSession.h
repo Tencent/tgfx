@@ -80,6 +80,14 @@ struct D3D12FrameSession {
   // whose StateBefore disagrees with reality.
   std::unordered_map<D3D12Texture*, D3D12_RESOURCE_STATES> initialTextureStates;
 
+  // Keyed mutexes that must be acquired before ExecuteCommandLists (to obtain exclusive access to
+  // the shared textures this session samples) and released after the fence signals (to hand the
+  // ownership back to the producer, typically the D3D11 side). Deduplicated at insertion time by
+  // D3D12CommandEncoder::recordTextureStateChange. The vector stores raw pointers because each
+  // corresponding D3D12HardwareTexture is retained through retainedResources for the entire
+  // session lifetime; hence the pointer stays valid until both Acquire and Release have finished.
+  std::vector<IDXGIKeyedMutex*> keyedMutexes;
+
   D3D12FrameSession() = default;
 
   // ComPtr is move-aware and zeroes the source on move; std::vector moves are also clean. The

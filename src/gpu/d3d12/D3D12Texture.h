@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <dxgi.h>
 #include "D3D12Resource.h"
 #include "D3D12Util.h"
 #include "tgfx/gpu/Texture.h"
@@ -69,6 +70,17 @@ class D3D12Texture : public Texture, public D3D12Resource {
 
   void setCurrentState(D3D12_RESOURCE_STATES state) {
     _currentState = state;
+  }
+
+  /**
+   * Returns the IDXGIKeyedMutex that guards this texture's memory when it is shared across APIs,
+   * or nullptr if no cross-API synchronisation is required. The base D3D12Texture never uses a
+   * keyed mutex; only D3D12HardwareTexture overrides this to expose the mutex queried from the
+   * D3D11 side. When non-null, D3D12CommandEncoder registers the mutex with the session so that
+   * D3D12GPU::executeSubmission can AcquireSync/ReleaseSync it around ExecuteCommandLists.
+   */
+  virtual IDXGIKeyedMutex* keyedMutex() const {
+    return nullptr;
   }
 
   BackendTexture getBackendTexture() const override;
