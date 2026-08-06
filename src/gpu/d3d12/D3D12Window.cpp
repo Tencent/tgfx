@@ -150,6 +150,12 @@ struct D3D12Window::PlatformState {
   // ResourceCache, resources retained by recycled command lists). Must run before ResizeBuffers
   // or swapchain release to avoid DXGI_ERROR_INVALID_CALL / OBJECT_DELETED_WHILE_STILL_IN_USE.
   void drainBackBufferOwners(Context* context, D3D12GPU* gpu);
+  // Fully drains the command queue: first waits on tgfx-managed submissions, then signals a
+  // fresh fence and waits on it to cover any Present-driven GPU work that was enqueued after
+  // the last tgfx frame fence (the frame fence is signaled at submit() time, before Present()
+  // hands the GPU-side flip to the queue). Callers that release backbuffers or resize the swap
+  // chain must invoke this instead of a bare waitUntilCompleted().
+  void drainQueue(D3D12GPU* gpu);
   bool rebuild(Context* context, int newWidth, int newHeight);
 };
 
@@ -170,8 +176,12 @@ bool D3D12Window::PlatformState::buildBackBuffers() {
 bool D3D12Window::PlatformState::rebuild(Context* context, int newWidth, int newHeight) {
   // Just clearing backBuffers is not enough: ExternalRenderTargets in the ResourceCache and
   // recycled command lists still hold refs on the old ID3D12Resources, so DXGI rejects
-  // ResizeBuffers. Route through drainBackBufferOwners which flushes both.
+  // ResizeBuffers. Route through drainBackBufferOwners which flushes both. drainQueue is
+  // required before that: waitUntilCompleted alone leaves any pending Present-driven flip
+  // work on the queue, which can race ResizeBuffers on rapid present-then-resize sequences
+  // (see the analogous handling in ~D3D12Window).
   auto* gpu = static_cast<D3D12GPU*>(context->gpu());
+  drainQueue(gpu);
   drainBackBufferOwners(context, gpu);
   auto hr =
       swapChain->ResizeBuffers(BACKBUFFER_COUNT, static_cast<UINT>(newWidth),
@@ -196,6 +206,36 @@ void D3D12Window::PlatformState::drainBackBufferOwners(Context* context, D3D12GP
   context->purgeResourcesNotUsedSince(std::chrono::steady_clock::now());
   gpu->processUnreferencedResources();
   gpu->commandListPool().clear();
+}
+
+void D3D12Window::PlatformState::drainQueue(D3D12GPU* gpu) {
+  // Step 1: wait for tgfx-managed submissions. Their frame fence is signaled at submit() time,
+  // before Present() is invoked, so this alone does not cover the GPU-side flip that DXGI
+  // schedules on our command queue when Present() runs.
+  gpu->queue()->waitUntilCompleted();
+
+  // Step 2: signal a fresh fence *after* Present's flip work has been enqueued and wait on it,
+  // ensuring the queue is truly idle before we release / resize the swapchain buffers.
+  auto* d3d12CmdQueue = static_cast<D3D12CommandQueue*>(gpu->queue())->d3d12CommandQueue();
+  ComPtr<ID3D12Fence> drainFence;
+  if (FAILED(gpu->device()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&drainFence)))) {
+    return;
+  }
+  const UINT64 targetValue = 1;
+  if (FAILED(d3d12CmdQueue->Signal(drainFence.Get(), targetValue))) {
+    return;
+  }
+  if (drainFence->GetCompletedValue() >= targetValue) {
+    return;
+  }
+  HANDLE evt = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+  if (evt == nullptr) {
+    return;
+  }
+  if (SUCCEEDED(drainFence->SetEventOnCompletion(targetValue, evt))) {
+    WaitForSingleObject(evt, 5000);
+  }
+  CloseHandle(evt);
 }
 
 #ifdef _WIN32
@@ -300,11 +340,11 @@ D3D12Window::~D3D12Window() {
   // that Present work is still pending, the runtime fires
   // OBJECT_DELETED_WHILE_STILL_IN_USE (#921) and the debug layer asserts.
   //
-  // To make sure the queue really is idle, we Signal a fresh fence on the queue and wait for
-  // it: that flushes everything previously enqueued, Present included.
+  // drainQueue performs both waits: the tgfx frame fence, followed by a fresh drain fence
+  // signaled *after* Present's flip is enqueued.
   //
-  // Then we still have to release the in-tgfx owners of each backbuffer before destroying
-  // the swap chain itself:
+  // We still have to release the in-tgfx owners of each backbuffer before destroying the swap
+  // chain itself:
   //   - the cached ExternalRenderTarget / ExternalTexture pair (drained via ResourceCache and
   //     D3D12GPU return queues)
   //   - recycled command lists in D3D12CommandListPool (each list still pins the resources it
@@ -312,35 +352,14 @@ D3D12Window::~D3D12Window() {
   auto context = device->lockContext();
   if (context != nullptr) {
     auto* d3d12GPU = static_cast<D3D12GPU*>(context->gpu());
-    auto* d3d12CmdQueue = static_cast<D3D12CommandQueue*>(d3d12GPU->queue())->d3d12CommandQueue();
 
-    // 1. Wait for all tgfx-managed submissions to complete.
-    d3d12GPU->queue()->waitUntilCompleted();
+    // 1. Drain both tgfx submissions and any Present-driven flip work still on the queue.
+    _platformState->drainQueue(d3d12GPU);
 
-    // 2. Wait for any Present-driven work the queue still has queued up. Without this the
-    //    swap-chain release path below trips OBJECT_DELETED_WHILE_STILL_IN_USE because DXGI's
-    //    internal flip operation is still in flight on the queue.
-    ComPtr<ID3D12Fence> drainFence;
-    if (SUCCEEDED(
-            d3d12GPU->device()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&drainFence)))) {
-      const UINT64 targetValue = 1;
-      if (SUCCEEDED(d3d12CmdQueue->Signal(drainFence.Get(), targetValue))) {
-        if (drainFence->GetCompletedValue() < targetValue) {
-          HANDLE evt = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-          if (evt != nullptr) {
-            if (SUCCEEDED(drainFence->SetEventOnCompletion(targetValue, evt))) {
-              WaitForSingleObject(evt, 5000);
-            }
-            CloseHandle(evt);
-          }
-        }
-      }
-    }
-
-    // 3. Drop tgfx-side owners of the backbuffers.
+    // 2. Drop tgfx-side owners of the backbuffers.
     _platformState->drainBackBufferOwners(context, d3d12GPU);
 
-    // 4. Release the swap chain. Our own backbuffer ComPtrs were already cleared inside
+    // 3. Release the swap chain. Our own backbuffer ComPtrs were already cleared inside
     //    drainBackBufferOwners.
     _platformState->swapChain = nullptr;
     device->unlock();
@@ -367,9 +386,8 @@ std::shared_ptr<RenderTargetProxy> D3D12Window::onCreateRenderTarget(Context* co
     return nullptr;
   }
   if (width != _platformState->width || height != _platformState->height) {
-    // Wait for the GPU to finish reading old backbuffers; ResizeBuffers cannot proceed while
-    // any reference is outstanding, including in-flight command lists.
-    context->gpu()->queue()->waitUntilCompleted();
+    // rebuild() drains the queue (both tgfx and Present-driven work) before ResizeBuffers,
+    // so callers do not need a separate waitUntilCompleted() here.
     if (!_platformState->rebuild(context, width, height)) {
       return nullptr;
     }
