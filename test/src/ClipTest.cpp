@@ -738,6 +738,50 @@ TGFX_TEST(ClipTest, ScissorOnlyClip) {
   }
 }
 
+TGFX_TEST(ClipTest, EmptyElementClippedOut) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto renderTarget = RenderTargetProxy::Make(context, 100, 100, false);
+  ASSERT_NE(renderTarget, nullptr);
+  OpsCompositor compositor(renderTarget, 0);
+
+  // A non-AA rect compressed below one pixel by transform() degenerates into an empty element
+  // (ClipElement::simplify marks it Empty because it covers no pixel center), while
+  // ClipRecord.state stays Rect. applyClip must still recognize the empty element and report
+  // ClippedOut instead of feeding it to the mask rasterizer.
+  ClipStack clip;
+  clip.clipRect(Rect::MakeXYWH(10, 20, 40, 30), Matrix::I(), false);
+  clip.transform(Matrix::MakeScale(1.0f, 0.001f));
+  TGFX_PRIVATE_ACCESS({
+    ASSERT_EQ(clip.elements().size(), 1u);
+    EXPECT_EQ(clip.state(), ClipState::Rect);
+    EXPECT_TRUE(clip.elements()[0].shape().isEmpty());
+    auto applied = compositor.applyClip(clip);
+    EXPECT_EQ(applied.status, AppliedClipStatus::ClippedOut);
+  });
+}
+
+TGFX_TEST(ClipTest, SubPixelClipMaskRasterizeNoNullOp) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto renderTarget = RenderTargetProxy::Make(context, 100, 100, false);
+  ASSERT_NE(renderTarget, nullptr);
+  OpsCompositor compositor(renderTarget, 0);
+
+  // End-to-end rendering path: before the fix, applyClip fed the degenerate empty element to
+  // makeClipTexture, which queued a null draw op whose execution crashed with a null vtable call
+  // (memory access out of bounds on wasm). With the fix the clip is reported ClippedOut and no
+  // clip-mask raster task is queued, so flushing must not crash.
+  ClipStack clip;
+  clip.clipRect(Rect::MakeXYWH(10, 20, 40, 30), Matrix::I(), false);
+  clip.transform(Matrix::MakeScale(1.0f, 0.001f));
+  auto applied = compositor.applyClip(clip);
+  EXPECT_EQ(applied.status, AppliedClipStatus::ClippedOut);
+  context->flushAndSubmit();
+}
+
 TGFX_TEST(ClipTest, Overview) {
   ContextScope scope;
   auto context = scope.getContext();
