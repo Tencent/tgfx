@@ -504,7 +504,8 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(BlockAllocator* allocator,
       default:
         return nullptr;
     }
-    if (slot.op != AOTChainOp::Texture && slot.in0 == -2) {
+    if (slot.op != AOTChainOp::Texture &&
+        (slot.in0 == -2 || (slot.op == AOTChainOp::Blend && slot.in1 == -2))) {
       return nullptr;
     }
   }
