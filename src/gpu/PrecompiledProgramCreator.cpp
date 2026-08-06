@@ -232,6 +232,10 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
     if (reason == PrecompiledFallbackReason::NoMatchingRule &&
         cache->diagnosticRecordingEnabled()) {
       record.decomposeAnalysis = AOTEffectDecomposer::Analyze(programInfo);
+      // Fold-route probe (still analysis-only): whether folding the coverage axis into the color
+      // chain at program-creation time would make this draw matchable. Sizes the
+      // decomposed-program route before it is enabled.
+      record.foldRouteOutcome = AOTEffectDecomposer::AnalyzeFoldRoute(programInfo);
     }
     cache->recordArtifactMiss(reason, record);
     return nullptr;

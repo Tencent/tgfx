@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/AOTEffectDecomposer.h"
+#include "gpu/AOTPlanExecutor.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/processors/FragmentProcessor.h"
 
@@ -397,6 +398,74 @@ AOTDecomposeAnalysis AOTEffectDecomposer::Analyze(const ProgramInfo* programInfo
   result.color = ClassifyAxis(colorProcessors);
   result.coverage = ClassifyAxis(coverageProcessors);
   return result;
+}
+
+const char* AOTFoldRouteOutcomeName(AOTFoldRouteOutcome outcome) {
+  switch (outcome) {
+    case AOTFoldRouteOutcome::NotApplicable:
+      return "NotApplicable";
+    case AOTFoldRouteOutcome::FoldBlockedByXP:
+      return "FoldBlockedByXP";
+    case AOTFoldRouteOutcome::BlockedByLowering:
+      return "BlockedByLowering";
+    case AOTFoldRouteOutcome::BlockedByValidation:
+      return "BlockedByValidation";
+    case AOTFoldRouteOutcome::UnsupportedShape:
+      return "UnsupportedShape";
+    case AOTFoldRouteOutcome::NotExecutable:
+      return "NotExecutable";
+    case AOTFoldRouteOutcome::GPIncompatible:
+      return "GPIncompatible";
+    case AOTFoldRouteOutcome::Routable:
+      return "Routable";
+  }
+  return "Unknown";
+}
+
+AOTFoldRouteOutcome AOTEffectDecomposer::AnalyzeFoldRoute(const ProgramInfo* programInfo) {
+  if (programInfo == nullptr) {
+    return AOTFoldRouteOutcome::NotApplicable;
+  }
+  auto total = programInfo->numFragmentProcessors();
+  auto colorCount = programInfo->numColorFragmentProcessors();
+  if (total == colorCount) {
+    return AOTFoldRouteOutcome::NotApplicable;
+  }
+  // Folding coverage into the color chain is only pixel-identical when the blend does not read the
+  // destination: a PorterDuff XP derives its factors from the source alpha, and folding changes
+  // what that alpha is. EmptyXferProcessor (fixed-function pipeline blend) applies coverage as a
+  // plain multiply, which is exactly what the folded chain reproduces.
+  auto xferProcessor = programInfo->getXferProcessor();
+  if (xferProcessor == nullptr || xferProcessor->name() != "EmptyXferProcessor") {
+    return AOTFoldRouteOutcome::FoldBlockedByXP;
+  }
+  std::vector<const FragmentProcessor*> allProcessors;
+  allProcessors.reserve(total);
+  for (size_t i = 0; i < total; ++i) {
+    allProcessors.push_back(programInfo->getFragmentProcessor(i));
+  }
+  AOTEffectGraph graph = {};
+  if (!Lower(allProcessors, &graph)) {
+    return AOTFoldRouteOutcome::BlockedByLowering;
+  }
+  if (!ValidateForFusion(graph)) {
+    return AOTFoldRouteOutcome::BlockedByValidation;
+  }
+  AOTEffectPlan plan = {};
+  if (!Decompose(graph, AOTDecompositionMode::PreferFusion, &plan)) {
+    return AOTFoldRouteOutcome::UnsupportedShape;
+  }
+  if (!AOTPlanExecutor::CanExecute(graph, plan)) {
+    return AOTFoldRouteOutcome::NotExecutable;
+  }
+  // The fused kernels' matchers only know the two rect-oriented GPs; anything else (shape,
+  // atlas text, mesh, ellipse) would fail the strict lookup after a successful plan.
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp == nullptr || (gp->name() != "DefaultGeometryProcessor" &&
+                        gp->name() != "QuadPerEdgeAAGeometryProcessor")) {
+    return AOTFoldRouteOutcome::GPIncompatible;
+  }
+  return AOTFoldRouteOutcome::Routable;
 }
 
 }  // namespace tgfx

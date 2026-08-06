@@ -80,6 +80,10 @@ struct PrecompiledFallbackRecord {
   // Populated only for NoMatchingRule misses while diagnostic recording is enabled; drives the
   // offline decomposition-coverage audit. Left at its all-Trivial default otherwise.
   AOTDecomposeAnalysis decomposeAnalysis = {};
+  // Populated under the same conditions as decomposeAnalysis: the static verdict on whether
+  // folding the coverage axis into the color chain at program-creation time would make this draw
+  // matchable (the decomposed-program route). NotApplicable when there is nothing to fold.
+  AOTFoldRouteOutcome foldRouteOutcome = AOTFoldRouteOutcome::NotApplicable;
 };
 
 const char* PrecompiledFallbackReasonName(PrecompiledFallbackReason reason);
