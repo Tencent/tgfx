@@ -18,13 +18,13 @@
 
 #pragma once
 
-#include "gpu/processors/FragmentProcessor.h"
+#include "gpu/processors/Blur1DFragmentProcessor.h"
 
 namespace tgfx {
 
 enum class GaussianBlurDirection { Horizontal, Vertical };
 
-class GaussianBlur1DFragmentProcessor : public FragmentProcessor {
+class GaussianBlur1DFragmentProcessor : public Blur1DFragmentProcessor {
  public:
   static PlacementPtr<FragmentProcessor> Make(BlockAllocator* allocator,
                                               PlacementPtr<FragmentProcessor> processor,
@@ -41,11 +41,16 @@ class GaussianBlur1DFragmentProcessor : public FragmentProcessor {
   GaussianBlur1DFragmentProcessor(PlacementPtr<FragmentProcessor> processor, float sigma,
                                   GaussianBlurDirection direction, float stepLength, int maxSigma);
 
-  void onComputeProcessorKey(BytesKey*) const override;
+  void onComputeProcessorKey(BytesKey* key) const override;
 
   float sigma = 0.f;
   GaussianBlurDirection direction = GaussianBlurDirection::Horizontal;
   float stepLength = 1.f;
   int maxSigma = 10;
+
+  void computeKernel() override;
+  int kernelLoopUpperBound() const override {
+    return 4 * maxSigma;
+  }
 };
 }  // namespace tgfx

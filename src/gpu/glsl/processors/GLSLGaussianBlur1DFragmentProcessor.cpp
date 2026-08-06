@@ -17,8 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLGaussianBlur1DFragmentProcessor.h"
+#include <algorithm>
+#include <cmath>
 
 namespace tgfx {
+
+// Returns the shader expression for sampling the child at a coord offset by the gaussian kernel.
+// "offset" is a shader variable declared in the emitted code and "i" is the loop index.
+static std::string GaussianOffsetCoordFunc(std::string_view coord) {
+  return "(" + std::string(coord) + " + offset * float(i))";
+}
 
 PlacementPtr<FragmentProcessor> GaussianBlur1DFragmentProcessor::Make(
     BlockAllocator* allocator, PlacementPtr<FragmentProcessor> processor, float sigma,
@@ -32,6 +40,12 @@ PlacementPtr<FragmentProcessor> GaussianBlur1DFragmentProcessor::Make(
   if (sigma <= 0 || stepLength <= 0) {
     return processor;
   }
+  // Cap maxSigma to the kernel table limit so the shader loop bound (4 * maxSigma) and the
+  // precomputed kernel size stay consistent with each other.
+  maxSigma = std::min(maxSigma, MAX_KERNEL_RADIUS / 2);
+  // Clamp sigma to maxSigma so the kernel radius never exceeds the fixed-size kernel table that is
+  // dimensioned for maxSigma. The shader loop also derives its bound from maxSigma.
+  sigma = std::min(sigma, static_cast<float>(maxSigma));
 
   return allocator->make<GLSLGaussianBlur1DFragmentProcessor>(
       std::move(processor), sigma, direction, stepLength, static_cast<int>(ceil(maxSigma)));
@@ -47,32 +61,31 @@ GLSLGaussianBlur1DFragmentProcessor::GLSLGaussianBlur1DFragmentProcessor(
 void GLSLGaussianBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
   auto fragBuilder = args.fragBuilder;
 
-  std::string sigmaName =
-      args.uniformHandler->addUniform("Sigma", UniformFormat::Float, ShaderStage::Fragment);
+  // The normalized half-kernel weights are precomputed on the CPU and uploaded as a vec4 array.
+  std::string kernelName = args.uniformHandler->addUniform(
+      "Kernel", UniformFormat::Float4, ShaderStage::Fragment, KERNEL_VEC4_COUNT);
+  std::string radiusName =
+      args.uniformHandler->addUniform("Radius", UniformFormat::Int, ShaderStage::Fragment);
   std::string texelSizeName =
       args.uniformHandler->addUniform("Step", UniformFormat::Float2, ShaderStage::Fragment);
 
   fragBuilder->codeAppendf("vec2 offset = %s;", texelSizeName.c_str());
-
-  fragBuilder->codeAppendf("float sigma = %s;", sigmaName.c_str());
-  fragBuilder->codeAppend("int radius = int(ceil(2.0 * sigma));");
+  fragBuilder->codeAppendf("int radius = %s;", radiusName.c_str());
   fragBuilder->codeAppend("vec4 sum = vec4(0.0);");
-  fragBuilder->codeAppend("float total = 0.0;");
 
-  fragBuilder->codeAppendf("for (int j = 0; j <= %d; ++j) {", 4 * maxSigma);
+  // The kernel is symmetric, so abs(i) indexes the half-kernel table. The weights are already
+  // normalized on the CPU, so neither exp() nor the trailing normalization division is needed.
+  fragBuilder->codeAppendf("for (int j = 0; j <= %d; ++j) {", kernelLoopUpperBound());
   fragBuilder->codeAppend("int i = j - radius;");
-  fragBuilder->codeAppend("float weight = exp(-float(i*i) / (2.0*sigma*sigma));");
-  fragBuilder->codeAppend("total += weight;");
+  fragBuilder->codeAppend("if (i > radius) { break; }");
+  fragBuilder->codeAppendf("float weight = %s[abs(i) / 4][abs(i) %% 4];", kernelName.c_str());
 
   std::string tempColor = "tempColor";
-  emitChild(0, &tempColor, args, [](std::string_view coord) {
-    return "(" + std::string(coord) + " + offset * float(i))";
-  });
+  emitChild(0, &tempColor, args, GaussianOffsetCoordFunc);
 
   fragBuilder->codeAppendf("sum += %s * weight;", tempColor.c_str());
-  fragBuilder->codeAppend("if (i == radius) { break; }");
   fragBuilder->codeAppend("}");
-  fragBuilder->codeAppendf("%s = sum / total;", args.outputColor.c_str());
+  fragBuilder->codeAppendf("%s = sum;", args.outputColor.c_str());
 }
 
 void GLSLGaussianBlur1DFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
@@ -88,7 +101,8 @@ void GLSLGaussianBlur1DFragmentProcessor::onSetData(UniformData* /*vertexUniform
   auto matrix = transform->getTotalMatrix();
   matrix.mapPoints(stepVectors, 2);
   Point step = stepVectors[1] - stepVectors[0];
-  fragmentUniformData->setData("Sigma", sigma);
+
+  Blur1DFragmentProcessor::setKernelData(fragmentUniformData);
   fragmentUniformData->setData("Step", step);
 }
 }  // namespace tgfx

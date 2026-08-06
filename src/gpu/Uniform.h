@@ -52,9 +52,12 @@ class Uniform {
   Uniform() = default;
 
   /**
-   * Creates a uniform variable with the specified name, type, and visibility.
+   * Creates a uniform variable with the specified name, type, and element count. An array uniform
+   * is created when count is greater than 1. Array uniforms must use a format whose element size is
+   * 16 bytes (e.g. Float4), because the std140 layout aligns every array element to 16 bytes.
    */
-  Uniform(std::string name, UniformFormat format) : _name(std::move(name)), _format(format) {
+  Uniform(std::string name, UniformFormat format, uint32_t count = 1)
+      : _name(std::move(name)), _format(format), _count(count) {
   }
 
   /**
@@ -79,12 +82,20 @@ class Uniform {
   }
 
   /**
-   * Returns the size of the uniform variable in bytes.
+   * The number of elements in the uniform array. Returns 1 for scalar uniforms.
+   */
+  uint32_t count() const {
+    return _count;
+  }
+
+  /**
+   * Returns the total size of the uniform variable in bytes.
    */
   size_t size() const;
 
  private:
   std::string _name = {};
   UniformFormat _format = UniformFormat::Float;
+  uint32_t _count = 1;
 };
 }  // namespace tgfx
