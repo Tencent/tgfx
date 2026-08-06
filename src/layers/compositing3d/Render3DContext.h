@@ -74,7 +74,8 @@ class Render3DContext : public Layer3DContext {
   // dispatches and any nested offscreen handlers walk the standard BackgroundCapturer pipeline.
   // `localToWorld` is the layer's matrix in this context's world space (== outer canvas-local at
   // the top level; == enclosing leaf's local for nested 3D contexts). `info` carries the raster
-  // dimensions and local->raster density derived from the leaf's projection onto the viewport.
+  // dimensions and local->raster density derived from the leaf's projection onto the viewport,
+  // falling back to the contentScale density when the whole leaf is visible.
   std::shared_ptr<Image> rasterLayer(Layer* layer, float alpha, BlendMode blendMode,
                                      DrawArgs& leafArgs, const RasterInfo& info,
                                      const std::shared_ptr<BackgroundSource>& compositorSource,
@@ -88,7 +89,8 @@ class Render3DContext : public Layer3DContext {
   bool primeCompositorFromOuterCanvas(Canvas* outerCanvas);
   // Fills `info` with a RasterInfo sized to the projection of `localBounds` through
   // `localToCompositor`, clipped to `compositorViewport`. Returns false when the layer projects
-  // entirely outside the viewport or behind the camera.
+  // entirely outside the viewport, or when any corner lands behind the camera (a near-plane
+  // straddle culls the whole leaf).
   static bool ComputeRasterInfo(const Matrix3D& localToCompositor, const Rect& localBounds,
                                 const Rect& compositorViewport, float contentScale,
                                 RasterInfo* info);

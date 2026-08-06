@@ -91,9 +91,10 @@ void Render3DContext::finishAndDrawTo(const DrawArgs& args, Canvas* canvas) {
     return;
   }
 
-  // Sizing rasters to the compositor viewport (not the full localBounds) and deriving density
-  // from the projected footprint keeps texture sizes bounded and sample rate aligned with what
-  // the compositor actually samples for perspective-transformed leaves.
+  // Rasters are sized to the compositor viewport (not the full localBounds), keeping texture
+  // sizes bounded. A fully visible leaf keeps the 1:1 contentScale density; a clipped leaf
+  // derives a projected-footprint density so its sample rate matches what the compositor
+  // samples.
   const Rect compositorViewport = Rect::MakeWH(static_cast<float>(_compositor->width()),
                                                static_cast<float>(_compositor->height()));
   std::unordered_map<Layer*, RasterInfo> layerRasterInfo;
@@ -295,9 +296,9 @@ bool Render3DContext::ComputeRasterInfo(const Matrix3D& localToCompositor, const
   }
   // Size the raster from the clip-visible local footprint: when it covers the whole leaf, keep the
   // 1:1 contentScale density; otherwise derive density from the (dest / local) ratio of the clipped
-  // region, which stays bounded by the viewport. The clip in ComputeVisibleFootprints keeps sample
-  // rate finite even when the visible region touches the near plane — a Jacobian sample at the
-  // singular boundary would otherwise blow up.
+  // region, which stays bounded by the viewport. IsRectBehindCamera already rejected near-plane
+  // straddles, so the visible region never touches the near plane here and the density stays
+  // finite; the homography clip would otherwise blow up at that singular boundary.
   Rect localFootprint = {};
   Rect destFootprint = {};
   if (!Matrix3DUtils::ComputeVisibleFootprints(localBounds, compositorViewport, localToCompositor,
