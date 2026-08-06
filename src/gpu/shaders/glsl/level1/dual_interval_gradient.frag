@@ -11,8 +11,9 @@
 #ifndef HAS_XP
 #define HAS_XP 0
 #endif
-#ifndef HAS_COVERAGE
-#define HAS_COVERAGE 0
+#define HAS_RUNTIME_CLIP 1
+#ifndef HAS_DEVICE_MASK
+#define HAS_DEVICE_MASK 0
 #endif
 #ifndef HAS_VCOVERAGE
 #define HAS_VCOVERAGE 0
@@ -39,7 +40,7 @@ layout(location = 0) in vec2 TransformedCoords_0;
 layout(location = 1) in float vCoverage;
 #endif
 
-#if HAS_COVERAGE == 2
+#if HAS_DEVICE_MASK
 layout(set = 1, binding = 0) uniform sampler2D MaskTextureSampler;
   #define XP_DST_TEX_BINDING 1
 #else

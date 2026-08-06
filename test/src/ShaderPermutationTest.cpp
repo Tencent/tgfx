@@ -493,7 +493,7 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientCompiledSpace) {
   SingleIntervalGradientShader shader;
   auto info = shader.info();
   EXPECT_EQ(info.vertDomain.totalCount(), 4u);
-  EXPECT_EQ(info.fragDomain.totalCount(), 18u);
+  EXPECT_EQ(info.fragDomain.totalCount(), 12u);
 
   std::set<uint32_t> vertexIndices;
   std::set<uint32_t> fragmentIndices;
@@ -508,11 +508,11 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientCompiledSpace) {
       fragmentIndices.insert(fi);
     }
   }
-  EXPECT_EQ(compiledCount, 36u);
+  EXPECT_EQ(compiledCount, 24u);
   EXPECT_EQ(vertexIndices.size(), 4u);
-  EXPECT_EQ(fragmentIndices.size(), 18u);
-  EXPECT_TRUE(IsBuildablePermutation(info, 3, 17));
-  EXPECT_FALSE(IsBuildablePermutation(info, 3, 18));
+  EXPECT_EQ(fragmentIndices.size(), 12u);
+  EXPECT_TRUE(IsBuildablePermutation(info, 3, 11));
+  EXPECT_FALSE(IsBuildablePermutation(info, 3, 12));
 }
 
 TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
@@ -575,8 +575,8 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
     }
   }
   EXPECT_EQ(vertexIndices.size(), 4u);
-  EXPECT_EQ(fragmentIndices.size(), 18u);
-  EXPECT_EQ(pairs.size(), 36u);
+  EXPECT_EQ(fragmentIndices.size(), 12u);
+  EXPECT_EQ(pairs.size(), 24u);
 
   for (int hasVertexCoverage = 0; hasVertexCoverage < 2; ++hasVertexCoverage) {
     BlockAllocator allocator;
@@ -651,9 +651,9 @@ TGFX_TEST(ShaderPermutationTest, ShouldCompile) {
     if (shaderInfo.name != TextureFillShader::Name()) {
       continue;
     }
-    // Vert: no dimensions = 1 raw. Frag: HAS_XP(int3) + HAS_COVERAGE(int3) = 9 raw. YUV is
+    // Vert: no dimensions = 1 raw. Frag: HAS_XP(int3) + HAS_DEVICE_MASK(bool) = 6 raw. YUV is
     // rejected by the matcher before matching and subset clamping is a runtime uniform, so every
-    // enumerated combination is buildable: 1 * 9 = 9.
+    // enumerated combination is buildable: 1 * 6 = 6.
     int compiledCount = 0;
     for (uint32_t vi = 0; vi < shaderInfo.vertDomain.totalCount(); vi++) {
       auto vertValues = shaderInfo.vertDomain.decode(vi);
@@ -669,7 +669,7 @@ TGFX_TEST(ShaderPermutationTest, ShouldCompile) {
         }
       }
     }
-    EXPECT_EQ(compiledCount, 9);
+    EXPECT_EQ(compiledCount, 6);
   }
 }
 
@@ -690,7 +690,8 @@ TGFX_TEST(ShaderPermutationTest, TextureFillTypedEncodingMatchesDomains) {
     auto values = fragmentDomain.decode(index);
     TextureFillShader::FragmentValues typedValues = {};
     typedValues.xp = static_cast<uint32_t>(values[TextureFillShader::FD::HAS_XP]);
-    typedValues.coverage = static_cast<uint32_t>(values[TextureFillShader::FD::HAS_COVERAGE]);
+    typedValues.deviceMask =
+        static_cast<uint32_t>(values[TextureFillShader::FD::HAS_DEVICE_MASK]);
     EXPECT_EQ(TextureFillShader::EncodeFragment(typedValues), index);
   }
 }
@@ -703,7 +704,7 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
   EXPECT_EQ(cache->vertexEntryCount(), 117u);
-  EXPECT_EQ(cache->fragmentEntryCount(), 378u);
+  EXPECT_EQ(cache->fragmentEntryCount(), 342u);
   std::string expectedTag = TGFX_BACKEND_NAME;
   auto dashPos = expectedTag.find('-');
   if (dashPos != std::string::npos) {

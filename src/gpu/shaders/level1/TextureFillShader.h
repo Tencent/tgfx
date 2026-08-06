@@ -35,20 +35,19 @@ class TextureFillShader : public PrecompiledShader {
   using VD = VertDims;
 
   // Fragment dimensions:
-  //   HAS_COVERAGE (int, 3 values):
-  //     0 = no coverage
-  //     1 = AARectEffect only (rect clip via uniform)
-  //     2 = AARectEffect + MaskTexture (DeviceSpaceTextureEffect mask + rect clip)
+  //   HAS_DEVICE_MASK: adds the device-space mask sampler and shifts the XP dst-texture binding.
+  // AARect clipping uses the always-present Rect / HasClip runtime uniform contract because it does
+  // not change the fragment resource interface.
   // ALPHA_ONLY and HAS_RGBAAA are folded into runtime uniforms (AlphaOnly / HasRgbaaa), set by
   // GLSLTextureEffect::onSetData, rather than compile-time permutations.
   struct FragDims {
     // Subset clamping is runtime: the shader always declares Subset and clamps, and the writer
     // uploads the full texture bounds when there is no real subset, so the clamp is a no-op.
-    enum : uint32_t { HAS_XP, HAS_COVERAGE, COUNT };
+    enum : uint32_t { HAS_XP, HAS_DEVICE_MASK, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("HAS_XP", 3),
-          PermutationInt("HAS_COVERAGE", 3),
+          PermutationBool("HAS_DEVICE_MASK"),
       });
     }
   };
@@ -57,7 +56,7 @@ class TextureFillShader : public PrecompiledShader {
 
   struct FragmentValues {
     uint32_t xp = 0;
-    uint32_t coverage = 0;
+    uint32_t deviceMask = 0;
   };
 
   /** Returns the stable template name used by both bundle generation and runtime lookup. */
@@ -72,7 +71,7 @@ class TextureFillShader : public PrecompiledShader {
 
   /** Encodes fragment values with the same mixed-radix layout as FD::domain() without allocation. */
   static constexpr uint32_t EncodeFragment(const FragmentValues& values) {
-    return values.xp + values.coverage * 3u;
+    return values.xp + values.deviceMask * 3u;
   }
 
   PrecompiledShaderInfo info() const override {

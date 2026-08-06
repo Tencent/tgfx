@@ -349,6 +349,7 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
     // optionally. Set in the base (unmangled) context, like RTAdjust.
     int outputAlphaSwizzle = getOutputSwizzle() == Swizzle::AAAA() ? 1 : 0;
     fragmentUniformData->setDataOptional("OutputAlphaSwizzle", outputAlphaSwizzle);
+    fragmentUniformData->setDataOptional("HasClip", 0);
   }
   updateUniformDataSuffix(vertexUniformData, fragmentUniformData, geometryProcessor);
 

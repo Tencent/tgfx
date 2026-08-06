@@ -1,7 +1,7 @@
 // TextureFillShader fragment shader (non-YUV path only)
 // Processor layout: DefaultGeometryProcessor() + TextureEffect() + [coverage FP] + EmptyXferProcessor/PorterDuffXP
 // Permutation dimensions (injected by build tool as #define 0/1):
-//   HAS_XP, HAS_COVERAGE (Subset is an always-on runtime uniform)
+//   HAS_XP, HAS_DEVICE_MASK (AARect clip is a runtime uniform)
 // ALPHA_ONLY and HAS_RGBAAA are runtime uniforms (AlphaOnly / HasRgbaaa), not compile-time
 // permutations: both are pure fragment math (alpha-only replicates .r; RGBAAA adds one
 // coherent-branch alpha sample), so folding them into uniform branches shrinks the variant count.
@@ -12,8 +12,9 @@
 #ifndef HAS_XP
 #define HAS_XP 0
 #endif
-#ifndef HAS_COVERAGE
-#define HAS_COVERAGE 0
+#define HAS_RUNTIME_CLIP 1
+#ifndef HAS_DEVICE_MASK
+#define HAS_DEVICE_MASK 0
 #endif
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
@@ -33,7 +34,7 @@ layout(location = 0) in vec2 TransformedCoords_0;
 
 layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
 
-#if HAS_COVERAGE == 2
+#if HAS_DEVICE_MASK
 layout(set = 1, binding = 1) uniform sampler2D MaskTextureSampler;
   #define XP_DST_TEX_BINDING 2
 #else

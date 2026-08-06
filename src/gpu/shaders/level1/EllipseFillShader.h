@@ -28,12 +28,12 @@ class EllipseFillShader : public PrecompiledShader {
   using D = Dims;
 
   struct FragDims {
-    enum : uint32_t { HAS_COMMON_COLOR, HAS_XP, HAS_COVERAGE, COUNT };
+    enum : uint32_t { HAS_COMMON_COLOR, HAS_XP, HAS_DEVICE_MASK, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationBool("HAS_COMMON_COLOR"),
           PermutationInt("HAS_XP", 3),
-          PermutationInt("HAS_COVERAGE", 3),
+          PermutationBool("HAS_DEVICE_MASK"),
       });
     }
   };

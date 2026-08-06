@@ -186,12 +186,15 @@ static std::optional<CoverageKind> ClassifyCoverageFP(const ProgramInfo* program
   return std::nullopt;
 }
 
-static std::optional<int> SharedCoverageValue(const ProgramInfo* programInfo) {
+// AARect coverage changes only fragment math, whereas a device-space mask adds a sampler and shifts
+// the terminal XP binding. Kernels using the runtime clip contract therefore compile only this ABI
+// distinction and carry the rect state through Rect / HasClip uniforms.
+static std::optional<int> SharedDeviceMaskValue(const ProgramInfo* programInfo) {
   auto coverage = ClassifyCoverageFP(programInfo);
   if (!coverage || *coverage == CoverageKind::LocalMask) {
     return std::nullopt;
   }
-  return static_cast<int>(*coverage);
+  return *coverage == CoverageKind::DeviceMask ? 1 : 0;
 }
 
 static std::optional<PermutationMatchResult> TryMatchTextureFill(const ProgramInfo* programInfo) {
@@ -202,7 +205,7 @@ static std::optional<PermutationMatchResult> TryMatchTextureFill(const ProgramIn
   if (programInfo->numColorFragmentProcessors() != 1) {
     return std::nullopt;
   }
-  auto coverageType = SharedCoverageValue(programInfo);
+  auto coverageType = SharedDeviceMaskValue(programInfo);
   if (!coverageType) {
     return std::nullopt;
   }
@@ -230,7 +233,7 @@ static std::optional<PermutationMatchResult> TryMatchTextureFill(const ProgramIn
 
   TextureFillShader::FragmentValues fragmentValues = {};
   fragmentValues.xp = static_cast<uint32_t>(xpType);
-  fragmentValues.coverage = static_cast<uint32_t>(*coverageType);
+  fragmentValues.deviceMask = static_cast<uint32_t>(*coverageType);
   auto fragIndex = TextureFillShader::EncodeFragment(fragmentValues);
   return PermutationMatchResult{TextureFillShader::Name(), vertIndex, fragIndex};
 }
@@ -793,7 +796,7 @@ static std::optional<PermutationMatchResult> TryMatchGradientFill(const ProgramI
   if (programInfo->numColorFragmentProcessors() != 1) {
     return std::nullopt;
   }
-  auto coverageType = SharedCoverageValue(programInfo);
+  auto coverageType = SharedDeviceMaskValue(programInfo);
   if (!coverageType) {
     return std::nullopt;
   }
@@ -842,7 +845,7 @@ static std::optional<PermutationMatchResult> TryMatchGradientFill(const ProgramI
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
   fragValues[FD::HAS_XP] = xpType;
-  fragValues[FD::HAS_COVERAGE] = *coverageType;
+  fragValues[FD::HAS_DEVICE_MASK] = *coverageType;
   fragValues[FD::HAS_VCOVERAGE] = vCoverage;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"GradientFillShader", vertIndex, fragIndex};
@@ -864,7 +867,7 @@ static std::optional<PermutationMatchResult> TryMatchSingleIntervalGradient(
   if (programInfo->numColorFragmentProcessors() != 1) {
     return std::nullopt;
   }
-  auto coverageType = SharedCoverageValue(programInfo);
+  auto coverageType = SharedDeviceMaskValue(programInfo);
   if (!coverageType) {
     return std::nullopt;
   }
@@ -906,7 +909,7 @@ static std::optional<PermutationMatchResult> TryMatchSingleIntervalGradient(
   std::vector<int> fragValues(FD::COUNT);
   // GP_TYPE is a vertex-only dimension; the fragment stage is identical for all GP types.
   fragValues[FD::HAS_XP] = xpType;
-  fragValues[FD::HAS_COVERAGE] = *coverageType;
+  fragValues[FD::HAS_DEVICE_MASK] = *coverageType;
   fragValues[FD::HAS_VCOVERAGE] = vCoverage;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"SingleIntervalGradientShader", vertIndex, fragIndex};
@@ -928,7 +931,7 @@ static std::optional<PermutationMatchResult> TryMatchDualIntervalGradient(
   if (programInfo->numColorFragmentProcessors() != 1) {
     return std::nullopt;
   }
-  auto coverageType = SharedCoverageValue(programInfo);
+  auto coverageType = SharedDeviceMaskValue(programInfo);
   if (!coverageType) {
     return std::nullopt;
   }
@@ -972,7 +975,7 @@ static std::optional<PermutationMatchResult> TryMatchDualIntervalGradient(
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
   fragValues[FD::HAS_XP] = xpType;
-  fragValues[FD::HAS_COVERAGE] = *coverageType;
+  fragValues[FD::HAS_DEVICE_MASK] = *coverageType;
   fragValues[FD::HAS_VCOVERAGE] = vCoverage;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"DualIntervalGradientShader", vertIndex, fragIndex};
@@ -994,7 +997,7 @@ static std::optional<PermutationMatchResult> TryMatchTextureGradient(
   if (programInfo->numColorFragmentProcessors() != 1) {
     return std::nullopt;
   }
-  auto coverageType = SharedCoverageValue(programInfo);
+  auto coverageType = SharedDeviceMaskValue(programInfo);
   if (!coverageType) {
     return std::nullopt;
   }
@@ -1038,7 +1041,7 @@ static std::optional<PermutationMatchResult> TryMatchTextureGradient(
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
   fragValues[FD::HAS_XP] = xpType;
-  fragValues[FD::HAS_COVERAGE] = *coverageType;
+  fragValues[FD::HAS_DEVICE_MASK] = *coverageType;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"TextureGradientShader", vertIndex, fragIndex};
 }
@@ -1297,7 +1300,7 @@ static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
   if (programInfo->numColorFragmentProcessors() != 1) {
     return std::nullopt;
   }
-  auto coverageType = SharedCoverageValue(programInfo);
+  auto coverageType = SharedDeviceMaskValue(programInfo);
   if (!coverageType) {
     return std::nullopt;
   }
@@ -1359,7 +1362,7 @@ static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
   fragValues[FD::HAS_XP] = xpType;
-  fragValues[FD::HAS_COVERAGE] = *coverageType;
+  fragValues[FD::HAS_DEVICE_MASK] = *coverageType;
   fragValues[FD::HAS_TILED_CHILD] = tiledChild ? 1 : 0;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"GaussianBlur1DShader", vertIndex, fragIndex};
@@ -1557,7 +1560,7 @@ static std::optional<PermutationMatchResult> TryMatchEllipseFill(const ProgramIn
   // A clip/mask coverage FP is served through the shared HAS_COVERAGE dimension (device-space
   // sampling in coverage_output.inc). LocalMask needs per-vertex UV the ellipse vertex shader does
   // not provide, so SharedCoverageValue rejects it.
-  auto coverageType = SharedCoverageValue(programInfo);
+  auto coverageType = SharedDeviceMaskValue(programInfo);
   if (!coverageType) {
     return std::nullopt;
   }
@@ -1576,7 +1579,7 @@ static std::optional<PermutationMatchResult> TryMatchEllipseFill(const ProgramIn
   std::vector<int> fragValues(FD::COUNT);
   fragValues[FD::HAS_COMMON_COLOR] = values[D::HAS_COMMON_COLOR];
   fragValues[FD::HAS_XP] = xpType;
-  fragValues[FD::HAS_COVERAGE] = *coverageType;
+  fragValues[FD::HAS_DEVICE_MASK] = *coverageType;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"EllipseFillShader", vertIndex, fragIndex};
 }

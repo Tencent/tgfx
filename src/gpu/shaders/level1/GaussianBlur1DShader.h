@@ -51,11 +51,11 @@ class GaussianBlur1DShader : public PrecompiledShader {
   struct FragDims {
     // Child subset clamping is runtime: the shader always declares Subset and every tap clamps,
     // and a child without a real subset uploads the full texture bounds, so the clamp is a no-op.
-    enum : uint32_t { HAS_XP, HAS_COVERAGE, HAS_TILED_CHILD, COUNT };
+    enum : uint32_t { HAS_XP, HAS_DEVICE_MASK, HAS_TILED_CHILD, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("HAS_XP", 3),
-          PermutationInt("HAS_COVERAGE", 3),
+          PermutationBool("HAS_DEVICE_MASK"),
           PermutationBool("HAS_TILED_CHILD"),
       });
     }
