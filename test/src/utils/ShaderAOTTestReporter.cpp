@@ -439,12 +439,11 @@ static nlohmann::json BuildBlendMergeReachabilityAudit(
         ++observedCount;
       }
       const auto xp = fragValues[BlendMergeShader::FD::HAS_XP];
-      const auto hasCoverage = fragValues[BlendMergeShader::FD::HAS_COVERAGE] != 0;
       const auto hasMask = fragValues[BlendMergeShader::FD::HAS_MASK_TEXTURE] != 0;
-      const char* routeClass = xp != 0       ? "LegacyXP"
-                               : hasMask     ? "LegacyMask"
-                               : hasCoverage ? "LegacyCoverage"
-                                             : "CleanColorOnly";
+      const char* routeClass = xp != 0 ? "LegacyXP" : hasMask ? "LegacyMask" : "CleanColorOnly";
+      // HAS_COVERAGE is the Quad vertex-AA interface, not an independent legacy coverage FP; clean
+      // two-child blends may legitimately use it. AARect/DeviceSpace coverage is represented by the
+      // separate ProgramInfo structure and cannot be inferred from this tuple alone.
       nlohmann::json row = {
           {"shader", "BlendMergeShader"},
           {"routeClass", routeClass},
