@@ -169,9 +169,10 @@ TGFX_TEST_PRIVATE(Render3DRasterSizingTest, ClippedAnisotropicProjection_UsesPro
     Render3DContext::RasterInfo info;
 
     ASSERT_TRUE(Render3DContext::ComputeRasterInfo(localToCompositor, localBounds, viewport,
-                                                    contentScale, &info));
+                                                   contentScale, &info));
     EXPECT_LT(info.visibleLocal.width(), localBounds.width());
     EXPECT_EQ(info.visibleLocal.height(), localBounds.height());
+
     EXPECT_NE(info.density.getScaleX(), info.density.getScaleY());
     EXPECT_LE(static_cast<float>(info.rasterWidth), viewport.width() + 1.0f);
     EXPECT_LE(static_cast<float>(info.rasterHeight), viewport.height() + 1.0f);

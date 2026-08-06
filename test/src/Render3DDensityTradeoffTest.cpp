@@ -31,19 +31,21 @@ namespace tgfx {
 
 namespace {
 
-// The 2000x2000 source carries the dense 8px grid and text. The displayed plane is scaled to 20%
-// and rotated so its upper/lower edges sit at z=10 and z=210, a strong but not extreme perspective
-// that exposes the average-density raster sizing path.
+// The 2000x2000 source carries the dense 8px grid and text. Its vertical scale and rotation put
+// the upper/lower edges at z=10 and z=210, creating a strong but stable perspective range.
 constexpr int FloorSize = 2000;
 constexpr int OutputWidth = 1200;
 constexpr int OutputHeight = 1000;
+constexpr int FrameInset = 50;
 constexpr float PerspectiveDepth = 500.0f;
 constexpr float FloorScale = 0.2f;
+constexpr float PartiallyClippedFloorScaleX = 0.8f;
 constexpr float TopEdgeZ = 10.0f;
 constexpr float BottomEdgeZ = 210.0f;
 constexpr float FloorRotationDegrees = 30.0f;
 constexpr int GridStep = 8;
 constexpr int BackgroundValue = 24;
+constexpr int FrameBackgroundValue = 8;
 
 static std::shared_ptr<Image> MakeFloorImage(Context* context) {
   auto surface = Surface::Make(context, FloorSize, FloorSize);
@@ -81,21 +83,20 @@ static std::shared_ptr<Image> MakeFloorImage(Context* context) {
   return surface->makeImageSnapshot();
 }
 
-static Matrix3D MakeFloorMatrix() {
+static Matrix3D MakeFloorMatrix(float horizontalScale) {
   const float anchorX = static_cast<float>(FloorSize) * 0.5f;
   const auto offsetToAnchor = Matrix3D::MakeTranslate(-anchorX, 0, 0);
-  const auto scale = Matrix3D::MakeScale(FloorScale, FloorScale, 1.0f);
+  const auto scale = Matrix3D::MakeScale(horizontalScale, FloorScale, 1.0f);
   const auto rotation = Matrix3D::MakeRotate({1, 0, 0}, FloorRotationDegrees);
   const auto translateZ = Matrix3D::MakeTranslate(0, 0, TopEdgeZ);
   auto perspectiveMatrix = Matrix3D::I();
   perspectiveMatrix.setRowColumn(3, 2, -1.0f / PerspectiveDepth);
-  // After scale+rotation, the upper and lower edges are z=10 and z=210 respectively. Their
-  // projected y range lands in the center of the output surface.
   const auto originTranslate = Matrix3D::MakeTranslate(OutputWidth * 0.5f, 200, 0);
   return originTranslate * perspectiveMatrix * translateZ * rotation * scale * offsetToAnchor;
 }
 
-static std::shared_ptr<Surface> RenderFloor(Context* context, const std::shared_ptr<Image>& image) {
+static std::shared_ptr<Surface> RenderFloor(Context* context, const std::shared_ptr<Image>& image,
+                                            float horizontalScale) {
   auto surface = Surface::Make(context, OutputWidth, OutputHeight);
   if (surface == nullptr) {
     return nullptr;
@@ -107,7 +108,7 @@ static std::shared_ptr<Surface> RenderFloor(Context* context, const std::shared_
   container->setPreserve3D(true);
   auto floor = ImageLayer::Make();
   floor->setImage(image);
-  floor->setMatrix3D(MakeFloorMatrix());
+  floor->setMatrix3D(MakeFloorMatrix(horizontalScale));
   container->addChild(floor);
 
   auto displayList = std::make_unique<DisplayList>();
@@ -116,13 +117,34 @@ static std::shared_ptr<Surface> RenderFloor(Context* context, const std::shared_
   return surface;
 }
 
+static std::shared_ptr<Surface> RenderFramedFloor(Context* context,
+                                                  const std::shared_ptr<Image>& image,
+                                                  float horizontalScale) {
+  auto floorSurface = RenderFloor(context, image, horizontalScale);
+  if (floorSurface == nullptr) {
+    return nullptr;
+  }
+  auto surface =
+      Surface::Make(context, OutputWidth + FrameInset * 2, OutputHeight + FrameInset * 2);
+  if (surface == nullptr) {
+    return nullptr;
+  }
+  auto floorImage = floorSurface->makeImageSnapshot();
+  if (floorImage == nullptr) {
+    return nullptr;
+  }
+  auto* canvas = surface->getCanvas();
+  canvas->clear(
+      Color::FromRGBA(FrameBackgroundValue, FrameBackgroundValue, FrameBackgroundValue, 255));
+  canvas->drawImage(floorImage, FrameInset, FrameInset);
+  return surface;
+}
+
 }  // namespace
 
-// A preserve-3D floor with a strong perspective spanning z=10 (upper edge) to z=210 (lower edge).
-// The near/far density ratio is noticeable but the whole plane stays comfortably within GPU limits,
-// exercising the average-density raster sizing path in a reproducible baseline.
+// A fully visible preserve-3D floor spanning z=10 (upper edge) to z=210 (lower edge). Its
+// complete footprint stays inside the compositor viewport, locking the unchanged contentScale path.
 TGFX_TEST(Render3DDensityTradeoffTest, PerspectiveFloor10To210) {
-  // scale(0.2) followed by rotateX(30°) raises the 2000px lower edge by 200 in z.
   EXPECT_FLOAT_EQ(TopEdgeZ + FloorSize * FloorScale * 0.5f, BottomEdgeZ);
   ContextScope scope;
   auto context = scope.getContext();
@@ -130,9 +152,26 @@ TGFX_TEST(Render3DDensityTradeoffTest, PerspectiveFloor10To210) {
   auto image = MakeFloorImage(context);
   ASSERT_TRUE(image != nullptr);
 
-  auto surface = RenderFloor(context, image);
+  auto surface = RenderFloor(context, image, FloorScale);
   ASSERT_TRUE(surface != nullptr);
   EXPECT_TRUE(Baseline::Compare(surface, "Render3DDensityTradeoffTest/PerspectiveFloor10To210"));
+}
+
+// A wider floor keeps the same z range but exceeds the compositor viewport horizontally. The
+// clipped footprint exercises the projected dest/local density path, while the outer 50px frame
+// keeps the final screenshot centered.
+TGFX_TEST(Render3DDensityTradeoffTest, PerspectiveFloorPartiallyClipped) {
+  EXPECT_FLOAT_EQ(TopEdgeZ + FloorSize * FloorScale * 0.5f, BottomEdgeZ);
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeFloorImage(context);
+  ASSERT_TRUE(image != nullptr);
+
+  auto surface = RenderFramedFloor(context, image, PartiallyClippedFloorScaleX);
+  ASSERT_TRUE(surface != nullptr);
+  EXPECT_TRUE(
+      Baseline::Compare(surface, "Render3DDensityTradeoffTest/PerspectiveFloorPartiallyClipped"));
 }
 
 }  // namespace tgfx
