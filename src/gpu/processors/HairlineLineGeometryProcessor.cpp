@@ -32,9 +32,7 @@ HairlineLineGeometryProcessor::HairlineLineGeometryProcessor(const PMColor& colo
   setVertexAttributes(&position, 2);
 }
 
-void HairlineLineGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
-  uint32_t flags = aaType == AAType::Coverage ? 1 : 0;
-  bytesKey->write(flags);
+void HairlineLineGeometryProcessor::onComputeProcessorKey(BytesKey* /*bytesKey*/) const {
 }
 
 }  // namespace tgfx

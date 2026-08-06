@@ -24,14 +24,13 @@ namespace tgfx {
 
 class EllipseFillShader : public PrecompiledShader {
  public:
-  TGFX_DEFINE_DIMS(STROKE, HAS_COMMON_COLOR);
+  TGFX_DEFINE_DIMS(HAS_COMMON_COLOR);
   using D = Dims;
 
   struct FragDims {
-    enum : uint32_t { STROKE, HAS_COMMON_COLOR, HAS_XP, HAS_COVERAGE, COUNT };
+    enum : uint32_t { HAS_COMMON_COLOR, HAS_XP, HAS_COVERAGE, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationBool("STROKE"),
           PermutationBool("HAS_COMMON_COLOR"),
           PermutationInt("HAS_XP", 3),
           PermutationInt("HAS_COVERAGE", 3),
@@ -39,7 +38,7 @@ class EllipseFillShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(D::COUNT == 2 && FD::COUNT == 4,
+  static_assert(D::COUNT == 1 && FD::COUNT == 3,
                 "Update the matcher below when dimensions change.");
 
   PrecompiledShaderInfo info() const override {

@@ -60,10 +60,10 @@ void GLSLHairlineLineGeometryProcessor::emitCode(EmitArgs& args) const {
   // Fragment shader: calculate anti-aliasing based on edge distance
   fragBuilder->codeAppendf("highp float edgeAlpha = abs(%s);", edgeVarying.fsIn().c_str());
   fragBuilder->codeAppend("edgeAlpha = clamp(edgeAlpha, 0.0, 1.0);");
-  if (aaType != AAType::Coverage) {
-    // Non-coverage anti-aliasing
-    fragBuilder->codeAppend("edgeAlpha = edgeAlpha >= 0.5 ? 1.0 : 0.0;");
-  }
+  auto aaEnabled =
+      uniformHandler->addUniform("AAEnabled", UniformFormat::Int, ShaderStage::Fragment);
+  fragBuilder->codeAppendf("if (%s == 0) { edgeAlpha = edgeAlpha >= 0.5 ? 1.0 : 0.0; }",
+                           aaEnabled.c_str());
 
   // Output color and coverage
   auto colorName =
@@ -87,6 +87,8 @@ void GLSLHairlineLineGeometryProcessor::setData(UniformData* vertexUniformData,
   fragmentUniformData->setData("Color", color);
   vertexUniformData->setData("Matrix", viewMatrix);
   fragmentUniformData->setData("Coverage", coverage);
+  int aaEnabled = aaType == AAType::Coverage ? 1 : 0;
+  fragmentUniformData->setData("AAEnabled", aaEnabled);
 }
 
 }  // namespace tgfx

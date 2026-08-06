@@ -46,6 +46,8 @@ void GLSLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
   vertBuilder->codeAppendf("%s = %s;", ellipseRadii.vsOut().c_str(), inEllipseRadii.name().c_str());
 
   auto fragBuilder = args.fragBuilder;
+  auto strokeEnabled =
+      uniformHandler->addUniform("StrokeEnabled", UniformFormat::Int, ShaderStage::Fragment);
   // setup pass through color
   if (commonColor.has_value()) {
     auto colorName =
@@ -74,9 +76,8 @@ void GLSLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
 
   // for outer curve
   fragBuilder->codeAppendf("highp vec2 offset = %s.xy;", ellipseOffsets.fsIn().c_str());
-  if (stroke) {
-    fragBuilder->codeAppendf("offset *= %s.xy;", ellipseRadii.fsIn().c_str());
-  }
+  fragBuilder->codeAppendf("if (%s != 0) { offset *= %s.xy; }", strokeEnabled.c_str(),
+                           ellipseRadii.fsIn().c_str());
   fragBuilder->codeAppend("highp float test = dot(offset, offset) - 1.0;");
   fragBuilder->codeAppendf("highp vec2 grad = 2.0*offset*%s.xy;", ellipseRadii.fsIn().c_str());
   fragBuilder->codeAppend("highp float grad_dot = dot(grad, grad);");
@@ -85,15 +86,15 @@ void GLSLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend("highp float edgeAlpha = clamp(0.5-test*invlen, 0.0, 1.0);");
 
   // for inner curve
-  if (stroke) {
-    fragBuilder->codeAppendf("offset = %s.xy*%s.zw;", ellipseOffsets.fsIn().c_str(),
-                             ellipseRadii.fsIn().c_str());
-    fragBuilder->codeAppend("test = dot(offset, offset) - 1.0;");
-    fragBuilder->codeAppendf("grad = 2.0*offset*%s.zw;", ellipseRadii.fsIn().c_str());
-    fragBuilder->codeAppend("grad_dot = dot(grad, grad);");
-    fragBuilder->codeAppend("invlen = inversesqrt(grad_dot);");
-    fragBuilder->codeAppend("edgeAlpha *= clamp(0.5+test*invlen, 0.0, 1.0);");
-  }
+  fragBuilder->codeAppendf("if (%s != 0) {", strokeEnabled.c_str());
+  fragBuilder->codeAppendf("offset = %s.xy*%s.zw;", ellipseOffsets.fsIn().c_str(),
+                           ellipseRadii.fsIn().c_str());
+  fragBuilder->codeAppend("test = dot(offset, offset) - 1.0;");
+  fragBuilder->codeAppendf("grad = 2.0*offset*%s.zw;", ellipseRadii.fsIn().c_str());
+  fragBuilder->codeAppend("grad_dot = dot(grad, grad);");
+  fragBuilder->codeAppend("invlen = inversesqrt(grad_dot);");
+  fragBuilder->codeAppend("edgeAlpha *= clamp(0.5+test*invlen, 0.0, 1.0);");
+  fragBuilder->codeAppend("}");
 
   fragBuilder->codeAppendf("%s = vec4(edgeAlpha);", args.outputCoverage.c_str());
 }
@@ -105,5 +106,7 @@ void GLSLEllipseGeometryProcessor::setData(UniformData* vertexUniformData,
   if (commonColor.has_value()) {
     fragmentUniformData->setData("Color", *commonColor);
   }
+  int strokeEnabled = stroke ? 1 : 0;
+  fragmentUniformData->setData("StrokeEnabled", strokeEnabled);
 }
 }  // namespace tgfx

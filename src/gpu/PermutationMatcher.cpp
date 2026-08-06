@@ -1518,21 +1518,12 @@ static std::optional<PermutationMatchResult> TryMatchHairlineLine(const ProgramI
   if (xpType < 0) {
     return std::nullopt;
   }
-  auto* hlgp = static_cast<const HairlineLineGeometryProcessor*>(gp);
-  using D = HairlineLineShader::Dims;
-  auto domain = D::domain();
-  std::vector<int> values(D::COUNT);
-  values[D::HAS_AA] = hlgp->getAAType() == AAType::Coverage ? 1 : 0;
-  auto vertIndex = domain.encode(values);
   using FD = HairlineLineShader::FD;
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
-  for (size_t i = 0; i < D::COUNT; ++i) {
-    fragValues[i] = values[i];
-  }
   fragValues[FD::HAS_XP] = xpType;
   auto fragIndex = fragDomain.encode(fragValues);
-  return PermutationMatchResult{"HairlineLineShader", vertIndex, fragIndex};
+  return PermutationMatchResult{"HairlineLineShader", 0, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchHairlineQuad(const ProgramInfo* programInfo) {
@@ -1547,21 +1538,12 @@ static std::optional<PermutationMatchResult> TryMatchHairlineQuad(const ProgramI
   if (xpType < 0) {
     return std::nullopt;
   }
-  auto* hqgp = static_cast<const HairlineQuadGeometryProcessor*>(gp);
-  using D = HairlineQuadShader::Dims;
-  auto domain = D::domain();
-  std::vector<int> values(D::COUNT);
-  values[D::HAS_AA] = hqgp->getAAType() == AAType::Coverage ? 1 : 0;
-  auto vertIndex = domain.encode(values);
   using FD = HairlineQuadShader::FD;
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
-  for (size_t i = 0; i < D::COUNT; ++i) {
-    fragValues[i] = values[i];
-  }
   fragValues[FD::HAS_XP] = xpType;
   auto fragIndex = fragDomain.encode(fragValues);
-  return PermutationMatchResult{"HairlineQuadShader", vertIndex, fragIndex};
+  return PermutationMatchResult{"HairlineQuadShader", 0, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchEllipseFill(const ProgramInfo* programInfo) {
@@ -1587,15 +1569,12 @@ static std::optional<PermutationMatchResult> TryMatchEllipseFill(const ProgramIn
   using D = EllipseFillShader::Dims;
   auto domain = D::domain();
   std::vector<int> values(D::COUNT);
-  values[D::STROKE] = egp->isStroke() ? 1 : 0;
   values[D::HAS_COMMON_COLOR] = egp->hasCommonColor() ? 1 : 0;
   auto vertIndex = domain.encode(values);
   using FD = EllipseFillShader::FD;
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
-  for (size_t i = 0; i < D::COUNT; ++i) {
-    fragValues[i] = values[i];
-  }
+  fragValues[FD::HAS_COMMON_COLOR] = values[D::HAS_COMMON_COLOR];
   fragValues[FD::HAS_XP] = xpType;
   fragValues[FD::HAS_COVERAGE] = *coverageType;
   auto fragIndex = fragDomain.encode(fragValues);

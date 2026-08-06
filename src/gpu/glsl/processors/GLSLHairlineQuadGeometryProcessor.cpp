@@ -77,10 +77,10 @@ void GLSLHairlineQuadGeometryProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend("edgeAlpha = sqrt(edgeAlpha * edgeAlpha / dot(gF, gF));");
   // Invert so that 1.0 = on curve, 0.0 = far from curve
   fragBuilder->codeAppend("edgeAlpha = max(1.0 - edgeAlpha, 0.0);");
-  if (aaType != AAType::Coverage) {
-    // Non-coverage AA: threshold to binary
-    fragBuilder->codeAppend("edgeAlpha = edgeAlpha >= 0.5 ? 1.0 : 0.0;");
-  }
+  auto aaEnabled =
+      uniformHandler->addUniform("AAEnabled", UniformFormat::Int, ShaderStage::Fragment);
+  fragBuilder->codeAppendf("if (%s == 0) { edgeAlpha = edgeAlpha >= 0.5 ? 1.0 : 0.0; }",
+                           aaEnabled.c_str());
 
   // Output color and coverage
   auto colorName =
@@ -104,6 +104,8 @@ void GLSLHairlineQuadGeometryProcessor::setData(UniformData* vertexUniformData,
   fragmentUniformData->setData("Color", color);
   vertexUniformData->setData("Matrix", viewMatrix);
   fragmentUniformData->setData("Coverage", coverage);
+  int aaEnabled = aaType == AAType::Coverage ? 1 : 0;
+  fragmentUniformData->setData("AAEnabled", aaEnabled);
 }
 
 }  // namespace tgfx

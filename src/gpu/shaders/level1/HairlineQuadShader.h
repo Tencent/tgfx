@@ -24,27 +24,22 @@ namespace tgfx {
 
 class HairlineQuadShader : public PrecompiledShader {
  public:
-  TGFX_DEFINE_DIMS(HAS_AA);
-  using D = Dims;
-
   struct FragDims {
-    enum : uint32_t { HAS_AA, HAS_XP, COUNT };
+    enum : uint32_t { HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationBool("HAS_AA"),
           PermutationInt("HAS_XP", 3),
       });
     }
   };
   using FD = FragDims;
-  static_assert(D::COUNT == 1 && FD::COUNT == 2,
-                "Update ShouldCompile below when dimensions change.");
+  static_assert(FD::COUNT == 1, "Update the matcher below when dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"HairlineQuadShader",
             "level1/hairline_quad.vert",
             "level1/hairline_quad.frag",
-            D::domain(),
+            PermutationDomain({}),
             FD::domain(),
             PermutationDomain({}),
             "HairlineQuadGeometryProcessor",
