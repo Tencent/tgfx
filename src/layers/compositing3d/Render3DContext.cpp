@@ -293,10 +293,11 @@ bool Render3DContext::ComputeRasterInfo(const Matrix3D& localToCompositor, const
   if (Matrix3DUtils::IsRectBehindCamera(localBounds, localToCompositor)) {
     return false;
   }
-  // Size the raster from the destination footprint (bounded by the viewport) and derive density
-  // from the (dest / local) ratio. The clip in ComputeVisibleFootprints keeps sample rate finite
-  // even when the visible region touches the near plane — a Jacobian sample at the singular
-  // boundary would otherwise blow up.
+  // Size the raster from the clip-visible local footprint: when it covers the whole leaf, keep the
+  // 1:1 contentScale density; otherwise derive density from the (dest / local) ratio of the clipped
+  // region, which stays bounded by the viewport. The clip in ComputeVisibleFootprints keeps sample
+  // rate finite even when the visible region touches the near plane — a Jacobian sample at the
+  // singular boundary would otherwise blow up.
   Rect localFootprint = {};
   Rect destFootprint = {};
   if (!Matrix3DUtils::ComputeVisibleFootprints(localBounds, compositorViewport, localToCompositor,
