@@ -183,6 +183,10 @@ class ProgramInfo {
     return decompositionRoute;
   }
 
+  // Returns the exact cache key for diagnostics without letting reporting code reconstruct it from
+  // effect/pipeline signatures (which omit processor-key details). The route is part of the key.
+  BytesKey programKeyForDiagnostics(AOTDecompositionRoute route) const;
+
   /**
    * Sets the shader-selection route for this draw. Must be called before getProgram() so the
    * program cache key distinguishes the decomposed route from the plain route and avoids serving a

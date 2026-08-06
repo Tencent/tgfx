@@ -272,17 +272,21 @@ static ConsistencyResult BuildConsistencyChecks(
   const bool fallbackRecordsMatch = fallbackRecordCount == fallbackEventCount;
 
   ConsistencyResult result;
-  result.consistent = stagesMonotonic && attemptsMatch && artifactHitsMatch &&
-                      pipelineCreationsMatch && hitRecordsMatch && fallbackEventsMatch &&
-                      fallbackRecordsMatch;
+  // Program cache lookups and diagnostic AOT/fallback records are different event streams: one
+  // logical ProgramInfo request can probe decomposed and plain keys, and Builder creations can occur
+  // without a diagnostic fallback record. Keep those comparisons as legacy diagnostics, but do not
+  // let them mark the epoch inconsistent. The stage/artifact/pipeline/hit-record chain is the
+  // reliable same-epoch invariant.
+  result.consistent = stagesMonotonic && artifactHitsMatch && pipelineCreationsMatch &&
+                      hitRecordsMatch;
   result.checks = {
       {"consistent", result.consistent},
       {"aotStagesMonotonic", stagesMonotonic},
-      {"aotAttemptsMatchProgramCacheMisses", attemptsMatch},
+      {"aotAttemptsMatchProgramCacheMissesLegacy", attemptsMatch},
       {"artifactHitsMatchArtifactsFound", artifactHitsMatch},
       {"pipelineCreationsMatchPrecompiledPrograms", pipelineCreationsMatch},
       {"hitRecordsMatchPipelineCreations", hitRecordsMatch},
-      {"fallbackEventsMatchProgramBuilderCreations", fallbackEventsMatch},
+      {"fallbackEventsMatchProgramBuilderCreationsLegacy", fallbackEventsMatch},
       {"fallbackRecordsMatchFallbackEvents", fallbackRecordsMatch},
       {"deltas",
        {{"aotAttemptsMinusProgramCacheMisses",
@@ -386,7 +390,9 @@ static bool MoreFrequentFallback(const AggregatedFallback& left, const Aggregate
 }
 
 static nlohmann::json HitRecordToJSON(const PrecompiledHitRecord& record) {
-  return {{"effect", record.effectSignature},
+  return {{"programKey", record.programKey},
+          {"route", record.route},
+          {"effect", record.effectSignature},
           {"pipeline", record.pipelineSignature},
           {"shader", record.shaderName},
           {"vertPermutationIndex", record.vertPermutationIndex},
@@ -506,7 +512,9 @@ static nlohmann::json AxisAnalysisToJSON(const AOTAxisAnalysis& axis) {
 }
 
 static nlohmann::json FallbackRecordToJSON(const PrecompiledFallbackRecord& record) {
-  nlohmann::json result = {{"reason", PrecompiledFallbackReasonName(record.reason)},
+  nlohmann::json result = {{"programKey", record.programKey},
+                           {"route", record.route},
+                           {"reason", PrecompiledFallbackReasonName(record.reason)},
                            {"effect", record.effectSignature},
                            {"pipeline", record.pipelineSignature},
                            {"shader", record.shaderName}};

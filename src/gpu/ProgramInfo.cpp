@@ -130,6 +130,10 @@ std::string ProgramInfo::getMangledSuffix(const Processor* processor) const {
   return "_P" + std::to_string(processorIndex);
 }
 
+BytesKey ProgramInfo::programKeyForDiagnostics(AOTDecompositionRoute route) const {
+  return buildProgramKey(route);
+}
+
 BytesKey ProgramInfo::buildProgramKey(AOTDecompositionRoute route) const {
   BytesKey key = {};
   auto context = renderTarget->getContext();

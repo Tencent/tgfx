@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PrecompiledProgramCreator.h"
+#include <iomanip>
 #include <sstream>
 #include "core/utils/Log.h"
 #include "gpu/AOTEffectDecomposer.h"
@@ -125,6 +126,17 @@ static std::string BuildPipelineSignature(const ProgramInfo* programInfo) {
   return stream.str();
 }
 
+static std::string ProgramKeyForDiagnostics(const ProgramInfo* programInfo,
+                                            AOTDecompositionRoute route) {
+  auto key = programInfo->programKeyForDiagnostics(route);
+  std::stringstream stream;
+  stream << key.size() << ":" << std::hex << std::setfill('0');
+  for (size_t i = 0; i < key.size(); ++i) {
+    stream << std::setw(8) << key.data()[i];
+  }
+  return stream.str();
+}
+
 static PrecompiledFallbackRecord MakeFallbackRecord(
     const PrecompiledShaderCache* cache, const ProgramInfo* programInfo,
     const PermutationMatchResult* matchResult = nullptr) {
@@ -132,6 +144,8 @@ static PrecompiledFallbackRecord MakeFallbackRecord(
   if (!cache->diagnosticRecordingEnabled()) {
     return record;
   }
+  record.programKey = ProgramKeyForDiagnostics(programInfo, AOTDecompositionRoute::None);
+  record.route = static_cast<uint32_t>(AOTDecompositionRoute::None);
   record.effectSignature = BuildEffectSignature(programInfo);
   record.pipelineSignature = BuildPipelineSignature(programInfo);
   if (matchResult != nullptr) {
@@ -149,6 +163,8 @@ static PrecompiledHitRecord MakeHitRecord(const PrecompiledShaderCache* cache,
   if (!cache->diagnosticRecordingEnabled()) {
     return record;
   }
+  record.programKey = ProgramKeyForDiagnostics(programInfo, AOTDecompositionRoute::None);
+  record.route = static_cast<uint32_t>(AOTDecompositionRoute::None);
   record.effectSignature = BuildEffectSignature(programInfo);
   record.pipelineSignature = BuildPipelineSignature(programInfo);
   record.shaderName = matchResult.shaderName;
