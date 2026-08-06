@@ -85,6 +85,7 @@ static void RenderScene(Context* context, PrecompiledShaderCache* cache,
                         uint32_t* outHits) {
   cache->setDecompositionEnabled(decompositionEnabled);
   cache->resetStats();
+  context->globalCache()->resetProgramStats();
   context->globalCache()->clearPrograms();
   auto surface = Surface::Make(context, width, height);
   ASSERT_TRUE(surface != nullptr);
@@ -170,6 +171,7 @@ static void RenderShaderScene(Context* context, PrecompiledShaderCache* cache,
                               uint32_t* outNoMatch) {
   cache->setDecompositionEnabled(decompositionEnabled);
   cache->resetStats();
+  context->globalCache()->resetProgramStats();
   context->globalCache()->clearPrograms();
   auto surface = Surface::Make(context, width, height);
   ASSERT_TRUE(surface != nullptr);
@@ -403,6 +405,7 @@ static void RenderShadowTiledScene(Context* context, PrecompiledShaderCache* cac
                                    uint32_t* outFragmentArtifactMissing) {
   cache->setDecompositionEnabled(decompositionEnabled);
   cache->resetStats();
+  context->globalCache()->resetProgramStats();
   context->globalCache()->clearPrograms();
   auto surface = Surface::Make(context, width, height);
   ASSERT_TRUE(surface != nullptr);
@@ -559,6 +562,7 @@ static void RenderDecalShaderMaskScene(Context* context, PrecompiledShaderCache*
                                        Bitmap* outBitmap, uint32_t* outNoMatch) {
   cache->setDecompositionEnabled(decompositionEnabled);
   cache->resetStats();
+  context->globalCache()->resetProgramStats();
   context->globalCache()->clearPrograms();
   auto surface = Surface::Make(context, 180, 160);
   ASSERT_TRUE(surface != nullptr);
@@ -660,12 +664,14 @@ TGFX_TEST(AOTL2AuditTest, CoverageTextureMaskMatchesJIT) {
   // Reference: cache not loaded -> ProgramBuilder (JIT) path.
   cache->unload();
   cache->resetStats();
+  context->globalCache()->resetProgramStats();
   Bitmap referenceBitmap = {};
   RenderCoverageMaskScene(context, color, mask, width, height, &referenceBitmap);
 
   // Candidate: cache loaded -> precompiled artifact path.
   ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
   cache->resetStats();
+  context->globalCache()->resetProgramStats();
   Bitmap candidateBitmap = {};
   RenderCoverageMaskScene(context, color, mask, width, height, &candidateBitmap);
   uint32_t noMatch = cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule);
@@ -835,11 +841,13 @@ TGFX_TEST(AOTL2AuditTest, GradientCoverageMatchesJIT) {
 
   cache->unload();
   cache->resetStats();
+  context->globalCache()->resetProgramStats();
   Bitmap referenceBitmap = {};
   RenderGradientCoverageScene(context, width, height, &referenceBitmap);
 
   ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
   cache->resetStats();
+  context->globalCache()->resetProgramStats();
   Bitmap candidateBitmap = {};
   RenderGradientCoverageScene(context, width, height, &candidateBitmap);
   uint32_t noMatch = cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule);
