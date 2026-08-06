@@ -27,6 +27,8 @@
 #include <vector>
 #if defined(__ANDROID__)
 #include <dlfcn.h>
+#endif
+#if defined(__ANDROID__) || defined(_WIN32)
 #include "gpu/vulkan/VulkanHardwareTexture.h"
 #endif
 #include "core/utils/Log.h"
@@ -43,6 +45,15 @@
 #include "vk_mem_alloc.h"
 
 namespace tgfx {
+
+#if defined(_WIN32) && !defined(__ANDROID__)
+// Maximum time (in milliseconds, driver-enforced in GPU time) we tolerate waiting for the D3D11
+// producer to release a keyed mutex before the current GPU submission stops making progress.
+// Kept at 5000ms to mirror the D3D12 backend contract; note that unlike the D3D12 code path this
+// value does NOT translate into a CPU-side timed wait — VkQueueSubmit is non-blocking, and the
+// timeout only bounds how long the driver waits inside its own scheduler.
+static constexpr uint32_t KEYED_MUTEX_ACQUIRE_TIMEOUT_MS = 5000;
+#endif
 
 static bool HasInstanceExtension(const std::vector<VkExtensionProperties>& available,
                                  const char* name) {
@@ -74,6 +85,16 @@ bool HardwareBufferAvailable() {
   // On Android, AHardwareBuffer is available on API 26+. Dynamically check by probing the symbol.
   static const bool available = (dlsym(RTLD_DEFAULT, "AHardwareBuffer_allocate") != nullptr);
   return available;
+}
+#elif defined(_WIN32)
+bool HardwareBufferAvailable() {
+  // On Windows the tgfx HardwareBuffer wrapper is an ID3D11Texture2D pointer. The capability is
+  // universally present as a type on any Windows install; whether a specific Vulkan device can
+  // actually import a given texture depends on the extensions we managed to enable on it (see
+  // VulkanExtensions::win32ExternalMemory / win32KeyedMutex) and the flags the source texture was
+  // created with. Returning true here mirrors the D3D12 backend contract; callers are expected to
+  // handle importHardwareTextures() returning an empty vector.
+  return true;
 }
 #else
 bool HardwareBufferAvailable() {
@@ -475,6 +496,20 @@ std::vector<std::shared_ptr<Texture>> VulkanGPU::importHardwareTextures(
   std::vector<std::shared_ptr<Texture>> textures;
   textures.push_back(std::move(texture));
   return textures;
+#elif defined(_WIN32)
+  if (!HardwareBufferCheck(hardwareBuffer)) {
+    return {};
+  }
+  if (!_extensions.win32ExternalMemory || !_extensions.win32KeyedMutex) {
+    return {};
+  }
+  auto texture = VulkanHardwareTexture::MakeFrom(this, hardwareBuffer, usage);
+  if (texture == nullptr) {
+    return {};
+  }
+  std::vector<std::shared_ptr<Texture>> textures;
+  textures.push_back(std::move(texture));
+  return textures;
 #else
   (void)hardwareBuffer;
   (void)usage;
@@ -839,6 +874,36 @@ void VulkanGPU::executeSubmission(SubmitRequest request) {
     timelineInfo.pSignalSemaphoreValues = signalValues.data();
     submitInfo.pNext = &timelineInfo;
   }
+
+#if defined(_WIN32) && !defined(__ANDROID__)
+  // Step 4b (Windows only): if this session sampled any shared D3D11 textures, chain a
+  // VkWin32KeyedMutexAcquireReleaseInfoKHR into submitInfo.pNext so the driver acquires the
+  // keyed mutexes (key = 0) before the GPU starts sampling and releases them once the GPU is
+  // done. Timeouts are enforced by the driver in GPU time; unlike the D3D12 backend this does
+  // NOT block the CPU, so there is no rollback path to worry about here — a failed acquire
+  // simply prevents the GPU from executing subsequent commands, which is surfaced through the
+  // fence status the same way any other execution error would be.
+  //
+  // Keys and timeouts are hard-coded to match the D3D12 v1 contract: key = 0, timeout = 5000ms.
+  VkWin32KeyedMutexAcquireReleaseInfoKHR keyedMutexInfo = {};
+  std::vector<uint64_t> keyedMutexKeys;
+  std::vector<uint32_t> keyedMutexTimeouts;
+  if (!request.session.keyedMutexMemories.empty()) {
+    keyedMutexKeys.assign(request.session.keyedMutexMemories.size(), 0);
+    keyedMutexTimeouts.assign(request.session.keyedMutexMemories.size(),
+                              KEYED_MUTEX_ACQUIRE_TIMEOUT_MS);
+    keyedMutexInfo.sType = VK_STRUCTURE_TYPE_WIN32_KEYED_MUTEX_ACQUIRE_RELEASE_INFO_KHR;
+    keyedMutexInfo.pNext = submitInfo.pNext;
+    keyedMutexInfo.acquireCount = static_cast<uint32_t>(request.session.keyedMutexMemories.size());
+    keyedMutexInfo.pAcquireSyncs = request.session.keyedMutexMemories.data();
+    keyedMutexInfo.pAcquireKeys = keyedMutexKeys.data();
+    keyedMutexInfo.pAcquireTimeouts = keyedMutexTimeouts.data();
+    keyedMutexInfo.releaseCount = static_cast<uint32_t>(request.session.keyedMutexMemories.size());
+    keyedMutexInfo.pReleaseSyncs = request.session.keyedMutexMemories.data();
+    keyedMutexInfo.pReleaseKeys = keyedMutexKeys.data();
+    submitInfo.pNext = &keyedMutexInfo;
+  }
+#endif
 
   // Step 5: Submit to the GPU queue.
   auto submitResult = vkQueueSubmit(vulkanQueue, 1, &submitInfo, fence);

@@ -61,6 +61,15 @@ struct FrameSession {
   // ReturnQueue and are safely destroyed during processUnreferencedResources().
   std::vector<std::shared_ptr<VulkanResource>> retainedResources;
 
+#if defined(_WIN32) && !defined(__ANDROID__)
+  // VkDeviceMemory objects that must be guarded by a Win32 keyed mutex (key = 0) around the
+  // vkQueueSubmit that executes this session. Populated by VulkanCommandEncoder::retainTexture()
+  // whenever it retains a VulkanHardwareTexture that reports a non-null keyed-mutex memory;
+  // deduplicated at insertion time. Consumed by VulkanGPU::executeSubmission() to build a
+  // VkWin32KeyedMutexAcquireReleaseInfoKHR pNext on the VkSubmitInfo.
+  std::vector<VkDeviceMemory> keyedMutexMemories;
+#endif
+
   FrameSession() = default;
 
   // Move constructor zeroes source handles to prevent double-destroy. Vectors are naturally emptied.
@@ -69,7 +78,12 @@ struct FrameSession {
         descriptorPools(std::move(other.descriptorPools)),
         deferredFramebuffers(std::move(other.deferredFramebuffers)),
         deferredRenderPasses(std::move(other.deferredRenderPasses)),
-        retainedResources(std::move(other.retainedResources)) {
+        retainedResources(std::move(other.retainedResources))
+#if defined(_WIN32) && !defined(__ANDROID__)
+        ,
+        keyedMutexMemories(std::move(other.keyedMutexMemories))
+#endif
+  {
     other.commandPool = VK_NULL_HANDLE;
     other.commandBuffer = VK_NULL_HANDLE;
   }
@@ -83,6 +97,9 @@ struct FrameSession {
       deferredFramebuffers = std::move(other.deferredFramebuffers);
       deferredRenderPasses = std::move(other.deferredRenderPasses);
       retainedResources = std::move(other.retainedResources);
+#if defined(_WIN32) && !defined(__ANDROID__)
+      keyedMutexMemories = std::move(other.keyedMutexMemories);
+#endif
       other.commandPool = VK_NULL_HANDLE;
       other.commandBuffer = VK_NULL_HANDLE;
     }

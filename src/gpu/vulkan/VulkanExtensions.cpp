@@ -45,6 +45,12 @@ void VulkanExtensions::query(VkPhysicalDevice physicalDevice) {
   bool hasAndroidHwb = false;
   bool hasYcbcr = isVulkan11OrLater;
   bool hasQueueFamilyForeign = false;
+#elif defined(_WIN32)
+  bool hasExternalMemory = isVulkan11OrLater;
+  bool hasDedicatedAllocation = isVulkan11OrLater;
+  bool hasGetMemReq2 = isVulkan11OrLater;
+  bool hasExternalMemoryWin32 = false;
+  bool hasWin32KeyedMutex = false;
 #endif
   for (const auto& ext : available) {
     if (strcmp(ext.extensionName, VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME) == 0) {
@@ -75,6 +81,21 @@ void VulkanExtensions::query(VkPhysicalDevice physicalDevice) {
       enumeratedYcbcr = true;
     } else if (strcmp(ext.extensionName, VK_EXT_QUEUE_FAMILY_FOREIGN_EXTENSION_NAME) == 0) {
       hasQueueFamilyForeign = true;
+    }
+#elif defined(_WIN32)
+    else if (strcmp(ext.extensionName, VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME) == 0) {
+      hasExternalMemory = true;
+      enumeratedExternalMemory = true;
+    } else if (strcmp(ext.extensionName, VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME) == 0) {
+      hasDedicatedAllocation = true;
+      enumeratedDedicatedAllocation = true;
+    } else if (strcmp(ext.extensionName, VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME) == 0) {
+      hasGetMemReq2 = true;
+      enumeratedGetMemoryRequirements2 = true;
+    } else if (strcmp(ext.extensionName, VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME) == 0) {
+      hasExternalMemoryWin32 = true;
+    } else if (strcmp(ext.extensionName, VK_KHR_WIN32_KEYED_MUTEX_EXTENSION_NAME) == 0) {
+      hasWin32KeyedMutex = true;
     }
 #endif
   }
@@ -129,6 +150,10 @@ void VulkanExtensions::query(VkPhysicalDevice physicalDevice) {
   androidHardwareBuffer =
       hasAndroidHwb && hasExternalMemory && hasDedicatedAllocation && hasQueueFamilyForeign;
   samplerYcbcrConversion = hasYcbcr && ycbcrFeature.samplerYcbcrConversion;
+#elif defined(_WIN32)
+  win32ExternalMemory =
+      hasExternalMemory && hasDedicatedAllocation && hasGetMemReq2 && hasExternalMemoryWin32;
+  win32KeyedMutex = hasWin32KeyedMutex;
 #endif
 }
 
@@ -151,6 +176,16 @@ void VulkanExtensions::detectFromDevice(VkPhysicalDevice physicalDevice) {
   } else {
     samplerYcbcrConversion = false;
   }
+#elif defined(_WIN32)
+  // For an externally created device we cannot re-enumerate what was enabled; the best we can do
+  // is trust the presence of the KHR entry points as a proxy for extension enablement.
+  win32ExternalMemory =
+      (vkGetMemoryWin32HandlePropertiesKHR != nullptr) &&
+      (vkGetImageMemoryRequirements2 != nullptr || vkGetImageMemoryRequirements2KHR != nullptr);
+  // VK_KHR_win32_keyed_mutex has no distinct entry points (its behaviour is data-only via a
+  // VkSubmitInfo pNext struct), so we cannot detect it from function pointers. Assume the
+  // caller enabled it when they enabled the rest of the win32 external-memory bundle.
+  win32KeyedMutex = win32ExternalMemory;
 #endif
 }
 
@@ -184,6 +219,24 @@ std::vector<const char*> VulkanExtensions::getEnabledNames() const {
   }
   if (samplerYcbcrConversion && enumeratedYcbcr) {
     names.push_back(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME);
+  }
+#elif defined(_WIN32)
+  if (win32ExternalMemory) {
+    // Same "only-if-enumerated" rule as the Android path. VK_KHR_external_memory_win32 is not
+    // promoted to core so it always needs to be listed explicitly.
+    if (enumeratedExternalMemory) {
+      names.push_back(VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME);
+    }
+    if (enumeratedDedicatedAllocation) {
+      names.push_back(VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME);
+    }
+    if (enumeratedGetMemoryRequirements2) {
+      names.push_back(VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME);
+    }
+    names.push_back(VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME);
+  }
+  if (win32KeyedMutex) {
+    names.push_back(VK_KHR_WIN32_KEYED_MUTEX_EXTENSION_NAME);
   }
 #endif
   return names;

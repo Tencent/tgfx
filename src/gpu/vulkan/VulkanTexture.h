@@ -64,6 +64,18 @@ class VulkanTexture : public Texture, public VulkanResource {
     layout = newLayout;
   }
 
+  /**
+   * Returns the VkDeviceMemory that must be guarded by a Win32 keyed mutex when this texture is
+   * sampled, or VK_NULL_HANDLE if no cross-API synchronisation is required. Only
+   * VulkanHardwareTexture on Windows returns a non-null handle; every other texture pays a
+   * single nullptr check per binding. See VulkanCommandEncoder::retainTexture for the collector
+   * side and VulkanGPU::executeSubmission for how the collected memories feed
+   * VkWin32KeyedMutexAcquireReleaseInfoKHR on vkQueueSubmit.
+   */
+  virtual VkDeviceMemory importedMemoryForKeyedMutex() const {
+    return VK_NULL_HANDLE;
+  }
+
   BackendTexture getBackendTexture() const override;
   BackendRenderTarget getBackendRenderTarget() const override;
 

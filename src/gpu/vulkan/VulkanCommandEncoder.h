@@ -18,11 +18,13 @@
 
 #pragma once
 
+#include <algorithm>
 #include <memory>
 #include <vector>
 #include "gpu/vulkan/VulkanAPI.h"
 #include "gpu/vulkan/VulkanFrameSession.h"
 #include "gpu/vulkan/VulkanResource.h"
+#include "gpu/vulkan/VulkanTexture.h"
 #include "tgfx/gpu/CommandEncoder.h"
 
 namespace tgfx {
@@ -86,6 +88,29 @@ class VulkanCommandEncoder : public CommandEncoder, public VulkanResource {
   // the session to VulkanCommandBuffer. Prevents resource destruction while GPU is executing.
   void retainResource(std::shared_ptr<VulkanResource> resource) {
     session.retainedResources.push_back(std::move(resource));
+  }
+
+  // Retains a texture and, on Windows, additionally records its Win32 keyed-mutex memory (if any)
+  // into the session so vkQueueSubmit can acquire/release it. Callers that already have a
+  // std::shared_ptr<VulkanTexture> should prefer this over retainResource(); pipelines, buffers,
+  // samplers and other non-texture resources continue to use retainResource() directly.
+  void retainTexture(std::shared_ptr<VulkanTexture> texture) {
+#if defined(_WIN32) && !defined(__ANDROID__)
+    if (texture) {
+      auto mem = texture->importedMemoryForKeyedMutex();
+      if (mem != VK_NULL_HANDLE) {
+        auto& list = session.keyedMutexMemories;
+        // Deduplicate: a session may reference the same imported texture multiple times (e.g.
+        // sampled in two draw calls), but the keyed mutex must be acquired/released exactly
+        // once per submission. Linear scan is fine because the expected list length is tiny
+        // (single-digit number of imported textures per frame in realistic workloads).
+        if (std::find(list.begin(), list.end(), mem) == list.end()) {
+          list.push_back(mem);
+        }
+      }
+    }
+#endif
+    session.retainedResources.push_back(std::move(texture));
   }
 
   friend class VulkanGPU;
