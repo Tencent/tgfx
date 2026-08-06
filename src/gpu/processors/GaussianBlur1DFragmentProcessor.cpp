@@ -32,10 +32,9 @@ GaussianBlur1DFragmentProcessor::GaussianBlur1DFragmentProcessor(
 }
 
 void GaussianBlur1DFragmentProcessor::computeKernel() {
-  // Keep sigma within the range the kernel table can represent. Clamping here, rather than only
-  // clamping the derived radius, keeps the generated kernel consistent with the requested sigma
-  // even when a caller bypasses Make. isfinite() also guards against NaN, for which ceil() is
-  // undefined.
+  // Clamp sigma defensively because the kernel table is dimensioned for maxSigma. Clamping sigma
+  // rather than only the derived radius keeps the kernel weights consistent with the clamped value.
+  // isfinite() also guards against NaN, for which ceil() is undefined.
   sigma = std::min(sigma, static_cast<float>(maxSigma));
   if (!std::isfinite(sigma)) {
     sigma = 0.0f;

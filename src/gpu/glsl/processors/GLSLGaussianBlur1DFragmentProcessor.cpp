@@ -18,7 +18,6 @@
 
 #include "GLSLGaussianBlur1DFragmentProcessor.h"
 #include <algorithm>
-#include <cmath>
 
 namespace tgfx {
 
@@ -47,8 +46,8 @@ PlacementPtr<FragmentProcessor> GaussianBlur1DFragmentProcessor::Make(
   // dimensioned for maxSigma. The shader loop also derives its bound from maxSigma.
   sigma = std::min(sigma, static_cast<float>(maxSigma));
 
-  return allocator->make<GLSLGaussianBlur1DFragmentProcessor>(
-      std::move(processor), sigma, direction, stepLength, static_cast<int>(ceil(maxSigma)));
+  return allocator->make<GLSLGaussianBlur1DFragmentProcessor>(std::move(processor), sigma,
+                                                              direction, stepLength, maxSigma);
 }
 
 GLSLGaussianBlur1DFragmentProcessor::GLSLGaussianBlur1DFragmentProcessor(
