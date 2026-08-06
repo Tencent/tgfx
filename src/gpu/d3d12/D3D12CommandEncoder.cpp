@@ -162,6 +162,15 @@ void D3D12CommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTextur
   if (!srcTexture || !dstBuffer) {
     return;
   }
+  // Only READBACK buffers are valid destinations here: they are created in the D3D12 READBACK
+  // heap and start in COPY_DEST, matching the state this function assumes for CopyTextureRegion.
+  // UPLOAD-heap buffers live in the UPLOAD heap and are locked to GENERIC_READ (D3D12 forbids
+  // state transitions on UPLOAD-heap resources), so using one here would trigger a debug-layer
+  // error and undefined behaviour on real drivers. Mirrors the guard in GLCommandEncoder.
+  if (!(dstBuffer->usage() & GPUBufferUsage::READBACK)) {
+    LOGE("D3D12CommandEncoder::copyTextureToBuffer: destination buffer must have READBACK usage.");
+    return;
+  }
   auto srcX = srcRect.x() < 0 ? 0u : static_cast<uint32_t>(srcRect.x());
   auto srcY = srcRect.y() < 0 ? 0u : static_cast<uint32_t>(srcRect.y());
   auto copyWidth = static_cast<uint32_t>(srcRect.width());
