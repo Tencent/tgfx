@@ -103,7 +103,8 @@ if (TGFX_USE_VULKAN)
     set(TGFX_USE_METAL OFF)
     set(TGFX_USE_D3D12 OFF)
     set(TGFX_USE_QT OFF)
-    set(TGFX_USE_SWIFTSHADER OFF)
+    # Keep TGFX_USE_SWIFTSHADER — in Vulkan mode it only controls ICD file copy,
+    # not EGL/GLES library linking.
     set(TGFX_USE_ANGLE OFF)
 elseif (TGFX_USE_D3D12)
     if (NOT WIN32)
@@ -112,8 +113,7 @@ elseif (TGFX_USE_D3D12)
     set(TGFX_USE_OPENGL OFF)
     set(TGFX_USE_METAL OFF)
     set(TGFX_USE_QT OFF)
-    # Keep TGFX_USE_SWIFTSHADER — in Vulkan mode it only controls ICD file copy,
-    # not EGL/GLES library linking.
+    set(TGFX_USE_SWIFTSHADER OFF)
     set(TGFX_USE_ANGLE OFF)
 elseif (TGFX_USE_METAL)
     if (NOT APPLE)
