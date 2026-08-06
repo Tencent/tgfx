@@ -90,7 +90,8 @@ class Render3DContext : public Layer3DContext {
   // `localToCompositor`, clipped to `compositorViewport`. Returns false when the layer projects
   // entirely outside the viewport or behind the camera.
   static bool ComputeRasterInfo(const Matrix3D& localToCompositor, const Rect& localBounds,
-                                const Rect& compositorViewport, RasterInfo* info);
+                                const Rect& compositorViewport, float contentScale,
+                                RasterInfo* info);
 
   std::shared_ptr<Context3DCompositor> _compositor = nullptr;
   std::vector<PendingNode> _pendingNodes = {};

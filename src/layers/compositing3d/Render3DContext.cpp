@@ -103,7 +103,8 @@ void Render3DContext::finishAndDrawTo(const DrawArgs& args, Canvas* canvas) {
     localToCompositor.postScale(_contentScale, _contentScale, 1.0f);
     localToCompositor.postTranslate(-_renderRect.left, -_renderRect.top, 0);
     RasterInfo info;
-    if (!ComputeRasterInfo(localToCompositor, node.localBounds, compositorViewport, &info)) {
+    if (!ComputeRasterInfo(localToCompositor, node.localBounds, compositorViewport, _contentScale,
+                           &info)) {
       continue;
     }
     layerRasterInfo.emplace(node.layer, info);
@@ -287,7 +288,8 @@ bool Render3DContext::primeCompositorFromOuterCanvas(Canvas* outerCanvas) {
 }
 
 bool Render3DContext::ComputeRasterInfo(const Matrix3D& localToCompositor, const Rect& localBounds,
-                                        const Rect& compositorViewport, RasterInfo* info) {
+                                        const Rect& compositorViewport, float contentScale,
+                                        RasterInfo* info) {
   if (Matrix3DUtils::IsRectBehindCamera(localBounds, localToCompositor)) {
     return false;
   }
@@ -302,11 +304,12 @@ bool Render3DContext::ComputeRasterInfo(const Matrix3D& localToCompositor, const
     return false;
   }
   // Near-plane clipping can push clipped vertices a hair past localBounds when interpolating in
-  // homogeneous space; intersecting brings the footprint back into the leaf's declared range.
+  // homogeneous space. Clamp again after roundOut so the compositing polygon never expands past
+  // the leaf's declared range.
+  localFootprint.roundOut();
   if (!localFootprint.intersect(localBounds)) {
     return false;
   }
-  localFootprint.roundOut();
   destFootprint.roundOut();
   const float localWidth = localFootprint.width();
   const float localHeight = localFootprint.height();
@@ -316,14 +319,15 @@ bool Render3DContext::ComputeRasterInfo(const Matrix3D& localToCompositor, const
       !(destHeight > 0.0f)) {
     return false;
   }
-  const float densityX = destWidth / localWidth;
-  const float densityY = destHeight / localHeight;
+  const bool coversWholeLeaf = localFootprint == localBounds;
+  const float densityX = coversWholeLeaf ? contentScale : destWidth / localWidth;
+  const float densityY = coversWholeLeaf ? contentScale : destHeight / localHeight;
   Matrix density = Matrix::MakeScale(densityX, densityY);
   density.postTranslate(-localFootprint.left * densityX, -localFootprint.top * densityY);
   info->visibleLocal = localFootprint;
   info->density = density;
-  info->rasterWidth = std::max(1, static_cast<int>(std::ceil(destWidth)));
-  info->rasterHeight = std::max(1, static_cast<int>(std::ceil(destHeight)));
+  info->rasterWidth = std::max(1, static_cast<int>(std::ceil(localWidth * densityX)));
+  info->rasterHeight = std::max(1, static_cast<int>(std::ceil(localHeight * densityY)));
   return true;
 }
 
