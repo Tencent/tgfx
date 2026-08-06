@@ -73,21 +73,24 @@ void D3D12CommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Rec
   }
   auto d3d12Tex = std::static_pointer_cast<D3D12Texture>(texture);
 
-  auto dstX = static_cast<int32_t>(rect.x());
-  auto dstY = static_cast<int32_t>(rect.y());
+  // Clamp copy region to destination texture bounds, matching copyTextureToTexture. Negative
+  // origins are clamped to 0 before any unsigned arithmetic; leaving dstX/dstY signed would cause
+  // dstX + copyWidth to wrap through uint32 (e.g. dstX=-10, copyWidth=100 wraps to 90) and the
+  // out-of-range check to silently pass, later feeding ~4G into CopyTextureRegion.
+  auto dstX = rect.x() < 0 ? 0u : static_cast<uint32_t>(rect.x());
+  auto dstY = rect.y() < 0 ? 0u : static_cast<uint32_t>(rect.y());
   auto width = static_cast<uint32_t>(rect.width());
   auto height = static_cast<uint32_t>(rect.height());
   auto texW = static_cast<uint32_t>(d3d12Tex->width());
   auto texH = static_cast<uint32_t>(d3d12Tex->height());
 
-  // Clamp copy region to destination texture bounds, matching copyTextureToTexture.
   auto copyWidth = width;
   auto copyHeight = height;
   if (dstX + copyWidth > texW) {
-    copyWidth = texW > static_cast<uint32_t>(dstX) ? texW - static_cast<uint32_t>(dstX) : 0;
+    copyWidth = texW > dstX ? texW - dstX : 0;
   }
   if (dstY + copyHeight > texH) {
-    copyHeight = texH > static_cast<uint32_t>(dstY) ? texH - static_cast<uint32_t>(dstY) : 0;
+    copyHeight = texH > dstY ? texH - dstY : 0;
   }
 
   auto bytesPerPixel = static_cast<uint32_t>(DXGIFormatBytesPerPixel(d3d12Tex->dxgiFormat()));
