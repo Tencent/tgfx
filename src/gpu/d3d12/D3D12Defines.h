@@ -51,8 +51,12 @@ inline PixelFormat DXGIFormatToPixelFormat(unsigned dxgiFormat) {
       return PixelFormat::DEPTH24_STENCIL8;
     case DXGI_FORMAT_R8G8B8A8_UNORM:
     case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
-    default:
       return PixelFormat::RGBA_8888;
+    default:
+      // Unrecognized DXGI formats (including DXGI_FORMAT_UNKNOWN) must not be silently mapped
+      // to RGBA_8888 — that would cause external-resource imports to be misinterpreted with no
+      // diagnostic. Return Unknown and let callers (e.g. D3D12Texture::MakeFrom) reject.
+      return PixelFormat::Unknown;
   }
 }
 

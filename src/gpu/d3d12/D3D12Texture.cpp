@@ -133,13 +133,19 @@ std::shared_ptr<D3D12Texture> D3D12Texture::MakeFrom(D3D12GPU* gpu, ComPtr<ID3D1
     return nullptr;
   }
 
+  auto pixelFormat = DXGIFormatToPixelFormat(dxgiFormat);
+  if (pixelFormat == PixelFormat::Unknown) {
+    LOGE("D3D12Texture::MakeFrom() unsupported DXGI format 0x%X", dxgiFormat);
+    return nullptr;
+  }
+
   auto desc = resource->GetDesc();
   TextureDescriptor descriptor = {};
   // D3D12 caps dimensions at D3D12_REQ_TEXTURE2D_U_OR_V_DIMENSION (16384), well below INT_MAX,
   // so the UINT64/UINT→int narrow cast is always safe.
   descriptor.width = static_cast<int>(desc.Width);
   descriptor.height = static_cast<int>(desc.Height);
-  descriptor.format = DXGIFormatToPixelFormat(dxgiFormat);
+  descriptor.format = pixelFormat;
   descriptor.mipLevelCount = static_cast<int>(desc.MipLevels);
   descriptor.sampleCount = static_cast<int>(desc.SampleDesc.Count);
   descriptor.usage = usage;
