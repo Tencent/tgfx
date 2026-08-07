@@ -209,6 +209,10 @@ jobs:
           depsync
         shell: bash
 
+      - name: Update Baseline
+        run: .\update_baseline.bat USE_D3D12_WARP
+        shell: cmd
+
       - name: Run Autotest
         run: .\autotest.bat USE_D3D12_WARP
         shell: cmd
