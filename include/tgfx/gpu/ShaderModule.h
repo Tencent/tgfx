@@ -28,13 +28,13 @@ namespace tgfx {
 class ShaderModuleDescriptor {
  public:
   /**
-   * The shader code to be compiled into a ShaderModule.
+   * The shader code to be compiled into a ShaderModule. Must be written in GLSL with OpenGL
+   * ES 3.0 syntax. See GPU::createShaderModule() for details.
    */
   std::string code;
 
   /**
-   * Specifies the shader stage (e.g., vertex, fragment, compute). Only relevant for the OpenGL
-   * backend; ignored by other backends.
+   * Specifies the shader stage (e.g., vertex, fragment, compute).
    */
   ShaderStage stage = ShaderStage::Vertex;
 };

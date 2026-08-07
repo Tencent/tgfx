@@ -117,8 +117,9 @@ class ImageFilter {
   static std::shared_ptr<ImageFilter> ColorFilter(std::shared_ptr<ColorFilter> colorFilter);
 
   /**
-   * Creates a filter that applies the given RuntimeEffect object to the input image.
-   * You can use the shading language of the current GPU backend to create RuntimeEffect objects.
+   * Creates a filter that applies the given RuntimeEffect object to the input image. The shader
+   * code of the RuntimeEffect must be written in GLSL with OpenGL ES 3.0 syntax. See RuntimeEffect
+   * for details.
    */
   static std::shared_ptr<ImageFilter> Runtime(std::shared_ptr<RuntimeEffect> effect);
 
