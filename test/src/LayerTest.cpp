@@ -27,6 +27,7 @@
 #include "layers/RootLayer.h"
 #include "layers/SubtreeCache.h"
 #include "layers/TileCache.h"
+#include "layers/compositing3d/Render3DContext.h"
 #include "layers/contents/ComposeContent.h"
 #include "layers/contents/MatrixContent.h"
 #include "layers/contents/RRectsContent.h"
@@ -4314,6 +4315,311 @@ TGFX_TEST(LayerTest, GlassStyleClippedEvaluationTiled) {
   accent->setColor(Color::FromRGBA(40, 90, 230, 255));
   displayList.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleClippedEvaluationTiledUpdate"));
+}
+
+namespace {
+
+constexpr int DensityFloorSize = 2000;
+constexpr int DensityOutputWidth = 1200;
+constexpr int DensityOutputHeight = 1000;
+constexpr int DensityFrameInset = 50;
+constexpr float DensityPerspectiveDepth = 500.0f;
+constexpr float DensityFloorScale = 0.2f;
+constexpr float DensityPartiallyClippedFloorScaleX = 0.8f;
+constexpr float DensityTopEdgeZ = 10.0f;
+constexpr float DensityBottomEdgeZ = 210.0f;
+constexpr float DensityFloorRotationDegrees = 30.0f;
+constexpr int DensityGridStep = 8;
+constexpr int DensityBackgroundValue = 24;
+constexpr int DensityFrameBackgroundValue = 8;
+
+static std::shared_ptr<Image> MakeDensityFloorImage(Context* context) {
+  auto surface = Surface::Make(context, DensityFloorSize, DensityFloorSize);
+  if (surface == nullptr) {
+    return nullptr;
+  }
+  auto* canvas = surface->getCanvas();
+  canvas->clear(Color::FromRGBA(12, 12, 12, 255));
+
+  Paint gridPaint;
+  gridPaint.setColor(Color::FromRGBA(180, 180, 180, 255));
+  gridPaint.setStrokeWidth(1.0f);
+  for (int coordinate = 0; coordinate <= DensityFloorSize; coordinate += DensityGridStep) {
+    canvas->drawLine(static_cast<float>(coordinate), 0, static_cast<float>(coordinate),
+                     DensityFloorSize, gridPaint);
+    canvas->drawLine(0, static_cast<float>(coordinate), DensityFloorSize,
+                     static_cast<float>(coordinate), gridPaint);
+  }
+
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  if (typeface == nullptr) {
+    return nullptr;
+  }
+  Font font(typeface, 40.0f);
+  auto label = TextBlob::MakeFrom("DENSITY 0123456789", font);
+  if (label == nullptr) {
+    return nullptr;
+  }
+  Paint textPaint;
+  textPaint.setColor(Color::FromRGBA(255, 224, 64, 255));
+  for (int y = 64; y < DensityFloorSize; y += 160) {
+    canvas->drawTextBlob(label, 1000, static_cast<float>(y), textPaint);
+  }
+  return surface->makeImageSnapshot();
+}
+
+static Matrix3D MakeDensityFloorMatrix(float horizontalScale) {
+  const float anchorX = static_cast<float>(DensityFloorSize) * 0.5f;
+  const auto offsetToAnchor = Matrix3D::MakeTranslate(-anchorX, 0, 0);
+  const auto scale = Matrix3D::MakeScale(horizontalScale, DensityFloorScale, 1.0f);
+  const auto rotation = Matrix3D::MakeRotate({1, 0, 0}, DensityFloorRotationDegrees);
+  const auto translateZ = Matrix3D::MakeTranslate(0, 0, DensityTopEdgeZ);
+  auto perspectiveMatrix = Matrix3D::I();
+  perspectiveMatrix.setRowColumn(3, 2, -1.0f / DensityPerspectiveDepth);
+  const auto originTranslate = Matrix3D::MakeTranslate(DensityOutputWidth * 0.5f, 200, 0);
+  return originTranslate * perspectiveMatrix * translateZ * rotation * scale * offsetToAnchor;
+}
+
+static std::shared_ptr<Surface> RenderDensityFloor(Context* context,
+                                                   const std::shared_ptr<Image>& image,
+                                                   float horizontalScale) {
+  auto surface = Surface::Make(context, DensityOutputWidth, DensityOutputHeight);
+  if (surface == nullptr) {
+    return nullptr;
+  }
+  surface->getCanvas()->clear(
+      Color::FromRGBA(DensityBackgroundValue, DensityBackgroundValue, DensityBackgroundValue, 255));
+
+  auto container = Layer::Make();
+  container->setPreserve3D(true);
+  auto floor = ImageLayer::Make();
+  floor->setImage(image);
+  floor->setMatrix3D(MakeDensityFloorMatrix(horizontalScale));
+  container->addChild(floor);
+
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->root()->addChild(container);
+  displayList->render(surface.get());
+  return surface;
+}
+
+static std::shared_ptr<Surface> RenderFramedDensityFloor(Context* context,
+                                                         const std::shared_ptr<Image>& image,
+                                                         float horizontalScale) {
+  auto floorSurface = RenderDensityFloor(context, image, horizontalScale);
+  if (floorSurface == nullptr) {
+    return nullptr;
+  }
+  auto surface = Surface::Make(context, DensityOutputWidth + DensityFrameInset * 2,
+                               DensityOutputHeight + DensityFrameInset * 2);
+  if (surface == nullptr) {
+    return nullptr;
+  }
+  auto floorImage = floorSurface->makeImageSnapshot();
+  if (floorImage == nullptr) {
+    return nullptr;
+  }
+  auto* canvas = surface->getCanvas();
+  canvas->clear(Color::FromRGBA(DensityFrameBackgroundValue, DensityFrameBackgroundValue,
+                                DensityFrameBackgroundValue, 255));
+  canvas->drawImage(floorImage, DensityFrameInset, DensityFrameInset);
+  return surface;
+}
+
+}  // namespace
+
+// A fully visible preserve-3D floor spanning z=10 (upper edge) to z=210 (lower edge). Its
+// complete footprint stays inside the compositor viewport, locking the unchanged contentScale path.
+TGFX_TEST(LayerTest, PerspectiveFloor10To210) {
+  EXPECT_FLOAT_EQ(DensityTopEdgeZ + DensityFloorSize * DensityFloorScale * 0.5f,
+                  DensityBottomEdgeZ);
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeDensityFloorImage(context);
+  ASSERT_TRUE(image != nullptr);
+
+  auto surface = RenderDensityFloor(context, image, DensityFloorScale);
+  ASSERT_TRUE(surface != nullptr);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PerspectiveFloor10To210"));
+}
+
+// A wider floor keeps the same z range but exceeds the compositor viewport horizontally. The
+// clipped footprint exercises the projected dest/local density path, while the outer 50px frame
+// keeps the final screenshot centered.
+TGFX_TEST(LayerTest, PerspectiveFloorPartiallyClipped) {
+  EXPECT_FLOAT_EQ(DensityTopEdgeZ + DensityFloorSize * DensityFloorScale * 0.5f,
+                  DensityBottomEdgeZ);
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeDensityFloorImage(context);
+  ASSERT_TRUE(image != nullptr);
+
+  auto surface = RenderFramedDensityFloor(context, image, DensityPartiallyClippedFloorScaleX);
+  ASSERT_TRUE(surface != nullptr);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PerspectiveFloorPartiallyClipped"));
+}
+
+namespace {
+
+static Matrix3D MakeRasterLocalToCompositor(const Matrix3D& nodeTransform, float contentScale,
+                                            const Rect& renderRect) {
+  Matrix3D matrix = nodeTransform;
+  matrix.postScale(contentScale, contentScale, 1.0f);
+  matrix.postTranslate(-renderRect.left, -renderRect.top, 0);
+  return matrix;
+}
+
+static Matrix3D MakeRasterPerspective(float depth) {
+  Matrix3D matrix = Matrix3D::I();
+  matrix.setRowColumn(3, 2, -1.0f / depth);
+  return matrix;
+}
+
+}  // namespace
+
+// A flat leaf preserves the main-branch contentScale sizing when the visible footprint covers the
+// complete local bounds.
+TGFX_TEST_PRIVATE(LayerTest, FlatLeaf_PreservesContentScaleSizing) {
+  TGFX_PRIVATE_ACCESS({
+    const Rect localBounds = Rect::MakeWH(100, 100);
+    const float contentScale = 1.0f;
+    const Rect renderRect = Rect::MakeWH(200, 200);
+    const Rect viewport = Rect::MakeWH(renderRect.width(), renderRect.height());
+    const auto localToCompositor =
+        MakeRasterLocalToCompositor(Matrix3D::MakeTranslate(50, 50, 0), contentScale, renderRect);
+    Render3DContext::RasterInfo info;
+
+    ASSERT_TRUE(Render3DContext::ComputeRasterInfo(localToCompositor, localBounds, viewport,
+                                                   contentScale, &info));
+    EXPECT_EQ(info.visibleLocal, localBounds);
+    EXPECT_FLOAT_EQ(info.density.getScaleX(), contentScale);
+    EXPECT_FLOAT_EQ(info.density.getScaleY(), contentScale);
+    EXPECT_EQ(info.rasterWidth, 100);
+    EXPECT_EQ(info.rasterHeight, 100);
+  });
+}
+
+// A large leaf under an extreme content scale is cropped to the compositor viewport before
+// rasterization, avoiding the main-branch allocation of more than one million pixels per axis.
+TGFX_TEST_PRIVATE(LayerTest, ExtremeZoom_CropsToViewportScale) {
+  TGFX_PRIVATE_ACCESS({
+    const Rect localBounds = Rect::MakeWH(1556, 1556);
+    const float contentScale = 783.0f;
+    const Rect renderRect = Rect::MakeWH(1861, 1861);
+    const Rect viewport = Rect::MakeWH(renderRect.width(), renderRect.height());
+    const auto localToCompositor =
+        MakeRasterLocalToCompositor(Matrix3D::I(), contentScale, renderRect);
+    Render3DContext::RasterInfo info;
+
+    ASSERT_TRUE(Render3DContext::ComputeRasterInfo(localToCompositor, localBounds, viewport,
+                                                   contentScale, &info));
+    EXPECT_LT(info.visibleLocal.width(), localBounds.width());
+    EXPECT_LT(info.visibleLocal.height(), localBounds.height());
+    EXPECT_LE(static_cast<float>(info.rasterWidth), viewport.width() + 1.0f);
+    EXPECT_LE(static_cast<float>(info.rasterHeight), viewport.height() + 1.0f);
+  });
+}
+
+// A fully visible oversized leaf deliberately retains the main-branch contentScale sizing. It is
+// outside this PR's viewport-clipping scope and can still exceed the GPU texture limit.
+TGFX_TEST_PRIVATE(LayerTest, FullyVisibleOversizedLeaf_PreservesMainBehavior) {
+  TGFX_PRIVATE_ACCESS({
+    const Rect localBounds = Rect::MakeWH(200, 200);
+    const float contentScale = 100.0f;
+    const Rect renderRect = Rect::MakeWH(30000, 30000);
+    const Rect viewport = Rect::MakeWH(renderRect.width(), renderRect.height());
+    const auto localToCompositor =
+        MakeRasterLocalToCompositor(Matrix3D::I(), contentScale, renderRect);
+    Render3DContext::RasterInfo info;
+
+    ASSERT_TRUE(Render3DContext::ComputeRasterInfo(localToCompositor, localBounds, viewport,
+                                                   contentScale, &info));
+    EXPECT_EQ(info.visibleLocal, localBounds);
+    EXPECT_FLOAT_EQ(info.density.getScaleX(), contentScale);
+    EXPECT_FLOAT_EQ(info.density.getScaleY(), contentScale);
+    EXPECT_EQ(info.rasterWidth, 20000);
+    EXPECT_EQ(info.rasterHeight, 20000);
+  });
+}
+
+// A leaf that crosses the near plane is not rasterized. Partial near-plane clipping is not in this
+// PR's scope.
+TGFX_TEST_PRIVATE(LayerTest, NearPlaneStraddle_CullsLeaf) {
+  TGFX_PRIVATE_ACCESS({
+    const Rect localBounds = Rect::MakeWH(100, 300);
+    Matrix3D nodeTransform = Matrix3D::I();
+    nodeTransform.setRowColumn(3, 1, -1.0f / 200.0f);
+    const float contentScale = 1.0f;
+    const Rect renderRect = Rect::MakeWH(1000, 1000);
+    const Rect viewport = Rect::MakeWH(renderRect.width(), renderRect.height());
+    const auto localToCompositor =
+        MakeRasterLocalToCompositor(nodeTransform, contentScale, renderRect);
+    Render3DContext::RasterInfo info;
+
+    EXPECT_FALSE(Render3DContext::ComputeRasterInfo(localToCompositor, localBounds, viewport,
+                                                    contentScale, &info));
+  });
+}
+
+TGFX_TEST_PRIVATE(LayerTest, LeafOutsideViewport_CullsLeaf) {
+  TGFX_PRIVATE_ACCESS({
+    const Rect localBounds = Rect::MakeWH(200, 200);
+    const float contentScale = 1.0f;
+    const Rect renderRect = Rect::MakeWH(500, 500);
+    const Rect viewport = Rect::MakeWH(renderRect.width(), renderRect.height());
+    const auto localToCompositor = MakeRasterLocalToCompositor(
+        Matrix3D::MakeTranslate(10000, 10000, 0), contentScale, renderRect);
+    Render3DContext::RasterInfo info;
+
+    EXPECT_FALSE(Render3DContext::ComputeRasterInfo(localToCompositor, localBounds, viewport,
+                                                    contentScale, &info));
+  });
+}
+
+TGFX_TEST_PRIVATE(LayerTest, LeafBehindCamera_CullsLeaf) {
+  TGFX_PRIVATE_ACCESS({
+    const Rect localBounds = Rect::MakeWH(200, 200);
+    Matrix3D nodeTransform = Matrix3D::MakeTranslate(0, 0, 100);
+    nodeTransform = MakeRasterPerspective(50.0f) * nodeTransform;
+    const float contentScale = 1.0f;
+    const Rect renderRect = Rect::MakeWH(500, 500);
+    const Rect viewport = Rect::MakeWH(renderRect.width(), renderRect.height());
+    const auto localToCompositor =
+        MakeRasterLocalToCompositor(nodeTransform, contentScale, renderRect);
+    Render3DContext::RasterInfo info;
+
+    EXPECT_FALSE(Render3DContext::ComputeRasterInfo(localToCompositor, localBounds, viewport,
+                                                    contentScale, &info));
+  });
+}
+
+// A leaf clipped only along the horizontal axis keeps the untouched vertical range and derives a
+// projected-footprint density distinct from the horizontal one.
+TGFX_TEST_PRIVATE(LayerTest, ClippedAnisotropicProjection_UsesProjectedDensity) {
+  TGFX_PRIVATE_ACCESS({
+    const Rect localBounds = Rect::MakeWH(200, 200);
+    Matrix3D nodeTransform = Matrix3D::MakeRotate({0, 1, 0}, 45.0f);
+    nodeTransform = MakeRasterPerspective(200.0f) * nodeTransform;
+    const float contentScale = 5.0f;
+    const Rect renderRect = Rect::MakeWH(2000, 2000);
+    // The projected leaf spans dest x in [261, 547] and y in [369, 774], so a 400-wide viewport
+    // clips only the horizontal axis.
+    const Rect viewport = Rect::MakeWH(400, 2000);
+    const auto localToCompositor =
+        MakeRasterLocalToCompositor(nodeTransform, contentScale, renderRect);
+    Render3DContext::RasterInfo info;
+
+    ASSERT_TRUE(Render3DContext::ComputeRasterInfo(localToCompositor, localBounds, viewport,
+                                                   contentScale, &info));
+    EXPECT_LT(info.visibleLocal.width(), localBounds.width());
+    EXPECT_EQ(info.visibleLocal.height(), localBounds.height());
+
+    EXPECT_NE(info.density.getScaleX(), info.density.getScaleY());
+    EXPECT_LE(static_cast<float>(info.rasterWidth), viewport.width() + 1.0f);
+    EXPECT_LE(static_cast<float>(info.rasterHeight), viewport.height() + 1.0f);
+  });
 }
 
 }  // namespace tgfx
