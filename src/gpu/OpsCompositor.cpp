@@ -1018,9 +1018,7 @@ PlacementPtr<FragmentProcessor> OpsCompositor::getClipMaskFP(
   }
   clipTexture = makeClipTexture(elements, clipBound);
   if (clipTexture == nullptr) {
-    // Clip rasterization failed (e.g. an empty or degenerate clip path). Return nullptr so
-    // applyClip reports ClippedOut: the clip region cannot be rasterized, so nothing inside it is
-    // drawn.
+    DEBUG_ASSERT(false);
     return nullptr;
   }
   cachedClipID = uniqueID;
