@@ -4430,7 +4430,7 @@ static std::shared_ptr<Surface> RenderFramedDensityFloor(Context* context,
 }  // namespace
 
 // A fully visible preserve-3D floor spanning z=10 (upper edge) to z=210 (lower edge). Its
-// complete footprint stays inside the compositor viewport, locking the unchanged contentScale path.
+// complete footprint stays inside the compositor viewport, verifying the contentScale density path.
 TGFX_TEST(LayerTest, PerspectiveFloor10To210) {
   EXPECT_FLOAT_EQ(DensityTopEdgeZ + DensityFloorSize * DensityFloorScale * 0.5f,
                   DensityBottomEdgeZ);
@@ -4480,16 +4480,16 @@ static Matrix3D MakeRasterPerspective(float depth) {
 
 }  // namespace
 
-// A flat leaf preserves the main-branch contentScale sizing when the visible footprint covers the
-// complete local bounds.
+// A fully visible leaf retains contentScale density even when its projected scale differs from
+// contentScale, exercising the coversWholeLeaf branch.
 TGFX_TEST_PRIVATE(LayerTest, FlatLeaf_PreservesContentScaleSizing) {
   TGFX_PRIVATE_ACCESS({
     const Rect localBounds = Rect::MakeWH(100, 100);
-    const float contentScale = 1.0f;
-    const Rect renderRect = Rect::MakeWH(200, 200);
+    const float contentScale = 3.0f;
+    const Rect renderRect = Rect::MakeWH(600, 600);
     const Rect viewport = Rect::MakeWH(renderRect.width(), renderRect.height());
-    const auto localToCompositor =
-        MakeRasterLocalToCompositor(Matrix3D::MakeTranslate(50, 50, 0), contentScale, renderRect);
+    const auto localToCompositor = MakeRasterLocalToCompositor(
+        Matrix3D::MakeScale(0.5f, 0.5f, 1.0f), contentScale, renderRect);
     Render3DContext::RasterInfo info;
 
     ASSERT_TRUE(Render3DContext::ComputeRasterInfo(localToCompositor, localBounds, viewport,
@@ -4497,13 +4497,13 @@ TGFX_TEST_PRIVATE(LayerTest, FlatLeaf_PreservesContentScaleSizing) {
     EXPECT_EQ(info.visibleLocal, localBounds);
     EXPECT_FLOAT_EQ(info.density.getScaleX(), contentScale);
     EXPECT_FLOAT_EQ(info.density.getScaleY(), contentScale);
-    EXPECT_EQ(info.rasterWidth, 100);
-    EXPECT_EQ(info.rasterHeight, 100);
+    EXPECT_EQ(info.rasterWidth, 300);
+    EXPECT_EQ(info.rasterHeight, 300);
   });
 }
 
 // A large leaf under an extreme content scale is cropped to the compositor viewport before
-// rasterization, avoiding the main-branch allocation of more than one million pixels per axis.
+// rasterization, avoiding an allocation of more than one million pixels per axis.
 TGFX_TEST_PRIVATE(LayerTest, ExtremeZoom_CropsToViewportScale) {
   TGFX_PRIVATE_ACCESS({
     const Rect localBounds = Rect::MakeWH(1556, 1556);
@@ -4523,8 +4523,8 @@ TGFX_TEST_PRIVATE(LayerTest, ExtremeZoom_CropsToViewportScale) {
   });
 }
 
-// A fully visible oversized leaf deliberately retains the main-branch contentScale sizing. It is
-// outside this PR's viewport-clipping scope and can still exceed the GPU texture limit.
+// A fully visible oversized leaf retains contentScale sizing and can still exceed the GPU texture
+// limit because no viewport clipping is needed.
 TGFX_TEST_PRIVATE(LayerTest, FullyVisibleOversizedLeaf_PreservesMainBehavior) {
   TGFX_PRIVATE_ACCESS({
     const Rect localBounds = Rect::MakeWH(200, 200);
@@ -4545,8 +4545,8 @@ TGFX_TEST_PRIVATE(LayerTest, FullyVisibleOversizedLeaf_PreservesMainBehavior) {
   });
 }
 
-// A leaf that crosses the near plane is not rasterized. Partial near-plane clipping is not in this
-// PR's scope.
+// A leaf that crosses the near plane is not rasterized because ComputeRasterInfo rejects every
+// leaf with a corner behind the camera before computing visible footprints.
 TGFX_TEST_PRIVATE(LayerTest, NearPlaneStraddle_CullsLeaf) {
   TGFX_PRIVATE_ACCESS({
     const Rect localBounds = Rect::MakeWH(100, 300);
@@ -4605,19 +4605,22 @@ TGFX_TEST_PRIVATE(LayerTest, ClippedAnisotropicProjection_UsesProjectedDensity) 
     nodeTransform = MakeRasterPerspective(200.0f) * nodeTransform;
     const float contentScale = 5.0f;
     const Rect renderRect = Rect::MakeWH(2000, 2000);
-    // The projected leaf spans dest x in [261, 547] and y in [369, 774], so a 400-wide viewport
-    // clips only the horizontal axis.
-    const Rect viewport = Rect::MakeWH(400, 2000);
+    // The leaf projects to x in [0, 414] and y in [0, 1000]. This viewport removes both
+    // horizontal edges while preserving the complete vertical range.
+    const Rect viewport = Rect::MakeLTRB(100, 0, 400, 2000);
     const auto localToCompositor =
         MakeRasterLocalToCompositor(nodeTransform, contentScale, renderRect);
     Render3DContext::RasterInfo info;
 
     ASSERT_TRUE(Render3DContext::ComputeRasterInfo(localToCompositor, localBounds, viewport,
                                                    contentScale, &info));
-    EXPECT_LT(info.visibleLocal.width(), localBounds.width());
+    EXPECT_GT(info.visibleLocal.left, localBounds.left);
+    EXPECT_LT(info.visibleLocal.right, localBounds.right);
     EXPECT_EQ(info.visibleLocal.height(), localBounds.height());
 
     EXPECT_NE(info.density.getScaleX(), info.density.getScaleY());
+    EXPECT_LT(info.density.getTranslateX(), 0.0f);
+    EXPECT_FLOAT_EQ(info.density.getTranslateY(), 0.0f);
     EXPECT_LE(static_cast<float>(info.rasterWidth), viewport.width() + 1.0f);
     EXPECT_LE(static_cast<float>(info.rasterHeight), viewport.height() + 1.0f);
   });
