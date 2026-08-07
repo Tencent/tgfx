@@ -4318,8 +4318,6 @@ TGFX_TEST(LayerTest, GlassStyleClippedEvaluationTiled) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleClippedEvaluationTiledUpdate"));
 }
 
-namespace {
-
 constexpr int DensityFloorSize = 2000;
 constexpr int DensityOutputWidth = 1200;
 constexpr int DensityOutputHeight = 1000;
@@ -4427,8 +4425,6 @@ static std::shared_ptr<Surface> RenderFramedDensityFloor(Context* context,
   return surface;
 }
 
-}  // namespace
-
 // A fully visible preserve-3D floor spanning z=10 (upper edge) to z=210 (lower edge). Its
 // complete footprint stays inside the compositor viewport, verifying the contentScale density path.
 TGFX_TEST(LayerTest, PerspectiveFloor10To210) {
@@ -4462,9 +4458,7 @@ TGFX_TEST(LayerTest, PerspectiveFloorPartiallyClipped) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PerspectiveFloorPartiallyClipped"));
 }
 
-namespace {
-
-static Matrix3D MakeRasterLocalToCompositor(const Matrix3D& nodeTransform, float contentScale,
+static Matrix3D MakeLocalToCompositorMatrix(const Matrix3D& nodeTransform, float contentScale,
                                             const Rect& renderRect) {
   Matrix3D matrix = nodeTransform;
   matrix.postScale(contentScale, contentScale, 1.0f);
@@ -4472,13 +4466,11 @@ static Matrix3D MakeRasterLocalToCompositor(const Matrix3D& nodeTransform, float
   return matrix;
 }
 
-static Matrix3D MakeRasterPerspective(float depth) {
+static Matrix3D MakeRasterPerspectiveMatrix(float depth) {
   Matrix3D matrix = Matrix3D::I();
   matrix.setRowColumn(3, 2, -1.0f / depth);
   return matrix;
 }
-
-}  // namespace
 
 // A fully visible leaf retains contentScale density even when its projected scale differs from
 // contentScale, exercising the coversWholeLeaf branch.
@@ -4488,7 +4480,7 @@ TGFX_TEST_PRIVATE(LayerTest, FlatLeaf_PreservesContentScaleSizing) {
     const float contentScale = 3.0f;
     const Rect renderRect = Rect::MakeWH(600, 600);
     const Rect viewport = Rect::MakeWH(renderRect.width(), renderRect.height());
-    const auto localToCompositor = MakeRasterLocalToCompositor(
+    const auto localToCompositor = MakeLocalToCompositorMatrix(
         Matrix3D::MakeScale(0.5f, 0.5f, 1.0f), contentScale, renderRect);
     Render3DContext::RasterInfo info;
 
@@ -4511,7 +4503,7 @@ TGFX_TEST_PRIVATE(LayerTest, ExtremeZoom_CropsToViewportScale) {
     const Rect renderRect = Rect::MakeWH(1861, 1861);
     const Rect viewport = Rect::MakeWH(renderRect.width(), renderRect.height());
     const auto localToCompositor =
-        MakeRasterLocalToCompositor(Matrix3D::I(), contentScale, renderRect);
+        MakeLocalToCompositorMatrix(Matrix3D::I(), contentScale, renderRect);
     Render3DContext::RasterInfo info;
 
     ASSERT_TRUE(Render3DContext::ComputeRasterInfo(localToCompositor, localBounds, viewport,
@@ -4532,7 +4524,7 @@ TGFX_TEST_PRIVATE(LayerTest, FullyVisibleOversizedLeaf_PreservesMainBehavior) {
     const Rect renderRect = Rect::MakeWH(30000, 30000);
     const Rect viewport = Rect::MakeWH(renderRect.width(), renderRect.height());
     const auto localToCompositor =
-        MakeRasterLocalToCompositor(Matrix3D::I(), contentScale, renderRect);
+        MakeLocalToCompositorMatrix(Matrix3D::I(), contentScale, renderRect);
     Render3DContext::RasterInfo info;
 
     ASSERT_TRUE(Render3DContext::ComputeRasterInfo(localToCompositor, localBounds, viewport,
@@ -4556,7 +4548,7 @@ TGFX_TEST_PRIVATE(LayerTest, NearPlaneStraddle_CullsLeaf) {
     const Rect renderRect = Rect::MakeWH(1000, 1000);
     const Rect viewport = Rect::MakeWH(renderRect.width(), renderRect.height());
     const auto localToCompositor =
-        MakeRasterLocalToCompositor(nodeTransform, contentScale, renderRect);
+        MakeLocalToCompositorMatrix(nodeTransform, contentScale, renderRect);
     Render3DContext::RasterInfo info;
 
     EXPECT_FALSE(Render3DContext::ComputeRasterInfo(localToCompositor, localBounds, viewport,
@@ -4570,7 +4562,7 @@ TGFX_TEST_PRIVATE(LayerTest, LeafOutsideViewport_CullsLeaf) {
     const float contentScale = 1.0f;
     const Rect renderRect = Rect::MakeWH(500, 500);
     const Rect viewport = Rect::MakeWH(renderRect.width(), renderRect.height());
-    const auto localToCompositor = MakeRasterLocalToCompositor(
+    const auto localToCompositor = MakeLocalToCompositorMatrix(
         Matrix3D::MakeTranslate(10000, 10000, 0), contentScale, renderRect);
     Render3DContext::RasterInfo info;
 
@@ -4583,12 +4575,12 @@ TGFX_TEST_PRIVATE(LayerTest, LeafBehindCamera_CullsLeaf) {
   TGFX_PRIVATE_ACCESS({
     const Rect localBounds = Rect::MakeWH(200, 200);
     Matrix3D nodeTransform = Matrix3D::MakeTranslate(0, 0, 100);
-    nodeTransform = MakeRasterPerspective(50.0f) * nodeTransform;
+    nodeTransform = MakeRasterPerspectiveMatrix(50.0f) * nodeTransform;
     const float contentScale = 1.0f;
     const Rect renderRect = Rect::MakeWH(500, 500);
     const Rect viewport = Rect::MakeWH(renderRect.width(), renderRect.height());
     const auto localToCompositor =
-        MakeRasterLocalToCompositor(nodeTransform, contentScale, renderRect);
+        MakeLocalToCompositorMatrix(nodeTransform, contentScale, renderRect);
     Render3DContext::RasterInfo info;
 
     EXPECT_FALSE(Render3DContext::ComputeRasterInfo(localToCompositor, localBounds, viewport,
@@ -4602,14 +4594,14 @@ TGFX_TEST_PRIVATE(LayerTest, ClippedAnisotropicProjection_UsesProjectedDensity) 
   TGFX_PRIVATE_ACCESS({
     const Rect localBounds = Rect::MakeWH(200, 200);
     Matrix3D nodeTransform = Matrix3D::MakeRotate({0, 1, 0}, 45.0f);
-    nodeTransform = MakeRasterPerspective(200.0f) * nodeTransform;
+    nodeTransform = MakeRasterPerspectiveMatrix(200.0f) * nodeTransform;
     const float contentScale = 5.0f;
     const Rect renderRect = Rect::MakeWH(2000, 2000);
     // The leaf projects to x in [0, 414] and y in [0, 1000]. This viewport removes both
     // horizontal edges while preserving the complete vertical range.
     const Rect viewport = Rect::MakeLTRB(100, 0, 400, 2000);
     const auto localToCompositor =
-        MakeRasterLocalToCompositor(nodeTransform, contentScale, renderRect);
+        MakeLocalToCompositorMatrix(nodeTransform, contentScale, renderRect);
     Render3DContext::RasterInfo info;
 
     ASSERT_TRUE(Render3DContext::ComputeRasterInfo(localToCompositor, localBounds, viewport,
@@ -4626,17 +4618,13 @@ TGFX_TEST_PRIVATE(LayerTest, ClippedAnisotropicProjection_UsesProjectedDensity) 
   });
 }
 
-namespace {
-
 constexpr float FootprintEpsilon = 0.01f;
 
-static Matrix3D MakeFootprintPerspective(float depth) {
+static Matrix3D MakeFootprintPerspectiveMatrix(float depth) {
   Matrix3D matrix = Matrix3D::I();
   matrix.setRowColumn(3, 2, -1.0f / depth);
   return matrix;
 }
-
-}  // namespace
 
 // Near-plane straddle: the bottom corners are behind the camera while the top corners are in
 // front. Homogeneous clipping keeps only the finite in-front portion, bounded by the viewport.
@@ -4674,7 +4662,7 @@ TGFX_TEST(LayerTest, ComputeVisibleFootprintsCullsInvisibleLeaves) {
   Rect destFootprint;
 
   Matrix3D behindCamera = Matrix3D::MakeTranslate(0, 0, 100);
-  behindCamera = MakeFootprintPerspective(50.0f) * behindCamera;
+  behindCamera = MakeFootprintPerspectiveMatrix(50.0f) * behindCamera;
   EXPECT_FALSE(Matrix3DUtils::ComputeVisibleFootprints(localBounds, destRect, behindCamera,
                                                        &localFootprint, &destFootprint));
 
