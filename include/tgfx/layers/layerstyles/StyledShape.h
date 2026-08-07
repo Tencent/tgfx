@@ -55,6 +55,13 @@ struct StyledShape {
                           StrokeAlign strokeAlign);
 
   /**
+   * Builds a StyledShape that only approximates the content by its bounding box. Use this when the
+   * real outline cannot be recovered. See the exact field for what callers must do differently.
+   */
+  static StyledShape MakeApproximate(std::shared_ptr<Shape> shape, StyledShapeType type,
+                                     float strokeWidth, StrokeAlign strokeAlign);
+
+  /**
    * Returns the bounding box of the shape in its local coordinate space. For Stroke and FillStroke
    * types, the bounds include the outward expansion caused by the stroke width and alignment.
    */
@@ -79,6 +86,15 @@ struct StyledShape {
    * The stroke alignment. Valid when type is Stroke or FillStroke.
    */
   StrokeAlign strokeAlign = StrokeAlign::Center;
+
+  /**
+   * True when shape reproduces the content outline, false when it is only a bounding-box stand-in
+   * for content whose outline could not be recovered. Consumers that render the shape as a
+   * substitute for the content itself must not do so when this is false, since a bounding box can
+   * be far larger than the actual outline (e.g. text). Consumers that merely need a conservative
+   * area may ignore it.
+   */
+  bool exact = true;
 };
 
 }  // namespace tgfx

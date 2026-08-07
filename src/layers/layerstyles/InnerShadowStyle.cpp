@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
+#include "core/shaders/ShapeBlurShader.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "layers/SpreadUtils.h"
@@ -143,6 +144,9 @@ void InnerShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, floa
 
 void InnerShadowStyle::drawWithSpread(Canvas* canvas, const LayerStyleInput& input, float alpha,
                                       BlendMode blendMode) {
+  if (drawAnalytic(canvas, input, alpha, blendMode)) {
+    return;
+  }
   auto shapeResult = SpreadUtils::MakeSpreadShapeImage(input, 0);
   auto spreadShapeResult = SpreadUtils::MakeSpreadShapeImage(input, -_spread);
 
@@ -199,6 +203,70 @@ void InnerShadowStyle::drawWithSpread(Canvas* canvas, const LayerStyleInput& inp
   paint.setMaskFilter(MaskFilter::MakeShader(offsetMaskShader, true));
   canvas->drawImage(shapeResult.image, shapeResult.offset.x, shapeResult.offset.y, sampling,
                     &paint);
+}
+
+bool InnerShadowStyle::drawAnalytic(Canvas* canvas, const LayerStyleInput& input, float alpha,
+                                    BlendMode blendMode) {
+  // Only reachable with a non-zero spread: the analytic form derives both shapes from contentShape,
+  // which describes this layer's own outline and omits the contents of its children. That matches
+  // the spread path, which rasterizes contentShape alone, but not the no-spread path, which filters
+  // the full content image.
+  DEBUG_ASSERT(!FloatNearlyZero(_spread));
+  // Vector exporters (SVG, PDF) translate the recorded draws into their own primitives and can
+  // represent a blur as a native filter, but not a custom shader: routing them through the analytic
+  // path would degrade a scalable feGaussianBlur into a rasterized mask. They record without a
+  // Surface, which is what distinguishes them from GPU rendering.
+  if (canvas->getSurface() == nullptr) {
+    return false;
+  }
+  // The closed form only describes an axis-aligned shape. The geometry check inside
+  // MakeAnalyticShape covers the shape's own matrix, but the canvas may carry a rotation, skew or
+  // perspective of its own (e.g. a layer placed with setMatrix3D), which would shear the analytic
+  // shapes while the filter path still rasterizes the real outline.
+  if (!canvas->getMatrix().rectStaysRect()) {
+    return false;
+  }
+  const auto sigmaX = _blurrinessX * input.contentScale;
+  const auto sigmaY = _blurrinessY * input.contentScale;
+  // A zero sigma degenerates the kernel; the filter path already handles the hard-edged case,
+  // including its nearest-neighbour sampling.
+  if (FloatNearlyZero(sigmaX) || FloatNearlyZero(sigmaY)) {
+    return false;
+  }
+  // The mask is the layer's own shape and the shadow is that shape inset by the spread, matching the
+  // two shape images the filter path rasterizes.
+  auto mask = SpreadUtils::MakeAnalyticShape(input, 0.0f);
+  if (!mask.has_value()) {
+    return false;
+  }
+  auto shadow = SpreadUtils::MakeAnalyticShape(input, -_spread);
+  if (!shadow.has_value()) {
+    return false;
+  }
+  const auto maskBounds = mask->rRect.rect();
+  const auto shadowBounds = shadow->rRect.rect();
+  const auto offsetX = _offsetX * input.contentScale;
+  const auto offsetY = _offsetY * input.contentScale;
+  // The offset moves the shadow only, so it is folded into the center difference rather than applied
+  // to the canvas: translating the canvas would drag the mask along with it.
+  const auto shadowCenterOffset =
+      Point::Make(shadowBounds.centerX() - maskBounds.centerX() + offsetX,
+                  shadowBounds.centerY() - maskBounds.centerY() + offsetY);
+  // Geometry, sigma and the canvas all live in content pixels here, so no extra scale is needed.
+  auto shader = ShapeBlurShader::MakeInner(mask->rRect, shadow->rRect, shadowCenterOffset, sigmaX,
+                                           sigmaY, _color, 1.0f);
+  if (shader == nullptr) {
+    return false;
+  }
+
+  Paint paint = {};
+  paint.setShader(std::move(shader));
+  paint.setBlendMode(blendMode);
+  paint.setAlpha(alpha);
+  // The shadow never reaches outside the shape, so the mask bounds are the whole affected area. This
+  // matches filterBounds returning srcRect unchanged.
+  canvas->drawRect(maskBounds, paint);
+  return true;
 }
 
 std::shared_ptr<ImageFilter> InnerShadowStyle::getShadowFilter(float scale) {

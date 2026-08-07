@@ -1038,9 +1038,13 @@ std::optional<StyledShape> Layer::onGetContentShape() {
   if (bounds.isEmpty()) {
     return std::nullopt;
   }
+  // Layer types that can describe their outline override this method. Everything else falls back to
+  // the bounding box, which is only an approximation: for content such as text the box is far larger
+  // than the glyphs it encloses.
   Path path = {};
   path.addRect(bounds);
-  return StyledShape::Make(Shape::MakeFrom(path), StyledShapeType::Fill, 0, StrokeAlign::Center);
+  return StyledShape::MakeApproximate(Shape::MakeFrom(path), StyledShapeType::Fill, 0,
+                                      StrokeAlign::Center);
 }
 
 void Layer::onAttachToRoot(RootLayer* rootLayer) {

@@ -19,10 +19,12 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <utility>
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Point.h"
+#include "tgfx/core/RRect.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/layers/layerstyles/LayerStyleInput.h"
 
@@ -44,6 +46,18 @@ class SpreadUtils {
   };
 
   /**
+   * A shape that can be evaluated analytically, already carrying the spread expansion.
+   */
+  struct AnalyticShape {
+    /**
+     * The spread-adjusted rounded rectangle, expressed in the coordinate space a LayerStyle draws
+     * in: content pixels with the origin at contentOffset. At most one distinct corner radius;
+     * never Complex.
+     */
+    RRect rRect = {};
+  };
+
+  /**
    * Returns the outward expansion distance from the path boundary caused by the stroke.
    */
   static float StrokeOutset(float width, StrokeAlign align);
@@ -54,6 +68,24 @@ class SpreadUtils {
    * space to the original shape's space.
    */
   static std::pair<std::shared_ptr<Shape>, Matrix> UnwrapMatrixShape(std::shared_ptr<Shape> shape);
+
+  /**
+   * Applies spread to a rounded rectangle: the bounds are outset by distance and each non-zero
+   * radius is adjusted by the same amount so the corners stay concentric. Returns an empty RRect
+   * when the result collapses.
+   */
+  static RRect MakeSpreadRRect(const RRect& rRect, float distance);
+
+  /**
+   * Returns the spread-adjusted shape when the shadow can be computed in closed form, or nullopt
+   * when it cannot and the caller must fall back to the filter path. Requires a fill-only shape
+   * whose outline is exact and reduces to a Rect, a uniformly rounded RRect or an Oval, optionally
+   * placed by a translation and axis-aligned scale.
+   *
+   * The returned geometry is ready to draw with in a LayerStyle's onDraw: it is measured in content
+   * pixels, the same space the shadow's sigma uses, with the origin the canvas already carries.
+   */
+  static std::optional<AnalyticShape> MakeAnalyticShape(const LayerStyleInput& input, float spread);
 
   /**
    * Rasterizes the contentShape with spread applied into a tightly-sized alpha image. Positive

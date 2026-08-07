@@ -17,10 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
+#include "core/shaders/ShapeBlurShader.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "layers/SpreadUtils.h"
+#include "tgfx/core/Canvas.h"
 #include "tgfx/core/ImageFilter.h"
+#include "tgfx/core/MaskFilter.h"
 
 namespace tgfx {
 
@@ -114,6 +117,71 @@ uint32_t DropShadowStyle::extraSourceType() const {
   return static_cast<uint32_t>(LayerStyleExtraSourceType::None);
 }
 
+bool DropShadowStyle::drawAnalytic(Canvas* canvas, const LayerStyleInput& input, float alpha,
+                                   BlendMode blendMode) {
+  // Only reachable with a non-zero spread: the analytic form derives the shadow from contentShape,
+  // which describes this layer's own outline and omits the contents of its children. That matches
+  // the spread path, which rasterizes contentShape alone, but not the no-spread path, which blurs
+  // the full content image.
+  DEBUG_ASSERT(!FloatNearlyZero(_spread));
+  // Vector exporters (SVG, PDF) translate the recorded draws into their own primitives and can
+  // represent a blur as a native filter, but not a custom shader: routing them through the analytic
+  // path would degrade a scalable feGaussianBlur into a rasterized mask. They record without a
+  // Surface, which is what distinguishes them from GPU rendering.
+  if (canvas->getSurface() == nullptr) {
+    return false;
+  }
+  // The closed form only describes an axis-aligned shape. The geometry check inside
+  // MakeAnalyticShape covers the shape's own matrix, but the canvas may carry a rotation, skew or
+  // perspective of its own (e.g. a layer placed with setMatrix3D), which would shear the analytic
+  // rect while the filter path still rasterizes the real outline.
+  if (!canvas->getMatrix().rectStaysRect()) {
+    return false;
+  }
+  const auto sigmaX = _blurrinessX * input.contentScale;
+  const auto sigmaY = _blurrinessY * input.contentScale;
+  // A zero sigma degenerates the kernel; the filter path already handles the hard-edged case,
+  // including its nearest-neighbour sampling.
+  if (FloatNearlyZero(sigmaX) || FloatNearlyZero(sigmaY)) {
+    return false;
+  }
+  auto analytic = SpreadUtils::MakeAnalyticShape(input, _spread);
+  if (!analytic.has_value()) {
+    return false;
+  }
+  // Geometry, sigma and the canvas all live in content pixels here, so no extra scale is needed.
+  auto shader = ShapeBlurShader::Make(analytic->rRect, sigmaX, sigmaY, _color, 1.0f);
+  if (shader == nullptr) {
+    return false;
+  }
+
+  auto drawRect = analytic->rRect.rect().makeOutset(2.0f * sigmaX, 2.0f * sigmaY);
+  const auto offsetX = _offsetX * input.contentScale;
+  const auto offsetY = _offsetY * input.contentScale;
+  Paint paint = {};
+  auto* contour = input.findExtraSource(StyleInputSource::Type::Contour);
+  if (!_showBehindLayer && contour != nullptr && contour->image() != nullptr) {
+    auto contourShader =
+        Shader::MakeImageShader(contour->image(), TileMode::Decal, TileMode::Decal, {});
+    auto contourOffset = contour->imageOffset();
+    // The canvas is translated by the shadow offset before drawing, which would drag the contour
+    // mask along with the shadow. The mask has to stay on the layer itself, so the offset is
+    // cancelled here: only the shadow moves, the knockout does not.
+    auto matrixShader = contourShader->makeWithMatrix(
+        Matrix::MakeTrans(contourOffset.x - offsetX, contourOffset.y - offsetY));
+    paint.setMaskFilter(MaskFilter::MakeShader(matrixShader, true));
+  }
+  paint.setShader(std::move(shader));
+  paint.setBlendMode(blendMode);
+  paint.setAlpha(alpha);
+  // The offset moves the shadow only; translating the canvas keeps the shader and the draw rect in
+  // the same space, so the geometry stays centred on the shape.
+  AutoCanvasRestore restoreCanvas(canvas);
+  canvas->translate(offsetX, offsetY);
+  canvas->drawRect(drawRect, paint);
+  return true;
+}
+
 void DropShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alpha,
                              BlendMode blendMode) {
   Point offset = {};
@@ -124,6 +192,9 @@ void DropShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float
   std::shared_ptr<Image> filterSource = input.content;
   Point filterSourceOffset = {};
   if (!FloatNearlyZero(_spread)) {
+    if (drawAnalytic(canvas, input, alpha, blendMode)) {
+      return;
+    }
     auto spreadImage = SpreadUtils::MakeSpreadShapeImage(input, _spread);
     // The spread shadow is drawn from the spread shape image. When the vector shape is unavailable
     // (e.g. a group layer with only children) or exceeds the content image, the spread cannot be

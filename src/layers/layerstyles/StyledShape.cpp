@@ -38,6 +38,13 @@ StyledShape StyledShape::Make(std::shared_ptr<Shape> shape, StyledShapeType type
   return result;
 }
 
+StyledShape StyledShape::MakeApproximate(std::shared_ptr<Shape> shape, StyledShapeType type,
+                                         float strokeWidth, StrokeAlign strokeAlign) {
+  auto result = Make(std::move(shape), type, strokeWidth, strokeAlign);
+  result.exact = false;
+  return result;
+}
+
 Rect StyledShape::getBounds() const {
   auto [innerShape, matrix] = SpreadUtils::UnwrapMatrixShape(shape);
   auto bounds = innerShape->getPath().getBounds();
