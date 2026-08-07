@@ -6,7 +6,7 @@
 #
 # This script automatically runs UpdateBaseline for all backends available on the current platform:
 #   macOS:   OpenGL
-#   Windows: Vulkan
+#   Windows: Vulkan, D3D12
 #
 # No arguments required.
 
@@ -63,7 +63,7 @@ case "$OS" in
     BACKENDS=("OpenGL:")
     ;;
   MINGW*|MSYS*|CYGWIN*|Windows_NT)
-    BACKENDS=("Vulkan:-DTGFX_USE_VULKAN=ON")
+    BACKENDS=("Vulkan:-DTGFX_USE_VULKAN=ON" "D3D12:-DTGFX_USE_D3D12=ON")
     ;;
   *)
     BACKENDS=("OpenGL:")

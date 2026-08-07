@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "VaryingHandler.h"
+#include <string>
 #include "ProgramBuilder.h"
 
 namespace tgfx {
@@ -61,6 +62,14 @@ void VaryingHandler::finalize() {
 
 void VaryingHandler::appendDecls(const std::vector<ShaderVar>& vars, std::string* out,
                                  ShaderStage stage) const {
+  // Do not emit explicit "layout(location=N)" qualifiers for varyings here. Desktop OpenGL
+  // sticks to "#version 150" which rejects layout(location) on varyings without the
+  // GL_ARB_separate_shader_objects extension, so emitting them breaks shader compilation on
+  // that backend. The SPIR-V cross-compiled backends (D3D12 / Vulkan / Metal) reassign
+  // locations later in ShaderCompiler::PreprocessGLSL via the in/out regex passes, which walk
+  // the GLSL source in textual order. Vertex outputs and fragment inputs come from the same
+  // VaryingHandler::varyings sequence, so the per-stage numbering they end up with already
+  // matches across the boundary.
   for (const auto& var : vars) {
     out->append(programBuilder->getShaderVarDeclarations(var, stage));
     out->append(";\n");

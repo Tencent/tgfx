@@ -28,6 +28,16 @@ if /I "%~1"=="USE_OPENGL" (
     set "BACKEND_NAME=opengl"
     set "TARGET_SUFFIX=OpenGL"
 )
+if /I "%~1"=="USE_D3D12" (
+   set "CMAKE_BACKEND_ARGS=-DTGFX_USE_D3D12=ON"
+   set "BACKEND_NAME=d3d12"
+   set "TARGET_SUFFIX=D3D12"
+)
+if /I "%~1"=="USE_D3D12_WARP" (
+   set "CMAKE_BACKEND_ARGS=-DTGFX_USE_D3D12=ON -DTGFX_D3D12_USE_WARP=ON"
+   set "BACKEND_NAME=d3d12-warp"
+   set "TARGET_SUFFIX=D3D12"
+)
 
 :: Check if cache is up to date
 set "CACHE_VERSION_FILE=test\baseline\.cache\%BACKEND_NAME%\version.json"
@@ -69,7 +79,10 @@ if exist %BUILD_DIR% rd /s /q %BUILD_DIR%
 mkdir %BUILD_DIR%
 cd %BUILD_DIR%
 
-cmake -G Ninja %CMAKE_BACKEND_ARGS% -DTGFX_SKIP_GENERATE_BASELINE_IMAGES=ON -DTGFX_BUILD_TESTS=ON -DTGFX_SKIP_BASELINE_CHECK=ON -DCMAKE_BUILD_TYPE=Debug ../
+:: Windows Debug builds compile far slower than macOS, so this script (which is also driven by
+:: CI) builds the baseline generator in Release across all Windows backends to keep the refresh
+:: turnaround acceptable. macOS update_baseline.sh keeps Debug for better diagnostics.
+cmake -G Ninja %CMAKE_BACKEND_ARGS% -DTGFX_SKIP_GENERATE_BASELINE_IMAGES=ON -DTGFX_BUILD_TESTS=ON -DTGFX_SKIP_BASELINE_CHECK=ON -DCMAKE_BUILD_TYPE=Release ../
 if %errorlevel% neq 0 (
     echo CMake configuration failed
     set "BASELINE_FAILED=true"
