@@ -777,8 +777,10 @@ TGFX_TEST(ClipTest, SubPixelClipMaskRasterizeNoNullOp) {
   ClipStack clip;
   clip.clipRect(Rect::MakeXYWH(10, 20, 40, 30), Matrix::I(), false);
   clip.transform(Matrix::MakeScale(1.0f, 0.001f));
-  auto applied = compositor.applyClip(clip);
-  EXPECT_EQ(applied.status, AppliedClipStatus::ClippedOut);
+  TGFX_PRIVATE_ACCESS({
+    auto applied = compositor.applyClip(clip);
+    EXPECT_EQ(applied.status, AppliedClipStatus::ClippedOut);
+  });
   context->flushAndSubmit();
 }
 
