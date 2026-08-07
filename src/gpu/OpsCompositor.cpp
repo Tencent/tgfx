@@ -1059,8 +1059,8 @@ std::shared_ptr<TextureProxy> OpsCompositor::makeClipTexture(
     auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), {}, uvMatrix, aaType);
     if (drawOp == nullptr) {
       // Shape rasterization failed (e.g. an empty or degenerate clip path, possibly after the
-      // inverse-fill toggle for DstOut masking); fall back to the caller's input fragment
-      // processor instead of queuing a null draw op.
+      // inverse-fill toggle for DstOut masking); return nullptr so the caller reports ClippedOut
+      // instead of queuing a null draw op.
       return nullptr;
     }
     if (i > 0) {

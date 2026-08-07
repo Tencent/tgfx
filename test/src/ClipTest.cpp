@@ -770,10 +770,10 @@ TGFX_TEST(ClipTest, SubPixelClipMaskRasterizeNoNullOp) {
   ASSERT_NE(renderTarget, nullptr);
   OpsCompositor compositor(renderTarget, 0);
 
-  // End-to-end rendering path: before the fix, applyClip fed the degenerate empty element to
-  // makeClipTexture, which queued a null draw op whose execution crashed with a null vtable call
-  // (memory access out of bounds on wasm). With the fix the clip is reported ClippedOut and no
-  // clip-mask raster task is queued, so flushing must not crash.
+  // End-to-end rendering path: without the fix, the empty clip element was skipped by the
+  // scissor-only path (innerBounds == outerBounds) and the draw proceeded unclipped (Clipped,
+  // overdrawing content outside the clip). The fix reports ClippedOut instead, matching the
+  // semantics of an empty clip region. Flushing must not crash.
   ClipStack clip;
   clip.clipRect(Rect::MakeXYWH(10, 20, 40, 30), Matrix::I(), false);
   clip.transform(Matrix::MakeScale(1.0f, 0.001f));
