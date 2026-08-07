@@ -77,6 +77,36 @@ class Matrix3DUtils {
   static Rect InverseMapRect(const Rect& rect, const Matrix3D& matrix);
 
   /**
+   * Computes the axis-aligned footprints of the intersection between `localBounds` (on the local
+   * z=0 plane) and `destRect` (in destination space), both in local space and in destination
+   * space, under the 3x3 homography embedded in `matrix`.
+   *
+   * Algorithm: forward-project the four corners of `localBounds` to homogeneous destination
+   * coordinates (X, Y, W), Sutherland-Hodgman clip the resulting quad against 5 planes
+   * (W > 0 near plane, plus the 4 viewport edges expressed as X ≥ 0·W, X ≤ destW·W, etc.),
+   * then for each surviving polygon vertex compute both:
+   *   - local (x, y) via the inverse homography → AABB → *localFootprint
+   *   - destination (X/W, Y/W) directly → AABB → *destFootprint
+   *
+   * The paired footprints are self-consistent: destFootprint always sits inside destRect, and
+   * ratios destFootprint.size / localFootprint.size give a numerically stable "how many
+   * destination pixels per local unit" estimate that stays finite even when the footprints touch
+   * the near plane, because the clip removes the singularity.
+   *
+   * Returns false when the homography is singular or the clipped polygon is empty (leaf not
+   * visible in `destRect`).
+   *
+   * @param localBounds The rect on the local z=0 plane whose visible footprint is being computed.
+   * @param destRect The visible region in destination space (typically the compositor viewport).
+   * @param matrix The 4x4 transformation from local space to destination space.
+   * @param localFootprint Output: AABB of clipped vertices in local space.
+   * @param destFootprint Output: AABB of clipped vertices in destination space.
+   */
+  static bool ComputeVisibleFootprints(const Rect& localBounds, const Rect& destRect,
+                                       const Matrix3D& matrix, Rect* localFootprint,
+                                       Rect* destFootprint);
+
+  /**
    * Adjusts a 3D transformation matrix so that the projection result can be correctly scaled.
    * This ensures the visual effect of "project first, then scale" rather than "scale first, then
    * project", which would cause incorrect perspective effects.
