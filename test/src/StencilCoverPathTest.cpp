@@ -1955,7 +1955,7 @@ TGFX_TEST(StencilCoverPathTest, Dispatch_MixRectDrawOp) {
 // Canvas::drawFill → drawContext->drawPath(emptyInversePath) → RenderContext::drawPath →
 // drawShape → shouldUseStencilCover, which is exactly where the empty-path early-out lives.
 // If the early-out is ever removed the clear silently starts paying that allocation.
-TGFX_TEST(StencilCoverPathTest, Dispatch_EmptyPathBypassesStencilAttachmentAllocation) {
+TGFX_TEST_PRIVATE(StencilCoverPathTest, Dispatch_EmptyPathBypassesStencilAttachmentAllocation) {
   TGFX_PRIVATE_ACCESS(
       ContextScope scope; auto context = scope.getContext(); ASSERT_TRUE(context != nullptr);
 

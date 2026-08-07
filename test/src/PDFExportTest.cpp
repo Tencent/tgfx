@@ -1221,7 +1221,7 @@ size_t MeasureActualPayload(const std::shared_ptr<Data>& bytes) {
 // Bug 1 unit test, compressed branch. Drives PDFStreamOut with input large enough that
 // FlateDecode actually saves bytes; expects /Length to equal the compressed payload size, not the
 // original input size. This is the case the PR fix targets directly.
-TGFX_TEST(PDFExportTest, PDFStreamOutWritesCompressedLength) {
+TGFX_TEST_PRIVATE(PDFExportTest, PDFStreamOutWritesCompressedLength) {
   TGFX_PRIVATE_ACCESS(
       // Highly redundant input compresses well; the 4096-byte block reliably exceeds MinimumSavings.
       std::string input(4096, 'A');
@@ -1244,7 +1244,7 @@ TGFX_TEST(PDFExportTest, PDFStreamOutWritesCompressedLength) {
 
 // Bug 1 unit test, uncompressed branch (compression disabled by metadata). /Length must equal the
 // input size and no /Filter entry should be emitted.
-TGFX_TEST(PDFExportTest, PDFStreamOutWritesUncompressedLength) {
+TGFX_TEST_PRIVATE(PDFExportTest, PDFStreamOutWritesUncompressedLength) {
   TGFX_PRIVATE_ACCESS(std::string input = "Hello, PDF stream length test.";
                       auto emitted = RunPDFStreamOut(input, PDFMetadata::CompressionLevel::None,
                                                      PDFSteamCompressionEnabled::Yes);
@@ -1266,7 +1266,7 @@ TGFX_TEST(PDFExportTest, PDFStreamOutWritesUncompressedLength) {
 // pre-fix code wrote the original input size into /Length unconditionally, so the bug surfaces in
 // this branch as well — making sure /Length still matches the actually-emitted payload (== input
 // size, since no Filter is written).
-TGFX_TEST(PDFExportTest, PDFStreamOutFallsBackWhenCompressionDoesNotSave) {
+TGFX_TEST_PRIVATE(PDFExportTest, PDFStreamOutFallsBackWhenCompressionDoesNotSave) {
   TGFX_PRIVATE_ACCESS(
       // 8 bytes is well under MinimumSavings (= strlen("/Filter_/FlateDecode_") = 21), so
       // SerializeStream skips the deflate path entirely.

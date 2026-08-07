@@ -51,7 +51,7 @@ static Path MakePath(std::initializer_list<Point> points, bool close = true) {
   return path;
 }
 
-TGFX_TEST(ClipTest, RectEffect) {
+TGFX_TEST_PRIVATE(ClipTest, RectEffect) {
   TGFX_PRIVATE_ACCESS(
       BlockAllocator allocator;
 
@@ -92,7 +92,7 @@ TGFX_TEST(ClipTest, RectEffect) {
       })
 }
 
-TGFX_TEST(ClipTest, RRectEffect) {
+TGFX_TEST_PRIVATE(ClipTest, RRectEffect) {
   TGFX_PRIVATE_ACCESS(
       BlockAllocator allocator;
 
