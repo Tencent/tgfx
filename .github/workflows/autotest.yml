@@ -209,10 +209,30 @@ jobs:
           depsync
         shell: bash
 
+      # windows-latest ships MinGW GCC on PATH, and depsync's internal vcvars32 leaves x86 cl
+      # first. Both cases make CMake pick the wrong compiler when the bat files invoke it.
+      # ilammy/msvc-dev-cmd runs vcvars64 at the workflow level so the environment survives
+      # git switch that update_baseline.bat performs internally (which would otherwise rewrite
+      # the bat file on disk and desync cmd's read offset with any environment logic embedded
+      # in the bat itself).
+      - name: Setup MSVC (x64)
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Update Baseline
+        run: .\update_baseline.bat USE_D3D12_WARP --skip-images
+        shell: cmd
+        env:
+          CC: cl.exe
+          CXX: cl.exe
+
       - name: Run Autotest
         run: .\autotest.bat USE_D3D12_WARP
         shell: cmd
         env:
+          CC: cl.exe
+          CXX: cl.exe
           TRACY_NO_INVARIANT_CHECK: 1
 
       - name: Save Third-Party Cache
