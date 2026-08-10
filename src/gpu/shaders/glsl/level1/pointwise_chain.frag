@@ -3,6 +3,9 @@
 // statically expanded slots each carry a Packed ivec4 (op, two input-slot indices, blend/const
 // selector), so any topology with the same texture-leaf count shares one program variant. Texture
 // leaves occupy slots 0..NTEX-1 and each samples its own sampler, keeping sampler indexing static.
+// TEXTURE_COUNT encodes 0/1/2/4 leaves; a zero-leaf chain evaluates const-color and blend ops
+// against the geometry color alone. With HAS_MASK_TEXTURE a device-space alpha mask child is
+// sampled after the DAG and before the XP stage.
 // Leaf subset rects are runtime uniforms (Subset / Subset_1 / ... following the structural ordinal
 // convention); a leaf without a real subset uploads the full texture bounds, so the clamp is a
 // no-op. ColorSpaceXform parameters are one shared chain-wide block, so a chain may contain at
@@ -21,8 +24,10 @@
 #endif
 
 #if TEXTURE_COUNT == 0
-#define NTEX 1
+#define NTEX 0
 #elif TEXTURE_COUNT == 1
+#define NTEX 1
+#elif TEXTURE_COUNT == 2
 #define NTEX 2
 #else
 #define NTEX 4
@@ -54,6 +59,9 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   // Chain-wide AA-rect clip for OP_AARECT_COVERAGE (at most one such slot per chain). The rect is
   // in destination device coordinates and already carries the 0.5 outset for the AA falloff.
   vec4 CoverageRect;
+#if HAS_MASK_TEXTURE
+  mat3 DeviceCoordMatrix;
+#endif
 
 #define TGFX_CHAIN_PACKED Slot0Packed
 #define TGFX_CHAIN_CONST_COLOR Slot0ConstColor
@@ -373,7 +381,9 @@ int TiledStrict;
 #include "xp_uniforms.inc"
 };
 
+#if NTEX >= 1
 layout(location = 0) in vec2 TransformedCoords_0;
+#endif
 #if NTEX >= 2
 layout(location = 1) in vec2 TransformedCoords_1;
 #endif
@@ -384,8 +394,14 @@ layout(location = 3) in vec2 TransformedCoords_3;
 #if HAS_COVERAGE
 layout(location = NTEX) in float vCoverage;
 #endif
+#if HAS_COLOR
+// QuadGP only: per-vertex color (broadcast for common-color draws) is the geometry color source.
+layout(location = NTEX + 1) in vec4 vColor;
+#endif
 
+#if NTEX >= 1
 layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
+#endif
 #if NTEX >= 2
 layout(set = 1, binding = 1) uniform sampler2D TextureSampler_1;
 #endif
@@ -393,11 +409,18 @@ layout(set = 1, binding = 1) uniform sampler2D TextureSampler_1;
 layout(set = 1, binding = 2) uniform sampler2D TextureSampler_2;
 layout(set = 1, binding = 3) uniform sampler2D TextureSampler_3;
 #endif
+#if HAS_MASK_TEXTURE
+// Device-space alpha mask applied after the DAG and before the XP stage (same application point
+// as the legacy blend kernel).
+layout(set = 1, binding = NTEX) uniform sampler2D MaskTextureSampler;
+#define XP_DST_TEX_BINDING (NTEX + 1)
+#else
+#define XP_DST_TEX_BINDING NTEX
+#endif
 
 // The chain kernel blends regardless of XP state, so include the shared blend math directly;
 // xp_porter_duff.inc re-includes it under HAS_XP >= 1, guarded against double definition.
 #include "xp_blend_colors.inc"
-#define XP_DST_TEX_BINDING NTEX
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
 
@@ -431,6 +454,14 @@ vec4 chainLeafFetch(sampler2D texSampler, vec2 coord, vec4 leafSubset, int leafI
 layout(location = 0) out vec4 fragColor;
 
 vec4 chainResults[16];
+
+// Geometry color source: the unconditional inColor attribute on QuadGP (broadcast for
+// common-color draws), the Color uniform otherwise.
+#if HAS_COLOR
+#define TGFX_CHAIN_GEOM_COLOR vColor
+#else
+#define TGFX_CHAIN_GEOM_COLOR Color
+#endif
 
 #define TGFX_CHAIN_PACKED Slot0Packed
 #define TGFX_CHAIN_CONST_COLOR Slot0ConstColor
@@ -754,6 +785,13 @@ void main() {
   chainResults[14] = evalChainSlot14();
   chainResults[15] = evalChainSlot15();
   vec4 result = chainResults[RootIndex];
+
+#if HAS_MASK_TEXTURE
+  // Device-space mask multiply, applied after the DAG and before coverage/XP (same application
+  // point as the legacy blend kernel).
+  highp vec3 maskCoord = DeviceCoordMatrix * vec3(gl_FragCoord.xy, 1.0);
+  result *= texture(MaskTextureSampler, maskCoord.xy).r;
+#endif
 
 #if HAS_COVERAGE
 #define TGFX_XP_SRC_COLOR (result * vCoverage)

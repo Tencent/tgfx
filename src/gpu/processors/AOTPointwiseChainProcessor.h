@@ -73,6 +73,10 @@ struct AOTChainSlot {
  * pairs with slot k and samples TextureSampler_k, which keeps sampler indexing static in the
  * kernel. Everything else about the DAG — op types, wiring, blend modes, operator parameters —
  * travels in uniforms, so one program variant serves any topology with the same leaf count.
+ *
+ * A chain may additionally carry one device-space alpha-mask child (registered last, after all
+ * leaves): it is not a DAG node; the kernel samples it after the DAG and multiplies the result
+ * before the coverage/XP stage, matching the legacy blend kernel's mask application point.
  */
 class AOTPointwiseChainProcessor : public FragmentProcessor {
  public:
@@ -81,18 +85,25 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
   static PlacementPtr<AOTPointwiseChainProcessor> Make(
       BlockAllocator* allocator, std::vector<PlacementPtr<FragmentProcessor>> textureLeaves,
       const std::vector<AOTChainSlot>& slots, size_t rootSlot, int tiledLeafIndex = -1,
-      const AOTTiledTextureRecipe* tiledRecipe = nullptr);
+      const AOTTiledTextureRecipe* tiledRecipe = nullptr,
+      PlacementPtr<FragmentProcessor> maskChild = nullptr);
 
   AOTPointwiseChainProcessor(std::vector<PlacementPtr<FragmentProcessor>> textureLeaves,
                              const std::vector<AOTChainSlot>& slots, size_t rootSlot,
-                             int tiledLeafIndex, const AOTTiledTextureRecipe* tiledRecipe);
+                             int tiledLeafIndex, const AOTTiledTextureRecipe* tiledRecipe,
+                             PlacementPtr<FragmentProcessor> maskChild);
 
   std::string name() const override {
     return "AOTPointwiseChainProcessor";
   }
 
   size_t leafCount() const {
-    return numChildProcessors();
+    return numChildProcessors() - (hasMask() ? 1 : 0);
+  }
+
+  // Whether the chain carries a device-space alpha-mask child (always the last child).
+  bool hasMask() const {
+    return hasMaskChild;
   }
 
   size_t slotCount() const {
@@ -132,6 +143,8 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
   int tiledLeafIndex = -1;
   AOTTiledTextureRecipe _tiledRecipe = {};
   std::array<AOTChainSlot, MaxSlots> slots = {};
+  // Kept only to mark the mask's presence; the mask itself is the last registered child.
+  bool hasMaskChild = false;
 };
 
 }  // namespace tgfx

@@ -66,16 +66,26 @@ bool DrawOp::prepare(RenderTarget* renderTarget, ProgramLookupMode mode,
 }
 
 // When the plain matcher cannot serve the color chain, the chain may still reduce onto the fused
-// pointwise-chain kernel. Rewriting the processors before program lookup keeps the cached program
-// and the per-draw uniform upload driven by the same ProgramInfo, which a post-hoc program swap
-// cannot guarantee. The matcher probe runs first so draws the plain route already serves keep
-// their original funnel accounting; coverage-bearing draws are excluded because folding coverage
-// into the color chain is only valid for a subset of blends and stays on its own route.
+// pointwise-chain kernel. Rewriting the processors before program lookup keeps the cached program and the
+// per-draw uniform upload driven by the same ProgramInfo, which a post-hoc program swap cannot
+// guarantee. The matcher probe runs first so draws the plain route already serves keep their
+// original funnel accounting. A single coverage FP is folded into the chain (AARect clip as a
+// coverage slot, a device-space alpha mask as the mask child, Compose(mask, rect) as both);
+// other coverage forms stay on their original route.
 std::shared_ptr<Program> DrawOp::prepareDecomposedProgram(RenderTarget* renderTarget,
                                                           const ColorProcessorList& activeColors) {
-  if (!coverages.empty() || !renderTarget->getContext()->precompiledShaderCache()->isLoaded() ||
-      MatchPermutation(preparedProgramInfo.get()).has_value()) {
+  if (!renderTarget->getContext()->precompiledShaderCache()->isLoaded()) {
     return nullptr;
+  }
+  if (MatchPermutation(preparedProgramInfo.get()).has_value()) {
+    return nullptr;
+  }
+  const FragmentProcessor* coverageFP = nullptr;
+  if (!coverages.empty()) {
+    if (coverages.size() != 1) {
+      return nullptr;
+    }
+    coverageFP = coverages.front().get();
   }
   std::vector<const FragmentProcessor*> colorProcessors = {};
   colorProcessors.reserve(activeColors.size());
@@ -91,7 +101,7 @@ std::shared_ptr<Program> DrawOp::prepareDecomposedProgram(RenderTarget* renderTa
       !AOTPlanExecutor::CanExecute(graph, plan)) {
     return nullptr;
   }
-  auto chainFP = AOTPlanExecutor::BuildChainProcessor(allocator, graph, plan.passes[0]);
+  auto chainFP = AOTPlanExecutor::BuildChainProcessor(allocator, graph, plan.passes[0], coverageFP);
   if (chainFP == nullptr) {
     return nullptr;
   }

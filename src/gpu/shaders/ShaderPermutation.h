@@ -55,7 +55,7 @@ namespace tgfx {
  *   - subset rects        -> vec4 Subset uniform + unconditional clamp, full-bounds default
  *                            (QuadTextureFillShader)
  *   - tile modes          -> ShaderModeX/Y uniforms (TiledTextureFillShader)
- *   - blend modes/roles   -> BlendModeValue uniform (BlendMergeShader)
+ *   - blend modes/roles   -> runtime uniforms on the pointwise chain kernel
  *   - pointwise op kinds  -> OpType uniforms (PointwiseChainShader)
  *   - alpha-only/RGBAAA   -> AlphaOnly uniform; swizzles are data, not bindings
  *

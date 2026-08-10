@@ -33,7 +33,6 @@
 #include "gpu/EmbeddedShaderBundles.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/PrecompiledShaderCache.h"
-#include "gpu/shaders/level1/BlendMergeShader.h"
 #include "gtest/gtest.h"
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunknown-warning-option"
@@ -398,92 +397,6 @@ static nlohmann::json HitRecordToJSON(const PrecompiledHitRecord& record) {
           {"shader", record.shaderName},
           {"vertPermutationIndex", record.vertPermutationIndex},
           {"fragPermutationIndex", record.fragPermutationIndex}};
-}
-
-static bool BlendMergeTupleBuildable(const std::vector<int>& vert, const std::vector<int>& frag) {
-  if (vert.size() != BlendMergeShader::VD::COUNT || frag.size() != BlendMergeShader::FD::COUNT) {
-    return false;
-  }
-  if (vert[BlendMergeShader::VD::GP_TYPE] == 0 && (vert[BlendMergeShader::VD::HAS_COVERAGE] != 0 ||
-                                                   vert[BlendMergeShader::VD::HAS_UV_COORD] != 0 ||
-                                                   vert[BlendMergeShader::VD::HAS_COLOR] != 0)) {
-    return false;
-  }
-  if (frag[BlendMergeShader::FD::HAS_MASK_TEXTURE] != 0 &&
-      vert[BlendMergeShader::VD::GP_TYPE] != 0) {
-    return false;
-  }
-  // Mirrored dimensions must agree between vertex and fragment domains.
-  return vert[BlendMergeShader::VD::HAS_COVERAGE] == frag[BlendMergeShader::FD::HAS_COVERAGE] &&
-         vert[BlendMergeShader::VD::HAS_COLOR] == frag[BlendMergeShader::FD::HAS_COLOR];
-}
-
-static nlohmann::json BuildBlendMergeReachabilityAudit(
-    const std::map<std::string, AggregatedHit>& permutationMap) {
-  auto shader = BlendMergeShader().info();
-  const auto vertCount = shader.vertDomain.totalCount();
-  const auto fragCount = shader.fragDomain.totalCount();
-  nlohmann::json rows = nlohmann::json::array();
-  uint64_t rawCount = 0;
-  uint64_t buildableCount = 0;
-  uint64_t observedCount = 0;
-  for (uint32_t vertIndex = 0; vertIndex < vertCount; ++vertIndex) {
-    auto vertValues = shader.vertDomain.decode(vertIndex);
-    for (uint32_t fragIndex = 0; fragIndex < fragCount; ++fragIndex) {
-      ++rawCount;
-      auto fragValues = shader.fragDomain.decode(fragIndex);
-      if (!BlendMergeTupleBuildable(vertValues, fragValues)) {
-        continue;
-      }
-      ++buildableCount;
-      std::stringstream key;
-      key << "BlendMergeShader\n" << vertIndex << "\n" << fragIndex;
-      auto hit = permutationMap.find(key.str());
-      uint64_t hitCount = hit == permutationMap.end() ? 0 : hit->second.count;
-      if (hitCount > 0) {
-        ++observedCount;
-      }
-      const auto xp = fragValues[BlendMergeShader::FD::HAS_XP];
-      const auto hasMask = fragValues[BlendMergeShader::FD::HAS_MASK_TEXTURE] != 0;
-      const char* routeClass = xp != 0 ? "LegacyXP" : hasMask ? "LegacyMask" : "CleanColorOnly";
-      // HAS_COVERAGE is the Quad vertex-AA interface, not an independent legacy coverage FP; clean
-      // two-child blends may legitimately use it. AARect/DeviceSpace coverage is represented by the
-      // separate ProgramInfo structure and cannot be inferred from this tuple alone.
-      nlohmann::json row = {
-          {"shader", "BlendMergeShader"},
-          {"routeClass", routeClass},
-          {"vertPermutationIndex", vertIndex},
-          {"fragPermutationIndex", fragIndex},
-          {"vertDefines",
-           {{"GP_TYPE", vertValues[BlendMergeShader::VD::GP_TYPE]},
-            {"HAS_COVERAGE", vertValues[BlendMergeShader::VD::HAS_COVERAGE]},
-            {"HAS_UV_COORD", vertValues[BlendMergeShader::VD::HAS_UV_COORD]},
-            {"HAS_COLOR", vertValues[BlendMergeShader::VD::HAS_COLOR]}}},
-          {"fragDefines",
-           {{"HAS_TWO_CHILDREN", fragValues[BlendMergeShader::FD::HAS_TWO_CHILDREN]},
-            {"HAS_XP", fragValues[BlendMergeShader::FD::HAS_XP]},
-            {"CHILD0_MODE", fragValues[BlendMergeShader::FD::CHILD0_MODE]},
-            {"HAS_COVERAGE", fragValues[BlendMergeShader::FD::HAS_COVERAGE]},
-            {"HAS_COLOR", fragValues[BlendMergeShader::FD::HAS_COLOR]},
-            {"HAS_MASK_TEXTURE", fragValues[BlendMergeShader::FD::HAS_MASK_TEXTURE]}}},
-          {"buildable", true},
-          {"hitExecutionCount", hitCount},
-          {"evidence", hitCount > 0 ? "ObservedInMetalTests" : "BuildableButUnobserved"},
-          {"deletionVerdict", "Unknown"}};
-      if (hit != permutationMap.end()) {
-        row["hitTests"] = hit->second.tests;
-        row["hitEffects"] = {hit->second.record.effectSignature};
-        row["hitPipelines"] = {hit->second.record.pipelineSignature};
-      }
-      rows.push_back(std::move(row));
-    }
-  }
-  return {{"rawTupleCount", rawCount},
-          {"bundleCompiledCount", buildableCount},
-          {"observedHitTupleCount", observedCount},
-          {"unobservedTupleCount", buildableCount - observedCount},
-          {"rows", std::move(rows)},
-          {"deletionPolicy", "No deletion verdict from test absence alone"}};
 }
 
 static bool ContainsRootCause(const std::string& effect, const std::string& token) {
@@ -990,7 +903,6 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
     uint64_t auditNeedsLowering = 0;
     auto decompositionAudit =
         BuildDecompositionAudit(sortedFallbacks, &auditFusableNow, &auditNeedsLowering);
-    auto blendMergeReachability = BuildBlendMergeReachabilityAudit(permutationMap);
     auto rootCauseProgramKeyAttribution = BuildRootCauseProgramKeyAttribution(testResults);
 
     nlohmann::json offscreenFillAudit = nlohmann::json::object();
@@ -1072,7 +984,6 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
         {"offscreenFillAudit", std::move(offscreenFillAudit)},
         {"offscreenFillCorrelations", std::move(offscreenFillCorrelations)},
         {"decompositionAudit", std::move(decompositionAudit)},
-        {"blendMergeReachability", std::move(blendMergeReachability)},
         {"rootCauseProgramKeyAttribution", std::move(rootCauseProgramKeyAttribution)},
         {"tests", std::move(testsJSON)}};
 

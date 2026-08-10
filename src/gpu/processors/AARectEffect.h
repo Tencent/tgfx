@@ -29,6 +29,11 @@ class AARectEffect : public FragmentProcessor {
     return "AARectEffect";
   }
 
+  /** The clip rect in destination device coordinates. */
+  const Rect& getRect() const {
+    return rect;
+  }
+
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
  protected:

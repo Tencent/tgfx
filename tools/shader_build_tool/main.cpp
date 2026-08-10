@@ -31,7 +31,6 @@
 #include "ShaderCompiler.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/level1/AtlasTextFillShader.h"
-#include "gpu/shaders/level1/BlendMergeShader.h"
 #include "gpu/shaders/level1/ComplexEllipseFillShader.h"
 #include "gpu/shaders/level1/ComplexNonAARRectFillShader.h"
 #include "gpu/shaders/level1/ConstColorShader.h"

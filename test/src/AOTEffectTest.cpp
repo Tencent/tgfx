@@ -744,7 +744,10 @@ TGFX_TEST(AOTEffectTest, ConstColorChainDecomposesToPointwiseChain) {
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
   EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
-  EXPECT_FALSE(AOTPlanExecutor::CanExecute(graph, plan));
+  // A zero-leaf chain is executable: the kernel's TEXTURE_COUNT domain encodes it, evaluating
+  // const-color and blend ops against the geometry color alone.
+  EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
+  EXPECT_TRUE(AOTPlanExecutor::BuildChainProcessor(&allocator, graph, plan.passes[0]) != nullptr);
 }
 
 TGFX_TEST(AOTEffectTest, LinearTextureChainUsesPointwiseTailPlanner) {

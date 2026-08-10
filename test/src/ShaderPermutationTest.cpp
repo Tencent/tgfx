@@ -712,8 +712,8 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
-  EXPECT_EQ(cache->vertexEntryCount(), 121u);
-  EXPECT_EQ(cache->fragmentEntryCount(), 345u);
+  EXPECT_EQ(cache->vertexEntryCount(), 124u);
+  EXPECT_EQ(cache->fragmentEntryCount(), 327u);
   std::string expectedTag = TGFX_BACKEND_NAME;
   auto dashPos = expectedTag.find('-');
   if (dashPos != std::string::npos) {
@@ -1334,34 +1334,12 @@ TGFX_TEST(ShaderPermutationTest, GaussianBlurHitsPrecompiledCache) {
   cache->unload();
 }
 
-// TODO: BlendMerge frag assumes child FP output via texture, but ModeColorFilter inlines the
-// child (ConstColorProcessor). Needs EffectDecomposer integration or shader redesign.
-TGFX_TEST(ShaderPermutationTest, DISABLED_BlendMergeHitsPrecompiledCache) {
-  auto image = MakeImage("resources/apitest/test_timestretch.png");
-  ASSERT_TRUE(image != nullptr);
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto bundlePath = ProjectPath::Absolute(BundlePath());
-  auto* cache = context->precompiledShaderCache();
-  ASSERT_TRUE(cache->loadBundle(bundlePath));
-  cache->resetStats();
-  auto surface = Surface::Make(context, 200, 200);
-  ASSERT_TRUE(surface != nullptr);
-  Paint paint;
-  paint.setColor(Color::Red());
-  paint.setColorFilter(ColorFilter::Blend(Color::Blue(), BlendMode::SrcOver));
-  surface->getCanvas()->drawRect(Rect::MakeWH(200, 200), paint);
-  context->flushAndSubmit(true);
-  EXPECT_GT(cache->hitCount(), 0u);
-}
-
-TGFX_TEST(ShaderPermutationTest, BlendMergeClipHitsPrecompiledCache) {
+TGFX_TEST(ShaderPermutationTest, ChainBlendClipHitsPrecompiledCache) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   if (context->backend() == Backend::OpenGL) {
-    GTEST_SKIP() << "BlendMerge is outside the OpenGL stage 1 whitelist";
+    GTEST_SKIP() << "The pointwise chain is outside the OpenGL stage 1 whitelist";
   }
   auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
@@ -1371,7 +1349,8 @@ TGFX_TEST(ShaderPermutationTest, BlendMergeClipHitsPrecompiledCache) {
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
   // Draw with ColorFilter::Blend (produces XfermodeFragmentProcessor) + AA clip rect
-  // (produces AARectEffect as coverage FP). This is the BlendMerge + HAS_CLIP=1 scenario.
+  // (produces AARectEffect as coverage FP). The pointwise chain serves this with an
+  // AARectCoverage slot.
   canvas->save();
   canvas->clipRect(Rect::MakeLTRB(10.5f, 10.5f, 189.5f, 189.5f));
   Paint paint;
@@ -1380,7 +1359,7 @@ TGFX_TEST(ShaderPermutationTest, BlendMergeClipHitsPrecompiledCache) {
   canvas->drawRect(Rect::MakeWH(200, 200), paint);
   canvas->restore();
   context->flushAndSubmit(true);
-  printf("  [BlendMergeClip] hit=%u miss=%u\n", cache->hitCount(), cache->missCount());
+  printf("  [ChainBlendClip] hit=%u miss=%u\n", cache->hitCount(), cache->missCount());
   EXPECT_GT(cache->hitCount(), 0u);
   cache->unload();
 }

@@ -192,8 +192,7 @@ static void RenderShaderWithColorFilterScene(Context* context, PrecompiledShader
                                              const std::shared_ptr<ColorFilter>& colorFilter,
                                              int width, int height, bool decompositionEnabled,
                                              bool bundleLoaded, Bitmap* outBitmap,
-                                             bool* pointwiseChainHit, bool* blendMergeHit,
-                                             uint32_t* outNoMatch) {
+                                             bool* pointwiseChainHit, uint32_t* outNoMatch) {
   cache->setDecompositionEnabled(decompositionEnabled);
   if (bundleLoaded) {
     ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
@@ -217,10 +216,8 @@ static void RenderShaderWithColorFilterScene(Context* context, PrecompiledShader
   ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
   outBitmap->unlockPixels();
   *pointwiseChainHit = false;
-  *blendMergeHit = false;
   for (const auto& record : cache->hitRecords()) {
     *pointwiseChainHit = *pointwiseChainHit || record.shaderName == "PointwiseChainShader";
-    *blendMergeHit = *blendMergeHit || record.shaderName == "BlendMergeShader";
   }
   *outNoMatch = cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule);
   cache->unload();
@@ -229,7 +226,7 @@ static void RenderShaderWithColorFilterScene(Context* context, PrecompiledShader
 // Measures the L2 error for the primary Xfermode+Tiled target: a blend whose dst child is a
 // repeat-tiled image shader (TiledTextureEffect). With decomposition enabled the tiled child is
 // materialized to an offscreen texture and the blend collapses to two(TextureEffect,TextureEffect)
-// which hits BlendMergeShader. This case quantifies whether that materialization + resample stays
+// which hits the pointwise chain kernel. This case quantifies whether that materialization + resample stays
 // within tolerance versus sampling the tiled child inline.
 static std::shared_ptr<Image> MakeAlphaOnlyAuditImage() {
   Bitmap bitmap = {};
@@ -273,25 +270,25 @@ static std::shared_ptr<Image> MakeColorAuditImage() {
   return Image::MakeFrom(bitmap);
 }
 
-static void ExpectBlendMergeAlphaOnlyExact(const std::shared_ptr<Shader>& shader, const char* label,
-                                           Context* context, PrecompiledShaderCache* cache,
-                                           int width, int height) {
+static void ExpectChainAlphaOnlyExact(const std::shared_ptr<Shader>& shader, const char* label,
+                                      Context* context, PrecompiledShaderCache* cache, int width,
+                                      int height) {
   Bitmap reference = {};
   Bitmap candidate = {};
   uint32_t referenceHits = 0;
   uint32_t referenceNoMatch = 0;
   uint32_t candidateHits = 0;
   uint32_t candidateNoMatch = 0;
-  // Keep decomposition disabled for both renders: this isolates the legacy BlendMergeShader
-  // matcher from the PointwiseChain route and proves the fixed shader's own AOT/JIT equivalence.
+  // The blend draw routes to the fused pointwise chain kernel; this proves the chain's alpha-only
+  // child handling stays byte-exact against the JIT path.
   RenderShaderScene(context, cache, shader, width, height, false, &candidate, &candidateHits,
                     &candidateNoMatch);
   auto hits = cache->hitRecords();
-  bool blendMergeHit = false;
+  bool chainHit = false;
   for (const auto& hit : hits) {
-    blendMergeHit = blendMergeHit || hit.shaderName == "BlendMergeShader";
+    chainHit = chainHit || hit.shaderName == "PointwiseChainShader";
   }
-  EXPECT_TRUE(blendMergeHit) << label;
+  EXPECT_TRUE(chainHit) << label;
   cache->unload();
   {
     // The reference render intentionally runs without the bundle; keep its JIT lookups out of the
@@ -313,7 +310,7 @@ static void ExpectBlendMergeAlphaOnlyExact(const std::shared_ptr<Shader>& shader
                              << " diffPixels=" << result.diffPixelCount;
 }
 
-TGFX_TEST(AOTL2AuditTest, BlendMergeAlphaOnlyChildrenMatchPlainPath) {
+TGFX_TEST(AOTL2AuditTest, ChainAlphaOnlyChildrenMatchPlainPath) {
   auto alphaImage = MakeAlphaOnlyAuditImage();
   auto colorImage = MakeColorAuditImage();
   ASSERT_TRUE(alphaImage != nullptr && colorImage != nullptr);
@@ -335,11 +332,11 @@ TGFX_TEST(AOTL2AuditTest, BlendMergeAlphaOnlyChildrenMatchPlainPath) {
   // MakeBlend collapses null operands for modes where the result is independent of the missing side;
   // use explicit two-child cases for the alpha semantic matrix below.
   ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
-  ExpectBlendMergeAlphaOnlyExact(srcAlphaDstColor, "two-child-src-color-dst-alpha", context, cache,
-                                 width, height);
+  ExpectChainAlphaOnlyExact(srcAlphaDstColor, "two-child-src-color-dst-alpha", context, cache,
+                            width, height);
   ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
-  ExpectBlendMergeAlphaOnlyExact(srcColorDstAlpha, "two-child-src-alpha-dst-color", context, cache,
-                                 width, height);
+  ExpectChainAlphaOnlyExact(srcColorDstAlpha, "two-child-src-alpha-dst-color", context, cache,
+                            width, height);
 }
 
 TGFX_TEST(AOTL2AuditTest, CleanBlendPrefersPointwiseChain) {
@@ -382,14 +379,12 @@ TGFX_TEST(AOTL2AuditTest, TextureBlendColorFilterConstColorUsesPointwiseChain) {
   Bitmap reference = {};
   Bitmap candidate = {};
   bool chainHit = false;
-  bool blendMergeHit = false;
   uint32_t noMatch = 0;
   RenderShaderWithColorFilterScene(context, cache, shader, colorFilter, 64, 64, false, false,
-                                   &reference, &chainHit, &blendMergeHit, &noMatch);
+                                   &reference, &chainHit, &noMatch);
   RenderShaderWithColorFilterScene(context, cache, shader, colorFilter, 64, 64, true, true,
-                                   &candidate, &chainHit, &blendMergeHit, &noMatch);
+                                   &candidate, &chainHit, &noMatch);
   EXPECT_TRUE(chainHit);
-  EXPECT_FALSE(blendMergeHit);
   EXPECT_EQ(noMatch, 0u);
   Pixmap referencePixmap(reference);
   Pixmap candidatePixmap(candidate);
@@ -413,14 +408,14 @@ TGFX_TEST(AOTL2AuditTest, TiledInBlendMatchesPlainPath) {
 
   int width = image->width();
   int height = image->height();
-  // Decisive test: a plain two-texture Multiply blend (NO tiling, NO flatten). BlendMerge accepts
-  // both TextureEffect children inline, so this hits BlendMergeShader when the cache is loaded and
+  // Decisive test: a plain two-texture Multiply blend (NO tiling, NO flatten). The chain
+  // accepts both TextureEffect children inline, so this hits PointwiseChainShader when loaded and
   // falls back to JIT when the cache is unloaded. Comparing the two isolates whether the precompiled
-  // BlendMerge kernel's Multiply math matches the runtime/JIT path.
+  // chain kernel's Multiply math matches the runtime/JIT path.
   // Clean L2 test: tiled (repeat, full-size) is the SRC/index-0 child so only the decomposition gate
   // flattens it; the DST child is a same-size plain image so there is no child-size/coord mismatch.
-  // Gate OFF: inline two(Tiled,Texture) -> BlendMerge rejects tiled -> JIT (correct reference).
-  // Gate ON: tiled materialized full-size -> two(Texture,Texture) -> BlendMerge. Must be bit-exact.
+  // Gate OFF: inline two(Tiled,Texture) -> the chain rejects tiled -> JIT (correct reference).
+  // Gate ON: tiled materialized full-size -> two(Texture,Texture) -> chain. Must be bit-exact.
   auto image2 = MakeImage("resources/apitest/test_timestretch.png");
   ASSERT_TRUE(image2 != nullptr);
   auto tiled = Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Repeat);

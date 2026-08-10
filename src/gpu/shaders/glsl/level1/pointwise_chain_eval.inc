@@ -84,11 +84,11 @@ vec4 evalChainSlot() {
     if ((Packed.w & 1) != 0) {
       // Color-source leaves are modulated by the geometry color's alpha, matching the runtime
       // paint-alpha wrap. Mask and blend-operand leaves sample raw, as the runtime emits them.
-      texColor *= Color.a;
+      texColor *= TGFX_CHAIN_GEOM_COLOR.a;
     }
     return texColor;
   }
-  vec4 in0 = Packed.y == -1 ? Color : (Packed.y < 0 ? vec4(0.0) : chainResults[Packed.y]);
+  vec4 in0 = Packed.y == -1 ? TGFX_CHAIN_GEOM_COLOR : (Packed.y < 0 ? vec4(0.0) : chainResults[Packed.y]);
   if (Packed.x == OP_CONST_COLOR) {
     if (Packed.w == 1) {
       return ConstColor * in0;
@@ -99,7 +99,7 @@ vec4 evalChainSlot() {
     return ConstColor;
   }
   if (Packed.x == OP_BLEND) {
-    vec4 in1 = Packed.z == -1 ? Color : (Packed.z < 0 ? vec4(0.0) : chainResults[Packed.z]);
+    vec4 in1 = Packed.z == -1 ? TGFX_CHAIN_GEOM_COLOR : (Packed.z < 0 ? vec4(0.0) : chainResults[Packed.z]);
     return xpBlendColors(in0, in1, Packed.w);
   }
   if (Packed.x == OP_AARECT_COVERAGE) {

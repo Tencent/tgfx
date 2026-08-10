@@ -24,6 +24,7 @@
 #include "gpu/BackingFit.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/PrecompiledShaderCache.h"
+#include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/AOTPointwiseTailProcessor.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
@@ -379,10 +380,13 @@ static int MapChainInput(const std::vector<size_t>& slotOf, AOTNodeID input) {
 
 // Flattens a single-pass pointwise DAG into the fused chain processor. Texture leaves are placed
 // in the leading slots so that slot k pairs with TextureSampler_k, which keeps sampler indexing
-// static in the kernel; the remaining nodes follow in topological order.
+// static in the kernel; the remaining nodes follow in topological order. When rectEffect is given,
+// an AARectCoverage slot multiplying the previous root is appended and becomes the new root.
 static PlacementPtr<FragmentProcessor> BuildChainFP(BlockAllocator* allocator,
                                                     const AOTEffectGraph& graph,
-                                                    const AOTPassDescriptor& pass) {
+                                                    const AOTPassDescriptor& pass,
+                                                    const AARectEffect* rectEffect,
+                                                    const DeviceSpaceTextureEffect* maskEffect) {
   std::vector<size_t> slotOf(graph.nodeCount(), SIZE_MAX);
   std::vector<AOTNodeID> ordered = {};
   ordered.reserve(pass.nodes.size());
@@ -513,9 +517,37 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(BlockAllocator* allocator,
   if (rootIndex == SIZE_MAX) {
     return nullptr;
   }
+  if (rectEffect != nullptr) {
+    if (slots.size() >= AOTPointwiseChainProcessor::MaxSlots) {
+      return nullptr;
+    }
+    AOTChainSlot rectSlot = {};
+    rectSlot.op = AOTChainOp::AARectCoverage;
+    const auto& rect = rectEffect->getRect();
+    rectSlot.rectCoverage.rect = {rect.left, rect.top, rect.right, rect.bottom};
+    rectSlot.in0 = static_cast<int>(rootIndex);
+    rootIndex = slots.size();
+    slots.push_back(rectSlot);
+  }
+  PlacementPtr<FragmentProcessor> maskChild = nullptr;
+  if (maskEffect != nullptr) {
+    // The mask child soft-writes the base-name Subset uniform, which would clobber a leaf's real
+    // subset rect; reject that combination so the draw keeps the plain route instead of sampling
+    // with a wrong clamp. The leaves were verified to be TextureEffects above.
+    for (const auto& leaf : leaves) {
+      if (static_cast<const TextureEffect*>(leaf.get())->hasSubset()) {
+        return nullptr;
+      }
+    }
+    maskChild = DeviceSpaceTextureEffect::Make(allocator, maskEffect->getTextureProxy(),
+                                               maskEffect->getUVMatrix());
+    if (maskChild == nullptr) {
+      return nullptr;
+    }
+  }
   const AOTTiledTextureRecipe* recipePtr = tiledLeafIndex >= 0 ? &tiledRecipe : nullptr;
   return AOTPointwiseChainProcessor::Make(allocator, std::move(leaves), slots, rootIndex,
-                                          tiledLeafIndex, recipePtr);
+                                          tiledLeafIndex, recipePtr, std::move(maskChild));
 }
 
 static PlacementPtr<FragmentProcessor> BuildFPForPass(
@@ -543,7 +575,7 @@ static PlacementPtr<FragmentProcessor> BuildFPForPass(
     return AOTPointwiseTailProcessor::Make(allocator, std::move(current), slots);
   }
   if (pass.kernel == AOTKernelKind::PointwiseChain) {
-    return BuildChainFP(allocator, graph, pass);
+    return BuildChainFP(allocator, graph, pass, nullptr, nullptr);
   }
   if (pass.kernel == AOTKernelKind::PerlinNoiseFill) {
     // A PerlinNoiseFill pass is always the plan's first pass and consumes no upstream texture: the
@@ -703,10 +735,10 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
         pass.nodes.size() > AOTPointwiseChainProcessor::MaxSlots) {
       return false;
     }
-    // The fused kernel binds one sampler per texture leaf and only exists for 1, 2 or 4 leaves
-    // that the kernel can sample directly: plain leaves, or tiled leaves whose wrap modes are
-    // fully resolved by the hardware sampler (no shader-mode emulation). Anything else must stay
-    // on the plain route.
+    // The fused kernel binds one sampler per texture leaf and exists for 0, 1, 2 or 4 leaves (a
+    // zero-leaf chain evaluates const-color and blend ops against the geometry color): plain
+    // leaves, or tiled leaves whose wrap modes are fully resolved by the hardware sampler (no
+    // shader-mode emulation). Anything else must stay on the plain route.
     size_t plainLeaves = 0;
     size_t shaderTiledLeaves = 0;
     for (auto nodeID : pass.nodes) {
@@ -740,17 +772,42 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
         ++plainLeaves;
       }
     }
-    return plainLeaves == 1 || plainLeaves == 2 || plainLeaves == 4;
+    return plainLeaves == 0 || plainLeaves == 1 || plainLeaves == 2 || plainLeaves == 4;
   }
   return ValidateLinearPlan(graph, plan);
 }
 
 PlacementPtr<FragmentProcessor> AOTPlanExecutor::BuildChainProcessor(
-    BlockAllocator* allocator, const AOTEffectGraph& graph, const AOTPassDescriptor& pass) {
+    BlockAllocator* allocator, const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
+    const FragmentProcessor* coverageFP) {
   if (pass.kernel != AOTKernelKind::PointwiseChain) {
     return nullptr;
   }
-  return BuildChainFP(allocator, graph, pass);
+  if (coverageFP == nullptr) {
+    return BuildChainFP(allocator, graph, pass, nullptr, nullptr);
+  }
+  // Normalize the coverage FP into the forms the chain kernel carries: a bare AARectEffect folds
+  // into an AARectCoverage slot, an alpha-only DeviceSpaceTextureEffect becomes the mask child,
+  // and Compose(mask, rect) yields both. Anything else stays on the plain route.
+  const AARectEffect* rectEffect = nullptr;
+  const DeviceSpaceTextureEffect* maskEffect = nullptr;
+  auto coverageName = coverageFP->name();
+  if (coverageName == "AARectEffect") {
+    rectEffect = static_cast<const AARectEffect*>(coverageFP);
+  } else if (coverageName == "DeviceSpaceTextureEffect") {
+    maskEffect = static_cast<const DeviceSpaceTextureEffect*>(coverageFP);
+  } else if (coverageName == "ComposeFragmentProcessor" && coverageFP->numChildProcessors() == 2 &&
+             coverageFP->childProcessor(0)->name() == "DeviceSpaceTextureEffect" &&
+             coverageFP->childProcessor(1)->name() == "AARectEffect") {
+    maskEffect = static_cast<const DeviceSpaceTextureEffect*>(coverageFP->childProcessor(0));
+    rectEffect = static_cast<const AARectEffect*>(coverageFP->childProcessor(1));
+  } else {
+    return nullptr;
+  }
+  if (maskEffect != nullptr && (!maskEffect->isAlphaOnly() || maskEffect->hasPerspective())) {
+    return nullptr;
+  }
+  return BuildChainFP(allocator, graph, pass, rectEffect, maskEffect);
 }
 
 PlacementPtr<RenderTask> AOTPlanExecutor::Make(Context* context, uint32_t renderFlags,

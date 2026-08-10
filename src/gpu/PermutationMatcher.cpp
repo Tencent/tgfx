@@ -53,7 +53,6 @@
 #include "gpu/processors/UnrolledBinaryGradientColorizer.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
 #include "gpu/shaders/level1/AtlasTextFillShader.h"
-#include "gpu/shaders/level1/BlendMergeShader.h"
 #include "gpu/shaders/level1/ComplexEllipseFillShader.h"
 #include "gpu/shaders/level1/ComplexNonAARRectFillShader.h"
 #include "gpu/shaders/level1/ConstColorShader.h"
@@ -680,11 +679,16 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
       programInfo->numFragmentProcessors() != 1) {
     return std::nullopt;
   }
+  int hasUVCoord = 0;
+  int hasColor = 0;
   if (gpType == 1) {
     auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
-    if (!quadGP->hasCommonColor() || !quadGP->hasUVMatrix() || quadGP->getHasSubset()) {
+    // The precompiled vert has no texSubset attribute, so subset-carrying quads fall back.
+    if (quadGP->getHasSubset()) {
       return std::nullopt;
     }
+    hasUVCoord = quadGP->hasUVMatrix() ? 0 : 1;
+    hasColor = quadGP->hasCommonColor() ? 0 : 1;
   }
   int xpType = GetXPType(programInfo);
   if (xpType < 0) {
@@ -696,7 +700,7 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
   }
   auto* chain = static_cast<const AOTPointwiseChainProcessor*>(fp);
   auto leafCount = chain->leafCount();
-  if (leafCount != 1 && leafCount != 2 && leafCount != 4) {
+  if (leafCount != 0 && leafCount != 1 && leafCount != 2 && leafCount != 4) {
     return std::nullopt;
   }
   // The kernel carries one shared chain-wide ColorSpaceXform parameter block, so a chain with two
@@ -723,12 +727,22 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
       return std::nullopt;
     }
   }
-  int textureCountValue = leafCount == 1 ? 0 : (leafCount == 2 ? 1 : 2);
-  int hasCoverage = GetGPCoverage(gp);
+  int hasMask = chain->hasMask() ? 1 : 0;
+  // Mask clips go through DefaultGP paths only; keep this in sync with the shader's ShouldCompile
+  // so the miss is attributed here instead of the buildability post-check.
+  if (hasMask && gpType != 0) {
+    return std::nullopt;
+  }
+  int textureCountValue = leafCount == 0 ? 0 : (leafCount == 1 ? 1 : (leafCount == 2 ? 2 : 3));
+  // QuadGP vertex buffers always carry the coverage slot (providers emit 1.0 for non-AA draws),
+  // so the always-on coverage path serves every quad; only DefaultGP toggles it.
+  int hasCoverage = gpType == 1 ? 1 : GetGPCoverage(gp);
   using VD = PointwiseChainShader::VD;
   std::vector<int> vertValues(VD::COUNT, 0);
   vertValues[VD::GP_TYPE] = gpType;
   vertValues[VD::HAS_COVERAGE] = hasCoverage;
+  vertValues[VD::HAS_UV_COORD] = hasUVCoord;
+  vertValues[VD::HAS_COLOR] = hasColor;
   vertValues[VD::TEXTURE_COUNT] = textureCountValue;
   auto vertIndex = VD::domain().encode(vertValues);
 
@@ -736,7 +750,9 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
   std::vector<int> fragValues(FD::COUNT, 0);
   fragValues[FD::HAS_XP] = xpType;
   fragValues[FD::HAS_COVERAGE] = hasCoverage;
+  fragValues[FD::HAS_COLOR] = hasColor;
   fragValues[FD::TEXTURE_COUNT] = textureCountValue;
+  fragValues[FD::HAS_MASK_TEXTURE] = hasMask;
   auto fragIndex = FD::domain().encode(fragValues);
   return PermutationMatchResult{"PointwiseChainShader", vertIndex, fragIndex};
 }
@@ -1397,147 +1413,6 @@ static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
   return PermutationMatchResult{"GaussianBlur1DShader", vertIndex, fragIndex};
 }
 
-static std::optional<PermutationMatchResult> TryMatchBlendMerge(const ProgramInfo* programInfo) {
-  auto gp = programInfo->getGeometryProcessor();
-  int gpType = GetGPType(gp);
-  if (gpType < 0) {
-    return std::nullopt;
-  }
-  // When gpType==1 (QuadPerEdgeAAGP), the coord transform source depends on hasUVMatrix():
-  //   hasUVMatrix()=true  -> uvCoord attribute is empty, uses aPosition as coord source
-  //   hasUVMatrix()=false -> uvCoord attribute exists, uses uvCoord as coord source
-  // The precompiled vert supports both cases via the HAS_UV_COORD dimension.
-  auto numFP = programInfo->numFragmentProcessors();
-  if (numFP < 1 || numFP > 2) {
-    return std::nullopt;
-  }
-  int hasMaskTexture = 0;
-  if (numFP == 2) {
-    if (programInfo->numColorFragmentProcessors() != 1) {
-      return std::nullopt;
-    }
-    auto coverageFP = programInfo->getFragmentProcessor(1);
-    auto coverageName = coverageFP->name();
-    if (coverageName == "AARectEffect") {
-      // Handled via HasClip runtime uniform in the shader.
-    } else if (coverageName == "DeviceSpaceTextureEffect") {
-      auto* dste = static_cast<const DeviceSpaceTextureEffect*>(coverageFP);
-      if (!dste->isAlphaOnly()) {
-        return std::nullopt;
-      }
-      hasMaskTexture = 1;
-    } else if (coverageName == "ComposeFragmentProcessor") {
-      if (coverageFP->numChildProcessors() != 2) {
-        return std::nullopt;
-      }
-      auto child0 = coverageFP->childProcessor(0);
-      auto child1 = coverageFP->childProcessor(1);
-      if (child0->name() != "DeviceSpaceTextureEffect" || child1->name() != "AARectEffect") {
-        return std::nullopt;
-      }
-      auto* dste = static_cast<const DeviceSpaceTextureEffect*>(child0);
-      if (!dste->isAlphaOnly()) {
-        return std::nullopt;
-      }
-      hasMaskTexture = 1;
-    } else {
-      return std::nullopt;
-    }
-  }
-  int xpType = GetXPType(programInfo);
-  if (xpType < 0) {
-    return std::nullopt;
-  }
-  auto fp = programInfo->getFragmentProcessor(0);
-  auto fpName = fp->name();
-  int childType = -1;
-  if (fpName == "XfermodeFragmentProcessor - dst") {
-    childType = 0;
-  } else if (fpName == "XfermodeFragmentProcessor - src") {
-    childType = 1;
-  } else if (fpName == "XfermodeFragmentProcessor - two") {
-    childType = 2;
-  } else {
-    return std::nullopt;
-  }
-  auto* xfp = static_cast<const XfermodeFragmentProcessor*>(fp);
-  int blendMode = static_cast<int>(xfp->getMode());
-  if (blendMode < 0 || blendMode >= 30) {
-    return std::nullopt;
-  }
-
-  // Determine child[0] mode:
-  //   0 = TextureEffect (standard texture sampling, no YUV)
-  //   1 = ConstColorProcessor (uniform color, no texture)
-  //   2 = TiledTextureEffect (tiling via runtime uniforms TileModeX/TileModeY)
-  int child0Mode = 0;
-
-  // Validate each child processor. We support:
-  //   - TextureEffect (plain, no YUV; subset is supported via the Child{N}Subset uniforms)
-  //   - ConstColorProcessor: uniform color output, only supported as child[0]
-  // TiledTextureEffect children are NOT supported: the precompiled shader has no populated tiling
-  // uniforms, so such draws fall back to ProgramBuilder for a correct result.
-  for (size_t i = 0; i < xfp->numChildProcessors(); i++) {
-    auto child = xfp->childProcessor(i);
-    if (child == nullptr) {
-      continue;
-    }
-    if (child->name() == "ConstColorProcessor") {
-      // ConstColorProcessor is only supported as child[0]. If it appears as child[1] in TwoChild
-      // mode, we cannot handle it (child[1] always needs a texture sampler in our current layout).
-      if (i != 0) {
-        return std::nullopt;
-      }
-      child0Mode = 1;
-      continue;
-    }
-    if (child->name() != "TextureEffect") {
-      return std::nullopt;
-    }
-    auto* childTE = static_cast<const TextureEffect*>(child);
-    // YUV children need the multi-plane sampling path, which the precompiled blend shader does not
-    // implement, so we still fall back for those.
-    if (childTE->numTextureSamplers() == 0 || childTE->isYUV()) {
-      return std::nullopt;
-    }
-    // Subset clamping is unconditional in the shader: the Child{N}Subset uniform is always present
-    // for a plain TextureEffect child and is populated from computeSubsetRect (full [0,1] bounds
-    // when the source has no real subset, making the clamp a no-op). No permutation dimension is
-    // needed to gate it.
-  }
-
-  int hasCoverage = 0;
-  int hasColor = 0;
-  int hasUVCoord = 0;
-  if (gpType == 1) {
-    auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
-    hasCoverage = quadGP->getAAType() == AAType::Coverage ? 1 : 0;
-    hasColor = !quadGP->hasCommonColor() ? 1 : 0;
-    hasUVCoord = !quadGP->hasUVMatrix() ? 1 : 0;
-  }
-
-  using VD = BlendMergeShader::VD;
-  auto vertDomain = VD::domain();
-  std::vector<int> vertValues(VD::COUNT, 0);
-  vertValues[VD::GP_TYPE] = gpType;
-  vertValues[VD::HAS_COVERAGE] = hasCoverage;
-  vertValues[VD::HAS_UV_COORD] = hasUVCoord;
-  vertValues[VD::HAS_COLOR] = hasColor;
-  auto vertIndex = vertDomain.encode(vertValues);
-
-  using FD = BlendMergeShader::FD;
-  auto fragDomain = FD::domain();
-  std::vector<int> fragValues(FD::COUNT, 0);
-  fragValues[FD::HAS_TWO_CHILDREN] = childType == 2 ? 1 : 0;
-  fragValues[FD::HAS_XP] = xpType;
-  fragValues[FD::CHILD0_MODE] = child0Mode;
-  fragValues[FD::HAS_COVERAGE] = hasCoverage;
-  fragValues[FD::HAS_COLOR] = hasColor;
-  fragValues[FD::HAS_MASK_TEXTURE] = hasMaskTexture;
-  auto fragIndex = fragDomain.encode(fragValues);
-  return PermutationMatchResult{"BlendMergeShader", vertIndex, fragIndex};
-}
-
 static std::optional<PermutationMatchResult> TryMatchHairlineLine(const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
   if (gp->name() != "HairlineLineGeometryProcessor") {
@@ -2071,9 +1946,6 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
     return result;
   }
   if (auto result = TryMatchGaussianBlur1D(programInfo)) {
-    return result;
-  }
-  if (auto result = TryMatchBlendMerge(programInfo)) {
     return result;
   }
   if (auto result = TryMatchHairlineLine(programInfo)) {

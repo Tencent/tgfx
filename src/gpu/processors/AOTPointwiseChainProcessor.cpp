@@ -79,14 +79,17 @@ static void UploadChainSlot(UniformData* uniformData, size_t index, const AOTCha
 PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
     BlockAllocator* allocator, std::vector<PlacementPtr<FragmentProcessor>> textureLeaves,
     const std::vector<AOTChainSlot>& slots, size_t rootSlot, int tiledLeafIndex,
-    const AOTTiledTextureRecipe* tiledRecipe) {
+    const AOTTiledTextureRecipe* tiledRecipe, PlacementPtr<FragmentProcessor> maskChild) {
   if (allocator == nullptr || slots.empty() || slots.size() > MaxSlots ||
       rootSlot >= slots.size()) {
     return nullptr;
   }
   auto leafCount = textureLeaves.size();
-  if (leafCount == 0 || (leafCount != 1 && leafCount != 2 && leafCount != 4) ||
+  if ((leafCount != 0 && leafCount != 1 && leafCount != 2 && leafCount != 4) ||
       leafCount > slots.size()) {
+    return nullptr;
+  }
+  if (maskChild != nullptr && maskChild->name() != "DeviceSpaceTextureEffect") {
     return nullptr;
   }
   if (tiledLeafIndex >= 0 &&
@@ -111,16 +114,16 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
       return nullptr;
     }
   }
-  return allocator->make<AOTPointwiseChainProcessor>(std::move(textureLeaves), slots, rootSlot,
-                                                     tiledLeafIndex, tiledRecipe);
+  return allocator->make<AOTPointwiseChainProcessor>(
+      std::move(textureLeaves), slots, rootSlot, tiledLeafIndex, tiledRecipe, std::move(maskChild));
 }
 
 AOTPointwiseChainProcessor::AOTPointwiseChainProcessor(
     std::vector<PlacementPtr<FragmentProcessor>> textureLeaves,
     const std::vector<AOTChainSlot>& newSlots, size_t rootSlot, int tiledLeafIndex,
-    const AOTTiledTextureRecipe* tiledRecipe)
+    const AOTTiledTextureRecipe* tiledRecipe, PlacementPtr<FragmentProcessor> maskChildFP)
     : FragmentProcessor(ClassID()), _slotCount(newSlots.size()), rootSlot(rootSlot),
-      tiledLeafIndex(tiledLeafIndex) {
+      tiledLeafIndex(tiledLeafIndex), hasMaskChild(maskChildFP != nullptr) {
   if (tiledRecipe != nullptr) {
     _tiledRecipe = *tiledRecipe;
   }
@@ -129,6 +132,9 @@ AOTPointwiseChainProcessor::AOTPointwiseChainProcessor(
   }
   for (auto& leaf : textureLeaves) {
     registerChildProcessor(std::move(leaf));
+  }
+  if (maskChildFP != nullptr) {
+    registerChildProcessor(std::move(maskChildFP));
   }
 }
 
@@ -146,6 +152,7 @@ void AOTPointwiseChainProcessor::onComputeProcessorKey(BytesKey* bytesKey) const
   bytesKey->write(static_cast<uint32_t>(_slotCount));
   bytesKey->write(static_cast<uint32_t>(rootSlot));
   bytesKey->write(static_cast<uint32_t>(numChildProcessors()));
+  bytesKey->write(static_cast<uint32_t>(hasMaskChild ? 1 : 0));
   for (size_t index = 0; index < _slotCount; ++index) {
     bytesKey->write(static_cast<uint32_t>(slots[index].op));
     if (slots[index].op == AOTChainOp::ColorSpaceXform) {

@@ -72,7 +72,7 @@ void XfermodeFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
     int modeInt = static_cast<int>(mode);
     fragmentUniformData->setData("BlendModeValue", modeInt);
   }
-  // Selects how the operands map onto the blend's src/dst in the precompiled BlendMergeShader. The
+  // Selects how the operands map onto the blend's src/dst in the fused chain kernel. The
   // single-child roles (DstChild/SrcChild) share one compiled variant and are told apart here, so
   // this must be written on every draw rather than relying on the uniform buffer's prior contents.
   if (fragmentUniformData->hasField("ChildType")) {
@@ -83,7 +83,7 @@ void XfermodeFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
     int hasClip = 0;
     fragmentUniformData->setData("HasClip", hasClip);
   }
-  // Populate the per-child subset uniforms declared by the precompiled BlendMergeShader. Each plain
+  // Populate the per-child subset uniforms for the precompiled blend path. Each plain
   // TextureEffect child that requires subset clamping writes its normalized subset rect into a
   // dedicated uniform (Child0Subset for child[0], Child1Subset for child[1]). Distinct names are
   // required because the precompiled path strips uniform name suffixes: if we relied on the
@@ -104,7 +104,7 @@ void XfermodeFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
       childTE->computeSubsetRect(rect);
       fragmentUniformData->setData(subsetFieldNames[i], rect);
     }
-    // BlendMerge keeps alpha-only as a runtime semantic flag so the same compiled variant handles
+    // Alpha-only stays a runtime semantic flag so the same compiled variant handles
     // RGBA and R8 operands. ProgramBuilder layouts do not declare this field, hence the optional
     // write; the precompiled layout receives the actual value on every draw.
     fragmentUniformData->setDataOptional(alphaOnlyFieldNames[i], childTE->isAlphaOnly() ? 1 : 0);

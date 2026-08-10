@@ -37,6 +37,16 @@ class DeviceSpaceTextureEffect : public FragmentProcessor {
     return uvMatrix.hasPerspective();
   }
 
+  /** The texture this effect samples. */
+  const std::shared_ptr<TextureProxy>& getTextureProxy() const {
+    return textureProxy;
+  }
+
+  /** The matrix mapping destination device coordinates to this effect's sampling space. */
+  const Matrix& getUVMatrix() const {
+    return uvMatrix;
+  }
+
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
  protected:
