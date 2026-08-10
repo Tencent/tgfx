@@ -15,7 +15,7 @@ WORKSPACE=$(pwd)
 
 cd $WORKSPACE
 
-./update_baseline.sh "${1:-""}" "${2:-""}"
+./update_baseline.sh "$@"
 if test $? -ne 0; then
    exit 1
 fi

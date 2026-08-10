@@ -109,10 +109,10 @@ Web 端构建时始终开启 `GENERATE_BASELINE_IMAGES`，等效于原生的 `Up
 
 之后在当前分支运行 `npm run autotest` 即可对比 main baseline 验证。
 
-如仅需刷新 cache 而不生成图像（CI 流水线使用此模式），追加 `SKIP_IMAGES` 参数：
+如仅需刷新 cache 而不生成图像（CI 流水线使用此模式），追加 `--skip-images` 参数：
 
 ```bash
-./update_baseline.sh USE_WEBGL SKIP_IMAGES
+./update_baseline.sh USE_WEBGL --skip-images
 ```
 
 ## 命令一览

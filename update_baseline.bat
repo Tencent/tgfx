@@ -4,50 +4,68 @@ setlocal enabledelayedexpansion
 cd /d "%~dp0"
 
 :: Usage:
-::   update_baseline.bat USE_D3D12                     :: D3D12 (real GPU)
-::   update_baseline.bat USE_D3D12_WARP                :: D3D12 (WARP software adapter, used in CI)
-::   update_baseline.bat USE_OPENGL                    :: OpenGL
-::   update_baseline.bat USE_OPENGL_SWIFTSHADER        :: OpenGL (SwiftShader)
-::   update_baseline.bat USE_VULKAN                    :: Vulkan (real GPU)
-::   update_baseline.bat USE_VULKAN_SWIFTSHADER        :: Vulkan (SwiftShader)
+::   update_baseline.bat [<BACKEND>] [--skip-images]
 ::
-:: Optional second argument:
-::   SKIP_IMAGES   Skip writing baseline `_base.webp` images. The cache
-::                 (md5.json + version.json) is still refreshed, which is
-::                 all the CI pipeline needs. Local runs omit this to also
-::                 produce baseline-out\ images for visual inspection.
+:: BACKEND (order-insensitive with --skip-images):
+::   USE_D3D12                     D3D12 (real GPU)
+::   USE_D3D12_WARP                D3D12 (WARP software adapter, used in CI)
+::   USE_OPENGL                    OpenGL
+::   USE_OPENGL_SWIFTSHADER        OpenGL (SwiftShader)
+::   USE_VULKAN                    Vulkan (real GPU)
+::   USE_VULKAN_SWIFTSHADER        Vulkan (SwiftShader)
+::
+:: Options:
+::   --skip-images   Skip writing baseline `_base.webp` images. The cache
+::                   (md5.json + version.json) is still refreshed, which is
+::                   all the CI pipeline needs. Local runs omit this to also
+::                   produce baseline-out\ images for visual inspection.
+
+:: Parse arguments: separate the backend keyword from the --skip-images flag so callers may
+:: pass them in any order (e.g. `update_baseline.bat --skip-images USE_D3D12`).
+set "BACKEND_ARG="
+set "SKIP_IMAGES=0"
+:parse_args
+if "%~1"=="" goto :done_args
+if /I "%~1"=="--skip-images" (
+    set "SKIP_IMAGES=1"
+) else (
+    set "BACKEND_ARG=%~1"
+)
+shift
+goto :parse_args
+:done_args
 
 :: Determine cmake args and backend name
 set "CMAKE_BACKEND_ARGS="
 set "BACKEND_NAME=opengl"
 set "TARGET_SUFFIX=OpenGL"
 
-if /I "%~1"=="USE_OPENGL_SWIFTSHADER" (
+if /I "!BACKEND_ARG!"=="USE_OPENGL_SWIFTSHADER" (
     set "CMAKE_BACKEND_ARGS=-DTGFX_USE_SWIFTSHADER=ON"
     set "BACKEND_NAME=opengl-swiftshader"
     set "TARGET_SUFFIX=OpenGL"
 )
-if /I "%~1"=="USE_VULKAN_SWIFTSHADER" (
+if /I "!BACKEND_ARG!"=="USE_VULKAN_SWIFTSHADER" (
     set "CMAKE_BACKEND_ARGS=-DTGFX_USE_VULKAN=ON -DTGFX_USE_SWIFTSHADER=ON"
     set "BACKEND_NAME=vulkan-swiftshader"
     set "TARGET_SUFFIX=Vulkan"
 )
-if /I "%~1"=="USE_VULKAN" (
+if /I "!BACKEND_ARG!"=="USE_VULKAN" (
     set "CMAKE_BACKEND_ARGS=-DTGFX_USE_VULKAN=ON"
     set "BACKEND_NAME=vulkan"
     set "TARGET_SUFFIX=Vulkan"
 )
-if /I "%~1"=="USE_OPENGL" (
+if /I "!BACKEND_ARG!"=="USE_OPENGL" (
     set "CMAKE_BACKEND_ARGS="
     set "BACKEND_NAME=opengl"
     set "TARGET_SUFFIX=OpenGL"
 )
-if /I "%~1"=="USE_D3D12" (
+if /I "!BACKEND_ARG!"=="USE_D3D12" (
    set "CMAKE_BACKEND_ARGS=-DTGFX_USE_D3D12=ON"
    set "BACKEND_NAME=d3d12"
    set "TARGET_SUFFIX=D3D12"
 )
-if /I "%~1"=="USE_D3D12_WARP" (
+if /I "!BACKEND_ARG!"=="USE_D3D12_WARP" (
    set "CMAKE_BACKEND_ARGS=-DTGFX_USE_D3D12=ON -DTGFX_D3D12_USE_WARP=ON"
    set "BACKEND_NAME=d3d12-warp"
    set "TARGET_SUFFIX=D3D12"
@@ -97,7 +115,7 @@ cd %BUILD_DIR%
 :: CI) builds the baseline generator in Release across all Windows backends to keep the refresh
 :: turnaround acceptable. macOS update_baseline.sh keeps Debug for better diagnostics.
 set "SKIP_IMAGES_FLAG="
-if /I "%~2"=="SKIP_IMAGES" set "SKIP_IMAGES_FLAG=-DTGFX_SKIP_GENERATE_BASELINE_IMAGES=ON"
+if "!SKIP_IMAGES!"=="1" set "SKIP_IMAGES_FLAG=-DTGFX_SKIP_GENERATE_BASELINE_IMAGES=ON"
 cmake -G Ninja %CMAKE_BACKEND_ARGS% %SKIP_IMAGES_FLAG% -DTGFX_BUILD_TESTS=ON -DTGFX_SKIP_BASELINE_CHECK=ON -DCMAKE_BUILD_TYPE=Release ../
 if %errorlevel% neq 0 (
     echo CMake configuration failed
@@ -115,7 +133,7 @@ if !errorlevel! neq 0 (
 )
 
 :: Set up SwiftShader Vulkan library so volk can load it at runtime.
-if /I "%~1"=="USE_VULKAN_SWIFTSHADER" copy /y "%~dp0vendor\swiftshader\win\x64\vk_swiftshader.dll" "%CD%\vulkan-1.dll" >nul 2>&1
+if /I "!BACKEND_ARG!"=="USE_VULKAN_SWIFTSHADER" copy /y "%~dp0vendor\swiftshader\win\x64\vk_swiftshader.dll" "%CD%\vulkan-1.dll" >nul 2>&1
 
 UpdateBaseline_%TARGET_SUFFIX%.exe
 if !errorlevel! equ 0 (
