@@ -73,6 +73,7 @@ static void RenderPaintOnce(const Paint& paint, int width, int height, bool useB
   } else {
     cache->unload();
   }
+  ScopedAOTStatsPause statsPause(cache, !useBundle);
   context->globalCache()->clearPrograms();
   auto surface = Surface::Make(context, width, height);
   ASSERT_TRUE(surface != nullptr);
@@ -103,6 +104,7 @@ static void RenderImageOnce(const std::shared_ptr<Image>& image,
   } else {
     cache->unload();
   }
+  ScopedAOTStatsPause statsPause(cache, !useBundle);
   context->globalCache()->clearPrograms();
   auto surface = Surface::Make(context, width, height);
   ASSERT_TRUE(surface != nullptr);
@@ -172,6 +174,7 @@ static void RenderPaintToP3Once(const Paint& paint, int width, int height, bool 
   } else {
     cache->unload();
   }
+  ScopedAOTStatsPause statsPause(cache, !useBundle);
   context->globalCache()->clearPrograms();
   auto surface = Surface::Make(context, width, height, false, 1, false, 0, ColorSpace::DisplayP3());
   ASSERT_TRUE(surface != nullptr);
@@ -319,6 +322,7 @@ static void RenderClippedCircleOnce(int clipMode, int width, int height, bool us
   } else {
     cache->unload();
   }
+  ScopedAOTStatsPause statsPause(cache, !useBundle);
   context->globalCache()->clearPrograms();
   auto surface = Surface::Make(context, width, height);
   ASSERT_TRUE(surface != nullptr);
@@ -393,6 +397,7 @@ static void RenderImageWithColorFilterOnce(const std::shared_ptr<Image>& image,
   } else {
     cache->unload();
   }
+  ScopedAOTStatsPause statsPause(cache, !useBundle);
   cache->setDiagnosticRecordingEnabled(false);
   context->globalCache()->clearPrograms();
   auto sourceImage = image;
@@ -566,6 +571,7 @@ TGFX_TEST(AOTRenderConsistencyTest, PerlinNoiseLuminanceAlphaThreshold) {
     } else {
       cache->unload();
     }
+    ScopedAOTStatsPause statsPause(cache, !useBundle);
     context->globalCache()->clearPrograms();
     auto surface = Surface::Make(context, width, height);
     ASSERT_TRUE(surface != nullptr);
@@ -609,6 +615,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AnalyticRectClipFoldsIntoChain) {
     } else {
       cache->unload();
     }
+    ScopedAOTStatsPause statsPause(cache, !useBundle);
     context->globalCache()->clearPrograms();
     auto surface = Surface::Make(context, width, height);
     ASSERT_TRUE(surface != nullptr);
@@ -646,8 +653,8 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyMaskFoldsIntoChain) {
   maskBitmap.unlockPixels();
   auto maskImage = Image::MakeFrom(maskBitmap);
   ASSERT_TRUE(maskImage != nullptr);
-  auto maskFilter = MaskFilter::MakeShader(
-      Shader::MakeImageShader(maskImage, TileMode::Clamp, TileMode::Clamp));
+  auto maskFilter =
+      MaskFilter::MakeShader(Shader::MakeImageShader(maskImage, TileMode::Clamp, TileMode::Clamp));
   ASSERT_TRUE(maskFilter != nullptr);
   auto colorImage = MakeImage("resources/apitest/mandrill_128.png");
   ASSERT_TRUE(colorImage != nullptr);
@@ -666,6 +673,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyMaskFoldsIntoChain) {
     } else {
       cache->unload();
     }
+    ScopedAOTStatsPause statsPause(cache, !useBundle);
     context->globalCache()->clearPrograms();
     auto surface = Surface::Make(context, width, height);
     ASSERT_TRUE(surface != nullptr);

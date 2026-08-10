@@ -187,6 +187,45 @@ static void RenderShaderScene(Context* context, PrecompiledShaderCache* cache,
   *outNoMatch = cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule);
 }
 
+static void RenderShaderWithColorFilterScene(Context* context, PrecompiledShaderCache* cache,
+                                             const std::shared_ptr<Shader>& shader,
+                                             const std::shared_ptr<ColorFilter>& colorFilter,
+                                             int width, int height, bool decompositionEnabled,
+                                             bool bundleLoaded, Bitmap* outBitmap,
+                                             bool* pointwiseChainHit, bool* blendMergeHit,
+                                             uint32_t* outNoMatch) {
+  cache->setDecompositionEnabled(decompositionEnabled);
+  if (bundleLoaded) {
+    ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
+  } else {
+    cache->unload();
+  }
+  ScopedAOTStatsPause statsPause(cache, !bundleLoaded);
+  cache->resetStats();
+  context->globalCache()->resetProgramStats();
+  context->globalCache()->clearPrograms();
+  auto surface = Surface::Make(context, width, height);
+  ASSERT_TRUE(surface != nullptr);
+  Paint paint = {};
+  paint.setShader(shader);
+  paint.setColorFilter(colorFilter);
+  surface->getCanvas()->drawRect(
+      Rect::MakeWH(static_cast<float>(width), static_cast<float>(height)), paint);
+  context->flushAndSubmit(true);
+  ASSERT_TRUE(outBitmap->allocPixels(width, height));
+  auto pixels = outBitmap->lockPixels();
+  ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+  outBitmap->unlockPixels();
+  *pointwiseChainHit = false;
+  *blendMergeHit = false;
+  for (const auto& record : cache->hitRecords()) {
+    *pointwiseChainHit = *pointwiseChainHit || record.shaderName == "PointwiseChainShader";
+    *blendMergeHit = *blendMergeHit || record.shaderName == "BlendMergeShader";
+  }
+  *outNoMatch = cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule);
+  cache->unload();
+}
+
 // Measures the L2 error for the primary Xfermode+Tiled target: a blend whose dst child is a
 // repeat-tiled image shader (TiledTextureEffect). With decomposition enabled the tiled child is
 // materialized to an offscreen texture and the blend collapses to two(TextureEffect,TextureEffect)
@@ -234,9 +273,9 @@ static std::shared_ptr<Image> MakeColorAuditImage() {
   return Image::MakeFrom(bitmap);
 }
 
-static void ExpectBlendMergeAlphaOnlyExact(const std::shared_ptr<Shader>& shader,
-                                           const char* label, Context* context,
-                                           PrecompiledShaderCache* cache, int width, int height) {
+static void ExpectBlendMergeAlphaOnlyExact(const std::shared_ptr<Shader>& shader, const char* label,
+                                           Context* context, PrecompiledShaderCache* cache,
+                                           int width, int height) {
   Bitmap reference = {};
   Bitmap candidate = {};
   uint32_t referenceHits = 0;
@@ -254,8 +293,13 @@ static void ExpectBlendMergeAlphaOnlyExact(const std::shared_ptr<Shader>& shader
   }
   EXPECT_TRUE(blendMergeHit) << label;
   cache->unload();
-  RenderShaderScene(context, cache, shader, width, height, false, &reference, &referenceHits,
-                    &referenceNoMatch);
+  {
+    // The reference render intentionally runs without the bundle; keep its JIT lookups out of the
+    // AOT hit-rate accounting.
+    ScopedAOTStatsPause statsPause(cache, true);
+    RenderShaderScene(context, cache, shader, width, height, false, &reference, &referenceHits,
+                      &referenceNoMatch);
+  }
   EXPECT_GT(candidateHits, 0u) << label;
   EXPECT_EQ(candidateNoMatch, 0u) << label;
   Pixmap referencePixmap(reference);
@@ -314,14 +358,48 @@ TGFX_TEST(AOTL2AuditTest, CleanBlendPrefersPointwiseChain) {
   Bitmap candidate = {};
   uint32_t hits = 0;
   uint32_t noMatch = 0;
-  RenderShaderScene(context, cache, blend, imageA->width(), imageA->height(), true, &candidate, &hits,
-                    &noMatch);
+  RenderShaderScene(context, cache, blend, imageA->width(), imageA->height(), true, &candidate,
+                    &hits, &noMatch);
   EXPECT_EQ(noMatch, 0u);
   bool chainHit = false;
   for (const auto& record : cache->hitRecords()) {
     chainHit = chainHit || record.shaderName == "PointwiseChainShader";
   }
   EXPECT_TRUE(chainHit);
+}
+
+TGFX_TEST(AOTL2AuditTest, TextureBlendColorFilterConstColorUsesPointwiseChain) {
+  auto image = MakeColorAuditImage();
+  ASSERT_TRUE(image != nullptr);
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  auto shader = Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp);
+  ASSERT_TRUE(shader != nullptr);
+  auto colorFilter = ColorFilter::Blend(Color{0.73f, 0.21f, 0.61f, 0.5f}, BlendMode::Multiply);
+  ASSERT_TRUE(colorFilter != nullptr);
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  bool chainHit = false;
+  bool blendMergeHit = false;
+  uint32_t noMatch = 0;
+  RenderShaderWithColorFilterScene(context, cache, shader, colorFilter, 64, 64, false, false,
+                                   &reference, &chainHit, &blendMergeHit, &noMatch);
+  RenderShaderWithColorFilterScene(context, cache, shader, colorFilter, 64, 64, true, true,
+                                   &candidate, &chainHit, &blendMergeHit, &noMatch);
+  EXPECT_TRUE(chainHit);
+  EXPECT_FALSE(blendMergeHit);
+  EXPECT_EQ(noMatch, 0u);
+  Pixmap referencePixmap(reference);
+  Pixmap candidatePixmap(candidate);
+  AOTToleranceSpec spec = {};
+  spec.maxChannelDiff = 1;
+  spec.maxDiffPixelRatio = 1.0;
+  spec.structuralChannelDiff = 2;
+  auto result = AOTToleranceCompare::Compare(referencePixmap, candidatePixmap, spec);
+  EXPECT_TRUE(result.passed) << "maxDelta=" << result.maxChannelDiff
+                             << " diffPixels=" << result.diffPixelCount;
 }
 
 TGFX_TEST(AOTL2AuditTest, TiledInBlendMatchesPlainPath) {
@@ -450,9 +528,12 @@ TGFX_TEST(AOTL2AuditTest, DropShadowTiledSrcFallsBackByteExact) {
   uint32_t referenceNoMatch = 0;
   uint32_t referenceVertexArtifactMissing = 0;
   uint32_t referenceFragmentArtifactMissing = 0;
-  RenderShadowTiledScene(context, cache, image, imageFilter, width, height, false, &referenceBitmap,
-                         &referenceNoMatch, &referenceVertexArtifactMissing,
-                         &referenceFragmentArtifactMissing);
+  {
+    ScopedAOTStatsPause statsPause(cache, true);
+    RenderShadowTiledScene(context, cache, image, imageFilter, width, height, false,
+                           &referenceBitmap, &referenceNoMatch, &referenceVertexArtifactMissing,
+                           &referenceFragmentArtifactMissing);
+  }
 
   ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
   Bitmap candidateBitmap = {};
@@ -506,9 +587,12 @@ TGFX_TEST(AOTL2AuditTest, InnerShadowTiledSrcFallsBackByteExact) {
   uint32_t referenceNoMatch = 0;
   uint32_t referenceVertexArtifactMissing = 0;
   uint32_t referenceFragmentArtifactMissing = 0;
-  RenderShadowTiledScene(context, cache, image, imageFilter, width, height, false, &referenceBitmap,
-                         &referenceNoMatch, &referenceVertexArtifactMissing,
-                         &referenceFragmentArtifactMissing);
+  {
+    ScopedAOTStatsPause statsPause(cache, true);
+    RenderShadowTiledScene(context, cache, image, imageFilter, width, height, false,
+                           &referenceBitmap, &referenceNoMatch, &referenceVertexArtifactMissing,
+                           &referenceFragmentArtifactMissing);
+  }
 
   ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
   Bitmap candidateBitmap = {};
@@ -666,7 +750,10 @@ TGFX_TEST(AOTL2AuditTest, CoverageTextureMaskMatchesJIT) {
   cache->resetStats();
   context->globalCache()->resetProgramStats();
   Bitmap referenceBitmap = {};
-  RenderCoverageMaskScene(context, color, mask, width, height, &referenceBitmap);
+  {
+    ScopedAOTStatsPause statsPause(cache, true);
+    RenderCoverageMaskScene(context, color, mask, width, height, &referenceBitmap);
+  }
 
   // Candidate: cache loaded -> precompiled artifact path.
   ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
@@ -843,7 +930,10 @@ TGFX_TEST(AOTL2AuditTest, GradientCoverageMatchesJIT) {
   cache->resetStats();
   context->globalCache()->resetProgramStats();
   Bitmap referenceBitmap = {};
-  RenderGradientCoverageScene(context, width, height, &referenceBitmap);
+  {
+    ScopedAOTStatsPause statsPause(cache, true);
+    RenderGradientCoverageScene(context, width, height, &referenceBitmap);
+  }
 
   ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
   cache->resetStats();
