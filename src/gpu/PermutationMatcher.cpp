@@ -257,7 +257,6 @@ static std::optional<PermutationMatchResult> TryMatchTiledTextureFill(
     const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
   int gpType = 0;
-  bool isQuad = false;
   int hasCoverage = 0;
   if (gp->name() == "DefaultGeometryProcessor") {
     gpType = 0;
@@ -272,7 +271,6 @@ static std::optional<PermutationMatchResult> TryMatchTiledTextureFill(
       return std::nullopt;
     }
     gpType = 1;
-    isQuad = true;
     hasCoverage = quadGP->getAAType() == AAType::Coverage ? 1 : 0;
   } else {
     return std::nullopt;
@@ -298,12 +296,9 @@ static std::optional<PermutationMatchResult> TryMatchTiledTextureFill(
   if (!TiledFillModeSupported(modeX) || !TiledFillModeSupported(modeY)) {
     return std::nullopt;
   }
-  // For the DefaultGeometryProcessor path a both-None (0/0) tiled effect reduces to a plain texture
-  // fill, which TryMatchTextureFill already handles, so reject it here. The QuadPerEdgeAA path has
-  // no such plain fallback for a TiledTextureEffect, so a 0/0 quad tiled fill must match here.
-  if (!isQuad && modeX == 0 && modeY == 0) {
-    return std::nullopt;
-  }
+  // A both-None (0/0) mode means the hardware sampler already resolves the tiling (e.g. Repeat
+  // with a full-boundary subset), so this kernel serves it like any other mode. Note
+  // TryMatchTextureFill cannot steal such draws: it requires the plain "TextureEffect" name.
   // ALPHA_ONLY and HAS_STRICT are folded into runtime uniforms (AlphaOnly / Strict), set by
   // GLSLTiledTextureEffect::onSetData; they are no longer compile-time dimensions.
   using VD = TiledTextureFillShader::VD;
@@ -786,10 +781,8 @@ static std::optional<PermutationMatchResult> TryMatchDeviceSpaceTexturedEffect(
   if (source->name() != "DeviceSpaceTextureEffect" || source->numTextureSamplers() != 1) {
     return std::nullopt;
   }
-  auto* deviceTexture = static_cast<const DeviceSpaceTextureEffect*>(source);
-  if (deviceTexture->isAlphaOnly()) {
-    return std::nullopt;
-  }
+  // Alpha-only sources are served by the kernel's AlphaOnly runtime uniform; perspective needs no
+  // check because the runtime path evaluates device-space sampling without the w division either.
   if (pointwise->name() != "ColorMatrixFragmentProcessor" &&
       pointwise->name() != "LumaFragmentProcessor") {
     return std::nullopt;

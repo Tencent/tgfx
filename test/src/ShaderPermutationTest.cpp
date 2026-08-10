@@ -435,7 +435,13 @@ TGFX_TEST(ShaderPermutationTest, DeviceSpaceTexturedEffectRejectsUnsupportedLayo
     ASSERT_NE(composed, nullptr);
     ProgramInfo programInfo(renderTarget.get(), gp.get(), {composed.get()}, 1, nullptr,
                             BlendMode::SrcOver);
-    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
+    auto match = MatchPermutation(&programInfo);
+    if (programInfo.backend() == Backend::OpenGL) {
+      EXPECT_FALSE(match.has_value());
+    } else {
+      // Alpha-only sources are served by the kernel's AlphaOnly runtime uniform.
+      EXPECT_TRUE(match.has_value());
+    }
   }
 
   {
