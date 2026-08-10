@@ -51,6 +51,14 @@ static Path MakePath(std::initializer_list<Point> points, bool close = true) {
   return path;
 }
 
+// Builds a clip whose single non-AA rect element degenerates to empty under transform().
+static ClipStack MakeDegenerateClip() {
+  ClipStack clip;
+  clip.clipRect(Rect::MakeXYWH(10, 20, 40, 30), Matrix::I(), false);
+  clip.transform(Matrix::MakeScale(1.0f, 0.001f));
+  return clip;
+}
+
 TGFX_TEST_PRIVATE(ClipTest, RectEffect) {
   TGFX_PRIVATE_ACCESS(
       BlockAllocator allocator;
@@ -750,9 +758,7 @@ TGFX_TEST(ClipTest, EmptyElementClippedOut) {
   // (ClipElement::simplify marks it Empty because it covers no pixel center). ClipStack keeps the
   // record state in sync, so applyClip short-circuits on ClipState::Empty and reports ClippedOut
   // instead of feeding the empty element to the mask rasterizer.
-  ClipStack clip;
-  clip.clipRect(Rect::MakeXYWH(10, 20, 40, 30), Matrix::I(), false);
-  clip.transform(Matrix::MakeScale(1.0f, 0.001f));
+  auto clip = MakeDegenerateClip();
   TGFX_PRIVATE_ACCESS({
     ASSERT_EQ(clip.elements().size(), 1u);
     EXPECT_EQ(clip.state(), ClipState::Empty);
@@ -770,13 +776,9 @@ TGFX_TEST(ClipTest, SubPixelClipMaskRasterizeNoNullOp) {
   ASSERT_NE(renderTarget, nullptr);
   OpsCompositor compositor(renderTarget, 0);
 
-  // End-to-end rendering path: without the fix, the empty clip element was skipped by the
-  // scissor-only path (innerBounds == outerBounds) and the draw proceeded unclipped (Clipped,
-  // overdrawing content outside the clip). The fix reports ClippedOut instead, matching the
-  // semantics of an empty clip region. Flushing must not crash.
-  ClipStack clip;
-  clip.clipRect(Rect::MakeXYWH(10, 20, 40, 30), Matrix::I(), false);
-  clip.transform(Matrix::MakeScale(1.0f, 0.001f));
+  // End-to-end rendering path: an empty clip region reports ClippedOut, so a degenerate clip
+  // never reaches the mask rasterizer and no null draw op is queued. Flushing must not crash.
+  auto clip = MakeDegenerateClip();
   TGFX_PRIVATE_ACCESS({
     auto applied = compositor.applyClip(clip);
     EXPECT_EQ(applied.status, AppliedClipStatus::ClippedOut);
