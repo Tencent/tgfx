@@ -49,9 +49,10 @@ namespace tgfx {
 class PointwiseChainShader : public PrecompiledShader {
  public:
   struct VertDims {
-    enum : uint32_t { HAS_COVERAGE, HAS_UV_COORD, HAS_COLOR, TEXTURE_COUNT, COUNT };
+    enum : uint32_t { GP_LAYOUT, HAS_COVERAGE, HAS_UV_COORD, HAS_COLOR, TEXTURE_COUNT, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
+          PermutationInt("GP_LAYOUT", 2),
           PermutationBool("HAS_COVERAGE"),
           PermutationBool("HAS_UV_COORD"),
           PermutationBool("HAS_COLOR"),
@@ -62,9 +63,18 @@ class PointwiseChainShader : public PrecompiledShader {
   using VD = VertDims;
 
   struct FragDims {
-    enum : uint32_t { HAS_XP, HAS_COVERAGE, HAS_COLOR, TEXTURE_COUNT, HAS_MASK_TEXTURE, COUNT };
+    enum : uint32_t {
+      GP_LAYOUT,
+      HAS_XP,
+      HAS_COVERAGE,
+      HAS_COLOR,
+      TEXTURE_COUNT,
+      HAS_MASK_TEXTURE,
+      COUNT
+    };
     static PermutationDomain domain() {
       return PermutationDomain({
+          PermutationInt("GP_LAYOUT", 2),
           PermutationInt("HAS_XP", 3),
           PermutationBool("HAS_COVERAGE"),
           PermutationBool("HAS_COLOR"),
@@ -74,7 +84,7 @@ class PointwiseChainShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 5, "Update ShouldCompile when fragment dimensions change.");
+  static_assert(FD::COUNT == 6, "Update ShouldCompile when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"PointwiseChainShader",
@@ -91,8 +101,17 @@ class PointwiseChainShader : public PrecompiledShader {
  private:
   static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>& vertValues,
                             const std::vector<int>& fragValues) {
-    // HAS_COVERAGE / HAS_COLOR / TEXTURE_COUNT vertex-fragment agreement is enforced by the
-    // framework (MirroredDimsAgree).
+    // GP_LAYOUT / HAS_COVERAGE / HAS_COLOR / TEXTURE_COUNT vertex-fragment agreement is enforced
+    // by the framework (MirroredDimsAgree).
+    if (vertValues[VD::GP_LAYOUT] == 1) {
+      // The ellipse layout carries no coverage/uvCoord attributes (its coverage is the per-pixel
+      // edge equation), never takes a mask clip, and leaves solid fills to EllipseFillShader.
+      if (vertValues[VD::HAS_COVERAGE] != 0 || vertValues[VD::HAS_UV_COORD] != 0 ||
+          vertValues[VD::TEXTURE_COUNT] == 0 || fragValues[FD::HAS_MASK_TEXTURE] != 0) {
+        return false;
+      }
+      return true;
+    }
     // uvCoord and per-vertex colors are quad-only attributes, and quad vertex buffers always
     // carry the coverage slot, so either of them implies coverage.
     if ((vertValues[VD::HAS_UV_COORD] != 0 || vertValues[VD::HAS_COLOR] != 0) &&

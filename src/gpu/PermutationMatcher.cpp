@@ -664,14 +664,20 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseTail(const Program
 static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
     const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
-  int gpType = GetGPType(gp);
-  if (gpType < 0 || programInfo->numColorFragmentProcessors() != 1 ||
+  // GP_LAYOUT: 0 covers both rect GPs, 1 is the ellipse layout.
+  int gpLayout = -1;
+  if (GetGPType(gp) >= 0) {
+    gpLayout = 0;
+  } else if (gp->name() == "EllipseGeometryProcessor") {
+    gpLayout = 1;
+  }
+  if (gpLayout < 0 || programInfo->numColorFragmentProcessors() != 1 ||
       programInfo->numFragmentProcessors() != 1) {
     return std::nullopt;
   }
   int hasUVCoord = 0;
   int hasColor = 0;
-  if (gpType == 1) {
+  if (gp->name() == "QuadPerEdgeAAGeometryProcessor") {
     auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
     // The precompiled vert has no texSubset attribute, so subset-carrying quads fall back.
     if (quadGP->getHasSubset()) {
@@ -679,6 +685,9 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
     }
     hasUVCoord = quadGP->hasUVMatrix() ? 0 : 1;
     hasColor = quadGP->hasCommonColor() ? 0 : 1;
+  } else if (gpLayout == 1) {
+    auto* ellipseGP = static_cast<const EllipseGeometryProcessor*>(gp);
+    hasColor = ellipseGP->hasCommonColor() ? 0 : 1;
   }
   int xpType = GetXPType(programInfo);
   if (xpType < 0) {
@@ -720,15 +729,27 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
   int hasMask = chain->hasMask() ? 1 : 0;
   // Mask clips go through DefaultGP paths only; keep this in sync with the shader's ShouldCompile
   // so the miss is attributed here instead of the buildability post-check.
-  if (hasMask && gpType != 0) {
+  if (hasMask && (gpLayout != 0 || GetGPType(gp) != 0)) {
+    return std::nullopt;
+  }
+  // The ellipse layout has no leaf-count-free variant: solid ellipse fills are EllipseFillShader's
+  // territory.
+  if (gpLayout == 1 && leafCount == 0) {
     return std::nullopt;
   }
   int textureCountValue = leafCount == 0 ? 0 : (leafCount == 1 ? 1 : (leafCount == 2 ? 2 : 3));
   // QuadGP vertex buffers always carry the coverage slot (providers emit 1.0 for non-AA draws),
-  // so the always-on coverage path serves every quad; only DefaultGP toggles it.
-  int hasCoverage = gpType == 1 ? 1 : GetGPCoverage(gp);
+  // so the always-on coverage path serves every quad; the ellipse layout evaluates coverage per
+  // pixel and never carries the attribute.
+  int hasCoverage = 0;
+  if (gp->name() == "QuadPerEdgeAAGeometryProcessor") {
+    hasCoverage = 1;
+  } else if (gpLayout == 0) {
+    hasCoverage = GetGPCoverage(gp);
+  }
   using VD = PointwiseChainShader::VD;
   std::vector<int> vertValues(VD::COUNT, 0);
+  vertValues[VD::GP_LAYOUT] = gpLayout;
   vertValues[VD::HAS_COVERAGE] = hasCoverage;
   vertValues[VD::HAS_UV_COORD] = hasUVCoord;
   vertValues[VD::HAS_COLOR] = hasColor;
@@ -737,6 +758,7 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
 
   using FD = PointwiseChainShader::FD;
   std::vector<int> fragValues(FD::COUNT, 0);
+  fragValues[FD::GP_LAYOUT] = gpLayout;
   fragValues[FD::HAS_XP] = xpType;
   fragValues[FD::HAS_COVERAGE] = hasCoverage;
   fragValues[FD::HAS_COLOR] = hasColor;

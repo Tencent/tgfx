@@ -338,6 +338,8 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
       }
       case AOTEffectKind::ColorMatrix:
       case AOTEffectKind::Luma:
+      case AOTEffectKind::AlphaThreshold:
+      case AOTEffectKind::ColorSpaceXform:
       case AOTEffectKind::ConstColor:
       case AOTEffectKind::Blend:
       case AOTEffectKind::RectCoverage:

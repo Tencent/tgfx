@@ -19,6 +19,15 @@
 #ifndef HAS_COVERAGE
 #define HAS_COVERAGE 0
 #endif
+#ifndef HAS_COLOR
+#define HAS_COLOR 0
+#endif
+#ifndef GP_LAYOUT
+#define GP_LAYOUT 0
+#endif
+#ifndef HAS_MASK_TEXTURE
+#define HAS_MASK_TEXTURE 0
+#endif
 #ifndef TEXTURE_COUNT
 #define TEXTURE_COUNT 0
 #endif
@@ -61,6 +70,10 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 CoverageRect;
 #if HAS_MASK_TEXTURE
   mat3 DeviceCoordMatrix;
+#endif
+#if GP_LAYOUT == 1
+  // EllipseGeometryProcessor writes this for every ellipse draw (stroke vs fill coverage).
+  int StrokeEnabled;
 #endif
 
 #define TGFX_CHAIN_PACKED Slot0Packed
@@ -381,22 +394,36 @@ int TiledStrict;
 #include "xp_uniforms.inc"
 };
 
-#if NTEX >= 1
-layout(location = 0) in vec2 TransformedCoords_0;
+#if GP_LAYOUT == 1
+layout(location = 0) in vec2 vEllipseOffsets;
+layout(location = 1) in vec4 vEllipseRadii;
+#if HAS_COLOR
+layout(location = 2) in vec4 vColor;
+#define CHAIN_TEX_LOC_BASE 3
+#else
+#define CHAIN_TEX_LOC_BASE 2
 #endif
-#if NTEX >= 2
-layout(location = 1) in vec2 TransformedCoords_1;
+#else
+#define CHAIN_TEX_LOC_BASE 0
 #endif
-#if NTEX >= 4
-layout(location = 2) in vec2 TransformedCoords_2;
-layout(location = 3) in vec2 TransformedCoords_3;
-#endif
-#if HAS_COVERAGE
+
+#if GP_LAYOUT == 0 && HAS_COVERAGE
 layout(location = NTEX) in float vCoverage;
 #endif
-#if HAS_COLOR
+#if GP_LAYOUT == 0 && HAS_COLOR
 // QuadGP only: per-vertex color (broadcast for common-color draws) is the geometry color source.
 layout(location = NTEX + 1) in vec4 vColor;
+#endif
+
+#if NTEX >= 1
+layout(location = CHAIN_TEX_LOC_BASE + 0) in vec2 TransformedCoords_0;
+#endif
+#if NTEX >= 2
+layout(location = CHAIN_TEX_LOC_BASE + 1) in vec2 TransformedCoords_1;
+#endif
+#if NTEX >= 4
+layout(location = CHAIN_TEX_LOC_BASE + 2) in vec2 TransformedCoords_2;
+layout(location = CHAIN_TEX_LOC_BASE + 3) in vec2 TransformedCoords_3;
 #endif
 
 #if NTEX >= 1
@@ -420,6 +447,7 @@ layout(set = 1, binding = NTEX) uniform sampler2D MaskTextureSampler;
 
 // The chain kernel blends regardless of XP state, so include the shared blend math directly;
 // xp_porter_duff.inc re-includes it under HAS_XP >= 1, guarded against double definition.
+#include "ellipse_coverage.inc"
 #include "xp_blend_colors.inc"
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
@@ -793,7 +821,13 @@ void main() {
   result *= texture(MaskTextureSampler, maskCoord.xy).r;
 #endif
 
-#if HAS_COVERAGE
+#if GP_LAYOUT == 1
+  // Ellipse edge AA, computed per pixel from the ellipse varyings (verbatim shared math).
+  highp float gpCoverage = ellipseEdgeCoverage(vEllipseOffsets, vEllipseRadii, StrokeEnabled);
+#define TGFX_XP_SRC_COLOR (result * gpCoverage)
+#define TGFX_XP_SRC_UNPREMUL result
+#define TGFX_XP_COVERAGE vec4(gpCoverage)
+#elif HAS_COVERAGE
 #define TGFX_XP_SRC_COLOR (result * vCoverage)
 #define TGFX_XP_SRC_UNPREMUL result
 #define TGFX_XP_COVERAGE vec4(vCoverage)
