@@ -106,9 +106,8 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
   if (analyze) {
     lowerSucceeded = AOTEffectDecomposer::Lower({processor.get()}, &graph, &blocker);
     validateSucceeded = lowerSucceeded && AOTEffectDecomposer::ValidateForFusion(graph);
-    decomposeSucceeded =
-        validateSucceeded &&
-        AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan);
+    decomposeSucceeded = validateSucceeded && AOTEffectDecomposer::Decompose(
+                                                  graph, AOTDecompositionMode::PreferFusion, &plan);
     canExecute = decomposeSucceeded && AOTPlanExecutor::CanExecute(graph, plan);
   }
   OffscreenFillKey diagnosticKey = InvalidOffscreenFillKey;

@@ -164,21 +164,6 @@ static std::optional<CoverageKind> ClassifyCoverageFP(const ProgramInfo* program
     }
     return CoverageKind::LocalMask;
   }
-  if (coverageName == "ComposeFragmentProcessor") {
-    if (coverageFP->numChildProcessors() != 2) {
-      return std::nullopt;
-    }
-    auto child0 = coverageFP->childProcessor(0);
-    auto child1 = coverageFP->childProcessor(1);
-    if (child0->name() != "DeviceSpaceTextureEffect" || child1->name() != "AARectEffect") {
-      return std::nullopt;
-    }
-    auto* dste = static_cast<const DeviceSpaceTextureEffect*>(child0);
-    if (!dste->isAlphaOnly()) {
-      return std::nullopt;
-    }
-    return CoverageKind::DeviceMask;
-  }
   if (coverageName == "DeviceSpaceTextureEffect") {
     auto* dste = static_cast<const DeviceSpaceTextureEffect*>(coverageFP);
     if (!dste->isAlphaOnly()) {
@@ -187,6 +172,18 @@ static std::optional<CoverageKind> ClassifyCoverageFP(const ProgramInfo* program
     return CoverageKind::DeviceMask;
   }
   return std::nullopt;
+}
+
+// Direct AARect coverage is the sole coverage FP, not a composed child. Keeping this test separate
+// from ClassifyCoverageFP prevents Compose(DeviceSpaceTextureEffect, AARectEffect) from silently
+// losing its rect component by being treated as a device mask.
+static bool HasDirectAARectCoverage(const ProgramInfo* programInfo) {
+  auto numColorFP = programInfo->numColorFragmentProcessors();
+  if (programInfo->numFragmentProcessors() != numColorFP + 1) {
+    return false;
+  }
+  auto coverageFP = programInfo->getFragmentProcessor(numColorFP);
+  return coverageFP->name() == "AARectEffect" && coverageFP->numChildProcessors() == 0;
 }
 
 // AARect coverage changes only fragment math, whereas a device-space mask adds a sampler and shifts
@@ -332,9 +329,11 @@ static std::optional<PermutationMatchResult> TryMatchSolidColorFill(
   if (gp->name() != "DefaultGeometryProcessor") {
     return std::nullopt;
   }
-  // Solid fill: no color and no coverage fragment processors. The fill color comes from the
-  // DefaultGeometryProcessor Color uniform.
-  if (programInfo->numFragmentProcessors() != 0) {
+  // The fill color comes from the DefaultGeometryProcessor Color uniform, so a color fragment
+  // processor would be silently dropped and must reject. The only accepted FP is one direct
+  // analytic AARect clip coverage FP, which this shader evaluates from fragment uniforms.
+  if (programInfo->numFragmentProcessors() != 0 &&
+      (programInfo->numColorFragmentProcessors() != 0 || !HasDirectAARectCoverage(programInfo))) {
     return std::nullopt;
   }
   int xpType = GetXPType(programInfo);
@@ -447,19 +446,22 @@ static std::optional<PermutationMatchResult> TryMatchQuadColorFill(const Program
   if (gp->name() != "QuadPerEdgeAAGeometryProcessor") {
     return std::nullopt;
   }
-  // Accept either zero fragment processors (plain colored quad) or a single device-space mask
-  // coverage FP, which this shader samples via HAS_MASK_TEXTURE. Analytic AARect and local-space
-  // masks are not supported here because QuadColorFill has no corresponding sampling path.
+  // Accept either zero fragment processors, a device-space mask, or one direct analytic AARect
+  // coverage FP. The latter is evaluated by the unconditional Rect/HasClip shader uniforms.
   bool hasMaskTexture = false;
   if (programInfo->numFragmentProcessors() != 0) {
     if (programInfo->numColorFragmentProcessors() != 0) {
       return std::nullopt;
     }
-    auto coverage = ClassifyCoverageFP(programInfo);
-    if (!coverage || *coverage != CoverageKind::DeviceMask) {
-      return std::nullopt;
+    if (HasDirectAARectCoverage(programInfo)) {
+      // No additional sampler or permutation dimension is needed.
+    } else {
+      auto coverage = ClassifyCoverageFP(programInfo);
+      if (!coverage || *coverage != CoverageKind::DeviceMask) {
+        return std::nullopt;
+      }
+      hasMaskTexture = true;
     }
-    hasMaskTexture = true;
   }
   int xpType = GetXPType(programInfo);
   if (xpType < 0) {
@@ -491,13 +493,17 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   bool hasMaskTexture = false;
   bool hasLocalMask = false;
   if (programInfo->numFragmentProcessors() != 1) {
-    auto coverage = ClassifyCoverageFP(programInfo);
-    if (coverage && *coverage == CoverageKind::DeviceMask) {
-      hasMaskTexture = true;
-    } else if (coverage && *coverage == CoverageKind::LocalMask) {
-      hasLocalMask = true;
+    if (HasDirectAARectCoverage(programInfo)) {
+      // Evaluated through the unconditional Rect/HasClip uniforms.
     } else {
-      return std::nullopt;
+      auto coverage = ClassifyCoverageFP(programInfo);
+      if (coverage && *coverage == CoverageKind::DeviceMask) {
+        hasMaskTexture = true;
+      } else if (coverage && *coverage == CoverageKind::LocalMask) {
+        hasLocalMask = true;
+      } else {
+        return std::nullopt;
+      }
     }
   }
   int xpType = GetXPType(programInfo);
@@ -1537,7 +1543,11 @@ static std::optional<PermutationMatchResult> TryMatchHairlineLine(const ProgramI
   if (gp->name() != "HairlineLineGeometryProcessor") {
     return std::nullopt;
   }
-  if (programInfo->numFragmentProcessors() != 0) {
+  // The stroke color comes from the geometry processor Color uniform, so a color fragment
+  // processor would be silently dropped and must reject; a direct AARect clip coverage FP is
+  // evaluated from fragment uniforms.
+  if (programInfo->numFragmentProcessors() != 0 &&
+      (programInfo->numColorFragmentProcessors() != 0 || !HasDirectAARectCoverage(programInfo))) {
     return std::nullopt;
   }
   int xpType = GetXPType(programInfo);
@@ -1557,7 +1567,11 @@ static std::optional<PermutationMatchResult> TryMatchHairlineQuad(const ProgramI
   if (gp->name() != "HairlineQuadGeometryProcessor") {
     return std::nullopt;
   }
-  if (programInfo->numFragmentProcessors() != 0) {
+  // The stroke color comes from the geometry processor Color uniform, so a color fragment
+  // processor would be silently dropped and must reject; a direct AARect clip coverage FP is
+  // evaluated from fragment uniforms.
+  if (programInfo->numFragmentProcessors() != 0 &&
+      (programInfo->numColorFragmentProcessors() != 0 || !HasDirectAARectCoverage(programInfo))) {
     return std::nullopt;
   }
   int xpType = GetXPType(programInfo);

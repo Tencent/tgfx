@@ -13,6 +13,8 @@
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Color;
+  vec4 Rect;
+  int HasClip;
 #if HAS_XP
   vec2 DstTextureUpperLeft;
   vec2 DstTextureCoordScale;
@@ -28,24 +30,20 @@ layout(location = 0) in float vCoverage;
 #define XP_DST_TEX_BINDING 0
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
+#include "aa_rect_clip_coverage.inc"
 
 layout(location = 0) out vec4 fragColor;
 
 void main() {
-  vec4 outputColor = Color;
+  float totalCoverage = aaRectClipCoverage();
+#if HAS_COVERAGE
+  totalCoverage *= vCoverage;
+#endif
 
 #if HAS_XP
-  #if HAS_COVERAGE
-  fragColor = applyPorterDuffXP(outputColor, vec4(vCoverage));
-  #else
-  fragColor = applyPorterDuffXP(outputColor, vec4(1.0));
-  #endif
+  fragColor = applyPorterDuffXP(Color, vec4(totalCoverage));
 #else
-  #if HAS_COVERAGE
-  fragColor = outputColor * vCoverage;
-  #else
-  fragColor = outputColor;
-  #endif
+  fragColor = Color * totalCoverage;
 #endif
 #include "output_swizzle.inc"
 }

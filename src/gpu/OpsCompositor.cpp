@@ -734,9 +734,8 @@ std::pair<bool, bool> OpsCompositor::needComputeBounds(const Brush& brush, bool 
   // the route: evaluating them would reroute every bare fill onto the L2 kernels and double the
   // program lookups on artifact misses.
   bool hasShaderDerivedChain =
-      brush.shader != nullptr &&
-      (brush.shader->type() == Shader::Type::ColorFilter ||
-       brush.shader->type() == Shader::Type::Blend);
+      brush.shader != nullptr && (brush.shader->type() == Shader::Type::ColorFilter ||
+                                  brush.shader->type() == Shader::Type::Blend);
   bool hasDecomposableColorSource = hasImageFill || brush.shader != nullptr;
   // An anti-aliased, non-pixel-aligned rect clip produces an AARectEffect coverage FP, which folds
   // into the color chain as a rect-coverage node. Pixel-aligned or non-AA rect clips become a

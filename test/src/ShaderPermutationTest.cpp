@@ -24,6 +24,7 @@
 #include "base/TGFXTest.h"
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/utils/BlockAllocator.h"
+#include "gpu/EmbeddedShaderBundles.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/PermutationMatcher.h"
 #include "gpu/PrecompiledShaderCache.h"
@@ -35,6 +36,8 @@
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
+#include "gpu/processors/HairlineLineGeometryProcessor.h"
+#include "gpu/processors/HairlineQuadGeometryProcessor.h"
 #include "gpu/processors/LumaFragmentProcessor.h"
 #include "gpu/processors/MeshGeometryProcessor.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
@@ -48,8 +51,11 @@
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/ShaderPermutation.h"
 #include "gpu/shaders/level1/DeviceSpaceTexturedEffectShader.h"
+#include "gpu/shaders/level1/MeshTextureFillShader.h"
+#include "gpu/shaders/level1/QuadConstColorShader.h"
 #include "gpu/shaders/level1/QuadTextureFillShader.h"
 #include "gpu/shaders/level1/ShapeInstancedFillShader.h"
+#include "gpu/shaders/level1/ShapeInstancedTextureCoverageShader.h"
 #include "gpu/shaders/level1/SingleIntervalGradientShader.h"
 #include "gpu/shaders/level1/TextureFillShader.h"
 #include "gtest/gtest.h"
@@ -296,8 +302,9 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistry) {
       foundTextureFill = true;
       EXPECT_EQ(shaderInfo.vertDomain.totalCount(), 1u);
       EXPECT_EQ(shaderInfo.vertDomain.dimensionCount(), 0u);
-      // FragDims: HAS_XP(int3) + HAS_COVERAGE(int3) = 9 permutations.
-      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 9u);
+      // FragDims: HAS_XP(int3) + HAS_DEVICE_MASK(bool) = 6 permutations. AARect clipping is a
+      // runtime uniform (Rect / HasClip), not a compile-time dimension.
+      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 6u);
       EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 2u);
       EXPECT_EQ(shaderInfo.vertexFile, "level1/texture_fill.vert");
       EXPECT_EQ(shaderInfo.fragmentFile, "level1/texture_fill.frag");
@@ -693,8 +700,7 @@ TGFX_TEST(ShaderPermutationTest, TextureFillTypedEncodingMatchesDomains) {
     auto values = fragmentDomain.decode(index);
     TextureFillShader::FragmentValues typedValues = {};
     typedValues.xp = static_cast<uint32_t>(values[TextureFillShader::FD::HAS_XP]);
-    typedValues.deviceMask =
-        static_cast<uint32_t>(values[TextureFillShader::FD::HAS_DEVICE_MASK]);
+    typedValues.deviceMask = static_cast<uint32_t>(values[TextureFillShader::FD::HAS_DEVICE_MASK]);
     EXPECT_EQ(TextureFillShader::EncodeFragment(typedValues), index);
   }
 }
@@ -730,6 +736,7 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledPerformance) {
     auto context = scope.getContext();
     ASSERT_TRUE(context != nullptr);
     context->precompiledShaderCache()->unload();
+    ScopedAOTStatsPause statsPause(context->precompiledShaderCache(), true);
     context->globalCache()->clearPrograms();
     auto surface = Surface::Make(context, width, height);
     ASSERT_TRUE(surface != nullptr);
@@ -801,6 +808,7 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledRenderConsistency) {
     ContextScope scope;
     auto context = scope.getContext();
     ASSERT_TRUE(context != nullptr);
+    ScopedAOTStatsPause statsPause(context->precompiledShaderCache(), true);
     context->globalCache()->clearPrograms();
     auto surface = Surface::Make(context, width, height);
     ASSERT_TRUE(surface != nullptr);
@@ -1847,6 +1855,156 @@ TGFX_TEST(ShaderPermutationTest, EffectDecomposerTripleFP) {
   }
   bitmap.unlockPixels();
   EXPECT_TRUE(hasNonZero);
+}
+
+static void ExpectDirectAARectMatch(ProgramInfo* programInfo, const char* shaderName) {
+  auto match = MatchPermutation(programInfo);
+  ASSERT_TRUE(match.has_value());
+  EXPECT_EQ(match->shaderName, shaderName);
+}
+
+TGFX_TEST(ShaderPermutationTest, DirectAARectCoverageMatchesFiveLevel1Families) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  if (context->backend() == Backend::OpenGL) {
+    GTEST_SKIP() << "Direct AARect families are outside the OpenGL stage 1 whitelist";
+  }
+  auto renderTargetProxy = RenderTargetProxy::Make(context, 8, 8, false);
+  ASSERT_NE(renderTargetProxy, nullptr);
+  auto renderTarget = renderTargetProxy->getRenderTarget();
+  ASSERT_NE(renderTarget, nullptr);
+
+  for (int xpType : {0, 1, 2}) {
+    {
+      BlockAllocator allocator;
+      auto gp = QuadPerEdgeAAGeometryProcessor::Make(&allocator, 8, 8, AAType::Coverage,
+                                                     PMColor::White(), Matrix::I(), false);
+      auto clip = AARectEffect::Make(&allocator, Rect::MakeWH(8, 8));
+      auto xp = MakeSingleIntervalXP(context, &allocator, xpType);
+      ASSERT_NE(gp, nullptr);
+      ASSERT_NE(clip, nullptr);
+      if (xpType != 0) {
+        ASSERT_NE(xp, nullptr);
+      }
+      ProgramInfo programInfo(renderTarget.get(), gp.get(), {clip.get()}, 0, xp.get(),
+                              BlendMode::SrcOver);
+      ExpectDirectAARectMatch(&programInfo, "QuadColorFillShader");
+    }
+    {
+      BlockAllocator allocator;
+      auto textureProxy =
+          context->proxyProvider()->createTextureProxy({}, 8, 8, PixelFormat::RGBA_8888);
+      ASSERT_NE(textureProxy, nullptr);
+      auto gp = QuadPerEdgeAAGeometryProcessor::Make(&allocator, 8, 8, AAType::Coverage,
+                                                     PMColor::White(), Matrix::I(), false);
+      auto color = TextureEffect::Make(&allocator, std::move(textureProxy));
+      auto clip = AARectEffect::Make(&allocator, Rect::MakeWH(8, 8));
+      auto xp = MakeSingleIntervalXP(context, &allocator, xpType);
+      ASSERT_NE(gp, nullptr);
+      ASSERT_NE(color, nullptr);
+      ASSERT_NE(clip, nullptr);
+      if (xpType != 0) {
+        ASSERT_NE(xp, nullptr);
+      }
+      ProgramInfo programInfo(renderTarget.get(), gp.get(), {color.get(), clip.get()}, 1, xp.get(),
+                              BlendMode::SrcOver);
+      ExpectDirectAARectMatch(&programInfo, "QuadTextureFillShader");
+    }
+    {
+      BlockAllocator allocator;
+      auto gp = DefaultGeometryProcessor::Make(&allocator, PMColor::White(), 8, 8, AAType::Coverage,
+                                               Matrix::I(), Matrix::I());
+      auto clip = AARectEffect::Make(&allocator, Rect::MakeWH(8, 8));
+      auto xp = MakeSingleIntervalXP(context, &allocator, xpType);
+      ASSERT_NE(gp, nullptr);
+      ASSERT_NE(clip, nullptr);
+      if (xpType != 0) {
+        ASSERT_NE(xp, nullptr);
+      }
+      ProgramInfo programInfo(renderTarget.get(), gp.get(), {clip.get()}, 0, xp.get(),
+                              BlendMode::SrcOver);
+      ExpectDirectAARectMatch(&programInfo, "SolidColorFillShader");
+    }
+    {
+      BlockAllocator allocator;
+      auto gp = HairlineLineGeometryProcessor::Make(&allocator, PMColor::White(), Matrix::I(),
+                                                    Matrix::I(), 1.0f, AAType::Coverage);
+      auto clip = AARectEffect::Make(&allocator, Rect::MakeWH(8, 8));
+      auto xp = MakeSingleIntervalXP(context, &allocator, xpType);
+      ASSERT_NE(gp, nullptr);
+      ASSERT_NE(clip, nullptr);
+      if (xpType != 0) {
+        ASSERT_NE(xp, nullptr);
+      }
+      ProgramInfo programInfo(renderTarget.get(), gp.get(), {clip.get()}, 0, xp.get(),
+                              BlendMode::SrcOver);
+      ExpectDirectAARectMatch(&programInfo, "HairlineLineShader");
+    }
+    {
+      BlockAllocator allocator;
+      auto gp = HairlineQuadGeometryProcessor::Make(&allocator, PMColor::White(), Matrix::I(),
+                                                    Matrix::I(), 1.0f, AAType::Coverage);
+      auto clip = AARectEffect::Make(&allocator, Rect::MakeWH(8, 8));
+      auto xp = MakeSingleIntervalXP(context, &allocator, xpType);
+      ASSERT_NE(gp, nullptr);
+      ASSERT_NE(clip, nullptr);
+      if (xpType != 0) {
+        ASSERT_NE(xp, nullptr);
+      }
+      ProgramInfo programInfo(renderTarget.get(), gp.get(), {clip.get()}, 0, xp.get(),
+                              BlendMode::SrcOver);
+      ExpectDirectAARectMatch(&programInfo, "HairlineQuadShader");
+    }
+  }
+}
+
+TGFX_TEST(ShaderPermutationTest, DirectAARectPreservesPermutationDomains) {
+  struct ExpectedDomain {
+    const char* name;
+    uint32_t vertexCount;
+    uint32_t fragmentCount;
+  };
+  const ExpectedDomain expected[] = {
+      {"QuadColorFillShader", 1, 6},  {"QuadTextureFillShader", 8, 24},
+      {"SolidColorFillShader", 2, 6}, {"HairlineLineShader", 1, 3},
+      {"HairlineQuadShader", 1, 3},
+  };
+  for (const auto& expectedDomain : expected) {
+    bool found = false;
+    for (const auto& factory : ShaderRegistry::All()) {
+      auto shader = factory();
+      auto info = shader->info();
+      if (info.name != expectedDomain.name) {
+        continue;
+      }
+      found = true;
+      EXPECT_EQ(info.vertDomain.totalCount(), expectedDomain.vertexCount);
+      EXPECT_EQ(info.fragDomain.totalCount(), expectedDomain.fragmentCount);
+    }
+    EXPECT_TRUE(found) << expectedDomain.name;
+  }
+}
+
+TGFX_TEST(ShaderPermutationTest, DirectAARectRejectsComposedCoverage) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto renderTargetProxy = RenderTargetProxy::Make(context, 8, 8, false);
+  ASSERT_NE(renderTargetProxy, nullptr);
+  BlockAllocator allocator;
+  auto gp = DefaultGeometryProcessor::Make(&allocator, PMColor::White(), 8, 8, AAType::None,
+                                           Matrix::I(), Matrix::I());
+  auto maskProxy = context->proxyProvider()->createTextureProxy({}, 8, 8, PixelFormat::ALPHA_8);
+  ASSERT_NE(maskProxy, nullptr);
+  auto mask = DeviceSpaceTextureEffect::Make(&allocator, std::move(maskProxy), Matrix::I());
+  auto clip = AARectEffect::Make(&allocator, Rect::MakeWH(8, 8));
+  auto composed = FragmentProcessor::Compose(&allocator, std::move(mask), std::move(clip));
+  ASSERT_NE(gp, nullptr);
+  ASSERT_NE(composed, nullptr);
+  ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), {composed.get()}, 0,
+                          nullptr, BlendMode::SrcOver);
+  EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
 }
 
 // --- MirroredDim: permanent desync guard --------------------------------------------------------

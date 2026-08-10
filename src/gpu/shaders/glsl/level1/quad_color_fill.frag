@@ -14,8 +14,9 @@
 #define HAS_MASK_TEXTURE 0
 #endif
 
-#if HAS_XP || HAS_MASK_TEXTURE
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
+  vec4 Rect;
+  int HasClip;
 #if HAS_MASK_TEXTURE
   mat3 DeviceCoordMatrix;
 #endif
@@ -25,7 +26,6 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   int XPBlendMode;
 #endif
 };
-#endif
 
 layout(location = 0) in float vCoverage;
 layout(location = 1) in vec4 vColor;
@@ -39,24 +39,21 @@ layout(set = 1, binding = 0) uniform sampler2D MaskTextureSampler;
 #endif
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
+#include "aa_rect_clip_coverage.inc"
 
 layout(location = 0) out vec4 fragColor;
 
 void main() {
-  vec4 outputColor = vColor;
-
+  float maskAlpha = 1.0;
 #if HAS_MASK_TEXTURE
-  // Device-space mask coverage: multiply the coverage sampled from the mask texture into the color.
-  // Geometry AA (vCoverage) is applied separately below, so the two coverage sources compose.
   highp vec3 maskCoord = DeviceCoordMatrix * vec3(gl_FragCoord.xy, 1.0);
-  float maskAlpha = texture(MaskTextureSampler, maskCoord.xy).r;
-  outputColor *= maskAlpha;
+  maskAlpha = texture(MaskTextureSampler, maskCoord.xy).r;
 #endif
+  float totalCoverage = vCoverage * maskAlpha * aaRectClipCoverage();
 
 #if HAS_XP
-  fragColor = applyPorterDuffXP(outputColor, vec4(vCoverage));
+  fragColor = applyPorterDuffXP(vColor, vec4(totalCoverage));
 #else
-  // EmptyXferProcessor: output = outputColor * outputCoverage (1.0 for non-AA, so it is a no-op).
-  fragColor = outputColor * vCoverage;
+  fragColor = vColor * totalCoverage;
 #endif
 }

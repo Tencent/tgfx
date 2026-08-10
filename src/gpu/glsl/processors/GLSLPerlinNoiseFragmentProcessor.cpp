@@ -42,12 +42,12 @@ void EmitPointwiseSlot(FragmentProcessor::EmitArgs& args, const std::string& pre
     args.fragBuilder->codeAppendf("%s.rgb *= %s.a;", args.outputColor.c_str(),
                                   args.outputColor.c_str());
   } else if (slot.type == AOTPointwiseOpType::Luma) {
-    auto kr = args.uniformHandler->addUniform(prefix + "Kr", UniformFormat::Float,
-                                              ShaderStage::Fragment);
-    auto kg = args.uniformHandler->addUniform(prefix + "Kg", UniformFormat::Float,
-                                              ShaderStage::Fragment);
-    auto kb = args.uniformHandler->addUniform(prefix + "Kb", UniformFormat::Float,
-                                              ShaderStage::Fragment);
+    auto kr =
+        args.uniformHandler->addUniform(prefix + "Kr", UniformFormat::Float, ShaderStage::Fragment);
+    auto kg =
+        args.uniformHandler->addUniform(prefix + "Kg", UniformFormat::Float, ShaderStage::Fragment);
+    auto kb =
+        args.uniformHandler->addUniform(prefix + "Kb", UniformFormat::Float, ShaderStage::Fragment);
     auto luma = "perlinSlotLuma" + prefix;
     args.fragBuilder->codeAppendf("float %s = dot(%s.rgb, vec3(%s, %s, %s));", luma.c_str(),
                                   args.outputColor.c_str(), kr.c_str(), kg.c_str(), kb.c_str());
@@ -146,7 +146,8 @@ PlacementPtr<PerlinNoiseFragmentProcessor> PerlinNoiseFragmentProcessor::MakeFro
   }
   for (const auto& slot : slots) {
     if (slot.type == AOTPointwiseOpType::None ||
-        (slot.type == AOTPointwiseOpType::ColorSpaceXform && slot.colorSpaceXform.steps == nullptr)) {
+        (slot.type == AOTPointwiseOpType::ColorSpaceXform &&
+         slot.colorSpaceXform.steps == nullptr)) {
       return nullptr;
     }
   }

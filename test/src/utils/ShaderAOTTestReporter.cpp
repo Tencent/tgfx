@@ -30,10 +30,10 @@
 #include <string>
 #include <vector>
 #include "gpu/AOTEffect.h"
-#include "gpu/shaders/level1/BlendMergeShader.h"
 #include "gpu/EmbeddedShaderBundles.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/PrecompiledShaderCache.h"
+#include "gpu/shaders/level1/BlendMergeShader.h"
 #include "gtest/gtest.h"
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunknown-warning-option"
@@ -278,8 +278,8 @@ static ConsistencyResult BuildConsistencyChecks(
   // without a diagnostic fallback record. Keep those comparisons as legacy diagnostics, but do not
   // let them mark the epoch inconsistent. The stage/artifact/pipeline/hit-record chain is the
   // reliable same-epoch invariant.
-  result.consistent = stagesMonotonic && artifactHitsMatch && pipelineCreationsMatch &&
-                      hitRecordsMatch;
+  result.consistent =
+      stagesMonotonic && artifactHitsMatch && pipelineCreationsMatch && hitRecordsMatch;
   result.checks = {
       {"consistent", result.consistent},
       {"aotStagesMonotonic", stagesMonotonic},
@@ -400,15 +400,13 @@ static nlohmann::json HitRecordToJSON(const PrecompiledHitRecord& record) {
           {"fragPermutationIndex", record.fragPermutationIndex}};
 }
 
-static bool BlendMergeTupleBuildable(const std::vector<int>& vert,
-                                     const std::vector<int>& frag) {
+static bool BlendMergeTupleBuildable(const std::vector<int>& vert, const std::vector<int>& frag) {
   if (vert.size() != BlendMergeShader::VD::COUNT || frag.size() != BlendMergeShader::FD::COUNT) {
     return false;
   }
-  if (vert[BlendMergeShader::VD::GP_TYPE] == 0 &&
-      (vert[BlendMergeShader::VD::HAS_COVERAGE] != 0 ||
-       vert[BlendMergeShader::VD::HAS_UV_COORD] != 0 ||
-       vert[BlendMergeShader::VD::HAS_COLOR] != 0)) {
+  if (vert[BlendMergeShader::VD::GP_TYPE] == 0 && (vert[BlendMergeShader::VD::HAS_COVERAGE] != 0 ||
+                                                   vert[BlendMergeShader::VD::HAS_UV_COORD] != 0 ||
+                                                   vert[BlendMergeShader::VD::HAS_COLOR] != 0)) {
     return false;
   }
   if (frag[BlendMergeShader::FD::HAS_MASK_TEXTURE] != 0 &&
@@ -456,16 +454,18 @@ static nlohmann::json BuildBlendMergeReachabilityAudit(
           {"routeClass", routeClass},
           {"vertPermutationIndex", vertIndex},
           {"fragPermutationIndex", fragIndex},
-          {"vertDefines", {{"GP_TYPE", vertValues[BlendMergeShader::VD::GP_TYPE]},
-                           {"HAS_COVERAGE", vertValues[BlendMergeShader::VD::HAS_COVERAGE]},
-                           {"HAS_UV_COORD", vertValues[BlendMergeShader::VD::HAS_UV_COORD]},
-                           {"HAS_COLOR", vertValues[BlendMergeShader::VD::HAS_COLOR]}}},
-          {"fragDefines", {{"HAS_TWO_CHILDREN", fragValues[BlendMergeShader::FD::HAS_TWO_CHILDREN]},
-                           {"HAS_XP", fragValues[BlendMergeShader::FD::HAS_XP]},
-                           {"CHILD0_MODE", fragValues[BlendMergeShader::FD::CHILD0_MODE]},
-                           {"HAS_COVERAGE", fragValues[BlendMergeShader::FD::HAS_COVERAGE]},
-                           {"HAS_COLOR", fragValues[BlendMergeShader::FD::HAS_COLOR]},
-                           {"HAS_MASK_TEXTURE", fragValues[BlendMergeShader::FD::HAS_MASK_TEXTURE]}}},
+          {"vertDefines",
+           {{"GP_TYPE", vertValues[BlendMergeShader::VD::GP_TYPE]},
+            {"HAS_COVERAGE", vertValues[BlendMergeShader::VD::HAS_COVERAGE]},
+            {"HAS_UV_COORD", vertValues[BlendMergeShader::VD::HAS_UV_COORD]},
+            {"HAS_COLOR", vertValues[BlendMergeShader::VD::HAS_COLOR]}}},
+          {"fragDefines",
+           {{"HAS_TWO_CHILDREN", fragValues[BlendMergeShader::FD::HAS_TWO_CHILDREN]},
+            {"HAS_XP", fragValues[BlendMergeShader::FD::HAS_XP]},
+            {"CHILD0_MODE", fragValues[BlendMergeShader::FD::CHILD0_MODE]},
+            {"HAS_COVERAGE", fragValues[BlendMergeShader::FD::HAS_COVERAGE]},
+            {"HAS_COLOR", fragValues[BlendMergeShader::FD::HAS_COLOR]},
+            {"HAS_MASK_TEXTURE", fragValues[BlendMergeShader::FD::HAS_MASK_TEXTURE]}}},
           {"buildable", true},
           {"hitExecutionCount", hitCount},
           {"evidence", hitCount > 0 ? "ObservedInMetalTests" : "BuildableButUnobserved"},
@@ -873,7 +873,8 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
             {{"hits", testResult.artifactHits}, {"misses", testResult.artifactMisses}}},
            {"consistencyChecks", std::move(testConsistency.checks)},
            {"hitRecords", std::move(hitRecordsJSON)},
-           {"jitProgramRecords", [&]() {
+           {"jitProgramRecords",
+            [&]() {
               nlohmann::json records = nlohmann::json::array();
               for (const auto& record : testResult.jitProgramRecords) {
                 records.push_back({{"programKey", record.programKey}, {"route", record.route}});
@@ -990,8 +991,7 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
     auto decompositionAudit =
         BuildDecompositionAudit(sortedFallbacks, &auditFusableNow, &auditNeedsLowering);
     auto blendMergeReachability = BuildBlendMergeReachabilityAudit(permutationMap);
-    auto rootCauseProgramKeyAttribution =
-        BuildRootCauseProgramKeyAttribution(testResults);
+    auto rootCauseProgramKeyAttribution = BuildRootCauseProgramKeyAttribution(testResults);
 
     nlohmann::json offscreenFillAudit = nlohmann::json::object();
     for (size_t i = 0; i < OFFSCREEN_FILL_SOURCE_COUNT; ++i) {
