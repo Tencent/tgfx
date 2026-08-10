@@ -31,6 +31,7 @@
 #include "tgfx/core/Point.h"
 #include "tgfx/core/RRect.h"
 #include "tgfx/core/Rect.h"
+#include "tgfx/core/Shape.h"
 #include "tgfx/core/Surface.h"
 #include "utils/TestUtils.h"
 
@@ -49,6 +50,14 @@ static Path MakePath(std::initializer_list<Point> points, bool close = true) {
     }
   }
   return path;
+}
+
+// Builds a clip whose single non-AA rect element degenerates to empty under transform().
+static ClipStack MakeDegenerateClip() {
+  ClipStack clip;
+  clip.clipRect(Rect::MakeXYWH(10, 20, 40, 30), Matrix::I(), false);
+  clip.transform(Matrix::MakeScale(1.0f, 0.001f));
+  return clip;
 }
 
 TGFX_TEST_PRIVATE(ClipTest, RectEffect) {
@@ -747,15 +756,13 @@ TGFX_TEST(ClipTest, EmptyElementClippedOut) {
   OpsCompositor compositor(renderTarget, 0);
 
   // A non-AA rect compressed below one pixel by transform() degenerates into an empty element
-  // (ClipElement::simplify marks it Empty because it covers no pixel center), while
-  // ClipRecord.state stays Rect. applyClip must still recognize the empty element and report
-  // ClippedOut instead of feeding it to the mask rasterizer.
-  ClipStack clip;
-  clip.clipRect(Rect::MakeXYWH(10, 20, 40, 30), Matrix::I(), false);
-  clip.transform(Matrix::MakeScale(1.0f, 0.001f));
+  // (ClipElement::simplify marks it Empty because it covers no pixel center). ClipStack keeps the
+  // record state in sync, so applyClip short-circuits on ClipState::Empty and reports ClippedOut
+  // instead of feeding the empty element to the mask rasterizer.
+  auto clip = MakeDegenerateClip();
   TGFX_PRIVATE_ACCESS({
     ASSERT_EQ(clip.elements().size(), 1u);
-    EXPECT_EQ(clip.state(), ClipState::Rect);
+    EXPECT_EQ(clip.state(), ClipState::Empty);
     EXPECT_TRUE(clip.elements()[0].shape().isEmpty());
     auto applied = compositor.applyClip(clip);
     EXPECT_EQ(applied.status, AppliedClipStatus::ClippedOut);
@@ -770,18 +777,104 @@ TGFX_TEST(ClipTest, SubPixelClipMaskRasterizeNoNullOp) {
   ASSERT_NE(renderTarget, nullptr);
   OpsCompositor compositor(renderTarget, 0);
 
-  // End-to-end rendering path: without the fix, the empty clip element was skipped by the
-  // scissor-only path (innerBounds == outerBounds) and the draw proceeded unclipped (Clipped,
-  // overdrawing content outside the clip). The fix reports ClippedOut instead, matching the
-  // semantics of an empty clip region. Flushing must not crash.
-  ClipStack clip;
-  clip.clipRect(Rect::MakeXYWH(10, 20, 40, 30), Matrix::I(), false);
-  clip.transform(Matrix::MakeScale(1.0f, 0.001f));
+  // End-to-end rendering path: an empty clip region reports ClippedOut, so a degenerate clip
+  // never reaches the mask rasterizer and no null draw op is queued. Flushing must not crash.
+  auto clip = MakeDegenerateClip();
   TGFX_PRIVATE_ACCESS({
     auto applied = compositor.applyClip(clip);
     EXPECT_EQ(applied.status, AppliedClipStatus::ClippedOut);
   });
   context->flushAndSubmit();
+}
+
+// An inverse-empty path is an identity clip element: it keeps the whole plane. It must never
+// collapse the clip. As the added element it is dropped as redundant in addElement, and as the
+// sole element it rasterizes to a full-coverage mask, so applyClip must report Clipped in both
+// cases and never ClippedOut.
+TGFX_TEST(ClipTest, InverseEmptyClipIdentity) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+
+  // Case 1: clipRect followed by clipPath(inverse-empty path). The identity element is dropped
+  // in addElement (ResolveClipGeometry returns AOnly because its removed region is empty), so the
+  // rect stays the only element and the clip keeps working.
+  {
+    ClipStack clip;
+    clip.clipRect(Rect::MakeXYWH(10, 20, 40, 30), Matrix::I(), false);
+    Path inverseEmpty = {};
+    inverseEmpty.toggleInverseFillType();
+    clip.clipPath(inverseEmpty, Matrix::I(), false);
+    TGFX_PRIVATE_ACCESS({
+      ASSERT_EQ(clip.elements().size(), 1u);
+      EXPECT_TRUE(clip.elements()[0].isValid());
+      EXPECT_EQ(clip.elements()[0].shape().type(), GeometryShape::Type::Rect);
+      EXPECT_NE(clip.state(), ClipState::Empty);
+      auto renderTarget = RenderTargetProxy::Make(context, 100, 100, false);
+      ASSERT_NE(renderTarget, nullptr);
+      OpsCompositor compositor(renderTarget, 0);
+      auto applied = compositor.applyClip(clip);
+      EXPECT_EQ(applied.status, AppliedClipStatus::Clipped);
+    });
+  }
+
+  // Case 2: Inverse-empty path as the sole element. It becomes a full-coverage mask (i == 0 in
+  // makeClipTexture preserves the inverse fill type), so the clip must remain Clipped.
+  {
+    ClipStack clip;
+    Path inverseEmpty = {};
+    inverseEmpty.toggleInverseFillType();
+    clip.clipPath(inverseEmpty, Matrix::I(), false);
+    TGFX_PRIVATE_ACCESS({
+      ASSERT_EQ(clip.elements().size(), 1u);
+      EXPECT_TRUE(clip.elements()[0].isValid());
+      EXPECT_EQ(clip.elements()[0].shape().type(), GeometryShape::Type::Path);
+      EXPECT_TRUE(clip.elements()[0].shape().path().isInverseFillType());
+      auto renderTarget = RenderTargetProxy::Make(context, 100, 100, false);
+      ASSERT_NE(renderTarget, nullptr);
+      OpsCompositor compositor(renderTarget, 0);
+      auto applied = compositor.applyClip(clip);
+      EXPECT_EQ(applied.status, AppliedClipStatus::Clipped);
+    });
+  }
+
+  // Case 3: The inverse-empty sole element survives a transform: its isEmpty stays false, so the
+  // emptyDetected check in transform() must not collapse the clip, and applyClip keeps working.
+  {
+    ClipStack clip;
+    Path inverseEmpty = {};
+    inverseEmpty.toggleInverseFillType();
+    clip.clipPath(inverseEmpty, Matrix::I(), false);
+    clip.transform(Matrix::MakeScale(2.0f, 2.0f));
+    TGFX_PRIVATE_ACCESS({
+      EXPECT_EQ(clip.elements().size(), 1u);
+      EXPECT_NE(clip.state(), ClipState::Empty);
+      auto renderTarget = RenderTargetProxy::Make(context, 100, 100, false);
+      ASSERT_NE(renderTarget, nullptr);
+      OpsCompositor compositor(renderTarget, 0);
+      auto applied = compositor.applyClip(clip);
+      EXPECT_EQ(applied.status, AppliedClipStatus::Clipped);
+    });
+  }
+}
+
+// Verifies the technical facts behind the inverse-empty review comment: Shape::MakeFrom keeps an
+// inverse-empty path (full-coverage identity shape) but rejects the same path after the inverse
+// toggle turns it into a plain empty path. This is exactly the operation makeClipTexture performs
+// on non-first mask elements.
+TGFX_TEST(ClipTest, ShapeMakeFromInverseEmpty) {
+  Path inverseEmpty = {};
+  inverseEmpty.toggleInverseFillType();
+  EXPECT_TRUE(inverseEmpty.isEmpty());
+  EXPECT_TRUE(inverseEmpty.isInverseFillType());
+  auto identityShape = Shape::MakeFrom(inverseEmpty);
+  EXPECT_NE(identityShape, nullptr);
+  EXPECT_TRUE(identityShape->isInverseFillType());
+
+  inverseEmpty.toggleInverseFillType();
+  EXPECT_TRUE(inverseEmpty.isEmpty());
+  EXPECT_FALSE(inverseEmpty.isInverseFillType());
+  EXPECT_EQ(Shape::MakeFrom(inverseEmpty), nullptr);
 }
 
 TGFX_TEST(ClipTest, Overview) {

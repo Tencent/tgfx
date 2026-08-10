@@ -687,15 +687,24 @@ void ClipStack::transform(const Matrix& matrix) {
   }
 
   willModify();
+  bool emptyDetected = false;
   for (auto& element : _data->elements) {
     element.transform(matrix);
+    // A valid element degenerating to empty (e.g. a sub-pixel non-AA rect covering no pixel
+    // center) makes the intersection empty, so the whole clip collapses to Empty. Every element
+    // must still be transformed so restore() can invert the accumulated transform consistently.
+    if (element.isValid() && element.shape().isEmpty()) {
+      emptyDetected = true;
+    }
   }
 
   // Update the current record after transforming all elements.
   auto& cur = current();
   cur.transform = newTransform;
   cur.bounds = matrix.mapRect(cur.bounds);
-  if (cur.state == ClipState::Rect && !matrix.rectStaysRect()) {
+  if (emptyDetected) {
+    cur.state = ClipState::Empty;
+  } else if (cur.state == ClipState::Rect && !matrix.rectStaysRect()) {
     cur.state = ClipState::Complex;
   }
   cur.uniqueID = UniqueID::Next();
