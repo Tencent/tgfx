@@ -55,7 +55,7 @@ if %errorlevel% equ 0 (
 )
 
 :do_update
-echo ~~~~~~~~~~~~~~~~~~~Update Baseline (%BACKEND_NAME%) Start~~~~~~~~~~~~~~~~~~~~~
+echo ~~~~~~~~~~~~~~~~~~~Update Baseline ^(%BACKEND_NAME%^) Start~~~~~~~~~~~~~~~~~~~~~
 
 :: Save current state
 for /f "delims=" %%i in ('git rev-parse --abbrev-ref HEAD') do set "CURRENT_BRANCH=%%i"
@@ -103,9 +103,9 @@ if /I "%~1"=="USE_VULKAN_SWIFTSHADER" copy /y "%~dp0vendor\swiftshader\win\x64\v
 
 UpdateBaseline_%TARGET_SUFFIX%.exe
 if !errorlevel! equ 0 (
-    echo ~~~~~~~~~~~~~~~~~~~Update Baseline (%BACKEND_NAME%) Success~~~~~~~~~~~~~~~~~~~~~
+    echo ~~~~~~~~~~~~~~~~~~~Update Baseline ^(%BACKEND_NAME%^) Success~~~~~~~~~~~~~~~~~~~~~
 ) else (
-    echo ~~~~~~~~~~~~~~~~~~~Update Baseline (%BACKEND_NAME%) Failed~~~~~~~~~~~~~~~~~~
+    echo ~~~~~~~~~~~~~~~~~~~Update Baseline ^(%BACKEND_NAME%^) Failed~~~~~~~~~~~~~~~~~~
     set "BASELINE_FAILED=true"
 )
 
