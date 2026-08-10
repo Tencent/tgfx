@@ -15,7 +15,20 @@ WORKSPACE=$(pwd)
 
 cd $WORKSPACE
 
-./update_baseline.sh "${1:-""}"
+# Parse arguments the same way update_baseline.sh does, so the backend keyword and the
+# --skip-images flag can appear in any order (e.g. `./autotest.sh --skip-images USE_METAL`).
+# Without this, the dispatch below would reject --skip-images as an unknown backend even
+# though update_baseline.sh (invoked next) handles it fine, leaving the user in a confusing
+# half-executed state.
+BACKEND_ARG=""
+for arg in "$@"; do
+  case "$arg" in
+    --skip-images) ;;
+    *) BACKEND_ARG="$arg" ;;
+  esac
+done
+
+./update_baseline.sh "$@"
 if test $? -ne 0; then
    exit 1
 fi
@@ -25,23 +38,23 @@ make_dir build
 cd build
 
 # Determine cmake args and target suffix
-if [[ "$1" == "USE_OPENGL_SWIFTSHADER" ]]; then
+if [[ "$BACKEND_ARG" == "USE_OPENGL_SWIFTSHADER" ]]; then
   TARGET_SUFFIX="OpenGL"
   cmake -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DTGFX_USE_SWIFTSHADER=ON -DTGFX_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug ../
-elif [[ "$1" == "USE_VULKAN_SWIFTSHADER" ]]; then
+elif [[ "$BACKEND_ARG" == "USE_VULKAN_SWIFTSHADER" ]]; then
   TARGET_SUFFIX="Vulkan"
   cmake -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DTGFX_USE_VULKAN=ON -DTGFX_USE_SWIFTSHADER=ON -DTGFX_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug ../
-elif [[ "$1" == "USE_METAL" ]]; then
+elif [[ "$BACKEND_ARG" == "USE_METAL" ]]; then
   TARGET_SUFFIX="Metal"
   cmake -DTGFX_USE_METAL=ON -DTGFX_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug ../
-elif [[ "$1" == "USE_VULKAN" ]]; then
+elif [[ "$BACKEND_ARG" == "USE_VULKAN" ]]; then
   echo "ERROR: USE_VULKAN (native GPU) is not supported on macOS. Use USE_VULKAN_SWIFTSHADER instead."
   exit 1
-elif [[ "$1" == "USE_OPENGL" ]]; then
+elif [[ "$BACKEND_ARG" == "USE_OPENGL" ]]; then
   TARGET_SUFFIX="OpenGL"
   cmake -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DTGFX_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug ../
 else
-  echo "ERROR: Unsupported backend argument: $1"
+  echo "ERROR: Unsupported backend argument: $BACKEND_ARG"
   echo "Supported: USE_OPENGL, USE_OPENGL_SWIFTSHADER, USE_VULKAN, USE_VULKAN_SWIFTSHADER, USE_METAL"
   exit 1
 fi
@@ -61,7 +74,7 @@ else
   exit 1
 fi
 
-if [[ "$1" == "USE_VULKAN_SWIFTSHADER" ]]; then
+if [[ "$BACKEND_ARG" == "USE_VULKAN_SWIFTSHADER" ]]; then
   HOST_ARCH=$(uname -m)
   if [[ "$HOST_ARCH" == "x86_64" ]]; then
     HOST_ARCH=x64
