@@ -68,6 +68,14 @@ std::shared_ptr<RenderTargetProxy> CGLWindow::onCreateRenderTarget(Context* cont
          "the main thread, then render on any thread.");
   }
   auto glContext = static_cast<CGLDevice*>(device.get())->glContext;
+  // AppKit may silently reset view.window.colorSpace when the window moves to a display whose
+  // native gamut differs from the configured one. Reassert the color space before [glContext
+  // update] reallocates the back buffer, otherwise the new buffer inherits the reset (native) color
+  // space and pixels get tagged incorrectly.
+  if (_colorSpace != nullptr &&
+      ColorSpace::Equals(_colorSpace.get(), ColorSpace::DisplayP3().get()) && view.window != nil) {
+    view.window.colorSpace = [NSColorSpace displayP3ColorSpace];
+  }
   [glContext update];
   CGSize size = [view convertSizeToBacking:view.bounds.size];
   if (size.width <= 0 || size.height <= 0) {
