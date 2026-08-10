@@ -104,9 +104,16 @@ Web 端构建时始终开启 `GENERATE_BASELINE_IMAGES`，等效于原生的 `Up
 1. 暂存当前分支的未提交改动（如有）
 2. 切到 main 分支，以 `UPDATE_BASELINE` 模式构建并运行 web 测试
 3. 生成 baseline cache 到 `test/baseline/.cache/webgl/`（或 `webgpu/`）
-4. 切回当前分支，恢复暂存改动
+4. 同时生成 baseline 图像到 `test/baseline-out/`，便于本地视觉核对
+5. 切回当前分支，恢复暂存改动
 
 之后在当前分支运行 `npm run autotest` 即可对比 main baseline 验证。
+
+如仅需刷新 cache 而不生成图像（CI 流水线使用此模式），追加 `SKIP_IMAGES` 参数：
+
+```bash
+./update_baseline.sh USE_WEBGL SKIP_IMAGES
+```
 
 ## 命令一览
 

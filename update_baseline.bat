@@ -3,6 +3,20 @@ setlocal enabledelayedexpansion
 
 cd /d "%~dp0"
 
+:: Usage:
+::   update_baseline.bat USE_D3D12                     :: D3D12 (real GPU)
+::   update_baseline.bat USE_D3D12_WARP                :: D3D12 (WARP software adapter, used in CI)
+::   update_baseline.bat USE_OPENGL                    :: OpenGL
+::   update_baseline.bat USE_OPENGL_SWIFTSHADER        :: OpenGL (SwiftShader)
+::   update_baseline.bat USE_VULKAN                    :: Vulkan (real GPU)
+::   update_baseline.bat USE_VULKAN_SWIFTSHADER        :: Vulkan (SwiftShader)
+::
+:: Optional second argument:
+::   SKIP_IMAGES   Skip writing baseline `_base.webp` images. The cache
+::                 (md5.json + version.json) is still refreshed, which is
+::                 all the CI pipeline needs. Local runs omit this to also
+::                 produce baseline-out\ images for visual inspection.
+
 :: Determine cmake args and backend name
 set "CMAKE_BACKEND_ARGS="
 set "BACKEND_NAME=opengl"
@@ -82,7 +96,9 @@ cd %BUILD_DIR%
 :: Windows Debug builds compile far slower than macOS, so this script (which is also driven by
 :: CI) builds the baseline generator in Release across all Windows backends to keep the refresh
 :: turnaround acceptable. macOS update_baseline.sh keeps Debug for better diagnostics.
-cmake -G Ninja %CMAKE_BACKEND_ARGS% -DTGFX_SKIP_GENERATE_BASELINE_IMAGES=ON -DTGFX_BUILD_TESTS=ON -DTGFX_SKIP_BASELINE_CHECK=ON -DCMAKE_BUILD_TYPE=Release ../
+set "SKIP_IMAGES_FLAG="
+if /I "%~2"=="SKIP_IMAGES" set "SKIP_IMAGES_FLAG=-DTGFX_SKIP_GENERATE_BASELINE_IMAGES=ON"
+cmake -G Ninja %CMAKE_BACKEND_ARGS% %SKIP_IMAGES_FLAG% -DTGFX_BUILD_TESTS=ON -DTGFX_SKIP_BASELINE_CHECK=ON -DCMAKE_BUILD_TYPE=Release ../
 if %errorlevel% neq 0 (
     echo CMake configuration failed
     set "BASELINE_FAILED=true"

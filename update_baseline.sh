@@ -12,6 +12,12 @@
 #   ./update_baseline.sh USE_METAL                  # Metal (Apple GPU)
 #   ./update_baseline.sh USE_WEBGL                  # Web (WebGL)
 #   ./update_baseline.sh USE_WEBGPU                 # Web (WebGPU)
+#
+# Optional second argument:
+#   SKIP_IMAGES   Skip writing baseline `_base.webp` images. The cache
+#                 (md5.json + version.json) is still refreshed, which is
+#                 all the CI pipelines need. Local runs omit this to also
+#                 produce baseline-out/ images for visual inspection.
 
 {
   # Web backends are handled by a separate script with Emscripten toolchain.
@@ -85,7 +91,14 @@
       TARGET_SUFFIX="OpenGL" ;;
   esac
 
-  cmake $CMAKE_BACKEND_ARGS -DTGFX_SKIP_GENERATE_BASELINE_IMAGES=ON \
+  # Default to generating baseline images so local users get baseline-out/ for inspection.
+  # CI pipelines pass SKIP_IMAGES as the second argument because they only need the cache.
+  SKIP_IMAGES_FLAG=""
+  if [ "$2" = "SKIP_IMAGES" ]; then
+    SKIP_IMAGES_FLAG="-DTGFX_SKIP_GENERATE_BASELINE_IMAGES=ON"
+  fi
+
+  cmake $CMAKE_BACKEND_ARGS $SKIP_IMAGES_FLAG \
         -DTGFX_BUILD_TESTS=ON -DTGFX_SKIP_BASELINE_CHECK=ON \
         -DCMAKE_BUILD_TYPE=Debug ../
 
