@@ -30,7 +30,7 @@ option(TGFX_USE_SWIFTSHADER "Enable building with the SwiftShader library" OFF)
 option(TGFX_USE_ANGLE "Enable building with the ANGLE library" OFF)
 option(TGFX_USE_VULKAN "Use Vulkan as the GPU backend" OFF)
 option(TGFX_USE_TEXT_GAMMA_CORRECTION "Enable gamma correction when rendering text" OFF)
-option(TGFX_ENABLE_STENCIL_COVER_PATH "Enable the stencil-and-cover GPU path renderer for non-antialiased fills" ON)
+option(TGFX_ENABLE_STENCIL_COVER_PATH "Enable the stencil-and-cover GPU path renderer for non-antialiased fills" OFF)
 
 # EMSCRIPTEN_PTHREADS can be set by vendor tools for building the wasm-mt architecture.
 if (NOT WEB OR EMSCRIPTEN_PTHREADS)
