@@ -34,13 +34,19 @@
     esac
   done
 
-  # Web backends are handled by a separate script with Emscripten toolchain.
+  # Web backends are handled by a separate script with Emscripten toolchain. Forward the
+  # --skip-images flag so `./update_baseline.sh USE_WEBGL --skip-images` really does skip
+  # emitting `_base.webp` images on the web side (aligned with native backends).
+  WEB_SKIP_FLAG=""
+  if [ "$SKIP_IMAGES" = "1" ]; then
+    WEB_SKIP_FLAG="--skip-images"
+  fi
   case "$BACKEND_ARG" in
     USE_WEBGL)
-      TGFX_WEB_BASELINE_INVOKED=1 exec bash web/test/update_web_baseline.sh webgl
+      TGFX_WEB_BASELINE_INVOKED=1 exec bash web/test/update_web_baseline.sh webgl $WEB_SKIP_FLAG
       ;;
     USE_WEBGPU)
-      TGFX_WEB_BASELINE_INVOKED=1 exec bash web/test/update_web_baseline.sh webgpu
+      TGFX_WEB_BASELINE_INVOKED=1 exec bash web/test/update_web_baseline.sh webgpu $WEB_SKIP_FLAG
       ;;
   esac
 
