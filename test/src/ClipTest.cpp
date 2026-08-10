@@ -747,15 +747,15 @@ TGFX_TEST(ClipTest, EmptyElementClippedOut) {
   OpsCompositor compositor(renderTarget, 0);
 
   // A non-AA rect compressed below one pixel by transform() degenerates into an empty element
-  // (ClipElement::simplify marks it Empty because it covers no pixel center), while
-  // ClipRecord.state stays Rect. applyClip must still recognize the empty element and report
-  // ClippedOut instead of feeding it to the mask rasterizer.
+  // (ClipElement::simplify marks it Empty because it covers no pixel center). ClipStack keeps the
+  // record state in sync, so applyClip short-circuits on ClipState::Empty and reports ClippedOut
+  // instead of feeding the empty element to the mask rasterizer.
   ClipStack clip;
   clip.clipRect(Rect::MakeXYWH(10, 20, 40, 30), Matrix::I(), false);
   clip.transform(Matrix::MakeScale(1.0f, 0.001f));
   TGFX_PRIVATE_ACCESS({
     ASSERT_EQ(clip.elements().size(), 1u);
-    EXPECT_EQ(clip.state(), ClipState::Rect);
+    EXPECT_EQ(clip.state(), ClipState::Empty);
     EXPECT_TRUE(clip.elements()[0].shape().isEmpty());
     auto applied = compositor.applyClip(clip);
     EXPECT_EQ(applied.status, AppliedClipStatus::ClippedOut);
