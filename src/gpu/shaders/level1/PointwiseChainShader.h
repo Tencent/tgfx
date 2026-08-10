@@ -30,15 +30,14 @@ namespace tgfx {
 /// sampler binding and a TransformedCoords varying.
 ///
 /// Vertex dimensions:
-///   GP_TYPE (int, 2 values): 0=DefaultGeometryProcessor, 1=QuadPerEdgeAAGeometryProcessor
-///   HAS_COVERAGE (bool): per-vertex AA coverage. QuadGP vertex buffers always carry the coverage
-///     slot (providers write 1.0 for non-AA draws), so ShouldCompile fixes this to 1 for QuadGP;
-///     only DefaultGP toggles it.
-///   HAS_UV_COORD (bool): QuadGP only; leaf coords come from the uvCoord attribute instead of
+///   HAS_COVERAGE (bool): per-vertex AA coverage varying present.
+///   HAS_UV_COORD (bool): quad only; leaf coords come from the uvCoord attribute instead of
 ///     aPosition.
-///   HAS_COLOR (bool): QuadGP only; the per-vertex color slot exists only when the provider
-///     carries per-vertex colors, so it stays a real dimension (mirrored with the fragment stage,
-///     which reads vColor instead of the Color uniform when set).
+///   HAS_COLOR (bool): quad only; the per-vertex color slot exists only when the provider
+///     carries per-vertex colors (mirrored with the fragment stage, which reads vColor instead
+///     of the Color uniform when set).
+///   There is no GP_TYPE: the position always goes through the Matrix uniform, which DefaultGP
+///   fills with the view matrix and QuadPerEdgeAAGP fills with identity (bit-exact).
 ///   TEXTURE_COUNT (int, 4 values): 0 -> 0 leaves, 1 -> 1, 2 -> 2, 3 -> 4. A zero-leaf chain
 ///     evaluates const-color/blend ops against the geometry color alone.
 ///
@@ -50,10 +49,9 @@ namespace tgfx {
 class PointwiseChainShader : public PrecompiledShader {
  public:
   struct VertDims {
-    enum : uint32_t { GP_TYPE, HAS_COVERAGE, HAS_UV_COORD, HAS_COLOR, TEXTURE_COUNT, COUNT };
+    enum : uint32_t { HAS_COVERAGE, HAS_UV_COORD, HAS_COLOR, TEXTURE_COUNT, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationInt("GP_TYPE", 2),
           PermutationBool("HAS_COVERAGE"),
           PermutationBool("HAS_UV_COORD"),
           PermutationBool("HAS_COLOR"),
@@ -95,22 +93,16 @@ class PointwiseChainShader : public PrecompiledShader {
                             const std::vector<int>& fragValues) {
     // HAS_COVERAGE / HAS_COLOR / TEXTURE_COUNT vertex-fragment agreement is enforced by the
     // framework (MirroredDimsAgree).
-    int gpType = vertValues[VD::GP_TYPE];
-    if (gpType == 0) {
-      // uvCoord and per-vertex colors are QuadGP-only attributes.
-      if (vertValues[VD::HAS_UV_COORD] != 0 || vertValues[VD::HAS_COLOR] != 0) {
-        return false;
-      }
-    } else {
-      // The QuadGP coverage slot is always present in the vertex buffer, so the always-on
-      // coverage path serves every quad draw and the toggled variants would be dead duplicates.
-      if (vertValues[VD::HAS_COVERAGE] == 0) {
-        return false;
-      }
-      // Mask clips go through DefaultGP paths only.
-      if (fragValues[FD::HAS_MASK_TEXTURE] != 0) {
-        return false;
-      }
+    // uvCoord and per-vertex colors are quad-only attributes, and quad vertex buffers always
+    // carry the coverage slot, so either of them implies coverage.
+    if ((vertValues[VD::HAS_UV_COORD] != 0 || vertValues[VD::HAS_COLOR] != 0) &&
+        vertValues[VD::HAS_COVERAGE] == 0) {
+      return false;
+    }
+    // Mask clips go through DefaultGP paths only, which never carry quad attributes.
+    if (fragValues[FD::HAS_MASK_TEXTURE] != 0 &&
+        (vertValues[VD::HAS_UV_COORD] != 0 || vertValues[VD::HAS_COLOR] != 0)) {
+      return false;
     }
     return true;
   }

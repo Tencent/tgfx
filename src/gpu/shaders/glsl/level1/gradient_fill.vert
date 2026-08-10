@@ -1,24 +1,18 @@
 // GradientFillShader vertex shader
 // Processor layout: GP + ClampedGradientEffect() + EmptyXferProcessor()
 // Permutation dimensions (vert):
-//   GP_TYPE (0=DefaultGP, 1=QuadPerEdgeAAGP): selects the position transform only.
 //   HAS_VCOVERAGE (bool): whether the draw supplies a per-vertex AA coverage attribute. This is
-//   independent of GP_TYPE — a QuadPerEdgeAA draw may or may not carry coverage — so the coverage
+//   a QuadPerEdgeAA draw may or may not carry coverage — so the coverage
 //   varying is gated on HAS_VCOVERAGE, not on the GP type.
 #version 450
 
-#ifndef GP_TYPE
-#define GP_TYPE 0
-#endif
 #ifndef HAS_VCOVERAGE
 #define HAS_VCOVERAGE 0
 #endif
 
 layout(std140, set = 0, binding = 0) uniform VertexUniformBlock {
   vec4 tgfx_RTAdjust;
-#if GP_TYPE == 0
   mat3 Matrix;
-#endif
   mat3 CoordTransformMatrix_0;
 };
 
@@ -36,11 +30,7 @@ void main() {
 #if HAS_VCOVERAGE
   vCoverage = inCoverage;
 #endif
-#if GP_TYPE == 0
   highp vec2 position = (Matrix * vec3(aPosition, 1.0)).xy;
-#else
-  highp vec2 position = aPosition;
-#endif
   TransformedCoords_0 = (CoordTransformMatrix_0 * vec3(aPosition, 1.0)).xy;
   gl_Position = vec4(position.xy * tgfx_RTAdjust.xz + tgfx_RTAdjust.yw, 0.0, 1.0);
 }

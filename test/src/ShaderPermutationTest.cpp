@@ -323,7 +323,7 @@ TGFX_TEST(ShaderPermutationTest, DeviceSpaceTexturedEffectShaderRegistry) {
     found = true;
     EXPECT_EQ(info.vertexFile, "level1/device_space_texture.vert");
     EXPECT_EQ(info.fragmentFile, "level1/device_space_textured_effect.frag");
-    EXPECT_EQ(info.vertDomain.totalCount(), 4u);
+    EXPECT_EQ(info.vertDomain.totalCount(), 2u);
     EXPECT_EQ(info.fragDomain.totalCount(), 6u);
     int compiledCount = 0;
     for (uint32_t vi = 0; vi < info.vertDomain.totalCount(); ++vi) {
@@ -335,7 +335,7 @@ TGFX_TEST(ShaderPermutationTest, DeviceSpaceTexturedEffectShaderRegistry) {
         }
       }
     }
-    EXPECT_EQ(compiledCount, 12);
+    EXPECT_EQ(compiledCount, 6);
   }
   EXPECT_TRUE(found);
 }
@@ -390,7 +390,7 @@ TGFX_TEST(ShaderPermutationTest, DeviceSpaceTexturedEffectMatchesSupportedLayout
     auto match = MatchPermutation(&programInfo);
     ASSERT_TRUE(match.has_value());
     EXPECT_EQ(match->shaderName, "DeviceSpaceTexturedEffectShader");
-    EXPECT_EQ(match->vertPermutationIndex, 3u);
+    EXPECT_EQ(match->vertPermutationIndex, 1u);
     EXPECT_EQ(match->fragPermutationIndex, 4u);
   }
 
@@ -508,7 +508,7 @@ TGFX_TEST(ShaderPermutationTest, DeviceSpaceTexturedEffectRejectsUnsupportedLayo
 TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientCompiledSpace) {
   SingleIntervalGradientShader shader;
   auto info = shader.info();
-  EXPECT_EQ(info.vertDomain.totalCount(), 4u);
+  EXPECT_EQ(info.vertDomain.totalCount(), 2u);
   EXPECT_EQ(info.fragDomain.totalCount(), 12u);
 
   std::set<uint32_t> vertexIndices;
@@ -524,11 +524,11 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientCompiledSpace) {
       fragmentIndices.insert(fi);
     }
   }
-  EXPECT_EQ(compiledCount, 24u);
-  EXPECT_EQ(vertexIndices.size(), 4u);
+  EXPECT_EQ(compiledCount, 12u);
+  EXPECT_EQ(vertexIndices.size(), 2u);
   EXPECT_EQ(fragmentIndices.size(), 12u);
-  EXPECT_TRUE(IsBuildablePermutation(info, 3, 11));
-  EXPECT_FALSE(IsBuildablePermutation(info, 3, 12));
+  EXPECT_TRUE(IsBuildablePermutation(info, 1, 11));
+  EXPECT_FALSE(IsBuildablePermutation(info, 0, 11));
 }
 
 TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
@@ -590,9 +590,9 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
       }
     }
   }
-  EXPECT_EQ(vertexIndices.size(), 4u);
+  EXPECT_EQ(vertexIndices.size(), 2u);
   EXPECT_EQ(fragmentIndices.size(), 12u);
-  EXPECT_EQ(pairs.size(), 24u);
+  EXPECT_EQ(pairs.size(), 12u);
 
   for (int hasVertexCoverage = 0; hasVertexCoverage < 2; ++hasVertexCoverage) {
     BlockAllocator allocator;
@@ -718,7 +718,7 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
-  EXPECT_EQ(cache->vertexEntryCount(), 124u);
+  EXPECT_EQ(cache->vertexEntryCount(), 100u);
   EXPECT_EQ(cache->fragmentEntryCount(), 327u);
   std::string expectedTag = TGFX_BACKEND_NAME;
   auto dashPos = expectedTag.find('-');

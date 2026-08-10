@@ -70,6 +70,11 @@ void GLSLQuadPerEdgeAAGeometryProcessor::setData(UniformData* vertexUniformData,
                                                  UniformData* fragmentUniformData,
                                                  FPCoordTransformIter* transformIter) const {
   setTransformDataHelper(uvMatrix.value_or(Matrix::I()), vertexUniformData, transformIter);
+  if (vertexUniformData != nullptr && vertexUniformData->hasField("Matrix")) {
+    // Merged vertex shaders always multiply positions by the Matrix uniform. These vertices are
+    // already in device space, so identity keeps the result bit-exact.
+    vertexUniformData->setData("Matrix", Matrix::I());
+  }
   if (commonColor.has_value() && fragmentUniformData != nullptr &&
       fragmentUniformData->hasField("Color")) {
     // The fill kernels take the broadcast per-vertex color instead, so a program with no fragment

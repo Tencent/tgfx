@@ -25,11 +25,9 @@ namespace tgfx {
 class TextureGradientShader : public PrecompiledShader {
  public:
   struct VertDims {
-    enum : uint32_t { GP_TYPE, COUNT };
+    enum : uint32_t { COUNT };
     static PermutationDomain domain() {
-      return PermutationDomain({
-          PermutationInt("GP_TYPE", 2),
-      });
+      return PermutationDomain({});
     }
   };
   using VD = VertDims;

@@ -256,10 +256,8 @@ static bool TiledFillModeSupported(int mode) {
 static std::optional<PermutationMatchResult> TryMatchTiledTextureFill(
     const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
-  int gpType = 0;
   int hasCoverage = 0;
   if (gp->name() == "DefaultGeometryProcessor") {
-    gpType = 0;
     hasCoverage =
         static_cast<const DefaultGeometryProcessor*>(gp)->getAAType() == AAType::Coverage ? 1 : 0;
   } else if (gp->name() == "QuadPerEdgeAAGeometryProcessor") {
@@ -270,7 +268,6 @@ static std::optional<PermutationMatchResult> TryMatchTiledTextureFill(
     if (!quadGP->hasCommonColor() || !quadGP->hasUVMatrix() || quadGP->getHasSubset()) {
       return std::nullopt;
     }
-    gpType = 1;
     hasCoverage = quadGP->getAAType() == AAType::Coverage ? 1 : 0;
   } else {
     return std::nullopt;
@@ -304,7 +301,6 @@ static std::optional<PermutationMatchResult> TryMatchTiledTextureFill(
   using VD = TiledTextureFillShader::VD;
   auto vertDomain = VD::domain();
   std::vector<int> vertValues(VD::COUNT, 0);
-  vertValues[VD::GP_TYPE] = gpType;
   vertValues[VD::HAS_COVERAGE] = hasCoverage;
   auto vertIndex = vertDomain.encode(vertValues);
 
@@ -651,7 +647,6 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseTail(const Program
   int hasCoverage = GetGPCoverage(gp);
   using VD = PointwiseTailShader::VD;
   std::vector<int> vertValues(VD::COUNT, 0);
-  vertValues[VD::GP_TYPE] = gpType;
   vertValues[VD::HAS_COVERAGE] = hasCoverage;
   auto vertIndex = VD::domain().encode(vertValues);
 
@@ -734,7 +729,6 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
   int hasCoverage = gpType == 1 ? 1 : GetGPCoverage(gp);
   using VD = PointwiseChainShader::VD;
   std::vector<int> vertValues(VD::COUNT, 0);
-  vertValues[VD::GP_TYPE] = gpType;
   vertValues[VD::HAS_COVERAGE] = hasCoverage;
   vertValues[VD::HAS_UV_COORD] = hasUVCoord;
   vertValues[VD::HAS_COLOR] = hasColor;
@@ -791,7 +785,6 @@ static std::optional<PermutationMatchResult> TryMatchDeviceSpaceTexturedEffect(
   int hasCoverage = GetGPCoverage(gp);
   using VD = DeviceSpaceTexturedEffectShader::VD;
   std::vector<int> vertValues(VD::COUNT, 0);
-  vertValues[VD::GP_TYPE] = gpType;
   vertValues[VD::HAS_COVERAGE] = hasCoverage;
   auto vertIndex = VD::domain().encode(vertValues);
 
@@ -875,7 +868,6 @@ static std::optional<PermutationMatchResult> TryMatchGradientFill(const ProgramI
   using VD = GradientFillShader::VD;
   auto vertDomain = VD::domain();
   std::vector<int> vertValues(VD::COUNT);
-  vertValues[VD::GP_TYPE] = gpType;
   vertValues[VD::HAS_VCOVERAGE] = vCoverage;
   auto vertIndex = vertDomain.encode(vertValues);
 
@@ -938,7 +930,6 @@ static std::optional<PermutationMatchResult> TryMatchSingleIntervalGradient(
   using VD = SingleIntervalGradientShader::VD;
   auto vertDomain = VD::domain();
   std::vector<int> vertValues(VD::COUNT);
-  vertValues[VD::GP_TYPE] = gpType;
   vertValues[VD::HAS_VCOVERAGE] = vCoverage;
   auto vertIndex = vertDomain.encode(vertValues);
 
@@ -1005,7 +996,6 @@ static std::optional<PermutationMatchResult> TryMatchDualIntervalGradient(
   using VD = DualIntervalGradientShader::VD;
   auto vertDomain = VD::domain();
   std::vector<int> vertValues(VD::COUNT);
-  vertValues[VD::GP_TYPE] = gpType;
   vertValues[VD::HAS_VCOVERAGE] = vCoverage;
   auto vertIndex = vertDomain.encode(vertValues);
 
@@ -1072,7 +1062,6 @@ static std::optional<PermutationMatchResult> TryMatchTextureGradient(
   using VD = TextureGradientShader::VD;
   auto vertDomain = VD::domain();
   std::vector<int> vertValues(VD::COUNT);
-  vertValues[VD::GP_TYPE] = gpType;
   auto vertIndex = vertDomain.encode(vertValues);
 
   using FD = TextureGradientShader::FD;
@@ -1205,7 +1194,6 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseDirect(
   int hasCoverage = GetGPCoverage(gp);
   using VD = PointwiseDirectShader::VD;
   std::vector<int> vertValues(VD::COUNT, 0);
-  vertValues[VD::GP_TYPE] = gpType;
   vertValues[VD::HAS_COVERAGE] = hasCoverage;
   auto vertIndex = VD::domain().encode(vertValues);
   using FD = PointwiseDirectShader::FD;
@@ -1252,10 +1240,8 @@ static bool IsSupportedPointwiseOp(const FragmentProcessor* fp) {
 static std::optional<PermutationMatchResult> TryMatchComposedTexture(
     const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
-  int gpType = 0;
   int hasCoverage = 0;
   if (gp->name() == "DefaultGeometryProcessor") {
-    gpType = 0;
     hasCoverage =
         static_cast<const DefaultGeometryProcessor*>(gp)->getAAType() == AAType::Coverage ? 1 : 0;
   } else if (gp->name() == "QuadPerEdgeAAGeometryProcessor") {
@@ -1267,14 +1253,12 @@ static std::optional<PermutationMatchResult> TryMatchComposedTexture(
     if (!quadGP->hasCommonColor() || !quadGP->hasUVMatrix() || quadGP->getHasSubset()) {
       return std::nullopt;
     }
-    gpType = 1;
     hasCoverage = quadGP->getAAType() == AAType::Coverage ? 1 : 0;
   } else {
     return std::nullopt;
   }
   using VD = TexturedEffectShader::VD;
   std::vector<int> vertValues(VD::COUNT, 0);
-  vertValues[VD::GP_TYPE] = gpType;
   vertValues[VD::HAS_COVERAGE] = hasCoverage;
   auto vertIndex = VD::domain().encode(vertValues);
   int xpType = GetXPType(programInfo);
@@ -1393,7 +1377,6 @@ static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
   using VD = GaussianBlur1DShader::VD;
   auto vertDomain = VD::domain();
   std::vector<int> vertValues(VD::COUNT);
-  vertValues[VD::GP_TYPE] = gpType;
   auto vertIndex = vertDomain.encode(vertValues);
 
   using FD = GaussianBlur1DShader::FD;
@@ -1727,10 +1710,8 @@ static std::optional<PermutationMatchResult> TryMatchMeshFill(const ProgramInfo*
 
 static std::optional<PermutationMatchResult> TryMatchPerlin(const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
-  int gpType = 0;
   int hasCoverage = 0;
   if (gp->name() == "DefaultGeometryProcessor") {
-    gpType = 0;
     hasCoverage =
         static_cast<const DefaultGeometryProcessor*>(gp)->getAAType() == AAType::Coverage ? 1 : 0;
   } else if (gp->name() == "QuadPerEdgeAAGeometryProcessor") {
@@ -1741,7 +1722,6 @@ static std::optional<PermutationMatchResult> TryMatchPerlin(const ProgramInfo* p
     if (!quadGP->hasCommonColor() || !quadGP->hasUVMatrix() || quadGP->getHasSubset()) {
       return std::nullopt;
     }
-    gpType = 1;
     hasCoverage = quadGP->getAAType() == AAType::Coverage ? 1 : 0;
   } else {
     return std::nullopt;
@@ -1777,7 +1757,6 @@ static std::optional<PermutationMatchResult> TryMatchPerlin(const ProgramInfo* p
   }
   using VD = PerlinNoiseFillShader::VD;
   std::vector<int> vertValues(VD::COUNT, 0);
-  vertValues[VD::GP_TYPE] = gpType;
   vertValues[VD::HAS_COVERAGE] = hasCoverage;
   auto vertIndex = VD::domain().encode(vertValues);
   using D = PerlinNoiseFillShader::D;

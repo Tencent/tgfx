@@ -25,10 +25,9 @@ namespace tgfx {
 class SingleIntervalGradientShader : public PrecompiledShader {
  public:
   struct VertDims {
-    enum : uint32_t { GP_TYPE, HAS_VCOVERAGE, COUNT };
+    enum : uint32_t { HAS_VCOVERAGE, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationInt("GP_TYPE", 2),
           PermutationBool("HAS_VCOVERAGE"),
       });
     }
@@ -61,7 +60,7 @@ class SingleIntervalGradientShader : public PrecompiledShader {
 
  private:
   // HAS_VCOVERAGE is mirrored across stages: the vertex shader emits the coverage varying only when
-  // the fragment shader consumes it. GP_TYPE is a vertex-only dimension — the fragment stage is
+  // the fragment shader consumes it. The GP difference is absorbed by the Matrix uniform — the fragment stage is
   // identical for all GP types, so it is not a fragment dimension.
 };
 

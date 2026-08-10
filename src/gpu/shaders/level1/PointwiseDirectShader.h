@@ -32,9 +32,8 @@ namespace tgfx {
 /// transfer-processor kind remain compile-time axes, because each changes the pipeline interface.
 ///
 /// Vertex dimensions:
-///   GP_TYPE (int, 2 values): 0=DefaultGeometryProcessor, 1=QuadPerEdgeAAGeometryProcessor
 ///   HAS_COVERAGE (bool): per-vertex AA coverage attribute present, driven by the GP's AAType and
-///     independent of GP_TYPE so AA and non-AA draws of the same GP share one variant.
+///     so AA and non-AA draws of the same GP share one variant.
 ///
 /// Fragment dimensions:
 ///   HAS_XP (int, 3 values): 0=Empty, 1=PorterDuff DST_TEX, 2=PorterDuff FBF
@@ -42,10 +41,9 @@ namespace tgfx {
 class PointwiseDirectShader : public PrecompiledShader {
  public:
   struct VertDims {
-    enum : uint32_t { GP_TYPE, HAS_COVERAGE, COUNT };
+    enum : uint32_t { HAS_COVERAGE, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationInt("GP_TYPE", 2),
           PermutationBool("HAS_COVERAGE"),
       });
     }

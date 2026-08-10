@@ -30,7 +30,6 @@ namespace tgfx {
 /// multiplied the whole fragment domain by 10).
 ///
 /// Vertex dimensions:
-///   GP_TYPE (int, 2 values): 0=DefaultGeometryProcessor, 1=QuadPerEdgeAAGeometryProcessor
 ///
 /// Fragment dimensions:
 ///   (MAX_SIGMA removed — sigma is now a uniform, not a variant dimension)
@@ -39,11 +38,9 @@ namespace tgfx {
 class GaussianBlur1DShader : public PrecompiledShader {
  public:
   struct VertDims {
-    enum : uint32_t { GP_TYPE, COUNT };
+    enum : uint32_t { COUNT };
     static PermutationDomain domain() {
-      return PermutationDomain({
-          PermutationInt("GP_TYPE", 2),
-      });
+      return PermutationDomain({});
     }
   };
   using VD = VertDims;

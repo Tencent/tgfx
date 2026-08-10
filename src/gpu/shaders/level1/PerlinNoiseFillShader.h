@@ -46,10 +46,9 @@ class PerlinNoiseFillShader : public PrecompiledShader {
   using D = FragDims;
 
   struct VertDims {
-    enum : uint32_t { GP_TYPE, HAS_COVERAGE, COUNT };
+    enum : uint32_t { HAS_COVERAGE, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationInt("GP_TYPE", 2),
           PermutationBool("HAS_COVERAGE"),
       });
     }

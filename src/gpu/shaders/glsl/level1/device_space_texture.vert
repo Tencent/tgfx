@@ -1,20 +1,15 @@
 // Device-space texture vertex shader
-// Permutation dimensions (vert): GP_TYPE, HAS_COVERAGE. DeviceSpaceTextureShader compiles the
-// default GP_TYPE=0/HAS_COVERAGE=0 variant; DeviceSpaceTexturedEffectShader uses the full domain.
+// Permutation dimensions (vert): HAS_COVERAGE. The position always goes through the Matrix
+// uniform (identity for pre-transformed quads), so one variant serves both geometry processors.
 #version 450
 
-#ifndef GP_TYPE
-#define GP_TYPE 0
-#endif
 #ifndef HAS_COVERAGE
 #define HAS_COVERAGE 0
 #endif
 
 layout(std140, set = 0, binding = 0) uniform VertexUniformBlock {
   vec4 tgfx_RTAdjust;
-#if GP_TYPE == 0
   mat3 Matrix;
-#endif
 };
 
 layout(location = 0) in vec2 aPosition;
@@ -24,11 +19,7 @@ layout(location = 0) out float vCoverage;
 #endif
 
 void main() {
-#if GP_TYPE == 0
   highp vec2 position = (Matrix * vec3(aPosition, 1.0)).xy;
-#else
-  highp vec2 position = aPosition;
-#endif
 #if HAS_COVERAGE
   vCoverage = inCoverage;
 #endif
