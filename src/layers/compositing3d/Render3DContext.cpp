@@ -214,7 +214,7 @@ std::shared_ptr<Image> Render3DContext::rasterLayer(
     return nullptr;
   }
   auto surface = Surface::Make(leafArgs.context, info.rasterWidth, info.rasterHeight, false, 1,
-                               false, 0, _colorSpace);
+                               true, 0, _colorSpace);
   if (surface == nullptr) {
     return nullptr;
   }

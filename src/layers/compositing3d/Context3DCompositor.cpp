@@ -195,7 +195,9 @@ void Context3DCompositor::drawQuads(const DrawPolygon3D* polygon,
       QuadsVertexProvider::MakeFrom(allocator, std::move(quadRecords), aaType, _colorSpace);
   auto drawOp = Quads3DDrawOp::Make(context, std::move(vertexProvider), 0);
 
-  const SamplingArgs samplingArgs = {TileMode::Clamp, TileMode::Clamp, {}, SrcRectConstraint::Fast};
+  const SamplingArgs samplingArgs = {TileMode::Clamp, TileMode::Clamp,
+                                     SamplingOptions(FilterMode::Linear, MipmapMode::Linear),
+                                     SrcRectConstraint::Fast};
   auto textureImage = image->makeTextureImage(context);
   if (textureImage == nullptr) {
     return;
