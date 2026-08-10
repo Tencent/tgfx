@@ -920,6 +920,11 @@ AppliedClip OpsCompositor::applyClip(const ClipStack& clipStack) {
     if (!element.isValid()) {
       continue;
     }
+    if (element.shape().isEmpty()) {
+      // An empty clip element makes the intersection empty: nothing in the clipped area is drawn.
+      out.status = AppliedClipStatus::ClippedOut;
+      return out;
+    }
 
     // Inner and outer bounds coincide only for an axis-aligned rect whose device footprint is an
     // exact integer pixel box: any non-AA rect (snapped to the grid) or a pixel-aligned AA rect.
@@ -947,6 +952,13 @@ AppliedClip OpsCompositor::applyClip(const ClipStack& clipStack) {
   // Stage 4: Generate mask for remaining elements
   if (!elementsForMask.empty()) {
     clipFP = getClipMaskFP(elementsForMask, clipStack.uniqueID(), clipBounds, std::move(clipFP));
+    if (clipFP == nullptr) {
+      // Mask rasterization failed (e.g. an empty or degenerate clip path, or an allocation
+      // failure). The clip region cannot be covered, so nothing in it is drawn. This keeps the
+      // failure direction consistent with empty clip elements: clip regions converge to empty.
+      out.status = AppliedClipStatus::ClippedOut;
+      return out;
+    }
   }
 
   out.coverageFP = std::move(clipFP);
@@ -1007,7 +1019,7 @@ PlacementPtr<FragmentProcessor> OpsCompositor::getClipMaskFP(
   clipTexture = makeClipTexture(elements, clipBound);
   if (clipTexture == nullptr) {
     DEBUG_ASSERT(false);
-    return inputFP;
+    return nullptr;
   }
   cachedClipID = uniqueID;
   return makeMaskFP(clipTexture, clipBound, std::move(inputFP));
@@ -1043,6 +1055,12 @@ std::shared_ptr<TextureProxy> OpsCompositor::makeClipTexture(
     auto shapeProxy = proxyProvider()->createGPUShapeProxy(shape, aaType, clipBounds, renderFlags);
     auto uvMatrix = Matrix::MakeTrans(bounds.left, bounds.top);
     auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), {}, uvMatrix, aaType);
+    if (drawOp == nullptr) {
+      // Shape rasterization failed (e.g. an empty or degenerate clip path, possibly after the
+      // inverse-fill toggle for DstOut masking); return nullptr so the caller reports ClippedOut
+      // instead of queuing a null draw op.
+      return nullptr;
+    }
     if (i > 0) {
       drawOp->setBlendMode(BlendMode::DstOut);
     }

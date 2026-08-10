@@ -46,7 +46,7 @@ jobs:
       - name: Run Autotest
         run: |
           chmod +x autotest.sh
-          ./autotest.sh USE_OPENGL_SWIFTSHADER
+          ./autotest.sh USE_OPENGL_SWIFTSHADER --skip-images
         env:
           TRACY_NO_INVARIANT_CHECK: 1
 
@@ -110,7 +110,7 @@ jobs:
       - name: Run Autotest
         run: |
           chmod +x autotest.sh
-          ./autotest.sh USE_METAL
+          ./autotest.sh USE_METAL --skip-images
         env:
           TRACY_NO_INVARIANT_CHECK: 1
 
@@ -163,7 +163,7 @@ jobs:
       - name: Run Autotest
         run: |
           chmod +x autotest.sh
-          ./autotest.sh USE_VULKAN_SWIFTSHADER
+          ./autotest.sh USE_VULKAN_SWIFTSHADER --skip-images
         env:
           TRACY_NO_INVARIANT_CHECK: 1
 

@@ -2,10 +2,11 @@
 
 # Internal script for updating web baseline cache. DO NOT call directly.
 # Use the project root entry point instead:
-#   ./update_baseline.sh USE_WEBGL
-#   ./update_baseline.sh USE_WEBGPU
+#   ./update_baseline.sh USE_WEBGL [--skip-images]
+#   ./update_baseline.sh USE_WEBGPU [--skip-images]
 #
-# This script is invoked by the root update_baseline.sh with a backend argument.
+# This script is invoked by the root update_baseline.sh with a backend argument, and
+# optionally --skip-images to omit generating `_base.webp` reference images (cache-only mode).
 
 set -e
 
@@ -19,6 +20,10 @@ if [ -z "$TGFX_WEB_BASELINE_INVOKED" ]; then
 fi
 
 BACKEND=${1:-webgl}
+SKIP_IMAGES_FLAG=""
+if [ "$2" = "--skip-images" ]; then
+    SKIP_IMAGES_FLAG="-DTGFX_SKIP_GENERATE_BASELINE_IMAGES=ON"
+fi
 
 if [ "$BACKEND" != "webgl" ] && [ "$BACKEND" != "webgpu" ]; then
     echo "Error: Invalid backend '$BACKEND'. Must be 'webgl' or 'webgpu'."
@@ -85,7 +90,7 @@ if [ "$BACKEND" = "webgpu" ]; then
     CMAKE_ARGS="$CMAKE_ARGS -DTGFX_USE_WEBGPU=ON"
 fi
 
-emcmake cmake -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release $CMAKE_ARGS
+emcmake cmake -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release $CMAKE_ARGS $SKIP_IMAGES_FLAG
 cmake --build "$BUILD_DIR" -- -j 8
 npm run "copy:${BACKEND}"
 

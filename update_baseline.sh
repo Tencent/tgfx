@@ -5,27 +5,53 @@
 # Without updating the cache, affected tests will be skipped, leading to inaccurate results.
 #
 # Usage:
-#   ./update_baseline.sh USE_OPENGL                 # OpenGL (真机 GPU)
-#   ./update_baseline.sh USE_OPENGL_SWIFTSHADER     # OpenGL (SwiftShader)
-#   ./update_baseline.sh USE_VULKAN                 # Vulkan (真机 GPU)
-#   ./update_baseline.sh USE_VULKAN_SWIFTSHADER     # Vulkan (SwiftShader)
-#   ./update_baseline.sh USE_METAL                  # Metal (Apple GPU)
-#   ./update_baseline.sh USE_WEBGL                  # Web (WebGL)
-#   ./update_baseline.sh USE_WEBGPU                 # Web (WebGPU)
+#   ./update_baseline.sh [<BACKEND>] [--skip-images]
+#
+# BACKEND (order-insensitive with --skip-images):
+#   USE_OPENGL                 OpenGL (real GPU)
+#   USE_OPENGL_SWIFTSHADER     OpenGL (SwiftShader)
+#   USE_VULKAN                 Vulkan (real GPU)
+#   USE_VULKAN_SWIFTSHADER     Vulkan (SwiftShader)
+#   USE_METAL                  Metal (Apple GPU)
+#   USE_WEBGL                  Web (WebGL)
+#   USE_WEBGPU                 Web (WebGPU)
+#
+# Options:
+#   --skip-images   Skip writing baseline `_base.webp` images. The cache
+#                   (md5.json + version.json) is still refreshed, which is
+#                   all the CI pipelines need. Local runs omit this to also
+#                   produce baseline-out/ images for visual inspection.
 
 {
-  # Web backends are handled by a separate script with Emscripten toolchain.
-  case "$1" in
+  # Parse arguments: separate the backend keyword from the --skip-images flag so callers may
+  # pass them in any order (e.g. `./update_baseline.sh --skip-images USE_METAL`).
+  BACKEND_ARG=""
+  SKIP_IMAGES=0
+  for arg in "$@"; do
+    case "$arg" in
+      --skip-images) SKIP_IMAGES=1 ;;
+      *) BACKEND_ARG="$arg" ;;
+    esac
+  done
+
+  # Web backends are handled by a separate script with Emscripten toolchain. Forward the
+  # --skip-images flag so `./update_baseline.sh USE_WEBGL --skip-images` really does skip
+  # emitting `_base.webp` images on the web side (aligned with native backends).
+  WEB_SKIP_FLAG=""
+  if [ "$SKIP_IMAGES" = "1" ]; then
+    WEB_SKIP_FLAG="--skip-images"
+  fi
+  case "$BACKEND_ARG" in
     USE_WEBGL)
-      TGFX_WEB_BASELINE_INVOKED=1 exec bash web/test/update_web_baseline.sh webgl
+      TGFX_WEB_BASELINE_INVOKED=1 exec bash web/test/update_web_baseline.sh webgl $WEB_SKIP_FLAG
       ;;
     USE_WEBGPU)
-      TGFX_WEB_BASELINE_INVOKED=1 exec bash web/test/update_web_baseline.sh webgpu
+      TGFX_WEB_BASELINE_INVOKED=1 exec bash web/test/update_web_baseline.sh webgpu $WEB_SKIP_FLAG
       ;;
   esac
 
   # Determine cmake args and backend name
-  case "$1" in
+  case "$BACKEND_ARG" in
     USE_OPENGL_SWIFTSHADER)
       CMAKE_BACKEND_ARGS="-DTGFX_USE_SWIFTSHADER=ON"
       BACKEND_NAME="opengl-swiftshader" ;;
@@ -76,7 +102,7 @@
   cd ${BUILD_DIR}
 
   # Determine target suffix
-  case "$1" in
+  case "$BACKEND_ARG" in
     USE_VULKAN_SWIFTSHADER|USE_VULKAN)
       TARGET_SUFFIX="Vulkan" ;;
     USE_METAL)
@@ -85,14 +111,21 @@
       TARGET_SUFFIX="OpenGL" ;;
   esac
 
-  cmake $CMAKE_BACKEND_ARGS -DTGFX_SKIP_GENERATE_BASELINE_IMAGES=ON \
+  # Default to generating baseline images so local users get baseline-out/ for inspection.
+  # CI pipelines pass --skip-images because they only need the cache (md5.json + version.json).
+  SKIP_IMAGES_FLAG=""
+  if [ "$SKIP_IMAGES" = "1" ]; then
+    SKIP_IMAGES_FLAG="-DTGFX_SKIP_GENERATE_BASELINE_IMAGES=ON"
+  fi
+
+  cmake $CMAKE_BACKEND_ARGS $SKIP_IMAGES_FLAG \
         -DTGFX_BUILD_TESTS=ON -DTGFX_SKIP_BASELINE_CHECK=ON \
         -DCMAKE_BUILD_TYPE=Debug ../
 
   cmake --build . --target UpdateBaseline_${TARGET_SUFFIX} -- -j 12
 
   # Set up SwiftShader Vulkan library so volk can load it at runtime.
-  if [[ "$1" == "USE_VULKAN_SWIFTSHADER" ]]; then
+  if [[ "$BACKEND_ARG" == "USE_VULKAN_SWIFTSHADER" ]]; then
     HOST_ARCH=$(uname -m)
     if [[ "$HOST_ARCH" == "x86_64" ]]; then
       HOST_ARCH=x64
