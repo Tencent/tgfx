@@ -745,6 +745,14 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
   return ValidateLinearPlan(graph, plan);
 }
 
+PlacementPtr<FragmentProcessor> AOTPlanExecutor::BuildChainProcessor(
+    BlockAllocator* allocator, const AOTEffectGraph& graph, const AOTPassDescriptor& pass) {
+  if (pass.kernel != AOTKernelKind::PointwiseChain) {
+    return nullptr;
+  }
+  return BuildChainFP(allocator, graph, pass);
+}
+
 PlacementPtr<RenderTask> AOTPlanExecutor::Make(Context* context, uint32_t renderFlags,
                                                const AOTEffectGraph& graph,
                                                const AOTEffectPlan& plan, const Rect& deviceBounds,

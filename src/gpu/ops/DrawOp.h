@@ -136,6 +136,9 @@ class DrawOp {
   virtual void onDraw(RenderPass* renderPass) = 0;
 
  private:
+  std::shared_ptr<Program> prepareDecomposedProgram(RenderTarget* renderTarget,
+                                                    const ColorProcessorList& activeColors);
+
   PlacementPtr<GeometryProcessor> geometryProcessor = nullptr;
   bool geometryProcessorInitialized = false;
   std::optional<ColorProcessorList> preparedColors = std::nullopt;

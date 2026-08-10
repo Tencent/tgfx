@@ -33,6 +33,17 @@ class AOTPlanExecutor {
   static bool CanExecute(const AOTEffectGraph& graph, const AOTEffectPlan& plan);
 
   /**
+   * Flattens a single-pass PointwiseChain plan into the fused chain processor, or returns nullptr
+   * if the pass shape exceeds what the chain kernel can represent. The returned processor carries
+   * the whole DAG in uniforms, so a draw whose color processors are replaced by it evaluates the
+   * same pixels through the precompiled PointwiseChainShader. Used both by the offscreen executor
+   * and by the direct-draw decomposition route in DrawOp::prepare.
+   */
+  static PlacementPtr<FragmentProcessor> BuildChainProcessor(BlockAllocator* allocator,
+                                                             const AOTEffectGraph& graph,
+                                                             const AOTPassDescriptor& pass);
+
+  /**
    * Builds an atomic render task for a supported linear AOT plan without enqueueing it. On failure,
    * originalDraw remains unchanged. On success, ownership of originalDraw moves into the task.
    *
@@ -49,6 +60,7 @@ class AOTPlanExecutor {
                                        const AOTEffectGraph& graph, const AOTEffectPlan& plan,
                                        const Rect& deviceBounds,
                                        std::shared_ptr<RenderTargetProxy> destination,
-                                       PlacementPtr<DrawOp>* originalDraw, const Point& fpCoordOffset);
+                                       PlacementPtr<DrawOp>* originalDraw,
+                                       const Point& fpCoordOffset);
 };
 }  // namespace tgfx

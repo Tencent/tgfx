@@ -18,6 +18,9 @@
 
 #include "DrawOp.h"
 #include <algorithm>
+#include "gpu/AOTEffectDecomposer.h"
+#include "gpu/AOTPlanExecutor.h"
+#include "gpu/PermutationMatcher.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/Program.h"
 
@@ -50,13 +53,69 @@ bool DrawOp::prepare(RenderTarget* renderTarget, ProgramLookupMode mode,
       renderTarget, geometryProcessor.get(), std::move(fragmentProcessors), activeColors.size(),
       xferProcessor.get(), blendMode);
   preparedProgramInfo->setCullMode(cullMode);
-  preparedProgram = preparedProgramInfo->getProgram(mode);
+  preparedProgram = prepareDecomposedProgram(renderTarget, activeColors);
+  if (preparedProgram == nullptr) {
+    preparedProgram = preparedProgramInfo->getProgram(mode);
+  }
   if (preparedProgram == nullptr) {
     LOGE("DrawOp::prepare() Failed to get the program!");
     return false;
   }
   preparedRenderTarget = renderTarget;
   return true;
+}
+
+// When the plain matcher cannot serve the color chain, the chain may still reduce onto the fused
+// pointwise-chain kernel. Rewriting the processors before program lookup keeps the cached program
+// and the per-draw uniform upload driven by the same ProgramInfo, which a post-hoc program swap
+// cannot guarantee. The matcher probe runs first so draws the plain route already serves keep
+// their original funnel accounting; coverage-bearing draws are excluded because folding coverage
+// into the color chain is only valid for a subset of blends and stays on its own route.
+std::shared_ptr<Program> DrawOp::prepareDecomposedProgram(RenderTarget* renderTarget,
+                                                          const ColorProcessorList& activeColors) {
+  if (!coverages.empty() || !renderTarget->getContext()->precompiledShaderCache()->isLoaded() ||
+      MatchPermutation(preparedProgramInfo.get()).has_value()) {
+    return nullptr;
+  }
+  std::vector<const FragmentProcessor*> colorProcessors = {};
+  colorProcessors.reserve(activeColors.size());
+  for (auto& color : activeColors) {
+    colorProcessors.push_back(color.get());
+  }
+  AOTEffectGraph graph = {};
+  AOTEffectPlan plan = {};
+  if (!AOTEffectDecomposer::Lower(colorProcessors, &graph) ||
+      !AOTEffectDecomposer::ValidateForFusion(graph) ||
+      !AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan) ||
+      plan.passes.size() != 1 || plan.passes[0].kernel != AOTKernelKind::PointwiseChain ||
+      !AOTPlanExecutor::CanExecute(graph, plan)) {
+    return nullptr;
+  }
+  auto chainFP = AOTPlanExecutor::BuildChainProcessor(allocator, graph, plan.passes[0]);
+  if (chainFP == nullptr) {
+    return nullptr;
+  }
+  std::vector<FragmentProcessor*> rewrittenProcessors = {chainFP.get()};
+  auto rewrittenInfo = std::make_unique<ProgramInfo>(renderTarget, geometryProcessor.get(),
+                                                     std::move(rewrittenProcessors), 1,
+                                                     xferProcessor.get(), blendMode);
+  rewrittenInfo->setCullMode(cullMode);
+  // Probe before the strict lookup: a chain the matcher rejects (unsupported GP, perspective leaf
+  // transforms) must fall back without recording a diagnostic miss against the rewritten tree,
+  // which would double-count the draw alongside the original tree's own miss record.
+  if (!MatchPermutation(rewrittenInfo.get()).has_value()) {
+    return nullptr;
+  }
+  // Strict lookup: a rewritten draw must resolve to the precompiled chain kernel. Anything else
+  // (cache not loaded, missing artifact) falls back to the original processors.
+  auto rewrittenProgram = rewrittenInfo->getProgram(ProgramLookupMode::PrecompiledOnly);
+  if (rewrittenProgram == nullptr) {
+    return nullptr;
+  }
+  preparedColors = ColorProcessorList{};
+  preparedColors->emplace_back(std::move(chainFP));
+  preparedProgramInfo = std::move(rewrittenInfo);
+  return rewrittenProgram;
 }
 
 void DrawOp::executePrepared(RenderPass* renderPass, bool recordDrawStats) {
