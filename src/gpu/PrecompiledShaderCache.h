@@ -269,6 +269,17 @@ class PrecompiledShaderCache {
     return diagnosticsEnabled.load(std::memory_order_relaxed);
   }
 
+  /// Pauses or resumes all statistics recording. While paused every record* method is a no-op, so
+  /// intentional JIT renders (e.g. cross-validation reference passes with the bundle unloaded) do
+  /// not pollute the AOT hit-rate accounting with draws that are not production lookups.
+  void setStatsRecordingPaused(bool paused) {
+    statsPaused.store(paused, std::memory_order_relaxed);
+  }
+
+  bool statsRecordingPaused() const {
+    return statsPaused.load(std::memory_order_relaxed);
+  }
+
   /// Enables or disables the bounded-AOT decomposition route. Off by default: the decomposition
   /// executor is served only when explicitly enabled (e.g. during cross-validation), so unverified
   /// kernels never reach production and every draw falls back to the plain matcher/builder path.
@@ -345,6 +356,7 @@ class PrecompiledShaderCache {
   std::array<std::atomic<uint32_t>, static_cast<size_t>(PrecompiledFallbackReason::Count)>
       fallbackCounts = {};
   std::atomic<bool> diagnosticsEnabled{false};
+  std::atomic<bool> statsPaused{false};
   std::atomic<bool> _decompositionEnabled{true};
   mutable std::mutex diagnosticsMutex = {};
   std::vector<PrecompiledHitRecord> _hitRecords = {};

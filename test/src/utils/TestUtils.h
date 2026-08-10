@@ -67,4 +67,20 @@ void RemoveFile(const std::string& key);
 std::shared_ptr<Image> ScaleImage(const std::shared_ptr<Image>& image, float scale,
                                   const SamplingOptions& options = {});
 
+class PrecompiledShaderCache;
+
+/**
+ * Pauses AOT statistics recording on the given cache for the scope's lifetime when active is
+ * true. Wrap intentional JIT reference renders (bundle unloaded) with this so they do not enter
+ * the AOT hit-rate accounting; the pause always unwinds even if an assertion aborts the helper.
+ */
+class ScopedAOTStatsPause {
+ public:
+  ScopedAOTStatsPause(PrecompiledShaderCache* cache, bool active);
+  ~ScopedAOTStatsPause();
+
+ private:
+  PrecompiledShaderCache* cache = nullptr;
+};
+
 }  // namespace tgfx

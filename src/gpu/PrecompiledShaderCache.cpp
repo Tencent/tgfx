@@ -75,18 +75,27 @@ const char* PrecompiledAOTStageName(PrecompiledAOTStage stage) {
 }
 
 void PrecompiledShaderCache::recordArtifactHit() {
+  if (statsRecordingPaused()) {
+    return;
+  }
   _hitCount.fetch_add(1, std::memory_order_relaxed);
   recordAOTStage(PrecompiledAOTStage::ArtifactsFound);
 }
 
 void PrecompiledShaderCache::recordArtifactMiss(PrecompiledFallbackReason reason,
                                                 const PrecompiledFallbackRecord& record) {
+  if (statsRecordingPaused()) {
+    return;
+  }
   _missCount.fetch_add(1, std::memory_order_relaxed);
   recordFailure(reason, record);
 }
 
 void PrecompiledShaderCache::recordFailure(PrecompiledFallbackReason reason,
                                            const PrecompiledFallbackRecord& record) {
+  if (statsRecordingPaused()) {
+    return;
+  }
   auto index = static_cast<size_t>(reason);
   if (index < fallbackCounts.size()) {
     fallbackCounts[index].fetch_add(1, std::memory_order_relaxed);
@@ -102,6 +111,9 @@ void PrecompiledShaderCache::recordFailure(PrecompiledFallbackReason reason,
 
 void PrecompiledShaderCache::recordAOTStage(PrecompiledAOTStage stage,
                                             const PrecompiledHitRecord& record) {
+  if (statsRecordingPaused()) {
+    return;
+  }
   auto index = static_cast<size_t>(stage);
   if (index >= aotStageCounts.size()) {
     return;
@@ -125,7 +137,7 @@ std::vector<PrecompiledFallbackRecord> PrecompiledShaderCache::fallbackRecords()
 }
 
 void PrecompiledShaderCache::recordJITProgram(const JITProgramRecord& record) {
-  if (!diagnosticRecordingEnabled()) {
+  if (statsRecordingPaused() || !diagnosticRecordingEnabled()) {
     return;
   }
   std::lock_guard<std::mutex> autoLock(diagnosticsMutex);
@@ -158,6 +170,9 @@ const char* OffscreenFillSourceName(OffscreenFillSource source) {
 }
 
 void PrecompiledShaderCache::recordDraw(const AOTDrawStats& delta, bool complete) {
+  if (statsRecordingPaused()) {
+    return;
+  }
   std::lock_guard<std::mutex> autoLock(drawStatsMutex);
   _drawStats.draws++;
   if (complete) {
@@ -174,6 +189,9 @@ void PrecompiledShaderCache::recordDraw(const AOTDrawStats& delta, bool complete
 }
 
 void PrecompiledShaderCache::recordMaterializedEdge(uint64_t bytes) {
+  if (statsRecordingPaused()) {
+    return;
+  }
   std::lock_guard<std::mutex> autoLock(drawStatsMutex);
   _drawStats.materializedEdges++;
   _drawStats.offscreenTargets++;
@@ -211,7 +229,7 @@ OffscreenFillKey PrecompiledShaderCache::recordOffscreenFillAnalysis(
     OffscreenFillSource source, bool coordOffsetNonZero, const std::string& topLevelProcessor,
     bool lowerSucceeded, const std::string& lowerBlocker, bool validateSucceeded,
     bool decomposeSucceeded, bool canExecute, const std::vector<AOTKernelKind>& kernels) {
-  if (!diagnosticRecordingEnabled()) {
+  if (statsRecordingPaused() || !diagnosticRecordingEnabled()) {
     return InvalidOffscreenFillKey;
   }
   std::string kernelSignature = "None";
@@ -270,7 +288,7 @@ OffscreenFillKey PrecompiledShaderCache::recordOffscreenFillAnalysis(
 
 void PrecompiledShaderCache::recordOffscreenFillProgram(OffscreenFillKey key,
                                                         ProgramOrigin origin) {
-  if (!diagnosticRecordingEnabled() || key == InvalidOffscreenFillKey) {
+  if (statsRecordingPaused() || !diagnosticRecordingEnabled() || key == InvalidOffscreenFillKey) {
     return;
   }
   std::lock_guard<std::mutex> autoLock(offscreenFillStatsMutex);

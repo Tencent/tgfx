@@ -21,10 +21,24 @@
 #include <fstream>
 #include "ProjectPath.h"
 #include "core/utils/Log.h"
+#include "gpu/PrecompiledShaderCache.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Stream.h"
 
 namespace tgfx {
+ScopedAOTStatsPause::ScopedAOTStatsPause(PrecompiledShaderCache* cache, bool active) {
+  if (active && cache != nullptr && !cache->statsRecordingPaused()) {
+    this->cache = cache;
+    cache->setStatsRecordingPaused(true);
+  }
+}
+
+ScopedAOTStatsPause::~ScopedAOTStatsPause() {
+  if (cache != nullptr) {
+    cache->setStatsRecordingPaused(false);
+  }
+}
+
 #ifdef GENERATE_BASELINE_IMAGES
 static const std::string OUT_ROOT = ProjectPath::Absolute("test/baseline-out/");
 #else
