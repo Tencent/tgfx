@@ -221,7 +221,7 @@ jobs:
           arch: x64
 
       - name: Update Baseline
-        run: .\update_baseline.bat USE_D3D12_WARP
+        run: .\update_baseline.bat USE_D3D12_WARP --skip-images
         shell: cmd
         env:
           CC: cl.exe
