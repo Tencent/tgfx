@@ -29,6 +29,13 @@
 
 namespace tgfx {
 
+static void ApplyWindowColorSpace(NSView* view, const std::shared_ptr<ColorSpace>& colorSpace) {
+  if (view.window != nil && colorSpace != nullptr &&
+      ColorSpace::Equals(colorSpace.get(), ColorSpace::DisplayP3().get())) {
+    view.window.colorSpace = [NSColorSpace displayP3ColorSpace];
+  }
+}
+
 std::shared_ptr<CGLWindow> CGLWindow::MakeFrom(NSView* view, CGLContextObj sharedContext,
                                                std::shared_ptr<ColorSpace> colorSpace) {
   if (view == nil) {
@@ -38,13 +45,11 @@ std::shared_ptr<CGLWindow> CGLWindow::MakeFrom(NSView* view, CGLContextObj share
   if (device == nullptr) {
     return nullptr;
   }
-  if (colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get())) {
-    if (ColorSpace::Equals(colorSpace.get(), ColorSpace::DisplayP3().get())) {
-      view.window.colorSpace = [NSColorSpace displayP3ColorSpace];
-    } else {
-      LOGE("CGLWindow::MakeFrom() The specified ColorSpace is not supported on this platform. "
-           "Rendering may have color inaccuracies.");
-    }
+  ApplyWindowColorSpace(view, colorSpace);
+  if (colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get()) &&
+      !ColorSpace::Equals(colorSpace.get(), ColorSpace::DisplayP3().get())) {
+    LOGE("CGLWindow::MakeFrom() The specified ColorSpace is not supported on this platform. "
+         "Rendering may have color inaccuracies.");
   }
   return std::shared_ptr<CGLWindow>(new CGLWindow(device, view, std::move(colorSpace)));
 }
@@ -72,10 +77,7 @@ std::shared_ptr<RenderTargetProxy> CGLWindow::onCreateRenderTarget(Context* cont
   // native gamut differs from the configured one. Reassert the color space before [glContext
   // update] reallocates the back buffer, otherwise the new buffer inherits the reset (native) color
   // space and pixels get tagged incorrectly.
-  if (_colorSpace != nullptr &&
-      ColorSpace::Equals(_colorSpace.get(), ColorSpace::DisplayP3().get()) && view.window != nil) {
-    view.window.colorSpace = [NSColorSpace displayP3ColorSpace];
-  }
+  ApplyWindowColorSpace(view, _colorSpace);
   [glContext update];
   CGSize size = [view convertSizeToBacking:view.bounds.size];
   if (size.width <= 0 || size.height <= 0) {
