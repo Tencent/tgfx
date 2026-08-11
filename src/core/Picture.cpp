@@ -143,6 +143,11 @@ std::shared_ptr<Image> Picture::asImage(Point* offset, const Matrix* matrix,
 
   std::shared_ptr<Image> image = nullptr;
   SamplingOptions sampling = {};
+  // DrawImageRect's makeSubset(rect) moves the image anchor by rect.left/top; offsetX/offsetY
+  // below must absorb the same shift so the subset is measured from the real image anchor
+  // (recordMatrix position + rect offset) instead of the recordMatrix position only.
+  float subsetOffsetX = 0.0f;
+  float subsetOffsetY = 0.0f;
 
   // Check for direct DrawImage or DrawImageRect
   if (record->type() == PictureRecordType::DrawImage ||
@@ -156,8 +161,11 @@ std::shared_ptr<Image> Picture::asImage(Point* offset, const Matrix* matrix,
       }
     }
     if (record->type() == PictureRecordType::DrawImageRect) {
-      image = image->makeSubset(static_cast<const DrawImageRect*>(record)->rect);
+      auto rect = static_cast<const DrawImageRect*>(record)->rect;
+      image = image->makeSubset(rect);
       DEBUG_ASSERT(image != nullptr);
+      subsetOffsetX = rect.left;
+      subsetOffsetY = rect.top;
     }
   }
   // Check for DrawRect with ImageShader (rect + ImageShader pattern)
@@ -209,8 +217,8 @@ std::shared_ptr<Image> Picture::asImage(Point* offset, const Matrix* matrix,
   } else if (!clipRect.isEmpty()) {
     subset = clipRect;
   }
-  auto offsetX = imageMatrix.getTranslateX();
-  auto offsetY = imageMatrix.getTranslateY();
+  auto offsetX = imageMatrix.getTranslateX() + subsetOffsetX;
+  auto offsetY = imageMatrix.getTranslateY() + subsetOffsetY;
   if (!subset.isEmpty()) {
     subset.offset(-offsetX, -offsetY);
     auto roundSubset = subset;
