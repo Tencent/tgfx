@@ -1,6 +1,8 @@
-// Defines one chain slot's eval function. Include once per slot, with pointwise_chain_bind.inc
-// redirecting the uniform and function names to that slot beforehand. Each eval reads its inputs
-// from the chainResults array (or the Color uniform for index -1) and returns the slot's output.
+// Shared chain-slot evaluation, included exactly once. Slot uniform fields are std140 arrays read
+// by runtime index (constant-memory reads), so the op bodies exist in the binary exactly once:
+// the op-slot loop in main() cannot be unrolled because SlotCount is runtime data. Leaf slots
+// (indices < NTEX) go through evalChainSlotWithTex with statically bound samplers; op slots share
+// evalChainSlotNoTex and are never OP_TEXTURE by construction.
 //
 // Op values mirror AOTChainOp and are part of the precompiled kernel ABI. The ColorSpaceXform
 // parameters are shared chain-wide (ChainCSFlags & friends): the matcher guarantees at most one
@@ -70,29 +72,16 @@ float chainDstTF(float x) {
   return s * x;
 }
 
-vec4 evalChainSlot() {
-  // Op dispatch order follows observed frequency: idle slots exit on the first check, the hot
-  // texture/const/blend ops next, the pointwise math ops before the rarer coverage op.
+// Evaluates every non-texture op of slot `slot`, reading its fields from the uniform arrays.
+vec4 evalChainSlotNoTex(int slot) {
+  ivec4 Packed = SlotPacked[slot];
   if (Packed.x == OP_NONE) {
     return vec4(0.0);
-  }
-  if (Packed.x == OP_TEXTURE) {
-    vec4 texColor = chainTexFetch;
-    if ((Packed.w & 2) != 0) {
-      // Alpha-only leaf (R8 on Metal returns (r,0,0,1)): splat .r into every channel so the alpha
-      // channel carries the mask value, matching the runtime TextureEffect alpha-only readback.
-      texColor = vec4(texColor.r);
-    }
-    if ((Packed.w & 1) != 0) {
-      // Color-source leaves are modulated by the geometry color's alpha, matching the runtime
-      // paint-alpha wrap. Mask and blend-operand leaves sample raw, as the runtime emits them.
-      texColor *= TGFX_CHAIN_GEOM_COLOR.a;
-    }
-    return texColor;
   }
   vec4 in0 = Packed.y == -1 ? TGFX_CHAIN_GEOM_COLOR
                             : (Packed.y < 0 ? vec4(0.0) : chainResults[Packed.y]);
   if (Packed.x == OP_CONST_COLOR) {
+    vec4 ConstColor = SlotConstColor[slot];
     if (Packed.w == 1) {
       return ConstColor * in0;
     }
@@ -107,22 +96,21 @@ vec4 evalChainSlot() {
     return xpBlendColors(in0, in1, Packed.w);
   }
   vec4 color = in0;
-  vec4 result;
   if (Packed.x == OP_COLOR_MATRIX) {
     // Unpremultiply, apply matrix + vector, clamp, re-premultiply.
     color = vec4(color.rgb / max(color.a, 9.9999997473787516e-05), color.a);
-    color = clamp(ColorMatrix * color + ColorVector, 0.0, 1.0);
+    color = clamp(SlotColorMatrix[slot] * color + SlotColorVector[slot], 0.0, 1.0);
     color.rgb *= color.a;
     return color;
   }
   if (Packed.x == OP_LUMA) {
-    return vec4(dot(color.rgb, LumaThresh.rgb));
+    return vec4(dot(color.rgb, SlotLumaThresh[slot].rgb));
   }
   if (Packed.x == OP_ALPHA_THRESHOLD) {
-    result = vec4(0.0);
+    vec4 result = vec4(0.0);
     if (color.a > 0.0) {
       result.rgb = color.rgb / color.a;
-      result.a = step(LumaThresh.a, color.a);
+      result.a = step(SlotLumaThresh[slot].a, color.a);
       result = clamp(result, 0.0, 1.0);
     }
     return result;
@@ -165,4 +153,26 @@ vec4 evalChainSlot() {
     color.rgb *= color.a;
   }
   return color;
+}
+
+// Texture-leaf variant: the sampler stays statically bound per slot (dynamic sampler indexing is
+// not portable), while every other field comes from the uniform arrays by slot index.
+vec4 evalChainSlotWithTex(int slot, sampler2D leafSampler, vec2 leafCoords, vec4 leafSubset,
+                          int leafIndex) {
+  ivec4 Packed = SlotPacked[slot];
+  if (Packed.x == OP_TEXTURE) {
+    vec4 texColor = chainLeafFetch(leafSampler, leafCoords, leafSubset, leafIndex);
+    if ((Packed.w & 2) != 0) {
+      // Alpha-only leaf (R8 on Metal returns (r,0,0,1)): splat .r into all channels so the alpha
+      // channel carries the mask value, matching the runtime TextureEffect alpha-only readback.
+      texColor = vec4(texColor.r);
+    }
+    if ((Packed.w & 1) != 0) {
+      // Color-source leaves are modulated by the geometry color's alpha, matching the runtime
+      // paint-alpha wrap. Mask and blend-operand leaves sample raw, as the runtime emits them.
+      texColor *= TGFX_CHAIN_GEOM_COLOR.a;
+    }
+    return texColor;
+  }
+  return evalChainSlotNoTex(slot);
 }

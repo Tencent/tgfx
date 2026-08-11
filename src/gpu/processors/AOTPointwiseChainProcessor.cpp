@@ -22,7 +22,6 @@
 namespace tgfx {
 namespace {
 static void UploadChainSlot(UniformData* uniformData, size_t index, const AOTChainSlot& slot) {
-  auto prefix = "Slot" + std::to_string(index);
   int selector = slot.op == AOTChainOp::Blend ? slot.blend.blendMode : 0;
   if (slot.op == AOTChainOp::ConstColor) {
     selector = slot.constColor.inputMode;
@@ -32,7 +31,7 @@ static void UploadChainSlot(UniformData* uniformData, size_t index, const AOTCha
     selector = slot.textureModulate | (slot.textureAlphaOnly << 1);
   }
   int packed[] = {static_cast<int>(slot.op), slot.in0, slot.in1, selector};
-  uniformData->setDataOptional(prefix + "Packed", packed);
+  uniformData->setArrayElementOptional("SlotPacked", index, packed);
   switch (slot.op) {
     case AOTChainOp::ColorMatrix: {
       const auto& matrix = slot.colorMatrix.matrix;
@@ -42,24 +41,24 @@ static void UploadChainSlot(UniformData* uniformData, size_t index, const AOTCha
           matrix[3],  matrix[8],  matrix[13], matrix[18],
       };
       float vectorData[] = {matrix[4], matrix[9], matrix[14], matrix[19]};
-      uniformData->setDataOptional(prefix + "ColorMatrix", matrixData);
-      uniformData->setDataOptional(prefix + "ColorVector", vectorData);
+      uniformData->setArrayElementOptional("SlotColorMatrix", index, matrixData);
+      uniformData->setArrayElementOptional("SlotColorVector", index, vectorData);
       break;
     }
     case AOTChainOp::Luma: {
       float lumaThresh[] = {slot.luma.kr, slot.luma.kg, slot.luma.kb, 0.0f};
-      uniformData->setDataOptional(prefix + "LumaThresh", lumaThresh);
+      uniformData->setArrayElementOptional("SlotLumaThresh", index, lumaThresh);
       break;
     }
     case AOTChainOp::AlphaThreshold: {
       float lumaThresh[] = {0.0f, 0.0f, 0.0f, slot.alphaThreshold.threshold};
-      uniformData->setDataOptional(prefix + "LumaThresh", lumaThresh);
+      uniformData->setArrayElementOptional("SlotLumaThresh", index, lumaThresh);
       break;
     }
     case AOTChainOp::ConstColor: {
       const auto& color = slot.constColor.color;
       float colorData[] = {color[0], color[1], color[2], color[3]};
-      uniformData->setDataOptional(prefix + "ConstColor", colorData);
+      uniformData->setArrayElementOptional("SlotConstColor", index, colorData);
       break;
     }
     case AOTChainOp::AARectCoverage: {
