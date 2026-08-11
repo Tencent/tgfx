@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "D3D12CommandEncoder.h"
+#include <algorithm>
 #include "D3D12BarrierBatch.h"
 #include "D3D12Buffer.h"
 #include "D3D12CommandBuffer.h"
@@ -459,12 +460,20 @@ void D3D12CommandEncoder::recordTextureStateChange(D3D12Texture* texture,
   texture->setCurrentState(newState);
   // On the first time we touch this texture in this session, remember its keyed mutex (if any)
   // so executeSubmission can acquire/release it around ExecuteCommandLists. Only D3D12Hardware-
-  // Texture returns a non-null mutex; every other texture short-circuits with zero overhead. We
-  // use the map's insertion flag as the de-dup source of truth to avoid scanning keyedMutexes
-  // on every barrier call.
+  // Texture returns a non-null mutex; every other texture short-circuits with zero overhead.
+  // The `firstTouch` guard deduplicates by D3D12Texture*, but two distinct D3D12HardwareTexture
+  // instances can, in principle, wrap different views of the same underlying shared surface and
+  // therefore share the same IDXGIKeyedMutex. IDXGIKeyedMutex is not reentrant across
+  // AcquireSync(0, ...) calls on the same device, so a second push of an already-registered
+  // mutex would either deadlock or unbalance the Release count. Guard against that with a
+  // linear find: keyedMutexes is typically empty or has a single element, so the O(N) scan is
+  // effectively O(1) in practice.
   if (firstTouch) {
     if (auto* mutex = texture->keyedMutex()) {
-      session.keyedMutexes.push_back(mutex);
+      auto& list = session.keyedMutexes;
+      if (std::find(list.begin(), list.end(), mutex) == list.end()) {
+        list.push_back(mutex);
+      }
     }
   }
 }
