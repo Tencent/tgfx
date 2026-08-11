@@ -413,6 +413,7 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(BlockAllocator* allocator,
   int tiledLeafIndex = -1;
   AOTTiledTextureRecipe tiledRecipe = {};
   bool hasRectCoverage = false;
+  bool hasGradient = false;
   std::vector<AOTChainSlot> slots(ordered.size());
   for (size_t index = 0; index < ordered.size(); ++index) {
     auto node = graph.nodeAt(ordered[index]);
@@ -502,6 +503,22 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(BlockAllocator* allocator,
         hasRectCoverage = true;
         slot.op = AOTChainOp::AARectCoverage;
         slot.rectCoverage = *parameters;
+        slot.in0 = MapChainInput(slotOf, node->inputs[0]);
+        break;
+      }
+      case AOTEffectKind::GradientSource: {
+        auto parameters = std::get_if<AOTGradientParameters>(&node->parameters);
+        if (parameters == nullptr || node->inputs.size() != 1) {
+          return nullptr;
+        }
+        // The kernel carries one chain-wide gradient parameter block and one gradient coordinate
+        // varying, so a second gradient node cannot be represented.
+        if (hasGradient) {
+          return nullptr;
+        }
+        hasGradient = true;
+        slot.op = AOTChainOp::Gradient;
+        slot.gradient = *parameters;
         slot.in0 = MapChainInput(slotOf, node->inputs[0]);
         break;
       }

@@ -58,15 +58,19 @@ layout(std140, set = 0, binding = 0) uniform VertexUniformBlock {
 #if GP_LAYOUT == 0
   mat3 Matrix;
 #endif
-#if NTEX >= 1
+  // The chain processor always exposes one own coord transform ahead of the leaf transforms:
+  // index 0 is the gradient coordinate mapping (identity for chains without a gradient source),
+  // and texture leaf k reads CoordTransformMatrix_{k+1}.
   mat3 CoordTransformMatrix_0;
-#endif
-#if NTEX >= 2
+#if NTEX >= 1
   mat3 CoordTransformMatrix_1;
 #endif
-#if NTEX >= 4
+#if NTEX >= 2
   mat3 CoordTransformMatrix_2;
+#endif
+#if NTEX >= 4
   mat3 CoordTransformMatrix_3;
+  mat3 CoordTransformMatrix_4;
 #endif
 };
 
@@ -115,6 +119,10 @@ layout(location = CHAIN_TEX_LOC_BASE + 1) out vec2 TransformedCoords_1;
 layout(location = CHAIN_TEX_LOC_BASE + 2) out vec2 TransformedCoords_2;
 layout(location = CHAIN_TEX_LOC_BASE + 3) out vec2 TransformedCoords_3;
 #endif
+// Gradient coordinate varying at a fixed location beyond every layout's varyings (ellipse with
+// color and 4 texture coords tops out at location 6). Always emitted; the fragment stage reads
+// it only when a chain slot is OP_GRADIENT.
+layout(location = 7) out vec2 GradientCoords;
 
 void main() {
 #if GP_LAYOUT == 0
@@ -135,15 +143,16 @@ void main() {
 #endif
 #endif
 #if NTEX >= 1
-  TransformedCoords_0 = (CoordTransformMatrix_0 * vec3(coordSource, 1.0)).xy;
+  TransformedCoords_0 = (CoordTransformMatrix_1 * vec3(coordSource, 1.0)).xy;
 #endif
 #if NTEX >= 2
-  TransformedCoords_1 = (CoordTransformMatrix_1 * vec3(coordSource, 1.0)).xy;
+  TransformedCoords_1 = (CoordTransformMatrix_2 * vec3(coordSource, 1.0)).xy;
 #endif
 #if NTEX >= 4
-  TransformedCoords_2 = (CoordTransformMatrix_2 * vec3(coordSource, 1.0)).xy;
-  TransformedCoords_3 = (CoordTransformMatrix_3 * vec3(coordSource, 1.0)).xy;
+  TransformedCoords_2 = (CoordTransformMatrix_3 * vec3(coordSource, 1.0)).xy;
+  TransformedCoords_3 = (CoordTransformMatrix_4 * vec3(coordSource, 1.0)).xy;
 #endif
+  GradientCoords = (CoordTransformMatrix_0 * vec3(coordSource, 1.0)).xy;
 #if GP_LAYOUT == 0 && HAS_COVERAGE
   vCoverage = inCoverage;
 #endif

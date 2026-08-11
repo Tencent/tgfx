@@ -502,11 +502,10 @@ static void RenderShadowTiledScene(Context* context, PrecompiledShaderCache* cac
       cache->fallbackCount(PrecompiledFallbackReason::FragmentArtifactMissing);
 }
 
-// DropShadow keeps its original nested Xfermode/TiledTexture processor tree. If no precompiled
-// shader covers the complete tree, loading a bundle must fall back to ProgramBuilder without first
-// materializing pointwise children into RGBA8 textures. The fallback must be byte-identical to the
-// no-bundle reference.
-TGFX_TEST(AOTL2AuditTest, DropShadowTiledSrcFallsBackByteExact) {
+// DropShadow keeps its original nested Xfermode/TiledTexture processor tree. With the gradient
+// chain op the complete tree resolves to precompiled programs, and the result must be
+// byte-identical to the no-bundle reference render.
+TGFX_TEST(AOTL2AuditTest, DropShadowTiledSrcServedByteExact) {
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);
   ContextScope scope;
@@ -554,18 +553,18 @@ TGFX_TEST(AOTL2AuditTest, DropShadowTiledSrcFallsBackByteExact) {
   cache->unload();
   context->globalCache()->clearPrograms();
 
-  EXPECT_GT(candidateNoMatch, 0u) << "expected the complete DropShadow tree to fall back to JIT";
+  EXPECT_EQ(candidateNoMatch, 0u) << "expected the complete DropShadow tree to be served by AOT";
   EXPECT_EQ(candidateVertexArtifactMissing, 0u);
   EXPECT_EQ(candidateFragmentArtifactMissing, 0u);
   EXPECT_FALSE(result.sizeMismatch);
   EXPECT_EQ(result.diffPixelCount, 0u);
   EXPECT_EQ(result.maxChannelDiff, 0);
-  EXPECT_TRUE(result.passed) << "DropShadow JIT fallback diverges from the no-bundle reference";
+  EXPECT_TRUE(result.passed) << "DropShadow AOT render diverges from the no-bundle reference";
 }
 
-// InnerShadow preserves its nested SrcOut inside SrcATop/SrcIn tree. A bundle miss must execute the
-// untouched tree with ProgramBuilder rather than materializing either blend child into RGBA8.
-TGFX_TEST(AOTL2AuditTest, InnerShadowTiledSrcFallsBackByteExact) {
+// InnerShadow preserves its nested SrcOut inside SrcATop/SrcIn tree. With the gradient chain op
+// the complete tree resolves to precompiled programs, byte-identical to the no-bundle reference.
+TGFX_TEST(AOTL2AuditTest, InnerShadowTiledSrcServedByteExact) {
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);
   ContextScope scope;
@@ -613,13 +612,13 @@ TGFX_TEST(AOTL2AuditTest, InnerShadowTiledSrcFallsBackByteExact) {
   cache->unload();
   context->globalCache()->clearPrograms();
 
-  EXPECT_GT(candidateNoMatch, 0u) << "expected the complete InnerShadow tree to fall back to JIT";
+  EXPECT_EQ(candidateNoMatch, 0u) << "expected the complete InnerShadow tree to be served by AOT";
   EXPECT_EQ(candidateVertexArtifactMissing, 0u);
   EXPECT_EQ(candidateFragmentArtifactMissing, 0u);
   EXPECT_FALSE(result.sizeMismatch);
   EXPECT_EQ(result.diffPixelCount, 0u);
   EXPECT_EQ(result.maxChannelDiff, 0);
-  EXPECT_TRUE(result.passed) << "InnerShadow JIT fallback diverges from the no-bundle reference";
+  EXPECT_TRUE(result.passed) << "InnerShadow AOT render diverges from the no-bundle reference";
 }
 
 static void DrawDecalShaderMaskScene(Canvas* canvas, const std::shared_ptr<Image>& color,

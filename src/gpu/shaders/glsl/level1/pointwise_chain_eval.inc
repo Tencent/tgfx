@@ -19,6 +19,7 @@
 #define OP_CONST_COLOR 6
 #define OP_BLEND 7
 #define OP_AARECT_COVERAGE 8
+#define OP_GRADIENT 9
 
 #define CS_UNPREMUL 1
 #define CS_LINEARIZE 2
@@ -72,6 +73,95 @@ float chainDstTF(float x) {
   return s * x;
 }
 
+// Unrolled-binary gradient colorizer, verbatim from gradient_fill.frag (the runtime search tree
+// structure is preserved exactly); IntervalCount is a runtime uniform so all interval counts
+// share this path.
+vec4 gradientColorizeUnrolled(float t) {
+  vec4 scale;
+  vec4 bias;
+  if (GradientIntervalCount >= 4) {
+    if (t < GradientThresholds1_7.w) {
+      if (t < GradientThresholds1_7.y) {
+        if (t < GradientThresholds1_7.x) {
+          scale = GradientScale0_1;
+          bias = GradientBias0_1;
+        } else {
+          scale = GradientScale2_3;
+          bias = GradientBias2_3;
+        }
+      } else {
+        if (t < GradientThresholds1_7.z) {
+          scale = GradientScale4_5;
+          bias = GradientBias4_5;
+        } else {
+          scale = GradientScale6_7;
+          bias = GradientBias6_7;
+        }
+      }
+    } else {
+      if (GradientIntervalCount >= 6) {
+        if (t < GradientThresholds9_13.y) {
+          if (t < GradientThresholds9_13.x) {
+            scale = GradientScale8_9;
+            bias = GradientBias8_9;
+          } else {
+            scale = GradientScale10_11;
+            bias = GradientBias10_11;
+          }
+        } else {
+          if (GradientIntervalCount >= 7) {
+            if (t < GradientThresholds9_13.z) {
+              scale = GradientScale12_13;
+              bias = GradientBias12_13;
+            } else {
+              scale = GradientScale14_15;
+              bias = GradientBias14_15;
+            }
+          } else {
+            scale = GradientScale12_13;
+            bias = GradientBias12_13;
+          }
+        }
+      } else {
+        if (t < GradientThresholds9_13.x) {
+          scale = GradientScale8_9;
+          bias = GradientBias8_9;
+        } else {
+          scale = GradientScale10_11;
+          bias = GradientBias10_11;
+        }
+      }
+    }
+  } else if (GradientIntervalCount >= 2) {
+    if (t < GradientThresholds1_7.y) {
+      if (t < GradientThresholds1_7.x) {
+        scale = GradientScale0_1;
+        bias = GradientBias0_1;
+      } else {
+        scale = GradientScale2_3;
+        bias = GradientBias2_3;
+      }
+    } else {
+      if (GradientIntervalCount >= 3) {
+        if (t < GradientThresholds1_7.z) {
+          scale = GradientScale4_5;
+          bias = GradientBias4_5;
+        } else {
+          scale = GradientScale6_7;
+          bias = GradientBias6_7;
+        }
+      } else {
+        scale = GradientScale4_5;
+        bias = GradientBias4_5;
+      }
+    }
+  } else {
+    scale = GradientScale0_1;
+    bias = GradientBias0_1;
+  }
+  return vec4(t * scale + bias);
+}
+
 // Evaluates every non-texture op of slot `slot`, reading its fields from the uniform arrays.
 vec4 evalChainSlotNoTex(int slot) {
   ivec4 Packed = SlotPacked[slot];
@@ -122,6 +212,45 @@ vec4 evalChainSlotNoTex(int slot) {
         clamp(vec4(1.0, 1.0, -1.0, -1.0) * vec4(gl_FragCoord.xyxy - CoverageRect), 0.0, 1.0);
     highp vec2 dists2 = dists4.xy + dists4.zw - 1.0;
     return in0 * (dists2.x * dists2.y);
+  }
+  if (Packed.x == OP_GRADIENT) {
+    // Analytic gradient source. The layout math and border clamp are verbatim from the dedicated
+    // gradient kernels; the colorizer kind selects between the single-interval mix, the
+    // dual-interval scale/bias pair and the unrolled-binary tree, each byte-matching its
+    // dedicated kernel. The epilogue premultiplies and modulates by the input alpha, matching
+    // the runtime ClampedGradientEffect emission.
+    highp vec2 gradientCoord = GradientCoords;
+    float gradT;
+    if (GradientLayoutType == 1) {
+      gradT = length(gradientCoord);
+    } else if (GradientLayoutType == 2) {
+      float angle = atan(-gradientCoord.y, -gradientCoord.x);
+      gradT = ((angle * 0.15915494309180001 + 0.5) + GradientBias) * GradientScale;
+    } else if (GradientLayoutType == 3) {
+      gradT = max(abs(gradientCoord.x), abs(gradientCoord.y));
+    } else {
+      gradT = gradientCoord.x + 1.0000000000000001e-05;
+    }
+    vec4 gradColor;
+    if (gradT <= 0.0) {
+      gradColor = GradientLeftBorder;
+    } else if (gradT >= 1.0) {
+      gradColor = GradientRightBorder;
+    } else if (GradientColorizerKind == 0) {
+      gradColor = mix(GradientStart, GradientEnd, gradT);
+    } else if (GradientColorizerKind == 1) {
+      vec4 gradScale = GradientScale01;
+      vec4 gradBias = GradientBias01;
+      if (gradT >= GradientThreshold) {
+        gradScale = GradientScale23;
+        gradBias = GradientBias23;
+      }
+      gradColor = vec4(gradT * gradScale + gradBias);
+    } else {
+      gradColor = gradientColorizeUnrolled(gradT);
+    }
+    gradColor.rgb *= gradColor.a;
+    return gradColor * in0.a;
   }
   // OP_COLOR_SPACE_XFORM
   if ((ChainCSFlags & CS_UNPREMUL) != 0) {

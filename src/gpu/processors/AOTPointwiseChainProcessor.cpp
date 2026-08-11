@@ -73,6 +73,38 @@ static void UploadChainSlot(UniformData* uniformData, size_t index, const AOTCha
       break;
   }
 }
+
+// Writes the chain-wide gradient parameter block (UBO fields declared unconditionally in
+// pointwise_chain.frag). Field names mirror the dedicated gradient kernels, prefixed with
+// "Gradient"; the unrolled-binary arrays use the scale0_1-style names of gradient_fill.frag.
+static void UploadGradientParams(UniformData* uniformData, const AOTGradientParameters& params) {
+  uniformData->setDataOptional("GradientLayoutType", params.layoutType);
+  uniformData->setDataOptional("GradientBias", params.bias);
+  uniformData->setDataOptional("GradientScale", params.scale);
+  uniformData->setDataOptional("GradientColorizerKind", params.colorizerKind);
+  uniformData->setDataOptional("GradientLeftBorder", params.leftBorder);
+  uniformData->setDataOptional("GradientRightBorder", params.rightBorder);
+  uniformData->setDataOptional("GradientStart", params.start);
+  uniformData->setDataOptional("GradientEnd", params.end);
+  uniformData->setDataOptional("GradientScale01", params.scale01);
+  uniformData->setDataOptional("GradientBias01", params.bias01);
+  uniformData->setDataOptional("GradientScale23", params.scale23);
+  uniformData->setDataOptional("GradientBias23", params.bias23);
+  uniformData->setDataOptional("GradientThreshold", params.threshold);
+  uniformData->setDataOptional("GradientIntervalCount", params.intervalCount);
+  uniformData->setDataOptional("GradientThresholds1_7", params.thresholds1_7);
+  uniformData->setDataOptional("GradientThresholds9_13", params.thresholds9_13);
+  static const char* scaleNames[] = {
+      "GradientScale0_1", "GradientScale2_3",   "GradientScale4_5",   "GradientScale6_7",
+      "GradientScale8_9", "GradientScale10_11", "GradientScale12_13", "GradientScale14_15"};
+  static const char* biasNames[] = {"GradientBias0_1",   "GradientBias2_3",  "GradientBias4_5",
+                                    "GradientBias6_7",   "GradientBias8_9",  "GradientBias10_11",
+                                    "GradientBias12_13", "GradientBias14_15"};
+  for (size_t index = 0; index < 8; ++index) {
+    uniformData->setDataOptional(scaleNames[index], params.scales[index]);
+    uniformData->setDataOptional(biasNames[index], params.biases[index]);
+  }
+}
 }  // namespace
 
 PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
@@ -128,7 +160,14 @@ AOTPointwiseChainProcessor::AOTPointwiseChainProcessor(
   }
   for (size_t index = 0; index < newSlots.size(); ++index) {
     slots[index] = newSlots[index];
+    if (slots[index].op == AOTChainOp::Gradient) {
+      gradientCoordTransform = CoordTransform(slots[index].gradient.coordMatrix);
+    }
   }
+  // Exposed unconditionally (a default identity transform when no gradient slot exists) so the
+  // leaf transforms keep stable ordinals: the gradient transform is index 0, leaf k is index
+  // k+1, and the GP-written CoordTransformMatrix_* uniforms line up the same way for every chain.
+  addCoordTransform(&gradientCoordTransform);
   for (auto& leaf : textureLeaves) {
     registerChildProcessor(std::move(leaf));
   }
@@ -194,6 +233,15 @@ void AOTPointwiseChainProcessor::onSetData(UniformData*, UniformData* fragmentUn
     if (slots[index].op == AOTChainOp::ColorSpaceXform) {
       ColorSpaceXformHelper("Chain").setData(fragmentUniformData,
                                              slots[index].colorSpaceXform.steps.get());
+      break;
+    }
+  }
+  // The gradient parameters are one shared chain-wide block (at most one gradient slot per chain,
+  // enforced by the builder). The vertex-side coordinate transform travels through the GP-written
+  // CoordTransformMatrix_0 instead (see the constructor).
+  for (size_t index = 0; index < _slotCount; ++index) {
+    if (slots[index].op == AOTChainOp::Gradient) {
+      UploadGradientParams(fragmentUniformData, slots[index].gradient);
       break;
     }
   }

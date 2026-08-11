@@ -105,9 +105,10 @@ class PointwiseChainShader : public PrecompiledShader {
     // by the framework (MirroredDimsAgree).
     if (vertValues[VD::GP_LAYOUT] == 1) {
       // The ellipse layout carries no coverage/uvCoord attributes (its coverage is the per-pixel
-      // edge equation), never takes a mask clip, and leaves solid fills to EllipseFillShader.
+      // edge equation) and never takes a mask clip. Leaf-free chains (const/blend/gradient) are
+      // served as well: only solid fills stay on EllipseFillShader via the plain route.
       if (vertValues[VD::HAS_COVERAGE] != 0 || vertValues[VD::HAS_UV_COORD] != 0 ||
-          vertValues[VD::TEXTURE_COUNT] == 0 || fragValues[FD::HAS_MASK_TEXTURE] != 0) {
+          fragValues[FD::HAS_MASK_TEXTURE] != 0) {
         return false;
       }
       return true;

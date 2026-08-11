@@ -132,6 +132,16 @@ bool AOTNodeBuilder::addRectCoverage(AOTNodeID input, const AOTRectCoverageParam
   return addUnaryNode(AOTEffectKind::RectCoverage, input, traits, parameters, output);
 }
 
+bool AOTNodeBuilder::addGradientSource(AOTNodeID input, const AOTGradientParameters& parameters,
+                                       AOTNodeID* output) {
+  // The gradient ignores its input's color but multiplies by the input alpha at the end
+  // (gradColor *= inputColor.a in the runtime emission). The premultiply step means the output
+  // alpha representation differs from the input, so it is not self-contained and does not
+  // preserve the alpha representation.
+  EffectTraits traits = {EffectDomain::Pointwise, EffectInputUsage::ColorAlpha, false, false, true};
+  return addUnaryNode(AOTEffectKind::GradientSource, input, traits, parameters, output);
+}
+
 bool AOTNodeBuilder::finish(AOTNodeID root, AOTEffectGraph* graph) const {
   if (graph == nullptr || !contains(root)) {
     return false;

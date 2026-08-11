@@ -34,6 +34,8 @@ class ClampedGradientEffect : public FragmentProcessor {
     return "ClampedGradientEffect";
   }
 
+  bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 

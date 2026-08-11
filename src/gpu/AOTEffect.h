@@ -81,6 +81,7 @@ enum class AOTEffectKind {
   Blend,
   PerlinNoiseSource,
   RectCoverage,
+  GradientSource,
 };
 
 enum class EffectDomain {
@@ -188,6 +189,36 @@ struct AOTPerlinNoiseParameters {
   Matrix uvMatrix = {};
 };
 
+// Analytic gradient source (ClampedGradientEffect): color computed from the fragment's
+// transformed coordinate instead of a texture sample. The layout (linear/radial/conic/diamond)
+// and the colorizer kind (single/dual/unrolled-binary) are runtime uniforms in the fused kernel,
+// matching the dedicated gradient shaders; the texture (LUT) colorizer is not supported. At most
+// one gradient source per chain (enforced by the chain builder). coordMatrix is the layout
+// processor's local-to-gradient-space transform; the chain processor exposes it as a coord
+// transform so the geometry processor writes the combined matrix through the standard path.
+struct AOTGradientParameters {
+  int layoutType = 0;  // 0=linear, 1=radial, 2=conic, 3=diamond
+  float bias = 0.0f;   // conic only
+  float scale = 1.0f;  // conic only
+  std::array<float, 4> leftBorder = {};
+  std::array<float, 4> rightBorder = {};
+  int colorizerKind = 0;              // 0=single-interval, 1=dual-interval, 2=unrolled-binary
+  std::array<float, 4> start = {};    // single
+  std::array<float, 4> end = {};      // single
+  std::array<float, 4> scale01 = {};  // dual
+  std::array<float, 4> bias01 = {};
+  std::array<float, 4> scale23 = {};
+  std::array<float, 4> bias23 = {};
+  float threshold = 0.0f;  // dual
+  int intervalCount = 0;   // unrolled: 1..8
+  std::array<std::array<float, 4>, 8> scales = {};
+  std::array<std::array<float, 4>, 8> biases = {};
+  std::array<float, 4> thresholds1_7 = {};
+  std::array<float, 4> thresholds9_13 = {};
+  Matrix coordMatrix = {};
+  bool hasPerspective = false;
+};
+
 // Analytic anti-aliased rect coverage (AARectEffect, produced by AA rect clips). Multiplies the
 // input color by a per-fragment coverage computed from gl_FragCoord and the rect, so it is a
 // pointwise node that reads the destination device coordinate directly and needs no texture or
@@ -200,7 +231,8 @@ struct AOTRectCoverageParameters {
 using AOTEffectParameters =
     std::variant<std::monostate, AOTTextureParameters, AOTColorMatrixParameters, AOTLumaParameters,
                  AOTAlphaThresholdParameters, AOTColorSpaceXformParameters, AOTConstColorParameters,
-                 AOTBlendParameters, AOTPerlinNoiseParameters, AOTRectCoverageParameters>;
+                 AOTBlendParameters, AOTPerlinNoiseParameters, AOTRectCoverageParameters,
+                 AOTGradientParameters>;
 
 // Runtime-selected pointwise operator applied by the fused kernels (PointwiseTail, PointwiseChain
 // and PerlinNoiseFill). The values mirror the OP_* constants in pointwise_op.inc: the kernels
@@ -278,6 +310,9 @@ class AOTNodeBuilder {
 
   bool addRectCoverage(AOTNodeID input, const AOTRectCoverageParameters& parameters,
                        AOTNodeID* output);
+
+  bool addGradientSource(AOTNodeID input, const AOTGradientParameters& parameters,
+                         AOTNodeID* output);
 
   bool finish(AOTNodeID root, AOTEffectGraph* graph) const;
 

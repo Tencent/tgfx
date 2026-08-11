@@ -38,6 +38,29 @@ class UnrolledBinaryGradientColorizer : public FragmentProcessor {
     return intervalCount;
   }
 
+  // Copies the piecewise-linear segments as scale/bias pairs plus the search thresholds.
+  void getSegments(Color* outScales, Color* outBiases, Rect* outThresholds1_7,
+                   Rect* outThresholds9_13) const {
+    outScales[0] = scale0_1;
+    outScales[1] = scale2_3;
+    outScales[2] = scale4_5;
+    outScales[3] = scale6_7;
+    outScales[4] = scale8_9;
+    outScales[5] = scale10_11;
+    outScales[6] = scale12_13;
+    outScales[7] = scale14_15;
+    outBiases[0] = bias0_1;
+    outBiases[1] = bias2_3;
+    outBiases[2] = bias4_5;
+    outBiases[3] = bias6_7;
+    outBiases[4] = bias8_9;
+    outBiases[5] = bias10_11;
+    outBiases[6] = bias12_13;
+    outBiases[7] = bias14_15;
+    *outThresholds1_7 = thresholds1_7;
+    *outThresholds9_13 = thresholds9_13;
+  }
+
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
  protected:

@@ -30,6 +30,14 @@ class ConicGradientLayout : public FragmentProcessor {
     return "ConicGradientLayout";
   }
 
+  float getBias() const {
+    return bias;
+  }
+
+  float getScale() const {
+    return scale;
+  }
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 

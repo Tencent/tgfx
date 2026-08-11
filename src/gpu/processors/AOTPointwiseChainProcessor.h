@@ -37,6 +37,7 @@ enum class AOTChainOp : int {
   ConstColor = 6,
   Blend = 7,
   AARectCoverage = 8,
+  Gradient = 9,
 };
 
 /// One node of a pointwise DAG after flattening into the fused kernel's slot array. in0/in1 are
@@ -65,6 +66,9 @@ struct AOTChainSlot {
   // CoverageRect uniform, so at most one slot per chain may carry this op (enforced by the
   // builder).
   AOTRectCoverageParameters rectCoverage = {};
+  // OP_GRADIENT only: layout/colorizer parameters. The kernel reads chain-wide Gradient*
+  // uniforms, so at most one slot per chain may carry this op (enforced by the builder).
+  AOTGradientParameters gradient = {};
 };
 
 /**
@@ -145,6 +149,10 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
   std::array<AOTChainSlot, MaxSlots> slots = {};
   // Kept only to mark the mask's presence; the mask itself is the last registered child.
   bool hasMaskChild = false;
+  // Always registered as this processor's own coord transform (index 0, ahead of the leaf
+  // transforms) so the gradient coordinate mapping shares the GP-written transform path. A chain
+  // without a gradient slot exposes a default identity transform here.
+  CoordTransform gradientCoordTransform = {};
 };
 
 }  // namespace tgfx

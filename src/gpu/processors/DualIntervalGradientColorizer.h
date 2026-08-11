@@ -32,6 +32,26 @@ class DualIntervalGradientColorizer : public FragmentProcessor {
     return "DualIntervalGradientColorizer";
   }
 
+  const Color& getScale01() const {
+    return scale01;
+  }
+
+  const Color& getBias01() const {
+    return bias01;
+  }
+
+  const Color& getScale23() const {
+    return scale23;
+  }
+
+  const Color& getBias23() const {
+    return bias23;
+  }
+
+  float getThreshold() const {
+    return threshold;
+  }
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 

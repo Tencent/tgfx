@@ -79,6 +79,42 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 
 #include "pointwise_chain_uniforms.inc"
 
+// Gradient source block (OP_GRADIENT): at most one gradient slot per chain. All fields are
+// runtime uniforms written only when a gradient slot is present; names mirror the dedicated
+// gradient kernels with a "Gradient" prefix.
+int GradientLayoutType;
+float GradientBias;
+float GradientScale;
+int GradientColorizerKind;
+vec4 GradientLeftBorder;
+vec4 GradientRightBorder;
+vec4 GradientStart;
+vec4 GradientEnd;
+vec4 GradientScale01;
+vec4 GradientBias01;
+vec4 GradientScale23;
+vec4 GradientBias23;
+float GradientThreshold;
+int GradientIntervalCount;
+vec4 GradientThresholds1_7;
+vec4 GradientThresholds9_13;
+vec4 GradientScale0_1;
+vec4 GradientScale2_3;
+vec4 GradientScale4_5;
+vec4 GradientScale6_7;
+vec4 GradientScale8_9;
+vec4 GradientScale10_11;
+vec4 GradientScale12_13;
+vec4 GradientScale14_15;
+vec4 GradientBias0_1;
+vec4 GradientBias2_3;
+vec4 GradientBias4_5;
+vec4 GradientBias6_7;
+vec4 GradientBias8_9;
+vec4 GradientBias10_11;
+vec4 GradientBias12_13;
+vec4 GradientBias14_15;
+
 // Tiled leaf support: at most one leaf per chain may need shader-side tiling (wrap or border
 // emulation). TiledLeafIndex selects it (-1 = none); the recipe fields are uploaded by the chain
 // processor from the resolved sampling, leaving plain leaves on the Subset-clamp path.
@@ -117,6 +153,10 @@ layout(location = NTEX + 1) in vec4 vColor;
 #if NTEX >= 1
 layout(location = CHAIN_TEX_LOC_BASE + 0) in vec2 TransformedCoords_0;
 #endif
+// Gradient coordinate varying at a fixed location beyond every layout's varyings (ellipse with
+// color and 4 texture coords tops out at location 6). Always written by the vertex stage; only
+// read when a chain slot is OP_GRADIENT.
+layout(location = 7) in vec2 GradientCoords;
 #if NTEX >= 2
 layout(location = CHAIN_TEX_LOC_BASE + 1) in vec2 TransformedCoords_1;
 #endif

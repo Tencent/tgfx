@@ -31,6 +31,14 @@ class SingleIntervalGradientColorizer : public FragmentProcessor {
     return "SingleIntervalGradientColorizer";
   }
 
+  const Color& startColor() const {
+    return start;
+  }
+
+  const Color& endColor() const {
+    return end;
+  }
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 

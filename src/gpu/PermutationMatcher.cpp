@@ -715,6 +715,14 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
   if (colorSpaceXformCount > 1) {
     return std::nullopt;
   }
+  // The kernel carries one gradient parameter block and computes gradient coordinates as a vec2,
+  // so a perspective gradient transform cannot be represented.
+  for (size_t index = 0; index < chain->slotCount(); ++index) {
+    const auto& slot = chain->slot(index);
+    if (slot.op == AOTChainOp::Gradient && slot.gradient.hasPerspective) {
+      return std::nullopt;
+    }
+  }
   for (size_t index = 0; index < leafCount; ++index) {
     auto leaf = chain->childProcessor(index);
     if (leaf->name() != "TextureEffect" || leaf->numTextureSamplers() != 1) {
@@ -734,11 +742,9 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
   if (hasMask && (gpLayout != 0 || GetGPType(gp) != 0)) {
     return std::nullopt;
   }
-  // The ellipse layout has no leaf-count-free variant: solid ellipse fills are EllipseFillShader's
-  // territory.
-  if (gpLayout == 1 && leafCount == 0) {
-    return std::nullopt;
-  }
+  // The ellipse layout carries the same leaf-count-free variants as the rect family: they serve
+  // const/blend/gradient chains (a solid fill still goes to EllipseFillShader through the plain
+  // route, so only chain-worthy shapes reach this rule).
   int textureCountValue = leafCount == 0 ? 0 : (leafCount == 1 ? 1 : (leafCount == 2 ? 2 : 3));
   // QuadGP vertex buffers always carry the coverage slot (providers emit 1.0 for non-AA draws),
   // so the always-on coverage path serves every quad; the ellipse layout evaluates coverage per
