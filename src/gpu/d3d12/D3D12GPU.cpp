@@ -1060,12 +1060,11 @@ void D3D12GPU::reclaimSubmission(InflightSubmission& submission) {
   }
   // Release every keyed mutex that executeSubmission acquired for this submission. The GPU has
   // now finished sampling the shared textures (fence has signalled), so it is safe to hand the
-  // memory back to the D3D11 producer with key 0. The tracking entry in mutexAcquireFenceValues
-  // is erased regardless of the ReleaseSync result: from acquireSessionMutexes()'s perspective
-  // the mutex is no longer bound to this fence, and a stale entry would cause the next acquire
-  // to wait on an already-completed fence (harmless but wasteful). Errors are only logged: the
+  // memory back to the D3D11 producer with key 0. ReleaseSync failures are only logged: the
   // resource is going away regardless, and there is no meaningful recovery path once the fence
-  // signal has been observed.
+  // signal has been observed. Whether the tracking entry in mutexAcquireFenceValues gets erased
+  // is independent of the ReleaseSync result — it is driven purely by fence-value matching, see
+  // the inline comment below.
   for (auto* mutex : submission.session.keyedMutexes) {
     if (mutex == nullptr) {
       continue;

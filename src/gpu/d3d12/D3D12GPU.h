@@ -437,9 +437,12 @@ class D3D12GPU : public GPU {
   // this GPU. When acquireSessionMutexes() finds an entry here, the corresponding submission may
   // still be inflight (fence not yet signalled), meaning the mutex is still held by the previous
   // ExecuteCommandLists. In that case we wait precisely for that fence and drive
-  // pollCompletedSubmissions() to release the mutex before re-acquiring. Entries are erased in
-  // reclaimSubmission() right after ReleaseSync(0) succeeds, keeping the map's size bounded by
-  // the number of distinct shared surfaces sampled at any given time.
+  // pollCompletedSubmissions() to release the mutex before re-acquiring. In reclaimSubmission()
+  // an entry is erased only when its recorded fence value still matches the submission being
+  // reclaimed; if a later submission has already re-acquired the mutex and overwritten the entry
+  // with a higher fence, that newer binding is left intact so subsequent acquireSessionMutexes()
+  // calls can still see the correct predecessor fence. This keeps the map's size bounded by the
+  // number of distinct shared surfaces sampled at any given time.
   std::unordered_map<IDXGIKeyedMutex*, uint64_t> mutexAcquireFenceValues;
   // Sticky flag set when the device returns DXGI_ERROR_DEVICE_REMOVED or another fatal error.
   // Once set, executeSubmission and waitAllInflightSubmissions stop blocking on the fence — the
