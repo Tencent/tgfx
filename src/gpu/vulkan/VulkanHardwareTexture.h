@@ -94,9 +94,13 @@ class VulkanHardwareTexture : public VulkanTexture {
   VkSamplerYcbcrConversion ycbcrConversion = VK_NULL_HANDLE;
 
 #if defined(_WIN32) && !defined(__ANDROID__)
-  // Non-owning reference to the IDXGIKeyedMutex living on the source ID3D11Texture2D. We retain
-  // it through the D3D11 texture (HardwareBufferRetain above), so this ComPtr just provides
-  // typed access without additional lifetime concerns. Set only on the Win32 import path.
+  // Owning ComPtr to the IDXGIKeyedMutex queried off the source ID3D11Texture2D at import time.
+  // QueryInterface returns a strong reference, so this ComPtr independently keeps the mutex
+  // object alive for the lifetime of this VulkanHardwareTexture. hardwareBuffer (a retained
+  // ID3D11Texture2D) also keeps the mutex reachable because the mutex is aggregated on the same
+  // COM object, but that is a property of the D3D11 implementation, not something we should rely
+  // on here — holding our own strong ref keeps the acquire/release call sites self-contained.
+  // Set only on the Win32 import path.
   Microsoft::WRL::ComPtr<IDXGIKeyedMutex> _keyedMutex = nullptr;
 #endif
 
