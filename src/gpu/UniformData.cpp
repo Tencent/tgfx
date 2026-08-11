@@ -28,9 +28,23 @@ UniformData::UniformData(std::vector<Uniform> uniforms) : _uniforms(std::move(un
     size = entrySize;
     align = entryAlign;
 
+    // std140 arrays stride each element up to a 16-byte multiple.
+    size_t elementStride = (size + 15) / 16 * 16;
+    uint32_t arraySize = uniform.arraySize();
+    size_t totalSize = arraySize > 1 ? elementStride * arraySize : size;
+
     const size_t offset = alignCursor(align);
-    fieldMap[uniform.name()] = {uniform.name(), uniform.format(), offset, size, align};
-    cursor = offset + size;
+    Field field = {};
+    field.name = uniform.name();
+    field.format = uniform.format();
+    field.offset = offset;
+    field.size = totalSize;
+    field.align = align;
+    field.arraySize = arraySize;
+    field.elementStride = elementStride;
+    field.elementSize = size;
+    fieldMap[uniform.name()] = field;
+    cursor = offset + totalSize;
   }
 
   bufferSize = alignCursor(16);
@@ -38,6 +52,25 @@ UniformData::UniformData(std::vector<Uniform> uniforms) : _uniforms(std::move(un
 
 void UniformData::setBuffer(void* buffer) {
   _buffer = static_cast<uint8_t*>(buffer);
+}
+
+void UniformData::onSetArrayElement(const std::string& name, size_t index, const void* data,
+                                    size_t size, bool optional) const {
+  DEBUG_ASSERT(_buffer != nullptr);
+
+  const auto& key = skipSuffix ? name + structuralSuffix : name + nameSuffix;
+  auto field = findField(key);
+  if (field == nullptr || field->arraySize <= 1 || index >= field->arraySize ||
+      field->elementSize != size) {
+    if (!optional) {
+      LOGE(
+          "UniformData::onSetArrayElement() array uniform '%s' not found or index %zu out of "
+          "range!",
+          name.c_str(), index);
+    }
+    return;
+  }
+  memcpy(_buffer + field->offset + index * field->elementStride, data, size);
 }
 
 void UniformData::onSetData(const std::string& name, const void* data, size_t size,

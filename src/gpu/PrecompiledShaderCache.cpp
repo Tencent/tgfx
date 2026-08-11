@@ -419,7 +419,7 @@ static constexpr size_t HEADER_SIZE_V3 = 80;
 static constexpr size_t POOL_ENTRY_SIZE = 28;
 
 static bool ReadUniformEntries(const uint8_t* data, size_t maxLen, size_t* offset, uint8_t count,
-                               std::vector<Uniform>& out) {
+                               std::vector<Uniform>& out, bool hasArraySize) {
   for (uint8_t i = 0; i < count; i++) {
     if (*offset >= maxLen) {
       return false;
@@ -431,15 +431,27 @@ static bool ReadUniformEntries(const uint8_t* data, size_t maxLen, size_t* offse
     std::string name(reinterpret_cast<const char*>(data + *offset), nameLen);
     *offset += nameLen;
     auto format = static_cast<UniformFormat>(data[(*offset)++]);
-    out.emplace_back(std::move(name), format);
+    uint32_t arraySize = 1;
+    if (hasArraySize) {
+      if (*offset + 2 > maxLen) {
+        return false;
+      }
+      arraySize =
+          static_cast<uint32_t>(data[*offset]) | (static_cast<uint32_t>(data[*offset + 1]) << 8);
+      *offset += 2;
+    }
+    out.emplace_back(std::move(name), format, arraySize);
   }
   return true;
 }
 
 // Reflection format: [uniformCount:u8][samplerCount:u8][reserved:u8][reserved:u8]
 //                    For each uniform: [nameLen:u8][name:bytes][format:u8]
+//                                      (+[arraySize:u16] since bundle v4)
 //                    For each sampler: [nameLen:u8][name:bytes][format:u8]
-static bool ParseStageReflection(const uint8_t* data, size_t maxLen, ShaderStageBlob* blob) {
+//                                      (+[arraySize:u16] since bundle v4)
+static bool ParseStageReflection(const uint8_t* data, size_t maxLen, ShaderStageBlob* blob,
+                                 bool hasArraySize) {
   if (maxLen < 4) {
     return false;
   }
@@ -448,10 +460,10 @@ static bool ParseStageReflection(const uint8_t* data, size_t maxLen, ShaderStage
   uint8_t samplerCount = data[offset++];
   offset += 2;  // reserved
 
-  if (!ReadUniformEntries(data, maxLen, &offset, uniformCount, blob->uniforms)) {
+  if (!ReadUniformEntries(data, maxLen, &offset, uniformCount, blob->uniforms, hasArraySize)) {
     return false;
   }
-  if (!ReadUniformEntries(data, maxLen, &offset, samplerCount, blob->samplers)) {
+  if (!ReadUniformEntries(data, maxLen, &offset, samplerCount, blob->samplers, hasArraySize)) {
     return false;
   }
   return true;
@@ -460,7 +472,8 @@ static bool ParseStageReflection(const uint8_t* data, size_t maxLen, ShaderStage
 static bool LoadPool(const uint8_t* fileData, size_t fileSize, uint32_t poolOffset,
                      uint32_t poolCount, uint32_t dataOffset, uint32_t reflectionOffset,
                      std::unordered_map<PrecompiledShaderCache::HashKey, ShaderStageBlob,
-                                        PrecompiledShaderCache::HashKeyHasher>& entries) {
+                                        PrecompiledShaderCache::HashKeyHasher>& entries,
+                     bool hasArraySize) {
   for (uint32_t i = 0; i < poolCount; i++) {
     size_t entryOff = poolOffset + static_cast<size_t>(i) * POOL_ENTRY_SIZE;
     if (entryOff + POOL_ENTRY_SIZE > fileSize) {
@@ -487,7 +500,7 @@ static bool LoadPool(const uint8_t* fileData, size_t fileSize, uint32_t poolOffs
       size_t absReflOff = static_cast<size_t>(reflectionOffset) + reflOff;
       if (absReflOff < fileSize) {
         size_t maxReflLen = fileSize - absReflOff;
-        if (!ParseStageReflection(fileData + absReflOff, maxReflLen, &blob)) {
+        if (!ParseStageReflection(fileData + absReflOff, maxReflLen, &blob, hasArraySize)) {
           LOGE("PrecompiledShaderCache: Failed to parse reflection for entry %u", i);
           return false;
         }
@@ -513,10 +526,12 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
     return false;
   }
   uint16_t formatVersion = ReadU16LE(ptr + 4);
-  if (formatVersion != 3) {
-    LOGE("PrecompiledShaderCache: Unsupported format version %u (expected 3)", formatVersion);
+  // v4 adds an arraySize field to every reflection entry; v3 entries parse as scalars.
+  if (formatVersion != 3 && formatVersion != 4) {
+    LOGE("PrecompiledShaderCache: Unsupported format version %u (expected 3 or 4)", formatVersion);
     return false;
   }
+  const bool hasArraySize = formatVersion >= 4;
   uint16_t compressionType = ReadU16LE(ptr + 6);
   if (compressionType != 0 && compressionType != 1) {
     LOGE("PrecompiledShaderCache: Unsupported compression type %u", compressionType);
@@ -576,11 +591,11 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> newVertEntries;
   std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> newFragEntries;
   if (!LoadPool(loadPtr, loadSize, vertPoolOffset, vertPoolCount, dataOffset, reflectionOffset,
-                newVertEntries)) {
+                newVertEntries, hasArraySize)) {
     return false;
   }
   if (!LoadPool(loadPtr, loadSize, fragPoolOffset, fragPoolCount, dataOffset, reflectionOffset,
-                newFragEntries)) {
+                newFragEntries, hasArraySize)) {
     return false;
   }
 

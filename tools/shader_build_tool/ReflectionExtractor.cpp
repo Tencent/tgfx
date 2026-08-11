@@ -87,6 +87,9 @@ static std::vector<UniformEntry> ExtractUBOMembers(spirv_cross::Compiler& compil
       UniformEntry entry;
       entry.name = memberName;
       entry.format = MapSPIRVTypeToFormat(memberType);
+      if (!memberType.array.empty()) {
+        entry.arraySize = static_cast<uint16_t>(memberType.array[0]);
+      }
       result.push_back(entry);
     }
   }

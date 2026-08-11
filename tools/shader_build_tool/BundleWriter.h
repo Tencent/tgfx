@@ -26,7 +26,8 @@ namespace tgfx {
 
 struct UniformEntry {
   std::string name;
-  uint8_t format = 0;  // UniformFormat enum value
+  uint8_t format = 0;      // UniformFormat enum value
+  uint16_t arraySize = 1;  // std140 array element count; 1 when not an array
 };
 
 struct StageReflectionData {

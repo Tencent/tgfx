@@ -107,11 +107,14 @@ static void WriteUniformEntries(std::vector<uint8_t>& blob,
     blob.push_back(nameLen);
     blob.insert(blob.end(), entry.name.begin(), entry.name.end());
     blob.push_back(entry.format);
+    // v4: array element count (1 for scalars).
+    blob.push_back(static_cast<uint8_t>(entry.arraySize & 0xFF));
+    blob.push_back(static_cast<uint8_t>((entry.arraySize >> 8) & 0xFF));
   }
 }
 
 // Serializes stage reflection: [uniformCount:u8][samplerCount:u8][reserved:u8][reserved:u8]
-//                              For each: [nameLen:u8][name:bytes][format:u8]
+//                              For each: [nameLen:u8][name:bytes][format:u8][arraySize:u16]
 static std::vector<uint8_t> SerializeStageReflection(const StageReflectionData& reflection) {
   std::vector<uint8_t> blob;
   blob.push_back(static_cast<uint8_t>(reflection.uniforms.size()));
@@ -247,7 +250,7 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
 
   // Header
   WriteU32LE(file, 0x54475346);       // magic "TGSF"
-  WriteU16LE(file, 3);                // formatVersion
+  WriteU16LE(file, 4);                // formatVersion
   WriteU16LE(file, compressionFlag);  // compressionType
   WriteU64LE(file, 0);                // sourceHash (reserved)
   WriteU32LE(file, 0x00010000);       // toolchainVersion 1.0.0

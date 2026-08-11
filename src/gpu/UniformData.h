@@ -106,6 +106,32 @@ class UniformData {
   }
 
   /**
+   * Copies value into one element of an array uniform. The named uniform must be an array with
+   * more than one element and index must be in range; the value size must match one element.
+   */
+  template <typename T>
+  std::enable_if_t<std::is_trivially_copyable_v<T> && !std::is_pointer_v<T> &&
+                       !std::is_same_v<std::decay_t<T>, Matrix> &&
+                       !std::is_same_v<std::decay_t<T>, ColorMatrix33>,
+                   void>
+  setArrayElement(const std::string& name, size_t index, const T& value) const {
+    onSetArrayElement(name, index, &value, sizeof(value), false);
+  }
+
+  /**
+   * Like setArrayElement(), but tolerates the array uniform being absent from this program (see
+   * setDataOptional() for when absence is legitimate).
+   */
+  template <typename T>
+  std::enable_if_t<std::is_trivially_copyable_v<T> && !std::is_pointer_v<T> &&
+                       !std::is_same_v<std::decay_t<T>, Matrix> &&
+                       !std::is_same_v<std::decay_t<T>, ColorMatrix33>,
+                   void>
+  setArrayElementOptional(const std::string& name, size_t index, const T& value) const {
+    onSetArrayElement(name, index, &value, sizeof(value), true);
+  }
+
+  /**
    * Sets an external memory buffer for writing uniform data.
    * On platforms with UBO support, the buffer points to memory mapped from a GPU UBO object.
    * On platforms without UBO support, the buffer points to CPU memory.
@@ -138,6 +164,9 @@ class UniformData {
     size_t offset = 0;
     size_t size = 0;
     size_t align = 0;
+    uint32_t arraySize = 1;
+    size_t elementStride = 0;
+    size_t elementSize = 0;
   };
 
   struct Entry {
@@ -165,6 +194,9 @@ class UniformData {
 
   void onSetData(const std::string& name, const void* data, size_t size,
                  bool optional = false) const;
+
+  void onSetArrayElement(const std::string& name, size_t index, const void* data, size_t size,
+                         bool optional) const;
 
   const Field* findField(const std::string& key) const;
 

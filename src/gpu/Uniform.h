@@ -52,9 +52,11 @@ class Uniform {
   Uniform() = default;
 
   /**
-   * Creates a uniform variable with the specified name, type, and visibility.
+   * Creates a uniform variable with the specified name, type, and visibility. arraySize is 1 for
+   * scalars and the element count for std140 arrays.
    */
-  Uniform(std::string name, UniformFormat format) : _name(std::move(name)), _format(format) {
+  Uniform(std::string name, UniformFormat format, uint32_t arraySize = 1)
+      : _name(std::move(name)), _format(format), _arraySize(arraySize) {
   }
 
   /**
@@ -79,6 +81,13 @@ class Uniform {
   }
 
   /**
+   * The number of array elements; 1 when the uniform is not an array.
+   */
+  uint32_t arraySize() const {
+    return _arraySize;
+  }
+
+  /**
    * Returns the size of the uniform variable in bytes.
    */
   size_t size() const;
@@ -86,5 +95,6 @@ class Uniform {
  private:
   std::string _name = {};
   UniformFormat _format = UniformFormat::Float;
+  uint32_t _arraySize = 1;
 };
 }  // namespace tgfx
