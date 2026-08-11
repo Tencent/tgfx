@@ -182,10 +182,16 @@ void VulkanExtensions::detectFromDevice(VkPhysicalDevice physicalDevice) {
   win32ExternalMemory =
       (vkGetMemoryWin32HandlePropertiesKHR != nullptr) &&
       (vkGetImageMemoryRequirements2 != nullptr || vkGetImageMemoryRequirements2KHR != nullptr);
-  // VK_KHR_win32_keyed_mutex has no distinct entry points (its behaviour is data-only via a
-  // VkSubmitInfo pNext struct), so we cannot detect it from function pointers. Assume the
-  // caller enabled it when they enabled the rest of the win32 external-memory bundle.
-  win32KeyedMutex = win32ExternalMemory;
+  // VK_KHR_win32_keyed_mutex is data-only (it activates the VkWin32KeyedMutexAcquireReleaseInfoKHR
+  // pNext struct on VkSubmitInfo) and exposes no distinct entry points, so there is no reliable
+  // way to detect whether the embedder actually enabled it on an adopted VkDevice. Assuming it
+  // follows win32ExternalMemory is unsafe: an embedder that enables only the external-memory
+  // bundle would let importHardwareTextures() succeed, and the subsequent vkQueueSubmit would
+  // then chain VkWin32KeyedMutexAcquireReleaseInfoKHR against a device that never enabled the
+  // extension — a VUID violation that can drop the device. Default to false on this path so the
+  // import gracefully fails; the embedder can opt in explicitly once a dedicated API is added
+  // (tracked as follow-up to VulkanDevice::MakeFrom).
+  win32KeyedMutex = false;
 #endif
 }
 
