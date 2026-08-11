@@ -14,10 +14,11 @@
 // do not provide; tiled_texture_fill.frag implements those inline, and blur/blend-merge still fall
 // back for 4/5.
 
-// ClampToBorder modes require unnormalized (pixel-space) coordinates: the incoming coord is divided
-// by Dimension before tiling and multiplied back when sampling.
+// ClampToBorder and RepeatLinear/mipmap modes require unnormalized (pixel-space) coordinates:
+// the incoming coord is divided by Dimension before tiling and multiplied back when sampling.
+// Matches GLSLTiledTextureEffect::ShaderModeRequiresUnormCoord (3/4/5/7/8).
 bool tiledUsesUnorm(int mode) {
-  return mode == 7 || mode == 8;
+  return mode == 3 || mode == 4 || mode == 5 || mode == 7 || mode == 8;
 }
 
 // Clamp, RepeatNearest, MirrorRepeat and ClampToBorderLinear clamp the tiled coordinate to the Clamp

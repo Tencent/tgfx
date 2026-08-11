@@ -82,6 +82,36 @@ void main() {
     vec2 tapClampedCoord;
     vec2 tapCoord = tiledMapCoord(sampleCoord, false, tapInCoord, tapSubsetCoord, tapClampedCoord);
     vec4 texColor = texture(TextureSampler_0, tapCoord);
+    // RepeatLinearNone(3) seam blend, ported from the runtime GLSLTiledTextureEffect emission: a
+    // wrapped coordinate that clamps means the linear footprint crosses the subset edge, so blend
+    // with a sample at the opposite clamp edge (diagonal read when both axes clamp). The signed
+    // single-axis weights intentionally match the runtime. Mode 3 uses pixel-space coordinates,
+    // so the repeat reads scale by Dimension like tiledMapCoord's returned sample coord does.
+    bool repeatX = ShaderModeX == 3 && tapSubsetCoord.x != tapClampedCoord.x;
+    bool repeatY = ShaderModeY == 3 && tapSubsetCoord.y != tapClampedCoord.y;
+    if (repeatX || repeatY) {
+      float errX = tapSubsetCoord.x - tapClampedCoord.x;
+      float errY = tapSubsetCoord.y - tapClampedCoord.y;
+      float repeatCoordX = errX > 0.0 ? Clamp.x : Clamp.z;
+      float repeatCoordY = errY > 0.0 ? Clamp.y : Clamp.w;
+      if (repeatX && repeatY) {
+        vec4 repeatReadX =
+            texture(TextureSampler_0, vec2(repeatCoordX, tapClampedCoord.y) * Dimension);
+        vec4 repeatReadY =
+            texture(TextureSampler_0, vec2(tapClampedCoord.x, repeatCoordY) * Dimension);
+        vec4 repeatReadXY = texture(TextureSampler_0, vec2(repeatCoordX, repeatCoordY) * Dimension);
+        texColor = mix(mix(texColor, repeatReadX, abs(errX)),
+                       mix(repeatReadY, repeatReadXY, abs(errX)), abs(errY));
+      } else if (repeatX) {
+        vec4 repeatReadX =
+            texture(TextureSampler_0, vec2(repeatCoordX, tapClampedCoord.y) * Dimension);
+        texColor = mix(texColor, repeatReadX, errX);
+      } else {
+        vec4 repeatReadY =
+            texture(TextureSampler_0, vec2(tapClampedCoord.x, repeatCoordY) * Dimension);
+        texColor = mix(texColor, repeatReadY, errY);
+      }
+    }
     texColor = tiledApplyBorder(texColor, tapInCoord, tapSubsetCoord, tapClampedCoord);
 #else
     sampleCoord = clamp(sampleCoord, Subset.xy, Subset.zw);

@@ -237,13 +237,15 @@ static std::optional<PermutationMatchResult> TryMatchTextureFill(const ProgramIn
   return PermutationMatchResult{TextureFillShader::Name(), vertIndex, fragIndex};
 }
 
-// ShaderMode values the shared single-tap tiled_sample.inc handles for the blur tap loop and the
-// blend-merge tiled child: None(0), Clamp(1), RepeatNearestNone(2), MirrorRepeat(6),
-// ClampToBorderNearest(7), ClampToBorderLinear(8). The RepeatLinear/mipmap modes 3/4/5 are only
-// implemented by the tiled fill kernel (see TiledFillModeSupported); blur and blend-merge keep
-// falling back for those to avoid diverging from the runtime path in those consumers.
+// ShaderMode values the shared single-tap tiled_sample.inc handles for the blur tap loop:
+// None(0), Clamp(1), RepeatNearestNone(2), RepeatLinearNone(3), MirrorRepeat(6),
+// ClampToBorderNearest(7), ClampToBorderLinear(8). Mode 3 shares mode 2's wrap-and-clamp
+// coordinate math — the linear-vs-nearest difference is the hardware sampler filter, and each
+// blur tap goes through the same tiledMapCoord path the fill kernel's pixel-verified mode-3
+// handling uses. The mipmap-repeat modes 4/5 need a 4-tap seam blend per tap, which only the
+// tiled fill kernel implements (see TiledFillModeSupported); blur keeps falling back for those.
 static bool TiledModeSupported(int mode) {
-  return mode == 0 || mode == 1 || mode == 2 || mode == 6 || mode == 7 || mode == 8;
+  return mode == 0 || mode == 1 || mode == 2 || mode == 3 || mode == 6 || mode == 7 || mode == 8;
 }
 
 // The tiled fill kernel additionally handles RepeatLinearNone(3) — shares mode 2's coordinate, the
