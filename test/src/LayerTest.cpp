@@ -4737,8 +4737,8 @@ TGFX_TEST(LayerTest, ComputeVisibleFootprintsRejectsSingularHomography) {
 // The text is placed off-origin so the DrawImageRect subset offset is nonzero, which makes the
 // unwrap anchor correction observable.
 static void RenderNestedOffscreenTiledZoom(DisplayList* displayList,
-                                           const std::shared_ptr<Surface>& surface,
-                                           float zoomScale, const std::string& key) {
+                                           const std::shared_ptr<Surface>& surface, float zoomScale,
+                                           const std::string& key) {
   displayList->setZoomScale(zoomScale);
   for (int i = 0; i < 40; ++i) {
     displayList->render(surface.get());
