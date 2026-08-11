@@ -71,6 +71,11 @@ static float SmallestSingularValueSquared(float m00, float m01, float m10, float
   return 0.5f * (trace - std::sqrt(discriminant));
 }
 
+// Mirrors Skia's lazy mipmap policy (SkMipmapAccessor::Make + SkMipmap::ComputeLevel): when the
+// effective minification is absent (computed LOD <= 0), no mip chain is needed and single-level
+// sampling is equivalent. Skia applies this on its CPU raster path; here the same conservative
+// decision gates GPU offscreen mip chain creation for 3D leaves, so perspective or any possible
+// minification keeps trilinear sampling.
 static bool NeedsMipmaps(const Matrix3D& localToCompositor, const Rect& visibleLocal,
                          int rasterWidth, int rasterHeight) {
   const float perspectiveX = localToCompositor.getRowColumn(3, 0);
@@ -243,6 +248,9 @@ std::shared_ptr<Image> Render3DContext::rasterLayer(
   if (info.rasterWidth <= 0 || info.rasterHeight <= 0) {
     return nullptr;
   }
+  // Following Skia's lazy mipmap decision (SkMipmapAccessor + SkMipmap::ComputeLevel), only create
+  // the offscreen mip chain when the leaf can actually be minified while sampling; single-level
+  // sampling is equivalent otherwise and saves the mip storage and generation cost.
   auto surface = Surface::Make(leafArgs.context, info.rasterWidth, info.rasterHeight, false, 1,
                                info.needsMipmaps, 0, _colorSpace);
   if (surface == nullptr) {
