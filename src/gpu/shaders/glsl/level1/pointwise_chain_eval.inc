@@ -71,6 +71,8 @@ float chainDstTF(float x) {
 }
 
 vec4 evalChainSlot() {
+  // Op dispatch order follows observed frequency: idle slots exit on the first check, the hot
+  // texture/const/blend ops next, the pointwise math ops before the rarer coverage op.
   if (Packed.x == OP_NONE) {
     return vec4(0.0);
   }
@@ -88,7 +90,8 @@ vec4 evalChainSlot() {
     }
     return texColor;
   }
-  vec4 in0 = Packed.y == -1 ? TGFX_CHAIN_GEOM_COLOR : (Packed.y < 0 ? vec4(0.0) : chainResults[Packed.y]);
+  vec4 in0 = Packed.y == -1 ? TGFX_CHAIN_GEOM_COLOR
+                            : (Packed.y < 0 ? vec4(0.0) : chainResults[Packed.y]);
   if (Packed.x == OP_CONST_COLOR) {
     if (Packed.w == 1) {
       return ConstColor * in0;
@@ -99,8 +102,30 @@ vec4 evalChainSlot() {
     return ConstColor;
   }
   if (Packed.x == OP_BLEND) {
-    vec4 in1 = Packed.z == -1 ? TGFX_CHAIN_GEOM_COLOR : (Packed.z < 0 ? vec4(0.0) : chainResults[Packed.z]);
+    vec4 in1 = Packed.z == -1 ? TGFX_CHAIN_GEOM_COLOR
+                              : (Packed.z < 0 ? vec4(0.0) : chainResults[Packed.z]);
     return xpBlendColors(in0, in1, Packed.w);
+  }
+  vec4 color = in0;
+  vec4 result;
+  if (Packed.x == OP_COLOR_MATRIX) {
+    // Unpremultiply, apply matrix + vector, clamp, re-premultiply.
+    color = vec4(color.rgb / max(color.a, 9.9999997473787516e-05), color.a);
+    color = clamp(ColorMatrix * color + ColorVector, 0.0, 1.0);
+    color.rgb *= color.a;
+    return color;
+  }
+  if (Packed.x == OP_LUMA) {
+    return vec4(dot(color.rgb, LumaThresh.rgb));
+  }
+  if (Packed.x == OP_ALPHA_THRESHOLD) {
+    result = vec4(0.0);
+    if (color.a > 0.0) {
+      result.rgb = color.rgb / color.a;
+      result.a = step(LumaThresh.a, color.a);
+      result = clamp(result, 0.0, 1.0);
+    }
+    return result;
   }
   if (Packed.x == OP_AARECT_COVERAGE) {
     // Analytic AA-rect coverage (identical math to GLSLAARectEffect): falloff from the fragment's
@@ -110,53 +135,34 @@ vec4 evalChainSlot() {
     highp vec2 dists2 = dists4.xy + dists4.zw - 1.0;
     return in0 * (dists2.x * dists2.y);
   }
-  vec4 color = in0;
-  vec4 result;
-  if (Packed.x == OP_COLOR_MATRIX) {
-    // Unpremultiply, apply matrix + vector, clamp, re-premultiply.
-    color = vec4(color.rgb / max(color.a, 9.9999997473787516e-05), color.a);
-    color = clamp(ColorMatrix * color + ColorVector, 0.0, 1.0);
-    color.rgb *= color.a;
-    result = color;
-  } else if (Packed.x == OP_LUMA) {
-    result = vec4(dot(color.rgb, LumaThresh.rgb));
-  } else if (Packed.x == OP_ALPHA_THRESHOLD) {
-    result = vec4(0.0);
-    if (color.a > 0.0) {
-      result.rgb = color.rgb / color.a;
-      result.a = step(LumaThresh.a, color.a);
-      result = clamp(result, 0.0, 1.0);
-    }
-  } else {  // OP_COLOR_SPACE_XFORM
-    if ((ChainCSFlags & CS_UNPREMUL) != 0) {
-      float a = color.a;
-      color = (a > 0.0) ? vec4(color.rgb / a, a) : vec4(0.0);
-    }
-    if ((ChainCSFlags & CS_LINEARIZE) != 0) {
-      color.r = chainSrcTF(color.r);
-      color.g = chainSrcTF(color.g);
-      color.b = chainSrcTF(color.b);
-    }
-    if ((ChainCSFlags & CS_SRC_OOTF) != 0) {
-      float srcY = dot(color.rgb, ChainSrcOOTF.rgb);
-      color.rgb *= sign(srcY) * pow(abs(srcY), ChainSrcOOTF.a);
-    }
-    if ((ChainCSFlags & CS_GAMUT) != 0) {
-      color.rgb = ChainColorXform * color.rgb;
-    }
-    if ((ChainCSFlags & CS_DST_OOTF) != 0) {
-      float dstY = dot(color.rgb, ChainDstOOTF.rgb);
-      color.rgb *= sign(dstY) * pow(abs(dstY), ChainDstOOTF.a);
-    }
-    if ((ChainCSFlags & CS_ENCODE) != 0) {
-      color.r = chainDstTF(color.r);
-      color.g = chainDstTF(color.g);
-      color.b = chainDstTF(color.b);
-    }
-    if ((ChainCSFlags & CS_PREMUL) != 0) {
-      color.rgb *= color.a;
-    }
-    result = color;
+  // OP_COLOR_SPACE_XFORM
+  if ((ChainCSFlags & CS_UNPREMUL) != 0) {
+    float a = color.a;
+    color = (a > 0.0) ? vec4(color.rgb / a, a) : vec4(0.0);
   }
-  return result;
+  if ((ChainCSFlags & CS_LINEARIZE) != 0) {
+    color.r = chainSrcTF(color.r);
+    color.g = chainSrcTF(color.g);
+    color.b = chainSrcTF(color.b);
+  }
+  if ((ChainCSFlags & CS_SRC_OOTF) != 0) {
+    float srcY = dot(color.rgb, ChainSrcOOTF.rgb);
+    color.rgb *= sign(srcY) * pow(abs(srcY), ChainSrcOOTF.a);
+  }
+  if ((ChainCSFlags & CS_GAMUT) != 0) {
+    color.rgb = ChainColorXform * color.rgb;
+  }
+  if ((ChainCSFlags & CS_DST_OOTF) != 0) {
+    float dstY = dot(color.rgb, ChainDstOOTF.rgb);
+    color.rgb *= sign(dstY) * pow(abs(dstY), ChainDstOOTF.a);
+  }
+  if ((ChainCSFlags & CS_ENCODE) != 0) {
+    color.r = chainDstTF(color.r);
+    color.g = chainDstTF(color.g);
+    color.b = chainDstTF(color.b);
+  }
+  if ((ChainCSFlags & CS_PREMUL) != 0) {
+    color.rgb *= color.a;
+  }
+  return color;
 }

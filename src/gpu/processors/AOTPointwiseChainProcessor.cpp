@@ -166,6 +166,7 @@ void AOTPointwiseChainProcessor::onSetData(UniformData*, UniformData* fragmentUn
     return;
   }
   fragmentUniformData->setDataOptional("RootIndex", static_cast<int>(rootSlot));
+  fragmentUniformData->setDataOptional("SlotCount", static_cast<int>(_slotCount));
   fragmentUniformData->setDataOptional("TiledLeafIndex", tiledLeafIndex);
   if (tiledLeafIndex >= 0) {
     int modeX = static_cast<int>(_tiledRecipe.shaderModeX);

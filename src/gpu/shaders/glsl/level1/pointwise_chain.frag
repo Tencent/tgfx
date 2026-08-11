@@ -45,6 +45,7 @@
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Color;
   int RootIndex;
+  int SlotCount;
   // Per-leaf subset rects, named for the structural ordinals the TextureEffect writers use.
   vec4 Subset;
 #if NTEX >= 2
@@ -796,22 +797,25 @@ vec4 chainResults[16];
 #include "pointwise_chain_unbind.inc"
 
 void main() {
+  // Active slots are contiguous from 0 by construction (texture leaves first, then the rest in
+  // topological order, root last), so a uniform guard skips the whole evaluation of unused slots —
+  // including the Packed read — instead of relying on the OP_NONE early-out alone.
   chainResults[0] = evalChainSlot0();
-  chainResults[1] = evalChainSlot1();
-  chainResults[2] = evalChainSlot2();
-  chainResults[3] = evalChainSlot3();
-  chainResults[4] = evalChainSlot4();
-  chainResults[5] = evalChainSlot5();
-  chainResults[6] = evalChainSlot6();
-  chainResults[7] = evalChainSlot7();
-  chainResults[8] = evalChainSlot8();
-  chainResults[9] = evalChainSlot9();
-  chainResults[10] = evalChainSlot10();
-  chainResults[11] = evalChainSlot11();
-  chainResults[12] = evalChainSlot12();
-  chainResults[13] = evalChainSlot13();
-  chainResults[14] = evalChainSlot14();
-  chainResults[15] = evalChainSlot15();
+  if (SlotCount > 1) chainResults[1] = evalChainSlot1();
+  if (SlotCount > 2) chainResults[2] = evalChainSlot2();
+  if (SlotCount > 3) chainResults[3] = evalChainSlot3();
+  if (SlotCount > 4) chainResults[4] = evalChainSlot4();
+  if (SlotCount > 5) chainResults[5] = evalChainSlot5();
+  if (SlotCount > 6) chainResults[6] = evalChainSlot6();
+  if (SlotCount > 7) chainResults[7] = evalChainSlot7();
+  if (SlotCount > 8) chainResults[8] = evalChainSlot8();
+  if (SlotCount > 9) chainResults[9] = evalChainSlot9();
+  if (SlotCount > 10) chainResults[10] = evalChainSlot10();
+  if (SlotCount > 11) chainResults[11] = evalChainSlot11();
+  if (SlotCount > 12) chainResults[12] = evalChainSlot12();
+  if (SlotCount > 13) chainResults[13] = evalChainSlot13();
+  if (SlotCount > 14) chainResults[14] = evalChainSlot14();
+  if (SlotCount > 15) chainResults[15] = evalChainSlot15();
   vec4 result = chainResults[RootIndex];
 
 #if HAS_MASK_TEXTURE
