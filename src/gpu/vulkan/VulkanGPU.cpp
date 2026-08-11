@@ -483,12 +483,9 @@ std::shared_ptr<CommandEncoder> VulkanGPU::createCommandEncoder() {
 std::vector<std::shared_ptr<Texture>> VulkanGPU::importHardwareTextures(
     HardwareBufferRef hardwareBuffer, uint32_t usage) {
 #if defined(__ANDROID__)
-  if (!HardwareBufferCheck(hardwareBuffer)) {
-    return {};
-  }
-  if (!_extensions.androidHardwareBuffer) {
-    return {};
-  }
+  // Extension-bit and HardwareBufferCheck gating live inside VulkanHardwareTexture::MakeFrom so
+  // there is a single authoritative import-eligibility path (with diagnostic logs on failure).
+  // Duplicating them here would risk the two gates drifting out of sync as new checks are added.
   auto texture = VulkanHardwareTexture::MakeFrom(this, hardwareBuffer, usage);
   if (texture == nullptr) {
     return {};
@@ -497,12 +494,9 @@ std::vector<std::shared_ptr<Texture>> VulkanGPU::importHardwareTextures(
   textures.push_back(std::move(texture));
   return textures;
 #elif defined(_WIN32)
-  if (!HardwareBufferCheck(hardwareBuffer)) {
-    return {};
-  }
-  if (!_extensions.win32ExternalMemory || !_extensions.win32KeyedMutex) {
-    return {};
-  }
+  // Extension-bit and HardwareBufferCheck gating live inside VulkanHardwareTexture::MakeFrom so
+  // there is a single authoritative import-eligibility path (with diagnostic logs on failure).
+  // Duplicating them here would risk the two gates drifting out of sync as new checks are added.
   auto texture = VulkanHardwareTexture::MakeFrom(this, hardwareBuffer, usage);
   if (texture == nullptr) {
     return {};

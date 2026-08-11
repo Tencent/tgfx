@@ -74,6 +74,20 @@ std::shared_ptr<VulkanHardwareTexture> VulkanHardwareTexture::MakeFrom(
   if (!gpu || !hardwareBuffer) {
     return nullptr;
   }
+  if (!gpu->extensions().androidHardwareBuffer) {
+    LOGE(
+        "VulkanHardwareTexture::MakeFrom() VK_ANDROID_external_memory_android_hardware_buffer "
+        "is not enabled on this device; importing an AHardwareBuffer requires this extension "
+        "along with its dependencies (external memory, dedicated allocation, queue family "
+        "foreign).");
+    return nullptr;
+  }
+  if (!HardwareBufferCheck(hardwareBuffer)) {
+    LOGE(
+        "VulkanHardwareTexture::MakeFrom() HardwareBufferCheck rejected the buffer; the "
+        "AHardwareBuffer system library is unavailable or the handle is invalid.");
+    return nullptr;
+  }
 
   auto info = HardwareBufferGetInfo(hardwareBuffer);
   if (info.width <= 0 || info.height <= 0) {
