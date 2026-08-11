@@ -94,10 +94,22 @@ std::shared_ptr<Program> DrawOp::prepareDecomposedProgram(RenderTarget* renderTa
   }
   AOTEffectGraph graph = {};
   AOTEffectPlan plan = {};
-  if (!AOTEffectDecomposer::Lower(colorProcessors, &graph) ||
-      !AOTEffectDecomposer::ValidateForFusion(graph) ||
-      !AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan) ||
-      plan.passes.size() != 1 || plan.passes[0].kernel != AOTKernelKind::PointwiseChain ||
+  bool decomposed =
+      AOTEffectDecomposer::Lower(colorProcessors, &graph) &&
+      AOTEffectDecomposer::ValidateForFusion(graph) &&
+      AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan);
+  // A single-pass pointwise-tail plan is a linear texture-plus-ops chain, and the tail ops are a
+  // subset of the chain op set, so the chain kernel can evaluate it as-is. This route only runs
+  // after the plain matcher missed, which includes the shapes the tail rule rejects (no UV
+  // matrix, alpha-only source, per-quad subset); rewriting the kernel field lets them resolve to
+  // the chain artifact instead of falling back to runtime compilation. Device-space sources and
+  // other chain-incompatible shapes are still rejected by CanExecute/BuildChainProcessor below.
+  if (decomposed && plan.passes.size() == 1 &&
+      plan.passes[0].kernel == AOTKernelKind::PointwiseTail) {
+    plan.passes[0].kernel = AOTKernelKind::PointwiseChain;
+  }
+  if (!decomposed || plan.passes.size() != 1 ||
+      plan.passes[0].kernel != AOTKernelKind::PointwiseChain ||
       !AOTPlanExecutor::CanExecute(graph, plan)) {
     return nullptr;
   }
