@@ -596,7 +596,6 @@ std::shared_ptr<VulkanHardwareTexture> VulkanHardwareTexture::MakeFrom(
     }
     // Some drivers (notably NVIDIA) additionally require dedicated allocation for imported
     // images; VkMemoryDedicatedAllocateInfo below already covers that requirement.
-    (void)features;
   }
 
   VkImageCreateInfo imageInfo = {};
