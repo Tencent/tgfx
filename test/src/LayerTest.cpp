@@ -4730,4 +4730,37 @@ TGFX_TEST(LayerTest, ComputeVisibleFootprintsRejectsSingularHomography) {
                                                        &localFootprint, &destFootprint));
 }
 
+// Tiled mode + high zoom: three nested empty layers (passThroughBackground disabled) wrapping a
+// text layer. Each empty offscreen layer records a single DrawImage, so Image::MakeFrom unwraps the
+// picture repeatedly. Compare the rendered output to catch any offset drift from the unwrap path.
+TGFX_TEST(LayerTest, NestedOffscreenTiledZoom) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto surface = Surface::Make(context, 1024, 1024);
+  ASSERT_NE(surface, nullptr);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Tiled);
+  displayList->setZoomScale(8.0f);
+  auto root = Layer::Make();
+  displayList->root()->addChild(root);
+  Layer* parent = root.get();
+  for (int i = 0; i < 3; ++i) {
+    auto frame = Layer::Make();
+    frame->setPassThroughBackground(false);
+    parent->addChild(frame);
+    parent = frame.get();
+  }
+  auto textLayer = TextLayer::Make();
+  textLayer->setText("06");
+  textLayer->setTextColor(Color::Black());
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  Font font(typeface, 40);
+  textLayer->setFont(font);
+  textLayer->setMatrix(Matrix::MakeTrans(300.0f, 200.0f));
+  parent->addChild(textLayer);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/NestedOffscreenTiledZoom"));
+}
+
 }  // namespace tgfx
