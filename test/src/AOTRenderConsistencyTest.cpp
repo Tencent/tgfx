@@ -241,6 +241,52 @@ TGFX_TEST(AOTRenderConsistencyTest, TiledTextureFillModes) {
 
 // Gaussian blur over a tiled source: exercises GaussianBlur1DShader with a TiledTextureEffect child
 // (HAS_TILED_CHILD) for the non-clamp tile modes, plus the plain-texture child for clamp.
+// Fractional-offset image draw with a shader mask filter: the QuadAA vertices carry sub-1.0
+// coverage, and the mask produces an Xfermode-dst coverage FP, so the chain's coverage subtree
+// reads the real per-vertex coverage through the -3 unit input. Any mis-wiring (opaque where the
+// true coverage belongs, or a doubled vCoverage modulation) shows up as a byte difference along
+// the AA edges.
+TGFX_TEST(AOTRenderConsistencyTest, AACoverageXferDstFold) {
+  auto image = MakeImage("resources/apitest/imageReplacement.jpg");
+  ASSERT_TRUE(image != nullptr);
+  auto renderOnce = [&](bool useBundle, Bitmap* outBitmap) {
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto* cache = context->precompiledShaderCache();
+    if (useBundle) {
+      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+    } else {
+      cache->unload();
+    }
+    ScopedAOTStatsPause statsPause(cache, !useBundle);
+    context->globalCache()->clearPrograms();
+    auto surface = Surface::Make(context, 200, 200);
+    ASSERT_TRUE(surface != nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::White());
+    auto maskShader = Shader::MakeLinearGradient(Point{0, 0}, Point{100, 0},
+                                                 {Color::White(), Color::Transparent()}, {});
+    Paint paint = {};
+    paint.setMaskFilter(MaskFilter::MakeShader(maskShader));
+    canvas->drawImage(image, 50.3f, 25.4f, &paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(200, 200));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+    if (useBundle) {
+      cache->unload();
+    }
+  };
+  Bitmap aotBitmap = {};
+  Bitmap runtimeBitmap = {};
+  renderOnce(true, &aotBitmap);
+  renderOnce(false, &runtimeBitmap);
+  ExpectBitmapsIdentical("aa-xfer-dst-fold", aotBitmap, runtimeBitmap, 200, 200);
+}
+
 TGFX_TEST(AOTRenderConsistencyTest, GaussianBlurTileModes) {
   auto image = MakeImage("resources/apitest/test_timestretch.png");
   ASSERT_TRUE(image != nullptr);

@@ -168,8 +168,11 @@ vec4 evalChainSlotNoTex(int slot) {
   if (Packed.x == OP_NONE) {
     return vec4(0.0);
   }
-  vec4 in0 = Packed.y == -1 ? TGFX_CHAIN_GEOM_COLOR
-                            : (Packed.y < 0 ? vec4(0.0) : chainResults[Packed.y]);
+  vec4 in0 = Packed.y == -1   ? TGFX_CHAIN_GEOM_COLOR
+             : Packed.y == -3 ? TGFX_CHAIN_UNIT_COVERAGE
+             : Packed.y == -4 ? vec4(1.0)
+             : Packed.y < 0   ? vec4(0.0)
+                              : chainResults[Packed.y];
   if (Packed.x == OP_CONST_COLOR) {
     vec4 ConstColor = SlotConstColor[slot];
     if (Packed.w == 1) {
@@ -181,8 +184,11 @@ vec4 evalChainSlotNoTex(int slot) {
     return ConstColor;
   }
   if (Packed.x == OP_BLEND) {
-    vec4 in1 = Packed.z == -1 ? TGFX_CHAIN_GEOM_COLOR
-                              : (Packed.z < 0 ? vec4(0.0) : chainResults[Packed.z]);
+    vec4 in1 = Packed.z == -1   ? TGFX_CHAIN_GEOM_COLOR
+               : Packed.z == -3 ? TGFX_CHAIN_UNIT_COVERAGE
+               : Packed.z == -4 ? vec4(1.0)
+               : Packed.z < 0   ? vec4(0.0)
+                                : chainResults[Packed.z];
     return xpBlendColors(in0, in1, Packed.w);
   }
   vec4 color = in0;

@@ -110,9 +110,13 @@ static void UploadGradientParams(UniformData* uniformData, const AOTGradientPara
 PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
     BlockAllocator* allocator, std::vector<PlacementPtr<FragmentProcessor>> textureLeaves,
     const std::vector<AOTChainSlot>& slots, size_t rootSlot, int tiledLeafIndex,
-    const AOTTiledTextureRecipe* tiledRecipe, PlacementPtr<FragmentProcessor> maskChild) {
+    const AOTTiledTextureRecipe* tiledRecipe, PlacementPtr<FragmentProcessor> maskChild,
+    int coverageRootSlot) {
   if (allocator == nullptr || slots.empty() || slots.size() > MaxSlots ||
       rootSlot >= slots.size()) {
+    return nullptr;
+  }
+  if (coverageRootSlot >= 0 && static_cast<size_t>(coverageRootSlot) >= slots.size()) {
     return nullptr;
   }
   auto leafCount = textureLeaves.size();
@@ -145,16 +149,19 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
       return nullptr;
     }
   }
-  return allocator->make<AOTPointwiseChainProcessor>(
-      std::move(textureLeaves), slots, rootSlot, tiledLeafIndex, tiledRecipe, std::move(maskChild));
+  return allocator->make<AOTPointwiseChainProcessor>(std::move(textureLeaves), slots, rootSlot,
+                                                     tiledLeafIndex, tiledRecipe,
+                                                     std::move(maskChild), coverageRootSlot);
 }
 
 AOTPointwiseChainProcessor::AOTPointwiseChainProcessor(
     std::vector<PlacementPtr<FragmentProcessor>> textureLeaves,
     const std::vector<AOTChainSlot>& newSlots, size_t rootSlot, int tiledLeafIndex,
-    const AOTTiledTextureRecipe* tiledRecipe, PlacementPtr<FragmentProcessor> maskChildFP)
+    const AOTTiledTextureRecipe* tiledRecipe, PlacementPtr<FragmentProcessor> maskChildFP,
+    int coverageRootSlot)
     : FragmentProcessor(ClassID()), _slotCount(newSlots.size()), rootSlot(rootSlot),
-      tiledLeafIndex(tiledLeafIndex), hasMaskChild(maskChildFP != nullptr) {
+      tiledLeafIndex(tiledLeafIndex), hasMaskChild(maskChildFP != nullptr),
+      coverageRootSlot(coverageRootSlot) {
   if (tiledRecipe != nullptr) {
     _tiledRecipe = *tiledRecipe;
   }
@@ -191,6 +198,7 @@ void AOTPointwiseChainProcessor::onComputeProcessorKey(BytesKey* bytesKey) const
   bytesKey->write(static_cast<uint32_t>(rootSlot));
   bytesKey->write(static_cast<uint32_t>(numChildProcessors()));
   bytesKey->write(static_cast<uint32_t>(hasMaskChild ? 1 : 0));
+  bytesKey->write(static_cast<uint32_t>(coverageRootSlot + 1));
   for (size_t index = 0; index < _slotCount; ++index) {
     bytesKey->write(static_cast<uint32_t>(slots[index].op));
     if (slots[index].op == AOTChainOp::ColorSpaceXform) {
@@ -204,6 +212,7 @@ void AOTPointwiseChainProcessor::onSetData(UniformData*, UniformData* fragmentUn
     return;
   }
   fragmentUniformData->setDataOptional("RootIndex", static_cast<int>(rootSlot));
+  fragmentUniformData->setDataOptional("CoverageRootIndex", coverageRootSlot);
   fragmentUniformData->setDataOptional("SlotCount", static_cast<int>(_slotCount));
   fragmentUniformData->setDataOptional("TiledLeafIndex", tiledLeafIndex);
   if (tiledLeafIndex >= 0) {

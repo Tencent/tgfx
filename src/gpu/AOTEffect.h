@@ -82,6 +82,10 @@ enum class AOTEffectKind {
   PerlinNoiseSource,
   RectCoverage,
   GradientSource,
+  // The unit input of a coverage subtree: the GP's output coverage (vCoverage broadcast, or
+  // vec4(1.0) when the GP carries none), matching the runtime coverage-chain origin. Never
+  // becomes a chain slot; as an op input it maps to the -3 designator.
+  GeometryCoverage,
 };
 
 enum class EffectDomain {
@@ -313,6 +317,8 @@ class AOTNodeBuilder {
 
   bool addGradientSource(AOTNodeID input, const AOTGradientParameters& parameters,
                          AOTNodeID* output);
+
+  bool addGeometryCoverage(AOTNodeID* output);
 
   bool finish(AOTNodeID root, AOTEffectGraph* graph) const;
 

@@ -39,13 +39,17 @@ class AOTPlanExecutor {
    * same pixels through the precompiled PointwiseChainShader. Used both by the offscreen executor
    * and by the direct-draw decomposition route in DrawOp::prepare.
    *
-   * coverageFP, when non-null, folds the draw's coverage into the chain: a bare AARectEffect
-   * becomes an AARectCoverage slot, an alpha-only DeviceSpaceTextureEffect becomes the mask child,
-   * and Compose(mask, rect) becomes both. Any other coverage form returns nullptr.
+   * coverageFPs, when non-empty, folds the draw's coverage into the chain. A single FP uses the
+   * narrow forms first (a bare AARectEffect becomes an AARectCoverage slot, an alpha-only
+   * DeviceSpaceTextureEffect becomes the mask child, Compose(mask, rect) becomes both); anything
+   * else is lowered as a general pointwise coverage subtree rooted at the GP coverage, which the
+   * kernel multiplies into the color result instead of the plain coverage modulation. Two FPs are
+   * accepted in the form [lowerable subtree, alpha-only device mask], folding to subtree + mask
+   * child. Any other coverage form returns nullptr.
    */
   static PlacementPtr<FragmentProcessor> BuildChainProcessor(
       BlockAllocator* allocator, const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
-      const FragmentProcessor* coverageFP = nullptr);
+      const std::vector<const FragmentProcessor*>& coverageFPs = {});
 
   /**
    * Builds an atomic render task for a supported linear AOT plan without enqueueing it. On failure,

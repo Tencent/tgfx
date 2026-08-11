@@ -80,12 +80,17 @@ std::shared_ptr<Program> DrawOp::prepareDecomposedProgram(RenderTarget* renderTa
   if (MatchPermutation(preparedProgramInfo.get()).has_value()) {
     return nullptr;
   }
-  const FragmentProcessor* coverageFP = nullptr;
+  std::vector<const FragmentProcessor*> coverageFPs = {};
   if (!coverages.empty()) {
-    if (coverages.size() != 1) {
+    // Up to two coverage FPs fold into the chain: a single one lowers as the narrow forms or a
+    // general subtree, and a pair folds as subtree + trailing device-mask child.
+    if (coverages.size() > 2) {
       return nullptr;
     }
-    coverageFP = coverages.front().get();
+    coverageFPs.reserve(coverages.size());
+    for (auto& coverage : coverages) {
+      coverageFPs.push_back(coverage.get());
+    }
   }
   std::vector<const FragmentProcessor*> colorProcessors = {};
   colorProcessors.reserve(activeColors.size());
@@ -113,7 +118,8 @@ std::shared_ptr<Program> DrawOp::prepareDecomposedProgram(RenderTarget* renderTa
       !AOTPlanExecutor::CanExecute(graph, plan)) {
     return nullptr;
   }
-  auto chainFP = AOTPlanExecutor::BuildChainProcessor(allocator, graph, plan.passes[0], coverageFP);
+  auto chainFP =
+      AOTPlanExecutor::BuildChainProcessor(allocator, graph, plan.passes[0], coverageFPs);
   if (chainFP == nullptr) {
     return nullptr;
   }

@@ -723,6 +723,11 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
       return std::nullopt;
     }
   }
+  // Coverage subtrees draw their unit input from the GP coverage, which only the rect layouts
+  // supply (the ellipse layout's coverage is evaluated per-pixel at the end).
+  if (chain->coverageRoot() >= 0 && gpLayout != 0) {
+    return std::nullopt;
+  }
   for (size_t index = 0; index < leafCount; ++index) {
     auto leaf = chain->childProcessor(index);
     if (leaf->name() != "TextureEffect" || leaf->numTextureSamplers() != 1) {

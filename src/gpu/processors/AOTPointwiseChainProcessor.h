@@ -90,12 +90,12 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
       BlockAllocator* allocator, std::vector<PlacementPtr<FragmentProcessor>> textureLeaves,
       const std::vector<AOTChainSlot>& slots, size_t rootSlot, int tiledLeafIndex = -1,
       const AOTTiledTextureRecipe* tiledRecipe = nullptr,
-      PlacementPtr<FragmentProcessor> maskChild = nullptr);
+      PlacementPtr<FragmentProcessor> maskChild = nullptr, int coverageRootSlot = -1);
 
   AOTPointwiseChainProcessor(std::vector<PlacementPtr<FragmentProcessor>> textureLeaves,
                              const std::vector<AOTChainSlot>& slots, size_t rootSlot,
                              int tiledLeafIndex, const AOTTiledTextureRecipe* tiledRecipe,
-                             PlacementPtr<FragmentProcessor> maskChild);
+                             PlacementPtr<FragmentProcessor> maskChild, int coverageRootSlot);
 
   std::string name() const override {
     return "AOTPointwiseChainProcessor";
@@ -116,6 +116,13 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
 
   size_t root() const {
     return rootSlot;
+  }
+
+  // Slot index of the coverage subtree's root, or -1 when the chain carries no coverage subtree.
+  // When present, the kernel multiplies the color result by that slot's value instead of the
+  // plain coverage modulation.
+  int coverageRoot() const {
+    return coverageRootSlot;
   }
 
   // Index of the leaf that needs shader-side tiling (wrap/border emulation), or -1 when every
@@ -153,6 +160,7 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
   // transforms) so the gradient coordinate mapping shares the GP-written transform path. A chain
   // without a gradient slot exposes a default identity transform here.
   CoordTransform gradientCoordTransform = {};
+  int coverageRootSlot = -1;
 };
 
 }  // namespace tgfx

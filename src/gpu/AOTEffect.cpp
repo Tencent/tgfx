@@ -142,6 +142,20 @@ bool AOTNodeBuilder::addGradientSource(AOTNodeID input, const AOTGradientParamet
   return addUnaryNode(AOTEffectKind::GradientSource, input, traits, parameters, output);
 }
 
+bool AOTNodeBuilder::addGeometryCoverage(AOTNodeID* output) {
+  if (output == nullptr || !nodes.empty()) {
+    return false;
+  }
+  // The unit input of a coverage subtree: the GP's output coverage, which is what the runtime
+  // coverage chain starts from. A self-contained source like the geometry color.
+  AOTEffectNode node = {};
+  node.kind = AOTEffectKind::GeometryCoverage;
+  node.traits = {EffectDomain::Pointwise, EffectInputUsage::Ignore, true, true, true};
+  nodes.push_back(std::move(node));
+  *output = AOTNodeID(0);
+  return true;
+}
+
 bool AOTNodeBuilder::finish(AOTNodeID root, AOTEffectGraph* graph) const {
   if (graph == nullptr || !contains(root)) {
     return false;

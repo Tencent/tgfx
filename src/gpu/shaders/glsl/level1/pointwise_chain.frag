@@ -45,6 +45,10 @@
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Color;
   int RootIndex;
+  // Slot index of the coverage subtree's root, -1 when the chain has none. When present, the
+  // subtree's value replaces the plain coverage modulation (it already carries the GP coverage
+  // through the -3 unit input).
+  int CoverageRootIndex;
   int SlotCount;
   // Per-leaf subset rects, named for the structural ordinals the TextureEffect writers use.
   vec4 Subset;
@@ -230,6 +234,15 @@ vec4 chainResults[16];
 #define TGFX_CHAIN_GEOM_COLOR Color
 #endif
 
+// The coverage subtree's unit input (slot designator -3): the GP's output coverage, which is
+// what the runtime coverage chain starts from. Only GP_LAYOUT=0 chains carry coverage subtrees
+// (matcher-enforced); the vec4(1.0) form keeps the define valid for every other variant.
+#if GP_LAYOUT == 0 && HAS_COVERAGE
+#define TGFX_CHAIN_UNIT_COVERAGE vec4(vCoverage)
+#else
+#define TGFX_CHAIN_UNIT_COVERAGE vec4(1.0)
+#endif
+
 #include "pointwise_chain_eval.inc"
 
 #if NTEX > 0
@@ -283,11 +296,14 @@ void main() {
 #define TGFX_XP_SRC_UNPREMUL result
 #define TGFX_XP_COVERAGE vec4(gpCoverage)
 #elif HAS_COVERAGE
-#define TGFX_XP_SRC_COLOR (result * vCoverage)
+  // A coverage subtree's root already carries the GP coverage (fed in through the -3 unit
+  // input), so it replaces the plain vCoverage modulation instead of doubling it.
+  vec4 finalCoverage = CoverageRootIndex >= 0 ? chainResults[CoverageRootIndex] : vec4(vCoverage);
+#define TGFX_XP_SRC_COLOR (result * finalCoverage)
 #define TGFX_XP_SRC_UNPREMUL result
-#define TGFX_XP_COVERAGE vec4(vCoverage)
+#define TGFX_XP_COVERAGE finalCoverage
 #else
-#define TGFX_XP_SRC_COLOR result
+#define TGFX_XP_SRC_COLOR (CoverageRootIndex >= 0 ? result * chainResults[CoverageRootIndex] : result)
 #endif
 #include "xp_output.inc"
 }
