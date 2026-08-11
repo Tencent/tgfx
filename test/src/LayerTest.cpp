@@ -4730,9 +4730,22 @@ TGFX_TEST(LayerTest, ComputeVisibleFootprintsRejectsSingularHomography) {
                                                        &localFootprint, &destFootprint));
 }
 
-// Tiled mode + high zoom: three nested empty layers (passThroughBackground disabled) wrapping a
-// text layer. Each empty offscreen layer records a single DrawImage, so Image::MakeFrom unwraps the
-// picture repeatedly. Compare the rendered output to catch any offset drift from the unwrap path.
+// Tiled mode with per-frame tile budget. Zooming in invalidates every tile; with
+// TileUpdateMode::Fast and setMaxTilesRefinedPerFrame(1), each render() call refines at most one
+// missing tile, so every tile runs its own offscreen pass followed by a Picture::asImage unwrap.
+// An anchor drift in the unwrap path then surfaces as block-aligned misalignment between tiles.
+// The text is placed off-origin so the DrawImageRect subset offset is nonzero, which makes the
+// unwrap anchor correction observable.
+static void RenderNestedOffscreenTiledZoom(DisplayList* displayList,
+                                           const std::shared_ptr<Surface>& surface,
+                                           float zoomScale, const std::string& key) {
+  displayList->setZoomScale(zoomScale);
+  for (int i = 0; i < 40; ++i) {
+    displayList->render(surface.get());
+  }
+  EXPECT_TRUE(Baseline::Compare(surface, key));
+}
+
 TGFX_TEST(LayerTest, NestedOffscreenTiledZoom) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -4741,9 +4754,12 @@ TGFX_TEST(LayerTest, NestedOffscreenTiledZoom) {
   ASSERT_NE(surface, nullptr);
   auto displayList = std::make_unique<DisplayList>();
   displayList->setRenderMode(RenderMode::Tiled);
-  displayList->setZoomScale(8.0f);
+  displayList->setTileUpdateMode(TileUpdateMode::Fast);
+  displayList->setMaxTilesRefinedPerFrame(1);
   auto root = Layer::Make();
   displayList->root()->addChild(root);
+  // Three nested layers each with passThroughBackground disabled, forcing every level through
+  // its own offscreen render pass before compositing.
   Layer* parent = root.get();
   for (int i = 0; i < 3; ++i) {
     auto frame = Layer::Make();
@@ -4757,10 +4773,15 @@ TGFX_TEST(LayerTest, NestedOffscreenTiledZoom) {
   auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
   Font font(typeface, 40);
   textLayer->setFont(font);
-  textLayer->setMatrix(Matrix::MakeTrans(300.0f, 200.0f));
+  textLayer->setMatrix(Matrix::MakeTrans(30.0f, 20.0f));
   parent->addChild(textLayer);
+  // Warm up at zoom=1.0 to build the initial tile cache and clear the startup dirty regions.
   displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/NestedOffscreenTiledZoom"));
+  // Zoom in: the frame right after the zoom change has a zero tile budget, so every tile falls
+  // back to the zoom=1.0 cache. Each following frame refines at most one missing tile. Loop until
+  // all tiles in the viewport are rasterized at the target zoom.
+  RenderNestedOffscreenTiledZoom(displayList.get(), surface, 12.29f,
+                                 "LayerTest/NestedOffscreenTiledZoom");
 }
 
 }  // namespace tgfx
