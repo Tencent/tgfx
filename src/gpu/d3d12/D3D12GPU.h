@@ -408,20 +408,13 @@ class D3D12GPU : public GPU {
 
   /**
    * Acquires every IDXGIKeyedMutex the session touched. If a mutex is still held by an earlier
-   * inflight submission (recorded in mutexAcquireFenceValues), waits precisely for that
-   * submission's fence to complete and drives reclaimSubmission() to release the mutex before
-   * re-acquiring. This avoids the deterministic self-deadlock that would otherwise trigger the
-   * AcquireSync timeout when the same shared surface is sampled across consecutive frames.
-   * Returns true on full success. On failure, any mutexes already acquired inside this call are
-   * released so the D3D11 side is not left permanently blocked; the caller must abandon the
-   * submission.
+   * inflight submission, waits precisely for that submission's fence and drives
+   * reclaimSubmission() to release the mutex before re-acquiring, avoiding the self-deadlock
+   * that would otherwise happen on the AcquireSync timeout. On failure, any mutexes already
+   * acquired inside this call are released; the caller must abandon the submission.
    */
   bool acquireSessionMutexes(D3D12FrameSession& session);
 
-  /// Rolls back a partial acquire performed by acquireSessionMutexes: releases the first
-  /// `acquiredCount` non-null mutexes in `session.keyedMutexes`, in the same order the acquire
-  /// loop visited them. Extracted as a member function to keep acquireSessionMutexes free of
-  /// lambdas (coding-guideline requirement).
   void releasePartiallyAcquiredMutexes(const D3D12FrameSession& session, size_t acquiredCount);
 
   ComPtr<ID3D12Fence> _frameFence = nullptr;
@@ -433,16 +426,10 @@ class D3D12GPU : public GPU {
   // value without taking the GPU lock.
   std::atomic<int64_t> _lastFenceSignalTime = {0};
   std::deque<InflightSubmission> inflightSubmissions;
-  // Tracks the frame-fence value under which each IDXGIKeyedMutex was most recently acquired by
-  // this GPU. When acquireSessionMutexes() finds an entry here, the corresponding submission may
-  // still be inflight (fence not yet signalled), meaning the mutex is still held by the previous
-  // ExecuteCommandLists. In that case we wait precisely for that fence and drive
-  // pollCompletedSubmissions() to release the mutex before re-acquiring. In reclaimSubmission()
-  // an entry is erased only when its recorded fence value still matches the submission being
-  // reclaimed; if a later submission has already re-acquired the mutex and overwritten the entry
-  // with a higher fence, that newer binding is left intact so subsequent acquireSessionMutexes()
-  // calls can still see the correct predecessor fence. This keeps the map's size bounded by the
-  // number of distinct shared surfaces sampled at any given time.
+  // Fence value under which each keyed mutex was last acquired, so acquireSessionMutexes can wait
+  // on the correct predecessor when the same shared surface is sampled across frames. Entries are
+  // erased in reclaimSubmission only when the recorded fence matches the reclaimed submission — a
+  // later acquire may have overwritten the entry with a higher fence, which must be preserved.
   std::unordered_map<IDXGIKeyedMutex*, uint64_t> mutexAcquireFenceValues;
   // Sticky flag set when the device returns DXGI_ERROR_DEVICE_REMOVED or another fatal error.
   // Once set, executeSubmission and waitAllInflightSubmissions stop blocking on the fence — the

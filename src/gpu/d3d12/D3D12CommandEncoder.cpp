@@ -458,16 +458,8 @@ void D3D12CommandEncoder::recordTextureStateChange(D3D12Texture* texture,
   // for the same texture as cheap O(1) lookups that do not overwrite the saved value.
   bool firstTouch = session.initialTextureStates.emplace(texture, texture->currentState()).second;
   texture->setCurrentState(newState);
-  // On the first time we touch this texture in this session, remember its keyed mutex (if any)
-  // so executeSubmission can acquire/release it around ExecuteCommandLists. Only D3D12Hardware-
-  // Texture returns a non-null mutex; every other texture short-circuits with zero overhead.
-  // The `firstTouch` guard deduplicates by D3D12Texture*, but two distinct D3D12HardwareTexture
-  // instances can, in principle, wrap different views of the same underlying shared surface and
-  // therefore share the same IDXGIKeyedMutex. IDXGIKeyedMutex is not reentrant across
-  // AcquireSync(0, ...) calls on the same device, so a second push of an already-registered
-  // mutex would either deadlock or unbalance the Release count. Guard against that with a
-  // linear find: keyedMutexes is typically empty or has a single element, so the O(N) scan is
-  // effectively O(1) in practice.
+  // Deduplicate mutexes by pointer: distinct D3D12HardwareTexture instances can wrap different
+  // views of the same shared surface, and IDXGIKeyedMutex is not reentrant across AcquireSync(0).
   if (firstTouch) {
     if (auto* mutex = texture->keyedMutex()) {
       auto& list = session.keyedMutexes;

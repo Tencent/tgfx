@@ -24,24 +24,9 @@
 namespace tgfx {
 
 /**
- * A D3D12Texture subclass that wraps an ID3D11Texture2D imported into D3D12 via a shared NT
- * handle. The source ID3D11Texture2D must have been created with
- * D3D11_RESOURCE_MISC_SHARED_NTHANDLE | D3D11_RESOURCE_MISC_SHARED_KEYEDMUTEX. NTHANDLE alone is
- * rejected by the D3D11 runtime (E_INVALIDARG), and the keyed mutex is what serialises access
- * between the D3D11 producer and the D3D12 consumer.
- *
- * Only TextureUsage::TEXTURE_BINDING is supported: the resulting D3D12 resource is intended for
- * sampling, not for use as a render target.
- *
- * Keyed-mutex contract (key is hard-coded to 0, matching WGL_NV_DX_interop / D3D11On12 / Skia):
- *   - The application produces content on the D3D11 side, then calls
- *     IDXGIKeyedMutex::ReleaseSync(0) to hand ownership to D3D12.
- *   - tgfx internally calls AcquireSync(0, 5000ms) before each ExecuteCommandLists that samples
- *     this texture and ReleaseSync(0) once the GPU has finished (after the fence signals).
- *   - The application must call AcquireSync(0, timeout) again before it modifies the texture on
- *     the D3D11 side.
- * If AcquireSync times out on the tgfx side (typically due to a missing ReleaseSync in the
- * application), the D3D12 context is marked lost.
+ * A D3D12Texture that wraps an ID3D11Texture2D imported via a shared NT handle. The source
+ * texture must have been created with D3D11_RESOURCE_MISC_SHARED_NTHANDLE |
+ * D3D11_RESOURCE_MISC_SHARED_KEYEDMUTEX. Only TextureUsage::TEXTURE_BINDING is supported.
  */
 class D3D12HardwareTexture : public D3D12Texture {
  public:

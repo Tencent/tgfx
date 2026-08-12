@@ -42,25 +42,12 @@ namespace tgfx {
 // heavy render frame before the wait aborts, while still guarding against a genuine device hang.
 static constexpr DWORD FENCE_WAIT_TIMEOUT_MS = 60000;
 
-// Bounded timeout for IDXGIKeyedMutex::AcquireSync(0). Self-contention across consecutive frames
-// is resolved before this ever fires: acquireSessionMutexes() precisely waits on the previous
-// submission's fence and drives pollCompletedSubmissions() to release the mutex. So AcquireSync
-// only blocks on an actual external holder — either a legitimate D3D11 producer whose current
-// AcquireSync/ReleaseSync window happens to be long (e.g. a video pipeline doing whole-frame GPU
-// composition inside the window, which can spike well above 100ms under load), or a genuinely
-// mis-behaving producer that forgot to call ReleaseSync(0). We cannot use INFINITE the way
-// Chromium's SharedImage layer does, because their producer holds the mutex only around CPU-side
-// command recording; we hold it across a GPU fence, so an anomalous producer would deadlock the
-// render thread. 5 seconds is chosen to favour "do not falsely kill a legitimate slow producer"
-// over "surface a broken producer immediately" — 5s is well above realistic GPU-composition
-// jitter on the producer side, and a real hang still surfaces as a context-loss within a bounded
-// window instead of an indefinite stall.
+// AcquireSync timeout. Self-contention is resolved via fence wait in acquireSessionMutexes, so
+// this only bounds external producers. 5s tolerates legitimate GPU-composition jitter while still
+// bounding a genuine hang.
 static constexpr DWORD KEYED_MUTEX_ACQUIRE_TIMEOUT_MS = 5000;
 
 bool HardwareBufferAvailable() {
-  // The D3D12 backend imports ID3D11Texture2D-based HardwareBufferRefs via a shared handle. The
-  // capability itself is always available; whether a specific texture can actually be imported
-  // depends on the flags it was created with (see D3D12HardwareTexture::MakeFrom for details).
   return true;
 }
 
@@ -851,13 +838,10 @@ void D3D12GPU::executeSubmission(SubmitRequest request) {
     lists.push_back(request.session.commandList.Get());
   }
 
-  // Step 4a: Acquire every IDXGIKeyedMutex the session touched. Self-contention across
-  // consecutive frames (previous submission still holds the mutex because its fence has not yet
-  // signalled) is handled inside the helper by waiting precisely on that fence and driving
-  // pollCompletedSubmissions() to release the mutex, rather than blocking on the AcquireSync
-  // timeout. Any mutex successfully acquired here is bound to the fence value we are about to
-  // signal in Step 6, so reclaimSubmission() can later ReleaseSync(0) and clear the tracking
-  // entry once the GPU is done sampling the shared surface.
+  // Step 4a: Acquire every IDXGIKeyedMutex the session touched. Self-contention with an earlier
+  // inflight submission is resolved inside the helper via a fence wait rather than by blocking on
+  // AcquireSync. Successfully acquired mutexes are bound in Step 6 to the fence about to be
+  // signalled, so reclaimSubmission() can release them once the GPU is done.
   if (!acquireSessionMutexes(request.session)) {
     markContextLost("executeSubmission keyed mutex acquire");
     reclaimAbandonedSession(std::move(request.session));
@@ -945,10 +929,8 @@ void D3D12GPU::executeSubmission(SubmitRequest request) {
     return;
   }
 
-  // Bind every mutex we acquired in Step 4a to the fence value we just signalled. Once that
-  // fence value completes, reclaimSubmission() will ReleaseSync(0) and erase the entry. Any
-  // subsequent acquireSessionMutexes() that finds an entry here waits precisely for this fence,
-  // avoiding the deterministic self-deadlock diagnosed in code review.
+  // Bind each mutex to the fence just signalled so reclaimSubmission() can release them and
+  // acquireSessionMutexes() can find the correct predecessor for the next frame.
   for (auto* mutex : request.session.keyedMutexes) {
     if (mutex != nullptr) {
       mutexAcquireFenceValues[mutex] = _lastSignalledFenceValue;
@@ -1064,13 +1046,9 @@ void D3D12GPU::reclaimSubmission(InflightSubmission& submission) {
       _commandListPool.release(std::move(entry));
     }
   }
-  // Release every keyed mutex that executeSubmission acquired for this submission. The GPU has
-  // now finished sampling the shared textures (fence has signalled), so it is safe to hand the
-  // memory back to the D3D11 producer with key 0. ReleaseSync failures are only logged: the
-  // resource is going away regardless, and there is no meaningful recovery path once the fence
-  // signal has been observed. Whether the tracking entry in mutexAcquireFenceValues gets erased
-  // is independent of the ReleaseSync result — it is driven purely by fence-value matching, see
-  // the inline comment below.
+  // Release every keyed mutex acquired for this submission. ReleaseSync failures are only logged
+  // — the resource is going away regardless. Tracking-entry erasure is independent of the
+  // ReleaseSync result and gated purely on fence-value matching (see below).
   for (auto* mutex : submission.session.keyedMutexes) {
     if (mutex == nullptr) {
       continue;
@@ -1082,9 +1060,8 @@ void D3D12GPU::reclaimSubmission(InflightSubmission& submission) {
     }
     auto it = mutexAcquireFenceValues.find(mutex);
     if (it != mutexAcquireFenceValues.end() && it->second == submission.fenceValue) {
-      // Only erase when the recorded fence still matches this submission. If a later submission
-      // has already re-acquired the mutex and overwritten the entry with its own (higher) fence,
-      // leave that newer binding intact so acquireSessionMutexes() sees the correct predecessor.
+      // A later submission may have re-bound the mutex to a higher fence; leave that binding
+      // intact so acquireSessionMutexes() still sees the correct predecessor.
       mutexAcquireFenceValues.erase(it);
     }
   }
@@ -1095,19 +1072,12 @@ void D3D12GPU::reclaimSubmission(InflightSubmission& submission) {
 }
 
 bool D3D12GPU::acquireSessionMutexes(D3D12FrameSession& session) {
-  // Two contention modes must be distinguished:
-  //   1. Self-contention: the same GPU's previous submission still holds this mutex because its
-  //      fence has not yet signalled. AcquireSync(0, timeout) would block until the timeout on
-  //      the same thread that would otherwise drive pollCompletedSubmissions() -> Release, so a
-  //      short timeout still deterministically loses the context. Instead, precisely wait on
-  //      that submission's fence value and drive pollCompletedSubmissions(), which invokes
-  //      reclaimSubmission() and therefore ReleaseSync(0). Only after that do we call
-  //      AcquireSync -- and it should now succeed immediately.
-  //   2. External contention: the D3D11 producer forgot to ReleaseSync(0) after its update, or
-  //      the keyed mutex is being used same-process (which returns DXGI_ERROR_INVALID_CALL /
-  //      0x887A0001 immediately from AcquireSync). This surfaces as an AcquireSync failure /
-  //      timeout after the self-contention path has already been resolved, and is treated as an
-  //      unrecoverable context loss for this submission.
+  // Two contention modes:
+  //   1. Self-contention (previous submission still holds the mutex): resolve by waiting on that
+  //      submission's fence and driving pollCompletedSubmissions() so reclaimSubmission() does
+  //      the ReleaseSync(0). Blocking AcquireSync directly would deadlock on the same thread.
+  //   2. External contention (D3D11 producer / same-process misuse): treated as an unrecoverable
+  //      context loss after the bounded AcquireSync timeout.
   size_t acquiredCount = 0;
   for (auto* mutex : session.keyedMutexes) {
     if (mutex == nullptr) {
@@ -1137,18 +1107,9 @@ bool D3D12GPU::acquireSessionMutexes(D3D12FrameSession& session) {
           return false;
         }
       }
-      // Drive the release side of the predecessor: pollCompletedSubmissions() walks
-      // inflightSubmissions in order and, for every entry whose fence has now signalled, calls
-      // reclaimSubmission() which does ReleaseSync(0) and clears the tracking entry. After this
-      // returns, either the entry is gone (mutex now free) or a still-later submission has
-      // rebound it, which acquireSessionMutexes callers cannot produce because we are running on
-      // the same submission thread.
       pollCompletedSubmissions();
     }
-    // Acquire phase: the mutex is now known to be free from our own side. Any remaining wait
-    // reflects an external holder; the timeout is sized to tolerate legitimate producer-side
-    // GPU-composition jitter while still surfacing a genuinely hung producer within a bounded
-    // window (see KEYED_MUTEX_ACQUIRE_TIMEOUT_MS for the rationale).
+    // Acquire phase: any remaining wait reflects an external holder.
     auto hr = mutex->AcquireSync(0, KEYED_MUTEX_ACQUIRE_TIMEOUT_MS);
     if (FAILED(hr) || hr == WAIT_TIMEOUT || hr == WAIT_ABANDONED) {
       LOGE(
@@ -1168,9 +1129,6 @@ bool D3D12GPU::acquireSessionMutexes(D3D12FrameSession& session) {
 
 void D3D12GPU::releasePartiallyAcquiredMutexes(const D3D12FrameSession& session,
                                                size_t acquiredCount) {
-  // Roll back a partial acquire so the D3D11 side is not left permanently blocked. Only the
-  // first acquiredCount non-null entries in session.keyedMutexes have actually been acquired by
-  // acquireSessionMutexes; matches its loop order exactly.
   size_t released = 0;
   for (auto* mutex : session.keyedMutexes) {
     if (released >= acquiredCount) {
