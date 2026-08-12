@@ -805,14 +805,8 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
   }
   PlacementPtr<FragmentProcessor> maskChild = nullptr;
   if (maskEffect != nullptr) {
-    // The mask child soft-writes the base-name Subset uniform, which would clobber a leaf's real
-    // subset rect; reject that combination so the draw keeps the plain route instead of sampling
-    // with a wrong clamp. The leaves were verified to be TextureEffects above.
-    for (const auto& leaf : leaves) {
-      if (static_cast<const TextureEffect*>(leaf.get())->hasSubset()) {
-        return nullptr;
-      }
-    }
+    // The mask child's Subset write routes to the kernel's DeviceMaskSubset decoy, so a leaf's
+    // real subset rect survives in the shared uniform block.
     maskChild = DeviceSpaceTextureEffect::Make(allocator, maskEffect->getTextureProxy(),
                                                maskEffect->getUVMatrix());
     if (maskChild == nullptr) {

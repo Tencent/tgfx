@@ -39,6 +39,10 @@ layout(set = 1, binding = 1) uniform sampler2D MaskTextureSampler;
   #define XP_DST_TEX_BINDING 2
 #else
   #define XP_DST_TEX_BINDING 1
+
+  // Decoy write target for the coverage mask FP (see GLSLDeviceSpaceTextureEffect::onSetData);
+  // never read — the mask is sampled unclamped.
+  vec4 DeviceMaskSubset;
 #endif
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"

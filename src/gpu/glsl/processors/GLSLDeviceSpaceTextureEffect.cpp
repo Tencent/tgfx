@@ -62,7 +62,20 @@ void GLSLDeviceSpaceTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
   auto scale = textureView->getTextureCoord(1, 1);
   deviceCoordMatrix.postScale(scale.x, scale.y);
   fragmentUniformData->setData("DeviceCoordMatrix", deviceCoordMatrix);
-  if (fragmentUniformData->hasField("Subset")) {
+  // Shared precompiled kernels (a device mask alongside texture fills) declare a
+  // DeviceMaskSubset decoy: this FP's Subset/AlphaOnly/Rect writes are dead or would clobber the
+  // leaf processor's same-named fields, so they are routed there and skipped here. The decoy is
+  // never read — these kernels sample the mask unclamped, matching the runtime emission.
+  bool sharedKernel = fragmentUniformData->hasField("DeviceMaskSubset");
+  if (sharedKernel) {
+    float rect[4] = {0.0f, 0.0f, 1.0f, 1.0f};
+    if (textureView->getTexture()->type() == TextureType::Rectangle) {
+      rect[2] = static_cast<float>(textureView->width());
+      rect[3] = static_cast<float>(textureView->height());
+    }
+    fragmentUniformData->setData("DeviceMaskSubset", rect);
+  }
+  if (!sharedKernel && fragmentUniformData->hasField("Subset")) {
     // Precompiled kernels declare Subset unconditionally and always clamp, so this source must
     // upload a no-op full-bounds rect: normalized for 2D textures, pixel bounds for Rectangle.
     float rect[4] = {0.0f, 0.0f, 1.0f, 1.0f};
@@ -72,20 +85,20 @@ void GLSLDeviceSpaceTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
     }
     fragmentUniformData->setData("Subset", rect);
   }
-  if (fragmentUniformData->hasField("AlphaOnly")) {
+  if (!sharedKernel && fragmentUniformData->hasField("AlphaOnly")) {
     // Precompiled path folds ALPHA_ONLY into a runtime uniform; JIT emitCode bakes it at compile
     // time and never declares this field.
     int alphaOnly = textureProxy->isAlphaOnly() ? 1 : 0;
     fragmentUniformData->setData("AlphaOnly", alphaOnly);
   }
-  if (fragmentUniformData->hasField("Rect")) {
+  if (!sharedKernel && fragmentUniformData->hasField("Rect")) {
     // The shared coverage_output.inc always evaluates the AARect clip term when HAS_COVERAGE >= 1.
     // A bare device-space mask carries no AARectEffect, so upload a rect that covers the whole plane
     // — its clip coverage then evaluates to 1 everywhere, leaving only the mask sample. This keeps
     // the shared coverage path correct without a dedicated permutation dimension or uniform field.
     fragmentUniformData->setData("Rect", Rect::MakeLTRB(-1e9f, -1e9f, 1e9f, 1e9f));
   }
-  if (fragmentUniformData->hasField("HasClip")) {
+  if (!sharedKernel && fragmentUniformData->hasField("HasClip")) {
     int hasClip = 0;
     fragmentUniformData->setData("HasClip", hasClip);
   }

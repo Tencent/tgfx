@@ -45,6 +45,9 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec2 AlphaStart;
 #if HAS_MASK_TEXTURE
   mat3 DeviceCoordMatrix;
+  // Decoy write target for the coverage mask FP (see GLSLDeviceSpaceTextureEffect::onSetData);
+  // never read — the mask is sampled unclamped.
+  vec4 DeviceMaskSubset;
 #endif
 #if HAS_XP
   vec2 DstTextureUpperLeft;
