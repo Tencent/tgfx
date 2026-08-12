@@ -126,6 +126,7 @@ bool XfermodeFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID in
   // AOT lowering aborts the whole tree, falling back to the plain route.
   AOTNodeID src = AOTNodeID::Invalid();
   AOTNodeID dst = AOTNodeID::Invalid();
+  bool inputIsPlainGeometryColor = false;
   switch (child) {
     case Child::DstChild:
       if (numChildProcessors() != 1) {
@@ -149,20 +150,23 @@ bool XfermodeFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID in
       if (numChildProcessors() != 2) {
         return false;
       }
-      // The runtime feeds both children vec4(inputColor.rgb, 1.0). That input is only
-      // representable when the xfer's own input is the geometry color (the opaque-alpha
-      // designator); any other input keeps the plain route.
-      if (input != AOTNodeID(0)) {
+      // The runtime feeds both children vec4(inputColor.rgb, 1.0) and re-multiplies the output
+      // by the input's alpha. The alpha override is idempotent, so when this xfer's input is
+      // already the opaque-alpha geometry input the children reuse it; otherwise the input must
+      // be the geometry color itself. Any other input keeps the plain route.
+      inputIsPlainGeometryColor = input == AOTNodeID(0);
+      AOTNodeID childInput = input;
+      if (inputIsPlainGeometryColor) {
+        if (!builder->addGeometryColorOpaqueInput(&childInput)) {
+          return false;
+        }
+      } else if (!builder->isGeometryColorOpaqueInput(input)) {
         return false;
       }
-      AOTNodeID opaqueInput = AOTNodeID::Invalid();
-      if (!builder->addGeometryColorOpaqueInput(&opaqueInput)) {
+      if (!childProcessor(0)->lowerToAOT(builder, childInput, &src)) {
         return false;
       }
-      if (!childProcessor(0)->lowerToAOT(builder, opaqueInput, &src)) {
-        return false;
-      }
-      if (!childProcessor(1)->lowerToAOT(builder, opaqueInput, &dst)) {
+      if (!childProcessor(1)->lowerToAOT(builder, childInput, &dst)) {
         return false;
       }
       break;
@@ -171,6 +175,9 @@ bool XfermodeFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID in
   AOTBlendParameters parameters = {};
   parameters.blendMode = static_cast<int>(mode);
   parameters.childType = static_cast<int>(child);
+  // The output epilogue multiplies the xfer input's alpha: the plain geometry color's alpha
+  // when the input is geometry, or 1.0 when it is already the opaque-alpha input (a no-op).
+  parameters.multiplyInputAlpha = child == Child::TwoChild && inputIsPlainGeometryColor;
   return builder->addBlend(src, dst, parameters, output);
 }
 }  // namespace tgfx

@@ -653,11 +653,6 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
         }
         slot.op = AOTChainOp::Blend;
         slot.blend = *parameters;
-        // The lowering guarantees a two-child blend's input is the geometry color, so the
-        // runtime's output *= inputColor.a epilogue becomes a geometry-alpha multiply.
-        if (parameters->childType == 2) {
-          slot.blend.multiplyInputAlpha = true;
-        }
         slot.in0 = mapInput(node->inputs[0]);
         slot.in1 = mapInput(node->inputs[1]);
         break;

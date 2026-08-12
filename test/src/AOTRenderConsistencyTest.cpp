@@ -421,6 +421,55 @@ TGFX_TEST(AOTRenderConsistencyTest, PerspectiveChainLeaf) {
   ExpectBitmapsIdentical("perspective-chain-leaf", aotBitmap, runtimeBitmap, 200, 200);
 }
 
+TGFX_TEST(AOTRenderConsistencyTest, NestedTwoChildXferFold) {
+  auto imageA = MakeImage("resources/apitest/imageReplacement.png");
+  auto imageB = MakeImage("resources/apitest/test_timestretch.png");
+  auto imageC = MakeImage("resources/apitest/rotation.jpg");
+  ASSERT_TRUE(imageA != nullptr && imageB != nullptr && imageC != nullptr);
+  auto renderOnce = [&](bool useBundle, Bitmap* outBitmap) {
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto* cache = context->precompiledShaderCache();
+    if (useBundle) {
+      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+    } else {
+      cache->unload();
+    }
+    ScopedAOTStatsPause statsPause(context, !useBundle);
+    context->globalCache()->clearPrograms();
+    auto surface = Surface::Make(context, 200, 200);
+    ASSERT_TRUE(surface != nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::White());
+    // Nested two-child blends: the inner blend's children receive the opaque-alpha input, and
+    // its epilogue multiplies alpha 1.0 (idempotent override), while the outermost multiplies
+    // the paint alpha.
+    auto shaderA = Shader::MakeImageShader(imageA);
+    auto shaderB = Shader::MakeImageShader(imageB);
+    auto shaderC = Shader::MakeImageShader(imageC);
+    auto inner = Shader::MakeBlend(BlendMode::Screen, shaderA, shaderB);
+    Paint paint = {};
+    paint.setShader(Shader::MakeBlend(BlendMode::Multiply, inner, shaderC));
+    paint.setAlpha(0.6f);
+    canvas->drawRect(Rect::MakeXYWH(30, 30, 140, 140), paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(200, 200));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+    if (useBundle) {
+      cache->unload();
+    }
+  };
+  Bitmap aotBitmap = {};
+  Bitmap runtimeBitmap = {};
+  renderOnce(true, &aotBitmap);
+  renderOnce(false, &runtimeBitmap);
+  ExpectBitmapsIdentical("nested-two-child-xfer-fold", aotBitmap, runtimeBitmap, 200, 200);
+}
+
 TGFX_TEST(AOTRenderConsistencyTest, TwoChildXferBlendFold) {
   auto imageA = MakeImage("resources/apitest/imageReplacement.png");
   auto imageB = MakeImage("resources/apitest/test_timestretch.png");
