@@ -19,16 +19,12 @@
 #include "tgfx/layers/layerstyles/GlassStyle.h"
 #include <algorithm>
 #include <cmath>
-#include "core/images/TextureImage.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
-#include "gpu/DrawingManager.h"
-#include "gpu/processors/TiledTextureEffect.h"
-#include "gpu/proxies/RenderTargetProxy.h"
 #include "layers/CanvasUtils.h"
 #include "layers/imagefilters/GlassRefractionImageFilter.h"
+#include "layers/layerstyles/GlassUDFImage.h"
 #include "layers/processors/GlassRefractionFragmentProcessor.h"
-#include "layers/processors/GlassUDFTentBlurFragmentProcessor.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/RRect.h"
@@ -36,7 +32,6 @@
 #include "tgfx/core/Shape.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Context.h"
-#include "tgfx/gpu/GPU.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/layerstyles/StyledShape.h"
 
@@ -85,84 +80,6 @@ static float GetRefractionOutset(float width, float height, float refractionFact
   float udfOutset = GetUDFMaxDisplacement(minHalf, refractionFactor, depthRatio);
   float sdfOutset = glassThickness * refractionFactor * 1.2f;
   return std::max(std::max(udfOutset, sdfOutset) * (1.0f + dispersion), 1.0f);
-}
-
-// Blurs a window of the coverage image with two tent radii and returns one RGBA8 image. RGB holds
-// the refraction field and A holds the edge-light field. Coordinates remain in the full UDF space.
-static std::shared_ptr<Image> MakeGlassUDFImage(Context* context,
-                                                const std::shared_ptr<Image>& source, int coreWidth,
-                                                int coreHeight, const Rect& textureRect,
-                                                const Point& fineRadius,
-                                                const Point& coarseRadius) {
-  if (context == nullptr || source == nullptr || coreWidth <= 0 || coreHeight <= 0 ||
-      textureRect.isEmpty()) {
-    return nullptr;
-  }
-  if (fineRadius.x <= 0.0f || fineRadius.y <= 0.0f || coarseRadius.x <= 0.0f ||
-      coarseRadius.y <= 0.0f) {
-    return nullptr;
-  }
-  auto textureWidth = static_cast<int>(std::round(textureRect.width()));
-  auto textureHeight = static_cast<int>(std::round(textureRect.height()));
-  if (textureWidth <= 0 || textureHeight <= 0) {
-    return nullptr;
-  }
-  SamplingArgs samplingArgs = {TileMode::Decal, TileMode::Decal,
-                               SamplingOptions(FilterMode::Linear), SrcRectConstraint::Fast};
-  auto allocator = context->drawingAllocator();
-  float verticalHalo = std::ceil(std::max(fineRadius.y, coarseRadius.y)) + 1.0f;
-  auto horizontalRect = textureRect.makeOutset(0.0f, verticalHalo);
-  horizontalRect.roundOut();
-  auto horizontalHeight = static_cast<int>(std::round(horizontalRect.height()));
-  auto horizontalTarget = RenderTargetProxy::Make(context, textureWidth, horizontalHeight, false, 1,
-                                                  false, ImageOrigin::TopLeft, BackingFit::Exact);
-  if (horizontalTarget == nullptr) {
-    return nullptr;
-  }
-  float horizontalHalo = std::ceil(std::max(fineRadius.x, coarseRadius.x)) + 1.0f;
-  auto sourceDrawRect =
-      Rect::MakeLTRB(-horizontalHalo, -1.0f, static_cast<float>(textureWidth) + horizontalHalo,
-                     static_cast<float>(horizontalHeight) + 1.0f);
-  // Scale the source to UDF core density and rasterize uniformly for all Image subclasses,
-  // without probing their internal rasterization behavior.
-  auto coreSource = source->makeScaled(coreWidth, coreHeight, SamplingOptions(FilterMode::Linear))
-                        ->makeRasterized();
-  if (coreSource == nullptr) {
-    return nullptr;
-  }
-  auto horizontalMatrix = Matrix::MakeTrans(textureRect.left, horizontalRect.top);
-  FPArgs sourceArgs = FPArgs(context, 0, sourceDrawRect);
-  // Each tent loop needs its own child because emitting one child twice redeclares its uniforms.
-  auto fineSource =
-      FragmentProcessor::Make(coreSource, sourceArgs, samplingArgs, &horizontalMatrix);
-  auto coarseSource =
-      FragmentProcessor::Make(coreSource, sourceArgs, samplingArgs, &horizontalMatrix);
-  auto horizontalProcessor = GlassUDFTentBlurFragmentProcessor::Make(
-      allocator, std::move(fineSource), std::move(coarseSource), fineRadius.x, coarseRadius.x,
-      GlassUDFBlurDirection::Horizontal, MaxTentRadius, false);
-  if (horizontalProcessor == nullptr || !context->drawingManager()->fillRTWithFP(
-                                            horizontalTarget, std::move(horizontalProcessor), 0)) {
-    return nullptr;
-  }
-  auto verticalMatrix = Matrix::MakeTrans(0.0f, textureRect.top - horizontalRect.top);
-  auto horizontalProxy = horizontalTarget->asTextureProxy();
-  auto verticalFineSource =
-      TiledTextureEffect::Make(allocator, horizontalProxy, samplingArgs, &verticalMatrix);
-  auto verticalCoarseSource =
-      TiledTextureEffect::Make(allocator, horizontalProxy, samplingArgs, &verticalMatrix);
-  auto verticalTarget = RenderTargetProxy::Make(context, textureWidth, textureHeight, false, 1,
-                                                false, ImageOrigin::TopLeft, BackingFit::Exact);
-  if (verticalTarget == nullptr) {
-    return nullptr;
-  }
-  auto verticalProcessor = GlassUDFTentBlurFragmentProcessor::Make(
-      allocator, std::move(verticalFineSource), std::move(verticalCoarseSource), fineRadius.y,
-      coarseRadius.y, GlassUDFBlurDirection::Vertical, MaxTentRadius, true);
-  if (verticalProcessor == nullptr ||
-      !context->drawingManager()->fillRTWithFP(verticalTarget, std::move(verticalProcessor), 0)) {
-    return nullptr;
-  }
-  return TextureImage::Wrap(verticalTarget->asTextureProxy(), nullptr);
 }
 
 struct GlassShapeInfo {
@@ -344,12 +261,13 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
     return;
   }
   auto bgOffset = backgroundSource->imageOffset();
+  // The UDF generation is deferred to GlassUDFImage::lockTextureProxy, so a missing GPU context
+  // at record time (e.g. recording into a Picture) no longer skips the effect. The texture size
+  // limit is only used to size the intermediate images; a conservative default keeps the
+  // recorded layout identical across contexts.
   auto surface = canvas->getSurface();
   auto context = surface ? surface->getContext() : nullptr;
-  if (context == nullptr) {
-    return;
-  }
-  auto maxTextureSize = context->gpu()->limits()->maxTextureDimension2D;
+  auto maxTextureSize = context ? context->gpu()->limits()->maxTextureDimension2D : 8192;
   auto contentWidth = static_cast<float>(input.content->width());
   auto contentHeight = static_cast<float>(input.content->height());
   auto origWidth = contentWidth / input.contentScale;
@@ -593,8 +511,8 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
         textureRect.roundOut();
       }
       udfTextureOrigin = {textureRect.left, textureRect.top};
-      maskImage = MakeGlassUDFImage(context, input.content, udfWidth, udfHeight, textureRect,
-                                    fineRadius, coarseRadius);
+      maskImage = GlassUDFImage::Make(input.content, udfWidth, udfHeight, textureRect, fineRadius,
+                                      coarseRadius);
       if (!maskImage) {
         LOGE("GlassStyle: Failed to create alpha UDF.");
         return;
