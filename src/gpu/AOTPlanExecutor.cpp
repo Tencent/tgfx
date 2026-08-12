@@ -936,15 +936,30 @@ PlacementPtr<FragmentProcessor> AOTPlanExecutor::BuildChainProcessor(
       return BuildChainFP(allocator, graph, pass, rectEffect, maskEffect);
     }
   } else {
-    // Two-FP coverage is accepted as [lowerable subtree, alpha-only device mask], folding to
-    // subtree + mask child. (A trailing local texture would form a bare-texture coverage root,
-    // which the gate in BuildChainFP currently rejects; see the comment there.)
+    // Two-FP coverage: the terminal FP decides the form. A trailing alpha-only device mask keeps
+    // the mask-child role and the first FP lowers as the subtree; a trailing local texture is the
+    // subtree root (a bare local mask, accepted by the gate only when the texture is already
+    // instantiated), with the first FP folding as a rect slot or mask child.
     auto* last = coverageFPs.back();
-    if (last->name() != "DeviceSpaceTextureEffect") {
-      return nullptr;
-    }
-    maskEffect = static_cast<const DeviceSpaceTextureEffect*>(last);
-    if (!maskEffect->isAlphaOnly() || maskEffect->hasPerspective()) {
+    auto* first = coverageFPs.front();
+    if (last->name() == "DeviceSpaceTextureEffect") {
+      maskEffect = static_cast<const DeviceSpaceTextureEffect*>(last);
+      if (!maskEffect->isAlphaOnly() || maskEffect->hasPerspective()) {
+        return nullptr;
+      }
+    } else if (last->name() == "TextureEffect") {
+      subtreeFP = last;
+      if (first->name() == "AARectEffect") {
+        rectEffect = static_cast<const AARectEffect*>(first);
+      } else if (first->name() == "DeviceSpaceTextureEffect") {
+        maskEffect = static_cast<const DeviceSpaceTextureEffect*>(first);
+        if (!maskEffect->isAlphaOnly() || maskEffect->hasPerspective()) {
+          return nullptr;
+        }
+      } else {
+        return nullptr;
+      }
+    } else {
       return nullptr;
     }
   }
