@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AOTPlanExecutor.h"
+#include <cstdio>
+#include <cstdlib>
 #include <utility>
 #include <vector>
 #include "core/shaders/PerlinNoiseShader.h"
@@ -441,6 +443,9 @@ static int MapChainInput(const std::vector<const AOTEffectNode*>& nodes,
   if (node->kind == AOTEffectKind::GeometryCoverage) {
     return isCoverageRoot ? -3 : -4;
   }
+  if (node->kind == AOTEffectKind::GeometryColorOpaqueInput) {
+    return -5;
+  }
   auto slot = slotOf[nodeIndex];
   return slot == SIZE_MAX ? -2 : static_cast<int>(slot);
 }
@@ -641,8 +646,18 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
         if (parameters == nullptr || node->inputs.size() != 2) {
           return nullptr;
         }
+        if (parameters->childType == 2 && inputBase != 0) {
+          // Two-child blends lower their children with the opaque-alpha geometry input, which
+          // only the color graph carries.
+          return nullptr;
+        }
         slot.op = AOTChainOp::Blend;
         slot.blend = *parameters;
+        // The lowering guarantees a two-child blend's input is the geometry color, so the
+        // runtime's output *= inputColor.a epilogue becomes a geometry-alpha multiply.
+        if (parameters->childType == 2) {
+          slot.blend.multiplyInputAlpha = true;
+        }
         slot.in0 = mapInput(node->inputs[0]);
         slot.in1 = mapInput(node->inputs[1]);
         break;
@@ -707,6 +722,22 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
         return nullptr;
       }
       lutLeafIndex = static_cast<int>(leaves.size());
+    }
+  }
+  if (leaves.size() == 3 && lutChild == nullptr) {
+    // TEXTURE_COUNT has no three-leaf value, so a three-leaf chain rides the four-leaf artifacts:
+    // a phantom child binds the fourth sampler while the fourth slot (always an op) never
+    // fetches from it.
+    for (size_t combined = 0; combined < nodes.size() && lutChild == nullptr; ++combined) {
+      if (nodes[combined]->kind != AOTEffectKind::TextureSource) {
+        continue;
+      }
+      auto* textureParams = std::get_if<AOTTextureParameters>(&nodes[combined]->parameters);
+      auto phantomMatrix = Matrix::I();
+      lutChild = TextureEffect::Make(allocator, textureParams->textureProxy, {}, &phantomMatrix);
+    }
+    if (lutChild == nullptr) {
+      return nullptr;
     }
   }
   auto rootIndex = slotOf[pass.output.index()];

@@ -86,6 +86,10 @@ enum class AOTEffectKind {
   // vec4(1.0) when the GP carries none), matching the runtime coverage-chain origin. Never
   // becomes a chain slot; as an op input it maps to the -3 designator.
   GeometryCoverage,
+  // The geometry color with alpha forced to 1.0 — the input a two-child xfer feeds its children
+  // in the runtime emission (vec4(inputColor.rgb, 1.0)). Never becomes a chain slot; as an op
+  // input it maps to the -5 designator.
+  GeometryColorOpaqueInput,
 };
 
 enum class EffectDomain {
@@ -172,6 +176,10 @@ struct AOTConstColorParameters {
 struct AOTBlendParameters {
   int blendMode = 0;
   int childType = 0;
+  // Two-child blends only: the runtime re-multiplies the xfer output by its input color's alpha
+  // (XfermodeFragmentProcessor's TwoChild epilogue). Accepted only at the color root, where the
+  // input is the geometry color, so the chain kernel multiplies by TGFX_CHAIN_GEOM_COLOR.a.
+  bool multiplyInputAlpha = false;
 };
 
 // Procedural-noise source (PerlinNoiseFragmentProcessor). Unlike AOTTextureParameters, the two
@@ -300,6 +308,8 @@ class AOTEffectGraph {
 class AOTNodeBuilder {
  public:
   bool addGeometryColor(AOTNodeID* output);
+
+  bool addGeometryColorOpaqueInput(AOTNodeID* output);
 
   bool addTextureSource(AOTNodeID input, const AOTTextureParameters& parameters, AOTNodeID* output);
 

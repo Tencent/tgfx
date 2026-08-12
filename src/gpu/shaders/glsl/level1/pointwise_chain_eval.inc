@@ -171,6 +171,7 @@ vec4 evalChainSlotNoTex(int slot) {
   vec4 in0 = Packed.y == -1   ? TGFX_CHAIN_GEOM_COLOR
              : Packed.y == -3 ? TGFX_CHAIN_UNIT_COVERAGE
              : Packed.y == -4 ? vec4(1.0)
+             : Packed.y == -5 ? vec4(TGFX_CHAIN_GEOM_COLOR.rgb, 1.0)
              : Packed.y < 0   ? vec4(0.0)
                               : chainResults[Packed.y];
   if (Packed.x == OP_CONST_COLOR) {
@@ -187,9 +188,16 @@ vec4 evalChainSlotNoTex(int slot) {
     vec4 in1 = Packed.z == -1   ? TGFX_CHAIN_GEOM_COLOR
                : Packed.z == -3 ? TGFX_CHAIN_UNIT_COVERAGE
                : Packed.z == -4 ? vec4(1.0)
+               : Packed.z == -5 ? vec4(TGFX_CHAIN_GEOM_COLOR.rgb, 1.0)
                : Packed.z < 0   ? vec4(0.0)
                                 : chainResults[Packed.z];
-    return xpBlendColors(in0, in1, Packed.w);
+    vec4 blendResult = xpBlendColors(in0, in1, Packed.w & 0xFF);
+    // Bit 8 of the selector: the two-child xfer epilogue re-multiplies by the input color's
+    // alpha, which at the color root is the geometry color's alpha.
+    if ((Packed.w & 0x100) != 0) {
+      blendResult *= TGFX_CHAIN_GEOM_COLOR.a;
+    }
+    return blendResult;
   }
   vec4 color = in0;
   if (Packed.x == OP_COLOR_MATRIX) {

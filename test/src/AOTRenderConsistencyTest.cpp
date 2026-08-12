@@ -290,6 +290,54 @@ TGFX_TEST(AOTRenderConsistencyTest, AACoverageXferDstFold) {
   ExpectBitmapsIdentical("aa-xfer-dst-fold", aotBitmap, runtimeBitmap, 200, 200);
 }
 
+TGFX_TEST(AOTRenderConsistencyTest, TwoChildXferBlendFold) {
+  auto imageA = MakeImage("resources/apitest/imageReplacement.png");
+  auto imageB = MakeImage("resources/apitest/test_timestretch.png");
+  ASSERT_TRUE(imageA != nullptr && imageB != nullptr);
+  auto renderOnce = [&](bool useBundle, Bitmap* outBitmap) {
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto* cache = context->precompiledShaderCache();
+    if (useBundle) {
+      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+    } else {
+      cache->unload();
+    }
+    ScopedAOTStatsPause statsPause(cache, !useBundle);
+    context->globalCache()->clearPrograms();
+    auto surface = Surface::Make(context, 200, 200);
+    ASSERT_TRUE(surface != nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::White());
+    // Two blended image shaders produce a two-child xfer; the translucent paint alpha exercises
+    // the runtime's output *= inputColor.a epilogue, and the shader mask adds a tiled coverage.
+    auto shaderA = Shader::MakeImageShader(imageA);
+    auto shaderB = Shader::MakeImageShader(imageB, TileMode::Repeat, TileMode::Repeat);
+    Paint paint = {};
+    paint.setShader(Shader::MakeBlend(BlendMode::Multiply, shaderA, shaderB));
+    paint.setAlpha(0.7f);
+    auto maskShader = Shader::MakeLinearGradient(Point{0, 0}, Point{200, 0},
+                                                 {Color::White(), Color::Transparent()}, {});
+    paint.setMaskFilter(MaskFilter::MakeShader(maskShader));
+    canvas->drawRect(Rect::MakeXYWH(40, 40, 120, 120), paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(200, 200));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+    if (useBundle) {
+      cache->unload();
+    }
+  };
+  Bitmap aotBitmap = {};
+  Bitmap runtimeBitmap = {};
+  renderOnce(true, &aotBitmap);
+  renderOnce(false, &runtimeBitmap);
+  ExpectBitmapsIdentical("two-child-xfer-blend-fold", aotBitmap, runtimeBitmap, 200, 200);
+}
+
 TGFX_TEST(AOTRenderConsistencyTest, LUTGradientMaskFold) {
   Color red = {1.f, 0.f, 0.f, 1.f};
   Color green = {0.f, 1.f, 0.f, 1.f};
@@ -316,9 +364,8 @@ TGFX_TEST(AOTRenderConsistencyTest, LUTGradientMaskFold) {
     path.addRoundRect(Rect::MakeWH(100, 100), 20, 20);
     Paint paint = {};
     paint.setShader(Shader::MakeLinearGradient(Point{0.f, 0.f}, Point{25.f, 150.f},
-                                               {red, green, blue, green, red, blue, red, green,
-                                                red, green, blue, green, red, blue, red, green,
-                                                blue},
+                                               {red, green, blue, green, red, blue, red, green, red,
+                                                green, blue, green, red, blue, red, green, blue},
                                                {}));
     auto matrix = Matrix::MakeRotate(15, 50, 50);
     matrix.postScale(1.5f, 0.9f, 50, 50);

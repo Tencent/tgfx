@@ -22,7 +22,9 @@
 namespace tgfx {
 namespace {
 static void UploadChainSlot(UniformData* uniformData, size_t index, const AOTChainSlot& slot) {
-  int selector = slot.op == AOTChainOp::Blend ? slot.blend.blendMode : 0;
+  int selector = slot.op == AOTChainOp::Blend
+                     ? slot.blend.blendMode | (slot.blend.multiplyInputAlpha ? 0x100 : 0)
+                     : 0;
   if (slot.op == AOTChainOp::ConstColor) {
     selector = slot.constColor.inputMode;
   }
@@ -123,7 +125,11 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
     return nullptr;
   }
   auto leafCount = textureLeaves.size();
-  if ((leafCount != 0 && leafCount != 1 && leafCount != 2 && leafCount != 4) ||
+  // Sampler-binding children include the DAG leaves plus a sampler-only child (the LUT gradient
+  // texture, or a phantom padding a three-leaf chain up to the four-leaf artifacts).
+  size_t samplerChildren = leafCount + (lutChild != nullptr ? 1 : 0);
+  if ((samplerChildren != 0 && samplerChildren != 1 && samplerChildren != 2 &&
+       samplerChildren != 4) ||
       leafCount > slots.size()) {
     return nullptr;
   }

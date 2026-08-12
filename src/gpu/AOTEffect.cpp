@@ -39,6 +39,18 @@ bool AOTNodeBuilder::addGeometryColor(AOTNodeID* output) {
   return true;
 }
 
+bool AOTNodeBuilder::addGeometryColorOpaqueInput(AOTNodeID* output) {
+  if (output == nullptr || nodes.empty()) {
+    return false;
+  }
+  AOTEffectNode node = {};
+  node.kind = AOTEffectKind::GeometryColorOpaqueInput;
+  node.traits = {EffectDomain::Pointwise, EffectInputUsage::Ignore, true, true, true};
+  *output = AOTNodeID(static_cast<uint32_t>(nodes.size()));
+  nodes.push_back(std::move(node));
+  return true;
+}
+
 bool AOTNodeBuilder::addTextureSource(AOTNodeID input, const AOTTextureParameters& parameters,
                                       AOTNodeID* output) {
   if (parameters.textureProxy == nullptr) {

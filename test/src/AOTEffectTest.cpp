@@ -142,20 +142,6 @@ static bool BuildTripleGraph(Context* context, BlockAllocator* allocator, AOTEff
   return AOTEffectDecomposer::Lower({texture.get(), colorMatrix.get(), luma.get()}, graph);
 }
 
-static PlacementPtr<FragmentProcessor> MakeTextureBlend(Context* context, BlockAllocator* allocator,
-                                                        int textureCount) {
-  auto result = MakeTextureProcessor(context, allocator, PixelFormat::RGBA_8888);
-  for (int index = 1; index < textureCount && result != nullptr; ++index) {
-    auto texture = MakeTextureProcessor(context, allocator, PixelFormat::RGBA_8888);
-    if (texture == nullptr) {
-      return nullptr;
-    }
-    result = XfermodeFragmentProcessor::MakeFromTwoProcessors(
-        allocator, std::move(result), std::move(texture), BlendMode::SrcOver);
-  }
-  return result;
-}
-
 TGFX_TEST(AOTEffectTest, BuilderRejectsInvalidInput) {
   AOTNodeBuilder builder;
   AOTNodeID geometry;
@@ -653,14 +639,25 @@ TGFX_TEST(AOTEffectTest, XfermodeTwoLowersBothChildren) {
 
   AOTEffectGraph graph;
   ASSERT_TRUE(AOTEffectDecomposer::Lower({xfermode.get()}, &graph));
-  // node0=geometry, node1=src texture, node2=dst texture, node3=blend(src=1, dst=2).
-  ASSERT_EQ(graph.nodeCount(), 4u);
-  auto blend = graph.nodeAt(AOTNodeID(3));
+  // node0=geometry, node1=opaque-alpha geometry input (the runtime feeds the children
+  // vec4(inputColor.rgb, 1.0)), node2=src texture(input=1), node3=dst texture(input=1),
+  // node4=blend(src=2, dst=3).
+  ASSERT_EQ(graph.nodeCount(), 5u);
+  auto opaqueInput = graph.nodeAt(AOTNodeID(1));
+  ASSERT_NE(opaqueInput, nullptr);
+  EXPECT_EQ(opaqueInput->kind, AOTEffectKind::GeometryColorOpaqueInput);
+  for (auto index : {2u, 3u}) {
+    auto child = graph.nodeAt(AOTNodeID(index));
+    ASSERT_NE(child, nullptr);
+    ASSERT_EQ(child->inputs.size(), 1u);
+    EXPECT_EQ(child->inputs[0], AOTNodeID(1));
+  }
+  auto blend = graph.nodeAt(AOTNodeID(4));
   ASSERT_NE(blend, nullptr);
   EXPECT_EQ(blend->kind, AOTEffectKind::Blend);
   ASSERT_EQ(blend->inputs.size(), 2u);
-  EXPECT_EQ(blend->inputs[0], AOTNodeID(1));  // src child
-  EXPECT_EQ(blend->inputs[1], AOTNodeID(2));  // dst child
+  EXPECT_EQ(blend->inputs[0], AOTNodeID(2));  // src child
+  EXPECT_EQ(blend->inputs[1], AOTNodeID(3));  // dst child
   auto parameters = std::get_if<AOTBlendParameters>(&blend->parameters);
   ASSERT_NE(parameters, nullptr);
   EXPECT_EQ(parameters->childType, 2);
@@ -710,20 +707,51 @@ TGFX_TEST(AOTEffectTest, PointwiseDAGUsesProductionSamplerBudget) {
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
 
-  BlockAllocator acceptedAllocator;
-  auto acceptedBlend = MakeTextureBlend(context, &acceptedAllocator, MaxFusedAOTSamplers);
-  ASSERT_NE(acceptedBlend, nullptr);
+  // Build the DAG directly: a geometry color plus N texture leaves folded by single-child
+  // blends, so the fused-pass sampler budget is the only thing under test.
+  auto makeBlendGraph = [&](int textureCount, AOTEffectGraph* graph) {
+    AOTNodeBuilder builder = {};
+    AOTNodeID geometry = AOTNodeID::Invalid();
+    if (!builder.addGeometryColor(&geometry)) {
+      return false;
+    }
+    AOTNodeID current = AOTNodeID::Invalid();
+    for (int index = 0; index < textureCount; ++index) {
+      auto proxy = context->proxyProvider()->createTextureProxy({}, 2, 2,
+                                                                PixelFormat::RGBA_8888);
+      if (proxy == nullptr || proxy->getTextureView() == nullptr) {
+        return false;
+      }
+      AOTTextureParameters textureParams = {};
+      textureParams.textureProxy = std::move(proxy);
+      AOTNodeID texture = AOTNodeID::Invalid();
+      if (!builder.addTextureSource(index == 0 ? geometry : current, textureParams, &texture)) {
+        return false;
+      }
+      if (index == 0) {
+        current = texture;
+        continue;
+      }
+      AOTBlendParameters blendParams = {};
+      blendParams.blendMode = static_cast<int>(BlendMode::SrcOver);
+      blendParams.childType = 0;
+      AOTNodeID blended = AOTNodeID::Invalid();
+      if (!builder.addBlend(current, texture, blendParams, &blended)) {
+        return false;
+      }
+      current = blended;
+    }
+    return builder.finish(current, graph);
+  };
+
   AOTEffectGraph acceptedGraph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({acceptedBlend.get()}, &acceptedGraph));
+  ASSERT_TRUE(makeBlendGraph(MaxFusedAOTSamplers, &acceptedGraph));
   AOTEffectPlan acceptedPlan;
   EXPECT_TRUE(AOTEffectDecomposer::Decompose(acceptedGraph, AOTDecompositionMode::PreferFusion,
                                              &acceptedPlan));
 
-  BlockAllocator rejectedAllocator;
-  auto rejectedBlend = MakeTextureBlend(context, &rejectedAllocator, MaxFusedAOTSamplers + 1);
-  ASSERT_NE(rejectedBlend, nullptr);
   AOTEffectGraph rejectedGraph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({rejectedBlend.get()}, &rejectedGraph));
+  ASSERT_TRUE(makeBlendGraph(MaxFusedAOTSamplers + 1, &rejectedGraph));
   AOTEffectPlan rejectedPlan;
   EXPECT_FALSE(AOTEffectDecomposer::Decompose(rejectedGraph, AOTDecompositionMode::PreferFusion,
                                               &rejectedPlan));

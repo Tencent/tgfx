@@ -145,17 +145,28 @@ bool XfermodeFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID in
         return false;
       }
       break;
-    case Child::TwoChild:
+    case Child::TwoChild: {
       if (numChildProcessors() != 2) {
         return false;
       }
-      if (!childProcessor(0)->lowerToAOT(builder, input, &src)) {
+      // The runtime feeds both children vec4(inputColor.rgb, 1.0). That input is only
+      // representable when the xfer's own input is the geometry color (the opaque-alpha
+      // designator); any other input keeps the plain route.
+      if (input != AOTNodeID(0)) {
         return false;
       }
-      if (!childProcessor(1)->lowerToAOT(builder, input, &dst)) {
+      AOTNodeID opaqueInput = AOTNodeID::Invalid();
+      if (!builder->addGeometryColorOpaqueInput(&opaqueInput)) {
+        return false;
+      }
+      if (!childProcessor(0)->lowerToAOT(builder, opaqueInput, &src)) {
+        return false;
+      }
+      if (!childProcessor(1)->lowerToAOT(builder, opaqueInput, &dst)) {
         return false;
       }
       break;
+    }
   }
   AOTBlendParameters parameters = {};
   parameters.blendMode = static_cast<int>(mode);
