@@ -730,7 +730,10 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
   }
   for (size_t index = 0; index < leafCount; ++index) {
     auto leaf = chain->childProcessor(index);
-    if (leaf->name() != "TextureEffect" || leaf->numTextureSamplers() != 1) {
+    // A deferred (task-local) proxy reports zero samplers until it is instantiated; it always
+    // binds exactly one when it is (a lazy proxy is internally rendered, hence never multi-plane
+    // YUV), so only a multi-sampler leaf is rejected here.
+    if (leaf->name() != "TextureEffect" || leaf->numTextureSamplers() > 1) {
       return std::nullopt;
     }
     auto* texture = static_cast<const TextureEffect*>(leaf);
@@ -742,9 +745,11 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
     }
   }
   int hasMask = chain->hasMask() ? 1 : 0;
-  // Mask clips go through DefaultGP paths only; keep this in sync with the shader's ShouldCompile
-  // so the miss is attributed here instead of the buildability post-check.
-  if (hasMask && (gpLayout != 0 || GetGPType(gp) != 0)) {
+  // The mask application point (device-space sample multiplied post-DAG) is GP-agnostic, but the
+  // compiled mask variants carry no quad attributes (ShouldCompile), so a mask chain is servable
+  // only on the rect layouts without uv/color attributes. Keep this in sync with ShouldCompile so
+  // the miss is attributed here instead of the buildability post-check.
+  if (hasMask && (gpLayout != 0 || hasUVCoord != 0 || hasColor != 0)) {
     return std::nullopt;
   }
   // The ellipse layout carries the same leaf-count-free variants as the rect family: they serve

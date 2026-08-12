@@ -23,6 +23,7 @@
 #include "gpu/PermutationMatcher.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/Program.h"
+#include "gpu/processors/ConstColorProcessor.h"
 
 namespace tgfx {
 bool DrawOp::prepare(RenderTarget* renderTarget, ProgramLookupMode mode,
@@ -93,9 +94,19 @@ std::shared_ptr<Program> DrawOp::prepareDecomposedProgram(RenderTarget* renderTa
     }
   }
   std::vector<const FragmentProcessor*> colorProcessors = {};
-  colorProcessors.reserve(activeColors.size());
+  colorProcessors.reserve(activeColors.size() + 1);
   for (auto& color : activeColors) {
     colorProcessors.push_back(color.get());
+  }
+  PlacementPtr<FragmentProcessor> unitColor = nullptr;
+  if (colorProcessors.empty()) {
+    // A color-free draw (pure mask/clip fill) takes the paint color as-is, which is a one-slot
+    // const-color chain modulating the geometry color.
+    unitColor = ConstColorProcessor::Make(allocator, PMColor::White(), InputMode::ModulateRGBA);
+    if (unitColor == nullptr) {
+      return nullptr;
+    }
+    colorProcessors.push_back(unitColor.get());
   }
   AOTEffectGraph graph = {};
   AOTEffectPlan plan = {};

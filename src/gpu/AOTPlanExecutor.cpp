@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AOTPlanExecutor.h"
+#include <cstdio>
+#include <cstdlib>
 #include <utility>
 #include <vector>
 #include "core/shaders/PerlinNoiseShader.h"
@@ -581,18 +583,20 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
   }
   int coverageRootSlot = -1;
   if (coverageGraph != nullptr) {
-    // v1 acceptance gate, kept tight to the byte-verified shapes: exactly one blend in the
-    // coverage subtree, it is the root, and it consumes the unit input. The unit may otherwise
-    // feed only texture leaves (their input is unused — blend operands sample raw) and the
-    // gradient (a blend child, so it reads the opaque -4 designator). Anything else (Compose-
-    // wrapped chains, two-child blends) keeps the plain route rather than risking a wrong value
-    // when the GP coverage is below 1.0.
-    if (rectEffect != nullptr) {
+    // Acceptance gate, kept tight to the byte-verified shapes: exactly one blend in the coverage
+    // subtree, it is the root, and it consumes the unit input. The unit may otherwise feed only
+    // texture leaves (their input is unused — blend operands sample raw) and the gradient (a
+    // blend child, so it reads the opaque -4 designator). A bare-texture coverage root (a local
+    // mask fill) is deliberately not accepted: for generated alpha-mask textures it diverges from
+    // the runtime by a few edge pixels under texture-pool pressure, and the responsible mechanism
+    // is not yet identified. Compose-wrapped chains and two-child blends likewise keep the plain
+    // route rather than risking a wrong value when the GP coverage is below 1.0.
+    auto* covRootNode = nodes[covRootCombined];
+    if (covRootNode->kind != AOTEffectKind::Blend || rectEffect != nullptr) {
       return nullptr;
     }
-    auto* covRootNode = nodes[covRootCombined];
     int coverageBlendCount = 0;
-    bool rejected = covRootNode->kind != AOTEffectKind::Blend;
+    bool rejected = false;
     bool rootConsumesUnit = false;
     for (size_t j = 1; j < covCount && !rejected; ++j) {
       auto* node = nodes[colorCount + j];
@@ -928,10 +932,14 @@ PlacementPtr<FragmentProcessor> AOTPlanExecutor::BuildChainProcessor(
       return BuildChainFP(allocator, graph, pass, rectEffect, maskEffect);
     }
   } else {
-    if (coverageFPs.back()->name() != "DeviceSpaceTextureEffect") {
+    // Two-FP coverage is accepted as [lowerable subtree, alpha-only device mask], folding to
+    // subtree + mask child. (A trailing local texture would form a bare-texture coverage root,
+    // which the gate in BuildChainFP currently rejects; see the comment there.)
+    auto* last = coverageFPs.back();
+    if (last->name() != "DeviceSpaceTextureEffect") {
       return nullptr;
     }
-    maskEffect = static_cast<const DeviceSpaceTextureEffect*>(coverageFPs.back());
+    maskEffect = static_cast<const DeviceSpaceTextureEffect*>(last);
     if (!maskEffect->isAlphaOnly() || maskEffect->hasPerspective()) {
       return nullptr;
     }
@@ -950,7 +958,7 @@ PlacementPtr<FragmentProcessor> AOTPlanExecutor::BuildChainProcessor(
   if (!covBuilder.finish(covRoot, &covGraph)) {
     return nullptr;
   }
-  return BuildChainFP(allocator, graph, pass, nullptr, maskEffect, &covGraph, covRoot);
+  return BuildChainFP(allocator, graph, pass, rectEffect, maskEffect, &covGraph, covRoot);
 }
 
 PlacementPtr<RenderTask> AOTPlanExecutor::Make(Context* context, uint32_t renderFlags,
