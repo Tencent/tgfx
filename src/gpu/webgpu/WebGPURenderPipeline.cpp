@@ -89,17 +89,20 @@ bool WebGPURenderPipeline::createPipelineState(WebGPUGPU* gpu,
     uniformBlockVisibility[entry.binding] = entry.visibility;
   }
 
+  // In the GLSL→WGSL conversion, combined samplers are split into separate texture and sampler
+  // resources, renumbered by declaration order starting from TEXTURE_BINDING_POINT_START (after
+  // uniform blocks), so each combined sampler occupies two consecutive WGSL bindings:
+  //   texture = TEXTURE_BINDING_POINT_START + samplerIndex * 2
+  //   sampler = texture_binding + 1
+  // samplerIndex must be the position within textureSamplers, matching the declaration order used
+  // by separateSamplerDeclarations() in WebGPUShaderModule.cpp. Deriving it from entry.binding
+  // instead maps distinct samplers onto the same WGSL binding once a pipeline has three or more of
+  // them, which makes the whole BindGroupLayout invalid.
+  unsigned samplerIndex = 0;
   for (auto& entry : descriptor.layout.textureSamplers) {
-    // In the GLSL→WGSL conversion, combined samplers are split into separate texture and sampler
-    // resources. The GLSL binding numbers are reassigned starting from TEXTURE_BINDING_POINT_START
-    // (after uniform blocks). In WGSL, each combined sampler occupies two consecutive bindings:
-    //   texture = TEXTURE_BINDING_POINT_START + samplerIndex * 2
-    //   sampler = texture_binding + 1
-    auto samplerIndex = static_cast<unsigned>(entry.binding < TEXTURE_BINDING_POINT_START
-                                                  ? entry.binding
-                                                  : entry.binding - TEXTURE_BINDING_POINT_START);
     unsigned textureBinding = TEXTURE_BINDING_POINT_START + samplerIndex * 2;
     unsigned samplerBinding = textureBinding + 1;
+    samplerIndex++;
     WGPUBindGroupLayoutEntry textureEntry = {};
     textureEntry.binding = textureBinding;
     textureEntry.visibility = WGPUShaderStage_Fragment;
