@@ -132,6 +132,9 @@ void main() {
 #else
   vec2 coordSource = aPosition;
 #endif
+#if HAS_COLOR
+  vColor = inColor;
+#endif
 #else
   // EllipseGeometryProcessor vertices are pre-transformed to device space.
   highp vec2 position = inPosition;

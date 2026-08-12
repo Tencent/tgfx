@@ -42,8 +42,21 @@ std::shared_ptr<Resource> VertexMeshBufferUploadTask::onMakeResource(Context* co
   // VertexMesh::Make() guarantees positions != nullptr
   DEBUG_ASSERT(vertexMesh->positions() != nullptr);
 
-  size_t vertexDataSize =
-      vertexMesh->getVertexStride() * static_cast<size_t>(vertexMesh->vertexCount());
+  // The buffer follows the chain's rect-layout attribute order: position, coverage, texCoord,
+  // color. Vertex meshes carry no real coverage data, so a constant 1.0f slot is written whenever
+  // texCoords or colors are present (matching MeshGeometryProcessor's attribute registration).
+  bool withCoverage = vertexMesh->hasTexCoords() || vertexMesh->hasColors();
+  size_t stride = sizeof(float) * 2;  // position.xy
+  if (withCoverage) {
+    stride += sizeof(float);
+  }
+  if (vertexMesh->hasTexCoords()) {
+    stride += sizeof(float) * 2;
+  }
+  if (vertexMesh->hasColors()) {
+    stride += sizeof(uint8_t) * 4;
+  }
+  size_t vertexDataSize = stride * static_cast<size_t>(vertexMesh->vertexCount());
 
   // Create color space transform steps if needed
   std::unique_ptr<ColorSpaceXformSteps> steps = nullptr;
@@ -60,6 +73,12 @@ std::shared_ptr<Resource> VertexMeshBufferUploadTask::onMakeResource(Context* co
     // Position (float2)
     *reinterpret_cast<Point*>(ptr) = vertexMesh->positions()[i];
     ptr += sizeof(Point);
+
+    // Coverage (float, constant 1.0 when present)
+    if (withCoverage) {
+      *reinterpret_cast<float*>(ptr) = 1.0f;
+      ptr += sizeof(float);
+    }
 
     // TexCoord (float2, optional)
     if (vertexMesh->hasTexCoords()) {

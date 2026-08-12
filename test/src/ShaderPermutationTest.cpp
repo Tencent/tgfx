@@ -51,7 +51,6 @@
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/ShaderPermutation.h"
 #include "gpu/shaders/level1/DeviceSpaceTexturedEffectShader.h"
-#include "gpu/shaders/level1/MeshTextureFillShader.h"
 #include "gpu/shaders/level1/QuadConstColorShader.h"
 #include "gpu/shaders/level1/QuadTextureFillShader.h"
 #include "gpu/shaders/level1/ShapeInstancedFillShader.h"
@@ -718,8 +717,8 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
-  EXPECT_EQ(cache->vertexEntryCount(), 108u);
-  EXPECT_EQ(cache->fragmentEntryCount(), 351u);
+  EXPECT_EQ(cache->vertexEntryCount(), 107u);
+  EXPECT_EQ(cache->fragmentEntryCount(), 350u);
   std::string expectedTag = TGFX_BACKEND_NAME;
   auto dashPos = expectedTag.find('-');
   if (dashPos != std::string::npos) {
@@ -1684,130 +1683,6 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageShaderRegistry) {
     found = true;
     EXPECT_EQ(info.vertDomain.totalCount(), 1u);
     EXPECT_EQ(info.fragDomain.totalCount(), 1u);
-  }
-  EXPECT_TRUE(found);
-}
-
-TGFX_TEST(ShaderPermutationTest, MeshTextureFillMatchesOnlyExactContract) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_NE(context, nullptr);
-  if (context->backend() == Backend::OpenGL) {
-    GTEST_SKIP() << "MeshTextureFill is outside the OpenGL stage 1 whitelist";
-  }
-  auto renderTargetProxy = RenderTargetProxy::Make(context, 8, 8, false);
-  ASSERT_NE(renderTargetProxy, nullptr);
-  auto textureProxy =
-      context->proxyProvider()->createTextureProxy({}, 8, 8, PixelFormat::RGBA_8888);
-  ASSERT_NE(textureProxy, nullptr);
-  ASSERT_NE(textureProxy->getTextureView(), nullptr);
-
-  {
-    BlockAllocator allocator;
-    auto gp =
-        MeshGeometryProcessor::Make(&allocator, true, false, false, PMColor::White(), Matrix::I());
-    auto fp = TextureEffect::Make(&allocator, textureProxy);
-    ASSERT_NE(gp, nullptr);
-    ASSERT_NE(fp, nullptr);
-    ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), {fp.get()}, 1,
-                            nullptr, BlendMode::SrcOver);
-    auto match = MatchPermutation(&programInfo);
-    ASSERT_TRUE(match.has_value());
-    EXPECT_EQ(match->shaderName, "MeshTextureFillShader");
-    EXPECT_EQ(match->vertPermutationIndex, 0u);
-    EXPECT_EQ(match->fragPermutationIndex, 0u);
-  }
-
-  {
-    BlockAllocator allocator;
-    auto gp =
-        MeshGeometryProcessor::Make(&allocator, false, false, false, PMColor::White(), Matrix::I());
-    auto fp = TextureEffect::Make(&allocator, textureProxy);
-    ASSERT_NE(gp, nullptr);
-    ASSERT_NE(fp, nullptr);
-    ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), {fp.get()}, 1,
-                            nullptr, BlendMode::SrcOver);
-    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
-  }
-
-  {
-    BlockAllocator allocator;
-    auto gp =
-        MeshGeometryProcessor::Make(&allocator, true, true, false, PMColor::White(), Matrix::I());
-    auto fp = TextureEffect::Make(&allocator, textureProxy);
-    ASSERT_NE(gp, nullptr);
-    ASSERT_NE(fp, nullptr);
-    ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), {fp.get()}, 1,
-                            nullptr, BlendMode::SrcOver);
-    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
-  }
-
-  {
-    BlockAllocator allocator;
-    auto gp =
-        MeshGeometryProcessor::Make(&allocator, true, false, true, PMColor::White(), Matrix::I());
-    auto fp = TextureEffect::Make(&allocator, textureProxy);
-    ASSERT_NE(gp, nullptr);
-    ASSERT_NE(fp, nullptr);
-    ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), {fp.get()}, 1,
-                            nullptr, BlendMode::SrcOver);
-    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
-  }
-
-  {
-    BlockAllocator allocator;
-    auto gp =
-        MeshGeometryProcessor::Make(&allocator, true, false, false, PMColor::White(), Matrix::I());
-    auto fp = TextureEffect::MakeRGBAAA(&allocator, textureProxy, {}, Point{1, 0});
-    ASSERT_NE(gp, nullptr);
-    ASSERT_NE(fp, nullptr);
-    ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), {fp.get()}, 1,
-                            nullptr, BlendMode::SrcOver);
-    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
-  }
-
-  {
-    BlockAllocator allocator;
-    auto gp =
-        MeshGeometryProcessor::Make(&allocator, true, false, false, PMColor::White(), Matrix::I());
-    auto fp = TextureEffect::Make(&allocator, textureProxy);
-    auto coverage = AARectEffect::Make(&allocator, Rect::MakeWH(8, 8));
-    ASSERT_NE(gp, nullptr);
-    ASSERT_NE(fp, nullptr);
-    ASSERT_NE(coverage, nullptr);
-    ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(),
-                            {fp.get(), coverage.get()}, 1, nullptr, BlendMode::SrcOver);
-    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
-  }
-
-  {
-    BlockAllocator allocator;
-    auto gp =
-        MeshGeometryProcessor::Make(&allocator, true, false, false, PMColor::White(), Matrix::I());
-    auto fp = TextureEffect::Make(&allocator, textureProxy);
-    auto xp = PorterDuffXferProcessor::Make(&allocator, BlendMode::SrcOver, {});
-    ASSERT_NE(gp, nullptr);
-    ASSERT_NE(fp, nullptr);
-    ASSERT_NE(xp, nullptr);
-    ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), {fp.get()}, 1,
-                            xp.get(), BlendMode::SrcOver);
-    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
-  }
-}
-
-TGFX_TEST(ShaderPermutationTest, MeshTextureFillShaderRegistry) {
-  bool found = false;
-  for (const auto& factory : ShaderRegistry::All()) {
-    auto shader = factory();
-    auto info = shader->info();
-    if (info.name != "MeshTextureFillShader") {
-      continue;
-    }
-    found = true;
-    EXPECT_EQ(info.vertDomain.totalCount(), 1u);
-    EXPECT_EQ(info.fragDomain.totalCount(), 1u);
-    EXPECT_EQ(info.vertexFile, "level1/mesh_texture_fill.vert");
-    EXPECT_EQ(info.fragmentFile, "level1/mesh_texture_fill.frag");
   }
   EXPECT_TRUE(found);
 }

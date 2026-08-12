@@ -23,16 +23,19 @@ namespace tgfx {
 MeshGeometryProcessor::MeshGeometryProcessor(bool hasTexCoords, bool hasColors, bool hasCoverage,
                                              PMColor color, const Matrix& viewMatrix)
     : GeometryProcessor(ClassID()), hasTexCoords(hasTexCoords), hasColors(hasColors),
-      hasCoverage(hasCoverage), commonColor(color), viewMatrix(viewMatrix) {
+      hasCoverage(hasCoverage || hasTexCoords || hasColors), commonColor(color),
+      viewMatrix(viewMatrix) {
   position = {"aPosition", VertexFormat::Float2};
+  // Chain-order attributes: coverage sits right after position (vertex meshes write a constant
+  // 1.0f), texCoords and colors follow. This matches the pointwise chain's rect layout.
+  if (this->hasCoverage) {
+    coverage = {"aCoverage", VertexFormat::Float};
+  }
   if (hasTexCoords) {
     texCoord = {"aTexCoord", VertexFormat::Float2};
   }
   if (hasColors) {
     this->color = {"aColor", VertexFormat::UByte4Normalized};
-  }
-  if (hasCoverage) {
-    coverage = {"aCoverage", VertexFormat::Float};
   }
   setVertexAttributes(&position, 4);
 }

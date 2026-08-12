@@ -35,6 +35,9 @@
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Context.h"
+#include "tgfx/layers/DisplayList.h"
+#include "tgfx/layers/ImageLayer.h"
+#include "tgfx/layers/Layer.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
@@ -285,6 +288,55 @@ TGFX_TEST(AOTRenderConsistencyTest, AACoverageXferDstFold) {
   renderOnce(true, &aotBitmap);
   renderOnce(false, &runtimeBitmap);
   ExpectBitmapsIdentical("aa-xfer-dst-fold", aotBitmap, runtimeBitmap, 200, 200);
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, MeshTextureAndColorsXferSrcFold) {
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+  auto imageWidth = static_cast<float>(image->width());
+  auto imageHeight = static_cast<float>(image->height());
+  auto renderOnce = [&](bool useBundle, Bitmap* outBitmap) {
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto* cache = context->precompiledShaderCache();
+    if (useBundle) {
+      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+    } else {
+      cache->unload();
+    }
+    ScopedAOTStatsPause statsPause(cache, !useBundle);
+    context->globalCache()->clearPrograms();
+    auto surface = Surface::Make(context, 200, 200);
+    ASSERT_TRUE(surface != nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::White());
+    Point positions[] = {{50, 50}, {150, 50}, {150, 150}, {50, 150}};
+    Point texCoords[] = {{0, 0}, {imageWidth, 0}, {imageWidth, imageHeight}, {0, imageHeight}};
+    Color colors[] = {Color::FromRGBA(255, 0, 0, 128), Color::FromRGBA(0, 255, 0, 128),
+                      Color::FromRGBA(0, 0, 255, 128), Color::FromRGBA(255, 255, 0, 128)};
+    uint16_t indices[] = {0, 1, 2, 0, 2, 3};
+    auto mesh =
+        Mesh::MakeCopy(MeshTopology::Triangles, 4, positions, texCoords, colors, 6, indices);
+    ASSERT_TRUE(mesh != nullptr);
+    Paint paint = {};
+    paint.setShader(Shader::MakeImageShader(image));
+    canvas->drawMesh(mesh, paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(200, 200));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+    if (useBundle) {
+      cache->unload();
+    }
+  };
+  Bitmap aotBitmap = {};
+  Bitmap runtimeBitmap = {};
+  renderOnce(true, &aotBitmap);
+  renderOnce(false, &runtimeBitmap);
+  ExpectBitmapsIdentical("mesh-texture-colors-xfer-src", aotBitmap, runtimeBitmap, 200, 200);
 }
 
 TGFX_TEST(AOTRenderConsistencyTest, GaussianBlurTileModes) {

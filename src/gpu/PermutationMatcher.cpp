@@ -66,7 +66,6 @@
 #include "gpu/shaders/level1/HairlineQuadShader.h"
 #include "gpu/shaders/level1/MaskFillShader.h"
 #include "gpu/shaders/level1/MeshFillShader.h"
-#include "gpu/shaders/level1/MeshTextureFillShader.h"
 #include "gpu/shaders/level1/NonAARRectFillShader.h"
 #include "gpu/shaders/level1/PerlinNoiseFillShader.h"
 #include "gpu/shaders/level1/PointwiseChainShader.h"
@@ -666,9 +665,10 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseTail(const Program
 static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
     const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
-  // GP_LAYOUT: 0 covers both rect GPs, 1 is the ellipse layout.
+  // GP_LAYOUT: 0 covers the rect GPs and MeshGP (whose vertex buffers follow the chain's
+  // attribute order), 1 is the ellipse layout.
   int gpLayout = -1;
-  if (GetGPType(gp) >= 0) {
+  if (GetGPType(gp) >= 0 || gp->name() == "MeshGeometryProcessor") {
     gpLayout = 0;
   } else if (gp->name() == "EllipseGeometryProcessor") {
     gpLayout = 1;
@@ -687,6 +687,12 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
     }
     hasUVCoord = quadGP->hasUVMatrix() ? 0 : 1;
     hasColor = quadGP->hasCommonColor() ? 0 : 1;
+  } else if (gp->name() == "MeshGeometryProcessor") {
+    auto* meshGP = static_cast<const MeshGeometryProcessor*>(gp);
+    // Mesh vertex buffers follow the chain's attribute order (position, coverage, texCoord,
+    // color): texCoords ride the uvCoord slot and per-vertex colors the color slot.
+    hasUVCoord = meshGP->getHasTexCoords() ? 1 : 0;
+    hasColor = meshGP->getHasColors() ? 1 : 0;
   } else if (gpLayout == 1) {
     auto* ellipseGP = static_cast<const EllipseGeometryProcessor*>(gp);
     hasColor = ellipseGP->hasCommonColor() ? 0 : 1;
@@ -760,7 +766,8 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
   // so the always-on coverage path serves every quad; the ellipse layout evaluates coverage per
   // pixel and never carries the attribute.
   int hasCoverage = 0;
-  if (gp->name() == "QuadPerEdgeAAGeometryProcessor") {
+  if (gp->name() == "QuadPerEdgeAAGeometryProcessor" || gp->name() == "MeshGeometryProcessor") {
+    // Mesh buffers always carry the coverage slot (1.0 for vertex meshes).
     hasCoverage = 1;
   } else if (gpLayout == 0) {
     hasCoverage = GetGPCoverage(gp);
@@ -1695,28 +1702,6 @@ static std::optional<PermutationMatchResult> TryMatchShapeInstancedFill(
   return PermutationMatchResult{"ShapeInstancedFillShader", vertIndex, fragIndex};
 }
 
-static std::optional<PermutationMatchResult> TryMatchMeshTextureFill(
-    const ProgramInfo* programInfo) {
-  auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "MeshGeometryProcessor" || programInfo->numColorFragmentProcessors() != 1 ||
-      programInfo->numFragmentProcessors() != 1 || GetXPType(programInfo) != 0) {
-    return std::nullopt;
-  }
-  auto* mgp = static_cast<const MeshGeometryProcessor*>(gp);
-  if (!mgp->getHasTexCoords() || mgp->getHasColors() || mgp->getHasCoverage()) {
-    return std::nullopt;
-  }
-  auto fp = programInfo->getFragmentProcessor(0);
-  if (fp->name() != "TextureEffect") {
-    return std::nullopt;
-  }
-  auto* texture = static_cast<const TextureEffect*>(fp);
-  if (texture->numTextureSamplers() != 1 || texture->isYUV() || texture->hasRGBAAA()) {
-    return std::nullopt;
-  }
-  return PermutationMatchResult{"MeshTextureFillShader", 0, 0};
-}
-
 static std::optional<PermutationMatchResult> TryMatchMeshFill(const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
   if (gp->name() != "MeshGeometryProcessor") {
@@ -1985,9 +1970,6 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
     return result;
   }
   if (auto result = TryMatchShapeInstancedFill(programInfo)) {
-    return result;
-  }
-  if (auto result = TryMatchMeshTextureFill(programInfo)) {
     return result;
   }
   if (auto result = TryMatchMeshFill(programInfo)) {

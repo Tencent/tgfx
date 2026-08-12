@@ -23,28 +23,17 @@ layout(std140, set = 0, binding = 0) uniform VertexUniformBlock {
 };
 
 layout(location = 0) in vec2 aPosition;
-#if HAS_TEX_COORDS
-layout(location = 1) in vec2 aTexCoord;
-#if HAS_COLOR
-layout(location = 2) in vec4 aColor;
-#if HAS_COVERAGE
-layout(location = 3) in float aCoverage;
-#endif
-#else
-#if HAS_COVERAGE
-layout(location = 2) in float aCoverage;
-#endif
-#endif
-#else
-#if HAS_COLOR
-layout(location = 1) in vec4 aColor;
-#if HAS_COVERAGE
-layout(location = 2) in float aCoverage;
-#endif
-#else
 #if HAS_COVERAGE
 layout(location = 1) in float aCoverage;
 #endif
+#if HAS_TEX_COORDS
+layout(location = 2) in vec2 aTexCoord;
+#if HAS_COLOR
+layout(location = 3) in vec4 aColor;
+#endif
+#else
+#if HAS_COLOR
+layout(location = 2) in vec4 aColor;
 #endif
 #endif
 

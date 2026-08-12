@@ -57,9 +57,9 @@ class MeshGeometryProcessor : public GeometryProcessor {
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   Attribute position = {};
+  Attribute coverage = {};
   Attribute texCoord = {};
   Attribute color = {};
-  Attribute coverage = {};
 
   bool hasTexCoords = false;
   bool hasColors = false;
