@@ -45,11 +45,17 @@ static constexpr DWORD FENCE_WAIT_TIMEOUT_MS = 60000;
 // Bounded timeout for IDXGIKeyedMutex::AcquireSync(0). Self-contention across consecutive frames
 // is resolved before this ever fires: acquireSessionMutexes() precisely waits on the previous
 // submission's fence and drives pollCompletedSubmissions() to release the mutex. So AcquireSync
-// only blocks on an actual external holder (typically the D3D11 producer that forgot to call
-// ReleaseSync(0) after its last update). 100ms is generous for that case while keeping the worst
-// case latency low enough that a mis-behaving producer becomes obvious immediately instead of
-// stalling the render thread for whole seconds.
-static constexpr DWORD KEYED_MUTEX_ACQUIRE_TIMEOUT_MS = 100;
+// only blocks on an actual external holder — either a legitimate D3D11 producer whose current
+// AcquireSync/ReleaseSync window happens to be long (e.g. a video pipeline doing whole-frame GPU
+// composition inside the window, which can spike well above 100ms under load), or a genuinely
+// mis-behaving producer that forgot to call ReleaseSync(0). We cannot use INFINITE the way
+// Chromium's SharedImage layer does, because their producer holds the mutex only around CPU-side
+// command recording; we hold it across a GPU fence, so an anomalous producer would deadlock the
+// render thread. 5 seconds is chosen to favour "do not falsely kill a legitimate slow producer"
+// over "surface a broken producer immediately" — 5s is well above realistic GPU-composition
+// jitter on the producer side, and a real hang still surfaces as a context-loss within a bounded
+// window instead of an indefinite stall.
+static constexpr DWORD KEYED_MUTEX_ACQUIRE_TIMEOUT_MS = 5000;
 
 bool HardwareBufferAvailable() {
   // The D3D12 backend imports ID3D11Texture2D-based HardwareBufferRefs via a shared handle. The
@@ -1140,8 +1146,9 @@ bool D3D12GPU::acquireSessionMutexes(D3D12FrameSession& session) {
       pollCompletedSubmissions();
     }
     // Acquire phase: the mutex is now known to be free from our own side. Any remaining wait
-    // reflects an external holder; bound the wait tightly so a mis-behaving producer surfaces as
-    // an immediate context loss rather than a multi-second stall.
+    // reflects an external holder; the timeout is sized to tolerate legitimate producer-side
+    // GPU-composition jitter while still surfacing a genuinely hung producer within a bounded
+    // window (see KEYED_MUTEX_ACQUIRE_TIMEOUT_MS for the rationale).
     auto hr = mutex->AcquireSync(0, KEYED_MUTEX_ACQUIRE_TIMEOUT_MS);
     if (FAILED(hr) || hr == WAIT_TIMEOUT || hr == WAIT_ABANDONED) {
       LOGE(
