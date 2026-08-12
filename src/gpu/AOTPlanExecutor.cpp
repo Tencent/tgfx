@@ -925,6 +925,12 @@ class AOTPlanRenderTask : public RenderTask {
     }
 
     bool prepared = true;
+    // These strict prepares double as route-validation probes: a plan pass the matcher cannot
+    // serve (e.g. a perspective leaf transform) falls back to the runtime route, so its lookup
+    // failure must not record a diagnostic miss against the rewritten pipeline — the fallback
+    // path records the draw's original pipeline instead.
+    auto* statsCache = finalTarget->getContext()->precompiledShaderCache();
+    statsCache->setMissRecordingPaused(true);
     for (size_t index = 0; index < intermediatePasses.size(); ++index) {
       if (!intermediatePasses[index].drawOp->prepare(renderTargets[index].get(),
                                                      ProgramLookupMode::PrecompiledOnly)) {
@@ -936,6 +942,7 @@ class AOTPlanRenderTask : public RenderTask {
                                            std::move(terminalColors))) {
       prepared = false;
     }
+    statsCache->setMissRecordingPaused(false);
     if (!prepared) {
       executeFallback(encoder, std::move(finalTarget));
       return;

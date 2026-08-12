@@ -84,7 +84,7 @@ void PrecompiledShaderCache::recordArtifactHit() {
 
 void PrecompiledShaderCache::recordArtifactMiss(PrecompiledFallbackReason reason,
                                                 const PrecompiledFallbackRecord& record) {
-  if (statsRecordingPaused()) {
+  if (statsRecordingPaused() || missPaused.load(std::memory_order_relaxed)) {
     return;
   }
   _missCount.fetch_add(1, std::memory_order_relaxed);
