@@ -62,11 +62,9 @@ struct FrameSession {
   std::vector<std::shared_ptr<VulkanResource>> retainedResources;
 
 #if defined(_WIN32) && !defined(__ANDROID__)
-  // VkDeviceMemory objects that must be guarded by a Win32 keyed mutex (key = 0) around the
-  // vkQueueSubmit that executes this session. Populated by VulkanCommandEncoder::retainTexture()
-  // whenever it retains a VulkanHardwareTexture that reports a non-null keyed-mutex memory;
-  // deduplicated at insertion time. Consumed by VulkanGPU::executeSubmission() to build a
-  // VkWin32KeyedMutexAcquireReleaseInfoKHR pNext on the VkSubmitInfo.
+  // VkDeviceMemory that must be guarded by a Win32 keyed mutex (key = 0) around this session's
+  // vkQueueSubmit. Populated (with deduplication) by VulkanCommandEncoder::retainTexture and
+  // consumed by VulkanGPU::executeSubmission to build VkWin32KeyedMutexAcquireReleaseInfoKHR.
   std::vector<VkDeviceMemory> keyedMutexMemories;
 #endif
 

@@ -47,11 +47,8 @@
 namespace tgfx {
 
 #if defined(_WIN32) && !defined(__ANDROID__)
-// Maximum time (in milliseconds, driver-enforced in GPU time) we tolerate waiting for the D3D11
-// producer to release a keyed mutex before the current GPU submission stops making progress.
-// Kept at 5000ms to mirror the D3D12 backend contract; note that unlike the D3D12 code path this
-// value does NOT translate into a CPU-side timed wait — VkQueueSubmit is non-blocking, and the
-// timeout only bounds how long the driver waits inside its own scheduler.
+// Driver-side GPU-time timeout for the keyed-mutex acquire chained onto vkQueueSubmit. Unlike
+// the D3D12 backend this does NOT block the CPU; it only bounds the GPU-side wait.
 static constexpr uint32_t KEYED_MUTEX_ACQUIRE_TIMEOUT_MS = 5000;
 #endif
 
@@ -88,12 +85,6 @@ bool HardwareBufferAvailable() {
 }
 #elif defined(_WIN32)
 bool HardwareBufferAvailable() {
-  // On Windows the tgfx HardwareBuffer wrapper is an ID3D11Texture2D pointer. The capability is
-  // universally present as a type on any Windows install; whether a specific Vulkan device can
-  // actually import a given texture depends on the extensions we managed to enable on it (see
-  // VulkanExtensions::win32ExternalMemory / win32KeyedMutex) and the flags the source texture was
-  // created with. Returning true here mirrors the D3D12 backend contract; callers are expected to
-  // handle importHardwareTextures() returning an empty vector.
   return true;
 }
 #else
@@ -482,10 +473,9 @@ std::shared_ptr<CommandEncoder> VulkanGPU::createCommandEncoder() {
 
 std::vector<std::shared_ptr<Texture>> VulkanGPU::importHardwareTextures(
     HardwareBufferRef hardwareBuffer, uint32_t usage) {
+  // All eligibility gating (extension bits + HardwareBufferCheck + format/usage) lives inside
+  // VulkanHardwareTexture::MakeFrom to keep a single authoritative import-eligibility path.
 #if defined(__ANDROID__)
-  // Extension-bit and HardwareBufferCheck gating live inside VulkanHardwareTexture::MakeFrom so
-  // there is a single authoritative import-eligibility path (with diagnostic logs on failure).
-  // Duplicating them here would risk the two gates drifting out of sync as new checks are added.
   auto texture = VulkanHardwareTexture::MakeFrom(this, hardwareBuffer, usage);
   if (texture == nullptr) {
     return {};
@@ -494,9 +484,6 @@ std::vector<std::shared_ptr<Texture>> VulkanGPU::importHardwareTextures(
   textures.push_back(std::move(texture));
   return textures;
 #elif defined(_WIN32)
-  // Extension-bit and HardwareBufferCheck gating live inside VulkanHardwareTexture::MakeFrom so
-  // there is a single authoritative import-eligibility path (with diagnostic logs on failure).
-  // Duplicating them here would risk the two gates drifting out of sync as new checks are added.
   auto texture = VulkanHardwareTexture::MakeFrom(this, hardwareBuffer, usage);
   if (texture == nullptr) {
     return {};
@@ -871,14 +858,9 @@ void VulkanGPU::executeSubmission(SubmitRequest request) {
 
 #if defined(_WIN32) && !defined(__ANDROID__)
   // Step 4b (Windows only): if this session sampled any shared D3D11 textures, chain a
-  // VkWin32KeyedMutexAcquireReleaseInfoKHR into submitInfo.pNext so the driver acquires the
-  // keyed mutexes (key = 0) before the GPU starts sampling and releases them once the GPU is
-  // done. Timeouts are enforced by the driver in GPU time; unlike the D3D12 backend this does
-  // NOT block the CPU, so there is no rollback path to worry about here — a failed acquire
-  // simply prevents the GPU from executing subsequent commands, which is surfaced through the
-  // fence status the same way any other execution error would be.
-  //
-  // Keys and timeouts are hard-coded to match the D3D12 v1 contract: key = 0, timeout = 5000ms.
+  // VkWin32KeyedMutexAcquireReleaseInfoKHR into submitInfo.pNext so the driver handles the
+  // key = 0 acquire/release around the GPU submission. Timeout is enforced in GPU time and
+  // does not block the CPU; a failed acquire surfaces through the fence like any GPU error.
   VkWin32KeyedMutexAcquireReleaseInfoKHR keyedMutexInfo = {};
   std::vector<uint64_t> keyedMutexKeys;
   std::vector<uint32_t> keyedMutexTimeouts;

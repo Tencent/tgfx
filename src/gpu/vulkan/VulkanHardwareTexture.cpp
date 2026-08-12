@@ -299,13 +299,9 @@ std::shared_ptr<VulkanHardwareTexture> VulkanHardwareTexture::MakeFrom(
 
 #elif defined(_WIN32)
 
-// Opens the shared NT handle produced by IDXGIResource1::CreateSharedHandle as a VkDeviceMemory
-// aliased over the same D3D11 texture memory. Returns VK_NULL_HANDLE on any failure; the caller
-// is responsible for the VkImage lifecycle.
-//
-// The Vulkan spec (VUID-VkMemoryAllocateInfo-pNext-00639) requires that imported NT handles are
-// duplicated by the driver: after vkAllocateMemory succeeds, the original handle must be closed
-// by the caller. We do that here regardless of success to keep handle accounting linear.
+// Imports a shared NT handle produced by CreateSharedHandle as VkDeviceMemory aliased over the
+// same D3D11 texture memory. Returns VK_NULL_HANDLE on failure. The caller retains ownership of
+// ntHandle (Vulkan duplicates it internally on success).
 static VkDeviceMemory ImportSharedNtHandleAsMemory(VkDevice device, VkPhysicalDevice physDevice,
                                                    HANDLE ntHandle, VkImage image,
                                                    const VkMemoryRequirements& imageMemReq) {
@@ -318,9 +314,8 @@ static VkDeviceMemory ImportSharedNtHandleAsMemory(VkDevice device, VkPhysicalDe
          VkResultToString(hr));
     return VK_NULL_HANDLE;
   }
-  // Intersect with the image's own compatible mask so the resulting index passes vkBindImageMemory
-  // validation. If the intersection is empty, fall back to the image mask alone (some drivers
-  // return an over-restrictive mask for imported handles).
+  // Intersect with the image's compatible mask so the type index passes vkBindImageMemory
+  // validation. If empty, fall back to the image mask alone.
   uint32_t typeBits = handleProps.memoryTypeBits & imageMemReq.memoryTypeBits;
   if (typeBits == 0) {
     typeBits = imageMemReq.memoryTypeBits;
@@ -359,21 +354,10 @@ static VkDeviceMemory ImportSharedNtHandleAsMemory(VkDevice device, VkPhysicalDe
   return memory;
 }
 
-// Performs a synchronous, one-shot queue-family-ownership acquire + layout transition on a
-// freshly-imported image. tgfx's Vulkan render pass code samples every texture assuming
-// VK_IMAGE_LAYOUT_GENERAL (see VulkanRenderPass.cpp), but an image bound to imported memory
-// starts in VK_IMAGE_LAYOUT_UNDEFINED and would be discarded by a regular UNDEFINED->GENERAL
-// barrier. The trick is srcQueueFamilyIndex = VK_QUEUE_FAMILY_EXTERNAL: the Vulkan spec treats
-// this pattern as an ownership-transfer from an external API and preserves the underlying
-// content instead of discarding it.
-//
-// Because this only runs once per imported texture, the extra vkQueueWaitIdle here is bounded
-// and acceptable; the alternative of deferring the barrier to the first render pass would
-// require intrusive changes to the render-pass lifecycle to insert pre-pass barriers.
-//
-// The keyed mutex on the imported memory MUST also be acquired and released around this submit,
-// because the D3D11 producer still owns the memory otherwise. Keys are 0, matching the runtime
-// contract used by the render path.
+// One-shot queue-family-ownership acquire from VK_QUEUE_FAMILY_EXTERNAL to the tgfx graphics
+// queue, chained with a keyed-mutex acquire/release (key = 0). Runs once per imported texture
+// so subsequent samples (which tgfx binds at VK_IMAGE_LAYOUT_GENERAL) see preserved content
+// instead of the discard a regular UNDEFINED->GENERAL barrier would trigger.
 static bool AcquireExternalOwnershipAndTransitionToGeneral(VulkanGPU* gpu, VkImage image,
                                                            VkDeviceMemory memory) {
   VkDevice device = gpu->device();
@@ -412,14 +396,10 @@ static bool AcquireExternalOwnershipAndTransitionToGeneral(VulkanGPU* gpu, VkIma
   barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
   barrier.srcAccessMask = 0;
   barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-  // Both layouts are GENERAL: this call is really a queue-family-ownership acquire, not a
-  // content-changing layout transition. Using UNDEFINED as oldLayout is spec-compliant for a
-  // fresh image but authorises the driver to discard content, which is exactly what we saw on
-  // NVIDIA. Declaring GENERAL on both sides tells the driver "the external producer already
-  // has the image in a shader-readable layout; just take ownership".
+  // Declare GENERAL on both sides: this is an ownership acquire, not a content-changing
+  // transition. UNDEFINED as oldLayout would let the driver discard content (observed on NVIDIA).
   barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
   barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-  // Acquire ownership from the external (D3D11) API.
   barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_EXTERNAL_KHR;
   barrier.dstQueueFamilyIndex = gpu->graphicsQueueIndex();
   barrier.image = image;
@@ -435,8 +415,7 @@ static bool AcquireExternalOwnershipAndTransitionToGeneral(VulkanGPU* gpu, VkIma
   vkEndCommandBuffer(cmdBuf);
 
   // Chain a keyed-mutex acquire/release around the submit so the D3D11 side does not race with
-  // thisownership-transfer. Key 0, timeout 5s — same numbers used everywhere else on this
-  // code path.
+  // this ownership transfer. Key 0, timeout 5s.
   VkWin32KeyedMutexAcquireReleaseInfoKHR keyedMutexInfo = {};
   uint64_t key = 0;
   uint32_t timeout = 5000;
@@ -462,9 +441,8 @@ static bool AcquireExternalOwnershipAndTransitionToGeneral(VulkanGPU* gpu, VkIma
     vkDestroyCommandPool(device, pool, nullptr);
     return false;
   }
-  // Blocking wait: OK because this is a one-shot initialisation. The graphics queue is single-
-  // threaded from tgfx's perspective (all callers hold the Context lock), so no cross-thread
-  // interference is possible.
+  // Blocking wait is OK: one-shot initialisation on the graphics queue that all callers already
+  // serialise via the Context lock.
   vkQueueWaitIdle(queue);
   vkFreeCommandBuffers(device, pool, 1, &cmdBuf);
   vkDestroyCommandPool(device, pool, nullptr);
@@ -496,7 +474,7 @@ std::shared_ptr<VulkanHardwareTexture> VulkanHardwareTexture::MakeFrom(
   auto info = HardwareBufferGetInfo(hardwareBuffer);
   VkFormat vkFormat = HardwareBufferFormatToVkFormat(info.format);
   if (vkFormat == VK_FORMAT_UNDEFINED || info.format == HardwareBufferFormat::YCBCR_420_SP) {
-    // NV12 is out of scope for the v1 Win32 path (see the D3D12 backend contract).
+    // NV12 is out of scope on the v1 Win32 path.
     return nullptr;
   }
 
@@ -536,11 +514,9 @@ std::shared_ptr<VulkanHardwareTexture> VulkanHardwareTexture::MakeFrom(
   externalMemoryInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO;
   externalMemoryInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D11_TEXTURE_BIT;
 
-  // Precheck: ask the driver whether a VkImage with this exact configuration can be backed by
-  // memory imported from a D3D11 shared NT handle. If it cannot, we bail out immediately with a
-  // detailed log — allocating anyway would produce an image whose sampled contents are
-  // driver-defined (typically all zeros on NVIDIA, matching the symptom we chased in the initial
-  // implementation).
+  // Precheck: ask the driver whether a VkImage with this configuration can be backed by memory
+  // imported from a D3D11 shared NT handle. Skipping this and allocating anyway produces images
+  // whose sampled contents are driver-defined (all zeros on NVIDIA in the initial impl).
   {
     VkPhysicalDeviceExternalImageFormatInfo extFormatInfo = {};
     extFormatInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_IMAGE_FORMAT_INFO;
@@ -594,8 +570,6 @@ std::shared_ptr<VulkanHardwareTexture> VulkanHardwareTexture::MakeFrom(
           static_cast<unsigned>(compatBits), static_cast<unsigned>(features));
       return nullptr;
     }
-    // Some drivers (notably NVIDIA) additionally require dedicated allocation for imported
-    // images; VkMemoryDedicatedAllocateInfo below already covers that requirement.
   }
 
   VkImageCreateInfo imageInfo = {};
@@ -625,8 +599,7 @@ std::shared_ptr<VulkanHardwareTexture> VulkanHardwareTexture::MakeFrom(
 
   VkDeviceMemory memory =
       ImportSharedNtHandleAsMemory(device, physDevice, ntHandle, vkImage, imageMemReq);
-  // Regardless of success, CloseHandle balances the CreateSharedHandle duplicate. On success the
-  // driver has taken its own reference; on failure we simply drop ours here.
+  // On success the driver has taken its own reference; on failure we drop ours here.
   CloseHandle(ntHandle);
   if (memory == VK_NULL_HANDLE) {
     vkDestroyImage(device, vkImage, nullptr);
@@ -641,11 +614,8 @@ std::shared_ptr<VulkanHardwareTexture> VulkanHardwareTexture::MakeFrom(
     return nullptr;
   }
 
-  // Immediately transition the image to GENERAL layout via an external-queue-family ownership
-  // acquire, so that subsequent samples (which tgfx unconditionally binds at GENERAL) find the
-  // image content preserved. Without this the very first sample of a freshly-imported texture
-  // reads zeros, because the driver treats UNDEFINED->GENERAL from the graphics queue as a
-  // discard.
+  // Transition to GENERAL via an external-queue-family ownership acquire so the first sample
+  // sees preserved content instead of being discarded by an UNDEFINED->GENERAL barrier.
   if (!AcquireExternalOwnershipAndTransitionToGeneral(gpu, vkImage, memory)) {
     LOGE("VulkanHardwareTexture::MakeFrom() failed to transition imported image to GENERAL.");
     vkFreeMemory(device, memory, nullptr);

@@ -50,14 +50,12 @@ struct VulkanExtensions {
   /// Whether VK_KHR_sampler_ycbcr_conversion is available and the feature is supported.
   bool samplerYcbcrConversion = false;
 #elif defined(_WIN32)
-  /// Whether the four extensions required to import a D3D11 shared NT handle as a VkImage are
-  /// all available: KHR_external_memory, KHR_external_memory_win32, KHR_dedicated_allocation,
-  /// KHR_get_memory_requirements2. Exposed as one bit because the import path needs them
-  /// together; individual absences are unrecoverable so there is no need to distinguish.
+  /// Whether all four extensions required to import a D3D11 shared NT handle are available:
+  /// KHR_external_memory, KHR_external_memory_win32, KHR_dedicated_allocation,
+  /// KHR_get_memory_requirements2.
   bool win32ExternalMemory = false;
   /// Whether VK_KHR_win32_keyed_mutex is available. Required to synchronise with the D3D11
-  /// producer around vkQueueSubmit; without it we cannot honour the keyed-mutex contract shared
-  /// with the D3D12 backend.
+  /// producer around vkQueueSubmit.
   bool win32KeyedMutex = false;
 #endif
 
@@ -72,8 +70,8 @@ struct VulkanExtensions {
   bool enumeratedDedicatedAllocation = false;
   bool enumeratedYcbcr = false;
 #elif defined(_WIN32)
-  // Same enumeration tracking as the Android path: promoted-to-1.1 extensions must be listed
-  // in ppEnabledExtensionNames only when the driver actually enumerated them.
+  // Enumeration tracking for promoted-to-1.1 extensions; only list in ppEnabledExtensionNames
+  // when the driver actually enumerated them.
   bool enumeratedExternalMemory = false;
   bool enumeratedDedicatedAllocation = false;
   bool enumeratedGetMemoryRequirements2 = false;

@@ -90,20 +90,16 @@ class VulkanCommandEncoder : public CommandEncoder, public VulkanResource {
     session.retainedResources.push_back(std::move(resource));
   }
 
-  // Retains a texture and, on Windows, additionally records its Win32 keyed-mutex memory (if any)
-  // into the session so vkQueueSubmit can acquire/release it. Callers that already have a
-  // std::shared_ptr<VulkanTexture> should prefer this over retainResource(); pipelines, buffers,
-  // samplers and other non-texture resources continue to use retainResource() directly.
+  // Like retainResource(), and additionally records the texture's Win32 keyed-mutex memory (if
+  // any) so vkQueueSubmit can acquire/release it. Callers holding a std::shared_ptr<VulkanTexture>
+  // should prefer this over retainResource().
   void retainTexture(std::shared_ptr<VulkanTexture> texture) {
 #if defined(_WIN32) && !defined(__ANDROID__)
     if (texture) {
       auto mem = texture->importedMemoryForKeyedMutex();
       if (mem != VK_NULL_HANDLE) {
         auto& list = session.keyedMutexMemories;
-        // Deduplicate: a session may reference the same imported texture multiple times (e.g.
-        // sampled in two draw calls), but the keyed mutex must be acquired/released exactly
-        // once per submission. Linear scan is fine because the expected list length is tiny
-        // (single-digit number of imported textures per frame in realistic workloads).
+        // Dedup: the mutex must be acquired/released exactly once per submission.
         if (std::find(list.begin(), list.end(), mem) == list.end()) {
           list.push_back(mem);
         }

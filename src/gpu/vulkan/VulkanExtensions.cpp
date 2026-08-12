@@ -177,20 +177,15 @@ void VulkanExtensions::detectFromDevice(VkPhysicalDevice physicalDevice) {
     samplerYcbcrConversion = false;
   }
 #elif defined(_WIN32)
-  // For an externally created device we cannot re-enumerate what was enabled; the best we can do
-  // is trust the presence of the KHR entry points as a proxy for extension enablement.
+  // For an externally created device we cannot re-enumerate what was enabled; trust the KHR
+  // entry points as a proxy for extension enablement.
   win32ExternalMemory =
       (vkGetMemoryWin32HandlePropertiesKHR != nullptr) &&
       (vkGetImageMemoryRequirements2 != nullptr || vkGetImageMemoryRequirements2KHR != nullptr);
-  // VK_KHR_win32_keyed_mutex is data-only (it activates the VkWin32KeyedMutexAcquireReleaseInfoKHR
-  // pNext struct on VkSubmitInfo) and exposes no distinct entry points, so there is no reliable
-  // way to detect whether the embedder actually enabled it on an adopted VkDevice. Assuming it
-  // follows win32ExternalMemory is unsafe: an embedder that enables only the external-memory
-  // bundle would let importHardwareTextures() succeed, and the subsequent vkQueueSubmit would
-  // then chain VkWin32KeyedMutexAcquireReleaseInfoKHR against a device that never enabled the
-  // extension — a VUID violation that can drop the device. Default to false on this path so the
-  // import gracefully fails; the embedder can opt in explicitly once a dedicated API is added
-  // (tracked as follow-up to VulkanDevice::MakeFrom).
+  // VK_KHR_win32_keyed_mutex is data-only and exposes no distinct entry points, so we cannot
+  // detect it on an adopted VkDevice. Default to false to avoid chaining
+  // VkWin32KeyedMutexAcquireReleaseInfoKHR against a device that never enabled the extension
+  // (VUID violation, may drop the device). Explicit opt-in will follow VulkanDevice::MakeFrom.
   win32KeyedMutex = false;
 #endif
 }
@@ -228,8 +223,7 @@ std::vector<const char*> VulkanExtensions::getEnabledNames() const {
   }
 #elif defined(_WIN32)
   if (win32ExternalMemory) {
-    // Same "only-if-enumerated" rule as the Android path. VK_KHR_external_memory_win32 is not
-    // promoted to core so it always needs to be listed explicitly.
+    // Only list promoted-to-1.1 extensions when the driver actually enumerated them.
     if (enumeratedExternalMemory) {
       names.push_back(VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME);
     }

@@ -33,33 +33,14 @@ namespace tgfx {
 class VulkanGPU;
 
 /**
- * Vulkan texture backed by a platform HardwareBuffer.
- *
- * On Android the buffer is an AHardwareBuffer imported through
- * VK_ANDROID_external_memory_android_hardware_buffer; on Windows it is an ID3D11Texture2D
- * imported through VK_KHR_external_memory_win32 with a shared NT handle. Both paths produce a
- * VkImage bound to dedicated device memory that aliases the source buffer, giving zero-copy
- * sampling.
- *
- * Windows integration contract (mirrors the D3D12 backend):
- *  - Source ID3D11Texture2D must be created with
- *    D3D11_RESOURCE_MISC_SHARED_NTHANDLE | D3D11_RESOURCE_MISC_SHARED_KEYEDMUTEX. The Vulkan
- *    driver rejects legacy KMT handles.
- *  - After any producer-side write (including the initial pInitialData upload passed to
- *    CreateTexture2D), the producer MUST call ID3D11DeviceContext::Flush() before releasing
- *    the keyed mutex. Unlike the D3D12 shared-handle path, Vulkan bypasses the D3D scheduler
- *    when it imports the memory, so an unflushed producer surfaces as zeroed pixels on the
- *    Vulkan side.
- *  - The keyed mutex key is hard-coded to 0. Producer releases with key 0 to hand ownership
- *    to Vulkan; the render path acquires/releases with key 0 around every vkQueueSubmit that
- *    samples the texture, so the producer can AcquireSync(0) again to write a new frame.
- *  - Only TextureUsage::TEXTURE_BINDING is supported: RENDER_ATTACHMENT would require the
- *    caller to also request BIND_RENDER_TARGET on the D3D11 side plus application-level
- *    fencing, none of which are part of the v1 contract.
- *
- * A VkWin32KeyedMutexAcquireReleaseInfoKHR pNext is attached to every vkQueueSubmit that
- * references imported memory, so the driver takes care of the actual acquire/release ordering
- * relative to the GPU commands.
+ * Vulkan texture backed by a platform HardwareBuffer, imported via
+ * VK_ANDROID_external_memory_android_hardware_buffer on Android or via
+ * VK_KHR_external_memory_win32 + shared NT handle on Windows. Produces a VkImage aliased over the
+ * source buffer's memory, giving zero-copy sampling. Only TextureUsage::TEXTURE_BINDING is
+ * supported. On Windows the source ID3D11Texture2D must have been created with
+ * D3D11_RESOURCE_MISC_SHARED_NTHANDLE | D3D11_RESOURCE_MISC_SHARED_KEYEDMUTEX, and the producer
+ * must Flush() before ReleaseSync(0) so the imported memory sees committed pixels; the render
+ * path chains VkWin32KeyedMutexAcquireReleaseInfoKHR (key = 0) around every vkQueueSubmit.
  */
 class VulkanHardwareTexture : public VulkanTexture {
  public:
@@ -94,13 +75,8 @@ class VulkanHardwareTexture : public VulkanTexture {
   VkSamplerYcbcrConversion ycbcrConversion = VK_NULL_HANDLE;
 
 #if defined(_WIN32) && !defined(__ANDROID__)
-  // Owning ComPtr to the IDXGIKeyedMutex queried off the source ID3D11Texture2D at import time.
-  // QueryInterface returns a strong reference, so this ComPtr independently keeps the mutex
-  // object alive for the lifetime of this VulkanHardwareTexture. hardwareBuffer (a retained
-  // ID3D11Texture2D) also keeps the mutex reachable because the mutex is aggregated on the same
-  // COM object, but that is a property of the D3D11 implementation, not something we should rely
-  // on here — holding our own strong ref keeps the acquire/release call sites self-contained.
-  // Set only on the Win32 import path.
+  // Owning ComPtr to the IDXGIKeyedMutex queried off the source ID3D11Texture2D. QueryInterface
+  // returns a strong reference, so this ComPtr independently keeps the mutex object alive.
   Microsoft::WRL::ComPtr<IDXGIKeyedMutex> _keyedMutex = nullptr;
 #endif
 
