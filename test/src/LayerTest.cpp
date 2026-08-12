@@ -4494,6 +4494,24 @@ TGFX_TEST_PRIVATE(LayerTest, FlatLeaf_PreservesContentScaleSizing) {
   });
 }
 
+TGFX_TEST_PRIVATE(LayerTest, ExtremeAffineLeaf_KeepsMipmaps) {
+  TGFX_PRIVATE_ACCESS({
+    const Rect localBounds = Rect::MakeWH(100, 100);
+    const float contentScale = 1.0f;
+    const Rect renderRect = Rect::MakeWH(1000, 1000);
+    const Rect viewport = Rect::MakeWH(renderRect.width(), renderRect.height());
+    // The clipped horizontal footprint rounds to one local unit, so m00 stays finite while its
+    // square overflows. This must prefer the conservative mipmapped path.
+    const auto localToCompositor = MakeLocalToCompositorMatrix(
+        Matrix3D::MakeScale(1.0e35f, 1.0f, 1.0f), contentScale, renderRect);
+    Render3DContext::RasterInfo info;
+
+    ASSERT_TRUE(Render3DContext::ComputeRasterInfo(localToCompositor, localBounds, viewport,
+                                                   contentScale, &info));
+    EXPECT_TRUE(info.needsMipmaps);
+  });
+}
+
 // A large leaf under an extreme content scale is cropped to the compositor viewport before
 // rasterization, avoiding an allocation of more than one million pixels per axis.
 TGFX_TEST_PRIVATE(LayerTest, ExtremeZoom_CropsToViewportScale) {

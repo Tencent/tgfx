@@ -94,7 +94,11 @@ static bool NeedsMipmaps(const Matrix3D& localToCompositor, const Rect& visibleL
   const float m01 = localToCompositor.getRowColumn(0, 1) / homogeneousW / texelsPerLocalY;
   const float m10 = localToCompositor.getRowColumn(1, 0) / homogeneousW / texelsPerLocalX;
   const float m11 = localToCompositor.getRowColumn(1, 1) / homogeneousW / texelsPerLocalY;
-  return SmallestSingularValueSquared(m00, m01, m10, m11) < 1.0f;
+  if (!std::isfinite(m00) || !std::isfinite(m01) || !std::isfinite(m10) || !std::isfinite(m11)) {
+    return true;
+  }
+  const float smallestSingularValueSquared = SmallestSingularValueSquared(m00, m01, m10, m11);
+  return !std::isfinite(smallestSingularValueSquared) || smallestSingularValueSquared < 1.0f;
 }
 
 }  // namespace
