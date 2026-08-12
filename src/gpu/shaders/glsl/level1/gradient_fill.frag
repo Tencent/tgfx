@@ -63,135 +63,17 @@ layout(set = 1, binding = 0) uniform sampler2D MaskTextureSampler;
 #endif
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
+#include "gradient_layout.inc"
+#include "gradient_colorize.inc"
 
 layout(location = 0) out vec4 fragColor;
-
-// Compute the gradient parameter t from transformed coordinates based on the runtime layout type.
-float computeLayoutT(vec2 coord) {
-  if (LayoutType == 1) {
-    // Radial: t = length
-    return length(coord);
-  } else if (LayoutType == 2) {
-    // Conic: t = angle-based
-    float angle = atan(-coord.y, -coord.x);
-    return ((angle * 0.15915494309180001 + 0.5) + Bias) * Scale;
-  } else if (LayoutType == 3) {
-    // Diamond: t = max(|x|, |y|)
-    return max(abs(coord.x), abs(coord.y));
-  }
-  // Linear (LayoutType == 0): t = x
-  return coord.x + 1.0000000000000001e-05;
-}
-
-// Unrolled binary gradient colorizer: maps t in [0,1] to a color using piecewise linear segments.
-// IntervalCount is a runtime uniform so all interval counts share the same shader variant.
-// The binary search tree structure mirrors the compile-time version exactly.
-vec4 colorize(float t) {
-  vec4 scale, bias;
-
-  if (IntervalCount >= 4) {
-    // thresholds1_7.w splits intervals (0..7) from (8..15)
-    if (t < thresholds1_7.w) {
-      // thresholds1_7.y splits intervals (0..3) from (4..7)
-      if (t < thresholds1_7.y) {
-        // thresholds1_7.x splits intervals (0,1) from (2,3)
-        if (t < thresholds1_7.x) {
-          scale = scale0_1;
-          bias = bias0_1;
-        } else {
-          scale = scale2_3;
-          bias = bias2_3;
-        }
-      } else {
-        // thresholds1_7.z splits intervals (4,5) from (6,7)
-        if (t < thresholds1_7.z) {
-          scale = scale4_5;
-          bias = bias4_5;
-        } else {
-          scale = scale6_7;
-          bias = bias6_7;
-        }
-      }
-    } else {
-      if (IntervalCount >= 6) {
-        // thresholds9_13.y splits intervals (8..11) from (12..15)
-        if (t < thresholds9_13.y) {
-          // thresholds9_13.x splits intervals (8,9) from (10,11)
-          if (t < thresholds9_13.x) {
-            scale = scale8_9;
-            bias = bias8_9;
-          } else {
-            scale = scale10_11;
-            bias = bias10_11;
-          }
-        } else {
-          if (IntervalCount >= 7) {
-            // thresholds9_13.z splits intervals (12,13) from (14,15)
-            if (t < thresholds9_13.z) {
-              scale = scale12_13;
-              bias = bias12_13;
-            } else {
-              scale = scale14_15;
-              bias = bias14_15;
-            }
-          } else {
-            scale = scale12_13;
-            bias = bias12_13;
-          }
-        }
-      } else {
-        // IntervalCount is 4 or 5
-        // thresholds9_13.x splits intervals (8,9) from (10,11)
-        if (t < thresholds9_13.x) {
-          scale = scale8_9;
-          bias = bias8_9;
-        } else {
-          scale = scale10_11;
-          bias = bias10_11;
-        }
-      }
-    }
-  } else if (IntervalCount >= 2) {
-    // thresholds1_7.y splits intervals (0..3) from (4..7)
-    if (t < thresholds1_7.y) {
-      // thresholds1_7.x splits intervals (0,1) from (2,3)
-      if (t < thresholds1_7.x) {
-        scale = scale0_1;
-        bias = bias0_1;
-      } else {
-        scale = scale2_3;
-        bias = bias2_3;
-      }
-    } else {
-      if (IntervalCount >= 3) {
-        // thresholds1_7.z splits intervals (4,5) from (6,7)
-        if (t < thresholds1_7.z) {
-          scale = scale4_5;
-          bias = bias4_5;
-        } else {
-          scale = scale6_7;
-          bias = bias6_7;
-        }
-      } else {
-        scale = scale4_5;
-        bias = bias4_5;
-      }
-    }
-  } else {
-    // IntervalCount == 1: single interval covers full range
-    scale = scale0_1;
-    bias = bias0_1;
-  }
-
-  return vec4(t * scale + bias);
-}
 
 void main() {
   vec4 outputColor = Color;
   highp vec2 coord = TransformedCoords_0;
 
   // Layout: compute t
-  float t = computeLayoutT(coord);
+  float t = gradientLayoutT(LayoutType, Bias, Scale, coord);
 
   // ClampedGradientEffect: border clamping + colorization
   vec4 gradColor;
@@ -200,7 +82,10 @@ void main() {
   } else if (t >= 1.0) {
     gradColor = rightBorderColor;
   } else {
-    gradColor = colorize(t);
+    gradColor = gradientColorizeUnrolled(t, IntervalCount, thresholds1_7, thresholds9_13,
+                                         scale0_1, bias0_1, scale2_3, bias2_3, scale4_5, bias4_5,
+                                         scale6_7, bias6_7, scale8_9, bias8_9, scale10_11,
+                                         bias10_11, scale12_13, bias12_13, scale14_15, bias14_15);
   }
 
   // Premultiply alpha

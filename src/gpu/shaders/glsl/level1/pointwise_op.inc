@@ -32,47 +32,15 @@
 // include is guarded, so the per-slot re-inclusions of this file stay harmless.
 #include "xp_blend_colors.inc"
 
-// ColorSpaceXform transfer functions (verbatim from textured_color_space_xform.frag).
+#include "transfer_function.inc"
+
+// ColorSpaceXform transfer functions bound to this slot's uniform names.
 float src_tf(float x) {
-  float s = sign(x);
-  x = abs(x);
-  float A = SrcTF0[1], B = SrcTF0[2], C = SrcTF0[3];
-  float D = SrcTF1[0], E = SrcTF1[1], F = SrcTF1[2];
-  if (SrcTFType == 0) {
-    float G = SrcTF0[0];
-    x = (x < D) ? (C * x + F) : (pow(A * x + B, G) + E);
-  } else if (SrcTFType == 1) {
-    float xC = pow(x, C);
-    x = pow(max(A + B * xC, 0.0) / (D + E * xC), F);
-  } else if (SrcTFType == 2) {
-    x = (x * A <= 1.0) ? pow(x * A, B) : exp((x - E) * C) + D;
-    x *= (F + 1.0);
-  } else {
-    x /= (F + 1.0);
-    x = (x <= 1.0) ? A * pow(x, B) : C * log(x - D) + E;
-  }
-  return s * x;
+  return transferTF(x, SrcTF0, SrcTF1, SrcTFType);
 }
 
 float dst_tf(float x) {
-  float s = sign(x);
-  x = abs(x);
-  float A = DstTF0[1], B = DstTF0[2], C = DstTF0[3];
-  float D = DstTF1[0], E = DstTF1[1], F = DstTF1[2];
-  if (DstTFType == 0) {
-    float G = DstTF0[0];
-    x = (x < D) ? (C * x + F) : (pow(A * x + B, G) + E);
-  } else if (DstTFType == 1) {
-    float xC = pow(x, C);
-    x = pow(max(A + B * xC, 0.0) / (D + E * xC), F);
-  } else if (DstTFType == 2) {
-    x = (x * A <= 1.0) ? pow(x * A, B) : exp((x - E) * C) + D;
-    x *= (F + 1.0);
-  } else {
-    x /= (F + 1.0);
-    x = (x <= 1.0) ? A * pow(x, B) : C * log(x - D) + E;
-  }
-  return s * x;
+  return transferTF(x, DstTF0, DstTF1, DstTFType);
 }
 
 // Applies the selected pointwise operator to a premultiplied color and returns a premultiplied color.

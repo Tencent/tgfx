@@ -30,136 +30,18 @@
 #define CS_DST_OOTF 64
 #endif
 
-// ColorSpaceXform transfer functions (verbatim from pointwise_op.inc, reading the shared block).
+#include "gradient_layout.inc"
+#include "gradient_colorize.inc"
+
+#include "transfer_function.inc"
+
+// ColorSpaceXform transfer functions bound to the shared chain-wide parameter block.
 float chainSrcTF(float x) {
-  float s = sign(x);
-  x = abs(x);
-  float A = ChainSrcTF0[1], B = ChainSrcTF0[2], C = ChainSrcTF0[3];
-  float D = ChainSrcTF1[0], E = ChainSrcTF1[1], F = ChainSrcTF1[2];
-  if (ChainSrcTFType == 0) {
-    float G = ChainSrcTF0[0];
-    x = (x < D) ? (C * x + F) : (pow(A * x + B, G) + E);
-  } else if (ChainSrcTFType == 1) {
-    float xC = pow(x, C);
-    x = pow(max(A + B * xC, 0.0) / (D + E * xC), F);
-  } else if (ChainSrcTFType == 2) {
-    x = (x * A <= 1.0) ? pow(x * A, B) : exp((x - E) * C) + D;
-    x *= (F + 1.0);
-  } else {
-    x /= (F + 1.0);
-    x = (x <= 1.0) ? A * pow(x, B) : C * log(x - D) + E;
-  }
-  return s * x;
+  return transferTF(x, ChainSrcTF0, ChainSrcTF1, ChainSrcTFType);
 }
 
 float chainDstTF(float x) {
-  float s = sign(x);
-  x = abs(x);
-  float A = ChainDstTF0[1], B = ChainDstTF0[2], C = ChainDstTF0[3];
-  float D = ChainDstTF1[0], E = ChainDstTF1[1], F = ChainDstTF1[2];
-  if (ChainDstTFType == 0) {
-    float G = ChainDstTF0[0];
-    x = (x < D) ? (C * x + F) : (pow(A * x + B, G) + E);
-  } else if (ChainDstTFType == 1) {
-    float xC = pow(x, C);
-    x = pow(max(A + B * xC, 0.0) / (D + E * xC), F);
-  } else if (ChainDstTFType == 2) {
-    x = (x * A <= 1.0) ? pow(x * A, B) : exp((x - E) * C) + D;
-    x *= (F + 1.0);
-  } else {
-    x /= (F + 1.0);
-    x = (x <= 1.0) ? A * pow(x, B) : C * log(x - D) + E;
-  }
-  return s * x;
-}
-
-// Unrolled-binary gradient colorizer, verbatim from gradient_fill.frag (the runtime search tree
-// structure is preserved exactly); IntervalCount is a runtime uniform so all interval counts
-// share this path.
-vec4 gradientColorizeUnrolled(float t) {
-  vec4 scale;
-  vec4 bias;
-  if (GradientIntervalCount >= 4) {
-    if (t < GradientThresholds1_7.w) {
-      if (t < GradientThresholds1_7.y) {
-        if (t < GradientThresholds1_7.x) {
-          scale = GradientScale0_1;
-          bias = GradientBias0_1;
-        } else {
-          scale = GradientScale2_3;
-          bias = GradientBias2_3;
-        }
-      } else {
-        if (t < GradientThresholds1_7.z) {
-          scale = GradientScale4_5;
-          bias = GradientBias4_5;
-        } else {
-          scale = GradientScale6_7;
-          bias = GradientBias6_7;
-        }
-      }
-    } else {
-      if (GradientIntervalCount >= 6) {
-        if (t < GradientThresholds9_13.y) {
-          if (t < GradientThresholds9_13.x) {
-            scale = GradientScale8_9;
-            bias = GradientBias8_9;
-          } else {
-            scale = GradientScale10_11;
-            bias = GradientBias10_11;
-          }
-        } else {
-          if (GradientIntervalCount >= 7) {
-            if (t < GradientThresholds9_13.z) {
-              scale = GradientScale12_13;
-              bias = GradientBias12_13;
-            } else {
-              scale = GradientScale14_15;
-              bias = GradientBias14_15;
-            }
-          } else {
-            scale = GradientScale12_13;
-            bias = GradientBias12_13;
-          }
-        }
-      } else {
-        if (t < GradientThresholds9_13.x) {
-          scale = GradientScale8_9;
-          bias = GradientBias8_9;
-        } else {
-          scale = GradientScale10_11;
-          bias = GradientBias10_11;
-        }
-      }
-    }
-  } else if (GradientIntervalCount >= 2) {
-    if (t < GradientThresholds1_7.y) {
-      if (t < GradientThresholds1_7.x) {
-        scale = GradientScale0_1;
-        bias = GradientBias0_1;
-      } else {
-        scale = GradientScale2_3;
-        bias = GradientBias2_3;
-      }
-    } else {
-      if (GradientIntervalCount >= 3) {
-        if (t < GradientThresholds1_7.z) {
-          scale = GradientScale4_5;
-          bias = GradientBias4_5;
-        } else {
-          scale = GradientScale6_7;
-          bias = GradientBias6_7;
-        }
-      } else {
-        scale = GradientScale4_5;
-        bias = GradientBias4_5;
-      }
-    }
-  } else {
-    scale = GradientScale0_1;
-    bias = GradientBias0_1;
-  }
-  return vec4(t * scale + bias);
+  return transferTF(x, ChainDstTF0, ChainDstTF1, ChainDstTFType);
 }
 
 // Evaluates every non-texture op of slot `slot`, reading its fields from the uniform arrays.
@@ -234,17 +116,7 @@ vec4 evalChainSlotNoTex(int slot) {
     // dedicated kernel. The epilogue premultiplies and modulates by the input alpha, matching
     // the runtime ClampedGradientEffect emission.
     highp vec2 gradientCoord = GradientCoords.xy / GradientCoords.z;
-    float gradT;
-    if (GradientLayoutType == 1) {
-      gradT = length(gradientCoord);
-    } else if (GradientLayoutType == 2) {
-      float angle = atan(-gradientCoord.y, -gradientCoord.x);
-      gradT = ((angle * 0.15915494309180001 + 0.5) + GradientBias) * GradientScale;
-    } else if (GradientLayoutType == 3) {
-      gradT = max(abs(gradientCoord.x), abs(gradientCoord.y));
-    } else {
-      gradT = gradientCoord.x + 1.0000000000000001e-05;
-    }
+    float gradT = gradientLayoutT(GradientLayoutType, GradientBias, GradientScale, gradientCoord);
     vec4 gradColor;
     if (gradT <= 0.0) {
       gradColor = GradientLeftBorder;
@@ -278,7 +150,12 @@ vec4 evalChainSlotNoTex(int slot) {
 #endif
 #endif
     } else {
-      gradColor = gradientColorizeUnrolled(gradT);
+      gradColor = gradientColorizeUnrolled(
+          gradT, GradientIntervalCount, GradientThresholds1_7, GradientThresholds9_13,
+          GradientScale0_1, GradientBias0_1, GradientScale2_3, GradientBias2_3, GradientScale4_5,
+          GradientBias4_5, GradientScale6_7, GradientBias6_7, GradientScale8_9, GradientBias8_9,
+          GradientScale10_11, GradientBias10_11, GradientScale12_13, GradientBias12_13,
+          GradientScale14_15, GradientBias14_15);
     }
     gradColor.rgb *= gradColor.a;
     return gradColor * in0.a;

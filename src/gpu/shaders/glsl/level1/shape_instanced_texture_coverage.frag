@@ -36,18 +36,7 @@ layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
 layout(location = 0) out vec4 fragColor;
 
 #if GRADIENT
-// Layout math verbatim from the single-interval gradient kernel.
-float computeLayoutT(vec2 coord) {
-  if (LayoutType == 1) {
-    return length(coord);
-  } else if (LayoutType == 2) {
-    float angle = atan(-coord.y, -coord.x);
-    return ((angle * 0.15915494309180001 + 0.5) + Bias) * Scale;
-  } else if (LayoutType == 3) {
-    return max(abs(coord.x), abs(coord.y));
-  }
-  return coord.x + 1.0000000000000001e-05;
-}
+#include "gradient_layout.inc"
 #endif
 
 void main() {
@@ -59,7 +48,7 @@ void main() {
 #if GRADIENT
   // The runtime gradient emission: border clamp, premultiply, then modulate by the input
   // color's alpha (here the per-instance vertex color).
-  highp float t = computeLayoutT(GradientCoords);
+  highp float t = gradientLayoutT(LayoutType, Bias, Scale, GradientCoords);
   vec4 gradColor;
   if (t <= 0.0) {
     gradColor = leftBorderColor;

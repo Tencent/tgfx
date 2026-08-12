@@ -48,24 +48,9 @@ layout(set = 1, binding = 0) uniform sampler2D MaskTextureSampler;
 #endif
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
+#include "gradient_layout.inc"
 
 layout(location = 0) out vec4 fragColor;
-
-float computeLayoutT(vec2 coord) {
-  if (LayoutType == 1) {
-    // Radial: t = length
-    return length(coord);
-  } else if (LayoutType == 2) {
-    // Conic: t = angle-based
-    float angle = atan(-coord.y, -coord.x);
-    return ((angle * 0.15915494309180001 + 0.5) + Bias) * Scale;
-  } else if (LayoutType == 3) {
-    // Diamond: t = max(|x|, |y|)
-    return max(abs(coord.x), abs(coord.y));
-  }
-  // Linear (LayoutType == 0): t = x
-  return coord.x + 1.0000000000000001e-05;
-}
 
 vec4 colorize(float t) {
   vec4 scale, bias;
@@ -83,7 +68,7 @@ void main() {
   vec4 outputColor = Color;
   highp vec2 coord = TransformedCoords_0;
 
-  float t = computeLayoutT(coord);
+  float t = gradientLayoutT(LayoutType, Bias, Scale, coord);
 
   vec4 gradColor;
   if (t <= 0.0) {
