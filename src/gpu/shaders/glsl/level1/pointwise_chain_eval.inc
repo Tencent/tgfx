@@ -302,6 +302,11 @@ vec4 evalChainSlotWithTex(int slot, sampler2D leafSampler, vec2 leafCoords, vec4
       // channel carries the mask value, matching the runtime TextureEffect alpha-only readback.
       texColor = vec4(texColor.r);
     }
+    if ((Packed.w & 4) != 0) {
+      // Coverage-root leaf: modulated by the coverage unit's alpha, matching the runtime
+      // coverage-FP readback (tex * coverageIn.a).
+      texColor *= TGFX_CHAIN_UNIT_COVERAGE.a;
+    }
     if ((Packed.w & 1) != 0) {
       // Color-source leaves are modulated by the geometry color's alpha, matching the runtime
       // paint-alpha wrap. Mask and blend-operand leaves sample raw, as the runtime emits them.

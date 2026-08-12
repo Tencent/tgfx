@@ -28,7 +28,9 @@ static void UploadChainSlot(UniformData* uniformData, size_t index, const AOTCha
   }
   if (slot.op == AOTChainOp::Texture) {
     // Bit 0: modulate by the paint alpha. Bit 1: alpha-only leaf, splat .r into all channels.
-    selector = slot.textureModulate | (slot.textureAlphaOnly << 1);
+    // Bit 2: coverage-root leaf, modulate by the coverage unit alpha.
+    selector =
+        slot.textureModulate | (slot.textureAlphaOnly << 1) | (slot.textureModulateUnit << 2);
   }
   int packed[] = {static_cast<int>(slot.op), slot.in0, slot.in1, selector};
   uniformData->setArrayElementOptional("SlotPacked", index, packed);

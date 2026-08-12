@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AOTPlanExecutor.h"
-#include <cstdio>
-#include <cstdlib>
 #include <utility>
 #include <vector>
 #include "core/shaders/PerlinNoiseShader.h"
@@ -476,6 +474,11 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
         // a coverage mask or a blend operand — must sample raw, matching the runtime emission.
         slot.textureModulate =
             !node->inputs.empty() && inputBase == 0 && node->inputs[0] == AOTNodeID(0) ? 1 : 0;
+        // A leaf that is the coverage subtree's root modulates by the coverage unit's alpha
+        // (bit 2), matching the runtime coverage-FP readback (tex * coverageIn.a).
+        if (isCoverageRoot && !node->inputs.empty() && node->inputs[0].index() == 0) {
+          slot.textureModulateUnit = 1;
+        }
         // Alpha-only leaves (e.g. shape masks) need the kernel to splat .r into all channels; the
         // raw sample would otherwise read alpha as constant 1.
         slot.textureAlphaOnly =
@@ -583,16 +586,17 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
   }
   int coverageRootSlot = -1;
   if (coverageGraph != nullptr) {
-    // Acceptance gate, kept tight to the byte-verified shapes: exactly one blend in the coverage
-    // subtree, it is the root, and it consumes the unit input. The unit may otherwise feed only
-    // texture leaves (their input is unused — blend operands sample raw) and the gradient (a
-    // blend child, so it reads the opaque -4 designator). A bare-texture coverage root (a local
-    // mask fill) is deliberately not accepted: for generated alpha-mask textures it diverges from
-    // the runtime by a few edge pixels under texture-pool pressure, and the responsible mechanism
-    // is not yet identified. Compose-wrapped chains and two-child blends likewise keep the plain
-    // route rather than risking a wrong value when the GP coverage is below 1.0.
+    // Acceptance gate, kept tight to the byte-verified shapes. Accepted roots: a single blend
+    // consuming the unit input (the xfer-dst coverage family), or a bare texture leaf consuming
+    // the unit (a local mask fill, modulated by the unit alpha through selector bit 2). The unit
+    // may otherwise feed only texture leaves (their input is unused — blend operands sample raw)
+    // and the gradient (a blend child, so it reads the opaque -4 designator). Compose-wrapped
+    // chains and two-child blends keep the plain route rather than risking a wrong value when
+    // the GP coverage is below 1.0.
     auto* covRootNode = nodes[covRootCombined];
-    if (covRootNode->kind != AOTEffectKind::Blend || rectEffect != nullptr) {
+    const bool rootIsBlend = covRootNode->kind == AOTEffectKind::Blend;
+    const bool rootIsTexture = covRootNode->kind == AOTEffectKind::TextureSource;
+    if ((!rootIsBlend && !rootIsTexture) || (rectEffect != nullptr && !rootIsTexture)) {
       return nullptr;
     }
     int coverageBlendCount = 0;
@@ -618,7 +622,7 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
         }
       }
     }
-    if (rejected || coverageBlendCount != 1 || !rootConsumesUnit) {
+    if (rejected || coverageBlendCount != (rootIsBlend ? 1 : 0) || !rootConsumesUnit) {
       return nullptr;
     }
     auto covSlot = slotOf[covRootCombined];
@@ -949,6 +953,9 @@ PlacementPtr<FragmentProcessor> AOTPlanExecutor::BuildChainProcessor(
   AOTNodeBuilder covBuilder = {};
   AOTNodeID unit = AOTNodeID::Invalid();
   AOTNodeID covRoot = AOTNodeID::Invalid();
+  // Strict lowering: a texture whose view is not yet instantiated (a generated mask) fails here,
+  // which keeps the draw on the runtime route whose program builder emits a zero stub for such
+  // textures — the AOT path must not serve content the runtime would have dropped.
   if (!covBuilder.addGeometryCoverage(&unit) ||
       !subtreeFP->lowerToAOT(&covBuilder, unit, &covRoot) || !covRoot.isValid() ||
       covRoot == unit) {

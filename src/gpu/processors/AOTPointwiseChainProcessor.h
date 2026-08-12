@@ -56,6 +56,10 @@ struct AOTChainSlot {
   // the runtime TextureEffect readback. Uploaded as bit 1 of the slot selector; textureModulate
   // remains bit 0.
   int textureAlphaOnly = 0;
+  // OP_TEXTURE only: 1 modulates the sample by the coverage unit's alpha (bit 2 of the selector).
+  // Set on a leaf that is the coverage subtree's root, matching the runtime coverage-FP readback
+  // (tex * coverageIn.a).
+  int textureModulateUnit = 0;
   AOTColorMatrixParameters colorMatrix = {};
   AOTLumaParameters luma = {};
   AOTAlphaThresholdParameters alphaThreshold = {};
