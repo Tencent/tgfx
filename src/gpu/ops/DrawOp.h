@@ -133,6 +133,19 @@ class DrawOp {
 
   virtual PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) = 0;
 
+  /**
+   * Provides a chain-route geometry processor for the decomposition rewrite, plus any coverage
+   * leaves synthesized from GP-owned textures. AtlasTextOp implements this because its GP owns
+   * the atlas sampler, which ProgramInfo would bind ahead of the chain's leaf samplers; the
+   * returned GP is identical except it claims no sampler. The default returns nullptr, keeping
+   * the draw's own geometry processor for the rewrite.
+   */
+  virtual PlacementPtr<GeometryProcessor> onMakeChainGeometryProcessor(
+      std::vector<PlacementPtr<FragmentProcessor>>* chainCoverageFPs) {
+    (void)chainCoverageFPs;
+    return nullptr;
+  }
+
   virtual void onDraw(RenderPass* renderPass) = 0;
 
  private:
@@ -140,6 +153,9 @@ class DrawOp {
                                                     const ColorProcessorList& activeColors);
 
   PlacementPtr<GeometryProcessor> geometryProcessor = nullptr;
+  // Holds the chain-route twin GP (when an op provides one) for the draw's lifetime: a local
+  // PlacementPtr would run the base destructor at scope exit and devolve the vtable.
+  PlacementPtr<GeometryProcessor> chainGeometryProcessor = nullptr;
   bool geometryProcessorInitialized = false;
   std::optional<ColorProcessorList> preparedColors = std::nullopt;
   std::unique_ptr<ProgramInfo> preparedProgramInfo = nullptr;

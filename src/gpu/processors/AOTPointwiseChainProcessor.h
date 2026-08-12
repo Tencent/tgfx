@@ -94,12 +94,14 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
       BlockAllocator* allocator, std::vector<PlacementPtr<FragmentProcessor>> textureLeaves,
       const std::vector<AOTChainSlot>& slots, size_t rootSlot, int tiledLeafIndex = -1,
       const AOTTiledTextureRecipe* tiledRecipe = nullptr,
-      PlacementPtr<FragmentProcessor> maskChild = nullptr, int coverageRootSlot = -1);
+      PlacementPtr<FragmentProcessor> maskChild = nullptr, int coverageRootSlot = -1,
+      uint32_t coordSourceMask = ~0u);
 
   AOTPointwiseChainProcessor(std::vector<PlacementPtr<FragmentProcessor>> textureLeaves,
                              const std::vector<AOTChainSlot>& slots, size_t rootSlot,
                              int tiledLeafIndex, const AOTTiledTextureRecipe* tiledRecipe,
-                             PlacementPtr<FragmentProcessor> maskChild, int coverageRootSlot);
+                             PlacementPtr<FragmentProcessor> maskChild, int coverageRootSlot,
+                             uint32_t coordSourceMask);
 
   std::string name() const override {
     return "AOTPointwiseChainProcessor";
@@ -165,6 +167,11 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
   // without a gradient slot exposes a default identity transform here.
   CoordTransform gradientCoordTransform = {};
   int coverageRootSlot = -1;
+  // Per-target coordinate source for the chain vertex stage: bit k set sources leaf k from the
+  // uvCoord attribute, bit 4 does the same for the gradient coordinates; clear bits source from
+  // aPosition. All-ones reproduces the legacy shared-source behavior (quads, meshes); atlas text
+  // sets only the atlas leaf's bit so gradients and image leaves come from position.
+  uint32_t coordSourceMask = ~0u;
 };
 
 }  // namespace tgfx

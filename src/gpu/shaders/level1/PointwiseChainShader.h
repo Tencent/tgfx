@@ -114,10 +114,18 @@ class PointwiseChainShader : public PrecompiledShader {
       return true;
     }
     // uvCoord and per-vertex colors are quad-only attributes, and quad vertex buffers always
-    // carry the coverage slot, so either of them implies coverage.
+    // carry the coverage slot, so either of them implies coverage. Exception: atlas text buffers
+    // (position, maskCoord, color?) carry no coverage slot, so the atlas route requests
+    // coverage-free uvCoord combos; those are only useful with the atlas leaf present (1-2
+    // texture leaves: the atlas alone for gradient text, image+atlas for image text).
     if ((vertValues[VD::HAS_UV_COORD] != 0 || vertValues[VD::HAS_COLOR] != 0) &&
         vertValues[VD::HAS_COVERAGE] == 0) {
-      return false;
+      bool atlasTextCombo =
+          vertValues[VD::HAS_UV_COORD] != 0 &&
+          (vertValues[VD::TEXTURE_COUNT] == 1 || vertValues[VD::TEXTURE_COUNT] == 2);
+      if (!atlasTextCombo) {
+        return false;
+      }
     }
     // Mask clips go through DefaultGP paths only, which never carry quad attributes.
     if (fragValues[FD::HAS_MASK_TEXTURE] != 0 &&

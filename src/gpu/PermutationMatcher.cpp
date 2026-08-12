@@ -668,7 +668,8 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
   // GP_LAYOUT: 0 covers the rect GPs and MeshGP (whose vertex buffers follow the chain's
   // attribute order), 1 is the ellipse layout.
   int gpLayout = -1;
-  if (GetGPType(gp) >= 0 || gp->name() == "MeshGeometryProcessor") {
+  if (GetGPType(gp) >= 0 || gp->name() == "MeshGeometryProcessor" ||
+      gp->name() == "AtlasTextGeometryProcessor") {
     gpLayout = 0;
   } else if (gp->name() == "EllipseGeometryProcessor") {
     gpLayout = 1;
@@ -693,6 +694,17 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
     // color): texCoords ride the uvCoord slot and per-vertex colors the color slot.
     hasUVCoord = meshGP->getHasTexCoords() ? 1 : 0;
     hasColor = meshGP->getHasColors() ? 1 : 0;
+  } else if (gp->name() == "AtlasTextGeometryProcessor") {
+    // Only the sampler-free chain-route twin is servable: a sampler-owning atlas GP would bind
+    // its atlas ahead of the chain's leaf samplers.
+    if (gp->numTextureSamplers() != 0) {
+      return std::nullopt;
+    }
+    auto* atlasGP = static_cast<const AtlasTextGeometryProcessor*>(gp);
+    // Atlas text buffers are (position, maskCoord, color?) with no coverage slot; maskCoord
+    // rides the uvCoord slot.
+    hasUVCoord = 1;
+    hasColor = atlasGP->hasCommonColor() ? 0 : 1;
   } else if (gpLayout == 1) {
     auto* ellipseGP = static_cast<const EllipseGeometryProcessor*>(gp);
     hasColor = ellipseGP->hasCommonColor() ? 0 : 1;

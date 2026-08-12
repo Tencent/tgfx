@@ -455,7 +455,8 @@ static int MapChainInput(const std::vector<const AOTEffectNode*>& nodes,
 static PlacementPtr<FragmentProcessor> BuildChainFP(
     BlockAllocator* allocator, const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
     const AARectEffect* rectEffect, const DeviceSpaceTextureEffect* maskEffect,
-    const AOTEffectGraph* coverageGraph = nullptr, AOTNodeID coverageRoot = AOTNodeID()) {
+    const AOTEffectGraph* coverageGraph = nullptr, AOTNodeID coverageRoot = AOTNodeID(),
+    bool coverageLeafFromUVCoord = false) {
   // Combined node space: color-graph nodes occupy [0, colorCount), coverage-graph nodes follow.
   const size_t colorCount = graph.nodeCount();
   const size_t covCount = coverageGraph != nullptr ? coverageGraph->nodeCount() : 0;
@@ -545,6 +546,9 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
   bool hasRectCoverage = false;
   bool hasGradient = false;
   std::vector<AOTChainSlot> slots(ordered.size());
+  // All-ones reproduces the legacy behavior (every target reads the uvCoord attribute when the GP
+  // carries one). The atlas-text route clears it and sets only the coverage leaves' bits.
+  uint32_t coordSourceMask = coverageLeafFromUVCoord ? 0u : ~0u;
   const size_t covRootCombined =
       coverageGraph != nullptr ? colorCount + coverageRoot.index() : SIZE_MAX;
   for (size_t index = 0; index < ordered.size(); ++index) {
@@ -581,6 +585,11 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
         // raw sample would otherwise read alpha as constant 1.
         slot.textureAlphaOnly =
             static_cast<const TextureEffect*>(leaf.get())->isAlphaOnly() ? 1 : 0;
+        if (coverageLeafFromUVCoord && inputBase != 0) {
+          // Atlas text: the coverage leaf sources its coordinates from the maskCoord attribute
+          // (the uvCoord slot), while color leaves and gradients keep the position source.
+          coordSourceMask |= 1u << static_cast<uint32_t>(leaves.size());
+        }
         auto parameters = std::get_if<AOTTextureParameters>(&node->parameters);
         if (parameters != nullptr && parameters->samplingKind == AOTTextureSamplingKind::Tiled &&
             parameters->tiledRecipe.has_value() &&
@@ -760,7 +769,7 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
   const AOTTiledTextureRecipe* recipePtr = tiledLeafIndex >= 0 ? &tiledRecipe : nullptr;
   return AOTPointwiseChainProcessor::Make(allocator, std::move(leaves), slots, rootIndex,
                                           tiledLeafIndex, recipePtr, std::move(maskChild),
-                                          coverageRootSlot);
+                                          coverageRootSlot, coordSourceMask);
 }
 
 static PlacementPtr<FragmentProcessor> BuildFPForPass(
@@ -1001,7 +1010,7 @@ PlacementPtr<FragmentProcessor> AOTPlanExecutor::BuildPerlinNoiseFP(BlockAllocat
 
 PlacementPtr<FragmentProcessor> AOTPlanExecutor::BuildChainProcessor(
     BlockAllocator* allocator, const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
-    const std::vector<const FragmentProcessor*>& coverageFPs) {
+    const std::vector<const FragmentProcessor*>& coverageFPs, bool coverageLeafFromUVCoord) {
   if (pass.kernel != AOTKernelKind::PointwiseChain) {
     return nullptr;
   }
@@ -1087,7 +1096,8 @@ PlacementPtr<FragmentProcessor> AOTPlanExecutor::BuildChainProcessor(
   if (!covBuilder.finish(covRoot, &covGraph)) {
     return nullptr;
   }
-  return BuildChainFP(allocator, graph, pass, rectEffect, maskEffect, &covGraph, covRoot);
+  return BuildChainFP(allocator, graph, pass, rectEffect, maskEffect, &covGraph, covRoot,
+                      coverageLeafFromUVCoord);
 }
 
 PlacementPtr<RenderTask> AOTPlanExecutor::Make(Context* context, uint32_t renderFlags,

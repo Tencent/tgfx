@@ -290,6 +290,95 @@ TGFX_TEST(AOTRenderConsistencyTest, AACoverageXferDstFold) {
   ExpectBitmapsIdentical("aa-xfer-dst-fold", aotBitmap, runtimeBitmap, 200, 200);
 }
 
+TGFX_TEST(AOTRenderConsistencyTest, AtlasTextConstColorFold) {
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  ASSERT_TRUE(typeface != nullptr);
+  auto font = Font(typeface, 50);
+  auto textBlob = TextBlob::MakeFrom("TGFX", font);
+  ASSERT_TRUE(textBlob != nullptr);
+  auto renderOnce = [&](bool useBundle, Bitmap* outBitmap) {
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto* cache = context->precompiledShaderCache();
+    if (useBundle) {
+      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+    } else {
+      cache->unload();
+    }
+    ScopedAOTStatsPause statsPause(cache, !useBundle);
+    context->globalCache()->clearPrograms();
+    auto surface = Surface::Make(context, 200, 100);
+    ASSERT_TRUE(surface != nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::White());
+    Paint paint;
+    paint.setColorFilter(ColorFilter::Blend(Color::Red(), BlendMode::Multiply));
+    canvas->drawTextBlob(textBlob, 25, 60, paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(200, 100));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+    if (useBundle) {
+      cache->unload();
+    }
+  };
+  Bitmap aotBitmap = {};
+  Bitmap runtimeBitmap = {};
+  renderOnce(true, &aotBitmap);
+  renderOnce(false, &runtimeBitmap);
+  ExpectBitmapsIdentical("atlas-text-const-fold", aotBitmap, runtimeBitmap, 200, 100);
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, AtlasTextGradientFold) {
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  ASSERT_TRUE(typeface != nullptr);
+  auto font = Font(typeface, 50);
+  auto textBlob = TextBlob::MakeFrom("TGFX", font);
+  ASSERT_TRUE(textBlob != nullptr);
+  auto textBounds = textBlob->getTightBounds();
+  auto renderOnce = [&](bool useBundle, Bitmap* outBitmap) {
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto* cache = context->precompiledShaderCache();
+    if (useBundle) {
+      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+    } else {
+      cache->unload();
+    }
+    ScopedAOTStatsPause statsPause(cache, !useBundle);
+    context->globalCache()->clearPrograms();
+    auto surface = Surface::Make(context, 200, 100);
+    ASSERT_TRUE(surface != nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::White());
+    auto gradientShader = Shader::MakeLinearGradient(Point{0, 0}, Point{textBounds.width(), 0},
+                                                     {Color::Red(), Color::Blue()}, {});
+    Paint paint;
+    paint.setShader(gradientShader);
+    canvas->drawTextBlob(textBlob, 25, 60, paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(200, 100));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+    if (useBundle) {
+      cache->unload();
+    }
+  };
+  Bitmap aotBitmap = {};
+  Bitmap runtimeBitmap = {};
+  renderOnce(true, &aotBitmap);
+  renderOnce(false, &runtimeBitmap);
+  ExpectBitmapsIdentical("atlas-text-gradient-fold", aotBitmap, runtimeBitmap, 200, 100);
+}
+
 TGFX_TEST(AOTRenderConsistencyTest, MeshTextureAndColorsXferSrcFold) {
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);

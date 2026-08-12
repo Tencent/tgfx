@@ -22,7 +22,8 @@ namespace tgfx {
 AtlasTextGeometryProcessor::AtlasTextGeometryProcessor(std::shared_ptr<TextureProxy> textureProxy,
                                                        AAType aa,
                                                        std::optional<PMColor> commonColor,
-                                                       const SamplingOptions& sampling)
+                                                       const SamplingOptions& sampling,
+                                                       bool bindAtlasSampler)
     : GeometryProcessor(ClassID()), textureProxy(std::move(textureProxy)), commonColor(commonColor),
       samplerState(sampling) {
   position = {"aPosition", VertexFormat::Float2};
@@ -34,8 +35,10 @@ AtlasTextGeometryProcessor::AtlasTextGeometryProcessor(std::shared_ptr<TexturePr
     color = {"inColor", VertexFormat::UByte4Normalized};
   }
   setVertexAttributes(&position, 4);
-  textures.emplace_back(this->textureProxy->getTextureView()->getTexture());
-  setTextureSamplerCount(textures.size());
+  if (bindAtlasSampler) {
+    textures.emplace_back(this->textureProxy->getTextureView()->getTexture());
+    setTextureSamplerCount(textures.size());
+  }
 }
 void AtlasTextGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   uint32_t flags = aa == AAType::Coverage ? 1 : 0;

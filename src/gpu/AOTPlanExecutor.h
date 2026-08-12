@@ -49,7 +49,8 @@ class AOTPlanExecutor {
    */
   static PlacementPtr<FragmentProcessor> BuildChainProcessor(
       BlockAllocator* allocator, const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
-      const std::vector<const FragmentProcessor*>& coverageFPs = {});
+      const std::vector<const FragmentProcessor*>& coverageFPs = {},
+      bool coverageLeafFromUVCoord = false);
 
   /**
    * Rebuilds the fused perlin-source processor of a single-pass PerlinNoiseFill plan: the noise

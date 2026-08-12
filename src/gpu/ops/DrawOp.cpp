@@ -82,6 +82,7 @@ std::shared_ptr<Program> DrawOp::prepareDecomposedProgram(RenderTarget* renderTa
     return nullptr;
   }
   std::vector<const FragmentProcessor*> coverageFPs = {};
+  std::vector<PlacementPtr<FragmentProcessor>> ownedChainCoverageFPs = {};
   if (!coverages.empty()) {
     // Up to two coverage FPs fold into the chain: a single one lowers as the narrow forms or a
     // general subtree, and a pair folds as subtree + trailing device-mask child.
@@ -91,6 +92,17 @@ std::shared_ptr<Program> DrawOp::prepareDecomposedProgram(RenderTarget* renderTa
     coverageFPs.reserve(coverages.size());
     for (auto& coverage : coverages) {
       coverageFPs.push_back(coverage.get());
+    }
+  } else if (geometryProcessor->name() == "AtlasTextGeometryProcessor") {
+    // Atlas text: the GP-owned atlas becomes a synthesized coverage leaf (the glyph mask), and
+    // the rewrite needs a sampler-free twin GP. A null override means the draw is not servable
+    // this way (e.g. a color-emoji atlas), so keep the original route.
+    chainGeometryProcessor = onMakeChainGeometryProcessor(&ownedChainCoverageFPs);
+    if (chainGeometryProcessor == nullptr) {
+      return nullptr;
+    }
+    for (auto& fp : ownedChainCoverageFPs) {
+      coverageFPs.push_back(fp.get());
     }
   }
   std::vector<const FragmentProcessor*> colorProcessors = {};
@@ -138,15 +150,17 @@ std::shared_ptr<Program> DrawOp::prepareDecomposedProgram(RenderTarget* renderTa
     }
     chainFP = AOTPlanExecutor::BuildPerlinNoiseFP(allocator, graph, plan.passes[0]);
   } else {
-    chainFP = AOTPlanExecutor::BuildChainProcessor(allocator, graph, plan.passes[0], coverageFPs);
+    chainFP = AOTPlanExecutor::BuildChainProcessor(allocator, graph, plan.passes[0], coverageFPs,
+                                                   !ownedChainCoverageFPs.empty());
   }
   if (chainFP == nullptr) {
     return nullptr;
   }
   std::vector<FragmentProcessor*> rewrittenProcessors = {chainFP.get()};
-  auto rewrittenInfo = std::make_unique<ProgramInfo>(renderTarget, geometryProcessor.get(),
-                                                     std::move(rewrittenProcessors), 1,
-                                                     xferProcessor.get(), blendMode);
+  auto* chainGP =
+      chainGeometryProcessor != nullptr ? chainGeometryProcessor.get() : geometryProcessor.get();
+  auto rewrittenInfo = std::make_unique<ProgramInfo>(
+      renderTarget, chainGP, std::move(rewrittenProcessors), 1, xferProcessor.get(), blendMode);
   rewrittenInfo->setCullMode(cullMode);
   // Probe before the strict lookup: a chain the matcher rejects (unsupported GP, perspective leaf
   // transforms) must fall back without recording a diagnostic miss against the rewritten tree,

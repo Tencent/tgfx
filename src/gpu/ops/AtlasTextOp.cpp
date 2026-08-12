@@ -22,6 +22,7 @@
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
+#include "gpu/processors/TextureEffect.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
@@ -63,6 +64,31 @@ AtlasTextOp::AtlasTextOp(BlockAllocator* allocator, RectsVertexProvider* provide
 
 PlacementPtr<GeometryProcessor> AtlasTextOp::onMakeGeometryProcessor(RenderTarget*) {
   return AtlasTextGeometryProcessor::Make(allocator, textureProxy, aaType, commonColor, sampling);
+}
+
+PlacementPtr<GeometryProcessor> AtlasTextOp::onMakeChainGeometryProcessor(
+    std::vector<PlacementPtr<FragmentProcessor>>* chainCoverageFPs) {
+  // The chain kernel reproduces the glyph mask as a coverage-subtree texture leaf sourced from
+  // the maskCoord attribute, which only matches the alpha-only atlas readback. A color atlas
+  // (emoji) replaces the output color in the GP emission, which the chain cannot express.
+  if (textureProxy == nullptr || !textureProxy->isAlphaOnly()) {
+    return nullptr;
+  }
+  auto textureView = textureProxy->getTextureView();
+  if (textureView == nullptr) {
+    return nullptr;
+  }
+  // Identity: CoordTransform::getTotalMatrix applies the texture normalization itself, so the
+  // chain leaf maps maskCoord straight into the atlas's normalized space.
+  auto uvMatrix = Matrix::I();
+  SamplingArgs args = {TileMode::Clamp, TileMode::Clamp, sampling, SrcRectConstraint::Fast};
+  auto atlasLeaf = TextureEffect::Make(allocator, textureProxy, args, &uvMatrix);
+  if (atlasLeaf == nullptr) {
+    return nullptr;
+  }
+  chainCoverageFPs->push_back(std::move(atlasLeaf));
+  return AtlasTextGeometryProcessor::MakeForChain(allocator, textureProxy, aaType, commonColor,
+                                                  sampling);
 }
 
 void AtlasTextOp::onDraw(RenderPass* renderPass) {

@@ -113,7 +113,7 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
     BlockAllocator* allocator, std::vector<PlacementPtr<FragmentProcessor>> textureLeaves,
     const std::vector<AOTChainSlot>& slots, size_t rootSlot, int tiledLeafIndex,
     const AOTTiledTextureRecipe* tiledRecipe, PlacementPtr<FragmentProcessor> maskChild,
-    int coverageRootSlot) {
+    int coverageRootSlot, uint32_t coordSourceMask) {
   if (allocator == nullptr || slots.empty() || slots.size() > MaxSlots ||
       rootSlot >= slots.size()) {
     return nullptr;
@@ -151,19 +151,19 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
       return nullptr;
     }
   }
-  return allocator->make<AOTPointwiseChainProcessor>(std::move(textureLeaves), slots, rootSlot,
-                                                     tiledLeafIndex, tiledRecipe,
-                                                     std::move(maskChild), coverageRootSlot);
+  return allocator->make<AOTPointwiseChainProcessor>(
+      std::move(textureLeaves), slots, rootSlot, tiledLeafIndex, tiledRecipe, std::move(maskChild),
+      coverageRootSlot, coordSourceMask);
 }
 
 AOTPointwiseChainProcessor::AOTPointwiseChainProcessor(
     std::vector<PlacementPtr<FragmentProcessor>> textureLeaves,
     const std::vector<AOTChainSlot>& newSlots, size_t rootSlot, int tiledLeafIndex,
     const AOTTiledTextureRecipe* tiledRecipe, PlacementPtr<FragmentProcessor> maskChildFP,
-    int coverageRootSlot)
+    int coverageRootSlot, uint32_t coordSourceMask)
     : FragmentProcessor(ClassID()), _slotCount(newSlots.size()), rootSlot(rootSlot),
       tiledLeafIndex(tiledLeafIndex), hasMaskChild(maskChildFP != nullptr),
-      coverageRootSlot(coverageRootSlot) {
+      coverageRootSlot(coverageRootSlot), coordSourceMask(coordSourceMask) {
   if (tiledRecipe != nullptr) {
     _tiledRecipe = *tiledRecipe;
   }
@@ -201,6 +201,7 @@ void AOTPointwiseChainProcessor::onComputeProcessorKey(BytesKey* bytesKey) const
   bytesKey->write(static_cast<uint32_t>(numChildProcessors()));
   bytesKey->write(static_cast<uint32_t>(hasMaskChild ? 1 : 0));
   bytesKey->write(static_cast<uint32_t>(coverageRootSlot + 1));
+  bytesKey->write(coordSourceMask);
   for (size_t index = 0; index < _slotCount; ++index) {
     bytesKey->write(static_cast<uint32_t>(slots[index].op));
     if (slots[index].op == AOTChainOp::ColorSpaceXform) {
@@ -209,7 +210,12 @@ void AOTPointwiseChainProcessor::onComputeProcessorKey(BytesKey* bytesKey) const
   }
 }
 
-void AOTPointwiseChainProcessor::onSetData(UniformData*, UniformData* fragmentUniformData) const {
+void AOTPointwiseChainProcessor::onSetData(UniformData* vertexUniformData,
+                                           UniformData* fragmentUniformData) const {
+  if (vertexUniformData != nullptr) {
+    // Absent in variants without a uvCoord attribute (the field is compiled out there).
+    vertexUniformData->setDataOptional("CoordSourceMask", static_cast<int>(coordSourceMask));
+  }
   if (fragmentUniformData == nullptr) {
     return;
   }

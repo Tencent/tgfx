@@ -28,8 +28,16 @@ PlacementPtr<AtlasTextGeometryProcessor> AtlasTextGeometryProcessor::Make(
 
 GLSLAtlasTextGeometryProcessor::GLSLAtlasTextGeometryProcessor(
     std::shared_ptr<TextureProxy> textureProxy, AAType aa, std::optional<PMColor> commonColor,
-    const SamplingOptions& sampling)
-    : AtlasTextGeometryProcessor(std::move(textureProxy), aa, commonColor, sampling) {
+    const SamplingOptions& sampling, bool bindAtlasSampler)
+    : AtlasTextGeometryProcessor(std::move(textureProxy), aa, commonColor, sampling,
+                                 bindAtlasSampler) {
+}
+
+PlacementPtr<AtlasTextGeometryProcessor> AtlasTextGeometryProcessor::MakeForChain(
+    BlockAllocator* allocator, std::shared_ptr<TextureProxy> textureProxy, AAType aa,
+    std::optional<PMColor> commonColor, const SamplingOptions& sampling) {
+  return allocator->make<GLSLAtlasTextGeometryProcessor>(std::move(textureProxy), aa, commonColor,
+                                                         sampling, false);
 }
 
 void GLSLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
@@ -90,7 +98,12 @@ void GLSLAtlasTextGeometryProcessor::setData(UniformData* vertexUniformData,
                                              UniformData* fragmentUniformData,
                                              FPCoordTransformIter* transformIter) const {
   auto atlasSizeInv = textureProxy->getTextureView()->getTextureCoord(1.f, 1.f);
-  vertexUniformData->setData(atlasSizeUniformName, atlasSizeInv);
+  // The dedicated kernel declares atlasSizeInv but no Matrix; the chain kernel declares Matrix
+  // (identity here: atlas positions are already in device space) but no atlasSizeInv.
+  vertexUniformData->setDataOptional(atlasSizeUniformName, atlasSizeInv);
+  if (vertexUniformData->hasField("Matrix")) {
+    vertexUniformData->setData("Matrix", Matrix::I());
+  }
   setTransformDataHelper(Matrix::I(), vertexUniformData, transformIter);
   if (commonColor.has_value()) {
     fragmentUniformData->setData("Color", *commonColor);
