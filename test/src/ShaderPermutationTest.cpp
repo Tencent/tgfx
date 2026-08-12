@@ -1120,9 +1120,13 @@ TGFX_TEST(ShaderPermutationTest, CreatorFunnelRecordsArtifactMiss) {
   context->globalCache()->resetProgramStats();
   cache->resetStats();
   cache->setDiagnosticRecordingEnabled(true);
+  // This miss is provoked on purpose to verify the accounting; mark it so the production
+  // coverage metrics exclude it.
+  cache->setDeliberateMissMarking(true);
 
   surface->getCanvas()->drawImage(image, 0, 0);
   context->flushAndSubmit(true);
+  cache->setDeliberateMissMarking(false);
 
   EXPECT_EQ(cache->aotStageCount(PrecompiledAOTStage::Attempt), 1u);
   EXPECT_EQ(cache->aotStageCount(PrecompiledAOTStage::CacheAvailable), 1u);

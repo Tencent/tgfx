@@ -34,6 +34,8 @@ const char* PrecompiledFallbackReasonName(PrecompiledFallbackReason reason) {
       return "UnsupportedOutputSwizzle";
     case PrecompiledFallbackReason::NoMatchingRule:
       return "NoMatchingRule";
+    case PrecompiledFallbackReason::DeferredTexture:
+      return "DeferredTexture";
     case PrecompiledFallbackReason::VertexArtifactMissing:
       return "VertexArtifactMissing";
     case PrecompiledFallbackReason::FragmentArtifactMissing:
@@ -105,6 +107,7 @@ void PrecompiledShaderCache::recordFailure(PrecompiledFallbackReason reason,
   }
   auto savedRecord = record;
   savedRecord.reason = reason;
+  savedRecord.deliberate = deliberateMarking.load(std::memory_order_relaxed);
   std::lock_guard<std::mutex> autoLock(diagnosticsMutex);
   _fallbackRecords.push_back(std::move(savedRecord));
 }

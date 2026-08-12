@@ -240,6 +240,20 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
   auto matchResult = MatchPermutation(programInfo, &matchFailure);
   if (!matchResult) {
     auto reason = ToFallbackReason(matchFailure);
+    if (reason == PrecompiledFallbackReason::NoMatchingRule) {
+      // A texture FP whose view is not instantiated yet (a lazy/deferred proxy) drops its
+      // content through the runtime stub program by design; classify it apart from real
+      // coverage gaps so the production metrics stay honest.
+      for (size_t i = 0; i < programInfo->numFragmentProcessors(); ++i) {
+        auto fp = programInfo->getFragmentProcessor(i);
+        bool textureFP = fp->name() == "TextureEffect" || fp->name() == "TiledTextureEffect" ||
+                         fp->name() == "DeviceSpaceTextureEffect";
+        if (textureFP && fp->numTextureSamplers() == 0) {
+          reason = PrecompiledFallbackReason::DeferredTexture;
+          break;
+        }
+      }
+    }
     auto record = MakeFallbackRecord(cache, programInfo);
     // Offline decomposition-coverage audit: for structural misses, classify (during diagnostic
     // runs only) whether each effect axis could be reduced onto the existing AOT kernel basis. This

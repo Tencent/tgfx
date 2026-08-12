@@ -892,8 +892,25 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
       fallbackStructuresJSON.push_back(std::move(json));
     }
 
+    // Records provoked by test fixtures (deliberate) and by-design deferred-texture stubs are
+    // excluded from the production coverage metrics: each corresponds to one runtime program
+    // creation, so subtracting them from the builder count keeps hitRate honest.
+    uint64_t excludedFallbacks = 0;
+    for (const auto& result : testResults) {
+      for (const auto& record : result.fallbackRecords) {
+        if (record.deliberate || record.reason == PrecompiledFallbackReason::DeferredTexture) {
+          ++excludedFallbacks;
+        }
+      }
+    }
+    const auto productionBuilderCreations =
+        summary.programStats.programBuilderCreations > excludedFallbacks
+            ? summary.programStats.programBuilderCreations - excludedFallbacks
+            : 0;
     const auto coldCreations = summary.programStats.precompiledArtifactCreations +
                                summary.programStats.programBuilderCreations;
+    const auto productionColdCreations =
+        summary.programStats.precompiledArtifactCreations + productionBuilderCreations;
     const auto artifactLookups = summary.artifactHits + summary.artifactMisses;
     auto globalConsistency =
         BuildConsistencyChecks(summary.programStats, summary.artifactHits, summary.aotStageCounts,
@@ -943,7 +960,8 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
         {"metricDefinitions",
          {{"coldAOTHitRate",
            "precompiledArtifactCreations / (precompiledArtifactCreations + "
-           "programBuilderCreations)"},
+           "programBuilderCreations), excluding deliberate (test fixture) and by-design "
+           "(deferred-texture stub) fallbacks"},
           {"artifactLookupHitRate", "artifactHits / (artifactHits + artifactMisses)"},
           {"successfulHit", "AOT render pipeline created successfully"},
           {"cacheHitsExcludedFromColdAOTRate", true}}},
@@ -961,6 +979,9 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
           {"drawMetrics", DrawStatsToJSON(summary.drawStats)},
           {"coldProgramCreations", coldCreations},
           {"coldAOTHitRate",
+           Percentage(summary.programStats.precompiledArtifactCreations, productionColdCreations)},
+          {"excludedDeliberateOrByDesignFallbacks", excludedFallbacks},
+          {"rawColdAOTHitRate",
            Percentage(summary.programStats.precompiledArtifactCreations, coldCreations)},
           {"artifactLookups",
            {{"hits", summary.artifactHits},
@@ -996,13 +1017,14 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
     }
 
     std::printf(
-        "\n[Shader AOT][%s] cold=%llu precompiled=%llu fallback=%llu hitRate=%.2f%% "
+        "\n[Shader AOT][%s] cold=%llu precompiled=%llu fallback=%llu(excluded=%llu) hitRate=%.2f%% "
         "cacheHits=%llu hitShaders=%zu hitEffects=%zu missEffects=%zu hitStructures=%zu "
         "missStructures=%zu\n",
-        TGFX_BACKEND_NAME, static_cast<unsigned long long>(coldCreations),
+        TGFX_BACKEND_NAME, static_cast<unsigned long long>(productionColdCreations),
         static_cast<unsigned long long>(summary.programStats.precompiledArtifactCreations),
-        static_cast<unsigned long long>(summary.programStats.programBuilderCreations),
-        Percentage(summary.programStats.precompiledArtifactCreations, coldCreations),
+        static_cast<unsigned long long>(productionBuilderCreations),
+        static_cast<unsigned long long>(excludedFallbacks),
+        Percentage(summary.programStats.precompiledArtifactCreations, productionColdCreations),
         static_cast<unsigned long long>(summary.programStats.cacheHits), sortedShaders.size(),
         sortedHitEffects.size(), fallbackEffectKeys.size(), sortedHitStructures.size(),
         sortedFallbacks.size());

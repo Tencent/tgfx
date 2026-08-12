@@ -42,6 +42,9 @@ enum class PrecompiledFallbackReason : uint8_t {
   CacheNotLoaded,
   UnsupportedOutputSwizzle,
   NoMatchingRule,
+  // The pipeline carries a texture that is not instantiated yet (a lazy/deferred proxy): the
+  // runtime drops such content via a stub program by design, so this is not a coverage gap.
+  DeferredTexture,
   VertexArtifactMissing,
   FragmentArtifactMissing,
   VertexModuleCreationFailed,
@@ -86,6 +89,9 @@ struct PrecompiledFallbackRecord {
   std::string shaderName;
   uint32_t vertPermutationIndex = std::numeric_limits<uint32_t>::max();
   uint32_t fragPermutationIndex = std::numeric_limits<uint32_t>::max();
+  // Set when the miss was provoked on purpose (a test fixture verifying miss accounting); such
+  // records are listed but excluded from the production coverage metrics.
+  bool deliberate = false;
   // Populated only for NoMatchingRule misses while diagnostic recording is enabled; drives the
   // offline decomposition-coverage audit. Left at its all-Trivial default otherwise.
   AOTDecomposeAnalysis decomposeAnalysis = {};
@@ -279,6 +285,12 @@ class PrecompiledShaderCache {
     missPaused.store(paused, std::memory_order_relaxed);
   }
 
+  /// While set, artifact-miss records are stamped as deliberate (provoked on purpose by a test
+  /// fixture). They stay listed but are excluded from the coverage metrics.
+  void setDeliberateMissMarking(bool marking) {
+    deliberateMarking.store(marking, std::memory_order_relaxed);
+  }
+
   void setStatsRecordingPaused(bool paused) {
     statsPaused.store(paused, std::memory_order_relaxed);
   }
@@ -365,6 +377,7 @@ class PrecompiledShaderCache {
   std::atomic<bool> diagnosticsEnabled{false};
   std::atomic<bool> statsPaused{false};
   std::atomic<bool> missPaused{false};
+  std::atomic<bool> deliberateMarking{false};
   std::atomic<bool> _decompositionEnabled{true};
   mutable std::mutex diagnosticsMutex = {};
   std::vector<PrecompiledHitRecord> _hitRecords = {};
