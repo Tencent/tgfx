@@ -4505,10 +4505,11 @@ TGFX_TEST_PRIVATE(LayerTest, ExtremeAffineLeaf_KeepsMipmaps) {
     const auto localToCompositor = MakeLocalToCompositorMatrix(
         Matrix3D::MakeScale(1.0e35f, 1.0f, 1.0f), contentScale, renderRect);
     Render3DContext::RasterInfo info;
+    info.mipmapped = false;
 
     ASSERT_TRUE(Render3DContext::ComputeRasterInfo(localToCompositor, localBounds, viewport,
                                                    contentScale, &info));
-    EXPECT_TRUE(info.needsMipmaps);
+    EXPECT_TRUE(info.mipmapped);
   });
 }
 

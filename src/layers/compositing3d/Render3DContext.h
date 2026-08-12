@@ -64,7 +64,7 @@ class Render3DContext : public Layer3DContext {
     Matrix density = Matrix::I();
     int rasterWidth = 0;
     int rasterHeight = 0;
-    bool needsMipmaps = true;
+    bool mipmapped = true;
   };
 
   void emitNode(Layer* layer, const Rect& localBounds, const Matrix3D& transform, float alpha,

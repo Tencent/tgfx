@@ -62,45 +62,6 @@ class Compositor3DBackgroundSource : public BackgroundSource {
   Context3DCompositor* _compositor = nullptr;
 };
 
-// The smallest singular value covers the most minified local direction after mapping raster texels
-// to compositor pixels, including rotation and skew without relying on an axis-aligned footprint.
-static float SmallestSingularValueSquared(float m00, float m01, float m10, float m11) {
-  const float trace = m00 * m00 + m01 * m01 + m10 * m10 + m11 * m11;
-  const float determinant = m00 * m11 - m01 * m10;
-  const float discriminant = std::max(0.0f, trace * trace - 4.0f * determinant * determinant);
-  return 0.5f * (trace - std::sqrt(discriminant));
-}
-
-// Mirrors Skia's lazy mipmap policy (SkMipmapAccessor::Make + SkMipmap::ComputeLevel): when the
-// effective minification is absent (computed LOD <= 0), no mip chain is needed and single-level
-// sampling is equivalent. Skia applies this on its CPU raster path; here the same conservative
-// decision gates GPU offscreen mip chain creation for 3D leaves, so perspective or any possible
-// minification keeps trilinear sampling.
-static bool NeedsMipmaps(const Matrix3D& localToCompositor, const Rect& visibleLocal,
-                         int rasterWidth, int rasterHeight) {
-  const float perspectiveX = localToCompositor.getRowColumn(3, 0);
-  const float perspectiveY = localToCompositor.getRowColumn(3, 1);
-  const float homogeneousW = localToCompositor.getRowColumn(3, 3);
-  if (perspectiveX != 0.0f || perspectiveY != 0.0f || !(homogeneousW > 0.0f) ||
-      visibleLocal.isEmpty() || rasterWidth <= 0 || rasterHeight <= 0) {
-    return true;
-  }
-  const float texelsPerLocalX = static_cast<float>(rasterWidth) / visibleLocal.width();
-  const float texelsPerLocalY = static_cast<float>(rasterHeight) / visibleLocal.height();
-  if (!(texelsPerLocalX > 0.0f) || !(texelsPerLocalY > 0.0f)) {
-    return true;
-  }
-  const float m00 = localToCompositor.getRowColumn(0, 0) / homogeneousW / texelsPerLocalX;
-  const float m01 = localToCompositor.getRowColumn(0, 1) / homogeneousW / texelsPerLocalY;
-  const float m10 = localToCompositor.getRowColumn(1, 0) / homogeneousW / texelsPerLocalX;
-  const float m11 = localToCompositor.getRowColumn(1, 1) / homogeneousW / texelsPerLocalY;
-  if (!std::isfinite(m00) || !std::isfinite(m01) || !std::isfinite(m10) || !std::isfinite(m11)) {
-    return true;
-  }
-  const float smallestSingularValueSquared = SmallestSingularValueSquared(m00, m01, m10, m11);
-  return !std::isfinite(smallestSingularValueSquared) || smallestSingularValueSquared < 1.0f;
-}
-
 }  // namespace
 
 Render3DContext::Render3DContext(std::shared_ptr<Context3DCompositor> compositor,
@@ -252,11 +213,8 @@ std::shared_ptr<Image> Render3DContext::rasterLayer(
   if (info.rasterWidth <= 0 || info.rasterHeight <= 0) {
     return nullptr;
   }
-  // Following Skia's lazy mipmap decision (SkMipmapAccessor + SkMipmap::ComputeLevel), only create
-  // the offscreen mip chain when the leaf can actually be minified while sampling; single-level
-  // sampling is equivalent otherwise and saves the mip storage and generation cost.
   auto surface = Surface::Make(leafArgs.context, info.rasterWidth, info.rasterHeight, false, 1,
-                               info.needsMipmaps, 0, _colorSpace);
+                               info.mipmapped, 0, _colorSpace);
   if (surface == nullptr) {
     return nullptr;
   }
@@ -330,6 +288,46 @@ bool Render3DContext::primeCompositorFromOuterCanvas(Canvas* outerCanvas) {
   return true;
 }
 
+namespace {
+
+// Returns the squared scale in the most minified raster-texel direction, including rotation and
+// skew without relying on an axis-aligned footprint.
+static float SmallestSingularValueSquared(float m00, float m01, float m10, float m11) {
+  const float trace = m00 * m00 + m01 * m01 + m10 * m10 + m11 * m11;
+  const float determinant = m00 * m11 - m01 * m10;
+  const float discriminant = std::max(0.0f, trace * trace - 4.0f * determinant * determinant);
+  return 0.5f * (trace - std::sqrt(discriminant));
+}
+
+// The offscreen leaf surface only needs mipmaps when an affine mapping minifies raster texels.
+// Perspective or invalid mappings conservatively retain mipmaps.
+static bool NeedsMipmaps(const Matrix3D& localToCompositor, const Rect& visibleLocal,
+                         int rasterWidth, int rasterHeight) {
+  const float perspectiveX = localToCompositor.getRowColumn(3, 0);
+  const float perspectiveY = localToCompositor.getRowColumn(3, 1);
+  const float homogeneousW = localToCompositor.getRowColumn(3, 3);
+  if (perspectiveX != 0.0f || perspectiveY != 0.0f || !(homogeneousW > 0.0f) ||
+      visibleLocal.isEmpty() || rasterWidth <= 0 || rasterHeight <= 0) {
+    return true;
+  }
+  const float texelsPerLocalX = static_cast<float>(rasterWidth) / visibleLocal.width();
+  const float texelsPerLocalY = static_cast<float>(rasterHeight) / visibleLocal.height();
+  if (!(texelsPerLocalX > 0.0f) || !(texelsPerLocalY > 0.0f)) {
+    return true;
+  }
+  const float m00 = localToCompositor.getRowColumn(0, 0) / homogeneousW / texelsPerLocalX;
+  const float m01 = localToCompositor.getRowColumn(0, 1) / homogeneousW / texelsPerLocalY;
+  const float m10 = localToCompositor.getRowColumn(1, 0) / homogeneousW / texelsPerLocalX;
+  const float m11 = localToCompositor.getRowColumn(1, 1) / homogeneousW / texelsPerLocalY;
+  if (!std::isfinite(m00) || !std::isfinite(m01) || !std::isfinite(m10) || !std::isfinite(m11)) {
+    return true;
+  }
+  const float smallestSingularValueSquared = SmallestSingularValueSquared(m00, m01, m10, m11);
+  return !std::isfinite(smallestSingularValueSquared) || smallestSingularValueSquared < 1.0f;
+}
+
+}  // namespace
+
 bool Render3DContext::ComputeRasterInfo(const Matrix3D& localToCompositor, const Rect& localBounds,
                                         const Rect& compositorViewport, float contentScale,
                                         RasterInfo* info) {
@@ -372,7 +370,7 @@ bool Render3DContext::ComputeRasterInfo(const Matrix3D& localToCompositor, const
   info->density = density;
   info->rasterWidth = std::max(1, static_cast<int>(std::ceil(localWidth * densityX)));
   info->rasterHeight = std::max(1, static_cast<int>(std::ceil(localHeight * densityY)));
-  info->needsMipmaps =
+  info->mipmapped =
       NeedsMipmaps(localToCompositor, info->visibleLocal, info->rasterWidth, info->rasterHeight);
   return true;
 }
