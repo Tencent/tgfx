@@ -15,14 +15,33 @@
 #ifndef HAS_XP
 #define HAS_XP 0
 #endif
+#ifndef TEXTURED
+#define TEXTURED 0
+#endif
 
-#if HAS_COMMON_COLOR || HAS_XP
+#if HAS_COMMON_COLOR || HAS_XP || TEXTURED
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #if HAS_COMMON_COLOR
   vec4 Color;
 #endif
+#if TEXTURED
+  // Tiled-sampling recipe, written by GLSLTiledTextureEffect::onSetData (runtime uniforms, same
+  // names as TiledTextureFillShader).
+  int ShaderModeX;
+  int ShaderModeY;
+  vec4 Subset;
+  vec4 Clamp;
+  vec2 Dimension;
+  int AlphaOnly;
+  int Strict;
+#endif
 #include "xp_uniforms.inc"
 };
+#endif
+
+#if TEXTURED
+layout(location = 5) in vec2 TransformedCoords_0;
+layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
 #endif
 
 layout(location = 0) in vec2 vLocalCoord;
@@ -39,9 +58,16 @@ layout(location = 3) in vec2 vStrokeWidth;
 #endif
 #endif
 
-#define XP_DST_TEX_BINDING 0
+#if TEXTURED
+  #define XP_DST_TEX_BINDING 1
+#else
+  #define XP_DST_TEX_BINDING 0
+#endif
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
+#if TEXTURED
+#include "tiled_sample.inc"
+#endif
 
 layout(location = 0) out vec4 fragColor;
 
@@ -50,6 +76,25 @@ void main() {
   vec4 outputColor = Color;
 #else
   vec4 outputColor = vColor;
+#endif
+
+#if TEXTURED
+  // Tiled texture as the color source, single-tap modes only (the matcher rejects the
+  // mipmap-repeat modes for this kernel). Mirrors GLSLTiledTextureEffect's emission: the sample
+  // is modulated by the input color's alpha.
+  vec2 texCoord = TransformedCoords_0;
+  vec2 inCoord;
+  vec2 subsetCoord;
+  vec2 clampedCoord;
+  vec2 sampleCoord = tiledMapCoord(texCoord, Strict != 0, inCoord, subsetCoord, clampedCoord);
+  vec4 texColor = texture(TextureSampler_0, sampleCoord);
+  texColor = tiledApplyBorder(texColor, inCoord, subsetCoord, clampedCoord);
+  if (AlphaOnly != 0) {
+    texColor = vec4(texColor.r);
+    outputColor = texColor.a * outputColor;
+  } else {
+    outputColor = texColor * outputColor.a;
+  }
 #endif
 
   // Outer round rect SDF

@@ -62,6 +62,7 @@
 #include "gpu/shaders/level1/TextureGradientShader.h"
 #include "gpu/shaders/level1/TexturedEffectShader.h"
 #include "gpu/shaders/level1/TiledTextureFillShader.h"
+#include "gpu/shaders/level1/YUVTextureFillShader.h"
 
 namespace tgfx {
 

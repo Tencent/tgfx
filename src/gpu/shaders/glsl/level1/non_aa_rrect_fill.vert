@@ -11,9 +11,15 @@
 #ifndef STROKE
 #define STROKE 0
 #endif
+#ifndef TEXTURED
+#define TEXTURED 0
+#endif
 
 layout(std140, set = 0, binding = 0) uniform VertexUniformBlock {
   vec4 tgfx_RTAdjust;
+#if TEXTURED
+  mat3 CoordTransformMatrix_0;
+#endif
 };
 
 layout(location = 0) in vec2 inPosition;
@@ -34,6 +40,11 @@ layout(location = 4) in vec2 inStrokeWidth;
 layout(location = 0) out vec2 vLocalCoord;
 layout(location = 1) out vec2 vRadii;
 layout(location = 2) out vec4 vRectBounds;
+#if TEXTURED
+// Texture coordinates come from the local coordinate through the FP's transform, always at a
+// fixed location beyond every attribute-driven varying.
+layout(location = 5) out vec2 TransformedCoords_0;
+#endif
 #if !HAS_COMMON_COLOR
 layout(location = 3) out vec4 vColor;
 #if STROKE
@@ -46,6 +57,9 @@ layout(location = 3) out vec2 vStrokeWidth;
 #endif
 
 void main() {
+#if TEXTURED
+  TransformedCoords_0 = (CoordTransformMatrix_0 * vec3(inLocalCoord, 1.0)).xy;
+#endif
   vLocalCoord = inLocalCoord;
   vRadii = inRadii;
   vRectBounds = inRectBounds;

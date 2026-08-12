@@ -717,8 +717,7 @@ TGFX_TEST(AOTEffectTest, PointwiseDAGUsesProductionSamplerBudget) {
     }
     AOTNodeID current = AOTNodeID::Invalid();
     for (int index = 0; index < textureCount; ++index) {
-      auto proxy = context->proxyProvider()->createTextureProxy({}, 2, 2,
-                                                                PixelFormat::RGBA_8888);
+      auto proxy = context->proxyProvider()->createTextureProxy({}, 2, 2, PixelFormat::RGBA_8888);
       if (proxy == nullptr || proxy->getTextureView() == nullptr) {
         return false;
       }

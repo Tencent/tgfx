@@ -209,6 +209,11 @@ void GLSLTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
     fragmentUniformData->setData("AlphaStart", alphaStartValue);
   }
   auto yuvTexture = getYUVTexture();
+  if (yuvTexture != nullptr && fragmentUniformData->hasField("YUVLimitedRange")) {
+    // The runtime codegen bakes the limited-range offset; precompiled programs read it here.
+    int limited = IsLimitedYUVColorRange(yuvTexture->yuvColorSpace()) ? 1 : 0;
+    fragmentUniformData->setData("YUVLimitedRange", limited);
+  }
   if (yuvTexture) {
     std::string mat3ColorConversion = "Mat3ColorConversion";
     switch (yuvTexture->yuvColorSpace()) {

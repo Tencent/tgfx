@@ -24,21 +24,22 @@ namespace tgfx {
 
 class NonAARRectFillShader : public PrecompiledShader {
  public:
-  TGFX_DEFINE_DIMS(HAS_COMMON_COLOR, STROKE);
+  TGFX_DEFINE_DIMS(HAS_COMMON_COLOR, STROKE, TEXTURED);
   using D = Dims;
 
   struct FragDims {
-    enum : uint32_t { HAS_COMMON_COLOR, STROKE, HAS_XP, COUNT };
+    enum : uint32_t { HAS_COMMON_COLOR, STROKE, TEXTURED, HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationBool("HAS_COMMON_COLOR"),
           PermutationBool("STROKE"),
+          PermutationBool("TEXTURED"),
           PermutationInt("HAS_XP", 3),
       });
     }
   };
   using FD = FragDims;
-  static_assert(D::COUNT == 2 && FD::COUNT == 3,
+  static_assert(D::COUNT == 3 && FD::COUNT == 4,
                 "Update ShouldCompile below when dimensions change.");
 
   PrecompiledShaderInfo info() const override {
@@ -50,7 +51,15 @@ class NonAARRectFillShader : public PrecompiledShader {
             PermutationDomain({}),
             "NonAARRectGeometryProcessor",
             "",
-            nullptr};
+            ShouldCompile};
+  }
+
+ private:
+  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>& vertValues,
+                            const std::vector<int>&) {
+    // The textured variant carries no stroke-width sampling: stroked rrects with a shader are
+    // not produced by the current callers, so the combination stays uncompiled.
+    return !(vertValues[D::TEXTURED] != 0 && vertValues[D::STROKE] != 0);
   }
 };
 

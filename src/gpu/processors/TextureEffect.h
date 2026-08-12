@@ -45,6 +45,10 @@ class TextureEffect : public FragmentProcessor {
 
   bool isYUV() const;
 
+  // The YUV plane layout of the texture (I420 or NV12), or YUVFormat::Unknown for non-YUV
+  // textures. Used by the precompiled matcher to select the plane-sampling variant.
+  YUVFormat yuvFormat() const;
+
   bool isAlphaOnly() const;
 
   bool hasRGBAAA() const {

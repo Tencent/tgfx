@@ -114,6 +114,11 @@ TextureView* TextureEffect::getTextureView() const {
   return textureProxy->getTextureView().get();
 }
 
+YUVFormat TextureEffect::yuvFormat() const {
+  auto* yuvView = getYUVTexture();
+  return yuvView != nullptr ? yuvView->yuvFormat() : YUVFormat::Unknown;
+}
+
 YUVTextureView* TextureEffect::getYUVTexture() const {
   auto textureView = textureProxy->getTextureView().get();
   if (textureView && textureView->isYUV()) {

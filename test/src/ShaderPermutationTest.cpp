@@ -717,8 +717,8 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
-  EXPECT_EQ(cache->vertexEntryCount(), 111u);
-  EXPECT_EQ(cache->fragmentEntryCount(), 356u);
+  EXPECT_EQ(cache->vertexEntryCount(), 117u);
+  EXPECT_EQ(cache->fragmentEntryCount(), 374u);
   std::string expectedTag = TGFX_BACKEND_NAME;
   auto dashPos = expectedTag.find('-');
   if (dashPos != std::string::npos) {
@@ -1603,8 +1603,10 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     auto match = MatchPermutation(&programInfo);
     ASSERT_TRUE(match.has_value());
     EXPECT_EQ(match->shaderName, "ShapeInstancedTextureCoverageShader");
-    EXPECT_EQ(match->vertPermutationIndex, 0u);
-    EXPECT_EQ(match->fragPermutationIndex, 0u);
+    // The bare coverage form is GRADIENT=0, HAS_COLORS=1 in the two-bool domain.
+    auto expected = ShapeInstancedTextureCoverageShader::D::domain().encode({0, 1});
+    EXPECT_EQ(match->vertPermutationIndex, expected);
+    EXPECT_EQ(match->fragPermutationIndex, expected);
   }
 
   {
@@ -1681,8 +1683,8 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageShaderRegistry) {
       continue;
     }
     found = true;
-    EXPECT_EQ(info.vertDomain.totalCount(), 1u);
-    EXPECT_EQ(info.fragDomain.totalCount(), 1u);
+    EXPECT_EQ(info.vertDomain.totalCount(), 4u);
+    EXPECT_EQ(info.fragDomain.totalCount(), 4u);
   }
   EXPECT_TRUE(found);
 }

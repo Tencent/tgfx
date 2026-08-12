@@ -24,16 +24,43 @@ namespace tgfx {
 
 class ShapeInstancedTextureCoverageShader : public PrecompiledShader {
  public:
+  // GRADIENT (bool): the color source is a single-interval gradient instead of the per-instance
+  // vertex color; its layout is selected at runtime through the LayoutType uniform.
+  // HAS_COLORS (bool): per-instance color attribute present. The bare coverage form requires
+  // colors (enforced by ShouldCompile); the gradient form works either way, using opaque white as
+  // the colorless input exactly like the runtime GP emission.
+  TGFX_DEFINE_DIMS(GRADIENT, HAS_COLORS);
+  using D = Dims;
+
+  struct FragDims {
+    enum : uint32_t { GRADIENT, HAS_COLORS, COUNT };
+    static PermutationDomain domain() {
+      return PermutationDomain({
+          PermutationBool("GRADIENT"),
+          PermutationBool("HAS_COLORS"),
+      });
+    }
+  };
+  using FD = FragDims;
+
   PrecompiledShaderInfo info() const override {
     return {"ShapeInstancedTextureCoverageShader",
             "level1/shape_instanced_texture_coverage.vert",
             "level1/shape_instanced_texture_coverage.frag",
-            PermutationDomain({}),
-            PermutationDomain({}),
+            D::domain(),
+            FD::domain(),
             PermutationDomain({}),
             "ShapeInstancedGeometryProcessor",
             "",
-            nullptr};
+            ShouldCompile};
+  }
+
+ private:
+  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>& vertValues,
+                            const std::vector<int>&) {
+    // The bare coverage variant reads the per-instance color; only the gradient form has a
+    // colorless path (opaque white input).
+    return vertValues[D::HAS_COLORS] != 0 || vertValues[D::GRADIENT] != 0;
   }
 };
 

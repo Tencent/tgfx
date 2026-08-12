@@ -84,6 +84,7 @@
 #include "gpu/shaders/level1/TextureGradientShader.h"
 #include "gpu/shaders/level1/TexturedEffectShader.h"
 #include "gpu/shaders/level1/TiledTextureFillShader.h"
+#include "gpu/shaders/level1/YUVTextureFillShader.h"
 
 namespace tgfx {
 
@@ -312,6 +313,55 @@ static std::optional<PermutationMatchResult> TryMatchTiledTextureFill(
   fragValues[FD::HAS_COVERAGE] = hasCoverage;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"TiledTextureFillShader", vertIndex, fragIndex};
+}
+
+static std::optional<PermutationMatchResult> TryMatchYUVTextureFill(
+    const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp->name() != "QuadPerEdgeAAGeometryProcessor") {
+    return std::nullopt;
+  }
+  auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
+  // The precompiled vert has no texSubset attribute, so subset-carrying quads fall back.
+  if (quadGP->getHasSubset()) {
+    return std::nullopt;
+  }
+  if (programInfo->numColorFragmentProcessors() != 1 || programInfo->numFragmentProcessors() != 1) {
+    return std::nullopt;
+  }
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
+    return std::nullopt;
+  }
+  auto fp = programInfo->getFragmentProcessor(0);
+  if (fp->name() != "TextureEffect") {
+    return std::nullopt;
+  }
+  auto* texture = static_cast<const TextureEffect*>(fp);
+  if (!texture->isYUV()) {
+    return std::nullopt;
+  }
+  // Only I420 and NV12 have precompiled plane layouts.
+  int format = -1;
+  if (texture->yuvFormat() == YUVFormat::I420) {
+    format = 0;
+  } else if (texture->yuvFormat() == YUVFormat::NV12) {
+    format = 1;
+  }
+  if (format < 0) {
+    return std::nullopt;
+  }
+  using VD = YUVTextureFillShader::VD;
+  std::vector<int> vertValues(VD::COUNT, 0);
+  vertValues[VD::HAS_UV_COORD] = quadGP->hasUVMatrix() ? 0 : 1;
+  auto vertIndex = VD::domain().encode(vertValues);
+
+  using FD = YUVTextureFillShader::FD;
+  std::vector<int> fragValues(FD::COUNT, 0);
+  fragValues[FD::YUV_FORMAT] = format;
+  fragValues[FD::HAS_XP] = xpType;
+  auto fragIndex = FD::domain().encode(fragValues);
+  return PermutationMatchResult{"YUVTextureFillShader", vertIndex, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchSolidColorFill(
@@ -1170,12 +1220,25 @@ static std::optional<PermutationMatchResult> TryMatchAtlasTextFill(const Program
   if (gp->name() != "AtlasTextGeometryProcessor") {
     return std::nullopt;
   }
-  if (programInfo->numFragmentProcessors() != 0) {
+  if (programInfo->numColorFragmentProcessors() != 0 || programInfo->numFragmentProcessors() > 1) {
     return std::nullopt;
   }
   int xpType = GetXPType(programInfo);
   if (xpType < 0) {
     return std::nullopt;
+  }
+  int deviceMask = 0;
+  if (programInfo->numFragmentProcessors() == 1) {
+    // A single alpha-only device-space mask coverage multiplies the atlas glyph coverage.
+    auto fp = programInfo->getFragmentProcessor(0);
+    if (fp->name() != "DeviceSpaceTextureEffect") {
+      return std::nullopt;
+    }
+    auto* mask = static_cast<const DeviceSpaceTextureEffect*>(fp);
+    if (!mask->isAlphaOnly() || mask->hasPerspective()) {
+      return std::nullopt;
+    }
+    deviceMask = 1;
   }
   auto* atgp = static_cast<const AtlasTextGeometryProcessor*>(gp);
   using D = AtlasTextFillShader::D;
@@ -1191,6 +1254,7 @@ static std::optional<PermutationMatchResult> TryMatchAtlasTextFill(const Program
     fragValues[i] = values[i];
   }
   fragValues[FD::HAS_XP] = xpType;
+  fragValues[FD::HAS_DEVICE_MASK] = deviceMask;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"AtlasTextFillShader", vertIndex, fragIndex};
 }
@@ -1568,7 +1632,7 @@ static std::optional<PermutationMatchResult> TryMatchNonAARRectFill(
   if (gp->name() != "NonAARRectGeometryProcessor") {
     return std::nullopt;
   }
-  if (programInfo->numFragmentProcessors() != 0) {
+  if (programInfo->numFragmentProcessors() > 1) {
     return std::nullopt;
   }
   int xpType = GetXPType(programInfo);
@@ -1576,11 +1640,32 @@ static std::optional<PermutationMatchResult> TryMatchNonAARRectFill(
     return std::nullopt;
   }
   auto* ngp = static_cast<const NonAARRectGeometryProcessor*>(gp);
+  int textured = 0;
+  if (programInfo->numFragmentProcessors() == 1) {
+    auto fp = programInfo->getFragmentProcessor(0);
+    // The textured variant carries the single-tap tiled modes only: the mipmap-repeat 4-tap path
+    // and perspective coordinates stay on the runtime route.
+    if (fp->name() != "TiledTextureEffect" || ngp->isStroke()) {
+      return std::nullopt;
+    }
+    auto* tte = static_cast<const TiledTextureEffect*>(fp);
+    if (tte->hasPerspective()) {
+      return std::nullopt;
+    }
+    int modeX = 0;
+    int modeY = 0;
+    tte->getShaderModes(&modeX, &modeY);
+    if (!TiledModeSupported(modeX) || !TiledModeSupported(modeY)) {
+      return std::nullopt;
+    }
+    textured = 1;
+  }
   using D = NonAARRectFillShader::Dims;
   auto domain = D::domain();
   std::vector<int> values(D::COUNT);
   values[D::HAS_COMMON_COLOR] = ngp->hasCommonColor() ? 1 : 0;
   values[D::STROKE] = ngp->isStroke() ? 1 : 0;
+  values[D::TEXTURED] = textured;
   auto vertIndex = domain.encode(values);
   using FD = NonAARRectFillShader::FD;
   auto fragDomain = FD::domain();
@@ -1663,12 +1748,30 @@ static std::optional<PermutationMatchResult> TryMatchRoundStrokeRectFill(
 static std::optional<PermutationMatchResult> TryMatchShapeInstancedTextureCoverage(
     const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "ShapeInstancedGeometryProcessor" ||
-      programInfo->numColorFragmentProcessors() != 0 || programInfo->numFragmentProcessors() != 1 ||
-      GetXPType(programInfo) != 0) {
+  if (gp->name() != "ShapeInstancedGeometryProcessor" || GetXPType(programInfo) != 0) {
     return std::nullopt;
   }
-  auto fp = programInfo->getFragmentProcessor(0);
+  // Two forms: a bare coverage texture, or a single-interval gradient color FP ahead of it.
+  int gradient = 0;
+  size_t colorCount = programInfo->numColorFragmentProcessors();
+  if (colorCount == 1) {
+    auto colorFP = programInfo->getFragmentProcessor(0);
+    if (colorFP->name() != "ClampedGradientEffect" || colorFP->numChildProcessors() != 2 ||
+        colorFP->childProcessor(0)->name() != "SingleIntervalGradientColorizer") {
+      return std::nullopt;
+    }
+    auto layout = colorFP->childProcessor(1);
+    if (layout->numCoordTransforms() != 1 || layout->coordTransform(0)->matrix.hasPerspective()) {
+      return std::nullopt;
+    }
+    gradient = 1;
+  } else if (colorCount != 0) {
+    return std::nullopt;
+  }
+  if (programInfo->numFragmentProcessors() != colorCount + 1) {
+    return std::nullopt;
+  }
+  auto fp = programInfo->getFragmentProcessor(colorCount);
   if (fp->name() != "TextureEffect") {
     return std::nullopt;
   }
@@ -1677,10 +1780,23 @@ static std::optional<PermutationMatchResult> TryMatchShapeInstancedTextureCovera
     return std::nullopt;
   }
   auto* shape = static_cast<const ShapeInstancedGeometryProcessor*>(gp);
-  if (!shape->getHasColors() || shape->getAAType() != AAType::None) {
+  // The bare coverage form reads the per-instance color; the gradient form also serves
+  // colorless batches (opaque-white input). This kernel carries no AA coverage attribute.
+  if (shape->getAAType() != AAType::None || (!gradient && !shape->getHasColors())) {
     return std::nullopt;
   }
-  return PermutationMatchResult{"ShapeInstancedTextureCoverageShader", 0, 0};
+  int hasColors = shape->getHasColors() ? 1 : 0;
+  using D = ShapeInstancedTextureCoverageShader::D;
+  std::vector<int> vertValues(D::COUNT, 0);
+  vertValues[D::GRADIENT] = gradient;
+  vertValues[D::HAS_COLORS] = hasColors;
+  auto vertIndex = D::domain().encode(vertValues);
+  using FD = ShapeInstancedTextureCoverageShader::FD;
+  std::vector<int> fragValues(FD::COUNT, 0);
+  fragValues[FD::GRADIENT] = gradient;
+  fragValues[FD::HAS_COLORS] = hasColors;
+  auto fragIndex = FD::domain().encode(fragValues);
+  return PermutationMatchResult{"ShapeInstancedTextureCoverageShader", vertIndex, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchShapeInstancedFill(
@@ -1899,6 +2015,9 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
     return result;
   }
   if (auto result = TryMatchQuadTextureFill(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchYUVTextureFill(programInfo)) {
     return result;
   }
   if (auto result = TryMatchTiledTextureFill(programInfo)) {

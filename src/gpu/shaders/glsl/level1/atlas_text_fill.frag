@@ -16,11 +16,16 @@
 #ifndef HAS_XP
 #define HAS_XP 0
 #endif
+#ifndef HAS_DEVICE_MASK
+#define HAS_DEVICE_MASK 0
+#endif
+#define HAS_RUNTIME_CLIP 1
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #if HAS_COMMON_COLOR
   vec4 Color;
 #endif
+#include "coverage_uniforms.inc"
 #include "xp_uniforms.inc"
   int AlphaOnly;
 };
@@ -38,8 +43,12 @@ layout(location = 1) in vec4 vColor;
 #endif
 
 layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
-
-#define XP_DST_TEX_BINDING 1
+#if HAS_DEVICE_MASK
+layout(set = 1, binding = 1) uniform sampler2D MaskTextureSampler;
+  #define XP_DST_TEX_BINDING 2
+#else
+  #define XP_DST_TEX_BINDING 1
+#endif
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
 
@@ -73,8 +82,8 @@ void main() {
     outputCoverage = vec4(texColor.a);
   }
 
-#define TGFX_XP_SRC_COLOR (outputColor * outputCoverage)
-#define TGFX_XP_SRC_UNPREMUL outputColor
-#define TGFX_XP_COVERAGE outputCoverage
+#define TGFX_INITIAL_COVERAGE outputCoverage
+#define TGFX_COVERAGE_SRC_COLOR outputColor
+#include "coverage_output.inc"
 #include "xp_output.inc"
 }
