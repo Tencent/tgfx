@@ -18,6 +18,10 @@
 #undef DstTF0
 #undef DstTF1
 #undef DstTFType
+#undef ConstColorValue
+#undef ConstInputMode
+#undef BlendModeValue
+#undef BlendConstFirst
 #undef src_tf
 #undef dst_tf
 #undef applyPointwiseOp
@@ -39,6 +43,10 @@
 #undef TGFX_SLOT_DST_TF0
 #undef TGFX_SLOT_DST_TF1
 #undef TGFX_SLOT_DST_TF_TYPE
+#undef TGFX_SLOT_CONST_COLOR_VALUE
+#undef TGFX_SLOT_CONST_INPUT_MODE
+#undef TGFX_SLOT_BLEND_MODE
+#undef TGFX_SLOT_BLEND_CONST_FIRST
 #undef TGFX_SLOT_SRC_TF_FUNC
 #undef TGFX_SLOT_DST_TF_FUNC
 #undef TGFX_SLOT_APPLY_FUNC

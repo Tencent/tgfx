@@ -197,12 +197,14 @@ static bool IsPerlinNoiseSource(const AOTEffectNode* node) {
          node->inputs.size() == 1 && node->inputs[0] == AOTNodeID(0);
 }
 
-// Planner for a procedural-noise source: GeometryColor -> PerlinNoiseSource -> [0..2 unary
-// pointwise ops]. PerlinNoiseFillShader carries two pointwise slots (a base OpType record shared
-// with a composed operator FP and a processor-owned Slot1 record), so up to two operators fold
-// into a single fused pass with no materialization.
+// Planner for a procedural-noise source: GeometryColor -> PerlinNoiseSource -> [0..3 unary
+// pointwise ops]. PerlinNoiseFillShader carries three pointwise slots (a base OpType record
+// shared with a composed operator FP and two processor-owned records), so up to three operators
+// fold into a single fused pass with no materialization. Besides the pure pointwise ops, a slot
+// may be a ConstColor op or a Blend whose other operand is a ConstColor node (the side constant
+// stays out of pass.nodes; its value is read from the blend node's inputs at build time).
 static bool DecomposePerlinNoiseChain(const AOTEffectGraph& graph, AOTEffectPlan* plan) {
-  if (plan == nullptr || graph.nodeCount() < 2 || graph.nodeCount() > 4 ||
+  if (plan == nullptr || graph.nodeCount() < 2 || graph.nodeCount() > 6 ||
       graph.root().index() + 1 != graph.nodeCount()) {
     return false;
   }
@@ -211,19 +213,57 @@ static bool DecomposePerlinNoiseChain(const AOTEffectGraph& graph, AOTEffectPlan
       !IsPerlinNoiseSource(graph.nodeAt(AOTNodeID(1)))) {
     return false;
   }
-  for (uint32_t index = 2; index < graph.nodeCount(); ++index) {
+  std::vector<AOTNodeID> passNodes = {AOTNodeID(1)};
+  AOTNodeID prev = AOTNodeID(1);
+  size_t slotCount = 0;
+  uint32_t index = 2;
+  while (index < graph.nodeCount()) {
     auto node = graph.nodeAt(AOTNodeID(index));
-    if (!IsPointwiseTailOp(node) || node->inputs[0] != AOTNodeID(index - 1)) {
+    if (node == nullptr) {
       return false;
     }
+    if (IsPointwiseTailOp(node) && node->inputs.size() == 1 && node->inputs[0] == prev) {
+      passNodes.push_back(AOTNodeID(index));
+      ++slotCount;
+      prev = AOTNodeID(index);
+      ++index;
+      continue;
+    }
+    if (node->kind == AOTEffectKind::ConstColor && node->inputs.size() == 1 &&
+        node->inputs[0] == prev) {
+      auto next = index + 1 < graph.nodeCount() ? graph.nodeAt(AOTNodeID(index + 1)) : nullptr;
+      if (next != nullptr && next->kind == AOTEffectKind::Blend && next->inputs.size() == 2 &&
+          ((next->inputs[0] == AOTNodeID(index) && next->inputs[1] == prev) ||
+           (next->inputs[1] == AOTNodeID(index) && next->inputs[0] == prev))) {
+        auto blendParams = std::get_if<AOTBlendParameters>(&next->parameters);
+        // A two-child blend needs both operands evaluated, which a single const-operand slot
+        // cannot express.
+        if (blendParams == nullptr || blendParams->childType == 2) {
+          return false;
+        }
+        passNodes.push_back(AOTNodeID(index + 1));
+        ++slotCount;
+        prev = AOTNodeID(index + 1);
+        index += 2;
+        continue;
+      }
+      // A const-color op of its own.
+      passNodes.push_back(AOTNodeID(index));
+      ++slotCount;
+      prev = AOTNodeID(index);
+      ++index;
+      continue;
+    }
+    return false;
+  }
+  if (slotCount > 3 || prev != graph.root()) {
+    return false;
   }
 
   AOTEffectPlan result = {};
   AOTPassDescriptor pass = {};
   pass.kernel = AOTKernelKind::PerlinNoiseFill;
-  for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
-    pass.nodes.push_back(AOTNodeID(index));
-  }
+  pass.nodes = std::move(passNodes);
   pass.output = pass.nodes.back();
   pass.materializesOutput = false;
   result.passes.push_back(std::move(pass));

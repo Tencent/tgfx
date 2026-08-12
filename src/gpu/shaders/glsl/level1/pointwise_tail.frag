@@ -42,6 +42,10 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #define TGFX_SLOT_DST_TF0 Slot0DstTF0
 #define TGFX_SLOT_DST_TF1 Slot0DstTF1
 #define TGFX_SLOT_DST_TF_TYPE Slot0DstTFType
+#define TGFX_SLOT_CONST_COLOR_VALUE Slot0ConstColorValue
+#define TGFX_SLOT_CONST_INPUT_MODE Slot0ConstInputMode
+#define TGFX_SLOT_BLEND_MODE Slot0BlendModeValue
+#define TGFX_SLOT_BLEND_CONST_FIRST Slot0BlendConstFirst
 #define TGFX_SLOT_SRC_TF_FUNC pointwiseTailSrcTF0
 #define TGFX_SLOT_DST_TF_FUNC pointwiseTailDstTF0
 #define TGFX_SLOT_APPLY_FUNC applyPointwiseSlot0
@@ -66,6 +70,10 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #define TGFX_SLOT_DST_TF0 Slot1DstTF0
 #define TGFX_SLOT_DST_TF1 Slot1DstTF1
 #define TGFX_SLOT_DST_TF_TYPE Slot1DstTFType
+#define TGFX_SLOT_CONST_COLOR_VALUE Slot1ConstColorValue
+#define TGFX_SLOT_CONST_INPUT_MODE Slot1ConstInputMode
+#define TGFX_SLOT_BLEND_MODE Slot1BlendModeValue
+#define TGFX_SLOT_BLEND_CONST_FIRST Slot1BlendConstFirst
 #define TGFX_SLOT_SRC_TF_FUNC pointwiseTailSrcTF1
 #define TGFX_SLOT_DST_TF_FUNC pointwiseTailDstTF1
 #define TGFX_SLOT_APPLY_FUNC applyPointwiseSlot1
@@ -106,6 +114,10 @@ layout(location = 0) out vec4 fragColor;
 #define TGFX_SLOT_DST_TF0 Slot0DstTF0
 #define TGFX_SLOT_DST_TF1 Slot0DstTF1
 #define TGFX_SLOT_DST_TF_TYPE Slot0DstTFType
+#define TGFX_SLOT_CONST_COLOR_VALUE Slot0ConstColorValue
+#define TGFX_SLOT_CONST_INPUT_MODE Slot0ConstInputMode
+#define TGFX_SLOT_BLEND_MODE Slot0BlendModeValue
+#define TGFX_SLOT_BLEND_CONST_FIRST Slot0BlendConstFirst
 #define TGFX_SLOT_SRC_TF_FUNC pointwiseTailSrcTF0
 #define TGFX_SLOT_DST_TF_FUNC pointwiseTailDstTF0
 #define TGFX_SLOT_APPLY_FUNC applyPointwiseSlot0
@@ -130,6 +142,10 @@ layout(location = 0) out vec4 fragColor;
 #define TGFX_SLOT_DST_TF0 Slot1DstTF0
 #define TGFX_SLOT_DST_TF1 Slot1DstTF1
 #define TGFX_SLOT_DST_TF_TYPE Slot1DstTFType
+#define TGFX_SLOT_CONST_COLOR_VALUE Slot1ConstColorValue
+#define TGFX_SLOT_CONST_INPUT_MODE Slot1ConstInputMode
+#define TGFX_SLOT_BLEND_MODE Slot1BlendModeValue
+#define TGFX_SLOT_BLEND_CONST_FIRST Slot1BlendConstFirst
 #define TGFX_SLOT_SRC_TF_FUNC pointwiseTailSrcTF1
 #define TGFX_SLOT_DST_TF_FUNC pointwiseTailDstTF1
 #define TGFX_SLOT_APPLY_FUNC applyPointwiseSlot1

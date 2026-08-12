@@ -31,10 +31,10 @@ class TextureView;
 
 class PerlinNoiseFragmentProcessor : public FragmentProcessor {
  public:
-  // The precompiled PerlinNoiseFillShader carries two pointwise-operator slots (mirroring
+  // The precompiled PerlinNoiseFillShader carries three pointwise-operator slots (mirroring
   // PointwiseTailShader): the first is shared with an operator FP composed on top of this
-  // processor, the second is reserved for slot records uploaded by the processor itself.
-  static constexpr size_t MaxPointwiseSlots = 2;
+  // processor, the rest are reserved for slot records uploaded by the processor itself.
+  static constexpr size_t MaxPointwiseSlots = 3;
 
   static PlacementPtr<PerlinNoiseFragmentProcessor> Make(
       BlockAllocator* allocator, Context* context, PerlinNoiseType noiseType, int numOctaves,

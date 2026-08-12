@@ -15,6 +15,9 @@
 #define OP_ALPHA_THRESHOLD 2
 #define OP_COLOR_SPACE_XFORM 3
 #define OP_NONE 4
+// Values 6/7 mirror the chain kernel's slot ABI (5 is OP_TEXTURE there, never a pointwise op).
+#define OP_CONST_COLOR 6
+#define OP_BLEND 7
 
 #define CS_UNPREMUL 1
 #define CS_LINEARIZE 2
@@ -24,6 +27,10 @@
 #define CS_SRC_OOTF 32
 #define CS_DST_OOTF 64
 #endif
+
+// OP_BLEND needs the shared PorterDuff blend math regardless of the kernel's XP state; the
+// include is guarded, so the per-slot re-inclusions of this file stay harmless.
+#include "xp_blend_colors.inc"
 
 // ColorSpaceXform transfer functions (verbatim from textured_color_space_xform.frag).
 float src_tf(float x) {
@@ -89,6 +96,21 @@ vec4 applyPointwiseOp(vec4 color) {
       result.a = step(Threshold, color.a);
       result = clamp(result, 0.0, 1.0);
     }
+  } else if (OpType == OP_CONST_COLOR) {
+    // Matches the chain kernel's const-color op and the runtime ConstColorProcessor emission:
+    // 0 = Ignore (replace), 1 = ModulateRGBA, 2 = ModulateA.
+    if (ConstInputMode == 1) {
+      result = ConstColorValue * color;
+    } else if (ConstInputMode == 2) {
+      result = ConstColorValue * color.a;
+    } else {
+      result = ConstColorValue;
+    }
+  } else if (OpType == OP_BLEND) {
+    // Blend with a constant operand; the operand order follows the source fragment processor's
+    // child position (BlendConstFirst mirrors XfermodeFragmentProcessor::Child).
+    result = BlendConstFirst != 0 ? xpBlendColors(ConstColorValue, color, BlendModeValue)
+                                  : xpBlendColors(color, ConstColorValue, BlendModeValue);
   } else {  // OP_COLOR_SPACE_XFORM
     if ((CSFlags & CS_UNPREMUL) != 0) {
       float a = color.a;

@@ -146,18 +146,43 @@ static bool ValidateLinearPlan(const AOTEffectGraph& graph, const AOTEffectPlan&
           return false;
         }
       } else if (pass.kernel == AOTKernelKind::PerlinNoiseFill) {
-        // One fused pass: a perlin source plus up to two pointwise-operator slots, matching the
-        // two slot records the PerlinNoiseFillShader kernel carries.
-        if (pass.nodes.empty() || pass.nodes.size() > 3 ||
+        // One fused pass: a perlin source plus up to three pointwise-operator slots, matching the
+        // three slot records the PerlinNoiseFillShader kernel carries. A slot may also be a
+        // const-color op or a blend with a constant side operand.
+        if (pass.nodes.empty() || pass.nodes.size() > 4 ||
             !ValidatePerlinNoiseSource(graph, pass.nodes[0])) {
           return false;
         }
         AOTNodeID expectedInput = pass.nodes[0];
         for (size_t opIndex = 1; opIndex < pass.nodes.size(); ++opIndex) {
-          if (!ValidatePointwiseTailOp(graph, pass.nodes[opIndex], expectedInput)) {
+          auto node = graph.nodeAt(pass.nodes[opIndex]);
+          if (node == nullptr) {
             return false;
           }
-          expectedInput = pass.nodes[opIndex];
+          if (ValidatePointwiseTailOp(graph, pass.nodes[opIndex], expectedInput)) {
+            expectedInput = pass.nodes[opIndex];
+            continue;
+          }
+          if (node->kind == AOTEffectKind::ConstColor && node->inputs.size() == 1 &&
+              node->inputs[0] == expectedInput) {
+            expectedInput = pass.nodes[opIndex];
+            continue;
+          }
+          if (node->kind == AOTEffectKind::Blend && node->inputs.size() == 2) {
+            auto blendParams = std::get_if<AOTBlendParameters>(&node->parameters);
+            auto* srcNode = graph.nodeAt(node->inputs[0]);
+            auto* dstNode = graph.nodeAt(node->inputs[1]);
+            bool srcIsConst = srcNode != nullptr && srcNode->kind == AOTEffectKind::ConstColor;
+            bool dstIsConst = dstNode != nullptr && dstNode->kind == AOTEffectKind::ConstColor;
+            AOTNodeID chained = srcIsConst ? node->inputs[1] : node->inputs[0];
+            if (blendParams == nullptr || blendParams->childType == 2 || srcIsConst == dstIsConst ||
+                chained != expectedInput) {
+              return false;
+            }
+            expectedInput = pass.nodes[opIndex];
+            continue;
+          }
+          return false;
         }
       } else {
         return false;
@@ -292,9 +317,43 @@ static PlacementPtr<FragmentProcessor> BuildPerlinNoiseFillFP(BlockAllocator* al
                                                               const AOTEffectGraph& graph,
                                                               const AOTPassDescriptor& pass);
 
-static bool BuildPointwiseSlot(const AOTEffectNode* node, AOTPointwiseSlot* slot) {
+static bool BuildPointwiseSlot(const AOTEffectGraph& graph, const AOTEffectNode* node,
+                               AOTPointwiseSlot* slot) {
   if (node == nullptr || slot == nullptr) {
     return false;
+  }
+  if (node->kind == AOTEffectKind::ConstColor) {
+    auto parameters = std::get_if<AOTConstColorParameters>(&node->parameters);
+    if (parameters == nullptr || node->inputs.size() != 1) {
+      return false;
+    }
+    slot->type = AOTPointwiseOpType::ConstColor;
+    slot->constColor = *parameters;
+    return true;
+  }
+  if (node->kind == AOTEffectKind::Blend) {
+    auto parameters = std::get_if<AOTBlendParameters>(&node->parameters);
+    if (parameters == nullptr || parameters->childType == 2 || node->inputs.size() != 2) {
+      return false;
+    }
+    auto* srcNode = graph.nodeAt(node->inputs[0]);
+    auto* dstNode = graph.nodeAt(node->inputs[1]);
+    const AOTEffectNode* constNode = nullptr;
+    if (srcNode != nullptr && srcNode->kind == AOTEffectKind::ConstColor) {
+      constNode = srcNode;
+    } else if (dstNode != nullptr && dstNode->kind == AOTEffectKind::ConstColor) {
+      constNode = dstNode;
+    } else {
+      return false;
+    }
+    auto constParams = std::get_if<AOTConstColorParameters>(&constNode->parameters);
+    if (constParams == nullptr) {
+      return false;
+    }
+    slot->type = AOTPointwiseOpType::Blend;
+    slot->blend = *parameters;
+    slot->constColor = *constParams;
+    return true;
   }
   if (node->kind == AOTEffectKind::ColorMatrix) {
     auto parameters = std::get_if<AOTColorMatrixParameters>(&node->parameters);
@@ -338,7 +397,7 @@ static bool BuildPointwiseSlot(const AOTEffectNode* node, AOTPointwiseSlot* slot
 static PlacementPtr<FragmentProcessor> BuildPerlinNoiseFillFP(BlockAllocator* allocator,
                                                               const AOTEffectGraph& graph,
                                                               const AOTPassDescriptor& pass) {
-  if (pass.nodes.empty() || pass.nodes.size() > 3) {
+  if (pass.nodes.empty() || pass.nodes.size() > 4) {
     return nullptr;
   }
   auto perlinNode = graph.nodeAt(pass.nodes[0]);
@@ -353,7 +412,7 @@ static PlacementPtr<FragmentProcessor> BuildPerlinNoiseFillFP(BlockAllocator* al
   slots.reserve(pass.nodes.size() - 1);
   for (size_t index = 1; index < pass.nodes.size(); ++index) {
     AOTPointwiseSlot slot = {};
-    if (!BuildPointwiseSlot(graph.nodeAt(pass.nodes[index]), &slot)) {
+    if (!BuildPointwiseSlot(graph, graph.nodeAt(pass.nodes[index]), &slot)) {
       return nullptr;
     }
     slots.push_back(slot);
@@ -516,7 +575,7 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
           return nullptr;
         }
         AOTPointwiseSlot pointwise = {};
-        if (!BuildPointwiseSlot(node, &pointwise)) {
+        if (!BuildPointwiseSlot(graph, node, &pointwise)) {
           return nullptr;
         }
         // AOTPointwiseOpType and AOTChainOp share values 0..4 by ABI (both mirror the OP_*
@@ -682,7 +741,7 @@ static PlacementPtr<FragmentProcessor> BuildFPForPass(
     slots.reserve(pass.nodes.size() - nodeIndex);
     for (; nodeIndex < pass.nodes.size(); ++nodeIndex) {
       AOTPointwiseSlot slot = {};
-      if (!BuildPointwiseSlot(graph.nodeAt(pass.nodes[nodeIndex]), &slot)) {
+      if (!BuildPointwiseSlot(graph, graph.nodeAt(pass.nodes[nodeIndex]), &slot)) {
         return nullptr;
       }
       slots.push_back(slot);
@@ -890,6 +949,15 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
     return plainLeaves == 0 || plainLeaves == 1 || plainLeaves == 2 || plainLeaves == 4;
   }
   return ValidateLinearPlan(graph, plan);
+}
+
+PlacementPtr<FragmentProcessor> AOTPlanExecutor::BuildPerlinNoiseFP(BlockAllocator* allocator,
+                                                                    const AOTEffectGraph& graph,
+                                                                    const AOTPassDescriptor& pass) {
+  if (pass.kernel != AOTKernelKind::PerlinNoiseFill) {
+    return nullptr;
+  }
+  return BuildPerlinNoiseFillFP(allocator, graph, pass);
 }
 
 PlacementPtr<FragmentProcessor> AOTPlanExecutor::BuildChainProcessor(

@@ -248,6 +248,10 @@ enum class AOTPointwiseOpType : int {
   AlphaThreshold = 2,
   ColorSpaceXform = 3,
   None = 4,
+  // 5 is OP_TEXTURE in the chain kernel's slot ABI and never a pointwise op. 6/7 mirror the
+  // chain kernel's OP_CONST_COLOR / OP_BLEND values.
+  ConstColor = 6,
+  Blend = 7,
 };
 
 // One pointwise-operator slot of a fused kernel, carrying the full parameter set of whichever
@@ -258,6 +262,10 @@ struct AOTPointwiseSlot {
   AOTLumaParameters luma = {};
   AOTAlphaThresholdParameters alphaThreshold = {};
   AOTColorSpaceXformParameters colorSpaceXform = {};
+  // ConstColor op: the constant and its input mode. Blend op: constColor holds the constant
+  // operand and blend carries the mode plus the operand order (childType).
+  AOTConstColorParameters constColor = {};
+  AOTBlendParameters blend = {};
 };
 
 struct AOTEffectNode {

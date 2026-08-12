@@ -33,3 +33,9 @@
   vec4 DstTF0;
   vec4 DstTF1;
   int DstTFType;
+  // ConstColor op
+  vec4 ConstColorValue;
+  int ConstInputMode;
+  // Blend op (one operand is ConstColorValue; BlendConstFirst picks the operand order)
+  int BlendModeValue;
+  int BlendConstFirst;

@@ -124,13 +124,22 @@ std::shared_ptr<Program> DrawOp::prepareDecomposedProgram(RenderTarget* renderTa
       plan.passes[0].kernel == AOTKernelKind::PointwiseTail) {
     plan.passes[0].kernel = AOTKernelKind::PointwiseChain;
   }
+  auto kernel = plan.passes.empty() ? AOTKernelKind::TextureFill : plan.passes[0].kernel;
   if (!decomposed || plan.passes.size() != 1 ||
-      plan.passes[0].kernel != AOTKernelKind::PointwiseChain ||
+      (kernel != AOTKernelKind::PointwiseChain && kernel != AOTKernelKind::PerlinNoiseFill) ||
       !AOTPlanExecutor::CanExecute(graph, plan)) {
     return nullptr;
   }
-  auto chainFP =
-      AOTPlanExecutor::BuildChainProcessor(allocator, graph, plan.passes[0], coverageFPs);
+  PlacementPtr<FragmentProcessor> chainFP = nullptr;
+  if (kernel == AOTKernelKind::PerlinNoiseFill) {
+    // The perlin kernel carries its own coordinate transform and has no coverage-fold path.
+    if (!coverageFPs.empty()) {
+      return nullptr;
+    }
+    chainFP = AOTPlanExecutor::BuildPerlinNoiseFP(allocator, graph, plan.passes[0]);
+  } else {
+    chainFP = AOTPlanExecutor::BuildChainProcessor(allocator, graph, plan.passes[0], coverageFPs);
+  }
   if (chainFP == nullptr) {
     return nullptr;
   }

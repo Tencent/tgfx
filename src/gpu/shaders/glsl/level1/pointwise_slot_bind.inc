@@ -28,6 +28,10 @@
 #define DstTF0 TGFX_SLOT_DST_TF0
 #define DstTF1 TGFX_SLOT_DST_TF1
 #define DstTFType TGFX_SLOT_DST_TF_TYPE
+#define ConstColorValue TGFX_SLOT_CONST_COLOR_VALUE
+#define ConstInputMode TGFX_SLOT_CONST_INPUT_MODE
+#define BlendModeValue TGFX_SLOT_BLEND_MODE
+#define BlendConstFirst TGFX_SLOT_BLEND_CONST_FIRST
 // The two transfer-function helpers and the operator entry point are functions, not uniforms, so
 // each slot needs its own names to avoid redefinition when pointwise_op.inc is included again.
 #define src_tf TGFX_SLOT_SRC_TF_FUNC

@@ -98,6 +98,13 @@ void UploadPointwiseSlot(UniformData* uniformData, const std::string& prefix,
   } else if (slot.type == AOTPointwiseOpType::ColorSpaceXform) {
     ColorSpaceXformHelper helper(prefix);
     helper.setData(uniformData, slot.colorSpaceXform.steps.get());
+  } else if (slot.type == AOTPointwiseOpType::ConstColor) {
+    uniformData->setDataOptional(prefix + "ConstColorValue", slot.constColor.color);
+    uniformData->setDataOptional(prefix + "ConstInputMode", slot.constColor.inputMode);
+  } else if (slot.type == AOTPointwiseOpType::Blend) {
+    uniformData->setDataOptional(prefix + "ConstColorValue", slot.constColor.color);
+    uniformData->setDataOptional(prefix + "BlendModeValue", slot.blend.blendMode);
+    uniformData->setDataOptional(prefix + "BlendConstFirst", slot.blend.childType == 1 ? 1 : 0);
   }
 }
 }  // namespace
@@ -362,8 +369,9 @@ void GLSLPerlinNoiseFragmentProcessor::onSetData(UniformData* /*vertexUniformDat
   // composed on top of this shader it is visited after this child in FragmentProcessor::Iter and
   // overwrites OpType with its own value, so this only takes effect for the pure-noise case.
   fragmentUniformData->setDataOptional("OpType", static_cast<int>(4));
-  // Slot 1 is owned by this processor and always written here (no other FP knows the name).
+  // Slots 1/2 are owned by this processor and always written here (no other FP knows the names).
   fragmentUniformData->setDataOptional("Slot1OpType", static_cast<int>(4));
+  fragmentUniformData->setDataOptional("Slot2OpType", static_cast<int>(4));
 
   for (size_t index = 0; index < slotCount; ++index) {
     auto prefix = index == 0 ? std::string() : "Slot" + std::to_string(index);

@@ -48,9 +48,41 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #define TGFX_SLOT_DST_TF0 Slot1DstTF0
 #define TGFX_SLOT_DST_TF1 Slot1DstTF1
 #define TGFX_SLOT_DST_TF_TYPE Slot1DstTFType
+#define TGFX_SLOT_CONST_COLOR_VALUE Slot1ConstColorValue
+#define TGFX_SLOT_CONST_INPUT_MODE Slot1ConstInputMode
+#define TGFX_SLOT_BLEND_MODE Slot1BlendModeValue
+#define TGFX_SLOT_BLEND_CONST_FIRST Slot1BlendConstFirst
 #define TGFX_SLOT_SRC_TF_FUNC perlinSlotSrcTF1
 #define TGFX_SLOT_DST_TF_FUNC perlinSlotDstTF1
 #define TGFX_SLOT_APPLY_FUNC applyPointwiseSlot1
+#include "pointwise_slot_bind.inc"
+#include "pointwise_op_uniforms.inc"
+#include "pointwise_slot_unbind.inc"
+
+#define TGFX_SLOT_OP_TYPE Slot2OpType
+#define TGFX_SLOT_COLOR_MATRIX Slot2ColorMatrix
+#define TGFX_SLOT_COLOR_VECTOR Slot2ColorVector
+#define TGFX_SLOT_KR Slot2Kr
+#define TGFX_SLOT_KG Slot2Kg
+#define TGFX_SLOT_KB Slot2Kb
+#define TGFX_SLOT_THRESHOLD Slot2Threshold
+#define TGFX_SLOT_CS_FLAGS Slot2CSFlags
+#define TGFX_SLOT_SRC_TF0 Slot2SrcTF0
+#define TGFX_SLOT_SRC_TF1 Slot2SrcTF1
+#define TGFX_SLOT_SRC_TF_TYPE Slot2SrcTFType
+#define TGFX_SLOT_SRC_OOTF Slot2SrcOOTF
+#define TGFX_SLOT_COLOR_XFORM Slot2ColorXform
+#define TGFX_SLOT_DST_OOTF Slot2DstOOTF
+#define TGFX_SLOT_DST_TF0 Slot2DstTF0
+#define TGFX_SLOT_DST_TF1 Slot2DstTF1
+#define TGFX_SLOT_DST_TF_TYPE Slot2DstTFType
+#define TGFX_SLOT_CONST_COLOR_VALUE Slot2ConstColorValue
+#define TGFX_SLOT_CONST_INPUT_MODE Slot2ConstInputMode
+#define TGFX_SLOT_BLEND_MODE Slot2BlendModeValue
+#define TGFX_SLOT_BLEND_CONST_FIRST Slot2BlendConstFirst
+#define TGFX_SLOT_SRC_TF_FUNC perlinSlotSrcTF2
+#define TGFX_SLOT_DST_TF_FUNC perlinSlotDstTF2
+#define TGFX_SLOT_APPLY_FUNC applyPointwiseSlot2
 #include "pointwise_slot_bind.inc"
 #include "pointwise_op_uniforms.inc"
 #include "pointwise_slot_unbind.inc"
@@ -92,9 +124,41 @@ layout(location = 0) out vec4 fragColor;
 #define TGFX_SLOT_DST_TF0 Slot1DstTF0
 #define TGFX_SLOT_DST_TF1 Slot1DstTF1
 #define TGFX_SLOT_DST_TF_TYPE Slot1DstTFType
+#define TGFX_SLOT_CONST_COLOR_VALUE Slot1ConstColorValue
+#define TGFX_SLOT_CONST_INPUT_MODE Slot1ConstInputMode
+#define TGFX_SLOT_BLEND_MODE Slot1BlendModeValue
+#define TGFX_SLOT_BLEND_CONST_FIRST Slot1BlendConstFirst
 #define TGFX_SLOT_SRC_TF_FUNC perlinSlotSrcTF1
 #define TGFX_SLOT_DST_TF_FUNC perlinSlotDstTF1
 #define TGFX_SLOT_APPLY_FUNC applyPointwiseSlot1
+#include "pointwise_slot_bind.inc"
+#include "pointwise_op.inc"
+#include "pointwise_slot_unbind.inc"
+
+#define TGFX_SLOT_OP_TYPE Slot2OpType
+#define TGFX_SLOT_COLOR_MATRIX Slot2ColorMatrix
+#define TGFX_SLOT_COLOR_VECTOR Slot2ColorVector
+#define TGFX_SLOT_KR Slot2Kr
+#define TGFX_SLOT_KG Slot2Kg
+#define TGFX_SLOT_KB Slot2Kb
+#define TGFX_SLOT_THRESHOLD Slot2Threshold
+#define TGFX_SLOT_CS_FLAGS Slot2CSFlags
+#define TGFX_SLOT_SRC_TF0 Slot2SrcTF0
+#define TGFX_SLOT_SRC_TF1 Slot2SrcTF1
+#define TGFX_SLOT_SRC_TF_TYPE Slot2SrcTFType
+#define TGFX_SLOT_SRC_OOTF Slot2SrcOOTF
+#define TGFX_SLOT_COLOR_XFORM Slot2ColorXform
+#define TGFX_SLOT_DST_OOTF Slot2DstOOTF
+#define TGFX_SLOT_DST_TF0 Slot2DstTF0
+#define TGFX_SLOT_DST_TF1 Slot2DstTF1
+#define TGFX_SLOT_DST_TF_TYPE Slot2DstTFType
+#define TGFX_SLOT_CONST_COLOR_VALUE Slot2ConstColorValue
+#define TGFX_SLOT_CONST_INPUT_MODE Slot2ConstInputMode
+#define TGFX_SLOT_BLEND_MODE Slot2BlendModeValue
+#define TGFX_SLOT_BLEND_CONST_FIRST Slot2BlendConstFirst
+#define TGFX_SLOT_SRC_TF_FUNC perlinSlotSrcTF2
+#define TGFX_SLOT_DST_TF_FUNC perlinSlotDstTF2
+#define TGFX_SLOT_APPLY_FUNC applyPointwiseSlot2
 #include "pointwise_slot_bind.inc"
 #include "pointwise_op.inc"
 #include "pointwise_slot_unbind.inc"
@@ -159,7 +223,9 @@ void main() {
   // Premultiply the raw noise, then apply both pointwise slots in order: the base OpType record
   // (shared with an operator FP composed on top of this shader, OP_NONE when absent) followed by
   // the processor-owned Slot1 record (OP_NONE when the processor carries fewer than two operators).
-  vec4 result = applyPointwiseSlot1(applyPointwiseOp(vec4(color.rgb * color.aaa, color.a)));
+  vec4 result =
+      applyPointwiseSlot2(applyPointwiseSlot1(applyPointwiseOp(vec4(color.rgb * color.aaa,
+                                                                     color.a))));
 
 #if HAS_COVERAGE
 #define TGFX_XP_SRC_COLOR (result * vCoverage)

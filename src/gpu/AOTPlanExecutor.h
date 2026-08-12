@@ -52,6 +52,15 @@ class AOTPlanExecutor {
       const std::vector<const FragmentProcessor*>& coverageFPs = {});
 
   /**
+   * Rebuilds the fused perlin-source processor of a single-pass PerlinNoiseFill plan: the noise
+   * source plus up to three folded pointwise/const/blend operator slots. Returns nullptr when the
+   * pass is not a valid PerlinNoiseFill pass.
+   */
+  static PlacementPtr<FragmentProcessor> BuildPerlinNoiseFP(BlockAllocator* allocator,
+                                                            const AOTEffectGraph& graph,
+                                                            const AOTPassDescriptor& pass);
+
+  /**
    * Builds an atomic render task for a supported linear AOT plan without enqueueing it. On failure,
    * originalDraw remains unchanged. On success, ownership of originalDraw moves into the task.
    *
