@@ -290,6 +290,58 @@ TGFX_TEST(AOTRenderConsistencyTest, AACoverageXferDstFold) {
   ExpectBitmapsIdentical("aa-xfer-dst-fold", aotBitmap, runtimeBitmap, 200, 200);
 }
 
+TGFX_TEST(AOTRenderConsistencyTest, LUTGradientMaskFold) {
+  Color red = {1.f, 0.f, 0.f, 1.f};
+  Color green = {0.f, 1.f, 0.f, 1.f};
+  Color blue = {0.f, 0.f, 1.f, 1.f};
+  auto renderOnce = [&](bool useBundle, Bitmap* outBitmap) {
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto* cache = context->precompiledShaderCache();
+    if (useBundle) {
+      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+    } else {
+      cache->unload();
+    }
+    ScopedAOTStatsPause statsPause(cache, !useBundle);
+    context->globalCache()->clearPrograms();
+    auto surface = Surface::Make(context, 200, 200);
+    ASSERT_TRUE(surface != nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::White());
+    // A rotated round-rect path rasterizes through a coverage mask texture; the 17-stop
+    // gradient bakes into a LUT colorizer.
+    Path path = {};
+    path.addRoundRect(Rect::MakeWH(100, 100), 20, 20);
+    Paint paint = {};
+    paint.setShader(Shader::MakeLinearGradient(Point{0.f, 0.f}, Point{25.f, 150.f},
+                                               {red, green, blue, green, red, blue, red, green,
+                                                red, green, blue, green, red, blue, red, green,
+                                                blue},
+                                               {}));
+    auto matrix = Matrix::MakeRotate(15, 50, 50);
+    matrix.postScale(1.5f, 0.9f, 50, 50);
+    matrix.postTranslate(40, 30);
+    canvas->setMatrix(matrix);
+    canvas->drawPath(path, paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(200, 200));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+    if (useBundle) {
+      cache->unload();
+    }
+  };
+  Bitmap aotBitmap = {};
+  Bitmap runtimeBitmap = {};
+  renderOnce(true, &aotBitmap);
+  renderOnce(false, &runtimeBitmap);
+  ExpectBitmapsIdentical("lut-gradient-mask-fold", aotBitmap, runtimeBitmap, 200, 200);
+}
+
 TGFX_TEST(AOTRenderConsistencyTest, AtlasTextConstColorFold) {
   auto typeface =
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));

@@ -21,6 +21,7 @@
 #include "gpu/processors/ConicGradientLayout.h"
 #include "gpu/processors/DualIntervalGradientColorizer.h"
 #include "gpu/processors/SingleIntervalGradientColorizer.h"
+#include "gpu/processors/TextureGradientColorizer.h"
 #include "gpu/processors/UnrolledBinaryGradientColorizer.h"
 
 namespace tgfx {
@@ -104,9 +105,16 @@ bool ClampedGradientEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
                                 thresholds1_7.bottom};
     parameters.thresholds9_13 = {thresholds9_13.left, thresholds9_13.top, thresholds9_13.right,
                                  thresholds9_13.bottom};
+  } else if (colorizerFP->name() == "TextureGradientColorizer") {
+    // LUT colorizer: the baked gradient texture joins the chain as a sampler-only child; the
+    // kernel's OP_GRADIENT LUT branch samples it at the computed t.
+    auto* lut = static_cast<const TextureGradientColorizer*>(colorizerFP);
+    if (lut->getGradient()->getTextureView() == nullptr) {
+      return false;
+    }
+    parameters.colorizerKind = 3;
+    parameters.lutProxy = lut->getGradient();
   } else {
-    // The texture (LUT) colorizer needs a sampler fed by the computed t, which the chain's
-    // static leaf sampling cannot express.
     return false;
   }
   return builder->addGradientSource(input, parameters, output);

@@ -113,7 +113,8 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
     BlockAllocator* allocator, std::vector<PlacementPtr<FragmentProcessor>> textureLeaves,
     const std::vector<AOTChainSlot>& slots, size_t rootSlot, int tiledLeafIndex,
     const AOTTiledTextureRecipe* tiledRecipe, PlacementPtr<FragmentProcessor> maskChild,
-    int coverageRootSlot, uint32_t coordSourceMask) {
+    int coverageRootSlot, uint32_t coordSourceMask, PlacementPtr<FragmentProcessor> lutChild,
+    int lutLeafIndex) {
   if (allocator == nullptr || slots.empty() || slots.size() > MaxSlots ||
       rootSlot >= slots.size()) {
     return nullptr;
@@ -127,6 +128,11 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
     return nullptr;
   }
   if (maskChild != nullptr && maskChild->name() != "DeviceSpaceTextureEffect") {
+    return nullptr;
+  }
+  // The LUT child binds the sampler right after the DAG leaves; the mask child's binding point
+  // relative to it is undefined, so reject the (currently unreachable) combination.
+  if (lutChild != nullptr && maskChild != nullptr) {
     return nullptr;
   }
   if (tiledLeafIndex >= 0 &&
@@ -153,17 +159,19 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
   }
   return allocator->make<AOTPointwiseChainProcessor>(
       std::move(textureLeaves), slots, rootSlot, tiledLeafIndex, tiledRecipe, std::move(maskChild),
-      coverageRootSlot, coordSourceMask);
+      coverageRootSlot, coordSourceMask, std::move(lutChild), lutLeafIndex);
 }
 
 AOTPointwiseChainProcessor::AOTPointwiseChainProcessor(
     std::vector<PlacementPtr<FragmentProcessor>> textureLeaves,
     const std::vector<AOTChainSlot>& newSlots, size_t rootSlot, int tiledLeafIndex,
     const AOTTiledTextureRecipe* tiledRecipe, PlacementPtr<FragmentProcessor> maskChildFP,
-    int coverageRootSlot, uint32_t coordSourceMask)
+    int coverageRootSlot, uint32_t coordSourceMask, PlacementPtr<FragmentProcessor> lutChildFP,
+    int lutLeafIndex)
     : FragmentProcessor(ClassID()), _slotCount(newSlots.size()), rootSlot(rootSlot),
       tiledLeafIndex(tiledLeafIndex), hasMaskChild(maskChildFP != nullptr),
-      coverageRootSlot(coverageRootSlot), coordSourceMask(coordSourceMask) {
+      coverageRootSlot(coverageRootSlot), coordSourceMask(coordSourceMask),
+      lutLeafIndex(lutLeafIndex) {
   if (tiledRecipe != nullptr) {
     _tiledRecipe = *tiledRecipe;
   }
@@ -179,6 +187,9 @@ AOTPointwiseChainProcessor::AOTPointwiseChainProcessor(
   addCoordTransform(&gradientCoordTransform);
   for (auto& leaf : textureLeaves) {
     registerChildProcessor(std::move(leaf));
+  }
+  if (lutChildFP != nullptr) {
+    registerChildProcessor(std::move(lutChildFP));
   }
   if (maskChildFP != nullptr) {
     registerChildProcessor(std::move(maskChildFP));
@@ -202,6 +213,7 @@ void AOTPointwiseChainProcessor::onComputeProcessorKey(BytesKey* bytesKey) const
   bytesKey->write(static_cast<uint32_t>(hasMaskChild ? 1 : 0));
   bytesKey->write(static_cast<uint32_t>(coverageRootSlot + 1));
   bytesKey->write(coordSourceMask);
+  bytesKey->write(static_cast<uint32_t>(lutLeafIndex + 1));
   for (size_t index = 0; index < _slotCount; ++index) {
     bytesKey->write(static_cast<uint32_t>(slots[index].op));
     if (slots[index].op == AOTChainOp::ColorSpaceXform) {
@@ -223,6 +235,7 @@ void AOTPointwiseChainProcessor::onSetData(UniformData* vertexUniformData,
   fragmentUniformData->setDataOptional("CoverageRootIndex", coverageRootSlot);
   fragmentUniformData->setDataOptional("SlotCount", static_cast<int>(_slotCount));
   fragmentUniformData->setDataOptional("TiledLeafIndex", tiledLeafIndex);
+  fragmentUniformData->setDataOptional("GradientLUTLeaf", lutLeafIndex);
   if (tiledLeafIndex >= 0) {
     int modeX = static_cast<int>(_tiledRecipe.shaderModeX);
     int modeY = static_cast<int>(_tiledRecipe.shaderModeY);

@@ -206,7 +206,10 @@ struct AOTGradientParameters {
   float scale = 1.0f;  // conic only
   std::array<float, 4> leftBorder = {};
   std::array<float, 4> rightBorder = {};
-  int colorizerKind = 0;              // 0=single-interval, 1=dual-interval, 2=unrolled-binary
+  int colorizerKind = 0;  // 0=single-interval, 1=dual-interval, 2=unrolled-binary, 3=LUT
+  // LUT colorizer only: the baked gradient texture. It joins the chain as a non-slot child whose
+  // sampler the OP_GRADIENT LUT branch reads through the GradientLUTLeaf uniform.
+  std::shared_ptr<TextureProxy> lutProxy = nullptr;
   std::array<float, 4> start = {};    // single
   std::array<float, 4> end = {};      // single
   std::array<float, 4> scale01 = {};  // dual

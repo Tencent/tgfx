@@ -687,6 +687,28 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
       return nullptr;
     }
   }
+  // A LUT gradient carries its baked texture as a sampler-only child appended after the DAG
+  // leaves; the OP_GRADIENT LUT branch reads it through the GradientLUTLeaf uniform.
+  PlacementPtr<FragmentProcessor> lutChild = nullptr;
+  int lutLeafIndex = -1;
+  for (auto& slot : slots) {
+    if (slot.op == AOTChainOp::Gradient && slot.gradient.colorizerKind == 3) {
+      // The LUT counts as a leaf for sampler binding, and TEXTURE_COUNT only exists for 1 or 2
+      // leaves here, so at most one DAG leaf can coexist with it.
+      if (leaves.size() >= 2) {
+        return nullptr;
+      }
+      SamplingOptions lutSampling(FilterMode::Linear, MipmapMode::None);
+      SamplingArgs lutArgs = {TileMode::Clamp, TileMode::Clamp, lutSampling,
+                              SrcRectConstraint::Fast};
+      auto lutMatrix = Matrix::I();
+      lutChild = TextureEffect::Make(allocator, slot.gradient.lutProxy, lutArgs, &lutMatrix);
+      if (lutChild == nullptr) {
+        return nullptr;
+      }
+      lutLeafIndex = static_cast<int>(leaves.size());
+    }
+  }
   auto rootIndex = slotOf[pass.output.index()];
   if (rootIndex == SIZE_MAX) {
     return nullptr;
@@ -767,9 +789,9 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
     }
   }
   const AOTTiledTextureRecipe* recipePtr = tiledLeafIndex >= 0 ? &tiledRecipe : nullptr;
-  return AOTPointwiseChainProcessor::Make(allocator, std::move(leaves), slots, rootIndex,
-                                          tiledLeafIndex, recipePtr, std::move(maskChild),
-                                          coverageRootSlot, coordSourceMask);
+  return AOTPointwiseChainProcessor::Make(
+      allocator, std::move(leaves), slots, rootIndex, tiledLeafIndex, recipePtr,
+      std::move(maskChild), coverageRootSlot, coordSourceMask, std::move(lutChild), lutLeafIndex);
 }
 
 static PlacementPtr<FragmentProcessor> BuildFPForPass(

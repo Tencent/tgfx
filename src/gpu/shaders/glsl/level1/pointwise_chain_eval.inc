@@ -252,6 +252,23 @@ vec4 evalChainSlotNoTex(int slot) {
         gradBias = GradientBias23;
       }
       gradColor = vec4(gradT * gradScale + gradBias);
+    } else if (GradientColorizerKind == 3) {
+      // LUT colorizer, matching the dedicated texture_gradient kernel: sample the baked gradient
+      // texture at the computed t. The LUT child occupies a leaf slot for sampler binding only;
+      // GradientLUTLeaf selects it with static indices. Unreachable when NTEX == 0 (a LUT chain
+      // always carries the child), but the branch must still compile for those variants.
+      gradColor = vec4(0.0);
+#if NTEX > 0
+      highp vec2 lutCoord = vec2(gradT, 0.5);
+      if (GradientLUTLeaf == 0) {
+        gradColor = texture(TextureSampler_0, lutCoord);
+      }
+#if NTEX > 1
+      if (GradientLUTLeaf == 1) {
+        gradColor = texture(TextureSampler_1, lutCoord);
+      }
+#endif
+#endif
     } else {
       gradColor = gradientColorizeUnrolled(gradT);
     }

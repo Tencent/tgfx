@@ -118,6 +118,9 @@ vec4 GradientBias8_9;
 vec4 GradientBias10_11;
 vec4 GradientBias12_13;
 vec4 GradientBias14_15;
+// Leaf index of the LUT gradient texture (a sampler-only child with no DAG slot), read by the
+// OP_GRADIENT LUT colorizer branch. -1 when no LUT gradient is present.
+int GradientLUTLeaf;
 
 // Tiled leaf support: at most one leaf per chain may need shader-side tiling (wrap or border
 // emulation). TiledLeafIndex selects it (-1 = none); the recipe fields are uploaded by the chain

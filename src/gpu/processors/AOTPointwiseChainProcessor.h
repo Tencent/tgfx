@@ -95,13 +95,15 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
       const std::vector<AOTChainSlot>& slots, size_t rootSlot, int tiledLeafIndex = -1,
       const AOTTiledTextureRecipe* tiledRecipe = nullptr,
       PlacementPtr<FragmentProcessor> maskChild = nullptr, int coverageRootSlot = -1,
-      uint32_t coordSourceMask = ~0u);
+      uint32_t coordSourceMask = ~0u, PlacementPtr<FragmentProcessor> lutChild = nullptr,
+      int lutLeafIndex = -1);
 
   AOTPointwiseChainProcessor(std::vector<PlacementPtr<FragmentProcessor>> textureLeaves,
                              const std::vector<AOTChainSlot>& slots, size_t rootSlot,
                              int tiledLeafIndex, const AOTTiledTextureRecipe* tiledRecipe,
                              PlacementPtr<FragmentProcessor> maskChild, int coverageRootSlot,
-                             uint32_t coordSourceMask);
+                             uint32_t coordSourceMask, PlacementPtr<FragmentProcessor> lutChild,
+                             int lutLeafIndex);
 
   std::string name() const override {
     return "AOTPointwiseChainProcessor";
@@ -172,6 +174,10 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
   // aPosition. All-ones reproduces the legacy shared-source behavior (quads, meshes); atlas text
   // sets only the atlas leaf's bit so gradients and image leaves come from position.
   uint32_t coordSourceMask = ~0u;
+  // Sampler-only child for the LUT gradient colorizer, registered after the DAG leaves (and
+  // counted by leafCount() so the matcher sizes TEXTURE_COUNT for it) but holding no chain slot;
+  // lutLeafIndex is its sampler index, read by the kernel's OP_GRADIENT LUT branch.
+  int lutLeafIndex = -1;
 };
 
 }  // namespace tgfx
