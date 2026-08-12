@@ -191,7 +191,9 @@ void GlobalCache::addProgram(const BytesKey& programKey, std::shared_ptr<Program
     return;
   }
   program->programKey = programKey;
-  if (program->getProvenance().program == ProgramOrigin::PrecompiledArtifact) {
+  if (programStatsPaused()) {
+    // Deliberate reference renders (tests) are excluded from the coverage metrics.
+  } else if (program->getProvenance().program == ProgramOrigin::PrecompiledArtifact) {
     _programStats.precompiledArtifactCreations++;
   } else {
     _programStats.programBuilderCreations++;

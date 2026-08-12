@@ -741,7 +741,7 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledPerformance) {
     auto context = scope.getContext();
     ASSERT_TRUE(context != nullptr);
     context->precompiledShaderCache()->unload();
-    ScopedAOTStatsPause statsPause(context->precompiledShaderCache(), true);
+    ScopedAOTStatsPause statsPause(context, true);
     context->globalCache()->clearPrograms();
     auto surface = Surface::Make(context, width, height);
     ASSERT_TRUE(surface != nullptr);
@@ -813,7 +813,7 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledRenderConsistency) {
     ContextScope scope;
     auto context = scope.getContext();
     ASSERT_TRUE(context != nullptr);
-    ScopedAOTStatsPause statsPause(context->precompiledShaderCache(), true);
+    ScopedAOTStatsPause statsPause(context, true);
     context->globalCache()->clearPrograms();
     auto surface = Surface::Make(context, width, height);
     ASSERT_TRUE(surface != nullptr);

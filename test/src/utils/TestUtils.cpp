@@ -21,21 +21,31 @@
 #include <fstream>
 #include "ProjectPath.h"
 #include "core/utils/Log.h"
+#include "gpu/GlobalCache.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Stream.h"
+#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
-ScopedAOTStatsPause::ScopedAOTStatsPause(PrecompiledShaderCache* cache, bool active) {
-  if (active && cache != nullptr && !cache->statsRecordingPaused()) {
-    this->cache = cache;
-    cache->setStatsRecordingPaused(true);
+ScopedAOTStatsPause::ScopedAOTStatsPause(Context* context, bool active) {
+  if (!active || context == nullptr) {
+    return;
   }
+  cache = context->precompiledShaderCache();
+  prevCachePaused = cache->statsRecordingPaused();
+  cache->setStatsRecordingPaused(true);
+  globalCache = context->globalCache();
+  prevGlobalPaused = globalCache->programStatsPaused();
+  globalCache->setProgramStatsPaused(true);
 }
 
 ScopedAOTStatsPause::~ScopedAOTStatsPause() {
   if (cache != nullptr) {
-    cache->setStatsRecordingPaused(false);
+    cache->setStatsRecordingPaused(prevCachePaused);
+  }
+  if (globalCache != nullptr) {
+    globalCache->setProgramStatsPaused(prevGlobalPaused);
   }
 }
 

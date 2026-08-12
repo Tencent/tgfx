@@ -76,7 +76,7 @@ static void RenderPaintOnce(const Paint& paint, int width, int height, bool useB
   } else {
     cache->unload();
   }
-  ScopedAOTStatsPause statsPause(cache, !useBundle);
+  ScopedAOTStatsPause statsPause(context, !useBundle);
   context->globalCache()->clearPrograms();
   auto surface = Surface::Make(context, width, height);
   ASSERT_TRUE(surface != nullptr);
@@ -107,7 +107,7 @@ static void RenderImageOnce(const std::shared_ptr<Image>& image,
   } else {
     cache->unload();
   }
-  ScopedAOTStatsPause statsPause(cache, !useBundle);
+  ScopedAOTStatsPause statsPause(context, !useBundle);
   context->globalCache()->clearPrograms();
   auto surface = Surface::Make(context, width, height);
   ASSERT_TRUE(surface != nullptr);
@@ -177,7 +177,7 @@ static void RenderPaintToP3Once(const Paint& paint, int width, int height, bool 
   } else {
     cache->unload();
   }
-  ScopedAOTStatsPause statsPause(cache, !useBundle);
+  ScopedAOTStatsPause statsPause(context, !useBundle);
   context->globalCache()->clearPrograms();
   auto surface = Surface::Make(context, width, height, false, 1, false, 0, ColorSpace::DisplayP3());
   ASSERT_TRUE(surface != nullptr);
@@ -262,7 +262,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AACoverageXferDstFold) {
     } else {
       cache->unload();
     }
-    ScopedAOTStatsPause statsPause(cache, !useBundle);
+    ScopedAOTStatsPause statsPause(context, !useBundle);
     context->globalCache()->clearPrograms();
     auto surface = Surface::Make(context, 200, 200);
     ASSERT_TRUE(surface != nullptr);
@@ -304,7 +304,7 @@ TGFX_TEST(AOTRenderConsistencyTest, TwoChildXferBlendFold) {
     } else {
       cache->unload();
     }
-    ScopedAOTStatsPause statsPause(cache, !useBundle);
+    ScopedAOTStatsPause statsPause(context, !useBundle);
     context->globalCache()->clearPrograms();
     auto surface = Surface::Make(context, 200, 200);
     ASSERT_TRUE(surface != nullptr);
@@ -352,7 +352,7 @@ TGFX_TEST(AOTRenderConsistencyTest, LUTGradientMaskFold) {
     } else {
       cache->unload();
     }
-    ScopedAOTStatsPause statsPause(cache, !useBundle);
+    ScopedAOTStatsPause statsPause(context, !useBundle);
     context->globalCache()->clearPrograms();
     auto surface = Surface::Make(context, 200, 200);
     ASSERT_TRUE(surface != nullptr);
@@ -406,7 +406,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AtlasTextConstColorFold) {
     } else {
       cache->unload();
     }
-    ScopedAOTStatsPause statsPause(cache, !useBundle);
+    ScopedAOTStatsPause statsPause(context, !useBundle);
     context->globalCache()->clearPrograms();
     auto surface = Surface::Make(context, 200, 100);
     ASSERT_TRUE(surface != nullptr);
@@ -450,7 +450,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AtlasTextGradientFold) {
     } else {
       cache->unload();
     }
-    ScopedAOTStatsPause statsPause(cache, !useBundle);
+    ScopedAOTStatsPause statsPause(context, !useBundle);
     context->globalCache()->clearPrograms();
     auto surface = Surface::Make(context, 200, 100);
     ASSERT_TRUE(surface != nullptr);
@@ -493,7 +493,7 @@ TGFX_TEST(AOTRenderConsistencyTest, MeshTextureAndColorsXferSrcFold) {
     } else {
       cache->unload();
     }
-    ScopedAOTStatsPause statsPause(cache, !useBundle);
+    ScopedAOTStatsPause statsPause(context, !useBundle);
     context->globalCache()->clearPrograms();
     auto surface = Surface::Make(context, 200, 200);
     ASSERT_TRUE(surface != nullptr);
@@ -608,7 +608,7 @@ static void RenderClippedCircleOnce(int clipMode, int width, int height, bool us
   } else {
     cache->unload();
   }
-  ScopedAOTStatsPause statsPause(cache, !useBundle);
+  ScopedAOTStatsPause statsPause(context, !useBundle);
   context->globalCache()->clearPrograms();
   auto surface = Surface::Make(context, width, height);
   ASSERT_TRUE(surface != nullptr);
@@ -683,7 +683,7 @@ static void RenderImageWithColorFilterOnce(const std::shared_ptr<Image>& image,
   } else {
     cache->unload();
   }
-  ScopedAOTStatsPause statsPause(cache, !useBundle);
+  ScopedAOTStatsPause statsPause(context, !useBundle);
   cache->setDiagnosticRecordingEnabled(false);
   context->globalCache()->clearPrograms();
   auto sourceImage = image;
@@ -857,7 +857,7 @@ TGFX_TEST(AOTRenderConsistencyTest, PerlinNoiseLuminanceAlphaThreshold) {
     } else {
       cache->unload();
     }
-    ScopedAOTStatsPause statsPause(cache, !useBundle);
+    ScopedAOTStatsPause statsPause(context, !useBundle);
     context->globalCache()->clearPrograms();
     auto surface = Surface::Make(context, width, height);
     ASSERT_TRUE(surface != nullptr);
@@ -901,7 +901,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AnalyticRectClipFoldsIntoChain) {
     } else {
       cache->unload();
     }
-    ScopedAOTStatsPause statsPause(cache, !useBundle);
+    ScopedAOTStatsPause statsPause(context, !useBundle);
     context->globalCache()->clearPrograms();
     auto surface = Surface::Make(context, width, height);
     ASSERT_TRUE(surface != nullptr);
@@ -959,7 +959,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyMaskFoldsIntoChain) {
     } else {
       cache->unload();
     }
-    ScopedAOTStatsPause statsPause(cache, !useBundle);
+    ScopedAOTStatsPause statsPause(context, !useBundle);
     context->globalCache()->clearPrograms();
     auto surface = Surface::Make(context, width, height);
     ASSERT_TRUE(surface != nullptr);

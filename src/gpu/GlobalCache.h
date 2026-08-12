@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <list>
 #include <optional>
 #include <unordered_map>
@@ -106,6 +107,19 @@ class GlobalCache {
   }
 
   /**
+   * Pauses program-creation counting. Test reference renders (deliberate runtime compiles with
+   * the bundle unloaded) use this so they do not dilute the cold AOT hit rate, which is meant to
+   * reflect production coverage only.
+   */
+  void setProgramStatsPaused(bool paused) {
+    _programStatsPaused.store(paused, std::memory_order_relaxed);
+  }
+
+  bool programStatsPaused() const {
+    return _programStatsPaused.load(std::memory_order_relaxed);
+  }
+
+  /**
    * Returns a texture that represents a gradient created from the specified colors and positions.
    */
   std::shared_ptr<TextureProxy> getGradient(const Color* colors, const float* positions, int count);
@@ -171,6 +185,7 @@ class GlobalCache {
   std::list<Program*> programLRU = {};
   BytesKeyMap<std::shared_ptr<Program>> programMap = {};
   ProgramCacheStats _programStats = {};
+  std::atomic<bool> _programStatsPaused{false};
   std::list<GradientTexture*> gradientLRU = {};
   BytesKeyMap<std::unique_ptr<GradientTexture>> gradientTextures = {};
   std::shared_ptr<GPUBufferProxy> aaQuadIndexBuffer = nullptr;

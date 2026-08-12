@@ -199,7 +199,7 @@ static void RenderShaderWithColorFilterScene(Context* context, PrecompiledShader
   } else {
     cache->unload();
   }
-  ScopedAOTStatsPause statsPause(cache, !bundleLoaded);
+  ScopedAOTStatsPause statsPause(context, !bundleLoaded);
   cache->resetStats();
   context->globalCache()->resetProgramStats();
   context->globalCache()->clearPrograms();
@@ -293,7 +293,7 @@ static void ExpectChainAlphaOnlyExact(const std::shared_ptr<Shader>& shader, con
   {
     // The reference render intentionally runs without the bundle; keep its JIT lookups out of the
     // AOT hit-rate accounting.
-    ScopedAOTStatsPause statsPause(cache, true);
+    ScopedAOTStatsPause statsPause(context, true);
     RenderShaderScene(context, cache, shader, width, height, false, &reference, &referenceHits,
                       &referenceNoMatch);
   }
@@ -523,7 +523,7 @@ TGFX_TEST(AOTL2AuditTest, DropShadowTiledSrcServedByteExact) {
   uint32_t referenceVertexArtifactMissing = 0;
   uint32_t referenceFragmentArtifactMissing = 0;
   {
-    ScopedAOTStatsPause statsPause(cache, true);
+    ScopedAOTStatsPause statsPause(context, true);
     RenderShadowTiledScene(context, cache, image, imageFilter, width, height, false,
                            &referenceBitmap, &referenceNoMatch, &referenceVertexArtifactMissing,
                            &referenceFragmentArtifactMissing);
@@ -582,7 +582,7 @@ TGFX_TEST(AOTL2AuditTest, InnerShadowTiledSrcServedByteExact) {
   uint32_t referenceVertexArtifactMissing = 0;
   uint32_t referenceFragmentArtifactMissing = 0;
   {
-    ScopedAOTStatsPause statsPause(cache, true);
+    ScopedAOTStatsPause statsPause(context, true);
     RenderShadowTiledScene(context, cache, image, imageFilter, width, height, false,
                            &referenceBitmap, &referenceNoMatch, &referenceVertexArtifactMissing,
                            &referenceFragmentArtifactMissing);
@@ -745,7 +745,7 @@ TGFX_TEST(AOTL2AuditTest, CoverageTextureMaskMatchesJIT) {
   context->globalCache()->resetProgramStats();
   Bitmap referenceBitmap = {};
   {
-    ScopedAOTStatsPause statsPause(cache, true);
+    ScopedAOTStatsPause statsPause(context, true);
     RenderCoverageMaskScene(context, color, mask, width, height, &referenceBitmap);
   }
 
@@ -925,7 +925,7 @@ TGFX_TEST(AOTL2AuditTest, GradientCoverageMatchesJIT) {
   context->globalCache()->resetProgramStats();
   Bitmap referenceBitmap = {};
   {
-    ScopedAOTStatsPause statsPause(cache, true);
+    ScopedAOTStatsPause statsPause(context, true);
     RenderGradientCoverageScene(context, width, height, &referenceBitmap);
   }
 
