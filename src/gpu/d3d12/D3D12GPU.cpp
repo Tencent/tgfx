@@ -25,6 +25,7 @@
 #include "D3D12Buffer.h"
 #include "D3D12CommandEncoder.h"
 #include "D3D12CommandQueue.h"
+#include "D3D12HardwareTexture.h"
 #include "D3D12MipmapGenerator.h"
 #include "D3D12RenderPipeline.h"
 #include "D3D12Resource.h"
@@ -41,8 +42,13 @@ namespace tgfx {
 // heavy render frame before the wait aborts, while still guarding against a genuine device hang.
 static constexpr DWORD FENCE_WAIT_TIMEOUT_MS = 60000;
 
+// AcquireSync timeout. Self-contention is resolved via fence wait in acquireSessionMutexes, so
+// this only bounds external producers. 5s tolerates legitimate GPU-composition jitter while still
+// bounding a genuine hang.
+static constexpr DWORD KEYED_MUTEX_ACQUIRE_TIMEOUT_MS = 5000;
+
 bool HardwareBufferAvailable() {
-  return false;
+  return true;
 }
 
 #ifdef TGFX_D3D12_DEBUG_LAYER
@@ -444,10 +450,13 @@ int D3D12GPU::getSampleCount(int requestedCount, PixelFormat pixelFormat) const 
   return 1;
 }
 
-std::vector<std::shared_ptr<Texture>> D3D12GPU::importHardwareTextures(HardwareBufferRef,
-                                                                       uint32_t) {
-  // D3D12 hardware buffer import is not supported yet.
-  return {};
+std::vector<std::shared_ptr<Texture>> D3D12GPU::importHardwareTextures(
+    HardwareBufferRef hardwareBuffer, uint32_t usage) {
+  auto texture = D3D12HardwareTexture::MakeFrom(this, hardwareBuffer, usage);
+  if (texture == nullptr) {
+    return {};
+  }
+  return {std::move(texture)};
 }
 
 std::shared_ptr<Texture> D3D12GPU::importBackendTexture(const BackendTexture& backendTexture,
@@ -828,6 +837,17 @@ void D3D12GPU::executeSubmission(SubmitRequest request) {
   if (request.session.commandList != nullptr) {
     lists.push_back(request.session.commandList.Get());
   }
+
+  // Step 4a: Acquire every IDXGIKeyedMutex the session touched. Self-contention with an earlier
+  // inflight submission is resolved inside the helper via a fence wait rather than by blocking on
+  // AcquireSync. Successfully acquired mutexes are bound in Step 6 to the fence about to be
+  // signalled, so reclaimSubmission() can release them once the GPU is done.
+  if (!acquireSessionMutexes(request.session)) {
+    markContextLost("executeSubmission keyed mutex acquire");
+    reclaimAbandonedSession(std::move(request.session));
+    return;
+  }
+
   if (!lists.empty()) {
     cmdQueue->ExecuteCommandLists(static_cast<UINT>(lists.size()), lists.data());
   }
@@ -894,6 +914,11 @@ void D3D12GPU::executeSubmission(SubmitRequest request) {
     // the inflight queue instead of reclaiming it here. waitAllInflightSubmissions() sees
     // contextLost and drains everything via the synchronous path without waiting on a fence
     // that may never advance.
+    for (auto* mutex : request.session.keyedMutexes) {
+      if (mutex != nullptr) {
+        mutexAcquireFenceValues[mutex] = _lastSignalledFenceValue;
+      }
+    }
     InflightSubmission inflight = {};
     inflight.fenceValue = _lastSignalledFenceValue;
     inflight.frameTime = request.frameTime;
@@ -902,6 +927,14 @@ void D3D12GPU::executeSubmission(SubmitRequest request) {
     inflightSubmissions.push_back(std::move(inflight));
     waitAllInflightSubmissions();
     return;
+  }
+
+  // Bind each mutex to the fence just signalled so reclaimSubmission() can release them and
+  // acquireSessionMutexes() can find the correct predecessor for the next frame.
+  for (auto* mutex : request.session.keyedMutexes) {
+    if (mutex != nullptr) {
+      mutexAcquireFenceValues[mutex] = _lastSignalledFenceValue;
+    }
   }
 
   InflightSubmission inflight = {};
@@ -1013,10 +1046,100 @@ void D3D12GPU::reclaimSubmission(InflightSubmission& submission) {
       _commandListPool.release(std::move(entry));
     }
   }
+  // Release every keyed mutex acquired for this submission. ReleaseSync failures are only logged
+  // — the resource is going away regardless. Tracking-entry erasure is independent of the
+  // ReleaseSync result and gated purely on fence-value matching (see below).
+  for (auto* mutex : submission.session.keyedMutexes) {
+    if (mutex == nullptr) {
+      continue;
+    }
+    auto hr = mutex->ReleaseSync(0);
+    if (FAILED(hr)) {
+      LOGE("D3D12GPU::reclaimSubmission: IDXGIKeyedMutex::ReleaseSync(0) failed (HRESULT=0x%08X).",
+           static_cast<unsigned>(hr));
+    }
+    auto it = mutexAcquireFenceValues.find(mutex);
+    if (it != mutexAcquireFenceValues.end() && it->second == submission.fenceValue) {
+      // A later submission may have re-bound the mutex to a higher fence; leave that binding
+      // intact so acquireSessionMutexes() still sees the correct predecessor.
+      mutexAcquireFenceValues.erase(it);
+    }
+  }
   // The remaining ComPtr / shared_ptr destructors in FrameSession handle descriptor heaps,
   // retained resources, and staging UPLOAD buffers.
   submission.session = D3D12FrameSession{};
   submission.uploads.clear();
+}
+
+bool D3D12GPU::acquireSessionMutexes(D3D12FrameSession& session) {
+  // Two contention modes:
+  //   1. Self-contention (previous submission still holds the mutex): resolve by waiting on that
+  //      submission's fence and driving pollCompletedSubmissions() so reclaimSubmission() does
+  //      the ReleaseSync(0). Blocking AcquireSync directly would deadlock on the same thread.
+  //   2. External contention (D3D11 producer / same-process misuse): treated as an unrecoverable
+  //      context loss after the bounded AcquireSync timeout.
+  size_t acquiredCount = 0;
+  for (auto* mutex : session.keyedMutexes) {
+    if (mutex == nullptr) {
+      continue;
+    }
+    // Fence-wait phase: resolve self-contention before touching AcquireSync.
+    auto it = mutexAcquireFenceValues.find(mutex);
+    if (it != mutexAcquireFenceValues.end() && _frameFence != nullptr) {
+      auto predecessorFence = it->second;
+      if (_frameFence->GetCompletedValue() < predecessorFence) {
+        auto hr = _frameFence->SetEventOnCompletion(predecessorFence, _frameFenceEvent);
+        if (FAILED(hr)) {
+          LOGE(
+              "D3D12GPU::acquireSessionMutexes: SetEventOnCompletion(%llu) failed "
+              "(HRESULT=0x%08X).",
+              static_cast<unsigned long long>(predecessorFence), static_cast<unsigned>(hr));
+          releasePartiallyAcquiredMutexes(session, acquiredCount);
+          return false;
+        }
+        auto waitResult = WaitForSingleObject(_frameFenceEvent, FENCE_WAIT_TIMEOUT_MS);
+        if (waitResult != WAIT_OBJECT_0) {
+          LOGE(
+              "D3D12GPU::acquireSessionMutexes: fence wait timed out (target=%llu), the previous "
+              "submission holding this shared surface never signalled.",
+              static_cast<unsigned long long>(predecessorFence));
+          releasePartiallyAcquiredMutexes(session, acquiredCount);
+          return false;
+        }
+      }
+      pollCompletedSubmissions();
+    }
+    // Acquire phase: any remaining wait reflects an external holder.
+    auto hr = mutex->AcquireSync(0, KEYED_MUTEX_ACQUIRE_TIMEOUT_MS);
+    if (FAILED(hr) || hr == WAIT_TIMEOUT || hr == WAIT_ABANDONED) {
+      LOGE(
+          "D3D12GPU::acquireSessionMutexes: IDXGIKeyedMutex::AcquireSync(0, %ums) failed "
+          "(HRESULT=0x%08X). Common causes: the D3D11 producer did not ReleaseSync(0) after its "
+          "last update, or both D3D11 and D3D12 sides live in the same process (keyed mutexes "
+          "were designed for cross-process synchronisation and same-process re-acquires often "
+          "return DXGI_ERROR_INVALID_CALL / 0x887A0001 immediately instead of blocking).",
+          KEYED_MUTEX_ACQUIRE_TIMEOUT_MS, static_cast<unsigned>(hr));
+      releasePartiallyAcquiredMutexes(session, acquiredCount);
+      return false;
+    }
+    ++acquiredCount;
+  }
+  return true;
+}
+
+void D3D12GPU::releasePartiallyAcquiredMutexes(const D3D12FrameSession& session,
+                                               size_t acquiredCount) {
+  size_t released = 0;
+  for (auto* mutex : session.keyedMutexes) {
+    if (released >= acquiredCount) {
+      break;
+    }
+    if (mutex == nullptr) {
+      continue;
+    }
+    mutex->ReleaseSync(0);
+    ++released;
+  }
 }
 
 }  // namespace tgfx

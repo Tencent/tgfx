@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "D3D12CommandEncoder.h"
+#include <algorithm>
 #include "D3D12BarrierBatch.h"
 #include "D3D12Buffer.h"
 #include "D3D12CommandBuffer.h"
@@ -455,8 +456,18 @@ void D3D12CommandEncoder::recordTextureStateChange(D3D12Texture* texture,
   // Snapshot the original state on the first call for this texture inside the current session.
   // unordered_map::emplace inserts only when the key is not present, leaving subsequent calls
   // for the same texture as cheap O(1) lookups that do not overwrite the saved value.
-  session.initialTextureStates.emplace(texture, texture->currentState());
+  bool firstTouch = session.initialTextureStates.emplace(texture, texture->currentState()).second;
   texture->setCurrentState(newState);
+  // Deduplicate mutexes by pointer: distinct D3D12HardwareTexture instances can wrap different
+  // views of the same shared surface, and IDXGIKeyedMutex is not reentrant across AcquireSync(0).
+  if (firstTouch) {
+    if (auto* mutex = texture->keyedMutex()) {
+      auto& list = session.keyedMutexes;
+      if (std::find(list.begin(), list.end(), mutex) == list.end()) {
+        list.push_back(mutex);
+      }
+    }
+  }
 }
 
 void D3D12CommandEncoder::onRelease(D3D12GPU* gpu) {
