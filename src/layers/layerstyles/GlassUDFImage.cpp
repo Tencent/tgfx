@@ -134,12 +134,19 @@ GlassUDFImage::GlassUDFImage(std::shared_ptr<Image> source, int coreWidth, int c
 }
 
 std::shared_ptr<TextureProxy> GlassUDFImage::lockTextureProxy(const TPArgs& args) const {
-  auto image = GenerateGlassUDFImage(args.context, source, coreWidth, coreHeight, textureRect,
-                                     fineRadius, coarseRadius);
-  if (image == nullptr) {
+  if (args.context == nullptr) {
     return nullptr;
   }
-  auto textureImage = std::static_pointer_cast<TextureImage>(image);
+  auto textureImage = std::static_pointer_cast<TextureImage>(cachedTexture.lock());
+  if (textureImage == nullptr || textureImage->makeTextureImage(args.context) == nullptr) {
+    auto image = GenerateGlassUDFImage(args.context, source, coreWidth, coreHeight, textureRect,
+                                       fineRadius, coarseRadius);
+    if (image == nullptr) {
+      return nullptr;
+    }
+    textureImage = std::static_pointer_cast<TextureImage>(image);
+    cachedTexture = image;
+  }
   return textureImage->getTextureProxy();
 }
 

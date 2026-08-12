@@ -86,6 +86,10 @@ class GlassUDFImage : public Image {
   Point coarseRadius = {};
   int _width = 0;
   int _height = 0;
+  // The generated UDF texture within the lifetime of this instance. The same filter may be sampled
+  // multiple times in one frame (e.g. blend-mode splitting); reusing the texture avoids regenerating
+  // the UDF for every sample. Context binding is validated through TextureImage::lockTextureProxy.
+  mutable std::weak_ptr<Image> cachedTexture = {};
 
   GlassUDFImage(std::shared_ptr<Image> source, int coreWidth, int coreHeight,
                 const Rect& textureRect, const Point& fineRadius, const Point& coarseRadius);
