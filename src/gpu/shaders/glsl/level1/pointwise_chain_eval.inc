@@ -233,7 +233,7 @@ vec4 evalChainSlotNoTex(int slot) {
     // dual-interval scale/bias pair and the unrolled-binary tree, each byte-matching its
     // dedicated kernel. The epilogue premultiplies and modulates by the input alpha, matching
     // the runtime ClampedGradientEffect emission.
-    highp vec2 gradientCoord = GradientCoords;
+    highp vec2 gradientCoord = GradientCoords.xy / GradientCoords.z;
     float gradT;
     if (GradientLayoutType == 1) {
       gradT = length(gradientCoord);
@@ -317,7 +317,7 @@ vec4 evalChainSlotNoTex(int slot) {
 
 // Texture-leaf variant: the sampler stays statically bound per slot (dynamic sampler indexing is
 // not portable), while every other field comes from the uniform arrays by slot index.
-vec4 evalChainSlotWithTex(int slot, sampler2D leafSampler, vec2 leafCoords, vec4 leafSubset,
+vec4 evalChainSlotWithTex(int slot, sampler2D leafSampler, vec3 leafCoords, vec4 leafSubset,
                           int leafIndex) {
   ivec4 Packed = SlotPacked[slot];
   if (Packed.x == OP_TEXTURE) {

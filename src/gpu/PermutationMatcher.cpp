@@ -783,14 +783,6 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
   if (colorSpaceXformCount > 1) {
     return std::nullopt;
   }
-  // The kernel carries one gradient parameter block and computes gradient coordinates as a vec2,
-  // so a perspective gradient transform cannot be represented.
-  for (size_t index = 0; index < chain->slotCount(); ++index) {
-    const auto& slot = chain->slot(index);
-    if (slot.op == AOTChainOp::Gradient && slot.gradient.hasPerspective) {
-      return std::nullopt;
-    }
-  }
   // Coverage subtrees draw their unit input from the GP coverage, which only the rect layouts
   // supply (the ellipse layout's coverage is evaluated per-pixel at the end).
   if (chain->coverageRoot() >= 0 && gpLayout != 0) {
@@ -807,8 +799,8 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
     auto* texture = static_cast<const TextureEffect*>(leaf);
     // A leaf subset is a runtime uniform (the kernel always clamps, full bounds when absent), and
     // an alpha-only leaf splats .r through its slot selector bit, so neither needs a variant.
-    if (texture->isYUV() || texture->hasRGBAAA() ||
-        leaf->coordTransform(0)->matrix.hasPerspective()) {
+    // Perspective transforms are served: leaf coordinates carry w and divide per-pixel.
+    if (texture->isYUV() || texture->hasRGBAAA()) {
       return std::nullopt;
     }
   }

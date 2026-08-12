@@ -158,18 +158,18 @@ layout(location = NTEX + 1) in vec4 vColor;
 #endif
 
 #if NTEX >= 1
-layout(location = CHAIN_TEX_LOC_BASE + 0) in vec2 TransformedCoords_0;
+layout(location = CHAIN_TEX_LOC_BASE + 0) in vec3 TransformedCoords_0;
 #endif
 // Gradient coordinate varying at a fixed location beyond every layout's varyings (ellipse with
 // color and 4 texture coords tops out at location 6). Always written by the vertex stage; only
 // read when a chain slot is OP_GRADIENT.
-layout(location = 7) in vec2 GradientCoords;
+layout(location = 7) in vec3 GradientCoords;
 #if NTEX >= 2
-layout(location = CHAIN_TEX_LOC_BASE + 1) in vec2 TransformedCoords_1;
+layout(location = CHAIN_TEX_LOC_BASE + 1) in vec3 TransformedCoords_1;
 #endif
 #if NTEX >= 4
-layout(location = CHAIN_TEX_LOC_BASE + 2) in vec2 TransformedCoords_2;
-layout(location = CHAIN_TEX_LOC_BASE + 3) in vec2 TransformedCoords_3;
+layout(location = CHAIN_TEX_LOC_BASE + 2) in vec3 TransformedCoords_2;
+layout(location = CHAIN_TEX_LOC_BASE + 3) in vec3 TransformedCoords_3;
 #endif
 
 #if NTEX >= 1
@@ -214,15 +214,19 @@ layout(set = 1, binding = NTEX) uniform sampler2D MaskTextureSampler;
 
 // Leaf fetch: plain leaves clamp to their Subset rect (full bounds = no-op). The tiled leaf, if
 // any, goes through the shared tiling math so wrap and clamp-to-border modes match the runtime.
-vec4 chainLeafFetch(sampler2D texSampler, vec2 coord, vec4 leafSubset, int leafIndex) {
+vec4 chainLeafFetch(sampler2D texSampler, vec3 coord, vec4 leafSubset, int leafIndex) {
+  // Perspective divide: affine transforms produce z=1.0, making this a no-op (same contract as
+  // QuadTextureFillShader); the tiled/subset math below then runs on the divided coordinate,
+  // matching the runtime's emitPerspTextCoord ordering.
+  highp vec2 uv = coord.xy / coord.z;
   if (leafIndex == TiledLeafIndex) {
     vec2 inCoord = vec2(0.0);
     vec2 subsetCoord = vec2(0.0);
     vec2 clampedCoord = vec2(0.0);
-    vec2 sampleCoord = tiledMapCoord(coord, TiledStrict != 0, inCoord, subsetCoord, clampedCoord);
+    vec2 sampleCoord = tiledMapCoord(uv, TiledStrict != 0, inCoord, subsetCoord, clampedCoord);
     return tiledApplyBorder(texture(texSampler, sampleCoord), inCoord, subsetCoord, clampedCoord);
   }
-  return texture(texSampler, clamp(coord, leafSubset.xy, leafSubset.zw));
+  return texture(texSampler, clamp(uv, leafSubset.xy, leafSubset.zw));
 }
 
 layout(location = 0) out vec4 fragColor;

@@ -115,19 +115,19 @@ layout(location = NTEX + 1) out vec4 vColor;
 #endif
 
 #if NTEX >= 1
-layout(location = CHAIN_TEX_LOC_BASE + 0) out vec2 TransformedCoords_0;
+layout(location = CHAIN_TEX_LOC_BASE + 0) out vec3 TransformedCoords_0;
 #endif
 #if NTEX >= 2
-layout(location = CHAIN_TEX_LOC_BASE + 1) out vec2 TransformedCoords_1;
+layout(location = CHAIN_TEX_LOC_BASE + 1) out vec3 TransformedCoords_1;
 #endif
 #if NTEX >= 4
-layout(location = CHAIN_TEX_LOC_BASE + 2) out vec2 TransformedCoords_2;
-layout(location = CHAIN_TEX_LOC_BASE + 3) out vec2 TransformedCoords_3;
+layout(location = CHAIN_TEX_LOC_BASE + 2) out vec3 TransformedCoords_2;
+layout(location = CHAIN_TEX_LOC_BASE + 3) out vec3 TransformedCoords_3;
 #endif
 // Gradient coordinate varying at a fixed location beyond every layout's varyings (ellipse with
 // color and 4 texture coords tops out at location 6). Always emitted; the fragment stage reads
 // it only when a chain slot is OP_GRADIENT.
-layout(location = 7) out vec2 GradientCoords;
+layout(location = 7) out vec3 GradientCoords;
 
 void main() {
 #if GP_LAYOUT == 0 && HAS_UV_COORD
@@ -155,16 +155,16 @@ void main() {
 #endif
 #endif
 #if NTEX >= 1
-  TransformedCoords_0 = (CoordTransformMatrix_1 * vec3(CHAIN_LEAF_SOURCE(0), 1.0)).xy;
+  TransformedCoords_0 = (CoordTransformMatrix_1 * vec3(CHAIN_LEAF_SOURCE(0), 1.0)).xyz;
 #endif
 #if NTEX >= 2
-  TransformedCoords_1 = (CoordTransformMatrix_2 * vec3(CHAIN_LEAF_SOURCE(1), 1.0)).xy;
+  TransformedCoords_1 = (CoordTransformMatrix_2 * vec3(CHAIN_LEAF_SOURCE(1), 1.0)).xyz;
 #endif
 #if NTEX >= 4
-  TransformedCoords_2 = (CoordTransformMatrix_3 * vec3(CHAIN_LEAF_SOURCE(2), 1.0)).xy;
-  TransformedCoords_3 = (CoordTransformMatrix_4 * vec3(CHAIN_LEAF_SOURCE(3), 1.0)).xy;
+  TransformedCoords_2 = (CoordTransformMatrix_3 * vec3(CHAIN_LEAF_SOURCE(2), 1.0)).xyz;
+  TransformedCoords_3 = (CoordTransformMatrix_4 * vec3(CHAIN_LEAF_SOURCE(3), 1.0)).xyz;
 #endif
-  GradientCoords = (CoordTransformMatrix_0 * vec3(CHAIN_GRADIENT_SOURCE, 1.0)).xy;
+  GradientCoords = (CoordTransformMatrix_0 * vec3(CHAIN_GRADIENT_SOURCE, 1.0)).xyz;
 #if GP_LAYOUT == 0 && HAS_COVERAGE
   vCoverage = inCoverage;
 #endif

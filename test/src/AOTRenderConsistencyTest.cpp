@@ -290,6 +290,53 @@ TGFX_TEST(AOTRenderConsistencyTest, AACoverageXferDstFold) {
   ExpectBitmapsIdentical("aa-xfer-dst-fold", aotBitmap, runtimeBitmap, 200, 200);
 }
 
+TGFX_TEST(AOTRenderConsistencyTest, PerspectiveChainLeaf) {
+  auto imageA = MakeImage("resources/apitest/imageReplacement.png");
+  auto imageB = MakeImage("resources/apitest/test_timestretch.png");
+  ASSERT_TRUE(imageA != nullptr && imageB != nullptr);
+  auto renderOnce = [&](bool useBundle, Bitmap* outBitmap) {
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto* cache = context->precompiledShaderCache();
+    if (useBundle) {
+      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+    } else {
+      cache->unload();
+    }
+    ScopedAOTStatsPause statsPause(context, !useBundle);
+    context->globalCache()->clearPrograms();
+    auto surface = Surface::Make(context, 200, 200);
+    ASSERT_TRUE(surface != nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::White());
+    // A perspective canvas matrix puts the w component into the leaf coordinate transforms; the
+    // two-shader blend forces the chain route.
+    Matrix matrix = {};
+    matrix.setAll(1.0f, 0.0f, 40.0f, 0.0f, 1.0f, 40.0f, 0.0015f, 0.0f, 1.0f);
+    canvas->setMatrix(matrix);
+    auto shaderA = Shader::MakeImageShader(imageA);
+    auto shaderB = Shader::MakeImageShader(imageB, TileMode::Repeat, TileMode::Repeat);
+    Paint paint = {};
+    paint.setShader(Shader::MakeBlend(BlendMode::Multiply, shaderA, shaderB));
+    canvas->drawRect(Rect::MakeWH(120, 120), paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(200, 200));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+    if (useBundle) {
+      cache->unload();
+    }
+  };
+  Bitmap aotBitmap = {};
+  Bitmap runtimeBitmap = {};
+  renderOnce(true, &aotBitmap);
+  renderOnce(false, &runtimeBitmap);
+  ExpectBitmapsIdentical("perspective-chain-leaf", aotBitmap, runtimeBitmap, 200, 200);
+}
+
 TGFX_TEST(AOTRenderConsistencyTest, TwoChildXferBlendFold) {
   auto imageA = MakeImage("resources/apitest/imageReplacement.png");
   auto imageB = MakeImage("resources/apitest/test_timestretch.png");
