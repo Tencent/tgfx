@@ -73,7 +73,7 @@ void EmitPointwiseSlot(FragmentProcessor::EmitArgs& args,
     args.fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), stepped.c_str());
   } else if (slot.type == AOTPointwiseOpType::ColorSpaceXform) {
     ColorSpaceXformHelper helper(static_cast<int>(index),
-                                      GLSLPerlinNoiseFragmentProcessor::MaxPointwiseSlots);
+                                 GLSLPerlinNoiseFragmentProcessor::MaxPointwiseSlots);
     auto steps = slot.colorSpaceXform.steps.get();
     helper.emitCode(args.uniformHandler, steps);
     std::string transformed;
