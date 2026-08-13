@@ -43,6 +43,12 @@ static std::shared_ptr<TextureProxy> MakeTextureProxy(Context* context,
   return textureImageImpl->getTextureProxy();
 }
 
+PlacementPtr<FragmentProcessor> GlassRefractionImageFilter::makeFragmentProcessor(
+    std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
+    SrcRectConstraint constraint, const Matrix* uvMatrix) const {
+  return asFragmentProcessor(std::move(source), args, sampling, constraint, uvMatrix);
+}
+
 PlacementPtr<FragmentProcessor> GlassRefractionImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& /*sampling*/,
     SrcRectConstraint /*constraint*/, const Matrix* uvMatrix) const {
