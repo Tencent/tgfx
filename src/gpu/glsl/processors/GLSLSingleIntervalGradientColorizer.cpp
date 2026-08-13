@@ -43,5 +43,7 @@ void GLSLSingleIntervalGradientColorizer::onSetData(UniformData* /*vertexUniform
                                                     UniformData* fragmentUniformData) const {
   fragmentUniformData->setData("start", start);
   fragmentUniformData->setData("end", end);
+  // Select this colorizer in the unified gradient kernel (absent in other programs).
+  fragmentUniformData->setDataOptional("ColorizerKind", 0);
 }
 }  // namespace tgfx

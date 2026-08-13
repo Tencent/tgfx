@@ -80,5 +80,7 @@ void GLSLDualIntervalGradientColorizer::onSetData(UniformData* /*vertexUniformDa
   fragmentUniformData->setData("scale23", scale23);
   fragmentUniformData->setData("bias23", bias23);
   fragmentUniformData->setData("threshold", threshold);
+  // Select this colorizer in the unified gradient kernel (absent in other programs).
+  fragmentUniformData->setDataOptional("ColorizerKind", 1);
 }
 }  // namespace tgfx

@@ -38,4 +38,9 @@ void GLSLTextureGradientColorizer::emitCode(EmitArgs& args) const {
   fragBuilder->appendTextureLookup((*args.textureSamplers)[0], "coord");
   fragBuilder->codeAppend(";");
 }
+void GLSLTextureGradientColorizer::onSetData(UniformData* /*vertexUniformData*/,
+                                             UniformData* fragmentUniformData) const {
+  // Select the LUT colorizer in the unified gradient kernel (absent in other programs).
+  fragmentUniformData->setDataOptional("ColorizerKind", 3);
+}
 }  // namespace tgfx

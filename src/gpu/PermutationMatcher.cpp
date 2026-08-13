@@ -58,10 +58,9 @@
 #include "gpu/shaders/level1/ConstColorShader.h"
 #include "gpu/shaders/level1/DeviceSpaceTextureShader.h"
 #include "gpu/shaders/level1/DeviceSpaceTexturedEffectShader.h"
-#include "gpu/shaders/level1/DualIntervalGradientShader.h"
 #include "gpu/shaders/level1/EllipseFillShader.h"
 #include "gpu/shaders/level1/GaussianBlur1DShader.h"
-#include "gpu/shaders/level1/GradientFillShader.h"
+#include "gpu/shaders/level1/UnifiedGradientShader.h"
 #include "gpu/shaders/level1/HairlineLineShader.h"
 #include "gpu/shaders/level1/HairlineQuadShader.h"
 #include "gpu/shaders/level1/MaskFillShader.h"
@@ -77,11 +76,9 @@
 #include "gpu/shaders/level1/RoundStrokeRectFillShader.h"
 #include "gpu/shaders/level1/ShapeInstancedFillShader.h"
 #include "gpu/shaders/level1/ShapeInstancedTextureCoverageShader.h"
-#include "gpu/shaders/level1/SingleIntervalGradientShader.h"
 #include "gpu/shaders/level1/SolidColorFillShader.h"
 #include "gpu/shaders/level1/TextureColorMatrixShader.h"
 #include "gpu/shaders/level1/TextureFillShader.h"
-#include "gpu/shaders/level1/TextureGradientShader.h"
 #include "gpu/shaders/level1/TexturedEffectShader.h"
 #include "gpu/shaders/level1/TiledTextureFillShader.h"
 #include "gpu/shaders/level1/YUVTextureFillShader.h"
@@ -913,7 +910,7 @@ static int GradientLayoutTypeIndex(const std::string& layoutName) {
   return -1;
 }
 
-static std::optional<PermutationMatchResult> TryMatchGradientFill(const ProgramInfo* programInfo) {
+static std::optional<PermutationMatchResult> TryMatchUnifiedGradient(const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
   int gpType = GetGPType(gp);
   if (gpType < 0) {
@@ -945,140 +942,21 @@ static std::optional<PermutationMatchResult> TryMatchGradientFill(const ProgramI
   }
   auto colorizer = fp->childProcessor(0);
   auto layout = fp->childProcessor(1);
-  if (colorizer->name() != "UnrolledBinaryGradientColorizer") {
-    return std::nullopt;
-  }
-  int layoutType = GradientLayoutTypeIndex(layout->name());
-  if (layoutType < 0) {
-    return std::nullopt;
-  }
-  if (layout->numCoordTransforms() > 0 && layout->coordTransform(0)->matrix.hasPerspective()) {
-    return std::nullopt;
-  }
-  auto* ubgc = static_cast<const UnrolledBinaryGradientColorizer*>(colorizer);
-  int intervalCount = ubgc->getIntervalCount();
-  if (intervalCount < 1 || intervalCount > 8) {
-    return std::nullopt;
-  }
-
-  // Per-vertex AA coverage is carried through the HAS_VCOVERAGE dimension (the shared vertex shader
-  // emits a vCoverage varying the fragment shader multiplies in), so coverage-carrying draws are
-  // served rather than rejected.
-  int vCoverage = GetGPCoverage(gp);
-
-  using VD = GradientFillShader::VD;
-  auto vertDomain = VD::domain();
-  std::vector<int> vertValues(VD::COUNT);
-  vertValues[VD::HAS_VCOVERAGE] = vCoverage;
-  auto vertIndex = vertDomain.encode(vertValues);
-
-  using FD = GradientFillShader::FD;
-  auto fragDomain = FD::domain();
-  std::vector<int> fragValues(FD::COUNT);
-  fragValues[FD::HAS_XP] = xpType;
-  fragValues[FD::HAS_DEVICE_MASK] = *coverageType;
-  fragValues[FD::HAS_VCOVERAGE] = vCoverage;
-  auto fragIndex = fragDomain.encode(fragValues);
-  return PermutationMatchResult{"GradientFillShader", vertIndex, fragIndex};
-}
-
-static std::optional<PermutationMatchResult> TryMatchSingleIntervalGradient(
-    const ProgramInfo* programInfo) {
-  auto gp = programInfo->getGeometryProcessor();
-  int gpType = GetGPType(gp);
-  if (gpType < 0) {
-    return std::nullopt;
-  }
-  if (gpType == 1) {
-    auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
-    if (!quadGP->hasUVMatrix()) {
+  int colorizerKind = -1;
+  if (colorizer->name() == "SingleIntervalGradientColorizer") {
+    colorizerKind = 0;
+  } else if (colorizer->name() == "DualIntervalGradientColorizer") {
+    colorizerKind = 1;
+  } else if (colorizer->name() == "UnrolledBinaryGradientColorizer") {
+    auto* unrolled = static_cast<const UnrolledBinaryGradientColorizer*>(colorizer);
+    int intervalCount = unrolled->getIntervalCount();
+    if (intervalCount < 1 || intervalCount > 8) {
       return std::nullopt;
     }
-  }
-  if (programInfo->numColorFragmentProcessors() != 1) {
-    return std::nullopt;
-  }
-  auto coverageType = SharedDeviceMaskValue(programInfo);
-  if (!coverageType) {
-    return std::nullopt;
-  }
-  int xpType = GetXPType(programInfo);
-  if (xpType < 0) {
-    return std::nullopt;
-  }
-  auto fp = programInfo->getFragmentProcessor(0);
-  if (fp->name() != "ClampedGradientEffect") {
-    return std::nullopt;
-  }
-  if (fp->numChildProcessors() != 2) {
-    return std::nullopt;
-  }
-  auto colorizer = fp->childProcessor(0);
-  auto layout = fp->childProcessor(1);
-  if (colorizer->name() != "SingleIntervalGradientColorizer") {
-    return std::nullopt;
-  }
-  int layoutType = GradientLayoutTypeIndex(layout->name());
-  if (layoutType < 0) {
-    return std::nullopt;
-  }
-  if (layout->numCoordTransforms() > 0 && layout->coordTransform(0)->matrix.hasPerspective()) {
-    return std::nullopt;
-  }
-
-  int vCoverage = GetGPCoverage(gp);
-
-  using VD = SingleIntervalGradientShader::VD;
-  auto vertDomain = VD::domain();
-  std::vector<int> vertValues(VD::COUNT);
-  vertValues[VD::HAS_VCOVERAGE] = vCoverage;
-  auto vertIndex = vertDomain.encode(vertValues);
-
-  using FD = SingleIntervalGradientShader::FD;
-  auto fragDomain = FD::domain();
-  std::vector<int> fragValues(FD::COUNT);
-  // GP_TYPE is a vertex-only dimension; the fragment stage is identical for all GP types.
-  fragValues[FD::HAS_XP] = xpType;
-  fragValues[FD::HAS_DEVICE_MASK] = *coverageType;
-  fragValues[FD::HAS_VCOVERAGE] = vCoverage;
-  auto fragIndex = fragDomain.encode(fragValues);
-  return PermutationMatchResult{"SingleIntervalGradientShader", vertIndex, fragIndex};
-}
-
-static std::optional<PermutationMatchResult> TryMatchDualIntervalGradient(
-    const ProgramInfo* programInfo) {
-  auto gp = programInfo->getGeometryProcessor();
-  int gpType = GetGPType(gp);
-  if (gpType < 0) {
-    return std::nullopt;
-  }
-  if (gpType == 1) {
-    auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
-    if (!quadGP->hasUVMatrix()) {
-      return std::nullopt;
-    }
-  }
-  if (programInfo->numColorFragmentProcessors() != 1) {
-    return std::nullopt;
-  }
-  auto coverageType = SharedDeviceMaskValue(programInfo);
-  if (!coverageType) {
-    return std::nullopt;
-  }
-  int xpType = GetXPType(programInfo);
-  if (xpType < 0) {
-    return std::nullopt;
-  }
-  auto fp = programInfo->getFragmentProcessor(0);
-  if (fp->name() != "ClampedGradientEffect") {
-    return std::nullopt;
-  }
-  if (fp->numChildProcessors() != 2) {
-    return std::nullopt;
-  }
-  auto colorizer = fp->childProcessor(0);
-  auto layout = fp->childProcessor(1);
-  if (colorizer->name() != "DualIntervalGradientColorizer") {
+    colorizerKind = 2;
+  } else if (colorizer->name() == "TextureGradientColorizer") {
+    colorizerKind = 3;
+  } else {
     return std::nullopt;
   }
   int layoutType = GradientLayoutTypeIndex(layout->name());
@@ -1091,87 +969,29 @@ static std::optional<PermutationMatchResult> TryMatchDualIntervalGradient(
 
   // Per-vertex AA coverage is carried through the HAS_VCOVERAGE dimension (the shared vertex shader
   // emits a vCoverage varying the fragment shader multiplies in), so coverage-carrying draws are
-  // served rather than rejected.
+  // served rather than rejected. LUT gradients keep the legacy TextureGradientShader behavior:
+  // coverage-carrying draws stay on the runtime path.
   int vCoverage = GetGPCoverage(gp);
+  int hasLUT = colorizerKind == 3 ? 1 : 0;
+  if (hasLUT != 0 && vCoverage != 0) {
+    return std::nullopt;
+  }
 
-  using VD = DualIntervalGradientShader::VD;
+  using VD = UnifiedGradientShader::VD;
   auto vertDomain = VD::domain();
   std::vector<int> vertValues(VD::COUNT);
   vertValues[VD::HAS_VCOVERAGE] = vCoverage;
   auto vertIndex = vertDomain.encode(vertValues);
 
-  using FD = DualIntervalGradientShader::FD;
+  using FD = UnifiedGradientShader::FD;
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
   fragValues[FD::HAS_XP] = xpType;
   fragValues[FD::HAS_DEVICE_MASK] = *coverageType;
   fragValues[FD::HAS_VCOVERAGE] = vCoverage;
+  fragValues[FD::HAS_LUT] = hasLUT;
   auto fragIndex = fragDomain.encode(fragValues);
-  return PermutationMatchResult{"DualIntervalGradientShader", vertIndex, fragIndex};
-}
-
-static std::optional<PermutationMatchResult> TryMatchTextureGradient(
-    const ProgramInfo* programInfo) {
-  auto gp = programInfo->getGeometryProcessor();
-  int gpType = GetGPType(gp);
-  if (gpType < 0) {
-    return std::nullopt;
-  }
-  if (gpType == 1) {
-    auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
-    if (!quadGP->hasUVMatrix()) {
-      return std::nullopt;
-    }
-  }
-  if (programInfo->numColorFragmentProcessors() != 1) {
-    return std::nullopt;
-  }
-  auto coverageType = SharedDeviceMaskValue(programInfo);
-  if (!coverageType) {
-    return std::nullopt;
-  }
-  int xpType = GetXPType(programInfo);
-  if (xpType < 0) {
-    return std::nullopt;
-  }
-  auto fp = programInfo->getFragmentProcessor(0);
-  if (fp->name() != "ClampedGradientEffect") {
-    return std::nullopt;
-  }
-  if (fp->numChildProcessors() != 2) {
-    return std::nullopt;
-  }
-  auto colorizer = fp->childProcessor(0);
-  auto layout = fp->childProcessor(1);
-  if (colorizer->name() != "TextureGradientColorizer") {
-    return std::nullopt;
-  }
-  int layoutType = GradientLayoutTypeIndex(layout->name());
-  if (layoutType < 0) {
-    return std::nullopt;
-  }
-  if (layout->numCoordTransforms() > 0 && layout->coordTransform(0)->matrix.hasPerspective()) {
-    return std::nullopt;
-  }
-
-  // This kernel does not consume per-vertex AA coverage and its shared vertex shader (HAS_VCOVERAGE
-  // defaults to 0 here) declares no inCoverage attribute, so reject coverage-carrying draws.
-  if (GetGPCoverage(gp)) {
-    return std::nullopt;
-  }
-
-  using VD = TextureGradientShader::VD;
-  auto vertDomain = VD::domain();
-  std::vector<int> vertValues(VD::COUNT);
-  auto vertIndex = vertDomain.encode(vertValues);
-
-  using FD = TextureGradientShader::FD;
-  auto fragDomain = FD::domain();
-  std::vector<int> fragValues(FD::COUNT);
-  fragValues[FD::HAS_XP] = xpType;
-  fragValues[FD::HAS_DEVICE_MASK] = *coverageType;
-  auto fragIndex = fragDomain.encode(fragValues);
-  return PermutationMatchResult{"TextureGradientShader", vertIndex, fragIndex};
+  return PermutationMatchResult{"UnifiedGradientShader", vertIndex, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchTextureColorMatrix(
@@ -2036,16 +1856,7 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
   if (auto result = TryMatchDeviceSpaceTexture(programInfo)) {
     return result;
   }
-  if (auto result = TryMatchGradientFill(programInfo)) {
-    return result;
-  }
-  if (auto result = TryMatchSingleIntervalGradient(programInfo)) {
-    return result;
-  }
-  if (auto result = TryMatchDualIntervalGradient(programInfo)) {
-    return result;
-  }
-  if (auto result = TryMatchTextureGradient(programInfo)) {
+  if (auto result = TryMatchUnifiedGradient(programInfo)) {
     return result;
   }
   if (auto result = TryMatchTextureColorMatrix(programInfo)) {

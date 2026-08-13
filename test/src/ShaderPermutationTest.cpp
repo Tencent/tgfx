@@ -55,7 +55,7 @@
 #include "gpu/shaders/level1/QuadTextureFillShader.h"
 #include "gpu/shaders/level1/ShapeInstancedFillShader.h"
 #include "gpu/shaders/level1/ShapeInstancedTextureCoverageShader.h"
-#include "gpu/shaders/level1/SingleIntervalGradientShader.h"
+#include "gpu/shaders/level1/UnifiedGradientShader.h"
 #include "gpu/shaders/level1/TextureFillShader.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Bitmap.h"
@@ -505,10 +505,10 @@ TGFX_TEST(ShaderPermutationTest, DeviceSpaceTexturedEffectRejectsUnsupportedLayo
 }
 
 TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientCompiledSpace) {
-  SingleIntervalGradientShader shader;
+  UnifiedGradientShader shader;
   auto info = shader.info();
   EXPECT_EQ(info.vertDomain.totalCount(), 2u);
-  EXPECT_EQ(info.fragDomain.totalCount(), 12u);
+  EXPECT_EQ(info.fragDomain.totalCount(), 24u);
 
   std::set<uint32_t> vertexIndices;
   std::set<uint32_t> fragmentIndices;
@@ -523,9 +523,10 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientCompiledSpace) {
       fragmentIndices.insert(fi);
     }
   }
-  EXPECT_EQ(compiledCount, 12u);
+  // 24 raw frag combos minus the six LUT-with-coverage combos excluded by ShouldCompile.
+  EXPECT_EQ(compiledCount, 18u);
   EXPECT_EQ(vertexIndices.size(), 2u);
-  EXPECT_EQ(fragmentIndices.size(), 12u);
+  EXPECT_EQ(fragmentIndices.size(), 18u);
   EXPECT_TRUE(IsBuildablePermutation(info, 1, 11));
   EXPECT_FALSE(IsBuildablePermutation(info, 0, 11));
 }
@@ -542,7 +543,7 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
   auto renderTarget = renderTargetProxy->getRenderTarget();
   ASSERT_NE(renderTarget, nullptr);
 
-  SingleIntervalGradientShader shader;
+  UnifiedGradientShader shader;
   auto info = shader.info();
   std::set<uint32_t> vertexIndices;
   std::set<uint32_t> fragmentIndices;
@@ -572,7 +573,7 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
                                   BlendMode::SrcOver);
           auto match = MatchPermutation(&programInfo);
           ASSERT_TRUE(match.has_value());
-          EXPECT_EQ(match->shaderName, "SingleIntervalGradientShader");
+          EXPECT_EQ(match->shaderName, "UnifiedGradientShader");
           ASSERT_LT(match->vertPermutationIndex, info.vertDomain.totalCount());
           ASSERT_LT(match->fragPermutationIndex, info.fragDomain.totalCount());
           auto vertValues = info.vertDomain.decode(match->vertPermutationIndex);
@@ -717,8 +718,8 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
-  EXPECT_EQ(cache->vertexEntryCount(), 117u);
-  EXPECT_EQ(cache->fragmentEntryCount(), 374u);
+  EXPECT_EQ(cache->vertexEntryCount(), 112u);
+  EXPECT_EQ(cache->fragmentEntryCount(), 350u);
   std::string expectedTag = TGFX_BACKEND_NAME;
   auto dashPos = expectedTag.find('-');
   if (dashPos != std::string::npos) {
@@ -1175,8 +1176,8 @@ TGFX_TEST(ShaderPermutationTest, CompressedBundleLoad) {
     PrecompiledShaderCache compressedOnly;
     ASSERT_TRUE(compressedOnly.loadBundle(original.data(), original.size()));
     EXPECT_TRUE(compressedOnly.isLoaded());
-    EXPECT_EQ(compressedOnly.vertexEntryCount(), 117u);
-    EXPECT_EQ(compressedOnly.fragmentEntryCount(), 374u);
+    EXPECT_EQ(compressedOnly.vertexEntryCount(), 112u);
+    EXPECT_EQ(compressedOnly.fragmentEntryCount(), 350u);
     std::string tag = TGFX_BACKEND_NAME;
     auto dash = tag.find('-');
     if (dash != std::string::npos) {

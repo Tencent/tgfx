@@ -289,5 +289,7 @@ void GLSLUnrolledBinaryGradientColorizer::onSetData(UniformData* /*vertexUniform
   SetColorUniform(fragmentUniformData, "bias14_15", bias14_15);
   fragmentUniformData->setData("thresholds1_7", thresholds1_7);
   fragmentUniformData->setData("thresholds9_13", thresholds9_13);
+  // Select this colorizer in the unified gradient kernel (absent in other programs).
+  fragmentUniformData->setDataOptional("ColorizerKind", 2);
 }
 }  // namespace tgfx

@@ -10,9 +10,9 @@
 //      https://opensource.org/licenses/BSD-3-Clause
 //
 //  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  License is distributed on an "as is" basis, without warranties or conditions of any kind,
 //  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -22,7 +22,11 @@
 
 namespace tgfx {
 
-class DualIntervalGradientShader : public PrecompiledShader {
+/// Unified precompiled shader for ClampedGradientEffect with any of the four gradient colorizers
+/// (single-interval, dual-interval, unrolled binary, LUT texture). The colorizer is a runtime
+/// uniform (ColorizerKind), so the four legacy gradient kernels collapse into one; only the LUT
+/// colorizer's sampler requires a compile-time dimension (HAS_LUT).
+class UnifiedGradientShader : public PrecompiledShader {
  public:
   struct VertDims {
     enum : uint32_t { HAS_VCOVERAGE, COUNT };
@@ -35,34 +39,43 @@ class DualIntervalGradientShader : public PrecompiledShader {
   using VD = VertDims;
 
   struct FragDims {
-    enum : uint32_t { HAS_XP, HAS_DEVICE_MASK, HAS_VCOVERAGE, COUNT };
+    enum : uint32_t { HAS_XP, HAS_DEVICE_MASK, HAS_VCOVERAGE, HAS_LUT, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("HAS_XP", 3),
           PermutationBool("HAS_DEVICE_MASK"),
           PermutationBool("HAS_VCOVERAGE"),
+          PermutationBool("HAS_LUT"),
       });
     }
   };
   using FD = FragDims;
+  static_assert(FD::COUNT == 4, "Update ShouldCompile when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
-    return {"DualIntervalGradientShader",
+    return {"UnifiedGradientShader",
             "level1/gradient_fill.vert",
-            "level1/dual_interval_gradient.frag",
+            "level1/unified_gradient.frag",
             VD::domain(),
             FD::domain(),
             PermutationDomain({}),
             "",
             "",
-            nullptr};
+            ShouldCompile};
   }
 
  private:
-  // HAS_VCOVERAGE is mirrored: the vertex shader emits the vCoverage varying only when the fragment
-  // shader consumes it, so a vertex/fragment mismatch would leave a dangling varying.
+  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>&,
+                            const std::vector<int>& fragValues) {
+    // The legacy TextureGradientShader rejected coverage-carrying draws; keep LUT gradients on the
+    // runtime path when the draw carries per-vertex coverage instead of adding untested combos.
+    if (fragValues[FD::HAS_LUT] != 0 && fragValues[FD::HAS_VCOVERAGE] != 0) {
+      return false;
+    }
+    return true;
+  }
 };
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER(tgfx::DualIntervalGradientShader)
+TGFX_REGISTER_SHADER(tgfx::UnifiedGradientShader)
