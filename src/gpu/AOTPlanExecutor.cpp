@@ -719,20 +719,39 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
       lutLeafIndex = static_cast<int>(leaves.size());
     }
   }
-  if (leaves.size() == 3 && lutChild == nullptr) {
-    // TEXTURE_COUNT has no three-leaf value, so a three-leaf chain rides the four-leaf artifacts:
-    // a phantom child binds the fourth sampler while the fourth slot (always an op) never
-    // fetches from it.
-    for (size_t combined = 0; combined < nodes.size() && lutChild == nullptr; ++combined) {
-      if (nodes[combined]->kind != AOTEffectKind::TextureSource) {
-        continue;
+  // TEXTURE_COUNT exists only as 0 or 4: chains with 1-3 sampler children ride the four-leaf
+  // artifacts by binding phantom children that re-use the first leaf's texture. Their DAG slots
+  // are never OP_TEXTURE, so the kernel's runtime guard never samples them.
+  std::vector<PlacementPtr<FragmentProcessor>> samplerPadding = {};
+  size_t samplerChildren = leaves.size() + (lutChild != nullptr ? 1 : 0);
+  if (samplerChildren > 0 && samplerChildren < 4) {
+    std::shared_ptr<TextureProxy> paddingProxy = nullptr;
+    for (size_t index = 0; index < nodes.size() && paddingProxy == nullptr; ++index) {
+      if (nodes[index]->kind == AOTEffectKind::TextureSource) {
+        auto* textureParams = std::get_if<AOTTextureParameters>(&nodes[index]->parameters);
+        if (textureParams != nullptr) {
+          paddingProxy = textureParams->textureProxy;
+        }
+      } else if (nodes[index]->kind == AOTEffectKind::GradientSource) {
+        // A LUT-gradient-only chain has no TextureSource node; its baked LUT texture serves as
+        // the padding texture just as it served as the phantom before.
+        auto* gradientParams = std::get_if<AOTGradientParameters>(&nodes[index]->parameters);
+        if (gradientParams != nullptr && gradientParams->lutProxy != nullptr) {
+          paddingProxy = gradientParams->lutProxy;
+        }
       }
-      auto* textureParams = std::get_if<AOTTextureParameters>(&nodes[combined]->parameters);
-      auto phantomMatrix = Matrix::I();
-      lutChild = TextureEffect::Make(allocator, textureParams->textureProxy, {}, &phantomMatrix);
     }
-    if (lutChild == nullptr) {
+    if (paddingProxy == nullptr) {
       return nullptr;
+    }
+    while (samplerChildren < 4) {
+      auto phantomMatrix = Matrix::I();
+      auto phantom = TextureEffect::Make(allocator, paddingProxy, {}, &phantomMatrix);
+      if (phantom == nullptr) {
+        return nullptr;
+      }
+      samplerPadding.push_back(std::move(phantom));
+      ++samplerChildren;
     }
   }
   auto rootIndex = slotOf[pass.output.index()];
@@ -809,9 +828,10 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
     }
   }
   const AOTTiledTextureRecipe* recipePtr = tiledLeafIndex >= 0 ? &tiledRecipe : nullptr;
-  return AOTPointwiseChainProcessor::Make(
-      allocator, std::move(leaves), slots, rootIndex, tiledLeafIndex, recipePtr,
-      std::move(maskChild), coverageRootSlot, coordSourceMask, std::move(lutChild), lutLeafIndex);
+  return AOTPointwiseChainProcessor::Make(allocator, std::move(leaves), slots, rootIndex,
+                                          tiledLeafIndex, recipePtr, std::move(maskChild),
+                                          coverageRootSlot, coordSourceMask, std::move(lutChild),
+                                          lutLeafIndex, std::move(samplerPadding));
 }
 
 static PlacementPtr<FragmentProcessor> BuildFPForPass(

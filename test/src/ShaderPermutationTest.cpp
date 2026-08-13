@@ -55,8 +55,8 @@
 #include "gpu/shaders/level1/QuadTextureFillShader.h"
 #include "gpu/shaders/level1/ShapeInstancedFillShader.h"
 #include "gpu/shaders/level1/ShapeInstancedTextureCoverageShader.h"
-#include "gpu/shaders/level1/UnifiedGradientShader.h"
 #include "gpu/shaders/level1/TextureFillShader.h"
+#include "gpu/shaders/level1/UnifiedGradientShader.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ColorFilter.h"
@@ -718,8 +718,8 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
-  EXPECT_EQ(cache->vertexEntryCount(), 112u);
-  EXPECT_EQ(cache->fragmentEntryCount(), 350u);
+  EXPECT_EQ(cache->vertexEntryCount(), 96u);
+  EXPECT_EQ(cache->fragmentEntryCount(), 305u);
   std::string expectedTag = TGFX_BACKEND_NAME;
   auto dashPos = expectedTag.find('-');
   if (dashPos != std::string::npos) {
@@ -1176,8 +1176,8 @@ TGFX_TEST(ShaderPermutationTest, CompressedBundleLoad) {
     PrecompiledShaderCache compressedOnly;
     ASSERT_TRUE(compressedOnly.loadBundle(original.data(), original.size()));
     EXPECT_TRUE(compressedOnly.isLoaded());
-    EXPECT_EQ(compressedOnly.vertexEntryCount(), 112u);
-    EXPECT_EQ(compressedOnly.fragmentEntryCount(), 350u);
+    EXPECT_EQ(compressedOnly.vertexEntryCount(), 96u);
+    EXPECT_EQ(compressedOnly.fragmentEntryCount(), 305u);
     std::string tag = TGFX_BACKEND_NAME;
     auto dash = tag.find('-');
     if (dash != std::string::npos) {

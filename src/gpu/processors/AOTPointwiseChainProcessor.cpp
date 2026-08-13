@@ -116,7 +116,7 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
     const std::vector<AOTChainSlot>& slots, size_t rootSlot, int tiledLeafIndex,
     const AOTTiledTextureRecipe* tiledRecipe, PlacementPtr<FragmentProcessor> maskChild,
     int coverageRootSlot, uint32_t coordSourceMask, PlacementPtr<FragmentProcessor> lutChild,
-    int lutLeafIndex) {
+    int lutLeafIndex, std::vector<PlacementPtr<FragmentProcessor>> samplerPadding) {
   if (allocator == nullptr || slots.empty() || slots.size() > MaxSlots ||
       rootSlot >= slots.size()) {
     return nullptr;
@@ -125,12 +125,11 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
     return nullptr;
   }
   auto leafCount = textureLeaves.size();
-  // Sampler-binding children include the DAG leaves plus a sampler-only child (the LUT gradient
-  // texture, or a phantom padding a three-leaf chain up to the four-leaf artifacts).
-  size_t samplerChildren = leafCount + (lutChild != nullptr ? 1 : 0);
-  if ((samplerChildren != 0 && samplerChildren != 1 && samplerChildren != 2 &&
-       samplerChildren != 4) ||
-      leafCount > slots.size()) {
+  // Sampler-binding children include the DAG leaves plus sampler-only children (the LUT gradient
+  // texture and phantom padding). TEXTURE_COUNT exists only as 0 or 4, so any chain with leaves
+  // must pad exactly up to the four-sampler artifacts.
+  size_t samplerChildren = leafCount + (lutChild != nullptr ? 1 : 0) + samplerPadding.size();
+  if ((samplerChildren != 0 && samplerChildren != 4) || leafCount > slots.size()) {
     return nullptr;
   }
   if (maskChild != nullptr && maskChild->name() != "DeviceSpaceTextureEffect") {
@@ -165,7 +164,8 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
   }
   return allocator->make<AOTPointwiseChainProcessor>(
       std::move(textureLeaves), slots, rootSlot, tiledLeafIndex, tiledRecipe, std::move(maskChild),
-      coverageRootSlot, coordSourceMask, std::move(lutChild), lutLeafIndex);
+      coverageRootSlot, coordSourceMask, std::move(lutChild), lutLeafIndex,
+      std::move(samplerPadding));
 }
 
 AOTPointwiseChainProcessor::AOTPointwiseChainProcessor(
@@ -173,7 +173,7 @@ AOTPointwiseChainProcessor::AOTPointwiseChainProcessor(
     const std::vector<AOTChainSlot>& newSlots, size_t rootSlot, int tiledLeafIndex,
     const AOTTiledTextureRecipe* tiledRecipe, PlacementPtr<FragmentProcessor> maskChildFP,
     int coverageRootSlot, uint32_t coordSourceMask, PlacementPtr<FragmentProcessor> lutChildFP,
-    int lutLeafIndex)
+    int lutLeafIndex, std::vector<PlacementPtr<FragmentProcessor>> samplerPadding)
     : FragmentProcessor(ClassID()), _slotCount(newSlots.size()), rootSlot(rootSlot),
       tiledLeafIndex(tiledLeafIndex), hasMaskChild(maskChildFP != nullptr),
       coverageRootSlot(coverageRootSlot), coordSourceMask(coordSourceMask),
@@ -196,6 +196,9 @@ AOTPointwiseChainProcessor::AOTPointwiseChainProcessor(
   }
   if (lutChildFP != nullptr) {
     registerChildProcessor(std::move(lutChildFP));
+  }
+  for (auto& phantom : samplerPadding) {
+    registerChildProcessor(std::move(phantom));
   }
   if (maskChildFP != nullptr) {
     registerChildProcessor(std::move(maskChildFP));

@@ -60,7 +60,6 @@
 #include "gpu/shaders/level1/DeviceSpaceTexturedEffectShader.h"
 #include "gpu/shaders/level1/EllipseFillShader.h"
 #include "gpu/shaders/level1/GaussianBlur1DShader.h"
-#include "gpu/shaders/level1/UnifiedGradientShader.h"
 #include "gpu/shaders/level1/HairlineLineShader.h"
 #include "gpu/shaders/level1/HairlineQuadShader.h"
 #include "gpu/shaders/level1/MaskFillShader.h"
@@ -81,6 +80,7 @@
 #include "gpu/shaders/level1/TextureFillShader.h"
 #include "gpu/shaders/level1/TexturedEffectShader.h"
 #include "gpu/shaders/level1/TiledTextureFillShader.h"
+#include "gpu/shaders/level1/UnifiedGradientShader.h"
 #include "gpu/shaders/level1/YUVTextureFillShader.h"
 
 namespace tgfx {
@@ -766,7 +766,8 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
   }
   auto* chain = static_cast<const AOTPointwiseChainProcessor*>(fp);
   auto leafCount = chain->leafCount();
-  if (leafCount != 0 && leafCount != 1 && leafCount != 2 && leafCount != 4) {
+  // Sampler-only padding makes every non-empty chain present exactly four sampler children.
+  if (leafCount != 0 && leafCount != 4) {
     return std::nullopt;
   }
   // The kernel carries one shared chain-wide ColorSpaceXform parameter block, so a chain with two
@@ -812,7 +813,7 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
   // The ellipse layout carries the same leaf-count-free variants as the rect family: they serve
   // const/blend/gradient chains (a solid fill still goes to EllipseFillShader through the plain
   // route, so only chain-worthy shapes reach this rule).
-  int textureCountValue = leafCount == 0 ? 0 : (leafCount == 1 ? 1 : (leafCount == 2 ? 2 : 3));
+  int textureCountValue = leafCount == 0 ? 0 : 1;
   // QuadGP vertex buffers always carry the coverage slot (providers emit 1.0 for non-AA draws),
   // so the always-on coverage path serves every quad; the ellipse layout evaluates coverage per
   // pixel and never carries the attribute.
@@ -910,7 +911,8 @@ static int GradientLayoutTypeIndex(const std::string& layoutName) {
   return -1;
 }
 
-static std::optional<PermutationMatchResult> TryMatchUnifiedGradient(const ProgramInfo* programInfo) {
+static std::optional<PermutationMatchResult> TryMatchUnifiedGradient(
+    const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
   int gpType = GetGPType(gp);
   if (gpType < 0) {

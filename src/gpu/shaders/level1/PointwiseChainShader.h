@@ -56,7 +56,9 @@ class PointwiseChainShader : public PrecompiledShader {
           PermutationBool("HAS_COVERAGE"),
           PermutationBool("HAS_UV_COORD"),
           PermutationBool("HAS_COLOR"),
-          PermutationInt("TEXTURE_COUNT", 4),
+          // 0 = no texture leaves, 1 = the four-leaf artifacts (chains with 1-3 sampler
+          // children bind phantom padding and run them).
+          PermutationInt("TEXTURE_COUNT", 2),
       });
     }
   };
@@ -78,7 +80,7 @@ class PointwiseChainShader : public PrecompiledShader {
           PermutationInt("HAS_XP", 3),
           PermutationBool("HAS_COVERAGE"),
           PermutationBool("HAS_COLOR"),
-          PermutationInt("TEXTURE_COUNT", 4),
+          PermutationInt("TEXTURE_COUNT", 2),
           PermutationBool("HAS_MASK_TEXTURE"),
       });
     }
@@ -120,9 +122,7 @@ class PointwiseChainShader : public PrecompiledShader {
     // texture leaves: the atlas alone for gradient text, image+atlas for image text).
     if ((vertValues[VD::HAS_UV_COORD] != 0 || vertValues[VD::HAS_COLOR] != 0) &&
         vertValues[VD::HAS_COVERAGE] == 0) {
-      bool atlasTextCombo =
-          vertValues[VD::HAS_UV_COORD] != 0 &&
-          (vertValues[VD::TEXTURE_COUNT] == 1 || vertValues[VD::TEXTURE_COUNT] == 2);
+      bool atlasTextCombo = vertValues[VD::HAS_UV_COORD] != 0 && vertValues[VD::TEXTURE_COUNT] == 1;
       if (!atlasTextCombo) {
         return false;
       }

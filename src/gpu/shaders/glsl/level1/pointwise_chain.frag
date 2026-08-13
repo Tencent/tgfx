@@ -34,10 +34,6 @@
 
 #if TEXTURE_COUNT == 0
 #define NTEX 0
-#elif TEXTURE_COUNT == 1
-#define NTEX 1
-#elif TEXTURE_COUNT == 2
-#define NTEX 2
 #else
 #define NTEX 4
 #endif

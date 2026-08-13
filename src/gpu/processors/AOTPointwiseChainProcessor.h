@@ -96,14 +96,15 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
       const AOTTiledTextureRecipe* tiledRecipe = nullptr,
       PlacementPtr<FragmentProcessor> maskChild = nullptr, int coverageRootSlot = -1,
       uint32_t coordSourceMask = ~0u, PlacementPtr<FragmentProcessor> lutChild = nullptr,
-      int lutLeafIndex = -1);
+      int lutLeafIndex = -1, std::vector<PlacementPtr<FragmentProcessor>> samplerPadding = {});
 
   AOTPointwiseChainProcessor(std::vector<PlacementPtr<FragmentProcessor>> textureLeaves,
                              const std::vector<AOTChainSlot>& slots, size_t rootSlot,
                              int tiledLeafIndex, const AOTTiledTextureRecipe* tiledRecipe,
                              PlacementPtr<FragmentProcessor> maskChild, int coverageRootSlot,
                              uint32_t coordSourceMask, PlacementPtr<FragmentProcessor> lutChild,
-                             int lutLeafIndex);
+                             int lutLeafIndex,
+                             std::vector<PlacementPtr<FragmentProcessor>> samplerPadding);
 
   std::string name() const override {
     return "AOTPointwiseChainProcessor";
