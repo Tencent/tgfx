@@ -17,7 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/d3d12/D3D12Window.h"
+#ifdef _WIN32
+#include <dcomp.h>
 #include <windows.h>
+#endif
 #include <algorithm>
 #include <chrono>
 #include <vector>
@@ -130,6 +133,9 @@ class D3D12SwapchainProxy : public RenderTargetProxy {
 // integers so an unqualified DXGI_FORMAT_R8G8B8A8_UNORM here is `unsigned`, not the enum type).
 struct D3D12Window::PlatformState {
   ComPtr<IDXGISwapChain3> swapChain;
+  ComPtr<IDCompositionDevice> compositionDevice;
+  ComPtr<IDCompositionTarget> compositionTarget;
+  ComPtr<IDCompositionVisual> compositionVisual;
   std::vector<ComPtr<ID3D12Resource>> backBuffers;
   unsigned format = DXGI_FORMAT_R8G8B8A8_UNORM;
   HWND hwnd = nullptr;
@@ -241,7 +247,8 @@ void D3D12Window::PlatformState::drainQueue(D3D12GPU* gpu) {
 #ifdef _WIN32
 
 std::shared_ptr<D3D12Window> D3D12Window::MakeFrom(HWND hwnd, std::shared_ptr<D3D12Device> device,
-                                                   std::shared_ptr<ColorSpace> colorSpace) {
+                                                   std::shared_ptr<ColorSpace> colorSpace,
+                                                   bool transparent) {
   if (hwnd == nullptr || device == nullptr) {
     return nullptr;
   }
@@ -284,22 +291,26 @@ std::shared_ptr<D3D12Window> D3D12Window::MakeFrom(HWND hwnd, std::shared_ptr<D3
   // does want the real enum.
   desc.Format = static_cast<DXGI_FORMAT>(DXGI_FORMAT_R8G8B8A8_UNORM);
   desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-  desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+  desc.SwapEffect = transparent ? DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL : DXGI_SWAP_EFFECT_FLIP_DISCARD;
   desc.SampleDesc.Count = 1;
   desc.SampleDesc.Quality = 0;
-  desc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
+  desc.AlphaMode = transparent ? DXGI_ALPHA_MODE_PREMULTIPLIED : DXGI_ALPHA_MODE_IGNORE;
   desc.Scaling = DXGI_SCALING_STRETCH;
   desc.Flags = 0;
 
   ComPtr<IDXGISwapChain1> swapChain1;
-  hr = factory->CreateSwapChainForHwnd(d3d12CommandQueue, hwnd, &desc, nullptr, nullptr,
-                                       &swapChain1);
+  if (transparent) {
+    hr = factory->CreateSwapChainForComposition(d3d12CommandQueue, &desc, nullptr, &swapChain1);
+  } else {
+    hr = factory->CreateSwapChainForHwnd(d3d12CommandQueue, hwnd, &desc, nullptr, nullptr,
+                                         &swapChain1);
+  }
   if (FAILED(hr)) {
-    LOGE("D3D12Window: CreateSwapChainForHwnd failed, HRESULT=0x%08X", static_cast<unsigned>(hr));
+    LOGE("D3D12Window: swap chain creation failed, HRESULT=0x%08X", static_cast<unsigned>(hr));
     device->unlock();
     return nullptr;
   }
-  // FLIP_DISCARD requires IDXGISwapChain3 for GetCurrentBackBufferIndex; QI is mandatory here.
+  // Flip-model swap chains require IDXGISwapChain3 for GetCurrentBackBufferIndex.
   ComPtr<IDXGISwapChain3> swapChain3;
   hr = swapChain1.As(&swapChain3);
   if (FAILED(hr) || swapChain3 == nullptr) {
@@ -316,7 +327,50 @@ std::shared_ptr<D3D12Window> D3D12Window::MakeFrom(HWND hwnd, std::shared_ptr<D3
   state->hwnd = hwnd;
   state->width = width;
   state->height = height;
+  if (transparent) {
+    hr = DCompositionCreateDevice(nullptr, IID_PPV_ARGS(state->compositionDevice.GetAddressOf()));
+    if (SUCCEEDED(hr)) {
+      // topmost=TRUE places the composition tree above any existing HWND drawing (GDI or
+      // other DX content). tgfx-owned windows are expected to be the sole renderer of the
+      // target hwnd, so this is the correct default. Callers that need to composite tgfx
+      // underneath other per-window drawing must fork this path.
+      hr = state->compositionDevice->CreateTargetForHwnd(hwnd, TRUE,
+                                                         state->compositionTarget.GetAddressOf());
+    }
+    if (SUCCEEDED(hr)) {
+      hr = state->compositionDevice->CreateVisual(state->compositionVisual.GetAddressOf());
+    }
+    if (SUCCEEDED(hr)) {
+      hr = state->compositionVisual->SetContent(state->swapChain.Get());
+    }
+    if (SUCCEEDED(hr)) {
+      hr = state->compositionTarget->SetRoot(state->compositionVisual.Get());
+    }
+    if (SUCCEEDED(hr)) {
+      hr = state->compositionDevice->Commit();
+    }
+    if (FAILED(hr)) {
+      LOGE("D3D12Window: DirectComposition setup failed, HRESULT=0x%08X",
+           static_cast<unsigned>(hr));
+      // Explicitly unwind the half-initialized DComp tree so the swap chain is no longer
+      // referenced by any visual before its COM Release runs at state.reset(). Then release
+      // D3D objects while still holding the device lock, matching ~D3D12Window's ordering.
+      if (state->compositionVisual != nullptr) {
+        state->compositionVisual->SetContent(nullptr);
+      }
+      if (state->compositionTarget != nullptr) {
+        state->compositionTarget->SetRoot(nullptr);
+      }
+      if (state->compositionDevice != nullptr) {
+        state->compositionDevice->Commit();
+      }
+      state.reset();
+      device->unlock();
+      return nullptr;
+    }
+  }
   if (!state->buildBackBuffers()) {
+    state.reset();
     device->unlock();
     return nullptr;
   }
@@ -359,14 +413,36 @@ D3D12Window::~D3D12Window() {
     // 2. Drop tgfx-side owners of the backbuffers.
     _platformState->drainBackBufferOwners(context, d3d12GPU);
 
-    // 3. Release the swap chain. Our own backbuffer ComPtrs were already cleared inside
-    //    drainBackBufferOwners.
+    // 3. Detach the swap chain from DirectComposition before releasing it. The visual holds
+    //    the swap chain as content; clearing the content and committing is what actually
+    //    tells DWM to stop referencing it. This runs while the device is still locked so
+    //    the tear-down is serialized with any other GPU work on this device.
+    if (_platformState->compositionVisual != nullptr) {
+      _platformState->compositionVisual->SetContent(nullptr);
+    }
+    if (_platformState->compositionTarget != nullptr) {
+      _platformState->compositionTarget->SetRoot(nullptr);
+    }
+    if (_platformState->compositionDevice != nullptr) {
+      _platformState->compositionDevice->Commit();
+    }
+    _platformState->compositionVisual = nullptr;
+    _platformState->compositionTarget = nullptr;
+    _platformState->compositionDevice = nullptr;
+
+    // 4. Release the swap chain while still holding the device lock so its final COM
+    //    Release does not race concurrent D3D12 work on another thread.
     _platformState->swapChain = nullptr;
     device->unlock();
   } else {
+    // The device context is unavailable, so GPU work cannot be drained. Release the remaining
+    // COM references without submitting another composition update.
     _platformState->currentProxy = nullptr;
     _platformState->currentProxyRaw = nullptr;
     _platformState->backBuffers.clear();
+    _platformState->compositionVisual = nullptr;
+    _platformState->compositionTarget = nullptr;
+    _platformState->compositionDevice = nullptr;
     _platformState->swapChain = nullptr;
   }
 }
