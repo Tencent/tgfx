@@ -815,6 +815,7 @@ if (TGFX_EMBED_SHADER_BUNDLES)
                     --shader-dir ${CMAKE_SOURCE_DIR}/src/gpu/shaders/glsl
                     --out-dir ${TGFX_SHADER_BUNDLE_DIR}
                     --backends ${TGFX_SHADER_BACKENDS_ARG}
+                    --compress
             COMMAND ${CMAKE_COMMAND} -E touch ${TGFX_SHADER_BUNDLE_STAMP}
             DEPENDS shader_build_tool ${TGFX_SHADER_SOURCES}
             COMMENT "Compiling precompiled shader bundles (${TGFX_SHADER_BACKENDS})")

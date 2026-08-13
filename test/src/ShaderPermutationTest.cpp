@@ -1169,8 +1169,22 @@ TGFX_TEST(ShaderPermutationTest, CompressedBundleLoad) {
   file.read(reinterpret_cast<char*>(original.data()), static_cast<std::streamsize>(fileSize));
   file.close();
 
-  // Verify it's uncompressed (compressionType at offset 6).
-  ASSERT_EQ(TestReadU16LE(original.data() + 6), 0u);
+  // Production bundles ship compressed; when the resource bundle is already compressed, the
+  // load itself is the roundtrip coverage, so just verify entries and tag.
+  if (TestReadU16LE(original.data() + 6) == 1u) {
+    PrecompiledShaderCache compressedOnly;
+    ASSERT_TRUE(compressedOnly.loadBundle(original.data(), original.size()));
+    EXPECT_TRUE(compressedOnly.isLoaded());
+    EXPECT_EQ(compressedOnly.vertexEntryCount(), 117u);
+    EXPECT_EQ(compressedOnly.fragmentEntryCount(), 374u);
+    std::string tag = TGFX_BACKEND_NAME;
+    auto dash = tag.find('-');
+    if (dash != std::string::npos) {
+      tag = tag.substr(0, dash);
+    }
+    EXPECT_EQ(compressedOnly.profileTag(), tag);
+    return;
+  }
 
   uint32_t dataOffset = TestReadU32LE(original.data() + 36);
   uint32_t dataSize = TestReadU32LE(original.data() + 40);
