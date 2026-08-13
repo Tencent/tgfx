@@ -108,7 +108,6 @@ void* WebGPUBuffer::map(size_t offset, size_t mapSize) {
   }
   if (_usage & GPUBufferUsage::READBACK) {
     if (mapState != MapState::Mapped) {
-      // Expected while the asynchronous mapping is still in flight; callers poll isReady().
       return nullptr;
     }
     return const_cast<void*>(wgpuBufferGetConstMappedRange(buffer, offset, mapSize));
@@ -133,8 +132,8 @@ void WebGPUBuffer::requestMapAsync() {
   if (buffer == nullptr || (_usage & GPUBufferUsage::READBACK) == 0) {
     return;
   }
-  // Re-issuing a map on a pending buffer is a validation error, and clearing the state of a mapped
-  // buffer would drop the obligation to unmap it.
+  // Re-issuing a map while pending is a validation error, and resetting a mapped buffer would lose
+  // the unmap obligation.
   if (mapState != MapState::Unmapped) {
     return;
   }
@@ -160,7 +159,6 @@ void WebGPUBuffer::setMapReady(bool ready) {
   if ((_usage & GPUBufferUsage::READBACK) == 0) {
     return;
   }
-  // The external path maps the buffer itself, so drop any request issued from C++.
   detachMapRequest();
   mapState = ready ? MapState::Mapped : MapState::Unmapped;
 }
@@ -190,8 +188,7 @@ void WebGPUBuffer::unmap() {
 }
 
 void WebGPUBuffer::detachMapRequest() {
-  // The generation supersedes an in-flight Asyncify request; the owner pointer supersedes a
-  // callback-based one.
+  // The generation supersedes an Asyncify request in flight; the owner pointer a callback-based one.
   ++mapGeneration;
   if (mapRequest != nullptr) {
     mapRequest->owner = nullptr;

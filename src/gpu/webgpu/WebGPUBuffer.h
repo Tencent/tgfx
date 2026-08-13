@@ -45,9 +45,8 @@ class WebGPUBuffer : public GPUBuffer, public WebGPUResource {
   void unmap() override;
 
   /**
-   * Initiates an asynchronous map request for READBACK buffers. After calling this, poll isReady()
-   * to check completion, then call map() to access the data. Idempotent: does nothing while a
-   * request is in flight or the buffer is already mapped, and re-issues the request after a failure.
+   * Initiates an asynchronous map request for READBACK buffers. Idempotent: does nothing while a
+   * request is in flight or the buffer is already mapped, and re-issues it after a failure.
    */
   void requestMapAsync() override;
 
@@ -62,8 +61,7 @@ class WebGPUBuffer : public GPUBuffer, public WebGPUResource {
  private:
   enum class MapState { Unmapped, Pending, Mapped };
 
-  // Shared with the map callback so it stays valid after the buffer is destroyed; the owner pointer
-  // is cleared before that happens.
+  // Shared with the map callback so it stays valid after the buffer is destroyed.
   struct MapRequest {
     WebGPUBuffer* owner = nullptr;
   };

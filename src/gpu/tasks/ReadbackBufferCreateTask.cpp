@@ -33,8 +33,7 @@ std::shared_ptr<Resource> ReadbackBufferCreateTask::onMakeResource(Context* cont
     return nullptr;
   }
   // A recycled buffer may still carry the map state of a readback that was abandoned before its
-  // pixels were consumed, which would leave it mapped while being used as a copy destination. This
-  // is the only place where a pooled readback buffer is handed out.
+  // pixels were consumed, which would leave it mapped while used as a copy destination.
   bufferResource->gpuBuffer()->unmap();
   return bufferResource;
 }
