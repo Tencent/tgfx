@@ -236,6 +236,10 @@ layout(location = 0) out vec4 fragColor;
 
 vec4 chainResults[16];
 
+// Prefetched leaf samples. Fetched with statically bound samplers in main; the OP_TEXTURE branch
+// of evalChainSlot reads them back by slot index.
+vec4 chainLeafTex[4];
+
 // Geometry color source: the unconditional inColor attribute on QuadGP (broadcast for
 // common-color draws), the Color uniform otherwise.
 #if HAS_COLOR
@@ -255,40 +259,36 @@ vec4 chainResults[16];
 
 #include "pointwise_chain_eval.inc"
 
-#if NTEX > 0
-#define CHAIN_EVAL_LEAF0 evalChainSlotWithTex(0, TextureSampler_0, TransformedCoords_0, Subset, 0)
-#endif
-#if NTEX > 1
-#define CHAIN_EVAL_LEAF1 evalChainSlotWithTex(1, TextureSampler_1, TransformedCoords_1, Subset_1, 1)
-#endif
-#if NTEX > 2
-#define CHAIN_EVAL_LEAF2 evalChainSlotWithTex(2, TextureSampler_2, TransformedCoords_2, Subset_2, 2)
-#endif
-#if NTEX > 3
-#define CHAIN_EVAL_LEAF3 evalChainSlotWithTex(3, TextureSampler_3, TransformedCoords_3, Subset_3, 3)
-#endif
-
 void main() {
   // Active slots are contiguous from 0 by construction (texture leaves first, then the rest in
   // topological order, root last), so a uniform guard skips the whole evaluation of unused slots —
   // including the Packed read — instead of relying on the OP_NONE early-out alone.
-  // Texture leaves occupy slots 0..NTEX-1 with statically bound samplers; the remaining op slots
-  // share one implementation, and the SlotCount-bound loop keeps that implementation single in the
-  // binary.
+  // Texture leaves occupy slots 0..NTEX-1. Each prefetch is guarded by the slot's op marker so
+  // the phantom slot of a 3-leaf chain and the sampler-only LUT child (both non-texture slots
+  // occupying leaf positions) are never sampled; the loop below still evaluates them like any
+  // other slot.
 #if NTEX > 0
-  chainResults[0] = CHAIN_EVAL_LEAF0;
+  if (SlotPacked[0].x == OP_TEXTURE) {
+    chainLeafTex[0] = chainLeafFetch(TextureSampler_0, TransformedCoords_0, Subset, 0);
+  }
 #endif
 #if NTEX > 1
-  chainResults[1] = CHAIN_EVAL_LEAF1;
+  if (SlotPacked[1].x == OP_TEXTURE) {
+    chainLeafTex[1] = chainLeafFetch(TextureSampler_1, TransformedCoords_1, Subset_1, 1);
+  }
 #endif
 #if NTEX > 2
-  chainResults[2] = CHAIN_EVAL_LEAF2;
+  if (SlotPacked[2].x == OP_TEXTURE) {
+    chainLeafTex[2] = chainLeafFetch(TextureSampler_2, TransformedCoords_2, Subset_2, 2);
+  }
 #endif
 #if NTEX > 3
-  chainResults[3] = CHAIN_EVAL_LEAF3;
+  if (SlotPacked[3].x == OP_TEXTURE) {
+    chainLeafTex[3] = chainLeafFetch(TextureSampler_3, TransformedCoords_3, Subset_3, 3);
+  }
 #endif
-  for (int i = NTEX; i < SlotCount; ++i) {
-    chainResults[i] = evalChainSlotNoTex(i);
+  for (int i = 0; i < SlotCount; ++i) {
+    chainResults[i] = evalChainSlot(i);
   }
   vec4 result = chainResults[RootIndex];
 

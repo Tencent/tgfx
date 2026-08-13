@@ -1,8 +1,9 @@
 // Shared chain-slot evaluation, included exactly once. Slot uniform fields are std140 arrays read
 // by runtime index (constant-memory reads), so the op bodies exist in the binary exactly once:
-// the op-slot loop in main() cannot be unrolled because SlotCount is runtime data. Leaf slots
-// (indices < NTEX) go through evalChainSlotWithTex with statically bound samplers; op slots share
-// evalChainSlotNoTex and are never OP_TEXTURE by construction.
+// the slot loop in main() cannot be unrolled because SlotCount is runtime data. Leaf texture
+// sampling happens in main() with statically bound samplers (dynamic sampler indexing is not
+// portable); the OP_TEXTURE branch of evalChainSlot only applies the leaf modulation flags to the
+// prefetched sample.
 //
 // Op values mirror AOTChainOp and are part of the precompiled kernel ABI. The ColorSpaceXform
 // parameters are shared chain-wide (ChainCSFlags & friends): the matcher guarantees at most one
@@ -44,11 +45,33 @@ float chainDstTF(float x) {
   return transferTF(x, ChainDstTF0, ChainDstTF1, ChainDstTFType);
 }
 
-// Evaluates every non-texture op of slot `slot`, reading its fields from the uniform arrays.
-vec4 evalChainSlotNoTex(int slot) {
+// Evaluates slot `slot`, reading its fields from the uniform arrays. OP_TEXTURE slots read the
+// prefetched sample from chainLeafTex (fetched in main with statically bound samplers) and apply
+// the leaf modulation flags; every other op shares this single implementation so the op library
+// exists exactly once in the binary.
+vec4 evalChainSlot(int slot) {
   ivec4 Packed = SlotPacked[slot];
   if (Packed.x == OP_NONE) {
     return vec4(0.0);
+  }
+  if (Packed.x == OP_TEXTURE) {
+    vec4 texColor = chainLeafTex[slot];
+    if ((Packed.w & 2) != 0) {
+      // Alpha-only leaf (R8 on Metal returns (r,0,0,1)): splat .r into all channels so the alpha
+      // channel carries the mask value, matching the runtime TextureEffect alpha-only readback.
+      texColor = vec4(texColor.r);
+    }
+    if ((Packed.w & 4) != 0) {
+      // Coverage-root leaf: modulated by the coverage unit's alpha, matching the runtime
+      // coverage-FP readback (tex * coverageIn.a).
+      texColor *= TGFX_CHAIN_UNIT_COVERAGE.a;
+    }
+    if ((Packed.w & 1) != 0) {
+      // Color-source leaves are modulated by the geometry color's alpha, matching the runtime
+      // paint-alpha wrap. Mask and blend-operand leaves sample raw, as the runtime emits them.
+      texColor *= TGFX_CHAIN_GEOM_COLOR.a;
+    }
+    return texColor;
   }
   vec4 in0 = Packed.y == -1   ? TGFX_CHAIN_GEOM_COLOR
              : Packed.y == -3 ? TGFX_CHAIN_UNIT_COVERAGE
@@ -192,29 +215,3 @@ vec4 evalChainSlotNoTex(int slot) {
   return color;
 }
 
-// Texture-leaf variant: the sampler stays statically bound per slot (dynamic sampler indexing is
-// not portable), while every other field comes from the uniform arrays by slot index.
-vec4 evalChainSlotWithTex(int slot, sampler2D leafSampler, vec3 leafCoords, vec4 leafSubset,
-                          int leafIndex) {
-  ivec4 Packed = SlotPacked[slot];
-  if (Packed.x == OP_TEXTURE) {
-    vec4 texColor = chainLeafFetch(leafSampler, leafCoords, leafSubset, leafIndex);
-    if ((Packed.w & 2) != 0) {
-      // Alpha-only leaf (R8 on Metal returns (r,0,0,1)): splat .r into all channels so the alpha
-      // channel carries the mask value, matching the runtime TextureEffect alpha-only readback.
-      texColor = vec4(texColor.r);
-    }
-    if ((Packed.w & 4) != 0) {
-      // Coverage-root leaf: modulated by the coverage unit's alpha, matching the runtime
-      // coverage-FP readback (tex * coverageIn.a).
-      texColor *= TGFX_CHAIN_UNIT_COVERAGE.a;
-    }
-    if ((Packed.w & 1) != 0) {
-      // Color-source leaves are modulated by the geometry color's alpha, matching the runtime
-      // paint-alpha wrap. Mask and blend-operand leaves sample raw, as the runtime emits them.
-      texColor *= TGFX_CHAIN_GEOM_COLOR.a;
-    }
-    return texColor;
-  }
-  return evalChainSlotNoTex(slot);
-}
