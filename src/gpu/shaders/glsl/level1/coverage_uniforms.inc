@@ -8,6 +8,10 @@
 #define HAS_DEVICE_MASK 0
 #endif
 
+#ifndef HAS_RUNTIME_DEVICE_MASK
+#define HAS_RUNTIME_DEVICE_MASK 0
+#endif
+
 #if HAS_RUNTIME_CLIP
   vec4 Rect;
   int HasClip;
@@ -16,7 +20,10 @@
 #endif
 
 #if HAS_RUNTIME_CLIP
-  #if HAS_DEVICE_MASK
+  #if HAS_RUNTIME_DEVICE_MASK
+    mat3 DeviceCoordMatrix;
+    int HasDeviceMask;
+  #elif HAS_DEVICE_MASK
     mat3 DeviceCoordMatrix;
   #endif
 #elif HAS_COVERAGE == 2

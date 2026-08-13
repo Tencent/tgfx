@@ -508,7 +508,7 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientCompiledSpace) {
   UnifiedGradientShader shader;
   auto info = shader.info();
   EXPECT_EQ(info.vertDomain.totalCount(), 2u);
-  EXPECT_EQ(info.fragDomain.totalCount(), 24u);
+  EXPECT_EQ(info.fragDomain.totalCount(), 12u);
 
   std::set<uint32_t> vertexIndices;
   std::set<uint32_t> fragmentIndices;
@@ -523,12 +523,13 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientCompiledSpace) {
       fragmentIndices.insert(fi);
     }
   }
-  // 24 raw frag combos minus the six LUT-with-coverage combos excluded by ShouldCompile.
-  EXPECT_EQ(compiledCount, 18u);
+  // 12 raw frag combos minus the three LUT-with-coverage combos excluded by ShouldCompile; the
+  // device mask is a runtime uniform now, not a dimension.
+  EXPECT_EQ(compiledCount, 9u);
   EXPECT_EQ(vertexIndices.size(), 2u);
-  EXPECT_EQ(fragmentIndices.size(), 18u);
-  EXPECT_TRUE(IsBuildablePermutation(info, 1, 11));
-  EXPECT_FALSE(IsBuildablePermutation(info, 0, 11));
+  EXPECT_EQ(fragmentIndices.size(), 9u);
+  EXPECT_TRUE(IsBuildablePermutation(info, 1, 5));
+  EXPECT_FALSE(IsBuildablePermutation(info, 0, 5));
 }
 
 TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
@@ -591,8 +592,9 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
     }
   }
   EXPECT_EQ(vertexIndices.size(), 2u);
-  EXPECT_EQ(fragmentIndices.size(), 12u);
-  EXPECT_EQ(pairs.size(), 12u);
+  // The device mask no longer contributes a dimension, so only XP and coverage vary.
+  EXPECT_EQ(fragmentIndices.size(), 6u);
+  EXPECT_EQ(pairs.size(), 6u);
 
   for (int hasVertexCoverage = 0; hasVertexCoverage < 2; ++hasVertexCoverage) {
     BlockAllocator allocator;
@@ -719,7 +721,7 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
   EXPECT_EQ(cache->vertexEntryCount(), 96u);
-  EXPECT_EQ(cache->fragmentEntryCount(), 305u);
+  EXPECT_EQ(cache->fragmentEntryCount(), 271u);
   std::string expectedTag = TGFX_BACKEND_NAME;
   auto dashPos = expectedTag.find('-');
   if (dashPos != std::string::npos) {
@@ -1177,7 +1179,7 @@ TGFX_TEST(ShaderPermutationTest, CompressedBundleLoad) {
     ASSERT_TRUE(compressedOnly.loadBundle(original.data(), original.size()));
     EXPECT_TRUE(compressedOnly.isLoaded());
     EXPECT_EQ(compressedOnly.vertexEntryCount(), 96u);
-    EXPECT_EQ(compressedOnly.fragmentEntryCount(), 305u);
+    EXPECT_EQ(compressedOnly.fragmentEntryCount(), 271u);
     std::string tag = TGFX_BACKEND_NAME;
     auto dash = tag.find('-');
     if (dash != std::string::npos) {
@@ -1449,11 +1451,11 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureFillShaderRegistry) {
       // vertex attributes, so they no longer appear as dimensions.
       EXPECT_EQ(shaderInfo.vertDomain.dimensionCount(), 3u);
       EXPECT_EQ(shaderInfo.vertDomain.totalCount(), 8u);
-      // FragDims: 3 bools + 1 int(3) = 2^3 * 3 = 24 total permutations. ALPHA_ONLY, HAS_RGBAAA
-      // and the unsupported YUV path are runtime/fallback concerns, not shader dimensions;
-      // HAS_LOCAL_MASK (added later) is a mirror dimension.
-      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 4u);
-      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 24u);
+      // FragDims: 2 bools + 1 int(3) = 2^2 * 3 = 12 total permutations. The device mask is a
+      // runtime uniform; ALPHA_ONLY, HAS_RGBAAA and the unsupported YUV path are runtime/fallback
+      // concerns; HAS_LOCAL_MASK is a mirror dimension.
+      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 3u);
+      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 12u);
       EXPECT_EQ(shaderInfo.vertexFile, "level1/quad_texture_fill.vert");
       EXPECT_EQ(shaderInfo.fragmentFile, "level1/quad_texture_fill.frag");
     }
@@ -1485,9 +1487,8 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureFillShouldCompile) {
       }
     }
     // ALPHA_ONLY / HAS_RGBAAA are runtime uniforms and per-vertex color/coverage are now
-    // unconditional; the remaining mirror dimensions plus the HAS_LOCAL_MASK restriction leave
-    // 36 variants.
-    EXPECT_EQ(compiledCount, 36);
+    // unconditional; the device mask is runtime too, leaving 24 variants.
+    EXPECT_EQ(compiledCount, 24);
   }
 }
 
@@ -1847,7 +1848,7 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectPreservesPermutationDomains) {
     uint32_t fragmentCount;
   };
   const ExpectedDomain expected[] = {
-      {"QuadColorFillShader", 1, 6},  {"QuadTextureFillShader", 8, 24},
+      {"QuadColorFillShader", 1, 6},  {"QuadTextureFillShader", 8, 12},
       {"SolidColorFillShader", 2, 6}, {"HairlineLineShader", 1, 3},
       {"HairlineQuadShader", 1, 3},
   };

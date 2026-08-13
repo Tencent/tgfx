@@ -57,6 +57,20 @@ GlobalCache::GlobalCache(Context* context) : context(context) {
   activePacket = &uniformBufferPool[0];
 }
 
+std::shared_ptr<Texture> GlobalCache::getOrCreateDummyTexture() {
+  if (dummyTexture == nullptr) {
+    dummyTexture = context->gpu()->createTexture(TextureDescriptor(1, 1, PixelFormat::RGBA_8888));
+  }
+  return dummyTexture;
+}
+
+std::shared_ptr<Sampler> GlobalCache::getOrCreateDummySampler() {
+  if (dummySampler == nullptr) {
+    dummySampler = context->gpu()->createSampler({});
+  }
+  return dummySampler;
+}
+
 std::shared_ptr<Program> GlobalCache::findProgram(const BytesKey& programKey) {
   _programStats.requests++;
   auto result = programMap.find(programKey);

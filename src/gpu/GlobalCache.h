@@ -54,6 +54,18 @@ class GlobalCache {
    * Finds a program in the cache by its key. Returns nullptr if no program is found. The program
    * will be kept alive for the lifetime of the GlobalCache.
    */
+  /**
+   * Returns a shared 1x1 white texture used to pad texture bindings a precompiled kernel declares
+   * but the draw does not supply (e.g. an absent device mask). The guarded shader path never
+   * samples it, so the content is irrelevant.
+   */
+  std::shared_ptr<Texture> getOrCreateDummyTexture();
+
+  /**
+   * Returns the sampler paired with the dummy padding texture.
+   */
+  std::shared_ptr<Sampler> getOrCreateDummySampler();
+
   std::shared_ptr<Program> findProgram(const BytesKey& programKey);
 
   /**
@@ -182,6 +194,8 @@ class GlobalCache {
   std::shared_ptr<GPUBufferProxy> getRoundStrokeIndexBuffer(bool antialias);
 
   Context* context = nullptr;
+  std::shared_ptr<Texture> dummyTexture = nullptr;
+  std::shared_ptr<Sampler> dummySampler = nullptr;
   std::list<Program*> programLRU = {};
   BytesKeyMap<std::shared_ptr<Program>> programMap = {};
   ProgramCacheStats _programStats = {};

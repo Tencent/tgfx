@@ -61,6 +61,19 @@ class Program {
     return provenance;
   }
 
+  /**
+   * The number of texture bindings the precompiled artifact declares. Draws providing fewer
+   * textures (e.g. an absent device mask) pad the rest with the shared dummy texture. Zero for
+   * runtime-generated programs, which bind exactly what the draw supplies.
+   */
+  uint32_t expectedTextureCount() const {
+    return expectedTextureCountValue;
+  }
+
+  void setExpectedTextureCount(uint32_t count) {
+    expectedTextureCountValue = count;
+  }
+
  private:
   BytesKey programKey = {};
   std::list<Program*>::iterator cachedPosition;
@@ -68,6 +81,7 @@ class Program {
   std::unique_ptr<UniformData> vertexUniformData = nullptr;
   std::unique_ptr<UniformData> fragmentUniformData = nullptr;
   ProgramProvenance provenance = {};
+  uint32_t expectedTextureCountValue = 0;
 
   friend class GlobalCache;
 };

@@ -39,18 +39,17 @@ class UnifiedGradientShader : public PrecompiledShader {
   using VD = VertDims;
 
   struct FragDims {
-    enum : uint32_t { HAS_XP, HAS_DEVICE_MASK, HAS_VCOVERAGE, HAS_LUT, COUNT };
+    enum : uint32_t { HAS_XP, HAS_VCOVERAGE, HAS_LUT, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("HAS_XP", 3),
-          PermutationBool("HAS_DEVICE_MASK"),
           PermutationBool("HAS_VCOVERAGE"),
           PermutationBool("HAS_LUT"),
       });
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 4, "Update ShouldCompile when fragment dimensions change.");
+  static_assert(FD::COUNT == 3, "Update ShouldCompile when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"UnifiedGradientShader",

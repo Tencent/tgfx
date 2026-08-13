@@ -19,6 +19,7 @@
 #define HAS_XP 0
 #endif
 #define HAS_RUNTIME_CLIP 1
+#define HAS_RUNTIME_DEVICE_MASK 1
 #ifndef HAS_DEVICE_MASK
 #define HAS_DEVICE_MASK 0
 #endif
@@ -78,10 +79,10 @@ layout(location = 1) in float vCoverage;
 #if HAS_LUT
 layout(set = 1, binding = 0) uniform sampler2D GradientTexture;
 #endif
-#if HAS_DEVICE_MASK
+// Always bound: an absent device mask is padded with the shared dummy texture and
+// HasDeviceMask is 0.
 layout(set = 1, binding = HAS_LUT) uniform sampler2D MaskTextureSampler;
-#endif
-#define XP_DST_TEX_BINDING (HAS_LUT + HAS_DEVICE_MASK)
+#define XP_DST_TEX_BINDING (HAS_LUT + 1)
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
 

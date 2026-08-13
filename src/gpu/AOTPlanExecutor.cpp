@@ -723,24 +723,24 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
   // artifacts by binding phantom children that re-use the first leaf's texture. Their DAG slots
   // are never OP_TEXTURE, so the kernel's runtime guard never samples them.
   std::vector<PlacementPtr<FragmentProcessor>> samplerPadding = {};
-  size_t samplerChildren = leaves.size() + (lutChild != nullptr ? 1 : 0);
-  if (samplerChildren > 0 && samplerChildren < 4) {
-    std::shared_ptr<TextureProxy> paddingProxy = nullptr;
-    for (size_t index = 0; index < nodes.size() && paddingProxy == nullptr; ++index) {
-      if (nodes[index]->kind == AOTEffectKind::TextureSource) {
-        auto* textureParams = std::get_if<AOTTextureParameters>(&nodes[index]->parameters);
-        if (textureParams != nullptr) {
-          paddingProxy = textureParams->textureProxy;
-        }
-      } else if (nodes[index]->kind == AOTEffectKind::GradientSource) {
-        // A LUT-gradient-only chain has no TextureSource node; its baked LUT texture serves as
-        // the padding texture just as it served as the phantom before.
-        auto* gradientParams = std::get_if<AOTGradientParameters>(&nodes[index]->parameters);
-        if (gradientParams != nullptr && gradientParams->lutProxy != nullptr) {
-          paddingProxy = gradientParams->lutProxy;
-        }
+  std::shared_ptr<TextureProxy> paddingProxy = nullptr;
+  for (size_t index = 0; index < nodes.size() && paddingProxy == nullptr; ++index) {
+    if (nodes[index]->kind == AOTEffectKind::TextureSource) {
+      auto* textureParams = std::get_if<AOTTextureParameters>(&nodes[index]->parameters);
+      if (textureParams != nullptr) {
+        paddingProxy = textureParams->textureProxy;
+      }
+    } else if (nodes[index]->kind == AOTEffectKind::GradientSource) {
+      // A LUT-gradient-only chain has no TextureSource node; its baked LUT texture serves as
+      // the padding texture just as it served as the phantom before.
+      auto* gradientParams = std::get_if<AOTGradientParameters>(&nodes[index]->parameters);
+      if (gradientParams != nullptr && gradientParams->lutProxy != nullptr) {
+        paddingProxy = gradientParams->lutProxy;
       }
     }
+  }
+  size_t samplerChildren = leaves.size() + (lutChild != nullptr ? 1 : 0);
+  if (samplerChildren > 0 && samplerChildren < 4) {
     if (paddingProxy == nullptr) {
       return nullptr;
     }
@@ -827,11 +827,25 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
       return nullptr;
     }
   }
+  // Four-leaf artifacts declare the mask sampler unconditionally, so a mask-free chain binds a
+  // phantom there (re-using the same padding texture) and clears HasMaskTexture at runtime.
+  bool maskChildIsPhantom = false;
+  if (samplerChildren == 4 && maskChild == nullptr) {
+    if (paddingProxy == nullptr) {
+      return nullptr;
+    }
+    auto phantomMatrix = Matrix::I();
+    maskChild = TextureEffect::Make(allocator, paddingProxy, {}, &phantomMatrix);
+    if (maskChild == nullptr) {
+      return nullptr;
+    }
+    maskChildIsPhantom = true;
+  }
   const AOTTiledTextureRecipe* recipePtr = tiledLeafIndex >= 0 ? &tiledRecipe : nullptr;
-  return AOTPointwiseChainProcessor::Make(allocator, std::move(leaves), slots, rootIndex,
-                                          tiledLeafIndex, recipePtr, std::move(maskChild),
-                                          coverageRootSlot, coordSourceMask, std::move(lutChild),
-                                          lutLeafIndex, std::move(samplerPadding));
+  return AOTPointwiseChainProcessor::Make(
+      allocator, std::move(leaves), slots, rootIndex, tiledLeafIndex, recipePtr,
+      std::move(maskChild), coverageRootSlot, coordSourceMask, std::move(lutChild), lutLeafIndex,
+      std::move(samplerPadding), maskChildIsPhantom);
 }
 
 static PlacementPtr<FragmentProcessor> BuildFPForPass(

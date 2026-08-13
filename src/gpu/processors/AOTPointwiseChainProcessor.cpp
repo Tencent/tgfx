@@ -116,7 +116,8 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
     const std::vector<AOTChainSlot>& slots, size_t rootSlot, int tiledLeafIndex,
     const AOTTiledTextureRecipe* tiledRecipe, PlacementPtr<FragmentProcessor> maskChild,
     int coverageRootSlot, uint32_t coordSourceMask, PlacementPtr<FragmentProcessor> lutChild,
-    int lutLeafIndex, std::vector<PlacementPtr<FragmentProcessor>> samplerPadding) {
+    int lutLeafIndex, std::vector<PlacementPtr<FragmentProcessor>> samplerPadding,
+    bool maskChildIsPhantom) {
   if (allocator == nullptr || slots.empty() || slots.size() > MaxSlots ||
       rootSlot >= slots.size()) {
     return nullptr;
@@ -132,12 +133,14 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
   if ((samplerChildren != 0 && samplerChildren != 4) || leafCount > slots.size()) {
     return nullptr;
   }
-  if (maskChild != nullptr && maskChild->name() != "DeviceSpaceTextureEffect") {
+  if (maskChild != nullptr && !maskChildIsPhantom &&
+      maskChild->name() != "DeviceSpaceTextureEffect") {
     return nullptr;
   }
-  // The LUT child binds the sampler right after the DAG leaves; the mask child's binding point
-  // relative to it is undefined, so reject the (currently unreachable) combination.
-  if (lutChild != nullptr && maskChild != nullptr) {
+  // The LUT child binds the sampler right after the DAG leaves; a real mask child's binding point
+  // relative to it is undefined, so reject that (currently unreachable) combination. A phantom
+  // mask child always binds last, after the padding.
+  if (lutChild != nullptr && maskChild != nullptr && !maskChildIsPhantom) {
     return nullptr;
   }
   if (tiledLeafIndex >= 0 &&
@@ -165,7 +168,7 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
   return allocator->make<AOTPointwiseChainProcessor>(
       std::move(textureLeaves), slots, rootSlot, tiledLeafIndex, tiledRecipe, std::move(maskChild),
       coverageRootSlot, coordSourceMask, std::move(lutChild), lutLeafIndex,
-      std::move(samplerPadding));
+      std::move(samplerPadding), maskChildIsPhantom);
 }
 
 AOTPointwiseChainProcessor::AOTPointwiseChainProcessor(
@@ -173,9 +176,11 @@ AOTPointwiseChainProcessor::AOTPointwiseChainProcessor(
     const std::vector<AOTChainSlot>& newSlots, size_t rootSlot, int tiledLeafIndex,
     const AOTTiledTextureRecipe* tiledRecipe, PlacementPtr<FragmentProcessor> maskChildFP,
     int coverageRootSlot, uint32_t coordSourceMask, PlacementPtr<FragmentProcessor> lutChildFP,
-    int lutLeafIndex, std::vector<PlacementPtr<FragmentProcessor>> samplerPadding)
+    int lutLeafIndex, std::vector<PlacementPtr<FragmentProcessor>> samplerPadding,
+    bool maskChildIsPhantom)
     : FragmentProcessor(ClassID()), _slotCount(newSlots.size()), rootSlot(rootSlot),
-      tiledLeafIndex(tiledLeafIndex), hasMaskChild(maskChildFP != nullptr),
+      tiledLeafIndex(tiledLeafIndex), hasMaskSlotChild(maskChildFP != nullptr),
+      hasMaskChild(maskChildFP != nullptr && !maskChildIsPhantom),
       coverageRootSlot(coverageRootSlot), coordSourceMask(coordSourceMask),
       lutLeafIndex(lutLeafIndex) {
   if (tiledRecipe != nullptr) {
@@ -240,6 +245,9 @@ void AOTPointwiseChainProcessor::onSetData(UniformData* vertexUniformData,
   if (fragmentUniformData == nullptr) {
     return;
   }
+  // The mask sampler slot is always bound in four-leaf variants; this flag selects the
+  // runtime application. Absent in leaf-free variants (compile-time mask there).
+  fragmentUniformData->setDataOptional("HasMaskTexture", hasMaskChild ? 1 : 0);
   fragmentUniformData->setDataOptional("RootIndex", static_cast<int>(rootSlot));
   fragmentUniformData->setDataOptional("CoverageRootIndex", coverageRootSlot);
   fragmentUniformData->setDataOptional("SlotCount", static_cast<int>(_slotCount));

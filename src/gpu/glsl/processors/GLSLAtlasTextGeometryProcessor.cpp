@@ -115,5 +115,9 @@ void GLSLAtlasTextGeometryProcessor::setData(UniformData* vertexUniformData,
     int alphaOnly = isAlphaOnly() ? 1 : 0;
     fragmentUniformData->setData("AlphaOnly", alphaOnly);
   }
+  if (fragmentUniformData != nullptr) {
+    // Default for the runtime device mask; a present mask FP overwrites it with 1 later.
+    fragmentUniformData->setDataOptional("HasDeviceMask", 0);
+  }
 }
 }  // namespace tgfx

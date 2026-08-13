@@ -62,6 +62,8 @@ void GLSLDeviceSpaceTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
   auto scale = textureView->getTextureCoord(1, 1);
   deviceCoordMatrix.postScale(scale.x, scale.y);
   fragmentUniformData->setData("DeviceCoordMatrix", deviceCoordMatrix);
+  // Kernels with a runtime device mask read this flag; absent in compile-time-mask programs.
+  fragmentUniformData->setDataOptional("HasDeviceMask", 1);
   // Shared precompiled kernels (a device mask alongside texture fills) declare a
   // DeviceMaskSubset decoy: this FP's Subset/AlphaOnly/Rect writes are dead or would clobber the
   // leaf processor's same-named fields, so they are routed there and skipped here. The decoy is

@@ -204,6 +204,9 @@ void GLSLTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
   if (textureView == nullptr || fragmentUniformData == nullptr) {
     return;
   }
+  // Default for kernels with a runtime device mask (absent elsewhere); a present mask FP
+  // overwrites it with 1 later in traversal.
+  fragmentUniformData->setDataOptional("HasDeviceMask", 0);
   if (alphaStart != Point::Zero()) {
     auto alphaStartValue = textureView->getTextureCoord(alphaStart.x, alphaStart.y);
     fragmentUniformData->setData("AlphaStart", alphaStartValue);

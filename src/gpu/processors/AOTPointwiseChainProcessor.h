@@ -96,7 +96,8 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
       const AOTTiledTextureRecipe* tiledRecipe = nullptr,
       PlacementPtr<FragmentProcessor> maskChild = nullptr, int coverageRootSlot = -1,
       uint32_t coordSourceMask = ~0u, PlacementPtr<FragmentProcessor> lutChild = nullptr,
-      int lutLeafIndex = -1, std::vector<PlacementPtr<FragmentProcessor>> samplerPadding = {});
+      int lutLeafIndex = -1, std::vector<PlacementPtr<FragmentProcessor>> samplerPadding = {},
+      bool maskChildIsPhantom = false);
 
   AOTPointwiseChainProcessor(std::vector<PlacementPtr<FragmentProcessor>> textureLeaves,
                              const std::vector<AOTChainSlot>& slots, size_t rootSlot,
@@ -104,17 +105,22 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
                              PlacementPtr<FragmentProcessor> maskChild, int coverageRootSlot,
                              uint32_t coordSourceMask, PlacementPtr<FragmentProcessor> lutChild,
                              int lutLeafIndex,
-                             std::vector<PlacementPtr<FragmentProcessor>> samplerPadding);
+                             std::vector<PlacementPtr<FragmentProcessor>> samplerPadding,
+                             bool maskChildIsPhantom);
 
   std::string name() const override {
     return "AOTPointwiseChainProcessor";
   }
 
+  // Sampler-binding leaf children (DAG leaves plus phantom padding), i.e. the count the
+  // TEXTURE_COUNT dimension is encoded from. The mask slot child (real or phantom) is excluded.
   size_t leafCount() const {
-    return numChildProcessors() - (hasMask() ? 1 : 0);
+    return numChildProcessors() - (hasMaskSlotChild ? 1 : 0);
   }
 
-  // Whether the chain carries a device-space alpha-mask child (always the last child).
+  // Whether the chain carries a real device-space alpha-mask child. Four-leaf chains always
+  // occupy the mask sampler slot (a phantom when no mask is present), so this flag only selects
+  // the runtime application, not the binding layout.
   bool hasMask() const {
     return hasMaskChild;
   }
@@ -164,6 +170,8 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
   AOTTiledTextureRecipe _tiledRecipe = {};
   std::array<AOTChainSlot, MaxSlots> slots = {};
   // Kept only to mark the mask's presence; the mask itself is the last registered child.
+  // The mask sampler slot is occupied (real mask or phantom) — four-leaf chains always occupy it.
+  bool hasMaskSlotChild = false;
   bool hasMaskChild = false;
   // Always registered as this processor's own coord transform (index 0, ahead of the leaf
   // transforms) so the gradient coordinate mapping shares the GP-written transform path. A chain

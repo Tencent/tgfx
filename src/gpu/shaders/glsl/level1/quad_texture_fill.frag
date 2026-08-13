@@ -43,12 +43,13 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   // RGBAAA dual-plane alpha: always declared. Only read when HasRgbaaa != 0 (set at runtime), so it
   // is a uniform branch rather than a compile-time permutation.
   vec2 AlphaStart;
-#if HAS_MASK_TEXTURE
+  // The device mask is a runtime uniform: the sampler is always bound (padded with the shared
+  // dummy when the draw has no mask) and HasDeviceMask selects the application.
   mat3 DeviceCoordMatrix;
   // Decoy write target for the coverage mask FP (see GLSLDeviceSpaceTextureEffect::onSetData);
   // never read — the mask is sampled unclamped.
   vec4 DeviceMaskSubset;
-#endif
+  int HasDeviceMask;
 #if HAS_XP
   vec2 DstTextureUpperLeft;
   vec2 DstTextureCoordScale;
@@ -78,16 +79,14 @@ layout(location = 4) in vec3 TransformedCoords_1;
 
 layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
 
-// A coverage mask (device-space or local-space) occupies binding 1; the XP dst texture, if any,
-// follows at 2. HAS_MASK_TEXTURE (device) and HAS_LOCAL_MASK (local) are mutually exclusive.
-#if HAS_MASK_TEXTURE
+// The device-mask sampler always occupies binding 1 (padded with the shared dummy when the draw
+// has no mask); the local mask, if any, follows at 2, and the XP dst texture after both.
 layout(set = 1, binding = 1) uniform sampler2D MaskTextureSampler;
-  #define XP_DST_TEX_BINDING 2
-#elif HAS_LOCAL_MASK
-layout(set = 1, binding = 1) uniform sampler2D LocalMaskSampler;
-  #define XP_DST_TEX_BINDING 2
+#if HAS_LOCAL_MASK
+layout(set = 1, binding = 2) uniform sampler2D LocalMaskSampler;
+  #define XP_DST_TEX_BINDING 3
 #else
-  #define XP_DST_TEX_BINDING 1
+  #define XP_DST_TEX_BINDING 2
 #endif
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
@@ -140,10 +139,10 @@ void main() {
   }
 
   float maskAlpha = 1.0;
-#if HAS_MASK_TEXTURE
-  highp vec3 maskCoord = DeviceCoordMatrix * vec3(gl_FragCoord.xy, 1.0);
-  maskAlpha = texture(MaskTextureSampler, maskCoord.xy).r;
-#endif
+  if (HasDeviceMask != 0) {
+    highp vec3 maskCoord = DeviceCoordMatrix * vec3(gl_FragCoord.xy, 1.0);
+    maskAlpha = texture(MaskTextureSampler, maskCoord.xy).r;
+  }
 
   float localMaskAlpha = 1.0;
 #if HAS_LOCAL_MASK

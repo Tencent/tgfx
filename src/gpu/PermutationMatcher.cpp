@@ -528,7 +528,6 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   if (programInfo->numColorFragmentProcessors() != 1) {
     return std::nullopt;
   }
-  bool hasMaskTexture = false;
   bool hasLocalMask = false;
   if (programInfo->numFragmentProcessors() != 1) {
     if (HasDirectAARectCoverage(programInfo)) {
@@ -536,10 +535,11 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
     } else {
       auto coverage = ClassifyCoverageFP(programInfo);
       if (coverage && *coverage == CoverageKind::DeviceMask) {
-        hasMaskTexture = true;
+        // Device masks are a runtime uniform now, so there is nothing to encode.
       } else if (coverage && *coverage == CoverageKind::LocalMask) {
         hasLocalMask = true;
       } else {
+        // Unrecognized coverage kinds (including unclassifiable ones) stay on other routes.
         return std::nullopt;
       }
     }
@@ -588,7 +588,6 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   // variants.
   fragValues[FD::HAS_SUBSET] = gpSubset ? 1 : 0;
   fragValues[FD::HAS_XP] = xpType;
-  fragValues[FD::HAS_MASK_TEXTURE] = hasMaskTexture ? 1 : 0;
   fragValues[FD::HAS_LOCAL_MASK] = hasLocalMask ? 1 : 0;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"QuadTextureFillShader", vertIndex, fragIndex};
@@ -803,11 +802,11 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
     }
   }
   int hasMask = chain->hasMask() ? 1 : 0;
-  // The mask application point (device-space sample multiplied post-DAG) is GP-agnostic, but the
-  // compiled mask variants carry no quad attributes (ShouldCompile), so a mask chain is servable
-  // only on the rect layouts without uv/color attributes. Keep this in sync with ShouldCompile so
-  // the miss is attributed here instead of the buildability post-check.
-  if (hasMask && (gpLayout != 0 || hasUVCoord != 0 || hasColor != 0)) {
+  // Four-leaf variants apply the mask through a runtime uniform, so a masked chain is servable on
+  // every layout. Leaf-free chains keep the compile-time mask dimension, which the kernel compiles
+  // without quad attributes (ShouldCompile), so those stay rect-only. Keep this in sync with
+  // ShouldCompile so the miss is attributed here instead of the buildability post-check.
+  if (hasMask && leafCount == 0 && (gpLayout != 0 || hasUVCoord != 0 || hasColor != 0)) {
     return std::nullopt;
   }
   // The ellipse layout carries the same leaf-count-free variants as the rect family: they serve
@@ -840,7 +839,7 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
   fragValues[FD::HAS_COVERAGE] = hasCoverage;
   fragValues[FD::HAS_COLOR] = hasColor;
   fragValues[FD::TEXTURE_COUNT] = textureCountValue;
-  fragValues[FD::HAS_MASK_TEXTURE] = hasMask;
+  fragValues[FD::HAS_MASK_TEXTURE] = leafCount == 0 ? hasMask : 0;
   auto fragIndex = FD::domain().encode(fragValues);
   return PermutationMatchResult{"PointwiseChainShader", vertIndex, fragIndex};
 }
@@ -989,7 +988,6 @@ static std::optional<PermutationMatchResult> TryMatchUnifiedGradient(
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
   fragValues[FD::HAS_XP] = xpType;
-  fragValues[FD::HAS_DEVICE_MASK] = *coverageType;
   fragValues[FD::HAS_VCOVERAGE] = vCoverage;
   fragValues[FD::HAS_LUT] = hasLUT;
   auto fragIndex = fragDomain.encode(fragValues);
@@ -1041,7 +1039,6 @@ static std::optional<PermutationMatchResult> TryMatchAtlasTextFill(const Program
   if (xpType < 0) {
     return std::nullopt;
   }
-  int deviceMask = 0;
   if (programInfo->numFragmentProcessors() == 1) {
     // A single alpha-only device-space mask coverage multiplies the atlas glyph coverage.
     auto fp = programInfo->getFragmentProcessor(0);
@@ -1052,7 +1049,6 @@ static std::optional<PermutationMatchResult> TryMatchAtlasTextFill(const Program
     if (!mask->isAlphaOnly() || mask->hasPerspective()) {
       return std::nullopt;
     }
-    deviceMask = 1;
   }
   auto* atgp = static_cast<const AtlasTextGeometryProcessor*>(gp);
   using D = AtlasTextFillShader::D;
@@ -1068,7 +1064,6 @@ static std::optional<PermutationMatchResult> TryMatchAtlasTextFill(const Program
     fragValues[i] = values[i];
   }
   fragValues[FD::HAS_XP] = xpType;
-  fragValues[FD::HAS_DEVICE_MASK] = deviceMask;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"AtlasTextFillShader", vertIndex, fragIndex};
 }
@@ -1282,7 +1277,6 @@ static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
   // The blur child is either a plain TextureEffect (inlined texture() call) or a TiledTextureEffect,
   // in which case the shared tiled_sample.inc tiling is applied per tap (HAS_TILED_CHILD). Tiled
   // children are limited to the ShaderMode values tiled_sample.inc implements; others fall back.
-  bool tiledChild = false;
   if (childFP->name() == "TextureEffect") {
     auto* childTE = static_cast<const TextureEffect*>(childFP);
     if (childTE->numTextureSamplers() == 0) {
@@ -1299,7 +1293,6 @@ static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
     if (!TiledModeSupported(modeX) || !TiledModeSupported(modeY)) {
       return std::nullopt;
     }
-    tiledChild = true;
   } else {
     return std::nullopt;
   }
@@ -1320,8 +1313,7 @@ static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
   fragValues[FD::HAS_XP] = xpType;
-  fragValues[FD::HAS_DEVICE_MASK] = *coverageType;
-  fragValues[FD::HAS_TILED_CHILD] = tiledChild ? 1 : 0;
+
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"GaussianBlur1DShader", vertIndex, fragIndex};
 }

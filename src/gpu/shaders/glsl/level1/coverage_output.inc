@@ -17,11 +17,20 @@
 #ifndef HAS_DEVICE_MASK
 #define HAS_DEVICE_MASK 0
 #endif
+#ifndef HAS_RUNTIME_DEVICE_MASK
+#define HAS_RUNTIME_DEVICE_MASK 0
+#endif
 
 #if HAS_RUNTIME_CLIP
   vec4 _coverageResult = TGFX_INITIAL_COVERAGE;
 
-  #if HAS_DEVICE_MASK
+  #if HAS_RUNTIME_DEVICE_MASK
+  if (HasDeviceMask != 0) {
+    highp vec3 _maskCoord = DeviceCoordMatrix * vec3(gl_FragCoord.xy, 1.0);
+    float _maskAlpha = texture(MaskTextureSampler, _maskCoord.xy).r;
+    _coverageResult *= _maskAlpha;
+  }
+  #elif HAS_DEVICE_MASK
     highp vec3 _maskCoord = DeviceCoordMatrix * vec3(gl_FragCoord.xy, 1.0);
     float _maskAlpha = texture(MaskTextureSampler, _maskCoord.xy).r;
     _coverageResult *= _maskAlpha;

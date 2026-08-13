@@ -16,9 +16,7 @@
 #ifndef HAS_XP
 #define HAS_XP 0
 #endif
-#ifndef HAS_DEVICE_MASK
-#define HAS_DEVICE_MASK 0
-#endif
+#define HAS_RUNTIME_DEVICE_MASK 1
 #define HAS_RUNTIME_CLIP 1
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
@@ -43,16 +41,10 @@ layout(location = 1) in vec4 vColor;
 #endif
 
 layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
-#if HAS_DEVICE_MASK
+// Always bound: an absent device mask is padded with the shared dummy texture and HasDeviceMask
+// is 0.
 layout(set = 1, binding = 1) uniform sampler2D MaskTextureSampler;
-  #define XP_DST_TEX_BINDING 2
-#else
-  #define XP_DST_TEX_BINDING 1
-
-  // Decoy write target for the coverage mask FP (see GLSLDeviceSpaceTextureEffect::onSetData);
-  // never read — the mask is sampled unclamped.
-  vec4 DeviceMaskSubset;
-#endif
+#define XP_DST_TEX_BINDING 2
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
 

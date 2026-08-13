@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ProgramInfo.h"
+#include <cstdio>
+#include <cstdlib>
 #include <iomanip>
 #include <sstream>
 #include "AlignTo.h"
@@ -392,13 +394,38 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
                                   fragmentOffset);
 
   auto samplers = getSamplers();
+  auto expected = program->expectedTextureCount();
+  // The dst texture always binds last in the artifact. When the artifact declares more samplers
+  // than the draw supplies (e.g. an absent device mask on a runtime-guarded kernel), the holes sit
+  // before the dst, so hold the dst aside and pad with the shared dummy texture first; the guarded
+  // shader path never samples the padded slots.
+  bool holdDst = expected > samplers.size() && !samplers.empty() && xferProcessor != nullptr &&
+                 xferProcessor->dstTextureView() != nullptr;
+  size_t sequentialCount = holdDst ? samplers.size() - 1 : samplers.size();
   unsigned textureBinding = 0;
   auto gpu = renderTarget->getContext()->gpu();
-  for (auto& [texture, state] : samplers) {
+  for (size_t i = 0; i < sequentialCount; ++i) {
+    auto& [texture, state] = samplers[i];
     SamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
                                  state.minFilterMode, state.magFilterMode, state.mipmapMode);
     auto sampler = gpu->createSampler(descriptor);
     renderPass->setTexture(textureBinding++, texture, sampler);
+  }
+  if (textureBinding < expected - (holdDst ? 1u : 0u)) {
+    auto* cache = renderTarget->getContext()->globalCache();
+    auto dummyTexture = cache->getOrCreateDummyTexture();
+    auto dummySampler = cache->getOrCreateDummySampler();
+    unsigned stop = expected - (holdDst ? 1u : 0u);
+    while (textureBinding < stop) {
+      renderPass->setTexture(textureBinding++, dummyTexture, dummySampler);
+    }
+  }
+  if (holdDst) {
+    auto& [texture, state] = samplers.back();
+    SamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
+                                 state.minFilterMode, state.magFilterMode, state.mipmapMode);
+    auto sampler = gpu->createSampler(descriptor);
+    renderPass->setTexture(textureBinding, texture, sampler);
   }
 }
 

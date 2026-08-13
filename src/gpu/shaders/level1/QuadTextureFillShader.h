@@ -60,18 +60,17 @@ class QuadTextureFillShader : public PrecompiledShader {
   // (alpha-only replicates .r; RGBAAA adds one coherent-branch alpha sample), so they are runtime
   // uniforms (AlphaOnly / HasRgbaaa) rather than compile-time permutations, shrinking the variants.
   struct FragDims {
-    enum : uint32_t { HAS_SUBSET, HAS_XP, HAS_MASK_TEXTURE, HAS_LOCAL_MASK, COUNT };
+    enum : uint32_t { HAS_SUBSET, HAS_XP, HAS_LOCAL_MASK, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationBool("HAS_SUBSET"),
           PermutationInt("HAS_XP", 3),
-          PermutationBool("HAS_MASK_TEXTURE"),
           PermutationBool("HAS_LOCAL_MASK"),
       });
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 4, "Update ShouldCompile when fragment dimensions change.");
+  static_assert(FD::COUNT == 3, "Update ShouldCompile when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"QuadTextureFillShader",
@@ -86,18 +85,10 @@ class QuadTextureFillShader : public PrecompiledShader {
   }
 
  private:
-  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>&,
-                            const std::vector<int>& fragValues) {
+  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>&, const std::vector<int>&) {
     // HAS_SUBSET / HAS_LOCAL_MASK vertex and fragment agreement is
-    // enforced automatically by the framework (MirroredDimsAgree).
-    if (fragValues[FD::HAS_LOCAL_MASK] != 0) {
-      // Local-space and device-space masks are mutually exclusive coverage sources.
-      if (fragValues[FD::HAS_MASK_TEXTURE] != 0) {
-        return false;
-      }
-      // (The former HAS_COLOR restriction for local mask is gone with the dimension: per-vertex
-      // color is now always present, so no carve-out is needed.)
-    }
+    // enforced automatically by the framework (MirroredDimsAgree); the device mask is a runtime
+    // uniform, so no mutual-exclusion carve-out is needed anymore.
     return true;
   }
 };

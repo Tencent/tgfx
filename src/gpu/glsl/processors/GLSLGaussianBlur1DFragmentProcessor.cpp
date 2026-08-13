@@ -90,5 +90,10 @@ void GLSLGaussianBlur1DFragmentProcessor::onSetData(UniformData* /*vertexUniform
   Point step = stepVectors[1] - stepVectors[0];
   fragmentUniformData->setData("Sigma", sigma);
   fragmentUniformData->setData("Step", step);
+  // Runtime flags of the shared blur kernel; a present mask FP overwrites HasDeviceMask with 1
+  // later in traversal.
+  fragmentUniformData->setDataOptional("HasDeviceMask", 0);
+  fragmentUniformData->setDataOptional("TiledChild",
+                                       processor->name() == "TiledTextureEffect" ? 1 : 0);
 }
 }  // namespace tgfx

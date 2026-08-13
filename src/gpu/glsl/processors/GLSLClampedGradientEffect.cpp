@@ -101,6 +101,8 @@ void GLSLClampedGradientEffect::onSetData(UniformData* /*vertexUniformData*/,
                                           UniformData* fragmentUniformData) const {
   fragmentUniformData->setData("leftBorderColor", leftBorderColor);
   fragmentUniformData->setData("rightBorderColor", rightBorderColor);
+  // Default for runtime-mask kernels; a present mask FP overwrites it with 1 later in traversal.
+  fragmentUniformData->setDataOptional("HasDeviceMask", 0);
   // The precompiled gradient shaders fold the four layout maths into one variant selected by the
   // LayoutType uniform. Runtime-generated shaders emit layout-specific code and declare no such
   // field, so setDataOptional tolerates its absence there.

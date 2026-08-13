@@ -127,6 +127,11 @@ class PointwiseChainShader : public PrecompiledShader {
         return false;
       }
     }
+    // The mask is a runtime uniform on four-leaf variants; the compile-time dimension remains
+    // only for leaf-free chains (which have no texture to rebind as the phantom).
+    if (fragValues[FD::HAS_MASK_TEXTURE] != 0 && fragValues[FD::TEXTURE_COUNT] != 0) {
+      return false;
+    }
     // Mask clips go through DefaultGP paths only, which never carry quad attributes.
     if (fragValues[FD::HAS_MASK_TEXTURE] != 0 &&
         (vertValues[VD::HAS_UV_COORD] != 0 || vertValues[VD::HAS_COLOR] != 0)) {

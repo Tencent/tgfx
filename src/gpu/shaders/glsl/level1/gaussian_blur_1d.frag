@@ -19,9 +19,7 @@
 #define HAS_XP 0
 #endif
 #define HAS_RUNTIME_CLIP 1
-#ifndef HAS_DEVICE_MASK
-#define HAS_DEVICE_MASK 0
-#endif
+#define HAS_RUNTIME_DEVICE_MASK 1
 #ifndef HAS_TILED_CHILD
 #define HAS_TILED_CHILD 0
 #endif
@@ -33,12 +31,13 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   // Always declared: plain-child taps clamp to it (no-op at full bounds); a tiled child uses it
   // as the tiling domain.
   vec4 Subset;
-#if HAS_TILED_CHILD
+  // The tiled-child fields are always declared: a plain child never reads them (the runtime
+  // TiledChild branch is not taken), so they need no compile-time dimension.
   int ShaderModeX;
   int ShaderModeY;
   vec4 Clamp;
   vec2 Dimension;
-#endif
+  int TiledChild;
 #include "coverage_uniforms.inc"
 #include "xp_uniforms.inc"
 };
@@ -47,21 +46,13 @@ layout(location = 0) in vec2 TransformedCoords_0;
 
 layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
 
-#if HAS_DEVICE_MASK
+// Always bound: an absent device mask is padded with the shared dummy texture and HasDeviceMask
+// is 0.
 layout(set = 1, binding = 1) uniform sampler2D MaskTextureSampler;
-  #define XP_DST_TEX_BINDING 2
-#else
-  #define XP_DST_TEX_BINDING 1
-
-  // Decoy write target for the coverage mask FP (see GLSLDeviceSpaceTextureEffect::onSetData);
-  // never read — the mask is sampled unclamped.
-  vec4 DeviceMaskSubset;
-#endif
+#define XP_DST_TEX_BINDING 2
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
-#if HAS_TILED_CHILD
 #include "tiled_sample.inc"
-#endif
 
 layout(location = 0) out vec4 fragColor;
 
@@ -79,13 +70,14 @@ void main() {
     total += weight;
 
     vec2 sampleCoord = TransformedCoords_0 + offset * float(i);
-#if HAS_TILED_CHILD
+    vec4 texColor = vec4(0.0);
+    if (TiledChild != 0) {
     // The child is a TiledTextureEffect: tile each tap exactly as the runtime does per sample.
     vec2 tapInCoord;
     vec2 tapSubsetCoord;
     vec2 tapClampedCoord;
     vec2 tapCoord = tiledMapCoord(sampleCoord, false, tapInCoord, tapSubsetCoord, tapClampedCoord);
-    vec4 texColor = texture(TextureSampler_0, tapCoord);
+    texColor = texture(TextureSampler_0, tapCoord);
     // RepeatLinearNone(3) seam blend, ported from the runtime GLSLTiledTextureEffect emission: a
     // wrapped coordinate that clamps means the linear footprint crosses the subset edge, so blend
     // with a sample at the opposite clamp edge (diagonal read when both axes clamp). The signed
@@ -117,10 +109,10 @@ void main() {
       }
     }
     texColor = tiledApplyBorder(texColor, tapInCoord, tapSubsetCoord, tapClampedCoord);
-#else
-    sampleCoord = clamp(sampleCoord, Subset.xy, Subset.zw);
-    vec4 texColor = texture(TextureSampler_0, sampleCoord);
-#endif
+    } else {
+      sampleCoord = clamp(sampleCoord, Subset.xy, Subset.zw);
+      texColor = texture(TextureSampler_0, sampleCoord);
+    }
     sum += texColor * weight;
 
     if (i == radius) {

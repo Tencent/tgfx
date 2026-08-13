@@ -423,8 +423,10 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
   ProgramProvenance provenance = {
       ArtifactOriginForBackend(context->backend(), vertexDesc, fragmentDesc),
       ProgramOrigin::PrecompiledArtifact, PipelineOrigin::RuntimeCreation};
-  return std::make_shared<Program>(std::move(pipeline), std::move(vertexUniformData),
-                                   std::move(fragmentUniformData), provenance);
+  auto program = std::make_shared<Program>(std::move(pipeline), std::move(vertexUniformData),
+                                           std::move(fragmentUniformData), provenance);
+  program->setExpectedTextureCount(static_cast<uint32_t>(descriptor.layout.textureSamplers.size()));
+  return program;
 }
 
 }  // namespace tgfx

@@ -30,28 +30,19 @@ class AtlasTextFillShader : public PrecompiledShader {
   using D = Dims;
 
   struct FragDims {
-    // HAS_DEVICE_MASK (bool): an alpha-only device-space mask multiplies the atlas coverage.
-    enum : uint32_t { HAS_COVERAGE, HAS_COMMON_COLOR, HAS_XP, HAS_DEVICE_MASK, COUNT };
+    // A device-space mask is a runtime uniform (HasDeviceMask), not a permutation dimension.
+    enum : uint32_t { HAS_COVERAGE, HAS_COMMON_COLOR, HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationBool("HAS_COVERAGE"),
           PermutationBool("HAS_COMMON_COLOR"),
           PermutationInt("HAS_XP", 3),
-          PermutationBool("HAS_DEVICE_MASK"),
       });
     }
   };
   using FD = FragDims;
-  static_assert(D::COUNT == 2 && FD::COUNT == 4,
+  static_assert(D::COUNT == 2 && FD::COUNT == 3,
                 "Update ShouldCompile below when dimensions change.");
-
- private:
-  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>&,
-                            const std::vector<int>& fragValues) {
-    // Masked text with a PorterDuff dst-texture blend is not produced by current callers, so the
-    // mask variants are pinned to the passthrough XP.
-    return fragValues[FD::HAS_DEVICE_MASK] == 0 || fragValues[FD::HAS_XP] == 0;
-  }
 
  public:
   PrecompiledShaderInfo info() const override {
@@ -63,7 +54,7 @@ class AtlasTextFillShader : public PrecompiledShader {
             PermutationDomain({}),
             "",
             "",
-            ShouldCompile};
+            nullptr};
   }
 };
 

@@ -69,7 +69,15 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   // Chain-wide AA-rect clip for OP_AARECT_COVERAGE (at most one such slot per chain). The rect is
   // in destination device coordinates and already carries the 0.5 outset for the AA falloff.
   vec4 CoverageRect;
-#if HAS_MASK_TEXTURE
+#if NTEX > 0
+  // Four-leaf variants always bind the mask sampler (a phantom when the chain has no mask);
+  // HasMaskTexture selects the application at runtime.
+  mat3 DeviceCoordMatrix;
+  // Decoy write target for the coverage mask FP (see GLSLDeviceSpaceTextureEffect::onSetData);
+  // never read — the mask is sampled unclamped.
+  vec4 DeviceMaskSubset;
+  int HasMaskTexture;
+#elif HAS_MASK_TEXTURE
   mat3 DeviceCoordMatrix;
   // Decoy write target for the coverage mask FP (see GLSLDeviceSpaceTextureEffect::onSetData);
   // never read — the mask is sampled unclamped.
@@ -181,9 +189,9 @@ layout(set = 1, binding = 1) uniform sampler2D TextureSampler_1;
 layout(set = 1, binding = 2) uniform sampler2D TextureSampler_2;
 layout(set = 1, binding = 3) uniform sampler2D TextureSampler_3;
 #endif
-#if HAS_MASK_TEXTURE
+#if NTEX > 0 || HAS_MASK_TEXTURE
 // Device-space alpha mask applied after the DAG and before the XP stage (same application point
-// as the legacy blend kernel).
+// as the legacy blend kernel). Four-leaf variants always bind it (phantom when absent).
 layout(set = 1, binding = NTEX) uniform sampler2D MaskTextureSampler;
 #define XP_DST_TEX_BINDING (NTEX + 1)
 #else
@@ -288,7 +296,14 @@ void main() {
   }
   vec4 result = chainResults[RootIndex];
 
-#if HAS_MASK_TEXTURE
+#if NTEX > 0
+  if (HasMaskTexture != 0) {
+    // Device-space mask multiply, applied after the DAG and before coverage/XP (same application
+    // point as the legacy blend kernel).
+    highp vec3 maskCoord = DeviceCoordMatrix * vec3(gl_FragCoord.xy, 1.0);
+    result *= texture(MaskTextureSampler, maskCoord.xy).r;
+  }
+#elif HAS_MASK_TEXTURE
   // Device-space mask multiply, applied after the DAG and before coverage/XP (same application
   // point as the legacy blend kernel).
   highp vec3 maskCoord = DeviceCoordMatrix * vec3(gl_FragCoord.xy, 1.0);
