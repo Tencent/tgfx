@@ -32,6 +32,9 @@ std::shared_ptr<Resource> ReadbackBufferCreateTask::onMakeResource(Context* cont
     LOGE("ReadbackBufferCreateTask::onMakeResource() Failed to create buffer!");
     return nullptr;
   }
+  // A recycled buffer may still carry the map state of a readback that was abandoned before its
+  // pixels were consumed, which would leave it mapped while used as a copy destination.
+  bufferResource->gpuBuffer()->unmap();
   return bufferResource;
 }
 

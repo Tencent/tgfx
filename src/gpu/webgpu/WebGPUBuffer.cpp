@@ -22,7 +22,6 @@
 #include "WebGPUCommandQueue.h"
 #include "WebGPUGPU.h"
 #include "WebGPUUtil.h"
-#include "core/utils/Log.h"
 #ifdef TGFX_USE_ASYNCIFY
 #include <emscripten.h>
 #endif
@@ -52,7 +51,7 @@ WebGPUBuffer::WebGPUBuffer(WebGPUGPU* gpu, WGPUBuffer buffer, size_t size, uint3
 
 bool WebGPUBuffer::isReady() const {
   if (_usage & GPUBufferUsage::READBACK) {
-    return mapReady;
+    return mapState == MapState::Mapped;
   }
   return true;
 }
@@ -78,14 +77,27 @@ EM_ASYNC_JS(int, webgpu_buffer_map_sync, (WGPUBuffer bufHandle, size_t size), {
     return 1;
   }
 });
-#else
-static void OnBufferMapped(WGPUBufferMapAsyncStatus status, void* userdata) {
-  if (status != WGPUBufferMapAsyncStatus_Success || userdata == nullptr) {
+#endif
+
+void WebGPUBuffer::OnBufferMapped(WGPUBufferMapAsyncStatus status, void* userdata) {
+  auto reference = static_cast<std::shared_ptr<MapRequest>*>(userdata);
+  if (reference == nullptr) {
     return;
   }
-  *static_cast<bool*>(userdata) = true;
+  auto request = *reference;
+  delete reference;
+  if (request == nullptr || request->owner == nullptr) {
+    return;
+  }
+  auto owner = request->owner;
+  if (status == WGPUBufferMapAsyncStatus_Success) {
+    owner->mapState = MapState::Mapped;
+    return;
+  }
+  // Falling back to Unmapped is required, otherwise the guard in requestMapAsync() rejects retries.
+  owner->mapState = MapState::Unmapped;
+  owner->detachMapRequest();
 }
-#endif
 
 void* WebGPUBuffer::map(size_t offset, size_t mapSize) {
   if (buffer == nullptr) {
@@ -95,10 +107,7 @@ void* WebGPUBuffer::map(size_t offset, size_t mapSize) {
     mapSize = _size - offset;
   }
   if (_usage & GPUBufferUsage::READBACK) {
-    if (!mapReady) {
-      // The buffer has not been asynchronously mapped yet. Synchronous readback is not supported
-      // in WebGPU. Call requestMapAsync() first, then poll isReady() before calling map().
-      LOGE("WebGPUBuffer::map() readback buffer not mapped. Use requestMapAsync() first.");
+    if (mapState != MapState::Mapped) {
       return nullptr;
     }
     return const_cast<void*>(wgpuBufferGetConstMappedRange(buffer, offset, mapSize));
@@ -123,13 +132,35 @@ void WebGPUBuffer::requestMapAsync() {
   if (buffer == nullptr || (_usage & GPUBufferUsage::READBACK) == 0) {
     return;
   }
-  mapReady = false;
+  // Re-issuing a map while pending is a validation error, and resetting a mapped buffer would lose
+  // the unmap obligation.
+  if (mapState != MapState::Unmapped) {
+    return;
+  }
+  detachMapRequest();
+  mapState = MapState::Pending;
 #ifdef TGFX_USE_ASYNCIFY
-  int result = webgpu_buffer_map_sync(buffer, _size);
-  mapReady = (result == 0);
+  auto generation = mapGeneration;
+  auto result = webgpu_buffer_map_sync(buffer, _size);
+  // The WASM stack was suspended during the await, so this request may have been superseded since.
+  if (generation != mapGeneration) {
+    return;
+  }
+  mapState = result == 0 ? MapState::Mapped : MapState::Unmapped;
 #else
-  wgpuBufferMapAsync(buffer, WGPUMapMode_Read, 0, _size, OnBufferMapped, &mapReady);
+  mapRequest = std::make_shared<MapRequest>();
+  mapRequest->owner = this;
+  auto reference = new std::shared_ptr<MapRequest>(mapRequest);
+  wgpuBufferMapAsync(buffer, WGPUMapMode_Read, 0, _size, OnBufferMapped, reference);
 #endif
+}
+
+void WebGPUBuffer::setMapReady(bool ready) {
+  if ((_usage & GPUBufferUsage::READBACK) == 0) {
+    return;
+  }
+  detachMapRequest();
+  mapState = ready ? MapState::Mapped : MapState::Unmapped;
 }
 
 void WebGPUBuffer::unmap() {
@@ -137,8 +168,12 @@ void WebGPUBuffer::unmap() {
     return;
   }
   if (_usage & GPUBufferUsage::READBACK) {
-    wgpuBufferUnmap(buffer);
-    mapReady = false;
+    if (mapState != MapState::Unmapped) {
+      // Unmapping rejects a pending map request, so this doubles as the cancellation path.
+      wgpuBufferUnmap(buffer);
+      mapState = MapState::Unmapped;
+    }
+    detachMapRequest();
     return;
   }
   if (stagingData != nullptr) {
@@ -152,20 +187,31 @@ void WebGPUBuffer::unmap() {
   }
 }
 
+void WebGPUBuffer::detachMapRequest() {
+  // The generation supersedes an Asyncify request in flight; the owner pointer a callback-based one.
+  ++mapGeneration;
+  if (mapRequest != nullptr) {
+    mapRequest->owner = nullptr;
+    mapRequest = nullptr;
+  }
+}
+
 void WebGPUBuffer::onRelease(WebGPUGPU*) {
   if (stagingData != nullptr) {
     free(stagingData);
     stagingData = nullptr;
   }
   if (buffer != nullptr) {
-    if (mapReady) {
+    if (mapState != MapState::Unmapped) {
       wgpuBufferUnmap(buffer);
-      mapReady = false;
     }
     wgpuBufferDestroy(buffer);
     wgpuBufferRelease(buffer);
     buffer = nullptr;
   }
+  mapState = MapState::Unmapped;
+  // Required even without a buffer: this object is deleted right after onRelease().
+  detachMapRequest();
 }
 
 }  // namespace tgfx

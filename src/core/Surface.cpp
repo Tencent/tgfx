@@ -253,6 +253,9 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
   auto context = renderTarget->getContext();
   auto srcPixels = readback->lockPixels(context);
   if (srcPixels == nullptr) {
+    // Backends whose buffer mapping is only asynchronous (WebGPU without Asyncify) can never
+    // satisfy a synchronous read; use asyncReadPixels() with isReady() polling there.
+    LOGE("Surface::readPixels() Failed to read the pixels from the surface!");
     return false;
   }
   auto flipY = renderTarget->origin() == ImageOrigin::BottomLeft;
