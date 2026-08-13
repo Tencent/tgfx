@@ -4494,6 +4494,42 @@ TGFX_TEST_PRIVATE(LayerTest, FlatLeaf_PreservesContentScaleSizing) {
   });
 }
 
+// An identity affine mapping rasters 1:1 and samples 1:1, so the offscreen mip chain can be
+// skipped entirely.
+TGFX_TEST_PRIVATE(LayerTest, AffineLeafWithoutMinification_SkipsMipmaps) {
+  TGFX_PRIVATE_ACCESS({
+    const Rect localBounds = Rect::MakeWH(100, 100);
+    const float contentScale = 1.0f;
+    const Rect renderRect = Rect::MakeWH(1000, 1000);
+    const Rect viewport = Rect::MakeWH(renderRect.width(), renderRect.height());
+    const auto localToCompositor =
+        MakeLocalToCompositorMatrix(Matrix3D::I(), contentScale, renderRect);
+    Render3DContext::RasterInfo info;
+
+    ASSERT_TRUE(Render3DContext::ComputeRasterInfo(localToCompositor, localBounds, viewport,
+                                                   contentScale, &info));
+    EXPECT_FALSE(info.mipmapped);
+  });
+}
+
+// A uniformly minified leaf samples its raster at half size, so the mip chain must be retained.
+TGFX_TEST_PRIVATE(LayerTest, MinifiedAffineLeaf_KeepsMipmaps) {
+  TGFX_PRIVATE_ACCESS({
+    const Rect localBounds = Rect::MakeWH(100, 100);
+    const float contentScale = 1.0f;
+    const Rect renderRect = Rect::MakeWH(1000, 1000);
+    const Rect viewport = Rect::MakeWH(renderRect.width(), renderRect.height());
+    const auto localToCompositor = MakeLocalToCompositorMatrix(
+        Matrix3D::MakeScale(0.5f, 0.5f, 1.0f), contentScale, renderRect);
+    Render3DContext::RasterInfo info;
+    info.mipmapped = false;
+
+    ASSERT_TRUE(Render3DContext::ComputeRasterInfo(localToCompositor, localBounds, viewport,
+                                                   contentScale, &info));
+    EXPECT_TRUE(info.mipmapped);
+  });
+}
+
 TGFX_TEST_PRIVATE(LayerTest, ExtremeAffineLeaf_KeepsMipmaps) {
   TGFX_PRIVATE_ACCESS({
     const Rect localBounds = Rect::MakeWH(100, 100);
