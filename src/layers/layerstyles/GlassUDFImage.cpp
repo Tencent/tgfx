@@ -22,6 +22,7 @@
 #include "tgfx/gpu/Context.h"
 
 #include "core/images/TextureImage.h"
+#include "core/utils/Log.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
@@ -137,17 +138,16 @@ std::shared_ptr<TextureProxy> GlassUDFImage::lockTextureProxy(const TPArgs& args
   if (args.context == nullptr) {
     return nullptr;
   }
-  auto textureImage = std::static_pointer_cast<TextureImage>(cachedTexture.lock());
-  if (textureImage == nullptr || textureImage->makeTextureImage(args.context) == nullptr) {
+  if (cachedTexture == nullptr || cachedTexture->makeTextureImage(args.context) == nullptr) {
     auto image = GenerateGlassUDFImage(args.context, source, coreWidth, coreHeight, textureRect,
                                        fineRadius, coarseRadius);
     if (image == nullptr) {
+      LOGE("GlassUDFImage: Failed to generate the UDF texture.");
       return nullptr;
     }
-    textureImage = std::static_pointer_cast<TextureImage>(image);
-    cachedTexture = image;
+    cachedTexture = std::static_pointer_cast<TextureImage>(image);
   }
-  return textureImage->getTextureProxy();
+  return cachedTexture->getTextureProxy();
 }
 
 PlacementPtr<FragmentProcessor> GlassUDFImage::asFragmentProcessor(

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "core/images/TextureImage.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
@@ -59,7 +60,10 @@ class GlassUDFImage : public Image {
   }
 
   const std::shared_ptr<ColorSpace>& colorSpace() const override {
-    return source->colorSpace();
+    // The UDF texture packs the refraction field in RGB and the edge-light field in A; it is not
+    // color data, so it carries no color space.
+    static const std::shared_ptr<ColorSpace> kNoColorSpace = nullptr;
+    return kNoColorSpace;
   }
 
  protected:
@@ -86,10 +90,11 @@ class GlassUDFImage : public Image {
   Point coarseRadius = {};
   int _width = 0;
   int _height = 0;
-  // The generated UDF texture within the lifetime of this instance. The same filter may be sampled
-  // multiple times in one frame (e.g. blend-mode splitting); reusing the texture avoids regenerating
-  // the UDF for every sample. Context binding is validated through TextureImage::lockTextureProxy.
-  mutable std::weak_ptr<Image> cachedTexture = {};
+  // The generated UDF texture, held strongly for the lifetime of this instance. The same filter may
+  // be sampled multiple times in one frame (e.g. blend-mode splitting); reusing the texture avoids
+  // regenerating the UDF for every sample. Context binding is validated through
+  // TextureImage::makeTextureImage before the cached texture is reused.
+  mutable std::shared_ptr<TextureImage> cachedTexture = nullptr;
 
   GlassUDFImage(std::shared_ptr<Image> source, int coreWidth, int coreHeight,
                 const Rect& textureRect, const Point& fineRadius, const Point& coarseRadius);
