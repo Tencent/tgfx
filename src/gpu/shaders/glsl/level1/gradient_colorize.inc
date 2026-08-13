@@ -1,8 +1,15 @@
-// Shared unrolled-binary gradient colorizer: maps t in [0,1] to a color using piecewise linear
-// segments. intervalCount is runtime data so all interval counts share this path; the binary
-// search tree structure mirrors the compile-time colorizer exactly. Single source for
+// Shared gradient colorizer: maps t in [0,1] to a color using piecewise linear segments.
+// intervalCount is runtime data so all interval counts share this path. Single source for
 // gradient_fill.frag and the chain kernel's OP_GRADIENT slot. All interval uniforms are passed
 // explicitly so each caller can feed its own uniform names.
+//
+// Packing (see UnrolledBinaryGradientColorizer::Make): thresholds1_7 holds the interval end
+// positions of intervals 0..3 in ascending order, thresholds9_13 those of intervals 4..6; slots
+// beyond intervalCount are zero-padded with transparent scales/biases. The selection is a linear
+// scan: crossing a real threshold advances to the next interval, and the > 0 guard stops the
+// scan at the last real interval, matching the padded-transparent leaves of the legacy binary
+// tree for out-of-range t. The selected (scale, bias) pair is identical to the tree's in every
+// case, so results are byte-identical.
 #ifndef TGFX_GRADIENT_COLORIZE_INC
 #define TGFX_GRADIENT_COLORIZE_INC
 
@@ -11,87 +18,35 @@ vec4 gradientColorizeUnrolled(float t, int intervalCount, vec4 thresholds1_7, ve
                               vec4 scale4_5, vec4 bias4_5, vec4 scale6_7, vec4 bias6_7,
                               vec4 scale8_9, vec4 bias8_9, vec4 scale10_11, vec4 bias10_11,
                               vec4 scale12_13, vec4 bias12_13, vec4 scale14_15, vec4 bias14_15) {
-  vec4 scale;
-  vec4 bias;
-  if (intervalCount >= 4) {
-    if (t < thresholds1_7.w) {
-      if (t < thresholds1_7.y) {
-        if (t < thresholds1_7.x) {
-          scale = scale0_1;
-          bias = bias0_1;
-        } else {
-          scale = scale2_3;
-          bias = bias2_3;
-        }
-      } else {
-        if (t < thresholds1_7.z) {
-          scale = scale4_5;
-          bias = bias4_5;
-        } else {
-          scale = scale6_7;
-          bias = bias6_7;
-        }
-      }
-    } else {
-      if (intervalCount >= 6) {
-        if (t < thresholds9_13.y) {
-          if (t < thresholds9_13.x) {
-            scale = scale8_9;
-            bias = bias8_9;
-          } else {
-            scale = scale10_11;
-            bias = bias10_11;
-          }
-        } else {
-          if (intervalCount >= 7) {
-            if (t < thresholds9_13.z) {
-              scale = scale12_13;
-              bias = bias12_13;
-            } else {
-              scale = scale14_15;
-              bias = bias14_15;
-            }
-          } else {
-            scale = scale12_13;
-            bias = bias12_13;
-          }
-        }
-      } else {
-        if (t < thresholds9_13.x) {
-          scale = scale8_9;
-          bias = bias8_9;
-        } else {
-          scale = scale10_11;
-          bias = bias10_11;
-        }
-      }
-    }
-  } else if (intervalCount >= 2) {
-    if (t < thresholds1_7.y) {
-      if (t < thresholds1_7.x) {
-        scale = scale0_1;
-        bias = bias0_1;
-      } else {
-        scale = scale2_3;
-        bias = bias2_3;
-      }
-    } else {
-      if (intervalCount >= 3) {
-        if (t < thresholds1_7.z) {
-          scale = scale4_5;
-          bias = bias4_5;
-        } else {
-          scale = scale6_7;
-          bias = bias6_7;
-        }
-      } else {
-        scale = scale4_5;
-        bias = bias4_5;
-      }
-    }
-  } else {
-    scale = scale0_1;
-    bias = bias0_1;
+  vec4 scale = scale0_1;
+  vec4 bias = bias0_1;
+  if (thresholds1_7.x > 0.0 && t >= thresholds1_7.x) {
+    scale = scale2_3;
+    bias = bias2_3;
+  }
+  if (thresholds1_7.y > 0.0 && t >= thresholds1_7.y) {
+    scale = scale4_5;
+    bias = bias4_5;
+  }
+  if (thresholds1_7.z > 0.0 && t >= thresholds1_7.z) {
+    scale = scale6_7;
+    bias = bias6_7;
+  }
+  if (thresholds1_7.w > 0.0 && t >= thresholds1_7.w) {
+    scale = scale8_9;
+    bias = bias8_9;
+  }
+  if (thresholds9_13.x > 0.0 && t >= thresholds9_13.x) {
+    scale = scale10_11;
+    bias = bias10_11;
+  }
+  if (thresholds9_13.y > 0.0 && t >= thresholds9_13.y) {
+    scale = scale12_13;
+    bias = bias12_13;
+  }
+  if (thresholds9_13.z > 0.0 && t >= thresholds9_13.z) {
+    scale = scale14_15;
+    bias = bias14_15;
   }
   return vec4(t * scale + bias);
 }

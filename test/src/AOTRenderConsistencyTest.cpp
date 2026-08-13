@@ -785,6 +785,29 @@ TGFX_TEST(AOTRenderConsistencyTest, GradientLayoutModes) {
   ExpectShaderConsistent("grad-conic-multi",
                          Shader::MakeConicGradient(center, 0, 360, multiStops, multiPositions),
                          width, height);
+  // The unrolled colorizer kicks in at 3+ intervals: a 6-stop gradient exercises the mid-depth
+  // threshold pack, and a 9-stop gradient maxes out all 8 intervals.
+  std::vector<Color> sixStops = {Color::Red(),   Color::Green(), Color::Blue(),
+                                 Color::White(), Color::Black(), Color::FromRGBA(255, 255, 0)};
+  std::vector<float> sixPositions = {0.0f, 0.2f, 0.4f, 0.6f, 0.8f, 1.0f};
+  std::vector<Color> nineStops = {Color::Red(),
+                                  Color::Green(),
+                                  Color::Blue(),
+                                  Color::White(),
+                                  Color::Black(),
+                                  Color::FromRGBA(255, 255, 0),
+                                  Color::FromRGBA(0, 255, 255),
+                                  Color::FromRGBA(255, 0, 255),
+                                  Color::FromRGBA(128, 128, 128)};
+  std::vector<float> ninePositions = {0.0f,   0.125f, 0.25f,  0.375f, 0.5f,
+                                      0.625f, 0.75f,  0.875f, 1.0f};
+  ExpectShaderConsistent(
+      "grad-linear-6stop",
+      Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(200, 0), sixStops, sixPositions),
+      width, height);
+  ExpectShaderConsistent("grad-radial-9stop",
+                         Shader::MakeRadialGradient(center, 100, nineStops, ninePositions), width,
+                         height);
 }
 
 // Renders an antialiased circle (EllipseGeometryProcessor) under an optional clip into outBitmap.
