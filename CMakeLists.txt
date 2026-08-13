@@ -696,6 +696,13 @@ elseif (CMAKE_HOST_SYSTEM_NAME MATCHES "Linux")
     endif ()
 endif ()
 
+# zstd (vendored, build-from-source): the bundle data pool is compressed with it. The runtime
+# only references the decoder, so the compressor objects drop out at static link time.
+file(GLOB ZSTD_SOURCES third_party/zstd/lib/common/*.c third_party/zstd/lib/compress/*.c
+        third_party/zstd/lib/decompress/*.c)
+add_library(tgfx_zstd STATIC ${ZSTD_SOURCES})
+target_include_directories(tgfx_zstd PUBLIC third_party/zstd/lib)
+
 add_vendor_target(tgfx-vendor STATIC_VENDORS ${TGFX_STATIC_VENDORS} SHARED_VENDORS ${TGFX_SHARED_VENDORS})
 find_vendor_libraries(tgfx-vendor STATIC TGFX_VENDOR_STATIC_LIBRARIES SHARED TGFX_VENDOR_SHARED_LIBRARIES)
 list(APPEND TGFX_STATIC_LIBS ${TGFX_VENDOR_STATIC_LIBRARIES})
@@ -728,7 +735,7 @@ if (TGFX_USE_VULKAN)
     target_include_directories(tgfx SYSTEM PRIVATE third_party/VulkanMemoryAllocator/include)
 endif ()
 merge_libraries_into(tgfx ${TGFX_STATIC_LIBS})
-target_link_libraries(tgfx ${TGFX_SHARED_LIBS})
+target_link_libraries(tgfx tgfx_zstd ${TGFX_SHARED_LIBS})
 if (TGFX_USE_WEBGPU)
     target_link_libraries(tgfx libtint)
 endif ()
@@ -782,7 +789,7 @@ if (TGFX_EMBED_SHADER_BUNDLES)
     add_vendor_target(shader-tool-vendor STATIC_VENDORS shaderc SPIRV-Cross zlib)
     add_dependencies(shader_build_tool shader-tool-vendor)
     find_vendor_libraries(shader-tool-vendor STATIC SHADER_TOOL_VENDOR_LIBS)
-    target_link_libraries(shader_build_tool PRIVATE ${SHADER_TOOL_VENDOR_LIBS})
+    target_link_libraries(shader_build_tool PRIVATE ${SHADER_TOOL_VENDOR_LIBS} tgfx_zstd)
 
     # Determine which backends to compile based on enabled GPU backends
     set(TGFX_SHADER_BACKENDS "")

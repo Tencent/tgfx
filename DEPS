@@ -26,6 +26,11 @@
         "dir": "third_party/zlib"
       },
       {
+        "url": "https://github.com/facebook/zstd.git",
+        "commit": "ac66b19e6bd6b83238bf008eecc1298105298532",
+        "dir": "third_party/zstd"
+      },
+      {
         "url": "https://github.com/glennrp/libpng.git",
         "commit": "872555f4ba910252783af1507f9e7fe1653be252",
         "dir": "third_party/libpng"
@@ -66,9 +71,9 @@
         "dir": "third_party/expat"
       },
       {
-         "url": "https://github.com/cameron314/concurrentqueue.git",
-         "commit": "6dd38b8a1dbaa7863aa907045f32308a56a6ff5d",
-         "dir": "third_party/concurrentqueue"
+        "url": "https://github.com/cameron314/concurrentqueue.git",
+        "commit": "6dd38b8a1dbaa7863aa907045f32308a56a6ff5d",
+        "dir": "third_party/concurrentqueue"
       },
       {
         "url": "https://github.com/google/highway.git",

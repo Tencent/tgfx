@@ -1174,7 +1174,7 @@ TGFX_TEST(ShaderPermutationTest, CompressedBundleLoad) {
 
   // Production bundles ship compressed; when the resource bundle is already compressed, the
   // load itself is the roundtrip coverage, so just verify entries and tag.
-  if (TestReadU16LE(original.data() + 6) == 1u) {
+  if (TestReadU16LE(original.data() + 6) != 0u) {
     PrecompiledShaderCache compressedOnly;
     ASSERT_TRUE(compressedOnly.loadBundle(original.data(), original.size()));
     EXPECT_TRUE(compressedOnly.isLoaded());

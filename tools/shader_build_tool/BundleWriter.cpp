@@ -23,6 +23,7 @@
 #include <iostream>
 #include <set>
 #include "zlib.h"
+#include "zstd.h"
 
 namespace tgfx {
 
@@ -224,22 +225,21 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
     return false;
   }
 
-  // Optionally compress the data pool.
+  // Optionally compress the data pool with zstd (compressionType=2; 1 is the legacy zlib path).
   std::vector<uint8_t> compressedData;
   uint16_t compressionFlag = 0;
   const uint8_t* dataToWrite = dataPool.data();
   size_t dataToWriteSize = dataPool.size();
   if (compress && !dataPool.empty()) {
-    uLongf compBound = compressBound(static_cast<uLong>(dataPool.size()));
+    size_t compBound = ZSTD_compressBound(dataPool.size());
     compressedData.resize(compBound);
-    uLongf compSize = compBound;
-    int ret = compress2(compressedData.data(), &compSize, dataPool.data(),
-                        static_cast<uLong>(dataPool.size()), Z_BEST_COMPRESSION);
-    if (ret == Z_OK && compSize < dataPool.size()) {
+    size_t compSize = ZSTD_compress(compressedData.data(), compBound, dataPool.data(),
+                                    dataPool.size(), ZSTD_maxCLevel());
+    if (!ZSTD_isError(compSize) && compSize < dataPool.size()) {
       compressedData.resize(compSize);
       dataToWrite = compressedData.data();
       dataToWriteSize = compSize;
-      compressionFlag = 1;
+      compressionFlag = 2;
     }
     // If compression didn't reduce size, fall back to uncompressed.
   }

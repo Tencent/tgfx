@@ -22,6 +22,7 @@
 #include <fstream>
 #include <limits>
 #include "core/utils/Log.h"
+#include "zstd.h"
 #include "zlib.h"
 
 namespace tgfx {
@@ -536,7 +537,7 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   }
   const bool hasArraySize = formatVersion >= 4;
   uint16_t compressionType = ReadU16LE(ptr + 6);
-  if (compressionType != 0 && compressionType != 1) {
+  if (compressionType > 2) {
     LOGE("PrecompiledShaderCache: Unsupported compression type %u", compressionType);
     return false;
   }
@@ -557,7 +558,7 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   size_t loadSize = size;
   std::vector<uint8_t> decompressed;
 
-  if (compressionType == 1) {
+  if (compressionType == 1 || compressionType == 2) {
     // Only the data pool region is compressed. Compute compressed size from file layout.
     size_t compressedEnd = reflectionOffset > 0 ? static_cast<size_t>(reflectionOffset) : size;
     if (dataOffset > size || compressedEnd > size || compressedEnd < dataOffset) {
@@ -574,11 +575,19 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
     // Decompress into a reassembled buffer: [header+pools | decompressed data | reflection]
     decompressed.resize(dataOffset + dataSize + reflectionSize);
     std::memcpy(decompressed.data(), ptr, dataOffset);
-    uLongf destLen = static_cast<uLongf>(dataSize);
-    int ret =
-        uncompress(decompressed.data() + dataOffset, &destLen, ptr + dataOffset, compressedSize);
-    if (ret != Z_OK || destLen != static_cast<uLongf>(dataSize)) {
-      LOGE("PrecompiledShaderCache: zlib decompression failed (ret=%d)", ret);
+    bool decompressOK = false;
+    if (compressionType == 1) {
+      uLongf destLen = static_cast<uLongf>(dataSize);
+      int ret = uncompress(decompressed.data() + dataOffset, &destLen, ptr + dataOffset,
+                           compressedSize);
+      decompressOK = ret == Z_OK && destLen == static_cast<uLongf>(dataSize);
+    } else {
+      size_t destLen = ZSTD_decompress(decompressed.data() + dataOffset, dataSize,
+                                       ptr + dataOffset, compressedSize);
+      decompressOK = !ZSTD_isError(destLen) && destLen == dataSize;
+    }
+    if (!decompressOK) {
+      LOGE("PrecompiledShaderCache: data pool decompression failed (type=%u)", compressionType);
       return false;
     }
     // Copy reflection section after the decompressed data.
