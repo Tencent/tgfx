@@ -299,7 +299,10 @@ static float SmallestSingularValueSquared(float m00, float m01, float m10, float
   return 0.5f * (trace - std::sqrt(discriminant));
 }
 
-// The offscreen leaf surface only needs mipmaps when an affine mapping minifies raster texels.
+// Creates mipmaps for the offscreen leaf surface only when the affine mapping minifies raster
+// texels. The smallest singular value of the texel-to-compositor Jacobian measures the most
+// minified direction: below 1.0 the leaf shrinks while sampling and needs mipmaps to avoid
+// aliasing, while equal or larger scales sample level 0 only and skip the mip storage entirely.
 // Perspective or invalid mappings conservatively retain mipmaps.
 static bool NeedsMipmaps(const Matrix3D& localToCompositor, const Rect& visibleLocal,
                          int rasterWidth, int rasterHeight) {
