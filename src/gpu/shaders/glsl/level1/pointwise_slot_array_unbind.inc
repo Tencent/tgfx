@@ -1,0 +1,22 @@
+// Restores the pointwise-operator field names after pointwise_slot_array_bind.inc.
+#undef OpType
+#undef ColorMatrix
+#undef ColorVector
+#undef Kr
+#undef Kg
+#undef Kb
+#undef Threshold
+#undef CSFlags
+#undef SrcTF0
+#undef SrcTF1
+#undef SrcTFType
+#undef SrcOOTF
+#undef ColorXform
+#undef DstOOTF
+#undef DstTF0
+#undef DstTF1
+#undef DstTFType
+#undef ConstColorValue
+#undef ConstInputMode
+#undef BlendModeValue
+#undef BlendConstFirst

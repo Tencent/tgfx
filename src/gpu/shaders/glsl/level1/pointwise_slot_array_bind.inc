@@ -1,0 +1,25 @@
+// Binds every pointwise-operator field name to its per-slot array element. Include after the
+// FragmentUniformBlock (the fields must already be declared as arrays via TGFX_SLOT_ARRAY_SUFFIX)
+// and before pointwise_op.inc, then include pointwise_slot_array_unbind.inc afterwards. The
+// self-referential expansions are safe: the preprocessor does not rescan the macro's own name.
+#define OpType OpType[slot]
+#define ColorMatrix ColorMatrix[slot]
+#define ColorVector ColorVector[slot]
+#define Kr Kr[slot]
+#define Kg Kg[slot]
+#define Kb Kb[slot]
+#define Threshold Threshold[slot]
+#define CSFlags CSFlags[slot]
+#define SrcTF0 SrcTF0[slot]
+#define SrcTF1 SrcTF1[slot]
+#define SrcTFType SrcTFType[slot]
+#define SrcOOTF SrcOOTF[slot]
+#define ColorXform ColorXform[slot]
+#define DstOOTF DstOOTF[slot]
+#define DstTF0 DstTF0[slot]
+#define DstTF1 DstTF1[slot]
+#define DstTFType DstTFType[slot]
+#define ConstColorValue ConstColorValue[slot]
+#define ConstInputMode ConstInputMode[slot]
+#define BlendModeValue BlendModeValue[slot]
+#define BlendConstFirst BlendConstFirst[slot]

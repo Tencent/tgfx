@@ -35,7 +35,7 @@ layout(location = 0) out vec4 fragColor;
 #include "pointwise_op.inc"
 
 void main() {
-  vec4 result = applyPointwiseOp(Color);
+  vec4 result = applyPointwiseOp(0, Color);
 
 #if HAS_COVERAGE
 #define TGFX_XP_SRC_COLOR (result * vCoverage)

@@ -24,14 +24,14 @@ namespace tgfx {
 static constexpr char OES_TEXTURE_EXTENSION[] = "GL_OES_EGL_image_external_essl3";
 
 std::string UniformHandler::addUniform(const std::string& name, UniformFormat format,
-                                       ShaderStage stage) {
+                                       ShaderStage stage, uint32_t arraySize) {
   auto uniformName = programBuilder->nameVariable(name);
   switch (stage) {
     case ShaderStage::Vertex:
-      vertexUniforms.emplace_back(uniformName, format);
+      vertexUniforms.emplace_back(uniformName, format, arraySize);
       break;
     case ShaderStage::Fragment:
-      fragmentUniforms.emplace_back(uniformName, format);
+      fragmentUniforms.emplace_back(uniformName, format, arraySize);
       break;
   }
   return uniformName;

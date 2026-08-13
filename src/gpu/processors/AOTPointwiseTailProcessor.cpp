@@ -18,36 +18,10 @@
 
 #include "gpu/processors/AOTPointwiseTailProcessor.h"
 #include "gpu/ColorSpaceXformHelper.h"
+#include "gpu/processors/AOTPointwiseSlotWriter.h"
 
 namespace tgfx {
-namespace {
-static void UploadSlot(UniformData* uniformData, size_t index, const AOTPointwiseSlot& slot) {
-  auto prefix = "Slot" + std::to_string(index);
-  uniformData->setDataOptional(prefix + "OpType", static_cast<int>(slot.type));
-  if (slot.type == AOTPointwiseOpType::ColorMatrix) {
-    const auto& matrix = slot.colorMatrix.matrix;
-    float matrixData[] = {
-        matrix[0], matrix[5], matrix[10], matrix[15], matrix[1], matrix[6], matrix[11], matrix[16],
-        matrix[2], matrix[7], matrix[12], matrix[17], matrix[3], matrix[8], matrix[13], matrix[18],
-    };
-    float vectorData[] = {matrix[4], matrix[9], matrix[14], matrix[19]};
-    uniformData->setDataOptional(prefix + "ColorMatrix", matrixData);
-    uniformData->setDataOptional(prefix + "ColorVector", vectorData);
-  } else if (slot.type == AOTPointwiseOpType::Luma) {
-    uniformData->setDataOptional(prefix + "Kr", slot.luma.kr);
-    uniformData->setDataOptional(prefix + "Kg", slot.luma.kg);
-    uniformData->setDataOptional(prefix + "Kb", slot.luma.kb);
-  } else if (slot.type == AOTPointwiseOpType::AlphaThreshold) {
-    uniformData->setDataOptional(prefix + "Threshold", slot.alphaThreshold.threshold);
-  } else if (slot.type == AOTPointwiseOpType::ColorSpaceXform) {
-    // Reuse the helper so this slot's transfer functions, gamut matrix and step flags are written
-    // exactly as the standalone ColorSpaceXformEffect writes them, keeping AOT and JIT in agreement.
-    ColorSpaceXformHelper helper(prefix);
-    helper.setData(uniformData, slot.colorSpaceXform.steps.get());
-    // setData writes OpType=3 through the same prefix, so the slot selector stays consistent.
-  }
-}
-}  // namespace
+namespace {}  // namespace
 
 PlacementPtr<AOTPointwiseTailProcessor> AOTPointwiseTailProcessor::Make(
     BlockAllocator* allocator, PlacementPtr<FragmentProcessor> source,
@@ -89,14 +63,19 @@ AOTPointwiseTailProcessor::AOTPointwiseTailProcessor(PlacementPtr<FragmentProces
 
 void AOTPointwiseTailProcessor::emitCode(EmitArgs& args) const {
   emitChild(0, args.inputColor, args);
+  // Per-slot uniform fields are std140 arrays shared with the precompiled kernel; declare each
+  // array once and reference its elements by slot index.
+  std::unordered_map<std::string, std::string> declaredArrays = {};
+  auto declareSlotField = [&](const char* field, UniformFormat format, size_t index) {
+    auto [it, _] = declaredArrays.try_emplace(
+        field, args.uniformHandler->addUniform(field, format, ShaderStage::Fragment, MaxSlots));
+    return it->second + "[" + std::to_string(index) + "]";
+  };
   for (size_t index = 0; index < _slotCount; ++index) {
     const auto& current = slots[index];
-    auto prefix = "Slot" + std::to_string(index);
     if (current.type == AOTPointwiseOpType::ColorMatrix) {
-      auto matrix = args.uniformHandler->addUniform(prefix + "ColorMatrix", UniformFormat::Float4x4,
-                                                    ShaderStage::Fragment);
-      auto vector = args.uniformHandler->addUniform(prefix + "ColorVector", UniformFormat::Float4,
-                                                    ShaderStage::Fragment);
+      auto matrix = declareSlotField("ColorMatrix", UniformFormat::Float4x4, index);
+      auto vector = declareSlotField("ColorVector", UniformFormat::Float4, index);
       args.fragBuilder->codeAppendf("%s = vec4(%s.rgb / max(%s.a, 9.9999997473787516e-05), %s.a);",
                                     args.outputColor.c_str(), args.outputColor.c_str(),
                                     args.outputColor.c_str(), args.outputColor.c_str());
@@ -105,19 +84,15 @@ void AOTPointwiseTailProcessor::emitCode(EmitArgs& args) const {
       args.fragBuilder->codeAppendf("%s.rgb *= %s.a;", args.outputColor.c_str(),
                                     args.outputColor.c_str());
     } else if (current.type == AOTPointwiseOpType::Luma) {
-      auto kr = args.uniformHandler->addUniform(prefix + "Kr", UniformFormat::Float,
-                                                ShaderStage::Fragment);
-      auto kg = args.uniformHandler->addUniform(prefix + "Kg", UniformFormat::Float,
-                                                ShaderStage::Fragment);
-      auto kb = args.uniformHandler->addUniform(prefix + "Kb", UniformFormat::Float,
-                                                ShaderStage::Fragment);
+      auto kr = declareSlotField("Kr", UniformFormat::Float, index);
+      auto kg = declareSlotField("Kg", UniformFormat::Float, index);
+      auto kb = declareSlotField("Kb", UniformFormat::Float, index);
       auto luma = "pointwiseTailLuma" + std::to_string(index);
       args.fragBuilder->codeAppendf("float %s = dot(%s.rgb, vec3(%s, %s, %s));", luma.c_str(),
                                     args.outputColor.c_str(), kr.c_str(), kg.c_str(), kb.c_str());
       args.fragBuilder->codeAppendf("%s = vec4(%s);", args.outputColor.c_str(), luma.c_str());
     } else if (current.type == AOTPointwiseOpType::AlphaThreshold) {
-      auto threshold = args.uniformHandler->addUniform(prefix + "Threshold", UniformFormat::Float,
-                                                       ShaderStage::Fragment);
+      auto threshold = declareSlotField("Threshold", UniformFormat::Float, index);
       auto stepped = "pointwiseTailStep" + std::to_string(index);
       args.fragBuilder->codeAppendf("vec4 %s = vec4(0.0);", stepped.c_str());
       args.fragBuilder->codeAppendf("if (%s.a > 0.0) {", args.outputColor.c_str());
@@ -132,7 +107,7 @@ void AOTPointwiseTailProcessor::emitCode(EmitArgs& args) const {
     } else {
       // Emit the color-space steps through the shared helper and builder routine so this slot's
       // generated code matches the standalone ColorSpaceXformEffect exactly.
-      ColorSpaceXformHelper helper(prefix);
+      ColorSpaceXformHelper helper(static_cast<int>(index), MaxSlots);
       auto steps = current.colorSpaceXform.steps.get();
       helper.emitCode(args.uniformHandler, steps);
       std::string transformed;
@@ -161,8 +136,11 @@ void AOTPointwiseTailProcessor::onSetData(UniformData*, UniformData* fragmentUni
     return;
   }
   fragmentUniformData->setDataOptional("SourceKind", static_cast<int>(_sourceKind));
+  // Runtime loop bound of the precompiled kernel; a uniform so the slot loop stays rolled and the
+  // operator library exists once in the binary.
+  fragmentUniformData->setDataOptional("PointwiseSlotCount", static_cast<int>(MaxSlots));
   for (size_t index = 0; index < MaxSlots; ++index) {
-    UploadSlot(fragmentUniformData, index, slots[index]);
+    UploadAOTPointwiseSlot(fragmentUniformData, index, MaxSlots, slots[index]);
   }
 }
 

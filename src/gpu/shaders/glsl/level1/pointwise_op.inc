@@ -5,9 +5,10 @@
 // no operator FP is composed on top of it, while the same OpType uniform absorbs the composed case.
 // Requires the pointwise_op_uniforms.inc fields to be present in the FragmentUniformBlock.
 //
-// A multi-slot kernel includes this file once per slot, with pointwise_slot_bind.inc redirecting the
-// uniform and function names to that slot beforehand. The operator/flag constants are therefore
-// guarded so repeated inclusion is a no-op rather than a redefinition.
+// The field names below are plain for single-slot kernels. A multi-slot kernel defines each name
+// to its array-element form (e.g. #define OpType OpType[slot]) before including, so one function
+// body serves every slot; the slot parameter is unused in the scalar form. The operator/flag
+// constants are guarded so repeated inclusion is a no-op rather than a redefinition.
 #ifndef TGFX_POINTWISE_OP_CONSTANTS
 #define TGFX_POINTWISE_OP_CONSTANTS
 #define OP_COLOR_MATRIX 0
@@ -35,16 +36,16 @@
 #include "transfer_function.inc"
 
 // ColorSpaceXform transfer functions bound to this slot's uniform names.
-float src_tf(float x) {
+float src_tf(int slot, float x) {
   return transferTF(x, SrcTF0, SrcTF1, SrcTFType);
 }
 
-float dst_tf(float x) {
+float dst_tf(int slot, float x) {
   return transferTF(x, DstTF0, DstTF1, DstTFType);
 }
 
 // Applies the selected pointwise operator to a premultiplied color and returns a premultiplied color.
-vec4 applyPointwiseOp(vec4 color) {
+vec4 applyPointwiseOp(int slot, vec4 color) {
   if (OpType == OP_NONE) {
     return color;
   }
@@ -85,9 +86,9 @@ vec4 applyPointwiseOp(vec4 color) {
       color = (a > 0.0) ? vec4(color.rgb / a, a) : vec4(0.0);
     }
     if ((CSFlags & CS_LINEARIZE) != 0) {
-      color.r = src_tf(color.r);
-      color.g = src_tf(color.g);
-      color.b = src_tf(color.b);
+      color.r = src_tf(slot, color.r);
+      color.g = src_tf(slot, color.g);
+      color.b = src_tf(slot, color.b);
     }
     if ((CSFlags & CS_SRC_OOTF) != 0) {
       float srcY = dot(color.rgb, SrcOOTF.rgb);
@@ -101,9 +102,9 @@ vec4 applyPointwiseOp(vec4 color) {
       color.rgb *= sign(dstY) * pow(abs(dstY), DstOOTF.a);
     }
     if ((CSFlags & CS_ENCODE) != 0) {
-      color.r = dst_tf(color.r);
-      color.g = dst_tf(color.g);
-      color.b = dst_tf(color.b);
+      color.r = dst_tf(slot, color.r);
+      color.g = dst_tf(slot, color.g);
+      color.b = dst_tf(slot, color.b);
     }
     if ((CSFlags & CS_PREMUL) != 0) {
       color.rgb *= color.a;

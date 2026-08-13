@@ -32,6 +32,10 @@ UniformData::UniformData(std::vector<Uniform> uniforms) : _uniforms(std::move(un
     size_t elementStride = (size + 15) / 16 * 16;
     uint32_t arraySize = uniform.arraySize();
     size_t totalSize = arraySize > 1 ? elementStride * arraySize : size;
+    // std140 arrays are always aligned to a vec4 boundary, even arrays of scalars.
+    if (arraySize > 1 && align < 16) {
+      align = 16;
+    }
 
     const size_t offset = alignCursor(align);
     Field field = {};
@@ -60,8 +64,9 @@ void UniformData::onSetArrayElement(const std::string& name, size_t index, const
 
   const auto& key = skipSuffix ? name + structuralSuffix : name + nameSuffix;
   auto field = findField(key);
-  if (field == nullptr || field->arraySize <= 1 || index >= field->arraySize ||
-      field->elementSize != size) {
+  // Scalars are accepted as single-element targets (index 0), so writers can use one call form
+  // for both scalar fields and array elements.
+  if (field == nullptr || index >= field->arraySize || field->elementSize != size) {
     if (!optional) {
       LOGE(
           "UniformData::onSetArrayElement() array uniform '%s' not found or index %zu out of "

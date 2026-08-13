@@ -43,7 +43,7 @@ void main() {
     color = color * Color.a;
   }
 
-  vec4 result = applyPointwiseOp(color);
+  vec4 result = applyPointwiseOp(0, color);
 
 #if HAS_COVERAGE
 #define TGFX_XP_SRC_COLOR (result * vCoverage)

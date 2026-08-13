@@ -17,8 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLPerlinNoiseFragmentProcessor.h"
+#include <unordered_map>
 #include "core/shaders/PerlinNoiseShader.h"
 #include "gpu/ColorSpaceXformHelper.h"
+#include "gpu/processors/AOTPointwiseSlotWriter.h"
 #include "gpu/resources/TextureView.h"
 
 namespace tgfx {
@@ -27,13 +29,21 @@ namespace {
 // Emits one pointwise operator on the output color, mirroring AOTPointwiseTailProcessor's slot
 // emission. The empty prefix addresses the kernel's shared OpType record (slot 0); slot 1 uses the
 // "Slot1" prefix declared by perlin_noise.frag.
-void EmitPointwiseSlot(FragmentProcessor::EmitArgs& args, const std::string& prefix,
+void EmitPointwiseSlot(FragmentProcessor::EmitArgs& args,
+                       std::unordered_map<std::string, std::string>& declaredArrays, size_t index,
                        const AOTPointwiseSlot& slot) {
+  // Per-slot uniform fields are std140 arrays shared with the precompiled kernel; declare each
+  // array once and reference its elements by slot index.
+  auto declareSlotField = [&](const char* field, UniformFormat format) {
+    auto [it, _] = declaredArrays.try_emplace(
+        field,
+        args.uniformHandler->addUniform(field, format, ShaderStage::Fragment,
+                                        GLSLPerlinNoiseFragmentProcessor::MaxPointwiseSlots));
+    return it->second + "[" + std::to_string(index) + "]";
+  };
   if (slot.type == AOTPointwiseOpType::ColorMatrix) {
-    auto matrix = args.uniformHandler->addUniform(prefix + "ColorMatrix", UniformFormat::Float4x4,
-                                                  ShaderStage::Fragment);
-    auto vector = args.uniformHandler->addUniform(prefix + "ColorVector", UniformFormat::Float4,
-                                                  ShaderStage::Fragment);
+    auto matrix = declareSlotField("ColorMatrix", UniformFormat::Float4x4);
+    auto vector = declareSlotField("ColorVector", UniformFormat::Float4);
     args.fragBuilder->codeAppendf("%s = vec4(%s.rgb / max(%s.a, 9.9999997473787516e-05), %s.a);",
                                   args.outputColor.c_str(), args.outputColor.c_str(),
                                   args.outputColor.c_str(), args.outputColor.c_str());
@@ -42,20 +52,16 @@ void EmitPointwiseSlot(FragmentProcessor::EmitArgs& args, const std::string& pre
     args.fragBuilder->codeAppendf("%s.rgb *= %s.a;", args.outputColor.c_str(),
                                   args.outputColor.c_str());
   } else if (slot.type == AOTPointwiseOpType::Luma) {
-    auto kr =
-        args.uniformHandler->addUniform(prefix + "Kr", UniformFormat::Float, ShaderStage::Fragment);
-    auto kg =
-        args.uniformHandler->addUniform(prefix + "Kg", UniformFormat::Float, ShaderStage::Fragment);
-    auto kb =
-        args.uniformHandler->addUniform(prefix + "Kb", UniformFormat::Float, ShaderStage::Fragment);
-    auto luma = "perlinSlotLuma" + prefix;
+    auto kr = declareSlotField("Kr", UniformFormat::Float);
+    auto kg = declareSlotField("Kg", UniformFormat::Float);
+    auto kb = declareSlotField("Kb", UniformFormat::Float);
+    auto luma = "perlinSlotLuma" + std::to_string(index);
     args.fragBuilder->codeAppendf("float %s = dot(%s.rgb, vec3(%s, %s, %s));", luma.c_str(),
                                   args.outputColor.c_str(), kr.c_str(), kg.c_str(), kb.c_str());
     args.fragBuilder->codeAppendf("%s = vec4(%s);", args.outputColor.c_str(), luma.c_str());
   } else if (slot.type == AOTPointwiseOpType::AlphaThreshold) {
-    auto threshold = args.uniformHandler->addUniform(prefix + "Threshold", UniformFormat::Float,
-                                                     ShaderStage::Fragment);
-    auto stepped = "perlinSlotStep" + prefix;
+    auto threshold = declareSlotField("Threshold", UniformFormat::Float);
+    auto stepped = "perlinSlotStep" + std::to_string(index);
     args.fragBuilder->codeAppendf("vec4 %s = vec4(0.0);", stepped.c_str());
     args.fragBuilder->codeAppendf("if (%s.a > 0.0) {", args.outputColor.c_str());
     args.fragBuilder->codeAppendf("  %s.rgb = %s.rgb / %s.a;", stepped.c_str(),
@@ -66,7 +72,8 @@ void EmitPointwiseSlot(FragmentProcessor::EmitArgs& args, const std::string& pre
     args.fragBuilder->codeAppend("}");
     args.fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), stepped.c_str());
   } else if (slot.type == AOTPointwiseOpType::ColorSpaceXform) {
-    ColorSpaceXformHelper helper(prefix);
+    ColorSpaceXformHelper helper(static_cast<int>(index),
+                                      GLSLPerlinNoiseFragmentProcessor::MaxPointwiseSlots);
     auto steps = slot.colorSpaceXform.steps.get();
     helper.emitCode(args.uniformHandler, steps);
     std::string transformed;
@@ -75,38 +82,6 @@ void EmitPointwiseSlot(FragmentProcessor::EmitArgs& args, const std::string& pre
   }
 }
 
-// Uploads one slot's uniform record, mirroring AOTPointwiseTailProcessor::UploadSlot but with an
-// arbitrary name prefix (empty for slot 0, "Slot1" for slot 1).
-void UploadPointwiseSlot(UniformData* uniformData, const std::string& prefix,
-                         const AOTPointwiseSlot& slot) {
-  uniformData->setDataOptional(prefix + "OpType", static_cast<int>(slot.type));
-  if (slot.type == AOTPointwiseOpType::ColorMatrix) {
-    const auto& matrix = slot.colorMatrix.matrix;
-    float matrixData[] = {
-        matrix[0], matrix[5], matrix[10], matrix[15], matrix[1], matrix[6], matrix[11], matrix[16],
-        matrix[2], matrix[7], matrix[12], matrix[17], matrix[3], matrix[8], matrix[13], matrix[18],
-    };
-    float vectorData[] = {matrix[4], matrix[9], matrix[14], matrix[19]};
-    uniformData->setDataOptional(prefix + "ColorMatrix", matrixData);
-    uniformData->setDataOptional(prefix + "ColorVector", vectorData);
-  } else if (slot.type == AOTPointwiseOpType::Luma) {
-    uniformData->setDataOptional(prefix + "Kr", slot.luma.kr);
-    uniformData->setDataOptional(prefix + "Kg", slot.luma.kg);
-    uniformData->setDataOptional(prefix + "Kb", slot.luma.kb);
-  } else if (slot.type == AOTPointwiseOpType::AlphaThreshold) {
-    uniformData->setDataOptional(prefix + "Threshold", slot.alphaThreshold.threshold);
-  } else if (slot.type == AOTPointwiseOpType::ColorSpaceXform) {
-    ColorSpaceXformHelper helper(prefix);
-    helper.setData(uniformData, slot.colorSpaceXform.steps.get());
-  } else if (slot.type == AOTPointwiseOpType::ConstColor) {
-    uniformData->setDataOptional(prefix + "ConstColorValue", slot.constColor.color);
-    uniformData->setDataOptional(prefix + "ConstInputMode", slot.constColor.inputMode);
-  } else if (slot.type == AOTPointwiseOpType::Blend) {
-    uniformData->setDataOptional(prefix + "ConstColorValue", slot.constColor.color);
-    uniformData->setDataOptional(prefix + "BlendModeValue", slot.blend.blendMode);
-    uniformData->setDataOptional(prefix + "BlendConstFirst", slot.blend.childType == 1 ? 1 : 0);
-  }
-}
 }  // namespace
 
 PlacementPtr<PerlinNoiseFragmentProcessor> PerlinNoiseFragmentProcessor::Make(
@@ -338,9 +313,9 @@ void GLSLPerlinNoiseFragmentProcessor::emitCode(EmitArgs& args) const {
   // kernel's applyPointwiseSlot1(applyPointwiseOp(...)) order. Only reachable when this processor
   // carries slot records (AOT route fallback safety); a pipeline-built perlin has none and relies
   // on composed operator FPs instead.
+  std::unordered_map<std::string, std::string> declaredArrays = {};
   for (size_t index = 0; index < slotCount; ++index) {
-    auto prefix = index == 0 ? std::string() : "Slot" + std::to_string(index);
-    EmitPointwiseSlot(args, prefix, pointwiseSlots[index]);
+    EmitPointwiseSlot(args, declaredArrays, index, pointwiseSlots[index]);
   }
 }
 
@@ -368,14 +343,16 @@ void GLSLPerlinNoiseFragmentProcessor::onSetData(UniformData* /*vertexUniformDat
   // Default the shared pointwise operator to NONE (passthrough). When a pointwise operator FP is
   // composed on top of this shader it is visited after this child in FragmentProcessor::Iter and
   // overwrites OpType with its own value, so this only takes effect for the pure-noise case.
-  fragmentUniformData->setDataOptional("OpType", static_cast<int>(4));
-  // Slots 1/2 are owned by this processor and always written here (no other FP knows the names).
-  fragmentUniformData->setDataOptional("Slot1OpType", static_cast<int>(4));
-  fragmentUniformData->setDataOptional("Slot2OpType", static_cast<int>(4));
+  fragmentUniformData->setArrayElementOptional("OpType", 0, static_cast<int>(4));
+  // Slots 1/2 are owned by this processor and always written here (no other FP knows the layout).
+  fragmentUniformData->setArrayElementOptional("OpType", 1, static_cast<int>(4));
+  fragmentUniformData->setArrayElementOptional("OpType", 2, static_cast<int>(4));
+  // Runtime loop bound of the precompiled kernel; a uniform so the slot loop stays rolled and the
+  // operator library exists once in the binary.
+  fragmentUniformData->setDataOptional("PointwiseSlotCount", static_cast<int>(MaxPointwiseSlots));
 
   for (size_t index = 0; index < slotCount; ++index) {
-    auto prefix = index == 0 ? std::string() : "Slot" + std::to_string(index);
-    UploadPointwiseSlot(fragmentUniformData, prefix, pointwiseSlots[index]);
+    UploadAOTPointwiseSlot(fragmentUniformData, index, MaxPointwiseSlots, pointwiseSlots[index]);
   }
 }
 }  // namespace tgfx

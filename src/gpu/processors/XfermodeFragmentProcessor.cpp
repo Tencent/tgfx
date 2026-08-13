@@ -70,7 +70,7 @@ void XfermodeFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
   }
   if (fragmentUniformData->hasField("BlendModeValue")) {
     int modeInt = static_cast<int>(mode);
-    fragmentUniformData->setData("BlendModeValue", modeInt);
+    fragmentUniformData->setArrayElement("BlendModeValue", 0, modeInt);
   }
   // Selects how the operands map onto the blend's src/dst in the fused chain kernel. The
   // single-child roles (DstChild/SrcChild) share one compiled variant and are told apart here, so

@@ -106,8 +106,9 @@ class UniformData {
   }
 
   /**
-   * Copies value into one element of an array uniform. The named uniform must be an array with
-   * more than one element and index must be in range; the value size must match one element.
+   * Copies value into one element of an array uniform. A scalar uniform is accepted as a
+   * single-element target (only index 0 is in range), so callers can use one call form for both
+   * scalar fields and array elements. The value size must match one element.
    */
   template <typename T>
   std::enable_if_t<std::is_trivially_copyable_v<T> && !std::is_pointer_v<T> &&

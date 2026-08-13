@@ -28,15 +28,20 @@
 namespace tgfx {
 /**
  * Declares and uploads the uniforms of a color-space transform. All uniform names are prefixed with
- * namePrefix, which lets a multi-slot kernel give each slot an independent parameter set
- * (Slot0SrcTF0, Slot1SrcTF0, ...); an empty prefix yields the plain names used by the standalone
- * ColorSpaceXformEffect.
+ * namePrefix; an empty prefix yields the plain names used by the standalone ColorSpaceXformEffect.
+ * When slotIndex >= 0 the plain names are declared and written as per-slot arrays of
+ * slotCapacity elements instead, letting a multi-slot kernel give each slot an independent
+ * parameter set (SrcTF0[0], SrcTF0[1], ...).
  */
 class ColorSpaceXformHelper {
  public:
   ColorSpaceXformHelper() = default;
 
   explicit ColorSpaceXformHelper(std::string namePrefix) : prefix(std::move(namePrefix)) {
+  }
+
+  ColorSpaceXformHelper(int slotIndex, uint32_t slotCapacity)
+      : slot(slotIndex), capacity(slotCapacity) {
   }
 
   void emitCode(UniformHandler* uniformHandler, const ColorSpaceXformSteps* colorSpaceXform,
@@ -100,7 +105,30 @@ class ColorSpaceXformHelper {
   }
 
  private:
+  template <typename T>
+  void writeRequired(UniformData* uniformData, const std::string& field, const T& value) const {
+    if (slot >= 0) {
+      uniformData->setArrayElement(field, static_cast<size_t>(slot), value);
+    } else {
+      uniformData->setData(prefix + field, value);
+    }
+  }
+
+  template <typename T>
+  void writeOptional(UniformData* uniformData, const std::string& field, const T& value) const {
+    if (slot >= 0) {
+      uniformData->setArrayElementOptional(field, static_cast<size_t>(slot), value);
+    } else {
+      uniformData->setDataOptional(prefix + field, value);
+    }
+  }
+
+  std::string declare(UniformHandler* uniformHandler, const std::string& field,
+                      UniformFormat format, ShaderStage stage);
+
   std::string prefix;
+  int slot = -1;
+  uint32_t capacity = 0;
   std::string srcTFVar0;
   std::string srcTFVar1;
   std::string srcOOTFVar;

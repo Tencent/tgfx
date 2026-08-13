@@ -33,33 +33,39 @@ static int TFTypeToIndex(gfx::skcms_TFType type) {
   }
 }
 
+std::string ColorSpaceXformHelper::declare(UniformHandler* uniformHandler, const std::string& field,
+                                           UniformFormat format, ShaderStage stage) {
+  if (slot >= 0) {
+    auto mangled = uniformHandler->addUniform(field, format, stage, capacity);
+    return mangled + "[" + std::to_string(slot) + "]";
+  }
+  return uniformHandler->addUniform(prefix + field, format, stage);
+}
+
 void ColorSpaceXformHelper::emitCode(UniformHandler* uniformHandler,
                                      const ColorSpaceXformSteps* colorSpaceXform,
                                      ShaderStage shaderStage) {
   if (colorSpaceXform) {
     flags = colorSpaceXform->flags;
     if (this->applySrcTF()) {
-      srcTFVar0 = uniformHandler->addUniform(prefix + "SrcTF0", UniformFormat::Float4, shaderStage);
-      srcTFVar1 = uniformHandler->addUniform(prefix + "SrcTF1", UniformFormat::Float4, shaderStage);
+      srcTFVar0 = declare(uniformHandler, "SrcTF0", UniformFormat::Float4, shaderStage);
+      srcTFVar1 = declare(uniformHandler, "SrcTF1", UniformFormat::Float4, shaderStage);
       _srcTFType =
           gfx::skcms_TransferFunction_getType(reinterpret_cast<const gfx::skcms_TransferFunction*>(
               &colorSpaceXform->srcTransferFunction));
     }
     if (this->applySrcOOTF()) {
-      srcOOTFVar =
-          uniformHandler->addUniform(prefix + "SrcOOTF", UniformFormat::Float4, shaderStage);
+      srcOOTFVar = declare(uniformHandler, "SrcOOTF", UniformFormat::Float4, shaderStage);
     }
     if (this->applyGamutXform()) {
-      gamutXformVar =
-          uniformHandler->addUniform(prefix + "ColorXform", UniformFormat::Float3x3, shaderStage);
+      gamutXformVar = declare(uniformHandler, "ColorXform", UniformFormat::Float3x3, shaderStage);
     }
     if (this->applyDstOOTF()) {
-      dstOOTFVar =
-          uniformHandler->addUniform(prefix + "DstOOTF", UniformFormat::Float4, shaderStage);
+      dstOOTFVar = declare(uniformHandler, "DstOOTF", UniformFormat::Float4, shaderStage);
     }
     if (this->applyDstTF()) {
-      dstTFVar0 = uniformHandler->addUniform(prefix + "DstTF0", UniformFormat::Float4, shaderStage);
-      dstTFVar1 = uniformHandler->addUniform(prefix + "DstTF1", UniformFormat::Float4, shaderStage);
+      dstTFVar0 = declare(uniformHandler, "DstTF0", UniformFormat::Float4, shaderStage);
+      dstTFVar1 = declare(uniformHandler, "DstTF1", UniformFormat::Float4, shaderStage);
       _dstTFType =
           gfx::skcms_TransferFunction_getType(reinterpret_cast<const gfx::skcms_TransferFunction*>(
               &colorSpaceXform->dstTransferFunctionInverse));
@@ -79,9 +85,9 @@ void ColorSpaceXformHelper::setData(UniformData* uniformData,
   // the uniforms of disabled steps, so setDataOptional tolerates their absence there. Disabled
   // steps get identity placeholders: their CSFlags bit is 0, so the shader never reads them.
   static const float kZero4[4] = {0.0f, 0.0f, 0.0f, 0.0f};
-  uniformData->setDataOptional(prefix + "CSFlags", static_cast<int>(flags.mask()));
+  writeOptional(uniformData, "CSFlags", static_cast<int>(flags.mask()));
   // Select the ColorSpaceXform operator in the shared pointwise operator table (absent elsewhere).
-  uniformData->setDataOptional(prefix + "OpType", 3);
+  writeOptional(uniformData, "OpType", 3);
 
   if (this->applySrcTF()) {
     float srcTF0[4] = {
@@ -90,25 +96,35 @@ void ColorSpaceXformHelper::setData(UniformData* uniformData,
     float srcTF1[4] = {colorSpaceXform->srcTransferFunction.d,
                        colorSpaceXform->srcTransferFunction.e,
                        colorSpaceXform->srcTransferFunction.f, 0.0f};
-    uniformData->setData(prefix + "SrcTF0", srcTF0);
-    uniformData->setData(prefix + "SrcTF1", srcTF1);
+    writeRequired(uniformData, "SrcTF0", srcTF0);
+    writeRequired(uniformData, "SrcTF1", srcTF1);
     int srcType = TFTypeToIndex(
         gfx::skcms_TransferFunction_getType(reinterpret_cast<const gfx::skcms_TransferFunction*>(
             &colorSpaceXform->srcTransferFunction)));
-    uniformData->setDataOptional(prefix + "SrcTFType", srcType);
+    writeOptional(uniformData, "SrcTFType", srcType);
   } else {
-    uniformData->setDataOptional(prefix + "SrcTF0", kZero4);
-    uniformData->setDataOptional(prefix + "SrcTF1", kZero4);
-    uniformData->setDataOptional(prefix + "SrcTFType", 0);
+    writeOptional(uniformData, "SrcTF0", kZero4);
+    writeOptional(uniformData, "SrcTF1", kZero4);
+    writeOptional(uniformData, "SrcTFType", 0);
   }
 
   if (this->applySrcOOTF()) {
-    uniformData->setData(prefix + "SrcOOTF", colorSpaceXform->srcOOTF);
+    writeRequired(uniformData, "SrcOOTF", colorSpaceXform->srcOOTF);
   } else {
-    uniformData->setDataOptional(prefix + "SrcOOTF", kZero4);
+    writeOptional(uniformData, "SrcOOTF", kZero4);
   }
 
-  if (this->applyGamutXform()) {
+  if (slot >= 0) {
+    const ColorMatrix33& m =
+        this->applyGamutXform()
+            ? colorSpaceXform->srcToDstMatrix
+            : ColorMatrix33{{{1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}}};
+    // std140 mat3 array element: three vec4 columns.
+    float packed[12] = {m.values[0][0], m.values[1][0], m.values[2][0], 0.0f,
+                        m.values[0][1], m.values[1][1], m.values[2][1], 0.0f,
+                        m.values[0][2], m.values[1][2], m.values[2][2], 0.0f};
+    uniformData->setArrayElementOptional("ColorXform", static_cast<size_t>(slot), packed);
+  } else if (this->applyGamutXform()) {
     uniformData->setData(prefix + "ColorXform", colorSpaceXform->srcToDstMatrix);
   } else if (uniformData->hasField(prefix + "ColorXform")) {
     ColorMatrix33 identity = {{{1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}}};
@@ -116,9 +132,9 @@ void ColorSpaceXformHelper::setData(UniformData* uniformData,
   }
 
   if (this->applyDstOOTF()) {
-    uniformData->setData(prefix + "DstOOTF", colorSpaceXform->dstOOTF);
+    writeRequired(uniformData, "DstOOTF", colorSpaceXform->dstOOTF);
   } else {
-    uniformData->setDataOptional(prefix + "DstOOTF", kZero4);
+    writeOptional(uniformData, "DstOOTF", kZero4);
   }
 
   if (this->applyDstTF()) {
@@ -129,16 +145,16 @@ void ColorSpaceXformHelper::setData(UniformData* uniformData,
     float dstTF1[4] = {colorSpaceXform->dstTransferFunctionInverse.d,
                        colorSpaceXform->dstTransferFunctionInverse.e,
                        colorSpaceXform->dstTransferFunctionInverse.f, 0.0f};
-    uniformData->setData(prefix + "DstTF0", dstTF0);
-    uniformData->setData(prefix + "DstTF1", dstTF1);
+    writeRequired(uniformData, "DstTF0", dstTF0);
+    writeRequired(uniformData, "DstTF1", dstTF1);
     int dstType = TFTypeToIndex(
         gfx::skcms_TransferFunction_getType(reinterpret_cast<const gfx::skcms_TransferFunction*>(
             &colorSpaceXform->dstTransferFunctionInverse)));
-    uniformData->setDataOptional(prefix + "DstTFType", dstType);
+    writeOptional(uniformData, "DstTFType", dstType);
   } else {
-    uniformData->setDataOptional(prefix + "DstTF0", kZero4);
-    uniformData->setDataOptional(prefix + "DstTF1", kZero4);
-    uniformData->setDataOptional(prefix + "DstTFType", 0);
+    writeOptional(uniformData, "DstTF0", kZero4);
+    writeOptional(uniformData, "DstTF1", kZero4);
+    writeOptional(uniformData, "DstTFType", 0);
   }
 }
 }  // namespace tgfx

@@ -49,7 +49,7 @@ void main() {
   // TextureEffect post-processing: intermediate is never alpha-only or RGBAAA.
   color = color * outputColor.a;
 
-  vec4 result = applyPointwiseOp(color);
+  vec4 result = applyPointwiseOp(0, color);
 
 #if HAS_COVERAGE
 // Per-vertex AA coverage: keep the un-premultiplied result for the XferProcessor lerp and multiply

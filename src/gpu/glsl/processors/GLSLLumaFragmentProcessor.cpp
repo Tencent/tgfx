@@ -42,11 +42,11 @@ void GLSLLumaFragmentProcessor::emitCode(EmitArgs& args) const {
 
 void GLSLLumaFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
                                           UniformData* fragmentUniformData) const {
-  fragmentUniformData->setData("Kr", _lumaFactor.kr);
-  fragmentUniformData->setData("Kg", _lumaFactor.kg);
-  fragmentUniformData->setData("Kb", _lumaFactor.kb);
+  fragmentUniformData->setArrayElement("Kr", 0, _lumaFactor.kr);
+  fragmentUniformData->setArrayElement("Kg", 0, _lumaFactor.kg);
+  fragmentUniformData->setArrayElement("Kb", 0, _lumaFactor.kb);
   // Select the Luma operator in the shared TexturedEffectShader (absent elsewhere).
-  fragmentUniformData->setDataOptional("OpType", 1);
+  fragmentUniformData->setArrayElementOptional("OpType", 0, 1);
 }
 
 }  // namespace tgfx
