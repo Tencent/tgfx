@@ -87,9 +87,6 @@ void WebGPUBuffer::OnBufferMapped(WGPUBufferMapAsyncStatus status, void* userdat
   auto request = *reference;
   delete reference;
   if (request == nullptr || request->owner == nullptr) {
-    // The buffer was released, or the request was superseded by unmap() / setMapReady() before the
-    // callback arrived. Dropping the result here is what keeps this callback from writing into
-    // freed memory or into a newer request's state.
     return;
   }
   auto owner = request->owner;
@@ -97,8 +94,7 @@ void WebGPUBuffer::OnBufferMapped(WGPUBufferMapAsyncStatus status, void* userdat
     owner->mapState = MapState::Mapped;
     return;
   }
-  // Falling back to Unmapped is mandatory: leaving the state at Pending would make the guard in
-  // requestMapAsync() reject every retry, blocking the readback forever.
+  // Falling back to Unmapped is required, otherwise the guard in requestMapAsync() rejects retries.
   owner->mapState = MapState::Unmapped;
   owner->detachMapRequest();
 }
@@ -112,9 +108,7 @@ void* WebGPUBuffer::map(size_t offset, size_t mapSize) {
   }
   if (_usage & GPUBufferUsage::READBACK) {
     if (mapState != MapState::Mapped) {
-      // Not yet mapped. WebGPU has no synchronous readback, so this is the expected result while
-      // the asynchronous mapping is still in flight; callers poll isReady() until it completes.
-      // Deliberately not logged: polling callers would flood the log every frame.
+      // Expected while the asynchronous mapping is still in flight; callers poll isReady().
       return nullptr;
     }
     return const_cast<void*>(wgpuBufferGetConstMappedRange(buffer, offset, mapSize));
@@ -139,9 +133,8 @@ void WebGPUBuffer::requestMapAsync() {
   if (buffer == nullptr || (_usage & GPUBufferUsage::READBACK) == 0) {
     return;
   }
-  // Idempotent by design. Re-issuing a map on a buffer that already has one pending is a validation
-  // error, and clearing the state of an already mapped buffer would drop the obligation to unmap
-  // it, leaving the buffer permanently mapped and unusable.
+  // Re-issuing a map on a pending buffer is a validation error, and clearing the state of a mapped
+  // buffer would drop the obligation to unmap it.
   if (mapState != MapState::Unmapped) {
     return;
   }
@@ -150,9 +143,7 @@ void WebGPUBuffer::requestMapAsync() {
 #ifdef TGFX_USE_ASYNCIFY
   auto generation = mapGeneration;
   auto result = webgpu_buffer_map_sync(buffer, _size);
-  // The WASM stack was suspended during the await, so unmap(), setMapReady() or onRelease() may
-  // have superseded this request in the meantime. Writing the result now would resurrect a state
-  // that no longer matches the buffer.
+  // The WASM stack was suspended during the await, so this request may have been superseded since.
   if (generation != mapGeneration) {
     return;
   }
@@ -169,8 +160,7 @@ void WebGPUBuffer::setMapReady(bool ready) {
   if ((_usage & GPUBufferUsage::READBACK) == 0) {
     return;
   }
-  // The external path performs the mapping itself, so any request issued from C++ must be
-  // superseded to keep its late callback from overwriting the state set here.
+  // The external path maps the buffer itself, so drop any request issued from C++.
   detachMapRequest();
   mapState = ready ? MapState::Mapped : MapState::Unmapped;
 }
@@ -181,8 +171,7 @@ void WebGPUBuffer::unmap() {
   }
   if (_usage & GPUBufferUsage::READBACK) {
     if (mapState != MapState::Unmapped) {
-      // Unmapping a buffer that still has a map request pending rejects that request with an
-      // AbortError, so this doubles as the cancellation path.
+      // Unmapping rejects a pending map request, so this doubles as the cancellation path.
       wgpuBufferUnmap(buffer);
       mapState = MapState::Unmapped;
     }
@@ -201,8 +190,8 @@ void WebGPUBuffer::unmap() {
 }
 
 void WebGPUBuffer::detachMapRequest() {
-  // Bumping the generation supersedes an in-flight Asyncify request, while clearing the owner
-  // pointer supersedes an in-flight callback-based request.
+  // The generation supersedes an in-flight Asyncify request; the owner pointer supersedes a
+  // callback-based one.
   ++mapGeneration;
   if (mapRequest != nullptr) {
     mapRequest->owner = nullptr;
@@ -224,8 +213,7 @@ void WebGPUBuffer::onRelease(WebGPUGPU*) {
     buffer = nullptr;
   }
   mapState = MapState::Unmapped;
-  // Must run even when the buffer was already gone: this object is deleted right after onRelease(),
-  // so a late callback would otherwise write into freed memory.
+  // Required even without a buffer: this object is deleted right after onRelease().
   detachMapRequest();
 }
 

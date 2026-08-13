@@ -80,17 +80,14 @@ const void* SurfaceReadback::lockPixels(Context* context, bool flipY) {
     context->gpu()->queue()->waitUntilCompleted();
   }
   auto gpuBuffer = readbackBuffer->gpuBuffer();
-  // For async-only backends like WebGPU, trigger async mapping if not already started. The call is
-  // idempotent, so it is safe even when a request is already in flight. With Asyncify enabled,
-  // requestMapAsync() suspends the WASM stack while buffer.mapAsync() awaits, allowing the JS event
-  // loop to process the async operation and resume once complete, so isReady() is true right after.
+  // For async-only backends like WebGPU, start the mapping if needed. The call is idempotent. With
+  // Asyncify it suspends the WASM stack until the mapping completes, so isReady() is true right
+  // after it returns.
   if (!gpuBuffer->isReady()) {
     gpuBuffer->requestMapAsync();
     if (!gpuBuffer->isReady()) {
-      // Without Asyncify the mapping completes on a later turn of the event loop, so returning
-      // nullptr here is the expected outcome of the first call: the caller polls isReady() and
-      // calls lockPixels() again once the data is available. Deliberately not logged, otherwise
-      // polling callers would flood the log every frame.
+      // Without Asyncify the mapping completes on a later turn of the event loop, so the caller is
+      // expected to poll isReady() and call lockPixels() again.
       return nullptr;
     }
   }

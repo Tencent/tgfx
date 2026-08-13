@@ -40,23 +40,20 @@ class WebGPUBuffer : public GPUBuffer, public WebGPUResource {
   void* map(size_t offset = 0, size_t size = GPU_BUFFER_WHOLE_SIZE) override;
 
   /**
-   * Unmaps the buffer, and also cancels an in-flight asynchronous map request. Calling this on a
-   * buffer that is neither mapped nor pending is a no-op.
+   * Unmaps the buffer and cancels any in-flight asynchronous map request.
    */
   void unmap() override;
 
   /**
    * Initiates an asynchronous map request for READBACK buffers. After calling this, poll isReady()
-   * to check completion, then call map() to access the data. This method is idempotent: it does
-   * nothing while a request is in flight or the buffer is already mapped. If a previous request
-   * failed, calling it again issues a new request.
+   * to check completion, then call map() to access the data. Idempotent: does nothing while a
+   * request is in flight or the buffer is already mapped, and re-issues the request after a failure.
    */
   void requestMapAsync() override;
 
   /**
-   * Marks the buffer as mapped or unmapped. Used by external async mapping paths (e.g., JS-side
-   * mapAsync) to notify C++ about the mapping result. Any in-flight request issued from C++ is
-   * superseded, so its late callback cannot overwrite the state set here.
+   * Marks the buffer as mapped or unmapped, for external mapping paths such as JS-side mapAsync.
+   * Supersedes any request issued from C++.
    */
   void setMapReady(bool ready);
 
@@ -65,11 +62,8 @@ class WebGPUBuffer : public GPUBuffer, public WebGPUResource {
  private:
   enum class MapState { Unmapped, Pending, Mapped };
 
-  /**
-   * Shared state for one asynchronous map request. It is kept alive by the map callback, so the
-   * callback stays safe even when the WebGPUBuffer has already been destroyed: the owner pointer is
-   * cleared before the buffer goes away.
-   */
+  // Shared with the map callback so it stays valid after the buffer is destroyed; the owner pointer
+  // is cleared before that happens.
   struct MapRequest {
     WebGPUBuffer* owner = nullptr;
   };

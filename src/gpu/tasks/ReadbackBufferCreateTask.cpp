@@ -32,12 +32,9 @@ std::shared_ptr<Resource> ReadbackBufferCreateTask::onMakeResource(Context* cont
     LOGE("ReadbackBufferCreateTask::onMakeResource() Failed to create buffer!");
     return nullptr;
   }
-  // A recycled readback buffer may still carry the map state of a previous readback that was
-  // abandoned before its pixels were consumed. Without this reset, backends with asynchronous
-  // mapping would encode a copy into a still-mapped buffer, and a late map callback could make the
-  // buffer report ready while holding the previous readback's pixels. This is the only place where
-  // a pooled readback buffer is handed out, so resetting here covers every reuse path. Backends
-  // without asynchronous mapping treat unmap() on an unmapped buffer as a no-op.
+  // A recycled buffer may still carry the map state of a readback that was abandoned before its
+  // pixels were consumed, which would leave it mapped while being used as a copy destination. This
+  // is the only place where a pooled readback buffer is handed out.
   bufferResource->gpuBuffer()->unmap();
   return bufferResource;
 }

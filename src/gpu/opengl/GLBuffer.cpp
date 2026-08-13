@@ -87,10 +87,8 @@ void* GLBuffer::map(size_t offset, size_t size) {
 }
 
 void GLBuffer::unmap() {
-  // Calling glUnmapBuffer() on a buffer that is not currently mapped raises GL_INVALID_OPERATION,
-  // which would pollute the GL error state for unrelated checks. Callers are allowed to invoke
-  // unmap() defensively (for example to reset a recycled readback buffer), so track the mapped
-  // state and make unmap() a no-op when nothing is mapped.
+  // glUnmapBuffer() on an unmapped buffer raises GL_INVALID_OPERATION, and callers may invoke
+  // unmap() defensively to reset a recycled readback buffer.
   if (!mapped) {
     return;
   }
