@@ -76,15 +76,9 @@ class D3D12Window : public Window {
   void onPresent(Context* context) override;
 
  private:
-  // PImpl: all DXGI / D3D12 handles and per-backbuffer state live in PlatformState (defined in
-  // the .cpp) so this header pulls in neither dxgi.h nor d3d12.h.
   struct PlatformState;
 
 #ifdef _WIN32
-  // Shared implementation for MakeForHwnd (transparent=false) and MakeForComposition
-  // (transparent=true). Kept private so the public API surface exposes only the two
-  // self-descriptive entry points that pair with CreateSwapChainForHwnd and
-  // CreateSwapChainForComposition, matching the naming convention Windows uses itself.
   static std::shared_ptr<D3D12Window> MakeImpl(HWND hwnd, std::shared_ptr<D3D12Device> device,
                                                std::shared_ptr<ColorSpace> colorSpace,
                                                bool transparent);
