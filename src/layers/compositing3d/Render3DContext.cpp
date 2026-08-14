@@ -316,6 +316,8 @@ static double SmallestSingularValueSquared(float m00, float m01, float m10, floa
 // Perspective or invalid mappings conservatively retain mipmaps.
 static bool NeedsMipmaps(const Matrix3D& localToCompositor, const Rect& visibleLocal,
                          int rasterWidth, int rasterHeight) {
+  // The leaf is planar (z = 0), so the row-3 column-2 perspective term multiplies zero and is
+  // intentionally ignored; only the x/y perspective terms affect the texel mapping.
   const float perspectiveX = localToCompositor.getRowColumn(3, 0);
   const float perspectiveY = localToCompositor.getRowColumn(3, 1);
   const float homogeneousW = localToCompositor.getRowColumn(3, 3);
