@@ -360,6 +360,7 @@ std::shared_ptr<D3D12Window> D3D12Window::MakeImpl(HWND hwnd, std::shared_ptr<D3
     }
   }
   if (!state->buildBackBuffers()) {
+    state->detachCompositionTree();
     state.reset();
     device->unlock();
     return nullptr;
