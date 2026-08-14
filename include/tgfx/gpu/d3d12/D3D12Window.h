@@ -39,37 +39,30 @@ class D3D12Window : public Window {
  public:
 #ifdef _WIN32
   /**
-   * Creates an opaque D3D12Window bound directly to a Win32 window handle.
-   *
-   * Mirrors IDXGIFactory2::CreateSwapChainForHwnd: an opaque FLIP_DISCARD swap chain is
-   * created for hwnd and DirectComposition is not involved.
+   * Creates an opaque D3D12Window bound to a Win32 window handle. Contents fully cover the
+   * window; alpha in rendered pixels is ignored.
    *
    * @param hwnd The target Win32 window. Must be non-null.
    * @param device The D3D12 device used to create the swap chain resources. Must be non-null.
    * @param colorSpace Optional color space for the output. Only sRGB is currently supported;
    *        any non-sRGB value is ignored with a logged warning.
-   * @return A new D3D12Window, or nullptr if the swap chain cannot be created.
+   * @return A new D3D12Window, or nullptr if creation failed.
    */
   static std::shared_ptr<D3D12Window> MakeForHwnd(HWND hwnd, std::shared_ptr<D3D12Device> device,
                                                   std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
-   * Creates a transparent D3D12Window that composes with the desktop via DirectComposition.
+   * Creates a D3D12Window that blends with the desktop and any UI beneath the target hwnd.
    *
-   * Mirrors IDXGIFactory2::CreateSwapChainForComposition: a FLIP_SEQUENTIAL swap chain with
-   * DXGI_ALPHA_MODE_PREMULTIPLIED is created and attached to a DirectComposition visual tree
-   * rooted at hwnd, letting the window blend with the desktop and other UI beneath it.
-   *
-   * The backbuffer is declared as premultiplied alpha: transparent regions must be cleared or
-   * drawn with alpha < 1 for the composited result to show through. The hwnd itself does NOT
-   * need WS_EX_LAYERED; DirectComposition routes composition outside the redirection bitmap.
+   * The backbuffer uses premultiplied alpha: transparent regions must be cleared or drawn with
+   * alpha < 1 for underlying content to show through; opaque pixels should set alpha = 1. The
+   * hwnd does NOT need the WS_EX_LAYERED extended style.
    *
    * @param hwnd The target Win32 window. Must be non-null.
    * @param device The D3D12 device used to create the swap chain resources. Must be non-null.
    * @param colorSpace Optional color space for the output. Only sRGB is currently supported;
    *        any non-sRGB value is ignored with a logged warning.
-   * @return A new D3D12Window, or nullptr if the swap chain or DirectComposition tree
-   *         cannot be created.
+   * @return A new D3D12Window, or nullptr if creation failed.
    */
   static std::shared_ptr<D3D12Window> MakeForComposition(
       HWND hwnd, std::shared_ptr<D3D12Device> device,

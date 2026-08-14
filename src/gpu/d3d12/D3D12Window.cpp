@@ -301,6 +301,10 @@ std::shared_ptr<D3D12Window> D3D12Window::MakeImpl(HWND hwnd, std::shared_ptr<D3
   // does want the real enum.
   desc.Format = static_cast<DXGI_FORMAT>(DXGI_FORMAT_R8G8B8A8_UNORM);
   desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+  // Opaque path: FLIP_DISCARD gives DXGI freedom to drop stale backbuffers and is the standard
+  // choice for windowed presentation. Transparent path: DirectComposition attaches to the swap
+  // chain by resource identity, so we need FLIP_SEQUENTIAL to keep buffer identity stable
+  // across frames; ALPHA_PREMULTIPLIED tells DWM how to blend the per-pixel alpha we render.
   desc.SwapEffect = transparent ? DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL : DXGI_SWAP_EFFECT_FLIP_DISCARD;
   desc.SampleDesc.Count = 1;
   desc.SampleDesc.Quality = 0;
@@ -310,8 +314,12 @@ std::shared_ptr<D3D12Window> D3D12Window::MakeImpl(HWND hwnd, std::shared_ptr<D3
 
   ComPtr<IDXGISwapChain1> swapChain1;
   if (transparent) {
+    // Composition swap chains have no direct HWND binding; they must be attached to a
+    // DirectComposition visual tree below (SetContent + SetRoot + Commit) to reach the screen.
     hr = factory->CreateSwapChainForComposition(d3d12CommandQueue, &desc, nullptr, &swapChain1);
   } else {
+    // Opaque swap chains render straight to the HWND through the DWM redirection bitmap; no
+    // DirectComposition tree is required.
     hr = factory->CreateSwapChainForHwnd(d3d12CommandQueue, hwnd, &desc, nullptr, nullptr,
                                          &swapChain1);
   }
