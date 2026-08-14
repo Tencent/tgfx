@@ -256,8 +256,9 @@ std::shared_ptr<D3D12Window> D3D12Window::MakeImpl(HWND hwnd, std::shared_ptr<D3
     return nullptr;
   }
   if (colorSpace && !colorSpace->isSRGB()) {
-    LOGI("D3D12Window: non-sRGB colorSpace is not yet supported and will be ignored. Only sRGB "
-         "output is currently available.");
+    LOGI(
+        "D3D12Window: non-sRGB colorSpace is not yet supported and will be ignored. Only sRGB "
+        "output is currently available.");
   }
 
   auto context = device->lockContext();
