@@ -19,6 +19,7 @@
 #include "GaussianBlur1DFragmentProcessor.h"
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace tgfx {
 
@@ -34,16 +35,20 @@ GaussianBlur1DFragmentProcessor::GaussianBlur1DFragmentProcessor(
 void GaussianBlur1DFragmentProcessor::computeKernel() {
   // Clamp sigma defensively because the kernel table is dimensioned for maxSigma. Clamping sigma
   // rather than only the derived radius keeps the kernel weights consistent with the clamped value.
-  // isfinite() also guards against NaN, for which ceil() is undefined.
+  // Non-finite or non-positive sigma is reset to zero so that ceil() and the exp() below stay
+  // defined: with sigma = 0 the denominator is clamped to 1 and the kernel degenerates to a single
+  // center sample, which means no blurring.
   sigma = std::min(sigma, static_cast<float>(maxSigma));
-  if (!std::isfinite(sigma)) {
+  if (!std::isfinite(sigma) || sigma <= 0.0f) {
     sigma = 0.0f;
   }
   kernelRadius = static_cast<int>(ceil(2.0f * sigma));
   // Clamp by the sample count so the total number of samples (2 * radius + 1) never exceeds the
   // kernel table capacity.
   kernelRadius = std::min(kernelRadius, MAX_KERNEL_RADIUS);
-  const float denominator = 2.0f * sigma * sigma;
+  // Guard against a zero denominator when sigma is zero: with sigma = 0 the kernel degenerates to
+  // a single center sample. The floor keeps the weights exact for all valid sigma values.
+  const float denominator = std::max(2.0f * sigma * sigma, std::numeric_limits<float>::min());
   float total = 0.0f;
   for (int i = 0; i <= kernelRadius; ++i) {
     const float weight = exp(-static_cast<float>(i * i) / denominator);
@@ -57,7 +62,6 @@ void GaussianBlur1DFragmentProcessor::computeKernel() {
 }
 
 void GaussianBlur1DFragmentProcessor::onComputeProcessorKey(BytesKey* key) const {
-  Blur1DFragmentProcessor::onComputeProcessorKey(key);
   key->write(maxSigma);
 }
 
