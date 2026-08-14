@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include "tgfx/core/Image.h"
+#include "tgfx/core/Path.h"
 #include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
@@ -159,7 +160,7 @@ class GlassStyle : public LayerStyle {
 
   std::shared_ptr<GlassRefractionImageFilter> getUDFRefractionFilter(
       float halfWidth, float halfHeight, const UDFSampling& udf, const BackgroundMapping& mapping,
-      std::shared_ptr<Image> maskImage);
+      std::shared_ptr<Image> maskImage, std::shared_ptr<Image> edgeMaskImage);
 
   float getRefractionFactor() const {
     return std::clamp(_refraction / 100.0f, 0.0f, 1.0f);
@@ -206,6 +207,20 @@ class GlassStyle : public LayerStyle {
   std::shared_ptr<Image> cachedDownscaleSource = nullptr;
   std::shared_ptr<Image> cachedDownscaledImage = nullptr;
   float cachedDownscale = 0.0f;
+  // Cached UDF coverage texture, shared across tiles and frames. The key is the layer shape
+  // identity (the contour path reference is stable while the layer is unedited) plus the
+  // parameters that affect the generated field.
+  Path cachedUDFPath = {};
+  std::shared_ptr<Image> cachedUDFSource = nullptr;
+  std::shared_ptr<Image> cachedUDFImage = nullptr;
+  std::shared_ptr<Image> cachedEdgeUDFImage = nullptr;
+  float cachedUDFContentScale = 0.0f;
+  float cachedUDFDepth = -1.0f;
+  float cachedUDFContentWidth = 0.0f;
+  float cachedUDFContentHeight = 0.0f;
+  // Cached GPU texture of the processed background, shared across tiles within a frame.
+  std::shared_ptr<Image> cachedBgTextureSource = nullptr;
+  std::shared_ptr<Image> cachedBgTextureImage = nullptr;
 };
 
 }  // namespace tgfx

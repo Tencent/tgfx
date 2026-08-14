@@ -27,7 +27,8 @@ class GlassRefractionImageFilter : public ImageFilter {
  public:
   GlassRefractionImageFilter(const GlassRefractionParams& params,
                              const GlassSDFGeometryParams& sdfParams,
-                             const GlassUDFGeometryParams& udfParams, std::shared_ptr<Image> mask);
+                             const GlassUDFGeometryParams& udfParams, std::shared_ptr<Image> mask,
+                             std::shared_ptr<Image> edgeMask = nullptr);
 
   /**
    * Returns a FragmentProcessor that applies this filter to the source image, bypassing the
@@ -54,6 +55,7 @@ class GlassRefractionImageFilter : public ImageFilter {
   GlassSDFGeometryParams sdfParams;
   GlassUDFGeometryParams udfParams;
   std::shared_ptr<Image> mask;
+  std::shared_ptr<Image> edgeMask;
 };
 
 }  // namespace tgfx

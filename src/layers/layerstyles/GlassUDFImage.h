@@ -19,6 +19,7 @@
 #pragma once
 
 #include "core/images/TextureImage.h"
+#include "layers/processors/GlassUDFTentBlurFragmentProcessor.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
@@ -41,10 +42,12 @@ class GlassUDFImage : public Image {
    * @param textureRect The window of the full UDF space to generate, in UDF pixels.
    * @param fineRadius The tent blur radii for the refraction field, in UDF pixels.
    * @param coarseRadius The tent blur radii for the edge-light field, in UDF pixels.
+   * @param field Which fields the generated texture carries.
    */
   static std::shared_ptr<Image> Make(std::shared_ptr<Image> source, int coreWidth, int coreHeight,
                                      const Rect& textureRect, const Point& fineRadius,
-                                     const Point& coarseRadius);
+                                     const Point& coarseRadius,
+                                     GlassUDFField field = GlassUDFField::Both);
 
   int width() const override {
     return _width;
@@ -88,6 +91,7 @@ class GlassUDFImage : public Image {
   Rect textureRect = {};
   Point fineRadius = {};
   Point coarseRadius = {};
+  GlassUDFField field = GlassUDFField::Both;
   int _width = 0;
   int _height = 0;
   // The generated UDF texture, held strongly for the lifetime of this instance. The same filter may
@@ -97,7 +101,8 @@ class GlassUDFImage : public Image {
   mutable std::shared_ptr<TextureImage> cachedTexture = nullptr;
 
   GlassUDFImage(std::shared_ptr<Image> source, int coreWidth, int coreHeight,
-                const Rect& textureRect, const Point& fineRadius, const Point& coarseRadius);
+                const Rect& textureRect, const Point& fineRadius, const Point& coarseRadius,
+                GlassUDFField field);
 };
 
 }  // namespace tgfx

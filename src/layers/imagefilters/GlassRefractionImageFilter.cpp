@@ -26,8 +26,10 @@ namespace tgfx {
 GlassRefractionImageFilter::GlassRefractionImageFilter(const GlassRefractionParams& params,
                                                        const GlassSDFGeometryParams& sdfParams,
                                                        const GlassUDFGeometryParams& udfParams,
-                                                       std::shared_ptr<Image> mask)
-    : params(params), sdfParams(sdfParams), udfParams(udfParams), mask(std::move(mask)) {
+                                                       std::shared_ptr<Image> mask,
+                                                       std::shared_ptr<Image> edgeMask)
+    : params(params), sdfParams(sdfParams), udfParams(udfParams), mask(std::move(mask)),
+      edgeMask(std::move(edgeMask)) {
 }
 
 static std::shared_ptr<TextureProxy> MakeTextureProxy(Context* context,
@@ -68,11 +70,19 @@ PlacementPtr<FragmentProcessor> GlassRefractionImageFilter::asFragmentProcessor(
       return nullptr;
     }
   }
+  std::shared_ptr<TextureProxy> edgeMaskProxy = nullptr;
+  if (edgeMask != nullptr) {
+    edgeMaskProxy = MakeTextureProxy(args.context, edgeMask);
+    if (edgeMaskProxy == nullptr) {
+      return nullptr;
+    }
+  }
 
   auto allocator = args.context->drawingAllocator();
   PlacementPtr<GlassShapeGeometryFragmentProcessor> geometry = nullptr;
   if (params.shapeType == GlassShapeType::AlphaMask) {
-    geometry = GlassUDFGeometryFragmentProcessor::Make(allocator, std::move(maskProxy), udfParams,
+    geometry = GlassUDFGeometryFragmentProcessor::Make(allocator, std::move(maskProxy),
+                                                       std::move(edgeMaskProxy), udfParams,
                                                        params.lightIntensity > 0.0f);
   } else {
     geometry = GlassSDFGeometryFragmentProcessor::Make(allocator, params.shapeType, sdfParams);
