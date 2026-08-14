@@ -167,11 +167,11 @@
     "Hello2DTest": {
         "ConicGradient": "1ea63c49",
         "ImageWithMipmap": "1ea63c49",
-        "ImageWithShadow": "bd0c09cff",
+        "ImageWithShadow": "18dfc7fd8",
         "Layer3DTree": "a5d1dcfb",
         "LiquidGlass": "e30e25a8",
         "RichText": "1ea63c49",
-        "SimpleLayerTree": "bd0c09cff"
+        "SimpleLayerTree": "18dfc7fd8"
     },
     "ImageRenderTest": {
         "RotateImageRect": "bf48e614",
