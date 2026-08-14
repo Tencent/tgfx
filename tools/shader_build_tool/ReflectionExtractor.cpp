@@ -97,7 +97,10 @@ static std::vector<UniformEntry> ExtractUBOMembers(spirv_cross::Compiler& compil
 }
 
 static std::vector<UniformEntry> ExtractSamplers(spirv_cross::Compiler& compiler) {
-  std::vector<UniformEntry> result;
+  // spirv-cross does not return sampled_images in binding order. The runtime binds textures
+  // sequentially (fragment textures first, dst last) matching the SPIRV binding decorations, so
+  // the bundle must record samplers in binding order or the GL backend swaps them.
+  std::vector<std::pair<uint32_t, UniformEntry>> byBinding;
   auto resources = compiler.get_shader_resources();
   for (auto& sampler : resources.sampled_images) {
     std::string name = compiler.get_name(sampler.id);
@@ -106,7 +109,15 @@ static std::vector<UniformEntry> ExtractSamplers(spirv_cross::Compiler& compiler
     if (type.image.dim == spv::DimRect) {
       format = static_cast<uint8_t>(UniformFormat::Texture2DRectSampler);
     }
-    result.push_back({name, format});
+    auto binding = compiler.get_decoration(sampler.id, spv::DecorationBinding);
+    byBinding.emplace_back(binding, UniformEntry{name, format});
+  }
+  std::sort(byBinding.begin(), byBinding.end(),
+            [](const auto& a, const auto& b) { return a.first < b.first; });
+  std::vector<UniformEntry> result;
+  result.reserve(byBinding.size());
+  for (auto& [binding, entry] : byBinding) {
+    result.push_back(entry);
   }
   return result;
 }

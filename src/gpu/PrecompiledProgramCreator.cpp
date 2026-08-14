@@ -316,6 +316,22 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
     fragmentDesc.code = std::string(fragBlob->data.begin(), fragBlob->data.end());
   }
 
+  if (const char* dumpDir = getenv("TGFX_AOT_DUMP_DIR")) {
+    std::string base = std::string(dumpDir) + "/" + matchResult->shaderName + "_v" +
+                       std::to_string(matchResult->vertPermutationIndex) + "_f" +
+                       std::to_string(matchResult->fragPermutationIndex);
+    if (!vertexDesc.code.empty()) {
+      FILE* f = fopen((base + ".vert").c_str(), "w");
+      fwrite(vertexDesc.code.data(), 1, vertexDesc.code.size(), f);
+      fclose(f);
+    }
+    if (!fragmentDesc.code.empty()) {
+      FILE* f = fopen((base + ".frag").c_str(), "w");
+      fwrite(fragmentDesc.code.data(), 1, fragmentDesc.code.size(), f);
+      fclose(f);
+    }
+  }
+
   auto vertexShader = gpu->createShaderModule(vertexDesc);
   if (vertexShader == nullptr) {
     cache->recordFailure(PrecompiledFallbackReason::VertexModuleCreationFailed,
@@ -343,6 +359,10 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
     VertexBufferLayout instanceLayout(instanceAttributes, VertexStepMode::Instance);
     descriptor.vertex.bufferLayouts.push_back(instanceLayout);
   }
+  // Precompiled GLSL declares attributes with layout(location=N) matching the flattened order of
+  // the runtime attribute list. Names in the template differ from the GeometryProcessor's runtime
+  // names, so name-based GL binding would silently drop attributes.
+  descriptor.vertex.bindAttributesByLocation = true;
   descriptor.vertex.module = vertexShader;
   descriptor.fragment.module = fragmentShader;
   descriptor.fragment.colorAttachments.push_back(programInfo->getPipelineColorAttachment());

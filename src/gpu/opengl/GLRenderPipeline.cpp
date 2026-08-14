@@ -280,6 +280,7 @@ bool GLRenderPipeline::setPipelineDescriptor(GLGPU* gpu,
 
   DEBUG_ASSERT(!descriptor.vertex.bufferLayouts.empty());
   bufferLayouts.reserve(descriptor.vertex.bufferLayouts.size());
+  size_t globalAttributeIndex = 0;
   for (const auto& layout : descriptor.vertex.bufferLayouts) {
     DEBUG_ASSERT(layout.stride > 0);
     GLBufferLayout glLayout = {};
@@ -289,7 +290,12 @@ bool GLRenderPipeline::setPipelineDescriptor(GLGPU* gpu,
     glLayout.attributes.reserve(layout.attributes.size());
     int divisor = (layout.stepMode == VertexStepMode::Instance) ? 1 : 0;
     for (const auto& attribute : layout.attributes) {
-      auto location = gl->getAttribLocation(programID, attribute.name().c_str());
+      int location = -1;
+      if (descriptor.vertex.bindAttributesByLocation) {
+        location = static_cast<int>(globalAttributeIndex);
+      } else {
+        location = gl->getAttribLocation(programID, attribute.name().c_str());
+      }
       if (location != -1) {
         glLayout.attributes.push_back(
             MakeGLAttribute(attribute.format(), location, attributeOffset));
@@ -297,6 +303,7 @@ bool GLRenderPipeline::setPipelineDescriptor(GLGPU* gpu,
         gl->vertexAttribDivisor(static_cast<unsigned>(location), divisor);
       }
       attributeOffset += attribute.size();
+      globalAttributeIndex++;
     }
     bufferLayouts.push_back(std::move(glLayout));
   }

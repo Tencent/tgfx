@@ -402,9 +402,29 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
   bool holdDst = expected > samplers.size() && !samplers.empty() && xferProcessor != nullptr &&
                  xferProcessor->dstTextureView() != nullptr;
   size_t sequentialCount = holdDst ? samplers.size() - 1 : samplers.size();
+  // The device-mask slot in precompiled kernels sits immediately after the color-side textures
+  // (geometry-processor textures plus the color fragment-processor subtrees); the dummy for an
+  // absent device mask must occupy that slot, pushing local-mask textures right.
+  size_t colorSamplerCount = geometryProcessor->numTextureSamplers();
+  for (size_t i = 0; i < numColorFragmentProcessors(); ++i) {
+    FragmentProcessor::Iter colorIter(fragmentProcessors[i]);
+    const FragmentProcessor* cfp = colorIter.next();
+    while (cfp) {
+      colorSamplerCount += cfp->numTextureSamplers();
+      cfp = colorIter.next();
+    }
+  }
   unsigned textureBinding = 0;
   auto gpu = renderTarget->getContext()->gpu();
+  auto* cache = renderTarget->getContext()->globalCache();
+  // The device-mask slot is the only hole a draw can leave in a precompiled kernel's sampler
+  // list, so an expected/supplied gap means the dummy must be inserted there.
+  bool padHole = expected > samplers.size();
   for (size_t i = 0; i < sequentialCount; ++i) {
+    if (padHole && textureBinding == colorSamplerCount) {
+      renderPass->setTexture(textureBinding++, cache->getOrCreateDummyTexture(),
+                             cache->getOrCreateDummySampler());
+    }
     auto& [texture, state] = samplers[i];
     SamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
                                  state.minFilterMode, state.magFilterMode, state.mipmapMode);
@@ -412,7 +432,6 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
     renderPass->setTexture(textureBinding++, texture, sampler);
   }
   if (textureBinding < expected - (holdDst ? 1u : 0u)) {
-    auto* cache = renderTarget->getContext()->globalCache();
     auto dummyTexture = cache->getOrCreateDummyTexture();
     auto dummySampler = cache->getOrCreateDummySampler();
     unsigned stop = expected - (holdDst ? 1u : 0u);

@@ -191,6 +191,14 @@ class VertexDescriptor {
    * data, and slot 1 for per-instance data.
    */
   std::vector<VertexBufferLayout> bufferLayouts = {};
+
+  /**
+   * If true, vertex attributes are bound to shader input locations by their flattened order index
+   * across all buffer layouts (the i-th attribute uses location i), for shaders that declare
+   * explicit layout(location=N) inputs. If false, attributes are bound by looking up their names
+   * in the linked program. Ignored by backends that always bind by location (e.g. Metal).
+   */
+  bool bindAttributesByLocation = false;
 };
 
 /**

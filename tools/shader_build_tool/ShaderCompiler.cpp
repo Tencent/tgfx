@@ -81,7 +81,11 @@ CompileResult TranslateToGLSL(const std::vector<uint32_t>& spirv) {
   try {
     spirv_cross::CompilerGLSL compiler(spirv);
     auto options = compiler.get_common_options();
-    options.version = 150;
+    // GLSL 330 keeps layout(location=) on vertex inputs, which the precompiled GL pipeline
+    // binds attributes by (name-based binding breaks because template attribute names differ
+    // from the runtime GeometryProcessor names). Requires desktop GL 3.3; older drivers fail
+    // at module creation and fall back to ProgramBuilder cleanly.
+    options.version = 330;
     options.es = false;
     options.vulkan_semantics = false;
     options.enable_420pack_extension = false;
