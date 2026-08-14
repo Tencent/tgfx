@@ -536,14 +536,53 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       fineTextureRect.roundOut();
       Point udfTextureOrigin = {fineTextureRect.left, fineTextureRect.top};
 
-      // The edge light field covers the full layer and is shared across all tiles. Its larger
-      // texture cap preserves more texels for the narrow edge-light ramp on large layers.
+      // The edge light field needs a narrow layer-space reach but high precision, so its texture
+      // covers only a window around the current tile instead of the whole layer. The window is
+      // five times the tile size and centered on the tile; when a later tile falls outside it,
+      // the UDF is rebuilt centered on that tile with the same window size.
       bool enableEdgeLighting = getLightIntensityFactor() > 0.0f;
+
+      // Every tile of a frame shares the same background image, so a changed pointer marks the
+      // first tile of a new frame and invalidates the previous window.
+      if (cachedEdgeFrameBgImage != bgImage) {
+        cachedEdgeFrameBgImage = bgImage;
+        cachedEdgeWindowRect = Rect::MakeEmpty();
+      }
+
+      auto contentRect = Rect::MakeWH(contentWidth, contentHeight);
+      // This tile's sampling range: its clip plus the shader's sampling halo.
+      static constexpr float COARSE_SAMPLE_HALO = 64.0f;
+      auto tileClip = clipBounds.has_value() ? *clipBounds : contentRect;
+      auto tileSampleRect = tileClip.makeOutset(COARSE_SAMPLE_HALO, COARSE_SAMPLE_HALO);
+      tileSampleRect.intersect(contentRect);
+
+      // The window is five times the tile size, centered on the tile.
+      static constexpr float COARSE_WINDOW_TILE_FACTOR = 5.0f;
+      float tileCenterX = tileClip.centerX();
+      float tileCenterY = tileClip.centerY();
+      float tileW = tileClip.width();
+      float tileH = tileClip.height();
+      auto tileWindow =
+          Rect::MakeXYWH(tileCenterX - tileW * COARSE_WINDOW_TILE_FACTOR * 0.5f,
+                         tileCenterY - tileH * COARSE_WINDOW_TILE_FACTOR * 0.5f,
+                         tileW * COARSE_WINDOW_TILE_FACTOR, tileH * COARSE_WINDOW_TILE_FACTOR);
+      if (!tileWindow.intersect(contentRect)) {
+        tileWindow = contentRect;
+      }
+
+      bool edgeNeedRegen =
+          cachedEdgeWindowRect.isEmpty() || !cachedEdgeWindowRect.contains(tileSampleRect);
+      Rect finalEdgeWindow = tileWindow;
+      if (!edgeNeedRegen) {
+        finalEdgeWindow = cachedEdgeWindowRect;
+      }
+
       static constexpr float MAX_COARSE_UDF_DIM = 2048.0f;
       float maxCoarseAllowedDim = std::min(maxTextureSizeF, MAX_COARSE_UDF_DIM);
       float edgeScale = 1.0f;
-      if (fullMaxDim > maxCoarseAllowedDim) {
-        edgeScale = maxCoarseAllowedDim / fullMaxDim;
+      float windowMaxDim = std::max(finalEdgeWindow.width(), finalEdgeWindow.height());
+      if (windowMaxDim > maxCoarseAllowedDim) {
+        edgeScale = maxCoarseAllowedDim / windowMaxDim;
       }
       int edgeCoreWidth = std::max(1, static_cast<int>(std::round(contentWidth * edgeScale)));
       int edgeCoreHeight = std::max(1, static_cast<int>(std::round(contentHeight * edgeScale)));
@@ -572,9 +611,11 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       float edgeSpanY = coarseRadius.y * edgePixelToLayerPixelY;
       float edgeHaloX = std::ceil(coarseRadius.x * 0.5f) + 1.0f;
       float edgeHaloY = std::ceil(coarseRadius.y * 0.5f) + 1.0f;
-      auto edgeTextureRect = Rect::MakeLTRB(-edgeHaloX, -edgeHaloY,
-                                            static_cast<float>(edgeCoreWidth) + edgeHaloX,
-                                            static_cast<float>(edgeCoreHeight) + edgeHaloY);
+      // The physical texture covers the window (in the full-layer UDF space) plus the sampling
+      // halo; the UDF coordinates keep the full-layer mapping so sampling stays uniform.
+      auto edgeWindowUDF = finalEdgeWindow;
+      edgeWindowUDF.scale(edgeScale, edgeScale);
+      auto edgeTextureRect = edgeWindowUDF.makeOutset(edgeHaloX, edgeHaloY);
       edgeTextureRect.roundOut();
       Point edgeTextureOrigin = {edgeTextureRect.left, edgeTextureRect.top};
 
@@ -607,10 +648,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
         cachedUDFImage = maskImage;
       }
       std::shared_ptr<Image> edgeMaskImage = nullptr;
-      bool edgeCacheValid = cacheMatch &&
-                            (enableEdgeLighting ? cachedEdgeUDFImage != nullptr
-                                                : cachedEdgeUDFImage == nullptr);
-      if (edgeCacheValid) {
+      if (!edgeNeedRegen && enableEdgeLighting && cachedEdgeUDFImage != nullptr) {
         edgeMaskImage = cachedEdgeUDFImage;
       } else if (enableEdgeLighting) {
         edgeMaskImage = GlassUDFImage::Make(input.content, edgeCoreWidth, edgeCoreHeight,
@@ -620,9 +658,11 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
           LOGE("GlassStyle: Failed to create edge light UDF.");
           return;
         }
+        cachedEdgeWindowRect = finalEdgeWindow;
         cachedEdgeUDFImage = edgeMaskImage;
       } else {
         cachedEdgeUDFImage = nullptr;
+        cachedEdgeWindowRect = Rect::MakeEmpty();
       }
       UDFSampling udf = {};
       udf.pixelToLayerPixel = {udfPixelToLayerPixelX, udfPixelToLayerPixelY};

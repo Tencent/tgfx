@@ -21,6 +21,7 @@
 #include <algorithm>
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Path.h"
+#include "tgfx/core/Rect.h"
 #include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
@@ -214,6 +215,11 @@ class GlassStyle : public LayerStyle {
   std::shared_ptr<Image> cachedUDFSource = nullptr;
   std::shared_ptr<Image> cachedUDFImage = nullptr;
   std::shared_ptr<Image> cachedEdgeUDFImage = nullptr;
+  // Frame boundary signal for the edge-light UDF: every tile of a frame shares the same
+  // background image, so a changed pointer marks the first tile of a new frame.
+  std::shared_ptr<Image> cachedEdgeFrameBgImage = nullptr;
+  // On-screen window (content coordinates) currently covered by the cached edge-light UDF.
+  Rect cachedEdgeWindowRect = {};
   float cachedUDFContentScale = 0.0f;
   float cachedUDFDepth = -1.0f;
   float cachedUDFContentWidth = 0.0f;
