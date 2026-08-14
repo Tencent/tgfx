@@ -246,16 +246,26 @@ void D3D12Window::PlatformState::drainQueue(D3D12GPU* gpu) {
 
 #ifdef _WIN32
 
-std::shared_ptr<D3D12Window> D3D12Window::MakeFrom(HWND hwnd, std::shared_ptr<D3D12Device> device,
+std::shared_ptr<D3D12Window> D3D12Window::MakeForHwnd(HWND hwnd,
+                                                      std::shared_ptr<D3D12Device> device,
+                                                      std::shared_ptr<ColorSpace> colorSpace) {
+  return MakeImpl(hwnd, std::move(device), std::move(colorSpace), false);
+}
+
+std::shared_ptr<D3D12Window> D3D12Window::MakeForComposition(
+    HWND hwnd, std::shared_ptr<D3D12Device> device, std::shared_ptr<ColorSpace> colorSpace) {
+  return MakeImpl(hwnd, std::move(device), std::move(colorSpace), true);
+}
+
+std::shared_ptr<D3D12Window> D3D12Window::MakeImpl(HWND hwnd, std::shared_ptr<D3D12Device> device,
                                                    std::shared_ptr<ColorSpace> colorSpace,
                                                    bool transparent) {
   if (hwnd == nullptr || device == nullptr) {
     return nullptr;
   }
   if (colorSpace && !colorSpace->isSRGB()) {
-    LOGI(
-        "D3D12Window::MakeFrom(): non-sRGB colorSpace is not yet supported and will be ignored. "
-        "Only sRGB output is currently available.");
+    LOGI("D3D12Window: non-sRGB colorSpace is not yet supported and will be ignored. Only sRGB "
+         "output is currently available.");
   }
 
   auto context = device->lockContext();

@@ -335,7 +335,7 @@ void TGFXWindow::draw() {
   if (!tgfxWindow) {
     auto device = tgfx::D3D12Device::Make();
     if (device) {
-      tgfxWindow = tgfx::D3D12Window::MakeFrom(windowHandle, device);
+      tgfxWindow = tgfx::D3D12Window::MakeForHwnd(windowHandle, device);
     }
   }
   if (tgfxWindow == nullptr) {
