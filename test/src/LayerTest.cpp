@@ -4530,6 +4530,25 @@ TGFX_TEST_PRIVATE(LayerTest, MinifiedAffineLeaf_KeepsMipmaps) {
   });
 }
 
+// A clipped leaf rasters at the projected density instead of contentScale, so even a minifying
+// transform samples its visible footprint 1:1 and the mip chain can be skipped.
+TGFX_TEST_PRIVATE(LayerTest, MinifiedClippedAffineLeaf_SkipsMipmaps) {
+  TGFX_PRIVATE_ACCESS({
+    const Rect localBounds = Rect::MakeWH(3000, 3000);
+    const float contentScale = 1.0f;
+    const Rect renderRect = Rect::MakeWH(1000, 1000);
+    const Rect viewport = Rect::MakeWH(renderRect.width(), renderRect.height());
+    const auto localToCompositor = MakeLocalToCompositorMatrix(
+        Matrix3D::MakeScale(0.5f, 0.5f, 1.0f), contentScale, renderRect);
+    Render3DContext::RasterInfo info;
+
+    ASSERT_TRUE(Render3DContext::ComputeRasterInfo(localToCompositor, localBounds, viewport,
+                                                   contentScale, &info));
+    EXPECT_LT(info.visibleLocal.width(), localBounds.width());
+    EXPECT_FALSE(info.mipmapped);
+  });
+}
+
 // The horizontal axis is extreme enough to overflow float-only arithmetic, but the double
 // intermediates still resolve the exact decision: the vertical axis stays 1:1, so no minification
 // occurs and the mip chain can be skipped.
