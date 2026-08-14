@@ -4530,16 +4530,35 @@ TGFX_TEST_PRIVATE(LayerTest, MinifiedAffineLeaf_KeepsMipmaps) {
   });
 }
 
-TGFX_TEST_PRIVATE(LayerTest, ExtremeAffineLeaf_KeepsMipmaps) {
+// The horizontal axis is extreme enough to overflow float-only arithmetic, but the double
+// intermediates still resolve the exact decision: the vertical axis stays 1:1, so no minification
+// occurs and the mip chain can be skipped.
+TGFX_TEST_PRIVATE(LayerTest, ExtremeAnisotropicAffineLeaf_SkipsMipmaps) {
   TGFX_PRIVATE_ACCESS({
     const Rect localBounds = Rect::MakeWH(100, 100);
     const float contentScale = 1.0f;
     const Rect renderRect = Rect::MakeWH(1000, 1000);
     const Rect viewport = Rect::MakeWH(renderRect.width(), renderRect.height());
-    // The clipped horizontal footprint rounds to one local unit, so m00 stays finite while its
-    // square overflows. This must prefer the conservative mipmapped path.
     const auto localToCompositor = MakeLocalToCompositorMatrix(
         Matrix3D::MakeScale(1.0e35f, 1.0f, 1.0f), contentScale, renderRect);
+    Render3DContext::RasterInfo info;
+
+    ASSERT_TRUE(Render3DContext::ComputeRasterInfo(localToCompositor, localBounds, viewport,
+                                                   contentScale, &info));
+    EXPECT_FALSE(info.mipmapped);
+  });
+}
+
+// A fully visible anisotropic mapping magnifies one axis 9x but minifies the other 0.11x, so the
+// short axis still shrinks while sampling and the mip chain must be retained.
+TGFX_TEST_PRIVATE(LayerTest, AnisotropicMinifiedAffineLeaf_KeepsMipmaps) {
+  TGFX_PRIVATE_ACCESS({
+    const Rect localBounds = Rect::MakeWH(100, 100);
+    const float contentScale = 1.0f;
+    const Rect renderRect = Rect::MakeWH(1000, 1000);
+    const Rect viewport = Rect::MakeWH(renderRect.width(), renderRect.height());
+    const auto localToCompositor = MakeLocalToCompositorMatrix(
+        Matrix3D::MakeScale(9.0f, 0.11f, 1.0f), contentScale, renderRect);
     Render3DContext::RasterInfo info;
     info.mipmapped = false;
 

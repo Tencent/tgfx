@@ -291,12 +291,22 @@ bool Render3DContext::primeCompositorFromOuterCanvas(Canvas* outerCanvas) {
 namespace {
 
 // Returns the squared scale in the most minified raster-texel direction, including rotation and
-// skew without relying on an axis-aligned footprint.
-static float SmallestSingularValueSquared(float m00, float m01, float m10, float m11) {
-  const float trace = m00 * m00 + m01 * m01 + m10 * m10 + m11 * m11;
-  const float determinant = m00 * m11 - m01 * m10;
-  const float discriminant = std::max(0.0f, trace * trace - 4.0f * determinant * determinant);
-  return 0.5f * (trace - std::sqrt(discriminant));
+// skew without relying on an axis-aligned footprint. The quotient form det² / λmax replaces the
+// trace - sqrt(discriminant) form, which cancels catastrophically when the two axis scales differ
+// widely; double intermediates also keep float inputs from overflowing.
+static double SmallestSingularValueSquared(float m00, float m01, float m10, float m11) {
+  const double a = static_cast<double>(m00);
+  const double b = static_cast<double>(m01);
+  const double c = static_cast<double>(m10);
+  const double d = static_cast<double>(m11);
+  const double trace = a * a + b * b + c * c + d * d;
+  const double determinant = a * d - b * c;
+  const double discriminant = std::max(0.0, trace * trace - 4.0 * determinant * determinant);
+  const double largestEigenvalue = 0.5 * (trace + std::sqrt(discriminant));
+  if (!(largestEigenvalue > 0.0)) {
+    return 0.0;
+  }
+  return determinant * determinant / largestEigenvalue;
 }
 
 // Creates mipmaps for the offscreen leaf surface only when the affine mapping minifies raster
@@ -325,8 +335,8 @@ static bool NeedsMipmaps(const Matrix3D& localToCompositor, const Rect& visibleL
   if (!std::isfinite(m00) || !std::isfinite(m01) || !std::isfinite(m10) || !std::isfinite(m11)) {
     return true;
   }
-  const float smallestSingularValueSquared = SmallestSingularValueSquared(m00, m01, m10, m11);
-  return !std::isfinite(smallestSingularValueSquared) || smallestSingularValueSquared < 1.0f;
+  const double smallestSingularValueSquared = SmallestSingularValueSquared(m00, m01, m10, m11);
+  return !std::isfinite(smallestSingularValueSquared) || smallestSingularValueSquared < 1.0;
 }
 
 }  // namespace
