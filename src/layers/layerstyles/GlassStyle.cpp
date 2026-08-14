@@ -648,7 +648,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
         cachedUDFImage = maskImage;
       }
       std::shared_ptr<Image> edgeMaskImage = nullptr;
-      if (!edgeNeedRegen && enableEdgeLighting && cachedEdgeUDFImage != nullptr) {
+      if (!edgeNeedRegen && cacheMatch && enableEdgeLighting && cachedEdgeUDFImage != nullptr) {
         edgeMaskImage = cachedEdgeUDFImage;
       } else if (enableEdgeLighting) {
         edgeMaskImage = GlassUDFImage::Make(input.content, edgeCoreWidth, edgeCoreHeight,
