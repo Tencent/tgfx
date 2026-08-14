@@ -162,6 +162,17 @@ struct D3D12Window::PlatformState {
   // hands the GPU-side flip to the queue). Callers that release backbuffers or resize the swap
   // chain must invoke this instead of a bare waitUntilCompleted().
   void drainQueue(D3D12GPU* gpu);
+  // Executes the DirectComposition tear-down protocol and releases the DComp COM handles:
+  // SetContent(nullptr) → SetRoot(nullptr) → Commit → drop refs. All three protocol steps are
+  // required — skipping Commit leaves DWM holding a stale reference to the swap chain and
+  // reproduces OBJECT_DELETED_WHILE_STILL_IN_USE once the swap chain is released.
+  //
+  // Callers must ensure the enclosing GPU queue has already been drained and must still hold
+  // the device lock so this tear-down is serialized with any other GPU work. This is a no-op
+  // for opaque swap chains (all three DComp fields are null). The failure fallback in
+  // ~D3D12Window that runs without a device lock intentionally does NOT call this and skips
+  // Commit; see the comment there for the rationale.
+  void detachCompositionTree();
   bool rebuild(Context* context, int newWidth, int newHeight);
 };
 
@@ -242,6 +253,21 @@ void D3D12Window::PlatformState::drainQueue(D3D12GPU* gpu) {
     WaitForSingleObject(evt, 5000);
   }
   CloseHandle(evt);
+}
+
+void D3D12Window::PlatformState::detachCompositionTree() {
+  if (compositionVisual != nullptr) {
+    compositionVisual->SetContent(nullptr);
+  }
+  if (compositionTarget != nullptr) {
+    compositionTarget->SetRoot(nullptr);
+  }
+  if (compositionDevice != nullptr) {
+    compositionDevice->Commit();
+  }
+  compositionVisual = nullptr;
+  compositionTarget = nullptr;
+  compositionDevice = nullptr;
 }
 
 #ifdef _WIN32
@@ -370,18 +396,10 @@ std::shared_ptr<D3D12Window> D3D12Window::MakeImpl(HWND hwnd, std::shared_ptr<D3
     if (FAILED(hr)) {
       LOGE("D3D12Window: DirectComposition setup failed, HRESULT=0x%08X",
            static_cast<unsigned>(hr));
-      // Explicitly unwind the half-initialized DComp tree so the swap chain is no longer
-      // referenced by any visual before its COM Release runs at state.reset(). Then release
-      // D3D objects while still holding the device lock, matching ~D3D12Window's ordering.
-      if (state->compositionVisual != nullptr) {
-        state->compositionVisual->SetContent(nullptr);
-      }
-      if (state->compositionTarget != nullptr) {
-        state->compositionTarget->SetRoot(nullptr);
-      }
-      if (state->compositionDevice != nullptr) {
-        state->compositionDevice->Commit();
-      }
+      // Unwind the half-initialized DComp tree so the swap chain is no longer referenced by
+      // any visual before its COM Release runs at state.reset(). No GPU work has been enqueued
+      // through this swap chain yet, so no queue drain is needed here.
+      state->detachCompositionTree();
       state.reset();
       device->unlock();
       return nullptr;
@@ -431,22 +449,9 @@ D3D12Window::~D3D12Window() {
     // 2. Drop tgfx-side owners of the backbuffers.
     _platformState->drainBackBufferOwners(context, d3d12GPU);
 
-    // 3. Detach the swap chain from DirectComposition before releasing it. The visual holds
-    //    the swap chain as content; clearing the content and committing is what actually
-    //    tells DWM to stop referencing it. This runs while the device is still locked so
-    //    the tear-down is serialized with any other GPU work on this device.
-    if (_platformState->compositionVisual != nullptr) {
-      _platformState->compositionVisual->SetContent(nullptr);
-    }
-    if (_platformState->compositionTarget != nullptr) {
-      _platformState->compositionTarget->SetRoot(nullptr);
-    }
-    if (_platformState->compositionDevice != nullptr) {
-      _platformState->compositionDevice->Commit();
-    }
-    _platformState->compositionVisual = nullptr;
-    _platformState->compositionTarget = nullptr;
-    _platformState->compositionDevice = nullptr;
+    // 3. Detach the swap chain from DirectComposition before releasing it, so DWM no longer
+    //    references it.
+    _platformState->detachCompositionTree();
 
     // 4. Release the swap chain while still holding the device lock so its final COM
     //    Release does not race concurrent D3D12 work on another thread.
