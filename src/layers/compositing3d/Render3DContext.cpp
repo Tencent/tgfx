@@ -214,7 +214,7 @@ std::shared_ptr<Image> Render3DContext::rasterLayer(
     return nullptr;
   }
   auto surface = Surface::Make(leafArgs.context, info.rasterWidth, info.rasterHeight, false, 1,
-                               true, 0, _colorSpace);
+                               info.mipmapped, 0, _colorSpace);
   if (surface == nullptr) {
     return nullptr;
   }
@@ -288,6 +288,61 @@ bool Render3DContext::primeCompositorFromOuterCanvas(Canvas* outerCanvas) {
   return true;
 }
 
+namespace {
+
+// Returns the squared scale in the most minified raster-texel direction, including rotation and
+// skew without relying on an axis-aligned footprint. The quotient form det² / λmax replaces the
+// trace - sqrt(discriminant) form, which cancels catastrophically when the two axis scales differ
+// widely; double intermediates also keep float inputs from overflowing.
+static double SmallestSingularValueSquared(float m00, float m01, float m10, float m11) {
+  const double a = static_cast<double>(m00);
+  const double b = static_cast<double>(m01);
+  const double c = static_cast<double>(m10);
+  const double d = static_cast<double>(m11);
+  const double trace = a * a + b * b + c * c + d * d;
+  const double determinant = a * d - b * c;
+  const double discriminant = std::max(0.0, trace * trace - 4.0 * determinant * determinant);
+  const double largestEigenvalue = 0.5 * (trace + std::sqrt(discriminant));
+  if (!(largestEigenvalue > 0.0)) {
+    return 0.0;
+  }
+  return determinant * determinant / largestEigenvalue;
+}
+
+// Creates mipmaps for the offscreen leaf surface only when the affine mapping minifies raster
+// texels. The smallest singular value of the texel-to-compositor Jacobian measures the most
+// minified direction: below 1.0 the leaf shrinks while sampling and needs mipmaps to avoid
+// aliasing, while equal or larger scales sample level 0 only and skip the mip storage entirely.
+// Perspective or invalid mappings conservatively retain mipmaps.
+static bool NeedsMipmaps(const Matrix3D& localToCompositor, const Rect& visibleLocal,
+                         int rasterWidth, int rasterHeight) {
+  // The leaf is planar (z = 0), so the row-3 column-2 perspective term multiplies zero and is
+  // intentionally ignored; only the x/y perspective terms affect the texel mapping.
+  const float perspectiveX = localToCompositor.getRowColumn(3, 0);
+  const float perspectiveY = localToCompositor.getRowColumn(3, 1);
+  const float homogeneousW = localToCompositor.getRowColumn(3, 3);
+  if (perspectiveX != 0.0f || perspectiveY != 0.0f || !(homogeneousW > 0.0f) ||
+      visibleLocal.isEmpty() || rasterWidth <= 0 || rasterHeight <= 0) {
+    return true;
+  }
+  const float texelsPerLocalX = static_cast<float>(rasterWidth) / visibleLocal.width();
+  const float texelsPerLocalY = static_cast<float>(rasterHeight) / visibleLocal.height();
+  if (!(texelsPerLocalX > 0.0f) || !(texelsPerLocalY > 0.0f)) {
+    return true;
+  }
+  const float m00 = localToCompositor.getRowColumn(0, 0) / homogeneousW / texelsPerLocalX;
+  const float m01 = localToCompositor.getRowColumn(0, 1) / homogeneousW / texelsPerLocalY;
+  const float m10 = localToCompositor.getRowColumn(1, 0) / homogeneousW / texelsPerLocalX;
+  const float m11 = localToCompositor.getRowColumn(1, 1) / homogeneousW / texelsPerLocalY;
+  if (!std::isfinite(m00) || !std::isfinite(m01) || !std::isfinite(m10) || !std::isfinite(m11)) {
+    return true;
+  }
+  const double smallestSingularValueSquared = SmallestSingularValueSquared(m00, m01, m10, m11);
+  return !std::isfinite(smallestSingularValueSquared) || smallestSingularValueSquared < 1.0;
+}
+
+}  // namespace
+
 bool Render3DContext::ComputeRasterInfo(const Matrix3D& localToCompositor, const Rect& localBounds,
                                         const Rect& compositorViewport, float contentScale,
                                         RasterInfo* info) {
@@ -330,6 +385,8 @@ bool Render3DContext::ComputeRasterInfo(const Matrix3D& localToCompositor, const
   info->density = density;
   info->rasterWidth = std::max(1, static_cast<int>(std::ceil(localWidth * densityX)));
   info->rasterHeight = std::max(1, static_cast<int>(std::ceil(localHeight * densityY)));
+  info->mipmapped =
+      NeedsMipmaps(localToCompositor, info->visibleLocal, info->rasterWidth, info->rasterHeight);
   return true;
 }
 
