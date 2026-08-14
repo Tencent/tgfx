@@ -245,7 +245,7 @@ if (TGFX_BUILD_PDF)
 endif ()
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    list(APPEND TGFX_COMPILE_OPTIONS -Werror -Wall -Wextra -Weffc++ -Wconversion -pedantic -Werror=return-type -Wno-unused-command-line-argument)
+    list(APPEND TGFX_COMPILE_OPTIONS -Werror -Wall -Wextra -Weffc++ -Wconversion -pedantic -Werror=return-type -Wno-unused-command-line-argument -Wno-misleading-indentation)
 endif ()
 
 if (WIN32)
