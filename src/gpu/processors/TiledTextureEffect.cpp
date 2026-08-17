@@ -112,12 +112,16 @@ TiledTextureEffect::Sampling::Sampling(const TextureView* textureView, SamplerSt
   };
   auto resolve = [&](int size, TileMode tileMode, Span subsetSpan, float linearFilterInset) {
     Result1D r;
+    // Populate shaderSubset even when the wrap is done in hardware: the shared AOT fill kernels
+    // clamp every sample to the Subset uniform unconditionally, so it must hold real bounds (the
+    // full texture span here) rather than the empty default. The JIT path ignores it (no Subset
+    // uniform is emitted for hardware-wrapped modes).
+    r.shaderSubset = subsetSpan;
     bool canDoModeInHW = canDoWrapInHW(tileMode);
     if (canDoModeInHW && subsetSpan.a <= 0 && subsetSpan.b >= static_cast<float>(size)) {
       r.hwMode = tileMode;
       return r;
     }
-    r.shaderSubset = subsetSpan;
     if (sampler.magFilterMode == FilterMode::Nearest &&
         sampler.minFilterMode == FilterMode::Nearest) {
       Span isubset{std::floor(subsetSpan.a), std::ceil(subsetSpan.b)};
