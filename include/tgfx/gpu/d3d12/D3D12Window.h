@@ -39,12 +39,34 @@ class D3D12Window : public Window {
  public:
 #ifdef _WIN32
   /**
-   * Creates a D3D12Window from a Win32 window handle. Returns nullptr if the swap chain cannot
-   * be created. Note: only sRGB output is currently supported. The colorSpace parameter is
-   * accepted for forward compatibility but non-sRGB values are ignored with a warning.
+   * Creates an opaque D3D12Window bound to a Win32 window handle. Contents fully cover the
+   * window; alpha in rendered pixels is ignored.
+   *
+   * @param hwnd The target Win32 window. Must be non-null.
+   * @param device The D3D12 device used to create the swap chain resources. Must be non-null.
+   * @param colorSpace Optional color space for the output. Only sRGB is currently supported;
+   *        any non-sRGB value is ignored with a logged warning.
+   * @return A new D3D12Window, or nullptr if creation failed.
    */
-  static std::shared_ptr<D3D12Window> MakeFrom(HWND hwnd, std::shared_ptr<D3D12Device> device,
-                                               std::shared_ptr<ColorSpace> colorSpace = nullptr);
+  static std::shared_ptr<D3D12Window> MakeForHwnd(HWND hwnd, std::shared_ptr<D3D12Device> device,
+                                                  std::shared_ptr<ColorSpace> colorSpace = nullptr);
+
+  /**
+   * Creates a D3D12Window that blends with the desktop and any UI beneath the target hwnd.
+   *
+   * The backbuffer uses premultiplied alpha: transparent regions must be cleared or drawn with
+   * alpha < 1 for underlying content to show through; opaque pixels should set alpha = 1. The
+   * hwnd does NOT need the WS_EX_LAYERED extended style.
+   *
+   * @param hwnd The target Win32 window. Must be non-null.
+   * @param device The D3D12 device used to create the swap chain resources. Must be non-null.
+   * @param colorSpace Optional color space for the output. Only sRGB is currently supported;
+   *        any non-sRGB value is ignored with a logged warning.
+   * @return A new D3D12Window, or nullptr if creation failed.
+   */
+  static std::shared_ptr<D3D12Window> MakeForComposition(
+      HWND hwnd, std::shared_ptr<D3D12Device> device,
+      std::shared_ptr<ColorSpace> colorSpace = nullptr);
 #endif
 
   ~D3D12Window() override;
@@ -54,9 +76,13 @@ class D3D12Window : public Window {
   void onPresent(Context* context) override;
 
  private:
-  // PImpl: all DXGI / D3D12 handles and per-backbuffer state live in PlatformState (defined in
-  // the .cpp) so this header pulls in neither dxgi.h nor d3d12.h.
   struct PlatformState;
+
+#ifdef _WIN32
+  static std::shared_ptr<D3D12Window> MakeImpl(HWND hwnd, std::shared_ptr<D3D12Device> device,
+                                               std::shared_ptr<ColorSpace> colorSpace,
+                                               bool transparent);
+#endif
 
   explicit D3D12Window(std::shared_ptr<Device> device, std::unique_ptr<PlatformState> state,
                        std::shared_ptr<ColorSpace> colorSpace);
