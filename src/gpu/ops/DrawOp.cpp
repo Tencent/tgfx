@@ -122,10 +122,9 @@ std::shared_ptr<Program> DrawOp::prepareDecomposedProgram(RenderTarget* renderTa
   }
   AOTEffectGraph graph = {};
   AOTEffectPlan plan = {};
-  bool decomposed =
-      AOTEffectDecomposer::Lower(colorProcessors, &graph) &&
-      AOTEffectDecomposer::ValidateForFusion(graph) &&
-      AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan);
+  bool decomposed = AOTEffectDecomposer::Lower(colorProcessors, &graph) &&
+                    AOTEffectDecomposer::ValidateForFusion(graph) &&
+                    AOTEffectDecomposer::Decompose(graph, &plan);
   // A single-pass pointwise-tail plan is a linear texture-plus-ops chain, and the tail ops are a
   // subset of the chain op set, so the chain kernel can evaluate it as-is. This route only runs
   // after the plain matcher missed, which includes the shapes the tail rule rejects (no UV

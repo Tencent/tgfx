@@ -27,11 +27,6 @@ namespace tgfx {
 class FragmentProcessor;
 class ProgramInfo;
 
-enum class AOTDecompositionMode {
-  PreferFusion,
-  Standard,
-};
-
 enum class AOTKernelKind {
   TextureFill = 0,
   TextureColorMatrix = 1,
@@ -39,7 +34,7 @@ enum class AOTKernelKind {
   TexturedLuma = 3,
   // A single fused pass that evaluates a pointwise DAG (texture/const-color leaves combined by
   // color-matrix, luma and blend ops) via a runtime opcode chain. Produced by the pointwise-DAG
-  // planner; its kernel artifact is the upcoming PointwiseChainShader.
+  // planner; its kernel artifact is PointwiseChainShader.
   PointwiseChain = 4,
   PointwiseTail = 5,
   // A procedural-noise source (PerlinNoiseFragmentProcessor) optionally followed by one pointwise
@@ -134,8 +129,11 @@ class AOTEffectDecomposer {
   static bool Lower(const std::vector<const FragmentProcessor*>& processors, AOTEffectGraph* graph,
                     std::string* blockingProcessor = nullptr);
 
-  static bool Decompose(const AOTEffectGraph& graph, AOTDecompositionMode mode,
-                        AOTEffectPlan* plan);
+  /**
+   * Decomposes the graph into an execution plan, preferring fusion: a single fused pass is chosen
+   * whenever the graph's shape allows it.
+   */
+  static bool Decompose(const AOTEffectGraph& graph, AOTEffectPlan* plan);
 
   /**
    * Validates that the effect graph is safe to fuse into a single Pointwise chain, enforcing the

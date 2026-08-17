@@ -61,7 +61,7 @@ static AOTAxisAnalysis ClassifyAxis(const std::vector<const FragmentProcessor*>&
     return analysis;
   }
   AOTEffectPlan plan = {};
-  if (!AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan)) {
+  if (!AOTEffectDecomposer::Decompose(graph, &plan)) {
     analysis.outcome = AOTDecomposeOutcome::UnsupportedShape;
     return analysis;
   }
@@ -272,76 +272,6 @@ static bool DecomposePerlinNoiseChain(const AOTEffectGraph& graph, AOTEffectPlan
   return true;
 }
 
-// Existing narrow planner: a strictly linear TextureSource -> ColorMatrix/Luma chain, mapped onto
-// the TextureFill / TextureColorMatrix / TexturedColorMatrix / TexturedLuma kernels. Preserved as the
-// standard-plan and conservative fallback path.
-static bool DecomposeLinearTextureChain(const AOTEffectGraph& graph, AOTDecompositionMode mode,
-                                        AOTEffectPlan* plan) {
-  if (plan == nullptr || graph.nodeCount() < 2 || graph.root().index() + 1 != graph.nodeCount()) {
-    return false;
-  }
-  auto geometryNode = graph.nodeAt(AOTNodeID(0));
-  auto textureNode = graph.nodeAt(AOTNodeID(1));
-  if (geometryNode == nullptr || geometryNode->kind != AOTEffectKind::GeometryColor ||
-      textureNode == nullptr || textureNode->kind != AOTEffectKind::TextureSource ||
-      textureNode->inputs.size() != 1 || textureNode->inputs[0] != AOTNodeID(0)) {
-    return false;
-  }
-  auto textureParameters = std::get_if<AOTTextureParameters>(&textureNode->parameters);
-  if (textureParameters == nullptr ||
-      textureParameters->samplingKind != AOTTextureSamplingKind::Plain ||
-      textureParameters->isYUV ||
-      (textureParameters->isAlphaOnly && textureParameters->hasRGBAAA)) {
-    return false;
-  }
-  for (uint32_t index = 2; index < graph.nodeCount(); ++index) {
-    auto node = graph.nodeAt(AOTNodeID(index));
-    if (node == nullptr || node->inputs.size() != 1 || node->inputs[0] != AOTNodeID(index - 1) ||
-        (node->kind != AOTEffectKind::ColorMatrix && node->kind != AOTEffectKind::Luma)) {
-      return false;
-    }
-  }
-
-  AOTEffectPlan result = {};
-  uint32_t nodeIndex = 1;
-  if (mode == AOTDecompositionMode::PreferFusion && graph.nodeCount() > 2 &&
-      graph.nodeAt(AOTNodeID(2))->kind == AOTEffectKind::ColorMatrix) {
-    AOTPassDescriptor pass = {};
-    pass.kernel = AOTKernelKind::TextureColorMatrix;
-    pass.nodes = {AOTNodeID(1), AOTNodeID(2)};
-    pass.output = AOTNodeID(2);
-    result.passes.push_back(std::move(pass));
-    nodeIndex = 3;
-  } else {
-    AOTPassDescriptor pass = {};
-    pass.kernel = AOTKernelKind::TextureFill;
-    pass.nodes = {AOTNodeID(1)};
-    pass.output = AOTNodeID(1);
-    result.passes.push_back(std::move(pass));
-    nodeIndex = 2;
-  }
-
-  while (nodeIndex < graph.nodeCount()) {
-    auto nodeID = AOTNodeID(nodeIndex);
-    auto node = graph.nodeAt(nodeID);
-    AOTPassDescriptor pass = {};
-    pass.kernel = node->kind == AOTEffectKind::ColorMatrix ? AOTKernelKind::TexturedColorMatrix
-                                                           : AOTKernelKind::TexturedLuma;
-    pass.nodes = {nodeID};
-    pass.dependencies = {static_cast<uint32_t>(result.passes.size() - 1)};
-    pass.output = nodeID;
-    result.passes.push_back(std::move(pass));
-    ++nodeIndex;
-  }
-
-  for (size_t index = 0; index < result.passes.size(); ++index) {
-    result.passes[index].materializesOutput = index + 1 < result.passes.size();
-  }
-  result.output = graph.root();
-  *plan = std::move(result);
-  return true;
-}
-
 // New planner: a pointwise DAG whose only leaves are texture sources / const colors and whose
 // interior nodes are pure pointwise or blend ops. Such a DAG evaluates in a single fused pass (the
 // PointwiseChain kernel) with no intermediate materialization. Resolved plain and tiled texture
@@ -416,15 +346,11 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
   return true;
 }
 
-bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, AOTDecompositionMode mode,
-                                    AOTEffectPlan* plan) {
-  if (mode == AOTDecompositionMode::PreferFusion && DecomposeLinearPointwiseTail(graph, plan)) {
+bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, AOTEffectPlan* plan) {
+  if (DecomposeLinearPointwiseTail(graph, plan)) {
     return true;
   }
   if (DecomposePerlinNoiseChain(graph, plan)) {
-    return true;
-  }
-  if (DecomposeLinearTextureChain(graph, mode, plan)) {
     return true;
   }
   return DecomposePointwiseDAG(graph, plan);
@@ -503,7 +429,7 @@ AOTFoldRouteOutcome AOTEffectDecomposer::AnalyzeFoldRoute(const ProgramInfo* pro
     return AOTFoldRouteOutcome::BlockedByValidation;
   }
   AOTEffectPlan plan = {};
-  if (!Decompose(graph, AOTDecompositionMode::PreferFusion, &plan)) {
+  if (!Decompose(graph, &plan)) {
     return AOTFoldRouteOutcome::UnsupportedShape;
   }
   if (!AOTPlanExecutor::CanExecute(graph, plan)) {

@@ -1130,9 +1130,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
       AOTEffectPlan foldedPlan = {};
       if (AOTEffectDecomposer::Lower(foldedProcessors, &foldedGraph) &&
           AOTEffectDecomposer::ValidateForFusion(foldedGraph) &&
-          AOTEffectDecomposer::Decompose(foldedGraph, AOTDecompositionMode::PreferFusion,
-                                         &foldedPlan) &&
-          !foldedPlan.passes.empty() &&
+          AOTEffectDecomposer::Decompose(foldedGraph, &foldedPlan) && !foldedPlan.passes.empty() &&
           (foldedPlan.passes.size() > 1 ||
            foldedPlan.passes[0].kernel == AOTKernelKind::PointwiseTail ||
            foldedPlan.passes[0].kernel == AOTKernelKind::PointwiseChain ||
@@ -1159,8 +1157,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     // before the atomic fallback replays the draw through the runtime path anyway.
     if (!op->hasCoverage() && AOTEffectDecomposer::Lower(colorProcessors, &graph) &&
         AOTEffectDecomposer::ValidateForFusion(graph) &&
-        AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan) &&
-        !plan.passes.empty() &&
+        AOTEffectDecomposer::Decompose(graph, &plan) && !plan.passes.empty() &&
         (plan.passes.size() > 1 || plan.passes[0].kernel == AOTKernelKind::PointwiseTail ||
          plan.passes[0].kernel == AOTKernelKind::PointwiseChain ||
          plan.passes[0].kernel == AOTKernelKind::PerlinNoiseFill)) {

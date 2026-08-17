@@ -289,7 +289,7 @@ TGFX_TEST(AOTEffectTest, TiledHardwareSamplingSnapshotMatchesLowering) {
   processor->computeProcessorKey(context, &keyAfterLowering);
   EXPECT_TRUE(keyAfterLowering == keyBeforeLowering);
   AOTEffectPlan plan;
-  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan));
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
   EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
   // Hardware-resolved tiling (shader mode None on both axes) is chain-compatible: the kernel
@@ -359,7 +359,7 @@ TGFX_TEST(AOTEffectTest, TiledShaderModesAndStrictSubsetMatchLowering) {
     EXPECT_TRUE(parameters->hasSubset);
     ExpectResolvedSamplingMatchesLowering(*resolved, *parameters);
     AOTEffectPlan plan;
-    ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan));
+    ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
     ASSERT_EQ(plan.passes.size(), 1u);
     EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
     // The chain kernel's tiled path covers the single-tap wrap modes (Clamp, Repeat*None,
@@ -395,7 +395,7 @@ TGFX_TEST(AOTEffectTest, ChainRejectsTwoShaderTiledLeaves) {
   AOTEffectGraph graph;
   ASSERT_TRUE(AOTEffectDecomposer::Lower({blend.get()}, &graph));
   AOTEffectPlan plan;
-  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan));
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
   EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
   EXPECT_FALSE(AOTPlanExecutor::CanExecute(graph, plan));
@@ -514,14 +514,14 @@ TGFX_TEST(AOTEffectTest, ColorMatrixChainFusesToSinglePass) {
   ASSERT_TRUE(AOTEffectDecomposer::Lower({texture.get(), colorMatrix.get()}, &graph));
 
   AOTEffectPlan plan;
-  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan));
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
   EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseTail);
   EXPECT_EQ(plan.passes[0].nodes, std::vector<AOTNodeID>({AOTNodeID(1), AOTNodeID(2)}));
   EXPECT_FALSE(plan.passes[0].materializesOutput);
 }
 
-TGFX_TEST(AOTEffectTest, TripleChainSupportsFusedAndStandardPlans) {
+TGFX_TEST(AOTEffectTest, TripleChainFusesToSinglePass) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
@@ -530,21 +530,13 @@ TGFX_TEST(AOTEffectTest, TripleChainSupportsFusedAndStandardPlans) {
   ASSERT_TRUE(BuildTripleGraph(context, &allocator, &graph));
 
   AOTEffectPlan fusedPlan;
-  ASSERT_TRUE(
-      AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &fusedPlan));
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &fusedPlan));
   ASSERT_EQ(fusedPlan.passes.size(), 1u);
   EXPECT_EQ(fusedPlan.passes[0].kernel, AOTKernelKind::PointwiseTail);
   EXPECT_EQ(fusedPlan.passes[0].nodes,
             std::vector<AOTNodeID>({AOTNodeID(1), AOTNodeID(2), AOTNodeID(3)}));
   EXPECT_FALSE(fusedPlan.passes[0].materializesOutput);
   EXPECT_TRUE(fusedPlan.passes[0].dependencies.empty());
-
-  AOTEffectPlan standardPlan;
-  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::Standard, &standardPlan));
-  ASSERT_EQ(standardPlan.passes.size(), 3u);
-  EXPECT_EQ(standardPlan.passes[0].kernel, AOTKernelKind::TextureFill);
-  EXPECT_EQ(standardPlan.passes[1].kernel, AOTKernelKind::TexturedColorMatrix);
-  EXPECT_EQ(standardPlan.passes[2].kernel, AOTKernelKind::TexturedLuma);
 }
 
 TGFX_TEST(AOTEffectTest, DecompositionIsDeterministic) {
@@ -557,8 +549,8 @@ TGFX_TEST(AOTEffectTest, DecompositionIsDeterministic) {
 
   AOTEffectPlan first;
   AOTEffectPlan second;
-  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &first));
-  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &second));
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &first));
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &second));
   ASSERT_EQ(first.passes.size(), second.passes.size());
   for (size_t index = 0; index < first.passes.size(); ++index) {
     EXPECT_EQ(first.passes[index].kernel, second.passes[index].kernel);
@@ -692,7 +684,7 @@ TGFX_TEST(AOTEffectTest, BlendTreeDecomposesToPointwiseChain) {
   // The linear planner cannot represent the two-input blend DAG; the pointwise-DAG planner folds
   // the whole graph into a single PointwiseChain pass covering nodes 1..3.
   AOTEffectPlan plan;
-  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan));
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
   EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
   EXPECT_FALSE(plan.passes[0].materializesOutput);
@@ -746,14 +738,12 @@ TGFX_TEST(AOTEffectTest, PointwiseDAGUsesProductionSamplerBudget) {
   AOTEffectGraph acceptedGraph;
   ASSERT_TRUE(makeBlendGraph(MaxFusedAOTSamplers, &acceptedGraph));
   AOTEffectPlan acceptedPlan;
-  EXPECT_TRUE(AOTEffectDecomposer::Decompose(acceptedGraph, AOTDecompositionMode::PreferFusion,
-                                             &acceptedPlan));
+  EXPECT_TRUE(AOTEffectDecomposer::Decompose(acceptedGraph, &acceptedPlan));
 
   AOTEffectGraph rejectedGraph;
   ASSERT_TRUE(makeBlendGraph(MaxFusedAOTSamplers + 1, &rejectedGraph));
   AOTEffectPlan rejectedPlan;
-  EXPECT_FALSE(AOTEffectDecomposer::Decompose(rejectedGraph, AOTDecompositionMode::PreferFusion,
-                                              &rejectedPlan));
+  EXPECT_FALSE(AOTEffectDecomposer::Decompose(rejectedGraph, &rejectedPlan));
 }
 
 TGFX_TEST(AOTEffectTest, ConstColorChainDecomposesToPointwiseChain) {
@@ -768,7 +758,7 @@ TGFX_TEST(AOTEffectTest, ConstColorChainDecomposesToPointwiseChain) {
   AOTEffectGraph graph;
   ASSERT_TRUE(AOTEffectDecomposer::Lower({constColor.get(), colorMatrix.get()}, &graph));
   AOTEffectPlan plan;
-  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan));
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
   EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
   // A zero-leaf chain is executable: the kernel's TEXTURE_COUNT domain encodes it, evaluating
@@ -785,7 +775,7 @@ TGFX_TEST(AOTEffectTest, LinearTextureChainUsesPointwiseTailPlanner) {
   AOTEffectGraph graph;
   ASSERT_TRUE(BuildTripleGraph(context, &allocator, &graph));
   AOTEffectPlan plan;
-  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan));
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
   EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseTail);
   EXPECT_EQ(plan.passes[0].nodes,
@@ -938,7 +928,7 @@ TGFX_TEST(AOTEffectTest, BarePerlinNoiseUsesPerlinNoiseFillPlanner) {
   AOTEffectGraph graph;
   ASSERT_TRUE(AOTEffectDecomposer::Lower({perlin.get()}, &graph));
   AOTEffectPlan plan;
-  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan));
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
   EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PerlinNoiseFill);
   EXPECT_EQ(plan.passes[0].nodes, std::vector<AOTNodeID>({AOTNodeID(1)}));
@@ -959,7 +949,7 @@ TGFX_TEST(AOTEffectTest, PerlinNoisePlusOneOpFusesToSinglePass) {
   AOTEffectGraph graph;
   ASSERT_TRUE(AOTEffectDecomposer::Lower({perlin.get(), colorMatrix.get()}, &graph));
   AOTEffectPlan plan;
-  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan));
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
   EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PerlinNoiseFill);
   EXPECT_EQ(plan.passes[0].nodes, std::vector<AOTNodeID>({AOTNodeID(1), AOTNodeID(2)}));
@@ -989,7 +979,7 @@ TGFX_TEST(AOTEffectTest, RectCoverageFoldsIntoPointwiseChain) {
   EXPECT_FLOAT_EQ(parameters->rect[2], 90.5f);
 
   AOTEffectPlan plan;
-  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan));
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
   EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
   EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
@@ -1011,7 +1001,7 @@ TGFX_TEST(AOTEffectTest, PerlinNoisePlusTwoOpsFusesToSinglePass) {
   ASSERT_TRUE(
       AOTEffectDecomposer::Lower({perlin.get(), colorMatrix.get(), alphaThreshold.get()}, &graph));
   AOTEffectPlan plan;
-  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, AOTDecompositionMode::PreferFusion, &plan));
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
   EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PerlinNoiseFill);
   EXPECT_EQ(plan.passes[0].nodes,
