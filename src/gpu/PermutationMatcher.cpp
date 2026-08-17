@@ -796,6 +796,7 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
   if (chain->coverageRoot() >= 0 && gpLayout != 0) {
     return std::nullopt;
   }
+  bool allLeavesRect = leafCount > 0;
   for (size_t index = 0; index < leafCount; ++index) {
     auto leaf = chain->childProcessor(index);
     // A deferred (task-local) proxy reports zero samplers until it is instantiated; it always
@@ -811,7 +812,15 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
     if (texture->isYUV() || texture->hasRGBAAA()) {
       return std::nullopt;
     }
+    if (texture->textureAt(0)->type() != TextureType::Rectangle) {
+      allLeavesRect = false;
+    }
   }
+  // A rectangle leaf requires the sampler2DRect declaration, which only the TEXTURE_KIND=1
+  // variants carry. Phantom padding reuses the first leaf's texture, so all-rectangle chains bind
+  // a rectangle texture in every leaf slot; a LUT child binds a 2D texture into a leaf slot, so it
+  // can never ride a Rect variant.
+  bool rectChain = allLeavesRect && chain->lutLeaf() < 0;
   int hasMask = chain->hasMask() ? 1 : 0;
   // Four-leaf variants apply the mask through a runtime uniform, so a masked chain is servable on
   // every layout. Leaf-free chains keep the compile-time mask dimension, which the kernel compiles
@@ -851,6 +860,7 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
   fragValues[FD::HAS_COLOR] = hasColor;
   fragValues[FD::TEXTURE_COUNT] = textureCountValue;
   fragValues[FD::HAS_MASK_TEXTURE] = leafCount == 0 ? hasMask : 0;
+  fragValues[FD::TEXTURE_KIND] = rectChain ? 1 : 0;
   auto fragIndex = FD::domain().encode(fragValues);
   return PermutationMatchResult{"PointwiseChainShader", vertIndex, fragIndex};
 }

@@ -31,6 +31,17 @@
 #ifndef TEXTURE_COUNT
 #define TEXTURE_COUNT 0
 #endif
+// 0 = TwoD, 1 = Rect (desktop GL texture leaves). Rect variants compile only into the opengl
+// bundle and only for single-RECT-leaf chains (phantom padding reuses the first leaf's texture,
+// so every leaf slot binds the same rectangle texture).
+#ifndef TEXTURE_KIND
+#define TEXTURE_KIND 0
+#endif
+#if TEXTURE_KIND == 1
+#define CHAIN_LEAF_SAMPLER sampler2DRect
+#else
+#define CHAIN_LEAF_SAMPLER sampler2D
+#endif
 
 #if TEXTURE_COUNT == 0
 #define NTEX 0
@@ -180,14 +191,14 @@ layout(location = CHAIN_TEX_LOC_BASE + 3) in vec3 TransformedCoords_3;
 #endif
 
 #if NTEX >= 1
-layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
+layout(set = 1, binding = 0) uniform CHAIN_LEAF_SAMPLER TextureSampler_0;
 #endif
 #if NTEX >= 2
-layout(set = 1, binding = 1) uniform sampler2D TextureSampler_1;
+layout(set = 1, binding = 1) uniform CHAIN_LEAF_SAMPLER TextureSampler_1;
 #endif
 #if NTEX >= 4
-layout(set = 1, binding = 2) uniform sampler2D TextureSampler_2;
-layout(set = 1, binding = 3) uniform sampler2D TextureSampler_3;
+layout(set = 1, binding = 2) uniform CHAIN_LEAF_SAMPLER TextureSampler_2;
+layout(set = 1, binding = 3) uniform CHAIN_LEAF_SAMPLER TextureSampler_3;
 #endif
 #if NTEX > 0 || HAS_MASK_TEXTURE
 // Device-space alpha mask applied after the DAG and before the XP stage (same application point
@@ -221,7 +232,7 @@ layout(set = 1, binding = NTEX) uniform sampler2D MaskTextureSampler;
 
 // Leaf fetch: plain leaves clamp to their Subset rect (full bounds = no-op). The tiled leaf, if
 // any, goes through the shared tiling math so wrap and clamp-to-border modes match the runtime.
-vec4 chainLeafFetch(sampler2D texSampler, vec3 coord, vec4 leafSubset, int leafIndex) {
+vec4 chainLeafFetch(CHAIN_LEAF_SAMPLER texSampler, vec3 coord, vec4 leafSubset, int leafIndex) {
   // Perspective divide: affine transforms produce z=1.0, making this a no-op (same contract as
   // QuadTextureFillShader); the tiled/subset math below then runs on the divided coordinate,
   // matching the runtime's emitPerspTextCoord ordering.

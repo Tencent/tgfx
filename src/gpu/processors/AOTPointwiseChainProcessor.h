@@ -146,6 +146,13 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
     return tiledLeafIndex;
   }
 
+  // Sampler index of the LUT gradient child, or -1 when the chain has none. The LUT child binds a
+  // 2D texture into a leaf slot, so a chain carrying one cannot use a rectangle (sampler2DRect)
+  // leaf variant.
+  int lutLeaf() const {
+    return lutLeafIndex;
+  }
+
   const AOTTiledTextureRecipe& tiledRecipe() const {
     return _tiledRecipe;
   }

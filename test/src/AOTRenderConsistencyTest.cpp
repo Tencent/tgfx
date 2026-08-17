@@ -1201,9 +1201,9 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyMaskFoldsIntoChain) {
   ExpectBitmapsIdentical("alpha-only-mask-fold-chain", candidate, reference, width, height);
 }
 
-// Encoded images use GL_TEXTURE_RECTANGLE on macOS. The precompiled textured kernel accepts only
-// TextureType::TwoD, so strict preparation must reject the plan before any pass executes and render
-// the untouched original draw through the runtime fallback.
+// Encoded images use GL_TEXTURE_RECTANGLE on macOS. The pointwise chain kernel carries a
+// TEXTURE_KIND dimension, so a rectangle image with a color-filter chain is served by a single
+// fused precompiled pass and stays pixel-identical to the runtime fallback.
 TGFX_TEST(AOTRenderConsistencyTest, MultiPassUnsupportedSourceFallsBackAtomically) {
   if (std::string(TGFX_BACKEND_NAME) != "opengl") {
     GTEST_SKIP() << "This case relies on macOS OpenGL encoded images using Rectangle textures";
@@ -1223,13 +1223,14 @@ TGFX_TEST(AOTRenderConsistencyTest, MultiPassUnsupportedSourceFallsBackAtomicall
                                  &reference, &referenceStats);
   RenderImageWithColorFilterOnce(image, chain, width, height, true, true, false, false, &candidate,
                                  &candidateStats);
-  EXPECT_GT(candidateStats.noMatchingRule, 0u);
-  EXPECT_EQ(candidateStats.programs.precompiledArtifactCreations, 0u);
-  EXPECT_GE(candidateStats.programs.programBuilderCreations, 1u);
+  // The rectangle source is served by the fused pointwise chain kernel: the matcher accepts it
+  // (no fallback miss) and an AOT artifact is created and used. The whole draw stays a single
+  // fused pass — no offscreen target, no materialized intermediate, no render-target switch — and
+  // the output is pixel-identical to the runtime fallback.
+  EXPECT_EQ(candidateStats.noMatchingRule, 0u);
+  EXPECT_EQ(candidateStats.programs.precompiledArtifactCreations, 1u);
+  EXPECT_EQ(candidateStats.programs.programBuilderCreations, 0u);
   EXPECT_EQ(candidateStats.draws.draws, 1u);
-  EXPECT_EQ(candidateStats.draws.completeAOTDraws, 0u);
-  EXPECT_EQ(candidateStats.draws.atomicFallbacks, 1u);
-  EXPECT_EQ(candidateStats.draws.kernelInvocations, 1u);
   EXPECT_EQ(candidateStats.draws.offscreenTargets, 0u);
   EXPECT_EQ(candidateStats.draws.materializedEdges, 0u);
   EXPECT_EQ(candidateStats.draws.renderTargetSwitches, 0u);

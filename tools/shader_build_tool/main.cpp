@@ -220,6 +220,9 @@ static std::string ReadFileContents(const std::string& path) {
 
 // Removes 'set = <n>, ' from layout qualifiers. glslang's OpenGL target rejects the descriptor-set
 // qualifier, while binding is kept (the GLSL output and reflection only rely on binding).
+// The token is only a descriptor set when it appears inside a layout(...) qualifier, i.e. the
+// preceding non-space character is '(' or ','. This avoids false positives on identifiers that
+// merely contain the substring (e.g. "offset = ", "Subset = ").
 static std::string StripDescriptorSets(std::string source) {
   std::string result;
   size_t cursor = 0;
@@ -230,11 +233,19 @@ static std::string StripDescriptorSets(std::string source) {
       result += source.substr(cursor);
       break;
     }
+    // Require a layout-qualifier context: the nearest non-space character before the token must be
+    // '(' or ','. Otherwise it is an identifier fragment, not a descriptor set — skip it.
+    size_t before = pos;
+    while (before > 0 && (source[before - 1] == ' ' || source[before - 1] == '\t')) {
+      --before;
+    }
+    bool isDescriptorSet = before > 0 && (source[before - 1] == '(' || source[before - 1] == ',');
     auto digitsStart = pos + token.size();
     auto digitsEnd = source.find_first_not_of("0123456789", digitsStart);
-    if (digitsEnd == std::string::npos || source[digitsEnd] != ',') {
-      result += source.substr(cursor);
-      break;
+    if (!isDescriptorSet || digitsEnd == std::string::npos || source[digitsEnd] != ',') {
+      result += source.substr(cursor, digitsStart - cursor);
+      cursor = digitsStart;
+      continue;
     }
     result += source.substr(cursor, pos - cursor);
     cursor = digitsEnd + 1;
@@ -362,7 +373,6 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
         vertReflData = &cacheEntry.reflection;
       }
 
-      // Compile fragment shader
       auto expandedFrag = PrependDefines(fragSource, fragDefines);
       if (rectVariant) {
         // glslang's OpenGL target rejects 'descriptor set' layout qualifiers, so strip the

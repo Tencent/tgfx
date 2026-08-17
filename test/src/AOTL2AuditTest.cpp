@@ -795,16 +795,12 @@ TGFX_TEST(AOTL2AuditTest, CoverageTextureMaskMatchesJIT) {
   LOGI("[L2COV] backend=%s shape=CoverageTextureMask noMatch=%u hits=%u maxDelta=%d pass=%d",
        TGFX_BACKEND_NAME, noMatch, hits, result.maxChannelDiff, result.passed ? 1 : 0);
 
-  if (IsOpenGLAuditBackend()) {
-    // The first desktop OpenGL profile only admits unmasked Texture2D pointwise draws. Coverage
-    // texture masks stay on ProgramBuilder until their OpenGL permutation is pixel-validated.
-    EXPECT_GT(noMatch, 0u);
-    EXPECT_EQ(hits, 0u);
-  } else {
-    EXPECT_EQ(noMatch, 0u)
-        << "coverage Xfermode-dst(TextureEffect) still misses the precompiled cache";
-    EXPECT_GT(hits, 0u) << "expected a precompiled artifact hit for the local-mask coverage draw";
-  }
+  // The coverage texture mask draw is served by the chain kernel's mask slot and is pixel-exact
+  // against the runtime path on every backend (verified byte-identical above), so it must hit
+  // everywhere including desktop OpenGL.
+  EXPECT_EQ(noMatch, 0u)
+      << "coverage Xfermode-dst(TextureEffect) still misses the precompiled cache";
+  EXPECT_GT(hits, 0u) << "expected a precompiled artifact hit for the local-mask coverage draw";
   EXPECT_FALSE(result.structuralDifference);
   EXPECT_TRUE(result.passed) << "AOT local-mask coverage diverges from JIT, maxDelta="
                              << result.maxChannelDiff;

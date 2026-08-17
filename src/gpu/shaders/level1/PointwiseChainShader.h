@@ -65,6 +65,11 @@ class PointwiseChainShader : public PrecompiledShader {
   using VD = VertDims;
 
   struct FragDims {
+    // TEXTURE_KIND is the texture leaves' sampler type (0=TwoD, 1=Rect). Appended last so TwoD
+    // variant indices are unchanged. The matcher only encodes Rect when every texture leaf is a
+    // rectangle texture and there is no LUT child (phantom padding reuses the first leaf's
+    // texture, so all leaf slots bind a rectangle texture then). Rect variants compile only into
+    // the opengl bundle.
     enum : uint32_t {
       GP_LAYOUT,
       HAS_XP,
@@ -72,6 +77,7 @@ class PointwiseChainShader : public PrecompiledShader {
       HAS_COLOR,
       TEXTURE_COUNT,
       HAS_MASK_TEXTURE,
+      TEXTURE_KIND,
       COUNT
     };
     static PermutationDomain domain() {
@@ -82,11 +88,12 @@ class PointwiseChainShader : public PrecompiledShader {
           PermutationBool("HAS_COLOR"),
           PermutationInt("TEXTURE_COUNT", 2),
           PermutationBool("HAS_MASK_TEXTURE"),
+          PermutationEnum("TEXTURE_KIND", {"TwoD", "Rect"}),
       });
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 6, "Update ShouldCompile when fragment dimensions change.");
+  static_assert(FD::COUNT == 7, "Update ShouldCompile when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"PointwiseChainShader",
@@ -103,6 +110,11 @@ class PointwiseChainShader : public PrecompiledShader {
  private:
   static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>& vertValues,
                             const std::vector<int>& fragValues) {
+    // Framebuffer fetch (HAS_XP=2) is a Vulkan/Metal-only path; Rect variants are opengl-only.
+    // Checked first so no early-return branch can leak a Rect+FBF combo into the build.
+    if (fragValues[FD::TEXTURE_KIND] == 1 && fragValues[FD::HAS_XP] == 2) {
+      return false;
+    }
     // GP_LAYOUT / HAS_COVERAGE / HAS_COLOR / TEXTURE_COUNT vertex-fragment agreement is enforced
     // by the framework (MirroredDimsAgree).
     if (vertValues[VD::GP_LAYOUT] == 1) {
