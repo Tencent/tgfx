@@ -75,6 +75,12 @@ void GLSLQuadPerEdgeAAGeometryProcessor::setData(UniformData* vertexUniformData,
     // already in device space, so identity keeps the result bit-exact.
     vertexUniformData->setData("Matrix", Matrix::I());
   }
+  if (fragmentUniformData != nullptr && fragmentUniformData->hasField("HasCommonColor")) {
+    // Precompiled fill kernels read the exact Color uniform for uniform-color draws instead of the
+    // quantized per-vertex color; this flag selects the color source at runtime. Only precompiled
+    // kernels declare the field, so the runtime (JIT) path is unaffected.
+    fragmentUniformData->setData("HasCommonColor", commonColor.has_value() ? 1 : 0);
+  }
   if (commonColor.has_value() && fragmentUniformData != nullptr &&
       fragmentUniformData->hasField("Color")) {
     // The fill kernels take the broadcast per-vertex color instead, so a program with no fragment

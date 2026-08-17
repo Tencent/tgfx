@@ -17,6 +17,12 @@
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Rect;
   int HasClip;
+  // Exact paint color for uniform-color draws. The per-vertex color attribute is UByte4Normalized
+  // and loses precision on fractional colors, so the geometry processor's exact Color uniform is
+  // preferred when HasCommonColor is set; otherwise the vColor varying is used (matching the
+  // runtime codegen, which reads the per-vertex attribute only when there is no common color).
+  vec4 Color;
+  int HasCommonColor;
 #if HAS_MASK_TEXTURE
   mat3 DeviceCoordMatrix;
 #endif
@@ -51,9 +57,16 @@ void main() {
 #endif
   float totalCoverage = vCoverage * maskAlpha * aaRectClipCoverage();
 
+  // Prefer the exact common-color uniform when the draw has one (uniform-color batch); the vColor
+  // attribute is quantized to 8 bits per channel and cannot represent fractional colors exactly.
+  vec4 baseColor = vColor;
+  if (HasCommonColor != 0) {
+    baseColor = Color;
+  }
+
 #if HAS_XP
-  fragColor = applyPorterDuffXP(vColor, vec4(totalCoverage));
+  fragColor = applyPorterDuffXP(baseColor, vec4(totalCoverage));
 #else
-  fragColor = vColor * totalCoverage;
+  fragColor = baseColor * totalCoverage;
 #endif
 }
