@@ -128,6 +128,7 @@ struct D3D12Window::PlatformState {
   HWND hwnd = nullptr;
   int width = 0;
   int height = 0;
+  PresentMode presentMode = PresentMode::VSync;
 
   // currentProxyRaw mirrors the currentProxy owner so onPresent can call releaseFrame without
   // a static_cast from the base RenderTargetProxy. The two are written and cleared together.
@@ -240,18 +241,21 @@ void D3D12Window::PlatformState::detachCompositionTree() {
 
 std::shared_ptr<D3D12Window> D3D12Window::MakeForHwnd(HWND hwnd,
                                                       std::shared_ptr<D3D12Device> device,
-                                                      std::shared_ptr<ColorSpace> colorSpace) {
-  return MakeImpl(hwnd, std::move(device), std::move(colorSpace), false);
+                                                      std::shared_ptr<ColorSpace> colorSpace,
+                                                      PresentMode presentMode) {
+  return MakeImpl(hwnd, std::move(device), std::move(colorSpace), false, presentMode);
 }
 
-std::shared_ptr<D3D12Window> D3D12Window::MakeForComposition(
-    HWND hwnd, std::shared_ptr<D3D12Device> device, std::shared_ptr<ColorSpace> colorSpace) {
-  return MakeImpl(hwnd, std::move(device), std::move(colorSpace), true);
+std::shared_ptr<D3D12Window> D3D12Window::MakeForComposition(HWND hwnd,
+                                                             std::shared_ptr<D3D12Device> device,
+                                                             std::shared_ptr<ColorSpace> colorSpace,
+                                                             PresentMode presentMode) {
+  return MakeImpl(hwnd, std::move(device), std::move(colorSpace), true, presentMode);
 }
 
 std::shared_ptr<D3D12Window> D3D12Window::MakeImpl(HWND hwnd, std::shared_ptr<D3D12Device> device,
                                                    std::shared_ptr<ColorSpace> colorSpace,
-                                                   bool transparent) {
+                                                   bool transparent, PresentMode presentMode) {
   if (hwnd == nullptr || device == nullptr) {
     return nullptr;
   }
@@ -330,6 +334,7 @@ std::shared_ptr<D3D12Window> D3D12Window::MakeImpl(HWND hwnd, std::shared_ptr<D3
   state->hwnd = hwnd;
   state->width = width;
   state->height = height;
+  state->presentMode = presentMode;
   if (transparent) {
     hr = DCompositionCreateDevice(nullptr, IID_PPV_ARGS(state->compositionDevice.GetAddressOf()));
     if (SUCCEEDED(hr)) {
@@ -436,8 +441,10 @@ void D3D12Window::onPresent(Context* /*context*/) {
   if (_platformState->swapChain == nullptr) {
     return;
   }
-  // SyncInterval=1 mirrors VK_PRESENT_MODE_FIFO_KHR (wait for vblank).
-  auto hr = _platformState->swapChain->Present(1, 0);
+  // SyncInterval=1 mirrors VK_PRESENT_MODE_FIFO_KHR (wait for vblank); SyncInterval=0 mirrors
+  // VK_PRESENT_MODE_IMMEDIATE_KHR (present without waiting).
+  auto syncInterval = _platformState->presentMode == PresentMode::VSync ? 1 : 0;
+  auto hr = _platformState->swapChain->Present(syncInterval, 0);
   if (FAILED(hr)) {
     LOGE("D3D12Window: Present failed, HRESULT=0x%08X", static_cast<unsigned>(hr));
   }

@@ -37,6 +37,11 @@ namespace tgfx {
  */
 class D3D12Window : public Window {
  public:
+  enum class PresentMode {
+    VSync,
+    Immediate,
+  };
+
 #ifdef _WIN32
   /**
    * Creates an opaque D3D12Window bound to a Win32 window handle. Contents fully cover the
@@ -46,10 +51,12 @@ class D3D12Window : public Window {
    * @param device The D3D12 device used to create the swap chain resources. Must be non-null.
    * @param colorSpace Optional color space for the output. Only sRGB is currently supported;
    *        any non-sRGB value is ignored with a logged warning.
+   * @param presentMode Controls whether Present waits for vertical synchronization.
    * @return A new D3D12Window, or nullptr if creation failed.
    */
   static std::shared_ptr<D3D12Window> MakeForHwnd(HWND hwnd, std::shared_ptr<D3D12Device> device,
-                                                  std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                                                  std::shared_ptr<ColorSpace> colorSpace = nullptr,
+                                                  PresentMode presentMode = PresentMode::VSync);
 
   /**
    * Creates a D3D12Window that blends with the desktop and any UI beneath the target hwnd.
@@ -62,11 +69,13 @@ class D3D12Window : public Window {
    * @param device The D3D12 device used to create the swap chain resources. Must be non-null.
    * @param colorSpace Optional color space for the output. Only sRGB is currently supported;
    *        any non-sRGB value is ignored with a logged warning.
+   * @param presentMode Controls whether Present waits for vertical synchronization.
    * @return A new D3D12Window, or nullptr if creation failed.
    */
   static std::shared_ptr<D3D12Window> MakeForComposition(
       HWND hwnd, std::shared_ptr<D3D12Device> device,
-      std::shared_ptr<ColorSpace> colorSpace = nullptr);
+      std::shared_ptr<ColorSpace> colorSpace = nullptr,
+      PresentMode presentMode = PresentMode::VSync);
 #endif
 
   ~D3D12Window() override;
@@ -81,7 +90,7 @@ class D3D12Window : public Window {
 #ifdef _WIN32
   static std::shared_ptr<D3D12Window> MakeImpl(HWND hwnd, std::shared_ptr<D3D12Device> device,
                                                std::shared_ptr<ColorSpace> colorSpace,
-                                               bool transparent);
+                                               bool transparent, PresentMode presentMode);
 #endif
 
   explicit D3D12Window(std::shared_ptr<Device> device, std::unique_ptr<PlatformState> state,
