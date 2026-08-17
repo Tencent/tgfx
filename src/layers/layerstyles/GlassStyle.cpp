@@ -302,6 +302,9 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
     return;
   }
   auto shapeInfo = DetectGlassShape(input);
+  // The edge light is only rendered when one layer pixel spans more than two screen pixels;
+  // below that the narrow light is under-sampled and adds cost without visible detail.
+  bool edgeLightEnabled = input.contentScale > 2.0f;
 
   float scaleRatioX = 1.0f;
   float scaleRatioY = 1.0f;
@@ -488,7 +491,6 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       float blurRadius =
           std::max(std::min((_depth / 100.0f) * MAX_BLUR_RADIUS, MAX_BLUR_RADIUS), MIN_BLUR_RADIUS);
       float minHalf = std::min(origBounds.width(), origBounds.height()) * 0.5f;
-      float effectiveBlurRadius = std::min(blurRadius, minHalf);
       auto visibleContentRect = Rect::MakeWH(contentWidth, contentHeight);
       if (clipBounds.has_value() && !visibleContentRect.intersect(*clipBounds)) {
         return;
@@ -522,6 +524,13 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       // The radius scales with udfScale, keeping the layer-space radius constant.
       float layerToSourceX = contentWidth / origBounds.width();
       float layerToSourceY = contentHeight / origBounds.height();
+      // Low depth on a large layer leaves the refraction kernel below one UDF texel, which turns
+      // the coverage ramp into per-texel steps. The internal floor lifts the layer-space radius so
+      // the kernel always spans at least MIN_FINE_TENT_TEXELS texels.
+      static constexpr float MIN_FINE_TENT_TEXELS = 2.0f;
+      float minBlurRadius = MIN_FINE_TENT_TEXELS / (udfScale * layerToSourceX);
+      blurRadius = std::max(blurRadius, minBlurRadius);
+      float effectiveBlurRadius = std::min(blurRadius, minHalf);
       Point fineRadius = {std::min(effectiveBlurRadius * udfScale * layerToSourceX,
                                    static_cast<float>(MaxTentRadius)),
                           std::min(effectiveBlurRadius * udfScale * layerToSourceY,
@@ -540,7 +549,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       // covers only a window around the current tile instead of the whole layer. The window is
       // five times the tile size and centered on the tile; when a later tile falls outside it,
       // the UDF is rebuilt centered on that tile with the same window size.
-      bool enableEdgeLighting = getLightIntensityFactor() > 0.0f;
+      bool enableEdgeLighting = getLightIntensityFactor() > 0.0f && edgeLightEnabled;
 
       // Every tile of a frame shares the same background image, so a changed pointer marks the
       // first tile of a new frame and invalidates the previous window.
@@ -671,10 +680,10 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       udf.edgePixelToLayerPixel = {edgePixelToLayerPixelX, edgePixelToLayerPixelY};
       udf.edgeTextureOrigin = edgeTextureOrigin;
       glassFilter = getUDFRefractionFilter(halfW, halfH, udf, mapping, std::move(maskImage),
-                                           std::move(edgeMaskImage));
+                                           std::move(edgeMaskImage), edgeLightEnabled);
     } else {
-      glassFilter =
-          getSDFRefractionFilter(shapeInfo.type, shapeInfo.cornerRadius, halfW, halfH, mapping);
+      glassFilter = getSDFRefractionFilter(shapeInfo.type, shapeInfo.cornerRadius, halfW, halfH,
+                                           mapping, edgeLightEnabled);
     }
   }
 
@@ -784,8 +793,11 @@ GlassRefractionParams GlassStyle::makeBaseRefractionParams(float halfW, float ha
 
 std::shared_ptr<GlassRefractionImageFilter> GlassStyle::getSDFRefractionFilter(
     GlassShapeType shapeType, float cornerRadius, float halfWidth, float halfHeight,
-    const BackgroundMapping& mapping) {
+    const BackgroundMapping& mapping, bool edgeLightEnabled) {
   auto params = makeBaseRefractionParams(halfWidth, halfHeight, mapping);
+  if (!edgeLightEnabled) {
+    params.lightIntensity = 0.0f;
+  }
   params.shapeType = shapeType;
   // Analytical SDF is an exact model, so displacement does not need clamping.
   params.maxDisplacement = 1.0e20f;
@@ -805,8 +817,12 @@ std::shared_ptr<GlassRefractionImageFilter> GlassStyle::getSDFRefractionFilter(
 
 std::shared_ptr<GlassRefractionImageFilter> GlassStyle::getUDFRefractionFilter(
     float halfWidth, float halfHeight, const UDFSampling& udf, const BackgroundMapping& mapping,
-    std::shared_ptr<Image> maskImage, std::shared_ptr<Image> edgeMaskImage) {
+    std::shared_ptr<Image> maskImage, std::shared_ptr<Image> edgeMaskImage,
+    bool edgeLightEnabled) {
   auto params = makeBaseRefractionParams(halfWidth, halfHeight, mapping);
+  if (!edgeLightEnabled) {
+    params.lightIntensity = 0.0f;
+  }
   params.shapeType = GlassShapeType::AlphaMask;
   float minHalf = std::min(halfWidth, halfHeight);
   params.maxDisplacement = GetUDFMaxDisplacement(minHalf, getRefractionFactor(), getDepthRatio());
