@@ -20,6 +20,7 @@
 
 #include <cinttypes>
 #include <cmath>
+#include <cstddef>
 
 namespace tgfx {
 /**
