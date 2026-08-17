@@ -302,9 +302,9 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
     return;
   }
   auto shapeInfo = DetectGlassShape(input);
-  // The edge light is only rendered when one layer pixel spans more than two screen pixels;
-  // below that the narrow light is under-sampled and adds cost without visible detail.
-  bool edgeLightEnabled = input.contentScale > 2.0f;
+  // The edge light is only rendered when one layer pixel spans more than half a screen pixel;
+  // below that the shape is too compressed for the light to remain distinguishable.
+  bool edgeLightEnabled = input.contentScale > 0.5f;
 
   float scaleRatioX = 1.0f;
   float scaleRatioY = 1.0f;
