@@ -546,59 +546,49 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       Point udfTextureOrigin = {fineTextureRect.left, fineTextureRect.top};
 
       // The edge light field needs a narrow layer-space reach but high precision, so its texture
-      // covers only a window around the current tile instead of the whole layer. The window is
-      // five times the tile size and centered on the tile; when a later tile falls outside it,
-      // the UDF is rebuilt centered on that tile with the same window size.
+      // covers a grid cell instead of the whole layer. The grid is anchored to the content origin
+      // and each cell is a fixed screen-space footprint converted to layer space; cells are
+      // disjoint, so each tile samples the single cell it falls into. Cells persist across frames
+      // while the content scale is unchanged, so panning reuses neighboring cells instead of
+      // rebuilding.
       bool enableEdgeLighting = getLightIntensityFactor() > 0.0f && edgeLightEnabled;
 
-      // Every tile of a frame shares the same background image, so a changed pointer marks the
-      // first tile of a new frame and invalidates the previous window.
-      if (cachedEdgeFrameBgImage != bgImage) {
-        cachedEdgeFrameBgImage = bgImage;
-        cachedEdgeWindowRect = Rect::MakeEmpty();
-      }
-
       auto contentRect = Rect::MakeWH(contentWidth, contentHeight);
-      // This tile's sampling range: its clip plus the shader's sampling halo.
-      static constexpr float COARSE_SAMPLE_HALO = 64.0f;
       auto tileClip = clipBounds.has_value() ? *clipBounds : contentRect;
-      auto tileSampleRect = tileClip.makeOutset(COARSE_SAMPLE_HALO, COARSE_SAMPLE_HALO);
-      tileSampleRect.intersect(contentRect);
-
-      // The window is five times the tile size, centered on the tile.
-      static constexpr float COARSE_WINDOW_TILE_FACTOR = 5.0f;
-      float tileCenterX = tileClip.centerX();
-      float tileCenterY = tileClip.centerY();
-      float tileW = tileClip.width();
-      float tileH = tileClip.height();
-      auto tileWindow =
-          Rect::MakeXYWH(tileCenterX - tileW * COARSE_WINDOW_TILE_FACTOR * 0.5f,
-                         tileCenterY - tileH * COARSE_WINDOW_TILE_FACTOR * 0.5f,
-                         tileW * COARSE_WINDOW_TILE_FACTOR, tileH * COARSE_WINDOW_TILE_FACTOR);
-      if (!tileWindow.intersect(contentRect)) {
-        tileWindow = contentRect;
+      // The grid granularity is a fixed screen-space footprint; the clip bounds are in content
+      // pixels, which map one-to-one with screen pixels here, so no scale conversion is needed.
+      static constexpr float EDGE_CELL_SCREEN_PIXELS = 1024.0f;
+      float cellSize = EDGE_CELL_SCREEN_PIXELS;
+      // The cell is anchored to the content origin so its boundaries stay stable across frames, and
+      // it is expanded outwards to fully contain the draw region. A single edge texture is bound
+      // for the whole draw, and the draw region is neither one tile nor in phase with this grid:
+      // continuous tiles are merged into one rect. Fragments outside the cell would sample past the
+      // texture and read zero, turning the shape interior into a false edge.
+      auto cell = Rect::MakeLTRB(std::floor(tileClip.left / cellSize) * cellSize,
+                                 std::floor(tileClip.top / cellSize) * cellSize,
+                                 std::ceil(tileClip.right / cellSize) * cellSize,
+                                 std::ceil(tileClip.bottom / cellSize) * cellSize);
+      if (!cell.intersect(contentRect)) {
+        cell = tileClip;
+        cell.intersect(contentRect);
       }
+      int64_t cellKey =
+          (static_cast<int64_t>(std::floor(cell.left / cellSize)) << 32) |
+          (static_cast<int64_t>(std::floor(cell.top / cellSize)) & 0xFFFFFFFF);
 
-      bool edgeNeedRegen =
-          cachedEdgeWindowRect.isEmpty() || !cachedEdgeWindowRect.contains(tileSampleRect);
-      Rect finalEdgeWindow = tileWindow;
-      if (!edgeNeedRegen) {
-        finalEdgeWindow = cachedEdgeWindowRect;
-      }
+      // The full-layer core density is fixed: each texel covers two content pixels, so the core
+      // stays at half the content resolution regardless of the cell size or zoom.
+      static constexpr float EDGE_CORE_SCALE = 0.5f;
+      int edgeCoreWidth = std::max(1, static_cast<int>(std::round(contentWidth * EDGE_CORE_SCALE)));
+      int edgeCoreHeight =
+          std::max(1, static_cast<int>(std::round(contentHeight * EDGE_CORE_SCALE)));
+      float edgePixelToLayerPixelX = 1.0f / (EDGE_CORE_SCALE * layerToSourceX);
+      float edgePixelToLayerPixelY = 1.0f / (EDGE_CORE_SCALE * layerToSourceY);
+      // The cell is expressed in the full-layer UDF space, so it must be scaled with the same
+      // density as the core. Any other factor would shift the texture origin away from the
+      // coordinates the shader derives from the full-layer mapping.
+      float edgeScale = EDGE_CORE_SCALE;
 
-      static constexpr float MAX_COARSE_UDF_DIM = 2048.0f;
-      float maxCoarseAllowedDim = std::min(maxTextureSizeF, MAX_COARSE_UDF_DIM);
-      float edgeScale = 1.0f;
-      float windowMaxDim = std::max(finalEdgeWindow.width(), finalEdgeWindow.height());
-      if (windowMaxDim > maxCoarseAllowedDim) {
-        edgeScale = maxCoarseAllowedDim / windowMaxDim;
-      }
-      int edgeCoreWidth = std::max(1, static_cast<int>(std::round(contentWidth * edgeScale)));
-      int edgeCoreHeight = std::max(1, static_cast<int>(std::round(contentHeight * edgeScale)));
-      // The texel-to-layer conversion is identical for every tile: each texel covers
-      // 1 / (edgeScale * layerToSource) layer pixels.
-      float edgePixelToLayerPixelX = 1.0f / (edgeScale * layerToSourceX);
-      float edgePixelToLayerPixelY = 1.0f / (edgeScale * layerToSourceY);
       // The edge light width is fixed in layer space so it stays constant across zoom; a screen
       // pixel floor lifts the layer width when zooming out so the light never shrinks below five
       // screen pixels and degenerates into flickering dots.
@@ -620,9 +610,9 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       float edgeSpanY = coarseRadius.y * edgePixelToLayerPixelY;
       float edgeHaloX = std::ceil(coarseRadius.x * 0.5f) + 1.0f;
       float edgeHaloY = std::ceil(coarseRadius.y * 0.5f) + 1.0f;
-      // The physical texture covers the window (in the full-layer UDF space) plus the sampling
+      // The physical texture covers the cell (in the full-layer UDF space) plus the sampling
       // halo; the UDF coordinates keep the full-layer mapping so sampling stays uniform.
-      auto edgeWindowUDF = finalEdgeWindow;
+      auto edgeWindowUDF = cell;
       edgeWindowUDF.scale(edgeScale, edgeScale);
       auto edgeTextureRect = edgeWindowUDF.makeOutset(edgeHaloX, edgeHaloY);
       edgeTextureRect.roundOut();
@@ -657,21 +647,35 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
         cachedUDFImage = maskImage;
       }
       std::shared_ptr<Image> edgeMaskImage = nullptr;
-      if (!edgeNeedRegen && cacheMatch && enableEdgeLighting && cachedEdgeUDFImage != nullptr) {
-        edgeMaskImage = cachedEdgeUDFImage;
-      } else if (enableEdgeLighting) {
-        edgeMaskImage = GlassUDFImage::Make(input.content, edgeCoreWidth, edgeCoreHeight,
-                                            edgeTextureRect, Point::Zero(), coarseRadius,
-                                            GlassUDFField::EdgeLight);
-        if (!edgeMaskImage) {
-          LOGE("GlassStyle: Failed to create edge light UDF.");
-          return;
+      if (enableEdgeLighting) {
+        // Cell keys are grid positions in content pixels, and content pixels move with the content
+        // scale, so the same key maps to a different region once the scale or the content changes.
+        // Reusing an entry across such a change would sample the texture with a mismatched origin,
+        // so the pool is invalidated on the same conditions as the full-layer UDF.
+        bool gridMatch = cacheMatch && FloatNearlyEqual(cachedEdgeGridSize, cellSize);
+        if (!gridMatch) {
+          cachedEdgeUDFs.clear();
+          cachedEdgeGridSize = cellSize;
         }
-        cachedEdgeWindowRect = finalEdgeWindow;
-        cachedEdgeUDFImage = edgeMaskImage;
-      } else {
-        cachedEdgeUDFImage = nullptr;
-        cachedEdgeWindowRect = Rect::MakeEmpty();
+        auto it = cachedEdgeUDFs.find(cellKey);
+        if (cacheMatch && gridMatch && it != cachedEdgeUDFs.end() &&
+            it->second.windowRect.contains(cell)) {
+          edgeMaskImage = it->second.udfImage;
+        } else {
+          edgeMaskImage = GlassUDFImage::Make(input.content, edgeCoreWidth, edgeCoreHeight,
+                                              edgeTextureRect, Point::Zero(), coarseRadius,
+                                              GlassUDFField::EdgeLight);
+          if (!edgeMaskImage) {
+            LOGE("GlassStyle: Failed to create edge light UDF.");
+            return;
+          }
+          // Cap the pool so panning across many cells cannot grow it unboundedly; evicting the
+          // whole pool is fine because a large cell count implies the view is moving.
+          if (cachedEdgeUDFs.size() >= 16) {
+            cachedEdgeUDFs.clear();
+          }
+          cachedEdgeUDFs[cellKey] = {cell, edgeMaskImage};
+        }
       }
       UDFSampling udf = {};
       udf.pixelToLayerPixel = {udfPixelToLayerPixelX, udfPixelToLayerPixelY};

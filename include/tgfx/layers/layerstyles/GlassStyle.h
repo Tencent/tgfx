@@ -19,6 +19,8 @@
 #pragma once
 
 #include <algorithm>
+#include <cmath>
+#include <unordered_map>
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Rect.h"
@@ -215,12 +217,16 @@ class GlassStyle : public LayerStyle {
   Path cachedUDFPath = {};
   std::shared_ptr<Image> cachedUDFSource = nullptr;
   std::shared_ptr<Image> cachedUDFImage = nullptr;
-  std::shared_ptr<Image> cachedEdgeUDFImage = nullptr;
-  // Frame boundary signal for the edge-light UDF: every tile of a frame shares the same
-  // background image, so a changed pointer marks the first tile of a new frame.
-  std::shared_ptr<Image> cachedEdgeFrameBgImage = nullptr;
-  // On-screen window (content coordinates) currently covered by the cached edge-light UDF.
-  Rect cachedEdgeWindowRect = {};
+  // A grid-aligned edge-light UDF cache: each entry covers one fixed grid cell (a screen-space
+  // footprint converted to layer space), so cells never overlap and tiles look up their own cell.
+  // The key is the cell coordinate (gridX, gridY) derived from the layer-space position.
+  struct EdgeUDFCacheEntry {
+    Rect windowRect = {};
+    std::shared_ptr<Image> udfImage = nullptr;
+  };
+  std::unordered_map<int64_t, EdgeUDFCacheEntry> cachedEdgeUDFs;
+  // Parameters of the grid used by the cached edge-light UDFs; a change invalidates the pool.
+  float cachedEdgeGridSize = 0.0f;
   float cachedUDFContentScale = 0.0f;
   float cachedUDFDepth = -1.0f;
   float cachedUDFContentWidth = 0.0f;
