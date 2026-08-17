@@ -185,15 +185,16 @@ void GLState::bindTexture(GLTexture* texture, unsigned textureUnit) {
   DEBUG_ASSERT(texture != nullptr);
   DEBUG_ASSERT(texture->usage() & TextureUsage::TEXTURE_BINDING);
   auto& uniqueID = textureUnits[textureUnit];
-  // Use uniqueID for comparison to prevent conflicts when GL resources are released and recreated.
-  if (uniqueID == texture->uniqueID) {
-    return;
-  }
-
+  // Activate the target unit even when the texture is already bound to it: callers may follow with
+  // texParameteri (updateSampler), which applies to the *active* unit, so it must point here.
   auto gl = interface->functions();
   if (activeTextureUint != textureUnit) {
     gl->activeTexture(static_cast<unsigned>(GL_TEXTURE0) + textureUnit);
     activeTextureUint = textureUnit;
+  }
+  // Use uniqueID for comparison to prevent conflicts when GL resources are released and recreated.
+  if (uniqueID == texture->uniqueID) {
+    return;
   }
   gl->bindTexture(texture->target(), texture->textureID());
   uniqueID = texture->uniqueID;
