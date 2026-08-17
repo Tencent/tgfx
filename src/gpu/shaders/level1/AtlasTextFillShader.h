@@ -31,17 +31,21 @@ class AtlasTextFillShader : public PrecompiledShader {
 
   struct FragDims {
     // A device-space mask is a runtime uniform (HasDeviceMask), not a permutation dimension.
-    enum : uint32_t { HAS_COVERAGE, HAS_COMMON_COLOR, HAS_XP, COUNT };
+    // TEXTURE_KIND is the atlas sampler type (0=TwoD, 1=Rect). The atlas is a rectangle texture on
+    // desktop GL; it changes the sampler declaration, so it is a legitimate dimension. Appended
+    // last so TwoD variant indices are unchanged. Rect variants compile only into the opengl bundle.
+    enum : uint32_t { HAS_COVERAGE, HAS_COMMON_COLOR, HAS_XP, TEXTURE_KIND, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationBool("HAS_COVERAGE"),
           PermutationBool("HAS_COMMON_COLOR"),
           PermutationInt("HAS_XP", 3),
+          PermutationEnum("TEXTURE_KIND", {"TwoD", "Rect"}),
       });
     }
   };
   using FD = FragDims;
-  static_assert(D::COUNT == 2 && FD::COUNT == 3,
+  static_assert(D::COUNT == 2 && FD::COUNT == 4,
                 "Update ShouldCompile below when dimensions change.");
 
  public:
@@ -54,7 +58,15 @@ class AtlasTextFillShader : public PrecompiledShader {
             PermutationDomain({}),
             "",
             "",
-            nullptr};
+            ShouldCompile};
+  }
+
+ private:
+  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>&,
+                            const std::vector<int>& fragValues) {
+    // Framebuffer fetch (HAS_XP=2) is a Vulkan/Metal-only path; Rect variants are opengl-only and
+    // never carry FBF.
+    return !(fragValues[FD::TEXTURE_KIND] == 1 && fragValues[FD::HAS_XP] == 2);
   }
 };
 

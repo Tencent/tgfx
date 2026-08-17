@@ -1075,6 +1075,9 @@ static std::optional<PermutationMatchResult> TryMatchAtlasTextFill(const Program
     fragValues[i] = values[i];
   }
   fragValues[FD::HAS_XP] = xpType;
+  // The glyph atlas is a rectangle texture on desktop GL; encode its sampler type so the matched
+  // variant declares sampler2DRect (required by the RECT chokepoint in MatchPermutation).
+  fragValues[FD::TEXTURE_KIND] = atgp->textureAt(0)->type() == TextureType::Rectangle ? 1 : 0;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"AtlasTextFillShader", vertIndex, fragIndex};
 }
