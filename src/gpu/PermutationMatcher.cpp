@@ -1327,6 +1327,8 @@ static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
   fragValues[FD::HAS_XP] = xpType;
+  // The blurred child texture is a rectangle texture on desktop GL; encode its sampler type.
+  fragValues[FD::TEXTURE_KIND] = childFP->textureAt(0)->type() == TextureType::Rectangle ? 1 : 0;
 
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"GaussianBlur1DShader", vertIndex, fragIndex};
