@@ -391,7 +391,6 @@ static bool MoreFrequentFallback(const AggregatedFallback& left, const Aggregate
 
 static nlohmann::json HitRecordToJSON(const PrecompiledHitRecord& record) {
   return {{"programKey", record.programKey},
-          {"route", record.route},
           {"effect", record.effectSignature},
           {"pipeline", record.pipelineSignature},
           {"shader", record.shaderName},
@@ -417,7 +416,7 @@ static nlohmann::json BuildRootCauseProgramKeyAttribution(
   for (const auto& result : results) {
     std::map<std::string, uint64_t> jitByKey;
     for (const auto& jit : result.jitProgramRecords) {
-      jitByKey[jit.programKey + "\n" + std::to_string(jit.route)]++;
+      jitByKey[jit.programKey]++;
     }
     for (const auto& fallback : result.fallbackRecords) {
       if (fallback.reason != PrecompiledFallbackReason::NoMatchingRule) {
@@ -431,7 +430,7 @@ static nlohmann::json BuildRootCauseProgramKeyAttribution(
       } else {
         continue;
       }
-      auto key = fallback.programKey + "\n" + std::to_string(fallback.route);
+      auto key = fallback.programKey;
       auto& row = byCategory[category][key];
       row.fallbacks++;
       row.tests.insert(result.testName);
@@ -506,7 +505,6 @@ static nlohmann::json AxisAnalysisToJSON(const AOTAxisAnalysis& axis) {
 
 static nlohmann::json FallbackRecordToJSON(const PrecompiledFallbackRecord& record) {
   nlohmann::json result = {{"programKey", record.programKey},
-                           {"route", record.route},
                            {"reason", PrecompiledFallbackReasonName(record.reason)},
                            {"effect", record.effectSignature},
                            {"pipeline", record.pipelineSignature},
@@ -790,7 +788,7 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
             [&]() {
               nlohmann::json records = nlohmann::json::array();
               for (const auto& record : testResult.jitProgramRecords) {
-                records.push_back({{"programKey", record.programKey}, {"route", record.route}});
+                records.push_back({{"programKey", record.programKey}});
               }
               return records;
             }()},

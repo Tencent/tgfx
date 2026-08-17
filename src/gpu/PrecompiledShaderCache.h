@@ -67,7 +67,6 @@ enum class PrecompiledAOTStage : uint8_t {
 
 struct PrecompiledHitRecord {
   std::string programKey;
-  uint32_t route = 0;
   std::string effectSignature;
   std::string pipelineSignature;
   std::string shaderName;
@@ -77,12 +76,10 @@ struct PrecompiledHitRecord {
 
 struct JITProgramRecord {
   std::string programKey;
-  uint32_t route = 0;
 };
 
 struct PrecompiledFallbackRecord {
   std::string programKey;
-  uint32_t route = 0;
   PrecompiledFallbackReason reason = PrecompiledFallbackReason::Unspecified;
   std::string effectSignature;
   std::string pipelineSignature;

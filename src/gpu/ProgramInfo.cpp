@@ -144,11 +144,11 @@ static std::string DiagnosticProgramKey(const BytesKey& key) {
   return stream.str();
 }
 
-BytesKey ProgramInfo::programKeyForDiagnostics(AOTDecompositionRoute route) const {
-  return buildProgramKey(route);
+BytesKey ProgramInfo::programKeyForDiagnostics() const {
+  return buildProgramKey();
 }
 
-BytesKey ProgramInfo::buildProgramKey(AOTDecompositionRoute route) const {
+BytesKey ProgramInfo::buildProgramKey() const {
   BytesKey key = {};
   auto context = renderTarget->getContext();
   geometryProcessor->computeProcessorKey(context, &key);
@@ -171,7 +171,6 @@ BytesKey ProgramInfo::buildProgramKey(AOTDecompositionRoute route) const {
   key.write(depthStencil.stencilWriteMask);
   EncodeStencilFace(key, depthStencil.stencilFront);
   EncodeStencilFace(key, depthStencil.stencilBack);
-  key.write(static_cast<uint32_t>(route));
   return key;
 }
 
@@ -179,33 +178,13 @@ std::shared_ptr<Program> ProgramInfo::getProgram(ProgramLookupMode mode) const {
   auto context = renderTarget->getContext();
   auto globalCache = context->globalCache();
 
-  // Program creation is atomic and never caches a program whose uniform layout disagrees with the
-  // route it is stored under. `route` is a local copy, so the const ProgramInfo is never mutated.
-  // The default lookup may fall back from a decomposed route to the plain route under its own key.
-  // PrecompiledOnly is strict: a decomposed-route miss must fail instead of silently changing the
-  // requested route.
-  auto route = decompositionRoute;
-  auto programKey = buildProgramKey(route);
+  auto programKey = buildProgramKey();
   auto program = globalCache->findProgram(programKey);
   bool cacheKeyOccupied = program != nullptr;
   bool programCreated = false;
   if (program != nullptr && mode == ProgramLookupMode::PrecompiledOnly &&
       program->getProvenance().program != ProgramOrigin::PrecompiledArtifact) {
     program = nullptr;
-  }
-  if (program == nullptr && route != AOTDecompositionRoute::None) {
-    program = PrecompiledProgramCreator::CreateDecomposedProgram(context, this);
-    programCreated = program != nullptr;
-    if (program == nullptr) {
-      if (mode == ProgramLookupMode::PrecompiledOnly) {
-        LOGE("ProgramInfo::getProgram() Failed strict decomposed program lookup!");
-        return nullptr;
-      }
-      route = AOTDecompositionRoute::None;
-      programKey = buildProgramKey(route);
-      program = globalCache->findProgram(programKey);
-      cacheKeyOccupied = program != nullptr;
-    }
   }
   if (program == nullptr) {
     program = PrecompiledProgramCreator::CreateProgram(context, this);
@@ -219,8 +198,7 @@ std::shared_ptr<Program> ProgramInfo::getProgram(ProgramLookupMode mode) const {
     }
     if (programCreated && context->precompiledShaderCache()->diagnosticRecordingEnabled() &&
         program->getProvenance().program != ProgramOrigin::PrecompiledArtifact) {
-      context->precompiledShaderCache()->recordJITProgram(
-          {DiagnosticProgramKey(programKey), static_cast<uint32_t>(route)});
+      context->precompiledShaderCache()->recordJITProgram({DiagnosticProgramKey(programKey)});
     }
   }
   if (mode == ProgramLookupMode::PrecompiledOnly &&
