@@ -498,7 +498,7 @@ or submit a [pull request](https://github.com/Tencent/tgfx/pulls). Before doing 
 
 If you find TGFX helpful, please give us a **Star**. We really appreciate your support :)
 
-[![Star History Chart](https://api.star-history.com/svg?repos=Tencent/tgfx&type=Date)](https://star-history.com/#Tencent/tgfx&Date)
+[![Star History Chart](https://star-history.dera.page/svg?repos=Tencent/tgfx&type=Date)](https://star-history.dera.page/#Tencent/tgfx&Date)
 
 ## License
 
