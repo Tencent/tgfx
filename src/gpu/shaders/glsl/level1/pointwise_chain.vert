@@ -67,6 +67,8 @@ layout(std140, set = 0, binding = 0) uniform VertexUniformBlock {
 #if NTEX >= 4
   mat3 CoordTransformMatrix_3;
   mat3 CoordTransformMatrix_4;
+  // The mask-slot phantom child contributes a transform like every child; it is never read.
+  mat3 CoordTransformMatrix_5;
 #endif
 #if GP_LAYOUT == 0 && HAS_UV_COORD
   // Per-target coordinate source: bit k set picks the uvCoord attribute for leaf k, bit 4 for the

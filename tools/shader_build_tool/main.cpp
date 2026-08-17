@@ -38,7 +38,6 @@
 #include "gpu/shaders/level1/DeviceSpaceTexturedEffectShader.h"
 #include "gpu/shaders/level1/EllipseFillShader.h"
 #include "gpu/shaders/level1/GaussianBlur1DShader.h"
-#include "gpu/shaders/level1/UnifiedGradientShader.h"
 #include "gpu/shaders/level1/HairlineLineShader.h"
 #include "gpu/shaders/level1/HairlineQuadShader.h"
 #include "gpu/shaders/level1/MaskFillShader.h"
@@ -59,6 +58,7 @@
 #include "gpu/shaders/level1/TextureFillShader.h"
 #include "gpu/shaders/level1/TexturedEffectShader.h"
 #include "gpu/shaders/level1/TiledTextureFillShader.h"
+#include "gpu/shaders/level1/UnifiedGradientShader.h"
 #include "gpu/shaders/level1/YUVTextureFillShader.h"
 
 namespace tgfx {
@@ -218,6 +218,33 @@ static std::string ReadFileContents(const std::string& path) {
   return buffer.str();
 }
 
+// Removes 'set = <n>, ' from layout qualifiers. glslang's OpenGL target rejects the descriptor-set
+// qualifier, while binding is kept (the GLSL output and reflection only rely on binding).
+static std::string StripDescriptorSets(std::string source) {
+  std::string result;
+  size_t cursor = 0;
+  const std::string token = "set = ";
+  while (true) {
+    auto pos = source.find(token, cursor);
+    if (pos == std::string::npos) {
+      result += source.substr(cursor);
+      break;
+    }
+    auto digitsStart = pos + token.size();
+    auto digitsEnd = source.find_first_not_of("0123456789", digitsStart);
+    if (digitsEnd == std::string::npos || source[digitsEnd] != ',') {
+      result += source.substr(cursor);
+      break;
+    }
+    result += source.substr(cursor, pos - cursor);
+    cursor = digitsEnd + 1;
+    if (cursor < source.size() && source[cursor] == ' ') {
+      cursor++;
+    }
+  }
+  return result;
+}
+
 static std::string ResolveIncludes(const std::string& source, const std::string& baseDir) {
   std::string result;
   std::istringstream stream(source);
@@ -304,6 +331,11 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
         continue;
       }
 
+      // A TEXTURE_KIND=1 variant declares sampler2DRect, whose SPIR-V (OpTypeImage Dim=Rect) is
+      // invalid under Vulkan semantics. It compiles under OpenGL semantics and only enters the
+      // opengl bundle.
+      bool rectVariant = info.fragDomain.valueOf(fi, "TEXTURE_KIND") == 1;
+
       auto vertDefines = vertDomain.defineListFor(vi);
       auto fragDefines = fragDomain.defineListFor(fi);
 
@@ -332,7 +364,13 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
 
       // Compile fragment shader
       auto expandedFrag = PrependDefines(fragSource, fragDefines);
-      auto fragResult = CompileGLSL(expandedFrag, ShaderStageType::Fragment, info.name, fi);
+      if (rectVariant) {
+        // glslang's OpenGL target rejects 'descriptor set' layout qualifiers, so strip the
+        // 'set = N, ' fragment while keeping binding (which the reflection and GLSL output use).
+        expandedFrag = StripDescriptorSets(std::move(expandedFrag));
+      }
+      auto fragResult =
+          CompileGLSL(expandedFrag, ShaderStageType::Fragment, info.name, fi, false, rectVariant);
       if (!fragResult.success) {
         std::cerr << "  " << fragResult.error << "\n";
         report.errorCount++;
@@ -348,6 +386,10 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
       }
 
       for (const auto& backend : options.backends) {
+        // RECT variants compile to GLSL only; never emit them for other backends' bundles.
+        if (rectVariant && backend != "opengl") {
+          continue;
+        }
         std::vector<uint8_t> vertBlob;
         std::vector<uint8_t> fragBlob;
 

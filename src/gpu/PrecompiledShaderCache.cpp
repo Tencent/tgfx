@@ -22,8 +22,8 @@
 #include <fstream>
 #include <limits>
 #include "core/utils/Log.h"
-#include "zstd.h"
 #include "zlib.h"
+#include "zstd.h"
 
 namespace tgfx {
 
@@ -578,12 +578,12 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
     bool decompressOK = false;
     if (compressionType == 1) {
       uLongf destLen = static_cast<uLongf>(dataSize);
-      int ret = uncompress(decompressed.data() + dataOffset, &destLen, ptr + dataOffset,
-                           compressedSize);
+      int ret =
+          uncompress(decompressed.data() + dataOffset, &destLen, ptr + dataOffset, compressedSize);
       decompressOK = ret == Z_OK && destLen == static_cast<uLongf>(dataSize);
     } else {
-      size_t destLen = ZSTD_decompress(decompressed.data() + dataOffset, dataSize,
-                                       ptr + dataOffset, compressedSize);
+      size_t destLen = ZSTD_decompress(decompressed.data() + dataOffset, dataSize, ptr + dataOffset,
+                                       compressedSize);
       decompressOK = !ZSTD_isError(destLen) && destLen == dataSize;
     }
     if (!decompressOK) {

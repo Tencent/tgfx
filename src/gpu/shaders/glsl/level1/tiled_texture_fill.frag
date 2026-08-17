@@ -20,6 +20,10 @@
 #ifndef HAS_COVERAGE
 #define HAS_COVERAGE 0
 #endif
+// 0 = TwoD, 1 = Rect (desktop GL images). Rect variants compile only into the opengl bundle.
+#ifndef TEXTURE_KIND
+#define TEXTURE_KIND 0
+#endif
 
 layout(location = 0) in vec2 TransformedCoords_0;
 #if HAS_COVERAGE
@@ -28,7 +32,11 @@ layout(location = 1) in float vCoverage;
 
 layout(location = 0) out vec4 fragColor;
 
+#if TEXTURE_KIND == 1
+layout(set = 1, binding = 0) uniform sampler2DRect TextureSampler_0;
+#else
 layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
+#endif
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Color;
@@ -81,7 +89,7 @@ void main() {
       ShaderModeX == 4 || ShaderModeX == 5 || ShaderModeY == 4 || ShaderModeY == 5;
   if (fourTap) {
     // Mipmap-repeat 4-tap seam blend (mirrors the runtime GLSLTiledTextureEffect mipmapRepeat path).
-    bool unorm = tiledUsesUnorm(ShaderModeX) || tiledUsesUnorm(ShaderModeY);
+    bool unorm = tiledEffectiveUnorm(ShaderModeX, ShaderModeY);
     vec2 inC = unorm ? texCoord / Dimension : texCoord;
     float subX, extraX, weightX;
     float subY, extraY, weightY;
@@ -117,6 +125,47 @@ void main() {
     vec2 sampleCoord = tiledMapCoord(texCoord, Strict != 0, inCoord, subsetCoord, clampedCoord);
     color = texture(TextureSampler_0, sampleCoord);
     color = tiledApplyBorder(color, inCoord, subsetCoord, clampedCoord);
+    // RepeatLinearNone seam blend: when the mod-wrapped coordinate clamps at a subset edge, blend
+    // with the opposite edge so linear filtering wraps across the seam. Mirrors the runtime codegen
+    // (GLSLTiledTextureEffect repeat path). Nearest repeat needs no blend.
+    bool repX = ShaderModeX == 3;
+    bool repY = ShaderModeY == 3;
+    if (repX || repY) {
+      vec2 sampleScale = tiledEffectiveUnorm(ShaderModeX, ShaderModeY) ? Dimension : vec2(1.0);
+      highp float errX = repX ? (subsetCoord.x - clampedCoord.x) : 0.0;
+      highp float errY = repY ? (subsetCoord.y - clampedCoord.y) : 0.0;
+      highp float repeatCoordX = errX > 0.0 ? Clamp.x : Clamp.z;
+      highp float repeatCoordY = errY > 0.0 ? Clamp.y : Clamp.w;
+      if (repX && repY) {
+        vec4 repeatReadX =
+            texture(TextureSampler_0, vec2(repeatCoordX, clampedCoord.y) * sampleScale);
+        vec4 repeatReadY =
+            texture(TextureSampler_0, vec2(clampedCoord.x, repeatCoordY) * sampleScale);
+        vec4 repeatReadXY =
+            texture(TextureSampler_0, vec2(repeatCoordX, repeatCoordY) * sampleScale);
+        if (errX != 0.0 && errY != 0.0) {
+          errX = abs(errX);
+          color = mix(mix(color, repeatReadX, errX), mix(repeatReadY, repeatReadXY, errX),
+                      abs(errY));
+        } else if (errX != 0.0) {
+          color = mix(color, repeatReadX, errX);
+        } else if (errY != 0.0) {
+          color = mix(color, repeatReadY, errY);
+        }
+      } else if (repX) {
+        if (errX != 0.0) {
+          vec4 repeatReadX =
+              texture(TextureSampler_0, vec2(repeatCoordX, clampedCoord.y) * sampleScale);
+          color = mix(color, repeatReadX, errX);
+        }
+      } else {
+        if (errY != 0.0) {
+          vec4 repeatReadY =
+              texture(TextureSampler_0, vec2(clampedCoord.x, repeatCoordY) * sampleScale);
+          color = mix(color, repeatReadY, errY);
+        }
+      }
+    }
   }
 
   if (AlphaOnly != 0) {

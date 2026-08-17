@@ -202,23 +202,30 @@ TGFX_TEST(GLRenderTest, AOTWhitelist) {
     ASSERT_NE(fp, nullptr);
     ProgramInfo programInfo(renderTarget.get(), gp.get(), {fp.get()}, 1, nullptr,
                             BlendMode::SrcOver);
-    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
+    // QuadPerEdgeAA + TextureEffect is served by QuadTextureFillShader.
+    EXPECT_TRUE(MatchPermutation(&programInfo).has_value());
   }
 
   {
     BlockAllocator allocator;
     auto gp = DefaultGeometryProcessor::Make(&allocator, PMColor::White(), 8, 8, AAType::None,
                                              Matrix::I(), Matrix::I());
-    auto glInfo = CreateRectangleTexture(context, 2, 2);
+    // Adopting an external texture caches its view under a scratch key derived from size/format.
+    // An unusual size keeps the adopted rectangle view from being recycled by the plain 2x2
+    // proxies other blocks (and other tests on the shared device) create, which would make their
+    // matched texture kind depend on test order.
+    auto glInfo = CreateRectangleTexture(context, 7, 5);
     ASSERT_NE(glInfo.id, 0u);
-    auto textureProxy = context->proxyProvider()->wrapExternalTexture(BackendTexture(glInfo, 2, 2),
+    auto textureProxy = context->proxyProvider()->wrapExternalTexture(BackendTexture(glInfo, 7, 5),
                                                                       ImageOrigin::TopLeft, true);
     auto fp = DeviceSpaceTextureEffect::Make(&allocator, std::move(textureProxy), Matrix::I());
     ASSERT_NE(gp, nullptr);
     ASSERT_NE(fp, nullptr);
     ProgramInfo programInfo(renderTarget.get(), gp.get(), {fp.get()}, 1, nullptr,
                             BlendMode::SrcOver);
-    EXPECT_FALSE(programInfo.samplersAre2D());
+    EXPECT_TRUE(programInfo.hasRectSampler());
+    // DeviceSpaceTextureEffect has no TEXTURE_KIND dimension, so a rectangle texture is rejected
+    // by the matcher (it would otherwise bind to a plain sampler2D).
     EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
   }
 
@@ -239,7 +246,8 @@ TGFX_TEST(GLRenderTest, AOTWhitelist) {
     ASSERT_NE(xp, nullptr);
     ProgramInfo programInfo(renderTarget.get(), gp.get(), {fp.get()}, 1, xp.get(),
                             BlendMode::SrcOver);
-    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
+    // SrcOver needs no dst readback, so the chain kernel serves this draw.
+    EXPECT_TRUE(MatchPermutation(&programInfo).has_value());
   }
 }
 

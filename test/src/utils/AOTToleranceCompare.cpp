@@ -49,7 +49,7 @@ AOTToleranceResult AOTToleranceCompare::Compare(const Pixmap& reference, const P
       int db = std::abs(ToByte(refColor.blue) - ToByte(candColor.blue));
       int da = std::abs(ToByte(refColor.alpha) - ToByte(candColor.alpha));
       int pixelMax = std::max(std::max(dr, dg), std::max(db, da));
-      if (pixelMax > 0) {
+      if (pixelMax > spec.significantChannelDiff) {
         result.diffPixelCount++;
       }
       if (pixelMax > result.maxChannelDiff) {

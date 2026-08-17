@@ -63,6 +63,11 @@ AOTClosureResult AOTClosureVerifier::Verify(const PrecompiledShaderCache* cache,
         if (!IsBuildablePermutation(info, vi, fi)) {
           continue;
         }
+        // RECT (TEXTURE_KIND=1) variants compile only into the opengl bundle, so non-opengl
+        // profiles must not expect them.
+        if (profileTag != "opengl" && info.fragDomain.valueOf(fi, "TEXTURE_KIND") == 1) {
+          continue;
+        }
         vertIndices.insert(vi);
         fragIndices.insert(fi);
       }

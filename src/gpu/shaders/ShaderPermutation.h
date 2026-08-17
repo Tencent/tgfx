@@ -160,6 +160,17 @@ class PermutationDomain {
    */
   std::vector<std::string> defineListFor(uint32_t index) const;
 
+  /**
+   * Returns the decoded value of the dimension with the given define name, or 0 when no dimension
+   * uses that name.
+   */
+  int valueOf(uint32_t index, const char* defineName) const;
+
+  /**
+   * Returns true when this domain declares a dimension with the given define name.
+   */
+  bool hasDimension(const char* defineName) const;
+
   const std::vector<PermutationDimension>& getDimensions() const {
     return dimensions;
   }

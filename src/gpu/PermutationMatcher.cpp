@@ -230,6 +230,7 @@ static std::optional<PermutationMatchResult> TryMatchTextureFill(const ProgramIn
   TextureFillShader::FragmentValues fragmentValues = {};
   fragmentValues.xp = static_cast<uint32_t>(xpType);
   fragmentValues.deviceMask = static_cast<uint32_t>(*coverageType);
+  fragmentValues.textureKind = te->textureAt(0)->type() == TextureType::Rectangle ? 1u : 0u;
   auto fragIndex = TextureFillShader::EncodeFragment(fragmentValues);
   return PermutationMatchResult{TextureFillShader::Name(), vertIndex, fragIndex};
 }
@@ -308,6 +309,7 @@ static std::optional<PermutationMatchResult> TryMatchTiledTextureFill(
   std::vector<int> fragValues(FD::COUNT);
   fragValues[FD::HAS_XP] = xpType;
   fragValues[FD::HAS_COVERAGE] = hasCoverage;
+  fragValues[FD::TEXTURE_KIND] = tte->textureAt(0)->type() == TextureType::Rectangle ? 1 : 0;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"TiledTextureFillShader", vertIndex, fragIndex};
 }
@@ -560,6 +562,14 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   if (te->isYUV()) {
     return std::nullopt;
   }
+  // The color texture may be a rectangle texture (encoded via TEXTURE_KIND); every other sampler
+  // (the local mask) must stay 2D, because the template declares it as sampler2D.
+  if (hasLocalMask) {
+    auto* maskFP = programInfo->getFragmentProcessor(programInfo->numColorFragmentProcessors());
+    if (maskFP->numTextureSamplers() == 0 || maskFP->textureAt(0)->type() != TextureType::TwoD) {
+      return std::nullopt;
+    }
+  }
   // No color-texture guards are needed for the local mask: the coverage texture writes its
   // per-texture uniforms (Subset/AlphaOnly/HasRgbaaa) under a distinct structural ordinal
   // (Subset_1, ...), so it can no longer clobber the color texture's Subset / AlphaOnly slots. The
@@ -589,6 +599,7 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   fragValues[FD::HAS_SUBSET] = gpSubset ? 1 : 0;
   fragValues[FD::HAS_XP] = xpType;
   fragValues[FD::HAS_LOCAL_MASK] = hasLocalMask ? 1 : 0;
+  fragValues[FD::TEXTURE_KIND] = te->textureAt(0)->type() == TextureType::Rectangle ? 1 : 0;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"QuadTextureFillShader", vertIndex, fragIndex};
 }
@@ -1726,68 +1737,12 @@ static std::optional<PermutationMatchResult> TryMatchPerlin(const ProgramInfo* p
   return PermutationMatchResult{"PerlinNoiseFillShader", vertIndex, fragIndex};
 }
 
-static bool IsOpenGLStage1Pointwise(const FragmentProcessor* processor) {
-  if (processor == nullptr) {
-    return false;
-  }
-  if (processor->name() == "LumaFragmentProcessor") {
-    return true;
-  }
-  return processor->name() == "ColorMatrixFragmentProcessor" &&
-         static_cast<const ColorMatrixFragmentProcessor*>(processor)->isChannelPermutation();
-}
-
-static bool IsOpenGLStage1Candidate(const ProgramInfo* programInfo) {
-  if (!programInfo->usesOpenGLDesktopAOTProfile() || !programInfo->samplersAre2D() ||
-      GetXPType(programInfo) != 0 ||
-      programInfo->numFragmentProcessors() != programInfo->numColorFragmentProcessors()) {
-    return false;
-  }
-  auto gp = programInfo->getGeometryProcessor();
-  auto colorCount = programInfo->numColorFragmentProcessors();
-  if (colorCount == 1 &&
-      programInfo->getFragmentProcessor(0)->name() == "AOTPointwiseTailProcessor") {
-    int gpType = GetGPType(gp);
-    if (gpType < 0) {
-      return false;
-    }
-    if (gpType == 1) {
-      auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
-      return quadGP->hasCommonColor() && quadGP->hasUVMatrix() && !quadGP->getHasSubset();
-    }
-    return true;
-  }
-  if (gp->name() != "QuadPerEdgeAAGeometryProcessor") {
-    return false;
-  }
-  auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
-  if (!quadGP->hasCommonColor() || !quadGP->hasUVMatrix() || quadGP->getHasSubset()) {
-    return false;
-  }
-  if (colorCount == 1) {
-    auto processor = programInfo->getFragmentProcessor(0);
-    if (processor->name() != "ComposeFragmentProcessor" || processor->numChildProcessors() != 2) {
-      return false;
-    }
-    auto source = processor->childProcessor(0);
-    auto pointwise = processor->childProcessor(1);
-    if (source->name() == "DeviceSpaceTextureEffect") {
-      return IsOpenGLStage1Pointwise(pointwise);
-    }
-    return source->name() == "TextureEffect" &&
-           pointwise->name() == "ColorMatrixFragmentProcessor" &&
-           IsOpenGLStage1Pointwise(pointwise);
-  }
-  auto pointwise = colorCount == 2 ? programInfo->getFragmentProcessor(1) : nullptr;
-  return pointwise != nullptr && programInfo->getFragmentProcessor(0)->name() == "TextureEffect" &&
-         pointwise->name() == "ColorMatrixFragmentProcessor" && IsOpenGLStage1Pointwise(pointwise);
-}
-
 static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramInfo* programInfo) {
-  // The first OpenGL AOT profile is intentionally limited to the exact texture and pointwise
-  // structures covered by pixel cross-validation. Other shader families stay on ProgramBuilder
-  // until their OpenGL variants are validated independently.
-  if (programInfo->backend() == Backend::OpenGL && !IsOpenGLStage1Candidate(programInfo)) {
+  // OpenGL is served in full on the desktop profile. Non-desktop profiles (GLES/SwiftShader) and
+  // External (OES) samplers keep the ProgramBuilder route. TwoD and Rectangle samplers are both
+  // servable: rectangle-capable kernels declare a TEXTURE_KIND dimension (see MatchPermutation).
+  if (programInfo->backend() == Backend::OpenGL &&
+      (!programInfo->usesOpenGLDesktopAOTProfile() || !programInfo->samplersAre2DOrRect())) {
     return std::nullopt;
   }
 
@@ -1921,6 +1876,14 @@ std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* progra
     if (info == nullptr || !IsBuildablePermutation(*info, result->vertPermutationIndex,
                                                    result->fragPermutationIndex)) {
       result.reset();
+    } else if (programInfo->backend() == Backend::OpenGL) {
+      // A rectangle texture may only bind to a sampler2DRect declaration, which exists only on
+      // variants whose TEXTURE_KIND dimension is encoded 1. Reject any other match so a RECT
+      // texture is never bound to a plain sampler2D (which would sample as an incomplete texture).
+      if (programInfo->hasRectSampler() &&
+          info->fragDomain.valueOf(result->fragPermutationIndex, "TEXTURE_KIND") != 1) {
+        result.reset();
+      }
     }
   }
   if (failure != nullptr) {

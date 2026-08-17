@@ -33,6 +33,10 @@
 #ifndef HAS_LOCAL_MASK
 #define HAS_LOCAL_MASK 0
 #endif
+// 0 = TwoD, 1 = Rect (desktop GL images). Rect variants compile only into the opengl bundle.
+#ifndef TEXTURE_KIND
+#define TEXTURE_KIND 0
+#endif
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Rect;
@@ -77,7 +81,11 @@ layout(location = 3) in vec4 vTexSubset;
 layout(location = 4) in vec3 TransformedCoords_1;
 #endif
 
+#if TEXTURE_KIND == 1
+layout(set = 1, binding = 0) uniform sampler2DRect TextureSampler_0;
+#else
 layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
+#endif
 
 // The device-mask sampler always occupies binding 1 (padded with the shared dummy when the draw
 // has no mask); the local mask, if any, follows at 2, and the XP dst texture after both.

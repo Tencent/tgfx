@@ -33,6 +33,10 @@ struct AOTToleranceSpec {
   int maxChannelDiff = 0;
   /// Maximum allowed fraction of pixels that differ at all, in [0,1].
   double maxDiffPixelRatio = 0.0;
+  /// Per-channel difference above which a pixel counts toward diffPixelCount. Software rasterizers
+  /// produce ULP-level sampling noise between equivalent code paths; setting this above that noise
+  /// floor keeps the ratio meaningful. Zero counts every differing pixel.
+  int significantChannelDiff = 0;
   /// A per-channel difference above this counts as a structural (non-microdiff) difference and
   /// always fails, regardless of the ratios above. Guards against a few catastrophically wrong
   /// pixels hiding under a low overall ratio.

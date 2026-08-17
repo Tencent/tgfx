@@ -50,17 +50,21 @@ namespace tgfx {
 class TiledTextureFillShader : public PrecompiledShader {
  public:
   // Fragment dimensions
+  //   TEXTURE_KIND (enum): the color texture's sampler type (0=TwoD, 1=Rect). Appended last so
+  //   existing TwoD variant indices are unchanged. Rect variants compile only into the opengl
+  //   bundle and never carry framebuffer fetch (HAS_XP=2), which is Vulkan/Metal-only.
   struct FragDims {
-    enum : uint32_t { HAS_XP, HAS_COVERAGE, COUNT };
+    enum : uint32_t { HAS_XP, HAS_COVERAGE, TEXTURE_KIND, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("HAS_XP", 3),
           PermutationBool("HAS_COVERAGE"),
+          PermutationEnum("TEXTURE_KIND", {"TwoD", "Rect"}),
       });
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 2, "Update info() when fragment dimensions change.");
+  static_assert(FD::COUNT == 3, "Update info() when fragment dimensions change.");
 
   // Vertex dimensions
   struct VertDims {
@@ -83,7 +87,14 @@ class TiledTextureFillShader : public PrecompiledShader {
             PermutationDomain({}),
             "",
             "",
-            nullptr};
+            ShouldCompile};
+  }
+
+ private:
+  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>&,
+                            const std::vector<int>& fragValues) {
+    // Framebuffer fetch (HAS_XP=2) is Vulkan/Metal-only; Rect variants are opengl-only.
+    return !(fragValues[FD::TEXTURE_KIND] == 1 && fragValues[FD::HAS_XP] == 2);
   }
 };
 

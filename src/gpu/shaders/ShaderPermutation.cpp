@@ -135,6 +135,25 @@ std::vector<std::string> PermutationDomain::defineListFor(uint32_t index) const 
   return defines;
 }
 
+int PermutationDomain::valueOf(uint32_t index, const char* defineName) const {
+  auto values = decode(index);
+  for (size_t i = 0; i < dimensions.size(); i++) {
+    if (std::strcmp(GetDefineName(dimensions[i]), defineName) == 0) {
+      return values[i];
+    }
+  }
+  return 0;
+}
+
+bool PermutationDomain::hasDimension(const char* defineName) const {
+  for (const auto& dim : dimensions) {
+    if (std::strcmp(GetDefineName(dim), defineName) == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool MirroredDimsAgree(const PermutationDomain& vertDomain, const PermutationDomain& fragDomain,
                        const std::vector<int>& vertValues, const std::vector<int>& fragValues) {
   const auto& vertDims = vertDomain.getDimensions();
