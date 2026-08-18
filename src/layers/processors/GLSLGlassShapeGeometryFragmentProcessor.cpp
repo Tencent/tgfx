@@ -159,9 +159,8 @@ PlacementPtr<GlassUDFGeometryFragmentProcessor> GlassUDFGeometryFragmentProcesso
   if (enableEdgeLighting && edgeMask == nullptr) {
     return nullptr;
   }
-  return allocator->make<GLSLGlassUDFGeometryFragmentProcessor>(std::move(mask),
-                                                                std::move(edgeMask), params,
-                                                                enableEdgeLighting);
+  return allocator->make<GLSLGlassUDFGeometryFragmentProcessor>(
+      std::move(mask), std::move(edgeMask), params, enableEdgeLighting);
 }
 
 GLSLGlassUDFGeometryFragmentProcessor::GLSLGlassUDFGeometryFragmentProcessor(

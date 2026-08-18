@@ -35,9 +35,11 @@ class GlassRefractionImageFilter : public ImageFilter {
    * FilterImage offscreen fallback. GlassShader uses this to render the refraction shader
    * directly at draw (screen) resolution.
    */
-  PlacementPtr<FragmentProcessor> makeFragmentProcessor(
-      std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-      SrcRectConstraint constraint, const Matrix* uvMatrix) const;
+  PlacementPtr<FragmentProcessor> makeFragmentProcessor(std::shared_ptr<Image> source,
+                                                        const FPArgs& args,
+                                                        const SamplingOptions& sampling,
+                                                        SrcRectConstraint constraint,
+                                                        const Matrix* uvMatrix) const;
 
  protected:
   Type type() const override {

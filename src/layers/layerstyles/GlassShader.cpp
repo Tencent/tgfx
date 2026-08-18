@@ -29,9 +29,8 @@ std::shared_ptr<GlassShader> GlassShader::Make(std::shared_ptr<GlassRefractionIm
   if (filter == nullptr || source == nullptr) {
     return nullptr;
   }
-  auto shader =
-      std::shared_ptr<GlassShader>(new GlassShader(std::move(filter), std::move(source), matrix,
-                                                   sampling));
+  auto shader = std::shared_ptr<GlassShader>(
+      new GlassShader(std::move(filter), std::move(source), matrix, sampling));
   shader->weakThis = shader;
   return shader;
 }

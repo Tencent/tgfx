@@ -92,9 +92,8 @@ static float GetSDFRefractionOutset(float refractionFactor, float glassThickness
 // maxDisplacement; the outset uses the identical bound.
 static float GetUDFRefractionOutset(float minHalf, float refractionFactor, float depthRatio,
                                     float dispersion) {
-  return std::max(GetUDFMaxDisplacement(minHalf, refractionFactor, depthRatio) *
-                      (1.0f + dispersion),
-                  1.0f);
+  return std::max(
+      GetUDFMaxDisplacement(minHalf, refractionFactor, depthRatio) * (1.0f + dispersion), 1.0f);
 }
 
 // Used when the shape type is not known yet (filterBackground runs before shape detection):
@@ -320,9 +319,8 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
   // needs to be added to the window below.
   {
     auto blurFilter = getFrostFilter(input.contentScale * scaleRatioX);
-    if (blurFilter != nullptr &&
-        (cachedFrostSource != bgImage ||
-         !FloatNearlyEqual(cachedFrostContentScale, input.contentScale))) {
+    if (blurFilter != nullptr && (cachedFrostSource != bgImage ||
+                                  !FloatNearlyEqual(cachedFrostContentScale, input.contentScale))) {
       Point blurOffset = {};
       auto frostedImage = bgImage->makeWithFilter(blurFilter, &blurOffset, nullptr);
       if (frostedImage != nullptr) {
@@ -343,8 +341,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
   // intermediate texture per tile.
   static constexpr float MAX_FROST_AREA = 1024.0f * 1024.0f;
   if (_refraction > 0 || _lightIntensity > 0) {
-    float fullArea =
-        static_cast<float>(bgImage->width()) * static_cast<float>(bgImage->height());
+    float fullArea = static_cast<float>(bgImage->width()) * static_cast<float>(bgImage->height());
     if (fullArea > MAX_FROST_AREA) {
       frostDownscale = std::sqrt(MAX_FROST_AREA / fullArea);
     }
@@ -539,9 +536,9 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       float fineHaloX = std::ceil(gradientSampleRadius) + 1.0f;
       float fineHaloY = std::ceil(gradientSampleRadius) + 1.0f;
       // The refraction texture covers the full layer once per frame and is shared across tiles.
-      auto fineTextureRect = Rect::MakeLTRB(-fineHaloX, -fineHaloY,
-                                            static_cast<float>(udfWidth) + fineHaloX,
-                                            static_cast<float>(udfHeight) + fineHaloY);
+      auto fineTextureRect =
+          Rect::MakeLTRB(-fineHaloX, -fineHaloY, static_cast<float>(udfWidth) + fineHaloX,
+                         static_cast<float>(udfHeight) + fineHaloY);
       fineTextureRect.roundOut();
       Point udfTextureOrigin = {fineTextureRect.left, fineTextureRect.top};
 
@@ -572,9 +569,8 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
         cell = tileClip;
         cell.intersect(contentRect);
       }
-      int64_t cellKey =
-          (static_cast<int64_t>(std::floor(cell.left / cellSize)) << 32) |
-          (static_cast<int64_t>(std::floor(cell.top / cellSize)) & 0xFFFFFFFF);
+      int64_t cellKey = (static_cast<int64_t>(std::floor(cell.left / cellSize)) << 32) |
+                        (static_cast<int64_t>(std::floor(cell.top / cellSize)) & 0xFFFFFFFF);
 
       // The full-layer core density is fixed: each texel covers two content pixels, so the core
       // stays at half the content resolution regardless of the cell size or zoom.
@@ -620,10 +616,10 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
 
       // The contour path reference is stable while the layer shape is unedited, so it serves as a
       // frame-invariant key; layers without a contour path fall back to the content image pointer.
-      bool udfShapeMatch =
-          shapeInfo.hasPath ? shapeInfo.shapePath.isSame(cachedUDFPath)
-                            : (cachedUDFSource == input.content);
-      bool cacheMatch = udfShapeMatch && FloatNearlyEqual(cachedUDFContentScale, input.contentScale) &&
+      bool udfShapeMatch = shapeInfo.hasPath ? shapeInfo.shapePath.isSame(cachedUDFPath)
+                                             : (cachedUDFSource == input.content);
+      bool cacheMatch = udfShapeMatch &&
+                        FloatNearlyEqual(cachedUDFContentScale, input.contentScale) &&
                         FloatNearlyEqual(cachedUDFDepth, _depth) &&
                         FloatNearlyEqual(cachedUDFContentWidth, contentWidth) &&
                         FloatNearlyEqual(cachedUDFContentHeight, contentHeight);
@@ -632,8 +628,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
         maskImage = cachedUDFImage;
       } else {
         maskImage = GlassUDFImage::Make(input.content, udfWidth, udfHeight, fineTextureRect,
-                                        fineRadius, Point::Zero(),
-                                        GlassUDFField::Refraction);
+                                        fineRadius, Point::Zero(), GlassUDFField::Refraction);
         if (!maskImage) {
           LOGE("GlassStyle: Failed to create refraction UDF.");
           return;
@@ -662,9 +657,9 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
             it->second.windowRect.contains(cell)) {
           edgeMaskImage = it->second.udfImage;
         } else {
-          edgeMaskImage = GlassUDFImage::Make(input.content, edgeCoreWidth, edgeCoreHeight,
-                                              edgeTextureRect, Point::Zero(), coarseRadius,
-                                              GlassUDFField::EdgeLight);
+          edgeMaskImage =
+              GlassUDFImage::Make(input.content, edgeCoreWidth, edgeCoreHeight, edgeTextureRect,
+                                  Point::Zero(), coarseRadius, GlassUDFField::EdgeLight);
           if (!edgeMaskImage) {
             LOGE("GlassStyle: Failed to create edge light UDF.");
             return;
@@ -821,8 +816,7 @@ std::shared_ptr<GlassRefractionImageFilter> GlassStyle::getSDFRefractionFilter(
 
 std::shared_ptr<GlassRefractionImageFilter> GlassStyle::getUDFRefractionFilter(
     float halfWidth, float halfHeight, const UDFSampling& udf, const BackgroundMapping& mapping,
-    std::shared_ptr<Image> maskImage, std::shared_ptr<Image> edgeMaskImage,
-    bool edgeLightEnabled) {
+    std::shared_ptr<Image> maskImage, std::shared_ptr<Image> edgeMaskImage, bool edgeLightEnabled) {
   auto params = makeBaseRefractionParams(halfWidth, halfHeight, mapping);
   if (!edgeLightEnabled) {
     params.lightIntensity = 0.0f;
@@ -847,9 +841,8 @@ std::shared_ptr<GlassRefractionImageFilter> GlassStyle::getUDFRefractionFilter(
   udfParams.edgeTextureOriginY = udf.edgeTextureOrigin.y;
   udfParams.edgePixelToLayerPixelX = udf.edgePixelToLayerPixel.x;
   udfParams.edgePixelToLayerPixelY = udf.edgePixelToLayerPixel.y;
-  return std::make_shared<GlassRefractionImageFilter>(params, GlassSDFGeometryParams{}, udfParams,
-                                                      std::move(maskImage),
-                                                      std::move(edgeMaskImage));
+  return std::make_shared<GlassRefractionImageFilter>(
+      params, GlassSDFGeometryParams{}, udfParams, std::move(maskImage), std::move(edgeMaskImage));
 }
 
 }  // namespace tgfx

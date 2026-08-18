@@ -17,16 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GlassUDFImage.h"
-
-#include "layers/processors/GlassUDFTentBlurFragmentProcessor.h"
-#include "tgfx/gpu/Context.h"
-
 #include "core/images/TextureImage.h"
 #include "core/utils/Log.h"
 #include "gpu/DrawingManager.h"
+#include "gpu/TPArgs.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
-#include "gpu/TPArgs.h"
+#include "layers/processors/GlassUDFTentBlurFragmentProcessor.h"
+#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 
@@ -34,13 +32,10 @@ static constexpr int MaxTentRadius = 64;
 
 // Blurs a window of the coverage image with tent kernels and returns one RGBA8 image containing
 // the requested fields. Coordinates remain in the full UDF space.
-static std::shared_ptr<Image> GenerateGlassUDFImage(Context* context,
-                                                    const std::shared_ptr<Image>& source,
-                                                    int coreWidth, int coreHeight,
-                                                    const Rect& textureRect,
-                                                    const Point& fineRadius,
-                                                    const Point& coarseRadius,
-                                                    GlassUDFField field) {
+static std::shared_ptr<Image> GenerateGlassUDFImage(
+    Context* context, const std::shared_ptr<Image>& source, int coreWidth, int coreHeight,
+    const Rect& textureRect, const Point& fineRadius, const Point& coarseRadius,
+    GlassUDFField field) {
   if (context == nullptr || source == nullptr || coreWidth <= 0 || coreHeight <= 0 ||
       textureRect.isEmpty()) {
     return nullptr;
@@ -86,10 +81,10 @@ static std::shared_ptr<Image> GenerateGlassUDFImage(Context* context,
   // UDF coordinate window.left + i), so the sampling matrix only subtracts the window origin.
   float sourceToUDFX = static_cast<float>(coreWidth) / static_cast<float>(source->width());
   float sourceToUDFY = static_cast<float>(coreHeight) / static_cast<float>(source->height());
-  auto coreWindowUDF = Rect::MakeLTRB(
-      textureRect.left - horizontalHalo, horizontalRect.top - 1.0f,
-      textureRect.left + static_cast<float>(textureWidth) + horizontalHalo,
-      horizontalRect.top + static_cast<float>(horizontalHeight) + 1.0f);
+  auto coreWindowUDF =
+      Rect::MakeLTRB(textureRect.left - horizontalHalo, horizontalRect.top - 1.0f,
+                     textureRect.left + static_cast<float>(textureWidth) + horizontalHalo,
+                     horizontalRect.top + static_cast<float>(horizontalHeight) + 1.0f);
   coreWindowUDF.roundOut();
   auto coreWindowSource = coreWindowUDF;
   coreWindowSource.scale(1.0f / sourceToUDFX, 1.0f / sourceToUDFY);
@@ -108,8 +103,8 @@ static std::shared_ptr<Image> GenerateGlassUDFImage(Context* context,
   }
   int windowWidth = std::max(1, static_cast<int>(std::round(actualUDFWindow.width())));
   int windowHeight = std::max(1, static_cast<int>(std::round(actualUDFWindow.height())));
-  coreSource = coreSource->makeScaled(windowWidth, windowHeight,
-                                      SamplingOptions(FilterMode::Linear));
+  coreSource =
+      coreSource->makeScaled(windowWidth, windowHeight, SamplingOptions(FilterMode::Linear));
   coreSource = coreSource->makeRasterized();
   if (coreSource == nullptr) {
     return nullptr;
@@ -202,10 +197,11 @@ std::shared_ptr<TextureProxy> GlassUDFImage::lockTextureProxy(const TPArgs& args
   return cachedTexture->getTextureProxy();
 }
 
-PlacementPtr<FragmentProcessor> GlassUDFImage::asFragmentProcessor(
-    const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix) const {
-  auto textureProxy = lockTextureProxy(TPArgs(args.context, args.renderFlags, false, args.drawScale,
-                                              BackingFit::Exact));
+PlacementPtr<FragmentProcessor> GlassUDFImage::asFragmentProcessor(const FPArgs& args,
+                                                                   const SamplingArgs& samplingArgs,
+                                                                   const Matrix* uvMatrix) const {
+  auto textureProxy = lockTextureProxy(
+      TPArgs(args.context, args.renderFlags, false, args.drawScale, BackingFit::Exact));
   if (textureProxy == nullptr) {
     return nullptr;
   }

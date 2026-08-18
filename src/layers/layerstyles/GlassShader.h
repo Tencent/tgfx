@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Image.h"
+#include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/SamplingOptions.h"
 #include "tgfx/core/Shader.h"
