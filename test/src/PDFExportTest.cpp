@@ -277,6 +277,80 @@ TGFX_TEST(PDFExportTest, Image) {
   EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/Image"));
 }
 
+TGFX_TEST(PDFExportTest, ImageShaderClamp) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto PDFStream = MemoryWriteStream::Make();
+
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  auto canvas = document->beginPage(500.f, 500.f);
+  {
+    // The rect spans (-100, -100) to (300, 300) in the 200x200 image's coordinate space, so all
+    // four clamp edges and all four corners are stretched outward from the border pixels.
+    canvas->translate(150.f, 150.f);
+    auto image = Image::MakeFromFile(ProjectPath::Absolute("resources/assets/glyph1.png"));
+    auto shader = Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp);
+    Paint paint;
+    paint.setShader(shader);
+    canvas->drawRect(Rect::MakeXYWH(-100.f, -100.f, 400.f, 400.f), paint);
+  }
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/ImageShaderClamp"));
+}
+
+TGFX_TEST(PDFExportTest, ImageShaderClampMirror) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto PDFStream = MemoryWriteStream::Make();
+
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  auto canvas = document->beginPage(500.f, 500.f);
+  {
+    // X is clamped with the rect sticking out on both sides, while Y mirrors, which exercises the
+    // mirrored variants of the left and right clamp strips.
+    canvas->translate(150.f, 150.f);
+    auto image = Image::MakeFromFile(ProjectPath::Absolute("resources/assets/glyph1.png"));
+    auto shader = Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Mirror);
+    Paint paint;
+    paint.setShader(shader);
+    canvas->drawRect(Rect::MakeXYWH(-100.f, 0.f, 400.f, 200.f), paint);
+  }
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/ImageShaderClampMirror"));
+}
+
+TGFX_TEST(PDFExportTest, DrawImageRectSubset) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto PDFStream = MemoryWriteStream::Make();
+
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  auto canvas = document->beginPage(500.f, 500.f);
+  {
+    canvas->translate(50.f, 50.f);
+    auto image = Image::MakeFromFile(ProjectPath::Absolute("resources/assets/glyph1.png"));
+    canvas->drawImageRect(image, Rect::MakeXYWH(0.f, 0.f, 100.f, 100.f),
+                          Rect::MakeWH(400.f, 400.f));
+  }
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/DrawImageRectSubset"));
+}
+
 TGFX_TEST(PDFExportTest, Complex) {
   ContextScope scope;
   auto context = scope.getContext();
