@@ -20,6 +20,9 @@
 #include <emscripten/emscripten.h>
 #include <emscripten/html5_webgpu.h>
 #include <webgpu/webgpu.h>
+#ifdef __EMSCRIPTEN_PTHREADS__
+#include <emscripten/threading.h>
+#endif
 #include "WebGPUGPU.h"
 #include "core/utils/Log.h"
 
@@ -46,7 +49,29 @@ static void OnUncapturedError(WGPUErrorType type, const char* message, void*) {
   LOGE("[WebGPU] Uncaptured %s error: %s", typeStr, message ? message : "(no message)");
 }
 
+// emscripten_webgpu_get_device() aborts rather than returning null when
+// Module.preinitializedWebGPUDevice is absent, so probe for it first. A GPUDevice never crosses
+// threads, so the thread test rules out worker threads without a JS call; those threads use
+// MakeFrom() with the device they own.
+// clang-format off
+EM_JS(int, WebGPUHasPreinitializedDevice, (), {
+  return (typeof Module !== "undefined" && !!Module["preinitializedWebGPUDevice"]) ? 1 : 0;
+});
+// clang-format on
+
+static bool CanGetPreinitializedDevice() {
+#ifdef __EMSCRIPTEN_PTHREADS__
+  if (!emscripten_is_main_runtime_thread()) {
+    return false;
+  }
+#endif
+  return WebGPUHasPreinitializedDevice() != 0;
+}
+
 std::shared_ptr<WebGPUDevice> WebGPUDevice::Make() {
+  if (!CanGetPreinitializedDevice()) {
+    return nullptr;
+  }
   auto wgpuDevice = emscripten_webgpu_get_device();
   if (wgpuDevice == nullptr) {
     return nullptr;

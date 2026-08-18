@@ -19,6 +19,7 @@
 #include "PDFShader.h"
 #include "core/shaders/ImageShader.h"
 #include "core/shaders/MatrixShader.h"
+#include "core/utils/CopyPixels.h"
 #include "core/utils/Log.h"
 #include "core/utils/Types.h"
 #include "pdf/PDFDocumentImpl.h"
@@ -34,6 +35,7 @@
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Surface.h"
+#include "tgfx/core/SurfaceReadback.h"
 #include "tgfx/core/TileMode.h"
 
 namespace tgfx {
@@ -49,17 +51,43 @@ Bitmap ImageExportToBitmap(Context* context, const std::shared_ptr<Image>& image
                            std::shared_ptr<ColorSpace> colorSpace) {
   auto surface = Surface::Make(context, image->width(), image->height(), false, 1, false, 0,
                                std::move(colorSpace));
+  if (surface == nullptr) {
+    LOGE("PDFShader ImageExportToBitmap() Failed to create the surface! (%dx%d)", image->width(),
+         image->height());
+    return {};
+  }
   auto canvas = surface->getCanvas();
   canvas->drawImage(image);
 
-  Bitmap bitmap(surface->width(), surface->height(), false, true, surface->colorSpace());
-  auto pixels = bitmap.lockPixels();
-  if (surface->readPixels(bitmap.info(), pixels)) {
-    bitmap.unlockPixels();
-    return bitmap;
+  // Deliberately not Surface::readPixels(): it logs an error whenever the pixels are not available
+  // yet, which on backends without synchronous readback happens for every tiled image and would
+  // flood the log once per page. These pixels only feed the clamp edge colors and the caller guards
+  // against an empty Bitmap, so degrading quietly is fine; a buffer that is ready yet still yields
+  // nothing is a genuine failure and stays reported.
+  auto readback = surface->asyncReadPixels(Rect::MakeWH(surface->width(), surface->height()));
+  if (readback == nullptr) {
+    LOGE("PDFShader ImageExportToBitmap() Failed to start the readback! (%dx%d)", surface->width(),
+         surface->height());
+    return {};
   }
-  bitmap.unlockPixels();
-  return Bitmap();
+  auto* srcPixels = readback->lockPixels(context);
+  if (srcPixels == nullptr) {
+    if (readback->isReady(context)) {
+      LOGE("PDFShader ImageExportToBitmap() Failed to read the pixels from the surface!");
+    }
+    return {};
+  }
+
+  Bitmap bitmap(surface->width(), surface->height(), false, true, surface->colorSpace());
+  if (auto* dstPixels = bitmap.lockPixels()) {
+    // The readback row stride carries the backend's buffer copy alignment (256 bytes on WebGPU) and
+    // can exceed the Bitmap stride, so both layouts have to be walked.
+    CopyPixels(readback->info(), srcPixels, bitmap.info(), dstPixels,
+               surface->origin() == ImageOrigin::BottomLeft);
+    bitmap.unlockPixels();
+  }
+  readback->unlockPixels(context);
+  return bitmap;
 }
 
 void DrawMatrix(Canvas* canvas, std::shared_ptr<Image> image, const Matrix& matrix,
@@ -231,10 +259,15 @@ PDFIndirectReference PDFShader::MakeImageShader(PDFDocumentImpl* doc, Matrix fin
     // to just make a bitmap from the image.
     bitmap = ImageExportToBitmap(doc->context(), image, doc->dstColorSpace());
   }
+  // Reading the pixels back can fail, for instance on a backend without synchronous readback. The
+  // clamp handling below indexes bitmap.width() - 1, which would be -1 on an empty bitmap, so drop
+  // the stretched edges and emit the pattern body alone.
+  const auto clampEdgesX = tileModesX == TileMode::Clamp && !bitmap.isEmpty();
+  const auto clampEdgesY = tileModesY == TileMode::Clamp && !bitmap.isEmpty();
 
   // If both x and y are in clamp mode, we start by filling in the corners.
   // (Which are just a rectangles of the corner colors.)
-  if (tileModesX == TileMode::Clamp && tileModesY == TileMode::Clamp) {
+  if (clampEdgesX && clampEdgesY) {
     FillColorFromBitmap(canvas.get(), deviceBounds.left, deviceBounds.top, 0, 0, bitmap, 0, 0,
                         paintColor.alpha);
 
@@ -249,7 +282,7 @@ PDFIndirectReference PDFShader::MakeImageShader(PDFDocumentImpl* doc, Matrix fin
   }
 
   // Then expand the left, right, top, then bottom.
-  if (tileModesX == TileMode::Clamp) {
+  if (clampEdgesX) {
     auto subset = Rect::MakeXYWH(0, 0, 1, bitmap.height());
     if (deviceBounds.left < 0) {
       Bitmap left = ExtractSubset(bitmap, subset);
@@ -287,7 +320,7 @@ PDFIndirectReference PDFShader::MakeImageShader(PDFDocumentImpl* doc, Matrix fin
     }
   }
 
-  if (tileModesY == TileMode::Clamp) {
+  if (clampEdgesY) {
     auto subset = Rect::MakeXYWH(0, 0, bitmap.width(), 1);
     if (deviceBounds.top < 0) {
       Bitmap top = ExtractSubset(bitmap, subset);

@@ -20,6 +20,7 @@
 
 #include "pdf/PDFTypes.h"
 #include "tgfx/core/Image.h"
+#include "tgfx/core/Pixmap.h"
 
 namespace tgfx {
 
@@ -30,6 +31,31 @@ class PDFBitmap {
    */
   static PDFIndirectReference Serialize(const std::shared_ptr<Image>& image,
                                         PDFDocumentImpl* document, int encodingQuality = 101);
+
+  /**
+   * Emits the image XObject body for pixels that already live on the CPU. Shared by the synchronous
+   * path and by PDFDocumentImpl::flushPendingRasters() so both emit identical objects.
+   * @param pixmap RGBA_8888 / Unpremultiplied pixels, as produced by both readback paths.
+   */
+  static void WritePixmap(const Pixmap& pixmap, bool isOpaque, int encodingQuality,
+                          PDFDocumentImpl* document, PDFIndirectReference ref);
+
+  /**
+   * Converts freshly locked readback pixels into the layout WritePixmap() expects and emits them.
+   * @param srcInfo Describes the readback buffer, whose row stride may be larger than the width
+   * because of the backend's buffer copy alignment.
+   * @param flipY Set when the render target origin is bottom-left.
+   */
+  static void WriteReadbackPixels(const ImageInfo& srcInfo, const void* srcPixels, bool flipY,
+                                  int encodingQuality, PDFDocumentImpl* document,
+                                  PDFIndirectReference ref);
+
+  /**
+   * Emits a blank 1x1 image XObject. Every reserved object number must be emitted: an object that
+   * is never written keeps offset 0 in the cross reference table, which corrupts the whole file. So
+   * a failed rasterization writes this rather than skipping the object.
+   */
+  static void WritePlaceholder(PDFDocumentImpl* document, PDFIndirectReference ref);
 
  private:
   static void SerializeImage(const std::shared_ptr<Image>& image, int encodingQuality,

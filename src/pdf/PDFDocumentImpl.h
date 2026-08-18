@@ -75,6 +75,23 @@ struct PDFLink {
   const int nodeId;
 };
 
+/**
+ * An image XObject whose pixels are still being read back from the GPU. The object number is
+ * reserved up front so drawing can reference it immediately, and the stream body is emitted later
+ * from flushPendingRasters(). PDF allows indirect objects in any file order, and the cross
+ * reference table indexes offsets by object number, so writing out of order stays valid.
+ * @note The Surface is intentionally not retained: the transfer task already holds a reference to
+ * its render target, so the readback stays valid on its own and keeping the Surface alive would
+ * pin one full-size render target per pending image.
+ */
+struct PDFPendingRaster {
+  PDFIndirectReference ref;
+  std::shared_ptr<SurfaceReadback> readback;
+  int encodingQuality = 101;
+  /// Matches what Surface::readPixels() derives from the render target origin.
+  bool flipY = false;
+};
+
 class PDFDocumentImpl : public PDFDocument {
  public:
   PDFDocumentImpl(std::shared_ptr<WriteStream> stream, Context* context, PDFMetadata Metadata);
@@ -88,6 +105,17 @@ class PDFDocumentImpl : public PDFDocument {
   void close() override;
 
   void abort() override;
+
+  bool hasPendingRasters() const override {
+    return !pendingRasters.empty();
+  }
+
+  bool isReadyToClose() const override;
+
+  std::vector<std::shared_ptr<SurfaceReadback>> pendingReadbacks() const override;
+
+  /// Takes ownership of a raster whose pixels are not available yet; see PDFPendingRaster.
+  void addPendingRaster(PDFPendingRaster raster);
 
   Canvas* onBeginPage(float width, float height);
 
@@ -178,6 +206,13 @@ class PDFDocumentImpl : public PDFDocument {
 
   PDFIndirectReference emitColorSpace();
 
+  /**
+   * Emits the stream body of every pending raster. Must run before onClose() writes the cross
+   * reference table: every reserved object number has to be emitted, otherwise its offset stays 0
+   * and the table is corrupt. Rasters that are still not ready fall back to a blank placeholder.
+   */
+  void flushPendingRasters();
+
   enum class State {
     BetweenPages,
     InPage,
@@ -203,6 +238,7 @@ class PDFDocumentImpl : public PDFDocument {
   float inverseRasterScale = 1;
   PDFTagTree tagTree;
   PDFIndirectReference _colorSpaceRef;
+  std::vector<PDFPendingRaster> pendingRasters;
 };
 
 }  // namespace tgfx

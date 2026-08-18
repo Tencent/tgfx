@@ -18,18 +18,24 @@
 
 #include "PDFBitmap.h"
 #include <vector>
+#include "core/utils/CopyPixels.h"
+#include "core/utils/Log.h"
 #include "core/utils/USE.h"
 #include "pdf/DeflateStream.h"
 #include "pdf/PDFDocumentImpl.h"
 #include "pdf/PDFTypes.h"
 #include "tgfx/core/AlphaType.h"
+#include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ColorType.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
+#include "tgfx/core/Rect.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Surface.h"
+#include "tgfx/core/SurfaceReadback.h"
 #include "tgfx/core/WriteStream.h"
+#include "tgfx/gpu/GPUBuffer.h"
 
 namespace tgfx {
 
@@ -360,42 +366,97 @@ void DoDCTImage(const Pixmap& pixmap, PDFDocumentImpl* document, bool isOpaque, 
 
 void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int encodingQuality,
                                PDFDocumentImpl* doc, PDFIndirectReference ref) {
-  auto image2bitmap = [doc](Context* context, const std::shared_ptr<Image>& image) {
-    auto surface = Surface::Make(context, image->width(), image->height(), false, 1, false, 0,
-                                 doc->dstColorSpace());
-    auto canvas = surface->getCanvas();
-    canvas->drawImage(image);
-
-    // Always use RGBA_8888 format for PDF export to ensure consistent pixel layout across all
-    // platforms. RGBA is the industry standard format used by PNG, JPEG, and PDF's DeviceRGB.
-    // This avoids R/B channel swap issues between platforms with different native formats.
-    auto dstInfo = ImageInfo::Make(surface->width(), surface->height(), ColorType::RGBA_8888,
-                                   AlphaType::Unpremultiplied, 0, surface->colorSpace());
-    Bitmap bitmap(surface->width(), surface->height(), false, false, surface->colorSpace());
-    auto pixels = bitmap.lockPixels();
-    if (surface->readPixels(dstInfo, pixels)) {
-      bitmap.unlockPixels();
-      return bitmap;
-    }
-    return Bitmap();
-  };
-
-  auto bitmap = image2bitmap(doc->context(), image);
-  if (bitmap.isEmpty()) {
+  auto surface = Surface::Make(doc->context(), image->width(), image->height(), false, 1, false, 0,
+                               doc->dstColorSpace());
+  if (surface == nullptr) {
+    LOGE("PDFBitmap::SerializeImage() Failed to create the surface! (%dx%d)", image->width(),
+         image->height());
+    WritePlaceholder(doc, ref);
     return;
   }
-  auto pixmap = Pixmap(bitmap);
+  surface->getCanvas()->drawImage(image);
 
+  auto readback = surface->asyncReadPixels(Rect::MakeWH(surface->width(), surface->height()));
+  if (readback == nullptr) {
+    LOGE("PDFBitmap::SerializeImage() Failed to start the readback! (%dx%d)", surface->width(),
+         surface->height());
+    WritePlaceholder(doc, ref);
+    return;
+  }
+  auto flipY = surface->origin() == ImageOrigin::BottomLeft;
+
+  // Deliberately not Surface::readPixels(): it logs an error whenever the pixels are not available
+  // yet, which is the normal first outcome on WebGPU and would fire once per image. lockPixels()
+  // blocks until the data is ready on backends that can block, and starts the async mapping on the
+  // ones that cannot.
+  if (auto* srcPixels = readback->lockPixels(doc->context())) {
+    WriteReadbackPixels(readback->info(), srcPixels, flipY, encodingQuality, doc, ref);
+    readback->unlockPixels(doc->context());
+    return;
+  }
+
+  // A ready buffer that still yields no pixels is a genuine failure, not an async wait, so report
+  // it here where the image is still in context instead of letting it look like a pending readback.
+  if (readback->isReady(doc->context())) {
+    LOGE("PDFBitmap::SerializeImage() Failed to read the pixels from the surface! (%dx%d)",
+         surface->width(), surface->height());
+    WritePlaceholder(doc, ref);
+    return;
+  }
+
+  doc->addPendingRaster({ref, std::move(readback), encodingQuality, flipY});
+}
+
+void PDFBitmap::WriteReadbackPixels(const ImageInfo& srcInfo, const void* srcPixels, bool flipY,
+                                    int encodingQuality, PDFDocumentImpl* document,
+                                    PDFIndirectReference ref) {
+  // Always use RGBA_8888 format for PDF export to ensure consistent pixel layout across all
+  // platforms. RGBA is the industry standard format used by PNG, JPEG, and PDF's DeviceRGB.
+  // This avoids R/B channel swap issues between platforms with different native formats.
+  auto dstInfo = ImageInfo::Make(srcInfo.width(), srcInfo.height(), ColorType::RGBA_8888,
+                                 AlphaType::Unpremultiplied, 0, srcInfo.colorSpace());
+  Bitmap bitmap(srcInfo.width(), srcInfo.height(), false, false, srcInfo.colorSpace());
+  if (bitmap.isEmpty()) {
+    LOGE("PDFBitmap::WriteReadbackPixels() Failed to allocate the bitmap! (%dx%d)", srcInfo.width(),
+         srcInfo.height());
+    WritePlaceholder(document, ref);
+    return;
+  }
+  auto* dstPixels = bitmap.lockPixels();
+  if (dstPixels == nullptr) {
+    LOGE("PDFBitmap::WriteReadbackPixels() Failed to lock the bitmap pixels!");
+    WritePlaceholder(document, ref);
+    return;
+  }
+  // srcInfo carries the readback row alignment (256 bytes on WebGPU), so the source stride can
+  // exceed the destination stride; CopyPixels walks both instead of a flat memcpy.
+  CopyPixels(srcInfo, srcPixels, dstInfo, dstPixels, flipY);
+  bitmap.unlockPixels();
+  WritePixmap(Pixmap(bitmap), bitmap.isOpaque(), encodingQuality, document, ref);
+}
+
+void PDFBitmap::WritePixmap(const Pixmap& pixmap, bool isOpaque, int encodingQuality,
+                            PDFDocumentImpl* document, PDFIndirectReference ref) {
 #ifdef TGFX_USE_JPEG_ENCODE
   if (encodingQuality <= 100) {
-    DoDCTImage(pixmap, doc, bitmap.isOpaque(), encodingQuality, ref);
+    DoDCTImage(pixmap, document, isOpaque, encodingQuality, ref);
     return;
   }
 #else
   USE(encodingQuality);
 #endif
 
-  DoDeflatedImage(pixmap, doc, bitmap.isOpaque(), ref);
+  DoDeflatedImage(pixmap, document, isOpaque, ref);
+}
+
+void PDFBitmap::WritePlaceholder(PDFDocumentImpl* document, PDFIndirectReference ref) {
+  static constexpr uint8_t WhitePixel[3] = {0xFF, 0xFF, 0xFF};
+  auto streamWriter = [](const std::shared_ptr<WriteStream>& stream) {
+    stream->write(WhitePixel, sizeof(WhitePixel));
+  };
+  EmitImageStream(document, ref, streamWriter, ISize::Make(1, 1), PDFUnion::Name("DeviceRGB"),
+                  PDFIndirectReference(), static_cast<int>(sizeof(WhitePixel)),
+                  PDFStreamFormat::Uncompressed);
 }
 
 PDFIndirectReference PDFBitmap::Serialize(const std::shared_ptr<Image>& image,
