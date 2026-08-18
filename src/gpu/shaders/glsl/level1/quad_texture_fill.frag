@@ -65,6 +65,12 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   int AlphaOnly;
   int HasRgbaaa;
   int OutputAlphaSwizzle;
+  // Exact common-color override: the vColor varying is UByte4Normalized (8-bit quantized), which
+  // shifts fractional-alpha outputs by one LSB versus the runtime renderer's float Color uniform.
+  // HasCommonColor selects the Color uniform for uniform-color draws (same contract as
+  // quad_color_fill.frag).
+  vec4 Color;
+  int HasCommonColor;
 };
 
 layout(location = 0) in vec3 TransformedCoords_0;
@@ -103,9 +109,13 @@ layout(set = 1, binding = 2) uniform sampler2D LocalMaskSampler;
 layout(location = 0) out vec4 fragColor;
 
 void main() {
-  // The only color source is the per-vertex varying: providers broadcast the record's paint color
-  // for uniform-color batches, so no Color uniform fallback exists.
+  // The per-vertex varying broadcasts the record's paint color for uniform-color batches; the
+  // exact Color uniform is preferred when HasCommonColor is set (8-bit varying quantization would
+  // otherwise shift fractional-alpha fills by one LSB).
   vec4 outputColor = vColor;
+  if (HasCommonColor != 0) {
+    outputColor = Color;
+  }
 
   // Perspective divide. For affine transforms z is 1.0 (no-op); for perspective it applies the
   // correct division.
