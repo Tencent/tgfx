@@ -21,9 +21,11 @@ layout(set = 1, binding = XP_DST_TEX_BINDING) uniform sampler2D DstTextureSample
 
 #if HAS_XP == 1
 vec4 applyPorterDuffXP(vec4 srcColor, vec4 coverage) {
-  if (coverage.r <= 0.0 && coverage.g <= 0.0 && coverage.b <= 0.0) {
-    discard;
-  }
+  // No zero-coverage discard here: the Apple desktop GL driver miscompiles the conditional
+  // discard in this helper (fragments die even when the condition never fires, verified by
+  // replacing it with an equivalent early-out color write). The runtime-generated shader keeps
+  // its inline discard in main() where it compiles correctly. Dropping it is pixel-exact: at
+  // zero coverage the expression below reduces to dstColor, which is the framebuffer content.
   highp vec2 dstCoord = (gl_FragCoord.xy - DstTextureUpperLeft) * DstTextureCoordScale;
   vec4 dstColor = texture(DstTextureSampler, dstCoord);
   vec4 blended = xpBlendColors(srcColor, dstColor, XPBlendMode);
