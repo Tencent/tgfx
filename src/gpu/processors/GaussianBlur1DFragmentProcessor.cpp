@@ -26,28 +26,22 @@ namespace tgfx {
 GaussianBlur1DFragmentProcessor::GaussianBlur1DFragmentProcessor(
     PlacementPtr<FragmentProcessor> processor, float sigma, GaussianBlurDirection direction,
     float stepLength, int maxSigma)
-    : Blur1DFragmentProcessor(ClassID()), sigma(sigma), direction(direction),
-      stepLength(stepLength), maxSigma(maxSigma) {
+    : Blur1DFragmentProcessor(ClassID()), direction(direction), stepLength(stepLength),
+      maxSigma(maxSigma) {
   registerChildProcessor(std::move(processor));
-  computeKernel();
+  computeKernel(sigma);
 }
 
-void GaussianBlur1DFragmentProcessor::computeKernel() {
-  // Clamp sigma defensively because the kernel table is dimensioned for maxSigma. Clamping sigma
-  // rather than only the derived radius keeps the kernel weights consistent with the clamped value.
-  // Non-finite or non-positive sigma is reset to zero so that ceil() and the exp() below stay
-  // defined: with sigma = 0 the denominator is clamped to 1 and the kernel degenerates to a single
-  // center sample, which means no blurring.
-  sigma = std::min(sigma, static_cast<float>(maxSigma));
-  if (!std::isfinite(sigma) || sigma <= 0.0f) {
-    sigma = 0.0f;
-  }
+void GaussianBlur1DFragmentProcessor::computeKernel(float sigma) {
+  // Make() guarantees that sigma is finite, positive, and not greater than maxSigma, so no
+  // clamping is needed here. The radius clamp below is a defensive guard for the kernel table
+  // capacity and never triggers on the validated path.
   kernelRadius = static_cast<int>(ceil(2.0f * sigma));
   // Clamp by the sample count so the total number of samples (2 * radius + 1) never exceeds the
   // kernel table capacity.
   kernelRadius = std::min(kernelRadius, MAX_KERNEL_RADIUS);
-  // Guard against a zero denominator when sigma is zero: with sigma = 0 the kernel degenerates to
-  // a single center sample. The floor keeps the weights exact for all valid sigma values.
+  // Guard against a zero denominator in case sigma underflows to zero: with sigma = 0 the kernel
+  // degenerates to a single center sample, which means no blurring.
   const float denominator = std::max(2.0f * sigma * sigma, std::numeric_limits<float>::min());
   float total = 0.0f;
   for (int i = 0; i <= kernelRadius; ++i) {

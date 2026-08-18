@@ -49,8 +49,6 @@ class GaussianBlur1DFragmentProcessor : public Blur1DFragmentProcessor {
 
   void onComputeProcessorKey(BytesKey* key) const override;
 
-  // The standard deviation of the gaussian kernel in pixels.
-  float sigma = 0.f;
   // The direction in which the blur is applied.
   GaussianBlurDirection direction = GaussianBlurDirection::Horizontal;
   // The pixel offset between adjacent samples.
@@ -58,7 +56,7 @@ class GaussianBlur1DFragmentProcessor : public Blur1DFragmentProcessor {
   // The maximum allowed sigma, bounding the shader loop and the kernel table size.
   int maxSigma = 10;
 
-  void computeKernel() override;
+  void computeKernel(float strength) override;
   int kernelLoopUpperBound() const override {
     return 4 * maxSigma;
   }

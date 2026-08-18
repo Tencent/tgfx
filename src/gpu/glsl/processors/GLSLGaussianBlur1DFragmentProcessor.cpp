@@ -18,6 +18,7 @@
 
 #include "GLSLGaussianBlur1DFragmentProcessor.h"
 #include <algorithm>
+#include <cmath>
 
 namespace tgfx {
 
@@ -36,15 +37,13 @@ PlacementPtr<FragmentProcessor> GaussianBlur1DFragmentProcessor::Make(
   if (maxSigma < 0) {
     return nullptr;
   }
-  if (sigma <= 0 || stepLength <= 0) {
+  if (sigma <= 0 || stepLength <= 0 || !std::isfinite(sigma)) {
     return processor;
   }
-  // Cap maxSigma to the kernel table limit so the shader loop bound (4 * maxSigma) and the
-  // precomputed kernel size stay consistent with each other.
-  maxSigma = std::min(maxSigma, MAX_KERNEL_RADIUS / 2);
-  // Clamp sigma to maxSigma so the kernel radius never exceeds the fixed-size kernel table that is
-  // dimensioned for maxSigma. The shader loop also derives its bound from maxSigma.
-  sigma = std::min(sigma, static_cast<float>(maxSigma));
+  // The kernel table and the shader loop bound are dimensioned for maxSigma and sigma, so the
+  // caller must respect both limits. Clamping here would silently mask contract violations.
+  DEBUG_ASSERT(maxSigma <= MAX_KERNEL_RADIUS / 2);
+  DEBUG_ASSERT(sigma <= static_cast<float>(maxSigma));
 
   return allocator->make<GLSLGaussianBlur1DFragmentProcessor>(std::move(processor), sigma,
                                                               direction, stepLength, maxSigma);
