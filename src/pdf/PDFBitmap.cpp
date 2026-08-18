@@ -18,8 +18,10 @@
 
 #include "PDFBitmap.h"
 #include <vector>
+#include "core/images/SubsetImage.h"
 #include "core/utils/CopyPixels.h"
 #include "core/utils/Log.h"
+#include "core/utils/Types.h"
 #include "core/utils/USE.h"
 #include "pdf/DeflateStream.h"
 #include "pdf/PDFDocumentImpl.h"
@@ -471,17 +473,31 @@ void PDFBitmap::WritePlaceholder(PDFDocumentImpl* document, PDFIndirectReference
                   PDFStreamFormat::Uncompressed);
 }
 
+namespace {
+// Maps an image onto the cache key identifying its pixels: a SubsetImage is keyed by its source and
+// bounds so identical regions dedupe, anything else is keyed by itself and its full bounds.
+PDFImageCacheKey MakeImageCacheKey(const std::shared_ptr<Image>& image) {
+  if (Types::Get(image.get()) == Types::ImageType::Subset) {
+    const auto subsetImage = static_cast<const SubsetImage*>(image.get());
+    return {subsetImage->source, subsetImage->bounds};
+  }
+  return {image, Rect::MakeXYWH(0.f, 0.f, static_cast<float>(image->width()),
+                                static_cast<float>(image->height()))};
+}
+}  // namespace
+
 PDFIndirectReference PDFBitmap::Serialize(const std::shared_ptr<Image>& image,
                                           PDFDocumentImpl* document, int encodingQuality) {
   DEBUG_ASSERT(image);
   DEBUG_ASSERT(document);
-  auto it = document->imageRefCache.find(image);
+  auto key = MakeImageCacheKey(image);
+  auto it = document->imageRefCache.find(key);
   if (it != document->imageRefCache.end()) {
     return it->second;
   }
   auto ref = document->reserveRef();
   SerializeImage(image, encodingQuality, document, ref);
-  document->imageRefCache[image] = ref;
+  document->imageRefCache[std::move(key)] = ref;
   return ref;
 }
 }  // namespace tgfx

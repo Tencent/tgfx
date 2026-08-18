@@ -220,12 +220,31 @@ void PDFExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& s
                                      const Matrix& matrix, const ClipStack& clip,
                                      const Brush& brush, SrcRectConstraint,
                                      const Rect* /*strictRect*/) {
-  auto subsetImage = image->makeSubset(srcRect);
+  // Match the raster pipeline, which clamps out-of-range sampling coordinates instead of dropping
+  // the draw: intersect srcRect with the image bounds and shrink dstRect to the visible part.
+  auto bounds =
+      Rect::MakeWH(static_cast<float>(image->width()), static_cast<float>(image->height()));
+  auto clippedSrc = srcRect;
+  if (!clippedSrc.intersect(bounds)) {
+    LOGE(
+        "PDFExportContext::drawImageRect() The srcRect is outside the image, the draw is skipped!");
+    return;
+  }
+  auto clippedDst = dstRect;
+  if (clippedSrc != srcRect) {
+    auto scaleX = dstRect.width() / srcRect.width();
+    auto scaleY = dstRect.height() / srcRect.height();
+    clippedDst = Rect::MakeLTRB(dstRect.left + (clippedSrc.left - srcRect.left) * scaleX,
+                                dstRect.top + (clippedSrc.top - srcRect.top) * scaleY,
+                                dstRect.left + (clippedSrc.right - srcRect.left) * scaleX,
+                                dstRect.top + (clippedSrc.bottom - srcRect.top) * scaleY);
+  }
+  auto subsetImage = image->makeSubset(clippedSrc);
   if (subsetImage == nullptr) {
     LOGE("PDFExportContext::drawImageRect() Failed to make the image subset, the draw is skipped!");
     return;
   }
-  onDrawImageRect(std::move(subsetImage), dstRect, sampling, matrix, clip, brush);
+  onDrawImageRect(std::move(subsetImage), clippedDst, sampling, matrix, clip, brush);
 }
 namespace {
 enum class BlendFastPath {

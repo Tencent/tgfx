@@ -76,6 +76,37 @@ struct PDFLink {
 };
 
 /**
+ * Identifies the pixels a drawn image refers to. Identical subsets create distinct SubsetImage
+ * instances, so the image cache is keyed on the underlying source plus bounds instead, collapsing
+ * repeated draws of the same region (e.g. the clamp strips of a mirrored image shader) into one
+ * image XObject.
+ */
+struct PDFImageCacheKey {
+  std::shared_ptr<Image> source;
+  Rect bounds = {};
+
+  bool operator==(const PDFImageCacheKey& other) const {
+    return source == other.source && bounds == other.bounds;
+  }
+};
+
+struct PDFImageCacheKeyHash {
+  size_t operator()(const PDFImageCacheKey& key) const {
+    auto seed = std::hash<Image*>{}(key.source.get());
+    seed = Combine(seed, std::hash<float>{}(key.bounds.left));
+    seed = Combine(seed, std::hash<float>{}(key.bounds.top));
+    seed = Combine(seed, std::hash<float>{}(key.bounds.right));
+    seed = Combine(seed, std::hash<float>{}(key.bounds.bottom));
+    return seed;
+  }
+
+ private:
+  static size_t Combine(size_t seed, size_t value) {
+    return seed ^ (value + 0x9e3779b9 + (seed << 6) + (seed >> 2));
+  }
+};
+
+/**
  * An image XObject whose pixels are still being read back from the GPU. The object number is
  * reserved up front so drawing can reference it immediately, and the stream body is emitted later
  * from flushPendingRasters(). PDF indexes cross reference offsets by object number, so writing the
@@ -191,9 +222,9 @@ class PDFDocumentImpl : public PDFDocument {
   std::unordered_map<PDFFillGraphicState, PDFIndirectReference> fillGSMap;
   PDFIndirectReference noSmaskGraphicState;
   std::vector<PDFNamedDestination> namedDestinations;
-  // Uses shared_ptr as key to hold a strong reference, preventing the Image from being released
+  // The key's source holds a strong reference, preventing the Image from being released
   // mid-document and its address reused by a different Image, which would cause false cache hits.
-  std::unordered_map<std::shared_ptr<Image>, PDFIndirectReference> imageRefCache;
+  std::unordered_map<PDFImageCacheKey, PDFIndirectReference, PDFImageCacheKeyHash> imageRefCache;
 
  private:
   std::shared_ptr<WriteStream> beginObject(PDFIndirectReference ref);
