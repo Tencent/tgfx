@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFExportContext.h"
-#include <array>
 #include "core/AdvancedTypefaceInfo.h"
 #include "core/CanvasState.h"
 #include "core/ClipStack.h"
@@ -60,6 +59,7 @@
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/ImageInfo.h"
+#include "tgfx/core/MaskFilter.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
@@ -1419,7 +1419,6 @@ void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack&
       return;
     }
     Canvas* maskCanvas = surface->getCanvas();
-    Paint maskPaint;
     // Compensate for maskBound offset: the mask shader's coordinates are in the path's
     // coordinate space (which starts at maskBound.x/y), but the surface starts at (0,0).
     // Apply an inverse translation to the shader so it samples from the correct region.
@@ -1427,19 +1426,21 @@ void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack&
     if (maskBound.x() != 0 || maskBound.y() != 0) {
       shader = shader->makeWithMatrix(Matrix::MakeTrans(-maskBound.x(), -maskBound.y()));
     }
-    maskPaint.setShader(shader);
-    // A PDF luminosity SMask reads the RGB brightness, so the mask's alpha has to be replicated
-    // into RGB with the result made opaque. This runs on the GPU so the mask stays a snapshot that
-    // flows through the regular image XObject path, which tolerates deferred pixel readback,
-    // whereas converting on the CPU would require the mask pixels inline and cannot be deferred.
+    // A PDF luminosity SMask reads the RGB brightness, so the shader alpha has to end up in RGB
+    // with the result opaque. Both variants below build that with blending rather than a color
+    // matrix: a matrix that lights up transparent pixels makes ColorFilterShader mask its own
+    // output with the original shader alpha (SrcIn), which drags the alpha back down from 1 and
+    // crushes the antialiased edge with it. The work stays on the GPU so the mask remains a
+    // snapshot flowing through the regular image XObject path, which tolerates deferred pixel
+    // readback, whereas converting on the CPU would need the mask pixels inline.
+    Paint maskPaint;
     if (shaderMaskFilter->isInverted()) {
-      // An inverted mask is 1 - A across the whole mask area, including the region the shader does
-      // not cover. A color matrix cannot express that: lighting up transparent pixels makes
-      // ColorFilterShader mask its output with the original shader alpha (SrcIn), which erases
-      // exactly the uncovered region that has to stay unmasked. Blending builds the value exactly.
-      // DstOut over a white backdrop gives Cr = Cd * (1 - As) = 1 - A, and DstOver with an opaque
-      // black then restores A' = 1 without touching RGB, because its Cs = 0 contributes no color.
+      // The mask is 1 - A over the whole area, including the region the shader never covers, which
+      // has to stay unmasked. DstOut over a white backdrop gives Cr = Cd * (1 - As) = 1 - A, and
+      // DstOver with an opaque black then restores A' = 1 while leaving RGB alone, since its Cs = 0
+      // contributes no color. The uncovered region keeps the white backdrop either way.
       maskCanvas->clear(Color::White());
+      maskPaint.setShader(shader);
       maskPaint.setBlendMode(BlendMode::DstOut);
       maskCanvas->drawPaint(maskPaint);
       Paint opaquePaint;
@@ -1447,16 +1448,12 @@ void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack&
       opaquePaint.setBlendMode(BlendMode::DstOver);
       maskCanvas->drawPaint(opaquePaint);
     } else {
-      // A' = 1 keeps the result correct regardless of whether the filter operates on premultiplied
-      // or unpremultiplied colors. The uncovered region stays transparent and reads as luminosity
-      // 0, which is what a non-inverted mask wants there anyway.
-      static constexpr std::array<float, 20> AlphaToLuminosity = {
-          0, 0, 0, 1, 0,  // R' = A
-          0, 0, 0, 1, 0,  // G' = A
-          0, 0, 0, 1, 0,  // B' = A
-          0, 0, 0, 0, 1,  // A' = 1
-      };
-      maskPaint.setColorFilter(ColorFilter::Matrix(AlphaToLuminosity));
+      // The mask is A, so paint an opaque white using the shader alpha as coverage: SrcOver onto an
+      // opaque black backdrop yields Cr = A and Ar = A + (1 - A) = 1, i.e. RGB = A at full opacity.
+      // The uncovered region keeps the black backdrop, which is what a non-inverted mask wants.
+      maskCanvas->clear(Color::Black());
+      maskPaint.setColor(Color::White());
+      maskPaint.setMaskFilter(MaskFilter::MakeShader(shader));
       maskCanvas->drawPaint(maskPaint);
     }
 
