@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -612,7 +613,9 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
       return;
     }
     auto cache = context->precompiledShaderCache();
-    if (!cache->isLoaded()) {
+    // TGFX_AOT_DISABLE=1 keeps the bundle unloaded so the suite runs the pure JIT route, which
+    // enables whole-suite AOT-vs-JIT A/B comparisons of the failure set.
+    if (!cache->isLoaded() && std::getenv("TGFX_AOT_DISABLE") == nullptr) {
       auto bundle = EmbeddedShaderBundles::GetBundle(context->backend());
       if (bundle.first != nullptr && bundle.second > 0) {
         cache->loadBundle(bundle.first, bundle.second);
