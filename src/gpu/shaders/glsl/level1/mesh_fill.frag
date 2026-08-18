@@ -53,6 +53,10 @@ void main() {
   vec4 outputCoverage = vec4(1.0);
 #endif
 
+// The XP path needs the uncovered color plus the total coverage separately; defining only the
+// covered SRC_COLOR double-applies the coverage inside the XferProcessor blend.
 #define TGFX_XP_SRC_COLOR (outputColor * outputCoverage)
+#define TGFX_XP_SRC_UNPREMUL outputColor
+#define TGFX_XP_COVERAGE outputCoverage
 #include "xp_output.inc"
 }

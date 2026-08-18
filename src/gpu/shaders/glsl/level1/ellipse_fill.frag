@@ -54,13 +54,12 @@ void main() {
   // Outer curve coverage using ellipse distance approximation
   highp float edgeAlpha = ellipseEdgeCoverage(vEllipseOffsets, vEllipseRadii, StrokeEnabled);
 
-  // Bake the ellipse's own edge antialiasing into the source color and declare it as the XP
-  // coverage, mirroring how the gradient shaders handle vCoverage. coverage_output.inc then folds
-  // any clip (AARect) or device-space mask coverage on top. A bare device-space mask uploads a
-  // full-plane Rect (GLSLDeviceSpaceTextureEffect::onSetData), so the unconditional AARect term in
-  // the shared include evaluates to 1 and only the mask applies.
-#define TGFX_COVERAGE_SRC_COLOR (outputColor * edgeAlpha)
-#define TGFX_XP_COVERAGE vec4(edgeAlpha)
+  // The uncovered color rides TGFX_COVERAGE_SRC_COLOR and the edge antialiasing enters as the
+  // initial coverage; coverage_output.inc multiplies clip and device-mask coverage on top and
+  // hands xp_output.inc the uncovered color (TGFX_XP_SRC_UNPREMUL) plus the TOTAL coverage.
+  // Baking edgeAlpha into the source color instead double-applies it on the XferProcessor path.
+#define TGFX_COVERAGE_SRC_COLOR outputColor
+#define TGFX_INITIAL_COVERAGE vec4(edgeAlpha)
 #include "coverage_output.inc"
 #include "xp_output.inc"
 }

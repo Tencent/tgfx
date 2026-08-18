@@ -100,6 +100,10 @@ void main() {
   outerAlpha *= innerAlpha;
 #endif
 
+// The XP path needs the uncovered color plus the total coverage separately; defining only the
+// covered SRC_COLOR double-applies the coverage inside the XferProcessor blend.
 #define TGFX_XP_SRC_COLOR (outputColor * outerAlpha)
+#define TGFX_XP_SRC_UNPREMUL outputColor
+#define TGFX_XP_COVERAGE vec4(outerAlpha)
 #include "xp_output.inc"
 }
