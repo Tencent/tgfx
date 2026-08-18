@@ -436,7 +436,10 @@ void PDFBitmap::WriteReadbackPixels(const ImageInfo& srcInfo, const void* srcPix
   // srcInfo carries the readback row alignment (256 bytes on WebGPU), so the source stride can
   // exceed the destination stride; CopyPixels walks both instead of a flat memcpy.
   CopyPixels(srcInfo, srcPixels, dstInfo, dstPixels, flipY);
-  WritePixmap(Pixmap(dstInfo, dstPixels), dstInfo.isOpaque(), encodingQuality, document, ref);
+  // dstInfo is Unpremultiplied, so isOpaque() could never be true here: every image gets an SMask.
+  // Passing the constant keeps this from reading like actual opacity detection.
+  // TODO: derive opacity from the alpha channel so opaque images can skip the SMask object.
+  WritePixmap(Pixmap(dstInfo, dstPixels), false, encodingQuality, document, ref);
   bitmap.unlockPixels();
 }
 

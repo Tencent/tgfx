@@ -59,11 +59,10 @@ Bitmap ImageExportToBitmap(Context* context, const std::shared_ptr<Image>& image
   auto canvas = surface->getCanvas();
   canvas->drawImage(image);
 
-  // Deliberately not Surface::readPixels(): it logs an error whenever the pixels are not available
-  // yet, which on backends without synchronous readback happens for every tiled image and would
-  // flood the log once per page. These pixels only feed the clamp edge colors and the caller guards
-  // against an empty Bitmap, so degrading quietly is fine; a buffer that is ready yet still yields
-  // nothing is a genuine failure and stays reported.
+  // Deliberately not Surface::readPixels(): it cannot tell a pending readback apart from a real
+  // failure and reports both as an error. Here the distinction matters, so a buffer that is ready
+  // yet still yields nothing is reported as a failure, while a pending one degrades quietly and
+  // lets the caller report the resulting content gap once per shader.
   auto readback = surface->asyncReadPixels(Rect::MakeWH(surface->width(), surface->height()));
   if (readback == nullptr) {
     LOGE("PDFShader ImageExportToBitmap() Failed to start the readback! (%dx%d)", surface->width(),
@@ -79,13 +78,19 @@ Bitmap ImageExportToBitmap(Context* context, const std::shared_ptr<Image>& image
   }
 
   Bitmap bitmap(surface->width(), surface->height(), false, true, surface->colorSpace());
-  if (auto* dstPixels = bitmap.lockPixels()) {
-    // The readback row stride carries the backend's buffer copy alignment (256 bytes on WebGPU) and
-    // can exceed the Bitmap stride, so both layouts have to be walked.
-    CopyPixels(readback->info(), srcPixels, bitmap.info(), dstPixels,
-               surface->origin() == ImageOrigin::BottomLeft);
-    bitmap.unlockPixels();
+  auto* dstPixels = bitmap.lockPixels();
+  if (dstPixels == nullptr) {
+    // The caller only checks isEmpty(), so an allocated but unwritten Bitmap must not escape: it
+    // would feed uninitialized memory into the clamp edge colors.
+    LOGE("PDFShader ImageExportToBitmap() Failed to lock the bitmap pixels!");
+    readback->unlockPixels(context);
+    return {};
   }
+  // The readback row stride carries the backend's buffer copy alignment (256 bytes on WebGPU) and
+  // can exceed the Bitmap stride, so both layouts have to be walked.
+  CopyPixels(readback->info(), srcPixels, bitmap.info(), dstPixels,
+             surface->origin() == ImageOrigin::BottomLeft);
+  bitmap.unlockPixels();
   readback->unlockPixels(context);
   return bitmap;
 }

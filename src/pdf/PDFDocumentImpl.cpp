@@ -314,6 +314,9 @@ void PDFDocumentImpl::endPage() {
   if (state == State::InPage) {
     onEndPage();
     state = State::BetweenPages;
+    // Write out whatever arrived while the page was being drawn, so its readback buffers are freed
+    // instead of living until close().
+    flushPendingRasters(true);
   }
 }
 
@@ -344,13 +347,11 @@ void PDFDocumentImpl::abort() {
   }
 }
 
-bool PDFDocumentImpl::isReadyToClose() const {
-  for (const auto& raster : pendingRasters) {
-    if (!raster.readback->isReady(_context)) {
-      return false;
-    }
-  }
-  return true;
+bool PDFDocumentImpl::isReadyToClose() {
+  // Everything that has arrived is written here rather than at close(), which is what keeps the
+  // memory bounded to the readbacks still in flight while the caller polls.
+  flushPendingRasters(true);
+  return pendingRasters.empty();
 }
 
 std::vector<std::shared_ptr<SurfaceReadback>> PDFDocumentImpl::pendingReadbacks() const {
@@ -369,35 +370,40 @@ void PDFDocumentImpl::addPendingRaster(PDFPendingRaster raster) {
   pendingRasters.push_back(std::move(raster));
 }
 
-void PDFDocumentImpl::flushPendingRasters() {
-  // Moved out first: emitting an image object can draw into the document again, and appending to a
-  // vector while iterating it would invalidate the iterators. Anything queued while flushing has to
-  // be flushed as well, otherwise its reserved object number is never emitted and its cross
-  // reference offset stays 0.
-  while (!pendingRasters.empty()) {
-    auto rasters = std::move(pendingRasters);
-    pendingRasters.clear();
-    for (auto& raster : rasters) {
-      // The readiness check has to come first: locking a readback whose mapping is still pending
-      // issues a second mapAsync on the same buffer, which is a validation error on WebGPU and also
-      // resets the buffer's ready state.
-      const void* srcPixels = nullptr;
-      if (raster.readback->isReady(_context)) {
-        srcPixels = raster.readback->lockPixels(_context);
-      }
-      if (srcPixels == nullptr) {
-        LOGE(
-            "PDFDocumentImpl::flushPendingRasters() Pixels never arrived for object %d, writing a "
-            "placeholder!",
-            raster.ref.value);
-        PDFBitmap::WritePlaceholder(this, raster.ref);
-        continue;
-      }
-      PDFBitmap::WriteReadbackPixels(raster.readback->info(), srcPixels, raster.flipY,
-                                     raster.encodingQuality, this, raster.ref);
-      raster.readback->unlockPixels(_context);
+void PDFDocumentImpl::flushPendingRasters(bool readyOnly) {
+  // Moved out first, because emitting into pendingRasters while iterating it would invalidate the
+  // iterators. std::exchange rather than a plain move, so the vector is guaranteed to be an empty
+  // one that the not-ready rasters can be put back into.
+  auto rasters = std::exchange(pendingRasters, {});
+  for (auto& raster : rasters) {
+    if (readyOnly && !raster.readback->isReady(_context)) {
+      pendingRasters.push_back(std::move(raster));
+      continue;
     }
+    // Checking readiness first avoids the synchronous queue wait inside lockPixels() for a readback
+    // that cannot deliver anything yet. Re-entering the mapping itself is harmless,
+    // WebGPUBuffer::requestMapAsync() already ignores a request while one is pending.
+    const void* srcPixels = nullptr;
+    if (raster.readback->isReady(_context)) {
+      srcPixels = raster.readback->lockPixels(_context);
+    }
+    if (srcPixels == nullptr) {
+      LOGE(
+          "PDFDocumentImpl::flushPendingRasters() Pixels never arrived for object %d, writing a "
+          "placeholder!",
+          raster.ref.value);
+      PDFBitmap::WritePlaceholder(this, raster.ref);
+      continue;
+    }
+    PDFBitmap::WriteReadbackPixels(raster.readback->info(), srcPixels, raster.flipY,
+                                   raster.encodingQuality, this, raster.ref);
+    raster.readback->unlockPixels(_context);
   }
+  // Emitting an image object only writes stream bodies and never draws back into the document, so
+  // nothing can be queued while flushing. A raster appearing here could no longer become ready
+  // within this call and would degrade to a placeholder, so the invariant is asserted instead of
+  // being papered over with another round.
+  DEBUG_ASSERT(readyOnly || pendingRasters.empty());
 }
 
 Canvas* PDFDocumentImpl::onBeginPage(float width, float height) {

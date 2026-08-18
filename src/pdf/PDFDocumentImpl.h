@@ -106,7 +106,7 @@ class PDFDocumentImpl : public PDFDocument {
 
   void abort() override;
 
-  bool isReadyToClose() const override;
+  bool isReadyToClose() override;
 
   std::vector<std::shared_ptr<SurfaceReadback>> pendingReadbacks() const override;
 
@@ -206,8 +206,11 @@ class PDFDocumentImpl : public PDFDocument {
    * Emits the stream body of every pending raster. Must run before onClose() writes the cross
    * reference table: every reserved object number has to be emitted, otherwise its offset stays 0
    * and the table is corrupt. Rasters that are still not ready fall back to a blank placeholder.
+   * @param readyOnly Only emits the rasters whose pixels have already arrived and keeps the rest
+   * queued, so their GPU buffers are released as early as possible instead of piling up until
+   * close(). No placeholder is written in this mode.
    */
-  void flushPendingRasters();
+  void flushPendingRasters(bool readyOnly = false);
 
   enum class State {
     BetweenPages,

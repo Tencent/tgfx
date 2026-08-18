@@ -82,8 +82,12 @@ class PDFDocument {
    * be waiting for its pixels to be read back from the GPU, which only happens on backends without
    * synchronous pixel readback, such as WebGPU. Backends that resolve every readback inline always
    * return true.
+   * @note This is not a pure query: every readback that has arrived is written into the document
+   * right away so its GPU buffer can be released. Polling this once per turn of the event loop
+   * therefore keeps only the still-pending readbacks in memory, instead of holding one buffer per
+   * image until close().
    */
-  virtual bool isReadyToClose() const = 0;
+  virtual bool isReadyToClose() = 0;
 
   /**
    * Returns the readbacks that close() is still waiting on, so the caller can poll them without
