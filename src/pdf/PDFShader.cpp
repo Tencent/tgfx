@@ -266,8 +266,6 @@ PDFIndirectReference PDFShader::MakeImageShader(PDFDocumentImpl* doc, Matrix fin
   // Reading the pixels back can fail, for instance on a backend without synchronous readback. The
   // clamp handling below indexes bitmap.width() - 1, which would be -1 on an empty bitmap, so drop
   // the stretched edges and emit the pattern body alone.
-  // TODO: derive the corners and edge strips from image->makeSubset() and draw them on the GPU, so
-  // the clamp handling needs no pixel readback at all.
   if (bitmap.isEmpty() && (tileModesX == TileMode::Clamp || tileModesY == TileMode::Clamp)) {
     LOGE("PDFShader::MakeImageShader() Clamp edges are dropped, the pixels are unavailable!");
   }

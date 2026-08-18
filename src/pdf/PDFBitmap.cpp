@@ -434,7 +434,6 @@ void PDFBitmap::WriteReadbackPixels(const ImageInfo& srcInfo, const void* srcPix
   // exceed the destination stride; CopyPixels walks both instead of a flat memcpy.
   CopyPixels(srcInfo, srcPixels, dstInfo, dstPixels, flipY);
   // dstInfo is Unpremultiplied, so isOpaque() could never be true here.
-  // TODO: derive opacity from the alpha channel so opaque images can skip the SMask object.
   WritePixmap(Pixmap(dstInfo, dstPixels), false, encodingQuality, document, ref);
   bitmap.unlockPixels();
 }
