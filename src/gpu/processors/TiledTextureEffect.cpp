@@ -231,8 +231,24 @@ bool TiledTextureEffect::isAlphaOnly() const {
 bool TiledTextureEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
                                     AOTNodeID* output) const {
   auto textureView = getTextureView();
-  if (builder == nullptr || output == nullptr || textureView == nullptr ||
-      textureView->getTexture()->type() != TextureType::TwoD) {
+  if (builder == nullptr || output == nullptr || textureView == nullptr) {
+    return false;
+  }
+  // Rectangle textures are accepted: the precompiled chain kernel carries a TEXTURE_KIND dimension
+  // (sampler2DRect variants), and its shared tiled-sampling path is rectangle-aware
+  // (tiledEffectiveUnorm keeps rectangle coordinates in pixel space). External textures still
+  // cannot be served. Restriction: only fully hardware-resolved wraps (shader mode None) ride the
+  // rectangle path for now — shader-emulated modes (repeat/mirror/decal) inside a folded chain
+  // render divergently on rectangle textures and stay on the runtime route until wired.
+  auto textureType = textureView->getTexture()->type();
+  if (textureType == TextureType::Rectangle) {
+    auto resolvedCheck = resolveSampling();
+    if (resolvedCheck == nullptr || resolvedCheck->shaderModeX != TiledTextureShaderMode::None ||
+        resolvedCheck->shaderModeY != TiledTextureShaderMode::None) {
+      return false;
+    }
+  }
+  if (textureType != TextureType::TwoD && textureType != TextureType::Rectangle) {
     return false;
   }
   auto resolved = resolveSampling();

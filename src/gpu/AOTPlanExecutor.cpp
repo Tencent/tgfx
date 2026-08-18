@@ -721,14 +721,24 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
   }
   // TEXTURE_COUNT exists only as 0 or 4: chains with 1-3 sampler children ride the four-leaf
   // artifacts by binding phantom children that re-use the first leaf's texture. Their DAG slots
-  // are never OP_TEXTURE, so the kernel's runtime guard never samples them.
+  // are never OP_TEXTURE, so the kernel's runtime guard never samples them. The phantom must
+  // mirror the first leaf's sampler state: on OpenGL the wrap/filter modes are texture-object
+  // state (not per-unit), so a default-state phantom bound after the real leaf would overwrite
+  // e.g. a decal clamp-to-border with clamp-to-edge for the whole draw.
   std::vector<PlacementPtr<FragmentProcessor>> samplerPadding = {};
   std::shared_ptr<TextureProxy> paddingProxy = nullptr;
+  SamplerState paddingState = {};
   for (size_t index = 0; index < nodes.size() && paddingProxy == nullptr; ++index) {
     if (nodes[index]->kind == AOTEffectKind::TextureSource) {
       auto* textureParams = std::get_if<AOTTextureParameters>(&nodes[index]->parameters);
       if (textureParams != nullptr) {
         paddingProxy = textureParams->textureProxy;
+        if (textureParams->samplingKind == AOTTextureSamplingKind::Tiled &&
+            textureParams->tiledRecipe.has_value()) {
+          paddingState = textureParams->tiledRecipe->hardwareSampler;
+        } else {
+          paddingState = textureParams->samplerState;
+        }
       }
     } else if (nodes[index]->kind == AOTEffectKind::GradientSource) {
       // A LUT-gradient-only chain has no TextureSource node; its baked LUT texture serves as
@@ -739,6 +749,10 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
       }
     }
   }
+  SamplingOptions paddingSampling(paddingState.minFilterMode, paddingState.magFilterMode,
+                                  paddingState.mipmapMode);
+  SamplingArgs paddingArgs = {paddingState.tileModeX, paddingState.tileModeY, paddingSampling,
+                              SrcRectConstraint::Fast};
   size_t samplerChildren = leaves.size() + (lutChild != nullptr ? 1 : 0);
   if (samplerChildren > 0 && samplerChildren < 4) {
     if (paddingProxy == nullptr) {
@@ -746,7 +760,7 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
     }
     while (samplerChildren < 4) {
       auto phantomMatrix = Matrix::I();
-      auto phantom = TextureEffect::Make(allocator, paddingProxy, {}, &phantomMatrix);
+      auto phantom = TextureEffect::Make(allocator, paddingProxy, paddingArgs, &phantomMatrix);
       if (phantom == nullptr) {
         return nullptr;
       }
@@ -835,7 +849,7 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
       return nullptr;
     }
     auto phantomMatrix = Matrix::I();
-    maskChild = TextureEffect::Make(allocator, paddingProxy, {}, &phantomMatrix);
+    maskChild = TextureEffect::Make(allocator, paddingProxy, paddingArgs, &phantomMatrix);
     if (maskChild == nullptr) {
       return nullptr;
     }

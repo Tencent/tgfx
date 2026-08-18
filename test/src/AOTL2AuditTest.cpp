@@ -689,7 +689,7 @@ static void RenderDecalShaderMaskScene(Context* context, PrecompiledShaderCache*
   *outNoMatch = cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule);
 }
 
-TGFX_TEST(AOTL2AuditTest, ShaderMaskDecalFallsBackByteExact) {
+TGFX_TEST(AOTL2AuditTest, ShaderMaskDecalServedByteExact) {
   auto color = MakeImage("resources/apitest/mandrill_128.png");
   auto mask = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(color != nullptr && mask != nullptr);
@@ -714,8 +714,11 @@ TGFX_TEST(AOTL2AuditTest, ShaderMaskDecalFallsBackByteExact) {
       Pixmap candidatePixmap(candidate);
       AOTToleranceSpec spec = {};
       auto result = AOTToleranceCompare::Compare(referencePixmap, candidatePixmap, spec);
-      EXPECT_GT(referenceNoMatch, 0u);
-      EXPECT_GT(candidateNoMatch, 0u);
+      // The rectangle-texture arms serve the decal mask on every suite backend, so both the
+      // decomposition-off and decomposition-on renders resolve without NoMatchingRule fallbacks
+      // and must stay byte-identical to each other.
+      EXPECT_EQ(referenceNoMatch, 0u);
+      EXPECT_EQ(candidateNoMatch, 0u);
       EXPECT_FALSE(result.sizeMismatch);
       EXPECT_EQ(result.diffPixelCount, 0u);
       EXPECT_EQ(result.maxChannelDiff, 0);

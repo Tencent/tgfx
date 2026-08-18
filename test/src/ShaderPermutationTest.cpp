@@ -439,8 +439,7 @@ TGFX_TEST(ShaderPermutationTest, DeviceSpaceTexturedEffectRejectsUnsupportedLayo
     // Alpha-only sources are served by the kernel's AlphaOnly runtime uniform. OpenGL is served in
     // full on the desktop profile (the source texture here is a TwoD offscreen, so the matcher
     // accepts it like any other backend); non-desktop GL profiles keep the ProgramBuilder route.
-    if (programInfo.backend() == Backend::OpenGL &&
-        !programInfo.usesOpenGLDesktopAOTProfile()) {
+    if (programInfo.backend() == Backend::OpenGL && !programInfo.usesOpenGLDesktopAOTProfile()) {
       EXPECT_FALSE(match.has_value());
     } else {
       EXPECT_TRUE(match.has_value());

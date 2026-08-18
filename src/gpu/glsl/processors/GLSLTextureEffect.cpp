@@ -248,8 +248,9 @@ void GLSLTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
   // Set the Subset uniform when the shader declares it. The precompiled shader may include the
   // Subset uniform even when needSubset() is false (GP has subset attribute but TE determined
   // subset clamping is unnecessary). In that case we use the full texture bounds so the clamp is
-  // a no-op.
-  if (needSubset() || (fragmentUniformData != nullptr && fragmentUniformData->hasField("Subset"))) {
+  // a no-op. Kernels without the field (e.g. a leaf-free pointwise chain) skip the write;
+  // needSubset() alone must not force it.
+  if (fragmentUniformData != nullptr && fragmentUniformData->hasField("Subset")) {
     float rect[4];
     computeSubsetRect(rect);
     fragmentUniformData->setData("Subset", rect);
