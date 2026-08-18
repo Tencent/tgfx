@@ -28,8 +28,7 @@ vec4 applyPorterDuffXP(vec4 srcColor, vec4 coverage) {
   // zero coverage the expression below reduces to dstColor, which is the framebuffer content.
   highp vec2 dstCoord = (gl_FragCoord.xy - DstTextureUpperLeft) * DstTextureCoordScale;
   vec4 dstColor = texture(DstTextureSampler, dstCoord);
-  vec4 blended = xpBlendColors(srcColor, dstColor, XPBlendMode);
-  return coverage * blended + (vec4(1.0) - coverage) * dstColor;
+  return xpBlendWithCoverage(srcColor, dstColor, coverage, XPBlendMode);
 }
 #endif
 

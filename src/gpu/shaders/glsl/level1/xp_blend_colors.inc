@@ -216,4 +216,76 @@ vec4 xpBlendColors(vec4 S, vec4 D, int mode) {
   return result;
 }
 
+// Coverage application for the XferProcessor path. Modes 0-14 (Clear..Screen) are coefficient
+// modes: the runtime bakes the coverage into the BlendFormula table (GLSLBlend.cpp Coeffs[1]) and
+// emits mode-specific forms like S*C + D*(1-C.a) for Src, which differ from the generic
+// C*blend(S,D) + (1-C)*D whenever the coverage alpha does not equal its rgb or S.a < 1. These
+// branches mirror that table exactly (primary/secondary outputs and src/dst factors, final
+// clamp included); advanced modes keep the generic form, matching the runtime's
+// HandleBlendModes + coverage wrapper.
+vec4 xpBlendWithCoverage(vec4 S, vec4 D, vec4 C, int mode) {
+  if (mode == 0) {
+    // clear: D*One - C*D
+    return clamp(D - C * D, 0.0, 1.0);
+  }
+  if (mode == 1) {
+    // src: primary=S*C; dst factor OneMinusSrc1Alpha on secondary=C
+    return clamp(S * C + D * (1.0 - C.a), 0.0, 1.0);
+  }
+  if (mode == 2) {
+    // dst
+    return clamp(D, 0.0, 1.0);
+  }
+  if (mode == 3) {
+    // src-over: primary=S*C; dst factor OneMinusSrcAlpha on primary
+    return clamp(S * C + D * (1.0 - (S * C).a), 0.0, 1.0);
+  }
+  if (mode == 4) {
+    // dst-over: src factor OneMinusDstAlpha on primary
+    return clamp(S * C * (1.0 - D.a) + D, 0.0, 1.0);
+  }
+  if (mode == 5) {
+    // src-in: src factor DstAlpha on primary; dst factor OneMinusSrc1Alpha on secondary=C
+    return clamp(S * C * D.a + D * (1.0 - C.a), 0.0, 1.0);
+  }
+  if (mode == 6) {
+    // dst-in: D*One - (1-S.a)*C*D
+    return clamp(D - (1.0 - S.a) * C * D, 0.0, 1.0);
+  }
+  if (mode == 7) {
+    // src-out: src factor OneMinusDstAlpha on primary; dst factor OneMinusSrc1Alpha on secondary
+    return clamp(S * C * (1.0 - D.a) + D * (1.0 - C.a), 0.0, 1.0);
+  }
+  if (mode == 8) {
+    // dst-out: dst factor OneMinusSrcAlpha on primary
+    return clamp(D * (1.0 - (S * C).a), 0.0, 1.0);
+  }
+  if (mode == 9) {
+    // src-atop
+    return clamp(S * C * D.a + D * (1.0 - (S * C).a), 0.0, 1.0);
+  }
+  if (mode == 10) {
+    // dst-atop: secondary=(1-S.a)*C; dst factor OneMinusSrc1 (vec4)
+    return clamp(S * C * (1.0 - D.a) + D * (vec4(1.0) - (1.0 - S.a) * C), 0.0, 1.0);
+  }
+  if (mode == 11) {
+    // xor
+    return clamp(S * C * (1.0 - D.a) + D * (1.0 - (S * C).a), 0.0, 1.0);
+  }
+  if (mode == 12) {
+    // plus
+    return clamp(S * C + D, 0.0, 1.0);
+  }
+  if (mode == 13) {
+    // modulate: D*One - (vec4(1.0)-S)*C*D
+    return clamp(D - (vec4(1.0) - S) * C * D, 0.0, 1.0);
+  }
+  if (mode == 14) {
+    // screen: dst factor OneMinusSrcColor (vec4) on primary
+    return clamp(S * C + D * (vec4(1.0) - S * C), 0.0, 1.0);
+  }
+  vec4 blended = xpBlendColors(S, D, mode);
+  return C * blended + (vec4(1.0) - C) * D;
+}
+
 #endif  // TGFX_XP_BLEND_COLORS_INC

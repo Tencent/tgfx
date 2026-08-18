@@ -12,8 +12,7 @@ layout(input_attachment_index = 0, set = 2, binding = 0) uniform subpassInput tg
 
 vec4 applyPorterDuffXP(vec4 srcColor, vec4 coverage) {
   vec4 dstColor = subpassLoad(tgfx_SubpassInput);
-  vec4 blended = xpBlendColors(srcColor, dstColor, XPBlendMode);
-  return coverage * blended + (vec4(1.0) - coverage) * dstColor;
+  return xpBlendWithCoverage(srcColor, dstColor, coverage, XPBlendMode);
 }
 
 #endif
