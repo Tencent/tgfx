@@ -307,35 +307,40 @@ void main() {
   }
   vec4 result = chainResults[RootIndex];
 
+  // The device-space mask is draw COVERAGE (a clip/mask on the whole draw), so it multiplies the
+  // coverage chain like the runtime's DeviceSpaceTextureEffect compositing — never the bare color.
+  // Baking it into the color instead leaves the XferProcessor's dst attenuation without the mask
+  // (dst is not released where the mask fades), diverging from the runtime composite.
+  highp float deviceMask = 1.0;
 #if NTEX > 0
   if (HasMaskTexture != 0) {
-    // Device-space mask multiply, applied after the DAG and before coverage/XP (same application
-    // point as the legacy blend kernel).
     highp vec3 maskCoord = DeviceCoordMatrix * vec3(gl_FragCoord.xy, 1.0);
-    result *= texture(MaskTextureSampler, maskCoord.xy).r;
+    deviceMask = texture(MaskTextureSampler, maskCoord.xy).r;
   }
 #elif HAS_MASK_TEXTURE
-  // Device-space mask multiply, applied after the DAG and before coverage/XP (same application
-  // point as the legacy blend kernel).
   highp vec3 maskCoord = DeviceCoordMatrix * vec3(gl_FragCoord.xy, 1.0);
-  result *= texture(MaskTextureSampler, maskCoord.xy).r;
+  deviceMask = texture(MaskTextureSampler, maskCoord.xy).r;
 #endif
 
 #if GP_LAYOUT == 1
   // Ellipse edge AA, computed per pixel from the ellipse varyings (verbatim shared math).
   highp float gpCoverage = ellipseEdgeCoverage(vEllipseOffsets, vEllipseRadii, StrokeEnabled);
-#define TGFX_XP_SRC_COLOR (result * gpCoverage)
+  deviceMask *= gpCoverage;
+#define TGFX_XP_SRC_COLOR (result * vec4(deviceMask))
 #define TGFX_XP_SRC_UNPREMUL result
-#define TGFX_XP_COVERAGE vec4(gpCoverage)
+#define TGFX_XP_COVERAGE vec4(deviceMask)
 #elif HAS_COVERAGE
   // A coverage subtree's root already carries the GP coverage (fed in through the -3 unit
   // input), so it replaces the plain vCoverage modulation instead of doubling it.
   vec4 finalCoverage = CoverageRootIndex >= 0 ? chainResults[CoverageRootIndex] : vec4(vCoverage);
+  finalCoverage *= deviceMask;
 #define TGFX_XP_SRC_COLOR (result * finalCoverage)
 #define TGFX_XP_SRC_UNPREMUL result
 #define TGFX_XP_COVERAGE finalCoverage
 #else
-#define TGFX_XP_SRC_COLOR (CoverageRootIndex >= 0 ? result * chainResults[CoverageRootIndex] : result)
+  vec4 noCovCoverage = vec4(deviceMask);
+#define TGFX_XP_SRC_COLOR                                                                 \
+  (CoverageRootIndex >= 0 ? result * chainResults[CoverageRootIndex] * noCovCoverage : result * noCovCoverage)
 #endif
 #include "xp_output.inc"
 }
