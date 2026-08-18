@@ -255,6 +255,7 @@
         "ChildMask": "351c4df9",
         "HighZoomWithMask_Tiled": "bf48e614",
         "InvalidMask": "bf48e614",
+        "InvertedMask": "9d18f8c1",
         "MaskAlpha": "bf48e614",
         "MaskInvalidation_NoMask": "6d7f38ad",
         "MaskInvalidation_SwitchMask": "92ee56bb",

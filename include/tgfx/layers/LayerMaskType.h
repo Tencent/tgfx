@@ -34,6 +34,16 @@ enum class LayerMaskType {
   /**
    * Uses the target layer's luminance as a mask.
    */
-  Luminance
+  Luminance,
+  /**
+   * Uses the inverted transparency of the target layer as a mask. The layer content is visible
+   * where the mask is transparent and hidden where the mask is opaque.
+   */
+  AlphaInverted,
+  /**
+   * Uses the inverted luminance of the target layer as a mask. The layer content is visible where
+   * the mask is dark and hidden where the mask is bright.
+   */
+  LuminanceInverted
 };
 }  // namespace tgfx

@@ -437,6 +437,81 @@ TGFX_TEST(LayerMaskTest, MaskAlpha) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerMaskTest/MaskAlpha"));
 }
 
+TGFX_TEST(LayerMaskTest, InvertedMask) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  DisplayList list;
+
+  Path contentPath;
+  contentPath.addRect(Rect::MakeWH(100, 100));
+  Path halfPath;
+  halfPath.addRect(Rect::MakeWH(50, 100));
+
+  // Alpha inverted: the content stays visible only where the mask is transparent.
+  auto alphaContent = ShapeLayer::Make();
+  alphaContent->setPath(contentPath);
+  alphaContent->setFillStyle(ShapeStyle::Make(Color::Green()));
+  auto alphaMask = ShapeLayer::Make();
+  alphaMask->setPath(halfPath);
+  alphaMask->setFillStyle(ShapeStyle::Make(Color::Red()));
+  alphaContent->setMask(alphaMask);
+  alphaContent->setMaskType(LayerMaskType::AlphaInverted);
+  list.root()->addChild(alphaContent);
+  list.root()->addChild(alphaMask);
+
+  // Luminance inverted: the content stays visible where the mask luminance is low.
+  auto lumaContent = ShapeLayer::Make();
+  lumaContent->setPath(contentPath);
+  lumaContent->setMatrix(Matrix::MakeTrans(100, 0));
+  lumaContent->setFillStyle(ShapeStyle::Make(Color::Blue()));
+  auto lumaMask = Layer::Make();
+  auto whiteHalf = ShapeLayer::Make();
+  whiteHalf->setPath(halfPath);
+  whiteHalf->setFillStyle(ShapeStyle::Make(Color::White()));
+  auto blackHalf = ShapeLayer::Make();
+  blackHalf->setPath(halfPath);
+  blackHalf->setMatrix(Matrix::MakeTrans(50, 0));
+  blackHalf->setFillStyle(ShapeStyle::Make(Color::Black()));
+  lumaMask->addChild(whiteHalf);
+  lumaMask->addChild(blackHalf);
+  lumaMask->setMatrix(Matrix::MakeTrans(100, 0));
+  lumaContent->setMask(lumaMask);
+  lumaContent->setMaskType(LayerMaskType::LuminanceInverted);
+  list.root()->addChild(lumaContent);
+  list.root()->addChild(lumaMask);
+
+  // Alpha inverted with an empty mask intersection: the content stays fully visible.
+  auto redContent = ShapeLayer::Make();
+  redContent->setPath(contentPath);
+  redContent->setMatrix(Matrix::MakeTrans(200, 0));
+  redContent->setFillStyle(ShapeStyle::Make(Color::Red()));
+  auto disjointMask = ShapeLayer::Make();
+  disjointMask->setPath(halfPath);
+  disjointMask->setMatrix(Matrix::MakeTrans(0, 200));
+  disjointMask->setFillStyle(ShapeStyle::Make(Color::Black()));
+  redContent->setMask(disjointMask);
+  redContent->setMaskType(LayerMaskType::AlphaInverted);
+  list.root()->addChild(redContent);
+  list.root()->addChild(disjointMask);
+
+  // Alpha inverted with a mask that draws nothing: the content stays fully visible.
+  auto orangeContent = ShapeLayer::Make();
+  orangeContent->setPath(contentPath);
+  orangeContent->setMatrix(Matrix::MakeTrans(300, 0));
+  orangeContent->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 128, 0)));
+  auto emptyMask = ShapeLayer::Make();
+  emptyMask->setFillStyle(ShapeStyle::Make(Color::Black()));
+  orangeContent->setMask(emptyMask);
+  orangeContent->setMaskType(LayerMaskType::AlphaInverted);
+  list.root()->addChild(orangeContent);
+  list.root()->addChild(emptyMask);
+
+  auto surface = Surface::Make(context, 400, 100);
+  list.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerMaskTest/InvertedMask"));
+}
+
 TGFX_TEST(LayerMaskTest, ChildMask) {
   ContextScope scope;
   auto context = scope.getContext();
