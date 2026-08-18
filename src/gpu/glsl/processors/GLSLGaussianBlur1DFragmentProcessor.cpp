@@ -17,8 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLGaussianBlur1DFragmentProcessor.h"
-#include <algorithm>
 #include <cmath>
+#include <string>
+#include <string_view>
 
 namespace tgfx {
 

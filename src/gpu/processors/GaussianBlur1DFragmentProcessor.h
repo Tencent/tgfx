@@ -30,7 +30,7 @@ class GaussianBlur1DFragmentProcessor : public Blur1DFragmentProcessor {
    * Creates a gaussian blur processor that samples the child along the given direction with the
    * specified step. sigma is the standard deviation of the gaussian kernel in pixels. Returns
    * nullptr when the processor or maxSigma is invalid, otherwise returns the child processor
-   * unchanged when sigma or stepLength is not positive.
+   * unchanged when sigma is not finite or not positive, or when stepLength is not positive.
    */
   static PlacementPtr<FragmentProcessor> Make(BlockAllocator* allocator,
                                               PlacementPtr<FragmentProcessor> processor,

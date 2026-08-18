@@ -33,15 +33,18 @@ GaussianBlur1DFragmentProcessor::GaussianBlur1DFragmentProcessor(
 }
 
 void GaussianBlur1DFragmentProcessor::computeKernel(float sigma) {
-  // Make() guarantees that sigma is finite, positive, and not greater than maxSigma, so no
-  // clamping is needed here. The radius clamp below is a defensive guard for the kernel table
-  // capacity and never triggers on the validated path.
+  // Make() guarantees in debug builds that sigma is finite, positive, and not greater than
+  // maxSigma, so no clamping is needed here. In release builds the DEBUG_ASSERT is compiled out
+  // and the same contract is upheld by the only call site, GaussianBlurImageFilter, which clamps
+  // sigma before construction. The radius clamp below is a defensive guard for the kernel table
+  // capacity that never triggers while the contract holds.
   kernelRadius = static_cast<int>(ceil(2.0f * sigma));
   // Clamp by the sample count so the total number of samples (2 * radius + 1) never exceeds the
   // kernel table capacity.
   kernelRadius = std::min(kernelRadius, MAX_KERNEL_RADIUS);
-  // Guard against a zero denominator in case sigma underflows to zero: with sigma = 0 the kernel
-  // degenerates to a single center sample, which means no blurring.
+  // Guard against a zero denominator: the product 2 * sigma * sigma can underflow to zero even
+  // when sigma itself is a valid positive float, in which case the kernel degenerates to a single
+  // center sample, which means no blurring.
   const float denominator = std::max(2.0f * sigma * sigma, std::numeric_limits<float>::min());
   float total = 0.0f;
   for (int i = 0; i <= kernelRadius; ++i) {
