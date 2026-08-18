@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Context.h"
+#include <cstdlib>
 #include "core/AtlasManager.h"
 #include "core/AtlasStrikeCache.h"
 #include "core/utils/BlockAllocator.h"
@@ -49,9 +50,13 @@ Context::Context(Device* device, GPU* gpu) : _device(device), _gpu(gpu) {
   _atlasManager = new AtlasManager(this);
   _atlasStrikeCache = new AtlasStrikeCache();
   _precompiledShaderCache = new PrecompiledShaderCache();
-  auto [bundleData, bundleSize] = EmbeddedShaderBundles::GetBundle(_gpu->info()->backend);
-  if (bundleData != nullptr && bundleSize > 0) {
-    _precompiledShaderCache->loadBundle(bundleData, bundleSize);
+  // TGFX_AOT_DISABLE=1 skips the embedded bundle so the runtime route can be exercised directly
+  // (test-suite A/B comparisons against the precompiled path).
+  if (std::getenv("TGFX_AOT_DISABLE") == nullptr) {
+    auto [bundleData, bundleSize] = EmbeddedShaderBundles::GetBundle(_gpu->info()->backend);
+    if (bundleData != nullptr && bundleSize > 0) {
+      _precompiledShaderCache->loadBundle(bundleData, bundleSize);
+    }
   }
 }
 
