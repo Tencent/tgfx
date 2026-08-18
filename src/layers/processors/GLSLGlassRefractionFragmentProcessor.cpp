@@ -102,6 +102,11 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppend("  finalColor += vec3(diffuse + rim);");
     fragBuilder->codeAppend("}");
   }
+  // DEBUG: switch the display mode by the sign of the light direction X component. A positive
+  // X (light from the right) shows the refraction direction as a color over the whole glass,
+  // a negative X keeps the normal rendering.
+  fragBuilder->codeAppendf("  if (%s.z >= 0.0) { finalColor = vec3(refractDir * 0.5 + 0.5, 0.5); }",
+                           lighting.c_str());
   fragBuilder->codeAppendf("%s = vec4(finalColor, srcAlpha);", args.outputColor.c_str());
 }
 
