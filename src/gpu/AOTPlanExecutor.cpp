@@ -1194,16 +1194,6 @@ PlacementPtr<RenderTask> AOTPlanExecutor::Make(Context* context, uint32_t render
       !CanExecute(graph, plan)) {
     return nullptr;
   }
-  // The OpenGL stage-1 whitelist only serves the pointwise-tail kernel, so any plan carrying a
-  // chain or perlin pass would create draws no opengl artifact can serve. Decline the whole plan
-  // up front; the callers keep the plain runtime route.
-  if (context->backend() == Backend::OpenGL) {
-    for (const auto& pass : plan.passes) {
-      if (pass.kernel != AOTKernelKind::PointwiseTail) {
-        return nullptr;
-      }
-    }
-  }
   // One geometry for the whole plan. Every intermediate pass renders into a target of exactly this
   // size and the terminal draw samples the last one back with its top-left, so the capture area and
   // the sampling translation are the same value by construction. The apron is zero here: all six
