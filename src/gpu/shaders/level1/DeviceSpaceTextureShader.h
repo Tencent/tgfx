@@ -30,21 +30,25 @@ namespace tgfx {
 class DeviceSpaceTextureShader : public PrecompiledShader {
  public:
   struct Dims {
-    enum : uint32_t { HAS_XP, COUNT };
+    // HAS_COVERAGE carries the geometry processor's AA coverage varying: the runtime composites
+    // it into the sampled device-space coverage (texture.r * vCoverage), so it must be a
+    // mirrored vert/frag dimension. HAS_XP rides the same domain.
+    enum : uint32_t { HAS_COVERAGE, HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
+          PermutationBool("HAS_COVERAGE"),
           PermutationInt("HAS_XP", 3),
       });
     }
   };
   using FD = Dims;
-  static_assert(FD::COUNT == 1, "Update info() when dimensions change.");
+  static_assert(FD::COUNT == 2, "Update info() when dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"DeviceSpaceTextureShader",
             "level1/device_space_texture.vert",
             "level1/device_space_texture.frag",
-            PermutationDomain({}),
+            FD::domain(),
             FD::domain(),
             PermutationDomain({}),
             "",

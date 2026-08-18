@@ -604,6 +604,8 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   return PermutationMatchResult{"QuadTextureFillShader", vertIndex, fragIndex};
 }
 
+static int GetGPCoverage(const GeometryProcessor* gp);
+
 static std::optional<PermutationMatchResult> TryMatchDeviceSpaceTexture(
     const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
@@ -624,10 +626,11 @@ static std::optional<PermutationMatchResult> TryMatchDeviceSpaceTexture(
   using FD = DeviceSpaceTextureShader::Dims;
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
+  fragValues[FD::HAS_COVERAGE] = GetGPCoverage(gp);
   // ALPHA_ONLY is a runtime uniform (AlphaOnly), not a permutation dimension.
   fragValues[FD::HAS_XP] = xpType;
   auto fragIndex = fragDomain.encode(fragValues);
-  return PermutationMatchResult{"DeviceSpaceTextureShader", 0, fragIndex};
+  return PermutationMatchResult{"DeviceSpaceTextureShader", fragIndex, fragIndex};
 }
 
 static int GetGPType(const GeometryProcessor* gp) {

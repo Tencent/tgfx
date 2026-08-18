@@ -725,15 +725,15 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
-  EXPECT_EQ(cache->vertexEntryCount(), 96u);
+  EXPECT_EQ(cache->vertexEntryCount(), 101u);
   std::string expectedTag = TGFX_BACKEND_NAME;
   auto dashPos = expectedTag.find('-');
   if (dashPos != std::string::npos) {
     expectedTag = expectedTag.substr(0, dashPos);
   }
-  // The opengl bundle carries the TEXTURE_KIND=Rect fragment variants (64 extra entries across
+  // The opengl bundle carries the TEXTURE_KIND=Rect fragment variants (67 extra entries across
   // the armed kernels); other backends compile TwoD variants only.
-  EXPECT_EQ(cache->fragmentEntryCount(), expectedTag == "opengl" ? 335u : 271u);
+  EXPECT_EQ(cache->fragmentEntryCount(), expectedTag == "opengl" ? 338u : 274u);
   EXPECT_EQ(cache->profileTag(), expectedTag);
   cache->unload();
 }
@@ -1185,14 +1185,14 @@ TGFX_TEST(ShaderPermutationTest, CompressedBundleLoad) {
     PrecompiledShaderCache compressedOnly;
     ASSERT_TRUE(compressedOnly.loadBundle(original.data(), original.size()));
     EXPECT_TRUE(compressedOnly.isLoaded());
-    EXPECT_EQ(compressedOnly.vertexEntryCount(), 96u);
+    EXPECT_EQ(compressedOnly.vertexEntryCount(), 101u);
     std::string tag = TGFX_BACKEND_NAME;
     auto dash = tag.find('-');
     if (dash != std::string::npos) {
       tag = tag.substr(0, dash);
     }
     // The opengl bundle carries the TEXTURE_KIND=Rect fragment variants (16 extra entries).
-    EXPECT_EQ(compressedOnly.fragmentEntryCount(), tag == "opengl" ? 335u : 271u);
+    EXPECT_EQ(compressedOnly.fragmentEntryCount(), tag == "opengl" ? 338u : 274u);
     EXPECT_EQ(compressedOnly.profileTag(), tag);
     return;
   }
