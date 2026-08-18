@@ -20,33 +20,45 @@
 
 namespace tgfx {
 size_t Uniform::size() const {
+  size_t elementSize = 0;
   switch (_format) {
     case UniformFormat::Float:
-      return sizeof(float);
+      elementSize = sizeof(float);
+      break;
     case UniformFormat::Float2:
-      return 2 * sizeof(float);
+      elementSize = 2 * sizeof(float);
+      break;
     case UniformFormat::Float3:
-      return 3 * sizeof(float);
+      elementSize = 3 * sizeof(float);
+      break;
     case UniformFormat::Float4:  // fall-through
     case UniformFormat::Float2x2:
-      return 4 * sizeof(float);
+      elementSize = 4 * sizeof(float);
+      break;
     case UniformFormat::Float3x3:
-      return 9 * sizeof(float);
+      elementSize = 9 * sizeof(float);
+      break;
     case UniformFormat::Float4x4:
-      return 16 * sizeof(float);
+      elementSize = 16 * sizeof(float);
+      break;
     case UniformFormat::Int:
-      return sizeof(int32_t);
+      elementSize = sizeof(int32_t);
+      break;
     case UniformFormat::Int2:
-      return 2 * sizeof(int32_t);
+      elementSize = 2 * sizeof(int32_t);
+      break;
     case UniformFormat::Int3:
-      return 3 * sizeof(int32_t);
+      elementSize = 3 * sizeof(int32_t);
+      break;
     case UniformFormat::Int4:
-      return 4 * sizeof(int32_t);
+      elementSize = 4 * sizeof(int32_t);
+      break;
     case UniformFormat::Texture2DSampler:
     case UniformFormat::TextureExternalSampler:
     case UniformFormat::Texture2DRectSampler:
-      return sizeof(int32_t);  // Samplers are represented as integers.
+      elementSize = sizeof(int32_t);  // Samplers are represented as integers.
+      break;
   }
-  return 0;
+  return elementSize * _count;
 }
 }  // namespace tgfx

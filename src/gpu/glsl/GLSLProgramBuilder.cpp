@@ -157,8 +157,11 @@ std::string GLSLProgramBuilder::getUniformBlockDeclaration(
     } else {
       precision = "";
     }
-    result +=
-        INDENT_STR + precision + " " + SLTypeString(var.type()) + " " + uniform.name() + ";\n";
+    result += INDENT_STR + precision + " " + SLTypeString(var.type()) + " " + uniform.name();
+    if (uniform.count() > 1) {
+      result += "[" + std::to_string(uniform.count()) + "]";
+    }
+    result += ";\n";
   }
   result += "};\n";
   return result;
