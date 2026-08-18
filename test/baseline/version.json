@@ -403,6 +403,8 @@
         "LinearGradientWhiteAlpha": "bf721f63",
         "NoiseEffects": "56f8f02d4",
         "NonRegularBlendMode": "bf721f63",
+        "PendingRasterFlushOnPoll": "692f781b",
+        "PendingRasterPlaceholder": "692f781b",
         "ShapeNoiseStyle": "4b3579dc4",
         "SimpleText": "984e8f18",
         "SrcBlendOverlap": "bf721f63",
