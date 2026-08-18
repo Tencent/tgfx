@@ -51,11 +51,9 @@ class PDFBitmap {
                                   PDFIndirectReference ref);
 
   /**
-   * Emits a fully transparent 1x1 image XObject. Every reserved object number must be emitted: an
-   * object that is never written keeps offset 0 in the cross reference table, which corrupts the
-   * whole file. So a failed rasterization writes this rather than skipping the object. The
-   * placeholder is transparent because the content stream stretches it over the whole image
-   * rectangle, where an opaque pixel would hide the content below it.
+   * Emits a fully transparent 1x1 image XObject, which is what a failed rasterization writes rather
+   * than skipping the object: an object number that is never emitted keeps offset 0 in the cross
+   * reference table and corrupts the whole file.
    */
   static void WritePlaceholder(PDFDocumentImpl* document, PDFIndirectReference ref);
 

@@ -314,8 +314,7 @@ void PDFDocumentImpl::endPage() {
   if (state == State::InPage) {
     onEndPage();
     state = State::BetweenPages;
-    // Write out whatever arrived while the page was being drawn, so its readback buffers are freed
-    // instead of living until close().
+    // Frees the readback buffers of whatever arrived while the page was drawn.
     flushPendingRasters(true);
   }
 }
@@ -339,8 +338,7 @@ void PDFDocumentImpl::close() {
 
 void PDFDocumentImpl::abort() {
   if (state != State::Closed) {
-    // The whole document is discarded, so the reserved object numbers never reach a cross
-    // reference table and the pending stream bodies can be dropped.
+    // No cross reference table is written, so the reserved object numbers can be dropped unemitted.
     pendingRasters.clear();
     onAbort();
     state = State::Closed;
@@ -348,8 +346,8 @@ void PDFDocumentImpl::abort() {
 }
 
 bool PDFDocumentImpl::isReadyToClose() {
-  // Everything that has arrived is written here rather than at close(), which is what keeps the
-  // memory bounded to the readbacks still in flight while the caller polls.
+  // Writing the arrived rasters here instead of at close() is what bounds the memory to the
+  // readbacks still in flight.
   flushPendingRasters(true);
   return pendingRasters.empty();
 }
@@ -364,16 +362,13 @@ std::vector<std::shared_ptr<SurfaceReadback>> PDFDocumentImpl::pendingReadbacks(
 }
 
 void PDFDocumentImpl::addPendingRaster(PDFPendingRaster raster) {
-  // A raster is only deferred while its readback can still resolve; a failed one gets its
-  // placeholder written immediately instead of entering the queue.
   DEBUG_ASSERT(raster.readback != nullptr);
   pendingRasters.push_back(std::move(raster));
 }
 
 void PDFDocumentImpl::flushPendingRasters(bool readyOnly) {
-  // Moved out first, because emitting into pendingRasters while iterating it would invalidate the
-  // iterators. std::exchange rather than a plain move, so the vector is guaranteed to be an empty
-  // one that the not-ready rasters can be put back into.
+  // std::exchange rather than a plain move, so the not-ready rasters can be put back into a
+  // guaranteed empty vector without invalidating the iterators being walked here.
   auto rasters = std::exchange(pendingRasters, {});
   for (auto& raster : rasters) {
     if (readyOnly && !raster.readback->isReady(_context)) {
@@ -381,8 +376,7 @@ void PDFDocumentImpl::flushPendingRasters(bool readyOnly) {
       continue;
     }
     // Checking readiness first avoids the synchronous queue wait inside lockPixels() for a readback
-    // that cannot deliver anything yet. Re-entering the mapping itself is harmless,
-    // WebGPUBuffer::requestMapAsync() already ignores a request while one is pending.
+    // that cannot deliver anything yet.
     const void* srcPixels = nullptr;
     if (raster.readback->isReady(_context)) {
       srcPixels = raster.readback->lockPixels(_context);
@@ -400,9 +394,8 @@ void PDFDocumentImpl::flushPendingRasters(bool readyOnly) {
     raster.readback->unlockPixels(_context);
   }
   // Emitting an image object only writes stream bodies and never draws back into the document, so
-  // nothing can be queued while flushing. A raster appearing here could no longer become ready
-  // within this call and would degrade to a placeholder, so the invariant is asserted instead of
-  // being papered over with another round.
+  // nothing can be queued while flushing. A raster appearing here could no longer become ready and
+  // would degrade to a placeholder, so the invariant is asserted rather than handled.
   DEBUG_ASSERT(readyOnly || pendingRasters.empty());
 }
 

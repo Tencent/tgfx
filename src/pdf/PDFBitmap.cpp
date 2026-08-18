@@ -385,20 +385,18 @@ void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int encoding
   }
   auto flipY = surface->origin() == ImageOrigin::BottomLeft;
 
-  // Deliberately not Surface::readPixels(): it logs an error whenever the pixels are not available
-  // yet, which is the normal first outcome on WebGPU and would fire once per image. lockPixels()
-  // blocks until the data is ready on backends that can block, and starts the async mapping on the
-  // ones that cannot.
+  // Deliberately not Surface::readPixels(): it reports a pending readback as an error, which is the
+  // normal first outcome on WebGPU. lockPixels() blocks on backends that can block, and starts the
+  // async mapping on the ones that cannot.
   if (auto* srcPixels = readback->lockPixels(doc->context())) {
     WriteReadbackPixels(readback->info(), srcPixels, flipY, encodingQuality, doc, ref);
     readback->unlockPixels(doc->context());
     return;
   }
 
-  // A ready buffer that still yields no pixels is a genuine failure, not an async wait, so report
-  // it here where the image is still in context instead of letting it look like a pending readback.
-  // A missing readback buffer is the same kind of failure: isReady() can never turn true for it, so
-  // deferring would make isReadyToClose() reject the caller forever.
+  // A ready buffer that still yields no pixels is a genuine failure, not an async wait. So is a
+  // missing readback buffer: isReady() can never turn true for it, so deferring would make
+  // isReadyToClose() reject the caller forever.
   if (readback->isReady(doc->context()) || readback->getGPUBuffer(doc->context()) == nullptr) {
     LOGE("PDFBitmap::SerializeImage() Failed to read the pixels from the surface! (%dx%d)",
          surface->width(), surface->height());
@@ -428,16 +426,14 @@ void PDFBitmap::WriteReadbackPixels(const ImageInfo& srcInfo, const void* srcPix
   // Always use RGBA_8888 format for PDF export to ensure consistent pixel layout across all
   // platforms. RGBA is the industry standard format used by PNG, JPEG, and PDF's DeviceRGB.
   // This avoids R/B channel swap issues between platforms with different native formats. Bitmap
-  // always reports a premultiplied layout, so the buffer is described explicitly here: the row
-  // stride comes from the Bitmap and the alpha type matches what is written into it.
+  // always reports a premultiplied layout, so the alpha type is described explicitly here.
   auto dstInfo =
       ImageInfo::Make(srcInfo.width(), srcInfo.height(), ColorType::RGBA_8888,
                       AlphaType::Unpremultiplied, bitmap.info().rowBytes(), srcInfo.colorSpace());
   // srcInfo carries the readback row alignment (256 bytes on WebGPU), so the source stride can
   // exceed the destination stride; CopyPixels walks both instead of a flat memcpy.
   CopyPixels(srcInfo, srcPixels, dstInfo, dstPixels, flipY);
-  // dstInfo is Unpremultiplied, so isOpaque() could never be true here: every image gets an SMask.
-  // Passing the constant keeps this from reading like actual opacity detection.
+  // dstInfo is Unpremultiplied, so isOpaque() could never be true here.
   // TODO: derive opacity from the alpha channel so opaque images can skip the SMask object.
   WritePixmap(Pixmap(dstInfo, dstPixels), false, encodingQuality, document, ref);
   bitmap.unlockPixels();
@@ -460,9 +456,8 @@ void PDFBitmap::WritePixmap(const Pixmap& pixmap, bool isOpaque, int encodingQua
 void PDFBitmap::WritePlaceholder(PDFDocumentImpl* document, PDFIndirectReference ref) {
   static constexpr uint8_t WhitePixel[3] = {0xFF, 0xFF, 0xFF};
   static constexpr uint8_t TransparentAlpha[1] = {0x00};
-  // The single pixel is stretched over the whole image rectangle by the content stream, so an
-  // opaque placeholder would paint a solid box over the content below it. A zero SMask keeps the
-  // reserved object emitted while staying invisible.
+  // The content stream stretches the single pixel over the whole image rectangle, so an opaque
+  // placeholder would paint a solid box over the content below it.
   auto sMask = document->reserveRef();
   auto streamWriter = [](const std::shared_ptr<WriteStream>& stream) {
     stream->write(WhitePixel, sizeof(WhitePixel));

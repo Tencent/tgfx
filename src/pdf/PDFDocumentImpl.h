@@ -78,11 +78,11 @@ struct PDFLink {
 /**
  * An image XObject whose pixels are still being read back from the GPU. The object number is
  * reserved up front so drawing can reference it immediately, and the stream body is emitted later
- * from flushPendingRasters(). PDF allows indirect objects in any file order, and the cross
- * reference table indexes offsets by object number, so writing out of order stays valid.
+ * from flushPendingRasters(). PDF indexes cross reference offsets by object number, so writing the
+ * body out of order stays valid.
  * @note The Surface is intentionally not retained: the transfer task already holds a reference to
- * its render target, so the readback stays valid on its own and keeping the Surface alive would
- * pin one full-size render target per pending image.
+ * its render target, so keeping the Surface alive would only pin one extra full-size render target
+ * per pending image.
  */
 struct PDFPendingRaster {
   PDFIndirectReference ref;
@@ -204,11 +204,10 @@ class PDFDocumentImpl : public PDFDocument {
 
   /**
    * Emits the stream body of every pending raster. Must run before onClose() writes the cross
-   * reference table: every reserved object number has to be emitted, otherwise its offset stays 0
-   * and the table is corrupt. Rasters that are still not ready fall back to a blank placeholder.
-   * @param readyOnly Only emits the rasters whose pixels have already arrived and keeps the rest
-   * queued, so their GPU buffers are released as early as possible instead of piling up until
-   * close(). No placeholder is written in this mode.
+   * reference table: an object number that is never emitted keeps offset 0 and corrupts the table,
+   * so a raster that is still not ready falls back to a blank placeholder.
+   * @param readyOnly Only emits the rasters whose pixels have already arrived, releasing their GPU
+   * buffers early and keeping the rest queued. No placeholder is written in this mode.
    */
   void flushPendingRasters(bool readyOnly = false);
 

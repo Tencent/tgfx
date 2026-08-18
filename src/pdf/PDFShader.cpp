@@ -60,9 +60,8 @@ Bitmap ImageExportToBitmap(Context* context, const std::shared_ptr<Image>& image
   canvas->drawImage(image);
 
   // Deliberately not Surface::readPixels(): it cannot tell a pending readback apart from a real
-  // failure and reports both as an error. Here the distinction matters, so a buffer that is ready
-  // yet still yields nothing is reported as a failure, while a pending one degrades quietly and
-  // lets the caller report the resulting content gap once per shader.
+  // failure and reports both as an error. Here a pending one degrades quietly and lets the caller
+  // report the resulting content gap, while a ready buffer yielding nothing stays a failure.
   auto readback = surface->asyncReadPixels(Rect::MakeWH(surface->width(), surface->height()));
   if (readback == nullptr) {
     LOGE("PDFShader ImageExportToBitmap() Failed to start the readback! (%dx%d)", surface->width(),
@@ -80,8 +79,8 @@ Bitmap ImageExportToBitmap(Context* context, const std::shared_ptr<Image>& image
   Bitmap bitmap(surface->width(), surface->height(), false, true, surface->colorSpace());
   auto* dstPixels = bitmap.lockPixels();
   if (dstPixels == nullptr) {
-    // The caller only checks isEmpty(), so an allocated but unwritten Bitmap must not escape: it
-    // would feed uninitialized memory into the clamp edge colors.
+    // The caller only checks isEmpty(), so an allocated but unwritten Bitmap must not escape: its
+    // uninitialized memory would end up in the clamp edge colors.
     LOGE("PDFShader ImageExportToBitmap() Failed to lock the bitmap pixels!");
     readback->unlockPixels(context);
     return {};
@@ -267,9 +266,8 @@ PDFIndirectReference PDFShader::MakeImageShader(PDFDocumentImpl* doc, Matrix fin
   // Reading the pixels back can fail, for instance on a backend without synchronous readback. The
   // clamp handling below indexes bitmap.width() - 1, which would be -1 on an empty bitmap, so drop
   // the stretched edges and emit the pattern body alone.
-  // TODO: On backends without synchronous readback this happens for every Clamp-tiled image, which
-  // is a permanent content gap. Derive the corners and edge strips from image->makeSubset() and
-  // draw them on the GPU so the clamp handling needs no pixel readback at all.
+  // TODO: derive the corners and edge strips from image->makeSubset() and draw them on the GPU, so
+  // the clamp handling needs no pixel readback at all.
   if (bitmap.isEmpty() && (tileModesX == TileMode::Clamp || tileModesY == TileMode::Clamp)) {
     LOGE("PDFShader::MakeImageShader() Clamp edges are dropped, the pixels are unavailable!");
   }

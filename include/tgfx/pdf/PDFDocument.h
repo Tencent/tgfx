@@ -84,8 +84,7 @@ class PDFDocument {
    * return true.
    * @note This is not a pure query: every readback that has arrived is written into the document
    * right away so its GPU buffer can be released. Polling this once per turn of the event loop
-   * therefore keeps only the still-pending readbacks in memory, instead of holding one buffer per
-   * image until close().
+   * therefore keeps only the still-pending readbacks in memory.
    */
   virtual bool isReadyToClose() = 0;
 
