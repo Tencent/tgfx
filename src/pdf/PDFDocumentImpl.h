@@ -106,10 +106,6 @@ class PDFDocumentImpl : public PDFDocument {
 
   void abort() override;
 
-  bool hasPendingRasters() const override {
-    return !pendingRasters.empty();
-  }
-
   bool isReadyToClose() const override;
 
   std::vector<std::shared_ptr<SurfaceReadback>> pendingReadbacks() const override;

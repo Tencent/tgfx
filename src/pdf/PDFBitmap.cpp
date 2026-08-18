@@ -397,7 +397,9 @@ void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int encoding
 
   // A ready buffer that still yields no pixels is a genuine failure, not an async wait, so report
   // it here where the image is still in context instead of letting it look like a pending readback.
-  if (readback->isReady(doc->context())) {
+  // A missing readback buffer is the same kind of failure: isReady() can never turn true for it, so
+  // deferring would make isReadyToClose() reject the caller forever.
+  if (readback->isReady(doc->context()) || readback->getGPUBuffer(doc->context()) == nullptr) {
     LOGE("PDFBitmap::SerializeImage() Failed to read the pixels from the surface! (%dx%d)",
          surface->width(), surface->height());
     WritePlaceholder(doc, ref);
@@ -410,11 +412,6 @@ void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int encoding
 void PDFBitmap::WriteReadbackPixels(const ImageInfo& srcInfo, const void* srcPixels, bool flipY,
                                     int encodingQuality, PDFDocumentImpl* document,
                                     PDFIndirectReference ref) {
-  // Always use RGBA_8888 format for PDF export to ensure consistent pixel layout across all
-  // platforms. RGBA is the industry standard format used by PNG, JPEG, and PDF's DeviceRGB.
-  // This avoids R/B channel swap issues between platforms with different native formats.
-  auto dstInfo = ImageInfo::Make(srcInfo.width(), srcInfo.height(), ColorType::RGBA_8888,
-                                 AlphaType::Unpremultiplied, 0, srcInfo.colorSpace());
   Bitmap bitmap(srcInfo.width(), srcInfo.height(), false, false, srcInfo.colorSpace());
   if (bitmap.isEmpty()) {
     LOGE("PDFBitmap::WriteReadbackPixels() Failed to allocate the bitmap! (%dx%d)", srcInfo.width(),
@@ -428,11 +425,19 @@ void PDFBitmap::WriteReadbackPixels(const ImageInfo& srcInfo, const void* srcPix
     WritePlaceholder(document, ref);
     return;
   }
+  // Always use RGBA_8888 format for PDF export to ensure consistent pixel layout across all
+  // platforms. RGBA is the industry standard format used by PNG, JPEG, and PDF's DeviceRGB.
+  // This avoids R/B channel swap issues between platforms with different native formats. Bitmap
+  // always reports a premultiplied layout, so the buffer is described explicitly here: the row
+  // stride comes from the Bitmap and the alpha type matches what is written into it.
+  auto dstInfo =
+      ImageInfo::Make(srcInfo.width(), srcInfo.height(), ColorType::RGBA_8888,
+                      AlphaType::Unpremultiplied, bitmap.info().rowBytes(), srcInfo.colorSpace());
   // srcInfo carries the readback row alignment (256 bytes on WebGPU), so the source stride can
   // exceed the destination stride; CopyPixels walks both instead of a flat memcpy.
   CopyPixels(srcInfo, srcPixels, dstInfo, dstPixels, flipY);
+  WritePixmap(Pixmap(dstInfo, dstPixels), dstInfo.isOpaque(), encodingQuality, document, ref);
   bitmap.unlockPixels();
-  WritePixmap(Pixmap(bitmap), bitmap.isOpaque(), encodingQuality, document, ref);
 }
 
 void PDFBitmap::WritePixmap(const Pixmap& pixmap, bool isOpaque, int encodingQuality,
@@ -451,11 +456,21 @@ void PDFBitmap::WritePixmap(const Pixmap& pixmap, bool isOpaque, int encodingQua
 
 void PDFBitmap::WritePlaceholder(PDFDocumentImpl* document, PDFIndirectReference ref) {
   static constexpr uint8_t WhitePixel[3] = {0xFF, 0xFF, 0xFF};
+  static constexpr uint8_t TransparentAlpha[1] = {0x00};
+  // The single pixel is stretched over the whole image rectangle by the content stream, so an
+  // opaque placeholder would paint a solid box over the content below it. A zero SMask keeps the
+  // reserved object emitted while staying invisible.
+  auto sMask = document->reserveRef();
   auto streamWriter = [](const std::shared_ptr<WriteStream>& stream) {
     stream->write(WhitePixel, sizeof(WhitePixel));
   };
   EmitImageStream(document, ref, streamWriter, ISize::Make(1, 1), PDFUnion::Name("DeviceRGB"),
-                  PDFIndirectReference(), static_cast<int>(sizeof(WhitePixel)),
+                  sMask, static_cast<int>(sizeof(WhitePixel)), PDFStreamFormat::Uncompressed);
+  auto alphaWriter = [](const std::shared_ptr<WriteStream>& stream) {
+    stream->write(TransparentAlpha, sizeof(TransparentAlpha));
+  };
+  EmitImageStream(document, sMask, alphaWriter, ISize::Make(1, 1), PDFUnion::Name("DeviceGray"),
+                  PDFIndirectReference(), static_cast<int>(sizeof(TransparentAlpha)),
                   PDFStreamFormat::Uncompressed);
 }
 

@@ -62,10 +62,17 @@ EM_JS(int, WebGPUHasPreinitializedDevice, (), {
 static bool CanGetPreinitializedDevice() {
 #ifdef __EMSCRIPTEN_PTHREADS__
   if (!emscripten_is_main_runtime_thread()) {
+    LOGE(
+        "[WebGPU] WebGPUDevice::Make() is only available on the main runtime thread, use "
+        "WebGPUDevice::MakeFrom() with the device owned by this thread!");
     return false;
   }
 #endif
-  return WebGPUHasPreinitializedDevice() != 0;
+  if (WebGPUHasPreinitializedDevice() == 0) {
+    LOGE("[WebGPU] Module.preinitializedWebGPUDevice is not set, WebGPUDevice::Make() failed!");
+    return false;
+  }
+  return true;
 }
 
 std::shared_ptr<WebGPUDevice> WebGPUDevice::Make() {

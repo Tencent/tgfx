@@ -346,9 +346,7 @@ void PDFDocumentImpl::abort() {
 
 bool PDFDocumentImpl::isReadyToClose() const {
   for (const auto& raster : pendingRasters) {
-    // A null readback means the raster already failed; close() writes a placeholder for it and
-    // must not be blocked waiting on something that will never arrive.
-    if (raster.readback != nullptr && !raster.readback->isReady(_context)) {
+    if (!raster.readback->isReady(_context)) {
       return false;
     }
   }
@@ -359,44 +357,46 @@ std::vector<std::shared_ptr<SurfaceReadback>> PDFDocumentImpl::pendingReadbacks(
   std::vector<std::shared_ptr<SurfaceReadback>> readbacks;
   readbacks.reserve(pendingRasters.size());
   for (const auto& raster : pendingRasters) {
-    if (raster.readback != nullptr) {
-      readbacks.push_back(raster.readback);
-    }
+    readbacks.push_back(raster.readback);
   }
   return readbacks;
 }
 
 void PDFDocumentImpl::addPendingRaster(PDFPendingRaster raster) {
+  // A raster is only deferred while its readback can still resolve; a failed one gets its
+  // placeholder written immediately instead of entering the queue.
+  DEBUG_ASSERT(raster.readback != nullptr);
   pendingRasters.push_back(std::move(raster));
 }
 
 void PDFDocumentImpl::flushPendingRasters() {
-  if (pendingRasters.empty()) {
-    return;
-  }
   // Moved out first: emitting an image object can draw into the document again, and appending to a
-  // vector while iterating it would invalidate the iterators.
-  auto rasters = std::move(pendingRasters);
-  pendingRasters.clear();
-  for (auto& raster : rasters) {
-    // The readiness check has to come first: locking a readback whose mapping is still pending
-    // issues a second mapAsync on the same buffer, which is a validation error on WebGPU and also
-    // resets the buffer's ready state.
-    const void* srcPixels = nullptr;
-    if (raster.readback != nullptr && raster.readback->isReady(_context)) {
-      srcPixels = raster.readback->lockPixels(_context);
+  // vector while iterating it would invalidate the iterators. Anything queued while flushing has to
+  // be flushed as well, otherwise its reserved object number is never emitted and its cross
+  // reference offset stays 0.
+  while (!pendingRasters.empty()) {
+    auto rasters = std::move(pendingRasters);
+    pendingRasters.clear();
+    for (auto& raster : rasters) {
+      // The readiness check has to come first: locking a readback whose mapping is still pending
+      // issues a second mapAsync on the same buffer, which is a validation error on WebGPU and also
+      // resets the buffer's ready state.
+      const void* srcPixels = nullptr;
+      if (raster.readback->isReady(_context)) {
+        srcPixels = raster.readback->lockPixels(_context);
+      }
+      if (srcPixels == nullptr) {
+        LOGE(
+            "PDFDocumentImpl::flushPendingRasters() Pixels never arrived for object %d, writing a "
+            "placeholder!",
+            raster.ref.value);
+        PDFBitmap::WritePlaceholder(this, raster.ref);
+        continue;
+      }
+      PDFBitmap::WriteReadbackPixels(raster.readback->info(), srcPixels, raster.flipY,
+                                     raster.encodingQuality, this, raster.ref);
+      raster.readback->unlockPixels(_context);
     }
-    if (srcPixels == nullptr) {
-      LOGE(
-          "PDFDocumentImpl::flushPendingRasters() Pixels never arrived for object %d, writing a "
-          "placeholder!",
-          raster.ref.value);
-      PDFBitmap::WritePlaceholder(this, raster.ref);
-      continue;
-    }
-    PDFBitmap::WriteReadbackPixels(raster.readback->info(), srcPixels, raster.flipY,
-                                   raster.encodingQuality, this, raster.ref);
-    raster.readback->unlockPixels(_context);
   }
 }
 

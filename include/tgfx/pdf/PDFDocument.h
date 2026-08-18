@@ -64,9 +64,11 @@ class PDFDocument {
   virtual void endPage() = 0;
 
   /**
-   * Ends the current page and closes the document.
-   * @note Raster content whose pixels are not yet available is written as a blank placeholder. Call
-   * isReadyToClose() first on backends that report pending readbacks.
+   * Ends the current page and closes the document. The Context passed to Make() must still be alive
+   * and ready for GPU work, because raster content whose pixels have not arrived yet is resolved
+   * here.
+   * @note Raster content whose pixels are still unavailable is written as a transparent
+   * placeholder. Call isReadyToClose() first on backends that report pending readbacks.
    */
   virtual void close() = 0;
 
@@ -76,21 +78,16 @@ class PDFDocument {
   virtual void abort() = 0;
 
   /**
-   * Returns true if some raster content is still waiting for its pixels to be read back from the
-   * GPU. This only happens on backends without synchronous pixel readback, such as WebGPU; other
-   * backends resolve every readback inline and always return false.
-   */
-  virtual bool hasPendingRasters() const = 0;
-
-  /**
-   * Returns true when close() is able to produce a complete document. Backends with synchronous
-   * pixel readback always return true.
+   * Returns true when close() is able to produce a complete document. Some raster content may still
+   * be waiting for its pixels to be read back from the GPU, which only happens on backends without
+   * synchronous pixel readback, such as WebGPU. Backends that resolve every readback inline always
+   * return true.
    */
   virtual bool isReadyToClose() const = 0;
 
   /**
    * Returns the readbacks that close() is still waiting on, so the caller can poll them without
-   * blocking the event loop. Empty when hasPendingRasters() is false.
+   * blocking the event loop. Empty when isReadyToClose() returns true.
    */
   virtual std::vector<std::shared_ptr<SurfaceReadback>> pendingReadbacks() const = 0;
 };
