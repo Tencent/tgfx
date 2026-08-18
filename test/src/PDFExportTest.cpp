@@ -34,6 +34,8 @@
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/core/Stroke.h"
+#include "tgfx/core/Surface.h"
+#include "tgfx/core/SurfaceReadback.h"
 #include "tgfx/core/TileMode.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/core/WriteStream.h"
@@ -349,6 +351,74 @@ TGFX_TEST(PDFExportTest, DrawImageRectSubset) {
   PDFStream->flush();
 
   EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/DrawImageRectSubset"));
+}
+
+TGFX_TEST(PDFExportTest, PendingRasterPlaceholder) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  // A readback whose transfer task has never been flushed reports isReady() == false on every
+  // backend because the readback buffer does not exist yet, which drives a desktop run through
+  // the pending raster path (requeue on endPage, placeholder on close) without WebGPU.
+  auto source = Surface::Make(context, 10, 10);
+  EXPECT_TRUE(source != nullptr);
+  source->getCanvas()->clear(Color::White());
+  auto neverReady = source->asyncReadPixels(Rect::MakeWH(10, 10));
+  EXPECT_TRUE(neverReady != nullptr);
+  EXPECT_FALSE(neverReady->isReady(context));
+
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  auto documentImpl = static_cast<PDFDocumentImpl*>(document.get());
+  auto canvas = document->beginPage(100.f, 100.f);
+  canvas->clear(Color::Red());
+  documentImpl->addPendingRaster({documentImpl->reserveRef(), neverReady, 101, false});
+  document->endPage();
+
+  EXPECT_FALSE(document->isReadyToClose());
+  auto pending = document->pendingReadbacks();
+  EXPECT_EQ(pending.size(), 1u);
+  EXPECT_TRUE(pending[0] == neverReady);
+
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/PendingRasterPlaceholder"));
+}
+
+TGFX_TEST(PDFExportTest, PendingRasterFlushOnPoll) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  // A readback that has been locked and unlocked once keeps reporting isReady() == true on desktop
+  // backends (GL fence signaled, Metal command buffer completed, Vulkan always ready), so the
+  // isReadyToClose() poll below flushes real pixels into the document instead of a placeholder.
+  auto source = Surface::Make(context, 10, 10);
+  EXPECT_TRUE(source != nullptr);
+  source->getCanvas()->clear(Color::Green());
+  auto readback = source->asyncReadPixels(Rect::MakeWH(10, 10));
+  EXPECT_TRUE(readback != nullptr);
+  EXPECT_TRUE(readback->lockPixels(context) != nullptr);
+  readback->unlockPixels(context);
+  EXPECT_TRUE(readback->isReady(context));
+
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  auto documentImpl = static_cast<PDFDocumentImpl*>(document.get());
+  auto canvas = document->beginPage(100.f, 100.f);
+  canvas->clear(Color::Red());
+  documentImpl->addPendingRaster({documentImpl->reserveRef(), readback, 101, false});
+  document->endPage();
+
+  EXPECT_TRUE(document->isReadyToClose());
+  EXPECT_TRUE(document->pendingReadbacks().empty());
+
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/PendingRasterFlushOnPoll"));
 }
 
 TGFX_TEST(PDFExportTest, Complex) {
