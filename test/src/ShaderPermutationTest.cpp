@@ -731,9 +731,9 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   if (dashPos != std::string::npos) {
     expectedTag = expectedTag.substr(0, dashPos);
   }
-  // The opengl bundle carries the TEXTURE_KIND=Rect fragment variants (16 extra entries); other
-  // backends compile TwoD variants only.
-  EXPECT_EQ(cache->fragmentEntryCount(), expectedTag == "opengl" ? 323u : 271u);
+  // The opengl bundle carries the TEXTURE_KIND=Rect fragment variants (64 extra entries across
+  // the armed kernels); other backends compile TwoD variants only.
+  EXPECT_EQ(cache->fragmentEntryCount(), expectedTag == "opengl" ? 335u : 271u);
   EXPECT_EQ(cache->profileTag(), expectedTag);
   cache->unload();
 }
@@ -1192,7 +1192,7 @@ TGFX_TEST(ShaderPermutationTest, CompressedBundleLoad) {
       tag = tag.substr(0, dash);
     }
     // The opengl bundle carries the TEXTURE_KIND=Rect fragment variants (16 extra entries).
-    EXPECT_EQ(compressedOnly.fragmentEntryCount(), tag == "opengl" ? 323u : 271u);
+    EXPECT_EQ(compressedOnly.fragmentEntryCount(), tag == "opengl" ? 335u : 271u);
     EXPECT_EQ(compressedOnly.profileTag(), tag);
     return;
   }

@@ -1473,6 +1473,7 @@ static std::optional<PermutationMatchResult> TryMatchNonAARRectFill(
   }
   auto* ngp = static_cast<const NonAARRectGeometryProcessor*>(gp);
   int textured = 0;
+  int textureKind = 0;
   if (programInfo->numFragmentProcessors() == 1) {
     auto fp = programInfo->getFragmentProcessor(0);
     // The textured variant carries the single-tap tiled modes only: the mipmap-repeat 4-tap path
@@ -1491,6 +1492,12 @@ static std::optional<PermutationMatchResult> TryMatchNonAARRectFill(
       return std::nullopt;
     }
     textured = 1;
+    // A rectangle texture may only bind to the sampler2DRect declaration of the TEXTURE_KIND=1
+    // variants (desktop GL images); the untextured variants keep TEXTURE_KIND=0.
+    textureKind = tte->textureAt(0) != nullptr &&
+                          tte->textureAt(0)->type() == TextureType::Rectangle
+                      ? 1
+                      : 0;
   }
   using D = NonAARRectFillShader::Dims;
   auto domain = D::domain();
@@ -1506,6 +1513,7 @@ static std::optional<PermutationMatchResult> TryMatchNonAARRectFill(
     fragValues[i] = values[i];
   }
   fragValues[FD::HAS_XP] = xpType;
+  fragValues[FD::TEXTURE_KIND] = textureKind;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"NonAARRectFillShader", vertIndex, fragIndex};
 }

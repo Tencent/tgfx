@@ -28,18 +28,22 @@ class NonAARRectFillShader : public PrecompiledShader {
   using D = Dims;
 
   struct FragDims {
-    enum : uint32_t { HAS_COMMON_COLOR, STROKE, TEXTURED, HAS_XP, COUNT };
+    // TEXTURE_KIND is the color texture's sampler type (0=TwoD, 1=Rect); it changes the sampler
+    // declaration, so it is a legitimate dimension. It is appended last so existing TwoD variant
+    // indices are unchanged. Rect variants compile only into the opengl bundle.
+    enum : uint32_t { HAS_COMMON_COLOR, STROKE, TEXTURED, HAS_XP, TEXTURE_KIND, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationBool("HAS_COMMON_COLOR"),
           PermutationBool("STROKE"),
           PermutationBool("TEXTURED"),
           PermutationInt("HAS_XP", 3),
+          PermutationEnum("TEXTURE_KIND", {"TwoD", "Rect"}),
       });
     }
   };
   using FD = FragDims;
-  static_assert(D::COUNT == 3 && FD::COUNT == 4,
+  static_assert(D::COUNT == 3 && FD::COUNT == 5,
                 "Update ShouldCompile below when dimensions change.");
 
   PrecompiledShaderInfo info() const override {
@@ -56,10 +60,14 @@ class NonAARRectFillShader : public PrecompiledShader {
 
  private:
   static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>& vertValues,
-                            const std::vector<int>&) {
+                            const std::vector<int>& fragValues) {
     // The textured variant carries no stroke-width sampling: stroked rrects with a shader are
     // not produced by the current callers, so the combination stays uncompiled.
-    return !(vertValues[D::TEXTURED] != 0 && vertValues[D::STROKE] != 0);
+    if (vertValues[D::TEXTURED] != 0 && vertValues[D::STROKE] != 0) {
+      return false;
+    }
+    // Framebuffer fetch (HAS_XP=2) is a Vulkan/Metal-only path; Rect variants are opengl-only.
+    return !(fragValues[FD::TEXTURE_KIND] == 1 && fragValues[FD::HAS_XP] == 2);
   }
 };
 
