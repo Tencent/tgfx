@@ -222,9 +222,10 @@ void PDFExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& s
                                      const Rect* /*strictRect*/) {
   auto subsetImage = image->makeSubset(srcRect);
   if (subsetImage == nullptr) {
+    LOGE("PDFExportContext::drawImageRect() Failed to make the image subset, the draw is skipped!");
     return;
   }
-  onDrawImageRect(image, dstRect, sampling, matrix, clip, brush);
+  onDrawImageRect(std::move(subsetImage), dstRect, sampling, matrix, clip, brush);
 }
 namespace {
 enum class BlendFastPath {
