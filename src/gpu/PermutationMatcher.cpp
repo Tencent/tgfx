@@ -1264,18 +1264,14 @@ static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
   if (sigma < 1 || sigma > 10) {
     return std::nullopt;
   }
-
-  using VD = GaussianBlur1DShader::VD;
-  auto vertDomain = VD::domain();
-  std::vector<int> vertValues(VD::COUNT);
-  auto vertIndex = vertDomain.encode(vertValues);
-
-  using FD = GaussianBlur1DShader::FD;
-  auto fragDomain = FD::domain();
-  std::vector<int> fragValues(FD::COUNT);
-  fragValues[FD::HAS_XP] = xpType;
-  auto fragIndex = fragDomain.encode(fragValues);
-  return PermutationMatchResult{"GaussianBlur1DShader", vertIndex, fragIndex};
+  GaussianBlur1DInputs inputs;
+  inputs.xpType = xpType;
+  auto composed = ComposeGaussianBlur1D(inputs);
+  if (!composed) {
+    return std::nullopt;
+  }
+  auto fragIndex = GaussianBlur1DShader::FD::domain().encode(composed->fragValues);
+  return PermutationMatchResult{"GaussianBlur1DShader", 0, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchHairlineLine(const ProgramInfo* programInfo) {

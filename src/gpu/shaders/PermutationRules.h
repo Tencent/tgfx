@@ -247,6 +247,15 @@ struct QuadTextureFillInputs {
 };
 
 /**
+ * Input contract of the GaussianBlur1DShader matcher rule. The blur child structure checks,
+ * tiled-mode limits, and sigma range are whole-draw rejections in Extract; sigma and the tiled
+ * child are runtime uniforms, so only the transfer type shapes dimensions.
+ */
+struct GaussianBlur1DInputs {
+  int xpType = -1;  // -1 = no representable XferProcessor.
+};
+
+/**
  * Dimension values a matcher rule produces for both stages, before domain encoding.
  */
 struct RuleComposedValues {
@@ -399,6 +408,12 @@ std::optional<RuleComposedValues> ComposeTiledTextureFill(
 std::optional<RuleComposedValues> ComposeQuadTextureFill(const QuadTextureFillInputs& inputs);
 
 /**
+ * Pure mapping for the GaussianBlur1DShader rule; see ComposeRoundStrokeRect for the sharing
+ * contract.
+ */
+std::optional<RuleComposedValues> ComposeGaussianBlur1D(const GaussianBlur1DInputs& inputs);
+
+/**
  * Returns every (vertIndex, fragIndex) pair the RoundStrokeRect rule can ever produce, by
  * enumerating the full input lattice through ComposeRoundStrokeRect.
  */
@@ -513,6 +528,11 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateTiledTextureFillReachable();
  * Returns every (vertIndex, fragIndex) pair the QuadTextureFill rule can ever produce.
  */
 std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadTextureFillReachable();
+
+/**
+ * Returns every (vertIndex, fragIndex) pair the GaussianBlur1D rule can ever produce.
+ */
+std::set<std::pair<uint32_t, uint32_t>> EnumerateGaussianBlur1DReachable();
 
 /**
  * Returns the reachable permutation set for a shader whose matcher rule has been migrated to the
