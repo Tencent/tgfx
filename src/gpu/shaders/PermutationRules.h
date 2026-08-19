@@ -266,6 +266,15 @@ struct TexturedEffectInputs {
 };
 
 /**
+ * Input contract of the PointwiseTailShader matcher rule. The tail source structure checks
+ * (plain vs device-space texture, perspective) are whole-draw rejections in Extract.
+ */
+struct PointwiseTailInputs {
+  bool hasCoverage = false;
+  int xpType = -1;  // -1 = no representable XferProcessor.
+};
+
+/**
  * Dimension values a matcher rule produces for both stages, before domain encoding.
  */
 struct RuleComposedValues {
@@ -430,6 +439,12 @@ std::optional<RuleComposedValues> ComposeGaussianBlur1D(const GaussianBlur1DInpu
 std::optional<RuleComposedValues> ComposeTexturedEffect(const TexturedEffectInputs& inputs);
 
 /**
+ * Pure mapping for the PointwiseTailShader rule; see ComposeRoundStrokeRect for the sharing
+ * contract.
+ */
+std::optional<RuleComposedValues> ComposePointwiseTail(const PointwiseTailInputs& inputs);
+
+/**
  * Returns every (vertIndex, fragIndex) pair the RoundStrokeRect rule can ever produce, by
  * enumerating the full input lattice through ComposeRoundStrokeRect.
  */
@@ -554,6 +569,11 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateGaussianBlur1DReachable();
  * Returns every (vertIndex, fragIndex) pair the TexturedEffect rule can ever produce.
  */
 std::set<std::pair<uint32_t, uint32_t>> EnumerateTexturedEffectReachable();
+
+/**
+ * Returns every (vertIndex, fragIndex) pair the PointwiseTail rule can ever produce.
+ */
+std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseTailReachable();
 
 /**
  * Returns the reachable permutation set for a shader whose matcher rule has been migrated to the

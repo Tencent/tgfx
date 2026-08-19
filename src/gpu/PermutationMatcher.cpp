@@ -659,16 +659,15 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseTail(const Program
   }
 
   int hasCoverage = GetGPCoverage(gp);
-  using VD = PointwiseTailShader::VD;
-  std::vector<int> vertValues(VD::COUNT, 0);
-  vertValues[VD::HAS_COVERAGE] = hasCoverage;
-  auto vertIndex = VD::domain().encode(vertValues);
-
-  using FD = PointwiseTailShader::FD;
-  std::vector<int> fragValues(FD::COUNT, 0);
-  fragValues[FD::HAS_XP] = xpType;
-  fragValues[FD::HAS_COVERAGE] = hasCoverage;
-  auto fragIndex = FD::domain().encode(fragValues);
+  PointwiseTailInputs inputs;
+  inputs.hasCoverage = hasCoverage != 0;
+  inputs.xpType = xpType;
+  auto composed = ComposePointwiseTail(inputs);
+  if (!composed) {
+    return std::nullopt;
+  }
+  auto vertIndex = PointwiseTailShader::VD::domain().encode(composed->vertValues);
+  auto fragIndex = PointwiseTailShader::FD::domain().encode(composed->fragValues);
   return PermutationMatchResult{"PointwiseTailShader", vertIndex, fragIndex};
 }
 
