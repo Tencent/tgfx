@@ -188,6 +188,16 @@ struct DeviceSpaceTextureInputs {
 };
 
 /**
+ * Input contract of the DeviceSpaceTexturedEffectShader matcher rule. The GP kind, quad
+ * attribute constraints, and Compose(DeviceSpaceTexture, pointwise) structure checks are
+ * whole-draw rejections in Extract; only coverage and the transfer type shape dimensions.
+ */
+struct DeviceSpaceTexturedEffectInputs {
+  bool hasCoverage = false;
+  int xpType = -1;  // -1 = no representable XferProcessor.
+};
+
+/**
  * Dimension values a matcher rule produces for both stages, before domain encoding.
  */
 struct RuleComposedValues {
@@ -300,6 +310,13 @@ std::optional<RuleComposedValues> ComposeDeviceSpaceTexture(
     const DeviceSpaceTextureInputs& inputs);
 
 /**
+ * Pure mapping for the DeviceSpaceTexturedEffectShader rule; see ComposeRoundStrokeRect for the
+ * sharing contract.
+ */
+std::optional<RuleComposedValues> ComposeDeviceSpaceTexturedEffect(
+    const DeviceSpaceTexturedEffectInputs& inputs);
+
+/**
  * Returns every (vertIndex, fragIndex) pair the RoundStrokeRect rule can ever produce, by
  * enumerating the full input lattice through ComposeRoundStrokeRect.
  */
@@ -384,6 +401,11 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateYUVTextureFillReachable();
  * Returns every (vertIndex, fragIndex) pair the DeviceSpaceTexture rule can ever produce.
  */
 std::set<std::pair<uint32_t, uint32_t>> EnumerateDeviceSpaceTextureReachable();
+
+/**
+ * Returns every (vertIndex, fragIndex) pair the DeviceSpaceTexturedEffect rule can ever produce.
+ */
+std::set<std::pair<uint32_t, uint32_t>> EnumerateDeviceSpaceTexturedEffectReachable();
 
 /**
  * Returns the reachable permutation set for a shader whose matcher rule has been migrated to the

@@ -21,6 +21,7 @@
 #include "gpu/shaders/level1/ComplexNonAARRectFillShader.h"
 #include "gpu/shaders/level1/ConstColorShader.h"
 #include "gpu/shaders/level1/DeviceSpaceTextureShader.h"
+#include "gpu/shaders/level1/DeviceSpaceTexturedEffectShader.h"
 #include "gpu/shaders/level1/EllipseFillShader.h"
 #include "gpu/shaders/level1/HairlineLineShader.h"
 #include "gpu/shaders/level1/HairlineQuadShader.h"
@@ -616,6 +617,43 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateDeviceSpaceTextureReachable() {
   return result;
 }
 
+std::optional<RuleComposedValues> ComposeDeviceSpaceTexturedEffect(
+    const DeviceSpaceTexturedEffectInputs& inputs) {
+  if (inputs.xpType < 0) {
+    return std::nullopt;
+  }
+  using VD = DeviceSpaceTexturedEffectShader::VD;
+  using FD = DeviceSpaceTexturedEffectShader::FD;
+  RuleComposedValues values;
+  values.vertValues.resize(VD::COUNT);
+  values.vertValues[VD::HAS_COVERAGE] = inputs.hasCoverage ? 1 : 0;
+  values.fragValues.resize(FD::COUNT);
+  values.fragValues[FD::HAS_XP] = inputs.xpType;
+  values.fragValues[FD::HAS_COVERAGE] = values.vertValues[VD::HAS_COVERAGE];
+  return values;
+}
+
+std::set<std::pair<uint32_t, uint32_t>> EnumerateDeviceSpaceTexturedEffectReachable() {
+  std::set<std::pair<uint32_t, uint32_t>> result;
+  for (int hasCoverage = 0; hasCoverage <= 1; ++hasCoverage) {
+    for (int xpType = -1; xpType <= 2; ++xpType) {
+      DeviceSpaceTexturedEffectInputs inputs;
+      inputs.hasCoverage = hasCoverage != 0;
+      inputs.xpType = xpType;
+      auto composed = ComposeDeviceSpaceTexturedEffect(inputs);
+      if (!composed) {
+        continue;
+      }
+      auto vertIndex =
+          DeviceSpaceTexturedEffectShader::VD::domain().encode(composed->vertValues);
+      auto fragIndex =
+          DeviceSpaceTexturedEffectShader::FD::domain().encode(composed->fragValues);
+      result.insert({vertIndex, fragIndex});
+    }
+  }
+  return result;
+}
+
 std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermutations(
     const std::string& shaderName) {
   if (shaderName == "RoundStrokeRectFillShader") {
@@ -668,6 +706,9 @@ std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermuta
   }
   if (shaderName == "DeviceSpaceTextureShader") {
     return EnumerateDeviceSpaceTextureReachable();
+  }
+  if (shaderName == "DeviceSpaceTexturedEffectShader") {
+    return EnumerateDeviceSpaceTexturedEffectReachable();
   }
   return std::nullopt;
 }

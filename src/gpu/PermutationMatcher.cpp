@@ -854,18 +854,17 @@ static std::optional<PermutationMatchResult> TryMatchDeviceSpaceTexturedEffect(
       pointwise->name() != "LumaFragmentProcessor") {
     return std::nullopt;
   }
-
-  int hasCoverage = GetGPCoverage(gp);
-  using VD = DeviceSpaceTexturedEffectShader::VD;
-  std::vector<int> vertValues(VD::COUNT, 0);
-  vertValues[VD::HAS_COVERAGE] = hasCoverage;
-  auto vertIndex = VD::domain().encode(vertValues);
-
-  using FD = DeviceSpaceTexturedEffectShader::FD;
-  std::vector<int> fragValues(FD::COUNT, 0);
-  fragValues[FD::HAS_XP] = xpType;
-  fragValues[FD::HAS_COVERAGE] = hasCoverage;
-  auto fragIndex = FD::domain().encode(fragValues);
+  DeviceSpaceTexturedEffectInputs inputs;
+  inputs.hasCoverage = GetGPCoverage(gp) != 0;
+  inputs.xpType = GetXPType(programInfo);
+  auto composed = ComposeDeviceSpaceTexturedEffect(inputs);
+  if (!composed) {
+    return std::nullopt;
+  }
+  auto vertIndex =
+      DeviceSpaceTexturedEffectShader::VD::domain().encode(composed->vertValues);
+  auto fragIndex =
+      DeviceSpaceTexturedEffectShader::FD::domain().encode(composed->fragValues);
   return PermutationMatchResult{"DeviceSpaceTexturedEffectShader", vertIndex, fragIndex};
 }
 
