@@ -507,13 +507,30 @@ static bool WriteReportJson(const BuildReport& report, const std::string& outDir
     return false;
   }
   auto artifactStats = CollectArtifactStats(report.variants, report.profileErrorCounts);
+  // Per-shader logical stage bytes: each unique (shader, permutationIndex) stage counts once.
+  std::map<std::string, std::pair<uint64_t, uint64_t>> shaderStageBytes;
+  std::set<std::pair<std::string, uint32_t>> seenVerts;
+  std::set<std::pair<std::string, uint32_t>> seenFrags;
+  for (const auto& variant : report.variants) {
+    if (seenVerts.insert({variant.shaderName, variant.vertPermutationIndex}).second) {
+      shaderStageBytes[variant.shaderName].first += variant.vertexBlob.size();
+    }
+    if (seenFrags.insert({variant.shaderName, variant.fragPermutationIndex}).second) {
+      shaderStageBytes[variant.shaderName].second += variant.fragmentBlob.size();
+    }
+  }
   file << "{\n  \"shaders\": [\n";
   for (size_t i = 0; i < report.shaders.size(); i++) {
     const auto& shader = report.shaders[i];
+    auto bytesIt = shaderStageBytes.find(shader.name);
+    uint64_t vertexBytes = bytesIt == shaderStageBytes.end() ? 0 : bytesIt->second.first;
+    uint64_t fragmentBytes = bytesIt == shaderStageBytes.end() ? 0 : bytesIt->second.second;
     file << "    {\n";
     file << "      \"name\": \"" << shader.name << "\",\n";
     file << "      \"rawCount\": " << shader.rawCount << ",\n";
     file << "      \"compiledCount\": " << shader.compiledCount << ",\n";
+    file << "      \"vertexBytes\": " << vertexBytes << ",\n";
+    file << "      \"fragmentBytes\": " << fragmentBytes << ",\n";
     file << "      \"errorCount\": " << shader.errorCount << "\n";
     file << "    }";
     if (i + 1 < report.shaders.size()) {
