@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/shaders/PermutationRules.h"
+#include "gpu/shaders/level1/AtlasTextFillShader.h"
 #include "gpu/shaders/level1/ComplexEllipseFillShader.h"
 #include "gpu/shaders/level1/ComplexNonAARRectFillShader.h"
 #include "gpu/shaders/level1/ConstColorShader.h"
@@ -1025,6 +1026,45 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateUnifiedGradientReachable() {
   return result;
 }
 
+std::optional<RuleComposedValues> ComposeAtlasTextFill(const AtlasTextFillInputs& inputs) {
+  if (inputs.xpType < 0) {
+    return std::nullopt;
+  }
+  using D = AtlasTextFillShader::D;
+  using FD = AtlasTextFillShader::FD;
+  RuleComposedValues values;
+  values.vertValues.resize(D::COUNT);
+  values.vertValues[D::HAS_COVERAGE] = inputs.hasCoverage ? 1 : 0;
+  values.vertValues[D::HAS_COMMON_COLOR] = inputs.hasCommonColor ? 1 : 0;
+  values.fragValues.resize(FD::COUNT);
+  values.fragValues[FD::HAS_COVERAGE] = values.vertValues[D::HAS_COVERAGE];
+  values.fragValues[FD::HAS_COMMON_COLOR] = values.vertValues[D::HAS_COMMON_COLOR];
+  values.fragValues[FD::HAS_XP] = inputs.xpType;
+  return values;
+}
+
+std::set<std::pair<uint32_t, uint32_t>> EnumerateAtlasTextFillReachable() {
+  std::set<std::pair<uint32_t, uint32_t>> result;
+  for (int hasCoverage = 0; hasCoverage <= 1; ++hasCoverage) {
+    for (int hasCommonColor = 0; hasCommonColor <= 1; ++hasCommonColor) {
+      for (int xpType = -1; xpType <= 2; ++xpType) {
+        AtlasTextFillInputs inputs;
+        inputs.hasCoverage = hasCoverage != 0;
+        inputs.hasCommonColor = hasCommonColor != 0;
+        inputs.xpType = xpType;
+        auto composed = ComposeAtlasTextFill(inputs);
+        if (!composed) {
+          continue;
+        }
+        auto vertIndex = AtlasTextFillShader::D::domain().encode(composed->vertValues);
+        auto fragIndex = AtlasTextFillShader::FD::domain().encode(composed->fragValues);
+        result.insert({vertIndex, fragIndex});
+      }
+    }
+  }
+  return result;
+}
+
 std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermutations(
     const std::string& shaderName) {
   if (shaderName == "RoundStrokeRectFillShader") {
@@ -1110,6 +1150,9 @@ std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermuta
   }
   if (shaderName == "UnifiedGradientShader") {
     return EnumerateUnifiedGradientReachable();
+  }
+  if (shaderName == "AtlasTextFillShader") {
+    return EnumerateAtlasTextFillReachable();
   }
   return std::nullopt;
 }

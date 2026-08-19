@@ -1003,20 +1003,16 @@ static std::optional<PermutationMatchResult> TryMatchAtlasTextFill(const Program
     }
   }
   auto* atgp = static_cast<const AtlasTextGeometryProcessor*>(gp);
-  using D = AtlasTextFillShader::D;
-  auto domain = D::domain();
-  std::vector<int> values(D::COUNT);
-  values[D::HAS_COVERAGE] = atgp->getAAType() == AAType::Coverage ? 1 : 0;
-  values[D::HAS_COMMON_COLOR] = atgp->hasCommonColor() ? 1 : 0;
-  auto vertIndex = domain.encode(values);
-  using FD = AtlasTextFillShader::FD;
-  auto fragDomain = FD::domain();
-  std::vector<int> fragValues(FD::COUNT);
-  for (size_t i = 0; i < D::COUNT; ++i) {
-    fragValues[i] = values[i];
+  AtlasTextFillInputs inputs;
+  inputs.hasCoverage = atgp->getAAType() == AAType::Coverage;
+  inputs.hasCommonColor = atgp->hasCommonColor();
+  inputs.xpType = xpType;
+  auto composed = ComposeAtlasTextFill(inputs);
+  if (!composed) {
+    return std::nullopt;
   }
-  fragValues[FD::HAS_XP] = xpType;
-  auto fragIndex = fragDomain.encode(fragValues);
+  auto vertIndex = AtlasTextFillShader::D::domain().encode(composed->vertValues);
+  auto fragIndex = AtlasTextFillShader::FD::domain().encode(composed->fragValues);
   return PermutationMatchResult{"AtlasTextFillShader", vertIndex, fragIndex};
 }
 

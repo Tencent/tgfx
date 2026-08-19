@@ -297,6 +297,16 @@ struct UnifiedGradientInputs {
 };
 
 /**
+ * Input contract of the AtlasTextFillShader matcher rule. The optional device-space mask
+ * structure checks are whole-draw rejections in Extract; the mask is a runtime uniform.
+ */
+struct AtlasTextFillInputs {
+  bool hasCoverage = false;
+  bool hasCommonColor = false;
+  int xpType = -1;  // -1 = no representable XferProcessor.
+};
+
+/**
  * Dimension values a matcher rule produces for both stages, before domain encoding.
  */
 struct RuleComposedValues {
@@ -479,6 +489,12 @@ std::optional<RuleComposedValues> ComposePointwiseDirect(const PointwiseDirectIn
 std::optional<RuleComposedValues> ComposeUnifiedGradient(const UnifiedGradientInputs& inputs);
 
 /**
+ * Pure mapping for the AtlasTextFillShader rule; see ComposeRoundStrokeRect for the sharing
+ * contract.
+ */
+std::optional<RuleComposedValues> ComposeAtlasTextFill(const AtlasTextFillInputs& inputs);
+
+/**
  * Returns every (vertIndex, fragIndex) pair the RoundStrokeRect rule can ever produce, by
  * enumerating the full input lattice through ComposeRoundStrokeRect.
  */
@@ -618,6 +634,11 @@ std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseDirectReachable();
  * Returns every (vertIndex, fragIndex) pair the UnifiedGradient rule can ever produce.
  */
 std::set<std::pair<uint32_t, uint32_t>> EnumerateUnifiedGradientReachable();
+
+/**
+ * Returns every (vertIndex, fragIndex) pair the AtlasTextFill rule can ever produce.
+ */
+std::set<std::pair<uint32_t, uint32_t>> EnumerateAtlasTextFillReachable();
 
 /**
  * Returns the reachable permutation set for a shader whose matcher rule has been migrated to the
