@@ -275,6 +275,16 @@ struct PointwiseTailInputs {
 };
 
 /**
+ * Input contract of the PointwiseDirectShader matcher rule. The pointwise FP identity and
+ * transfer-function range checks are whole-draw rejections in Extract; the operator and pipeline
+ * flags are runtime uniforms.
+ */
+struct PointwiseDirectInputs {
+  bool hasCoverage = false;
+  int xpType = -1;  // -1 = no representable XferProcessor.
+};
+
+/**
  * Dimension values a matcher rule produces for both stages, before domain encoding.
  */
 struct RuleComposedValues {
@@ -445,6 +455,12 @@ std::optional<RuleComposedValues> ComposeTexturedEffect(const TexturedEffectInpu
 std::optional<RuleComposedValues> ComposePointwiseTail(const PointwiseTailInputs& inputs);
 
 /**
+ * Pure mapping for the PointwiseDirectShader rule; see ComposeRoundStrokeRect for the sharing
+ * contract.
+ */
+std::optional<RuleComposedValues> ComposePointwiseDirect(const PointwiseDirectInputs& inputs);
+
+/**
  * Returns every (vertIndex, fragIndex) pair the RoundStrokeRect rule can ever produce, by
  * enumerating the full input lattice through ComposeRoundStrokeRect.
  */
@@ -574,6 +590,11 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateTexturedEffectReachable();
  * Returns every (vertIndex, fragIndex) pair the PointwiseTail rule can ever produce.
  */
 std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseTailReachable();
+
+/**
+ * Returns every (vertIndex, fragIndex) pair the PointwiseDirect rule can ever produce.
+ */
+std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseDirectReachable();
 
 /**
  * Returns the reachable permutation set for a shader whose matcher rule has been migrated to the
