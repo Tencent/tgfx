@@ -546,25 +546,18 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   //                     uniform is populated from computeSubsetRect, which yields the full texture
   //                     bounds when the source has no real subset, so the clamp is a no-op. This
   //                     subsumes the former HAS_CLAMP_SUBSET dimension.
-  bool gpSubset = quadGP->getHasSubset();
-
-  using VD = QuadTextureFillShader::VD;
-  auto vertDomain = VD::domain();
-  std::vector<int> vertValues(VD::COUNT, 0);
-  vertValues[VD::HAS_UV_COORD] = !quadGP->hasUVMatrix() ? 1 : 0;
-  vertValues[VD::HAS_SUBSET] = gpSubset ? 1 : 0;
-  vertValues[VD::HAS_LOCAL_MASK] = hasLocalMask ? 1 : 0;
-  auto vertIndex = vertDomain.encode(vertValues);
-
-  using FD = QuadTextureFillShader::FD;
-  auto fragDomain = FD::domain();
-  std::vector<int> fragValues(FD::COUNT, 0);
-  // ALPHA_ONLY and HAS_RGBAAA are now runtime uniforms (set by GLSLTextureEffect::onSetData), not
-  // variants.
-  fragValues[FD::HAS_SUBSET] = gpSubset ? 1 : 0;
-  fragValues[FD::HAS_XP] = xpType;
-  fragValues[FD::HAS_LOCAL_MASK] = hasLocalMask ? 1 : 0;
-  auto fragIndex = fragDomain.encode(fragValues);
+  auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
+  QuadTextureFillInputs inputs;
+  inputs.hasUVCoord = !quadGP->hasUVMatrix();
+  inputs.hasSubset = quadGP->getHasSubset();
+  inputs.hasLocalMask = hasLocalMask;
+  inputs.xpType = xpType;
+  auto composed = ComposeQuadTextureFill(inputs);
+  if (!composed) {
+    return std::nullopt;
+  }
+  auto vertIndex = QuadTextureFillShader::VD::domain().encode(composed->vertValues);
+  auto fragIndex = QuadTextureFillShader::FD::domain().encode(composed->fragValues);
   return PermutationMatchResult{"QuadTextureFillShader", vertIndex, fragIndex};
 }
 

@@ -31,6 +31,7 @@
 #include "gpu/shaders/level1/PerlinNoiseFillShader.h"
 #include "gpu/shaders/level1/QuadColorFillShader.h"
 #include "gpu/shaders/level1/QuadConstColorShader.h"
+#include "gpu/shaders/level1/QuadTextureFillShader.h"
 #include "gpu/shaders/level1/RoundStrokeRectFillShader.h"
 #include "gpu/shaders/level1/ShapeInstancedFillShader.h"
 #include "gpu/shaders/level1/ShapeInstancedTextureCoverageShader.h"
@@ -803,6 +804,51 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateTiledTextureFillReachable() {
   return result;
 }
 
+std::optional<RuleComposedValues> ComposeQuadTextureFill(const QuadTextureFillInputs& inputs) {
+  if (inputs.xpType < 0) {
+    return std::nullopt;
+  }
+  using VD = QuadTextureFillShader::VD;
+  using FD = QuadTextureFillShader::FD;
+  RuleComposedValues values;
+  values.vertValues.resize(VD::COUNT);
+  values.vertValues[VD::HAS_UV_COORD] = inputs.hasUVCoord ? 1 : 0;
+  values.vertValues[VD::HAS_SUBSET] = inputs.hasSubset ? 1 : 0;
+  values.vertValues[VD::HAS_LOCAL_MASK] = inputs.hasLocalMask ? 1 : 0;
+  values.fragValues.resize(FD::COUNT);
+  // ALPHA_ONLY and HAS_RGBAAA are runtime uniforms (set by GLSLTextureEffect::onSetData), not
+  // variants.
+  values.fragValues[FD::HAS_SUBSET] = values.vertValues[VD::HAS_SUBSET];
+  values.fragValues[FD::HAS_XP] = inputs.xpType;
+  values.fragValues[FD::HAS_LOCAL_MASK] = values.vertValues[VD::HAS_LOCAL_MASK];
+  return values;
+}
+
+std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadTextureFillReachable() {
+  std::set<std::pair<uint32_t, uint32_t>> result;
+  for (int hasUVCoord = 0; hasUVCoord <= 1; ++hasUVCoord) {
+    for (int hasSubset = 0; hasSubset <= 1; ++hasSubset) {
+      for (int hasLocalMask = 0; hasLocalMask <= 1; ++hasLocalMask) {
+        for (int xpType = -1; xpType <= 2; ++xpType) {
+          QuadTextureFillInputs inputs;
+          inputs.hasUVCoord = hasUVCoord != 0;
+          inputs.hasSubset = hasSubset != 0;
+          inputs.hasLocalMask = hasLocalMask != 0;
+          inputs.xpType = xpType;
+          auto composed = ComposeQuadTextureFill(inputs);
+          if (!composed) {
+            continue;
+          }
+          auto vertIndex = QuadTextureFillShader::VD::domain().encode(composed->vertValues);
+          auto fragIndex = QuadTextureFillShader::FD::domain().encode(composed->fragValues);
+          result.insert({vertIndex, fragIndex});
+        }
+      }
+    }
+  }
+  return result;
+}
+
 std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermutations(
     const std::string& shaderName) {
   if (shaderName == "RoundStrokeRectFillShader") {
@@ -870,6 +916,9 @@ std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermuta
   }
   if (shaderName == "TiledTextureFillShader") {
     return EnumerateTiledTextureFillReachable();
+  }
+  if (shaderName == "QuadTextureFillShader") {
+    return EnumerateQuadTextureFillReachable();
   }
   return std::nullopt;
 }

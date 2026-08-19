@@ -235,6 +235,18 @@ struct TiledTextureFillInputs {
 };
 
 /**
+ * Input contract of the QuadTextureFillShader matcher rule. The coverage FP classification
+ * (device mask = runtime uniform, local mask = dimension, else reject) and the TextureEffect
+ * shape checks happen in Extract; alphaOnly / RGBAAA are runtime uniforms.
+ */
+struct QuadTextureFillInputs {
+  bool hasUVCoord = false;
+  bool hasSubset = false;
+  bool hasLocalMask = false;
+  int xpType = -1;  // -1 = no representable XferProcessor.
+};
+
+/**
  * Dimension values a matcher rule produces for both stages, before domain encoding.
  */
 struct RuleComposedValues {
@@ -381,6 +393,12 @@ std::optional<RuleComposedValues> ComposeTiledTextureFill(
     const TiledTextureFillInputs& inputs);
 
 /**
+ * Pure mapping for the QuadTextureFillShader rule; see ComposeRoundStrokeRect for the sharing
+ * contract.
+ */
+std::optional<RuleComposedValues> ComposeQuadTextureFill(const QuadTextureFillInputs& inputs);
+
+/**
  * Returns every (vertIndex, fragIndex) pair the RoundStrokeRect rule can ever produce, by
  * enumerating the full input lattice through ComposeRoundStrokeRect.
  */
@@ -490,6 +508,11 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateTextureFillReachable();
  * Returns every (vertIndex, fragIndex) pair the TiledTextureFill rule can ever produce.
  */
 std::set<std::pair<uint32_t, uint32_t>> EnumerateTiledTextureFillReachable();
+
+/**
+ * Returns every (vertIndex, fragIndex) pair the QuadTextureFill rule can ever produce.
+ */
+std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadTextureFillReachable();
 
 /**
  * Returns the reachable permutation set for a shader whose matcher rule has been migrated to the
