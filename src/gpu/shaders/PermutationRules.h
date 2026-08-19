@@ -106,6 +106,17 @@ struct ComplexEllipseFillInputs {
 };
 
 /**
+ * Input contract of the EllipseFillShader matcher rule. deviceMask is the shared coverage
+ * classification result (0 = none, 1 = device-space mask); the LocalMask/unclassifiable cases are
+ * whole-draw rejections and stay in Extract.
+ */
+struct EllipseFillInputs {
+  bool hasCommonColor = false;
+  int deviceMask = 0;  // 0 = no mask coverage FP, 1 = device-space mask.
+  int xpType = -1;     // -1 = no representable XferProcessor.
+};
+
+/**
  * Dimension values a matcher rule produces for both stages, before domain encoding.
  */
 struct RuleComposedValues {
@@ -168,6 +179,12 @@ std::optional<RuleComposedValues> ComposeSolidColorFill(const SolidColorFillInpu
 std::optional<RuleComposedValues> ComposeComplexEllipseFill(const ComplexEllipseFillInputs& inputs);
 
 /**
+ * Pure mapping for the EllipseFillShader rule; see ComposeRoundStrokeRect for the sharing
+ * contract.
+ */
+std::optional<RuleComposedValues> ComposeEllipseFill(const EllipseFillInputs& inputs);
+
+/**
  * Returns every (vertIndex, fragIndex) pair the RoundStrokeRect rule can ever produce, by
  * enumerating the full input lattice through ComposeRoundStrokeRect.
  */
@@ -212,6 +229,11 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateSolidColorFillReachable();
  * Returns every (vertIndex, fragIndex) pair the ComplexEllipseFill rule can ever produce.
  */
 std::set<std::pair<uint32_t, uint32_t>> EnumerateComplexEllipseFillReachable();
+
+/**
+ * Returns every (vertIndex, fragIndex) pair the EllipseFill rule can ever produce.
+ */
+std::set<std::pair<uint32_t, uint32_t>> EnumerateEllipseFillReachable();
 
 /**
  * Returns the reachable permutation set for a shader whose matcher rule has been migrated to the

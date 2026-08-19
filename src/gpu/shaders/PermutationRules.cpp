@@ -19,6 +19,7 @@
 #include "gpu/shaders/PermutationRules.h"
 #include "gpu/shaders/level1/ComplexEllipseFillShader.h"
 #include "gpu/shaders/level1/ConstColorShader.h"
+#include "gpu/shaders/level1/EllipseFillShader.h"
 #include "gpu/shaders/level1/HairlineLineShader.h"
 #include "gpu/shaders/level1/HairlineQuadShader.h"
 #include "gpu/shaders/level1/MaskFillShader.h"
@@ -305,6 +306,44 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateComplexEllipseFillReachable() {
   return result;
 }
 
+std::optional<RuleComposedValues> ComposeEllipseFill(const EllipseFillInputs& inputs) {
+  if (inputs.xpType < 0) {
+    return std::nullopt;
+  }
+  using D = EllipseFillShader::Dims;
+  using FD = EllipseFillShader::FD;
+  RuleComposedValues values;
+  values.vertValues.resize(D::COUNT);
+  values.vertValues[D::HAS_COMMON_COLOR] = inputs.hasCommonColor ? 1 : 0;
+  values.fragValues.resize(FD::COUNT);
+  values.fragValues[FD::HAS_COMMON_COLOR] = values.vertValues[D::HAS_COMMON_COLOR];
+  values.fragValues[FD::HAS_XP] = inputs.xpType;
+  values.fragValues[FD::HAS_DEVICE_MASK] = inputs.deviceMask;
+  return values;
+}
+
+std::set<std::pair<uint32_t, uint32_t>> EnumerateEllipseFillReachable() {
+  std::set<std::pair<uint32_t, uint32_t>> result;
+  for (int hasCommonColor = 0; hasCommonColor <= 1; ++hasCommonColor) {
+    for (int deviceMask = 0; deviceMask <= 1; ++deviceMask) {
+      for (int xpType = -1; xpType <= 2; ++xpType) {
+        EllipseFillInputs inputs;
+        inputs.hasCommonColor = hasCommonColor != 0;
+        inputs.deviceMask = deviceMask;
+        inputs.xpType = xpType;
+        auto composed = ComposeEllipseFill(inputs);
+        if (!composed) {
+          continue;
+        }
+        auto vertIndex = EllipseFillShader::Dims::domain().encode(composed->vertValues);
+        auto fragIndex = EllipseFillShader::FD::domain().encode(composed->fragValues);
+        result.insert({vertIndex, fragIndex});
+      }
+    }
+  }
+  return result;
+}
+
 std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermutations(
     const std::string& shaderName) {
   if (shaderName == "RoundStrokeRectFillShader") {
@@ -333,6 +372,9 @@ std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermuta
   }
   if (shaderName == "ComplexEllipseFillShader") {
     return EnumerateComplexEllipseFillReachable();
+  }
+  if (shaderName == "EllipseFillShader") {
+    return EnumerateEllipseFillReachable();
   }
   return std::nullopt;
 }

@@ -1363,23 +1363,17 @@ static std::optional<PermutationMatchResult> TryMatchEllipseFill(const ProgramIn
   if (!coverageType) {
     return std::nullopt;
   }
-  int xpType = GetXPType(programInfo);
-  if (xpType < 0) {
+  auto* egp = static_cast<const EllipseGeometryProcessor*>(gp);
+  EllipseFillInputs inputs;
+  inputs.hasCommonColor = egp->hasCommonColor();
+  inputs.deviceMask = *coverageType;
+  inputs.xpType = GetXPType(programInfo);
+  auto composed = ComposeEllipseFill(inputs);
+  if (!composed) {
     return std::nullopt;
   }
-  auto* egp = static_cast<const EllipseGeometryProcessor*>(gp);
-  using D = EllipseFillShader::Dims;
-  auto domain = D::domain();
-  std::vector<int> values(D::COUNT);
-  values[D::HAS_COMMON_COLOR] = egp->hasCommonColor() ? 1 : 0;
-  auto vertIndex = domain.encode(values);
-  using FD = EllipseFillShader::FD;
-  auto fragDomain = FD::domain();
-  std::vector<int> fragValues(FD::COUNT);
-  fragValues[FD::HAS_COMMON_COLOR] = values[D::HAS_COMMON_COLOR];
-  fragValues[FD::HAS_XP] = xpType;
-  fragValues[FD::HAS_DEVICE_MASK] = *coverageType;
-  auto fragIndex = fragDomain.encode(fragValues);
+  auto vertIndex = EllipseFillShader::Dims::domain().encode(composed->vertValues);
+  auto fragIndex = EllipseFillShader::FD::domain().encode(composed->fragValues);
   return PermutationMatchResult{"EllipseFillShader", vertIndex, fragIndex};
 }
 
