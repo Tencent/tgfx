@@ -857,14 +857,14 @@ static std::optional<PermutationMatchResult> TryMatchDeviceSpaceTexturedEffect(
   DeviceSpaceTexturedEffectInputs inputs;
   inputs.hasCoverage = GetGPCoverage(gp) != 0;
   inputs.xpType = GetXPType(programInfo);
-  auto composed = ComposeDeviceSpaceTexturedEffect(inputs);
-  if (!composed) {
+  auto composedValues = ComposeDeviceSpaceTexturedEffect(inputs);
+  if (!composedValues) {
     return std::nullopt;
   }
   auto vertIndex =
-      DeviceSpaceTexturedEffectShader::VD::domain().encode(composed->vertValues);
+      DeviceSpaceTexturedEffectShader::VD::domain().encode(composedValues->vertValues);
   auto fragIndex =
-      DeviceSpaceTexturedEffectShader::FD::domain().encode(composed->fragValues);
+      DeviceSpaceTexturedEffectShader::FD::domain().encode(composedValues->fragValues);
   return PermutationMatchResult{"DeviceSpaceTexturedEffectShader", vertIndex, fragIndex};
 }
 
