@@ -1451,25 +1451,17 @@ static std::optional<PermutationMatchResult> TryMatchComplexNonAARRectFill(
   if (programInfo->numFragmentProcessors() != 0) {
     return std::nullopt;
   }
-  int xpType = GetXPType(programInfo);
-  if (xpType < 0) {
+  auto* cngp = static_cast<const ComplexNonAARRectGeometryProcessor*>(gp);
+  ComplexNonAARRectFillInputs inputs;
+  inputs.hasCommonColor = cngp->hasCommonColor();
+  inputs.isStroke = cngp->isStroke();
+  inputs.xpType = GetXPType(programInfo);
+  auto composed = ComposeComplexNonAARRectFill(inputs);
+  if (!composed) {
     return std::nullopt;
   }
-  auto* cngp = static_cast<const ComplexNonAARRectGeometryProcessor*>(gp);
-  using D = ComplexNonAARRectFillShader::Dims;
-  auto domain = D::domain();
-  std::vector<int> values(D::COUNT);
-  values[D::HAS_COMMON_COLOR] = cngp->hasCommonColor() ? 1 : 0;
-  values[D::STROKE] = cngp->isStroke() ? 1 : 0;
-  auto vertIndex = domain.encode(values);
-  using FD = ComplexNonAARRectFillShader::FD;
-  auto fragDomain = FD::domain();
-  std::vector<int> fragValues(FD::COUNT);
-  for (size_t i = 0; i < D::COUNT; ++i) {
-    fragValues[i] = values[i];
-  }
-  fragValues[FD::HAS_XP] = xpType;
-  auto fragIndex = fragDomain.encode(fragValues);
+  auto vertIndex = ComplexNonAARRectFillShader::Dims::domain().encode(composed->vertValues);
+  auto fragIndex = ComplexNonAARRectFillShader::FD::domain().encode(composed->fragValues);
   return PermutationMatchResult{"ComplexNonAARRectFillShader", vertIndex, fragIndex};
 }
 

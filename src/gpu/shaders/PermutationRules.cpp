@@ -18,6 +18,7 @@
 
 #include "gpu/shaders/PermutationRules.h"
 #include "gpu/shaders/level1/ComplexEllipseFillShader.h"
+#include "gpu/shaders/level1/ComplexNonAARRectFillShader.h"
 #include "gpu/shaders/level1/ConstColorShader.h"
 #include "gpu/shaders/level1/EllipseFillShader.h"
 #include "gpu/shaders/level1/HairlineLineShader.h"
@@ -394,6 +395,46 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateNonAARRectFillReachable() {
   return result;
 }
 
+std::optional<RuleComposedValues> ComposeComplexNonAARRectFill(
+    const ComplexNonAARRectFillInputs& inputs) {
+  if (inputs.xpType < 0) {
+    return std::nullopt;
+  }
+  using D = ComplexNonAARRectFillShader::Dims;
+  using FD = ComplexNonAARRectFillShader::FD;
+  RuleComposedValues values;
+  values.vertValues.resize(D::COUNT);
+  values.vertValues[D::HAS_COMMON_COLOR] = inputs.hasCommonColor ? 1 : 0;
+  values.vertValues[D::STROKE] = inputs.isStroke ? 1 : 0;
+  values.fragValues.resize(FD::COUNT);
+  values.fragValues[FD::HAS_COMMON_COLOR] = values.vertValues[D::HAS_COMMON_COLOR];
+  values.fragValues[FD::STROKE] = values.vertValues[D::STROKE];
+  values.fragValues[FD::HAS_XP] = inputs.xpType;
+  return values;
+}
+
+std::set<std::pair<uint32_t, uint32_t>> EnumerateComplexNonAARRectFillReachable() {
+  std::set<std::pair<uint32_t, uint32_t>> result;
+  for (int hasCommonColor = 0; hasCommonColor <= 1; ++hasCommonColor) {
+    for (int isStroke = 0; isStroke <= 1; ++isStroke) {
+      for (int xpType = -1; xpType <= 2; ++xpType) {
+        ComplexNonAARRectFillInputs inputs;
+        inputs.hasCommonColor = hasCommonColor != 0;
+        inputs.isStroke = isStroke != 0;
+        inputs.xpType = xpType;
+        auto composed = ComposeComplexNonAARRectFill(inputs);
+        if (!composed) {
+          continue;
+        }
+        auto vertIndex = ComplexNonAARRectFillShader::Dims::domain().encode(composed->vertValues);
+        auto fragIndex = ComplexNonAARRectFillShader::FD::domain().encode(composed->fragValues);
+        result.insert({vertIndex, fragIndex});
+      }
+    }
+  }
+  return result;
+}
+
 std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermutations(
     const std::string& shaderName) {
   if (shaderName == "RoundStrokeRectFillShader") {
@@ -428,6 +469,9 @@ std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermuta
   }
   if (shaderName == "NonAARRectFillShader") {
     return EnumerateNonAARRectFillReachable();
+  }
+  if (shaderName == "ComplexNonAARRectFillShader") {
+    return EnumerateComplexNonAARRectFillReachable();
   }
   return std::nullopt;
 }
