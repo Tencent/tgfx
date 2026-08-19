@@ -438,6 +438,9 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
           fragBlob.assign(fp, fp + fragOpt.spirv.size() * 4);
         }
       } else if (backend == "metal") {
+        // The unoptimized SPIR-V is intentional here: xcrun produces byte-identical metallibs
+        // whether fed the optimized or unoptimized translation (verified 2026-08-19), so the
+        // extra optimized compile would only slow the build down.
         auto mslVert = TranslateToMSL(*vertSpirv, ShaderStageType::Vertex);
         auto mslFrag = TranslateToMSL(fragResult.spirv, ShaderStageType::Fragment);
         if (!mslVert.success || !mslFrag.success) {
