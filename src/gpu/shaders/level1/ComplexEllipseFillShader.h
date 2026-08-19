@@ -39,7 +39,7 @@ class ComplexEllipseFillShader : public PrecompiledShader {
   };
   using FD = FragDims;
   static_assert(D::COUNT == 2 && FD::COUNT == 3,
-                "Update ShouldCompile below when dimensions change.");
+                "Update the Compose mapping when dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"ComplexEllipseFillShader",
@@ -49,8 +49,7 @@ class ComplexEllipseFillShader : public PrecompiledShader {
             FD::domain(),
             PermutationDomain({}),
             "ComplexEllipseGeometryProcessor",
-            "",
-            nullptr};
+            ""};
   }
 };
 

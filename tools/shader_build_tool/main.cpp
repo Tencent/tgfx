@@ -549,59 +549,41 @@ static bool WriteReportJson(const BuildReport& report, const std::string& outDir
   return true;
 }
 
-// Cross-checks, for every shader whose matcher rule has been migrated to the Compose pattern,
-// the legacy compile list (cartesian domain filtered by IsBuildablePermutation) against the set
-// enumerated from the rule itself. Any symmetric difference is a drift between the two sources
-// of truth: legacy-only entries are dead bundle weight, reachable-only entries are produced by
-// the rule at runtime but never compiled (silent JIT fallback). Unmigrated shaders are reported
-// as pending and do not fail the audit.
+// Validates every shader's rule-reachable set: each (vertIndex, fragIndex) pair the Compose
+// functions can produce must be a structurally valid permutation (indices within the declared
+// domains and mirrored dimensions in agreement), because the compile list is derived directly
+// from these sets. An invalid entry would compile a variant with a broken vertex/fragment
+// interface, so any violation fails the audit.
 static int RunAuditMode() {
   const auto& factories = ShaderRegistry::All();
   size_t audited = 0;
-  size_t pending = 0;
-  size_t mismatched = 0;
+  size_t violations = 0;
   for (const auto& factory : factories) {
     auto shader = factory();
     auto info = shader->info();
     auto reachable = EnumerateReachablePermutations(info.name);
     if (!reachable) {
-      pending++;
-      std::cout << "[audit] " << info.name << ": pending (rule not migrated)\n";
+      std::cerr << "[audit] " << info.name << ": ERROR no rule enumerator\n";
+      violations++;
       continue;
-    }
-    std::set<std::pair<uint32_t, uint32_t>> legacy;
-    for (uint32_t vi = 0; vi < info.vertDomain.totalCount(); ++vi) {
-      for (uint32_t fi = 0; fi < info.fragDomain.totalCount(); ++fi) {
-        if (IsBuildablePermutation(info, vi, fi)) {
-          legacy.insert({vi, fi});
-        }
-      }
     }
     audited++;
-    if (legacy == *reachable) {
-      std::cout << "[audit] " << info.name << ": OK (" << legacy.size()
-                << " permutations on both sides)\n";
-      continue;
-    }
-    mismatched++;
-    std::cout << "[audit] " << info.name << ": MISMATCH legacy=" << legacy.size()
-              << " reachable=" << reachable->size() << "\n";
-    for (const auto& pair : legacy) {
-      if (reachable->find(pair) == reachable->end()) {
-        std::cout << "    legacy-only: vert=" << pair.first << " frag=" << pair.second
-                  << " (compiled but unreachable: dead bundle weight)\n";
-      }
-    }
+    size_t invalid = 0;
     for (const auto& pair : *reachable) {
-      if (legacy.find(pair) == legacy.end()) {
-        std::cout << "    reachable-only: vert=" << pair.first << " frag=" << pair.second
-                  << " (produced by rule but never compiled: silent JIT fallback)\n";
+      if (!IsBuildablePermutation(info, pair.first, pair.second)) {
+        invalid++;
+        violations++;
+        std::cout << "[audit] " << info.name << ": INVALID vert=" << pair.first
+                  << " frag=" << pair.second << " (out of range or mirrored dimensions disagree)\n";
       }
+    }
+    if (invalid == 0) {
+      std::cout << "[audit] " << info.name << ": OK (" << reachable->size()
+                << " reachable permutations)\n";
     }
   }
-  std::cout << "[audit] summary: " << audited << " audited, " << pending << " pending, "
-            << mismatched << " mismatched\n";
-  return mismatched == 0 ? 0 : 1;
+  std::cout << "[audit] summary: " << audited << " audited, " << violations << " violations\n";
+  return violations == 0 ? 0 : 1;
 }
 
 }  // namespace tgfx

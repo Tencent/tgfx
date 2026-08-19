@@ -87,7 +87,7 @@ class PointwiseChainShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 6, "Update ShouldCompile when fragment dimensions change.");
+  static_assert(FD::COUNT == 6, "Update the Compose mapping when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"PointwiseChainShader",
@@ -97,48 +97,7 @@ class PointwiseChainShader : public PrecompiledShader {
             FD::domain(),
             PermutationDomain({}),
             "",
-            "",
-            ShouldCompile};
-  }
-
- private:
-  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>& vertValues,
-                            const std::vector<int>& fragValues) {
-    // GP_LAYOUT / HAS_COVERAGE / HAS_COLOR / TEXTURE_COUNT vertex-fragment agreement is enforced
-    // by the framework (MirroredDimsAgree).
-    if (vertValues[VD::GP_LAYOUT] == 1) {
-      // The ellipse layout carries no coverage/uvCoord attributes (its coverage is the per-pixel
-      // edge equation) and never takes a mask clip. Leaf-free chains (const/blend/gradient) are
-      // served as well: only solid fills stay on EllipseFillShader via the plain route.
-      if (vertValues[VD::HAS_COVERAGE] != 0 || vertValues[VD::HAS_UV_COORD] != 0 ||
-          fragValues[FD::HAS_MASK_TEXTURE] != 0) {
-        return false;
-      }
-      return true;
-    }
-    // uvCoord and per-vertex colors are quad-only attributes, and quad vertex buffers always
-    // carry the coverage slot, so either of them implies coverage. Exception: atlas text buffers
-    // (position, maskCoord, color?) carry no coverage slot, so the atlas route requests
-    // coverage-free uvCoord combos; those are only useful with the atlas leaf present (1-2
-    // texture leaves: the atlas alone for gradient text, image+atlas for image text).
-    if ((vertValues[VD::HAS_UV_COORD] != 0 || vertValues[VD::HAS_COLOR] != 0) &&
-        vertValues[VD::HAS_COVERAGE] == 0) {
-      bool atlasTextCombo = vertValues[VD::HAS_UV_COORD] != 0 && vertValues[VD::TEXTURE_COUNT] == 1;
-      if (!atlasTextCombo) {
-        return false;
-      }
-    }
-    // The mask is a runtime uniform on four-leaf variants; the compile-time dimension remains
-    // only for leaf-free chains (which have no texture to rebind as the phantom).
-    if (fragValues[FD::HAS_MASK_TEXTURE] != 0 && fragValues[FD::TEXTURE_COUNT] != 0) {
-      return false;
-    }
-    // Mask clips go through DefaultGP paths only, which never carry quad attributes.
-    if (fragValues[FD::HAS_MASK_TEXTURE] != 0 &&
-        (vertValues[VD::HAS_UV_COORD] != 0 || vertValues[VD::HAS_COLOR] != 0)) {
-      return false;
-    }
-    return true;
+            ""};
   }
 };
 

@@ -63,8 +63,7 @@ class YUVTextureFillShader : public PrecompiledShader {
             FD::domain(),
             PermutationDomain({}),
             "",
-            "",
-            nullptr};
+            ""};
   }
 };
 

@@ -46,8 +46,7 @@ class QuadConstColorShader : public PrecompiledShader {
             PermutationDomain({}),
             PermutationDomain({}),
             "QuadPerEdgeAAGeometryProcessor",
-            "ConstColorProcessor",
-            nullptr};
+            "ConstColorProcessor"};
   }
 };
 

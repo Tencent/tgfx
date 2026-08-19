@@ -19,6 +19,7 @@
 #include "gpu/AOTClosureVerifier.h"
 #include <set>
 #include "gpu/ShaderKeyHash.h"
+#include "gpu/shaders/PermutationRules.h"
 #include "gpu/shaders/PrecompiledShader.h"
 
 namespace tgfx {
@@ -51,26 +52,18 @@ AOTClosureResult AOTClosureVerifier::Verify(const PrecompiledShaderCache* cache,
     if (!ShaderSelected(info.name, shaderNames)) {
       continue;
     }
-    // Reproduce the build tool's enumeration: walk the vert x frag product, apply the same
-    // shouldCompile filter, and collect the vertex and fragment permutation indices that survive.
-    // Vertices are deduplicated by index because a vertex stage is compiled once per vertIndex.
+    // Reproduce the build tool's enumeration: the compile list is the matcher rule's reachable
+    // set. Vertices are deduplicated by index because a vertex stage is compiled once per
+    // vertIndex.
+    auto reachable = EnumerateReachablePermutations(info.name);
+    if (!reachable) {
+      continue;
+    }
     std::set<uint32_t> vertIndices;
     std::set<uint32_t> fragIndices;
-    auto vertTotal = info.vertDomain.totalCount();
-    auto fragTotal = info.fragDomain.totalCount();
-    for (uint32_t vi = 0; vi < vertTotal; ++vi) {
-      for (uint32_t fi = 0; fi < fragTotal; ++fi) {
-        if (!IsBuildablePermutation(info, vi, fi)) {
-          continue;
-        }
-        // RECT (TEXTURE_KIND=1) variants compile only into the opengl bundle, so non-opengl
-        // profiles must not expect them.
-        if (profileTag != "opengl" && info.fragDomain.valueOf(fi, "TEXTURE_KIND") == 1) {
-          continue;
-        }
-        vertIndices.insert(vi);
-        fragIndices.insert(fi);
-      }
+    for (const auto& permutation : *reachable) {
+      vertIndices.insert(permutation.first);
+      fragIndices.insert(permutation.second);
     }
     for (auto vi : vertIndices) {
       result.expectedCount++;

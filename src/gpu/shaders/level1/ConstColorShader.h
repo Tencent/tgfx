@@ -48,8 +48,7 @@ class ConstColorShader : public PrecompiledShader {
             FD::domain(),
             PermutationDomain({}),
             "",
-            "",
-            nullptr};
+            ""};
   }
 };
 

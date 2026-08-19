@@ -55,7 +55,7 @@ class SolidColorFillShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 2, "Update ShouldCompile when fragment dimensions change.");
+  static_assert(FD::COUNT == 2, "Update the Compose mapping when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"SolidColorFillShader",
@@ -65,8 +65,7 @@ class SolidColorFillShader : public PrecompiledShader {
             FD::domain(),
             PermutationDomain({}),
             "",
-            "",
-            nullptr};
+            ""};
   }
 };
 

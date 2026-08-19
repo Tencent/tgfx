@@ -67,8 +67,7 @@ class TexturedEffectShader : public PrecompiledShader {
             D::domain(),
             PermutationDomain({}),
             "",
-            "",
-            nullptr};
+            ""};
   }
 };
 

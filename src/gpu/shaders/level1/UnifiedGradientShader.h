@@ -49,7 +49,7 @@ class UnifiedGradientShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 3, "Update ShouldCompile when fragment dimensions change.");
+  static_assert(FD::COUNT == 3, "Update the Compose mapping when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"UnifiedGradientShader",
@@ -59,19 +59,7 @@ class UnifiedGradientShader : public PrecompiledShader {
             FD::domain(),
             PermutationDomain({}),
             "",
-            "",
-            ShouldCompile};
-  }
-
- private:
-  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>&,
-                            const std::vector<int>& fragValues) {
-    // The legacy TextureGradientShader rejected coverage-carrying draws; keep LUT gradients on the
-    // runtime path when the draw carries per-vertex coverage instead of adding untested combos.
-    if (fragValues[FD::HAS_LUT] != 0 && fragValues[FD::HAS_VCOVERAGE] != 0) {
-      return false;
-    }
-    return true;
+            ""};
   }
 };
 

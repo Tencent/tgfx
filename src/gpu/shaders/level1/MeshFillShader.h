@@ -40,12 +40,11 @@ class MeshFillShader : public PrecompiledShader {
   };
   using FD = FragDims;
   static_assert(D::COUNT == 3 && FD::COUNT == 4,
-                "Update ShouldCompile below when dimensions change.");
+                "Update the Compose mapping when dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"MeshFillShader", "level1/mesh_fill.vert", "level1/mesh_fill.frag", D::domain(),
-            FD::domain(),     PermutationDomain({}),   "MeshGeometryProcessor", "",
-            nullptr};
+            FD::domain(),     PermutationDomain({}),   "MeshGeometryProcessor", ""};
   }
 };
 

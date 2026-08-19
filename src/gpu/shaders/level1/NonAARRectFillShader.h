@@ -40,7 +40,7 @@ class NonAARRectFillShader : public PrecompiledShader {
   };
   using FD = FragDims;
   static_assert(D::COUNT == 3 && FD::COUNT == 4,
-                "Update ShouldCompile below when dimensions change.");
+                "Update the Compose mapping when dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"NonAARRectFillShader",
@@ -50,16 +50,7 @@ class NonAARRectFillShader : public PrecompiledShader {
             FD::domain(),
             PermutationDomain({}),
             "NonAARRectGeometryProcessor",
-            "",
-            ShouldCompile};
-  }
-
- private:
-  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>& vertValues,
-                            const std::vector<int>&) {
-    // The textured variant carries no stroke-width sampling: stroked rrects with a shader are
-    // not produced by the current callers, so the combination stays uncompiled.
-    return !(vertValues[D::TEXTURED] != 0 && vertValues[D::STROKE] != 0);
+            ""};
   }
 };
 

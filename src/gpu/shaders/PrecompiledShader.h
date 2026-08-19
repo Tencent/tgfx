@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -27,8 +26,9 @@
 namespace tgfx {
 
 /**
- * Metadata describing a precompiled shader, including its permutation domain, source file paths,
- * and variant filtering function.
+ * Metadata describing a precompiled shader, including its permutation domain and source file
+ * paths. The compiled variant list is defined by the matcher rules (see PermutationRules.h);
+ * no shader-side filter exists.
  */
 struct PrecompiledShaderInfo {
   std::string name;
@@ -39,14 +39,11 @@ struct PrecompiledShaderInfo {
   PermutationDomain gpDomain;
   std::string gpClassName;
   std::string declarationFile;
-  std::function<bool(uint32_t vertIndex, uint32_t fragIndex, const std::vector<int>& vertValues,
-                     const std::vector<int>& fragValues)>
-      shouldCompile;
 };
 
 /**
- * Returns true when the vertex/fragment indices belong to the shader's declared domains, agree on
- * every mirrored dimension, and pass its optional shouldCompile filter.
+ * Returns true when the vertex/fragment indices belong to the shader's declared domains and
+ * agree on every mirrored dimension.
  */
 bool IsBuildablePermutation(const PrecompiledShaderInfo& info, uint32_t vertIndex,
                             uint32_t fragIndex);

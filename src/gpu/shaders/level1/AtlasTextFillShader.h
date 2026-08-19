@@ -42,7 +42,7 @@ class AtlasTextFillShader : public PrecompiledShader {
   };
   using FD = FragDims;
   static_assert(D::COUNT == 2 && FD::COUNT == 3,
-                "Update ShouldCompile below when dimensions change.");
+                "Update the Compose mapping when dimensions change.");
 
  public:
   PrecompiledShaderInfo info() const override {
@@ -53,14 +53,7 @@ class AtlasTextFillShader : public PrecompiledShader {
             FD::domain(),
             PermutationDomain({}),
             "",
-            "",
-            ShouldCompile};
-  }
-
- private:
-  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>&,
-                            const std::vector<int>&) {
-    return true;
+            ""};
   }
 };
 

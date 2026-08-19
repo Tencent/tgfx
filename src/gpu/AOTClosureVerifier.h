@@ -51,11 +51,11 @@ struct AOTClosureResult {
 /**
  * AOTClosureVerifier proves that every structural Key a Kernel family can produce is present in the
  * loaded precompiled bundle. It reproduces the build tool's enumeration exactly: for each named
- * shader it walks the vertDomain × fragDomain product, applies the same shouldCompile filter, and
- * for every surviving variant recomputes the vertex/fragment key hash and looks it up in the cache.
- * A missing lookup means the bundle does not cover a Key the runtime matcher could emit, i.e. a
- * closure hole. This is the standing definition of "the AOT path is verifiably complete" and must
- * gate any claim of zero bundle misses.
+ * shader it enumerates the matcher rule's reachable set (the Compose single source of truth in
+ * PermutationRules.cpp) and for every surviving variant recomputes the vertex/fragment key hash and
+ * looks it up in the cache. A missing lookup means the bundle does not cover a Key the runtime
+ * matcher could emit, i.e. a closure hole. This is the standing definition of "the AOT path is
+ * verifiably complete" and must gate any claim of zero bundle misses.
  */
 class AOTClosureVerifier {
  public:

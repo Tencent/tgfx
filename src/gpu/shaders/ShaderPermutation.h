@@ -198,9 +198,8 @@ class PermutationDomain {
  * Returns false when a dimension shared by name between the vertex and fragment domains has
  * differing values in the two stages. Such a dimension gates a varying that both stages must
  * declare identically (the vertex emits it only when the fragment consumes it), so mismatched
- * values would produce an invalid vertex/fragment interface. Callers enumerating the variant space
- * consult this before shouldCompile, so shaders no longer hand-write per-dimension
- * `vertValues[X] == fragValues[X]` guards. vertValues/fragValues must match the arity of the
+ * values would produce an invalid vertex/fragment interface. Callers validating permutations
+ * consult this after decoding indices. vertValues/fragValues must match the arity of the
  * respective domains.
  */
 bool MirroredDimsAgree(const PermutationDomain& vertDomain, const PermutationDomain& fragDomain,

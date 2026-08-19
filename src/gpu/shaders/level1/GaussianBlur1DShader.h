@@ -68,14 +68,7 @@ class GaussianBlur1DShader : public PrecompiledShader {
             FD::domain(),
             PermutationDomain({}),
             "",
-            "",
-            ShouldCompile};
-  }
-
- private:
-  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>&,
-                            const std::vector<int>&) {
-    return true;
+            ""};
   }
 };
 

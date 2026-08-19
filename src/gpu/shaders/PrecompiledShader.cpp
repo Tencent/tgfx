@@ -38,10 +38,7 @@ bool IsBuildablePermutation(const PrecompiledShaderInfo& info, uint32_t vertInde
   }
   auto vertValues = info.vertDomain.decode(vertIndex);
   auto fragValues = info.fragDomain.decode(fragIndex);
-  if (!MirroredDimsAgree(info.vertDomain, info.fragDomain, vertValues, fragValues)) {
-    return false;
-  }
-  return !info.shouldCompile || info.shouldCompile(vertIndex, fragIndex, vertValues, fragValues);
+  return MirroredDimsAgree(info.vertDomain, info.fragDomain, vertValues, fragValues);
 }
 
 void ShaderRegistry::Register(Factory factory) {

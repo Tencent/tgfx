@@ -49,7 +49,7 @@ class QuadColorFillShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 2, "Update ShouldCompile below when dimensions change.");
+  static_assert(FD::COUNT == 2, "Update the Compose mapping when dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"QuadColorFillShader",
@@ -59,8 +59,7 @@ class QuadColorFillShader : public PrecompiledShader {
             FD::domain(),
             PermutationDomain({}),
             "QuadPerEdgeAAGeometryProcessor",
-            "",
-            nullptr};
+            ""};
   }
 };
 

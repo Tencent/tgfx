@@ -48,6 +48,7 @@
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "gpu/shaders/PermutationRules.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/ShaderPermutation.h"
 #include "gpu/shaders/level1/DeviceSpaceTexturedEffectShader.h"
@@ -512,26 +513,19 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientCompiledSpace) {
   EXPECT_EQ(info.vertDomain.totalCount(), 2u);
   EXPECT_EQ(info.fragDomain.totalCount(), 12u);
 
+  auto reachable = EnumerateReachablePermutations(info.name);
+  ASSERT_TRUE(reachable.has_value());
   std::set<uint32_t> vertexIndices;
   std::set<uint32_t> fragmentIndices;
-  uint32_t compiledCount = 0;
-  for (uint32_t vi = 0; vi < info.vertDomain.totalCount(); ++vi) {
-    for (uint32_t fi = 0; fi < info.fragDomain.totalCount(); ++fi) {
-      if (!IsBuildablePermutation(info, vi, fi)) {
-        continue;
-      }
-      compiledCount++;
-      vertexIndices.insert(vi);
-      fragmentIndices.insert(fi);
-    }
+  for (const auto& permutation : *reachable) {
+    vertexIndices.insert(permutation.first);
+    fragmentIndices.insert(permutation.second);
   }
-  // 12 raw frag combos minus the three LUT-with-coverage combos excluded by ShouldCompile; the
-  // device mask is a runtime uniform now, not a dimension.
-  EXPECT_EQ(compiledCount, 9u);
+  // 12 raw frag combos minus the three LUT-with-coverage combos excluded by the rule's Compose
+  // mapping; the device mask is a runtime uniform now, not a dimension.
+  EXPECT_EQ(reachable->size(), 9u);
   EXPECT_EQ(vertexIndices.size(), 2u);
   EXPECT_EQ(fragmentIndices.size(), 9u);
-  EXPECT_TRUE(IsBuildablePermutation(info, 1, 5));
-  EXPECT_FALSE(IsBuildablePermutation(info, 0, 5));
 }
 
 TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
@@ -582,9 +576,6 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
           auto vertValues = info.vertDomain.decode(match->vertPermutationIndex);
           auto fragValues = info.fragDomain.decode(match->fragPermutationIndex);
           EXPECT_TRUE(MirroredDimsAgree(info.vertDomain, info.fragDomain, vertValues, fragValues));
-          EXPECT_TRUE(!info.shouldCompile ||
-                      info.shouldCompile(match->vertPermutationIndex, match->fragPermutationIndex,
-                                         vertValues, fragValues));
           vertexIndices.insert(match->vertPermutationIndex);
           fragmentIndices.insert(match->fragPermutationIndex);
           pairs.insert((static_cast<uint64_t>(match->vertPermutationIndex) << 32u) |
@@ -660,36 +651,6 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureLocalMaskRejectsInvertedCoverage) {
       ASSERT_TRUE(match.has_value());
       EXPECT_EQ(match->shaderName, "QuadTextureFillShader");
     }
-  }
-}
-
-TGFX_TEST(ShaderPermutationTest, ShouldCompile) {
-  auto& factories = ShaderRegistry::All();
-  for (auto& factory : factories) {
-    auto shader = factory();
-    auto shaderInfo = shader->info();
-    if (shaderInfo.name != TextureFillShader::Name()) {
-      continue;
-    }
-    // Vert: no dimensions = 1 raw. Frag: HAS_XP(int3) + HAS_DEVICE_MASK(bool) = 6 raw. YUV is
-    // rejected by the matcher before matching and subset clamping is a runtime uniform; all
-    // combinations compile.
-    int compiledCount = 0;
-    for (uint32_t vi = 0; vi < shaderInfo.vertDomain.totalCount(); vi++) {
-      auto vertValues = shaderInfo.vertDomain.decode(vi);
-      for (uint32_t fi = 0; fi < shaderInfo.fragDomain.totalCount(); fi++) {
-        auto fragValues = shaderInfo.fragDomain.decode(fi);
-        // Mirror the production enumeration: framework mirror rule first, then the shader rule.
-        if (!MirroredDimsAgree(shaderInfo.vertDomain, shaderInfo.fragDomain, vertValues,
-                               fragValues)) {
-          continue;
-        }
-        if (!shaderInfo.shouldCompile || shaderInfo.shouldCompile(vi, fi, vertValues, fragValues)) {
-          compiledCount++;
-        }
-      }
-    }
-    EXPECT_EQ(compiledCount, 6);
   }
 }
 
@@ -1462,90 +1423,6 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureFillShaderRegistry) {
       EXPECT_EQ(shaderInfo.vertexFile, "level1/quad_texture_fill.vert");
       EXPECT_EQ(shaderInfo.fragmentFile, "level1/quad_texture_fill.frag");
     }
-  }
-  EXPECT_TRUE(found);
-}
-
-TGFX_TEST(ShaderPermutationTest, QuadTextureFillShouldCompile) {
-  auto& factories = ShaderRegistry::All();
-  for (auto& factory : factories) {
-    auto shader = factory();
-    auto shaderInfo = shader->info();
-    if (shaderInfo.name != "QuadTextureFillShader") {
-      continue;
-    }
-    int compiledCount = 0;
-    for (uint32_t vi = 0; vi < shaderInfo.vertDomain.totalCount(); vi++) {
-      auto vertValues = shaderInfo.vertDomain.decode(vi);
-      for (uint32_t fi = 0; fi < shaderInfo.fragDomain.totalCount(); fi++) {
-        auto fragValues = shaderInfo.fragDomain.decode(fi);
-        // Mirror the production enumeration: framework mirror rule first, then the shader rule.
-        if (!MirroredDimsAgree(shaderInfo.vertDomain, shaderInfo.fragDomain, vertValues,
-                               fragValues)) {
-          continue;
-        }
-        if (!shaderInfo.shouldCompile || shaderInfo.shouldCompile(vi, fi, vertValues, fragValues)) {
-          compiledCount++;
-        }
-      }
-    }
-    // ALPHA_ONLY / HAS_RGBAAA are runtime uniforms and per-vertex color/coverage are now
-    // unconditional; the device mask is runtime too. Mirror agreement ties HAS_SUBSET and
-    // HAS_LOCAL_MASK across stages (2*2), leaving HAS_UV_COORD(2) * HAS_XP(3) free: 24 raw
-    // pairs, all compiled.
-    EXPECT_EQ(compiledCount, 24);
-  }
-}
-
-TGFX_TEST(ShaderPermutationTest, SolidColorFillShouldCompile) {
-  auto& factories = ShaderRegistry::All();
-  bool found = false;
-  for (auto& factory : factories) {
-    auto shader = factory();
-    auto shaderInfo = shader->info();
-    if (shaderInfo.name != "SolidColorFillShader") {
-      continue;
-    }
-    found = true;
-    // Vert: HAS_COVERAGE(2). Frag: HAS_COVERAGE(2) x HAS_XP(3) = 12 raw. HAS_COVERAGE is a mirror
-    // dimension enforced by the framework (MirroredDimsAgree), so only matching-HAS_COVERAGE pairs
-    // compile -> 2 * 3 = 6.
-    EXPECT_EQ(shaderInfo.vertDomain.totalCount(), 2u);
-    EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 6u);
-    int compiledCount = 0;
-    for (uint32_t vi = 0; vi < shaderInfo.vertDomain.totalCount(); vi++) {
-      auto vertValues = shaderInfo.vertDomain.decode(vi);
-      for (uint32_t fi = 0; fi < shaderInfo.fragDomain.totalCount(); fi++) {
-        auto fragValues = shaderInfo.fragDomain.decode(fi);
-        // Mirror the production enumeration: framework mirror rule first, then any shader rule.
-        if (!MirroredDimsAgree(shaderInfo.vertDomain, shaderInfo.fragDomain, vertValues,
-                               fragValues)) {
-          continue;
-        }
-        if (!shaderInfo.shouldCompile || shaderInfo.shouldCompile(vi, fi, vertValues, fragValues)) {
-          compiledCount++;
-        }
-      }
-    }
-    EXPECT_EQ(compiledCount, 6);
-  }
-  EXPECT_TRUE(found);
-}
-
-TGFX_TEST(ShaderPermutationTest, MaskFillShouldCompile) {
-  auto& factories = ShaderRegistry::All();
-  bool found = false;
-  for (auto& factory : factories) {
-    auto shader = factory();
-    auto shaderInfo = shader->info();
-    if (shaderInfo.name != "MaskFillShader") {
-      continue;
-    }
-    found = true;
-    // No vertex dimensions; the fragment stage carries a single HAS_XP dimension (3 values:
-    // none / PorterDuff DST_TEX / PorterDuff framebuffer-fetch).
-    EXPECT_EQ(shaderInfo.vertDomain.totalCount(), 1u);
-    EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 3u);
   }
   EXPECT_TRUE(found);
 }

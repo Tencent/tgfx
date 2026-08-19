@@ -43,8 +43,7 @@ class HairlineQuadShader : public PrecompiledShader {
             FD::domain(),
             PermutationDomain({}),
             "HairlineQuadGeometryProcessor",
-            "",
-            nullptr};
+            ""};
   }
 };
 

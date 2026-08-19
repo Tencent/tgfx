@@ -53,7 +53,7 @@ class QuadTextureFillShader : public PrecompiledShader {
     }
   };
   using VD = VertDims;
-  static_assert(VD::COUNT == 3, "Update ShouldCompile when vertex dimensions change.");
+  static_assert(VD::COUNT == 3, "Update the Compose mapping when vertex dimensions change.");
 
   // Fragment dimensions
   // ALPHA_ONLY and HAS_RGBAAA are intentionally NOT dimensions: both are pure fragment math
@@ -70,7 +70,7 @@ class QuadTextureFillShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 3, "Update ShouldCompile when fragment dimensions change.");
+  static_assert(FD::COUNT == 3, "Update the Compose mapping when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"QuadTextureFillShader",
@@ -80,17 +80,7 @@ class QuadTextureFillShader : public PrecompiledShader {
             FD::domain(),
             PermutationDomain({}),
             "",
-            "",
-            ShouldCompile};
-  }
-
- private:
-  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>&,
-                            const std::vector<int>&) {
-    // HAS_SUBSET / HAS_LOCAL_MASK vertex and fragment agreement is
-    // enforced automatically by the framework (MirroredDimsAgree); the device mask is a runtime
-    // uniform, so no mutual-exclusion carve-out is needed anymore.
-    return true;
+            ""};
   }
 };
 

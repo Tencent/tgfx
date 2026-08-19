@@ -50,8 +50,7 @@ class MaskFillShader : public PrecompiledShader {
             D::domain(),
             PermutationDomain({}),
             "",
-            "",
-            nullptr};
+            ""};
   }
 };
 

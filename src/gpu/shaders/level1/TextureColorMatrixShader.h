@@ -47,8 +47,7 @@ class TextureColorMatrixShader : public PrecompiledShader {
             D::domain(),
             PermutationDomain({}),
             "",
-            "",
-            {}};
+            ""};
   }
 };
 

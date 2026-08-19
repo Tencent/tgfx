@@ -42,15 +42,9 @@ class EllipseFillShader : public PrecompiledShader {
                 "Update the matcher below when dimensions change.");
 
   PrecompiledShaderInfo info() const override {
-    return {"EllipseFillShader",
-            "level1/ellipse_fill.vert",
-            "level1/ellipse_fill.frag",
-            D::domain(),
-            FD::domain(),
-            PermutationDomain({}),
-            "EllipseGeometryProcessor",
-            "",
-            nullptr};
+    return {
+        "EllipseFillShader", "level1/ellipse_fill.vert", "level1/ellipse_fill.frag", D::domain(),
+        FD::domain(),        PermutationDomain({}),      "EllipseGeometryProcessor", ""};
   }
 };
 

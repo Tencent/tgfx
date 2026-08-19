@@ -43,8 +43,7 @@ class HairlineLineShader : public PrecompiledShader {
             FD::domain(),
             PermutationDomain({}),
             "HairlineLineGeometryProcessor",
-            "",
-            nullptr};
+            ""};
   }
 };
 

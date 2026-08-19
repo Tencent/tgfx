@@ -27,7 +27,7 @@ class ShapeInstancedTextureCoverageShader : public PrecompiledShader {
   // GRADIENT (bool): the color source is a single-interval gradient instead of the per-instance
   // vertex color; its layout is selected at runtime through the LayoutType uniform.
   // HAS_COLORS (bool): per-instance color attribute present. The bare coverage form requires
-  // colors (enforced by ShouldCompile); the gradient form works either way, using opaque white as
+  // colors (enforced by the Compose mapping); the gradient form works either way, using opaque white as
   // the colorless input exactly like the runtime GP emission.
   TGFX_DEFINE_DIMS(GRADIENT, HAS_COLORS);
   using D = Dims;
@@ -51,16 +51,7 @@ class ShapeInstancedTextureCoverageShader : public PrecompiledShader {
             FD::domain(),
             PermutationDomain({}),
             "ShapeInstancedGeometryProcessor",
-            "",
-            ShouldCompile};
-  }
-
- private:
-  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>& vertValues,
-                            const std::vector<int>&) {
-    // The bare coverage variant reads the per-instance color; only the gradient form has a
-    // colorless path (opaque white input).
-    return vertValues[D::HAS_COLORS] != 0 || vertValues[D::GRADIENT] != 0;
+            ""};
   }
 };
 

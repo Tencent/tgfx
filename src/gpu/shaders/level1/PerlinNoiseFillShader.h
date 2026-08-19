@@ -65,8 +65,7 @@ class PerlinNoiseFillShader : public PrecompiledShader {
             D::domain(),
             PermutationDomain({}),
             "",
-            "",
-            nullptr};
+            ""};
   }
 };
 

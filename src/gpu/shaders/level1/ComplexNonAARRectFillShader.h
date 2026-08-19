@@ -39,7 +39,7 @@ class ComplexNonAARRectFillShader : public PrecompiledShader {
   };
   using FD = FragDims;
   static_assert(D::COUNT == 2 && FD::COUNT == 3,
-                "Update ShouldCompile below when dimensions change.");
+                "Update the Compose mapping when dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"ComplexNonAARRectFillShader",
@@ -49,8 +49,7 @@ class ComplexNonAARRectFillShader : public PrecompiledShader {
             FD::domain(),
             PermutationDomain({}),
             "ComplexNonAARRectGeometryProcessor",
-            "",
-            nullptr};
+            ""};
   }
 };
 

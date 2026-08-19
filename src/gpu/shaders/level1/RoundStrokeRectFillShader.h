@@ -40,7 +40,7 @@ class RoundStrokeRectFillShader : public PrecompiledShader {
   };
   using FD = FragDims;
   static_assert(D::COUNT == 3 && FD::COUNT == 4,
-                "Update ShouldCompile below when dimensions change.");
+                "Update the Compose mapping when dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"RoundStrokeRectFillShader",
@@ -50,8 +50,7 @@ class RoundStrokeRectFillShader : public PrecompiledShader {
             FD::domain(),
             PermutationDomain({}),
             "RoundStrokeRectGeometryProcessor",
-            "",
-            nullptr};
+            ""};
   }
 };
 

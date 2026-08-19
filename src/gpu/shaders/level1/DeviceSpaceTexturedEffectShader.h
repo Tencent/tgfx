@@ -57,8 +57,7 @@ class DeviceSpaceTexturedEffectShader : public PrecompiledShader {
             FD::domain(),
             PermutationDomain({}),
             "",
-            "",
-            nullptr};
+            ""};
   }
 };
 

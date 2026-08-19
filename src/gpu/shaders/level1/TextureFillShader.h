@@ -52,7 +52,8 @@ class TextureFillShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 2, "Update the encoders and ShouldCompile when dimensions change.");
+  static_assert(FD::COUNT == 2,
+                "Update the encoders and the Compose mapping when dimensions change.");
 
   struct FragmentValues {
     uint32_t xp = 0;
@@ -82,14 +83,7 @@ class TextureFillShader : public PrecompiledShader {
             FD::domain(),
             PermutationDomain({}),
             "",
-            "",
-            ShouldCompile};
-  }
-
- private:
-  static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>&,
-                            const std::vector<int>&) {
-    return true;
+            ""};
   }
 };
 
