@@ -18,6 +18,7 @@
 
 #include "gpu/shaders/PermutationRules.h"
 #include "gpu/shaders/level1/ConstColorShader.h"
+#include "gpu/shaders/level1/HairlineLineShader.h"
 #include "gpu/shaders/level1/MaskFillShader.h"
 #include "gpu/shaders/level1/RoundStrokeRectFillShader.h"
 
@@ -120,6 +121,32 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateConstColorReachable() {
   return result;
 }
 
+std::optional<RuleComposedValues> ComposeHairlineLine(const HairlineLineInputs& inputs) {
+  if (inputs.xpType < 0) {
+    return std::nullopt;
+  }
+  using FD = HairlineLineShader::FD;
+  RuleComposedValues values;
+  values.fragValues.resize(FD::COUNT);
+  values.fragValues[FD::HAS_XP] = inputs.xpType;
+  return values;
+}
+
+std::set<std::pair<uint32_t, uint32_t>> EnumerateHairlineLineReachable() {
+  std::set<std::pair<uint32_t, uint32_t>> result;
+  for (int xpType = -1; xpType <= 2; ++xpType) {
+    HairlineLineInputs inputs;
+    inputs.xpType = xpType;
+    auto composed = ComposeHairlineLine(inputs);
+    if (!composed) {
+      continue;
+    }
+    auto fragIndex = HairlineLineShader::FD::domain().encode(composed->fragValues);
+    result.insert({0, fragIndex});
+  }
+  return result;
+}
+
 std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermutations(
     const std::string& shaderName) {
   if (shaderName == "RoundStrokeRectFillShader") {
@@ -130,6 +157,9 @@ std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermuta
   }
   if (shaderName == "ConstColorShader") {
     return EnumerateConstColorReachable();
+  }
+  if (shaderName == "HairlineLineShader") {
+    return EnumerateHairlineLineReachable();
   }
   return std::nullopt;
 }

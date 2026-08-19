@@ -1329,15 +1329,13 @@ static std::optional<PermutationMatchResult> TryMatchHairlineLine(const ProgramI
       (programInfo->numColorFragmentProcessors() != 0 || !HasDirectAARectCoverage(programInfo))) {
     return std::nullopt;
   }
-  int xpType = GetXPType(programInfo);
-  if (xpType < 0) {
+  HairlineLineInputs inputs;
+  inputs.xpType = GetXPType(programInfo);
+  auto composed = ComposeHairlineLine(inputs);
+  if (!composed) {
     return std::nullopt;
   }
-  using FD = HairlineLineShader::FD;
-  auto fragDomain = FD::domain();
-  std::vector<int> fragValues(FD::COUNT);
-  fragValues[FD::HAS_XP] = xpType;
-  auto fragIndex = fragDomain.encode(fragValues);
+  auto fragIndex = HairlineLineShader::FD::domain().encode(composed->fragValues);
   return PermutationMatchResult{"HairlineLineShader", 0, fragIndex};
 }
 
