@@ -469,10 +469,13 @@ static std::optional<PermutationMatchResult> TryMatchQuadConstColor(
     return std::nullopt;
   }
   auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
-  using VD = QuadConstColorShader::VD;
-  std::vector<int> vertValues(VD::COUNT, 0);
-  vertValues[VD::HAS_UV_COORD] = quadGP->hasUVMatrix() ? 0 : 1;
-  auto vertIndex = VD::domain().encode(vertValues);
+  QuadConstColorInputs inputs;
+  inputs.hasUVMatrix = quadGP->hasUVMatrix();
+  auto composed = ComposeQuadConstColor(inputs);
+  if (!composed) {
+    return std::nullopt;
+  }
+  auto vertIndex = QuadConstColorShader::VD::domain().encode(composed->vertValues);
   return PermutationMatchResult{"QuadConstColorShader", vertIndex, 0};
 }
 

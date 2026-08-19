@@ -70,6 +70,14 @@ struct HairlineQuadInputs {
 };
 
 /**
+ * Input contract of the QuadConstColorShader matcher rule. The EmptyXferProcessor requirement is
+ * a whole-draw rejection and stays in Extract.
+ */
+struct QuadConstColorInputs {
+  bool hasUVMatrix = false;
+};
+
+/**
  * Dimension values a matcher rule produces for both stages, before domain encoding.
  */
 struct RuleComposedValues {
@@ -108,6 +116,12 @@ std::optional<RuleComposedValues> ComposeHairlineLine(const HairlineLineInputs& 
 std::optional<RuleComposedValues> ComposeHairlineQuad(const HairlineQuadInputs& inputs);
 
 /**
+ * Pure mapping for the QuadConstColorShader rule; see ComposeRoundStrokeRect for the sharing
+ * contract.
+ */
+std::optional<RuleComposedValues> ComposeQuadConstColor(const QuadConstColorInputs& inputs);
+
+/**
  * Returns every (vertIndex, fragIndex) pair the RoundStrokeRect rule can ever produce, by
  * enumerating the full input lattice through ComposeRoundStrokeRect.
  */
@@ -132,6 +146,11 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateHairlineLineReachable();
  * Returns every (vertIndex, fragIndex) pair the HairlineQuad rule can ever produce.
  */
 std::set<std::pair<uint32_t, uint32_t>> EnumerateHairlineQuadReachable();
+
+/**
+ * Returns every (vertIndex, fragIndex) pair the QuadConstColor rule can ever produce.
+ */
+std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadConstColorReachable();
 
 /**
  * Returns the reachable permutation set for a shader whose matcher rule has been migrated to the

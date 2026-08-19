@@ -21,6 +21,7 @@
 #include "gpu/shaders/level1/HairlineLineShader.h"
 #include "gpu/shaders/level1/HairlineQuadShader.h"
 #include "gpu/shaders/level1/MaskFillShader.h"
+#include "gpu/shaders/level1/QuadConstColorShader.h"
 #include "gpu/shaders/level1/RoundStrokeRectFillShader.h"
 
 namespace tgfx {
@@ -174,6 +175,29 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateHairlineQuadReachable() {
   return result;
 }
 
+std::optional<RuleComposedValues> ComposeQuadConstColor(const QuadConstColorInputs& inputs) {
+  using VD = QuadConstColorShader::VD;
+  RuleComposedValues values;
+  values.vertValues.resize(VD::COUNT);
+  values.vertValues[VD::HAS_UV_COORD] = inputs.hasUVMatrix ? 0 : 1;
+  return values;
+}
+
+std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadConstColorReachable() {
+  std::set<std::pair<uint32_t, uint32_t>> result;
+  for (int hasUVMatrix = 0; hasUVMatrix <= 1; ++hasUVMatrix) {
+    QuadConstColorInputs inputs;
+    inputs.hasUVMatrix = hasUVMatrix != 0;
+    auto composed = ComposeQuadConstColor(inputs);
+    if (!composed) {
+      continue;
+    }
+    auto vertIndex = QuadConstColorShader::VD::domain().encode(composed->vertValues);
+    result.insert({vertIndex, 0});
+  }
+  return result;
+}
+
 std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermutations(
     const std::string& shaderName) {
   if (shaderName == "RoundStrokeRectFillShader") {
@@ -190,6 +214,9 @@ std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermuta
   }
   if (shaderName == "HairlineQuadShader") {
     return EnumerateHairlineQuadReachable();
+  }
+  if (shaderName == "QuadConstColorShader") {
+    return EnumerateQuadConstColorReachable();
   }
   return std::nullopt;
 }
