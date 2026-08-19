@@ -1409,12 +1409,10 @@ static std::optional<PermutationMatchResult> TryMatchNonAARRectFill(
   if (programInfo->numFragmentProcessors() > 1) {
     return std::nullopt;
   }
-  int xpType = GetXPType(programInfo);
-  if (xpType < 0) {
-    return std::nullopt;
-  }
   auto* ngp = static_cast<const NonAARRectGeometryProcessor*>(gp);
-  int textured = 0;
+  NonAARRectFillInputs inputs;
+  inputs.hasCommonColor = ngp->hasCommonColor();
+  inputs.isStroke = ngp->isStroke();
   if (programInfo->numFragmentProcessors() == 1) {
     auto fp = programInfo->getFragmentProcessor(0);
     // The textured variant carries the single-tap tiled modes only: the mipmap-repeat 4-tap path
@@ -1432,23 +1430,15 @@ static std::optional<PermutationMatchResult> TryMatchNonAARRectFill(
     if (!TiledModeSupported(modeX) || !TiledModeSupported(modeY)) {
       return std::nullopt;
     }
-    textured = 1;
+    inputs.textured = true;
   }
-  using D = NonAARRectFillShader::Dims;
-  auto domain = D::domain();
-  std::vector<int> values(D::COUNT);
-  values[D::HAS_COMMON_COLOR] = ngp->hasCommonColor() ? 1 : 0;
-  values[D::STROKE] = ngp->isStroke() ? 1 : 0;
-  values[D::TEXTURED] = textured;
-  auto vertIndex = domain.encode(values);
-  using FD = NonAARRectFillShader::FD;
-  auto fragDomain = FD::domain();
-  std::vector<int> fragValues(FD::COUNT);
-  for (size_t i = 0; i < D::COUNT; ++i) {
-    fragValues[i] = values[i];
+  inputs.xpType = GetXPType(programInfo);
+  auto composed = ComposeNonAARRectFill(inputs);
+  if (!composed) {
+    return std::nullopt;
   }
-  fragValues[FD::HAS_XP] = xpType;
-  auto fragIndex = fragDomain.encode(fragValues);
+  auto vertIndex = NonAARRectFillShader::Dims::domain().encode(composed->vertValues);
+  auto fragIndex = NonAARRectFillShader::FD::domain().encode(composed->fragValues);
   return PermutationMatchResult{"NonAARRectFillShader", vertIndex, fragIndex};
 }
 

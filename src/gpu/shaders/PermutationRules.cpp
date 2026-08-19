@@ -23,6 +23,7 @@
 #include "gpu/shaders/level1/HairlineLineShader.h"
 #include "gpu/shaders/level1/HairlineQuadShader.h"
 #include "gpu/shaders/level1/MaskFillShader.h"
+#include "gpu/shaders/level1/NonAARRectFillShader.h"
 #include "gpu/shaders/level1/QuadColorFillShader.h"
 #include "gpu/shaders/level1/QuadConstColorShader.h"
 #include "gpu/shaders/level1/RoundStrokeRectFillShader.h"
@@ -344,6 +345,55 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateEllipseFillReachable() {
   return result;
 }
 
+std::optional<RuleComposedValues> ComposeNonAARRectFill(const NonAARRectFillInputs& inputs) {
+  if (inputs.xpType < 0) {
+    return std::nullopt;
+  }
+  // The textured variant (a TiledTextureEffect fill) is fill-only: a stroked rect never carries
+  // the tiled texture child.
+  if (inputs.textured && inputs.isStroke) {
+    return std::nullopt;
+  }
+  using D = NonAARRectFillShader::Dims;
+  using FD = NonAARRectFillShader::FD;
+  RuleComposedValues values;
+  values.vertValues.resize(D::COUNT);
+  values.vertValues[D::HAS_COMMON_COLOR] = inputs.hasCommonColor ? 1 : 0;
+  values.vertValues[D::STROKE] = inputs.isStroke ? 1 : 0;
+  values.vertValues[D::TEXTURED] = inputs.textured ? 1 : 0;
+  values.fragValues.resize(FD::COUNT);
+  values.fragValues[FD::HAS_COMMON_COLOR] = values.vertValues[D::HAS_COMMON_COLOR];
+  values.fragValues[FD::STROKE] = values.vertValues[D::STROKE];
+  values.fragValues[FD::TEXTURED] = values.vertValues[D::TEXTURED];
+  values.fragValues[FD::HAS_XP] = inputs.xpType;
+  return values;
+}
+
+std::set<std::pair<uint32_t, uint32_t>> EnumerateNonAARRectFillReachable() {
+  std::set<std::pair<uint32_t, uint32_t>> result;
+  for (int hasCommonColor = 0; hasCommonColor <= 1; ++hasCommonColor) {
+    for (int isStroke = 0; isStroke <= 1; ++isStroke) {
+      for (int textured = 0; textured <= 1; ++textured) {
+        for (int xpType = -1; xpType <= 2; ++xpType) {
+          NonAARRectFillInputs inputs;
+          inputs.hasCommonColor = hasCommonColor != 0;
+          inputs.isStroke = isStroke != 0;
+          inputs.textured = textured != 0;
+          inputs.xpType = xpType;
+          auto composed = ComposeNonAARRectFill(inputs);
+          if (!composed) {
+            continue;
+          }
+          auto vertIndex = NonAARRectFillShader::Dims::domain().encode(composed->vertValues);
+          auto fragIndex = NonAARRectFillShader::FD::domain().encode(composed->fragValues);
+          result.insert({vertIndex, fragIndex});
+        }
+      }
+    }
+  }
+  return result;
+}
+
 std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermutations(
     const std::string& shaderName) {
   if (shaderName == "RoundStrokeRectFillShader") {
@@ -375,6 +425,9 @@ std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermuta
   }
   if (shaderName == "EllipseFillShader") {
     return EnumerateEllipseFillReachable();
+  }
+  if (shaderName == "NonAARRectFillShader") {
+    return EnumerateNonAARRectFillReachable();
   }
   return std::nullopt;
 }

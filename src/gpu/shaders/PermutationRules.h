@@ -117,6 +117,18 @@ struct EllipseFillInputs {
 };
 
 /**
+ * Input contract of the NonAARRectFillShader matcher rule. The TiledTextureEffect shape checks
+ * (single-tap modes only, no perspective) happen in Extract; the textured variant never
+ * combines with stroke, which Compose enforces.
+ */
+struct NonAARRectFillInputs {
+  bool hasCommonColor = false;
+  bool isStroke = false;
+  bool textured = false;
+  int xpType = -1;  // -1 = no representable XferProcessor.
+};
+
+/**
  * Dimension values a matcher rule produces for both stages, before domain encoding.
  */
 struct RuleComposedValues {
@@ -185,6 +197,12 @@ std::optional<RuleComposedValues> ComposeComplexEllipseFill(const ComplexEllipse
 std::optional<RuleComposedValues> ComposeEllipseFill(const EllipseFillInputs& inputs);
 
 /**
+ * Pure mapping for the NonAARRectFillShader rule; see ComposeRoundStrokeRect for the sharing
+ * contract.
+ */
+std::optional<RuleComposedValues> ComposeNonAARRectFill(const NonAARRectFillInputs& inputs);
+
+/**
  * Returns every (vertIndex, fragIndex) pair the RoundStrokeRect rule can ever produce, by
  * enumerating the full input lattice through ComposeRoundStrokeRect.
  */
@@ -234,6 +252,11 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateComplexEllipseFillReachable();
  * Returns every (vertIndex, fragIndex) pair the EllipseFill rule can ever produce.
  */
 std::set<std::pair<uint32_t, uint32_t>> EnumerateEllipseFillReachable();
+
+/**
+ * Returns every (vertIndex, fragIndex) pair the NonAARRectFill rule can ever produce.
+ */
+std::set<std::pair<uint32_t, uint32_t>> EnumerateNonAARRectFillReachable();
 
 /**
  * Returns the reachable permutation set for a shader whose matcher rule has been migrated to the
