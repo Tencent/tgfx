@@ -78,6 +78,16 @@ struct QuadConstColorInputs {
 };
 
 /**
+ * Input contract of the QuadColorFillShader matcher rule. The coverage FP classification
+ * (none, direct AARect, or device mask) happens in Extract: only the resulting mask flag and the
+ * transfer type shape dimensions.
+ */
+struct QuadColorFillInputs {
+  int xpType = -1;              // -1 = no representable XferProcessor.
+  bool hasMaskTexture = false;  // device-space mask coverage FP present.
+};
+
+/**
  * Dimension values a matcher rule produces for both stages, before domain encoding.
  */
 struct RuleComposedValues {
@@ -122,6 +132,12 @@ std::optional<RuleComposedValues> ComposeHairlineQuad(const HairlineQuadInputs& 
 std::optional<RuleComposedValues> ComposeQuadConstColor(const QuadConstColorInputs& inputs);
 
 /**
+ * Pure mapping for the QuadColorFillShader rule; see ComposeRoundStrokeRect for the sharing
+ * contract.
+ */
+std::optional<RuleComposedValues> ComposeQuadColorFill(const QuadColorFillInputs& inputs);
+
+/**
  * Returns every (vertIndex, fragIndex) pair the RoundStrokeRect rule can ever produce, by
  * enumerating the full input lattice through ComposeRoundStrokeRect.
  */
@@ -151,6 +167,11 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateHairlineQuadReachable();
  * Returns every (vertIndex, fragIndex) pair the QuadConstColor rule can ever produce.
  */
 std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadConstColorReachable();
+
+/**
+ * Returns every (vertIndex, fragIndex) pair the QuadColorFill rule can ever produce.
+ */
+std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadColorFillReachable();
 
 /**
  * Returns the reachable permutation set for a shader whose matcher rule has been migrated to the

@@ -21,6 +21,7 @@
 #include "gpu/shaders/level1/HairlineLineShader.h"
 #include "gpu/shaders/level1/HairlineQuadShader.h"
 #include "gpu/shaders/level1/MaskFillShader.h"
+#include "gpu/shaders/level1/QuadColorFillShader.h"
 #include "gpu/shaders/level1/QuadConstColorShader.h"
 #include "gpu/shaders/level1/RoundStrokeRectFillShader.h"
 
@@ -198,6 +199,36 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadConstColorReachable() {
   return result;
 }
 
+std::optional<RuleComposedValues> ComposeQuadColorFill(const QuadColorFillInputs& inputs) {
+  if (inputs.xpType < 0) {
+    return std::nullopt;
+  }
+  using FD = QuadColorFillShader::FD;
+  RuleComposedValues values;
+  values.fragValues.resize(FD::COUNT);
+  values.fragValues[FD::HAS_XP] = inputs.xpType;
+  values.fragValues[FD::HAS_MASK_TEXTURE] = inputs.hasMaskTexture ? 1 : 0;
+  return values;
+}
+
+std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadColorFillReachable() {
+  std::set<std::pair<uint32_t, uint32_t>> result;
+  for (int xpType = -1; xpType <= 2; ++xpType) {
+    for (int hasMaskTexture = 0; hasMaskTexture <= 1; ++hasMaskTexture) {
+      QuadColorFillInputs inputs;
+      inputs.xpType = xpType;
+      inputs.hasMaskTexture = hasMaskTexture != 0;
+      auto composed = ComposeQuadColorFill(inputs);
+      if (!composed) {
+        continue;
+      }
+      auto fragIndex = QuadColorFillShader::FD::domain().encode(composed->fragValues);
+      result.insert({0, fragIndex});
+    }
+  }
+  return result;
+}
+
 std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermutations(
     const std::string& shaderName) {
   if (shaderName == "RoundStrokeRectFillShader") {
@@ -217,6 +248,9 @@ std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermuta
   }
   if (shaderName == "QuadConstColorShader") {
     return EnumerateQuadConstColorReachable();
+  }
+  if (shaderName == "QuadColorFillShader") {
+    return EnumerateQuadColorFillReachable();
   }
   return std::nullopt;
 }

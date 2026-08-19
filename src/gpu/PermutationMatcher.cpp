@@ -486,7 +486,7 @@ static std::optional<PermutationMatchResult> TryMatchQuadColorFill(const Program
   }
   // Accept either zero fragment processors, a device-space mask, or one direct analytic AARect
   // coverage FP. The latter is evaluated by the unconditional Rect/HasClip shader uniforms.
-  bool hasMaskTexture = false;
+  QuadColorFillInputs inputs;
   if (programInfo->numFragmentProcessors() != 0) {
     if (programInfo->numColorFragmentProcessors() != 0) {
       return std::nullopt;
@@ -498,23 +498,16 @@ static std::optional<PermutationMatchResult> TryMatchQuadColorFill(const Program
       if (!coverage || *coverage != CoverageKind::DeviceMask) {
         return std::nullopt;
       }
-      hasMaskTexture = true;
+      inputs.hasMaskTexture = true;
     }
   }
-  int xpType = GetXPType(programInfo);
-  if (xpType < 0) {
+  inputs.xpType = GetXPType(programInfo);
+  auto composed = ComposeQuadColorFill(inputs);
+  if (!composed) {
     return std::nullopt;
   }
-  using VD = QuadColorFillShader::VD;
-  auto vertIndex = VD::domain().encode({});
-
-  using FD = QuadColorFillShader::FD;
-  auto fragDomain = FD::domain();
-  std::vector<int> fragValues(FD::COUNT, 0);
-  fragValues[FD::HAS_XP] = xpType;
-  fragValues[FD::HAS_MASK_TEXTURE] = hasMaskTexture ? 1 : 0;
-  auto fragIndex = fragDomain.encode(fragValues);
-  return PermutationMatchResult{"QuadColorFillShader", vertIndex, fragIndex};
+  auto fragIndex = QuadColorFillShader::FD::domain().encode(composed->fragValues);
+  return PermutationMatchResult{"QuadColorFillShader", 0, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
