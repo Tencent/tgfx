@@ -217,6 +217,15 @@ struct ShapeInstancedFillInputs {
 };
 
 /**
+ * Input contract of the TextureFillShader matcher rule. The TextureEffect shape checks (no YUV)
+ * are whole-draw rejections in Extract; alphaOnly / RGBAAA / subset are runtime uniforms.
+ */
+struct TextureFillInputs {
+  int deviceMask = 0;  // 0 = no mask coverage FP, 1 = device-space mask.
+  int xpType = -1;     // -1 = no representable XferProcessor.
+};
+
+/**
  * Dimension values a matcher rule produces for both stages, before domain encoding.
  */
 struct RuleComposedValues {
@@ -350,6 +359,12 @@ std::optional<RuleComposedValues> ComposeShapeInstancedFill(
     const ShapeInstancedFillInputs& inputs);
 
 /**
+ * Pure mapping for the TextureFillShader rule; see ComposeRoundStrokeRect for the sharing
+ * contract.
+ */
+std::optional<RuleComposedValues> ComposeTextureFill(const TextureFillInputs& inputs);
+
+/**
  * Returns every (vertIndex, fragIndex) pair the RoundStrokeRect rule can ever produce, by
  * enumerating the full input lattice through ComposeRoundStrokeRect.
  */
@@ -449,6 +464,11 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateShapeInstancedTextureCoverageRe
  * Returns every (vertIndex, fragIndex) pair the ShapeInstancedFill rule can ever produce.
  */
 std::set<std::pair<uint32_t, uint32_t>> EnumerateShapeInstancedFillReachable();
+
+/**
+ * Returns every (vertIndex, fragIndex) pair the TextureFill rule can ever produce.
+ */
+std::set<std::pair<uint32_t, uint32_t>> EnumerateTextureFillReachable();
 
 /**
  * Returns the reachable permutation set for a shader whose matcher rule has been migrated to the

@@ -226,13 +226,16 @@ static std::optional<PermutationMatchResult> TryMatchTextureFill(const ProgramIn
   // alphaOnly / hasRGBAAA are runtime uniforms (AlphaOnly / HasRgbaaa) written by
   // GLSLTextureEffect::onSetData, not permutation dimensions. TextureFill's vertex interface is
   // invariant: subset clamping is fragment-local, so every matching draw shares vertex artifact 0.
-  auto vertIndex = TextureFillShader::EncodeVertex();
-
-  TextureFillShader::FragmentValues fragmentValues = {};
-  fragmentValues.xp = static_cast<uint32_t>(xpType);
-  fragmentValues.deviceMask = static_cast<uint32_t>(*coverageType);
-  auto fragIndex = TextureFillShader::EncodeFragment(fragmentValues);
-  return PermutationMatchResult{TextureFillShader::Name(), vertIndex, fragIndex};
+  TextureFillInputs inputs;
+  inputs.deviceMask = *coverageType;
+  inputs.xpType = xpType;
+  auto composed = ComposeTextureFill(inputs);
+  if (!composed) {
+    return std::nullopt;
+  }
+  auto fragIndex = TextureFillShader::FD::domain().encode(composed->fragValues);
+  return PermutationMatchResult{TextureFillShader::Name(), TextureFillShader::EncodeVertex(),
+                                fragIndex};
 }
 
 // ShaderMode values the shared single-tap tiled_sample.inc handles for the blur tap loop:

@@ -36,6 +36,7 @@
 #include "gpu/shaders/level1/ShapeInstancedTextureCoverageShader.h"
 #include "gpu/shaders/level1/SolidColorFillShader.h"
 #include "gpu/shaders/level1/TextureColorMatrixShader.h"
+#include "gpu/shaders/level1/TextureFillShader.h"
 #include "gpu/shaders/level1/YUVTextureFillShader.h"
 
 namespace tgfx {
@@ -736,6 +737,36 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateShapeInstancedFillReachable() {
   return result;
 }
 
+std::optional<RuleComposedValues> ComposeTextureFill(const TextureFillInputs& inputs) {
+  if (inputs.xpType < 0) {
+    return std::nullopt;
+  }
+  using FD = TextureFillShader::FD;
+  RuleComposedValues values;
+  values.fragValues.resize(FD::COUNT);
+  values.fragValues[FD::HAS_XP] = inputs.xpType;
+  values.fragValues[FD::HAS_DEVICE_MASK] = inputs.deviceMask;
+  return values;
+}
+
+std::set<std::pair<uint32_t, uint32_t>> EnumerateTextureFillReachable() {
+  std::set<std::pair<uint32_t, uint32_t>> result;
+  for (int deviceMask = 0; deviceMask <= 1; ++deviceMask) {
+    for (int xpType = -1; xpType <= 2; ++xpType) {
+      TextureFillInputs inputs;
+      inputs.deviceMask = deviceMask;
+      inputs.xpType = xpType;
+      auto composed = ComposeTextureFill(inputs);
+      if (!composed) {
+        continue;
+      }
+      auto fragIndex = TextureFillShader::FD::domain().encode(composed->fragValues);
+      result.insert({0, fragIndex});
+    }
+  }
+  return result;
+}
+
 std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermutations(
     const std::string& shaderName) {
   if (shaderName == "RoundStrokeRectFillShader") {
@@ -797,6 +828,9 @@ std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermuta
   }
   if (shaderName == "ShapeInstancedFillShader") {
     return EnumerateShapeInstancedFillReachable();
+  }
+  if (shaderName == "TextureFillShader") {
+    return EnumerateTextureFillReachable();
   }
   return std::nullopt;
 }
