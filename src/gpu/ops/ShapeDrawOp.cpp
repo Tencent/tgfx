@@ -60,8 +60,12 @@ PlacementPtr<GeometryProcessor> ShapeDrawOp::onMakeGeometryProcessor(RenderTarge
   if (vertexBuffer == nullptr) {
     aa = AAType::None;
     auto textureProxy = shapeProxy->getTextureProxy();
-    if (textureProxy == nullptr || maskBufferProxy == nullptr ||
-        maskBufferProxy->getBuffer() == nullptr) {
+    // An empty shape rasterizes to nothing, so its texture proxy stays an unpopulated shell that
+    // the proxy cache keeps serving. The runtime path compiles such a mask to transparent black
+    // (GLSLTextureEffect emits vec4(0)), which leaves the destination unchanged — dropping the
+    // draw here is pixel-identical and avoids a useless program.
+    if (textureProxy == nullptr || textureProxy->getTextureView() == nullptr ||
+        maskBufferProxy == nullptr || maskBufferProxy->getBuffer() == nullptr) {
       return nullptr;
     }
     Matrix maskMatrix = {};
