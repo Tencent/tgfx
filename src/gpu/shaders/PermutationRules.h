@@ -26,6 +26,35 @@
 
 namespace tgfx {
 
+// ---------------------------------------------------------------------------------------
+// Design charter: what becomes a compile-time permutation dimension
+// ---------------------------------------------------------------------------------------
+// A permutation dimension is justified ONLY when it changes a resource binding or a varying
+// layout. Everything else — value math, operator selection, mode flags, colors — must ride a
+// runtime uniform. When reviewing a new dimension, ask what ABI difference it gates; if the
+// answer is "none", make it a uniform instead.
+//
+// The Compose functions below are the single source of truth for the compiled variant list:
+// the runtime matcher feeds them real inputs (via Extract in PermutationMatcher.cpp), while the
+// build tool feeds them the full input lattice (via the Enumerate functions) and compiles
+// exactly what survives. Rejections that depend on dimension values must therefore live inside
+// Compose — the enumeration must see the same rejection the runtime applies — while whole-draw
+// rejections (wrong processor kind, unsupported shapes) stay in Extract where they never shape
+// the reachable set.
+//
+// ---------------------------------------------------------------------------------------
+// Contract: adding a rule input field
+// ---------------------------------------------------------------------------------------
+// Adding a field to any *Inputs struct below must be synced in three places:
+//   1. Extract (PermutationMatcher.cpp) — assign the field from the ProgramInfo.
+//   2. Compose (this file) — read the field where it shapes dimensions or rejects.
+//   3. Enumerate (this file) — add a loop layer covering every value the field can take.
+// Forgetting step 3 leaves the field at its default in the enumeration, so the bundle misses
+// those variants and the affected draws fall back to runtime compilation silently. The
+// shader_build_tool --audit mode validates structural validity of the reachable set only, NOT
+// lattice completeness — the Enumerate loops are the sole declaration of the input space.
+// ---------------------------------------------------------------------------------------
+
 /**
  * Input contract of the RoundStrokeRectFillShader matcher rule. Only predicates that shape
  * dimension values belong here; whole-draw rejections (wrong geometry processor kind,
