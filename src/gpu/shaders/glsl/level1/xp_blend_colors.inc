@@ -2,6 +2,15 @@
 // xpBlendColors(S, D, mode) blends two premultiplied colors with a runtime-selected mode. This
 // file has its own include guard so kernels that need the blend math without the dst-texture XP
 // machinery (PointwiseChainShader) can include it directly.
+//
+// The heavy modes (Overlay, ColorDodge, ColorBurn, HardLight, SoftLight, and the HSL family) are
+// written as branch-free vector selections of the runtime's per-component formulas
+// (GLSLBlend.cpp): each lane evaluates every arm and mix() with a bvec picks the arm the scalar
+// branch would have taken. mix() with a boolean vector is a true component-wise select (SPIR-V
+// OpSelect), so unselected lanes are discarded bit-for-bit. Division denominators are sanitized
+// (zero replaced with one) only on lanes whose result the select discards, keeping every
+// evaluated lane finite; the per-lane arithmetic mirrors the original expression trees exactly,
+// so selected lanes produce bit-identical results.
 #ifndef TGFX_XP_BLEND_COLORS_INC
 #define TGFX_XP_BLEND_COLORS_INC
 
@@ -19,42 +28,26 @@ vec3 xpSetLuminance(vec3 hueSat, float alpha, vec3 lumColor) {
   float outLum = xpLuminance(outColor);
   float minComp = min(min(outColor.r, outColor.g), outColor.b);
   float maxComp = max(max(outColor.r, outColor.g), outColor.b);
-  if (minComp < 0.0 && outLum != minComp) {
-    outColor = vec3(outLum) + ((outColor - vec3(outLum)) * outLum) / (outLum - minComp);
-  }
-  if (maxComp > alpha && maxComp != outLum) {
-    outColor = vec3(outLum) + ((outColor - vec3(outLum)) * (alpha - outLum)) / (maxComp - outLum);
-  }
-  return outColor;
-}
-
-vec3 xpSetSatHelper(float minComp, float midComp, float maxComp, float sat) {
-  if (minComp < maxComp) {
-    return vec3(0.0, sat * (midComp - minComp) / (maxComp - minComp), sat);
-  }
-  return vec3(0.0);
+  float lowDen = (outLum != minComp) ? (outLum - minComp) : 1.0;
+  vec3 lowClamped = vec3(outLum) + ((outColor - vec3(outLum)) * outLum) / vec3(lowDen);
+  outColor = mix(outColor, lowClamped, bvec3(minComp < 0.0 && outLum != minComp));
+  float highDen = (maxComp != outLum) ? (maxComp - outLum) : 1.0;
+  vec3 highClamped = vec3(outLum) + ((outColor - vec3(outLum)) * (alpha - outLum)) / vec3(highDen);
+  return mix(outColor, highClamped, bvec3(maxComp > alpha && maxComp != outLum));
 }
 
 vec3 xpSetSaturation(vec3 hueLumColor, vec3 satColor) {
+  // Component-wise rank form of the classic min/mid/max permutation tree: every channel maps to
+  // sat * (c - min) / (max - min), which is exactly the tree's mid-channel expression, while the
+  // min channel evaluates to 0.0 and the max channel is replaced with the constant sat the tree
+  // assigns to it. When max == min the tree returns all zeros; the sanitized denominator makes
+  // every lane compute sat * 0 = 0 instead.
   float sat = xpSaturation(satColor);
-  if (hueLumColor.r <= hueLumColor.g) {
-    if (hueLumColor.g <= hueLumColor.b) {
-      hueLumColor.rgb = xpSetSatHelper(hueLumColor.r, hueLumColor.g, hueLumColor.b, sat);
-    } else if (hueLumColor.r <= hueLumColor.b) {
-      hueLumColor.rbg = xpSetSatHelper(hueLumColor.r, hueLumColor.b, hueLumColor.g, sat);
-    } else {
-      hueLumColor.brg = xpSetSatHelper(hueLumColor.b, hueLumColor.r, hueLumColor.g, sat);
-    }
-  } else {
-    if (hueLumColor.r <= hueLumColor.b) {
-      hueLumColor.grb = xpSetSatHelper(hueLumColor.g, hueLumColor.r, hueLumColor.b, sat);
-    } else if (hueLumColor.g <= hueLumColor.b) {
-      hueLumColor.gbr = xpSetSatHelper(hueLumColor.g, hueLumColor.b, hueLumColor.r, sat);
-    } else {
-      hueLumColor.bgr = xpSetSatHelper(hueLumColor.b, hueLumColor.g, hueLumColor.r, sat);
-    }
-  }
-  return hueLumColor;
+  float minComp = min(min(hueLumColor.r, hueLumColor.g), hueLumColor.b);
+  float maxComp = max(max(hueLumColor.r, hueLumColor.g), hueLumColor.b);
+  float denom = (maxComp > minComp) ? (maxComp - minComp) : 1.0;
+  vec3 ranked = (sat * (hueLumColor - vec3(minComp))) / vec3(denom);
+  return mix(ranked, vec3(sat), equal(hueLumColor, vec3(maxComp)));
 }
 
 vec4 xpBlendColors(vec4 S, vec4 D, int mode) {
@@ -91,9 +84,9 @@ vec4 xpBlendColors(vec4 S, vec4 D, int mode) {
     result = S + D - S * D;
   } else if (mode == 15) {
     result.a = S.a + (1.0 - S.a) * D.a;
-    result.r = (2.0 * D.r < D.a) ? 2.0 * S.r * D.r : S.a * D.a - 2.0 * (S.a - S.r) * (D.a - D.r);
-    result.g = (2.0 * D.g < D.a) ? 2.0 * S.g * D.g : S.a * D.a - 2.0 * (S.a - S.g) * (D.a - D.g);
-    result.b = (2.0 * D.b < D.a) ? 2.0 * S.b * D.b : S.a * D.a - 2.0 * (S.a - S.b) * (D.a - D.b);
+    vec3 fast = 2.0 * S.rgb * D.rgb;
+    vec3 slow = vec3(S.a * D.a) - 2.0 * (vec3(S.a) - S.rgb) * (vec3(D.a) - D.rgb);
+    result.rgb = mix(fast, slow, lessThan(2.0 * D.rgb, vec3(D.a)));
     result.rgb += D.rgb * (1.0 - S.a) + S.rgb * (1.0 - D.a);
   } else if (mode == 16) {
     result.a = S.a + (1.0 - S.a) * D.a;
@@ -103,79 +96,45 @@ vec4 xpBlendColors(vec4 S, vec4 D, int mode) {
     result.rgb = max((1.0 - S.a) * D.rgb + S.rgb, (1.0 - D.a) * S.rgb + D.rgb);
   } else if (mode == 18) {
     result.a = S.a + (1.0 - S.a) * D.a;
-    vec3 r3;
-    for (int c = 0; c < 3; ++c) {
-      float Sc = (c == 0) ? S.r : ((c == 1) ? S.g : S.b);
-      float Dc = (c == 0) ? D.r : ((c == 1) ? D.g : D.b);
-      float val;
-      if (Dc == 0.0) {
-        val = Sc * (1.0 - D.a);
-      } else {
-        float d = S.a - Sc;
-        if (d == 0.0) {
-          val = S.a * D.a + Sc * (1.0 - D.a) + Dc * (1.0 - S.a);
-        } else {
-          d = min(D.a, Dc * S.a / d);
-          val = d * S.a + Sc * (1.0 - D.a) + Dc * (1.0 - S.a);
-        }
-      }
-      if (c == 0) r3.r = val;
-      else if (c == 1) r3.g = val;
-      else r3.b = val;
-    }
-    result.rgb = r3;
+    vec3 d = vec3(S.a) - S.rgb;
+    vec3 dSafe = mix(vec3(1.0), d, notEqual(d, vec3(0.0)));
+    vec3 dd = min(vec3(D.a), D.rgb * vec3(S.a) / dSafe);
+    vec3 valElse = dd * vec3(S.a) + S.rgb * (1.0 - D.a) + D.rgb * (1.0 - S.a);
+    vec3 valZeroD = vec3(S.a * D.a) + S.rgb * (1.0 - D.a) + D.rgb * (1.0 - S.a);
+    vec3 val = mix(valElse, valZeroD, equal(d, vec3(0.0)));
+    result.rgb = mix(val, S.rgb * (1.0 - D.a), equal(D.rgb, vec3(0.0)));
   } else if (mode == 19) {
     result.a = S.a + (1.0 - S.a) * D.a;
-    vec3 r3;
-    for (int c = 0; c < 3; ++c) {
-      float Sc = (c == 0) ? S.r : ((c == 1) ? S.g : S.b);
-      float Dc = (c == 0) ? D.r : ((c == 1) ? D.g : D.b);
-      float val;
-      if (D.a == Dc) {
-        val = S.a * D.a + Sc * (1.0 - D.a) + Dc * (1.0 - S.a);
-      } else if (Sc == 0.0) {
-        val = Dc * (1.0 - S.a);
-      } else {
-        float d = max(0.0, D.a - (D.a - Dc) * S.a / Sc);
-        val = S.a * d + Sc * (1.0 - D.a) + Dc * (1.0 - S.a);
-      }
-      if (c == 0) r3.r = val;
-      else if (c == 1) r3.g = val;
-      else r3.b = val;
-    }
-    result.rgb = r3;
+    vec3 sSafe = mix(vec3(1.0), S.rgb, notEqual(S.rgb, vec3(0.0)));
+    vec3 dd = max(vec3(0.0), vec3(D.a) - (vec3(D.a) - D.rgb) * vec3(S.a) / sSafe);
+    vec3 valElse = vec3(S.a) * dd + S.rgb * (1.0 - D.a) + D.rgb * (1.0 - S.a);
+    vec3 valSrc0 = D.rgb * (1.0 - S.a);
+    vec3 valFull = vec3(S.a * D.a) + S.rgb * (1.0 - D.a) + D.rgb * (1.0 - S.a);
+    vec3 val = mix(valElse, valSrc0, equal(S.rgb, vec3(0.0)));
+    result.rgb = mix(val, valFull, equal(D.rgb, vec3(D.a)));
   } else if (mode == 20) {
     result.a = S.a + (1.0 - S.a) * D.a;
-    result.r = (2.0 * S.r < S.a) ? 2.0 * S.r * D.r : S.a * D.a - 2.0 * (D.a - D.r) * (S.a - S.r);
-    result.g = (2.0 * S.g < S.a) ? 2.0 * S.g * D.g : S.a * D.a - 2.0 * (D.a - D.g) * (S.a - S.g);
-    result.b = (2.0 * S.b < S.a) ? 2.0 * S.b * D.b : S.a * D.a - 2.0 * (D.a - D.b) * (S.a - S.b);
+    vec3 fast = 2.0 * S.rgb * D.rgb;
+    vec3 slow = vec3(S.a * D.a) - 2.0 * (vec3(D.a) - D.rgb) * (vec3(S.a) - S.rgb);
+    result.rgb = mix(fast, slow, lessThan(2.0 * S.rgb, vec3(S.a)));
     result.rgb += S.rgb * (1.0 - D.a) + D.rgb * (1.0 - S.a);
   } else if (mode == 21) {
     result.a = S.a + (1.0 - S.a) * D.a;
     if (D.a == 0.0) {
       result.rgb = S.rgb;
     } else {
-      vec3 r3;
-      for (int c = 0; c < 3; ++c) {
-        float Sc = (c == 0) ? S.r : ((c == 1) ? S.g : S.b);
-        float Dc = (c == 0) ? D.r : ((c == 1) ? D.g : D.b);
-        float val;
-        if (2.0 * Sc <= S.a) {
-          val = (Dc * Dc * (S.a - 2.0 * Sc)) / D.a + (1.0 - D.a) * Sc + Dc * (-S.a + 2.0 * Sc + 1.0);
-        } else if (4.0 * Dc <= D.a) {
-          float DSqd = Dc * Dc;
-          float DCub = DSqd * Dc;
-          float DaSqd = D.a * D.a;
-          float DaCub = DaSqd * D.a;
-          val = (DaSqd * (Sc - Dc * (3.0 * S.a - 6.0 * Sc - 1.0)) + 12.0 * D.a * DSqd * (S.a - 2.0 * Sc) - 16.0 * DCub * (S.a - 2.0 * Sc) - DaCub * Sc) / DaSqd;
-        } else {
-          val = Dc * (S.a - 2.0 * Sc + 1.0) + Sc - sqrt(D.a * Dc) * (S.a - 2.0 * Sc) - D.a * Sc;
-        }
-        if (c == 0) r3.r = val;
-        else if (c == 1) r3.g = val;
-        else r3.b = val;
-      }
-      result.rgb = r3;
+      vec3 sa2 = S.a - 2.0 * S.rgb;
+      vec3 arm1 = (D.rgb * D.rgb * sa2) / vec3(D.a) + (1.0 - D.a) * S.rgb + D.rgb * (1.0 - sa2);
+      vec3 DSqd = D.rgb * D.rgb;
+      vec3 DCub = DSqd * D.rgb;
+      float DaSqd = D.a * D.a;
+      float DaCub = DaSqd * D.a;
+      vec3 arm2 = (vec3(DaSqd) * (S.rgb - D.rgb * (3.0 * S.a - 6.0 * S.rgb - 1.0)) +
+                   12.0 * D.a * DSqd * sa2 - 16.0 * DCub * sa2 - vec3(DaCub) * S.rgb) /
+                  vec3(DaSqd);
+      vec3 arm3 = D.rgb * (sa2 + 1.0) + S.rgb - sqrt(vec3(D.a) * D.rgb) * sa2 - vec3(D.a) * S.rgb;
+      vec3 val = mix(arm3, arm2, lessThanEqual(4.0 * D.rgb, vec3(D.a)));
+      result.rgb = mix(val, arm1, lessThanEqual(2.0 * S.rgb, vec3(S.a)));
     }
   } else if (mode == 22) {
     result.a = S.a + (1.0 - S.a) * D.a;
@@ -189,12 +148,14 @@ vec4 xpBlendColors(vec4 S, vec4 D, int mode) {
   } else if (mode == 25) {
     result.a = S.a + (1.0 - S.a) * D.a;
     vec4 dstSrcAlpha = D * S.a;
-    result.rgb = xpSetLuminance(xpSetSaturation(S.rgb * D.a, dstSrcAlpha.rgb), dstSrcAlpha.a, dstSrcAlpha.rgb);
+    result.rgb = xpSetLuminance(xpSetSaturation(S.rgb * D.a, dstSrcAlpha.rgb), dstSrcAlpha.a,
+                                dstSrcAlpha.rgb);
     result.rgb += (1.0 - S.a) * D.rgb + (1.0 - D.a) * S.rgb;
   } else if (mode == 26) {
     result.a = S.a + (1.0 - S.a) * D.a;
     vec4 dstSrcAlpha = D * S.a;
-    result.rgb = xpSetLuminance(xpSetSaturation(dstSrcAlpha.rgb, S.rgb * D.a), dstSrcAlpha.a, dstSrcAlpha.rgb);
+    result.rgb = xpSetLuminance(xpSetSaturation(dstSrcAlpha.rgb, S.rgb * D.a), dstSrcAlpha.a,
+                                dstSrcAlpha.rgb);
     result.rgb += (1.0 - S.a) * D.rgb + (1.0 - D.a) * S.rgb;
   } else if (mode == 27) {
     result.a = S.a + (1.0 - S.a) * D.a;
