@@ -1351,15 +1351,13 @@ static std::optional<PermutationMatchResult> TryMatchHairlineQuad(const ProgramI
       (programInfo->numColorFragmentProcessors() != 0 || !HasDirectAARectCoverage(programInfo))) {
     return std::nullopt;
   }
-  int xpType = GetXPType(programInfo);
-  if (xpType < 0) {
+  HairlineQuadInputs inputs;
+  inputs.xpType = GetXPType(programInfo);
+  auto composed = ComposeHairlineQuad(inputs);
+  if (!composed) {
     return std::nullopt;
   }
-  using FD = HairlineQuadShader::FD;
-  auto fragDomain = FD::domain();
-  std::vector<int> fragValues(FD::COUNT);
-  fragValues[FD::HAS_XP] = xpType;
-  auto fragIndex = fragDomain.encode(fragValues);
+  auto fragIndex = HairlineQuadShader::FD::domain().encode(composed->fragValues);
   return PermutationMatchResult{"HairlineQuadShader", 0, fragIndex};
 }
 
