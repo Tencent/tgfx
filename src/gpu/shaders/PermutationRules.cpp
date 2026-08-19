@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/shaders/PermutationRules.h"
+#include "gpu/shaders/level1/ConstColorShader.h"
 #include "gpu/shaders/level1/MaskFillShader.h"
 #include "gpu/shaders/level1/RoundStrokeRectFillShader.h"
 
@@ -92,6 +93,33 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateMaskFillReachable() {
   return result;
 }
 
+std::optional<RuleComposedValues> ComposeConstColor(const ConstColorInputs& inputs) {
+  if (inputs.xpType < 0) {
+    return std::nullopt;
+  }
+  using FD = ConstColorShader::FragDims;
+  RuleComposedValues values;
+  values.fragValues.resize(FD::COUNT);
+  // inputMode is a runtime uniform (InputMode), not a permutation dimension.
+  values.fragValues[FD::HAS_XP] = inputs.xpType;
+  return values;
+}
+
+std::set<std::pair<uint32_t, uint32_t>> EnumerateConstColorReachable() {
+  std::set<std::pair<uint32_t, uint32_t>> result;
+  for (int xpType = -1; xpType <= 2; ++xpType) {
+    ConstColorInputs inputs;
+    inputs.xpType = xpType;
+    auto composed = ComposeConstColor(inputs);
+    if (!composed) {
+      continue;
+    }
+    auto fragIndex = ConstColorShader::FragDims::domain().encode(composed->fragValues);
+    result.insert({0, fragIndex});
+  }
+  return result;
+}
+
 std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermutations(
     const std::string& shaderName) {
   if (shaderName == "RoundStrokeRectFillShader") {
@@ -99,6 +127,9 @@ std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermuta
   }
   if (shaderName == "MaskFillShader") {
     return EnumerateMaskFillReachable();
+  }
+  if (shaderName == "ConstColorShader") {
+    return EnumerateConstColorReachable();
   }
   return std::nullopt;
 }

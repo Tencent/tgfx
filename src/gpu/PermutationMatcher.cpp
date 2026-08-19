@@ -442,20 +442,17 @@ static std::optional<PermutationMatchResult> TryMatchConstColor(const ProgramInf
   if (programInfo->numFragmentProcessors() != 1) {
     return std::nullopt;
   }
-  int xpType = GetXPType(programInfo);
-  if (xpType < 0) {
-    return std::nullopt;
-  }
   auto fp = programInfo->getFragmentProcessor(0);
   if (fp->name() != "ConstColorProcessor") {
     return std::nullopt;
   }
-  using FD = ConstColorShader::FragDims;
-  auto fragDomain = FD::domain();
-  std::vector<int> fragValues(FD::COUNT);
-  // inputMode is a runtime uniform (InputMode), not a permutation dimension.
-  fragValues[FD::HAS_XP] = xpType;
-  auto fragIndex = fragDomain.encode(fragValues);
+  ConstColorInputs inputs;
+  inputs.xpType = GetXPType(programInfo);
+  auto composed = ComposeConstColor(inputs);
+  if (!composed) {
+    return std::nullopt;
+  }
+  auto fragIndex = ConstColorShader::FragDims::domain().encode(composed->fragValues);
   return PermutationMatchResult{"ConstColorShader", 0, fragIndex};
 }
 

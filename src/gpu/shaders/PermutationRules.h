@@ -47,6 +47,14 @@ struct MaskFillInputs {
 };
 
 /**
+ * Input contract of the ConstColorShader matcher rule. The ConstColorProcessor inputMode is a
+ * runtime uniform, so only the transfer type shapes dimensions.
+ */
+struct ConstColorInputs {
+  int xpType = -1;  // -1 = no representable XferProcessor.
+};
+
+/**
  * Dimension values a matcher rule produces for both stages, before domain encoding.
  */
 struct RuleComposedValues {
@@ -68,6 +76,11 @@ std::optional<RuleComposedValues> ComposeRoundStrokeRect(const RoundStrokeRectIn
 std::optional<RuleComposedValues> ComposeMaskFill(const MaskFillInputs& inputs);
 
 /**
+ * Pure mapping for the ConstColorShader rule; see ComposeRoundStrokeRect for the sharing contract.
+ */
+std::optional<RuleComposedValues> ComposeConstColor(const ConstColorInputs& inputs);
+
+/**
  * Returns every (vertIndex, fragIndex) pair the RoundStrokeRect rule can ever produce, by
  * enumerating the full input lattice through ComposeRoundStrokeRect.
  */
@@ -77,6 +90,11 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateRoundStrokeRectReachable();
  * Returns every (vertIndex, fragIndex) pair the MaskFill rule can ever produce.
  */
 std::set<std::pair<uint32_t, uint32_t>> EnumerateMaskFillReachable();
+
+/**
+ * Returns every (vertIndex, fragIndex) pair the ConstColor rule can ever produce.
+ */
+std::set<std::pair<uint32_t, uint32_t>> EnumerateConstColorReachable();
 
 /**
  * Returns the reachable permutation set for a shader whose matcher rule has been migrated to the
