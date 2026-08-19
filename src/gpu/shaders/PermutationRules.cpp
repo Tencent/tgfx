@@ -1,0 +1,76 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making tgfx available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+//  in compliance with the License. You may obtain a copy of the License at
+//
+//      https://opensource.org/licenses/BSD-3-Clause
+//
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. see the License for the specific language governing permissions
+//  and limitations under the License.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#include "gpu/shaders/PermutationRules.h"
+#include "gpu/shaders/level1/RoundStrokeRectFillShader.h"
+
+namespace tgfx {
+
+std::optional<RuleComposedValues> ComposeRoundStrokeRect(const RoundStrokeRectInputs& inputs) {
+  if (inputs.xpType < 0) {
+    return std::nullopt;
+  }
+  using D = RoundStrokeRectFillShader::Dims;
+  using FD = RoundStrokeRectFillShader::FD;
+  RuleComposedValues values;
+  values.vertValues.resize(D::COUNT);
+  values.vertValues[D::HAS_AA] = inputs.isCoverageAA ? 1 : 0;
+  values.vertValues[D::HAS_COMMON_COLOR] = inputs.hasCommonColor ? 1 : 0;
+  values.vertValues[D::HAS_UV_MATRIX] = inputs.hasUVMatrix ? 1 : 0;
+  values.fragValues.resize(FD::COUNT);
+  values.fragValues[FD::HAS_AA] = values.vertValues[D::HAS_AA];
+  values.fragValues[FD::HAS_COMMON_COLOR] = values.vertValues[D::HAS_COMMON_COLOR];
+  values.fragValues[FD::HAS_UV_MATRIX] = values.vertValues[D::HAS_UV_MATRIX];
+  values.fragValues[FD::HAS_XP] = inputs.xpType;
+  return values;
+}
+
+std::set<std::pair<uint32_t, uint32_t>> EnumerateRoundStrokeRectReachable() {
+  std::set<std::pair<uint32_t, uint32_t>> result;
+  for (int isCoverageAA = 0; isCoverageAA <= 1; ++isCoverageAA) {
+    for (int hasCommonColor = 0; hasCommonColor <= 1; ++hasCommonColor) {
+      for (int hasUVMatrix = 0; hasUVMatrix <= 1; ++hasUVMatrix) {
+        for (int xpType = -1; xpType <= 2; ++xpType) {
+          RoundStrokeRectInputs inputs;
+          inputs.isCoverageAA = isCoverageAA != 0;
+          inputs.hasCommonColor = hasCommonColor != 0;
+          inputs.hasUVMatrix = hasUVMatrix != 0;
+          inputs.xpType = xpType;
+          auto composed = ComposeRoundStrokeRect(inputs);
+          if (!composed) {
+            continue;
+          }
+          auto vertIndex = RoundStrokeRectFillShader::Dims::domain().encode(composed->vertValues);
+          auto fragIndex = RoundStrokeRectFillShader::FD::domain().encode(composed->fragValues);
+          result.insert({vertIndex, fragIndex});
+        }
+      }
+    }
+  }
+  return result;
+}
+
+std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermutations(
+    const std::string& shaderName) {
+  if (shaderName == "RoundStrokeRectFillShader") {
+    return EnumerateRoundStrokeRectReachable();
+  }
+  return std::nullopt;
+}
+
+}  // namespace tgfx

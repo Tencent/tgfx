@@ -29,6 +29,7 @@
 #include "BundleWriter.h"
 #include "ReflectionExtractor.h"
 #include "ShaderCompiler.h"
+#include "gpu/shaders/PermutationRules.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/level1/AtlasTextFillShader.h"
 #include "gpu/shaders/level1/ComplexEllipseFillShader.h"
@@ -69,6 +70,7 @@ struct BuildOptions {
   std::vector<std::string> backends;
   bool reportOnly = false;
   bool compress = false;
+  bool audit = false;
 };
 
 struct ShaderReport {
@@ -159,12 +161,14 @@ static void RecordBackendArtifactError(const std::string& backend,
 }
 
 static void PrintUsage() {
-  std::cerr << "Usage: shader_build_tool [options]\n"
-            << "  --shader-dir <path>   Directory containing shader sources\n"
-            << "  --out-dir <path>      Output directory for build artifacts\n"
-            << "  --backends <list>     Comma-separated backend list (opengl,vulkan,metal,webgpu)\n"
-            << "  --report-only         Only enumerate and report, do not compile\n"
-            << "  --compress            Compress data pool with zlib in output bundles\n";
+  std::cerr
+      << "Usage: shader_build_tool [options]\n"
+      << "  --shader-dir <path>   Directory containing shader sources\n"
+      << "  --out-dir <path>      Output directory for build artifacts\n"
+      << "  --backends <list>     Comma-separated backend list (opengl,vulkan,metal,webgpu)\n"
+      << "  --report-only         Only enumerate and report, do not compile\n"
+      << "  --audit               Cross-check legacy compile lists against rule-reachable sets\n"
+      << "  --compress            Compress data pool with zlib in output bundles\n";
 }
 
 static std::vector<std::string> SplitByComma(const std::string& input) {
@@ -194,6 +198,8 @@ static bool ParseArgs(int argc, char** argv, BuildOptions* options) {
       options->backends = SplitByComma(argv[++i]);
     } else if (std::strcmp(argv[i], "--report-only") == 0) {
       options->reportOnly = true;
+    } else if (std::strcmp(argv[i], "--audit") == 0) {
+      options->audit = true;
     } else if (std::strcmp(argv[i], "--compress") == 0) {
       options->compress = true;
     } else {
@@ -535,12 +541,71 @@ static bool WriteReportJson(const BuildReport& report, const std::string& outDir
   return true;
 }
 
+// Cross-checks, for every shader whose matcher rule has been migrated to the Compose pattern,
+// the legacy compile list (cartesian domain filtered by IsBuildablePermutation) against the set
+// enumerated from the rule itself. Any symmetric difference is a drift between the two sources
+// of truth: legacy-only entries are dead bundle weight, reachable-only entries are produced by
+// the rule at runtime but never compiled (silent JIT fallback). Unmigrated shaders are reported
+// as pending and do not fail the audit.
+static int RunAuditMode() {
+  const auto& factories = ShaderRegistry::All();
+  size_t audited = 0;
+  size_t pending = 0;
+  size_t mismatched = 0;
+  for (const auto& factory : factories) {
+    auto shader = factory();
+    auto info = shader->info();
+    auto reachable = EnumerateReachablePermutations(info.name);
+    if (!reachable) {
+      pending++;
+      std::cout << "[audit] " << info.name << ": pending (rule not migrated)\n";
+      continue;
+    }
+    std::set<std::pair<uint32_t, uint32_t>> legacy;
+    for (uint32_t vi = 0; vi < info.vertDomain.totalCount(); ++vi) {
+      for (uint32_t fi = 0; fi < info.fragDomain.totalCount(); ++fi) {
+        if (IsBuildablePermutation(info, vi, fi)) {
+          legacy.insert({vi, fi});
+        }
+      }
+    }
+    audited++;
+    if (legacy == *reachable) {
+      std::cout << "[audit] " << info.name << ": OK (" << legacy.size()
+                << " permutations on both sides)\n";
+      continue;
+    }
+    mismatched++;
+    std::cout << "[audit] " << info.name << ": MISMATCH legacy=" << legacy.size()
+              << " reachable=" << reachable->size() << "\n";
+    for (const auto& pair : legacy) {
+      if (reachable->find(pair) == reachable->end()) {
+        std::cout << "    legacy-only: vert=" << pair.first << " frag=" << pair.second
+                  << " (compiled but unreachable: dead bundle weight)\n";
+      }
+    }
+    for (const auto& pair : *reachable) {
+      if (legacy.find(pair) == legacy.end()) {
+        std::cout << "    reachable-only: vert=" << pair.first << " frag=" << pair.second
+                  << " (produced by rule but never compiled: silent JIT fallback)\n";
+      }
+    }
+  }
+  std::cout << "[audit] summary: " << audited << " audited, " << pending << " pending, "
+            << mismatched << " mismatched\n";
+  return mismatched == 0 ? 0 : 1;
+}
+
 }  // namespace tgfx
 
 int main(int argc, char** argv) {
   tgfx::BuildOptions options;
   if (!tgfx::ParseArgs(argc, argv, &options)) {
     return 1;
+  }
+
+  if (options.audit) {
+    return tgfx::RunAuditMode();
   }
 
   tgfx::BuildReport report;

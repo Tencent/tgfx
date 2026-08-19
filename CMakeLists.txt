@@ -771,6 +771,7 @@ if (TGFX_EMBED_SHADER_BUNDLES)
     file(GLOB_RECURSE TGFX_SHADER_DECL_FILES
             src/gpu/shaders/ShaderPermutation.*
             src/gpu/shaders/PrecompiledShader.*
+            src/gpu/shaders/PermutationRules.*
             src/gpu/shaders/level1/*.h)
     add_library(tgfx_shader_declarations STATIC ${TGFX_SHADER_DECL_FILES})
     set_target_properties(tgfx_shader_declarations PROPERTIES PREFIX "")

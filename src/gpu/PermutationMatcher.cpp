@@ -52,6 +52,7 @@
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/processors/UnrolledBinaryGradientColorizer.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
+#include "gpu/shaders/PermutationRules.h"
 #include "gpu/shaders/level1/AtlasTextFillShader.h"
 #include "gpu/shaders/level1/ComplexEllipseFillShader.h"
 #include "gpu/shaders/level1/ComplexNonAARRectFillShader.h"
@@ -1517,8 +1518,11 @@ static std::optional<PermutationMatchResult> TryMatchComplexNonAARRectFill(
   return PermutationMatchResult{"ComplexNonAARRectFillShader", vertIndex, fragIndex};
 }
 
-static std::optional<PermutationMatchResult> TryMatchRoundStrokeRectFill(
-    const ProgramInfo* programInfo) {
+// Extracts the RoundStrokeRect rule's input predicates from the ProgramInfo. Whole-draw
+// rejections (wrong GP kind, unexpected fragment processors, perspective UV) stay here: they
+// route the draw elsewhere and never shape the rule's reachable variant set, which is defined
+// by ComposeRoundStrokeRect in PermutationRules.cpp and shared with the build tool.
+static std::optional<RoundStrokeRectInputs> ExtractRoundStrokeRect(const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
   if (gp->name() != "RoundStrokeRectGeometryProcessor") {
     return std::nullopt;
@@ -1526,30 +1530,31 @@ static std::optional<PermutationMatchResult> TryMatchRoundStrokeRectFill(
   if (programInfo->numFragmentProcessors() != 0) {
     return std::nullopt;
   }
-  int xpType = GetXPType(programInfo);
-  if (xpType < 0) {
-    return std::nullopt;
-  }
   auto* rsgp = static_cast<const RoundStrokeRectGeometryProcessor*>(gp);
   // Skip perspective UV transforms — not covered by precompiled variants.
   if (rsgp->isUVPerspective()) {
     return std::nullopt;
   }
-  using D = RoundStrokeRectFillShader::Dims;
-  auto domain = D::domain();
-  std::vector<int> values(D::COUNT);
-  values[D::HAS_AA] = rsgp->getAAType() == AAType::Coverage ? 1 : 0;
-  values[D::HAS_COMMON_COLOR] = rsgp->hasCommonColor() ? 1 : 0;
-  values[D::HAS_UV_MATRIX] = rsgp->hasUVMatrixTransform() ? 1 : 0;
-  auto vertIndex = domain.encode(values);
-  using FD = RoundStrokeRectFillShader::FD;
-  auto fragDomain = FD::domain();
-  std::vector<int> fragValues(FD::COUNT);
-  for (size_t i = 0; i < D::COUNT; ++i) {
-    fragValues[i] = values[i];
+  RoundStrokeRectInputs inputs;
+  inputs.isCoverageAA = rsgp->getAAType() == AAType::Coverage;
+  inputs.hasCommonColor = rsgp->hasCommonColor();
+  inputs.hasUVMatrix = rsgp->hasUVMatrixTransform();
+  inputs.xpType = GetXPType(programInfo);
+  return inputs;
+}
+
+static std::optional<PermutationMatchResult> TryMatchRoundStrokeRectFill(
+    const ProgramInfo* programInfo) {
+  auto inputs = ExtractRoundStrokeRect(programInfo);
+  if (!inputs) {
+    return std::nullopt;
   }
-  fragValues[FD::HAS_XP] = xpType;
-  auto fragIndex = fragDomain.encode(fragValues);
+  auto composed = ComposeRoundStrokeRect(*inputs);
+  if (!composed) {
+    return std::nullopt;
+  }
+  auto vertIndex = RoundStrokeRectFillShader::Dims::domain().encode(composed->vertValues);
+  auto fragIndex = RoundStrokeRectFillShader::FD::domain().encode(composed->fragValues);
   return PermutationMatchResult{"RoundStrokeRectFillShader", vertIndex, fragIndex};
 }
 
