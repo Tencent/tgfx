@@ -32,6 +32,8 @@
 #include "gpu/shaders/level1/QuadColorFillShader.h"
 #include "gpu/shaders/level1/QuadConstColorShader.h"
 #include "gpu/shaders/level1/RoundStrokeRectFillShader.h"
+#include "gpu/shaders/level1/ShapeInstancedFillShader.h"
+#include "gpu/shaders/level1/ShapeInstancedTextureCoverageShader.h"
 #include "gpu/shaders/level1/SolidColorFillShader.h"
 #include "gpu/shaders/level1/TextureColorMatrixShader.h"
 #include "gpu/shaders/level1/YUVTextureFillShader.h"
@@ -654,6 +656,86 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateDeviceSpaceTexturedEffectReacha
   return result;
 }
 
+std::optional<RuleComposedValues> ComposeShapeInstancedTextureCoverage(
+    const ShapeInstancedTextureCoverageInputs& inputs) {
+  // The bare coverage form reads the per-instance color; only the gradient form serves colorless
+  // batches with an opaque-white input.
+  if (!inputs.gradient && !inputs.hasColors) {
+    return std::nullopt;
+  }
+  using D = ShapeInstancedTextureCoverageShader::D;
+  using FD = ShapeInstancedTextureCoverageShader::FD;
+  RuleComposedValues values;
+  values.vertValues.resize(D::COUNT);
+  values.vertValues[D::GRADIENT] = inputs.gradient ? 1 : 0;
+  values.vertValues[D::HAS_COLORS] = inputs.hasColors ? 1 : 0;
+  values.fragValues.resize(FD::COUNT);
+  values.fragValues[FD::GRADIENT] = values.vertValues[D::GRADIENT];
+  values.fragValues[FD::HAS_COLORS] = values.vertValues[D::HAS_COLORS];
+  return values;
+}
+
+std::set<std::pair<uint32_t, uint32_t>> EnumerateShapeInstancedTextureCoverageReachable() {
+  std::set<std::pair<uint32_t, uint32_t>> result;
+  for (int gradient = 0; gradient <= 1; ++gradient) {
+    for (int hasColors = 0; hasColors <= 1; ++hasColors) {
+      ShapeInstancedTextureCoverageInputs inputs;
+      inputs.gradient = gradient != 0;
+      inputs.hasColors = hasColors != 0;
+      auto composed = ComposeShapeInstancedTextureCoverage(inputs);
+      if (!composed) {
+        continue;
+      }
+      auto vertIndex =
+          ShapeInstancedTextureCoverageShader::D::domain().encode(composed->vertValues);
+      auto fragIndex =
+          ShapeInstancedTextureCoverageShader::FD::domain().encode(composed->fragValues);
+      result.insert({vertIndex, fragIndex});
+    }
+  }
+  return result;
+}
+
+std::optional<RuleComposedValues> ComposeShapeInstancedFill(
+    const ShapeInstancedFillInputs& inputs) {
+  if (inputs.xpType < 0) {
+    return std::nullopt;
+  }
+  using D = ShapeInstancedFillShader::Dims;
+  using FD = ShapeInstancedFillShader::FD;
+  RuleComposedValues values;
+  values.vertValues.resize(D::COUNT);
+  values.vertValues[D::HAS_COLOR] = inputs.hasColors ? 1 : 0;
+  values.vertValues[D::HAS_AA] = inputs.isCoverageAA ? 1 : 0;
+  values.fragValues.resize(FD::COUNT);
+  values.fragValues[FD::HAS_COLOR] = values.vertValues[D::HAS_COLOR];
+  values.fragValues[FD::HAS_AA] = values.vertValues[D::HAS_AA];
+  values.fragValues[FD::HAS_XP] = inputs.xpType;
+  return values;
+}
+
+std::set<std::pair<uint32_t, uint32_t>> EnumerateShapeInstancedFillReachable() {
+  std::set<std::pair<uint32_t, uint32_t>> result;
+  for (int hasColors = 0; hasColors <= 1; ++hasColors) {
+    for (int isCoverageAA = 0; isCoverageAA <= 1; ++isCoverageAA) {
+      for (int xpType = -1; xpType <= 2; ++xpType) {
+        ShapeInstancedFillInputs inputs;
+        inputs.hasColors = hasColors != 0;
+        inputs.isCoverageAA = isCoverageAA != 0;
+        inputs.xpType = xpType;
+        auto composed = ComposeShapeInstancedFill(inputs);
+        if (!composed) {
+          continue;
+        }
+        auto vertIndex = ShapeInstancedFillShader::Dims::domain().encode(composed->vertValues);
+        auto fragIndex = ShapeInstancedFillShader::FD::domain().encode(composed->fragValues);
+        result.insert({vertIndex, fragIndex});
+      }
+    }
+  }
+  return result;
+}
+
 std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermutations(
     const std::string& shaderName) {
   if (shaderName == "RoundStrokeRectFillShader") {
@@ -709,6 +791,12 @@ std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermuta
   }
   if (shaderName == "DeviceSpaceTexturedEffectShader") {
     return EnumerateDeviceSpaceTexturedEffectReachable();
+  }
+  if (shaderName == "ShapeInstancedTextureCoverageShader") {
+    return EnumerateShapeInstancedTextureCoverageReachable();
+  }
+  if (shaderName == "ShapeInstancedFillShader") {
+    return EnumerateShapeInstancedFillReachable();
   }
   return std::nullopt;
 }

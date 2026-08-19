@@ -1524,20 +1524,20 @@ static std::optional<PermutationMatchResult> TryMatchShapeInstancedTextureCovera
   auto* shape = static_cast<const ShapeInstancedGeometryProcessor*>(gp);
   // The bare coverage form reads the per-instance color; the gradient form also serves
   // colorless batches (opaque-white input). This kernel carries no AA coverage attribute.
-  if (shape->getAAType() != AAType::None || (!gradient && !shape->getHasColors())) {
+  if (shape->getAAType() != AAType::None) {
     return std::nullopt;
   }
-  int hasColors = shape->getHasColors() ? 1 : 0;
-  using D = ShapeInstancedTextureCoverageShader::D;
-  std::vector<int> vertValues(D::COUNT, 0);
-  vertValues[D::GRADIENT] = gradient;
-  vertValues[D::HAS_COLORS] = hasColors;
-  auto vertIndex = D::domain().encode(vertValues);
-  using FD = ShapeInstancedTextureCoverageShader::FD;
-  std::vector<int> fragValues(FD::COUNT, 0);
-  fragValues[FD::GRADIENT] = gradient;
-  fragValues[FD::HAS_COLORS] = hasColors;
-  auto fragIndex = FD::domain().encode(fragValues);
+  ShapeInstancedTextureCoverageInputs inputs;
+  inputs.gradient = gradient != 0;
+  inputs.hasColors = shape->getHasColors();
+  auto composed = ComposeShapeInstancedTextureCoverage(inputs);
+  if (!composed) {
+    return std::nullopt;
+  }
+  auto vertIndex =
+      ShapeInstancedTextureCoverageShader::D::domain().encode(composed->vertValues);
+  auto fragIndex =
+      ShapeInstancedTextureCoverageShader::FD::domain().encode(composed->fragValues);
   return PermutationMatchResult{"ShapeInstancedTextureCoverageShader", vertIndex, fragIndex};
 }
 
@@ -1550,25 +1550,17 @@ static std::optional<PermutationMatchResult> TryMatchShapeInstancedFill(
   if (programInfo->numFragmentProcessors() != 0) {
     return std::nullopt;
   }
-  int xpType = GetXPType(programInfo);
-  if (xpType < 0) {
+  auto* sigp = static_cast<const ShapeInstancedGeometryProcessor*>(gp);
+  ShapeInstancedFillInputs inputs;
+  inputs.hasColors = sigp->getHasColors();
+  inputs.isCoverageAA = sigp->getAAType() == AAType::Coverage;
+  inputs.xpType = GetXPType(programInfo);
+  auto composed = ComposeShapeInstancedFill(inputs);
+  if (!composed) {
     return std::nullopt;
   }
-  auto* sigp = static_cast<const ShapeInstancedGeometryProcessor*>(gp);
-  using D = ShapeInstancedFillShader::Dims;
-  auto domain = D::domain();
-  std::vector<int> values(D::COUNT);
-  values[D::HAS_COLOR] = sigp->getHasColors() ? 1 : 0;
-  values[D::HAS_AA] = sigp->getAAType() == AAType::Coverage ? 1 : 0;
-  auto vertIndex = domain.encode(values);
-  using FD = ShapeInstancedFillShader::FD;
-  auto fragDomain = FD::domain();
-  std::vector<int> fragValues(FD::COUNT);
-  for (size_t i = 0; i < D::COUNT; ++i) {
-    fragValues[i] = values[i];
-  }
-  fragValues[FD::HAS_XP] = xpType;
-  auto fragIndex = fragDomain.encode(fragValues);
+  auto vertIndex = ShapeInstancedFillShader::Dims::domain().encode(composed->vertValues);
+  auto fragIndex = ShapeInstancedFillShader::FD::domain().encode(composed->fragValues);
   return PermutationMatchResult{"ShapeInstancedFillShader", vertIndex, fragIndex};
 }
 

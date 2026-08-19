@@ -198,6 +198,25 @@ struct DeviceSpaceTexturedEffectInputs {
 };
 
 /**
+ * Input contract of the ShapeInstancedTextureCoverageShader matcher rule. The kernel is
+ * EmptyXP-only and the gradient/texture structure checks are whole-draw rejections in Extract;
+ * the bare coverage form requires per-instance colors, which Compose enforces.
+ */
+struct ShapeInstancedTextureCoverageInputs {
+  bool gradient = false;
+  bool hasColors = false;
+};
+
+/**
+ * Input contract of the ShapeInstancedFillShader matcher rule.
+ */
+struct ShapeInstancedFillInputs {
+  bool hasColors = false;
+  bool isCoverageAA = false;
+  int xpType = -1;  // -1 = no representable XferProcessor.
+};
+
+/**
  * Dimension values a matcher rule produces for both stages, before domain encoding.
  */
 struct RuleComposedValues {
@@ -317,6 +336,20 @@ std::optional<RuleComposedValues> ComposeDeviceSpaceTexturedEffect(
     const DeviceSpaceTexturedEffectInputs& inputs);
 
 /**
+ * Pure mapping for the ShapeInstancedTextureCoverageShader rule; see ComposeRoundStrokeRect for
+ * the sharing contract.
+ */
+std::optional<RuleComposedValues> ComposeShapeInstancedTextureCoverage(
+    const ShapeInstancedTextureCoverageInputs& inputs);
+
+/**
+ * Pure mapping for the ShapeInstancedFillShader rule; see ComposeRoundStrokeRect for the sharing
+ * contract.
+ */
+std::optional<RuleComposedValues> ComposeShapeInstancedFill(
+    const ShapeInstancedFillInputs& inputs);
+
+/**
  * Returns every (vertIndex, fragIndex) pair the RoundStrokeRect rule can ever produce, by
  * enumerating the full input lattice through ComposeRoundStrokeRect.
  */
@@ -406,6 +439,16 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateDeviceSpaceTextureReachable();
  * Returns every (vertIndex, fragIndex) pair the DeviceSpaceTexturedEffect rule can ever produce.
  */
 std::set<std::pair<uint32_t, uint32_t>> EnumerateDeviceSpaceTexturedEffectReachable();
+
+/**
+ * Returns every (vertIndex, fragIndex) pair the ShapeInstancedTextureCoverage rule can produce.
+ */
+std::set<std::pair<uint32_t, uint32_t>> EnumerateShapeInstancedTextureCoverageReachable();
+
+/**
+ * Returns every (vertIndex, fragIndex) pair the ShapeInstancedFill rule can ever produce.
+ */
+std::set<std::pair<uint32_t, uint32_t>> EnumerateShapeInstancedFillReachable();
 
 /**
  * Returns the reachable permutation set for a shader whose matcher rule has been migrated to the
