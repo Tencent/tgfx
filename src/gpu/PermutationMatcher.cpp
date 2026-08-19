@@ -424,14 +424,13 @@ static std::optional<PermutationMatchResult> TryMatchMaskFill(const ProgramInfo*
   // The mask coverage feeds the XferProcessor's coverage lerp, so Porter-Duff blends (DST_TEX and
   // framebuffer-fetch) are supported via the HAS_XP fragment dimension. Only a genuinely
   // unsupported transfer processor (xpType < 0) falls back to ProgramBuilder.
-  int xpType = GetXPType(programInfo);
-  if (xpType < 0) {
+  MaskFillInputs inputs;
+  inputs.xpType = GetXPType(programInfo);
+  auto composed = ComposeMaskFill(inputs);
+  if (!composed) {
     return std::nullopt;
   }
-  using D = MaskFillShader::D;
-  std::vector<int> fragValues(D::COUNT, 0);
-  fragValues[D::HAS_XP] = xpType;
-  auto fragIndex = D::domain().encode(fragValues);
+  auto fragIndex = MaskFillShader::D::domain().encode(composed->fragValues);
   return PermutationMatchResult{"MaskFillShader", 0, fragIndex};
 }
 

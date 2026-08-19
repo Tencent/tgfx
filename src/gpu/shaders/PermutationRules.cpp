@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/shaders/PermutationRules.h"
+#include "gpu/shaders/level1/MaskFillShader.h"
 #include "gpu/shaders/level1/RoundStrokeRectFillShader.h"
 
 namespace tgfx {
@@ -65,10 +66,39 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateRoundStrokeRectReachable() {
   return result;
 }
 
+std::optional<RuleComposedValues> ComposeMaskFill(const MaskFillInputs& inputs) {
+  if (inputs.xpType < 0) {
+    return std::nullopt;
+  }
+  using D = MaskFillShader::D;
+  RuleComposedValues values;
+  values.fragValues.resize(D::COUNT);
+  values.fragValues[D::HAS_XP] = inputs.xpType;
+  return values;
+}
+
+std::set<std::pair<uint32_t, uint32_t>> EnumerateMaskFillReachable() {
+  std::set<std::pair<uint32_t, uint32_t>> result;
+  for (int xpType = -1; xpType <= 2; ++xpType) {
+    MaskFillInputs inputs;
+    inputs.xpType = xpType;
+    auto composed = ComposeMaskFill(inputs);
+    if (!composed) {
+      continue;
+    }
+    auto fragIndex = MaskFillShader::D::domain().encode(composed->fragValues);
+    result.insert({0, fragIndex});
+  }
+  return result;
+}
+
 std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermutations(
     const std::string& shaderName) {
   if (shaderName == "RoundStrokeRectFillShader") {
     return EnumerateRoundStrokeRectReachable();
+  }
+  if (shaderName == "MaskFillShader") {
+    return EnumerateMaskFillReachable();
   }
   return std::nullopt;
 }

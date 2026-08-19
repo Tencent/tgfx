@@ -39,6 +39,14 @@ struct RoundStrokeRectInputs {
 };
 
 /**
+ * Input contract of the MaskFillShader matcher rule. The mask TextureEffect shape checks
+ * (alpha-only, no subset, no RGBAAA, no YUV) are whole-draw rejections and stay in Extract.
+ */
+struct MaskFillInputs {
+  int xpType = -1;  // -1 = no representable XferProcessor.
+};
+
+/**
  * Dimension values a matcher rule produces for both stages, before domain encoding.
  */
 struct RuleComposedValues {
@@ -55,10 +63,20 @@ struct RuleComposedValues {
 std::optional<RuleComposedValues> ComposeRoundStrokeRect(const RoundStrokeRectInputs& inputs);
 
 /**
+ * Pure mapping for the MaskFillShader rule; see ComposeRoundStrokeRect for the sharing contract.
+ */
+std::optional<RuleComposedValues> ComposeMaskFill(const MaskFillInputs& inputs);
+
+/**
  * Returns every (vertIndex, fragIndex) pair the RoundStrokeRect rule can ever produce, by
  * enumerating the full input lattice through ComposeRoundStrokeRect.
  */
 std::set<std::pair<uint32_t, uint32_t>> EnumerateRoundStrokeRectReachable();
+
+/**
+ * Returns every (vertIndex, fragIndex) pair the MaskFill rule can ever produce.
+ */
+std::set<std::pair<uint32_t, uint32_t>> EnumerateMaskFillReachable();
 
 /**
  * Returns the reachable permutation set for a shader whose matcher rule has been migrated to the
