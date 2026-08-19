@@ -327,10 +327,6 @@ static std::optional<PermutationMatchResult> TryMatchYUVTextureFill(
   if (programInfo->numColorFragmentProcessors() != 1 || programInfo->numFragmentProcessors() != 1) {
     return std::nullopt;
   }
-  int xpType = GetXPType(programInfo);
-  if (xpType < 0) {
-    return std::nullopt;
-  }
   auto fp = programInfo->getFragmentProcessor(0);
   if (fp->name() != "TextureEffect") {
     return std::nullopt;
@@ -340,25 +336,20 @@ static std::optional<PermutationMatchResult> TryMatchYUVTextureFill(
     return std::nullopt;
   }
   // Only I420 and NV12 have precompiled plane layouts.
-  int format = -1;
+  YUVTextureFillInputs inputs;
+  inputs.hasUVMatrix = quadGP->hasUVMatrix();
   if (texture->yuvFormat() == YUVFormat::I420) {
-    format = 0;
+    inputs.yuvFormat = 0;
   } else if (texture->yuvFormat() == YUVFormat::NV12) {
-    format = 1;
+    inputs.yuvFormat = 1;
   }
-  if (format < 0) {
+  inputs.xpType = GetXPType(programInfo);
+  auto composed = ComposeYUVTextureFill(inputs);
+  if (!composed) {
     return std::nullopt;
   }
-  using VD = YUVTextureFillShader::VD;
-  std::vector<int> vertValues(VD::COUNT, 0);
-  vertValues[VD::HAS_UV_COORD] = quadGP->hasUVMatrix() ? 0 : 1;
-  auto vertIndex = VD::domain().encode(vertValues);
-
-  using FD = YUVTextureFillShader::FD;
-  std::vector<int> fragValues(FD::COUNT, 0);
-  fragValues[FD::YUV_FORMAT] = format;
-  fragValues[FD::HAS_XP] = xpType;
-  auto fragIndex = FD::domain().encode(fragValues);
+  auto vertIndex = YUVTextureFillShader::VD::domain().encode(composed->vertValues);
+  auto fragIndex = YUVTextureFillShader::FD::domain().encode(composed->fragValues);
   return PermutationMatchResult{"YUVTextureFillShader", vertIndex, fragIndex};
 }
 

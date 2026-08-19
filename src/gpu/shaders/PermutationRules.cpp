@@ -32,6 +32,7 @@
 #include "gpu/shaders/level1/RoundStrokeRectFillShader.h"
 #include "gpu/shaders/level1/SolidColorFillShader.h"
 #include "gpu/shaders/level1/TextureColorMatrixShader.h"
+#include "gpu/shaders/level1/YUVTextureFillShader.h"
 
 namespace tgfx {
 
@@ -544,6 +545,43 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateTextureColorMatrixReachable() {
   return result;
 }
 
+std::optional<RuleComposedValues> ComposeYUVTextureFill(const YUVTextureFillInputs& inputs) {
+  if (inputs.xpType < 0 || inputs.yuvFormat < 0) {
+    return std::nullopt;
+  }
+  using VD = YUVTextureFillShader::VD;
+  using FD = YUVTextureFillShader::FD;
+  RuleComposedValues values;
+  values.vertValues.resize(VD::COUNT);
+  values.vertValues[VD::HAS_UV_COORD] = inputs.hasUVMatrix ? 0 : 1;
+  values.fragValues.resize(FD::COUNT);
+  values.fragValues[FD::YUV_FORMAT] = inputs.yuvFormat;
+  values.fragValues[FD::HAS_XP] = inputs.xpType;
+  return values;
+}
+
+std::set<std::pair<uint32_t, uint32_t>> EnumerateYUVTextureFillReachable() {
+  std::set<std::pair<uint32_t, uint32_t>> result;
+  for (int hasUVMatrix = 0; hasUVMatrix <= 1; ++hasUVMatrix) {
+    for (int yuvFormat = -1; yuvFormat <= 1; ++yuvFormat) {
+      for (int xpType = -1; xpType <= 2; ++xpType) {
+        YUVTextureFillInputs inputs;
+        inputs.hasUVMatrix = hasUVMatrix != 0;
+        inputs.yuvFormat = yuvFormat;
+        inputs.xpType = xpType;
+        auto composed = ComposeYUVTextureFill(inputs);
+        if (!composed) {
+          continue;
+        }
+        auto vertIndex = YUVTextureFillShader::VD::domain().encode(composed->vertValues);
+        auto fragIndex = YUVTextureFillShader::FD::domain().encode(composed->fragValues);
+        result.insert({vertIndex, fragIndex});
+      }
+    }
+  }
+  return result;
+}
+
 std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermutations(
     const std::string& shaderName) {
   if (shaderName == "RoundStrokeRectFillShader") {
@@ -590,6 +628,9 @@ std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermuta
   }
   if (shaderName == "TextureColorMatrixShader") {
     return EnumerateTextureColorMatrixReachable();
+  }
+  if (shaderName == "YUVTextureFillShader") {
+    return EnumerateYUVTextureFillReachable();
   }
   return std::nullopt;
 }

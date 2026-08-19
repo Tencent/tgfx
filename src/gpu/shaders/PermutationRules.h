@@ -168,6 +168,17 @@ struct TextureColorMatrixInputs {
 };
 
 /**
+ * Input contract of the YUVTextureFillShader matcher rule. yuvFormat is the plane layout index
+ * (0 = I420, 1 = NV12); unsupported formats map to -1 and are rejected in Compose so the
+ * enumeration sees the same rejection as the runtime.
+ */
+struct YUVTextureFillInputs {
+  bool hasUVMatrix = false;
+  int yuvFormat = -1;  // -1 = unsupported plane layout.
+  int xpType = -1;     // -1 = no representable XferProcessor.
+};
+
+/**
  * Dimension values a matcher rule produces for both stages, before domain encoding.
  */
 struct RuleComposedValues {
@@ -267,6 +278,12 @@ std::optional<RuleComposedValues> ComposeTextureColorMatrix(
     const TextureColorMatrixInputs& inputs);
 
 /**
+ * Pure mapping for the YUVTextureFillShader rule; see ComposeRoundStrokeRect for the sharing
+ * contract.
+ */
+std::optional<RuleComposedValues> ComposeYUVTextureFill(const YUVTextureFillInputs& inputs);
+
+/**
  * Returns every (vertIndex, fragIndex) pair the RoundStrokeRect rule can ever produce, by
  * enumerating the full input lattice through ComposeRoundStrokeRect.
  */
@@ -341,6 +358,11 @@ std::set<std::pair<uint32_t, uint32_t>> EnumeratePerlinNoiseFillReachable();
  * Returns every (vertIndex, fragIndex) pair the TextureColorMatrix rule can ever produce.
  */
 std::set<std::pair<uint32_t, uint32_t>> EnumerateTextureColorMatrixReachable();
+
+/**
+ * Returns every (vertIndex, fragIndex) pair the YUVTextureFill rule can ever produce.
+ */
+std::set<std::pair<uint32_t, uint32_t>> EnumerateYUVTextureFillReachable();
 
 /**
  * Returns the reachable permutation set for a shader whose matcher rule has been migrated to the
