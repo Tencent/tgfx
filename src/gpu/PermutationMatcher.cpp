@@ -579,22 +579,19 @@ static std::optional<PermutationMatchResult> TryMatchDeviceSpaceTexture(
   if (programInfo->numFragmentProcessors() != 1) {
     return std::nullopt;
   }
-  int xpType = GetXPType(programInfo);
-  if (xpType < 0) {
-    return std::nullopt;
-  }
   auto fp = programInfo->getFragmentProcessor(0);
   if (fp->name() != "DeviceSpaceTextureEffect") {
     return std::nullopt;
   }
-  using FD = DeviceSpaceTextureShader::Dims;
-  auto fragDomain = FD::domain();
-  std::vector<int> fragValues(FD::COUNT);
-  fragValues[FD::HAS_COVERAGE] = GetGPCoverage(gp);
-  // ALPHA_ONLY is a runtime uniform (AlphaOnly), not a permutation dimension.
-  fragValues[FD::HAS_XP] = xpType;
-  auto fragIndex = fragDomain.encode(fragValues);
-  return PermutationMatchResult{"DeviceSpaceTextureShader", fragIndex, fragIndex};
+  DeviceSpaceTextureInputs inputs;
+  inputs.hasCoverage = GetGPCoverage(gp) != 0;
+  inputs.xpType = GetXPType(programInfo);
+  auto composed = ComposeDeviceSpaceTexture(inputs);
+  if (!composed) {
+    return std::nullopt;
+  }
+  auto index = DeviceSpaceTextureShader::Dims::domain().encode(composed->fragValues);
+  return PermutationMatchResult{"DeviceSpaceTextureShader", index, index};
 }
 
 static int GetGPType(const GeometryProcessor* gp) {

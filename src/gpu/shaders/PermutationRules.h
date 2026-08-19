@@ -179,6 +179,15 @@ struct YUVTextureFillInputs {
 };
 
 /**
+ * Input contract of the DeviceSpaceTextureShader matcher rule. ALPHA_ONLY is a runtime uniform,
+ * so only coverage and the transfer type shape dimensions.
+ */
+struct DeviceSpaceTextureInputs {
+  bool hasCoverage = false;
+  int xpType = -1;  // -1 = no representable XferProcessor.
+};
+
+/**
  * Dimension values a matcher rule produces for both stages, before domain encoding.
  */
 struct RuleComposedValues {
@@ -284,6 +293,13 @@ std::optional<RuleComposedValues> ComposeTextureColorMatrix(
 std::optional<RuleComposedValues> ComposeYUVTextureFill(const YUVTextureFillInputs& inputs);
 
 /**
+ * Pure mapping for the DeviceSpaceTextureShader rule; see ComposeRoundStrokeRect for the sharing
+ * contract.
+ */
+std::optional<RuleComposedValues> ComposeDeviceSpaceTexture(
+    const DeviceSpaceTextureInputs& inputs);
+
+/**
  * Returns every (vertIndex, fragIndex) pair the RoundStrokeRect rule can ever produce, by
  * enumerating the full input lattice through ComposeRoundStrokeRect.
  */
@@ -363,6 +379,11 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateTextureColorMatrixReachable();
  * Returns every (vertIndex, fragIndex) pair the YUVTextureFill rule can ever produce.
  */
 std::set<std::pair<uint32_t, uint32_t>> EnumerateYUVTextureFillReachable();
+
+/**
+ * Returns every (vertIndex, fragIndex) pair the DeviceSpaceTexture rule can ever produce.
+ */
+std::set<std::pair<uint32_t, uint32_t>> EnumerateDeviceSpaceTextureReachable();
 
 /**
  * Returns the reachable permutation set for a shader whose matcher rule has been migrated to the

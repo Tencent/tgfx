@@ -20,6 +20,7 @@
 #include "gpu/shaders/level1/ComplexEllipseFillShader.h"
 #include "gpu/shaders/level1/ComplexNonAARRectFillShader.h"
 #include "gpu/shaders/level1/ConstColorShader.h"
+#include "gpu/shaders/level1/DeviceSpaceTextureShader.h"
 #include "gpu/shaders/level1/EllipseFillShader.h"
 #include "gpu/shaders/level1/HairlineLineShader.h"
 #include "gpu/shaders/level1/HairlineQuadShader.h"
@@ -582,6 +583,39 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateYUVTextureFillReachable() {
   return result;
 }
 
+std::optional<RuleComposedValues> ComposeDeviceSpaceTexture(
+    const DeviceSpaceTextureInputs& inputs) {
+  if (inputs.xpType < 0) {
+    return std::nullopt;
+  }
+  using FD = DeviceSpaceTextureShader::Dims;
+  RuleComposedValues values;
+  values.vertValues.resize(FD::COUNT);
+  values.vertValues[FD::HAS_COVERAGE] = inputs.hasCoverage ? 1 : 0;
+  // ALPHA_ONLY is a runtime uniform (AlphaOnly), not a permutation dimension.
+  values.vertValues[FD::HAS_XP] = inputs.xpType;
+  values.fragValues = values.vertValues;
+  return values;
+}
+
+std::set<std::pair<uint32_t, uint32_t>> EnumerateDeviceSpaceTextureReachable() {
+  std::set<std::pair<uint32_t, uint32_t>> result;
+  for (int hasCoverage = 0; hasCoverage <= 1; ++hasCoverage) {
+    for (int xpType = -1; xpType <= 2; ++xpType) {
+      DeviceSpaceTextureInputs inputs;
+      inputs.hasCoverage = hasCoverage != 0;
+      inputs.xpType = xpType;
+      auto composed = ComposeDeviceSpaceTexture(inputs);
+      if (!composed) {
+        continue;
+      }
+      auto index = DeviceSpaceTextureShader::Dims::domain().encode(composed->fragValues);
+      result.insert({index, index});
+    }
+  }
+  return result;
+}
+
 std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermutations(
     const std::string& shaderName) {
   if (shaderName == "RoundStrokeRectFillShader") {
@@ -631,6 +665,9 @@ std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermuta
   }
   if (shaderName == "YUVTextureFillShader") {
     return EnumerateYUVTextureFillReachable();
+  }
+  if (shaderName == "DeviceSpaceTextureShader") {
+    return EnumerateDeviceSpaceTextureReachable();
   }
   return std::nullopt;
 }
