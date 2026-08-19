@@ -69,6 +69,7 @@
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Surface.h"
+#include "utils/AOTToleranceCompare.h"
 #include "utils/TestUtils.h"
 #include "zlib.h"
 
@@ -1805,6 +1806,135 @@ TGFX_TEST(ShaderPermutationTest, MirroredDimsHaveConsistentArity) {
       }
     }
   }
+}
+
+// ---------------------------------------------------------------------------------------
+// AOT-vs-JIT blend mode parity gate.
+//
+// For every BlendMode, renders the same scene twice: once with the precompiled bundle loaded
+// (AOT path, exercising the xpBlendColors table in the precompiled shader) and once with the
+// bundle unloaded (JIT path, exercising the runtime-compiled blend code from GLSLBlend.cpp).
+// The two must agree within 1 LSB per channel. This gate guards any future modification to
+// xp_blend_colors.inc: if a restructuring changes pixel output, this test fails.
+// ---------------------------------------------------------------------------------------
+
+static void RenderBlendParityScene(Context* context, BlendMode mode, Bitmap* outBitmap) {
+  context->globalCache()->clearPrograms();
+  auto surface = Surface::Make(context, 96, 96);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+
+  // Destination: varying colors so different formula branches are exercised.
+  Color dstColors[] = {
+      Color::Red(),
+      Color::Green(),
+      Color::Blue(),
+      Color::White(),
+      Color::Black(),
+      Color::FromRGBA(255, 0, 255, 255),
+      Color::FromRGBA(128, 128, 0, 255),
+      Color::FromRGBA(128, 128, 128, 255),
+  };
+  for (int i = 0; i < 8; i++) {
+    Paint bgPaint = {};
+    bgPaint.setColor(dstColors[i]);
+    canvas->drawRect(Rect::MakeXYWH(0, i * 12, 96, 12), bgPaint);
+  }
+
+  // Source: one rect with the blend mode covering all destination strips. Only ONE blend-mode
+  // draw per render pass — Metal crashes on the second consecutive PorterDuff draw in a pass
+  // (a pre-existing pipeline issue, not related to this gate).
+  Paint paint = {};
+  paint.setBlendMode(mode);
+  paint.setColor(Color::FromRGBA(100, 150, 200, 180));
+  canvas->drawRect(Rect::MakeWH(96, 96), paint);
+
+  context->flushAndSubmit(true);
+  ASSERT_TRUE(outBitmap->allocPixels(96, 96));
+  auto pixels = outBitmap->lockPixels();
+  ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+  outBitmap->unlockPixels();
+}
+
+TGFX_TEST(ShaderPermutationTest, BlendModesMatchJIT) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+
+  std::string bundlePath = ProjectPath::Absolute(
+      "resources/shaders/shader_bundle." +
+      std::string(TGFX_BACKEND_NAME).substr(0, std::string(TGFX_BACKEND_NAME).find('-')) + ".bin");
+
+  // Clear is a degenerate mode (result always transparent, no formula branch exercised) and
+  // crashes on Metal's PorterDuff pipeline; skip it.
+  BlendMode modes[] = {
+      BlendMode::Src,        BlendMode::Dst,        BlendMode::SrcOver,   BlendMode::DstOver,
+      BlendMode::SrcIn,      BlendMode::DstIn,      BlendMode::SrcOut,    BlendMode::DstOut,
+      BlendMode::SrcATop,    BlendMode::DstATop,    BlendMode::Xor,       BlendMode::PlusLighter,
+      BlendMode::Modulate,   BlendMode::Screen,     BlendMode::Overlay,   BlendMode::Darken,
+      BlendMode::Lighten,    BlendMode::ColorDodge, BlendMode::ColorBurn, BlendMode::HardLight,
+      BlendMode::SoftLight,  BlendMode::Difference, BlendMode::Exclusion, BlendMode::Multiply,
+      BlendMode::Hue,        BlendMode::Saturation, BlendMode::Color,     BlendMode::Luminosity,
+      BlendMode::PlusDarker,
+  };
+
+  int totalModes = static_cast<int>(sizeof(modes) / sizeof(modes[0]));
+  int failures = 0;
+  int aotHits = 0;
+  int jitOnly = 0;
+
+  for (int i = 0; i < totalModes; i++) {
+    BlendMode mode = modes[i];
+
+    // Reference: JIT path (bundle unloaded).
+    cache->unload();
+    cache->resetStats();
+    context->globalCache()->resetProgramStats();
+    Bitmap referenceBitmap = {};
+    {
+      ScopedAOTStatsPause statsPause(context, true);
+      RenderBlendParityScene(context, mode, &referenceBitmap);
+    }
+
+    // Candidate: AOT path (bundle loaded).
+    ASSERT_TRUE(cache->loadBundle(bundlePath));
+    cache->resetStats();
+    context->globalCache()->resetProgramStats();
+    Bitmap candidateBitmap = {};
+    RenderBlendParityScene(context, mode, &candidateBitmap);
+    uint32_t hits = cache->hitCount();
+    uint32_t misses = cache->missCount();
+    cache->unload();
+
+    Pixmap referencePixmap(referenceBitmap);
+    Pixmap candidatePixmap(candidateBitmap);
+    AOTToleranceSpec spec = {};
+    spec.maxChannelDiff = 1;
+    spec.maxDiffPixelRatio = 1.0;
+    spec.structuralChannelDiff = 2;
+    auto result = AOTToleranceCompare::Compare(referencePixmap, candidatePixmap, spec);
+
+    if (hits > 0) {
+      aotHits++;
+    } else {
+      jitOnly++;
+    }
+    if (!result.passed) {
+      failures++;
+    }
+
+    LOGI("[BLENDGATE] mode=%d hits=%u misses=%u maxDelta=%d structural=%d pass=%d", i, hits, misses,
+         result.maxChannelDiff, result.structuralDifference ? 1 : 0, result.passed ? 1 : 0);
+
+    EXPECT_TRUE(result.passed) << "BlendMode " << i
+                               << " AOT diverges from JIT, maxDelta=" << result.maxChannelDiff
+                               << " (hits=" << hits << " misses=" << misses << ")";
+  }
+
+  LOGI("[BLENDGATE] summary: total=%d aotServed=%d jitOnly=%d failures=%d", totalModes, aotHits,
+       jitOnly, failures);
+  EXPECT_EQ(failures, 0) << failures << " blend modes diverge between AOT and JIT";
 }
 
 }  // namespace tgfx
