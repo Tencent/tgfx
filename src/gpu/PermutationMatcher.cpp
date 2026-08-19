@@ -677,52 +677,22 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseTail(const Program
 static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
     const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
-  // GP_LAYOUT: 0 covers the rect GPs and MeshGP (whose vertex buffers follow the chain's
-  // attribute order), 1 is the ellipse layout.
-  int gpLayout = -1;
-  if (GetGPType(gp) >= 0 || gp->name() == "MeshGeometryProcessor" ||
-      gp->name() == "AtlasTextGeometryProcessor") {
-    gpLayout = 0;
-  } else if (gp->name() == "EllipseGeometryProcessor") {
-    gpLayout = 1;
-  }
-  if (gpLayout < 0 || programInfo->numColorFragmentProcessors() != 1 ||
-      programInfo->numFragmentProcessors() != 1) {
-    return std::nullopt;
-  }
-  int hasUVCoord = 0;
-  int hasColor = 0;
-  if (gp->name() == "QuadPerEdgeAAGeometryProcessor") {
-    auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
-    // The precompiled vert has no texSubset attribute, so subset-carrying quads fall back.
-    if (quadGP->getHasSubset()) {
-      return std::nullopt;
-    }
-    hasUVCoord = quadGP->hasUVMatrix() ? 0 : 1;
-    hasColor = quadGP->hasCommonColor() ? 0 : 1;
+  // GP profiles: 0 covers the rect GPs (Default/Quad), 2 Mesh (whose vertex buffers follow the
+  // chain's attribute order), 3 the sampler-free AtlasText twin, 4 the ellipse layout.
+  int gpKind = -1;
+  if (gp->name() == "DefaultGeometryProcessor") {
+    gpKind = 0;
+  } else if (gp->name() == "QuadPerEdgeAAGeometryProcessor") {
+    gpKind = 1;
   } else if (gp->name() == "MeshGeometryProcessor") {
-    auto* meshGP = static_cast<const MeshGeometryProcessor*>(gp);
-    // Mesh vertex buffers follow the chain's attribute order (position, coverage, texCoord,
-    // color): texCoords ride the uvCoord slot and per-vertex colors the color slot.
-    hasUVCoord = meshGP->getHasTexCoords() ? 1 : 0;
-    hasColor = meshGP->getHasColors() ? 1 : 0;
+    gpKind = 2;
   } else if (gp->name() == "AtlasTextGeometryProcessor") {
-    // Only the sampler-free chain-route twin is servable: a sampler-owning atlas GP would bind
-    // its atlas ahead of the chain's leaf samplers.
-    if (gp->numTextureSamplers() != 0) {
-      return std::nullopt;
-    }
-    auto* atlasGP = static_cast<const AtlasTextGeometryProcessor*>(gp);
-    // Atlas text buffers are (position, maskCoord, color?) with no coverage slot; maskCoord
-    // rides the uvCoord slot.
-    hasUVCoord = 1;
-    hasColor = atlasGP->hasCommonColor() ? 0 : 1;
-  } else if (gpLayout == 1) {
-    auto* ellipseGP = static_cast<const EllipseGeometryProcessor*>(gp);
-    hasColor = ellipseGP->hasCommonColor() ? 0 : 1;
+    gpKind = 3;
+  } else if (gp->name() == "EllipseGeometryProcessor") {
+    gpKind = 4;
   }
-  int xpType = GetXPType(programInfo);
-  if (xpType < 0) {
+  if (gpKind < 0 || programInfo->numColorFragmentProcessors() != 1 ||
+      programInfo->numFragmentProcessors() != 1) {
     return std::nullopt;
   }
   auto fp = programInfo->getFragmentProcessor(0);
@@ -746,11 +716,6 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
   if (colorSpaceXformCount > 1) {
     return std::nullopt;
   }
-  // Coverage subtrees draw their unit input from the GP coverage, which only the rect layouts
-  // supply (the ellipse layout's coverage is evaluated per-pixel at the end).
-  if (chain->coverageRoot() >= 0 && gpLayout != 0) {
-    return std::nullopt;
-  }
   for (size_t index = 0; index < leafCount; ++index) {
     auto leaf = chain->childProcessor(index);
     // A deferred (task-local) proxy reports zero samplers until it is instantiated; it always
@@ -767,46 +732,54 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
       return std::nullopt;
     }
   }
-  int hasMask = chain->hasMask() ? 1 : 0;
-  // Four-leaf variants apply the mask through a runtime uniform, so a masked chain is servable on
-  // every layout. Leaf-free chains keep the compile-time mask dimension, which the kernel compiles
-  // without quad attributes (ShouldCompile), so those stay rect-only. Keep this in sync with
-  // ShouldCompile so the miss is attributed here instead of the buildability post-check.
-  if (hasMask && leafCount == 0 && (gpLayout != 0 || hasUVCoord != 0 || hasColor != 0)) {
+  PointwiseChainInputs inputs;
+  inputs.gpKind = gpKind;
+  inputs.textureCount = leafCount == 0 ? 0 : 1;
+  inputs.hasMask = chain->hasMask();
+  inputs.hasCoverageSubtree = chain->coverageRoot() >= 0;
+  inputs.xpType = GetXPType(programInfo);
+  if (gpKind == 1) {
+    auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
+    // The precompiled vert has no texSubset attribute, so subset-carrying quads fall back.
+    if (quadGP->getHasSubset()) {
+      return std::nullopt;
+    }
+    inputs.hasUVCoord = !quadGP->hasUVMatrix();
+    inputs.hasColor = !quadGP->hasCommonColor();
+    inputs.hasCoverage = true;
+  } else if (gpKind == 2) {
+    auto* meshGP = static_cast<const MeshGeometryProcessor*>(gp);
+    // Mesh vertex buffers follow the chain's attribute order (position, coverage, texCoord,
+    // color): texCoords ride the uvCoord slot and per-vertex colors the color slot. Mesh buffers
+    // always carry the coverage slot (1.0 for vertex meshes).
+    inputs.hasUVCoord = meshGP->getHasTexCoords();
+    inputs.hasColor = meshGP->getHasColors();
+    inputs.hasCoverage = true;
+  } else if (gpKind == 3) {
+    // Only the sampler-free chain-route twin is servable: a sampler-owning atlas GP would bind
+    // its atlas ahead of the chain's leaf samplers.
+    if (gp->numTextureSamplers() != 0) {
+      return std::nullopt;
+    }
+    auto* atlasGP = static_cast<const AtlasTextGeometryProcessor*>(gp);
+    // Atlas text buffers are (position, maskCoord, color?) with no coverage slot; maskCoord
+    // rides the uvCoord slot.
+    inputs.hasUVCoord = true;
+    inputs.hasColor = !atlasGP->hasCommonColor();
+    inputs.hasCoverage = false;
+  } else if (gpKind == 4) {
+    auto* ellipseGP = static_cast<const EllipseGeometryProcessor*>(gp);
+    inputs.hasColor = !ellipseGP->hasCommonColor();
+    inputs.hasCoverage = false;
+  } else {
+    inputs.hasCoverage = GetGPCoverage(gp) != 0;
+  }
+  auto composed = ComposePointwiseChain(inputs);
+  if (!composed) {
     return std::nullopt;
   }
-  // The ellipse layout carries the same leaf-count-free variants as the rect family: they serve
-  // const/blend/gradient chains (a solid fill still goes to EllipseFillShader through the plain
-  // route, so only chain-worthy shapes reach this rule).
-  int textureCountValue = leafCount == 0 ? 0 : 1;
-  // QuadGP vertex buffers always carry the coverage slot (providers emit 1.0 for non-AA draws),
-  // so the always-on coverage path serves every quad; the ellipse layout evaluates coverage per
-  // pixel and never carries the attribute.
-  int hasCoverage = 0;
-  if (gp->name() == "QuadPerEdgeAAGeometryProcessor" || gp->name() == "MeshGeometryProcessor") {
-    // Mesh buffers always carry the coverage slot (1.0 for vertex meshes).
-    hasCoverage = 1;
-  } else if (gpLayout == 0) {
-    hasCoverage = GetGPCoverage(gp);
-  }
-  using VD = PointwiseChainShader::VD;
-  std::vector<int> vertValues(VD::COUNT, 0);
-  vertValues[VD::GP_LAYOUT] = gpLayout;
-  vertValues[VD::HAS_COVERAGE] = hasCoverage;
-  vertValues[VD::HAS_UV_COORD] = hasUVCoord;
-  vertValues[VD::HAS_COLOR] = hasColor;
-  vertValues[VD::TEXTURE_COUNT] = textureCountValue;
-  auto vertIndex = VD::domain().encode(vertValues);
-
-  using FD = PointwiseChainShader::FD;
-  std::vector<int> fragValues(FD::COUNT, 0);
-  fragValues[FD::GP_LAYOUT] = gpLayout;
-  fragValues[FD::HAS_XP] = xpType;
-  fragValues[FD::HAS_COVERAGE] = hasCoverage;
-  fragValues[FD::HAS_COLOR] = hasColor;
-  fragValues[FD::TEXTURE_COUNT] = textureCountValue;
-  fragValues[FD::HAS_MASK_TEXTURE] = leafCount == 0 ? hasMask : 0;
-  auto fragIndex = FD::domain().encode(fragValues);
+  auto vertIndex = PointwiseChainShader::VD::domain().encode(composed->vertValues);
+  auto fragIndex = PointwiseChainShader::FD::domain().encode(composed->fragValues);
   return PermutationMatchResult{"PointwiseChainShader", vertIndex, fragIndex};
 }
 

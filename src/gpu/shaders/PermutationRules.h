@@ -307,6 +307,25 @@ struct AtlasTextFillInputs {
 };
 
 /**
+ * Input contract of the PointwiseChainShader matcher rule. gpKind selects the GP profile
+ * (0 = DefaultGP, 1 = QuadPerEdgeAA, 2 = Mesh, 3 = sampler-free AtlasText twin, 4 = Ellipse);
+ * each profile fixes which attribute slots its vertex buffers carry, and Compose rejects
+ * profile-inconsistent combinations. The chain slot topology (ops, indices) is runtime data;
+ * only the leaf-count class, the mask flag, the coverage-subtree flag, and the transfer type
+ * shape dimensions.
+ */
+struct PointwiseChainInputs {
+  int gpKind = 0;
+  bool hasCoverage = false;        // DefaultGP: AA coverage; quad/mesh: always true.
+  bool hasUVCoord = false;         // quad/mesh: texCoord slot; atlas: always true.
+  bool hasColor = false;           // per-vertex color slot (not DefaultGP).
+  int textureCount = 0;            // domain value: 0 = leaf-free, 1 = four-leaf padded slots.
+  bool hasMask = false;            // device-space mask child present.
+  bool hasCoverageSubtree = false; // chain coverage subtree present.
+  int xpType = -1;                 // -1 = no representable XferProcessor.
+};
+
+/**
  * Dimension values a matcher rule produces for both stages, before domain encoding.
  */
 struct RuleComposedValues {
@@ -495,6 +514,12 @@ std::optional<RuleComposedValues> ComposeUnifiedGradient(const UnifiedGradientIn
 std::optional<RuleComposedValues> ComposeAtlasTextFill(const AtlasTextFillInputs& inputs);
 
 /**
+ * Pure mapping for the PointwiseChainShader rule; see ComposeRoundStrokeRect for the sharing
+ * contract.
+ */
+std::optional<RuleComposedValues> ComposePointwiseChain(const PointwiseChainInputs& inputs);
+
+/**
  * Returns every (vertIndex, fragIndex) pair the RoundStrokeRect rule can ever produce, by
  * enumerating the full input lattice through ComposeRoundStrokeRect.
  */
@@ -639,6 +664,11 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateUnifiedGradientReachable();
  * Returns every (vertIndex, fragIndex) pair the AtlasTextFill rule can ever produce.
  */
 std::set<std::pair<uint32_t, uint32_t>> EnumerateAtlasTextFillReachable();
+
+/**
+ * Returns every (vertIndex, fragIndex) pair the PointwiseChain rule can ever produce.
+ */
+std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseChainReachable();
 
 /**
  * Returns the reachable permutation set for a shader whose matcher rule has been migrated to the
