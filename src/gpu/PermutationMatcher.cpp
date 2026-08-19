@@ -1392,25 +1392,17 @@ static std::optional<PermutationMatchResult> TryMatchComplexEllipseFill(
   if (programInfo->numFragmentProcessors() != 0) {
     return std::nullopt;
   }
-  int xpType = GetXPType(programInfo);
-  if (xpType < 0) {
+  auto* cegp = static_cast<const ComplexEllipseGeometryProcessor*>(gp);
+  ComplexEllipseFillInputs inputs;
+  inputs.isStroke = cegp->isStroke();
+  inputs.hasCommonColor = cegp->hasCommonColor();
+  inputs.xpType = GetXPType(programInfo);
+  auto composed = ComposeComplexEllipseFill(inputs);
+  if (!composed) {
     return std::nullopt;
   }
-  auto* cegp = static_cast<const ComplexEllipseGeometryProcessor*>(gp);
-  using D = ComplexEllipseFillShader::Dims;
-  auto domain = D::domain();
-  std::vector<int> values(D::COUNT);
-  values[D::STROKE] = cegp->isStroke() ? 1 : 0;
-  values[D::HAS_COMMON_COLOR] = cegp->hasCommonColor() ? 1 : 0;
-  auto vertIndex = domain.encode(values);
-  using FD = ComplexEllipseFillShader::FD;
-  auto fragDomain = FD::domain();
-  std::vector<int> fragValues(FD::COUNT);
-  for (size_t i = 0; i < D::COUNT; ++i) {
-    fragValues[i] = values[i];
-  }
-  fragValues[FD::HAS_XP] = xpType;
-  auto fragIndex = fragDomain.encode(fragValues);
+  auto vertIndex = ComplexEllipseFillShader::Dims::domain().encode(composed->vertValues);
+  auto fragIndex = ComplexEllipseFillShader::FD::domain().encode(composed->fragValues);
   return PermutationMatchResult{"ComplexEllipseFillShader", vertIndex, fragIndex};
 }
 
