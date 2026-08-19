@@ -256,6 +256,16 @@ struct GaussianBlur1DInputs {
 };
 
 /**
+ * Input contract of the TexturedEffectShader matcher rule (the composed texture transform). The
+ * Compose(Texture, pointwise) structure checks are whole-draw rejections in Extract: the operator
+ * rides the OpType runtime uniform, so only coverage and the transfer type shape dimensions.
+ */
+struct TexturedEffectInputs {
+  bool hasCoverage = false;
+  int xpType = -1;  // -1 = no representable XferProcessor.
+};
+
+/**
  * Dimension values a matcher rule produces for both stages, before domain encoding.
  */
 struct RuleComposedValues {
@@ -414,6 +424,12 @@ std::optional<RuleComposedValues> ComposeQuadTextureFill(const QuadTextureFillIn
 std::optional<RuleComposedValues> ComposeGaussianBlur1D(const GaussianBlur1DInputs& inputs);
 
 /**
+ * Pure mapping for the TexturedEffectShader rule; see ComposeRoundStrokeRect for the sharing
+ * contract.
+ */
+std::optional<RuleComposedValues> ComposeTexturedEffect(const TexturedEffectInputs& inputs);
+
+/**
  * Returns every (vertIndex, fragIndex) pair the RoundStrokeRect rule can ever produce, by
  * enumerating the full input lattice through ComposeRoundStrokeRect.
  */
@@ -533,6 +549,11 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadTextureFillReachable();
  * Returns every (vertIndex, fragIndex) pair the GaussianBlur1D rule can ever produce.
  */
 std::set<std::pair<uint32_t, uint32_t>> EnumerateGaussianBlur1DReachable();
+
+/**
+ * Returns every (vertIndex, fragIndex) pair the TexturedEffect rule can ever produce.
+ */
+std::set<std::pair<uint32_t, uint32_t>> EnumerateTexturedEffectReachable();
 
 /**
  * Returns the reachable permutation set for a shader whose matcher rule has been migrated to the

@@ -1150,10 +1150,6 @@ static std::optional<PermutationMatchResult> TryMatchComposedTexture(
   } else {
     return std::nullopt;
   }
-  using VD = TexturedEffectShader::VD;
-  std::vector<int> vertValues(VD::COUNT, 0);
-  vertValues[VD::HAS_COVERAGE] = hasCoverage;
-  auto vertIndex = VD::domain().encode(vertValues);
   int xpType = GetXPType(programInfo);
   if (xpType < 0) {
     return std::nullopt;
@@ -1192,16 +1188,18 @@ static std::optional<PermutationMatchResult> TryMatchComposedTexture(
   // TexturedEffectShader. The operator is selected at draw time by the OpType runtime uniform (set
   // by the pointwise FP's onSetData), so it is not a compile-time dimension. The frag index only
   // encodes the structural axes HAS_XP and HAS_COVERAGE; subset clamping is a runtime uniform.
-  using D = TexturedEffectShader::D;
-  auto fragDomain = D::domain();
-  std::vector<int> fragValues(D::COUNT, 0);
-  fragValues[D::HAS_XP] = xpType;
-  fragValues[D::HAS_COVERAGE] = hasCoverage;
-  auto fragIndex = fragDomain.encode(fragValues);
-
   if (!IsSupportedPointwiseOp(child1)) {
     return std::nullopt;
   }
+  TexturedEffectInputs inputs;
+  inputs.hasCoverage = hasCoverage != 0;
+  inputs.xpType = xpType;
+  auto composed = ComposeTexturedEffect(inputs);
+  if (!composed) {
+    return std::nullopt;
+  }
+  auto vertIndex = TexturedEffectShader::VD::domain().encode(composed->vertValues);
+  auto fragIndex = TexturedEffectShader::D::domain().encode(composed->fragValues);
   return PermutationMatchResult{"TexturedEffectShader", vertIndex, fragIndex};
 }
 

@@ -37,6 +37,7 @@
 #include "gpu/shaders/level1/ShapeInstancedFillShader.h"
 #include "gpu/shaders/level1/ShapeInstancedTextureCoverageShader.h"
 #include "gpu/shaders/level1/SolidColorFillShader.h"
+#include "gpu/shaders/level1/TexturedEffectShader.h"
 #include "gpu/shaders/level1/TextureColorMatrixShader.h"
 #include "gpu/shaders/level1/TextureFillShader.h"
 #include "gpu/shaders/level1/TiledTextureFillShader.h"
@@ -876,6 +877,40 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateGaussianBlur1DReachable() {
   return result;
 }
 
+std::optional<RuleComposedValues> ComposeTexturedEffect(const TexturedEffectInputs& inputs) {
+  if (inputs.xpType < 0) {
+    return std::nullopt;
+  }
+  using VD = TexturedEffectShader::VD;
+  using D = TexturedEffectShader::D;
+  RuleComposedValues values;
+  values.vertValues.resize(VD::COUNT);
+  values.vertValues[VD::HAS_COVERAGE] = inputs.hasCoverage ? 1 : 0;
+  values.fragValues.resize(D::COUNT);
+  values.fragValues[D::HAS_XP] = inputs.xpType;
+  values.fragValues[D::HAS_COVERAGE] = values.vertValues[VD::HAS_COVERAGE];
+  return values;
+}
+
+std::set<std::pair<uint32_t, uint32_t>> EnumerateTexturedEffectReachable() {
+  std::set<std::pair<uint32_t, uint32_t>> result;
+  for (int hasCoverage = 0; hasCoverage <= 1; ++hasCoverage) {
+    for (int xpType = -1; xpType <= 2; ++xpType) {
+      TexturedEffectInputs inputs;
+      inputs.hasCoverage = hasCoverage != 0;
+      inputs.xpType = xpType;
+      auto composed = ComposeTexturedEffect(inputs);
+      if (!composed) {
+        continue;
+      }
+      auto vertIndex = TexturedEffectShader::VD::domain().encode(composed->vertValues);
+      auto fragIndex = TexturedEffectShader::D::domain().encode(composed->fragValues);
+      result.insert({vertIndex, fragIndex});
+    }
+  }
+  return result;
+}
+
 std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermutations(
     const std::string& shaderName) {
   if (shaderName == "RoundStrokeRectFillShader") {
@@ -949,6 +984,9 @@ std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermuta
   }
   if (shaderName == "GaussianBlur1DShader") {
     return EnumerateGaussianBlur1DReachable();
+  }
+  if (shaderName == "TexturedEffectShader") {
+    return EnumerateTexturedEffectReachable();
   }
   return std::nullopt;
 }
