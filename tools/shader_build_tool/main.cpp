@@ -337,155 +337,163 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
   };
   std::map<uint32_t, VertCacheEntry> vertCache;
 
-  for (uint32_t vi = 0; vi < vertDomain.totalCount(); vi++) {
-    for (uint32_t fi = 0; fi < fragDomain.totalCount(); fi++) {
-      if (!IsBuildablePermutation(info, vi, fi)) {
-        continue;
-      }
-      report.compiledCount++;
+  // The compile list comes from the matcher rules' reachable sets (the Compose single source of
+  // truth in PermutationRules.cpp), enumerated at build time. This replaces the former cartesian
+  // domain walk filtered by ShouldCompile; the --audit mode verified both sides agree for every
+  // shader before the switch, so the bundle content is unchanged.
+  auto reachable = EnumerateReachablePermutations(info.name);
+  if (!reachable) {
+    std::cerr << "  ERROR: no rule enumerator for " << info.name
+              << ": every shader must be migrated to the Compose pattern\n";
+    report.errorCount++;
+    RecordCommonArtifactError(profileErrorCounts);
+    return report;
+  }
+  for (const auto& permutation : *reachable) {
+    uint32_t vi = permutation.first;
+    uint32_t fi = permutation.second;
+    report.compiledCount++;
 
-      if (options.reportOnly || vertSource.empty() || fragSource.empty()) {
-        continue;
-      }
+    if (options.reportOnly || vertSource.empty() || fragSource.empty()) {
+      continue;
+    }
 
-      // A TEXTURE_KIND=1 variant declares sampler2DRect, whose SPIR-V (OpTypeImage Dim=Rect) is
-      // invalid under Vulkan semantics. It compiles under OpenGL semantics and only enters the
-      // opengl bundle.
-      bool rectVariant = info.fragDomain.valueOf(fi, "TEXTURE_KIND") == 1;
+    // A TEXTURE_KIND=1 variant declares sampler2DRect, whose SPIR-V (OpTypeImage Dim=Rect) is
+    // invalid under Vulkan semantics. It compiles under OpenGL semantics and only enters the
+    // opengl bundle.
+    bool rectVariant = info.fragDomain.valueOf(fi, "TEXTURE_KIND") == 1;
 
-      auto vertDefines = vertDomain.defineListFor(vi);
-      auto fragDefines = fragDomain.defineListFor(fi);
+    auto vertDefines = vertDomain.defineListFor(vi);
+    auto fragDefines = fragDomain.defineListFor(fi);
 
-      // Compile vertex shader (use cache if already compiled for this vertIndex)
-      std::vector<uint32_t>* vertSpirv = nullptr;
-      StageReflectionData* vertReflData = nullptr;
-      auto vertIt = vertCache.find(vi);
-      if (vertIt != vertCache.end()) {
-        vertSpirv = &vertIt->second.spirv;
-        vertReflData = &vertIt->second.reflection;
-      } else {
-        auto expandedVert = PrependDefines(vertSource, vertDefines);
-        auto vertResult = CompileGLSL(expandedVert, ShaderStageType::Vertex, info.name, vi);
-        if (!vertResult.success) {
-          std::cerr << "  " << vertResult.error << "\n";
-          report.errorCount++;
-          RecordCommonArtifactError(profileErrorCounts);
-          continue;
-        }
-        // Store a dummy reflection for now; we'll fill it after frag compilation
-        auto& cacheEntry = vertCache[vi];
-        cacheEntry.spirv = std::move(vertResult.spirv);
-        vertSpirv = &cacheEntry.spirv;
-        vertReflData = &cacheEntry.reflection;
-      }
-
-      auto expandedFrag = PrependDefines(fragSource, fragDefines);
-      if (rectVariant) {
-        // glslang's OpenGL target rejects 'descriptor set' layout qualifiers, so strip the
-        // 'set = N, ' fragment while keeping binding (which the reflection and GLSL output use).
-        expandedFrag = StripDescriptorSets(std::move(expandedFrag));
-      }
-      auto fragResult =
-          CompileGLSL(expandedFrag, ShaderStageType::Fragment, info.name, fi, false, rectVariant);
-      if (!fragResult.success) {
-        std::cerr << "  " << fragResult.error << "\n";
+    // Compile vertex shader (use cache if already compiled for this vertIndex)
+    std::vector<uint32_t>* vertSpirv = nullptr;
+    StageReflectionData* vertReflData = nullptr;
+    auto vertIt = vertCache.find(vi);
+    if (vertIt != vertCache.end()) {
+      vertSpirv = &vertIt->second.spirv;
+      vertReflData = &vertIt->second.reflection;
+    } else {
+      auto expandedVert = PrependDefines(vertSource, vertDefines);
+      auto vertResult = CompileGLSL(expandedVert, ShaderStageType::Vertex, info.name, vi);
+      if (!vertResult.success) {
+        std::cerr << "  " << vertResult.error << "\n";
         report.errorCount++;
         RecordCommonArtifactError(profileErrorCounts);
         continue;
       }
+      // Store a dummy reflection for now; we'll fill it after frag compilation
+      auto& cacheEntry = vertCache[vi];
+      cacheEntry.spirv = std::move(vertResult.spirv);
+      vertSpirv = &cacheEntry.spirv;
+      vertReflData = &cacheEntry.reflection;
+    }
 
-      // Extract reflection from SPIR-V
-      auto reflection = ExtractReflection(*vertSpirv, fragResult.spirv);
-      // Update vert reflection cache on first successful extraction
-      if (vertReflData->uniforms.empty() && vertReflData->samplers.empty()) {
-        *vertReflData = reflection.vertexReflection;
+    auto expandedFrag = PrependDefines(fragSource, fragDefines);
+    if (rectVariant) {
+      // glslang's OpenGL target rejects 'descriptor set' layout qualifiers, so strip the
+      // 'set = N, ' fragment while keeping binding (which the reflection and GLSL output use).
+      expandedFrag = StripDescriptorSets(std::move(expandedFrag));
+    }
+    auto fragResult =
+        CompileGLSL(expandedFrag, ShaderStageType::Fragment, info.name, fi, false, rectVariant);
+    if (!fragResult.success) {
+      std::cerr << "  " << fragResult.error << "\n";
+      report.errorCount++;
+      RecordCommonArtifactError(profileErrorCounts);
+      continue;
+    }
+
+    // Extract reflection from SPIR-V
+    auto reflection = ExtractReflection(*vertSpirv, fragResult.spirv);
+    // Update vert reflection cache on first successful extraction
+    if (vertReflData->uniforms.empty() && vertReflData->samplers.empty()) {
+      *vertReflData = reflection.vertexReflection;
+    }
+
+    for (const auto& backend : options.backends) {
+      // RECT variants compile to GLSL only; never emit them for other backends' bundles.
+      if (rectVariant && backend != "opengl") {
+        continue;
       }
+      std::vector<uint8_t> vertBlob;
+      std::vector<uint8_t> fragBlob;
 
-      for (const auto& backend : options.backends) {
-        // RECT variants compile to GLSL only; never emit them for other backends' bundles.
-        if (rectVariant && backend != "opengl") {
-          continue;
-        }
-        std::vector<uint8_t> vertBlob;
-        std::vector<uint8_t> fragBlob;
-
-        if (backend == "vulkan") {
-          // Re-compile with optimization for smaller SPIR-V output.
-          auto expandedVertOpt = PrependDefines(vertSource, vertDefines);
-          auto vertOpt = CompileGLSL(expandedVertOpt, ShaderStageType::Vertex, info.name, vi, true);
-          auto expandedFragOpt = PrependDefines(fragSource, fragDefines);
-          auto fragOpt =
-              CompileGLSL(expandedFragOpt, ShaderStageType::Fragment, info.name, fi, true);
-          if (!vertOpt.success || !fragOpt.success) {
-            // Fallback to unoptimized if optimization fails.
-            auto* vp = reinterpret_cast<const uint8_t*>(vertSpirv->data());
-            vertBlob.assign(vp, vp + vertSpirv->size() * 4);
-            auto* fp = reinterpret_cast<const uint8_t*>(fragResult.spirv.data());
-            fragBlob.assign(fp, fp + fragResult.spirv.size() * 4);
-          } else {
-            auto* vp = reinterpret_cast<const uint8_t*>(vertOpt.spirv.data());
-            vertBlob.assign(vp, vp + vertOpt.spirv.size() * 4);
-            auto* fp = reinterpret_cast<const uint8_t*>(fragOpt.spirv.data());
-            fragBlob.assign(fp, fp + fragOpt.spirv.size() * 4);
-          }
-        } else if (backend == "metal") {
-          auto mslVert = TranslateToMSL(*vertSpirv, ShaderStageType::Vertex);
-          auto mslFrag = TranslateToMSL(fragResult.spirv, ShaderStageType::Fragment);
-          if (!mslVert.success || !mslFrag.success) {
-            std::cerr << "  MSL translation error: "
-                      << (mslVert.success ? mslFrag.error : mslVert.error) << "\n";
-            report.errorCount++;
-            RecordBackendArtifactError(backend, profileErrorCounts);
-            continue;
-          }
-          vertBlob = CompileMSLToMetallib(mslVert.msl, ShaderStageType::Vertex);
-          fragBlob = CompileMSLToMetallib(mslFrag.msl, ShaderStageType::Fragment);
-          if (vertBlob.empty() || fragBlob.empty()) {
-            std::cerr << "  metallib compilation failed for " << info.name << " [vert=" << vi
-                      << " frag=" << fi << "]\n";
-            report.errorCount++;
-            RecordBackendArtifactError(backend, profileErrorCounts);
-            continue;
-          }
-        } else if (backend == "webgpu") {
-          auto wgslVert = TranslateToWGSL(*vertSpirv);
-          auto wgslFrag = TranslateToWGSL(fragResult.spirv);
-          if (!wgslVert.success || !wgslFrag.success) {
-            std::cerr << "  WGSL translation error: "
-                      << (wgslVert.success ? wgslFrag.error : wgslVert.error) << "\n";
-            report.errorCount++;
-            RecordBackendArtifactError(backend, profileErrorCounts);
-            continue;
-          }
-          vertBlob.assign(wgslVert.wgsl.begin(), wgslVert.wgsl.end());
-          fragBlob.assign(wgslFrag.wgsl.begin(), wgslFrag.wgsl.end());
-        } else if (backend == "opengl") {
-          auto glslVert = TranslateToGLSL(*vertSpirv);
-          auto glslFrag = TranslateToGLSL(fragResult.spirv);
-          if (!glslVert.success || !glslFrag.success) {
-            std::cerr << "  GLSL translation error: "
-                      << (glslVert.success ? glslFrag.error : glslVert.error) << "\n";
-            report.errorCount++;
-            RecordBackendArtifactError(backend, profileErrorCounts);
-            continue;
-          }
-          vertBlob.assign(glslVert.glsl.begin(), glslVert.glsl.end());
-          fragBlob.assign(glslFrag.glsl.begin(), glslFrag.glsl.end());
+      if (backend == "vulkan") {
+        // Re-compile with optimization for smaller SPIR-V output.
+        auto expandedVertOpt = PrependDefines(vertSource, vertDefines);
+        auto vertOpt = CompileGLSL(expandedVertOpt, ShaderStageType::Vertex, info.name, vi, true);
+        auto expandedFragOpt = PrependDefines(fragSource, fragDefines);
+        auto fragOpt = CompileGLSL(expandedFragOpt, ShaderStageType::Fragment, info.name, fi, true);
+        if (!vertOpt.success || !fragOpt.success) {
+          // Fallback to unoptimized if optimization fails.
+          auto* vp = reinterpret_cast<const uint8_t*>(vertSpirv->data());
+          vertBlob.assign(vp, vp + vertSpirv->size() * 4);
+          auto* fp = reinterpret_cast<const uint8_t*>(fragResult.spirv.data());
+          fragBlob.assign(fp, fp + fragResult.spirv.size() * 4);
         } else {
+          auto* vp = reinterpret_cast<const uint8_t*>(vertOpt.spirv.data());
+          vertBlob.assign(vp, vp + vertOpt.spirv.size() * 4);
+          auto* fp = reinterpret_cast<const uint8_t*>(fragOpt.spirv.data());
+          fragBlob.assign(fp, fp + fragOpt.spirv.size() * 4);
+        }
+      } else if (backend == "metal") {
+        auto mslVert = TranslateToMSL(*vertSpirv, ShaderStageType::Vertex);
+        auto mslFrag = TranslateToMSL(fragResult.spirv, ShaderStageType::Fragment);
+        if (!mslVert.success || !mslFrag.success) {
+          std::cerr << "  MSL translation error: "
+                    << (mslVert.success ? mslFrag.error : mslVert.error) << "\n";
+          report.errorCount++;
+          RecordBackendArtifactError(backend, profileErrorCounts);
           continue;
         }
-
-        VariantData variant;
-        variant.shaderName = info.name;
-        variant.vertPermutationIndex = vi;
-        variant.fragPermutationIndex = fi;
-        variant.profileTag = backend;
-        variant.vertexBlob = std::move(vertBlob);
-        variant.fragmentBlob = std::move(fragBlob);
-        variant.vertexReflection = reflection.vertexReflection;
-        variant.fragmentReflection = reflection.fragmentReflection;
-        outVariants->push_back(std::move(variant));
+        vertBlob = CompileMSLToMetallib(mslVert.msl, ShaderStageType::Vertex);
+        fragBlob = CompileMSLToMetallib(mslFrag.msl, ShaderStageType::Fragment);
+        if (vertBlob.empty() || fragBlob.empty()) {
+          std::cerr << "  metallib compilation failed for " << info.name << " [vert=" << vi
+                    << " frag=" << fi << "]\n";
+          report.errorCount++;
+          RecordBackendArtifactError(backend, profileErrorCounts);
+          continue;
+        }
+      } else if (backend == "webgpu") {
+        auto wgslVert = TranslateToWGSL(*vertSpirv);
+        auto wgslFrag = TranslateToWGSL(fragResult.spirv);
+        if (!wgslVert.success || !wgslFrag.success) {
+          std::cerr << "  WGSL translation error: "
+                    << (wgslVert.success ? wgslFrag.error : wgslVert.error) << "\n";
+          report.errorCount++;
+          RecordBackendArtifactError(backend, profileErrorCounts);
+          continue;
+        }
+        vertBlob.assign(wgslVert.wgsl.begin(), wgslVert.wgsl.end());
+        fragBlob.assign(wgslFrag.wgsl.begin(), wgslFrag.wgsl.end());
+      } else if (backend == "opengl") {
+        auto glslVert = TranslateToGLSL(*vertSpirv);
+        auto glslFrag = TranslateToGLSL(fragResult.spirv);
+        if (!glslVert.success || !glslFrag.success) {
+          std::cerr << "  GLSL translation error: "
+                    << (glslVert.success ? glslFrag.error : glslVert.error) << "\n";
+          report.errorCount++;
+          RecordBackendArtifactError(backend, profileErrorCounts);
+          continue;
+        }
+        vertBlob.assign(glslVert.glsl.begin(), glslVert.glsl.end());
+        fragBlob.assign(glslFrag.glsl.begin(), glslFrag.glsl.end());
+      } else {
+        continue;
       }
+
+      VariantData variant;
+      variant.shaderName = info.name;
+      variant.vertPermutationIndex = vi;
+      variant.fragPermutationIndex = fi;
+      variant.profileTag = backend;
+      variant.vertexBlob = std::move(vertBlob);
+      variant.fragmentBlob = std::move(fragBlob);
+      variant.vertexReflection = reflection.vertexReflection;
+      variant.fragmentReflection = reflection.fragmentReflection;
+      outVariants->push_back(std::move(variant));
     }
   }
   return report;
