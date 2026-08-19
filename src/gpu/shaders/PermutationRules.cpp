@@ -24,6 +24,7 @@
 #include "gpu/shaders/level1/HairlineLineShader.h"
 #include "gpu/shaders/level1/HairlineQuadShader.h"
 #include "gpu/shaders/level1/MaskFillShader.h"
+#include "gpu/shaders/level1/MeshFillShader.h"
 #include "gpu/shaders/level1/NonAARRectFillShader.h"
 #include "gpu/shaders/level1/QuadColorFillShader.h"
 #include "gpu/shaders/level1/QuadConstColorShader.h"
@@ -435,6 +436,50 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateComplexNonAARRectFillReachable(
   return result;
 }
 
+std::optional<RuleComposedValues> ComposeMeshFill(const MeshFillInputs& inputs) {
+  if (inputs.xpType < 0) {
+    return std::nullopt;
+  }
+  using D = MeshFillShader::Dims;
+  using FD = MeshFillShader::FD;
+  RuleComposedValues values;
+  values.vertValues.resize(D::COUNT);
+  values.vertValues[D::HAS_TEX_COORDS] = inputs.hasTexCoords ? 1 : 0;
+  values.vertValues[D::HAS_COLOR] = inputs.hasColors ? 1 : 0;
+  values.vertValues[D::HAS_COVERAGE] = inputs.hasCoverage ? 1 : 0;
+  values.fragValues.resize(FD::COUNT);
+  values.fragValues[FD::HAS_TEX_COORDS] = values.vertValues[D::HAS_TEX_COORDS];
+  values.fragValues[FD::HAS_COLOR] = values.vertValues[D::HAS_COLOR];
+  values.fragValues[FD::HAS_COVERAGE] = values.vertValues[D::HAS_COVERAGE];
+  values.fragValues[FD::HAS_XP] = inputs.xpType;
+  return values;
+}
+
+std::set<std::pair<uint32_t, uint32_t>> EnumerateMeshFillReachable() {
+  std::set<std::pair<uint32_t, uint32_t>> result;
+  for (int hasTexCoords = 0; hasTexCoords <= 1; ++hasTexCoords) {
+    for (int hasColors = 0; hasColors <= 1; ++hasColors) {
+      for (int hasCoverage = 0; hasCoverage <= 1; ++hasCoverage) {
+        for (int xpType = -1; xpType <= 2; ++xpType) {
+          MeshFillInputs inputs;
+          inputs.hasTexCoords = hasTexCoords != 0;
+          inputs.hasColors = hasColors != 0;
+          inputs.hasCoverage = hasCoverage != 0;
+          inputs.xpType = xpType;
+          auto composed = ComposeMeshFill(inputs);
+          if (!composed) {
+            continue;
+          }
+          auto vertIndex = MeshFillShader::Dims::domain().encode(composed->vertValues);
+          auto fragIndex = MeshFillShader::FD::domain().encode(composed->fragValues);
+          result.insert({vertIndex, fragIndex});
+        }
+      }
+    }
+  }
+  return result;
+}
+
 std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermutations(
     const std::string& shaderName) {
   if (shaderName == "RoundStrokeRectFillShader") {
@@ -472,6 +517,9 @@ std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermuta
   }
   if (shaderName == "ComplexNonAARRectFillShader") {
     return EnumerateComplexNonAARRectFillReachable();
+  }
+  if (shaderName == "MeshFillShader") {
+    return EnumerateMeshFillReachable();
   }
   return std::nullopt;
 }

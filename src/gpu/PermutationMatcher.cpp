@@ -1598,26 +1598,18 @@ static std::optional<PermutationMatchResult> TryMatchMeshFill(const ProgramInfo*
   if (programInfo->numFragmentProcessors() != 0) {
     return std::nullopt;
   }
-  int xpType = GetXPType(programInfo);
-  if (xpType < 0) {
+  auto* mgp = static_cast<const MeshGeometryProcessor*>(gp);
+  MeshFillInputs inputs;
+  inputs.hasTexCoords = mgp->getHasTexCoords();
+  inputs.hasColors = mgp->getHasColors();
+  inputs.hasCoverage = mgp->getHasCoverage();
+  inputs.xpType = GetXPType(programInfo);
+  auto composed = ComposeMeshFill(inputs);
+  if (!composed) {
     return std::nullopt;
   }
-  auto* mgp = static_cast<const MeshGeometryProcessor*>(gp);
-  using D = MeshFillShader::Dims;
-  auto domain = D::domain();
-  std::vector<int> values(D::COUNT);
-  values[D::HAS_TEX_COORDS] = mgp->getHasTexCoords() ? 1 : 0;
-  values[D::HAS_COLOR] = mgp->getHasColors() ? 1 : 0;
-  values[D::HAS_COVERAGE] = mgp->getHasCoverage() ? 1 : 0;
-  auto vertIndex = domain.encode(values);
-  using FD = MeshFillShader::FD;
-  auto fragDomain = FD::domain();
-  std::vector<int> fragValues(FD::COUNT);
-  for (size_t i = 0; i < D::COUNT; ++i) {
-    fragValues[i] = values[i];
-  }
-  fragValues[FD::HAS_XP] = xpType;
-  auto fragIndex = fragDomain.encode(fragValues);
+  auto vertIndex = MeshFillShader::Dims::domain().encode(composed->vertValues);
+  auto fragIndex = MeshFillShader::FD::domain().encode(composed->fragValues);
   return PermutationMatchResult{"MeshFillShader", vertIndex, fragIndex};
 }
 

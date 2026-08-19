@@ -138,6 +138,16 @@ struct ComplexNonAARRectFillInputs {
 };
 
 /**
+ * Input contract of the MeshFillShader matcher rule.
+ */
+struct MeshFillInputs {
+  bool hasTexCoords = false;
+  bool hasColors = false;
+  bool hasCoverage = false;
+  int xpType = -1;  // -1 = no representable XferProcessor.
+};
+
+/**
  * Dimension values a matcher rule produces for both stages, before domain encoding.
  */
 struct RuleComposedValues {
@@ -219,6 +229,11 @@ std::optional<RuleComposedValues> ComposeComplexNonAARRectFill(
     const ComplexNonAARRectFillInputs& inputs);
 
 /**
+ * Pure mapping for the MeshFillShader rule; see ComposeRoundStrokeRect for the sharing contract.
+ */
+std::optional<RuleComposedValues> ComposeMeshFill(const MeshFillInputs& inputs);
+
+/**
  * Returns every (vertIndex, fragIndex) pair the RoundStrokeRect rule can ever produce, by
  * enumerating the full input lattice through ComposeRoundStrokeRect.
  */
@@ -278,6 +293,11 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateNonAARRectFillReachable();
  * Returns every (vertIndex, fragIndex) pair the ComplexNonAARRectFill rule can ever produce.
  */
 std::set<std::pair<uint32_t, uint32_t>> EnumerateComplexNonAARRectFillReachable();
+
+/**
+ * Returns every (vertIndex, fragIndex) pair the MeshFill rule can ever produce.
+ */
+std::set<std::pair<uint32_t, uint32_t>> EnumerateMeshFillReachable();
 
 /**
  * Returns the reachable permutation set for a shader whose matcher rule has been migrated to the
