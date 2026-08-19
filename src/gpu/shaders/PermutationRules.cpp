@@ -26,6 +26,7 @@
 #include "gpu/shaders/level1/MaskFillShader.h"
 #include "gpu/shaders/level1/MeshFillShader.h"
 #include "gpu/shaders/level1/NonAARRectFillShader.h"
+#include "gpu/shaders/level1/PerlinNoiseFillShader.h"
 #include "gpu/shaders/level1/QuadColorFillShader.h"
 #include "gpu/shaders/level1/QuadConstColorShader.h"
 #include "gpu/shaders/level1/RoundStrokeRectFillShader.h"
@@ -480,6 +481,40 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateMeshFillReachable() {
   return result;
 }
 
+std::optional<RuleComposedValues> ComposePerlinNoiseFill(const PerlinNoiseFillInputs& inputs) {
+  if (inputs.xpType < 0) {
+    return std::nullopt;
+  }
+  using VD = PerlinNoiseFillShader::VD;
+  using D = PerlinNoiseFillShader::D;
+  RuleComposedValues values;
+  values.vertValues.resize(VD::COUNT);
+  values.vertValues[VD::HAS_COVERAGE] = inputs.hasCoverage ? 1 : 0;
+  values.fragValues.resize(D::COUNT);
+  values.fragValues[D::HAS_XP] = inputs.xpType;
+  values.fragValues[D::HAS_COVERAGE] = values.vertValues[VD::HAS_COVERAGE];
+  return values;
+}
+
+std::set<std::pair<uint32_t, uint32_t>> EnumeratePerlinNoiseFillReachable() {
+  std::set<std::pair<uint32_t, uint32_t>> result;
+  for (int hasCoverage = 0; hasCoverage <= 1; ++hasCoverage) {
+    for (int xpType = -1; xpType <= 2; ++xpType) {
+      PerlinNoiseFillInputs inputs;
+      inputs.hasCoverage = hasCoverage != 0;
+      inputs.xpType = xpType;
+      auto composed = ComposePerlinNoiseFill(inputs);
+      if (!composed) {
+        continue;
+      }
+      auto vertIndex = PerlinNoiseFillShader::VD::domain().encode(composed->vertValues);
+      auto fragIndex = PerlinNoiseFillShader::D::domain().encode(composed->fragValues);
+      result.insert({vertIndex, fragIndex});
+    }
+  }
+  return result;
+}
+
 std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermutations(
     const std::string& shaderName) {
   if (shaderName == "RoundStrokeRectFillShader") {
@@ -520,6 +555,9 @@ std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermuta
   }
   if (shaderName == "MeshFillShader") {
     return EnumerateMeshFillReachable();
+  }
+  if (shaderName == "PerlinNoiseFillShader") {
+    return EnumeratePerlinNoiseFillReachable();
   }
   return std::nullopt;
 }

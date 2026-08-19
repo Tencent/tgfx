@@ -1660,15 +1660,15 @@ static std::optional<PermutationMatchResult> TryMatchPerlin(const ProgramInfo* p
   if (xpType < 0) {
     return std::nullopt;
   }
-  using VD = PerlinNoiseFillShader::VD;
-  std::vector<int> vertValues(VD::COUNT, 0);
-  vertValues[VD::HAS_COVERAGE] = hasCoverage;
-  auto vertIndex = VD::domain().encode(vertValues);
-  using D = PerlinNoiseFillShader::D;
-  std::vector<int> fragValues(D::COUNT, 0);
-  fragValues[D::HAS_XP] = xpType;
-  fragValues[D::HAS_COVERAGE] = hasCoverage;
-  auto fragIndex = D::domain().encode(fragValues);
+  PerlinNoiseFillInputs inputs;
+  inputs.hasCoverage = hasCoverage != 0;
+  inputs.xpType = xpType;
+  auto composed = ComposePerlinNoiseFill(inputs);
+  if (!composed) {
+    return std::nullopt;
+  }
+  auto vertIndex = PerlinNoiseFillShader::VD::domain().encode(composed->vertValues);
+  auto fragIndex = PerlinNoiseFillShader::D::domain().encode(composed->fragValues);
   return PermutationMatchResult{"PerlinNoiseFillShader", vertIndex, fragIndex};
 }
 

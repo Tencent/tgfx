@@ -148,6 +148,17 @@ struct MeshFillInputs {
 };
 
 /**
+ * Input contract of the PerlinNoiseFillShader matcher rule. The GP kind (Default or QuadAA),
+ * the quad attribute constraints, and the Perlin + optional pointwise FP structure checks are
+ * whole-draw rejections in Extract: the folded pointwise operator rides a runtime uniform and
+ * shapes no dimension, so only coverage and the transfer type remain.
+ */
+struct PerlinNoiseFillInputs {
+  bool hasCoverage = false;
+  int xpType = -1;  // -1 = no representable XferProcessor.
+};
+
+/**
  * Dimension values a matcher rule produces for both stages, before domain encoding.
  */
 struct RuleComposedValues {
@@ -234,6 +245,12 @@ std::optional<RuleComposedValues> ComposeComplexNonAARRectFill(
 std::optional<RuleComposedValues> ComposeMeshFill(const MeshFillInputs& inputs);
 
 /**
+ * Pure mapping for the PerlinNoiseFillShader rule; see ComposeRoundStrokeRect for the sharing
+ * contract.
+ */
+std::optional<RuleComposedValues> ComposePerlinNoiseFill(const PerlinNoiseFillInputs& inputs);
+
+/**
  * Returns every (vertIndex, fragIndex) pair the RoundStrokeRect rule can ever produce, by
  * enumerating the full input lattice through ComposeRoundStrokeRect.
  */
@@ -298,6 +315,11 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateComplexNonAARRectFillReachable(
  * Returns every (vertIndex, fragIndex) pair the MeshFill rule can ever produce.
  */
 std::set<std::pair<uint32_t, uint32_t>> EnumerateMeshFillReachable();
+
+/**
+ * Returns every (vertIndex, fragIndex) pair the PerlinNoiseFill rule can ever produce.
+ */
+std::set<std::pair<uint32_t, uint32_t>> EnumeratePerlinNoiseFillReachable();
 
 /**
  * Returns the reachable permutation set for a shader whose matcher rule has been migrated to the
