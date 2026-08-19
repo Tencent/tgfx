@@ -37,6 +37,7 @@
 #include "gpu/shaders/level1/SolidColorFillShader.h"
 #include "gpu/shaders/level1/TextureColorMatrixShader.h"
 #include "gpu/shaders/level1/TextureFillShader.h"
+#include "gpu/shaders/level1/TiledTextureFillShader.h"
 #include "gpu/shaders/level1/YUVTextureFillShader.h"
 
 namespace tgfx {
@@ -767,6 +768,41 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateTextureFillReachable() {
   return result;
 }
 
+std::optional<RuleComposedValues> ComposeTiledTextureFill(
+    const TiledTextureFillInputs& inputs) {
+  if (inputs.xpType < 0) {
+    return std::nullopt;
+  }
+  using VD = TiledTextureFillShader::VD;
+  using FD = TiledTextureFillShader::FragDims;
+  RuleComposedValues values;
+  values.vertValues.resize(VD::COUNT);
+  values.vertValues[VD::HAS_COVERAGE] = inputs.hasCoverage ? 1 : 0;
+  values.fragValues.resize(FD::COUNT);
+  values.fragValues[FD::HAS_XP] = inputs.xpType;
+  values.fragValues[FD::HAS_COVERAGE] = values.vertValues[VD::HAS_COVERAGE];
+  return values;
+}
+
+std::set<std::pair<uint32_t, uint32_t>> EnumerateTiledTextureFillReachable() {
+  std::set<std::pair<uint32_t, uint32_t>> result;
+  for (int hasCoverage = 0; hasCoverage <= 1; ++hasCoverage) {
+    for (int xpType = -1; xpType <= 2; ++xpType) {
+      TiledTextureFillInputs inputs;
+      inputs.hasCoverage = hasCoverage != 0;
+      inputs.xpType = xpType;
+      auto composed = ComposeTiledTextureFill(inputs);
+      if (!composed) {
+        continue;
+      }
+      auto vertIndex = TiledTextureFillShader::VD::domain().encode(composed->vertValues);
+      auto fragIndex = TiledTextureFillShader::FragDims::domain().encode(composed->fragValues);
+      result.insert({vertIndex, fragIndex});
+    }
+  }
+  return result;
+}
+
 std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermutations(
     const std::string& shaderName) {
   if (shaderName == "RoundStrokeRectFillShader") {
@@ -831,6 +867,9 @@ std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermuta
   }
   if (shaderName == "TextureFillShader") {
     return EnumerateTextureFillReachable();
+  }
+  if (shaderName == "TiledTextureFillShader") {
+    return EnumerateTiledTextureFillReachable();
   }
   return std::nullopt;
 }

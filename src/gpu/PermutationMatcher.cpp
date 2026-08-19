@@ -301,18 +301,15 @@ static std::optional<PermutationMatchResult> TryMatchTiledTextureFill(
   // TryMatchTextureFill cannot steal such draws: it requires the plain "TextureEffect" name.
   // ALPHA_ONLY and HAS_STRICT are folded into runtime uniforms (AlphaOnly / Strict), set by
   // GLSLTiledTextureEffect::onSetData; they are no longer compile-time dimensions.
-  using VD = TiledTextureFillShader::VD;
-  auto vertDomain = VD::domain();
-  std::vector<int> vertValues(VD::COUNT, 0);
-  vertValues[VD::HAS_COVERAGE] = hasCoverage;
-  auto vertIndex = vertDomain.encode(vertValues);
-
-  using FD = TiledTextureFillShader::FragDims;
-  auto fragDomain = FD::domain();
-  std::vector<int> fragValues(FD::COUNT);
-  fragValues[FD::HAS_XP] = xpType;
-  fragValues[FD::HAS_COVERAGE] = hasCoverage;
-  auto fragIndex = fragDomain.encode(fragValues);
+  TiledTextureFillInputs inputs;
+  inputs.hasCoverage = hasCoverage != 0;
+  inputs.xpType = xpType;
+  auto composed = ComposeTiledTextureFill(inputs);
+  if (!composed) {
+    return std::nullopt;
+  }
+  auto vertIndex = TiledTextureFillShader::VD::domain().encode(composed->vertValues);
+  auto fragIndex = TiledTextureFillShader::FragDims::domain().encode(composed->fragValues);
   return PermutationMatchResult{"TiledTextureFillShader", vertIndex, fragIndex};
 }
 

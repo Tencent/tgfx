@@ -226,6 +226,15 @@ struct TextureFillInputs {
 };
 
 /**
+ * Input contract of the TiledTextureFillShader matcher rule. The tiled mode / perspective checks
+ * are whole-draw rejections in Extract; ALPHA_ONLY / strict are runtime uniforms.
+ */
+struct TiledTextureFillInputs {
+  bool hasCoverage = false;
+  int xpType = -1;  // -1 = no representable XferProcessor.
+};
+
+/**
  * Dimension values a matcher rule produces for both stages, before domain encoding.
  */
 struct RuleComposedValues {
@@ -365,6 +374,13 @@ std::optional<RuleComposedValues> ComposeShapeInstancedFill(
 std::optional<RuleComposedValues> ComposeTextureFill(const TextureFillInputs& inputs);
 
 /**
+ * Pure mapping for the TiledTextureFillShader rule; see ComposeRoundStrokeRect for the sharing
+ * contract.
+ */
+std::optional<RuleComposedValues> ComposeTiledTextureFill(
+    const TiledTextureFillInputs& inputs);
+
+/**
  * Returns every (vertIndex, fragIndex) pair the RoundStrokeRect rule can ever produce, by
  * enumerating the full input lattice through ComposeRoundStrokeRect.
  */
@@ -469,6 +485,11 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateShapeInstancedFillReachable();
  * Returns every (vertIndex, fragIndex) pair the TextureFill rule can ever produce.
  */
 std::set<std::pair<uint32_t, uint32_t>> EnumerateTextureFillReachable();
+
+/**
+ * Returns every (vertIndex, fragIndex) pair the TiledTextureFill rule can ever produce.
+ */
+std::set<std::pair<uint32_t, uint32_t>> EnumerateTiledTextureFillReachable();
 
 /**
  * Returns the reachable permutation set for a shader whose matcher rule has been migrated to the
