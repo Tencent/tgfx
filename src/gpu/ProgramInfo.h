@@ -177,15 +177,10 @@ class ProgramInfo {
   bool usesOpenGLDesktopAOTProfile() const;
 
   /**
-   * Returns true when every texture sampled by this program is a 2D or rectangle texture.
+   * Returns true when every texture sampled by this program uses the 2D texture type.
    * External (OES) textures are not supported by the precompiled shaders.
    */
-  bool samplersAre2DOrRect() const;
-
-  /**
-   * Returns true when any texture sampled by this program is a rectangle texture.
-   */
-  bool hasRectSampler() const;
+  bool samplersAre2D() const;
 
  private:
   RenderTarget* renderTarget = nullptr;

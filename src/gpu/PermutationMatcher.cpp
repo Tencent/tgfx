@@ -230,7 +230,6 @@ static std::optional<PermutationMatchResult> TryMatchTextureFill(const ProgramIn
   TextureFillShader::FragmentValues fragmentValues = {};
   fragmentValues.xp = static_cast<uint32_t>(xpType);
   fragmentValues.deviceMask = static_cast<uint32_t>(*coverageType);
-  fragmentValues.textureKind = te->textureAt(0)->type() == TextureType::Rectangle ? 1u : 0u;
   auto fragIndex = TextureFillShader::EncodeFragment(fragmentValues);
   return PermutationMatchResult{TextureFillShader::Name(), vertIndex, fragIndex};
 }
@@ -309,7 +308,6 @@ static std::optional<PermutationMatchResult> TryMatchTiledTextureFill(
   std::vector<int> fragValues(FD::COUNT);
   fragValues[FD::HAS_XP] = xpType;
   fragValues[FD::HAS_COVERAGE] = hasCoverage;
-  fragValues[FD::TEXTURE_KIND] = tte->textureAt(0)->type() == TextureType::Rectangle ? 1 : 0;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"TiledTextureFillShader", vertIndex, fragIndex};
 }
@@ -562,14 +560,6 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   if (te->isYUV()) {
     return std::nullopt;
   }
-  // The color texture may be a rectangle texture (encoded via TEXTURE_KIND); every other sampler
-  // (the local mask) must stay 2D, because the template declares it as sampler2D.
-  if (hasLocalMask) {
-    auto* maskFP = programInfo->getFragmentProcessor(programInfo->numColorFragmentProcessors());
-    if (maskFP->numTextureSamplers() == 0 || maskFP->textureAt(0)->type() != TextureType::TwoD) {
-      return std::nullopt;
-    }
-  }
   // No color-texture guards are needed for the local mask: the coverage texture writes its
   // per-texture uniforms (Subset/AlphaOnly/HasRgbaaa) under a distinct structural ordinal
   // (Subset_1, ...), so it can no longer clobber the color texture's Subset / AlphaOnly slots. The
@@ -599,7 +589,6 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   fragValues[FD::HAS_SUBSET] = gpSubset ? 1 : 0;
   fragValues[FD::HAS_XP] = xpType;
   fragValues[FD::HAS_LOCAL_MASK] = hasLocalMask ? 1 : 0;
-  fragValues[FD::TEXTURE_KIND] = te->textureAt(0)->type() == TextureType::Rectangle ? 1 : 0;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"QuadTextureFillShader", vertIndex, fragIndex};
 }
@@ -799,7 +788,6 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
   if (chain->coverageRoot() >= 0 && gpLayout != 0) {
     return std::nullopt;
   }
-  bool allLeavesRect = leafCount > 0;
   for (size_t index = 0; index < leafCount; ++index) {
     auto leaf = chain->childProcessor(index);
     // A deferred (task-local) proxy reports zero samplers until it is instantiated; it always
@@ -815,15 +803,7 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
     if (texture->isYUV() || texture->hasRGBAAA()) {
       return std::nullopt;
     }
-    if (texture->textureAt(0)->type() != TextureType::Rectangle) {
-      allLeavesRect = false;
-    }
   }
-  // A rectangle leaf requires the sampler2DRect declaration, which only the TEXTURE_KIND=1
-  // variants carry. Phantom padding reuses the first leaf's texture, so all-rectangle chains bind
-  // a rectangle texture in every leaf slot; a LUT child binds a 2D texture into a leaf slot, so it
-  // can never ride a Rect variant.
-  bool rectChain = allLeavesRect && chain->lutLeaf() < 0;
   int hasMask = chain->hasMask() ? 1 : 0;
   // Four-leaf variants apply the mask through a runtime uniform, so a masked chain is servable on
   // every layout. Leaf-free chains keep the compile-time mask dimension, which the kernel compiles
@@ -863,7 +843,6 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
   fragValues[FD::HAS_COLOR] = hasColor;
   fragValues[FD::TEXTURE_COUNT] = textureCountValue;
   fragValues[FD::HAS_MASK_TEXTURE] = leafCount == 0 ? hasMask : 0;
-  fragValues[FD::TEXTURE_KIND] = rectChain ? 1 : 0;
   auto fragIndex = FD::domain().encode(fragValues);
   return PermutationMatchResult{"PointwiseChainShader", vertIndex, fragIndex};
 }
@@ -1088,9 +1067,6 @@ static std::optional<PermutationMatchResult> TryMatchAtlasTextFill(const Program
     fragValues[i] = values[i];
   }
   fragValues[FD::HAS_XP] = xpType;
-  // The glyph atlas is a rectangle texture on desktop GL; encode its sampler type so the matched
-  // variant declares sampler2DRect (required by the RECT chokepoint in MatchPermutation).
-  fragValues[FD::TEXTURE_KIND] = atgp->textureAt(0)->type() == TextureType::Rectangle ? 1 : 0;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"AtlasTextFillShader", vertIndex, fragIndex};
 }
@@ -1340,9 +1316,6 @@ static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
   auto fragDomain = FD::domain();
   std::vector<int> fragValues(FD::COUNT);
   fragValues[FD::HAS_XP] = xpType;
-  // The blurred child texture is a rectangle texture on desktop GL; encode its sampler type.
-  fragValues[FD::TEXTURE_KIND] = childFP->textureAt(0)->type() == TextureType::Rectangle ? 1 : 0;
-
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"GaussianBlur1DShader", vertIndex, fragIndex};
 }
@@ -1476,7 +1449,6 @@ static std::optional<PermutationMatchResult> TryMatchNonAARRectFill(
   }
   auto* ngp = static_cast<const NonAARRectGeometryProcessor*>(gp);
   int textured = 0;
-  int textureKind = 0;
   if (programInfo->numFragmentProcessors() == 1) {
     auto fp = programInfo->getFragmentProcessor(0);
     // The textured variant carries the single-tap tiled modes only: the mipmap-repeat 4-tap path
@@ -1495,12 +1467,6 @@ static std::optional<PermutationMatchResult> TryMatchNonAARRectFill(
       return std::nullopt;
     }
     textured = 1;
-    // A rectangle texture may only bind to the sampler2DRect declaration of the TEXTURE_KIND=1
-    // variants (desktop GL images); the untextured variants keep TEXTURE_KIND=0.
-    textureKind = tte->textureAt(0) != nullptr &&
-                          tte->textureAt(0)->type() == TextureType::Rectangle
-                      ? 1
-                      : 0;
   }
   using D = NonAARRectFillShader::Dims;
   auto domain = D::domain();
@@ -1516,7 +1482,6 @@ static std::optional<PermutationMatchResult> TryMatchNonAARRectFill(
     fragValues[i] = values[i];
   }
   fragValues[FD::HAS_XP] = xpType;
-  fragValues[FD::TEXTURE_KIND] = textureKind;
   auto fragIndex = fragDomain.encode(fragValues);
   return PermutationMatchResult{"NonAARRectFillShader", vertIndex, fragIndex};
 }
@@ -1764,11 +1729,11 @@ static std::optional<PermutationMatchResult> TryMatchPerlin(const ProgramInfo* p
 }
 
 static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramInfo* programInfo) {
-  // OpenGL is served in full on the desktop profile. Non-desktop profiles (GLES/SwiftShader) and
-  // External (OES) samplers keep the ProgramBuilder route. TwoD and Rectangle samplers are both
-  // servable: rectangle-capable kernels declare a TEXTURE_KIND dimension (see MatchPermutation).
+  // OpenGL is served in full on the desktop profile. Non-desktop profiles (GLES/SwiftShader) keep
+  // the ProgramBuilder route, as do External (OES) and rectangle samplers (external adopters only;
+  // every texture the context itself produces is two-dimensional).
   if (programInfo->backend() == Backend::OpenGL &&
-      (!programInfo->usesOpenGLDesktopAOTProfile() || !programInfo->samplersAre2DOrRect())) {
+      (!programInfo->usesOpenGLDesktopAOTProfile() || !programInfo->samplersAre2D())) {
     return std::nullopt;
   }
 
@@ -1902,14 +1867,6 @@ std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* progra
     if (info == nullptr || !IsBuildablePermutation(*info, result->vertPermutationIndex,
                                                    result->fragPermutationIndex)) {
       result.reset();
-    } else if (programInfo->backend() == Backend::OpenGL) {
-      // A rectangle texture may only bind to a sampler2DRect declaration, which exists only on
-      // variants whose TEXTURE_KIND dimension is encoded 1. Reject any other match so a RECT
-      // texture is never bound to a plain sampler2D (which would sample as an incomplete texture).
-      if (programInfo->hasRectSampler() &&
-          info->fragDomain.valueOf(result->fragPermutationIndex, "TEXTURE_KIND") != 1) {
-        result.reset();
-      }
     }
   }
   if (failure != nullptr) {

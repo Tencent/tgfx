@@ -23,10 +23,6 @@
 #ifndef HAS_TILED_CHILD
 #define HAS_TILED_CHILD 0
 #endif
-// 0 = TwoD, 1 = Rect (desktop GL blur source). Rect variants compile only into the opengl bundle.
-#ifndef TEXTURE_KIND
-#define TEXTURE_KIND 0
-#endif
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Color;
@@ -48,11 +44,7 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 
 layout(location = 0) in vec2 TransformedCoords_0;
 
-#if TEXTURE_KIND == 1
-layout(set = 1, binding = 0) uniform sampler2DRect TextureSampler_0;
-#else
 layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
-#endif
 
 // Always bound: an absent device mask is padded with the shared dummy texture and HasDeviceMask
 // is 0.

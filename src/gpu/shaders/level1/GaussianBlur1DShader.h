@@ -50,20 +50,15 @@ class GaussianBlur1DShader : public PrecompiledShader {
     // and a child without a real subset uploads the full texture bounds, so the clamp is a no-op.
     // The device mask and the tiled-child tap path are runtime uniforms (HasDeviceMask /
     // TiledChild), not permutation dimensions.
-    // TEXTURE_KIND is the child texture's sampler type (0=TwoD, 1=Rect). The blurred source image
-    // is a rectangle texture on desktop GL; it changes the sampler declaration, so it is a
-    // legitimate dimension. Appended last so TwoD variant indices are unchanged. Rect variants
-    // compile only into the opengl bundle.
-    enum : uint32_t { HAS_XP, TEXTURE_KIND, COUNT };
+    enum : uint32_t { HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("HAS_XP", 3),
-          PermutationEnum("TEXTURE_KIND", {"TwoD", "Rect"}),
       });
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 2, "Update info() when fragment dimensions change.");
+  static_assert(FD::COUNT == 1, "Update info() when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"GaussianBlur1DShader",
@@ -79,10 +74,8 @@ class GaussianBlur1DShader : public PrecompiledShader {
 
  private:
   static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>&,
-                            const std::vector<int>& fragValues) {
-    // Framebuffer fetch (HAS_XP=2) is a Vulkan/Metal-only path; Rect variants are opengl-only and
-    // never carry FBF.
-    return !(fragValues[FD::TEXTURE_KIND] == 1 && fragValues[FD::HAS_XP] == 2);
+                            const std::vector<int>&) {
+    return true;
   }
 };
 

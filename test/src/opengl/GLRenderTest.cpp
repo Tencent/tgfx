@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <array>
+#include <chrono>
 #include <vector>
 #include "core/utils/BlockAllocator.h"
 #include "core/utils/PixelFormatUtil.h"
@@ -26,6 +27,9 @@
 #include "gpu/ProxyProvider.h"
 #include "gpu/opengl/GLCaps.h"
 #include "gpu/opengl/GLFunctions.h"
+#include <CoreVideo/CoreVideo.h>
+#include <OpenGL/CGLCurrent.h>
+#include <OpenGL/CGLContext.h>
 #include "gpu/opengl/GLGPU.h"
 #include "gpu/opengl/GLUtil.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
@@ -162,6 +166,135 @@ static GLTextureInfo CreateRectangleTexture(Context* context, int width, int hei
   return glInfo;
 }
 
+// Measures the two image import paths on desktop OpenGL: the IOSurface zero-copy import
+// (CVOpenGLTextureCache, produces GL_TEXTURE_RECTANGLE) versus a plain GL_TEXTURE_2D upload
+// (genTextures + texImage2D + glFinish). Each round creates and releases a fresh texture like a
+// real image decode would; the pixel source is a single pre-filled buffer so only the import cost
+// is measured.
+TGFX_TEST(GLRenderTest, TextureImportBenchmark) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  ASSERT_EQ(context->backend(), Backend::OpenGL);
+  auto gl = static_cast<GLGPU*>(context->gpu())->functions();
+  const std::pair<int, int> sizes[] = {{512, 512}, {1080, 1920}};
+  const int rounds = 50;
+  for (const auto& size : sizes) {
+    const int width = size.first;
+    const int height = size.second;
+    auto byteCount = static_cast<size_t>(width) * static_cast<size_t>(height) * 4;
+    auto pixels = std::vector<uint8_t>(byteCount, 0x7f);
+    // Zero-copy path: CVPixelBuffer (IOSurface) -> CVOpenGLTextureCache -> RECTANGLE texture.
+    CVPixelBufferRef pixelBuffer = nullptr;
+    // An empty IOSurface properties dictionary mirrors HardwareBuffer.mm: the pixel buffer
+    // allocates with a default IOSurface backing, which is what the zero-copy import needs.
+    auto emptySurfaceProps =
+        CFDictionaryCreate(kCFAllocatorDefault, nullptr, nullptr, 0,
+                           &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    const void* optionKeys[] = {kCVPixelBufferIOSurfacePropertiesKey};
+    const void* optionValues[] = {emptySurfaceProps};
+    auto options =
+        CFDictionaryCreate(kCFAllocatorDefault, optionKeys, optionValues, 1,
+                           &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    CFRelease(emptySurfaceProps);
+    EXPECT_EQ(static_cast<int>(CVPixelBufferCreate(kCFAllocatorDefault, static_cast<size_t>(width),
+                                                static_cast<size_t>(height),
+                                                kCVPixelFormatType_32BGRA, options, &pixelBuffer)),
+              static_cast<int>(kCVReturnSuccess));
+    CFRelease(options);
+    CVOpenGLTextureCacheRef textureCache = nullptr;
+    auto cglContext = CGLGetCurrentContext();
+    ASSERT_NE(cglContext, nullptr);
+    auto cglPixelFormat = CGLGetPixelFormat(cglContext);
+    ASSERT_NE(cglPixelFormat, nullptr);
+    EXPECT_EQ(static_cast<int>(CVOpenGLTextureCacheCreate(
+                  kCFAllocatorDefault, nullptr, cglContext, cglPixelFormat, nullptr,
+                  &textureCache)),
+              static_cast<int>(kCVReturnSuccess));
+    CVOpenGLTextureRef adopted = nullptr;
+    // Warm up both paths once so first-touch allocations do not skew the averages.
+    EXPECT_EQ(static_cast<int>(CVOpenGLTextureCacheCreateTextureFromImage(
+                  kCFAllocatorDefault, textureCache, pixelBuffer, nullptr, &adopted)),
+              static_cast<int>(kCVReturnSuccess));
+    CVOpenGLTextureRelease(adopted);
+    unsigned warmup = 0;
+    gl->genTextures(1, &warmup);
+    gl->bindTexture(GL_TEXTURE_2D, warmup);
+    const auto& format = static_cast<GLGPU*>(context->gpu())
+                             ->caps()
+                             ->getTextureFormat(PixelFormat::RGBA_8888);
+    gl->texImage2D(GL_TEXTURE_2D, 0, static_cast<int>(format.internalFormatTexImage), width, height,
+                   0, format.externalFormat, format.externalType, pixels.data());
+    gl->deleteTextures(1, &warmup);
+
+    auto start = std::chrono::steady_clock::now();
+    for (int i = 0; i < rounds; ++i) {
+      CVOpenGLTextureRef texture = nullptr;
+      CVOpenGLTextureCacheCreateTextureFromImage(kCFAllocatorDefault, textureCache, pixelBuffer,
+                                                 nullptr, &texture);
+      CVOpenGLTextureRelease(texture);
+    }
+    gl->finish();
+    auto zeroCopyMs =
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() /
+        rounds;
+
+    start = std::chrono::steady_clock::now();
+    for (int i = 0; i < rounds; ++i) {
+      unsigned id = 0;
+      gl->genTextures(1, &id);
+      gl->bindTexture(GL_TEXTURE_2D, id);
+      gl->texImage2D(GL_TEXTURE_2D, 0, static_cast<int>(format.internalFormatTexImage), width,
+                     height, 0, format.externalFormat, format.externalType, pixels.data());
+      gl->deleteTextures(1, &id);
+    }
+    gl->finish();
+    auto uploadMs =
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() /
+        rounds;
+
+    // BGRA is the native Apple GPU layout; this variant isolates how much of the RGBA upload cost
+    // is the driver's CPU-side format conversion rather than the transfer itself.
+    const auto& bgraFormat =
+        static_cast<GLGPU*>(context->gpu())->caps()->getTextureFormat(PixelFormat::BGRA_8888);
+    start = std::chrono::steady_clock::now();
+    for (int i = 0; i < rounds; ++i) {
+      unsigned id = 0;
+      gl->genTextures(1, &id);
+      gl->bindTexture(GL_TEXTURE_2D, id);
+      gl->texImage2D(GL_TEXTURE_2D, 0, static_cast<int>(bgraFormat.internalFormatTexImage), width,
+                     height, 0, bgraFormat.externalFormat, bgraFormat.externalType, pixels.data());
+      gl->deleteTextures(1, &id);
+    }
+    gl->finish();
+    auto uploadBgraMs =
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() /
+        rounds;
+
+    // Same upload without the per-round glFinish: measures the CPU-side submission cost only,
+    // separating the driver's synchronous transfer work from the deferred GPU work.
+    start = std::chrono::steady_clock::now();
+    for (int i = 0; i < rounds; ++i) {
+      unsigned id = 0;
+      gl->genTextures(1, &id);
+      gl->bindTexture(GL_TEXTURE_2D, id);
+      gl->texImage2D(GL_TEXTURE_2D, 0, static_cast<int>(format.internalFormatTexImage), width,
+                     height, 0, format.externalFormat, format.externalType, pixels.data());
+      gl->deleteTextures(1, &id);
+    }
+    auto submitOnlyMs =
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() /
+        rounds;
+    gl->finish();
+
+    LOGI("[Benchmark] %dx%d zeroCopyImport=%.3fms uploadRGBA=%.3fms uploadBGRA=%.3fms "
+         "submitOnly=%.3fms",
+         width, height, zeroCopyMs, uploadMs, uploadBgraMs, submitOnlyMs);
+    CVOpenGLTextureCacheRelease(textureCache);
+    CVPixelBufferRelease(pixelBuffer);
+  }
+}
+
 TGFX_TEST(GLRenderTest, AOTWhitelist) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -223,9 +356,9 @@ TGFX_TEST(GLRenderTest, AOTWhitelist) {
     ASSERT_NE(fp, nullptr);
     ProgramInfo programInfo(renderTarget.get(), gp.get(), {fp.get()}, 1, nullptr,
                             BlendMode::SrcOver);
-    EXPECT_TRUE(programInfo.hasRectSampler());
-    // DeviceSpaceTextureEffect has no TEXTURE_KIND dimension, so a rectangle texture is rejected
-    // by the matcher (it would otherwise bind to a plain sampler2D).
+    EXPECT_FALSE(programInfo.samplersAre2D());
+    // A rectangle texture (external adopters only) has no precompiled variant and is rejected by
+    // the matcher gate (it would otherwise bind to a plain sampler2D).
     EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
   }
 

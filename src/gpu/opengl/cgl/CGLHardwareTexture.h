@@ -39,8 +39,7 @@ class CGLHardwareTexture : public GLTexture {
 
  private:
   CVPixelBufferRef pixelBuffer = nullptr;
-  CVOpenGLTextureRef texture = nil;
-  CVOpenGLTextureCacheRef textureCache = nil;
+  CVOpenGLTextureCacheRef textureCache = nullptr;
 
   CGLHardwareTexture(const TextureDescriptor& descriptor, CVPixelBufferRef pixelBuffer,
                      CVOpenGLTextureCacheRef textureCache, unsigned target, unsigned textureID);

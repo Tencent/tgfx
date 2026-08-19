@@ -33,23 +33,46 @@ std::vector<std::shared_ptr<Texture>> CGLHardwareTexture::MakeFrom(
   if (usage & TextureUsage::RENDER_ATTACHMENT && !gpu->isFormatRenderable(format)) {
     return {};
   }
-  CVOpenGLTextureRef texture = nil;
+  CVOpenGLTextureRef texture = nullptr;
   CVOpenGLTextureCacheCreateTextureFromImage(kCFAllocatorDefault, textureCache, pixelBuffer,
                                              nullptr, &texture);
-  if (texture == nil) {
+  if (texture == nullptr) {
     return {};
   }
-  auto target = CVOpenGLTextureGetTarget(texture);
-  auto textureID = CVOpenGLTextureGetName(texture);
-  TextureDescriptor descriptor = {static_cast<int>(CVPixelBufferGetWidth(pixelBuffer)),
-                                  static_cast<int>(CVPixelBufferGetHeight(pixelBuffer)),
-                                  format,
-                                  false,
-                                  1,
-                                  usage};
+  // CVOpenGLTextureCache only ever yields GL_TEXTURE_RECTANGLE objects, and rectangle textures
+  // cannot share the precompiled pipeline with regular two-dimensional ones (per-sampler type
+  // declarations, no hardware wrap modes). Since macOS desktop OpenGL is a debugging backend
+  // here, copy the surface into a plain GL_TEXTURE_2D once at import: the pixel buffer keeps its
+  // zero-copy path on Metal, and every texture the GL context produces stays two-dimensional.
+  auto gl = gpu->functions();
+  auto width = static_cast<int>(CVPixelBufferGetWidth(pixelBuffer));
+  auto height = static_cast<int>(CVPixelBufferGetHeight(pixelBuffer));
+  auto rectTarget = CVOpenGLTextureGetTarget(texture);
+  auto rectID = CVOpenGLTextureGetName(texture);
+  GLint boundFBO = 0;
+  gl->getIntegerv(GL_FRAMEBUFFER_BINDING, &boundFBO);
+  unsigned copyFBO = 0;
+  gl->genFramebuffers(1, &copyFBO);
+  gl->bindFramebuffer(GL_FRAMEBUFFER, copyFBO);
+  gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, rectTarget, rectID, 0);
+  unsigned twoDID = 0;
+  gl->genTextures(1, &twoDID);
+  gl->bindTexture(GL_TEXTURE_2D, twoDID);
+  const auto& textureFormat = gpu->caps()->getTextureFormat(format);
+  gl->texImage2D(GL_TEXTURE_2D, 0, static_cast<int>(textureFormat.internalFormatTexImage), width,
+                 height, 0, textureFormat.externalFormat, textureFormat.externalType, nullptr);
+  gl->copyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, width, height);
+  gl->bindFramebuffer(GL_FRAMEBUFFER, static_cast<unsigned>(boundFBO));
+  gl->deleteFramebuffers(1, &copyFBO);
+  CVOpenGLTextureRelease(texture);
+  if (twoDID == 0) {
+    LOGE("CGLHardwareTexture::MakeFrom() failed to copy the pixel buffer into a 2D texture!");
+    return {};
+  }
+  TextureDescriptor descriptor = {width, height, format, false, 1, usage};
   auto glTexture = gpu->makeResource<CGLHardwareTexture>(descriptor, pixelBuffer, textureCache,
-                                                         target, textureID);
-  glTexture->texture = texture;
+                                                         static_cast<unsigned>(GL_TEXTURE_2D),
+                                                         twoDID);
   if (usage & TextureUsage::RENDER_ATTACHMENT && !glTexture->checkFrameBuffer(gpu)) {
     return {};
   }
@@ -71,18 +94,15 @@ CGLHardwareTexture::CGLHardwareTexture(const TextureDescriptor& descriptor,
 
 CGLHardwareTexture::~CGLHardwareTexture() {
   CFRelease(pixelBuffer);
-  if (texture != nil) {
-    CFRelease(texture);
+  if (textureCache != nil) {
     CFRelease(textureCache);
   }
 }
 
 void CGLHardwareTexture::onReleaseTexture(GLGPU*) {
-  if (texture == nil) {
+  if (textureCache == nil) {
     return;
   }
-  CFRelease(texture);
-  texture = nil;
   CVOpenGLTextureCacheFlush(textureCache, 0);
   CFRelease(textureCache);
   textureCache = nil;

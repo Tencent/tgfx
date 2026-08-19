@@ -234,15 +234,11 @@ bool TiledTextureEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
   if (builder == nullptr || output == nullptr || textureView == nullptr) {
     return false;
   }
-  // Rectangle textures are accepted: the precompiled chain kernel carries a TEXTURE_KIND dimension
-  // (sampler2DRect variants), and its shared tiled-sampling path is rectangle-aware
-  // (tiledEffectiveUnorm keeps rectangle coordinates in pixel space, so shader-emulated
-  // wrap/border modes run in pixel space exactly like the standalone tiled fill kernels).
-  // The earlier shader-mode restriction dated from before the phantom sampler-state alignment:
-  // the observed divergence was the phantom overwriting the leaf's sampler state, not the tiling
-  // math. External textures still cannot be served.
+  // Rectangle textures cannot be served: the context no longer produces them (the CGL pixel
+  // buffer import copies into a plain 2D texture), and rectangle samplers adopted from external
+  // adopters have no precompiled variant.
   auto textureType = textureView->getTexture()->type();
-  if (textureType != TextureType::TwoD && textureType != TextureType::Rectangle) {
+  if (textureType != TextureType::TwoD) {
     return false;
   }
   auto resolved = resolveSampling();

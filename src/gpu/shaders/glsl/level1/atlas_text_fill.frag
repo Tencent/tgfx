@@ -16,10 +16,6 @@
 #ifndef HAS_XP
 #define HAS_XP 0
 #endif
-// 0 = TwoD, 1 = Rect (desktop GL atlas). Rect variants compile only into the opengl bundle.
-#ifndef TEXTURE_KIND
-#define TEXTURE_KIND 0
-#endif
 #define HAS_RUNTIME_DEVICE_MASK 1
 #define HAS_RUNTIME_CLIP 1
 
@@ -44,11 +40,7 @@ layout(location = 1) in vec4 vColor;
 #endif
 #endif
 
-#if TEXTURE_KIND == 1
-layout(set = 1, binding = 0) uniform sampler2DRect TextureSampler_0;
-#else
 layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
-#endif
 // Always bound: an absent device mask is padded with the shared dummy texture and HasDeviceMask
 // is 0.
 layout(set = 1, binding = 1) uniform sampler2D MaskTextureSampler;

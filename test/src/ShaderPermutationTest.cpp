@@ -301,11 +301,10 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistry) {
       foundTextureFill = true;
       EXPECT_EQ(shaderInfo.vertDomain.totalCount(), 1u);
       EXPECT_EQ(shaderInfo.vertDomain.dimensionCount(), 0u);
-      // FragDims: HAS_XP(int3) + HAS_DEVICE_MASK(bool) + TEXTURE_KIND(TwoD/Rect) = 12
-      // permutations. AARect clipping is a runtime uniform (Rect / HasClip), not a compile-time
-      // dimension.
-      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 12u);
-      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 3u);
+      // FragDims: HAS_XP(int3) + HAS_DEVICE_MASK(bool) = 6 permutations. AARect clipping is a
+      // runtime uniform (Rect / HasClip), not a compile-time dimension.
+      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 6u);
+      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 2u);
       EXPECT_EQ(shaderInfo.vertexFile, "level1/texture_fill.vert");
       EXPECT_EQ(shaderInfo.fragmentFile, "level1/texture_fill.frag");
     }
@@ -672,10 +671,9 @@ TGFX_TEST(ShaderPermutationTest, ShouldCompile) {
     if (shaderInfo.name != TextureFillShader::Name()) {
       continue;
     }
-    // Vert: no dimensions = 1 raw. Frag: HAS_XP(int3) + HAS_DEVICE_MASK(bool) +
-    // TEXTURE_KIND(TwoD/Rect) = 12 raw. YUV is rejected by the matcher before matching and subset
-    // clamping is a runtime uniform. ShouldCompile rejects the 2 Rect+framebuffer-fetch combos
-    // (HAS_XP=2 is Vulkan/Metal-only), leaving 1 * 12 - 2 = 10.
+    // Vert: no dimensions = 1 raw. Frag: HAS_XP(int3) + HAS_DEVICE_MASK(bool) = 6 raw. YUV is
+    // rejected by the matcher before matching and subset clamping is a runtime uniform; all
+    // combinations compile.
     int compiledCount = 0;
     for (uint32_t vi = 0; vi < shaderInfo.vertDomain.totalCount(); vi++) {
       auto vertValues = shaderInfo.vertDomain.decode(vi);
@@ -691,7 +689,7 @@ TGFX_TEST(ShaderPermutationTest, ShouldCompile) {
         }
       }
     }
-    EXPECT_EQ(compiledCount, 10);
+    EXPECT_EQ(compiledCount, 6);
   }
 }
 
@@ -713,7 +711,6 @@ TGFX_TEST(ShaderPermutationTest, TextureFillTypedEncodingMatchesDomains) {
     TextureFillShader::FragmentValues typedValues = {};
     typedValues.xp = static_cast<uint32_t>(values[TextureFillShader::FD::HAS_XP]);
     typedValues.deviceMask = static_cast<uint32_t>(values[TextureFillShader::FD::HAS_DEVICE_MASK]);
-    typedValues.textureKind = static_cast<uint32_t>(values[TextureFillShader::FD::TEXTURE_KIND]);
     EXPECT_EQ(TextureFillShader::EncodeFragment(typedValues), index);
   }
 }
@@ -731,9 +728,7 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   if (dashPos != std::string::npos) {
     expectedTag = expectedTag.substr(0, dashPos);
   }
-  // The opengl bundle carries the TEXTURE_KIND=Rect fragment variants (67 extra entries across
-  // the armed kernels); other backends compile TwoD variants only.
-  EXPECT_EQ(cache->fragmentEntryCount(), expectedTag == "opengl" ? 338u : 274u);
+  EXPECT_EQ(cache->fragmentEntryCount(), 274u);
   EXPECT_EQ(cache->profileTag(), expectedTag);
   cache->unload();
 }
@@ -1192,7 +1187,7 @@ TGFX_TEST(ShaderPermutationTest, CompressedBundleLoad) {
       tag = tag.substr(0, dash);
     }
     // The opengl bundle carries the TEXTURE_KIND=Rect fragment variants (16 extra entries).
-    EXPECT_EQ(compressedOnly.fragmentEntryCount(), tag == "opengl" ? 338u : 274u);
+    EXPECT_EQ(compressedOnly.fragmentEntryCount(), 274u);
     EXPECT_EQ(compressedOnly.profileTag(), tag);
     return;
   }
@@ -1459,11 +1454,11 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureFillShaderRegistry) {
       // vertex attributes, so they no longer appear as dimensions.
       EXPECT_EQ(shaderInfo.vertDomain.dimensionCount(), 3u);
       EXPECT_EQ(shaderInfo.vertDomain.totalCount(), 8u);
-      // FragDims: 2 bools + 1 int(3) + TEXTURE_KIND(TwoD/Rect) = 2^2 * 3 * 2 = 24 total
-      // permutations. The device mask is a runtime uniform; ALPHA_ONLY, HAS_RGBAAA and the
-      // unsupported YUV path are runtime/fallback concerns; HAS_LOCAL_MASK is a mirror dimension.
-      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 4u);
-      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 24u);
+      // FragDims: 2 bools + 1 int(3) = 2^2 * 3 = 12 total permutations. The device mask is a
+      // runtime uniform; ALPHA_ONLY, HAS_RGBAAA and the unsupported YUV path are
+      // runtime/fallback concerns; HAS_LOCAL_MASK is a mirror dimension.
+      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 3u);
+      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 12u);
       EXPECT_EQ(shaderInfo.vertexFile, "level1/quad_texture_fill.vert");
       EXPECT_EQ(shaderInfo.fragmentFile, "level1/quad_texture_fill.frag");
     }
@@ -1496,10 +1491,9 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureFillShouldCompile) {
     }
     // ALPHA_ONLY / HAS_RGBAAA are runtime uniforms and per-vertex color/coverage are now
     // unconditional; the device mask is runtime too. Mirror agreement ties HAS_SUBSET and
-    // HAS_LOCAL_MASK across stages (2*2), leaving HAS_UV_COORD(2) * HAS_XP(3) * TEXTURE_KIND(2)
-    // free: 48 raw pairs. ShouldCompile rejects Rect+framebuffer-fetch (HAS_XP=2 & KIND=Rect):
-    // 2(UV) * 4(mirrored) = 8 combos, leaving 40 variants.
-    EXPECT_EQ(compiledCount, 40);
+    // HAS_LOCAL_MASK across stages (2*2), leaving HAS_UV_COORD(2) * HAS_XP(3) free: 24 raw
+    // pairs, all compiled.
+    EXPECT_EQ(compiledCount, 24);
   }
 }
 
@@ -1859,7 +1853,7 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectPreservesPermutationDomains) {
     uint32_t fragmentCount;
   };
   const ExpectedDomain expected[] = {
-      {"QuadColorFillShader", 1, 6},  {"QuadTextureFillShader", 8, 24},
+      {"QuadColorFillShader", 1, 6},  {"QuadTextureFillShader", 8, 12},
       {"SolidColorFillShader", 2, 6}, {"HairlineLineShader", 1, 3},
       {"HairlineQuadShader", 1, 3},
   };

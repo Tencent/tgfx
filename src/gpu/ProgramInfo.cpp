@@ -435,28 +435,18 @@ bool ProgramInfo::usesOpenGLDesktopAOTProfile() const {
   return !shaderCaps->usesPrecisionModifiers && shaderCaps->versionDeclString == "#version 150";
 }
 
-bool ProgramInfo::samplersAre2DOrRect() const {
+bool ProgramInfo::samplersAre2D() const {
   for (const auto& sampler : getSamplers()) {
     if (sampler.texture == nullptr) {
       return false;
     }
-    // Only TwoD and Rectangle are supported by the precompiled samplers. External (OES) textures
-    // keep the ProgramBuilder route.
-    auto type = sampler.texture->type();
-    if (type != TextureType::TwoD && type != TextureType::Rectangle) {
+    // Only TwoD is supported by the precompiled samplers. External (OES) and rectangle textures
+    // (external adopters only) keep the ProgramBuilder route.
+    if (sampler.texture->type() != TextureType::TwoD) {
       return false;
     }
   }
   return true;
-}
-
-bool ProgramInfo::hasRectSampler() const {
-  for (const auto& sampler : getSamplers()) {
-    if (sampler.texture != nullptr && sampler.texture->type() == TextureType::Rectangle) {
-      return true;
-    }
-  }
-  return false;
 }
 
 std::vector<SamplerInfo> ProgramInfo::getSamplers() const {

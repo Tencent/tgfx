@@ -40,28 +40,23 @@ class TextureFillShader : public PrecompiledShader {
   // not change the fragment resource interface.
   // ALPHA_ONLY and HAS_RGBAAA are folded into runtime uniforms (AlphaOnly / HasRgbaaa), set by
   // GLSLTextureEffect::onSetData, rather than compile-time permutations.
-  //   TEXTURE_KIND: the color texture's sampler type (0=TwoD, 1=Rect). Changes the sampler
-  // declaration, so it is a legitimate compile-time dimension; Rect variants compile only into
-  // the opengl bundle (see the build tool).
   struct FragDims {
     // Subset clamping is runtime: the shader always declares Subset and clamps, and the writer
     // uploads the full texture bounds when there is no real subset, so the clamp is a no-op.
-    enum : uint32_t { HAS_XP, HAS_DEVICE_MASK, TEXTURE_KIND, COUNT };
+    enum : uint32_t { HAS_XP, HAS_DEVICE_MASK, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("HAS_XP", 3),
           PermutationBool("HAS_DEVICE_MASK"),
-          PermutationEnum("TEXTURE_KIND", {"TwoD", "Rect"}),
       });
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 3, "Update the encoders and ShouldCompile when dimensions change.");
+  static_assert(FD::COUNT == 2, "Update the encoders and ShouldCompile when dimensions change.");
 
   struct FragmentValues {
     uint32_t xp = 0;
     uint32_t deviceMask = 0;
-    uint32_t textureKind = 0;
   };
 
   /** Returns the stable template name used by both bundle generation and runtime lookup. */
@@ -76,7 +71,7 @@ class TextureFillShader : public PrecompiledShader {
 
   /** Encodes fragment values with the same mixed-radix layout as FD::domain() without allocation. */
   static constexpr uint32_t EncodeFragment(const FragmentValues& values) {
-    return values.xp + values.deviceMask * 3u + values.textureKind * 6u;
+    return values.xp + values.deviceMask * 3u;
   }
 
   PrecompiledShaderInfo info() const override {
@@ -93,10 +88,8 @@ class TextureFillShader : public PrecompiledShader {
 
  private:
   static bool ShouldCompile(uint32_t, uint32_t, const std::vector<int>&,
-                            const std::vector<int>& fragValues) {
-    // Framebuffer fetch (HAS_XP=2) is a Vulkan/Metal-only path (subpassInput); Rect variants are
-    // opengl-only, so they never carry FBF.
-    return !(fragValues[FD::TEXTURE_KIND] == 1 && fragValues[FD::HAS_XP] == 2);
+                            const std::vector<int>&) {
+    return true;
   }
 };
 

@@ -21,18 +21,8 @@ bool tiledUsesUnorm(int mode) {
   return mode == 3 || mode == 4 || mode == 5 || mode == 7 || mode == 8;
 }
 
-#ifndef TEXTURE_KIND
-#define TEXTURE_KIND 0
-#endif
-// Rectangle textures are always pixel-space: the runtime keeps Subset/Clamp unnormalized and
-// never writes the Dimension uniform for them (usesShaderDimensions is forced false), so the
-// divide/multiply must be skipped entirely.
 bool tiledEffectiveUnorm(int modeX, int modeY) {
-#if TEXTURE_KIND == 1
-  return false;
-#else
   return tiledUsesUnorm(modeX) || tiledUsesUnorm(modeY);
-#endif
 }
 
 // Clamp, RepeatNearest, MirrorRepeat and ClampToBorderLinear clamp the tiled coordinate to the Clamp

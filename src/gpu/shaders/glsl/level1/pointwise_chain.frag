@@ -31,17 +31,7 @@
 #ifndef TEXTURE_COUNT
 #define TEXTURE_COUNT 0
 #endif
-// 0 = TwoD, 1 = Rect (desktop GL texture leaves). Rect variants compile only into the opengl
-// bundle and only for single-RECT-leaf chains (phantom padding reuses the first leaf's texture,
-// so every leaf slot binds the same rectangle texture).
-#ifndef TEXTURE_KIND
-#define TEXTURE_KIND 0
-#endif
-#if TEXTURE_KIND == 1
-#define CHAIN_LEAF_SAMPLER sampler2DRect
-#else
 #define CHAIN_LEAF_SAMPLER sampler2D
-#endif
 
 #if TEXTURE_COUNT == 0
 #define NTEX 0
