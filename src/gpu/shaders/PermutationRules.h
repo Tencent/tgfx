@@ -88,6 +88,15 @@ struct QuadColorFillInputs {
 };
 
 /**
+ * Input contract of the SolidColorFillShader matcher rule. The direct AARect clip coverage check
+ * is a whole-draw rejection and stays in Extract.
+ */
+struct SolidColorFillInputs {
+  bool isCoverageAA = false;
+  int xpType = -1;  // -1 = no representable XferProcessor.
+};
+
+/**
  * Dimension values a matcher rule produces for both stages, before domain encoding.
  */
 struct RuleComposedValues {
@@ -138,6 +147,12 @@ std::optional<RuleComposedValues> ComposeQuadConstColor(const QuadConstColorInpu
 std::optional<RuleComposedValues> ComposeQuadColorFill(const QuadColorFillInputs& inputs);
 
 /**
+ * Pure mapping for the SolidColorFillShader rule; see ComposeRoundStrokeRect for the sharing
+ * contract.
+ */
+std::optional<RuleComposedValues> ComposeSolidColorFill(const SolidColorFillInputs& inputs);
+
+/**
  * Returns every (vertIndex, fragIndex) pair the RoundStrokeRect rule can ever produce, by
  * enumerating the full input lattice through ComposeRoundStrokeRect.
  */
@@ -172,6 +187,11 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadConstColorReachable();
  * Returns every (vertIndex, fragIndex) pair the QuadColorFill rule can ever produce.
  */
 std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadColorFillReachable();
+
+/**
+ * Returns every (vertIndex, fragIndex) pair the SolidColorFill rule can ever produce.
+ */
+std::set<std::pair<uint32_t, uint32_t>> EnumerateSolidColorFillReachable();
 
 /**
  * Returns the reachable permutation set for a shader whose matcher rule has been migrated to the

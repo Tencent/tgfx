@@ -375,25 +375,16 @@ static std::optional<PermutationMatchResult> TryMatchSolidColorFill(
       (programInfo->numColorFragmentProcessors() != 0 || !HasDirectAARectCoverage(programInfo))) {
     return std::nullopt;
   }
-  int xpType = GetXPType(programInfo);
-  if (xpType < 0) {
+  auto* dgp = static_cast<const DefaultGeometryProcessor*>(gp);
+  SolidColorFillInputs inputs;
+  inputs.isCoverageAA = dgp->getAAType() == AAType::Coverage;
+  inputs.xpType = GetXPType(programInfo);
+  auto composed = ComposeSolidColorFill(inputs);
+  if (!composed) {
     return std::nullopt;
   }
-  auto* dgp = static_cast<const DefaultGeometryProcessor*>(gp);
-  int hasCoverage = dgp->getAAType() == AAType::Coverage ? 1 : 0;
-
-  using VD = SolidColorFillShader::VD;
-  auto vertDomain = VD::domain();
-  std::vector<int> vertValues(VD::COUNT, 0);
-  vertValues[VD::HAS_COVERAGE] = hasCoverage;
-  auto vertIndex = vertDomain.encode(vertValues);
-
-  using FD = SolidColorFillShader::FD;
-  auto fragDomain = FD::domain();
-  std::vector<int> fragValues(FD::COUNT, 0);
-  fragValues[FD::HAS_COVERAGE] = hasCoverage;
-  fragValues[FD::HAS_XP] = xpType;
-  auto fragIndex = fragDomain.encode(fragValues);
+  auto vertIndex = SolidColorFillShader::VD::domain().encode(composed->vertValues);
+  auto fragIndex = SolidColorFillShader::FD::domain().encode(composed->fragValues);
   return PermutationMatchResult{"SolidColorFillShader", vertIndex, fragIndex};
 }
 

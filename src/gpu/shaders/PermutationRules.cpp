@@ -24,6 +24,7 @@
 #include "gpu/shaders/level1/QuadColorFillShader.h"
 #include "gpu/shaders/level1/QuadConstColorShader.h"
 #include "gpu/shaders/level1/RoundStrokeRectFillShader.h"
+#include "gpu/shaders/level1/SolidColorFillShader.h"
 
 namespace tgfx {
 
@@ -229,6 +230,40 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadColorFillReachable() {
   return result;
 }
 
+std::optional<RuleComposedValues> ComposeSolidColorFill(const SolidColorFillInputs& inputs) {
+  if (inputs.xpType < 0) {
+    return std::nullopt;
+  }
+  using VD = SolidColorFillShader::VD;
+  using FD = SolidColorFillShader::FD;
+  RuleComposedValues values;
+  values.vertValues.resize(VD::COUNT);
+  values.vertValues[VD::HAS_COVERAGE] = inputs.isCoverageAA ? 1 : 0;
+  values.fragValues.resize(FD::COUNT);
+  values.fragValues[FD::HAS_COVERAGE] = values.vertValues[VD::HAS_COVERAGE];
+  values.fragValues[FD::HAS_XP] = inputs.xpType;
+  return values;
+}
+
+std::set<std::pair<uint32_t, uint32_t>> EnumerateSolidColorFillReachable() {
+  std::set<std::pair<uint32_t, uint32_t>> result;
+  for (int isCoverageAA = 0; isCoverageAA <= 1; ++isCoverageAA) {
+    for (int xpType = -1; xpType <= 2; ++xpType) {
+      SolidColorFillInputs inputs;
+      inputs.isCoverageAA = isCoverageAA != 0;
+      inputs.xpType = xpType;
+      auto composed = ComposeSolidColorFill(inputs);
+      if (!composed) {
+        continue;
+      }
+      auto vertIndex = SolidColorFillShader::VD::domain().encode(composed->vertValues);
+      auto fragIndex = SolidColorFillShader::FD::domain().encode(composed->fragValues);
+      result.insert({vertIndex, fragIndex});
+    }
+  }
+  return result;
+}
+
 std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermutations(
     const std::string& shaderName) {
   if (shaderName == "RoundStrokeRectFillShader") {
@@ -251,6 +286,9 @@ std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermuta
   }
   if (shaderName == "QuadColorFillShader") {
     return EnumerateQuadColorFillReachable();
+  }
+  if (shaderName == "SolidColorFillShader") {
+    return EnumerateSolidColorFillReachable();
   }
   return std::nullopt;
 }
