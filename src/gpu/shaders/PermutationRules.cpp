@@ -43,6 +43,7 @@
 #include "gpu/shaders/level1/TextureColorMatrixShader.h"
 #include "gpu/shaders/level1/TextureFillShader.h"
 #include "gpu/shaders/level1/TiledTextureFillShader.h"
+#include "gpu/shaders/level1/UnifiedGradientShader.h"
 #include "gpu/shaders/level1/YUVTextureFillShader.h"
 
 namespace tgfx {
@@ -981,6 +982,49 @@ std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseDirectReachable() {
   return result;
 }
 
+std::optional<RuleComposedValues> ComposeUnifiedGradient(const UnifiedGradientInputs& inputs) {
+  if (inputs.xpType < 0) {
+    return std::nullopt;
+  }
+  // LUT gradients keep the legacy TextureGradientShader behavior: coverage-carrying draws stay on
+  // the runtime path.
+  if (inputs.hasLUT && inputs.hasVCoverage) {
+    return std::nullopt;
+  }
+  using VD = UnifiedGradientShader::VD;
+  using FD = UnifiedGradientShader::FD;
+  RuleComposedValues values;
+  values.vertValues.resize(VD::COUNT);
+  values.vertValues[VD::HAS_VCOVERAGE] = inputs.hasVCoverage ? 1 : 0;
+  values.fragValues.resize(FD::COUNT);
+  values.fragValues[FD::HAS_XP] = inputs.xpType;
+  values.fragValues[FD::HAS_VCOVERAGE] = values.vertValues[VD::HAS_VCOVERAGE];
+  values.fragValues[FD::HAS_LUT] = inputs.hasLUT ? 1 : 0;
+  return values;
+}
+
+std::set<std::pair<uint32_t, uint32_t>> EnumerateUnifiedGradientReachable() {
+  std::set<std::pair<uint32_t, uint32_t>> result;
+  for (int hasVCoverage = 0; hasVCoverage <= 1; ++hasVCoverage) {
+    for (int hasLUT = 0; hasLUT <= 1; ++hasLUT) {
+      for (int xpType = -1; xpType <= 2; ++xpType) {
+        UnifiedGradientInputs inputs;
+        inputs.hasVCoverage = hasVCoverage != 0;
+        inputs.hasLUT = hasLUT != 0;
+        inputs.xpType = xpType;
+        auto composed = ComposeUnifiedGradient(inputs);
+        if (!composed) {
+          continue;
+        }
+        auto vertIndex = UnifiedGradientShader::VD::domain().encode(composed->vertValues);
+        auto fragIndex = UnifiedGradientShader::FD::domain().encode(composed->fragValues);
+        result.insert({vertIndex, fragIndex});
+      }
+    }
+  }
+  return result;
+}
+
 std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermutations(
     const std::string& shaderName) {
   if (shaderName == "RoundStrokeRectFillShader") {
@@ -1063,6 +1107,9 @@ std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermuta
   }
   if (shaderName == "PointwiseDirectShader") {
     return EnumeratePointwiseDirectReachable();
+  }
+  if (shaderName == "UnifiedGradientShader") {
+    return EnumerateUnifiedGradientReachable();
   }
   return std::nullopt;
 }

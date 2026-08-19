@@ -285,6 +285,18 @@ struct PointwiseDirectInputs {
 };
 
 /**
+ * Input contract of the UnifiedGradientShader matcher rule. The colorizer kind (beyond LUT vs
+ * analytic), layout type, and perspective checks are whole-draw rejections in Extract; the
+ * colorizer itself is a runtime uniform. LUT gradients never carry per-vertex coverage, which
+ * Compose enforces.
+ */
+struct UnifiedGradientInputs {
+  bool hasVCoverage = false;
+  bool hasLUT = false;
+  int xpType = -1;  // -1 = no representable XferProcessor.
+};
+
+/**
  * Dimension values a matcher rule produces for both stages, before domain encoding.
  */
 struct RuleComposedValues {
@@ -461,6 +473,12 @@ std::optional<RuleComposedValues> ComposePointwiseTail(const PointwiseTailInputs
 std::optional<RuleComposedValues> ComposePointwiseDirect(const PointwiseDirectInputs& inputs);
 
 /**
+ * Pure mapping for the UnifiedGradientShader rule; see ComposeRoundStrokeRect for the sharing
+ * contract.
+ */
+std::optional<RuleComposedValues> ComposeUnifiedGradient(const UnifiedGradientInputs& inputs);
+
+/**
  * Returns every (vertIndex, fragIndex) pair the RoundStrokeRect rule can ever produce, by
  * enumerating the full input lattice through ComposeRoundStrokeRect.
  */
@@ -595,6 +613,11 @@ std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseTailReachable();
  * Returns every (vertIndex, fragIndex) pair the PointwiseDirect rule can ever produce.
  */
 std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseDirectReachable();
+
+/**
+ * Returns every (vertIndex, fragIndex) pair the UnifiedGradient rule can ever produce.
+ */
+std::set<std::pair<uint32_t, uint32_t>> EnumerateUnifiedGradientReachable();
 
 /**
  * Returns the reachable permutation set for a shader whose matcher rule has been migrated to the

@@ -938,24 +938,16 @@ static std::optional<PermutationMatchResult> TryMatchUnifiedGradient(
   // served rather than rejected. LUT gradients keep the legacy TextureGradientShader behavior:
   // coverage-carrying draws stay on the runtime path.
   int vCoverage = GetGPCoverage(gp);
-  int hasLUT = colorizerKind == 3 ? 1 : 0;
-  if (hasLUT != 0 && vCoverage != 0) {
+  UnifiedGradientInputs inputs;
+  inputs.hasVCoverage = vCoverage != 0;
+  inputs.hasLUT = colorizerKind == 3;
+  inputs.xpType = xpType;
+  auto composed = ComposeUnifiedGradient(inputs);
+  if (!composed) {
     return std::nullopt;
   }
-
-  using VD = UnifiedGradientShader::VD;
-  auto vertDomain = VD::domain();
-  std::vector<int> vertValues(VD::COUNT);
-  vertValues[VD::HAS_VCOVERAGE] = vCoverage;
-  auto vertIndex = vertDomain.encode(vertValues);
-
-  using FD = UnifiedGradientShader::FD;
-  auto fragDomain = FD::domain();
-  std::vector<int> fragValues(FD::COUNT);
-  fragValues[FD::HAS_XP] = xpType;
-  fragValues[FD::HAS_VCOVERAGE] = vCoverage;
-  fragValues[FD::HAS_LUT] = hasLUT;
-  auto fragIndex = fragDomain.encode(fragValues);
+  auto vertIndex = UnifiedGradientShader::VD::domain().encode(composed->vertValues);
+  auto fragIndex = UnifiedGradientShader::FD::domain().encode(composed->fragValues);
   return PermutationMatchResult{"UnifiedGradientShader", vertIndex, fragIndex};
 }
 
