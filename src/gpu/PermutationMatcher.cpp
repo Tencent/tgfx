@@ -546,7 +546,6 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   //                     uniform is populated from computeSubsetRect, which yields the full texture
   //                     bounds when the source has no real subset, so the clamp is a no-op. This
   //                     subsumes the former HAS_CLAMP_SUBSET dimension.
-  auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
   QuadTextureFillInputs inputs;
   inputs.hasUVCoord = !quadGP->hasUVMatrix();
   inputs.hasSubset = quadGP->getHasSubset();
