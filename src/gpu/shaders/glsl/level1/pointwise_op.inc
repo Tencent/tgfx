@@ -31,9 +31,8 @@
 
 // OP_BLEND needs the shared PorterDuff blend math regardless of the kernel's XP state; the
 // include is guarded, so the per-slot re-inclusions of this file stay harmless.
-#include "xp_blend_colors.inc"
-
 #include "transfer_function.inc"
+#include "xp_blend_colors.inc"
 
 // ColorSpaceXform transfer functions bound to this slot's uniform names.
 float src_tf(int slot, float x) {
@@ -77,9 +76,12 @@ vec4 applyPointwiseOp(int slot, vec4 color) {
     }
   } else if (OpType == OP_BLEND) {
     // Blend with a constant operand; the operand order follows the source fragment processor's
-    // child position (BlendConstFirst mirrors XfermodeFragmentProcessor::Child).
-    result = BlendConstFirst != 0 ? xpBlendColors(ConstColorValue, color, BlendModeValue)
-                                  : xpBlendColors(color, ConstColorValue, BlendModeValue);
+    // child position (BlendConstFirst mirrors XfermodeFragmentProcessor::Child). Select the
+    // arguments before the call so the compiler inlines xpBlendColors once instead of twice
+    // (one per ternary branch).
+    vec4 blendSrc = BlendConstFirst != 0 ? ConstColorValue : color;
+    vec4 blendDst = BlendConstFirst != 0 ? color : ConstColorValue;
+    result = xpBlendColors(blendSrc, blendDst, BlendModeValue);
   } else {  // OP_COLOR_SPACE_XFORM
     if ((CSFlags & CS_UNPREMUL) != 0) {
       float a = color.a;
