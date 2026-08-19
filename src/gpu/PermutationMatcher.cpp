@@ -990,10 +990,6 @@ static std::optional<PermutationMatchResult> TryMatchTextureColorMatrix(
   if (programInfo->numFragmentProcessors() != 2) {
     return std::nullopt;
   }
-  int xpType = GetXPType(programInfo);
-  if (xpType < 0) {
-    return std::nullopt;
-  }
   auto fp0 = programInfo->getFragmentProcessor(0);
   auto fp1 = programInfo->getFragmentProcessor(1);
   if (fp0->name() != "TextureEffect" || fp1->name() != "ColorMatrixFragmentProcessor") {
@@ -1003,14 +999,13 @@ static std::optional<PermutationMatchResult> TryMatchTextureColorMatrix(
   if (te->isYUV()) {
     return std::nullopt;
   }
-  using D = TextureColorMatrixShader::D;
-  auto fragDomain = D::domain();
-  std::vector<int> fragValues(D::COUNT);
-  // alphaOnly / hasRGBAAA are runtime uniforms (AlphaOnly / HasRgbaaa), not permutation dimensions.
-  // Subset is also runtime: the shader always clamps by the Subset uniform, which the writer fills
-  // with the full texture bounds when there is no real subset.
-  fragValues[D::HAS_XP] = xpType;
-  auto fragIndex = fragDomain.encode(fragValues);
+  TextureColorMatrixInputs inputs;
+  inputs.xpType = GetXPType(programInfo);
+  auto composed = ComposeTextureColorMatrix(inputs);
+  if (!composed) {
+    return std::nullopt;
+  }
+  auto fragIndex = TextureColorMatrixShader::D::domain().encode(composed->fragValues);
   return PermutationMatchResult{"TextureColorMatrixShader", 0, fragIndex};
 }
 

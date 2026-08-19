@@ -31,6 +31,7 @@
 #include "gpu/shaders/level1/QuadConstColorShader.h"
 #include "gpu/shaders/level1/RoundStrokeRectFillShader.h"
 #include "gpu/shaders/level1/SolidColorFillShader.h"
+#include "gpu/shaders/level1/TextureColorMatrixShader.h"
 
 namespace tgfx {
 
@@ -515,6 +516,34 @@ std::set<std::pair<uint32_t, uint32_t>> EnumeratePerlinNoiseFillReachable() {
   return result;
 }
 
+std::optional<RuleComposedValues> ComposeTextureColorMatrix(
+    const TextureColorMatrixInputs& inputs) {
+  if (inputs.xpType < 0) {
+    return std::nullopt;
+  }
+  using D = TextureColorMatrixShader::D;
+  RuleComposedValues values;
+  values.fragValues.resize(D::COUNT);
+  // alphaOnly / hasRGBAAA / subset are runtime uniforms, not permutation dimensions.
+  values.fragValues[D::HAS_XP] = inputs.xpType;
+  return values;
+}
+
+std::set<std::pair<uint32_t, uint32_t>> EnumerateTextureColorMatrixReachable() {
+  std::set<std::pair<uint32_t, uint32_t>> result;
+  for (int xpType = -1; xpType <= 2; ++xpType) {
+    TextureColorMatrixInputs inputs;
+    inputs.xpType = xpType;
+    auto composed = ComposeTextureColorMatrix(inputs);
+    if (!composed) {
+      continue;
+    }
+    auto fragIndex = TextureColorMatrixShader::D::domain().encode(composed->fragValues);
+    result.insert({0, fragIndex});
+  }
+  return result;
+}
+
 std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermutations(
     const std::string& shaderName) {
   if (shaderName == "RoundStrokeRectFillShader") {
@@ -558,6 +587,9 @@ std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermuta
   }
   if (shaderName == "PerlinNoiseFillShader") {
     return EnumeratePerlinNoiseFillReachable();
+  }
+  if (shaderName == "TextureColorMatrixShader") {
+    return EnumerateTextureColorMatrixReachable();
   }
   return std::nullopt;
 }

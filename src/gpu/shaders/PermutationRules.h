@@ -159,6 +159,15 @@ struct PerlinNoiseFillInputs {
 };
 
 /**
+ * Input contract of the TextureColorMatrixShader matcher rule. alphaOnly / hasRGBAAA / subset are
+ * runtime uniforms, so only the transfer type shapes dimensions; the TextureEffect + ColorMatrix
+ * structure checks are whole-draw rejections in Extract.
+ */
+struct TextureColorMatrixInputs {
+  int xpType = -1;  // -1 = no representable XferProcessor.
+};
+
+/**
  * Dimension values a matcher rule produces for both stages, before domain encoding.
  */
 struct RuleComposedValues {
@@ -251,6 +260,13 @@ std::optional<RuleComposedValues> ComposeMeshFill(const MeshFillInputs& inputs);
 std::optional<RuleComposedValues> ComposePerlinNoiseFill(const PerlinNoiseFillInputs& inputs);
 
 /**
+ * Pure mapping for the TextureColorMatrixShader rule; see ComposeRoundStrokeRect for the sharing
+ * contract.
+ */
+std::optional<RuleComposedValues> ComposeTextureColorMatrix(
+    const TextureColorMatrixInputs& inputs);
+
+/**
  * Returns every (vertIndex, fragIndex) pair the RoundStrokeRect rule can ever produce, by
  * enumerating the full input lattice through ComposeRoundStrokeRect.
  */
@@ -320,6 +336,11 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateMeshFillReachable();
  * Returns every (vertIndex, fragIndex) pair the PerlinNoiseFill rule can ever produce.
  */
 std::set<std::pair<uint32_t, uint32_t>> EnumeratePerlinNoiseFillReachable();
+
+/**
+ * Returns every (vertIndex, fragIndex) pair the TextureColorMatrix rule can ever produce.
+ */
+std::set<std::pair<uint32_t, uint32_t>> EnumerateTextureColorMatrixReachable();
 
 /**
  * Returns the reachable permutation set for a shader whose matcher rule has been migrated to the
