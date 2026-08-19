@@ -38,7 +38,8 @@ namespace tgfx {
 ///     of the Color uniform when set).
 ///   There is no GP_TYPE: the position always goes through the Matrix uniform, which DefaultGP
 ///   fills with the view matrix and QuadPerEdgeAAGP fills with identity (bit-exact).
-///   TEXTURE_COUNT (int, 4 values): 0 -> 0 leaves, 1 -> 1, 2 -> 2, 3 -> 4. A zero-leaf chain
+///   TEXTURE_COUNT (int, 2 values): 0 -> no texture leaves, 1 -> the four-leaf slots (chains
+///     with 1-3 sampler children bind phantom padding and run them). A zero-leaf chain
 ///     evaluates const-color/blend ops against the geometry color alone.
 ///
 /// Fragment dimensions:
