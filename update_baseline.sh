@@ -90,23 +90,7 @@
   STASH_LIST_BEFORE=$(git stash list)
   git stash push --include-untracked --quiet
   STASH_LIST_AFTER=$(git stash list)
-
-  # Detach at the baseline ref instead of switching to the local main branch: `git switch main`
-  # fails when main is already checked out in another worktree, and that failure used to go
-  # unnoticed, so the baseline got generated from the current branch and every comparison became
-  # self-referential (all screenshot/PDF tests pass locally while CI fails). Prefer origin/main so
-  # the generated cache matches the version.json used by the up-to-date check above.
-  BASELINE_REF=origin/main
-  if ! git rev-parse --verify --quiet "$BASELINE_REF" >/dev/null; then
-    BASELINE_REF=main
-  fi
-  if ! git switch --detach "$BASELINE_REF" --quiet; then
-    echo "~~~~~~~~~~~~~~~~~~~Update Baseline ($BACKEND_NAME) Failed: cannot check out $BASELINE_REF~~~~~~~~~~~~~~~~~~"
-    if [[ $STASH_LIST_BEFORE != "$STASH_LIST_AFTER" ]]; then
-      git stash pop --index --quiet
-    fi
-    exit 1
-  fi
+  git switch main --quiet
 
   ./install_tools.sh
   depsync
