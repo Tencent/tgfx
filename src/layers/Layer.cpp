@@ -355,7 +355,9 @@ void Layer::setAllowsEdgeAntialiasing(bool value) {
     return;
   }
   bitFields.allowsEdgeAntialiasing = value;
-  invalidateTransform();
+  // The flag is baked into the recorded layer content and style source pixels, so switching it
+  // needs content-level invalidation rather than a transform-only one.
+  invalidateContent();
 }
 
 void Layer::setAllowsGroupOpacity(bool value) {
@@ -974,6 +976,10 @@ void Layer::invalidateTransform() {
 }
 
 void Layer::invalidateDescendents() {
+  // Layers without a root never run updateRenderBounds, so dirtyDescendents stays set forever and
+  // the early return below would swallow later invalidations. Clearing the content identity up
+  // front keeps the style caches of such layers correct too.
+  contentID = 0;
   if (bitFields.dirtyDescendents) {
     return;
   }

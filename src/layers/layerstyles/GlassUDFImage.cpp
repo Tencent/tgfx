@@ -29,8 +29,6 @@
 
 namespace tgfx {
 
-static constexpr int MaxTentRadius = 64;
-
 // Blurs a window of the coverage image with tent kernels and returns one RGBA8 texture containing
 // the requested fields. Coordinates remain in the full UDF space.
 static std::shared_ptr<TextureProxy> GenerateGlassUDFTexture(
@@ -124,7 +122,7 @@ static std::shared_ptr<TextureProxy> GenerateGlassUDFTexture(
   }
   auto horizontalProcessor = GlassUDFTentBlurFragmentProcessor::Make(
       allocator, std::move(fineSource), std::move(coarseSource), fineRadius.x, coarseRadius.x,
-      GlassUDFBlurDirection::Horizontal, MaxTentRadius, false, field);
+      GlassUDFBlurDirection::Horizontal, GlassUDFMaxTentRadius, false, field);
   if (horizontalProcessor == nullptr || !context->drawingManager()->fillRTWithFP(
                                             horizontalTarget, std::move(horizontalProcessor), 0)) {
     return nullptr;
@@ -148,7 +146,7 @@ static std::shared_ptr<TextureProxy> GenerateGlassUDFTexture(
   }
   auto verticalProcessor = GlassUDFTentBlurFragmentProcessor::Make(
       allocator, std::move(verticalFineSource), std::move(verticalCoarseSource), fineRadius.y,
-      coarseRadius.y, GlassUDFBlurDirection::Vertical, MaxTentRadius, true, field);
+      coarseRadius.y, GlassUDFBlurDirection::Vertical, GlassUDFMaxTentRadius, true, field);
   if (verticalProcessor == nullptr ||
       !context->drawingManager()->fillRTWithFP(verticalTarget, std::move(verticalProcessor), 0)) {
     return nullptr;

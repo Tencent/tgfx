@@ -26,6 +26,10 @@
 
 namespace tgfx {
 
+// Cap of the tent blur radius in UDF pixels, shared by the callers that clamp their requested
+// radii and the generation that applies them, so the two sides can never drift apart.
+constexpr int GlassUDFMaxTentRadius = 64;
+
 /**
  * GlassUDFImage defers the GPU generation of the UDF coverage texture until the image is actually
  * drawn, so GlassStyle works on canvases without a GPU surface at record time (e.g. picture

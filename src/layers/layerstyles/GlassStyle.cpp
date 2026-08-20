@@ -60,7 +60,6 @@ struct GlassStyle::UDFSampling {
 };
 
 static constexpr float MaxFrostSigma = 50.0f;
-static constexpr int MaxTentRadius = 64;
 static constexpr float MaxBackgroundSize = 2048.0f;
 // Fallback texture size limit used when no GPU context is available at record time. Kept equal to
 // the UDF size cap so recorded intermediate sizes stay allocatable on any playback device.
@@ -178,18 +177,21 @@ static const UniqueKey& GlassUDFCacheDomain() {
 // therefore yields a different key, which removes the need to invalidate the cache by hand.
 // Returns an empty key when the source carries no identity, which disables reuse.
 static UniqueKey MakeGlassUDFKey(uint64_t contentID, int sourceWidth, int sourceHeight,
-                                 GlassUDFField field, int coreWidth, int coreHeight,
-                                 const Rect& textureRect, const Point& fineRadius,
+                                 GlassUDFField field, bool excludeChildEffects, int coreWidth,
+                                 int coreHeight, const Rect& textureRect, const Point& fineRadius,
                                  const Point& coarseRadius) {
   if (contentID == 0) {
     return {};
   }
-  BytesKey bytesKey(14);
+  BytesKey bytesKey(15);
   bytesKey.write(static_cast<uint32_t>(contentID));
   bytesKey.write(static_cast<uint32_t>(contentID >> 32));
   bytesKey.write(sourceWidth);
   bytesKey.write(sourceHeight);
   bytesKey.write(static_cast<uint32_t>(field));
+  // The two style source groups (with and without child effects) share one contentID, so the group
+  // selection must be part of the key to keep their textures apart.
+  bytesKey.write(excludeChildEffects ? 1u : 0u);
   bytesKey.write(coreWidth);
   bytesKey.write(coreHeight);
   bytesKey.write(textureRect.left);
@@ -537,7 +539,8 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
         return;
       }
       // The refraction field needs a large layer-space reach but is low frequency, so its density
-      // is anchored to the layer size and capped so the tent radius always fits MaxTentRadius.
+      // is anchored to the layer size and capped so the tent radius always fits
+      // GlassUDFMaxTentRadius.
       static constexpr float MAX_UDF_VISIBLE_DIM = 512.0f;
       float maxAllowedDim = std::min(maxTextureSizeF, MAX_UDF_VISIBLE_DIM);
       float udfScale = 1.0f;
@@ -568,9 +571,9 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       blurRadius = std::max(blurRadius, minBlurRadius);
       float effectiveBlurRadius = std::min(blurRadius, minHalf);
       Point fineRadius = {std::min(effectiveBlurRadius * udfScale * layerToSourceX,
-                                   static_cast<float>(MaxTentRadius)),
+                                   static_cast<float>(GlassUDFMaxTentRadius)),
                           std::min(effectiveBlurRadius * udfScale * layerToSourceY,
-                                   static_cast<float>(MaxTentRadius))};
+                                   static_cast<float>(GlassUDFMaxTentRadius))};
       float gradientSampleRadius = getDepthRatio() * 3.0f + 1.0f;
       float fineHaloX = std::ceil(gradientSampleRadius) + 1.0f;
       float fineHaloY = std::ceil(gradientSampleRadius) + 1.0f;
@@ -633,9 +636,9 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       static constexpr float MIN_COARSE_TENT_TEXELS = 4.0f;
       Point coarseRadius = {
           std::min(std::max(edgeLightLayerPixels / edgePixelToLayerPixelX, MIN_COARSE_TENT_TEXELS),
-                   static_cast<float>(MaxTentRadius)),
+                   static_cast<float>(GlassUDFMaxTentRadius)),
           std::min(std::max(edgeLightLayerPixels / edgePixelToLayerPixelY, MIN_COARSE_TENT_TEXELS),
-                   static_cast<float>(MaxTentRadius))};
+                   static_cast<float>(GlassUDFMaxTentRadius))};
       // The span must come from the clamped radius, otherwise the shader would divide by a
       // different distance than the one the blur actually produced.
       float edgeSpanX = coarseRadius.x * edgePixelToLayerPixelX;
@@ -654,9 +657,9 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       // rebuilt per draw while the textures behind them live in the context resource cache.
       auto sourceWidth = input.content->width();
       auto sourceHeight = input.content->height();
-      auto refractionKey =
-          MakeGlassUDFKey(input.contentID, sourceWidth, sourceHeight, GlassUDFField::Refraction,
-                          udfWidth, udfHeight, fineTextureRect, fineRadius, Point::Zero());
+      auto refractionKey = MakeGlassUDFKey(
+          input.contentID, sourceWidth, sourceHeight, GlassUDFField::Refraction,
+          excludeChildEffects(), udfWidth, udfHeight, fineTextureRect, fineRadius, Point::Zero());
       auto maskImage =
           GlassUDFImage::Make(input.content, udfWidth, udfHeight, fineTextureRect, fineRadius,
                               Point::Zero(), GlassUDFField::Refraction, std::move(refractionKey));
@@ -666,9 +669,10 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       }
       std::shared_ptr<Image> edgeMaskImage = nullptr;
       if (enableEdgeLighting) {
-        auto edgeKey = MakeGlassUDFKey(input.contentID, sourceWidth, sourceHeight,
-                                       GlassUDFField::EdgeLight, edgeCoreWidth, edgeCoreHeight,
-                                       edgeTextureRect, Point::Zero(), coarseRadius);
+        auto edgeKey =
+            MakeGlassUDFKey(input.contentID, sourceWidth, sourceHeight, GlassUDFField::EdgeLight,
+                            excludeChildEffects(), edgeCoreWidth, edgeCoreHeight, edgeTextureRect,
+                            Point::Zero(), coarseRadius);
         edgeMaskImage = GlassUDFImage::Make(input.content, edgeCoreWidth, edgeCoreHeight,
                                             edgeTextureRect, Point::Zero(), coarseRadius,
                                             GlassUDFField::EdgeLight, std::move(edgeKey));
