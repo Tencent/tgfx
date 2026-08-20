@@ -4191,6 +4191,161 @@ TGFX_TEST(LayerTest, GlassStyleFollowsContentChange) {
   EXPECT_GT(changedPixels, 0);
 }
 
+// Renders the same glass layer fully visible and partially off-screen and compares the edge light
+// at the same content position in both renderings. The edge light must not depend on how much of
+// the layer happens to be visible.
+TGFX_TEST(LayerTest, GlassStyleEdgeLightOutsideVisibleRegion) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto buildScene = [](float layerX) {
+    auto displayList = std::make_unique<DisplayList>();
+    displayList->setRenderMode(RenderMode::Direct);
+    auto glassLayer = ShapeLayer::Make();
+    Path path = {};
+    path.addRRect(RRect::MakeRectXY(Rect::MakeXYWH(0, 0, 1500, 300), 20.0f, 20.0f));
+    glassLayer->setPath(path);
+    glassLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 60)));
+    glassLayer->setLayerStyles({GlassStyle::Make(20, 5, 0, 0, 0, 0, 1.0f)});
+    glassLayer->setMatrix(Matrix::MakeTrans(layerX, 0));
+    displayList->root()->addChild(glassLayer);
+    return displayList;
+  };
+
+  auto sample = [&context](DisplayList* displayList, int surfaceWidth, int x, int y) {
+    auto surface = Surface::Make(context, surfaceWidth, 300);
+    displayList->render(surface.get());
+    auto row = ReadSurfaceRow(surface.get(), y);
+    return row.empty() ? 0u : row[static_cast<size_t>(x)];
+  };
+
+  // Fully visible: the layer spans screen x [50, 1550], so content x 1030 sits at screen 1080.
+  auto full = buildScene(50.0f);
+  auto fullPixel = sample(full.get(), 1600, 1080, 3);
+  // Partially visible: the layer spans screen x [-1000, 500], so content x 1030 sits at screen 30.
+  auto partial = buildScene(-1000.0f);
+  auto partialPixel = sample(partial.get(), 1000, 30, 3);
+
+  // Both renderings show the same shape edge (content x 1030, top edge) over the same black
+  // background, so the edge light there must match. Compare the red channel as brightness.
+  auto red = [](uint32_t pixel) { return pixel & 0xFF; };
+  EXPECT_NEAR(red(fullPixel), red(partialPixel), 8);
+}
+
+// Slides the glass layer across the viewport in Direct mode and checks that the edge light at a
+// fixed content position stays identical no matter where the layer is, so cached edge textures
+// cannot leak a stale or truncated field into later frames.
+TGFX_TEST(LayerTest, GlassStyleEdgeLightDuringLayerMove) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  constexpr int SurfaceWidth = 1000;
+  constexpr int ContentWidth = 1500;
+  auto glassLayer = ShapeLayer::Make();
+  Path path = {};
+  path.addRRect(RRect::MakeRectXY(Rect::MakeXYWH(0, 0, ContentWidth, 300), 20.0f, 20.0f));
+  glassLayer->setPath(path);
+  glassLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 60)));
+  glassLayer->setLayerStyles({GlassStyle::Make(20, 5, 0, 0, 0, 0, 1.0f)});
+  DisplayList displayList;
+  displayList.setRenderMode(RenderMode::Direct);
+  displayList.root()->addChild(glassLayer);
+
+  auto surface = Surface::Make(context, SurfaceWidth, 300);
+  auto red = [](uint32_t pixel) { return static_cast<int>(pixel & 0xFF); };
+  std::map<int, int> brightness;
+  auto firstProblem = std::make_pair(-10000, -1);
+
+  // The sampled band sits on the top edge (y=3); content x in [600, 900] is far from the rounded
+  // corners, so every sample shows the same geometry and must produce the same edge light.
+  for (int layerX = -700; layerX <= 200; layerX += 100) {
+    glassLayer->setMatrix(Matrix::MakeTrans(static_cast<float>(layerX), 0));
+    displayList.render(surface.get());
+    auto row = ReadSurfaceRow(surface.get(), 3);
+    ASSERT_FALSE(row.empty());
+    for (int cx = 600; cx <= 900; cx += 20) {
+      int screenX = cx + layerX;
+      if (screenX < 0 || screenX >= SurfaceWidth) {
+        continue;
+      }
+      auto value = red(row[static_cast<size_t>(screenX)]);
+      auto it = brightness.find(cx);
+      if (it == brightness.end()) {
+        brightness[cx] = value;
+      } else if (std::abs(it->second - value) > 12) {
+        if (firstProblem.first == -10000) {
+          firstProblem = {cx, value};
+        }
+      }
+    }
+  }
+  // Report the first mismatch instead of a bare failure to make the failure mode readable.
+  EXPECT_EQ(firstProblem.first, -10000)
+      << "edge light at content x=" << firstProblem.first << " changed to " << firstProblem.second
+      << " while the layer was moving";
+}
+
+// Slides the glass layer across a full-coverage background on a large surface with Partial
+// rendering, the production path: the layer re-renders through the dirty-region mechanism as it
+// moves, and its refraction background must stay identical wherever the layer is.
+TGFX_TEST(LayerTest, GlassStyleEdgeLightDuringLayerMoveMultiTile) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  constexpr int SurfaceWidth = 2400;
+  constexpr int SurfaceHeight = 1400;
+  constexpr int ContentWidth = 1800;
+  auto background = ShapeLayer::Make();
+  Path backgroundPath = {};
+  backgroundPath.addRect(Rect::MakeXYWH(0, 0, SurfaceWidth, SurfaceHeight));
+  background->setPath(backgroundPath);
+  background->setFillStyle(ShapeStyle::Make(Color::FromRGBA(200, 200, 200, 255)));
+  auto glassLayer = ShapeLayer::Make();
+  Path path = {};
+  path.addRRect(RRect::MakeRectXY(Rect::MakeXYWH(0, 0, ContentWidth, 600), 20.0f, 20.0f));
+  glassLayer->setPath(path);
+  glassLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 60)));
+  glassLayer->setLayerStyles({GlassStyle::Make(20, 5, 0, 0, 0, 0, 1.0f)});
+  DisplayList displayList;
+  displayList.root()->addChild(background);
+  displayList.root()->addChild(glassLayer);
+
+  auto surface = Surface::Make(context, SurfaceWidth, SurfaceHeight);
+  auto red = [](uint32_t pixel) { return static_cast<int>(pixel & 0xFF); };
+  std::map<int, int> brightness;
+  auto firstProblem = std::make_pair(-10000, -1);
+
+  // The shape spans y [400, 1000]; the sampled band y=403 sits on its top edge. Content x in
+  // [700, 1100] stays away from the rounded corners.
+  for (int layerX = -900; layerX <= 300; layerX += 150) {
+    glassLayer->setMatrix(Matrix::MakeTrans(static_cast<float>(layerX), 400.0f));
+    displayList.render(surface.get());
+    auto row = ReadSurfaceRow(surface.get(), 403);
+    ASSERT_FALSE(row.empty());
+    for (int cx = 700; cx <= 1100; cx += 25) {
+      int screenX = cx + layerX;
+      if (screenX < 0 || screenX >= SurfaceWidth) {
+        continue;
+      }
+      auto value = red(row[static_cast<size_t>(screenX)]);
+      auto it = brightness.find(cx);
+      if (it == brightness.end()) {
+        brightness[cx] = value;
+      } else if (std::abs(it->second - value) > 12) {
+        if (firstProblem.first == -10000) {
+          firstProblem = {cx, value};
+        }
+      }
+    }
+  }
+  EXPECT_EQ(firstProblem.first, -10000)
+      << "edge light at content x=" << firstProblem.first << " changed to " << firstProblem.second
+      << " while the layer was moving";
+}
+
 TGFX_TEST(LayerTest, GlassStyleEllipse) {
   RunGlassStyleTest("Ellipse");
 }

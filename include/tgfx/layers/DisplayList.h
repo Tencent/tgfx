@@ -402,6 +402,8 @@ class DisplayList {
   std::unique_ptr<BackgroundSnapshotMap> captureBackgrounds(
       Surface* surface, const std::vector<Rect>& renderRects) const;
 
+  static void collectBackgroundStyleBounds(Layer* layer, std::vector<Rect>* out);
+
   void updateMousePosition();
 };
 }  // namespace tgfx
