@@ -97,8 +97,20 @@ git stash push --include-untracked --quiet
 set "STASH_AFTER="
 for /f "delims=" %%i in ('git stash list') do set "STASH_AFTER=%%i"
 
-:: Switch to main
-git switch main --quiet
+:: Detach at the baseline ref instead of switching to the local main branch: `git switch main`
+:: fails when main is already checked out in another worktree, and that failure used to go
+:: unnoticed, so the baseline got generated from the current branch and every comparison became
+:: self-referential (all screenshot/PDF tests pass locally while CI fails). Prefer origin/main so
+:: the generated cache matches the version.json used by the up-to-date check above.
+set "BASELINE_REF=origin/main"
+git rev-parse --verify --quiet origin/main >nul 2>&1
+if !errorlevel! neq 0 set "BASELINE_REF=main"
+git switch --detach !BASELINE_REF! --quiet
+if !errorlevel! neq 0 (
+    echo ~~~~~~~~~~~~~~~~~~~Update Baseline ^(%BACKEND_NAME%^) Failed: cannot check out !BASELINE_REF!~~~~~~~~~~~~~~~~~~
+    set "BASELINE_FAILED=true"
+    goto :restore
+)
 
 :: Install dependencies
 for /f "delims=" %%i in ('npm prefix -g') do set "PATH=%%i;!PATH!"
