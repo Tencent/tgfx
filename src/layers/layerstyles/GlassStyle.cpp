@@ -769,6 +769,13 @@ std::shared_ptr<ImageFilter> GlassStyle::getFrostFilter(float contentScale) {
 
 void GlassStyle::invalidateFrostFilter() {
   frostFilter = nullptr;
+  // The frost cache key omits the frost value itself, so a changed sigma must drop the cached
+  // blur here or onDraw keeps reusing the old image when the background and scale are unchanged.
+  // The downstream downscale cache is keyed on the frost result pointer and rebuilds in turn.
+  cachedFrostSource = nullptr;
+  cachedFrostedImage = nullptr;
+  cachedFrostBlurOffset = Point::Zero();
+  cachedFrostContentScale = 0.0f;
   invalidateTransform();
 }
 
