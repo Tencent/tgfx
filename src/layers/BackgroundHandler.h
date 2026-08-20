@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <unordered_map>
 #include <vector>
 #include "layers/BackgroundSnapshotMap.h"
@@ -177,6 +178,19 @@ class BackgroundCapturer : public BackgroundHandler {
     return snapshots;
   }
 
+  // Records the transform from the current offscreen recording space to world space. The
+  // offscreen content path records the layer into a canvas whose matrix starts at the
+  // layer-local origin, so drawBackgroundStyle() cannot recover the layer's world placement
+  // from canvas->getMatrix() there and uses this matrix instead. Set by the offscreen content
+  // path right before the layer subtree is recorded.
+  void setCaptureWorldMatrix(std::optional<Matrix> worldMatrix) {
+    _captureWorldMatrix = std::move(worldMatrix);
+  }
+
+  const std::optional<Matrix>& captureWorldMatrix() const {
+    return _captureWorldMatrix;
+  }
+
  private:
   bool isForcedCapture() const {
     return _forcedCaptureDepth > 0;
@@ -189,6 +203,7 @@ class BackgroundCapturer : public BackgroundHandler {
   std::shared_ptr<BackgroundSource> bgSource = nullptr;
   std::vector<Rect> _renderRects;
   int _forcedCaptureDepth = 0;
+  std::optional<Matrix> _captureWorldMatrix = std::nullopt;
 };
 
 class BackgroundConsumer : public BackgroundHandler {

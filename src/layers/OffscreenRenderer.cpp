@@ -81,10 +81,10 @@ OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& a
       result = RenderContentOnSurface(layer, args, std::move(surface), density, imageClip,
                                       *inputBounds, contentMatrix);
     } else {
-      result = RenderContentOnPicture(layer, args, density, imageClip);
+      result = RenderContentOnPicture(layer, args, density, imageClip, contentMatrix);
     }
   } else {
-    result = RenderContentOnPicture(layer, args, density, imageClip);
+    result = RenderContentOnPicture(layer, args, density, imageClip, contentMatrix);
   }
 
   if (result.image == nullptr || !hasFilter) {
@@ -171,7 +171,8 @@ OffscreenResult OffscreenRenderer::RenderContentOnSurface(
 
 OffscreenResult OffscreenRenderer::RenderContentOnPicture(Layer* layer, const DrawArgs& args,
                                                           const Matrix& density,
-                                                          const Rect& imageClip) {
+                                                          const Rect& imageClip,
+                                                          const Matrix& contentMatrix) {
   PictureRecorder recorder;
   auto* canvas = recorder.beginRecording();
   if (!imageClip.isEmpty()) {
@@ -179,7 +180,24 @@ OffscreenResult OffscreenRenderer::RenderContentOnPicture(Layer* layer, const Dr
   }
   canvas->setMatrix(density);
 
-  layer->drawDirectly(args, canvas, 1.0f);
+  // The recording canvas starts at the layer-local origin (scaled by density), so a background
+  // style drawn during the recording cannot recover the layer's world placement from
+  // canvas->getMatrix(). Publish the recording-space-to-world transform on the capturer instead,
+  // restoring any previous value afterwards so nested offscreen recordings stay balanced.
+  auto* capturer = args.backgroundHandler ? args.backgroundHandler->asCapturer() : nullptr;
+  if (capturer != nullptr) {
+    auto savedMatrix = capturer->captureWorldMatrix();
+    auto imageToWorld = contentMatrix;
+    Matrix invertDensity = {};
+    if (density.invert(&invertDensity)) {
+      imageToWorld.preConcat(invertDensity);
+      capturer->setCaptureWorldMatrix(std::move(imageToWorld));
+    }
+    layer->drawDirectly(args, canvas, 1.0f);
+    capturer->setCaptureWorldMatrix(std::move(savedMatrix));
+  } else {
+    layer->drawDirectly(args, canvas, 1.0f);
+  }
 
   OffscreenResult result;
   Point offset = {};

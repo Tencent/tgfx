@@ -3381,6 +3381,41 @@ TGFX_TEST(LayerTest, BackgroundBlurWithFilter) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundBlurWithFilter_Partial"));
 }
 
+TGFX_TEST(LayerTest, BackgroundBlurAlignment) {
+  // A checker background gives grid lines with exact positions, so any offset or coverage loss
+  // in the background snapshot chain shows up as a discontinuity between the blurred grid
+  // inside the layer and the sharp grid outside it. The layer also carries a LayerFilter,
+  // which routes the capture pass through the offscreen content path.
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 484, 484);
+  ASSERT_TRUE(surface != nullptr);
+
+  auto background = ImageLayer::Make();
+  background->setImage(MakeImage("resources/apitest/checker_128.png"));
+  auto backgroundMatrix = Matrix::MakeScale(3, 3);
+  backgroundMatrix.postTranslate(50, 50);
+  background->setMatrix(backgroundMatrix);
+
+  auto blurLayer = SolidLayer::Make();
+  blurLayer->setColor(Color::FromRGBA(255, 255, 255, 60));
+  blurLayer->setWidth(130);
+  blurLayer->setHeight(120);
+  blurLayer->setMatrix(Matrix::MakeTrans(282, 120));
+  blurLayer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
+  blurLayer->setFilters({BlurFilter::Make(1, 1)});
+
+  auto rootLayer = Layer::Make();
+  rootLayer->addChild(background);
+  rootLayer->addChild(blurLayer);
+  DisplayList displayList;
+  displayList.root()->addChild(rootLayer);
+  displayList.render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundBlurAlignment"));
+}
+
 TGFX_TEST(LayerTest, BackgroundColor) {
   ContextScope scope;
   auto context = scope.getContext();

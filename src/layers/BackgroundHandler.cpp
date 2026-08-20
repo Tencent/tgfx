@@ -183,7 +183,14 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   auto surfaceScale = bgSource->surfaceScale();
   auto contentScale = source->contentScale;
   auto localToWorld = bgSource->surfaceToWorldMatrix();
-  localToWorld.preConcat(canvas->getMatrix());
+  // When the layer subtree is being recorded through the offscreen content path, the canvas
+  // matrix starts at the layer-local origin and no longer carries the layer's world placement;
+  // use the recording-space-to-world transform published by that path instead.
+  if (_captureWorldMatrix.has_value()) {
+    localToWorld.preConcat(*_captureWorldMatrix);
+  } else {
+    localToWorld.preConcat(canvas->getMatrix());
+  }
   if (!FloatNearlyZero(surfaceScale) && surfaceScale != 1.0f) {
     contentScale /= surfaceScale;
   }
