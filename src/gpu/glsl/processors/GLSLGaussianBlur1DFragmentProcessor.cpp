@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLGaussianBlur1DFragmentProcessor.h"
+#include <algorithm>
 #include <cmath>
 #include <string>
 #include <string_view>
@@ -27,6 +28,26 @@ namespace tgfx {
 // "offset" is a shader variable declared in the emitted code and "i" is the loop index.
 static std::string GaussianOffsetCoordFunc(std::string_view coord) {
   return "(" + std::string(coord) + " + offset * float(i))";
+}
+
+// Emits the code that reads the half-kernel weight for the current loop offset into a "weight"
+// variable. The slot and the lane inside it are picked with chains of compile-time indices rather
+// than indexing the uniform array with abs(i) directly: SwiftShader miscompiles a dynamic index
+// into a std140 uniform block array and silently reads zeros, which drops the blur.
+static void AppendKernelWeight(FragmentShaderBuilder* fragBuilder, const std::string& kernelName,
+                               int slotCount) {
+  fragBuilder->codeAppend("int kernelOffset = abs(i);");
+  fragBuilder->codeAppend("int kernelSlot = kernelOffset / 4;");
+  fragBuilder->codeAppendf("vec4 kernelValues = %s[0];", kernelName.c_str());
+  for (int slot = 1; slot < slotCount; ++slot) {
+    fragBuilder->codeAppendf("if (kernelSlot == %d) { kernelValues = %s[%d]; }", slot,
+                             kernelName.c_str(), slot);
+  }
+  fragBuilder->codeAppend("int kernelLane = kernelOffset - kernelSlot * 4;");
+  fragBuilder->codeAppend("float weight = kernelValues.x;");
+  fragBuilder->codeAppend("if (kernelLane == 1) { weight = kernelValues.y; }");
+  fragBuilder->codeAppend("if (kernelLane == 2) { weight = kernelValues.z; }");
+  fragBuilder->codeAppend("if (kernelLane == 3) { weight = kernelValues.w; }");
 }
 
 PlacementPtr<FragmentProcessor> GaussianBlur1DFragmentProcessor::Make(
@@ -77,7 +98,12 @@ void GLSLGaussianBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("for (int j = 0; j <= %d; ++j) {", kernelLoopUpperBound());
   fragBuilder->codeAppend("int i = j - radius;");
   fragBuilder->codeAppend("if (i > radius) { break; }");
-  fragBuilder->codeAppendf("float weight = %s[abs(i) / 4][abs(i) %% 4];", kernelName.c_str());
+  // abs(i) never exceeds kernelRadius, which computeKernel() derives as ceil(2 * sigma) and thus
+  // stays within 2 * maxSigma as long as the sigma <= maxSigma contract holds, upheld by the call
+  // site as described in computeKernel(). The loop bound above rests on the same contract, so the
+  // selection chain only has to cover the slots that range can reach.
+  auto maxOffset = std::min(2 * maxSigma, MAX_KERNEL_RADIUS);
+  AppendKernelWeight(fragBuilder, kernelName, std::min(maxOffset / 4 + 1, KERNEL_VEC4_COUNT));
 
   std::string tempColor = "tempColor";
   emitChild(0, &tempColor, args, GaussianOffsetCoordFunc);
