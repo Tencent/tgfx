@@ -69,6 +69,13 @@ static constexpr int SUBTREE_CACHE_MIN_SIZE = 32;
 static std::atomic_bool AllowsEdgeAntialiasing = true;
 static std::atomic_bool AllowsGroupOpacity = false;
 
+// Hands out content identities for layer style sources. Starts at 1 so zero stays reserved for
+// "not assigned".
+static uint64_t NextContentID() {
+  static std::atomic<uint64_t> nextID = {1};
+  return nextID.fetch_add(1);
+}
+
 /**
  * Clips the canvas using the scroll rect. If the sublayer's Matrix contains 3D transformations or
  * projection transformations, because this matrix has been merged into the Canvas, it can be
@@ -1770,6 +1777,10 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
 
   auto source = std::make_unique<LayerStyleSource>();
   source->contentScale = contentScale;
+  if (contentID == 0) {
+    contentID = NextContentID();
+  }
+  source->contentID = contentID;
 
   DrawArgs drawArgs = args;
   drawArgs.render3DContext = nullptr;
@@ -1920,6 +1931,7 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
   styleInput.content = contentEntry.image;
   styleInput.contentOffset = contentEntry.offset;
   styleInput.contentScale = source->contentScale;
+  styleInput.contentID = source->contentID;
   auto sourceFlags = layerStyle->extraSourceType();
   if (HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Contour)) {
     auto contourImage = group->contour.has_value() ? group->contour->image : nullptr;
@@ -2231,6 +2243,9 @@ void Layer::invalidateSubtree() {
   bitFields.staticSubtree = false;
   subtreeCache = nullptr;
   localBounds = nullptr;
+  // The rendered pixels of this subtree are about to change, so any style cache keyed on the
+  // previous identity must miss from now on.
+  contentID = 0;
 }
 
 void Layer::updateStaticSubtreeFlags() {

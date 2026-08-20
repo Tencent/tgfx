@@ -20,9 +20,7 @@
 
 #include <algorithm>
 #include <cmath>
-#include <unordered_map>
 #include "tgfx/core/Image.h"
-#include "tgfx/core/Path.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/layers/layerstyles/LayerStyle.h"
 
@@ -202,36 +200,20 @@ class GlassStyle : public LayerStyle {
   std::shared_ptr<ImageFilter> frostFilter = nullptr;
   float currentFrostScale = 0.0f;
 
-  // Cached frost blur of the shared background snapshot, reused across tiles within a frame.
+  // The caches below only bridge the draws of a single frame: each of them is keyed on the identity
+  // of the shared background snapshot, which is re-created every frame, so a new frame always
+  // misses and rebuilds. Two layers sharing this style alternate between two snapshots and
+  // therefore evict each other, which costs the reuse but never yields a stale result.
+  // Frost blur of the shared background snapshot, reused across the tiles of one frame.
   std::shared_ptr<Image> cachedFrostSource = nullptr;
   std::shared_ptr<Image> cachedFrostedImage = nullptr;
   Point cachedFrostBlurOffset = Point::Zero();
   float cachedFrostContentScale = 0.0f;
-  // Cached downscaled blurred background, shared across tiles within a frame.
+  // Downscaled blurred background, reused across the tiles of one frame.
   std::shared_ptr<Image> cachedDownscaleSource = nullptr;
   std::shared_ptr<Image> cachedDownscaledImage = nullptr;
   float cachedDownscale = 0.0f;
-  // Cached UDF coverage texture, shared across tiles and frames. The key is the layer shape
-  // identity (the contour path reference is stable while the layer is unedited) plus the
-  // parameters that affect the generated field.
-  Path cachedUDFPath = {};
-  std::shared_ptr<Image> cachedUDFSource = nullptr;
-  std::shared_ptr<Image> cachedUDFImage = nullptr;
-  // A grid-aligned edge-light UDF cache: each entry covers one fixed grid cell (a screen-space
-  // footprint converted to layer space), so cells never overlap and tiles look up their own cell.
-  // The key is the cell coordinate (gridX, gridY) derived from the layer-space position.
-  struct EdgeUDFCacheEntry {
-    Rect windowRect = {};
-    std::shared_ptr<Image> udfImage = nullptr;
-  };
-  std::unordered_map<int64_t, EdgeUDFCacheEntry> cachedEdgeUDFs;
-  // Parameters of the grid used by the cached edge-light UDFs; a change invalidates the pool.
-  float cachedEdgeGridSize = 0.0f;
-  float cachedUDFContentScale = 0.0f;
-  float cachedUDFDepth = -1.0f;
-  float cachedUDFContentWidth = 0.0f;
-  float cachedUDFContentHeight = 0.0f;
-  // Cached GPU texture of the processed background, shared across tiles within a frame.
+  // GPU texture of the processed background, reused across the tiles of one frame.
   std::shared_ptr<Image> cachedBgTextureSource = nullptr;
   std::shared_ptr<Image> cachedBgTextureImage = nullptr;
 };

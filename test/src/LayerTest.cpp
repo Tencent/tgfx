@@ -4127,6 +4127,70 @@ TGFX_TEST(LayerTest, GlassStyleShapeLayerContentOffset) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleShapeLayerContentOffset"));
 }
 
+// Reads one horizontal line of the surface so two renderings can be compared without a baseline.
+static std::vector<uint32_t> ReadSurfaceRow(Surface* surface, int y) {
+  std::vector<uint32_t> row(static_cast<size_t>(surface->width()), 0);
+  auto info = ImageInfo::Make(surface->width(), 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  if (!surface->readPixels(info, row.data(), 0, y)) {
+    row.clear();
+  }
+  return row;
+}
+
+TGFX_TEST(LayerTest, GlassStyleFollowsContentChange) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  DisplayList displayList;
+  // Direct rendering keeps the dirty-region and tile caches out of the picture, so the comparison
+  // below only reflects what the style itself produces.
+  displayList.setRenderMode(RenderMode::Direct);
+
+  auto background = ImageLayer::Make();
+  background->setImage(MakeImage("resources/apitest/checker_128.png"));
+  background->setMatrix(Matrix::MakeScale(2));
+  displayList.root()->addChild(background);
+
+  // A ring puts the style on the AlphaMask path and leaves an uncovered hole that a child fills
+  // below, so the coverage the refraction field is built from changes while the layer path, the
+  // layer bounds and the content scale all stay identical.
+  Path ringPath = {};
+  ringPath.addOval(Rect::MakeXYWH(20, 20, 160, 160));
+  ringPath.addOval(Rect::MakeXYWH(70, 70, 60, 60));
+  ringPath.setFillType(PathFillType::EvenOdd);
+  auto glassLayer = ShapeLayer::Make();
+  glassLayer->setPath(ringPath);
+  glassLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 60)));
+  glassLayer->setLayerStyles({GlassStyle::Make(100, 50, 0, 0, 0, 0, 0)});
+  displayList.root()->addChild(glassLayer);
+
+  displayList.render(surface.get());
+  auto before = ReadSurfaceRow(surface.get(), 100);
+  ASSERT_FALSE(before.empty());
+
+  auto hole = ShapeLayer::Make();
+  Path holePath = {};
+  holePath.addOval(Rect::MakeXYWH(70, 70, 60, 60));
+  hole->setPath(holePath);
+  hole->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 60)));
+  glassLayer->addChild(hole);
+
+  displayList.render(surface.get());
+  auto after = ReadSurfaceRow(surface.get(), 100);
+  ASSERT_FALSE(after.empty());
+
+  // The sampled span sits in the ring band left of the hole, which the child never draws over, so
+  // a difference there can only come from the refraction field being rebuilt for the new coverage.
+  int changedPixels = 0;
+  for (int x = 30; x < 65; x++) {
+    if (before[static_cast<size_t>(x)] != after[static_cast<size_t>(x)]) {
+      changedPixels++;
+    }
+  }
+  EXPECT_GT(changedPixels, 0);
+}
+
 TGFX_TEST(LayerTest, GlassStyleEllipse) {
   RunGlassStyleTest("Ellipse");
 }

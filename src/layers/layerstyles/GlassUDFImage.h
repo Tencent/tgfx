@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "core/images/TextureImage.h"
+#include "gpu/resources/ResourceKey.h"
 #include "layers/processors/GlassUDFTentBlurFragmentProcessor.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Point.h"
@@ -43,11 +43,15 @@ class GlassUDFImage : public Image {
    * @param fineRadius The tent blur radii for the refraction field, in UDF pixels.
    * @param coarseRadius The tent blur radii for the edge-light field, in UDF pixels.
    * @param field Which fields the generated texture carries.
+   * @param uniqueKey Cache key of the generated texture. The caller must encode every parameter
+   *                  that changes the generated pixels, including the identity of the source
+   *                  content. An empty key disables reuse and regenerates the texture per draw.
    */
   static std::shared_ptr<Image> Make(std::shared_ptr<Image> source, int coreWidth, int coreHeight,
                                      const Rect& textureRect, const Point& fineRadius,
                                      const Point& coarseRadius,
-                                     GlassUDFField field = GlassUDFField::Both);
+                                     GlassUDFField field = GlassUDFField::Both,
+                                     UniqueKey uniqueKey = {});
 
   int width() const override {
     return _width;
@@ -94,15 +98,13 @@ class GlassUDFImage : public Image {
   GlassUDFField field = GlassUDFField::Both;
   int _width = 0;
   int _height = 0;
-  // The generated UDF texture, held strongly for the lifetime of this instance. The same filter may
-  // be sampled multiple times in one frame (e.g. blend-mode splitting); reusing the texture avoids
-  // regenerating the UDF for every sample. Context binding is validated through
-  // TextureImage::makeTextureImage before the cached texture is reused.
-  mutable std::shared_ptr<TextureImage> cachedTexture = nullptr;
+  // Cache key of the generated texture. The texture itself lives in the context's resource cache,
+  // so instances of this class stay cheap and can be rebuilt per draw.
+  UniqueKey uniqueKey = {};
 
   GlassUDFImage(std::shared_ptr<Image> source, int coreWidth, int coreHeight,
                 const Rect& textureRect, const Point& fineRadius, const Point& coarseRadius,
-                GlassUDFField field);
+                GlassUDFField field, UniqueKey uniqueKey);
 };
 
 }  // namespace tgfx

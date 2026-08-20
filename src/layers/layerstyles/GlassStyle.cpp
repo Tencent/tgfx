@@ -21,11 +21,13 @@
 #include <cmath>
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "gpu/resources/ResourceKey.h"
 #include "layers/CanvasUtils.h"
 #include "layers/imagefilters/GlassRefractionImageFilter.h"
 #include "layers/layerstyles/GlassShader.h"
 #include "layers/layerstyles/GlassUDFImage.h"
 #include "layers/processors/GlassRefractionFragmentProcessor.h"
+#include "tgfx/core/BytesKey.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/RRect.h"
@@ -162,6 +164,43 @@ static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
     info.shapeRRect = RRect::MakeRect(rect);
   }
   return info;
+}
+
+// The UDF textures of every glass layer share one cache domain; the bytes appended below carry the
+// identity of the generated pixels.
+static const UniqueKey& GlassUDFCacheDomain() {
+  static const UniqueKey domain = UniqueKey::Make();
+  return domain;
+}
+
+// Builds the cache key of a UDF texture from the full input set of its generation: the identity and
+// size of the coverage source plus every parameter that shapes the generated field. Any change
+// therefore yields a different key, which removes the need to invalidate the cache by hand.
+// Returns an empty key when the source carries no identity, which disables reuse.
+static UniqueKey MakeGlassUDFKey(uint64_t contentID, int sourceWidth, int sourceHeight,
+                                 GlassUDFField field, int coreWidth, int coreHeight,
+                                 const Rect& textureRect, const Point& fineRadius,
+                                 const Point& coarseRadius) {
+  if (contentID == 0) {
+    return {};
+  }
+  BytesKey bytesKey(14);
+  bytesKey.write(static_cast<uint32_t>(contentID));
+  bytesKey.write(static_cast<uint32_t>(contentID >> 32));
+  bytesKey.write(sourceWidth);
+  bytesKey.write(sourceHeight);
+  bytesKey.write(static_cast<uint32_t>(field));
+  bytesKey.write(coreWidth);
+  bytesKey.write(coreHeight);
+  bytesKey.write(textureRect.left);
+  bytesKey.write(textureRect.top);
+  bytesKey.write(textureRect.right);
+  bytesKey.write(textureRect.bottom);
+  bytesKey.write(fineRadius.x);
+  bytesKey.write(fineRadius.y);
+  bytesKey.write(coarseRadius.x);
+  bytesKey.write(coarseRadius.y);
+  return UniqueKey::Append(GlassUDFCacheDomain(), bytesKey.data(), bytesKey.size());
 }
 
 std::shared_ptr<GlassStyle> GlassStyle::Make(float refraction, float depth, float frost,
@@ -545,9 +584,8 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       // The edge light field needs a narrow layer-space reach but high precision, so its texture
       // covers a grid cell instead of the whole layer. The grid is anchored to the content origin
       // and each cell is a fixed screen-space footprint converted to layer space; cells are
-      // disjoint, so each tile samples the single cell it falls into. Cells persist across frames
-      // while the content scale is unchanged, so panning reuses neighboring cells instead of
-      // rebuilding.
+      // disjoint, so each tile samples the single cell it falls into. Grid alignment also keeps the
+      // texture window identical while panning inside a cell, so the cache key stays stable.
       bool enableEdgeLighting = getLightIntensityFactor() > 0.0f && edgeLightEnabled;
 
       auto contentRect = Rect::MakeWH(contentWidth, contentHeight);
@@ -569,8 +607,6 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
         cell = tileClip;
         cell.intersect(contentRect);
       }
-      int64_t cellKey = (static_cast<int64_t>(std::floor(cell.left / cellSize)) << 32) |
-                        (static_cast<int64_t>(std::floor(cell.top / cellSize)) & 0xFFFFFFFF);
 
       // The full-layer core density is fixed: each texel covers two content pixels, so the core
       // stays at half the content resolution regardless of the cell size or zoom.
@@ -614,62 +650,31 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       edgeTextureRect.roundOut();
       Point edgeTextureOrigin = {edgeTextureRect.left, edgeTextureRect.top};
 
-      // The contour path reference is stable while the layer shape is unedited, so it serves as a
-      // frame-invariant key; layers without a contour path fall back to the content image pointer.
-      bool udfShapeMatch = shapeInfo.hasPath ? shapeInfo.shapePath.isSame(cachedUDFPath)
-                                             : (cachedUDFSource == input.content);
-      bool cacheMatch = udfShapeMatch &&
-                        FloatNearlyEqual(cachedUDFContentScale, input.contentScale) &&
-                        FloatNearlyEqual(cachedUDFDepth, _depth) &&
-                        FloatNearlyEqual(cachedUDFContentWidth, contentWidth) &&
-                        FloatNearlyEqual(cachedUDFContentHeight, contentHeight);
-      std::shared_ptr<Image> maskImage = nullptr;
-      if (cacheMatch && cachedUDFImage != nullptr) {
-        maskImage = cachedUDFImage;
-      } else {
-        maskImage = GlassUDFImage::Make(input.content, udfWidth, udfHeight, fineTextureRect,
-                                        fineRadius, Point::Zero(), GlassUDFField::Refraction);
-        if (!maskImage) {
-          LOGE("GlassStyle: Failed to create refraction UDF.");
-          return;
-        }
-        cachedUDFPath = shapeInfo.shapePath;
-        cachedUDFSource = input.content;
-        cachedUDFContentScale = input.contentScale;
-        cachedUDFDepth = _depth;
-        cachedUDFContentWidth = contentWidth;
-        cachedUDFContentHeight = contentHeight;
-        cachedUDFImage = maskImage;
+      // Both fields are regenerated only when their cache key misses, so the images below are
+      // rebuilt per draw while the textures behind them live in the context resource cache.
+      auto sourceWidth = input.content->width();
+      auto sourceHeight = input.content->height();
+      auto refractionKey =
+          MakeGlassUDFKey(input.contentID, sourceWidth, sourceHeight, GlassUDFField::Refraction,
+                          udfWidth, udfHeight, fineTextureRect, fineRadius, Point::Zero());
+      auto maskImage =
+          GlassUDFImage::Make(input.content, udfWidth, udfHeight, fineTextureRect, fineRadius,
+                              Point::Zero(), GlassUDFField::Refraction, std::move(refractionKey));
+      if (maskImage == nullptr) {
+        LOGE("GlassStyle: Failed to create refraction UDF.");
+        return;
       }
       std::shared_ptr<Image> edgeMaskImage = nullptr;
       if (enableEdgeLighting) {
-        // Cell keys are grid positions in content pixels, and content pixels move with the content
-        // scale, so the same key maps to a different region once the scale or the content changes.
-        // Reusing an entry across such a change would sample the texture with a mismatched origin,
-        // so the pool is invalidated on the same conditions as the full-layer UDF.
-        bool gridMatch = cacheMatch && FloatNearlyEqual(cachedEdgeGridSize, cellSize);
-        if (!gridMatch) {
-          cachedEdgeUDFs.clear();
-          cachedEdgeGridSize = cellSize;
-        }
-        auto it = cachedEdgeUDFs.find(cellKey);
-        if (cacheMatch && gridMatch && it != cachedEdgeUDFs.end() &&
-            it->second.windowRect.contains(cell)) {
-          edgeMaskImage = it->second.udfImage;
-        } else {
-          edgeMaskImage =
-              GlassUDFImage::Make(input.content, edgeCoreWidth, edgeCoreHeight, edgeTextureRect,
-                                  Point::Zero(), coarseRadius, GlassUDFField::EdgeLight);
-          if (!edgeMaskImage) {
-            LOGE("GlassStyle: Failed to create edge light UDF.");
-            return;
-          }
-          // Cap the pool so panning across many cells cannot grow it unboundedly; evicting the
-          // whole pool is fine because a large cell count implies the view is moving.
-          if (cachedEdgeUDFs.size() >= 16) {
-            cachedEdgeUDFs.clear();
-          }
-          cachedEdgeUDFs[cellKey] = {cell, edgeMaskImage};
+        auto edgeKey = MakeGlassUDFKey(input.contentID, sourceWidth, sourceHeight,
+                                       GlassUDFField::EdgeLight, edgeCoreWidth, edgeCoreHeight,
+                                       edgeTextureRect, Point::Zero(), coarseRadius);
+        edgeMaskImage = GlassUDFImage::Make(input.content, edgeCoreWidth, edgeCoreHeight,
+                                            edgeTextureRect, Point::Zero(), coarseRadius,
+                                            GlassUDFField::EdgeLight, std::move(edgeKey));
+        if (edgeMaskImage == nullptr) {
+          LOGE("GlassStyle: Failed to create edge light UDF.");
+          return;
         }
       }
       UDFSampling udf = {};
