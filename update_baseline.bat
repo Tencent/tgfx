@@ -1,7 +1,25 @@
 @echo off
 setlocal enabledelayedexpansion
 
-cd /d "%~dp0"
+:: cmd.exe reads a bat file from disk by byte offset while executing it, so the `git switch` below
+:: rewrites this very file with the checked-out revision and desyncs the reader, which then runs
+:: garbage from the middle of a line. Re-launch from a copy outside the repository so the file being
+:: read never changes. %~dp0 points at the copy afterwards, hence the remembered repository path.
+if not defined TGFX_BASELINE_REPO_DIR set "TGFX_BASELINE_REPO_DIR=%~dp0"
+if not defined TGFX_BASELINE_SELF_COPY (
+    set "TGFX_BASELINE_SELF_COPY=%TEMP%\tgfx_update_baseline_%RANDOM%%RANDOM%.bat"
+    copy /y "%~f0" "!TGFX_BASELINE_SELF_COPY!" >nul
+    if !errorlevel! neq 0 (
+        echo ERROR: failed to copy update_baseline.bat into %TEMP%.
+        exit /b 1
+    )
+    call "!TGFX_BASELINE_SELF_COPY!" %*
+    set "SELF_EXIT_CODE=!errorlevel!"
+    del "!TGFX_BASELINE_SELF_COPY!" >nul 2>&1
+    exit /b !SELF_EXIT_CODE!
+)
+
+cd /d "%TGFX_BASELINE_REPO_DIR%"
 
 :: Usage:
 ::   update_baseline.bat [<BACKEND>] [--skip-images]
@@ -145,7 +163,7 @@ if !errorlevel! neq 0 (
 )
 
 :: Set up SwiftShader Vulkan library so volk can load it at runtime.
-if /I "!BACKEND_ARG!"=="USE_VULKAN_SWIFTSHADER" copy /y "%~dp0vendor\swiftshader\win\x64\vk_swiftshader.dll" "%CD%\vulkan-1.dll" >nul 2>&1
+if /I "!BACKEND_ARG!"=="USE_VULKAN_SWIFTSHADER" copy /y "%TGFX_BASELINE_REPO_DIR%vendor\swiftshader\win\x64\vk_swiftshader.dll" "%CD%\vulkan-1.dll" >nul 2>&1
 
 UpdateBaseline_%TARGET_SUFFIX%.exe
 if !errorlevel! equ 0 (
