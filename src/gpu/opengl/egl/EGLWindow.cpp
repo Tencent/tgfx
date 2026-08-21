@@ -112,6 +112,14 @@ void EGLWindow::onPresent(Context*) {
   auto eglDisplay = device->eglDisplay;
   // eglSurface cannot be nullptr in EGLWindow.
   auto eglSurface = device->eglSurface;
+  // The context is current here, so eglSwapInterval applies to this window's surface. Apply it
+  // only when the vsync setting changed to avoid a driver call every frame.
+  int desiredInterval = vsyncEnabled() ? 1 : 0;
+  if (desiredInterval != appliedSwapInterval) {
+    if (eglSwapInterval(eglDisplay, desiredInterval)) {
+      appliedSwapInterval = desiredInterval;
+    }
+  }
   if (presentationTime.has_value()) {
     static auto eglPresentationTimeANDROID = reinterpret_cast<PFNEGLPRESENTATIONTIMEANDROIDPROC>(
         eglGetProcAddress("eglPresentationTimeANDROID"));

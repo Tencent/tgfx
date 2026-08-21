@@ -188,8 +188,8 @@ std::shared_ptr<RenderTargetProxy> WebGPUWindow::onCreateRenderTarget(Context* c
     return nullptr;
   }
 
-  // Only reconfigure the surface when dimensions actually change.
-  if (_width != _configuredWidth || _height != _configuredHeight) {
+  // Reconfigure the surface when dimensions change or the present mode (vsync) changed.
+  if (_width != _configuredWidth || _height != _configuredHeight || _presentModeDirty) {
     auto wgpuDevice =
         static_cast<WGPUDevice>(static_cast<WebGPUDevice*>(getDevice().get())->webgpuDevice());
     auto wgpuSurface = static_cast<WGPUSurface>(_surface);
@@ -199,12 +199,13 @@ std::shared_ptr<RenderTargetProxy> WebGPUWindow::onCreateRenderTarget(Context* c
     config.usage = WGPUTextureUsage_RenderAttachment;
     config.width = static_cast<uint32_t>(_width);
     config.height = static_cast<uint32_t>(_height);
-    config.presentMode = WGPUPresentMode_Fifo;
+    config.presentMode = _presentMode;
     config.alphaMode = WGPUCompositeAlphaMode_Premultiplied;
     wgpuSurfaceConfigure(wgpuSurface, &config);
     configureColorSpace(config.format, config.usage, config.alphaMode);
     _configuredWidth = _width;
     _configuredHeight = _height;
+    _presentModeDirty = false;
   }
 
   auto wgpuSurface = static_cast<WGPUSurface>(_surface);
@@ -220,6 +221,18 @@ void WebGPUWindow::onPresent(Context*) {
   auto proxy = std::static_pointer_cast<WebGPUDrawableProxy>(drawableProxy);
   proxy->present();
   proxy->releaseDrawable();
+}
+
+void WebGPUWindow::onVSyncEnabledChanged(bool enabled) {
+  // Called while holding the window lock; defer the actual wgpuSurfaceConfigure to the next
+  // onCreateRenderTarget. On Web the browser may still cap presentation to the display refresh
+  // rate regardless of this request; Immediate is honored only where the implementation supports
+  // it (e.g. native Dawn).
+  auto mode = enabled ? WGPUPresentMode_Fifo : WGPUPresentMode_Immediate;
+  if (mode != _presentMode) {
+    _presentMode = mode;
+    _presentModeDirty = true;
+  }
 }
 
 }  // namespace tgfx

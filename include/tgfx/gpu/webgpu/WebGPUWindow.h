@@ -47,6 +47,7 @@ class WebGPUWindow : public Window {
  protected:
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
   void onPresent(Context* context) override;
+  void onVSyncEnabledChanged(bool enabled) override;
 
  private:
   WebGPUWindow(std::shared_ptr<Device> device, void* surface, int width, int height,
@@ -64,6 +65,10 @@ class WebGPUWindow : public Window {
   int _height = 0;
   int _configuredWidth = 0;
   int _configuredHeight = 0;
+  // Present mode currently applied to the surface. Defaults to Fifo (vsync on). onVSyncEnabledChanged
+  // updates it and flags a reconfigure so onCreateRenderTarget re-applies it.
+  WGPUPresentMode _presentMode = WGPUPresentMode_Fifo;
+  bool _presentModeDirty = false;
   std::shared_ptr<RenderTargetProxy> drawableProxy = nullptr;
 };
 

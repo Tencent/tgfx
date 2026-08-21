@@ -436,8 +436,14 @@ void D3D12Window::onPresent(Context* /*context*/) {
   if (_platformState->swapChain == nullptr) {
     return;
   }
-  // SyncInterval=1 mirrors VK_PRESENT_MODE_FIFO_KHR (wait for vblank).
-  auto hr = _platformState->swapChain->Present(1, 0);
+  bool vsync = vsyncEnabled();
+  // With vsync on, SyncInterval=1 mirrors VK_PRESENT_MODE_FIFO_KHR (wait for vblank). With vsync
+  // off, SyncInterval=0 does NOT tear or present early here: the swap chain is created without
+  // DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING, so in windowed mode DWM still composites at vsync. It only
+  // releases the present call from blocking on vblank (intermediate frames may be dropped by DWM),
+  // which is what callers whose present thread must not stall on vsync need.
+  UINT syncInterval = vsync ? 1u : 0u;
+  auto hr = _platformState->swapChain->Present(syncInterval, 0);
   if (FAILED(hr)) {
     LOGE("D3D12Window: Present failed, HRESULT=0x%08X", static_cast<unsigned>(hr));
   }

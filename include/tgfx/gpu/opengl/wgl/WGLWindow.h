@@ -36,6 +36,9 @@ class WGLWindow : public Window {
 
  private:
   HWND nativeWindow = nullptr;
+  // Tracks the swap interval last applied via wglSwapInterval so onPresent only calls it when the
+  // vsync setting actually changes. -1 means no interval has been applied yet.
+  int appliedSwapInterval = -1;
 
   explicit WGLWindow(std::shared_ptr<Device> device,
                      std::shared_ptr<ColorSpace> colorSpace = nullptr);

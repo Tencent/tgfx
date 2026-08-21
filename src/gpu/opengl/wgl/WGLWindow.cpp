@@ -19,6 +19,7 @@
 #include "tgfx/gpu/opengl/wgl/WGLWindow.h"
 #include <GL/GL.h>
 #include "core/utils/Log.h"
+#include "gpu/opengl/wgl/WGLInterface.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
@@ -65,6 +66,17 @@ std::shared_ptr<RenderTargetProxy> WGLWindow::onCreateRenderTarget(Context* cont
 
 void WGLWindow::onPresent(Context*) {
   const auto wglDevice = std::static_pointer_cast<WGLDevice>(this->device);
+  // The GL context is current here (locked by DrawingBuffer before present), so wglSwapInterval
+  // targets this window's context. Apply it only when the vsync setting changed to avoid a driver
+  // call every frame.
+  int desiredInterval = vsyncEnabled() ? 1 : 0;
+  if (desiredInterval != appliedSwapInterval) {
+    auto wglInterface = WGLInterface::Get();
+    if (wglInterface->swapIntervalSupport && wglInterface->wglSwapInterval != nullptr) {
+      wglInterface->wglSwapInterval(desiredInterval);
+      appliedSwapInterval = desiredInterval;
+    }
+  }
   SwapBuffers(wglDevice->deviceContext);
 }
 
