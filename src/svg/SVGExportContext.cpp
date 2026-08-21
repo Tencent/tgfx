@@ -137,6 +137,8 @@ SVGExportContext::SVGExportContext(Context* context, const Rect& viewBox,
   }
 }
 
+SVGExportContext::~SVGExportContext() = default;
+
 void SVGExportContext::drawFill(const Brush& brush) {
   drawRect(viewBox, {}, ClipStack(), brush, nullptr);
 }

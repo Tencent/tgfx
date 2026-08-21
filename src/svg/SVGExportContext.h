@@ -49,7 +49,8 @@ class SVGExportContext : public DrawContext {
                    uint32_t exportFlags, std::shared_ptr<SVGCustomWriter> customWriter,
                    std::shared_ptr<ColorSpace> targetColorSpace,
                    std::shared_ptr<ColorSpace> assignColorSpace);
-  ~SVGExportContext() override = default;
+  // Defined out of line because the unique_ptr members hold forward declared types.
+  ~SVGExportContext() override;
 
   void setCanvas(Canvas* inputCanvas) {
     canvas = inputCanvas;
