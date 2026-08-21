@@ -18,18 +18,26 @@
 
 #include "PDFBitmap.h"
 #include <vector>
+#include "core/images/SubsetImage.h"
+#include "core/utils/CopyPixels.h"
+#include "core/utils/Log.h"
+#include "core/utils/Types.h"
 #include "core/utils/USE.h"
 #include "pdf/DeflateStream.h"
 #include "pdf/PDFDocumentImpl.h"
 #include "pdf/PDFTypes.h"
 #include "tgfx/core/AlphaType.h"
+#include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ColorType.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
+#include "tgfx/core/Rect.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Surface.h"
+#include "tgfx/core/SurfaceReadback.h"
 #include "tgfx/core/WriteStream.h"
+#include "tgfx/gpu/GPUBuffer.h"
 
 namespace tgfx {
 
@@ -360,55 +368,133 @@ void DoDCTImage(const Pixmap& pixmap, PDFDocumentImpl* document, bool isOpaque, 
 
 void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int encodingQuality,
                                PDFDocumentImpl* doc, PDFIndirectReference ref) {
-  auto image2bitmap = [doc](Context* context, const std::shared_ptr<Image>& image) {
-    auto surface = Surface::Make(context, image->width(), image->height(), false, 1, false, 0,
-                                 doc->dstColorSpace());
-    auto canvas = surface->getCanvas();
-    canvas->drawImage(image);
-
-    // Always use RGBA_8888 format for PDF export to ensure consistent pixel layout across all
-    // platforms. RGBA is the industry standard format used by PNG, JPEG, and PDF's DeviceRGB.
-    // This avoids R/B channel swap issues between platforms with different native formats.
-    auto dstInfo = ImageInfo::Make(surface->width(), surface->height(), ColorType::RGBA_8888,
-                                   AlphaType::Unpremultiplied, 0, surface->colorSpace());
-    Bitmap bitmap(surface->width(), surface->height(), false, false, surface->colorSpace());
-    auto pixels = bitmap.lockPixels();
-    if (surface->readPixels(dstInfo, pixels)) {
-      bitmap.unlockPixels();
-      return bitmap;
-    }
-    return Bitmap();
-  };
-
-  auto bitmap = image2bitmap(doc->context(), image);
-  if (bitmap.isEmpty()) {
+  auto surface = Surface::Make(doc->context(), image->width(), image->height(), false, 1, false, 0,
+                               doc->dstColorSpace());
+  if (surface == nullptr) {
+    LOGE("PDFBitmap::SerializeImage() Failed to create the surface! (%dx%d)", image->width(),
+         image->height());
+    WritePlaceholder(doc, ref);
     return;
   }
-  auto pixmap = Pixmap(bitmap);
+  surface->getCanvas()->drawImage(image);
 
+  auto readback = surface->asyncReadPixels(Rect::MakeWH(surface->width(), surface->height()));
+  if (readback == nullptr) {
+    LOGE("PDFBitmap::SerializeImage() Failed to start the readback! (%dx%d)", surface->width(),
+         surface->height());
+    WritePlaceholder(doc, ref);
+    return;
+  }
+  auto flipY = surface->origin() == ImageOrigin::BottomLeft;
+
+  // Deliberately not Surface::readPixels(): it reports a pending readback as an error, which is the
+  // normal first outcome on WebGPU. lockPixels() blocks where blocking is possible and starts the
+  // async mapping where it is not.
+  if (auto* srcPixels = readback->lockPixels(doc->context())) {
+    WriteReadbackPixels(readback->info(), srcPixels, flipY, encodingQuality, doc, ref);
+    readback->unlockPixels(doc->context());
+    return;
+  }
+
+  // A ready buffer that still yields no pixels is a genuine failure rather than an async wait, and
+  // so is a missing readback buffer: isReady() can never turn true for it, so deferring it would
+  // make isReadyToClose() reject the caller forever.
+  if (readback->isReady(doc->context()) || readback->getGPUBuffer(doc->context()) == nullptr) {
+    LOGE("PDFBitmap::SerializeImage() Failed to read the pixels from the surface! (%dx%d)",
+         surface->width(), surface->height());
+    WritePlaceholder(doc, ref);
+    return;
+  }
+
+  doc->addPendingRaster({ref, std::move(readback), encodingQuality, flipY});
+}
+
+void PDFBitmap::WriteReadbackPixels(const ImageInfo& srcInfo, const void* srcPixels, bool flipY,
+                                    int encodingQuality, PDFDocumentImpl* document,
+                                    PDFIndirectReference ref) {
+  Bitmap bitmap(srcInfo.width(), srcInfo.height(), false, false, srcInfo.colorSpace());
+  if (bitmap.isEmpty()) {
+    LOGE("PDFBitmap::WriteReadbackPixels() Failed to allocate the bitmap! (%dx%d)", srcInfo.width(),
+         srcInfo.height());
+    WritePlaceholder(document, ref);
+    return;
+  }
+  auto* dstPixels = bitmap.lockPixels();
+  if (dstPixels == nullptr) {
+    LOGE("PDFBitmap::WriteReadbackPixels() Failed to lock the bitmap pixels!");
+    WritePlaceholder(document, ref);
+    return;
+  }
+  // RGBA_8888 keeps the pixel layout identical on every platform, avoiding the R/B swap of the
+  // native formats. Bitmap always reports a premultiplied layout, so the alpha type is stated here.
+  auto dstInfo =
+      ImageInfo::Make(srcInfo.width(), srcInfo.height(), ColorType::RGBA_8888,
+                      AlphaType::Unpremultiplied, bitmap.info().rowBytes(), srcInfo.colorSpace());
+  // srcInfo carries the readback row alignment (256 bytes on WebGPU), so its stride can exceed the
+  // destination stride and a flat memcpy would not work.
+  CopyPixels(srcInfo, srcPixels, dstInfo, dstPixels, flipY);
+  WritePixmap(Pixmap(dstInfo, dstPixels), false, encodingQuality, document, ref);
+  bitmap.unlockPixels();
+}
+
+void PDFBitmap::WritePixmap(const Pixmap& pixmap, bool isOpaque, int encodingQuality,
+                            PDFDocumentImpl* document, PDFIndirectReference ref) {
 #ifdef TGFX_USE_JPEG_ENCODE
   if (encodingQuality <= 100) {
-    DoDCTImage(pixmap, doc, bitmap.isOpaque(), encodingQuality, ref);
+    DoDCTImage(pixmap, document, isOpaque, encodingQuality, ref);
     return;
   }
 #else
   USE(encodingQuality);
 #endif
 
-  DoDeflatedImage(pixmap, doc, bitmap.isOpaque(), ref);
+  DoDeflatedImage(pixmap, document, isOpaque, ref);
 }
+
+void PDFBitmap::WritePlaceholder(PDFDocumentImpl* document, PDFIndirectReference ref) {
+  static constexpr uint8_t WhitePixel[3] = {0xFF, 0xFF, 0xFF};
+  static constexpr uint8_t TransparentAlpha[1] = {0x00};
+  // The content stream stretches the single pixel over the whole image rectangle, so the pixel must
+  // be transparent to avoid painting a solid box over the content below.
+  auto sMask = document->reserveRef();
+  auto streamWriter = [](const std::shared_ptr<WriteStream>& stream) {
+    stream->write(WhitePixel, sizeof(WhitePixel));
+  };
+  EmitImageStream(document, ref, streamWriter, ISize::Make(1, 1), PDFUnion::Name("DeviceRGB"),
+                  sMask, static_cast<int>(sizeof(WhitePixel)), PDFStreamFormat::Uncompressed);
+  auto alphaWriter = [](const std::shared_ptr<WriteStream>& stream) {
+    stream->write(TransparentAlpha, sizeof(TransparentAlpha));
+  };
+  EmitImageStream(document, sMask, alphaWriter, ISize::Make(1, 1), PDFUnion::Name("DeviceGray"),
+                  PDFIndirectReference(), static_cast<int>(sizeof(TransparentAlpha)),
+                  PDFStreamFormat::Uncompressed);
+}
+
+namespace {
+// Keys a SubsetImage by its source and bounds so identical regions dedupe, and anything else by
+// itself and its full bounds.
+PDFImageCacheKey MakeImageCacheKey(const std::shared_ptr<Image>& image) {
+  if (Types::Get(image.get()) == Types::ImageType::Subset) {
+    const auto subsetImage = static_cast<const SubsetImage*>(image.get());
+    return {subsetImage->source, subsetImage->bounds};
+  }
+  return {image, Rect::MakeXYWH(0.f, 0.f, static_cast<float>(image->width()),
+                                static_cast<float>(image->height()))};
+}
+}  // namespace
 
 PDFIndirectReference PDFBitmap::Serialize(const std::shared_ptr<Image>& image,
                                           PDFDocumentImpl* document, int encodingQuality) {
   DEBUG_ASSERT(image);
   DEBUG_ASSERT(document);
-  auto it = document->imageRefCache.find(image);
+  auto key = MakeImageCacheKey(image);
+  auto it = document->imageRefCache.find(key);
   if (it != document->imageRefCache.end()) {
     return it->second;
   }
   auto ref = document->reserveRef();
   SerializeImage(image, encodingQuality, document, ref);
-  document->imageRefCache[image] = ref;
+  document->imageRefCache[std::move(key)] = ref;
   return ref;
 }
 }  // namespace tgfx

@@ -19,13 +19,11 @@
 #include "PDFShader.h"
 #include "core/shaders/ImageShader.h"
 #include "core/shaders/MatrixShader.h"
-#include "core/utils/Log.h"
 #include "core/utils/Types.h"
 #include "pdf/PDFDocumentImpl.h"
 #include "pdf/PDFExportContext.h"
 #include "pdf/PDFGradientShader.h"
 #include "pdf/PDFTypes.h"
-#include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Matrix.h"
@@ -45,23 +43,6 @@ void Draw(Canvas* canvas, std::shared_ptr<Image> image, Color paintColor) {
   canvas->drawImage(std::move(image), SamplingOptions(), &paint);
 }
 
-Bitmap ImageExportToBitmap(Context* context, const std::shared_ptr<Image>& image,
-                           std::shared_ptr<ColorSpace> colorSpace) {
-  auto surface = Surface::Make(context, image->width(), image->height(), false, 1, false, 0,
-                               std::move(colorSpace));
-  auto canvas = surface->getCanvas();
-  canvas->drawImage(image);
-
-  Bitmap bitmap(surface->width(), surface->height(), false, true, surface->colorSpace());
-  auto pixels = bitmap.lockPixels();
-  if (surface->readPixels(bitmap.info(), pixels)) {
-    bitmap.unlockPixels();
-    return bitmap;
-  }
-  bitmap.unlockPixels();
-  return Bitmap();
-}
-
 void DrawMatrix(Canvas* canvas, std::shared_ptr<Image> image, const Matrix& matrix,
                 Color paintColor) {
   AutoCanvasRestore acr(canvas);
@@ -69,25 +50,28 @@ void DrawMatrix(Canvas* canvas, std::shared_ptr<Image> image, const Matrix& matr
   Draw(canvas, std::move(image), paintColor);
 }
 
-void DrawBitmapMatrix(Canvas* canvas, const Bitmap& bm, const Matrix& matrix, Color paintColor) {
+// Stretches a border subset of the image into place. The subset is sampled from the original image
+// so the draw stays on the deferred image XObject path and needs no pixel readback.
+void DrawSubsetMatrix(Canvas* canvas, const std::shared_ptr<Image>& image, const Rect& subset,
+                      const Matrix& matrix, Color paintColor) {
   AutoCanvasRestore acr(canvas);
   canvas->concat(matrix);
   Paint paint;
   paint.setColor(paintColor);
-  auto image = Image::MakeFrom(bm);
-  canvas->drawImage(image, SamplingOptions(), &paint);
+  canvas->drawImageRect(image, subset, Rect::MakeWH(subset.width(), subset.height()),
+                        SamplingOptions(), &paint);
 }
 
-void FillColorFromBitmap(Canvas* canvas, float left, float top, float right, float bottom,
-                         const Bitmap& bitmap, int x, int y, float alpha) {
+// Stretches a single source pixel over the rect, filling it with that pixel's color.
+void DrawPixelRect(Canvas* canvas, const std::shared_ptr<Image>& image, float px, float py,
+                   float left, float top, float right, float bottom, Color paintColor) {
   Rect rect{left, top, right, bottom};
-  if (!rect.isEmpty()) {
-    Color color = bitmap.getColor(x, y);
-    color.alpha = alpha * color.alpha;
-    Paint paint;
-    paint.setColor(color);
-    canvas->drawRect(rect, paint);
+  if (rect.isEmpty()) {
+    return;
   }
+  Paint paint;
+  paint.setColor(paintColor);
+  canvas->drawImageRect(image, Rect::MakeXYWH(px, py, 1.f, 1.f), rect, SamplingOptions(), &paint);
 }
 
 Color AdjustColor(const Shader* shader, Color paintColor) {
@@ -109,17 +93,6 @@ Matrix ScaleTranslate(float sx, float sy, float tx, float ty) {
   Matrix matrix;
   matrix.setAll(sx, 0.f, tx, 0.f, sy, ty);
   return matrix;
-}
-
-Bitmap ExtractSubset(Bitmap src, Rect subset) {
-  Bitmap destination(static_cast<int>(subset.width()), static_cast<int>(subset.height()), false,
-                     true, src.colorSpace());
-  destination.clear();
-  const auto srcPixels = src.lockPixels();
-  destination.writePixels(src.info(), srcPixels, static_cast<int>(subset.left),
-                          static_cast<int>(subset.top));
-  src.unlockPixels();
-  return destination;
 }
 }  // namespace
 
@@ -225,55 +198,52 @@ PDFIndirectReference PDFShader::MakeImageShader(PDFDocumentImpl* doc, Matrix fin
   // Then handle Clamping, which requires expanding the pattern canvas to
   // cover the entire surfaceBBox.
 
-  Bitmap bitmap;
-  if (tileModesX == TileMode::Clamp || tileModesY == TileMode::Clamp) {
-    // For now, the easiest way to access the colors in the corners and sides is
-    // to just make a bitmap from the image.
-    bitmap = ImageExportToBitmap(doc->context(), image, doc->dstColorSpace());
-  }
+  // The clamp edges stretch the border pixels outward: corners are 1x1 subsets scaled to the corner
+  // rects, sides are 1-pixel strips scaled into place. Sampling them from the original image keeps
+  // every draw on the deferred image XObject path, so clamping needs no pixel readback.
+  const auto clampEdgesX = tileModesX == TileMode::Clamp;
+  const auto clampEdgesY = tileModesY == TileMode::Clamp;
 
   // If both x and y are in clamp mode, we start by filling in the corners.
   // (Which are just a rectangles of the corner colors.)
-  if (tileModesX == TileMode::Clamp && tileModesY == TileMode::Clamp) {
-    FillColorFromBitmap(canvas.get(), deviceBounds.left, deviceBounds.top, 0, 0, bitmap, 0, 0,
-                        paintColor.alpha);
+  if (clampEdgesX && clampEdgesY) {
+    DrawPixelRect(canvas.get(), image, 0.f, 0.f, deviceBounds.left, deviceBounds.top, 0, 0,
+                  paintColor);
 
-    FillColorFromBitmap(canvas.get(), width, deviceBounds.top, deviceBounds.right, 0, bitmap,
-                        bitmap.width() - 1, 0, paintColor.alpha);
+    DrawPixelRect(canvas.get(), image, width - 1, 0, width, deviceBounds.top, deviceBounds.right, 0,
+                  paintColor);
 
-    FillColorFromBitmap(canvas.get(), width, height, deviceBounds.right, deviceBounds.bottom,
-                        bitmap, bitmap.width() - 1, bitmap.height() - 1, paintColor.alpha);
+    DrawPixelRect(canvas.get(), image, width - 1, height - 1, width, height, deviceBounds.right,
+                  deviceBounds.bottom, paintColor);
 
-    FillColorFromBitmap(canvas.get(), deviceBounds.left, height, 0, deviceBounds.bottom, bitmap, 0,
-                        bitmap.height() - 1, paintColor.alpha);
+    DrawPixelRect(canvas.get(), image, 0, height - 1, deviceBounds.left, height, 0,
+                  deviceBounds.bottom, paintColor);
   }
 
   // Then expand the left, right, top, then bottom.
-  if (tileModesX == TileMode::Clamp) {
-    auto subset = Rect::MakeXYWH(0, 0, 1, bitmap.height());
+  if (clampEdgesX) {
     if (deviceBounds.left < 0) {
-      Bitmap left = ExtractSubset(bitmap, subset);
+      auto leftSubset = Rect::MakeXYWH(0.f, 0.f, 1.f, height);
       auto leftMatrix = ScaleTranslate(-deviceBounds.left, 1, deviceBounds.left, 0);
-      DrawBitmapMatrix(canvas.get(), left, leftMatrix, paintColor);
+      DrawSubsetMatrix(canvas.get(), image, leftSubset, leftMatrix, paintColor);
 
       if (tileModesY == TileMode::Mirror) {
         leftMatrix.postScale(1.f, -1.f);
         leftMatrix.postTranslate(0, 2 * height);
-        DrawBitmapMatrix(canvas.get(), left, leftMatrix, paintColor);
+        DrawSubsetMatrix(canvas.get(), image, leftSubset, leftMatrix, paintColor);
       }
       patternBBox.left = 0;
     }
 
     if (deviceBounds.right > width) {
-      subset.offset(static_cast<float>(bitmap.width()) - 1.f, 0.f);
-      Bitmap right = ExtractSubset(bitmap, subset);
+      auto rightSubset = Rect::MakeXYWH(width - 1.f, 0.f, 1.f, height);
       auto rightMatrix = ScaleTranslate(deviceBounds.right - width, 1, width, 0);
-      DrawBitmapMatrix(canvas.get(), right, rightMatrix, paintColor);
+      DrawSubsetMatrix(canvas.get(), image, rightSubset, rightMatrix, paintColor);
 
       if (tileModesY == TileMode::Mirror) {
         rightMatrix.postScale(1.f, -1.f);
         rightMatrix.postTranslate(0, 2 * height);
-        DrawBitmapMatrix(canvas.get(), right, rightMatrix, paintColor);
+        DrawSubsetMatrix(canvas.get(), image, rightSubset, rightMatrix, paintColor);
       }
       patternBBox.right = deviceBounds.width();
     }
@@ -287,32 +257,29 @@ PDFIndirectReference PDFShader::MakeImageShader(PDFDocumentImpl* doc, Matrix fin
     }
   }
 
-  if (tileModesY == TileMode::Clamp) {
-    auto subset = Rect::MakeXYWH(0, 0, bitmap.width(), 1);
+  if (clampEdgesY) {
     if (deviceBounds.top < 0) {
-      Bitmap top = ExtractSubset(bitmap, subset);
+      auto topSubset = Rect::MakeXYWH(0.f, 0.f, width, 1.f);
       auto topMatrix = ScaleTranslate(1, -deviceBounds.top, 0, deviceBounds.top);
-      DrawBitmapMatrix(canvas.get(), top, topMatrix, paintColor);
+      DrawSubsetMatrix(canvas.get(), image, topSubset, topMatrix, paintColor);
 
       if (tileModesX == TileMode::Mirror) {
         topMatrix.postScale(-1, 1);
         topMatrix.postTranslate(2 * width, 0);
-        DrawBitmapMatrix(canvas.get(), top, topMatrix, paintColor);
+        DrawSubsetMatrix(canvas.get(), image, topSubset, topMatrix, paintColor);
       }
       patternBBox.top = 0;
     }
 
     if (deviceBounds.bottom > height) {
-      subset.offset(0.f, static_cast<float>(bitmap.height()) - 1.f);
-      Bitmap bottom = ExtractSubset(bitmap, subset);
-
+      auto bottomSubset = Rect::MakeXYWH(0.f, height - 1.f, width, 1.f);
       auto bottomMatrix = ScaleTranslate(1, deviceBounds.bottom - height, 0, height);
-      DrawBitmapMatrix(canvas.get(), bottom, bottomMatrix, paintColor);
+      DrawSubsetMatrix(canvas.get(), image, bottomSubset, bottomMatrix, paintColor);
 
       if (tileModesX == TileMode::Mirror) {
         bottomMatrix.postScale(-1, 1);
         bottomMatrix.postTranslate(2 * width, 0);
-        DrawBitmapMatrix(canvas.get(), bottom, bottomMatrix, paintColor);
+        DrawSubsetMatrix(canvas.get(), image, bottomSubset, bottomMatrix, paintColor);
       }
       patternBBox.bottom = deviceBounds.height();
     }
