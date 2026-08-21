@@ -21,6 +21,7 @@
 #include <string>
 #include "base/TGFXTest.h"
 #include "gtest/gtest.h"
+#include "svg/ElementWriter.h"
 #include "svg/SVGExportContext.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Color.h"

@@ -43,6 +43,8 @@
 
 namespace tgfx {
 
+class SVGExportContext;
+
 class ElementWriter {
  public:
   ElementWriter(const std::string& name, XMLWriter* writer,
