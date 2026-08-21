@@ -62,11 +62,11 @@ class PDFDocument {
   virtual void endPage() = 0;
 
   /**
-   * Ends the current page and closes the document. The Context passed to Make() must still be alive
-   * and ready for GPU work when this is called.
-   * @note On backends without synchronous pixel readback, such as WebGPU, poll isReadyToClose()
-   * until it returns true before calling this. Closing earlier still produces a valid document, but
-   * the images whose pixels have not arrived yet are written as transparent placeholders.
+   * Ends the current page and closes the document. The Context passed to Make() must still be
+   * alive.
+   * @note Raster content whose pixels are still unavailable is exported as a transparent
+   * placeholder. On backends like WebGPU, poll isReadyToClose() until it returns true before
+   * calling this.
    */
   virtual void close() = 0;
 
@@ -76,10 +76,9 @@ class PDFDocument {
   virtual void abort() = 0;
 
   /**
-   * Returns true when close() is able to write every image with its real pixels. Returns false
-   * while some images are still waiting for their pixels to be read back from the GPU, which only
-   * happens on backends without synchronous pixel readback, such as WebGPU. Poll this once per
-   * turn of the event loop until it returns true, then call close().
+   * Returns true when close() is able to produce a complete document. On backends like WebGPU, some
+   * raster pixels may still be in flight; poll this once per event loop turn until it returns true
+   * before calling close().
    */
   virtual bool isReadyToClose() {
     return true;
