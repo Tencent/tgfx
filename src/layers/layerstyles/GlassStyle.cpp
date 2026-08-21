@@ -497,9 +497,16 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
   // Upload the processed background to a texture once and reuse it across tiles; the filter and
   // shader constructors below take the shared texture image, so per-tile sources are O(1).
   if (context != nullptr) {
-    if (cachedBgTextureSource != processedBg) {
-      cachedBgTextureSource = processedBg;
-      cachedBgTextureImage = processedBg->makeTextureImage(context);
+    if (cachedBgTextureSource != processedBg ||
+        cachedBgTextureContextID != context->uniqueID()) {
+      auto textureImage = processedBg->makeTextureImage(context);
+      if (textureImage != nullptr) {
+        cachedBgTextureSource = processedBg;
+        cachedBgTextureContextID = context->uniqueID();
+        cachedBgTextureImage = std::move(textureImage);
+      }
+      // On failure nothing is registered, so a later draw retries the upload; the draw then falls
+      // back to the unspecialized image, which uploads lazily on its own.
     }
     if (cachedBgTextureImage != nullptr) {
       processedBg = cachedBgTextureImage;

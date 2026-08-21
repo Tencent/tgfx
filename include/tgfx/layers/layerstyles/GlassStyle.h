@@ -213,9 +213,13 @@ class GlassStyle : public LayerStyle {
   std::shared_ptr<Image> cachedDownscaleSource = nullptr;
   std::shared_ptr<Image> cachedDownscaledImage = nullptr;
   float cachedDownscale = 0.0f;
-  // GPU texture of the processed background, reused across the tiles of one frame.
+  // GPU texture of the processed background, reused across the tiles of one frame. The texture is
+  // bound to one Context, so the owning Context's uniqueID is part of the hit condition: after a
+  // GPU context is rebuilt the old texture is unusable and must be re-uploaded, otherwise the
+  // effect would silently stay broken.
   std::shared_ptr<Image> cachedBgTextureSource = nullptr;
   std::shared_ptr<Image> cachedBgTextureImage = nullptr;
+  uint32_t cachedBgTextureContextID = 0;
 };
 
 }  // namespace tgfx
