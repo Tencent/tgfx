@@ -1603,7 +1603,7 @@ TGFX_TEST(SVGExportTest, BlendImageFilterWithColorFilterShader) {
  * A readback whose transfer task has never been flushed never becomes ready, so close() must write
  * an empty href instead of leaking the pending image token into the SVG text.
  */
-TGFX_TEST_PRIVATE(SVGExportTest, PendingImageEmptyHref) {
+TGFX_TEST_PRIVATE(SVGExportTest, PendingImageEmptyHref){TGFX_PRIVATE_ACCESS({
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -1631,45 +1631,47 @@ TGFX_TEST_PRIVATE(SVGExportTest, PendingImageEmptyHref) {
   auto SVGString = SVGStream->readString();
   EXPECT_EQ(SVGString.find(token), std::string::npos);
   EXPECT_NE(SVGString.find("xlink:href=\"\""), std::string::npos);
-}
+})}
 
 /**
  * A readback that has been locked once stays ready on desktop backends, so the isReadyToClose()
  * poll must encode its pixels and close() must substitute the token with the PNG data URI.
  */
 TGFX_TEST_PRIVATE(SVGExportTest, PendingImageResolvedOnPoll) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
+  TGFX_PRIVATE_ACCESS({
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
 
-  auto source = Surface::Make(context, 10, 10);
-  ASSERT_TRUE(source != nullptr);
-  source->getCanvas()->clear(Color::Green());
-  auto readback = source->asyncReadPixels(Rect::MakeWH(10, 10));
-  ASSERT_TRUE(readback != nullptr);
-  ASSERT_TRUE(readback->lockPixels(context) != nullptr);
-  readback->unlockPixels(context);
-  ASSERT_TRUE(readback->isReady(context));
+    auto source = Surface::Make(context, 10, 10);
+    ASSERT_TRUE(source != nullptr);
+    source->getCanvas()->clear(Color::Green());
+    auto readback = source->asyncReadPixels(Rect::MakeWH(10, 10));
+    ASSERT_TRUE(readback != nullptr);
+    ASSERT_TRUE(readback->lockPixels(context) != nullptr);
+    readback->unlockPixels(context);
+    ASSERT_TRUE(readback->isReady(context));
 
-  auto SVGStream = MemoryWriteStream::Make();
-  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(100, 100),
-                                    SVGExportFlags::DisablePrettyXML);
-  ASSERT_TRUE(exporter != nullptr);
-  auto* drawContext = exporter->drawContext;
-  auto* pendings = drawContext->pendingSink();
-  pendings->push_back(PendingImage::Make(readback, pendings->size(), false, nullptr));
-  auto token = pendings->back().token;
-  drawContext->exportPendingImage(token, 10, 10, Matrix::MakeTrans(45, 45), Brush());
+    auto SVGStream = MemoryWriteStream::Make();
+    auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(100, 100),
+                                      SVGExportFlags::DisablePrettyXML);
+    ASSERT_TRUE(exporter != nullptr);
+    auto* drawContext = exporter->drawContext;
+    auto* pendings = drawContext->pendingSink();
+    pendings->push_back(PendingImage::Make(readback, pendings->size(), false, nullptr));
+    auto token = pendings->back().token;
+    drawContext->exportPendingImage(token, 10, 10, Matrix::MakeTrans(45, 45), Brush());
 
-  EXPECT_TRUE(exporter->isReadyToClose());
-  // The poll must release the GPU buffer instead of holding it until close().
-  EXPECT_TRUE(pendings->back().readback == nullptr);
-  EXPECT_FALSE(pendings->back().dataUri.empty());
+    EXPECT_TRUE(exporter->isReadyToClose());
+    // The poll must release the GPU buffer instead of holding it until close().
+    EXPECT_TRUE(pendings->back().readback == nullptr);
+    EXPECT_FALSE(pendings->back().dataUri.empty());
 
-  exporter->close();
-  auto SVGString = SVGStream->readString();
-  EXPECT_EQ(SVGString.find(token), std::string::npos);
-  EXPECT_NE(SVGString.find("data:image/png;base64,"), std::string::npos);
+    exporter->close();
+    auto SVGString = SVGStream->readString();
+    EXPECT_EQ(SVGString.find(token), std::string::npos);
+    EXPECT_NE(SVGString.find("data:image/png;base64,"), std::string::npos);
+  })
 }
 
 }  // namespace tgfx
