@@ -30,7 +30,7 @@
 
 namespace tgfx {
 
-static inline RRect MakeSpreadRRect(const RRect& rRect, float distance) {
+RRect SpreadUtils::MakeSpreadRRect(const RRect& rRect, float distance) {
   auto bounds = rRect.rect();
   bounds.outset(distance, distance);
   if (bounds.width() <= 0.0f || bounds.height() <= 0.0f) {
@@ -87,7 +87,7 @@ static inline void DrawSpreadRRect(Canvas* canvas, const RRect& rRect, StyledSha
         outset += SpreadUtils::StrokeOutset(strokeWidth, strokeAlign);
       }
       if (outset != 0) {
-        auto spreadRRect = MakeSpreadRRect(rRect, outset);
+        auto spreadRRect = SpreadUtils::MakeSpreadRRect(rRect, outset);
         DEBUG_ASSERT(!spreadRRect.rect().isEmpty());
         canvas->drawRRect(spreadRRect, paint);
       } else {
@@ -116,14 +116,15 @@ static inline void DrawSpreadRRect(Canvas* canvas, const RRect& rRect, StyledSha
       }
       const auto innerOffset = centerOffset - halfWidth;
       const auto outerOffset = centerOffset + halfWidth;
-      if (MakeSpreadRRect(rRect, innerOffset).rect().isEmpty()) {
+      if (SpreadUtils::MakeSpreadRRect(rRect, innerOffset).rect().isEmpty()) {
         // The inner hole has vanished; the band fills the shape solid out to its outer edge.
         paint.setStyle(PaintStyle::Fill);
-        canvas->drawRRect(MakeSpreadRRect(rRect, outerOffset), paint);
+        canvas->drawRRect(SpreadUtils::MakeSpreadRRect(rRect, outerOffset), paint);
       } else {
         paint.setStyle(PaintStyle::Stroke);
         paint.setStroke(Stroke(effectiveWidth));
-        const auto drawRRect = centerOffset == 0.0f ? rRect : MakeSpreadRRect(rRect, centerOffset);
+        const auto drawRRect =
+            centerOffset == 0.0f ? rRect : SpreadUtils::MakeSpreadRRect(rRect, centerOffset);
         DEBUG_ASSERT(!drawRRect.rect().isEmpty());
         canvas->drawRRect(drawRRect, paint);
       }

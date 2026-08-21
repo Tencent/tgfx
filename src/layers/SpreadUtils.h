@@ -19,10 +19,12 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <utility>
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Point.h"
+#include "tgfx/core/RRect.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/layers/layerstyles/LayerStyleInput.h"
 
@@ -54,6 +56,13 @@ class SpreadUtils {
    * space to the original shape's space.
    */
   static std::pair<std::shared_ptr<Shape>, Matrix> UnwrapMatrixShape(std::shared_ptr<Shape> shape);
+
+  /**
+   * Applies spread to a rounded rectangle: the bounds are outset by distance and each non-zero
+   * radius is adjusted by the same amount so the corners stay concentric. Returns an empty RRect
+   * when the result collapses.
+   */
+  static RRect MakeSpreadRRect(const RRect& rRect, float distance);
 
   /**
    * Rasterizes the contentShape with spread applied into a tightly-sized alpha image. Positive

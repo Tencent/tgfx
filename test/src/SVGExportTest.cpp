@@ -38,10 +38,13 @@
 #include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/ShapeStyle.h"
+#include "tgfx/layers/SolidLayer.h"
 #include "tgfx/layers/filters/BlurFilter.h"
 #include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
+#include "tgfx/layers/layerstyles/GlassStyle.h"
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
+#include "tgfx/svg/SVGDOM.h"
 #include "tgfx/svg/SVGExporter.h"
 #include "tgfx/svg/SVGPathParser.h"
 #include "utils/TestUtils.h"
@@ -49,6 +52,15 @@
 namespace tgfx {
 
 namespace {
+size_t CountOccurrences(const std::string& text, const std::string& token) {
+  size_t count = 0;
+  for (auto pos = text.find(token); pos != std::string::npos;
+       pos = text.find(token, pos + token.size())) {
+    ++count;
+  }
+  return count;
+}
+
 bool CompareSVG(const std::shared_ptr<MemoryWriteStream>& stream, const std::string& key) {
   auto data = stream->readData();
 #ifdef GENERATE_BASELINE_IMAGES
@@ -749,6 +761,26 @@ TGFX_TEST(SVGExportTest, LayerShadow) {
   innerShadowLayer->setFillStyle(ShapeStyle::Make(Color::Red()));
   innerShadowLayer->setLayerStyles({innerShadowStyle});
   rootLayer->addChild(innerShadowLayer);
+
+  // A non-zero spread on an exact rect is what the analytic shadow path accepts, so these two layers
+  // reach the export-only branch that keeps the shadow as a native SVG filter.
+  auto spreadDropShadowLayer = ShapeLayer::Make();
+  auto spreadDropShadowStyle = DropShadowStyle::Make(10, 10, 10, 10, Color::White(), false);
+  spreadDropShadowStyle->setSpread(5);
+  spreadDropShadowLayer->setMatrix(Matrix::MakeTrans(0, 150));
+  spreadDropShadowLayer->setPath(rect);
+  spreadDropShadowLayer->setFillStyle(ShapeStyle::Make(Color::Red()));
+  spreadDropShadowLayer->setLayerStyles({spreadDropShadowStyle});
+  rootLayer->addChild(spreadDropShadowLayer);
+
+  auto spreadInnerShadowLayer = ShapeLayer::Make();
+  auto spreadInnerShadowStyle = InnerShadowStyle::Make(10, 10, 10, 10, Color::White());
+  spreadInnerShadowStyle->setSpread(5);
+  spreadInnerShadowLayer->setMatrix(Matrix::MakeTrans(200, 150));
+  spreadInnerShadowLayer->setPath(rect);
+  spreadInnerShadowLayer->setFillStyle(ShapeStyle::Make(Color::Red()));
+  spreadInnerShadowLayer->setLayerStyles({spreadInnerShadowStyle});
+  rootLayer->addChild(spreadInnerShadowLayer);
 
   displayList->root()->addChild(rootLayer);
   displayList->root()->draw(canvas);
@@ -1594,6 +1626,73 @@ TGFX_TEST(SVGExportTest, BlendImageFilterWithColorFilterShader) {
   gpuCanvas->drawRect(Rect::MakeXYWH(550, 25, 150, 150), paint4);
   context->flushAndSubmit();
   Baseline::Compare(surface, "SVGExportTest/BlendImageFilterWithColorFilterShader");
+}
+
+TGFX_TEST(SVGExportTest, AnalyticShadowExport) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto displayList = std::make_unique<DisplayList>();
+
+  // A non-zero spread on a rounded rect is what the analytic shadow path accepts, so both styles
+  // reach the shader that carries its own shape.
+  auto dropLayer = SolidLayer::Make();
+  dropLayer->setWidth(100);
+  dropLayer->setHeight(60);
+  dropLayer->setRadiusX(12);
+  dropLayer->setRadiusY(12);
+  dropLayer->setColor(Color::Red());
+  dropLayer->setMatrix(Matrix::MakeTrans(50, 50));
+  auto dropStyle = DropShadowStyle::Make(10, 10, 8, 8, Color::Blue(), true);
+  dropStyle->setSpread(4);
+  dropLayer->setLayerStyles({dropStyle});
+  displayList->root()->addChild(dropLayer);
+
+  // Anisotropic sigma exercises the two-value stdDeviation form.
+  auto anisoLayer = SolidLayer::Make();
+  anisoLayer->setWidth(100);
+  anisoLayer->setHeight(60);
+  anisoLayer->setColor(Color::Red());
+  anisoLayer->setMatrix(Matrix::MakeTrans(50, 180));
+  auto anisoStyle = DropShadowStyle::Make(10, 10, 8, 3, Color::Blue(), true);
+  anisoStyle->setSpread(4);
+  anisoLayer->setLayerStyles({anisoStyle});
+  displayList->root()->addChild(anisoLayer);
+
+  auto innerLayer = SolidLayer::Make();
+  innerLayer->setWidth(100);
+  innerLayer->setHeight(60);
+  innerLayer->setColor(Color::FromRGBA(200, 200, 200));
+  innerLayer->setMatrix(Matrix::MakeTrans(50, 310));
+  auto innerStyle = InnerShadowStyle::Make(6, 6, 5, 5, Color::Black());
+  innerStyle->setSpread(8);
+  innerLayer->setLayerStyles({innerStyle});
+  displayList->root()->addChild(innerLayer);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(250, 420));
+  displayList->root()->draw(exporter->getCanvas());
+  exporter->close();
+  auto data = SVGStream->readData();
+  SaveFile(data, "SVGExportTest/AnalyticShadowExport.svg");
+  std::string svgText(static_cast<const char*>(data->data()), data->size());
+
+  // Each shadow reuses the filter chain the image filter path emits: the drop shadows keep their
+  // shape as vector geometry, while the inner shadow's shape is rasterized because its mask is.
+  EXPECT_EQ(3u, CountOccurrences(svgText, "feGaussianBlur"));
+  EXPECT_TRUE(svgText.find("stdDeviation=\"8\"") != std::string::npos);
+  EXPECT_TRUE(svgText.find("stdDeviation=\"8 3\"") != std::string::npos);
+  // The hardAlpha primitive marks the shared drop shadow chain rather than a hand-built filter.
+  EXPECT_EQ(2u, CountOccurrences(svgText, "result=\"hardAlpha\""));
+  EXPECT_EQ(2u, CountOccurrences(svgText, "feOffset"));
+  // The inner shadow keeps the layer's shape under an inverted mask built from the blurred shape.
+  EXPECT_EQ(1u, CountOccurrences(svgText, "<mask"));
+
+  auto surface = Surface::Make(context, 250, 420);
+  displayList->render(surface.get());
+  context->flushAndSubmit();
+  EXPECT_TRUE(Baseline::Compare(surface, "SVGExportTest/AnalyticShadowExport"));
 }
 
 }  // namespace tgfx

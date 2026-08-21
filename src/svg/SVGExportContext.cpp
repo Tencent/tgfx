@@ -32,20 +32,28 @@
 #include "core/images/SubsetImage.h"
 #include "core/shaders/ImageShader.h"
 #include "core/shaders/MatrixShader.h"
+#include "core/shaders/RRectBlurShader.h"
+#include "core/shaders/RRectInnerShadowShader.h"
+#include "core/shaders/RectBlurShader.h"
+#include "core/shaders/RectInnerShadowShader.h"
+#include "core/utils/ColorHelper.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/RectToRectMatrix.h"
 #include "core/utils/ShapeUtils.h"
 #include "core/utils/StrokeUtils.h"
 #include "core/utils/Types.h"
+#include "layers/LayerStyleSource.h"
 #include "svg/SVGTextBuilder.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Brush.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Image.h"
+#include "tgfx/core/MaskFilter.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathTypes.h"
+#include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/RRect.h"
@@ -106,6 +114,18 @@ static const PictureImage* GetContentPictureImage(const MaskFilter* maskFilter,
   return nullptr;
 }
 
+// Returns the shader behind any Matrix wrappers, accumulating their transforms into shaderMatrix.
+static const Shader* UnwrapMatrixShader(const Brush& brush, Matrix* shaderMatrix) {
+  *shaderMatrix = Matrix::I();
+  const Shader* shader = brush.shader.get();
+  while (shader != nullptr && Types::Get(shader) == Types::ShaderType::Matrix) {
+    const auto* matrixShader = static_cast<const MatrixShader*>(shader);
+    shaderMatrix->preConcat(matrixShader->matrix);
+    shader = matrixShader->source.get();
+  }
+  return shader;
+}
+
 SVGExportContext::SVGExportContext(Context* context, const Rect& viewBox,
                                    std::unique_ptr<XMLWriter> inputXmlWriter, uint32_t exportFlags,
                                    std::shared_ptr<SVGCustomWriter> customWriter,
@@ -142,6 +162,56 @@ void SVGExportContext::drawFill(const Brush& brush) {
 
 void SVGExportContext::drawRect(const Rect& rect, const Matrix& matrix, const ClipStack& clip,
                                 const Brush& brush, const Stroke* stroke) {
+  // The analytic shadow shaders have no SVG equivalent and would otherwise be dropped. They carry
+  // the shapes they blur, so the draw can be redone as the image filter form the filter path uses,
+  // whose SVG mapping already exists.
+  if (stroke == nullptr) {
+    Matrix shaderMatrix = Matrix::I();
+    if (const auto* shader = UnwrapMatrixShader(brush, &shaderMatrix)) {
+      auto shapeMatrix = matrix;
+      shapeMatrix.preConcat(shaderMatrix);
+      switch (Types::Get(shader)) {
+        case Types::ShaderType::RectBlur: {
+          const auto* blur = static_cast<const RectBlurShader*>(shader);
+          if (redrawBlurAsFilterImage(blur->rect, Point::Zero(), blur->sigmaX, blur->sigmaY,
+                                      blur->color, blur->localScale, shapeMatrix, clip, brush)) {
+            return;
+          }
+          break;
+        }
+        case Types::ShaderType::RRectBlur: {
+          const auto* blur = static_cast<const RRectBlurShader*>(shader);
+          if (redrawBlurAsFilterImage(blur->rect, blur->radius, blur->sigmaX, blur->sigmaY,
+                                      blur->color, blur->localScale, shapeMatrix, clip, brush)) {
+            return;
+          }
+          break;
+        }
+        case Types::ShaderType::RectInnerShadow: {
+          const auto* inner = static_cast<const RectInnerShadowShader*>(shader);
+          if (redrawInnerShadowAsMaskedImage(inner->maskRect, Point::Zero(), inner->shadowRect,
+                                             Point::Zero(), inner->shadowCenterOffset,
+                                             inner->sigmaX, inner->sigmaY, inner->color,
+                                             inner->localScale, shapeMatrix, clip, brush)) {
+            return;
+          }
+          break;
+        }
+        case Types::ShaderType::RRectInnerShadow: {
+          const auto* inner = static_cast<const RRectInnerShadowShader*>(shader);
+          if (redrawInnerShadowAsMaskedImage(inner->maskRect, inner->maskRadius, inner->shadowRect,
+                                             inner->shadowRadius, inner->shadowCenterOffset,
+                                             inner->sigmaX, inner->sigmaY, inner->color,
+                                             inner->localScale, shapeMatrix, clip, brush)) {
+            return;
+          }
+          break;
+        }
+        default:
+          break;
+      }
+    }
+  }
   std::unique_ptr<ElementWriter> svg;
   if (RequiresViewportReset(brush)) {
     svg =
@@ -631,6 +701,125 @@ void SVGExportContext::drawPicture(std::shared_ptr<Picture> picture, const Matri
                                    const ClipStack& clip) {
   DEBUG_ASSERT(picture != nullptr);
   picture->playback(this, matrix, clip);
+}
+
+// Records the shape as a solid picture and wraps it in an image, mirroring how the filter path
+// rasterizes a shape before filtering it. Returns the image and the offset from its top-left corner
+// to the shape's coordinate origin.
+static std::shared_ptr<Image> ShapeToImage(const Rect& rect, const Point& radius,
+                                           const Color& color, const Rect& imageBounds,
+                                           Point* offset) {
+  PictureRecorder recorder = {};
+  auto* recordingCanvas = recorder.beginRecording();
+  Paint shapePaint = {};
+  shapePaint.setColor(color);
+  recordingCanvas->drawRRect(RRect::MakeRectXY(rect, radius.x, radius.y), shapePaint);
+  auto picture = recorder.finishRecordingAsPicture();
+  if (picture == nullptr) {
+    return nullptr;
+  }
+  return ToImageWithOffset(std::move(picture), offset, &imageBounds);
+}
+
+bool SVGExportContext::redrawBlurAsFilterImage(const Rect& rect, const Point& radius, float sigmaX,
+                                               float sigmaY, const Color& color, float localScale,
+                                               const Matrix& matrix, const ClipStack& clip,
+                                               const Brush& brush) {
+  // The geometry and sigma live in the shader's own space, which localScale maps from the canvas
+  // local space. Folding that scale into the matrix lets the shape be recorded in its own space.
+  auto contentMatrix = matrix;
+  contentMatrix.preScale(1.0f / localScale, 1.0f / localScale);
+
+  Point shapeOffset = {};
+  // The filter colorizes the shape, so it only needs to supply full coverage.
+  auto shapeImage = ShapeToImage(rect, radius, Color::White(), rect, &shapeOffset);
+  if (shapeImage == nullptr) {
+    return false;
+  }
+
+  auto filter = ImageFilter::DropShadowOnly(0.0f, 0.0f, sigmaX, sigmaY, color);
+  if (filter == nullptr) {
+    return false;
+  }
+  Point filterOffset = {};
+  auto shadowImage = shapeImage->makeWithFilter(filter, &filterOffset);
+  if (shadowImage == nullptr) {
+    return false;
+  }
+
+  // The shadow color and coverage now come from the filter, so the brush only carries the layer
+  // style's compositing state.
+  Brush shadowBrush = brush;
+  shadowBrush.shader = nullptr;
+  auto imageMatrix = contentMatrix;
+  imageMatrix.preTranslate(shapeOffset.x + filterOffset.x, shapeOffset.y + filterOffset.y);
+  drawImage(std::move(shadowImage), {}, imageMatrix, clip, shadowBrush);
+  return true;
+}
+
+bool SVGExportContext::redrawInnerShadowAsMaskedImage(const Rect& maskRect, const Point& maskRadius,
+                                                      const Rect& shadowRect,
+                                                      const Point& shadowRadius,
+                                                      const Point& shadowCenterOffset, float sigmaX,
+                                                      float sigmaY, const Color& color,
+                                                      float localScale, const Matrix& matrix,
+                                                      const ClipStack& clip, const Brush& brush) {
+  // The inner shadow is the layer's own shape tinted by the shadow color, kept only where the
+  // blurred light-passing shape is absent. That is the shape image plus an inverted mask built from
+  // the blurred shape, matching what the filter path composes.
+  auto contentMatrix = matrix;
+  contentMatrix.preScale(1.0f / localScale, 1.0f / localScale);
+
+  // The mask image is replayed at its own origin, so both images have to span the same bounds for
+  // them to line up; a matrix-wrapped mask shader has no SVG mask form. The bounds extend by the
+  // blur reach so the falloff is not clipped where the shadow is strongest.
+  const auto imageBounds = maskRect.makeOutset(2.0f * sigmaX, 2.0f * sigmaY);
+  Point shapeOffset = {};
+  // The shape carries the shadow color directly: a SrcIn color filter has no SVG equivalent, so
+  // tinting it here keeps the draw expressible.
+  auto shapeImage = ShapeToImage(maskRect, maskRadius, color, imageBounds, &shapeOffset);
+  if (shapeImage == nullptr) {
+    return false;
+  }
+
+  // The light-passing shape is centered on the mask plus the offset the shader carries.
+  auto lightRect = shadowRect;
+  lightRect.offset(maskRect.centerX() + shadowCenterOffset.x - shadowRect.centerX(),
+                   maskRect.centerY() + shadowCenterOffset.y - shadowRect.centerY());
+
+  // The mask is the blurred light-passing shape, inverted so the shadow survives where the light
+  // does not reach. The inversion the mask filter path emits carries no filter region, so it is
+  // confined to the blurred shape's bounds; the mask therefore covers the outset bounds to keep the
+  // inversion meaningful across the whole shape.
+  PictureRecorder maskRecorder = {};
+  auto* maskCanvas = maskRecorder.beginRecording();
+  Paint shadowShapePaint = {};
+  shadowShapePaint.setColor(Color::White());
+  shadowShapePaint.setImageFilter(ImageFilter::Blur(sigmaX, sigmaY));
+  maskCanvas->drawRRect(RRect::MakeRectXY(lightRect, shadowRadius.x, shadowRadius.y),
+                        shadowShapePaint);
+  auto maskPicture = maskRecorder.finishRecordingAsPicture();
+  if (maskPicture == nullptr) {
+    return false;
+  }
+  Point maskOffset = {};
+  auto maskImage = ToImageWithOffset(std::move(maskPicture), &maskOffset, &imageBounds);
+  if (maskImage == nullptr) {
+    return false;
+  }
+
+  auto maskShader = Shader::MakeImageShader(maskImage, TileMode::Decal, TileMode::Decal, {});
+  if (maskShader == nullptr) {
+    return false;
+  }
+
+  Brush shadowBrush = brush;
+  shadowBrush.shader = nullptr;
+  shadowBrush.maskFilter = MaskFilter::MakeShader(maskShader, true);
+  auto imageMatrix = contentMatrix;
+  imageMatrix.preTranslate(shapeOffset.x, shapeOffset.y);
+  drawImage(std::move(shapeImage), {}, imageMatrix, clip, shadowBrush);
+  return true;
 }
 
 void SVGExportContext::exportPictureImageAsVector(const PictureImage* pictureImage,

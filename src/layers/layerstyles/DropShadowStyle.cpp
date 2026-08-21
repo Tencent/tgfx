@@ -17,10 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
+#include "core/shaders/RRectBlurShader.h"
+#include "core/shaders/RectBlurShader.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "layers/SpreadUtils.h"
+#include "layers/layerstyles/AnalyticShadowUtils.h"
+#include "tgfx/core/Canvas.h"
 #include "tgfx/core/ImageFilter.h"
+#include "tgfx/core/MaskFilter.h"
 
 namespace tgfx {
 
@@ -114,6 +119,68 @@ uint32_t DropShadowStyle::extraSourceType() const {
   return static_cast<uint32_t>(LayerStyleExtraSourceType::None);
 }
 
+bool DropShadowStyle::drawAnalytic(Canvas* canvas, const LayerStyleInput& input, float alpha,
+                                   BlendMode blendMode) {
+  DEBUG_ASSERT(!FloatNearlyZero(_spread));
+  // The closed form convolves the shape along its own x and y axes, while the blurriness is defined
+  // along the canvas axes. The two only agree while the axes stay parallel, so a canvas carrying
+  // rotation, skew or perspective (e.g. a layer placed with setMatrix3D) would apply the blur along
+  // the wrong directions. Quarter-turn rotations are still accepted: the supported shapes are
+  // symmetric about both center axes, so the axes swap without tilting.
+  if (!canvas->getMatrix().rectStaysRect()) {
+    return false;
+  }
+  const auto sigmaX = _blurrinessX * input.contentScale;
+  const auto sigmaY = _blurrinessY * input.contentScale;
+  // A zero sigma degenerates the kernel; the filter path already handles the hard-edged case,
+  // including its nearest-neighbour sampling.
+  if (FloatNearlyZero(sigmaX) || FloatNearlyZero(sigmaY)) {
+    return false;
+  }
+  auto analytic = MakeAnalyticShadowShape(input, _spread);
+  if (!analytic.has_value()) {
+    return false;
+  }
+  auto [shapeRect, shapeRadius] = *analytic;
+  // Geometry, sigma and the canvas all live in content pixels here, so no extra scale is needed. A
+  // sharp shape has its own closed form, without the corner term.
+  std::shared_ptr<Shader> shader = nullptr;
+  if (FloatNearlyZero(shapeRadius.x) && FloatNearlyZero(shapeRadius.y)) {
+    shader = RectBlurShader::Make(shapeRect, sigmaX, sigmaY, _color, 1.0f);
+  } else {
+    shader = RRectBlurShader::Make(shapeRect, shapeRadius, sigmaX, sigmaY, _color, 1.0f);
+  }
+  if (shader == nullptr) {
+    return false;
+  }
+
+  auto drawRect = shapeRect.makeOutset(2.0f * sigmaX, 2.0f * sigmaY);
+  const auto offsetX = _offsetX * input.contentScale;
+  const auto offsetY = _offsetY * input.contentScale;
+  Paint paint = {};
+  auto* contour = input.findExtraSource(StyleInputSource::Type::Contour);
+  if (!_showBehindLayer && contour != nullptr && contour->image() != nullptr) {
+    auto contourShader =
+        Shader::MakeImageShader(contour->image(), TileMode::Decal, TileMode::Decal, {});
+    auto contourOffset = contour->imageOffset();
+    // The canvas is translated by the shadow offset before drawing, which would drag the contour
+    // mask along with the shadow. The mask has to stay on the layer itself, so the offset is
+    // cancelled here: only the shadow moves, the knockout does not.
+    auto matrixShader = contourShader->makeWithMatrix(
+        Matrix::MakeTrans(contourOffset.x - offsetX, contourOffset.y - offsetY));
+    paint.setMaskFilter(MaskFilter::MakeShader(matrixShader, true));
+  }
+  paint.setShader(std::move(shader));
+  paint.setBlendMode(blendMode);
+  paint.setAlpha(alpha);
+  // The offset moves the shadow only; translating the canvas keeps the shader and the draw rect in
+  // the same space, so the geometry stays centred on the shape.
+  AutoCanvasRestore restoreCanvas(canvas);
+  canvas->translate(offsetX, offsetY);
+  canvas->drawRect(drawRect, paint);
+  return true;
+}
+
 void DropShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alpha,
                              BlendMode blendMode) {
   Point offset = {};
@@ -124,6 +191,12 @@ void DropShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float
   std::shared_ptr<Image> filterSource = input.content;
   Point filterSourceOffset = {};
   if (!FloatNearlyZero(_spread)) {
+    // The analytic path draws from contentShape, the layer's own outline without its children. Only
+    // the spread path matches that, since it rasterizes contentShape alone, while the no-spread path
+    // blurs the full content image.
+    if (drawAnalytic(canvas, input, alpha, blendMode)) {
+      return;
+    }
     auto spreadImage = SpreadUtils::MakeSpreadShapeImage(input, _spread);
     // The spread shadow is drawn from the spread shape image. When the vector shape is unavailable
     // (e.g. a group layer with only children) or exceeds the content image, the spread cannot be

@@ -131,9 +131,28 @@ class SVGExportContext : public DrawContext {
                                   const std::shared_ptr<ColorFilter>& colorFilter,
                                   const std::string& blendModeStyle, float alpha);
 
+  /**
+   * Redraws an analytic drop shadow as the equivalent image filter draw, so the shadow reuses the SVG
+   * filter chain the image filter path already emits instead of rasterizing the shader. Returns false
+   * when the draw cannot be expressed this way, leaving nothing written.
+   */
+  bool redrawBlurAsFilterImage(const Rect& rect, const Point& radius, float sigmaX, float sigmaY,
+                               const Color& color, float localScale, const Matrix& matrix,
+                               const ClipStack& clip, const Brush& brush);
+
+  /**
+   * Redraws an analytic inner shadow as the layer's own shape masked by the inverted blur of the
+   * light-passing shape, mirroring what the filter path composes. Returns false when the draw cannot
+   * be expressed this way, leaving nothing written.
+   */
+  bool redrawInnerShadowAsMaskedImage(const Rect& maskRect, const Point& maskRadius,
+                                      const Rect& shadowRect, const Point& shadowRadius,
+                                      const Point& shadowCenterOffset, float sigmaX, float sigmaY,
+                                      const Color& color, float localScale, const Matrix& matrix,
+                                      const ClipStack& clip, const Brush& brush);
+
   void exportGlyphRunAsPath(const GlyphRun& glyphRun, const Matrix& matrix, const Brush& brush,
                             const Stroke* stroke);
-
   void exportGlyphRunAsText(const GlyphRun& glyphRun, const Matrix& matrix, const Brush& brush,
                             const Stroke* stroke);
 

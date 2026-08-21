@@ -147,6 +147,13 @@ class DropShadowStyle : public LayerStyle {
 
   void invalidateFilter();
 
+  /**
+   * Tries to draw the shadow analytically.
+   * @return True if the shadow was drawn successfully, false if the conditions are not met or an
+   * error occurs.
+   */
+  bool drawAnalytic(Canvas* canvas, const LayerStyleInput& input, float alpha, BlendMode blendMode);
+
   std::shared_ptr<ImageFilter> getShadowFilter(float contentScale);
 
   float _offsetX = 0.0f;

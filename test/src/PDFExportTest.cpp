@@ -904,11 +904,24 @@ TGFX_TEST(PDFExportTest, DropShadowLayer) {
   layerB->setLayerStyles({DropShadowStyle::Make(20.f, 20.f, 10.f, 10.f, Color::Blue(), true)});
   root->addChild(layerB);
 
+  // A non-zero spread on an exact rect is what the analytic shadow path accepts, so this layer
+  // reaches the export-only branch that keeps the shadow as a native PDF filter.
+  auto layerC = ShapeLayer::Make();
+  Path pathC;
+  pathC.addRect(Rect::MakeWH(200.f, 200.f));
+  layerC->setPath(pathC);
+  layerC->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 0, 0, 127)));
+  layerC->setPosition(Point{650.f, 50.f});
+  auto spreadStyle = DropShadowStyle::Make(20.f, 20.f, 10.f, 10.f, Color::Blue(), true);
+  spreadStyle->setSpread(10.f);
+  layerC->setLayerStyles({spreadStyle});
+  root->addChild(layerC);
+
   auto PDFStream = MemoryWriteStream::Make();
   auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
 
   // Page 1: rectangles
-  auto canvas = document->beginPage(650.f, 350.f);
+  auto canvas = document->beginPage(950.f, 350.f);
   canvas->drawColor(Color::FromRGBA(200, 200, 200));
   root->draw(canvas);
   document->endPage();
