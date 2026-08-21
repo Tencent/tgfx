@@ -507,7 +507,22 @@ TGFX_TEST(LayerMaskTest, InvertedMask) {
   list.root()->addChild(orangeContent);
   list.root()->addChild(emptyMask);
 
-  auto surface = Surface::Make(context, 400, 100);
+  // Contour inverted: the content stays visible only outside the mask's contour.
+  auto contourContent = ShapeLayer::Make();
+  contourContent->setPath(contentPath);
+  contourContent->setMatrix(Matrix::MakeTrans(400, 0));
+  contourContent->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 128, 0)));
+  auto contourMask = ShapeLayer::Make();
+  contourMask->setPath(halfPath);
+  contourMask->setFillStyle(ShapeStyle::Make(Color::Black()));
+  contourMask->setAlpha(0.5f);
+  contourMask->setMatrix(Matrix::MakeTrans(400, 0));
+  contourContent->setMask(contourMask);
+  contourContent->setMaskType(LayerMaskType::ContourInverted);
+  list.root()->addChild(contourContent);
+  list.root()->addChild(contourMask);
+
+  auto surface = Surface::Make(context, 500, 100);
   list.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerMaskTest/InvertedMask"));
 }

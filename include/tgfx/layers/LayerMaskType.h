@@ -36,13 +36,15 @@ enum class LayerMaskType {
    */
   Luminance,
   /**
-   * Uses the inverted transparency of the target layer as a mask. The layer content is visible
-   * where the mask is transparent and hidden where the mask is opaque.
+   * Uses the inverted transparency of the target layer as a mask.
    */
   AlphaInverted,
   /**
-   * Uses the inverted luminance of the target layer as a mask. The layer content is visible where
-   * the mask is dark and hidden where the mask is bright.
+   * Uses the inverted contour of the target layer as a mask.
+   */
+  ContourInverted,
+  /**
+   * Uses the inverted luminance of the target layer as a mask.
    */
   LuminanceInverted
 };

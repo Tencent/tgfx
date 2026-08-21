@@ -94,8 +94,6 @@ static void ClipScrollRect(Canvas* canvas, const Rect* scrollRect, const Matrix3
 struct MaskData {
   MaskData() = default;
 
-  // Creates the result for a mask that covers nothing: hides all content for normal mask types,
-  // but keeps all content for inverted mask types (an inverse-filled empty path clips nothing).
   explicit MaskData(bool inverted) {
     if (inverted) {
       clipPath.toggleInverseFillType();
@@ -1255,11 +1253,13 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
   DEBUG_ASSERT(_mask != nullptr);
   DEBUG_ASSERT(args.render3DContext == nullptr);
   auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
-  auto isContourMode = maskType == LayerMaskType::Contour;
+  auto isContourMode =
+      maskType == LayerMaskType::Contour || maskType == LayerMaskType::ContourInverted;
   bool needLuminance =
       maskType == LayerMaskType::Luminance || maskType == LayerMaskType::LuminanceInverted;
-  bool inverted =
-      maskType == LayerMaskType::AlphaInverted || maskType == LayerMaskType::LuminanceInverted;
+  bool inverted = maskType == LayerMaskType::AlphaInverted ||
+                  maskType == LayerMaskType::LuminanceInverted ||
+                  maskType == LayerMaskType::ContourInverted;
 
   auto relativeMatrix3D = _mask->getRelativeMatrix3D(this);
   auto maskPicture = getMaskPicture(args, isContourMode, scale, relativeMatrix3D);
@@ -1267,8 +1267,6 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
     return MaskData(inverted);
   }
 
-  // Inverted masks take the shader path for now; a geometric fast path using
-  // toggleInverseFillType is left as a future optimization.
   if (!needLuminance && !inverted) {
     Path maskPath = {};
     if (MaskContext::GetMaskPath(maskPicture, &maskPath)) {
