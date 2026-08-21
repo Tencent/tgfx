@@ -119,4 +119,14 @@ void MetalWindow::onPresent(Context*) {
   proxy->releaseDrawable();
 }
 
+void MetalWindow::onVSyncEnabledChanged(bool enabled) {
+#if TARGET_OS_OSX
+  // displaySyncEnabled only exists on macOS; on iOS/tvOS presentation is always synchronized to
+  // the display and cannot be disabled, so this is a no-op there.
+  metalLayer.displaySyncEnabled = enabled ? YES : NO;
+#else
+  (void)enabled;
+#endif
+}
+
 }  // namespace tgfx

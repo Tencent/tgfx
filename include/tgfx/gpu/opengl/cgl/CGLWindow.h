@@ -38,6 +38,9 @@ class CGLWindow : public Window {
 
  private:
   NSView* view = nil;
+  // Tracks the swap interval last applied via NSOpenGLContextParameterSwapInterval so onPresent
+  // only sets it when the vsync setting actually changes. -1 means not yet applied.
+  int appliedSwapInterval = -1;
 
   CGLWindow(std::shared_ptr<Device> device, NSView* view,
             std::shared_ptr<ColorSpace> colorSpace = nullptr);

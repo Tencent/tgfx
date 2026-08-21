@@ -87,6 +87,7 @@ class VulkanWindow : public Window {
  protected:
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
   void onPresent(Context* context) override;
+  void onVSyncEnabledChanged(bool enabled) override;
 
  private:
   // PImpl: all Vulkan handles and swapchain state live in PlatformState (defined in .cpp) to avoid

@@ -51,6 +51,40 @@ static void DestroySwapchainResources(VkDevice device, VkInstance instance, VkSu
   }
 }
 
+// Picks the swapchain present mode for the requested vsync setting. FIFO is guaranteed by the
+// spec and used whenever vsync is enabled. When vsync is disabled, MAILBOX is preferred (tear-free,
+// low latency) and IMMEDIATE is the fallback; if neither is advertised the code stays on FIFO so
+// creation always succeeds.
+static VkPresentModeKHR ChoosePresentMode(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface,
+                                          bool vsyncEnabled) {
+  if (vsyncEnabled) {
+    return VK_PRESENT_MODE_FIFO_KHR;
+  }
+  uint32_t count = 0;
+  vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &count, nullptr);
+  if (count == 0) {
+    return VK_PRESENT_MODE_FIFO_KHR;
+  }
+  std::vector<VkPresentModeKHR> modes(count);
+  vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &count, modes.data());
+  bool hasMailbox = false;
+  bool hasImmediate = false;
+  for (auto mode : modes) {
+    if (mode == VK_PRESENT_MODE_MAILBOX_KHR) {
+      hasMailbox = true;
+    } else if (mode == VK_PRESENT_MODE_IMMEDIATE_KHR) {
+      hasImmediate = true;
+    }
+  }
+  if (hasMailbox) {
+    return VK_PRESENT_MODE_MAILBOX_KHR;
+  }
+  if (hasImmediate) {
+    return VK_PRESENT_MODE_IMMEDIATE_KHR;
+  }
+  return VK_PRESENT_MODE_FIFO_KHR;
+}
+
 // Holds all Vulkan-specific handles and swapchain resources. Defined here (not in the header) so
 // that vulkan.h is never required by downstream translation units that include VulkanWindow.h.
 struct VulkanWindow::PlatformState {
@@ -61,6 +95,10 @@ struct VulkanWindow::PlatformState {
   std::vector<VkImage> images;
   std::vector<VkImageView> imageViews;
   VkFormat format = VK_FORMAT_UNDEFINED;
+  VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
+  // Set by onVSyncEnabledChanged (which runs while holding the window lock and has no Context) so
+  // the next onCreateRenderTarget rebuilds the swapchain with the new present mode.
+  bool vsyncDirty = false;
   int width = 0;
   int height = 0;
   std::shared_ptr<RenderTargetProxy> swapchainProxy;
@@ -664,7 +702,7 @@ bool VulkanWindow::PlatformState::recreateSwapchain(VkDevice device,
   swapchainInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
   swapchainInfo.preTransform = capabilities.currentTransform;
   swapchainInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-  swapchainInfo.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+  swapchainInfo.presentMode = presentMode;
   swapchainInfo.clipped = VK_TRUE;
   swapchainInfo.oldSwapchain = swapchain;
 
@@ -729,15 +767,29 @@ std::shared_ptr<RenderTargetProxy> VulkanWindow::onCreateRenderTarget(Context* c
   }
 
   auto lastProxy = std::static_pointer_cast<VulkanSwapchainProxy>(_platformState->swapchainProxy);
+  // Recompute the desired present mode up front: a pending vsync change forces a rebuild, and the
+  // chosen mode is written into PlatformState so recreateSwapchain() picks it up.
+  bool vsyncPending = _platformState->vsyncDirty;
+  VkPresentModeKHR desiredPresentMode = _platformState->presentMode;
+  if (vsyncPending) {
+    desiredPresentMode = ChoosePresentMode(physicalDevice, _platformState->surface, vsyncEnabled());
+  }
   bool needsRebuild = (_platformState->swapchain == VK_NULL_HANDLE) ||
                       (lastProxy && lastProxy->isOutOfDate()) ||
+                      (vsyncPending && desiredPresentMode != _platformState->presentMode) ||
                       (static_cast<int>(extent.width) != _platformState->width) ||
                       (static_cast<int>(extent.height) != _platformState->height);
+
+  // Clear the dirty flag regardless: if the present mode did not actually change (e.g. IMMEDIATE
+  // not supported so it stays FIFO), there is nothing to rebuild for and re-checking every frame
+  // would be wasteful.
+  _platformState->vsyncDirty = false;
 
   if (needsRebuild) {
     if (extent.width == 0 || extent.height == 0) {
       return nullptr;
     }
+    _platformState->presentMode = desiredPresentMode;
     // Release the old proxy before rebuilding the swapchain, since recreateSwapchain() destroys
     // the old swapchain images that the proxy references.
     _platformState->swapchainProxy.reset();
@@ -759,6 +811,12 @@ void VulkanWindow::onPresent(Context*) {
   }
   auto proxy = std::static_pointer_cast<VulkanSwapchainProxy>(_platformState->swapchainProxy);
   proxy->releaseFrame();
+}
+
+void VulkanWindow::onVSyncEnabledChanged(bool /*enabled*/) {
+  // Called while holding the window lock and without a Context, so the swapchain cannot be rebuilt
+  // here. Flag it and let the next onCreateRenderTarget rebuild with the new present mode.
+  _platformState->vsyncDirty = true;
 }
 
 }  // namespace tgfx

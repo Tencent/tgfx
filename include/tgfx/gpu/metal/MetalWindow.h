@@ -51,6 +51,7 @@ class MetalWindow : public Window {
  protected:
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
   void onPresent(Context* context) override;
+  void onVSyncEnabledChanged(bool enabled) override;
 
  private:
   CAMetalLayer* metalLayer = nil;

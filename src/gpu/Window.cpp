@@ -28,11 +28,28 @@ std::shared_ptr<ColorSpace> Window::colorSpace() const {
   return _colorSpace;
 }
 
+void Window::setVSyncEnabled(bool enabled) {
+  std::lock_guard<std::mutex> autoLock(locker);
+  if (_vsyncEnabled == enabled) {
+    return;
+  }
+  _vsyncEnabled = enabled;
+  onVSyncEnabledChanged(enabled);
+}
+
+bool Window::vsyncEnabled() {
+  std::lock_guard<std::mutex> autoLock(locker);
+  return _vsyncEnabled;
+}
+
 std::shared_ptr<Device> Window::getDevice() {
   std::lock_guard<std::mutex> autoLock(locker);
   return device;
 }
 
 void Window::onPresent(Context*) {
+}
+
+void Window::onVSyncEnabledChanged(bool) {
 }
 }  // namespace tgfx

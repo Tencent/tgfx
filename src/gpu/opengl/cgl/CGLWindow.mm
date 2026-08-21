@@ -94,6 +94,11 @@ std::shared_ptr<RenderTargetProxy> CGLWindow::onCreateRenderTarget(Context* cont
 
 void CGLWindow::onPresent(Context*) {
   auto glContext = static_cast<CGLDevice*>(device.get())->glContext;
+  int desiredInterval = vsyncEnabled() ? 1 : 0;
+  if (desiredInterval != appliedSwapInterval) {
+    [glContext setValues:&desiredInterval forParameter:NSOpenGLContextParameterSwapInterval];
+    appliedSwapInterval = desiredInterval;
+  }
   [glContext flushBuffer];
 }
 }  // namespace tgfx
