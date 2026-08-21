@@ -246,7 +246,11 @@ void GLSLGlassUDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppend("float edgeGradientLength = max(length(edgeGradient), 0.0001);");
     fragBuilder->codeAppend(
         "float edgeDistance = max((edgeHeight - 0.5) / edgeGradientLength, 0.0);");
-    fragBuilder->codeAppend("edgeWeight = 1.0 - smoothstep(0.0, 1.0, edgeDistance);");
+    // The distance is in layer pixels, so a fixed band shrinks below one screen pixel once the
+    // layer is scaled down and the border turns into a hard threshold. Widen it to cover a screen
+    // pixel in that case.
+    fragBuilder->codeAppendf("float edgeBand = max(1.0, %s.w);", effect.c_str());
+    fragBuilder->codeAppend("edgeWeight = 1.0 - smoothstep(0.0, edgeBand, edgeDistance);");
   }
   fragBuilder->codeAppendf("%s = vec4(0.0);", args.outputColor.c_str());
   fragBuilder->codeAppend("if (gradientLength > 0.000001 && gradientWeight > 0.000001) {");

@@ -4346,6 +4346,135 @@ TGFX_TEST(LayerTest, GlassStyleEdgeLightDuringLayerMoveMultiTile) {
       << " while the layer was moving";
 }
 
+// Same slide as GlassStyleEdgeLightDuringLayerMoveMultiTile but with an L-shaped (non-regular)
+// path, which takes the AlphaMask/UDF path instead of the analytical SDF one: the edge light
+// field comes from the grid-celled coarse UDF textures, and the test checks that the cell
+// window covers the moving draw region so no part of the edge light goes missing.
+TGFX_TEST(LayerTest, GlassStyleEdgeLightDuringLayerMoveAlphaMask) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  constexpr int SurfaceWidth = 2400;
+  constexpr int SurfaceHeight = 1400;
+  auto background = ShapeLayer::Make();
+  Path backgroundPath = {};
+  backgroundPath.addRect(Rect::MakeXYWH(0, 0, SurfaceWidth, SurfaceHeight));
+  background->setPath(backgroundPath);
+  background->setFillStyle(ShapeStyle::Make(Color::FromRGBA(200, 200, 200, 255)));
+  auto glassLayer = ShapeLayer::Make();
+  Path path = {};
+  path.addRect(Rect::MakeXYWH(0, 0, 1800, 300));
+  path.addRect(Rect::MakeXYWH(0, 300, 600, 300));
+  glassLayer->setPath(path);
+  glassLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 60)));
+  glassLayer->setLayerStyles({GlassStyle::Make(20, 5, 0, 0, 0, 0, 1.0f)});
+  DisplayList displayList;
+  displayList.root()->addChild(background);
+  displayList.root()->addChild(glassLayer);
+
+  auto surface = Surface::Make(context, SurfaceWidth, SurfaceHeight);
+  auto red = [](uint32_t pixel) { return static_cast<int>(pixel & 0xFF); };
+  std::map<int, int> brightness;
+  auto firstProblem = std::make_pair(-10000, -1);
+
+  // The L spans y [400, 1000] in world space; the sampled band y=403 sits on the top edge of the
+  // horizontal arm. Content x in [700, 1100] stays in the arm away from the inner corner.
+  for (int layerX = -900; layerX <= 300; layerX += 150) {
+    glassLayer->setMatrix(Matrix::MakeTrans(static_cast<float>(layerX), 400.0f));
+    displayList.render(surface.get());
+    auto row = ReadSurfaceRow(surface.get(), 403);
+    ASSERT_FALSE(row.empty());
+    for (int cx = 700; cx <= 1100; cx += 25) {
+      int screenX = cx + layerX;
+      if (screenX < 0 || screenX >= SurfaceWidth) {
+        continue;
+      }
+      auto value = red(row[static_cast<size_t>(screenX)]);
+      auto it = brightness.find(cx);
+      if (it == brightness.end()) {
+        brightness[cx] = value;
+      } else if (std::abs(it->second - value) > 12) {
+        if (firstProblem.first == -10000) {
+          firstProblem = {cx, value};
+        }
+      }
+    }
+  }
+  EXPECT_EQ(firstProblem.first, -10000)
+      << "edge light at content x=" << firstProblem.first << " changed to " << firstProblem.second
+      << " while the layer was moving";
+}
+
+// Slides an AlphaMask-path glass layer in small continuous steps over a striped background,
+// mirroring an interactive drag: each frame's dirty region is the layer's old and new positions,
+// the background snapshot carries non-uniform content, and the edge light must stay identical at
+// every content position throughout the drag.
+TGFX_TEST(LayerTest, GlassStyleEdgeLightContinuousDrag) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  constexpr int SurfaceWidth = 2400;
+  constexpr int SurfaceHeight = 1400;
+  // Striped background: horizontal bars of varying gray, covering the whole surface, so the
+  // background content is neither uniform nor translation-invariant.
+  DisplayList displayList;
+  constexpr int BarHeight = 100;
+  for (int i = 0; i * BarHeight < SurfaceHeight; ++i) {
+    auto bar = ShapeLayer::Make();
+    Path barPath = {};
+    barPath.addRect(Rect::MakeXYWH(0.0f, static_cast<float>(i * BarHeight),
+                                   static_cast<float>(SurfaceWidth),
+                                   static_cast<float>(BarHeight)));
+    bar->setPath(barPath);
+    auto shade = static_cast<uint8_t>(90 + (i % 3) * 50);
+    bar->setFillStyle(ShapeStyle::Make(Color::FromRGBA(shade, shade, shade, 255)));
+    displayList.root()->addChild(bar);
+  }
+  auto glassLayer = ShapeLayer::Make();
+  Path path = {};
+  path.addRect(Rect::MakeXYWH(0, 0, 1800, 300));
+  path.addRect(Rect::MakeXYWH(0, 300, 600, 300));
+  glassLayer->setPath(path);
+  glassLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 60)));
+  glassLayer->setLayerStyles({GlassStyle::Make(20, 5, 0, 0, 0, 0, 1.0f)});
+  displayList.root()->addChild(glassLayer);
+
+  auto surface = Surface::Make(context, SurfaceWidth, SurfaceHeight);
+  auto red = [](uint32_t pixel) { return static_cast<int>(pixel & 0xFF); };
+  std::map<int, int> brightness;
+  auto firstProblem = std::make_pair(-10000, -1);
+  // The sampled band y=403 sits on the top edge of the L's horizontal arm (the layer starts at
+  // world y=400); content x in [700, 1100] stays in the arm away from the inner corner. The layer
+  // stays within bars 4-6 vertically throughout the drag, so the sampled edge always sits over
+  // the same stripe.
+  for (int layerX = -600; layerX <= 0; layerX += 10) {
+    glassLayer->setMatrix(Matrix::MakeTrans(static_cast<float>(layerX), 400.0f));
+    displayList.render(surface.get());
+    auto row = ReadSurfaceRow(surface.get(), 403);
+    ASSERT_FALSE(row.empty());
+    for (int cx = 700; cx <= 1100; cx += 25) {
+      int screenX = cx + layerX;
+      if (screenX < 0 || screenX >= SurfaceWidth) {
+        continue;
+      }
+      auto value = red(row[static_cast<size_t>(screenX)]);
+      auto it = brightness.find(cx);
+      if (it == brightness.end()) {
+        brightness[cx] = value;
+      } else if (std::abs(it->second - value) > 12) {
+        if (firstProblem.first == -10000) {
+          firstProblem = {cx, value};
+        }
+      }
+    }
+  }
+  EXPECT_EQ(firstProblem.first, -10000)
+      << "edge light at content x=" << firstProblem.first << " changed to " << firstProblem.second
+      << " during the drag";
+}
+
 TGFX_TEST(LayerTest, GlassStyleEllipse) {
   RunGlassStyleTest("Ellipse");
 }

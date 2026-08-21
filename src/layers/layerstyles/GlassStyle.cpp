@@ -611,36 +611,36 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
         cell.intersect(contentRect);
       }
 
-      // The full-layer core density is fixed: each texel covers two content pixels, so the core
-      // stays at half the content resolution regardless of the cell size or zoom.
-      static constexpr float EDGE_CORE_SCALE = 0.5f;
-      int edgeCoreWidth = std::max(1, static_cast<int>(std::round(contentWidth * EDGE_CORE_SCALE)));
-      int edgeCoreHeight =
-          std::max(1, static_cast<int>(std::round(contentHeight * EDGE_CORE_SCALE)));
-      float edgePixelToLayerPixelX = 1.0f / (EDGE_CORE_SCALE * layerToSourceX);
-      float edgePixelToLayerPixelY = 1.0f / (EDGE_CORE_SCALE * layerToSourceY);
+      // Keep at least one edge-field texel per layer pixel. Below 2x zoom this raises the density
+      // continuously as contentScale falls; edgeCoreWidth/Height then stay approximately equal to
+      // the layer dimensions instead of changing at a zoom threshold. The cell window remains at
+      // most about 2048 texels while edge lighting is enabled (contentScale > 0.5).
+      static constexpr float MIN_EDGE_CORE_SCALE = 0.5f;
+      float edgeScale =
+          std::max(MIN_EDGE_CORE_SCALE, 1.0f / std::min(layerToSourceX, layerToSourceY));
+      int edgeCoreWidth = std::max(1, static_cast<int>(std::round(contentWidth * edgeScale)));
+      int edgeCoreHeight = std::max(1, static_cast<int>(std::round(contentHeight * edgeScale)));
+      float edgePixelToLayerPixelX = 1.0f / (edgeScale * layerToSourceX);
+      float edgePixelToLayerPixelY = 1.0f / (edgeScale * layerToSourceY);
       // The cell is expressed in the full-layer UDF space, so it must be scaled with the same
       // density as the core. Any other factor would shift the texture origin away from the
       // coordinates the shader derives from the full-layer mapping.
-      float edgeScale = EDGE_CORE_SCALE;
 
-      // The edge light width is fixed in layer space so it stays constant across zoom; a screen
-      // pixel floor lifts the layer width when zooming out so the light never shrinks below five
-      // screen pixels and degenerates into flickering dots.
-      static constexpr float EDGE_LIGHT_LAYER_PIXELS = 2.0f;
-      static constexpr float MIN_EDGE_LIGHT_SCREEN_PIXELS = 5.0f;
-      auto edgeLightLayerPixels =
-          std::max(EDGE_LIGHT_LAYER_PIXELS, MIN_EDGE_LIGHT_SCREEN_PIXELS / input.contentScale);
-      // Tent kernels below four texels cannot represent a stable ramp, so the radius never drops
-      // under that floor; the span below widens accordingly.
+      // This radius controls only the smoothness and reach of the distance field. The shader
+      // divides the field height by its reconstructed gradient and then applies smoothstep(0, 1),
+      // so the visible edge-light width remains exactly one layer pixel. Keeping the field radius
+      // at four layer pixels and at least four texels prevents sparse point-like gradients without
+      // coupling the visible width to zoom or UDF density.
+      static constexpr float EDGE_FIELD_RADIUS_LAYER_PIXELS = 4.0f;
       static constexpr float MIN_COARSE_TENT_TEXELS = 4.0f;
       Point coarseRadius = {
-          std::min(std::max(edgeLightLayerPixels / edgePixelToLayerPixelX, MIN_COARSE_TENT_TEXELS),
+          std::min(std::max(EDGE_FIELD_RADIUS_LAYER_PIXELS / edgePixelToLayerPixelX,
+                            MIN_COARSE_TENT_TEXELS),
                    static_cast<float>(GlassUDFMaxTentRadius)),
-          std::min(std::max(edgeLightLayerPixels / edgePixelToLayerPixelY, MIN_COARSE_TENT_TEXELS),
+          std::min(std::max(EDGE_FIELD_RADIUS_LAYER_PIXELS / edgePixelToLayerPixelY,
+                            MIN_COARSE_TENT_TEXELS),
                    static_cast<float>(GlassUDFMaxTentRadius))};
-      // The span must come from the clamped radius, otherwise the shader would divide by a
-      // different distance than the one the blur actually produced.
+      // edgeSpan describes the field's physical gradient sampling distance, not the visible width.
       float edgeSpanX = coarseRadius.x * edgePixelToLayerPixelX;
       float edgeSpanY = coarseRadius.y * edgePixelToLayerPixelY;
       float edgeHaloX = std::ceil(coarseRadius.x * 0.5f) + 1.0f;

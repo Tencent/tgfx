@@ -74,42 +74,38 @@ static std::shared_ptr<TextureProxy> GenerateGlassUDFTexture(
   auto sourceDrawRect =
       Rect::MakeLTRB(-horizontalHalo, -1.0f, static_cast<float>(textureWidth) + horizontalHalo,
                      static_cast<float>(horizontalHeight) + 1.0f);
-  // Rasterize only the sampling window (textureRect + blur halos) at UDF core density instead of
-  // the full-layer core; the full core can exceed the texture limit at high zoom although only
-  // the window is ever sampled. The window image keeps the UDF coordinate space (pixel i maps to
-  // UDF coordinate window.left + i), so the sampling matrix only subtracts the window origin.
-  float sourceToUDFX = static_cast<float>(coreWidth) / static_cast<float>(source->width());
-  float sourceToUDFY = static_cast<float>(coreHeight) / static_cast<float>(source->height());
+  // Resample the source to the core density first, then take the sampling window (textureRect plus
+  // blur halos) out of it. Only the window is rasterized, because the full core can exceed the
+  // texture limit at high zoom. Doing the resample before the window matters: its grid is then a
+  // layer-wide constant, so every window lands on the same grid with the same phase. Resampling a
+  // window instead ties the grid phase to the window's origin and size, and neighbouring cells
+  // along one straight edge would then disagree on the field, which shows up as the edge light
+  // changing width from one cell to the next.
+  auto coreImage = source->makeScaled(coreWidth, coreHeight, SamplingOptions(FilterMode::Linear));
+  if (coreImage == nullptr) {
+    return nullptr;
+  }
   auto coreWindowUDF =
       Rect::MakeLTRB(textureRect.left - horizontalHalo, horizontalRect.top - 1.0f,
                      textureRect.left + static_cast<float>(textureWidth) + horizontalHalo,
                      horizontalRect.top + static_cast<float>(horizontalHeight) + 1.0f);
   coreWindowUDF.roundOut();
-  auto coreWindowSource = coreWindowUDF;
-  coreWindowSource.scale(1.0f / sourceToUDFX, 1.0f / sourceToUDFY);
-  coreWindowSource.roundOut();
-  if (!coreWindowSource.intersect(Rect::MakeWH(source->width(), source->height()))) {
+  if (!coreWindowUDF.intersect(Rect::MakeWH(coreWidth, coreHeight))) {
     return nullptr;
   }
-  coreWindowSource.roundOut();
-  // The window may be clipped by the source bounds; the actual UDF range follows the clip.
-  auto actualUDFWindow = coreWindowSource;
-  actualUDFWindow.scale(sourceToUDFX, sourceToUDFY);
-  actualUDFWindow.roundOut();
-  auto coreSource = source->makeSubset(coreWindowSource);
+  auto coreSource = coreImage->makeSubset(coreWindowUDF);
   if (coreSource == nullptr) {
     return nullptr;
   }
-  int windowWidth = std::max(1, static_cast<int>(std::round(actualUDFWindow.width())));
-  int windowHeight = std::max(1, static_cast<int>(std::round(actualUDFWindow.height())));
-  coreSource =
-      coreSource->makeScaled(windowWidth, windowHeight, SamplingOptions(FilterMode::Linear));
   coreSource = coreSource->makeRasterized();
   if (coreSource == nullptr) {
     return nullptr;
   }
-  auto horizontalMatrix = Matrix::MakeTrans(textureRect.left - actualUDFWindow.left,
-                                            horizontalRect.top - actualUDFWindow.top);
+  // The window and textureRect are both integral in core-density space, so mapping the pass's local
+  // coordinates onto the window is a plain integer translation: no fractional offset can differ
+  // between windows.
+  auto horizontalMatrix = Matrix::MakeTrans(textureRect.left - coreWindowUDF.left,
+                                            horizontalRect.top - coreWindowUDF.top);
   FPArgs sourceArgs = FPArgs(context, 0, sourceDrawRect);
   // Each tent loop needs its own child because emitting one child twice redeclares its uniforms.
   PlacementPtr<FragmentProcessor> fineSource = nullptr;
