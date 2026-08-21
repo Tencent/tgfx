@@ -496,8 +496,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
   // Upload the processed background to a texture once and reuse it across tiles; the filter and
   // shader constructors below take the shared texture image, so per-tile sources are O(1).
   if (context != nullptr) {
-    if (cachedBgTextureSource != processedBg ||
-        cachedBgTextureContextID != context->uniqueID()) {
+    if (cachedBgTextureSource != processedBg || cachedBgTextureContextID != context->uniqueID()) {
       auto textureImage = processedBg->makeTextureImage(context);
       if (textureImage != nullptr) {
         cachedBgTextureSource = processedBg;
@@ -722,12 +721,12 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
     if (filteredBg != nullptr) {
       // The filtered image's origin sits at filterOffset within the background image, so the
       // shader matrix translates by the combined offset.
-      auto filteredMatrix = Matrix::MakeAll(
-          finalScaleX, 0.0f, (processedOffset.x + filterOffset.x) / scaleRatioX, 0.0f, finalScaleY,
-          (processedOffset.y + filterOffset.y) / scaleRatioY);
-      auto imageShader = Shader::MakeImageShader(std::move(filteredBg), TileMode::Decal,
-                                                  TileMode::Decal,
-                                                  SamplingOptions(FilterMode::Linear));
+      auto filteredMatrix =
+          Matrix::MakeAll(finalScaleX, 0.0f, (processedOffset.x + filterOffset.x) / scaleRatioX,
+                          0.0f, finalScaleY, (processedOffset.y + filterOffset.y) / scaleRatioY);
+      auto imageShader =
+          Shader::MakeImageShader(std::move(filteredBg), TileMode::Decal, TileMode::Decal,
+                                  SamplingOptions(FilterMode::Linear));
       glassShader = imageShader->makeWithMatrix(filteredMatrix);
     }
   }

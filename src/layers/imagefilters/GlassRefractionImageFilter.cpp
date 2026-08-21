@@ -53,7 +53,8 @@ static float GetRefractionOutsetLayerPixels(const GlassRefractionParams& params,
   float depthRatio = std::clamp(sdfParams.depthRatio / 0.1f, 0.0f, 1.0f);
   float depthScale = depthRatio * depthRatio * (3.0f - 2.0f * depthRatio);
   float minHalf = std::min(params.origWidth, params.origHeight) * 0.5f;
-  float udfOutset = 0.999f * minHalf * sdfParams.refractionFactor * sdfParams.depthRatio * depthScale;
+  float udfOutset =
+      0.999f * minHalf * sdfParams.refractionFactor * sdfParams.depthRatio * depthScale;
   float sdfOutset = sdfParams.glassThickness * sdfParams.refractionFactor;
   return std::max(std::max(sdfOutset, udfOutset) * (1.0f + params.dispersion), 1.0f);
 }
