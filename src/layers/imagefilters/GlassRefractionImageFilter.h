@@ -27,7 +27,8 @@ class GlassRefractionImageFilter : public ImageFilter {
  public:
   GlassRefractionImageFilter(const GlassRefractionParams& params,
                              const GlassSDFGeometryParams& sdfParams,
-                             const GlassUDFGeometryParams& udfParams, std::shared_ptr<Image> mask);
+                             const GlassUDFGeometryParams& udfParams, std::shared_ptr<Image> mask,
+                             std::shared_ptr<Image> edgeMask = nullptr);
 
  protected:
   Type type() const override {
@@ -40,11 +41,20 @@ class GlassRefractionImageFilter : public ImageFilter {
                                                       SrcRectConstraint constraint,
                                                       const Matrix* uvMatrix) const override;
 
+  /**
+   * Outsets the bounds by the maximum refraction displacement (plus the dispersion channel
+   * spread). FilterImage's direct-attach branch requires the filter's output bounds to contain
+   * the draw bounds; with the outset it always does, so the refraction shader is evaluated at
+   * draw (screen) resolution instead of being baked into an offscreen texture.
+   */
+  Rect onFilterBounds(const Rect& rect, MapDirection mapDirection) const override;
+
  private:
   GlassRefractionParams params;
   GlassSDFGeometryParams sdfParams;
   GlassUDFGeometryParams udfParams;
   std::shared_ptr<Image> mask;
+  std::shared_ptr<Image> edgeMask;
 };
 
 }  // namespace tgfx

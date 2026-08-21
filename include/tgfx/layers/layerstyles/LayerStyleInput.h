@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -123,6 +124,16 @@ struct LayerStyleInput {
    * size-related parameters that must be adjusted with this scale factor.
    */
   float contentScale = 1.0f;
+
+  /**
+   * Identifies the pixel content of the images in this input. The value is stable while the layer
+   * subtree that produced them is unchanged, and becomes a new value once any part of that subtree
+   * is invalidated. The images themselves are re-created for every draw, so styles that cache
+   * data derived from them across frames must key that cache on this value instead of the image
+   * pointers. Zero means the producer did not supply an identity, in which case no cross-frame
+   * reuse is allowed.
+   */
+  uint64_t contentID = 0;
 
   /**
    * Extra sources requested by LayerStyle::extraSourceType() flags. Each source is an independent
