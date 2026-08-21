@@ -289,8 +289,8 @@ TGFX_TEST(PDFExportTest, ImageShaderClamp) {
   auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
   auto canvas = document->beginPage(500.f, 500.f);
   {
-    // The rect spans (-100, -100) to (300, 300) in the 200x200 image's coordinate space, so all
-    // four clamp edges and all four corners are stretched outward from the border pixels.
+    // The rect spans (-100, -100) to (300, 300) in the 200x200 image space, so all four clamp edges
+    // and all four corners are stretched outward.
     canvas->translate(150.f, 150.f);
     auto image = Image::MakeFromFile(ProjectPath::Absolute("resources/assets/glyph1.png"));
     auto shader = Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp);
@@ -315,7 +315,7 @@ TGFX_TEST(PDFExportTest, ImageShaderClampMirror) {
   auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
   auto canvas = document->beginPage(500.f, 500.f);
   {
-    // X is clamped with the rect sticking out on both sides, while Y mirrors, which exercises the
+    // X clamps with the rect sticking out on both sides while Y mirrors, which exercises the
     // mirrored variants of the left and right clamp strips.
     canvas->translate(150.f, 150.f);
     auto image = Image::MakeFromFile(ProjectPath::Absolute("resources/assets/glyph1.png"));
@@ -358,9 +358,8 @@ TGFX_TEST(PDFExportTest, PendingRasterPlaceholder) {
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
 
-  // A readback whose transfer task has never been flushed reports isReady() == false on every
-  // backend because the readback buffer does not exist yet, which drives a desktop run through
-  // the pending raster path (requeue on endPage, placeholder on close) without WebGPU.
+  // A readback whose transfer task has never been flushed has no readback buffer yet, so it reports
+  // isReady() == false on every backend, driving a desktop run through the pending raster path.
   auto source = Surface::Make(context, 10, 10);
   EXPECT_TRUE(source != nullptr);
   source->getCanvas()->clear(Color::White());
@@ -390,8 +389,7 @@ TGFX_TEST(PDFExportTest, PendingRasterFlushOnPoll) {
   EXPECT_TRUE(context != nullptr);
 
   // A readback that has been locked and unlocked once keeps reporting isReady() == true on desktop
-  // backends (GL fence signaled, Metal command buffer completed, Vulkan always ready), so the
-  // isReadyToClose() poll below flushes real pixels into the document instead of a placeholder.
+  // backends, so the poll below flushes real pixels into the document instead of a placeholder.
   auto source = Surface::Make(context, 10, 10);
   EXPECT_TRUE(source != nullptr);
   source->getCanvas()->clear(Color::Green());

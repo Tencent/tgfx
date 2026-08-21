@@ -220,8 +220,8 @@ void PDFExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& s
                                      const Matrix& matrix, const ClipStack& clip,
                                      const Brush& brush, SrcRectConstraint,
                                      const Rect* /*strictRect*/) {
-  // Match the raster pipeline, which clamps out-of-range sampling coordinates instead of dropping
-  // the draw: intersect srcRect with the image bounds and shrink dstRect to the visible part.
+  // The raster pipeline clamps out-of-range sampling coordinates instead of dropping the draw, so
+  // match it by intersecting srcRect with the image bounds and shrinking dstRect accordingly.
   auto bounds =
       Rect::MakeWH(static_cast<float>(image->width()), static_cast<float>(image->height()));
   auto clippedSrc = srcRect;
@@ -1439,9 +1439,8 @@ void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack&
       return;
     }
     Canvas* maskCanvas = surface->getCanvas();
-    // Compensate for maskBound offset: the mask shader's coordinates are in the path's
-    // coordinate space (which starts at maskBound.x/y), but the surface starts at (0,0).
-    // Apply an inverse translation to the shader so it samples from the correct region.
+    // The mask shader's coordinates are in the path's space, which starts at maskBound.x/y, while
+    // the surface starts at (0, 0).
     auto shader = shaderMaskFilter->getShader();
     if (maskBound.x() != 0 || maskBound.y() != 0) {
       shader = shader->makeWithMatrix(Matrix::MakeTrans(-maskBound.x(), -maskBound.y()));
@@ -1449,14 +1448,11 @@ void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack&
     // A PDF luminosity SMask reads the RGB brightness, so the shader alpha has to end up in RGB
     // with the result opaque. Both variants below build that with blending rather than a color
     // matrix: a matrix that lights up transparent pixels makes ColorFilterShader mask its own
-    // output with the original shader alpha (SrcIn), which crushes the antialiased edge. The work
-    // stays on the GPU so the mask remains a snapshot flowing through the regular image XObject
-    // path, which tolerates deferred pixel readback.
+    // output with the original shader alpha (SrcIn), which crushes the antialiased edge.
     Paint maskPaint;
     if (shaderMaskFilter->isInverted()) {
-      // DstOut over a white backdrop gives Cr = Cd * (1 - As) = 1 - A, and DstOver with an opaque
-      // black then restores A' = 1 while leaving RGB alone, since its Cs = 0 contributes no color.
-      // The region the shader never covers keeps the white backdrop, i.e. stays unmasked.
+      // DstOut over a white backdrop gives Cr = 1 - A, then DstOver with an opaque black restores
+      // A' = 1 without touching RGB. The region the shader never covers stays white, i.e. unmasked.
       maskCanvas->clear(Color::White());
       maskPaint.setShader(shader);
       maskPaint.setBlendMode(BlendMode::DstOut);
@@ -1466,9 +1462,8 @@ void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack&
       opaquePaint.setBlendMode(BlendMode::DstOver);
       maskCanvas->drawPaint(opaquePaint);
     } else {
-      // Painting an opaque white with the shader alpha as coverage: SrcOver onto an opaque black
-      // backdrop yields Cr = A and Ar = A + (1 - A) = 1, i.e. RGB = A at full opacity. The
-      // uncovered region keeps the black backdrop, which is what a non-inverted mask wants.
+      // SrcOver of an opaque white with the shader alpha as coverage onto an opaque black backdrop
+      // yields Cr = A at Ar = 1. The uncovered region stays black, i.e. fully masked.
       maskCanvas->clear(Color::Black());
       maskPaint.setColor(Color::White());
       maskPaint.setMaskFilter(MaskFilter::MakeShader(shader));

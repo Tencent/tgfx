@@ -388,17 +388,17 @@ void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int encoding
   auto flipY = surface->origin() == ImageOrigin::BottomLeft;
 
   // Deliberately not Surface::readPixels(): it reports a pending readback as an error, which is the
-  // normal first outcome on WebGPU. lockPixels() blocks on backends that can block, and starts the
-  // async mapping on the ones that cannot.
+  // normal first outcome on WebGPU. lockPixels() blocks where blocking is possible and starts the
+  // async mapping where it is not.
   if (auto* srcPixels = readback->lockPixels(doc->context())) {
     WriteReadbackPixels(readback->info(), srcPixels, flipY, encodingQuality, doc, ref);
     readback->unlockPixels(doc->context());
     return;
   }
 
-  // A ready buffer that still yields no pixels is a genuine failure, not an async wait. So is a
-  // missing readback buffer: isReady() can never turn true for it, so deferring would make
-  // isReadyToClose() reject the caller forever.
+  // A ready buffer that still yields no pixels is a genuine failure rather than an async wait, and
+  // so is a missing readback buffer: isReady() can never turn true for it, so deferring it would
+  // make isReadyToClose() reject the caller forever.
   if (readback->isReady(doc->context()) || readback->getGPUBuffer(doc->context()) == nullptr) {
     LOGE("PDFBitmap::SerializeImage() Failed to read the pixels from the surface! (%dx%d)",
          surface->width(), surface->height());
@@ -425,17 +425,14 @@ void PDFBitmap::WriteReadbackPixels(const ImageInfo& srcInfo, const void* srcPix
     WritePlaceholder(document, ref);
     return;
   }
-  // Always use RGBA_8888 format for PDF export to ensure consistent pixel layout across all
-  // platforms. RGBA is the industry standard format used by PNG, JPEG, and PDF's DeviceRGB.
-  // This avoids R/B channel swap issues between platforms with different native formats. Bitmap
-  // always reports a premultiplied layout, so the alpha type is described explicitly here.
+  // RGBA_8888 keeps the pixel layout identical on every platform, avoiding the R/B swap of the
+  // native formats. Bitmap always reports a premultiplied layout, so the alpha type is stated here.
   auto dstInfo =
       ImageInfo::Make(srcInfo.width(), srcInfo.height(), ColorType::RGBA_8888,
                       AlphaType::Unpremultiplied, bitmap.info().rowBytes(), srcInfo.colorSpace());
-  // srcInfo carries the readback row alignment (256 bytes on WebGPU), so the source stride can
-  // exceed the destination stride; CopyPixels walks both instead of a flat memcpy.
+  // srcInfo carries the readback row alignment (256 bytes on WebGPU), so its stride can exceed the
+  // destination stride and a flat memcpy would not work.
   CopyPixels(srcInfo, srcPixels, dstInfo, dstPixels, flipY);
-  // dstInfo is Unpremultiplied, so isOpaque() could never be true here.
   WritePixmap(Pixmap(dstInfo, dstPixels), false, encodingQuality, document, ref);
   bitmap.unlockPixels();
 }
@@ -457,8 +454,8 @@ void PDFBitmap::WritePixmap(const Pixmap& pixmap, bool isOpaque, int encodingQua
 void PDFBitmap::WritePlaceholder(PDFDocumentImpl* document, PDFIndirectReference ref) {
   static constexpr uint8_t WhitePixel[3] = {0xFF, 0xFF, 0xFF};
   static constexpr uint8_t TransparentAlpha[1] = {0x00};
-  // The content stream stretches the single pixel over the whole image rectangle, so an opaque
-  // placeholder would paint a solid box over the content below it.
+  // The content stream stretches the single pixel over the whole image rectangle, so the pixel must
+  // be transparent to avoid painting a solid box over the content below.
   auto sMask = document->reserveRef();
   auto streamWriter = [](const std::shared_ptr<WriteStream>& stream) {
     stream->write(WhitePixel, sizeof(WhitePixel));
@@ -474,8 +471,8 @@ void PDFBitmap::WritePlaceholder(PDFDocumentImpl* document, PDFIndirectReference
 }
 
 namespace {
-// Maps an image onto the cache key identifying its pixels: a SubsetImage is keyed by its source and
-// bounds so identical regions dedupe, anything else is keyed by itself and its full bounds.
+// Keys a SubsetImage by its source and bounds so identical regions dedupe, and anything else by
+// itself and its full bounds.
 PDFImageCacheKey MakeImageCacheKey(const std::shared_ptr<Image>& image) {
   if (Types::Get(image.get()) == Types::ImageType::Subset) {
     const auto subsetImage = static_cast<const SubsetImage*>(image.get());

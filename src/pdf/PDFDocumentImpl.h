@@ -78,9 +78,8 @@ struct PDFLink {
 
 /**
  * Identifies the pixels a drawn image refers to. Identical subsets create distinct SubsetImage
- * instances, so the image cache is keyed on the underlying source plus bounds instead, collapsing
- * repeated draws of the same region (e.g. the clamp strips of a mirrored image shader) into one
- * image XObject.
+ * instances, so keying on the underlying source plus bounds collapses repeated draws of the same
+ * region into one image XObject.
  */
 struct PDFImageCacheKey {
   std::shared_ptr<Image> source;
@@ -109,18 +108,16 @@ struct PDFImageCacheKeyHash {
 
 /**
  * An image XObject whose pixels are still being read back from the GPU. The object number is
- * reserved up front so drawing can reference it immediately, and the stream body is emitted later
- * from flushPendingRasters(). PDF indexes cross reference offsets by object number, so writing the
- * body out of order stays valid.
- * @note The Surface is intentionally not retained: the transfer task already holds a reference to
- * its render target, so keeping the Surface alive would only pin one extra full-size render target
- * per pending image.
+ * reserved up front so drawing can reference it immediately, and the stream body is emitted later.
+ * PDF indexes cross reference offsets by object number, so writing the body out of order stays
+ * valid.
+ * @note The Surface is intentionally not retained: the transfer task already references its render
+ * target, so holding the Surface would pin one extra full-size render target per pending image.
  */
 struct PDFPendingRaster {
   PDFIndirectReference ref;
   std::shared_ptr<SurfaceReadback> readback;
   int encodingQuality = 101;
-  /// Matches what Surface::readPixels() derives from the render target origin.
   bool flipY = false;
 };
 
@@ -221,8 +218,8 @@ class PDFDocumentImpl : public PDFDocument {
   std::unordered_map<PDFFillGraphicState, PDFIndirectReference> fillGSMap;
   PDFIndirectReference noSmaskGraphicState;
   std::vector<PDFNamedDestination> namedDestinations;
-  // The key's source holds a strong reference, preventing the Image from being released
-  // mid-document and its address reused by a different Image, which would cause false cache hits.
+  // The key holds a strong reference to the source, so a released Image cannot have its address
+  // reused by another one and cause a false cache hit.
   std::unordered_map<PDFImageCacheKey, PDFIndirectReference, PDFImageCacheKeyHash> imageRefCache;
 
  private:
@@ -233,11 +230,11 @@ class PDFDocumentImpl : public PDFDocument {
   PDFIndirectReference emitColorSpace();
 
   /**
-   * Emits the stream body of every pending raster. Must run before onClose() writes the cross
-   * reference table: an object number that is never emitted keeps offset 0 and corrupts the table,
-   * so a raster that is still not ready falls back to a blank placeholder.
-   * @param readyOnly Only emits the rasters whose pixels have already arrived, releasing their GPU
-   * buffers early and keeping the rest queued. No placeholder is written in this mode.
+   * Emits the stream body of every pending raster, falling back to a placeholder for the ones that
+   * are still not ready. Must run before onClose() writes the cross reference table: an object
+   * number that is never emitted keeps offset 0 and corrupts the table.
+   * @param readyOnly Only emits the rasters whose pixels have already arrived and keeps the rest
+   * queued, writing no placeholder.
    */
   void flushPendingRasters(bool readyOnly = false);
 

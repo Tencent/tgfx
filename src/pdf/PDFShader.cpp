@@ -50,9 +50,8 @@ void DrawMatrix(Canvas* canvas, std::shared_ptr<Image> image, const Matrix& matr
   Draw(canvas, std::move(image), paintColor);
 }
 
-// Stretches a border subset (a 1-pixel row/column) of the image into place. The subset is
-// sampled from the original image so the draw stays on the deferred image XObject path and no
-// pixel readback is needed.
+// Stretches a border subset of the image into place. The subset is sampled from the original image
+// so the draw stays on the deferred image XObject path and needs no pixel readback.
 void DrawSubsetMatrix(Canvas* canvas, const std::shared_ptr<Image>& image, const Rect& subset,
                       const Matrix& matrix, Color paintColor) {
   AutoCanvasRestore acr(canvas);
@@ -199,10 +198,9 @@ PDFIndirectReference PDFShader::MakeImageShader(PDFDocumentImpl* doc, Matrix fin
   // Then handle Clamping, which requires expanding the pattern canvas to
   // cover the entire surfaceBBox.
 
-  // The clamp edges are the border pixels of the image stretched outward: the corners are 1x1
-  // pixel subsets scaled to the corner rects, the sides are 1-pixel strips scaled into place.
-  // Sampling the subsets from the original image keeps every draw on the deferred image XObject
-  // path, so clamping needs no pixel readback and works on backends without synchronous readback.
+  // The clamp edges stretch the border pixels outward: corners are 1x1 subsets scaled to the corner
+  // rects, sides are 1-pixel strips scaled into place. Sampling them from the original image keeps
+  // every draw on the deferred image XObject path, so clamping needs no pixel readback.
   const auto clampEdgesX = tileModesX == TileMode::Clamp;
   const auto clampEdgesY = tileModesY == TileMode::Clamp;
 

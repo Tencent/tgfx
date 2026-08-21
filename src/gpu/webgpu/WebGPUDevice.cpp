@@ -50,8 +50,7 @@ static void OnUncapturedError(WGPUErrorType type, const char* message, void*) {
 }
 
 // emscripten_webgpu_get_device() aborts rather than returning null when
-// Module.preinitializedWebGPUDevice is absent, so probe for it first. A GPUDevice never crosses
-// threads, so the thread test rules out worker threads without a JS call.
+// Module.preinitializedWebGPUDevice is absent, so probe for it first.
 // clang-format off
 EM_JS(int, WebGPUHasPreinitializedDevice, (), {
   return (typeof Module !== "undefined" && !!Module["preinitializedWebGPUDevice"]) ? 1 : 0;

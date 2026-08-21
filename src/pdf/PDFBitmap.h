@@ -33,26 +33,25 @@ class PDFBitmap {
                                         PDFDocumentImpl* document, int encodingQuality = 101);
 
   /**
-   * Emits the image XObject body for pixels that already live on the CPU. Shared by the synchronous
-   * path and by PDFDocumentImpl::flushPendingRasters() so both emit identical objects.
-   * @param pixmap RGBA_8888 / Unpremultiplied pixels, as produced by both readback paths.
+   * Emits the image XObject body for RGBA_8888 / Unpremultiplied pixels that already live on the
+   * CPU. Shared by the synchronous path and by the deferred raster flush so both emit identical
+   * objects.
    */
   static void WritePixmap(const Pixmap& pixmap, bool isOpaque, int encodingQuality,
                           PDFDocumentImpl* document, PDFIndirectReference ref);
 
   /**
    * Converts freshly locked readback pixels into the layout WritePixmap() expects and emits them.
-   * @param srcInfo Describes the readback buffer, whose row stride may be larger than the width
-   * because of the backend's buffer copy alignment.
-   * @param flipY Set when the render target origin is bottom-left.
+   * srcInfo describes the readback buffer, whose row stride may exceed the width because of the
+   * backend's buffer copy alignment. flipY is set when the render target origin is bottom-left.
    */
   static void WriteReadbackPixels(const ImageInfo& srcInfo, const void* srcPixels, bool flipY,
                                   int encodingQuality, PDFDocumentImpl* document,
                                   PDFIndirectReference ref);
 
   /**
-   * Emits a fully transparent 1x1 image XObject, which is what a failed rasterization writes rather
-   * than skipping the object: an object number that is never emitted keeps offset 0 in the cross
+   * Emits a fully transparent 1x1 image XObject for a failed rasterization. The object must be
+   * emitted rather than skipped: an object number that is never emitted keeps offset 0 in the cross
    * reference table and corrupts the whole file.
    */
   static void WritePlaceholder(PDFDocumentImpl* document, PDFIndirectReference ref);
