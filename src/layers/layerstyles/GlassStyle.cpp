@@ -24,7 +24,6 @@
 #include "gpu/resources/ResourceKey.h"
 #include "layers/CanvasUtils.h"
 #include "layers/imagefilters/GlassRefractionImageFilter.h"
-#include "layers/layerstyles/GlassShader.h"
 #include "layers/layerstyles/GlassUDFImage.h"
 #include "layers/processors/GlassRefractionFragmentProcessor.h"
 #include "tgfx/core/BytesKey.h"
@@ -713,13 +712,26 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
 
   auto imageMatrix =
       Matrix::MakeAll(finalScaleX, 0.0f, finalOffsetX, 0.0f, finalScaleY, finalOffsetY);
-  // GlassShader renders the refraction shader directly at draw (screen) resolution, so the
-  // SDF edge light is not baked into a downscaled offscreen texture by FilterImage.
+  // The filter rides on the standard FilterImage path: onFilterBounds outsets the output bounds
+  // past the draw bounds, so FilterImage attaches the refraction processor directly at draw
+  // (screen) resolution instead of baking it into an offscreen texture.
   std::shared_ptr<Shader> glassShader = nullptr;
   if (glassFilter != nullptr) {
-    glassShader = GlassShader::Make(std::move(glassFilter), processedBg, imageMatrix,
-                                    SamplingOptions(FilterMode::Linear));
-  } else {
+    Point filterOffset = {};
+    auto filteredBg = processedBg->makeWithFilter(std::move(glassFilter), &filterOffset, nullptr);
+    if (filteredBg != nullptr) {
+      // The filtered image's origin sits at filterOffset within the background image, so the
+      // shader matrix translates by the combined offset.
+      auto filteredMatrix = Matrix::MakeAll(
+          finalScaleX, 0.0f, (processedOffset.x + filterOffset.x) / scaleRatioX, 0.0f, finalScaleY,
+          (processedOffset.y + filterOffset.y) / scaleRatioY);
+      auto imageShader = Shader::MakeImageShader(std::move(filteredBg), TileMode::Decal,
+                                                  TileMode::Decal,
+                                                  SamplingOptions(FilterMode::Linear));
+      glassShader = imageShader->makeWithMatrix(filteredMatrix);
+    }
+  }
+  if (glassShader == nullptr) {
     auto imageShader = Shader::MakeImageShader(processedBg, TileMode::Decal, TileMode::Decal,
                                                SamplingOptions(FilterMode::Linear));
     glassShader = imageShader->makeWithMatrix(imageMatrix);

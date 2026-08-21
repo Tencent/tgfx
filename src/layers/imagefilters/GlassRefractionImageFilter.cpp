@@ -45,10 +45,26 @@ static std::shared_ptr<TextureProxy> MakeTextureProxy(Context* context,
   return textureImageImpl->getTextureProxy();
 }
 
-PlacementPtr<FragmentProcessor> GlassRefractionImageFilter::makeFragmentProcessor(
-    std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-    SrcRectConstraint constraint, const Matrix* uvMatrix) const {
-  return asFragmentProcessor(std::move(source), args, sampling, constraint, uvMatrix);
+// Must mirror the shader's displacement clamps: the SDF path displaces by at most
+// glassThickness * refractionFactor, the UDF path by 0.999 * minHalf * refractionFactor *
+// depthRatio (smoothed near depth 0), and dispersion spreads the channels by (1 + dispersion).
+static float GetRefractionOutsetLayerPixels(const GlassRefractionParams& params,
+                                            const GlassSDFGeometryParams& sdfParams) {
+  float depthRatio = std::clamp(sdfParams.depthRatio / 0.1f, 0.0f, 1.0f);
+  float depthScale = depthRatio * depthRatio * (3.0f - 2.0f * depthRatio);
+  float minHalf = std::min(params.origWidth, params.origHeight) * 0.5f;
+  float udfOutset = 0.999f * minHalf * sdfParams.refractionFactor * sdfParams.depthRatio * depthScale;
+  float sdfOutset = sdfParams.glassThickness * sdfParams.refractionFactor;
+  return std::max(std::max(sdfOutset, udfOutset) * (1.0f + params.dispersion), 1.0f);
+}
+
+Rect GlassRefractionImageFilter::onFilterBounds(const Rect& rect, MapDirection) const {
+  // The outset covers both mapping directions: forward keeps the output bounds large enough for
+  // the direct-attach branch, reverse keeps the sampled input bounds wide enough for the
+  // displaced reads when the filter is baked offscreen.
+  auto outsetLayer = GetRefractionOutsetLayerPixels(params, sdfParams);
+  return rect.makeOutset(outsetLayer * params.layerPixelToSourcePixelX,
+                         outsetLayer * params.layerPixelToSourcePixelY);
 }
 
 PlacementPtr<FragmentProcessor> GlassRefractionImageFilter::asFragmentProcessor(

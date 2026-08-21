@@ -30,17 +30,6 @@ class GlassRefractionImageFilter : public ImageFilter {
                              const GlassUDFGeometryParams& udfParams, std::shared_ptr<Image> mask,
                              std::shared_ptr<Image> edgeMask = nullptr);
 
-  /**
-   * Returns a FragmentProcessor that applies this filter to the source image, bypassing the
-   * FilterImage offscreen fallback. GlassShader uses this to render the refraction shader
-   * directly at draw (screen) resolution.
-   */
-  PlacementPtr<FragmentProcessor> makeFragmentProcessor(std::shared_ptr<Image> source,
-                                                        const FPArgs& args,
-                                                        const SamplingOptions& sampling,
-                                                        SrcRectConstraint constraint,
-                                                        const Matrix* uvMatrix) const;
-
  protected:
   Type type() const override {
     return Type::Runtime;
@@ -51,6 +40,14 @@ class GlassRefractionImageFilter : public ImageFilter {
                                                       const SamplingOptions& sampling,
                                                       SrcRectConstraint constraint,
                                                       const Matrix* uvMatrix) const override;
+
+  /**
+   * Outsets the bounds by the maximum refraction displacement (plus the dispersion channel
+   * spread). FilterImage's direct-attach branch requires the filter's output bounds to contain
+   * the draw bounds; with the outset it always does, so the refraction shader is evaluated at
+   * draw (screen) resolution instead of being baked into an offscreen texture.
+   */
+  Rect onFilterBounds(const Rect& rect, MapDirection mapDirection) const override;
 
  private:
   GlassRefractionParams params;
