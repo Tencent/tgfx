@@ -3403,7 +3403,7 @@ TGFX_TEST(LayerTest, BackgroundBlurAlignment) {
   blurLayer->setWidth(130);
   blurLayer->setHeight(120);
   blurLayer->setMatrix(Matrix::MakeTrans(282, 120));
-  blurLayer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
+  blurLayer->setLayerStyles({BackgroundBlurStyle::Make(13, 13)});
   blurLayer->setFilters({BlurFilter::Make(1, 1)});
 
   auto rootLayer = Layer::Make();

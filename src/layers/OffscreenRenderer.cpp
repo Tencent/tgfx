@@ -187,12 +187,12 @@ OffscreenResult OffscreenRenderer::RenderContentOnPicture(Layer* layer, const Dr
   auto* capturer = args.backgroundHandler ? args.backgroundHandler->asCapturer() : nullptr;
   if (capturer != nullptr) {
     auto savedMatrix = capturer->captureWorldMatrix();
-    auto imageToWorld = contentMatrix;
-    Matrix invertDensity = {};
-    if (density.invert(&invertDensity)) {
-      imageToWorld.preConcat(invertDensity);
-      capturer->setCaptureWorldMatrix(std::move(imageToWorld));
-    }
+    // contentMatrix maps layer-local coordinates into the coordinate space of the canvas the
+    // capture pass is replaying into (world space on the main surface, or the downsampled
+    // background-source space during capture), matching what canvas->getMatrix() would provide
+    // on the direct path. The recording pixels themselves (density-scaled) are NOT the space
+    // the consumer works in — layer bounds arrive in layer-local coordinates.
+    capturer->setCaptureWorldMatrix(contentMatrix);
     layer->drawDirectly(args, canvas, 1.0f);
     capturer->setCaptureWorldMatrix(std::move(savedMatrix));
   } else {
