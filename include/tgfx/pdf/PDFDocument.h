@@ -19,10 +19,8 @@
 #pragma once
 
 #include <memory>
-#include <vector>
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Rect.h"
-#include "tgfx/core/SurfaceReadback.h"
 #include "tgfx/core/WriteStream.h"
 #include "tgfx/pdf/PDFMetadata.h"
 
@@ -68,7 +66,8 @@ class PDFDocument {
    * and ready for GPU work, because raster content whose pixels have not arrived yet is resolved
    * here.
    * @note Raster content whose pixels are still unavailable is written as a transparent
-   * placeholder. Call isReadyToClose() first on backends that report pending readbacks.
+   * placeholder. On backends without synchronous pixel readback, such as WebGPU, poll
+   * isReadyToClose() until it returns true before calling this.
    */
   virtual void close() = 0;
 
@@ -86,13 +85,9 @@ class PDFDocument {
    * right away so its GPU buffer can be released. Polling this once per turn of the event loop
    * therefore keeps only the still-pending readbacks in memory.
    */
-  virtual bool isReadyToClose() = 0;
-
-  /**
-   * Returns the readbacks that close() is still waiting on, so the caller can poll them without
-   * blocking the event loop. Empty when isReadyToClose() returns true.
-   */
-  virtual std::vector<std::shared_ptr<SurfaceReadback>> pendingReadbacks() const = 0;
+  virtual bool isReadyToClose() {
+    return true;
+  }
 };
 
 }  // namespace tgfx

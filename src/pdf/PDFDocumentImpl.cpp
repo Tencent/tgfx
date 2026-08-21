@@ -352,15 +352,6 @@ bool PDFDocumentImpl::isReadyToClose() {
   return pendingRasters.empty();
 }
 
-std::vector<std::shared_ptr<SurfaceReadback>> PDFDocumentImpl::pendingReadbacks() const {
-  std::vector<std::shared_ptr<SurfaceReadback>> readbacks;
-  readbacks.reserve(pendingRasters.size());
-  for (const auto& raster : pendingRasters) {
-    readbacks.push_back(raster.readback);
-  }
-  return readbacks;
-}
-
 void PDFDocumentImpl::addPendingRaster(PDFPendingRaster raster) {
   DEBUG_ASSERT(raster.readback != nullptr);
   pendingRasters.push_back(std::move(raster));

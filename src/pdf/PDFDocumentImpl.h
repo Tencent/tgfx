@@ -29,6 +29,7 @@
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
+#include "tgfx/core/SurfaceReadback.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/core/WriteStream.h"
 #include "tgfx/gpu/Context.h"
@@ -138,8 +139,6 @@ class PDFDocumentImpl : public PDFDocument {
   void abort() override;
 
   bool isReadyToClose() override;
-
-  std::vector<std::shared_ptr<SurfaceReadback>> pendingReadbacks() const override;
 
   /// Takes ownership of a raster whose pixels are not available yet; see PDFPendingRaster.
   void addPendingRaster(PDFPendingRaster raster);

@@ -377,9 +377,6 @@ TGFX_TEST(PDFExportTest, PendingRasterPlaceholder) {
   document->endPage();
 
   EXPECT_FALSE(document->isReadyToClose());
-  auto pending = document->pendingReadbacks();
-  EXPECT_EQ(pending.size(), 1u);
-  EXPECT_TRUE(pending[0] == neverReady);
 
   document->close();
   PDFStream->flush();
@@ -413,7 +410,6 @@ TGFX_TEST(PDFExportTest, PendingRasterFlushOnPoll) {
   document->endPage();
 
   EXPECT_TRUE(document->isReadyToClose());
-  EXPECT_TRUE(document->pendingReadbacks().empty());
 
   document->close();
   PDFStream->flush();
