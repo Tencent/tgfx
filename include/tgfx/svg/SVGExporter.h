@@ -130,9 +130,17 @@ class SVGExporter {
 
   /**
    * Closes the SVG exporter, finalizing any unfinished drawing commands and writing the SVG end 
-   * tag.
+   * tag. The Context passed to Make() must still be alive. Images whose pixels have not arrived yet
+   * are exported without content, so wait until isReadyToClose() returns true before calling this.
    */
   void close();
+
+  /**
+   * Returns true when close() can produce a complete SVG. Only backends without synchronous pixel
+   * readback, such as WebGPU, may return false, meaning some images are still being read back from
+   * the GPU. Poll this once per turn of the event loop until it returns true, then call close().
+   */
+  bool isReadyToClose();
 
  private:
   /**
@@ -143,8 +151,17 @@ class SVGExporter {
               std::shared_ptr<ColorSpace> targetColorSpace,
               std::shared_ptr<ColorSpace> assignColorSpace);
 
+  void resolveArrivedImages();
+
+  void flushToUserStream();
+
   SVGExportContext* drawContext = nullptr;
   Canvas* canvas = nullptr;
+  Context* context = nullptr;
+  std::shared_ptr<WriteStream> userStream = nullptr;
+  std::shared_ptr<MemoryWriteStream> bufferStream = nullptr;
+  bool closed = false;
+  bool flushed = false;
 };
 
 }  // namespace tgfx

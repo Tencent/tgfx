@@ -43,6 +43,8 @@
 
 namespace tgfx {
 
+class SVGExportContext;
+
 class ElementWriter {
  public:
   ElementWriter(const std::string& name, XMLWriter* writer,
@@ -87,7 +89,8 @@ class ElementWriter {
   std::vector<std::string> addImageFilterChain(const std::shared_ptr<ImageFilter>& imageFilter,
                                                const Rect& bound,
                                                const std::shared_ptr<SVGCustomWriter>& exportWriter,
-                                               Context* context);
+                                               Context* context,
+                                               SVGExportContext* svgContext = nullptr);
 
   /**
    * Emits an SVG <filter> resource that reproduces the given color filter and returns its
@@ -101,14 +104,14 @@ class ElementWriter {
   Resources addResources(const Brush& brush, Context* context, SVGExportContext* svgContext);
 
   void addShaderResources(const std::shared_ptr<Shader>& shader, Context* context,
-                          Resources* resources);
+                          Resources* resources, SVGExportContext* svgContext = nullptr);
   void addShaderFilterPrimitives(const Shader* shader);
   void addPerlinNoisePrimitives(const Shader* noiseShader, const std::string& resultName = "");
   void addColorShaderResources(const ColorShader* shader, Resources* resources);
   void addGradientShaderResources(const GradientShader* shader, const Matrix& matrix,
                                   Resources* resources);
   void addImageShaderResources(const ImageShader* shader, const Matrix& matrix, Context* context,
-                               Resources* resources);
+                               Resources* resources, SVGExportContext* svgContext = nullptr);
 
   void addMatrixColorFilterPrimitives(const MatrixColorFilter* matrixColorFilter,
                                       const std::string& inputResult = "",
@@ -132,10 +135,10 @@ class ElementWriter {
                                     SVGExportContext* svgContext);
 
   void addRenderImageMaskResources(const ImageShader* imageShaders, const std::string& filterID,
-                                   Context* context);
+                                   Context* context, SVGExportContext* svgContext = nullptr);
 
   void addShaderMaskResources(const std::shared_ptr<Shader>& shader, const std::string& filterID,
-                              Context* context);
+                              Context* context, SVGExportContext* svgContext = nullptr);
 
   void addFillAndStroke(const Brush& brush, const Stroke* stroke, const Resources& resources);
 
@@ -145,15 +148,17 @@ class ElementWriter {
   std::string addUnsupportedGradientDef(const GradientInfo& info, const Matrix& matrix);
 
   std::string addImageFilter(const std::shared_ptr<ImageFilter>& imageFilter, const Rect& bound,
-                             const std::shared_ptr<SVGCustomWriter>& exportWriter,
-                             Context* context);
+                             const std::shared_ptr<SVGCustomWriter>& exportWriter, Context* context,
+                             SVGExportContext* svgContext = nullptr);
   std::string emitFilterElement(const std::shared_ptr<ImageFilter>& imageFilter, const Rect& bound,
                                 const std::shared_ptr<SVGCustomWriter>& exportWriter,
-                                Context* context, bool preserveSoftAlpha = false);
+                                Context* context, bool preserveSoftAlpha = false,
+                                SVGExportContext* svgContext = nullptr);
   bool writeFilterPrimitives(const std::shared_ptr<ImageFilter>& imageFilter,
                              ElementWriter& filterElement,
                              const std::shared_ptr<SVGCustomWriter>& exportWriter,
-                             const Rect& bound, Context* context, bool preserveSoftAlpha);
+                             const Rect& bound, Context* context, bool preserveSoftAlpha,
+                             SVGExportContext* svgContext = nullptr);
   void callbackBlurImageFilter(const GaussianBlurImageFilter* filter,
                                const std::shared_ptr<SVGCustomWriter>& exportWriter,
                                ElementWriter& filterElement);
@@ -176,10 +181,12 @@ class ElementWriter {
                                  bool preserveSoftAlpha = false);
   void addColorImageFilter(const ColorImageFilter* filter, const std::string& inputResult = "");
   void addBlendImageFilter(const BlendImageFilter* filter, const std::string& inputResult,
-                           const Rect* filterBounds, Context* context);
+                           const Rect* filterBounds, Context* context,
+                           SVGExportContext* svgContext = nullptr);
 
   std::string emitShaderAsPrimitive(const Shader* shader, const Matrix& shaderMatrix,
-                                    const Rect* filterBounds, Context* context);
+                                    const Rect* filterBounds, Context* context,
+                                    SVGExportContext* svgContext = nullptr);
 
   void reportUnsupportedElement(const char* message) const;
 
