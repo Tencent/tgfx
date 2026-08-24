@@ -294,12 +294,6 @@ std::shared_ptr<Data> AsDataUri(const std::shared_ptr<Data>& encodedData) {
 
 std::shared_ptr<Image> ConvertImageColorSpace(const std::shared_ptr<Image>& image, Context* context,
                                               const std::shared_ptr<ColorSpace>& targetColorSpace,
-                                              const std::shared_ptr<ColorSpace>& assignColorSpace) {
-  return ConvertImageColorSpace(image, context, targetColorSpace, assignColorSpace, nullptr);
-}
-
-std::shared_ptr<Image> ConvertImageColorSpace(const std::shared_ptr<Image>& image, Context* context,
-                                              const std::shared_ptr<ColorSpace>& targetColorSpace,
                                               const std::shared_ptr<ColorSpace>& assignColorSpace,
                                               std::vector<PendingImage>* pendings) {
   auto tempColorSpace = assignColorSpace ? assignColorSpace : targetColorSpace;

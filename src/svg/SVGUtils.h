@@ -65,14 +65,10 @@ std::shared_ptr<Data> AsDataUri(const Pixmap& pixmap);
 
 std::shared_ptr<Data> AsDataUri(const std::shared_ptr<Data>& encodedData);
 
-std::shared_ptr<Image> ConvertImageColorSpace(const std::shared_ptr<Image>& image, Context* context,
-                                              const std::shared_ptr<ColorSpace>& targetColorSpace,
-                                              const std::shared_ptr<ColorSpace>& assignColorSpace);
-
 /**
- * Same as the overload above, plus an optional pending sink: when the converted pixels cannot be
- * read synchronously, the readback is registered there and nullptr is returned. Callers must then
- * emit a pending image carrying the registered token.
+ * Converts the image to the target color space if needed. When the converted pixels cannot be read
+ * synchronously, the readback is registered in the optional pending sink and nullptr is returned.
+ * Callers must then emit a pending image carrying the registered token.
  */
 std::shared_ptr<Image> ConvertImageColorSpace(const std::shared_ptr<Image>& image, Context* context,
                                               const std::shared_ptr<ColorSpace>& targetColorSpace,

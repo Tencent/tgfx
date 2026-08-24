@@ -507,6 +507,18 @@ void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& s
                                      const Brush& brush, SrcRectConstraint,
                                      const Rect* /*strictRect*/) {
   DEBUG_ASSERT(image != nullptr);
+  // The image is fully clipped away when the transformed dstRect and the outer clip do not
+  // intersect. Return early to avoid a wasted readback and a dangling pending token.
+  Path dstClip;
+  dstClip.addRect(dstRect);
+  dstClip.transform(matrix);
+  auto outerClipPath = clip.getClipPath();
+  if (!outerClipPath.isEmpty()) {
+    dstClip.addPath(outerClipPath, PathOp::Intersect);
+  }
+  if (dstClip.isEmpty()) {
+    return;
+  }
   auto modifyImage =
       ConvertImageColorSpace(image, context, _targetColorSpace, _assignColorSpace, &_pendingImages);
   if (modifyImage == nullptr) {
@@ -517,13 +529,6 @@ void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& s
     newMatrix.preConcat(viewMatrix);
     auto fillMatrix = Matrix::I();
     viewMatrix.invert(&fillMatrix);
-    Path dstClip;
-    dstClip.addRect(dstRect);
-    dstClip.transform(matrix);
-    auto outerClipPath = clip.getClipPath();
-    if (!outerClipPath.isEmpty()) {
-      dstClip.addPath(outerClipPath, PathOp::Intersect);
-    }
     applyClipPath(dstClip);
     exportPendingImage(_pendingImages.back().token, image->width(), image->height(), newMatrix,
                        brush.makeWithMatrix(fillMatrix));
@@ -565,22 +570,17 @@ void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& s
   }
 }
 
-void SVGExportContext::exportPixmap(const Pixmap& pixmap, const Matrix& matrix,
-                                    const Brush& brush) {
-  auto dataUri = AsDataUri(pixmap);
-  if (!dataUri) {
-    return;
-  }
-
+void SVGExportContext::exportImageElement(const std::string& href, int width, int height,
+                                          const Matrix& matrix, const Brush& brush) {
   std::string imageID = resourceBucket->addImage();
   {
     ElementWriter defElement("defs", xmlWriter);
     {
       ElementWriter imageElement("image", xmlWriter);
       imageElement.addAttribute("id", imageID);
-      imageElement.addAttribute("width", pixmap.width());
-      imageElement.addAttribute("height", pixmap.height());
-      imageElement.addAttribute("xlink:href", static_cast<const char*>(dataUri->data()));
+      imageElement.addAttribute("width", width);
+      imageElement.addAttribute("height", height);
+      imageElement.addAttribute("xlink:href", href);
     }
   }
   {
@@ -589,6 +589,16 @@ void SVGExportContext::exportPixmap(const Pixmap& pixmap, const Matrix& matrix,
                            _targetColorSpace, _assignColorSpace);
     imageUse.addAttribute("xlink:href", "#" + imageID);
   }
+}
+
+void SVGExportContext::exportPixmap(const Pixmap& pixmap, const Matrix& matrix,
+                                    const Brush& brush) {
+  auto dataUri = AsDataUri(pixmap);
+  if (!dataUri) {
+    return;
+  }
+  exportImageElement(static_cast<const char*>(dataUri->data()), pixmap.width(), pixmap.height(),
+                     matrix, brush);
 }
 
 void SVGExportContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const Matrix& matrix,
@@ -997,23 +1007,7 @@ void SVGExportContext::finish() {
 
 void SVGExportContext::exportPendingImage(const std::string& token, int width, int height,
                                           const Matrix& matrix, const Brush& brush) {
-  std::string imageID = resourceBucket->addImage();
-  {
-    ElementWriter defElement("defs", xmlWriter);
-    {
-      ElementWriter imageElement("image", xmlWriter);
-      imageElement.addAttribute("id", imageID);
-      imageElement.addAttribute("width", width);
-      imageElement.addAttribute("height", height);
-      imageElement.addAttribute("xlink:href", token);
-    }
-  }
-  {
-    ElementWriter imageUse("use", context, this, xmlWriter.get(), resourceBucket.get(),
-                           exportFlags & SVGExportFlags::DisableWarnings, matrix, brush, nullptr,
-                           _targetColorSpace, _assignColorSpace);
-    imageUse.addAttribute("xlink:href", "#" + imageID);
-  }
+  exportImageElement(token, width, height, matrix, brush);
 }
 
 }  // namespace tgfx

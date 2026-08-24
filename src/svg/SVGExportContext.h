@@ -136,6 +136,9 @@ class SVGExportContext : public DrawContext {
    */
   static bool RequiresViewportReset(const Brush& brush);
 
+  void exportImageElement(const std::string& href, int width, int height, const Matrix& matrix,
+                          const Brush& brush);
+
   void exportPixmap(const Pixmap& pixmap, const Matrix& matrix, const Brush& brush);
 
   /**
