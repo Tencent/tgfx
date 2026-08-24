@@ -178,8 +178,9 @@ class BackgroundCapturer : public BackgroundHandler {
     return snapshots;
   }
 
-  // Records the transform from the current offscreen recording space to world space. The
-  // offscreen content path records the layer into a canvas whose matrix starts at the
+  // Records the matrix that maps layer-local coordinates into the capture canvas space: world
+  // space on the main surface, or the downsampled background-source pixel space during capture.
+  // The offscreen content path records the layer into a canvas whose matrix starts at the
   // layer-local origin, so drawBackgroundStyle() cannot recover the layer's world placement
   // from canvas->getMatrix() there and uses this matrix instead. Set by the offscreen content
   // path right before the layer subtree is recorded.

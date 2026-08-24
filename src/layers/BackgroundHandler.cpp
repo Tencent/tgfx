@@ -185,7 +185,7 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   auto localToWorld = bgSource->surfaceToWorldMatrix();
   // When the layer subtree is being recorded through the offscreen content path, the canvas
   // matrix starts at the layer-local origin and no longer carries the layer's world placement;
-  // use the recording-space-to-world transform published by that path instead.
+  // use the layer-local-to-capture-canvas transform published by that path instead.
   if (_captureWorldMatrix.has_value()) {
     localToWorld.preConcat(*_captureWorldMatrix);
   } else {
