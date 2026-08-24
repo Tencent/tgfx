@@ -65,8 +65,7 @@ static const char* ToAlphaModeString(WGPUCompositeAlphaMode alphaMode) {
 
 std::shared_ptr<WebGPUWindow> WebGPUWindow::MakeFrom(const std::string& canvasSelector,
                                                      std::shared_ptr<WebGPUDevice> device,
-                                                     std::shared_ptr<ColorSpace> colorSpace,
-                                                     bool vsyncEnabled) {
+                                                     std::shared_ptr<ColorSpace> colorSpace) {
   if (canvasSelector.empty()) {
     return nullptr;
   }
@@ -116,24 +115,28 @@ std::shared_ptr<WebGPUWindow> WebGPUWindow::MakeFrom(const std::string& canvasSe
   config.usage = WGPUTextureUsage_RenderAttachment;
   config.width = static_cast<uint32_t>(canvasWidth);
   config.height = static_cast<uint32_t>(canvasHeight);
-  config.presentMode = vsyncEnabled ? WGPUPresentMode_Fifo : WGPUPresentMode_Immediate;
+  // Browser canvas presentation only supports Fifo; Immediate (vsync off) is a native-only
+  // extension. Requesting an unsupported present mode makes wgpuSurfaceConfigure raise a validation
+  // error and leaves the surface invalid, so always use Fifo here and treat vsyncEnabled=false as a
+  // no-op on this backend (matching the "backends that cannot control vsync ignore this setting"
+  // contract).
+  config.presentMode = WGPUPresentMode_Fifo;
   config.alphaMode = WGPUCompositeAlphaMode_Premultiplied;
   wgpuSurfaceConfigure(surface, &config);
 
   auto window = std::shared_ptr<WebGPUWindow>(
       new WebGPUWindow(std::move(device), surface, canvasWidth, canvasHeight, canvasSelector,
-                       std::move(colorSpace), vsyncEnabled));
+                       std::move(colorSpace)));
   window->configureColorSpace(config.format, config.usage, config.alphaMode);
   return window;
 }
 
 WebGPUWindow::WebGPUWindow(std::shared_ptr<Device> device, void* surface, int width, int height,
                            const std::string& canvasSelector,
-                           std::shared_ptr<ColorSpace> colorSpace, bool vsyncEnabled)
-    : Window(std::move(device), std::move(colorSpace), vsyncEnabled),
-      _canvasSelector(canvasSelector), _surface(surface), _width(width), _height(height),
-      _configuredWidth(width), _configuredHeight(height),
-      _presentMode(vsyncEnabled ? WGPUPresentMode_Fifo : WGPUPresentMode_Immediate) {
+                           std::shared_ptr<ColorSpace> colorSpace)
+    : Window(std::move(device), std::move(colorSpace)), _canvasSelector(canvasSelector),
+      _surface(surface), _width(width), _height(height), _configuredWidth(width),
+      _configuredHeight(height) {
 }
 
 void WebGPUWindow::configureColorSpace(WGPUTextureFormat format, WGPUTextureUsageFlags usage,
@@ -191,8 +194,7 @@ std::shared_ptr<RenderTargetProxy> WebGPUWindow::onCreateRenderTarget(Context* c
     return nullptr;
   }
 
-  // Reconfigure the surface when dimensions change. The present mode is fixed at creation and
-  // reused here.
+  // Reconfigure the surface when dimensions change. Present mode stays Fifo (see MakeFrom).
   if (_width != _configuredWidth || _height != _configuredHeight) {
     auto wgpuDevice =
         static_cast<WGPUDevice>(static_cast<WebGPUDevice*>(getDevice().get())->webgpuDevice());
@@ -203,7 +205,7 @@ std::shared_ptr<RenderTargetProxy> WebGPUWindow::onCreateRenderTarget(Context* c
     config.usage = WGPUTextureUsage_RenderAttachment;
     config.width = static_cast<uint32_t>(_width);
     config.height = static_cast<uint32_t>(_height);
-    config.presentMode = _presentMode;
+    config.presentMode = WGPUPresentMode_Fifo;
     config.alphaMode = WGPUCompositeAlphaMode_Premultiplied;
     wgpuSurfaceConfigure(wgpuSurface, &config);
     configureColorSpace(config.format, config.usage, config.alphaMode);
