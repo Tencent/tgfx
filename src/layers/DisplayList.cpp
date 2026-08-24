@@ -1176,19 +1176,6 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   _root->drawLayer(args, surface->getCanvas(), 1.0f, BlendMode::SrcOver);
 }
 
-// Collects the render bounds of every layer that carries a background-sourced style. The capture
-// pass must paint the background across each such layer's full bounds, not just the frame's dirty
-// rects: the snapshot window of a layer spans its whole bounds, and the capture surface starts out
-// empty each frame, so any part outside the painted area would read back as missing background.
-void DisplayList::collectBackgroundStyleBounds(Layer* layer, std::vector<Rect>* out) {
-  if (layer->hasBackgroundStyle() && !layer->renderBounds.isEmpty()) {
-    out->push_back(layer->renderBounds);
-  }
-  for (const auto& child : layer->children()) {
-    collectBackgroundStyleBounds(child.get(), out);
-  }
-}
-
 std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
     Surface* surface, const std::vector<Rect>& renderRects) const {
   DEBUG_ASSERT(surface != nullptr);
@@ -1227,18 +1214,6 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   // still contribute pixels to the blur sampling region are not culled by the capture pass.
   for (auto& rect : worldRects) {
     rect.outset(_root->maxBackgroundOutset, _root->maxBackgroundOutset);
-  }
-  // The dirty rects cover only what changed this frame; a moving background style layer has parts
-  // of its bounds outside them, and those parts would sample empty background from the snapshot.
-  std::vector<Rect> styleBounds = {};
-  collectBackgroundStyleBounds(_root.get(), &styleBounds);
-  for (auto& bounds : styleBounds) {
-    bounds.outset(_root->maxBackgroundOutset, _root->maxBackgroundOutset);
-    bounds.roundOut();
-    worldRects.push_back(bounds);
-    auto surfaceRect = viewMatrix.mapRect(bounds);
-    surfaceRect.roundOut();
-    surfaceUnion.join(surfaceRect);
   }
   DrawArgs args(context);
   args.dstColorSpace = surface->colorSpace();
