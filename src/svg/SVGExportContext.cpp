@@ -32,6 +32,7 @@
 #include "core/images/SubsetImage.h"
 #include "core/shaders/ImageShader.h"
 #include "core/shaders/MatrixShader.h"
+#include "core/utils/CopyPixels.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/RectToRectMatrix.h"
@@ -144,10 +145,10 @@ void SVGExportContext::drawRect(const Rect& rect, const Matrix& matrix, const Cl
                                 const Brush& brush, const Stroke* stroke) {
   std::unique_ptr<ElementWriter> svg;
   if (RequiresViewportReset(brush)) {
-    svg =
-        std::make_unique<ElementWriter>("svg", context, this, xmlWriter.get(), resourceBucket.get(),
-                                        exportFlags & SVGExportFlags::DisableWarnings, matrix,
-                                        brush, nullptr, _targetColorSpace, _assignColorSpace);
+    svg = std::make_unique<ElementWriter>("svg", context, this, _pendingImages, xmlWriter.get(),
+                                          resourceBucket.get(),
+                                          exportFlags & SVGExportFlags::DisableWarnings, matrix,
+                                          brush, nullptr, _targetColorSpace, _assignColorSpace);
     svg->addRectAttributes(rect);
   }
 
@@ -157,9 +158,9 @@ void SVGExportContext::drawRect(const Rect& rect, const Matrix& matrix, const Cl
   }
   applyClip(clip, matrix.mapRect(contentBounds));
 
-  ElementWriter rectElement("rect", context, this, xmlWriter.get(), resourceBucket.get(),
-                            exportFlags & SVGExportFlags::DisableWarnings, matrix, brush, stroke,
-                            _targetColorSpace, _assignColorSpace);
+  ElementWriter rectElement("rect", context, this, _pendingImages, xmlWriter.get(),
+                            resourceBucket.get(), exportFlags & SVGExportFlags::DisableWarnings,
+                            matrix, brush, stroke, _targetColorSpace, _assignColorSpace);
 
   if (svg) {
     rectElement.addAttribute("x", 0);
@@ -193,20 +194,21 @@ void SVGExportContext::drawRRect(const RRect& roundRect, const Matrix& matrix,
   applyClip(clip, matrix.mapRect(contentBounds));
   if (roundRect.isOval()) {
     if (roundRect.rect().width() == roundRect.rect().height()) {
-      ElementWriter circleElement("circle", context, this, xmlWriter.get(), resourceBucket.get(),
+      ElementWriter circleElement("circle", context, this, _pendingImages, xmlWriter.get(),
+                                  resourceBucket.get(),
                                   exportFlags & SVGExportFlags::DisableWarnings, matrix, brush,
                                   stroke, _targetColorSpace, _assignColorSpace);
       circleElement.addCircleAttributes(roundRect.rect());
     } else {
-      ElementWriter ovalElement("ellipse", context, this, xmlWriter.get(), resourceBucket.get(),
-                                exportFlags & SVGExportFlags::DisableWarnings, matrix, brush,
-                                stroke, _targetColorSpace, _assignColorSpace);
+      ElementWriter ovalElement("ellipse", context, this, _pendingImages, xmlWriter.get(),
+                                resourceBucket.get(), exportFlags & SVGExportFlags::DisableWarnings,
+                                matrix, brush, stroke, _targetColorSpace, _assignColorSpace);
       ovalElement.addEllipseAttributes(roundRect.rect());
     }
   } else {
-    ElementWriter rrectElement("rect", context, this, xmlWriter.get(), resourceBucket.get(),
-                               exportFlags & SVGExportFlags::DisableWarnings, matrix, brush, stroke,
-                               _targetColorSpace, _assignColorSpace);
+    ElementWriter rrectElement("rect", context, this, _pendingImages, xmlWriter.get(),
+                               resourceBucket.get(), exportFlags & SVGExportFlags::DisableWarnings,
+                               matrix, brush, stroke, _targetColorSpace, _assignColorSpace);
     rrectElement.addRoundRectAttributes(roundRect);
   }
 }
@@ -214,9 +216,9 @@ void SVGExportContext::drawRRect(const RRect& roundRect, const Matrix& matrix,
 void SVGExportContext::drawPath(const Path& path, const Matrix& matrix, const ClipStack& clip,
                                 const Brush& brush) {
   applyClip(clip, matrix.mapRect(path.getBounds()));
-  ElementWriter pathElement("path", context, this, xmlWriter.get(), resourceBucket.get(),
-                            exportFlags & SVGExportFlags::DisableWarnings, matrix, brush, nullptr,
-                            _targetColorSpace, _assignColorSpace);
+  ElementWriter pathElement("path", context, this, _pendingImages, xmlWriter.get(),
+                            resourceBucket.get(), exportFlags & SVGExportFlags::DisableWarnings,
+                            matrix, brush, nullptr, _targetColorSpace, _assignColorSpace);
   pathElement.addPathAttributes(path, tgfx::SVGExportContext::PathEncodingType());
   if (path.getFillType() == PathFillType::EvenOdd) {
     pathElement.addAttribute("fill-rule", "evenodd");
@@ -280,11 +282,24 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
                                  brush.color.alpha);
       return;
     }
-    auto modifyImage = ConvertImageColorSpace(image, context, _targetColorSpace, _assignColorSpace);
-    Bitmap bitmap = ImageExportToBitmap(context, modifyImage);
+    auto modifyImage = ConvertImageColorSpace(image, context, _targetColorSpace, _assignColorSpace,
+                                              _pendingImages);
+    if (modifyImage == nullptr) {
+      // The registered readback holds the converted full-size pixels, matching the geometry below.
+      applyClip(clip, matrix.mapRect(Rect::MakeWH(image->width(), image->height())));
+      exportPendingImage(_pendingImages->back().token, image->width(), image->height(), matrix,
+                         brush);
+      return;
+    }
+    auto pendingCount = _pendingImages->size();
+    Bitmap bitmap = ImageExportToBitmap(context, modifyImage, _pendingImages);
     if (!bitmap.isEmpty()) {
       applyClip(clip, matrix.mapRect(Rect::MakeWH(image->width(), image->height())));
       exportPixmap(Pixmap(bitmap), matrix, brush);
+    } else if (_pendingImages->size() > pendingCount) {
+      applyClip(clip, matrix.mapRect(Rect::MakeWH(image->width(), image->height())));
+      exportPendingImage(_pendingImages->back().token, modifyImage->width(), modifyImage->height(),
+                         matrix, brush);
     }
   } else if (type == Types::ImageType::Filter) {
     const auto filterImage = static_cast<const FilterImage*>(image.get());
@@ -399,7 +414,7 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
     if (filter) {
       ElementWriter defs("defs", xmlWriter, resourceBucket.get(), _targetColorSpace,
                          _assignColorSpace);
-      filterIDs = defs.addImageFilterChain(filter, bound, customWriter, context);
+      filterIDs = defs.addImageFilterChain(filter, bound, customWriter, context, _pendingImages);
       if (filterIDs.size() == 1) {
         resources.filter = "url(#" + filterIDs[0] + ")";
       }
@@ -468,10 +483,21 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
     }
     drawImage(subsetImage->source, sampling, matrix, clip, brush);
   } else {
-    auto modifyImage = ConvertImageColorSpace(image, context, _targetColorSpace, _assignColorSpace);
-    Bitmap bitmap = ImageExportToBitmap(context, modifyImage);
+    auto modifyImage = ConvertImageColorSpace(image, context, _targetColorSpace, _assignColorSpace,
+                                              _pendingImages);
+    if (modifyImage == nullptr) {
+      // The registered readback holds the converted full-size pixels, matching the geometry below.
+      exportPendingImage(_pendingImages->back().token, image->width(), image->height(), matrix,
+                         brush);
+      return;
+    }
+    auto pendingCount = _pendingImages->size();
+    Bitmap bitmap = ImageExportToBitmap(context, modifyImage, _pendingImages);
     if (!bitmap.isEmpty()) {
       exportPixmap(Pixmap(bitmap), matrix, brush);
+    } else if (_pendingImages->size() > pendingCount) {
+      exportPendingImage(_pendingImages->back().token, modifyImage->width(), modifyImage->height(),
+                         matrix, brush);
     }
   }
 }
@@ -482,12 +508,39 @@ void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& s
                                      const Brush& brush, SrcRectConstraint,
                                      const Rect* /*strictRect*/) {
   DEBUG_ASSERT(image != nullptr);
-  auto modifyImage = ConvertImageColorSpace(image, context, _targetColorSpace, _assignColorSpace);
+  // The image is fully clipped away when the transformed dstRect and the outer clip do not
+  // intersect. Return early to avoid a wasted readback and a dangling pending token.
+  Path dstClip;
+  dstClip.addRect(dstRect);
+  dstClip.transform(matrix);
+  auto outerClipPath = clip.getClipPath();
+  if (!outerClipPath.isEmpty()) {
+    dstClip.addPath(outerClipPath, PathOp::Intersect);
+  }
+  if (dstClip.isEmpty()) {
+    return;
+  }
+  auto modifyImage =
+      ConvertImageColorSpace(image, context, _targetColorSpace, _assignColorSpace, _pendingImages);
+  if (modifyImage == nullptr) {
+    // The registered readback holds the converted full-size pixels, so the srcRect subset must be
+    // expressed by mapping srcRect onto dstRect and clipping to the transformed dstRect.
+    auto viewMatrix = MakeRectToRectMatrix(srcRect, dstRect);
+    auto newMatrix = matrix;
+    newMatrix.preConcat(viewMatrix);
+    auto fillMatrix = Matrix::I();
+    viewMatrix.invert(&fillMatrix);
+    applyClipPath(dstClip);
+    exportPendingImage(_pendingImages->back().token, image->width(), image->height(), newMatrix,
+                       brush.makeWithMatrix(fillMatrix));
+    return;
+  }
   auto subsetImage = modifyImage->makeSubset(srcRect);
   if (subsetImage == nullptr) {
     return;
   }
-  Bitmap bitmap = ImageExportToBitmap(context, subsetImage);
+  auto pendingCount = _pendingImages->size();
+  Bitmap bitmap = ImageExportToBitmap(context, subsetImage, _pendingImages);
   if (!bitmap.isEmpty()) {
     applyClip(clip, matrix.mapRect(dstRect));
 
@@ -501,6 +554,41 @@ void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& s
     viewMatrix.invert(&fillMatrix);
 
     exportPixmap(Pixmap(bitmap), newMatrix, brush.makeWithMatrix(fillMatrix));
+  } else if (_pendingImages->size() > pendingCount) {
+    applyClip(clip, matrix.mapRect(dstRect));
+
+    auto viewMatrix =
+        MakeRectToRectMatrix(Rect::MakeWH(srcRect.width(), srcRect.height()), dstRect);
+
+    auto newMatrix = matrix;
+    newMatrix.preConcat(viewMatrix);
+
+    auto fillMatrix = Matrix::I();
+    viewMatrix.invert(&fillMatrix);
+
+    exportPendingImage(_pendingImages->back().token, subsetImage->width(), subsetImage->height(),
+                       newMatrix, brush.makeWithMatrix(fillMatrix));
+  }
+}
+
+void SVGExportContext::exportImageElement(const std::string& href, int width, int height,
+                                          const Matrix& matrix, const Brush& brush) {
+  std::string imageID = resourceBucket->addImage();
+  {
+    ElementWriter defElement("defs", xmlWriter);
+    {
+      ElementWriter imageElement("image", xmlWriter);
+      imageElement.addAttribute("id", imageID);
+      imageElement.addAttribute("width", width);
+      imageElement.addAttribute("height", height);
+      imageElement.addAttribute("xlink:href", href);
+    }
+  }
+  {
+    ElementWriter imageUse("use", context, this, _pendingImages, xmlWriter.get(),
+                           resourceBucket.get(), exportFlags & SVGExportFlags::DisableWarnings,
+                           matrix, brush, nullptr, _targetColorSpace, _assignColorSpace);
+    imageUse.addAttribute("xlink:href", "#" + imageID);
   }
 }
 
@@ -510,24 +598,8 @@ void SVGExportContext::exportPixmap(const Pixmap& pixmap, const Matrix& matrix,
   if (!dataUri) {
     return;
   }
-
-  std::string imageID = resourceBucket->addImage();
-  {
-    ElementWriter defElement("defs", xmlWriter);
-    {
-      ElementWriter imageElement("image", xmlWriter);
-      imageElement.addAttribute("id", imageID);
-      imageElement.addAttribute("width", pixmap.width());
-      imageElement.addAttribute("height", pixmap.height());
-      imageElement.addAttribute("xlink:href", static_cast<const char*>(dataUri->data()));
-    }
-  }
-  {
-    ElementWriter imageUse("use", context, this, xmlWriter.get(), resourceBucket.get(),
-                           exportFlags & SVGExportFlags::DisableWarnings, matrix, brush, nullptr,
-                           _targetColorSpace, _assignColorSpace);
-    imageUse.addAttribute("xlink:href", "#" + imageID);
-  }
+  exportImageElement(static_cast<const char*>(dataUri->data()), pixmap.width(), pixmap.height(),
+                     matrix, brush);
 }
 
 void SVGExportContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const Matrix& matrix,
@@ -578,9 +650,9 @@ void SVGExportContext::exportGlyphRunAsPath(const GlyphRun& glyphRun, const Matr
   if (path.isEmpty()) {
     return;
   }
-  ElementWriter pathElement("path", context, this, xmlWriter.get(), resourceBucket.get(),
-                            exportFlags & SVGExportFlags::DisableWarnings, matrix, brush, stroke,
-                            _targetColorSpace, _assignColorSpace);
+  ElementWriter pathElement("path", context, this, _pendingImages, xmlWriter.get(),
+                            resourceBucket.get(), exportFlags & SVGExportFlags::DisableWarnings,
+                            matrix, brush, stroke, _targetColorSpace, _assignColorSpace);
   pathElement.addPathAttributes(path, tgfx::SVGExportContext::PathEncodingType());
   if (path.getFillType() == PathFillType::EvenOdd) {
     pathElement.addAttribute("fill-rule", "evenodd");
@@ -589,9 +661,9 @@ void SVGExportContext::exportGlyphRunAsPath(const GlyphRun& glyphRun, const Matr
 
 void SVGExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const Matrix& matrix,
                                             const Brush& brush, const Stroke* stroke) {
-  ElementWriter textElement("text", context, this, xmlWriter.get(), resourceBucket.get(),
-                            exportFlags & SVGExportFlags::DisableWarnings, matrix, brush, stroke,
-                            _targetColorSpace, _assignColorSpace);
+  ElementWriter textElement("text", context, this, _pendingImages, xmlWriter.get(),
+                            resourceBucket.get(), exportFlags & SVGExportFlags::DisableWarnings,
+                            matrix, brush, stroke, _targetColorSpace, _assignColorSpace);
 
   textElement.addFontAttributes(glyphRun.font);
 
@@ -735,7 +807,7 @@ void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
   if (imageFilter) {
     ElementWriter defs("defs", xmlWriter, resourceBucket.get(), _targetColorSpace,
                        _assignColorSpace);
-    filterIDs = defs.addImageFilterChain(imageFilter, bound, customWriter, context);
+    filterIDs = defs.addImageFilterChain(imageFilter, bound, customWriter, context, _pendingImages);
   }
   auto clipPath = clip.getClipPath();
   bool needsClip = !clipPath.isEmpty() && !clipPath.contains(bound);
@@ -851,24 +923,51 @@ void SVGExportContext::applyClipPath(const Path& clipPath) {
   clipGroupElement->addAttribute("clip-path", "url(#" + clipID + ")");
 }
 
-Bitmap SVGExportContext::ImageExportToBitmap(Context* context,
-                                             const std::shared_ptr<Image>& image) {
+Bitmap SVGExportContext::ImageExportToBitmap(Context* context, const std::shared_ptr<Image>& image,
+                                             std::vector<PendingImage>* pendings) {
   auto surface = Surface::Make(context, image->width(), image->height());
+  if (surface == nullptr) {
+    LOGE("SVGExportContext::ImageExportToBitmap() Failed to create readback surface!");
+    return Bitmap();
+  }
   auto canvas = surface->getCanvas();
   canvas->drawImage(image);
+  auto readback = surface->asyncReadPixels(Rect::MakeWH(surface->width(), surface->height()));
+  if (readback == nullptr) {
+    LOGE("SVGExportContext::ImageExportToBitmap() asyncReadPixels() returned null!");
+    return Bitmap();
+  }
+  // Starting the async mapping here lets it complete on a later turn of the event loop, and
+  // getGPUBuffer() flushes without the synchronous GPU wait lockPixels() would do.
+  if (auto gpuBuffer = readback->getGPUBuffer(context)) {
+    gpuBuffer->requestMapAsync();
+  }
 
+  auto flipY = surface->origin() == ImageOrigin::BottomLeft;
+  auto srcPixels = readback->lockPixels(context);
+  if (srcPixels == nullptr) {
+    readback->unlockPixels(context);
+    if (pendings != nullptr && readback->status(context) == ReadbackStatus::Pending) {
+      pendings->push_back(
+          PendingImage::Make(std::move(readback), pendings->size(), flipY, image->colorSpace()));
+    }
+    return Bitmap();
+  }
   Bitmap bitmap(surface->width(), surface->height(), false, true, image->colorSpace());
   auto pixels = bitmap.lockPixels();
-  if (surface->readPixels(bitmap.info().makeColorSpace(nullptr), pixels)) {
-    bitmap.unlockPixels();
-    return bitmap;
+  if (pixels == nullptr) {
+    readback->unlockPixels(context);
+    LOGE("SVGExportContext::ImageExportToBitmap() Failed to lock the destination bitmap!");
+    return Bitmap();
   }
+  CopyPixels(readback->info(), srcPixels, bitmap.info().makeColorSpace(nullptr), pixels, flipY);
+  readback->unlockPixels(context);
   bitmap.unlockPixels();
-  return Bitmap();
+  return bitmap;
 }
 
 std::shared_ptr<Data> SVGExportContext::ImageToEncodedData(const std::shared_ptr<Image>& image) {
-  if (Types::Get(image.get()) != Types::ImageType::Codec) {
+  if (image == nullptr || Types::Get(image.get()) != Types::ImageType::Codec) {
     return nullptr;
   }
   const auto codecImage = static_cast<const CodecImage*>(image.get());
@@ -877,18 +976,39 @@ std::shared_ptr<Data> SVGExportContext::ImageToEncodedData(const std::shared_ptr
 }
 
 std::shared_ptr<Data> SVGExportContext::EncodeImageToDataUri(const std::shared_ptr<Image>& image,
-                                                             Context* context) {
+                                                             Context* context,
+                                                             std::vector<PendingImage>* pendings) {
+  if (image == nullptr) {
+    return nullptr;
+  }
   auto data = ImageToEncodedData(image);
   if (data && (JpegCodec::IsJpeg(data) || PngCodec::IsPng(data))) {
     return AsDataUri(data);
   }
   if (context) {
-    Bitmap bitmap = ImageExportToBitmap(context, image);
+    auto pendingCount = pendings == nullptr ? 0u : pendings->size();
+    Bitmap bitmap = ImageExportToBitmap(context, image, pendings);
     if (!bitmap.isEmpty()) {
       return AsDataUri(Pixmap(bitmap));
     }
+    if (pendings != nullptr && pendings->size() > pendingCount) {
+      // Returning the token as a data URI lets pattern and feImage call sites embed it directly.
+      return PendingImage::MakeTokenData(pendings->back().token);
+    }
   }
   return nullptr;
+}
+
+void SVGExportContext::finish() {
+  // A clip group left open by the last draw sits on top of the XML element stack, so closing the
+  // root first would emit </g> in place of </svg>.
+  clipGroupElement = nullptr;
+  rootElement = nullptr;
+}
+
+void SVGExportContext::exportPendingImage(const std::string& token, int width, int height,
+                                          const Matrix& matrix, const Brush& brush) {
+  exportImageElement(token, width, height, matrix, brush);
 }
 
 }  // namespace tgfx

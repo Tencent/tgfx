@@ -396,10 +396,7 @@ void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int encoding
     return;
   }
 
-  // A ready buffer that still yields no pixels is a genuine failure rather than an async wait, and
-  // so is a missing readback buffer: isReady() can never turn true for it, so deferring it would
-  // make isReadyToClose() reject the caller forever.
-  if (readback->isReady(doc->context()) || readback->getGPUBuffer(doc->context()) == nullptr) {
+  if (readback->status(doc->context()) != ReadbackStatus::Pending) {
     LOGE("PDFBitmap::SerializeImage() Failed to read the pixels from the surface! (%dx%d)",
          surface->width(), surface->height());
     WritePlaceholder(doc, ref);
