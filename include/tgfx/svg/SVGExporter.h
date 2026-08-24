@@ -137,9 +137,9 @@ class SVGExporter {
   void close();
 
   /**
-   * Returns true when close() can produce a complete SVG. Only backends without synchronous pixel
-   * readback, such as WebGPU, may return false, meaning some images are still being read back from
-   * the GPU. Poll this once per turn of the event loop until it returns true, then call close().
+   * Returns true when close() can produce a complete SVG. Returns false while some images are
+   * still being read back from the GPU asynchronously. Poll until it returns true, then call
+   * close().
    */
   bool isReadyToClose();
 

@@ -38,7 +38,7 @@ enum class ReadbackStatus {
    */
   Pending,
   /**
-   * The pixels will never arrive. Callers must degrade immediately instead of polling forever.
+   * The readback has failed; the pixels will never arrive.
    */
   Failed,
 };
@@ -97,10 +97,7 @@ class SurfaceReadback {
   std::shared_ptr<GPUBuffer> getGPUBuffer(Context* context) const;
 
   /**
-   * Returns the current state of the readback. Unlike isReady(), this also distinguishes a terminal
-   * failure from a pending readback so callers can degrade immediately instead of polling forever.
-   * Absorbs the flush side effect internally: when the readback buffer has not been created yet,
-   * the transfer task is submitted without a synchronous GPU wait.
+   * Returns the current state of the readback. This method does not block the calling thread.
    * @param context The Context associated with the Surface from which pixels are being read.
    */
   ReadbackStatus status(Context* context) const;

@@ -148,6 +148,7 @@ ReadbackStatus SurfaceReadback::status(Context* context) const {
   }
   auto readbackBuffer = proxy->getBuffer();
   if (readbackBuffer == nullptr) {
+    // Submits the pending transfer task without blocking so the buffer can be created.
     context->flushAndSubmit(false);
     readbackBuffer = proxy->getBuffer();
     if (readbackBuffer == nullptr) {
