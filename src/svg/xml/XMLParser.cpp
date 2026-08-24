@@ -52,8 +52,6 @@ class AutoTCallVProc : public std::unique_ptr<T, FunctionObject<P>> {
   }
 };
 
-constexpr const void* HASH_SEED = &HASH_SEED;
-
 const XML_Memory_Handling_Suite XML_alloc = {malloc, realloc, free};
 
 struct ParsingContext {
@@ -127,12 +125,6 @@ bool XMLParser::parse(Stream& stream) {
     LOGE("could not create XML parser\n");
     return false;
   }
-
-  // Avoid calls to rand_s if this is not set. This seed helps prevent DOS
-  // with a known hash sequence so an address is sufficient. The provided
-  // seed should not be zero as that results in a call to rand_s.
-  auto seed = static_cast<unsigned long>(reinterpret_cast<size_t>(HASH_SEED) & 0xFFFFFFFF);
-  XML_SetHashSalt(parsingContext._XMLParser, seed ? seed : 1);
 
   XML_SetUserData(parsingContext._XMLParser, &parsingContext);
   XML_SetElementHandler(parsingContext._XMLParser, start_element_handler, end_element_handler);
