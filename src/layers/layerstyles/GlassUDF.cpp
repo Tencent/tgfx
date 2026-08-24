@@ -16,10 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GlassUDFImage.h"
-#include "core/utils/Log.h"
+#include "GlassUDF.h"
 #include "gpu/DrawingManager.h"
-#include "gpu/TPArgs.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "layers/processors/GlassUDFTentBlurFragmentProcessor.h"
@@ -27,22 +25,25 @@
 
 namespace tgfx {
 
-// Blurs a window of the coverage image with tent kernels and returns one RGBA8 texture containing
-// the requested fields. Coordinates remain in the full UDF space.
-static std::shared_ptr<TextureProxy> GenerateGlassUDFTexture(
-    Context* context, const std::shared_ptr<Image>& source, int coreWidth, int coreHeight,
-    const Rect& textureRect, const Point& fineRadius, const Point& coarseRadius,
-    GlassUDFField field) {
-  if (context == nullptr || source == nullptr || coreWidth <= 0 || coreHeight <= 0 ||
-      textureRect.isEmpty()) {
+bool GlassUDFRequest::isValid() const {
+  if (source == nullptr || coreWidth <= 0 || coreHeight <= 0 || textureRect.isEmpty()) {
+    return false;
+  }
+  auto& radius = field == GlassUDFField::Refraction ? fineRadius : coarseRadius;
+  return radius.x > 0.0f && radius.y > 0.0f;
+}
+
+std::shared_ptr<TextureProxy> GenerateGlassUDFTexture(Context* context,
+                                                      const GlassUDFRequest& request) {
+  if (context == nullptr || !request.isValid()) {
     return nullptr;
   }
+  auto& textureRect = request.textureRect;
+  auto& fineRadius = request.fineRadius;
+  auto& coarseRadius = request.coarseRadius;
+  auto field = request.field;
   bool usesFine = field == GlassUDFField::Refraction;
   bool usesCoarse = field == GlassUDFField::EdgeLight;
-  if ((usesFine && (fineRadius.x <= 0.0f || fineRadius.y <= 0.0f)) ||
-      (usesCoarse && (coarseRadius.x <= 0.0f || coarseRadius.y <= 0.0f))) {
-    return nullptr;
-  }
   auto textureWidth = static_cast<int>(std::round(textureRect.width()));
   auto textureHeight = static_cast<int>(std::round(textureRect.height()));
   if (textureWidth <= 0 || textureHeight <= 0) {
@@ -79,7 +80,8 @@ static std::shared_ptr<TextureProxy> GenerateGlassUDFTexture(
   // window instead ties the grid phase to the window's origin and size, and neighbouring cells
   // along one straight edge would then disagree on the field, which shows up as the edge light
   // changing width from one cell to the next.
-  auto coreImage = source->makeScaled(coreWidth, coreHeight, SamplingOptions(FilterMode::Linear));
+  auto coreImage = request.source->makeScaled(request.coreWidth, request.coreHeight,
+                                              SamplingOptions(FilterMode::Linear));
   if (coreImage == nullptr) {
     return nullptr;
   }
@@ -88,7 +90,7 @@ static std::shared_ptr<TextureProxy> GenerateGlassUDFTexture(
                      textureRect.left + static_cast<float>(textureWidth) + horizontalHalo,
                      horizontalRect.top + static_cast<float>(horizontalHeight) + 1.0f);
   coreWindowUDF.roundOut();
-  if (!coreWindowUDF.intersect(Rect::MakeWH(coreWidth, coreHeight))) {
+  if (!coreWindowUDF.intersect(Rect::MakeWH(request.coreWidth, request.coreHeight))) {
     return nullptr;
   }
   auto coreSource = coreImage->makeSubset(coreWindowUDF);
@@ -146,57 +148,6 @@ static std::shared_ptr<TextureProxy> GenerateGlassUDFTexture(
     return nullptr;
   }
   return verticalTarget->asTextureProxy();
-}
-
-std::shared_ptr<Image> GlassUDFImage::Make(std::shared_ptr<Image> source, int coreWidth,
-                                           int coreHeight, const Rect& textureRect,
-                                           const Point& fineRadius, const Point& coarseRadius,
-                                           GlassUDFField field) {
-  bool usesFine = field == GlassUDFField::Refraction;
-  bool usesCoarse = field == GlassUDFField::EdgeLight;
-  if (source == nullptr || coreWidth <= 0 || coreHeight <= 0 || textureRect.isEmpty() ||
-      (usesFine && (fineRadius.x <= 0.0f || fineRadius.y <= 0.0f)) ||
-      (usesCoarse && (coarseRadius.x <= 0.0f || coarseRadius.y <= 0.0f))) {
-    return nullptr;
-  }
-  auto image = std::shared_ptr<GlassUDFImage>(new GlassUDFImage(
-      std::move(source), coreWidth, coreHeight, textureRect, fineRadius, coarseRadius, field));
-  image->weakThis = image;
-  return image;
-}
-
-GlassUDFImage::GlassUDFImage(std::shared_ptr<Image> source, int coreWidth, int coreHeight,
-                             const Rect& textureRect, const Point& fineRadius,
-                             const Point& coarseRadius, GlassUDFField field)
-    : source(std::move(source)), coreWidth(coreWidth), coreHeight(coreHeight),
-      textureRect(textureRect), fineRadius(fineRadius), coarseRadius(coarseRadius), field(field),
-      _width(static_cast<int>(std::round(textureRect.width()))),
-      _height(static_cast<int>(std::round(textureRect.height()))) {
-}
-
-std::shared_ptr<TextureProxy> GlassUDFImage::lockTextureProxy(const TPArgs& args) const {
-  if (args.context == nullptr) {
-    return nullptr;
-  }
-  auto textureProxy = GenerateGlassUDFTexture(args.context, source, coreWidth, coreHeight,
-                                              textureRect, fineRadius, coarseRadius, field);
-  if (textureProxy == nullptr) {
-    LOGE("GlassUDFImage: Failed to generate the UDF texture.");
-    return nullptr;
-  }
-  return textureProxy;
-}
-
-PlacementPtr<FragmentProcessor> GlassUDFImage::asFragmentProcessor(const FPArgs& args,
-                                                                   const SamplingArgs& samplingArgs,
-                                                                   const Matrix* uvMatrix) const {
-  auto textureProxy = lockTextureProxy(
-      TPArgs(args.context, args.renderFlags, false, args.drawScale, BackingFit::Exact));
-  if (textureProxy == nullptr) {
-    return nullptr;
-  }
-  return TiledTextureEffect::Make(args.context->drawingAllocator(), std::move(textureProxy),
-                                  samplingArgs, uvMatrix);
 }
 
 }  // namespace tgfx

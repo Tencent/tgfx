@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "layers/layerstyles/GlassUDF.h"
 #include "layers/processors/GlassRefractionFragmentProcessor.h"
 #include "tgfx/core/ImageFilter.h"
 
@@ -25,10 +26,17 @@ namespace tgfx {
 
 class GlassRefractionImageFilter : public ImageFilter {
  public:
+  /**
+   * @param maskRequest Describes the refraction UDF field to generate at playback time. Empty on
+   * the analytical SDF path, which needs no field.
+   * @param edgeMaskRequest Describes the edge light UDF field. Empty when the edge light is off or
+   * on the analytical SDF path.
+   */
   GlassRefractionImageFilter(const GlassRefractionParams& params,
                              const GlassSDFGeometryParams& sdfParams,
-                             const GlassUDFGeometryParams& udfParams, std::shared_ptr<Image> mask,
-                             std::shared_ptr<Image> edgeMask = nullptr);
+                             const GlassUDFGeometryParams& udfParams,
+                             const GlassUDFRequest& maskRequest = {},
+                             const GlassUDFRequest& edgeMaskRequest = {});
 
  protected:
   Type type() const override {
@@ -53,8 +61,8 @@ class GlassRefractionImageFilter : public ImageFilter {
   GlassRefractionParams params;
   GlassSDFGeometryParams sdfParams;
   GlassUDFGeometryParams udfParams;
-  std::shared_ptr<Image> mask;
-  std::shared_ptr<Image> edgeMask;
+  GlassUDFRequest maskRequest;
+  GlassUDFRequest edgeMaskRequest;
 };
 
 }  // namespace tgfx

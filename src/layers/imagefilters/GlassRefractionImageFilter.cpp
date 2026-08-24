@@ -18,6 +18,7 @@
 
 #include "layers/imagefilters/GlassRefractionImageFilter.h"
 #include "core/images/TextureImage.h"
+#include "core/utils/Log.h"
 #include "gpu/TPArgs.h"
 #include "layers/processors/GlassRefractionFragmentProcessor.h"
 
@@ -26,10 +27,10 @@ namespace tgfx {
 GlassRefractionImageFilter::GlassRefractionImageFilter(const GlassRefractionParams& params,
                                                        const GlassSDFGeometryParams& sdfParams,
                                                        const GlassUDFGeometryParams& udfParams,
-                                                       std::shared_ptr<Image> mask,
-                                                       std::shared_ptr<Image> edgeMask)
-    : params(params), sdfParams(sdfParams), udfParams(udfParams), mask(std::move(mask)),
-      edgeMask(std::move(edgeMask)) {
+                                                       const GlassUDFRequest& maskRequest,
+                                                       const GlassUDFRequest& edgeMaskRequest)
+    : params(params), sdfParams(sdfParams), udfParams(udfParams), maskRequest(maskRequest),
+      edgeMaskRequest(edgeMaskRequest) {
 }
 
 static std::shared_ptr<TextureProxy> MakeTextureProxy(Context* context,
@@ -69,17 +70,21 @@ PlacementPtr<FragmentProcessor> GlassRefractionImageFilter::asFragmentProcessor(
     return nullptr;
   }
 
+  // The UDF fields are generated here rather than while recording, because their tent blur passes
+  // need a GPU context that a recording canvas does not have yet.
   std::shared_ptr<TextureProxy> maskProxy = nullptr;
-  if (mask != nullptr) {
-    maskProxy = MakeTextureProxy(args.context, mask);
+  if (maskRequest.isValid()) {
+    maskProxy = GenerateGlassUDFTexture(args.context, maskRequest);
     if (maskProxy == nullptr) {
+      LOGE("GlassRefractionImageFilter: Failed to generate the refraction UDF.");
       return nullptr;
     }
   }
   std::shared_ptr<TextureProxy> edgeMaskProxy = nullptr;
-  if (edgeMask != nullptr) {
-    edgeMaskProxy = MakeTextureProxy(args.context, edgeMask);
+  if (edgeMaskRequest.isValid()) {
+    edgeMaskProxy = GenerateGlassUDFTexture(args.context, edgeMaskRequest);
     if (edgeMaskProxy == nullptr) {
+      LOGE("GlassRefractionImageFilter: Failed to generate the edge light UDF.");
       return nullptr;
     }
   }

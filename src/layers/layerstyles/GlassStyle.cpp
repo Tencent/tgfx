@@ -23,7 +23,7 @@
 #include "core/utils/MathExtra.h"
 #include "layers/CanvasUtils.h"
 #include "layers/imagefilters/GlassRefractionImageFilter.h"
-#include "layers/layerstyles/GlassUDFImage.h"
+#include "layers/layerstyles/GlassUDF.h"
 #include "layers/processors/GlassRefractionFragmentProcessor.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Path.h"
@@ -298,7 +298,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
     return;
   }
   auto bgOffset = backgroundSource->imageOffset();
-  // The UDF generation is deferred to GlassUDFImage::lockTextureProxy, so a missing GPU context
+  // The UDF generation is deferred to the refraction filter, so a missing GPU context
   // at record time (e.g. recording into a Picture) no longer skips the effect. The texture size
   // limit is only used to size the intermediate images; without a context the default is capped at
   // the UDF size limit so the recorded layout never exceeds what playback can allocate.
@@ -616,18 +616,26 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       edgeTextureRect.roundOut();
       Point edgeTextureOrigin = {edgeTextureRect.left, edgeTextureRect.top};
 
-      auto maskImage = GlassUDFImage::Make(input.content, udfWidth, udfHeight, fineTextureRect,
-                                           fineRadius, Point::Zero(), GlassUDFField::Refraction);
-      if (maskImage == nullptr) {
+      GlassUDFRequest maskRequest = {};
+      maskRequest.source = input.content;
+      maskRequest.coreWidth = udfWidth;
+      maskRequest.coreHeight = udfHeight;
+      maskRequest.textureRect = fineTextureRect;
+      maskRequest.fineRadius = fineRadius;
+      maskRequest.field = GlassUDFField::Refraction;
+      if (!maskRequest.isValid()) {
         LOGE("GlassStyle: Failed to create refraction UDF.");
         return;
       }
-      std::shared_ptr<Image> edgeMaskImage = nullptr;
+      GlassUDFRequest edgeMaskRequest = {};
       if (enableEdgeLighting) {
-        edgeMaskImage =
-            GlassUDFImage::Make(input.content, edgeCoreWidth, edgeCoreHeight, edgeTextureRect,
-                                Point::Zero(), coarseRadius, GlassUDFField::EdgeLight);
-        if (edgeMaskImage == nullptr) {
+        edgeMaskRequest.source = input.content;
+        edgeMaskRequest.coreWidth = edgeCoreWidth;
+        edgeMaskRequest.coreHeight = edgeCoreHeight;
+        edgeMaskRequest.textureRect = edgeTextureRect;
+        edgeMaskRequest.coarseRadius = coarseRadius;
+        edgeMaskRequest.field = GlassUDFField::EdgeLight;
+        if (!edgeMaskRequest.isValid()) {
           LOGE("GlassStyle: Failed to create edge light UDF.");
           return;
         }
@@ -638,8 +646,8 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       udf.textureOrigin = udfTextureOrigin;
       udf.edgePixelToLayerPixel = {edgePixelToLayerPixelX, edgePixelToLayerPixelY};
       udf.edgeTextureOrigin = edgeTextureOrigin;
-      glassFilter = getUDFRefractionFilter(halfW, halfH, udf, mapping, std::move(maskImage),
-                                           std::move(edgeMaskImage), input.contentScale);
+      glassFilter = getUDFRefractionFilter(halfW, halfH, udf, mapping, maskRequest, edgeMaskRequest,
+                                           input.contentScale);
     } else {
       glassFilter = getSDFRefractionFilter(shapeInfo.type, shapeInfo.cornerRadius, halfW, halfH,
                                            mapping, input.contentScale);
@@ -786,13 +794,13 @@ std::shared_ptr<GlassRefractionImageFilter> GlassStyle::getSDFRefractionFilter(
   sdfParams.splay = std::clamp(_splay / 100.0f, 0.0f, 1.0f);
   sdfParams.depthRatio = getDepthRatio();
   sdfParams.edgeBandLayerPixels = GetEdgeBandLayerPixels(contentScale);
-  return std::make_shared<GlassRefractionImageFilter>(params, sdfParams, GlassUDFGeometryParams{},
-                                                      nullptr);
+  return std::make_shared<GlassRefractionImageFilter>(params, sdfParams, GlassUDFGeometryParams{});
 }
 
 std::shared_ptr<GlassRefractionImageFilter> GlassStyle::getUDFRefractionFilter(
     float halfWidth, float halfHeight, const UDFSampling& udf, const BackgroundMapping& mapping,
-    std::shared_ptr<Image> maskImage, std::shared_ptr<Image> edgeMaskImage, float contentScale) {
+    const GlassUDFRequest& maskRequest, const GlassUDFRequest& edgeMaskRequest,
+    float contentScale) {
   auto params = makeBaseRefractionParams(halfWidth, halfHeight, mapping);
   if (contentScale <= EdgeLightMinContentScale) {
     params.lightIntensity = 0.0f;
@@ -818,8 +826,8 @@ std::shared_ptr<GlassRefractionImageFilter> GlassStyle::getUDFRefractionFilter(
   udfParams.edgeTextureOriginY = udf.edgeTextureOrigin.y;
   udfParams.edgePixelToLayerPixelX = udf.edgePixelToLayerPixel.x;
   udfParams.edgePixelToLayerPixelY = udf.edgePixelToLayerPixel.y;
-  return std::make_shared<GlassRefractionImageFilter>(
-      params, GlassSDFGeometryParams{}, udfParams, std::move(maskImage), std::move(edgeMaskImage));
+  return std::make_shared<GlassRefractionImageFilter>(params, GlassSDFGeometryParams{}, udfParams,
+                                                      maskRequest, edgeMaskRequest);
 }
 
 }  // namespace tgfx

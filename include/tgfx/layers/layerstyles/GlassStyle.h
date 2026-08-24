@@ -27,6 +27,7 @@
 namespace tgfx {
 
 class GlassRefractionImageFilter;
+struct GlassUDFRequest;
 enum class GlassShapeType;
 struct GlassRefractionParams;
 
@@ -161,7 +162,8 @@ class GlassStyle : public LayerStyle {
 
   std::shared_ptr<GlassRefractionImageFilter> getUDFRefractionFilter(
       float halfWidth, float halfHeight, const UDFSampling& udf, const BackgroundMapping& mapping,
-      std::shared_ptr<Image> maskImage, std::shared_ptr<Image> edgeMaskImage, float contentScale);
+      const GlassUDFRequest& maskRequest, const GlassUDFRequest& edgeMaskRequest,
+      float contentScale);
 
   float getRefractionFactor() const {
     return std::clamp(_refraction / 100.0f, 0.0f, 1.0f);
