@@ -78,6 +78,19 @@ static float GetUDFMaxDisplacement(float minHalf, float refractionFactor, float 
   return 0.999f * minHalf * refractionFactor * depthRatio * GetDepthScale(depthRatio);
 }
 
+// Below this content scale the edge light field is too coarse to reconstruct, so it is switched off
+// instead of rendered from unreliable gradients.
+static constexpr float EdgeLightMinContentScale = 0.5f;
+
+// Edge light falloff width in layer pixels. The shader measures the edge distance in layer pixels,
+// so the band has to grow as the layer shrinks on screen to stay at least one screen pixel wide.
+static float GetEdgeBandLayerPixels(float contentScale) {
+  if (contentScale <= 0.0f) {
+    return 1.0f;
+  }
+  return std::max(1.0f, 1.0f / contentScale);
+}
+
 // SDF shapes cap the refraction displacement at refractionFactor * glassThickness in the shader
 // (glassThickness is capped at the depth parameter); the sampling outset follows the same bound,
 // extended only by the dispersion channel spread.
@@ -302,9 +315,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
     return;
   }
   auto shapeInfo = DetectGlassShape(input);
-  // The edge light is only rendered when one layer pixel spans more than half a screen pixel;
-  // below that the shape is too compressed for the light to remain distinguishable.
-  bool edgeLightEnabled = input.contentScale > 0.5f;
+  bool edgeLightEnabled = input.contentScale > EdgeLightMinContentScale;
 
   float scaleRatioX = 1.0f;
   float scaleRatioY = 1.0f;
@@ -628,10 +639,10 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       udf.edgePixelToLayerPixel = {edgePixelToLayerPixelX, edgePixelToLayerPixelY};
       udf.edgeTextureOrigin = edgeTextureOrigin;
       glassFilter = getUDFRefractionFilter(halfW, halfH, udf, mapping, std::move(maskImage),
-                                           std::move(edgeMaskImage), edgeLightEnabled);
+                                           std::move(edgeMaskImage), input.contentScale);
     } else {
       glassFilter = getSDFRefractionFilter(shapeInfo.type, shapeInfo.cornerRadius, halfW, halfH,
-                                           mapping, edgeLightEnabled);
+                                           mapping, input.contentScale);
     }
   }
 
@@ -754,16 +765,18 @@ GlassRefractionParams GlassStyle::makeBaseRefractionParams(float halfW, float ha
 
 std::shared_ptr<GlassRefractionImageFilter> GlassStyle::getSDFRefractionFilter(
     GlassShapeType shapeType, float cornerRadius, float halfWidth, float halfHeight,
-    const BackgroundMapping& mapping, bool edgeLightEnabled) {
+    const BackgroundMapping& mapping, float contentScale) {
   auto params = makeBaseRefractionParams(halfWidth, halfHeight, mapping);
-  if (!edgeLightEnabled) {
+  if (contentScale <= EdgeLightMinContentScale) {
     params.lightIntensity = 0.0f;
   }
   params.shapeType = shapeType;
-  // Analytical SDF is an exact model, so displacement does not need clamping.
-  params.maxDisplacement = 1.0e20f;
-
   float minHalf = std::min(halfWidth, halfHeight);
+  // The analytical SDF displaces by at most refractionFactor * glassThickness, so the shader clamp
+  // is an identity here. Carrying the real bound instead of a sentinel lets the image filter derive
+  // its sampling outset from this value alone.
+  params.maxDisplacement = getGlassThickness(minHalf) * getRefractionFactor();
+
   GlassSDFGeometryParams sdfParams = {};
   sdfParams.halfW = halfWidth;
   sdfParams.halfH = halfHeight;
@@ -772,15 +785,16 @@ std::shared_ptr<GlassRefractionImageFilter> GlassStyle::getSDFRefractionFilter(
   sdfParams.refractionFactor = getRefractionFactor();
   sdfParams.splay = std::clamp(_splay / 100.0f, 0.0f, 1.0f);
   sdfParams.depthRatio = getDepthRatio();
+  sdfParams.edgeBandLayerPixels = GetEdgeBandLayerPixels(contentScale);
   return std::make_shared<GlassRefractionImageFilter>(params, sdfParams, GlassUDFGeometryParams{},
                                                       nullptr);
 }
 
 std::shared_ptr<GlassRefractionImageFilter> GlassStyle::getUDFRefractionFilter(
     float halfWidth, float halfHeight, const UDFSampling& udf, const BackgroundMapping& mapping,
-    std::shared_ptr<Image> maskImage, std::shared_ptr<Image> edgeMaskImage, bool edgeLightEnabled) {
+    std::shared_ptr<Image> maskImage, std::shared_ptr<Image> edgeMaskImage, float contentScale) {
   auto params = makeBaseRefractionParams(halfWidth, halfHeight, mapping);
-  if (!edgeLightEnabled) {
+  if (contentScale <= EdgeLightMinContentScale) {
     params.lightIntensity = 0.0f;
   }
   params.shapeType = GlassShapeType::AlphaMask;
@@ -793,6 +807,7 @@ std::shared_ptr<GlassRefractionImageFilter> GlassStyle::getUDFRefractionFilter(
   udfParams.refractionFactor = getRefractionFactor();
   udfParams.splay = std::clamp(_splay / 100.0f, 0.0f, 1.0f);
   udfParams.depthRatio = getDepthRatio();
+  udfParams.edgeBandLayerPixels = GetEdgeBandLayerPixels(contentScale);
   udfParams.udfPixelToLayerPixelX = udf.pixelToLayerPixel.x;
   udfParams.udfPixelToLayerPixelY = udf.pixelToLayerPixel.y;
   udfParams.edgeSpanX = udf.edgeSpan.x;

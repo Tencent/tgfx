@@ -157,12 +157,11 @@ class GlassStyle : public LayerStyle {
 
   std::shared_ptr<GlassRefractionImageFilter> getSDFRefractionFilter(
       GlassShapeType shapeType, float cornerRadius, float halfWidth, float halfHeight,
-      const BackgroundMapping& mapping, bool edgeLightEnabled);
+      const BackgroundMapping& mapping, float contentScale);
 
   std::shared_ptr<GlassRefractionImageFilter> getUDFRefractionFilter(
       float halfWidth, float halfHeight, const UDFSampling& udf, const BackgroundMapping& mapping,
-      std::shared_ptr<Image> maskImage, std::shared_ptr<Image> edgeMaskImage,
-      bool edgeLightEnabled);
+      std::shared_ptr<Image> maskImage, std::shared_ptr<Image> edgeMaskImage, float contentScale);
 
   float getRefractionFactor() const {
     return std::clamp(_refraction / 100.0f, 0.0f, 1.0f);

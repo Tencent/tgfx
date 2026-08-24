@@ -35,6 +35,13 @@ struct GlassGeometryParams {
   float refractionFactor = 0.0f;
   float splay = 0.0f;
   float depthRatio = 0.0f;
+  /**
+   * Width of the edge light falloff in layer pixels. The shader measures the edge distance in layer
+   * pixels, so a band of one layer pixel covers less than one screen pixel once the layer is scaled
+   * down and the falloff collapses into a hard threshold. Callers rendering at a reduced scale must
+   * widen the band accordingly. Values below one are ignored.
+   */
+  float edgeBandLayerPixels = 1.0f;
 };
 
 struct GlassSDFGeometryParams : public GlassGeometryParams {

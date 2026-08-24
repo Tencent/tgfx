@@ -86,7 +86,8 @@ void GLSLGlassSDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("%s = vec4(0.0);", args.outputColor.c_str());
   fragBuilder->codeAppend("if (outerSDF < 0.0) {");
   fragBuilder->codeAppend("  float edgeDist = -outerSDF;");
-  fragBuilder->codeAppend("  float edgeWeight = 1.0 - smoothstep(0.0, 1.0, edgeDist);");
+  fragBuilder->codeAppendf("  float edgeBand = max(1.0, %s.w);", effect.c_str());
+  fragBuilder->codeAppend("  float edgeWeight = 1.0 - smoothstep(0.0, edgeBand, edgeDist);");
   // Figma profile with rd = glassThickness, bs = 0 (no bevel):
   // offset = I * rd * pow(clamp((rd - d) / rd, 0, 1), 3.5), capped at 0.999 * rd.
   fragBuilder->codeAppendf("  float rd = max(%s.w, 0.0001);", shape.c_str());
@@ -145,7 +146,8 @@ void GLSLGlassSDFGeometryFragmentProcessor::onSetData(UniformData*,
                                                       UniformData* fragmentUniformData) const {
   float shapeData[4] = {params.halfW, params.halfH, params.cornerRadius, params.glassThickness};
   fragmentUniformData->setData("GlassShapeP0", shapeData);
-  float effectData[4] = {params.refractionFactor, params.splay, params.depthRatio, 0.0f};
+  float effectData[4] = {params.refractionFactor, params.splay, params.depthRatio,
+                         params.edgeBandLayerPixels};
   fragmentUniformData->setData("GlassShapeP1", effectData);
 }
 
@@ -246,9 +248,8 @@ void GLSLGlassUDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppend("float edgeGradientLength = max(length(edgeGradient), 0.0001);");
     fragBuilder->codeAppend(
         "float edgeDistance = max((edgeHeight - 0.5) / edgeGradientLength, 0.0);");
-    // The distance is in layer pixels, so a fixed band shrinks below one screen pixel once the
-    // layer is scaled down and the border turns into a hard threshold. Widen it to cover a screen
-    // pixel in that case.
+    // The distance is in layer pixels, so the band is widened by the caller when the layer renders
+    // at a reduced scale; without that the falloff collapses into a hard threshold.
     fragBuilder->codeAppendf("float edgeBand = max(1.0, %s.w);", effect.c_str());
     fragBuilder->codeAppend("edgeWeight = 1.0 - smoothstep(0.0, edgeBand, edgeDistance);");
   }
@@ -279,7 +280,8 @@ void GLSLGlassUDFGeometryFragmentProcessor::onSetData(UniformData*,
   float shapeData[4] = {params.halfW, params.halfH, params.udfPixelToLayerPixelX,
                         params.udfPixelToLayerPixelY};
   fragmentUniformData->setData("GlassShapeP0", shapeData);
-  float effectData[4] = {params.refractionFactor, params.splay, params.depthRatio, 0.0f};
+  float effectData[4] = {params.refractionFactor, params.splay, params.depthRatio,
+                         params.edgeBandLayerPixels};
   fragmentUniformData->setData("GlassShapeP1", effectData);
   float edgeSpanData[2] = {params.edgeSpanX, params.edgeSpanY};
   fragmentUniformData->setData("GlassEdgeSpan", edgeSpanData);
