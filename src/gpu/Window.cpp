@@ -20,12 +20,17 @@
 #include "tgfx/gpu/Device.h"
 
 namespace tgfx {
-Window::Window(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace)
-    : device(std::move(device)), _colorSpace(std::move(colorSpace)) {
+Window::Window(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace,
+               bool vsyncEnabled)
+    : device(std::move(device)), _colorSpace(std::move(colorSpace)), _vsyncEnabled(vsyncEnabled) {
 }
 
 std::shared_ptr<ColorSpace> Window::colorSpace() const {
   return _colorSpace;
+}
+
+bool Window::vsyncEnabled() const {
+  return _vsyncEnabled;
 }
 
 std::shared_ptr<Device> Window::getDevice() {

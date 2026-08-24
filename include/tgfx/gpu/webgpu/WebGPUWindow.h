@@ -37,6 +37,10 @@ class WebGPUWindow : public Window {
    * supported.
    * On Web, the final executable must export the WebGPU runtime method (see the Web build section
    * in README.md); otherwise color space configuration and video texture uploads will not work.
+   *
+   * Note: this backend does not expose a vsync option. Browser canvas presentation only supports
+   * Fifo, so presentation is always synchronized to the display refresh rate and vsyncEnabled()
+   * always returns true.
    */
   static std::shared_ptr<WebGPUWindow> MakeFrom(const std::string& canvasSelector,
                                                 std::shared_ptr<WebGPUDevice> device = nullptr,

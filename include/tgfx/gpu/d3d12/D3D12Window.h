@@ -46,10 +46,13 @@ class D3D12Window : public Window {
    * @param device The D3D12 device used to create the swap chain resources. Must be non-null.
    * @param colorSpace Optional color space for the output. Only sRGB is currently supported;
    *        any non-sRGB value is ignored with a logged warning.
+   * @param vsyncEnabled Whether presentation is synchronized to the display's refresh rate. Fixed
+   *        for the lifetime of the window. Defaults to true.
    * @return A new D3D12Window, or nullptr if creation failed.
    */
   static std::shared_ptr<D3D12Window> MakeForHwnd(HWND hwnd, std::shared_ptr<D3D12Device> device,
-                                                  std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                                                  std::shared_ptr<ColorSpace> colorSpace = nullptr,
+                                                  bool vsyncEnabled = true);
 
   /**
    * Creates a D3D12Window that blends with the desktop and any UI beneath the target hwnd.
@@ -62,11 +65,13 @@ class D3D12Window : public Window {
    * @param device The D3D12 device used to create the swap chain resources. Must be non-null.
    * @param colorSpace Optional color space for the output. Only sRGB is currently supported;
    *        any non-sRGB value is ignored with a logged warning.
+   * @param vsyncEnabled Whether presentation is synchronized to the display's refresh rate. Fixed
+   *        for the lifetime of the window. Defaults to true.
    * @return A new D3D12Window, or nullptr if creation failed.
    */
   static std::shared_ptr<D3D12Window> MakeForComposition(
       HWND hwnd, std::shared_ptr<D3D12Device> device,
-      std::shared_ptr<ColorSpace> colorSpace = nullptr);
+      std::shared_ptr<ColorSpace> colorSpace = nullptr, bool vsyncEnabled = true);
 #endif
 
   ~D3D12Window() override;
@@ -81,11 +86,11 @@ class D3D12Window : public Window {
 #ifdef _WIN32
   static std::shared_ptr<D3D12Window> MakeImpl(HWND hwnd, std::shared_ptr<D3D12Device> device,
                                                std::shared_ptr<ColorSpace> colorSpace,
-                                               bool transparent);
+                                               bool transparent, bool vsyncEnabled);
 #endif
 
   explicit D3D12Window(std::shared_ptr<Device> device, std::unique_ptr<PlatformState> state,
-                       std::shared_ptr<ColorSpace> colorSpace);
+                       std::shared_ptr<ColorSpace> colorSpace, bool vsyncEnabled);
 
   std::unique_ptr<PlatformState> _platformState;
 };
