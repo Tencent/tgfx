@@ -1620,7 +1620,7 @@ TGFX_TEST_PRIVATE(SVGExportTest, PendingImageEmptyHref){TGFX_PRIVATE_ACCESS({
                                     SVGExportFlags::DisablePrettyXML);
   ASSERT_TRUE(exporter != nullptr);
   auto* drawContext = exporter->drawContext;
-  auto* pendings = drawContext->pendingSink();
+  auto* pendings = &exporter->pendingImages->images;
   pendings->push_back(PendingImage::Make(neverReady, pendings->size(), false, nullptr));
   auto token = pendings->back().token;
   drawContext->exportPendingImage(token, 10, 10, Matrix::MakeTrans(45, 45), Brush());
@@ -1657,7 +1657,7 @@ TGFX_TEST_PRIVATE(SVGExportTest, PendingImageResolvedOnPoll) {
                                       SVGExportFlags::DisablePrettyXML);
     ASSERT_TRUE(exporter != nullptr);
     auto* drawContext = exporter->drawContext;
-    auto* pendings = drawContext->pendingSink();
+    auto* pendings = &exporter->pendingImages->images;
     pendings->push_back(PendingImage::Make(readback, pendings->size(), false, nullptr));
     auto token = pendings->back().token;
     drawContext->exportPendingImage(token, 10, 10, Matrix::MakeTrans(45, 45), Brush());
