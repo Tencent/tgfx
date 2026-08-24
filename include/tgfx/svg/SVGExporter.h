@@ -27,7 +27,7 @@
 
 namespace tgfx {
 class SVGExportContext;
-class PendingImageList;
+struct PendingImageList;
 
 /**
  * Defines flags for SVG exporting that influence the readability and functionality of the exported
