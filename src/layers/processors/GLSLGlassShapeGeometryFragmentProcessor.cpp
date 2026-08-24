@@ -86,7 +86,8 @@ void GLSLGlassSDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("%s = vec4(0.0);", args.outputColor.c_str());
   fragBuilder->codeAppend("if (outerSDF < 0.0) {");
   fragBuilder->codeAppend("  float edgeDist = -outerSDF;");
-  fragBuilder->codeAppend("  float edgeWeight = 1.0 - smoothstep(0.0, 1.0, edgeDist);");
+  fragBuilder->codeAppendf("  float edgeBand = max(1.0, %s.w);", effect.c_str());
+  fragBuilder->codeAppend("  float edgeWeight = 1.0 - smoothstep(0.0, edgeBand, edgeDist);");
   // Figma profile with rd = glassThickness, bs = 0 (no bevel):
   // offset = I * rd * pow(clamp((rd - d) / rd, 0, 1), 3.5), capped at 0.999 * rd.
   fragBuilder->codeAppendf("  float rd = max(%s.w, 0.0001);", shape.c_str());
@@ -145,24 +146,30 @@ void GLSLGlassSDFGeometryFragmentProcessor::onSetData(UniformData*,
                                                       UniformData* fragmentUniformData) const {
   float shapeData[4] = {params.halfW, params.halfH, params.cornerRadius, params.glassThickness};
   fragmentUniformData->setData("GlassShapeP0", shapeData);
-  float effectData[4] = {params.refractionFactor, params.splay, params.depthRatio, 0.0f};
+  float effectData[4] = {params.refractionFactor, params.splay, params.depthRatio,
+                         params.edgeBandLayerPixels};
   fragmentUniformData->setData("GlassShapeP1", effectData);
 }
 
 PlacementPtr<GlassUDFGeometryFragmentProcessor> GlassUDFGeometryFragmentProcessor::Make(
     BlockAllocator* allocator, std::shared_ptr<TextureProxy> mask,
-    const GlassUDFGeometryParams& params, bool enableEdgeLighting) {
+    std::shared_ptr<TextureProxy> edgeMask, const GlassUDFGeometryParams& params,
+    bool enableEdgeLighting) {
   if (allocator == nullptr || mask == nullptr) {
     return nullptr;
   }
-  return allocator->make<GLSLGlassUDFGeometryFragmentProcessor>(std::move(mask), params,
-                                                                enableEdgeLighting);
+  if (enableEdgeLighting && edgeMask == nullptr) {
+    return nullptr;
+  }
+  return allocator->make<GLSLGlassUDFGeometryFragmentProcessor>(
+      std::move(mask), std::move(edgeMask), params, enableEdgeLighting);
 }
 
 GLSLGlassUDFGeometryFragmentProcessor::GLSLGlassUDFGeometryFragmentProcessor(
-    std::shared_ptr<TextureProxy> mask, const GlassUDFGeometryParams& params,
-    bool enableEdgeLighting)
-    : GlassUDFGeometryFragmentProcessor(std::move(mask), params, enableEdgeLighting) {
+    std::shared_ptr<TextureProxy> mask, std::shared_ptr<TextureProxy> edgeMask,
+    const GlassUDFGeometryParams& params, bool enableEdgeLighting)
+    : GlassUDFGeometryFragmentProcessor(std::move(mask), std::move(edgeMask), params,
+                                        enableEdgeLighting) {
 }
 
 void GLSLGlassUDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
@@ -175,10 +182,13 @@ void GLSLGlassUDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
                                                     ShaderStage::Fragment);
   auto edgeSpan = args.uniformHandler->addUniform("GlassEdgeSpan", UniformFormat::Float2,
                                                   ShaderStage::Fragment);
+  auto edgeMaskUV = args.uniformHandler->addUniform("GlassEdgeMaskUV", UniformFormat::Float4,
+                                                    ShaderStage::Fragment);
   auto& maskSampler = (*args.textureSamplers)[0];
 
   EmitGeometryCoordinates(fragBuilder, args.inputColor, shape);
-  // The mask packs the refraction height into RGB with 24-bit precision and the edge height into A.
+  // The fine mask packs the refraction height into RGB with 24-bit precision; the edge mask
+  // carries the edge light height in A.
   fragBuilder->codeAppend("const vec3 UNPACK24 = vec3(1.0, 1.0/255.0, 1.0/65025.0);");
   fragBuilder->codeAppend("vec2 maskUV = vec2(glassUV.x, 1.0 - glassUV.y);");
   fragBuilder->codeAppendf("vec2 fineUV = maskUV * %s.xy + %s.zw;", fineMaskUV.c_str(),
@@ -206,25 +216,30 @@ void GLSLGlassUDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend("float gradientWeight = smoothstep(0.001, 0.005, gradientSignal);");
   fragBuilder->codeAppend("float edgeWeight = 0.0;");
   if (enableEdgeLighting) {
-    fragBuilder->codeAppend("float edgeHeight = packedCenter.a;");
+    auto& edgeSampler = (*args.textureSamplers)[1];
+    fragBuilder->codeAppendf("vec2 edgeUV = maskUV * %s.xy + %s.zw;", edgeMaskUV.c_str(),
+                             edgeMaskUV.c_str());
+    fragBuilder->codeAppend("float edgeHeight = ");
+    fragBuilder->appendTextureLookup(edgeSampler, "edgeUV");
+    fragBuilder->codeAppend(".a;");
     // Sample half a span to each side so the center difference spans exactly the tent radius that
     // produced the edge field; dividing the height difference by that same span makes the
     // reconstructed distance independent of the radius.
     fragBuilder->codeAppendf(
         "vec2 edgeUVStep = %s * vec2(0.25 / max(halfW, 0.0001), 0.25 / max(halfH, 0.0001)) * "
         "%s.xy;",
-        edgeSpan.c_str(), fineMaskUV.c_str());
+        edgeSpan.c_str(), edgeMaskUV.c_str());
     fragBuilder->codeAppend("vec4 packedEdgeRight = ");
-    fragBuilder->appendTextureLookup(maskSampler, "fineUV + vec2(edgeUVStep.x, 0.0)");
+    fragBuilder->appendTextureLookup(edgeSampler, "edgeUV + vec2(edgeUVStep.x, 0.0)");
     fragBuilder->codeAppend(";");
     fragBuilder->codeAppend("vec4 packedEdgeLeft = ");
-    fragBuilder->appendTextureLookup(maskSampler, "fineUV - vec2(edgeUVStep.x, 0.0)");
+    fragBuilder->appendTextureLookup(edgeSampler, "edgeUV - vec2(edgeUVStep.x, 0.0)");
     fragBuilder->codeAppend(";");
     fragBuilder->codeAppend("vec4 packedEdgeUp = ");
-    fragBuilder->appendTextureLookup(maskSampler, "fineUV - vec2(0.0, edgeUVStep.y)");
+    fragBuilder->appendTextureLookup(edgeSampler, "edgeUV - vec2(0.0, edgeUVStep.y)");
     fragBuilder->codeAppend(";");
     fragBuilder->codeAppend("vec4 packedEdgeDown = ");
-    fragBuilder->appendTextureLookup(maskSampler, "fineUV + vec2(0.0, edgeUVStep.y)");
+    fragBuilder->appendTextureLookup(edgeSampler, "edgeUV + vec2(0.0, edgeUVStep.y)");
     fragBuilder->codeAppend(";");
     fragBuilder->codeAppendf(
         "vec2 edgeGradient = vec2((packedEdgeRight.a - packedEdgeLeft.a) / max(%s.x, 0.0001),"
@@ -233,7 +248,10 @@ void GLSLGlassUDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppend("float edgeGradientLength = max(length(edgeGradient), 0.0001);");
     fragBuilder->codeAppend(
         "float edgeDistance = max((edgeHeight - 0.5) / edgeGradientLength, 0.0);");
-    fragBuilder->codeAppend("edgeWeight = 1.0 - smoothstep(0.0, 1.0, edgeDistance);");
+    // The distance is in layer pixels, so the band is widened by the caller when the layer renders
+    // at a reduced scale; without that the falloff collapses into a hard threshold.
+    fragBuilder->codeAppendf("float edgeBand = max(1.0, %s.w);", effect.c_str());
+    fragBuilder->codeAppend("edgeWeight = 1.0 - smoothstep(0.0, edgeBand, edgeDistance);");
   }
   fragBuilder->codeAppendf("%s = vec4(0.0);", args.outputColor.c_str());
   fragBuilder->codeAppend("if (gradientLength > 0.000001 && gradientWeight > 0.000001) {");
@@ -262,7 +280,8 @@ void GLSLGlassUDFGeometryFragmentProcessor::onSetData(UniformData*,
   float shapeData[4] = {params.halfW, params.halfH, params.udfPixelToLayerPixelX,
                         params.udfPixelToLayerPixelY};
   fragmentUniformData->setData("GlassShapeP0", shapeData);
-  float effectData[4] = {params.refractionFactor, params.splay, params.depthRatio, 0.0f};
+  float effectData[4] = {params.refractionFactor, params.splay, params.depthRatio,
+                         params.edgeBandLayerPixels};
   fragmentUniformData->setData("GlassShapeP1", effectData);
   float edgeSpanData[2] = {params.edgeSpanX, params.edgeSpanY};
   fragmentUniformData->setData("GlassEdgeSpan", edgeSpanData);
@@ -275,6 +294,22 @@ void GLSLGlassUDFGeometryFragmentProcessor::onSetData(UniformData*,
   float maskUVData[4] = {scaleX, scaleY, -params.textureOriginX / textureWidth,
                          -params.textureOriginY / textureHeight};
   fragmentUniformData->setData("GlassFineMaskUV", maskUVData);
+  float edgeScaleX = 1.0f;
+  float edgeScaleY = 1.0f;
+  float edgeOriginX = params.edgeTextureOriginX;
+  float edgeOriginY = params.edgeTextureOriginY;
+  if (enableEdgeLighting && edgeMaskProxy != nullptr) {
+    float edgeTextureWidth = static_cast<float>(edgeMaskProxy->width());
+    float edgeTextureHeight = static_cast<float>(edgeMaskProxy->height());
+    float edgeCoreWidth = std::round(params.halfW * 2.0f / params.edgePixelToLayerPixelX);
+    float edgeCoreHeight = std::round(params.halfH * 2.0f / params.edgePixelToLayerPixelY);
+    edgeScaleX = edgeCoreWidth / edgeTextureWidth;
+    edgeScaleY = edgeCoreHeight / edgeTextureHeight;
+    edgeOriginX = -params.edgeTextureOriginX / edgeTextureWidth;
+    edgeOriginY = -params.edgeTextureOriginY / edgeTextureHeight;
+  }
+  float edgeMaskUVData[4] = {edgeScaleX, edgeScaleY, edgeOriginX, edgeOriginY};
+  fragmentUniformData->setData("GlassEdgeMaskUV", edgeMaskUVData);
 }
 
 }  // namespace tgfx

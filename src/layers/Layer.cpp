@@ -92,6 +92,18 @@ static void ClipScrollRect(Canvas* canvas, const Rect* scrollRect, const Matrix3
 }
 
 struct MaskData {
+  MaskData() = default;
+
+  explicit MaskData(bool inverted) {
+    if (inverted) {
+      clipPath.toggleInverseFillType();
+    }
+  }
+
+  MaskData(Path path, std::shared_ptr<MaskFilter> filter)
+      : clipPath(std::move(path)), maskFilter(std::move(filter)) {
+  }
+
   Path clipPath = {};
   std::shared_ptr<MaskFilter> maskFilter = nullptr;
 };
@@ -1241,16 +1253,21 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
   DEBUG_ASSERT(_mask != nullptr);
   DEBUG_ASSERT(args.render3DContext == nullptr);
   auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
-  auto isContourMode = maskType == LayerMaskType::Contour;
+  auto isContourMode =
+      maskType == LayerMaskType::Contour || maskType == LayerMaskType::ContourInverted;
+  bool needLuminance =
+      maskType == LayerMaskType::Luminance || maskType == LayerMaskType::LuminanceInverted;
+  bool inverted = maskType == LayerMaskType::AlphaInverted ||
+                  maskType == LayerMaskType::LuminanceInverted ||
+                  maskType == LayerMaskType::ContourInverted;
 
   auto relativeMatrix3D = _mask->getRelativeMatrix3D(this);
   auto maskPicture = getMaskPicture(args, isContourMode, scale, relativeMatrix3D);
   if (maskPicture == nullptr) {
-    return {};
+    return MaskData(inverted);
   }
 
-  bool needLuminance = maskType == LayerMaskType::Luminance;
-  if (!needLuminance) {
+  if (!needLuminance && !inverted) {
     Path maskPath = {};
     if (MaskContext::GetMaskPath(maskPicture, &maskPath)) {
       maskPath.transform(Matrix::MakeScale(1.0f / scale, 1.0f / scale));
@@ -1263,14 +1280,14 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
     auto scaledClipBounds = *layerClipBounds;
     scaledClipBounds.scale(scale, scale);
     if (!maskBounds.intersect(scaledClipBounds)) {
-      return {};
+      return MaskData(inverted);
     }
   }
   Point maskImageOffset = {};
   auto maskContentImage =
       ToImageWithOffset(std::move(maskPicture), &maskImageOffset, &maskBounds, args.dstColorSpace);
   if (maskContentImage == nullptr) {
-    return {};
+    return MaskData(inverted);
   }
   if (needLuminance) {
     maskContentImage =
@@ -1283,7 +1300,7 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
   if (shader) {
     shader = shader->makeWithMatrix(maskMatrix);
   }
-  return {{}, MaskFilter::MakeShader(shader)};
+  return {{}, MaskFilter::MakeShader(shader, inverted)};
 }
 
 std::shared_ptr<Image> Layer::getContentContourImage(const DrawArgs& args, float contentScale,

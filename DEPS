@@ -62,7 +62,7 @@
       },
       {
         "url": "https://github.com/libexpat/libexpat.git",
-        "commit": "88b3ed553d8ad335559254863a33360d55b9f1d6",
+        "commit": "92810461043fce37e70079b37ab1f04490a8f039",
         "dir": "third_party/expat"
       },
       {

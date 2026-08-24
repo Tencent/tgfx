@@ -51,6 +51,43 @@ static void DestroySwapchainResources(VkDevice device, VkInstance instance, VkSu
   }
 }
 
+// Picks the swapchain present mode for the requested vsync setting. FIFO is guaranteed by the
+// spec and used whenever vsync is enabled. When vsync is disabled, MAILBOX is preferred (tear-free,
+// low latency) and IMMEDIATE is the fallback; if neither is advertised the code stays on FIFO so
+// creation always succeeds. Guarded by the same platform macros as its callers (the MakeFrom
+// overloads) so it is not compiled as an unused function on platforms without a MakeFrom.
+#if defined(_WIN32) || defined(__OHOS__) || defined(__ANDROID__)
+static VkPresentModeKHR ChoosePresentMode(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface,
+                                          bool vsyncEnabled) {
+  if (vsyncEnabled) {
+    return VK_PRESENT_MODE_FIFO_KHR;
+  }
+  uint32_t count = 0;
+  vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &count, nullptr);
+  if (count == 0) {
+    return VK_PRESENT_MODE_FIFO_KHR;
+  }
+  std::vector<VkPresentModeKHR> modes(count);
+  vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &count, modes.data());
+  bool hasMailbox = false;
+  bool hasImmediate = false;
+  for (auto mode : modes) {
+    if (mode == VK_PRESENT_MODE_MAILBOX_KHR) {
+      hasMailbox = true;
+    } else if (mode == VK_PRESENT_MODE_IMMEDIATE_KHR) {
+      hasImmediate = true;
+    }
+  }
+  if (hasMailbox) {
+    return VK_PRESENT_MODE_MAILBOX_KHR;
+  }
+  if (hasImmediate) {
+    return VK_PRESENT_MODE_IMMEDIATE_KHR;
+  }
+  return VK_PRESENT_MODE_FIFO_KHR;
+}
+#endif
+
 // Holds all Vulkan-specific handles and swapchain resources. Defined here (not in the header) so
 // that vulkan.h is never required by downstream translation units that include VulkanWindow.h.
 struct VulkanWindow::PlatformState {
@@ -61,6 +98,7 @@ struct VulkanWindow::PlatformState {
   std::vector<VkImage> images;
   std::vector<VkImageView> imageViews;
   VkFormat format = VK_FORMAT_UNDEFINED;
+  VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
   int width = 0;
   int height = 0;
   std::shared_ptr<RenderTargetProxy> swapchainProxy;
@@ -73,7 +111,8 @@ struct VulkanWindow::PlatformState {
 
 std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(HWND hwnd,
                                                      std::shared_ptr<VulkanDevice> device,
-                                                     std::shared_ptr<ColorSpace> colorSpace) {
+                                                     std::shared_ptr<ColorSpace> colorSpace,
+                                                     bool vsyncEnabled) {
   if (hwnd == nullptr || device == nullptr) {
     return nullptr;
   }
@@ -194,7 +233,8 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(HWND hwnd,
   swapchainInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
   swapchainInfo.preTransform = capabilities.currentTransform;
   swapchainInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-  swapchainInfo.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+  auto presentMode = ChoosePresentMode(physicalDevice, surface, vsyncEnabled);
+  swapchainInfo.presentMode = presentMode;
   swapchainInfo.clipped = VK_TRUE;
 
   VkSwapchainKHR swapchain = VK_NULL_HANDLE;
@@ -239,10 +279,12 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(HWND hwnd,
   state->images = std::move(images);
   state->imageViews = std::move(imageViews);
   state->format = chosenFormat.format;
+  state->presentMode = presentMode;
   state->width = static_cast<int>(extent.width);
   state->height = static_cast<int>(extent.height);
 
-  return std::shared_ptr<VulkanWindow>(new VulkanWindow(device, std::move(state), colorSpace));
+  return std::shared_ptr<VulkanWindow>(
+      new VulkanWindow(device, std::move(state), colorSpace, vsyncEnabled));
 }
 
 #endif
@@ -251,7 +293,8 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(HWND hwnd,
 
 std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(OHNativeWindow* nativeWindow,
                                                      std::shared_ptr<VulkanDevice> device,
-                                                     std::shared_ptr<ColorSpace> colorSpace) {
+                                                     std::shared_ptr<ColorSpace> colorSpace,
+                                                     bool vsyncEnabled) {
   if (nativeWindow == nullptr || device == nullptr) {
     return nullptr;
   }
@@ -384,7 +427,8 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(OHNativeWindow* nativeWindo
     compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
   }
   swapchainInfo.compositeAlpha = compositeAlpha;
-  swapchainInfo.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+  auto presentMode = ChoosePresentMode(physicalDevice, surface, vsyncEnabled);
+  swapchainInfo.presentMode = presentMode;
   swapchainInfo.clipped = VK_TRUE;
 
   VkSwapchainKHR swapchain = VK_NULL_HANDLE;
@@ -429,10 +473,12 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(OHNativeWindow* nativeWindo
   state->images = std::move(images);
   state->imageViews = std::move(imageViews);
   state->format = chosenFormat.format;
+  state->presentMode = presentMode;
   state->width = static_cast<int>(extent.width);
   state->height = static_cast<int>(extent.height);
 
-  return std::shared_ptr<VulkanWindow>(new VulkanWindow(device, std::move(state), colorSpace));
+  return std::shared_ptr<VulkanWindow>(
+      new VulkanWindow(device, std::move(state), colorSpace, vsyncEnabled));
 }
 
 #endif
@@ -441,7 +487,8 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(OHNativeWindow* nativeWindo
 
 std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(ANativeWindow* nativeWindow,
                                                      std::shared_ptr<VulkanDevice> device,
-                                                     std::shared_ptr<ColorSpace> colorSpace) {
+                                                     std::shared_ptr<ColorSpace> colorSpace,
+                                                     bool vsyncEnabled) {
   if (nativeWindow == nullptr || device == nullptr) {
     return nullptr;
   }
@@ -557,7 +604,8 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(ANativeWindow* nativeWindow
     compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
   }
   swapchainInfo.compositeAlpha = compositeAlpha;
-  swapchainInfo.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+  auto presentMode = ChoosePresentMode(physicalDevice, surface, vsyncEnabled);
+  swapchainInfo.presentMode = presentMode;
   swapchainInfo.clipped = VK_TRUE;
 
   VkSwapchainKHR swapchain = VK_NULL_HANDLE;
@@ -602,17 +650,20 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(ANativeWindow* nativeWindow
   state->images = std::move(images);
   state->imageViews = std::move(imageViews);
   state->format = chosenFormat.format;
+  state->presentMode = presentMode;
   state->width = static_cast<int>(extent.width);
   state->height = static_cast<int>(extent.height);
 
-  return std::shared_ptr<VulkanWindow>(new VulkanWindow(device, std::move(state), colorSpace));
+  return std::shared_ptr<VulkanWindow>(
+      new VulkanWindow(device, std::move(state), colorSpace, vsyncEnabled));
 }
 
 #endif
 
 VulkanWindow::VulkanWindow(std::shared_ptr<Device> device, std::unique_ptr<PlatformState> state,
-                           std::shared_ptr<ColorSpace> colorSpace)
-    : Window(std::move(device), std::move(colorSpace)), _platformState(std::move(state)) {
+                           std::shared_ptr<ColorSpace> colorSpace, bool vsyncEnabled)
+    : Window(std::move(device), std::move(colorSpace), vsyncEnabled),
+      _platformState(std::move(state)) {
 }
 
 VulkanWindow::~VulkanWindow() {
@@ -664,7 +715,7 @@ bool VulkanWindow::PlatformState::recreateSwapchain(VkDevice device,
   swapchainInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
   swapchainInfo.preTransform = capabilities.currentTransform;
   swapchainInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-  swapchainInfo.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+  swapchainInfo.presentMode = presentMode;
   swapchainInfo.clipped = VK_TRUE;
   swapchainInfo.oldSwapchain = swapchain;
 
@@ -729,6 +780,8 @@ std::shared_ptr<RenderTargetProxy> VulkanWindow::onCreateRenderTarget(Context* c
   }
 
   auto lastProxy = std::static_pointer_cast<VulkanSwapchainProxy>(_platformState->swapchainProxy);
+  // The present mode is fixed at creation (stored in PlatformState) and reused across rebuilds, so
+  // only an out-of-date swapchain or a size change triggers a rebuild.
   bool needsRebuild = (_platformState->swapchain == VK_NULL_HANDLE) ||
                       (lastProxy && lastProxy->isOutOfDate()) ||
                       (static_cast<int>(extent.width) != _platformState->width) ||

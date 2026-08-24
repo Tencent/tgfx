@@ -30,31 +30,44 @@ static std::string TentOffsetCoordFunc(std::string_view coord) {
 PlacementPtr<FragmentProcessor> GlassUDFTentBlurFragmentProcessor::Make(
     BlockAllocator* allocator, PlacementPtr<FragmentProcessor> fineSource,
     PlacementPtr<FragmentProcessor> coarseSource, float fineRadius, float coarseRadius,
-    GlassUDFBlurDirection direction, int maxRadius, bool inputIsPacked) {
-  if (allocator == nullptr || fineSource == nullptr || coarseSource == nullptr) {
+    GlassUDFBlurDirection direction, int maxRadius, bool inputIsPacked, GlassUDFField field) {
+  if (allocator == nullptr) {
     return nullptr;
   }
-  if (maxRadius < 1 || fineRadius <= 0.0f || coarseRadius <= 0.0f) {
+  bool usesFine = field == GlassUDFField::Refraction;
+  if (usesFine && (fineSource == nullptr || fineRadius <= 0.0f)) {
+    return nullptr;
+  }
+  if (!usesFine && (coarseSource == nullptr || coarseRadius <= 0.0f)) {
+    return nullptr;
+  }
+  if (maxRadius < 1) {
     return nullptr;
   }
   return allocator->make<GlassUDFTentBlurFragmentProcessor>(
       std::move(fineSource), std::move(coarseSource), fineRadius, coarseRadius, direction,
-      maxRadius, inputIsPacked);
+      maxRadius, inputIsPacked, field);
 }
 
 GlassUDFTentBlurFragmentProcessor::GlassUDFTentBlurFragmentProcessor(
     PlacementPtr<FragmentProcessor> fineSource, PlacementPtr<FragmentProcessor> coarseSource,
     float fineRadius, float coarseRadius, GlassUDFBlurDirection direction, int maxRadius,
-    bool inputIsPacked)
+    bool inputIsPacked, GlassUDFField field)
     : FragmentProcessor(ClassID()), fineRadius(fineRadius), coarseRadius(coarseRadius),
-      direction(direction), maxRadius(maxRadius), inputIsPacked(inputIsPacked) {
-  registerChildProcessor(std::move(fineSource));
-  registerChildProcessor(std::move(coarseSource));
+      direction(direction), maxRadius(maxRadius), inputIsPacked(inputIsPacked), field(field) {
+  // The source of the requested field is always child 0, so onSetData reads the step matrix from a
+  // valid child either way.
+  if (field == GlassUDFField::EdgeLight) {
+    registerChildProcessor(std::move(coarseSource));
+  } else {
+    registerChildProcessor(std::move(fineSource));
+  }
 }
 
 void GlassUDFTentBlurFragmentProcessor::onComputeProcessorKey(BytesKey* key) const {
   key->write(maxRadius);
   key->write(static_cast<uint32_t>(inputIsPacked));
+  key->write(static_cast<uint32_t>(field));
 }
 
 void GlassUDFTentBlurFragmentProcessor::emitCode(EmitArgs& args) const {
@@ -114,9 +127,14 @@ void GlassUDFTentBlurFragmentProcessor::emitCode(EmitArgs& args) const {
 
   // The coarse field always lives in the alpha channel, both in the source coverage image and in
   // this processor's own layout, so it never needs the 24-bit decode path.
-  emitTentLoop(0, "x", "fineResult", inputIsPacked);
-  emitTentLoop(1, "y", "coarseResult", false);
+  if (field == GlassUDFField::EdgeLight) {
+    emitTentLoop(0, "y", "coarseResult", false);
+    fragBuilder->codeAppendf("%s = vec4(0.0, 0.0, 0.0, clamp(coarseResult, 0.0, 1.0));",
+                             args.outputColor.c_str());
+    return;
+  }
 
+  emitTentLoop(0, "x", "fineResult", inputIsPacked);
   // Encode the fine field into RGB with true 24-bit precision. The fract chain pre-compensates the
   // 8-bit rounding of the following channel; a floor-based split would mismatch the GPU's
   // round-to-nearest UNORM8 conversion. The upper clamp is required because fract(1.0) == 0.0 and
@@ -125,8 +143,7 @@ void GlassUDFTentBlurFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend("vec3 enc = fract(vec3(1.0, 255.0, 65025.0) * fineValue);");
   fragBuilder->codeAppend("enc.x -= enc.y / 255.0;");
   fragBuilder->codeAppend("enc.y -= enc.z / 255.0;");
-  fragBuilder->codeAppendf("%s = vec4(enc, clamp(coarseResult, 0.0, 1.0));",
-                           args.outputColor.c_str());
+  fragBuilder->codeAppendf("%s = vec4(enc, 0.0);", args.outputColor.c_str());
 }
 
 void GlassUDFTentBlurFragmentProcessor::onSetData(UniformData*,

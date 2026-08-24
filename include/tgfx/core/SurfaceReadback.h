@@ -26,6 +26,24 @@ class GPUBuffer;
 class GPUBufferProxy;
 
 /**
+ * Describes the current state of an asynchronous pixel readback.
+ */
+enum class ReadbackStatus {
+  /**
+   * The pixels are ready and can be locked with lockPixels().
+   */
+  Ready,
+  /**
+   * The pixels have not arrived yet and may still become Ready on a later poll.
+   */
+  Pending,
+  /**
+   * The readback has failed; the pixels will never arrive.
+   */
+  Failed,
+};
+
+/**
  * SurfaceReadback represents an asynchronous operation to read pixels from a Surface. Because this
  * process may involve GPU work, the pixel data might not be available immediately after starting
  * the readback. Use isReady() to check if the pixel data is accessible, and lockPixels() to obtain
@@ -77,6 +95,12 @@ class SurfaceReadback {
    * before reading buffer contents. Returns nullptr on failure.
    */
   std::shared_ptr<GPUBuffer> getGPUBuffer(Context* context) const;
+
+  /**
+   * Returns the current state of the readback. This method does not block the calling thread.
+   * @param context The Context associated with the Surface from which pixels are being read.
+   */
+  ReadbackStatus status(Context* context) const;
 
  private:
   ImageInfo _info = {};

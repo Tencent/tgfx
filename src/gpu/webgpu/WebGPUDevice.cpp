@@ -20,6 +20,9 @@
 #include <emscripten/emscripten.h>
 #include <emscripten/html5_webgpu.h>
 #include <webgpu/webgpu.h>
+#ifdef __EMSCRIPTEN_PTHREADS__
+#include <emscripten/threading.h>
+#endif
 #include "WebGPUGPU.h"
 #include "core/utils/Log.h"
 
@@ -46,7 +49,34 @@ static void OnUncapturedError(WGPUErrorType type, const char* message, void*) {
   LOGE("[WebGPU] Uncaptured %s error: %s", typeStr, message ? message : "(no message)");
 }
 
+// emscripten_webgpu_get_device() aborts rather than returning null when
+// Module.preinitializedWebGPUDevice is absent, so probe for it first.
+// clang-format off
+EM_JS(int, WebGPUHasPreinitializedDevice, (), {
+  return (typeof Module !== "undefined" && !!Module["preinitializedWebGPUDevice"]) ? 1 : 0;
+});
+// clang-format on
+
+static bool CanGetPreinitializedDevice() {
+#ifdef __EMSCRIPTEN_PTHREADS__
+  if (!emscripten_is_main_runtime_thread()) {
+    LOGE(
+        "[WebGPU] WebGPUDevice::Make() is only available on the main runtime thread, use "
+        "WebGPUDevice::MakeFrom() with the device owned by this thread!");
+    return false;
+  }
+#endif
+  if (WebGPUHasPreinitializedDevice() == 0) {
+    LOGE("[WebGPU] Module.preinitializedWebGPUDevice is not set, WebGPUDevice::Make() failed!");
+    return false;
+  }
+  return true;
+}
+
 std::shared_ptr<WebGPUDevice> WebGPUDevice::Make() {
+  if (!CanGetPreinitializedDevice()) {
+    return nullptr;
+  }
   auto wgpuDevice = emscripten_webgpu_get_device();
   if (wgpuDevice == nullptr) {
     return nullptr;

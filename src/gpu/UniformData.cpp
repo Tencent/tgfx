@@ -22,11 +22,14 @@
 namespace tgfx {
 UniformData::UniformData(std::vector<Uniform> uniforms) : _uniforms(std::move(uniforms)) {
   for (const auto& uniform : _uniforms) {
-    size_t size = 0;
-    size_t align = 0;
     const auto& [entrySize, entryAlign] = EntryOf(uniform.format());
-    size = entrySize;
-    align = entryAlign;
+    const auto count = uniform.count();
+    // The std140 layout aligns every array element to a 16-byte boundary, so only formats whose
+    // element size is 16 bytes (e.g. Float4) match the contiguous CPU-side layout. Other element
+    // types would be misaligned in the GPU uniform block and must not be used as arrays.
+    DEBUG_ASSERT(count <= 1 || entrySize == 16);
+    const size_t size = entrySize * count;
+    const size_t align = entryAlign;
 
     const size_t offset = alignCursor(align);
     fieldMap[uniform.name()] = {uniform.name(), uniform.format(), offset, size, align};

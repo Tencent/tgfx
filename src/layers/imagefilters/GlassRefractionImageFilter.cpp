@@ -18,6 +18,7 @@
 
 #include "layers/imagefilters/GlassRefractionImageFilter.h"
 #include "core/images/TextureImage.h"
+#include "core/utils/Log.h"
 #include "gpu/TPArgs.h"
 #include "layers/processors/GlassRefractionFragmentProcessor.h"
 
@@ -26,8 +27,10 @@ namespace tgfx {
 GlassRefractionImageFilter::GlassRefractionImageFilter(const GlassRefractionParams& params,
                                                        const GlassSDFGeometryParams& sdfParams,
                                                        const GlassUDFGeometryParams& udfParams,
-                                                       std::shared_ptr<Image> mask)
-    : params(params), sdfParams(sdfParams), udfParams(udfParams), mask(std::move(mask)) {
+                                                       const GlassUDFRequest& maskRequest,
+                                                       const GlassUDFRequest& edgeMaskRequest)
+    : params(params), sdfParams(sdfParams), udfParams(udfParams), maskRequest(maskRequest),
+      edgeMaskRequest(edgeMaskRequest) {
 }
 
 static std::shared_ptr<TextureProxy> MakeTextureProxy(Context* context,
@@ -43,6 +46,18 @@ static std::shared_ptr<TextureProxy> MakeTextureProxy(Context* context,
   return textureImageImpl->getTextureProxy();
 }
 
+Rect GlassRefractionImageFilter::onFilterBounds(const Rect& rect, MapDirection) const {
+  // params.maxDisplacement is the bound the shader clamps the displacement to, and dispersion
+  // spreads the channels by (1 + dispersion) on top of it. Both come from the style that built this
+  // filter, so the sampling range never has to re-derive them from the geometry parameters.
+  // The outset covers both mapping directions: forward keeps the output bounds large enough for
+  // the direct-attach branch, reverse keeps the sampled input bounds wide enough for the
+  // displaced reads when the filter is baked offscreen.
+  auto outsetLayer = std::max(params.maxDisplacement * (1.0f + params.dispersion), 1.0f);
+  return rect.makeOutset(outsetLayer * params.layerPixelToSourcePixelX,
+                         outsetLayer * params.layerPixelToSourcePixelY);
+}
+
 PlacementPtr<FragmentProcessor> GlassRefractionImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& /*sampling*/,
     SrcRectConstraint /*constraint*/, const Matrix* uvMatrix) const {
@@ -55,10 +70,21 @@ PlacementPtr<FragmentProcessor> GlassRefractionImageFilter::asFragmentProcessor(
     return nullptr;
   }
 
+  // The UDF fields are generated here rather than while recording, because their tent blur passes
+  // need a GPU context that a recording canvas does not have yet.
   std::shared_ptr<TextureProxy> maskProxy = nullptr;
-  if (mask != nullptr) {
-    maskProxy = MakeTextureProxy(args.context, mask);
+  if (maskRequest.isValid()) {
+    maskProxy = GenerateGlassUDFTexture(args.context, maskRequest);
     if (maskProxy == nullptr) {
+      LOGE("GlassRefractionImageFilter: Failed to generate the refraction UDF.");
+      return nullptr;
+    }
+  }
+  std::shared_ptr<TextureProxy> edgeMaskProxy = nullptr;
+  if (edgeMaskRequest.isValid()) {
+    edgeMaskProxy = GenerateGlassUDFTexture(args.context, edgeMaskRequest);
+    if (edgeMaskProxy == nullptr) {
+      LOGE("GlassRefractionImageFilter: Failed to generate the edge light UDF.");
       return nullptr;
     }
   }
@@ -66,7 +92,8 @@ PlacementPtr<FragmentProcessor> GlassRefractionImageFilter::asFragmentProcessor(
   auto allocator = args.context->drawingAllocator();
   PlacementPtr<GlassShapeGeometryFragmentProcessor> geometry = nullptr;
   if (params.shapeType == GlassShapeType::AlphaMask) {
-    geometry = GlassUDFGeometryFragmentProcessor::Make(allocator, std::move(maskProxy), udfParams,
+    geometry = GlassUDFGeometryFragmentProcessor::Make(allocator, std::move(maskProxy),
+                                                       std::move(edgeMaskProxy), udfParams,
                                                        params.lightIntensity > 0.0f);
   } else {
     geometry = GlassSDFGeometryFragmentProcessor::Make(allocator, params.shapeType, sdfParams);

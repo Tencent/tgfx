@@ -140,4 +140,21 @@ std::shared_ptr<GPUBuffer> SurfaceReadback::getGPUBuffer(Context* context) const
   }
   return readbackBuffer->gpuBuffer();
 }
+
+ReadbackStatus SurfaceReadback::status(Context* context) const {
+  if (context != proxy->getContext()) {
+    LOGE("SurfaceReadback::status() Context mismatch!");
+    return ReadbackStatus::Failed;
+  }
+  auto readbackBuffer = proxy->getBuffer();
+  if (readbackBuffer == nullptr) {
+    // Submits the pending transfer task without blocking so the buffer can be created.
+    context->flushAndSubmit(false);
+    readbackBuffer = proxy->getBuffer();
+    if (readbackBuffer == nullptr) {
+      return ReadbackStatus::Failed;
+    }
+  }
+  return readbackBuffer->gpuBuffer()->isReady() ? ReadbackStatus::Ready : ReadbackStatus::Pending;
+}
 }  // namespace tgfx

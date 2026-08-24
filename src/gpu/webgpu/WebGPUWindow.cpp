@@ -115,6 +115,11 @@ std::shared_ptr<WebGPUWindow> WebGPUWindow::MakeFrom(const std::string& canvasSe
   config.usage = WGPUTextureUsage_RenderAttachment;
   config.width = static_cast<uint32_t>(canvasWidth);
   config.height = static_cast<uint32_t>(canvasHeight);
+  // Browser canvas presentation only supports Fifo; Immediate (vsync off) is a native-only
+  // extension. Requesting an unsupported present mode makes wgpuSurfaceConfigure raise a validation
+  // error and leaves the surface invalid, so always use Fifo here and treat vsyncEnabled=false as a
+  // no-op on this backend (matching the "backends that cannot control vsync ignore this setting"
+  // contract).
   config.presentMode = WGPUPresentMode_Fifo;
   config.alphaMode = WGPUCompositeAlphaMode_Premultiplied;
   wgpuSurfaceConfigure(surface, &config);
@@ -130,7 +135,8 @@ WebGPUWindow::WebGPUWindow(std::shared_ptr<Device> device, void* surface, int wi
                            const std::string& canvasSelector,
                            std::shared_ptr<ColorSpace> colorSpace)
     : Window(std::move(device), std::move(colorSpace)), _canvasSelector(canvasSelector),
-      _surface(surface), _width(width), _height(height) {
+      _surface(surface), _width(width), _height(height), _configuredWidth(width),
+      _configuredHeight(height) {
 }
 
 void WebGPUWindow::configureColorSpace(WGPUTextureFormat format, WGPUTextureUsageFlags usage,
@@ -188,7 +194,7 @@ std::shared_ptr<RenderTargetProxy> WebGPUWindow::onCreateRenderTarget(Context* c
     return nullptr;
   }
 
-  // Only reconfigure the surface when dimensions actually change.
+  // Reconfigure the surface when dimensions change. Present mode stays Fifo (see MakeFrom).
   if (_width != _configuredWidth || _height != _configuredHeight) {
     auto wgpuDevice =
         static_cast<WGPUDevice>(static_cast<WebGPUDevice*>(getDevice().get())->webgpuDevice());

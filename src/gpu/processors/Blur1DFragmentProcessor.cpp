@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,28 +16,22 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/gpu/Window.h"
-#include "tgfx/gpu/Device.h"
+#include "Blur1DFragmentProcessor.h"
+#include <cstring>
+#include "gpu/UniformData.h"
 
 namespace tgfx {
-Window::Window(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace,
-               bool vsyncEnabled)
-    : device(std::move(device)), _colorSpace(std::move(colorSpace)), _vsyncEnabled(vsyncEnabled) {
+
+Blur1DFragmentProcessor::Blur1DFragmentProcessor(uint32_t classID) : FragmentProcessor(classID) {
 }
 
-std::shared_ptr<ColorSpace> Window::colorSpace() const {
-  return _colorSpace;
-}
-
-bool Window::vsyncEnabled() const {
-  return _vsyncEnabled;
-}
-
-std::shared_ptr<Device> Window::getDevice() {
-  std::lock_guard<std::mutex> autoLock(locker);
-  return device;
-}
-
-void Window::onPresent(Context*) {
+void Blur1DFragmentProcessor::setKernelData(UniformData* fragmentUniformData) const {
+  // Pack the half-kernel into a vec4 array. Unused trailing slots stay zero and are never indexed
+  // because the shader only accesses offsets within the stored radius.
+  std::array<float, 4 * KERNEL_VEC4_COUNT> kernelData = {};
+  const size_t weightCount = static_cast<size_t>(kernelRadius + 1);
+  memcpy(kernelData.data(), kernel.data(), weightCount * sizeof(float));
+  fragmentUniformData->setData("Kernel", kernelData);
+  fragmentUniformData->setData("Radius", kernelRadius);
 }
 }  // namespace tgfx

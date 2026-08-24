@@ -19,11 +19,13 @@
 #include "tgfx/gpu/opengl/wgl/WGLWindow.h"
 #include <GL/GL.h>
 #include "core/utils/Log.h"
+#include "gpu/opengl/wgl/WGLInterface.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
 std::shared_ptr<WGLWindow> WGLWindow::MakeFrom(HWND nativeWindow, HGLRC sharedContext,
-                                               std::shared_ptr<ColorSpace> colorSpace) {
+                                               std::shared_ptr<ColorSpace> colorSpace,
+                                               bool vsyncEnabled) {
   if (nativeWindow == nullptr) {
     return nullptr;
   }
@@ -37,13 +39,15 @@ std::shared_ptr<WGLWindow> WGLWindow::MakeFrom(HWND nativeWindow, HGLRC sharedCo
         "WGLWindow::MakeFrom() The specified ColorSpace is not supported on this platform. "
         "Rendering may have color inaccuracies.");
   }
-  auto wglWindow = std::shared_ptr<WGLWindow>(new WGLWindow(device, std::move(colorSpace)));
+  auto wglWindow =
+      std::shared_ptr<WGLWindow>(new WGLWindow(device, std::move(colorSpace), vsyncEnabled));
   wglWindow->nativeWindow = nativeWindow;
   return wglWindow;
 }
 
-WGLWindow::WGLWindow(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace)
-    : Window(std::move(device), std::move(colorSpace)) {
+WGLWindow::WGLWindow(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace,
+                     bool vsyncEnabled)
+    : Window(std::move(device), std::move(colorSpace), vsyncEnabled) {
 }
 
 std::shared_ptr<RenderTargetProxy> WGLWindow::onCreateRenderTarget(Context* context) {
@@ -65,6 +69,16 @@ std::shared_ptr<RenderTargetProxy> WGLWindow::onCreateRenderTarget(Context* cont
 
 void WGLWindow::onPresent(Context*) {
   const auto wglDevice = std::static_pointer_cast<WGLDevice>(this->device);
+  // The GL context is current here (locked by DrawingBuffer before present), so wglSwapInterval
+  // targets this window's context. The vsync setting is fixed at creation, so apply it once on the
+  // first present.
+  if (!swapIntervalApplied) {
+    auto wglInterface = WGLInterface::Get();
+    if (wglInterface->swapIntervalSupport && wglInterface->wglSwapInterval != nullptr) {
+      wglInterface->wglSwapInterval(vsyncEnabled() ? 1 : 0);
+      swapIntervalApplied = true;
+    }
+  }
   SwapBuffers(wglDevice->deviceContext);
 }
 

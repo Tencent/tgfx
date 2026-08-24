@@ -18,7 +18,10 @@
 
 #pragma once
 
+#include <string>
+#include <utility>
 #include "core/DrawContext.h"
+#include "svg/PendingImage.h"
 #include "svg/SVGTextBuilder.h"
 #include "svg/xml/XMLWriter.h"
 #include "tgfx/core/Bitmap.h"
@@ -50,6 +53,14 @@ class SVGExportContext : public DrawContext {
 
   void setCanvas(Canvas* inputCanvas) {
     canvas = inputCanvas;
+  }
+
+  /**
+   * Injects the sink where readbacks that cannot be locked synchronously are registered. The sink
+   * is owned by the SVGExporter so its lifetime matches the export session.
+   */
+  void setPendingSink(std::vector<PendingImage>* sink) {
+    _pendingImages = sink;
   }
 
   void drawFill(const Brush& brush) override;
@@ -92,9 +103,12 @@ class SVGExportContext : public DrawContext {
   }
 
   /**
-   * Draws a image onto a surface and reads the pixels from the surface.
+   * Draws a image onto a surface and reads the pixels from the surface. When the pixels cannot be
+   * read synchronously and `pendings` is non-null, the readback is registered there and an empty
+   * Bitmap is returned.
    */
-  static Bitmap ImageExportToBitmap(Context* context, const std::shared_ptr<Image>& image);
+  static Bitmap ImageExportToBitmap(Context* context, const std::shared_ptr<Image>& image,
+                                    std::vector<PendingImage>* pendings = nullptr);
 
   /**
    * Returns the encoded pixel data if the image was created from a supported encoded format.
@@ -103,10 +117,18 @@ class SVGExportContext : public DrawContext {
 
   /**
    * Encodes an image to a data URI string. Tries to use the original encoded data if available
-   * (JPEG/PNG), otherwise rasterizes via the GPU context and encodes as PNG.
+   * (JPEG/PNG), otherwise rasterizes via the GPU context and encodes as PNG. When the rasterized
+   * pixels cannot be read synchronously and `pendings` is non-null, the readback is registered
+   * there and its token is returned in place of the data URI.
    */
   static std::shared_ptr<Data> EncodeImageToDataUri(const std::shared_ptr<Image>& image,
-                                                    Context* context);
+                                                    Context* context,
+                                                    std::vector<PendingImage>* pendings = nullptr);
+
+  /**
+   * Closes the root <svg> element. No further drawing is allowed after this call.
+   */
+  void finish();
 
  private:
   /**
@@ -115,7 +137,16 @@ class SVGExportContext : public DrawContext {
    */
   static bool RequiresViewportReset(const Brush& brush);
 
+  void exportImageElement(const std::string& href, int width, int height, const Matrix& matrix,
+                          const Brush& brush);
+
   void exportPixmap(const Pixmap& pixmap, const Matrix& matrix, const Brush& brush);
+
+  /**
+   * Emits the same structure as exportPixmap, with the data URI replaced by a pending image token.
+   */
+  void exportPendingImage(const std::string& token, int width, int height, const Matrix& matrix,
+                          const Brush& brush);
 
   /**
    * Replays a PictureImage as SVG vector elements, wrapped in a single <g> carrying any
@@ -165,5 +196,6 @@ class SVGExportContext : public DrawContext {
   std::shared_ptr<SVGCustomWriter> customWriter = {};
   std::shared_ptr<ColorSpace> _targetColorSpace = nullptr;
   std::shared_ptr<ColorSpace> _assignColorSpace = nullptr;
+  std::vector<PendingImage>* _pendingImages = nullptr;
 };
 }  // namespace tgfx

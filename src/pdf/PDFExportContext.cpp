@@ -59,6 +59,7 @@
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/ImageInfo.h"
+#include "tgfx/core/MaskFilter.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
@@ -219,11 +220,31 @@ void PDFExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& s
                                      const Matrix& matrix, const ClipStack& clip,
                                      const Brush& brush, SrcRectConstraint,
                                      const Rect* /*strictRect*/) {
-  auto subsetImage = image->makeSubset(srcRect);
-  if (subsetImage == nullptr) {
+  // The raster pipeline clamps out-of-range sampling coordinates instead of dropping the draw, so
+  // match it by intersecting srcRect with the image bounds and shrinking dstRect accordingly.
+  auto bounds =
+      Rect::MakeWH(static_cast<float>(image->width()), static_cast<float>(image->height()));
+  auto clippedSrc = srcRect;
+  if (!clippedSrc.intersect(bounds)) {
+    LOGE(
+        "PDFExportContext::drawImageRect() The srcRect is outside the image, the draw is skipped!");
     return;
   }
-  onDrawImageRect(image, dstRect, sampling, matrix, clip, brush);
+  auto clippedDst = dstRect;
+  if (clippedSrc != srcRect) {
+    auto scaleX = dstRect.width() / srcRect.width();
+    auto scaleY = dstRect.height() / srcRect.height();
+    clippedDst = Rect::MakeLTRB(dstRect.left + (clippedSrc.left - srcRect.left) * scaleX,
+                                dstRect.top + (clippedSrc.top - srcRect.top) * scaleY,
+                                dstRect.left + (clippedSrc.right - srcRect.left) * scaleX,
+                                dstRect.top + (clippedSrc.bottom - srcRect.top) * scaleY);
+  }
+  auto subsetImage = image->makeSubset(clippedSrc);
+  if (subsetImage == nullptr) {
+    LOGE("PDFExportContext::drawImageRect() Failed to make the image subset, the draw is skipped!");
+    return;
+  }
+  onDrawImageRect(std::move(subsetImage), clippedDst, sampling, matrix, clip, brush);
 }
 namespace {
 enum class BlendFastPath {
@@ -1411,48 +1432,51 @@ void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack&
     auto surface = Surface::Make(document->context(), static_cast<int>(maskBound.width()),
                                  static_cast<int>(maskBound.height()), false, 1, false, 0,
                                  document->dstColorSpace());
+    if (surface == nullptr) {
+      LOGE(
+          "PDFExportContext::drawPathWithFilter() Failed to create the mask surface, the masked "
+          "content is skipped!");
+      return;
+    }
     Canvas* maskCanvas = surface->getCanvas();
-    Paint maskPaint;
-    // Compensate for maskBound offset: the mask shader's coordinates are in the path's
-    // coordinate space (which starts at maskBound.x/y), but the surface starts at (0,0).
-    // Apply an inverse translation to the shader so it samples from the correct region.
+    // The mask shader's coordinates are in the path's space, which starts at maskBound.x/y, while
+    // the surface starts at (0, 0).
     auto shader = shaderMaskFilter->getShader();
     if (maskBound.x() != 0 || maskBound.y() != 0) {
       shader = shader->makeWithMatrix(Matrix::MakeTrans(-maskBound.x(), -maskBound.y()));
     }
-    maskPaint.setShader(shader);
-    maskCanvas->drawPaint(maskPaint);
+    // A PDF luminosity SMask reads the RGB brightness, so the shader alpha has to end up in RGB
+    // with the result opaque. Both variants below build that with blending rather than a color
+    // matrix: a matrix that lights up transparent pixels makes ColorFilterShader mask its own
+    // output with the original shader alpha (SrcIn), which crushes the antialiased edge.
+    Paint maskPaint;
+    if (shaderMaskFilter->isInverted()) {
+      // DstOut over a white backdrop gives Cr = 1 - A, then DstOver with an opaque black restores
+      // A' = 1 without touching RGB. The region the shader never covers stays white, i.e. unmasked.
+      maskCanvas->clear(Color::White());
+      maskPaint.setShader(shader);
+      maskPaint.setBlendMode(BlendMode::DstOut);
+      maskCanvas->drawPaint(maskPaint);
+      Paint opaquePaint;
+      opaquePaint.setColor(Color::Black());
+      opaquePaint.setBlendMode(BlendMode::DstOver);
+      maskCanvas->drawPaint(opaquePaint);
+    } else {
+      // SrcOver of an opaque white with the shader alpha as coverage onto an opaque black backdrop
+      // yields Cr = A at Ar = 1. The uncovered region stays black, i.e. fully masked.
+      maskCanvas->clear(Color::Black());
+      maskPaint.setColor(Color::White());
+      maskPaint.setMaskFilter(MaskFilter::MakeShader(shader));
+      maskCanvas->drawPaint(maskPaint);
+    }
 
-    auto grayscaleInfo = ImageInfo::Make(surface->width(), surface->height(), ColorType::ALPHA_8);
-    auto byteSize = grayscaleInfo.byteSize();
-    void* pixels = malloc(byteSize);
-    if (!surface->readPixels(grayscaleInfo, pixels)) {
-      free(pixels);
+    auto maskImage = surface->makeImageSnapshot();
+    if (maskImage == nullptr) {
+      LOGE(
+          "PDFExportContext::drawPathWithFilter() Failed to snapshot the mask, the masked content "
+          "is skipped!");
       return;
     }
-    // Convert ALPHA_8 pixels to RGBA to avoid GPU texture upload issues.
-    // Gray_8 and ALPHA_8 formats both trigger texture upload attempts, which fail for CPU-only data.
-    // Instead, convert to RGBA_8888 so PDF serialization can handle it without GPU.
-    int w = static_cast<int>(maskBound.width());
-    int h = static_cast<int>(maskBound.height());
-    auto rgbaInfo = ImageInfo::Make(w, h, ColorType::RGBA_8888, AlphaType::Unpremultiplied);
-    auto rgbaSize = rgbaInfo.byteSize();
-    auto* rgbaPixels = static_cast<uint8_t*>(malloc(rgbaSize));
-    auto* alphaPixels = static_cast<const uint8_t*>(pixels);
-    for (int i = 0; i < w * h; ++i) {
-      // PDF SMask has no native inversion support, so we invert the pixel values directly.
-      uint8_t a = shaderMaskFilter->isInverted() ? static_cast<uint8_t>(255 - alphaPixels[i])
-                                                 : alphaPixels[i];
-      // Replicate alpha to RGB channels for luminosity blending in PDF
-      rgbaPixels[i * 4 + 0] = a;
-      rgbaPixels[i * 4 + 1] = a;
-      rgbaPixels[i * 4 + 2] = a;
-      rgbaPixels[i * 4 + 3] = 255;  // Full opacity
-    }
-    free(pixels);  // Release ALPHA_8 data
-
-    auto rgbaData = Data::MakeAdopted(rgbaPixels, rgbaSize, Data::FreeProc);
-    auto maskImage = Image::MakeFrom(rgbaInfo, rgbaData);
 
     // PDF doesn't seem to allow masking vector graphics with an Image XObject.
     // Must mask with a Form XObject.

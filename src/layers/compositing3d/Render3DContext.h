@@ -64,6 +64,10 @@ class Render3DContext : public Layer3DContext {
     Matrix density = Matrix::I();
     int rasterWidth = 0;
     int rasterHeight = 0;
+    // Whether the leaf surface keeps a mip chain; ComputeRasterInfo clears it when the affine
+    // mapping never minifies texels. Defaults to true so any path that skips the decision stays
+    // conservative.
+    bool mipmapped = true;
   };
 
   void emitNode(Layer* layer, const Rect& localBounds, const Matrix3D& transform, float alpha,
@@ -82,7 +86,7 @@ class Render3DContext : public Layer3DContext {
                                      BackgroundSnapshotMap* snapshots, const Matrix& localToWorld);
   // Snapshot the outer canvas and prime the compositor target with it so in-subtree
   // BackgroundBlur dispatches can sample "outside the 3D subtree" content as part of their
-  // backdrop. Returns true on success; returns false (with a LOGW for the no-surface case)
+  // backdrop. Returns true on success; returns false (with a LOGE for the no-surface case)
   // when the outer canvas has no surface or the snapshot can't be remapped into compositor
   // pixel space — the caller must skip compositorSource construction so blur falls back
   // cleanly rather than consuming an un-primed compositor.
