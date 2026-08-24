@@ -751,7 +751,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
     bool matrix3DIsAffine : 1;  // Whether the matrix3D is equivalent to a 2D affine matrix
     bool staticSubtree : 1;  // Whether the subtree (content, children, filters, styles) is static.
     uint8_t blendMode : 5;
-    uint8_t maskType : 2;
+    uint8_t maskType : 3;
   } bitFields = {};
   std::string _name;
   float _alpha = 1.0f;
