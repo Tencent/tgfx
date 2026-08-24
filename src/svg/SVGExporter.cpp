@@ -51,6 +51,7 @@ SVGExporter::SVGExporter(const std::shared_ptr<WriteStream>& svgStream, Context*
                          std::shared_ptr<ColorSpace> targetColorSpace,
                          std::shared_ptr<ColorSpace> assignColorSpace)
     : context(context), userStream(svgStream), bufferStream(MemoryWriteStream::Make()) {
+  pendingImages = std::make_shared<PendingImageList>();
   // The XML is staged in an internal buffer so pending image tokens can still be substituted before
   // the text reaches the caller's stream.
   auto streamWriter = std::make_unique<XMLStreamWriter>(
@@ -60,6 +61,7 @@ SVGExporter::SVGExporter(const std::shared_ptr<WriteStream>& svgStream, Context*
                            std::move(targetColorSpace), std::move(assignColorSpace));
   canvas = new Canvas(drawContext);
   drawContext->setCanvas(canvas);
+  drawContext->setPendingSink(&pendingImages->images);
 };
 
 SVGExporter::~SVGExporter() {
@@ -85,12 +87,12 @@ void SVGExporter::close() {
 }
 
 bool SVGExporter::isReadyToClose() {
-  if (closed || drawContext == nullptr) {
+  if (closed || pendingImages == nullptr) {
     return true;
   }
   // Encoding here instead of at close() bounds the memory to the readbacks still in flight.
   resolveArrivedImages();
-  for (const auto& pending : *drawContext->pendingSink()) {
+  for (const auto& pending : pendingImages->images) {
     if (pending.readback != nullptr) {
       return false;
     }
@@ -99,10 +101,10 @@ bool SVGExporter::isReadyToClose() {
 }
 
 void SVGExporter::resolveArrivedImages() {
-  if (drawContext == nullptr || context == nullptr) {
+  if (pendingImages == nullptr || context == nullptr) {
     return;
   }
-  for (auto& pending : *drawContext->pendingSink()) {
+  for (auto& pending : pendingImages->images) {
     // Checking readiness first avoids the synchronous GPU wait inside lockPixels().
     if (pending.readback == nullptr || !pending.readback->isReady(context)) {
       continue;
@@ -126,7 +128,7 @@ void SVGExporter::flushToUserStream() {
     return;
   }
   flushed = true;
-  auto* pendings = drawContext == nullptr ? nullptr : drawContext->pendingSink();
+  auto* pendings = pendingImages == nullptr ? nullptr : &pendingImages->images;
   if (pendings == nullptr || pendings->empty()) {
     auto data = bufferStream->readData();
     if (data != nullptr) {

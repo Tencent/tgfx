@@ -282,22 +282,22 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
       return;
     }
     auto modifyImage = ConvertImageColorSpace(image, context, _targetColorSpace, _assignColorSpace,
-                                              &_pendingImages);
+                                              _pendingImages);
     if (modifyImage == nullptr) {
       // The registered readback holds the converted full-size pixels, matching the geometry below.
       applyClip(clip, matrix.mapRect(Rect::MakeWH(image->width(), image->height())));
-      exportPendingImage(_pendingImages.back().token, image->width(), image->height(), matrix,
+      exportPendingImage(_pendingImages->back().token, image->width(), image->height(), matrix,
                          brush);
       return;
     }
-    auto pendingCount = _pendingImages.size();
-    Bitmap bitmap = ImageExportToBitmap(context, modifyImage, &_pendingImages);
+    auto pendingCount = _pendingImages->size();
+    Bitmap bitmap = ImageExportToBitmap(context, modifyImage, _pendingImages);
     if (!bitmap.isEmpty()) {
       applyClip(clip, matrix.mapRect(Rect::MakeWH(image->width(), image->height())));
       exportPixmap(Pixmap(bitmap), matrix, brush);
-    } else if (_pendingImages.size() > pendingCount) {
+    } else if (_pendingImages->size() > pendingCount) {
       applyClip(clip, matrix.mapRect(Rect::MakeWH(image->width(), image->height())));
-      exportPendingImage(_pendingImages.back().token, modifyImage->width(), modifyImage->height(),
+      exportPendingImage(_pendingImages->back().token, modifyImage->width(), modifyImage->height(),
                          matrix, brush);
     }
   } else if (type == Types::ImageType::Filter) {
@@ -483,19 +483,19 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
     drawImage(subsetImage->source, sampling, matrix, clip, brush);
   } else {
     auto modifyImage = ConvertImageColorSpace(image, context, _targetColorSpace, _assignColorSpace,
-                                              &_pendingImages);
+                                              _pendingImages);
     if (modifyImage == nullptr) {
       // The registered readback holds the converted full-size pixels, matching the geometry below.
-      exportPendingImage(_pendingImages.back().token, image->width(), image->height(), matrix,
+      exportPendingImage(_pendingImages->back().token, image->width(), image->height(), matrix,
                          brush);
       return;
     }
-    auto pendingCount = _pendingImages.size();
-    Bitmap bitmap = ImageExportToBitmap(context, modifyImage, &_pendingImages);
+    auto pendingCount = _pendingImages->size();
+    Bitmap bitmap = ImageExportToBitmap(context, modifyImage, _pendingImages);
     if (!bitmap.isEmpty()) {
       exportPixmap(Pixmap(bitmap), matrix, brush);
-    } else if (_pendingImages.size() > pendingCount) {
-      exportPendingImage(_pendingImages.back().token, modifyImage->width(), modifyImage->height(),
+    } else if (_pendingImages->size() > pendingCount) {
+      exportPendingImage(_pendingImages->back().token, modifyImage->width(), modifyImage->height(),
                          matrix, brush);
     }
   }
@@ -520,7 +520,7 @@ void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& s
     return;
   }
   auto modifyImage =
-      ConvertImageColorSpace(image, context, _targetColorSpace, _assignColorSpace, &_pendingImages);
+      ConvertImageColorSpace(image, context, _targetColorSpace, _assignColorSpace, _pendingImages);
   if (modifyImage == nullptr) {
     // The registered readback holds the converted full-size pixels, so the srcRect subset must be
     // expressed by mapping srcRect onto dstRect and clipping to the transformed dstRect.
@@ -530,7 +530,7 @@ void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& s
     auto fillMatrix = Matrix::I();
     viewMatrix.invert(&fillMatrix);
     applyClipPath(dstClip);
-    exportPendingImage(_pendingImages.back().token, image->width(), image->height(), newMatrix,
+    exportPendingImage(_pendingImages->back().token, image->width(), image->height(), newMatrix,
                        brush.makeWithMatrix(fillMatrix));
     return;
   }
@@ -538,8 +538,8 @@ void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& s
   if (subsetImage == nullptr) {
     return;
   }
-  auto pendingCount = _pendingImages.size();
-  Bitmap bitmap = ImageExportToBitmap(context, subsetImage, &_pendingImages);
+  auto pendingCount = _pendingImages->size();
+  Bitmap bitmap = ImageExportToBitmap(context, subsetImage, _pendingImages);
   if (!bitmap.isEmpty()) {
     applyClip(clip, matrix.mapRect(dstRect));
 
@@ -553,7 +553,7 @@ void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& s
     viewMatrix.invert(&fillMatrix);
 
     exportPixmap(Pixmap(bitmap), newMatrix, brush.makeWithMatrix(fillMatrix));
-  } else if (_pendingImages.size() > pendingCount) {
+  } else if (_pendingImages->size() > pendingCount) {
     applyClip(clip, matrix.mapRect(dstRect));
 
     auto viewMatrix =
@@ -565,7 +565,7 @@ void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& s
     auto fillMatrix = Matrix::I();
     viewMatrix.invert(&fillMatrix);
 
-    exportPendingImage(_pendingImages.back().token, subsetImage->width(), subsetImage->height(),
+    exportPendingImage(_pendingImages->back().token, subsetImage->width(), subsetImage->height(),
                        newMatrix, brush.makeWithMatrix(fillMatrix));
   }
 }

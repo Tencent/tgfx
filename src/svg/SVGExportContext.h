@@ -55,6 +55,14 @@ class SVGExportContext : public DrawContext {
     canvas = inputCanvas;
   }
 
+  /**
+   * Injects the sink where readbacks that cannot be locked synchronously are registered. The sink
+   * is owned by the SVGExporter so its lifetime matches the export session.
+   */
+  void setPendingSink(std::vector<PendingImage>* sink) {
+    _pendingImages = sink;
+  }
+
   void drawFill(const Brush& brush) override;
 
   void drawRect(const Rect& rect, const Matrix& matrix, const ClipStack& clip, const Brush& brush,
@@ -126,7 +134,7 @@ class SVGExportContext : public DrawContext {
    * The sink where readbacks that cannot be locked synchronously are registered.
    */
   std::vector<PendingImage>* pendingSink() {
-    return &_pendingImages;
+    return _pendingImages;
   }
 
  private:
@@ -195,6 +203,6 @@ class SVGExportContext : public DrawContext {
   std::shared_ptr<SVGCustomWriter> customWriter = {};
   std::shared_ptr<ColorSpace> _targetColorSpace = nullptr;
   std::shared_ptr<ColorSpace> _assignColorSpace = nullptr;
-  std::vector<PendingImage> _pendingImages = {};
+  std::vector<PendingImage>* _pendingImages = nullptr;
 };
 }  // namespace tgfx

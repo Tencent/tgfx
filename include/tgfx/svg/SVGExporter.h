@@ -27,6 +27,7 @@
 
 namespace tgfx {
 class SVGExportContext;
+class PendingImageList;
 
 /**
  * Defines flags for SVG exporting that influence the readability and functionality of the exported
@@ -160,6 +161,7 @@ class SVGExporter {
   Context* context = nullptr;
   std::shared_ptr<WriteStream> userStream = nullptr;
   std::shared_ptr<MemoryWriteStream> bufferStream = nullptr;
+  std::shared_ptr<PendingImageList> pendingImages = nullptr;
   bool closed = false;
   bool flushed = false;
 };

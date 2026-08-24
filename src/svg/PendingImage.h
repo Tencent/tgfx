@@ -22,6 +22,7 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <vector>
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/SurfaceReadback.h"
@@ -60,6 +61,14 @@ struct PendingImage {
   static std::shared_ptr<Data> MakeTokenData(const std::string& token) {
     return Data::MakeWithCopy(token.c_str(), token.size() + 1);
   }
+};
+
+/**
+ * Holds the pending images of an export session. Exists as a separate type so the public
+ * SVGExporter header can reference it by forward declaration while PendingImage stays internal.
+ */
+struct PendingImageList {
+  std::vector<PendingImage> images;
 };
 
 }  // namespace tgfx
