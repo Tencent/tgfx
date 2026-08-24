@@ -43,14 +43,15 @@ class GlassUDFImage : public Image {
    * @param coreWidth The width of the UDF core in content pixels.
    * @param coreHeight The height of the UDF core in content pixels.
    * @param textureRect The window of the full UDF space to generate, in UDF pixels.
-   * @param fineRadius The tent blur radii for the refraction field, in UDF pixels.
-   * @param coarseRadius The tent blur radii for the edge-light field, in UDF pixels.
-   * @param field Which fields the generated texture carries.
+   * @param fineRadius The tent blur radii for the refraction field, in UDF pixels. Only read when
+   * field is Refraction.
+   * @param coarseRadius The tent blur radii for the edge-light field, in UDF pixels. Only read when
+   * field is EdgeLight.
+   * @param field Which field the generated texture carries.
    */
   static std::shared_ptr<Image> Make(std::shared_ptr<Image> source, int coreWidth, int coreHeight,
                                      const Rect& textureRect, const Point& fineRadius,
-                                     const Point& coarseRadius,
-                                     GlassUDFField field = GlassUDFField::Both);
+                                     const Point& coarseRadius, GlassUDFField field);
 
   int width() const override {
     return _width;
@@ -94,7 +95,7 @@ class GlassUDFImage : public Image {
   Rect textureRect = {};
   Point fineRadius = {};
   Point coarseRadius = {};
-  GlassUDFField field = GlassUDFField::Both;
+  GlassUDFField field = GlassUDFField::Refraction;
   int _width = 0;
   int _height = 0;
 

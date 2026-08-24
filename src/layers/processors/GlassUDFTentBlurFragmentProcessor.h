@@ -25,24 +25,23 @@ namespace tgfx {
 enum class GlassUDFBlurDirection { Horizontal, Vertical };
 
 /**
- * Selects which fields a tent pass produces. Refraction writes the 24-bit fine field into RGB;
- * EdgeLight writes the coarse field into A; Both writes both (the original combined layout).
+ * Selects which field a tent pass produces. Refraction writes the 24-bit fine field into RGB;
+ * EdgeLight writes the coarse field into A.
  */
-enum class GlassUDFField { Refraction, EdgeLight, Both };
+enum class GlassUDFField { Refraction, EdgeLight };
 
 /**
- * @description Blurs alpha coverage with tent kernels in a single pass and writes one or two
- * fields into one RGBA8 target: RGB carries the wide "fine" field with 24-bit precision for the
- * refraction gradient, A carries the narrow "coarse" field that drives the edge light width.
+ * @description Blurs alpha coverage with a tent kernel in a single pass and writes one field into an
+ * RGBA8 target: the wide "fine" field goes to RGB with 24-bit precision for the refraction gradient,
+ * the narrow "coarse" field goes to A and drives the edge light width.
  *
- * The two source processors must sample the same image with the same coordinate matrix. Separate
- * instances are required because a single child cannot be emitted twice without redeclaring its
- * uniforms.
+ * Only the source matching the requested field is used; the other one must be null.
  */
 class GlassUDFTentBlurFragmentProcessor : public FragmentProcessor {
  public:
   /**
-   * @description Creates the processor. Both radii are expressed in destination texel units.
+   * @description Creates the processor. Both radii are expressed in destination texel units, and
+   * only the one belonging to the requested field is read.
    * @param inputIsPacked True when the sources already produce this processor's own layout, which
    * is the case for the second (vertical) pass.
    */
@@ -51,8 +50,7 @@ class GlassUDFTentBlurFragmentProcessor : public FragmentProcessor {
                                               PlacementPtr<FragmentProcessor> coarseSource,
                                               float fineRadius, float coarseRadius,
                                               GlassUDFBlurDirection direction, int maxRadius,
-                                              bool inputIsPacked,
-                                              GlassUDFField field = GlassUDFField::Both);
+                                              bool inputIsPacked, GlassUDFField field);
 
   std::string name() const override {
     return "GlassUDFTentBlurFragmentProcessor";
@@ -77,7 +75,7 @@ class GlassUDFTentBlurFragmentProcessor : public FragmentProcessor {
   GlassUDFBlurDirection direction = GlassUDFBlurDirection::Horizontal;
   int maxRadius = 64;
   bool inputIsPacked = false;
-  GlassUDFField field = GlassUDFField::Both;
+  GlassUDFField field = GlassUDFField::Refraction;
 
   friend class BlockAllocator;
 };

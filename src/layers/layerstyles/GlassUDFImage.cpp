@@ -37,8 +37,8 @@ static std::shared_ptr<TextureProxy> GenerateGlassUDFTexture(
       textureRect.isEmpty()) {
     return nullptr;
   }
-  bool usesFine = field != GlassUDFField::EdgeLight;
-  bool usesCoarse = field != GlassUDFField::Refraction;
+  bool usesFine = field == GlassUDFField::Refraction;
+  bool usesCoarse = field == GlassUDFField::EdgeLight;
   if ((usesFine && (fineRadius.x <= 0.0f || fineRadius.y <= 0.0f)) ||
       (usesCoarse && (coarseRadius.x <= 0.0f || coarseRadius.y <= 0.0f))) {
     return nullptr;
@@ -105,18 +105,19 @@ static std::shared_ptr<TextureProxy> GenerateGlassUDFTexture(
   auto horizontalMatrix = Matrix::MakeTrans(textureRect.left - coreWindowUDF.left,
                                             horizontalRect.top - coreWindowUDF.top);
   FPArgs sourceArgs = FPArgs(context, 0, sourceDrawRect);
-  // Each tent loop needs its own child because emitting one child twice redeclares its uniforms.
-  PlacementPtr<FragmentProcessor> fineSource = nullptr;
-  PlacementPtr<FragmentProcessor> coarseSource = nullptr;
+  // A pass reads a single field, so only the matching source is built and the other stays null.
+  PlacementPtr<FragmentProcessor> horizontalFine = nullptr;
+  PlacementPtr<FragmentProcessor> horizontalCoarse = nullptr;
+  auto horizontalSource =
+      FragmentProcessor::Make(coreSource, sourceArgs, samplingArgs, &horizontalMatrix);
   if (usesFine) {
-    fineSource = FragmentProcessor::Make(coreSource, sourceArgs, samplingArgs, &horizontalMatrix);
-  }
-  if (usesCoarse) {
-    coarseSource = FragmentProcessor::Make(coreSource, sourceArgs, samplingArgs, &horizontalMatrix);
+    horizontalFine = std::move(horizontalSource);
+  } else {
+    horizontalCoarse = std::move(horizontalSource);
   }
   auto horizontalProcessor = GlassUDFTentBlurFragmentProcessor::Make(
-      allocator, std::move(fineSource), std::move(coarseSource), fineRadius.x, coarseRadius.x,
-      GlassUDFBlurDirection::Horizontal, GlassUDFMaxTentRadius, false, field);
+      allocator, std::move(horizontalFine), std::move(horizontalCoarse), fineRadius.x,
+      coarseRadius.x, GlassUDFBlurDirection::Horizontal, GlassUDFMaxTentRadius, false, field);
   if (horizontalProcessor == nullptr || !context->drawingManager()->fillRTWithFP(
                                             horizontalTarget, std::move(horizontalProcessor), 0)) {
     return nullptr;
@@ -125,13 +126,12 @@ static std::shared_ptr<TextureProxy> GenerateGlassUDFTexture(
   auto horizontalProxy = horizontalTarget->asTextureProxy();
   PlacementPtr<FragmentProcessor> verticalFineSource = nullptr;
   PlacementPtr<FragmentProcessor> verticalCoarseSource = nullptr;
+  auto verticalSource =
+      TiledTextureEffect::Make(allocator, horizontalProxy, samplingArgs, &verticalMatrix);
   if (usesFine) {
-    verticalFineSource =
-        TiledTextureEffect::Make(allocator, horizontalProxy, samplingArgs, &verticalMatrix);
-  }
-  if (usesCoarse) {
-    verticalCoarseSource =
-        TiledTextureEffect::Make(allocator, horizontalProxy, samplingArgs, &verticalMatrix);
+    verticalFineSource = std::move(verticalSource);
+  } else {
+    verticalCoarseSource = std::move(verticalSource);
   }
   auto verticalTarget = RenderTargetProxy::Make(context, textureWidth, textureHeight, false, 1,
                                                 false, ImageOrigin::TopLeft, BackingFit::Exact);
@@ -152,8 +152,8 @@ std::shared_ptr<Image> GlassUDFImage::Make(std::shared_ptr<Image> source, int co
                                            int coreHeight, const Rect& textureRect,
                                            const Point& fineRadius, const Point& coarseRadius,
                                            GlassUDFField field) {
-  bool usesFine = field != GlassUDFField::EdgeLight;
-  bool usesCoarse = field != GlassUDFField::Refraction;
+  bool usesFine = field == GlassUDFField::Refraction;
+  bool usesCoarse = field == GlassUDFField::EdgeLight;
   if (source == nullptr || coreWidth <= 0 || coreHeight <= 0 || textureRect.isEmpty() ||
       (usesFine && (fineRadius.x <= 0.0f || fineRadius.y <= 0.0f)) ||
       (usesCoarse && (coarseRadius.x <= 0.0f || coarseRadius.y <= 0.0f))) {

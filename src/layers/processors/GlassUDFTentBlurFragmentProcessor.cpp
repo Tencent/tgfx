@@ -34,15 +34,14 @@ PlacementPtr<FragmentProcessor> GlassUDFTentBlurFragmentProcessor::Make(
   if (allocator == nullptr) {
     return nullptr;
   }
-  if (field != GlassUDFField::EdgeLight && fineSource == nullptr) {
+  bool usesFine = field == GlassUDFField::Refraction;
+  if (usesFine && (fineSource == nullptr || fineRadius <= 0.0f)) {
     return nullptr;
   }
-  if (field != GlassUDFField::Refraction && coarseSource == nullptr) {
+  if (!usesFine && (coarseSource == nullptr || coarseRadius <= 0.0f)) {
     return nullptr;
   }
-  bool fineRadiusValid = (field == GlassUDFField::EdgeLight) || fineRadius > 0.0f;
-  bool coarseRadiusValid = (field == GlassUDFField::Refraction) || coarseRadius > 0.0f;
-  if (maxRadius < 1 || !fineRadiusValid || !coarseRadiusValid) {
+  if (maxRadius < 1) {
     return nullptr;
   }
   return allocator->make<GlassUDFTentBlurFragmentProcessor>(
@@ -56,14 +55,12 @@ GlassUDFTentBlurFragmentProcessor::GlassUDFTentBlurFragmentProcessor(
     bool inputIsPacked, GlassUDFField field)
     : FragmentProcessor(ClassID()), fineRadius(fineRadius), coarseRadius(coarseRadius),
       direction(direction), maxRadius(maxRadius), inputIsPacked(inputIsPacked), field(field) {
+  // The source of the requested field is always child 0, so onSetData reads the step matrix from a
+  // valid child either way.
   if (field == GlassUDFField::EdgeLight) {
-    // Keep the coarse source as child 0 so onSetData reads the step matrix from a valid child.
     registerChildProcessor(std::move(coarseSource));
   } else {
     registerChildProcessor(std::move(fineSource));
-    if (field == GlassUDFField::Both) {
-      registerChildProcessor(std::move(coarseSource));
-    }
   }
 }
 
@@ -130,33 +127,23 @@ void GlassUDFTentBlurFragmentProcessor::emitCode(EmitArgs& args) const {
 
   // The coarse field always lives in the alpha channel, both in the source coverage image and in
   // this processor's own layout, so it never needs the 24-bit decode path.
-  if (field != GlassUDFField::EdgeLight) {
-    emitTentLoop(0, "x", "fineResult", inputIsPacked);
-  }
-  if (field != GlassUDFField::Refraction) {
-    size_t coarseChildIndex = field == GlassUDFField::EdgeLight ? 0 : 1;
-    emitTentLoop(coarseChildIndex, "y", "coarseResult", false);
+  if (field == GlassUDFField::EdgeLight) {
+    emitTentLoop(0, "y", "coarseResult", false);
+    fragBuilder->codeAppendf("%s = vec4(0.0, 0.0, 0.0, clamp(coarseResult, 0.0, 1.0));",
+                             args.outputColor.c_str());
+    return;
   }
 
+  emitTentLoop(0, "x", "fineResult", inputIsPacked);
   // Encode the fine field into RGB with true 24-bit precision. The fract chain pre-compensates the
   // 8-bit rounding of the following channel; a floor-based split would mismatch the GPU's
   // round-to-nearest UNORM8 conversion. The upper clamp is required because fract(1.0) == 0.0 and
   // interior UDF samples are exactly 1.0.
-  if (field == GlassUDFField::EdgeLight) {
-    fragBuilder->codeAppendf("%s = vec4(0.0, 0.0, 0.0, clamp(coarseResult, 0.0, 1.0));",
-                             args.outputColor.c_str());
-  } else {
-    fragBuilder->codeAppend("float fineValue = clamp(fineResult, 0.0, 1.0 - 1.0/16581375.0);");
-    fragBuilder->codeAppend("vec3 enc = fract(vec3(1.0, 255.0, 65025.0) * fineValue);");
-    fragBuilder->codeAppend("enc.x -= enc.y / 255.0;");
-    fragBuilder->codeAppend("enc.y -= enc.z / 255.0;");
-    if (field == GlassUDFField::Refraction) {
-      fragBuilder->codeAppendf("%s = vec4(enc, 0.0);", args.outputColor.c_str());
-    } else {
-      fragBuilder->codeAppendf("%s = vec4(enc, clamp(coarseResult, 0.0, 1.0));",
-                               args.outputColor.c_str());
-    }
-  }
+  fragBuilder->codeAppend("float fineValue = clamp(fineResult, 0.0, 1.0 - 1.0/16581375.0);");
+  fragBuilder->codeAppend("vec3 enc = fract(vec3(1.0, 255.0, 65025.0) * fineValue);");
+  fragBuilder->codeAppend("enc.x -= enc.y / 255.0;");
+  fragBuilder->codeAppend("enc.y -= enc.z / 255.0;");
+  fragBuilder->codeAppendf("%s = vec4(enc, 0.0);", args.outputColor.c_str());
 }
 
 void GlassUDFTentBlurFragmentProcessor::onSetData(UniformData*,
