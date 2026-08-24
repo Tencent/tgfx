@@ -270,6 +270,7 @@
     },
     "LayerTest": {
         "AdaptiveDashEffect": "eefb7a46",
+        "BackgroundBlurAlignment": "443d915b3",
         "BackgroundBlurWithFilter_Partial": "67e7638e7",
         "BackgroundBlurWithFilter_Tiled": "67e7638e7",
         "BackgroundColor_Draw": "f0f48dd2",
