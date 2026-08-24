@@ -26,9 +26,15 @@ class CGLWindow : public Window {
  public:
   /**
    * Creates a new window from an NSView with specified shared context.
+   * @param view The NSView to render into. Must not be nil.
+   * @param sharedContext An optional shared CGL context.
+   * @param colorSpace An optional color space for rendering. If nullptr, the default sRGB is used.
+   * @param vsyncEnabled Whether presentation is synchronized to the display's refresh rate. Fixed
+   * for the lifetime of the window. Defaults to true.
    */
   static std::shared_ptr<CGLWindow> MakeFrom(NSView* view, CGLContextObj sharedContext = nullptr,
-                                             std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                                             std::shared_ptr<ColorSpace> colorSpace = nullptr,
+                                             bool vsyncEnabled = true);
 
   ~CGLWindow() override;
 
@@ -38,11 +44,8 @@ class CGLWindow : public Window {
 
  private:
   NSView* view = nil;
-  // Tracks the swap interval last applied via NSOpenGLContextParameterSwapInterval so onPresent
-  // only sets it when the vsync setting actually changes. -1 means not yet applied.
-  int appliedSwapInterval = -1;
 
-  CGLWindow(std::shared_ptr<Device> device, NSView* view,
-            std::shared_ptr<ColorSpace> colorSpace = nullptr);
+  CGLWindow(std::shared_ptr<Device> device, NSView* view, std::shared_ptr<ColorSpace> colorSpace,
+            bool vsyncEnabled);
 };
 }  // namespace tgfx

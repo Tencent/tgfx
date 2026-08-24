@@ -37,7 +37,8 @@ static void ApplyWindowColorSpace(NSView* view, const std::shared_ptr<ColorSpace
 }
 
 std::shared_ptr<CGLWindow> CGLWindow::MakeFrom(NSView* view, CGLContextObj sharedContext,
-                                               std::shared_ptr<ColorSpace> colorSpace) {
+                                               std::shared_ptr<ColorSpace> colorSpace,
+                                               bool vsyncEnabled) {
   if (view == nil) {
     return nullptr;
   }
@@ -51,13 +52,17 @@ std::shared_ptr<CGLWindow> CGLWindow::MakeFrom(NSView* view, CGLContextObj share
          "Rendering may have color inaccuracies.");
   }
   ApplyWindowColorSpace(view, colorSpace);
-  return std::shared_ptr<CGLWindow>(new CGLWindow(device, view, std::move(colorSpace)));
+  return std::shared_ptr<CGLWindow>(
+      new CGLWindow(device, view, std::move(colorSpace), vsyncEnabled));
 }
 
 CGLWindow::CGLWindow(std::shared_ptr<Device> device, NSView* view,
-                     std::shared_ptr<ColorSpace> colorSpace)
-    : Window(std::move(device), std::move(colorSpace)), view(view) {
+                     std::shared_ptr<ColorSpace> colorSpace, bool vsyncEnabled)
+    : Window(std::move(device), std::move(colorSpace), vsyncEnabled), view(view) {
   // do not retain view here, otherwise it can cause circular reference.
+  auto glContext = static_cast<CGLDevice*>(this->device.get())->glContext;
+  int interval = vsyncEnabled ? 1 : 0;
+  [glContext setValues:&interval forParameter:NSOpenGLContextParameterSwapInterval];
 }
 
 CGLWindow::~CGLWindow() {
@@ -94,11 +99,6 @@ std::shared_ptr<RenderTargetProxy> CGLWindow::onCreateRenderTarget(Context* cont
 
 void CGLWindow::onPresent(Context*) {
   auto glContext = static_cast<CGLDevice*>(device.get())->glContext;
-  int desiredInterval = vsyncEnabled() ? 1 : 0;
-  if (desiredInterval != appliedSwapInterval) {
-    [glContext setValues:&desiredInterval forParameter:NSOpenGLContextParameterSwapInterval];
-    appliedSwapInterval = desiredInterval;
-  }
   [glContext flushBuffer];
 }
 }  // namespace tgfx

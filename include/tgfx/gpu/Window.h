@@ -48,33 +48,23 @@ class Window {
   std::shared_ptr<ColorSpace> colorSpace() const;
 
   /**
-   * Enables or disables vertical synchronization for presentation. When enabled (the default),
-   * presentation is throttled to the display's refresh rate. When disabled, the calling thread is
-   * no longer blocked by the display's vsync during present, which is useful when that thread must
-   * not stall (for example a UI callback thread). The exact effect depends on the backend and the
-   * underlying platform; backends that cannot control vsync ignore this setting. Takes effect on
-   * the next present.
-   *
-   * Backend note: some backends (for example Vulkan and WebGPU) apply the new setting by rebuilding
-   * their swap chain, which only happens when the render target is recreated. On those backends the
-   * caller must recreate the Surface (via Surface::MakeFrom) after changing this setting for it to
-   * take effect. Backends that switch the swap interval at present time (D3D12, WGL, EGL, CGL,
-   * Metal) apply the change on the next present without recreating the Surface.
+   * Returns whether vertical synchronization is enabled for presentation. This is fixed when the
+   * Window is created (defaults to true) and cannot be changed afterwards. When enabled,
+   * presentation is throttled to the display's refresh rate. When disabled, the presenting thread
+   * is no longer blocked by the display's vsync, which is useful when that thread must not stall
+   * (for example a UI callback thread). The exact effect depends on the backend and the underlying
+   * platform; backends that cannot control vsync ignore this setting.
    */
-  void setVSyncEnabled(bool enabled);
-
-  /**
-   * Returns whether vertical synchronization is enabled for presentation. Defaults to true.
-   */
-  bool vsyncEnabled();
+  bool vsyncEnabled() const;
 
  protected:
   std::mutex locker = {};
   std::shared_ptr<Device> device = nullptr;
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;
-  bool _vsyncEnabled = true;
+  const bool _vsyncEnabled = true;
 
-  explicit Window(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace = nullptr);
+  explicit Window(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace = nullptr,
+                  bool vsyncEnabled = true);
   Window() = default;
 
   /**
@@ -89,13 +79,6 @@ class Window {
    * implementation does nothing.
    */
   virtual void onPresent(Context* context);
-
-  /**
-   * Called when the vsync setting changes via setVSyncEnabled(). Subclasses that must react
-   * immediately (for example by rebuilding a swap chain) override this. Invoked while holding the
-   * window lock. The default implementation does nothing.
-   */
-  virtual void onVSyncEnabledChanged(bool enabled);
 
  private:
   friend class DrawingBuffer;

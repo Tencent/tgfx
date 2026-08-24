@@ -65,7 +65,8 @@ static const char* ToAlphaModeString(WGPUCompositeAlphaMode alphaMode) {
 
 std::shared_ptr<WebGPUWindow> WebGPUWindow::MakeFrom(const std::string& canvasSelector,
                                                      std::shared_ptr<WebGPUDevice> device,
-                                                     std::shared_ptr<ColorSpace> colorSpace) {
+                                                     std::shared_ptr<ColorSpace> colorSpace,
+                                                     bool vsyncEnabled) {
   if (canvasSelector.empty()) {
     return nullptr;
   }
@@ -115,22 +116,24 @@ std::shared_ptr<WebGPUWindow> WebGPUWindow::MakeFrom(const std::string& canvasSe
   config.usage = WGPUTextureUsage_RenderAttachment;
   config.width = static_cast<uint32_t>(canvasWidth);
   config.height = static_cast<uint32_t>(canvasHeight);
-  config.presentMode = WGPUPresentMode_Fifo;
+  config.presentMode = vsyncEnabled ? WGPUPresentMode_Fifo : WGPUPresentMode_Immediate;
   config.alphaMode = WGPUCompositeAlphaMode_Premultiplied;
   wgpuSurfaceConfigure(surface, &config);
 
   auto window = std::shared_ptr<WebGPUWindow>(
       new WebGPUWindow(std::move(device), surface, canvasWidth, canvasHeight, canvasSelector,
-                       std::move(colorSpace)));
+                       std::move(colorSpace), vsyncEnabled));
   window->configureColorSpace(config.format, config.usage, config.alphaMode);
   return window;
 }
 
 WebGPUWindow::WebGPUWindow(std::shared_ptr<Device> device, void* surface, int width, int height,
                            const std::string& canvasSelector,
-                           std::shared_ptr<ColorSpace> colorSpace)
-    : Window(std::move(device), std::move(colorSpace)), _canvasSelector(canvasSelector),
-      _surface(surface), _width(width), _height(height) {
+                           std::shared_ptr<ColorSpace> colorSpace, bool vsyncEnabled)
+    : Window(std::move(device), std::move(colorSpace), vsyncEnabled),
+      _canvasSelector(canvasSelector), _surface(surface), _width(width), _height(height),
+      _configuredWidth(width), _configuredHeight(height),
+      _presentMode(vsyncEnabled ? WGPUPresentMode_Fifo : WGPUPresentMode_Immediate) {
 }
 
 void WebGPUWindow::configureColorSpace(WGPUTextureFormat format, WGPUTextureUsageFlags usage,
@@ -188,8 +191,9 @@ std::shared_ptr<RenderTargetProxy> WebGPUWindow::onCreateRenderTarget(Context* c
     return nullptr;
   }
 
-  // Reconfigure the surface when dimensions change or the present mode (vsync) changed.
-  if (_width != _configuredWidth || _height != _configuredHeight || _presentModeDirty) {
+  // Reconfigure the surface when dimensions change. The present mode is fixed at creation and
+  // reused here.
+  if (_width != _configuredWidth || _height != _configuredHeight) {
     auto wgpuDevice =
         static_cast<WGPUDevice>(static_cast<WebGPUDevice*>(getDevice().get())->webgpuDevice());
     auto wgpuSurface = static_cast<WGPUSurface>(_surface);
@@ -205,7 +209,6 @@ std::shared_ptr<RenderTargetProxy> WebGPUWindow::onCreateRenderTarget(Context* c
     configureColorSpace(config.format, config.usage, config.alphaMode);
     _configuredWidth = _width;
     _configuredHeight = _height;
-    _presentModeDirty = false;
   }
 
   auto wgpuSurface = static_cast<WGPUSurface>(_surface);
@@ -221,18 +224,6 @@ void WebGPUWindow::onPresent(Context*) {
   auto proxy = std::static_pointer_cast<WebGPUDrawableProxy>(drawableProxy);
   proxy->present();
   proxy->releaseDrawable();
-}
-
-void WebGPUWindow::onVSyncEnabledChanged(bool enabled) {
-  // Called while holding the window lock; defer the actual wgpuSurfaceConfigure to the next
-  // onCreateRenderTarget. On Web the browser may still cap presentation to the display refresh
-  // rate regardless of this request; Immediate is honored only where the implementation supports
-  // it (e.g. native Dawn).
-  auto mode = enabled ? WGPUPresentMode_Fifo : WGPUPresentMode_Immediate;
-  if (mode != _presentMode) {
-    _presentMode = mode;
-    _presentModeDirty = true;
-  }
 }
 
 }  // namespace tgfx

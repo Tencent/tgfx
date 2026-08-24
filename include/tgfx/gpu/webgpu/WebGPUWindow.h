@@ -37,21 +37,26 @@ class WebGPUWindow : public Window {
    * supported.
    * On Web, the final executable must export the WebGPU runtime method (see the Web build section
    * in README.md); otherwise color space configuration and video texture uploads will not work.
+   * @param vsyncEnabled Whether presentation is synchronized to the display's refresh rate. Fixed
+   * for the lifetime of the window. Defaults to true. Note: in a browser, the compositor may cap
+   * presentation to the display refresh rate regardless of this setting; Immediate is honored only
+   * where the implementation supports it (e.g. native Dawn).
    */
   static std::shared_ptr<WebGPUWindow> MakeFrom(const std::string& canvasSelector,
                                                 std::shared_ptr<WebGPUDevice> device = nullptr,
-                                                std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                                                std::shared_ptr<ColorSpace> colorSpace = nullptr,
+                                                bool vsyncEnabled = true);
 
   ~WebGPUWindow() override;
 
  protected:
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
   void onPresent(Context* context) override;
-  void onVSyncEnabledChanged(bool enabled) override;
 
  private:
   WebGPUWindow(std::shared_ptr<Device> device, void* surface, int width, int height,
-               const std::string& canvasSelector, std::shared_ptr<ColorSpace> colorSpace);
+               const std::string& canvasSelector, std::shared_ptr<ColorSpace> colorSpace,
+               bool vsyncEnabled);
 
   // Configures the canvas's WebGPU context to use the target color space. Must be called after
   // each wgpuSurfaceConfigure() call, since the emscripten surface configuration does not carry
@@ -65,10 +70,8 @@ class WebGPUWindow : public Window {
   int _height = 0;
   int _configuredWidth = 0;
   int _configuredHeight = 0;
-  // Present mode currently applied to the surface. Defaults to Fifo (vsync on). onVSyncEnabledChanged
-  // updates it and flags a reconfigure so onCreateRenderTarget re-applies it.
+  // Present mode applied to the surface, fixed at creation (Fifo for vsync on, Immediate for off).
   WGPUPresentMode _presentMode = WGPUPresentMode_Fifo;
-  bool _presentModeDirty = false;
   std::shared_ptr<RenderTargetProxy> drawableProxy = nullptr;
 };
 

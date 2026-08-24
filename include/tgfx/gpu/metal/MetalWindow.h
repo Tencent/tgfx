@@ -35,23 +35,28 @@ class MetalWindow : public Window {
    * @param layer The CAMetalLayer to render into. Must not be nil.
    * @param device An optional MetalDevice. If nullptr, a default device is created automatically.
    * @param colorSpace An optional color space for rendering. If nullptr, the default sRGB is used.
+   * @param vsyncEnabled Whether presentation is synchronized to the display's refresh rate. Fixed
+   * for the lifetime of the window. Defaults to true.
    */
   static std::shared_ptr<MetalWindow> MakeFrom(CAMetalLayer* layer,
                                                std::shared_ptr<MetalDevice> device = nullptr,
-                                               std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                                               std::shared_ptr<ColorSpace> colorSpace = nullptr,
+                                               bool vsyncEnabled = true);
 
   /**
    * Creates a new window from an MTKView.
    * @param view The MTKView to render into. Must not be nil.
    * @param colorSpace An optional color space for rendering. If nullptr, the default sRGB is used.
+   * @param vsyncEnabled Whether presentation is synchronized to the display's refresh rate. Fixed
+   * for the lifetime of the window. Defaults to true.
    */
   static std::shared_ptr<MetalWindow> MakeFrom(MTKView* view,
-                                               std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                                               std::shared_ptr<ColorSpace> colorSpace = nullptr,
+                                               bool vsyncEnabled = true);
 
  protected:
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
   void onPresent(Context* context) override;
-  void onVSyncEnabledChanged(bool enabled) override;
 
  private:
   CAMetalLayer* metalLayer = nil;
@@ -59,9 +64,9 @@ class MetalWindow : public Window {
   std::shared_ptr<RenderTargetProxy> drawableProxy = nullptr;
 
   MetalWindow(std::shared_ptr<Device> device, CAMetalLayer* layer,
-              std::shared_ptr<ColorSpace> colorSpace);
+              std::shared_ptr<ColorSpace> colorSpace, bool vsyncEnabled);
   MetalWindow(std::shared_ptr<Device> device, MTKView* view, CAMetalLayer* layer,
-              std::shared_ptr<ColorSpace> colorSpace);
+              std::shared_ptr<ColorSpace> colorSpace, bool vsyncEnabled);
 };
 
 }  // namespace tgfx

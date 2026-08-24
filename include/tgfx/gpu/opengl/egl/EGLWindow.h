@@ -33,10 +33,16 @@ class EGLWindow : public Window {
 
   /**
    * Creates a new window from an EGL native window with specified shared context.
+   * @param nativeWindow The native window to render into.
+   * @param sharedContext An optional shared EGL context.
+   * @param colorSpace An optional color space for rendering. If nullptr, the default sRGB is used.
+   * @param vsyncEnabled Whether presentation is synchronized to the display's refresh rate. Fixed
+   * for the lifetime of the window. Defaults to true.
    */
   static std::shared_ptr<EGLWindow> MakeFrom(EGLNativeWindowType nativeWindow,
                                              EGLContext sharedContext = nullptr,
-                                             std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                                             std::shared_ptr<ColorSpace> colorSpace = nullptr,
+                                             bool vsyncEnabled = true);
 
   /**
    * Sets the presentation time for the next frame in microseconds. This is only applicable on
@@ -52,11 +58,11 @@ class EGLWindow : public Window {
  private:
   EGLNativeWindowType nativeWindow;
   std::optional<int64_t> presentationTime = std::nullopt;
-  // Tracks the swap interval last applied via eglSwapInterval so onPresent only calls it when the
-  // vsync setting actually changes. -1 means no interval has been applied yet.
-  int appliedSwapInterval = -1;
+  // eglSwapInterval requires the context to be current, which is only guaranteed at present time,
+  // so the fixed vsync setting is applied once on the first present.
+  bool swapIntervalApplied = false;
 
   explicit EGLWindow(std::shared_ptr<Device> device,
-                     std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                     std::shared_ptr<ColorSpace> colorSpace = nullptr, bool vsyncEnabled = true);
 };
 }  // namespace tgfx

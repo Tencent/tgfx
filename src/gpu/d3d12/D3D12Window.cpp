@@ -240,18 +240,21 @@ void D3D12Window::PlatformState::detachCompositionTree() {
 
 std::shared_ptr<D3D12Window> D3D12Window::MakeForHwnd(HWND hwnd,
                                                       std::shared_ptr<D3D12Device> device,
-                                                      std::shared_ptr<ColorSpace> colorSpace) {
-  return MakeImpl(hwnd, std::move(device), std::move(colorSpace), false);
+                                                      std::shared_ptr<ColorSpace> colorSpace,
+                                                      bool vsyncEnabled) {
+  return MakeImpl(hwnd, std::move(device), std::move(colorSpace), false, vsyncEnabled);
 }
 
-std::shared_ptr<D3D12Window> D3D12Window::MakeForComposition(
-    HWND hwnd, std::shared_ptr<D3D12Device> device, std::shared_ptr<ColorSpace> colorSpace) {
-  return MakeImpl(hwnd, std::move(device), std::move(colorSpace), true);
+std::shared_ptr<D3D12Window> D3D12Window::MakeForComposition(HWND hwnd,
+                                                             std::shared_ptr<D3D12Device> device,
+                                                             std::shared_ptr<ColorSpace> colorSpace,
+                                                             bool vsyncEnabled) {
+  return MakeImpl(hwnd, std::move(device), std::move(colorSpace), true, vsyncEnabled);
 }
 
 std::shared_ptr<D3D12Window> D3D12Window::MakeImpl(HWND hwnd, std::shared_ptr<D3D12Device> device,
                                                    std::shared_ptr<ColorSpace> colorSpace,
-                                                   bool transparent) {
+                                                   bool transparent, bool vsyncEnabled) {
   if (hwnd == nullptr || device == nullptr) {
     return nullptr;
   }
@@ -367,14 +370,16 @@ std::shared_ptr<D3D12Window> D3D12Window::MakeImpl(HWND hwnd, std::shared_ptr<D3
   }
 
   device->unlock();
-  return std::shared_ptr<D3D12Window>(new D3D12Window(device, std::move(state), colorSpace));
+  return std::shared_ptr<D3D12Window>(
+      new D3D12Window(device, std::move(state), colorSpace, vsyncEnabled));
 }
 
 #endif
 
 D3D12Window::D3D12Window(std::shared_ptr<Device> device, std::unique_ptr<PlatformState> state,
-                         std::shared_ptr<ColorSpace> colorSpace)
-    : Window(std::move(device), std::move(colorSpace)), _platformState(std::move(state)) {
+                         std::shared_ptr<ColorSpace> colorSpace, bool vsyncEnabled)
+    : Window(std::move(device), std::move(colorSpace), vsyncEnabled),
+      _platformState(std::move(state)) {
 }
 
 D3D12Window::~D3D12Window() {
