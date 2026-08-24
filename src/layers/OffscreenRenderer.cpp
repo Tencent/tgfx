@@ -182,10 +182,14 @@ OffscreenResult OffscreenRenderer::RenderContentOnPicture(Layer* layer, const Dr
 
   // The recording canvas starts at the layer-local origin (scaled by density), so a background
   // style drawn during the recording cannot recover the layer's world placement from
-  // canvas->getMatrix(). Publish the recording-space-to-world transform on the capturer instead,
-  // restoring any previous value afterwards so nested offscreen recordings stay balanced.
+  // canvas->getMatrix(). Publish contentMatrix on the capturer instead, but only when the
+  // recorded subtree cannot draw a descendant background style (needsSurface is false). When the
+  // subtree has descendant background styles, it normally records onto a surface; if that falls
+  // back to a picture, the descendants keep using canvas->getMatrix(), which still carries their
+  // placement inside the recording. Restore any previous value afterwards so nested offscreen
+  // recordings stay balanced.
   auto* capturer = args.backgroundHandler ? args.backgroundHandler->asCapturer() : nullptr;
-  if (capturer != nullptr) {
+  if (capturer != nullptr && !capturer->needsSurface(layer)) {
     auto savedMatrix = capturer->captureWorldMatrix();
     // contentMatrix maps layer-local coordinates into the coordinate space of the canvas the
     // capture pass is replaying into (world space on the main surface, or the downsampled
