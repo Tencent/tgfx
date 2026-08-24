@@ -19,11 +19,15 @@
 #pragma once
 
 #include <algorithm>
+#include <cmath>
 #include "tgfx/core/Image.h"
+#include "tgfx/core/Rect.h"
 #include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
 
+class GlassRefractionImageFilter;
+struct GlassUDFRequest;
 enum class GlassShapeType;
 struct GlassRefractionParams;
 
@@ -84,7 +88,7 @@ class GlassStyle : public LayerStyle {
     return _dispersion;
   }
 
-  /** Sets the chromatic aberration intensity. */
+  /** Sets the chromatic aberration intensity. Values outside [0, 100] are constrained on entry. */
   void setDispersion(float value);
 
   /**
@@ -152,14 +156,14 @@ class GlassStyle : public LayerStyle {
   GlassRefractionParams makeBaseRefractionParams(float halfW, float halfH,
                                                  const BackgroundMapping& mapping) const;
 
-  std::shared_ptr<ImageFilter> getSDFRefractionFilter(GlassShapeType shapeType, float cornerRadius,
-                                                      float halfWidth, float halfHeight,
-                                                      const BackgroundMapping& mapping);
+  std::shared_ptr<GlassRefractionImageFilter> getSDFRefractionFilter(
+      GlassShapeType shapeType, float cornerRadius, float halfWidth, float halfHeight,
+      const BackgroundMapping& mapping, float contentScale);
 
-  std::shared_ptr<ImageFilter> getUDFRefractionFilter(float halfWidth, float halfHeight,
-                                                      const UDFSampling& udf,
-                                                      const BackgroundMapping& mapping,
-                                                      std::shared_ptr<Image> maskImage);
+  std::shared_ptr<GlassRefractionImageFilter> getUDFRefractionFilter(
+      float halfWidth, float halfHeight, const UDFSampling& udf, const BackgroundMapping& mapping,
+      const GlassUDFRequest& maskRequest, const GlassUDFRequest& edgeMaskRequest,
+      float contentScale);
 
   float getRefractionFactor() const {
     return std::clamp(_refraction / 100.0f, 0.0f, 1.0f);
@@ -169,10 +173,11 @@ class GlassStyle : public LayerStyle {
     return std::clamp(_depth / 100.0f, 0.0f, 1.0f);
   }
 
-  // Scales dispersion to [0, 0.2]: the shader offsets R/B UVs by uvOffset * (1 ± dispersion),
-  // so 0.2 means max 20% additional offset.
+  // Scales the stored percentage to the shader factor: the shader offsets R/B UVs by
+  // uvOffset * (1 ± dispersion), so 100% maps to a 5% additional offset. The stored value is
+  // constrained to [0, 100] at the setters, so no clamping is needed here.
   float getDispersionFactor() const {
-    return std::clamp(_dispersion / 100.0f, 0.0f, 1.0f) * 0.2f;
+    return _dispersion / 100.0f * 0.05f;
   }
 
   // Scales lightIntensity to [0, 1] for the shader.

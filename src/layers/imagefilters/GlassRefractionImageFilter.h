@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "layers/layerstyles/GlassUDF.h"
 #include "layers/processors/GlassRefractionFragmentProcessor.h"
 #include "tgfx/core/ImageFilter.h"
 
@@ -25,9 +26,17 @@ namespace tgfx {
 
 class GlassRefractionImageFilter : public ImageFilter {
  public:
+  /**
+   * @param maskRequest Describes the refraction UDF field to generate at playback time. Empty on
+   * the analytical SDF path, which needs no field.
+   * @param edgeMaskRequest Describes the edge light UDF field. Empty when the edge light is off or
+   * on the analytical SDF path.
+   */
   GlassRefractionImageFilter(const GlassRefractionParams& params,
                              const GlassSDFGeometryParams& sdfParams,
-                             const GlassUDFGeometryParams& udfParams, std::shared_ptr<Image> mask);
+                             const GlassUDFGeometryParams& udfParams,
+                             const GlassUDFRequest& maskRequest = {},
+                             const GlassUDFRequest& edgeMaskRequest = {});
 
  protected:
   Type type() const override {
@@ -40,11 +49,20 @@ class GlassRefractionImageFilter : public ImageFilter {
                                                       SrcRectConstraint constraint,
                                                       const Matrix* uvMatrix) const override;
 
+  /**
+   * Outsets the bounds by the maximum refraction displacement (plus the dispersion channel
+   * spread). FilterImage's direct-attach branch requires the filter's output bounds to contain
+   * the draw bounds; with the outset it always does, so the refraction shader is evaluated at
+   * draw (screen) resolution instead of being baked into an offscreen texture.
+   */
+  Rect onFilterBounds(const Rect& rect, MapDirection mapDirection) const override;
+
  private:
   GlassRefractionParams params;
   GlassSDFGeometryParams sdfParams;
   GlassUDFGeometryParams udfParams;
-  std::shared_ptr<Image> mask;
+  GlassUDFRequest maskRequest;
+  GlassUDFRequest edgeMaskRequest;
 };
 
 }  // namespace tgfx
