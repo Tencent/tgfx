@@ -946,7 +946,7 @@ Bitmap SVGExportContext::ImageExportToBitmap(Context* context, const std::shared
   auto srcPixels = readback->lockPixels(context);
   if (srcPixels == nullptr) {
     readback->unlockPixels(context);
-    if (pendings != nullptr) {
+    if (pendings != nullptr && readback->status(context) == ReadbackStatus::Pending) {
       pendings->push_back(
           PendingImage::Make(std::move(readback), pendings->size(), flipY, image->colorSpace()));
     }

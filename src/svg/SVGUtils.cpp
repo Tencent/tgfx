@@ -320,12 +320,13 @@ std::shared_ptr<Image> ConvertImageColorSpace(const std::shared_ptr<Image>& imag
   auto srcPixels = readback->lockPixels(context);
   if (srcPixels == nullptr) {
     readback->unlockPixels(context);
-    if (pendings != nullptr) {
+    if (pendings != nullptr && readback->status(context) == ReadbackStatus::Pending) {
       pendings->push_back(
           PendingImage::Make(std::move(readback), pendings->size(), flipY, tempColorSpace));
       return nullptr;
     }
-    // Without a pending sink, returning the source image keeps its original encoded data.
+    // On a terminal failure or without a pending sink, returning the source image keeps its
+    // original encoded data.
     return image;
   }
   Bitmap bitmap{image->width(), image->height(), false, true, tempColorSpace};
