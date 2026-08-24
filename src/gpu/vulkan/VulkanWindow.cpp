@@ -54,7 +54,9 @@ static void DestroySwapchainResources(VkDevice device, VkInstance instance, VkSu
 // Picks the swapchain present mode for the requested vsync setting. FIFO is guaranteed by the
 // spec and used whenever vsync is enabled. When vsync is disabled, MAILBOX is preferred (tear-free,
 // low latency) and IMMEDIATE is the fallback; if neither is advertised the code stays on FIFO so
-// creation always succeeds.
+// creation always succeeds. Guarded by the same platform macros as its callers (the MakeFrom
+// overloads) so it is not compiled as an unused function on platforms without a MakeFrom.
+#if defined(_WIN32) || defined(__OHOS__) || defined(__ANDROID__)
 static VkPresentModeKHR ChoosePresentMode(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface,
                                           bool vsyncEnabled) {
   if (vsyncEnabled) {
@@ -84,6 +86,7 @@ static VkPresentModeKHR ChoosePresentMode(VkPhysicalDevice physicalDevice, VkSur
   }
   return VK_PRESENT_MODE_FIFO_KHR;
 }
+#endif
 
 // Holds all Vulkan-specific handles and swapchain resources. Defined here (not in the header) so
 // that vulkan.h is never required by downstream translation units that include VulkanWindow.h.
