@@ -145,10 +145,10 @@ void SVGExportContext::drawRect(const Rect& rect, const Matrix& matrix, const Cl
                                 const Brush& brush, const Stroke* stroke) {
   std::unique_ptr<ElementWriter> svg;
   if (RequiresViewportReset(brush)) {
-    svg =
-        std::make_unique<ElementWriter>("svg", context, this, xmlWriter.get(), resourceBucket.get(),
-                                        exportFlags & SVGExportFlags::DisableWarnings, matrix,
-                                        brush, nullptr, _targetColorSpace, _assignColorSpace);
+    svg = std::make_unique<ElementWriter>("svg", context, this, _pendingImages, xmlWriter.get(),
+                                          resourceBucket.get(),
+                                          exportFlags & SVGExportFlags::DisableWarnings, matrix,
+                                          brush, nullptr, _targetColorSpace, _assignColorSpace);
     svg->addRectAttributes(rect);
   }
 
@@ -158,9 +158,9 @@ void SVGExportContext::drawRect(const Rect& rect, const Matrix& matrix, const Cl
   }
   applyClip(clip, matrix.mapRect(contentBounds));
 
-  ElementWriter rectElement("rect", context, this, xmlWriter.get(), resourceBucket.get(),
-                            exportFlags & SVGExportFlags::DisableWarnings, matrix, brush, stroke,
-                            _targetColorSpace, _assignColorSpace);
+  ElementWriter rectElement("rect", context, this, _pendingImages, xmlWriter.get(),
+                            resourceBucket.get(), exportFlags & SVGExportFlags::DisableWarnings,
+                            matrix, brush, stroke, _targetColorSpace, _assignColorSpace);
 
   if (svg) {
     rectElement.addAttribute("x", 0);
@@ -194,20 +194,21 @@ void SVGExportContext::drawRRect(const RRect& roundRect, const Matrix& matrix,
   applyClip(clip, matrix.mapRect(contentBounds));
   if (roundRect.isOval()) {
     if (roundRect.rect().width() == roundRect.rect().height()) {
-      ElementWriter circleElement("circle", context, this, xmlWriter.get(), resourceBucket.get(),
+      ElementWriter circleElement("circle", context, this, _pendingImages, xmlWriter.get(),
+                                  resourceBucket.get(),
                                   exportFlags & SVGExportFlags::DisableWarnings, matrix, brush,
                                   stroke, _targetColorSpace, _assignColorSpace);
       circleElement.addCircleAttributes(roundRect.rect());
     } else {
-      ElementWriter ovalElement("ellipse", context, this, xmlWriter.get(), resourceBucket.get(),
-                                exportFlags & SVGExportFlags::DisableWarnings, matrix, brush,
-                                stroke, _targetColorSpace, _assignColorSpace);
+      ElementWriter ovalElement("ellipse", context, this, _pendingImages, xmlWriter.get(),
+                                resourceBucket.get(), exportFlags & SVGExportFlags::DisableWarnings,
+                                matrix, brush, stroke, _targetColorSpace, _assignColorSpace);
       ovalElement.addEllipseAttributes(roundRect.rect());
     }
   } else {
-    ElementWriter rrectElement("rect", context, this, xmlWriter.get(), resourceBucket.get(),
-                               exportFlags & SVGExportFlags::DisableWarnings, matrix, brush, stroke,
-                               _targetColorSpace, _assignColorSpace);
+    ElementWriter rrectElement("rect", context, this, _pendingImages, xmlWriter.get(),
+                               resourceBucket.get(), exportFlags & SVGExportFlags::DisableWarnings,
+                               matrix, brush, stroke, _targetColorSpace, _assignColorSpace);
     rrectElement.addRoundRectAttributes(roundRect);
   }
 }
@@ -215,9 +216,9 @@ void SVGExportContext::drawRRect(const RRect& roundRect, const Matrix& matrix,
 void SVGExportContext::drawPath(const Path& path, const Matrix& matrix, const ClipStack& clip,
                                 const Brush& brush) {
   applyClip(clip, matrix.mapRect(path.getBounds()));
-  ElementWriter pathElement("path", context, this, xmlWriter.get(), resourceBucket.get(),
-                            exportFlags & SVGExportFlags::DisableWarnings, matrix, brush, nullptr,
-                            _targetColorSpace, _assignColorSpace);
+  ElementWriter pathElement("path", context, this, _pendingImages, xmlWriter.get(),
+                            resourceBucket.get(), exportFlags & SVGExportFlags::DisableWarnings,
+                            matrix, brush, nullptr, _targetColorSpace, _assignColorSpace);
   pathElement.addPathAttributes(path, tgfx::SVGExportContext::PathEncodingType());
   if (path.getFillType() == PathFillType::EvenOdd) {
     pathElement.addAttribute("fill-rule", "evenodd");
@@ -413,7 +414,7 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
     if (filter) {
       ElementWriter defs("defs", xmlWriter, resourceBucket.get(), _targetColorSpace,
                          _assignColorSpace);
-      filterIDs = defs.addImageFilterChain(filter, bound, customWriter, context, this);
+      filterIDs = defs.addImageFilterChain(filter, bound, customWriter, context, _pendingImages);
       if (filterIDs.size() == 1) {
         resources.filter = "url(#" + filterIDs[0] + ")";
       }
@@ -584,9 +585,9 @@ void SVGExportContext::exportImageElement(const std::string& href, int width, in
     }
   }
   {
-    ElementWriter imageUse("use", context, this, xmlWriter.get(), resourceBucket.get(),
-                           exportFlags & SVGExportFlags::DisableWarnings, matrix, brush, nullptr,
-                           _targetColorSpace, _assignColorSpace);
+    ElementWriter imageUse("use", context, this, _pendingImages, xmlWriter.get(),
+                           resourceBucket.get(), exportFlags & SVGExportFlags::DisableWarnings,
+                           matrix, brush, nullptr, _targetColorSpace, _assignColorSpace);
     imageUse.addAttribute("xlink:href", "#" + imageID);
   }
 }
@@ -649,9 +650,9 @@ void SVGExportContext::exportGlyphRunAsPath(const GlyphRun& glyphRun, const Matr
   if (path.isEmpty()) {
     return;
   }
-  ElementWriter pathElement("path", context, this, xmlWriter.get(), resourceBucket.get(),
-                            exportFlags & SVGExportFlags::DisableWarnings, matrix, brush, stroke,
-                            _targetColorSpace, _assignColorSpace);
+  ElementWriter pathElement("path", context, this, _pendingImages, xmlWriter.get(),
+                            resourceBucket.get(), exportFlags & SVGExportFlags::DisableWarnings,
+                            matrix, brush, stroke, _targetColorSpace, _assignColorSpace);
   pathElement.addPathAttributes(path, tgfx::SVGExportContext::PathEncodingType());
   if (path.getFillType() == PathFillType::EvenOdd) {
     pathElement.addAttribute("fill-rule", "evenodd");
@@ -660,9 +661,9 @@ void SVGExportContext::exportGlyphRunAsPath(const GlyphRun& glyphRun, const Matr
 
 void SVGExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const Matrix& matrix,
                                             const Brush& brush, const Stroke* stroke) {
-  ElementWriter textElement("text", context, this, xmlWriter.get(), resourceBucket.get(),
-                            exportFlags & SVGExportFlags::DisableWarnings, matrix, brush, stroke,
-                            _targetColorSpace, _assignColorSpace);
+  ElementWriter textElement("text", context, this, _pendingImages, xmlWriter.get(),
+                            resourceBucket.get(), exportFlags & SVGExportFlags::DisableWarnings,
+                            matrix, brush, stroke, _targetColorSpace, _assignColorSpace);
 
   textElement.addFontAttributes(glyphRun.font);
 
@@ -806,7 +807,7 @@ void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
   if (imageFilter) {
     ElementWriter defs("defs", xmlWriter, resourceBucket.get(), _targetColorSpace,
                        _assignColorSpace);
-    filterIDs = defs.addImageFilterChain(imageFilter, bound, customWriter, context, this);
+    filterIDs = defs.addImageFilterChain(imageFilter, bound, customWriter, context, _pendingImages);
   }
   auto clipPath = clip.getClipPath();
   bool needsClip = !clipPath.isEmpty() && !clipPath.contains(bound);

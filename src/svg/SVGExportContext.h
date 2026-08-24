@@ -130,13 +130,6 @@ class SVGExportContext : public DrawContext {
    */
   void finish();
 
-  /**
-   * The sink where readbacks that cannot be locked synchronously are registered.
-   */
-  std::vector<PendingImage>* pendingSink() {
-    return _pendingImages;
-  }
-
  private:
   /**
    * Determine if the paint requires us to reset the viewport.Currently, we do this whenever the
