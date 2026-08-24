@@ -19,12 +19,10 @@
 #include "GlassUDFImage.h"
 #include "core/utils/Log.h"
 #include "gpu/DrawingManager.h"
-#include "gpu/ProxyProvider.h"
 #include "gpu/TPArgs.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "layers/processors/GlassUDFTentBlurFragmentProcessor.h"
-#include "tgfx/core/RenderFlags.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
@@ -153,7 +151,7 @@ static std::shared_ptr<TextureProxy> GenerateGlassUDFTexture(
 std::shared_ptr<Image> GlassUDFImage::Make(std::shared_ptr<Image> source, int coreWidth,
                                            int coreHeight, const Rect& textureRect,
                                            const Point& fineRadius, const Point& coarseRadius,
-                                           GlassUDFField field, UniqueKey uniqueKey) {
+                                           GlassUDFField field) {
   bool usesFine = field != GlassUDFField::EdgeLight;
   bool usesCoarse = field != GlassUDFField::Refraction;
   if (source == nullptr || coreWidth <= 0 || coreHeight <= 0 || textureRect.isEmpty() ||
@@ -161,45 +159,30 @@ std::shared_ptr<Image> GlassUDFImage::Make(std::shared_ptr<Image> source, int co
       (usesCoarse && (coarseRadius.x <= 0.0f || coarseRadius.y <= 0.0f))) {
     return nullptr;
   }
-  auto image = std::shared_ptr<GlassUDFImage>(
-      new GlassUDFImage(std::move(source), coreWidth, coreHeight, textureRect, fineRadius,
-                        coarseRadius, field, std::move(uniqueKey)));
+  auto image = std::shared_ptr<GlassUDFImage>(new GlassUDFImage(
+      std::move(source), coreWidth, coreHeight, textureRect, fineRadius, coarseRadius, field));
   image->weakThis = image;
   return image;
 }
 
 GlassUDFImage::GlassUDFImage(std::shared_ptr<Image> source, int coreWidth, int coreHeight,
                              const Rect& textureRect, const Point& fineRadius,
-                             const Point& coarseRadius, GlassUDFField field, UniqueKey uniqueKey)
+                             const Point& coarseRadius, GlassUDFField field)
     : source(std::move(source)), coreWidth(coreWidth), coreHeight(coreHeight),
       textureRect(textureRect), fineRadius(fineRadius), coarseRadius(coarseRadius), field(field),
       _width(static_cast<int>(std::round(textureRect.width()))),
-      _height(static_cast<int>(std::round(textureRect.height()))), uniqueKey(std::move(uniqueKey)) {
+      _height(static_cast<int>(std::round(textureRect.height()))) {
 }
 
 std::shared_ptr<TextureProxy> GlassUDFImage::lockTextureProxy(const TPArgs& args) const {
   if (args.context == nullptr) {
     return nullptr;
   }
-  auto proxyProvider = args.context->proxyProvider();
-  if (!uniqueKey.empty()) {
-    if (auto textureProxy = proxyProvider->findOrWrapTextureProxy(uniqueKey)) {
-      return textureProxy;
-    }
-  }
   auto textureProxy = GenerateGlassUDFTexture(args.context, source, coreWidth, coreHeight,
                                               textureRect, fineRadius, coarseRadius, field);
   if (textureProxy == nullptr) {
     LOGE("GlassUDFImage: Failed to generate the UDF texture.");
     return nullptr;
-  }
-  if (!uniqueKey.empty()) {
-    // Registering the proxy keeps the generated texture shared across the draws of one flush even
-    // when caching is disabled; only the resource-level key is skipped in that case.
-    proxyProvider->assignProxyUniqueKey(textureProxy, uniqueKey);
-    if (!(args.renderFlags & RenderFlags::DisableCache)) {
-      textureProxy->assignUniqueKey(uniqueKey);
-    }
   }
   return textureProxy;
 }

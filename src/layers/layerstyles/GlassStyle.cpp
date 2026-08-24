@@ -21,12 +21,10 @@
 #include <cmath>
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
-#include "gpu/resources/ResourceKey.h"
 #include "layers/CanvasUtils.h"
 #include "layers/imagefilters/GlassRefractionImageFilter.h"
 #include "layers/layerstyles/GlassUDFImage.h"
 #include "layers/processors/GlassRefractionFragmentProcessor.h"
-#include "tgfx/core/BytesKey.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/RRect.h"
@@ -164,46 +162,6 @@ static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
   return info;
 }
 
-// The UDF textures of every glass layer share one cache domain; the bytes appended below carry the
-// identity of the generated pixels.
-static const UniqueKey& GlassUDFCacheDomain() {
-  static const UniqueKey domain = UniqueKey::Make();
-  return domain;
-}
-
-// Builds the cache key of a UDF texture from the full input set of its generation: the identity and
-// size of the coverage source plus every parameter that shapes the generated field. Any change
-// therefore yields a different key, which removes the need to invalidate the cache by hand.
-// Returns an empty key when the source carries no identity, which disables reuse.
-static UniqueKey MakeGlassUDFKey(uint64_t contentID, int sourceWidth, int sourceHeight,
-                                 GlassUDFField field, bool excludeChildEffects, int coreWidth,
-                                 int coreHeight, const Rect& textureRect, const Point& fineRadius,
-                                 const Point& coarseRadius) {
-  if (contentID == 0) {
-    return {};
-  }
-  BytesKey bytesKey(15);
-  bytesKey.write(static_cast<uint32_t>(contentID));
-  bytesKey.write(static_cast<uint32_t>(contentID >> 32));
-  bytesKey.write(sourceWidth);
-  bytesKey.write(sourceHeight);
-  bytesKey.write(static_cast<uint32_t>(field));
-  // The two style source groups (with and without child effects) share one contentID, so the group
-  // selection must be part of the key to keep their textures apart.
-  bytesKey.write(excludeChildEffects ? 1u : 0u);
-  bytesKey.write(coreWidth);
-  bytesKey.write(coreHeight);
-  bytesKey.write(textureRect.left);
-  bytesKey.write(textureRect.top);
-  bytesKey.write(textureRect.right);
-  bytesKey.write(textureRect.bottom);
-  bytesKey.write(fineRadius.x);
-  bytesKey.write(fineRadius.y);
-  bytesKey.write(coarseRadius.x);
-  bytesKey.write(coarseRadius.y);
-  return UniqueKey::Append(GlassUDFCacheDomain(), bytesKey.data(), bytesKey.size());
-}
-
 std::shared_ptr<GlassStyle> GlassStyle::Make(float refraction, float depth, float frost,
                                              float dispersion, float splay, float lightAngle,
                                              float lightIntensity) {
@@ -213,8 +171,9 @@ std::shared_ptr<GlassStyle> GlassStyle::Make(float refraction, float depth, floa
 
 GlassStyle::GlassStyle(float refraction, float depth, float frost, float dispersion, float splay,
                        float lightAngle, float lightIntensity)
-    : _refraction(refraction), _depth(depth), _frost(frost), _dispersion(dispersion), _splay(splay),
-      _lightAngle(lightAngle), _lightIntensity(lightIntensity) {
+    : _refraction(refraction), _depth(depth), _frost(frost),
+      _dispersion(std::clamp(dispersion, 0.0f, 100.0f)), _splay(splay), _lightAngle(lightAngle),
+      _lightIntensity(lightIntensity) {
 }
 
 void GlassStyle::setRefraction(float value) {
@@ -242,6 +201,8 @@ void GlassStyle::setFrost(float value) {
 }
 
 void GlassStyle::setDispersion(float value) {
+  // The value is constrained on entry, so the render path can convert it without re-clamping.
+  value = std::clamp(value, 0.0f, 100.0f);
   if (_dispersion == value) {
     return;
   }
@@ -354,62 +315,6 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
   auto evaluationLimit = std::min(static_cast<float>(maxTextureSize), MaxBackgroundSize);
   auto clipBounds = GetClipBounds(canvas);
 
-  // Apply the frost blur to the shared background snapshot once and cache the result so all
-  // tiles reuse the same blurred image; subsetting happens after the blur, so no blur halo
-  // needs to be added to the window below.
-  {
-    auto blurFilter = getFrostFilter(input.contentScale * scaleRatioX);
-    if (blurFilter != nullptr && (cachedFrostSource != bgImage ||
-                                  !FloatNearlyEqual(cachedFrostContentScale, input.contentScale))) {
-      Point blurOffset = {};
-      auto frostedImage = bgImage->makeWithFilter(blurFilter, &blurOffset, nullptr);
-      if (frostedImage != nullptr) {
-        cachedFrostSource = bgImage;
-        cachedFrostContentScale = input.contentScale;
-        cachedFrostBlurOffset = blurOffset;
-        cachedFrostedImage = std::move(frostedImage);
-      }
-    }
-    if (cachedFrostSource == bgImage && cachedFrostedImage != nullptr) {
-      bgImage = cachedFrostedImage;
-      bgOffset += cachedFrostBlurOffset;
-    }
-  }
-
-  // Downscale the whole blurred background once and cache the result so all tiles share the
-  // same downscaled texture; subsetting after the downscale is a lazy view and adds no
-  // intermediate texture per tile.
-  static constexpr float MAX_FROST_AREA = 1024.0f * 1024.0f;
-  if (_refraction > 0 || _lightIntensity > 0) {
-    float fullArea = static_cast<float>(bgImage->width()) * static_cast<float>(bgImage->height());
-    if (fullArea > MAX_FROST_AREA) {
-      frostDownscale = std::sqrt(MAX_FROST_AREA / fullArea);
-    }
-  }
-  if (frostDownscale < 1.0f) {
-    if (cachedDownscaleSource != bgImage || !FloatNearlyEqual(cachedDownscale, frostDownscale)) {
-      int scaledW = std::max(
-          1, static_cast<int>(std::round(static_cast<float>(bgImage->width()) * frostDownscale)));
-      int scaledH = std::max(
-          1, static_cast<int>(std::round(static_cast<float>(bgImage->height()) * frostDownscale)));
-      auto scaledBg = bgImage->makeScaled(scaledW, scaledH, SamplingOptions(FilterMode::Linear));
-      if (scaledBg != nullptr) {
-        cachedDownscaleSource = bgImage;
-        cachedDownscale = frostDownscale;
-        cachedDownscaledImage = std::move(scaledBg);
-      }
-    }
-    if (cachedDownscaleSource == bgImage && cachedDownscaledImage != nullptr) {
-      bgImage = cachedDownscaledImage;
-      bgOffset.x *= cachedDownscale;
-      bgOffset.y *= cachedDownscale;
-      scaleRatioX *= cachedDownscale;
-      scaleRatioY *= cachedDownscale;
-    } else {
-      frostDownscale = 1.0f;
-    }
-  }
-
   // Frost and refraction have bounded sampling radii, so evaluate against the visible clip
   // whenever it is known; subsets exceeding the texture limit fall back to the full background.
   if (clipBounds.has_value() && !clipBounds->isEmpty()) {
@@ -419,8 +324,39 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
     }
     visibleRect.roundOut();
 
-    // Subset the visible window from the downscaled blurred background. The window is computed
-    // in the downscaled coordinate space; makeSubset is a lazy view and adds no texture.
+    // Downscale the full background before the subset so every tile reads the same source grid.
+    // Applying the scale to the subset would give each tile its own size and sampling phase.
+    static constexpr float MAX_FROST_AREA = 1024.0f * 1024.0f;
+    if (_refraction > 0 || _lightIntensity > 0) {
+      auto minHalf = std::min(origWidth, origHeight) * 0.5f;
+      float fullRefractionOutset =
+          GetRefractionOutset(origWidth, origHeight, getRefractionFactor(), getDepthRatio(),
+                              getDispersionFactor(), getGlassThickness(minHalf));
+      fullRefractionOutset = std::ceil(fullRefractionOutset * input.contentScale + 1.0f);
+      float fullWidth = contentWidth + 2.0f * fullRefractionOutset;
+      float fullHeight = contentHeight + 2.0f * fullRefractionOutset;
+      float fullArea = fullWidth * fullHeight;
+      if (fullArea > MAX_FROST_AREA) {
+        frostDownscale = std::sqrt(MAX_FROST_AREA / fullArea);
+      }
+    }
+    if (frostDownscale < 1.0f) {
+      int scaledW = std::max(
+          1, static_cast<int>(std::round(static_cast<float>(bgImage->width()) * frostDownscale)));
+      int scaledH = std::max(
+          1, static_cast<int>(std::round(static_cast<float>(bgImage->height()) * frostDownscale)));
+      auto scaledBg = bgImage->makeScaled(scaledW, scaledH, SamplingOptions(FilterMode::Linear));
+      if (scaledBg != nullptr) {
+        bgImage = std::move(scaledBg);
+        bgOffset.x *= frostDownscale;
+        bgOffset.y *= frostDownscale;
+        scaleRatioX *= frostDownscale;
+        scaleRatioY *= frostDownscale;
+      } else {
+        frostDownscale = 1.0f;
+      }
+    }
+
     refractInputRect = visibleRect;
     if (_refraction > 0 || _lightIntensity > 0) {
       auto minHalf = std::min(origWidth, origHeight) * 0.5f;
@@ -438,22 +374,19 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       refractInputRect.roundOut();
     }
     auto backgroundInputRect = refractInputRect;
-    // The subset window never extends past the content bounds: the blurred background snapshot
-    // may be larger, but the extra pixels are never displayed.
-    backgroundInputRect.intersect(Rect::MakeWH(contentWidth, contentHeight));
-    backgroundInputRect.roundOut();
     backgroundInputRect.scale(frostDownscale, frostDownscale);
+    // The frost blur runs on the subset, so the window must already carry the blur's own sampling
+    // halo; otherwise the mirrored edge of the subset would leak into the visible pixels.
+    auto backgroundBlur = getFrostFilter(input.contentScale * scaleRatioX);
+    if (backgroundBlur != nullptr) {
+      backgroundInputRect = backgroundBlur->filterBounds(backgroundInputRect);
+      backgroundInputRect.outset(1.0f, 1.0f);
+    }
     backgroundInputRect.roundOut();
     auto availableBackground =
         Rect::MakeXYWH(bgOffset.x, bgOffset.y, static_cast<float>(bgImage->width()),
                        static_cast<float>(bgImage->height()));
-    bool fullCoverage = availableBackground.contains(backgroundInputRect);
-    if (fullCoverage && static_cast<float>(bgImage->width()) <= evaluationLimit &&
-        static_cast<float>(bgImage->height()) <= evaluationLimit) {
-      // The whole background fits the texture limit and covers the sampling window: keep the
-      // full image so the texture upload below is shared across tiles.
-      usesLocalEvaluation = true;
-    } else if (backgroundInputRect.intersect(availableBackground)) {
+    if (backgroundInputRect.intersect(availableBackground)) {
       auto subsetRect = backgroundInputRect;
       subsetRect.offset(-bgOffset.x, -bgOffset.y);
       subsetRect.roundOut();
@@ -493,21 +426,13 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
 
   std::shared_ptr<Image> processedBg = bgImage;
   Point processedOffset = bgOffset;
-  // Upload the processed background to a texture once and reuse it across tiles; the filter and
-  // shader constructors below take the shared texture image, so per-tile sources are O(1).
-  if (context != nullptr) {
-    if (cachedBgTextureSource != processedBg || cachedBgTextureContextID != context->uniqueID()) {
-      auto textureImage = processedBg->makeTextureImage(context);
-      if (textureImage != nullptr) {
-        cachedBgTextureSource = processedBg;
-        cachedBgTextureContextID = context->uniqueID();
-        cachedBgTextureImage = std::move(textureImage);
-      }
-      // On failure nothing is registered, so a later draw retries the upload; the draw then falls
-      // back to the unspecialized image, which uploads lazily on its own.
-    }
-    if (cachedBgTextureImage != nullptr) {
-      processedBg = cachedBgTextureImage;
+  auto blurFilter = getFrostFilter(input.contentScale * scaleRatioX);
+  if (blurFilter != nullptr) {
+    Point blurOffset = {};
+    auto frostedImage = bgImage->makeWithFilter(blurFilter, &blurOffset, nullptr);
+    if (frostedImage != nullptr) {
+      processedBg = std::move(frostedImage);
+      processedOffset += blurOffset;
     }
   }
   // Step 2 & 3: Apply refraction with dispersion and lighting (computed entirely in GPU shader)
@@ -543,11 +468,17 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       if (maxTextureSizeF < 1.0f) {
         return;
       }
-      // The refraction field needs a large layer-space reach but is low frequency, so its density
-      // is anchored to the layer size and capped so the tent radius always fits
-      // GlassUDFMaxTentRadius.
-      static constexpr float MAX_UDF_VISIBLE_DIM = 512.0f;
-      float maxAllowedDim = std::min(maxTextureSizeF, MAX_UDF_VISIBLE_DIM);
+      // The refraction field is low frequency but needs a large layer-space reach, so its density
+      // is anchored to the layer size. The cap leaves room for the widest tent and shader halos
+      // that can be added around the generated window.
+      static constexpr float MAX_UDF_SHADER_HALO = GlassUDFMaxTentRadius * 0.5f + 1.0f;
+      static constexpr float MAX_UDF_BLUR_HALO = GlassUDFMaxTentRadius + 1.0f;
+      static constexpr float MAX_UDF_SIZE = 2048.0f;
+      float maxAllowedDim = std::min(maxTextureSizeF, MAX_UDF_SIZE) -
+                            (MAX_UDF_SHADER_HALO + MAX_UDF_BLUR_HALO) * 2.0f;
+      if (maxAllowedDim < 1.0f) {
+        return;
+      }
       float udfScale = 1.0f;
       if (fullMaxDim > maxAllowedDim) {
         udfScale = maxAllowedDim / fullMaxDim;
@@ -582,18 +513,34 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       float gradientSampleRadius = getDepthRatio() * 3.0f + 1.0f;
       float fineHaloX = std::ceil(gradientSampleRadius) + 1.0f;
       float fineHaloY = std::ceil(gradientSampleRadius) + 1.0f;
-      // The refraction texture covers the full layer once per frame and is shared across tiles.
-      auto fineTextureRect =
+      // Only the visible window of the refraction field is generated, plus the halo the shader
+      // samples for its gradient. A window that already spans most of the field is widened to the
+      // whole field instead, so the two cases do not differ by a few pixels of allocation.
+      float contentToUDFX = static_cast<float>(udfWidth) / contentWidth;
+      float contentToUDFY = static_cast<float>(udfHeight) / contentHeight;
+      auto visibleUDFRect = Rect::MakeLTRB(std::floor(visibleContentRect.left * contentToUDFX),
+                                           std::floor(visibleContentRect.top * contentToUDFY),
+                                           std::ceil(visibleContentRect.right * contentToUDFX),
+                                           std::ceil(visibleContentRect.bottom * contentToUDFY));
+      auto fullFineRect =
           Rect::MakeLTRB(-fineHaloX, -fineHaloY, static_cast<float>(udfWidth) + fineHaloX,
                          static_cast<float>(udfHeight) + fineHaloY);
+      auto fineTextureRect = visibleUDFRect.makeOutset(fineHaloX, fineHaloY);
+      if (!fineTextureRect.intersect(fullFineRect)) {
+        return;
+      }
       fineTextureRect.roundOut();
+      static constexpr float LOCAL_UDF_AREA_THRESHOLD = 0.7f;
+      if (fineTextureRect.area() >= fullFineRect.area() * LOCAL_UDF_AREA_THRESHOLD) {
+        fineTextureRect = fullFineRect;
+        fineTextureRect.roundOut();
+      }
       Point udfTextureOrigin = {fineTextureRect.left, fineTextureRect.top};
 
       // The edge light field needs a narrow layer-space reach but high precision, so its texture
       // covers a grid cell instead of the whole layer. The grid is anchored to the content origin
       // and each cell is a fixed screen-space footprint converted to layer space; cells are
-      // disjoint, so each tile samples the single cell it falls into. Grid alignment also keeps the
-      // texture window identical while panning inside a cell, so the cache key stays stable.
+      // disjoint, so each tile samples the single cell it falls into.
       bool enableEdgeLighting = getLightIntensityFactor() > 0.0f && edgeLightEnabled;
 
       auto contentRect = Rect::MakeWH(contentWidth, contentHeight);
@@ -658,29 +605,17 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       edgeTextureRect.roundOut();
       Point edgeTextureOrigin = {edgeTextureRect.left, edgeTextureRect.top};
 
-      // Both fields are regenerated only when their cache key misses, so the images below are
-      // rebuilt per draw while the textures behind them live in the context resource cache.
-      auto sourceWidth = input.content->width();
-      auto sourceHeight = input.content->height();
-      auto refractionKey = MakeGlassUDFKey(
-          input.contentID, sourceWidth, sourceHeight, GlassUDFField::Refraction,
-          excludeChildEffects(), udfWidth, udfHeight, fineTextureRect, fineRadius, Point::Zero());
-      auto maskImage =
-          GlassUDFImage::Make(input.content, udfWidth, udfHeight, fineTextureRect, fineRadius,
-                              Point::Zero(), GlassUDFField::Refraction, std::move(refractionKey));
+      auto maskImage = GlassUDFImage::Make(input.content, udfWidth, udfHeight, fineTextureRect,
+                                           fineRadius, Point::Zero(), GlassUDFField::Refraction);
       if (maskImage == nullptr) {
         LOGE("GlassStyle: Failed to create refraction UDF.");
         return;
       }
       std::shared_ptr<Image> edgeMaskImage = nullptr;
       if (enableEdgeLighting) {
-        auto edgeKey =
-            MakeGlassUDFKey(input.contentID, sourceWidth, sourceHeight, GlassUDFField::EdgeLight,
-                            excludeChildEffects(), edgeCoreWidth, edgeCoreHeight, edgeTextureRect,
-                            Point::Zero(), coarseRadius);
-        edgeMaskImage = GlassUDFImage::Make(input.content, edgeCoreWidth, edgeCoreHeight,
-                                            edgeTextureRect, Point::Zero(), coarseRadius,
-                                            GlassUDFField::EdgeLight, std::move(edgeKey));
+        edgeMaskImage =
+            GlassUDFImage::Make(input.content, edgeCoreWidth, edgeCoreHeight, edgeTextureRect,
+                                Point::Zero(), coarseRadius, GlassUDFField::EdgeLight);
         if (edgeMaskImage == nullptr) {
           LOGE("GlassStyle: Failed to create edge light UDF.");
           return;
@@ -796,13 +731,6 @@ std::shared_ptr<ImageFilter> GlassStyle::getFrostFilter(float contentScale) {
 
 void GlassStyle::invalidateFrostFilter() {
   frostFilter = nullptr;
-  // The frost cache key omits the frost value itself, so a changed sigma must drop the cached
-  // blur here or onDraw keeps reusing the old image when the background and scale are unchanged.
-  // The downstream downscale cache is keyed on the frost result pointer and rebuilds in turn.
-  cachedFrostSource = nullptr;
-  cachedFrostedImage = nullptr;
-  cachedFrostBlurOffset = Point::Zero();
-  cachedFrostContentScale = 0.0f;
   invalidateTransform();
 }
 

@@ -778,12 +778,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
   float maxBackgroundOutset = 0.f;
   float minBackgroundOutset = std::numeric_limits<float>::max();
 
-  // Identity of the pixel content this layer's subtree renders to, handed to layer styles through
-  // LayerStyleSource so they can cache derived GPU data across frames. Renewed by
-  // invalidateSubtree(), which is the same signal that drops the subtree cache, and assigned
-  // lazily on first use; zero means "not assigned yet".
-  uint64_t contentID = 0;
-
   friend class RootLayer;
   friend class DisplayList;
   friend class BackgroundCapturer;

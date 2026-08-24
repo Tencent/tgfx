@@ -69,13 +69,6 @@ static constexpr int SUBTREE_CACHE_MIN_SIZE = 32;
 static std::atomic_bool AllowsEdgeAntialiasing = true;
 static std::atomic_bool AllowsGroupOpacity = false;
 
-// Hands out content identities for layer style sources. Starts at 1 so zero stays reserved for
-// "not assigned".
-static uint64_t NextContentID() {
-  static std::atomic<uint64_t> nextID = {1};
-  return nextID.fetch_add(1);
-}
-
 /**
  * Clips the canvas using the scroll rect. If the sublayer's Matrix contains 3D transformations or
  * projection transformations, because this matrix has been merged into the Canvas, it can be
@@ -355,9 +348,7 @@ void Layer::setAllowsEdgeAntialiasing(bool value) {
     return;
   }
   bitFields.allowsEdgeAntialiasing = value;
-  // The flag is baked into the recorded layer content and style source pixels, so switching it
-  // needs content-level invalidation rather than a transform-only one.
-  invalidateContent();
+  invalidateTransform();
 }
 
 void Layer::setAllowsGroupOpacity(bool value) {
@@ -976,10 +967,6 @@ void Layer::invalidateTransform() {
 }
 
 void Layer::invalidateDescendents() {
-  // Layers without a root never run updateRenderBounds, so dirtyDescendents stays set forever and
-  // the early return below would swallow later invalidations. Clearing the content identity up
-  // front keeps the style caches of such layers correct too.
-  contentID = 0;
   if (bitFields.dirtyDescendents) {
     return;
   }
@@ -1783,10 +1770,6 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
 
   auto source = std::make_unique<LayerStyleSource>();
   source->contentScale = contentScale;
-  if (contentID == 0) {
-    contentID = NextContentID();
-  }
-  source->contentID = contentID;
 
   DrawArgs drawArgs = args;
   drawArgs.render3DContext = nullptr;
@@ -1937,7 +1920,6 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
   styleInput.content = contentEntry.image;
   styleInput.contentOffset = contentEntry.offset;
   styleInput.contentScale = source->contentScale;
-  styleInput.contentID = source->contentID;
   auto sourceFlags = layerStyle->extraSourceType();
   if (HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Contour)) {
     auto contourImage = group->contour.has_value() ? group->contour->image : nullptr;
@@ -2249,9 +2231,6 @@ void Layer::invalidateSubtree() {
   bitFields.staticSubtree = false;
   subtreeCache = nullptr;
   localBounds = nullptr;
-  // The rendered pixels of this subtree are about to change, so any style cache keyed on the
-  // previous identity must miss from now on.
-  contentID = 0;
 }
 
 void Layer::updateStaticSubtreeFlags() {

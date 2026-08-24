@@ -60,11 +60,6 @@ struct LayerStyleSourceGroup {
 struct LayerStyleSource {
   float contentScale = 1.0f;
 
-  // Identity of the pixel content captured in the groups below, forwarded to
-  // LayerStyleInput::contentID. Assigned by the producing Layer and renewed whenever its subtree
-  // is invalidated.
-  uint64_t contentID = 0;
-
   // groups[0]: excludeChildEffects = false
   // groups[1]: excludeChildEffects = true
   std::unique_ptr<LayerStyleSourceGroup> groups[2] = {};

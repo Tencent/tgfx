@@ -87,7 +87,7 @@ class GlassStyle : public LayerStyle {
     return _dispersion;
   }
 
-  /** Sets the chromatic aberration intensity. */
+  /** Sets the chromatic aberration intensity. Values outside [0, 100] are constrained on entry. */
   void setDispersion(float value);
 
   /**
@@ -172,10 +172,11 @@ class GlassStyle : public LayerStyle {
     return std::clamp(_depth / 100.0f, 0.0f, 1.0f);
   }
 
-  // Scales dispersion to [0, 0.05]: the shader offsets R/B UVs by uvOffset * (1 ± dispersion),
-  // so 0.05 caps the additional offset at 5%.
+  // Scales the stored percentage to the shader factor: the shader offsets R/B UVs by
+  // uvOffset * (1 ± dispersion), so 100% maps to a 5% additional offset. The stored value is
+  // constrained to [0, 100] at the setters, so no clamping is needed here.
   float getDispersionFactor() const {
-    return std::clamp(_dispersion / 100.0f, 0.0f, 1.0f) * 0.05f;
+    return _dispersion / 100.0f * 0.05f;
   }
 
   // Scales lightIntensity to [0, 1] for the shader.
@@ -199,27 +200,6 @@ class GlassStyle : public LayerStyle {
 
   std::shared_ptr<ImageFilter> frostFilter = nullptr;
   float currentFrostScale = 0.0f;
-
-  // The caches below only bridge the draws of a single frame: each of them is keyed on the identity
-  // of the shared background snapshot, which is re-created every frame, so a new frame always
-  // misses and rebuilds. Two layers sharing this style alternate between two snapshots and
-  // therefore evict each other, which costs the reuse but never yields a stale result.
-  // Frost blur of the shared background snapshot, reused across the tiles of one frame.
-  std::shared_ptr<Image> cachedFrostSource = nullptr;
-  std::shared_ptr<Image> cachedFrostedImage = nullptr;
-  Point cachedFrostBlurOffset = Point::Zero();
-  float cachedFrostContentScale = 0.0f;
-  // Downscaled blurred background, reused across the tiles of one frame.
-  std::shared_ptr<Image> cachedDownscaleSource = nullptr;
-  std::shared_ptr<Image> cachedDownscaledImage = nullptr;
-  float cachedDownscale = 0.0f;
-  // GPU texture of the processed background, reused across the tiles of one frame. The texture is
-  // bound to one Context, so the owning Context's uniqueID is part of the hit condition: after a
-  // GPU context is rebuilt the old texture is unusable and must be re-uploaded, otherwise the
-  // effect would silently stay broken.
-  std::shared_ptr<Image> cachedBgTextureSource = nullptr;
-  std::shared_ptr<Image> cachedBgTextureImage = nullptr;
-  uint32_t cachedBgTextureContextID = 0;
 };
 
 }  // namespace tgfx
