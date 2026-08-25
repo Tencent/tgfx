@@ -103,10 +103,12 @@ static std::string replaceInputLocation(const std::smatch& match, int& counter) 
 }
 
 // Add location qualifiers to 'in' variables, handling optional interpolation qualifiers
-// (flat, noperspective) and precision qualifiers (highp, mediump, lowp).
+// (flat, noperspective), precision qualifiers (highp, mediump, lowp), and array-typed varyings
+// like `in vec2 blurCoordinates[5];`. The array suffix is captured as part of the identifier
+// group so replaceInputLocation preserves it verbatim in the emitted declaration.
 static std::string assignInputLocationQualifiers(const std::string& source) {
   static std::regex inVarRegex(
-      R"((flat\s+|noperspective\s+)?in\s+(highp\s+|mediump\s+|lowp\s+)?(\w+)\s+(\w+)\s*;)");
+      R"((flat\s+|noperspective\s+)?in\s+(highp\s+|mediump\s+|lowp\s+)?(\w+)\s+(\w+(?:\s*\[\s*\d+\s*\])?)\s*;)");
   int location = 0;
   return replaceAllMatches(source, inVarRegex, replaceInputLocation, location);
 }
@@ -119,10 +121,12 @@ static std::string replaceOutputLocation(const std::smatch& match, int& counter)
 }
 
 // Add location qualifiers to 'out' variables, handling optional interpolation qualifiers
-// (flat, noperspective) and precision qualifiers (highp, mediump, lowp).
+// (flat, noperspective), precision qualifiers (highp, mediump, lowp), and array-typed varyings
+// like `out vec2 blurCoordinates[5];`. The array suffix is captured as part of the identifier
+// group so replaceOutputLocation preserves it verbatim in the emitted declaration.
 static std::string assignOutputLocationQualifiers(const std::string& source) {
   static std::regex outVarRegex(
-      R"((flat\s+|noperspective\s+)?out\s+(highp\s+|mediump\s+|lowp\s+)?(\w+)\s+(\w+)\s*;)");
+      R"((flat\s+|noperspective\s+)?out\s+(highp\s+|mediump\s+|lowp\s+)?(\w+)\s+(\w+(?:\s*\[\s*\d+\s*\])?)\s*;)");
   int location = 0;
   return replaceAllMatches(source, outVarRegex, replaceOutputLocation, location);
 }
