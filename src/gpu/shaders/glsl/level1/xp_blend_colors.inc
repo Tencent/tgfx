@@ -82,12 +82,21 @@ vec4 xpBlendColors(vec4 S, vec4 D, int mode) {
     result = S * D;
   } else if (mode == 14) {
     result = S + D - S * D;
-  } else if (mode == 15) {
+  } else if (mode == 15 || mode == 20) {
+    // Overlay and HardLight share one branch: Overlay == HardLight with operands swapped.
+    // Two structurally-related branches in the if-chain miscompile under Chrome WebGPU (dawn
+    // swaps their bodies in large shaders), so they are fused with an operand pick instead.
+    // The step-based pick is exactly 0 or 1, keeping the arithmetic bit-identical to a select
+    // and equally correct on the other backends.
     result.a = S.a + (1.0 - S.a) * D.a;
-    vec3 fast = 2.0 * S.rgb * D.rgb;
-    vec3 slow = vec3(S.a * D.a) - 2.0 * (vec3(S.a) - S.rgb) * (vec3(D.a) - D.rgb);
-    result.rgb = mix(fast, slow, lessThan(2.0 * D.rgb, vec3(D.a)));
-    result.rgb += D.rgb * (1.0 - S.a) + S.rgb * (1.0 - D.a);
+    vec3 pick = step(vec3(1.5), vec3(float(mode - 14)));
+    vec4 A = mix(S, D, pick.x);  // mode 15: A = D; mode 20: A = S
+    vec4 B = mix(D, S, pick.x);  // mode 15: B = S; mode 20: B = D
+    vec3 fast = 2.0 * A.rgb * B.rgb;
+    vec3 slow = vec3(A.a * B.a) - 2.0 * (vec3(A.a) - A.rgb) * (vec3(B.a) - B.rgb);
+    vec3 w = step(vec3(A.a), 2.0 * A.rgb);
+    result.rgb = fast * w + slow * (vec3(1.0) - w);
+    result.rgb += A.rgb * (1.0 - B.a) + B.rgb * (1.0 - A.a);
   } else if (mode == 16) {
     result.a = S.a + (1.0 - S.a) * D.a;
     result.rgb = min((1.0 - S.a) * D.rgb + S.rgb, (1.0 - D.a) * S.rgb + D.rgb);
@@ -112,12 +121,6 @@ vec4 xpBlendColors(vec4 S, vec4 D, int mode) {
     vec3 valFull = vec3(S.a * D.a) + S.rgb * (1.0 - D.a) + D.rgb * (1.0 - S.a);
     vec3 val = mix(valElse, valSrc0, equal(S.rgb, vec3(0.0)));
     result.rgb = mix(val, valFull, equal(D.rgb, vec3(D.a)));
-  } else if (mode == 20) {
-    result.a = S.a + (1.0 - S.a) * D.a;
-    vec3 fast = 2.0 * S.rgb * D.rgb;
-    vec3 slow = vec3(S.a * D.a) - 2.0 * (vec3(D.a) - D.rgb) * (vec3(S.a) - S.rgb);
-    result.rgb = mix(fast, slow, lessThan(2.0 * S.rgb, vec3(S.a)));
-    result.rgb += S.rgb * (1.0 - D.a) + D.rgb * (1.0 - S.a);
   } else if (mode == 21) {
     result.a = S.a + (1.0 - S.a) * D.a;
     if (D.a == 0.0) {
