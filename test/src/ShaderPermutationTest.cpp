@@ -1934,6 +1934,16 @@ TGFX_TEST(ShaderPermutationTest, BlendModesMatchJIT) {
     LOGI("[BLENDGATE] mode=%d hits=%u misses=%u maxDelta=%d structural=%d pass=%d", i, hits, misses,
          result.maxChannelDiff, result.structuralDifference ? 1 : 0, result.passed ? 1 : 0);
 
+    {
+      // Forensic probe: always dump pixel (0,0) of both renders for every mode, so backend
+      // comparisons can identify which blend formula each side actually executed.
+      auto* refPixels = static_cast<const uint8_t*>(referencePixmap.pixels());
+      auto* candPixels = static_cast<const uint8_t*>(candidatePixmap.pixels());
+      LOGI("[BLENDGATE-P0] mode=%d jit=[%d,%d,%d,%d] aot=[%d,%d,%d,%d]", i, refPixels[0],
+           refPixels[1], refPixels[2], refPixels[3], candPixels[0], candPixels[1], candPixels[2],
+           candPixels[3]);
+    }
+
     if (!result.passed) {
       // Forensic dump: first differing pixel with both sides' RGBA, to identify which formula
       // produced the AOT output.
