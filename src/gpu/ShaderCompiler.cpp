@@ -98,17 +98,24 @@ static std::string assignSamplerBindings(const std::string& source) {
 static std::string replaceInputLocation(const std::smatch& match, int& counter) {
   std::string interpStr = match[1].matched ? match[1].str() : "";
   std::string precisionStr = match[2].matched ? match[2].str() : "";
-  return "layout(location=" + std::to_string(counter++) + ") " + interpStr + "in " + precisionStr +
-         match[3].str() + " " + match[4].str() + ";";
+  // match[5] is the whole array suffix like "[5]" (preserved verbatim in the emitted decl);
+  // match[6] is just the size digits, used to advance the location counter.
+  std::string arraySuffix = match[5].matched ? match[5].str() : "";
+  int step = match[6].matched ? std::stoi(match[6].str()) : 1;
+  std::string decl = "layout(location=" + std::to_string(counter) + ") " + interpStr + "in " +
+                     precisionStr + match[3].str() + " " + match[4].str() + arraySuffix + ";";
+  counter += step;
+  return decl;
 }
 
 // Add location qualifiers to 'in' variables, handling optional interpolation qualifiers
 // (flat, noperspective), precision qualifiers (highp, mediump, lowp), and array-typed varyings
-// like `in vec2 blurCoordinates[5];`. The array suffix is captured as part of the identifier
-// group so replaceInputLocation preserves it verbatim in the emitted declaration.
+// like `in vec2 blurCoordinates[5];`. Array-typed varyings occupy `size` consecutive locations,
+// so the counter is advanced by the array length instead of one, matching SPIR-V semantics for
+// per-vertex block members.
 static std::string assignInputLocationQualifiers(const std::string& source) {
   static std::regex inVarRegex(
-      R"((flat\s+|noperspective\s+)?in\s+(highp\s+|mediump\s+|lowp\s+)?(\w+)\s+(\w+(?:\s*\[\s*\d+\s*\])?)\s*;)");
+      R"((flat\s+|noperspective\s+)?in\s+(highp\s+|mediump\s+|lowp\s+)?(\w+)\s+(\w+)(\s*\[\s*(\d+)\s*\])?\s*;)");
   int location = 0;
   return replaceAllMatches(source, inVarRegex, replaceInputLocation, location);
 }
@@ -116,17 +123,22 @@ static std::string assignInputLocationQualifiers(const std::string& source) {
 static std::string replaceOutputLocation(const std::smatch& match, int& counter) {
   std::string interpStr = match[1].matched ? match[1].str() : "";
   std::string precisionStr = match[2].matched ? match[2].str() : "";
-  return "layout(location=" + std::to_string(counter++) + ") " + interpStr + "out " + precisionStr +
-         match[3].str() + " " + match[4].str() + ";";
+  std::string arraySuffix = match[5].matched ? match[5].str() : "";
+  int step = match[6].matched ? std::stoi(match[6].str()) : 1;
+  std::string decl = "layout(location=" + std::to_string(counter) + ") " + interpStr + "out " +
+                     precisionStr + match[3].str() + " " + match[4].str() + arraySuffix + ";";
+  counter += step;
+  return decl;
 }
 
 // Add location qualifiers to 'out' variables, handling optional interpolation qualifiers
 // (flat, noperspective), precision qualifiers (highp, mediump, lowp), and array-typed varyings
-// like `out vec2 blurCoordinates[5];`. The array suffix is captured as part of the identifier
-// group so replaceOutputLocation preserves it verbatim in the emitted declaration.
+// like `out vec2 blurCoordinates[5];`. Array-typed varyings occupy `size` consecutive locations,
+// so the counter is advanced by the array length instead of one, matching SPIR-V semantics for
+// per-vertex block members.
 static std::string assignOutputLocationQualifiers(const std::string& source) {
   static std::regex outVarRegex(
-      R"((flat\s+|noperspective\s+)?out\s+(highp\s+|mediump\s+|lowp\s+)?(\w+)\s+(\w+(?:\s*\[\s*\d+\s*\])?)\s*;)");
+      R"((flat\s+|noperspective\s+)?out\s+(highp\s+|mediump\s+|lowp\s+)?(\w+)\s+(\w+)(\s*\[\s*(\d+)\s*\])?\s*;)");
   int location = 0;
   return replaceAllMatches(source, outVarRegex, replaceOutputLocation, location);
 }
