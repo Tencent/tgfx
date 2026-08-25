@@ -18,6 +18,7 @@
 
 #include "ShaderCompiler.h"
 #include <algorithm>
+#include <atomic>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -212,11 +213,12 @@ static std::string replaceAllMatches(const std::string& source, const std::regex
 }
 
 // Template shaders declare combined image samplers in set 1. The binding expression may be a
-// preprocessor macro (HAS_LUT, NTEX, XP_DST_TEX_BINDING), so the original numbers are ignored:
-// bindings are reassigned in declaration order, mirroring the runtime JIT path
+// literal, a preprocessor macro, or a parenthesized macro expansion like "(4 + 1)", so it must
+// tolerate one level of nested parentheses. The original numbers are ignored: bindings are
+// reassigned in declaration order, mirroring the runtime JIT path
 // (WebGPUShaderModule::preprocessGLSL) and the WebGPURenderPipeline bind-group expansion.
 static const char* kWebGPUSamplerDeclRegex =
-    R"(layout\s*\(\s*set\s*=\s*1\s*,\s*binding\s*=\s*[^)]*\)\s*uniform\s+(?:sampler2D|CHAIN_LEAF_SAMPLER)\s+(\w+)\s*;)";
+    R"(layout\s*\(\s*set\s*=\s*1\s*,\s*binding\s*=\s*(?:[^()]|\([^)]*\))*\s*\)\s*uniform\s+(?:sampler2D|CHAIN_LEAF_SAMPLER)\s+(\w+)\s*;)";
 
 static std::vector<std::string> collectSamplerNames(const std::string& source) {
   static std::regex samplerRegex(kWebGPUSamplerDeclRegex);
@@ -320,6 +322,30 @@ static std::string expandSamplerCallArgs(const std::string& source,
   return result;
 }
 
+// Runs the GLSL preprocessor before the regex passes. Template shaders wrap conditional sampler
+// declarations in #if blocks (e.g. UnifiedGradientShader's GradientTexture), so a regex pass over
+// the raw source would count declarations the preprocessor removes, leaving binding holes between
+// the reassigned binding numbers and the reflection's sampler list. Preprocessing first keeps the
+// declaration set exact.
+static std::string preprocessGLSLMacros(const std::string& source, ShaderStageType stage,
+                                        std::string* error) {
+  shaderc::Compiler compiler;
+  shaderc::CompileOptions options;
+  auto shaderKind =
+      (stage == ShaderStageType::Vertex) ? shaderc_vertex_shader : shaderc_fragment_shader;
+  auto preprocessed = compiler.PreprocessGlsl(source, shaderKind, "shader", options);
+  if (preprocessed.GetCompilationStatus() != shaderc_compilation_status_success) {
+    *error = preprocessed.GetErrorMessage();
+    return {};
+  }
+  std::string result{preprocessed.cbegin(), preprocessed.cend()};
+  // Strip the #line directives the preprocessor emits: they can appear between a layout
+  // qualifier and the uniform declaration, breaking the regex passes below.
+  static std::regex lineRegex(R"((^|\n)[ \t]*#[ \t]*line[^\n]*)");
+  result = std::regex_replace(result, lineRegex, "$1");
+  return result;
+}
+
 static std::string preprocessWebGPU(const std::string& source) {
   auto samplerNames = collectSamplerNames(source);
   auto samplerParamFunctions = collectSamplerParamFunctions(source);
@@ -359,8 +385,28 @@ CompileResult CompileGLSLToWGSL(const std::string& source, ShaderStageType stage
   CompileResult result;
   std::string errorPrefix = "[" + shaderName + " variant " + std::to_string(variantIndex) + "] ";
 #ifdef TGFX_SHADER_TOOL_HAS_TINT
-  auto vulkanGLSL = preprocessWebGPU(source);
   std::string compileError;
+  auto expandedSource = preprocessGLSLMacros(source, stage, &compileError);
+  if (expandedSource.empty()) {
+    result.error = errorPrefix + "GLSL preprocess: " + compileError;
+    return result;
+  }
+  auto vulkanGLSL = preprocessWebGPU(expandedSource);
+  if (const char* dumpDir = std::getenv("TGFX_SHADER_DUMP_DIR")) {
+    static std::atomic<int> dumpCounter{0};
+    std::string base = std::string(dumpDir) + "/wgsl_" + shaderName + "_v" +
+                       std::to_string(variantIndex) + "_" + std::to_string(dumpCounter++);
+    FILE* f = fopen((base + ".pre.glsl").c_str(), "w");
+    if (f) {
+      fwrite(expandedSource.data(), 1, expandedSource.size(), f);
+      fclose(f);
+    }
+    f = fopen((base + ".final.glsl").c_str(), "w");
+    if (f) {
+      fwrite(vulkanGLSL.data(), 1, vulkanGLSL.size(), f);
+      fclose(f);
+    }
+  }
   auto spirv = compileSPIRVForWGSL(vulkanGLSL, stage, &compileError);
   if (spirv.empty()) {
     result.error = errorPrefix + "GLSL to SPIR-V: " + compileError;

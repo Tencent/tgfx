@@ -95,9 +95,10 @@ bool WebGPURenderPipeline::createPipelineState(WebGPUGPU* gpu,
     // (after uniform blocks). In WGSL, each combined sampler occupies two consecutive bindings:
     //   texture = TEXTURE_BINDING_POINT_START + samplerIndex * 2
     //   sampler = texture_binding + 1
-    auto samplerIndex = static_cast<unsigned>(entry.binding < TEXTURE_BINDING_POINT_START
-                                                  ? entry.binding
-                                                  : entry.binding - TEXTURE_BINDING_POINT_START);
+    // entry.binding is the 0-based sampler index in both the runtime (GLSLProgramBuilder) and
+    // precompiled (PrecompiledProgramCreator) paths; it must not be reinterpreted as a WGSL
+    // binding number.
+    auto samplerIndex = static_cast<unsigned>(entry.binding);
     unsigned textureBinding = TEXTURE_BINDING_POINT_START + samplerIndex * 2;
     unsigned samplerBinding = textureBinding + 1;
     WGPUBindGroupLayoutEntry textureEntry = {};

@@ -780,6 +780,9 @@ endif ()
 # into libtgfx. It is independent of TGFX_BUILD_TESTS so that production builds also benefit
 # from precompiled shaders. Set TGFX_EMBED_SHADER_BUNDLES=OFF to disable embedding entirely.
 if (TGFX_EMBED_SHADER_BUNDLES)
+  # The tool runs on the build host only; web builds consume prebuilt bundles and never
+  # compile the tool (a wasm tool cannot shell out to host compilers anyway).
+  if (NOT WEB)
     file(GLOB_RECURSE TGFX_SHADER_DECL_FILES
             src/gpu/shaders/ShaderPermutation.*
             src/gpu/shaders/PrecompiledShader.*
@@ -803,6 +806,7 @@ if (TGFX_EMBED_SHADER_BUNDLES)
     add_dependencies(shader_build_tool shader-tool-vendor)
     find_vendor_libraries(shader-tool-vendor STATIC SHADER_TOOL_VENDOR_LIBS)
     target_link_libraries(shader_build_tool PRIVATE ${SHADER_TOOL_VENDOR_LIBS} tgfx_zstd)
+  endif ()
 
     # Determine which backends to compile based on enabled GPU backends
     set(TGFX_SHADER_BACKENDS "")
@@ -849,7 +853,7 @@ if (TGFX_EMBED_SHADER_BUNDLES)
         # The Emscripten toolchain cannot run shader_build_tool at build time (it shells out to
         # host tools), so web builds consume prebuilt bundles from resources/shaders/. Publish
         # them from a native build via the tgfx_publish_shader_bundles target.
-        set(TGFX_PREBUILT_BUNDLE_DIR "${CMAKE_SOURCE_DIR}/resources/shaders")
+        set(TGFX_PREBUILT_BUNDLE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders")
         set(TGFX_PREBUILT_BUNDLE_FILES "")
         set(TGFX_COPY_BUNDLE_COMMANDS "")
         foreach (B ${TGFX_SHADER_BACKENDS})
@@ -891,7 +895,7 @@ if (TGFX_EMBED_SHADER_BUNDLES)
             list(APPEND TGFX_PUBLISH_BUNDLE_COMMANDS
                     COMMAND ${CMAKE_COMMAND} -E copy_if_different
                             "${TGFX_SHADER_BUNDLE_DIR}/shader_bundle.${B}.bin"
-                            "${CMAKE_SOURCE_DIR}/resources/shaders/shader_bundle.${B}.bin")
+                            "${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/shader_bundle.${B}.bin")
         endforeach ()
         add_custom_target(tgfx_publish_shader_bundles
                 ${TGFX_PUBLISH_BUNDLE_COMMANDS}
@@ -917,7 +921,7 @@ if (TGFX_EMBED_SHADER_BUNDLES)
         set(BUNDLE_CPP "${TGFX_EMBEDDED_BUNDLE_DIR}/EmbeddedShaderBundle_${B}.cpp")
         add_custom_command(
                 OUTPUT ${BUNDLE_CPP}
-                COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/cmake/BundleToCpp.cmake
+                COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/BundleToCpp.cmake
                         ${BUNDLE_BIN} ${BUNDLE_CPP} ${BUNDLE_VAR} ${BACKEND_ENUM}
                 DEPENDS ${TGFX_SHADER_BUNDLE_STAMP}
                 COMMENT "Embedding shader bundle: ${B}")
