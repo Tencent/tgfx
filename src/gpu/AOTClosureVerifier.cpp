@@ -62,6 +62,11 @@ AOTClosureResult AOTClosureVerifier::Verify(const PrecompiledShaderCache* cache,
     std::set<uint32_t> vertIndices;
     std::set<uint32_t> fragIndices;
     for (const auto& permutation : *reachable) {
+      // Apply the same backend-specific exclusions as the bundle generator (RECT for non-GL,
+      // FBF for WebGPU); without this the verifier reports holes the runtime can never request.
+      if (!PermutationCompilesForBackend(info, permutation.first, permutation.second, profileTag)) {
+        continue;
+      }
       vertIndices.insert(permutation.first);
       fragIndices.insert(permutation.second);
     }

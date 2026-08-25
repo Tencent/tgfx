@@ -684,13 +684,17 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
-  EXPECT_EQ(cache->vertexEntryCount(), 101u);
   std::string expectedTag = TGFX_BACKEND_NAME;
   auto dashPos = expectedTag.find('-');
   if (dashPos != std::string::npos) {
     expectedTag = expectedTag.substr(0, dashPos);
   }
-  EXPECT_EQ(cache->fragmentEntryCount(), 274u);
+  // Entry counts follow the backend-specific exclusions in the bundle generator
+  // (PermutationCompilesForBackend): the WebGPU bundle drops FBF (subpassInput) variants, which
+  // WGSL cannot express, and their vertex stages.
+  const bool isWebGPU = expectedTag == "webgpu";
+  EXPECT_EQ(cache->vertexEntryCount(), isWebGPU ? 99u : 101u);
+  EXPECT_EQ(cache->fragmentEntryCount(), isWebGPU ? 184u : 274u);
   EXPECT_EQ(cache->profileTag(), expectedTag);
   cache->unload();
 }
@@ -1142,14 +1146,17 @@ TGFX_TEST(ShaderPermutationTest, CompressedBundleLoad) {
     PrecompiledShaderCache compressedOnly;
     ASSERT_TRUE(compressedOnly.loadBundle(original.data(), original.size()));
     EXPECT_TRUE(compressedOnly.isLoaded());
-    EXPECT_EQ(compressedOnly.vertexEntryCount(), 101u);
     std::string tag = TGFX_BACKEND_NAME;
     auto dash = tag.find('-');
     if (dash != std::string::npos) {
       tag = tag.substr(0, dash);
     }
-    // The opengl bundle carries the TEXTURE_KIND=Rect fragment variants (16 extra entries).
-    EXPECT_EQ(compressedOnly.fragmentEntryCount(), 274u);
+    // Counts follow the generator's backend exclusions (PermutationCompilesForBackend): the
+    // opengl bundle carries the TEXTURE_KIND=Rect variants, the webgpu bundle drops the FBF
+    // (subpassInput) variants, and metal/vulkan keep everything.
+    const bool isWebGPU = tag == "webgpu";
+    EXPECT_EQ(compressedOnly.vertexEntryCount(), isWebGPU ? 99u : 101u);
+    EXPECT_EQ(compressedOnly.fragmentEntryCount(), isWebGPU ? 184u : 274u);
     EXPECT_EQ(compressedOnly.profileTag(), tag);
     return;
   }

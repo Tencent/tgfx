@@ -18,6 +18,7 @@
 
 #include "gpu/shaders/PrecompiledShader.h"
 #include <map>
+#include "core/utils/USE.h"
 
 namespace tgfx {
 
@@ -39,6 +40,23 @@ bool IsBuildablePermutation(const PrecompiledShaderInfo& info, uint32_t vertInde
   auto vertValues = info.vertDomain.decode(vertIndex);
   auto fragValues = info.fragDomain.decode(fragIndex);
   return MirroredDimsAgree(info.vertDomain, info.fragDomain, vertValues, fragValues);
+}
+
+bool PermutationCompilesForBackend(const PrecompiledShaderInfo& info, uint32_t vertIndex,
+                                   uint32_t fragIndex, const std::string& profileTag) {
+  USE(vertIndex);
+  // RECT variants declare sampler2DRect, whose SPIR-V (OpTypeImage Dim=Rect) is invalid under
+  // Vulkan semantics; they compile under OpenGL semantics and only enter the OpenGL bundle.
+  if (info.fragDomain.valueOf(fragIndex, "TEXTURE_KIND") == 1 && profileTag != "opengl") {
+    return false;
+  }
+  // FBF variants (HAS_XP == 2) read the framebuffer through subpassInput, which WGSL cannot
+  // express. The WebGPU runtime never requests them (frameBufferFetchSupport = false), so they
+  // are excluded from the WebGPU bundle only; Metal, Vulkan and OpenGL compile them.
+  if (info.fragDomain.valueOf(fragIndex, "HAS_XP") == 2 && profileTag == "webgpu") {
+    return false;
+  }
+  return true;
 }
 
 void ShaderRegistry::Register(Factory factory) {

@@ -412,8 +412,9 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
     }
 
     for (const auto& backend : options.backends) {
-      // RECT variants compile to GLSL only; never emit them for other backends' bundles.
-      if (rectVariant && backend != "opengl") {
+      // Backend-specific exclusions (RECT, WebGPU FBF) share one source of truth with the
+      // closure verifier; see PermutationCompilesForBackend.
+      if (!PermutationCompilesForBackend(info, vi, fi, backend)) {
         continue;
       }
       std::vector<uint8_t> vertBlob;
@@ -460,12 +461,6 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
           continue;
         }
       } else if (backend == "webgpu") {
-        // FBF variants (HAS_XP == 2) read the framebuffer via subpassInput, which has no WGSL
-        // equivalent. The WebGPU runtime never requests them (frameBufferFetchSupport = false),
-        // so skipping them here mirrors the RECT exclusion above and cannot cause a miss.
-        if (info.fragDomain.valueOf(fi, "HAS_XP") == 2) {
-          continue;
-        }
         // WebGPU needs its own GLSL form (separated texture/sampler bindings), so re-expand and
         // recompile like the vulkan branch instead of reusing the combined-sampler SPIR-V.
         auto expandedVertWgsl = PrependDefines(vertSource, vertDefines);

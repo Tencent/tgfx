@@ -49,6 +49,15 @@ bool IsBuildablePermutation(const PrecompiledShaderInfo& info, uint32_t vertInde
                             uint32_t fragIndex);
 
 /**
+ * Returns true when the permutation is compiled into the bundle of the backend identified by
+ * profileTag. This is the single source of truth for backend-specific variant exclusion; both
+ * the bundle generator (shader_build_tool) and the closure verifier (AOTClosureVerifier) must
+ * apply it, or the verifier reports holes the runtime can never request.
+ */
+bool PermutationCompilesForBackend(const PrecompiledShaderInfo& info, uint32_t vertIndex,
+                                   uint32_t fragIndex, const std::string& profileTag);
+
+/**
  * Base class for all precompiled shader declarations. Each concrete shader must override info()
  * to provide its metadata.
  */
