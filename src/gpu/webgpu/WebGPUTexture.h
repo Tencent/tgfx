@@ -19,6 +19,7 @@
 #pragma once
 
 #include <webgpu/webgpu.h>
+#include <string>
 #include "WebGPUResource.h"
 #include "tgfx/gpu/Texture.h"
 

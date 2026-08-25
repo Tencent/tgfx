@@ -17,9 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "WebGPUTexture.h"
+#include <string>
 #include "WebGPUDefines.h"
 #include "WebGPUGPU.h"
 #include "WebGPUUtil.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
 
@@ -29,6 +31,11 @@ std::shared_ptr<WebGPUTexture> WebGPUTexture::Make(WebGPUGPU* gpu,
     return nullptr;
   }
   auto format = gpu->getWGPUTextureFormat(descriptor.format);
+  // The backend's own mechanisms (render-pass mip blits in generateMipmapsForTexture, offscreen
+  // fills that render into sampling textures) can turn any created texture into a render target,
+  // and WebGPU validates usages strictly. All formats this backend creates are renderable, so
+  // every texture carries RENDER_ATTACHMENT regardless of what the caller declared.
+  uint32_t usage = descriptor.usage | TextureUsage::RENDER_ATTACHMENT;
   WGPUTextureDescriptor textureDesc = {};
   textureDesc.dimension = WGPUTextureDimension_2D;
   textureDesc.size = {static_cast<uint32_t>(descriptor.width),
@@ -36,7 +43,12 @@ std::shared_ptr<WebGPUTexture> WebGPUTexture::Make(WebGPUGPU* gpu,
   textureDesc.format = format;
   textureDesc.mipLevelCount = static_cast<uint32_t>(descriptor.mipLevelCount);
   textureDesc.sampleCount = static_cast<uint32_t>(descriptor.sampleCount);
-  textureDesc.usage = ToWGPUTextureUsage(descriptor.usage);
+  textureDesc.usage = ToWGPUTextureUsage(usage);
+  std::string label = "tgfx-tex-" + std::to_string(descriptor.width) + "x" +
+                      std::to_string(descriptor.height) + "-mips" +
+                      std::to_string(descriptor.mipLevelCount) + "-f" +
+                      std::to_string(static_cast<int>(descriptor.format));
+  textureDesc.label = label.c_str();
   auto texture = wgpuDeviceCreateTexture(gpu->device(), &textureDesc);
   if (texture == nullptr) {
     return nullptr;
@@ -50,7 +62,7 @@ std::shared_ptr<WebGPUTexture> WebGPUTexture::Make(WebGPUGPU* gpu,
   // When a texture has mipmaps and is used as a render attachment, WebGPU requires the view
   // to reference exactly one mip level. Create a separate single-level view for rendering.
   WGPUTextureView renderView = nullptr;
-  if (descriptor.mipLevelCount > 1 && (descriptor.usage & TextureUsage::RENDER_ATTACHMENT)) {
+  if (descriptor.mipLevelCount > 1 && (usage & TextureUsage::RENDER_ATTACHMENT)) {
     WGPUTextureViewDescriptor viewDesc = {};
     viewDesc.format = format;
     viewDesc.dimension = WGPUTextureViewDimension_2D;
