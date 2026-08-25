@@ -1934,6 +1934,31 @@ TGFX_TEST(ShaderPermutationTest, BlendModesMatchJIT) {
     LOGI("[BLENDGATE] mode=%d hits=%u misses=%u maxDelta=%d structural=%d pass=%d", i, hits, misses,
          result.maxChannelDiff, result.structuralDifference ? 1 : 0, result.passed ? 1 : 0);
 
+    if (!result.passed) {
+      // Forensic dump: first differing pixel with both sides' RGBA, to identify which formula
+      // produced the AOT output.
+      auto* refPixels = static_cast<const uint8_t*>(referencePixmap.pixels());
+      auto* candPixels = static_cast<const uint8_t*>(candidatePixmap.pixels());
+      int totalBytes = static_cast<int>(referencePixmap.width() * referencePixmap.height() * 4);
+      for (int byteIndex = 0; byteIndex < totalBytes; byteIndex += 4) {
+        bool differs = false;
+        for (int c = 0; c < 4; c++) {
+          if (refPixels[byteIndex + c] != candPixels[byteIndex + c]) {
+            differs = true;
+            break;
+          }
+        }
+        if (differs) {
+          int pixelIndex = byteIndex / 4;
+          LOGI("[BLENDGATE-PIXEL] mode=%d pixel=(%d,%d) jit=[%d,%d,%d,%d] aot=[%d,%d,%d,%d]", i,
+               pixelIndex % 96, pixelIndex / 96, refPixels[byteIndex], refPixels[byteIndex + 1],
+               refPixels[byteIndex + 2], refPixels[byteIndex + 3], candPixels[byteIndex],
+               candPixels[byteIndex + 1], candPixels[byteIndex + 2], candPixels[byteIndex + 3]);
+          break;
+        }
+      }
+    }
+
     EXPECT_TRUE(result.passed) << "BlendMode " << i
                                << " AOT diverges from JIT, maxDelta=" << result.maxChannelDiff
                                << " (hits=" << hits << " misses=" << misses << ")";
