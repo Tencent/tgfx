@@ -29,6 +29,7 @@ option(TGFX_USE_ANGLE "Enable building with the ANGLE library" OFF)
 option(TGFX_USE_VULKAN "Use Vulkan as the GPU backend" OFF)
 option(TGFX_USE_TEXT_GAMMA_CORRECTION "Enable gamma correction when rendering text" OFF)
 option(TGFX_EMBED_SHADER_BUNDLES "Embed precompiled shader bundles into libtgfx" ON)
+option(TGFX_BUILD_WEBGPU_BUNDLE "Generate the WebGPU shader bundle in native builds" OFF)
 
 # EMSCRIPTEN_PTHREADS can be set by vendor tools for building the wasm-mt architecture.
 if (NOT WEB OR EMSCRIPTEN_PTHREADS)
@@ -338,6 +339,32 @@ if (TGFX_USE_TEXT_GAMMA_CORRECTION)
     list(APPEND TGFX_DEFINES TGFX_USE_TEXT_GAMMA_CORRECTION)
 endif ()
 
+# Tint: SPIR-V to WGSL shader conversion for WebGPU. Shared by the WebGPU runtime backend and
+# the shader_build_tool WebGPU bundle generation; kept in one function so the two consumers
+# cannot drift apart. SPIRV-Tools/Headers come from the shaderc checkout, so shaderc
+# sub-dependencies must be synced (./sync_deps.sh) before calling this.
+function(tgfx_setup_tint)
+    if (TARGET libtint)
+        return()
+    endif ()
+    set(TINT_BUILD_CMD_TOOLS OFF CACHE BOOL "" FORCE)
+    set(TINT_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(TINT_BUILD_BENCHMARKS OFF CACHE BOOL "" FORCE)
+    set(TINT_BUILD_AS_OTHER_OS ON CACHE BOOL "" FORCE)
+    set(TINT_BUILD_SPV_READER ON CACHE BOOL "" FORCE)
+    set(TINT_BUILD_WGSL_WRITER ON CACHE BOOL "" FORCE)
+    set(TINT_BUILD_WGSL_READER OFF CACHE BOOL "" FORCE)
+    set(TINT_BUILD_SPV_WRITER OFF CACHE BOOL "" FORCE)
+    set(TINT_BUILD_MSL_WRITER OFF CACHE BOOL "" FORCE)
+    set(TINT_BUILD_HLSL_WRITER OFF CACHE BOOL "" FORCE)
+    set(TINT_BUILD_GLSL_WRITER OFF CACHE BOOL "" FORCE)
+    set(TINT_BUILD_GLSL_VALIDATOR OFF CACHE BOOL "" FORCE)
+    set(TINT_BUILD_IR ON CACHE BOOL "" FORCE)
+    set(TINT_SPIRV_TOOLS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/shaderc/third_party/spirv-tools" CACHE STRING "" FORCE)
+    set(TINT_SPIRV_HEADERS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/shaderc/third_party/spirv-headers" CACHE STRING "" FORCE)
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/third_party/tint ${CMAKE_CURRENT_BINARY_DIR}/tint EXCLUDE_FROM_ALL)
+endfunction()
+
 if (TGFX_USE_VULKAN)
     file(GLOB_RECURSE GFX_PLATFORM_FILES src/gpu/vulkan/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
@@ -381,22 +408,7 @@ elseif (TGFX_USE_WEBGPU)
         message(FATAL_ERROR "shaderc sub-dependencies not found. Please run ./sync_deps.sh first.")
     endif ()
     # Tint: SPIR-V to WGSL shader conversion for WebGPU
-    set(TINT_BUILD_CMD_TOOLS OFF CACHE BOOL "" FORCE)
-    set(TINT_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-    set(TINT_BUILD_BENCHMARKS OFF CACHE BOOL "" FORCE)
-    set(TINT_BUILD_AS_OTHER_OS ON CACHE BOOL "" FORCE)
-    set(TINT_BUILD_SPV_READER ON CACHE BOOL "" FORCE)
-    set(TINT_BUILD_WGSL_WRITER ON CACHE BOOL "" FORCE)
-    set(TINT_BUILD_WGSL_READER OFF CACHE BOOL "" FORCE)
-    set(TINT_BUILD_SPV_WRITER OFF CACHE BOOL "" FORCE)
-    set(TINT_BUILD_MSL_WRITER OFF CACHE BOOL "" FORCE)
-    set(TINT_BUILD_HLSL_WRITER OFF CACHE BOOL "" FORCE)
-    set(TINT_BUILD_GLSL_WRITER OFF CACHE BOOL "" FORCE)
-    set(TINT_BUILD_GLSL_VALIDATOR OFF CACHE BOOL "" FORCE)
-    set(TINT_BUILD_IR ON CACHE BOOL "" FORCE)
-    set(TINT_SPIRV_TOOLS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/shaderc/third_party/spirv-tools" CACHE STRING "" FORCE)
-    set(TINT_SPIRV_HEADERS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/shaderc/third_party/spirv-headers" CACHE STRING "" FORCE)
-    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/third_party/tint ${CMAKE_CURRENT_BINARY_DIR}/tint EXCLUDE_FROM_ALL)
+    tgfx_setup_tint()
     list(APPEND TGFX_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tint/include)
     list(APPEND TGFX_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tint)
 elseif (APPLE)
@@ -803,11 +815,27 @@ if (TGFX_EMBED_SHADER_BUNDLES)
     if (TGFX_USE_WEBGPU)
         list(APPEND TGFX_SHADER_BACKENDS "webgpu")
     endif ()
+    # Native builds can request the WebGPU bundle explicitly: the Emscripten toolchain cannot
+    # run shader_build_tool at build time (it shells out to host tools), so the bundle is
+    # generated natively, published to resources/shaders/, and consumed by web builds.
+    if (TGFX_BUILD_WEBGPU_BUNDLE AND NOT WEB)
+        list(APPEND TGFX_SHADER_BACKENDS "webgpu")
+    endif ()
     if (NOT TGFX_SHADER_BACKENDS)
         list(APPEND TGFX_SHADER_BACKENDS "opengl")
     endif ()
     # Pass all backends as the single comma-separated argument expected by shader_build_tool.
     string(JOIN "," TGFX_SHADER_BACKENDS_ARG ${TGFX_SHADER_BACKENDS})
+
+    if ("webgpu" IN_LIST TGFX_SHADER_BACKENDS AND NOT WEB)
+        tgfx_setup_tint()
+        target_include_directories(shader_build_tool SYSTEM PRIVATE
+                third_party/tint third_party/tint/include)
+        target_link_libraries(shader_build_tool PRIVATE libtint)
+        # The macro is defined exactly when "webgpu" can appear in --backends, so the
+        # non-tint build can never reach the WebGPU translation path.
+        target_compile_definitions(shader_build_tool PRIVATE TGFX_SHADER_TOOL_HAS_TINT=1)
+    endif ()
 
     set(TGFX_SHADER_BUNDLE_DIR "${CMAKE_BINARY_DIR}/generated/shaders")
     file(MAKE_DIRECTORY ${TGFX_SHADER_BUNDLE_DIR})
@@ -817,17 +845,59 @@ if (TGFX_EMBED_SHADER_BUNDLES)
             src/gpu/shaders/glsl/level1/*.frag
             src/gpu/shaders/glsl/level1/*.vert
             src/gpu/shaders/glsl/level1/*.inc)
-    add_custom_command(
-            OUTPUT ${TGFX_SHADER_BUNDLE_STAMP}
-            COMMAND shader_build_tool
-                    --shader-dir ${CMAKE_SOURCE_DIR}/src/gpu/shaders/glsl
-                    --out-dir ${TGFX_SHADER_BUNDLE_DIR}
-                    --backends ${TGFX_SHADER_BACKENDS_ARG}
-                    --compress
-            COMMAND ${CMAKE_COMMAND} -E touch ${TGFX_SHADER_BUNDLE_STAMP}
-            DEPENDS shader_build_tool ${TGFX_SHADER_SOURCES}
-            COMMENT "Compiling precompiled shader bundles (${TGFX_SHADER_BACKENDS})")
+    if (WEB)
+        # The Emscripten toolchain cannot run shader_build_tool at build time (it shells out to
+        # host tools), so web builds consume prebuilt bundles from resources/shaders/. Publish
+        # them from a native build via the tgfx_publish_shader_bundles target.
+        set(TGFX_PREBUILT_BUNDLE_DIR "${CMAKE_SOURCE_DIR}/resources/shaders")
+        set(TGFX_PREBUILT_BUNDLE_FILES "")
+        set(TGFX_COPY_BUNDLE_COMMANDS "")
+        foreach (B ${TGFX_SHADER_BACKENDS})
+            set(PREBUILT_BUNDLE "${TGFX_PREBUILT_BUNDLE_DIR}/shader_bundle.${B}.bin")
+            if (NOT EXISTS "${PREBUILT_BUNDLE}")
+                message(FATAL_ERROR "Prebuilt shader bundle not found: ${PREBUILT_BUNDLE}\n"
+                        "Web builds consume prebuilt bundles from resources/shaders/. Build "
+                        "natively and run the tgfx_publish_shader_bundles target to publish them.")
+            endif ()
+            list(APPEND TGFX_PREBUILT_BUNDLE_FILES "${PREBUILT_BUNDLE}")
+            list(APPEND TGFX_COPY_BUNDLE_COMMANDS
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${PREBUILT_BUNDLE}"
+                            "${TGFX_SHADER_BUNDLE_DIR}/shader_bundle.${B}.bin")
+        endforeach ()
+        add_custom_command(
+                OUTPUT ${TGFX_SHADER_BUNDLE_STAMP}
+                ${TGFX_COPY_BUNDLE_COMMANDS}
+                COMMAND ${CMAKE_COMMAND} -E touch ${TGFX_SHADER_BUNDLE_STAMP}
+                DEPENDS ${TGFX_PREBUILT_BUNDLE_FILES}
+                COMMENT "Consuming prebuilt shader bundles (${TGFX_SHADER_BACKENDS})")
+    else ()
+        add_custom_command(
+                OUTPUT ${TGFX_SHADER_BUNDLE_STAMP}
+                COMMAND shader_build_tool
+                        --shader-dir ${CMAKE_SOURCE_DIR}/src/gpu/shaders/glsl
+                        --out-dir ${TGFX_SHADER_BUNDLE_DIR}
+                        --backends ${TGFX_SHADER_BACKENDS_ARG}
+                        --compress
+                COMMAND ${CMAKE_COMMAND} -E touch ${TGFX_SHADER_BUNDLE_STAMP}
+                DEPENDS shader_build_tool ${TGFX_SHADER_SOURCES}
+                COMMENT "Compiling precompiled shader bundles (${TGFX_SHADER_BACKENDS})")
+    endif ()
     add_custom_target(tgfx_shader_bundles DEPENDS ${TGFX_SHADER_BUNDLE_STAMP})
+    if (NOT WEB)
+        # Publishes this build's generated bundles to resources/shaders/ so web builds can
+        # consume them; run explicitly, nothing depends on it.
+        set(TGFX_PUBLISH_BUNDLE_COMMANDS "")
+        foreach (B ${TGFX_SHADER_BACKENDS})
+            list(APPEND TGFX_PUBLISH_BUNDLE_COMMANDS
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                            "${TGFX_SHADER_BUNDLE_DIR}/shader_bundle.${B}.bin"
+                            "${CMAKE_SOURCE_DIR}/resources/shaders/shader_bundle.${B}.bin")
+        endforeach ()
+        add_custom_target(tgfx_publish_shader_bundles
+                ${TGFX_PUBLISH_BUNDLE_COMMANDS}
+                DEPENDS tgfx_shader_bundles
+                COMMENT "Publishing shader bundles to resources/shaders")
+    endif ()
 
     set(TGFX_EMBEDDED_BUNDLE_DIR "${CMAKE_BINARY_DIR}/generated/embedded")
     file(MAKE_DIRECTORY ${TGFX_EMBEDDED_BUNDLE_DIR})

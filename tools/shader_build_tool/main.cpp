@@ -460,8 +460,20 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
           continue;
         }
       } else if (backend == "webgpu") {
-        auto wgslVert = TranslateToWGSL(*vertSpirv);
-        auto wgslFrag = TranslateToWGSL(fragResult.spirv);
+        // FBF variants (HAS_XP == 2) read the framebuffer via subpassInput, which has no WGSL
+        // equivalent. The WebGPU runtime never requests them (frameBufferFetchSupport = false),
+        // so skipping them here mirrors the RECT exclusion above and cannot cause a miss.
+        if (info.fragDomain.valueOf(fi, "HAS_XP") == 2) {
+          continue;
+        }
+        // WebGPU needs its own GLSL form (separated texture/sampler bindings), so re-expand and
+        // recompile like the vulkan branch instead of reusing the combined-sampler SPIR-V.
+        auto expandedVertWgsl = PrependDefines(vertSource, vertDefines);
+        auto expandedFragWgsl = PrependDefines(fragSource, fragDefines);
+        auto wgslVert =
+            CompileGLSLToWGSL(expandedVertWgsl, ShaderStageType::Vertex, info.name, vi);
+        auto wgslFrag =
+            CompileGLSLToWGSL(expandedFragWgsl, ShaderStageType::Fragment, info.name, fi);
         if (!wgslVert.success || !wgslFrag.success) {
           std::cerr << "  WGSL translation error: "
                     << (wgslVert.success ? wgslFrag.error : wgslVert.error) << "\n";

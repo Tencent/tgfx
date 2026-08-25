@@ -50,8 +50,13 @@ CompileResult TranslateToGLSL(const std::vector<uint32_t>& spirv);
 /// Translates SPIR-V binary to Metal Shading Language via spirv-cross.
 CompileResult TranslateToMSL(const std::vector<uint32_t>& spirv, ShaderStageType stage);
 
-/// Translates SPIR-V binary to WGSL via tint.
-CompileResult TranslateToWGSL(const std::vector<uint32_t>& spirv);
+/// Converts #define-expanded template GLSL to WGSL: preprocess into Vulkan GLSL with
+/// separated texture/sampler bindings, compile to SPIR-V via shaderc, then translate to
+/// WGSL via tint. Binding contract (must match WebGPURenderPipeline and the runtime JIT
+/// path in WebGPUShaderModule): group 0; binding 0/1 = vertex/fragment uniform blocks;
+/// per sampler i (declaration order): texture binding = 2+2i, sampler binding = 3+2i.
+CompileResult CompileGLSLToWGSL(const std::string& source, ShaderStageType stage,
+                                const std::string& shaderName, uint32_t variantIndex);
 
 /// Compiles MSL source text to Metal library binary (.metallib) using xcrun metal/metallib.
 /// Returns empty vector on failure.
