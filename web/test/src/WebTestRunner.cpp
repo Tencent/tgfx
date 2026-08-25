@@ -20,6 +20,7 @@
 #include <string>
 #include "base/TestEnvironment.h"
 #include "gtest/gtest.h"
+#include "utils/ShaderAOTTestReporter.h"
 
 static bool initialized = false;
 
@@ -40,6 +41,10 @@ static void initTests() {
   const char* argv[] = {"tgfx-test"};
   testing::AddGlobalTestEnvironment(new tgfx::TestEnvironment());
   testing::InitGoogleTest(&argc, const_cast<char**>(argv));
+  // Keep the web runner's per-test AOT accounting identical to the native TestMain: without the
+  // reporter, diagnostic recording stays off and tests asserting on hitRecords (e.g. the L2
+  // chain audits) see an empty record list.
+  tgfx::InstallShaderAOTTestReporter();
   if (excludeFilter[0] != '\0') {
     testing::GTEST_FLAG(filter) = excludeFilter;
   }
