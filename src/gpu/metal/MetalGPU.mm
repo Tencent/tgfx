@@ -192,7 +192,8 @@ std::shared_ptr<Texture> MetalGPU::importBackendTexture(const BackendTexture& ba
   }
 
   id<MTLTexture> metalTexture = (__bridge id<MTLTexture>)metalInfo.texture;
-  return MetalTexture::MakeFrom(this, metalTexture, usage, adopted);
+  return MetalTexture::MakeFrom(this, metalTexture, backendTexture.width(), backendTexture.height(),
+                                usage, adopted);
 }
 
 std::shared_ptr<Texture> MetalGPU::importBackendRenderTarget(
@@ -209,7 +210,9 @@ std::shared_ptr<Texture> MetalGPU::importBackendRenderTarget(
   if (!metalTexture) {
     return nullptr;
   }
-  return MetalTexture::MakeFrom(this, metalTexture, TextureUsage::RENDER_ATTACHMENT, false);
+  return MetalTexture::MakeFrom(this, metalTexture, backendRenderTarget.width(),
+                                backendRenderTarget.height(), TextureUsage::RENDER_ATTACHMENT,
+                                false);
 }
 
 std::shared_ptr<Semaphore> MetalGPU::importBackendSemaphore(const BackendSemaphore& semaphore) {
