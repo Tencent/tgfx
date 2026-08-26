@@ -17,9 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "HardwareBufferUtil.h"
-#if defined(__APPLE__)
-#include <TargetConditionals.h>
-#endif
 
 namespace tgfx {
 ImageInfo GetImageInfo(HardwareBufferRef hardwareBuffer, std::shared_ptr<ColorSpace> colorSpace) {
@@ -42,24 +39,14 @@ ImageInfo GetImageInfo(HardwareBufferRef hardwareBuffer, std::shared_ptr<ColorSp
                          info.rowBytes, std::move(colorSpace));
 }
 
-PixelFormat GetRenderableFormat(HardwareBufferFormat hardwareBufferFormat, Backend backend) {
-#if !(TARGET_OS_MAC && !TARGET_OS_IPHONE)
-  (void)backend;
-#endif
+PixelFormat GetRenderableFormat(HardwareBufferFormat hardwareBufferFormat) {
   switch (hardwareBufferFormat) {
     case HardwareBufferFormat::ALPHA_8:
       return PixelFormat::ALPHA_8;
     case HardwareBufferFormat::RGBA_8888:
       return PixelFormat::RGBA_8888;
     case HardwareBufferFormat::BGRA_8888:
-#if TARGET_OS_MAC && !TARGET_OS_IPHONE
-      // On macOS OpenGL imports BGRA hardware buffers as RGBA_8888 textures, while Metal imports
-      // them as BGRA_8888. Keep the renderable format consistent with the backend to avoid a
-      // proxy/texture mismatch that swaps red and blue in advanced blend modes.
-      return backend == Backend::Metal ? PixelFormat::BGRA_8888 : PixelFormat::RGBA_8888;
-#else
       return PixelFormat::BGRA_8888;
-#endif
     default:
       break;
   }

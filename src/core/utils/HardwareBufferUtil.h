@@ -19,7 +19,6 @@
 #pragma once
 
 #include "tgfx/core/ImageInfo.h"
-#include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/PixelFormat.h"
 #include "tgfx/platform/HardwareBuffer.h"
 
@@ -33,8 +32,7 @@ ImageInfo GetImageInfo(HardwareBufferRef hardwareBuffer,
 
 /**
  * Returns the corresponding PixelFormat for the given HardwareBufferFormat if renderable; otherwise
- * returns PixelFormat::Unknown. On macOS OpenGL imports BGRA hardware buffers as RGBA_8888 textures
- * while Metal imports them as BGRA_8888, so the backend is required to keep the format consistent.
+ * returns PixelFormat::Unknown.
  */
-PixelFormat GetRenderableFormat(HardwareBufferFormat hardwareBufferFormat, Backend backend);
+PixelFormat GetRenderableFormat(HardwareBufferFormat hardwareBufferFormat);
 }  // namespace tgfx
