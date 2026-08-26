@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/metal/MetalGPU.h"
+#include "gpu/vulkan/VulkanGPU.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Paint.h"
@@ -24,18 +24,18 @@
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/Texture.h"
-#include "tgfx/gpu/metal/MetalTypes.h"
+#include "tgfx/gpu/vulkan/VulkanTypes.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
 
-TGFX_TEST(MetalBackendTextureTest, LogicalSize) {
+TGFX_TEST(VulkanBackendTextureTest, LogicalSize) {
   ContextScope scope;
   auto context = scope.getContext();
   if (context == nullptr) {
-    GTEST_SKIP() << "Metal backend not available";
+    GTEST_SKIP() << "Vulkan backend not available";
   }
-  auto gpu = static_cast<MetalGPU*>(context->gpu());
+  auto gpu = static_cast<VulkanGPU*>(context->gpu());
   ASSERT_TRUE(gpu != nullptr);
 
   const int physicalSize = 200;
@@ -47,10 +47,10 @@ TGFX_TEST(MetalBackendTextureTest, LogicalSize) {
   ASSERT_TRUE(texture != nullptr);
 
   auto backendTexture = texture->getBackendTexture();
-  MetalTextureInfo metalInfo = {};
-  ASSERT_TRUE(backendTexture.getMetalTextureInfo(&metalInfo));
+  VulkanImageInfo vulkanInfo = {};
+  ASSERT_TRUE(backendTexture.getVulkanImageInfo(&vulkanInfo));
 
-  BackendTexture logicalBackendTexture(metalInfo, logicalSize, logicalSize);
+  BackendTexture logicalBackendTexture(vulkanInfo, logicalSize, logicalSize);
   auto imported = gpu->importBackendTexture(
       logicalBackendTexture, TextureUsage::RENDER_ATTACHMENT | TextureUsage::TEXTURE_BINDING);
   ASSERT_TRUE(imported != nullptr);

@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/metal/MetalGPU.h"
+#include "gpu/d3d12/D3D12GPU.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Paint.h"
@@ -24,18 +24,18 @@
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/Texture.h"
-#include "tgfx/gpu/metal/MetalTypes.h"
+#include "tgfx/gpu/d3d12/D3D12Types.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
 
-TGFX_TEST(MetalBackendTextureTest, LogicalSize) {
+TGFX_TEST(D3D12BackendTextureTest, LogicalSize) {
   ContextScope scope;
   auto context = scope.getContext();
   if (context == nullptr) {
-    GTEST_SKIP() << "Metal backend not available";
+    GTEST_SKIP() << "D3D12 backend not available";
   }
-  auto gpu = static_cast<MetalGPU*>(context->gpu());
+  auto gpu = static_cast<D3D12GPU*>(context->gpu());
   ASSERT_TRUE(gpu != nullptr);
 
   const int physicalSize = 200;
@@ -47,10 +47,10 @@ TGFX_TEST(MetalBackendTextureTest, LogicalSize) {
   ASSERT_TRUE(texture != nullptr);
 
   auto backendTexture = texture->getBackendTexture();
-  MetalTextureInfo metalInfo = {};
-  ASSERT_TRUE(backendTexture.getMetalTextureInfo(&metalInfo));
+  D3D12TextureInfo d3d12Info = {};
+  ASSERT_TRUE(backendTexture.getD3D12TextureInfo(&d3d12Info));
 
-  BackendTexture logicalBackendTexture(metalInfo, logicalSize, logicalSize);
+  BackendTexture logicalBackendTexture(d3d12Info, logicalSize, logicalSize);
   auto imported = gpu->importBackendTexture(
       logicalBackendTexture, TextureUsage::RENDER_ATTACHMENT | TextureUsage::TEXTURE_BINDING);
   ASSERT_TRUE(imported != nullptr);

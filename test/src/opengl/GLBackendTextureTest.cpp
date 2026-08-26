@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/metal/MetalGPU.h"
+#include "gpu/opengl/GLGPU.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Paint.h"
@@ -24,18 +24,18 @@
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/Texture.h"
-#include "tgfx/gpu/metal/MetalTypes.h"
+#include "tgfx/gpu/opengl/GLTypes.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
 
-TGFX_TEST(MetalBackendTextureTest, LogicalSize) {
+TGFX_TEST(GLBackendTextureTest, LogicalSize) {
   ContextScope scope;
   auto context = scope.getContext();
   if (context == nullptr) {
-    GTEST_SKIP() << "Metal backend not available";
+    GTEST_SKIP() << "OpenGL backend not available";
   }
-  auto gpu = static_cast<MetalGPU*>(context->gpu());
+  auto gpu = static_cast<GLGPU*>(context->gpu());
   ASSERT_TRUE(gpu != nullptr);
 
   const int physicalSize = 200;
@@ -47,12 +47,13 @@ TGFX_TEST(MetalBackendTextureTest, LogicalSize) {
   ASSERT_TRUE(texture != nullptr);
 
   auto backendTexture = texture->getBackendTexture();
-  MetalTextureInfo metalInfo = {};
-  ASSERT_TRUE(backendTexture.getMetalTextureInfo(&metalInfo));
+  GLTextureInfo glInfo = {};
+  ASSERT_TRUE(backendTexture.getGLTextureInfo(&glInfo));
 
-  BackendTexture logicalBackendTexture(metalInfo, logicalSize, logicalSize);
+  BackendTexture logicalBackendTexture(glInfo, logicalSize, logicalSize);
   auto imported = gpu->importBackendTexture(
-      logicalBackendTexture, TextureUsage::RENDER_ATTACHMENT | TextureUsage::TEXTURE_BINDING);
+      logicalBackendTexture, TextureUsage::RENDER_ATTACHMENT | TextureUsage::TEXTURE_BINDING,
+      false);
   ASSERT_TRUE(imported != nullptr);
   EXPECT_EQ(imported->width(), logicalSize);
   EXPECT_EQ(imported->height(), logicalSize);
