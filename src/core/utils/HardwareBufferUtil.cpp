@@ -43,6 +43,9 @@ ImageInfo GetImageInfo(HardwareBufferRef hardwareBuffer, std::shared_ptr<ColorSp
 }
 
 PixelFormat GetRenderableFormat(HardwareBufferFormat hardwareBufferFormat, Backend backend) {
+#if !(TARGET_OS_MAC && !TARGET_OS_IPHONE)
+  (void)backend;
+#endif
   switch (hardwareBufferFormat) {
     case HardwareBufferFormat::ALPHA_8:
       return PixelFormat::ALPHA_8;
