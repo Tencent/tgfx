@@ -480,7 +480,8 @@ std::shared_ptr<Texture> D3D12GPU::importBackendTexture(const BackendTexture& ba
   if (adopted) {
     d3d12Resource->Release();
   }
-  return D3D12Texture::MakeFrom(this, std::move(resource), d3d12Info.format, usage);
+  return D3D12Texture::MakeFrom(this, std::move(resource), d3d12Info.format, backendTexture.width(),
+                                backendTexture.height(), usage);
 }
 
 std::shared_ptr<Texture> D3D12GPU::importBackendRenderTarget(
@@ -504,6 +505,7 @@ std::shared_ptr<Texture> D3D12GPU::importBackendRenderTarget(
     return nullptr;
   }
   return D3D12Texture::MakeFrom(this, std::move(resource), d3d12Info.format,
+                                backendRenderTarget.width(), backendRenderTarget.height(),
                                 TextureUsage::RENDER_ATTACHMENT);
 }
 
