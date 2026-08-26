@@ -68,7 +68,7 @@ class TextureRenderTargetProxy : public DefaultTextureProxy,
 
   std::shared_ptr<RenderTarget> getRenderTarget() const override;
 
-  std::shared_ptr<Texture> getStencil(int sampleCount) override {
+  std::shared_ptr<DepthStencilTextureView> getStencil(int sampleCount) override {
     return getOrAllocateStencil(_backingStoreWidth, _backingStoreHeight, sampleCount);
   }
 

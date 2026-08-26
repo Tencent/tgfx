@@ -19,7 +19,6 @@
 #include "PermutationMatcher.h"
 #include <skcms.h>
 #include "gpu/Swizzle.h"
-#include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/AOTPointwiseTailProcessor.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
@@ -44,6 +43,7 @@
 #include "gpu/processors/NonAARRectGeometryProcessor.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
+#include "gpu/processors/RectEffect.h"
 #include "gpu/processors/RoundStrokeRectGeometryProcessor.h"
 #include "gpu/processors/ShapeInstancedGeometryProcessor.h"
 #include "gpu/processors/SingleIntervalGradientColorizer.h"
@@ -127,6 +127,16 @@ static bool IsLocalMaskChild(const FragmentProcessor* child) {
   return false;
 }
 
+// A RectEffect serves as chain/AARect coverage only in its device-space AA form: the AOT
+// shaders carry device-space rect parameters and analytic AA.
+static bool IsFoldableAARectEffect(const FragmentProcessor* fp) {
+  if (fp == nullptr || fp->name() != "RectEffect" || fp->numChildProcessors() != 0) {
+    return false;
+  }
+  auto rectEffect = static_cast<const RectEffect*>(fp);
+  return rectEffect->isDeviceSpaceRect() && rectEffect->isAntiAlias();
+}
+
 enum class CoverageKind {
   None,
   AARect,
@@ -148,7 +158,7 @@ static std::optional<CoverageKind> ClassifyCoverageFP(const ProgramInfo* program
   }
   auto coverageFP = programInfo->getFragmentProcessor(numColorFP);
   auto coverageName = coverageFP->name();
-  if (coverageName == "AARectEffect") {
+  if (coverageName == "RectEffect" && IsFoldableAARectEffect(coverageFP)) {
     return CoverageKind::AARect;
   }
   if (coverageName == "XfermodeFragmentProcessor - dst") {
@@ -172,7 +182,7 @@ static std::optional<CoverageKind> ClassifyCoverageFP(const ProgramInfo* program
 }
 
 // Direct AARect coverage is the sole coverage FP, not a composed child. Keeping this test separate
-// from ClassifyCoverageFP prevents Compose(DeviceSpaceTextureEffect, AARectEffect) from silently
+// from ClassifyCoverageFP prevents Compose(DeviceSpaceTextureEffect, RectEffect) from silently
 // losing its rect component by being treated as a device mask.
 static bool HasDirectAARectCoverage(const ProgramInfo* programInfo) {
   auto numColorFP = programInfo->numColorFragmentProcessors();
@@ -180,7 +190,7 @@ static bool HasDirectAARectCoverage(const ProgramInfo* programInfo) {
     return false;
   }
   auto coverageFP = programInfo->getFragmentProcessor(numColorFP);
-  return coverageFP->name() == "AARectEffect" && coverageFP->numChildProcessors() == 0;
+  return IsFoldableAARectEffect(coverageFP);
 }
 
 // AARect coverage changes only fragment math, whereas a device-space mask adds a sampler and shifts
@@ -825,10 +835,8 @@ static std::optional<PermutationMatchResult> TryMatchDeviceSpaceTexturedEffect(
   if (!composedValues) {
     return std::nullopt;
   }
-  auto vertIndex =
-      DeviceSpaceTexturedEffectShader::VD::domain().encode(composedValues->vertValues);
-  auto fragIndex =
-      DeviceSpaceTexturedEffectShader::FD::domain().encode(composedValues->fragValues);
+  auto vertIndex = DeviceSpaceTexturedEffectShader::VD::domain().encode(composedValues->vertValues);
+  auto fragIndex = DeviceSpaceTexturedEffectShader::FD::domain().encode(composedValues->fragValues);
   return PermutationMatchResult{"DeviceSpaceTexturedEffectShader", vertIndex, fragIndex};
 }
 
@@ -1480,10 +1488,8 @@ static std::optional<PermutationMatchResult> TryMatchShapeInstancedTextureCovera
   if (!composed) {
     return std::nullopt;
   }
-  auto vertIndex =
-      ShapeInstancedTextureCoverageShader::D::domain().encode(composed->vertValues);
-  auto fragIndex =
-      ShapeInstancedTextureCoverageShader::FD::domain().encode(composed->fragValues);
+  auto vertIndex = ShapeInstancedTextureCoverageShader::D::domain().encode(composed->vertValues);
+  auto fragIndex = ShapeInstancedTextureCoverageShader::FD::domain().encode(composed->fragValues);
   return PermutationMatchResult{"ShapeInstancedTextureCoverageShader", vertIndex, fragIndex};
 }
 

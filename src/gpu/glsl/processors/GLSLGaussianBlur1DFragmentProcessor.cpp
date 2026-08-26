@@ -17,8 +17,38 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLGaussianBlur1DFragmentProcessor.h"
+#include <algorithm>
+#include <cmath>
+#include <string>
+#include <string_view>
 
 namespace tgfx {
+
+// Returns the shader expression for sampling the child at a coord offset by the gaussian kernel.
+// "offset" is a shader variable declared in the emitted code and "i" is the loop index.
+static std::string GaussianOffsetCoordFunc(std::string_view coord) {
+  return "(" + std::string(coord) + " + offset * float(i))";
+}
+
+// Emits the code that reads the half-kernel weight for the current loop offset into a "weight"
+// variable. The slot and the lane inside it are picked with chains of compile-time indices rather
+// than indexing the uniform array with abs(i) directly: SwiftShader miscompiles a dynamic index
+// into a std140 uniform block array and silently reads zeros, which drops the blur.
+static void AppendKernelWeight(FragmentShaderBuilder* fragBuilder, const std::string& kernelName,
+                               int slotCount) {
+  fragBuilder->codeAppend("int kernelOffset = abs(i);");
+  fragBuilder->codeAppend("int kernelSlot = kernelOffset / 4;");
+  fragBuilder->codeAppendf("vec4 kernelValues = %s[0];", kernelName.c_str());
+  for (int slot = 1; slot < slotCount; ++slot) {
+    fragBuilder->codeAppendf("if (kernelSlot == %d) { kernelValues = %s[%d]; }", slot,
+                             kernelName.c_str(), slot);
+  }
+  fragBuilder->codeAppend("int kernelLane = kernelOffset - kernelSlot * 4;");
+  fragBuilder->codeAppend("float weight = kernelValues.x;");
+  fragBuilder->codeAppend("if (kernelLane == 1) { weight = kernelValues.y; }");
+  fragBuilder->codeAppend("if (kernelLane == 2) { weight = kernelValues.z; }");
+  fragBuilder->codeAppend("if (kernelLane == 3) { weight = kernelValues.w; }");
+}
 
 PlacementPtr<FragmentProcessor> GaussianBlur1DFragmentProcessor::Make(
     BlockAllocator* allocator, PlacementPtr<FragmentProcessor> processor, float sigma,
@@ -29,12 +59,16 @@ PlacementPtr<FragmentProcessor> GaussianBlur1DFragmentProcessor::Make(
   if (maxSigma < 0) {
     return nullptr;
   }
-  if (sigma <= 0 || stepLength <= 0) {
+  if (sigma <= 0 || stepLength <= 0 || !std::isfinite(sigma)) {
     return processor;
   }
+  // The kernel table and the shader loop bound are dimensioned for maxSigma and sigma, so the
+  // caller must respect both limits. Clamping here would silently mask contract violations.
+  DEBUG_ASSERT(maxSigma <= MAX_KERNEL_RADIUS / 2);
+  DEBUG_ASSERT(sigma <= static_cast<float>(maxSigma));
 
-  return allocator->make<GLSLGaussianBlur1DFragmentProcessor>(
-      std::move(processor), sigma, direction, stepLength, static_cast<int>(ceil(maxSigma)));
+  return allocator->make<GLSLGaussianBlur1DFragmentProcessor>(std::move(processor), sigma,
+                                                              direction, stepLength, maxSigma);
 }
 
 GLSLGaussianBlur1DFragmentProcessor::GLSLGaussianBlur1DFragmentProcessor(
@@ -47,32 +81,36 @@ GLSLGaussianBlur1DFragmentProcessor::GLSLGaussianBlur1DFragmentProcessor(
 void GLSLGaussianBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
   auto fragBuilder = args.fragBuilder;
 
-  std::string sigmaName =
-      args.uniformHandler->addUniform("Sigma", UniformFormat::Float, ShaderStage::Fragment);
+  // The normalized half-kernel weights are precomputed on the CPU and uploaded as a vec4 array.
+  std::string kernelName = args.uniformHandler->addUniform(
+      "Kernel", UniformFormat::Float4, ShaderStage::Fragment, KERNEL_VEC4_COUNT);
+  std::string radiusName =
+      args.uniformHandler->addUniform("Radius", UniformFormat::Int, ShaderStage::Fragment);
   std::string texelSizeName =
       args.uniformHandler->addUniform("Step", UniformFormat::Float2, ShaderStage::Fragment);
 
   fragBuilder->codeAppendf("vec2 offset = %s;", texelSizeName.c_str());
-
-  fragBuilder->codeAppendf("float sigma = %s;", sigmaName.c_str());
-  fragBuilder->codeAppend("int radius = int(ceil(2.0 * sigma));");
+  fragBuilder->codeAppendf("int radius = %s;", radiusName.c_str());
   fragBuilder->codeAppend("vec4 sum = vec4(0.0);");
-  fragBuilder->codeAppend("float total = 0.0;");
 
-  fragBuilder->codeAppendf("for (int j = 0; j <= %d; ++j) {", 4 * maxSigma);
+  // The kernel is symmetric, so abs(i) indexes the half-kernel table. The weights are already
+  // normalized on the CPU, so neither exp() nor the trailing normalization division is needed.
+  fragBuilder->codeAppendf("for (int j = 0; j <= %d; ++j) {", kernelLoopUpperBound());
   fragBuilder->codeAppend("int i = j - radius;");
-  fragBuilder->codeAppend("float weight = exp(-float(i*i) / (2.0*sigma*sigma));");
-  fragBuilder->codeAppend("total += weight;");
+  fragBuilder->codeAppend("if (i > radius) { break; }");
+  // abs(i) never exceeds kernelRadius, which computeKernel() derives as ceil(2 * sigma) and thus
+  // stays within 2 * maxSigma as long as the sigma <= maxSigma contract holds, upheld by the call
+  // site as described in computeKernel(). The loop bound above rests on the same contract, so the
+  // selection chain only has to cover the slots that range can reach.
+  auto maxOffset = std::min(2 * maxSigma, MAX_KERNEL_RADIUS);
+  AppendKernelWeight(fragBuilder, kernelName, std::min(maxOffset / 4 + 1, KERNEL_VEC4_COUNT));
 
   std::string tempColor = "tempColor";
-  emitChild(0, &tempColor, args, [](std::string_view coord) {
-    return "(" + std::string(coord) + " + offset * float(i))";
-  });
+  emitChild(0, &tempColor, args, GaussianOffsetCoordFunc);
 
   fragBuilder->codeAppendf("sum += %s * weight;", tempColor.c_str());
-  fragBuilder->codeAppend("if (i == radius) { break; }");
   fragBuilder->codeAppend("}");
-  fragBuilder->codeAppendf("%s = sum / total;", args.outputColor.c_str());
+  fragBuilder->codeAppendf("%s = sum;", args.outputColor.c_str());
 }
 
 void GLSLGaussianBlur1DFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
@@ -88,7 +126,8 @@ void GLSLGaussianBlur1DFragmentProcessor::onSetData(UniformData* /*vertexUniform
   auto matrix = transform->getTotalMatrix();
   matrix.mapPoints(stepVectors, 2);
   Point step = stepVectors[1] - stepVectors[0];
-  fragmentUniformData->setData("Sigma", sigma);
+
+  Blur1DFragmentProcessor::setKernelData(fragmentUniformData);
   fragmentUniformData->setData("Step", step);
   // Runtime flags of the shared blur kernel; a present mask FP overwrites HasDeviceMask with 1
   // later in traversal.

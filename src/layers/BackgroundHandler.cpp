@@ -183,7 +183,14 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   auto surfaceScale = bgSource->surfaceScale();
   auto contentScale = source->contentScale;
   auto localToWorld = bgSource->surfaceToWorldMatrix();
-  localToWorld.preConcat(canvas->getMatrix());
+  // When the layer subtree is being recorded through the offscreen content path, the canvas
+  // matrix starts at the layer-local origin and no longer carries the layer's world placement;
+  // use the layer-local-to-capture-canvas transform published by that path instead.
+  if (_captureWorldMatrix.has_value()) {
+    localToWorld.preConcat(*_captureWorldMatrix);
+  } else {
+    localToWorld.preConcat(canvas->getMatrix());
+  }
   if (!FloatNearlyZero(surfaceScale) && surfaceScale != 1.0f) {
     contentScale /= surfaceScale;
   }
@@ -336,7 +343,19 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   styleInput.content = contentEntry.image;
   styleInput.contentOffset = contentEntry.offset;
   styleInput.contentScale = source->contentScale;
-  styleInput.extraSource = std::make_shared<StyleInputSource>(std::move(bgImage), backgroundOffset);
+  auto sourceFlags = style->extraSourceType();
+  styleInput.extraSources.push_back(
+      std::make_shared<StyleInputSource>(std::move(bgImage), backgroundOffset));
+  if ((sourceFlags & static_cast<uint32_t>(LayerStyleExtraSourceType::Contour)) != 0) {
+    std::shared_ptr<Image> contourImage = nullptr;
+    Point contourOffset = {};
+    if (group->contour.has_value()) {
+      contourImage = group->contour->image;
+      contourOffset = group->contour->offset - contentEntry.offset;
+    }
+    styleInput.extraSources.push_back(std::make_shared<ContourInputSource>(
+        std::move(contourImage), contourOffset, source->contentShape));
+  }
   style->draw(canvas, styleInput, alpha);
 }
 

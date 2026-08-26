@@ -43,9 +43,6 @@ static constexpr unsigned RECT_EDGE_TOP = 0b0001;
 static constexpr unsigned RECT_EDGE_RIGHT = 0b0010;
 static constexpr unsigned RECT_EDGE_BOTTOM = 0b0100;
 
-// The color space used for the compositor's render target.
-static const auto TargetColorSpace = ColorSpace::SRGB;
-
 static inline AAType GetAAType(int sampleCount, bool antiAlias) {
   if (sampleCount > 1) {
     return AAType::MSAA;
@@ -127,8 +124,9 @@ static std::pair<Quad, unsigned> GetQuadAndAAFlags(const Rect& originalRect, AAT
   return {quad, aaFlags};
 }
 
-Context3DCompositor::Context3DCompositor(const Context& context, int width, int height)
-    : _width(width), _height(height) {
+Context3DCompositor::Context3DCompositor(const Context& context, int width, int height,
+                                         std::shared_ptr<ColorSpace> colorSpace)
+    : _width(width), _height(height), _colorSpace(std::move(colorSpace)) {
   _targetColorProxy =
       context.proxyProvider()->createRenderTargetProxy({}, width, height, PixelFormat::RGBA_8888);
   DEBUG_ASSERT(_targetColorProxy != nullptr);
@@ -194,10 +192,12 @@ void Context3DCompositor::drawQuads(const DrawPolygon3D* polygon,
   }
 
   auto vertexProvider =
-      QuadsVertexProvider::MakeFrom(allocator, std::move(quadRecords), aaType, TargetColorSpace());
+      QuadsVertexProvider::MakeFrom(allocator, std::move(quadRecords), aaType, _colorSpace);
   auto drawOp = Quads3DDrawOp::Make(context, std::move(vertexProvider), 0);
 
-  const SamplingArgs samplingArgs = {TileMode::Clamp, TileMode::Clamp, {}, SrcRectConstraint::Fast};
+  const SamplingArgs samplingArgs = {TileMode::Clamp, TileMode::Clamp,
+                                     SamplingOptions(FilterMode::Linear, MipmapMode::Linear),
+                                     SrcRectConstraint::Fast};
   auto textureImage = image->makeTextureImage(context);
   if (textureImage == nullptr) {
     return;
@@ -246,7 +246,7 @@ std::shared_ptr<Image> Context3DCompositor::snapshotTarget() {
   // Make an immutable copy so subsequent draws to _targetColorProxy do not mutate this snapshot.
   auto copyProxy = _targetColorProxy->makeTextureProxy();
   context->drawingManager()->addRenderTargetCopyTask(_targetColorProxy, copyProxy);
-  return TextureImage::Wrap(std::move(copyProxy), TargetColorSpace());
+  return TextureImage::Wrap(std::move(copyProxy), _colorSpace);
 }
 
 void Context3DCompositor::primeWithImage(const std::shared_ptr<Image>& image) {
@@ -276,7 +276,7 @@ std::shared_ptr<Image> Context3DCompositor::flushToImage() {
   auto clearColor =
       _targetCleared ? std::optional<PMColor>{} : std::optional<PMColor>(PMColor::Transparent());
   context->drawingManager()->addOpsRenderTask(_targetColorProxy, std::move(opArray), clearColor);
-  auto image = TextureImage::Wrap(_targetColorProxy->asTextureProxy(), TargetColorSpace());
+  auto image = TextureImage::Wrap(_targetColorProxy->asTextureProxy(), _colorSpace);
   _targetColorProxy = nullptr;
   _orderedFragments.clear();
   _bspTree.reset();

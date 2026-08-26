@@ -25,8 +25,9 @@
 namespace tgfx {
 
 /**
- * RuntimeEffect supports creating custom ImageFilter objects using the shading language of the
- * current GPU backend.
+ * RuntimeEffect supports creating custom ImageFilter objects with user-provided shader code.
+ * Shader code must be written in GLSL with OpenGL ES 3.0 syntax. Use the "#version 300 es"
+ * directive, or "#version 150" on desktop OpenGL.
  */
 class RuntimeEffect {
  public:

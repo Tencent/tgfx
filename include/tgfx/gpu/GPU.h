@@ -141,8 +141,9 @@ class GPU {
   virtual std::shared_ptr<Sampler> createSampler(const SamplerDescriptor& descriptor) = 0;
 
   /**
-   * Creates a ShaderModule from the provided shader code. The shader code must be valid and
-   * compatible with the GPU backend. Returns nullptr if the shader module creation fails.
+   * Creates a ShaderModule from the provided shader code. The shader code must be written in GLSL
+   * with OpenGL ES 3.0 syntax. Use the "#version 300 es" directive, or "#version 150" on desktop
+   * OpenGL. Returns nullptr if the shader module creation fails.
    */
   virtual std::shared_ptr<ShaderModule> createShaderModule(
       const ShaderModuleDescriptor& descriptor) = 0;

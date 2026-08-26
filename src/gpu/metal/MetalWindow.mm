@@ -36,7 +36,8 @@ static void ApplyColorSpace(CAMetalLayer* layer, const std::shared_ptr<ColorSpac
 
 std::shared_ptr<MetalWindow> MetalWindow::MakeFrom(CAMetalLayer* layer,
                                                    std::shared_ptr<MetalDevice> device,
-                                                   std::shared_ptr<ColorSpace> colorSpace) {
+                                                   std::shared_ptr<ColorSpace> colorSpace,
+                                                   bool vsyncEnabled) {
   if (layer == nil) {
     return nullptr;
   }
@@ -54,11 +55,13 @@ std::shared_ptr<MetalWindow> MetalWindow::MakeFrom(CAMetalLayer* layer,
     layer.device = (__bridge id<MTLDevice>)device->metalDevice();
   }
   ApplyColorSpace(layer, colorSpace);
-  return std::shared_ptr<MetalWindow>(new MetalWindow(device, layer, std::move(colorSpace)));
+  return std::shared_ptr<MetalWindow>(
+      new MetalWindow(device, layer, std::move(colorSpace), vsyncEnabled));
 }
 
 std::shared_ptr<MetalWindow> MetalWindow::MakeFrom(MTKView* view,
-                                                   std::shared_ptr<ColorSpace> colorSpace) {
+                                                   std::shared_ptr<ColorSpace> colorSpace,
+                                                   bool vsyncEnabled) {
   if (view == nil) {
     return nullptr;
   }
@@ -75,18 +78,34 @@ std::shared_ptr<MetalWindow> MetalWindow::MakeFrom(MTKView* view,
     layer.device = (__bridge id<MTLDevice>)device->metalDevice();
   }
   ApplyColorSpace(layer, colorSpace);
-  return std::shared_ptr<MetalWindow>(new MetalWindow(device, view, layer, std::move(colorSpace)));
+  return std::shared_ptr<MetalWindow>(
+      new MetalWindow(device, view, layer, std::move(colorSpace), vsyncEnabled));
+}
+
+static void ApplyVSync(CAMetalLayer* layer, bool vsyncEnabled) {
+#if TARGET_OS_OSX
+  // displaySyncEnabled only exists on macOS; on iOS/tvOS presentation is always synchronized to
+  // the display and cannot be disabled, so vsync cannot be turned off there.
+  layer.displaySyncEnabled = vsyncEnabled ? YES : NO;
+#else
+  (void)layer;
+  (void)vsyncEnabled;
+#endif
 }
 
 // Do not retain layer/view here, otherwise it can cause circular reference.
 MetalWindow::MetalWindow(std::shared_ptr<Device> device, CAMetalLayer* layer,
-                         std::shared_ptr<ColorSpace> colorSpace)
-    : Window(std::move(device), std::move(colorSpace)), metalLayer(layer) {
+                         std::shared_ptr<ColorSpace> colorSpace, bool vsyncEnabled)
+    : Window(std::move(device), std::move(colorSpace), vsyncEnabled), metalLayer(layer) {
+  ApplyVSync(metalLayer, vsyncEnabled);
 }
 
 MetalWindow::MetalWindow(std::shared_ptr<Device> device, MTKView* view, CAMetalLayer* layer,
-                         std::shared_ptr<ColorSpace> colorSpace)
-    : Window(std::move(device), std::move(colorSpace)), metalLayer(layer), metalView(view) {
+                         std::shared_ptr<ColorSpace> colorSpace, bool vsyncEnabled)
+    : Window(std::move(device), std::move(colorSpace), vsyncEnabled),
+      metalLayer(layer),
+      metalView(view) {
+  ApplyVSync(metalLayer, vsyncEnabled);
 }
 
 std::shared_ptr<RenderTargetProxy> MetalWindow::onCreateRenderTarget(Context* context) {

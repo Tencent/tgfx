@@ -18,12 +18,12 @@
 
 #pragma once
 
-#include "DrawOp.h"
+#include "StandardDrawOp.h"
 #include "gpu/proxies/GPUMeshProxy.h"
 
 namespace tgfx {
 
-class MeshDrawOp : public DrawOp {
+class MeshDrawOp : public StandardDrawOp {
  public:
   static PlacementPtr<MeshDrawOp> Make(std::shared_ptr<GPUMeshProxy> meshProxy, PMColor color,
                                        const Matrix& viewMatrix);
@@ -33,7 +33,7 @@ class MeshDrawOp : public DrawOp {
  protected:
   PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
 
-  void onDraw(RenderPass* renderPass) override;
+  void onDraw(RenderPass* renderPass, RenderTarget* renderTarget) override;
 
   Type type() const override {
     return Type::MeshDrawOp;

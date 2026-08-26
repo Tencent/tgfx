@@ -18,6 +18,7 @@
 
 #include <vector>
 #include "tgfx/core/Buffer.h"
+#include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Surface.h"
@@ -155,6 +156,50 @@ TGFX_TEST(ReadPixelsTest, PixelMap) {
   result = A8Map.readPixels(BGRAInfo, pixelsB.data());
   EXPECT_TRUE(result);
   CHECK_PIXELS(BGRAInfo, pixelsB.data(), "PixelMap_alpha_to_BGRA");
+}
+
+TGFX_TEST(ReadPixelsTest, PixmapCopySharesLock) {
+  // Regression test for the double-unlock bug that used to abort MSVC debug builds. A Pixmap
+  // constructed from a Bitmap owns a lock on the Bitmap's PixelRef; copying the Pixmap must share
+  // that lock (via internal shared_ptr) so the mutex is unlocked exactly once when the last copy
+  // is destroyed. Under the old implementation, each copy called unlockPixels() independently and
+  // the second unlock aborted under MSVC's checked STL. On POSIX platforms the extra unlock was
+  // silent undefined behavior; this test observes the correct outcome (readable pixels through
+  // the surviving copy) rather than the abort, so it protects all platforms from regression.
+  Bitmap bitmap(4, 4);
+  ASSERT_FALSE(bitmap.isEmpty());
+  {
+    Pixmap writer(bitmap);
+    ASSERT_TRUE(writer.clear());
+  }
+
+  Pixmap original(bitmap);
+  ASSERT_NE(original.pixels(), nullptr);
+  const void* originalPixels = original.pixels();
+
+  // Copy construction: shares the same lock guard, points at the same pixel memory.
+  Pixmap copy = original;
+  ASSERT_NE(copy.pixels(), nullptr);
+  EXPECT_EQ(copy.pixels(), originalPixels);
+
+  // Reset the original. The old implementation would unlock the underlying mutex here; copy's
+  // destructor would then double-unlock. With shared ownership the mutex stays locked because
+  // copy still holds a reference.
+  original.reset();
+  EXPECT_EQ(original.pixels(), nullptr);
+  ASSERT_NE(copy.pixels(), nullptr);
+  EXPECT_EQ(copy.pixels(), originalPixels);
+
+  // The surviving copy must still be readable end-to-end.
+  Buffer readBuf(copy.info().byteSize());
+  EXPECT_TRUE(copy.readPixels(copy.info(), readBuf.data()));
+
+  // Copy assignment path: assigning another live Pixmap-from-Bitmap into an empty Pixmap must
+  // participate in the same shared lock guard, so both instances hold a reference and neither
+  // releases the mutex until both are destroyed.
+  Pixmap assigned;
+  assigned = copy;
+  EXPECT_EQ(assigned.pixels(), originalPixels);
 }
 
 TGFX_TEST(ReadPixelsTest, Surface) {
@@ -328,6 +373,34 @@ TGFX_TEST(ReadPixelsTest, PngCodec) {
   buffer.clear();
   EXPECT_TRUE(codec->readPixels(RGB565Info, pixels));
   CHECK_PIXELS(RGB565Info, pixels, "PngCodec_Encode_RGB565");
+}
+
+TGFX_TEST(ReadPixelsTest, PngCICPColorSpace) {
+  // The test image declares Display P3 via a PNG v3 cICP chunk (colour_primaries=12,
+  // transfer_function=13, matrix_coefficients=0, video_full_range_flag=1) and carries no iCCP or
+  // sRGB chunks. The decoder must recognise the cICP chunk and report Display P3 primaries with
+  // the sRGB transfer function, instead of falling back to sRGB.
+  auto codec = MakeImageCodec("resources/apitest/cicp_display_p3.png");
+  ASSERT_TRUE(codec != nullptr);
+  auto colorSpace = codec->colorSpace();
+  ASSERT_TRUE(colorSpace != nullptr);
+  EXPECT_TRUE(colorSpace->gammaCloseToSRGB());
+  // Gamut must not match sRGB: otherwise the cICP was silently ignored and the decoder fell back
+  // to the plain sRGB profile.
+  EXPECT_NE(colorSpace->toXYZD50Hash(), ColorSpace::SRGB()->toXYZD50Hash());
+  // Gamut must match Display P3 within floating-point tolerance. `MakeCICP` derives the toXYZD50
+  // matrix from chromaticity coordinates, so it does not exactly equal the hard-coded matrix used
+  // by `ColorSpace::DisplayP3()`; compare each entry with a loose tolerance instead of using the
+  // exact hash equality.
+  ColorMatrix33 actualMatrix = {};
+  ColorMatrix33 expectedMatrix = {};
+  ASSERT_TRUE(colorSpace->toXYZD50(&actualMatrix));
+  ASSERT_TRUE(ColorSpace::DisplayP3()->toXYZD50(&expectedMatrix));
+  for (int row = 0; row < 3; ++row) {
+    for (int col = 0; col < 3; ++col) {
+      EXPECT_NEAR(actualMatrix.values[row][col], expectedMatrix.values[row][col], 1e-3f);
+    }
+  }
 }
 
 TGFX_TEST(ReadPixelsTest, WebpCodec) {

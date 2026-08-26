@@ -37,10 +37,10 @@ class AOTPlanExecutor {
    * if the pass shape exceeds what the chain kernel can represent. The returned processor carries
    * the whole DAG in uniforms, so a draw whose color processors are replaced by it evaluates the
    * same pixels through the precompiled PointwiseChainShader. Used both by the offscreen executor
-   * and by the direct-draw decomposition route in DrawOp::prepare.
+   * and by the direct-draw decomposition route in StandardDrawOp::prepare.
    *
    * coverageFPs, when non-empty, folds the draw's coverage into the chain. A single FP uses the
-   * narrow forms first (a bare AARectEffect becomes an AARectCoverage slot, an alpha-only
+   * narrow forms first (a bare device-space AA RectEffect becomes an AARectCoverage slot, an alpha-only
    * DeviceSpaceTextureEffect becomes the mask child, Compose(mask, rect) becomes both); anything
    * else is lowered as a general pointwise coverage subtree rooted at the GP coverage, which the
    * kernel multiplies into the color result instead of the plain coverage modulation. Two FPs are

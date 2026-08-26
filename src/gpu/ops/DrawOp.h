@@ -9,10 +9,10 @@
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
-//  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. see the License for the specific language governing permissions
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,10 +21,21 @@
 #include <optional>
 #include "gpu/AAType.h"
 #include "gpu/PrecompiledShaderCache.h"
-#include "gpu/ProgramInfo.h"
+#include "gpu/processors/FragmentProcessor.h"
+#include "gpu/processors/XferProcessor.h"
+#include "gpu/resources/RenderTarget.h"
 #include "tgfx/gpu/RenderPass.h"
 
 namespace tgfx {
+/**
+ * DrawOp is the minimal contract every deferred draw operation must satisfy. It exposes only
+ * what OpsRenderTask needs to schedule an op inside a render pass: an execute() entry point,
+ * plus flags such as needsStencil() that let the task set up the pass correctly. Concrete
+ * pipeline-binding strategies live in subclasses — StandardDrawOp handles the common
+ * "framework binds a single pipeline, subclass issues one draw call" pattern; ops that manage
+ * their own pipelines (e.g. StencilCoverPathDrawOp with its stencil + cover passes) inherit
+ * from DrawOp directly and implement execute() themselves.
+ */
 class DrawOp {
  public:
   using ColorProcessorList = std::vector<PlacementPtr<FragmentProcessor>>;
@@ -39,6 +50,7 @@ class DrawOp {
     HairlineLineOp,
     HairlineQuadOp,
     ShapeInstancedDrawOp,
+    StencilCoverPathDrawOp,
   };
 
   virtual ~DrawOp() = default;
@@ -87,34 +99,47 @@ class DrawOp {
     return colors;
   }
 
-  size_t numColorProcessors() const {
-    return colors.size();
-  }
-
-  bool hasXferProcessor() const {
-    return xferProcessor != nullptr;
-  }
-
   virtual bool hasCoverage() const {
     return !coverages.empty();
   }
 
   /**
-   * Prepares the geometry processor and program for a draw. When colorOverride is present, its
-   * processors replace the DrawOp's color processors without modifying them.
+   * Returns true when the op needs a depth/stencil attachment to be present on the render
+   * pass. OpsRenderTask scans the op list with this hook before beginning the pass and attaches
+   * a stencil texture when at least one op opts in. Default is false so existing draw ops keep
+   * running without a stencil buffer.
    */
-  bool prepare(RenderTarget* renderTarget,
-               ProgramLookupMode mode = ProgramLookupMode::AllowRuntimeFallback,
-               std::optional<ColorProcessorList> colorOverride = std::nullopt);
+  virtual bool needsStencil() const {
+    return false;
+  }
 
   /**
-   * Executes a successfully prepared draw and uploads its uniforms and texture samplers. Set
-   * recordDrawStats to false when a caller aggregates multiple prepared passes into one logical
-   * Draw-level record.
+   * Returns the device-space region this op will write to the stencil buffer, so the pass can
+   * scope the initial stencil clear to just that area. The returned rect is in canvas top-left
+   * device space (the same space viewMatrix maps into and Path::getBounds reports in);
+   * OpsRenderTask joins these rects across the pass and applies the render target's origin
+   * transform once before handing them to the backend as clearScissor. Return values:
+   *   - std::nullopt: this op has not declared its stencil-write extent (default). The pass
+   *     conservatively falls back to a full-attachment clear whenever any stencil op returns
+   *     nullopt, since a partial clear could leave stale stencil values wherever the op
+   *     might touch.
+   *   - An empty rect: this op is known to write no stencil (e.g. its cover region was fully
+   *     clipped out). Contributes nothing to the clear union.
+   *   - A non-empty rect: the exact device-space footprint of the op's stencil writes.
+   * Ops that write to stencil (e.g. StencilCoverPathDrawOp) must override this to return an
+   * accurate rect so the clear stays tight. Only meaningful when needsStencil() returns true.
    */
-  void executePrepared(RenderPass* renderPass, bool recordDrawStats = true);
+  virtual std::optional<Rect> getStencilResolveBounds() const {
+    return std::nullopt;
+  }
 
-  void execute(RenderPass* renderPass, RenderTarget* renderTarget);
+  /**
+   * Encodes the op into the given render pass. Called by OpsRenderTask after the pass has
+   * been begun with the correct attachments. Concrete subclasses decide how the op reaches
+   * the GPU — StandardDrawOp does one bindPipeline + one draw call, while custom multi-pass
+   * ops build their own pipelines here.
+   */
+  virtual void execute(RenderPass* renderPass, RenderTarget* renderTarget) = 0;
 
   virtual Type type() const = 0;
 
@@ -127,40 +152,19 @@ class DrawOp {
   PlacementPtr<XferProcessor> xferProcessor = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
   CullMode cullMode = CullMode::None;
+  OffscreenFillKey offscreenFillKey = InvalidOffscreenFillKey;
 
   DrawOp(BlockAllocator* allocator, AAType aaType) : allocator(allocator), aaType(aaType) {
   }
 
-  virtual PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) = 0;
-
   /**
-   * Provides a chain-route geometry processor for the decomposition rewrite, plus any coverage
-   * leaves synthesized from GP-owned textures. AtlasTextOp implements this because its GP owns
-   * the atlas sampler, which ProgramInfo would bind ahead of the chain's leaf samplers; the
-   * returned GP is identical except it claims no sampler. The default returns nullptr, keeping
-   * the draw's own geometry processor for the rewrite.
+   * Applies the op's scissor rectangle to the render pass. An empty scissor expands to the
+   * full render target. StandardDrawOp calls this internally as part of pipeline binding;
+   * multi-pass ops that bind their own pipelines must call it (or a stricter variant) for
+   * every pass — otherwise that pass writes outside the op's clip and may pollute the render
+   * pass for subsequent ops (especially relevant for stencil writes, which are not undone by
+   * a cover pass outside the cover scissor).
    */
-  virtual PlacementPtr<GeometryProcessor> onMakeChainGeometryProcessor(
-      std::vector<PlacementPtr<FragmentProcessor>>* chainCoverageFPs) {
-    (void)chainCoverageFPs;
-    return nullptr;
-  }
-
-  virtual void onDraw(RenderPass* renderPass) = 0;
-
- private:
-  std::shared_ptr<Program> prepareDecomposedProgram(RenderTarget* renderTarget,
-                                                    const ColorProcessorList& activeColors);
-
-  PlacementPtr<GeometryProcessor> geometryProcessor = nullptr;
-  // Holds the chain-route twin GP (when an op provides one) for the draw's lifetime: a local
-  // PlacementPtr would run the base destructor at scope exit and devolve the vtable.
-  PlacementPtr<GeometryProcessor> chainGeometryProcessor = nullptr;
-  bool geometryProcessorInitialized = false;
-  std::optional<ColorProcessorList> preparedColors = std::nullopt;
-  std::unique_ptr<ProgramInfo> preparedProgramInfo = nullptr;
-  std::shared_ptr<Program> preparedProgram = nullptr;
-  RenderTarget* preparedRenderTarget = nullptr;
-  OffscreenFillKey offscreenFillKey = InvalidOffscreenFillKey;
+  void applyScissor(RenderPass* renderPass, RenderTarget* renderTarget) const;
 };
 }  // namespace tgfx

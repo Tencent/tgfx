@@ -37,7 +37,7 @@ class UniformHandler {
    * Adds a uniform variable to the current program, that has visibility in one or more shaders.
    * visibility is a bitfield of ShaderFlag values indicating from which shaders the uniform should
    * be accessible. At least one bit must be set. The actual uniform name will be mangled. Returns
-   * the final uniform name. arraySize is 1 for scalars and the element count for std140 arrays.
+   * the final uniform name. An array uniform is created when arraySize is greater than 1.
    */
   std::string addUniform(const std::string& name, UniformFormat format, ShaderStage stage,
                          uint32_t arraySize = 1);

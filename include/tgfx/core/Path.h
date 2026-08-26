@@ -141,6 +141,17 @@ class Path {
   bool contains(const Rect& rect) const;
 
   /**
+   * Returns true if the Path is convex. An unclosed path is treated as convex if it would be
+   * convex once closed; use isLastContourClosed() to additionally require a closed contour.
+   */
+  bool isConvex() const;
+
+  /**
+   * Returns true if the last contour of the Path is closed.
+   */
+  bool isLastContourClosed() const;
+
+  /**
    * Adds beginning of contour at Point (x, y).
    */
   void moveTo(float x, float y);

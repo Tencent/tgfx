@@ -295,21 +295,20 @@ void ConvertNoninflectCubicToQuads(const Point p[4], float toleranceSqd, std::ve
 
 }  // namespace
 
-std::vector<Point> PathUtils::ConvertCubicToQuads(const Point cubicPoints[4], float tolerance) {
-  if (!FloatsAreFinite(&tolerance, 1)) {
-    return {};
+void PathUtils::ConvertCubicToQuads(const Point cubicPoints[4], float tolerance,
+                                    std::vector<Point>* quads) {
+  if (quads == nullptr || !FloatsAreFinite(&tolerance, 1)) {
+    return;
   }
   Point chopped[10];
   int count = ChopCubicAtInflections(cubicPoints, chopped);
 
   float toleranceSquare = tolerance * tolerance;
 
-  std::vector<Point> convertQuads;
   for (int i = 0; i < count; ++i) {
     Point* cubic = chopped + (3 * i);
-    ConvertNoninflectCubicToQuads(cubic, toleranceSquare, convertQuads);
+    ConvertNoninflectCubicToQuads(cubic, toleranceSquare, *quads);
   }
-  return convertQuads;
 }
 
 void PathUtils::ChopQuadAt(const Point source[3], Point destination[5], float t) {

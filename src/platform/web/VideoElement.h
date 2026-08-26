@@ -19,6 +19,7 @@
 #pragma once
 
 #include <emscripten/val.h>
+#include <cstdint>
 #include "platform/ImageStream.h"
 
 namespace tgfx {
@@ -45,6 +46,11 @@ class VideoElement : public ImageStream {
 
  private:
   emscripten::val source = emscripten::val::null();
+#ifdef TGFX_USE_WEBGPU
+  // Caches the WGPUDevice handle of the context that created the texture, so that the JS side can
+  // resolve the same GPUDevice object via WebGPU.mgrDevice when uploading video frames.
+  uintptr_t _deviceHandle = 0;
+#endif
 
   VideoElement(emscripten::val video, int width, int height);
 };

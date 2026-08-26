@@ -90,7 +90,7 @@ VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder, VulkanGPU* gpu
       continue;
     }
     auto vulkanTexture = std::static_pointer_cast<VulkanTexture>(ca.texture);
-    encoder->retainResource(vulkanTexture);
+    encoder->retainTexture(vulkanTexture);
 
     // Transition color attachment to GENERAL layout. For Clear/DontCare loadOp, using UNDEFINED as
     // oldLayout avoids cross-submission layout tracking issues. For Load, we must preserve contents
@@ -135,7 +135,7 @@ VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder, VulkanGPU* gpu
       }
       hasResolve = true;
       auto resolveVulkanTexture = std::static_pointer_cast<VulkanTexture>(ca.resolveTexture);
-      encoder->retainResource(resolveVulkanTexture);
+      encoder->retainTexture(resolveVulkanTexture);
 
       TransitionImageLayout(commandBuffer, resolveVulkanTexture->vulkanImage(),
                             VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
@@ -169,7 +169,7 @@ VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder, VulkanGPU* gpu
   if (hasDepth) {
     auto dsTexture =
         std::static_pointer_cast<VulkanTexture>(passDescriptor.depthStencilAttachment.texture);
-    encoder->retainResource(dsTexture);
+    encoder->retainTexture(dsTexture);
 
     TransitionImageLayout(commandBuffer, dsTexture->vulkanImage(), dsTexture->currentLayout(),
                           VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
@@ -374,7 +374,7 @@ void VulkanRenderPass::setTexture(unsigned binding, std::shared_ptr<Texture> tex
   if (tb.imageView == view && tb.sampler == samp) {
     return;
   }
-  encoder->retainResource(vulkanTexture);
+  encoder->retainTexture(vulkanTexture);
   encoder->retainResource(vulkanSampler);
   tb = {view, samp};
   lastBound.descriptorDirty = true;

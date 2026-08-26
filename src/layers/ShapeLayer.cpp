@@ -22,6 +22,7 @@
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/layers/LayerPaint.h"
+#include "tgfx/layers/LayerRecorder.h"
 #include "tgfx/layers/layerstyles/StyledShape.h"
 
 namespace tgfx {
@@ -228,12 +229,11 @@ void ShapeLayer::onUpdateContent(LayerRecorder* recorder) {
   }
 
   if (!_strokeStyles.empty()) {
-    // Check if we can use simple stroke mode (pass stroke params to LayerPaint directly).
     auto strokeAlign = static_cast<StrokeAlign>(shapeBitFields.strokeAlign);
-    bool simpleStroke = _lineDashPattern.empty() && strokeAlign == StrokeAlign::Center;
-    std::shared_ptr<Shape> strokeShape = nullptr;
-    if (!simpleStroke) {
-      strokeShape = createStrokeShape();
+    std::shared_ptr<PathEffect> dashEffect = nullptr;
+    if (!_lineDashPattern.empty()) {
+      dashEffect = CreateDashPathEffect(_lineDashPattern, _lineDashPhase,
+                                        shapeBitFields.lineDashAdaptive, stroke);
     }
     for (const auto& style : _strokeStyles) {
       LayerPaint paint(style->color(), style->blendMode());
@@ -241,38 +241,13 @@ void ShapeLayer::onUpdateContent(LayerRecorder* recorder) {
       if (shapeBitFields.strokeOnTop) {
         paint.placement = LayerPlacement::Foreground;
       }
-      if (simpleStroke) {
-        paint.style = PaintStyle::Stroke;
-        paint.stroke = stroke;
-        recorder->addShape(_shape, paint);
-      } else {
-        recorder->addShape(strokeShape, paint);
-      }
+      paint.style = PaintStyle::Stroke;
+      paint.stroke = stroke;
+      paint.strokeAlign = strokeAlign;
+      paint.pathEffect = dashEffect;
+      recorder->addShape(_shape, paint);
     }
   }
-}
-
-std::shared_ptr<Shape> ShapeLayer::createStrokeShape() const {
-  auto strokeShape = _shape;
-  auto strokeAlign = static_cast<StrokeAlign>(shapeBitFields.strokeAlign);
-  auto tempStroke = stroke;
-  if (strokeAlign != StrokeAlign::Center) {
-    tempStroke.width *= 2;
-  }
-  if (!_lineDashPattern.empty()) {
-    auto dash = CreateDashPathEffect(_lineDashPattern, _lineDashPhase,
-                                     shapeBitFields.lineDashAdaptive, tempStroke);
-    if (dash) {
-      strokeShape = Shape::ApplyEffect(std::move(strokeShape), std::move(dash));
-    }
-  }
-  strokeShape = Shape::ApplyStroke(std::move(strokeShape), &tempStroke);
-  if (strokeAlign == StrokeAlign::Inside) {
-    strokeShape = Shape::Merge(std::move(strokeShape), _shape, PathOp::Intersect);
-  } else if (strokeAlign == StrokeAlign::Outside) {
-    strokeShape = Shape::Merge(std::move(strokeShape), _shape, PathOp::Difference);
-  }
-  return strokeShape;
 }
 
 std::optional<StyledShape> ShapeLayer::onGetContentShape() {

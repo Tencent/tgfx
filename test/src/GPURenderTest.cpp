@@ -18,12 +18,15 @@
 
 #include <memory>
 #include <vector>
+#include "ArrayVaryingEffect.h"
 #include "InstancedGridRenderPass.h"
 #include "MultisampleTestEffect.h"
 #include "StencilMaskRenderPass.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "gpu/resources/DepthStencilTextureView.h"
+#include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/RenderPass.h"
@@ -162,26 +165,60 @@ TGFX_TEST(GPURenderTest, StencilMaskRenderPass) {
   EXPECT_EQ(cornerPixel, 0u) << "corner pixel was not the clear colour";
 }
 
-// Verifies RenderTargetProxy::getStencil() lazily allocates a stencil texture the first
-// time it is called and then returns the same instance on subsequent calls.
 TGFX_TEST(GPURenderTest, RenderTargetProxyGetStencil) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  auto proxy = RenderTargetProxy::Make(context, 96, 64, /*alphaOnly=*/false);
-  ASSERT_TRUE(proxy != nullptr);
+  std::shared_ptr<DepthStencilTextureView> shared = nullptr;
+  {
+    // Case 1: the attachment is lazily created on the first getStencil() call and reused
+    // within the proxy on subsequent calls.
+    auto proxy = RenderTargetProxy::Make(context, 96, 64, /*alphaOnly=*/false);
+    ASSERT_TRUE(proxy != nullptr);
+    shared = proxy->getStencil(1);
+    ASSERT_TRUE(shared != nullptr);
+    EXPECT_EQ(shared->width(), 96);
+    EXPECT_EQ(shared->height(), 64);
+    EXPECT_EQ(shared->sampleCount(), 1);
+    auto second = proxy->getStencil(1);
+    ASSERT_TRUE(second != nullptr);
+    // Lazy-init contract: subsequent calls return the cached instance, not a fresh attachment.
+    EXPECT_EQ(shared.get(), second.get());
+  }
 
-  auto first = proxy->getStencil(1);
-  ASSERT_TRUE(first != nullptr);
-  EXPECT_EQ(first->width(), 96);
-  EXPECT_EQ(first->height(), 64);
-  EXPECT_EQ(first->sampleCount(), 1);
+  {
+    // Case 2: a proxy with the same spec reuses the cached attachment while it is still in
+    // the nonpurgeable list.
+    auto proxy = RenderTargetProxy::Make(context, 96, 64, /*alphaOnly=*/false);
+    ASSERT_TRUE(proxy != nullptr);
+    auto stencil = proxy->getStencil(1);
+    ASSERT_TRUE(stencil != nullptr);
+    EXPECT_EQ(stencil.get(), shared.get());
+  }
 
-  auto second = proxy->getStencil(1);
-  ASSERT_TRUE(second != nullptr);
-  // Lazy-init contract: subsequent calls return the cached instance, not a fresh texture.
-  EXPECT_EQ(first.get(), second.get());
+  // Release the last strong reference so the attachment enters the purgeable queue.
+  auto* released = shared.get();
+  shared = nullptr;
+  {
+    // Case 3: a proxy with the same spec reactivates the same attachment from the purgeable
+    // queue.
+    auto proxy = RenderTargetProxy::Make(context, 96, 64, /*alphaOnly=*/false);
+    ASSERT_TRUE(proxy != nullptr);
+    auto stencil = proxy->getStencil(1);
+    ASSERT_TRUE(stencil != nullptr);
+    EXPECT_EQ(stencil.get(), released);
+    shared = stencil;
+  }
+
+  {
+    // Case 4: a proxy with a different spec gets a separate attachment.
+    auto proxy = RenderTargetProxy::Make(context, 128, 64, /*alphaOnly=*/false);
+    ASSERT_TRUE(proxy != nullptr);
+    auto stencil = proxy->getStencil(1);
+    ASSERT_TRUE(stencil != nullptr);
+    EXPECT_NE(stencil.get(), shared.get());
+  }
 }
 
 // Verifies the setter/getter pair for ProgramInfo's stencil and colour-write-mask state, and
@@ -387,6 +424,28 @@ TGFX_TEST(GPURenderTest, AlphaToCoverage) {
   canvas->clear();
   canvas->drawImage(std::move(imageOn));
   EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/AlphaToCoverage_On"));
+}
+
+TGFX_TEST(GPURenderTest, ArrayVarying) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // Use a 200x200 synthetic input so the filtered image is also 200x200. The effect draws an NDC
+  // [-0.5, 0.5] quad, which lands a 100x100 rectangle centred in the 200x200 surface with a
+  // 50-pixel margin on every side. The input pixel values are irrelevant — the effect ignores
+  // its source texture and overwrites the entire filtered image with the blue quad.
+  Bitmap inputBitmap(200, 200, false);
+  auto image = Image::MakeFrom(std::move(inputBitmap));
+  ASSERT_TRUE(image != nullptr);
+
+  auto effect = ArrayVaryingEffect::Make();
+  auto filter = ImageFilter::Runtime(std::move(effect));
+  auto filtered = image->makeWithFilter(std::move(filter));
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  canvas->drawImage(std::move(filtered));
+  EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/ArrayVarying"));
 }
 
 }  // namespace tgfx

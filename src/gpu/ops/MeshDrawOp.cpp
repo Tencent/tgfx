@@ -32,7 +32,8 @@ PlacementPtr<MeshDrawOp> MeshDrawOp::Make(std::shared_ptr<GPUMeshProxy> meshProx
 
 MeshDrawOp::MeshDrawOp(BlockAllocator* allocator, std::shared_ptr<GPUMeshProxy> meshProxy,
                        PMColor color, const Matrix& viewMatrix)
-    : DrawOp(allocator, meshProxy->attributes().hasCoverage ? AAType::Coverage : AAType::None),
+    : StandardDrawOp(allocator,
+                     meshProxy->attributes().hasCoverage ? AAType::Coverage : AAType::None),
       meshProxy(std::move(meshProxy)), color(color), viewMatrix(viewMatrix) {
 }
 
@@ -42,7 +43,7 @@ PlacementPtr<GeometryProcessor> MeshDrawOp::onMakeGeometryProcessor(RenderTarget
                                      attrs.hasCoverage, color, viewMatrix);
 }
 
-void MeshDrawOp::onDraw(RenderPass* renderPass) {
+void MeshDrawOp::onDraw(RenderPass* renderPass, RenderTarget* /*renderTarget*/) {
   auto vertexBuffer = meshProxy->getVertexBuffer();
   if (vertexBuffer == nullptr) {
     return;

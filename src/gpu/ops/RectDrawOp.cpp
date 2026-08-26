@@ -48,7 +48,7 @@ PlacementPtr<RectDrawOp> RectDrawOp::Make(Context* context,
 }
 
 RectDrawOp::RectDrawOp(BlockAllocator* allocator, RectsVertexProvider* provider)
-    : DrawOp(allocator, provider->aaType()), rectCount(provider->rectCount()),
+    : StandardDrawOp(allocator, provider->aaType()), rectCount(provider->rectCount()),
       lineJoin(provider->lineJoin()) {
   if (!provider->hasUVCoord()) {
     auto matrix = provider->firstMatrix();
@@ -91,7 +91,7 @@ static uint16_t GetNumIndicesPerQuad(AAType aaType, const std::optional<LineJoin
   }
 }
 
-void RectDrawOp::onDraw(RenderPass* renderPass) {
+void RectDrawOp::onDraw(RenderPass* renderPass, RenderTarget* /*renderTarget*/) {
   std::shared_ptr<BufferResource> indexBuffer = nullptr;
   if (indexBufferProxy) {
     indexBuffer = indexBufferProxy->getBuffer();

@@ -26,7 +26,7 @@
 #include "gpu/BackingFit.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/PrecompiledShaderCache.h"
-#include "gpu/processors/AARectEffect.h"
+#include "gpu/ops/StandardDrawOp.h"
 #include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/AOTPointwiseTailProcessor.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
@@ -35,6 +35,7 @@
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/LumaFragmentProcessor.h"
 #include "gpu/processors/PerlinNoiseFragmentProcessor.h"
+#include "gpu/processors/RectEffect.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/resources/RenderTarget.h"
@@ -450,6 +451,17 @@ static int MapChainInput(const std::vector<const AOTEffectNode*>& nodes,
   return slot == SIZE_MAX ? -2 : static_cast<int>(slot);
 }
 
+// A RectEffect folds into the chain's AARectCoverage slot only in its device-space AA form:
+// a transformed rect cannot be expressed by the device-space rect parameters, and the NonAA
+// hard edge is not implemented by the analytic coverage kernel.
+static bool IsChainFoldableRectEffect(const FragmentProcessor* fp) {
+  if (fp == nullptr || fp->name() != "RectEffect" || fp->numChildProcessors() != 0) {
+    return false;
+  }
+  auto rectEffect = static_cast<const RectEffect*>(fp);
+  return rectEffect->isDeviceSpaceRect() && rectEffect->isAntiAlias();
+}
+
 // Flattens a single-pass pointwise DAG into the fused chain processor. Texture leaves are placed
 // in the leading slots so that slot k pairs with TextureSampler_k, which keeps sampler indexing
 // static in the kernel; the remaining nodes follow in topological order. When rectEffect is given,
@@ -459,7 +471,7 @@ static int MapChainInput(const std::vector<const AOTEffectNode*>& nodes,
 // block, coverage ops trail the color ops, and coverageRoot becomes the chain's coverage root.
 static PlacementPtr<FragmentProcessor> BuildChainFP(
     BlockAllocator* allocator, const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
-    const AARectEffect* rectEffect, const DeviceSpaceTextureEffect* maskEffect,
+    const RectEffect* rectEffect, const DeviceSpaceTextureEffect* maskEffect,
     const AOTEffectGraph* coverageGraph = nullptr, AOTNodeID coverageRoot = AOTNodeID(),
     bool coverageLeafFromUVCoord = false) {
   // Combined node space: color-graph nodes occupy [0, colorCount), coverage-graph nodes follow.
@@ -915,8 +927,9 @@ static PlacementPtr<FragmentProcessor> BuildFPForPass(
   return current;
 }
 
-static bool ExecutePreparedPass(CommandEncoder* encoder, RenderTarget* renderTarget, DrawOp* drawOp,
-                                LoadAction loadAction, const PMColor& clearColor) {
+static bool ExecutePreparedPass(CommandEncoder* encoder, RenderTarget* renderTarget,
+                                StandardDrawOp* drawOp, LoadAction loadAction,
+                                const PMColor& clearColor) {
   auto resolveTexture =
       renderTarget->sampleCount() > 1 ? renderTarget->getSampleTexture() : nullptr;
   RenderPassDescriptor descriptor(renderTarget->getRenderTexture(), loadAction, StoreAction::Store,
@@ -926,7 +939,7 @@ static bool ExecutePreparedPass(CommandEncoder* encoder, RenderTarget* renderTar
     LOGE("AOTPlanRenderTask::execute() Failed to initialize the render pass!");
     return false;
   }
-  drawOp->executePrepared(renderPass.get(), false);
+  drawOp->executePrepared(renderPass.get(), renderTarget, false);
   renderPass->end();
   return true;
 }
@@ -969,14 +982,15 @@ class AOTPlanRenderTask : public RenderTask {
     auto* statsCache = finalTarget->getContext()->precompiledShaderCache();
     statsCache->setMissRecordingPaused(true);
     for (size_t index = 0; index < intermediatePasses.size(); ++index) {
-      if (!intermediatePasses[index].drawOp->prepare(renderTargets[index].get(),
-                                                     ProgramLookupMode::PrecompiledOnly)) {
+      auto drawOp = static_cast<StandardDrawOp*>(intermediatePasses[index].drawOp.get());
+      if (!drawOp->prepare(renderTargets[index].get(), ProgramLookupMode::PrecompiledOnly)) {
         prepared = false;
         break;
       }
     }
-    if (prepared && !originalDraw->prepare(finalTarget.get(), ProgramLookupMode::PrecompiledOnly,
-                                           std::move(terminalColors))) {
+    if (prepared && !static_cast<StandardDrawOp*>(originalDraw.get())
+                         ->prepare(finalTarget.get(), ProgramLookupMode::PrecompiledOnly,
+                                   std::move(terminalColors))) {
       prepared = false;
     }
     statsCache->setMissRecordingPaused(false);
@@ -1000,12 +1014,13 @@ class AOTPlanRenderTask : public RenderTask {
 
     for (size_t index = 0; index < intermediatePasses.size(); ++index) {
       if (!ExecutePreparedPass(encoder, renderTargets[index].get(),
-                               intermediatePasses[index].drawOp.get(), LoadAction::Clear,
-                               PMColor::Transparent())) {
+                               static_cast<StandardDrawOp*>(intermediatePasses[index].drawOp.get()),
+                               LoadAction::Clear, PMColor::Transparent())) {
         return;
       }
     }
-    if (!ExecutePreparedPass(encoder, finalTarget.get(), originalDraw.get(), LoadAction::Load,
+    if (!ExecutePreparedPass(encoder, finalTarget.get(),
+                             static_cast<StandardDrawOp*>(originalDraw.get()), LoadAction::Load,
                              PMColor::Transparent())) {
       return;
     }
@@ -1026,10 +1041,11 @@ class AOTPlanRenderTask : public RenderTask {
       LOGE("AOTPlanRenderTask::executeFallback() Final render target is null!");
       return;
     }
-    if (!originalDraw->prepare(finalTarget.get(), ProgramLookupMode::AllowRuntimeFallback)) {
+    auto drawOp = static_cast<StandardDrawOp*>(originalDraw.get());
+    if (!drawOp->prepare(finalTarget.get(), ProgramLookupMode::AllowRuntimeFallback)) {
       return;
     }
-    if (!ExecutePreparedPass(encoder, finalTarget.get(), originalDraw.get(), LoadAction::Load,
+    if (!ExecutePreparedPass(encoder, finalTarget.get(), drawOp, LoadAction::Load,
                              PMColor::Transparent())) {
       return;
     }
@@ -1118,17 +1134,18 @@ PlacementPtr<FragmentProcessor> AOTPlanExecutor::BuildChainProcessor(
     return nullptr;
   }
   // Normalize the coverage into the forms the chain kernel carries. The narrow forms come first:
-  // a bare AARectEffect folds into an AARectCoverage slot, an alpha-only DeviceSpaceTextureEffect
-  // becomes the mask child, and Compose(mask, rect) yields both. Anything else is lowered as a
-  // general coverage subtree (a pointwise DAG rooted at the GP coverage unit). A two-FP coverage
-  // is accepted as [lowerable subtree, alpha-only device mask] and folds to subtree + mask child.
-  const AARectEffect* rectEffect = nullptr;
+  // a bare device-space AA RectEffect folds into an AARectCoverage slot, an alpha-only
+  // DeviceSpaceTextureEffect becomes the mask child, and Compose(mask, rect) yields both. Anything
+  // else is lowered as a general coverage subtree (a pointwise DAG rooted at the GP coverage
+  // unit). A two-FP coverage is accepted as [lowerable subtree, alpha-only device mask] and folds
+  // to subtree + mask child.
+  const RectEffect* rectEffect = nullptr;
   const DeviceSpaceTextureEffect* maskEffect = nullptr;
   const FragmentProcessor* subtreeFP = coverageFPs.front();
   if (coverageFPs.size() == 1) {
     auto coverageName = subtreeFP->name();
-    if (coverageName == "AARectEffect") {
-      rectEffect = static_cast<const AARectEffect*>(subtreeFP);
+    if (coverageName == "RectEffect" && IsChainFoldableRectEffect(subtreeFP)) {
+      rectEffect = static_cast<const RectEffect*>(subtreeFP);
       return BuildChainFP(allocator, graph, pass, rectEffect, nullptr);
     }
     if (coverageName == "DeviceSpaceTextureEffect") {
@@ -1140,9 +1157,9 @@ PlacementPtr<FragmentProcessor> AOTPlanExecutor::BuildChainProcessor(
     }
     if (coverageName == "ComposeFragmentProcessor" && subtreeFP->numChildProcessors() == 2 &&
         subtreeFP->childProcessor(0)->name() == "DeviceSpaceTextureEffect" &&
-        subtreeFP->childProcessor(1)->name() == "AARectEffect") {
+        IsChainFoldableRectEffect(subtreeFP->childProcessor(1))) {
       maskEffect = static_cast<const DeviceSpaceTextureEffect*>(subtreeFP->childProcessor(0));
-      rectEffect = static_cast<const AARectEffect*>(subtreeFP->childProcessor(1));
+      rectEffect = static_cast<const RectEffect*>(subtreeFP->childProcessor(1));
       if (!maskEffect->isAlphaOnly() || maskEffect->hasPerspective()) {
         return nullptr;
       }
@@ -1162,8 +1179,8 @@ PlacementPtr<FragmentProcessor> AOTPlanExecutor::BuildChainProcessor(
       }
     } else if (last->name() == "TextureEffect") {
       subtreeFP = last;
-      if (first->name() == "AARectEffect") {
-        rectEffect = static_cast<const AARectEffect*>(first);
+      if (IsChainFoldableRectEffect(first)) {
+        rectEffect = static_cast<const RectEffect*>(first);
       } else if (first->name() == "DeviceSpaceTextureEffect") {
         maskEffect = static_cast<const DeviceSpaceTextureEffect*>(first);
         if (!maskEffect->isAlphaOnly() || maskEffect->hasPerspective()) {

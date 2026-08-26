@@ -22,15 +22,17 @@
 namespace tgfx {
 UniformData::UniformData(std::vector<Uniform> uniforms) : _uniforms(std::move(uniforms)) {
   for (const auto& uniform : _uniforms) {
-    size_t size = 0;
-    size_t align = 0;
     const auto& [entrySize, entryAlign] = EntryOf(uniform.format());
-    size = entrySize;
-    align = entryAlign;
+    uint32_t arraySize = uniform.arraySize();
+    // The std140 layout aligns every array element to a 16-byte boundary, so only formats whose
+    // element size is 16 bytes (e.g. Float4) match the contiguous CPU-side layout. Other element
+    // types would be misaligned in the GPU uniform block and must not be used as arrays.
+    DEBUG_ASSERT(arraySize <= 1 || entrySize == 16);
+    const size_t size = entrySize * arraySize;
+    const size_t align = entryAlign;
 
     // std140 arrays stride each element up to a 16-byte multiple.
     size_t elementStride = (size + 15) / 16 * 16;
-    uint32_t arraySize = uniform.arraySize();
     size_t totalSize = arraySize > 1 ? elementStride * arraySize : size;
     // std140 arrays are always aligned to a vec4 boundary, even arrays of scalars.
     if (arraySize > 1 && align < 16) {

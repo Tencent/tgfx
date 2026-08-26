@@ -26,6 +26,7 @@
 #include "core/utils/MathExtra.h"
 #include "core/utils/RectToRectMatrix.h"
 #include "core/utils/StrokeUtils.h"
+#include "core/utils/USE.h"
 #include "gpu/AOTEffectDecomposer.h"
 #include "gpu/AOTPlanExecutor.h"
 #include "gpu/DrawingManager.h"
@@ -37,13 +38,16 @@
 #include "gpu/ops/MeshDrawOp.h"
 #include "gpu/ops/ShapeDrawOp.h"
 #include "gpu/ops/ShapeInstancedDrawOp.h"
-#include "gpu/processors/AARectEffect.h"
+#include "gpu/ops/StencilCoverPathDrawOp.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
+#include "gpu/processors/RRectEffect.h"
+#include "gpu/processors/RectEffect.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "processors/ColorSpaceXFormEffect.h"
 #include "processors/PorterDuffXferProcessor.h"
 #include "processors/XfermodeFragmentProcessor.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 
@@ -186,6 +190,20 @@ static bool MatrixOnlyDiffersInTranslation(const Matrix& a, const Matrix& b) {
 void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const Matrix& matrix,
                               const ClipStack& clip, const Brush& brush) {
   DEBUG_ASSERT(shape != nullptr);
+  if (shouldUseStencilCover(brush, *shape)) {
+    if (!canAppend(PendingOpType::StencilCoverPath, clip, brush)) {
+      flushPendingOps(PendingOpType::StencilCoverPath, clip, brush);
+    }
+    // canAppend + CompareBrush ignore brush.color, so a run of stencil-cover shapes may
+    // legitimately differ only in color. Keep per-shape colors in a parallel array while
+    // pendingBrush stays pinned to the first shape's brush (its shader / blendMode /
+    // maskFilter / colorFilter are what canAppend actually validated). flushPendingStencil-
+    // CoverOps MUST feed dstColor from this array, not from pendingBrush.color.
+    pendingStencilCoverShapes.emplace_back(std::move(shape));
+    pendingStencilCoverMatrices.emplace_back(matrix);
+    pendingStencilCoverColors.emplace_back(brush.color);
+    return;
+  }
   if (canAppend(PendingOpType::Shape, clip, brush) && pendingShape &&
       pendingShape->getUniqueKey() == shape->getUniqueKey() &&
       MatrixOnlyDiffersInTranslation(pendingShapeMatrix, matrix)) {
@@ -214,6 +232,41 @@ void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const Matrix& matrix
   pendingShapeMatrix = matrix;
   pendingShapeOffsets.emplace_back(0.0f, 0.0f);
   pendingShapeColors.emplace_back(brush.color);
+}
+
+bool OpsCompositor::shouldUseStencilCover(const Brush& brush, const Shape& shape) const {
+#ifndef TGFX_ENABLE_STENCIL_COVER_PATH
+  // Compile-time master switch: shouldUseStencilCover returns false unconditionally when
+  // TGFX_ENABLE_STENCIL_COVER_PATH is off, which removes the only caller of the stencil-cover
+  // dispatch path (drawStencilCoverPath) and yields zero runtime overhead. The stencil-cover
+  // support files (tessellator, draw op, GPs, upload task) are still pulled in by the CMake
+  // GLOB and rely on the linker's dead-code stripping to drop them from the final binary.
+  USE(brush);
+  USE(shape);
+  return false;
+#else
+  // Any brush requesting antialiasing keeps using the legacy triangulation path so the
+  // existing coverage-AA / alpha-ramp visual contract is preserved without modification.
+  // MSAA render targets are *not* excluded: the stencil pass evaluates the Loop-Blinn test
+  // per-sample when the depth/stencil attachment is multisampled (OpsRenderTask requests the
+  // stencil texture with the same sampleCount as the render target), so hardware MSAA and
+  // stencil-and-cover compose naturally — MSAA handles edge coverage while stencil-and-cover
+  // handles interior/exterior classification.
+  if (brush.antiAlias) {
+    return false;
+  }
+  // Skip empty paths: Canvas::drawFill() under a non-WideOpen clip forwards an empty
+  // inverse-fill path here, and letting it enter stencil-cover would make a plain
+  // Canvas::clear() under a clip allocate a full-size DEPTH24_STENCIL8 attachment for
+  // nothing.
+  if (shape.isSimplePath() && shape.getPath().isEmpty()) {
+    return false;
+  }
+  // Hardware gate: the render path requires a renderable stencil attachment. All other
+  // eligibility checks (this path being the tgfx-side choice for non-AA fills) are encoded
+  // in this method, not in GPUFeatures.
+  return context->gpu()->features()->stencilAttachmentSupported;
+#endif
 }
 
 void OpsCompositor::drawMesh(std::shared_ptr<Mesh> mesh, const Matrix& matrix,
@@ -359,6 +412,9 @@ void OpsCompositor::resetPendingOps(PendingOpType type, ClipStack clip, Brush br
   pendingShapeMatrix = {};
   pendingShapeOffsets.clear();
   pendingShapeColors.clear();
+  pendingStencilCoverShapes.clear();
+  pendingStencilCoverMatrices.clear();
+  pendingStencilCoverColors.clear();
 }
 
 bool OpsCompositor::CompareBrush(const Brush& a, const Brush& b) {
@@ -397,18 +453,12 @@ bool OpsCompositor::canAppend(PendingOpType type, const ClipStack& clip, const B
       return pendingRRects.size() < RRectDrawOp::MaxNumRRects;
     case PendingOpType::Shape:
       return pendingShapeOffsets.size() < ShapeInstancedDrawOp::MaxNumInstances;
+    case PendingOpType::StencilCoverPath:
+      return pendingStencilCoverShapes.size() < StencilCoverPathDrawOp::MaxNumBatched;
     default:
       break;
   }
   return true;
-}
-
-/**
- * Returns true if the given rect counts as aligned with pixel boundaries.
- */
-static bool IsPixelAligned(const Rect& rect) {
-  return IsPixelAligned(rect.left) && IsPixelAligned(rect.top) && IsPixelAligned(rect.right) &&
-         IsPixelAligned(rect.bottom);
 }
 
 class PendingOpsAutoReset {
@@ -441,6 +491,10 @@ void OpsCompositor::flushPendingOps(PendingOpType type, ClipStack clip, Brush br
   // Shape is handled separately with its own bounds computation.
   if (pendingType == PendingOpType::Shape) {
     flushPendingShapeOps();
+    return;
+  }
+  if (pendingType == PendingOpType::StencilCoverPath) {
+    flushPendingStencilCoverOps();
     return;
   }
   PlacementPtr<DrawOp> drawOp = nullptr;
@@ -648,6 +702,83 @@ void OpsCompositor::flushPendingShapeOps() {
   }
 }
 
+void OpsCompositor::flushPendingStencilCoverOps() {
+  DEBUG_ASSERT(!pendingStencilCoverShapes.empty());
+  DEBUG_ASSERT(pendingStencilCoverShapes.size() == pendingStencilCoverMatrices.size());
+  DEBUG_ASSERT(pendingStencilCoverShapes.size() == pendingStencilCoverColors.size());
+  auto shapes = std::move(pendingStencilCoverShapes);
+  auto matrices = std::move(pendingStencilCoverMatrices);
+  auto colors = std::move(pendingStencilCoverColors);
+  auto count = shapes.size();
+
+  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(pendingBrush, /*hasCoverage=*/true);
+  auto clipBounds = getClipBounds(pendingClip);
+
+  for (size_t i = 0; i < count; ++i) {
+    const auto& shape = shapes[i];
+    const auto& matrix = matrices[i];
+    const auto& color = colors[i];
+
+    auto geometryProxy = proxyProvider()->createStencilCoverPathProxy(shape, renderFlags);
+    if (geometryProxy == nullptr) {
+      continue;
+    }
+
+    auto shapeBounds = shape->getBounds();
+    bool isInverseFill = shape->isInverseFillType();
+    if (isInverseFill && clipBounds.isEmpty()) {
+      continue;
+    }
+    // Local-space clip rect is used by both the inverse-fill local bounds and the cover
+    // quad. A non-invertible view matrix is a hard error for this op — bail out before
+    // consuming any further resources.
+    Matrix uvMatrix = {};
+    if (!matrix.invert(&uvMatrix)) {
+      continue;
+    }
+    Rect localClipBounds = uvMatrix.mapRect(clipBounds);
+
+    std::optional<Rect> localBounds = std::nullopt;
+    std::optional<Rect> deviceBounds = std::nullopt;
+    float drawScale = 1.0f;
+    if (needLocalBounds) {
+      if (isInverseFill) {
+        localBounds = localClipBounds;
+      } else {
+        localBounds = ClipLocalBounds(shapeBounds, matrix, clipBounds);
+        if (localBounds->isEmpty()) {
+          continue;
+        }
+      }
+      drawScale = std::min(matrix.getMaxScale(), 1.0f);
+    }
+    if (needDeviceBounds) {
+      if (isInverseFill) {
+        deviceBounds = clipBounds;
+      } else {
+        deviceBounds = matrix.mapRect(shapeBounds);
+        if (!deviceBounds->intersect(clipBounds)) {
+          deviceBounds->setEmpty();
+        }
+      }
+    }
+
+    Rect coverLocalBounds = isInverseFill ? localClipBounds : shapeBounds;
+    if (coverLocalBounds.isEmpty()) {
+      continue;
+    }
+
+    auto dstColor = ToPMColor(color, dstColorSpace);
+    auto fillType = shape->fillType();
+    auto drawOp = StencilCoverPathDrawOp::Make(std::move(geometryProxy), dstColor, matrix,
+                                               coverLocalBounds, fillType);
+    if (drawOp == nullptr) {
+      continue;
+    }
+    addDrawOp(std::move(drawOp), pendingClip, pendingBrush, localBounds, deviceBounds, drawScale);
+  }
+}
+
 static void FlipYIfNeeded(Rect* rect, const RenderTargetProxy* renderTarget) {
   if (renderTarget->origin() == ImageOrigin::BottomLeft) {
     renderTarget->getOriginTransform().mapRect(rect);
@@ -678,7 +809,7 @@ bool OpsCompositor::drawAsClear(const Rect& rect, const Matrix& matrix, const Cl
   }
   auto bounds = rect;
   matrix.mapRect(&bounds);
-  if (!bounds.intersect(clipRect) || !IsPixelAligned(bounds)) {
+  if (!bounds.intersect(clipRect) || !IsClipPixelAligned(bounds)) {
     return false;
   }
   bounds.round();
@@ -737,7 +868,8 @@ std::pair<bool, bool> OpsCompositor::needComputeBounds(const Brush& brush, bool 
       brush.shader != nullptr && (brush.shader->type() == Shader::Type::ColorFilter ||
                                   brush.shader->type() == Shader::Type::Blend);
   bool hasDecomposableColorSource = hasImageFill || brush.shader != nullptr;
-  // An anti-aliased, non-pixel-aligned rect clip produces an AARectEffect coverage FP, which folds
+  // An anti-aliased, non-pixel-aligned rect clip produces a device-space RectEffect coverage FP,
+  // which folds
   // into the color chain as a rect-coverage node. Pixel-aligned or non-AA rect clips become a
   // scissor instead and carry no coverage, so they do not need the evaluation.
   bool clipProducesFoldableCoverage = false;
@@ -798,37 +930,58 @@ AppliedClip OpsCompositor::applyClip(const ClipStack& clipStack) {
     return out;
   }
 
-  // Stage 2: Set initial scissor from clip bounds to restrict drawing area.
+  // Stage 2: Set initial scissor from clip bounds to restrict drawing area. The scissor is
+  // published to draw ops in canvas top-left device space — the same space viewMatrix,
+  // coverDeviceBounds and every other rect owned by a DrawOp live in. The Y-flip required for
+  // BottomLeft render targets is applied at the backend boundary (DrawOp::applyScissor,
+  // StencilCoverPathDrawOp::applyStencilScissor) via OriginFlip.h::FlipYIfNeeded, immediately
+  // before RenderPass::setScissorRect. Keeping the intermediate representation in one space
+  // avoids the mixed-space bug that used to affect getStencilResolveBounds's intersect.
   auto clipBounds = clipStack.bounds();
   if (!clipBounds.intersect(renderTarget->bounds())) {
     out.status = AppliedClipStatus::ClippedOut;
     return out;
   }
   clipBounds.roundOut();
-  auto scissorBounds = clipBounds;
-  FlipYIfNeeded(&scissorBounds, renderTarget.get());
-  out.scissor = scissorBounds;
+  out.scissor = clipBounds;
 
   // Stage 3: Iterate through valid elements.
   auto& elements = clipStack.elements();
   std::vector<const ClipElement*> elementsForMask;
   elementsForMask.reserve(elements.size() - clipStack.oldestValidIndex());
   PlacementPtr<FragmentProcessor> clipFP = nullptr;
+  // Limit the analytic FP chain length; longer chains bloat program keys and shader complexity.
+  // Excess elements fall through to the mask path.
+  constexpr size_t MaxAnalyticFPs = 4;
+  size_t analyticFPCount = 0;
   for (size_t i = clipStack.oldestValidIndex(); i < elements.size(); ++i) {
     auto& element = elements[i];
     if (!element.isValid()) {
       continue;
     }
+    if (element.shape().isEmpty()) {
+      // An empty clip element makes the intersection empty: nothing in the clipped area is drawn.
+      out.status = AppliedClipStatus::ClippedOut;
+      return out;
+    }
 
-    // Pixel-aligned rects or non-AA rects have hard edges, already covered by clipBounds scissor.
-    if (element.isRect() && (element.isPixelAligned() || !element.isAntiAlias())) {
+    // Inner and outer bounds coincide only for an axis-aligned rect whose device footprint is an
+    // exact integer pixel box: any non-AA rect (snapped to the grid) or a pixel-aligned AA rect.
+    // Such an element is exactly an integer scissor rect already covered by the clipBounds scissor,
+    // so it needs no coverage FP or mask.
+    if (element.innerBounds() == element.outerBounds()) {
       continue;
     }
 
-    // AA rect uses AARectEffect for smooth edges.
-    if (element.isRect() && element.isAntiAlias()) {
-      clipFP = makeAnalyticFP(element, std::move(clipFP));
-      continue;
+    // Prefer the analytic FP path: it evaluates coverage in the shader and avoids the extra
+    // texture allocation and render pass of the mask path.
+    if (analyticFPCount < MaxAnalyticFPs) {
+      auto [success, result] = tryApplyAnalyticFP(element, std::move(clipFP));
+      clipFP = std::move(result);
+      if (success) {
+        ++analyticFPCount;
+        continue;
+      }
     }
 
     // Collect elements that need mask processing.
@@ -838,6 +991,13 @@ AppliedClip OpsCompositor::applyClip(const ClipStack& clipStack) {
   // Stage 4: Generate mask for remaining elements
   if (!elementsForMask.empty()) {
     clipFP = getClipMaskFP(elementsForMask, clipStack.uniqueID(), clipBounds, std::move(clipFP));
+    if (clipFP == nullptr) {
+      // Mask rasterization failed (e.g. an empty or degenerate clip path, or an allocation
+      // failure). The clip region cannot be covered, so nothing in it is drawn. This keeps the
+      // failure direction consistent with empty clip elements: clip regions converge to empty.
+      out.status = AppliedClipStatus::ClippedOut;
+      return out;
+    }
   }
 
   out.coverageFP = std::move(clipFP);
@@ -845,20 +1005,46 @@ AppliedClip OpsCompositor::applyClip(const ClipStack& clipStack) {
   return out;
 }
 
-PlacementPtr<FragmentProcessor> OpsCompositor::makeAnalyticFP(
-    const ClipElement& element, PlacementPtr<FragmentProcessor> inputFP) {
-  if (!element.isRect()) {
-    // Future extension: RRectEffect, etc.
-    return inputFP;
+std::pair<bool, PlacementPtr<FragmentProcessor>> OpsCompositor::tryApplyAnalyticFP(
+    const ClipElement& element, PlacementPtr<FragmentProcessor> inputFP) const {
+  // The shader reads gl_FragCoord in window space, so append the render-target-to-window-space
+  // transform to the element's matrix.
+  auto matrix = element.matrix();
+  matrix.postConcat(renderTarget->getOriginTransform());
+  PlacementPtr<FragmentProcessor> elementFP = nullptr;
+  // Analytic FPs need a linear device-to-local inverse to reconstruct local coordinates in the
+  // shader, which a perspective matrix cannot provide; such elements fall through to the mask path.
+  if (!matrix.hasPerspective()) {
+    const bool aa = element.antiAlias();
+    const auto& shape = element.shape();
+    switch (shape.type()) {
+      case GeometryShape::Type::Rect:
+        elementFP = RectEffect::Make(drawingAllocator(), shape.rect(), matrix, aa);
+        break;
+      case GeometryShape::Type::RRect: {
+        const auto& rRect = shape.rRect();
+        if (rRect.type() == RRect::Type::Rect) {
+          elementFP = RectEffect::Make(drawingAllocator(), rRect.rect(), matrix, aa);
+        } else {
+          elementFP = RRectEffect::Make(drawingAllocator(), rRect, matrix, aa);
+        }
+        break;
+      }
+      case GeometryShape::Type::Empty:
+      case GeometryShape::Type::Path:
+        break;
+    }
   }
-
-  auto rect = element.bounds();
-  FlipYIfNeeded(&rect, renderTarget.get());
-  auto clipFP = AARectEffect::Make(drawingAllocator(), rect);
-  if (!inputFP) {
-    return clipFP;
+  // No analytic FP for this element (perspective, empty, or path); return the accumulated chain
+  // unchanged and report failure.
+  if (!elementFP) {
+    return {false, std::move(inputFP)};
   }
-  return FragmentProcessor::Compose(drawingAllocator(), std::move(inputFP), std::move(clipFP));
+  if (inputFP) {
+    elementFP =
+        FragmentProcessor::Compose(drawingAllocator(), std::move(inputFP), std::move(elementFP));
+  }
+  return {true, std::move(elementFP)};
 }
 
 PlacementPtr<FragmentProcessor> OpsCompositor::getClipMaskFP(
@@ -872,7 +1058,7 @@ PlacementPtr<FragmentProcessor> OpsCompositor::getClipMaskFP(
   clipTexture = makeClipTexture(elements, clipBound);
   if (clipTexture == nullptr) {
     DEBUG_ASSERT(false);
-    return inputFP;
+    return nullptr;
   }
   cachedClipID = uniqueID;
   return makeMaskFP(clipTexture, clipBound, std::move(inputFP));
@@ -895,9 +1081,9 @@ std::shared_ptr<TextureProxy> OpsCompositor::makeClipTexture(
   for (size_t i = 0; i < elements.size(); ++i) {
     const auto element = elements[i];
     DEBUG_ASSERT(element->isValid());
-    const auto aaType = element->isAntiAlias() ? AAType::Coverage : AAType::None;
+    const auto aaType = element->antiAlias() ? AAType::Coverage : AAType::None;
     auto clipBounds = Rect::MakeWH(width, height);
-    auto path = element->path();
+    auto path = element->getDevicePath();
     if (i > 0) {
       // Modulate blend erases the mask when hasCoverage is true (source coefficient becomes zero).
       // Use inverse fill + DstOut to erase areas outside each clip shape instead.
@@ -908,6 +1094,12 @@ std::shared_ptr<TextureProxy> OpsCompositor::makeClipTexture(
     auto shapeProxy = proxyProvider()->createGPUShapeProxy(shape, aaType, clipBounds, renderFlags);
     auto uvMatrix = Matrix::MakeTrans(bounds.left, bounds.top);
     auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), {}, uvMatrix, aaType);
+    if (drawOp == nullptr) {
+      // Shape rasterization failed (e.g. an empty or degenerate clip path, possibly after the
+      // inverse-fill toggle for DstOut masking); return nullptr so the caller reports ClippedOut
+      // instead of queuing a null draw op.
+      return nullptr;
+    }
     if (i > 0) {
       drawOp->setBlendMode(BlendMode::DstOut);
     }
@@ -1114,11 +1306,16 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
       }
     }
     if (clipCoverage != nullptr) {
-      // Only the analytic AA-rect clip coverage lowers into the chain today; a clip-mask texture
-      // (DeviceSpaceTextureEffect) is device-space sampled and stays a coverage FP, which blocks
-      // the fold entirely so the draw keeps the plain route.
-      if (clipCoverage->name() == "AARectEffect") {
-        foldedProcessors.push_back(clipCoverage);
+      // Only the analytic device-space AA-rect clip coverage lowers into the chain today; a
+      // clip-mask texture (DeviceSpaceTextureEffect) is device-space sampled and stays a coverage
+      // FP, which blocks the fold entirely so the draw keeps the plain route.
+      if (clipCoverage->name() == "RectEffect") {
+        auto rectEffect = static_cast<const RectEffect*>(clipCoverage);
+        if (rectEffect->isDeviceSpaceRect() && rectEffect->isAntiAlias()) {
+          foldedProcessors.push_back(clipCoverage);
+        } else {
+          foldBlocked = true;
+        }
       } else {
         foldBlocked = true;
       }

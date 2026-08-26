@@ -37,6 +37,10 @@ bool GLRenderPass::begin() {
   bindFramebuffer();
   auto state = _gpu->state();
   auto gl = _gpu->functions();
+  // Scissor starts disabled so a stale rect from a previous pass cannot restrict the clears
+  // below and leave stale pixels outside it. It is only enabled around the stencil clear when
+  // clearScissor is set, and re-applied per draw via setScissorRect().
+  state->setEnabled(GL_SCISSOR_TEST, false);
   auto& depthStencilAttachment = descriptor.depthStencilAttachment;
   if (depthStencilAttachment.texture != nullptr) {
     auto depthStencilTexture =
@@ -51,17 +55,26 @@ bool GLRenderPass::begin() {
     }
 #endif
     if (depthStencilAttachment.loadAction == LoadAction::Clear) {
+      bool hasScissor = depthStencilAttachment.clearScissor.has_value() &&
+                        !depthStencilAttachment.clearScissor->isEmpty();
+      if (hasScissor) {
+        auto& s = *depthStencilAttachment.clearScissor;
+        state->setScissorRect(static_cast<int>(s.left), static_cast<int>(s.top),
+                              static_cast<int>(s.width()), static_cast<int>(s.height()));
+        state->setEnabled(GL_SCISSOR_TEST, true);
+      }
       gl->clearDepthf(depthStencilAttachment.depthClearValue);
       gl->clearStencil(static_cast<int>(depthStencilAttachment.stencilClearValue));
       gl->clear(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+      if (hasScissor) {
+        state->setEnabled(GL_SCISSOR_TEST, false);
+      }
     }
   }
   auto& colorAttachment = descriptor.colorAttachments[0];
   auto renderTexture = static_cast<GLTexture*>(colorAttachment.texture.get());
   // Set the viewport to cover the entire color attachment by default.
   state->setViewport(0, 0, renderTexture->width(), renderTexture->height());
-  // Disable scissor test by default.
-  state->setEnabled(GL_SCISSOR_TEST, false);
   if (colorAttachment.resolveTexture && _gpu->caps()->multisampleDisableSupport) {
     state->setEnabled(GL_MULTISAMPLE, true);
   }

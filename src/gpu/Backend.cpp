@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Backend.h"
+#include "d3d12/D3D12Defines.h"
 #include "metal/MetalDefines.h"
 #include "opengl/GLDefines.h"
 #include "vulkan/VulkanDefines.h"
@@ -67,6 +68,9 @@ BackendTexture& BackendTexture::operator=(const BackendTexture& that) {
     case Backend::WebGPU:
       webgpuInfo = that.webgpuInfo;
       break;
+    case Backend::D3D12:
+      d3d12Info = that.d3d12Info;
+      break;
     default:
       break;
   }
@@ -86,6 +90,8 @@ PixelFormat BackendTexture::format() const {
       return VulkanFormatToPixelFormat(vulkanInfo.format);
     case Backend::WebGPU:
       return WebGPUTextureFormatToPixelFormat(webgpuInfo.format);
+    case Backend::D3D12:
+      return DXGIFormatToPixelFormat(d3d12Info.format);
     default:
       break;
   }
@@ -113,6 +119,14 @@ bool BackendTexture::getVulkanImageInfo(VulkanImageInfo* vulkanImageInfo) const 
     return false;
   }
   *vulkanImageInfo = vulkanInfo;
+  return true;
+}
+
+bool BackendTexture::getD3D12TextureInfo(D3D12TextureInfo* d3d12TextureInfo) const {
+  if (!isValid() || _backend != Backend::D3D12) {
+    return false;
+  }
+  *d3d12TextureInfo = d3d12Info;
   return true;
 }
 
@@ -145,6 +159,9 @@ BackendRenderTarget& BackendRenderTarget::operator=(const BackendRenderTarget& t
     case Backend::WebGPU:
       webgpuInfo = that.webgpuInfo;
       break;
+    case Backend::D3D12:
+      d3d12Info = that.d3d12Info;
+      break;
     default:
       break;
   }
@@ -164,6 +181,8 @@ PixelFormat BackendRenderTarget::format() const {
       return VulkanFormatToPixelFormat(vulkanInfo.format);
     case Backend::WebGPU:
       return WebGPUTextureFormatToPixelFormat(webgpuInfo.format);
+    case Backend::D3D12:
+      return DXGIFormatToPixelFormat(d3d12Info.format);
     default:
       break;
   }
@@ -194,6 +213,14 @@ bool BackendRenderTarget::getVulkanImageInfo(VulkanImageInfo* vulkanImageInfo) c
   return true;
 }
 
+bool BackendRenderTarget::getD3D12TextureInfo(D3D12TextureInfo* d3d12TextureInfo) const {
+  if (!isValid() || _backend != Backend::D3D12) {
+    return false;
+  }
+  *d3d12TextureInfo = d3d12Info;
+  return true;
+}
+
 bool BackendRenderTarget::getWebGPUTextureInfo(WebGPUTextureInfo* webgpuTextureInfo) const {
   if (!isValid() || _backend != Backend::WebGPU) {
     return false;
@@ -217,6 +244,9 @@ BackendSemaphore& BackendSemaphore::operator=(const BackendSemaphore& that) {
     case Backend::WebGPU:
       webgpuSyncInfo = that.webgpuSyncInfo;
       break;
+    case Backend::D3D12:
+      d3d12SyncInfo = that.d3d12SyncInfo;
+      break;
     default:
       break;
   }
@@ -234,6 +264,8 @@ bool BackendSemaphore::isInitialized() const {
     case Backend::WebGPU:
       // WebGPU has no explicit semaphore handle; synchronization is managed by the browser.
       return true;
+    case Backend::D3D12:
+      return d3d12SyncInfo.fence != nullptr;
     default:
       break;
   }
@@ -261,6 +293,14 @@ bool BackendSemaphore::getVulkanSync(VulkanSyncInfo* vulkanSyncInfo) const {
     return false;
   }
   *vulkanSyncInfo = this->vulkanSyncInfo;
+  return true;
+}
+
+bool BackendSemaphore::getD3D12Sync(D3D12SyncInfo* d3d12Info) const {
+  if (_backend != Backend::D3D12 || d3d12SyncInfo.fence == nullptr) {
+    return false;
+  }
+  *d3d12Info = d3d12SyncInfo;
   return true;
 }
 

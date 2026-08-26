@@ -107,6 +107,12 @@ static inline RRect::Type ComputeType(const Rect& rect, const std::array<Point, 
   return RRect::Type::Complex;
 }
 
+void RRect::setRect(const Rect& rect) {
+  _rect = rect.makeSorted();
+  _radii = {};
+  _type = Type::Rect;
+}
+
 void RRect::setRectXY(const Rect& rect, float radiusX, float radiusY) {
   const auto radius = Point{radiusX, radiusY};
   setRectRadii(rect, {radius, radius, radius, radius});
@@ -144,4 +150,5 @@ void RRect::scale(float scaleX, float scaleY) {
 void RRect::offset(float dx, float dy) {
   _rect.offset(dx, dy);
 }
+
 }  // namespace tgfx

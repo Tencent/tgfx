@@ -811,7 +811,7 @@ TGFX_TEST(AOTRenderConsistencyTest, GradientLayoutModes) {
 }
 
 // Renders an antialiased circle (EllipseGeometryProcessor) under an optional clip into outBitmap.
-// clipMode: 0 = no clip, 1 = antialiased clipRect (AARectEffect coverage), 2 = antialiased
+// clipMode: 0 = no clip, 1 = antialiased clipRect (a device-space RectEffect coverage), 2 = antialiased
 // non-rect clipPath (device-space mask texture coverage). This exercises the EllipseFillShader
 // HAS_COVERAGE dimension whose mask is sampled in device space via DeviceCoordMatrix * gl_FragCoord;
 // a divergent coordinate transform would show up as a byte mismatch against the runtime path.
@@ -864,7 +864,7 @@ static void ExpectClippedCircleConsistent(const char* label, int clipMode, int w
 }
 
 // EllipseFillShader HAS_COVERAGE dimension: an antialiased circle drawn under a clip pulls in a
-// coverage FP (AARectEffect for a rect clip, a device-space mask texture for a non-rect clip). The
+// coverage FP (RectEffect for a rect clip, a device-space mask texture for a non-rect clip). The
 // AOT path samples that coverage in device space; this verifies it is byte-identical to the runtime
 // ProgramBuilder path, catching any DeviceCoordMatrix / gl_FragCoord misalignment.
 TGFX_TEST(AOTRenderConsistencyTest, EllipseFillCoverageModes) {
@@ -1098,7 +1098,7 @@ TGFX_TEST(AOTRenderConsistencyTest, PerlinNoiseLuminanceAlphaThreshold) {
   ExpectBitmapsIdentical("perlin-luminance-alphathreshold", candidate, reference, width, height);
 }
 
-// An anti-aliased, non-pixel-aligned rect clip produces an AARectEffect coverage FP. It must fold
+// An anti-aliased, non-pixel-aligned rect clip produces a device-space RectEffect coverage FP. It must fold
 // into the pointwise chain as an OP_AARECT_COVERAGE node, so a clipped texture draw hits
 // PointwiseChainShader in one pass and stays byte-identical to the runtime path.
 TGFX_TEST(AOTRenderConsistencyTest, AnalyticRectClipFoldsIntoChain) {

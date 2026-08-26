@@ -29,6 +29,7 @@
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
+#include "tgfx/core/SurfaceReadback.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/core/WriteStream.h"
 #include "tgfx/gpu/Context.h"
@@ -75,6 +76,51 @@ struct PDFLink {
   const int nodeId;
 };
 
+/**
+ * Identifies the pixels a drawn image refers to. Identical subsets create distinct SubsetImage
+ * instances, so keying on the underlying source plus bounds collapses repeated draws of the same
+ * region into one image XObject.
+ */
+struct PDFImageCacheKey {
+  std::shared_ptr<Image> source;
+  Rect bounds = {};
+
+  bool operator==(const PDFImageCacheKey& other) const {
+    return source == other.source && bounds == other.bounds;
+  }
+};
+
+struct PDFImageCacheKeyHash {
+  size_t operator()(const PDFImageCacheKey& key) const {
+    auto seed = std::hash<Image*>{}(key.source.get());
+    seed = Combine(seed, std::hash<float>{}(key.bounds.left));
+    seed = Combine(seed, std::hash<float>{}(key.bounds.top));
+    seed = Combine(seed, std::hash<float>{}(key.bounds.right));
+    seed = Combine(seed, std::hash<float>{}(key.bounds.bottom));
+    return seed;
+  }
+
+ private:
+  static size_t Combine(size_t seed, size_t value) {
+    return seed ^ (value + 0x9e3779b9 + (seed << 6) + (seed >> 2));
+  }
+};
+
+/**
+ * An image XObject whose pixels are still being read back from the GPU. The object number is
+ * reserved up front so drawing can reference it immediately, and the stream body is emitted later.
+ * PDF indexes cross reference offsets by object number, so writing the body out of order stays
+ * valid.
+ * @note The Surface is intentionally not retained: the transfer task already references its render
+ * target, so holding the Surface would pin one extra full-size render target per pending image.
+ */
+struct PDFPendingRaster {
+  PDFIndirectReference ref;
+  std::shared_ptr<SurfaceReadback> readback;
+  int encodingQuality = 101;
+  bool flipY = false;
+};
+
 class PDFDocumentImpl : public PDFDocument {
  public:
   PDFDocumentImpl(std::shared_ptr<WriteStream> stream, Context* context, PDFMetadata Metadata);
@@ -88,6 +134,11 @@ class PDFDocumentImpl : public PDFDocument {
   void close() override;
 
   void abort() override;
+
+  bool isReadyToClose() override;
+
+  /// Takes ownership of a raster whose pixels are not available yet; see PDFPendingRaster.
+  void addPendingRaster(PDFPendingRaster raster);
 
   Canvas* onBeginPage(float width, float height);
 
@@ -167,9 +218,9 @@ class PDFDocumentImpl : public PDFDocument {
   std::unordered_map<PDFFillGraphicState, PDFIndirectReference> fillGSMap;
   PDFIndirectReference noSmaskGraphicState;
   std::vector<PDFNamedDestination> namedDestinations;
-  // Uses shared_ptr as key to hold a strong reference, preventing the Image from being released
-  // mid-document and its address reused by a different Image, which would cause false cache hits.
-  std::unordered_map<std::shared_ptr<Image>, PDFIndirectReference> imageRefCache;
+  // The key holds a strong reference to the source, so a released Image cannot have its address
+  // reused by another one and cause a false cache hit.
+  std::unordered_map<PDFImageCacheKey, PDFIndirectReference, PDFImageCacheKeyHash> imageRefCache;
 
  private:
   std::shared_ptr<WriteStream> beginObject(PDFIndirectReference ref);
@@ -177,6 +228,15 @@ class PDFDocumentImpl : public PDFDocument {
   void endObject();
 
   PDFIndirectReference emitColorSpace();
+
+  /**
+   * Emits the stream body of every pending raster, falling back to a placeholder for the ones that
+   * are still not ready. Must run before onClose() writes the cross reference table: an object
+   * number that is never emitted keeps offset 0 and corrupts the table.
+   * @param readyOnly Only emits the rasters whose pixels have already arrived and keeps the rest
+   * queued, writing no placeholder.
+   */
+  void flushPendingRasters(bool readyOnly = false);
 
   enum class State {
     BetweenPages,
@@ -203,6 +263,7 @@ class PDFDocumentImpl : public PDFDocument {
   float inverseRasterScale = 1;
   PDFTagTree tagTree;
   PDFIndirectReference _colorSpaceRef;
+  std::vector<PDFPendingRaster> pendingRasters;
 };
 
 }  // namespace tgfx

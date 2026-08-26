@@ -25,15 +25,24 @@
 namespace tgfx {
 
 /**
- * Defines the maximum distance a draw can extend beyond a clip's boundary and still be considered
- * 'on the other side'. This tolerance accounts for potential floating point rounding errors. The
- * value of 1e-3 is chosen because, in the coverage case, as long as coverage stays within
+ * Maximum distance, in device pixels, that a clip bound may differ from an integer pixel position
+ * and still be counted as that pixel. It absorbs the floating-point rounding error from computing
+ * analytic clip bounds, and is used both when rounding a bound to the pixel grid and when checking
+ * whether a bound is pixel-aligned.
+ *
+ * The value 1e-3 is tied to coverage: a clip edge's coverage changes with its distance to the
+ * pixel, so limiting the distance also limits the coverage error. As long as coverage stays within
  * 0.5 * 1/256 of its intended value, it shouldn't affect the final pixel values.
  */
-static constexpr float BOUNDS_TOLERANCE = 1e-3f;
+static constexpr float CLIP_BOUNDS_TOLERANCE = 1e-3f;
 
-inline bool IsPixelAligned(float value) {
-  return fabsf(roundf(value) - value) <= BOUNDS_TOLERANCE;
+inline bool IsClipPixelAligned(float value) {
+  return fabsf(roundf(value) - value) <= CLIP_BOUNDS_TOLERANCE;
+}
+
+inline bool IsClipPixelAligned(const Rect& rect) {
+  return IsClipPixelAligned(rect.left) && IsClipPixelAligned(rect.top) &&
+         IsClipPixelAligned(rect.right) && IsClipPixelAligned(rect.bottom);
 }
 
 inline Rect ToLocalBounds(const Rect& bounds, const Matrix& viewMatrix) {

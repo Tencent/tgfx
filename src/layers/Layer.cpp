@@ -33,6 +33,7 @@
 #include "layers/BackgroundHandler.h"
 #include "layers/BackgroundSnapshotMap.h"
 #include "layers/BackgroundSource.h"
+#include "layers/CanvasUtils.h"
 #include "layers/DrawArgs.h"
 #include "layers/LayerStyleSource.h"
 #include "layers/MaskContext.h"
@@ -48,6 +49,19 @@
 #include "tgfx/layers/ShapeLayer.h"
 
 namespace tgfx {
+
+// Returns true if the given source flags include the requested source type.
+static bool HasExtraSource(uint32_t sourceFlags, LayerStyleExtraSourceType type) {
+  return (sourceFlags & static_cast<uint32_t>(type)) != 0;
+}
+
+static bool NeedsBackgroundSource(uint32_t sourceFlags) {
+  return HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Background);
+}
+
+static bool NeedsContourSource(uint32_t sourceFlags) {
+  return HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Contour);
+}
 
 // The minimum size (longest edge) for subtree cache. This prevents creating excessively small
 // mipmap levels that would be inefficient to cache.
@@ -78,6 +92,18 @@ static void ClipScrollRect(Canvas* canvas, const Rect* scrollRect, const Matrix3
 }
 
 struct MaskData {
+  MaskData() = default;
+
+  explicit MaskData(bool inverted) {
+    if (inverted) {
+      clipPath.toggleInverseFillType();
+    }
+  }
+
+  MaskData(Path path, std::shared_ptr<MaskFilter> filter)
+      : clipPath(std::move(path)), maskFilter(std::move(filter)) {
+  }
+
   Path clipPath = {};
   std::shared_ptr<MaskFilter> maskFilter = nullptr;
 };
@@ -129,37 +155,6 @@ static void ComputeDirtyNodesForReordering(const std::vector<Layer*>& retainedCh
       nodesToMarkDirty->push_back(retainedChildren[i]);
     }
   }
-}
-
-static std::optional<Rect> GetClipBounds(const Canvas* canvas) {
-  if (canvas == nullptr) {
-    return std::nullopt;
-  }
-  const auto clipBound = canvas->getTotalClipBounds();
-  auto clipRect = Rect::MakeEmpty();
-  auto surface = canvas->getSurface();
-  if (!clipBound.has_value()) {
-    if (!surface) {
-      return std::nullopt;
-    }
-    clipRect = Rect::MakeWH(surface->width(), surface->height());
-  } else {
-    clipRect = *clipBound;
-    if (surface && !clipRect.intersect(Rect::MakeWH(surface->width(), surface->height()))) {
-      return Rect::MakeEmpty();
-    }
-  }
-  if (clipRect.isEmpty()) {
-    return Rect::MakeEmpty();
-  }
-  auto invert = Matrix::I();
-  auto viewMatrix = canvas->getMatrix();
-  if (!viewMatrix.invert(&invert)) {
-    return Rect::MakeEmpty();
-  }
-  clipRect = invert.mapRect(clipRect);
-  clipRect.roundOut();
-  return clipRect;
 }
 
 static int GetMipmapCacheLongEdge(int maxSize, float contentScale, const Rect& layerBounds) {
@@ -1258,16 +1253,21 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
   DEBUG_ASSERT(_mask != nullptr);
   DEBUG_ASSERT(args.render3DContext == nullptr);
   auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
-  auto isContourMode = maskType == LayerMaskType::Contour;
+  auto isContourMode =
+      maskType == LayerMaskType::Contour || maskType == LayerMaskType::ContourInverted;
+  bool needLuminance =
+      maskType == LayerMaskType::Luminance || maskType == LayerMaskType::LuminanceInverted;
+  bool inverted = maskType == LayerMaskType::AlphaInverted ||
+                  maskType == LayerMaskType::LuminanceInverted ||
+                  maskType == LayerMaskType::ContourInverted;
 
   auto relativeMatrix3D = _mask->getRelativeMatrix3D(this);
   auto maskPicture = getMaskPicture(args, isContourMode, scale, relativeMatrix3D);
   if (maskPicture == nullptr) {
-    return {};
+    return MaskData(inverted);
   }
 
-  bool needLuminance = maskType == LayerMaskType::Luminance;
-  if (!needLuminance) {
+  if (!needLuminance && !inverted) {
     Path maskPath = {};
     if (MaskContext::GetMaskPath(maskPicture, &maskPath)) {
       maskPath.transform(Matrix::MakeScale(1.0f / scale, 1.0f / scale));
@@ -1280,14 +1280,14 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
     auto scaledClipBounds = *layerClipBounds;
     scaledClipBounds.scale(scale, scale);
     if (!maskBounds.intersect(scaledClipBounds)) {
-      return {};
+      return MaskData(inverted);
     }
   }
   Point maskImageOffset = {};
   auto maskContentImage =
       ToImageWithOffset(std::move(maskPicture), &maskImageOffset, &maskBounds, args.dstColorSpace);
   if (maskContentImage == nullptr) {
-    return {};
+    return MaskData(inverted);
   }
   if (needLuminance) {
     maskContentImage =
@@ -1300,7 +1300,7 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
   if (shader) {
     shader = shader->makeWithMatrix(maskMatrix);
   }
-  return {{}, MaskFilter::MakeShader(shader)};
+  return {{}, MaskFilter::MakeShader(shader, inverted)};
 }
 
 std::shared_ptr<Image> Layer::getContentContourImage(const DrawArgs& args, float contentScale,
@@ -1771,14 +1771,17 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
     return nullptr;
   }
 
-  // Collect which excludeChildEffects values need content and/or contour.
+  // Collect which excludeChildEffects values need content and/or a rasterized contour.
   bool needContent[2] = {false, false};
   bool needContour[2] = {false, false};
+  bool needsContentShape = false;
   for (const auto& layerStyle : _layerStyles) {
     auto index = static_cast<int>(layerStyle->excludeChildEffects());
     needContent[index] = true;
-    if (layerStyle->extraSourceType() == LayerStyleExtraSourceType::Contour) {
+    auto sourceFlags = layerStyle->extraSourceType();
+    if (NeedsContourSource(sourceFlags)) {
       needContour[index] = true;
+      needsContentShape = true;
     }
   }
 
@@ -1828,13 +1831,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
     source->groups[i] = std::move(group);
   }
 
-  if (needContour[0] || needContour[1]) {
-    // TODO: The contour shape should have the same semantics as the contour image,
-    // covering the entire subtree content. Contour should be encapsulated as a composite
-    // class that records Picture data containing draw instructions, with a new interface
-    // to parse Shape from the Picture data. This ensures the Image and Shape inside
-    // Contour have consistent semantics. The layer's clip region should also be stored
-    // within Contour.
+  if (needsContentShape) {
     source->contentShape = getContentShape();
   }
 
@@ -1849,7 +1846,7 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
     if (layerStyle->position() != position) {
       continue;
     }
-    if (layerStyle->extraSourceType() == LayerStyleExtraSourceType::Background) {
+    if (NeedsBackgroundSource(layerStyle->extraSourceType())) {
       BackgroundHandler::DispatchOrSkip(args, canvas, this, alpha, layerStyle.get(), source);
       continue;
     }
@@ -1922,7 +1919,7 @@ std::shared_ptr<Image> Layer::synthesizeBackgroundImage(const DrawArgs& args, fl
 void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, float alpha,
                                   LayerStyle* layerStyle, const LayerStyleSource* source) {
   DEBUG_ASSERT(source != nullptr && !FloatNearlyZero(source->contentScale));
-  DEBUG_ASSERT(layerStyle->extraSourceType() != LayerStyleExtraSourceType::Background);
+  DEBUG_ASSERT(!NeedsBackgroundSource(layerStyle->extraSourceType()));
   auto groupIndex = static_cast<int>(layerStyle->excludeChildEffects());
   auto* group = source->groups[groupIndex].get();
   if (group == nullptr) {
@@ -1940,14 +1937,13 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
   styleInput.content = contentEntry.image;
   styleInput.contentOffset = contentEntry.offset;
   styleInput.contentScale = source->contentScale;
-  if (layerStyle->extraSourceType() == LayerStyleExtraSourceType::Contour) {
+  auto sourceFlags = layerStyle->extraSourceType();
+  if (HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Contour)) {
     auto contourImage = group->contour.has_value() ? group->contour->image : nullptr;
     auto contourOffset =
         contourImage ? group->contour->offset - contentEntry.offset : Point::Zero();
-    // contour shape may be nullopt when the layer has no simple vector content (e.g. a group
-    // layer with only children).
-    styleInput.extraSource = std::make_shared<ContourInputSource>(
-        std::move(contourImage), contourOffset, source->contentShape);
+    styleInput.extraSources.push_back(std::make_shared<ContourInputSource>(
+        std::move(contourImage), contourOffset, source->contentShape));
   }
   layerStyle->draw(canvas, styleInput, alpha);
 }
@@ -2030,7 +2026,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   // The snapshot costs O(MAX_DIRTY_REGIONS) = O(1) per blur-capable layer.
   std::vector<Rect> backgroundSourceRects = {};
   for (const auto& style : _layerStyles) {
-    if (style && style->extraSourceType() == LayerStyleExtraSourceType::Background) {
+    if (style && NeedsBackgroundSource(style->extraSourceType())) {
       backgroundSourceRects = _root->currentDirtyRects();
       break;
     }
@@ -2106,31 +2102,45 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     }
   }
   auto backOutset = 0.f;
+  // maxBackgroundOutset includes every background dependency, while minBackgroundOutset only
+  // includes resolution-insensitive effects such as blur. Each LayerStyle classifies its own
+  // background bounds as soft or sharp so this aggregation does not depend on concrete types.
+  auto downsampleOutset = std::numeric_limits<float>::max();
   if (!renderBounds.isEmpty()) {
     for (auto& style : _layerStyles) {
       DEBUG_ASSERT(style != nullptr);
-      if (style->extraSourceType() != LayerStyleExtraSourceType::Background) {
+      if (!NeedsBackgroundSource(style->extraSourceType())) {
         continue;
       }
-      auto outset = style->filterBackground(Rect::MakeEmpty(), contentScale);
-      backOutset = std::max(backOutset, outset.right);
-      backOutset = std::max(backOutset, outset.bottom);
+      auto bounds = style->filterBackground(Rect::MakeEmpty(), contentScale);
+      auto fullOutset = std::max({-bounds.left, -bounds.top, bounds.right, bounds.bottom});
+      if (fullOutset <= 0) {
+        continue;
+      }
+      backOutset = std::max(backOutset, fullOutset);
+      auto softBounds = style->filterBackgroundSoft(Rect::MakeEmpty(), contentScale);
+      auto softOutset =
+          std::max({-softBounds.left, -softBounds.top, softBounds.right, softBounds.bottom});
+      downsampleOutset = std::min(downsampleOutset, softOutset);
     }
     // When a layer has both background styles and filters, the outer filter needs to sample
-    // beyond the background content area. Expand the background outset to include the filter's
-    // sampling range. Use Reverse direction to calculate required input bounds.
+    // beyond the background content area. Expand both ranges only when a soft background effect
+    // already permits downsampling; filter bounds alone do not imply a low-pass effect.
     if (backOutset > 0 && !_filters.empty()) {
       auto baseBounds = mapOutputBoundsToInput(Rect::MakeEmpty(), contentScale);
       if (!baseBounds.isEmpty()) {
         auto maxOutset =
             std::max({-baseBounds.left, -baseBounds.top, baseBounds.right, baseBounds.bottom});
         backOutset += maxOutset;
+        if (downsampleOutset > 0) {
+          downsampleOutset += maxOutset;
+        }
       }
     }
   }
   if (backOutset > 0) {
     maxBackgroundOutset = std::max(backOutset, maxBackgroundOutset);
-    minBackgroundOutset = std::min(backOutset, minBackgroundOutset);
+    minBackgroundOutset = std::min(downsampleOutset, minBackgroundOutset);
     updateBackgroundBounds(contentScale, backgroundSourceRects);
   }
   if (bitFields.blendMode != static_cast<uint8_t>(BlendMode::SrcOver) ||
@@ -2160,7 +2170,7 @@ void Layer::checkBackgroundStyles(std::shared_ptr<RegionTransformer> transformer
 void Layer::updateBackgroundBounds(float contentScale, const std::vector<Rect>& sourceRects) {
   for (auto& style : _layerStyles) {
     DEBUG_ASSERT(style != nullptr);
-    if (style->extraSourceType() == LayerStyleExtraSourceType::Background) {
+    if (NeedsBackgroundSource(style->extraSourceType())) {
       _root->invalidateBackground(renderBounds, style.get(), contentScale, sourceRects);
     }
   }
@@ -2199,7 +2209,7 @@ bool Layer::hasBackgroundStyle() {
   }
   for (const auto& style : _layerStyles) {
     DEBUG_ASSERT(style != nullptr);
-    if (style->extraSourceType() == LayerStyleExtraSourceType::Background) {
+    if (NeedsBackgroundSource(style->extraSourceType())) {
       return true;
     }
   }

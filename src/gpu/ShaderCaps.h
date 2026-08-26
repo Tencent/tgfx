@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include "tgfx/gpu/GPU.h"
 
@@ -84,7 +85,7 @@ class ShaderCaps {
    * Returns the maximum size in bytes of a uniform buffer object (UBO) supported by the
    * shader language.
    */
-  int maxUBOSize = 0;
+  int64_t maxUBOSize = 0;
 
   /**
    * Returns the required alignment in bytes for offsets within a uniform buffer object (UBO).

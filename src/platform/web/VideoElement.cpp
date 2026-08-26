@@ -21,6 +21,7 @@
 #ifdef TGFX_USE_WEBGPU
 #include <emscripten.h>
 #include "gpu/webgpu/WebGPUTexture.h"
+#include "tgfx/gpu/webgpu/WebGPUDevice.h"
 #else
 #include "gpu/opengl/GLTexture.h"
 #endif
@@ -58,6 +59,10 @@ std::shared_ptr<TextureView> VideoElement::onMakeTexture(Context* context, bool 
           ANDROID_MINIPROGRAM_ALIGNMENT - (textureHeight % ANDROID_MINIPROGRAM_ALIGNMENT);
     }
   }
+#ifdef TGFX_USE_WEBGPU
+  _deviceHandle = reinterpret_cast<uintptr_t>(
+      static_cast<WGPUDevice>(static_cast<WebGPUDevice*>(context->device())->webgpuDevice()));
+#endif
   auto textureView = TextureView::MakeFormat(context, textureWidth, textureHeight,
                                              PixelFormat::RGBA_8888, mipmapped);
   if (textureView != nullptr) {
@@ -73,7 +78,8 @@ bool VideoElement::onUpdateTexture(std::shared_ptr<TextureView> textureView) {
   auto w = webgpuTexture->width();
   auto h = webgpuTexture->height();
   val::module_property("tgfx").call<void>("uploadVideoToWebGPUTexture", source,
-                                          reinterpret_cast<uintptr_t>(wgpuTexture), w, h);
+                                          reinterpret_cast<uintptr_t>(wgpuTexture), w, h,
+                                          static_cast<unsigned>(_deviceHandle));
 #else
   auto glTexture = std::static_pointer_cast<GLTexture>(textureView->getTexture());
   val::module_property("tgfx").call<void>("uploadToTexture", emscripten::val::module_property("GL"),

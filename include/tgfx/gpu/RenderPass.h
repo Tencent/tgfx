@@ -18,7 +18,9 @@
 
 #pragma once
 
+#include <optional>
 #include "tgfx/core/Color.h"
+#include "tgfx/core/Rect.h"
 #include "tgfx/gpu/GPUBuffer.h"
 #include "tgfx/gpu/RenderPipeline.h"
 #include "tgfx/gpu/Sampler.h"
@@ -170,6 +172,17 @@ class DepthStencilAttachment {
    * If set to true, the stencil component is read-only during the render pass.
    */
   bool stencilReadOnly = false;
+
+  /**
+   * Optional best-effort hint that confines the depth/stencil clear to the given rectangle
+   * (in backend scissor space) when loadAction is LoadAction::Clear, allowing backends to
+   * skip clearing pixels the caller will not touch. When nullopt, the entire attachment is
+   * cleared. Currently honored only by the OpenGL backend; Metal, Vulkan, and WebGPU
+   * ignore this field and clear the whole attachment, which is functionally correct but
+   * forgoes the bandwidth saving. Does not affect draw-time scissor, which is controlled
+   * by RenderPass::setScissorRect().
+   */
+  std::optional<Rect> clearScissor = std::nullopt;
 };
 
 /**
@@ -254,6 +267,15 @@ class RenderPass {
    * Returns the GPU associated with this RenderPass.
    */
   virtual GPU* gpu() const = 0;
+
+  /**
+   * Returns the pixel format of the bound depth-stencil attachment, or PixelFormat::Unknown if
+   * this render pass has no depth-stencil attachment.
+   */
+  PixelFormat depthStencilFormat() const {
+    auto& texture = descriptor.depthStencilAttachment.texture;
+    return texture != nullptr ? texture->format() : PixelFormat::Unknown;
+  }
 
   /**
    * Sets the viewport used during the rasterization stage to linearly map from normalized device

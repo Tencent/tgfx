@@ -129,7 +129,7 @@ std::shared_ptr<RenderPipeline> StencilMaskRenderPass::createMaskPipeline(GPU* g
   colorAttachment.colorWriteMask = 0;
   descriptor.fragment.colorAttachments.push_back(colorAttachment);
   // Stencil: write 1 wherever the disc fragment shader runs. compare=Always + passOp=Replace
-  // is exactly the configuration the bezier rasterization stencil pass needs and the
+  // is exactly the configuration the stencil-and-cover stencil pass needs and the
   // configuration GLRenderPipeline used to silently discard. Pin every stencil-related field
   // explicitly: this fixture exists to lock down the GLRenderPipeline stencil-state factory,
   // so any future change to defaults must surface here as a test break rather than a silent

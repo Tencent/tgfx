@@ -41,7 +41,8 @@ std::shared_ptr<EGLWindow> EGLWindow::Current() {
 
 std::shared_ptr<EGLWindow> EGLWindow::MakeFrom(EGLNativeWindowType nativeWindow,
                                                EGLContext sharedContext,
-                                               std::shared_ptr<ColorSpace> colorSpace) {
+                                               std::shared_ptr<ColorSpace> colorSpace,
+                                               bool vsyncEnabled) {
   if (!nativeWindow) {
     return nullptr;
   }
@@ -49,13 +50,15 @@ std::shared_ptr<EGLWindow> EGLWindow::MakeFrom(EGLNativeWindowType nativeWindow,
   if (device == nullptr) {
     return nullptr;
   }
-  auto eglWindow = std::shared_ptr<EGLWindow>(new EGLWindow(device, std::move(colorSpace)));
+  auto eglWindow =
+      std::shared_ptr<EGLWindow>(new EGLWindow(device, std::move(colorSpace), vsyncEnabled));
   eglWindow->nativeWindow = nativeWindow;
   return eglWindow;
 }
 
-EGLWindow::EGLWindow(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace)
-    : Window(std::move(device), std::move(colorSpace)) {
+EGLWindow::EGLWindow(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace,
+                     bool vsyncEnabled)
+    : Window(std::move(device), std::move(colorSpace), vsyncEnabled) {
 }
 
 ISize GetNativeWindowSize(EGLNativeWindowType nativeWindow) {
@@ -112,6 +115,13 @@ void EGLWindow::onPresent(Context*) {
   auto eglDisplay = device->eglDisplay;
   // eglSurface cannot be nullptr in EGLWindow.
   auto eglSurface = device->eglSurface;
+  // The context is current here, so eglSwapInterval applies to this window's surface. The vsync
+  // setting is fixed at creation, so apply it once on the first present.
+  if (!swapIntervalApplied) {
+    if (eglSwapInterval(eglDisplay, vsyncEnabled() ? 1 : 0)) {
+      swapIntervalApplied = true;
+    }
+  }
   if (presentationTime.has_value()) {
     static auto eglPresentationTimeANDROID = reinterpret_cast<PFNEGLPRESENTATIONTIMEANDROIDPROC>(
         eglGetProcAddress("eglPresentationTimeANDROID"));

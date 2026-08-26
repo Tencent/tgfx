@@ -22,7 +22,7 @@
       },
       {
         "url": "https://github.com/madler/zlib.git",
-        "commit": "51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf",
+        "commit": "da607da739fa6047df13e66a2af6b8bec7c2a498",
         "dir": "third_party/zlib"
       },
       {
@@ -32,7 +32,7 @@
       },
       {
         "url": "https://github.com/glennrp/libpng.git",
-        "commit": "872555f4ba910252783af1507f9e7fe1653be252",
+        "commit": "3061454d980de7d53608f594194cfac722721d2a",
         "dir": "third_party/libpng"
       },
       {
@@ -47,7 +47,7 @@
       },
       {
         "url": "https://github.com/freetype/freetype.git",
-        "commit": "42608f77f20749dd6ddc9e0536788eaad70ea4b5",
+        "commit": "0a0221a1347e2f1e07c395263540026e9a0aa7c7",
         "dir": "third_party/freetype"
       },
       {
@@ -67,7 +67,7 @@
       },
       {
         "url": "https://github.com/libexpat/libexpat.git",
-        "commit": "88b3ed553d8ad335559254863a33360d55b9f1d6",
+        "commit": "92810461043fce37e70079b37ab1f04490a8f039",
         "dir": "third_party/expat"
       },
       {

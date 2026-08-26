@@ -819,8 +819,10 @@ class NonAARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
       if (inBounds.isEmpty()) {  //degenerate
         inBounds.left = inBounds.right = rect.centerX();
         inBounds.top = inBounds.bottom = rect.centerY();
-        inUV.left = inUV.right = uvRects[i]->centerX();
-        inUV.top = inUV.bottom = uvRects[i]->centerY();
+        if (hasUVCoord) {
+          inUV.left = inUV.right = uvRects[i]->centerX();
+          inUV.top = inUV.bottom = uvRects[i]->centerY();
+        }
       }
       auto inQuad = Quad::MakeFrom(inBounds, &viewMatrix);
       auto inUVQuad = Quad::MakeFrom(inUV);

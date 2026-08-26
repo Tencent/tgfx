@@ -212,6 +212,9 @@ bool Baseline::Compare(const Pixmap& pixmap, const std::string& key) {
     SaveImage(pixmap, key + "_base");
   }
 #endif
+  // Pixmap has RAII shared-lock semantics on its underlying PixelRef, so capturing pixmap by value
+  // is safe: the copy shares the same lock guard with the original and unlockPixels runs only when
+  // the last owner is destroyed.
   return CompareVersionAndMd5(md5, key, [key, pixmap](bool result) {
     if (result) {
       RemoveImage(key);

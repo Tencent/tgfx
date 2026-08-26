@@ -27,7 +27,17 @@ void LayerStyle::setBlendMode(BlendMode blendMode) {
   invalidateTransform();
 }
 
-Rect LayerStyle::filterBackground(const Rect& srcRect, float) {
+Rect LayerStyle::filterBackground(const Rect& srcRect, float contentScale) {
+  auto result = filterBackgroundSoft(srcRect, contentScale);
+  result.join(filterBackgroundSharp(srcRect, contentScale));
+  return result;
+}
+
+Rect LayerStyle::filterBackgroundSoft(const Rect& srcRect, float) {
+  return srcRect;
+}
+
+Rect LayerStyle::filterBackgroundSharp(const Rect& srcRect, float) {
   return srcRect;
 }
 

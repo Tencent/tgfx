@@ -162,7 +162,13 @@ BytesKey ProgramInfo::buildProgramKey() const {
   key.write(static_cast<uint32_t>(getOutputSwizzle().asKey()));
   key.write(static_cast<uint32_t>(cullMode));
   key.write(static_cast<uint32_t>(renderTarget->format()));
+  // Note: if mask or alphaToCoverage from MultisampleDescriptor are used in the pipeline
+  // creation, they must also be encoded here.
   key.write(static_cast<uint32_t>(renderTarget->sampleCount()));
+  // Pipelines that share shaders but differ in colour write mask or stencil configuration must
+  // resolve to distinct cache entries — otherwise the stencil-and-cover stencil/cover passes
+  // would silently collapse onto a single program. Keep this section in sync with the fields that
+  // are actually written into RenderPipelineDescriptor.
   key.write(colorWriteMask);
   key.write(static_cast<uint32_t>(depthStencil.format));
   key.write(static_cast<uint32_t>(depthStencil.depthCompare));

@@ -18,14 +18,20 @@
 
 #pragma once
 
-#include "gpu/processors/FragmentProcessor.h"
+#include "gpu/processors/Blur1DFragmentProcessor.h"
 
 namespace tgfx {
 
 enum class GaussianBlurDirection { Horizontal, Vertical };
 
-class GaussianBlur1DFragmentProcessor : public FragmentProcessor {
+class GaussianBlur1DFragmentProcessor : public Blur1DFragmentProcessor {
  public:
+  /**
+   * Creates a gaussian blur processor that samples the child along the given direction with the
+   * specified step. sigma is the standard deviation of the gaussian kernel in pixels. Returns
+   * nullptr when the processor or maxSigma is invalid, otherwise returns the child processor
+   * unchanged when sigma is not finite or not positive, or when stepLength is not positive.
+   */
   static PlacementPtr<FragmentProcessor> Make(BlockAllocator* allocator,
                                               PlacementPtr<FragmentProcessor> processor,
                                               float sigma, GaussianBlurDirection direction,
@@ -45,11 +51,18 @@ class GaussianBlur1DFragmentProcessor : public FragmentProcessor {
   GaussianBlur1DFragmentProcessor(PlacementPtr<FragmentProcessor> processor, float sigma,
                                   GaussianBlurDirection direction, float stepLength, int maxSigma);
 
-  void onComputeProcessorKey(BytesKey*) const override;
+  void onComputeProcessorKey(BytesKey* key) const override;
 
-  float sigma = 0.f;
+  // The direction in which the blur is applied.
   GaussianBlurDirection direction = GaussianBlurDirection::Horizontal;
+  // The pixel offset between adjacent samples.
   float stepLength = 1.f;
+  // The maximum allowed sigma, bounding the shader loop and the kernel table size.
   int maxSigma = 10;
+
+  void computeKernel(float strength) override;
+  int kernelLoopUpperBound() const override {
+    return 4 * maxSigma;
+  }
 };
 }  // namespace tgfx

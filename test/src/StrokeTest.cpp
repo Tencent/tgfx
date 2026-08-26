@@ -710,7 +710,8 @@ TGFX_TEST(StrokeTest, ConvertCubicToQuads) {
   {
     Point cubicPoints[4] = {Point(25, 50), Point(25, -17), Point(175, -2), Point(175, 50)};
     float tolerance = 1.f;
-    auto quads = PathUtils::ConvertCubicToQuads(cubicPoints, tolerance);
+    std::vector<Point> quads;
+    PathUtils::ConvertCubicToQuads(cubicPoints, tolerance, &quads);
     DrawCubicPath(canvas, cubicPoints);
     canvas->save();
     canvas->translate(0, 100.f);
@@ -723,7 +724,8 @@ TGFX_TEST(StrokeTest, ConvertCubicToQuads) {
     //alpha type cubic
     Point cubicPoints[4] = {Point(25, 50), Point(292, 90.5), Point(-68.5, 117.5), Point(175, 50)};
     float tolerance = 1.f;
-    auto quads = PathUtils::ConvertCubicToQuads(cubicPoints, tolerance);
+    std::vector<Point> quads;
+    PathUtils::ConvertCubicToQuads(cubicPoints, tolerance, &quads);
     DrawCubicPath(canvas, cubicPoints);
     canvas->save();
     canvas->translate(0, 100.f);
@@ -736,7 +738,8 @@ TGFX_TEST(StrokeTest, ConvertCubicToQuads) {
     // z type cubic
     Point cubicPoints[4] = {Point(25, 50), Point(310, 6), Point(-96, 111), Point(175, 50)};
     float tolerance = 1.f;
-    auto quads = PathUtils::ConvertCubicToQuads(cubicPoints, tolerance);
+    std::vector<Point> quads;
+    PathUtils::ConvertCubicToQuads(cubicPoints, tolerance, &quads);
     DrawCubicPath(canvas, cubicPoints);
     canvas->save();
     canvas->translate(0, 100.f);
@@ -748,7 +751,8 @@ TGFX_TEST(StrokeTest, ConvertCubicToQuads) {
   {
     Point cubicPoints[4] = {Point(25, 50), Point(126.5, 111), Point(64, -14), Point(175, 50)};
     float tolerance = 1.f;
-    auto quads = PathUtils::ConvertCubicToQuads(cubicPoints, tolerance);
+    std::vector<Point> quads;
+    PathUtils::ConvertCubicToQuads(cubicPoints, tolerance, &quads);
     DrawCubicPath(canvas, cubicPoints);
     canvas->save();
     canvas->translate(0, 100.f);
@@ -761,7 +765,8 @@ TGFX_TEST(StrokeTest, ConvertCubicToQuads) {
     // line type cubic
     Point cubicPoints[4] = {Point(25, 50), Point(175, 50), Point(25, 50), Point(175, 50)};
     float tolerance = 1.f;
-    auto quads = PathUtils::ConvertCubicToQuads(cubicPoints, tolerance);
+    std::vector<Point> quads;
+    PathUtils::ConvertCubicToQuads(cubicPoints, tolerance, &quads);
     DrawCubicPath(canvas, cubicPoints);
     canvas->save();
     canvas->translate(0, 100.f);
@@ -773,7 +778,8 @@ TGFX_TEST(StrokeTest, ConvertCubicToQuads) {
   {
     Point cubicPoints[4] = {Point(25, 50), Point(94.5, 7), Point(147.5, -1.5), Point(175, 50)};
     float tolerance = 1.f;
-    auto quads = PathUtils::ConvertCubicToQuads(cubicPoints, tolerance);
+    std::vector<Point> quads;
+    PathUtils::ConvertCubicToQuads(cubicPoints, tolerance, &quads);
     DrawCubicPath(canvas, cubicPoints);
     canvas->save();
     canvas->translate(0, 100.f);
@@ -785,7 +791,8 @@ TGFX_TEST(StrokeTest, ConvertCubicToQuads) {
   {
     Point cubicPoints[4] = {Point(25, 50), Point(-69, 16.5), Point(269, 23), Point(175, 50)};
     float tolerance = 1.f;
-    auto quads = PathUtils::ConvertCubicToQuads(cubicPoints, tolerance);
+    std::vector<Point> quads;
+    PathUtils::ConvertCubicToQuads(cubicPoints, tolerance, &quads);
     DrawCubicPath(canvas, cubicPoints);
     canvas->save();
     canvas->translate(0, 100.f);
@@ -797,7 +804,8 @@ TGFX_TEST(StrokeTest, ConvertCubicToQuads) {
   {
     Point cubicPoints[4] = {Point(25, 50), Point(52.5, -33.5), Point(94, 65), Point(175, 50)};
     float tolerance = 1.f;
-    auto quads = PathUtils::ConvertCubicToQuads(cubicPoints, tolerance);
+    std::vector<Point> quads;
+    PathUtils::ConvertCubicToQuads(cubicPoints, tolerance, &quads);
     DrawCubicPath(canvas, cubicPoints);
     canvas->save();
     canvas->translate(0, 100.f);
@@ -809,7 +817,8 @@ TGFX_TEST(StrokeTest, ConvertCubicToQuads) {
   {
     Point cubicPoints[4] = {Point(25, 50), Point(157, 111), Point(41, 110), Point(175, 50)};
     float tolerance = 1.f;
-    auto quads = PathUtils::ConvertCubicToQuads(cubicPoints, tolerance);
+    std::vector<Point> quads;
+    PathUtils::ConvertCubicToQuads(cubicPoints, tolerance, &quads);
     DrawCubicPath(canvas, cubicPoints);
     canvas->save();
     canvas->translate(0, 100.f);

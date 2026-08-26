@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,19 +16,19 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <optional>
-#include "gpu/processors/AARectEffect.h"
+#include "D3D12CommandBuffer.h"
+#include "D3D12GPU.h"
 
 namespace tgfx {
-class GLSLAARectEffect : public AARectEffect {
- public:
-  explicit GLSLAARectEffect(const Rect& rect);
 
-  void emitCode(EmitArgs& args) const override;
+D3D12CommandBuffer::~D3D12CommandBuffer() {
+  if (session.commandAllocator == nullptr) {
+    // Session was already moved out by submit(). Normal path — nothing to clean up.
+    return;
+  }
+  // Abandon path: CommandBuffer was created (finish() succeeded) but never submitted.
+  // Reclaim all session resources through the same unified path used by reclaimSubmission().
+  _gpu->reclaimAbandonedSession(std::move(session));
+}
 
- private:
-  void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
-};
 }  // namespace tgfx

@@ -17,7 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Render3DContext.h"
+#include <algorithm>
+#include <cmath>
 #include "Context3DCompositor.h"
+#include "core/Matrix3DUtils.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "layers/BackgroundHandler.h"
@@ -88,14 +91,26 @@ void Render3DContext::finishAndDrawTo(const DrawArgs& args, Canvas* canvas) {
     return;
   }
 
-  // Register every collected node as a polygon. The compositor's BSP tree may split polygons
-  // further; each fragment carries the layer pointer and node alpha for the raster pass below.
+  // Rasters are sized to the compositor viewport (not the full localBounds), keeping texture
+  // sizes bounded. A fully visible leaf keeps the 1:1 contentScale density; a clipped leaf
+  // derives a projected-footprint density so its sample rate matches what the compositor
+  // samples.
+  const Rect compositorViewport = Rect::MakeWH(static_cast<float>(_compositor->width()),
+                                               static_cast<float>(_compositor->height()));
+  std::unordered_map<Layer*, RasterInfo> layerRasterInfo;
+  layerRasterInfo.reserve(_pendingNodes.size());
   for (const auto& node : _pendingNodes) {
-    Matrix3D finalTransform = node.transform;
-    finalTransform.postScale(_contentScale, _contentScale, 1.0f);
-    finalTransform.postTranslate(-_renderRect.left, -_renderRect.top, 0);
-    _compositor->addPolygon(node.layer, node.localBounds, finalTransform, node.depth, node.alpha,
-                            node.antialiasing);
+    Matrix3D localToCompositor = node.transform;
+    localToCompositor.postScale(_contentScale, _contentScale, 1.0f);
+    localToCompositor.postTranslate(-_renderRect.left, -_renderRect.top, 0);
+    RasterInfo info;
+    if (!ComputeRasterInfo(localToCompositor, node.localBounds, compositorViewport, _contentScale,
+                           &info)) {
+      continue;
+    }
+    layerRasterInfo.emplace(node.layer, info);
+    _compositor->addPolygon(node.layer, info.visibleLocal, localToCompositor, node.depth,
+                            node.alpha, node.antialiasing);
   }
 
   const auto& fragments = _compositor->prepareTraversal();
@@ -153,16 +168,21 @@ void Render3DContext::finishAndDrawTo(const DrawArgs& args, Canvas* canvas) {
     float rasterAlpha = fragment->rasterAlpha();
     auto worldIt = layerLocalToWorld.find(layer);
     Matrix localToWorld = worldIt != layerLocalToWorld.end() ? worldIt->second : Matrix::I();
+    auto infoIt = layerRasterInfo.find(layer);
+    if (infoIt == layerRasterInfo.end()) {
+      continue;
+    }
+    const RasterInfo& info = infoIt->second;
     auto blendMode = layer->blendMode();
     std::shared_ptr<Image> image;
     if (perFragmentRaster) {
-      image = rasterLayer(layer, fragment->localBounds(), rasterAlpha, blendMode, leafArgs,
-                          compositorSource, outerSnapshots, localToWorld);
+      image = rasterLayer(layer, rasterAlpha, blendMode, leafArgs, info, compositorSource,
+                          outerSnapshots, localToWorld);
     } else {
       auto cacheIt = layerImages.find(layer);
       if (cacheIt == layerImages.end()) {
-        image = rasterLayer(layer, fragment->localBounds(), rasterAlpha, blendMode, leafArgs,
-                            compositorSource, outerSnapshots, localToWorld);
+        image = rasterLayer(layer, rasterAlpha, blendMode, leafArgs, info, compositorSource,
+                            outerSnapshots, localToWorld);
         layerImages.emplace(layer, image);
       } else {
         image = cacheIt->second;
@@ -187,25 +207,19 @@ void Render3DContext::finishAndDrawTo(const DrawArgs& args, Canvas* canvas) {
 }
 
 std::shared_ptr<Image> Render3DContext::rasterLayer(
-    Layer* layer, const Rect& localBounds, float alpha, BlendMode blendMode, DrawArgs& leafArgs,
+    Layer* layer, float alpha, BlendMode blendMode, DrawArgs& leafArgs, const RasterInfo& info,
     const std::shared_ptr<BackgroundSource>& compositorSource, BackgroundSnapshotMap* snapshots,
     const Matrix& localToWorld) {
-  auto scaledBounds = localBounds;
-  scaledBounds.scale(_contentScale, _contentScale);
-  scaledBounds.roundOut();
-  auto width = static_cast<int>(scaledBounds.width());
-  auto height = static_cast<int>(scaledBounds.height());
-  if (width <= 0 || height <= 0) {
+  if (info.rasterWidth <= 0 || info.rasterHeight <= 0) {
     return nullptr;
   }
-  auto surface = Surface::Make(leafArgs.context, width, height, false, 1, false, 0, _colorSpace);
+  auto surface = Surface::Make(leafArgs.context, info.rasterWidth, info.rasterHeight, false, 1,
+                               info.mipmapped, 0, _colorSpace);
   if (surface == nullptr) {
     return nullptr;
   }
   auto* leafCanvas = surface->getCanvas();
-  auto density = Matrix::MakeScale(_contentScale, _contentScale);
-  density.postTranslate(-localBounds.left * _contentScale, -localBounds.top * _contentScale);
-  leafCanvas->setMatrix(density);
+  leafCanvas->setMatrix(info.density);
 
   // Bind a fresh BackgroundCapturer to a leaf-backed sub source for this fragment when the
   // outer pass is capturing. The sub source treats the leaf as own contents and the compositor
@@ -217,9 +231,9 @@ std::shared_ptr<Image> Render3DContext::rasterLayer(
     // leafArgs is reused across fragments; reset to NoOp so a failed createFromSurface call
     // doesn't leave a dangling pointer to the previous iteration's stack-local capturer.
     leafArgs.backgroundHandler = BackgroundHandler::NoOp();
-    auto worldBounds = localToWorld.mapRect(localBounds);
+    auto worldBounds = localToWorld.mapRect(info.visibleLocal);
     leafSource =
-        compositorSource->createFromSurface(surface.get(), worldBounds, localToWorld, density);
+        compositorSource->createFromSurface(surface.get(), worldBounds, localToWorld, info.density);
     if (leafSource != nullptr) {
       leafCapturer = std::make_unique<BackgroundCapturer>(snapshots, leafSource);
       leafArgs.backgroundHandler = leafCapturer.get();
@@ -271,6 +285,108 @@ bool Render3DContext::primeCompositorFromOuterCanvas(Canvas* outerCanvas) {
   if (primeImage != nullptr) {
     _compositor->primeWithImage(primeImage);
   }
+  return true;
+}
+
+namespace {
+
+// Returns the squared scale in the most minified raster-texel direction, including rotation and
+// skew without relying on an axis-aligned footprint. The quotient form det² / λmax replaces the
+// trace - sqrt(discriminant) form, which cancels catastrophically when the two axis scales differ
+// widely; double intermediates also keep float inputs from overflowing.
+static double SmallestSingularValueSquared(float m00, float m01, float m10, float m11) {
+  const double a = static_cast<double>(m00);
+  const double b = static_cast<double>(m01);
+  const double c = static_cast<double>(m10);
+  const double d = static_cast<double>(m11);
+  const double trace = a * a + b * b + c * c + d * d;
+  const double determinant = a * d - b * c;
+  const double discriminant = std::max(0.0, trace * trace - 4.0 * determinant * determinant);
+  const double largestEigenvalue = 0.5 * (trace + std::sqrt(discriminant));
+  if (!(largestEigenvalue > 0.0)) {
+    return 0.0;
+  }
+  return determinant * determinant / largestEigenvalue;
+}
+
+// Creates mipmaps for the offscreen leaf surface only when the affine mapping minifies raster
+// texels. The smallest singular value of the texel-to-compositor Jacobian measures the most
+// minified direction: below 1.0 the leaf shrinks while sampling and needs mipmaps to avoid
+// aliasing, while equal or larger scales sample level 0 only and skip the mip storage entirely.
+// Perspective or invalid mappings conservatively retain mipmaps.
+static bool NeedsMipmaps(const Matrix3D& localToCompositor, const Rect& visibleLocal,
+                         int rasterWidth, int rasterHeight) {
+  // The leaf is planar (z = 0), so the row-3 column-2 perspective term multiplies zero and is
+  // intentionally ignored; only the x/y perspective terms affect the texel mapping.
+  const float perspectiveX = localToCompositor.getRowColumn(3, 0);
+  const float perspectiveY = localToCompositor.getRowColumn(3, 1);
+  const float homogeneousW = localToCompositor.getRowColumn(3, 3);
+  if (perspectiveX != 0.0f || perspectiveY != 0.0f || !(homogeneousW > 0.0f) ||
+      visibleLocal.isEmpty() || rasterWidth <= 0 || rasterHeight <= 0) {
+    return true;
+  }
+  const float texelsPerLocalX = static_cast<float>(rasterWidth) / visibleLocal.width();
+  const float texelsPerLocalY = static_cast<float>(rasterHeight) / visibleLocal.height();
+  if (!(texelsPerLocalX > 0.0f) || !(texelsPerLocalY > 0.0f)) {
+    return true;
+  }
+  const float m00 = localToCompositor.getRowColumn(0, 0) / homogeneousW / texelsPerLocalX;
+  const float m01 = localToCompositor.getRowColumn(0, 1) / homogeneousW / texelsPerLocalY;
+  const float m10 = localToCompositor.getRowColumn(1, 0) / homogeneousW / texelsPerLocalX;
+  const float m11 = localToCompositor.getRowColumn(1, 1) / homogeneousW / texelsPerLocalY;
+  if (!std::isfinite(m00) || !std::isfinite(m01) || !std::isfinite(m10) || !std::isfinite(m11)) {
+    return true;
+  }
+  const double smallestSingularValueSquared = SmallestSingularValueSquared(m00, m01, m10, m11);
+  return !std::isfinite(smallestSingularValueSquared) || smallestSingularValueSquared < 1.0;
+}
+
+}  // namespace
+
+bool Render3DContext::ComputeRasterInfo(const Matrix3D& localToCompositor, const Rect& localBounds,
+                                        const Rect& compositorViewport, float contentScale,
+                                        RasterInfo* info) {
+  if (Matrix3DUtils::IsRectBehindCamera(localBounds, localToCompositor)) {
+    return false;
+  }
+  // Size the raster from the clip-visible local footprint: when it covers the whole leaf, keep the
+  // 1:1 contentScale density; otherwise derive density from the (dest / local) ratio of the clipped
+  // region, which stays bounded by the viewport. IsRectBehindCamera already rejected near-plane
+  // straddles, so the visible region never touches the near plane here and the density stays
+  // finite; the homography clip would otherwise blow up at that singular boundary.
+  Rect localFootprint = {};
+  Rect destFootprint = {};
+  if (!Matrix3DUtils::ComputeVisibleFootprints(localBounds, compositorViewport, localToCompositor,
+                                               &localFootprint, &destFootprint)) {
+    return false;
+  }
+  // Near-plane clipping can push clipped vertices a hair past localBounds when interpolating in
+  // homogeneous space. Clamp again after roundOut so the compositing polygon never expands past
+  // the leaf's declared range.
+  localFootprint.roundOut();
+  if (!localFootprint.intersect(localBounds)) {
+    return false;
+  }
+  destFootprint.roundOut();
+  const float localWidth = localFootprint.width();
+  const float localHeight = localFootprint.height();
+  const float destWidth = destFootprint.width();
+  const float destHeight = destFootprint.height();
+  if (!(localWidth > 0.0f) || !(localHeight > 0.0f) || !(destWidth > 0.0f) ||
+      !(destHeight > 0.0f)) {
+    return false;
+  }
+  const bool coversWholeLeaf = localFootprint == localBounds;
+  const float densityX = coversWholeLeaf ? contentScale : destWidth / localWidth;
+  const float densityY = coversWholeLeaf ? contentScale : destHeight / localHeight;
+  Matrix density = Matrix::MakeScale(densityX, densityY);
+  density.postTranslate(-localFootprint.left * densityX, -localFootprint.top * densityY);
+  info->visibleLocal = localFootprint;
+  info->density = density;
+  info->rasterWidth = std::max(1, static_cast<int>(std::ceil(localWidth * densityX)));
+  info->rasterHeight = std::max(1, static_cast<int>(std::ceil(localHeight * densityY)));
+  info->mipmapped =
+      NeedsMipmaps(localToCompositor, info->visibleLocal, info->rasterWidth, info->rasterHeight);
   return true;
 }
 

@@ -93,17 +93,25 @@ static bool GetHardClipRect(const ClipStack& clip, const Matrix* matrix, Rect* c
     case ClipState::Rect:
       break;
   }
-  auto& elements = clip.elements();
-  for (size_t i = clip.oldestValidIndex(); i < elements.size(); ++i) {
-    const auto& element = elements[i];
-    // Skip invalid elements or pixel-aligned rectangles (hard edges even with anti-aliasing).
-    if (!element.isValid() || (element.isRect() && element.isPixelAligned())) {
-      continue;
-    }
-    if (element.isAntiAlias()) {
-      return false;
-    }
+  // In the Rect state the only valid element is the most recently added one: an axis-aligned rect
+  // under an identity matrix, sitting at the back of the stack.
+  const auto& elements = clip.elements();
+  DEBUG_ASSERT(!elements.empty());
+  if (elements.empty()) {
+    return false;
   }
+  const auto& element = elements.back();
+  DEBUG_ASSERT(element.isValid() && element.shape().isRect() && element.matrix().isIdentity());
+  if (!element.isValid() || !element.shape().isRect() || !element.matrix().isIdentity()) {
+    return false;
+  }
+  // A pixel-aligned rect has hard edges even with anti-aliasing, so only a non-aligned AA rect
+  // produces soft edges that cannot be represented as an integer clip rect.
+  if (element.antiAlias() && !IsClipPixelAligned(element.shape().rect())) {
+    return false;
+  }
+  // Use the clip's accumulated bounds: unlike the element's raw rect, they are already snapped to
+  // the pixel grid according to whether AA is enabled, and are thus integer-valued.
   auto rect = clip.bounds();
   if (matrix != nullptr) {
     if (!matrix->rectStaysRect()) {
@@ -135,6 +143,11 @@ std::shared_ptr<Image> Picture::asImage(Point* offset, const Matrix* matrix,
 
   std::shared_ptr<Image> image = nullptr;
   SamplingOptions sampling = {};
+  // DrawImageRect's makeSubset(rect) moves the image anchor by rect.left/top; offsetX/offsetY
+  // below must absorb the same shift so the subset is measured from the real image anchor
+  // (recordMatrix position + rect offset) instead of the recordMatrix position only.
+  float subsetOffsetX = 0.0f;
+  float subsetOffsetY = 0.0f;
 
   // Check for direct DrawImage or DrawImageRect
   if (record->type() == PictureRecordType::DrawImage ||
@@ -148,8 +161,11 @@ std::shared_ptr<Image> Picture::asImage(Point* offset, const Matrix* matrix,
       }
     }
     if (record->type() == PictureRecordType::DrawImageRect) {
-      image = image->makeSubset(static_cast<const DrawImageRect*>(record)->rect);
+      auto rect = static_cast<const DrawImageRect*>(record)->rect;
+      image = image->makeSubset(rect);
       DEBUG_ASSERT(image != nullptr);
+      subsetOffsetX = rect.left;
+      subsetOffsetY = rect.top;
     }
   }
   // Check for DrawRect with ImageShader (rect + ImageShader pattern)
@@ -201,8 +217,8 @@ std::shared_ptr<Image> Picture::asImage(Point* offset, const Matrix* matrix,
   } else if (!clipRect.isEmpty()) {
     subset = clipRect;
   }
-  auto offsetX = imageMatrix.getTranslateX();
-  auto offsetY = imageMatrix.getTranslateY();
+  auto offsetX = imageMatrix.getTranslateX() + subsetOffsetX;
+  auto offsetY = imageMatrix.getTranslateY() + subsetOffsetY;
   if (!subset.isEmpty()) {
     subset.offset(-offsetX, -offsetY);
     auto roundSubset = subset;

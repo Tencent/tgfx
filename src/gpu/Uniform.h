@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <string>
 
 namespace tgfx {
@@ -52,8 +53,10 @@ class Uniform {
   Uniform() = default;
 
   /**
-   * Creates a uniform variable with the specified name, type, and visibility. arraySize is 1 for
-   * scalars and the element count for std140 arrays.
+   * Creates a uniform variable with the specified name, type, and element count. An array uniform
+   * is created when arraySize is greater than 1. Array uniforms must use a format whose element
+   * size is 16 bytes (e.g. Float4), because the std140 layout aligns every array element to 16
+   * bytes.
    */
   Uniform(std::string name, UniformFormat format, uint32_t arraySize = 1)
       : _name(std::move(name)), _format(format), _arraySize(arraySize) {
@@ -81,14 +84,14 @@ class Uniform {
   }
 
   /**
-   * The number of array elements; 1 when the uniform is not an array.
+   * The number of elements in the uniform array. Returns 1 for scalar uniforms.
    */
   uint32_t arraySize() const {
     return _arraySize;
   }
 
   /**
-   * Returns the size of the uniform variable in bytes.
+   * Returns the total size of the uniform variable in bytes.
    */
   size_t size() const;
 

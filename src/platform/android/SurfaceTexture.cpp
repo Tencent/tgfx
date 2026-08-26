@@ -42,7 +42,6 @@ static jmethodID SurfaceTexture_release;
 static jmethodID SurfaceTexture_getDataSpace;
 static Global<jclass> SurfaceClass;
 static jmethodID Surface_Constructor;
-static jmethodID Surface_release;
 static Global<jclass> HandlerClass;
 static jmethodID Handler_Constructor;
 static Global<jclass> EventHandlerClass;
@@ -95,7 +94,6 @@ void SurfaceTexture::JNIInit(JNIEnv* env) {
   SurfaceClass = env->FindClass("android/view/Surface");
   Surface_Constructor =
       env->GetMethodID(SurfaceClass.get(), "<init>", "(Landroid/graphics/SurfaceTexture;)V");
-  Surface_release = env->GetMethodID(SurfaceClass.get(), "release", "()V");
   DataSpaceClass = env->FindClass("android/hardware/DataSpace");
   if (DataSpaceClass.get() != nullptr) {
     DataSpaceClass_getStandard =
@@ -172,10 +170,9 @@ std::shared_ptr<SurfaceTexture> SurfaceTexture::Make(int width, int height, jobj
   return std::shared_ptr<SurfaceTexture>(new SurfaceTexture(width, height, env, stObject));
 }
 
-SurfaceTexture::SurfaceTexture(int width, int height, JNIEnv* env, jobject st)
+SurfaceTexture::SurfaceTexture(int width, int height, JNIEnv*, jobject st)
     : ImageStream(width, height) {
   surfaceTexture = st;
-  surface = env->NewObject(SurfaceClass.get(), Surface_Constructor, st);
 }
 
 SurfaceTexture::~SurfaceTexture() {
@@ -184,12 +181,19 @@ SurfaceTexture::~SurfaceTexture() {
   if (env == nullptr) {
     return;
   }
-  env->CallVoidMethod(surface.get(), Surface_release);
   env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_release);
 }
 
-jobject SurfaceTexture::getInputSurface() const {
-  return surface.get();
+jobject SurfaceTexture::createInputSurface() const {
+  // Use JNIEnvironment::Current() to fetch the thread-local JNIEnv without pushing a new local
+  // frame. Wrapping this in a stack JNIEnvironment would trigger PopLocalFrame(nullptr) on scope
+  // exit and release the local ref returned by NewObject before the caller can use it. The
+  // returned local ref instead lives in the caller's current local frame.
+  auto env = JNIEnvironment::Current();
+  if (env == nullptr) {
+    return nullptr;
+  }
+  return env->NewObject(SurfaceClass.get(), Surface_Constructor, surfaceTexture.get());
 }
 
 void SurfaceTexture::notifyFrameAvailable() {

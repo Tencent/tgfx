@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,30 +18,17 @@
 
 #pragma once
 
-#include "gpu/processors/FragmentProcessor.h"
+#include <optional>
+#include "tgfx/core/Rect.h"
 
 namespace tgfx {
-class AARectEffect : public FragmentProcessor {
- public:
-  static PlacementPtr<AARectEffect> Make(BlockAllocator* allocator, const Rect& rect);
 
-  std::string name() const override {
-    return "AARectEffect";
-  }
+class Canvas;
 
-  /** The clip rect in destination device coordinates. */
-  const Rect& getRect() const {
-    return rect;
-  }
+/**
+ * Returns the canvas clip bounds in the layer's local coordinate space, or std::nullopt if the
+ * canvas cannot provide a meaningful clip (e.g. no canvas or no surface to derive bounds from).
+ */
+std::optional<Rect> GetClipBounds(const Canvas* canvas);
 
-  bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
-
- protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
-  explicit AARectEffect(const Rect& rect) : FragmentProcessor(ClassID()), rect(rect) {
-  }
-
-  Rect rect = {};
-};
 }  // namespace tgfx

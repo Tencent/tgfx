@@ -48,7 +48,7 @@ PlacementPtr<RRectDrawOp> RRectDrawOp::Make(Context* context,
 }
 
 RRectDrawOp::RRectDrawOp(BlockAllocator* allocator, RRectsVertexProvider* provider)
-    : DrawOp(allocator, provider->aaType()), rectCount(provider->rectCount()) {
+    : StandardDrawOp(allocator, provider->aaType()), rectCount(provider->rectCount()) {
   if (!provider->hasColor()) {
     commonColor = ToPMColor(provider->firstColor(), provider->dstColorSpace());
   }
@@ -81,7 +81,7 @@ PlacementPtr<GeometryProcessor> RRectDrawOp::onMakeGeometryProcessor(RenderTarge
                                         hasStroke, commonColor);
 }
 
-void RRectDrawOp::onDraw(RenderPass* renderPass) {
+void RRectDrawOp::onDraw(RenderPass* renderPass, RenderTarget* /*renderTarget*/) {
   if (indexBufferProxy == nullptr || vertexBufferProxyView == nullptr) {
     return;
   }

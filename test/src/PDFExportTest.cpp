@@ -34,6 +34,8 @@
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/core/Stroke.h"
+#include "tgfx/core/Surface.h"
+#include "tgfx/core/SurfaceReadback.h"
 #include "tgfx/core/TileMode.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/core/WriteStream.h"
@@ -275,6 +277,142 @@ TGFX_TEST(PDFExportTest, Image) {
   PDFStream->flush();
 
   EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/Image"));
+}
+
+TGFX_TEST(PDFExportTest, ImageShaderClamp) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto PDFStream = MemoryWriteStream::Make();
+
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  auto canvas = document->beginPage(500.f, 500.f);
+  {
+    // The rect spans (-100, -100) to (300, 300) in the 200x200 image space, so all four clamp edges
+    // and all four corners are stretched outward.
+    canvas->translate(150.f, 150.f);
+    auto image = Image::MakeFromFile(ProjectPath::Absolute("resources/assets/glyph1.png"));
+    auto shader = Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp);
+    Paint paint;
+    paint.setShader(shader);
+    canvas->drawRect(Rect::MakeXYWH(-100.f, -100.f, 400.f, 400.f), paint);
+  }
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/ImageShaderClamp"));
+}
+
+TGFX_TEST(PDFExportTest, ImageShaderClampMirror) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto PDFStream = MemoryWriteStream::Make();
+
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  auto canvas = document->beginPage(500.f, 500.f);
+  {
+    // X clamps with the rect sticking out on both sides while Y mirrors, which exercises the
+    // mirrored variants of the left and right clamp strips.
+    canvas->translate(150.f, 150.f);
+    auto image = Image::MakeFromFile(ProjectPath::Absolute("resources/assets/glyph1.png"));
+    auto shader = Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Mirror);
+    Paint paint;
+    paint.setShader(shader);
+    canvas->drawRect(Rect::MakeXYWH(-100.f, 0.f, 400.f, 200.f), paint);
+  }
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/ImageShaderClampMirror"));
+}
+
+TGFX_TEST(PDFExportTest, DrawImageRectSubset) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto PDFStream = MemoryWriteStream::Make();
+
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  auto canvas = document->beginPage(500.f, 500.f);
+  {
+    canvas->translate(50.f, 50.f);
+    auto image = Image::MakeFromFile(ProjectPath::Absolute("resources/assets/glyph1.png"));
+    canvas->drawImageRect(image, Rect::MakeXYWH(0.f, 0.f, 100.f, 100.f),
+                          Rect::MakeWH(400.f, 400.f));
+  }
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/DrawImageRectSubset"));
+}
+
+TGFX_TEST(PDFExportTest, PendingRasterPlaceholder) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  // A readback whose transfer task has never been flushed has no readback buffer yet, so it reports
+  // isReady() == false on every backend, driving a desktop run through the pending raster path.
+  auto source = Surface::Make(context, 10, 10);
+  EXPECT_TRUE(source != nullptr);
+  source->getCanvas()->clear(Color::White());
+  auto neverReady = source->asyncReadPixels(Rect::MakeWH(10, 10));
+  EXPECT_TRUE(neverReady != nullptr);
+  EXPECT_FALSE(neverReady->isReady(context));
+
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  auto documentImpl = static_cast<PDFDocumentImpl*>(document.get());
+  auto canvas = document->beginPage(100.f, 100.f);
+  canvas->clear(Color::Red());
+  documentImpl->addPendingRaster({documentImpl->reserveRef(), neverReady, 101, false});
+  document->endPage();
+
+  EXPECT_FALSE(document->isReadyToClose());
+
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/PendingRasterPlaceholder"));
+}
+
+TGFX_TEST(PDFExportTest, PendingRasterFlushOnPoll) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  // A readback that has been locked and unlocked once keeps reporting isReady() == true on desktop
+  // backends, so the poll below flushes real pixels into the document instead of a placeholder.
+  auto source = Surface::Make(context, 10, 10);
+  EXPECT_TRUE(source != nullptr);
+  source->getCanvas()->clear(Color::Green());
+  auto readback = source->asyncReadPixels(Rect::MakeWH(10, 10));
+  EXPECT_TRUE(readback != nullptr);
+  EXPECT_TRUE(readback->lockPixels(context) != nullptr);
+  readback->unlockPixels(context);
+  EXPECT_TRUE(readback->isReady(context));
+
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  auto documentImpl = static_cast<PDFDocumentImpl*>(document.get());
+  auto canvas = document->beginPage(100.f, 100.f);
+  canvas->clear(Color::Red());
+  documentImpl->addPendingRaster({documentImpl->reserveRef(), readback, 101, false});
+  document->endPage();
+
+  EXPECT_TRUE(document->isReadyToClose());
+
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/PendingRasterFlushOnPoll"));
 }
 
 TGFX_TEST(PDFExportTest, Complex) {
@@ -1132,23 +1270,24 @@ struct EmittedStream {
 EmittedStream RunPDFStreamOut(const std::string& input,
                               PDFMetadata::CompressionLevel compressionLevel,
                               PDFSteamCompressionEnabled compressFlag) {
-  auto sink = MemoryWriteStream::Make();
-  PDFMetadata metadata;
-  metadata.compressionLevel = compressionLevel;
-  PDFDocumentImpl doc(sink, /*context=*/nullptr, metadata);
-  // PDFStreamOut routes through emitStream, which records object offsets via offsetMap. The full
-  // PDFDocument pipeline initializes baseOffset inside SerializeHeader during the first
-  // onBeginPage call; this fixture skips beginPage entirely, so initialize the offset map here so
-  // the DEBUG_ASSERT inside Difference does not fire.
-  doc.offsetMap.markStartOfDocument(sink);
+  TGFX_PRIVATE_ACCESS(
+      auto sink = MemoryWriteStream::Make(); PDFMetadata metadata;
+      metadata.compressionLevel = compressionLevel;
+      PDFDocumentImpl doc(sink, /*context=*/nullptr, metadata);
+      // PDFStreamOut routes through emitStream, which records object offsets via offsetMap. The full
+      // PDFDocument pipeline initializes baseOffset inside SerializeHeader during the first
+      // onBeginPage call; this fixture skips beginPage entirely, so initialize the offset map here so
+      // the DEBUG_ASSERT inside Difference does not fire.
+      doc.offsetMap.markStartOfDocument(sink);
 
-  auto inputData = Data::MakeWithCopy(input.data(), input.size());
-  auto inputStream = Stream::MakeFromData(inputData);
+      auto inputData = Data::MakeWithCopy(input.data(), input.size());
+      auto inputStream = Stream::MakeFromData(inputData);
 
-  auto dict = PDFDictionary::Make();
-  PDFIndirectReference ref =
-      PDFStreamOut(std::move(dict), std::move(inputStream), &doc, compressFlag);
-  return EmittedStream{sink->readData(), ref};
+      auto dict = PDFDictionary::Make();
+      PDFIndirectReference ref =
+          PDFStreamOut(std::move(dict), std::move(inputStream), &doc, compressFlag);
+      return EmittedStream{sink->readData(), ref};)
+  return EmittedStream{};
 }
 
 // Searches `bytes` for the byte sequence `needle` and returns its start offset, or
@@ -1220,42 +1359,44 @@ size_t MeasureActualPayload(const std::shared_ptr<Data>& bytes) {
 // Bug 1 unit test, compressed branch. Drives PDFStreamOut with input large enough that
 // FlateDecode actually saves bytes; expects /Length to equal the compressed payload size, not the
 // original input size. This is the case the PR fix targets directly.
-TGFX_TEST(PDFExportTest, PDFStreamOutWritesCompressedLength) {
-  // Highly redundant input compresses well; the 4096-byte block reliably exceeds MinimumSavings.
-  std::string input(4096, 'A');
-  auto emitted = RunPDFStreamOut(input, PDFMetadata::CompressionLevel::Default,
-                                 PDFSteamCompressionEnabled::Yes);
+TGFX_TEST_PRIVATE(PDFExportTest, PDFStreamOutWritesCompressedLength) {
+  TGFX_PRIVATE_ACCESS(
+      // Highly redundant input compresses well; the 4096-byte block reliably exceeds MinimumSavings.
+      std::string input(4096, 'A');
+      auto emitted = RunPDFStreamOut(input, PDFMetadata::CompressionLevel::Default,
+                                     PDFSteamCompressionEnabled::Yes);
 
-  EXPECT_NE(IndexOf(emitted.bytes, "/Filter /FlateDecode"), std::string::npos)
+      EXPECT_NE(IndexOf(emitted.bytes, "/Filter /FlateDecode"), std::string::npos)
       << "Compressed branch should emit /Filter /FlateDecode.";
 
-  size_t declared = ReadDeclaredLength(emitted.bytes);
-  size_t actual = MeasureActualPayload(emitted.bytes);
+      size_t declared = ReadDeclaredLength(emitted.bytes);
+      size_t actual = MeasureActualPayload(emitted.bytes);
 
-  EXPECT_EQ(declared, actual) << "/Length must match the actual payload bytes (ISO 32000-1 "
-                                 "§7.3.8.2). declared="
-                              << declared << " actual=" << actual;
-  EXPECT_LT(declared, input.size())
+      EXPECT_EQ(declared, actual) << "/Length must match the actual payload bytes (ISO 32000-1 "
+                                     "§7.3.8.2). declared="
+                                  << declared << " actual=" << actual;
+      EXPECT_LT(declared, input.size())
       << "Compressed payload should be smaller than the uncompressed input; otherwise the test "
-         "input is not exercising the compression path.";
+         "input is not exercising the compression path.";)
 }
 
 // Bug 1 unit test, uncompressed branch (compression disabled by metadata). /Length must equal the
 // input size and no /Filter entry should be emitted.
-TGFX_TEST(PDFExportTest, PDFStreamOutWritesUncompressedLength) {
-  std::string input = "Hello, PDF stream length test.";
-  auto emitted =
-      RunPDFStreamOut(input, PDFMetadata::CompressionLevel::None, PDFSteamCompressionEnabled::Yes);
+TGFX_TEST_PRIVATE(PDFExportTest, PDFStreamOutWritesUncompressedLength) {
+  TGFX_PRIVATE_ACCESS(std::string input = "Hello, PDF stream length test.";
+                      auto emitted = RunPDFStreamOut(input, PDFMetadata::CompressionLevel::None,
+                                                     PDFSteamCompressionEnabled::Yes);
 
-  EXPECT_EQ(IndexOf(emitted.bytes, "/Filter"), std::string::npos)
-      << "Uncompressed branch must not emit a /Filter entry.";
+                      EXPECT_EQ(IndexOf(emitted.bytes, "/Filter"), std::string::npos)
+                      << "Uncompressed branch must not emit a /Filter entry.";
 
-  size_t declared = ReadDeclaredLength(emitted.bytes);
-  size_t actual = MeasureActualPayload(emitted.bytes);
+                      size_t declared = ReadDeclaredLength(emitted.bytes);
+                      size_t actual = MeasureActualPayload(emitted.bytes);
 
-  EXPECT_EQ(declared, actual) << "/Length must match the actual payload bytes. declared="
-                              << declared << " actual=" << actual;
-  EXPECT_EQ(declared, input.size());
+                      EXPECT_EQ(declared, actual)
+                      << "/Length must match the actual payload bytes. declared=" << declared
+                      << " actual=" << actual;
+                      EXPECT_EQ(declared, input.size());)
 }
 
 // Bug 1 unit test, "compression refused" branch: input is too short or too random for FlateDecode
@@ -1263,23 +1404,24 @@ TGFX_TEST(PDFExportTest, PDFStreamOutWritesUncompressedLength) {
 // pre-fix code wrote the original input size into /Length unconditionally, so the bug surfaces in
 // this branch as well — making sure /Length still matches the actually-emitted payload (== input
 // size, since no Filter is written).
-TGFX_TEST(PDFExportTest, PDFStreamOutFallsBackWhenCompressionDoesNotSave) {
-  // 8 bytes is well under MinimumSavings (= strlen("/Filter_/FlateDecode_") = 21), so
-  // SerializeStream skips the deflate path entirely.
-  std::string input = "abcdefgh";
-  auto emitted = RunPDFStreamOut(input, PDFMetadata::CompressionLevel::Default,
-                                 PDFSteamCompressionEnabled::Yes);
+TGFX_TEST_PRIVATE(PDFExportTest, PDFStreamOutFallsBackWhenCompressionDoesNotSave) {
+  TGFX_PRIVATE_ACCESS(
+      // 8 bytes is well under MinimumSavings (= strlen("/Filter_/FlateDecode_") = 21), so
+      // SerializeStream skips the deflate path entirely.
+      std::string input = "abcdefgh";
+      auto emitted = RunPDFStreamOut(input, PDFMetadata::CompressionLevel::Default,
+                                     PDFSteamCompressionEnabled::Yes);
 
-  EXPECT_EQ(IndexOf(emitted.bytes, "/Filter"), std::string::npos)
+      EXPECT_EQ(IndexOf(emitted.bytes, "/Filter"), std::string::npos)
       << "Short input below MinimumSavings should bypass FlateDecode.";
 
-  size_t declared = ReadDeclaredLength(emitted.bytes);
-  size_t actual = MeasureActualPayload(emitted.bytes);
+      size_t declared = ReadDeclaredLength(emitted.bytes);
+      size_t actual = MeasureActualPayload(emitted.bytes);
 
-  EXPECT_EQ(declared, actual) << "/Length must match the actual payload bytes even when the "
-                                 "compression path is skipped. declared="
-                              << declared << " actual=" << actual;
-  EXPECT_EQ(declared, input.size());
+      EXPECT_EQ(declared, actual) << "/Length must match the actual payload bytes even when the "
+                                     "compression path is skipped. declared="
+                                  << declared << " actual=" << actual;
+      EXPECT_EQ(declared, input.size());)
 }
 
 TGFX_TEST(PDFExportTest, NoiseEffects) {

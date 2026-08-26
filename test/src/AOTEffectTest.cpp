@@ -25,12 +25,12 @@
 #include "gpu/AOTPlanExecutor.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/LumaFragmentProcessor.h"
 #include "gpu/processors/PerlinNoiseFragmentProcessor.h"
+#include "gpu/processors/RectEffect.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
@@ -964,7 +964,7 @@ TGFX_TEST(AOTEffectTest, RectCoverageFoldsIntoPointwiseChain) {
   BlockAllocator allocator;
   auto texture = MakeTextureProcessor(context, &allocator, PixelFormat::RGBA_8888);
   ASSERT_NE(texture, nullptr);
-  auto rectCoverage = AARectEffect::Make(&allocator, Rect::MakeLTRB(10.5f, 10.5f, 90.5f, 90.5f));
+  auto rectCoverage = RectEffect::Make(&allocator, Rect::MakeLTRB(10.5f, 10.5f, 90.5f, 90.5f));
   ASSERT_NE(rectCoverage, nullptr);
 
   AOTEffectGraph graph;

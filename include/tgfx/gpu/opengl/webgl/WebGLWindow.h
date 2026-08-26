@@ -26,6 +26,8 @@ class WebGLWindow : public Window {
  public:
   /**
    * Creates a new window from a canvas.
+   * On Web, the final executable must export the GL runtime method (see the Web build section in
+   * README.md); otherwise color space configuration and image/video texture uploads will not work.
    */
   static std::shared_ptr<WebGLWindow> MakeFrom(const std::string& canvasID,
                                                std::shared_ptr<ColorSpace> colorSpace = nullptr);

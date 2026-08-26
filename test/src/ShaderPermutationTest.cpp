@@ -29,7 +29,6 @@
 #include "gpu/PermutationMatcher.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 #include "gpu/processors/ClampedGradientEffect.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
@@ -43,6 +42,7 @@
 #include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/processors/RadialGradientLayout.h"
+#include "gpu/processors/RectEffect.h"
 #include "gpu/processors/ShapeInstancedGeometryProcessor.h"
 #include "gpu/processors/SingleIntervalGradientColorizer.h"
 #include "gpu/processors/TextureEffect.h"
@@ -150,7 +150,7 @@ static PlacementPtr<FragmentProcessor> MakeSingleIntervalCoverage(Context* conte
     return nullptr;
   }
   if (coverageType == 1) {
-    return AARectEffect::Make(allocator, Rect::MakeWH(8, 8));
+    return RectEffect::Make(allocator, Rect::MakeWH(8, 8));
   }
   auto proxy = context->proxyProvider()->createTextureProxy({}, 8, 8, PixelFormat::ALPHA_8);
   if (proxy == nullptr || proxy->getTextureView() == nullptr) {
@@ -466,7 +466,7 @@ TGFX_TEST(ShaderPermutationTest, DeviceSpaceTexturedEffectRejectsUnsupportedLayo
                                              Matrix::I(), Matrix::I());
     auto composed =
         MakeDeviceSpacePointwiseProcessor(context, &allocator, PixelFormat::RGBA_8888, false);
-    auto coverage = AARectEffect::Make(&allocator, Rect::MakeWH(8, 8));
+    auto coverage = RectEffect::Make(&allocator, Rect::MakeWH(8, 8));
     ASSERT_NE(gp, nullptr);
     ASSERT_NE(composed, nullptr);
     ASSERT_NE(coverage, nullptr);
@@ -1347,7 +1347,7 @@ TGFX_TEST(ShaderPermutationTest, ChainBlendClipHitsPrecompiledCache) {
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
   // Draw with ColorFilter::Blend (produces XfermodeFragmentProcessor) + AA clip rect
-  // (produces AARectEffect as coverage FP). The pointwise chain serves this with an
+  // (produces a device-space RectEffect as coverage FP). The pointwise chain serves this with an
   // AARectCoverage slot.
   canvas->save();
   canvas->clipRect(Rect::MakeLTRB(10.5f, 10.5f, 189.5f, 189.5f));
@@ -1652,7 +1652,7 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectCoverageMatchesFiveLevel1Families) 
       BlockAllocator allocator;
       auto gp = QuadPerEdgeAAGeometryProcessor::Make(&allocator, 8, 8, AAType::Coverage,
                                                      PMColor::White(), Matrix::I(), false);
-      auto clip = AARectEffect::Make(&allocator, Rect::MakeWH(8, 8));
+      auto clip = RectEffect::Make(&allocator, Rect::MakeWH(8, 8));
       auto xp = MakeSingleIntervalXP(context, &allocator, xpType);
       ASSERT_NE(gp, nullptr);
       ASSERT_NE(clip, nullptr);
@@ -1671,7 +1671,7 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectCoverageMatchesFiveLevel1Families) 
       auto gp = QuadPerEdgeAAGeometryProcessor::Make(&allocator, 8, 8, AAType::Coverage,
                                                      PMColor::White(), Matrix::I(), false);
       auto color = TextureEffect::Make(&allocator, std::move(textureProxy));
-      auto clip = AARectEffect::Make(&allocator, Rect::MakeWH(8, 8));
+      auto clip = RectEffect::Make(&allocator, Rect::MakeWH(8, 8));
       auto xp = MakeSingleIntervalXP(context, &allocator, xpType);
       ASSERT_NE(gp, nullptr);
       ASSERT_NE(color, nullptr);
@@ -1687,7 +1687,7 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectCoverageMatchesFiveLevel1Families) 
       BlockAllocator allocator;
       auto gp = DefaultGeometryProcessor::Make(&allocator, PMColor::White(), 8, 8, AAType::Coverage,
                                                Matrix::I(), Matrix::I());
-      auto clip = AARectEffect::Make(&allocator, Rect::MakeWH(8, 8));
+      auto clip = RectEffect::Make(&allocator, Rect::MakeWH(8, 8));
       auto xp = MakeSingleIntervalXP(context, &allocator, xpType);
       ASSERT_NE(gp, nullptr);
       ASSERT_NE(clip, nullptr);
@@ -1702,7 +1702,7 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectCoverageMatchesFiveLevel1Families) 
       BlockAllocator allocator;
       auto gp = HairlineLineGeometryProcessor::Make(&allocator, PMColor::White(), Matrix::I(),
                                                     Matrix::I(), 1.0f, AAType::Coverage);
-      auto clip = AARectEffect::Make(&allocator, Rect::MakeWH(8, 8));
+      auto clip = RectEffect::Make(&allocator, Rect::MakeWH(8, 8));
       auto xp = MakeSingleIntervalXP(context, &allocator, xpType);
       ASSERT_NE(gp, nullptr);
       ASSERT_NE(clip, nullptr);
@@ -1717,7 +1717,7 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectCoverageMatchesFiveLevel1Families) 
       BlockAllocator allocator;
       auto gp = HairlineQuadGeometryProcessor::Make(&allocator, PMColor::White(), Matrix::I(),
                                                     Matrix::I(), 1.0f, AAType::Coverage);
-      auto clip = AARectEffect::Make(&allocator, Rect::MakeWH(8, 8));
+      auto clip = RectEffect::Make(&allocator, Rect::MakeWH(8, 8));
       auto xp = MakeSingleIntervalXP(context, &allocator, xpType);
       ASSERT_NE(gp, nullptr);
       ASSERT_NE(clip, nullptr);
@@ -1770,7 +1770,7 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectRejectsComposedCoverage) {
   auto maskProxy = context->proxyProvider()->createTextureProxy({}, 8, 8, PixelFormat::ALPHA_8);
   ASSERT_NE(maskProxy, nullptr);
   auto mask = DeviceSpaceTextureEffect::Make(&allocator, std::move(maskProxy), Matrix::I());
-  auto clip = AARectEffect::Make(&allocator, Rect::MakeWH(8, 8));
+  auto clip = RectEffect::Make(&allocator, Rect::MakeWH(8, 8));
   auto composed = FragmentProcessor::Compose(&allocator, std::move(mask), std::move(clip));
   ASSERT_NE(gp, nullptr);
   ASSERT_NE(composed, nullptr);
