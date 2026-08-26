@@ -590,7 +590,7 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
 std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
     HardwareBufferRef hardwareBuffer, int sampleCount) {
   auto info = HardwareBufferGetInfo(hardwareBuffer);
-  auto format = GetRenderableFormat(info.format);
+  auto format = GetRenderableFormat(info.format, context->backend());
   if (format == PixelFormat::Unknown) {
     return nullptr;
   }

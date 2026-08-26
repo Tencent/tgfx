@@ -42,7 +42,7 @@ ImageInfo GetImageInfo(HardwareBufferRef hardwareBuffer, std::shared_ptr<ColorSp
                          info.rowBytes, std::move(colorSpace));
 }
 
-PixelFormat GetRenderableFormat(HardwareBufferFormat hardwareBufferFormat) {
+PixelFormat GetRenderableFormat(HardwareBufferFormat hardwareBufferFormat, Backend backend) {
   switch (hardwareBufferFormat) {
     case HardwareBufferFormat::ALPHA_8:
       return PixelFormat::ALPHA_8;
@@ -50,8 +50,12 @@ PixelFormat GetRenderableFormat(HardwareBufferFormat hardwareBufferFormat) {
       return PixelFormat::RGBA_8888;
     case HardwareBufferFormat::BGRA_8888:
 #if TARGET_OS_MAC && !TARGET_OS_IPHONE
-      // On macOS, hardware textures always use the RGBA format.
-      return PixelFormat::RGBA_8888;
+      // On macOS the OpenGL (CGL) backend imports a BGRA hardware buffer as an RGBA_8888 texture,
+      // so the renderable format must be RGBA_8888 to keep the whole pipeline on one convention.
+      // The Metal backend imports the same buffer as a genuine BGRA8Unorm texture, so it must keep
+      // BGRA_8888; otherwise the render target proxy (RGBA) and its texture (BGRA) disagree and the
+      // destination-texture copy used by advanced blend modes swaps red and blue.
+      return backend == Backend::Metal ? PixelFormat::BGRA_8888 : PixelFormat::RGBA_8888;
 #else
       return PixelFormat::BGRA_8888;
 #endif
