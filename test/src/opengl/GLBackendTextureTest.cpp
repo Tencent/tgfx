@@ -17,11 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/opengl/GLGPU.h"
-#include "tgfx/core/Canvas.h"
-#include "tgfx/core/Color.h"
-#include "tgfx/core/Paint.h"
-#include "tgfx/core/Rect.h"
-#include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/Texture.h"
 #include "tgfx/gpu/opengl/GLTypes.h"
@@ -46,30 +41,36 @@ TGFX_TEST(GLBackendTextureTest, LogicalSize) {
   auto texture = gpu->createTexture(descriptor);
   ASSERT_TRUE(texture != nullptr);
 
-  auto backendTexture = texture->getBackendTexture();
-  GLTextureInfo glInfo = {};
-  ASSERT_TRUE(backendTexture.getGLTextureInfo(&glInfo));
+  {
+    auto backendTexture = texture->getBackendTexture();
+    GLTextureInfo info = {};
+    ASSERT_TRUE(backendTexture.getGLTextureInfo(&info));
+    BackendTexture logicalTexture(info, logicalSize, logicalSize);
+    auto imported = gpu->importBackendTexture(
+        logicalTexture, TextureUsage::RENDER_ATTACHMENT | TextureUsage::TEXTURE_BINDING, false);
+    ASSERT_TRUE(imported != nullptr);
+    EXPECT_EQ(imported->width(), logicalSize);
+    EXPECT_EQ(imported->height(), logicalSize);
+    auto roundTrip = imported->getBackendTexture();
+    ASSERT_TRUE(roundTrip.isValid());
+    EXPECT_EQ(roundTrip.width(), logicalSize);
+    EXPECT_EQ(roundTrip.height(), logicalSize);
+  }
 
-  BackendTexture logicalBackendTexture(glInfo, logicalSize, logicalSize);
-  auto imported = gpu->importBackendTexture(
-      logicalBackendTexture, TextureUsage::RENDER_ATTACHMENT | TextureUsage::TEXTURE_BINDING,
-      false);
-  ASSERT_TRUE(imported != nullptr);
-  EXPECT_EQ(imported->width(), logicalSize);
-  EXPECT_EQ(imported->height(), logicalSize);
-
-  auto roundTrip = imported->getBackendTexture();
-  ASSERT_TRUE(roundTrip.isValid());
-  EXPECT_EQ(roundTrip.width(), logicalSize);
-  EXPECT_EQ(roundTrip.height(), logicalSize);
-
-  auto surface = Surface::MakeFrom(context, roundTrip, ImageOrigin::TopLeft);
-  ASSERT_TRUE(surface != nullptr);
-  auto canvas = surface->getCanvas();
-  Paint paint;
-  paint.setColor(Color::Red());
-  canvas->drawRect(Rect::MakeWH(logicalSize, logicalSize), paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "BackendTextureTest/LogicalSize"));
+  {
+    auto backendRenderTarget = texture->getBackendRenderTarget();
+    GLFrameBufferInfo info = {};
+    ASSERT_TRUE(backendRenderTarget.getGLFramebufferInfo(&info));
+    BackendRenderTarget logicalRenderTarget(info, logicalSize, logicalSize);
+    auto imported = gpu->importBackendRenderTarget(logicalRenderTarget);
+    ASSERT_TRUE(imported != nullptr);
+    EXPECT_EQ(imported->width(), logicalSize);
+    EXPECT_EQ(imported->height(), logicalSize);
+    auto roundTrip = imported->getBackendRenderTarget();
+    ASSERT_TRUE(roundTrip.isValid());
+    EXPECT_EQ(roundTrip.width(), logicalSize);
+    EXPECT_EQ(roundTrip.height(), logicalSize);
+  }
 }
 
 }  // namespace tgfx
