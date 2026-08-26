@@ -142,8 +142,7 @@ BackendTexture MetalTexture::getBackendTexture() const {
   MetalTextureInfo metalInfo;
   metalInfo.texture = (__bridge const void*)texture;
   metalInfo.format = static_cast<unsigned>(texture.pixelFormat);
-  return BackendTexture(metalInfo, static_cast<int>(texture.width),
-                        static_cast<int>(texture.height));
+  return BackendTexture(metalInfo, descriptor.width, descriptor.height);
 }
 
 BackendRenderTarget MetalTexture::getBackendRenderTarget() const {
@@ -153,8 +152,7 @@ BackendRenderTarget MetalTexture::getBackendRenderTarget() const {
   MetalTextureInfo metalInfo;
   metalInfo.texture = (__bridge const void*)texture;
   metalInfo.format = static_cast<unsigned>(texture.pixelFormat);
-  return BackendRenderTarget(metalInfo, static_cast<int>(texture.width),
-                             static_cast<int>(texture.height));
+  return BackendRenderTarget(metalInfo, descriptor.width, descriptor.height);
 }
 
 }  // namespace tgfx
