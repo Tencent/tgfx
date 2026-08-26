@@ -18,6 +18,7 @@
 
 #include <memory>
 #include <vector>
+#include "ArrayVaryingEffect.h"
 #include "InstancedGridRenderPass.h"
 #include "MultisampleTestEffect.h"
 #include "StencilMaskRenderPass.h"
@@ -26,6 +27,7 @@
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/resources/DepthStencilTextureView.h"
 #include "tgfx/core/ImageFilter.h"
+#include "tgfx/core/Bitmap.h"
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/RenderPass.h"
 #include "tgfx/gpu/Texture.h"
@@ -422,6 +424,28 @@ TGFX_TEST(GPURenderTest, AlphaToCoverage) {
   canvas->clear();
   canvas->drawImage(std::move(imageOn));
   EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/AlphaToCoverage_On"));
+}
+
+TGFX_TEST(GPURenderTest, ArrayVarying) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // Use a 200x200 synthetic input so the filtered image is also 200x200. The effect draws an NDC
+  // [-0.5, 0.5] quad, which lands a 100x100 rectangle centred in the 200x200 surface with a
+  // 50-pixel margin on every side. The input pixel values are irrelevant — the effect ignores
+  // its source texture and overwrites the entire filtered image with the blue quad.
+  Bitmap inputBitmap(200, 200, false);
+  auto image = Image::MakeFrom(std::move(inputBitmap));
+  ASSERT_TRUE(image != nullptr);
+
+  auto effect = ArrayVaryingEffect::Make();
+  auto filter = ImageFilter::Runtime(std::move(effect));
+  auto filtered = image->makeWithFilter(std::move(filter));
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  canvas->drawImage(std::move(filtered));
+  EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/ArrayVarying"));
 }
 
 }  // namespace tgfx
