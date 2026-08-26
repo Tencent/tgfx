@@ -1223,9 +1223,10 @@ static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
   } else {
     return std::nullopt;
   }
-  // Sigma is now a runtime uniform, not a variant dimension. The precompiled shader uses a fixed
-  // maximum kernel (MAX_SIGMA=9 → radius up to 10) and breaks early at the runtime radius, so any
-  // sigma in [1,10] maps to the same variant. Sigma > 10 exceeds the fixed kernel and falls back.
+  // The kernel radius is a runtime uniform, not a variant dimension. The precompiled shader uses
+  // a fixed maximum kernel (MAX_SIGMA=9 → radius up to 10) and breaks early at the runtime
+  // radius, so any sigma in [1,10] maps to the same variant. Sigma > 10 exceeds the fixed kernel
+  // and falls back.
   int sigma = blur->getMaxSigma();
   if (sigma < 1 || sigma > 10) {
     return std::nullopt;

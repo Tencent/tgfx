@@ -234,7 +234,7 @@ struct AOTGradientParameters {
   bool hasPerspective = false;
 };
 
-// Analytic anti-aliased rect coverage (AARectEffect, produced by AA rect clips). Multiplies the
+// Analytic anti-aliased rect coverage (RectEffect, produced by AA rect clips). Multiplies the
 // input color by a per-fragment coverage computed from gl_FragCoord and the rect, so it is a
 // pointwise node that reads the destination device coordinate directly and needs no texture or
 // varying. rect is {left, top, right, bottom} in device coordinates, already origin-flipped by the

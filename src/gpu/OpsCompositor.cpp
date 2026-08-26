@@ -876,8 +876,10 @@ std::pair<bool, bool> OpsCompositor::needComputeBounds(const Brush& brush, bool 
   if (pendingClip.state() == ClipState::Rect) {
     for (const auto& element : pendingClip.elements()) {
       if (element.isValid()) {
-        clipProducesFoldableCoverage =
-            element.isRect() && element.isAntiAlias() && !element.isPixelAligned();
+        // Coinciding bounds mark an exact integer-pixel rect that the clipBounds scissor already
+        // covers, so no coverage FP is produced for it.
+        clipProducesFoldableCoverage = element.shape().isRect() && element.antiAlias() &&
+                                       element.innerBounds() != element.outerBounds();
         break;
       }
     }

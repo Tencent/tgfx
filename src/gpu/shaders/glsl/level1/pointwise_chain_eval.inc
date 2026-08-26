@@ -125,7 +125,7 @@ vec4 evalChainSlot(int slot) {
     return result;
   }
   if (Packed.x == OP_AARECT_COVERAGE) {
-    // Analytic AA-rect coverage (identical math to GLSLAARectEffect): falloff from the fragment's
+    // Analytic AA-rect coverage (identical math to GLSLRectEffect): falloff from the fragment's
     // distance to the rect edges, evaluated in destination device coordinates via gl_FragCoord.
     highp vec4 dists4 =
         clamp(vec4(1.0, 1.0, -1.0, -1.0) * vec4(gl_FragCoord.xyxy - CoverageRect), 0.0, 1.0);

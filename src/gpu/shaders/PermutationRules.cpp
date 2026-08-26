@@ -21,10 +21,10 @@
 #include "gpu/shaders/level1/ComplexEllipseFillShader.h"
 #include "gpu/shaders/level1/ComplexNonAARRectFillShader.h"
 #include "gpu/shaders/level1/ConstColorShader.h"
-#include "gpu/shaders/level1/GaussianBlur1DShader.h"
 #include "gpu/shaders/level1/DeviceSpaceTextureShader.h"
 #include "gpu/shaders/level1/DeviceSpaceTexturedEffectShader.h"
 #include "gpu/shaders/level1/EllipseFillShader.h"
+#include "gpu/shaders/level1/GaussianBlur1DShader.h"
 #include "gpu/shaders/level1/HairlineLineShader.h"
 #include "gpu/shaders/level1/HairlineQuadShader.h"
 #include "gpu/shaders/level1/MaskFillShader.h"
@@ -41,9 +41,9 @@
 #include "gpu/shaders/level1/ShapeInstancedFillShader.h"
 #include "gpu/shaders/level1/ShapeInstancedTextureCoverageShader.h"
 #include "gpu/shaders/level1/SolidColorFillShader.h"
-#include "gpu/shaders/level1/TexturedEffectShader.h"
 #include "gpu/shaders/level1/TextureColorMatrixShader.h"
 #include "gpu/shaders/level1/TextureFillShader.h"
+#include "gpu/shaders/level1/TexturedEffectShader.h"
 #include "gpu/shaders/level1/TiledTextureFillShader.h"
 #include "gpu/shaders/level1/UnifiedGradientShader.h"
 #include "gpu/shaders/level1/YUVTextureFillShader.h"
@@ -656,10 +656,8 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateDeviceSpaceTexturedEffectReacha
       if (!composed) {
         continue;
       }
-      auto vertIndex =
-          DeviceSpaceTexturedEffectShader::VD::domain().encode(composed->vertValues);
-      auto fragIndex =
-          DeviceSpaceTexturedEffectShader::FD::domain().encode(composed->fragValues);
+      auto vertIndex = DeviceSpaceTexturedEffectShader::VD::domain().encode(composed->vertValues);
+      auto fragIndex = DeviceSpaceTexturedEffectShader::FD::domain().encode(composed->fragValues);
       result.insert({vertIndex, fragIndex});
     }
   }
@@ -776,8 +774,7 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateTextureFillReachable() {
   return result;
 }
 
-std::optional<RuleComposedValues> ComposeTiledTextureFill(
-    const TiledTextureFillInputs& inputs) {
+std::optional<RuleComposedValues> ComposeTiledTextureFill(const TiledTextureFillInputs& inputs) {
   if (inputs.xpType < 0) {
     return std::nullopt;
   }
@@ -1172,10 +1169,8 @@ std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseChainReachable() {
                   if (!composed) {
                     continue;
                   }
-                  auto vertIndex =
-                      PointwiseChainShader::VD::domain().encode(composed->vertValues);
-                  auto fragIndex =
-                      PointwiseChainShader::FD::domain().encode(composed->fragValues);
+                  auto vertIndex = PointwiseChainShader::VD::domain().encode(composed->vertValues);
+                  auto fragIndex = PointwiseChainShader::FD::domain().encode(composed->fragValues);
                   result.insert({vertIndex, fragIndex});
                 }
               }

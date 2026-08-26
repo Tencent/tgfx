@@ -72,11 +72,6 @@ static std::string AuditBundlePath() {
   return "resources/shaders/shader_bundle." + backend + ".bin";
 }
 
-static bool IsOpenGLAuditBackend() {
-  std::string backend = TGFX_BACKEND_NAME;
-  return backend.rfind("opengl", 0) == 0;
-}
-
 // Two-pass scenes (materialize-then-resample) cannot be byte-exact on SwiftShader: its fixed-point
 // sampler snaps ULP-level coordinate differences between the AOT and JIT code paths to adjacent
 // texels at content edges (measured 0.14% of pixels, full-swing). Metal is the byte-exact
@@ -973,13 +968,11 @@ TGFX_TEST(AOTL2AuditTest, GradientCoverageMatchesJIT) {
   LOGI("[L2GRAD] backend=%s shape=GradientCoverage noMatch=%u hits=%u maxDelta=%d pass=%d",
        TGFX_BACKEND_NAME, noMatch, hits, result.maxChannelDiff, result.passed ? 1 : 0);
 
-  if (IsOpenGLAuditBackend()) {
-    EXPECT_GT(noMatch, 0u);
-    EXPECT_EQ(hits, 0u);
-  } else {
-    EXPECT_EQ(noMatch, 0u) << "anti-aliased multi-stop gradient still misses the precompiled cache";
-    EXPECT_GT(hits, 0u) << "expected a precompiled artifact hit for the AA gradient draw";
-  }
+  // main's analytic clip refactor turned the AA rect edge into a RectEffect coverage FP, which
+  // the UnifiedGradientShader coverage rule serves on every backend (including desktop OpenGL,
+  // which previously missed this shape), so the hit expectation is uniform now.
+  EXPECT_EQ(noMatch, 0u) << "anti-aliased multi-stop gradient still misses the precompiled cache";
+  EXPECT_GT(hits, 0u) << "expected a precompiled artifact hit for the AA gradient draw";
   EXPECT_FALSE(result.structuralDifference);
   EXPECT_TRUE(result.passed) << "AOT gradient-with-coverage diverges from JIT, maxDelta="
                              << result.maxChannelDiff;

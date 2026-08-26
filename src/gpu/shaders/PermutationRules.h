@@ -345,13 +345,13 @@ struct AtlasTextFillInputs {
  */
 struct PointwiseChainInputs {
   int gpKind = 0;
-  bool hasCoverage = false;        // DefaultGP: AA coverage; quad/mesh: always true.
-  bool hasUVCoord = false;         // quad/mesh: texCoord slot; atlas: always true.
-  bool hasColor = false;           // per-vertex color slot (not DefaultGP).
-  int textureCount = 0;            // domain value: 0 = leaf-free, 1 = four-leaf padded slots.
-  bool hasMask = false;            // device-space mask child present.
-  bool hasCoverageSubtree = false; // chain coverage subtree present.
-  int xpType = -1;                 // -1 = no representable XferProcessor.
+  bool hasCoverage = false;         // DefaultGP: AA coverage; quad/mesh: always true.
+  bool hasUVCoord = false;          // quad/mesh: texCoord slot; atlas: always true.
+  bool hasColor = false;            // per-vertex color slot (not DefaultGP).
+  int textureCount = 0;             // domain value: 0 = leaf-free, 1 = four-leaf padded slots.
+  bool hasMask = false;             // device-space mask child present.
+  bool hasCoverageSubtree = false;  // chain coverage subtree present.
+  int xpType = -1;                  // -1 = no representable XferProcessor.
 };
 
 /**
@@ -450,8 +450,7 @@ std::optional<RuleComposedValues> ComposePerlinNoiseFill(const PerlinNoiseFillIn
  * Pure mapping for the TextureColorMatrixShader rule; see ComposeRoundStrokeRect for the sharing
  * contract.
  */
-std::optional<RuleComposedValues> ComposeTextureColorMatrix(
-    const TextureColorMatrixInputs& inputs);
+std::optional<RuleComposedValues> ComposeTextureColorMatrix(const TextureColorMatrixInputs& inputs);
 
 /**
  * Pure mapping for the YUVTextureFillShader rule; see ComposeRoundStrokeRect for the sharing
@@ -463,8 +462,7 @@ std::optional<RuleComposedValues> ComposeYUVTextureFill(const YUVTextureFillInpu
  * Pure mapping for the DeviceSpaceTextureShader rule; see ComposeRoundStrokeRect for the sharing
  * contract.
  */
-std::optional<RuleComposedValues> ComposeDeviceSpaceTexture(
-    const DeviceSpaceTextureInputs& inputs);
+std::optional<RuleComposedValues> ComposeDeviceSpaceTexture(const DeviceSpaceTextureInputs& inputs);
 
 /**
  * Pure mapping for the DeviceSpaceTexturedEffectShader rule; see ComposeRoundStrokeRect for the
@@ -484,8 +482,7 @@ std::optional<RuleComposedValues> ComposeShapeInstancedTextureCoverage(
  * Pure mapping for the ShapeInstancedFillShader rule; see ComposeRoundStrokeRect for the sharing
  * contract.
  */
-std::optional<RuleComposedValues> ComposeShapeInstancedFill(
-    const ShapeInstancedFillInputs& inputs);
+std::optional<RuleComposedValues> ComposeShapeInstancedFill(const ShapeInstancedFillInputs& inputs);
 
 /**
  * Pure mapping for the TextureFillShader rule; see ComposeRoundStrokeRect for the sharing
@@ -497,8 +494,7 @@ std::optional<RuleComposedValues> ComposeTextureFill(const TextureFillInputs& in
  * Pure mapping for the TiledTextureFillShader rule; see ComposeRoundStrokeRect for the sharing
  * contract.
  */
-std::optional<RuleComposedValues> ComposeTiledTextureFill(
-    const TiledTextureFillInputs& inputs);
+std::optional<RuleComposedValues> ComposeTiledTextureFill(const TiledTextureFillInputs& inputs);
 
 /**
  * Pure mapping for the QuadTextureFillShader rule; see ComposeRoundStrokeRect for the sharing

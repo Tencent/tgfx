@@ -16,6 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <CoreVideo/CoreVideo.h>
+#include <OpenGL/CGLContext.h>
+#include <OpenGL/CGLCurrent.h>
 #include <array>
 #include <chrono>
 #include <vector>
@@ -27,9 +30,6 @@
 #include "gpu/ProxyProvider.h"
 #include "gpu/opengl/GLCaps.h"
 #include "gpu/opengl/GLFunctions.h"
-#include <CoreVideo/CoreVideo.h>
-#include <OpenGL/CGLCurrent.h>
-#include <OpenGL/CGLContext.h>
 #include "gpu/opengl/GLGPU.h"
 #include "gpu/opengl/GLUtil.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
@@ -189,17 +189,17 @@ TGFX_TEST(GLRenderTest, TextureImportBenchmark) {
     // An empty IOSurface properties dictionary mirrors HardwareBuffer.mm: the pixel buffer
     // allocates with a default IOSurface backing, which is what the zero-copy import needs.
     auto emptySurfaceProps =
-        CFDictionaryCreate(kCFAllocatorDefault, nullptr, nullptr, 0,
-                           &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+        CFDictionaryCreate(kCFAllocatorDefault, nullptr, nullptr, 0, &kCFTypeDictionaryKeyCallBacks,
+                           &kCFTypeDictionaryValueCallBacks);
     const void* optionKeys[] = {kCVPixelBufferIOSurfacePropertiesKey};
     const void* optionValues[] = {emptySurfaceProps};
     auto options =
         CFDictionaryCreate(kCFAllocatorDefault, optionKeys, optionValues, 1,
                            &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
     CFRelease(emptySurfaceProps);
-    EXPECT_EQ(static_cast<int>(CVPixelBufferCreate(kCFAllocatorDefault, static_cast<size_t>(width),
-                                                static_cast<size_t>(height),
-                                                kCVPixelFormatType_32BGRA, options, &pixelBuffer)),
+    EXPECT_EQ(static_cast<int>(CVPixelBufferCreate(
+                  kCFAllocatorDefault, static_cast<size_t>(width), static_cast<size_t>(height),
+                  kCVPixelFormatType_32BGRA, options, &pixelBuffer)),
               static_cast<int>(kCVReturnSuccess));
     CFRelease(options);
     CVOpenGLTextureCacheRef textureCache = nullptr;
@@ -207,9 +207,8 @@ TGFX_TEST(GLRenderTest, TextureImportBenchmark) {
     ASSERT_NE(cglContext, nullptr);
     auto cglPixelFormat = CGLGetPixelFormat(cglContext);
     ASSERT_NE(cglPixelFormat, nullptr);
-    EXPECT_EQ(static_cast<int>(CVOpenGLTextureCacheCreate(
-                  kCFAllocatorDefault, nullptr, cglContext, cglPixelFormat, nullptr,
-                  &textureCache)),
+    EXPECT_EQ(static_cast<int>(CVOpenGLTextureCacheCreate(kCFAllocatorDefault, nullptr, cglContext,
+                                                          cglPixelFormat, nullptr, &textureCache)),
               static_cast<int>(kCVReturnSuccess));
     CVOpenGLTextureRef adopted = nullptr;
     // Warm up both paths once so first-touch allocations do not skew the averages.
@@ -220,9 +219,8 @@ TGFX_TEST(GLRenderTest, TextureImportBenchmark) {
     unsigned warmup = 0;
     gl->genTextures(1, &warmup);
     gl->bindTexture(GL_TEXTURE_2D, warmup);
-    const auto& format = static_cast<GLGPU*>(context->gpu())
-                             ->caps()
-                             ->getTextureFormat(PixelFormat::RGBA_8888);
+    const auto& format =
+        static_cast<GLGPU*>(context->gpu())->caps()->getTextureFormat(PixelFormat::RGBA_8888);
     gl->texImage2D(GL_TEXTURE_2D, 0, static_cast<int>(format.internalFormatTexImage), width, height,
                    0, format.externalFormat, format.externalType, pixels.data());
     gl->deleteTextures(1, &warmup);
@@ -236,7 +234,8 @@ TGFX_TEST(GLRenderTest, TextureImportBenchmark) {
     }
     gl->finish();
     auto zeroCopyMs =
-        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() /
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start)
+            .count() /
         rounds;
 
     start = std::chrono::steady_clock::now();
@@ -250,7 +249,8 @@ TGFX_TEST(GLRenderTest, TextureImportBenchmark) {
     }
     gl->finish();
     auto uploadMs =
-        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() /
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start)
+            .count() /
         rounds;
 
     // BGRA is the native Apple GPU layout; this variant isolates how much of the RGBA upload cost
@@ -268,7 +268,8 @@ TGFX_TEST(GLRenderTest, TextureImportBenchmark) {
     }
     gl->finish();
     auto uploadBgraMs =
-        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() /
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start)
+            .count() /
         rounds;
 
     // Same upload without the per-round glFinish: measures the CPU-side submission cost only,
@@ -283,13 +284,15 @@ TGFX_TEST(GLRenderTest, TextureImportBenchmark) {
       gl->deleteTextures(1, &id);
     }
     auto submitOnlyMs =
-        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() /
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start)
+            .count() /
         rounds;
     gl->finish();
 
-    LOGI("[Benchmark] %dx%d zeroCopyImport=%.3fms uploadRGBA=%.3fms uploadBGRA=%.3fms "
-         "submitOnly=%.3fms",
-         width, height, zeroCopyMs, uploadMs, uploadBgraMs, submitOnlyMs);
+    LOGI(
+        "[Benchmark] %dx%d zeroCopyImport=%.3fms uploadRGBA=%.3fms uploadBGRA=%.3fms "
+        "submitOnly=%.3fms",
+        width, height, zeroCopyMs, uploadMs, uploadBgraMs, submitOnlyMs);
     CVOpenGLTextureCacheRelease(textureCache);
     CVPixelBufferRelease(pixelBuffer);
   }

@@ -24,17 +24,19 @@ namespace tgfx {
 
 /// Precompiled shader declaration for GaussianBlur1DFragmentProcessor. Performs a 1D Gaussian blur
 /// by sampling a child texture in a loop. The loop upper bound is a fixed compile-time constant
-/// (MAX_BLUR_SIGMA); the actual kernel radius is a runtime value derived from the Sigma uniform,
-/// and the loop breaks early once it is reached. Sigma is therefore a runtime parameter, NOT a
+/// (MAX_BLUR_SIGMA); the actual kernel radius is a runtime value taken from the Radius uniform,
+/// and the loop breaks early once it is reached. The half-kernel weights are precomputed and
+/// normalized on the CPU and uploaded via the shared Kernel vec4 array, matching the runtime
+/// path's uniform contract bit-for-bit. The radius is therefore a runtime parameter, NOT a
 /// compile-time permutation dimension — this keeps the variant count bounded (previously MAX_SIGMA
 /// multiplied the whole fragment domain by 10).
 ///
 /// Vertex dimensions:
 ///
 /// Fragment dimensions:
-///   (MAX_SIGMA removed — sigma is now a uniform, not a variant dimension)
+///   (MAX_SIGMA removed — the radius is now a uniform, not a variant dimension)
 ///
-/// Runtime uniforms: Sigma (float), Step (vec2 direction vector)
+/// Runtime uniforms: Kernel (vec4[KERNEL_VEC4_COUNT]), Radius (int), Step (vec2 direction vector)
 class GaussianBlur1DShader : public PrecompiledShader {
  public:
   struct VertDims {

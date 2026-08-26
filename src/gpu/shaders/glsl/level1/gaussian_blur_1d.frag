@@ -1,8 +1,9 @@
 // GaussianBlur1DShader fragment shader
 // MAX_SIGMA is a FIXED compile-time constant (max supported kernel), NOT a permutation dimension.
-// The loop upper bound is 4*(MAX_SIGMA+1); the actual radius comes from the Sigma uniform at runtime
-// and the loop breaks early once reached. Sigma being a uniform (not a variant) keeps the variant
-// count bounded — it previously multiplied the fragment domain by 10.
+// The loop upper bound is 4*(MAX_SIGMA+1); the actual radius comes from the Radius uniform at
+// runtime and the loop breaks early once reached. The half-kernel weights are precomputed and
+// normalized on the CPU (Blur1DFragmentProcessor::setKernelData) and uploaded as a vec4 array,
+// exactly matching the runtime path's uniform contract so AOT and JIT renders stay bit-identical.
 // Permutation dimensions (frag):
 //   HAS_XP (0~2): 0=Empty, 1=PorterDuff DST_TEX, 2=PorterDuff FBF
 //   HAS_TILED_CHILD (bool): When 1, the child is a TiledTextureEffect: each tap is tiled through the
@@ -11,7 +12,7 @@
 //   without a real subset uploads the full texture bounds, so the clamp is a no-op.
 #version 450
 
-// Fixed maximum kernel: maxSigma=10 → loop upper bound 4*(9+1)=40. Runtime Sigma <= 10 breaks early.
+// Fixed maximum kernel: maxSigma=10 → loop upper bound 4*(9+1)=40. Runtime radius <= 2*9 breaks early.
 #ifndef MAX_SIGMA
 #define MAX_SIGMA 9
 #endif
@@ -23,10 +24,15 @@
 #ifndef HAS_TILED_CHILD
 #define HAS_TILED_CHILD 0
 #endif
+// Mirrors Blur1DFragmentProcessor::KERNEL_VEC4_COUNT: the vec4 capacity of the half-kernel table.
+// The size stays a literal because the reflection extractor does not expand preprocessor macros.
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Color;
-  float Sigma;
+  // Precomputed normalized half-kernel weights; lane i holds the shared weight of the samples at
+  // offsets +i and -i. Slots past the radius stay zero and are never indexed.
+  vec4 Kernel[17];
+  int Radius;
   vec2 Step;
   // Always declared: plain-child taps clamp to it (no-op at full bounds); a tiled child uses it
   // as the tiling domain.
@@ -57,17 +63,45 @@ layout(set = 1, binding = 1) uniform sampler2D MaskTextureSampler;
 layout(location = 0) out vec4 fragColor;
 
 void main() {
-  float sigma = Sigma;
   vec2 offset = Step;
-  int radius = int(ceil(2.0 * sigma));
+  int radius = Radius;
 
   vec4 sum = vec4(0.0);
-  float total = 0.0;
 
   for (int j = 0; j <= 4 * (MAX_SIGMA + 1); ++j) {
     int i = j - radius;
-    float weight = exp(-float(i * i) / (2.0 * sigma * sigma));
-    total += weight;
+    if (i > radius) {
+      break;
+    }
+    // Read the half-kernel weight for the current loop offset. The slot and the lane inside it
+    // are picked with chains of compile-time indices rather than indexing the uniform array with
+    // abs(i) directly: SwiftShader miscompiles a dynamic index into a std140 uniform block array
+    // and silently reads zeros, which drops the blur (same workaround as the runtime emission in
+    // GLSLGaussianBlur1DFragmentProcessor::AppendKernelWeight).
+    int kernelOffset = abs(i);
+    int kernelSlot = kernelOffset / 4;
+    vec4 kernelValues = Kernel[0];
+    if (kernelSlot == 1) { kernelValues = Kernel[1]; }
+    if (kernelSlot == 2) { kernelValues = Kernel[2]; }
+    if (kernelSlot == 3) { kernelValues = Kernel[3]; }
+    if (kernelSlot == 4) { kernelValues = Kernel[4]; }
+    if (kernelSlot == 5) { kernelValues = Kernel[5]; }
+    if (kernelSlot == 6) { kernelValues = Kernel[6]; }
+    if (kernelSlot == 7) { kernelValues = Kernel[7]; }
+    if (kernelSlot == 8) { kernelValues = Kernel[8]; }
+    if (kernelSlot == 9) { kernelValues = Kernel[9]; }
+    if (kernelSlot == 10) { kernelValues = Kernel[10]; }
+    if (kernelSlot == 11) { kernelValues = Kernel[11]; }
+    if (kernelSlot == 12) { kernelValues = Kernel[12]; }
+    if (kernelSlot == 13) { kernelValues = Kernel[13]; }
+    if (kernelSlot == 14) { kernelValues = Kernel[14]; }
+    if (kernelSlot == 15) { kernelValues = Kernel[15]; }
+    if (kernelSlot == 16) { kernelValues = Kernel[16]; }
+    int kernelLane = kernelOffset - kernelSlot * 4;
+    float weight = kernelValues.x;
+    if (kernelLane == 1) { weight = kernelValues.y; }
+    if (kernelLane == 2) { weight = kernelValues.z; }
+    if (kernelLane == 3) { weight = kernelValues.w; }
 
     vec2 sampleCoord = TransformedCoords_0 + offset * float(i);
     vec4 texColor = vec4(0.0);
@@ -120,7 +154,8 @@ void main() {
     }
   }
 
-  vec4 blurResult = sum / total;
+  // The uploaded weights are already normalized on the CPU, so no trailing division is needed.
+  vec4 blurResult = sum;
 
 #define TGFX_COVERAGE_SRC_COLOR blurResult
 #include "coverage_output.inc"

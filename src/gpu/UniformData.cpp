@@ -24,12 +24,12 @@ UniformData::UniformData(std::vector<Uniform> uniforms) : _uniforms(std::move(un
   for (const auto& uniform : _uniforms) {
     const auto& [entrySize, entryAlign] = EntryOf(uniform.format());
     uint32_t arraySize = uniform.arraySize();
-    // The std140 layout aligns every array element to a 16-byte boundary, so only formats whose
-    // element size is 16 bytes (e.g. Float4) match the contiguous CPU-side layout. Other element
-    // types would be misaligned in the GPU uniform block and must not be used as arrays.
-    DEBUG_ASSERT(arraySize <= 1 || entrySize == 16);
-    const size_t size = entrySize * arraySize;
-    const size_t align = entryAlign;
+    // The std140 layout aligns every array element to a 16-byte boundary. Elements smaller than
+    // 16 bytes (e.g. Float) are therefore non-contiguous on the GPU side; writers must go through
+    // the elementStride-aware paths (onSetArrayElement / slot writers) instead of assuming a
+    // packed CPU-side layout.
+    const size_t size = entrySize;
+    size_t align = entryAlign;
 
     // std140 arrays stride each element up to a 16-byte multiple.
     size_t elementStride = (size + 15) / 16 * 16;

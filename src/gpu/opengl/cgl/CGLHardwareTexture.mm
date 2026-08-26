@@ -70,9 +70,8 @@ std::vector<std::shared_ptr<Texture>> CGLHardwareTexture::MakeFrom(
     return {};
   }
   TextureDescriptor descriptor = {width, height, format, false, 1, usage};
-  auto glTexture = gpu->makeResource<CGLHardwareTexture>(descriptor, pixelBuffer, textureCache,
-                                                         static_cast<unsigned>(GL_TEXTURE_2D),
-                                                         twoDID);
+  auto glTexture = gpu->makeResource<CGLHardwareTexture>(
+      descriptor, pixelBuffer, textureCache, static_cast<unsigned>(GL_TEXTURE_2D), twoDID);
   if (usage & TextureUsage::RENDER_ATTACHMENT && !glTexture->checkFrameBuffer(gpu)) {
     return {};
   }

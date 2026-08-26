@@ -67,7 +67,7 @@ static void UploadChainSlot(UniformData* uniformData, size_t index, const AOTCha
     }
     case AOTChainOp::AARectCoverage: {
       // The AA math evaluates to 0 at the rect coordinates, so outset by 0.5 to interpolate from 0
-      // at a half-pixel inset to 1 at a half-pixel outset (same as GLSLAARectEffect::onSetData).
+      // at a half-pixel inset to 1 at a half-pixel outset (same as GLSLRectEffect::onSetData).
       const auto& rect = slot.rectCoverage.rect;
       float rectData[] = {rect[0] - 0.5f, rect[1] - 0.5f, rect[2] + 0.5f, rect[3] + 0.5f};
       uniformData->setDataOptional("CoverageRect", rectData);
