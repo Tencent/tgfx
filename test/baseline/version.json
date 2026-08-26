@@ -158,6 +158,7 @@
     "GPURenderTest": {
         "AlphaToCoverage_Off": "faa8a587",
         "AlphaToCoverage_On": "faa8a587",
+        "ArrayVarying": "ac9be50c",
         "InstancedGridRender": "62f124a1",
         "MultisampleCount_1x": "faa8a587",
         "MultisampleCount_4x": "faa8a587",
