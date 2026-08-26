@@ -33,11 +33,8 @@ ImageInfo GetImageInfo(HardwareBufferRef hardwareBuffer,
 
 /**
  * Returns the corresponding PixelFormat for the given HardwareBufferFormat if renderable; otherwise
- * returns PixelFormat::Unknown. The backend is required because a BGRA hardware buffer maps to
- * different renderable formats per backend on macOS: the OpenGL (CGL) backend imports it as an
- * RGBA_8888 texture, while the Metal backend imports it as a genuine BGRA_8888 texture. Passing the
- * wrong backend leads to a proxy/texture format mismatch that swaps red and blue in the
- * destination-texture copy used by advanced blend modes.
+ * returns PixelFormat::Unknown. On macOS OpenGL imports BGRA hardware buffers as RGBA_8888 textures
+ * while Metal imports them as BGRA_8888, so the backend is required to keep the format consistent.
  */
 PixelFormat GetRenderableFormat(HardwareBufferFormat hardwareBufferFormat, Backend backend);
 }  // namespace tgfx
