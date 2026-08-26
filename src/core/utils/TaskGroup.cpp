@@ -89,6 +89,17 @@ TaskGroup::TaskGroup() : maxThreads(GetMaxThreads()) {
   std::atexit(OnAppExit);
 }
 
+void TaskGroup::setMaxThreads(int maxThreads) {
+  if (maxThreads <= 0) {
+    maxThreads = GetMaxThreads();
+  }
+  this->maxThreads = maxThreads;
+  lowPriorityThreads = FloatRoundToInt(static_cast<float>(maxThreads) * LOW_PRIORITY_THREAD_RATIO);
+  if (lowPriorityThreads < 1) {
+    lowPriorityThreads = 1;
+  }
+}
+
 bool TaskGroup::checkThreads() {
   if (waitingThreads == 0 && totalThreads < maxThreads) {
     auto thread = new (std::nothrow) std::thread(TaskGroup::RunLoop, this);

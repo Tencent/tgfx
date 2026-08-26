@@ -170,6 +170,11 @@ export interface TGFX extends EmscriptenModule {
     TGFXLineJoin: TGFXLineJoin;
     GL: EmscriptenGL;
     TGFXPathFillType: TGFXPathFillType;
+    /**
+     * Sets the maximum number of worker threads that can be created for running tasks. Pass zero to
+     * restore the default, which is based on the number of CPU cores and capped at 32.
+     */
+    setTaskMaxThreads: (maxThreads: number) => void;
     _Matrix: {
         _MakeAll: (
             scaleX: number,

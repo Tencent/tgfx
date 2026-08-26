@@ -35,6 +35,10 @@ class BlockTask : public Task {
   std::function<void()> block;
 };
 
+void Task::SetMaxThreads(int maxThreads) {
+  TaskGroup::GetInstance()->setMaxThreads(maxThreads);
+}
+
 void Task::ReleaseThreads() {
   TaskGroup::GetInstance()->releaseThreads(false);
 }
