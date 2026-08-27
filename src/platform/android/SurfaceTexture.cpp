@@ -301,6 +301,9 @@ ISize SurfaceTexture::updateTexImage() {
   // behind the most recently decoded frame with a fluctuating delay, which shows up as video
   // jitter (frames appearing to jump back and forth). Stop when the timestamp stops changing
   // (queue empty) or an exception is thrown, with a bounded number of iterations.
+  // The timestamp == lastTimestamp check is a heuristic that assumes each new frame carries a
+  // distinct timestamp; on streams that report duplicate or constant (e.g. always-0) timestamps
+  // the drain stops early and simply degrades to the previous single-frame behavior (no crash).
   if (SurfaceTexture_getTimestamp != nullptr) {
     // Safety cap on how many extra frames to drain per call so a runaway/mis-behaving queue
     // cannot spin this loop unboundedly.
@@ -309,6 +312,8 @@ ISize SurfaceTexture::updateTexImage() {
     for (int i = 0; i < MAX_DRAIN_FRAMES; i++) {
       env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_updateTexImage);
       if (env->ExceptionCheck()) {
+        // Best-effort drain: swallow the exception and stop, unlike the initial mandatory
+        // updateTexImage above whose failure logs via LOGE and hard-returns {}.
         env->ExceptionClear();
         break;
       }
