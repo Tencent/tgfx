@@ -28,7 +28,8 @@ using namespace emscripten;
 
 namespace tgfx {
 bool TGFXBindInit() {
-  function("setTaskMaxThreads", &Task::SetMaxThreadCount);
+  function("setTaskMaxThreadCounts", &Task::SetMaxThreadCount);
+  function("taskMaxThreadCounts", &Task::MaxThreadCount);
 
   class_<Matrix>("TGFXMatrix").function("_get", &Matrix::get).function("_set", &Matrix::set);
 
