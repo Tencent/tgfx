@@ -28,27 +28,27 @@
 
 namespace tgfx {
 static constexpr auto THREAD_TIMEOUT = std::chrono::seconds(10);
-static constexpr int MAX_THREADS_SIZE = 32;
+static constexpr size_t MAX_THREADS_SIZE = 32;
 static constexpr size_t TASK_PRIORITY_SIZE = 3;
 // 70% of max threads can run low priority tasks
 static constexpr float LOW_PRIORITY_THREAD_RATIO = 0.7f;
 
 static size_t GetDefaultMaxThreadCount() {
-  int cpuCores = 0;
+  size_t cpuCores = 0;
 #ifdef __APPLE__
   size_t len = sizeof(cpuCores);
   // We can get the exact number of physical CPUs on apple platforms.
   sysctlbyname("hw.physicalcpu", &cpuCores, &len, nullptr, 0);
 #else
-  cpuCores = static_cast<int>(std::thread::hardware_concurrency());
+  cpuCores = std::thread::hardware_concurrency();
 #endif
-  if (cpuCores <= 0) {
+  if (cpuCores == 0) {
     cpuCores = 8;
   }
   if (cpuCores > MAX_THREADS_SIZE) {
     cpuCores = MAX_THREADS_SIZE;
   }
-  return static_cast<size_t>(cpuCores);
+  return cpuCores;
 }
 
 TaskGroup* TaskGroup::GetInstance() {
