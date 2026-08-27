@@ -22,11 +22,15 @@
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/PathTypes.h"
 #include "tgfx/core/Stroke.h"
+#include "tgfx/core/Task.h"
 
 using namespace emscripten;
 
 namespace tgfx {
 bool TGFXBindInit() {
+  function("setTaskMaxThreadCounts", &Task::SetMaxThreadCount);
+  function("taskMaxThreadCounts", &Task::MaxThreadCount);
+
   class_<Matrix>("TGFXMatrix").function("_get", &Matrix::get).function("_set", &Matrix::set);
 
   value_object<Point>("TGFXPoint").field("x", &Point::x).field("y", &Point::y);

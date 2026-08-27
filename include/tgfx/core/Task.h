@@ -75,6 +75,21 @@ enum class TaskPriority {
 class Task {
  public:
   /**
+   * Sets the maximum number of worker threads that can be created for running tasks. Call this
+   * method before submitting any tasks to avoid thread creation races. A value of zero restores
+   * the default, which is based on the number of CPU cores and capped at 32. Lowering the limit
+   * releases the surplus worker threads.
+   * @param maxThreadCount The maximum number of worker threads. Zero means use the default.
+   */
+  static void SetMaxThreadCount(size_t maxThreadCount);
+
+  /**
+   * Returns the current maximum number of worker threads that can be created for running tasks.
+   * @return The current maximum number of worker threads.
+   */
+  static size_t MaxThreadCount();
+
+  /**
    * Release all task threads once the pending tasks have completed. This method will block the
    * current thread.
    */
