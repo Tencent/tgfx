@@ -309,7 +309,6 @@ ISize SurfaceTexture::updateTexImage() {
         env->ExceptionClear();
         break;
       }
-      frameAvailable = false;
       auto timestamp = env->CallLongMethod(surfaceTexture.get(), SurfaceTexture_getTimestamp);
       if (timestamp == lastTimestamp) {
         break;
