@@ -77,10 +77,8 @@ class Task {
   /**
    * Sets the maximum number of worker threads that can be created for running tasks. Call this
    * method before submitting any tasks to avoid thread creation races. A value of zero restores
-   * the default, which is based on the number of CPU cores and capped at 32. Worker threads are
-   * created lazily as tasks are submitted, and the actual number never exceeds this limit. If the
-   * limit is lowered, the surplus idle worker threads are released, and threads busy with tasks
-   * exit once they become idle.
+   * the default, which is based on the number of CPU cores and capped at 32. Lowering the limit
+   * releases the surplus worker threads.
    * @param maxThreads The maximum number of worker threads. Zero means use the default.
    */
   static void SetMaxThreads(int maxThreads);
