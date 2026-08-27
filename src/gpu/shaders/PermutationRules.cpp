@@ -20,9 +20,7 @@
 #include "gpu/shaders/level1/AtlasTextFillShader.h"
 #include "gpu/shaders/level1/ComplexEllipseFillShader.h"
 #include "gpu/shaders/level1/ComplexNonAARRectFillShader.h"
-#include "gpu/shaders/level1/ConstColorShader.h"
 #include "gpu/shaders/level1/DeviceSpaceTextureShader.h"
-#include "gpu/shaders/level1/DeviceSpaceTexturedEffectShader.h"
 #include "gpu/shaders/level1/EllipseFillShader.h"
 #include "gpu/shaders/level1/GaussianBlur1DShader.h"
 #include "gpu/shaders/level1/HairlineLineShader.h"
@@ -35,7 +33,6 @@
 #include "gpu/shaders/level1/PointwiseDirectShader.h"
 #include "gpu/shaders/level1/PointwiseTailShader.h"
 #include "gpu/shaders/level1/QuadColorFillShader.h"
-#include "gpu/shaders/level1/QuadConstColorShader.h"
 #include "gpu/shaders/level1/QuadTextureFillShader.h"
 #include "gpu/shaders/level1/RoundStrokeRectFillShader.h"
 #include "gpu/shaders/level1/ShapeInstancedFillShader.h"
@@ -120,33 +117,6 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateMaskFillReachable() {
   return result;
 }
 
-std::optional<RuleComposedValues> ComposeConstColor(const ConstColorInputs& inputs) {
-  if (inputs.xpType < 0) {
-    return std::nullopt;
-  }
-  using FD = ConstColorShader::FragDims;
-  RuleComposedValues values;
-  values.fragValues.resize(FD::COUNT);
-  // inputMode is a runtime uniform (InputMode), not a permutation dimension.
-  values.fragValues[FD::HAS_XP] = inputs.xpType;
-  return values;
-}
-
-std::set<std::pair<uint32_t, uint32_t>> EnumerateConstColorReachable() {
-  std::set<std::pair<uint32_t, uint32_t>> result;
-  for (int xpType = -1; xpType <= 2; ++xpType) {
-    ConstColorInputs inputs;
-    inputs.xpType = xpType;
-    auto composed = ComposeConstColor(inputs);
-    if (!composed) {
-      continue;
-    }
-    auto fragIndex = ConstColorShader::FragDims::domain().encode(composed->fragValues);
-    result.insert({0, fragIndex});
-  }
-  return result;
-}
-
 std::optional<RuleComposedValues> ComposeHairlineLine(const HairlineLineInputs& inputs) {
   if (inputs.xpType < 0) {
     return std::nullopt;
@@ -195,29 +165,6 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateHairlineQuadReachable() {
     }
     auto fragIndex = HairlineQuadShader::FD::domain().encode(composed->fragValues);
     result.insert({0, fragIndex});
-  }
-  return result;
-}
-
-std::optional<RuleComposedValues> ComposeQuadConstColor(const QuadConstColorInputs& inputs) {
-  using VD = QuadConstColorShader::VD;
-  RuleComposedValues values;
-  values.vertValues.resize(VD::COUNT);
-  values.vertValues[VD::HAS_UV_COORD] = inputs.hasUVMatrix ? 0 : 1;
-  return values;
-}
-
-std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadConstColorReachable() {
-  std::set<std::pair<uint32_t, uint32_t>> result;
-  for (int hasUVMatrix = 0; hasUVMatrix <= 1; ++hasUVMatrix) {
-    QuadConstColorInputs inputs;
-    inputs.hasUVMatrix = hasUVMatrix != 0;
-    auto composed = ComposeQuadConstColor(inputs);
-    if (!composed) {
-      continue;
-    }
-    auto vertIndex = QuadConstColorShader::VD::domain().encode(composed->vertValues);
-    result.insert({vertIndex, 0});
   }
   return result;
 }
@@ -624,41 +571,6 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateDeviceSpaceTextureReachable() {
       }
       auto index = DeviceSpaceTextureShader::Dims::domain().encode(composed->fragValues);
       result.insert({index, index});
-    }
-  }
-  return result;
-}
-
-std::optional<RuleComposedValues> ComposeDeviceSpaceTexturedEffect(
-    const DeviceSpaceTexturedEffectInputs& inputs) {
-  if (inputs.xpType < 0) {
-    return std::nullopt;
-  }
-  using VD = DeviceSpaceTexturedEffectShader::VD;
-  using FD = DeviceSpaceTexturedEffectShader::FD;
-  RuleComposedValues values;
-  values.vertValues.resize(VD::COUNT);
-  values.vertValues[VD::HAS_COVERAGE] = inputs.hasCoverage ? 1 : 0;
-  values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::HAS_XP] = inputs.xpType;
-  values.fragValues[FD::HAS_COVERAGE] = values.vertValues[VD::HAS_COVERAGE];
-  return values;
-}
-
-std::set<std::pair<uint32_t, uint32_t>> EnumerateDeviceSpaceTexturedEffectReachable() {
-  std::set<std::pair<uint32_t, uint32_t>> result;
-  for (int hasCoverage = 0; hasCoverage <= 1; ++hasCoverage) {
-    for (int xpType = -1; xpType <= 2; ++xpType) {
-      DeviceSpaceTexturedEffectInputs inputs;
-      inputs.hasCoverage = hasCoverage != 0;
-      inputs.xpType = xpType;
-      auto composed = ComposeDeviceSpaceTexturedEffect(inputs);
-      if (!composed) {
-        continue;
-      }
-      auto vertIndex = DeviceSpaceTexturedEffectShader::VD::domain().encode(composed->vertValues);
-      auto fragIndex = DeviceSpaceTexturedEffectShader::FD::domain().encode(composed->fragValues);
-      result.insert({vertIndex, fragIndex});
     }
   }
   return result;
@@ -1191,17 +1103,11 @@ std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermuta
   if (shaderName == "MaskFillShader") {
     return EnumerateMaskFillReachable();
   }
-  if (shaderName == "ConstColorShader") {
-    return EnumerateConstColorReachable();
-  }
   if (shaderName == "HairlineLineShader") {
     return EnumerateHairlineLineReachable();
   }
   if (shaderName == "HairlineQuadShader") {
     return EnumerateHairlineQuadReachable();
-  }
-  if (shaderName == "QuadConstColorShader") {
-    return EnumerateQuadConstColorReachable();
   }
   if (shaderName == "QuadColorFillShader") {
     return EnumerateQuadColorFillReachable();
@@ -1235,9 +1141,6 @@ std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermuta
   }
   if (shaderName == "DeviceSpaceTextureShader") {
     return EnumerateDeviceSpaceTextureReachable();
-  }
-  if (shaderName == "DeviceSpaceTexturedEffectShader") {
-    return EnumerateDeviceSpaceTexturedEffectReachable();
   }
   if (shaderName == "ShapeInstancedTextureCoverageShader") {
     return EnumerateShapeInstancedTextureCoverageReachable();

@@ -76,14 +76,6 @@ struct MaskFillInputs {
 };
 
 /**
- * Input contract of the ConstColorShader matcher rule. The ConstColorProcessor inputMode is a
- * runtime uniform, so only the transfer type shapes dimensions.
- */
-struct ConstColorInputs {
-  int xpType = -1;  // -1 = no representable XferProcessor.
-};
-
-/**
  * Input contract of the HairlineLineShader matcher rule. The direct AARect clip coverage check
  * is a whole-draw rejection and stays in Extract.
  */
@@ -96,14 +88,6 @@ struct HairlineLineInputs {
  */
 struct HairlineQuadInputs {
   int xpType = -1;  // -1 = no representable XferProcessor.
-};
-
-/**
- * Input contract of the QuadConstColorShader matcher rule. The EmptyXferProcessor requirement is
- * a whole-draw rejection and stays in Extract.
- */
-struct QuadConstColorInputs {
-  bool hasUVMatrix = false;
 };
 
 /**
@@ -212,16 +196,6 @@ struct YUVTextureFillInputs {
  * so only coverage and the transfer type shape dimensions.
  */
 struct DeviceSpaceTextureInputs {
-  bool hasCoverage = false;
-  int xpType = -1;  // -1 = no representable XferProcessor.
-};
-
-/**
- * Input contract of the DeviceSpaceTexturedEffectShader matcher rule. The GP kind, quad
- * attribute constraints, and Compose(DeviceSpaceTexture, pointwise) structure checks are
- * whole-draw rejections in Extract; only coverage and the transfer type shape dimensions.
- */
-struct DeviceSpaceTexturedEffectInputs {
   bool hasCoverage = false;
   int xpType = -1;  // -1 = no representable XferProcessor.
 };
@@ -376,11 +350,6 @@ std::optional<RuleComposedValues> ComposeRoundStrokeRect(const RoundStrokeRectIn
 std::optional<RuleComposedValues> ComposeMaskFill(const MaskFillInputs& inputs);
 
 /**
- * Pure mapping for the ConstColorShader rule; see ComposeRoundStrokeRect for the sharing contract.
- */
-std::optional<RuleComposedValues> ComposeConstColor(const ConstColorInputs& inputs);
-
-/**
  * Pure mapping for the HairlineLineShader rule; see ComposeRoundStrokeRect for the sharing
  * contract.
  */
@@ -391,12 +360,6 @@ std::optional<RuleComposedValues> ComposeHairlineLine(const HairlineLineInputs& 
  * contract.
  */
 std::optional<RuleComposedValues> ComposeHairlineQuad(const HairlineQuadInputs& inputs);
-
-/**
- * Pure mapping for the QuadConstColorShader rule; see ComposeRoundStrokeRect for the sharing
- * contract.
- */
-std::optional<RuleComposedValues> ComposeQuadConstColor(const QuadConstColorInputs& inputs);
 
 /**
  * Pure mapping for the QuadColorFillShader rule; see ComposeRoundStrokeRect for the sharing
@@ -463,13 +426,6 @@ std::optional<RuleComposedValues> ComposeYUVTextureFill(const YUVTextureFillInpu
  * contract.
  */
 std::optional<RuleComposedValues> ComposeDeviceSpaceTexture(const DeviceSpaceTextureInputs& inputs);
-
-/**
- * Pure mapping for the DeviceSpaceTexturedEffectShader rule; see ComposeRoundStrokeRect for the
- * sharing contract.
- */
-std::optional<RuleComposedValues> ComposeDeviceSpaceTexturedEffect(
-    const DeviceSpaceTexturedEffectInputs& inputs);
 
 /**
  * Pure mapping for the ShapeInstancedTextureCoverageShader rule; see ComposeRoundStrokeRect for
@@ -556,11 +512,6 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateRoundStrokeRectReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateMaskFillReachable();
 
 /**
- * Returns every (vertIndex, fragIndex) pair the ConstColor rule can ever produce.
- */
-std::set<std::pair<uint32_t, uint32_t>> EnumerateConstColorReachable();
-
-/**
  * Returns every (vertIndex, fragIndex) pair the HairlineLine rule can ever produce.
  */
 std::set<std::pair<uint32_t, uint32_t>> EnumerateHairlineLineReachable();
@@ -569,11 +520,6 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateHairlineLineReachable();
  * Returns every (vertIndex, fragIndex) pair the HairlineQuad rule can ever produce.
  */
 std::set<std::pair<uint32_t, uint32_t>> EnumerateHairlineQuadReachable();
-
-/**
- * Returns every (vertIndex, fragIndex) pair the QuadConstColor rule can ever produce.
- */
-std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadConstColorReachable();
 
 /**
  * Returns every (vertIndex, fragIndex) pair the QuadColorFill rule can ever produce.
@@ -629,11 +575,6 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateYUVTextureFillReachable();
  * Returns every (vertIndex, fragIndex) pair the DeviceSpaceTexture rule can ever produce.
  */
 std::set<std::pair<uint32_t, uint32_t>> EnumerateDeviceSpaceTextureReachable();
-
-/**
- * Returns every (vertIndex, fragIndex) pair the DeviceSpaceTexturedEffect rule can ever produce.
- */
-std::set<std::pair<uint32_t, uint32_t>> EnumerateDeviceSpaceTexturedEffectReachable();
 
 /**
  * Returns every (vertIndex, fragIndex) pair the ShapeInstancedTextureCoverage rule can produce.

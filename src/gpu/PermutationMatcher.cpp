@@ -56,9 +56,7 @@
 #include "gpu/shaders/level1/AtlasTextFillShader.h"
 #include "gpu/shaders/level1/ComplexEllipseFillShader.h"
 #include "gpu/shaders/level1/ComplexNonAARRectFillShader.h"
-#include "gpu/shaders/level1/ConstColorShader.h"
 #include "gpu/shaders/level1/DeviceSpaceTextureShader.h"
-#include "gpu/shaders/level1/DeviceSpaceTexturedEffectShader.h"
 #include "gpu/shaders/level1/EllipseFillShader.h"
 #include "gpu/shaders/level1/GaussianBlur1DShader.h"
 #include "gpu/shaders/level1/HairlineLineShader.h"
@@ -71,7 +69,6 @@
 #include "gpu/shaders/level1/PointwiseDirectShader.h"
 #include "gpu/shaders/level1/PointwiseTailShader.h"
 #include "gpu/shaders/level1/QuadColorFillShader.h"
-#include "gpu/shaders/level1/QuadConstColorShader.h"
 #include "gpu/shaders/level1/QuadTextureFillShader.h"
 #include "gpu/shaders/level1/RoundStrokeRectFillShader.h"
 #include "gpu/shaders/level1/ShapeInstancedFillShader.h"
@@ -426,51 +423,6 @@ static std::optional<PermutationMatchResult> TryMatchMaskFill(const ProgramInfo*
   return PermutationMatchResult{"MaskFillShader", 0, fragIndex};
 }
 
-static std::optional<PermutationMatchResult> TryMatchConstColor(const ProgramInfo* programInfo) {
-  auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "DefaultGeometryProcessor") {
-    return std::nullopt;
-  }
-  if (programInfo->numFragmentProcessors() != 1) {
-    return std::nullopt;
-  }
-  auto fp = programInfo->getFragmentProcessor(0);
-  if (fp->name() != "ConstColorProcessor") {
-    return std::nullopt;
-  }
-  ConstColorInputs inputs;
-  inputs.xpType = GetXPType(programInfo);
-  auto composed = ComposeConstColor(inputs);
-  if (!composed) {
-    return std::nullopt;
-  }
-  auto fragIndex = ConstColorShader::FragDims::domain().encode(composed->fragValues);
-  return PermutationMatchResult{"ConstColorShader", 0, fragIndex};
-}
-
-static std::optional<PermutationMatchResult> TryMatchQuadConstColor(
-    const ProgramInfo* programInfo) {
-  auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "QuadPerEdgeAAGeometryProcessor" ||
-      programInfo->numColorFragmentProcessors() != 1 || programInfo->numFragmentProcessors() != 1 ||
-      programInfo->getXferProcessor() != EmptyXferProcessor::GetInstance()) {
-    return std::nullopt;
-  }
-  auto fp = programInfo->getFragmentProcessor(0);
-  if (fp->name() != "ConstColorProcessor") {
-    return std::nullopt;
-  }
-  auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
-  QuadConstColorInputs inputs;
-  inputs.hasUVMatrix = quadGP->hasUVMatrix();
-  auto composed = ComposeQuadConstColor(inputs);
-  if (!composed) {
-    return std::nullopt;
-  }
-  auto vertIndex = QuadConstColorShader::VD::domain().encode(composed->vertValues);
-  return PermutationMatchResult{"QuadConstColorShader", vertIndex, 0};
-}
-
 static std::optional<PermutationMatchResult> TryMatchQuadColorFill(const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
   if (gp->name() != "QuadPerEdgeAAGeometryProcessor") {
@@ -791,53 +743,6 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
   auto vertIndex = PointwiseChainShader::VD::domain().encode(composed->vertValues);
   auto fragIndex = PointwiseChainShader::FD::domain().encode(composed->fragValues);
   return PermutationMatchResult{"PointwiseChainShader", vertIndex, fragIndex};
-}
-
-static std::optional<PermutationMatchResult> TryMatchDeviceSpaceTexturedEffect(
-    const ProgramInfo* programInfo) {
-  auto gp = programInfo->getGeometryProcessor();
-  int gpType = GetGPType(gp);
-  if (gpType < 0) {
-    return std::nullopt;
-  }
-  if (gpType == 1) {
-    auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
-    if (!quadGP->hasCommonColor() || !quadGP->hasUVMatrix() || quadGP->getHasSubset()) {
-      return std::nullopt;
-    }
-  }
-  if (programInfo->numFragmentProcessors() != 1 || programInfo->numColorFragmentProcessors() != 1) {
-    return std::nullopt;
-  }
-  int xpType = GetXPType(programInfo);
-  if (xpType < 0) {
-    return std::nullopt;
-  }
-  auto composed = programInfo->getFragmentProcessor(0);
-  if (composed->name() != "ComposeFragmentProcessor" || composed->numChildProcessors() != 2) {
-    return std::nullopt;
-  }
-  auto source = composed->childProcessor(0);
-  auto pointwise = composed->childProcessor(1);
-  if (source->name() != "DeviceSpaceTextureEffect" || source->numTextureSamplers() != 1) {
-    return std::nullopt;
-  }
-  // Alpha-only sources are served by the kernel's AlphaOnly runtime uniform; perspective needs no
-  // check because the runtime path evaluates device-space sampling without the w division either.
-  if (pointwise->name() != "ColorMatrixFragmentProcessor" &&
-      pointwise->name() != "LumaFragmentProcessor") {
-    return std::nullopt;
-  }
-  DeviceSpaceTexturedEffectInputs inputs;
-  inputs.hasCoverage = GetGPCoverage(gp) != 0;
-  inputs.xpType = GetXPType(programInfo);
-  auto composedValues = ComposeDeviceSpaceTexturedEffect(inputs);
-  if (!composedValues) {
-    return std::nullopt;
-  }
-  auto vertIndex = DeviceSpaceTexturedEffectShader::VD::domain().encode(composedValues->vertValues);
-  auto fragIndex = DeviceSpaceTexturedEffectShader::FD::domain().encode(composedValues->fragValues);
-  return PermutationMatchResult{"DeviceSpaceTexturedEffectShader", vertIndex, fragIndex};
 }
 
 static int GradientLayoutTypeIndex(const std::string& layoutName) {
@@ -1634,9 +1539,6 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
   if (auto result = TryMatchQuadColorFill(programInfo)) {
     return result;
   }
-  if (auto result = TryMatchQuadConstColor(programInfo)) {
-    return result;
-  }
   if (auto result = TryMatchQuadTextureFill(programInfo)) {
     return result;
   }
@@ -1652,16 +1554,10 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
   if (auto result = TryMatchMaskFill(programInfo)) {
     return result;
   }
-  if (auto result = TryMatchConstColor(programInfo)) {
-    return result;
-  }
   if (auto result = TryMatchPointwiseTail(programInfo)) {
     return result;
   }
   if (auto result = TryMatchPointwiseChain(programInfo)) {
-    return result;
-  }
-  if (auto result = TryMatchDeviceSpaceTexturedEffect(programInfo)) {
     return result;
   }
   if (auto result = TryMatchDeviceSpaceTexture(programInfo)) {

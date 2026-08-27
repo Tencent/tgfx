@@ -29,15 +29,12 @@
 #include "gpu/PermutationMatcher.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 #include "gpu/processors/ClampedGradientEffect.h"
-#include "gpu/processors/ColorMatrixFragmentProcessor.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/HairlineLineGeometryProcessor.h"
 #include "gpu/processors/HairlineQuadGeometryProcessor.h"
-#include "gpu/processors/LumaFragmentProcessor.h"
 #include "gpu/processors/MeshGeometryProcessor.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
@@ -51,8 +48,6 @@
 #include "gpu/shaders/PermutationRules.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/ShaderPermutation.h"
-#include "gpu/shaders/level1/DeviceSpaceTexturedEffectShader.h"
-#include "gpu/shaders/level1/QuadConstColorShader.h"
 #include "gpu/shaders/level1/QuadTextureFillShader.h"
 #include "gpu/shaders/level1/ShapeInstancedFillShader.h"
 #include "gpu/shaders/level1/ShapeInstancedTextureCoverageShader.h"
@@ -98,30 +93,6 @@ static std::shared_ptr<Image> MakeTexture2DImage(Context* context,
   auto snapshot = surface->makeImageSnapshot();
   context->flushAndSubmit(true);
   return snapshot;
-}
-
-static constexpr std::array<float, 20> MatcherIdentityColorMatrix = {
-    1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0,
-};
-
-static PlacementPtr<FragmentProcessor> MakeDeviceSpacePointwiseProcessor(Context* context,
-                                                                         BlockAllocator* allocator,
-                                                                         PixelFormat format,
-                                                                         bool useLuma) {
-  auto textureProxy = context->proxyProvider()->createTextureProxy({}, 2, 2, format);
-  if (textureProxy == nullptr || textureProxy->getTextureView() == nullptr) {
-    return nullptr;
-  }
-  auto source = DeviceSpaceTextureEffect::Make(allocator, std::move(textureProxy), Matrix::I());
-  if (source == nullptr) {
-    return nullptr;
-  }
-  if (useLuma) {
-    auto pointwise = LumaFragmentProcessor::Make(allocator);
-    return FragmentProcessor::Compose(allocator, std::move(source), std::move(pointwise));
-  }
-  auto pointwise = ColorMatrixFragmentProcessor::Make(allocator, MatcherIdentityColorMatrix);
-  return FragmentProcessor::Compose(allocator, std::move(source), std::move(pointwise));
 }
 
 static PlacementPtr<GeometryProcessor> MakeSingleIntervalGeometry(BlockAllocator* allocator,
@@ -314,200 +285,6 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistry) {
   EXPECT_TRUE(foundTextureFill);
 }
 
-TGFX_TEST(ShaderPermutationTest, DeviceSpaceTexturedEffectShaderRegistry) {
-  bool found = false;
-  for (const auto& factory : ShaderRegistry::All()) {
-    auto info = factory()->info();
-    if (info.name != "DeviceSpaceTexturedEffectShader") {
-      continue;
-    }
-    found = true;
-    EXPECT_EQ(info.vertexFile, "level1/device_space_texture.vert");
-    EXPECT_EQ(info.fragmentFile, "level1/device_space_textured_effect.frag");
-    EXPECT_EQ(info.vertDomain.totalCount(), 2u);
-    EXPECT_EQ(info.fragDomain.totalCount(), 6u);
-    int compiledCount = 0;
-    for (uint32_t vi = 0; vi < info.vertDomain.totalCount(); ++vi) {
-      auto vertValues = info.vertDomain.decode(vi);
-      for (uint32_t fi = 0; fi < info.fragDomain.totalCount(); ++fi) {
-        auto fragValues = info.fragDomain.decode(fi);
-        if (MirroredDimsAgree(info.vertDomain, info.fragDomain, vertValues, fragValues)) {
-          compiledCount++;
-        }
-      }
-    }
-    EXPECT_EQ(compiledCount, 6);
-  }
-  EXPECT_TRUE(found);
-}
-
-TGFX_TEST(ShaderPermutationTest, DeviceSpaceTexturedEffectMatchesSupportedLayouts) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_NE(context, nullptr);
-  if (context->backend() == Backend::OpenGL) {
-    GTEST_SKIP() << "OpenGL stage 1 validates only the pixel-crossed pointwise layouts";
-  }
-  auto renderTargetProxy = RenderTargetProxy::Make(context, 8, 8, false);
-  ASSERT_NE(renderTargetProxy, nullptr);
-  auto renderTarget = renderTargetProxy->getRenderTarget();
-  ASSERT_NE(renderTarget, nullptr);
-
-  {
-    BlockAllocator allocator;
-    auto gp = DefaultGeometryProcessor::Make(&allocator, PMColor::White(), 8, 8, AAType::None,
-                                             Matrix::I(), Matrix::I());
-    auto composed =
-        MakeDeviceSpacePointwiseProcessor(context, &allocator, PixelFormat::RGBA_8888, false);
-    ASSERT_NE(gp, nullptr);
-    ASSERT_NE(composed, nullptr);
-    ProgramInfo programInfo(renderTarget.get(), gp.get(), {composed.get()}, 1, nullptr,
-                            BlendMode::SrcOver);
-    auto match = MatchPermutation(&programInfo);
-    ASSERT_TRUE(match.has_value());
-    EXPECT_EQ(match->shaderName, "DeviceSpaceTexturedEffectShader");
-    EXPECT_EQ(match->vertPermutationIndex, 0u);
-    EXPECT_EQ(match->fragPermutationIndex, 0u);
-  }
-
-  {
-    BlockAllocator allocator;
-    auto gp = QuadPerEdgeAAGeometryProcessor::Make(&allocator, 8, 8, AAType::Coverage,
-                                                   PMColor::White(), Matrix::I(), false);
-    auto composed =
-        MakeDeviceSpacePointwiseProcessor(context, &allocator, PixelFormat::RGBA_8888, true);
-    auto dstTexture =
-        context->proxyProvider()->createTextureProxy({}, 8, 8, PixelFormat::RGBA_8888);
-    ASSERT_NE(dstTexture, nullptr);
-    ASSERT_NE(dstTexture->getTextureView(), nullptr);
-    DstTextureInfo dstTextureInfo = {std::move(dstTexture), {}};
-    auto xp =
-        PorterDuffXferProcessor::Make(&allocator, BlendMode::SrcOver, std::move(dstTextureInfo));
-    ASSERT_NE(gp, nullptr);
-    ASSERT_NE(composed, nullptr);
-    ASSERT_NE(xp, nullptr);
-    ProgramInfo programInfo(renderTarget.get(), gp.get(), {composed.get()}, 1, xp.get(),
-                            BlendMode::SrcOver);
-    auto match = MatchPermutation(&programInfo);
-    ASSERT_TRUE(match.has_value());
-    EXPECT_EQ(match->shaderName, "DeviceSpaceTexturedEffectShader");
-    EXPECT_EQ(match->vertPermutationIndex, 1u);
-    EXPECT_EQ(match->fragPermutationIndex, 4u);
-  }
-
-  {
-    BlockAllocator allocator;
-    auto gp = DefaultGeometryProcessor::Make(&allocator, PMColor::White(), 8, 8, AAType::None,
-                                             Matrix::I(), Matrix::I());
-    auto composed =
-        MakeDeviceSpacePointwiseProcessor(context, &allocator, PixelFormat::RGBA_8888, true);
-    auto xp = PorterDuffXferProcessor::Make(&allocator, BlendMode::SrcOver, {});
-    ASSERT_NE(gp, nullptr);
-    ASSERT_NE(composed, nullptr);
-    ASSERT_NE(xp, nullptr);
-    ProgramInfo programInfo(renderTarget.get(), gp.get(), {composed.get()}, 1, xp.get(),
-                            BlendMode::SrcOver);
-    auto match = MatchPermutation(&programInfo);
-    if (programInfo.backend() == Backend::OpenGL) {
-      EXPECT_FALSE(match.has_value());
-    } else {
-      ASSERT_TRUE(match.has_value());
-      EXPECT_EQ(match->fragPermutationIndex, 2u);
-    }
-  }
-}
-
-TGFX_TEST(ShaderPermutationTest, DeviceSpaceTexturedEffectRejectsUnsupportedLayouts) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_NE(context, nullptr);
-  auto renderTargetProxy = RenderTargetProxy::Make(context, 8, 8, false);
-  ASSERT_NE(renderTargetProxy, nullptr);
-  auto renderTarget = renderTargetProxy->getRenderTarget();
-  ASSERT_NE(renderTarget, nullptr);
-
-  {
-    BlockAllocator allocator;
-    auto gp = DefaultGeometryProcessor::Make(&allocator, PMColor::White(), 8, 8, AAType::None,
-                                             Matrix::I(), Matrix::I());
-    auto composed =
-        MakeDeviceSpacePointwiseProcessor(context, &allocator, PixelFormat::ALPHA_8, false);
-    ASSERT_NE(gp, nullptr);
-    ASSERT_NE(composed, nullptr);
-    ProgramInfo programInfo(renderTarget.get(), gp.get(), {composed.get()}, 1, nullptr,
-                            BlendMode::SrcOver);
-    auto match = MatchPermutation(&programInfo);
-    // Alpha-only sources are served by the kernel's AlphaOnly runtime uniform. OpenGL is served in
-    // full on the desktop profile (the source texture here is a TwoD offscreen, so the matcher
-    // accepts it like any other backend); non-desktop GL profiles keep the ProgramBuilder route.
-    if (programInfo.backend() == Backend::OpenGL && !programInfo.usesOpenGLDesktopAOTProfile()) {
-      EXPECT_FALSE(match.has_value());
-    } else {
-      EXPECT_TRUE(match.has_value());
-    }
-  }
-
-  {
-    BlockAllocator allocator;
-    auto gp = QuadPerEdgeAAGeometryProcessor::Make(&allocator, 8, 8, AAType::None, std::nullopt,
-                                                   Matrix::I(), false);
-    auto composed =
-        MakeDeviceSpacePointwiseProcessor(context, &allocator, PixelFormat::RGBA_8888, false);
-    ASSERT_NE(gp, nullptr);
-    ASSERT_NE(composed, nullptr);
-    ProgramInfo programInfo(renderTarget.get(), gp.get(), {composed.get()}, 1, nullptr,
-                            BlendMode::SrcOver);
-    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
-  }
-
-  {
-    BlockAllocator allocator;
-    auto gp = DefaultGeometryProcessor::Make(&allocator, PMColor::White(), 8, 8, AAType::None,
-                                             Matrix::I(), Matrix::I());
-    auto composed =
-        MakeDeviceSpacePointwiseProcessor(context, &allocator, PixelFormat::RGBA_8888, false);
-    auto coverage = RectEffect::Make(&allocator, Rect::MakeWH(8, 8));
-    ASSERT_NE(gp, nullptr);
-    ASSERT_NE(composed, nullptr);
-    ASSERT_NE(coverage, nullptr);
-    ProgramInfo programInfo(renderTarget.get(), gp.get(), {composed.get(), coverage.get()}, 1,
-                            nullptr, BlendMode::SrcOver);
-    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
-  }
-
-  {
-    BlockAllocator allocator;
-    auto gp = DefaultGeometryProcessor::Make(&allocator, PMColor::White(), 8, 8, AAType::None,
-                                             Matrix::I(), Matrix::I());
-    auto textureProxy =
-        context->proxyProvider()->createTextureProxy({}, 2, 2, PixelFormat::RGBA_8888);
-    auto source = DeviceSpaceTextureEffect::Make(&allocator, std::move(textureProxy), Matrix::I());
-    auto pointwise = AlphaThresholdFragmentProcessor::Make(&allocator, 0.5f);
-    auto composed = FragmentProcessor::Compose(&allocator, std::move(source), std::move(pointwise));
-    ASSERT_NE(gp, nullptr);
-    ASSERT_NE(composed, nullptr);
-    ProgramInfo programInfo(renderTarget.get(), gp.get(), {composed.get()}, 1, nullptr,
-                            BlendMode::SrcOver);
-    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
-  }
-
-  {
-    BlockAllocator allocator;
-    auto gp = DefaultGeometryProcessor::Make(&allocator, PMColor::White(), 8, 8, AAType::None,
-                                             Matrix::I(), Matrix::I());
-    auto textureProxy =
-        context->proxyProvider()->createTextureProxy({}, 2, 2, PixelFormat::RGBA_8888);
-    auto source = DeviceSpaceTextureEffect::Make(&allocator, std::move(textureProxy), Matrix::I());
-    auto pointwise = LumaFragmentProcessor::Make(&allocator);
-    ASSERT_NE(gp, nullptr);
-    ASSERT_NE(source, nullptr);
-    ASSERT_NE(pointwise, nullptr);
-    ProgramInfo programInfo(renderTarget.get(), gp.get(), {source.get(), pointwise.get()}, 2,
-                            nullptr, BlendMode::SrcOver);
-    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
-  }
-}
-
 TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientCompiledSpace) {
   UnifiedGradientShader shader;
   auto info = shader.info();
@@ -693,8 +470,8 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   // (PermutationCompilesForBackend): the WebGPU bundle drops FBF (subpassInput) variants, which
   // WGSL cannot express, and their vertex stages.
   const bool isWebGPU = expectedTag == "webgpu";
-  EXPECT_EQ(cache->vertexEntryCount(), isWebGPU ? 99u : 101u);
-  EXPECT_EQ(cache->fragmentEntryCount(), isWebGPU ? 184u : 274u);
+  EXPECT_EQ(cache->vertexEntryCount(), isWebGPU ? 94u : 96u);
+  EXPECT_EQ(cache->fragmentEntryCount(), isWebGPU ? 177u : 264u);
   EXPECT_EQ(cache->profileTag(), expectedTag);
   cache->unload();
 }
@@ -1155,8 +932,8 @@ TGFX_TEST(ShaderPermutationTest, CompressedBundleLoad) {
     // opengl bundle carries the TEXTURE_KIND=Rect variants, the webgpu bundle drops the FBF
     // (subpassInput) variants, and metal/vulkan keep everything.
     const bool isWebGPU = tag == "webgpu";
-    EXPECT_EQ(compressedOnly.vertexEntryCount(), isWebGPU ? 99u : 101u);
-    EXPECT_EQ(compressedOnly.fragmentEntryCount(), isWebGPU ? 184u : 274u);
+    EXPECT_EQ(compressedOnly.vertexEntryCount(), isWebGPU ? 94u : 96u);
+    EXPECT_EQ(compressedOnly.fragmentEntryCount(), isWebGPU ? 177u : 264u);
     EXPECT_EQ(compressedOnly.profileTag(), tag);
     return;
   }
@@ -1431,59 +1208,6 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureFillShaderRegistry) {
       EXPECT_EQ(shaderInfo.vertexFile, "level1/quad_texture_fill.vert");
       EXPECT_EQ(shaderInfo.fragmentFile, "level1/quad_texture_fill.frag");
     }
-  }
-  EXPECT_TRUE(found);
-}
-
-TGFX_TEST(ShaderPermutationTest, QuadConstColorMatchesBothVertexLayouts) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_NE(context, nullptr);
-  if (context->backend() == Backend::OpenGL) {
-    GTEST_SKIP() << "QuadConstColor is outside the OpenGL stage 1 whitelist";
-  }
-  auto renderTargetProxy = RenderTargetProxy::Make(context, 8, 8, false);
-  ASSERT_NE(renderTargetProxy, nullptr);
-  auto renderTarget = renderTargetProxy->getRenderTarget();
-  ASSERT_NE(renderTarget, nullptr);
-
-  for (bool hasUVCoord : {false, true}) {
-    for (auto inputMode : {InputMode::Ignore, InputMode::ModulateRGBA, InputMode::ModulateA}) {
-      BlockAllocator allocator;
-      std::optional<Matrix> uvMatrix = Matrix::I();
-      if (hasUVCoord) {
-        uvMatrix = std::nullopt;
-      }
-      auto gp = QuadPerEdgeAAGeometryProcessor::Make(&allocator, 8, 8, AAType::Coverage,
-                                                     PMColor::White(), uvMatrix, false);
-      auto fp = ConstColorProcessor::Make(&allocator, PMColor::Red(), inputMode);
-      ASSERT_NE(gp, nullptr);
-      ASSERT_NE(fp, nullptr);
-      ProgramInfo programInfo(renderTarget.get(), gp.get(), {fp.get()}, 1, nullptr,
-                              BlendMode::SrcOver);
-      auto match = MatchPermutation(&programInfo);
-      ASSERT_TRUE(match.has_value());
-      EXPECT_EQ(match->shaderName, "QuadConstColorShader");
-      EXPECT_EQ(match->vertPermutationIndex, hasUVCoord ? 1u : 0u);
-      EXPECT_EQ(match->fragPermutationIndex, 0u);
-    }
-  }
-}
-
-TGFX_TEST(ShaderPermutationTest, QuadConstColorShaderRegistry) {
-  bool found = false;
-  for (const auto& factory : ShaderRegistry::All()) {
-    auto shader = factory();
-    auto info = shader->info();
-    if (info.name != "QuadConstColorShader") {
-      continue;
-    }
-    found = true;
-    EXPECT_EQ(info.vertDomain.dimensionCount(), 1u);
-    EXPECT_EQ(info.vertDomain.totalCount(), 2u);
-    EXPECT_EQ(info.fragDomain.totalCount(), 1u);
-    EXPECT_EQ(info.vertexFile, "level1/quad_const_color.vert");
-    EXPECT_EQ(info.fragmentFile, "level1/quad_const_color.frag");
   }
   EXPECT_TRUE(found);
 }
