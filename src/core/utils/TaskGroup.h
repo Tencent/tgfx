@@ -31,22 +31,24 @@ namespace tgfx {
 class TaskGroup {
  private:
   std::mutex locker = {};
-  std::atomic_int maxThreads = 32;
-  std::atomic_int lowPriorityThreads = 2;
+  std::atomic_size_t _maxThreadCount = 32;
+  std::atomic_size_t lowPriorityThreads = 2;
   std::condition_variable condition = {};
-  std::atomic_int totalThreads = 0;
+  std::atomic_size_t totalThreads = 0;
   std::atomic_bool exited = false;
-  std::atomic_int waitingThreads = 0;
+  std::atomic_size_t waitingThreads = 0;
   std::vector<moodycamel::ConcurrentQueue<std::shared_ptr<Task>>*> priorityQueues = {};
   moodycamel::ConcurrentQueue<std::thread*>* threads = nullptr;
   static TaskGroup* GetInstance();
   static void RunLoop(TaskGroup* taskGroup);
 
   TaskGroup();
-  void setMaxThreads(int maxThreads);
+  void setMaxThreadCount(size_t maxThreadCount);
+  size_t maxThreadCount() const;
   bool shrinkThread();
   bool checkThreads();
   bool pushTask(std::shared_ptr<Task> task, TaskPriority priority);
+  std::shared_ptr<Task> tryDequeueTask();
   std::shared_ptr<Task> popTask();
   void exit();
   void releaseThreads(bool exit);

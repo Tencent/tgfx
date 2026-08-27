@@ -33,7 +33,7 @@ static constexpr size_t TASK_PRIORITY_SIZE = 3;
 // 70% of max threads can run low priority tasks
 static constexpr float LOW_PRIORITY_THREAD_RATIO = 0.7f;
 
-static int GetMaxThreads() {
+static size_t GetDefaultMaxThreadCount() {
   int cpuCores = 0;
 #ifdef __APPLE__
   size_t len = sizeof(cpuCores);
@@ -48,7 +48,7 @@ static int GetMaxThreads() {
   if (cpuCores > MAX_THREADS_SIZE) {
     cpuCores = MAX_THREADS_SIZE;
   }
-  return cpuCores;
+  return static_cast<size_t>(cpuCores);
 }
 
 TaskGroup* TaskGroup::GetInstance() {
@@ -78,12 +78,13 @@ void OnAppExit() {
   TaskGroup::GetInstance()->exit();
 }
 
-TaskGroup::TaskGroup() : maxThreads(GetMaxThreads()) {
-  lowPriorityThreads = FloatRoundToInt(static_cast<float>(maxThreads) * LOW_PRIORITY_THREAD_RATIO);
+TaskGroup::TaskGroup() : _maxThreadCount(GetDefaultMaxThreadCount()) {
+  lowPriorityThreads = static_cast<size_t>(
+      FloatRoundToInt(static_cast<float>(_maxThreadCount.load()) * LOW_PRIORITY_THREAD_RATIO));
   if (lowPriorityThreads < 1) {
     lowPriorityThreads = 1;
   }
-  threads = new moodycamel::ConcurrentQueue<std::thread*>(static_cast<size_t>(maxThreads));
+  threads = new moodycamel::ConcurrentQueue<std::thread*>(_maxThreadCount.load());
   priorityQueues.reserve(TASK_PRIORITY_SIZE);
   for (size_t i = 0; i < TASK_PRIORITY_SIZE; i++) {
     auto queue = new moodycamel::ConcurrentQueue<std::shared_ptr<Task>>();
@@ -92,12 +93,14 @@ TaskGroup::TaskGroup() : maxThreads(GetMaxThreads()) {
   std::atexit(OnAppExit);
 }
 
-void TaskGroup::setMaxThreads(int maxThreads) {
-  if (maxThreads <= 0) {
-    maxThreads = GetMaxThreads();
+void TaskGroup::setMaxThreadCount(size_t maxThreadCount) {
+  if (maxThreadCount == 0) {
+    maxThreadCount = GetDefaultMaxThreadCount();
   }
-  this->maxThreads = maxThreads;
-  lowPriorityThreads = FloatRoundToInt(static_cast<float>(maxThreads) * LOW_PRIORITY_THREAD_RATIO);
+  std::lock_guard<std::mutex> autoLock(locker);
+  _maxThreadCount = maxThreadCount;
+  lowPriorityThreads = static_cast<size_t>(
+      FloatRoundToInt(static_cast<float>(maxThreadCount) * LOW_PRIORITY_THREAD_RATIO));
   if (lowPriorityThreads < 1) {
     lowPriorityThreads = 1;
   }
@@ -105,9 +108,13 @@ void TaskGroup::setMaxThreads(int maxThreads) {
   condition.notify_all();
 }
 
+size_t TaskGroup::maxThreadCount() const {
+  return _maxThreadCount.load();
+}
+
 bool TaskGroup::shrinkThread() {
-  int total = totalThreads.load();
-  while (total > maxThreads.load()) {
+  size_t total = totalThreads.load();
+  while (total > _maxThreadCount.load()) {
     if (totalThreads.compare_exchange_weak(total, total - 1)) {
       return true;
     }
@@ -116,7 +123,7 @@ bool TaskGroup::shrinkThread() {
 }
 
 bool TaskGroup::checkThreads() {
-  if (waitingThreads == 0 && totalThreads < maxThreads) {
+  if (waitingThreads.load() == 0 && totalThreads.load() < _maxThreadCount.load()) {
     auto thread = new (std::nothrow) std::thread(TaskGroup::RunLoop, this);
     if (thread) {
       if (threads->enqueue(thread)) {
@@ -143,32 +150,52 @@ bool TaskGroup::pushTask(std::shared_ptr<Task> task, TaskPriority priority) {
   if (!queue->enqueue(task)) {
     return false;
   }
+  std::lock_guard<std::mutex> autoLock(locker);
   if (waitingThreads > 0) {
     condition.notify_one();
   }
   return true;
 }
 
+std::shared_ptr<Task> TaskGroup::tryDequeueTask() {
+  std::shared_ptr<Task> task = nullptr;
+  for (size_t i = 0; i < static_cast<size_t>(TaskPriority::Low); i++) {
+    if (priorityQueues[i]->try_dequeue(task)) {
+      return task;
+    }
+  }
+  if (totalThreads.load() - waitingThreads.load() < lowPriorityThreads.load()) {
+    auto& queue = priorityQueues[static_cast<size_t>(TaskPriority::Low)];
+    if (queue->try_dequeue(task)) {
+      return task;
+    }
+  }
+  return nullptr;
+}
+
 std::shared_ptr<Task> TaskGroup::popTask() {
   while (!exited) {
-    std::shared_ptr<Task> task = nullptr;
-    for (size_t i = 0; i < static_cast<size_t>(TaskPriority::Low); i++) {
-      if (priorityQueues[i]->try_dequeue(task)) {
-        return task;
-      }
+    auto task = tryDequeueTask();
+    if (task) {
+      return task;
     }
-    if (totalThreads - waitingThreads < lowPriorityThreads) {
-      auto& queue = priorityQueues[static_cast<size_t>(TaskPriority::Low)];
-      if (queue->try_dequeue(task)) {
-        return task;
-      }
-    }
-    if (exited || totalThreads > maxThreads) {
+    if (exited || totalThreads.load() > _maxThreadCount.load()) {
       return nullptr;
     }
     ++waitingThreads;
     {
       std::unique_lock<std::mutex> autoLock(locker);
+      // Re-check the queues while holding the lock so a task pushed concurrently cannot be missed
+      // by a lost notification.
+      task = tryDequeueTask();
+      if (task) {
+        --waitingThreads;
+        return task;
+      }
+      if (totalThreads.load() > _maxThreadCount.load()) {
+        --waitingThreads;
+        return nullptr;
+      }
       auto status = condition.wait_for(autoLock, THREAD_TIMEOUT);
       if (status == std::cv_status::timeout) {
         --waitingThreads;

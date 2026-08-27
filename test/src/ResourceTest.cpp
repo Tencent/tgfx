@@ -39,7 +39,7 @@ TGFX_TEST(ResourceTest, TaskRelease) {
   Task::ReleaseThreads();
   TGFX_PRIVATE_ACCESS(auto group = TaskGroup::GetInstance(); std::thread* thead = nullptr;
                       group->threads->try_dequeue(thead); EXPECT_EQ(thead, nullptr);
-                      EXPECT_EQ(group->waitingThreads, 0); EXPECT_EQ(group->totalThreads, 0);
+                      EXPECT_EQ(group->waitingThreads, 0u); EXPECT_EQ(group->totalThreads, 0u);
                       for (auto& queue
                            : group->priorityQueues) {
                         std::shared_ptr<Task> task = nullptr;
@@ -49,9 +49,10 @@ TGFX_TEST(ResourceTest, TaskRelease) {
 }
 
 #ifdef TGFX_USE_THREADS
-TGFX_TEST(ResourceTest, SetMaxThreadsShrink) {
+TGFX_TEST(ResourceTest, MaxThreadCountShrink) {
   Task::ReleaseThreads();
-  Task::SetMaxThreads(4);
+  Task::SetMaxThreadCount(4);
+  EXPECT_EQ(Task::MaxThreadCount(), 4u);
   std::atomic<int> started{0};
   std::atomic<int> finished{0};
   std::atomic_bool release{false};
@@ -76,12 +77,12 @@ TGFX_TEST(ResourceTest, SetMaxThreadsShrink) {
   }
   // Give the threads a moment to become idle before lowering the limit.
   std::this_thread::sleep_for(std::chrono::milliseconds(50));
-  TGFX_PRIVATE_ACCESS(auto group = TaskGroup::GetInstance(); EXPECT_EQ(group->totalThreads, 4);
-                      Task::SetMaxThreads(1);
-                      for (int i = 0; i < 100 && group->totalThreads > 1; ++i) {
+  TGFX_PRIVATE_ACCESS(auto group = TaskGroup::GetInstance(); EXPECT_EQ(group->totalThreads, 4u);
+                      Task::SetMaxThreadCount(1);
+                      for (int i = 0; i < 100 && group->totalThreads > 1u; ++i) {
                         std::this_thread::sleep_for(std::chrono::milliseconds(10));
-                      } EXPECT_EQ(group->totalThreads, 1););
-  Task::SetMaxThreads(0);
+                      } EXPECT_EQ(group->totalThreads, 1u););
+  Task::SetMaxThreadCount(0);
 }
 #endif
 
