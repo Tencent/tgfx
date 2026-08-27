@@ -40,6 +40,7 @@ static jmethodID SurfaceTexture_detachFromGLContext;
 static jmethodID SurfaceTexture_getTransformMatrix;
 static jmethodID SurfaceTexture_release;
 static jmethodID SurfaceTexture_getDataSpace;
+static jmethodID SurfaceTexture_getTimestamp;
 static Global<jclass> SurfaceClass;
 static jmethodID Surface_Constructor;
 static Global<jclass> HandlerClass;
@@ -89,6 +90,10 @@ void SurfaceTexture::JNIInit(JNIEnv* env) {
   SurfaceTexture_release = env->GetMethodID(SurfaceTextureClass.get(), "release", "()V");
   SurfaceTexture_getDataSpace = env->GetMethodID(SurfaceTextureClass.get(), "getDataSpace", "()I");
   if (SurfaceTexture_getDataSpace == nullptr) {
+    env->ExceptionClear();
+  }
+  SurfaceTexture_getTimestamp = env->GetMethodID(SurfaceTextureClass.get(), "getTimestamp", "()J");
+  if (SurfaceTexture_getTimestamp == nullptr) {
     env->ExceptionClear();
   }
   SurfaceClass = env->FindClass("android/view/Surface");
@@ -289,6 +294,28 @@ ISize SurfaceTexture::updateTexImage() {
     env->ExceptionClear();
     LOGE("NativeImageReader::onUpdateTexture(): failed to updateTexImage!");
     return {};
+  }
+  // Drain any remaining pending frames so the texture always holds the latest decoded frame.
+  // Frames reach the SurfaceTexture asynchronously (releaseOutputBuffer hands them over through
+  // the BufferQueue). Consuming only one frame per call can leave the texture content lagging
+  // behind the most recently decoded frame with a fluctuating delay, which shows up as video
+  // jitter (frames appearing to jump back and forth). Stop when the timestamp stops changing
+  // (queue empty) or an exception is thrown, with a bounded number of iterations.
+  if (SurfaceTexture_getTimestamp != nullptr) {
+    auto lastTimestamp = env->CallLongMethod(surfaceTexture.get(), SurfaceTexture_getTimestamp);
+    for (int i = 0; i < 8; i++) {
+      env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_updateTexImage);
+      if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+        break;
+      }
+      frameAvailable = false;
+      auto timestamp = env->CallLongMethod(surfaceTexture.get(), SurfaceTexture_getTimestamp);
+      if (timestamp == lastTimestamp) {
+        break;
+      }
+      lastTimestamp = timestamp;
+    }
   }
   if (SurfaceTexture_getDataSpace) {
     jint dataSpace = env->CallIntMethod(surfaceTexture.get(), SurfaceTexture_getDataSpace);
