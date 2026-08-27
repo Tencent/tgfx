@@ -302,8 +302,11 @@ ISize SurfaceTexture::updateTexImage() {
   // jitter (frames appearing to jump back and forth). Stop when the timestamp stops changing
   // (queue empty) or an exception is thrown, with a bounded number of iterations.
   if (SurfaceTexture_getTimestamp != nullptr) {
+    // Safety cap on how many extra frames to drain per call so a runaway/mis-behaving queue
+    // cannot spin this loop unboundedly.
+    constexpr int MAX_DRAIN_FRAMES = 8;
     auto lastTimestamp = env->CallLongMethod(surfaceTexture.get(), SurfaceTexture_getTimestamp);
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < MAX_DRAIN_FRAMES; i++) {
       env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_updateTexImage);
       if (env->ExceptionCheck()) {
         env->ExceptionClear();
