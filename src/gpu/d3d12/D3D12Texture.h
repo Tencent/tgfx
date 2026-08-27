@@ -35,10 +35,13 @@ class D3D12Texture : public Texture, public D3D12Resource {
   static std::shared_ptr<D3D12Texture> Make(D3D12GPU* gpu, const TextureDescriptor& descriptor);
 
   /**
-   * Creates a D3D12Texture wrapper from an external D3D12 resource.
+   * Creates a D3D12Texture wrapper from an external D3D12 resource. The width and height come from
+   * the caller's declared dimensions rather than the underlying resource size, so the logical size
+   * can be a subregion of the physical resource.
    */
   static std::shared_ptr<D3D12Texture> MakeFrom(D3D12GPU* gpu, ComPtr<ID3D12Resource> resource,
-                                                unsigned dxgiFormat, uint32_t usage);
+                                                unsigned dxgiFormat, int width, int height,
+                                                uint32_t usage);
 
   /**
    * Returns the underlying D3D12 resource.

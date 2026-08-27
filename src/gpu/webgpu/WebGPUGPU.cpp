@@ -105,7 +105,8 @@ std::shared_ptr<Texture> WebGPUGPU::importBackendTexture(const BackendTexture& b
   if (wgpuTexture == nullptr) {
     return nullptr;
   }
-  return WebGPUTexture::MakeFrom(this, wgpuTexture, usage, adopted);
+  return WebGPUTexture::MakeFrom(this, wgpuTexture, backendTexture.width(), backendTexture.height(),
+                                 usage, adopted);
 }
 
 std::shared_ptr<Texture> WebGPUGPU::importBackendRenderTarget(
@@ -119,7 +120,8 @@ std::shared_ptr<Texture> WebGPUGPU::importBackendRenderTarget(
     return nullptr;
   }
   return WebGPUTexture::MakeFrom(
-      this, wgpuTexture, TextureUsage::RENDER_ATTACHMENT | TextureUsage::TEXTURE_BINDING, false);
+      this, wgpuTexture, backendRenderTarget.width(), backendRenderTarget.height(),
+      TextureUsage::RENDER_ATTACHMENT | TextureUsage::TEXTURE_BINDING, false);
 }
 
 std::shared_ptr<Semaphore> WebGPUGPU::importBackendSemaphore(const BackendSemaphore&) {

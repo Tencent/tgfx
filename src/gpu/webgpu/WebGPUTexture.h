@@ -30,8 +30,13 @@ class WebGPUTexture : public Texture, public WebGPUResource {
  public:
   static std::shared_ptr<WebGPUTexture> Make(WebGPUGPU* gpu, const TextureDescriptor& descriptor);
 
-  static std::shared_ptr<WebGPUTexture> MakeFrom(WebGPUGPU* gpu, WGPUTexture texture,
-                                                 uint32_t usage, bool adopted);
+  /**
+   * Creates a WebGPUTexture wrapper from an external WGPUTexture. The width and height come from
+   * the caller's declared dimensions rather than the underlying texture size, so the logical size
+   * can be a subregion of the physical texture.
+   */
+  static std::shared_ptr<WebGPUTexture> MakeFrom(WebGPUGPU* gpu, WGPUTexture texture, int width,
+                                                 int height, uint32_t usage, bool adopted);
 
   WGPUTexture webgpuTexture() const {
     return texture;

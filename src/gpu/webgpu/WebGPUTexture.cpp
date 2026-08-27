@@ -71,13 +71,12 @@ std::shared_ptr<WebGPUTexture> WebGPUTexture::Make(WebGPUGPU* gpu,
 }
 
 std::shared_ptr<WebGPUTexture> WebGPUTexture::MakeFrom(WebGPUGPU* gpu, WGPUTexture texture,
-                                                       uint32_t usage, bool adopted) {
+                                                       int width, int height, uint32_t usage,
+                                                       bool adopted) {
   if (gpu == nullptr || texture == nullptr) {
     return nullptr;
   }
   auto format = wgpuTextureGetFormat(texture);
-  auto width = static_cast<int>(wgpuTextureGetWidth(texture));
-  auto height = static_cast<int>(wgpuTextureGetHeight(texture));
   auto mipLevelCount = static_cast<int>(wgpuTextureGetMipLevelCount(texture));
   auto sampleCount = static_cast<int>(wgpuTextureGetSampleCount(texture));
   TextureDescriptor descriptor = {};
