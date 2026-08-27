@@ -31,7 +31,7 @@ namespace tgfx {
 class TaskGroup {
  private:
   std::mutex locker = {};
-  std::atomic_size_t _maxThreadCount = 32;
+  std::atomic_size_t maxThreads = 32;
   std::atomic_size_t lowPriorityThreads = 2;
   std::condition_variable condition = {};
   std::atomic_size_t totalThreads = 0;
@@ -45,6 +45,7 @@ class TaskGroup {
   TaskGroup();
   void setMaxThreadCount(size_t maxThreadCount);
   size_t maxThreadCount() const;
+  bool shouldExit() const;
   bool shrinkThread();
   bool checkThreads();
   bool pushTask(std::shared_ptr<Task> task, TaskPriority priority);

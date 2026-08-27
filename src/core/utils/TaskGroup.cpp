@@ -78,13 +78,13 @@ void OnAppExit() {
   TaskGroup::GetInstance()->exit();
 }
 
-TaskGroup::TaskGroup() : _maxThreadCount(GetDefaultMaxThreadCount()) {
+TaskGroup::TaskGroup() : maxThreads(GetDefaultMaxThreadCount()) {
   lowPriorityThreads = static_cast<size_t>(
-      FloatRoundToInt(static_cast<float>(_maxThreadCount.load()) * LOW_PRIORITY_THREAD_RATIO));
+      FloatRoundToInt(static_cast<float>(maxThreads.load()) * LOW_PRIORITY_THREAD_RATIO));
   if (lowPriorityThreads < 1) {
     lowPriorityThreads = 1;
   }
-  threads = new moodycamel::ConcurrentQueue<std::thread*>(_maxThreadCount.load());
+  threads = new moodycamel::ConcurrentQueue<std::thread*>(maxThreads.load());
   priorityQueues.reserve(TASK_PRIORITY_SIZE);
   for (size_t i = 0; i < TASK_PRIORITY_SIZE; i++) {
     auto queue = new moodycamel::ConcurrentQueue<std::shared_ptr<Task>>();
@@ -98,7 +98,7 @@ void TaskGroup::setMaxThreadCount(size_t maxThreadCount) {
     maxThreadCount = GetDefaultMaxThreadCount();
   }
   std::lock_guard<std::mutex> autoLock(locker);
-  _maxThreadCount = maxThreadCount;
+  maxThreads = maxThreadCount;
   lowPriorityThreads = static_cast<size_t>(
       FloatRoundToInt(static_cast<float>(maxThreadCount) * LOW_PRIORITY_THREAD_RATIO));
   if (lowPriorityThreads < 1) {
@@ -109,12 +109,16 @@ void TaskGroup::setMaxThreadCount(size_t maxThreadCount) {
 }
 
 size_t TaskGroup::maxThreadCount() const {
-  return _maxThreadCount.load();
+  return maxThreads.load();
+}
+
+bool TaskGroup::shouldExit() const {
+  return exited || totalThreads.load() > maxThreads.load();
 }
 
 bool TaskGroup::shrinkThread() {
   size_t total = totalThreads.load();
-  while (total > _maxThreadCount.load()) {
+  while (total > maxThreads.load()) {
     if (totalThreads.compare_exchange_weak(total, total - 1)) {
       return true;
     }
@@ -123,7 +127,7 @@ bool TaskGroup::shrinkThread() {
 }
 
 bool TaskGroup::checkThreads() {
-  if (waitingThreads.load() == 0 && totalThreads.load() < _maxThreadCount.load()) {
+  if (waitingThreads.load() == 0 && totalThreads.load() < maxThreads.load()) {
     auto thread = new (std::nothrow) std::thread(TaskGroup::RunLoop, this);
     if (thread) {
       if (threads->enqueue(thread)) {
@@ -179,7 +183,7 @@ std::shared_ptr<Task> TaskGroup::popTask() {
     if (task) {
       return task;
     }
-    if (exited || totalThreads.load() > _maxThreadCount.load()) {
+    if (shouldExit()) {
       return nullptr;
     }
     ++waitingThreads;
@@ -192,7 +196,7 @@ std::shared_ptr<Task> TaskGroup::popTask() {
         --waitingThreads;
         return task;
       }
-      if (totalThreads.load() > _maxThreadCount.load()) {
+      if (shouldExit()) {
         --waitingThreads;
         return nullptr;
       }
@@ -219,8 +223,14 @@ static void ReleaseThread(std::thread* thread) {
 }
 
 void TaskGroup::releaseThreads(bool exit) {
-  exited = true;
-  condition.notify_all();
+  // Set exited and notify while holding the lock, so a worker that has not entered its wait yet
+  // will observe exited in the locked section of popTask() instead of missing the notification
+  // and sleeping for the full THREAD_TIMEOUT.
+  {
+    std::lock_guard<std::mutex> autoLock(locker);
+    exited = true;
+    condition.notify_all();
+  }
   std::thread* thread = nullptr;
   while (threads->try_dequeue(thread)) {
     ReleaseThread(thread);
