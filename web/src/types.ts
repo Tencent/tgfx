@@ -174,11 +174,11 @@ export interface TGFX extends EmscriptenModule {
      * Sets the maximum number of worker threads that can be created for running tasks. Pass zero to
      * restore the default, which is based on the number of CPU cores and capped at 32.
      */
-    setTaskMaxThreadCounts: (maxThreadCounts: number) => void;
+    setTaskMaxThreadCount: (maxThreadCount: number) => void;
     /**
      * Returns the current maximum number of worker threads that can be created for running tasks.
      */
-    taskMaxThreadCounts: () => number;
+    taskMaxThreadCount: () => number;
     _Matrix: {
         _MakeAll: (
             scaleX: number,
