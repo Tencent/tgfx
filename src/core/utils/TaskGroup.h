@@ -44,6 +44,7 @@ class TaskGroup {
 
   TaskGroup();
   void setMaxThreads(int maxThreads);
+  bool shrinkThread();
   bool checkThreads();
   bool pushTask(std::shared_ptr<Task> task, TaskPriority priority);
   std::shared_ptr<Task> popTask();

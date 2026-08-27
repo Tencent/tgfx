@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <array>
+#include <atomic>
+#include <thread>
 #include <utility>
 #include <vector>
 #include "base/TGFXTest.h"
@@ -45,6 +47,43 @@ TGFX_TEST(ResourceTest, TaskRelease) {
                         EXPECT_EQ(task, nullptr);
                       })
 }
+
+#ifdef TGFX_USE_THREADS
+TGFX_TEST(ResourceTest, SetMaxThreadsShrink) {
+  Task::ReleaseThreads();
+  Task::SetMaxThreads(4);
+  std::atomic<int> started{0};
+  std::atomic<int> finished{0};
+  std::atomic_bool release{false};
+  auto blockTask = [&started, &finished, &release] {
+    ++started;
+    while (!release.load()) {
+    }
+    ++finished;
+  };
+  Task::Run(blockTask);
+  // Wait for the first worker thread to start, then submit more tasks. All existing threads are
+  // busy with the blocking tasks, so each submission guarantees a new worker thread is created.
+  while (started.load() < 1) {
+  }
+  for (int i = 0; i < 3; ++i) {
+    Task::Run(blockTask);
+  }
+  while (started.load() < 4) {
+  }
+  release = true;
+  while (finished.load() < 4) {
+  }
+  // Give the threads a moment to become idle before lowering the limit.
+  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  TGFX_PRIVATE_ACCESS(auto group = TaskGroup::GetInstance(); EXPECT_EQ(group->totalThreads, 4);
+                      Task::SetMaxThreads(1);
+                      for (int i = 0; i < 100 && group->totalThreads > 1; ++i) {
+                        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                      } EXPECT_EQ(group->totalThreads, 1););
+  Task::SetMaxThreads(0);
+}
+#endif
 
 // ==================== Resource Cache Tests ====================
 

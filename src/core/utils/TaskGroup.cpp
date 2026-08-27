@@ -63,6 +63,9 @@ void TaskGroup::RunLoop(TaskGroup* taskGroup) {
       if (taskGroup->exited) {
         break;
       }
+      if (taskGroup->shrinkThread()) {
+        break;
+      }
       continue;
     }
     task->execute();
@@ -98,6 +101,18 @@ void TaskGroup::setMaxThreads(int maxThreads) {
   if (lowPriorityThreads < 1) {
     lowPriorityThreads = 1;
   }
+  // Wake up idle threads so they can exit if the pool exceeds the new limit.
+  condition.notify_all();
+}
+
+bool TaskGroup::shrinkThread() {
+  int total = totalThreads.load();
+  while (total > maxThreads.load()) {
+    if (totalThreads.compare_exchange_weak(total, total - 1)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 bool TaskGroup::checkThreads() {
@@ -148,7 +163,7 @@ std::shared_ptr<Task> TaskGroup::popTask() {
         return task;
       }
     }
-    if (exited) {
+    if (exited || totalThreads > maxThreads) {
       return nullptr;
     }
     ++waitingThreads;
