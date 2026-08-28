@@ -1419,13 +1419,25 @@ void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack&
 
   Brush paint(originPaint);
 
-  if (Types::Get(originPaint.maskFilter.get()) != Types::MaskFilterType::Shader) {
+  auto maskFilterType = Types::Get(originPaint.maskFilter.get());
+  if (maskFilterType != Types::MaskFilterType::Shader &&
+      maskFilterType != Types::MaskFilterType::Compose) {
     return;
   }
-  const auto shaderMaskFilter = static_cast<const ShaderMaskFilter*>(originPaint.maskFilter.get());
-  auto [picture, pictureMatrix] = MaskFilterToPicture(shaderMaskFilter);
-  // Inverted masks have no vector Picture representation — always rasterize as bitmap.
-  bool useBitmapMask = !picture || shaderMaskFilter->isInverted();
+  const ShaderMaskFilter* shaderMaskFilter = nullptr;
+  std::shared_ptr<Picture> maskPicture = nullptr;
+  Matrix maskPictureMatrix = {};
+  // Inverted and composed masks have no vector Picture representation — always rasterize them.
+  bool useBitmapMask = true;
+  if (maskFilterType == Types::MaskFilterType::Shader) {
+    shaderMaskFilter = static_cast<const ShaderMaskFilter*>(originPaint.maskFilter.get());
+    auto [picture, pictureMatrix] = MaskFilterToPicture(shaderMaskFilter);
+    useBitmapMask = !picture || shaderMaskFilter->isInverted();
+    if (!useBitmapMask) {
+      maskPicture = std::move(picture);
+      maskPictureMatrix = pictureMatrix;
+    }
+  }
 
   auto maskContext = makeCongruentDevice();
   if (useBitmapMask) {
@@ -1441,33 +1453,45 @@ void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack&
     Canvas* maskCanvas = surface->getCanvas();
     // The mask shader's coordinates are in the path's space, which starts at maskBound.x/y, while
     // the surface starts at (0, 0).
-    auto shader = shaderMaskFilter->getShader();
-    if (maskBound.x() != 0 || maskBound.y() != 0) {
-      shader = shader->makeWithMatrix(Matrix::MakeTrans(-maskBound.x(), -maskBound.y()));
-    }
-    // A PDF luminosity SMask reads the RGB brightness, so the shader alpha has to end up in RGB
-    // with the result opaque. Both variants below build that with blending rather than a color
-    // matrix: a matrix that lights up transparent pixels makes ColorFilterShader mask its own
-    // output with the original shader alpha (SrcIn), which crushes the antialiased edge.
+    auto maskOffset = Matrix::MakeTrans(-maskBound.x(), -maskBound.y());
     Paint maskPaint;
-    if (shaderMaskFilter->isInverted()) {
-      // DstOut over a white backdrop gives Cr = 1 - A, then DstOver with an opaque black restores
-      // A' = 1 without touching RGB. The region the shader never covers stays white, i.e. unmasked.
-      maskCanvas->clear(Color::White());
-      maskPaint.setShader(shader);
-      maskPaint.setBlendMode(BlendMode::DstOut);
-      maskCanvas->drawPaint(maskPaint);
-      Paint opaquePaint;
-      opaquePaint.setColor(Color::Black());
-      opaquePaint.setBlendMode(BlendMode::DstOver);
-      maskCanvas->drawPaint(opaquePaint);
-    } else {
-      // SrcOver of an opaque white with the shader alpha as coverage onto an opaque black backdrop
-      // yields Cr = A at Ar = 1. The uncovered region stays black, i.e. fully masked.
+    if (shaderMaskFilter == nullptr) {
+      // Composed mask filters have no single shader to extract. Draw opaque white through the
+      // compose filter onto an opaque black backdrop, so the combined coverage ends up in RGB
+      // with the result opaque.
       maskCanvas->clear(Color::Black());
       maskPaint.setColor(Color::White());
-      maskPaint.setMaskFilter(MaskFilter::MakeShader(shader));
+      maskPaint.setMaskFilter(originPaint.maskFilter->makeWithMatrix(maskOffset));
       maskCanvas->drawPaint(maskPaint);
+    } else {
+      auto shader = shaderMaskFilter->getShader();
+      if (maskBound.x() != 0 || maskBound.y() != 0) {
+        shader = shader->makeWithMatrix(maskOffset);
+      }
+      // A PDF luminosity SMask reads the RGB brightness, so the shader alpha has to end up in RGB
+      // with the result opaque. Both variants below build that with blending rather than a color
+      // matrix: a matrix that lights up transparent pixels makes ColorFilterShader mask its own
+      // output with the original shader alpha (SrcIn), which crushes the antialiased edge.
+      if (shaderMaskFilter->isInverted()) {
+        // DstOut over a white backdrop gives Cr = 1 - A, then DstOver with an opaque black
+        // restores A' = 1 without touching RGB. The region the shader never covers stays white,
+        // i.e. unmasked.
+        maskCanvas->clear(Color::White());
+        maskPaint.setShader(shader);
+        maskPaint.setBlendMode(BlendMode::DstOut);
+        maskCanvas->drawPaint(maskPaint);
+        Paint opaquePaint;
+        opaquePaint.setColor(Color::Black());
+        opaquePaint.setBlendMode(BlendMode::DstOver);
+        maskCanvas->drawPaint(opaquePaint);
+      } else {
+        // SrcOver of an opaque white with the shader alpha as coverage onto an opaque black
+        // backdrop yields Cr = A at Ar = 1. The uncovered region stays black, i.e. fully masked.
+        maskCanvas->clear(Color::Black());
+        maskPaint.setColor(Color::White());
+        maskPaint.setMaskFilter(MaskFilter::MakeShader(shader));
+        maskCanvas->drawPaint(maskPaint);
+      }
     }
 
     auto maskImage = surface->makeImageSnapshot();
@@ -1486,8 +1510,8 @@ void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack&
     }
   } else {
     Canvas canvas(maskContext.get());
-    canvas.concat(pictureMatrix);
-    canvas.drawPicture(picture);
+    canvas.concat(maskPictureMatrix);
+    canvas.drawPicture(maskPicture);
   }
 
   if (!matrix.isIdentity() && paint.shader) {

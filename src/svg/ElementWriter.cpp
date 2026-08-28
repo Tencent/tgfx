@@ -1434,6 +1434,9 @@ void ElementWriter::addMaskResources(const std::shared_ptr<MaskFilter>& maskFilt
                                      SVGExportContext* svgContext,
                                      std::vector<PendingImage>* pendings) {
   if (Types::Get(maskFilter.get()) != Types::MaskFilterType::Shader) {
+    if (Types::Get(maskFilter.get()) == Types::MaskFilterType::Compose) {
+      reportUnsupportedElement("composed mask filter");
+    }
     return;
   }
 
