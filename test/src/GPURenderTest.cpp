@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <memory>
+#include <string>
 #include <vector>
 #include "ArrayVaryingEffect.h"
 #include "InstancedGridRenderPass.h"
@@ -34,6 +35,99 @@
 #include "utils/TestUtils.h"
 
 namespace tgfx {
+
+namespace {
+
+// Vertex shader: emits a full-screen quad and passes three constant scalar varyings to the
+// fragment stage. The values are constants (not derived from vertex attributes) so rasterizer
+// interpolation cannot perturb them — the fragment stage must see the exact same 1.0 / 0.5 /
+// 0.25 triple across every pixel, isolating the varying-matching contract from any numerical
+// noise.
+static constexpr char VARYING_ORDER_VERTEX_SHADER[] = R"(
+        in vec2 inPosition;
+
+        out float vRed;
+        out float vGreen;
+        out float vBlue;
+
+        void main() {
+            gl_Position = vec4(inPosition, 0.0, 1.0);
+            vRed = 1.0;
+            vGreen = 0.5;
+            vBlue = 0.25;
+        }
+    )";
+
+// Fragment shader: deliberately declares the three `in` varyings in a DIFFERENT order from the
+// vertex stage's `out` declarations (vertex: Red / Green / Blue; fragment: Blue / Red / Green).
+// GL matches varyings by name, so the fragment reads back {1.0, 0.5, 0.25} and writes
+// (255, 128, 64, 255). SPIR-V-based backends (Metal, Vulkan, D3D12) match by location — with
+// ShaderCompiler's current per-stage `assignInputLocationQualifiers` /
+// `assignOutputLocationQualifiers` policy each stage's locations are assigned in source order,
+// so the fragment reads the wrong varying for each channel and produces a visibly different
+// colour. This test pins the tgfx-level contract that a RuntimeEffect written in GLSL renders
+// the same on every backend regardless of varying declaration order.
+static constexpr char VARYING_ORDER_FRAGMENT_SHADER[] = R"(
+        precision mediump float;
+
+        in float vBlue;
+        in float vRed;
+        in float vGreen;
+
+        out vec4 tgfx_FragColor;
+
+        void main() {
+            tgfx_FragColor = vec4(vRed, vGreen, vBlue, 1.0);
+        }
+    )";
+
+struct VaryingOrderVertex {
+  float x;
+  float y;
+};
+
+static std::string PrefixShaderVersion(const char* body, bool isDesktop) {
+  if (isDesktop) {
+    return std::string("#version 150\n\n") + body;
+  }
+  return std::string("#version 300 es\n\n") + body;
+}
+
+static std::shared_ptr<RenderPipeline> CreateVaryingOrderPipeline(GPU* gpu) {
+  auto info = gpu->info();
+  auto isDesktop = info->version.find("OpenGL ES") == std::string::npos;
+
+  ShaderModuleDescriptor vertexModule = {};
+  vertexModule.code = PrefixShaderVersion(VARYING_ORDER_VERTEX_SHADER, isDesktop);
+  vertexModule.stage = ShaderStage::Vertex;
+  auto vertexShader = gpu->createShaderModule(vertexModule);
+  if (vertexShader == nullptr) {
+    return nullptr;
+  }
+
+  ShaderModuleDescriptor fragmentModule = {};
+  fragmentModule.code = PrefixShaderVersion(VARYING_ORDER_FRAGMENT_SHADER, isDesktop);
+  fragmentModule.stage = ShaderStage::Fragment;
+  auto fragmentShader = gpu->createShaderModule(fragmentModule);
+  if (fragmentShader == nullptr) {
+    return nullptr;
+  }
+
+  RenderPipelineDescriptor descriptor = {};
+  Attribute position = {"inPosition", VertexFormat::Float2};
+  VertexBufferLayout vertexLayout({position}, VertexStepMode::Vertex);
+  descriptor.vertex.bufferLayouts = {vertexLayout};
+  descriptor.vertex.module = vertexShader;
+  descriptor.fragment.module = fragmentShader;
+
+  PipelineColorAttachment colorAttachment = {};
+  colorAttachment.blendEnable = false;
+  descriptor.fragment.colorAttachments.push_back(colorAttachment);
+
+  return gpu->createRenderPipeline(descriptor);
+}
+
+}  // namespace
 
 // ==================== GPU Tests ====================
 
@@ -446,6 +540,72 @@ TGFX_TEST(GPURenderTest, ArrayVarying) {
   auto canvas = surface->getCanvas();
   canvas->drawImage(std::move(filtered));
   EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/ArrayVarying"));
+}
+
+// Reproduces a cross-backend rendering divergence caused by declaring vertex `out` and
+// fragment `in` varyings in different orders. GL links varyings by name and renders the
+// intended colour; SPIR-V-based backends (Metal via GLSL → SPIR-V → MSL, Vulkan, D3D12) link
+// by location, and tgfx's ShaderCompiler currently assigns locations per-stage in source
+// order — so the mismatched order silently swaps channels on those backends.
+//
+// The vertex shader emits three constant scalar varyings (vRed=1.0, vGreen=0.5, vBlue=0.25)
+// and the fragment shader declares them in a shuffled order (vBlue / vRed / vGreen) before
+// writing vec4(vRed, vGreen, vBlue, 1.0). The full-screen quad means every rendered pixel
+// carries the same colour, so the baseline captures a flat swatch and any location-order
+// bug shows up as the swapped colour (Metal today renders vec4(vBlue, vRed, vGreen, 1.0)).
+TGFX_TEST(GPURenderTest, VaryingOrderMismatch) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto gpu = context->gpu();
+  ASSERT_TRUE(gpu != nullptr);
+
+  constexpr int SIZE = 200;
+  TextureDescriptor renderTextureDesc(
+      SIZE, SIZE, PixelFormat::RGBA_8888, false, 1,
+      TextureUsage::RENDER_ATTACHMENT | TextureUsage::TEXTURE_BINDING);
+  auto renderTexture = gpu->createTexture(renderTextureDesc);
+  ASSERT_TRUE(renderTexture != nullptr);
+
+  auto encoder = gpu->createCommandEncoder();
+  ASSERT_TRUE(encoder != nullptr);
+
+  auto pipeline = CreateVaryingOrderPipeline(gpu);
+  ASSERT_TRUE(pipeline != nullptr);
+
+  RenderPassDescriptor renderPassDesc(renderTexture, LoadAction::Clear, StoreAction::Store,
+                                      PMColor::Transparent());
+  auto renderPass = encoder->beginRenderPass(renderPassDesc);
+  ASSERT_TRUE(renderPass != nullptr);
+  renderPass->setPipeline(std::move(pipeline));
+
+  // Full-screen quad in NDC as a TriangleStrip: BL, BR, TL, TR.
+  VaryingOrderVertex quadVertices[] = {
+      {-1.0f, -1.0f},
+      {1.0f, -1.0f},
+      {-1.0f, 1.0f},
+      {1.0f, 1.0f},
+  };
+  auto vertexBuffer = gpu->createBuffer(sizeof(quadVertices), GPUBufferUsage::VERTEX);
+  ASSERT_TRUE(vertexBuffer != nullptr);
+  auto* mapped = static_cast<VaryingOrderVertex*>(vertexBuffer->map());
+  ASSERT_TRUE(mapped != nullptr);
+  memcpy(mapped, quadVertices, sizeof(quadVertices));
+  vertexBuffer->unmap();
+
+  renderPass->setVertexBuffer(0, vertexBuffer);
+  renderPass->draw(PrimitiveType::TriangleStrip, 4, 1);
+  renderPass->end();
+
+  auto commandBuffer = encoder->finish();
+  ASSERT_TRUE(commandBuffer != nullptr);
+  gpu->queue()->submit(commandBuffer);
+  gpu->queue()->waitUntilCompleted();
+
+  auto surface =
+      Surface::MakeFrom(context, renderTexture->getBackendTexture(), ImageOrigin::TopLeft);
+  ASSERT_TRUE(surface != nullptr);
+  EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/VaryingOrderMismatch"));
 }
 
 }  // namespace tgfx

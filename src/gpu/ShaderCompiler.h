@@ -32,7 +32,19 @@ namespace tgfx {
 /// Preprocesses OpenGL-style GLSL source code to Vulkan-compatible GLSL 450 with explicit
 /// binding/location qualifiers. This includes upgrading the #version directive, assigning UBO and
 /// sampler bindings, adding input/output location qualifiers, and removing precision declarations.
-std::string PreprocessGLSL(const std::string& glslCode);
+///
+/// `stage` selects the semantics for interface variable location assignment so that varying
+/// declarations line up across the vertex/fragment boundary regardless of source order:
+///   - Vertex stage: `in` (vertex attributes) keep their source-declaration order — the assigned
+///     locations must match the attribute order in `RenderPipelineDescriptor::vertex.bufferLayouts`,
+///     which is the CPU-side contract every backend (Metal, Vulkan, D3D12) relies on. `out`
+///     (varying) declarations are collected and sorted by name before receiving locations, so the
+///     fragment side can pair them up without knowing the vertex side's source order.
+///   - Fragment stage: `in` (varying) declarations are collected and sorted by name using the
+///     same rule as the vertex `out` side, guaranteeing matching locations across stages. `out`
+///     (colour attachments) keep their source-declaration order to preserve the mapping to the
+///     colour attachment index.
+std::string PreprocessGLSL(const std::string& glslCode, ShaderStage stage);
 
 /// Compiles preprocessed GLSL 450 source to SPIR-V binary using shaderc. Returns an empty vector
 /// on failure.

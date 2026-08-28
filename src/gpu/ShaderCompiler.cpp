@@ -17,8 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShaderCompiler.h"
+#include <algorithm>
 #include <regex>
 #include <shaderc/shaderc.hpp>
+#include <unordered_map>
 #include "UniformData.h"
 #include "core/utils/Log.h"
 
@@ -108,16 +110,93 @@ static std::string replaceInputLocation(const std::smatch& match, int& counter) 
   return decl;
 }
 
+// Rewrite interface-variable declarations so their `layout(location=N)` numbers are assigned by
+// looking up each variable's name in `nameToLocation`, instead of in source order. Any matched
+// declaration whose name is not in the map keeps whatever the fallback replacer produces, which
+// preserves the source-order behaviour for declarations that are not part of the cross-stage
+// interface (in practice this branch is not hit because the map is always built from the same
+// scan the second pass consumes).
+static std::string replaceWithNameKeyedLocations(
+    const std::string& source, const std::regex& pattern,
+    const std::unordered_map<std::string, int>& nameToLocation, bool isInput) {
+  std::smatch match;
+  std::string::const_iterator searchStart(source.cbegin());
+  std::string result;
+  size_t lastPos = 0;
+  while (std::regex_search(searchStart, source.cend(), match, pattern)) {
+    auto matchPos = static_cast<size_t>(match.position(0));
+    auto iterOffset = static_cast<size_t>(searchStart - source.cbegin());
+    size_t matchStart = matchPos + iterOffset;
+    result += source.substr(lastPos, matchStart - lastPos);
+
+    std::string interpStr = match[1].matched ? match[1].str() : "";
+    std::string precisionStr = match[2].matched ? match[2].str() : "";
+    std::string arraySuffix = match[5].matched ? match[5].str() : "";
+    const std::string& name = match[4].str();
+    auto it = nameToLocation.find(name);
+    int location = (it != nameToLocation.end()) ? it->second : 0;
+    std::string decl = "layout(location=" + std::to_string(location) + ") " + interpStr +
+                       (isInput ? "in " : "out ") + precisionStr + match[3].str() + " " + name +
+                       arraySuffix + ";";
+    result += decl;
+
+    lastPos = matchStart + static_cast<size_t>(match.length(0));
+    searchStart = match.suffix().first;
+  }
+  result += source.substr(lastPos);
+  return result;
+}
+
+// Build a `name -> location` map from the interface declarations matched by `pattern`. Names are
+// collected in source order, then sorted lexicographically before locations are assigned. Array-
+// typed varyings occupy `size` consecutive locations, so the counter is advanced by the array
+// length to match SPIR-V semantics for per-vertex block members.
+static std::unordered_map<std::string, int> buildNameSortedLocationMap(const std::string& source,
+                                                                       const std::regex& pattern) {
+  struct Entry {
+    std::string name;
+    int step;
+  };
+  std::vector<Entry> entries;
+  std::smatch match;
+  std::string::const_iterator searchStart(source.cbegin());
+  while (std::regex_search(searchStart, source.cend(), match, pattern)) {
+    int step = match[6].matched ? std::stoi(match[6].str()) : 1;
+    entries.push_back({match[4].str(), step});
+    searchStart = match.suffix().first;
+  }
+  std::sort(entries.begin(), entries.end(),
+            [](const Entry& a, const Entry& b) { return a.name < b.name; });
+  std::unordered_map<std::string, int> nameToLocation;
+  int location = 0;
+  for (const auto& entry : entries) {
+    nameToLocation[entry.name] = location;
+    location += entry.step;
+  }
+  return nameToLocation;
+}
+
 // Add location qualifiers to 'in' variables, handling optional interpolation qualifiers
 // (flat, noperspective), precision qualifiers (highp, mediump, lowp), and array-typed varyings
 // like `in vec2 blurCoordinates[5];`. Array-typed varyings occupy `size` consecutive locations,
 // so the counter is advanced by the array length instead of one, matching SPIR-V semantics for
 // per-vertex block members.
-static std::string assignInputLocationQualifiers(const std::string& source) {
+//
+// Vertex stage inputs are vertex attributes whose locations must match the attribute order
+// declared in `RenderPipelineDescriptor::vertex.bufferLayouts` (a CPU-side contract shared by
+// Metal / Vulkan / D3D12), so we keep the source-declaration order there. Fragment stage inputs
+// are varyings paired with the vertex stage's outputs; assigning their locations by sorted name
+// makes the pairing independent of source order, so a fragment shader can declare its `in`
+// varyings in any order and still line up with the vertex `out` declarations.
+static std::string assignInputLocationQualifiers(const std::string& source, ShaderStage stage) {
   static std::regex inVarRegex(
       R"((flat\s+|noperspective\s+)?in\s+(highp\s+|mediump\s+|lowp\s+)?(\w+)\s+(\w+)(\s*\[\s*(\d+)\s*\])?\s*;)");
-  int location = 0;
-  return replaceAllMatches(source, inVarRegex, replaceInputLocation, location);
+  if (stage == ShaderStage::Vertex) {
+    int location = 0;
+    return replaceAllMatches(source, inVarRegex, replaceInputLocation, location);
+  }
+  auto nameToLocation = buildNameSortedLocationMap(source, inVarRegex);
+  return replaceWithNameKeyedLocations(source, inVarRegex, nameToLocation, /*isInput=*/true);
 }
 
 static std::string replaceOutputLocation(const std::smatch& match, int& counter) {
@@ -136,11 +215,20 @@ static std::string replaceOutputLocation(const std::smatch& match, int& counter)
 // like `out vec2 blurCoordinates[5];`. Array-typed varyings occupy `size` consecutive locations,
 // so the counter is advanced by the array length instead of one, matching SPIR-V semantics for
 // per-vertex block members.
-static std::string assignOutputLocationQualifiers(const std::string& source) {
+//
+// Vertex stage outputs are varyings feeding the fragment stage; assigning their locations by
+// sorted name (the same rule used for fragment inputs) makes the vertex→fragment pairing
+// independent of source order. Fragment stage outputs are colour attachments whose location
+// index maps directly to the colour attachment slot, so we keep the source-declaration order.
+static std::string assignOutputLocationQualifiers(const std::string& source, ShaderStage stage) {
   static std::regex outVarRegex(
       R"((flat\s+|noperspective\s+)?out\s+(highp\s+|mediump\s+|lowp\s+)?(\w+)\s+(\w+)(\s*\[\s*(\d+)\s*\])?\s*;)");
-  int location = 0;
-  return replaceAllMatches(source, outVarRegex, replaceOutputLocation, location);
+  if (stage == ShaderStage::Fragment) {
+    int location = 0;
+    return replaceAllMatches(source, outVarRegex, replaceOutputLocation, location);
+  }
+  auto nameToLocation = buildNameSortedLocationMap(source, outVarRegex);
+  return replaceWithNameKeyedLocations(source, outVarRegex, nameToLocation, /*isInput=*/false);
 }
 
 // Remove precision qualifiers that are not supported in desktop GLSL 450.
@@ -149,13 +237,13 @@ static std::string removePrecisionDeclarations(const std::string& source) {
   return std::regex_replace(source, precisionDeclRegex, "");
 }
 
-std::string PreprocessGLSL(const std::string& glslCode) {
+std::string PreprocessGLSL(const std::string& glslCode, ShaderStage stage) {
   auto result = upgradeGLSLVersion(glslCode);
   result = assignInternalUBOBindings(result);
   result = assignCustomUBOBindings(result);
   result = assignSamplerBindings(result);
-  result = assignInputLocationQualifiers(result);
-  result = assignOutputLocationQualifiers(result);
+  result = assignInputLocationQualifiers(result, stage);
+  result = assignOutputLocationQualifiers(result, stage);
   result = removePrecisionDeclarations(result);
   return result;
 }
