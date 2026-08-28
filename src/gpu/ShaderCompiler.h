@@ -29,6 +29,15 @@ class Compiler;
 
 namespace tgfx {
 
+struct ShaderUniformBinding {
+  std::string name;
+  uint32_t descriptorSet = 0;
+  uint32_t binding = 0;
+};
+
+/// Extracts uniform-block names and physical descriptor locations from preprocessed GLSL.
+std::vector<ShaderUniformBinding> GetShaderUniformBindings(const std::string& preprocessedGLSL);
+
 /// Preprocesses OpenGL-style GLSL source code to Vulkan-compatible GLSL 450 with explicit
 /// binding/location qualifiers. This includes upgrading the #version directive, assigning UBO and
 /// sampler bindings, adding input/output location qualifiers, and removing precision declarations.

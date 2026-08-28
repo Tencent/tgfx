@@ -19,6 +19,7 @@
 #pragma once
 
 #include <Metal/Metal.h>
+#include "MetalShaderModule.h"
 #include "tgfx/gpu/RenderPass.h"
 
 namespace tgfx {
@@ -80,11 +81,13 @@ class MetalRenderPass : public RenderPass {
   int lastScissorWidth = -1;
   int lastScissorHeight = -1;
 
-  // Cached uniform buffer state to avoid redundant Metal API calls.
-  // Index 0 = VERTEX_UBO_BINDING_POINT, Index 1 = FRAGMENT_UBO_BINDING_POINT.
-  static constexpr int MaxUniformBindings = 2;
-  GPUBuffer* lastUniformBuffers[MaxUniformBindings] = {};
-  size_t lastUniformOffsets[MaxUniformBindings] = {};
+  // Cached uniform buffer state is indexed by the physical Metal slot for each stage. Public
+  // bindings are pipeline-scoped logical IDs and may resolve to different vertex/fragment slots.
+  static constexpr int MaxUniformBindings = VertexBufferIndexStart;
+  GPUBuffer* lastVertexUniformBuffers[MaxUniformBindings] = {};
+  size_t lastVertexUniformOffsets[MaxUniformBindings] = {};
+  GPUBuffer* lastFragmentUniformBuffers[MaxUniformBindings] = {};
+  size_t lastFragmentUniformOffsets[MaxUniformBindings] = {};
 
   // Cached texture/sampler state to avoid redundant Metal API calls.
   static constexpr int MaxTextureBindings = 16;

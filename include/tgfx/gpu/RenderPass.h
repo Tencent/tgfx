@@ -296,7 +296,9 @@ class RenderPass {
   virtual void setPipeline(std::shared_ptr<RenderPipeline> pipeline) = 0;
 
   /**
-   * Sets a GPUBuffer as a uniform buffer to a specified binding index in the shader's UBO table.
+   * Sets a GPUBuffer for the pipeline-scoped logical binding declared by
+   * BindingLayout::uniformBlocks. The active pipeline maps the logical binding to every physical
+   * shader-stage slot that uses the resource.
    */
   virtual void setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuffer> buffer, size_t offset,
                                 size_t size) = 0;

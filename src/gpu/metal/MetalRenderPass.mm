@@ -296,45 +296,50 @@ void MetalRenderPass::setTexture(unsigned binding, std::shared_ptr<Texture> text
 
 void MetalRenderPass::setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuffer> buffer,
                                        size_t offset, size_t size) {
-  if (!renderEncoder || !buffer) {
+  if (!renderEncoder || !buffer || !currentPipeline) {
     return;
   }
-  DEBUG_ASSERT(binding < VertexBufferIndexStart);
-  (void)size;  // Metal doesn't need explicit size
-
-  if (binding < MaxUniformBindings && lastUniformBuffers[binding] == buffer.get() &&
-      lastUniformOffsets[binding] == offset) {
-    return;
-  }
-
-  uint32_t visibility = currentPipeline ? currentPipeline->getUniformBlockVisibility(binding)
-                                        : ShaderVisibility::VertexFragment;
-
-  if (binding < MaxUniformBindings && lastUniformBuffers[binding] == buffer.get()) {
-    // Same buffer, only offset changed — use lightweight offset-only update.
-    lastUniformOffsets[binding] = offset;
-    if (visibility & ShaderVisibility::Vertex) {
-      [renderEncoder setVertexBufferOffset:offset atIndex:binding];
-    }
-    if (visibility & ShaderVisibility::Fragment) {
-      [renderEncoder setFragmentBufferOffset:offset atIndex:binding];
-    }
-    return;
-  }
-
-  if (binding < MaxUniformBindings) {
-    lastUniformBuffers[binding] = buffer.get();
-    lastUniformOffsets[binding] = offset;
-  }
-
+  (void)size;
   auto metalBuffer = std::static_pointer_cast<MetalBuffer>(buffer);
-
-  // Bind the uniform buffer to the shader stages specified by the pipeline's visibility flags.
-  if (visibility & ShaderVisibility::Vertex) {
-    [renderEncoder setVertexBuffer:metalBuffer->metalBuffer() offset:offset atIndex:binding];
+  auto vertexIndices = currentPipeline->getVertexUniformIndices(binding);
+  if (vertexIndices != nullptr) {
+    for (auto physicalIndex : *vertexIndices) {
+      DEBUG_ASSERT(physicalIndex < MaxUniformBindings);
+      if (physicalIndex >= MaxUniformBindings) {
+        continue;
+      }
+      if (lastVertexUniformBuffers[physicalIndex] == buffer.get()) {
+        if (lastVertexUniformOffsets[physicalIndex] != offset) {
+          [renderEncoder setVertexBufferOffset:offset atIndex:physicalIndex];
+        }
+      } else {
+        [renderEncoder setVertexBuffer:metalBuffer->metalBuffer()
+                                offset:offset
+                               atIndex:physicalIndex];
+      }
+      lastVertexUniformBuffers[physicalIndex] = buffer.get();
+      lastVertexUniformOffsets[physicalIndex] = offset;
+    }
   }
-  if (visibility & ShaderVisibility::Fragment) {
-    [renderEncoder setFragmentBuffer:metalBuffer->metalBuffer() offset:offset atIndex:binding];
+  auto fragmentIndices = currentPipeline->getFragmentUniformIndices(binding);
+  if (fragmentIndices != nullptr) {
+    for (auto physicalIndex : *fragmentIndices) {
+      DEBUG_ASSERT(physicalIndex < MaxUniformBindings);
+      if (physicalIndex >= MaxUniformBindings) {
+        continue;
+      }
+      if (lastFragmentUniformBuffers[physicalIndex] == buffer.get()) {
+        if (lastFragmentUniformOffsets[physicalIndex] != offset) {
+          [renderEncoder setFragmentBufferOffset:offset atIndex:physicalIndex];
+        }
+      } else {
+        [renderEncoder setFragmentBuffer:metalBuffer->metalBuffer()
+                                  offset:offset
+                                 atIndex:physicalIndex];
+      }
+      lastFragmentUniformBuffers[physicalIndex] = buffer.get();
+      lastFragmentUniformOffsets[physicalIndex] = offset;
+    }
   }
 }
 

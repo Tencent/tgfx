@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "D3D12ShaderModule.h"
+#include <map>
 #include <shaderc/shaderc.hpp>
 #include "D3D12GPU.h"
 #include "core/utils/Log.h"
@@ -46,7 +47,9 @@ namespace tgfx {
 //     front-end numbers samplers (currently starting from 0 in descriptor set 1), which is a
 //     detail of the SPIR-V producer, whereas root-signature construction just needs a dense
 //     zero-based register space.
-static std::string convertSPIRVToHLSL(const std::vector<uint32_t>& spirvBinary, ShaderStage stage) {
+static std::string convertSPIRVToHLSL(const std::vector<uint32_t>& spirvBinary, ShaderStage stage,
+                                      const std::vector<ShaderUniformBinding>& declaredUniforms,
+                                      std::unordered_map<std::string, unsigned>* uniformRegisters) {
   spirv_cross::Parser spvParser(spirvBinary.data(), spirvBinary.size());
   spvParser.parse();
   spirv_cross::CompilerHLSL hlslCompiler(std::move(spvParser.get_parsed_ir()));
@@ -71,10 +74,19 @@ static std::string convertSPIRVToHLSL(const std::vector<uint32_t>& spirvBinary, 
   // sequentially. HLSL register namespaces are per-stage, so this gives each stage a dense
   // packing that matches D3D12RenderPipeline::createRootSignature, which assigns the same
   // stage-local index to each entry's CBV root parameter.
+  std::map<std::pair<uint32_t, uint32_t>, std::string> uniformNames;
+  for (const auto& uniform : declaredUniforms) {
+    uniformNames[{uniform.descriptorSet, uniform.binding}] = uniform.name;
+  }
   uint32_t cbvRegister = 0;
   for (auto& ubo : resources.uniform_buffers) {
     uint32_t spvBinding = hlslCompiler.get_decoration(ubo.id, spv::DecorationBinding);
     uint32_t spvDescSet = hlslCompiler.get_decoration(ubo.id, spv::DecorationDescriptorSet);
+    auto key = std::make_pair(spvDescSet, spvBinding);
+    auto name = uniformNames.find(key);
+    if (name != uniformNames.end() && uniformRegisters != nullptr) {
+      (*uniformRegisters)[name->second] = cbvRegister;
+    }
     spirv_cross::HLSLResourceBinding resourceBinding = {};
     resourceBinding.stage = executionModel;
     resourceBinding.desc_set = spvDescSet;
@@ -162,13 +174,15 @@ std::shared_ptr<D3D12ShaderModule> D3D12ShaderModule::Make(
 D3D12ShaderModule::D3D12ShaderModule(D3D12GPU* gpu, const ShaderModuleDescriptor& descriptor)
     : _stage(descriptor.stage) {
   std::string vulkanGLSL = PreprocessGLSL(descriptor.code, descriptor.stage);
+  auto declaredUniforms = GetShaderUniformBindings(vulkanGLSL);
   // D3D12 needs every declared interface variable to survive — see ShaderCompiler.h.
   auto spirvBinary = CompileGLSLToSPIRV(gpu->shaderCompiler(), vulkanGLSL, descriptor.stage, true);
   if (spirvBinary.empty()) {
     LOGE("D3D12ShaderModule: GLSL to SPIR-V compilation failed.");
     return;
   }
-  std::string hlsl = convertSPIRVToHLSL(spirvBinary, descriptor.stage);
+  std::string hlsl =
+      convertSPIRVToHLSL(spirvBinary, descriptor.stage, declaredUniforms, &uniformRegisters);
   if (hlsl.empty()) {
     return;
   }
@@ -176,6 +190,17 @@ D3D12ShaderModule::D3D12ShaderModule(D3D12GPU* gpu, const ShaderModuleDescriptor
 #ifdef TGFX_D3D12_DEBUG_LAYER
   _hlslSource = std::move(hlsl);
 #endif
+}
+
+bool D3D12ShaderModule::getUniformRegister(const std::string& name, unsigned* registerIndex) const {
+  auto result = uniformRegisters.find(name);
+  if (result == uniformRegisters.end()) {
+    return false;
+  }
+  if (registerIndex != nullptr) {
+    *registerIndex = result->second;
+  }
+  return true;
 }
 
 void D3D12ShaderModule::onRelease(D3D12GPU*) {

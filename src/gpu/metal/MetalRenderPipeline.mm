@@ -54,9 +54,24 @@ MetalRenderPipeline::MetalRenderPipeline(MetalGPU* gpu,
     textureUnits[entry.binding] = textureUnit++;
   }
 
-  // Build uniform block visibility mapping: binding -> shader stage visibility flags.
+  auto vertexShader = std::static_pointer_cast<MetalShaderModule>(descriptor.vertex.module);
+  auto fragmentShader = std::static_pointer_cast<MetalShaderModule>(descriptor.fragment.module);
   for (auto& entry : descriptor.layout.uniformBlocks) {
-    uniformBlockVisibility[entry.binding] = entry.visibility;
+    unsigned physicalIndex = 0;
+    if ((entry.visibility & ShaderVisibility::Vertex) && vertexShader != nullptr) {
+      if (vertexShader->getUniformBinding(entry.name, &physicalIndex)) {
+        vertexUniformIndices[entry.binding].push_back(physicalIndex);
+      } else {
+        LOGE("MetalRenderPipeline: vertex uniform block '%s' was not found.", entry.name.c_str());
+      }
+    }
+    if ((entry.visibility & ShaderVisibility::Fragment) && fragmentShader != nullptr) {
+      if (fragmentShader->getUniformBinding(entry.name, &physicalIndex)) {
+        fragmentUniformIndices[entry.binding].push_back(physicalIndex);
+      } else {
+        LOGE("MetalRenderPipeline: fragment uniform block '%s' was not found.", entry.name.c_str());
+      }
+    }
   }
 }
 
@@ -83,12 +98,15 @@ unsigned MetalRenderPipeline::getTextureIndex(unsigned binding) const {
   return binding;
 }
 
-uint32_t MetalRenderPipeline::getUniformBlockVisibility(unsigned binding) const {
-  auto result = uniformBlockVisibility.find(binding);
-  if (result != uniformBlockVisibility.end()) {
-    return result->second;
-  }
-  return ShaderVisibility::VertexFragment;
+const std::vector<unsigned>* MetalRenderPipeline::getVertexUniformIndices(unsigned binding) const {
+  auto result = vertexUniformIndices.find(binding);
+  return result != vertexUniformIndices.end() ? &result->second : nullptr;
+}
+
+const std::vector<unsigned>* MetalRenderPipeline::getFragmentUniformIndices(
+    unsigned binding) const {
+  auto result = fragmentUniformIndices.find(binding);
+  return result != fragmentUniformIndices.end() ? &result->second : nullptr;
 }
 
 bool MetalRenderPipeline::createPipelineState(MetalGPU* gpu,

@@ -56,24 +56,57 @@ static std::string upgradeGLSLVersion(const std::string& source) {
   return std::regex_replace(source, versionRegex, "#version 450");
 }
 
+static int UniformDescriptorSet(ShaderStage stage) {
+  return stage == ShaderStage::Vertex ? VERTEX_UBO_DESCRIPTOR_SET : FRAGMENT_UBO_DESCRIPTOR_SET;
+}
+
 static std::string assignInternalUBOBindings(const std::string& source) {
   static std::regex vertexUboRegex(R"(layout\s*\(\s*std140\s*\)\s*uniform\s+VertexUniformBlock)");
-  auto result = std::regex_replace(source, vertexUboRegex,
-                                   "layout(std140, binding=0) uniform VertexUniformBlock");
+  auto result =
+      std::regex_replace(source, vertexUboRegex,
+                         "layout(std140, set=" + std::to_string(VERTEX_UBO_DESCRIPTOR_SET) +
+                             ", binding=0) uniform VertexUniformBlock");
   static std::regex fragmentUboRegex(
       R"(layout\s*\(\s*std140\s*\)\s*uniform\s+FragmentUniformBlock)");
   return std::regex_replace(result, fragmentUboRegex,
-                            "layout(std140, binding=1) uniform FragmentUniformBlock");
+                            "layout(std140, set=" + std::to_string(FRAGMENT_UBO_DESCRIPTOR_SET) +
+                                ", binding=0) uniform FragmentUniformBlock");
 }
 
-static std::string replaceCustomUBO(const std::smatch& match, int& counter) {
-  return "layout(std140, binding=" + std::to_string(counter++) + ") uniform " + match[1].str();
+static int nextUniformBinding(const std::string& source, int descriptorSet) {
+  static std::regex boundUboRegex(
+      R"(layout\s*\(\s*std140\s*,\s*set\s*=\s*(\d+)\s*,\s*binding\s*=\s*(\d+)\s*\)\s*uniform)");
+  int nextBinding = 0;
+  std::smatch match;
+  std::string::const_iterator searchStart(source.cbegin());
+  while (std::regex_search(searchStart, source.cend(), match, boundUboRegex)) {
+    if (std::stoi(match[1].str()) == descriptorSet) {
+      nextBinding = std::max(nextBinding, std::stoi(match[2].str()) + 1);
+    }
+    searchStart = match.suffix().first;
+  }
+  return nextBinding;
 }
 
-static std::string assignCustomUBOBindings(const std::string& source) {
+static std::string assignCustomUBOBindings(const std::string& source, ShaderStage stage) {
   static std::regex uboRegex(R"(layout\s*\(\s*std140\s*\)\s*uniform\s+(\w+))");
-  int binding = 0;
-  return replaceAllMatches(source, uboRegex, replaceCustomUBO, binding);
+  std::smatch match;
+  std::string::const_iterator searchStart(source.cbegin());
+  std::string result;
+  size_t lastPos = 0;
+  int binding = nextUniformBinding(source, UniformDescriptorSet(stage));
+  while (std::regex_search(searchStart, source.cend(), match, uboRegex)) {
+    auto matchPos = static_cast<size_t>(match.position(0));
+    auto iterOffset = static_cast<size_t>(searchStart - source.cbegin());
+    size_t matchStart = matchPos + iterOffset;
+    result += source.substr(lastPos, matchStart - lastPos);
+    result += "layout(std140, set=" + std::to_string(UniformDescriptorSet(stage)) +
+              ", binding=" + std::to_string(binding++) + ") uniform " + match[1].str();
+    lastPos = matchStart + static_cast<size_t>(match.length(0));
+    searchStart = match.suffix().first;
+  }
+  result += source.substr(lastPos);
+  return result;
 }
 
 // Separates combined sampler declarations into distinct texture and sampler resources.
@@ -91,10 +124,12 @@ static std::string replaceSeparatedSampler(const std::smatch& match, int& counte
   } else {
     textureType = "texture2D";
   }
-  auto textureDecl =
-      "layout(binding=" + std::to_string(counter++) + ") uniform " + textureType + " " + name + ";";
-  auto samplerDecl =
-      "\nlayout(binding=" + std::to_string(counter++) + ") uniform sampler " + name + "_Sampler;";
+  auto textureDecl = "layout(set=" + std::to_string(TEXTURE_DESCRIPTOR_SET) +
+                     ", binding=" + std::to_string(counter++) + ") uniform " + textureType + " " +
+                     name + ";";
+  auto samplerDecl = "\nlayout(set=" + std::to_string(TEXTURE_DESCRIPTOR_SET) +
+                     ", binding=" + std::to_string(counter++) + ") uniform sampler " + name +
+                     "_Sampler;";
   return textureDecl + samplerDecl;
 }
 
@@ -220,10 +255,24 @@ static std::string removePrecisionDeclarations(const std::string& source) {
   return std::regex_replace(source, precisionDeclRegex, "");
 }
 
+static std::unordered_map<std::string, unsigned> collectUniformBindings(
+    const std::string& preprocessedGLSL) {
+  static std::regex uboRegex(
+      R"(layout\s*\(\s*std140\s*,\s*set\s*=\s*\d+\s*,\s*binding\s*=\s*(\d+)\s*\)\s*uniform\s+(\w+))");
+  std::unordered_map<std::string, unsigned> bindings;
+  std::smatch match;
+  std::string::const_iterator searchStart(preprocessedGLSL.cbegin());
+  while (std::regex_search(searchStart, preprocessedGLSL.cend(), match, uboRegex)) {
+    bindings[match[2].str()] = static_cast<unsigned>(std::stoul(match[1].str()));
+    searchStart = match.suffix().first;
+  }
+  return bindings;
+}
+
 static std::string preprocessGLSL(const std::string& glslCode, ShaderStage stage) {
   auto result = upgradeGLSLVersion(glslCode);
   result = assignInternalUBOBindings(result);
-  result = assignCustomUBOBindings(result);
+  result = assignCustomUBOBindings(result, stage);
   // Collect sampler names before separating declarations.
   auto samplerNames = collectSamplerNames(result);
   result = separateSamplerDeclarations(result);
@@ -272,9 +321,21 @@ WebGPUShaderModule::WebGPUShaderModule(WebGPUGPU* gpu, const ShaderModuleDescrip
   compileShader(gpu->device(), descriptor.code, descriptor.stage);
 }
 
+bool WebGPUShaderModule::getUniformBinding(const std::string& name, unsigned* binding) const {
+  auto result = uniformBindings.find(name);
+  if (result == uniformBindings.end()) {
+    return false;
+  }
+  if (binding != nullptr) {
+    *binding = result->second;
+  }
+  return true;
+}
+
 bool WebGPUShaderModule::compileShader(WGPUDevice device, const std::string& glslCode,
                                        ShaderStage stage) {
   std::string vulkanGLSL = preprocessGLSL(glslCode, stage);
+  uniformBindings = collectUniformBindings(vulkanGLSL);
   auto spirvBinary = compileGLSLToSPIRV(vulkanGLSL, stage);
   if (spirvBinary.empty()) {
     return false;

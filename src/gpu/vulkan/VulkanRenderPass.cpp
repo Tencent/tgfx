@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "VulkanRenderPass.h"
+#include <deque>
 #include "VulkanBuffer.h"
 #include "VulkanCommandEncoder.h"
 #include "VulkanGPU.h"
@@ -72,7 +73,6 @@ VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder, VulkanGPU* gpu
 
   auto device = vulkanGPU->device();
 
-  lastBound.uniformBindings.resize(16);
   lastBound.textureBindings.resize(16);
   lastBound.vertexBindings.resize(4);
 
@@ -343,7 +343,7 @@ void VulkanRenderPass::setPipeline(std::shared_ptr<RenderPipeline> pipeline) {
 
 void VulkanRenderPass::setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuffer> buffer,
                                         size_t offset, size_t size) {
-  if (!buffer || binding >= lastBound.uniformBindings.size()) {
+  if (!buffer) {
     return;
   }
   auto vulkanBuffer = std::static_pointer_cast<VulkanBuffer>(buffer);
@@ -380,51 +380,74 @@ void VulkanRenderPass::setTexture(unsigned binding, std::shared_ptr<Texture> tex
   lastBound.descriptorDirty = true;
 }
 
-void VulkanRenderPass::bindDescriptorSetIfDirty() {
-  if (!lastBound.descriptorDirty || !lastBound.pipeline) {
-    return;
+bool VulkanRenderPass::bindDescriptorSetIfDirty() {
+  if (!lastBound.descriptorDirty) {
+    return true;
   }
-  lastBound.descriptorDirty = false;
+  if (!lastBound.pipeline) {
+    return false;
+  }
 
   auto device = vulkanGPU->device();
-  auto uboLayout = lastBound.pipeline->vulkanUboSetLayout();
+  auto vertexUboLayout = lastBound.pipeline->vulkanVertexUboSetLayout();
+  auto fragmentUboLayout = lastBound.pipeline->vulkanFragmentUboSetLayout();
   auto texLayout = lastBound.pipeline->vulkanTextureSetLayout();
-  if (uboLayout == VK_NULL_HANDLE || texLayout == VK_NULL_HANDLE) {
-    return;
+  if (vertexUboLayout == VK_NULL_HANDLE || fragmentUboLayout == VK_NULL_HANDLE ||
+      texLayout == VK_NULL_HANDLE) {
+    return false;
   }
 
-  // Allocate two descriptor sets: set 0 for UBOs, set 1 for textures.
-  auto uboSet = encoder->allocateDescriptorSet(uboLayout);
+  auto vertexUboSet = encoder->allocateDescriptorSet(vertexUboLayout);
+  auto fragmentUboSet = encoder->allocateDescriptorSet(fragmentUboLayout);
   auto texSet = encoder->allocateDescriptorSet(texLayout);
-  if (uboSet == VK_NULL_HANDLE || texSet == VK_NULL_HANDLE) {
+  if (vertexUboSet == VK_NULL_HANDLE || fragmentUboSet == VK_NULL_HANDLE ||
+      texSet == VK_NULL_HANDLE) {
     LOGE("VulkanRenderPass: descriptor set allocation failed, draw will be dropped.");
-    return;
+    return false;
   }
 
   std::vector<VkWriteDescriptorSet> writes;
-  std::vector<VkDescriptorBufferInfo> bufferInfos;
+  std::deque<VkDescriptorBufferInfo> bufferInfos;
   std::vector<VkDescriptorImageInfo> imageInfos;
-  bufferInfos.reserve(lastBound.uniformBindings.size());
   imageInfos.reserve(lastBound.textureBindings.size());
 
-  // Write UBO descriptors into set 0.
-  for (unsigned i = 0; i < static_cast<unsigned>(lastBound.uniformBindings.size()); i++) {
-    auto& ub = lastBound.uniformBindings[i];
-    if (ub.buffer == VK_NULL_HANDLE || !lastBound.pipeline->hasUniformBinding(i)) {
+  for (auto& item : lastBound.uniformBindings) {
+    auto logicalBinding = item.first;
+    auto& ub = item.second;
+    if (ub.buffer == VK_NULL_HANDLE) {
       continue;
     }
-    bufferInfos.push_back({ub.buffer, ub.offset, ub.size});
-    VkWriteDescriptorSet write = {};
-    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    write.dstSet = uboSet;
-    write.dstBinding = i;
-    write.descriptorCount = 1;
-    write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    write.pBufferInfo = &bufferInfos.back();
-    writes.push_back(write);
+    auto vertexBindings = lastBound.pipeline->getVertexUniformBindings(logicalBinding);
+    if (vertexBindings != nullptr) {
+      for (auto physicalBinding : *vertexBindings) {
+        bufferInfos.push_back({ub.buffer, ub.offset, ub.size});
+        VkWriteDescriptorSet write = {};
+        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.dstSet = vertexUboSet;
+        write.dstBinding = physicalBinding;
+        write.descriptorCount = 1;
+        write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        write.pBufferInfo = &bufferInfos.back();
+        writes.push_back(write);
+      }
+    }
+    auto fragmentBindings = lastBound.pipeline->getFragmentUniformBindings(logicalBinding);
+    if (fragmentBindings != nullptr) {
+      for (auto physicalBinding : *fragmentBindings) {
+        bufferInfos.push_back({ub.buffer, ub.offset, ub.size});
+        VkWriteDescriptorSet write = {};
+        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.dstSet = fragmentUboSet;
+        write.dstBinding = physicalBinding;
+        write.descriptorCount = 1;
+        write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        write.pBufferInfo = &bufferInfos.back();
+        writes.push_back(write);
+      }
+    }
   }
 
-  // Write texture/sampler descriptors into set 1. Binding index equals the texture unit index
+  // Write texture/sampler descriptors into set 2. Binding index equals the texture unit index
   // (both start from 0), so no offset translation is needed.
   for (auto userBinding : lastBound.pipeline->getTextureBindings()) {
     auto unitIndex = lastBound.pipeline->getTextureIndex(userBinding);
@@ -451,10 +474,11 @@ void VulkanRenderPass::bindDescriptorSetIfDirty() {
     vkUpdateDescriptorSets(device, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
   }
 
-  // Bind both descriptor sets in a single call.
-  VkDescriptorSet sets[] = {uboSet, texSet};
+  VkDescriptorSet sets[] = {vertexUboSet, fragmentUboSet, texSet};
   vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                          lastBound.pipeline->vulkanPipelineLayout(), 0, 2, sets, 0, nullptr);
+                          lastBound.pipeline->vulkanPipelineLayout(), 0, 3, sets, 0, nullptr);
+  lastBound.descriptorDirty = false;
+  return true;
 }
 
 void VulkanRenderPass::setVertexBuffer(unsigned slot, std::shared_ptr<GPUBuffer> buffer,
@@ -501,7 +525,9 @@ void VulkanRenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount,
   if (!lastBound.pipeline) {
     return;
   }
-  bindDescriptorSetIfDirty();
+  if (!bindDescriptorSetIfDirty()) {
+    return;
+  }
   if (vulkanGPU->extensions().extendedDynamicState) {
     auto vkTopology = primitiveType == PrimitiveType::TriangleStrip
                           ? VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP
@@ -525,7 +551,9 @@ void VulkanRenderPass::drawIndexed(PrimitiveType primitiveType, uint32_t indexCo
   if (!lastBound.pipeline) {
     return;
   }
-  bindDescriptorSetIfDirty();
+  if (!bindDescriptorSetIfDirty()) {
+    return;
+  }
   if (vulkanGPU->extensions().extendedDynamicState) {
     auto vkTopology = primitiveType == PrimitiveType::TriangleStrip
                           ? VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP

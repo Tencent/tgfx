@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <unordered_map>
 #include <vector>
 #include "gpu/vulkan/VulkanAPI.h"
 #include "tgfx/gpu/RenderPass.h"
@@ -64,7 +65,7 @@ class VulkanRenderPass : public RenderPass {
   VulkanRenderPass(VulkanCommandEncoder* encoder, VulkanGPU* gpu,
                    const RenderPassDescriptor& descriptor);
 
-  void bindDescriptorSetIfDirty();
+  bool bindDescriptorSetIfDirty();
 
   VulkanCommandEncoder* encoder = nullptr;
   VulkanGPU* vulkanGPU = nullptr;
@@ -92,7 +93,7 @@ class VulkanRenderPass : public RenderPass {
   // draws use the same pipeline, buffers, textures, or scissor rect.
   struct BoundState {
     std::shared_ptr<VulkanRenderPipeline> pipeline = nullptr;
-    std::vector<UniformBinding> uniformBindings;
+    std::unordered_map<unsigned, UniformBinding> uniformBindings;
     std::vector<TextureBinding> textureBindings;
     std::vector<VertexBinding> vertexBindings;
     VkBuffer indexBuffer = VK_NULL_HANDLE;

@@ -127,6 +127,109 @@ static std::shared_ptr<RenderPipeline> CreateVaryingOrderPipeline(GPU* gpu) {
   return gpu->createRenderPipeline(descriptor);
 }
 
+// Vertex shader: draws a full-screen quad using a scale factor pulled from a vertex-only UBO. The
+// UBO's payload beyond scale.xy is padding whose bytes are chosen so that if a location-mismatch
+// bug on a SPIR-V based backend causes the fragment stage to accidentally read this buffer, the
+// resulting pixel colour is obviously different from the intended green output — see the
+// UNIFORM_BUFFER_BINDING_FRAGMENT_SHADER commentary below.
+static constexpr char UNIFORM_BUFFER_BINDING_VERTEX_SHADER[] = R"(
+        in vec2 inPosition;
+
+        layout(std140) uniform VertexArgs {
+            vec4 scaleAndFiller;
+        };
+
+        void main() {
+            gl_Position = vec4(inPosition * scaleAndFiller.xy, 0.0, 1.0);
+        }
+    )";
+
+// Fragment shader: writes a solid colour taken from a fragment-only UBO. Combined with the CPU
+// side declaring `uniformBlocks = {{"VertexArgs", 0, Vertex}, {"FragmentArgs", 1, Fragment}}` and
+// calls to `setUniformBuffer(0, vertBuf, ...)` / `setUniformBuffer(1, fragBuf, ...)`, this pins
+// the tgfx-level contract that each declared UBO binding number identifies a specific buffer
+// regardless of which stage(s) actually read it.
+//
+// GL matches uniform blocks by name at link time via `glUniformBlockBinding`, so it renders the
+// intended solid colour. SPIR-V based backends (Metal today, Vulkan / D3D12 by symmetry) match
+// UBO binding numbers per-stage: ShaderCompiler currently numbers each stage's custom UBOs from 0
+// in source order, so on Metal the fragment stage's `FragmentArgs` ends up at Metal buffer index
+// 0, but the CPU wrote the fragment buffer at index 1. The fragment shader then reads the wrong
+// slot and picks up whatever happens to sit at index 0 (nothing / garbage / the vertex buffer),
+// producing a non-green pixel that the baseline comparison will flag.
+static constexpr char UNIFORM_BUFFER_BINDING_FRAGMENT_SHADER[] = R"(
+        precision mediump float;
+
+        layout(std140) uniform FragmentArgs {
+            vec4 color;
+        };
+
+        out vec4 tgfx_FragColor;
+
+        void main() {
+            tgfx_FragColor = color;
+        }
+    )";
+
+struct UniformBufferBindingVertex {
+  float x;
+  float y;
+};
+
+struct UniformBufferBindingVertexArgs {
+  float scaleX;
+  float scaleY;
+  float fillerZ;
+  float fillerW;
+};
+
+struct UniformBufferBindingFragmentArgs {
+  float r;
+  float g;
+  float b;
+  float a;
+};
+
+static std::shared_ptr<RenderPipeline> CreateUniformBufferBindingPipeline(GPU* gpu) {
+  auto info = gpu->info();
+  auto isDesktop = info->version.find("OpenGL ES") == std::string::npos;
+
+  ShaderModuleDescriptor vertexModule = {};
+  vertexModule.code = PrefixShaderVersion(UNIFORM_BUFFER_BINDING_VERTEX_SHADER, isDesktop);
+  vertexModule.stage = ShaderStage::Vertex;
+  auto vertexShader = gpu->createShaderModule(vertexModule);
+  if (vertexShader == nullptr) {
+    return nullptr;
+  }
+
+  ShaderModuleDescriptor fragmentModule = {};
+  fragmentModule.code = PrefixShaderVersion(UNIFORM_BUFFER_BINDING_FRAGMENT_SHADER, isDesktop);
+  fragmentModule.stage = ShaderStage::Fragment;
+  auto fragmentShader = gpu->createShaderModule(fragmentModule);
+  if (fragmentShader == nullptr) {
+    return nullptr;
+  }
+
+  RenderPipelineDescriptor descriptor = {};
+  Attribute position = {"inPosition", VertexFormat::Float2};
+  VertexBufferLayout vertexLayout({position}, VertexStepMode::Vertex);
+  descriptor.vertex.bufferLayouts = {vertexLayout};
+  descriptor.vertex.module = vertexShader;
+  descriptor.fragment.module = fragmentShader;
+
+  PipelineColorAttachment colorAttachment = {};
+  colorAttachment.blendEnable = false;
+  descriptor.fragment.colorAttachments.push_back(colorAttachment);
+
+  // Two distinct binding numbers, each visible to exactly one stage. This is the exact shape
+  // libpag's MotionBlurFilter uses and the reason the current tgfx UBO-binding contract leaks
+  // per-stage numbering semantics onto callers on SPIR-V based backends.
+  descriptor.layout.uniformBlocks = {{"VertexArgs", 0, ShaderVisibility::Vertex},
+                                     {"FragmentArgs", 1, ShaderVisibility::Fragment}};
+
+  return gpu->createRenderPipeline(descriptor);
+}
+
 }  // namespace
 
 // ==================== GPU Tests ====================
@@ -606,6 +709,107 @@ TGFX_TEST(GPURenderTest, VaryingOrderMismatch) {
       Surface::MakeFrom(context, renderTexture->getBackendTexture(), ImageOrigin::TopLeft);
   ASSERT_TRUE(surface != nullptr);
   EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/VaryingOrderMismatch"));
+}
+
+// Reproduces a cross-backend rendering divergence caused by declaring one custom UBO per stage
+// with distinct CPU-side binding numbers. libpag hits this today in MotionBlurFilter, where the
+// vertex shader has one UBO (matrix) and the fragment shader has a different one (blur
+// parameters), declared as `{{"VertexArgs", 0, Vertex}, {"FragmentArgs", 1, Fragment}}`.
+//
+// GL binds uniform blocks by name via `glUniformBlockBinding` at link time, so the fragment
+// stage sees `FragmentArgs` at binding 1 exactly as the CPU wrote it. SPIR-V based backends
+// match by numeric binding: ShaderCompiler currently numbers custom UBOs per-stage starting at
+// 0 in source order, so the fragment stage's `FragmentArgs` ends up at binding 0. Metal then
+// binds the fragment buffer at its own per-stage index 1 (what the CPU asked for), but the
+// shader reads index 0 and picks up garbage / the vertex buffer. The baseline captures the
+// intended solid green output; any per-stage numbering leak shows up as a wildly different
+// colour.
+TGFX_TEST(GPURenderTest, UniformBufferBindingMismatch) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto gpu = context->gpu();
+  ASSERT_TRUE(gpu != nullptr);
+
+  constexpr int SIZE = 200;
+  TextureDescriptor renderTextureDesc(
+      SIZE, SIZE, PixelFormat::RGBA_8888, false, 1,
+      TextureUsage::RENDER_ATTACHMENT | TextureUsage::TEXTURE_BINDING);
+  auto renderTexture = gpu->createTexture(renderTextureDesc);
+  ASSERT_TRUE(renderTexture != nullptr);
+
+  auto encoder = gpu->createCommandEncoder();
+  ASSERT_TRUE(encoder != nullptr);
+
+  auto pipeline = CreateUniformBufferBindingPipeline(gpu);
+  ASSERT_TRUE(pipeline != nullptr);
+
+  RenderPassDescriptor renderPassDesc(renderTexture, LoadAction::Clear, StoreAction::Store,
+                                      PMColor::Transparent());
+  auto renderPass = encoder->beginRenderPass(renderPassDesc);
+  ASSERT_TRUE(renderPass != nullptr);
+  renderPass->setPipeline(std::move(pipeline));
+
+  // Full-screen quad in NDC as a TriangleStrip: BL, BR, TL, TR. The vertex shader multiplies by
+  // scaleAndFiller.xy, which is 1.0 so the geometry stays full-screen.
+  UniformBufferBindingVertex quadVertices[] = {
+      {-1.0f, -1.0f},
+      {1.0f, -1.0f},
+      {-1.0f, 1.0f},
+      {1.0f, 1.0f},
+  };
+  auto vertexBuffer = gpu->createBuffer(sizeof(quadVertices), GPUBufferUsage::VERTEX);
+  ASSERT_TRUE(vertexBuffer != nullptr);
+  auto* mappedVertices = static_cast<UniformBufferBindingVertex*>(vertexBuffer->map());
+  ASSERT_TRUE(mappedVertices != nullptr);
+  memcpy(mappedVertices, quadVertices, sizeof(quadVertices));
+  vertexBuffer->unmap();
+
+  // Vertex UBO: scaleAndFiller = (1.0, 1.0, 1.0, 1.0). If a binding-number mismatch causes the
+  // fragment stage to accidentally read this buffer as its `color`, the output pixel would be
+  // (255, 255, 255, 255) — pure white, clearly distinguishable from the intended green.
+  auto vertexUniformBuffer =
+      gpu->createBuffer(sizeof(UniformBufferBindingVertexArgs), GPUBufferUsage::UNIFORM);
+  ASSERT_TRUE(vertexUniformBuffer != nullptr);
+  auto* vertexArgs = static_cast<UniformBufferBindingVertexArgs*>(vertexUniformBuffer->map());
+  ASSERT_TRUE(vertexArgs != nullptr);
+  vertexArgs->scaleX = 1.0f;
+  vertexArgs->scaleY = 1.0f;
+  vertexArgs->fillerZ = 1.0f;
+  vertexArgs->fillerW = 1.0f;
+  vertexUniformBuffer->unmap();
+
+  // Fragment UBO: solid green colour.
+  auto fragmentUniformBuffer =
+      gpu->createBuffer(sizeof(UniformBufferBindingFragmentArgs), GPUBufferUsage::UNIFORM);
+  ASSERT_TRUE(fragmentUniformBuffer != nullptr);
+  auto* fragmentArgs = static_cast<UniformBufferBindingFragmentArgs*>(fragmentUniformBuffer->map());
+  ASSERT_TRUE(fragmentArgs != nullptr);
+  fragmentArgs->r = 0.0f;
+  fragmentArgs->g = 1.0f;
+  fragmentArgs->b = 0.0f;
+  fragmentArgs->a = 1.0f;
+  fragmentUniformBuffer->unmap();
+
+  renderPass->setVertexBuffer(0, vertexBuffer);
+  // The CPU-declared bindings (0 for vertex, 1 for fragment) are treated as global identifiers by
+  // the tgfx API — the same contract GL enforces via glUniformBlockBinding. Backends that treat
+  // binding numbers as per-stage indices need internal translation; that translation is what this
+  // test pins down.
+  renderPass->setUniformBuffer(0, vertexUniformBuffer, 0, vertexUniformBuffer->size());
+  renderPass->setUniformBuffer(1, fragmentUniformBuffer, 0, fragmentUniformBuffer->size());
+  renderPass->draw(PrimitiveType::TriangleStrip, 4, 1);
+  renderPass->end();
+
+  auto commandBuffer = encoder->finish();
+  ASSERT_TRUE(commandBuffer != nullptr);
+  gpu->queue()->submit(commandBuffer);
+  gpu->queue()->waitUntilCompleted();
+
+  auto surface =
+      Surface::MakeFrom(context, renderTexture->getBackendTexture(), ImageOrigin::TopLeft);
+  ASSERT_TRUE(surface != nullptr);
+  EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/UniformBufferBindingMismatch"));
 }
 
 }  // namespace tgfx

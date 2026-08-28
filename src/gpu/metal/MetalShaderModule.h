@@ -20,6 +20,7 @@
 
 #include <Metal/Metal.h>
 #include <string>
+#include <unordered_map>
 #include "MetalResource.h"
 #include "tgfx/gpu/ShaderModule.h"
 
@@ -72,6 +73,8 @@ class MetalShaderModule : public ShaderModule, public MetalResource {
     return _glslCode;
   }
 
+  bool getUniformBinding(const std::string& name, unsigned* binding) const;
+
  protected:
   void onRelease(MetalGPU* gpu) override;
 
@@ -87,6 +90,7 @@ class MetalShaderModule : public ShaderModule, public MetalResource {
   id<MTLLibrary> library = nil;
   ShaderStage _stage = ShaderStage::Vertex;
   std::string _glslCode;
+  std::unordered_map<std::string, unsigned> uniformBindings = {};
 
   friend class MetalGPU;
 };

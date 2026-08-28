@@ -188,9 +188,23 @@ bool MetalShaderModule::compileShader(id<MTLDevice> device, const shaderc::Compi
   return true;
 }
 
+bool MetalShaderModule::getUniformBinding(const std::string& name, unsigned* binding) const {
+  auto result = uniformBindings.find(name);
+  if (result == uniformBindings.end()) {
+    return false;
+  }
+  if (binding != nullptr) {
+    *binding = result->second;
+  }
+  return true;
+}
+
 std::string MetalShaderModule::convertGLSLToMSL(const shaderc::Compiler* compiler,
                                                 const std::string& glslCode, ShaderStage stage) {
   std::string vulkanGLSL = PreprocessGLSL(glslCode, stage);
+  for (const auto& uniform : GetShaderUniformBindings(vulkanGLSL)) {
+    uniformBindings[uniform.name] = uniform.binding;
+  }
   auto spirvBinary = CompileGLSLToSPIRV(compiler, vulkanGLSL, stage);
   if (spirvBinary.empty()) {
     return "";

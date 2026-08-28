@@ -20,6 +20,7 @@
 
 #include <webgpu/webgpu.h>
 #include <string>
+#include <unordered_map>
 #include "WebGPUResource.h"
 #include "tgfx/gpu/ShaderModule.h"
 #include "tgfx/gpu/ShaderStage.h"
@@ -41,6 +42,8 @@ class WebGPUShaderModule : public ShaderModule, public WebGPUResource {
     return _stage;
   }
 
+  bool getUniformBinding(const std::string& name, unsigned* binding) const;
+
   void onRelease(WebGPUGPU* gpu) override;
 
  private:
@@ -50,6 +53,7 @@ class WebGPUShaderModule : public ShaderModule, public WebGPUResource {
 
   WGPUShaderModule shaderModule = nullptr;
   ShaderStage _stage = ShaderStage::Vertex;
+  std::unordered_map<std::string, unsigned> uniformBindings = {};
 
   friend class WebGPUGPU;
 };

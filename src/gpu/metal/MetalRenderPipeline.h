@@ -20,6 +20,7 @@
 
 #include <Metal/Metal.h>
 #include <unordered_map>
+#include <vector>
 #include "MetalResource.h"
 #include "tgfx/gpu/RenderPipeline.h"
 
@@ -56,11 +57,9 @@ class MetalRenderPipeline : public RenderPipeline, public MetalResource {
    */
   unsigned getTextureIndex(unsigned binding) const;
 
-  /**
-   * Returns the shader stage visibility flags for the given uniform block binding point.
-   * Returns ShaderVisibility::VertexFragment if no mapping is found.
-   */
-  uint32_t getUniformBlockVisibility(unsigned binding) const;
+  const std::vector<unsigned>* getVertexUniformIndices(unsigned binding) const;
+
+  const std::vector<unsigned>* getFragmentUniformIndices(unsigned binding) const;
 
  protected:
   void onRelease(MetalGPU* gpu) override;
@@ -80,7 +79,8 @@ class MetalRenderPipeline : public RenderPipeline, public MetalResource {
   id<MTLDepthStencilState> depthStencilState = nil;
   id<MTLLibrary> sampleMaskLibrary = nil;
   std::unordered_map<unsigned, unsigned> textureUnits = {};
-  std::unordered_map<unsigned, uint32_t> uniformBlockVisibility = {};
+  std::unordered_map<unsigned, std::vector<unsigned>> vertexUniformIndices = {};
+  std::unordered_map<unsigned, std::vector<unsigned>> fragmentUniformIndices = {};
   MTLCullMode cullMode = MTLCullModeNone;
   MTLWinding frontFace = MTLWindingCounterClockwise;
 

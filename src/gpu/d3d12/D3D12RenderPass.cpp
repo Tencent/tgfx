@@ -278,7 +278,7 @@ void D3D12RenderPass::setPipeline(std::shared_ptr<RenderPipeline> pipeline) {
 
 void D3D12RenderPass::setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuffer> buffer,
                                        size_t offset, size_t /*size*/) {
-  if (!buffer || binding >= MaxUniformBindings) {
+  if (!buffer) {
     return;
   }
   auto d3d12Buffer = std::static_pointer_cast<D3D12Buffer>(buffer);
@@ -376,17 +376,18 @@ void D3D12RenderPass::flushBindingsIfNeeded() {
   pendingBarriers.flush(commandList);
 
   // Apply uniform CBVs — one root constant buffer view per dirty uniform binding.
-  for (unsigned i = 0; i < MaxUniformBindings; i++) {
-    auto& ub = uniformBindings[i];
+  for (auto& item : uniformBindings) {
+    auto binding = item.first;
+    auto& ub = item.second;
     if (!ub.dirty) {
       continue;
     }
-    auto rootIndex = currentPipeline->getUniformRootParameterIndex(i);
-    if (rootIndex == UINT32_MAX) {
-      ub.dirty = false;
-      continue;
+    auto rootIndices = currentPipeline->getUniformRootParameterIndices(binding);
+    if (rootIndices != nullptr) {
+      for (auto rootIndex : *rootIndices) {
+        commandList->SetGraphicsRootConstantBufferView(rootIndex, ub.gpuAddress);
+      }
     }
-    commandList->SetGraphicsRootConstantBufferView(rootIndex, ub.gpuAddress);
     ub.dirty = false;
   }
 

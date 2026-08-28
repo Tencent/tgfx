@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <string>
+#include <unordered_map>
 #include "gpu/vulkan/VulkanAPI.h"
 #include "gpu/vulkan/VulkanResource.h"
 #include "tgfx/gpu/ShaderModule.h"
@@ -39,6 +41,8 @@ class VulkanShaderModule : public ShaderModule, public VulkanResource {
     return shaderModule;
   }
 
+  bool getUniformBinding(const std::string& name, unsigned* binding) const;
+
  protected:
   void onRelease(VulkanGPU* gpu) override;
 
@@ -47,6 +51,7 @@ class VulkanShaderModule : public ShaderModule, public VulkanResource {
   ~VulkanShaderModule() override = default;
 
   VkShaderModule shaderModule = VK_NULL_HANDLE;
+  std::unordered_map<std::string, unsigned> uniformBindings = {};
 
   friend class VulkanGPU;
 };
