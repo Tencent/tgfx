@@ -163,7 +163,8 @@
         "MultisampleCount_1x": "faa8a587",
         "MultisampleCount_4x": "faa8a587",
         "MultisampleMask_AllSamples": "faa8a587",
-        "MultisampleMask_NoSamples": "faa8a587"
+        "MultisampleMask_NoSamples": "faa8a587",
+        "VaryingOrderMismatch": "f4927aa3"
     },
     "Hello2DTest": {
         "ConicGradient": "1ea63c49",
