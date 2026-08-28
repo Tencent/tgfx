@@ -60,6 +60,7 @@
         "EmptyRectStroke": "dc886da3",
         "FractalNoiseFreqOne": "a8bfb235",
         "GlyphBaseline": "40d85838c",
+        "InverseFillPath": "42d0b287",
         "LumaFilterToRec2020": "82494664",
         "LumaFilterToRec601": "82494664",
         "LumaFilterToSRGB": "82494664",
@@ -414,6 +415,17 @@
         "TextInnerShadow": "351c4df9",
         "TextLayerStyleAlignment": "351c4df9",
         "TextMultiNoiseTransforms": "2c4681a2"
+    },
+    "PathMaskTest": {
+        "Animation_End": "42d0b287",
+        "Animation_Start": "42d0b287",
+        "Combine": "42d0b287",
+        "Feather": "42d0b287",
+        "Invalidation_Cleared": "42d0b287",
+        "Invalidation_Masked": "42d0b287",
+        "ScrollRect": "42d0b287",
+        "Transform": "42d0b287",
+        "WithLayerMask": "42d0b287"
     },
     "PathShapeTest": {
         "AdaptiveDashEffect": "0448e0fe",

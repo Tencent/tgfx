@@ -27,6 +27,7 @@
 #include "tgfx/layers/LayerMaskType.h"
 #include "tgfx/layers/LayerRecorder.h"
 #include "tgfx/layers/LayerType.h"
+#include "tgfx/layers/PathMask.h"
 #include "tgfx/layers/filters/LayerFilter.h"
 #include "tgfx/layers/layerstyles/LayerStyle.h"
 #include "tgfx/layers/layerstyles/StyledShape.h"
@@ -329,6 +330,20 @@ class Layer : public std::enable_shared_from_this<Layer> {
    * Sets the mask type used by the layer.
    */
   void setMaskType(LayerMaskType value);
+
+  /**
+   * Returns the list of path masks applied to the layer. Path masks clip the layer's content with
+   * vector paths, combined in order using each mask's boolean operation. They are applied before
+   * the layer-level mask (see setMask()). The default value is an empty list.
+   */
+  const std::vector<std::shared_ptr<PathMask>>& pathMasks() const {
+    return _pathMasks;
+  }
+
+  /**
+   * Sets the list of path masks applied to the layer.
+   */
+  void setPathMasks(const std::vector<std::shared_ptr<PathMask>>& value);
 
   /**
    * Returns the scroll rectangle bounds of the layer. The layer is cropped to the size defined by
@@ -687,6 +702,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool prepareMask(const DrawArgs& args, Canvas* canvas, std::shared_ptr<MaskFilter>* maskFilter);
 
+  bool preparePathMasks(const DrawArgs& args, Canvas* canvas,
+                        std::shared_ptr<MaskFilter>* maskFilter) const;
+
   MaskData getMaskData(const DrawArgs& args, float scale,
                        const std::optional<Rect>& layerClipBounds);
 
@@ -766,6 +784,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::vector<std::shared_ptr<Layer>> _children = {};
   std::vector<std::shared_ptr<LayerFilter>> _filters = {};
   std::vector<std::shared_ptr<LayerStyle>> _layerStyles = {};
+  std::vector<std::shared_ptr<PathMask>> _pathMasks = {};
   std::unique_ptr<SubtreeCache> subtreeCache;
   std::shared_ptr<LayerContent> layerContent = nullptr;
   Rect renderBounds = {};                       // in global coordinates

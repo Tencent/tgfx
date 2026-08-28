@@ -18,6 +18,7 @@
 
 #include "tgfx/layers/Layer.h"
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cmath>
 #include <unordered_map>
@@ -44,7 +45,9 @@
 #include "layers/SubtreeCache.h"
 #include "layers/contents/LayerContent.h"
 #include "tgfx/core/ColorSpace.h"
+#include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/PictureRecorder.h"
+#include "tgfx/core/Stroke.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/ShapeLayer.h"
 
@@ -240,6 +243,10 @@ Layer::~Layer() {
     DEBUG_ASSERT(layerStyle != nullptr);
     layerStyle->detachFromLayer(this);
   }
+  for (const auto& pathMask : _pathMasks) {
+    DEBUG_ASSERT(pathMask != nullptr);
+    pathMask->detachFromLayer(this);
+  }
   if (_mask) {
     _mask->maskOwner = nullptr;
   }
@@ -424,6 +431,26 @@ void Layer::setMaskType(LayerMaskType value) {
   if (_mask) {
     invalidateTransform();
   }
+}
+
+void Layer::setPathMasks(const std::vector<std::shared_ptr<PathMask>>& value) {
+  if (_pathMasks.size() == value.size() &&
+      std::equal(_pathMasks.begin(), _pathMasks.end(), value.begin())) {
+    return;
+  }
+  for (const auto& pathMask : _pathMasks) {
+    DEBUG_ASSERT(pathMask != nullptr);
+    pathMask->detachFromLayer(this);
+  }
+  _pathMasks.clear();
+  for (const auto& pathMask : value) {
+    if (pathMask == nullptr) {
+      continue;
+    }
+    pathMask->attachToLayer(this);
+    _pathMasks.push_back(pathMask);
+  }
+  invalidateContent();
 }
 
 void Layer::setScrollRect(const Rect& rect) {
@@ -1189,23 +1216,166 @@ bool Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
   return true;
 }
 
+static Path ExpandMaskPath(const Path& path, float expansion) {
+  auto result = path;
+  if (expansion == 0.0f) {
+    return result;
+  }
+  auto strokePath = path;
+  Stroke stroke(fabsf(expansion) * 2.0f, LineCap::Butt, LineJoin::Round);
+  stroke.applyToPath(&strokePath);
+  result.addPath(strokePath, expansion < 0.0f ? PathOp::Difference : PathOp::Union);
+  return result;
+}
+
 bool Layer::prepareMask(const DrawArgs& args, Canvas* canvas,
                         std::shared_ptr<MaskFilter>* maskFilter) {
-  if (!hasValidMask()) {
-    return true;
+  std::shared_ptr<MaskFilter> pathMaskFilter = nullptr;
+  if (!preparePathMasks(args, canvas, &pathMaskFilter)) {
+    return false;
   }
-  auto clipBounds = GetClipBounds(canvas);
-  auto contentScale = canvas->getMatrix().getMaxScale();
-  auto maskData = getMaskData(args, contentScale, clipBounds);
-  if (maskData.maskFilter == nullptr) {
-    if (maskData.clipPath.isEmpty() && !maskData.clipPath.isInverseFillType()) {
-      return false;
+  std::shared_ptr<MaskFilter> layerMaskFilter = nullptr;
+  if (hasValidMask()) {
+    auto clipBounds = GetClipBounds(canvas);
+    auto contentScale = canvas->getMatrix().getMaxScale();
+    auto maskData = getMaskData(args, contentScale, clipBounds);
+    if (maskData.maskFilter == nullptr) {
+      if (maskData.clipPath.isEmpty() && !maskData.clipPath.isInverseFillType()) {
+        return false;
+      }
+      canvas->clipPath(maskData.clipPath, _mask->bitFields.allowsEdgeAntialiasing);
+    } else {
+      layerMaskFilter = maskData.maskFilter;
     }
-    canvas->clipPath(maskData.clipPath, _mask->bitFields.allowsEdgeAntialiasing);
-    return true;
   }
   if (maskFilter) {
-    *maskFilter = maskData.maskFilter;
+    *maskFilter = MaskFilter::Compose(std::move(pathMaskFilter), std::move(layerMaskFilter));
+  }
+  return true;
+}
+
+bool Layer::preparePathMasks(const DrawArgs& args, Canvas* canvas,
+                             std::shared_ptr<MaskFilter>* maskFilter) const {
+  bool needFeather = false;
+  bool hasEffectiveMask = false;
+  for (const auto& mask : _pathMasks) {
+    if (mask->path().isEmpty()) {
+      continue;
+    }
+    hasEffectiveMask = true;
+    if (mask->feather() != Point::Zero() || mask->opacity() < 1.0f) {
+      needFeather = true;
+    }
+  }
+  if (!hasEffectiveMask) {
+    return true;
+  }
+  if (!needFeather) {
+    Path combined = {};
+    bool isFirst = true;
+    for (const auto& mask : _pathMasks) {
+      if (mask->path().isEmpty()) {
+        continue;
+      }
+      auto maskPath = ExpandMaskPath(mask->path(), mask->expansion());
+      auto op = mask->op();
+      if (op == PathOp::Append || op == PathOp::Extend) {
+        op = PathOp::Union;
+      }
+      auto inverted = mask->inverted();
+      if (isFirst && op == PathOp::Difference) {
+        inverted = !inverted;
+      }
+      if (inverted) {
+        maskPath.toggleInverseFillType();
+      }
+      if (isFirst) {
+        combined = maskPath;
+        isFirst = false;
+      } else {
+        combined.addPath(maskPath, op);
+      }
+    }
+    if (combined.isEmpty() && !combined.isInverseFillType()) {
+      return false;
+    }
+    canvas->clipPath(combined, bitFields.allowsEdgeAntialiasing);
+    return true;
+  }
+  // Feathered compositing: boolean operations are ignored. Each mask is drawn with its own
+  // opacity, blurred by feather / 2, and composited in SrcOver order.
+  auto scale = canvas->getMatrix().getMaxScale();
+  PictureRecorder recorder = {};
+  auto* recordingCanvas = recorder.beginRecording();
+  recordingCanvas->scale(scale, scale);
+  bool isFirst = true;
+  bool anyInverted = false;
+  for (const auto& mask : _pathMasks) {
+    if (mask->path().isEmpty()) {
+      continue;
+    }
+    auto maskPath = ExpandMaskPath(mask->path(), mask->expansion());
+    auto inverted = mask->inverted();
+    if (isFirst && mask->op() == PathOp::Difference) {
+      inverted = !inverted;
+    }
+    isFirst = false;
+    if (inverted) {
+      maskPath.toggleInverseFillType();
+      anyInverted = true;
+    }
+    Paint layerPaint = {};
+    layerPaint.setAlpha(mask->opacity());
+    const auto& feather = mask->feather();
+    if (feather != Point::Zero()) {
+      // The mask is recorded at `scale`, so the blur radius is scaled to stay in the mask's own
+      // coordinate space.
+      layerPaint.setImageFilter(
+          ImageFilter::Blur(feather.x * 0.5f * scale, feather.y * 0.5f * scale));
+    }
+    recordingCanvas->saveLayer(&layerPaint);
+    recordingCanvas->drawPath(maskPath, {});
+    recordingCanvas->restore();
+  }
+  auto picture = recorder.finishRecordingAsPicture();
+  if (picture == nullptr) {
+    return false;
+  }
+  auto clipBounds = GetClipBounds(canvas);
+  Rect maskBounds = {};
+  if (anyInverted) {
+    // Inverse-filled masks reveal the content outside their geometry, so the rasterized region
+    // must cover the whole visible area instead of the picture bounds.
+    if (clipBounds.has_value()) {
+      maskBounds = *clipBounds;
+      maskBounds.scale(scale, scale);
+    } else {
+      maskBounds = picture->getBounds();
+    }
+  } else {
+    maskBounds = picture->getBounds();
+    if (clipBounds.has_value()) {
+      auto scaledClipBounds = *clipBounds;
+      scaledClipBounds.scale(scale, scale);
+      if (!maskBounds.intersect(scaledClipBounds)) {
+        return false;
+      }
+    }
+  }
+  Point maskImageOffset = {};
+  auto maskContentImage =
+      ToImageWithOffset(std::move(picture), &maskImageOffset, &maskBounds, args.dstColorSpace);
+  if (maskContentImage == nullptr) {
+    return false;
+  }
+  auto maskMatrix = Matrix::MakeScale(1.0f / scale, 1.0f / scale);
+  maskMatrix.preTranslate(maskImageOffset.x, maskImageOffset.y);
+  auto shader = Shader::MakeImageShader(maskContentImage, TileMode::Decal, TileMode::Decal);
+  if (shader) {
+    shader = shader->makeWithMatrix(maskMatrix);
+  }
+  if (maskFilter) {
+    *maskFilter = MaskFilter::MakeShader(std::move(shader), false);
   }
   return true;
 }
@@ -1623,18 +1793,8 @@ bool Layer::drawContourInternal(const DrawArgs& args, Canvas* canvas, bool conte
 
   // Apply mask for child layers (not contentOnly)
   std::shared_ptr<MaskFilter> maskFilter = nullptr;
-  if (!contentOnly && hasValidMask()) {
-    auto contentScale = canvas->getMatrix().getMaxScale();
-    auto clipBounds = GetClipBounds(canvas);
-    auto maskData = getMaskData(args, contentScale, clipBounds);
-    if (maskData.maskFilter == nullptr) {
-      if (maskData.clipPath.isEmpty() && !maskData.clipPath.isInverseFillType()) {
-        return allMatch;
-      }
-      canvas->clipPath(maskData.clipPath, _mask->bitFields.allowsEdgeAntialiasing);
-    } else {
-      maskFilter = maskData.maskFilter;
-    }
+  if (!contentOnly && !prepareMask(args, canvas, &maskFilter)) {
+    return allMatch;
   }
 
   // Handle offscreen rendering for mask filter

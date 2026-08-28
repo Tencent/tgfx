@@ -35,6 +35,14 @@ class MaskFilter {
   static std::shared_ptr<MaskFilter> MakeShader(std::shared_ptr<Shader> shader,
                                                 bool inverted = false);
 
+  /**
+   * Creates a mask filter whose effect is to first apply the inner filter and then apply the
+   * outer filter, so the drawn content is masked by the product of both mask coverages. Returns
+   * the non-null filter if one of them is null, and nullptr if both are null.
+   */
+  static std::shared_ptr<MaskFilter> Compose(std::shared_ptr<MaskFilter> inner,
+                                             std::shared_ptr<MaskFilter> outer);
+
   virtual ~MaskFilter() = default;
 
   /**
@@ -45,7 +53,7 @@ class MaskFilter {
   virtual std::shared_ptr<MaskFilter> makeWithMatrix(const Matrix& viewMatrix) const = 0;
 
  protected:
-  enum class Type { Shader, None };
+  enum class Type { Shader, Compose, None };
 
   /**
    * Returns the type of this mask filter.
@@ -62,6 +70,7 @@ class MaskFilter {
                                                               const Matrix* uvMatrix) const = 0;
 
   friend class OpsCompositor;
+  friend class ComposeMaskFilter;
   friend class Types;
 };
 }  // namespace tgfx

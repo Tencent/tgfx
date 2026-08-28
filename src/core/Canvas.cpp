@@ -448,6 +448,19 @@ void Canvas::drawPath(const Path& path, const Paint& paint) {
 void Canvas::drawPath(const Path& path, const Matrix& matrix, const ClipStack& clip,
                       const Brush& brush, const Stroke* stroke) const {
   DEBUG_ASSERT(!path.isEmpty());
+  if (path.isInverseFillType()) {
+    // The rect/rrect fast paths below would drop the inverse fill semantics.
+    if (stroke == nullptr) {
+      drawContext->drawPath(path, matrix, clip, brush);
+      return;
+    }
+    auto inverseShape = Shape::MakeFrom(path);
+    if (inverseShape == nullptr) {
+      return;
+    }
+    drawContext->drawShape(inverseShape, matrix, clip, brush, stroke);
+    return;
+  }
   Point line[2] = {};
   if (path.isLine(line)) {
     if (!stroke) {

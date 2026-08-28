@@ -289,6 +289,42 @@ TGFX_TEST(CanvasTest, saveLayer) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/saveLayer"));
 }
 
+TGFX_TEST(CanvasTest, InverseFillPath) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 100);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  Paint paint = {};
+  paint.setColor(Color::FromRGBA(0, 180, 0));
+
+  // Plain draw: an inverse-filled oval paints everything except the oval.
+  canvas->save();
+  canvas->clipRect(Rect::MakeWH(100, 100));
+  Path path = {};
+  path.addOval(Rect::MakeXYWH(20, 20, 60, 60));
+  path.toggleInverseFillType();
+  canvas->drawPath(path, paint);
+  canvas->restore();
+
+  // Draw through a saveLayer with an image filter: the inverse fill must survive the offscreen
+  // layer bounds computation.
+  canvas->save();
+  canvas->clipRect(Rect::MakeXYWH(100, 0, 100, 100));
+  Paint layerPaint = {};
+  layerPaint.setImageFilter(ImageFilter::Blur(5, 5));
+  canvas->saveLayer(&layerPaint);
+  Path blurredPath = {};
+  blurredPath.addOval(Rect::MakeXYWH(120, 20, 60, 60));
+  blurredPath.toggleInverseFillType();
+  canvas->drawPath(blurredPath, paint);
+  canvas->restore();
+  canvas->restore();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/InverseFillPath"));
+}
+
 TGFX_TEST(CanvasTest, NothingToDraw) {
   ContextScope scope;
   auto context = scope.getContext();
