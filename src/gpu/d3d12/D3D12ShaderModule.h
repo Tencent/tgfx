@@ -80,6 +80,10 @@ class D3D12ShaderModule : public ShaderModule, public D3D12Resource {
 
   bool getUniformRegister(const std::string& name, unsigned* registerIndex) const;
 
+  const std::unordered_map<std::string, unsigned>& uniformRegisterMap() const {
+    return uniformRegisters;
+  }
+
 #ifdef TGFX_D3D12_DEBUG_LAYER
   /// Returns the cross-compiled HLSL source captured during construction. Diagnostic-only:
   /// available only when TGFX_D3D12_DEBUG_LAYER is defined so production builds don't pay the

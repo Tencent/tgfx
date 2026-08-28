@@ -179,21 +179,35 @@ VulkanRenderPipeline::VulkanRenderPipeline(VulkanGPU* gpu,
   }
   auto vertexShader = std::static_pointer_cast<VulkanShaderModule>(descriptor.vertex.module);
   auto fragmentShader = std::static_pointer_cast<VulkanShaderModule>(descriptor.fragment.module);
-  for (auto& entry : descriptor.layout.uniformBlocks) {
-    unsigned physicalBinding = 0;
-    if ((entry.visibility & ShaderVisibility::Vertex) && vertexShader != nullptr) {
-      if (vertexShader->getUniformBinding(entry.name, &physicalBinding)) {
-        vertexUniformBindings[entry.binding].push_back(physicalBinding);
-      } else {
-        LOGE("VulkanRenderPipeline: vertex uniform block '%s' was not found.", entry.name.c_str());
+  if (descriptor.layout.uniformBlocks.empty()) {
+    if (vertexShader != nullptr) {
+      for (const auto& item : vertexShader->uniformBindingMap()) {
+        vertexUniformBindings[item.second].push_back(item.second);
       }
     }
-    if ((entry.visibility & ShaderVisibility::Fragment) && fragmentShader != nullptr) {
-      if (fragmentShader->getUniformBinding(entry.name, &physicalBinding)) {
-        fragmentUniformBindings[entry.binding].push_back(physicalBinding);
-      } else {
-        LOGE("VulkanRenderPipeline: fragment uniform block '%s' was not found.",
-             entry.name.c_str());
+    if (fragmentShader != nullptr) {
+      for (const auto& item : fragmentShader->uniformBindingMap()) {
+        fragmentUniformBindings[item.second].push_back(item.second);
+      }
+    }
+  } else {
+    for (auto& entry : descriptor.layout.uniformBlocks) {
+      unsigned physicalBinding = 0;
+      if ((entry.visibility & ShaderVisibility::Vertex) && vertexShader != nullptr) {
+        if (vertexShader->getUniformBinding(entry.name, &physicalBinding)) {
+          vertexUniformBindings[entry.binding].push_back(physicalBinding);
+        } else {
+          LOGE("VulkanRenderPipeline: vertex uniform block '%s' was not found.",
+               entry.name.c_str());
+        }
+      }
+      if ((entry.visibility & ShaderVisibility::Fragment) && fragmentShader != nullptr) {
+        if (fragmentShader->getUniformBinding(entry.name, &physicalBinding)) {
+          fragmentUniformBindings[entry.binding].push_back(physicalBinding);
+        } else {
+          LOGE("VulkanRenderPipeline: fragment uniform block '%s' was not found.",
+               entry.name.c_str());
+        }
       }
     }
   }

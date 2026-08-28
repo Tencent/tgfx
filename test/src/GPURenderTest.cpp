@@ -190,7 +190,8 @@ struct UniformBufferBindingFragmentArgs {
   float a;
 };
 
-static std::shared_ptr<RenderPipeline> CreateUniformBufferBindingPipeline(GPU* gpu) {
+static std::shared_ptr<RenderPipeline> CreateUniformBufferBindingPipeline(GPU* gpu,
+                                                                          bool explicitLayout) {
   auto info = gpu->info();
   auto isDesktop = info->version.find("OpenGL ES") == std::string::npos;
 
@@ -224,8 +225,10 @@ static std::shared_ptr<RenderPipeline> CreateUniformBufferBindingPipeline(GPU* g
   // Two distinct binding numbers, each visible to exactly one stage. This is the exact shape
   // libpag's MotionBlurFilter uses and the reason the current tgfx UBO-binding contract leaks
   // per-stage numbering semantics onto callers on SPIR-V based backends.
-  descriptor.layout.uniformBlocks = {{"VertexArgs", 0, ShaderVisibility::Vertex},
-                                     {"FragmentArgs", 1, ShaderVisibility::Fragment}};
+  if (explicitLayout) {
+    descriptor.layout.uniformBlocks = {{"VertexArgs", 0, ShaderVisibility::Vertex},
+                                       {"FragmentArgs", 1, ShaderVisibility::Fragment}};
+  }
 
   return gpu->createRenderPipeline(descriptor);
 }
@@ -741,7 +744,7 @@ TGFX_TEST(GPURenderTest, UniformBufferBindingMismatch) {
   auto encoder = gpu->createCommandEncoder();
   ASSERT_TRUE(encoder != nullptr);
 
-  auto pipeline = CreateUniformBufferBindingPipeline(gpu);
+  auto pipeline = CreateUniformBufferBindingPipeline(gpu, true);
   ASSERT_TRUE(pipeline != nullptr);
 
   RenderPassDescriptor renderPassDesc(renderTexture, LoadAction::Clear, StoreAction::Store,
@@ -750,8 +753,8 @@ TGFX_TEST(GPURenderTest, UniformBufferBindingMismatch) {
   ASSERT_TRUE(renderPass != nullptr);
   renderPass->setPipeline(std::move(pipeline));
 
-  // Full-screen quad in NDC as a TriangleStrip: BL, BR, TL, TR. The vertex shader multiplies by
-  // scaleAndFiller.xy, which is 1.0 so the geometry stays full-screen.
+  // Full-screen source quad in NDC as a TriangleStrip: BL, BR, TL, TR. The vertex UBO scales it
+  // to a centered 100x100 rectangle with a 50-pixel margin on each side.
   UniformBufferBindingVertex quadVertices[] = {
       {-1.0f, -1.0f},
       {1.0f, -1.0f},
@@ -765,16 +768,16 @@ TGFX_TEST(GPURenderTest, UniformBufferBindingMismatch) {
   memcpy(mappedVertices, quadVertices, sizeof(quadVertices));
   vertexBuffer->unmap();
 
-  // Vertex UBO: scaleAndFiller = (1.0, 1.0, 1.0, 1.0). If a binding-number mismatch causes the
-  // fragment stage to accidentally read this buffer as its `color`, the output pixel would be
-  // (255, 255, 255, 255) — pure white, clearly distinguishable from the intended green.
+  // Vertex UBO: scaleAndFiller = (0.5, 0.5, 1.0, 1.0). If a binding-number mismatch causes the
+  // fragment stage to accidentally read this buffer as its `color`, the output is visibly
+  // different from the intended green.
   auto vertexUniformBuffer =
       gpu->createBuffer(sizeof(UniformBufferBindingVertexArgs), GPUBufferUsage::UNIFORM);
   ASSERT_TRUE(vertexUniformBuffer != nullptr);
   auto* vertexArgs = static_cast<UniformBufferBindingVertexArgs*>(vertexUniformBuffer->map());
   ASSERT_TRUE(vertexArgs != nullptr);
-  vertexArgs->scaleX = 1.0f;
-  vertexArgs->scaleY = 1.0f;
+  vertexArgs->scaleX = 0.5f;
+  vertexArgs->scaleY = 0.5f;
   vertexArgs->fillerZ = 1.0f;
   vertexArgs->fillerW = 1.0f;
   vertexUniformBuffer->unmap();
@@ -810,6 +813,74 @@ TGFX_TEST(GPURenderTest, UniformBufferBindingMismatch) {
       Surface::MakeFrom(context, renderTexture->getBackendTexture(), ImageOrigin::TopLeft);
   ASSERT_TRUE(surface != nullptr);
   EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/UniformBufferBindingMismatch"));
+}
+
+// Verifies the documented automatic layout mode. When BindingLayout::uniformBlocks is empty, each
+// shader module's physical binding number is also its public logical binding. Both stages have one
+// UBO at binding 0 here, so a single setUniformBuffer(0) call intentionally feeds the same vec4 to
+// the vertex scale and fragment colour. The values scale the quad to 100x100 and paint it olive.
+TGFX_TEST(GPURenderTest, UniformBufferAutoLayout) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto gpu = context->gpu();
+  ASSERT_TRUE(gpu != nullptr);
+
+  constexpr int SIZE = 200;
+  TextureDescriptor renderTextureDesc(
+      SIZE, SIZE, PixelFormat::RGBA_8888, false, 1,
+      TextureUsage::RENDER_ATTACHMENT | TextureUsage::TEXTURE_BINDING);
+  auto renderTexture = gpu->createTexture(renderTextureDesc);
+  ASSERT_TRUE(renderTexture != nullptr);
+
+  auto pipeline = CreateUniformBufferBindingPipeline(gpu, false);
+  ASSERT_TRUE(pipeline != nullptr);
+  auto encoder = gpu->createCommandEncoder();
+  ASSERT_TRUE(encoder != nullptr);
+  RenderPassDescriptor renderPassDesc(renderTexture, LoadAction::Clear, StoreAction::Store,
+                                      PMColor::Transparent());
+  auto renderPass = encoder->beginRenderPass(renderPassDesc);
+  ASSERT_TRUE(renderPass != nullptr);
+  renderPass->setPipeline(std::move(pipeline));
+
+  UniformBufferBindingVertex quadVertices[] = {
+      {-1.0f, -1.0f},
+      {1.0f, -1.0f},
+      {-1.0f, 1.0f},
+      {1.0f, 1.0f},
+  };
+  auto vertexBuffer = gpu->createBuffer(sizeof(quadVertices), GPUBufferUsage::VERTEX);
+  ASSERT_TRUE(vertexBuffer != nullptr);
+  auto* mappedVertices = static_cast<UniformBufferBindingVertex*>(vertexBuffer->map());
+  ASSERT_TRUE(mappedVertices != nullptr);
+  memcpy(mappedVertices, quadVertices, sizeof(quadVertices));
+  vertexBuffer->unmap();
+
+  auto uniformBuffer =
+      gpu->createBuffer(sizeof(UniformBufferBindingFragmentArgs), GPUBufferUsage::UNIFORM);
+  ASSERT_TRUE(uniformBuffer != nullptr);
+  auto* args = static_cast<UniformBufferBindingFragmentArgs*>(uniformBuffer->map());
+  ASSERT_TRUE(args != nullptr);
+  args->r = 0.5f;
+  args->g = 0.5f;
+  args->b = 0.0f;
+  args->a = 1.0f;
+  uniformBuffer->unmap();
+
+  renderPass->setVertexBuffer(0, vertexBuffer);
+  renderPass->setUniformBuffer(0, uniformBuffer, 0, uniformBuffer->size());
+  renderPass->draw(PrimitiveType::TriangleStrip, 4, 1);
+  renderPass->end();
+
+  auto commandBuffer = encoder->finish();
+  ASSERT_TRUE(commandBuffer != nullptr);
+  gpu->queue()->submit(commandBuffer);
+  gpu->queue()->waitUntilCompleted();
+
+  auto surface =
+      Surface::MakeFrom(context, renderTexture->getBackendTexture(), ImageOrigin::TopLeft);
+  ASSERT_TRUE(surface != nullptr);
+  EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/UniformBufferAutoLayout"));
 }
 
 }  // namespace tgfx

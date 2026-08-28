@@ -43,6 +43,10 @@ class VulkanShaderModule : public ShaderModule, public VulkanResource {
 
   bool getUniformBinding(const std::string& name, unsigned* binding) const;
 
+  const std::unordered_map<std::string, unsigned>& uniformBindingMap() const {
+    return uniformBindings;
+  }
+
  protected:
   void onRelease(VulkanGPU* gpu) override;
 

@@ -56,20 +56,34 @@ MetalRenderPipeline::MetalRenderPipeline(MetalGPU* gpu,
 
   auto vertexShader = std::static_pointer_cast<MetalShaderModule>(descriptor.vertex.module);
   auto fragmentShader = std::static_pointer_cast<MetalShaderModule>(descriptor.fragment.module);
-  for (auto& entry : descriptor.layout.uniformBlocks) {
-    unsigned physicalIndex = 0;
-    if ((entry.visibility & ShaderVisibility::Vertex) && vertexShader != nullptr) {
-      if (vertexShader->getUniformBinding(entry.name, &physicalIndex)) {
-        vertexUniformIndices[entry.binding].push_back(physicalIndex);
-      } else {
-        LOGE("MetalRenderPipeline: vertex uniform block '%s' was not found.", entry.name.c_str());
+  if (descriptor.layout.uniformBlocks.empty()) {
+    if (vertexShader != nullptr) {
+      for (const auto& item : vertexShader->uniformBindingMap()) {
+        vertexUniformIndices[item.second].push_back(item.second);
       }
     }
-    if ((entry.visibility & ShaderVisibility::Fragment) && fragmentShader != nullptr) {
-      if (fragmentShader->getUniformBinding(entry.name, &physicalIndex)) {
-        fragmentUniformIndices[entry.binding].push_back(physicalIndex);
-      } else {
-        LOGE("MetalRenderPipeline: fragment uniform block '%s' was not found.", entry.name.c_str());
+    if (fragmentShader != nullptr) {
+      for (const auto& item : fragmentShader->uniformBindingMap()) {
+        fragmentUniformIndices[item.second].push_back(item.second);
+      }
+    }
+  } else {
+    for (auto& entry : descriptor.layout.uniformBlocks) {
+      unsigned physicalIndex = 0;
+      if ((entry.visibility & ShaderVisibility::Vertex) && vertexShader != nullptr) {
+        if (vertexShader->getUniformBinding(entry.name, &physicalIndex)) {
+          vertexUniformIndices[entry.binding].push_back(physicalIndex);
+        } else {
+          LOGE("MetalRenderPipeline: vertex uniform block '%s' was not found.", entry.name.c_str());
+        }
+      }
+      if ((entry.visibility & ShaderVisibility::Fragment) && fragmentShader != nullptr) {
+        if (fragmentShader->getUniformBinding(entry.name, &physicalIndex)) {
+          fragmentUniformIndices[entry.binding].push_back(physicalIndex);
+        } else {
+          LOGE("MetalRenderPipeline: fragment uniform block '%s' was not found.",
+               entry.name.c_str());
+        }
       }
     }
   }

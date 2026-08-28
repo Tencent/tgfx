@@ -18,6 +18,7 @@
 
 #include "D3D12RenderPipeline.h"
 #include <d3dcompiler.h>
+#include <algorithm>
 #include <vector>
 #include "D3D12GPU.h"
 #include "D3D12ShaderModule.h"
@@ -109,18 +110,41 @@ bool D3D12RenderPipeline::createRootSignature(D3D12GPU* gpu,
   // First, populate the per-binding index maps — those are needed for every pipeline regardless
   // of whether the underlying ID3D12RootSignature is cached. Walk uniform blocks first, then
   // texture samplers, so the parameter indices line up with the order used when serialising.
+  auto vertexShader = std::static_pointer_cast<D3D12ShaderModule>(descriptor.vertex.module);
+  auto fragmentShader = std::static_pointer_cast<D3D12ShaderModule>(descriptor.fragment.module);
+  auto uniformBlocks = descriptor.layout.uniformBlocks;
+  if (uniformBlocks.empty()) {
+    if (vertexShader != nullptr) {
+      for (const auto& item : vertexShader->uniformRegisterMap()) {
+        uniformBlocks.emplace_back(item.first, item.second, ShaderVisibility::Vertex);
+      }
+    }
+    if (fragmentShader != nullptr) {
+      for (const auto& item : fragmentShader->uniformRegisterMap()) {
+        uniformBlocks.emplace_back(item.first, item.second, ShaderVisibility::Fragment);
+      }
+    }
+    std::sort(uniformBlocks.begin(), uniformBlocks.end(),
+              [](const BindingEntry& a, const BindingEntry& b) {
+                if (a.binding != b.binding) {
+                  return a.binding < b.binding;
+                }
+                if (a.visibility != b.visibility) {
+                  return a.visibility < b.visibility;
+                }
+                return a.name < b.name;
+              });
+  }
+
   std::vector<uint8_t> shapeKey;
   // Reserve roughly: 1 byte UBO count + 3 bytes per UBO (visibility + vertex register +
   // fragment register) + 1 byte sampler count + 1 byte per sampler (visibility).
-  shapeKey.reserve(2 + descriptor.layout.uniformBlocks.size() * 3 +
-                   descriptor.layout.textureSamplers.size());
+  shapeKey.reserve(2 + uniformBlocks.size() * 3 + descriptor.layout.textureSamplers.size());
 
-  auto vertexShader = std::static_pointer_cast<D3D12ShaderModule>(descriptor.vertex.module);
-  auto fragmentShader = std::static_pointer_cast<D3D12ShaderModule>(descriptor.fragment.module);
-  std::vector<uint8_t> ubVertexRegister(descriptor.layout.uniformBlocks.size(), 0xFF);
-  std::vector<uint8_t> ubFragmentRegister(descriptor.layout.uniformBlocks.size(), 0xFF);
-  for (size_t i = 0; i < descriptor.layout.uniformBlocks.size(); i++) {
-    const auto& entry = descriptor.layout.uniformBlocks[i];
+  std::vector<uint8_t> ubVertexRegister(uniformBlocks.size(), 0xFF);
+  std::vector<uint8_t> ubFragmentRegister(uniformBlocks.size(), 0xFF);
+  for (size_t i = 0; i < uniformBlocks.size(); i++) {
+    const auto& entry = uniformBlocks[i];
     unsigned registerIndex = 0;
     if ((entry.visibility & ShaderVisibility::Vertex) && vertexShader != nullptr) {
       if (vertexShader->getUniformRegister(entry.name, &registerIndex) && registerIndex < 0xFF) {
@@ -139,9 +163,9 @@ bool D3D12RenderPipeline::createRootSignature(D3D12GPU* gpu,
   }
 
   uint32_t paramCursor = 0;
-  shapeKey.push_back(static_cast<uint8_t>(descriptor.layout.uniformBlocks.size()));
-  for (size_t i = 0; i < descriptor.layout.uniformBlocks.size(); i++) {
-    const auto& entry = descriptor.layout.uniformBlocks[i];
+  shapeKey.push_back(static_cast<uint8_t>(uniformBlocks.size()));
+  for (size_t i = 0; i < uniformBlocks.size(); i++) {
+    const auto& entry = uniformBlocks[i];
     if (ubVertexRegister[i] != 0xFF) {
       uniformRootParameterIndices[entry.binding].push_back(paramCursor++);
     }
@@ -186,7 +210,7 @@ bool D3D12RenderPipeline::createRootSignature(D3D12GPU* gpu,
   srvRanges.reserve(descriptor.layout.textureSamplers.size());
   samplerRanges.reserve(descriptor.layout.textureSamplers.size());
 
-  for (size_t i = 0; i < descriptor.layout.uniformBlocks.size(); i++) {
+  for (size_t i = 0; i < uniformBlocks.size(); i++) {
     if (ubVertexRegister[i] != 0xFF) {
       D3D12_ROOT_PARAMETER param = {};
       param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;

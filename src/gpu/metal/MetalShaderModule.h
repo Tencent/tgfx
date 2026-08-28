@@ -75,6 +75,10 @@ class MetalShaderModule : public ShaderModule, public MetalResource {
 
   bool getUniformBinding(const std::string& name, unsigned* binding) const;
 
+  const std::unordered_map<std::string, unsigned>& uniformBindingMap() const {
+    return uniformBindings;
+  }
+
  protected:
   void onRelease(MetalGPU* gpu) override;
 

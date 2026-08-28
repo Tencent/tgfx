@@ -44,6 +44,10 @@ class WebGPUShaderModule : public ShaderModule, public WebGPUResource {
 
   bool getUniformBinding(const std::string& name, unsigned* binding) const;
 
+  const std::unordered_map<std::string, unsigned>& uniformBindingMap() const {
+    return uniformBindings;
+  }
+
   void onRelease(WebGPUGPU* gpu) override;
 
  private:

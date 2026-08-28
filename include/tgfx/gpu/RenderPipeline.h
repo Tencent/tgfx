@@ -239,7 +239,8 @@ class BindingEntry {
 class BindingLayout {
  public:
   /**
-   * Specifies the binding points for uniform blocks used in the shader program.
+   * Specifies the logical bindings for uniform blocks used in the shader program. When empty, the
+   * physical binding assigned while compiling each shader stage is also used as its logical binding.
    */
   std::vector<BindingEntry> uniformBlocks = {};
 
