@@ -35,7 +35,6 @@ static jfieldID SurfaceTexture_mEventHandler;
 static jmethodID SurfaceTexture_updateTexImage;
 static jmethodID SurfaceTexture_attachToGLContext;
 static jmethodID SurfaceTexture_detachFromGLContext;
-static jmethodID SurfaceTexture_getTransformMatrix;
 static jmethodID SurfaceTexture_release;
 static Global<jclass> SurfaceClass;
 static jmethodID Surface_Constructor;
@@ -78,8 +77,6 @@ void SurfaceTexture::JNIInit(JNIEnv* env) {
       env->GetMethodID(SurfaceTextureClass.get(), "attachToGLContext", "(I)V");
   SurfaceTexture_detachFromGLContext =
       env->GetMethodID(SurfaceTextureClass.get(), "detachFromGLContext", "()V");
-  SurfaceTexture_getTransformMatrix =
-      env->GetMethodID(SurfaceTextureClass.get(), "getTransformMatrix", "([F)V");
   SurfaceTexture_release = env->GetMethodID(SurfaceTextureClass.get(), "release", "()V");
   SurfaceClass = env->FindClass("android/view/Surface");
   Surface_Constructor =
@@ -185,43 +182,31 @@ void SurfaceTexture::notifyFrameAvailable() {
   condition.notify_all();
 }
 
-static ISize ComputeTextureSize(float matrix[16], int width, int height) {
-  Size size = {static_cast<float>(width), static_cast<float>(height)};
-  auto scaleX = fabsf(matrix[0]);
-  if (scaleX > 0) {
-    size.width = size.width / (scaleX + matrix[12] * 2);
-  }
-  float scaleY = fabsf(matrix[5]);
-  if (scaleY > 0) {
-    size.height = size.height / (scaleY + (matrix[13] - scaleY) * 2);
-  }
-  return size.toRound();
-}
-
 std::shared_ptr<TextureView> SurfaceTexture::onMakeTexture(Context* context, bool) {
   auto textureID = makeExternalOESTexture(context);
   if (textureID == 0) {
     return nullptr;
   }
-  auto textureSize = updateTexImage();
-  if (textureSize.isEmpty()) {
+  if (!updateTexImage()) {
     auto gl = GLFunctions::Get(context);
     gl->deleteTextures(1, &textureID);
     return nullptr;
   }
-  GPUTextureDescriptor descriptor = {textureSize.width,
-                                     textureSize.height,
-                                     PixelFormat::RGBA_8888,
-                                     false,
-                                     1,
-                                     GPUTextureUsage::TEXTURE_BINDING};
+  // Use the video content size (width()/height()) for the texture descriptor rather than the
+  // hardware buffer's aligned size. Hardware decoders may pad the output buffer to a larger
+  // aligned size (e.g. 720x1560 -> 720x1568), and the extra rows hold unstable padding. Since
+  // getTextureCoord() maps content coordinates to UVs by dividing by these dimensions, using the
+  // content size preserves the "texture pixel coord == content coord" invariant and excludes the
+  // padding rows from sampling. Do not switch this back to the buffer-aligned size, which caused
+  // the edge-flicker regression this restores.
+  GPUTextureDescriptor descriptor = {width(), height(), PixelFormat::RGBA_8888,
+                                     false,   1,        GPUTextureUsage::TEXTURE_BINDING};
   auto texture = std::make_unique<GLTexture>(descriptor, GL_TEXTURE_EXTERNAL_OES, textureID);
   return Resource::AddToCache(context, new DefaultTextureView(std::move(texture)));
 }
 
 bool SurfaceTexture::onUpdateTexture(std::shared_ptr<TextureView>) {
-  auto size = updateTexImage();
-  return !size.isEmpty();
+  return updateTexImage();
 }
 
 unsigned SurfaceTexture::makeExternalOESTexture(Context* context) {
@@ -247,34 +232,29 @@ unsigned SurfaceTexture::makeExternalOESTexture(Context* context) {
   return textureID;
 }
 
-ISize SurfaceTexture::updateTexImage() {
+bool SurfaceTexture::updateTexImage() {
   std::unique_lock<std::mutex> autoLock(locker);
   if (!frameAvailable) {
     static const auto TIMEOUT = std::chrono::seconds(1);
     auto status = condition.wait_for(autoLock, TIMEOUT);
     if (status == std::cv_status::timeout) {
       LOGE("NativeImageReader::onUpdateTexture(): timeout when waiting for the frame available!");
-      return {};
+      return false;
     }
   }
   JNIEnvironment environment;
   auto env = environment.current();
   if (env == nullptr) {
-    return {};
+    return false;
   }
   frameAvailable = false;
   env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_updateTexImage);
   if (env->ExceptionCheck()) {
     env->ExceptionClear();
     LOGE("NativeImageReader::onUpdateTexture(): failed to updateTexImage!");
-    return {};
+    return false;
   }
-  auto floatArray = env->NewFloatArray(16);
-  env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_getTransformMatrix, floatArray);
-  auto matrix = env->GetFloatArrayElements(floatArray, nullptr);
-  auto textureSize = ComputeTextureSize(matrix, width(), height());
-  env->ReleaseFloatArrayElements(floatArray, matrix, 0);
-  return textureSize;
+  return true;
 }
 
 }  // namespace tgfx
