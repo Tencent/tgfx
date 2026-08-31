@@ -264,7 +264,8 @@ void D3D12RenderPass::setPipeline(std::shared_ptr<RenderPipeline> pipeline) {
   commandList->SetGraphicsRootSignature(d3d12Pipeline->d3d12RootSignature());
 
   // Switching pipelines invalidates root parameter state, so re-flag every binding as dirty.
-  for (auto& ub : uniformBindings) {
+  for (auto& item : uniformBindings) {
+    auto& ub = item.second;
     if (ub.gpuAddress != 0) {
       ub.dirty = true;
     }
