@@ -31,32 +31,6 @@
 
 namespace tgfx {
 
-using MatchReplacer = std::string (*)(const std::smatch&, int&);
-
-static std::string replaceAllMatches(const std::string& source, const std::regex& pattern,
-                                     MatchReplacer replacer, int& counter) {
-  std::smatch match;
-  std::string::const_iterator searchStart(source.cbegin());
-  std::string result;
-  size_t lastPos = 0;
-  while (std::regex_search(searchStart, source.cend(), match, pattern)) {
-    auto matchPos = static_cast<size_t>(match.position(0));
-    auto iterOffset = static_cast<size_t>(searchStart - source.cbegin());
-    size_t matchStart = matchPos + iterOffset;
-    result += source.substr(lastPos, matchStart - lastPos);
-    result += replacer(match, counter);
-    lastPos = matchStart + static_cast<size_t>(match.length(0));
-    searchStart = match.suffix().first;
-  }
-  result += source.substr(lastPos);
-  return result;
-}
-
-static std::string upgradeGLSLVersion(const std::string& source) {
-  static std::regex versionRegex(R"(#version\s+\d+(\s+es)?)");
-  return std::regex_replace(source, versionRegex, "#version 450");
-}
-
 static std::string assignInternalUBOBindings(const std::string& source) {
   static std::regex vertexUboRegex(R"(layout\s*\(\s*std140\s*\)\s*uniform\s+VertexUniformBlock)");
   auto result = std::regex_replace(source, vertexUboRegex,
@@ -74,7 +48,7 @@ static std::string replaceCustomUBO(const std::smatch& match, int& counter) {
 static std::string assignCustomUBOBindings(const std::string& source) {
   static std::regex uboRegex(R"(layout\s*\(\s*std140\s*\)\s*uniform\s+(\w+))");
   int binding = 0;
-  return replaceAllMatches(source, uboRegex, replaceCustomUBO, binding);
+  return detail::ReplaceAllMatches(source, uboRegex, replaceCustomUBO, binding);
 }
 
 // Separates combined sampler declarations into distinct texture and sampler resources.
@@ -102,7 +76,7 @@ static std::string replaceSeparatedSampler(const std::smatch& match, int& counte
 static std::string separateSamplerDeclarations(const std::string& source) {
   static std::regex samplerRegex(R"(uniform\s+(sampler\w+)\s+(\w+);)");
   int binding = TEXTURE_BINDING_POINT_START;
-  return replaceAllMatches(source, samplerRegex, replaceSeparatedSampler, binding);
+  return detail::ReplaceAllMatches(source, samplerRegex, replaceSeparatedSampler, binding);
 }
 
 // Replaces texture lookup calls to use separated texture and sampler resources.
@@ -132,129 +106,17 @@ static std::vector<std::string> collectSamplerNames(const std::string& source) {
   return names;
 }
 
-static std::string replaceInputLocation(const std::smatch& match, int& counter) {
-  std::string interpStr = match[1].matched ? match[1].str() : "";
-  std::string precisionStr = match[2].matched ? match[2].str() : "";
-  std::string arraySuffix = match[5].matched ? match[5].str() : "";
-  int step = match[6].matched ? std::stoi(match[6].str()) : 1;
-  std::string decl = "layout(location=" + std::to_string(counter) + ") " + interpStr + "in " +
-                     precisionStr + match[3].str() + " " + match[4].str() + arraySuffix + ";";
-  counter += step;
-  return decl;
-}
-
-// See ShaderCompiler.cpp for the rationale: fragment inputs are name-keyed so vertex/fragment
-// varyings pair up regardless of source order, while vertex inputs (attributes) stay in
-// source-declaration order to match `RenderPipelineDescriptor::vertex.bufferLayouts`.
-static std::string replaceWithNameKeyedLocations(
-    const std::string& source, const std::regex& pattern,
-    const std::unordered_map<std::string, int>& nameToLocation, bool isInput) {
-  std::smatch match;
-  std::string::const_iterator searchStart(source.cbegin());
-  std::string result;
-  size_t lastPos = 0;
-  while (std::regex_search(searchStart, source.cend(), match, pattern)) {
-    auto matchPos = static_cast<size_t>(match.position(0));
-    auto iterOffset = static_cast<size_t>(searchStart - source.cbegin());
-    size_t matchStart = matchPos + iterOffset;
-    result += source.substr(lastPos, matchStart - lastPos);
-
-    std::string interpStr = match[1].matched ? match[1].str() : "";
-    std::string precisionStr = match[2].matched ? match[2].str() : "";
-    std::string arraySuffix = match[5].matched ? match[5].str() : "";
-    const std::string& name = match[4].str();
-    auto it = nameToLocation.find(name);
-    DEBUG_ASSERT(it != nameToLocation.end());
-    int location = it->second;
-    result += "layout(location=" + std::to_string(location) + ") " + interpStr +
-              (isInput ? "in " : "out ") + precisionStr + match[3].str() + " " + name +
-              arraySuffix + ";";
-
-    lastPos = matchStart + static_cast<size_t>(match.length(0));
-    searchStart = match.suffix().first;
-  }
-  result += source.substr(lastPos);
-  return result;
-}
-
-struct NameSortedEntry {
-  std::string name;
-  int step;
-};
-
-static bool CompareEntryNames(const NameSortedEntry& a, const NameSortedEntry& b) {
-  return a.name < b.name;
-}
-
-static std::unordered_map<std::string, int> buildNameSortedLocationMap(const std::string& source,
-                                                                       const std::regex& pattern) {
-  std::vector<NameSortedEntry> entries;
-  std::smatch match;
-  std::string::const_iterator searchStart(source.cbegin());
-  while (std::regex_search(searchStart, source.cend(), match, pattern)) {
-    int step = match[6].matched ? std::stoi(match[6].str()) : 1;
-    entries.push_back({match[4].str(), step});
-    searchStart = match.suffix().first;
-  }
-  std::sort(entries.begin(), entries.end(), CompareEntryNames);
-  std::unordered_map<std::string, int> nameToLocation;
-  int location = 0;
-  for (const auto& entry : entries) {
-    nameToLocation[entry.name] = location;
-    location += entry.step;
-  }
-  return nameToLocation;
-}
-
-static std::string assignInputLocationQualifiers(const std::string& source, ShaderStage stage) {
-  static std::regex inVarRegex(
-      R"((flat\s+|noperspective\s+)?in\s+(highp\s+|mediump\s+|lowp\s+)?(\w+)\s+(\w+)(\s*\[\s*(\d+)\s*\])?\s*;)");
-  if (stage == ShaderStage::Vertex) {
-    int location = 0;
-    return replaceAllMatches(source, inVarRegex, replaceInputLocation, location);
-  }
-  auto nameToLocation = buildNameSortedLocationMap(source, inVarRegex);
-  return replaceWithNameKeyedLocations(source, inVarRegex, nameToLocation, /*isInput=*/true);
-}
-
-static std::string replaceOutputLocation(const std::smatch& match, int& counter) {
-  std::string interpStr = match[1].matched ? match[1].str() : "";
-  std::string precisionStr = match[2].matched ? match[2].str() : "";
-  std::string arraySuffix = match[5].matched ? match[5].str() : "";
-  int step = match[6].matched ? std::stoi(match[6].str()) : 1;
-  std::string decl = "layout(location=" + std::to_string(counter) + ") " + interpStr + "out " +
-                     precisionStr + match[3].str() + " " + match[4].str() + arraySuffix + ";";
-  counter += step;
-  return decl;
-}
-
-static std::string assignOutputLocationQualifiers(const std::string& source, ShaderStage stage) {
-  static std::regex outVarRegex(
-      R"((flat\s+|noperspective\s+)?out\s+(highp\s+|mediump\s+|lowp\s+)?(\w+)\s+(\w+)(\s*\[\s*(\d+)\s*\])?\s*;)");
-  if (stage == ShaderStage::Fragment) {
-    int location = 0;
-    return replaceAllMatches(source, outVarRegex, replaceOutputLocation, location);
-  }
-  auto nameToLocation = buildNameSortedLocationMap(source, outVarRegex);
-  return replaceWithNameKeyedLocations(source, outVarRegex, nameToLocation, /*isInput=*/false);
-}
-
-static std::string removePrecisionDeclarations(const std::string& source) {
-  static std::regex precisionDeclRegex(R"(precision\s+(highp|mediump|lowp)\s+\w+\s*;)");
-  return std::regex_replace(source, precisionDeclRegex, "");
-}
-
 static std::string preprocessGLSL(const std::string& glslCode, ShaderStage stage) {
-  auto result = upgradeGLSLVersion(glslCode);
+  auto result = detail::UpgradeGLSLVersion(glslCode);
   result = assignInternalUBOBindings(result);
   result = assignCustomUBOBindings(result);
   // Collect sampler names before separating declarations.
   auto samplerNames = collectSamplerNames(result);
   result = separateSamplerDeclarations(result);
   result = separateTextureLookups(result, samplerNames);
-  result = assignInputLocationQualifiers(result, stage);
-  result = assignOutputLocationQualifiers(result, stage);
-  result = removePrecisionDeclarations(result);
+  result = detail::AssignInputLocationQualifiers(result, stage);
+  result = detail::AssignOutputLocationQualifiers(result, stage);
+  result = detail::RemovePrecisionDeclarations(result);
   return result;
 }
 
