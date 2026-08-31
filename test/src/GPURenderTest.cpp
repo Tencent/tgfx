@@ -127,6 +127,68 @@ static std::shared_ptr<RenderPipeline> CreateVaryingOrderPipeline(GPU* gpu) {
   return gpu->createRenderPipeline(descriptor);
 }
 
+// Vertex shader emitting an extra `vUnused` output that the fragment never consumes. Its name
+// sorts lexicographically before `vUsed`, so per-stage name-sorted locations would shift `vUsed`
+// on the vertex side only and desync the two stages.
+static constexpr char MISMATCH_VERTEX_SHADER[] = R"(
+        in vec2 inPosition;
+
+        out float vUsed;
+        out float vUnused;
+
+        void main() {
+            gl_Position = vec4(inPosition, 0.0, 1.0);
+            vUsed = 1.0;
+            vUnused = 0.0;
+        }
+    )";
+
+static constexpr char MISMATCH_FRAGMENT_SHADER[] = R"(
+        precision mediump float;
+
+        in float vUsed;
+
+        out vec4 tgfx_FragColor;
+
+        void main() {
+            tgfx_FragColor = vec4(vUsed, 0.0, 0.0, 1.0);
+        }
+    )";
+
+static std::shared_ptr<RenderPipeline> CreateMismatchedVaryingPipeline(GPU* gpu) {
+  auto info = gpu->info();
+  auto isDesktop = info->version.find("OpenGL ES") == std::string::npos;
+
+  ShaderModuleDescriptor vertexModule = {};
+  vertexModule.code = PrefixShaderVersion(MISMATCH_VERTEX_SHADER, isDesktop);
+  vertexModule.stage = ShaderStage::Vertex;
+  auto vertexShader = gpu->createShaderModule(vertexModule);
+  if (vertexShader == nullptr) {
+    return nullptr;
+  }
+
+  ShaderModuleDescriptor fragmentModule = {};
+  fragmentModule.code = PrefixShaderVersion(MISMATCH_FRAGMENT_SHADER, isDesktop);
+  fragmentModule.stage = ShaderStage::Fragment;
+  auto fragmentShader = gpu->createShaderModule(fragmentModule);
+  if (fragmentShader == nullptr) {
+    return nullptr;
+  }
+
+  RenderPipelineDescriptor descriptor = {};
+  Attribute position = {"inPosition", VertexFormat::Float2};
+  VertexBufferLayout vertexLayout({position}, VertexStepMode::Vertex);
+  descriptor.vertex.bufferLayouts = {vertexLayout};
+  descriptor.vertex.module = vertexShader;
+  descriptor.fragment.module = fragmentShader;
+
+  PipelineColorAttachment colorAttachment = {};
+  colorAttachment.blendEnable = false;
+  descriptor.fragment.colorAttachments.push_back(colorAttachment);
+
+  return gpu->createRenderPipeline(descriptor);
+}
+
 }  // namespace
 
 // ==================== GPU Tests ====================
@@ -606,6 +668,25 @@ TGFX_TEST(GPURenderTest, VaryingOrderMismatch) {
       Surface::MakeFrom(context, renderTexture->getBackendTexture(), ImageOrigin::TopLeft);
   ASSERT_TRUE(surface != nullptr);
   EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/VaryingOrderMismatch"));
+}
+
+// The vertex stage emits an extra output that the fragment never consumes. SPIR-V based backends
+// (Metal, Vulkan, D3D12, WebGPU) must reject the pipeline at creation instead of silently reading
+// undefined values; OpenGL links varyings by name and silently drops the unused output.
+TGFX_TEST(GPURenderTest, VaryingMismatchRejected) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto gpu = context->gpu();
+  auto backend = gpu->info()->backend;
+
+  auto pipeline = CreateMismatchedVaryingPipeline(gpu);
+
+  if (backend == Backend::OpenGL) {
+    EXPECT_TRUE(pipeline != nullptr);
+  } else {
+    EXPECT_TRUE(pipeline == nullptr);
+  }
 }
 
 }  // namespace tgfx
