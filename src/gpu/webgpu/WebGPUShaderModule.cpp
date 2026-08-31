@@ -134,8 +134,12 @@ static std::vector<std::string> collectSamplerNames(const std::string& source) {
 static std::string replaceInputLocation(const std::smatch& match, int& counter) {
   std::string interpStr = match[1].matched ? match[1].str() : "";
   std::string precisionStr = match[2].matched ? match[2].str() : "";
-  return "layout(location=" + std::to_string(counter++) + ") " + interpStr + "in " + precisionStr +
-         match[3].str() + " " + match[4].str() + ";";
+  std::string arraySuffix = match[5].matched ? match[5].str() : "";
+  int step = match[6].matched ? std::stoi(match[6].str()) : 1;
+  std::string decl = "layout(location=" + std::to_string(counter) + ") " + interpStr + "in " +
+                     precisionStr + match[3].str() + " " + match[4].str() + arraySuffix + ";";
+  counter += step;
+  return decl;
 }
 
 // See ShaderCompiler.cpp for the rationale: fragment inputs are name-keyed so vertex/fragment
@@ -156,12 +160,14 @@ static std::string replaceWithNameKeyedLocations(
 
     std::string interpStr = match[1].matched ? match[1].str() : "";
     std::string precisionStr = match[2].matched ? match[2].str() : "";
+    std::string arraySuffix = match[5].matched ? match[5].str() : "";
     const std::string& name = match[4].str();
     auto it = nameToLocation.find(name);
     DEBUG_ASSERT(it != nameToLocation.end());
     int location = it->second;
     result += "layout(location=" + std::to_string(location) + ") " + interpStr +
-              (isInput ? "in " : "out ") + precisionStr + match[3].str() + " " + name + ";";
+              (isInput ? "in " : "out ") + precisionStr + match[3].str() + " " + name +
+              arraySuffix + ";";
 
     lastPos = matchStart + static_cast<size_t>(match.length(0));
     searchStart = match.suffix().first;
@@ -170,26 +176,38 @@ static std::string replaceWithNameKeyedLocations(
   return result;
 }
 
+struct NameSortedEntry {
+  std::string name;
+  int step;
+};
+
+static bool CompareEntryNames(const NameSortedEntry& a, const NameSortedEntry& b) {
+  return a.name < b.name;
+}
+
 static std::unordered_map<std::string, int> buildNameSortedLocationMap(const std::string& source,
                                                                        const std::regex& pattern) {
-  std::vector<std::string> names;
+  std::vector<NameSortedEntry> entries;
   std::smatch match;
   std::string::const_iterator searchStart(source.cbegin());
   while (std::regex_search(searchStart, source.cend(), match, pattern)) {
-    names.push_back(match[4].str());
+    int step = match[6].matched ? std::stoi(match[6].str()) : 1;
+    entries.push_back({match[4].str(), step});
     searchStart = match.suffix().first;
   }
-  std::sort(names.begin(), names.end());
+  std::sort(entries.begin(), entries.end(), CompareEntryNames);
   std::unordered_map<std::string, int> nameToLocation;
-  for (size_t i = 0; i < names.size(); i++) {
-    nameToLocation[names[i]] = static_cast<int>(i);
+  int location = 0;
+  for (const auto& entry : entries) {
+    nameToLocation[entry.name] = location;
+    location += entry.step;
   }
   return nameToLocation;
 }
 
 static std::string assignInputLocationQualifiers(const std::string& source, ShaderStage stage) {
   static std::regex inVarRegex(
-      R"((flat\s+|noperspective\s+)?in\s+(highp\s+|mediump\s+|lowp\s+)?(\w+)\s+(\w+)\s*;)");
+      R"((flat\s+|noperspective\s+)?in\s+(highp\s+|mediump\s+|lowp\s+)?(\w+)\s+(\w+)(\s*\[\s*(\d+)\s*\])?\s*;)");
   if (stage == ShaderStage::Vertex) {
     int location = 0;
     return replaceAllMatches(source, inVarRegex, replaceInputLocation, location);
@@ -201,13 +219,17 @@ static std::string assignInputLocationQualifiers(const std::string& source, Shad
 static std::string replaceOutputLocation(const std::smatch& match, int& counter) {
   std::string interpStr = match[1].matched ? match[1].str() : "";
   std::string precisionStr = match[2].matched ? match[2].str() : "";
-  return "layout(location=" + std::to_string(counter++) + ") " + interpStr + "out " + precisionStr +
-         match[3].str() + " " + match[4].str() + ";";
+  std::string arraySuffix = match[5].matched ? match[5].str() : "";
+  int step = match[6].matched ? std::stoi(match[6].str()) : 1;
+  std::string decl = "layout(location=" + std::to_string(counter) + ") " + interpStr + "out " +
+                     precisionStr + match[3].str() + " " + match[4].str() + arraySuffix + ";";
+  counter += step;
+  return decl;
 }
 
 static std::string assignOutputLocationQualifiers(const std::string& source, ShaderStage stage) {
   static std::regex outVarRegex(
-      R"((flat\s+|noperspective\s+)?out\s+(highp\s+|mediump\s+|lowp\s+)?(\w+)\s+(\w+)\s*;)");
+      R"((flat\s+|noperspective\s+)?out\s+(highp\s+|mediump\s+|lowp\s+)?(\w+)\s+(\w+)(\s*\[\s*(\d+)\s*\])?\s*;)");
   if (stage == ShaderStage::Fragment) {
     int location = 0;
     return replaceAllMatches(source, outVarRegex, replaceOutputLocation, location);
