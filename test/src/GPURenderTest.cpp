@@ -612,9 +612,10 @@ TGFX_TEST(GPURenderTest, ArrayVarying) {
 //
 // The vertex shader emits three constant scalar varyings (vRed=1.0, vGreen=0.5, vBlue=0.25)
 // and the fragment shader declares them in a shuffled order (vBlue / vRed / vGreen) before
-// writing vec4(vRed, vGreen, vBlue, 1.0). The full-screen quad means every rendered pixel
-// carries the same colour, so the baseline captures a flat swatch and any location-order
-// bug shows up as the swapped colour (Metal today renders vec4(vBlue, vRed, vGreen, 1.0)).
+// writing vec4(vRed, vGreen, vBlue, 1.0). The centred quad means every rendered pixel carries the
+// same colour, so the baseline captures a flat swatch surrounded by transparency and any
+// location-order bug shows up as the swapped colour (Metal today renders vec4(vBlue, vRed,
+// vGreen, 1.0)).
 TGFX_TEST(GPURenderTest, VaryingOrderMismatch) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -641,12 +642,13 @@ TGFX_TEST(GPURenderTest, VaryingOrderMismatch) {
   ASSERT_TRUE(renderPass != nullptr);
   renderPass->setPipeline(std::move(pipeline));
 
-  // Full-screen quad in NDC as a TriangleStrip: BL, BR, TL, TR.
+  // A centred quad covering the middle half of NDC in both axes. On the 200x200 surface this
+  // yields a 100x100 rectangle with a 50-pixel margin on every side.
   VaryingOrderVertex quadVertices[] = {
-      {-1.0f, -1.0f},
-      {1.0f, -1.0f},
-      {-1.0f, 1.0f},
-      {1.0f, 1.0f},
+      {-0.5f, -0.5f},
+      {0.5f, -0.5f},
+      {-0.5f, 0.5f},
+      {0.5f, 0.5f},
   };
   auto vertexBuffer = gpu->createBuffer(sizeof(quadVertices), GPUBufferUsage::VERTEX);
   ASSERT_TRUE(vertexBuffer != nullptr);
