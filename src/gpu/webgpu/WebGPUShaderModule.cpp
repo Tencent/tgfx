@@ -158,7 +158,8 @@ static std::string replaceWithNameKeyedLocations(
     std::string precisionStr = match[2].matched ? match[2].str() : "";
     const std::string& name = match[4].str();
     auto it = nameToLocation.find(name);
-    int location = (it != nameToLocation.end()) ? it->second : 0;
+    DEBUG_ASSERT(it != nameToLocation.end());
+    int location = it->second;
     result += "layout(location=" + std::to_string(location) + ") " + interpStr +
               (isInput ? "in " : "out ") + precisionStr + match[3].str() + " " + name + ";";
 

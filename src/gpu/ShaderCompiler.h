@@ -44,6 +44,10 @@ namespace tgfx {
 ///     same rule as the vertex `out` side, guaranteeing matching locations across stages. `out`
 ///     (colour attachments) keep their source-declaration order to preserve the mapping to the
 ///     colour attachment index.
+///
+/// Name-based cross-stage pairing assumes both stages declare the same set of interface names.
+/// A varying emitted by the vertex shader but never consumed by the fragment (valid GLSL on the
+/// OpenGL backend) shifts the vertex-side locations and desyncs the two stages.
 std::string PreprocessGLSL(const std::string& glslCode, ShaderStage stage);
 
 /// Compiles preprocessed GLSL 450 source to SPIR-V binary using shaderc. Returns an empty vector

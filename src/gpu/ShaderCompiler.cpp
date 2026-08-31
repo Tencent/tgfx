@@ -111,11 +111,9 @@ static std::string replaceInputLocation(const std::smatch& match, int& counter) 
 }
 
 // Rewrite interface-variable declarations so their `layout(location=N)` numbers are assigned by
-// looking up each variable's name in `nameToLocation`, instead of in source order. Any matched
-// declaration whose name is not in the map keeps whatever the fallback replacer produces, which
-// preserves the source-order behaviour for declarations that are not part of the cross-stage
-// interface (in practice this branch is not hit because the map is always built from the same
-// scan the second pass consumes).
+// looking up each variable's name in `nameToLocation`, instead of in source order. The map is
+// built from the same regex scan this pass consumes, so every matched name is guaranteed to be
+// present; the assertion below documents that contract.
 static std::string replaceWithNameKeyedLocations(
     const std::string& source, const std::regex& pattern,
     const std::unordered_map<std::string, int>& nameToLocation, bool isInput) {
@@ -134,7 +132,8 @@ static std::string replaceWithNameKeyedLocations(
     std::string arraySuffix = match[5].matched ? match[5].str() : "";
     const std::string& name = match[4].str();
     auto it = nameToLocation.find(name);
-    int location = (it != nameToLocation.end()) ? it->second : 0;
+    DEBUG_ASSERT(it != nameToLocation.end());
+    int location = it->second;
     std::string decl = "layout(location=" + std::to_string(location) + ") " + interpStr +
                        (isInput ? "in " : "out ") + precisionStr + match[3].str() + " " + name +
                        arraySuffix + ";";
@@ -147,17 +146,22 @@ static std::string replaceWithNameKeyedLocations(
   return result;
 }
 
+struct NameSortedEntry {
+  std::string name;
+  int step;
+};
+
+static bool CompareEntryNames(const NameSortedEntry& a, const NameSortedEntry& b) {
+  return a.name < b.name;
+}
+
 // Build a `name -> location` map from the interface declarations matched by `pattern`. Names are
 // collected in source order, then sorted lexicographically before locations are assigned. Array-
 // typed varyings occupy `size` consecutive locations, so the counter is advanced by the array
 // length to match SPIR-V semantics for per-vertex block members.
 static std::unordered_map<std::string, int> buildNameSortedLocationMap(const std::string& source,
                                                                        const std::regex& pattern) {
-  struct Entry {
-    std::string name;
-    int step;
-  };
-  std::vector<Entry> entries;
+  std::vector<NameSortedEntry> entries;
   std::smatch match;
   std::string::const_iterator searchStart(source.cbegin());
   while (std::regex_search(searchStart, source.cend(), match, pattern)) {
@@ -165,8 +169,7 @@ static std::unordered_map<std::string, int> buildNameSortedLocationMap(const std
     entries.push_back({match[4].str(), step});
     searchStart = match.suffix().first;
   }
-  std::sort(entries.begin(), entries.end(),
-            [](const Entry& a, const Entry& b) { return a.name < b.name; });
+  std::sort(entries.begin(), entries.end(), CompareEntryNames);
   std::unordered_map<std::string, int> nameToLocation;
   int location = 0;
   for (const auto& entry : entries) {
@@ -220,6 +223,9 @@ static std::string replaceOutputLocation(const std::smatch& match, int& counter)
 // sorted name (the same rule used for fragment inputs) makes the vertex→fragment pairing
 // independent of source order. Fragment stage outputs are colour attachments whose location
 // index maps directly to the colour attachment slot, so we keep the source-declaration order.
+// Name-based pairing assumes both stages declare the same set of interface names: a varying
+// emitted by the vertex shader but never consumed by the fragment (valid GLSL on the OpenGL
+// backend) shifts the vertex-side locations and desyncs the two stages.
 static std::string assignOutputLocationQualifiers(const std::string& source, ShaderStage stage) {
   static std::regex outVarRegex(
       R"((flat\s+|noperspective\s+)?out\s+(highp\s+|mediump\s+|lowp\s+)?(\w+)\s+(\w+)(\s*\[\s*(\d+)\s*\])?\s*;)");
