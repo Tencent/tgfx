@@ -27,7 +27,8 @@ namespace tgfx {
 /**
  * RuntimeEffect supports creating custom ImageFilter objects with user-provided shader code.
  * Shader code must be written in GLSL with OpenGL ES 3.0 syntax. Use the "#version 300 es"
- * directive, or "#version 150" on desktop OpenGL.
+ * directive, or "#version 150" on desktop OpenGL. The vertex and fragment shader stages must
+ * declare matching varyings, otherwise pipeline creation fails on SPIR-V based backends.
  */
 class RuntimeEffect {
  public:
