@@ -24,6 +24,7 @@
 #include "WebGPUDefines.h"
 #include "WebGPUGPU.h"
 #include "core/utils/Log.h"
+#include "gpu/ShaderCompiler.h"
 #include "gpu/UniformData.h"
 #include "src/tint/lang/spirv/reader/reader.h"
 #include "src/tint/lang/wgsl/writer/writer.h"
@@ -292,6 +293,7 @@ std::shared_ptr<WebGPUShaderModule> WebGPUShaderModule::Make(
 
 WebGPUShaderModule::WebGPUShaderModule(WebGPUGPU* gpu, const ShaderModuleDescriptor& descriptor)
     : _stage(descriptor.stage) {
+  _varyingDecls = ExtractVaryingDecls(descriptor.code, descriptor.stage);
   compileShader(gpu->device(), descriptor.code, descriptor.stage);
 }
 

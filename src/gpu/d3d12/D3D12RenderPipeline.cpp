@@ -22,6 +22,7 @@
 #include "D3D12GPU.h"
 #include "D3D12ShaderModule.h"
 #include "core/utils/Log.h"
+#include "gpu/ShaderCompiler.h"
 #include "tgfx/gpu/ColorWriteMask.h"
 #include "tgfx/gpu/ShaderVisibility.h"
 
@@ -65,6 +66,14 @@ std::shared_ptr<D3D12RenderPipeline> D3D12RenderPipeline::Make(
     D3D12GPU* gpu, const RenderPipelineDescriptor& descriptor) {
   if (gpu == nullptr) {
     return nullptr;
+  }
+  if (descriptor.vertex.module && descriptor.fragment.module) {
+    std::string mismatch;
+    if (!VaryingInterfacesMatch(descriptor.vertex.module->varyingDecls(),
+                                descriptor.fragment.module->varyingDecls(), mismatch)) {
+      LOGE("D3D12RenderPipeline: %s", mismatch.c_str());
+      return nullptr;
+    }
   }
   auto pipeline = gpu->makeResource<D3D12RenderPipeline>(gpu, descriptor);
   if (pipeline->pipelineState == nullptr) {
