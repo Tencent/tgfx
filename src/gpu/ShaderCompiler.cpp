@@ -17,40 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShaderCompiler.h"
+#include <algorithm>
 #include <regex>
 #include <shaderc/shaderc.hpp>
+#include <unordered_map>
 #include "UniformData.h"
 #include "core/utils/Log.h"
 
 namespace tgfx {
-
-// Replace a regex pattern in the source string by invoking a callback for each match.
-// The callback receives the match and returns the replacement string.
-using MatchReplacer = std::string (*)(const std::smatch&, int&);
-
-static std::string replaceAllMatches(const std::string& source, const std::regex& pattern,
-                                     MatchReplacer replacer, int& counter) {
-  std::smatch match;
-  std::string::const_iterator searchStart(source.cbegin());
-  std::string result;
-  size_t lastPos = 0;
-  while (std::regex_search(searchStart, source.cend(), match, pattern)) {
-    auto matchPos = static_cast<size_t>(match.position(0));
-    auto iterOffset = static_cast<size_t>(searchStart - source.cbegin());
-    size_t matchStart = matchPos + iterOffset;
-    result += source.substr(lastPos, matchStart - lastPos);
-    result += replacer(match, counter);
-    lastPos = matchStart + static_cast<size_t>(match.length(0));
-    searchStart = match.suffix().first;
-  }
-  result += source.substr(lastPos);
-  return result;
-}
-
-static std::string upgradeGLSLVersion(const std::string& source) {
-  static std::regex versionRegex(R"(#version\s+\d+(\s+es)?)");
-  return std::regex_replace(source, versionRegex, "#version 450");
-}
 
 // Assign fixed binding points for internal UBOs to match CPU-side constants:
 // VertexUniformBlock -> set 0, binding 0 (VERTEX_UBO_BINDING_POINT)
@@ -78,7 +52,7 @@ static std::string replaceCustomUBO(const std::smatch& match, int& counter) {
 static std::string assignCustomUBOBindings(const std::string& source) {
   static std::regex uboRegex(R"(layout\s*\(\s*std140\s*\)\s*uniform\s+(\w+))");
   int binding = 0;
-  return replaceAllMatches(source, uboRegex, replaceCustomUBO, binding);
+  return detail::ReplaceAllMatches(source, uboRegex, replaceCustomUBO, binding);
 }
 
 static std::string replaceSamplerBinding(const std::smatch& match, int& counter) {
@@ -92,71 +66,17 @@ static std::string replaceSamplerBinding(const std::smatch& match, int& counter)
 static std::string assignSamplerBindings(const std::string& source) {
   static std::regex samplerRegex(R"(uniform\s+(sampler\w+)\s+(\w+);)");
   int binding = 0;
-  return replaceAllMatches(source, samplerRegex, replaceSamplerBinding, binding);
+  return detail::ReplaceAllMatches(source, samplerRegex, replaceSamplerBinding, binding);
 }
 
-static std::string replaceInputLocation(const std::smatch& match, int& counter) {
-  std::string interpStr = match[1].matched ? match[1].str() : "";
-  std::string precisionStr = match[2].matched ? match[2].str() : "";
-  // match[5] is the whole array suffix like "[5]" (preserved verbatim in the emitted decl);
-  // match[6] is just the size digits, used to advance the location counter.
-  std::string arraySuffix = match[5].matched ? match[5].str() : "";
-  int step = match[6].matched ? std::stoi(match[6].str()) : 1;
-  std::string decl = "layout(location=" + std::to_string(counter) + ") " + interpStr + "in " +
-                     precisionStr + match[3].str() + " " + match[4].str() + arraySuffix + ";";
-  counter += step;
-  return decl;
-}
-
-// Add location qualifiers to 'in' variables, handling optional interpolation qualifiers
-// (flat, noperspective), precision qualifiers (highp, mediump, lowp), and array-typed varyings
-// like `in vec2 blurCoordinates[5];`. Array-typed varyings occupy `size` consecutive locations,
-// so the counter is advanced by the array length instead of one, matching SPIR-V semantics for
-// per-vertex block members.
-static std::string assignInputLocationQualifiers(const std::string& source) {
-  static std::regex inVarRegex(
-      R"((flat\s+|noperspective\s+)?in\s+(highp\s+|mediump\s+|lowp\s+)?(\w+)\s+(\w+)(\s*\[\s*(\d+)\s*\])?\s*;)");
-  int location = 0;
-  return replaceAllMatches(source, inVarRegex, replaceInputLocation, location);
-}
-
-static std::string replaceOutputLocation(const std::smatch& match, int& counter) {
-  std::string interpStr = match[1].matched ? match[1].str() : "";
-  std::string precisionStr = match[2].matched ? match[2].str() : "";
-  std::string arraySuffix = match[5].matched ? match[5].str() : "";
-  int step = match[6].matched ? std::stoi(match[6].str()) : 1;
-  std::string decl = "layout(location=" + std::to_string(counter) + ") " + interpStr + "out " +
-                     precisionStr + match[3].str() + " " + match[4].str() + arraySuffix + ";";
-  counter += step;
-  return decl;
-}
-
-// Add location qualifiers to 'out' variables, handling optional interpolation qualifiers
-// (flat, noperspective), precision qualifiers (highp, mediump, lowp), and array-typed varyings
-// like `out vec2 blurCoordinates[5];`. Array-typed varyings occupy `size` consecutive locations,
-// so the counter is advanced by the array length instead of one, matching SPIR-V semantics for
-// per-vertex block members.
-static std::string assignOutputLocationQualifiers(const std::string& source) {
-  static std::regex outVarRegex(
-      R"((flat\s+|noperspective\s+)?out\s+(highp\s+|mediump\s+|lowp\s+)?(\w+)\s+(\w+)(\s*\[\s*(\d+)\s*\])?\s*;)");
-  int location = 0;
-  return replaceAllMatches(source, outVarRegex, replaceOutputLocation, location);
-}
-
-// Remove precision qualifiers that are not supported in desktop GLSL 450.
-static std::string removePrecisionDeclarations(const std::string& source) {
-  static std::regex precisionDeclRegex(R"(precision\s+(highp|mediump|lowp)\s+\w+\s*;)");
-  return std::regex_replace(source, precisionDeclRegex, "");
-}
-
-std::string PreprocessGLSL(const std::string& glslCode) {
-  auto result = upgradeGLSLVersion(glslCode);
+std::string PreprocessGLSL(const std::string& glslCode, ShaderStage stage) {
+  auto result = detail::UpgradeGLSLVersion(glslCode);
   result = assignInternalUBOBindings(result);
   result = assignCustomUBOBindings(result);
   result = assignSamplerBindings(result);
-  result = assignInputLocationQualifiers(result);
-  result = assignOutputLocationQualifiers(result);
-  result = removePrecisionDeclarations(result);
+  result = detail::AssignInputLocationQualifiers(result, stage);
+  result = detail::AssignOutputLocationQualifiers(result, stage);
+  result = detail::RemovePrecisionDeclarations(result);
   return result;
 }
 

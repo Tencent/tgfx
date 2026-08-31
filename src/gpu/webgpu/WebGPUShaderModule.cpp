@@ -17,42 +17,19 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "WebGPUShaderModule.h"
+#include <algorithm>
 #include <regex>
 #include <shaderc/shaderc.hpp>
+#include <unordered_map>
 #include "WebGPUDefines.h"
 #include "WebGPUGPU.h"
 #include "core/utils/Log.h"
+#include "gpu/ShaderCompiler.h"
 #include "gpu/UniformData.h"
 #include "src/tint/lang/spirv/reader/reader.h"
 #include "src/tint/lang/wgsl/writer/writer.h"
 
 namespace tgfx {
-
-using MatchReplacer = std::string (*)(const std::smatch&, int&);
-
-static std::string replaceAllMatches(const std::string& source, const std::regex& pattern,
-                                     MatchReplacer replacer, int& counter) {
-  std::smatch match;
-  std::string::const_iterator searchStart(source.cbegin());
-  std::string result;
-  size_t lastPos = 0;
-  while (std::regex_search(searchStart, source.cend(), match, pattern)) {
-    auto matchPos = static_cast<size_t>(match.position(0));
-    auto iterOffset = static_cast<size_t>(searchStart - source.cbegin());
-    size_t matchStart = matchPos + iterOffset;
-    result += source.substr(lastPos, matchStart - lastPos);
-    result += replacer(match, counter);
-    lastPos = matchStart + static_cast<size_t>(match.length(0));
-    searchStart = match.suffix().first;
-  }
-  result += source.substr(lastPos);
-  return result;
-}
-
-static std::string upgradeGLSLVersion(const std::string& source) {
-  static std::regex versionRegex(R"(#version\s+\d+(\s+es)?)");
-  return std::regex_replace(source, versionRegex, "#version 450");
-}
 
 static std::string assignInternalUBOBindings(const std::string& source) {
   static std::regex vertexUboRegex(R"(layout\s*\(\s*std140\s*\)\s*uniform\s+VertexUniformBlock)");
@@ -71,7 +48,7 @@ static std::string replaceCustomUBO(const std::smatch& match, int& counter) {
 static std::string assignCustomUBOBindings(const std::string& source) {
   static std::regex uboRegex(R"(layout\s*\(\s*std140\s*\)\s*uniform\s+(\w+))");
   int binding = 0;
-  return replaceAllMatches(source, uboRegex, replaceCustomUBO, binding);
+  return detail::ReplaceAllMatches(source, uboRegex, replaceCustomUBO, binding);
 }
 
 // Separates combined sampler declarations into distinct texture and sampler resources.
@@ -99,7 +76,7 @@ static std::string replaceSeparatedSampler(const std::smatch& match, int& counte
 static std::string separateSamplerDeclarations(const std::string& source) {
   static std::regex samplerRegex(R"(uniform\s+(sampler\w+)\s+(\w+);)");
   int binding = TEXTURE_BINDING_POINT_START;
-  return replaceAllMatches(source, samplerRegex, replaceSeparatedSampler, binding);
+  return detail::ReplaceAllMatches(source, samplerRegex, replaceSeparatedSampler, binding);
 }
 
 // Replaces texture lookup calls to use separated texture and sampler resources.
@@ -129,50 +106,17 @@ static std::vector<std::string> collectSamplerNames(const std::string& source) {
   return names;
 }
 
-static std::string replaceInputLocation(const std::smatch& match, int& counter) {
-  std::string interpStr = match[1].matched ? match[1].str() : "";
-  std::string precisionStr = match[2].matched ? match[2].str() : "";
-  return "layout(location=" + std::to_string(counter++) + ") " + interpStr + "in " + precisionStr +
-         match[3].str() + " " + match[4].str() + ";";
-}
-
-static std::string assignInputLocationQualifiers(const std::string& source) {
-  static std::regex inVarRegex(
-      R"((flat\s+|noperspective\s+)?in\s+(highp\s+|mediump\s+|lowp\s+)?(\w+)\s+(\w+)\s*;)");
-  int location = 0;
-  return replaceAllMatches(source, inVarRegex, replaceInputLocation, location);
-}
-
-static std::string replaceOutputLocation(const std::smatch& match, int& counter) {
-  std::string interpStr = match[1].matched ? match[1].str() : "";
-  std::string precisionStr = match[2].matched ? match[2].str() : "";
-  return "layout(location=" + std::to_string(counter++) + ") " + interpStr + "out " + precisionStr +
-         match[3].str() + " " + match[4].str() + ";";
-}
-
-static std::string assignOutputLocationQualifiers(const std::string& source) {
-  static std::regex outVarRegex(
-      R"((flat\s+|noperspective\s+)?out\s+(highp\s+|mediump\s+|lowp\s+)?(\w+)\s+(\w+)\s*;)");
-  int location = 0;
-  return replaceAllMatches(source, outVarRegex, replaceOutputLocation, location);
-}
-
-static std::string removePrecisionDeclarations(const std::string& source) {
-  static std::regex precisionDeclRegex(R"(precision\s+(highp|mediump|lowp)\s+\w+\s*;)");
-  return std::regex_replace(source, precisionDeclRegex, "");
-}
-
-static std::string preprocessGLSL(const std::string& glslCode) {
-  auto result = upgradeGLSLVersion(glslCode);
+static std::string preprocessGLSL(const std::string& glslCode, ShaderStage stage) {
+  auto result = detail::UpgradeGLSLVersion(glslCode);
   result = assignInternalUBOBindings(result);
   result = assignCustomUBOBindings(result);
   // Collect sampler names before separating declarations.
   auto samplerNames = collectSamplerNames(result);
   result = separateSamplerDeclarations(result);
   result = separateTextureLookups(result, samplerNames);
-  result = assignInputLocationQualifiers(result);
-  result = assignOutputLocationQualifiers(result);
-  result = removePrecisionDeclarations(result);
+  result = detail::AssignInputLocationQualifiers(result, stage);
+  result = detail::AssignOutputLocationQualifiers(result, stage);
+  result = detail::RemovePrecisionDeclarations(result);
   return result;
 }
 
@@ -210,13 +154,14 @@ std::shared_ptr<WebGPUShaderModule> WebGPUShaderModule::Make(
 }
 
 WebGPUShaderModule::WebGPUShaderModule(WebGPUGPU* gpu, const ShaderModuleDescriptor& descriptor)
-    : _stage(descriptor.stage) {
+    : VaryingShaderModule(ExtractVaryingDecls(descriptor.code, descriptor.stage)),
+      _stage(descriptor.stage) {
   compileShader(gpu->device(), descriptor.code, descriptor.stage);
 }
 
 bool WebGPUShaderModule::compileShader(WGPUDevice device, const std::string& glslCode,
                                        ShaderStage stage) {
-  std::string vulkanGLSL = preprocessGLSL(glslCode);
+  std::string vulkanGLSL = preprocessGLSL(glslCode, stage);
   auto spirvBinary = compileGLSLToSPIRV(vulkanGLSL, stage);
   if (spirvBinary.empty()) {
     return false;

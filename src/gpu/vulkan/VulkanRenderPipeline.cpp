@@ -21,6 +21,7 @@
 #include "VulkanShaderModule.h"
 #include "VulkanUtil.h"
 #include "core/utils/Log.h"
+#include "gpu/ShaderCompiler.h"
 #include "gpu/UniformData.h"
 
 namespace tgfx {
@@ -136,6 +137,16 @@ std::shared_ptr<VulkanRenderPipeline> VulkanRenderPipeline::Make(
     VulkanGPU* gpu, const RenderPipelineDescriptor& descriptor) {
   if (!gpu) {
     return nullptr;
+  }
+  if (descriptor.vertex.module && descriptor.fragment.module) {
+    auto vertexShader = std::static_pointer_cast<VulkanShaderModule>(descriptor.vertex.module);
+    auto fragmentShader = std::static_pointer_cast<VulkanShaderModule>(descriptor.fragment.module);
+    std::string mismatch;
+    if (!VaryingInterfacesMatch(vertexShader->varyingDecls(), fragmentShader->varyingDecls(),
+                                mismatch)) {
+      LOGE("VulkanRenderPipeline: %s", mismatch.c_str());
+      return nullptr;
+    }
   }
   auto pipeline = gpu->makeResource<VulkanRenderPipeline>(gpu, descriptor);
   if (pipeline->pipeline == VK_NULL_HANDLE) {

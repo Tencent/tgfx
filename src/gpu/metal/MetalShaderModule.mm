@@ -153,7 +153,8 @@ std::shared_ptr<MetalShaderModule> MetalShaderModule::Make(
 }
 
 MetalShaderModule::MetalShaderModule(MetalGPU* gpu, const ShaderModuleDescriptor& descriptor)
-    : _stage(descriptor.stage),
+    : VaryingShaderModule(ExtractVaryingDecls(descriptor.code, descriptor.stage)),
+      _stage(descriptor.stage),
       _glslCode(descriptor.stage == ShaderStage::Fragment ? descriptor.code : std::string{}) {
   compileShader(gpu->device(), gpu->shaderCompiler(), descriptor.code, descriptor.stage);
 }
@@ -190,7 +191,7 @@ bool MetalShaderModule::compileShader(id<MTLDevice> device, const shaderc::Compi
 
 std::string MetalShaderModule::convertGLSLToMSL(const shaderc::Compiler* compiler,
                                                 const std::string& glslCode, ShaderStage stage) {
-  std::string vulkanGLSL = PreprocessGLSL(glslCode);
+  std::string vulkanGLSL = PreprocessGLSL(glslCode, stage);
   auto spirvBinary = CompileGLSLToSPIRV(compiler, vulkanGLSL, stage);
   if (spirvBinary.empty()) {
     return "";
@@ -207,7 +208,7 @@ SampleMaskCompileResult CompileFragmentShaderWithSampleMask(MetalGPU* gpu,
   auto device = gpu->device();
   auto* compiler = gpu->shaderCompiler();
   auto stage = ShaderStage::Fragment;
-  std::string vulkanGLSL = PreprocessGLSL(glslCode);
+  std::string vulkanGLSL = PreprocessGLSL(glslCode, stage);
 
   // First pass: compile to SPIR-V and collect used specialization constant IDs.
   auto spirvBinary = CompileGLSLToSPIRV(compiler, vulkanGLSL, stage);
