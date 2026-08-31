@@ -32,9 +32,11 @@ std::shared_ptr<MetalRenderPipeline> MetalRenderPipeline::Make(
   }
 
   if (descriptor.vertex.module && descriptor.fragment.module) {
+    auto vertexShader = std::static_pointer_cast<MetalShaderModule>(descriptor.vertex.module);
+    auto fragmentShader = std::static_pointer_cast<MetalShaderModule>(descriptor.fragment.module);
     std::string mismatch;
-    if (!VaryingInterfacesMatch(descriptor.vertex.module->varyingDecls(),
-                                descriptor.fragment.module->varyingDecls(), mismatch)) {
+    if (!VaryingInterfacesMatch(vertexShader->varyingDecls(), fragmentShader->varyingDecls(),
+                                mismatch)) {
       LOGE("MetalRenderPipeline: %s", mismatch.c_str());
       return nullptr;
     }

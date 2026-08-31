@@ -154,8 +154,8 @@ std::shared_ptr<WebGPUShaderModule> WebGPUShaderModule::Make(
 }
 
 WebGPUShaderModule::WebGPUShaderModule(WebGPUGPU* gpu, const ShaderModuleDescriptor& descriptor)
-    : _stage(descriptor.stage) {
-  _varyingDecls = ExtractVaryingDecls(descriptor.code, descriptor.stage);
+    : VaryingShaderModule(ExtractVaryingDecls(descriptor.code, descriptor.stage)),
+      _stage(descriptor.stage) {
   compileShader(gpu->device(), descriptor.code, descriptor.stage);
 }
 

@@ -18,38 +18,31 @@
 
 #pragma once
 
-#include "gpu/VaryingShaderModule.h"
-#include "gpu/vulkan/VulkanAPI.h"
-#include "gpu/vulkan/VulkanResource.h"
+#include <unordered_map>
+#include <utility>
 #include "tgfx/gpu/ShaderModule.h"
 
 namespace tgfx {
 
-class VulkanGPU;
-
 /**
- * Vulkan shader module implementation. Compiles GLSL to SPIR-V via the shared ShaderCompiler, then
- * creates a VkShaderModule from the SPIR-V binary.
+ * Internal base class for shader modules that declare a varying interface (vertex `out` or
+ * fragment `in` declarations). The varying interface is only consumed by the backend render
+ * pipelines for cross-stage validation, so it lives in this src/-side base class instead of the
+ * public ShaderModule API.
  */
-class VulkanShaderModule : public VaryingShaderModule, public VulkanResource {
+class VaryingShaderModule : public ShaderModule {
  public:
-  static std::shared_ptr<VulkanShaderModule> Make(VulkanGPU* gpu,
-                                                  const ShaderModuleDescriptor& descriptor);
-
-  VkShaderModule vulkanShaderModule() const {
-    return shaderModule;
+  const std::unordered_map<std::string, int>& varyingDecls() const {
+    return _varyingDecls;
   }
 
  protected:
-  void onRelease(VulkanGPU* gpu) override;
+  explicit VaryingShaderModule(std::unordered_map<std::string, int> varyingDecls)
+      : _varyingDecls(std::move(varyingDecls)) {
+  }
 
  private:
-  VulkanShaderModule(VulkanGPU* gpu, const ShaderModuleDescriptor& descriptor);
-  ~VulkanShaderModule() override = default;
-
-  VkShaderModule shaderModule = VK_NULL_HANDLE;
-
-  friend class VulkanGPU;
+  std::unordered_map<std::string, int> _varyingDecls = {};
 };
 
 }  // namespace tgfx

@@ -35,8 +35,8 @@ std::shared_ptr<VulkanShaderModule> VulkanShaderModule::Make(
   return module;
 }
 
-VulkanShaderModule::VulkanShaderModule(VulkanGPU* gpu, const ShaderModuleDescriptor& descriptor) {
-  _varyingDecls = ExtractVaryingDecls(descriptor.code, descriptor.stage);
+VulkanShaderModule::VulkanShaderModule(VulkanGPU* gpu, const ShaderModuleDescriptor& descriptor)
+    : VaryingShaderModule(ExtractVaryingDecls(descriptor.code, descriptor.stage)) {
   std::string vulkanGLSL = PreprocessGLSL(descriptor.code, descriptor.stage);
   auto spirvBinary = CompileGLSLToSPIRV(gpu->shaderCompiler(), vulkanGLSL, descriptor.stage);
   if (spirvBinary.empty()) {

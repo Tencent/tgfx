@@ -68,9 +68,11 @@ std::shared_ptr<D3D12RenderPipeline> D3D12RenderPipeline::Make(
     return nullptr;
   }
   if (descriptor.vertex.module && descriptor.fragment.module) {
+    auto vertexShader = std::static_pointer_cast<D3D12ShaderModule>(descriptor.vertex.module);
+    auto fragmentShader = std::static_pointer_cast<D3D12ShaderModule>(descriptor.fragment.module);
     std::string mismatch;
-    if (!VaryingInterfacesMatch(descriptor.vertex.module->varyingDecls(),
-                                descriptor.fragment.module->varyingDecls(), mismatch)) {
+    if (!VaryingInterfacesMatch(vertexShader->varyingDecls(), fragmentShader->varyingDecls(),
+                                mismatch)) {
       LOGE("D3D12RenderPipeline: %s", mismatch.c_str());
       return nullptr;
     }

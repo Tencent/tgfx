@@ -139,9 +139,11 @@ std::shared_ptr<VulkanRenderPipeline> VulkanRenderPipeline::Make(
     return nullptr;
   }
   if (descriptor.vertex.module && descriptor.fragment.module) {
+    auto vertexShader = std::static_pointer_cast<VulkanShaderModule>(descriptor.vertex.module);
+    auto fragmentShader = std::static_pointer_cast<VulkanShaderModule>(descriptor.fragment.module);
     std::string mismatch;
-    if (!VaryingInterfacesMatch(descriptor.vertex.module->varyingDecls(),
-                                descriptor.fragment.module->varyingDecls(), mismatch)) {
+    if (!VaryingInterfacesMatch(vertexShader->varyingDecls(), fragmentShader->varyingDecls(),
+                                mismatch)) {
       LOGE("VulkanRenderPipeline: %s", mismatch.c_str());
       return nullptr;
     }

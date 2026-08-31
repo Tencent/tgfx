@@ -22,6 +22,7 @@
 #include <string>
 #include "D3D12Resource.h"
 #include "D3D12Util.h"
+#include "gpu/VaryingShaderModule.h"
 #include "tgfx/gpu/ShaderModule.h"
 #include "tgfx/gpu/ShaderStage.h"
 
@@ -56,7 +57,7 @@ class D3D12GPU;
  *     slots correspond one-to-one with the root parameter tables. Reordering either loop, or
  *     changing SPIRV-Cross's resource iteration order, will silently mis-map bindings.
  */
-class D3D12ShaderModule : public ShaderModule, public D3D12Resource {
+class D3D12ShaderModule : public VaryingShaderModule, public D3D12Resource {
  public:
   static std::shared_ptr<D3D12ShaderModule> Make(D3D12GPU* gpu,
                                                  const ShaderModuleDescriptor& descriptor);

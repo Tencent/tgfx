@@ -19,7 +19,6 @@
 #pragma once
 
 #include <string>
-#include <unordered_map>
 #include "tgfx/gpu/ShaderStage.h"
 
 namespace tgfx {
@@ -47,18 +46,5 @@ class ShaderModuleDescriptor {
 class ShaderModule {
  public:
   virtual ~ShaderModule() = default;
-
-  /**
-   * Returns the varying declarations of this shader stage: `out` declarations for the vertex
-   * stage and `in` declarations for the fragment stage. Each varying is keyed by name and maps to
-   * the number of locations it occupies (1 for scalars/vectors, the array length for array-typed
-   * varyings).
-   */
-  const std::unordered_map<std::string, int>& varyingDecls() const {
-    return _varyingDecls;
-  }
-
- protected:
-  std::unordered_map<std::string, int> _varyingDecls = {};
 };
 }  // namespace tgfx
