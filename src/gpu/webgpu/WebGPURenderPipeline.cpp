@@ -22,6 +22,7 @@
 #include "WebGPUShaderModule.h"
 #include "WebGPUUtil.h"
 #include "core/utils/Log.h"
+#include "gpu/ShaderCompiler.h"
 #include "gpu/UniformData.h"
 #include "tgfx/gpu/ShaderVisibility.h"
 
@@ -37,6 +38,16 @@ std::shared_ptr<WebGPURenderPipeline> WebGPURenderPipeline::Make(
     WebGPUGPU* gpu, const RenderPipelineDescriptor& descriptor) {
   if (gpu == nullptr) {
     return nullptr;
+  }
+  if (descriptor.vertex.module && descriptor.fragment.module) {
+    auto vertexShader = std::static_pointer_cast<WebGPUShaderModule>(descriptor.vertex.module);
+    auto fragmentShader = std::static_pointer_cast<WebGPUShaderModule>(descriptor.fragment.module);
+    std::string mismatch;
+    if (!VaryingInterfacesMatch(vertexShader->varyingDecls(), fragmentShader->varyingDecls(),
+                                mismatch)) {
+      LOGE("WebGPURenderPipeline: %s", mismatch.c_str());
+      return nullptr;
+    }
   }
   auto renderPipeline = gpu->makeResource<WebGPURenderPipeline>(gpu, descriptor);
   if (renderPipeline->pipeline == nullptr) {

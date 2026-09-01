@@ -22,6 +22,7 @@
 #include <string>
 #include <unordered_map>
 #include "MetalResource.h"
+#include "gpu/VaryingShaderModule.h"
 #include "tgfx/gpu/ShaderModule.h"
 
 namespace shaderc {
@@ -47,7 +48,7 @@ static constexpr unsigned MaxVertexAttributes = 31;
  * an MTLLibrary and retains the original GLSL code so that MetalRenderPipeline can re-compile with
  * sample mask injection when needed.
  */
-class MetalShaderModule : public ShaderModule, public MetalResource {
+class MetalShaderModule : public VaryingShaderModule, public MetalResource {
  public:
   static std::shared_ptr<MetalShaderModule> Make(MetalGPU* gpu,
                                                  const ShaderModuleDescriptor& descriptor);

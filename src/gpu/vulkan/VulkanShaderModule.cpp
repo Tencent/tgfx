@@ -35,7 +35,8 @@ std::shared_ptr<VulkanShaderModule> VulkanShaderModule::Make(
   return module;
 }
 
-VulkanShaderModule::VulkanShaderModule(VulkanGPU* gpu, const ShaderModuleDescriptor& descriptor) {
+VulkanShaderModule::VulkanShaderModule(VulkanGPU* gpu, const ShaderModuleDescriptor& descriptor)
+    : VaryingShaderModule(ExtractVaryingDecls(descriptor.code, descriptor.stage)) {
   std::string vulkanGLSL = PreprocessGLSL(descriptor.code, descriptor.stage);
   for (const auto& uniform : GetShaderUniformBindings(vulkanGLSL)) {
     uniformBindings[uniform.name] = uniform.binding;

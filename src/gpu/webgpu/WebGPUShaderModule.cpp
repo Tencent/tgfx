@@ -24,37 +24,12 @@
 #include "WebGPUDefines.h"
 #include "WebGPUGPU.h"
 #include "core/utils/Log.h"
+#include "gpu/ShaderCompiler.h"
 #include "gpu/UniformData.h"
 #include "src/tint/lang/spirv/reader/reader.h"
 #include "src/tint/lang/wgsl/writer/writer.h"
 
 namespace tgfx {
-
-using MatchReplacer = std::string (*)(const std::smatch&, int&);
-
-static std::string replaceAllMatches(const std::string& source, const std::regex& pattern,
-                                     MatchReplacer replacer, int& counter) {
-  std::smatch match;
-  std::string::const_iterator searchStart(source.cbegin());
-  std::string result;
-  size_t lastPos = 0;
-  while (std::regex_search(searchStart, source.cend(), match, pattern)) {
-    auto matchPos = static_cast<size_t>(match.position(0));
-    auto iterOffset = static_cast<size_t>(searchStart - source.cbegin());
-    size_t matchStart = matchPos + iterOffset;
-    result += source.substr(lastPos, matchStart - lastPos);
-    result += replacer(match, counter);
-    lastPos = matchStart + static_cast<size_t>(match.length(0));
-    searchStart = match.suffix().first;
-  }
-  result += source.substr(lastPos);
-  return result;
-}
-
-static std::string upgradeGLSLVersion(const std::string& source) {
-  static std::regex versionRegex(R"(#version\s+\d+(\s+es)?)");
-  return std::regex_replace(source, versionRegex, "#version 450");
-}
 
 static int UniformDescriptorSet(ShaderStage stage) {
   return stage == ShaderStage::Vertex ? VERTEX_UBO_DESCRIPTOR_SET : FRAGMENT_UBO_DESCRIPTOR_SET;
@@ -136,7 +111,7 @@ static std::string replaceSeparatedSampler(const std::smatch& match, int& counte
 static std::string separateSamplerDeclarations(const std::string& source) {
   static std::regex samplerRegex(R"(uniform\s+(sampler\w+)\s+(\w+);)");
   int binding = TEXTURE_BINDING_POINT_START;
-  return replaceAllMatches(source, samplerRegex, replaceSeparatedSampler, binding);
+  return detail::ReplaceAllMatches(source, samplerRegex, replaceSeparatedSampler, binding);
 }
 
 // Replaces texture lookup calls to use separated texture and sampler resources.
@@ -166,95 +141,6 @@ static std::vector<std::string> collectSamplerNames(const std::string& source) {
   return names;
 }
 
-static std::string replaceInputLocation(const std::smatch& match, int& counter) {
-  std::string interpStr = match[1].matched ? match[1].str() : "";
-  std::string precisionStr = match[2].matched ? match[2].str() : "";
-  return "layout(location=" + std::to_string(counter++) + ") " + interpStr + "in " + precisionStr +
-         match[3].str() + " " + match[4].str() + ";";
-}
-
-// See ShaderCompiler.cpp for the rationale: fragment inputs are name-keyed so vertex/fragment
-// varyings pair up regardless of source order, while vertex inputs (attributes) stay in
-// source-declaration order to match `RenderPipelineDescriptor::vertex.bufferLayouts`.
-static std::string replaceWithNameKeyedLocations(
-    const std::string& source, const std::regex& pattern,
-    const std::unordered_map<std::string, int>& nameToLocation, bool isInput) {
-  std::smatch match;
-  std::string::const_iterator searchStart(source.cbegin());
-  std::string result;
-  size_t lastPos = 0;
-  while (std::regex_search(searchStart, source.cend(), match, pattern)) {
-    auto matchPos = static_cast<size_t>(match.position(0));
-    auto iterOffset = static_cast<size_t>(searchStart - source.cbegin());
-    size_t matchStart = matchPos + iterOffset;
-    result += source.substr(lastPos, matchStart - lastPos);
-
-    std::string interpStr = match[1].matched ? match[1].str() : "";
-    std::string precisionStr = match[2].matched ? match[2].str() : "";
-    const std::string& name = match[4].str();
-    auto it = nameToLocation.find(name);
-    int location = (it != nameToLocation.end()) ? it->second : 0;
-    result += "layout(location=" + std::to_string(location) + ") " + interpStr +
-              (isInput ? "in " : "out ") + precisionStr + match[3].str() + " " + name + ";";
-
-    lastPos = matchStart + static_cast<size_t>(match.length(0));
-    searchStart = match.suffix().first;
-  }
-  result += source.substr(lastPos);
-  return result;
-}
-
-static std::unordered_map<std::string, int> buildNameSortedLocationMap(const std::string& source,
-                                                                       const std::regex& pattern) {
-  std::vector<std::string> names;
-  std::smatch match;
-  std::string::const_iterator searchStart(source.cbegin());
-  while (std::regex_search(searchStart, source.cend(), match, pattern)) {
-    names.push_back(match[4].str());
-    searchStart = match.suffix().first;
-  }
-  std::sort(names.begin(), names.end());
-  std::unordered_map<std::string, int> nameToLocation;
-  for (size_t i = 0; i < names.size(); i++) {
-    nameToLocation[names[i]] = static_cast<int>(i);
-  }
-  return nameToLocation;
-}
-
-static std::string assignInputLocationQualifiers(const std::string& source, ShaderStage stage) {
-  static std::regex inVarRegex(
-      R"((flat\s+|noperspective\s+)?in\s+(highp\s+|mediump\s+|lowp\s+)?(\w+)\s+(\w+)\s*;)");
-  if (stage == ShaderStage::Vertex) {
-    int location = 0;
-    return replaceAllMatches(source, inVarRegex, replaceInputLocation, location);
-  }
-  auto nameToLocation = buildNameSortedLocationMap(source, inVarRegex);
-  return replaceWithNameKeyedLocations(source, inVarRegex, nameToLocation, /*isInput=*/true);
-}
-
-static std::string replaceOutputLocation(const std::smatch& match, int& counter) {
-  std::string interpStr = match[1].matched ? match[1].str() : "";
-  std::string precisionStr = match[2].matched ? match[2].str() : "";
-  return "layout(location=" + std::to_string(counter++) + ") " + interpStr + "out " + precisionStr +
-         match[3].str() + " " + match[4].str() + ";";
-}
-
-static std::string assignOutputLocationQualifiers(const std::string& source, ShaderStage stage) {
-  static std::regex outVarRegex(
-      R"((flat\s+|noperspective\s+)?out\s+(highp\s+|mediump\s+|lowp\s+)?(\w+)\s+(\w+)\s*;)");
-  if (stage == ShaderStage::Fragment) {
-    int location = 0;
-    return replaceAllMatches(source, outVarRegex, replaceOutputLocation, location);
-  }
-  auto nameToLocation = buildNameSortedLocationMap(source, outVarRegex);
-  return replaceWithNameKeyedLocations(source, outVarRegex, nameToLocation, /*isInput=*/false);
-}
-
-static std::string removePrecisionDeclarations(const std::string& source) {
-  static std::regex precisionDeclRegex(R"(precision\s+(highp|mediump|lowp)\s+\w+\s*;)");
-  return std::regex_replace(source, precisionDeclRegex, "");
-}
-
 static std::unordered_map<std::string, unsigned> collectUniformBindings(
     const std::string& preprocessedGLSL) {
   static std::regex uboRegex(
@@ -270,16 +156,16 @@ static std::unordered_map<std::string, unsigned> collectUniformBindings(
 }
 
 static std::string preprocessGLSL(const std::string& glslCode, ShaderStage stage) {
-  auto result = upgradeGLSLVersion(glslCode);
+  auto result = detail::UpgradeGLSLVersion(glslCode);
   result = assignInternalUBOBindings(result);
   result = assignCustomUBOBindings(result, stage);
   // Collect sampler names before separating declarations.
   auto samplerNames = collectSamplerNames(result);
   result = separateSamplerDeclarations(result);
   result = separateTextureLookups(result, samplerNames);
-  result = assignInputLocationQualifiers(result, stage);
-  result = assignOutputLocationQualifiers(result, stage);
-  result = removePrecisionDeclarations(result);
+  result = detail::AssignInputLocationQualifiers(result, stage);
+  result = detail::AssignOutputLocationQualifiers(result, stage);
+  result = detail::RemovePrecisionDeclarations(result);
   return result;
 }
 
@@ -317,7 +203,8 @@ std::shared_ptr<WebGPUShaderModule> WebGPUShaderModule::Make(
 }
 
 WebGPUShaderModule::WebGPUShaderModule(WebGPUGPU* gpu, const ShaderModuleDescriptor& descriptor)
-    : _stage(descriptor.stage) {
+    : VaryingShaderModule(ExtractVaryingDecls(descriptor.code, descriptor.stage)),
+      _stage(descriptor.stage) {
   compileShader(gpu->device(), descriptor.code, descriptor.stage);
 }
 

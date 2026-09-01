@@ -20,6 +20,7 @@
 
 #include <string>
 #include <unordered_map>
+#include "gpu/VaryingShaderModule.h"
 #include "gpu/vulkan/VulkanAPI.h"
 #include "gpu/vulkan/VulkanResource.h"
 #include "tgfx/gpu/ShaderModule.h"
@@ -32,7 +33,7 @@ class VulkanGPU;
  * Vulkan shader module implementation. Compiles GLSL to SPIR-V via the shared ShaderCompiler, then
  * creates a VkShaderModule from the SPIR-V binary.
  */
-class VulkanShaderModule : public ShaderModule, public VulkanResource {
+class VulkanShaderModule : public VaryingShaderModule, public VulkanResource {
  public:
   static std::shared_ptr<VulkanShaderModule> Make(VulkanGPU* gpu,
                                                   const ShaderModuleDescriptor& descriptor);

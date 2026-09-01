@@ -172,7 +172,8 @@ std::shared_ptr<D3D12ShaderModule> D3D12ShaderModule::Make(
 }
 
 D3D12ShaderModule::D3D12ShaderModule(D3D12GPU* gpu, const ShaderModuleDescriptor& descriptor)
-    : _stage(descriptor.stage) {
+    : VaryingShaderModule(ExtractVaryingDecls(descriptor.code, descriptor.stage)),
+      _stage(descriptor.stage) {
   std::string vulkanGLSL = PreprocessGLSL(descriptor.code, descriptor.stage);
   auto declaredUniforms = GetShaderUniformBindings(vulkanGLSL);
   // D3D12 needs every declared interface variable to survive — see ShaderCompiler.h.

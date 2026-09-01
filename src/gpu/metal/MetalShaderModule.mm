@@ -153,7 +153,8 @@ std::shared_ptr<MetalShaderModule> MetalShaderModule::Make(
 }
 
 MetalShaderModule::MetalShaderModule(MetalGPU* gpu, const ShaderModuleDescriptor& descriptor)
-    : _stage(descriptor.stage),
+    : VaryingShaderModule(ExtractVaryingDecls(descriptor.code, descriptor.stage)),
+      _stage(descriptor.stage),
       _glslCode(descriptor.stage == ShaderStage::Fragment ? descriptor.code : std::string{}) {
   compileShader(gpu->device(), gpu->shaderCompiler(), descriptor.code, descriptor.stage);
 }

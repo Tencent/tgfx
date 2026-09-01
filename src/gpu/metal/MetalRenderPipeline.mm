@@ -21,6 +21,7 @@
 #include "MetalShaderModule.h"
 #include "MetalUtil.h"
 #include "core/utils/Log.h"
+#include "gpu/ShaderCompiler.h"
 
 namespace tgfx {
 
@@ -28,6 +29,17 @@ std::shared_ptr<MetalRenderPipeline> MetalRenderPipeline::Make(
     MetalGPU* gpu, const RenderPipelineDescriptor& descriptor) {
   if (!gpu) {
     return nullptr;
+  }
+
+  if (descriptor.vertex.module && descriptor.fragment.module) {
+    auto vertexShader = std::static_pointer_cast<MetalShaderModule>(descriptor.vertex.module);
+    auto fragmentShader = std::static_pointer_cast<MetalShaderModule>(descriptor.fragment.module);
+    std::string mismatch;
+    if (!VaryingInterfacesMatch(vertexShader->varyingDecls(), fragmentShader->varyingDecls(),
+                                mismatch)) {
+      LOGE("MetalRenderPipeline: %s", mismatch.c_str());
+      return nullptr;
+    }
   }
 
   auto pipeline = gpu->makeResource<MetalRenderPipeline>(gpu, descriptor);
