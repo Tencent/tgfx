@@ -164,6 +164,8 @@
         "MultisampleCount_4x": "faa8a587",
         "MultisampleMask_AllSamples": "faa8a587",
         "MultisampleMask_NoSamples": "faa8a587",
+        "UniformBufferAutoLayout": "a65023f3",
+        "UniformBufferBindingMismatch": "a65023f3",
         "VaryingOrderMismatch": "f4927aa3"
     },
     "Hello2DTest": {
