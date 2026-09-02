@@ -289,7 +289,7 @@ bool WebGPURenderPass::updateBindGroup() {
 void WebGPURenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount,
                             uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) {
   if (passEncoder == nullptr || currentPipeline == nullptr) {
-    LOGE("[WebGPU Draw] SKIPPED: encoder=%p pipeline=%p", static_cast<void*>(passEncoder),
+    LOGE("WebGPURenderPass::draw: encoder=%p pipeline=%p", static_cast<void*>(passEncoder),
          static_cast<void*>(currentPipeline.get()));
     return;
   }
@@ -310,6 +310,8 @@ void WebGPURenderPass::drawIndexed(PrimitiveType primitiveType, uint32_t indexCo
                                    uint32_t instanceCount, uint32_t firstIndex, int32_t baseVertex,
                                    uint32_t firstInstance) {
   if (passEncoder == nullptr || currentPipeline == nullptr) {
+    LOGE("WebGPURenderPass::drawIndexed: encoder=%p pipeline=%p", static_cast<void*>(passEncoder),
+         static_cast<void*>(currentPipeline.get()));
     return;
   }
   auto topology = ToWGPUPrimitiveTopology(primitiveType);

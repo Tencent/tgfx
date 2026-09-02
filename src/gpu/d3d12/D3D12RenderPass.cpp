@@ -294,7 +294,11 @@ void D3D12RenderPass::setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuff
 
 void D3D12RenderPass::setTexture(unsigned binding, std::shared_ptr<Texture> texture,
                                  std::shared_ptr<Sampler> sampler) {
-  if (!texture || !sampler || !currentPipeline || binding >= MaxTextureBindings) {
+  if (!texture || !sampler || binding >= MaxTextureBindings) {
+    return;
+  }
+  if (!currentPipeline) {
+    LOGE("D3D12RenderPass::setTexture: setPipeline must be called first.");
     return;
   }
   auto d3d12Tex = std::static_pointer_cast<D3D12Texture>(texture);
@@ -414,7 +418,11 @@ void D3D12RenderPass::flushBindingsIfNeeded() {
 
 void D3D12RenderPass::setVertexBuffer(unsigned slot, std::shared_ptr<GPUBuffer> buffer,
                                       size_t offset) {
-  if (!buffer || !currentPipeline) {
+  if (!buffer) {
+    return;
+  }
+  if (!currentPipeline) {
+    LOGE("D3D12RenderPass::setVertexBuffer: setPipeline must be called first.");
     return;
   }
   auto d3d12Buffer = std::static_pointer_cast<D3D12Buffer>(buffer);
@@ -469,6 +477,7 @@ void D3D12RenderPass::setStencilReference(uint32_t reference) {
 void D3D12RenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount,
                            uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) {
   if (!currentPipeline) {
+    LOGE("D3D12RenderPass::draw: setPipeline must be called first.");
     return;
   }
   auto topology = ToD3D12PrimitiveTopology(primitiveType);
@@ -485,6 +494,7 @@ void D3D12RenderPass::drawIndexed(PrimitiveType primitiveType, uint32_t indexCou
                                   uint32_t instanceCount, uint32_t firstIndex, int32_t baseVertex,
                                   uint32_t firstInstance) {
   if (!currentPipeline) {
+    LOGE("D3D12RenderPass::drawIndexed: setPipeline must be called first.");
     return;
   }
   auto topology = ToD3D12PrimitiveTopology(primitiveType);

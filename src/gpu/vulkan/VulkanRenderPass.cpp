@@ -359,7 +359,11 @@ void VulkanRenderPass::setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuf
 
 void VulkanRenderPass::setTexture(unsigned binding, std::shared_ptr<Texture> texture,
                                   std::shared_ptr<Sampler> sampler) {
-  if (!texture || !sampler || !lastBound.pipeline) {
+  if (!texture || !sampler) {
+    return;
+  }
+  if (!lastBound.pipeline) {
+    LOGE("VulkanRenderPass::setTexture: setPipeline must be called first.");
     return;
   }
   auto unitIndex = lastBound.pipeline->getTextureIndex(binding);
@@ -521,6 +525,7 @@ void VulkanRenderPass::setStencilReference(uint32_t reference) {
 void VulkanRenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount,
                             uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) {
   if (!lastBound.pipeline) {
+    LOGE("VulkanRenderPass::draw: setPipeline must be called first.");
     return;
   }
   if (!bindDescriptorSetIfDirty()) {
@@ -547,6 +552,7 @@ void VulkanRenderPass::drawIndexed(PrimitiveType primitiveType, uint32_t indexCo
                                    uint32_t instanceCount, uint32_t firstIndex, int32_t baseVertex,
                                    uint32_t firstInstance) {
   if (!lastBound.pipeline) {
+    LOGE("VulkanRenderPass::drawIndexed: setPipeline must be called first.");
     return;
   }
   if (!bindDescriptorSetIfDirty()) {
