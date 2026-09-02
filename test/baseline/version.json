@@ -166,6 +166,7 @@
         "MultisampleMask_NoSamples": "faa8a587",
         "UniformBufferAutoLayout": "a65023f3",
         "UniformBufferBindingMismatch": "a65023f3",
+        "UniformBufferSharedLayout": "8a44df9f",
         "VaryingOrderMismatch": "f4927aa3"
     },
     "Hello2DTest": {
