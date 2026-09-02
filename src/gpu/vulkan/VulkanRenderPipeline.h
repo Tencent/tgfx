@@ -18,9 +18,11 @@
 
 #pragma once
 
+#include <map>
 #include <unordered_map>
 #include <unordered_set>
 #include "core/utils/Log.h"
+#include "gpu/VaryingShaderModule.h"
 #include "gpu/vulkan/VulkanAPI.h"
 #include "gpu/vulkan/VulkanResource.h"
 #include "tgfx/gpu/RenderPass.h"
@@ -70,9 +72,9 @@ class VulkanRenderPipeline : public RenderPipeline, public VulkanResource {
 
   unsigned getTextureIndex(unsigned binding) const;
 
-  const std::vector<unsigned>* getVertexUniformBindings(unsigned binding) const;
-
-  const std::vector<unsigned>* getFragmentUniformBindings(unsigned binding) const;
+  /// Returns the per-stage physical UBO slots for the given public logical binding, or nullptr if
+  /// the pipeline does not use that binding.
+  const UniformSlotMapping* getUniformSlots(unsigned binding) const;
 
   const std::unordered_set<unsigned>& getTextureBindings() const {
     return textureBindingSet;
@@ -97,8 +99,7 @@ class VulkanRenderPipeline : public RenderPipeline, public VulkanResource {
   VkDescriptorSetLayout fragmentUboSetLayout = VK_NULL_HANDLE;
   VkDescriptorSetLayout textureSetLayout = VK_NULL_HANDLE;
   std::unordered_map<unsigned, unsigned> textureUnits = {};
-  std::unordered_map<unsigned, std::vector<unsigned>> vertexUniformBindings = {};
-  std::unordered_map<unsigned, std::vector<unsigned>> fragmentUniformBindings = {};
+  std::map<unsigned, UniformSlotMapping> uniformSlots = {};
   std::unordered_set<unsigned> textureBindingSet = {};
 
   friend class VulkanGPU;

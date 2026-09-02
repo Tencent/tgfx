@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include <string>
-#include <unordered_map>
 #include "gpu/VaryingShaderModule.h"
 #include "gpu/vulkan/VulkanAPI.h"
 #include "gpu/vulkan/VulkanResource.h"
@@ -42,12 +40,6 @@ class VulkanShaderModule : public VaryingShaderModule, public VulkanResource {
     return shaderModule;
   }
 
-  bool getUniformBinding(const std::string& name, unsigned* binding) const;
-
-  const std::unordered_map<std::string, unsigned>& uniformBindingMap() const {
-    return uniformBindings;
-  }
-
  protected:
   void onRelease(VulkanGPU* gpu) override;
 
@@ -56,7 +48,6 @@ class VulkanShaderModule : public VaryingShaderModule, public VulkanResource {
   ~VulkanShaderModule() override = default;
 
   VkShaderModule shaderModule = VK_NULL_HANDLE;
-  std::unordered_map<std::string, unsigned> uniformBindings = {};
 
   friend class VulkanGPU;
 };

@@ -899,10 +899,12 @@ TGFX_TEST(GPURenderTest, UniformBufferBindingMismatch) {
   EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/UniformBufferBindingMismatch"));
 }
 
-// Verifies the documented automatic layout mode. When BindingLayout::uniformBlocks is empty, each
-// shader module's physical binding number is also its public logical binding. Both stages have one
-// UBO at binding 0 here, so a single setUniformBuffer(0) call intentionally feeds the same vec4 to
-// the vertex scale and fragment colour. The values scale the quad to 100x100 and paint it olive.
+// Verifies the documented automatic layout mode. When BindingLayout::uniformBlocks is empty,
+// logical bindings are assigned by merging both stages' block names into one name-sorted set and
+// numbering them 0, 1, 2, ... — matching OpenGL's program-level, name-keyed binding space. The two
+// differently named blocks here (FragmentArgs, VertexArgs) must therefore land on distinct logical
+// bindings ordered by name: FragmentArgs -> 0, VertexArgs -> 1. Each is fed its own buffer; the
+// vertex block scales the quad to 100x100 and the fragment block paints it olive.
 TGFX_TEST(GPURenderTest, UniformBufferAutoLayout) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -940,19 +942,34 @@ TGFX_TEST(GPURenderTest, UniformBufferAutoLayout) {
   memcpy(mappedVertices, quadVertices, sizeof(quadVertices));
   vertexBuffer->unmap();
 
-  auto uniformBuffer =
+  // Vertex block "VertexArgs": scale the full-screen quad down to a centered 100x100 rectangle.
+  auto vertexUniformBuffer =
+      gpu->createBuffer(sizeof(UniformBufferBindingVertexArgs), GPUBufferUsage::UNIFORM);
+  ASSERT_TRUE(vertexUniformBuffer != nullptr);
+  auto* vertexArgs = static_cast<UniformBufferBindingVertexArgs*>(vertexUniformBuffer->map());
+  ASSERT_TRUE(vertexArgs != nullptr);
+  vertexArgs->scaleX = 0.5f;
+  vertexArgs->scaleY = 0.5f;
+  vertexArgs->fillerZ = 1.0f;
+  vertexArgs->fillerW = 1.0f;
+  vertexUniformBuffer->unmap();
+
+  // Fragment block "FragmentArgs": olive fill colour.
+  auto fragmentUniformBuffer =
       gpu->createBuffer(sizeof(UniformBufferBindingFragmentArgs), GPUBufferUsage::UNIFORM);
-  ASSERT_TRUE(uniformBuffer != nullptr);
-  auto* args = static_cast<UniformBufferBindingFragmentArgs*>(uniformBuffer->map());
-  ASSERT_TRUE(args != nullptr);
-  args->r = 0.5f;
-  args->g = 0.5f;
-  args->b = 0.0f;
-  args->a = 1.0f;
-  uniformBuffer->unmap();
+  ASSERT_TRUE(fragmentUniformBuffer != nullptr);
+  auto* fragmentArgs = static_cast<UniformBufferBindingFragmentArgs*>(fragmentUniformBuffer->map());
+  ASSERT_TRUE(fragmentArgs != nullptr);
+  fragmentArgs->r = 0.5f;
+  fragmentArgs->g = 0.5f;
+  fragmentArgs->b = 0.0f;
+  fragmentArgs->a = 1.0f;
+  fragmentUniformBuffer->unmap();
 
   renderPass->setVertexBuffer(0, vertexBuffer);
-  renderPass->setUniformBuffer(0, uniformBuffer, 0, uniformBuffer->size());
+  // Name-sorted automatic layout: FragmentArgs -> logical 0, VertexArgs -> logical 1.
+  renderPass->setUniformBuffer(0, fragmentUniformBuffer, 0, fragmentUniformBuffer->size());
+  renderPass->setUniformBuffer(1, vertexUniformBuffer, 0, vertexUniformBuffer->size());
   renderPass->draw(PrimitiveType::TriangleStrip, 4, 1);
   renderPass->end();
 

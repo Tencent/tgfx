@@ -172,7 +172,7 @@ std::shared_ptr<D3D12ShaderModule> D3D12ShaderModule::Make(
 }
 
 D3D12ShaderModule::D3D12ShaderModule(D3D12GPU* gpu, const ShaderModuleDescriptor& descriptor)
-    : VaryingShaderModule(ExtractVaryingDecls(descriptor.code, descriptor.stage)),
+    : VaryingShaderModule(ExtractVaryingDecls(descriptor.code, descriptor.stage), {}),
       _stage(descriptor.stage) {
   std::string vulkanGLSL = PreprocessGLSL(descriptor.code, descriptor.stage);
   auto declaredUniforms = GetShaderUniformBindings(vulkanGLSL);
@@ -182,26 +182,20 @@ D3D12ShaderModule::D3D12ShaderModule(D3D12GPU* gpu, const ShaderModuleDescriptor
     LOGE("D3D12ShaderModule: GLSL to SPIR-V compilation failed.");
     return;
   }
+  // SPIRV-Cross assigns the CBV register (b{N}) each uniform block occupies; capture that as the
+  // per-stage physical slot and publish it to the base class for pipeline-side resolution.
+  std::unordered_map<std::string, unsigned> uniformRegisters;
   std::string hlsl =
       convertSPIRVToHLSL(spirvBinary, descriptor.stage, declaredUniforms, &uniformRegisters);
   if (hlsl.empty()) {
     return;
   }
+  setUniformSlots(
+      std::map<std::string, unsigned>(uniformRegisters.begin(), uniformRegisters.end()));
   bytecode = compileHLSLToDXBC(hlsl, descriptor.stage);
 #ifdef TGFX_D3D12_DEBUG_LAYER
   _hlslSource = std::move(hlsl);
 #endif
-}
-
-bool D3D12ShaderModule::getUniformRegister(const std::string& name, unsigned* registerIndex) const {
-  auto result = uniformRegisters.find(name);
-  if (result == uniformRegisters.end()) {
-    return false;
-  }
-  if (registerIndex != nullptr) {
-    *registerIndex = result->second;
-  }
-  return true;
 }
 
 void D3D12ShaderModule::onRelease(D3D12GPU*) {

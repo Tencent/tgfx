@@ -134,23 +134,25 @@ static VkFormat AttributeToVkFormat(const Attribute& attr) {
 }
 
 static bool CreateUboSetLayout(VkDevice device,
-                               const std::unordered_map<unsigned, std::vector<unsigned>>& bindings,
+                               const std::map<unsigned, UniformSlotMapping>& mappings, bool vertex,
                                VkShaderStageFlags stageFlags, VkDescriptorSetLayout* setLayout) {
   std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
   std::unordered_set<unsigned> physicalBindings;
-  for (const auto& item : bindings) {
-    for (auto physicalBinding : item.second) {
-      if (!physicalBindings.insert(physicalBinding).second) {
-        LOGE("VulkanRenderPipeline: duplicate physical UBO binding %u.", physicalBinding);
-        return false;
-      }
-      VkDescriptorSetLayoutBinding binding = {};
-      binding.binding = physicalBinding;
-      binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-      binding.descriptorCount = 1;
-      binding.stageFlags = stageFlags;
-      layoutBindings.push_back(binding);
+  for (const auto& item : mappings) {
+    auto slot = vertex ? item.second.vertexSlot : item.second.fragmentSlot;
+    if (!slot.has_value()) {
+      continue;
     }
+    if (!physicalBindings.insert(*slot).second) {
+      LOGE("VulkanRenderPipeline: duplicate physical UBO binding %u.", *slot);
+      return false;
+    }
+    VkDescriptorSetLayoutBinding binding = {};
+    binding.binding = *slot;
+    binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    binding.descriptorCount = 1;
+    binding.stageFlags = stageFlags;
+    layoutBindings.push_back(binding);
   }
   VkDescriptorSetLayoutCreateInfo layoutInfo = {};
   layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -190,37 +192,11 @@ VulkanRenderPipeline::VulkanRenderPipeline(VulkanGPU* gpu,
   }
   auto vertexShader = std::static_pointer_cast<VulkanShaderModule>(descriptor.vertex.module);
   auto fragmentShader = std::static_pointer_cast<VulkanShaderModule>(descriptor.fragment.module);
-  if (descriptor.layout.uniformBlocks.empty()) {
-    if (vertexShader != nullptr) {
-      for (const auto& item : vertexShader->uniformBindingMap()) {
-        vertexUniformBindings[item.second].push_back(item.second);
-      }
-    }
-    if (fragmentShader != nullptr) {
-      for (const auto& item : fragmentShader->uniformBindingMap()) {
-        fragmentUniformBindings[item.second].push_back(item.second);
-      }
-    }
-  } else {
-    for (auto& entry : descriptor.layout.uniformBlocks) {
-      unsigned physicalBinding = 0;
-      if ((entry.visibility & ShaderVisibility::Vertex) && vertexShader != nullptr) {
-        if (vertexShader->getUniformBinding(entry.name, &physicalBinding)) {
-          vertexUniformBindings[entry.binding].push_back(physicalBinding);
-        } else {
-          LOGE("VulkanRenderPipeline: vertex uniform block '%s' was not found.",
-               entry.name.c_str());
-        }
-      }
-      if ((entry.visibility & ShaderVisibility::Fragment) && fragmentShader != nullptr) {
-        if (fragmentShader->getUniformBinding(entry.name, &physicalBinding)) {
-          fragmentUniformBindings[entry.binding].push_back(physicalBinding);
-        } else {
-          LOGE("VulkanRenderPipeline: fragment uniform block '%s' was not found.",
-               entry.name.c_str());
-        }
-      }
-    }
+  std::string error;
+  if (!ResolveUniformSlots(vertexShader.get(), fragmentShader.get(),
+                           descriptor.layout.uniformBlocks, uniformSlots, error)) {
+    LOGE("VulkanRenderPipeline: %s.", error.c_str());
+    return;
   }
 
   if (!createDescriptorSetLayouts(gpu, descriptor) || !createPipelineLayout(gpu) ||
@@ -270,25 +246,18 @@ unsigned VulkanRenderPipeline::getTextureIndex(unsigned binding) const {
   return binding;
 }
 
-const std::vector<unsigned>* VulkanRenderPipeline::getVertexUniformBindings(
-    unsigned binding) const {
-  auto result = vertexUniformBindings.find(binding);
-  return result != vertexUniformBindings.end() ? &result->second : nullptr;
-}
-
-const std::vector<unsigned>* VulkanRenderPipeline::getFragmentUniformBindings(
-    unsigned binding) const {
-  auto result = fragmentUniformBindings.find(binding);
-  return result != fragmentUniformBindings.end() ? &result->second : nullptr;
+const UniformSlotMapping* VulkanRenderPipeline::getUniformSlots(unsigned binding) const {
+  auto result = uniformSlots.find(binding);
+  return result != uniformSlots.end() ? &result->second : nullptr;
 }
 
 bool VulkanRenderPipeline::createDescriptorSetLayouts(VulkanGPU* gpu,
                                                       const RenderPipelineDescriptor& descriptor) {
   auto device = gpu->device();
 
-  if (!CreateUboSetLayout(device, vertexUniformBindings, VK_SHADER_STAGE_VERTEX_BIT,
+  if (!CreateUboSetLayout(device, uniformSlots, /*vertex=*/true, VK_SHADER_STAGE_VERTEX_BIT,
                           &vertexUboSetLayout) ||
-      !CreateUboSetLayout(device, fragmentUniformBindings, VK_SHADER_STAGE_FRAGMENT_BIT,
+      !CreateUboSetLayout(device, uniformSlots, /*vertex=*/false, VK_SHADER_STAGE_FRAGMENT_BIT,
                           &fragmentUboSetLayout)) {
     LOGE("VulkanRenderPipeline: vkCreateDescriptorSetLayout (UBO set) failed.");
     return false;

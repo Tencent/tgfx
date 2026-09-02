@@ -68,36 +68,16 @@ MetalRenderPipeline::MetalRenderPipeline(MetalGPU* gpu,
 
   auto vertexShader = std::static_pointer_cast<MetalShaderModule>(descriptor.vertex.module);
   auto fragmentShader = std::static_pointer_cast<MetalShaderModule>(descriptor.fragment.module);
-  if (descriptor.layout.uniformBlocks.empty()) {
-    if (vertexShader != nullptr) {
-      for (const auto& item : vertexShader->uniformBindingMap()) {
-        vertexUniformIndices[item.second].push_back(item.second);
-      }
+  std::string error;
+  if (!ResolveUniformSlots(vertexShader.get(), fragmentShader.get(),
+                           descriptor.layout.uniformBlocks, uniformSlots, error)) {
+    LOGE("MetalRenderPipeline: %s.", error.c_str());
+    // Reject the pipeline: a dangling logical binding must not silently produce a usable pipeline.
+    if (pipelineState != nil) {
+      [pipelineState release];
+      pipelineState = nil;
     }
-    if (fragmentShader != nullptr) {
-      for (const auto& item : fragmentShader->uniformBindingMap()) {
-        fragmentUniformIndices[item.second].push_back(item.second);
-      }
-    }
-  } else {
-    for (auto& entry : descriptor.layout.uniformBlocks) {
-      unsigned physicalIndex = 0;
-      if ((entry.visibility & ShaderVisibility::Vertex) && vertexShader != nullptr) {
-        if (vertexShader->getUniformBinding(entry.name, &physicalIndex)) {
-          vertexUniformIndices[entry.binding].push_back(physicalIndex);
-        } else {
-          LOGE("MetalRenderPipeline: vertex uniform block '%s' was not found.", entry.name.c_str());
-        }
-      }
-      if ((entry.visibility & ShaderVisibility::Fragment) && fragmentShader != nullptr) {
-        if (fragmentShader->getUniformBinding(entry.name, &physicalIndex)) {
-          fragmentUniformIndices[entry.binding].push_back(physicalIndex);
-        } else {
-          LOGE("MetalRenderPipeline: fragment uniform block '%s' was not found.",
-               entry.name.c_str());
-        }
-      }
-    }
+    return;
   }
 }
 
@@ -124,15 +104,9 @@ unsigned MetalRenderPipeline::getTextureIndex(unsigned binding) const {
   return binding;
 }
 
-const std::vector<unsigned>* MetalRenderPipeline::getVertexUniformIndices(unsigned binding) const {
-  auto result = vertexUniformIndices.find(binding);
-  return result != vertexUniformIndices.end() ? &result->second : nullptr;
-}
-
-const std::vector<unsigned>* MetalRenderPipeline::getFragmentUniformIndices(
-    unsigned binding) const {
-  auto result = fragmentUniformIndices.find(binding);
-  return result != fragmentUniformIndices.end() ? &result->second : nullptr;
+const UniformSlotMapping* MetalRenderPipeline::getUniformSlots(unsigned binding) const {
+  auto result = uniformSlots.find(binding);
+  return result != uniformSlots.end() ? &result->second : nullptr;
 }
 
 bool MetalRenderPipeline::createPipelineState(MetalGPU* gpu,

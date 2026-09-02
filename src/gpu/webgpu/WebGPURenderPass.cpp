@@ -229,27 +229,25 @@ bool WebGPURenderPass::updateBindGroup() {
       continue;
     }
     auto webgpuBuffer = std::static_pointer_cast<WebGPUBuffer>(uniform.buffer);
-    auto vertexBindings = currentPipeline->getVertexUniformBindings(binding);
-    if (vertexBindings != nullptr) {
-      for (auto physicalBinding : *vertexBindings) {
-        WGPUBindGroupEntry entry = {};
-        entry.binding = physicalBinding;
-        entry.buffer = webgpuBuffer->webgpuBuffer();
-        entry.offset = uniform.offset;
-        entry.size = uniform.size;
-        groupEntries[VERTEX_UBO_DESCRIPTOR_SET].push_back(entry);
-      }
+    auto slots = currentPipeline->getUniformSlots(binding);
+    if (slots == nullptr) {
+      continue;
     }
-    auto fragmentBindings = currentPipeline->getFragmentUniformBindings(binding);
-    if (fragmentBindings != nullptr) {
-      for (auto physicalBinding : *fragmentBindings) {
-        WGPUBindGroupEntry entry = {};
-        entry.binding = physicalBinding;
-        entry.buffer = webgpuBuffer->webgpuBuffer();
-        entry.offset = uniform.offset;
-        entry.size = uniform.size;
-        groupEntries[FRAGMENT_UBO_DESCRIPTOR_SET].push_back(entry);
-      }
+    if (slots->vertexSlot.has_value()) {
+      WGPUBindGroupEntry entry = {};
+      entry.binding = *slots->vertexSlot;
+      entry.buffer = webgpuBuffer->webgpuBuffer();
+      entry.offset = uniform.offset;
+      entry.size = uniform.size;
+      groupEntries[VERTEX_UBO_DESCRIPTOR_SET].push_back(entry);
+    }
+    if (slots->fragmentSlot.has_value()) {
+      WGPUBindGroupEntry entry = {};
+      entry.binding = *slots->fragmentSlot;
+      entry.buffer = webgpuBuffer->webgpuBuffer();
+      entry.offset = uniform.offset;
+      entry.size = uniform.size;
+      groupEntries[FRAGMENT_UBO_DESCRIPTOR_SET].push_back(entry);
     }
   }
 

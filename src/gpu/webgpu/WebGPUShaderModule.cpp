@@ -141,20 +141,6 @@ static std::vector<std::string> collectSamplerNames(const std::string& source) {
   return names;
 }
 
-static std::unordered_map<std::string, unsigned> collectUniformBindings(
-    const std::string& preprocessedGLSL) {
-  static std::regex uboRegex(
-      R"(layout\s*\(\s*std140\s*,\s*set\s*=\s*\d+\s*,\s*binding\s*=\s*(\d+)\s*\)\s*uniform\s+(\w+))");
-  std::unordered_map<std::string, unsigned> bindings;
-  std::smatch match;
-  std::string::const_iterator searchStart(preprocessedGLSL.cbegin());
-  while (std::regex_search(searchStart, preprocessedGLSL.cend(), match, uboRegex)) {
-    bindings[match[2].str()] = static_cast<unsigned>(std::stoul(match[1].str()));
-    searchStart = match.suffix().first;
-  }
-  return bindings;
-}
-
 static std::string preprocessGLSL(const std::string& glslCode, ShaderStage stage) {
   auto result = detail::UpgradeGLSLVersion(glslCode);
   result = assignInternalUBOBindings(result);
@@ -167,6 +153,24 @@ static std::string preprocessGLSL(const std::string& glslCode, ShaderStage stage
   result = detail::AssignOutputLocationQualifiers(result, stage);
   result = detail::RemovePrecisionDeclarations(result);
   return result;
+}
+
+// Collects the uniform-block name -> physical binding map from the preprocessed GLSL, in the
+// same descriptor namespace the pipeline resolves against. Ordered by name for deterministic
+// slot resolution.
+static std::map<std::string, unsigned> CollectUniformSlots(const std::string& glslCode,
+                                                           ShaderStage stage) {
+  static std::regex uboRegex(
+      R"(layout\s*\(\s*std140\s*,\s*set\s*=\s*\d+\s*,\s*binding\s*=\s*(\d+)\s*\)\s*uniform\s+(\w+))");
+  auto preprocessedGLSL = preprocessGLSL(glslCode, stage);
+  std::map<std::string, unsigned> slots;
+  std::smatch match;
+  std::string::const_iterator searchStart(preprocessedGLSL.cbegin());
+  while (std::regex_search(searchStart, preprocessedGLSL.cend(), match, uboRegex)) {
+    slots[match[2].str()] = static_cast<unsigned>(std::stoul(match[1].str()));
+    searchStart = match.suffix().first;
+  }
+  return slots;
 }
 
 static std::vector<uint32_t> compileGLSLToSPIRV(const std::string& glslCode, ShaderStage stage) {
@@ -203,26 +207,15 @@ std::shared_ptr<WebGPUShaderModule> WebGPUShaderModule::Make(
 }
 
 WebGPUShaderModule::WebGPUShaderModule(WebGPUGPU* gpu, const ShaderModuleDescriptor& descriptor)
-    : VaryingShaderModule(ExtractVaryingDecls(descriptor.code, descriptor.stage)),
+    : VaryingShaderModule(ExtractVaryingDecls(descriptor.code, descriptor.stage),
+                          CollectUniformSlots(descriptor.code, descriptor.stage)),
       _stage(descriptor.stage) {
   compileShader(gpu->device(), descriptor.code, descriptor.stage);
-}
-
-bool WebGPUShaderModule::getUniformBinding(const std::string& name, unsigned* binding) const {
-  auto result = uniformBindings.find(name);
-  if (result == uniformBindings.end()) {
-    return false;
-  }
-  if (binding != nullptr) {
-    *binding = result->second;
-  }
-  return true;
 }
 
 bool WebGPUShaderModule::compileShader(WGPUDevice device, const std::string& glslCode,
                                        ShaderStage stage) {
   std::string vulkanGLSL = preprocessGLSL(glslCode, stage);
-  uniformBindings = collectUniformBindings(vulkanGLSL);
   auto spirvBinary = compileGLSLToSPIRV(vulkanGLSL, stage);
   if (spirvBinary.empty()) {
     return false;

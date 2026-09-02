@@ -74,12 +74,6 @@ class MetalShaderModule : public VaryingShaderModule, public MetalResource {
     return _glslCode;
   }
 
-  bool getUniformBinding(const std::string& name, unsigned* binding) const;
-
-  const std::unordered_map<std::string, unsigned>& uniformBindingMap() const {
-    return uniformBindings;
-  }
-
  protected:
   void onRelease(MetalGPU* gpu) override;
 
@@ -95,7 +89,6 @@ class MetalShaderModule : public VaryingShaderModule, public MetalResource {
   id<MTLLibrary> library = nil;
   ShaderStage _stage = ShaderStage::Vertex;
   std::string _glslCode;
-  std::unordered_map<std::string, unsigned> uniformBindings = {};
 
   friend class MetalGPU;
 };

@@ -19,9 +19,11 @@
 #pragma once
 
 #include <webgpu/webgpu.h>
+#include <map>
 #include <unordered_map>
 #include <vector>
 #include "WebGPUResource.h"
+#include "gpu/VaryingShaderModule.h"
 #include "tgfx/gpu/RenderPipeline.h"
 
 namespace tgfx {
@@ -46,9 +48,9 @@ class WebGPURenderPipeline : public RenderPipeline, public WebGPUResource {
 
   unsigned getTextureIndex(unsigned binding) const;
 
-  const std::vector<unsigned>* getVertexUniformBindings(unsigned binding) const;
-
-  const std::vector<unsigned>* getFragmentUniformBindings(unsigned binding) const;
+  /// Returns the per-stage physical bindings for the given public logical binding, or nullptr if
+  /// the pipeline does not use that binding.
+  const UniformSlotMapping* getUniformSlots(unsigned binding) const;
 
   void onRelease(WebGPUGPU* gpu) override;
 
@@ -63,8 +65,7 @@ class WebGPURenderPipeline : public RenderPipeline, public WebGPUResource {
   WGPUBindGroupLayout bindGroupLayouts[3] = {};
   WGPUPipelineLayout pipelineLayout = nullptr;
   std::unordered_map<unsigned, unsigned> textureUnits = {};
-  std::unordered_map<unsigned, std::vector<unsigned>> vertexUniformBindings = {};
-  std::unordered_map<unsigned, std::vector<unsigned>> fragmentUniformBindings = {};
+  std::map<unsigned, UniformSlotMapping> uniformSlots = {};
   WGPUCullMode cullMode = WGPUCullMode_None;
   WGPUFrontFace frontFace = WGPUFrontFace_CCW;
 

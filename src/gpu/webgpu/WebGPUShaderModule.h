@@ -43,12 +43,6 @@ class WebGPUShaderModule : public VaryingShaderModule, public WebGPUResource {
     return _stage;
   }
 
-  bool getUniformBinding(const std::string& name, unsigned* binding) const;
-
-  const std::unordered_map<std::string, unsigned>& uniformBindingMap() const {
-    return uniformBindings;
-  }
-
   void onRelease(WebGPUGPU* gpu) override;
 
  private:
@@ -58,7 +52,6 @@ class WebGPUShaderModule : public VaryingShaderModule, public WebGPUResource {
 
   WGPUShaderModule shaderModule = nullptr;
   ShaderStage _stage = ShaderStage::Vertex;
-  std::unordered_map<std::string, unsigned> uniformBindings = {};
 
   friend class WebGPUGPU;
 };

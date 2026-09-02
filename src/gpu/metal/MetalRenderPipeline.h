@@ -19,9 +19,11 @@
 #pragma once
 
 #include <Metal/Metal.h>
+#include <map>
 #include <unordered_map>
 #include <vector>
 #include "MetalResource.h"
+#include "gpu/VaryingShaderModule.h"
 #include "tgfx/gpu/RenderPipeline.h"
 
 namespace tgfx {
@@ -57,9 +59,9 @@ class MetalRenderPipeline : public RenderPipeline, public MetalResource {
    */
   unsigned getTextureIndex(unsigned binding) const;
 
-  const std::vector<unsigned>* getVertexUniformIndices(unsigned binding) const;
-
-  const std::vector<unsigned>* getFragmentUniformIndices(unsigned binding) const;
+  /// Returns the per-stage physical Metal buffer indices for the given public logical binding, or
+  /// nullptr if the pipeline does not use that binding.
+  const UniformSlotMapping* getUniformSlots(unsigned binding) const;
 
  protected:
   void onRelease(MetalGPU* gpu) override;
@@ -79,8 +81,7 @@ class MetalRenderPipeline : public RenderPipeline, public MetalResource {
   id<MTLDepthStencilState> depthStencilState = nil;
   id<MTLLibrary> sampleMaskLibrary = nil;
   std::unordered_map<unsigned, unsigned> textureUnits = {};
-  std::unordered_map<unsigned, std::vector<unsigned>> vertexUniformIndices = {};
-  std::unordered_map<unsigned, std::vector<unsigned>> fragmentUniformIndices = {};
+  std::map<unsigned, UniformSlotMapping> uniformSlots = {};
   MTLCullMode cullMode = MTLCullModeNone;
   MTLWinding frontFace = MTLWindingCounterClockwise;
 

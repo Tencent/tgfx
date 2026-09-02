@@ -18,17 +18,35 @@
 
 #pragma once
 
+#include <map>
+#include <optional>
+#include <string>
 #include <unordered_map>
 #include <utility>
+#include <vector>
+#include "tgfx/gpu/RenderPipeline.h"
 #include "tgfx/gpu/ShaderModule.h"
+#include "tgfx/gpu/ShaderStage.h"
 
 namespace tgfx {
 
 /**
+ * Maps one public logical uniform-block binding to the physical shader-stage slots that consume
+ * it. A block declared in both stages (a shared, same-named uniform block, matching the OpenGL
+ * program-level binding contract) populates both slots; a stage-exclusive block populates only
+ * one. The physical slot value is backend-specific (Vulkan descriptor binding, Metal buffer
+ * index, WebGPU binding, or D3D12 CBV register).
+ */
+struct UniformSlotMapping {
+  std::optional<unsigned> vertexSlot;
+  std::optional<unsigned> fragmentSlot;
+};
+
+/**
  * Internal base class for shader modules that declare a varying interface (vertex `out` or
- * fragment `in` declarations). The varying interface is only consumed by the backend render
- * pipelines for cross-stage validation, so it lives in this src/-side base class instead of the
- * public ShaderModule API.
+ * fragment `in` declarations) and a set of uniform blocks. Both are only consumed by the backend
+ * render pipelines for cross-stage validation and uniform-slot resolution, so they live in this
+ * src/-side base class instead of the public ShaderModule API.
  */
 class VaryingShaderModule : public ShaderModule {
  public:
@@ -36,13 +54,102 @@ class VaryingShaderModule : public ShaderModule {
     return _varyingDecls;
   }
 
+  /**
+   * Returns the uniform blocks declared by this stage, keyed by block name and mapped to the
+   * physical shader-stage slot the backend assigned to it. Ordered by name so slot resolution is
+   * deterministic across runs.
+   */
+  const std::map<std::string, unsigned>& uniformSlots() const {
+    return _uniformSlots;
+  }
+
  protected:
-  explicit VaryingShaderModule(std::unordered_map<std::string, int> varyingDecls)
-      : _varyingDecls(std::move(varyingDecls)) {
+  VaryingShaderModule(std::unordered_map<std::string, int> varyingDecls,
+                      std::map<std::string, unsigned> uniformSlots)
+      : _varyingDecls(std::move(varyingDecls)), _uniformSlots(std::move(uniformSlots)) {
+  }
+
+  /**
+   * Sets the uniform-slot map after construction. Used by backends (e.g. D3D12) whose physical
+   * slot assignment is only known partway through the constructor body, after the base class has
+   * already been initialized.
+   */
+  void setUniformSlots(std::map<std::string, unsigned> uniformSlots) {
+    _uniformSlots = std::move(uniformSlots);
   }
 
  private:
   std::unordered_map<std::string, int> _varyingDecls = {};
+  std::map<std::string, unsigned> _uniformSlots = {};
 };
+
+/**
+ * Resolves the public logical uniform-block bindings for a pipeline into per-stage physical slots,
+ * shared by every SPIR-V based backend (Vulkan / Metal / D3D12 / WebGPU).
+ *
+ * When `uniformBlocks` is non-empty (explicit layout), each entry's `binding` is the logical id;
+ * the block is looked up by name in whichever stage(s) its visibility targets. A name that a
+ * targeted stage does not declare is a hard error: `errorOut` receives a description and the
+ * function returns false so the caller can reject pipeline creation instead of silently producing
+ * a pipeline with a dangling logical binding.
+ *
+ * When `uniformBlocks` is empty (automatic layout), logical ids are assigned by merging the vertex
+ * and fragment block names into one name-sorted set and numbering them 0, 1, 2, ... — mirroring
+ * OpenGL's program-level, name-keyed binding space: differently named blocks always get distinct
+ * ids, and a same-named block declared in both stages shares one id (and one buffer). This must be
+ * done here, where both modules are available, because each module is compiled independently and a
+ * single stage cannot see the other stage's block names.
+ *
+ * `vertexModule` / `fragmentModule` may be null when the pipeline omits that stage.
+ */
+inline bool ResolveUniformSlots(const VaryingShaderModule* vertexModule,
+                                const VaryingShaderModule* fragmentModule,
+                                const std::vector<BindingEntry>& uniformBlocks,
+                                std::map<unsigned, UniformSlotMapping>& mappingOut,
+                                std::string& errorOut) {
+  mappingOut.clear();
+  if (!uniformBlocks.empty()) {
+    for (const auto& entry : uniformBlocks) {
+      UniformSlotMapping mapping;
+      if ((entry.visibility & ShaderVisibility::Vertex) && vertexModule != nullptr) {
+        auto it = vertexModule->uniformSlots().find(entry.name);
+        if (it == vertexModule->uniformSlots().end()) {
+          errorOut = "vertex uniform block '" + entry.name + "' was not found";
+          return false;
+        }
+        mapping.vertexSlot = it->second;
+      }
+      if ((entry.visibility & ShaderVisibility::Fragment) && fragmentModule != nullptr) {
+        auto it = fragmentModule->uniformSlots().find(entry.name);
+        if (it == fragmentModule->uniformSlots().end()) {
+          errorOut = "fragment uniform block '" + entry.name + "' was not found";
+          return false;
+        }
+        mapping.fragmentSlot = it->second;
+      }
+      mappingOut[entry.binding] = mapping;
+    }
+    return true;
+  }
+
+  // Automatic layout: merge both stages' block names into one name-sorted set and number them
+  // sequentially, so the public logical binding space matches OpenGL's program-level semantics.
+  std::map<std::string, UniformSlotMapping> byName;
+  if (vertexModule != nullptr) {
+    for (const auto& [name, slot] : vertexModule->uniformSlots()) {
+      byName[name].vertexSlot = slot;
+    }
+  }
+  if (fragmentModule != nullptr) {
+    for (const auto& [name, slot] : fragmentModule->uniformSlots()) {
+      byName[name].fragmentSlot = slot;
+    }
+  }
+  unsigned logicalBinding = 0;
+  for (const auto& [name, mapping] : byName) {
+    mappingOut[logicalBinding++] = mapping;
+  }
+  return true;
+}
 
 }  // namespace tgfx

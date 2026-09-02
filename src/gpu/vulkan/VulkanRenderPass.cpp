@@ -417,33 +417,31 @@ bool VulkanRenderPass::bindDescriptorSetIfDirty() {
     if (ub.buffer == VK_NULL_HANDLE) {
       continue;
     }
-    auto vertexBindings = lastBound.pipeline->getVertexUniformBindings(logicalBinding);
-    if (vertexBindings != nullptr) {
-      for (auto physicalBinding : *vertexBindings) {
-        bufferInfos.push_back({ub.buffer, ub.offset, ub.size});
-        VkWriteDescriptorSet write = {};
-        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        write.dstSet = vertexUboSet;
-        write.dstBinding = physicalBinding;
-        write.descriptorCount = 1;
-        write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        write.pBufferInfo = &bufferInfos.back();
-        writes.push_back(write);
-      }
+    auto slots = lastBound.pipeline->getUniformSlots(logicalBinding);
+    if (slots == nullptr) {
+      continue;
     }
-    auto fragmentBindings = lastBound.pipeline->getFragmentUniformBindings(logicalBinding);
-    if (fragmentBindings != nullptr) {
-      for (auto physicalBinding : *fragmentBindings) {
-        bufferInfos.push_back({ub.buffer, ub.offset, ub.size});
-        VkWriteDescriptorSet write = {};
-        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        write.dstSet = fragmentUboSet;
-        write.dstBinding = physicalBinding;
-        write.descriptorCount = 1;
-        write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        write.pBufferInfo = &bufferInfos.back();
-        writes.push_back(write);
-      }
+    if (slots->vertexSlot.has_value()) {
+      bufferInfos.push_back({ub.buffer, ub.offset, ub.size});
+      VkWriteDescriptorSet write = {};
+      write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+      write.dstSet = vertexUboSet;
+      write.dstBinding = *slots->vertexSlot;
+      write.descriptorCount = 1;
+      write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+      write.pBufferInfo = &bufferInfos.back();
+      writes.push_back(write);
+    }
+    if (slots->fragmentSlot.has_value()) {
+      bufferInfos.push_back({ub.buffer, ub.offset, ub.size});
+      VkWriteDescriptorSet write = {};
+      write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+      write.dstSet = fragmentUboSet;
+      write.dstBinding = *slots->fragmentSlot;
+      write.descriptorCount = 1;
+      write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+      write.pBufferInfo = &bufferInfos.back();
+      writes.push_back(write);
     }
   }
 

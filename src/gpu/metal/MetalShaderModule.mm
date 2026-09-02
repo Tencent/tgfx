@@ -143,6 +143,17 @@ static std::string convertSPIRVToMSL(const std::vector<uint32_t>& spirvBinary, S
   return mslCode;
 }
 
+// Collects the uniform-block name -> physical buffer index map from the preprocessed GLSL, in
+// the same descriptor namespace the pipeline resolves against.
+static std::map<std::string, unsigned> CollectUniformSlots(const std::string& code,
+                                                           ShaderStage stage) {
+  std::map<std::string, unsigned> slots;
+  for (const auto& uniform : GetShaderUniformBindings(PreprocessGLSL(code, stage))) {
+    slots[uniform.name] = uniform.binding;
+  }
+  return slots;
+}
+
 std::shared_ptr<MetalShaderModule> MetalShaderModule::Make(
     MetalGPU* gpu, const ShaderModuleDescriptor& descriptor) {
   if (!gpu) {
@@ -153,7 +164,8 @@ std::shared_ptr<MetalShaderModule> MetalShaderModule::Make(
 }
 
 MetalShaderModule::MetalShaderModule(MetalGPU* gpu, const ShaderModuleDescriptor& descriptor)
-    : VaryingShaderModule(ExtractVaryingDecls(descriptor.code, descriptor.stage)),
+    : VaryingShaderModule(ExtractVaryingDecls(descriptor.code, descriptor.stage),
+                          CollectUniformSlots(descriptor.code, descriptor.stage)),
       _stage(descriptor.stage),
       _glslCode(descriptor.stage == ShaderStage::Fragment ? descriptor.code : std::string{}) {
   compileShader(gpu->device(), gpu->shaderCompiler(), descriptor.code, descriptor.stage);
@@ -189,23 +201,9 @@ bool MetalShaderModule::compileShader(id<MTLDevice> device, const shaderc::Compi
   return true;
 }
 
-bool MetalShaderModule::getUniformBinding(const std::string& name, unsigned* binding) const {
-  auto result = uniformBindings.find(name);
-  if (result == uniformBindings.end()) {
-    return false;
-  }
-  if (binding != nullptr) {
-    *binding = result->second;
-  }
-  return true;
-}
-
 std::string MetalShaderModule::convertGLSLToMSL(const shaderc::Compiler* compiler,
                                                 const std::string& glslCode, ShaderStage stage) {
   std::string vulkanGLSL = PreprocessGLSL(glslCode, stage);
-  for (const auto& uniform : GetShaderUniformBindings(vulkanGLSL)) {
-    uniformBindings[uniform.name] = uniform.binding;
-  }
   auto spirvBinary = CompileGLSLToSPIRV(compiler, vulkanGLSL, stage);
   if (spirvBinary.empty()) {
     return "";

@@ -81,52 +81,27 @@ bool WebGPURenderPipeline::createPipelineState(WebGPUGPU* gpu,
   frontFace = ToWGPUFrontFace(descriptor.primitive.frontFace);
 
   std::vector<WGPUBindGroupLayoutEntry> groupEntries[3] = {};
-  if (descriptor.layout.uniformBlocks.empty()) {
-    for (const auto& item : vertexModule->uniformBindingMap()) {
-      vertexUniformBindings[item.second].push_back(item.second);
+  std::string error;
+  if (!ResolveUniformSlots(vertexModule.get(), fragmentModule.get(),
+                           descriptor.layout.uniformBlocks, uniformSlots, error)) {
+    LOGE("WebGPURenderPipeline: %s.", error.c_str());
+    return false;
+  }
+  for (const auto& [logicalBinding, mapping] : uniformSlots) {
+    (void)logicalBinding;
+    if (mapping.vertexSlot.has_value()) {
       WGPUBindGroupLayoutEntry layoutEntry = {};
-      layoutEntry.binding = item.second;
+      layoutEntry.binding = *mapping.vertexSlot;
       layoutEntry.visibility = WGPUShaderStage_Vertex;
       layoutEntry.buffer.type = WGPUBufferBindingType_Uniform;
       groupEntries[VERTEX_UBO_DESCRIPTOR_SET].push_back(layoutEntry);
     }
-    for (const auto& item : fragmentModule->uniformBindingMap()) {
-      fragmentUniformBindings[item.second].push_back(item.second);
+    if (mapping.fragmentSlot.has_value()) {
       WGPUBindGroupLayoutEntry layoutEntry = {};
-      layoutEntry.binding = item.second;
+      layoutEntry.binding = *mapping.fragmentSlot;
       layoutEntry.visibility = WGPUShaderStage_Fragment;
       layoutEntry.buffer.type = WGPUBufferBindingType_Uniform;
       groupEntries[FRAGMENT_UBO_DESCRIPTOR_SET].push_back(layoutEntry);
-    }
-  } else {
-    for (auto& entry : descriptor.layout.uniformBlocks) {
-      unsigned physicalBinding = 0;
-      if (entry.visibility & ShaderVisibility::Vertex) {
-        if (!vertexModule->getUniformBinding(entry.name, &physicalBinding)) {
-          LOGE("WebGPURenderPipeline: vertex uniform block '%s' was not found.",
-               entry.name.c_str());
-          return false;
-        }
-        vertexUniformBindings[entry.binding].push_back(physicalBinding);
-        WGPUBindGroupLayoutEntry layoutEntry = {};
-        layoutEntry.binding = physicalBinding;
-        layoutEntry.visibility = WGPUShaderStage_Vertex;
-        layoutEntry.buffer.type = WGPUBufferBindingType_Uniform;
-        groupEntries[VERTEX_UBO_DESCRIPTOR_SET].push_back(layoutEntry);
-      }
-      if (entry.visibility & ShaderVisibility::Fragment) {
-        if (!fragmentModule->getUniformBinding(entry.name, &physicalBinding)) {
-          LOGE("WebGPURenderPipeline: fragment uniform block '%s' was not found.",
-               entry.name.c_str());
-          return false;
-        }
-        fragmentUniformBindings[entry.binding].push_back(physicalBinding);
-        WGPUBindGroupLayoutEntry layoutEntry = {};
-        layoutEntry.binding = physicalBinding;
-        layoutEntry.visibility = WGPUShaderStage_Fragment;
-        layoutEntry.buffer.type = WGPUBufferBindingType_Uniform;
-        groupEntries[FRAGMENT_UBO_DESCRIPTOR_SET].push_back(layoutEntry);
-      }
     }
   }
 
@@ -310,16 +285,9 @@ unsigned WebGPURenderPipeline::getTextureIndex(unsigned binding) const {
   return binding;
 }
 
-const std::vector<unsigned>* WebGPURenderPipeline::getVertexUniformBindings(
-    unsigned binding) const {
-  auto result = vertexUniformBindings.find(binding);
-  return result != vertexUniformBindings.end() ? &result->second : nullptr;
-}
-
-const std::vector<unsigned>* WebGPURenderPipeline::getFragmentUniformBindings(
-    unsigned binding) const {
-  auto result = fragmentUniformBindings.find(binding);
-  return result != fragmentUniformBindings.end() ? &result->second : nullptr;
+const UniformSlotMapping* WebGPURenderPipeline::getUniformSlots(unsigned binding) const {
+  auto result = uniformSlots.find(binding);
+  return result != uniformSlots.end() ? &result->second : nullptr;
 }
 
 void WebGPURenderPipeline::onRelease(WebGPUGPU*) {

@@ -301,13 +301,14 @@ void MetalRenderPass::setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuff
   }
   (void)size;
   auto metalBuffer = std::static_pointer_cast<MetalBuffer>(buffer);
-  auto vertexIndices = currentPipeline->getVertexUniformIndices(binding);
-  if (vertexIndices != nullptr) {
-    for (auto physicalIndex : *vertexIndices) {
-      DEBUG_ASSERT(physicalIndex < MaxUniformBindings);
-      if (physicalIndex >= MaxUniformBindings) {
-        continue;
-      }
+  auto slots = currentPipeline->getUniformSlots(binding);
+  if (slots == nullptr) {
+    return;
+  }
+  if (slots->vertexSlot.has_value()) {
+    auto physicalIndex = *slots->vertexSlot;
+    DEBUG_ASSERT(physicalIndex < MaxUniformBindings);
+    if (physicalIndex < MaxUniformBindings) {
       if (lastVertexUniformBuffers[physicalIndex] == buffer.get()) {
         if (lastVertexUniformOffsets[physicalIndex] != offset) {
           [renderEncoder setVertexBufferOffset:offset atIndex:physicalIndex];
@@ -321,13 +322,10 @@ void MetalRenderPass::setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuff
       lastVertexUniformOffsets[physicalIndex] = offset;
     }
   }
-  auto fragmentIndices = currentPipeline->getFragmentUniformIndices(binding);
-  if (fragmentIndices != nullptr) {
-    for (auto physicalIndex : *fragmentIndices) {
-      DEBUG_ASSERT(physicalIndex < MaxUniformBindings);
-      if (physicalIndex >= MaxUniformBindings) {
-        continue;
-      }
+  if (slots->fragmentSlot.has_value()) {
+    auto physicalIndex = *slots->fragmentSlot;
+    DEBUG_ASSERT(physicalIndex < MaxUniformBindings);
+    if (physicalIndex < MaxUniformBindings) {
       if (lastFragmentUniformBuffers[physicalIndex] == buffer.get()) {
         if (lastFragmentUniformOffsets[physicalIndex] != offset) {
           [renderEncoder setFragmentBufferOffset:offset atIndex:physicalIndex];

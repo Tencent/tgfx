@@ -23,6 +23,17 @@
 
 namespace tgfx {
 
+// Collects the uniform-block name -> physical binding map from the preprocessed GLSL, in the
+// same descriptor namespace the pipeline resolves against.
+static std::map<std::string, unsigned> CollectUniformSlots(const std::string& code,
+                                                           ShaderStage stage) {
+  std::map<std::string, unsigned> slots;
+  for (const auto& uniform : GetShaderUniformBindings(PreprocessGLSL(code, stage))) {
+    slots[uniform.name] = uniform.binding;
+  }
+  return slots;
+}
+
 std::shared_ptr<VulkanShaderModule> VulkanShaderModule::Make(
     VulkanGPU* gpu, const ShaderModuleDescriptor& descriptor) {
   if (!gpu) {
@@ -36,11 +47,9 @@ std::shared_ptr<VulkanShaderModule> VulkanShaderModule::Make(
 }
 
 VulkanShaderModule::VulkanShaderModule(VulkanGPU* gpu, const ShaderModuleDescriptor& descriptor)
-    : VaryingShaderModule(ExtractVaryingDecls(descriptor.code, descriptor.stage)) {
+    : VaryingShaderModule(ExtractVaryingDecls(descriptor.code, descriptor.stage),
+                          CollectUniformSlots(descriptor.code, descriptor.stage)) {
   std::string vulkanGLSL = PreprocessGLSL(descriptor.code, descriptor.stage);
-  for (const auto& uniform : GetShaderUniformBindings(vulkanGLSL)) {
-    uniformBindings[uniform.name] = uniform.binding;
-  }
   auto spirvBinary = CompileGLSLToSPIRV(gpu->shaderCompiler(), vulkanGLSL, descriptor.stage);
   if (spirvBinary.empty()) {
     LOGE("VulkanShaderModule: GLSL to SPIR-V compilation failed.");
@@ -57,17 +66,6 @@ VulkanShaderModule::VulkanShaderModule(VulkanGPU* gpu, const ShaderModuleDescrip
     LOGE("VulkanShaderModule: vkCreateShaderModule failed.");
     shaderModule = VK_NULL_HANDLE;
   }
-}
-
-bool VulkanShaderModule::getUniformBinding(const std::string& name, unsigned* binding) const {
-  auto result = uniformBindings.find(name);
-  if (result == uniformBindings.end()) {
-    return false;
-  }
-  if (binding != nullptr) {
-    *binding = result->second;
-  }
-  return true;
 }
 
 void VulkanShaderModule::onRelease(VulkanGPU* gpu) {
