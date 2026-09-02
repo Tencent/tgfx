@@ -125,8 +125,9 @@ struct GlassShapeInfo {
 };
 
 // Detects whether the layer's vector shape is a regular shape (RoundedRect or Ellipse)
-// that can use the analytical SDF path. Only Fill-type shapes are supported; Stroke and
-// FillStroke produce a different rendered outline than the fill path, so SDF would mismatch.
+// that can use the analytical SDF path. Only exact Fill-type shapes are supported; Stroke,
+// FillStroke, and shapes approximated from content bounds produce a different rendered outline,
+// so SDF would mismatch.
 static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
   GlassShapeInfo info;
   auto* contourSource = input.findExtraSource(StyleInputSource::Type::Contour);
@@ -138,10 +139,7 @@ static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
     return info;
   }
   const auto& optShape = contour->shape();
-  if (optShape->type != StyledShapeType::Fill) {
-    return info;
-  }
-  if (optShape->shape == nullptr) {
+  if (!optShape->isExact || optShape->type != StyledShapeType::Fill || optShape->shape == nullptr) {
     return info;
   }
   auto path = optShape->shape->getPath();

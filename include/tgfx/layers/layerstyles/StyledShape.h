@@ -79,6 +79,12 @@ struct StyledShape {
    * The stroke alignment. Valid when type is Stroke or FillStroke.
    */
   StrokeAlign strokeAlign = StrokeAlign::Center;
+
+  /**
+   * Whether the shape exactly matches the rendered content outline. A false value means the shape
+   * is an approximation derived from the content bounds and must not be used as exact geometry.
+   */
+  bool isExact = true;
 };
 
 }  // namespace tgfx

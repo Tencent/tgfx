@@ -22,8 +22,10 @@
 #include "tgfx/core/TextBlobBuilder.h"
 #include "tgfx/core/UTF.h"
 #include "tgfx/layers/DisplayList.h"
+#include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/SolidLayer.h"
 #include "tgfx/layers/VectorLayer.h"
+#include "tgfx/layers/layerstyles/GlassStyle.h"
 #include "tgfx/layers/vectors/Ellipse.h"
 #include "tgfx/layers/vectors/FillStyle.h"
 #include "tgfx/layers/vectors/Gradient.h"
@@ -54,6 +56,131 @@ static std::shared_ptr<StrokeStyle> MakeStrokeStyle(const Color& color, float wi
   auto stroke = StrokeStyle::Make(SolidColor::Make(color));
   stroke->setStrokeWidth(width);
   return stroke;
+}
+
+class ContentShapeVectorLayer final : public VectorLayer {
+ public:
+  static std::shared_ptr<ContentShapeVectorLayer> Make() {
+    return std::shared_ptr<ContentShapeVectorLayer>(new ContentShapeVectorLayer());
+  }
+
+  std::optional<StyledShape> getContentShapeForTesting() {
+    return onGetContentShape();
+  }
+};
+
+static std::shared_ptr<Rectangle> MakeRoundedRectangle() {
+  auto rectangle = Rectangle::Make();
+  rectangle->setPosition({100, 100});
+  rectangle->setSize({100, 100});
+  rectangle->setRoundness({20, 20, 20, 20});
+  return rectangle;
+}
+
+static std::vector<std::shared_ptr<VectorElement>> MakeRoundedRectangleContents(bool twoStrokes) {
+  auto fill = MakeFillStyle(Color::FromRGBA(255, 255, 255, 96));
+  auto outerStroke = MakeStrokeStyle(Color::FromRGBA(20, 80, 220, 255), 10);
+  std::vector<std::shared_ptr<VectorElement>> contents = {MakeRoundedRectangle(), fill,
+                                                          outerStroke};
+  if (twoStrokes) {
+    contents.push_back(MakeStrokeStyle(Color::FromRGBA(255, 180, 20, 255), 4));
+  }
+  return contents;
+}
+
+static std::vector<std::shared_ptr<VectorElement>> MakeMultipleGeometryContents() {
+  auto ellipse = Ellipse::Make();
+  ellipse->setPosition({150, 100});
+  ellipse->setSize({60, 60});
+  return {MakeRoundedRectangle(), ellipse, MakeFillStyle(Color::FromRGBA(255, 255, 255, 96))};
+}
+
+static std::vector<std::shared_ptr<VectorElement>> MakeDifferentGeometryContents() {
+  auto rectangleGroup = VectorGroup::Make();
+  rectangleGroup->setElements(
+      {MakeRoundedRectangle(), MakeFillStyle(Color::FromRGBA(255, 255, 255, 96))});
+  auto ellipse = Ellipse::Make();
+  ellipse->setPosition({150, 100});
+  ellipse->setSize({60, 60});
+  auto ellipseGroup = VectorGroup::Make();
+  ellipseGroup->setElements({ellipse, MakeFillStyle(Color::FromRGBA(255, 255, 255, 96))});
+  return {rectangleGroup, ellipseGroup};
+}
+
+struct GlassPixels {
+  uint32_t corner = 0;
+  uint32_t center = 0;
+};
+
+static std::optional<GlassPixels> RenderRoundedMultiStrokeGlass(
+    Context* context, const std::shared_ptr<Image>& backgroundImage, bool withGlass) {
+  auto surface = Surface::Make(context, 200, 200);
+  if (surface == nullptr) {
+    return std::nullopt;
+  }
+  auto displayList = std::make_unique<DisplayList>();
+  auto background = ImageLayer::Make();
+  background->setImage(backgroundImage);
+  auto scale = 200.0f / static_cast<float>(backgroundImage->width());
+  background->setMatrix(Matrix::MakeScale(scale, scale));
+  displayList->root()->addChild(background);
+
+  auto vectorLayer = VectorLayer::Make();
+  vectorLayer->setContents(MakeRoundedRectangleContents(true));
+  if (withGlass) {
+    vectorLayer->setLayerStyles({GlassStyle::Make(80, 50, 0, 50, 0, 135, 50)});
+  }
+  displayList->root()->addChild(vectorLayer);
+  displayList->render(surface.get());
+
+  auto info = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  GlassPixels pixels = {};
+  if (!surface->readPixels(info, &pixels.corner, 50, 50) ||
+      !surface->readPixels(info, &pixels.center, 100, 100)) {
+    return std::nullopt;
+  }
+  return pixels;
+}
+
+TGFX_TEST(VectorLayerTest, MultiStrokeContentShapeExactness) {
+  auto singleStrokeLayer = ContentShapeVectorLayer::Make();
+  singleStrokeLayer->setContents(MakeRoundedRectangleContents(false));
+  auto singleStrokeShape = singleStrokeLayer->getContentShapeForTesting();
+  ASSERT_TRUE(singleStrokeShape.has_value());
+  EXPECT_TRUE(singleStrokeShape->isExact);
+
+  auto multiStrokeLayer = ContentShapeVectorLayer::Make();
+  multiStrokeLayer->setContents(MakeRoundedRectangleContents(true));
+  auto multiStrokeShape = multiStrokeLayer->getContentShapeForTesting();
+  ASSERT_TRUE(multiStrokeShape.has_value());
+  EXPECT_FALSE(multiStrokeShape->isExact);
+
+  auto multipleGeometryLayer = ContentShapeVectorLayer::Make();
+  multipleGeometryLayer->setContents(MakeMultipleGeometryContents());
+  auto multipleGeometryShape = multipleGeometryLayer->getContentShapeForTesting();
+  ASSERT_TRUE(multipleGeometryShape.has_value());
+  EXPECT_FALSE(multipleGeometryShape->isExact);
+
+  auto differentGeometryLayer = ContentShapeVectorLayer::Make();
+  differentGeometryLayer->setContents(MakeDifferentGeometryContents());
+  auto differentGeometryShape = differentGeometryLayer->getContentShapeForTesting();
+  ASSERT_TRUE(differentGeometryShape.has_value());
+  EXPECT_FALSE(differentGeometryShape->isExact);
+}
+
+TGFX_TEST(VectorLayerTest, GlassStyleMultiStrokeRoundedCorner) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto backgroundImage = MakeImage("resources/apitest/checker_128.png");
+  ASSERT_TRUE(backgroundImage != nullptr);
+
+  auto withoutGlass = RenderRoundedMultiStrokeGlass(context, backgroundImage, false);
+  auto withGlass = RenderRoundedMultiStrokeGlass(context, backgroundImage, true);
+  ASSERT_TRUE(withoutGlass.has_value());
+  ASSERT_TRUE(withGlass.has_value());
+  EXPECT_EQ(withGlass->corner, withoutGlass->corner);
+  EXPECT_NE(withGlass->center, withoutGlass->center);
 }
 
 /**

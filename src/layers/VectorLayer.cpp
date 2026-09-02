@@ -108,12 +108,20 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
       continue;
     }
     if (painter->geometries.size() != 1) {
-      return Layer::onGetContentShape();
+      auto contentShape = Layer::onGetContentShape();
+      if (contentShape.has_value()) {
+        contentShape->isExact = false;
+      }
+      return contentShape;
     }
     if (sharedGeometry == nullptr) {
       sharedGeometry = painter->geometries[0];
     } else if (painter->geometries[0] != sharedGeometry) {
-      return Layer::onGetContentShape();
+      auto contentShape = Layer::onGetContentShape();
+      if (contentShape.has_value()) {
+        contentShape->isExact = false;
+      }
+      return contentShape;
     }
 
     auto style = painter->getStyle();
@@ -122,7 +130,11 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
     } else {
       // Multiple strokes cannot be simplified to a single StyledShape.
       if (strokeStyle.has_value()) {
-        return Layer::onGetContentShape();
+        auto contentShape = Layer::onGetContentShape();
+        if (contentShape.has_value()) {
+          contentShape->isExact = false;
+        }
+        return contentShape;
       }
       strokeStyle = style;
     }
