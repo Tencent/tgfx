@@ -210,6 +210,7 @@ void MetalRenderPass::setPipeline(std::shared_ptr<RenderPipeline> pipeline) {
   if (currentPipeline == pipeline) return;
 
   currentPipeline = std::static_pointer_cast<MetalRenderPipeline>(pipeline);
+  hasInvalidBindings = false;
   [renderEncoder setRenderPipelineState:currentPipeline->metalRenderPipelineState()];
 
   // Set depth stencil state if available
@@ -272,9 +273,14 @@ void MetalRenderPass::setTexture(unsigned binding, std::shared_ptr<Texture> text
   if (!renderEncoder || !texture) {
     return;
   }
+  if (!currentPipeline) {
+    LOGE("MetalRenderPass::setTexture: setPipeline must be called first.");
+    hasInvalidBindings = true;
+    return;
+  }
 
   // Remap logical binding to actual Metal texture index via the pipeline's mapping table.
-  unsigned textureIndex = currentPipeline ? currentPipeline->getTextureIndex(binding) : binding;
+  unsigned textureIndex = currentPipeline->getTextureIndex(binding);
 
   if (textureIndex < MaxTextureBindings && lastTextures[textureIndex] == texture.get() &&
       lastSamplers[textureIndex] == sampler.get()) {
@@ -296,7 +302,12 @@ void MetalRenderPass::setTexture(unsigned binding, std::shared_ptr<Texture> text
 
 void MetalRenderPass::setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuffer> buffer,
                                        size_t offset, size_t size) {
-  if (!renderEncoder || !buffer || !currentPipeline) {
+  if (!renderEncoder || !buffer) {
+    return;
+  }
+  if (!currentPipeline) {
+    LOGE("MetalRenderPass::setUniformBuffer: setPipeline must be called first.");
+    hasInvalidBindings = true;
     return;
   }
   (void)size;
@@ -353,6 +364,14 @@ void MetalRenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount,
   if (!renderEncoder) {
     return;
   }
+  if (!currentPipeline) {
+    LOGE("MetalRenderPass::draw: setPipeline must be called first.");
+    return;
+  }
+  if (hasInvalidBindings) {
+    LOGE("MetalRenderPass::draw: dropped because a prior resource binding was invalid.");
+    return;
+  }
 
   MTLPrimitiveType metalPrimitiveType = ToMTLPrimitiveType(primitiveType);
   [renderEncoder drawPrimitives:metalPrimitiveType
@@ -366,6 +385,14 @@ void MetalRenderPass::drawIndexed(PrimitiveType primitiveType, uint32_t indexCou
                                   uint32_t instanceCount, uint32_t firstIndex, int32_t baseVertex,
                                   uint32_t firstInstance) {
   if (!renderEncoder || !indexBuffer) {
+    return;
+  }
+  if (!currentPipeline) {
+    LOGE("MetalRenderPass::drawIndexed: setPipeline must be called first.");
+    return;
+  }
+  if (hasInvalidBindings) {
+    LOGE("MetalRenderPass::drawIndexed: dropped because a prior resource binding was invalid.");
     return;
   }
 

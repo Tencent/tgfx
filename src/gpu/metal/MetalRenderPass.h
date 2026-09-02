@@ -75,6 +75,13 @@ class MetalRenderPass : public RenderPass {
   id<MTLRenderCommandEncoder> renderEncoder = nil;
   std::shared_ptr<MetalRenderPipeline> currentPipeline = nullptr;
 
+  // Set to true when a resource-binding call arrives before setPipeline() and cannot be routed to
+  // a physical shader-stage slot. Metal is the only backend that translates public logical
+  // bindings to physical slots at the setter-call site rather than at draw/flush time, so it
+  // cannot silently defer a bad binding — the subsequent draw would otherwise use stale or empty
+  // slots. Cleared by setPipeline() so a well-formed run after a bad prefix still works.
+  bool hasInvalidBindings = false;
+
   // Cached scissor rect to avoid redundant Metal API calls.
   int lastScissorX = -1;
   int lastScissorY = -1;
