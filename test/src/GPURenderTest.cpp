@@ -241,6 +241,8 @@ static std::shared_ptr<RenderPipeline> CreateUniformBufferBindingPipeline(GPU* g
 // the quad and the fragment stage reads the second vec4 for its colour, so a regression that splits
 // the shared block into two logical bindings leaves one stage without data.
 static constexpr char SHARED_UBO_VERTEX_SHADER[] = R"(
+        precision mediump float;
+
         in vec2 inPosition;
 
         layout(std140) uniform SharedArgs {
