@@ -411,6 +411,9 @@ bool VulkanRenderPass::bindDescriptorSetIfDirty() {
   }
 
   std::vector<VkWriteDescriptorSet> writes;
+  // Use a std::deque (not std::vector) for bufferInfos: each VkWriteDescriptorSet holds a pointer
+  // into it via pBufferInfo, and those pointers must stay valid through vkUpdateDescriptorSets even
+  // as more entries are appended. A std::vector would reallocate and invalidate them.
   std::deque<VkDescriptorBufferInfo> bufferInfos;
   std::vector<VkDescriptorImageInfo> imageInfos;
   imageInfos.reserve(lastBound.textureBindings.size());

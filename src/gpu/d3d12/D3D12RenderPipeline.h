@@ -69,6 +69,9 @@ class D3D12RenderPipeline : public RenderPipeline, public D3D12Resource {
     return pipelineState.Get();
   }
 
+  /// Returns the root-parameter indices of the CBVs that consume the given public logical uniform
+  /// binding, or nullptr if the pipeline does not use that binding. A binding visible to both
+  /// stages yields two indices (vertex CBV then fragment CBV).
   const std::vector<uint32_t>* getUniformRootParameterIndices(unsigned binding) const;
 
   /**

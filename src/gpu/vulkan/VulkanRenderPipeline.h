@@ -58,14 +58,17 @@ class VulkanRenderPipeline : public RenderPipeline, public VulkanResource {
     return pipelineLayout;
   }
 
+  /// Returns the descriptor set layout for the vertex UBO set (descriptor set 0).
   VkDescriptorSetLayout vulkanVertexUboSetLayout() const {
     return vertexUboSetLayout;
   }
 
+  /// Returns the descriptor set layout for the fragment UBO set (descriptor set 1).
   VkDescriptorSetLayout vulkanFragmentUboSetLayout() const {
     return fragmentUboSetLayout;
   }
 
+  /// Returns the descriptor set layout for the texture sampler set (descriptor set 2).
   VkDescriptorSetLayout vulkanTextureSetLayout() const {
     return textureSetLayout;
   }

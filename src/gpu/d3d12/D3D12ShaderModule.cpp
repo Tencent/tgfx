@@ -34,17 +34,16 @@ namespace tgfx {
 // Convert a SPIR-V binary to HLSL source code suitable for D3DCompile with profile vs_5_0/ps_5_0.
 //
 // Binding strategy:
-//   - UBOs are walked in the order SPIRV-Cross returns them — which is GLSL declaration order,
-//     and therefore matches the BindingLayout::uniformBlocks order seen by the pipeline side —
+//   - UBOs are walked in the order SPIRV-Cross returns them — which is GLSL declaration order —
 //     and assigned consecutive CBV registers b0, b1, ... within this single stage. HLSL register
 //     namespaces are per-stage so the vertex stage and the pixel stage have independent b0
-//     packings; D3D12RenderPipeline's root signature mirrors this by giving each entry a
-//     stage-local register index.
+//     packings; D3D12RenderPipeline's root signature mirrors this by resolving each uniform block
+//     by name against the stage's uniformSlots() and giving it a stage-local register index.
 //   - Sampled images are walked in the order SPIRV-Cross returns them — which is GLSL
 //     declaration order, and therefore matches the BindingLayout::textureSamplers order seen
 //     by the pipeline side — and assigned consecutive (t{K}, s{K}) register pairs. The value
 //     of the SPIR-V binding decoration is intentionally ignored: it depends on how the GLSL
-//     front-end numbers samplers (currently starting from 0 in descriptor set 1), which is a
+//     front-end numbers samplers (currently starting from 0 in descriptor set 2), which is a
 //     detail of the SPIR-V producer, whereas root-signature construction just needs a dense
 //     zero-based register space.
 static std::string convertSPIRVToHLSL(const std::vector<uint32_t>& spirvBinary, ShaderStage stage,

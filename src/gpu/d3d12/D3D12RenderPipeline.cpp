@@ -132,9 +132,9 @@ bool D3D12RenderPipeline::createRootSignature(D3D12GPU* gpu,
   }
 
   std::vector<uint8_t> shapeKey;
-  // Reserve roughly: 1 byte UBO count + 3 bytes per UBO (logical binding + vertex register +
-  // fragment register) + 1 byte sampler count + 1 byte per sampler (visibility).
-  shapeKey.reserve(2 + uniformSlots.size() * 3 + descriptor.layout.textureSamplers.size());
+  // Reserve roughly: 1 byte UBO count + 2 bytes per UBO (vertex register + fragment register) +
+  // 1 byte sampler count + 1 byte per sampler (visibility).
+  shapeKey.reserve(2 + uniformSlots.size() * 2 + descriptor.layout.textureSamplers.size());
 
   // Walk logical bindings in ascending order (std::map is ordered) so root-parameter indices are
   // deterministic and match the order used both here and when serialising below.

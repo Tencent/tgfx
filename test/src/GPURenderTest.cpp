@@ -151,12 +151,13 @@ static constexpr char UNIFORM_BUFFER_BINDING_VERTEX_SHADER[] = R"(
 // regardless of which stage(s) actually read it.
 //
 // GL matches uniform blocks by name at link time via `glUniformBlockBinding`, so it renders the
-// intended solid colour. SPIR-V based backends (Metal today, Vulkan / D3D12 by symmetry) match
-// UBO binding numbers per-stage: ShaderCompiler currently numbers each stage's custom UBOs from 0
-// in source order, so on Metal the fragment stage's `FragmentArgs` ends up at Metal buffer index
-// 0, but the CPU wrote the fragment buffer at index 1. The fragment shader then reads the wrong
-// slot and picks up whatever happens to sit at index 0 (nothing / garbage / the vertex buffer),
-// producing a non-green pixel that the baseline comparison will flag.
+// intended solid colour. Before the binding resolution was unified across backends, SPIR-V based
+// backends (Metal, Vulkan / D3D12 by symmetry) matched UBO binding numbers per-stage: ShaderCompiler
+// numbered each stage's custom UBOs from 0 in source order, so on Metal the fragment stage's
+// `FragmentArgs` ended up at Metal buffer index 0 while the CPU wrote the fragment buffer at index
+// 1. The fragment shader then read the wrong slot and picked up whatever happened to sit at index 0
+// (nothing / garbage / the vertex buffer), producing a non-green pixel. This test pins the corrected
+// name-keyed resolution.
 static constexpr char UNIFORM_BUFFER_BINDING_FRAGMENT_SHADER[] = R"(
         precision mediump float;
 
@@ -804,13 +805,13 @@ TGFX_TEST(GPURenderTest, VaryingMismatchRejected) {
 // parameters), declared as `{{"VertexArgs", 0, Vertex}, {"FragmentArgs", 1, Fragment}}`.
 //
 // GL binds uniform blocks by name via `glUniformBlockBinding` at link time, so the fragment
-// stage sees `FragmentArgs` at binding 1 exactly as the CPU wrote it. SPIR-V based backends
-// match by numeric binding: ShaderCompiler currently numbers custom UBOs per-stage starting at
-// 0 in source order, so the fragment stage's `FragmentArgs` ends up at binding 0. Metal then
-// binds the fragment buffer at its own per-stage index 1 (what the CPU asked for), but the
-// shader reads index 0 and picks up garbage / the vertex buffer. The baseline captures the
-// intended solid green output; any per-stage numbering leak shows up as a wildly different
-// colour.
+// stage sees `FragmentArgs` at binding 1 exactly as the CPU wrote it. Before binding resolution
+// was unified, SPIR-V based backends matched by numeric binding: ShaderCompiler numbered custom
+// UBOs per-stage starting at 0 in source order, so the fragment stage's `FragmentArgs` ended up at
+// binding 0. Metal then bound the fragment buffer at its own per-stage index 1 (what the CPU asked
+// for), but the shader read index 0 and picked up garbage / the vertex buffer. The baseline
+// captures the intended solid green output; a per-stage numbering leak shows up as a wildly
+// different colour.
 TGFX_TEST(GPURenderTest, UniformBufferBindingMismatch) {
   ContextScope scope;
   auto context = scope.getContext();
