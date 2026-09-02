@@ -97,6 +97,14 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
     return std::nullopt;
   }
 
+  auto getApproximateContentShape = [this]() {
+    auto contentShape = Layer::onGetContentShape();
+    if (contentShape.has_value()) {
+      contentShape->isExact = false;
+    }
+    return contentShape;
+  };
+
   // Only a single shared geometry across all painters with a uniform stroke style can be
   // simplified to a StyledShape.
   Geometry* sharedGeometry = nullptr;
@@ -108,20 +116,12 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
       continue;
     }
     if (painter->geometries.size() != 1) {
-      auto contentShape = Layer::onGetContentShape();
-      if (contentShape.has_value()) {
-        contentShape->isExact = false;
-      }
-      return contentShape;
+      return getApproximateContentShape();
     }
     if (sharedGeometry == nullptr) {
       sharedGeometry = painter->geometries[0];
     } else if (painter->geometries[0] != sharedGeometry) {
-      auto contentShape = Layer::onGetContentShape();
-      if (contentShape.has_value()) {
-        contentShape->isExact = false;
-      }
-      return contentShape;
+      return getApproximateContentShape();
     }
 
     auto style = painter->getStyle();
@@ -130,11 +130,7 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
     } else {
       // Multiple strokes cannot be simplified to a single StyledShape.
       if (strokeStyle.has_value()) {
-        auto contentShape = Layer::onGetContentShape();
-        if (contentShape.has_value()) {
-          contentShape->isExact = false;
-        }
-        return contentShape;
+        return getApproximateContentShape();
       }
       strokeStyle = style;
     }

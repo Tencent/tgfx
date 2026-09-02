@@ -108,7 +108,7 @@ static std::vector<std::shared_ptr<VectorElement>> MakeDifferentGeometryContents
 }
 
 struct GlassPixels {
-  uint32_t corner = 0;
+  uint32_t outsideCorner = 0;
   uint32_t center = 0;
 };
 
@@ -135,7 +135,10 @@ static std::optional<GlassPixels> RenderRoundedMultiStrokeGlass(
 
   auto info = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
   GlassPixels pixels = {};
-  if (!surface->readPixels(info, &pixels.corner, 50, 50) ||
+  // The rectangle spans [50, 150] with 20px corners and a 10px centered stroke. The point
+  // (50, 50) is outside the rendered corner but inside the bounds rectangle returned by the
+  // approximate content-shape fallback, so it detects when GlassStyle uses that fallback as exact.
+  if (!surface->readPixels(info, &pixels.outsideCorner, 50, 50) ||
       !surface->readPixels(info, &pixels.center, 100, 100)) {
     return std::nullopt;
   }
@@ -179,7 +182,7 @@ TGFX_TEST(VectorLayerTest, GlassStyleMultiStrokeRoundedCorner) {
   auto withGlass = RenderRoundedMultiStrokeGlass(context, backgroundImage, true);
   ASSERT_TRUE(withoutGlass.has_value());
   ASSERT_TRUE(withGlass.has_value());
-  EXPECT_EQ(withGlass->corner, withoutGlass->corner);
+  EXPECT_EQ(withGlass->outsideCorner, withoutGlass->outsideCorner);
   EXPECT_NE(withGlass->center, withoutGlass->center);
 }
 

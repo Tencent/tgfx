@@ -81,8 +81,9 @@ struct StyledShape {
   StrokeAlign strokeAlign = StrokeAlign::Center;
 
   /**
-   * Whether the shape exactly matches the rendered content outline. A false value means the shape
-   * is an approximation derived from the content bounds and must not be used as exact geometry.
+   * Whether the shape exactly matches the rendered content outline. VectorLayer sets this to false
+   * when it falls back to an approximation derived from content bounds because its painters cannot
+   * be represented by one StyledShape.
    */
   bool isExact = true;
 };
