@@ -175,7 +175,7 @@ D3D12ShaderModule::D3D12ShaderModule(D3D12GPU* gpu, const ShaderModuleDescriptor
     : VaryingShaderModule(ExtractVaryingDecls(descriptor.code, descriptor.stage), {}),
       _stage(descriptor.stage) {
   std::string vulkanGLSL = PreprocessGLSL(descriptor.code, descriptor.stage);
-  auto declaredUniforms = GetShaderUniformBindings(vulkanGLSL);
+  auto declaredUniforms = detail::CollectUniformBindings(vulkanGLSL);
   // D3D12 needs every declared interface variable to survive — see ShaderCompiler.h.
   auto spirvBinary = CompileGLSLToSPIRV(gpu->shaderCompiler(), vulkanGLSL, descriptor.stage, true);
   if (spirvBinary.empty()) {

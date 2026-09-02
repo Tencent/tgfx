@@ -17,10 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "WebGPUShaderModule.h"
-#include <algorithm>
 #include <regex>
 #include <shaderc/shaderc.hpp>
-#include <unordered_map>
 #include "WebGPUDefines.h"
 #include "WebGPUGPU.h"
 #include "core/utils/Log.h"
@@ -30,59 +28,6 @@
 #include "src/tint/lang/wgsl/writer/writer.h"
 
 namespace tgfx {
-
-static int UniformDescriptorSet(ShaderStage stage) {
-  return stage == ShaderStage::Vertex ? VERTEX_UBO_DESCRIPTOR_SET : FRAGMENT_UBO_DESCRIPTOR_SET;
-}
-
-static std::string assignInternalUBOBindings(const std::string& source) {
-  static std::regex vertexUboRegex(R"(layout\s*\(\s*std140\s*\)\s*uniform\s+VertexUniformBlock)");
-  auto result =
-      std::regex_replace(source, vertexUboRegex,
-                         "layout(std140, set=" + std::to_string(VERTEX_UBO_DESCRIPTOR_SET) +
-                             ", binding=0) uniform VertexUniformBlock");
-  static std::regex fragmentUboRegex(
-      R"(layout\s*\(\s*std140\s*\)\s*uniform\s+FragmentUniformBlock)");
-  return std::regex_replace(result, fragmentUboRegex,
-                            "layout(std140, set=" + std::to_string(FRAGMENT_UBO_DESCRIPTOR_SET) +
-                                ", binding=0) uniform FragmentUniformBlock");
-}
-
-static int nextUniformBinding(const std::string& source, int descriptorSet) {
-  static std::regex boundUboRegex(
-      R"(layout\s*\(\s*std140\s*,\s*set\s*=\s*(\d+)\s*,\s*binding\s*=\s*(\d+)\s*\)\s*uniform)");
-  int nextBinding = 0;
-  std::smatch match;
-  std::string::const_iterator searchStart(source.cbegin());
-  while (std::regex_search(searchStart, source.cend(), match, boundUboRegex)) {
-    if (std::stoi(match[1].str()) == descriptorSet) {
-      nextBinding = std::max(nextBinding, std::stoi(match[2].str()) + 1);
-    }
-    searchStart = match.suffix().first;
-  }
-  return nextBinding;
-}
-
-static std::string assignCustomUBOBindings(const std::string& source, ShaderStage stage) {
-  static std::regex uboRegex(R"(layout\s*\(\s*std140\s*\)\s*uniform\s+(\w+))");
-  std::smatch match;
-  std::string::const_iterator searchStart(source.cbegin());
-  std::string result;
-  size_t lastPos = 0;
-  int binding = nextUniformBinding(source, UniformDescriptorSet(stage));
-  while (std::regex_search(searchStart, source.cend(), match, uboRegex)) {
-    auto matchPos = static_cast<size_t>(match.position(0));
-    auto iterOffset = static_cast<size_t>(searchStart - source.cbegin());
-    size_t matchStart = matchPos + iterOffset;
-    result += source.substr(lastPos, matchStart - lastPos);
-    result += "layout(std140, set=" + std::to_string(UniformDescriptorSet(stage)) +
-              ", binding=" + std::to_string(binding++) + ") uniform " + match[1].str();
-    lastPos = matchStart + static_cast<size_t>(match.length(0));
-    searchStart = match.suffix().first;
-  }
-  result += source.substr(lastPos);
-  return result;
-}
 
 // Separates combined sampler declarations into distinct texture and sampler resources.
 // Input:  "uniform sampler2D TextureSampler_0;"
@@ -143,8 +88,8 @@ static std::vector<std::string> collectSamplerNames(const std::string& source) {
 
 static std::string preprocessGLSL(const std::string& glslCode, ShaderStage stage) {
   auto result = detail::UpgradeGLSLVersion(glslCode);
-  result = assignInternalUBOBindings(result);
-  result = assignCustomUBOBindings(result, stage);
+  result = detail::AssignInternalUBOBindings(result);
+  result = detail::AssignCustomUBOBindings(result, stage);
   // Collect sampler names before separating declarations.
   auto samplerNames = collectSamplerNames(result);
   result = separateSamplerDeclarations(result);
@@ -153,24 +98,6 @@ static std::string preprocessGLSL(const std::string& glslCode, ShaderStage stage
   result = detail::AssignOutputLocationQualifiers(result, stage);
   result = detail::RemovePrecisionDeclarations(result);
   return result;
-}
-
-// Collects the uniform-block name -> physical binding map from the preprocessed GLSL, in the
-// same descriptor namespace the pipeline resolves against. Ordered by name for deterministic
-// slot resolution.
-static std::map<std::string, unsigned> CollectUniformSlots(const std::string& glslCode,
-                                                           ShaderStage stage) {
-  static std::regex uboRegex(
-      R"(layout\s*\(\s*std140\s*,\s*set\s*=\s*\d+\s*,\s*binding\s*=\s*(\d+)\s*\)\s*uniform\s+(\w+))");
-  auto preprocessedGLSL = preprocessGLSL(glslCode, stage);
-  std::map<std::string, unsigned> slots;
-  std::smatch match;
-  std::string::const_iterator searchStart(preprocessedGLSL.cbegin());
-  while (std::regex_search(searchStart, preprocessedGLSL.cend(), match, uboRegex)) {
-    slots[match[2].str()] = static_cast<unsigned>(std::stoul(match[1].str()));
-    searchStart = match.suffix().first;
-  }
-  return slots;
 }
 
 static std::vector<uint32_t> compileGLSLToSPIRV(const std::string& glslCode, ShaderStage stage) {
@@ -207,15 +134,15 @@ std::shared_ptr<WebGPUShaderModule> WebGPUShaderModule::Make(
 }
 
 WebGPUShaderModule::WebGPUShaderModule(WebGPUGPU* gpu, const ShaderModuleDescriptor& descriptor)
-    : VaryingShaderModule(ExtractVaryingDecls(descriptor.code, descriptor.stage),
-                          CollectUniformSlots(descriptor.code, descriptor.stage)),
+    : VaryingShaderModule(ExtractVaryingDecls(descriptor.code, descriptor.stage), {}),
       _stage(descriptor.stage) {
-  compileShader(gpu->device(), descriptor.code, descriptor.stage);
+  std::string vulkanGLSL = preprocessGLSL(descriptor.code, descriptor.stage);
+  setUniformSlots(detail::CollectUniformSlots(vulkanGLSL));
+  compileShader(gpu->device(), vulkanGLSL, descriptor.stage);
 }
 
-bool WebGPUShaderModule::compileShader(WGPUDevice device, const std::string& glslCode,
+bool WebGPUShaderModule::compileShader(WGPUDevice device, const std::string& vulkanGLSL,
                                        ShaderStage stage) {
-  std::string vulkanGLSL = preprocessGLSL(glslCode, stage);
   auto spirvBinary = compileGLSLToSPIRV(vulkanGLSL, stage);
   if (spirvBinary.empty()) {
     return false;
@@ -231,7 +158,7 @@ bool WebGPUShaderModule::compileShader(WGPUDevice device, const std::string& gls
     for (const auto& diag : program.Diagnostics()) {
       LOGE("  [tint] %s", diag.message.Plain().c_str());
     }
-    LOGE("  [glsl] %s", glslCode.c_str());
+    LOGE("  [glsl] %s", vulkanGLSL.c_str());
     return false;
   }
 

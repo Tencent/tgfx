@@ -143,17 +143,6 @@ static std::string convertSPIRVToMSL(const std::vector<uint32_t>& spirvBinary, S
   return mslCode;
 }
 
-// Collects the uniform-block name -> physical buffer index map from the preprocessed GLSL, in
-// the same descriptor namespace the pipeline resolves against.
-static std::map<std::string, unsigned> CollectUniformSlots(const std::string& code,
-                                                           ShaderStage stage) {
-  std::map<std::string, unsigned> slots;
-  for (const auto& uniform : GetShaderUniformBindings(PreprocessGLSL(code, stage))) {
-    slots[uniform.name] = uniform.binding;
-  }
-  return slots;
-}
-
 std::shared_ptr<MetalShaderModule> MetalShaderModule::Make(
     MetalGPU* gpu, const ShaderModuleDescriptor& descriptor) {
   if (!gpu) {
@@ -164,11 +153,12 @@ std::shared_ptr<MetalShaderModule> MetalShaderModule::Make(
 }
 
 MetalShaderModule::MetalShaderModule(MetalGPU* gpu, const ShaderModuleDescriptor& descriptor)
-    : VaryingShaderModule(ExtractVaryingDecls(descriptor.code, descriptor.stage),
-                          CollectUniformSlots(descriptor.code, descriptor.stage)),
+    : VaryingShaderModule(ExtractVaryingDecls(descriptor.code, descriptor.stage), {}),
       _stage(descriptor.stage),
       _glslCode(descriptor.stage == ShaderStage::Fragment ? descriptor.code : std::string{}) {
-  compileShader(gpu->device(), gpu->shaderCompiler(), descriptor.code, descriptor.stage);
+  std::string vulkanGLSL = PreprocessGLSL(descriptor.code, descriptor.stage);
+  setUniformSlots(detail::CollectUniformSlots(vulkanGLSL));
+  compileShader(gpu->device(), gpu->shaderCompiler(), vulkanGLSL, descriptor.stage);
 }
 
 void MetalShaderModule::onRelease(MetalGPU*) {
@@ -179,8 +169,12 @@ void MetalShaderModule::onRelease(MetalGPU*) {
 }
 
 bool MetalShaderModule::compileShader(id<MTLDevice> device, const shaderc::Compiler* compiler,
-                                      const std::string& glslCode, ShaderStage stage) {
-  std::string mslCode = convertGLSLToMSL(compiler, glslCode, stage);
+                                      const std::string& vulkanGLSL, ShaderStage stage) {
+  auto spirvBinary = CompileGLSLToSPIRV(compiler, vulkanGLSL, stage);
+  if (spirvBinary.empty()) {
+    return false;
+  }
+  std::string mslCode = convertSPIRVToMSL(spirvBinary, stage);
   if (mslCode.empty()) {
     return false;
   }
@@ -192,23 +186,12 @@ bool MetalShaderModule::compileShader(id<MTLDevice> device, const shaderc::Compi
   if (!library) {
     if (error) {
       LOGE("Metal shader compilation error: %s", error.localizedDescription.UTF8String);
-      LOGE("Original GLSL:\n%s", glslCode.c_str());
       LOGE("MSL code:\n%s", mslCode.c_str());
     }
     return false;
   }
 
   return true;
-}
-
-std::string MetalShaderModule::convertGLSLToMSL(const shaderc::Compiler* compiler,
-                                                const std::string& glslCode, ShaderStage stage) {
-  std::string vulkanGLSL = PreprocessGLSL(glslCode, stage);
-  auto spirvBinary = CompileGLSLToSPIRV(compiler, vulkanGLSL, stage);
-  if (spirvBinary.empty()) {
-    return "";
-  }
-  return convertSPIRVToMSL(spirvBinary, stage);
 }
 
 SampleMaskCompileResult CompileFragmentShaderWithSampleMask(MetalGPU* gpu,

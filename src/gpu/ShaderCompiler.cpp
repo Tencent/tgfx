@@ -17,72 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShaderCompiler.h"
-#include <algorithm>
 #include <regex>
 #include <shaderc/shaderc.hpp>
-#include <unordered_map>
 #include "UniformData.h"
 #include "core/utils/Log.h"
 
 namespace tgfx {
-
-static int UniformDescriptorSet(ShaderStage stage) {
-  return stage == ShaderStage::Vertex ? VERTEX_UBO_DESCRIPTOR_SET : FRAGMENT_UBO_DESCRIPTOR_SET;
-}
-
-// Assign fixed local binding points for internal UBOs. Vertex and fragment UBOs live in separate
-// descriptor sets, so their numeric bindings are physical stage-local slots rather than public
-// BindingEntry.binding values.
-static std::string assignInternalUBOBindings(const std::string& source) {
-  static std::regex vertexUboRegex(R"(layout\s*\(\s*std140\s*\)\s*uniform\s+VertexUniformBlock)");
-  auto result =
-      std::regex_replace(source, vertexUboRegex,
-                         "layout(std140, set=" + std::to_string(VERTEX_UBO_DESCRIPTOR_SET) +
-                             ", binding=0) uniform VertexUniformBlock");
-  static std::regex fragmentUboRegex(
-      R"(layout\s*\(\s*std140\s*\)\s*uniform\s+FragmentUniformBlock)");
-  return std::regex_replace(result, fragmentUboRegex,
-                            "layout(std140, set=" + std::to_string(FRAGMENT_UBO_DESCRIPTOR_SET) +
-                                ", binding=0) uniform FragmentUniformBlock");
-}
-
-static int nextUniformBinding(const std::string& source, int descriptorSet) {
-  static std::regex boundUboRegex(
-      R"(layout\s*\(\s*std140\s*,\s*set\s*=\s*(\d+)\s*,\s*binding\s*=\s*(\d+)\s*\)\s*uniform)");
-  int nextBinding = 0;
-  std::smatch match;
-  std::string::const_iterator searchStart(source.cbegin());
-  while (std::regex_search(searchStart, source.cend(), match, boundUboRegex)) {
-    if (std::stoi(match[1].str()) == descriptorSet) {
-      nextBinding = std::max(nextBinding, std::stoi(match[2].str()) + 1);
-    }
-    searchStart = match.suffix().first;
-  }
-  return nextBinding;
-}
-
-// Add physical bindings to remaining uniform blocks sequentially within the shader stage's
-// descriptor set. The public BindingEntry.binding is resolved by name at pipeline creation time.
-static std::string assignCustomUBOBindings(const std::string& source, ShaderStage stage) {
-  static std::regex uboRegex(R"(layout\s*\(\s*std140\s*\)\s*uniform\s+(\w+))");
-  std::smatch match;
-  std::string::const_iterator searchStart(source.cbegin());
-  std::string result;
-  size_t lastPos = 0;
-  int binding = nextUniformBinding(source, UniformDescriptorSet(stage));
-  while (std::regex_search(searchStart, source.cend(), match, uboRegex)) {
-    auto matchPos = static_cast<size_t>(match.position(0));
-    auto iterOffset = static_cast<size_t>(searchStart - source.cbegin());
-    size_t matchStart = matchPos + iterOffset;
-    result += source.substr(lastPos, matchStart - lastPos);
-    result += "layout(std140, set=" + std::to_string(UniformDescriptorSet(stage)) +
-              ", binding=" + std::to_string(binding++) + ") uniform " + match[1].str();
-    lastPos = matchStart + static_cast<size_t>(match.length(0));
-    searchStart = match.suffix().first;
-  }
-  result += source.substr(lastPos);
-  return result;
-}
 
 static std::string replaceSamplerBinding(const std::smatch& match, int& counter) {
   return "layout(set=" + std::to_string(TEXTURE_DESCRIPTOR_SET) +
@@ -98,24 +38,10 @@ static std::string assignSamplerBindings(const std::string& source) {
   return detail::ReplaceAllMatches(source, samplerRegex, replaceSamplerBinding, binding);
 }
 
-std::vector<ShaderUniformBinding> GetShaderUniformBindings(const std::string& preprocessedGLSL) {
-  static std::regex uboRegex(
-      R"(layout\s*\(\s*std140\s*,\s*set\s*=\s*(\d+)\s*,\s*binding\s*=\s*(\d+)\s*\)\s*uniform\s+(\w+))");
-  std::vector<ShaderUniformBinding> bindings;
-  std::smatch match;
-  std::string::const_iterator searchStart(preprocessedGLSL.cbegin());
-  while (std::regex_search(searchStart, preprocessedGLSL.cend(), match, uboRegex)) {
-    bindings.push_back({match[3].str(), static_cast<uint32_t>(std::stoul(match[1].str())),
-                        static_cast<uint32_t>(std::stoul(match[2].str()))});
-    searchStart = match.suffix().first;
-  }
-  return bindings;
-}
-
 std::string PreprocessGLSL(const std::string& glslCode, ShaderStage stage) {
   auto result = detail::UpgradeGLSLVersion(glslCode);
-  result = assignInternalUBOBindings(result);
-  result = assignCustomUBOBindings(result, stage);
+  result = detail::AssignInternalUBOBindings(result);
+  result = detail::AssignCustomUBOBindings(result, stage);
   result = assignSamplerBindings(result);
   result = detail::AssignInputLocationQualifiers(result, stage);
   result = detail::AssignOutputLocationQualifiers(result, stage);
