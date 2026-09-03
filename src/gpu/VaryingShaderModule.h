@@ -88,11 +88,18 @@ class VaryingShaderModule : public ShaderModule {
  * Resolves the public logical uniform-block bindings for a pipeline into per-stage physical slots,
  * shared by every SPIR-V based backend (Vulkan / Metal / D3D12 / WebGPU).
  *
- * Every uniform block declared in either shader stage must appear in `uniformBlocks` with a
- * visibility that covers that stage, and every entry in `uniformBlocks` must correspond to a
- * uniform block declared in each stage it targets. Missing declarations in either direction are
- * hard errors: `errorOut` receives a description and the function returns false so the caller can
- * reject pipeline creation instead of producing a pipeline with a dangling binding.
+ * Three self-consistency checks run at pipeline creation, all reported through `errorOut` +
+ * `return false` so the caller can reject the descriptor before any silently misrouted draw:
+ *   1. Layout → shader: every entry in `uniformBlocks` must be declared by each stage its
+ *      visibility covers.
+ *   2. Shader → layout: every uniform block declared by either shader stage must be listed in
+ *      `uniformBlocks`. Without this the SPIR-V backends silently misroute buffers at draw time
+ *      (WebGPU catches it at pipeline creation, Vulkan/D3D12 only through validation layers,
+ *      Metal defers until the draw, GL reads undefined data).
+ *   3. Uniqueness: no two entries may share the same logical binding number, otherwise the later
+ *      entry would silently overwrite the earlier one in `mappingOut` and one of the two blocks
+ *      would never receive data — exactly the alias behaviour this pipeline-time check exists to
+ *      eliminate.
  *
  * A same-named block declared in both stages shares one `BindingEntry` (visibility ==
  * VertexFragment) and one logical binding, so a single RenderPass::setUniformBuffer() call feeds
@@ -122,7 +129,14 @@ inline bool ResolveUniformSlots(const VaryingShaderModule* vertexModule,
   mappingOut.clear();
   std::unordered_set<std::string> vertexInLayout;
   std::unordered_set<std::string> fragmentInLayout;
+  std::unordered_map<unsigned, std::string> bindingToName;
   for (const auto& entry : uniformBlocks) {
+    auto existing = bindingToName.find(entry.binding);
+    if (existing != bindingToName.end()) {
+      errorOut = "logical binding " + std::to_string(entry.binding) +
+                 " is declared for both '" + existing->second + "' and '" + entry.name + "'";
+      return false;
+    }
     UniformSlotMapping mapping;
     if ((entry.visibility & ShaderVisibility::Vertex) && vertexModule != nullptr) {
       auto it = vertexModule->uniformSlots().find(entry.name);
@@ -142,13 +156,12 @@ inline bool ResolveUniformSlots(const VaryingShaderModule* vertexModule,
       mapping.fragmentSlot = it->second;
       fragmentInLayout.insert(entry.name);
     }
+    bindingToName.emplace(entry.binding, entry.name);
     mappingOut[entry.binding] = mapping;
   }
   // Reverse check: every uniform block declared in either shader stage must be covered by
-  // `uniformBlocks`. Missing this in the SPIR-V backends silently misroutes buffers at draw time
-  // (WebGPU catches it at pipeline creation, Vulkan/D3D12 only through validation layers, Metal
-  // defers until the draw, GL reads undefined data), so we surface it uniformly here — mirroring
-  // the varying interface check that keeps vertex/fragment declarations in sync.
+  // `uniformBlocks`. Mirrors the varying interface check that keeps vertex/fragment declarations
+  // in sync.
   if (vertexModule != nullptr) {
     for (const auto& [name, slot] : vertexModule->uniformSlots()) {
       (void)slot;

@@ -949,6 +949,57 @@ TGFX_TEST(GPURenderTest, UniformBufferMissingDeclarationRejected) {
   }
 }
 
+// Two distinct blocks — vertex-only `VertexArgs` and fragment-only `FragmentArgs` — declared with
+// the same logical binding number in the pipeline layout. Every SPIR-V backend keys its
+// per-draw `setUniformBuffer(binding, ...)` off that logical number and stores at most one
+// UniformSlotMapping per number, so silently accepting a duplicate would guarantee that whichever
+// entry lost the tie could never receive data at draw time. The pipeline-time uniqueness check
+// exists precisely to eliminate that silent misbind; OpenGL takes a different code path (a linked
+// program's block-to-binding-point map has no room for the collision).
+TGFX_TEST(GPURenderTest, UniformBufferDuplicateLogicalBinding) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto gpu = context->gpu();
+  ASSERT_TRUE(gpu != nullptr);
+  auto backend = gpu->info()->backend;
+  auto info = gpu->info();
+  auto isDesktop = info->version.find("OpenGL ES") == std::string::npos;
+
+  ShaderModuleDescriptor vertexModule = {};
+  vertexModule.code = PrefixShaderVersion(UNIFORM_BUFFER_BINDING_VERTEX_SHADER, isDesktop);
+  vertexModule.stage = ShaderStage::Vertex;
+  auto vertexShader = gpu->createShaderModule(vertexModule);
+  ASSERT_TRUE(vertexShader != nullptr);
+
+  ShaderModuleDescriptor fragmentModule = {};
+  fragmentModule.code = PrefixShaderVersion(UNIFORM_BUFFER_BINDING_FRAGMENT_SHADER, isDesktop);
+  fragmentModule.stage = ShaderStage::Fragment;
+  auto fragmentShader = gpu->createShaderModule(fragmentModule);
+  ASSERT_TRUE(fragmentShader != nullptr);
+
+  RenderPipelineDescriptor descriptor = {};
+  Attribute position = {"inPosition", VertexFormat::Float2};
+  VertexBufferLayout vertexLayout({position}, VertexStepMode::Vertex);
+  descriptor.vertex.bufferLayouts = {vertexLayout};
+  descriptor.vertex.module = vertexShader;
+  descriptor.fragment.module = fragmentShader;
+  PipelineColorAttachment colorAttachment = {};
+  colorAttachment.blendEnable = false;
+  descriptor.fragment.colorAttachments.push_back(colorAttachment);
+
+  // Two different blocks share logical binding 0 — the SPIR-V backends must reject this.
+  descriptor.layout.uniformBlocks = {{"VertexArgs", 0, ShaderVisibility::Vertex},
+                                     {"FragmentArgs", 0, ShaderVisibility::Fragment}};
+
+  auto pipeline = gpu->createRenderPipeline(descriptor);
+  if (backend == Backend::OpenGL) {
+    EXPECT_TRUE(pipeline != nullptr);
+  } else {
+    EXPECT_TRUE(pipeline == nullptr);
+  }
+}
+
 // Vertex shader declaring two uniform blocks (`PreArgs` then `SharedArgs`) so `SharedArgs`
 // occupies physical slot 1 in the vertex stage, while the fragment shader declares only
 // `SharedArgs` and puts it at physical slot 0. `SharedArgs` is a same-name cross-stage block
