@@ -22,6 +22,7 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 #include "tgfx/gpu/RenderPipeline.h"
@@ -87,24 +88,18 @@ class VaryingShaderModule : public ShaderModule {
  * Resolves the public logical uniform-block bindings for a pipeline into per-stage physical slots,
  * shared by every SPIR-V based backend (Vulkan / Metal / D3D12 / WebGPU).
  *
- * When `uniformBlocks` is non-empty (explicit layout), each entry's `binding` is the logical id;
- * the block is looked up by name in whichever stage(s) its visibility targets. A name that a
- * targeted stage does not declare is a hard error: `errorOut` receives a description and the
- * function returns false so the caller can reject pipeline creation instead of silently producing
- * a pipeline with a dangling logical binding.
+ * Every uniform block declared in either shader stage must appear in `uniformBlocks` with a
+ * visibility that covers that stage, and every entry in `uniformBlocks` must correspond to a
+ * uniform block declared in each stage it targets. Missing declarations in either direction are
+ * hard errors: `errorOut` receives a description and the function returns false so the caller can
+ * reject pipeline creation instead of producing a pipeline with a dangling binding.
  *
- * When `uniformBlocks` is empty (automatic layout), logical ids are assigned by merging the vertex
- * and fragment block names into one name-sorted set and numbering them 0, 1, 2, ... — mirroring
- * OpenGL's program-level, name-keyed binding space: differently named blocks always get distinct
- * ids, and a same-named block declared in both stages shares one id (and one buffer). This must be
- * done here, where both modules are available, because each module is compiled independently and a
- * single stage cannot see the other stage's block names.
- *
- * Contract for a same-named block declared in both stages: the two declarations must be verbatim
- * identical — same member list, member order, member types, and precision qualifiers. This is not
- * a tgfx-specific rule; GLSL/SPIR-V both require it, and OpenGL's `glLinkProgram` is meant to
- * reject any mismatch. In practice detection is uneven across the backends and drivers this
- * function serves:
+ * A same-named block declared in both stages shares one `BindingEntry` (visibility ==
+ * VertexFragment) and one logical binding, so a single RenderPass::setUniformBuffer() call feeds
+ * both stages. The two declarations must be verbatim identical — same member list, member order,
+ * member types, and precision qualifiers. This is not a tgfx-specific rule; GLSL/SPIR-V both
+ * require it, and OpenGL's `glLinkProgram` is meant to reject any mismatch. In practice detection
+ * is uneven across the backends and drivers this function serves:
  *   - Strict OpenGL implementations (e.g. SwiftShader ES) report the mismatch as a link error.
  *   - Many production GL drivers (WebGL, common Android / OpenHarmony vendor drivers) tolerate
  *     the milder cases such as a precision mismatch and link successfully.
@@ -125,46 +120,54 @@ inline bool ResolveUniformSlots(const VaryingShaderModule* vertexModule,
                                 std::map<unsigned, UniformSlotMapping>& mappingOut,
                                 std::string& errorOut) {
   mappingOut.clear();
-  if (!uniformBlocks.empty()) {
-    for (const auto& entry : uniformBlocks) {
-      UniformSlotMapping mapping;
-      if ((entry.visibility & ShaderVisibility::Vertex) && vertexModule != nullptr) {
-        auto it = vertexModule->uniformSlots().find(entry.name);
-        if (it == vertexModule->uniformSlots().end()) {
-          errorOut = "vertex uniform block '" + entry.name + "' was not found";
-          return false;
-        }
-        mapping.vertexSlot = it->second;
+  std::unordered_set<std::string> vertexInLayout;
+  std::unordered_set<std::string> fragmentInLayout;
+  for (const auto& entry : uniformBlocks) {
+    UniformSlotMapping mapping;
+    if ((entry.visibility & ShaderVisibility::Vertex) && vertexModule != nullptr) {
+      auto it = vertexModule->uniformSlots().find(entry.name);
+      if (it == vertexModule->uniformSlots().end()) {
+        errorOut = "vertex uniform block '" + entry.name + "' was not found";
+        return false;
       }
-      if ((entry.visibility & ShaderVisibility::Fragment) && fragmentModule != nullptr) {
-        auto it = fragmentModule->uniformSlots().find(entry.name);
-        if (it == fragmentModule->uniformSlots().end()) {
-          errorOut = "fragment uniform block '" + entry.name + "' was not found";
-          return false;
-        }
-        mapping.fragmentSlot = it->second;
-      }
-      mappingOut[entry.binding] = mapping;
+      mapping.vertexSlot = it->second;
+      vertexInLayout.insert(entry.name);
     }
-    return true;
+    if ((entry.visibility & ShaderVisibility::Fragment) && fragmentModule != nullptr) {
+      auto it = fragmentModule->uniformSlots().find(entry.name);
+      if (it == fragmentModule->uniformSlots().end()) {
+        errorOut = "fragment uniform block '" + entry.name + "' was not found";
+        return false;
+      }
+      mapping.fragmentSlot = it->second;
+      fragmentInLayout.insert(entry.name);
+    }
+    mappingOut[entry.binding] = mapping;
   }
-
-  // Automatic layout: merge both stages' block names into one name-sorted set and number them
-  // sequentially, so the public logical binding space matches OpenGL's program-level semantics.
-  std::map<std::string, UniformSlotMapping> byName;
+  // Reverse check: every uniform block declared in either shader stage must be covered by
+  // `uniformBlocks`. Missing this in the SPIR-V backends silently misroutes buffers at draw time
+  // (WebGPU catches it at pipeline creation, Vulkan/D3D12 only through validation layers, Metal
+  // defers until the draw, GL reads undefined data), so we surface it uniformly here — mirroring
+  // the varying interface check that keeps vertex/fragment declarations in sync.
   if (vertexModule != nullptr) {
     for (const auto& [name, slot] : vertexModule->uniformSlots()) {
-      byName[name].vertexSlot = slot;
+      (void)slot;
+      if (vertexInLayout.find(name) == vertexInLayout.end()) {
+        errorOut = "vertex uniform block '" + name +
+                   "' is declared in the shader but missing from the pipeline layout";
+        return false;
+      }
     }
   }
   if (fragmentModule != nullptr) {
     for (const auto& [name, slot] : fragmentModule->uniformSlots()) {
-      byName[name].fragmentSlot = slot;
+      (void)slot;
+      if (fragmentInLayout.find(name) == fragmentInLayout.end()) {
+        errorOut = "fragment uniform block '" + name +
+                   "' is declared in the shader but missing from the pipeline layout";
+        return false;
+      }
     }
-  }
-  unsigned logicalBinding = 0;
-  for (const auto& [name, mapping] : byName) {
-    mappingOut[logicalBinding++] = mapping;
   }
   return true;
 }

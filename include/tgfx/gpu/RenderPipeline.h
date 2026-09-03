@@ -239,12 +239,12 @@ class BindingEntry {
 class BindingLayout {
  public:
   /**
-   * Specifies the logical bindings for uniform blocks used in the shader program. When empty,
-   * bindings are assigned automatically: uniform blocks from both stages are numbered 0, 1, 2,
-   * ... in lexicographical order of their names. Blocks with different names always receive
-   * distinct bindings, while a block with the same name in both stages shares one binding — a
-   * single RenderPass::setUniformBuffer() call then feeds both stages. The two declarations of
-   * a same-named block must be identical.
+   * Specifies the uniform blocks used by this pipeline and their logical bindings. Every uniform
+   * block declared in the vertex or fragment shader must be listed here with a visibility that
+   * covers the declaring stage(s); a same-named block declared in both stages is expressed as a
+   * single entry with visibility ShaderVisibility::VertexFragment and its two declarations must
+   * be verbatim identical. Pipeline creation fails when the declared uniform blocks and this list
+   * disagree.
    */
   std::vector<BindingEntry> uniformBlocks = {};
 
