@@ -100,6 +100,23 @@ class VaryingShaderModule : public ShaderModule {
  * done here, where both modules are available, because each module is compiled independently and a
  * single stage cannot see the other stage's block names.
  *
+ * Contract for a same-named block declared in both stages: the two declarations must be verbatim
+ * identical — same member list, member order, member types, and precision qualifiers. This is not
+ * a tgfx-specific rule; GLSL/SPIR-V both require it, and OpenGL's `glLinkProgram` is meant to
+ * reject any mismatch. In practice detection is uneven across the backends and drivers this
+ * function serves:
+ *   - Strict OpenGL implementations (e.g. SwiftShader ES) report the mismatch as a link error.
+ *   - Many production GL drivers (WebGL, common Android / OpenHarmony vendor drivers) tolerate
+ *     the milder cases such as a precision mismatch and link successfully.
+ *   - The SPIR-V backends (Vulkan / Metal / D3D12 / WebGPU) compile each module independently,
+ *     so nothing at either compile or pipeline creation time observes the other stage's member
+ *     list; precision, member order, or member type differences all pass silently. When the two
+ *     declarations diverge structurally, the same buffer bytes get reinterpreted through two
+ *     different layouts and the render output is silently wrong.
+ * tgfx cannot close this gap at pipeline creation time — module objects only carry the block name
+ * and its physical slot, not the member list — so callers must guarantee the verbatim-identical
+ * declaration themselves.
+ *
  * `vertexModule` / `fragmentModule` may be null when the pipeline omits that stage.
  */
 inline bool ResolveUniformSlots(const VaryingShaderModule* vertexModule,
