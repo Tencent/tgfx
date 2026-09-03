@@ -133,8 +133,8 @@ inline bool ResolveUniformSlots(const VaryingShaderModule* vertexModule,
   for (const auto& entry : uniformBlocks) {
     auto existing = bindingToName.find(entry.binding);
     if (existing != bindingToName.end()) {
-      errorOut = "logical binding " + std::to_string(entry.binding) +
-                 " is declared for both '" + existing->second + "' and '" + entry.name + "'";
+      errorOut = "logical binding " + std::to_string(entry.binding) + " is declared for both '" +
+                 existing->second + "' and '" + entry.name + "'";
       return false;
     }
     UniformSlotMapping mapping;
