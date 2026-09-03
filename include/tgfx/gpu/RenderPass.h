@@ -298,16 +298,17 @@ class RenderPass {
   /**
    * Sets a GPUBuffer for the pipeline-scoped logical binding declared by
    * BindingLayout::uniformBlocks. The active pipeline maps the logical binding to every physical
-   * shader-stage slot that uses the resource. setPipeline() must have been called first;
-   * otherwise the call is dropped and the subsequent draw is skipped.
+   * shader-stage slot that uses the resource. The mapping is resolved when the next draw is
+   * encoded, so this call may be issued before or after setPipeline(); a draw with no pipeline
+   * bound is dropped.
    */
   virtual void setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuffer> buffer, size_t offset,
                                 size_t size) = 0;
 
   /**
    * Sets a texture and its sampler state to a specified binding index in the shader's texture
-   * table. setPipeline() must have been called first; otherwise the call is dropped and the
-   * subsequent draw is skipped.
+   * table. The mapping is resolved when the next draw is encoded, so this call may be issued
+   * before or after setPipeline(); a draw with no pipeline bound is dropped.
    */
   virtual void setTexture(unsigned binding, std::shared_ptr<Texture> texture,
                           std::shared_ptr<Sampler> sampler) = 0;

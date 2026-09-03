@@ -210,7 +210,6 @@ void MetalRenderPass::setPipeline(std::shared_ptr<RenderPipeline> pipeline) {
   if (currentPipeline == pipeline) return;
 
   currentPipeline = std::static_pointer_cast<MetalRenderPipeline>(pipeline);
-  hasInvalidBindings = false;
   [renderEncoder setRenderPipelineState:currentPipeline->metalRenderPipelineState()];
 
   // Set depth stencil state if available
@@ -273,31 +272,9 @@ void MetalRenderPass::setTexture(unsigned binding, std::shared_ptr<Texture> text
   if (!renderEncoder || !texture) {
     return;
   }
-  if (!currentPipeline) {
-    LOGE("MetalRenderPass::setTexture: setPipeline must be called first.");
-    hasInvalidBindings = true;
-    return;
-  }
-
-  // Remap logical binding to actual Metal texture index via the pipeline's mapping table.
-  unsigned textureIndex = currentPipeline->getTextureIndex(binding);
-
-  if (textureIndex < MaxTextureBindings && lastTextures[textureIndex] == texture.get() &&
-      lastSamplers[textureIndex] == sampler.get()) {
-    return;
-  }
-  if (textureIndex < MaxTextureBindings) {
-    lastTextures[textureIndex] = texture.get();
-    lastSamplers[textureIndex] = sampler.get();
-  }
-
-  auto metalTexture = std::static_pointer_cast<MetalTexture>(texture);
-  [renderEncoder setFragmentTexture:metalTexture->metalTexture() atIndex:textureIndex];
-
-  if (sampler) {
-    auto metalSampler = std::static_pointer_cast<MetalSampler>(sampler);
-    [renderEncoder setFragmentSamplerState:metalSampler->metalSamplerState() atIndex:textureIndex];
-  }
+  // Record the binding; the logical->physical translation happens in flushBindings() at draw time,
+  // so setTexture can be called before or after setPipeline().
+  pendingTextures[binding] = {std::move(texture), std::move(sampler)};
 }
 
 void MetalRenderPass::setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuffer> buffer,
@@ -305,51 +282,48 @@ void MetalRenderPass::setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuff
   if (!renderEncoder || !buffer) {
     return;
   }
-  if (!currentPipeline) {
-    LOGE("MetalRenderPass::setUniformBuffer: setPipeline must be called first.");
-    hasInvalidBindings = true;
-    return;
-  }
   (void)size;
-  auto metalBuffer = std::static_pointer_cast<MetalBuffer>(buffer);
-  auto slots = currentPipeline->getUniformSlots(binding);
-  if (slots == nullptr) {
-    return;
+  // Record the binding; the logical->physical translation happens in flushBindings() at draw time,
+  // so setUniformBuffer can be called before or after setPipeline().
+  pendingUniforms[binding] = {std::move(buffer), offset};
+}
+
+bool MetalRenderPass::flushBindings() {
+  if (!currentPipeline) {
+    LOGE("MetalRenderPass::flushBindings: setPipeline must be called first.");
+    return false;
   }
-  if (slots->vertexSlot.has_value()) {
-    auto physicalIndex = *slots->vertexSlot;
-    DEBUG_ASSERT(physicalIndex < MaxUniformBindings);
-    if (physicalIndex < MaxUniformBindings) {
-      if (lastVertexUniformBuffers[physicalIndex] == buffer.get()) {
-        if (lastVertexUniformOffsets[physicalIndex] != offset) {
-          [renderEncoder setVertexBufferOffset:offset atIndex:physicalIndex];
-        }
-      } else {
-        [renderEncoder setVertexBuffer:metalBuffer->metalBuffer()
-                                offset:offset
-                               atIndex:physicalIndex];
-      }
-      lastVertexUniformBuffers[physicalIndex] = buffer.get();
-      lastVertexUniformOffsets[physicalIndex] = offset;
+  for (auto& [binding, uniform] : pendingUniforms) {
+    auto slots = currentPipeline->getUniformSlots(binding);
+    if (slots == nullptr) {
+      continue;
+    }
+    auto metalBuffer = std::static_pointer_cast<MetalBuffer>(uniform.buffer);
+    if (slots->vertexSlot.has_value()) {
+      [renderEncoder setVertexBuffer:metalBuffer->metalBuffer()
+                              offset:uniform.offset
+                             atIndex:*slots->vertexSlot];
+    }
+    if (slots->fragmentSlot.has_value()) {
+      [renderEncoder setFragmentBuffer:metalBuffer->metalBuffer()
+                                offset:uniform.offset
+                               atIndex:*slots->fragmentSlot];
     }
   }
-  if (slots->fragmentSlot.has_value()) {
-    auto physicalIndex = *slots->fragmentSlot;
-    DEBUG_ASSERT(physicalIndex < MaxUniformBindings);
-    if (physicalIndex < MaxUniformBindings) {
-      if (lastFragmentUniformBuffers[physicalIndex] == buffer.get()) {
-        if (lastFragmentUniformOffsets[physicalIndex] != offset) {
-          [renderEncoder setFragmentBufferOffset:offset atIndex:physicalIndex];
-        }
-      } else {
-        [renderEncoder setFragmentBuffer:metalBuffer->metalBuffer()
-                                  offset:offset
-                                 atIndex:physicalIndex];
-      }
-      lastFragmentUniformBuffers[physicalIndex] = buffer.get();
-      lastFragmentUniformOffsets[physicalIndex] = offset;
+  for (auto& [binding, tex] : pendingTextures) {
+    if (tex.texture == nullptr) {
+      continue;
+    }
+    unsigned textureIndex = currentPipeline->getTextureIndex(binding);
+    auto metalTexture = std::static_pointer_cast<MetalTexture>(tex.texture);
+    [renderEncoder setFragmentTexture:metalTexture->metalTexture() atIndex:textureIndex];
+    if (tex.sampler != nullptr) {
+      auto metalSampler = std::static_pointer_cast<MetalSampler>(tex.sampler);
+      [renderEncoder setFragmentSamplerState:metalSampler->metalSamplerState()
+                                     atIndex:textureIndex];
     }
   }
+  return true;
 }
 
 void MetalRenderPass::setStencilReference(uint32_t reference) {
@@ -364,12 +338,7 @@ void MetalRenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount,
   if (!renderEncoder) {
     return;
   }
-  if (!currentPipeline) {
-    LOGE("MetalRenderPass::draw: setPipeline must be called first.");
-    return;
-  }
-  if (hasInvalidBindings) {
-    LOGE("MetalRenderPass::draw: dropped because a prior resource binding was invalid.");
+  if (!flushBindings()) {
     return;
   }
 
@@ -387,12 +356,7 @@ void MetalRenderPass::drawIndexed(PrimitiveType primitiveType, uint32_t indexCou
   if (!renderEncoder || !indexBuffer) {
     return;
   }
-  if (!currentPipeline) {
-    LOGE("MetalRenderPass::drawIndexed: setPipeline must be called first.");
-    return;
-  }
-  if (hasInvalidBindings) {
-    LOGE("MetalRenderPass::drawIndexed: dropped because a prior resource binding was invalid.");
+  if (!flushBindings()) {
     return;
   }
 
