@@ -1374,14 +1374,17 @@ bool Layer::canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode) {
   if (args.subtreeCacheMaxSize <= 0) {
     return false;
   }
+  // Cached subtrees are recorded without a background handler, so they cannot represent
+  // backdrop styles.
+  if (shouldPassThroughBackground(blendMode) || hasBackgroundStyle()) {
+    subtreeCache = nullptr;
+    return false;
+  }
   if (subtreeCache) {
     if (subtreeCache->maxSize() != args.subtreeCacheMaxSize) {
       subtreeCache = std::make_unique<SubtreeCache>(args.subtreeCacheMaxSize);
     }
     return true;
-  }
-  if (shouldPassThroughBackground(blendMode) || hasBackgroundStyle()) {
-    return false;
   }
   if (!bitFields.staticSubtree) {
     return false;
