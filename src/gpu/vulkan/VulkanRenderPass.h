@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <map>
+#include <memory>
 #include <unordered_map>
 #include <vector>
 #include "gpu/vulkan/VulkanAPI.h"
@@ -28,6 +30,8 @@ namespace tgfx {
 class VulkanCommandEncoder;
 class VulkanGPU;
 class VulkanRenderPipeline;
+class VulkanSampler;
+class VulkanTexture;
 
 /**
  * Vulkan render pass implementation.
@@ -84,6 +88,15 @@ class VulkanRenderPass : public RenderPass {
     VkSampler sampler = VK_NULL_HANDLE;
   };
 
+  // Recorded by setTexture() and translated to a physical texture unit by flushBindings() at
+  // draw time. Deferring the translation lets setTexture() be called before or after
+  // setPipeline(); the shared_ptr keeps the texture and sampler alive until the flush retains
+  // them on the command encoder.
+  struct PendingTexture {
+    std::shared_ptr<VulkanTexture> texture;
+    std::shared_ptr<VulkanSampler> sampler;
+  };
+
   struct VertexBinding {
     VkBuffer buffer = VK_NULL_HANDLE;
     VkDeviceSize offset = 0;
@@ -94,6 +107,7 @@ class VulkanRenderPass : public RenderPass {
   struct BoundState {
     std::shared_ptr<VulkanRenderPipeline> pipeline = nullptr;
     std::unordered_map<unsigned, UniformBinding> uniformBindings;
+    std::map<unsigned, PendingTexture> pendingTextures;
     std::vector<TextureBinding> textureBindings;
     std::vector<VertexBinding> vertexBindings;
     VkBuffer indexBuffer = VK_NULL_HANDLE;

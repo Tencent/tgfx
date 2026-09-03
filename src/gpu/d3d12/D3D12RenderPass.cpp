@@ -297,10 +297,9 @@ void D3D12RenderPass::setTexture(unsigned binding, std::shared_ptr<Texture> text
   if (!texture || !sampler || binding >= MaxTextureBindings) {
     return;
   }
-  if (!currentPipeline) {
-    LOGE("D3D12RenderPass::setTexture: setPipeline must be called first.");
-    return;
-  }
+  // setTexture only records state indexed by the public logical binding; the physical root
+  // parameter is resolved from currentPipeline in flushBindingsIfNeeded() at draw time, so this
+  // call may be issued before or after setPipeline().
   auto d3d12Tex = std::static_pointer_cast<D3D12Texture>(texture);
   auto d3d12Samp = std::static_pointer_cast<D3D12Sampler>(sampler);
   encoder->retainResource(d3d12Tex);

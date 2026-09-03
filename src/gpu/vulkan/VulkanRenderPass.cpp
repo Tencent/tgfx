@@ -362,25 +362,12 @@ void VulkanRenderPass::setTexture(unsigned binding, std::shared_ptr<Texture> tex
   if (!texture || !sampler) {
     return;
   }
-  if (!lastBound.pipeline) {
-    LOGE("VulkanRenderPass::setTexture: setPipeline must be called first.");
-    return;
-  }
-  auto unitIndex = lastBound.pipeline->getTextureIndex(binding);
-  if (unitIndex >= lastBound.textureBindings.size()) {
-    return;
-  }
   auto vulkanTexture = std::static_pointer_cast<VulkanTexture>(texture);
   auto vulkanSampler = std::static_pointer_cast<VulkanSampler>(sampler);
-  auto view = vulkanTexture->vulkanImageView();
-  auto samp = vulkanSampler->vulkanSampler();
-  auto& tb = lastBound.textureBindings[unitIndex];
-  if (tb.imageView == view && tb.sampler == samp) {
-    return;
-  }
-  encoder->retainTexture(vulkanTexture);
-  encoder->retainResource(vulkanSampler);
-  tb = {view, samp};
+  // Record the binding; the logical->physical translation and descriptor dedup happen in
+  // bindDescriptorSetIfDirty() at draw time, so setTexture can be called before or after
+  // setPipeline().
+  lastBound.pendingTextures[binding] = {std::move(vulkanTexture), std::move(vulkanSampler)};
   lastBound.descriptorDirty = true;
 }
 
@@ -391,6 +378,28 @@ bool VulkanRenderPass::bindDescriptorSetIfDirty() {
   if (!lastBound.pipeline) {
     return false;
   }
+
+  // Translate pending texture bindings (recorded by setTexture without any pipeline knowledge)
+  // into the physical texture units the pipeline exposes. The result is written into
+  // lastBound.textureBindings, which the descriptor-write loop below reads. The intra-pass dedup
+  // (skip retainResource when the same view/sampler is already bound at that unit) is preserved
+  // here, at the flush site, since setTexture no longer has a physical unit to key it against.
+  for (auto& [binding, pending] : lastBound.pendingTextures) {
+    auto unitIndex = lastBound.pipeline->getTextureIndex(binding);
+    if (unitIndex >= lastBound.textureBindings.size()) {
+      continue;
+    }
+    auto view = pending.texture->vulkanImageView();
+    auto samp = pending.sampler->vulkanSampler();
+    auto& tb = lastBound.textureBindings[unitIndex];
+    if (tb.imageView == view && tb.sampler == samp) {
+      continue;
+    }
+    encoder->retainTexture(pending.texture);
+    encoder->retainResource(pending.sampler);
+    tb = {view, samp};
+  }
+  lastBound.pendingTextures.clear();
 
   auto device = vulkanGPU->device();
   auto vertexUboLayout = lastBound.pipeline->vulkanVertexUboSetLayout();
