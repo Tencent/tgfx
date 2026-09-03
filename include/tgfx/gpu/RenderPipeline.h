@@ -239,12 +239,7 @@ class BindingEntry {
 class BindingLayout {
  public:
   /**
-   * Specifies the uniform blocks used by this pipeline and their logical bindings. Every uniform
-   * block declared in the vertex or fragment shader must be listed here with a visibility that
-   * covers the declaring stage(s); a same-named block declared in both stages is expressed as a
-   * single entry with visibility ShaderVisibility::VertexFragment and its two declarations must
-   * be verbatim identical. Pipeline creation fails when the declared uniform blocks and this list
-   * disagree.
+   * Specifies the logical bindings for uniform blocks used in the shader program.
    */
   std::vector<BindingEntry> uniformBlocks = {};
 
