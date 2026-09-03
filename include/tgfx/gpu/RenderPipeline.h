@@ -239,8 +239,12 @@ class BindingEntry {
 class BindingLayout {
  public:
   /**
-   * Specifies the logical bindings for uniform blocks used in the shader program. When empty, the
-   * physical binding assigned while compiling each shader stage is also used as its logical binding.
+   * Specifies the logical bindings for uniform blocks used in the shader program. When empty,
+   * bindings are assigned automatically: uniform blocks from both stages are numbered 0, 1, 2,
+   * ... in lexicographical order of their names. Blocks with different names always receive
+   * distinct bindings, while a block with the same name in both stages shares one binding — a
+   * single RenderPass::setUniformBuffer() call then feeds both stages. The two declarations of
+   * a same-named block must be identical.
    */
   std::vector<BindingEntry> uniformBlocks = {};
 
