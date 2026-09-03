@@ -20,6 +20,7 @@
 
 #include <d3dcompiler.h>
 #include <string>
+#include <unordered_map>
 #include "D3D12Resource.h"
 #include "D3D12Util.h"
 #include "gpu/VaryingShaderModule.h"

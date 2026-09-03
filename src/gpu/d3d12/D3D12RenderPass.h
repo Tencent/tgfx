@@ -142,9 +142,8 @@ class D3D12RenderPass : public RenderPass {
     D3D12_GPU_DESCRIPTOR_HANDLE samplerTableStart = {};
     bool dirty = false;
   };
-  static constexpr unsigned MaxUniformBindings = 8;
   static constexpr unsigned MaxTextureBindings = 32;
-  UniformBinding uniformBindings[MaxUniformBindings] = {};
+  std::unordered_map<unsigned, UniformBinding> uniformBindings = {};
   TextureBinding textureBindings[MaxTextureBindings] = {};
 
   std::shared_ptr<D3D12RenderPipeline> currentPipeline = nullptr;

@@ -20,10 +20,12 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <map>
 #include <regex>
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "UniformData.h"
 #include "core/utils/Log.h"
 #include "tgfx/gpu/ShaderStage.h"
 
@@ -32,6 +34,12 @@ class Compiler;
 }
 
 namespace tgfx {
+
+struct ShaderUniformBinding {
+  std::string name;
+  uint32_t descriptorSet = 0;
+  uint32_t binding = 0;
+};
 
 /// Extracts the varying declarations of a shader stage: the `out` declarations for the vertex
 /// stage and the `in` declarations for the fragment stage. Each varying is keyed by name and maps
@@ -88,12 +96,11 @@ inline bool VaryingInterfacesMatch(const std::unordered_map<std::string, int>& v
 // ShaderCompiler.cpp, which is excluded from WebGPU-only builds.
 namespace detail {
 
-using MatchReplacer = std::string (*)(const std::smatch&, int&);
-
 // Replaces every match of `pattern` in `source`, advancing `counter` by each match's location
 // footprint and letting `replacer` format the replacement declaration.
+template <typename Replacer>
 inline std::string ReplaceAllMatches(const std::string& source, const std::regex& pattern,
-                                     MatchReplacer replacer, int& counter) {
+                                     Replacer replacer, int& counter) {
   std::smatch match;
   std::string::const_iterator searchStart(source.cbegin());
   std::string result;
@@ -109,6 +116,85 @@ inline std::string ReplaceAllMatches(const std::string& source, const std::regex
   }
   result += source.substr(lastPos);
   return result;
+}
+
+inline int UniformDescriptorSet(ShaderStage stage) {
+  return stage == ShaderStage::Vertex ? VERTEX_UBO_DESCRIPTOR_SET : FRAGMENT_UBO_DESCRIPTOR_SET;
+}
+
+// Assigns fixed local binding points for internal UBOs. Vertex and fragment UBOs live in separate
+// descriptor sets, so their numeric bindings are physical stage-local slots rather than public
+// BindingEntry.binding values.
+inline std::string AssignInternalUBOBindings(const std::string& source) {
+  static std::regex vertexUboRegex(R"(layout\s*\(\s*std140\s*\)\s*uniform\s+VertexUniformBlock)");
+  auto result =
+      std::regex_replace(source, vertexUboRegex,
+                         "layout(std140, set=" + std::to_string(VERTEX_UBO_DESCRIPTOR_SET) +
+                             ", binding=0) uniform VertexUniformBlock");
+  static std::regex fragmentUboRegex(
+      R"(layout\s*\(\s*std140\s*\)\s*uniform\s+FragmentUniformBlock)");
+  return std::regex_replace(result, fragmentUboRegex,
+                            "layout(std140, set=" + std::to_string(FRAGMENT_UBO_DESCRIPTOR_SET) +
+                                ", binding=0) uniform FragmentUniformBlock");
+}
+
+inline int NextUniformBinding(const std::string& source, int descriptorSet) {
+  static std::regex boundUboRegex(
+      R"(layout\s*\(\s*std140\s*,\s*set\s*=\s*(\d+)\s*,\s*binding\s*=\s*(\d+)\s*\)\s*uniform)");
+  int nextBinding = 0;
+  std::smatch match;
+  std::string::const_iterator searchStart(source.cbegin());
+  while (std::regex_search(searchStart, source.cend(), match, boundUboRegex)) {
+    if (std::stoi(match[1].str()) == descriptorSet) {
+      nextBinding = std::max(nextBinding, std::stoi(match[2].str()) + 1);
+    }
+    searchStart = match.suffix().first;
+  }
+  return nextBinding;
+}
+
+struct CustomUBOBindingReplacer {
+  int descriptorSet = 0;
+  std::string operator()(const std::smatch& match, int& counter) const {
+    return "layout(std140, set=" + std::to_string(descriptorSet) +
+           ", binding=" + std::to_string(counter++) + ") uniform " + match[1].str();
+  }
+};
+
+// Adds physical bindings to remaining uniform blocks sequentially within the shader stage's
+// descriptor set. The public BindingEntry.binding is resolved by name at pipeline creation time.
+inline std::string AssignCustomUBOBindings(const std::string& source, ShaderStage stage) {
+  static std::regex uboRegex(R"(layout\s*\(\s*std140\s*\)\s*uniform\s+(\w+))");
+  int binding = NextUniformBinding(source, UniformDescriptorSet(stage));
+  return ReplaceAllMatches(source, uboRegex, CustomUBOBindingReplacer{UniformDescriptorSet(stage)},
+                           binding);
+}
+
+// Extracts uniform-block names and physical descriptor locations from preprocessed GLSL.
+inline std::vector<ShaderUniformBinding> CollectUniformBindings(
+    const std::string& preprocessedGLSL) {
+  static std::regex uboRegex(
+      R"(layout\s*\(\s*std140\s*,\s*set\s*=\s*(\d+)\s*,\s*binding\s*=\s*(\d+)\s*\)\s*uniform\s+(\w+))");
+  std::vector<ShaderUniformBinding> bindings;
+  std::smatch match;
+  std::string::const_iterator searchStart(preprocessedGLSL.cbegin());
+  while (std::regex_search(searchStart, preprocessedGLSL.cend(), match, uboRegex)) {
+    bindings.push_back({match[3].str(), static_cast<uint32_t>(std::stoul(match[1].str())),
+                        static_cast<uint32_t>(std::stoul(match[2].str()))});
+    searchStart = match.suffix().first;
+  }
+  return bindings;
+}
+
+// Builds the uniform-block name -> physical binding map from preprocessed GLSL, ordered by name
+// for deterministic slot resolution. The physical binding is stage-local: it lives in a per-stage
+// descriptor set, so the name uniquely identifies the block within the stage.
+inline std::map<std::string, unsigned> CollectUniformSlots(const std::string& preprocessedGLSL) {
+  std::map<std::string, unsigned> slots;
+  for (const auto& uniform : CollectUniformBindings(preprocessedGLSL)) {
+    slots[uniform.name] = uniform.binding;
+  }
+  return slots;
 }
 
 inline std::string ReplaceInputLocation(const std::smatch& match, int& counter) {

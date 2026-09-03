@@ -133,6 +133,34 @@ static VkFormat AttributeToVkFormat(const Attribute& attr) {
   }
 }
 
+static bool CreateUboSetLayout(VkDevice device,
+                               const std::map<unsigned, UniformSlotMapping>& mappings, bool vertex,
+                               VkShaderStageFlags stageFlags, VkDescriptorSetLayout* setLayout) {
+  std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
+  std::unordered_set<unsigned> physicalBindings;
+  for (const auto& item : mappings) {
+    auto slot = vertex ? item.second.vertexSlot : item.second.fragmentSlot;
+    if (!slot.has_value()) {
+      continue;
+    }
+    if (!physicalBindings.insert(*slot).second) {
+      LOGE("VulkanRenderPipeline: duplicate physical UBO binding %u.", *slot);
+      return false;
+    }
+    VkDescriptorSetLayoutBinding binding = {};
+    binding.binding = *slot;
+    binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    binding.descriptorCount = 1;
+    binding.stageFlags = stageFlags;
+    layoutBindings.push_back(binding);
+  }
+  VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+  layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+  layoutInfo.bindingCount = static_cast<uint32_t>(layoutBindings.size());
+  layoutInfo.pBindings = layoutBindings.data();
+  return vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, setLayout) == VK_SUCCESS;
+}
+
 std::shared_ptr<VulkanRenderPipeline> VulkanRenderPipeline::Make(
     VulkanGPU* gpu, const RenderPipelineDescriptor& descriptor) {
   if (!gpu) {
@@ -157,37 +185,28 @@ std::shared_ptr<VulkanRenderPipeline> VulkanRenderPipeline::Make(
 
 VulkanRenderPipeline::VulkanRenderPipeline(VulkanGPU* gpu,
                                            const RenderPipelineDescriptor& descriptor) {
-  if (!createDescriptorSetLayouts(gpu, descriptor)) {
-    return;
-  }
-  if (!createPipelineLayout(gpu)) {
-    return;
-  }
-  if (!createPipeline(gpu, descriptor, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, &pipeline)) {
-    return;
-  }
-  // When extendedDynamicState is unavailable, create a TriangleStrip pipeline variant so that
-  // draw calls requesting strip topology can bind the correct pipeline instead of falling back
-  // to an incorrect TriangleList interpretation.
-  if (!gpu->extensions().extendedDynamicState) {
-    if (!createPipeline(gpu, descriptor, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP, &stripPipeline)) {
-      vkDestroyPipeline(gpu->device(), pipeline, nullptr);
-      pipeline = VK_NULL_HANDLE;
-      return;
-    }
-  }
-
-  // Build texture binding mapping: user-facing binding -> sequential texture unit index.
-  // With multi descriptor set layout, texture bindings start from 0 in both SPIR-V (set 1)
-  // and the runtime API, so this map is effectively an identity mapping.
   unsigned textureUnit = 0;
   for (auto& entry : descriptor.layout.textureSamplers) {
     textureUnits[entry.binding] = textureUnit++;
     textureBindingSet.insert(entry.binding);
   }
-  for (auto& entry : descriptor.layout.uniformBlocks) {
-    uniformBlockVisibility[entry.binding] = entry.visibility;
-    uniformBindingSet.insert(entry.binding);
+  auto vertexShader = std::static_pointer_cast<VulkanShaderModule>(descriptor.vertex.module);
+  auto fragmentShader = std::static_pointer_cast<VulkanShaderModule>(descriptor.fragment.module);
+  std::string error;
+  if (!ResolveUniformSlots(vertexShader.get(), fragmentShader.get(),
+                           descriptor.layout.uniformBlocks, uniformSlots, error)) {
+    LOGE("VulkanRenderPipeline: %s.", error.c_str());
+    return;
+  }
+
+  if (!createDescriptorSetLayouts(gpu, descriptor) || !createPipelineLayout(gpu) ||
+      !createPipeline(gpu, descriptor, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, &pipeline)) {
+    return;
+  }
+  if (!gpu->extensions().extendedDynamicState &&
+      !createPipeline(gpu, descriptor, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP, &stripPipeline)) {
+    vkDestroyPipeline(gpu->device(), pipeline, nullptr);
+    pipeline = VK_NULL_HANDLE;
   }
 }
 
@@ -205,9 +224,13 @@ void VulkanRenderPipeline::onRelease(VulkanGPU* gpu) {
     vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
     pipelineLayout = VK_NULL_HANDLE;
   }
-  if (uboSetLayout != VK_NULL_HANDLE) {
-    vkDestroyDescriptorSetLayout(device, uboSetLayout, nullptr);
-    uboSetLayout = VK_NULL_HANDLE;
+  if (vertexUboSetLayout != VK_NULL_HANDLE) {
+    vkDestroyDescriptorSetLayout(device, vertexUboSetLayout, nullptr);
+    vertexUboSetLayout = VK_NULL_HANDLE;
+  }
+  if (fragmentUboSetLayout != VK_NULL_HANDLE) {
+    vkDestroyDescriptorSetLayout(device, fragmentUboSetLayout, nullptr);
+    fragmentUboSetLayout = VK_NULL_HANDLE;
   }
   if (textureSetLayout != VK_NULL_HANDLE) {
     vkDestroyDescriptorSetLayout(device, textureSetLayout, nullptr);
@@ -223,41 +246,23 @@ unsigned VulkanRenderPipeline::getTextureIndex(unsigned binding) const {
   return binding;
 }
 
-uint32_t VulkanRenderPipeline::getUniformBlockVisibility(unsigned binding) const {
-  auto result = uniformBlockVisibility.find(binding);
-  if (result != uniformBlockVisibility.end()) {
-    return result->second;
-  }
-  return ShaderVisibility::VertexFragment;
+const UniformSlotMapping* VulkanRenderPipeline::getUniformSlots(unsigned binding) const {
+  auto result = uniformSlots.find(binding);
+  return result != uniformSlots.end() ? &result->second : nullptr;
 }
 
 bool VulkanRenderPipeline::createDescriptorSetLayouts(VulkanGPU* gpu,
                                                       const RenderPipelineDescriptor& descriptor) {
   auto device = gpu->device();
 
-  // Set 0: Uniform buffer bindings only.
-  std::vector<VkDescriptorSetLayoutBinding> uboBindings;
-  for (auto& entry : descriptor.layout.uniformBlocks) {
-    VkDescriptorSetLayoutBinding binding = {};
-    binding.binding = entry.binding;
-    binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    binding.descriptorCount = 1;
-    binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-    uboBindings.push_back(binding);
-  }
-  VkDescriptorSetLayoutCreateInfo uboLayoutInfo = {};
-  uboLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-  uboLayoutInfo.bindingCount = static_cast<uint32_t>(uboBindings.size());
-  uboLayoutInfo.pBindings = uboBindings.data();
-  auto result = vkCreateDescriptorSetLayout(device, &uboLayoutInfo, nullptr, &uboSetLayout);
-  if (result != VK_SUCCESS) {
+  if (!CreateUboSetLayout(device, uniformSlots, /*vertex=*/true, VK_SHADER_STAGE_VERTEX_BIT,
+                          &vertexUboSetLayout) ||
+      !CreateUboSetLayout(device, uniformSlots, /*vertex=*/false, VK_SHADER_STAGE_FRAGMENT_BIT,
+                          &fragmentUboSetLayout)) {
     LOGE("VulkanRenderPipeline: vkCreateDescriptorSetLayout (UBO set) failed.");
     return false;
   }
 
-  // Set 1: Combined image sampler bindings, starting from binding 0.
-  // Currently all texture sampling occurs in fragment shaders. If vertex texture sampling is
-  // needed in the future (e.g. displacement mapping), stageFlags should be extended accordingly.
   std::vector<VkDescriptorSetLayoutBinding> texBindings;
   auto samplerCount = descriptor.layout.textureSamplers.size();
   for (size_t i = 0; i < samplerCount; i++) {
@@ -272,20 +277,19 @@ bool VulkanRenderPipeline::createDescriptorSetLayouts(VulkanGPU* gpu,
   texLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
   texLayoutInfo.bindingCount = static_cast<uint32_t>(texBindings.size());
   texLayoutInfo.pBindings = texBindings.data();
-  result = vkCreateDescriptorSetLayout(device, &texLayoutInfo, nullptr, &textureSetLayout);
+  auto result = vkCreateDescriptorSetLayout(device, &texLayoutInfo, nullptr, &textureSetLayout);
   if (result != VK_SUCCESS) {
     LOGE("VulkanRenderPipeline: vkCreateDescriptorSetLayout (texture set) failed.");
     return false;
   }
-
   return true;
 }
 
 bool VulkanRenderPipeline::createPipelineLayout(VulkanGPU* gpu) {
-  VkDescriptorSetLayout setLayouts[] = {uboSetLayout, textureSetLayout};
+  VkDescriptorSetLayout setLayouts[] = {vertexUboSetLayout, fragmentUboSetLayout, textureSetLayout};
   VkPipelineLayoutCreateInfo layoutInfo = {};
   layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-  layoutInfo.setLayoutCount = 2;
+  layoutInfo.setLayoutCount = 3;
   layoutInfo.pSetLayouts = setLayouts;
 
   auto result = vkCreatePipelineLayout(gpu->device(), &layoutInfo, nullptr, &pipelineLayout);

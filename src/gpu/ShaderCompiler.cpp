@@ -17,43 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShaderCompiler.h"
-#include <algorithm>
 #include <regex>
 #include <shaderc/shaderc.hpp>
-#include <unordered_map>
 #include "UniformData.h"
 #include "core/utils/Log.h"
 
 namespace tgfx {
-
-// Assign fixed binding points for internal UBOs to match CPU-side constants:
-// VertexUniformBlock -> set 0, binding 0 (VERTEX_UBO_BINDING_POINT)
-// FragmentUniformBlock -> set 0, binding 1 (FRAGMENT_UBO_BINDING_POINT)
-static std::string assignInternalUBOBindings(const std::string& source) {
-  static std::regex vertexUboRegex(R"(layout\s*\(\s*std140\s*\)\s*uniform\s+VertexUniformBlock)");
-  auto result = std::regex_replace(source, vertexUboRegex,
-                                   "layout(std140, set=" + std::to_string(UBO_DESCRIPTOR_SET) +
-                                       ", binding=" + std::to_string(VERTEX_UBO_BINDING_POINT) +
-                                       ") uniform VertexUniformBlock");
-  static std::regex fragmentUboRegex(
-      R"(layout\s*\(\s*std140\s*\)\s*uniform\s+FragmentUniformBlock)");
-  return std::regex_replace(result, fragmentUboRegex,
-                            "layout(std140, set=" + std::to_string(UBO_DESCRIPTOR_SET) +
-                                ", binding=" + std::to_string(FRAGMENT_UBO_BINDING_POINT) +
-                                ") uniform FragmentUniformBlock");
-}
-
-static std::string replaceCustomUBO(const std::smatch& match, int& counter) {
-  return "layout(std140, set=" + std::to_string(UBO_DESCRIPTOR_SET) +
-         ", binding=" + std::to_string(counter++) + ") uniform " + match[1].str();
-}
-
-// Add binding to any remaining uniform blocks (custom shaders) sequentially from 0 in set 0.
-static std::string assignCustomUBOBindings(const std::string& source) {
-  static std::regex uboRegex(R"(layout\s*\(\s*std140\s*\)\s*uniform\s+(\w+))");
-  int binding = 0;
-  return detail::ReplaceAllMatches(source, uboRegex, replaceCustomUBO, binding);
-}
 
 static std::string replaceSamplerBinding(const std::smatch& match, int& counter) {
   return "layout(set=" + std::to_string(TEXTURE_DESCRIPTOR_SET) +
@@ -61,8 +30,8 @@ static std::string replaceSamplerBinding(const std::smatch& match, int& counter)
          match[2].str() + ";";
 }
 
-// Add binding to sampler uniforms sequentially from 0 in descriptor set 1.
-// UBOs reside in set 0, so texture bindings start fresh from 0 without collision.
+// Add binding to sampler uniforms sequentially from 0 in descriptor set 2. Vertex and fragment
+// UBOs reside in sets 0 and 1, so texture bindings use an independent namespace.
 static std::string assignSamplerBindings(const std::string& source) {
   static std::regex samplerRegex(R"(uniform\s+(sampler\w+)\s+(\w+);)");
   int binding = 0;
@@ -71,8 +40,8 @@ static std::string assignSamplerBindings(const std::string& source) {
 
 std::string PreprocessGLSL(const std::string& glslCode, ShaderStage stage) {
   auto result = detail::UpgradeGLSLVersion(glslCode);
-  result = assignInternalUBOBindings(result);
-  result = assignCustomUBOBindings(result);
+  result = detail::AssignInternalUBOBindings(result);
+  result = detail::AssignCustomUBOBindings(result, stage);
   result = assignSamplerBindings(result);
   result = detail::AssignInputLocationQualifiers(result, stage);
   result = detail::AssignOutputLocationQualifiers(result, stage);

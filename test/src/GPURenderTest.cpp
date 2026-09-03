@@ -127,6 +127,113 @@ static std::shared_ptr<RenderPipeline> CreateVaryingOrderPipeline(GPU* gpu) {
   return gpu->createRenderPipeline(descriptor);
 }
 
+// Vertex shader: draws a full-screen quad using a scale factor pulled from a vertex-only UBO. The
+// UBO's payload beyond scale.xy is padding whose bytes are chosen so that if a location-mismatch
+// bug on a SPIR-V based backend causes the fragment stage to accidentally read this buffer, the
+// resulting pixel colour is obviously different from the intended green output — see the
+// UNIFORM_BUFFER_BINDING_FRAGMENT_SHADER commentary below.
+static constexpr char UNIFORM_BUFFER_BINDING_VERTEX_SHADER[] = R"(
+        in vec2 inPosition;
+
+        layout(std140) uniform VertexArgs {
+            vec4 scaleAndFiller;
+        };
+
+        void main() {
+            gl_Position = vec4(inPosition * scaleAndFiller.xy, 0.0, 1.0);
+        }
+    )";
+
+// Fragment shader: writes a solid colour taken from a fragment-only UBO. Combined with the CPU
+// side declaring `uniformBlocks = {{"VertexArgs", 0, Vertex}, {"FragmentArgs", 1, Fragment}}` and
+// calls to `setUniformBuffer(0, vertBuf, ...)` / `setUniformBuffer(1, fragBuf, ...)`, this pins
+// the tgfx-level contract that each declared UBO binding number identifies a specific buffer
+// regardless of which stage(s) actually read it.
+//
+// GL matches uniform blocks by name at link time via `glUniformBlockBinding`, so it renders the
+// intended solid colour. Before the binding resolution was unified across backends, SPIR-V based
+// backends (Metal, Vulkan / D3D12 by symmetry) matched UBO binding numbers per-stage: ShaderCompiler
+// numbered each stage's custom UBOs from 0 in source order, so on Metal the fragment stage's
+// `FragmentArgs` ended up at Metal buffer index 0 while the CPU wrote the fragment buffer at index
+// 1. The fragment shader then read the wrong slot and picked up whatever happened to sit at index 0
+// (nothing / garbage / the vertex buffer), producing a non-green pixel. This test pins the corrected
+// name-keyed resolution.
+static constexpr char UNIFORM_BUFFER_BINDING_FRAGMENT_SHADER[] = R"(
+        precision mediump float;
+
+        layout(std140) uniform FragmentArgs {
+            vec4 color;
+        };
+
+        out vec4 tgfx_FragColor;
+
+        void main() {
+            tgfx_FragColor = color;
+        }
+    )";
+
+struct UniformBufferBindingVertex {
+  float x;
+  float y;
+};
+
+struct UniformBufferBindingVertexArgs {
+  float scaleX;
+  float scaleY;
+  float fillerZ;
+  float fillerW;
+};
+
+struct UniformBufferBindingFragmentArgs {
+  float r;
+  float g;
+  float b;
+  float a;
+};
+
+static std::shared_ptr<RenderPipeline> CreateUniformBufferBindingPipeline(GPU* gpu,
+                                                                          bool explicitLayout) {
+  auto info = gpu->info();
+  auto isDesktop = info->version.find("OpenGL ES") == std::string::npos;
+
+  ShaderModuleDescriptor vertexModule = {};
+  vertexModule.code = PrefixShaderVersion(UNIFORM_BUFFER_BINDING_VERTEX_SHADER, isDesktop);
+  vertexModule.stage = ShaderStage::Vertex;
+  auto vertexShader = gpu->createShaderModule(vertexModule);
+  if (vertexShader == nullptr) {
+    return nullptr;
+  }
+
+  ShaderModuleDescriptor fragmentModule = {};
+  fragmentModule.code = PrefixShaderVersion(UNIFORM_BUFFER_BINDING_FRAGMENT_SHADER, isDesktop);
+  fragmentModule.stage = ShaderStage::Fragment;
+  auto fragmentShader = gpu->createShaderModule(fragmentModule);
+  if (fragmentShader == nullptr) {
+    return nullptr;
+  }
+
+  RenderPipelineDescriptor descriptor = {};
+  Attribute position = {"inPosition", VertexFormat::Float2};
+  VertexBufferLayout vertexLayout({position}, VertexStepMode::Vertex);
+  descriptor.vertex.bufferLayouts = {vertexLayout};
+  descriptor.vertex.module = vertexShader;
+  descriptor.fragment.module = fragmentShader;
+
+  PipelineColorAttachment colorAttachment = {};
+  colorAttachment.blendEnable = false;
+  descriptor.fragment.colorAttachments.push_back(colorAttachment);
+
+  // Two distinct binding numbers, each visible to exactly one stage. This is the exact shape
+  // libpag's MotionBlurFilter uses and the reason the current tgfx UBO-binding contract leaks
+  // per-stage numbering semantics onto callers on SPIR-V based backends.
+  if (explicitLayout) {
+    descriptor.layout.uniformBlocks = {{"VertexArgs", 0, ShaderVisibility::Vertex},
+                                       {"FragmentArgs", 1, ShaderVisibility::Fragment}};
+  }
+
+  return gpu->createRenderPipeline(descriptor);
+}
+
 // Vertex shader emitting an extra `vUnused` output that the fragment never consumes. Its name
 // sorts lexicographically before `vUsed`, so per-stage name-sorted locations would shift `vUsed`
 // on the vertex side only and desync the two stages.
@@ -680,6 +787,7 @@ TGFX_TEST(GPURenderTest, VaryingMismatchRejected) {
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto gpu = context->gpu();
+
   auto backend = gpu->info()->backend;
 
   auto pipeline = CreateMismatchedVaryingPipeline(gpu);
@@ -689,6 +797,383 @@ TGFX_TEST(GPURenderTest, VaryingMismatchRejected) {
   } else {
     EXPECT_TRUE(pipeline == nullptr);
   }
+}
+
+// Reproduces a cross-backend rendering divergence caused by declaring one custom UBO per stage
+// with distinct CPU-side binding numbers. libpag hits this today in MotionBlurFilter, where the
+// vertex shader has one UBO (matrix) and the fragment shader has a different one (blur
+// parameters), declared as `{{"VertexArgs", 0, Vertex}, {"FragmentArgs", 1, Fragment}}`.
+//
+// GL binds uniform blocks by name via `glUniformBlockBinding` at link time, so the fragment
+// stage sees `FragmentArgs` at binding 1 exactly as the CPU wrote it. Before binding resolution
+// was unified, SPIR-V based backends matched by numeric binding: ShaderCompiler numbered custom
+// UBOs per-stage starting at 0 in source order, so the fragment stage's `FragmentArgs` ended up at
+// binding 0. Metal then bound the fragment buffer at its own per-stage index 1 (what the CPU asked
+// for), but the shader read index 0 and picked up garbage / the vertex buffer. The baseline
+// captures the intended solid green output; a per-stage numbering leak shows up as a wildly
+// different colour.
+TGFX_TEST(GPURenderTest, UniformBufferBindingMismatch) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto gpu = context->gpu();
+  ASSERT_TRUE(gpu != nullptr);
+
+  constexpr int SIZE = 200;
+  TextureDescriptor renderTextureDesc(
+      SIZE, SIZE, PixelFormat::RGBA_8888, false, 1,
+      TextureUsage::RENDER_ATTACHMENT | TextureUsage::TEXTURE_BINDING);
+  auto renderTexture = gpu->createTexture(renderTextureDesc);
+  ASSERT_TRUE(renderTexture != nullptr);
+
+  auto encoder = gpu->createCommandEncoder();
+  ASSERT_TRUE(encoder != nullptr);
+
+  auto pipeline = CreateUniformBufferBindingPipeline(gpu, true);
+  ASSERT_TRUE(pipeline != nullptr);
+
+  RenderPassDescriptor renderPassDesc(renderTexture, LoadAction::Clear, StoreAction::Store,
+                                      PMColor::Transparent());
+  auto renderPass = encoder->beginRenderPass(renderPassDesc);
+  ASSERT_TRUE(renderPass != nullptr);
+  renderPass->setPipeline(std::move(pipeline));
+
+  // Full-screen source quad in NDC as a TriangleStrip: BL, BR, TL, TR. The vertex UBO scales it
+  // to a centered 100x100 rectangle with a 50-pixel margin on each side.
+  UniformBufferBindingVertex quadVertices[] = {
+      {-1.0f, -1.0f},
+      {1.0f, -1.0f},
+      {-1.0f, 1.0f},
+      {1.0f, 1.0f},
+  };
+  auto vertexBuffer = gpu->createBuffer(sizeof(quadVertices), GPUBufferUsage::VERTEX);
+  ASSERT_TRUE(vertexBuffer != nullptr);
+  auto* mappedVertices = static_cast<UniformBufferBindingVertex*>(vertexBuffer->map());
+  ASSERT_TRUE(mappedVertices != nullptr);
+  memcpy(mappedVertices, quadVertices, sizeof(quadVertices));
+  vertexBuffer->unmap();
+
+  // Vertex UBO: scaleAndFiller = (0.5, 0.5, 1.0, 1.0). If a binding-number mismatch causes the
+  // fragment stage to accidentally read this buffer as its `color`, the output is visibly
+  // different from the intended green.
+  auto vertexUniformBuffer =
+      gpu->createBuffer(sizeof(UniformBufferBindingVertexArgs), GPUBufferUsage::UNIFORM);
+  ASSERT_TRUE(vertexUniformBuffer != nullptr);
+  auto* vertexArgs = static_cast<UniformBufferBindingVertexArgs*>(vertexUniformBuffer->map());
+  ASSERT_TRUE(vertexArgs != nullptr);
+  vertexArgs->scaleX = 0.5f;
+  vertexArgs->scaleY = 0.5f;
+  vertexArgs->fillerZ = 1.0f;
+  vertexArgs->fillerW = 1.0f;
+  vertexUniformBuffer->unmap();
+
+  // Fragment UBO: solid green colour.
+  auto fragmentUniformBuffer =
+      gpu->createBuffer(sizeof(UniformBufferBindingFragmentArgs), GPUBufferUsage::UNIFORM);
+  ASSERT_TRUE(fragmentUniformBuffer != nullptr);
+  auto* fragmentArgs = static_cast<UniformBufferBindingFragmentArgs*>(fragmentUniformBuffer->map());
+  ASSERT_TRUE(fragmentArgs != nullptr);
+  fragmentArgs->r = 0.0f;
+  fragmentArgs->g = 1.0f;
+  fragmentArgs->b = 0.0f;
+  fragmentArgs->a = 1.0f;
+  fragmentUniformBuffer->unmap();
+
+  renderPass->setVertexBuffer(0, vertexBuffer);
+  // The CPU-declared bindings (0 for vertex, 1 for fragment) are treated as global identifiers by
+  // the tgfx API — the same contract GL enforces via glUniformBlockBinding. Backends that treat
+  // binding numbers as per-stage indices need internal translation; that translation is what this
+  // test pins down.
+  renderPass->setUniformBuffer(0, vertexUniformBuffer, 0, vertexUniformBuffer->size());
+  renderPass->setUniformBuffer(1, fragmentUniformBuffer, 0, fragmentUniformBuffer->size());
+  renderPass->draw(PrimitiveType::TriangleStrip, 4, 1);
+  renderPass->end();
+
+  auto commandBuffer = encoder->finish();
+  ASSERT_TRUE(commandBuffer != nullptr);
+  gpu->queue()->submit(commandBuffer);
+  gpu->queue()->waitUntilCompleted();
+
+  auto surface =
+      Surface::MakeFrom(context, renderTexture->getBackendTexture(), ImageOrigin::TopLeft);
+  ASSERT_TRUE(surface != nullptr);
+  EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/UniformBufferBindingMismatch"));
+}
+
+// Verifies that createRenderPipeline rejects a layout that omits a uniform block a shader stage
+// declares. Symmetric to VaryingMismatchRejected: silently accepting the pipeline would leave the
+// fragment `FragmentArgs` unbound at draw time on SPIR-V backends. OpenGL binds uniform blocks by
+// name at link time and simply reads undefined data from an unbound block, so it is expected to
+// still succeed pipeline creation there — the check is enforced by ResolveUniformSlots and only
+// runs on the SPIR-V based backends (Metal / Vulkan / D3D12 / WebGPU).
+TGFX_TEST(GPURenderTest, UniformBufferMissingDeclarationRejected) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto gpu = context->gpu();
+  ASSERT_TRUE(gpu != nullptr);
+  auto backend = gpu->info()->backend;
+  auto info = gpu->info();
+  auto isDesktop = info->version.find("OpenGL ES") == std::string::npos;
+
+  ShaderModuleDescriptor vertexModule = {};
+  vertexModule.code = PrefixShaderVersion(UNIFORM_BUFFER_BINDING_VERTEX_SHADER, isDesktop);
+  vertexModule.stage = ShaderStage::Vertex;
+  auto vertexShader = gpu->createShaderModule(vertexModule);
+  ASSERT_TRUE(vertexShader != nullptr);
+
+  ShaderModuleDescriptor fragmentModule = {};
+  fragmentModule.code = PrefixShaderVersion(UNIFORM_BUFFER_BINDING_FRAGMENT_SHADER, isDesktop);
+  fragmentModule.stage = ShaderStage::Fragment;
+  auto fragmentShader = gpu->createShaderModule(fragmentModule);
+  ASSERT_TRUE(fragmentShader != nullptr);
+
+  RenderPipelineDescriptor descriptor = {};
+  Attribute position = {"inPosition", VertexFormat::Float2};
+  VertexBufferLayout vertexLayout({position}, VertexStepMode::Vertex);
+  descriptor.vertex.bufferLayouts = {vertexLayout};
+  descriptor.vertex.module = vertexShader;
+  descriptor.fragment.module = fragmentShader;
+  PipelineColorAttachment colorAttachment = {};
+  colorAttachment.blendEnable = false;
+  descriptor.fragment.colorAttachments.push_back(colorAttachment);
+
+  // Layout intentionally omits the fragment shader's `FragmentArgs` block.
+  descriptor.layout.uniformBlocks = {{"VertexArgs", 0, ShaderVisibility::Vertex}};
+
+  auto pipeline = gpu->createRenderPipeline(descriptor);
+  if (backend == Backend::OpenGL) {
+    EXPECT_TRUE(pipeline != nullptr);
+  } else {
+    EXPECT_TRUE(pipeline == nullptr);
+  }
+}
+
+// Two distinct blocks — vertex-only `VertexArgs` and fragment-only `FragmentArgs` — declared with
+// the same logical binding number in the pipeline layout. Every SPIR-V backend keys its
+// per-draw `setUniformBuffer(binding, ...)` off that logical number and stores at most one
+// UniformSlotMapping per number, so silently accepting a duplicate would guarantee that whichever
+// entry lost the tie could never receive data at draw time. The pipeline-time uniqueness check
+// exists precisely to eliminate that silent misbind; OpenGL takes a different code path (a linked
+// program's block-to-binding-point map has no room for the collision).
+TGFX_TEST(GPURenderTest, UniformBufferDuplicateLogicalBinding) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto gpu = context->gpu();
+  ASSERT_TRUE(gpu != nullptr);
+  auto backend = gpu->info()->backend;
+  auto info = gpu->info();
+  auto isDesktop = info->version.find("OpenGL ES") == std::string::npos;
+
+  ShaderModuleDescriptor vertexModule = {};
+  vertexModule.code = PrefixShaderVersion(UNIFORM_BUFFER_BINDING_VERTEX_SHADER, isDesktop);
+  vertexModule.stage = ShaderStage::Vertex;
+  auto vertexShader = gpu->createShaderModule(vertexModule);
+  ASSERT_TRUE(vertexShader != nullptr);
+
+  ShaderModuleDescriptor fragmentModule = {};
+  fragmentModule.code = PrefixShaderVersion(UNIFORM_BUFFER_BINDING_FRAGMENT_SHADER, isDesktop);
+  fragmentModule.stage = ShaderStage::Fragment;
+  auto fragmentShader = gpu->createShaderModule(fragmentModule);
+  ASSERT_TRUE(fragmentShader != nullptr);
+
+  RenderPipelineDescriptor descriptor = {};
+  Attribute position = {"inPosition", VertexFormat::Float2};
+  VertexBufferLayout vertexLayout({position}, VertexStepMode::Vertex);
+  descriptor.vertex.bufferLayouts = {vertexLayout};
+  descriptor.vertex.module = vertexShader;
+  descriptor.fragment.module = fragmentShader;
+  PipelineColorAttachment colorAttachment = {};
+  colorAttachment.blendEnable = false;
+  descriptor.fragment.colorAttachments.push_back(colorAttachment);
+
+  // Two different blocks share logical binding 0 — the SPIR-V backends must reject this.
+  descriptor.layout.uniformBlocks = {{"VertexArgs", 0, ShaderVisibility::Vertex},
+                                     {"FragmentArgs", 0, ShaderVisibility::Fragment}};
+
+  auto pipeline = gpu->createRenderPipeline(descriptor);
+  if (backend == Backend::OpenGL) {
+    EXPECT_TRUE(pipeline != nullptr);
+  } else {
+    EXPECT_TRUE(pipeline == nullptr);
+  }
+}
+
+// Vertex shader declaring two uniform blocks (`PreArgs` then `SharedArgs`) so `SharedArgs`
+// occupies physical slot 1 in the vertex stage, while the fragment shader declares only
+// `SharedArgs` and puts it at physical slot 0. `SharedArgs` is a same-name cross-stage block
+// (visibility = VertexFragment), which is the only path that produces a UniformSlotMapping with
+// non-matching vertexSlot / fragmentSlot values — and, on D3D12, two CBV root parameters that
+// bind different registers for the same logical binding. Both blocks are read in the vertex body
+// so no driver can dead-strip PreArgs and collapse SharedArgs back to slot 0.
+static constexpr char SHARED_STAGGERED_VERTEX_SHADER[] = R"(
+        precision mediump float;
+
+        in vec2 inPosition;
+
+        layout(std140) uniform PreArgs {
+            vec4 vertScale;
+        };
+
+        layout(std140) uniform SharedArgs {
+            vec4 scaleAndFiller;
+            vec4 color;
+        };
+
+        void main() {
+            // Final scale = PreArgs.vertScale.xy * SharedArgs.scaleAndFiller.xy. CPU feeds
+            // (0.5, 0.5) * (1.0, 1.0) = 0.5, producing a centered 100x100 quad. If the
+            // pipeline mis-binds either block, the observable scale changes visibly.
+            gl_Position =
+                vec4(inPosition * vertScale.xy * scaleAndFiller.xy, 0.0, 1.0);
+        }
+    )";
+
+static constexpr char SHARED_STAGGERED_FRAGMENT_SHADER[] = R"(
+        precision mediump float;
+
+        layout(std140) uniform SharedArgs {
+            vec4 scaleAndFiller;
+            vec4 color;
+        };
+
+        out vec4 tgfx_FragColor;
+
+        void main() {
+            tgfx_FragColor = color;
+        }
+    )";
+
+struct SharedStaggeredArgs {
+  float scaleX;
+  float scaleY;
+  float fillerZ;
+  float fillerW;
+  float r;
+  float g;
+  float b;
+  float a;
+};
+
+struct PreArgsData {
+  float vertScaleX;
+  float vertScaleY;
+  float pad0;
+  float pad1;
+};
+
+TGFX_TEST(GPURenderTest, UniformBufferSharedLayoutStaggeredSlots) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto gpu = context->gpu();
+  ASSERT_TRUE(gpu != nullptr);
+  auto info = gpu->info();
+  auto isDesktop = info->version.find("OpenGL ES") == std::string::npos;
+
+  constexpr int SIZE = 200;
+  TextureDescriptor renderTextureDesc(
+      SIZE, SIZE, PixelFormat::RGBA_8888, false, 1,
+      TextureUsage::RENDER_ATTACHMENT | TextureUsage::TEXTURE_BINDING);
+  auto renderTexture = gpu->createTexture(renderTextureDesc);
+  ASSERT_TRUE(renderTexture != nullptr);
+
+  ShaderModuleDescriptor vertexModule = {};
+  vertexModule.code = PrefixShaderVersion(SHARED_STAGGERED_VERTEX_SHADER, isDesktop);
+  vertexModule.stage = ShaderStage::Vertex;
+  auto vertexShader = gpu->createShaderModule(vertexModule);
+  ASSERT_TRUE(vertexShader != nullptr);
+
+  ShaderModuleDescriptor fragmentModule = {};
+  fragmentModule.code = PrefixShaderVersion(SHARED_STAGGERED_FRAGMENT_SHADER, isDesktop);
+  fragmentModule.stage = ShaderStage::Fragment;
+  auto fragmentShader = gpu->createShaderModule(fragmentModule);
+  ASSERT_TRUE(fragmentShader != nullptr);
+
+  RenderPipelineDescriptor descriptor = {};
+  Attribute position = {"inPosition", VertexFormat::Float2};
+  VertexBufferLayout vertexLayout({position}, VertexStepMode::Vertex);
+  descriptor.vertex.bufferLayouts = {vertexLayout};
+  descriptor.vertex.module = vertexShader;
+  descriptor.fragment.module = fragmentShader;
+  PipelineColorAttachment colorAttachment = {};
+  colorAttachment.blendEnable = false;
+  descriptor.fragment.colorAttachments.push_back(colorAttachment);
+
+  // Logical binding 10 targets vertex-only PreArgs, logical binding 0 targets the shared
+  // SharedArgs (visible to both stages). Distinct logical ids and the VertexFragment visibility
+  // together drive the vertexSlot != fragmentSlot path in UniformSlotMapping.
+  descriptor.layout.uniformBlocks = {{"PreArgs", 10, ShaderVisibility::Vertex},
+                                     {"SharedArgs", 0, ShaderVisibility::VertexFragment}};
+
+  auto pipeline = gpu->createRenderPipeline(descriptor);
+  ASSERT_TRUE(pipeline != nullptr);
+
+  auto encoder = gpu->createCommandEncoder();
+  ASSERT_TRUE(encoder != nullptr);
+  RenderPassDescriptor renderPassDesc(renderTexture, LoadAction::Clear, StoreAction::Store,
+                                      PMColor::Transparent());
+  auto renderPass = encoder->beginRenderPass(renderPassDesc);
+  ASSERT_TRUE(renderPass != nullptr);
+  renderPass->setPipeline(std::move(pipeline));
+
+  UniformBufferBindingVertex quadVertices[] = {
+      {-1.0f, -1.0f},
+      {1.0f, -1.0f},
+      {-1.0f, 1.0f},
+      {1.0f, 1.0f},
+  };
+  auto vertexBuffer = gpu->createBuffer(sizeof(quadVertices), GPUBufferUsage::VERTEX);
+  ASSERT_TRUE(vertexBuffer != nullptr);
+  auto* mappedVertices = static_cast<UniformBufferBindingVertex*>(vertexBuffer->map());
+  ASSERT_TRUE(mappedVertices != nullptr);
+  memcpy(mappedVertices, quadVertices, sizeof(quadVertices));
+  vertexBuffer->unmap();
+
+  // PreArgs.vertScale.xy = (0.5, 0.5): vertex reads this as one factor of the quad scale.
+  auto preBuffer = gpu->createBuffer(sizeof(PreArgsData), GPUBufferUsage::UNIFORM);
+  ASSERT_TRUE(preBuffer != nullptr);
+  auto* preArgs = static_cast<PreArgsData*>(preBuffer->map());
+  ASSERT_TRUE(preArgs != nullptr);
+  preArgs->vertScaleX = 0.5f;
+  preArgs->vertScaleY = 0.5f;
+  preArgs->pad0 = 0.0f;
+  preArgs->pad1 = 0.0f;
+  preBuffer->unmap();
+
+  // SharedArgs feeds both stages via a single setUniformBuffer(0) call: vertex multiplies its
+  // scaleAndFiller = (1.0, 1.0) into the final scale so the quad ends up centered 100x100;
+  // fragment paints it blue.
+  auto sharedBuffer = gpu->createBuffer(sizeof(SharedStaggeredArgs), GPUBufferUsage::UNIFORM);
+  ASSERT_TRUE(sharedBuffer != nullptr);
+  auto* sharedArgs = static_cast<SharedStaggeredArgs*>(sharedBuffer->map());
+  ASSERT_TRUE(sharedArgs != nullptr);
+  sharedArgs->scaleX = 1.0f;
+  sharedArgs->scaleY = 1.0f;
+  sharedArgs->fillerZ = 0.0f;
+  sharedArgs->fillerW = 0.0f;
+  sharedArgs->r = 0.0f;
+  sharedArgs->g = 0.0f;
+  sharedArgs->b = 1.0f;
+  sharedArgs->a = 1.0f;
+  sharedBuffer->unmap();
+
+  renderPass->setVertexBuffer(0, vertexBuffer);
+  renderPass->setUniformBuffer(10, preBuffer, 0, preBuffer->size());
+  renderPass->setUniformBuffer(0, sharedBuffer, 0, sharedBuffer->size());
+  renderPass->draw(PrimitiveType::TriangleStrip, 4, 1);
+  renderPass->end();
+
+  auto commandBuffer = encoder->finish();
+  ASSERT_TRUE(commandBuffer != nullptr);
+  gpu->queue()->submit(commandBuffer);
+  gpu->queue()->waitUntilCompleted();
+
+  auto surface =
+      Surface::MakeFrom(context, renderTexture->getBackendTexture(), ImageOrigin::TopLeft);
+  ASSERT_TRUE(surface != nullptr);
+  EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/UniformBufferSharedLayoutStaggeredSlots"));
 }
 
 }  // namespace tgfx

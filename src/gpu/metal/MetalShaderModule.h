@@ -20,6 +20,7 @@
 
 #include <Metal/Metal.h>
 #include <string>
+#include <unordered_map>
 #include "MetalResource.h"
 #include "gpu/VaryingShaderModule.h"
 #include "tgfx/gpu/ShaderModule.h"
@@ -81,9 +82,7 @@ class MetalShaderModule : public VaryingShaderModule, public MetalResource {
   ~MetalShaderModule() override = default;
 
   bool compileShader(id<MTLDevice> device, const shaderc::Compiler* compiler,
-                     const std::string& glslCode, ShaderStage stage);
-  std::string convertGLSLToMSL(const shaderc::Compiler* compiler, const std::string& glslCode,
-                               ShaderStage stage);
+                     const std::string& vulkanGLSL, ShaderStage stage);
 
   id<MTLLibrary> library = nil;
   ShaderStage _stage = ShaderStage::Vertex;

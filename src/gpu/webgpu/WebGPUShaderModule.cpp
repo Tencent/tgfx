@@ -17,10 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "WebGPUShaderModule.h"
-#include <algorithm>
 #include <regex>
 #include <shaderc/shaderc.hpp>
-#include <unordered_map>
 #include "WebGPUDefines.h"
 #include "WebGPUGPU.h"
 #include "core/utils/Log.h"
@@ -30,26 +28,6 @@
 #include "src/tint/lang/wgsl/writer/writer.h"
 
 namespace tgfx {
-
-static std::string assignInternalUBOBindings(const std::string& source) {
-  static std::regex vertexUboRegex(R"(layout\s*\(\s*std140\s*\)\s*uniform\s+VertexUniformBlock)");
-  auto result = std::regex_replace(source, vertexUboRegex,
-                                   "layout(std140, binding=0) uniform VertexUniformBlock");
-  static std::regex fragmentUboRegex(
-      R"(layout\s*\(\s*std140\s*\)\s*uniform\s+FragmentUniformBlock)");
-  return std::regex_replace(result, fragmentUboRegex,
-                            "layout(std140, binding=1) uniform FragmentUniformBlock");
-}
-
-static std::string replaceCustomUBO(const std::smatch& match, int& counter) {
-  return "layout(std140, binding=" + std::to_string(counter++) + ") uniform " + match[1].str();
-}
-
-static std::string assignCustomUBOBindings(const std::string& source) {
-  static std::regex uboRegex(R"(layout\s*\(\s*std140\s*\)\s*uniform\s+(\w+))");
-  int binding = 0;
-  return detail::ReplaceAllMatches(source, uboRegex, replaceCustomUBO, binding);
-}
 
 // Separates combined sampler declarations into distinct texture and sampler resources.
 // Input:  "uniform sampler2D TextureSampler_0;"
@@ -66,10 +44,12 @@ static std::string replaceSeparatedSampler(const std::smatch& match, int& counte
   } else {
     textureType = "texture2D";
   }
-  auto textureDecl =
-      "layout(binding=" + std::to_string(counter++) + ") uniform " + textureType + " " + name + ";";
-  auto samplerDecl =
-      "\nlayout(binding=" + std::to_string(counter++) + ") uniform sampler " + name + "_Sampler;";
+  auto textureDecl = "layout(set=" + std::to_string(TEXTURE_DESCRIPTOR_SET) +
+                     ", binding=" + std::to_string(counter++) + ") uniform " + textureType + " " +
+                     name + ";";
+  auto samplerDecl = "\nlayout(set=" + std::to_string(TEXTURE_DESCRIPTOR_SET) +
+                     ", binding=" + std::to_string(counter++) + ") uniform sampler " + name +
+                     "_Sampler;";
   return textureDecl + samplerDecl;
 }
 
@@ -108,8 +88,8 @@ static std::vector<std::string> collectSamplerNames(const std::string& source) {
 
 static std::string preprocessGLSL(const std::string& glslCode, ShaderStage stage) {
   auto result = detail::UpgradeGLSLVersion(glslCode);
-  result = assignInternalUBOBindings(result);
-  result = assignCustomUBOBindings(result);
+  result = detail::AssignInternalUBOBindings(result);
+  result = detail::AssignCustomUBOBindings(result, stage);
   // Collect sampler names before separating declarations.
   auto samplerNames = collectSamplerNames(result);
   result = separateSamplerDeclarations(result);
@@ -154,14 +134,15 @@ std::shared_ptr<WebGPUShaderModule> WebGPUShaderModule::Make(
 }
 
 WebGPUShaderModule::WebGPUShaderModule(WebGPUGPU* gpu, const ShaderModuleDescriptor& descriptor)
-    : VaryingShaderModule(ExtractVaryingDecls(descriptor.code, descriptor.stage)),
+    : VaryingShaderModule(ExtractVaryingDecls(descriptor.code, descriptor.stage), {}),
       _stage(descriptor.stage) {
-  compileShader(gpu->device(), descriptor.code, descriptor.stage);
+  std::string vulkanGLSL = preprocessGLSL(descriptor.code, descriptor.stage);
+  setUniformSlots(detail::CollectUniformSlots(vulkanGLSL));
+  compileShader(gpu->device(), vulkanGLSL, descriptor.stage);
 }
 
-bool WebGPUShaderModule::compileShader(WGPUDevice device, const std::string& glslCode,
+bool WebGPUShaderModule::compileShader(WGPUDevice device, const std::string& vulkanGLSL,
                                        ShaderStage stage) {
-  std::string vulkanGLSL = preprocessGLSL(glslCode, stage);
   auto spirvBinary = compileGLSLToSPIRV(vulkanGLSL, stage);
   if (spirvBinary.empty()) {
     return false;
@@ -177,7 +158,7 @@ bool WebGPUShaderModule::compileShader(WGPUDevice device, const std::string& gls
     for (const auto& diag : program.Diagnostics()) {
       LOGE("  [tint] %s", diag.message.Plain().c_str());
     }
-    LOGE("  [glsl] %s", glslCode.c_str());
+    LOGE("  [glsl] %s", vulkanGLSL.c_str());
     return false;
   }
 

@@ -99,9 +99,10 @@ void D3D12RenderPipeline::onRelease(D3D12GPU*) {
   rootSignature = nullptr;
 }
 
-uint32_t D3D12RenderPipeline::getUniformRootParameterIndex(unsigned binding) const {
-  auto it = uniformRootParameterIndex.find(binding);
-  return it != uniformRootParameterIndex.end() ? it->second : UINT32_MAX;
+const std::vector<uint32_t>* D3D12RenderPipeline::getUniformRootParameterIndices(
+    unsigned binding) const {
+  auto it = uniformRootParameterIndices.find(binding);
+  return it != uniformRootParameterIndices.end() ? &it->second : nullptr;
 }
 
 uint32_t D3D12RenderPipeline::getTextureRootParameterIndex(unsigned binding) const {
@@ -116,50 +117,42 @@ uint32_t D3D12RenderPipeline::getSamplerRootParameterIndex(unsigned binding) con
 
 bool D3D12RenderPipeline::createRootSignature(D3D12GPU* gpu,
                                               const RenderPipelineDescriptor& descriptor) {
-  // First, populate the per-binding index maps — those are needed for every pipeline regardless
-  // of whether the underlying ID3D12RootSignature is cached. Walk uniform blocks first, then
-  // texture samplers, so the parameter indices line up with the order used when serialising.
-  std::vector<uint8_t> shapeKey;
-  // Reserve roughly: 1 byte UBO count + 3 bytes per UBO (visibility + vertex register +
-  // fragment register) + 1 byte sampler count + 1 byte per sampler (visibility).
-  shapeKey.reserve(2 + descriptor.layout.uniformBlocks.size() * 3 +
-                   descriptor.layout.textureSamplers.size());
-
-  // Pre-scan uniform blocks to compute, for every entry, its 0-based register index inside the
-  // vertex and fragment stages. SPIR-V binding K is mapped to HLSL register b{idx} where idx is
-  // the entry's position among same-stage entries in BindingLayout.uniformBlocks. Two entries
-  // visible to the same stage must therefore yield different register indices, and the indices
-  // must agree with what D3D12ShaderModule produces when it walks the SPIR-V resources of that
-  // stage in declaration order.
-  std::vector<uint8_t> ubVertexRegister(descriptor.layout.uniformBlocks.size(), 0xFF);
-  std::vector<uint8_t> ubFragmentRegister(descriptor.layout.uniformBlocks.size(), 0xFF);
-  uint32_t nextVertexRegister = 0;
-  uint32_t nextFragmentRegister = 0;
-  for (size_t i = 0; i < descriptor.layout.uniformBlocks.size(); i++) {
-    const auto& entry = descriptor.layout.uniformBlocks[i];
-    if (entry.visibility & ShaderVisibility::Vertex) {
-      ubVertexRegister[i] = static_cast<uint8_t>(nextVertexRegister++);
-    }
-    if (entry.visibility & ShaderVisibility::Fragment) {
-      ubFragmentRegister[i] = static_cast<uint8_t>(nextFragmentRegister++);
-    }
+  // Resolve the public logical uniform-block bindings into per-stage CBV registers. The shared
+  // resolver enforces the OpenGL program-level binding contract (name-keyed, program-wide) for
+  // both explicit and automatic layouts, and rejects layouts naming a block a stage never
+  // declares.
+  auto vertexShader = std::static_pointer_cast<D3D12ShaderModule>(descriptor.vertex.module);
+  auto fragmentShader = std::static_pointer_cast<D3D12ShaderModule>(descriptor.fragment.module);
+  std::map<unsigned, UniformSlotMapping> uniformSlots;
+  std::string error;
+  if (!ResolveUniformSlots(vertexShader.get(), fragmentShader.get(),
+                           descriptor.layout.uniformBlocks, uniformSlots, error)) {
+    LOGE("D3D12RenderPipeline: %s.", error.c_str());
+    return false;
   }
 
+  std::vector<uint8_t> shapeKey;
+  // Reserve roughly: 1 byte UBO count + 2 bytes per UBO (vertex register + fragment register) +
+  // 1 byte sampler count + 1 byte per sampler (visibility).
+  shapeKey.reserve(2 + uniformSlots.size() * 2 + descriptor.layout.textureSamplers.size());
+
+  // Walk logical bindings in ascending order (std::map is ordered) so root-parameter indices are
+  // deterministic and match the order used both here and when serialising below.
   uint32_t paramCursor = 0;
-  shapeKey.push_back(static_cast<uint8_t>(descriptor.layout.uniformBlocks.size()));
-  for (size_t i = 0; i < descriptor.layout.uniformBlocks.size(); i++) {
-    const auto& entry = descriptor.layout.uniformBlocks[i];
-    uniformRootParameterIndex[entry.binding] = paramCursor++;
-    // Encode the D3D12-mapped visibility plus per-stage register indices in the shape key.
-    // Different stage-local register layouts must hit different cached root signatures;
-    // otherwise a pipeline whose fragment UBO ends up at b1 (because it has a sibling at b0)
-    // would reuse another pipeline's root signature that still places it at b0.
-    // Use ToD3D12ShaderVisibility so that different ShaderVisibility values that map to the
-    // same D3D12_SHADER_VISIBILITY (e.g. VertexFragment and any future "All" flag) share the
-    // same cached root signature instead of creating duplicates.
-    shapeKey.push_back(static_cast<uint8_t>(ToD3D12ShaderVisibility(entry.visibility)));
-    shapeKey.push_back(ubVertexRegister[i]);
-    shapeKey.push_back(ubFragmentRegister[i]);
+  shapeKey.push_back(static_cast<uint8_t>(uniformSlots.size()));
+  for (const auto& [logicalBinding, mapping] : uniformSlots) {
+    uint8_t vertexRegister =
+        mapping.vertexSlot.has_value() ? static_cast<uint8_t>(*mapping.vertexSlot) : 0xFF;
+    uint8_t fragmentRegister =
+        mapping.fragmentSlot.has_value() ? static_cast<uint8_t>(*mapping.fragmentSlot) : 0xFF;
+    if (vertexRegister != 0xFF) {
+      uniformRootParameterIndices[logicalBinding].push_back(paramCursor++);
+    }
+    if (fragmentRegister != 0xFF) {
+      uniformRootParameterIndices[logicalBinding].push_back(paramCursor++);
+    }
+    shapeKey.push_back(vertexRegister);
+    shapeKey.push_back(fragmentRegister);
   }
 
   shapeKey.push_back(static_cast<uint8_t>(descriptor.layout.textureSamplers.size()));
@@ -196,30 +189,24 @@ bool D3D12RenderPipeline::createRootSignature(D3D12GPU* gpu,
   srvRanges.reserve(descriptor.layout.textureSamplers.size());
   samplerRanges.reserve(descriptor.layout.textureSamplers.size());
 
-  for (size_t i = 0; i < descriptor.layout.uniformBlocks.size(); i++) {
-    const auto& entry = descriptor.layout.uniformBlocks[i];
-    D3D12_ROOT_PARAMETER param = {};
-    param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    param.ShaderVisibility = ToD3D12ShaderVisibility(entry.visibility);
-    // ShaderRegister is per-stage in HLSL. Pick the register index from whichever stage the
-    // entry is visible to; for VertexFragment-visible UBOs the two stage-local indices must
-    // match, otherwise the single CBV root parameter cannot satisfy both stages with one
-    // register number. Such a configuration is rejected here so the mismatch surfaces early
-    // instead of producing silently broken bindings.
-    uint8_t vsReg = ubVertexRegister[i];
-    uint8_t fsReg = ubFragmentRegister[i];
-    if (vsReg != 0xFF && fsReg != 0xFF && vsReg != fsReg) {
-      LOGE(
-          "D3D12RenderPipeline: VertexFragment-visible UBO binding %u cannot share a single CBV "
-          "root parameter when its vertex-stage register (b%u) and fragment-stage register (b%u) "
-          "differ. Either split it into vertex-only and fragment-only entries, or extend the "
-          "root signature to emit two CBV root parameters for this binding.",
-          entry.binding, static_cast<unsigned>(vsReg), static_cast<unsigned>(fsReg));
-      return false;
+  for (const auto& [logicalBinding, mapping] : uniformSlots) {
+    (void)logicalBinding;
+    if (mapping.vertexSlot.has_value()) {
+      D3D12_ROOT_PARAMETER param = {};
+      param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+      param.ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+      param.Descriptor.ShaderRegister = *mapping.vertexSlot;
+      param.Descriptor.RegisterSpace = 0;
+      rootParameters.push_back(param);
     }
-    param.Descriptor.ShaderRegister = (vsReg != 0xFF) ? vsReg : fsReg;
-    param.Descriptor.RegisterSpace = 0;
-    rootParameters.push_back(param);
+    if (mapping.fragmentSlot.has_value()) {
+      D3D12_ROOT_PARAMETER param = {};
+      param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+      param.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+      param.Descriptor.ShaderRegister = *mapping.fragmentSlot;
+      param.Descriptor.RegisterSpace = 0;
+      rootParameters.push_back(param);
+    }
   }
 
   unsigned rangeRegister = 0;

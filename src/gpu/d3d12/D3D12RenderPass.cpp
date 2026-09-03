@@ -264,7 +264,8 @@ void D3D12RenderPass::setPipeline(std::shared_ptr<RenderPipeline> pipeline) {
   commandList->SetGraphicsRootSignature(d3d12Pipeline->d3d12RootSignature());
 
   // Switching pipelines invalidates root parameter state, so re-flag every binding as dirty.
-  for (auto& ub : uniformBindings) {
+  for (auto& item : uniformBindings) {
+    auto& ub = item.second;
     if (ub.gpuAddress != 0) {
       ub.dirty = true;
     }
@@ -278,7 +279,7 @@ void D3D12RenderPass::setPipeline(std::shared_ptr<RenderPipeline> pipeline) {
 
 void D3D12RenderPass::setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuffer> buffer,
                                        size_t offset, size_t /*size*/) {
-  if (!buffer || binding >= MaxUniformBindings) {
+  if (!buffer) {
     return;
   }
   auto d3d12Buffer = std::static_pointer_cast<D3D12Buffer>(buffer);
@@ -293,9 +294,12 @@ void D3D12RenderPass::setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuff
 
 void D3D12RenderPass::setTexture(unsigned binding, std::shared_ptr<Texture> texture,
                                  std::shared_ptr<Sampler> sampler) {
-  if (!texture || !sampler || !currentPipeline || binding >= MaxTextureBindings) {
+  if (!texture || !sampler || binding >= MaxTextureBindings) {
     return;
   }
+  // setTexture only records state indexed by the public logical binding; the physical root
+  // parameter is resolved from currentPipeline in flushBindingsIfNeeded() at draw time, so this
+  // call may be issued before or after setPipeline().
   auto d3d12Tex = std::static_pointer_cast<D3D12Texture>(texture);
   auto d3d12Samp = std::static_pointer_cast<D3D12Sampler>(sampler);
   encoder->retainResource(d3d12Tex);
@@ -376,17 +380,18 @@ void D3D12RenderPass::flushBindingsIfNeeded() {
   pendingBarriers.flush(commandList);
 
   // Apply uniform CBVs — one root constant buffer view per dirty uniform binding.
-  for (unsigned i = 0; i < MaxUniformBindings; i++) {
-    auto& ub = uniformBindings[i];
+  for (auto& item : uniformBindings) {
+    auto binding = item.first;
+    auto& ub = item.second;
     if (!ub.dirty) {
       continue;
     }
-    auto rootIndex = currentPipeline->getUniformRootParameterIndex(i);
-    if (rootIndex == UINT32_MAX) {
-      ub.dirty = false;
-      continue;
+    auto rootIndices = currentPipeline->getUniformRootParameterIndices(binding);
+    if (rootIndices != nullptr) {
+      for (auto rootIndex : *rootIndices) {
+        commandList->SetGraphicsRootConstantBufferView(rootIndex, ub.gpuAddress);
+      }
     }
-    commandList->SetGraphicsRootConstantBufferView(rootIndex, ub.gpuAddress);
     ub.dirty = false;
   }
 
@@ -412,7 +417,11 @@ void D3D12RenderPass::flushBindingsIfNeeded() {
 
 void D3D12RenderPass::setVertexBuffer(unsigned slot, std::shared_ptr<GPUBuffer> buffer,
                                       size_t offset) {
-  if (!buffer || !currentPipeline) {
+  if (!buffer) {
+    return;
+  }
+  if (!currentPipeline) {
+    LOGE("D3D12RenderPass::setVertexBuffer: setPipeline must be called first.");
     return;
   }
   auto d3d12Buffer = std::static_pointer_cast<D3D12Buffer>(buffer);
@@ -467,6 +476,7 @@ void D3D12RenderPass::setStencilReference(uint32_t reference) {
 void D3D12RenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount,
                            uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) {
   if (!currentPipeline) {
+    LOGE("D3D12RenderPass::draw: setPipeline must be called first.");
     return;
   }
   auto topology = ToD3D12PrimitiveTopology(primitiveType);
@@ -483,6 +493,7 @@ void D3D12RenderPass::drawIndexed(PrimitiveType primitiveType, uint32_t indexCou
                                   uint32_t instanceCount, uint32_t firstIndex, int32_t baseVertex,
                                   uint32_t firstInstance) {
   if (!currentPipeline) {
+    LOGE("D3D12RenderPass::drawIndexed: setPipeline must be called first.");
     return;
   }
   auto topology = ToD3D12PrimitiveTopology(primitiveType);
