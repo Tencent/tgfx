@@ -4066,6 +4066,257 @@ static void RunGlassStyleTest(const std::string& keySuffix, float zoomScale = 1.
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyle" + keySuffix));
 }
 
+struct GlassStrokePixels {
+  uint32_t edge = 0;
+  uint32_t refraction = 0;
+  uint32_t strokeOnly = 0;
+  uint32_t strokeOnGlass = 0;
+};
+
+static std::optional<GlassStrokePixels> RenderGlassStrokeComparison(
+    Context* context, int strokeCount, StrokeAlign strokeAlign, bool hasGlass, float zoomScale) {
+  auto surfaceSize = static_cast<int>(200.0f * zoomScale);
+  auto surface = Surface::Make(context, surfaceSize, surfaceSize);
+  if (surface == nullptr) {
+    return std::nullopt;
+  }
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Direct);
+  displayList->setZoomScale(zoomScale);
+  auto background = ImageLayer::Make();
+  auto backgroundImage = MakeImage("resources/apitest/checker_128.png");
+  if (backgroundImage == nullptr) {
+    return std::nullopt;
+  }
+  background->setImage(backgroundImage);
+  auto backgroundScale =
+      static_cast<float>(surfaceSize) / static_cast<float>(backgroundImage->width());
+  background->setMatrix(Matrix::MakeScale(backgroundScale));
+  displayList->root()->addChild(background);
+  auto colorBoundary = ShapeLayer::Make();
+  Path boundaryPath = {};
+  boundaryPath.addRect(Rect::MakeXYWH(75, 40, 20, 120));
+  colorBoundary->setPath(boundaryPath);
+  colorBoundary->setFillStyle(ShapeStyle::Make(Color::Red()));
+  displayList->root()->addChild(colorBoundary);
+
+  auto vectorLayer = VectorLayer::Make();
+  auto rectangle = Rectangle::Make();
+  rectangle->setPosition({100, 100});
+  rectangle->setSize({100, 100});
+  rectangle->setRoundness({20, 20, 20, 20});
+  auto fill = FillStyle::Make(SolidColor::Make(Color::FromRGBA(255, 255, 255, 96)));
+  std::vector<std::shared_ptr<VectorElement>> contents = {rectangle, fill};
+  for (int i = 0; i < strokeCount; i++) {
+    auto stroke = StrokeStyle::Make(SolidColor::Make(Color::FromRGBA(20, 80, 220, 255)));
+    stroke->setStrokeWidth(i == 0 ? 10.0f : 6.0f);
+    stroke->setStrokeAlign(strokeAlign);
+    contents.push_back(stroke);
+  }
+  vectorLayer->setContents(std::move(contents));
+  if (hasGlass) {
+    vectorLayer->setLayerStyles({GlassStyle::Make(80, 50, 0, 50, 0, 135, 50)});
+  }
+  displayList->root()->addChild(vectorLayer);
+  displayList->render(surface.get());
+
+  auto info = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  GlassStrokePixels pixels = {};
+  auto edgeX = static_cast<int>(60.0f * zoomScale);
+  auto edgeY = static_cast<int>(80.0f * zoomScale);
+  auto refractX = static_cast<int>(70.0f * zoomScale);
+  auto refractY = static_cast<int>(90.0f * zoomScale);
+  auto strokeX = static_cast<int>(47.0f * zoomScale);
+  auto strokeY = static_cast<int>(100.0f * zoomScale);
+  // A point inside the fill area and inside the Inside/Center stroke band. The stroke is drawn
+  // after the Below-positioned glass style, so its pixel must not depend on the glass.
+  auto strokeOnGlassX =
+      static_cast<int>((strokeAlign == StrokeAlign::Inside ? 55.0f : 52.0f) * zoomScale);
+  if (!surface->readPixels(info, &pixels.edge, edgeX, edgeY) ||
+      !surface->readPixels(info, &pixels.refraction, refractX, refractY) ||
+      !surface->readPixels(info, &pixels.strokeOnly, strokeX, strokeY) ||
+      !surface->readPixels(info, &pixels.strokeOnGlass, strokeOnGlassX, strokeY)) {
+    return std::nullopt;
+  }
+  return pixels;
+}
+
+TGFX_TEST_PRIVATE(LayerTest, GlassStyleStrokeContentBounds) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  std::vector<int> widths = {};
+  std::vector<float> offsets = {};
+
+  for (auto strokeAlign : {StrokeAlign::Center, StrokeAlign::Inside, StrokeAlign::Outside}) {
+    auto vectorLayer = VectorLayer::Make();
+    auto rectangle = Rectangle::Make();
+    rectangle->setPosition({100, 100});
+    rectangle->setSize({100, 100});
+    rectangle->setRoundness({20, 20, 20, 20});
+    auto fill = FillStyle::Make(SolidColor::Make(Color::White()));
+    auto stroke = StrokeStyle::Make(SolidColor::Make(Color::Blue()));
+    stroke->setStrokeWidth(10);
+    stroke->setStrokeAlign(strokeAlign);
+    vectorLayer->setContents({rectangle, fill, stroke});
+    vectorLayer->setLayerStyles({GlassStyle::Make(80, 50, 0, 50, 0, 135, 50)});
+    DrawArgs drawArgs(context);
+    TGFX_PRIVATE_ACCESS(auto source = vectorLayer->getLayerStyleSource(drawArgs, Matrix::I());
+                        ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[0] != nullptr);
+                        ASSERT_TRUE(source->groups[0]->content.image != nullptr);
+                        widths.push_back(source->groups[0]->content.image->width());
+                        offsets.push_back(source->groups[0]->content.offset.x);)
+  }
+  ASSERT_EQ(widths.size(), 3u);
+  EXPECT_EQ(widths[1], 100);
+  EXPECT_LT(offsets[0], offsets[1]);
+  EXPECT_GT(widths[0], widths[1]);
+  EXPECT_LT(offsets[2], offsets[0]);
+  EXPECT_GT(widths[2], widths[0]);
+}
+
+TGFX_TEST_PRIVATE(LayerTest, ShapeLayerContentShapeExactness) {
+  auto layer = ShapeLayer::Make();
+  Path path = {};
+  path.addRRect(RRect::MakeRectXY(Rect::MakeXYWH(50, 50, 100, 100), 20, 20));
+  layer->setPath(path);
+  layer->setFillStyle(ShapeStyle::Make(Color::White()));
+  layer->setStrokeStyle(ShapeStyle::Make(Color::Blue()));
+  TGFX_PRIVATE_ACCESS(auto singleStroke = layer->onGetContentShape();
+                      ASSERT_TRUE(singleStroke.has_value());
+                      EXPECT_EQ(singleStroke->type, StyledShapeType::FillStroke);
+                      EXPECT_TRUE(singleStroke->isExact);)
+
+  layer->addStrokeStyle(ShapeStyle::Make(Color::Red()));
+  TGFX_PRIVATE_ACCESS(auto multipleStrokes = layer->onGetContentShape();
+                      ASSERT_TRUE(multipleStrokes.has_value());
+                      EXPECT_FALSE(multipleStrokes->isExact);)
+
+  auto multipleFills = ShapeLayer::Make();
+  multipleFills->setPath(path);
+  multipleFills->setFillStyles({ShapeStyle::Make(Color::White()), ShapeStyle::Make(Color::Blue())});
+  TGFX_PRIVATE_ACCESS(auto multipleFillShape = multipleFills->onGetContentShape();
+                      ASSERT_TRUE(multipleFillShape.has_value());
+                      EXPECT_EQ(multipleFillShape->type, StyledShapeType::Fill);
+                      EXPECT_TRUE(multipleFillShape->isExact);)
+}
+
+TGFX_TEST(LayerTest, GlassStyleFillStrokeParity) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  for (auto zoomScale : {1.0f, 2.0f}) {
+    for (auto strokeAlign : {StrokeAlign::Center, StrokeAlign::Inside, StrokeAlign::Outside}) {
+      auto fillOnly = RenderGlassStrokeComparison(context, 0, strokeAlign, true, zoomScale);
+      auto withStroke = RenderGlassStrokeComparison(context, 1, strokeAlign, true, zoomScale);
+      auto withTwoStrokes = RenderGlassStrokeComparison(context, 2, strokeAlign, true, zoomScale);
+      auto strokeWithoutGlass =
+          RenderGlassStrokeComparison(context, 1, strokeAlign, false, zoomScale);
+      ASSERT_TRUE(fillOnly.has_value());
+      ASSERT_TRUE(withStroke.has_value());
+      ASSERT_TRUE(withTwoStrokes.has_value());
+      ASSERT_TRUE(strokeWithoutGlass.has_value());
+      EXPECT_EQ(fillOnly->edge, withStroke->edge);
+      EXPECT_EQ(fillOnly->refraction, withStroke->refraction);
+      // The fill surface stays exact with two decorative strokes, so the refraction must not
+      // change even though the combined content shape falls back to the approximate bounds.
+      EXPECT_EQ(fillOnly->edge, withTwoStrokes->edge);
+      EXPECT_EQ(fillOnly->refraction, withTwoStrokes->refraction);
+      EXPECT_NE(withStroke->refraction, strokeWithoutGlass->refraction);
+      if (strokeAlign != StrokeAlign::Inside) {
+        EXPECT_EQ(withStroke->strokeOnly, strokeWithoutGlass->strokeOnly);
+      }
+      if (strokeAlign != StrokeAlign::Outside) {
+        EXPECT_EQ(withStroke->strokeOnGlass, strokeWithoutGlass->strokeOnGlass);
+      }
+    }
+  }
+}
+
+struct IrregularFillPixels {
+  uint32_t interior = 0;
+  uint32_t center = 0;
+};
+
+static std::optional<IrregularFillPixels> RenderIrregularFillGlass(Context* context, bool hasStroke,
+                                                                   bool hasGlass) {
+  auto surface = Surface::Make(context, 200, 200);
+  if (surface == nullptr) {
+    return std::nullopt;
+  }
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Direct);
+  auto background = ImageLayer::Make();
+  auto backgroundImage = MakeImage("resources/apitest/checker_128.png");
+  if (backgroundImage == nullptr) {
+    return std::nullopt;
+  }
+  background->setImage(backgroundImage);
+  background->setMatrix(Matrix::MakeScale(200.0f / static_cast<float>(backgroundImage->width())));
+  displayList->root()->addChild(background);
+  auto colorBoundary = ShapeLayer::Make();
+  Path boundaryPath = {};
+  boundaryPath.addRect(Rect::MakeXYWH(75, 40, 20, 120));
+  colorBoundary->setPath(boundaryPath);
+  colorBoundary->setFillStyle(ShapeStyle::Make(Color::Red()));
+  displayList->root()->addChild(colorBoundary);
+
+  auto vectorLayer = VectorLayer::Make();
+  auto shapePath = ShapePath::Make();
+  Path starPath = {};
+  for (int i = 0; i < 5; i++) {
+    auto angle = static_cast<float>(i) * 144.0f - 90.0f;
+    auto radians = angle * static_cast<float>(M_PI) / 180.0f;
+    if (i == 0) {
+      starPath.moveTo(100 + 50 * std::cos(radians), 100 + 50 * std::sin(radians));
+    } else {
+      starPath.lineTo(100 + 50 * std::cos(radians), 100 + 50 * std::sin(radians));
+    }
+  }
+  starPath.close();
+  shapePath->setPath(starPath);
+  auto fill = FillStyle::Make(SolidColor::Make(Color::FromRGBA(255, 255, 255, 96)));
+  std::vector<std::shared_ptr<VectorElement>> contents = {shapePath, fill};
+  if (hasStroke) {
+    auto stroke = StrokeStyle::Make(SolidColor::Make(Color::FromRGBA(20, 80, 220, 255)));
+    stroke->setStrokeWidth(10);
+    contents.push_back(stroke);
+  }
+  vectorLayer->setContents(std::move(contents));
+  if (hasGlass) {
+    vectorLayer->setLayerStyles({GlassStyle::Make(80, 50, 0, 50, 0, 135, 50)});
+  }
+  displayList->root()->addChild(vectorLayer);
+  displayList->render(surface.get());
+
+  auto info = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  IrregularFillPixels pixels = {};
+  // (100, 100) is the star center and (110, 100) sits inside the fill, both far from the stroke
+  // band, so the fill-surface refraction must match the fill-only render at both points.
+  if (!surface->readPixels(info, &pixels.center, 100, 100) ||
+      !surface->readPixels(info, &pixels.interior, 110, 100)) {
+    return std::nullopt;
+  }
+  return pixels;
+}
+
+TGFX_TEST(LayerTest, GlassStyleIrregularFillStrokeParity) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto fillOnly = RenderIrregularFillGlass(context, false, true);
+  auto withStroke = RenderIrregularFillGlass(context, true, true);
+  auto strokeWithoutGlass = RenderIrregularFillGlass(context, true, false);
+  ASSERT_TRUE(fillOnly.has_value());
+  ASSERT_TRUE(withStroke.has_value());
+  ASSERT_TRUE(strokeWithoutGlass.has_value());
+  EXPECT_EQ(fillOnly->center, withStroke->center);
+  EXPECT_EQ(fillOnly->interior, withStroke->interior);
+  EXPECT_NE(withStroke->center, strokeWithoutGlass->center);
+}
+
 TGFX_TEST_PRIVATE(LayerTest, GlassStyleUsesBackgroundAndContourSource) {
   ContextScope scope;
   auto context = scope.getContext();

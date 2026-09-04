@@ -54,6 +54,8 @@ void GLSLGlassSDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
       args.uniformHandler->addUniform("GlassShapeP0", UniformFormat::Float4, ShaderStage::Fragment);
   auto effect =
       args.uniformHandler->addUniform("GlassShapeP1", UniformFormat::Float4, ShaderStage::Fragment);
+  auto surface =
+      args.uniformHandler->addUniform("GlassShapeP2", UniformFormat::Float2, ShaderStage::Fragment);
 
   std::string sdfFunction = fragBuilder->getMangledFunctionName("glassShapeSDF");
   if (shapeType == GlassShapeType::RoundedRect) {
@@ -76,12 +78,15 @@ void GLSLGlassSDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
   }
 
   EmitGeometryCoordinates(fragBuilder, args.inputColor, shape);
+  fragBuilder->codeAppendf("float shapeHalfW = %s.x;", surface.c_str());
+  fragBuilder->codeAppendf("float shapeHalfH = %s.y;", surface.c_str());
   fragBuilder->codeAppendf("float cornerRadius = %s.z;", shape.c_str());
   if (shapeType == GlassShapeType::RoundedRect) {
-    fragBuilder->codeAppendf("float outerSDF = %s(px, py, halfW, halfH, cornerRadius);",
+    fragBuilder->codeAppendf("float outerSDF = %s(px, py, shapeHalfW, shapeHalfH, cornerRadius);",
                              sdfFunction.c_str());
   } else {
-    fragBuilder->codeAppendf("float outerSDF = %s(px, py, halfW, halfH);", sdfFunction.c_str());
+    fragBuilder->codeAppendf("float outerSDF = %s(px, py, shapeHalfW, shapeHalfH);",
+                             sdfFunction.c_str());
   }
   fragBuilder->codeAppendf("%s = vec4(0.0);", args.outputColor.c_str());
   fragBuilder->codeAppend("if (outerSDF < 0.0) {");
@@ -97,7 +102,8 @@ void GLSLGlassSDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("  float effectiveSplay = %s.y;", effect.c_str());
   if (shapeType == GlassShapeType::Ellipse) {
     fragBuilder->codeAppend(
-        "  vec2 sdfGradient = vec2(px / (halfW * halfW), py / (halfH * halfH));");
+        "  vec2 sdfGradient = vec2(px / (shapeHalfW * shapeHalfW), py / (shapeHalfH * "
+        "shapeHalfH));");
     fragBuilder->codeAppend("  float gradientLength = length(sdfGradient);");
     fragBuilder->codeAppend("  if (gradientLength > 0.000001) {");
     fragBuilder->codeAppend("    vec2 gradientDir = -sdfGradient / gradientLength;");
@@ -108,9 +114,10 @@ void GLSLGlassSDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppend("  vec2 absP = abs(vec2(px, py));");
     fragBuilder->codeAppendf("  float refractionDistance = %s.w;", shape.c_str());
     fragBuilder->codeAppend(
-        "  float r_effective = min(min(halfW, halfH), max(cornerRadius, refractionDistance));");
+        "  float r_effective = min(min(shapeHalfW, shapeHalfH), max(cornerRadius, "
+        "refractionDistance));");
     fragBuilder->codeAppend(
-        "  vec2 cornerCenter = vec2(halfW - r_effective, halfH - r_effective);");
+        "  vec2 cornerCenter = vec2(shapeHalfW - r_effective, shapeHalfH - r_effective);");
     fragBuilder->codeAppend("  vec2 relToCorner = absP - cornerCenter;");
     fragBuilder->codeAppend("  float compensation = max(-min(relToCorner.x, relToCorner.y), 0.0);");
     fragBuilder->codeAppend("  vec2 grad = relToCorner + vec2(compensation);");
@@ -149,6 +156,9 @@ void GLSLGlassSDFGeometryFragmentProcessor::onSetData(UniformData*,
   float effectData[4] = {params.refractionFactor, params.splay, params.depthRatio,
                          params.edgeBandLayerPixels};
   fragmentUniformData->setData("GlassShapeP1", effectData);
+  float surfaceData[2] = {params.shapeHalfW > 0.0f ? params.shapeHalfW : params.halfW,
+                          params.shapeHalfH > 0.0f ? params.shapeHalfH : params.halfH};
+  fragmentUniformData->setData("GlassShapeP2", surfaceData);
 }
 
 PlacementPtr<GlassUDFGeometryFragmentProcessor> GlassUDFGeometryFragmentProcessor::Make(
@@ -178,6 +188,8 @@ void GLSLGlassUDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
       args.uniformHandler->addUniform("GlassShapeP0", UniformFormat::Float4, ShaderStage::Fragment);
   auto effect =
       args.uniformHandler->addUniform("GlassShapeP1", UniformFormat::Float4, ShaderStage::Fragment);
+  auto surface =
+      args.uniformHandler->addUniform("GlassShapeP2", UniformFormat::Float2, ShaderStage::Fragment);
   auto fineMaskUV = args.uniformHandler->addUniform("GlassFineMaskUV", UniformFormat::Float4,
                                                     ShaderStage::Fragment);
   auto edgeSpan = args.uniformHandler->addUniform("GlassEdgeSpan", UniformFormat::Float2,
@@ -187,6 +199,10 @@ void GLSLGlassUDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
   auto& maskSampler = (*args.textureSamplers)[0];
 
   EmitGeometryCoordinates(fragBuilder, args.inputColor, shape);
+  // The displacement scale follows the fill surface half sizes; the content half sizes above only
+  // drive coordinate mapping, so decorative strokes outset the content without scaling the glass.
+  fragBuilder->codeAppendf("float surfaceHalfW = %s.x;", surface.c_str());
+  fragBuilder->codeAppendf("float surfaceHalfH = %s.y;", surface.c_str());
   // The fine mask packs the refraction height into RGB with 24-bit precision; the edge mask
   // carries the edge light height in A.
   fragBuilder->codeAppend("const vec3 UNPACK24 = vec3(1.0, 1.0/255.0, 1.0/65025.0);");
@@ -266,7 +282,8 @@ void GLSLGlassUDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
       "  refractDir = refractLength < 0.000001 ? gradientDir : refractDir / refractLength;");
   fragBuilder->codeAppendf("  float depthScale = smoothstep(0.0, 0.1, %s.z);", effect.c_str());
   fragBuilder->codeAppendf(
-      "  float distance = min(halfW, halfH) * %s.x * %s.z * depthScale * gradientWeight;",
+      "  float distance = min(surfaceHalfW, surfaceHalfH) * %s.x * %s.z * depthScale * "
+      "gradientWeight;",
       effect.c_str(), effect.c_str());
   fragBuilder->codeAppend(
       "  float proximity = (1.0 - height * height) * (1.0 - height * height) * 1.2;");
@@ -283,6 +300,9 @@ void GLSLGlassUDFGeometryFragmentProcessor::onSetData(UniformData*,
   float effectData[4] = {params.refractionFactor, params.splay, params.depthRatio,
                          params.edgeBandLayerPixels};
   fragmentUniformData->setData("GlassShapeP1", effectData);
+  float surfaceData[2] = {params.surfaceHalfW > 0.0f ? params.surfaceHalfW : params.halfW,
+                          params.surfaceHalfH > 0.0f ? params.surfaceHalfH : params.halfH};
+  fragmentUniformData->setData("GlassShapeP2", surfaceData);
   float edgeSpanData[2] = {params.edgeSpanX, params.edgeSpanY};
   fragmentUniformData->setData("GlassEdgeSpan", edgeSpanData);
   float textureWidth = static_cast<float>(maskProxy->width());

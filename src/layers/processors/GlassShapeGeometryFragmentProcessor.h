@@ -47,11 +47,20 @@ struct GlassGeometryParams {
 struct GlassSDFGeometryParams : public GlassGeometryParams {
   float cornerRadius = 0.0f;
   float glassThickness = 0.0f;
+  float shapeHalfW = 0.0f;
+  float shapeHalfH = 0.0f;
 };
 
 struct GlassUDFGeometryParams : public GlassGeometryParams {
   float udfPixelToLayerPixelX = 1.0f;
   float udfPixelToLayerPixelY = 1.0f;
+  /**
+   * Half sizes of the fill surface in layer pixels. The displacement scale follows the fill
+   * surface instead of the content bounds, which decorative strokes outset. Equal to halfW/halfH
+   * when no exact fill surface is known.
+   */
+  float surfaceHalfW = 0.0f;
+  float surfaceHalfH = 0.0f;
   /**
    * Layer-space distance between the two taps of the edge field's center difference. It must match
    * the tent radius used to build that field, otherwise the reconstructed edge distance is scaled.

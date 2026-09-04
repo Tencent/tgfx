@@ -22,11 +22,14 @@
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "layers/CanvasUtils.h"
+#include "layers/LayerStyleSource.h"
 #include "layers/imagefilters/GlassRefractionImageFilter.h"
 #include "layers/layerstyles/GlassUDF.h"
 #include "layers/processors/GlassRefractionFragmentProcessor.h"
+#include "tgfx/core/Canvas.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Path.h"
+#include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/RRect.h"
 #include "tgfx/core/SamplingOptions.h"
 #include "tgfx/core/Shape.h"
@@ -121,13 +124,19 @@ struct GlassShapeInfo {
   float cornerRadius = 0.0f;
   RRect shapeRRect = {};
   Path shapePath = {};
+  // Bounds of the fill surface in layer space. Valid whenever hasPath is true.
+  Rect surfaceBounds = {};
   bool hasPath = false;
+  // True when the content image carries fills only (no visible strokes), so it already matches
+  // the fill surface and can feed the UDF directly.
+  bool contentIsFillOnly = false;
 };
 
-// Detects whether the layer's vector shape is a regular shape (RoundedRect or Ellipse)
-// that can use the analytical SDF path. Only exact Fill-type shapes are supported; Stroke,
-// FillStroke, and shapes approximated from content bounds produce a different rendered outline,
-// so SDF would mismatch.
+// Detects whether the layer's fill surface is a regular shape (RoundedRect or Ellipse) that can
+// use the analytical SDF path. The fill surface comes from fillShape when available: it stays
+// exact across decorative strokes, unlike the combined content shape. Without fillShape, exact
+// Fill and FillStroke shapes carry the same fill path; pure Stroke and shapes approximated from
+// content bounds still fall back to AlphaMask.
 static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
   GlassShapeInfo info;
   auto* contourSource = input.findExtraSource(StyleInputSource::Type::Contour);
@@ -139,12 +148,19 @@ static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
     return info;
   }
   const auto& optShape = contour->shape();
-  if (!optShape->isExact || optShape->type != StyledShapeType::Fill || optShape->shape == nullptr) {
-    return info;
+  auto surfaceShape = optShape->fillShape;
+  if (surfaceShape == nullptr) {
+    if (!optShape->isExact || optShape->type == StyledShapeType::Stroke ||
+        optShape->shape == nullptr) {
+      return info;
+    }
+    surfaceShape = optShape->shape;
   }
-  auto path = optShape->shape->getPath();
+  info.contentIsFillOnly = optShape->type == StyledShapeType::Fill && optShape->isExact;
+  auto path = surfaceShape->getPath();
   info.shapePath = path;
   info.hasPath = true;
+  info.surfaceBounds = path.getBounds();
   RRect rRect = {};
   Rect rect = {};
   if (path.isRRect(&rRect)) {
@@ -171,6 +187,31 @@ static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
     info.shapeRRect = RRect::MakeRect(rect);
   }
   return info;
+}
+
+// Rasterizes the fill surface path into a coverage image aligned with the content bitmap. The
+// content image bakes decorative strokes into its alpha; the UDF distance field must instead be
+// shaped by the stroke-free fill surface, so the recorded picture only draws the fill path with
+// the same matrix the drawPath clip uses. Only the alpha channel is consumed downstream.
+static std::shared_ptr<Image> MakeFillSurfaceImage(const Path& surfacePath,
+                                                   const LayerStyleInput& input, float contentWidth,
+                                                   float contentHeight) {
+  auto path = surfacePath;
+  auto matrix = Matrix::MakeScale(input.contentScale, input.contentScale);
+  matrix.postTranslate(-input.contentOffset.x, -input.contentOffset.y);
+  path.transform(matrix);
+  PictureRecorder recorder = {};
+  auto canvas = recorder.beginRecording();
+  Paint paint = {};
+  paint.setColor(Color::White());
+  canvas->drawPath(path, paint);
+  auto picture = recorder.finishRecordingAsPicture();
+  if (picture == nullptr) {
+    return nullptr;
+  }
+  auto imageBounds = Rect::MakeWH(contentWidth, contentHeight);
+  Point offset = {};
+  return ToImageWithOffset(std::move(picture), &offset, &imageBounds);
 }
 
 std::shared_ptr<GlassStyle> GlassStyle::Make(float refraction, float depth, float frost,
@@ -368,7 +409,13 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
 
     refractInputRect = visibleRect;
     if (_refraction > 0 || _lightIntensity > 0) {
+      // The fill surface, not the stroke-outset content bounds, defines the optical scale; the
+      // content fallback keeps the previous behavior when no exact surface is known.
       auto minHalf = std::min(origWidth, origHeight) * 0.5f;
+      if (shapeInfo.hasPath) {
+        minHalf =
+            std::min(shapeInfo.surfaceBounds.width(), shapeInfo.surfaceBounds.height()) * 0.5f;
+      }
       float refractionOutset =
           shapeInfo.type == GlassShapeType::AlphaMask
               ? GetUDFRefractionOutset(minHalf, getRefractionFactor(), getDepthRatio(),
@@ -468,6 +515,10 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       float blurRadius =
           std::max(std::min((_depth / 100.0f) * MAX_BLUR_RADIUS, MAX_BLUR_RADIUS), MIN_BLUR_RADIUS);
       float minHalf = std::min(origBounds.width(), origBounds.height()) * 0.5f;
+      if (shapeInfo.hasPath) {
+        minHalf =
+            std::min(shapeInfo.surfaceBounds.width(), shapeInfo.surfaceBounds.height()) * 0.5f;
+      }
       auto visibleContentRect = Rect::MakeWH(contentWidth, contentHeight);
       if (clipBounds.has_value() && !visibleContentRect.intersect(*clipBounds)) {
         return;
@@ -614,8 +665,19 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       edgeTextureRect.roundOut();
       Point edgeTextureOrigin = {edgeTextureRect.left, edgeTextureRect.top};
 
+      // The content image bakes decorative strokes into its alpha. When the exact fill surface is
+      // known, rasterize it into a stroke-free coverage image so the distance field does not
+      // depend on the strokes. Fill-only content already matches the surface and is used as is.
+      auto udfSource = input.content;
+      if (shapeInfo.hasPath && !shapeInfo.contentIsFillOnly) {
+        udfSource = MakeFillSurfaceImage(shapeInfo.shapePath, input, contentWidth, contentHeight);
+        if (udfSource == nullptr) {
+          udfSource = input.content;
+        }
+      }
+
       GlassUDFRequest maskRequest = {};
-      maskRequest.source = input.content;
+      maskRequest.source = udfSource;
       maskRequest.coreWidth = udfWidth;
       maskRequest.coreHeight = udfHeight;
       maskRequest.textureRect = fineTextureRect;
@@ -627,7 +689,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       }
       GlassUDFRequest edgeMaskRequest = {};
       if (enableEdgeLighting) {
-        edgeMaskRequest.source = input.content;
+        edgeMaskRequest.source = udfSource;
         edgeMaskRequest.coreWidth = edgeCoreWidth;
         edgeMaskRequest.coreHeight = edgeCoreHeight;
         edgeMaskRequest.textureRect = edgeTextureRect;
@@ -644,11 +706,11 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       udf.textureOrigin = udfTextureOrigin;
       udf.edgePixelToLayerPixel = {edgePixelToLayerPixelX, edgePixelToLayerPixelY};
       udf.edgeTextureOrigin = edgeTextureOrigin;
-      glassFilter = getUDFRefractionFilter(halfW, halfH, udf, mapping, maskRequest, edgeMaskRequest,
-                                           input.contentScale);
+      glassFilter = getUDFRefractionFilter(halfW, halfH, shapeInfo.surfaceBounds, udf, mapping,
+                                           maskRequest, edgeMaskRequest, input.contentScale);
     } else {
       glassFilter = getSDFRefractionFilter(shapeInfo.type, shapeInfo.cornerRadius, halfW, halfH,
-                                           mapping, input.contentScale);
+                                           shapeInfo.surfaceBounds, mapping, input.contentScale);
     }
   }
 
@@ -770,24 +832,28 @@ GlassRefractionParams GlassStyle::makeBaseRefractionParams(float halfW, float ha
 }
 
 std::shared_ptr<GlassRefractionImageFilter> GlassStyle::getSDFRefractionFilter(
-    GlassShapeType shapeType, float cornerRadius, float halfWidth, float halfHeight,
-    const BackgroundMapping& mapping, float contentScale) {
-  auto params = makeBaseRefractionParams(halfWidth, halfHeight, mapping);
+    GlassShapeType shapeType, float cornerRadius, float contentHalfWidth, float contentHalfHeight,
+    const Rect& shapeBounds, const BackgroundMapping& mapping, float contentScale) {
+  auto params = makeBaseRefractionParams(contentHalfWidth, contentHalfHeight, mapping);
   if (contentScale <= EdgeLightMinContentScale) {
     params.lightIntensity = 0.0f;
   }
   params.shapeType = shapeType;
-  float minHalf = std::min(halfWidth, halfHeight);
+  auto shapeHalfWidth = shapeBounds.width() * 0.5f;
+  auto shapeHalfHeight = shapeBounds.height() * 0.5f;
+  float minHalf = std::min(shapeHalfWidth, shapeHalfHeight);
   // The analytical SDF displaces by at most refractionFactor * glassThickness, so the shader clamp
   // is an identity here. Carrying the real bound instead of a sentinel lets the image filter derive
   // its sampling outset from this value alone.
   params.maxDisplacement = getGlassThickness(minHalf) * getRefractionFactor();
 
   GlassSDFGeometryParams sdfParams = {};
-  sdfParams.halfW = halfWidth;
-  sdfParams.halfH = halfHeight;
+  sdfParams.halfW = contentHalfWidth;
+  sdfParams.halfH = contentHalfHeight;
   sdfParams.cornerRadius = cornerRadius;
   sdfParams.glassThickness = getGlassThickness(minHalf);
+  sdfParams.shapeHalfW = shapeHalfWidth;
+  sdfParams.shapeHalfH = shapeHalfHeight;
   sdfParams.refractionFactor = getRefractionFactor();
   sdfParams.splay = std::clamp(_splay / 100.0f, 0.0f, 1.0f);
   sdfParams.depthRatio = getDepthRatio();
@@ -796,20 +862,30 @@ std::shared_ptr<GlassRefractionImageFilter> GlassStyle::getSDFRefractionFilter(
 }
 
 std::shared_ptr<GlassRefractionImageFilter> GlassStyle::getUDFRefractionFilter(
-    float halfWidth, float halfHeight, const UDFSampling& udf, const BackgroundMapping& mapping,
-    const GlassUDFRequest& maskRequest, const GlassUDFRequest& edgeMaskRequest,
-    float contentScale) {
+    float halfWidth, float halfHeight, const Rect& shapeBounds, const UDFSampling& udf,
+    const BackgroundMapping& mapping, const GlassUDFRequest& maskRequest,
+    const GlassUDFRequest& edgeMaskRequest, float contentScale) {
   auto params = makeBaseRefractionParams(halfWidth, halfHeight, mapping);
   if (contentScale <= EdgeLightMinContentScale) {
     params.lightIntensity = 0.0f;
   }
   params.shapeType = GlassShapeType::AlphaMask;
-  float minHalf = std::min(halfWidth, halfHeight);
+  // The displacement scale follows the fill surface, not the stroke-outset content bounds; the
+  // content half sizes are the fallback when no exact surface is known.
+  auto surfaceHalfWidth = halfWidth;
+  auto surfaceHalfHeight = halfHeight;
+  if (!shapeBounds.isEmpty()) {
+    surfaceHalfWidth = shapeBounds.width() * 0.5f;
+    surfaceHalfHeight = shapeBounds.height() * 0.5f;
+  }
+  float minHalf = std::min(surfaceHalfWidth, surfaceHalfHeight);
   params.maxDisplacement = GetUDFMaxDisplacement(minHalf, getRefractionFactor(), getDepthRatio());
 
   GlassUDFGeometryParams udfParams = {};
   udfParams.halfW = halfWidth;
   udfParams.halfH = halfHeight;
+  udfParams.surfaceHalfW = surfaceHalfWidth;
+  udfParams.surfaceHalfH = surfaceHalfHeight;
   udfParams.refractionFactor = getRefractionFactor();
   udfParams.splay = std::clamp(_splay / 100.0f, 0.0f, 1.0f);
   udfParams.depthRatio = getDepthRatio();

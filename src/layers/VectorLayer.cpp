@@ -106,62 +106,78 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
   };
 
   // Only a single shared geometry across all painters with a uniform stroke style can be
-  // simplified to a StyledShape.
+  // simplified to a StyledShape. The scan collects flags instead of returning early because the
+  // fill surface stays derivable from the shared geometry even when the combined content falls
+  // back to the approximate bounds shape below.
   Geometry* sharedGeometry = nullptr;
+  auto geometryShared = true;
   auto hasFill = false;
+  auto strokeCount = 0;
   std::optional<PainterStyle> strokeStyle = std::nullopt;
   for (const auto& painter : context.painters) {
     DEBUG_ASSERT(painter != nullptr);
     if (HasTransparentSolidColor(painter.get())) {
       continue;
     }
-    if (painter->geometries.size() != 1) {
-      return getApproximateContentShape();
+    if (painter->geometries.size() != 1 ||
+        (sharedGeometry != nullptr && painter->geometries[0] != sharedGeometry)) {
+      geometryShared = false;
+      break;
     }
     if (sharedGeometry == nullptr) {
       sharedGeometry = painter->geometries[0];
-    } else if (painter->geometries[0] != sharedGeometry) {
-      return getApproximateContentShape();
     }
 
     auto style = painter->getStyle();
     if (style.style == PaintStyle::Fill) {
       hasFill = true;
     } else {
-      // Multiple strokes cannot be simplified to a single StyledShape.
-      if (strokeStyle.has_value()) {
-        return getApproximateContentShape();
-      }
+      strokeCount++;
       strokeStyle = style;
     }
   }
 
-  // sharedGeometry stays null when every painter was skipped as invisible, meaning the layer has
-  // no visible content.
-  if (sharedGeometry == nullptr) {
+  std::optional<StyledShape> contentShape = std::nullopt;
+  if (!geometryShared || strokeCount > 1) {
+    contentShape = getApproximateContentShape();
+  } else if (sharedGeometry == nullptr) {
     return std::nullopt;
-  }
-  auto shape = sharedGeometry->getShape();
-  if (shape == nullptr) {
-    return std::nullopt;
-  }
-  // Baking the geometry matrix into the shape makes spread scale with the layer transform, like
-  // stroke width and other in-layer measurements. This is intentional.
-  shape = Shape::ApplyMatrix(shape, sharedGeometry->matrix);
-  if (shape == nullptr) {
-    return std::nullopt;
+  } else {
+    auto shape = sharedGeometry->getShape();
+    if (shape == nullptr) {
+      return std::nullopt;
+    }
+    // Baking the geometry matrix into the shape makes spread scale with the layer transform, like
+    // stroke width and other in-layer measurements. This is intentional.
+    shape = Shape::ApplyMatrix(shape, sharedGeometry->matrix);
+    if (shape == nullptr) {
+      return std::nullopt;
+    }
+
+    auto hasStroke = strokeStyle.has_value();
+    auto strokeWidth = hasStroke ? strokeStyle->strokeWidth : 0.0f;
+    auto strokeAlign = hasStroke ? strokeStyle->strokeAlign : StrokeAlign::Center;
+    auto type = StyledShapeType::FillStroke;
+    if (!hasStroke) {
+      type = StyledShapeType::Fill;
+    } else if (!hasFill) {
+      type = StyledShapeType::Stroke;
+    }
+    contentShape = StyledShape::Make(shape, type, strokeWidth, strokeAlign);
   }
 
-  auto hasStroke = strokeStyle.has_value();
-  auto strokeWidth = hasStroke ? strokeStyle->strokeWidth : 0.0f;
-  auto strokeAlign = hasStroke ? strokeStyle->strokeAlign : StrokeAlign::Center;
-  auto type = StyledShapeType::FillStroke;
-  if (!hasStroke) {
-    type = StyledShapeType::Fill;
-  } else if (!hasFill) {
-    type = StyledShapeType::Stroke;
+  // The fill surface only needs the shared geometry, so it stays exact regardless of how many
+  // decorative strokes made the combined content fall back above.
+  if (contentShape.has_value() && geometryShared && hasFill && sharedGeometry != nullptr) {
+    auto fillShape = sharedGeometry->getShape();
+    if (fillShape != nullptr) {
+      fillShape = Shape::ApplyMatrix(fillShape, sharedGeometry->matrix);
+      if (fillShape != nullptr) {
+        contentShape->fillShape = fillShape;
+      }
+    }
   }
-  return StyledShape::Make(shape, type, strokeWidth, strokeAlign);
+  return contentShape;
 }
 
 }  // namespace tgfx

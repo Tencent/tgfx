@@ -269,7 +269,16 @@ std::optional<StyledShape> ShapeLayer::onGetContentShape() {
   // The dash pattern is intentionally ignored here: spread expands the stroke outline, and a dash
   // only changes how that outline is displayed, not its geometry, so it is treated as a solid
   // stroke.
-  return StyledShape::Make(Shape::MakeFrom(_shape->getPath()), type, stroke.width,
-                           static_cast<StrokeAlign>(shapeBitFields.strokeAlign));
+  auto contentShape = StyledShape::Make(Shape::MakeFrom(_shape->getPath()), type, stroke.width,
+                                        static_cast<StrokeAlign>(shapeBitFields.strokeAlign));
+  if (strokeCount > 1) {
+    contentShape.isExact = false;
+  }
+  // The layer has a single geometry, so its fill surface stays exact no matter how many decorative
+  // strokes are stacked on top of it.
+  if (fillCount > 0) {
+    contentShape.fillShape = Shape::MakeFrom(_shape->getPath());
+  }
+  return contentShape;
 }
 }  // namespace tgfx
