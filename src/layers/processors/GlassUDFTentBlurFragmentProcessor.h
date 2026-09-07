@@ -56,6 +56,10 @@ class GlassUDFTentBlurFragmentProcessor : public FragmentProcessor {
     return "GlassUDFTentBlurFragmentProcessor";
   }
 
+  int getMaxRadius() const {
+    return maxRadius;
+  }
+
   void emitCode(EmitArgs& args) const override;
 
  protected:

@@ -120,8 +120,9 @@ std::shared_ptr<TextureProxy> GenerateGlassUDFTexture(Context* context,
   auto horizontalProcessor = GlassUDFTentBlurFragmentProcessor::Make(
       allocator, std::move(horizontalFine), std::move(horizontalCoarse), fineRadius.x,
       coarseRadius.x, GlassUDFBlurDirection::Horizontal, GlassUDFMaxTentRadius, false, field);
-  if (horizontalProcessor == nullptr || !context->drawingManager()->fillRTWithFP(
-                                            horizontalTarget, std::move(horizontalProcessor), 0)) {
+  if (horizontalProcessor == nullptr ||
+      !context->drawingManager()->fillRTWithFP(horizontalTarget, std::move(horizontalProcessor), 0,
+                                               Point::Zero(), OffscreenFillSource::GlassUDF)) {
     return nullptr;
   }
   auto verticalMatrix = Matrix::MakeTrans(0.0f, textureRect.top - horizontalRect.top);
@@ -144,7 +145,8 @@ std::shared_ptr<TextureProxy> GenerateGlassUDFTexture(Context* context,
       allocator, std::move(verticalFineSource), std::move(verticalCoarseSource), fineRadius.y,
       coarseRadius.y, GlassUDFBlurDirection::Vertical, GlassUDFMaxTentRadius, true, field);
   if (verticalProcessor == nullptr ||
-      !context->drawingManager()->fillRTWithFP(verticalTarget, std::move(verticalProcessor), 0)) {
+      !context->drawingManager()->fillRTWithFP(verticalTarget, std::move(verticalProcessor), 0,
+                                               Point::Zero(), OffscreenFillSource::GlassUDF)) {
     return nullptr;
   }
   return verticalTarget->asTextureProxy();

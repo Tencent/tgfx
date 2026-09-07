@@ -59,6 +59,7 @@
 #include "gpu/shaders/level1/DeviceSpaceTextureShader.h"
 #include "gpu/shaders/level1/EllipseFillShader.h"
 #include "gpu/shaders/level1/GaussianBlur1DShader.h"
+#include "gpu/shaders/level1/GlassUDFTentBlurShader.h"
 #include "gpu/shaders/level1/HairlineLineShader.h"
 #include "gpu/shaders/level1/HairlineQuadShader.h"
 #include "gpu/shaders/level1/MaskFillShader.h"
@@ -80,6 +81,7 @@
 #include "gpu/shaders/level1/TiledTextureFillShader.h"
 #include "gpu/shaders/level1/UnifiedGradientShader.h"
 #include "gpu/shaders/level1/YUVTextureFillShader.h"
+#include "layers/processors/GlassUDFTentBlurFragmentProcessor.h"
 
 namespace tgfx {
 
@@ -1146,6 +1148,72 @@ static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
   return PermutationMatchResult{"GaussianBlur1DShader", 0, fragIndex};
 }
 
+static std::optional<PermutationMatchResult> TryMatchGlassUDFTentBlur(
+    const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  int gpType = GetGPType(gp);
+  if (gpType < 0) {
+    return std::nullopt;
+  }
+  if (programInfo->numColorFragmentProcessors() != 1) {
+    return std::nullopt;
+  }
+  auto coverageType = SharedDeviceMaskValue(programInfo);
+  if (!coverageType) {
+    return std::nullopt;
+  }
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
+    return std::nullopt;
+  }
+  auto fp = programInfo->getFragmentProcessor(0);
+  if (fp->name() != "GlassUDFTentBlurFragmentProcessor") {
+    return std::nullopt;
+  }
+  auto* tent = static_cast<const GlassUDFTentBlurFragmentProcessor*>(fp);
+  if (tent->numChildProcessors() != 1) {
+    return std::nullopt;
+  }
+  auto childFP = tent->childProcessor(0);
+  if (childFP == nullptr) {
+    return std::nullopt;
+  }
+  // The horizontal pass reads a plain TextureEffect; the vertical pass reads a TiledTextureEffect.
+  // Tiled children are limited to the ShaderMode values tiled_sample.inc implements; others fall
+  // back.
+  if (childFP->name() == "TextureEffect") {
+    auto* childTE = static_cast<const TextureEffect*>(childFP);
+    if (childTE->numTextureSamplers() == 0) {
+      return std::nullopt;
+    }
+  } else if (childFP->name() == "TiledTextureEffect") {
+    auto* childTiled = static_cast<const TiledTextureEffect*>(childFP);
+    if (childTiled->numTextureSamplers() == 0 || childTiled->hasPerspective()) {
+      return std::nullopt;
+    }
+    int modeX = 0;
+    int modeY = 0;
+    childTiled->getShaderModes(&modeX, &modeY);
+    if (!TiledModeSupported(modeX) || !TiledModeSupported(modeY)) {
+      return std::nullopt;
+    }
+  } else {
+    return std::nullopt;
+  }
+  // The loop upper bound is the fixed constant 64; a longer max radius exceeds it and falls back.
+  if (tent->getMaxRadius() > 64) {
+    return std::nullopt;
+  }
+  GlassUDFTentBlurInputs inputs;
+  inputs.xpType = xpType;
+  auto composed = ComposeGlassUDFTentBlur(inputs);
+  if (!composed) {
+    return std::nullopt;
+  }
+  auto fragIndex = GlassUDFTentBlurShader::FD::domain().encode(composed->fragValues);
+  return PermutationMatchResult{"GlassUDFTentBlurShader", 0, fragIndex};
+}
+
 static std::optional<PermutationMatchResult> TryMatchHairlineLine(const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
   if (gp->name() != "HairlineLineGeometryProcessor") {
@@ -1584,6 +1652,9 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
     return result;
   }
   if (auto result = TryMatchGaussianBlur1D(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchGlassUDFTentBlur(programInfo)) {
     return result;
   }
   if (auto result = TryMatchHairlineLine(programInfo)) {

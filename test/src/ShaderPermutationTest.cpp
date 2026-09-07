@@ -470,8 +470,8 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   // (PermutationCompilesForBackend): the WebGPU bundle drops FBF (subpassInput) variants, which
   // WGSL cannot express, and their vertex stages.
   const bool isWebGPU = expectedTag == "webgpu";
-  EXPECT_EQ(cache->vertexEntryCount(), isWebGPU ? 94u : 96u);
-  EXPECT_EQ(cache->fragmentEntryCount(), isWebGPU ? 177u : 264u);
+  EXPECT_EQ(cache->vertexEntryCount(), isWebGPU ? 95u : 97u);
+  EXPECT_EQ(cache->fragmentEntryCount(), isWebGPU ? 180u : 267u);
   EXPECT_EQ(cache->profileTag(), expectedTag);
   cache->unload();
 }
@@ -932,8 +932,8 @@ TGFX_TEST(ShaderPermutationTest, CompressedBundleLoad) {
     // opengl bundle carries the TEXTURE_KIND=Rect variants, the webgpu bundle drops the FBF
     // (subpassInput) variants, and metal/vulkan keep everything.
     const bool isWebGPU = tag == "webgpu";
-    EXPECT_EQ(compressedOnly.vertexEntryCount(), isWebGPU ? 94u : 96u);
-    EXPECT_EQ(compressedOnly.fragmentEntryCount(), isWebGPU ? 177u : 264u);
+    EXPECT_EQ(compressedOnly.vertexEntryCount(), isWebGPU ? 95u : 97u);
+    EXPECT_EQ(compressedOnly.fragmentEntryCount(), isWebGPU ? 180u : 267u);
     EXPECT_EQ(compressedOnly.profileTag(), tag);
     return;
   }

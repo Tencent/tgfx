@@ -113,6 +113,7 @@ enum class OffscreenFillSource : uint8_t {
   Unknown,
   FPFlatten,
   GaussianBlur,
+  GlassUDF,
   ImageFilter,
   TransformImage,
   RGBAAAImage,
