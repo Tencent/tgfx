@@ -473,7 +473,9 @@ TGFX_TEST(ReadPixelsTest, JpegCodecFullChroma) {
   ASSERT_TRUE(pixels);
   for (int y = 0; y < info.height(); y++) {
     for (int x = 0; x < info.width(); x++) {
-      static_cast<uint32_t*>(pixels)[y * info.width() + x] = y == 4 ? 0xFFF50707 : 0xFF38393D;
+      // RGBA_8888 byte order is R, G, B, A, so the packed value is 0xAABBGGRR: red (#F50707) on
+      // the dark gray (#38393D) used by the editor canvas.
+      static_cast<uint32_t*>(pixels)[y * info.width() + x] = y == 4 ? 0xFF0707F5u : 0xFF3D3938u;
     }
   }
   auto bytes = ImageCodec::Encode(Pixmap(info, pixels), EncodedFormat::JPEG, 100);
