@@ -4073,6 +4073,29 @@ struct GlassStrokePixels {
   uint32_t strokeOnGlass = 0;
 };
 
+// Software rasterizers (SwiftShader) can differ from hardware GPUs by 1 LSB per channel between
+// two renders of identical glass optics: stroke extents change the backdrop texture layout, and
+// the software sampler's bilinear rounding of the resized texture lands on the other side of a
+// half step. Parity assertions therefore allow a small per-channel delta, while real semantic
+// violations (missing refraction, changed geometry) produce far larger differences.
+static bool PixelsWithinTolerance(uint32_t a, uint32_t b, int tolerance = 2) {
+  for (auto shift : {0, 8, 16, 24}) {
+    auto delta = static_cast<int>((a >> shift) & 0xFF) - static_cast<int>((b >> shift) & 0xFF);
+    if (delta < 0) {
+      delta = -delta;
+    }
+    if (delta > tolerance) {
+      return false;
+    }
+  }
+  return true;
+}
+
+#define EXPECT_PIXEL_PARITY(expected, actual)                            \
+  EXPECT_TRUE(PixelsWithinTolerance(expected, actual))                   \
+      << "glass parity broken: 0x" << std::hex << (expected) << " vs 0x" \
+      << static_cast<uint32_t>(actual) << std::dec
+
 static std::optional<GlassStrokePixels> RenderGlassStrokeComparison(
     Context* context, int strokeCount, StrokeAlign strokeAlign, bool hasGlass, float zoomScale) {
   auto surfaceSize = static_cast<int>(200.0f * zoomScale);
@@ -4217,18 +4240,18 @@ TGFX_TEST(LayerTest, GlassStyleFillStrokeParity) {
       ASSERT_TRUE(withStroke.has_value());
       ASSERT_TRUE(withTwoStrokes.has_value());
       ASSERT_TRUE(strokeWithoutGlass.has_value());
-      EXPECT_EQ(fillOnly->edge, withStroke->edge);
-      EXPECT_EQ(fillOnly->refraction, withStroke->refraction);
+      EXPECT_PIXEL_PARITY(fillOnly->edge, withStroke->edge);
+      EXPECT_PIXEL_PARITY(fillOnly->refraction, withStroke->refraction);
       // The fill surface stays exact with two decorative strokes, so the refraction must not
       // change even though the combined content shape falls back to the approximate bounds.
-      EXPECT_EQ(fillOnly->edge, withTwoStrokes->edge);
-      EXPECT_EQ(fillOnly->refraction, withTwoStrokes->refraction);
+      EXPECT_PIXEL_PARITY(fillOnly->edge, withTwoStrokes->edge);
+      EXPECT_PIXEL_PARITY(fillOnly->refraction, withTwoStrokes->refraction);
       EXPECT_NE(withStroke->refraction, strokeWithoutGlass->refraction);
       if (strokeAlign != StrokeAlign::Inside) {
-        EXPECT_EQ(withStroke->strokeOnly, strokeWithoutGlass->strokeOnly);
+        EXPECT_PIXEL_PARITY(withStroke->strokeOnly, strokeWithoutGlass->strokeOnly);
       }
       if (strokeAlign != StrokeAlign::Outside) {
-        EXPECT_EQ(withStroke->strokeOnGlass, strokeWithoutGlass->strokeOnGlass);
+        EXPECT_PIXEL_PARITY(withStroke->strokeOnGlass, strokeWithoutGlass->strokeOnGlass);
       }
     }
   }
@@ -4312,8 +4335,8 @@ TGFX_TEST(LayerTest, GlassStyleIrregularFillStrokeParity) {
   ASSERT_TRUE(fillOnly.has_value());
   ASSERT_TRUE(withStroke.has_value());
   ASSERT_TRUE(strokeWithoutGlass.has_value());
-  EXPECT_EQ(fillOnly->center, withStroke->center);
-  EXPECT_EQ(fillOnly->interior, withStroke->interior);
+  EXPECT_PIXEL_PARITY(fillOnly->center, withStroke->center);
+  EXPECT_PIXEL_PARITY(fillOnly->interior, withStroke->interior);
   EXPECT_NE(withStroke->center, strokeWithoutGlass->center);
 }
 
