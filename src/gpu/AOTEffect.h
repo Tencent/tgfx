@@ -82,6 +82,7 @@ enum class AOTEffectKind {
   PerlinNoiseSource,
   RectCoverage,
   GradientSource,
+  RRectCoverage,
   // The unit input of a coverage subtree: the GP's output coverage (vCoverage broadcast, or
   // vec4(1.0) when the GP carries none), matching the runtime coverage-chain origin. Never
   // becomes a chain slot; as an op input it maps to the -3 designator.
@@ -238,16 +239,33 @@ struct AOTGradientParameters {
 // input color by a per-fragment coverage computed from gl_FragCoord and the rect, so it is a
 // pointwise node that reads the destination device coordinate directly and needs no texture or
 // varying. rect is {left, top, right, bottom} in device coordinates, already origin-flipped by the
-// clip code; the 0.5 outset for the AA falloff is applied at uniform upload time.
+// clip code; the 0.5 outset for the AA falloff is applied at uniform upload time. deviceToLocal
+// maps device coordinates into the rect's local space in Matrix::get9 row-major order; identity
+// means the rect already lives in device space (the shader then evaluates the separable math
+// directly on gl_FragCoord).
 struct AOTRectCoverageParameters {
   std::array<float, 4> rect = {};
+  std::array<float, 9> deviceToLocal = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+};
+
+// Analytic rounded-rect coverage (RRectEffect). Every parameter rides uniforms — local or device
+// space via deviceToLocal (identity for the device-space form, Matrix::get9 row-major order), AA
+// or hard edge via antiAlias — so a single node kind covers all RRectEffect forms. rect is
+// {left, top, right, bottom} in the local space; radiiX/radiiY pack the per-corner radii in
+// [TL, TR, BR, BL] order.
+struct AOTRRectCoverageParameters {
+  std::array<float, 4> rect = {};
+  std::array<float, 4> radiiX = {};
+  std::array<float, 4> radiiY = {};
+  std::array<float, 9> deviceToLocal = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+  float antiAlias = 1.0f;
 };
 
 using AOTEffectParameters =
     std::variant<std::monostate, AOTTextureParameters, AOTColorMatrixParameters, AOTLumaParameters,
                  AOTAlphaThresholdParameters, AOTColorSpaceXformParameters, AOTConstColorParameters,
                  AOTBlendParameters, AOTPerlinNoiseParameters, AOTRectCoverageParameters,
-                 AOTGradientParameters>;
+                 AOTGradientParameters, AOTRRectCoverageParameters>;
 
 // Runtime-selected pointwise operator applied by the fused kernels (PointwiseTail, PointwiseChain
 // and PerlinNoiseFill). The values mirror the OP_* constants in pointwise_op.inc: the kernels
@@ -335,6 +353,9 @@ class AOTNodeBuilder {
 
   bool addRectCoverage(AOTNodeID input, const AOTRectCoverageParameters& parameters,
                        AOTNodeID* output);
+
+  bool addRRectCoverage(AOTNodeID input, const AOTRRectCoverageParameters& parameters,
+                        AOTNodeID* output);
 
   bool addGradientSource(AOTNodeID input, const AOTGradientParameters& parameters,
                          AOTNodeID* output);

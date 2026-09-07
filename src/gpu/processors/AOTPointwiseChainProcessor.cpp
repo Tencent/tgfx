@@ -21,7 +21,15 @@
 
 namespace tgfx {
 namespace {
-static void UploadChainSlot(UniformData* uniformData, size_t index, const AOTChainSlot& slot) {
+// std140 column packing of a 3x3 matrix stored in Matrix::get9 row-major order, mirroring
+// UniformData::setData(const Matrix&) so chain uploads match the same layout.
+static std::array<float, 12> MatrixColumnMajor(const std::array<float, 9>& values) {
+  return {values[0], values[3], values[6], 0.0f,      values[1], values[4],
+          values[7], 0.0f,      values[2], values[5], values[8], 0.0f};
+}
+
+static void UploadChainSlot(UniformData* uniformData, size_t index, const AOTChainSlot& slot,
+                            int rrectOrdinal) {
   int selector = slot.op == AOTChainOp::Blend
                      ? slot.blend.blendMode | (slot.blend.multiplyInputAlpha ? 0x100 : 0)
                      : 0;
@@ -33,6 +41,10 @@ static void UploadChainSlot(UniformData* uniformData, size_t index, const AOTCha
     // Bit 2: coverage-root leaf, modulate by the coverage unit alpha.
     selector =
         slot.textureModulate | (slot.textureAlphaOnly << 1) | (slot.textureModulateUnit << 2);
+  }
+  if (slot.op == AOTChainOp::RRectCoverage) {
+    // Bits 16-19: the slot's ordinal into the CoverageRRect* parameter arrays.
+    selector = rrectOrdinal << 16;
   }
   int packed[] = {static_cast<int>(slot.op), slot.in0, slot.in1, selector};
   uniformData->setArrayElementOptional("SlotPacked", index, packed);
@@ -71,6 +83,33 @@ static void UploadChainSlot(UniformData* uniformData, size_t index, const AOTCha
       const auto& rect = slot.rectCoverage.rect;
       float rectData[] = {rect[0] - 0.5f, rect[1] - 0.5f, rect[2] + 0.5f, rect[3] + 0.5f};
       uniformData->setDataOptional("CoverageRect", rectData);
+      break;
+    }
+    case AOTChainOp::LocalRectCoverage: {
+      // The local rect keeps its exact coordinates; the kernel's AA ramp clamps each edge distance
+      // to half a pixel after mapping through the device-to-local matrix.
+      const auto& params = slot.localRectCoverage;
+      float rectData[] = {params.rect[0], params.rect[1], params.rect[2], params.rect[3]};
+      uniformData->setDataOptional("CoverageLocalRect", rectData);
+      uniformData->setDataOptional("CoverageLocalDeviceToLocal",
+                                   MatrixColumnMajor(params.deviceToLocal));
+      break;
+    }
+    case AOTChainOp::RRectCoverage: {
+      const auto& params = slot.rrectCoverage;
+      float rectData[] = {params.rect[0], params.rect[1], params.rect[2], params.rect[3]};
+      uniformData->setArrayElementOptional("CoverageRRectRect", static_cast<size_t>(rrectOrdinal),
+                                           rectData);
+      uniformData->setArrayElementOptional("CoverageRRectRadiiX", static_cast<size_t>(rrectOrdinal),
+                                           params.radiiX);
+      uniformData->setArrayElementOptional("CoverageRRectRadiiY", static_cast<size_t>(rrectOrdinal),
+                                           params.radiiY);
+      float antiAliasData[] = {params.antiAlias};
+      uniformData->setArrayElementOptional("CoverageRRectAntiAlias",
+                                           static_cast<size_t>(rrectOrdinal), antiAliasData);
+      uniformData->setArrayElementOptional("CoverageRRectDeviceToLocal",
+                                           static_cast<size_t>(rrectOrdinal),
+                                           MatrixColumnMajor(params.deviceToLocal));
       break;
     }
     default:
@@ -153,11 +192,20 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
       return nullptr;
     }
   }
+  int localRectSlots = 0;
+  int rrectSlots = 0;
   for (const auto& slot : slots) {
     if (slot.op == AOTChainOp::None) {
       return nullptr;
     }
     if (slot.op == AOTChainOp::ColorSpaceXform && slot.colorSpaceXform.steps == nullptr) {
+      return nullptr;
+    }
+    // The kernel carries one chain-wide local-rect parameter set and four rrect array elements.
+    if (slot.op == AOTChainOp::LocalRectCoverage && ++localRectSlots > 1) {
+      return nullptr;
+    }
+    if (slot.op == AOTChainOp::RRectCoverage && ++rrectSlots > 4) {
       return nullptr;
     }
     // -1 (the geometry color) is a legitimate blend operand; only an unmapped edge (-2) is invalid.
@@ -270,8 +318,14 @@ void AOTPointwiseChainProcessor::onSetData(UniformData* vertexUniformData,
     int strict = _tiledRecipe.strict ? 1 : 0;
     fragmentUniformData->setDataOptional("TiledStrict", strict);
   }
+  // RRect coverage slots consume the CoverageRRect* arrays in slot order; the upload assigns the
+  // ordinals the same way, so the selector's bits 16-19 match the array element written here.
+  int rrectOrdinal = 0;
   for (size_t index = 0; index < MaxSlots; ++index) {
-    UploadChainSlot(fragmentUniformData, index, slots[index]);
+    UploadChainSlot(fragmentUniformData, index, slots[index], rrectOrdinal);
+    if (slots[index].op == AOTChainOp::RRectCoverage) {
+      ++rrectOrdinal;
+    }
   }
   // The color-space parameters are one shared chain-wide block, so the kernel supports at most one
   // color-space op per chain (enforced by the matcher). The helper writes the same field names the

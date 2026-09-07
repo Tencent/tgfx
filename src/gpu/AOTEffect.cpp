@@ -144,6 +144,14 @@ bool AOTNodeBuilder::addRectCoverage(AOTNodeID input, const AOTRectCoverageParam
   return addUnaryNode(AOTEffectKind::RectCoverage, input, traits, parameters, output);
 }
 
+bool AOTNodeBuilder::addRRectCoverage(AOTNodeID input, const AOTRRectCoverageParameters& parameters,
+                                      AOTNodeID* output) {
+  // Same analytic-coverage traits as the rect form: pointwise, consumes the input color, and the
+  // coverage multiply changes the alpha representation.
+  EffectTraits traits = {EffectDomain::Pointwise, EffectInputUsage::ColorRGBA, false, false, false};
+  return addUnaryNode(AOTEffectKind::RRectCoverage, input, traits, parameters, output);
+}
+
 bool AOTNodeBuilder::addGradientSource(AOTNodeID input, const AOTGradientParameters& parameters,
                                        AOTNodeID* output) {
   // The gradient ignores its input's color but multiplies by the input alpha at the end

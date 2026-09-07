@@ -313,6 +313,7 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
       case AOTEffectKind::ConstColor:
       case AOTEffectKind::Blend:
       case AOTEffectKind::RectCoverage:
+      case AOTEffectKind::RRectCoverage:
       case AOTEffectKind::GradientSource:
         break;
       case AOTEffectKind::GeometryColorOpaqueInput:

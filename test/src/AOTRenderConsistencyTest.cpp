@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <cmath>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -35,6 +36,7 @@
 #include "tgfx/core/Path.h"
 #include "tgfx/core/RRect.h"
 #include "tgfx/core/Shader.h"
+#include "tgfx/core/Shape.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/layers/DisplayList.h"
@@ -1285,6 +1287,165 @@ TGFX_TEST(AOTRenderConsistencyTest, AnalyticClipCoverageModes) {
   ExpectAnalyticClipSceneConsistent("clip-device-rrect-nonaa", AnalyticClipScene::DeviceRRectNonAA);
   ExpectAnalyticClipSceneConsistent("clip-rotated-rrect", AnalyticClipScene::RotatedRRect);
   ExpectAnalyticClipSceneConsistent("clip-rotated-rect", AnalyticClipScene::RotatedRect);
+}
+
+// Chain-route clip coverage forms: a composed multi-clip coverage (a flat Compose of rrect
+// elements, optionally led by a device-space path mask), a shape-masked draw under an analytic
+// clip ([analytic slot, local mask subtree]), and a shader-mask draw under a local rect clip
+// ([xfermode subtree, analytic slot], exercising the blend-root gate relaxation). Each scene
+// renders once with the bundle and once without and must stay byte-identical, with the AOT pass
+// asserting the precompiled route served the draw.
+enum class ChainClipScene {
+  ComposedRRects,
+  PathMaskAndRRects,
+  ShapeMaskUnderRRect,
+  ShapeMaskUnderLocalRect,
+  ShaderMaskUnderLocalRect,
+};
+
+static void RenderChainClipSceneOnce(ChainClipScene scene, bool useBundle, Bitmap* outBitmap,
+                                     ColorFilterRenderStats* outStats) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  if (useBundle) {
+    ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+  } else {
+    cache->unload();
+  }
+  ScopedAOTStatsPause statsPause(context, !useBundle);
+  cache->setDiagnosticRecordingEnabled(false);
+  context->globalCache()->clearPrograms();
+  cache->setDiagnosticRecordingEnabled(true);
+  cache->resetStats();
+  context->globalCache()->clearPrograms();
+  context->globalCache()->resetProgramStats();
+  constexpr int size = 180;
+  auto surface = Surface::Make(context, size, size);
+  ASSERT_TRUE(surface != nullptr);
+  auto* canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  const auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_TRUE(image != nullptr);
+  switch (scene) {
+    case ChainClipScene::ComposedRRects:
+      canvas->clipRRect(RRect::MakeRectXY(Rect::MakeLTRB(16, 20, 150, 120), 22, 30), true);
+      canvas->clipRRect(RRect::MakeRectXY(Rect::MakeLTRB(40, 60, 168, 156), 18, 26), true);
+      canvas->drawImage(image, 26, 26);
+      break;
+    case ChainClipScene::PathMaskAndRRects: {
+      // A curvy clip path cannot fold into an analytic clip, so it contributes a device-space
+      // mask element and the two rrect elements follow as analytic leaves of the same Compose.
+      Path path = {};
+      path.addOval(Rect::MakeLTRB(10, 14, 120, 110));
+      canvas->clipPath(path, true);
+      canvas->clipRRect(RRect::MakeRectXY(Rect::MakeLTRB(30, 40, 160, 140), 24, 18), true);
+      canvas->clipRRect(RRect::MakeRectXY(Rect::MakeLTRB(50, 70, 170, 165), 14, 22), true);
+      canvas->drawImage(image, 26, 26);
+      break;
+    }
+    case ChainClipScene::ShapeMaskUnderRRect: {
+      // A concave star cannot triangulate, so the shape draws through its rasterized alpha mask
+      // (a trailing local-texture coverage) under the rrect clip.
+      Path star = {};
+      for (int i = 0; i < 10; ++i) {
+        float angle = static_cast<float>(i) * 36.0f - 90.0f;
+        float radius = (i % 2 == 0) ? 86.0f : 36.0f;
+        float x = 90.0f + radius * cosf(angle * static_cast<float>(M_PI) / 180.0f);
+        float y = 90.0f + radius * sinf(angle * static_cast<float>(M_PI) / 180.0f);
+        if (i == 0) {
+          star.moveTo(x, y);
+        } else {
+          star.lineTo(x, y);
+        }
+      }
+      star.close();
+      canvas->clipRRect(RRect::MakeRectXY(Rect::MakeLTRB(18, 24, 162, 156), 26, 20), true);
+      Paint shapePaint = {};
+      shapePaint.setColor(Color::Red());
+      canvas->drawShape(Shape::MakeFrom(std::move(star)), shapePaint);
+      break;
+    }
+    case ChainClipScene::ShapeMaskUnderLocalRect: {
+      Path star = {};
+      for (int i = 0; i < 10; ++i) {
+        float angle = static_cast<float>(i) * 36.0f - 90.0f;
+        float radius = (i % 2 == 0) ? 86.0f : 36.0f;
+        float x = 90.0f + radius * cosf(angle * static_cast<float>(M_PI) / 180.0f);
+        float y = 90.0f + radius * sinf(angle * static_cast<float>(M_PI) / 180.0f);
+        if (i == 0) {
+          star.moveTo(x, y);
+        } else {
+          star.lineTo(x, y);
+        }
+      }
+      star.close();
+      canvas->concat(Matrix::MakeTrans(90, 90) * Matrix::MakeRotate(24) *
+                     Matrix::MakeTrans(-90, -90));
+      canvas->clipRect(Rect::MakeLTRB(22, 26, 158, 154), true);
+      canvas->concat(Matrix::MakeTrans(90, 90) * Matrix::MakeRotate(-24) *
+                     Matrix::MakeTrans(-90, -90));
+      Paint shapePaint = {};
+      shapePaint.setColor(Color::Blue());
+      canvas->drawShape(Shape::MakeFrom(std::move(star)), shapePaint);
+      break;
+    }
+    case ChainClipScene::ShaderMaskUnderLocalRect: {
+      // The shader mask filter contributes an xfermode coverage (a blend-rooted subtree) and the
+      // rotated rect clip folds as a local-rect slot on top of it.
+      auto maskShader = Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp);
+      ASSERT_TRUE(maskShader != nullptr);
+      Paint maskPaint = {};
+      maskPaint.setMaskFilter(MaskFilter::MakeShader(maskShader));
+      canvas->concat(Matrix::MakeTrans(90, 90) * Matrix::MakeRotate(18) *
+                     Matrix::MakeTrans(-90, -90));
+      canvas->clipRect(Rect::MakeLTRB(20, 24, 160, 156), true);
+      canvas->concat(Matrix::MakeTrans(90, 90) * Matrix::MakeRotate(-18) *
+                     Matrix::MakeTrans(-90, -90));
+      canvas->drawImage(image, 26, 26, &maskPaint);
+      break;
+    }
+  }
+  context->flushAndSubmit(true);
+  ASSERT_TRUE(outBitmap->allocPixels(size, size));
+  auto* pixels = outBitmap->lockPixels();
+  ASSERT_TRUE(pixels != nullptr);
+  ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+  outBitmap->unlockPixels();
+  if (outStats != nullptr) {
+    outStats->hits = cache->hitCount();
+    outStats->pipelines = cache->aotStageCount(PrecompiledAOTStage::PipelineCreated);
+    outStats->noMatchingRule = cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule);
+    outStats->draws = cache->drawStats();
+    outStats->programs = context->globalCache()->programStats();
+  }
+  cache->setDiagnosticRecordingEnabled(false);
+  cache->unload();
+  context->globalCache()->clearPrograms();
+}
+
+static void ExpectChainClipSceneConsistent(const char* label, ChainClipScene scene) {
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  ColorFilterRenderStats stats = {};
+  RenderChainClipSceneOnce(scene, false, &reference, nullptr);
+  RenderChainClipSceneOnce(scene, true, &candidate, &stats);
+  EXPECT_GE(stats.hits, 1u);
+  EXPECT_GE(stats.pipelines, 1u);
+  EXPECT_EQ(stats.noMatchingRule, 0u);
+  EXPECT_EQ(stats.programs.programBuilderCreations, 0u);
+  ExpectBitmapsIdentical(label, candidate, reference, 180, 180);
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, ChainClipCoverageModes) {
+  ExpectChainClipSceneConsistent("chain-composed-rrects", ChainClipScene::ComposedRRects);
+  ExpectChainClipSceneConsistent("chain-pathmask-rrects", ChainClipScene::PathMaskAndRRects);
+  ExpectChainClipSceneConsistent("chain-shapemask-rrect", ChainClipScene::ShapeMaskUnderRRect);
+  ExpectChainClipSceneConsistent("chain-shapemask-localrect",
+                                 ChainClipScene::ShapeMaskUnderLocalRect);
+  ExpectChainClipSceneConsistent("chain-shadermask-localrect",
+                                 ChainClipScene::ShaderMaskUnderLocalRect);
 }
 
 // An alpha-only texture mask (R8 on Metal) folded into the pointwise chain: the kernel must splat

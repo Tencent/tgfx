@@ -57,6 +57,11 @@ class RectEffect : public FragmentProcessor {
     return !_needTransform;
   }
 
+  /** Maps device coordinates into the rect's local space; identity for the device-space form. */
+  const Matrix& getDeviceToLocal() const {
+    return _deviceToLocal;
+  }
+
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
  protected:

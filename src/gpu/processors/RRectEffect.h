@@ -49,6 +49,27 @@ class RRectEffect : public FragmentProcessor {
     return "RRectEffect";
   }
 
+  bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
+
+  /** The rounded rect in local space, with the axis scales baked in by Make. */
+  const Rect& getLocalRect() const {
+    return localRect;
+  }
+
+  /** Per-corner radii in [TL, TR, BR, BL] order, in the same baked units as getLocalRect(). */
+  const std::array<Point, 4>& getRadii() const {
+    return radii;
+  }
+
+  /** Maps device coordinates into the rrect's local space; identity for the device-space form. */
+  const Matrix& getDeviceToLocal() const {
+    return _deviceToLocal;
+  }
+
+  bool isAntiAlias() const {
+    return antiAlias;
+  }
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 

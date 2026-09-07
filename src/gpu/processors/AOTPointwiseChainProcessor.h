@@ -38,6 +38,8 @@ enum class AOTChainOp : int {
   Blend = 7,
   AARectCoverage = 8,
   Gradient = 9,
+  LocalRectCoverage = 10,
+  RRectCoverage = 11,
 };
 
 /// One node of a pointwise DAG after flattening into the fused kernel's slot array. in0/in1 are
@@ -70,6 +72,14 @@ struct AOTChainSlot {
   // CoverageRect uniform, so at most one slot per chain may carry this op (enforced by the
   // builder).
   AOTRectCoverageParameters rectCoverage = {};
+  // OP_LOCAL_RECT_COVERAGE only: the local-space clip rect. The kernel reads the chain-wide
+  // CoverageLocalRect / CoverageLocalDeviceToLocal uniforms, so at most one slot per chain may
+  // carry this op (enforced by the builder).
+  AOTRectCoverageParameters localRectCoverage = {};
+  // OP_RRECT_COVERAGE only: the rounded-rect parameters. The kernel reads the CoverageRRect*
+  // uniform arrays indexed by the slot's rrect ordinal (assigned in slot order by the builder,
+  // carried in the selector's bits 16-19), so at most four such slots per chain.
+  AOTRRectCoverageParameters rrectCoverage = {};
   // OP_GRADIENT only: layout/colorizer parameters. The kernel reads chain-wide Gradient*
   // uniforms, so at most one slot per chain may carry this op (enforced by the builder).
   AOTGradientParameters gradient = {};

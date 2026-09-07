@@ -35,6 +35,7 @@
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/LumaFragmentProcessor.h"
 #include "gpu/processors/PerlinNoiseFragmentProcessor.h"
+#include "gpu/processors/RRectEffect.h"
 #include "gpu/processors/RectEffect.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
@@ -462,16 +463,68 @@ static bool IsChainFoldableRectEffect(const FragmentProcessor* fp) {
   return rectEffect->isDeviceSpaceRect() && rectEffect->isAntiAlias();
 }
 
+// Analytic clip FPs folded onto the chain as color-root coverage slots (the two-FP coverage
+// forms). The device-space AA rect keeps the existing chain-wide CoverageRect uniform
+// (AARectCoverage); the local-space AA rect and the rrects use the dedicated LocalRectCoverage /
+// RRectCoverage slot ops. The chain kernel carries one chain-wide rect parameter set per space and
+// four rrect array elements, so a coverage exceeding those caps keeps the runtime route.
+struct ChainClipSlots {
+  const RectEffect* deviceRect = nullptr;
+  const RectEffect* localRect = nullptr;
+  std::vector<const RRectEffect*> rrects = {};
+};
+
+// Collects one bare analytic clip leaf (no Compose here — composed coverage lowers through the
+// AOT graph instead). Returns false for anything the chain cannot represent.
+static bool CollectChainClipSlot(const FragmentProcessor* fp, ChainClipSlots* slots) {
+  if (fp == nullptr || slots == nullptr || fp->numChildProcessors() != 0) {
+    return false;
+  }
+  if (fp->name() == "RectEffect") {
+    auto* rectEffect = static_cast<const RectEffect*>(fp);
+    if (!rectEffect->isAntiAlias()) {
+      return false;
+    }
+    if (rectEffect->isDeviceSpaceRect()) {
+      if (slots->deviceRect != nullptr) {
+        return false;
+      }
+      slots->deviceRect = rectEffect;
+    } else {
+      if (slots->localRect != nullptr) {
+        return false;
+      }
+      slots->localRect = rectEffect;
+    }
+    return true;
+  }
+  if (fp->name() == "RRectEffect") {
+    if (slots->rrects.size() >= 4) {
+      return false;
+    }
+    slots->rrects.push_back(static_cast<const RRectEffect*>(fp));
+    return true;
+  }
+  return false;
+}
+
+// Whether a Matrix::get9 row-major array is the identity matrix.
+static bool IsIdentityMatrix(const std::array<float, 9>& values) {
+  return values[0] == 1.0f && values[1] == 0.0f && values[2] == 0.0f && values[3] == 0.0f &&
+         values[4] == 1.0f && values[5] == 0.0f && values[6] == 0.0f && values[7] == 0.0f &&
+         values[8] == 1.0f;
+}
+
 // Flattens a single-pass pointwise DAG into the fused chain processor. Texture leaves are placed
 // in the leading slots so that slot k pairs with TextureSampler_k, which keeps sampler indexing
-// static in the kernel; the remaining nodes follow in topological order. When rectEffect is given,
-// an AARectCoverage slot multiplying the previous root is appended and becomes the new root.
-// When coverageGraph is given, its nodes (lowered from the coverage FP with the GeometryCoverage
-// unit as origin) are merged after the color nodes: coverage leaves extend the leading texture
-// block, coverage ops trail the color ops, and coverageRoot becomes the chain's coverage root.
+// static in the kernel. When clipSlots carries analytic clip FPs, their coverage slots multiply
+// the previous root and the last one becomes the new root. When coverageGraph is given, its nodes
+// (lowered from the coverage FP with the GeometryCoverage unit as origin) are merged after the
+// color nodes: coverage leaves extend the leading texture block, coverage ops trail the color ops,
+// and coverageRoot becomes the chain's coverage root.
 static PlacementPtr<FragmentProcessor> BuildChainFP(
     BlockAllocator* allocator, const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
-    const RectEffect* rectEffect, const DeviceSpaceTextureEffect* maskEffect,
+    const ChainClipSlots& clipSlots, const DeviceSpaceTextureEffect* maskEffect,
     const AOTEffectGraph* coverageGraph = nullptr, AOTNodeID coverageRoot = AOTNodeID(),
     bool coverageLeafFromUVCoord = false) {
   // Combined node space: color-graph nodes occupy [0, colorCount), coverage-graph nodes follow.
@@ -561,6 +614,7 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
   int tiledLeafIndex = -1;
   AOTTiledTextureRecipe tiledRecipe = {};
   bool hasRectCoverage = false;
+  bool hasLocalRectCoverage = false;
   bool hasGradient = false;
   std::vector<AOTChainSlot> slots(ordered.size());
   // All-ones reproduces the legacy behavior (every target reads the uvCoord attribute when the GP
@@ -674,14 +728,36 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
         if (parameters == nullptr || node->inputs.size() != 1) {
           return nullptr;
         }
-        // The kernel carries one chain-wide CoverageRect uniform, so a second rect-coverage node
-        // cannot be represented.
-        if (hasRectCoverage) {
+        if (IsIdentityMatrix(parameters->deviceToLocal)) {
+          // The kernel carries one chain-wide CoverageRect uniform, so a second device-space
+          // rect-coverage node cannot be represented.
+          if (hasRectCoverage) {
+            return nullptr;
+          }
+          hasRectCoverage = true;
+          slot.op = AOTChainOp::AARectCoverage;
+          slot.rectCoverage = *parameters;
+        } else {
+          // Same for the local-space form through the CoverageLocalRect uniform set.
+          if (hasLocalRectCoverage) {
+            return nullptr;
+          }
+          hasLocalRectCoverage = true;
+          slot.op = AOTChainOp::LocalRectCoverage;
+          slot.localRectCoverage = *parameters;
+        }
+        slot.in0 = mapInput(node->inputs[0]);
+        break;
+      }
+      case AOTEffectKind::RRectCoverage: {
+        auto parameters = std::get_if<AOTRRectCoverageParameters>(&node->parameters);
+        if (parameters == nullptr || node->inputs.size() != 1) {
           return nullptr;
         }
-        hasRectCoverage = true;
-        slot.op = AOTChainOp::AARectCoverage;
-        slot.rectCoverage = *parameters;
+        // The kernel carries four CoverageRRect* array elements; AOTPointwiseChainProcessor::Make
+        // rejects a fifth rrect slot.
+        slot.op = AOTChainOp::RRectCoverage;
+        slot.rrectCoverage = *parameters;
         slot.in0 = mapInput(node->inputs[0]);
         break;
       }
@@ -787,16 +863,21 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
   int coverageRootSlot = -1;
   if (coverageGraph != nullptr) {
     // Acceptance gate, kept tight to the byte-verified shapes. Accepted roots: a single blend
-    // consuming the unit input (the xfer-dst coverage family), or a bare texture leaf consuming
-    // the unit (a local mask fill, modulated by the unit alpha through selector bit 2). The unit
-    // may otherwise feed only texture leaves (their input is unused — blend operands sample raw)
-    // and the gradient (a blend child, so it reads the opaque -4 designator). Compose-wrapped
-    // chains and two-child blends keep the plain route rather than risking a wrong value when
-    // the GP coverage is below 1.0.
+    // consuming the unit input (the xfer-dst coverage family), a bare texture leaf consuming the
+    // unit (a local mask fill, modulated by the unit alpha through selector bit 2), or an analytic
+    // coverage node (RectCoverage / RRectCoverage) closing a chain that starts at the unit. The
+    // unit may otherwise feed only texture leaves (their input is unused — blend operands sample
+    // raw), the gradient (a blend child, so it reads the opaque -4 designator), and analytic
+    // coverage nodes. Analytic clip slots may multiply a blend-rooted subtree: the scalar coverage
+    // commutes with the pointwise blend result, so the product matches the runtime chain order
+    // (verified differentially). Two-child blends keep the plain route rather than risking a wrong
+    // value when the GP coverage is below 1.0.
     auto* covRootNode = nodes[covRootCombined];
     const bool rootIsBlend = covRootNode->kind == AOTEffectKind::Blend;
     const bool rootIsTexture = covRootNode->kind == AOTEffectKind::TextureSource;
-    if ((!rootIsBlend && !rootIsTexture) || (rectEffect != nullptr && !rootIsTexture)) {
+    const bool rootIsAnalytic = covRootNode->kind == AOTEffectKind::RectCoverage ||
+                                covRootNode->kind == AOTEffectKind::RRectCoverage;
+    if (!rootIsBlend && !rootIsTexture && !rootIsAnalytic) {
       return nullptr;
     }
     int coverageBlendCount = 0;
@@ -816,13 +897,20 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
           continue;
         }
         if (node->kind != AOTEffectKind::TextureSource &&
-            node->kind != AOTEffectKind::GradientSource) {
+            node->kind != AOTEffectKind::GradientSource &&
+            node->kind != AOTEffectKind::RectCoverage &&
+            node->kind != AOTEffectKind::RRectCoverage) {
           rejected = true;
           break;
         }
       }
     }
-    if (rejected || coverageBlendCount != (rootIsBlend ? 1 : 0) || !rootConsumesUnit) {
+    // An analytic root consumes the previous analytic node rather than the unit, but the chain
+    // still transmits the unit coverage transitively, so the root-consumes-unit requirement only
+    // applies to the blend and texture roots (the blend-count rule already rejects blends under
+    // an analytic root).
+    if (rejected || coverageBlendCount != (rootIsBlend ? 1 : 0) ||
+        (!rootConsumesUnit && !rootIsAnalytic)) {
       return nullptr;
     }
     auto covSlot = slotOf[covRootCombined];
@@ -831,17 +919,55 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
     }
     coverageRootSlot = static_cast<int>(covSlot);
   }
-  if (rectEffect != nullptr) {
+  // The narrow clip slots multiply the color root; each appended slot becomes the new root.
+  if (clipSlots.deviceRect != nullptr) {
     if (slots.size() >= AOTPointwiseChainProcessor::MaxSlots) {
       return nullptr;
     }
     AOTChainSlot rectSlot = {};
     rectSlot.op = AOTChainOp::AARectCoverage;
-    const auto& rect = rectEffect->getRect();
+    const auto& rect = clipSlots.deviceRect->getRect();
     rectSlot.rectCoverage.rect = {rect.left, rect.top, rect.right, rect.bottom};
     rectSlot.in0 = static_cast<int>(rootIndex);
     rootIndex = slots.size();
     slots.push_back(rectSlot);
+  }
+  if (clipSlots.localRect != nullptr) {
+    if (slots.size() >= AOTPointwiseChainProcessor::MaxSlots) {
+      return nullptr;
+    }
+    AOTChainSlot localRectSlot = {};
+    localRectSlot.op = AOTChainOp::LocalRectCoverage;
+    const auto& rect = clipSlots.localRect->getRect();
+    localRectSlot.localRectCoverage.rect = {rect.left, rect.top, rect.right, rect.bottom};
+    const auto& matrix = clipSlots.localRect->getDeviceToLocal();
+    localRectSlot.localRectCoverage.deviceToLocal = {matrix[0], matrix[1], matrix[2],
+                                                     matrix[3], matrix[4], matrix[5],
+                                                     matrix[6], matrix[7], matrix[8]};
+    localRectSlot.in0 = static_cast<int>(rootIndex);
+    rootIndex = slots.size();
+    slots.push_back(localRectSlot);
+  }
+  for (auto* rrectEffect : clipSlots.rrects) {
+    if (slots.size() >= AOTPointwiseChainProcessor::MaxSlots) {
+      return nullptr;
+    }
+    AOTChainSlot rrectSlot = {};
+    rrectSlot.op = AOTChainOp::RRectCoverage;
+    const auto& rect = rrectEffect->getLocalRect();
+    rrectSlot.rrectCoverage.rect = {rect.left, rect.top, rect.right, rect.bottom};
+    const auto& radii = rrectEffect->getRadii();
+    for (size_t i = 0; i < 4; ++i) {
+      rrectSlot.rrectCoverage.radiiX[i] = radii[i].x;
+      rrectSlot.rrectCoverage.radiiY[i] = radii[i].y;
+    }
+    const auto& matrix = rrectEffect->getDeviceToLocal();
+    rrectSlot.rrectCoverage.deviceToLocal = {matrix[0], matrix[1], matrix[2], matrix[3], matrix[4],
+                                             matrix[5], matrix[6], matrix[7], matrix[8]};
+    rrectSlot.rrectCoverage.antiAlias = rrectEffect->isAntiAlias() ? 1.0f : 0.0f;
+    rrectSlot.in0 = static_cast<int>(rootIndex);
+    rootIndex = slots.size();
+    slots.push_back(rrectSlot);
   }
   PlacementPtr<FragmentProcessor> maskChild = nullptr;
   if (maskEffect != nullptr) {
@@ -899,7 +1025,8 @@ static PlacementPtr<FragmentProcessor> BuildFPForPass(
     return AOTPointwiseTailProcessor::Make(allocator, std::move(current), slots);
   }
   if (pass.kernel == AOTKernelKind::PointwiseChain) {
-    return BuildChainFP(allocator, graph, pass, nullptr, nullptr);
+    ChainClipSlots emptyClipSlots = {};
+    return BuildChainFP(allocator, graph, pass, emptyClipSlots, nullptr);
   }
   if (pass.kernel == AOTKernelKind::PerlinNoiseFill) {
     // A PerlinNoiseFill pass is always the plan's first pass and consumes no upstream texture: the
@@ -1121,55 +1248,129 @@ PlacementPtr<FragmentProcessor> AOTPlanExecutor::BuildPerlinNoiseFP(BlockAllocat
   return BuildPerlinNoiseFillFP(allocator, graph, pass);
 }
 
+// Single-FP analytic coverage beyond the narrow forms: a bare AA RectEffect (local space), a bare
+// RRectEffect, or a flat Compose of AA rect / rrect leaves with at most one alpha-only device-space
+// mask (extracted as the mask child — the kernel cannot sample a device-space leaf inside the
+// coverage subtree). The analytic leaves lower through the AOT graph as chained RectCoverage /
+// RRectCoverage nodes rooted at the GP coverage unit, which is what makes composed multi-clip
+// coverage representable at all. Returns false when the coverage carries anything else.
+static bool LowerAnalyticCoverageFP(const FragmentProcessor* fp,
+                                    const DeviceSpaceTextureEffect** maskEffect,
+                                    AOTNodeBuilder* covBuilder, AOTNodeID* covRoot) {
+  if (fp == nullptr || maskEffect == nullptr || covBuilder == nullptr || covRoot == nullptr) {
+    return false;
+  }
+  std::vector<const FragmentProcessor*> leaves = {};
+  if (fp->name() == "ComposeFragmentProcessor") {
+    for (size_t i = 0; i < fp->numChildProcessors(); ++i) {
+      leaves.push_back(fp->childProcessor(i));
+    }
+  } else {
+    leaves.push_back(fp);
+  }
+  std::vector<const FragmentProcessor*> analytic = {};
+  for (auto* leaf : leaves) {
+    if (leaf->name() == "DeviceSpaceTextureEffect") {
+      auto* dste = static_cast<const DeviceSpaceTextureEffect*>(leaf);
+      if (*maskEffect != nullptr || !dste->isAlphaOnly() || dste->hasPerspective()) {
+        return false;
+      }
+      *maskEffect = dste;
+      continue;
+    }
+    analytic.push_back(leaf);
+  }
+  if (analytic.empty()) {
+    return false;
+  }
+  AOTNodeID unit = AOTNodeID::Invalid();
+  if (!covBuilder->addGeometryCoverage(&unit)) {
+    return false;
+  }
+  AOTNodeID current = unit;
+  for (auto* leaf : analytic) {
+    if ((leaf->name() != "RectEffect" && leaf->name() != "RRectEffect") ||
+        leaf->numChildProcessors() != 0) {
+      return false;
+    }
+    AOTNodeID next = AOTNodeID::Invalid();
+    if (!leaf->lowerToAOT(covBuilder, current, &next)) {
+      return false;
+    }
+    current = next;
+  }
+  if (current == unit) {
+    return false;
+  }
+  *covRoot = current;
+  return true;
+}
+
 PlacementPtr<FragmentProcessor> AOTPlanExecutor::BuildChainProcessor(
     BlockAllocator* allocator, const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
     const std::vector<const FragmentProcessor*>& coverageFPs, bool coverageLeafFromUVCoord) {
   if (pass.kernel != AOTKernelKind::PointwiseChain) {
     return nullptr;
   }
+  ChainClipSlots clipSlots = {};
   if (coverageFPs.empty()) {
-    return BuildChainFP(allocator, graph, pass, nullptr, nullptr);
+    return BuildChainFP(allocator, graph, pass, clipSlots, nullptr);
   }
   if (coverageFPs.size() > 2) {
     return nullptr;
   }
   // Normalize the coverage into the forms the chain kernel carries. The narrow forms come first:
   // a bare device-space AA RectEffect folds into an AARectCoverage slot, an alpha-only
-  // DeviceSpaceTextureEffect becomes the mask child, and Compose(mask, rect) yields both. Anything
-  // else is lowered as a general coverage subtree (a pointwise DAG rooted at the GP coverage
-  // unit). A two-FP coverage is accepted as [lowerable subtree, alpha-only device mask] and folds
-  // to subtree + mask child.
-  const RectEffect* rectEffect = nullptr;
+  // DeviceSpaceTextureEffect becomes the mask child, and Compose(mask, rect) yields both.
+  // Analytic coverage the narrow forms cannot express — rrects, local-space rects, composed
+  // multi-clip chains — lowers through the AOT graph as RectCoverage / RRectCoverage nodes rooted
+  // at the GP coverage unit. Anything else lowers as a general coverage subtree. A two-FP coverage
+  // folds as [analytic slots / mask, texture subtree] or [texture subtree, analytic slots / mask]
+  // depending on which position carries the subtree.
   const DeviceSpaceTextureEffect* maskEffect = nullptr;
-  const FragmentProcessor* subtreeFP = coverageFPs.front();
+  const FragmentProcessor* subtreeFP = nullptr;
   if (coverageFPs.size() == 1) {
-    auto coverageName = subtreeFP->name();
-    if (coverageName == "RectEffect" && IsChainFoldableRectEffect(subtreeFP)) {
-      rectEffect = static_cast<const RectEffect*>(subtreeFP);
-      return BuildChainFP(allocator, graph, pass, rectEffect, nullptr);
+    auto* coverage = coverageFPs.front();
+    auto coverageName = coverage->name();
+    if (coverageName == "RectEffect" && IsChainFoldableRectEffect(coverage)) {
+      clipSlots.deviceRect = static_cast<const RectEffect*>(coverage);
+      return BuildChainFP(allocator, graph, pass, clipSlots, nullptr);
     }
     if (coverageName == "DeviceSpaceTextureEffect") {
-      maskEffect = static_cast<const DeviceSpaceTextureEffect*>(subtreeFP);
+      maskEffect = static_cast<const DeviceSpaceTextureEffect*>(coverage);
       if (!maskEffect->isAlphaOnly() || maskEffect->hasPerspective()) {
         return nullptr;
       }
-      return BuildChainFP(allocator, graph, pass, nullptr, maskEffect);
+      return BuildChainFP(allocator, graph, pass, clipSlots, maskEffect);
     }
-    if (coverageName == "ComposeFragmentProcessor" && subtreeFP->numChildProcessors() == 2 &&
-        subtreeFP->childProcessor(0)->name() == "DeviceSpaceTextureEffect" &&
-        IsChainFoldableRectEffect(subtreeFP->childProcessor(1))) {
-      maskEffect = static_cast<const DeviceSpaceTextureEffect*>(subtreeFP->childProcessor(0));
-      rectEffect = static_cast<const RectEffect*>(subtreeFP->childProcessor(1));
+    if (coverageName == "ComposeFragmentProcessor" && coverage->numChildProcessors() == 2 &&
+        coverage->childProcessor(0)->name() == "DeviceSpaceTextureEffect" &&
+        IsChainFoldableRectEffect(coverage->childProcessor(1))) {
+      maskEffect = static_cast<const DeviceSpaceTextureEffect*>(coverage->childProcessor(0));
+      clipSlots.deviceRect = static_cast<const RectEffect*>(coverage->childProcessor(1));
       if (!maskEffect->isAlphaOnly() || maskEffect->hasPerspective()) {
         return nullptr;
       }
-      return BuildChainFP(allocator, graph, pass, rectEffect, maskEffect);
+      return BuildChainFP(allocator, graph, pass, clipSlots, maskEffect);
     }
+    AOTNodeBuilder covBuilder = {};
+    AOTNodeID covRoot = AOTNodeID::Invalid();
+    if (LowerAnalyticCoverageFP(coverage, &maskEffect, &covBuilder, &covRoot)) {
+      AOTEffectGraph covGraph = {};
+      if (!covBuilder.finish(covRoot, &covGraph)) {
+        return nullptr;
+      }
+      return BuildChainFP(allocator, graph, pass, clipSlots, maskEffect, &covGraph, covRoot,
+                          coverageLeafFromUVCoord);
+    }
+    subtreeFP = coverage;
   } else {
     // Two-FP coverage: the terminal FP decides the form. A trailing alpha-only device mask keeps
-    // the mask-child role and the first FP lowers as the subtree; a trailing local texture is the
-    // subtree root (a bare local mask, accepted by the gate only when the texture is already
-    // instantiated), with the first FP folding as a rect slot or mask child.
+    // the mask-child role and the first FP lowers as the subtree (or folds as an analytic slot);
+    // a trailing local texture is the subtree root (a bare local mask, accepted by the gate only
+    // when the texture is already instantiated), with the first FP folding as analytic clip slots
+    // or the mask child; a trailing analytic clip leaf folds as clip slots with the first FP
+    // lowering as the subtree.
     auto* last = coverageFPs.back();
     auto* first = coverageFPs.front();
     if (last->name() == "DeviceSpaceTextureEffect") {
@@ -1177,10 +1378,19 @@ PlacementPtr<FragmentProcessor> AOTPlanExecutor::BuildChainProcessor(
       if (!maskEffect->isAlphaOnly() || maskEffect->hasPerspective()) {
         return nullptr;
       }
+      if (first->name() == "RectEffect" || first->name() == "RRectEffect") {
+        if (!CollectChainClipSlot(first, &clipSlots)) {
+          return nullptr;
+        }
+      } else {
+        subtreeFP = first;
+      }
     } else if (last->name() == "TextureEffect") {
       subtreeFP = last;
-      if (IsChainFoldableRectEffect(first)) {
-        rectEffect = static_cast<const RectEffect*>(first);
+      if (first->name() == "RectEffect" || first->name() == "RRectEffect") {
+        if (!CollectChainClipSlot(first, &clipSlots)) {
+          return nullptr;
+        }
       } else if (first->name() == "DeviceSpaceTextureEffect") {
         maskEffect = static_cast<const DeviceSpaceTextureEffect*>(first);
         if (!maskEffect->isAlphaOnly() || maskEffect->hasPerspective()) {
@@ -1189,9 +1399,23 @@ PlacementPtr<FragmentProcessor> AOTPlanExecutor::BuildChainProcessor(
       } else {
         return nullptr;
       }
+    } else if (last->name() == "RectEffect" || last->name() == "RRectEffect") {
+      if (!CollectChainClipSlot(last, &clipSlots)) {
+        return nullptr;
+      }
+      subtreeFP = first;
     } else {
       return nullptr;
     }
+  }
+  if (subtreeFP == nullptr) {
+    // A two-FP [analytic slots, device mask] coverage carries no texture subtree; the slots and
+    // the mask child are the whole coverage.
+    if (clipSlots.deviceRect == nullptr && clipSlots.localRect == nullptr &&
+        clipSlots.rrects.empty()) {
+      return nullptr;
+    }
+    return BuildChainFP(allocator, graph, pass, clipSlots, maskEffect);
   }
   // General coverage subtree: lower the FP with the GP coverage unit as its input. BuildChainFP
   // applies the acceptance gate (single root blend consuming the unit) before merging.
@@ -1210,7 +1434,7 @@ PlacementPtr<FragmentProcessor> AOTPlanExecutor::BuildChainProcessor(
   if (!covBuilder.finish(covRoot, &covGraph)) {
     return nullptr;
   }
-  return BuildChainFP(allocator, graph, pass, rectEffect, maskEffect, &covGraph, covRoot,
+  return BuildChainFP(allocator, graph, pass, clipSlots, maskEffect, &covGraph, covRoot,
                       coverageLeafFromUVCoord);
 }
 

@@ -21,6 +21,8 @@
 #define OP_BLEND 7
 #define OP_AARECT_COVERAGE 8
 #define OP_GRADIENT 9
+#define OP_LOCAL_RECT_COVERAGE 10
+#define OP_RRECT_COVERAGE 11
 
 #define CS_UNPREMUL 1
 #define CS_LINEARIZE 2
@@ -35,6 +37,8 @@
 #include "gradient_colorize.inc"
 
 #include "transfer_function.inc"
+
+#include "analytic_clip_math.inc"
 
 // ColorSpaceXform transfer functions bound to the shared chain-wide parameter block.
 float chainSrcTF(float x) {
@@ -131,6 +135,22 @@ vec4 evalChainSlot(int slot) {
         clamp(vec4(1.0, 1.0, -1.0, -1.0) * vec4(gl_FragCoord.xyxy - CoverageRect), 0.0, 1.0);
     highp vec2 dists2 = dists4.xy + dists4.zw - 1.0;
     return in0 * (dists2.x * dists2.y);
+  }
+  if (Packed.x == OP_LOCAL_RECT_COVERAGE) {
+    // Analytic AA-rect coverage in the clip's local space: map gl_FragCoord through the
+    // device-to-local matrix, then the shared separable half-pixel ramp.
+    return in0 *
+           vec4(analyticLocalRectCoverage(CoverageLocalRect, CoverageLocalDeviceToLocal));
+  }
+  if (Packed.x == OP_RRECT_COVERAGE) {
+    // Analytic rrect coverage; bits 16-19 of the selector carry this slot's ordinal into the
+    // CoverageRRect* parameter arrays.
+    int rrectOrdinal = (Packed.w >> 16) & 0xF;
+    return in0 * vec4(analyticRRectCoverage(CoverageRRectRect[rrectOrdinal],
+                                            CoverageRRectRadiiX[rrectOrdinal],
+                                            CoverageRRectRadiiY[rrectOrdinal],
+                                            CoverageRRectAntiAlias[rrectOrdinal],
+                                            CoverageRRectDeviceToLocal[rrectOrdinal]));
   }
   if (Packed.x == OP_GRADIENT) {
     // Analytic gradient source. The layout math and border clamp are verbatim from the dedicated
