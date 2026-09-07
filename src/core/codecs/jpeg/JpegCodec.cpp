@@ -423,6 +423,14 @@ std::shared_ptr<Data> JpegCodec::Encode(const Pixmap& pixmap, int quality) {
       break;
   }
   jpeg_set_defaults(&cinfo);
+  // libjpeg defaults to 4:2:0 chroma subsampling, which cannot represent thin colored lines:
+  // a 1px stroke whose luma is close to its surroundings loses its color entirely. All current
+  // JPEG encode consumers export design content (strokes, text, edges), so keep full-resolution
+  // chroma (4:4:4).
+  for (int i = 0; i < cinfo.num_components; i++) {
+    cinfo.comp_info[i].h_samp_factor = 1;
+    cinfo.comp_info[i].v_samp_factor = 1;
+  }
   cinfo.optimize_coding = TRUE;
   jpeg_set_quality(&cinfo, quality, TRUE);
   jpeg_start_compress(&cinfo, TRUE);

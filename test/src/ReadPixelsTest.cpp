@@ -463,6 +463,41 @@ TGFX_TEST(ReadPixelsTest, WebpCodec) {
   CHECK_PIXELS(RGB565Info, pixels, "WebpCodec_Encode_RGB565");
 }
 
+TGFX_TEST(ReadPixelsTest, JpegCodecFullChroma) {
+  // 4:4:4 chroma keeps thin colored lines: a 1px red stroke on similar-luma dark gray keeps its
+  // color after a quality-100 round trip, while 4:2:0 subsampling smears the stroke's chroma
+  // into the background (the line's luma is nearly identical to the background's).
+  auto info = ImageInfo::Make(64, 9, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  Buffer buffer(info.byteSize());
+  auto pixels = buffer.data();
+  ASSERT_TRUE(pixels);
+  for (int y = 0; y < info.height(); y++) {
+    for (int x = 0; x < info.width(); x++) {
+      static_cast<uint32_t*>(pixels)[y * info.width() + x] = y == 4 ? 0xFFF50707 : 0xFF38393D;
+    }
+  }
+  auto bytes = ImageCodec::Encode(Pixmap(info, pixels), EncodedFormat::JPEG, 100);
+  auto codec = ImageCodec::MakeFrom(bytes);
+  ASSERT_TRUE(codec != nullptr);
+  auto RGBAInfo = ImageInfo::Make(codec->width(), codec->height(), ColorType::RGBA_8888,
+                                  AlphaType::Premultiplied, 0, codec->colorSpace());
+  buffer.clear();
+  buffer.alloc(RGBAInfo.byteSize());
+  pixels = buffer.data();
+  ASSERT_TRUE(pixels);
+  EXPECT_TRUE(codec->readPixels(RGBAInfo, pixels));
+  auto channelSpread = [&](int x, int y) {
+    auto pixel = static_cast<const uint8_t*>(pixels) + (y * RGBAInfo.width() + x) * 4;
+    auto max = std::max(pixel[0], std::max(pixel[1], pixel[2]));
+    auto min = std::min(pixel[0], std::min(pixel[1], pixel[2]));
+    return max - min;
+  };
+  // The stroke line must stay strongly colored; the background must stay neutral.
+  EXPECT_GT(channelSpread(32, 4), 180);
+  EXPECT_LT(channelSpread(32, 1), 30);
+  EXPECT_LT(channelSpread(32, 7), 30);
+}
+
 TGFX_TEST(ReadPixelsTest, JpegCodec) {
   auto rgbaCodec = MakeImageCodec("resources/apitest/imageReplacement.jpg");
   auto colorSpace = rgbaCodec->colorSpace();
