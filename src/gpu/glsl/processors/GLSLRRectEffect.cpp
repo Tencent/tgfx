@@ -150,8 +150,18 @@ void GLSLRRectEffect::onSetData(UniformData*, UniformData* fragmentUniformData) 
   fragmentUniformData->setData("RadiiY", radiiYValues);
   const float antiAliasValue = antiAlias ? 1.0f : 0.0f;
   fragmentUniformData->setData("AntiAlias", antiAliasValue);
-  if (needTransform()) {
+  // The precompiled clip contract always declares DeviceToLocal (identity for a device-space
+  // rrect), so upload it whenever the field exists; the JIT block only declares it when a
+  // transform applies.
+  if (fragmentUniformData->hasField("DeviceToLocal")) {
     fragmentUniformData->setData("DeviceToLocal", deviceToLocal());
+  }
+  // The precompiled clip contract selects the rrect kernel branch through HasClip == 2; the
+  // LocalRect/RadiiX/RadiiY/AntiAlias/DeviceToLocal fields above share names with the JIT block,
+  // so those uploads already populate the contract.
+  if (fragmentUniformData->hasField("HasClip")) {
+    int hasClip = 2;
+    fragmentUniformData->setData("HasClip", hasClip);
   }
 }
 

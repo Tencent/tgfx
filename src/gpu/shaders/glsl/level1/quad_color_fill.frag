@@ -17,6 +17,7 @@
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Rect;
   int HasClip;
+#include "rrect_clip_uniforms.inc"
   // Exact paint color for uniform-color draws. The per-vertex color attribute is UByte4Normalized
   // and loses precision on fractional colors, so the geometry processor's exact Color uniform is
   // preferred when HasCommonColor is set; otherwise the vColor varying is used (matching the
@@ -45,7 +46,7 @@ layout(set = 1, binding = 0) uniform sampler2D MaskTextureSampler;
 #endif
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
-#include "aa_rect_clip_coverage.inc"
+#include "clip_coverage.inc"
 
 layout(location = 0) out vec4 fragColor;
 
@@ -55,7 +56,7 @@ void main() {
   highp vec3 maskCoord = DeviceCoordMatrix * vec3(gl_FragCoord.xy, 1.0);
   maskAlpha = texture(MaskTextureSampler, maskCoord.xy).r;
 #endif
-  float totalCoverage = vCoverage * maskAlpha * aaRectClipCoverage();
+  float totalCoverage = vCoverage * maskAlpha * clipCoverage();
 
   // Prefer the exact common-color uniform when the draw has one (uniform-color batch); the vColor
   // attribute is quantized to 8 bits per channel and cannot represent fractional colors exactly.

@@ -129,19 +129,21 @@ static bool IsLocalMaskChild(const FragmentProcessor* child) {
   return false;
 }
 
-// A RectEffect serves as chain/AARect coverage only in its device-space AA form: the AOT
-// shaders carry device-space rect parameters and analytic AA.
+// A RectEffect serves as chain/AARect coverage in its AA form; both spaces are accepted because
+// the runtime clip contract carries a DeviceToLocal matrix (identity for the device-space form).
+// NonAA rects keep the hard-edge step math out of the contract and stay on the fallback route.
 static bool IsFoldableAARectEffect(const FragmentProcessor* fp) {
   if (fp == nullptr || fp->name() != "RectEffect" || fp->numChildProcessors() != 0) {
     return false;
   }
   auto rectEffect = static_cast<const RectEffect*>(fp);
-  return rectEffect->isDeviceSpaceRect() && rectEffect->isAntiAlias();
+  return rectEffect->isAntiAlias();
 }
 
 enum class CoverageKind {
   None,
   AARect,
+  RRect,
   DeviceMask,
   LocalMask,
 };
@@ -163,6 +165,12 @@ static std::optional<CoverageKind> ClassifyCoverageFP(const ProgramInfo* program
   if (coverageName == "RectEffect" && IsFoldableAARectEffect(coverageFP)) {
     return CoverageKind::AARect;
   }
+  if (coverageName == "RRectEffect" && coverageFP->numChildProcessors() == 0) {
+    // Every rrect parameter rides the runtime clip contract (LocalRect/RadiiX/RadiiY/AntiAlias/
+    // DeviceToLocal), so any leaf RRectEffect classifies without extra conditions; perspective
+    // and degenerate matrices were already rejected at construction.
+    return CoverageKind::RRect;
+  }
   if (coverageName == "XfermodeFragmentProcessor - dst") {
     // Only the non-inverted ShaderMaskFilter is input * mask.a (SrcIn). The inverted SrcOut form
     // needs 1 - mask.a, which the local-mask kernel does not implement.
@@ -183,21 +191,25 @@ static std::optional<CoverageKind> ClassifyCoverageFP(const ProgramInfo* program
   return std::nullopt;
 }
 
-// Direct AARect coverage is the sole coverage FP, not a composed child. Keeping this test separate
-// from ClassifyCoverageFP prevents Compose(DeviceSpaceTextureEffect, RectEffect) from silently
-// losing its rect component by being treated as a device mask.
-static bool HasDirectAARectCoverage(const ProgramInfo* programInfo) {
+// Direct analytic clip coverage is the sole coverage FP, not a composed child. Keeping this test
+// separate from ClassifyCoverageFP prevents Compose(DeviceSpaceTextureEffect, RectEffect) from
+// silently losing its rect component by being treated as a device mask.
+static bool HasDirectAnalyticClipCoverage(const ProgramInfo* programInfo) {
   auto numColorFP = programInfo->numColorFragmentProcessors();
   if (programInfo->numFragmentProcessors() != numColorFP + 1) {
     return false;
   }
   auto coverageFP = programInfo->getFragmentProcessor(numColorFP);
-  return IsFoldableAARectEffect(coverageFP);
+  auto coverageName = coverageFP->name();
+  if (coverageName == "RectEffect") {
+    return IsFoldableAARectEffect(coverageFP);
+  }
+  return coverageName == "RRectEffect" && coverageFP->numChildProcessors() == 0;
 }
 
-// AARect coverage changes only fragment math, whereas a device-space mask adds a sampler and shifts
-// the terminal XP binding. Kernels using the runtime clip contract therefore compile only this ABI
-// distinction and carry the rect state through Rect / HasClip uniforms.
+// Analytic clip coverage (AA rect or rrect) changes only fragment math, whereas a device-space
+// mask adds a sampler and shifts the terminal XP binding. Kernels using the runtime clip contract
+// therefore compile only this ABI distinction and carry the clip state through uniforms.
 static std::optional<int> SharedDeviceMaskValue(const ProgramInfo* programInfo) {
   auto coverage = ClassifyCoverageFP(programInfo);
   if (!coverage || *coverage == CoverageKind::LocalMask) {
@@ -373,9 +385,11 @@ static std::optional<PermutationMatchResult> TryMatchSolidColorFill(
   }
   // The fill color comes from the DefaultGeometryProcessor Color uniform, so a color fragment
   // processor would be silently dropped and must reject. The only accepted FP is one direct
-  // analytic AARect clip coverage FP, which this shader evaluates from fragment uniforms.
+  // analytic clip coverage FP (AA rect or rrect), which this shader evaluates from the runtime
+  // clip contract uniforms.
   if (programInfo->numFragmentProcessors() != 0 &&
-      (programInfo->numColorFragmentProcessors() != 0 || !HasDirectAARectCoverage(programInfo))) {
+      (programInfo->numColorFragmentProcessors() != 0 ||
+       !HasDirectAnalyticClipCoverage(programInfo))) {
     return std::nullopt;
   }
   auto* dgp = static_cast<const DefaultGeometryProcessor*>(gp);
@@ -433,14 +447,14 @@ static std::optional<PermutationMatchResult> TryMatchQuadColorFill(const Program
   if (gp->name() != "QuadPerEdgeAAGeometryProcessor") {
     return std::nullopt;
   }
-  // Accept either zero fragment processors, a device-space mask, or one direct analytic AARect
-  // coverage FP. The latter is evaluated by the unconditional Rect/HasClip shader uniforms.
+  // Accept either zero fragment processors, a device-space mask, or one direct analytic clip
+  // coverage FP (AA rect or rrect). The clip is evaluated by the runtime clip contract uniforms.
   QuadColorFillInputs inputs;
   if (programInfo->numFragmentProcessors() != 0) {
     if (programInfo->numColorFragmentProcessors() != 0) {
       return std::nullopt;
     }
-    if (HasDirectAARectCoverage(programInfo)) {
+    if (HasDirectAnalyticClipCoverage(programInfo)) {
       // No additional sampler or permutation dimension is needed.
     } else {
       auto coverage = ClassifyCoverageFP(programInfo);
@@ -472,8 +486,8 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   }
   bool hasLocalMask = false;
   if (programInfo->numFragmentProcessors() != 1) {
-    if (HasDirectAARectCoverage(programInfo)) {
-      // Evaluated through the unconditional Rect/HasClip uniforms.
+    if (HasDirectAnalyticClipCoverage(programInfo)) {
+      // Evaluated through the runtime clip contract uniforms.
     } else {
       auto coverage = ClassifyCoverageFP(programInfo);
       if (coverage && *coverage == CoverageKind::DeviceMask) {
@@ -883,14 +897,17 @@ static std::optional<PermutationMatchResult> TryMatchAtlasTextFill(const Program
     return std::nullopt;
   }
   if (programInfo->numFragmentProcessors() == 1) {
-    // A single alpha-only device-space mask coverage multiplies the atlas glyph coverage.
-    auto fp = programInfo->getFragmentProcessor(0);
-    if (fp->name() != "DeviceSpaceTextureEffect") {
-      return std::nullopt;
-    }
-    auto* mask = static_cast<const DeviceSpaceTextureEffect*>(fp);
-    if (!mask->isAlphaOnly() || mask->hasPerspective()) {
-      return std::nullopt;
+    // A single coverage FP multiplies the atlas glyph coverage: either an alpha-only device-space
+    // mask, or a direct analytic clip (AA rect / rrect) via the runtime clip contract.
+    if (!HasDirectAnalyticClipCoverage(programInfo)) {
+      auto fp = programInfo->getFragmentProcessor(0);
+      if (fp->name() != "DeviceSpaceTextureEffect") {
+        return std::nullopt;
+      }
+      auto* mask = static_cast<const DeviceSpaceTextureEffect*>(fp);
+      if (!mask->isAlphaOnly() || mask->hasPerspective()) {
+        return std::nullopt;
+      }
     }
   }
   auto* atgp = static_cast<const AtlasTextGeometryProcessor*>(gp);
@@ -1279,10 +1296,11 @@ static std::optional<PermutationMatchResult> TryMatchHairlineLine(const ProgramI
     return std::nullopt;
   }
   // The stroke color comes from the geometry processor Color uniform, so a color fragment
-  // processor would be silently dropped and must reject; a direct AARect clip coverage FP is
-  // evaluated from fragment uniforms.
+  // processor would be silently dropped and must reject; a direct analytic clip coverage FP
+  // (AA rect or rrect) is evaluated from the runtime clip contract uniforms.
   if (programInfo->numFragmentProcessors() != 0 &&
-      (programInfo->numColorFragmentProcessors() != 0 || !HasDirectAARectCoverage(programInfo))) {
+      (programInfo->numColorFragmentProcessors() != 0 ||
+       !HasDirectAnalyticClipCoverage(programInfo))) {
     return std::nullopt;
   }
   HairlineLineInputs inputs;
@@ -1301,10 +1319,11 @@ static std::optional<PermutationMatchResult> TryMatchHairlineQuad(const ProgramI
     return std::nullopt;
   }
   // The stroke color comes from the geometry processor Color uniform, so a color fragment
-  // processor would be silently dropped and must reject; a direct AARect clip coverage FP is
-  // evaluated from fragment uniforms.
+  // processor would be silently dropped and must reject; a direct analytic clip coverage FP
+  // (AA rect or rrect) is evaluated from the runtime clip contract uniforms.
   if (programInfo->numFragmentProcessors() != 0 &&
-      (programInfo->numColorFragmentProcessors() != 0 || !HasDirectAARectCoverage(programInfo))) {
+      (programInfo->numColorFragmentProcessors() != 0 ||
+       !HasDirectAnalyticClipCoverage(programInfo))) {
     return std::nullopt;
   }
   HairlineQuadInputs inputs;

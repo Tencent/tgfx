@@ -1,4 +1,6 @@
 // Coverage computation — include before xp_output.inc.
+// Requires: with HAS_RUNTIME_CLIP, clip_coverage.inc must already be included (file scope) so the
+// clipCoverage() function is available for the HasClip branch.
 // Before including, #define TGFX_COVERAGE_SRC_COLOR to the uncovered color expression.
 // Optionally #define TGFX_INITIAL_COVERAGE to the coverage this draw already carries (e.g. a
 // geometry-AA vCoverage); AARect and mask coverage are then multiplied on top of it. Defaults to
@@ -37,10 +39,7 @@
   #endif
 
   if (HasClip != 0) {
-    highp vec4 _dists4 =
-        clamp(vec4(1.0, 1.0, -1.0, -1.0) * vec4(gl_FragCoord.xyxy - Rect), 0.0, 1.0);
-    highp vec2 _dists2 = _dists4.xy + _dists4.zw - 1.0;
-    _coverageResult *= _dists2.x * _dists2.y;
+    _coverageResult *= clipCoverage();
   }
 
   vec4 _uncoveredColor = TGFX_COVERAGE_SRC_COLOR;

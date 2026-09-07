@@ -30,8 +30,10 @@
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/MaskFilter.h"
+#include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
+#include "tgfx/core/RRect.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Context.h"
@@ -1181,6 +1183,108 @@ TGFX_TEST(AOTRenderConsistencyTest, AnalyticRectClipDirectEllipseFill) {
   renderOnce(false, &reference);
   renderOnce(true, &candidate);
   ExpectBitmapsIdentical("aarect-clip-direct-ellipse-fill", candidate, reference, 120, 120);
+}
+
+// Coverage modes of the runtime clip contract exercised through the L1 direct-hang route: an
+// rrect clip (HasClip == 2) in device space, in device space without AA, and under a rotation
+// (non-identity DeviceToLocal); plus a local-space AA rect clip (HasClip == 3) under a rotation.
+// The filled oval always extends beyond the clip boundary, so a clip that silently evaluates to
+// full coverage changes the output instead of passing vacuously.
+enum class AnalyticClipScene {
+  DeviceRRectAA,
+  DeviceRRectNonAA,
+  RotatedRRect,
+  RotatedRect,
+};
+
+static void RenderAnalyticClipSceneOnce(AnalyticClipScene scene, bool useBundle, Bitmap* outBitmap,
+                                        ColorFilterRenderStats* outStats) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  if (useBundle) {
+    ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+  } else {
+    cache->unload();
+  }
+  ScopedAOTStatsPause statsPause(context, !useBundle);
+  cache->setDiagnosticRecordingEnabled(false);
+  context->globalCache()->clearPrograms();
+  cache->setDiagnosticRecordingEnabled(true);
+  cache->resetStats();
+  context->globalCache()->clearPrograms();
+  context->globalCache()->resetProgramStats();
+  auto surface = Surface::Make(context, 160, 160);
+  ASSERT_TRUE(surface != nullptr);
+  auto* canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  const auto clipBounds = Rect::MakeLTRB(24, 24, 136, 136);
+  const auto complexRadii =
+      std::array<Point, 4>({Point{18, 26}, Point{8, 12}, Point{30, 20}, Point{12, 32}});
+  bool antiAlias = true;
+  switch (scene) {
+    case AnalyticClipScene::DeviceRRectAA:
+    case AnalyticClipScene::DeviceRRectNonAA:
+      antiAlias = scene == AnalyticClipScene::DeviceRRectAA;
+      canvas->clipRRect(RRect::MakeRectRadii(clipBounds, complexRadii), antiAlias);
+      break;
+    case AnalyticClipScene::RotatedRRect:
+      canvas->concat(Matrix::MakeTrans(80, 80) * Matrix::MakeRotate(30) *
+                     Matrix::MakeTrans(-80, -80));
+      canvas->clipRRect(RRect::MakeRectXY(clipBounds, 20, 28), true);
+      canvas->concat(Matrix::MakeTrans(80, 80) * Matrix::MakeRotate(-30) *
+                     Matrix::MakeTrans(-80, -80));
+      break;
+    case AnalyticClipScene::RotatedRect:
+      canvas->concat(Matrix::MakeTrans(80, 80) * Matrix::MakeRotate(20) *
+                     Matrix::MakeTrans(-80, -80));
+      canvas->clipRect(clipBounds, true);
+      canvas->concat(Matrix::MakeTrans(80, 80) * Matrix::MakeRotate(-20) *
+                     Matrix::MakeTrans(-80, -80));
+      break;
+  }
+  Paint paint = {};
+  paint.setColor(Color::Red());
+  canvas->drawOval(Rect::MakeXYWH(4, 4, 152, 152), paint);
+  context->flushAndSubmit(true);
+  ASSERT_TRUE(outBitmap->allocPixels(160, 160));
+  auto* pixels = outBitmap->lockPixels();
+  ASSERT_TRUE(pixels != nullptr);
+  ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+  outBitmap->unlockPixels();
+  if (outStats != nullptr) {
+    outStats->hits = cache->hitCount();
+    outStats->pipelines = cache->aotStageCount(PrecompiledAOTStage::PipelineCreated);
+    outStats->noMatchingRule = cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule);
+    outStats->draws = cache->drawStats();
+    outStats->programs = context->globalCache()->programStats();
+  }
+  cache->setDiagnosticRecordingEnabled(false);
+  cache->unload();
+  context->globalCache()->clearPrograms();
+}
+
+static void ExpectAnalyticClipSceneConsistent(const char* label, AnalyticClipScene scene) {
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  ColorFilterRenderStats stats = {};
+  RenderAnalyticClipSceneOnce(scene, false, &reference, nullptr);
+  RenderAnalyticClipSceneOnce(scene, true, &candidate, &stats);
+  // The draw must actually ride the precompiled route; otherwise the byte comparison would
+  // compare two runtime renders and prove nothing.
+  EXPECT_GE(stats.hits, 1u);
+  EXPECT_GE(stats.pipelines, 1u);
+  EXPECT_EQ(stats.noMatchingRule, 0u);
+  EXPECT_EQ(stats.programs.programBuilderCreations, 0u);
+  ExpectBitmapsIdentical(label, candidate, reference, 160, 160);
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, AnalyticClipCoverageModes) {
+  ExpectAnalyticClipSceneConsistent("clip-device-rrect-aa", AnalyticClipScene::DeviceRRectAA);
+  ExpectAnalyticClipSceneConsistent("clip-device-rrect-nonaa", AnalyticClipScene::DeviceRRectNonAA);
+  ExpectAnalyticClipSceneConsistent("clip-rotated-rrect", AnalyticClipScene::RotatedRRect);
+  ExpectAnalyticClipSceneConsistent("clip-rotated-rect", AnalyticClipScene::RotatedRect);
 }
 
 // An alpha-only texture mask (R8 on Metal) folded into the pointwise chain: the kernel must splat

@@ -41,6 +41,7 @@ layout(set = 1, binding = 0) uniform sampler2D MaskTextureSampler;
 #include "ellipse_coverage.inc"
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
+#include "clip_coverage.inc"
 
 layout(location = 0) out vec4 fragColor;
 

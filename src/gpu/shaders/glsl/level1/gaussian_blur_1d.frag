@@ -58,6 +58,7 @@ layout(set = 1, binding = 1) uniform sampler2D MaskTextureSampler;
 #define XP_DST_TEX_BINDING 2
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
+#include "clip_coverage.inc"
 #include "tiled_sample.inc"
 
 layout(location = 0) out vec4 fragColor;

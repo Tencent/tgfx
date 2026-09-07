@@ -103,12 +103,15 @@ void GLSLRectEffect::onSetData(UniformData*, UniformData* fragmentUniformData) c
   }
   if (fragmentUniformData->hasField("Rect") && isDeviceSpaceRect()) {
     // The precompiled level1 kernels evaluate a direct analytic clip through the shared
-    // Rect/HasClip contract (aa_rect_clip_coverage.inc), which expects the device-space rect
+    // Rect/HasClip contract (clip_coverage.inc), which expects the device-space rect
     // uploaded half a pixel outward so the coverage ramp centers on the geometric boundary.
     fragmentUniformData->setData("Rect", localRect.makeOutset(0.5f, 0.5f));
   }
   if (fragmentUniformData->hasField("HasClip")) {
-    int hasClip = 1;
+    // HasClip selects the contract branch: 1 = device-space AA rect (Rect with the half-pixel
+    // outset above), 3 = local-space AA rect (LocalRect/DeviceToLocal, written by the JIT-path
+    // uploads above with the exact local rect and the device-to-local matrix).
+    int hasClip = isDeviceSpaceRect() ? 1 : 3;
     fragmentUniformData->setData("HasClip", hasClip);
   }
 }

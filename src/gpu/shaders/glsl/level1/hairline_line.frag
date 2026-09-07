@@ -14,6 +14,7 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   int AAEnabled;
   vec4 Rect;
   int HasClip;
+#include "rrect_clip_uniforms.inc"
 #include "xp_uniforms.inc"
 };
 
@@ -22,7 +23,7 @@ layout(location = 0) in float vEdgeDistance;
 #define XP_DST_TEX_BINDING 0
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
-#include "aa_rect_clip_coverage.inc"
+#include "clip_coverage.inc"
 
 layout(location = 0) out vec4 fragColor;
 
@@ -33,7 +34,7 @@ void main() {
     edgeAlpha = edgeAlpha >= 0.5 ? 1.0 : 0.0;
   }
 
-  vec4 outputCoverage = vec4(Coverage * edgeAlpha * aaRectClipCoverage());
+  vec4 outputCoverage = vec4(Coverage * edgeAlpha * clipCoverage());
 
 #define TGFX_XP_SRC_COLOR (Color * outputCoverage)
 #define TGFX_XP_SRC_UNPREMUL Color

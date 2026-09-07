@@ -16,6 +16,7 @@
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Rect;
   int HasClip;
+#include "rrect_clip_uniforms.inc"
   // Always present; holds the full texture bounds when the source has no real subset, so the
   // clamp degenerates to a no-op.
   vec4 Subset;
@@ -47,7 +48,7 @@ layout(set = 1, binding = 2) uniform sampler2D TextureSampler_2;
 #endif
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
-#include "aa_rect_clip_coverage.inc"
+#include "clip_coverage.inc"
 
 layout(location = 0) out vec4 fragColor;
 
@@ -84,7 +85,7 @@ void main() {
   }
   color = color * outputColor.a;
 
-  float totalCoverage = vCoverage * aaRectClipCoverage();
+  float totalCoverage = vCoverage * clipCoverage();
 
 #if HAS_XP
   fragColor = applyPorterDuffXP(color, vec4(totalCoverage));

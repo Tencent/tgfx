@@ -57,6 +57,7 @@ layout(set = 1, binding = 2) uniform sampler2D EdgeMaskSampler;
 #include "ellipse_coverage.inc"
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
+#include "clip_coverage.inc"
 
 #if GEOMETRY_KIND <= 1
 

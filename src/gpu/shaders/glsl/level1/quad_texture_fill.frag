@@ -37,6 +37,7 @@
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Rect;
   int HasClip;
+#include "rrect_clip_uniforms.inc"
   // Always present. For HAS_SUBSET=1 it provides the half-pixel-inset safe range; for HAS_SUBSET=0
   // it is the sole clamp bound (full texture bounds when no real subset, so the clamp is a no-op).
   vec4 Subset;
@@ -96,7 +97,7 @@ layout(set = 1, binding = 2) uniform sampler2D LocalMaskSampler;
 #endif
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
-#include "aa_rect_clip_coverage.inc"
+#include "clip_coverage.inc"
 
 layout(location = 0) out vec4 fragColor;
 
@@ -159,7 +160,7 @@ void main() {
   highp vec2 localMaskCoord = TransformedCoords_1.xy / TransformedCoords_1.z;
   localMaskAlpha = texture(LocalMaskSampler, localMaskCoord).a;
 #endif
-  float totalCoverage = vCoverage * maskAlpha * localMaskAlpha * aaRectClipCoverage();
+  float totalCoverage = vCoverage * maskAlpha * localMaskAlpha * clipCoverage();
 
 #if HAS_XP
   fragColor = applyPorterDuffXP(color, vec4(totalCoverage));

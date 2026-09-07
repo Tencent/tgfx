@@ -15,6 +15,7 @@
 #if HAS_RUNTIME_CLIP
   vec4 Rect;
   int HasClip;
+#include "rrect_clip_uniforms.inc"
 #elif HAS_COVERAGE
   vec4 Rect;
 #endif

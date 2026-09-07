@@ -15,6 +15,7 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Color;
   vec4 Rect;
   int HasClip;
+#include "rrect_clip_uniforms.inc"
 #if HAS_XP
   vec2 DstTextureUpperLeft;
   vec2 DstTextureCoordScale;
@@ -30,12 +31,12 @@ layout(location = 0) in float vCoverage;
 #define XP_DST_TEX_BINDING 0
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
-#include "aa_rect_clip_coverage.inc"
+#include "clip_coverage.inc"
 
 layout(location = 0) out vec4 fragColor;
 
 void main() {
-  float totalCoverage = aaRectClipCoverage();
+  float totalCoverage = clipCoverage();
 #if HAS_COVERAGE
   totalCoverage *= vCoverage;
 #endif
