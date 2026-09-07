@@ -23,6 +23,7 @@
 #include "gpu/shaders/level1/DeviceSpaceTextureShader.h"
 #include "gpu/shaders/level1/EllipseFillShader.h"
 #include "gpu/shaders/level1/GaussianBlur1DShader.h"
+#include "gpu/shaders/level1/GlassUDFTentBlurShader.h"
 #include "gpu/shaders/level1/HairlineLineShader.h"
 #include "gpu/shaders/level1/HairlineQuadShader.h"
 #include "gpu/shaders/level1/MaskFillShader.h"
@@ -791,6 +792,32 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateGaussianBlur1DReachable() {
   return result;
 }
 
+std::optional<RuleComposedValues> ComposeGlassUDFTentBlur(const GlassUDFTentBlurInputs& inputs) {
+  if (inputs.xpType < 0) {
+    return std::nullopt;
+  }
+  using FD = GlassUDFTentBlurShader::FD;
+  RuleComposedValues values;
+  values.fragValues.resize(FD::COUNT);
+  values.fragValues[FD::HAS_XP] = inputs.xpType;
+  return values;
+}
+
+std::set<std::pair<uint32_t, uint32_t>> EnumerateGlassUDFTentBlurReachable() {
+  std::set<std::pair<uint32_t, uint32_t>> result;
+  for (int xpType = -1; xpType <= 2; ++xpType) {
+    GlassUDFTentBlurInputs inputs;
+    inputs.xpType = xpType;
+    auto composed = ComposeGlassUDFTentBlur(inputs);
+    if (!composed) {
+      continue;
+    }
+    auto fragIndex = GlassUDFTentBlurShader::FD::domain().encode(composed->fragValues);
+    result.insert({0, fragIndex});
+  }
+  return result;
+}
+
 std::optional<RuleComposedValues> ComposeTexturedEffect(const TexturedEffectInputs& inputs) {
   if (inputs.xpType < 0) {
     return std::nullopt;
@@ -1159,6 +1186,9 @@ std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermuta
   }
   if (shaderName == "GaussianBlur1DShader") {
     return EnumerateGaussianBlur1DReachable();
+  }
+  if (shaderName == "GlassUDFTentBlurShader") {
+    return EnumerateGlassUDFTentBlurReachable();
   }
   if (shaderName == "TexturedEffectShader") {
     return EnumerateTexturedEffectReachable();

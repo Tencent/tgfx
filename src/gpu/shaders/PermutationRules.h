@@ -259,6 +259,16 @@ struct GaussianBlur1DInputs {
 };
 
 /**
+ * Input contract of the GlassUDFTentBlurShader matcher rule. The child structure checks, tiled-mode
+ * limits, and the max-radius bound are whole-draw rejections in Extract; the radius pair, field
+ * selection, packed-input decode, and the tiled child are runtime uniforms, so only the transfer
+ * type shapes dimensions.
+ */
+struct GlassUDFTentBlurInputs {
+  int xpType = -1;  // -1 = no representable XferProcessor.
+};
+
+/**
  * Input contract of the TexturedEffectShader matcher rule (the composed texture transform). The
  * Compose(Texture, pointwise) structure checks are whole-draw rejections in Extract: the operator
  * rides the OpType runtime uniform, so only coverage and the transfer type shape dimensions.
@@ -465,6 +475,12 @@ std::optional<RuleComposedValues> ComposeQuadTextureFill(const QuadTextureFillIn
 std::optional<RuleComposedValues> ComposeGaussianBlur1D(const GaussianBlur1DInputs& inputs);
 
 /**
+ * Pure mapping for the GlassUDFTentBlurShader rule; see ComposeRoundStrokeRect for the sharing
+ * contract.
+ */
+std::optional<RuleComposedValues> ComposeGlassUDFTentBlur(const GlassUDFTentBlurInputs& inputs);
+
+/**
  * Pure mapping for the TexturedEffectShader rule; see ComposeRoundStrokeRect for the sharing
  * contract.
  */
@@ -605,6 +621,11 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadTextureFillReachable();
  * Returns every (vertIndex, fragIndex) pair the GaussianBlur1D rule can ever produce.
  */
 std::set<std::pair<uint32_t, uint32_t>> EnumerateGaussianBlur1DReachable();
+
+/**
+ * Returns every (vertIndex, fragIndex) pair the GlassUDFTentBlur rule can ever produce.
+ */
+std::set<std::pair<uint32_t, uint32_t>> EnumerateGlassUDFTentBlurReachable();
 
 /**
  * Returns every (vertIndex, fragIndex) pair the TexturedEffect rule can ever produce.

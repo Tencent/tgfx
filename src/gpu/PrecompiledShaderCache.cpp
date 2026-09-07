@@ -161,6 +161,8 @@ const char* OffscreenFillSourceName(OffscreenFillSource source) {
       return "FPFlatten";
     case OffscreenFillSource::GaussianBlur:
       return "GaussianBlur";
+    case OffscreenFillSource::GlassUDF:
+      return "GlassUDF";
     case OffscreenFillSource::ImageFilter:
       return "ImageFilter";
     case OffscreenFillSource::TransformImage:

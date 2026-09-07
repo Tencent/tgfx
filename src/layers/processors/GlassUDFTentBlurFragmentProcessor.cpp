@@ -160,6 +160,14 @@ void GlassUDFTentBlurFragmentProcessor::onSetData(UniformData*,
   Point radii = {fineRadius, coarseRadius};
   fragmentUniformData->setData("GlassUDFRadius", radii);
   fragmentUniformData->setData("GlassUDFStep", step);
+  // The precompiled tent-blur kernel folds the field selection and the packed-input decode into
+  // runtime uniforms, so both values ride this same onSetData path.
+  if (fragmentUniformData->hasField("Field")) {
+    fragmentUniformData->setData("Field", static_cast<int>(field));
+  }
+  if (fragmentUniformData->hasField("InputIsPacked")) {
+    fragmentUniformData->setData("InputIsPacked", inputIsPacked ? 1 : 0);
+  }
 }
 
 }  // namespace tgfx
