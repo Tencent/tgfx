@@ -1140,6 +1140,49 @@ TGFX_TEST(AOTRenderConsistencyTest, AnalyticRectClipFoldsIntoChain) {
   ExpectBitmapsIdentical("aarect-clip-fold-chain", candidate, reference, width, height);
 }
 
+// The L1 direct-hang route: the ellipse GP is incompatible with the chain matcher, so an AA
+// clipRect paired with a solid oval must match EllipseFillShader with a bare RectEffect coverage
+// FP. That route evaluates the clip through the shared Rect/HasClip uniforms, and the rect value
+// itself has to come from GLSLRectEffect::onSetData — the fold path above is exercised separately
+// and never uploads the shader-level Rect.
+TGFX_TEST(AOTRenderConsistencyTest, AnalyticRectClipDirectEllipseFill) {
+  auto renderOnce = [&](bool useBundle, Bitmap* outBitmap) {
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto* cache = context->precompiledShaderCache();
+    if (useBundle) {
+      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+    } else {
+      cache->unload();
+    }
+    ScopedAOTStatsPause statsPause(context, !useBundle);
+    context->globalCache()->clearPrograms();
+    auto surface = Surface::Make(context, 120, 120);
+    ASSERT_TRUE(surface != nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::White());
+    canvas->clipRect(Rect::MakeLTRB(10.25f, 10.5f, 109.75f, 109.5f), true);
+    Paint paint = {};
+    paint.setColor(Color::Red());
+    canvas->drawOval(Rect::MakeXYWH(2, 2, 116, 116), paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(120, 120));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+    if (useBundle) {
+      cache->unload();
+    }
+  };
+  Bitmap candidate = {};
+  Bitmap reference = {};
+  renderOnce(false, &reference);
+  renderOnce(true, &candidate);
+  ExpectBitmapsIdentical("aarect-clip-direct-ellipse-fill", candidate, reference, 120, 120);
+}
+
 // An alpha-only texture mask (R8 on Metal) folded into the pointwise chain: the kernel must splat
 // the sampled .r into the alpha channel via the leaf's selector bit, otherwise the mask reads as
 // fully opaque. Byte-exact against the runtime path proves the splat matches the JIT emission.
