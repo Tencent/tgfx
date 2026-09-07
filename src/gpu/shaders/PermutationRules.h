@@ -269,6 +269,16 @@ struct GlassUDFTentBlurInputs {
 };
 
 /**
+ * Input contract of the GlassRefractionShader matcher rule. The geometry child selects the
+ * GEOMETRY_KIND dimension (0=SDF rounded rect, 1=SDF ellipse, 2=UDF, 3=UDF + edge light) because
+ * it changes the sampler layout; the dispersion and lighting branches ride runtime uniforms.
+ */
+struct GlassRefractionInputs {
+  int geometryKind = -1;  // -1 = unrepresentable geometry child.
+  int xpType = -1;        // -1 = no representable XferProcessor.
+};
+
+/**
  * Input contract of the TexturedEffectShader matcher rule (the composed texture transform). The
  * Compose(Texture, pointwise) structure checks are whole-draw rejections in Extract: the operator
  * rides the OpType runtime uniform, so only coverage and the transfer type shape dimensions.
@@ -481,6 +491,12 @@ std::optional<RuleComposedValues> ComposeGaussianBlur1D(const GaussianBlur1DInpu
 std::optional<RuleComposedValues> ComposeGlassUDFTentBlur(const GlassUDFTentBlurInputs& inputs);
 
 /**
+ * Pure mapping for the GlassRefractionShader rule; see ComposeRoundStrokeRect for the sharing
+ * contract.
+ */
+std::optional<RuleComposedValues> ComposeGlassRefraction(const GlassRefractionInputs& inputs);
+
+/**
  * Pure mapping for the TexturedEffectShader rule; see ComposeRoundStrokeRect for the sharing
  * contract.
  */
@@ -626,6 +642,11 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateGaussianBlur1DReachable();
  * Returns every (vertIndex, fragIndex) pair the GlassUDFTentBlur rule can ever produce.
  */
 std::set<std::pair<uint32_t, uint32_t>> EnumerateGlassUDFTentBlurReachable();
+
+/**
+ * Returns every (vertIndex, fragIndex) pair the GlassRefraction rule can ever produce.
+ */
+std::set<std::pair<uint32_t, uint32_t>> EnumerateGlassRefractionReachable();
 
 /**
  * Returns every (vertIndex, fragIndex) pair the TexturedEffect rule can ever produce.

@@ -133,6 +133,14 @@ void GLSLGlassRefractionFragmentProcessor::onSetData(UniformData*,
   fragmentUniformData->setData("GlassOpticsP2", offsetData);
   float geometryMappingData[4] = {params.glassUVOffsetX, params.glassUVOffsetY, 0.0f, 0.0f};
   fragmentUniformData->setData("GlassOpticsP3", geometryMappingData);
+  // The precompiled refraction kernel folds the dispersion and lighting branches into runtime
+  // uniforms, so both values ride this same onSetData path.
+  if (fragmentUniformData->hasField("DispersionOn")) {
+    fragmentUniformData->setData("DispersionOn", params.dispersion >= 0.01f ? 1 : 0);
+  }
+  if (fragmentUniformData->hasField("LightingOn")) {
+    fragmentUniformData->setData("LightingOn", params.lightIntensity > 0.0f ? 1 : 0);
+  }
 }
 
 }  // namespace tgfx

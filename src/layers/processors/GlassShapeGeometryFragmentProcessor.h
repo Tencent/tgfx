@@ -89,6 +89,10 @@ class GlassSDFGeometryFragmentProcessor : public GlassShapeGeometryFragmentProce
     return "GlassSDFGeometryFragmentProcessor";
   }
 
+  GlassShapeType getShapeType() const {
+    return shapeType;
+  }
+
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
  protected:
@@ -117,6 +121,10 @@ class GlassUDFGeometryFragmentProcessor : public GlassShapeGeometryFragmentProce
 
   std::string name() const override {
     return "GlassUDFGeometryFragmentProcessor";
+  }
+
+  bool isEdgeLightingEnabled() const {
+    return enableEdgeLighting;
   }
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;

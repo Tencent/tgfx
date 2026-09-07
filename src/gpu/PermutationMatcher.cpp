@@ -59,6 +59,7 @@
 #include "gpu/shaders/level1/DeviceSpaceTextureShader.h"
 #include "gpu/shaders/level1/EllipseFillShader.h"
 #include "gpu/shaders/level1/GaussianBlur1DShader.h"
+#include "gpu/shaders/level1/GlassRefractionShader.h"
 #include "gpu/shaders/level1/GlassUDFTentBlurShader.h"
 #include "gpu/shaders/level1/HairlineLineShader.h"
 #include "gpu/shaders/level1/HairlineQuadShader.h"
@@ -81,6 +82,8 @@
 #include "gpu/shaders/level1/TiledTextureFillShader.h"
 #include "gpu/shaders/level1/UnifiedGradientShader.h"
 #include "gpu/shaders/level1/YUVTextureFillShader.h"
+#include "layers/processors/GlassRefractionFragmentProcessor.h"
+#include "layers/processors/GlassShapeGeometryFragmentProcessor.h"
 #include "layers/processors/GlassUDFTentBlurFragmentProcessor.h"
 
 namespace tgfx {
@@ -1214,6 +1217,62 @@ static std::optional<PermutationMatchResult> TryMatchGlassUDFTentBlur(
   return PermutationMatchResult{"GlassUDFTentBlurShader", 0, fragIndex};
 }
 
+static std::optional<PermutationMatchResult> TryMatchGlassRefraction(
+    const ProgramInfo* programInfo) {
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp == nullptr || gp->name() != "EllipseGeometryProcessor") {
+    return std::nullopt;
+  }
+  // The declaration's vertex layout is the common-color attribute form, so a per-vertex color
+  // ellipse cannot ride it. The QuadPerEdgeAA form of the Glass draw stays on the fallback route
+  // until a real workload asks for it.
+  auto* egp = static_cast<const EllipseGeometryProcessor*>(gp);
+  if (!egp->hasCommonColor()) {
+    return std::nullopt;
+  }
+  if (programInfo->numColorFragmentProcessors() != 1 || programInfo->numFragmentProcessors() != 1) {
+    return std::nullopt;
+  }
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
+    return std::nullopt;
+  }
+  auto fp = programInfo->getFragmentProcessor(0);
+  if (fp->name() != "GlassRefractionFragmentProcessor") {
+    return std::nullopt;
+  }
+  auto* refraction = static_cast<const GlassRefractionFragmentProcessor*>(fp);
+  if (refraction->numChildProcessors() != 1 || refraction->numTextureSamplers() != 1) {
+    return std::nullopt;
+  }
+  auto child = refraction->childProcessor(0);
+  if (child == nullptr) {
+    return std::nullopt;
+  }
+  // The geometry child selects the compile-time dimension because it changes the sampler layout;
+  // the dispersion and lighting branches are runtime uniforms and need no dimension.
+  int geometryKind = -1;
+  if (child->name() == "GlassSDFGeometryFragmentProcessor") {
+    auto* sdf = static_cast<const GlassSDFGeometryFragmentProcessor*>(child);
+    geometryKind = sdf->getShapeType() == GlassShapeType::RoundedRect ? 0 : 1;
+  } else if (child->name() == "GlassUDFGeometryFragmentProcessor") {
+    auto* udf = static_cast<const GlassUDFGeometryFragmentProcessor*>(child);
+    geometryKind = udf->isEdgeLightingEnabled() ? 3 : 2;
+  }
+  if (geometryKind < 0) {
+    return std::nullopt;
+  }
+  GlassRefractionInputs inputs;
+  inputs.geometryKind = geometryKind;
+  inputs.xpType = xpType;
+  auto composed = ComposeGlassRefraction(inputs);
+  if (!composed) {
+    return std::nullopt;
+  }
+  auto fragIndex = GlassRefractionShader::FD::domain().encode(composed->fragValues);
+  return PermutationMatchResult{"GlassRefractionShader", 0, fragIndex};
+}
+
 static std::optional<PermutationMatchResult> TryMatchHairlineLine(const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
   if (gp->name() != "HairlineLineGeometryProcessor") {
@@ -1655,6 +1714,9 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
     return result;
   }
   if (auto result = TryMatchGlassUDFTentBlur(programInfo)) {
+    return result;
+  }
+  if (auto result = TryMatchGlassRefraction(programInfo)) {
     return result;
   }
   if (auto result = TryMatchHairlineLine(programInfo)) {

@@ -23,6 +23,7 @@
 #include "gpu/shaders/level1/DeviceSpaceTextureShader.h"
 #include "gpu/shaders/level1/EllipseFillShader.h"
 #include "gpu/shaders/level1/GaussianBlur1DShader.h"
+#include "gpu/shaders/level1/GlassRefractionShader.h"
 #include "gpu/shaders/level1/GlassUDFTentBlurShader.h"
 #include "gpu/shaders/level1/HairlineLineShader.h"
 #include "gpu/shaders/level1/HairlineQuadShader.h"
@@ -818,6 +819,36 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateGlassUDFTentBlurReachable() {
   return result;
 }
 
+std::optional<RuleComposedValues> ComposeGlassRefraction(const GlassRefractionInputs& inputs) {
+  if (inputs.geometryKind < 0 || inputs.xpType < 0) {
+    return std::nullopt;
+  }
+  using FD = GlassRefractionShader::FD;
+  RuleComposedValues values;
+  values.fragValues.resize(FD::COUNT);
+  values.fragValues[FD::GEOMETRY_KIND] = inputs.geometryKind;
+  values.fragValues[FD::HAS_XP] = inputs.xpType;
+  return values;
+}
+
+std::set<std::pair<uint32_t, uint32_t>> EnumerateGlassRefractionReachable() {
+  std::set<std::pair<uint32_t, uint32_t>> result;
+  for (int geometryKind = 0; geometryKind < 4; ++geometryKind) {
+    for (int xpType = 0; xpType <= 2; ++xpType) {
+      GlassRefractionInputs inputs;
+      inputs.geometryKind = geometryKind;
+      inputs.xpType = xpType;
+      auto composed = ComposeGlassRefraction(inputs);
+      if (!composed) {
+        continue;
+      }
+      auto fragIndex = GlassRefractionShader::FD::domain().encode(composed->fragValues);
+      result.insert({0, fragIndex});
+    }
+  }
+  return result;
+}
+
 std::optional<RuleComposedValues> ComposeTexturedEffect(const TexturedEffectInputs& inputs) {
   if (inputs.xpType < 0) {
     return std::nullopt;
@@ -1189,6 +1220,9 @@ std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermuta
   }
   if (shaderName == "GlassUDFTentBlurShader") {
     return EnumerateGlassUDFTentBlurReachable();
+  }
+  if (shaderName == "GlassRefractionShader") {
+    return EnumerateGlassRefractionReachable();
   }
   if (shaderName == "TexturedEffectShader") {
     return EnumerateTexturedEffectReachable();
