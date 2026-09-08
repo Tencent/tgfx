@@ -1448,6 +1448,168 @@ TGFX_TEST(AOTRenderConsistencyTest, ChainClipCoverageModes) {
                                  ChainClipScene::ShaderMaskUnderLocalRect);
 }
 
+// Builds a balanced binary blend tree over the given number of image leaves (cycling through the
+// image list), e.g. five leaves reduce to Blend(Blend(A,B), Blend(Blend(C,D),E)). The balanced
+// shape spreads the texture leaves across the DAG, so a split planner must find a cut whose both
+// sides stay within the fused kernel's four-sampler budget.
+static std::shared_ptr<Shader> MakeBalancedBlendShader(
+    const std::vector<std::shared_ptr<Image>>& images, size_t begin, size_t end) {
+  if (end - begin == 1) {
+    return Shader::MakeImageShader(images[begin % images.size()]);
+  }
+  auto mid = begin + (end - begin) / 2;
+  auto left = MakeBalancedBlendShader(images, begin, mid);
+  auto right = MakeBalancedBlendShader(images, mid, end);
+  auto mode = mid % 2 == 0 ? BlendMode::Multiply : BlendMode::Screen;
+  return Shader::MakeBlend(mode, left, right);
+}
+
+// Builds a left-deep blend chain: Blend(Blend(Blend(A,B),C),D)... Every blend's pass-through
+// operand is the accumulated chain, so a greedy split materializes the chain side repeatedly and
+// each output pixel crosses one RGBA8 intermediate per pass — the materialization-depth axis for
+// the quantization calibration.
+static std::shared_ptr<Shader> MakeLeftDeepBlendShader(
+    const std::vector<std::shared_ptr<Image>>& images, size_t leafCount) {
+  auto current = Shader::MakeImageShader(images[0]);
+  for (size_t i = 1; i < leafCount; ++i) {
+    auto mode = i % 2 == 0 ? BlendMode::Multiply : BlendMode::Screen;
+    auto leaf = Shader::MakeImageShader(images[i % images.size()]);
+    current = Shader::MakeBlend(mode, current, leaf);
+  }
+  return current;
+}
+
+static void RenderBlendShaderSceneOnce(std::shared_ptr<Shader> shader, bool drawOval,
+                                       bool useBundle, Bitmap* outBitmap,
+                                       ColorFilterRenderStats* outStats) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  if (useBundle) {
+    ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+  } else {
+    cache->unload();
+  }
+  ScopedAOTStatsPause statsPause(context, !useBundle);
+  cache->setDiagnosticRecordingEnabled(false);
+  context->globalCache()->clearPrograms();
+  cache->setDiagnosticRecordingEnabled(true);
+  cache->resetStats();
+  context->globalCache()->clearPrograms();
+  context->globalCache()->resetProgramStats();
+  constexpr int size = 180;
+  auto surface = Surface::Make(context, size, size);
+  ASSERT_TRUE(surface != nullptr);
+  auto* canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  Paint paint = {};
+  paint.setShader(std::move(shader));
+  if (drawOval) {
+    canvas->drawOval(Rect::MakeXYWH(10, 14, 160, 152), paint);
+  } else {
+    canvas->drawRect(Rect::MakeXYWH(10, 14, 160, 152), paint);
+  }
+  context->flushAndSubmit(true);
+  ASSERT_TRUE(outBitmap->allocPixels(size, size));
+  auto* pixels = outBitmap->lockPixels();
+  ASSERT_TRUE(pixels != nullptr);
+  ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+  outBitmap->unlockPixels();
+  if (outStats != nullptr) {
+    outStats->hits = cache->hitCount();
+    outStats->pipelines = cache->aotStageCount(PrecompiledAOTStage::PipelineCreated);
+    outStats->noMatchingRule = cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule);
+    outStats->draws = cache->drawStats();
+    outStats->programs = context->globalCache()->programStats();
+  }
+  cache->setDiagnosticRecordingEnabled(false);
+  cache->unload();
+  context->globalCache()->clearPrograms();
+}
+
+static std::vector<std::shared_ptr<Image>> MakeBlendFixtureImages() {
+  std::vector<std::shared_ptr<Image>> images = {};
+  for (auto* path : {"resources/apitest/mandrill_128.png", "resources/apitest/imageReplacement.png",
+                     "resources/apitest/test_timestretch.png", "resources/apitest/rotation.jpg"}) {
+    auto image = MakeImage(path);
+    if (image == nullptr) {
+      return {};
+    }
+    images.push_back(std::move(image));
+  }
+  return images;
+}
+
+// WP4-0 fixtures: over-sampler-budget blend DAGs (5/7/9 texture leaves against the fused kernel's
+// four-sampler budget), drawn as a rect (rect GPs) and as an oval (the non-rect-GP terminal
+// materialization route). Discovery (2026-09-07): these shapes never reach the planner as one
+// DAG — AOTMaterializationPolicy::Evaluate flattens every non-texture blend child to a texture at
+// shader-construction time (EnsureSimpleBlendChild), so each blend node renders through its own
+// offscreen fill that the single-pass chain route already serves. The fixtures therefore verify
+// that path end to end: zero fallback, zero runtime compilation, and byte-identical output
+// against the no-bundle pass (both passes flatten at the same points, so the RGBA8 intermediates
+// quantize identically). The 16-leaf left-deep variant crosses fourteen materialization edges —
+// the quantization-depth axis for the WP4 calibration.
+TGFX_TEST(AOTRenderConsistencyTest, NestedBlendSamplerBudget) {
+  if (std::string(TGFX_BACKEND_NAME) != "metal") {
+    // Metal is the byte-exact AOT verification backend; software backends carry LSB-level
+    // precision differences and skip.
+    GTEST_SKIP();
+  }
+  auto images = MakeBlendFixtureImages();
+  ASSERT_EQ(images.size(), 4u);
+  struct Scene {
+    const char* label;
+    size_t leafCount;
+    bool drawOval;
+  };
+  const std::array<Scene, 4> scenes = {{
+      {"budget-blend-five-leaves", 5, false},
+      {"budget-blend-seven-leaves", 7, false},
+      {"budget-blend-nine-leaves", 9, false},
+      {"budget-blend-five-leaves-oval", 5, true},
+  }};
+  for (const auto& scene : scenes) {
+    auto shader = MakeBalancedBlendShader(images, 0, scene.leafCount);
+    ASSERT_TRUE(shader != nullptr);
+    Bitmap reference = {};
+    Bitmap candidate = {};
+    ColorFilterRenderStats stats = {};
+    RenderBlendShaderSceneOnce(shader, scene.drawOval, false, &reference, nullptr);
+    RenderBlendShaderSceneOnce(shader, scene.drawOval, true, &candidate, &stats);
+    // The pre-draw flattening route serves the whole tree with precompiled programs.
+    EXPECT_GE(stats.draws.completeAOTDraws, 1u);
+    EXPECT_EQ(stats.programs.programBuilderCreations, 0u);
+    EXPECT_EQ(stats.noMatchingRule, 0u);
+    ExpectBitmapsIdentical(scene.label, candidate, reference, 180, 180);
+  }
+}
+
+// WP4-0 fixture for the materialization-depth axis: a 16-leaf left-deep blend chain. The
+// per-child flattening policy materializes every accumulated left operand, so the output pixel
+// crosses fourteen RGBA8 intermediates — the quantization-calibration shape (a greedy DAG split
+// would cross four; comparing the two policies is the WP4 performance question).
+TGFX_TEST(AOTRenderConsistencyTest, DeepMaterializationChain) {
+  if (std::string(TGFX_BACKEND_NAME) != "metal") {
+    GTEST_SKIP();
+  }
+  auto images = MakeBlendFixtureImages();
+  ASSERT_EQ(images.size(), 4u);
+  auto shader = MakeLeftDeepBlendShader(images, 16);
+  ASSERT_TRUE(shader != nullptr);
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  ColorFilterRenderStats stats = {};
+  RenderBlendShaderSceneOnce(shader, false, false, &reference, nullptr);
+  RenderBlendShaderSceneOnce(shader, false, true, &candidate, &stats);
+  EXPECT_GE(stats.draws.completeAOTDraws, 1u);
+  EXPECT_EQ(stats.programs.programBuilderCreations, 0u);
+  EXPECT_EQ(stats.noMatchingRule, 0u);
+  EXPECT_GE(stats.draws.materializedEdges, 14u);
+  ExpectBitmapsIdentical("deep-materialization-chain", candidate, reference, 180, 180);
+}
+
 // An alpha-only texture mask (R8 on Metal) folded into the pointwise chain: the kernel must splat
 // the sampled .r into the alpha channel via the leaf's selector bit, otherwise the mask reads as
 // fully opaque. Byte-exact against the runtime path proves the splat matches the JIT emission.
