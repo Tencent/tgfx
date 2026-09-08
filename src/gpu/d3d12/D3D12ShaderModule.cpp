@@ -121,8 +121,8 @@ static ComPtr<ID3DBlob> compileHLSLToDXBC(const std::string& hlsl, ShaderStage s
   // Use the same optimization level in Debug and Release so shader output is bit-stable across
   // build configurations. Skipping optimization in Debug changes floating-point evaluation order
   // (loop unrolling, FMA fusion, instruction reordering), which propagates through packed-float
-  // encoded intermediate textures (see TentBlur1DFragmentProcessor) and is then amplified by
-  // finite-difference gradient + normalize + distance scaling in the UDF refraction path,
+  // encoded intermediate textures (see GlassUDFTentBlurFragmentProcessor) and is then amplified
+  // by finite-difference gradient + normalize + distance scaling in the UDF refraction path,
   // yielding visibly different results between Debug and Release builds.
   UINT flags = D3DCOMPILE_ENABLE_STRICTNESS | D3DCOMPILE_OPTIMIZATION_LEVEL3;
 #ifdef _DEBUG

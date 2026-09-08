@@ -122,10 +122,6 @@ const ProcessorClaim ProcessorClaims[] = {
     {"GaussianBlur1DFragmentProcessor", "GaussianBlur1DFragmentProcessor", kMatcher, ""},
     {"GlassRefractionFragmentProcessor", "GlassRefractionFragmentProcessor", kMatcher, ""},
     {"GlassUDFTentBlurFragmentProcessor", "GlassUDFTentBlurFragmentProcessor", kMatcher, ""},
-    // Runtime by design.
-    {"TentBlur1DFragmentProcessor", "TentBlur1DFragmentProcessor", 0,
-     "legacy processor with no production construction sites (only a D3D12 comment references "
-     "it); remove it or add a claim when a consumer appears"},
 };
 
 struct ScannedProcessor {
