@@ -132,11 +132,12 @@ struct GlassShapeInfo {
   bool contentIsFillOnly = false;
 };
 
-// Detects whether the layer's fill surface is a regular shape (RoundedRect or Ellipse) that can
-// use the analytical SDF path. The fill surface comes from fillShape when available: it stays
-// exact across decorative strokes, unlike the combined content shape. Without fillShape, an exact
-// Fill or FillStroke shape carries the same fill path; pure Stroke shapes and shapes without an
-// exact outline (null) fall back to AlphaMask.
+// Detects the glass optical surface: the fill surface expanded by the decorative stroke outset,
+// so semi-transparent strokes lying on the glass refract the backdrop too. The fill surface comes
+// from fillShape when available; without fillShape, exact Fill and FillStroke shapes carry the
+// same fill path. Regular shapes (RoundedRect or Ellipse) expand analytically and use the
+// analytical SDF path; pure Stroke shapes and shapes without an exact outline (null) fall back to
+// AlphaMask.
 static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
   GlassShapeInfo info;
   auto* contourSource = input.findExtraSource(StyleInputSource::Type::Contour);
@@ -157,41 +158,81 @@ static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
   }
   info.contentIsFillOnly = optShape->type == StyledShapeType::Fill;
   auto path = surfaceShape->getPath();
-  info.shapePath = path;
-  info.hasPath = true;
-  info.surfaceBounds = path.getBounds();
+
+  // Strokes participate in the glass surface: expand the optical surface by the stroke outset so
+  // semi-transparent strokes lying on the glass also refract the backdrop. Inside strokes stay
+  // within the fill and need no expansion. Only regular shapes (rect, rrect, oval) are expanded
+  // analytically; irregular paths keep the unexpanded surface (their AlphaMask coverage comes
+  // from the content alpha, which already includes the strokes).
+  auto strokeOutset = 0.0f;
+  if (optShape->type == StyledShapeType::FillStroke && optShape->strokeWidth > 0) {
+    switch (optShape->strokeAlign) {
+      case StrokeAlign::Outside:
+        strokeOutset = optShape->strokeWidth;
+        break;
+      case StrokeAlign::Center:
+        strokeOutset = optShape->strokeWidth * 0.5f;
+        break;
+      case StrokeAlign::Inside:
+        break;
+    }
+  }
+
   RRect rRect = {};
   Rect rect = {};
   if (path.isRRect(&rRect)) {
+    auto radii = rRect.radii();
+    auto uniformCircular = radii[0] == radii[1] && radii[1] == radii[2] && radii[2] == radii[3] &&
+                           radii[0].x == radii[0].y;
+    if (strokeOutset > 0.0f && (rRect.isOval() || uniformCircular)) {
+      // Equidistant expansion keeps the shape regular: the rect grows by the outset and each
+      // corner radius grows with it.
+      auto bounds = rRect.rect();
+      bounds.outset(strokeOutset, strokeOutset);
+      rRect = RRect::MakeRectXY(bounds, radii[0].x + strokeOutset, radii[0].y + strokeOutset);
+      path = {};
+      path.addRRect(rRect);
+      radii = rRect.radii();
+    }
     info.shapeRRect = rRect;
     if (rRect.isOval()) {
       info.type = GlassShapeType::Ellipse;
     } else {
       // Shader SDF assumes a single uniform circular radius (rx == ry) across all four corners.
       // Non-uniform or elliptical corners fall back to AlphaMask for accuracy.
-      auto radii = rRect.radii();
-      bool uniformCircular = radii[0] == radii[1] && radii[1] == radii[2] && radii[2] == radii[3] &&
-                             radii[0].x == radii[0].y;
       if (uniformCircular) {
         info.type = GlassShapeType::RoundedRect;
         info.cornerRadius = radii[0].x;
       }
     }
   } else if (path.isOval(&rect)) {
+    if (strokeOutset > 0.0f) {
+      rect.outset(strokeOutset, strokeOutset);
+      path = {};
+      path.addOval(rect);
+    }
     info.type = GlassShapeType::Ellipse;
     info.shapeRRect = RRect::MakeOval(rect);
   } else if (path.isRect(&rect)) {
+    if (strokeOutset > 0.0f) {
+      rect.outset(strokeOutset, strokeOutset);
+      path = {};
+      path.addRect(rect);
+    }
     info.type = GlassShapeType::RoundedRect;
     info.cornerRadius = 0.0f;
     info.shapeRRect = RRect::MakeRect(rect);
   }
+  info.shapePath = path;
+  info.hasPath = true;
+  info.surfaceBounds = path.getBounds();
   return info;
 }
 
-// Rasterizes the fill surface path into a coverage image aligned with the content bitmap. The
-// content image bakes decorative strokes into its alpha; the UDF distance field must instead be
-// shaped by the stroke-free fill surface, so the recorded picture only draws the fill path with
-// the same matrix the drawPath clip uses. Only the alpha channel is consumed downstream.
+// Rasterizes the glass surface path into a coverage image aligned with the content bitmap. The
+// content image bakes decorative strokes into its alpha, which would couple the distance field to
+// the stroke rendering; the recorded picture instead draws the (stroke-expanded) surface path
+// with the same matrix the drawPath clip uses. Only the alpha channel is consumed downstream.
 static std::shared_ptr<Image> MakeFillSurfaceImage(const Path& surfacePath,
                                                    const LayerStyleInput& input, float contentWidth,
                                                    float contentHeight) {

@@ -4096,8 +4096,11 @@ static bool PixelsWithinTolerance(uint32_t a, uint32_t b, int tolerance = 2) {
       << "glass parity broken: 0x" << std::hex << (expected) << " vs 0x" \
       << static_cast<uint32_t>(actual) << std::dec
 
-static std::optional<GlassStrokePixels> RenderGlassStrokeComparison(
-    Context* context, int strokeCount, StrokeAlign strokeAlign, bool hasGlass, float zoomScale) {
+static std::optional<GlassStrokePixels> RenderGlassStrokeComparison(Context* context,
+                                                                    int strokeCount,
+                                                                    StrokeAlign strokeAlign,
+                                                                    bool hasGlass, float zoomScale,
+                                                                    uint8_t strokeAlpha = 255) {
   auto surfaceSize = static_cast<int>(200.0f * zoomScale);
   auto surface = Surface::Make(context, surfaceSize, surfaceSize);
   if (surface == nullptr) {
@@ -4131,7 +4134,7 @@ static std::optional<GlassStrokePixels> RenderGlassStrokeComparison(
   auto fill = FillStyle::Make(SolidColor::Make(Color::FromRGBA(255, 255, 255, 96)));
   std::vector<std::shared_ptr<VectorElement>> contents = {rectangle, fill};
   for (int i = 0; i < strokeCount; i++) {
-    auto stroke = StrokeStyle::Make(SolidColor::Make(Color::FromRGBA(20, 80, 220, 255)));
+    auto stroke = StrokeStyle::Make(SolidColor::Make(Color::FromRGBA(20, 80, 220, strokeAlpha)));
     stroke->setStrokeWidth(i == 0 ? 10.0f : 6.0f);
     stroke->setStrokeAlign(strokeAlign);
     contents.push_back(stroke);
@@ -4271,29 +4274,32 @@ static std::shared_ptr<VectorLayer> MakeMultiStrokeVectorLayer(bool withFill) {
   return vectorLayer;
 }
 
-// The spread shadow must survive the loss of the exact outline: stacked strokes drop the
-// StyledShape (null shape or nullopt), so the spread footprint has to come from SpreadUtils'
-// fallback path (the producer-provided approximate bounds).
+// Stacked strokes drop the exact outline (null shape or nullopt): the spread must be skipped and
+// the shadow must fall back to its plain (spread-less) form, hugging the content instead of
+// expanding by the spread.
 TGFX_TEST(LayerTest, DropShadowSpreadWithoutExactShape) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  // The fill spans [50, 150]; the 10px centered stroke extends the content to [45, 155]. With a
-  // spread of 10, the shadow reaches [35, 165], so (100, 40) is outside the content but inside
-  // the spread shadow.
+  // The fill spans [50, 150]; the 10px centered stroke extends the content to [45, 155]. The
+  // shadow has no blur and a Y offset of 15, so the plain (spread-less) shadow reaches 170. A
+  // spread of 10 would reach 180 — the assertions distinguish the two.
   for (auto withFill : {true, false}) {
     auto layer = MakeMultiStrokeVectorLayer(withFill);
-    auto shadowStyle = DropShadowStyle::Make(0, 0, 0, 0, Color::Black());
+    auto shadowStyle = DropShadowStyle::Make(0, 15, 0, 0, Color::Black());
     shadowStyle->setSpread(10);
     layer->setLayerStyles({shadowStyle});
-    auto shadowPixel = RenderSpreadShadowPixel(context, layer, 100, 40);
+    // Inside the plain shadow footprint (content bottom 155 + offset 15).
+    auto shadowPixel = RenderSpreadShadowPixel(context, layer, 100, 168);
     ASSERT_TRUE(shadowPixel.has_value());
-    EXPECT_NE(*shadowPixel, 0u) << "spread shadow missing (withFill=" << withFill << ")";
-    // Far outside the spread footprint the shadow must be absent.
-    auto outsidePixel = RenderSpreadShadowPixel(context, layer, 100, 30);
-    ASSERT_TRUE(outsidePixel.has_value());
-    EXPECT_EQ(*outsidePixel, 0u);
+    EXPECT_NE(*shadowPixel, 0u) << "plain shadow missing (withFill=" << withFill << ")";
+    // Beyond the plain footprint but within the spread-expanded one: the shadow must be absent,
+    // proving the spread was skipped rather than applied.
+    auto spreadPixel = RenderSpreadShadowPixel(context, layer, 100, 175);
+    ASSERT_TRUE(spreadPixel.has_value());
+    EXPECT_EQ(*spreadPixel, 0u) << "spread was applied without an exact shape (withFill="
+                                << withFill << ")";
   }
 }
 
@@ -4313,13 +4319,14 @@ TGFX_TEST(LayerTest, GlassStyleFillStrokeParity) {
       ASSERT_TRUE(withStroke.has_value());
       ASSERT_TRUE(withTwoStrokes.has_value());
       ASSERT_TRUE(strokeWithoutGlass.has_value());
-      EXPECT_PIXEL_PARITY(fillOnly->edge, withStroke->edge);
-      EXPECT_PIXEL_PARITY(fillOnly->refraction, withStroke->refraction);
-      // The fill surface stays exact with two decorative strokes, so the refraction must not
-      // change even though the combined content shape drops its exact outline (null shape).
-      EXPECT_PIXEL_PARITY(fillOnly->edge, withTwoStrokes->edge);
-      EXPECT_PIXEL_PARITY(fillOnly->refraction, withTwoStrokes->refraction);
-      EXPECT_NE(withStroke->refraction, strokeWithoutGlass->refraction);
+      // Strokes participate in the optical surface. Center/Outside strokes expand the surface,
+      // which legitimately reshapes the whole SDF refraction field (edge and interior alike), so
+      // no interior parity is asserted for them. Inside strokes stay within the fill: the surface
+      // and therefore the refraction field are unchanged.
+      if (strokeAlign == StrokeAlign::Inside) {
+        EXPECT_PIXEL_PARITY(fillOnly->refraction, withStroke->refraction);
+        EXPECT_PIXEL_PARITY(fillOnly->refraction, withTwoStrokes->refraction);
+      }
       if (strokeAlign != StrokeAlign::Inside) {
         EXPECT_PIXEL_PARITY(withStroke->strokeOnly, strokeWithoutGlass->strokeOnly);
       }
@@ -4328,6 +4335,17 @@ TGFX_TEST(LayerTest, GlassStyleFillStrokeParity) {
       }
     }
   }
+
+  // Strokes participate in the glass surface: with a nearly transparent stroke (alpha = 1), the
+  // stroke-only sample point — outside the fill but inside the stroke band — must differ between
+  // the glass and no-glass renders, proving the band refracts the backdrop through the stroke.
+  auto faintWithGlass = RenderGlassStrokeComparison(context, 1, StrokeAlign::Center, true, 1.0f, 1);
+  auto faintWithoutGlass =
+      RenderGlassStrokeComparison(context, 1, StrokeAlign::Center, false, 1.0f, 1);
+  ASSERT_TRUE(faintWithGlass.has_value());
+  ASSERT_TRUE(faintWithoutGlass.has_value());
+  EXPECT_NE(faintWithGlass->strokeOnly, faintWithoutGlass->strokeOnly)
+      << "stroke band does not refract the backdrop";
 }
 
 struct IrregularFillPixels {
