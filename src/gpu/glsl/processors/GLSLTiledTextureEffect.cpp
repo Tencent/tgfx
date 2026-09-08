@@ -414,6 +414,11 @@ void GLSLTiledTextureEffect::emitCode(EmitArgs& args) const {
 
 void GLSLTiledTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
                                        UniformData* fragmentUniformData) const {
+  // A fully hardware-tiled sampling (ShaderMode None on both axes) declares no fragment uniforms
+  // of its own, so a program whose remaining processors also declare none hands over a null block.
+  if (fragmentUniformData == nullptr) {
+    return;
+  }
   auto sampling = resolveSampling();
   if (sampling == nullptr) {
     return;
