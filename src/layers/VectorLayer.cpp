@@ -153,7 +153,10 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
         // stroke: the contour is geometry-only, and each stroke contributes its lateral extent
         // (Outside -> width, Center -> half the width, Inside -> none, it stays within the fill).
         // The merged equivalent covers every band, so consumers (glass surface expansion, shadow
-        // spread) keep working without per-stroke knowledge.
+        // spread) keep working without per-stroke knowledge. With a fill the merge is exact (the
+        // fill covers the inner half of the band); without one the inner edge conservatively
+        // over-covers (two Outside strokes of 10 and 6 union to [path, path+10] but merge to
+        // [path-10, path+10]).
         auto maxLateral = 0.0f;
         for (const auto& painter : context.painters) {
           if (HasTransparentSolidColor(painter.get())) {

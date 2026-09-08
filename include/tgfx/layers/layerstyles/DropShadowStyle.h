@@ -116,9 +116,9 @@ class DropShadowStyle : public LayerStyle {
    * image without any spread adjustment.
    * When positive, the shadow grows outward, making the shadow larger than the content. When
    * negative, the shadow shrinks inward, making the shadow smaller than the content. The spread is
-   * derived from the layer's exact vector shape (e.g. Rect, Oval, or RRect); when no exact
-   * shape is available (complex paths, text, or a group layer with only children), the spread
-   * is skipped and the shadow falls back to its plain (spread-less) form.
+   * applied only when the layer content can be represented as a single vector outline;
+   * otherwise (e.g. a text layer, or a group layer with only children) the spread is ignored
+   * and the shadow falls back to its plain (spread-less) form.
    */
   float spread() const {
     return _spread;

@@ -61,15 +61,12 @@ struct StyledShape {
   Rect getBounds() const;
 
   /**
-   * The vector shape of this StyledShape: the underlying geometry (the fill path) of the content.
-   * For Fill/FillStroke types the rendered outline derives from this path expanded by
-   * strokeWidth/strokeAlign; for Stroke types it is the stroke centerline. A non-null shape is
-   * always exact; producers must never populate it with an approximation. Null means the outline
-   * cannot be represented by a single StyledShape (for example, multiple distinct geometries).
-   * Stacked strokes are merged into one equivalent centered stroke by VectorLayer, so they stay
-   * exact. When the shape is null, the type only describes the content composition (whether
-   * strokes are visible) and carries no geometric promise; consumers must skip shape-dependent
-   * enhancements rather than approximate the outline themselves.
+   * The vector shape of this StyledShape. A non-null shape precisely describes the rendered
+   * content outline: for Fill/FillStroke it is the fill path (the rendered outline expands it
+   * by strokeWidth/strokeAlign), for Stroke it is the stroked centerline. Null means the content
+   * has no single precise outline (for example, multiple distinct geometries); in that case the
+   * type only describes the content composition (whether strokes are visible) and
+   * outline-dependent effects (such as shadow spread) do not apply.
    */
   std::shared_ptr<Shape> shape = nullptr;
 
