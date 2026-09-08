@@ -27,6 +27,7 @@
 #include <utility>
 #include <vector>
 #include "BundleWriter.h"
+#include "ContractChecks.h"
 #include "ReflectionExtractor.h"
 #include "ShaderCompiler.h"
 #include "gpu/shaders/PermutationRules.h"
@@ -649,6 +650,17 @@ int main(int argc, char** argv) {
   }
 
   if (!tgfx::WriteReportJson(report, options.outDir)) {
+    return 1;
+  }
+
+  // Cross-language contract checks: the clip contract fields and the chain op codes must match
+  // the C++ constants, otherwise the runtime uploads would silently miss their targets.
+  size_t contractErrors = tgfx::ValidateClipContractFields(report.variants);
+  if (!options.reportOnly && !options.shaderDir.empty()) {
+    contractErrors += tgfx::ValidateChainOpCodes(options.shaderDir);
+  }
+  if (contractErrors > 0) {
+    std::cerr << "Build failed: " << contractErrors << " kernel contract violation(s).\n";
     return 1;
   }
 

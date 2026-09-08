@@ -19,6 +19,7 @@
 #include "GLSLRRectEffect.h"
 #include "core/utils/Log.h"
 #include "gpu/AOTEffect.h"
+#include "gpu/shaders/KernelContract.h"
 
 namespace tgfx {
 
@@ -61,19 +62,19 @@ void GLSLRRectEffect::emitCode(EmitArgs& args) const {
   auto fragBuilder = args.fragBuilder;
   auto uniformHandler = args.uniformHandler;
 
-  const auto rectName =
-      uniformHandler->addUniform("LocalRect", UniformFormat::Float4, ShaderStage::Fragment);
-  const auto radiiXName =
-      uniformHandler->addUniform("RadiiX", UniformFormat::Float4, ShaderStage::Fragment);
-  const auto radiiYName =
-      uniformHandler->addUniform("RadiiY", UniformFormat::Float4, ShaderStage::Fragment);
-  const auto antiAliasName =
-      uniformHandler->addUniform("AntiAlias", UniformFormat::Float, ShaderStage::Fragment);
+  const auto rectName = uniformHandler->addUniform(ClipContract::LocalRect, UniformFormat::Float4,
+                                                   ShaderStage::Fragment);
+  const auto radiiXName = uniformHandler->addUniform(ClipContract::RadiiX, UniformFormat::Float4,
+                                                     ShaderStage::Fragment);
+  const auto radiiYName = uniformHandler->addUniform(ClipContract::RadiiY, UniformFormat::Float4,
+                                                     ShaderStage::Fragment);
+  const auto antiAliasName = uniformHandler->addUniform(
+      ClipContract::AntiAlias, UniformFormat::Float, ShaderStage::Fragment);
 
   // Step 1: get local-space coordinate.
   if (needTransform()) {
-    const auto deviceToLocalName =
-        uniformHandler->addUniform("DeviceToLocal", UniformFormat::Float3x3, ShaderStage::Fragment);
+    const auto deviceToLocalName = uniformHandler->addUniform(
+        ClipContract::DeviceToLocal, UniformFormat::Float3x3, ShaderStage::Fragment);
     fragBuilder->codeAppendf("highp vec3 hl = %s * vec3(gl_FragCoord.xy, 1.0);",
                              deviceToLocalName.c_str());
     fragBuilder->codeAppend("highp vec2 local = hl.xy / hl.z;");
@@ -142,27 +143,27 @@ void GLSLRRectEffect::emitCode(EmitArgs& args) const {
 }
 
 void GLSLRRectEffect::onSetData(UniformData*, UniformData* fragmentUniformData) const {
-  fragmentUniformData->setData("LocalRect", localRect);
+  fragmentUniformData->setData(ClipContract::LocalRect, localRect);
   // Pack the per-corner radii into two vec4 uniforms (RadiiX, RadiiY) in [TL, TR, BR, BL]
   // order to match the shader.
   const std::array<float, 4> radiiXValues = {radii[0].x, radii[1].x, radii[2].x, radii[3].x};
   const std::array<float, 4> radiiYValues = {radii[0].y, radii[1].y, radii[2].y, radii[3].y};
-  fragmentUniformData->setData("RadiiX", radiiXValues);
-  fragmentUniformData->setData("RadiiY", radiiYValues);
+  fragmentUniformData->setData(ClipContract::RadiiX, radiiXValues);
+  fragmentUniformData->setData(ClipContract::RadiiY, radiiYValues);
   const float antiAliasValue = antiAlias ? 1.0f : 0.0f;
-  fragmentUniformData->setData("AntiAlias", antiAliasValue);
+  fragmentUniformData->setData(ClipContract::AntiAlias, antiAliasValue);
   // The precompiled clip contract always declares DeviceToLocal (identity for a device-space
   // rrect), so upload it whenever the field exists; the JIT block only declares it when a
   // transform applies.
-  if (fragmentUniformData->hasField("DeviceToLocal")) {
-    fragmentUniformData->setData("DeviceToLocal", deviceToLocal());
+  if (fragmentUniformData->hasField(ClipContract::DeviceToLocal)) {
+    fragmentUniformData->setData(ClipContract::DeviceToLocal, deviceToLocal());
   }
   // The precompiled clip contract selects the rrect kernel branch through HasClip == 2; the
   // LocalRect/RadiiX/RadiiY/AntiAlias/DeviceToLocal fields above share names with the JIT block,
   // so those uploads already populate the contract.
-  if (fragmentUniformData->hasField("HasClip")) {
+  if (fragmentUniformData->hasField(ClipContract::HasClip)) {
     int hasClip = 2;
-    fragmentUniformData->setData("HasClip", hasClip);
+    fragmentUniformData->setData(ClipContract::HasClip, hasClip);
   }
 }
 

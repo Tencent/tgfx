@@ -47,6 +47,10 @@
 
 namespace tgfx {
 
+// M_PI is a POSIX extension that MSVC does not define without _USE_MATH_DEFINES, so the star
+// fixtures carry their own constant.
+constexpr float kStarPi = 3.14159265358979323846f;
+
 #ifndef TGFX_BACKEND_NAME
 #define TGFX_BACKEND_NAME "opengl"
 #endif
@@ -1465,8 +1469,8 @@ static void RenderChainClipSceneOnce(ChainClipScene scene, bool useBundle, Bitma
       for (int i = 0; i < 10; ++i) {
         float angle = static_cast<float>(i) * 36.0f - 90.0f;
         float radius = (i % 2 == 0) ? 86.0f : 36.0f;
-        float x = 90.0f + radius * cosf(angle * static_cast<float>(M_PI) / 180.0f);
-        float y = 90.0f + radius * sinf(angle * static_cast<float>(M_PI) / 180.0f);
+        float x = 90.0f + radius * cosf(angle * kStarPi / 180.0f);
+        float y = 90.0f + radius * sinf(angle * kStarPi / 180.0f);
         if (i == 0) {
           star.moveTo(x, y);
         } else {
@@ -1485,8 +1489,8 @@ static void RenderChainClipSceneOnce(ChainClipScene scene, bool useBundle, Bitma
       for (int i = 0; i < 10; ++i) {
         float angle = static_cast<float>(i) * 36.0f - 90.0f;
         float radius = (i % 2 == 0) ? 86.0f : 36.0f;
-        float x = 90.0f + radius * cosf(angle * static_cast<float>(M_PI) / 180.0f);
-        float y = 90.0f + radius * sinf(angle * static_cast<float>(M_PI) / 180.0f);
+        float x = 90.0f + radius * cosf(angle * kStarPi / 180.0f);
+        float y = 90.0f + radius * sinf(angle * kStarPi / 180.0f);
         if (i == 0) {
           star.moveTo(x, y);
         } else {

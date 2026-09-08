@@ -22,24 +22,26 @@
 #include <vector>
 #include "gpu/AOTEffect.h"
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/shaders/KernelContract.h"
 
 namespace tgfx {
 
 /// The runtime operator of one chain slot. The integer values are part of the precompiled kernel
-/// ABI: they must match the OP_* constants in pointwise_chain.inc.
+/// ABI: they must match the OP_* constants in pointwise_chain.inc, which shader_build_tool
+/// validates against the shared ChainOp constants at bundle build time.
 enum class AOTChainOp : int {
-  ColorMatrix = 0,
-  Luma = 1,
-  AlphaThreshold = 2,
-  ColorSpaceXform = 3,
-  None = 4,
-  Texture = 5,
-  ConstColor = 6,
-  Blend = 7,
-  AARectCoverage = 8,
-  Gradient = 9,
-  LocalRectCoverage = 10,
-  RRectCoverage = 11,
+  ColorMatrix = ChainOp::ColorMatrix,
+  Luma = ChainOp::Luma,
+  AlphaThreshold = ChainOp::AlphaThreshold,
+  ColorSpaceXform = ChainOp::ColorSpaceXform,
+  None = ChainOp::None,
+  Texture = ChainOp::Texture,
+  ConstColor = ChainOp::ConstColor,
+  Blend = ChainOp::Blend,
+  AARectCoverage = ChainOp::AARectCoverage,
+  Gradient = ChainOp::Gradient,
+  LocalRectCoverage = ChainOp::LocalRectCoverage,
+  RRectCoverage = ChainOp::RRectCoverage,
 };
 
 /// One node of a pointwise DAG after flattening into the fused kernel's slot array. in0/in1 are

@@ -19,6 +19,7 @@
 #include "GLSLRectEffect.h"
 #include "core/utils/Log.h"
 #include "gpu/AOTEffect.h"
+#include "gpu/shaders/KernelContract.h"
 
 namespace tgfx {
 
@@ -59,15 +60,15 @@ void GLSLRectEffect::emitCode(EmitArgs& args) const {
   auto fragBuilder = args.fragBuilder;
   auto uniformHandler = args.uniformHandler;
 
-  const auto rectName =
-      uniformHandler->addUniform("LocalRect", UniformFormat::Float4, ShaderStage::Fragment);
-  const auto antiAliasName =
-      uniformHandler->addUniform("AntiAlias", UniformFormat::Float, ShaderStage::Fragment);
+  const auto rectName = uniformHandler->addUniform(ClipContract::LocalRect, UniformFormat::Float4,
+                                                   ShaderStage::Fragment);
+  const auto antiAliasName = uniformHandler->addUniform(
+      ClipContract::AntiAlias, UniformFormat::Float, ShaderStage::Fragment);
 
   // Step 1: get local-space coordinates.
   if (needTransform()) {
-    const auto deviceToLocalName =
-        uniformHandler->addUniform("DeviceToLocal", UniformFormat::Float3x3, ShaderStage::Fragment);
+    const auto deviceToLocalName = uniformHandler->addUniform(
+        ClipContract::DeviceToLocal, UniformFormat::Float3x3, ShaderStage::Fragment);
     fragBuilder->codeAppendf("highp vec3 hl = %s * vec3(gl_FragCoord.xy, 1.0);",
                              deviceToLocalName.c_str());
     fragBuilder->codeAppend("highp vec2 local = hl.xy / hl.z;");
@@ -95,24 +96,24 @@ void GLSLRectEffect::emitCode(EmitArgs& args) const {
 }
 
 void GLSLRectEffect::onSetData(UniformData*, UniformData* fragmentUniformData) const {
-  fragmentUniformData->setData("LocalRect", localRect);
+  fragmentUniformData->setData(ClipContract::LocalRect, localRect);
   const float antiAliasValue = antiAlias ? 1.0f : 0.0f;
-  fragmentUniformData->setData("AntiAlias", antiAliasValue);
+  fragmentUniformData->setData(ClipContract::AntiAlias, antiAliasValue);
   if (needTransform()) {
-    fragmentUniformData->setData("DeviceToLocal", deviceToLocal());
+    fragmentUniformData->setData(ClipContract::DeviceToLocal, deviceToLocal());
   }
-  if (fragmentUniformData->hasField("Rect") && isDeviceSpaceRect()) {
+  if (fragmentUniformData->hasField(ClipContract::Rect) && isDeviceSpaceRect()) {
     // The precompiled level1 kernels evaluate a direct analytic clip through the shared
     // Rect/HasClip contract (clip_coverage.inc), which expects the device-space rect
     // uploaded half a pixel outward so the coverage ramp centers on the geometric boundary.
-    fragmentUniformData->setData("Rect", localRect.makeOutset(0.5f, 0.5f));
+    fragmentUniformData->setData(ClipContract::Rect, localRect.makeOutset(0.5f, 0.5f));
   }
-  if (fragmentUniformData->hasField("HasClip")) {
+  if (fragmentUniformData->hasField(ClipContract::HasClip)) {
     // HasClip selects the contract branch: 1 = device-space AA rect (Rect with the half-pixel
     // outset above), 3 = local-space AA rect (LocalRect/DeviceToLocal, written by the JIT-path
     // uploads above with the exact local rect and the device-to-local matrix).
     int hasClip = isDeviceSpaceRect() ? 1 : 3;
-    fragmentUniformData->setData("HasClip", hasClip);
+    fragmentUniformData->setData(ClipContract::HasClip, hasClip);
   }
 }
 
