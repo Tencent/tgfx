@@ -160,10 +160,8 @@ TGFX_TEST(VectorLayerTest, MultiStrokeContentShapeExactness) {
   auto singleStrokeShape = singleStrokeLayer->getContentShapeForTesting();
   ASSERT_TRUE(singleStrokeShape.has_value());
   EXPECT_TRUE(singleStrokeShape->shape != nullptr);
-  // The fill surface stays exact with a decorative stroke attached.
-  EXPECT_TRUE(singleStrokeShape->fillShape != nullptr);
   RRect fillRRect = {};
-  EXPECT_TRUE(singleStrokeShape->fillShape->getPath().isRRect(&fillRRect));
+  EXPECT_TRUE(singleStrokeShape->shape->getPath().isRRect(&fillRRect));
   EXPECT_EQ(fillRRect.rect(), Rect::MakeXYWH(50, 50, 100, 100));
 
   auto multiStrokeLayer = ContentShapeVectorLayer::Make();
@@ -177,8 +175,7 @@ TGFX_TEST(VectorLayerTest, MultiStrokeContentShapeExactness) {
   EXPECT_TRUE(multiStrokeShape->shape != nullptr);
   EXPECT_EQ(multiStrokeShape->strokeWidth, 10.0f);
   EXPECT_EQ(multiStrokeShape->strokeAlign, StrokeAlign::Center);
-  EXPECT_TRUE(multiStrokeShape->fillShape != nullptr);
-  EXPECT_TRUE(multiStrokeShape->fillShape->getPath().isRRect(&fillRRect));
+  EXPECT_TRUE(multiStrokeShape->shape->getPath().isRRect(&fillRRect));
   EXPECT_EQ(fillRRect.rect(), Rect::MakeXYWH(50, 50, 100, 100));
 
   auto fillOnlyLayer = ContentShapeVectorLayer::Make();
@@ -186,7 +183,6 @@ TGFX_TEST(VectorLayerTest, MultiStrokeContentShapeExactness) {
   auto fillOnlyShape = fillOnlyLayer->getContentShapeForTesting();
   ASSERT_TRUE(fillOnlyShape.has_value());
   EXPECT_TRUE(fillOnlyShape->shape != nullptr);
-  EXPECT_TRUE(fillOnlyShape->fillShape != nullptr);
 
   auto multipleGeometryLayer = ContentShapeVectorLayer::Make();
   multipleGeometryLayer->setContents(MakeMultipleGeometryContents());
@@ -203,8 +199,6 @@ TGFX_TEST(VectorLayerTest, MultiStrokeContentShapeExactness) {
   transparentFillLayer->setContents(MakeTransparentFillStrokeContents());
   auto transparentFillShape = transparentFillLayer->getContentShapeForTesting();
   ASSERT_TRUE(transparentFillShape.has_value());
-  // An invisible fill contributes no fill surface.
-  EXPECT_TRUE(transparentFillShape->fillShape == nullptr);
 }
 
 TGFX_TEST(VectorLayerTest, GlassStyleMultiStrokeRoundedCorner) {

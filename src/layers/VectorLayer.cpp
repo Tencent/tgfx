@@ -179,17 +179,6 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
   }
   // Non-shared geometries cannot produce a single exact outline or fill surface: nullopt.
 
-  // The fill surface only needs the shared geometry, so it stays exact regardless of how many
-  // decorative strokes are stacked on top of it.
-  if (contentShape.has_value() && geometryShared && hasFill && sharedGeometry != nullptr) {
-    auto fillShape = sharedGeometry->getShape();
-    if (fillShape != nullptr) {
-      fillShape = Shape::ApplyMatrix(fillShape, sharedGeometry->matrix);
-      if (fillShape != nullptr) {
-        contentShape->fillShape = fillShape;
-      }
-    }
-  }
   return contentShape;
 }
 

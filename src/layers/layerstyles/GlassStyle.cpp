@@ -130,11 +130,11 @@ struct GlassShapeInfo {
 };
 
 // Detects the glass optical surface: the fill surface expanded by the decorative stroke outset,
-// so semi-transparent strokes lying on the glass refract the backdrop too. The fill surface comes
-// from fillShape when available; without fillShape, exact Fill and FillStroke shapes carry the
-// same fill path. Regular shapes (RoundedRect or Ellipse) expand analytically and use the
-// analytical SDF path; pure Stroke shapes and shapes without an exact outline (null) fall back to
-// AlphaMask.
+// so semi-transparent strokes lying on the glass also refract the backdrop too. The fill surface
+// is the shape's path (a Fill/FillStroke shape carries the fill geometry; the stroke is carried
+// separately in strokeWidth/strokeAlign). Regular shapes (RoundedRect or Ellipse) expand
+// analytically and use the analytical SDF path; pure Stroke shapes and shapes without an exact
+// outline (null) fall back to AlphaMask.
 static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
   GlassShapeInfo info;
   auto* contourSource = input.findExtraSource(StyleInputSource::Type::Contour);
@@ -146,12 +146,9 @@ static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
     return info;
   }
   const auto& optShape = contour->shape();
-  auto surfaceShape = optShape->fillShape;
-  if (surfaceShape == nullptr) {
-    if (optShape->shape == nullptr || optShape->type == StyledShapeType::Stroke) {
-      return info;
-    }
-    surfaceShape = optShape->shape;
+  auto surfaceShape = optShape->shape;
+  if (surfaceShape == nullptr || optShape->type == StyledShapeType::Stroke) {
+    return info;
   }
   auto path = surfaceShape->getPath();
 

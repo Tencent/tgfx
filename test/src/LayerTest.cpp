@@ -4219,8 +4219,7 @@ TGFX_TEST_PRIVATE(LayerTest, ShapeLayerContentShapeExactness) {
                       // Stacked stroke styles share the layer's single width and alignment, so the
                       // contour stays exact no matter how many are stacked.
                       EXPECT_EQ(multipleStrokes->type, StyledShapeType::FillStroke);
-                      EXPECT_TRUE(multipleStrokes->shape != nullptr);
-                      EXPECT_TRUE(multipleStrokes->fillShape != nullptr);)
+                      EXPECT_TRUE(multipleStrokes->shape != nullptr);)
 
   auto multipleFills = ShapeLayer::Make();
   multipleFills->setPath(path);

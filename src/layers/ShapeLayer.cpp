@@ -270,13 +270,7 @@ std::optional<StyledShape> ShapeLayer::onGetContentShape() {
   // only changes how that outline is displayed, not its geometry, so it is treated as a solid
   // stroke. Stacked stroke styles share the layer's single line width and alignment (they only
   // differ in color), so the contour stays exact no matter how many are stacked.
-  auto contentShape = StyledShape::Make(Shape::MakeFrom(_shape->getPath()), type, stroke.width,
-                                        static_cast<StrokeAlign>(shapeBitFields.strokeAlign));
-  // The layer has a single geometry, so its fill surface stays exact no matter how many decorative
-  // strokes are stacked on top of it.
-  if (fillCount > 0) {
-    contentShape.fillShape = Shape::MakeFrom(_shape->getPath());
-  }
-  return contentShape;
+  return StyledShape::Make(Shape::MakeFrom(_shape->getPath()), type, stroke.width,
+                           static_cast<StrokeAlign>(shapeBitFields.strokeAlign));
 }
 }  // namespace tgfx

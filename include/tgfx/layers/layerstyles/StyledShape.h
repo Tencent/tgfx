@@ -61,8 +61,10 @@ struct StyledShape {
   Rect getBounds() const;
 
   /**
-   * The vector shape of this StyledShape. A non-null shape exactly matches the rendered content
-   * outline; producers must never populate it with an approximation. Null means the outline
+   * The vector shape of this StyledShape: the underlying geometry (the fill path) of the content.
+   * For Fill/FillStroke types the rendered outline derives from this path expanded by
+   * strokeWidth/strokeAlign; for Stroke types it is the stroke centerline. A non-null shape is
+   * always exact; producers must never populate it with an approximation. Null means the outline
    * cannot be represented by a single StyledShape (for example, multiple distinct geometries).
    * Stacked strokes are merged into one equivalent centered stroke by VectorLayer, so they stay
    * exact. When the shape is null, the type only describes the content composition (whether
@@ -85,16 +87,6 @@ struct StyledShape {
    * The stroke alignment. Valid when type is Stroke or FillStroke.
    */
   StrokeAlign strokeAlign = StrokeAlign::Center;
-
-  /**
-   * The fill surface of the layer, independent of decorative strokes. Producers set it whenever
-   * the visible fills lie on a single exact geometry, even when the combined fill and stroke
-   * content cannot be represented by one StyledShape (shape is null). The surface shares the
-   * content's center: stroke outsets are symmetric around a single closed geometry. Consumers
-   * that define an optical surface, such as GlassStyle, should prefer this shape over shape and
-   * expand it by the stroke outset when strokes participate in the optical surface.
-   */
-  std::shared_ptr<Shape> fillShape = nullptr;
 };
 
 }  // namespace tgfx
