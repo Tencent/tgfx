@@ -4273,7 +4273,7 @@ static std::shared_ptr<VectorLayer> MakeMultiStrokeVectorLayer(bool withFill) {
 
 // The spread shadow must survive the loss of the exact outline: stacked strokes drop the
 // StyledShape (null shape or nullopt), so the spread footprint has to come from SpreadUtils'
-// content-image bounds fallback.
+// fallback path (the producer-provided approximate bounds).
 TGFX_TEST(LayerTest, DropShadowSpreadWithoutExactShape) {
   ContextScope scope;
   auto context = scope.getContext();

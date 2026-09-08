@@ -66,8 +66,8 @@ struct StyledShape {
    * cannot be represented by a single StyledShape (for example, stacked strokes with different
    * widths). When the shape is null, the type only describes the content composition (whether
    * strokes are visible) and carries no geometric promise. Geometry-insensitive consumers, such
-   * as SpreadUtils, may derive their own approximation; geometry-sensitive consumers must fall
-   * back to non-vector paths.
+   * as SpreadUtils, may use the producer-provided approximate bounds carried separately by
+   * ContourInputSource; geometry-sensitive consumers must fall back to non-vector paths.
    */
   std::shared_ptr<Shape> shape = nullptr;
 
