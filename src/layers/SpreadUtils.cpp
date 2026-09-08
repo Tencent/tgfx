@@ -161,36 +161,9 @@ SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInpu
   const auto& shapeOption = contour->shape();
   if (!shapeOption.has_value() || shapeOption->shape == nullptr) {
     // No exact vector outline is available (stacked strokes, text, or layer types without an
-    // exact shape). Spread is geometry-insensitive, so fall back to an approximate footprint:
-    // prefer the producer-declared vector tight bounds; derive the footprint from the rasterized
-    // content image only when those are unavailable (accurate to within one content pixel).
-    Rect rect = contour->approximateBounds();
-    if (rect.isEmpty()) {
-      if (input.content == nullptr || FloatNearlyZero(input.contentScale)) {
-        return {nullptr, {}, false};
-      }
-      auto scale = input.contentScale;
-      rect = Rect::MakeXYWH(input.contentOffset.x / scale, input.contentOffset.y / scale,
-                            static_cast<float>(input.content->width()) / scale,
-                            static_cast<float>(input.content->height()) / scale);
-    }
-    if (rect.width() + 2.0f * spread <= 0.0f || rect.height() + 2.0f * spread <= 0.0f) {
-      return {nullptr, {}, true};
-    }
-    PictureRecorder fallbackRecorder;
-    auto* fallbackCanvas = fallbackRecorder.beginRecording();
-    fallbackCanvas->scale(input.contentScale, input.contentScale);
-    DrawSpreadRRect(fallbackCanvas, RRect::MakeRectXY(rect, 0, 0), StyledShapeType::Fill,
-                    StrokeAlign::Center, 0, spread);
-    auto fallbackPicture = fallbackRecorder.finishRecordingAsPicture();
-    Point fallbackOffset = {};
-    auto fallbackImage = ToImageWithOffset(std::move(fallbackPicture), &fallbackOffset);
-    if (fallbackImage == nullptr) {
-      return {nullptr, {}, false};
-    }
-    return {std::move(fallbackImage),
-            {fallbackOffset.x - input.contentOffset.x, fallbackOffset.y - input.contentOffset.y},
-            false};
+    // exact shape). Skip spread entirely for these, mirroring how design tools disable spread
+    // for complex paths: a bounding-rect approximation would change the shadow shape.
+    return {nullptr, {}, false};
   }
   auto& styledShape = *contour->shape();
   DEBUG_ASSERT(styledShape.shape != nullptr);

@@ -57,12 +57,12 @@ class SpreadUtils {
 
   /**
    * Rasterizes the contentShape with spread applied into a tightly-sized alpha image. Positive
-   * spread outsets the shape, negative spread insets it. When no exact vector shape is available,
-   * the producer-provided approximate bounds (the vector tight bounds of the content, carried by
-   * ContourInputSource) stand in as the spread footprint; the rasterized content image's bounds
-   * serve as a last resort when even those are unavailable. Returns {nullptr, {}, false} when
-   * neither a shape nor any bounds are available. When the shape collapses to empty because the
-   * spread fully consumes the geometry, returns {nullptr, {}, true} with collapsed set to true.
+   * spread outsets the shape, negative spread insets it. When no exact vector shape is available
+   * (complex paths, text, or layer types without an exact shape), the spread is skipped:
+   * {nullptr, {}, false} is returned and callers fall back to the plain (spread-less) shadow,
+   * matching how design tools disable spread for complex paths. When the shape collapses to
+   * empty because the spread fully consumes the geometry, returns {nullptr, {}, true} with
+   * collapsed set to true.
    */
   static SpreadResult MakeSpreadShapeImage(const LayerStyleInput& input, float spread);
 

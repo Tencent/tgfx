@@ -87,13 +87,10 @@ class ContourInputSource : public StyleInputSource {
    * @param image The rasterized contour image.
    * @param imageOffset The contour image offset relative to the content image.
    * @param shape The optional vector shape corresponding to the contour.
-   * @param approximateBounds The vector tight bounds of the rendered content in layer space.
    */
   ContourInputSource(std::shared_ptr<Image> image, Point imageOffset,
-                     std::optional<StyledShape> shape = std::nullopt,
-                     Rect approximateBounds = Rect())
-      : StyleInputSource(Type::Contour, std::move(image), imageOffset), _shape(std::move(shape)),
-        _approximateBounds(approximateBounds) {
+                     std::optional<StyledShape> shape = std::nullopt)
+      : StyleInputSource(Type::Contour, std::move(image), imageOffset), _shape(std::move(shape)) {
   }
 
   /** Returns the optional vector shape corresponding to the contour. */
@@ -101,19 +98,8 @@ class ContourInputSource : public StyleInputSource {
     return _shape;
   }
 
-  /**
-   * Returns an explicitly approximate bounding rect of the rendered content in layer space (the
-   * vector tight bounds of the layer content). This is NOT an exact outline: it is provided for
-   * geometry-insensitive consumers (such as shadow spread) as a fallback footprint when the
-   * exact-or-null shape is null. Geometry-sensitive consumers must ignore it.
-   */
-  Rect approximateBounds() const {
-    return _approximateBounds;
-  }
-
  private:
   std::optional<StyledShape> _shape = std::nullopt;
-  Rect _approximateBounds = {};
 };
 
 /**

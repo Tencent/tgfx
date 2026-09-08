@@ -65,9 +65,8 @@ struct StyledShape {
    * outline; producers must never populate it with an approximation. Null means the outline
    * cannot be represented by a single StyledShape (for example, stacked strokes with different
    * widths). When the shape is null, the type only describes the content composition (whether
-   * strokes are visible) and carries no geometric promise. Geometry-insensitive consumers, such
-   * as SpreadUtils, may use the producer-provided approximate bounds carried separately by
-   * ContourInputSource; geometry-sensitive consumers must fall back to non-vector paths.
+   * strokes are visible) and carries no geometric promise; consumers must skip shape-dependent
+   * enhancements rather than approximate the outline themselves.
    */
   std::shared_ptr<Shape> shape = nullptr;
 
@@ -91,7 +90,8 @@ struct StyledShape {
    * the visible fills lie on a single exact geometry, even when the combined fill and stroke
    * content cannot be represented by one StyledShape (shape is null). The surface shares the
    * content's center: stroke outsets are symmetric around a single closed geometry. Consumers
-   * that define an optical surface, such as GlassStyle, should prefer this shape over shape.
+   * that define an optical surface, such as GlassStyle, should prefer this shape over shape and
+   * expand it by the stroke outset when strokes participate in the optical surface.
    */
   std::shared_ptr<Shape> fillShape = nullptr;
 };

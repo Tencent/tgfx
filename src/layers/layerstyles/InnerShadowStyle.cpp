@@ -117,7 +117,11 @@ void InnerShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, floa
     drawWithSpread(canvas, input, alpha, blendMode);
     return;
   }
+  drawPlain(canvas, input, alpha, blendMode);
+}
 
+void InnerShadowStyle::drawPlain(Canvas* canvas, const LayerStyleInput& input, float alpha,
+                                 BlendMode blendMode) {
   auto filter = getShadowFilter(input.contentScale);
   if (!filter) {
     return;
@@ -144,6 +148,12 @@ void InnerShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, floa
 void InnerShadowStyle::drawWithSpread(Canvas* canvas, const LayerStyleInput& input, float alpha,
                                       BlendMode blendMode) {
   auto shapeResult = SpreadUtils::MakeSpreadShapeImage(input, 0);
+  if (shapeResult.image == nullptr) {
+    // No exact vector shape: skip the spread shaping and keep the plain (spread-less) inner
+    // shadow, matching how design tools disable spread for complex paths.
+    drawPlain(canvas, input, alpha, blendMode);
+    return;
+  }
   auto spreadShapeResult = SpreadUtils::MakeSpreadShapeImage(input, -_spread);
 
   // Use nearest filtering when there's no blur to avoid edge artifacts caused by linear
@@ -156,9 +166,6 @@ void InnerShadowStyle::drawWithSpread(Canvas* canvas, const LayerStyleInput& inp
 
   if (spreadShapeResult.collapsed) {
     // The mask fully collapsed — shadow fills the entire content area.
-    if (!shapeResult.image) {
-      return;
-    }
     Paint paint = {};
     paint.setBlendMode(blendMode);
     paint.setAlpha(alpha);
@@ -167,7 +174,7 @@ void InnerShadowStyle::drawWithSpread(Canvas* canvas, const LayerStyleInput& inp
                       &paint);
     return;
   }
-  if (!shapeResult.image || !spreadShapeResult.image) {
+  if (!spreadShapeResult.image) {
     return;
   }
 

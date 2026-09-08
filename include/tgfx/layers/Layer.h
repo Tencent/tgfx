@@ -597,13 +597,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
    */
   virtual std::optional<StyledShape> onGetContentShape();
 
-  /**
-   * Returns the vector tight bounds of this layer's rendered content in layer space. The bounds
-   * are an explicitly approximate footprint (not an outline), suitable for geometry-insensitive
-   * consumers such as shadow spread.
-   */
-  Rect getApproximateContentBounds();
-
  private:
   /**
    * Marks the layer as needing to be redrawn. Unlike invalidateContent(), this method only marks
