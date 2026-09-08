@@ -160,9 +160,9 @@ SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInpu
   auto contour = static_cast<const ContourInputSource*>(source);
   const auto& shapeOption = contour->shape();
   if (!shapeOption.has_value() || shapeOption->shape == nullptr) {
-    // No exact vector outline is available (stacked strokes, text, or layer types without an
-    // exact shape). Skip spread entirely for these, mirroring how design tools disable spread
-    // for complex paths: a bounding-rect approximation would change the shadow shape.
+    // No exact vector outline is available (multiple distinct geometries, text, or layer types
+    // without an exact shape). Skip spread entirely for these, mirroring how design tools disable
+    // spread for complex paths: a bounding-rect approximation would change the shadow shape.
     return {nullptr, {}, false};
   }
   auto& styledShape = *contour->shape();

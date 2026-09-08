@@ -63,8 +63,9 @@ struct StyledShape {
   /**
    * The vector shape of this StyledShape. A non-null shape exactly matches the rendered content
    * outline; producers must never populate it with an approximation. Null means the outline
-   * cannot be represented by a single StyledShape (for example, stacked strokes with different
-   * widths). When the shape is null, the type only describes the content composition (whether
+   * cannot be represented by a single StyledShape (for example, multiple distinct geometries).
+   * Stacked strokes are merged into one equivalent centered stroke by VectorLayer, so they stay
+   * exact. When the shape is null, the type only describes the content composition (whether
    * strokes are visible) and carries no geometric promise; consumers must skip shape-dependent
    * enhancements rather than approximate the outline themselves.
    */

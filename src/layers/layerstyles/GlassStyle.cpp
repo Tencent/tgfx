@@ -158,8 +158,8 @@ static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
   // Strokes participate in the glass surface: expand the optical surface by the stroke outset so
   // semi-transparent strokes lying on the glass also refract the backdrop. Inside strokes stay
   // within the fill and need no expansion. Only regular shapes (rect, rrect, oval) are expanded
-  // analytically; irregular paths keep the unexpanded surface (their AlphaMask coverage comes
-  // from the content alpha, which already includes the strokes).
+  // analytically. Irregular paths keep the unexpanded drawing clip, while their distance field
+  // comes from the content alpha, which already includes the strokes.
   auto strokeOutset = 0.0f;
   if (optShape->type == StyledShapeType::FillStroke && optShape->strokeWidth > 0) {
     switch (optShape->strokeAlign) {

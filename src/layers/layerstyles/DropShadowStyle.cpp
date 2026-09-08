@@ -101,9 +101,12 @@ Rect DropShadowStyle::filterBounds(const Rect& srcRect, float contentScale) {
     return srcRect;
   }
   auto bounds = srcRect;
-  if (!FloatNearlyZero(_spread)) {
+  if (_spread > 0) {
     bounds.outset(_spread * contentScale, _spread * contentScale);
   }
+  // A negative spread shrinks the shadow only when an exact vector shape exists; when the spread
+  // is skipped (complex paths, text) the shadow hugs the content, so shrinking the bounds here
+  // would under-report them and could clip the shadow edge in partial redraws.
   return filter->filterBounds(bounds);
 }
 
