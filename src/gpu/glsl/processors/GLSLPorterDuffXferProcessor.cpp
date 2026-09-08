@@ -79,6 +79,12 @@ void GLSLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
 
 void GLSLPorterDuffXferProcessor::setData(UniformData* /*vertexUniformData*/,
                                           UniformData* fragmentUniformData) const {
+  // A runtime-compiled program whose fragment stage declares no uniforms hands over a null block
+  // (the JIT bakes the blend mode into the shader code and a no-dst-texture draw declares nothing
+  // else), so every field access must be guarded.
+  if (fragmentUniformData == nullptr) {
+    return;
+  }
   // For precompiled shaders, blend mode is passed as a uniform rather than baked into shader code.
   // This must be set before the dst-texture early return below: the framebuffer-fetch path has no
   // dst texture yet still reads XPBlendMode, so setting it afterwards would leave it unwritten and
