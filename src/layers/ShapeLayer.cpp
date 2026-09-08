@@ -272,7 +272,13 @@ std::optional<StyledShape> ShapeLayer::onGetContentShape() {
   auto contentShape = StyledShape::Make(Shape::MakeFrom(_shape->getPath()), type, stroke.width,
                                         static_cast<StrokeAlign>(shapeBitFields.strokeAlign));
   if (strokeCount > 1) {
-    contentShape.isExact = false;
+    if (fillCount == 0) {
+      // Stacked strokes with no fill leave neither an exact outline nor a fill surface.
+      return std::nullopt;
+    }
+    // Stacked strokes with different widths cannot be represented by one exact outline: drop the
+    // shape (keeping the composition type) and let the fill surface carry the exact geometry.
+    contentShape.shape = nullptr;
   }
   // The layer has a single geometry, so its fill surface stays exact no matter how many decorative
   // strokes are stacked on top of it.

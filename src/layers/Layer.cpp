@@ -1012,17 +1012,10 @@ void Layer::detachProperty(LayerProperty* property) {
 }
 
 std::optional<StyledShape> Layer::onGetContentShape() {
-  auto* content = getContent();
-  if (content == nullptr) {
-    return std::nullopt;
-  }
-  auto bounds = content->getTightBounds(Matrix::I());
-  if (bounds.isEmpty()) {
-    return std::nullopt;
-  }
-  Path path = {};
-  path.addRect(bounds);
-  return StyledShape::Make(Shape::MakeFrom(path), StyledShapeType::Fill, 0, StrokeAlign::Center);
+  // The default implementation has no exact vector outline to offer: deriving a rect from the
+  // content bounds would be an approximation, which the exact-or-null StyledShape contract
+  // forbids. Layer types whose content is exactly a rect (such as ImageLayer) override this.
+  return std::nullopt;
 }
 
 void Layer::onAttachToRoot(RootLayer* rootLayer) {

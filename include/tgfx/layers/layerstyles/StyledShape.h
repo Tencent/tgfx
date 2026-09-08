@@ -61,7 +61,13 @@ struct StyledShape {
   Rect getBounds() const;
 
   /**
-   * The original vector shape.
+   * The vector shape of this StyledShape. A non-null shape exactly matches the rendered content
+   * outline; producers must never populate it with an approximation. Null means the outline
+   * cannot be represented by a single StyledShape (for example, stacked strokes with different
+   * widths). When the shape is null, the type only describes the content composition (whether
+   * strokes are visible) and carries no geometric promise. Geometry-insensitive consumers, such
+   * as SpreadUtils, may derive their own approximation; geometry-sensitive consumers must fall
+   * back to non-vector paths.
    */
   std::shared_ptr<Shape> shape = nullptr;
 
@@ -81,15 +87,9 @@ struct StyledShape {
   StrokeAlign strokeAlign = StrokeAlign::Center;
 
   /**
-   * Whether the shape exactly matches the rendered content outline. VectorLayer and ShapeLayer set
-   * this to false when their visible content cannot be represented by one StyledShape.
-   */
-  bool isExact = true;
-
-  /**
    * The fill surface of the layer, independent of decorative strokes. Producers set it whenever
    * the visible fills lie on a single exact geometry, even when the combined fill and stroke
-   * content cannot be represented by one StyledShape (isExact is false). The surface shares the
+   * content cannot be represented by one StyledShape (shape is null). The surface shares the
    * content's center: stroke outsets are symmetric around a single closed geometry. Consumers
    * that define an optical surface, such as GlassStyle, should prefer this shape over shape.
    */

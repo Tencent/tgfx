@@ -97,18 +97,9 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
     return std::nullopt;
   }
 
-  auto getApproximateContentShape = [this]() {
-    auto contentShape = Layer::onGetContentShape();
-    if (contentShape.has_value()) {
-      contentShape->isExact = false;
-    }
-    return contentShape;
-  };
-
-  // Only a single shared geometry across all painters with a uniform stroke style can be
-  // simplified to a StyledShape. The scan collects flags instead of returning early because the
-  // fill surface stays derivable from the shared geometry even when the combined content falls
-  // back to the approximate bounds shape below.
+  // Only a single shared geometry across all painters can be simplified to a StyledShape. The
+  // scan collects flags instead of returning early because the fill surface stays derivable from
+  // the shared geometry even when the combined content drops its exact outline below.
   Geometry* sharedGeometry = nullptr;
   auto geometryShared = true;
   auto hasFill = false;
@@ -138,36 +129,38 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
   }
 
   std::optional<StyledShape> contentShape = std::nullopt;
-  if (!geometryShared || strokeCount > 1) {
-    contentShape = getApproximateContentShape();
-  } else if (sharedGeometry == nullptr) {
-    return std::nullopt;
-  } else {
-    auto shape = sharedGeometry->getShape();
-    if (shape == nullptr) {
-      return std::nullopt;
+  if (geometryShared && sharedGeometry != nullptr) {
+    if (strokeCount <= 1) {
+      auto shape = sharedGeometry->getShape();
+      if (shape != nullptr) {
+        // Baking the geometry matrix into the shape makes spread scale with the layer transform,
+        // like stroke width and other in-layer measurements. This is intentional.
+        shape = Shape::ApplyMatrix(shape, sharedGeometry->matrix);
+      }
+      if (shape != nullptr) {
+        auto hasStroke = strokeStyle.has_value();
+        auto strokeWidth = hasStroke ? strokeStyle->strokeWidth : 0.0f;
+        auto strokeAlign = hasStroke ? strokeStyle->strokeAlign : StrokeAlign::Center;
+        auto type = StyledShapeType::FillStroke;
+        if (!hasStroke) {
+          type = StyledShapeType::Fill;
+        } else if (!hasFill) {
+          type = StyledShapeType::Stroke;
+        }
+        contentShape = StyledShape::Make(std::move(shape), type, strokeWidth, strokeAlign);
+      }
+    } else if (hasFill) {
+      // Stacked strokes with different widths cannot form one exact outline: keep the composition
+      // type (strokes are visible) and let the fill surface carry the exact geometry.
+      contentShape =
+          StyledShape::Make(nullptr, StyledShapeType::FillStroke, 0, StrokeAlign::Center);
     }
-    // Baking the geometry matrix into the shape makes spread scale with the layer transform, like
-    // stroke width and other in-layer measurements. This is intentional.
-    shape = Shape::ApplyMatrix(shape, sharedGeometry->matrix);
-    if (shape == nullptr) {
-      return std::nullopt;
-    }
-
-    auto hasStroke = strokeStyle.has_value();
-    auto strokeWidth = hasStroke ? strokeStyle->strokeWidth : 0.0f;
-    auto strokeAlign = hasStroke ? strokeStyle->strokeAlign : StrokeAlign::Center;
-    auto type = StyledShapeType::FillStroke;
-    if (!hasStroke) {
-      type = StyledShapeType::Fill;
-    } else if (!hasFill) {
-      type = StyledShapeType::Stroke;
-    }
-    contentShape = StyledShape::Make(shape, type, strokeWidth, strokeAlign);
+    // Stacked strokes without a fill leave neither an exact outline nor a fill surface: nullopt.
   }
+  // Non-shared geometries cannot produce a single exact outline or fill surface: nullopt.
 
   // The fill surface only needs the shared geometry, so it stays exact regardless of how many
-  // decorative strokes made the combined content fall back above.
+  // decorative strokes made the combined content drop its exact outline above.
   if (contentShape.has_value() && geometryShared && hasFill && sharedGeometry != nullptr) {
     auto fillShape = sharedGeometry->getShape();
     if (fillShape != nullptr) {

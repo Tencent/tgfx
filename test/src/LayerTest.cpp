@@ -4208,12 +4208,14 @@ TGFX_TEST_PRIVATE(LayerTest, ShapeLayerContentShapeExactness) {
   TGFX_PRIVATE_ACCESS(auto singleStroke = layer->onGetContentShape();
                       ASSERT_TRUE(singleStroke.has_value());
                       EXPECT_EQ(singleStroke->type, StyledShapeType::FillStroke);
-                      EXPECT_TRUE(singleStroke->isExact);)
+                      EXPECT_TRUE(singleStroke->shape != nullptr);)
 
   layer->addStrokeStyle(ShapeStyle::Make(Color::Red()));
   TGFX_PRIVATE_ACCESS(auto multipleStrokes = layer->onGetContentShape();
                       ASSERT_TRUE(multipleStrokes.has_value());
-                      EXPECT_FALSE(multipleStrokes->isExact);)
+                      // Stacked strokes drop the exact outline; the fill surface carries geometry.
+                      EXPECT_TRUE(multipleStrokes->shape == nullptr);
+                      EXPECT_TRUE(multipleStrokes->fillShape != nullptr);)
 
   auto multipleFills = ShapeLayer::Make();
   multipleFills->setPath(path);
@@ -4221,7 +4223,78 @@ TGFX_TEST_PRIVATE(LayerTest, ShapeLayerContentShapeExactness) {
   TGFX_PRIVATE_ACCESS(auto multipleFillShape = multipleFills->onGetContentShape();
                       ASSERT_TRUE(multipleFillShape.has_value());
                       EXPECT_EQ(multipleFillShape->type, StyledShapeType::Fill);
-                      EXPECT_TRUE(multipleFillShape->isExact);)
+                      EXPECT_TRUE(multipleFillShape->shape != nullptr);)
+
+  auto strokeOnly = ShapeLayer::Make();
+  strokeOnly->setPath(path);
+  strokeOnly->addStrokeStyle(ShapeStyle::Make(Color::Blue()));
+  strokeOnly->addStrokeStyle(ShapeStyle::Make(Color::Red()));
+  TGFX_PRIVATE_ACCESS(auto strokeOnlyShape = strokeOnly->onGetContentShape();
+                      // Stacked strokes without a fill leave no shape at all.
+                      EXPECT_FALSE(strokeOnlyShape.has_value());)
+}
+
+static std::optional<uint32_t> RenderSpreadShadowPixel(Context* context,
+                                                       const std::shared_ptr<Layer>& layer, int x,
+                                                       int y) {
+  auto surface = Surface::Make(context, 200, 200);
+  if (surface == nullptr) {
+    return std::nullopt;
+  }
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->root()->addChild(layer);
+  displayList->render(surface.get());
+  auto info = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  uint32_t pixel = 0;
+  if (!surface->readPixels(info, &pixel, x, y)) {
+    return std::nullopt;
+  }
+  return pixel;
+}
+
+static std::shared_ptr<VectorLayer> MakeMultiStrokeVectorLayer(bool withFill) {
+  auto vectorLayer = VectorLayer::Make();
+  auto rectangle = Rectangle::Make();
+  rectangle->setPosition({100, 100});
+  rectangle->setSize({100, 100});
+  rectangle->setRoundness({20, 20, 20, 20});
+  std::vector<std::shared_ptr<VectorElement>> contents = {rectangle};
+  if (withFill) {
+    contents.push_back(FillStyle::Make(SolidColor::Make(Color::FromRGBA(255, 255, 255, 255))));
+  }
+  for (auto width : {10.0f, 6.0f}) {
+    auto stroke = StrokeStyle::Make(SolidColor::Make(Color::FromRGBA(20, 80, 220, 255)));
+    stroke->setStrokeWidth(width);
+    contents.push_back(stroke);
+  }
+  vectorLayer->setContents(std::move(contents));
+  return vectorLayer;
+}
+
+// The spread shadow must survive the loss of the exact outline: stacked strokes drop the
+// StyledShape (null shape or nullopt), so the spread footprint has to come from SpreadUtils'
+// content-image bounds fallback.
+TGFX_TEST(LayerTest, DropShadowSpreadWithoutExactShape) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // The fill spans [50, 150]; the 10px centered stroke extends the content to [45, 155]. With a
+  // spread of 10, the shadow reaches [35, 165], so (100, 40) is outside the content but inside
+  // the spread shadow.
+  for (auto withFill : {true, false}) {
+    auto layer = MakeMultiStrokeVectorLayer(withFill);
+    auto shadowStyle = DropShadowStyle::Make(0, 0, 0, 0, Color::Black());
+    shadowStyle->setSpread(10);
+    layer->setLayerStyles({shadowStyle});
+    auto shadowPixel = RenderSpreadShadowPixel(context, layer, 100, 40);
+    ASSERT_TRUE(shadowPixel.has_value());
+    EXPECT_NE(*shadowPixel, 0u) << "spread shadow missing (withFill=" << withFill << ")";
+    // Far outside the spread footprint the shadow must be absent.
+    auto outsidePixel = RenderSpreadShadowPixel(context, layer, 100, 30);
+    ASSERT_TRUE(outsidePixel.has_value());
+    EXPECT_EQ(*outsidePixel, 0u);
+  }
 }
 
 TGFX_TEST(LayerTest, GlassStyleFillStrokeParity) {
@@ -4243,7 +4316,7 @@ TGFX_TEST(LayerTest, GlassStyleFillStrokeParity) {
       EXPECT_PIXEL_PARITY(fillOnly->edge, withStroke->edge);
       EXPECT_PIXEL_PARITY(fillOnly->refraction, withStroke->refraction);
       // The fill surface stays exact with two decorative strokes, so the refraction must not
-      // change even though the combined content shape falls back to the approximate bounds.
+      // change even though the combined content shape drops its exact outline (null shape).
       EXPECT_PIXEL_PARITY(fillOnly->edge, withTwoStrokes->edge);
       EXPECT_PIXEL_PARITY(fillOnly->refraction, withTwoStrokes->refraction);
       EXPECT_NE(withStroke->refraction, strokeWithoutGlass->refraction);

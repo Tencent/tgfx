@@ -47,4 +47,14 @@ void ImageLayer::onUpdateContent(LayerRecorder* recorder) {
   auto shader = Shader::MakeImageShader(_image, TileMode::Clamp, TileMode::Clamp, _sampling);
   recorder->addRect(rect, LayerPaint(std::move(shader)));
 }
+
+std::optional<StyledShape> ImageLayer::onGetContentShape() {
+  if (!_image) {
+    return std::nullopt;
+  }
+  // The image fills its rect exactly, so the rect is the precise content outline.
+  Path path = {};
+  path.addRect(Rect::MakeWH(_image->width(), _image->height()));
+  return StyledShape::Make(Shape::MakeFrom(path), StyledShapeType::Fill, 0, StrokeAlign::Center);
+}
 }  // namespace tgfx

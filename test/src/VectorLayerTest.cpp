@@ -145,8 +145,8 @@ static std::optional<GlassPixels> RenderRoundedMultiStrokeGlass(
   auto info = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
   GlassPixels pixels = {};
   // The rectangle spans [50, 150] with 20px corners and a 10px centered stroke. The point
-  // (50, 50) is outside the rendered corner but inside the bounds rectangle returned by the
-  // approximate content-shape fallback, so it detects when GlassStyle uses that fallback as exact.
+  // (50, 50) is outside the rendered corner but inside the content bounds, so it detects when
+  // GlassStyle mistakes a non-exact footprint for the exact fill surface.
   if (!surface->readPixels(info, &pixels.outsideCorner, 50, 50) ||
       !surface->readPixels(info, &pixels.center, 100, 100)) {
     return std::nullopt;
@@ -159,7 +159,7 @@ TGFX_TEST(VectorLayerTest, MultiStrokeContentShapeExactness) {
   singleStrokeLayer->setContents(MakeRoundedRectangleContents(false));
   auto singleStrokeShape = singleStrokeLayer->getContentShapeForTesting();
   ASSERT_TRUE(singleStrokeShape.has_value());
-  EXPECT_TRUE(singleStrokeShape->isExact);
+  EXPECT_TRUE(singleStrokeShape->shape != nullptr);
   // The fill surface stays exact with a decorative stroke attached.
   EXPECT_TRUE(singleStrokeShape->fillShape != nullptr);
   RRect fillRRect = {};
@@ -170,8 +170,8 @@ TGFX_TEST(VectorLayerTest, MultiStrokeContentShapeExactness) {
   multiStrokeLayer->setContents(MakeRoundedRectangleContents(true));
   auto multiStrokeShape = multiStrokeLayer->getContentShapeForTesting();
   ASSERT_TRUE(multiStrokeShape.has_value());
-  EXPECT_FALSE(multiStrokeShape->isExact);
-  // The combined content is approximate, but the fill surface is still the exact shared geometry.
+  // Stacked strokes drop the exact outline; the fill surface carries the exact shared geometry.
+  EXPECT_TRUE(multiStrokeShape->shape == nullptr);
   EXPECT_TRUE(multiStrokeShape->fillShape != nullptr);
   EXPECT_TRUE(multiStrokeShape->fillShape->getPath().isRRect(&fillRRect));
   EXPECT_EQ(fillRRect.rect(), Rect::MakeXYWH(50, 50, 100, 100));
@@ -180,23 +180,19 @@ TGFX_TEST(VectorLayerTest, MultiStrokeContentShapeExactness) {
   fillOnlyLayer->setContents(MakeFillOnlyContents());
   auto fillOnlyShape = fillOnlyLayer->getContentShapeForTesting();
   ASSERT_TRUE(fillOnlyShape.has_value());
-  EXPECT_TRUE(fillOnlyShape->isExact);
+  EXPECT_TRUE(fillOnlyShape->shape != nullptr);
   EXPECT_TRUE(fillOnlyShape->fillShape != nullptr);
 
   auto multipleGeometryLayer = ContentShapeVectorLayer::Make();
   multipleGeometryLayer->setContents(MakeMultipleGeometryContents());
   auto multipleGeometryShape = multipleGeometryLayer->getContentShapeForTesting();
-  ASSERT_TRUE(multipleGeometryShape.has_value());
-  EXPECT_FALSE(multipleGeometryShape->isExact);
-  // No unique fill surface across multiple geometries.
-  EXPECT_TRUE(multipleGeometryShape->fillShape == nullptr);
+  // No unique geometry means no exact outline and no fill surface: null shape.
+  EXPECT_FALSE(multipleGeometryShape.has_value());
 
   auto differentGeometryLayer = ContentShapeVectorLayer::Make();
   differentGeometryLayer->setContents(MakeDifferentGeometryContents());
   auto differentGeometryShape = differentGeometryLayer->getContentShapeForTesting();
-  ASSERT_TRUE(differentGeometryShape.has_value());
-  EXPECT_FALSE(differentGeometryShape->isExact);
-  EXPECT_TRUE(differentGeometryShape->fillShape == nullptr);
+  EXPECT_FALSE(differentGeometryShape.has_value());
 
   auto transparentFillLayer = ContentShapeVectorLayer::Make();
   transparentFillLayer->setContents(MakeTransparentFillStrokeContents());

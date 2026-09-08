@@ -158,8 +158,37 @@ SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInpu
     return {nullptr, {}, false};
   }
   auto contour = static_cast<const ContourInputSource*>(source);
-  if (!contour->shape().has_value()) {
-    return {nullptr, {}, false};
+  const auto& shapeOption = contour->shape();
+  if (!shapeOption.has_value() || shapeOption->shape == nullptr) {
+    // No exact vector outline is available (stacked strokes, text, or layer types without an
+    // exact shape). Spread is geometry-insensitive, so derive the footprint from the rasterized
+    // content image instead: it is the content's tight bounds rounded outward by at most one
+    // content pixel.
+    if (input.content == nullptr || FloatNearlyZero(input.contentScale)) {
+      return {nullptr, {}, false};
+    }
+    auto scale = input.contentScale;
+    auto rect = Rect::MakeXYWH(input.contentOffset.x / scale, input.contentOffset.y / scale,
+                               static_cast<float>(input.content->width()) / scale,
+                               static_cast<float>(input.content->height()) / scale);
+    if (rect.isEmpty() || rect.width() + 2.0f * spread <= 0.0f ||
+        rect.height() + 2.0f * spread <= 0.0f) {
+      return {nullptr, {}, true};
+    }
+    PictureRecorder fallbackRecorder;
+    auto* fallbackCanvas = fallbackRecorder.beginRecording();
+    fallbackCanvas->scale(scale, scale);
+    DrawSpreadRRect(fallbackCanvas, RRect::MakeRectXY(rect, 0, 0), StyledShapeType::Fill,
+                    StrokeAlign::Center, 0, spread);
+    auto fallbackPicture = fallbackRecorder.finishRecordingAsPicture();
+    Point fallbackOffset = {};
+    auto fallbackImage = ToImageWithOffset(std::move(fallbackPicture), &fallbackOffset);
+    if (fallbackImage == nullptr) {
+      return {nullptr, {}, false};
+    }
+    return {std::move(fallbackImage),
+            {fallbackOffset.x - input.contentOffset.x, fallbackOffset.y - input.contentOffset.y},
+            false};
   }
   auto& styledShape = *contour->shape();
   DEBUG_ASSERT(styledShape.shape != nullptr);

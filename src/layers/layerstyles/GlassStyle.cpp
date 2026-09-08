@@ -134,9 +134,9 @@ struct GlassShapeInfo {
 
 // Detects whether the layer's fill surface is a regular shape (RoundedRect or Ellipse) that can
 // use the analytical SDF path. The fill surface comes from fillShape when available: it stays
-// exact across decorative strokes, unlike the combined content shape. Without fillShape, exact
-// Fill and FillStroke shapes carry the same fill path; pure Stroke and shapes approximated from
-// content bounds still fall back to AlphaMask.
+// exact across decorative strokes, unlike the combined content shape. Without fillShape, an exact
+// Fill or FillStroke shape carries the same fill path; pure Stroke shapes and shapes without an
+// exact outline (null) fall back to AlphaMask.
 static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
   GlassShapeInfo info;
   auto* contourSource = input.findExtraSource(StyleInputSource::Type::Contour);
@@ -150,13 +150,12 @@ static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
   const auto& optShape = contour->shape();
   auto surfaceShape = optShape->fillShape;
   if (surfaceShape == nullptr) {
-    if (!optShape->isExact || optShape->type == StyledShapeType::Stroke ||
-        optShape->shape == nullptr) {
+    if (optShape->shape == nullptr || optShape->type == StyledShapeType::Stroke) {
       return info;
     }
     surfaceShape = optShape->shape;
   }
-  info.contentIsFillOnly = optShape->type == StyledShapeType::Fill && optShape->isExact;
+  info.contentIsFillOnly = optShape->type == StyledShapeType::Fill;
   auto path = surfaceShape->getPath();
   info.shapePath = path;
   info.hasPath = true;
