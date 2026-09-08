@@ -1014,7 +1014,7 @@ void Layer::detachProperty(LayerProperty* property) {
 std::optional<StyledShape> Layer::onGetContentShape() {
   // The default implementation has no exact vector outline to offer: deriving a rect from the
   // content bounds would be an approximation, which the exact-or-null StyledShape contract
-  // forbids. Layer types whose content is exactly a rect (such as ImageLayer) override this.
+  // forbids. Layer types whose content is an exact vector shape override this.
   return std::nullopt;
 }
 

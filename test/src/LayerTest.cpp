@@ -4272,31 +4272,29 @@ static std::shared_ptr<VectorLayer> MakeMultiGeometryVectorLayer() {
   return vectorLayer;
 }
 
-// Multiple geometries cannot produce a single exact outline: the spread must be skipped and the
-// shadow must fall back to its plain (spread-less) form, hugging the content instead of
-// expanding by the spread.
+// Multiple geometries cannot produce a single exact outline: the spread falls back to the
+// content image's bounds, so it still applies — the shadow expands by the spread from the
+// bounds rect rather than hugging the content.
 TGFX_TEST(LayerTest, DropShadowSpreadWithoutExactShape) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  // Both geometries are centered at (100, 100); the rect spans [50, 150], so the content (and
-  // the plain shadow footprint) ends at 150. The shadow has no blur and a Y offset of 15, so the
-  // plain shadow reaches 165. A spread of 10 would reach 175 — the assertions distinguish the
-  // two.
+  // Both geometries are centered at (100, 100); the rect spans [50, 150], so the content bounds
+  // end at 150. The shadow has no blur and a Y offset of 15, and a spread of 10 expands the
+  // bounds footprint to 160, so the shadow reaches 175.
   auto layer = MakeMultiGeometryVectorLayer();
   auto shadowStyle = DropShadowStyle::Make(0, 15, 0, 0, Color::Black());
   shadowStyle->setSpread(10);
   layer->setLayerStyles({shadowStyle});
-  // Inside the plain shadow footprint (content bottom 150 + offset 15).
-  auto shadowPixel = RenderSpreadShadowPixel(context, layer, 100, 163);
-  ASSERT_TRUE(shadowPixel.has_value());
-  EXPECT_NE(*shadowPixel, 0u) << "plain shadow missing";
-  // Beyond the plain footprint but within the spread-expanded one: the shadow must be absent,
-  // proving the spread was skipped rather than applied.
+  // Within the spread-expanded footprint (150 + 10 + 15).
   auto spreadPixel = RenderSpreadShadowPixel(context, layer, 100, 170);
   ASSERT_TRUE(spreadPixel.has_value());
-  EXPECT_EQ(*spreadPixel, 0u) << "spread was applied without an exact shape";
+  EXPECT_NE(*spreadPixel, 0u) << "spread was not applied from the content bounds";
+  // Beyond the spread-expanded footprint the shadow must be absent.
+  auto outsidePixel = RenderSpreadShadowPixel(context, layer, 100, 180);
+  ASSERT_TRUE(outsidePixel.has_value());
+  EXPECT_EQ(*outsidePixel, 0u);
 }
 
 TGFX_TEST(LayerTest, GlassStyleFillStrokeParity) {

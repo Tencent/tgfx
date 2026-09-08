@@ -160,10 +160,35 @@ SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInpu
   auto contour = static_cast<const ContourInputSource*>(source);
   const auto& shapeOption = contour->shape();
   if (!shapeOption.has_value() || shapeOption->shape == nullptr) {
-    // No exact vector outline is available (multiple distinct geometries, text, or layer types
-    // without an exact shape). Skip spread entirely for these, mirroring how design tools disable
-    // spread for complex paths: a bounding-rect approximation would change the shadow shape.
-    return {nullptr, {}, false};
+    // No single vector outline is available (text, multiple distinct geometries, or layer types
+    // without an exact shape). Fall back to the content image's bounds — contentOffset and the
+    // image size are both on LayerStyleInput, so no producer-side channel is needed, and for
+    // layers whose content is itself a rect (e.g. an opaque image) the bounds are the exact
+    // outline. The rasterized bounds sit within one content pixel of the vector tight bounds.
+    if (input.content == nullptr || FloatNearlyZero(input.contentScale)) {
+      return {nullptr, {}, false};
+    }
+    auto scale = input.contentScale;
+    auto rect = Rect::MakeXYWH(input.contentOffset.x / scale, input.contentOffset.y / scale,
+                               static_cast<float>(input.content->width()) / scale,
+                               static_cast<float>(input.content->height()) / scale);
+    if (rect.width() + 2.0f * spread <= 0.0f || rect.height() + 2.0f * spread <= 0.0f) {
+      return {nullptr, {}, true};
+    }
+    PictureRecorder fallbackRecorder;
+    auto* fallbackCanvas = fallbackRecorder.beginRecording();
+    fallbackCanvas->scale(scale, scale);
+    DrawSpreadRRect(fallbackCanvas, RRect::MakeRectXY(rect, 0, 0), StyledShapeType::Fill,
+                    StrokeAlign::Center, 0, spread);
+    auto fallbackPicture = fallbackRecorder.finishRecordingAsPicture();
+    Point fallbackOffset = {};
+    auto fallbackImage = ToImageWithOffset(std::move(fallbackPicture), &fallbackOffset);
+    if (fallbackImage == nullptr) {
+      return {nullptr, {}, false};
+    }
+    return {std::move(fallbackImage),
+            {fallbackOffset.x - input.contentOffset.x, fallbackOffset.y - input.contentOffset.y},
+            false};
   }
   auto& styledShape = *contour->shape();
   DEBUG_ASSERT(styledShape.shape != nullptr);

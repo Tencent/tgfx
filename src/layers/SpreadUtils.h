@@ -59,10 +59,11 @@ class SpreadUtils {
    * Rasterizes the contentShape with spread applied into a tightly-sized alpha image. Positive
    * spread outsets the shape, negative spread insets it. When the content has no single vector
    * outline (e.g. text, multiple distinct geometries, or a group layer with only children), the
-   * spread is skipped: {nullptr, {}, false} is returned and callers fall back to the plain
-   * (spread-less) shadow. Outlines that exist but have no closed-form spread (irregular paths)
-   * are spread via their bounding rect instead. When the shape collapses to empty because the
-   * spread fully consumes the geometry, returns {nullptr, {}, true} with collapsed set to true.
+   * content image's bounds stand in as the spread footprint. Outlines that exist but have no
+   * closed-form spread (irregular paths) are spread via their bounding rect. When the shape
+   * collapses to empty because the spread fully consumes the geometry, returns {nullptr, {},
+   * true} with collapsed set to true; {nullptr, {}, false} only when no footprint can be derived
+   * at all.
    */
   static SpreadResult MakeSpreadShapeImage(const LayerStyleInput& input, float spread);
 

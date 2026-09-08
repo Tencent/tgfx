@@ -67,8 +67,6 @@ class ImageLayer : public Layer {
 
   void onUpdateContent(LayerRecorder* recorder) override;
 
-  std::optional<StyledShape> onGetContentShape() override;
-
  private:
   SamplingOptions _sampling;
   std::shared_ptr<Image> _image = nullptr;

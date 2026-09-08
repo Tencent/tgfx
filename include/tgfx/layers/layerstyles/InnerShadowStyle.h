@@ -103,9 +103,8 @@ class InnerShadowStyle : public LayerStyle {
    * content image without any spread adjustment.
    * When positive, the shadow coverage grows inward, making the shadow thicker. When negative,
    * the shadow coverage shrinks, making the shadow thinner. The spread is derived from the layer's
-   * applied only when the layer content can be represented as a single vector outline;
-   * otherwise (e.g. a text layer, or a group layer with only children) the spread is ignored
-   * and the inner shadow falls back to its plain (spread-less) form.
+   * derived from the layer's vector shape when the content has a single outline, and from the
+   * content image's bounds otherwise (text, child-only groups), so the spread always applies.
    */
   float spread() const {
     return _spread;

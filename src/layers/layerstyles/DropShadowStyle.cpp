@@ -101,12 +101,9 @@ Rect DropShadowStyle::filterBounds(const Rect& srcRect, float contentScale) {
     return srcRect;
   }
   auto bounds = srcRect;
-  if (_spread > 0) {
+  if (!FloatNearlyZero(_spread)) {
     bounds.outset(_spread * contentScale, _spread * contentScale);
   }
-  // A negative spread shrinks the shadow only when an exact vector shape exists; when the spread
-  // is skipped (complex paths, text) the shadow hugs the content, so shrinking the bounds here
-  // would under-report them and could clip the shadow edge in partial redraws.
   return filter->filterBounds(bounds);
 }
 
@@ -128,16 +125,11 @@ void DropShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float
   Point filterSourceOffset = {};
   if (!FloatNearlyZero(_spread)) {
     auto spreadImage = SpreadUtils::MakeSpreadShapeImage(input, _spread);
-    if (spreadImage.collapsed) {
-      // The geometry fully collapsed under the negative spread; nothing is left to shadow.
+    if (spreadImage.collapsed || spreadImage.image == nullptr) {
       return;
     }
-    if (spreadImage.image != nullptr) {
-      filterSource = std::move(spreadImage.image);
-      filterSourceOffset = spreadImage.offset;
-    }
-    // No exact vector shape: skip the spread expansion and keep the plain (spread-less) shadow
-    // drawn from the content image, matching how design tools disable spread for complex paths.
+    filterSource = std::move(spreadImage.image);
+    filterSourceOffset = spreadImage.offset;
   }
   DEBUG_ASSERT(filterSource != nullptr);
   auto shadowImage = filterSource->makeWithFilter(filter, &offset);
