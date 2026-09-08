@@ -1018,6 +1018,15 @@ std::optional<StyledShape> Layer::onGetContentShape() {
   return std::nullopt;
 }
 
+Rect Layer::getApproximateContentBounds() {
+  auto* content = getContent();
+  if (content == nullptr) {
+    return Rect();
+  }
+  auto bounds = content->getTightBounds(Matrix::I());
+  return bounds.isEmpty() ? Rect() : bounds;
+}
+
 void Layer::onAttachToRoot(RootLayer* rootLayer) {
   _root = rootLayer;
   for (auto& child : _children) {
@@ -1829,6 +1838,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
 
   if (needsContentShape) {
     source->contentShape = getContentShape();
+    source->approximateContentBounds = getApproximateContentBounds();
   }
 
   return source;
@@ -1939,7 +1949,8 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
     auto contourOffset =
         contourImage ? group->contour->offset - contentEntry.offset : Point::Zero();
     styleInput.extraSources.push_back(std::make_shared<ContourInputSource>(
-        std::move(contourImage), contourOffset, source->contentShape));
+        std::move(contourImage), contourOffset, source->contentShape,
+        source->approximateContentBounds));
   }
   layerStyle->draw(canvas, styleInput, alpha);
 }

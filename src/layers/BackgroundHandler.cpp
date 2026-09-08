@@ -354,7 +354,8 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
       contourOffset = group->contour->offset - contentEntry.offset;
     }
     styleInput.extraSources.push_back(std::make_shared<ContourInputSource>(
-        std::move(contourImage), contourOffset, source->contentShape));
+        std::move(contourImage), contourOffset, source->contentShape,
+        source->approximateContentBounds));
   }
   style->draw(canvas, styleInput, alpha);
 }

@@ -591,11 +591,18 @@ class Layer : public std::enable_shared_from_this<Layer> {
   void detachProperty(LayerProperty* property);
 
   /**
-   * Returns the content shape of this layer.
-   * The base class generates a shape from the content's bounding rect. Subclasses can override
-   * this to provide a more precise shape.
+   * Returns the content shape of this layer. A returned shape always matches the rendered
+   * content outline exactly (see StyledShape). The base class returns nullopt; layer types
+   * whose content is exactly a vector shape override this.
    */
   virtual std::optional<StyledShape> onGetContentShape();
+
+  /**
+   * Returns the vector tight bounds of this layer's rendered content in layer space. The bounds
+   * are an explicitly approximate footprint (not an outline), suitable for geometry-insensitive
+   * consumers such as shadow spread.
+   */
+  Rect getApproximateContentBounds();
 
  private:
   /**

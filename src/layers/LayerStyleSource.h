@@ -67,6 +67,11 @@ struct LayerStyleSource {
   // Simplified content shape of the layer for LayerStyles that need vector access (e.g. shadow
   // spread). std::nullopt when no LayerStyle needs it.
   std::optional<StyledShape> contentShape = std::nullopt;
+
+  // Vector tight bounds of the rendered content in layer space. Always available when
+  // contentShape is requested; an explicitly approximate footprint for geometry-insensitive
+  // consumers when the exact-or-null shape carries no geometry.
+  Rect approximateContentBounds = {};
 };
 
 /**
