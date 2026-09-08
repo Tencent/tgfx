@@ -1066,6 +1066,11 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
           TGFX_BACKEND_NAME, static_cast<unsigned long long>(strictNoMatching),
           static_cast<unsigned long long>(strictRuntimeCompiles));
       for (size_t i = 0; i < sortedFallbacks.size(); ++i) {
+        // Deliberate records are provoked on purpose by test fixtures (e.g. the creator-funnel
+        // artifact-miss test) and are already excluded from the production metrics.
+        if (sortedFallbacks[i].record.deliberate) {
+          continue;
+        }
         std::printf("  PENDING %zu. count=%llu reason=%s effect=%s\n", i + 1,
                     static_cast<unsigned long long>(sortedFallbacks[i].count),
                     PrecompiledFallbackReasonName(sortedFallbacks[i].record.reason),

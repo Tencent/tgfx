@@ -1,13 +1,19 @@
 // GlassRefractionShader fragment shader
-// Processor layout: EllipseGeometryProcessor(common color) + GlassRefractionFragmentProcessor(
-// GlassSDF or GlassUDF geometry child). The refraction body, the SDF/UDF geometry math, and the
-// dispersion/lighting branches mirror the runtime emissions expression-for-expression; the
-// geometry child selects GEOMETRY_KIND because it changes the sampler layout.
+// Processor layout: EllipseGeometryProcessor(common color) or QuadPerEdgeAAGeometryProcessor
+// (common color, uvCoord) + GlassRefractionFragmentProcessor(GlassSDF or GlassUDF geometry child).
+// The refraction body, the SDF/UDF geometry math, and the dispersion/lighting branches mirror the
+// runtime emissions expression-for-expression; the geometry child selects GEOMETRY_KIND because it
+// changes the sampler layout.
 // Permutation dimensions (frag):
+//   GP_KIND (0~1): 0=ellipse (analytic edge coverage, vec2 background coordinate),
+//                  1=quad (per-vertex edge coverage, vec3 background coordinate)
 //   GEOMETRY_KIND (0~3): 0=SDF rounded rect, 1=SDF ellipse, 2=UDF, 3=UDF + edge light
 //   HAS_XP (0~2): 0=Empty, 1=PorterDuff DST_TEX, 2=PorterDuff FBF
 #version 450
 
+#ifndef GP_KIND
+#define GP_KIND 0
+#endif
 #ifndef GEOMETRY_KIND
 #define GEOMETRY_KIND 0
 #endif
@@ -38,9 +44,16 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #include "xp_uniforms.inc"
 };
 
+#if GP_KIND == 1
+// Quad form: the background coordinate arrives as a vec3 (perspective-safe; the affine case
+// divides by 1.0), and the quad's per-vertex edge coverage replaces the analytic ellipse coverage.
+layout(location = 0) in vec3 TransformedCoords_0;
+layout(location = 1) in float vCoverage;
+#else
 layout(location = 0) in vec2 vEllipseOffsets;
 layout(location = 1) in vec4 vEllipseRadii;
 layout(location = 2) in vec2 TransformedCoords_0;
+#endif
 
 layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
 #if GEOMETRY_KIND >= 2
@@ -214,8 +227,13 @@ void main() {
   // The refraction body mirrors GLSLGlassRefractionFragmentProcessor::emitCode
   // expression-for-expression; the static dispersion/lighting branches of the runtime emission
   // ride the DispersionOn/LightingOn uniforms here with identical math.
-  vec2 sourceUV = TransformedCoords_0 * GlassOpticsP0.xy;
-  vec2 glassUV = TransformedCoords_0 * GlassOpticsP2.xy + GlassOpticsP3.xy;
+#if GP_KIND == 1
+  vec2 backgroundUV = TransformedCoords_0.xy / TransformedCoords_0.z;
+#else
+  vec2 backgroundUV = TransformedCoords_0;
+#endif
+  vec2 sourceUV = backgroundUV * GlassOpticsP0.xy;
+  vec2 glassUV = backgroundUV * GlassOpticsP2.xy + GlassOpticsP3.xy;
 
   vec4 geometry = glassGeometry(glassUV);
   vec2 refractDir = geometry.xy;
@@ -252,13 +270,16 @@ void main() {
   }
   vec4 outputColor = vec4(finalColor, srcAlpha);
 
-  // The ellipse edge antialiasing enters as the initial coverage, mirroring
-  // EllipseFillShader: coverage_output.inc multiplies the clip term on top and hands
-  // xp_output.inc the uncovered color plus the total coverage.
+  // The initial coverage mirrors EllipseFillShader (analytic edge alpha) for the ellipse form and
+  // the quad's per-vertex edge coverage for the quad form; coverage_output.inc multiplies the clip
+  // term on top and hands xp_output.inc the uncovered color plus the total coverage.
+#if GP_KIND == 1
+#define TGFX_INITIAL_COVERAGE vec4(vCoverage)
+#else
   highp float edgeAlpha = ellipseEdgeCoverage(vEllipseOffsets, vEllipseRadii, StrokeEnabled);
-
-#define TGFX_COVERAGE_SRC_COLOR outputColor
 #define TGFX_INITIAL_COVERAGE vec4(edgeAlpha)
+#endif
+#define TGFX_COVERAGE_SRC_COLOR outputColor
 #include "coverage_output.inc"
 #include "xp_output.inc"
 }

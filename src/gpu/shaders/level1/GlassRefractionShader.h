@@ -22,40 +22,46 @@
 
 namespace tgfx {
 
-/// Precompiled shader declaration for GlassRefractionFragmentProcessor bound to
-/// EllipseGeometryProcessor in its common-color form (the Glass terminal draw). The geometry child
+/// Precompiled shader declaration for GlassRefractionFragmentProcessor, bound to either
+/// EllipseGeometryProcessor in its common-color form (the oval glass terminal draw) or
+/// QuadPerEdgeAAGeometryProcessor in its common-color uvCoord form (the rect-like glass terminal
+/// draw, whose per-edge vertex coverage replaces the analytic ellipse coverage). The geometry child
 /// selects the GEOMETRY_KIND compile-time dimension because it changes the sampler layout: the SDF
 /// kinds are purely procedural (source texture only), while the UDF kinds add the height mask and
 /// the edge-light mask. Dispersion and edge lighting ride runtime-uniform branches that mirror the
 /// runtime emission's static branches expression-for-expression, so they add no variants.
 ///
 /// Vertex dimensions:
-///   (none — the Glass draw always uses the common-color attribute layout)
+///   GP_KIND (int, 2 values): 0=Ellipse common color, 1=QuadPerEdgeAA (uvCoord + edge coverage)
 ///
 /// Fragment dimensions:
+///   GP_KIND (int, 2 values): selects the initial-coverage source and the coordinate varying form
 ///   GEOMETRY_KIND (int, 4 values): 0=SDF rounded rect, 1=SDF ellipse, 2=UDF, 3=UDF + edge light
 ///   HAS_XP (int, 3 values): XferProcessor type
 class GlassRefractionShader : public PrecompiledShader {
  public:
   struct VertDims {
-    enum : uint32_t { COUNT };
+    enum : uint32_t { GP_KIND, COUNT };
     static PermutationDomain domain() {
-      return PermutationDomain({});
+      return PermutationDomain({
+          PermutationInt("GP_KIND", 2),
+      });
     }
   };
   using VD = VertDims;
 
   struct FragDims {
-    enum : uint32_t { GEOMETRY_KIND, HAS_XP, COUNT };
+    enum : uint32_t { GP_KIND, GEOMETRY_KIND, HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
+          PermutationInt("GP_KIND", 2),
           PermutationInt("GEOMETRY_KIND", 4),
           PermutationInt("HAS_XP", 3),
       });
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 2, "Update info() when fragment dimensions change.");
+  static_assert(FD::COUNT == 3, "Update info() when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"GlassRefractionShader",
@@ -64,7 +70,7 @@ class GlassRefractionShader : public PrecompiledShader {
             VD::domain(),
             FD::domain(),
             PermutationDomain({}),
-            "EllipseGeometryProcessor",
+            "",
             ""};
   }
 };

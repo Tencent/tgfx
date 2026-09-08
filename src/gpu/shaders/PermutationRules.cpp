@@ -820,30 +820,38 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateGlassUDFTentBlurReachable() {
 }
 
 std::optional<RuleComposedValues> ComposeGlassRefraction(const GlassRefractionInputs& inputs) {
-  if (inputs.geometryKind < 0 || inputs.xpType < 0) {
+  if (inputs.gpKind < 0 || inputs.geometryKind < 0 || inputs.xpType < 0) {
     return std::nullopt;
   }
   using FD = GlassRefractionShader::FD;
+  using VD = GlassRefractionShader::VD;
   RuleComposedValues values;
   values.fragValues.resize(FD::COUNT);
+  values.fragValues[FD::GP_KIND] = inputs.gpKind;
   values.fragValues[FD::GEOMETRY_KIND] = inputs.geometryKind;
   values.fragValues[FD::HAS_XP] = inputs.xpType;
+  values.vertValues.resize(VD::COUNT);
+  values.vertValues[VD::GP_KIND] = inputs.gpKind;
   return values;
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateGlassRefractionReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
-  for (int geometryKind = 0; geometryKind < 4; ++geometryKind) {
-    for (int xpType = 0; xpType <= 2; ++xpType) {
-      GlassRefractionInputs inputs;
-      inputs.geometryKind = geometryKind;
-      inputs.xpType = xpType;
-      auto composed = ComposeGlassRefraction(inputs);
-      if (!composed) {
-        continue;
+  for (int gpKind = 0; gpKind < 2; ++gpKind) {
+    for (int geometryKind = 0; geometryKind < 4; ++geometryKind) {
+      for (int xpType = 0; xpType <= 2; ++xpType) {
+        GlassRefractionInputs inputs;
+        inputs.gpKind = gpKind;
+        inputs.geometryKind = geometryKind;
+        inputs.xpType = xpType;
+        auto composed = ComposeGlassRefraction(inputs);
+        if (!composed) {
+          continue;
+        }
+        auto vertIndex = GlassRefractionShader::VD::domain().encode(composed->vertValues);
+        auto fragIndex = GlassRefractionShader::FD::domain().encode(composed->fragValues);
+        result.insert({vertIndex, fragIndex});
       }
-      auto fragIndex = GlassRefractionShader::FD::domain().encode(composed->fragValues);
-      result.insert({0, fragIndex});
     }
   }
   return result;

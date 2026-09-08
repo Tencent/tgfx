@@ -1237,14 +1237,29 @@ static std::optional<PermutationMatchResult> TryMatchGlassUDFTentBlur(
 static std::optional<PermutationMatchResult> TryMatchGlassRefraction(
     const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
-  if (gp == nullptr || gp->name() != "EllipseGeometryProcessor") {
+  if (gp == nullptr) {
     return std::nullopt;
   }
-  // The declaration's vertex layout is the common-color attribute form, so a per-vertex color
-  // ellipse cannot ride it. The QuadPerEdgeAA form of the Glass draw stays on the fallback route
-  // until a real workload asks for it.
-  auto* egp = static_cast<const EllipseGeometryProcessor*>(gp);
-  if (!egp->hasCommonColor()) {
+  // The GP selects the vertex layout and the initial-coverage source. Both forms must be the
+  // common-color attribute layout: the kernels read the Color uniform, and a per-vertex color
+  // draw would quantize fractional paint colors through the UByte4 attribute.
+  int gpKind = -1;
+  if (gp->name() == "EllipseGeometryProcessor") {
+    auto* egp = static_cast<const EllipseGeometryProcessor*>(gp);
+    if (!egp->hasCommonColor()) {
+      return std::nullopt;
+    }
+    gpKind = 0;
+  } else if (gp->name() == "QuadPerEdgeAAGeometryProcessor") {
+    auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
+    // The quad vertex reads the uvCoord attribute for the background transform and the per-edge
+    // coverage for the glass edge alpha; a subset-carrying quad has a different transform
+    // contract and stays on the fallback route.
+    if (!quadGP->hasCommonColor() || !quadGP->hasUVMatrix() || quadGP->getHasSubset()) {
+      return std::nullopt;
+    }
+    gpKind = 1;
+  } else {
     return std::nullopt;
   }
   if (programInfo->numColorFragmentProcessors() != 1 || programInfo->numFragmentProcessors() != 1) {
@@ -1280,14 +1295,16 @@ static std::optional<PermutationMatchResult> TryMatchGlassRefraction(
     return std::nullopt;
   }
   GlassRefractionInputs inputs;
+  inputs.gpKind = gpKind;
   inputs.geometryKind = geometryKind;
   inputs.xpType = xpType;
   auto composed = ComposeGlassRefraction(inputs);
   if (!composed) {
     return std::nullopt;
   }
+  auto vertIndex = GlassRefractionShader::VD::domain().encode(composed->vertValues);
   auto fragIndex = GlassRefractionShader::FD::domain().encode(composed->fragValues);
-  return PermutationMatchResult{"GlassRefractionShader", 0, fragIndex};
+  return PermutationMatchResult{"GlassRefractionShader", vertIndex, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchHairlineLine(const ProgramInfo* programInfo) {
