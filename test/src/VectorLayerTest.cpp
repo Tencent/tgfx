@@ -170,8 +170,13 @@ TGFX_TEST(VectorLayerTest, MultiStrokeContentShapeExactness) {
   multiStrokeLayer->setContents(MakeRoundedRectangleContents(true));
   auto multiStrokeShape = multiStrokeLayer->getContentShapeForTesting();
   ASSERT_TRUE(multiStrokeShape.has_value());
-  // Stacked strokes drop the exact outline; the fill surface carries the exact shared geometry.
-  EXPECT_TRUE(multiStrokeShape->shape == nullptr);
+  // Stacked strokes merge into one equivalent centered stroke sized by the widest lateral
+  // extent: a 10px plus a 4px centered stroke merges to the same 10px equivalent width as the
+  // 10px stroke alone, keeping the contour exact.
+  EXPECT_EQ(multiStrokeShape->type, StyledShapeType::FillStroke);
+  EXPECT_TRUE(multiStrokeShape->shape != nullptr);
+  EXPECT_EQ(multiStrokeShape->strokeWidth, 10.0f);
+  EXPECT_EQ(multiStrokeShape->strokeAlign, StrokeAlign::Center);
   EXPECT_TRUE(multiStrokeShape->fillShape != nullptr);
   EXPECT_TRUE(multiStrokeShape->fillShape->getPath().isRRect(&fillRRect));
   EXPECT_EQ(fillRRect.rect(), Rect::MakeXYWH(50, 50, 100, 100));

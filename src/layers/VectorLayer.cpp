@@ -130,14 +130,14 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
 
   std::optional<StyledShape> contentShape = std::nullopt;
   if (geometryShared && sharedGeometry != nullptr) {
-    if (strokeCount <= 1) {
-      auto shape = sharedGeometry->getShape();
-      if (shape != nullptr) {
-        // Baking the geometry matrix into the shape makes spread scale with the layer transform,
-        // like stroke width and other in-layer measurements. This is intentional.
-        shape = Shape::ApplyMatrix(shape, sharedGeometry->matrix);
-      }
-      if (shape != nullptr) {
+    auto shape = sharedGeometry->getShape();
+    if (shape != nullptr) {
+      // Baking the geometry matrix into the shape makes spread scale with the layer transform,
+      // like stroke width and other in-layer measurements. This is intentional.
+      shape = Shape::ApplyMatrix(shape, sharedGeometry->matrix);
+    }
+    if (shape != nullptr) {
+      if (strokeCount <= 1) {
         auto hasStroke = strokeStyle.has_value();
         auto strokeWidth = hasStroke ? strokeStyle->strokeWidth : 0.0f;
         auto strokeAlign = hasStroke ? strokeStyle->strokeAlign : StrokeAlign::Center;
@@ -148,19 +148,39 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
           type = StyledShapeType::Stroke;
         }
         contentShape = StyledShape::Make(std::move(shape), type, strokeWidth, strokeAlign);
+      } else {
+        // Stacked strokes with different widths/alignments merge into one equivalent centered
+        // stroke: the contour is geometry-only, and each stroke contributes its lateral extent
+        // (Outside -> width, Center -> half the width, Inside -> none, it stays within the fill).
+        // The merged equivalent covers every band, so consumers (glass surface expansion, shadow
+        // spread) keep working without per-stroke knowledge.
+        auto maxLateral = 0.0f;
+        for (const auto& painter : context.painters) {
+          if (HasTransparentSolidColor(painter.get())) {
+            continue;
+          }
+          auto style = painter->getStyle();
+          if (style.style == PaintStyle::Fill) {
+            continue;
+          }
+          auto lateral = style.strokeWidth;
+          if (style.strokeAlign == StrokeAlign::Center) {
+            lateral *= 0.5f;
+          } else if (style.strokeAlign == StrokeAlign::Inside) {
+            continue;
+          }
+          maxLateral = std::max(maxLateral, lateral);
+        }
+        auto type = hasFill ? StyledShapeType::FillStroke : StyledShapeType::Stroke;
+        contentShape =
+            StyledShape::Make(std::move(shape), type, maxLateral * 2.0f, StrokeAlign::Center);
       }
-    } else if (hasFill) {
-      // Stacked strokes with different widths cannot form one exact outline: keep the composition
-      // type (strokes are visible) and let the fill surface carry the exact geometry.
-      contentShape =
-          StyledShape::Make(nullptr, StyledShapeType::FillStroke, 0, StrokeAlign::Center);
     }
-    // Stacked strokes without a fill leave neither an exact outline nor a fill surface: nullopt.
   }
   // Non-shared geometries cannot produce a single exact outline or fill surface: nullopt.
 
   // The fill surface only needs the shared geometry, so it stays exact regardless of how many
-  // decorative strokes made the combined content drop its exact outline above.
+  // decorative strokes are stacked on top of it.
   if (contentShape.has_value() && geometryShared && hasFill && sharedGeometry != nullptr) {
     auto fillShape = sharedGeometry->getShape();
     if (fillShape != nullptr) {

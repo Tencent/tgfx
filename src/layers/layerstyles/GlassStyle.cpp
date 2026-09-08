@@ -127,9 +127,6 @@ struct GlassShapeInfo {
   // Bounds of the fill surface in layer space. Valid whenever hasPath is true.
   Rect surfaceBounds = {};
   bool hasPath = false;
-  // True when the content image carries fills only (no visible strokes), so it already matches
-  // the fill surface and can feed the UDF directly.
-  bool contentIsFillOnly = false;
 };
 
 // Detects the glass optical surface: the fill surface expanded by the decorative stroke outset,
@@ -156,7 +153,6 @@ static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
     }
     surfaceShape = optShape->shape;
   }
-  info.contentIsFillOnly = optShape->type == StyledShapeType::Fill;
   auto path = surfaceShape->getPath();
 
   // Strokes participate in the glass surface: expand the optical surface by the stroke outset so
@@ -227,31 +223,6 @@ static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
   info.hasPath = true;
   info.surfaceBounds = path.getBounds();
   return info;
-}
-
-// Rasterizes the glass surface path into a coverage image aligned with the content bitmap. The
-// content image bakes decorative strokes into its alpha, which would couple the distance field to
-// the stroke rendering; the recorded picture instead draws the (stroke-expanded) surface path
-// with the same matrix the drawPath clip uses. Only the alpha channel is consumed downstream.
-static std::shared_ptr<Image> MakeFillSurfaceImage(const Path& surfacePath,
-                                                   const LayerStyleInput& input, float contentWidth,
-                                                   float contentHeight) {
-  auto path = surfacePath;
-  auto matrix = Matrix::MakeScale(input.contentScale, input.contentScale);
-  matrix.postTranslate(-input.contentOffset.x, -input.contentOffset.y);
-  path.transform(matrix);
-  PictureRecorder recorder = {};
-  auto canvas = recorder.beginRecording();
-  Paint paint = {};
-  paint.setColor(Color::White());
-  canvas->drawPath(path, paint);
-  auto picture = recorder.finishRecordingAsPicture();
-  if (picture == nullptr) {
-    return nullptr;
-  }
-  auto imageBounds = Rect::MakeWH(contentWidth, contentHeight);
-  Point offset = {};
-  return ToImageWithOffset(std::move(picture), &offset, &imageBounds);
 }
 
 std::shared_ptr<GlassStyle> GlassStyle::Make(float refraction, float depth, float frost,
@@ -705,16 +676,10 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       edgeTextureRect.roundOut();
       Point edgeTextureOrigin = {edgeTextureRect.left, edgeTextureRect.top};
 
-      // The content image bakes decorative strokes into its alpha. When the exact fill surface is
-      // known, rasterize it into a stroke-free coverage image so the distance field does not
-      // depend on the strokes. Fill-only content already matches the surface and is used as is.
+      // Strokes participate in the glass: the content image's alpha is the real rendering of the
+      // fill plus every stroke, so the UDF distance field is computed from the combined shape
+      // directly — strokes and fill go through the UDF together.
       auto udfSource = input.content;
-      if (shapeInfo.hasPath && !shapeInfo.contentIsFillOnly) {
-        udfSource = MakeFillSurfaceImage(shapeInfo.shapePath, input, contentWidth, contentHeight);
-        if (udfSource == nullptr) {
-          udfSource = input.content;
-        }
-      }
 
       GlassUDFRequest maskRequest = {};
       maskRequest.source = udfSource;

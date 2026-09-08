@@ -4216,8 +4216,10 @@ TGFX_TEST_PRIVATE(LayerTest, ShapeLayerContentShapeExactness) {
   layer->addStrokeStyle(ShapeStyle::Make(Color::Red()));
   TGFX_PRIVATE_ACCESS(auto multipleStrokes = layer->onGetContentShape();
                       ASSERT_TRUE(multipleStrokes.has_value());
-                      // Stacked strokes drop the exact outline; the fill surface carries geometry.
-                      EXPECT_TRUE(multipleStrokes->shape == nullptr);
+                      // Stacked stroke styles share the layer's single width and alignment, so the
+                      // contour stays exact no matter how many are stacked.
+                      EXPECT_EQ(multipleStrokes->type, StyledShapeType::FillStroke);
+                      EXPECT_TRUE(multipleStrokes->shape != nullptr);
                       EXPECT_TRUE(multipleStrokes->fillShape != nullptr);)
 
   auto multipleFills = ShapeLayer::Make();
@@ -4233,8 +4235,9 @@ TGFX_TEST_PRIVATE(LayerTest, ShapeLayerContentShapeExactness) {
   strokeOnly->addStrokeStyle(ShapeStyle::Make(Color::Blue()));
   strokeOnly->addStrokeStyle(ShapeStyle::Make(Color::Red()));
   TGFX_PRIVATE_ACCESS(auto strokeOnlyShape = strokeOnly->onGetContentShape();
-                      // Stacked strokes without a fill leave no shape at all.
-                      EXPECT_FALSE(strokeOnlyShape.has_value());)
+                      ASSERT_TRUE(strokeOnlyShape.has_value());
+                      EXPECT_EQ(strokeOnlyShape->type, StyledShapeType::Stroke);
+                      EXPECT_TRUE(strokeOnlyShape->shape != nullptr);)
 }
 
 static std::optional<uint32_t> RenderSpreadShadowPixel(Context* context,
@@ -4255,52 +4258,46 @@ static std::optional<uint32_t> RenderSpreadShadowPixel(Context* context,
   return pixel;
 }
 
-static std::shared_ptr<VectorLayer> MakeMultiStrokeVectorLayer(bool withFill) {
+static std::shared_ptr<VectorLayer> MakeMultiGeometryVectorLayer() {
   auto vectorLayer = VectorLayer::Make();
-  auto rectangle = Rectangle::Make();
-  rectangle->setPosition({100, 100});
-  rectangle->setSize({100, 100});
-  rectangle->setRoundness({20, 20, 20, 20});
-  std::vector<std::shared_ptr<VectorElement>> contents = {rectangle};
-  if (withFill) {
-    contents.push_back(FillStyle::Make(SolidColor::Make(Color::FromRGBA(255, 255, 255, 255))));
-  }
-  for (auto width : {10.0f, 6.0f}) {
-    auto stroke = StrokeStyle::Make(SolidColor::Make(Color::FromRGBA(20, 80, 220, 255)));
-    stroke->setStrokeWidth(width);
-    contents.push_back(stroke);
-  }
-  vectorLayer->setContents(std::move(contents));
+  auto group = VectorGroup::Make();
+  auto rect = Rectangle::Make();
+  rect->setPosition({100, 100});
+  rect->setSize({100, 100});
+  auto ellipse = Ellipse::Make();
+  ellipse->setPosition({100, 100});
+  ellipse->setSize({80, 80});
+  auto fill = FillStyle::Make(SolidColor::Make(Color::FromRGBA(255, 255, 255, 255)));
+  group->setElements({rect, ellipse, fill});
+  vectorLayer->setContents({group});
   return vectorLayer;
 }
 
-// Stacked strokes drop the exact outline (null shape or nullopt): the spread must be skipped and
-// the shadow must fall back to its plain (spread-less) form, hugging the content instead of
+// Multiple geometries cannot produce a single exact outline: the spread must be skipped and the
+// shadow must fall back to its plain (spread-less) form, hugging the content instead of
 // expanding by the spread.
 TGFX_TEST(LayerTest, DropShadowSpreadWithoutExactShape) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  // The fill spans [50, 150]; the 10px centered stroke extends the content to [45, 155]. The
-  // shadow has no blur and a Y offset of 15, so the plain (spread-less) shadow reaches 170. A
-  // spread of 10 would reach 180 — the assertions distinguish the two.
-  for (auto withFill : {true, false}) {
-    auto layer = MakeMultiStrokeVectorLayer(withFill);
-    auto shadowStyle = DropShadowStyle::Make(0, 15, 0, 0, Color::Black());
-    shadowStyle->setSpread(10);
-    layer->setLayerStyles({shadowStyle});
-    // Inside the plain shadow footprint (content bottom 155 + offset 15).
-    auto shadowPixel = RenderSpreadShadowPixel(context, layer, 100, 168);
-    ASSERT_TRUE(shadowPixel.has_value());
-    EXPECT_NE(*shadowPixel, 0u) << "plain shadow missing (withFill=" << withFill << ")";
-    // Beyond the plain footprint but within the spread-expanded one: the shadow must be absent,
-    // proving the spread was skipped rather than applied.
-    auto spreadPixel = RenderSpreadShadowPixel(context, layer, 100, 175);
-    ASSERT_TRUE(spreadPixel.has_value());
-    EXPECT_EQ(*spreadPixel, 0u) << "spread was applied without an exact shape (withFill="
-                                << withFill << ")";
-  }
+  // Both geometries are centered at (100, 100); the rect spans [50, 150], so the content (and
+  // the plain shadow footprint) ends at 150. The shadow has no blur and a Y offset of 15, so the
+  // plain shadow reaches 165. A spread of 10 would reach 175 — the assertions distinguish the
+  // two.
+  auto layer = MakeMultiGeometryVectorLayer();
+  auto shadowStyle = DropShadowStyle::Make(0, 15, 0, 0, Color::Black());
+  shadowStyle->setSpread(10);
+  layer->setLayerStyles({shadowStyle});
+  // Inside the plain shadow footprint (content bottom 150 + offset 15).
+  auto shadowPixel = RenderSpreadShadowPixel(context, layer, 100, 163);
+  ASSERT_TRUE(shadowPixel.has_value());
+  EXPECT_NE(*shadowPixel, 0u) << "plain shadow missing";
+  // Beyond the plain footprint but within the spread-expanded one: the shadow must be absent,
+  // proving the spread was skipped rather than applied.
+  auto spreadPixel = RenderSpreadShadowPixel(context, layer, 100, 170);
+  ASSERT_TRUE(spreadPixel.has_value());
+  EXPECT_EQ(*spreadPixel, 0u) << "spread was applied without an exact shape";
 }
 
 TGFX_TEST(LayerTest, GlassStyleFillStrokeParity) {
@@ -4321,12 +4318,17 @@ TGFX_TEST(LayerTest, GlassStyleFillStrokeParity) {
       ASSERT_TRUE(strokeWithoutGlass.has_value());
       // Strokes participate in the optical surface. Center/Outside strokes expand the surface,
       // which legitimately reshapes the whole SDF refraction field (edge and interior alike), so
-      // no interior parity is asserted for them. Inside strokes stay within the fill: the surface
-      // and therefore the refraction field are unchanged.
+      // no fill-only interior parity is asserted for them. Inside strokes stay within the fill:
+      // the surface and therefore the refraction field are unchanged.
       if (strokeAlign == StrokeAlign::Inside) {
         EXPECT_PIXEL_PARITY(fillOnly->refraction, withStroke->refraction);
         EXPECT_PIXEL_PARITY(fillOnly->refraction, withTwoStrokes->refraction);
       }
+      // Stacked strokes merge into one equivalent centered stroke sized by the widest lateral
+      // extent: a 10px stroke plus a 6px stroke merges to the same equivalent width as the 10px
+      // stroke alone, so the optical surface (and the refraction field) are identical.
+      EXPECT_PIXEL_PARITY(withStroke->refraction, withTwoStrokes->refraction);
+      EXPECT_PIXEL_PARITY(withStroke->edge, withTwoStrokes->edge);
       if (strokeAlign != StrokeAlign::Inside) {
         EXPECT_PIXEL_PARITY(withStroke->strokeOnly, strokeWithoutGlass->strokeOnly);
       }
@@ -4426,9 +4428,12 @@ TGFX_TEST(LayerTest, GlassStyleIrregularFillStrokeParity) {
   ASSERT_TRUE(fillOnly.has_value());
   ASSERT_TRUE(withStroke.has_value());
   ASSERT_TRUE(strokeWithoutGlass.has_value());
-  EXPECT_PIXEL_PARITY(fillOnly->center, withStroke->center);
-  EXPECT_PIXEL_PARITY(fillOnly->interior, withStroke->interior);
+  // Strokes participate in the glass surface: the UDF distance field now comes from the real
+  // content (fill plus strokes), so the centered stroke legitimately reshapes the interior
+  // refraction field — no fill-only parity is asserted. The glass must stay active at the
+  // interior points, though.
   EXPECT_NE(withStroke->center, strokeWithoutGlass->center);
+  EXPECT_NE(withStroke->interior, strokeWithoutGlass->interior);
 }
 
 TGFX_TEST_PRIVATE(LayerTest, GlassStyleUsesBackgroundAndContourSource) {

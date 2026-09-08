@@ -268,18 +268,10 @@ std::optional<StyledShape> ShapeLayer::onGetContentShape() {
   }
   // The dash pattern is intentionally ignored here: spread expands the stroke outline, and a dash
   // only changes how that outline is displayed, not its geometry, so it is treated as a solid
-  // stroke.
+  // stroke. Stacked stroke styles share the layer's single line width and alignment (they only
+  // differ in color), so the contour stays exact no matter how many are stacked.
   auto contentShape = StyledShape::Make(Shape::MakeFrom(_shape->getPath()), type, stroke.width,
                                         static_cast<StrokeAlign>(shapeBitFields.strokeAlign));
-  if (strokeCount > 1) {
-    if (fillCount == 0) {
-      // Stacked strokes with no fill leave neither an exact outline nor a fill surface.
-      return std::nullopt;
-    }
-    // Stacked strokes with different widths cannot be represented by one exact outline: drop the
-    // shape (keeping the composition type) and let the fill surface carry the exact geometry.
-    contentShape.shape = nullptr;
-  }
   // The layer has a single geometry, so its fill surface stays exact no matter how many decorative
   // strokes are stacked on top of it.
   if (fillCount > 0) {
