@@ -24,6 +24,7 @@
 #include "gpu/EmbeddedShaderBundles.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/PrecompiledShaderCache.h"
+#include "gpu/glsl/GLSLBlend.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Canvas.h"
@@ -1287,6 +1288,118 @@ TGFX_TEST(AOTRenderConsistencyTest, AnalyticClipCoverageModes) {
   ExpectAnalyticClipSceneConsistent("clip-device-rrect-nonaa", AnalyticClipScene::DeviceRRectNonAA);
   ExpectAnalyticClipSceneConsistent("clip-rotated-rrect", AnalyticClipScene::RotatedRRect);
   ExpectAnalyticClipSceneConsistent("clip-rotated-rect", AnalyticClipScene::RotatedRect);
+}
+
+// Renders the full BlendModeTest scene once (see the parity scene test below); shared by the
+// differential assertion.
+static void RenderFullBlendModeSceneOnce(Context* context, bool useBundle, Bitmap* outBitmap) {
+  auto* cache = context->precompiledShaderCache();
+  if (useBundle) {
+    ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+  } else {
+    cache->unload();
+  }
+  ScopedAOTStatsPause statsPause(context, !useBundle);
+  context->globalCache()->clearPrograms();
+  // Verbatim CanvasTest.BlendModeTest: 18 modes x (image, then solid red rect) in one render, the
+  // only structural difference from the per-mode probe that passes.
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+  auto padding = 30;
+  auto scale = 1.f;
+  auto offset = static_cast<float>(padding + image->width()) * scale;
+  BlendMode blendModes[] = {BlendMode::SrcOver,    BlendMode::Darken,      BlendMode::Multiply,
+                            BlendMode::PlusDarker, BlendMode::ColorBurn,   BlendMode::Lighten,
+                            BlendMode::Screen,     BlendMode::PlusLighter, BlendMode::ColorDodge,
+                            BlendMode::Overlay,    BlendMode::SoftLight,   BlendMode::HardLight,
+                            BlendMode::Difference, BlendMode::Exclusion,   BlendMode::Hue,
+                            BlendMode::Saturation, BlendMode::Color,       BlendMode::Luminosity};
+  auto surfaceHeight = (static_cast<float>(padding + image->height())) * scale *
+                       ceil(sizeof(blendModes) / sizeof(BlendMode) / 4.0f) * 2;
+  auto surface = Surface::Make(context, static_cast<int>(offset * 4),
+                               static_cast<int>(surfaceHeight), false, 4);
+  ASSERT_TRUE(surface != nullptr);
+  auto* canvas = surface->getCanvas();
+  Paint backPaint = {};
+  backPaint.setColor(Color::FromRGBA(82, 117, 132, 255));
+  backPaint.setStyle(PaintStyle::Fill);
+  canvas->drawRect(Rect::MakeWH(surface->width(), surface->height()), backPaint);
+  for (auto& blendMode : blendModes) {
+    Paint paint = {};
+    paint.setBlendMode(blendMode);
+    paint.setAntiAlias(true);
+    canvas->save();
+    canvas->concat(Matrix::MakeScale(scale));
+    canvas->drawImage(image, &paint);
+    canvas->restore();
+    canvas->concat(Matrix::MakeTrans(offset, 0));
+    if (canvas->getMatrix().getTranslateX() + static_cast<float>(image->width()) * scale >
+        static_cast<float>(surface->width())) {
+      canvas->translate(-canvas->getMatrix().getTranslateX(),
+                        static_cast<float>(image->height() + padding) * scale);
+    }
+  }
+  Rect bounds = Rect::MakeWH(static_cast<float>(image->width()) * scale,
+                             static_cast<float>(image->height()) * scale);
+  canvas->translate(-canvas->getMatrix().getTranslateX(),
+                    static_cast<float>(image->height() + padding) * scale);
+  for (auto& blendMode : blendModes) {
+    Paint paint = {};
+    paint.setBlendMode(blendMode);
+    paint.setStyle(PaintStyle::Fill);
+    paint.setColor(Color::FromRGBA(255, 14, 14, 255));
+    canvas->drawRect(bounds, paint);
+    canvas->concat(Matrix::MakeTrans(offset, 0));
+    if (canvas->getMatrix().getTranslateX() + static_cast<float>(image->width()) * scale >
+        static_cast<float>(surface->width())) {
+      canvas->translate(-canvas->getMatrix().getTranslateX(),
+                        static_cast<float>(image->height() + padding) * scale);
+    }
+  }
+  context->flushAndSubmit(true);
+  ASSERT_TRUE(outBitmap->allocPixels(surface->width(), surface->height()));
+  auto* pixels = outBitmap->lockPixels();
+  ASSERT_TRUE(pixels != nullptr);
+  ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+  outBitmap->unlockPixels();
+  cache->unload();
+  context->globalCache()->clearPrograms();
+}
+
+// The full CanvasTest.BlendModeTest scene (18 blend modes x image + solid rect, MSAA) rendered
+// through both routes. The precompiled blend kernels must match the runtime emission; the
+// Overlay/HardLight operand-pick regression (branch control on the wrong operand) reproduced
+// here at a 43000-byte scale before the fix. The two compilation pipelines (shaderc -> SPIRV ->
+// MSL vs direct MSL) legitimately differ by one LSB on a handful of texels, so the assertion
+// allows ±1 with a small byte budget instead of demanding byte equality.
+TGFX_TEST(AOTRenderConsistencyTest, BlendParityTextureScene) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  RenderFullBlendModeSceneOnce(context, false, &reference);
+  RenderFullBlendModeSceneOnce(context, true, &candidate);
+  auto* refPixels = static_cast<const uint8_t*>(reference.lockPixels());
+  auto* candPixels = static_cast<const uint8_t*>(candidate.lockPixels());
+  int diffBytes = 0;
+  int maxDiff = 0;
+  size_t totalBytes =
+      static_cast<size_t>(reference.width()) * static_cast<size_t>(reference.height()) * 4;
+  for (size_t i = 0; i < totalBytes; i++) {
+    int d = std::abs(static_cast<int>(refPixels[i]) - static_cast<int>(candPixels[i]));
+    if (d > 0) {
+      ++diffBytes;
+    }
+    if (d > maxDiff) {
+      maxDiff = d;
+    }
+  }
+  reference.unlockPixels();
+  candidate.unlockPixels();
+  printf("[BlendParityScene] diffBytes=%d maxDiff=%d\n", diffBytes, maxDiff);
+  EXPECT_LE(maxDiff, 1);
+  EXPECT_LE(diffBytes, 600);
 }
 
 // Chain-route clip coverage forms: a composed multi-clip coverage (a flat Compose of rrect
