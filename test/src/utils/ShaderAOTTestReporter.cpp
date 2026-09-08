@@ -1048,6 +1048,30 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
         TGFX_BACKEND_NAME, static_cast<unsigned long long>(auditFusableNow + auditNeedsLowering),
         static_cast<unsigned long long>(auditFusableNow),
         static_cast<unsigned long long>(auditNeedsLowering));
+    // WP5 strict coverage targets, monitoring mode (flips to blocking at the no-fallback
+    // milestone): the terminal state requires zero NoMatchingRule fallbacks and zero runtime
+    // program compilations across the full suite. Until then every remaining miss prints as a
+    // tracked warning with its effect shape, so a regression adds a name here instead of hiding
+    // inside a hit-rate percentage.
+    auto strictNoMatching =
+        summary.fallbackCounts[static_cast<size_t>(PrecompiledFallbackReason::NoMatchingRule)];
+    auto strictRuntimeCompiles = productionBuilderCreations;
+    if (strictNoMatching == 0 && strictRuntimeCompiles == 0) {
+      std::printf("[Coverage Gate][%s] strict targets MET: noMatchingRule=0 runtimeCompiles=0\n",
+                  TGFX_BACKEND_NAME);
+    } else {
+      std::printf(
+          "[Coverage Gate][%s] MONITORING (targets: noMatchingRule=0 runtimeCompiles=0): "
+          "noMatchingRule=%llu runtimeCompiles=%llu\n",
+          TGFX_BACKEND_NAME, static_cast<unsigned long long>(strictNoMatching),
+          static_cast<unsigned long long>(strictRuntimeCompiles));
+      for (size_t i = 0; i < sortedFallbacks.size(); ++i) {
+        std::printf("  PENDING %zu. count=%llu reason=%s effect=%s\n", i + 1,
+                    static_cast<unsigned long long>(sortedFallbacks[i].count),
+                    PrecompiledFallbackReasonName(sortedFallbacks[i].record.reason),
+                    sortedFallbacks[i].record.effectSignature.c_str());
+      }
+    }
   }
 };
 
