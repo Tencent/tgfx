@@ -124,7 +124,8 @@ struct GlassShapeInfo {
   float cornerRadius = 0.0f;
   RRect shapeRRect = {};
   Path shapePath = {};
-  // Bounds of the fill surface in layer space. Valid whenever hasPath is true.
+  // Bounds of the glass optical surface (the fill surface expanded by the stroke outset) in
+  // layer space. Valid whenever hasPath is true.
   Rect surfaceBounds = {};
   bool hasPath = false;
 };
@@ -417,8 +418,8 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
 
     refractInputRect = visibleRect;
     if (_refraction > 0 || _lightIntensity > 0) {
-      // The fill surface, not the stroke-outset content bounds, defines the optical scale; the
-      // content fallback keeps the previous behavior when no exact surface is known.
+      // The optical surface defines the refraction scale; the content bounds are the fallback
+      // when no exact surface is known.
       auto minHalf = std::min(origWidth, origHeight) * 0.5f;
       if (shapeInfo.hasPath) {
         minHalf =
@@ -872,8 +873,8 @@ std::shared_ptr<GlassRefractionImageFilter> GlassStyle::getUDFRefractionFilter(
     params.lightIntensity = 0.0f;
   }
   params.shapeType = GlassShapeType::AlphaMask;
-  // The displacement scale follows the fill surface, not the stroke-outset content bounds; the
-  // content half sizes are the fallback when no exact surface is known.
+  // The displacement scale follows the optical surface; the content half sizes are the fallback
+  // when no exact surface is known.
   auto surfaceHalfWidth = halfWidth;
   auto surfaceHalfHeight = halfHeight;
   if (!shapeBounds.isEmpty()) {

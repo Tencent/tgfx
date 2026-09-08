@@ -199,8 +199,8 @@ void GLSLGlassUDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
   auto& maskSampler = (*args.textureSamplers)[0];
 
   EmitGeometryCoordinates(fragBuilder, args.inputColor, shape);
-  // The displacement scale follows the fill surface half sizes; the content half sizes above only
-  // drive coordinate mapping, so decorative strokes outset the content without scaling the glass.
+  // The displacement scale follows the optical surface half sizes; the content half sizes above
+  // only drive coordinate mapping.
   fragBuilder->codeAppendf("float surfaceHalfW = %s.x;", surface.c_str());
   fragBuilder->codeAppendf("float surfaceHalfH = %s.y;", surface.c_str());
   // The fine mask packs the refraction height into RGB with 24-bit precision; the edge mask

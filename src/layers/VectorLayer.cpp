@@ -177,7 +177,7 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
       }
     }
   }
-  // Non-shared geometries cannot produce a single exact outline or fill surface: nullopt.
+  // Non-shared geometries cannot produce a single exact outline: nullopt.
 
   return contentShape;
 }
