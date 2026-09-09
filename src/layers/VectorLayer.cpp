@@ -97,14 +97,14 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
     return std::nullopt;
   }
 
-  // Only a single shared geometry across all painters can be simplified to a StyledShape. The
-  // scan collects flags instead of returning early because stacked strokes and non-shared
-  // geometries both drop the outline below (nullopt), while the fill keeps a single-stroke
-  // shape exact.
+  // Only a single shared geometry across all painters can be simplified to a StyledShape.
+  // Stacked strokes keep the exact outline when they share the same width and alignment
+  // (rendering identical to one stroke); differing strokes and non-shared geometries drop it
+  // (nullopt).
   Geometry* sharedGeometry = nullptr;
   auto geometryShared = true;
   auto hasFill = false;
-  auto strokeCount = 0;
+  auto uniformStroke = true;
   std::optional<PainterStyle> strokeStyle = std::nullopt;
   for (const auto& painter : context.painters) {
     DEBUG_ASSERT(painter != nullptr);
@@ -124,14 +124,21 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
     if (style.style == PaintStyle::Fill) {
       hasFill = true;
     } else {
-      strokeCount++;
-      strokeStyle = style;
+      // Stacked strokes keep a single exact outline only when they all share the same width and
+      // alignment (rendering identical to one stroke); any difference drops it (nullopt).
+      if (strokeStyle.has_value() && (strokeStyle->strokeWidth != style.strokeWidth ||
+                                      strokeStyle->strokeAlign != style.strokeAlign)) {
+        uniformStroke = false;
+      }
+      if (!strokeStyle.has_value()) {
+        strokeStyle = style;
+      }
     }
   }
 
   std::optional<StyledShape> contentShape = std::nullopt;
   if (geometryShared && sharedGeometry != nullptr) {
-    if (strokeCount <= 1) {
+    if (uniformStroke) {
       auto shape = sharedGeometry->getShape();
       if (shape != nullptr) {
         // Baking the geometry matrix into the shape makes spread scale with the layer transform,
@@ -151,7 +158,7 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
         contentShape = StyledShape::Make(std::move(shape), type, strokeWidth, strokeAlign);
       }
     }
-    // Stacked strokes with different widths/alignments have no single exact outline: nullopt.
+    // Stacked strokes with differing widths or alignments have no single exact outline: nullopt.
     // Consumers fall back to non-vector paths (glass uses the content alpha; spread uses the
     // content bounds).
   }

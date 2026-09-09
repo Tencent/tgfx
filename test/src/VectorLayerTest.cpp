@@ -171,6 +171,22 @@ TGFX_TEST(VectorLayerTest, MultiStrokeContentShapeExactness) {
   // back to non-vector paths (glass AlphaMask, spread content bounds).
   EXPECT_FALSE(multiStrokeShape.has_value());
 
+  auto sameWidthLayer = ContentShapeVectorLayer::Make();
+  auto sameFill = FillStyle::Make(SolidColor::Make(Color::FromRGBA(255, 255, 255, 96)));
+  auto makeStroke = [] {
+    auto s = StrokeStyle::Make(SolidColor::Make(Color::Blue()));
+    s->setStrokeWidth(10);
+    return s;
+  };
+  sameWidthLayer->setContents({MakeRoundedRectangle(), sameFill, makeStroke(), makeStroke()});
+  auto sameWidthShape = sameWidthLayer->getContentShapeForTesting();
+  ASSERT_TRUE(sameWidthShape.has_value());
+  // Two strokes with the same width and alignment render identically to one stroke: the outline
+  // stays exact (analytical SDF preserved).
+  EXPECT_EQ(sameWidthShape->type, StyledShapeType::FillStroke);
+  EXPECT_TRUE(sameWidthShape->shape != nullptr);
+  EXPECT_EQ(sameWidthShape->strokeWidth, 10.0f);
+
   auto fillOnlyLayer = ContentShapeVectorLayer::Make();
   fillOnlyLayer->setContents(MakeFillOnlyContents());
   auto fillOnlyShape = fillOnlyLayer->getContentShapeForTesting();

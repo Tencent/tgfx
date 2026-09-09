@@ -65,8 +65,9 @@ struct StyledShape {
    * content outline: for Fill/FillStroke it is the fill path (the rendered outline expands it
    * by strokeWidth/strokeAlign), for Stroke it is the stroked centerline. Null means the content
    * has no single precise outline (for example, multiple distinct geometries); in that case the
-   * type only describes the content composition (whether strokes are visible) and
-   * outline-dependent effects (such as shadow spread) do not apply.
+   * type only describes the content composition (whether strokes are visible), and consumers
+   * that need an outline fall back to non-vector paths (glass uses the content alpha, shadow
+   * spread uses the content bounds).
    */
   std::shared_ptr<Shape> shape = nullptr;
 
