@@ -22,11 +22,9 @@
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "layers/CanvasUtils.h"
-#include "layers/LayerStyleSource.h"
 #include "layers/imagefilters/GlassRefractionImageFilter.h"
 #include "layers/layerstyles/GlassUDF.h"
 #include "layers/processors/GlassRefractionFragmentProcessor.h"
-#include "tgfx/core/Canvas.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/RRect.h"
@@ -141,11 +139,15 @@ static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
     return info;
   }
   const auto& optShape = contour->shape();
-  auto surfaceShape = optShape->shape;
-  if (surfaceShape == nullptr || optShape->type != StyledShapeType::Fill) {
+  if (optShape->type != StyledShapeType::Fill) {
     return info;
   }
-  auto path = surfaceShape->getPath();
+  if (optShape->shape == nullptr) {
+    return info;
+  }
+  auto path = optShape->shape->getPath();
+  info.shapePath = path;
+  info.hasPath = true;
   RRect rRect = {};
   Rect rect = {};
   if (path.isRRect(&rRect)) {
@@ -156,7 +158,7 @@ static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
       // Shader SDF assumes a single uniform circular radius (rx == ry) across all four corners.
       // Non-uniform or elliptical corners fall back to AlphaMask for accuracy.
       auto radii = rRect.radii();
-      auto uniformCircular = radii[0] == radii[1] && radii[1] == radii[2] && radii[2] == radii[3] &&
+      bool uniformCircular = radii[0] == radii[1] && radii[1] == radii[2] && radii[2] == radii[3] &&
                              radii[0].x == radii[0].y;
       if (uniformCircular) {
         info.type = GlassShapeType::RoundedRect;
@@ -171,8 +173,6 @@ static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
     info.cornerRadius = 0.0f;
     info.shapeRRect = RRect::MakeRect(rect);
   }
-  info.shapePath = path;
-  info.hasPath = true;
   return info;
 }
 
@@ -619,10 +619,8 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
 
       // The UDF distance field is computed from the content image directly: its alpha is the
       // actually rendered shape, strokes included.
-      auto udfSource = input.content;
-
       GlassUDFRequest maskRequest = {};
-      maskRequest.source = udfSource;
+      maskRequest.source = input.content;
       maskRequest.coreWidth = udfWidth;
       maskRequest.coreHeight = udfHeight;
       maskRequest.textureRect = fineTextureRect;
@@ -634,7 +632,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       }
       GlassUDFRequest edgeMaskRequest = {};
       if (enableEdgeLighting) {
-        edgeMaskRequest.source = udfSource;
+        edgeMaskRequest.source = input.content;
         edgeMaskRequest.coreWidth = edgeCoreWidth;
         edgeMaskRequest.coreHeight = edgeCoreHeight;
         edgeMaskRequest.textureRect = edgeTextureRect;

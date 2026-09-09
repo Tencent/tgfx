@@ -130,8 +130,6 @@ class InnerShadowStyle : public LayerStyle {
   void onDraw(Canvas* canvas, const LayerStyleInput& input, float alpha,
               BlendMode blendMode) override;
 
-  void drawPlain(Canvas* canvas, const LayerStyleInput& input, float alpha, BlendMode blendMode);
-
   void drawWithSpread(Canvas* canvas, const LayerStyleInput& input, float alpha,
                       BlendMode blendMode);
 

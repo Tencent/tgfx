@@ -117,11 +117,7 @@ void InnerShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, floa
     drawWithSpread(canvas, input, alpha, blendMode);
     return;
   }
-  drawPlain(canvas, input, alpha, blendMode);
-}
 
-void InnerShadowStyle::drawPlain(Canvas* canvas, const LayerStyleInput& input, float alpha,
-                                 BlendMode blendMode) {
   auto filter = getShadowFilter(input.contentScale);
   if (!filter) {
     return;

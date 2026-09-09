@@ -164,7 +164,8 @@ SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInpu
     // without an exact shape). Fall back to the content image's bounds — contentOffset and the
     // image size are both on LayerStyleInput, so no producer-side channel is needed, and for
     // layers whose content is itself a rect (e.g. an opaque image) the bounds are the exact
-    // outline. The rasterized bounds sit within one content pixel of the vector tight bounds.
+    // outline. For other content the bounds carry the rasterization round-out (and for text,
+    // the layout box rather than the ink box).
     if (input.content == nullptr || FloatNearlyZero(input.contentScale)) {
       return {nullptr, {}, false};
     }
@@ -235,7 +236,7 @@ SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInpu
     if (!path.isRect(&rect)) {
       // Irregular paths (stars, freeform shapes) have an exact shape but no closed-form spread:
       // their bounding rect is used as a fill approximation for the shadow source (a pre-existing
-      // behavior). The skip path above only covers layers with no exact outline at all. A
+      // behavior); the fallback above only covers layers with no exact outline at all. A
       // collapsed stroke is already rejected by IsSpreadCollapsed above, so any stroke reaching
       // here is non-collapsed and safe to approximate as a fill.
       rect = path.getBounds();
