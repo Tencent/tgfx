@@ -4096,11 +4096,8 @@ static bool PixelsWithinTolerance(uint32_t a, uint32_t b, int tolerance = 2) {
       << "glass parity broken: 0x" << std::hex << (expected) << " vs 0x" \
       << static_cast<uint32_t>(actual) << std::dec
 
-static std::optional<GlassStrokePixels> RenderGlassStrokeComparison(Context* context,
-                                                                    int strokeCount,
-                                                                    StrokeAlign strokeAlign,
-                                                                    bool hasGlass, float zoomScale,
-                                                                    uint8_t strokeAlpha = 255) {
+static std::optional<GlassStrokePixels> RenderGlassStrokeComparison(
+    Context* context, int strokeCount, StrokeAlign strokeAlign, bool hasGlass, float zoomScale) {
   auto surfaceSize = static_cast<int>(200.0f * zoomScale);
   auto surface = Surface::Make(context, surfaceSize, surfaceSize);
   if (surface == nullptr) {
@@ -4134,7 +4131,7 @@ static std::optional<GlassStrokePixels> RenderGlassStrokeComparison(Context* con
   auto fill = FillStyle::Make(SolidColor::Make(Color::FromRGBA(255, 255, 255, 96)));
   std::vector<std::shared_ptr<VectorElement>> contents = {rectangle, fill};
   for (int i = 0; i < strokeCount; i++) {
-    auto stroke = StrokeStyle::Make(SolidColor::Make(Color::FromRGBA(20, 80, 220, strokeAlpha)));
+    auto stroke = StrokeStyle::Make(SolidColor::Make(Color::FromRGBA(20, 80, 220, 255)));
     stroke->setStrokeWidth(i == 0 ? 10.0f : 6.0f);
     stroke->setStrokeAlign(strokeAlign);
     contents.push_back(stroke);
@@ -4306,26 +4303,16 @@ TGFX_TEST(LayerTest, GlassStyleFillStrokeParity) {
     for (auto strokeAlign : {StrokeAlign::Center, StrokeAlign::Inside, StrokeAlign::Outside}) {
       auto fillOnly = RenderGlassStrokeComparison(context, 0, strokeAlign, true, zoomScale);
       auto withStroke = RenderGlassStrokeComparison(context, 1, strokeAlign, true, zoomScale);
-      auto withTwoStrokes = RenderGlassStrokeComparison(context, 2, strokeAlign, true, zoomScale);
       auto strokeWithoutGlass =
           RenderGlassStrokeComparison(context, 1, strokeAlign, false, zoomScale);
       ASSERT_TRUE(fillOnly.has_value());
       ASSERT_TRUE(withStroke.has_value());
-      ASSERT_TRUE(withTwoStrokes.has_value());
       ASSERT_TRUE(strokeWithoutGlass.has_value());
-      // Strokes participate in the optical surface. Center/Outside strokes expand the surface,
-      // which legitimately reshapes the whole SDF refraction field (edge and interior alike), so
-      // no fill-only interior parity is asserted for them. Inside strokes stay within the fill:
-      // the surface and therefore the refraction field are unchanged.
-      if (strokeAlign == StrokeAlign::Inside) {
-        EXPECT_PIXEL_PARITY(fillOnly->refraction, withStroke->refraction);
-        EXPECT_PIXEL_PARITY(fillOnly->refraction, withTwoStrokes->refraction);
-      }
-      // Stacked strokes merge into one equivalent centered stroke sized by the widest lateral
-      // extent: a 10px stroke plus a 6px stroke merges to the same equivalent width as the 10px
-      // stroke alone, so the optical surface (and the refraction field) are identical.
-      EXPECT_PIXEL_PARITY(withStroke->refraction, withTwoStrokes->refraction);
-      EXPECT_PIXEL_PARITY(withStroke->edge, withTwoStrokes->edge);
+      // A single decorative stroke does not affect the glass: the fill surface defines the
+      // optical surface, so the edge and refraction stay identical to the fill-only render.
+      EXPECT_PIXEL_PARITY(fillOnly->edge, withStroke->edge);
+      EXPECT_PIXEL_PARITY(fillOnly->refraction, withStroke->refraction);
+      EXPECT_NE(withStroke->refraction, strokeWithoutGlass->refraction);
       if (strokeAlign != StrokeAlign::Inside) {
         EXPECT_PIXEL_PARITY(withStroke->strokeOnly, strokeWithoutGlass->strokeOnly);
       }
@@ -4334,17 +4321,9 @@ TGFX_TEST(LayerTest, GlassStyleFillStrokeParity) {
       }
     }
   }
-
-  // Strokes participate in the glass surface: with a nearly transparent stroke (alpha = 1), the
-  // stroke-only sample point — outside the fill but inside the stroke band — must differ between
-  // the glass and no-glass renders, proving the band refracts the backdrop through the stroke.
-  auto faintWithGlass = RenderGlassStrokeComparison(context, 1, StrokeAlign::Center, true, 1.0f, 1);
-  auto faintWithoutGlass =
-      RenderGlassStrokeComparison(context, 1, StrokeAlign::Center, false, 1.0f, 1);
-  ASSERT_TRUE(faintWithGlass.has_value());
-  ASSERT_TRUE(faintWithoutGlass.has_value());
-  EXPECT_NE(faintWithGlass->strokeOnly, faintWithoutGlass->strokeOnly)
-      << "stroke band does not refract the backdrop";
+  // Stacked strokes drop the exact outline entirely: the glass falls back to AlphaMask, whose
+  // coverage comes from the content alpha (the actual rendered shape). Shape correctness for
+  // that path is asserted by VectorLayerTest.GlassStyleMultiStrokeRoundedCorner.
 }
 
 struct IrregularFillPixels {
@@ -4425,12 +4404,11 @@ TGFX_TEST(LayerTest, GlassStyleIrregularFillStrokeParity) {
   ASSERT_TRUE(fillOnly.has_value());
   ASSERT_TRUE(withStroke.has_value());
   ASSERT_TRUE(strokeWithoutGlass.has_value());
-  // Strokes participate in the glass surface: the UDF distance field now comes from the real
-  // content (fill plus strokes), so the centered stroke legitimately reshapes the interior
-  // refraction field — no fill-only parity is asserted. The glass must stay active at the
-  // interior points, though.
+  // The UDF distance field is shaped by the stroke-free fill surface, so the interior refraction
+  // matches the fill-only render at both sample points, which sit far from the stroke band.
+  EXPECT_PIXEL_PARITY(fillOnly->center, withStroke->center);
+  EXPECT_PIXEL_PARITY(fillOnly->interior, withStroke->interior);
   EXPECT_NE(withStroke->center, strokeWithoutGlass->center);
-  EXPECT_NE(withStroke->interior, strokeWithoutGlass->interior);
 }
 
 TGFX_TEST_PRIVATE(LayerTest, GlassStyleUsesBackgroundAndContourSource) {

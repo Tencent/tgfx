@@ -130,14 +130,14 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
 
   std::optional<StyledShape> contentShape = std::nullopt;
   if (geometryShared && sharedGeometry != nullptr) {
-    auto shape = sharedGeometry->getShape();
-    if (shape != nullptr) {
-      // Baking the geometry matrix into the shape makes spread scale with the layer transform,
-      // like stroke width and other in-layer measurements. This is intentional.
-      shape = Shape::ApplyMatrix(shape, sharedGeometry->matrix);
-    }
-    if (shape != nullptr) {
-      if (strokeCount <= 1) {
+    if (strokeCount <= 1) {
+      auto shape = sharedGeometry->getShape();
+      if (shape != nullptr) {
+        // Baking the geometry matrix into the shape makes spread scale with the layer transform,
+        // like stroke width and other in-layer measurements. This is intentional.
+        shape = Shape::ApplyMatrix(shape, sharedGeometry->matrix);
+      }
+      if (shape != nullptr) {
         auto hasStroke = strokeStyle.has_value();
         auto strokeWidth = hasStroke ? strokeStyle->strokeWidth : 0.0f;
         auto strokeAlign = hasStroke ? strokeStyle->strokeAlign : StrokeAlign::Center;
@@ -148,37 +148,11 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
           type = StyledShapeType::Stroke;
         }
         contentShape = StyledShape::Make(std::move(shape), type, strokeWidth, strokeAlign);
-      } else {
-        // Stacked strokes with different widths/alignments merge into one equivalent centered
-        // stroke: the contour is geometry-only, and each stroke contributes its lateral extent
-        // (Outside -> width, Center -> half the width, Inside -> none, it stays within the fill).
-        // The merged equivalent covers every band, so consumers (glass surface expansion, shadow
-        // spread) keep working without per-stroke knowledge. With a fill the merge is exact (the
-        // fill covers the inner half of the band); without one the inner edge conservatively
-        // over-covers (two Outside strokes of 10 and 6 union to [path, path+10] but merge to
-        // [path-10, path+10]).
-        auto maxLateral = 0.0f;
-        for (const auto& painter : context.painters) {
-          if (HasTransparentSolidColor(painter.get())) {
-            continue;
-          }
-          auto style = painter->getStyle();
-          if (style.style == PaintStyle::Fill) {
-            continue;
-          }
-          auto lateral = style.strokeWidth;
-          if (style.strokeAlign == StrokeAlign::Center) {
-            lateral *= 0.5f;
-          } else if (style.strokeAlign == StrokeAlign::Inside) {
-            continue;
-          }
-          maxLateral = std::max(maxLateral, lateral);
-        }
-        auto type = hasFill ? StyledShapeType::FillStroke : StyledShapeType::Stroke;
-        contentShape =
-            StyledShape::Make(std::move(shape), type, maxLateral * 2.0f, StrokeAlign::Center);
       }
     }
+    // Stacked strokes with different widths/alignments have no single exact outline: nullopt.
+    // Consumers fall back to non-vector paths (glass uses the content alpha; spread uses the
+    // content bounds).
   }
   // Non-shared geometries cannot produce a single exact outline: nullopt.
 

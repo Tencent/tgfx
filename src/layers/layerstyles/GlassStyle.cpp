@@ -124,18 +124,18 @@ struct GlassShapeInfo {
   float cornerRadius = 0.0f;
   RRect shapeRRect = {};
   Path shapePath = {};
-  // Bounds of the glass optical surface (the fill surface expanded by the stroke outset) in
-  // layer space. Valid whenever hasPath is true.
+  // Bounds of the fill surface in layer space. Valid whenever hasPath is true.
   Rect surfaceBounds = {};
   bool hasPath = false;
+  // True when the content image carries fills only (no visible strokes), so it already matches
+  // the fill surface and can feed the UDF directly.
+  bool contentIsFillOnly = false;
 };
 
-// Detects the glass optical surface: the fill surface expanded by the decorative stroke outset,
-// so semi-transparent strokes lying on the glass also refract the backdrop too. The fill surface
-// is the shape's path (a Fill/FillStroke shape carries the fill geometry; the stroke is carried
-// separately in strokeWidth/strokeAlign). Regular shapes (RoundedRect or Ellipse) expand
-// analytically and use the analytical SDF path; pure Stroke shapes and shapes without an exact
-// outline (null) fall back to AlphaMask.
+// Detects whether the layer's fill surface is a regular shape (RoundedRect or Ellipse) that can
+// use the analytical SDF path. The fill surface is the shape's path (a Fill/FillStroke shape
+// carries the fill geometry; the stroke is carried separately in strokeWidth/strokeAlign). Pure
+// Stroke shapes and shapes without an exact outline (null) fall back to AlphaMask.
 static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
   GlassShapeInfo info;
   auto* contourSource = input.findExtraSource(StyleInputSource::Type::Contour);
@@ -152,67 +152,28 @@ static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
     return info;
   }
   auto path = surfaceShape->getPath();
-
-  // Strokes participate in the glass surface: expand the optical surface by the stroke outset so
-  // semi-transparent strokes lying on the glass also refract the backdrop. Inside strokes stay
-  // within the fill and need no expansion. Only regular shapes (rect, rrect, oval) are expanded
-  // analytically. Irregular paths keep the unexpanded drawing clip, while their distance field
-  // comes from the content alpha, which already includes the strokes.
-  auto strokeOutset = 0.0f;
-  if (optShape->type == StyledShapeType::FillStroke && optShape->strokeWidth > 0) {
-    switch (optShape->strokeAlign) {
-      case StrokeAlign::Outside:
-        strokeOutset = optShape->strokeWidth;
-        break;
-      case StrokeAlign::Center:
-        strokeOutset = optShape->strokeWidth * 0.5f;
-        break;
-      case StrokeAlign::Inside:
-        break;
-    }
-  }
-
+  info.contentIsFillOnly = optShape->type == StyledShapeType::Fill;
   RRect rRect = {};
   Rect rect = {};
   if (path.isRRect(&rRect)) {
-    auto radii = rRect.radii();
-    auto uniformCircular = radii[0] == radii[1] && radii[1] == radii[2] && radii[2] == radii[3] &&
-                           radii[0].x == radii[0].y;
-    if (strokeOutset > 0.0f && (rRect.isOval() || uniformCircular)) {
-      // Equidistant expansion keeps the shape regular: the rect grows by the outset and each
-      // corner radius grows with it.
-      auto bounds = rRect.rect();
-      bounds.outset(strokeOutset, strokeOutset);
-      rRect = RRect::MakeRectXY(bounds, radii[0].x + strokeOutset, radii[0].y + strokeOutset);
-      path = {};
-      path.addRRect(rRect);
-      radii = rRect.radii();
-    }
     info.shapeRRect = rRect;
     if (rRect.isOval()) {
       info.type = GlassShapeType::Ellipse;
     } else {
       // Shader SDF assumes a single uniform circular radius (rx == ry) across all four corners.
       // Non-uniform or elliptical corners fall back to AlphaMask for accuracy.
+      auto radii = rRect.radii();
+      auto uniformCircular = radii[0] == radii[1] && radii[1] == radii[2] && radii[2] == radii[3] &&
+                             radii[0].x == radii[0].y;
       if (uniformCircular) {
         info.type = GlassShapeType::RoundedRect;
         info.cornerRadius = radii[0].x;
       }
     }
   } else if (path.isOval(&rect)) {
-    if (strokeOutset > 0.0f) {
-      rect.outset(strokeOutset, strokeOutset);
-      path = {};
-      path.addOval(rect);
-    }
     info.type = GlassShapeType::Ellipse;
     info.shapeRRect = RRect::MakeOval(rect);
   } else if (path.isRect(&rect)) {
-    if (strokeOutset > 0.0f) {
-      rect.outset(strokeOutset, strokeOutset);
-      path = {};
-      path.addRect(rect);
-    }
     info.type = GlassShapeType::RoundedRect;
     info.cornerRadius = 0.0f;
     info.shapeRRect = RRect::MakeRect(rect);
@@ -221,6 +182,31 @@ static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
   info.hasPath = true;
   info.surfaceBounds = path.getBounds();
   return info;
+}
+
+// Rasterizes the fill surface path into a coverage image aligned with the content bitmap. The
+// content image bakes decorative strokes into its alpha; the UDF distance field must instead be
+// shaped by the stroke-free fill surface, so the recorded picture only draws the fill path with
+// the same matrix the drawPath clip uses. Only the alpha channel is consumed downstream.
+static std::shared_ptr<Image> MakeFillSurfaceImage(const Path& surfacePath,
+                                                   const LayerStyleInput& input, float contentWidth,
+                                                   float contentHeight) {
+  auto path = surfacePath;
+  auto matrix = Matrix::MakeScale(input.contentScale, input.contentScale);
+  matrix.postTranslate(-input.contentOffset.x, -input.contentOffset.y);
+  path.transform(matrix);
+  PictureRecorder recorder = {};
+  auto canvas = recorder.beginRecording();
+  Paint paint = {};
+  paint.setColor(Color::White());
+  canvas->drawPath(path, paint);
+  auto picture = recorder.finishRecordingAsPicture();
+  if (picture == nullptr) {
+    return nullptr;
+  }
+  auto imageBounds = Rect::MakeWH(contentWidth, contentHeight);
+  Point offset = {};
+  return ToImageWithOffset(std::move(picture), &offset, &imageBounds);
 }
 
 std::shared_ptr<GlassStyle> GlassStyle::Make(float refraction, float depth, float frost,
@@ -674,10 +660,16 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       edgeTextureRect.roundOut();
       Point edgeTextureOrigin = {edgeTextureRect.left, edgeTextureRect.top};
 
-      // Strokes participate in the glass: the content image's alpha is the real rendering of the
-      // fill plus every stroke, so the UDF distance field is computed from the combined shape
-      // directly — strokes and fill go through the UDF together.
+      // The content image bakes decorative strokes into its alpha. When the exact fill surface is
+      // known, rasterize it into a stroke-free coverage image so the distance field does not
+      // depend on the strokes. Fill-only content already matches the surface and is used as is.
       auto udfSource = input.content;
+      if (shapeInfo.hasPath && !shapeInfo.contentIsFillOnly) {
+        udfSource = MakeFillSurfaceImage(shapeInfo.shapePath, input, contentWidth, contentHeight);
+        if (udfSource == nullptr) {
+          udfSource = input.content;
+        }
+      }
 
       GlassUDFRequest maskRequest = {};
       maskRequest.source = udfSource;
@@ -842,6 +834,8 @@ std::shared_ptr<GlassRefractionImageFilter> GlassStyle::getSDFRefractionFilter(
     params.lightIntensity = 0.0f;
   }
   params.shapeType = shapeType;
+  // The fill surface, not the stroke-outset content bounds, defines the optical scale; the
+  // content fallback keeps the previous behavior when no exact surface is known.
   auto shapeHalfWidth = shapeBounds.width() * 0.5f;
   auto shapeHalfHeight = shapeBounds.height() * 0.5f;
   float minHalf = std::min(shapeHalfWidth, shapeHalfHeight);
@@ -873,8 +867,8 @@ std::shared_ptr<GlassRefractionImageFilter> GlassStyle::getUDFRefractionFilter(
     params.lightIntensity = 0.0f;
   }
   params.shapeType = GlassShapeType::AlphaMask;
-  // The displacement scale follows the optical surface; the content half sizes are the fallback
-  // when no exact surface is known.
+  // The displacement scale follows the fill surface, not the stroke-outset content bounds; the
+  // content half sizes are the fallback when no exact surface is known.
   auto surfaceHalfWidth = halfWidth;
   auto surfaceHalfHeight = halfHeight;
   if (!shapeBounds.isEmpty()) {

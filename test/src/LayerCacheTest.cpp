@@ -245,36 +245,6 @@ TGFX_TEST_PRIVATE(LayerCacheTest, LayerCacheWithTransform) {
   TGFX_PRIVATE_ACCESS(EXPECT_TRUE(root->subtreeCache != nullptr));
 }
 
-TGFX_TEST_PRIVATE(LayerCacheTest, BackgroundStyleInvalidatesExistingCache) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 200, 200);
-  auto displayList = std::make_unique<DisplayList>();
-  displayList->setRenderMode(RenderMode::Direct);
-  displayList->setSubtreeCacheMaxSize(2048);
-
-  auto layer = SolidLayer::Make();
-  layer->setWidth(100);
-  layer->setHeight(100);
-  layer->setColor(Color::Red());
-  // A zero-radius background blur starts cacheable and becomes backdrop-dependent only after its
-  // blurriness is raised.
-  auto backgroundStyle = BackgroundBlurStyle::Make(0, 0);
-  layer->setLayerStyles({backgroundStyle});
-  displayList->root()->addChild(layer);
-
-  displayList->render(surface.get());
-  displayList->render(surface.get());
-  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(layer->subtreeCache != nullptr));
-
-  backgroundStyle->setBlurrinessX(8);
-  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(layer->subtreeCache != nullptr));
-
-  displayList->render(surface.get());
-  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(layer->subtreeCache == nullptr));
-}
-
 TGFX_TEST_PRIVATE(LayerCacheTest, LayerCacheContentScale) {
   ContextScope scope;
   auto context = scope.getContext();

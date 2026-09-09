@@ -55,9 +55,9 @@ struct GlassUDFGeometryParams : public GlassGeometryParams {
   float udfPixelToLayerPixelX = 1.0f;
   float udfPixelToLayerPixelY = 1.0f;
   /**
-   * Half sizes of the glass optical surface in layer pixels. The displacement scale follows the
-   * optical surface (the fill surface expanded by the stroke outset). Equal to halfW/halfH when
-   * no exact surface is known.
+   * Half sizes of the fill surface in layer pixels. The displacement scale follows the fill
+   * surface instead of the content bounds, which decorative strokes outset. Equal to halfW/halfH
+   * when no exact fill surface is known.
    */
   float surfaceHalfW = 0.0f;
   float surfaceHalfH = 0.0f;
