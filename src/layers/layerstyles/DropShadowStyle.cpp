@@ -125,10 +125,10 @@ void DropShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float
   Point filterSourceOffset = {};
   if (!FloatNearlyZero(_spread)) {
     auto spreadImage = SpreadUtils::MakeSpreadShapeImage(input, _spread);
-    // The spread shadow is drawn from the spread shape image. When the vector shape is unavailable
-    // (e.g. a group layer with only children) or exceeds the content image, the spread cannot be
-    // applied; skip drawing rather than falling back, since filterBounds cannot reflect the
-    // fallback geometry.
+    // Without an exact outline the spread falls back to the content bounds, so it applies in the
+    // common no-shape cases (text, child-only groups). The image is still null when the shape
+    // exceeds the content image (or the content image itself is missing); skip drawing in those
+    // cases, since filterBounds cannot reflect any further fallback geometry.
     if (spreadImage.collapsed || spreadImage.image == nullptr) {
       return;
     }

@@ -158,8 +158,38 @@ SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInpu
     return {nullptr, {}, false};
   }
   auto contour = static_cast<const ContourInputSource*>(source);
-  if (!contour->shape().has_value()) {
-    return {nullptr, {}, false};
+  const auto& shapeOption = contour->shape();
+  if (!shapeOption.has_value() || shapeOption->shape == nullptr) {
+    // No single vector outline is available (text, multiple distinct geometries, or layer types
+    // without an exact shape). Fall back to the content image's bounds — contentOffset and the
+    // image size are both on LayerStyleInput, so no producer-side channel is needed, and for
+    // layers whose content is itself a rect (e.g. an opaque image) the bounds are the exact
+    // outline. For other content the bounds carry the rasterization round-out (and for text,
+    // the layout box rather than the ink box).
+    if (input.content == nullptr || FloatNearlyZero(input.contentScale)) {
+      return {nullptr, {}, false};
+    }
+    auto scale = input.contentScale;
+    auto rect = Rect::MakeXYWH(input.contentOffset.x / scale, input.contentOffset.y / scale,
+                               static_cast<float>(input.content->width()) / scale,
+                               static_cast<float>(input.content->height()) / scale);
+    if (rect.width() + 2.0f * spread <= 0.0f || rect.height() + 2.0f * spread <= 0.0f) {
+      return {nullptr, {}, true};
+    }
+    PictureRecorder fallbackRecorder;
+    auto* fallbackCanvas = fallbackRecorder.beginRecording();
+    fallbackCanvas->scale(scale, scale);
+    DrawSpreadRRect(fallbackCanvas, RRect::MakeRectXY(rect, 0, 0), StyledShapeType::Fill,
+                    StrokeAlign::Center, 0, spread);
+    auto fallbackPicture = fallbackRecorder.finishRecordingAsPicture();
+    Point fallbackOffset = {};
+    auto fallbackImage = ToImageWithOffset(std::move(fallbackPicture), &fallbackOffset);
+    if (fallbackImage == nullptr) {
+      return {nullptr, {}, false};
+    }
+    return {std::move(fallbackImage),
+            {fallbackOffset.x - input.contentOffset.x, fallbackOffset.y - input.contentOffset.y},
+            false};
   }
   auto& styledShape = *contour->shape();
   DEBUG_ASSERT(styledShape.shape != nullptr);
@@ -204,7 +234,9 @@ SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInpu
     DrawSpreadRRect(recordCanvas, rRect, type, strokeAlign, strokeWidth, spread);
   } else {
     if (!path.isRect(&rect)) {
-      // Complex paths use their bounding rect as a fill approximation for the shadow source. A
+      // Irregular paths (stars, freeform shapes) have an exact shape but no closed-form spread:
+      // their bounding rect is used as a fill approximation for the shadow source (a pre-existing
+      // behavior); the fallback above only covers layers with no exact outline at all. A
       // collapsed stroke is already rejected by IsSpreadCollapsed above, so any stroke reaching
       // here is non-collapsed and safe to approximate as a fill.
       rect = path.getBounds();

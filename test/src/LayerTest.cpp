@@ -4065,7 +4065,135 @@ static void RunGlassStyleTest(const std::string& keySuffix, float zoomScale = 1.
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyle" + keySuffix));
 }
+TGFX_TEST_PRIVATE(LayerTest, GlassStyleStrokeContentBounds) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  std::vector<int> widths = {};
+  std::vector<float> offsets = {};
 
+  for (auto strokeAlign : {StrokeAlign::Center, StrokeAlign::Inside, StrokeAlign::Outside}) {
+    auto vectorLayer = VectorLayer::Make();
+    auto rectangle = Rectangle::Make();
+    rectangle->setPosition({100, 100});
+    rectangle->setSize({100, 100});
+    rectangle->setRoundness({20, 20, 20, 20});
+    auto fill = FillStyle::Make(SolidColor::Make(Color::White()));
+    auto stroke = StrokeStyle::Make(SolidColor::Make(Color::Blue()));
+    stroke->setStrokeWidth(10);
+    stroke->setStrokeAlign(strokeAlign);
+    vectorLayer->setContents({rectangle, fill, stroke});
+    vectorLayer->setLayerStyles({GlassStyle::Make(80, 50, 0, 50, 0, 135, 50)});
+    DrawArgs drawArgs(context);
+    TGFX_PRIVATE_ACCESS(auto source = vectorLayer->getLayerStyleSource(drawArgs, Matrix::I());
+                        ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[0] != nullptr);
+                        ASSERT_TRUE(source->groups[0]->content.image != nullptr);
+                        widths.push_back(source->groups[0]->content.image->width());
+                        offsets.push_back(source->groups[0]->content.offset.x);)
+  }
+  ASSERT_EQ(widths.size(), 3u);
+  EXPECT_EQ(widths[1], 100);
+  EXPECT_LT(offsets[0], offsets[1]);
+  EXPECT_GT(widths[0], widths[1]);
+  EXPECT_LT(offsets[2], offsets[0]);
+  EXPECT_GT(widths[2], widths[0]);
+}
+
+TGFX_TEST_PRIVATE(LayerTest, ShapeLayerContentShapeExactness) {
+  auto layer = ShapeLayer::Make();
+  Path path = {};
+  path.addRRect(RRect::MakeRectXY(Rect::MakeXYWH(50, 50, 100, 100), 20, 20));
+  layer->setPath(path);
+  layer->setFillStyle(ShapeStyle::Make(Color::White()));
+  layer->setStrokeStyle(ShapeStyle::Make(Color::Blue()));
+  TGFX_PRIVATE_ACCESS(auto singleStroke = layer->onGetContentShape();
+                      ASSERT_TRUE(singleStroke.has_value());
+                      EXPECT_EQ(singleStroke->type, StyledShapeType::FillStroke);
+                      EXPECT_TRUE(singleStroke->shape != nullptr);)
+
+  layer->addStrokeStyle(ShapeStyle::Make(Color::Red()));
+  TGFX_PRIVATE_ACCESS(auto multipleStrokes = layer->onGetContentShape();
+                      ASSERT_TRUE(multipleStrokes.has_value());
+                      // Stacked stroke styles share the layer's single width and alignment, so the
+                      // contour stays exact no matter how many are stacked.
+                      EXPECT_EQ(multipleStrokes->type, StyledShapeType::FillStroke);
+                      EXPECT_TRUE(multipleStrokes->shape != nullptr);)
+
+  auto multipleFills = ShapeLayer::Make();
+  multipleFills->setPath(path);
+  multipleFills->setFillStyles({ShapeStyle::Make(Color::White()), ShapeStyle::Make(Color::Blue())});
+  TGFX_PRIVATE_ACCESS(auto multipleFillShape = multipleFills->onGetContentShape();
+                      ASSERT_TRUE(multipleFillShape.has_value());
+                      EXPECT_EQ(multipleFillShape->type, StyledShapeType::Fill);
+                      EXPECT_TRUE(multipleFillShape->shape != nullptr);)
+
+  auto strokeOnly = ShapeLayer::Make();
+  strokeOnly->setPath(path);
+  strokeOnly->addStrokeStyle(ShapeStyle::Make(Color::Blue()));
+  strokeOnly->addStrokeStyle(ShapeStyle::Make(Color::Red()));
+  TGFX_PRIVATE_ACCESS(auto strokeOnlyShape = strokeOnly->onGetContentShape();
+                      ASSERT_TRUE(strokeOnlyShape.has_value());
+                      EXPECT_EQ(strokeOnlyShape->type, StyledShapeType::Stroke);
+                      EXPECT_TRUE(strokeOnlyShape->shape != nullptr);)
+}
+
+static std::optional<uint32_t> RenderSpreadShadowPixel(Context* context,
+                                                       const std::shared_ptr<Layer>& layer, int x,
+                                                       int y) {
+  auto surface = Surface::Make(context, 200, 200);
+  if (surface == nullptr) {
+    return std::nullopt;
+  }
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->root()->addChild(layer);
+  displayList->render(surface.get());
+  auto info = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  uint32_t pixel = 0;
+  if (!surface->readPixels(info, &pixel, x, y)) {
+    return std::nullopt;
+  }
+  return pixel;
+}
+
+static std::shared_ptr<VectorLayer> MakeMultiGeometryVectorLayer() {
+  auto vectorLayer = VectorLayer::Make();
+  auto group = VectorGroup::Make();
+  auto rect = Rectangle::Make();
+  rect->setPosition({100, 100});
+  rect->setSize({100, 100});
+  auto ellipse = Ellipse::Make();
+  ellipse->setPosition({100, 100});
+  ellipse->setSize({80, 80});
+  auto fill = FillStyle::Make(SolidColor::Make(Color::FromRGBA(255, 255, 255, 255)));
+  group->setElements({rect, ellipse, fill});
+  vectorLayer->setContents({group});
+  return vectorLayer;
+}
+
+// Multiple geometries cannot produce a single exact outline: the spread falls back to the
+// content image's bounds, so it still applies — the shadow expands by the spread from the
+// bounds rect rather than hugging the content.
+TGFX_TEST(LayerTest, DropShadowSpreadWithoutExactShape) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // Both geometries are centered at (100, 100); the rect spans [50, 150], so the content bounds
+  // end at 150. The shadow has no blur and a Y offset of 15, and a spread of 10 expands the
+  // bounds footprint to 160, so the shadow reaches 175.
+  auto layer = MakeMultiGeometryVectorLayer();
+  auto shadowStyle = DropShadowStyle::Make(0, 15, 0, 0, Color::Black());
+  shadowStyle->setSpread(10);
+  layer->setLayerStyles({shadowStyle});
+  // Within the spread-expanded footprint (150 + 10 + 15).
+  auto spreadPixel = RenderSpreadShadowPixel(context, layer, 100, 170);
+  ASSERT_TRUE(spreadPixel.has_value());
+  EXPECT_NE(*spreadPixel, 0u) << "spread was not applied from the content bounds";
+  // Beyond the spread-expanded footprint the shadow must be absent.
+  auto outsidePixel = RenderSpreadShadowPixel(context, layer, 100, 180);
+  ASSERT_TRUE(outsidePixel.has_value());
+  EXPECT_EQ(*outsidePixel, 0u);
+}
 TGFX_TEST_PRIVATE(LayerTest, GlassStyleUsesBackgroundAndContourSource) {
   ContextScope scope;
   auto context = scope.getContext();
