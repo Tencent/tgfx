@@ -115,9 +115,7 @@ class DropShadowStyle : public LayerStyle {
    * When zero (the default), the shadow is rendered directly from the layer's rasterized content
    * image without any spread adjustment.
    * When positive, the shadow grows outward, making the shadow larger than the content. When
-   * negative, the shadow shrinks inward, making the shadow smaller than the content. The spread is
-   * derived from the layer's vector shape when the content has a single outline, and from the
-   * content image's bounds otherwise (text, child-only groups), so the spread always applies.
+   * negative, the shadow shrinks inward, making the shadow smaller than the content.
    */
   float spread() const {
     return _spread;
