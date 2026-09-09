@@ -98,8 +98,9 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
   }
 
   // Only a single shared geometry across all painters can be simplified to a StyledShape. The
-  // scan collects flags instead of returning early because stacked strokes merge into one
-  // equivalent centered stroke, and only non-shared geometries drop the outline below.
+  // scan collects flags instead of returning early because stacked strokes and non-shared
+  // geometries both drop the outline below (nullopt), while the fill keeps a single-stroke
+  // shape exact.
   Geometry* sharedGeometry = nullptr;
   auto geometryShared = true;
   auto hasFill = false;
