@@ -97,74 +97,64 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
     return std::nullopt;
   }
 
-  // Only a single shared geometry across all painters can be simplified to a StyledShape.
-  // Stacked strokes keep the exact outline when they share the same width and alignment
-  // (rendering identical to one stroke); differing strokes and non-shared geometries drop it
-  // (nullopt).
+  // Only a single shared geometry across all painters with a uniform stroke style can be
+  // simplified to a StyledShape. Anything else has no exact outline: nullopt (consumers fall
+  // back to non-vector paths — glass uses the content alpha, spread uses the content bounds).
   Geometry* sharedGeometry = nullptr;
-  auto geometryShared = true;
   auto hasFill = false;
-  auto uniformStroke = true;
   std::optional<PainterStyle> strokeStyle = std::nullopt;
   for (const auto& painter : context.painters) {
     DEBUG_ASSERT(painter != nullptr);
     if (HasTransparentSolidColor(painter.get())) {
       continue;
     }
-    if (painter->geometries.size() != 1 ||
-        (sharedGeometry != nullptr && painter->geometries[0] != sharedGeometry)) {
-      geometryShared = false;
-      break;
+    if (painter->geometries.size() != 1) {
+      return std::nullopt;
     }
     if (sharedGeometry == nullptr) {
       sharedGeometry = painter->geometries[0];
+    } else if (painter->geometries[0] != sharedGeometry) {
+      return std::nullopt;
     }
 
     auto style = painter->getStyle();
     if (style.style == PaintStyle::Fill) {
       hasFill = true;
     } else {
-      // Stacked strokes keep a single exact outline only when they all share the same width and
-      // alignment (rendering identical to one stroke); any difference drops it (nullopt).
-      if (strokeStyle.has_value() && (strokeStyle->strokeWidth != style.strokeWidth ||
-                                      strokeStyle->strokeAlign != style.strokeAlign)) {
-        uniformStroke = false;
+      // Multiple strokes cannot be simplified to a single StyledShape.
+      if (strokeStyle.has_value()) {
+        return std::nullopt;
       }
-      if (!strokeStyle.has_value()) {
-        strokeStyle = style;
-      }
+      strokeStyle = style;
     }
   }
 
-  std::optional<StyledShape> contentShape = std::nullopt;
-  if (geometryShared && sharedGeometry != nullptr) {
-    if (uniformStroke) {
-      auto shape = sharedGeometry->getShape();
-      if (shape != nullptr) {
-        // Baking the geometry matrix into the shape makes spread scale with the layer transform,
-        // like stroke width and other in-layer measurements. This is intentional.
-        shape = Shape::ApplyMatrix(shape, sharedGeometry->matrix);
-      }
-      if (shape != nullptr) {
-        auto hasStroke = strokeStyle.has_value();
-        auto strokeWidth = hasStroke ? strokeStyle->strokeWidth : 0.0f;
-        auto strokeAlign = hasStroke ? strokeStyle->strokeAlign : StrokeAlign::Center;
-        auto type = StyledShapeType::FillStroke;
-        if (!hasStroke) {
-          type = StyledShapeType::Fill;
-        } else if (!hasFill) {
-          type = StyledShapeType::Stroke;
-        }
-        contentShape = StyledShape::Make(std::move(shape), type, strokeWidth, strokeAlign);
-      }
-    }
-    // Stacked strokes with differing widths or alignments have no single exact outline: nullopt.
-    // Consumers fall back to non-vector paths (glass uses the content alpha; spread uses the
-    // content bounds).
+  // sharedGeometry stays null when every painter was skipped as invisible, meaning the layer has
+  // no visible content.
+  if (sharedGeometry == nullptr) {
+    return std::nullopt;
   }
-  // Non-shared geometries cannot produce a single exact outline: nullopt.
+  auto shape = sharedGeometry->getShape();
+  if (shape == nullptr) {
+    return std::nullopt;
+  }
+  // Baking the geometry matrix into the shape makes spread scale with the layer transform,
+  // like stroke width and other in-layer measurements. This is intentional.
+  shape = Shape::ApplyMatrix(shape, sharedGeometry->matrix);
+  if (shape == nullptr) {
+    return std::nullopt;
+  }
 
-  return contentShape;
+  auto hasStroke = strokeStyle.has_value();
+  auto strokeWidth = hasStroke ? strokeStyle->strokeWidth : 0.0f;
+  auto strokeAlign = hasStroke ? strokeStyle->strokeAlign : StrokeAlign::Center;
+  auto type = StyledShapeType::FillStroke;
+  if (!hasStroke) {
+    type = StyledShapeType::Fill;
+  } else if (!hasFill) {
+    type = StyledShapeType::Stroke;
+  }
+  return StyledShape::Make(std::move(shape), type, strokeWidth, strokeAlign);
 }
 
 }  // namespace tgfx

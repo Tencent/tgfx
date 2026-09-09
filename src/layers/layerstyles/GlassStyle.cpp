@@ -29,7 +29,6 @@
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Path.h"
-#include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/RRect.h"
 #include "tgfx/core/SamplingOptions.h"
 #include "tgfx/core/Shape.h"
@@ -124,8 +123,6 @@ struct GlassShapeInfo {
   float cornerRadius = 0.0f;
   RRect shapeRRect = {};
   Path shapePath = {};
-  // Bounds of the fill surface in layer space. Valid whenever hasPath is true.
-  Rect surfaceBounds = {};
   bool hasPath = false;
 };
 
@@ -176,7 +173,6 @@ static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
   }
   info.shapePath = path;
   info.hasPath = true;
-  info.surfaceBounds = path.getBounds();
   return info;
 }
 
@@ -375,13 +371,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
 
     refractInputRect = visibleRect;
     if (_refraction > 0 || _lightIntensity > 0) {
-      // The optical surface defines the refraction scale; the content bounds are the fallback
-      // when no exact surface is known.
       auto minHalf = std::min(origWidth, origHeight) * 0.5f;
-      if (shapeInfo.hasPath) {
-        minHalf =
-            std::min(shapeInfo.surfaceBounds.width(), shapeInfo.surfaceBounds.height()) * 0.5f;
-      }
       float refractionOutset =
           shapeInfo.type == GlassShapeType::AlphaMask
               ? GetUDFRefractionOutset(minHalf, getRefractionFactor(), getDepthRatio(),
@@ -481,10 +471,6 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       float blurRadius =
           std::max(std::min((_depth / 100.0f) * MAX_BLUR_RADIUS, MAX_BLUR_RADIUS), MIN_BLUR_RADIUS);
       float minHalf = std::min(origBounds.width(), origBounds.height()) * 0.5f;
-      if (shapeInfo.hasPath) {
-        minHalf =
-            std::min(shapeInfo.surfaceBounds.width(), shapeInfo.surfaceBounds.height()) * 0.5f;
-      }
       auto visibleContentRect = Rect::MakeWH(contentWidth, contentHeight);
       if (clipBounds.has_value() && !visibleContentRect.intersect(*clipBounds)) {
         return;
@@ -665,11 +651,11 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       udf.textureOrigin = udfTextureOrigin;
       udf.edgePixelToLayerPixel = {edgePixelToLayerPixelX, edgePixelToLayerPixelY};
       udf.edgeTextureOrigin = edgeTextureOrigin;
-      glassFilter = getUDFRefractionFilter(halfW, halfH, shapeInfo.surfaceBounds, udf, mapping,
-                                           maskRequest, edgeMaskRequest, input.contentScale);
+      glassFilter = getUDFRefractionFilter(halfW, halfH, udf, mapping, maskRequest, edgeMaskRequest,
+                                           input.contentScale);
     } else {
       glassFilter = getSDFRefractionFilter(shapeInfo.type, shapeInfo.cornerRadius, halfW, halfH,
-                                           shapeInfo.surfaceBounds, mapping, input.contentScale);
+                                           mapping, input.contentScale);
     }
   }
 
@@ -791,30 +777,24 @@ GlassRefractionParams GlassStyle::makeBaseRefractionParams(float halfW, float ha
 }
 
 std::shared_ptr<GlassRefractionImageFilter> GlassStyle::getSDFRefractionFilter(
-    GlassShapeType shapeType, float cornerRadius, float contentHalfWidth, float contentHalfHeight,
-    const Rect& shapeBounds, const BackgroundMapping& mapping, float contentScale) {
-  auto params = makeBaseRefractionParams(contentHalfWidth, contentHalfHeight, mapping);
+    GlassShapeType shapeType, float cornerRadius, float halfWidth, float halfHeight,
+    const BackgroundMapping& mapping, float contentScale) {
+  auto params = makeBaseRefractionParams(halfWidth, halfHeight, mapping);
   if (contentScale <= EdgeLightMinContentScale) {
     params.lightIntensity = 0.0f;
   }
   params.shapeType = shapeType;
-  // The fill surface, not the stroke-outset content bounds, defines the optical scale; the
-  // content fallback keeps the previous behavior when no exact surface is known.
-  auto shapeHalfWidth = shapeBounds.width() * 0.5f;
-  auto shapeHalfHeight = shapeBounds.height() * 0.5f;
-  float minHalf = std::min(shapeHalfWidth, shapeHalfHeight);
+  float minHalf = std::min(halfWidth, halfHeight);
   // The analytical SDF displaces by at most refractionFactor * glassThickness, so the shader clamp
   // is an identity here. Carrying the real bound instead of a sentinel lets the image filter derive
   // its sampling outset from this value alone.
   params.maxDisplacement = getGlassThickness(minHalf) * getRefractionFactor();
 
   GlassSDFGeometryParams sdfParams = {};
-  sdfParams.halfW = contentHalfWidth;
-  sdfParams.halfH = contentHalfHeight;
+  sdfParams.halfW = halfWidth;
+  sdfParams.halfH = halfHeight;
   sdfParams.cornerRadius = cornerRadius;
   sdfParams.glassThickness = getGlassThickness(minHalf);
-  sdfParams.shapeHalfW = shapeHalfWidth;
-  sdfParams.shapeHalfH = shapeHalfHeight;
   sdfParams.refractionFactor = getRefractionFactor();
   sdfParams.splay = std::clamp(_splay / 100.0f, 0.0f, 1.0f);
   sdfParams.depthRatio = getDepthRatio();
@@ -823,30 +803,20 @@ std::shared_ptr<GlassRefractionImageFilter> GlassStyle::getSDFRefractionFilter(
 }
 
 std::shared_ptr<GlassRefractionImageFilter> GlassStyle::getUDFRefractionFilter(
-    float halfWidth, float halfHeight, const Rect& shapeBounds, const UDFSampling& udf,
-    const BackgroundMapping& mapping, const GlassUDFRequest& maskRequest,
-    const GlassUDFRequest& edgeMaskRequest, float contentScale) {
+    float halfWidth, float halfHeight, const UDFSampling& udf, const BackgroundMapping& mapping,
+    const GlassUDFRequest& maskRequest, const GlassUDFRequest& edgeMaskRequest,
+    float contentScale) {
   auto params = makeBaseRefractionParams(halfWidth, halfHeight, mapping);
   if (contentScale <= EdgeLightMinContentScale) {
     params.lightIntensity = 0.0f;
   }
   params.shapeType = GlassShapeType::AlphaMask;
-  // The displacement scale follows the fill surface, not the stroke-outset content bounds; the
-  // content half sizes are the fallback when no exact surface is known.
-  auto surfaceHalfWidth = halfWidth;
-  auto surfaceHalfHeight = halfHeight;
-  if (!shapeBounds.isEmpty()) {
-    surfaceHalfWidth = shapeBounds.width() * 0.5f;
-    surfaceHalfHeight = shapeBounds.height() * 0.5f;
-  }
-  float minHalf = std::min(surfaceHalfWidth, surfaceHalfHeight);
+  float minHalf = std::min(halfWidth, halfHeight);
   params.maxDisplacement = GetUDFMaxDisplacement(minHalf, getRefractionFactor(), getDepthRatio());
 
   GlassUDFGeometryParams udfParams = {};
   udfParams.halfW = halfWidth;
   udfParams.halfH = halfHeight;
-  udfParams.surfaceHalfW = surfaceHalfWidth;
-  udfParams.surfaceHalfH = surfaceHalfHeight;
   udfParams.refractionFactor = getRefractionFactor();
   udfParams.splay = std::clamp(_splay / 100.0f, 0.0f, 1.0f);
   udfParams.depthRatio = getDepthRatio();
