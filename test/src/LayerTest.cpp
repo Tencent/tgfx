@@ -4299,20 +4299,17 @@ TGFX_TEST(LayerTest, GlassStyleFillStrokeParity) {
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
+  // Any stroked content takes the AlphaMask glass path (the content alpha is the actually
+  // rendered shape), while fill-only content may take the analytical SDF path — so there is no
+  // fill-only parity to assert. What must hold for the stroked path: opaque strokes cover the
+  // glass beneath them, so their pixels match the no-glass render regardless of alignment.
   for (auto zoomScale : {1.0f, 2.0f}) {
     for (auto strokeAlign : {StrokeAlign::Center, StrokeAlign::Inside, StrokeAlign::Outside}) {
-      auto fillOnly = RenderGlassStrokeComparison(context, 0, strokeAlign, true, zoomScale);
       auto withStroke = RenderGlassStrokeComparison(context, 1, strokeAlign, true, zoomScale);
       auto strokeWithoutGlass =
           RenderGlassStrokeComparison(context, 1, strokeAlign, false, zoomScale);
-      ASSERT_TRUE(fillOnly.has_value());
       ASSERT_TRUE(withStroke.has_value());
       ASSERT_TRUE(strokeWithoutGlass.has_value());
-      // A single decorative stroke does not affect the glass: the fill surface defines the
-      // optical surface, so the edge and refraction stay identical to the fill-only render.
-      EXPECT_PIXEL_PARITY(fillOnly->edge, withStroke->edge);
-      EXPECT_PIXEL_PARITY(fillOnly->refraction, withStroke->refraction);
-      EXPECT_NE(withStroke->refraction, strokeWithoutGlass->refraction);
       if (strokeAlign != StrokeAlign::Inside) {
         EXPECT_PIXEL_PARITY(withStroke->strokeOnly, strokeWithoutGlass->strokeOnly);
       }
@@ -4321,9 +4318,8 @@ TGFX_TEST(LayerTest, GlassStyleFillStrokeParity) {
       }
     }
   }
-  // Stacked strokes drop the exact outline entirely: the glass falls back to AlphaMask, whose
-  // coverage comes from the content alpha (the actual rendered shape). Shape correctness for
-  // that path is asserted by VectorLayerTest.GlassStyleMultiStrokeRoundedCorner.
+  // Shape correctness of the AlphaMask path (no glass outside the rendered corners) is asserted
+  // by VectorLayerTest.GlassStyleMultiStrokeRoundedCorner.
 }
 
 struct IrregularFillPixels {

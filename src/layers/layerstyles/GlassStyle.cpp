@@ -127,15 +127,12 @@ struct GlassShapeInfo {
   // Bounds of the fill surface in layer space. Valid whenever hasPath is true.
   Rect surfaceBounds = {};
   bool hasPath = false;
-  // True when the content image carries fills only (no visible strokes), so it already matches
-  // the fill surface and can feed the UDF directly.
-  bool contentIsFillOnly = false;
 };
 
 // Detects whether the layer's fill surface is a regular shape (RoundedRect or Ellipse) that can
-// use the analytical SDF path. The fill surface is the shape's path (a Fill/FillStroke shape
-// carries the fill geometry; the stroke is carried separately in strokeWidth/strokeAlign). Pure
-// Stroke shapes and shapes without an exact outline (null) fall back to AlphaMask.
+// use the analytical SDF path. Only fill-only shapes take the analytical path; any stroked
+// content (FillStroke, Stroke) falls back to AlphaMask, whose coverage comes from the content
+// alpha — the actually rendered shape, strokes included.
 static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
   GlassShapeInfo info;
   auto* contourSource = input.findExtraSource(StyleInputSource::Type::Contour);
@@ -148,11 +145,10 @@ static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
   }
   const auto& optShape = contour->shape();
   auto surfaceShape = optShape->shape;
-  if (surfaceShape == nullptr || optShape->type == StyledShapeType::Stroke) {
+  if (surfaceShape == nullptr || optShape->type != StyledShapeType::Fill) {
     return info;
   }
   auto path = surfaceShape->getPath();
-  info.contentIsFillOnly = optShape->type == StyledShapeType::Fill;
   RRect rRect = {};
   Rect rect = {};
   if (path.isRRect(&rRect)) {
@@ -182,31 +178,6 @@ static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
   info.hasPath = true;
   info.surfaceBounds = path.getBounds();
   return info;
-}
-
-// Rasterizes the fill surface path into a coverage image aligned with the content bitmap. The
-// content image bakes decorative strokes into its alpha; the UDF distance field must instead be
-// shaped by the stroke-free fill surface, so the recorded picture only draws the fill path with
-// the same matrix the drawPath clip uses. Only the alpha channel is consumed downstream.
-static std::shared_ptr<Image> MakeFillSurfaceImage(const Path& surfacePath,
-                                                   const LayerStyleInput& input, float contentWidth,
-                                                   float contentHeight) {
-  auto path = surfacePath;
-  auto matrix = Matrix::MakeScale(input.contentScale, input.contentScale);
-  matrix.postTranslate(-input.contentOffset.x, -input.contentOffset.y);
-  path.transform(matrix);
-  PictureRecorder recorder = {};
-  auto canvas = recorder.beginRecording();
-  Paint paint = {};
-  paint.setColor(Color::White());
-  canvas->drawPath(path, paint);
-  auto picture = recorder.finishRecordingAsPicture();
-  if (picture == nullptr) {
-    return nullptr;
-  }
-  auto imageBounds = Rect::MakeWH(contentWidth, contentHeight);
-  Point offset = {};
-  return ToImageWithOffset(std::move(picture), &offset, &imageBounds);
 }
 
 std::shared_ptr<GlassStyle> GlassStyle::Make(float refraction, float depth, float frost,
@@ -660,16 +631,9 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       edgeTextureRect.roundOut();
       Point edgeTextureOrigin = {edgeTextureRect.left, edgeTextureRect.top};
 
-      // The content image bakes decorative strokes into its alpha. When the exact fill surface is
-      // known, rasterize it into a stroke-free coverage image so the distance field does not
-      // depend on the strokes. Fill-only content already matches the surface and is used as is.
+      // The UDF distance field is computed from the content image directly: its alpha is the
+      // actually rendered shape, strokes included.
       auto udfSource = input.content;
-      if (shapeInfo.hasPath && !shapeInfo.contentIsFillOnly) {
-        udfSource = MakeFillSurfaceImage(shapeInfo.shapePath, input, contentWidth, contentHeight);
-        if (udfSource == nullptr) {
-          udfSource = input.content;
-        }
-      }
 
       GlassUDFRequest maskRequest = {};
       maskRequest.source = udfSource;
