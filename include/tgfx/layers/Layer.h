@@ -670,6 +670,11 @@ class Layer : public std::enable_shared_from_this<Layer> {
   void drawLayerStyleDefault(const DrawArgs& args, Canvas* canvas, float alpha, LayerStyle* style,
                              const LayerStyleSource* source);
 
+  std::shared_ptr<Image> renderBackgroundStyleToImage(const DrawArgs& args, LayerStyle* style,
+                                                      const LayerStyleSource* source,
+                                                      std::shared_ptr<Image> backgroundImage,
+                                                      const Point& backgroundOffset, Point* offset);
+
   // Walks ancestors and prior siblings, painting their content + Below styles into canvas. Used
   // by synthesizeBackgroundImage for the picture-canvas fallback. Returns the cumulative alpha
   // after the parent chain. Each frame passes its `this` to the parent as stopChild so siblings

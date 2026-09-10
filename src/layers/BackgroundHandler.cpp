@@ -239,8 +239,18 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   if (image == nullptr) {
     return;
   }
+  if (snapshots->shareStyleOutput) {
+    Point styleOffset = {};
+    auto styleImage =
+        layer->renderBackgroundStyleToImage(args, style, source, image, offset, &styleOffset);
+    if (styleImage != nullptr) {
+      snapshots->snapshots[BackgroundSnapshotKey{layer, style}].push_back(
+          BackgroundSnapshotEntry{std::move(styleImage), styleOffset, true});
+      return;
+    }
+  }
   snapshots->snapshots[BackgroundSnapshotKey{layer, style}].push_back(
-      BackgroundSnapshotEntry{std::move(image), offset});
+      BackgroundSnapshotEntry{std::move(image), offset, false});
 }
 
 const LayerStyleSource* BackgroundCapturer::getCachedLayerStyleSource(Layer* layer) const {
@@ -310,6 +320,7 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   const auto& contentEntry = group->content;
   std::shared_ptr<Image> bgImage = nullptr;
   Point bgOffset = {};
+  bool isStyleOutput = false;
   if (snapshots != nullptr) {
     BackgroundSnapshotKey key{layer, style};
     auto it = snapshots->snapshots.find(key);
@@ -326,6 +337,7 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     auto& entry = it->second[cursor++];
     bgImage = entry.image;
     bgOffset = entry.offset;
+    isStyleOutput = entry.isStyleOutput;
   } else {
     // Picture-canvas path: capture was skipped because there is no GPU context. Synthesize the
     // backdrop on the fly by walking ancestors and prior siblings via PictureRecorder.
@@ -338,6 +350,16 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   auto matrix = Matrix::MakeScale(1.f / source->contentScale, 1.f / source->contentScale);
   matrix.preTranslate(contentEntry.offset.x, contentEntry.offset.y);
   canvas->concat(matrix);
+  if (isStyleOutput) {
+    // The capture pass already rendered the style; only compositing is left, and it must happen
+    // against the real destination, which may already hold earlier styles that the backdrop slice
+    // does not carry.
+    Paint paint = {};
+    paint.setAlpha(alpha);
+    paint.setBlendMode(style->blendMode());
+    canvas->drawImage(bgImage, bgOffset.x, bgOffset.y, &paint);
+    return;
+  }
   auto backgroundOffset = bgOffset - contentEntry.offset;
   LayerStyleInput styleInput = {};
   styleInput.content = contentEntry.image;

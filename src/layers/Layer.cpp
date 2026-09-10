@@ -1948,6 +1948,70 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
   layerStyle->draw(canvas, styleInput, alpha);
 }
 
+std::shared_ptr<Image> Layer::renderBackgroundStyleToImage(const DrawArgs& args, LayerStyle* style,
+                                                           const LayerStyleSource* source,
+                                                           std::shared_ptr<Image> backgroundImage,
+                                                           const Point& backgroundOffset,
+                                                           Point* offset) {
+  if (args.context == nullptr || style == nullptr || source == nullptr ||
+      backgroundImage == nullptr || offset == nullptr) {
+    return nullptr;
+  }
+  auto groupIndex = static_cast<int>(style->excludeChildEffects());
+  auto* group = source->groups[groupIndex].get();
+  if (group == nullptr) {
+    return nullptr;
+  }
+  const auto& contentEntry = group->content;
+  auto contentScale = source->contentScale;
+  if (FloatNearlyZero(contentScale)) {
+    return nullptr;
+  }
+
+  PictureRecorder recorder = {};
+  auto* recording = recorder.beginRecording();
+  // Record at content-pixel resolution, then apply the same transform the consume pass uses, so
+  // the picture lands in the content image space the style draws into.
+  recording->scale(contentScale, contentScale);
+  auto matrix = Matrix::MakeScale(1.f / contentScale, 1.f / contentScale);
+  matrix.preTranslate(contentEntry.offset.x, contentEntry.offset.y);
+  recording->concat(matrix);
+
+  LayerStyleInput styleInput = {};
+  styleInput.content = contentEntry.image;
+  styleInput.contentOffset = contentEntry.offset;
+  styleInput.contentScale = contentScale;
+  styleInput.extraSources.push_back(std::make_shared<StyleInputSource>(
+      std::move(backgroundImage), backgroundOffset - contentEntry.offset));
+  auto sourceFlags = style->extraSourceType();
+  if (HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Contour)) {
+    auto contourImage = group->contour.has_value() ? group->contour->image : nullptr;
+    auto contourOffset =
+        contourImage ? group->contour->offset - contentEntry.offset : Point::Zero();
+    styleInput.extraSources.push_back(std::make_shared<ContourInputSource>(
+        std::move(contourImage), contourOffset, source->contentShape));
+  }
+  // The style's own blend mode is skipped on purpose: it would blend against this transparent
+  // offscreen instead of the real destination, which may already hold earlier styles that the
+  // backdrop slice does not carry. Both the blend mode and the consume-time alpha are applied
+  // when the result is blitted.
+  style->onDraw(recording, styleInput, 1.0f, BlendMode::SrcOver);
+
+  auto picture = recorder.finishRecordingAsPicture();
+  if (picture == nullptr) {
+    return nullptr;
+  }
+  Point imageOffset = {};
+  auto image = ToImageWithOffset(std::move(picture), &imageOffset, nullptr, args.dstColorSpace);
+  if (image == nullptr) {
+    return nullptr;
+  }
+  // The recorded space is the content image space shifted by contentEntry.offset, so translate
+  // back to let the caller blit under the consume pass transform.
+  *offset = imageOffset - contentEntry.offset;
+  return image->makeTextureImage(args.context);
+}
+
 bool Layer::getLayersUnderPointInternal(float x, float y,
                                         std::vector<std::shared_ptr<Layer>>* results) {
   bool hasLayerUnderPoint = false;
