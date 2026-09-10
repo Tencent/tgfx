@@ -89,7 +89,7 @@
 namespace tgfx {
 
 // Returns 0 for EmptyXferProcessor, 1 for PorterDuffXferProcessor with dst texture (DST_TEX mode),
-// or -1 for unsupported XP types (including PorterDuff with framebuffer fetch).
+// 2 for PorterDuffXferProcessor with framebuffer fetch, or -1 for unsupported XP types.
 static int GetXPType(const ProgramInfo* programInfo) {
   auto xp = programInfo->getXferProcessor();
   if (xp == EmptyXferProcessor::GetInstance()) {

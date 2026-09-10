@@ -37,9 +37,10 @@ enum class AOTKernelKind {
   // planner; its kernel artifact is PointwiseChainShader.
   PointwiseChain = 4,
   PointwiseTail = 5,
-  // A procedural-noise source (PerlinNoiseFragmentProcessor) optionally followed by one pointwise
-  // operator folded into its own OpType uniform, matching PerlinNoiseFillShader. Produced by
-  // DecomposePerlinNoiseChain; a second operator materializes into a following PointwiseTail pass.
+  // A procedural-noise source (PerlinNoiseFragmentProcessor) optionally followed by up to three
+  // folded pointwise/const/blend operator slots, matching PerlinNoiseFillShader. Produced by
+  // DecomposePerlinNoiseChain; the plan is always a single pass — shapes beyond the slot budget
+  // are rejected rather than split.
   PerlinNoiseFill = 6,
 };
 
