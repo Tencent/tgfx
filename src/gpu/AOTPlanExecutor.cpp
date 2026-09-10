@@ -40,15 +40,12 @@
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/resources/RenderTarget.h"
+#include "gpu/tasks/AOTPlanRenderTask.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/RenderPass.h"
 
 namespace tgfx {
 namespace {
-struct AOTIntermediatePass {
-  std::shared_ptr<RenderTargetProxy> target = nullptr;
-  PlacementPtr<DrawOp> drawOp = nullptr;
-};
 
 static bool ValidatePointwiseTailSource(const AOTEffectGraph& graph, AOTNodeID nodeID) {
   auto node = graph.nodeAt(nodeID);
@@ -1014,137 +1011,6 @@ static PlacementPtr<FragmentProcessor> BuildFPForPass(
   return current;
 }
 
-static bool ExecutePreparedPass(CommandEncoder* encoder, RenderTarget* renderTarget,
-                                StandardDrawOp* drawOp, LoadAction loadAction,
-                                const PMColor& clearColor) {
-  auto resolveTexture =
-      renderTarget->sampleCount() > 1 ? renderTarget->getSampleTexture() : nullptr;
-  RenderPassDescriptor descriptor(renderTarget->getRenderTexture(), loadAction, StoreAction::Store,
-                                  clearColor, resolveTexture);
-  auto renderPass = encoder->beginRenderPass(descriptor);
-  if (renderPass == nullptr) {
-    LOGE("AOTPlanRenderTask::execute() Failed to initialize the render pass!");
-    return false;
-  }
-  drawOp->executePrepared(renderPass.get(), renderTarget, false);
-  renderPass->end();
-  return true;
-}
-
-class AOTPlanRenderTask : public RenderTask {
- public:
-  AOTPlanRenderTask(BlockAllocator* allocator,
-                    std::vector<AOTIntermediatePass>&& intermediatePasses,
-                    DrawOp::ColorProcessorList&& terminalColors,
-                    std::shared_ptr<RenderTargetProxy> destination)
-      : RenderTask(allocator), intermediatePasses(std::move(intermediatePasses)),
-        terminalColors(std::move(terminalColors)), destination(std::move(destination)) {
-  }
-
-  void setOriginalDraw(PlacementPtr<DrawOp> drawOp) {
-    originalDraw = std::move(drawOp);
-  }
-
-  void execute(CommandEncoder* encoder) override {
-    std::vector<std::shared_ptr<RenderTarget>> renderTargets = {};
-    renderTargets.reserve(intermediatePasses.size());
-    bool targetsResolved = true;
-    for (const auto& pass : intermediatePasses) {
-      auto renderTarget = pass.target->getRenderTarget();
-      targetsResolved = targetsResolved && renderTarget != nullptr;
-      renderTargets.push_back(std::move(renderTarget));
-    }
-    auto finalTarget = destination->getRenderTarget();
-    targetsResolved = targetsResolved && finalTarget != nullptr;
-    if (!targetsResolved) {
-      executeFallback(encoder, std::move(finalTarget));
-      return;
-    }
-
-    bool prepared = true;
-    // These strict prepares double as route-validation probes: a plan pass the matcher cannot
-    // serve (e.g. a perspective leaf transform) falls back to the runtime route, so its lookup
-    // failure must not record a diagnostic miss against the rewritten pipeline — the fallback
-    // path records the draw's original pipeline instead.
-    auto* statsCache = finalTarget->getContext()->precompiledShaderCache();
-    statsCache->setMissRecordingPaused(true);
-    for (size_t index = 0; index < intermediatePasses.size(); ++index) {
-      auto drawOp = static_cast<StandardDrawOp*>(intermediatePasses[index].drawOp.get());
-      if (!drawOp->prepare(renderTargets[index].get(), ProgramLookupMode::PrecompiledOnly)) {
-        prepared = false;
-        break;
-      }
-    }
-    if (prepared && !static_cast<StandardDrawOp*>(originalDraw.get())
-                         ->prepare(finalTarget.get(), ProgramLookupMode::PrecompiledOnly,
-                                   std::move(terminalColors))) {
-      prepared = false;
-    }
-    statsCache->setMissRecordingPaused(false);
-    if (!prepared) {
-      executeFallback(encoder, std::move(finalTarget));
-      return;
-    }
-
-    AOTDrawStats drawStats = {};
-    drawStats.kernelInvocations = intermediatePasses.size() + 1;
-    drawStats.offscreenTargets = intermediatePasses.size();
-    drawStats.materializedEdges = intermediatePasses.size();
-    drawStats.renderTargetSwitches = intermediatePasses.size();
-    for (const auto& renderTarget : renderTargets) {
-      auto bytes = static_cast<uint64_t>(renderTarget->width()) *
-                   static_cast<uint64_t>(renderTarget->height()) * 4;
-      drawStats.intermediateReadBytes += bytes;
-      drawStats.intermediateWriteBytes += bytes;
-      drawStats.peakTemporaryBytes += bytes;
-    }
-
-    for (size_t index = 0; index < intermediatePasses.size(); ++index) {
-      if (!ExecutePreparedPass(encoder, renderTargets[index].get(),
-                               static_cast<StandardDrawOp*>(intermediatePasses[index].drawOp.get()),
-                               LoadAction::Clear, PMColor::Transparent())) {
-        return;
-      }
-    }
-    if (!ExecutePreparedPass(encoder, finalTarget.get(),
-                             static_cast<StandardDrawOp*>(originalDraw.get()), LoadAction::Load,
-                             PMColor::Transparent())) {
-      return;
-    }
-    auto cache = finalTarget->getContext()->precompiledShaderCache();
-    if (cache->diagnosticRecordingEnabled()) {
-      cache->recordDraw(drawStats, true);
-    }
-  }
-
- private:
-  std::vector<AOTIntermediatePass> intermediatePasses = {};
-  DrawOp::ColorProcessorList terminalColors = {};
-  std::shared_ptr<RenderTargetProxy> destination = nullptr;
-  PlacementPtr<DrawOp> originalDraw = nullptr;
-
-  void executeFallback(CommandEncoder* encoder, std::shared_ptr<RenderTarget> finalTarget) {
-    if (finalTarget == nullptr) {
-      LOGE("AOTPlanRenderTask::executeFallback() Final render target is null!");
-      return;
-    }
-    auto drawOp = static_cast<StandardDrawOp*>(originalDraw.get());
-    if (!drawOp->prepare(finalTarget.get(), ProgramLookupMode::AllowRuntimeFallback)) {
-      return;
-    }
-    if (!ExecutePreparedPass(encoder, finalTarget.get(), drawOp, LoadAction::Load,
-                             PMColor::Transparent())) {
-      return;
-    }
-    auto cache = finalTarget->getContext()->precompiledShaderCache();
-    if (cache->diagnosticRecordingEnabled()) {
-      AOTDrawStats drawStats = {};
-      drawStats.atomicFallbacks = 1;
-      drawStats.kernelInvocations = 1;
-      cache->recordDraw(drawStats, false);
-    }
-  }
-};
 }  // namespace
 
 bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPlan& plan) {
