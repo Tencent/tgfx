@@ -19,6 +19,7 @@
 #include <array>
 #include "base/TGFXTest.h"
 #include "core/utils/BlockAllocator.h"
+#include "gpu/AOTChainBuilder.h"
 #include "gpu/AOTEffect.h"
 #include "gpu/AOTEffectDecomposer.h"
 #include "gpu/AOTMaterializationPolicy.h"
@@ -764,7 +765,7 @@ TGFX_TEST(AOTEffectTest, ConstColorChainDecomposesToPointwiseChain) {
   // A zero-leaf chain is executable: the kernel's TEXTURE_COUNT domain encodes it, evaluating
   // const-color and blend ops against the geometry color alone.
   EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
-  EXPECT_TRUE(AOTPlanExecutor::BuildChainProcessor(&allocator, graph, plan.passes[0]) != nullptr);
+  EXPECT_TRUE(AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0]) != nullptr);
 }
 
 TGFX_TEST(AOTEffectTest, LinearTextureChainUsesPointwiseTailPlanner) {

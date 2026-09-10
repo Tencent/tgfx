@@ -18,6 +18,7 @@
 
 #include "StandardDrawOp.h"
 #include "core/utils/Log.h"
+#include "gpu/AOTChainBuilder.h"
 #include "gpu/AOTEffectDecomposer.h"
 #include "gpu/AOTPlanExecutor.h"
 #include "gpu/PermutationMatcher.h"
@@ -168,9 +169,9 @@ std::shared_ptr<Program> StandardDrawOp::prepareDecomposedProgram(
     if (!coverageFPs.empty()) {
       return nullptr;
     }
-    chainFP = AOTPlanExecutor::BuildPerlinNoiseFP(allocator, graph, plan.passes[0]);
+    chainFP = AOTChainBuilder::BuildPerlinNoiseFP(allocator, graph, plan.passes[0]);
   } else {
-    chainFP = AOTPlanExecutor::BuildChainProcessor(allocator, graph, plan.passes[0], coverageFPs,
+    chainFP = AOTChainBuilder::BuildChainProcessor(allocator, graph, plan.passes[0], coverageFPs,
                                                    !ownedChainCoverageFPs.empty());
   }
   if (chainFP == nullptr) {
