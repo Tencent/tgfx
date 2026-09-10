@@ -127,5 +127,6 @@ class StandardDrawOp : public DrawOp {
   std::unique_ptr<ProgramInfo> preparedProgramInfo = nullptr;
   std::shared_ptr<Program> preparedProgram = nullptr;
   RenderTarget* preparedRenderTarget = nullptr;
+  bool preparedViaDecomposition = false;
 };
 }  // namespace tgfx

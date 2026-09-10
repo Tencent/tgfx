@@ -137,6 +137,13 @@ static void AddDrawStats(AOTDrawStats* target, const AOTDrawStats& source) {
   target->intermediateReadBytes += source.intermediateReadBytes;
   target->intermediateWriteBytes += source.intermediateWriteBytes;
   target->peakTemporaryBytes = std::max(target->peakTemporaryBytes, source.peakTemporaryBytes);
+  target->directChainDraws += source.directChainDraws;
+  target->offscreenPlanDraws += source.offscreenPlanDraws;
+  target->fpFlattenEdges += source.fpFlattenEdges;
+  target->planMaterializedEdges += source.planMaterializedEdges;
+  for (size_t index = 0; index < target->planPassHistogram.size(); ++index) {
+    target->planPassHistogram[index] += source.planPassHistogram[index];
+  }
 }
 
 static nlohmann::json OffscreenFillStatsToJSON(const OffscreenFillStats& stats) {
@@ -158,6 +165,10 @@ static nlohmann::json OffscreenFillStatsToJSON(const OffscreenFillStats& stats) 
 }
 
 static nlohmann::json DrawStatsToJSON(const AOTDrawStats& stats) {
+  nlohmann::json passHistogram = nlohmann::json::array();
+  for (auto count : stats.planPassHistogram) {
+    passHistogram.push_back(count);
+  }
   return {{"draws", stats.draws},
           {"completeAOTDraws", stats.completeAOTDraws},
           {"atomicFallbacks", stats.atomicFallbacks},
@@ -167,7 +178,12 @@ static nlohmann::json DrawStatsToJSON(const AOTDrawStats& stats) {
           {"renderTargetSwitches", stats.renderTargetSwitches},
           {"intermediateReadBytes", stats.intermediateReadBytes},
           {"intermediateWriteBytes", stats.intermediateWriteBytes},
-          {"peakTemporaryBytes", stats.peakTemporaryBytes}};
+          {"peakTemporaryBytes", stats.peakTemporaryBytes},
+          {"directChainDraws", stats.directChainDraws},
+          {"offscreenPlanDraws", stats.offscreenPlanDraws},
+          {"planPassHistogram", passHistogram},
+          {"fpFlattenEdges", stats.fpFlattenEdges},
+          {"planMaterializedEdges", stats.planMaterializedEdges}};
 }
 
 struct AggregatedShader {

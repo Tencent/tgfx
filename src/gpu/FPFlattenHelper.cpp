@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/FPFlattenHelper.h"
-
 #include "gpu/DrawingManager.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/processors/TextureEffect.h"

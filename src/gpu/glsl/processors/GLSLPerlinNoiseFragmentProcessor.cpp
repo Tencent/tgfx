@@ -19,8 +19,8 @@
 #include "GLSLPerlinNoiseFragmentProcessor.h"
 #include <unordered_map>
 #include "core/shaders/PerlinNoiseShader.h"
-#include "gpu/ColorSpaceXformHelper.h"
 #include "gpu/AOTPointwiseSlotWriter.h"
+#include "gpu/ColorSpaceXformHelper.h"
 #include "gpu/resources/TextureView.h"
 
 namespace tgfx {

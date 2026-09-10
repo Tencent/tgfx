@@ -168,6 +168,17 @@ struct AOTDrawStats {
   uint64_t intermediateReadBytes = 0;
   uint64_t intermediateWriteBytes = 0;
   uint64_t peakTemporaryBytes = 0;
+  // Route-level counters: each draw is counted once by the route that finally served it, either
+  // the direct decomposition rewrite in StandardDrawOp or the atomic multi-pass plan task.
+  uint64_t directChainDraws = 0;
+  uint64_t offscreenPlanDraws = 0;
+  // Distribution of executed plan pass counts: bucket k counts plans with k+1 passes, the last
+  // bucket accumulates deeper plans.
+  std::array<uint64_t, 4> planPassHistogram = {};
+  // materializedEdges split by phase: construction-time blend-child flattening versus plan-time
+  // intermediate passes.
+  uint64_t fpFlattenEdges = 0;
+  uint64_t planMaterializedEdges = 0;
 };
 
 /// Runtime cache that loads precompiled shader bundles and provides O(1) lookup by ShaderKey hash.

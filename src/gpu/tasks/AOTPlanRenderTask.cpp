@@ -99,6 +99,12 @@ void AOTPlanRenderTask::execute(CommandEncoder* encoder) {
   drawStats.offscreenTargets = intermediatePasses.size();
   drawStats.materializedEdges = intermediatePasses.size();
   drawStats.renderTargetSwitches = intermediatePasses.size();
+  drawStats.offscreenPlanDraws = 1;
+  drawStats.planMaterializedEdges = intermediatePasses.size();
+  size_t passBucket = intermediatePasses.size() < drawStats.planPassHistogram.size() - 1
+                          ? intermediatePasses.size()
+                          : drawStats.planPassHistogram.size() - 1;
+  drawStats.planPassHistogram[passBucket]++;
   for (const auto& renderTarget : renderTargets) {
     auto bytes = static_cast<uint64_t>(renderTarget->width()) *
                  static_cast<uint64_t>(renderTarget->height()) * 4;

@@ -192,6 +192,13 @@ void PrecompiledShaderCache::recordDraw(const AOTDrawStats& delta, bool complete
   _drawStats.intermediateReadBytes += delta.intermediateReadBytes;
   _drawStats.intermediateWriteBytes += delta.intermediateWriteBytes;
   _drawStats.peakTemporaryBytes = std::max(_drawStats.peakTemporaryBytes, delta.peakTemporaryBytes);
+  _drawStats.directChainDraws += delta.directChainDraws;
+  _drawStats.offscreenPlanDraws += delta.offscreenPlanDraws;
+  _drawStats.fpFlattenEdges += delta.fpFlattenEdges;
+  _drawStats.planMaterializedEdges += delta.planMaterializedEdges;
+  for (size_t index = 0; index < _drawStats.planPassHistogram.size(); ++index) {
+    _drawStats.planPassHistogram[index] += delta.planPassHistogram[index];
+  }
 }
 
 void PrecompiledShaderCache::recordMaterializedEdge(uint64_t bytes) {
@@ -200,6 +207,7 @@ void PrecompiledShaderCache::recordMaterializedEdge(uint64_t bytes) {
   }
   std::lock_guard<std::mutex> autoLock(drawStatsMutex);
   _drawStats.materializedEdges++;
+  _drawStats.fpFlattenEdges++;
   _drawStats.offscreenTargets++;
   _drawStats.renderTargetSwitches++;
   _drawStats.intermediateReadBytes += bytes;

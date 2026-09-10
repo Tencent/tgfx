@@ -77,6 +77,7 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, ProgramLookupMode mode,
   }
   onConfigureProgramInfo(*preparedProgramInfo);
   preparedProgram = prepareDecomposedProgram(renderTarget, activeColors);
+  preparedViaDecomposition = preparedProgram != nullptr;
   if (preparedProgram == nullptr) {
     preparedProgram = preparedProgramInfo->getProgram(mode);
   }
@@ -221,6 +222,9 @@ void StandardDrawOp::executePrepared(RenderPass* renderPass, RenderTarget* rende
   if (recordDrawStats && cache->diagnosticRecordingEnabled()) {
     AOTDrawStats drawDelta = {};
     drawDelta.kernelInvocations = 1;
+    if (preparedViaDecomposition) {
+      drawDelta.directChainDraws = 1;
+    }
     bool completeAOTDraw =
         preparedProgram->getProvenance().program == ProgramOrigin::PrecompiledArtifact;
     cache->recordDraw(drawDelta, completeAOTDraw);
