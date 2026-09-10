@@ -9,8 +9,8 @@
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "as is" basis, without warranties or conditions of any kind,
 //  either express or implied. see the license for the specific language governing permissions
 //  and limitations under the license.
 //
@@ -19,12 +19,7 @@
 #pragma once
 
 #include "gpu/AOTMaterializationPolicy.h"
-#include "gpu/DrawingManager.h"
-#include "gpu/PrecompiledShaderCache.h"
 #include "gpu/processors/FragmentProcessor.h"
-#include "gpu/processors/TextureEffect.h"
-#include "gpu/proxies/RenderTargetProxy.h"
-#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 
@@ -36,31 +31,9 @@ namespace tgfx {
  * side; pass the value the materialization policy produced for this consumer. Returns nullptr on
  * failure.
  */
-static inline PlacementPtr<FragmentProcessor> FlattenToTexture(const FPArgs& args,
-                                                               PlacementPtr<FragmentProcessor> fp,
-                                                               float apronRadius = 0.0f) {
-  auto context = args.context;
-  auto target = AOTMaterializationPolicy::PrepareTarget(context, args.drawRect, apronRadius);
-  if (target.renderTarget == nullptr) {
-    return nullptr;
-  }
-  auto drawingManager = context->drawingManager();
-  if (!drawingManager->fillRTWithFP(target.renderTarget, std::move(fp), args.renderFlags,
-                                    target.geometry.coordOffset, OffscreenFillSource::FPFlatten)) {
-    return nullptr;
-  }
-  auto textureProxy = target.renderTarget->asTextureProxy();
-  if (textureProxy == nullptr) {
-    return nullptr;
-  }
-  auto uvMatrix = Matrix::MakeTrans(-target.geometry.bounds.left, -target.geometry.bounds.top);
-  auto cache = context->precompiledShaderCache();
-  if (cache != nullptr && cache->diagnosticRecordingEnabled()) {
-    cache->recordMaterializedEdge(target.geometry.byteSize());
-  }
-  auto allocator = context->drawingAllocator();
-  return TextureEffect::Make(allocator, std::move(textureProxy), {}, &uvMatrix);
-}
+PlacementPtr<FragmentProcessor> FlattenToTexture(const FPArgs& args,
+                                                 PlacementPtr<FragmentProcessor> fp,
+                                                 float apronRadius = 0.0f);
 
 /**
  * Ensures the given FragmentProcessor is simple for use as a blend child at the specified position.
@@ -75,21 +48,8 @@ static inline PlacementPtr<FragmentProcessor> FlattenToTexture(const FPArgs& arg
  *    the draw is not already inside a nested rasterization, so the default path is byte-for-byte
  *    identical to before and no baseline shifts.
  */
-static inline PlacementPtr<FragmentProcessor> EnsureSimpleBlendChild(
-    const FPArgs& args, PlacementPtr<FragmentProcessor> fp, size_t childIndex = 0) {
-  auto decision = AOTMaterializationPolicy::Evaluate(
-      fp.get(), MaterializationConsumer::PointwiseBlend, childIndex);
-  if (decision.requiredForCorrectness) {
-    return FlattenToTexture(args, std::move(fp), decision.apronRadius);
-  }
-  if ((args.renderFlags & InternalRenderFlags::NestedRasterization) != 0) {
-    return fp;
-  }
-  auto cache = args.context->precompiledShaderCache();
-  if (cache != nullptr && cache->decompositionEnabled() && decision.shouldFlatten) {
-    return FlattenToTexture(args, std::move(fp), decision.apronRadius);
-  }
-  return fp;
-}
+PlacementPtr<FragmentProcessor> EnsureSimpleBlendChild(const FPArgs& args,
+                                                       PlacementPtr<FragmentProcessor> fp,
+                                                       size_t childIndex = 0);
 
 }  // namespace tgfx

@@ -18,7 +18,7 @@
 
 #include "gpu/processors/AOTPointwiseTailProcessor.h"
 #include "gpu/ColorSpaceXformHelper.h"
-#include "gpu/processors/AOTPointwiseSlotWriter.h"
+#include "gpu/AOTPointwiseSlotWriter.h"
 
 namespace tgfx {
 namespace {}  // namespace
