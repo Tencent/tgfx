@@ -50,17 +50,6 @@ struct AOTIntermediatePass {
   PlacementPtr<DrawOp> drawOp = nullptr;
 };
 
-static bool ValidateTextureSource(const AOTEffectGraph& graph, AOTNodeID nodeID) {
-  auto node = graph.nodeAt(nodeID);
-  if (node == nullptr || node->kind != AOTEffectKind::TextureSource || node->inputs.size() != 1) {
-    return false;
-  }
-  auto parameters = std::get_if<AOTTextureParameters>(&node->parameters);
-  auto input = graph.nodeAt(node->inputs[0]);
-  return parameters != nullptr && parameters->samplingKind == AOTTextureSamplingKind::Plain &&
-         input != nullptr && input->kind == AOTEffectKind::GeometryColor;
-}
-
 static bool ValidatePointwiseTailSource(const AOTEffectGraph& graph, AOTNodeID nodeID) {
   auto node = graph.nodeAt(nodeID);
   if (node == nullptr || node->kind != AOTEffectKind::TextureSource || node->inputs.size() != 1) {
@@ -136,20 +125,7 @@ static bool ValidateLinearPlan(const AOTEffectGraph& graph, const AOTEffectPlan&
       if (!pass.dependencies.empty()) {
         return false;
       }
-      if (pass.kernel == AOTKernelKind::TextureFill) {
-        if (pass.nodes.size() != 1 || !ValidateTextureSource(graph, pass.nodes[0])) {
-          return false;
-        }
-      } else if (pass.kernel == AOTKernelKind::TextureColorMatrix) {
-        if (pass.nodes.size() != 2 || !ValidateTextureSource(graph, pass.nodes[0])) {
-          return false;
-        }
-        auto matrix = graph.nodeAt(pass.nodes[1]);
-        if (matrix == nullptr || matrix->kind != AOTEffectKind::ColorMatrix ||
-            matrix->inputs.size() != 1 || matrix->inputs[0] != pass.nodes[0]) {
-          return false;
-        }
-      } else if (pass.kernel == AOTKernelKind::PerlinNoiseFill) {
+      if (pass.kernel == AOTKernelKind::PerlinNoiseFill) {
         // One fused pass: a perlin source plus up to three pointwise-operator slots, matching the
         // three slot records the PerlinNoiseFillShader kernel carries. A slot may also be a
         // const-color op or a blend with a constant side operand.
@@ -193,26 +169,10 @@ static bool ValidateLinearPlan(const AOTEffectGraph& graph, const AOTEffectPlan&
       }
       continue;
     }
-    if (pass.dependencies.size() != 1 || pass.dependencies[0] != index - 1 ||
-        pass.nodes.size() != 1) {
-      return false;
-    }
-    auto node = graph.nodeAt(pass.nodes[0]);
-    if (node == nullptr || node->inputs.size() != 1 ||
-        node->inputs[0] != plan.passes[index - 1].output) {
-      return false;
-    }
-    if (pass.kernel == AOTKernelKind::TexturedColorMatrix) {
-      if (node->kind != AOTEffectKind::ColorMatrix) {
-        return false;
-      }
-    } else if (pass.kernel == AOTKernelKind::TexturedLuma) {
-      if (node->kind != AOTEffectKind::Luma) {
-        return false;
-      }
-    } else {
-      return false;
-    }
+    // The legacy linear TextureFill/TextureColorMatrix/TexturedColorMatrix/TexturedLuma kernels
+    // are no longer produced by the decomposer's planners, so any non-first pass that is not a
+    // PointwiseTail segment is unreachable and rejected outright.
+    return false;
   }
   return plan.output == plan.passes.back().output;
 }
@@ -1224,7 +1184,7 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
             // PointwiseChainShader carries exactly one shared tiled-sampling uniform block.
             // BuildChainFP cannot represent a second shader-tiled leaf, so reject before planning
             // execution rather than letting construction fail after CanExecute promised success.
-            if (++shaderTiledLeaves > 1) {
+            if (++shaderTiledLeaves > AOTPointwiseChainProcessor::MaxShaderTiledChainLeaves) {
               return false;
             }
           }
@@ -1234,7 +1194,7 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
         ++plainLeaves;
       }
     }
-    return plainLeaves == 0 || plainLeaves == 1 || plainLeaves == 2 || plainLeaves == 4;
+    return AOTPointwiseChainProcessor::HasChainKernelVariant(plainLeaves);
   }
   return ValidateLinearPlan(graph, plan);
 }

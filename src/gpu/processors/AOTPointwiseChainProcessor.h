@@ -102,6 +102,17 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
  public:
   static constexpr size_t MaxSlots = 16;
 
+  // The chain kernel carries exactly one shared tiled-sampling uniform block, so at most one
+  // shader-tiled leaf is expressible per chain.
+  static constexpr size_t MaxShaderTiledChainLeaves = 1;
+
+  // Whether a precompiled chain-kernel variant exists for the given plain-leaf count: variants
+  // are enumerated for 0, 1, 2 and 4 texture leaves, so other leaf counts must stay on the
+  // plain route.
+  static bool HasChainKernelVariant(size_t plainLeaves) {
+    return plainLeaves == 0 || plainLeaves == 1 || plainLeaves == 2 || plainLeaves == 4;
+  }
+
   static PlacementPtr<AOTPointwiseChainProcessor> Make(
       BlockAllocator* allocator, std::vector<PlacementPtr<FragmentProcessor>> textureLeaves,
       const std::vector<AOTChainSlot>& slots, size_t rootSlot, int tiledLeafIndex = -1,

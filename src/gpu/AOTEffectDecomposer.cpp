@@ -19,7 +19,9 @@
 #include "gpu/AOTEffectDecomposer.h"
 #include "gpu/AOTPlanExecutor.h"
 #include "gpu/ProgramInfo.h"
+#include "gpu/processors/AOTPointwiseTailProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/processors/PerlinNoiseFragmentProcessor.h"
 
 namespace tgfx {
 
@@ -177,7 +179,7 @@ static bool DecomposeLinearPointwiseTail(const AOTEffectGraph& graph, AOTEffectP
       pass.dependencies.push_back(static_cast<uint32_t>(result.passes.size() - 1));
     }
     size_t slotCount = 0;
-    while (nodeIndex < graph.nodeCount() && slotCount < 2) {
+    while (nodeIndex < graph.nodeCount() && slotCount < AOTPointwiseTailProcessor::MaxSlots) {
       pass.nodes.push_back(AOTNodeID(nodeIndex++));
       ++slotCount;
     }
@@ -256,7 +258,7 @@ static bool DecomposePerlinNoiseChain(const AOTEffectGraph& graph, AOTEffectPlan
     }
     return false;
   }
-  if (slotCount > 3 || prev != graph.root()) {
+  if (slotCount > PerlinNoiseFragmentProcessor::MaxPointwiseSlots || prev != graph.root()) {
     return false;
   }
 
