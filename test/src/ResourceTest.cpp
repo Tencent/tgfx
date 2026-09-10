@@ -39,13 +39,9 @@ TGFX_TEST(ResourceTest, TaskRelease) {
   Task::ReleaseThreads();
   TGFX_PRIVATE_ACCESS(auto group = TaskGroup::GetInstance(); std::thread* thead = nullptr;
                       group->threads->try_dequeue(thead); EXPECT_EQ(thead, nullptr);
-                      EXPECT_EQ(group->waitingThreads, 0u); EXPECT_EQ(group->totalThreads, 0u);
-                      for (auto& queue
-                           : group->priorityQueues) {
-                        std::shared_ptr<Task> task = nullptr;
-                        queue->try_dequeue(task);
-                        EXPECT_EQ(task, nullptr);
-                      })
+                      EXPECT_EQ(group->taskQueue.sleeperCount(), 0u);
+                      EXPECT_EQ(group->totalThreads, 0u);
+                      EXPECT_EQ(group->taskQueue.pendingCount(), 0u);)
 }
 
 #ifdef TGFX_USE_THREADS
@@ -59,21 +55,25 @@ TGFX_TEST(ResourceTest, MaxThreadCountShrink) {
   auto blockTask = [&started, &finished, &release] {
     ++started;
     while (!release.load()) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
     ++finished;
   };
   Task::Run(blockTask);
   // Wait for the first worker thread to start, then submit more tasks. All existing threads are
   // busy with the blocking tasks, so each submission guarantees a new worker thread is created.
-  while (started.load() < 1) {
+  for (int i = 0; i < 1000 && started.load() < 1; ++i) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
   for (int i = 0; i < 3; ++i) {
     Task::Run(blockTask);
   }
-  while (started.load() < 4) {
+  for (int i = 0; i < 1000 && started.load() < 4; ++i) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
   release = true;
-  while (finished.load() < 4) {
+  for (int i = 0; i < 1000 && finished.load() < 4; ++i) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
   // Give the threads a moment to become idle before lowering the limit.
   std::this_thread::sleep_for(std::chrono::milliseconds(50));
@@ -83,6 +83,47 @@ TGFX_TEST(ResourceTest, MaxThreadCountShrink) {
                         std::this_thread::sleep_for(std::chrono::milliseconds(10));
                       } EXPECT_EQ(group->totalThreads, 1u););
   Task::SetMaxThreadCount(0);
+  Task::ReleaseThreads();
+}
+
+TGFX_TEST_PRIVATE(ResourceTest, TaskBacklogSpawnsThreads) {
+  // Regression test for the wakeup-window accounting race: a notified waiter absorbs at most one
+  // task, but waitingThreads keeps counting it until the woken thread rechecks the queues. When
+  // two tasks are pushed back to back while the only waiter is waking up, the second push used to
+  // read the stale count and neither notified a sleeper nor spawned a thread, leaving the second
+  // task stranded until some worker finished its current task.
+  Task::ReleaseThreads();
+  Task::SetMaxThreadCount(2);
+  std::atomic<int> started{0};
+  std::atomic<int> finished{0};
+  std::atomic_bool release{false};
+  auto blockTask = [&started, &finished, &release] {
+    ++started;
+    while (!release.load()) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    ++finished;
+  };
+  // Bring the first worker online and wait until it goes back to sleep on the empty queue, so the
+  // first blocking task is guaranteed to wake the sole sleeper.
+  Task::Run([] {});
+  TGFX_PRIVATE_ACCESS(auto group = TaskGroup::GetInstance();
+                      for (int i = 0; i < 1000 && group->taskQueue.sleeperCount() < 1; ++i) {
+                        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                      } EXPECT_EQ(group->taskQueue.sleeperCount(), 1u););
+  Task::Run(blockTask);
+  Task::Run(blockTask);
+  for (int i = 0; i < 1000 && started.load() < 2; ++i) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  EXPECT_EQ(started.load(), 2);
+  release = true;
+  for (int i = 0; i < 1000 && finished.load() < 2; ++i) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  EXPECT_EQ(finished.load(), 2);
+  Task::SetMaxThreadCount(0);
+  Task::ReleaseThreads();
 }
 #endif
 
