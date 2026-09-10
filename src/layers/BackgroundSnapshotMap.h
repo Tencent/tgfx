@@ -30,13 +30,15 @@ class Layer;
 class LayerStyle;
 
 /**
- * A snapshot of the background image and its offset captured during the capture pass for a
- * specific (Layer, LayerStyle) pair. Consumed during the consume pass by LayerStyle::draw via
- * LayerStyleInput::extraSource.
+ * A snapshot produced during the capture pass for a specific (Layer, LayerStyle) pair. When
+ * isStyleOutput is true the image is the rendered style itself and every consume pass blits it
+ * instead of re-running LayerStyle::draw. Otherwise it is the raw backdrop slice and the consume
+ * pass renders the style as usual. Consumed by LayerStyle::draw via LayerStyleInput::extraSource.
  */
 struct BackgroundSnapshotEntry {
   std::shared_ptr<Image> image = nullptr;
   Point offset = Point::Zero();
+  bool isStyleOutput = false;
 };
 
 /**
@@ -97,6 +99,11 @@ struct BackgroundSnapshotMap {
                      BackgroundSnapshotKeyHash>
       snapshots = {};
   std::unordered_map<Layer*, std::unique_ptr<LayerStyleSource>> layerStyleSources = {};
+  // Set when one capture pass serves several consume passes (tiled rendering, multiple dirty
+  // rects). The capture pass then renders each background style into an image that every consume
+  // pass blits, instead of re-running the style per pass. Sub-handlers inherit it automatically
+  // because they share this map.
+  bool shareStyleOutput = false;
 };
 
 }  // namespace tgfx
