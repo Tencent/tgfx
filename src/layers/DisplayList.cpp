@@ -39,10 +39,10 @@ static constexpr int MAX_TILE_SIZE = 2048;
 static constexpr int FALLBACK_GRID_SIZE = 64;
 static constexpr int MAX_ATLAS_SIZE = 8192;
 
-// Diagnostic switch for A/B comparison. Disabled so every background style is rendered once per
-// consume pass; set the return value to true to restore the shared-cache path.
+// Diagnostic switch for A/B comparison. Enabled so each background style is rendered once per frame
+// and shared by every consume pass; set the return value to false to fall back to the per-pass path.
 static bool ShareBackgroundStyleOutput() {
-  return false;
+  return true;
 }
 
 class DrawTask {
