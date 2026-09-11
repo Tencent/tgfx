@@ -40,11 +40,9 @@ static constexpr int FALLBACK_GRID_SIZE = 64;
 static constexpr int MAX_ATLAS_SIZE = 8192;
 
 // Diagnostic switch for A/B comparison. Forced off so every background style is rendered once per
-// consume pass; flip `enabled` to true to restore the shared-cache path.
+// consume pass; flip the return value to true to restore the shared-cache path.
 static bool ShareBackgroundStyleOutput() {
-  static constexpr bool enabled = false;
-  FrameStats::backgroundStyleCacheEnabled = enabled;
-  return enabled;
+  return false;
 }
 
 class DrawTask {
@@ -328,6 +326,8 @@ void DisplayList::render(Surface* surface, bool autoClear) {
   if (!surface) {
     return;
   }
+  // Publish the switch on every frame so the reported state never lags behind the render path.
+  FrameStats::backgroundStyleCacheEnabled = ShareBackgroundStyleOutput();
   _hasContentChanged = false;
   auto dirtyRegions = _root->updateDirtyRegions();
   if (_zoomScaleInt == 0) {
