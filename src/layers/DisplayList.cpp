@@ -18,6 +18,7 @@
 
 #include "tgfx/layers/DisplayList.h"
 #include <algorithm>
+#include <cstdlib>
 #include "core/utils/DecomposeRects.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -37,6 +38,16 @@ static constexpr int MIN_TILE_SIZE = 16;
 static constexpr int MAX_TILE_SIZE = 2048;
 static constexpr int FALLBACK_GRID_SIZE = 64;
 static constexpr int MAX_ATLAS_SIZE = 8192;
+
+// Diagnostic override: set TGFX_DISABLE_BG_STYLE_CACHE to a non-zero value to fall back to
+// rendering every background style once per consume pass, so the two paths can be compared.
+static bool ShareBackgroundStyleOutput() {
+  static const bool disabled = [] {
+    const char* value = std::getenv("TGFX_DISABLE_BG_STYLE_CACHE");
+    return value != nullptr && value[0] != '\0' && value[0] != '0';
+  }();
+  return !disabled;
+}
 
 class DrawTask {
  public:
@@ -410,7 +421,8 @@ std::vector<Rect> DisplayList::renderPartial(Surface* surface, bool autoClear,
   // gaps between scattered dirty regions get skipped.
   std::unique_ptr<BackgroundSnapshotMap> snapshotMap = nullptr;
   if (_root->hasBackgroundStyle()) {
-    snapshotMap = captureBackgrounds(surface, renderRects, renderRects.size() > 1);
+    snapshotMap = captureBackgrounds(surface, renderRects,
+                                     renderRects.size() > 1 && ShareBackgroundStyleOutput());
   }
   auto canvas = surface->getCanvas();
   for (auto& drawRect : renderRects) {
@@ -456,7 +468,8 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
       captureRect.offset(_contentOffset.x, _contentOffset.y);
       captureRects.push_back(captureRect);
     }
-    snapshotMap = captureBackgrounds(surface, captureRects, tileTasks.size() > 1);
+    snapshotMap = captureBackgrounds(surface, captureRects,
+                                     tileTasks.size() > 1 && ShareBackgroundStyleOutput());
   }
   std::vector<Rect> dirtyRects = {};
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
