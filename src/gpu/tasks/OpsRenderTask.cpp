@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "OpsRenderTask.h"
+#include "gpu/FrameStats.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/resources/DepthStencilTextureView.h"
 #include "tgfx/gpu/RenderPass.h"
@@ -102,6 +103,7 @@ void OpsRenderTask::execute(CommandEncoder* encoder) {
       continue;
     }
     op->execute(renderPass.get(), renderTarget.get());
+    ++FrameStats::drawOpCount;
     // Release the Op immediately after execution to maximize GPU resource reuse.
     op = nullptr;
   }
