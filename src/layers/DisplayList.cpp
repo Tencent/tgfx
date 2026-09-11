@@ -23,6 +23,7 @@
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/TileSortCompareFunc.h"
+#include "gpu/FrameStats.h"
 #include "layers/BackgroundHandler.h"
 #include "layers/BackgroundSnapshotMap.h"
 #include "layers/BackgroundSource.h"
@@ -44,8 +45,11 @@ static constexpr int MAX_ATLAS_SIZE = 8192;
 static bool ShareBackgroundStyleOutput() {
   static const bool disabled = [] {
     const char* value = std::getenv("TGFX_DISABLE_BG_STYLE_CACHE");
-    return value != nullptr && value[0] != '\0' && value[0] != '0';
+    auto isDisabled = value != nullptr && value[0] != '\0' && value[0] != '0';
+    LOGI("Background style cache: %s", isDisabled ? "DISABLED" : "ENABLED");
+    return isDisabled;
   }();
+  FrameStats::backgroundStyleCacheEnabled = !disabled;
   return !disabled;
 }
 
