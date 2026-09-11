@@ -30,6 +30,9 @@ struct FrameStats {
   inline static int renderPassCount = 0;
   // Number of draw ops submitted through OpsRenderTask.
   inline static int drawOpCount = 0;
+  // Whether the shared background style cache is active, reported alongside the counters above.
+  // Set by DisplayList from the TGFX_DISABLE_BG_STYLE_CACHE environment variable.
+  inline static bool backgroundStyleCacheEnabled = true;
 };
 
 }  // namespace tgfx

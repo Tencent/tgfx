@@ -63,8 +63,9 @@ std::shared_ptr<CommandBuffer> DrawingBuffer::encode() {
   auto encodeMs =
       std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - encodeStartTime)
           .count();
-  LOGI("Frame stats: encode %.2f ms, renderPasses %d, drawOps %d", encodeMs,
-       FrameStats::renderPassCount, FrameStats::drawOpCount);
+  LOGI("Frame stats: encode %.2f ms, renderPasses %d, drawOps %d, bgStyleCache %s", encodeMs,
+       FrameStats::renderPassCount, FrameStats::drawOpCount,
+       FrameStats::backgroundStyleCacheEnabled ? "on" : "off");
   FrameStats::renderPassCount = 0;
   FrameStats::drawOpCount = 0;
   return commandBuffer;
