@@ -18,7 +18,6 @@
 
 #include "tgfx/layers/DisplayList.h"
 #include <algorithm>
-#include <cstdlib>
 #include "core/utils/DecomposeRects.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -40,17 +39,12 @@ static constexpr int MAX_TILE_SIZE = 2048;
 static constexpr int FALLBACK_GRID_SIZE = 64;
 static constexpr int MAX_ATLAS_SIZE = 8192;
 
-// Diagnostic override: set TGFX_DISABLE_BG_STYLE_CACHE to a non-zero value to fall back to
-// rendering every background style once per consume pass, so the two paths can be compared.
+// Diagnostic switch for A/B comparison. Forced off so every background style is rendered once per
+// consume pass; flip `enabled` to true to restore the shared-cache path.
 static bool ShareBackgroundStyleOutput() {
-  static const bool disabled = [] {
-    const char* value = std::getenv("TGFX_DISABLE_BG_STYLE_CACHE");
-    auto isDisabled = value != nullptr && value[0] != '\0' && value[0] != '0';
-    LOGI("Background style cache: %s", isDisabled ? "DISABLED" : "ENABLED");
-    return isDisabled;
-  }();
-  FrameStats::backgroundStyleCacheEnabled = !disabled;
-  return !disabled;
+  static constexpr bool enabled = false;
+  FrameStats::backgroundStyleCacheEnabled = enabled;
+  return enabled;
 }
 
 class DrawTask {
