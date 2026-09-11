@@ -133,6 +133,10 @@ class InnerShadowStyle : public LayerStyle {
   void drawWithSpread(Canvas* canvas, const LayerStyleInput& input, float alpha,
                       BlendMode blendMode);
 
+  // Draws the shadow in a single pass when the layer's shape can be evaluated in closed form.
+  // Returns false when it cannot, leaving nothing drawn so the caller can use the filter path.
+  bool drawAnalytic(Canvas* canvas, const LayerStyleInput& input, float alpha, BlendMode blendMode);
+
   std::shared_ptr<ImageFilter> getShadowFilter(float scale);
 
   void invalidateFilter();
