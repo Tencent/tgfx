@@ -10,15 +10,15 @@
 //      https://opensource.org/licenses/BSD-3-Clause
 //
 //  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
-//  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. See the License for the specific language governing permissions
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TaskGroup.h"
+#include <chrono>
 #include <cmath>
-#include <cstdlib>
 #include "MathExtra.h"
 #include "core/utils/Log.h"
 
@@ -27,18 +27,22 @@
 #endif
 
 namespace tgfx {
-static constexpr auto THREAD_TIMEOUT = std::chrono::seconds(10);
+// Workers wake up periodically to recheck the exit conditions, so a missed wakeAll() delays
+// shutdown or shrink by at most this long.
+static constexpr auto THREAD_TIMEOUT = std::chrono::milliseconds(10000);
 static constexpr size_t MAX_THREADS_SIZE = 32;
-static constexpr size_t TASK_PRIORITY_SIZE = 3;
 // 70% of max threads can run low priority tasks
 static constexpr float LOW_PRIORITY_THREAD_RATIO = 0.7f;
 
 static size_t GetDefaultMaxThreadCount() {
   size_t cpuCores = 0;
 #ifdef __APPLE__
-  size_t len = sizeof(cpuCores);
+  int cores = 0;
+  // hw.physicalcpu returns an int, so the buffer must be int-sized to avoid reading past it.
+  size_t len = sizeof(cores);
   // We can get the exact number of physical CPUs on apple platforms.
-  sysctlbyname("hw.physicalcpu", &cpuCores, &len, nullptr, 0);
+  sysctlbyname("hw.physicalcpu", &cores, &len, nullptr, 0);
+  cpuCores = cores > 0 ? static_cast<size_t>(cores) : 0;
 #else
   cpuCores = std::thread::hardware_concurrency();
 #endif
@@ -58,24 +62,28 @@ TaskGroup* TaskGroup::GetInstance() {
 
 void TaskGroup::RunLoop(TaskGroup* taskGroup) {
   while (true) {
-    auto task = taskGroup->popTask();
-    if (task == nullptr) {
-      if (taskGroup->exited) {
-        break;
-      }
-      if (taskGroup->shrinkThread()) {
-        break;
-      }
+    std::shared_ptr<Task> task = nullptr;
+    auto result = taskGroup->taskQueue.waitForTask(&task, taskGroup->totalThreads.load(),
+                                                   taskGroup->lowPriorityThreads.load(),
+                                                   THREAD_TIMEOUT.count());
+    if (result == TaskQueue::ClaimResult::Claimed) {
+      task->execute();
       continue;
     }
-    task->execute();
+    if (taskGroup->taskQueue.isClosed()) {
+      break;
+    }
+    if (taskGroup->shrinkSelf()) {
+      break;
+    }
+    // Timed out or woken with the pool under the limit: claim again.
   }
 }
 
 void OnAppExit() {
   // Forces all pending tasks to be finished when the app is exiting to prevent accessing wild
   // pointers.
-  TaskGroup::GetInstance()->exit();
+  TaskGroup::GetInstance()->releaseThreads(true);
 }
 
 TaskGroup::TaskGroup() : maxThreads(GetDefaultMaxThreadCount()) {
@@ -85,38 +93,30 @@ TaskGroup::TaskGroup() : maxThreads(GetDefaultMaxThreadCount()) {
     lowPriorityThreads = 1;
   }
   threads = new moodycamel::ConcurrentQueue<std::thread*>(maxThreads.load());
-  priorityQueues.reserve(TASK_PRIORITY_SIZE);
-  for (size_t i = 0; i < TASK_PRIORITY_SIZE; i++) {
-    auto queue = new moodycamel::ConcurrentQueue<std::shared_ptr<Task>>();
-    priorityQueues.push_back(queue);
-  }
   std::atexit(OnAppExit);
 }
 
 void TaskGroup::setMaxThreadCount(size_t maxThreadCount) {
   if (maxThreadCount == 0) {
     maxThreadCount = GetDefaultMaxThreadCount();
+  } else if (maxThreadCount > MAX_THREADS_SIZE) {
+    maxThreadCount = MAX_THREADS_SIZE;
   }
-  std::lock_guard<std::mutex> autoLock(locker);
   maxThreads = maxThreadCount;
   lowPriorityThreads = static_cast<size_t>(
       FloatRoundToInt(static_cast<float>(maxThreadCount) * LOW_PRIORITY_THREAD_RATIO));
   if (lowPriorityThreads < 1) {
     lowPriorityThreads = 1;
   }
-  // Wake up idle threads so they can exit if the pool exceeds the new limit.
-  condition.notify_all();
+  // Wake idle workers so they can exit if the pool exceeds the new limit.
+  taskQueue.wakeAll();
 }
 
 size_t TaskGroup::maxThreadCount() const {
   return maxThreads.load();
 }
 
-bool TaskGroup::shouldExit() const {
-  return exited || totalThreads.load() > maxThreads.load();
-}
-
-bool TaskGroup::shrinkThread() {
+bool TaskGroup::shrinkSelf() {
   size_t total = totalThreads.load();
   while (total > maxThreads.load()) {
     if (totalThreads.compare_exchange_weak(total, total - 1)) {
@@ -126,93 +126,44 @@ bool TaskGroup::shrinkThread() {
   return false;
 }
 
-bool TaskGroup::checkThreads() {
-  if (waitingThreads.load() == 0 && totalThreads.load() < maxThreads.load()) {
-    auto thread = new (std::nothrow) std::thread(TaskGroup::RunLoop, this);
-    if (thread) {
-      if (threads->enqueue(thread)) {
-        ++totalThreads;
-      } else {
-        delete thread;
-        return false;
-      }
-    }
-  } else {
-    return true;
+bool TaskGroup::spawnWorker() {
+  // Reserve the slot before starting the thread so concurrent pushes cannot spawn past the cap.
+  auto reserved = totalThreads.fetch_add(1) + 1;
+  if (reserved > maxThreads.load()) {
+    totalThreads.fetch_sub(1);
+    return false;
   }
-  return totalThreads > 0;
+  auto thread = new (std::nothrow) std::thread(TaskGroup::RunLoop, this);
+  if (thread == nullptr) {
+    totalThreads.fetch_sub(1);
+    return false;
+  }
+  if (!threads->enqueue(thread)) {
+    // The threads queue is unbounded, so this only happens on OOM. Detach the started thread
+    // so deleting the handle stays safe; it exits on the next close().
+    thread->detach();
+    delete thread;
+    totalThreads.fetch_sub(1);
+    return false;
+  }
+  return true;
 }
 
 bool TaskGroup::pushTask(std::shared_ptr<Task> task, TaskPriority priority) {
 #ifndef TGFX_USE_THREADS
   return false;
 #endif
-  if (exited || !checkThreads()) {
+  if (taskQueue.isClosed()) {
     return false;
   }
-  auto& queue = priorityQueues[static_cast<size_t>(priority)];
-  if (!queue->enqueue(task)) {
+  auto result = taskQueue.enqueue(task, priority);
+  if (result == TaskQueue::EnqueueResult::Rejected) {
     return false;
   }
-  std::lock_guard<std::mutex> autoLock(locker);
-  if (waitingThreads > 0) {
-    condition.notify_one();
+  if (result == TaskQueue::EnqueueResult::NeedsWorker && totalThreads.load() < maxThreads.load()) {
+    spawnWorker();
   }
   return true;
-}
-
-std::shared_ptr<Task> TaskGroup::tryDequeueTask() {
-  std::shared_ptr<Task> task = nullptr;
-  for (size_t i = 0; i < static_cast<size_t>(TaskPriority::Low); i++) {
-    if (priorityQueues[i]->try_dequeue(task)) {
-      return task;
-    }
-  }
-  if (totalThreads.load() - waitingThreads.load() < lowPriorityThreads.load()) {
-    auto& queue = priorityQueues[static_cast<size_t>(TaskPriority::Low)];
-    if (queue->try_dequeue(task)) {
-      return task;
-    }
-  }
-  return nullptr;
-}
-
-std::shared_ptr<Task> TaskGroup::popTask() {
-  while (!exited) {
-    auto task = tryDequeueTask();
-    if (task) {
-      return task;
-    }
-    if (shouldExit()) {
-      return nullptr;
-    }
-    ++waitingThreads;
-    {
-      std::unique_lock<std::mutex> autoLock(locker);
-      // Re-check the queues while holding the lock so a task pushed concurrently cannot be missed
-      // by a lost notification.
-      task = tryDequeueTask();
-      if (task) {
-        --waitingThreads;
-        return task;
-      }
-      if (shouldExit()) {
-        --waitingThreads;
-        return nullptr;
-      }
-      auto status = condition.wait_for(autoLock, THREAD_TIMEOUT);
-      if (status == std::cv_status::timeout) {
-        --waitingThreads;
-        return nullptr;
-      }
-    }
-    --waitingThreads;
-  }
-  return nullptr;
-}
-
-void TaskGroup::exit() {
-  releaseThreads(true);
 }
 
 static void ReleaseThread(std::thread* thread) {
@@ -223,28 +174,18 @@ static void ReleaseThread(std::thread* thread) {
 }
 
 void TaskGroup::releaseThreads(bool exit) {
-  // Set exited and notify while holding the lock, so a worker that has not entered its wait yet
-  // will observe exited in the locked section of popTask() instead of missing the notification
-  // and sleeping for the full THREAD_TIMEOUT.
-  {
-    std::lock_guard<std::mutex> autoLock(locker);
-    exited = true;
-    condition.notify_all();
-  }
+  // The queue closes and notifies while holding its lock, so a worker that has not entered its
+  // wait yet observes the closed flag instead of missing the notification and sleeping for the
+  // full THREAD_TIMEOUT.
+  taskQueue.close();
   std::thread* thread = nullptr;
   while (threads->try_dequeue(thread)) {
     ReleaseThread(thread);
   }
   totalThreads = 0;
-  DEBUG_ASSERT(waitingThreads == 0)
-  if (exit) {
-    delete threads;
-    for (auto& queue : priorityQueues) {
-      delete queue;
-    }
-    priorityQueues.clear();
-  } else {
-    exited = false;
+  DEBUG_ASSERT(taskQueue.sleeperCount() == 0)
+  if (!exit) {
+    taskQueue.reset();
   }
 }
 }  // namespace tgfx
