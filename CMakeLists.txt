@@ -1105,7 +1105,8 @@ if (TGFX_BUILD_TESTS)
                     "LINKER:--whole-archive" "$<TARGET_FILE:tgfx_embedded_bundles>" "LINKER:--no-whole-archive")
         endif ()
     endif ()
-    list(APPEND TGFX_TEST_INCLUDES src test/src hello2d/include third_party/json/include)
+    list(APPEND TGFX_TEST_INCLUDES src test/src hello2d/include third_party/json/include
+            third_party/zstd/lib)
 
     add_vendor_target(test-vendor STATIC_VENDORS googletest)
     find_vendor_libraries(test-vendor STATIC TEST_VENDOR_STATIC_LIBRARIES)

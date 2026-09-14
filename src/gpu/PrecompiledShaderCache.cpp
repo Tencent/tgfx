@@ -483,8 +483,9 @@ static bool ParseStageReflection(const uint8_t* data, size_t maxLen, ShaderStage
   return true;
 }
 
-static bool LoadPool(const uint8_t* fileData, size_t fileSize, uint32_t poolOffset,
-                     uint32_t poolCount, uint32_t dataOffset, uint32_t reflectionOffset,
+static bool LoadPool(const uint8_t* fileData, size_t fileSize, size_t poolOffset,
+                     uint32_t poolCount, size_t dataPoolStart, size_t dataPoolEnd,
+                     size_t reflectionPoolStart,
                      std::unordered_map<PrecompiledShaderCache::HashKey, ShaderStageBlob,
                                         PrecompiledShaderCache::HashKeyHasher>& entries,
                      bool hasArraySize) {
@@ -501,23 +502,25 @@ static bool LoadPool(const uint8_t* fileData, size_t fileSize, uint32_t poolOffs
     uint32_t blobSize = ReadU32LE(entry + 20);
     uint32_t reflOff = ReadU32LE(entry + 24);
 
-    size_t absDataOff = static_cast<size_t>(dataOffset) + blobOff;
-    if (absDataOff + blobSize > fileSize) {
-      LOGE("PrecompiledShaderCache: Data blob out of bounds for entry %u", i);
+    size_t absDataOff = dataPoolStart + blobOff;
+    if (absDataOff > dataPoolEnd || blobSize > dataPoolEnd - absDataOff) {
+      LOGE("PrecompiledShaderCache: Data blob outside the data pool for entry %u", i);
       return false;
     }
 
     ShaderStageBlob blob;
     blob.data.assign(fileData + absDataOff, fileData + absDataOff + blobSize);
 
-    if (reflectionOffset != 0) {
-      size_t absReflOff = static_cast<size_t>(reflectionOffset) + reflOff;
-      if (absReflOff < fileSize) {
-        size_t maxReflLen = fileSize - absReflOff;
-        if (!ParseStageReflection(fileData + absReflOff, maxReflLen, &blob, hasArraySize)) {
-          LOGE("PrecompiledShaderCache: Failed to parse reflection for entry %u", i);
-          return false;
-        }
+    if (reflectionPoolStart != 0) {
+      size_t absReflOff = reflectionPoolStart + reflOff;
+      if (absReflOff >= fileSize) {
+        LOGE("PrecompiledShaderCache: Reflection out of bounds for entry %u", i);
+        return false;
+      }
+      if (!ParseStageReflection(fileData + absReflOff, fileSize - absReflOff, &blob,
+                                hasArraySize)) {
+        LOGE("PrecompiledShaderCache: Failed to parse reflection for entry %u", i);
+        return false;
       }
     }
 
@@ -568,32 +571,49 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   size_t loadSize = size;
   std::vector<uint8_t> decompressed;
 
+  // All layout arithmetic runs in size_t: the u32 header fields can describe sums that wrap in
+  // uint32_t, and validating those sums in a wider domain than the reassembly math actually uses
+  // would let a wrapped length pass the bounds check and under-allocate the buffer.
+  auto dataPoolStart = static_cast<size_t>(dataOffset);
+  auto dataPoolEnd = dataPoolStart + dataSize;
+  auto vertPoolEnd = static_cast<size_t>(vertPoolOffset) +
+                     static_cast<size_t>(vertPoolCount) * POOL_ENTRY_SIZE;
+  auto fragPoolEnd = static_cast<size_t>(fragPoolOffset) +
+                     static_cast<size_t>(fragPoolCount) * POOL_ENTRY_SIZE;
+  if (vertPoolOffset < HEADER_SIZE_V3 || fragPoolOffset < vertPoolEnd ||
+      fragPoolEnd > dataPoolStart) {
+    LOGE("PrecompiledShaderCache: Pool sections overlap the header or the data pool");
+    return false;
+  }
+
+  size_t reflectionPoolStart = reflectionOffset;
+
   if (compressionType == 1 || compressionType == 2) {
     // Only the data pool region is compressed. Compute compressed size from file layout.
     size_t compressedEnd = reflectionOffset > 0 ? static_cast<size_t>(reflectionOffset) : size;
-    if (dataOffset > size || compressedEnd > size || compressedEnd < dataOffset) {
+    if (dataPoolStart > size || compressedEnd > size || compressedEnd < dataPoolStart) {
       LOGE("PrecompiledShaderCache: Compressed data region out of bounds");
       return false;
     }
-    size_t compressedSize = compressedEnd - static_cast<size_t>(dataOffset);
+    size_t compressedSize = compressedEnd - dataPoolStart;
     size_t reflectionSize = reflectionOffset > 0 ? size - compressedEnd : 0;
-    if (dataSize > std::numeric_limits<size_t>::max() - dataOffset ||
-        reflectionSize > std::numeric_limits<size_t>::max() - dataOffset - dataSize) {
+    if (dataPoolEnd < dataPoolStart ||
+        dataPoolEnd > std::numeric_limits<size_t>::max() - reflectionSize) {
       LOGE("PrecompiledShaderCache: Decompressed bundle size overflow");
       return false;
     }
     // Decompress into a reassembled buffer: [header+pools | decompressed data | reflection]
-    decompressed.resize(dataOffset + dataSize + reflectionSize);
-    std::memcpy(decompressed.data(), ptr, dataOffset);
+    decompressed.resize(dataPoolEnd + reflectionSize);
+    std::memcpy(decompressed.data(), ptr, dataPoolStart);
     bool decompressOK = false;
     if (compressionType == 1) {
       uLongf destLen = static_cast<uLongf>(dataSize);
-      int ret =
-          uncompress(decompressed.data() + dataOffset, &destLen, ptr + dataOffset, compressedSize);
+      int ret = uncompress(decompressed.data() + dataPoolStart, &destLen, ptr + dataPoolStart,
+                           compressedSize);
       decompressOK = ret == Z_OK && destLen == static_cast<uLongf>(dataSize);
     } else {
-      size_t destLen = ZSTD_decompress(decompressed.data() + dataOffset, dataSize, ptr + dataOffset,
-                                       compressedSize);
+      size_t destLen = ZSTD_decompress(decompressed.data() + dataPoolStart, dataSize,
+                                       ptr + dataPoolStart, compressedSize);
       decompressOK = !ZSTD_isError(destLen) && destLen == dataSize;
     }
     if (!decompressOK) {
@@ -601,23 +621,29 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
       return false;
     }
     // Copy reflection section after the decompressed data.
-    if (reflectionOffset > 0 && compressedEnd < size) {
-      size_t newReflOffset = dataOffset + dataSize;
-      std::memcpy(decompressed.data() + newReflOffset, ptr + compressedEnd, size - compressedEnd);
-      reflectionOffset = static_cast<uint32_t>(newReflOffset);
+    if (reflectionSize > 0) {
+      std::memcpy(decompressed.data() + dataPoolEnd, ptr + compressedEnd, reflectionSize);
+      reflectionPoolStart = dataPoolEnd;
+    } else {
+      reflectionPoolStart = 0;
     }
     loadPtr = decompressed.data();
     loadSize = decompressed.size();
+  } else if (dataPoolEnd > size ||
+             (reflectionOffset != 0 &&
+              (dataPoolEnd > reflectionOffset || reflectionOffset > size))) {
+    LOGE("PrecompiledShaderCache: Data or reflection section out of bounds");
+    return false;
   }
 
   std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> newVertEntries;
   std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> newFragEntries;
-  if (!LoadPool(loadPtr, loadSize, vertPoolOffset, vertPoolCount, dataOffset, reflectionOffset,
-                newVertEntries, hasArraySize)) {
+  if (!LoadPool(loadPtr, loadSize, vertPoolOffset, vertPoolCount, dataPoolStart, dataPoolEnd,
+                reflectionPoolStart, newVertEntries, hasArraySize)) {
     return false;
   }
-  if (!LoadPool(loadPtr, loadSize, fragPoolOffset, fragPoolCount, dataOffset, reflectionOffset,
-                newFragEntries, hasArraySize)) {
+  if (!LoadPool(loadPtr, loadSize, fragPoolOffset, fragPoolCount, dataPoolStart, dataPoolEnd,
+                reflectionPoolStart, newFragEntries, hasArraySize)) {
     return false;
   }
 
