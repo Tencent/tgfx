@@ -1152,6 +1152,78 @@ TGFX_TEST(AOTRenderConsistencyTest, TexturedEffect2D) {
   ExpectBitmapsIdentical("textured-effect-2d", candidate, reference, width, height);
 }
 
+// The decomposition switch must gate every entry point, including the direct-draw rewrite in
+// StandardDrawOp::prepareDecomposedProgram, which previously only checked bundle loading. The
+// trigger scene is the triangulated AA polygon (its GP coverage makes the plain matcher pass,
+// so the chain rewrite serves it): with the switch on the draw records a direct chain rewrite;
+// with the switch off the rewrite must not run and the draw falls back to the runtime builder.
+// Note a separate boundary this test documents: the switch does not gate the matcher's own
+// chain rule — a draw the plain matcher serves directly (e.g. a simple filter chain) still uses
+// the chain kernel with the switch off. That rule-level gating is a semantic decision recorded
+// in the audit report, not a defect fixed here.
+TGFX_TEST(AOTRenderConsistencyTest, DecompositionSwitchControlsDirectDrawEntry) {
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_TRUE(image != nullptr);
+  auto renderOnce = [&](bool decompositionEnabled, AOTDrawStats* outDraws,
+                        ProgramCacheStats* outPrograms, Bitmap* outBitmap) {
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto* cache = context->precompiledShaderCache();
+    auto [bundleData, bundleSize] = EmbeddedShaderBundles::GetBundle(context->backend());
+    ASSERT_NE(bundleData, nullptr);
+    ASSERT_GT(bundleSize, 0u);
+    ASSERT_TRUE(cache->loadBundle(bundleData, bundleSize));
+    context->globalCache()->clearPrograms();
+    context->globalCache()->resetProgramStats();
+    cache->setDecompositionEnabled(decompositionEnabled);
+    cache->setDiagnosticRecordingEnabled(true);
+    cache->resetStats();
+    auto surface = Surface::Make(context, 240, 240);
+    ASSERT_TRUE(surface != nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::White());
+    Path path = {};
+    for (int i = 0; i < 5; ++i) {
+      float angle = static_cast<float>(i) * 72.0f - 90.0f;
+      float x = 120.0f + 95.0f * cosf(angle * kStarPi / 180.0f);
+      float y = 120.0f + 95.0f * sinf(angle * kStarPi / 180.0f);
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+    path.close();
+    Paint paint = {};
+    paint.setShader(Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp));
+    canvas->drawShape(Shape::MakeFrom(std::move(path)), paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(240, 240));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+    *outDraws = cache->drawStats();
+    *outPrograms = context->globalCache()->programStats();
+    cache->setDiagnosticRecordingEnabled(false);
+    cache->setDecompositionEnabled(true);
+    cache->unload();
+  };
+  AOTDrawStats onDraws = {};
+  AOTDrawStats offDraws = {};
+  ProgramCacheStats onPrograms = {};
+  ProgramCacheStats offPrograms = {};
+  Bitmap onBitmap = {};
+  Bitmap offBitmap = {};
+  renderOnce(true, &onDraws, &onPrograms, &onBitmap);
+  renderOnce(false, &offDraws, &offPrograms, &offBitmap);
+  EXPECT_GE(onDraws.directChainDraws, 1u);
+  EXPECT_EQ(offDraws.directChainDraws, 0u);
+  EXPECT_GE(offPrograms.programBuilderCreations, 1u);
+  ExpectBitmapsIdentical("decomposition-switch-direct-entry", onBitmap, offBitmap, 240, 240);
+}
+
 // Three pointwise operators are packed into two fixed-slot passes: the first pass applies Matrix +
 // Luma, and the terminal device-space pass applies the final Matrix. This exercises both source
 // coordinate domains while requiring only one RGBA8 intermediate.

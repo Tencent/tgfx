@@ -98,7 +98,8 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, ProgramLookupMode mode,
 // other coverage forms stay on their original route.
 std::shared_ptr<Program> StandardDrawOp::prepareDecomposedProgram(
     RenderTarget* renderTarget, const ColorProcessorList& activeColors) {
-  if (!renderTarget->getContext()->precompiledShaderCache()->isLoaded()) {
+  auto cache = renderTarget->getContext()->precompiledShaderCache();
+  if (!cache->isLoaded() || !cache->decompositionEnabled()) {
     return nullptr;
   }
   if (MatchPermutation(preparedProgramInfo.get()).has_value()) {

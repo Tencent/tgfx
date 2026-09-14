@@ -308,9 +308,11 @@ class PrecompiledShaderCache {
     return statsPaused.load(std::memory_order_relaxed);
   }
 
-  /// Enables or disables the bounded-AOT decomposition route. Off by default: the decomposition
-  /// executor is served only when explicitly enabled (e.g. during cross-validation), so unverified
-  /// kernels never reach production and every draw falls back to the plain matcher/builder path.
+  /// Enables or disables the bounded-AOT decomposition route on every entry point (direct draw
+  /// rewrite, offscreen fill, and the compositor's on-screen plans). On by default: the
+  /// decomposition route is part of the precompiled execution path. Turning it off routes every
+  /// draw through the plain matcher/builder path, which is useful for comparisons and
+  /// troubleshooting; note that bundle loading itself is controlled separately by loadBundle.
   void setDecompositionEnabled(bool enabled) {
     _decompositionEnabled.store(enabled, std::memory_order_relaxed);
   }
