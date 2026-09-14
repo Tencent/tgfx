@@ -453,7 +453,7 @@ static bool ReadUniformEntries(const uint8_t* data, size_t maxLen, size_t* offse
       return false;
     }
     uint8_t nameLen = data[(*offset)++];
-    if (*offset + nameLen + 1 > maxLen) {
+    if (static_cast<size_t>(nameLen) + 1 > maxLen - *offset) {
       return false;
     }
     std::string name(reinterpret_cast<const char*>(data + *offset), nameLen);
@@ -461,7 +461,7 @@ static bool ReadUniformEntries(const uint8_t* data, size_t maxLen, size_t* offse
     auto format = static_cast<UniformFormat>(data[(*offset)++]);
     uint32_t arraySize = 1;
     if (hasArraySize) {
-      if (*offset + 2 > maxLen) {
+      if (maxLen - *offset < 2) {
         return false;
       }
       arraySize =
@@ -505,7 +505,7 @@ static bool LoadPool(const uint8_t* fileData, size_t fileSize, size_t poolOffset
                      bool hasArraySize) {
   for (uint32_t i = 0; i < poolCount; i++) {
     size_t entryOff = poolOffset + static_cast<size_t>(i) * POOL_ENTRY_SIZE;
-    if (entryOff + POOL_ENTRY_SIZE > fileSize) {
+    if (entryOff > fileSize || POOL_ENTRY_SIZE > fileSize - entryOff) {
       LOGE("PrecompiledShaderCache: Pool entry %u out of bounds", i);
       return false;
     }
@@ -516,21 +516,22 @@ static bool LoadPool(const uint8_t* fileData, size_t fileSize, size_t poolOffset
     uint32_t blobSize = ReadU32LE(entry + 20);
     uint32_t reflOff = ReadU32LE(entry + 24);
 
-    size_t absDataOff = dataPoolStart + blobOff;
-    if (absDataOff > dataPoolEnd || blobSize > dataPoolEnd - absDataOff) {
+    auto dataPoolSize = dataPoolEnd - dataPoolStart;
+    if (blobOff > dataPoolSize || blobSize > dataPoolSize - blobOff) {
       LOGE("PrecompiledShaderCache: Data blob outside the data pool for entry %u", i);
       return false;
     }
+    size_t absDataOff = dataPoolStart + blobOff;
 
     ShaderStageBlob blob;
     blob.data.assign(fileData + absDataOff, fileData + absDataOff + blobSize);
 
     if (reflectionPoolStart != 0) {
-      size_t absReflOff = reflectionPoolStart + reflOff;
-      if (absReflOff >= fileSize) {
+      if (reflectionPoolStart > fileSize || reflOff >= fileSize - reflectionPoolStart) {
         LOGE("PrecompiledShaderCache: Reflection out of bounds for entry %u", i);
         return false;
       }
+      size_t absReflOff = reflectionPoolStart + reflOff;
       if (!ParseStageReflection(fileData + absReflOff, fileSize - absReflOff, &blob,
                                 hasArraySize)) {
         LOGE("PrecompiledShaderCache: Failed to parse reflection for entry %u", i);
@@ -599,20 +600,21 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   size_t loadSize = size;
   std::vector<uint8_t> decompressed;
 
-  // All layout arithmetic runs in size_t: the u32 header fields can describe sums that wrap in
-  // uint32_t, and validating those sums in a wider domain than the reassembly math actually uses
-  // would let a wrapped length pass the bounds check and under-allocate the buffer.
+  // Validate spans before any multiplication, pointer arithmetic or hash traversal. size_t is
+  // only 32 bits on wasm32 and some mobile targets, so casting the header fields is not enough.
   auto dataPoolStart = static_cast<size_t>(dataOffset);
-  auto dataPoolEnd = dataPoolStart + dataSize;
-  auto vertPoolEnd = static_cast<size_t>(vertPoolOffset) +
-                     static_cast<size_t>(vertPoolCount) * POOL_ENTRY_SIZE;
-  auto fragPoolEnd = static_cast<size_t>(fragPoolOffset) +
-                     static_cast<size_t>(fragPoolCount) * POOL_ENTRY_SIZE;
-  if (vertPoolOffset < HEADER_SIZE_V3 || fragPoolOffset < vertPoolEnd ||
-      fragPoolEnd > dataPoolStart) {
-    LOGE("PrecompiledShaderCache: Pool sections overlap the header or the data pool");
+  if (vertPoolOffset < HEADER_SIZE_V3 || vertPoolOffset > fragPoolOffset ||
+      fragPoolOffset > dataPoolStart || dataPoolStart > size ||
+      vertPoolCount > (static_cast<size_t>(fragPoolOffset) - vertPoolOffset) / POOL_ENTRY_SIZE ||
+      fragPoolCount > (dataPoolStart - fragPoolOffset) / POOL_ENTRY_SIZE) {
+    LOGE("PrecompiledShaderCache: Pool sections overlap or exceed the file");
     return false;
   }
+  if (dataSize > std::numeric_limits<size_t>::max() - dataPoolStart) {
+    LOGE("PrecompiledShaderCache: Data pool size overflow");
+    return false;
+  }
+  auto dataPoolEnd = dataPoolStart + dataSize;
 
   size_t reflectionPoolStart = reflectionOffset;
 

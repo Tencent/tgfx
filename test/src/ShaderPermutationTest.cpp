@@ -879,7 +879,9 @@ static void ExpectBundleRejectedPreservingCache(const std::vector<uint8_t>& inva
   auto original = MakeTestBundle("original", 1, 1, 10);
   PrecompiledShaderCache cache(nullptr, Backend::Unknown);
   ASSERT_TRUE(cache.loadBundle(original.data(), original.size()));
+  auto generation = cache.bundleGeneration();
   EXPECT_FALSE(cache.loadBundle(invalid.data(), invalid.size()));
+  EXPECT_EQ(cache.bundleGeneration(), generation);
   EXPECT_EQ(cache.profileTag(), "original");
   EXPECT_EQ(cache.vertexEntryCount(), 1u);
   EXPECT_EQ(cache.fragmentEntryCount(), 1u);
@@ -925,6 +927,22 @@ TGFX_TEST(ShaderPermutationTest, BundleCompressionAndReflectionRoundTrip) {
           } else {
             EXPECT_TRUE(blob->uniforms.empty());
           }
+        }
+      }
+    }
+  }
+}
+
+TGFX_TEST(ShaderPermutationTest, BundleRejectsWrappedPoolCountsBeforeHashing) {
+  for (uint16_t version : {uint16_t{3}, uint16_t{4}}) {
+    for (uint32_t count : {0x40000000u, 0x80000000u, 0xc0000000u}) {
+      for (size_t countOffset : {20u, 24u}) {
+        for (uint8_t hashByte : {uint8_t{0}, uint8_t{1}}) {
+          auto invalid = MakeTestBundle("bounds", 0, 0, 0);
+          TestWriteU16LE(invalid.data() + 4, version);
+          invalid[8] = hashByte;
+          TestWriteU32LE(invalid.data() + countOffset, count);
+          ExpectBundleRejectedPreservingCache(invalid);
         }
       }
     }
@@ -1032,17 +1050,17 @@ TGFX_TEST(ShaderPermutationTest, CompressedBundleFailedReflectionPreservesCache)
 }
 
 TGFX_TEST(ShaderPermutationTest, CompressedBundleRejectsInvalidOffsetOrder) {
-  std::vector<uint8_t> bundle(80, 0);
-  TestWriteU32LE(bundle.data(), 0x54475346);
-  TestWriteU16LE(bundle.data() + 4, 3);
-  TestWriteU16LE(bundle.data() + 6, 1);
-  TestWriteU32LE(bundle.data() + 36, 80);
-  TestWriteU32LE(bundle.data() + 40, 1);
-  TestWriteU32LE(bundle.data() + 44, 64);
-
-  PrecompiledShaderCache cache(nullptr, TestBackend());
-  EXPECT_FALSE(cache.loadBundle(bundle.data(), bundle.size()));
-  EXPECT_FALSE(cache.isLoaded());
+  for (uint16_t compression : {uint16_t{1}, uint16_t{2}}) {
+    auto bundle = CompressTestBundle(MakeReflectedTestBundle(4), compression);
+    PrecompiledShaderCache cache(nullptr, Backend::Unknown);
+    ASSERT_TRUE(cache.loadBundle(bundle.data(), bundle.size()));
+    auto generation = cache.bundleGeneration();
+    auto dataOffset = TestReadU32LE(bundle.data() + 36);
+    TestWriteU32LE(bundle.data() + 44, dataOffset - 1);
+    EXPECT_FALSE(cache.loadBundle(bundle.data(), bundle.size()));
+    EXPECT_EQ(cache.bundleGeneration(), generation);
+    EXPECT_TRUE(cache.isLoaded());
+  }
 }
 
 TGFX_TEST(ShaderPermutationTest, FailedBundleReloadPreservesCache) {
