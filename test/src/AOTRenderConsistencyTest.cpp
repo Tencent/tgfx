@@ -542,6 +542,118 @@ TGFX_TEST(AOTRenderConsistencyTest, TwoChildXferBlendFold) {
   ExpectBitmapsIdentical("two-child-xfer-blend-fold", aotBitmap, runtimeBitmap, 200, 200);
 }
 
+TGFX_TEST(AOTRenderConsistencyTest, ProgramKeyColorCoverageBoundary) {
+  // The program cache key does not encode the color/coverage boundary (numColorProcessors is
+  // absent from buildProgramKey), so two draws with identical processor sequences but different
+  // boundaries share one cache entry. Verification result (2026-09-14, JIT and AOT both): the
+  // Xfermode uniform layout makes the reuse self-consistent on this shape — its onSetData
+  // writes the same uniform slots in either position — so no visible error is produced. This
+  // test stays as a regression fence: any future layout asymmetry between the color and
+  // coverage positions of a shared FP would turn this pair into a real misrender, and the key
+  // fix (encoding the boundary) is deferred until such a case is reproduced rather than being
+  // applied without a failing case.
+  // A shared alpha-gradient image: the left half is opaque, the right half is half-transparent,
+  // so the blue blend draw and the red mask draw produce visibly different pixels when mixed up.
+  Bitmap gradient = {};
+  ASSERT_TRUE(gradient.allocPixels(64, 64));
+  {
+    auto* pixels = static_cast<uint32_t*>(gradient.lockPixels());
+    ASSERT_TRUE(pixels != nullptr);
+    for (int y = 0; y < 64; ++y) {
+      for (int x = 0; x < 64; ++x) {
+        auto alpha = x < 32 ? 255u : 128u;
+        pixels[y * 64 + x] = (alpha << 24) | 0x00FFFFFFu;
+      }
+    }
+    gradient.unlockPixels();
+  }
+  auto image = Image::MakeFrom(gradient);
+  ASSERT_TRUE(image != nullptr);
+
+  auto renderScene = [&](bool withBlendDraw, bool useBundle, Bitmap* outBitmap) {
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto* cache = context->precompiledShaderCache();
+    if (useBundle) {
+      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+    } else {
+      cache->unload();
+    }
+    ScopedAOTStatsPause statsPause(context, !useBundle);
+    context->globalCache()->clearPrograms();
+    auto surface = Surface::Make(context, 128, 128);
+    ASSERT_TRUE(surface != nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::White());
+    // Draw A: a SrcIn blend shader whose processor sequence is
+    // [TextureEffect(gradient), Xfermode(SrcIn, DstChild)] in the color chain, with a solid
+    // blue source operand.
+    if (withBlendDraw) {
+      Paint paintA = {};
+      paintA.setShader(Shader::MakeBlend(
+          BlendMode::SrcIn, Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp),
+          Shader::MakeColorShader(Color::Blue())));
+      canvas->drawRect(Rect::MakeXYWH(8, 8, 112, 52), paintA);
+    }
+    // Draw B: a solid red paint with a shader mask filter over the same gradient. Its
+    // processor sequence is structurally identical — [TextureEffect(gradient),
+    // Xfermode(SrcIn, DstChild)] — but the pair sits in the coverage chain. Reusing draw A's
+    // program for draw B would read the paint color through the blend's uniform layout
+    // instead of the geometry color, so the program key must distinguish the two.
+    Paint paintB = {};
+    paintB.setColor(Color::Red());
+    paintB.setMaskFilter(
+        MaskFilter::MakeShader(Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp)));
+    canvas->drawRect(Rect::MakeXYWH(8, 68, 112, 52), paintB);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(128, 128));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+  };
+
+  Bitmap reference = {};
+  renderScene(false, false, &reference);
+  Bitmap mixed = {};
+  renderScene(true, false, &mixed);
+  Bitmap referenceAOT = {};
+  renderScene(false, true, &referenceAOT);
+  Bitmap mixedAOT = {};
+  renderScene(true, true, &mixedAOT);
+  // Compare only draw B's band (rows 60..124): the reference scene never draws A, so the upper
+  // band differs by construction while the lower band must stay identical.
+  auto compareBand = [&](const char* label, const Bitmap& ref, const Bitmap& mix) {
+    auto* refPixels = static_cast<const uint32_t*>(const_cast<Bitmap&>(ref).lockPixels());
+    auto* mixPixels = static_cast<uint32_t*>(const_cast<Bitmap&>(mix).lockPixels());
+    ASSERT_TRUE(refPixels != nullptr && mixPixels != nullptr);
+    int mismatches = 0;
+    uint32_t firstRef = 0;
+    uint32_t firstMix = 0;
+    for (int y = 60; y < 124; ++y) {
+      for (int x = 0; x < 128; ++x) {
+        auto refValue = refPixels[y * 128 + x];
+        auto mixValue = mixPixels[y * 128 + x];
+        if (refValue != mixValue) {
+          if (mismatches == 0) {
+            firstRef = refValue;
+            firstMix = mixValue;
+          }
+          ++mismatches;
+        }
+      }
+    }
+    const_cast<Bitmap&>(ref).unlockPixels();
+    const_cast<Bitmap&>(mix).unlockPixels();
+    EXPECT_EQ(mismatches, 0) << label << ": mask draw changed after the blend draw shared its "
+                             << "program key (first ref=" << firstRef << " mix=" << firstMix
+                             << ")";
+  };
+  compareBand("jit", reference, mixed);
+  compareBand("aot", referenceAOT, mixedAOT);
+}
+
 TGFX_TEST(AOTRenderConsistencyTest, TextureFillTriangulatedShapeAA) {
   auto renderOnce = [&](bool useBundle, Bitmap* outBitmap) {
     ContextScope scope;
