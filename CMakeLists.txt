@@ -797,7 +797,7 @@ endif ()
 merge_libraries_into(tgfx ${TGFX_STATIC_LIBS} "$<TARGET_FILE:tgfx_zstd>")
 target_link_libraries(tgfx PUBLIC ${TGFX_SHARED_LIBS})
 if (TGFX_USE_WEBGPU)
-    target_link_libraries(tgfx libtint)
+    target_link_libraries(tgfx PUBLIC libtint)
 endif ()
 set_target_properties(tgfx PROPERTIES PREFIX "")
 
