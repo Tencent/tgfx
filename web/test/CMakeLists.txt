@@ -225,11 +225,5 @@ target_link_libraries(tgfx-test
     ${TEST_VENDOR_LIBS}
 )
 
-# The embedded bundle library registers itself through static constructors; without
-# --whole-archive the linker drops the objects (no symbols are referenced) and
-# EmbeddedShaderBundles::GetBundle() returns null at runtime.
-if (TGFX_EMBED_SHADER_BUNDLES AND TARGET tgfx_embedded_bundles)
-    target_link_libraries(tgfx-test tgfx_embedded_bundles)
-    target_link_options(tgfx-test PRIVATE
-            "LINKER:--whole-archive" "$<TARGET_FILE:tgfx_embedded_bundles>" "LINKER:--no-whole-archive")
-endif ()
+# Embedded bundle objects are part of tgfx and are referenced by its registration chain.
+# Do not link them a second time or force-load a companion archive.

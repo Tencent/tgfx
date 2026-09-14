@@ -1004,17 +1004,13 @@ ${TRAMPOLINE_CALLS}}
 ")
     list(APPEND TGFX_EMBEDDED_BUNDLE_SOURCES ${TRAMPOLINE_CPP})
 
-    # Build embedded bundles as a separate static library so that -force_load can target only it
-    # (avoiding duplicate symbol issues from force-loading the entire libtgfx).
-    add_library(tgfx_embedded_bundles STATIC ${TGFX_EMBEDDED_BUNDLE_SOURCES})
+    # Include generated objects in the physical tgfx archive/framework, not just its CMake
+    # link interface. The registration symbol chain keeps them reachable without force-load.
+    add_library(tgfx_embedded_bundles OBJECT ${TGFX_EMBEDDED_BUNDLE_SOURCES})
     target_include_directories(tgfx_embedded_bundles PRIVATE src include)
     add_dependencies(tgfx_embedded_bundles tgfx_shader_bundles)
     set(TGFX_EMBEDDED_BUNDLES_TARGET tgfx_embedded_bundles CACHE INTERNAL "")
-    # The embedded bundles travel with the library itself: EmbeddedShaderBundles::GetBundle
-    # references RegisterAllEmbeddedBundles, which references each per-backend registration, so
-    # linking tgfx pulls the bundle data in through ordinary symbol resolution and no
-    # whole-archive option is needed on the consumer side.
-    target_link_libraries(tgfx PUBLIC tgfx_embedded_bundles)
+    target_sources(tgfx PRIVATE $<TARGET_OBJECTS:tgfx_embedded_bundles>)
     target_compile_definitions(tgfx PRIVATE TGFX_EMBED_SHADER_BUNDLES=1)
 endif ()
 
@@ -1130,9 +1126,8 @@ if (TGFX_BUILD_TESTS)
     endif ()
 
     list(APPEND TGFX_TEST_LIBS tgfx-hello2d tgfx ${TGFX_SHARED_LIBS})
-    # Note: no explicit tgfx_embedded_bundles linking or whole-archive options here anymore. The
-    # bundles travel with the tgfx target itself (PUBLIC dependency plus the registration symbol
-    # chain), which is exactly the consumer contract the minimal app verifies.
+    # Bundle objects reside in tgfx itself; tests use the same registration chain as consumers,
+    # without explicit bundle linking or whole-archive options.
     list(APPEND TGFX_TEST_INCLUDES src test/src hello2d/include third_party/json/include
             third_party/zstd/lib)
 
@@ -1209,6 +1204,13 @@ if (TGFX_BUILD_TESTS)
         if (APPLE)
             target_link_libraries(EmbeddedBundleMinimalApp "-framework OpenGL")
         endif ()
+        # Use the physical archive, not the tgfx target's transitive link interface. This is
+        # the contract used by consumers receiving only tgfx.a/lib or a static framework.
+        add_executable(EmbeddedBundleArchiveApp test/minimal/EmbeddedBundleMinimalApp.cpp)
+        target_include_directories(EmbeddedBundleArchiveApp PRIVATE include src ${TGFX_INCLUDES})
+        add_dependencies(EmbeddedBundleArchiveApp tgfx)
+        target_link_libraries(EmbeddedBundleArchiveApp PRIVATE "$<TARGET_FILE:tgfx>"
+                ${TGFX_SHARED_LIBS})
     endif ()
 endif ()
 
