@@ -445,20 +445,71 @@ static uint64_t ReadU64LE(const uint8_t* p) {
 static constexpr size_t HEADER_SIZE_V3 = 80;
 // PoolEntry: hashHi(8) + hashLo(8) + dataOff(4) + dataSize(4) + reflOff(4) = 28
 static constexpr size_t POOL_ENTRY_SIZE = 28;
+// Independent bounds for the input/reassembled file and for copied shader/reflection payloads.
+// These are parser limits, not a bound on total process RSS or concurrently retained old bundles.
+static constexpr size_t MAX_BUNDLE_BYTES = 256u * 1024u * 1024u;
+static constexpr size_t MAX_DECODED_PAYLOAD_BYTES = 256u * 1024u * 1024u;
+static constexpr uint32_t MAX_BUNDLE_ENTRIES = 65536;
+
+static bool ConsumePayloadBudget(size_t bytes, size_t* remainingBytes) {
+  if (bytes > *remainingBytes) {
+    return false;
+  }
+  *remainingBytes -= bytes;
+  return true;
+}
+
+static bool IsValidReflectionFormat(UniformFormat format, bool sampler) {
+  switch (format) {
+    case UniformFormat::Float:
+    case UniformFormat::Float2:
+    case UniformFormat::Float3:
+    case UniformFormat::Float4:
+    case UniformFormat::Float2x2:
+    case UniformFormat::Float3x3:
+    case UniformFormat::Float4x4:
+    case UniformFormat::Int:
+    case UniformFormat::Int2:
+    case UniformFormat::Int3:
+    case UniformFormat::Int4:
+      return !sampler;
+    case UniformFormat::Texture2DSampler:
+    case UniformFormat::TextureExternalSampler:
+    case UniformFormat::Texture2DRectSampler:
+      return sampler;
+    default:
+      return false;
+  }
+}
 
 static bool ReadUniformEntries(const uint8_t* data, size_t maxLen, size_t* offset, uint8_t count,
-                               std::vector<Uniform>& out, bool hasArraySize) {
+                               std::vector<Uniform>& out, bool hasArraySize, bool sampler,
+                               size_t* remainingBytes) {
+  if (!ConsumePayloadBudget(static_cast<size_t>(count) * sizeof(Uniform), remainingBytes)) {
+    return false;
+  }
+  out.reserve(count);
   for (uint8_t i = 0; i < count; i++) {
     if (*offset >= maxLen) {
       return false;
     }
     uint8_t nameLen = data[(*offset)++];
-    if (static_cast<size_t>(nameLen) + 1 > maxLen - *offset) {
+    if (nameLen == 0 || static_cast<size_t>(nameLen) + 1 > maxLen - *offset ||
+        !ConsumePayloadBudget(static_cast<size_t>(nameLen) + 1, remainingBytes)) {
       return false;
     }
     std::string name(reinterpret_cast<const char*>(data + *offset), nameLen);
+    if (name.find('\0') != std::string::npos ||
+        std::any_of(out.begin(), out.end(), [&](const Uniform& uniform) {
+          return uniform.name() == name;
+        })) {
+      return false;
+    }
     *offset += nameLen;
     auto format = static_cast<UniformFormat>(data[(*offset)++]);
+    if (!IsValidReflectionFormat(format, sampler)) {
+      return false;
+    }
     uint32_t arraySize = 1;
     if (hasArraySize) {
       if (maxLen - *offset < 2) {
@@ -467,6 +518,9 @@ static bool ReadUniformEntries(const uint8_t* data, size_t maxLen, size_t* offse
       arraySize =
           static_cast<uint32_t>(data[*offset]) | (static_cast<uint32_t>(data[*offset + 1]) << 8);
       *offset += 2;
+    }
+    if (arraySize == 0 || (sampler && arraySize != 1)) {
+      return false;
     }
     out.emplace_back(std::move(name), format, arraySize);
   }
@@ -479,7 +533,7 @@ static bool ReadUniformEntries(const uint8_t* data, size_t maxLen, size_t* offse
 //                    For each sampler: [nameLen:u8][name:bytes][format:u8]
 //                                      (+[arraySize:u16] since bundle v4)
 static bool ParseStageReflection(const uint8_t* data, size_t maxLen, ShaderStageBlob* blob,
-                                 bool hasArraySize) {
+                                 bool hasArraySize, size_t* remainingBytes) {
   if (maxLen < 4) {
     return false;
   }
@@ -488,11 +542,31 @@ static bool ParseStageReflection(const uint8_t* data, size_t maxLen, ShaderStage
   uint8_t samplerCount = data[offset++];
   offset += 2;  // reserved
 
-  if (!ReadUniformEntries(data, maxLen, &offset, uniformCount, blob->uniforms, hasArraySize)) {
+  if (!ReadUniformEntries(data, maxLen, &offset, uniformCount, blob->uniforms, hasArraySize,
+                          false, remainingBytes)) {
     return false;
   }
-  if (!ReadUniformEntries(data, maxLen, &offset, samplerCount, blob->samplers, hasArraySize)) {
+  if (!ReadUniformEntries(data, maxLen, &offset, samplerCount, blob->samplers, hasArraySize,
+                          true, remainingBytes)) {
     return false;
+  }
+  return true;
+}
+
+// Pool table spans have already been checked. Account for aliases separately: every entry
+// becomes an owned blob, even when several keys refer to the same serialized byte range.
+static bool CheckPoolPayloadBudget(const uint8_t* fileData, size_t poolOffset, uint32_t poolCount,
+                                   size_t dataPoolSize, size_t* remainingBytes) {
+  for (uint32_t index = 0; index < poolCount; ++index) {
+    auto entry = fileData + poolOffset + static_cast<size_t>(index) * POOL_ENTRY_SIZE;
+    auto blobOffset = ReadU32LE(entry + 16);
+    auto blobSize = ReadU32LE(entry + 20);
+    if (blobOffset > dataPoolSize || blobSize > dataPoolSize - blobOffset ||
+        !ConsumePayloadBudget(sizeof(ShaderStageBlob) + sizeof(PrecompiledShaderCache::HashKey),
+                              remainingBytes) ||
+        !ConsumePayloadBudget(blobSize, remainingBytes)) {
+      return false;
+    }
   }
   return true;
 }
@@ -502,7 +576,7 @@ static bool LoadPool(const uint8_t* fileData, size_t fileSize, size_t poolOffset
                      size_t reflectionPoolStart,
                      std::unordered_map<PrecompiledShaderCache::HashKey, ShaderStageBlob,
                                         PrecompiledShaderCache::HashKeyHasher>& entries,
-                     bool hasArraySize) {
+                     bool hasArraySize, size_t* remainingBytes) {
   for (uint32_t i = 0; i < poolCount; i++) {
     size_t entryOff = poolOffset + static_cast<size_t>(i) * POOL_ENTRY_SIZE;
     if (entryOff > fileSize || POOL_ENTRY_SIZE > fileSize - entryOff) {
@@ -533,7 +607,7 @@ static bool LoadPool(const uint8_t* fileData, size_t fileSize, size_t poolOffset
       }
       size_t absReflOff = reflectionPoolStart + reflOff;
       if (!ParseStageReflection(fileData + absReflOff, fileSize - absReflOff, &blob,
-                                hasArraySize)) {
+                                hasArraySize, remainingBytes)) {
         LOGE("PrecompiledShaderCache: Failed to parse reflection for entry %u", i);
         return false;
       }
@@ -546,8 +620,8 @@ static bool LoadPool(const uint8_t* fileData, size_t fileSize, size_t poolOffset
 }
 
 bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
-  if (data == nullptr || size < HEADER_SIZE_V3) {
-    LOGE("PrecompiledShaderCache: Bundle data too small (%zu bytes)", size);
+  if (data == nullptr || size < HEADER_SIZE_V3 || size > MAX_BUNDLE_BYTES) {
+    LOGE("PrecompiledShaderCache: Bundle size outside parser limits (%zu bytes)", size);
     return false;
   }
 
@@ -610,11 +684,20 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
     LOGE("PrecompiledShaderCache: Pool sections overlap or exceed the file");
     return false;
   }
-  if (dataSize > std::numeric_limits<size_t>::max() - dataPoolStart) {
-    LOGE("PrecompiledShaderCache: Data pool size overflow");
+  if (dataSize > MAX_BUNDLE_BYTES - dataPoolStart || vertPoolCount > MAX_BUNDLE_ENTRIES ||
+      fragPoolCount > MAX_BUNDLE_ENTRIES - vertPoolCount) {
+    LOGE("PrecompiledShaderCache: Bundle data or entry count exceeds parser limits");
     return false;
   }
   auto dataPoolEnd = dataPoolStart + dataSize;
+  size_t remainingPayloadBytes = MAX_DECODED_PAYLOAD_BYTES;
+  if (!CheckPoolPayloadBudget(ptr, vertPoolOffset, vertPoolCount, dataSize,
+                              &remainingPayloadBytes) ||
+      !CheckPoolPayloadBudget(ptr, fragPoolOffset, fragPoolCount, dataSize,
+                              &remainingPayloadBytes)) {
+    LOGE("PrecompiledShaderCache: Invalid blob span or decoded payload budget exceeded");
+    return false;
+  }
 
   size_t reflectionPoolStart = reflectionOffset;
 
@@ -627,9 +710,8 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
     }
     size_t compressedSize = compressedEnd - dataPoolStart;
     size_t reflectionSize = reflectionOffset > 0 ? size - compressedEnd : 0;
-    if (dataPoolEnd < dataPoolStart ||
-        dataPoolEnd > std::numeric_limits<size_t>::max() - reflectionSize) {
-      LOGE("PrecompiledShaderCache: Decompressed bundle size overflow");
+    if (reflectionSize > MAX_BUNDLE_BYTES - dataPoolEnd) {
+      LOGE("PrecompiledShaderCache: Reassembled bundle exceeds parser limits");
       return false;
     }
     // Decompress into a reassembled buffer: [header+pools | decompressed data | reflection]
@@ -704,11 +786,11 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> newVertEntries;
   std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> newFragEntries;
   if (!LoadPool(loadPtr, loadSize, vertPoolOffset, vertPoolCount, dataPoolStart, dataPoolEnd,
-                reflectionPoolStart, newVertEntries, hasArraySize)) {
+                reflectionPoolStart, newVertEntries, hasArraySize, &remainingPayloadBytes)) {
     return false;
   }
   if (!LoadPool(loadPtr, loadSize, fragPoolOffset, fragPoolCount, dataPoolStart, dataPoolEnd,
-                reflectionPoolStart, newFragEntries, hasArraySize)) {
+                reflectionPoolStart, newFragEntries, hasArraySize, &remainingPayloadBytes)) {
     return false;
   }
 
@@ -733,11 +815,17 @@ bool PrecompiledShaderCache::loadBundle(const std::string& path) {
   if (!file.is_open()) {
     return false;
   }
-  auto fileSize = static_cast<size_t>(file.tellg());
+  auto fileLength = file.tellg();
+  if (fileLength < static_cast<std::streamoff>(HEADER_SIZE_V3) ||
+      fileLength > static_cast<std::streamoff>(MAX_BUNDLE_BYTES)) {
+    return false;
+  }
+  auto fileSize = static_cast<size_t>(fileLength);
   file.seekg(0);
   std::vector<uint8_t> data(fileSize);
-  file.read(reinterpret_cast<char*>(data.data()), static_cast<std::streamsize>(fileSize));
-  file.close();
+  if (!file.read(reinterpret_cast<char*>(data.data()), static_cast<std::streamsize>(fileSize))) {
+    return false;
+  }
   return loadBundle(data.data(), fileSize);
 }
 

@@ -836,6 +836,26 @@ static std::vector<uint8_t> MakeReflectedTestBundle(uint16_t version) {
   return bundle;
 }
 
+static void SetTestBundleIdentity(std::vector<uint8_t>* bundle) {
+  auto data = bundle->data();
+  ASSERT_EQ(TestReadU16LE(data + 6), 0u);
+  auto vertCount = TestReadU32LE(data + 20);
+  auto fragCount = TestReadU32LE(data + 24);
+  auto hash = BundleIdentityHashHeader(BundleIdentityHashInit(), TestReadU16LE(data + 4),
+                                       vertCount, fragCount, data + 48);
+  hash = BundleIdentityHashBytes(hash, data + TestReadU32LE(data + 28),
+                                 static_cast<size_t>(vertCount) * 28);
+  hash = BundleIdentityHashBytes(hash, data + TestReadU32LE(data + 32),
+                                 static_cast<size_t>(fragCount) * 28);
+  hash = BundleIdentityHashBytes(hash, data + TestReadU32LE(data + 36), TestReadU32LE(data + 40));
+  auto reflectionOffset = TestReadU32LE(data + 44);
+  if (reflectionOffset != 0) {
+    hash = BundleIdentityHashBytes(hash, data + reflectionOffset, bundle->size() - reflectionOffset);
+  }
+  TestWriteU32LE(data + 8, static_cast<uint32_t>(hash));
+  TestWriteU32LE(data + 12, static_cast<uint32_t>(hash >> 32));
+}
+
 static std::vector<uint8_t> CompressTestBundle(const std::vector<uint8_t>& bundle,
                                                uint16_t compressionType) {
   if (compressionType == 0) {
@@ -1005,6 +1025,100 @@ TGFX_TEST(ShaderPermutationTest, BundleRejectsTruncatedReflection) {
   }
 }
 
+TGFX_TEST(ShaderPermutationTest, BundleReflectionContractsWithVerifiedIdentity) {
+  for (uint16_t version : {uint16_t{3}, uint16_t{4}}) {
+    for (uint16_t compression : {uint16_t{0}, uint16_t{1}, uint16_t{2}}) {
+      SCOPED_TRACE(version);
+      SCOPED_TRACE(compression);
+      for (uint8_t format = 0;
+           format <= static_cast<uint8_t>(UniformFormat::Texture2DRectSampler); ++format) {
+        auto original = MakeReflectedTestBundle(version);
+        auto offset = TestReadU32LE(original.data() + 44);
+        bool sampler = format >= static_cast<uint8_t>(UniformFormat::Texture2DSampler);
+        original[offset] = sampler ? 0 : 1;
+        original[offset + 1] = sampler ? 1 : 0;
+        original[offset + 6] = format;
+        if (version == 4 && sampler) {
+          TestWriteU16LE(original.data() + offset + 7, 1);
+        }
+        SetTestBundleIdentity(&original);
+        auto bundle = CompressTestBundle(original, compression);
+        PrecompiledShaderCache cache(nullptr, Backend::Unknown);
+        ASSERT_TRUE(cache.loadBundle(bundle.data(), bundle.size()));
+        auto vertex = cache.findVertex(50, 0);
+        ASSERT_NE(vertex, nullptr);
+        const auto& entries = sampler ? vertex->samplers : vertex->uniforms;
+        ASSERT_EQ(entries.size(), 1u);
+        EXPECT_EQ(entries[0].format(), static_cast<UniformFormat>(format));
+      }
+      for (int mutation = 0; mutation < (version == 4 ? 8 : 6); ++mutation) {
+        SCOPED_TRACE(mutation);
+        auto invalid = MakeReflectedTestBundle(version);
+        auto offset = TestReadU32LE(invalid.data() + 44);
+        switch (mutation) {
+          case 0:
+            invalid[offset + 6] = 255;
+            break;
+          case 1:
+            invalid[offset + 4] = 0;
+            break;
+          case 2:
+            invalid[offset + 5] = 0;
+            break;
+          case 3:
+            invalid[offset + 6] = static_cast<uint8_t>(UniformFormat::Texture2DSampler);
+            break;
+          case 4:
+            invalid[offset] = 0;
+            invalid[offset + 1] = 1;
+            break;
+          case 5: {
+            std::vector<uint8_t> duplicate(invalid.begin() + offset + 4, invalid.end());
+            invalid.insert(invalid.end(), duplicate.begin(), duplicate.end());
+            invalid[offset] = 2;
+            break;
+          }
+          case 6:
+            TestWriteU16LE(invalid.data() + offset + 7, 0);
+            break;
+          case 7:
+            invalid[offset] = 0;
+            invalid[offset + 1] = 1;
+            invalid[offset + 6] = static_cast<uint8_t>(UniformFormat::Texture2DSampler);
+            break;
+        }
+        for (bool withIdentity : {false, true}) {
+          if (withIdentity) {
+            SetTestBundleIdentity(&invalid);
+          }
+          ExpectBundleRejectedPreservingCache(CompressTestBundle(invalid, compression));
+        }
+      }
+    }
+  }
+}
+
+TGFX_TEST(ShaderPermutationTest, BundleRejectsAllocationAmplification) {
+  constexpr uint32_t BlobSize = 1024u * 1024u;
+  constexpr uint32_t EntryCount = 257;
+  auto bundle = MakeTestBundle("bounds", EntryCount, 0, 50);
+  auto dataOffset = TestReadU32LE(bundle.data() + 36);
+  bundle.resize(static_cast<size_t>(dataOffset) + BlobSize, 1);
+  TestWriteU32LE(bundle.data() + 40, BlobSize);
+  PrecompiledShaderCache cache(nullptr, Backend::Unknown);
+  ASSERT_TRUE(cache.loadBundle(bundle.data(), bundle.size()));
+  for (uint32_t index = 0; index < EntryCount; ++index) {
+    TestWriteU32LE(bundle.data() + 80 + index * 28 + 16, 0);
+    TestWriteU32LE(bundle.data() + 80 + index * 28 + 20, BlobSize);
+  }
+  auto generation = cache.bundleGeneration();
+  EXPECT_FALSE(cache.loadBundle(bundle.data(), bundle.size()));
+  EXPECT_EQ(cache.bundleGeneration(), generation);
+  EXPECT_EQ(cache.vertexEntryCount(), EntryCount);
+  auto tooManyEntries = MakeTestBundle("bounds", 65537, 0, 50);
+  ExpectBundleRejectedPreservingCache(tooManyEntries);
+}
+
 TGFX_TEST(ShaderPermutationTest, BundleRejectsReconstructedSizeOverflow) {
   // The uncompressed path rejects a declared data pool running past the file without any
   // allocation; the u32 wraparound value exercises the same size_t-domain check.
@@ -1013,13 +1127,17 @@ TGFX_TEST(ShaderPermutationTest, BundleRejectsReconstructedSizeOverflow) {
   ExpectBundleRejectedPreservingCache(invalid);
   TestWriteU32LE(invalid.data() + 40, std::numeric_limits<uint32_t>::max());
   ExpectBundleRejectedPreservingCache(invalid);
-  // Compressed: declaring more decompressed bytes than the stream actually produces must fail
-  // the destLen verification. The wraparound value itself is not used here because it would
-  // make the reassembly allocate gigabytes before the verification runs.
-  auto compressed = CompressTestBundle(MakeReflectedTestBundle(4), 2);
-  ASSERT_FALSE(compressed.empty());
-  TestWriteU32LE(compressed.data() + 40, 3);
-  ExpectBundleRejectedPreservingCache(compressed);
+  for (uint16_t compression : {uint16_t{1}, uint16_t{2}}) {
+    auto compressed = CompressTestBundle(MakeReflectedTestBundle(4), compression);
+    ASSERT_FALSE(compressed.empty());
+    auto dataOffset = TestReadU32LE(compressed.data() + 36);
+    for (uint32_t size : {3u, 256u * 1024u * 1024u,
+                          256u * 1024u * 1024u - dataOffset,
+                          std::numeric_limits<uint32_t>::max()}) {
+      TestWriteU32LE(compressed.data() + 40, size);
+      ExpectBundleRejectedPreservingCache(compressed);
+    }
+  }
 }
 
 TGFX_TEST(ShaderPermutationTest, CompressedBundleRejectsIncorrectDataSize) {
