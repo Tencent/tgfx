@@ -296,8 +296,7 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
     switch (node->kind) {
       case AOTEffectKind::TextureSource: {
         auto parameters = std::get_if<AOTTextureParameters>(&node->parameters);
-        if (parameters == nullptr || parameters->isYUV ||
-            (parameters->isAlphaOnly && parameters->hasRGBAAA)) {
+        if (parameters == nullptr || parameters->isYUV || parameters->hasRGBAAA) {
           return false;
         }
         bool supportedSampling = parameters->samplingKind == AOTTextureSamplingKind::Plain ||
@@ -332,21 +331,6 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
   if (textureLeaves > MaxFusedAOTSamplers) {
     return false;
   }
-  // Planner-level feasibility mirrors AOTPlanExecutor::CanExecute: the fused kernel has a fixed
-  // slot budget and precompiled variants exist only for 0, 1, 2 or 4 texture leaves. Rejecting
-  // here (instead of returning a plan that execution would refuse) lets the tail planner serve
-  // the graph with multiple passes rather than falling back to runtime compilation.
-  size_t chainNodeCount = 0;
-  for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
-    if (graph.nodeAt(AOTNodeID(index))->kind != AOTEffectKind::GeometryColorOpaqueInput) {
-      ++chainNodeCount;
-    }
-  }
-  if (chainNodeCount == 0 || chainNodeCount > AOTPointwiseChainProcessor::MaxSlots ||
-      !AOTPointwiseChainProcessor::HasChainKernelVariant(
-          static_cast<size_t>(textureLeaves))) {
-    return false;
-  }
   AOTEffectPlan result = {};
   AOTPassDescriptor pass = {};
   pass.kernel = AOTKernelKind::PointwiseChain;
@@ -361,6 +345,9 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
   }
   result.passes.push_back(std::move(pass));
   result.output = graph.root();
+  if (!AOTPlanExecutor::CanExecute(graph, result)) {
+    return false;
+  }
   *plan = std::move(result);
   return true;
 }

@@ -166,16 +166,20 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
   if (plan.passes.size() == 1 && plan.passes[0].kernel == AOTKernelKind::PointwiseChain) {
     const auto& pass = plan.passes[0];
     if (!plan.output.isValid() || plan.output != graph.root() || pass.output != plan.output ||
-        pass.materializesOutput || pass.nodes.empty() ||
+        pass.materializesOutput || pass.nodes.empty() || !pass.dependencies.empty() ||
         pass.nodes.size() > AOTPointwiseChainProcessor::MaxSlots) {
       return false;
     }
-    // The fused kernel binds one sampler per texture leaf and exists for 0, 1, 2 or 4 leaves (a
-    // zero-leaf chain evaluates const-color and blend ops against the geometry color): plain
-    // leaves, or tiled leaves whose wrap modes are fully resolved by the hardware sampler (no
-    // shader-mode emulation). Anything else must stay on the plain route.
+    // Check kernel-wide parameter budgets before accepting a DAG candidate. Logical texture
+    // leaves are padded to the existing four-sampler artifacts by the chain builder.
     size_t plainLeaves = 0;
     size_t shaderTiledLeaves = 0;
+    size_t colorSpaceXforms = 0;
+    size_t gradients = 0;
+    size_t deviceRects = 0;
+    size_t localRects = 0;
+    size_t rrects = 0;
+    bool hasLUT = false;
     for (auto nodeID : pass.nodes) {
       auto node = graph.nodeAt(nodeID);
       if (node == nullptr) {
@@ -183,7 +187,7 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
       }
       if (node->kind == AOTEffectKind::TextureSource) {
         auto parameters = std::get_if<AOTTextureParameters>(&node->parameters);
-        if (parameters == nullptr) {
+        if (parameters == nullptr || parameters->isYUV || parameters->hasRGBAAA) {
           return false;
         }
         if (parameters->samplingKind == AOTTextureSamplingKind::Tiled) {
@@ -206,9 +210,39 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
           return false;
         }
         ++plainLeaves;
+      } else if (node->kind == AOTEffectKind::ColorSpaceXform) {
+        auto parameters = std::get_if<AOTColorSpaceXformParameters>(&node->parameters);
+        if (parameters == nullptr || parameters->steps == nullptr || ++colorSpaceXforms > 1) {
+          return false;
+        }
+      } else if (node->kind == AOTEffectKind::GradientSource) {
+        auto parameters = std::get_if<AOTGradientParameters>(&node->parameters);
+        if (parameters == nullptr || ++gradients > 1) {
+          return false;
+        }
+        hasLUT = parameters->colorizerKind == 3;
+        if (hasLUT && parameters->lutProxy == nullptr) {
+          return false;
+        }
+      } else if (node->kind == AOTEffectKind::RectCoverage) {
+        auto parameters = std::get_if<AOTRectCoverageParameters>(&node->parameters);
+        if (parameters == nullptr) {
+          return false;
+        }
+        const std::array<float, 9> identity = {1, 0, 0, 0, 1, 0, 0, 0, 1};
+        auto& count = parameters->deviceToLocal == identity ? deviceRects : localRects;
+        if (++count > 1) {
+          return false;
+        }
+      } else if (node->kind == AOTEffectKind::RRectCoverage && ++rrects > 4) {
+        return false;
       }
     }
-    return AOTPointwiseChainProcessor::HasChainKernelVariant(plainLeaves);
+    // The LUT branch addresses sampler 0 or 1 only, even though bindings are padded to four.
+    if (hasLUT && plainLeaves > 1) {
+      return false;
+    }
+    return AOTPointwiseChainProcessor::HasChainKernelVariant(plainLeaves + (hasLUT ? 1u : 0u));
   }
   return ValidateLinearPlan(graph, plan);
 }

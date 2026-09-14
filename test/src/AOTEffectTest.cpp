@@ -26,8 +26,10 @@
 #include "gpu/AOTPlanExecutor.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
+#include "gpu/processors/ColorSpaceXFormEffect.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/LumaFragmentProcessor.h"
@@ -361,15 +363,24 @@ TGFX_TEST(AOTEffectTest, TiledShaderModesAndStrictSubsetMatchLowering) {
     EXPECT_TRUE(parameters->hasSubset);
     ExpectResolvedSamplingMatchesLowering(*resolved, *parameters);
     AOTEffectPlan plan;
-    ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
-    ASSERT_EQ(plan.passes.size(), 1u);
-    EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
-    // The chain kernel's tiled path covers the single-tap wrap modes (Clamp, Repeat*None,
-    // MirrorRepeat, ClampToBorder*); only the mipmap-repeat modes (4,5) stay on the plain route.
+    // Mipmap-repeat modes (4,5) must be rejected before publishing a DAG candidate.
     bool chainCompatible =
         modeCase.shaderModeX != TiledTextureEffect::ShaderMode::RepeatLinearMipmap &&
         modeCase.shaderModeX != TiledTextureEffect::ShaderMode::RepeatNearestMipmap;
-    EXPECT_EQ(AOTPlanExecutor::CanExecute(graph, plan), chainCompatible);
+    ASSERT_EQ(AOTEffectDecomposer::Decompose(graph, &plan), chainCompatible);
+    if (chainCompatible) {
+      ASSERT_EQ(plan.passes.size(), 1u);
+      EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
+      EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
+    } else {
+      plan.output = graph.root();
+      AOTPassDescriptor unsupported = {};
+      unsupported.kernel = AOTKernelKind::PointwiseChain;
+      unsupported.output = graph.root();
+      unsupported.nodes = {AOTNodeID(1)};
+      plan.passes.push_back(unsupported);
+      EXPECT_FALSE(AOTPlanExecutor::CanExecute(graph, plan));
+    }
   }
 }
 
@@ -397,9 +408,17 @@ TGFX_TEST(AOTEffectTest, ChainRejectsTwoShaderTiledLeaves) {
   AOTEffectGraph graph;
   ASSERT_TRUE(AOTEffectDecomposer::Lower({blend.get()}, &graph));
   AOTEffectPlan plan;
-  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
-  ASSERT_EQ(plan.passes.size(), 1u);
-  EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
+  EXPECT_FALSE(AOTEffectDecomposer::Decompose(graph, &plan));
+  plan.output = graph.root();
+  AOTPassDescriptor unsupported = {};
+  unsupported.kernel = AOTKernelKind::PointwiseChain;
+  unsupported.output = graph.root();
+  for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
+    if (graph.nodeAt(AOTNodeID(index))->kind != AOTEffectKind::GeometryColorOpaqueInput) {
+      unsupported.nodes.push_back(AOTNodeID(index));
+    }
+  }
+  plan.passes.push_back(unsupported);
   EXPECT_FALSE(AOTPlanExecutor::CanExecute(graph, plan));
 }
 
@@ -575,6 +594,111 @@ TGFX_TEST(AOTEffectTest, DeviceSpaceLinearChainUsesPointwiseTailPlanner) {
   }
   EXPECT_FALSE(plan.passes.back().materializesOutput);
   EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
+}
+
+TGFX_TEST(AOTEffectTest, TwoColorSpaceTransformsRetainTailCandidate) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  for (bool insertLuma : {false, true}) {
+    BlockAllocator allocator;
+    auto texture = MakeTextureProcessor(context, &allocator, PixelFormat::RGBA_8888);
+    auto first = ColorSpaceXformEffect::Make(&allocator, ColorSpace::SRGB().get(),
+                                             AlphaType::Premultiplied,
+                                             ColorSpace::SRGBLinear().get(),
+                                             AlphaType::Premultiplied);
+    auto second = ColorSpaceXformEffect::Make(&allocator, ColorSpace::SRGBLinear().get(),
+                                              AlphaType::Premultiplied, ColorSpace::SRGB().get(),
+                                              AlphaType::Premultiplied);
+    auto luma = LumaFragmentProcessor::Make(&allocator);
+    ASSERT_NE(texture, nullptr);
+    ASSERT_NE(first, nullptr);
+    ASSERT_NE(second, nullptr);
+    std::vector<const FragmentProcessor*> processors = {texture.get(), first.get()};
+    if (insertLuma) {
+      processors.push_back(luma.get());
+    }
+    processors.push_back(second.get());
+    AOTEffectGraph graph;
+    ASSERT_TRUE(AOTEffectDecomposer::Lower(processors, &graph));
+    AOTEffectPlan plan;
+    ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
+    ASSERT_EQ(plan.passes.size(), insertLuma ? 2u : 1u);
+    for (const auto& pass : plan.passes) {
+      EXPECT_EQ(pass.kernel, AOTKernelKind::PointwiseTail);
+    }
+    EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
+    auto rebuilt = AOTChainBuilder::BuildFPForPass(&allocator, graph, plan.passes[0], nullptr);
+    EXPECT_NE(rebuilt, nullptr);
+    AOTEffectPlan forcedChain = {};
+    forcedChain.output = graph.root();
+    AOTPassDescriptor pass = {};
+    pass.kernel = AOTKernelKind::PointwiseChain;
+    pass.output = graph.root();
+    for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
+      pass.nodes.push_back(AOTNodeID(index));
+    }
+    forcedChain.passes.push_back(pass);
+    EXPECT_FALSE(AOTPlanExecutor::CanExecute(graph, forcedChain));
+    EXPECT_EQ(AOTChainBuilder::BuildChainProcessor(&allocator, graph, pass), nullptr);
+  }
+}
+
+TGFX_TEST(AOTEffectTest, LUTBindingBudgetIsNotOrdinaryLeafBudget) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  for (int textureCount : {0, 1, 2}) {
+    AOTNodeBuilder builder;
+    AOTNodeID current;
+    ASSERT_TRUE(builder.addGeometryColor(&current));
+    for (int index = 0; index < textureCount; ++index) {
+      AOTTextureParameters texture = {};
+      texture.textureProxy = context->proxyProvider()->createTextureProxy({}, 2, 2,
+                                                                          PixelFormat::RGBA_8888);
+      ASSERT_NE(texture.textureProxy, nullptr);
+      ASSERT_TRUE(builder.addTextureSource(current, texture, &current));
+    }
+    AOTGradientParameters gradient = {};
+    gradient.colorizerKind = 3;
+    gradient.lutProxy = context->proxyProvider()->createTextureProxy({}, 2, 2,
+                                                                   PixelFormat::RGBA_8888);
+    ASSERT_NE(gradient.lutProxy, nullptr);
+    ASSERT_TRUE(builder.addGradientSource(current, gradient, &current));
+    AOTEffectGraph graph;
+    ASSERT_TRUE(builder.finish(current, &graph));
+    AOTEffectPlan plan;
+    ASSERT_EQ(AOTEffectDecomposer::Decompose(graph, &plan), textureCount < 2);
+    if (textureCount < 2) {
+      ASSERT_EQ(plan.passes.size(), 1u);
+      EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
+      BlockAllocator allocator;
+      EXPECT_NE(AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0]), nullptr);
+    }
+  }
+}
+
+TGFX_TEST(AOTEffectTest, LinearChainSlotBoundaryPreservesTailFallback) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  for (size_t opCount : {size_t{15}, size_t{16}}) {
+    BlockAllocator allocator;
+    auto texture = MakeTextureProcessor(context, &allocator, PixelFormat::RGBA_8888);
+    auto matrix = ColorMatrixFragmentProcessor::Make(&allocator, IdentityColorMatrix);
+    ASSERT_NE(texture, nullptr);
+    ASSERT_NE(matrix, nullptr);
+    std::vector<const FragmentProcessor*> processors = {texture.get()};
+    processors.insert(processors.end(), opCount, matrix.get());
+    AOTEffectGraph graph;
+    ASSERT_TRUE(AOTEffectDecomposer::Lower(processors, &graph));
+    AOTEffectPlan plan;
+    ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
+    EXPECT_EQ(plan.passes.size(), opCount == 15 ? 1u : 8u);
+    EXPECT_EQ(plan.passes[0].kernel, opCount == 15 ? AOTKernelKind::PointwiseChain
+                                                 : AOTKernelKind::PointwiseTail);
+    EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
+  }
 }
 
 TGFX_TEST(AOTEffectTest, DecompositionIsDeterministic) {
@@ -773,10 +897,21 @@ TGFX_TEST(AOTEffectTest, PointwiseDAGUsesProductionSamplerBudget) {
     return builder.finish(current, graph);
   };
 
-  AOTEffectGraph acceptedGraph;
-  ASSERT_TRUE(makeBlendGraph(MaxFusedAOTSamplers, &acceptedGraph));
-  AOTEffectPlan acceptedPlan;
-  EXPECT_TRUE(AOTEffectDecomposer::Decompose(acceptedGraph, &acceptedPlan));
+  for (int count = 1; count <= MaxFusedAOTSamplers; ++count) {
+    SCOPED_TRACE(count);
+    AOTEffectGraph acceptedGraph;
+    ASSERT_TRUE(makeBlendGraph(count, &acceptedGraph));
+    AOTEffectPlan acceptedPlan;
+    ASSERT_TRUE(AOTEffectDecomposer::Decompose(acceptedGraph, &acceptedPlan));
+    ASSERT_EQ(acceptedPlan.passes.size(), 1u);
+    EXPECT_TRUE(AOTPlanExecutor::CanExecute(acceptedGraph, acceptedPlan));
+    BlockAllocator allocator;
+    auto processor = AOTChainBuilder::BuildChainProcessor(&allocator, acceptedGraph,
+                                                          acceptedPlan.passes[0]);
+    ASSERT_NE(processor, nullptr);
+    auto chain = static_cast<const AOTPointwiseChainProcessor*>(processor.get());
+    EXPECT_EQ(chain->leafCount(), 4u);
+  }
 
   AOTEffectGraph rejectedGraph;
   ASSERT_TRUE(makeBlendGraph(MaxFusedAOTSamplers + 1, &rejectedGraph));

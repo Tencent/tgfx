@@ -106,11 +106,10 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
   // shader-tiled leaf is expressible per chain.
   static constexpr size_t MaxShaderTiledChainLeaves = 1;
 
-  // Whether a precompiled chain-kernel variant exists for the given plain-leaf count: variants
-  // are enumerated for 0, 1, 2 and 4 texture leaves, so other leaf counts must stay on the
-  // plain route.
-  static bool HasChainKernelVariant(size_t plainLeaves) {
-    return plainLeaves == 0 || plainLeaves == 1 || plainLeaves == 2 || plainLeaves == 4;
+  // Logical sampler children before padding. The artifacts bind 0 or 4 samplers; the builder
+  // pads 1, 2 and 3 children to 4 without adding sampled DAG slots.
+  static bool HasChainKernelVariant(size_t samplerChildren) {
+    return samplerChildren <= static_cast<size_t>(MaxFusedAOTSamplers);
   }
 
   static PlacementPtr<AOTPointwiseChainProcessor> Make(

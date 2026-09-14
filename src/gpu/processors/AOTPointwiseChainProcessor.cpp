@@ -179,7 +179,9 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
   // The LUT child binds the sampler right after the DAG leaves; a real mask child's binding point
   // relative to it is undefined, so reject that (currently unreachable) combination. A phantom
   // mask child always binds last, after the padding.
-  if (lutChild != nullptr && maskChild != nullptr && !maskChildIsPhantom) {
+  if (lutChild != nullptr && (lutLeafIndex < 0 || lutLeafIndex > 1 ||
+                             static_cast<size_t>(lutLeafIndex) != leafCount ||
+                             (maskChild != nullptr && !maskChildIsPhantom))) {
     return nullptr;
   }
   if (tiledLeafIndex >= 0 &&
@@ -193,12 +195,22 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
     }
   }
   int localRectSlots = 0;
+  int deviceRectSlots = 0;
+  int colorSpaceSlots = 0;
+  int gradientSlots = 0;
   int rrectSlots = 0;
   for (const auto& slot : slots) {
     if (slot.op == AOTChainOp::None) {
       return nullptr;
     }
-    if (slot.op == AOTChainOp::ColorSpaceXform && slot.colorSpaceXform.steps == nullptr) {
+    if (slot.op == AOTChainOp::ColorSpaceXform &&
+        (slot.colorSpaceXform.steps == nullptr || ++colorSpaceSlots > 1)) {
+      return nullptr;
+    }
+    if (slot.op == AOTChainOp::Gradient && ++gradientSlots > 1) {
+      return nullptr;
+    }
+    if (slot.op == AOTChainOp::AARectCoverage && ++deviceRectSlots > 1) {
       return nullptr;
     }
     // The kernel carries one chain-wide local-rect parameter set and four rrect array elements.
