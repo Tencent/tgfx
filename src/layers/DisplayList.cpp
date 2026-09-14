@@ -22,7 +22,6 @@
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/TileSortCompareFunc.h"
-#include "gpu/FrameStats.h"
 #include "layers/BackgroundHandler.h"
 #include "layers/BackgroundSnapshotMap.h"
 #include "layers/BackgroundSource.h"
@@ -38,12 +37,6 @@ static constexpr int MIN_TILE_SIZE = 16;
 static constexpr int MAX_TILE_SIZE = 2048;
 static constexpr int FALLBACK_GRID_SIZE = 64;
 static constexpr int MAX_ATLAS_SIZE = 8192;
-
-// Diagnostic switch for A/B comparison. Disabled so every background style is rendered once per
-// consume pass; set the return value to true to restore the shared-cache path.
-static bool ShareBackgroundStyleOutput() {
-  return false;
-}
 
 class DrawTask {
  public:
@@ -326,8 +319,6 @@ void DisplayList::render(Surface* surface, bool autoClear) {
   if (!surface) {
     return;
   }
-  // Publish the switch on every frame so the reported state never lags behind the render path.
-  FrameStats::backgroundStyleCacheEnabled = ShareBackgroundStyleOutput();
   _hasContentChanged = false;
   auto dirtyRegions = _root->updateDirtyRegions();
   if (_zoomScaleInt == 0) {
@@ -419,8 +410,7 @@ std::vector<Rect> DisplayList::renderPartial(Surface* surface, bool autoClear,
   // gaps between scattered dirty regions get skipped.
   std::unique_ptr<BackgroundSnapshotMap> snapshotMap = nullptr;
   if (_root->hasBackgroundStyle()) {
-    snapshotMap = captureBackgrounds(surface, renderRects,
-                                     renderRects.size() > 1 && ShareBackgroundStyleOutput());
+    snapshotMap = captureBackgrounds(surface, renderRects, renderRects.size() > 1);
   }
   auto canvas = surface->getCanvas();
   for (auto& drawRect : renderRects) {
@@ -466,8 +456,7 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
       captureRect.offset(_contentOffset.x, _contentOffset.y);
       captureRects.push_back(captureRect);
     }
-    snapshotMap = captureBackgrounds(surface, captureRects,
-                                     tileTasks.size() > 1 && ShareBackgroundStyleOutput());
+    snapshotMap = captureBackgrounds(surface, captureRects, tileTasks.size() > 1);
   }
   std::vector<Rect> dirtyRects = {};
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());

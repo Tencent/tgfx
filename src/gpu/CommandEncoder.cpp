@@ -18,7 +18,6 @@
 
 #include "tgfx/gpu/CommandEncoder.h"
 #include "core/utils/Log.h"
-#include "gpu/FrameStats.h"
 #include "tgfx/gpu/RenderPass.h"
 
 namespace tgfx {
@@ -29,9 +28,6 @@ std::shared_ptr<RenderPass> CommandEncoder::beginRenderPass(
     return nullptr;
   }
   activeRenderPass = onBeginRenderPass(descriptor);
-  if (activeRenderPass != nullptr) {
-    ++FrameStats::renderPassCount;
-  }
   return activeRenderPass;
 }
 
