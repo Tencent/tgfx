@@ -1224,6 +1224,93 @@ TGFX_TEST(AOTRenderConsistencyTest, DecompositionSwitchControlsDirectDrawEntry) 
   ExpectBitmapsIdentical("decomposition-switch-direct-entry", onBitmap, offBitmap, 240, 240);
 }
 
+// Bundle identity and program-cache generations (audit F04/F06). Sequence A: draw without a
+// bundle first (a JIT program occupies the cache key), then load — the load must invalidate
+// that program so the redraw creates and caches the AOT program (previously the JIT program
+// kept occupying the key). Sequence B: unload — the cached AOT program must not be served
+// after its bundle is gone; the draw falls back to the runtime builder. Sequence C/D: a
+// tampered content byte and a tampered profile tag must both be rejected at load time, and
+// failed loads must not bump the generation.
+TGFX_TEST(AOTRenderConsistencyTest, BundleIdentityAndGenerationLifecycle) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  auto [bundleData, bundleSize] = EmbeddedShaderBundles::GetBundle(context->backend());
+  ASSERT_NE(bundleData, nullptr);
+  ASSERT_GT(bundleSize, 0u);
+
+  auto drawOnce = [&](Bitmap* outBitmap) {
+    auto surface = Surface::Make(context, 128, 128);
+    ASSERT_TRUE(surface != nullptr);
+    auto image = MakeImage("resources/apitest/mandrill_128.png");
+    ASSERT_TRUE(image != nullptr);
+    Paint paint = {};
+    std::array<float, 20> swapRedBlue = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
+    paint.setColorFilter(ColorFilter::Matrix(swapRedBlue));
+    surface->getCanvas()->drawImage(image, 0, 0, &paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(128, 128));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+  };
+
+  auto generation0 = cache->bundleGeneration();
+  cache->unload();  // start from the no-bundle state (the constructor auto-loads)
+  EXPECT_EQ(cache->bundleGeneration(), generation0 + 1u);
+  cache->setDiagnosticRecordingEnabled(true);
+  cache->resetStats();
+  context->globalCache()->resetProgramStats();
+
+  // Sequence A: JIT first, then load.
+  Bitmap jitBitmap = {};
+  drawOnce(&jitBitmap);
+  auto jitCreations = context->globalCache()->programStats().programBuilderCreations;
+  EXPECT_GE(jitCreations, 1u);
+  ASSERT_TRUE(cache->loadBundle(bundleData, bundleSize));
+  EXPECT_EQ(cache->bundleGeneration(), generation0 + 2u);  // unload + successful load
+  Bitmap aotBitmap = {};
+  drawOnce(&aotBitmap);
+  const auto& aotPhaseStats = context->globalCache()->programStats();
+  EXPECT_GE(aotPhaseStats.precompiledArtifactCreations, 1u);
+  EXPECT_EQ(aotPhaseStats.programBuilderCreations, jitCreations);
+  ExpectBitmapsIdentical("bundle-lifecycle-jit-then-aot", aotBitmap, jitBitmap, 128, 128);
+
+  // Sequence B: unload invalidates the cached AOT program.
+  auto aotCreations = aotPhaseStats.precompiledArtifactCreations;
+  cache->unload();
+  EXPECT_EQ(cache->bundleGeneration(), generation0 + 3u);
+  Bitmap staleBitmap = {};
+  drawOnce(&staleBitmap);
+  EXPECT_EQ(context->globalCache()->programStats().precompiledArtifactCreations, aotCreations);
+  EXPECT_GE(context->globalCache()->programStats().programBuilderCreations, jitCreations + 1u);
+  ExpectBitmapsIdentical("bundle-lifecycle-unload", staleBitmap, aotBitmap, 128, 128);
+  cache->setDiagnosticRecordingEnabled(false);
+
+  // Sequence C: tamper with one byte inside the reflection pool. That region is stored
+  // uncompressed and its layout checks stay structurally valid, so only the identity hash can
+  // reject the modified content.
+  std::vector<uint8_t> tampered(bundleData, bundleData + bundleSize);
+  uint32_t reflectionOffset = static_cast<uint32_t>(tampered[44]) |
+                              (static_cast<uint32_t>(tampered[45]) << 8) |
+                              (static_cast<uint32_t>(tampered[46]) << 16) |
+                              (static_cast<uint32_t>(tampered[47]) << 24);
+  ASSERT_GT(tampered.size(), reflectionOffset + 8u);
+  tampered[reflectionOffset + (tampered.size() - reflectionOffset) / 2] ^= 0xFF;
+  EXPECT_FALSE(cache->loadBundle(tampered.data(), tampered.size()));
+
+  // Sequence D: tamper with the profile tag (backend identity).
+  std::vector<uint8_t> wrongTag(bundleData, bundleData + bundleSize);
+  wrongTag[48] = static_cast<uint8_t>('x');
+  EXPECT_FALSE(cache->loadBundle(wrongTag.data(), wrongTag.size()));
+
+  // Failed loads must not change the generation or the loaded state.
+  EXPECT_EQ(cache->bundleGeneration(), generation0 + 3u);
+  EXPECT_FALSE(cache->isLoaded());
+}
+
 // Three pointwise operators are packed into two fixed-slot passes: the first pass applies Matrix +
 // Luma, and the terminal device-space pass applies the final Matrix. This exercises both source
 // coordinate domains while requiring only one RGBA8 intermediate.

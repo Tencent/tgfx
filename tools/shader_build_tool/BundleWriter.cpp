@@ -22,6 +22,7 @@
 #include <fstream>
 #include <iostream>
 #include <set>
+#include "gpu/PrecompiledBundleIdentity.h"
 #include "zlib.h"
 #include "zstd.h"
 
@@ -248,11 +249,32 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
   uint32_t actualReflectionOffset =
       reflPool.empty() ? 0 : static_cast<uint32_t>(dataOffset + dataToWriteSize);
 
+  // Identity hash: covers the serialized pool entries, the uncompressed data and reflection
+  // pools, the profile tag, and the counts. The runtime loader recomputes this over the same
+  // fields and rejects a bundle whose hash does not match, closing the gap where a same-name
+  // bundle with changed shader content or reflection layout would otherwise load fine.
+  char tagBuf[32] = {};
+  std::strncpy(tagBuf, profileTag.c_str(), sizeof(tagBuf) - 1);
+  uint64_t identityHash = BundleIdentityHashInit();
+  identityHash =
+      BundleIdentityHashHeader(identityHash, 4, vertPoolCount, fragPoolCount,
+                               reinterpret_cast<const uint8_t*>(tagBuf));
+  for (const auto& entry : vertPool) {
+    identityHash = BundleIdentityHashEntry(identityHash, entry.hash.hi, entry.hash.lo,
+                                           entry.dataOffset, entry.dataSize, entry.reflOffset);
+  }
+  for (const auto& entry : fragPool) {
+    identityHash = BundleIdentityHashEntry(identityHash, entry.hash.hi, entry.hash.lo,
+                                           entry.dataOffset, entry.dataSize, entry.reflOffset);
+  }
+  identityHash = BundleIdentityHashBytes(identityHash, dataPool.data(), dataPool.size());
+  identityHash = BundleIdentityHashBytes(identityHash, reflPool.data(), reflPool.size());
+
   // Header
   WriteU32LE(file, 0x54475346);       // magic "TGSF"
   WriteU16LE(file, 4);                // formatVersion
   WriteU16LE(file, compressionFlag);  // compressionType
-  WriteU64LE(file, 0);                // sourceHash (reserved)
+  WriteU64LE(file, identityHash);     // sourceHash (bundle identity, see above)
   WriteU32LE(file, 0x00010000);       // toolchainVersion 1.0.0
   WriteU32LE(file, vertPoolCount);    // vertPoolCount
   WriteU32LE(file, fragPoolCount);    // fragPoolCount
@@ -261,8 +283,6 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
   WriteU32LE(file, dataOffset);       // dataOffset
   WriteU32LE(file, dataSize);         // dataSize (uncompressed)
   WriteU32LE(file, actualReflectionOffset);  // reflectionOffset
-  char tagBuf[32] = {};
-  std::strncpy(tagBuf, profileTag.c_str(), sizeof(tagBuf) - 1);
   file.write(tagBuf, sizeof(tagBuf));
 
   // Vert pool entries

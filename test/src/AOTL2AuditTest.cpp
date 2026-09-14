@@ -303,8 +303,10 @@ static void ExpectChainAlphaOnlyExact(const std::shared_ptr<Shader>& shader, con
   uint32_t candidateHits = 0;
   uint32_t candidateNoMatch = 0;
   // The blend draw routes to the fused pointwise chain kernel; this proves the chain's alpha-only
-  // child handling stays byte-exact against the JIT path.
-  RenderShaderScene(context, cache, shader, width, height, false, &candidate, &candidateHits,
+  // child handling stays byte-exact against the JIT path. The candidate keeps decomposition
+  // enabled: a two-child blend tree is only servable through the decomposition route, and the
+  // plain matcher has no rule for it.
+  RenderShaderScene(context, cache, shader, width, height, true, &candidate, &candidateHits,
                     &candidateNoMatch);
   auto hits = cache->hitRecords();
   bool chainHit = false;
@@ -701,18 +703,26 @@ TGFX_TEST(AOTL2AuditTest, ShaderMaskDecalServedByteExact) {
       Bitmap candidate = {};
       uint32_t referenceNoMatch = 0;
       uint32_t candidateNoMatch = 0;
-      RenderDecalShaderMaskScene(context, cache, color, mask, inverted, usePicture, false,
-                                 &reference, &referenceNoMatch);
+      // The reference runs as the plain JIT path (bundle unloaded, decomposition moot), matching
+      // the design of the other L2 audits. A mask-filtered color tree is a compound the plain
+      // matcher has no rule for, so serving it via AOT requires the decomposition route; an
+      // earlier revision kept the bundle loaded with decomposition off and relied on the switch
+      // not gating the direct-draw entry, which is no longer the case.
+      cache->unload();
+      {
+        ScopedAOTStatsPause statsPause(context, true);
+        RenderDecalShaderMaskScene(context, cache, color, mask, inverted, usePicture, false,
+                                   &reference, &referenceNoMatch);
+      }
+      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
       RenderDecalShaderMaskScene(context, cache, color, mask, inverted, usePicture, true,
                                  &candidate, &candidateNoMatch);
       Pixmap referencePixmap(reference);
       Pixmap candidatePixmap(candidate);
       AOTToleranceSpec spec = {};
       auto result = AOTToleranceCompare::Compare(referencePixmap, candidatePixmap, spec);
-      // The rectangle-texture arms serve the decal mask on every suite backend, so both the
-      // decomposition-off and decomposition-on renders resolve without NoMatchingRule fallbacks
-      // and must stay byte-identical to each other.
-      EXPECT_EQ(referenceNoMatch, 0u);
+      // The candidate is served by the decomposed pointwise chain and must stay byte-identical
+      // to the JIT reference.
       EXPECT_EQ(candidateNoMatch, 0u);
       EXPECT_FALSE(result.sizeMismatch);
       EXPECT_EQ(result.diffPixelCount, 0u);

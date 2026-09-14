@@ -29,8 +29,11 @@
 #include "gpu/AOTEffectDecomposer.h"
 #include "gpu/Program.h"
 #include "gpu/Uniform.h"
+#include "tgfx/gpu/Backend.h"
 
 namespace tgfx {
+
+class Context;
 
 struct ShaderStageBlob {
   std::vector<uint8_t> data;
@@ -186,6 +189,20 @@ struct AOTDrawStats {
 /// enabling M+N storage instead of M*N.
 class PrecompiledShaderCache {
  public:
+  /// The cache is owned by its Context and keeps a back pointer for bundle-generation
+  /// bookkeeping: every load or unload bumps the generation and invalidates cached programs.
+  /// The backend is captured at construction because the bundle's profile tag must be verified
+  /// during the Context constructor (embedded-bundle auto load), before the owner-thread
+  /// contract is in effect and Context::backend() may be called.
+  explicit PrecompiledShaderCache(Context* context, Backend backend);
+
+  /// Returns the number of bundle generation changes (loads and unloads) since construction.
+  /// Diagnostic counter for lifecycle verification; program invalidation itself happens
+  /// eagerly at each generation change.
+  uint64_t bundleGeneration() const {
+    return _generation.load(std::memory_order_relaxed);
+  }
+
   /// Loads a bundle file from the given path. On success, the bundle completely replaces any
   /// previously loaded entries. On failure, the existing cache remains unchanged.
   bool loadBundle(const std::string& path);
@@ -376,6 +393,9 @@ class PrecompiledShaderCache {
   };
 
  private:
+  Context* _context = nullptr;
+  Backend _backend = Backend::Unknown;
+  std::atomic<uint64_t> _generation{0};
   std::string _profileTag;
   std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> vertEntries;
   std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> fragEntries;

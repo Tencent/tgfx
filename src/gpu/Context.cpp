@@ -49,7 +49,7 @@ Context::Context(Device* device, GPU* gpu) : _device(device), _gpu(gpu) {
   _proxyProvider = new ProxyProvider(this);
   _atlasManager = new AtlasManager(this);
   _atlasStrikeCache = new AtlasStrikeCache();
-  _precompiledShaderCache = new PrecompiledShaderCache();
+  _precompiledShaderCache = new PrecompiledShaderCache(this, _gpu->info()->backend);
   // TGFX_AOT_DISABLE=1 skips the embedded bundle so the runtime route can be exercised directly
   // (test-suite A/B comparisons against the precompiled path).
   if (std::getenv("TGFX_AOT_DISABLE") == nullptr) {

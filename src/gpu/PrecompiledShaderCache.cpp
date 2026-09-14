@@ -21,11 +21,18 @@
 #include <cstring>
 #include <fstream>
 #include <limits>
+#include "PrecompiledBundleIdentity.h"
 #include "core/utils/Log.h"
+#include "gpu/GlobalCache.h"
+#include "tgfx/gpu/Context.h"
 #include "zlib.h"
 #include "zstd.h"
 
 namespace tgfx {
+
+PrecompiledShaderCache::PrecompiledShaderCache(Context* context, Backend backend)
+    : _context(context), _backend(backend) {
+}
 
 const char* PrecompiledFallbackReasonName(PrecompiledFallbackReason reason) {
   switch (reason) {
@@ -406,6 +413,13 @@ void PrecompiledShaderCache::unload() {
   vertEntries.clear();
   fragEntries.clear();
   _profileTag.clear();
+  _generation.fetch_add(1, std::memory_order_relaxed);
+  if (_context != nullptr) {
+    // Dropping the bundle is a generation change: cached precompiled programs must not outlive
+    // the bundle that produced them, and clearing also keeps JIT programs from occupying keys
+    // a later bundle could fill.
+    _context->globalCache()->clearPrograms();
+  }
 }
 
 static uint16_t ReadU16LE(const uint8_t* p) {
@@ -555,6 +569,7 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
     return false;
   }
   // offset 8: sourceHash(8), offset 16: toolchainVersion(4)
+  uint64_t sourceHash = ReadU64LE(ptr + 8);
   uint32_t vertPoolCount = ReadU32LE(ptr + 20);
   uint32_t fragPoolCount = ReadU32LE(ptr + 24);
   uint32_t vertPoolOffset = ReadU32LE(ptr + 28);
@@ -566,6 +581,19 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   // Parse profileTag (32 bytes at offset 48)
   const char* tagPtr = reinterpret_cast<const char*>(ptr + 48);
   std::string profileTag(tagPtr, strnlen(tagPtr, 32));
+
+  // Backend identity: a bundle compiled for a different backend must be rejected outright. The
+  // format version says nothing about the code dialect or binary format of the blobs, so a
+  // same-name cross-backend bundle would otherwise feed mismatched code to the GPU. A cache
+  // constructed without a backend (standalone parsing in tests) skips this check, mirroring the
+  // legacy-hash skip below: an unspecified identity cannot be verified.
+  const char* expectedTag = ExpectedProfileTag(_backend);
+  if (expectedTag[0] != '\0' && profileTag != expectedTag) {
+    LOGE("PrecompiledShaderCache: Bundle profile tag '%s' does not match the running backend "
+         "(expected '%s')",
+         profileTag.c_str(), expectedTag);
+    return false;
+  }
 
   const uint8_t* loadPtr = ptr;
   size_t loadSize = size;
@@ -636,6 +664,41 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
     return false;
   }
 
+  // Content identity: recompute the writer's identity hash over the loaded view (pool entries,
+  // uncompressed data pool, reflection pool, tag, counts) and reject mismatches. A zero hash
+  // marks a legacy bundle written before the identity contract existed; it still loads with a
+  // warning, keeping old data readable.
+  if (sourceHash != 0) {
+    uint64_t computed = BundleIdentityHashInit();
+    computed = BundleIdentityHashHeader(computed, formatVersion, vertPoolCount, fragPoolCount,
+                                        ptr + 48);
+    for (uint32_t i = 0; i < vertPoolCount; i++) {
+      const uint8_t* entry = loadPtr + vertPoolOffset + static_cast<size_t>(i) * POOL_ENTRY_SIZE;
+      computed = BundleIdentityHashEntry(computed, ReadU64LE(entry), ReadU64LE(entry + 8),
+                                         ReadU32LE(entry + 16), ReadU32LE(entry + 20),
+                                         ReadU32LE(entry + 24));
+    }
+    for (uint32_t i = 0; i < fragPoolCount; i++) {
+      const uint8_t* entry = loadPtr + fragPoolOffset + static_cast<size_t>(i) * POOL_ENTRY_SIZE;
+      computed = BundleIdentityHashEntry(computed, ReadU64LE(entry), ReadU64LE(entry + 8),
+                                         ReadU32LE(entry + 16), ReadU32LE(entry + 20),
+                                         ReadU32LE(entry + 24));
+    }
+    computed = BundleIdentityHashBytes(computed, loadPtr + dataPoolStart, dataSize);
+    if (reflectionPoolStart != 0 && loadSize > reflectionPoolStart) {
+      computed = BundleIdentityHashBytes(computed, loadPtr + reflectionPoolStart,
+                                         loadSize - reflectionPoolStart);
+    }
+    if (computed != sourceHash) {
+      LOGE("PrecompiledShaderCache: Bundle identity hash mismatch (expected 0x%016llx, computed "
+           "0x%016llx); the content does not match its recorded identity",
+           static_cast<unsigned long long>(sourceHash), static_cast<unsigned long long>(computed));
+      return false;
+    }
+  } else {
+    LOGI("PrecompiledShaderCache: Legacy bundle without an identity hash; skipping verification");
+  }
+
   std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> newVertEntries;
   std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> newFragEntries;
   if (!LoadPool(loadPtr, loadSize, vertPoolOffset, vertPoolCount, dataPoolStart, dataPoolEnd,
@@ -650,6 +713,14 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   _profileTag = std::move(profileTag);
   vertEntries = std::move(newVertEntries);
   fragEntries = std::move(newFragEntries);
+  _generation.fetch_add(1, std::memory_order_relaxed);
+  if (_context != nullptr) {
+    // A new bundle generation invalidates every cached program: precompiled programs from the
+    // replaced bundle must not be served under unchanged keys, and JIT programs must not keep
+    // occupying keys the new bundle can now fill (which previously forced PrecompiledOnly
+    // lookups to recreate their programs on every request).
+    _context->globalCache()->clearPrograms();
+  }
   LOGI("PrecompiledShaderCache: Loaded %u vert + %u frag entries (format v%u, profile=%s)",
        vertPoolCount, fragPoolCount, formatVersion, _profileTag.c_str());
   return true;

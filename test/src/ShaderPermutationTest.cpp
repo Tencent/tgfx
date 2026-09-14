@@ -85,6 +85,29 @@ static std::string BundlePath() {
   return "resources/shaders/shader_bundle." + backend + ".bin";
 }
 
+// The backend a standalone PrecompiledShaderCache must be constructed with so bundle loads
+// pass the profile-tag check outside of a Context.
+static Backend TestBackend() {
+  std::string backend = TGFX_BACKEND_NAME;
+  auto pos = backend.find('-');
+  if (pos != std::string::npos) {
+    backend = backend.substr(0, pos);
+  }
+  if (backend == "opengl") {
+    return Backend::OpenGL;
+  }
+  if (backend == "metal") {
+    return Backend::Metal;
+  }
+  if (backend == "vulkan") {
+    return Backend::Vulkan;
+  }
+  if (backend == "webgpu") {
+    return Backend::WebGPU;
+  }
+  return Backend::Unknown;
+}
+
 static std::shared_ptr<Image> MakeTexture2DImage(Context* context,
                                                  const std::shared_ptr<Image>& image) {
   auto surface = Surface::Make(context, image->width(), image->height(), false, 1, true);
@@ -584,7 +607,7 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledRenderConsistency) {
 }
 
 TGFX_TEST(ShaderPermutationTest, ShaderCacheStats) {
-  PrecompiledShaderCache cache;
+  PrecompiledShaderCache cache(nullptr, TestBackend());
 
   EXPECT_EQ(cache.hitCount(), 0u);
   EXPECT_EQ(cache.missCount(), 0u);
@@ -711,7 +734,7 @@ TGFX_TEST(ShaderPermutationTest, EmbeddedBundleLoadFromMemory) {
   file.close();
 
   // Load from memory (simulates embedded bundle)
-  PrecompiledShaderCache cache;
+  PrecompiledShaderCache cache(nullptr, TestBackend());
   ASSERT_TRUE(cache.loadBundle(data.data(), data.size()));
   EXPECT_TRUE(cache.isLoaded());
   EXPECT_GT(cache.vertexEntryCount(), 0u);
@@ -726,7 +749,7 @@ TGFX_TEST(ShaderPermutationTest, EmbeddedBundleLoadFromMemory) {
 
 TGFX_TEST(ShaderPermutationTest, EmbeddedBundleInvalidData) {
   // Verify that loadBundle rejects invalid data gracefully.
-  PrecompiledShaderCache cache;
+  PrecompiledShaderCache cache(nullptr, TestBackend());
 
   // Empty data
   EXPECT_FALSE(cache.loadBundle(nullptr, 0));
@@ -853,7 +876,7 @@ static std::vector<uint8_t> CompressTestBundle(const std::vector<uint8_t>& bundl
 
 static void ExpectBundleRejectedPreservingCache(const std::vector<uint8_t>& invalid) {
   auto original = MakeTestBundle("original", 1, 1, 10);
-  PrecompiledShaderCache cache;
+  PrecompiledShaderCache cache(nullptr, Backend::Unknown);
   ASSERT_TRUE(cache.loadBundle(original.data(), original.size()));
   EXPECT_FALSE(cache.loadBundle(invalid.data(), invalid.size()));
   EXPECT_EQ(cache.profileTag(), "original");
@@ -881,7 +904,7 @@ TGFX_TEST(ShaderPermutationTest, BundleCompressionAndReflectionRoundTrip) {
         TestWriteU16LE(original.data() + 4, version);
         auto bundle = CompressTestBundle(original, compression);
         ASSERT_FALSE(bundle.empty());
-        PrecompiledShaderCache cache;
+        PrecompiledShaderCache cache(nullptr, Backend::Unknown);
         ASSERT_TRUE(cache.loadBundle(bundle.data(), bundle.size()));
         EXPECT_EQ(cache.profileTag(), "bounds");
         EXPECT_EQ(cache.vertexEntryCount(), 1u);
@@ -1016,14 +1039,14 @@ TGFX_TEST(ShaderPermutationTest, CompressedBundleRejectsInvalidOffsetOrder) {
   TestWriteU32LE(bundle.data() + 40, 1);
   TestWriteU32LE(bundle.data() + 44, 64);
 
-  PrecompiledShaderCache cache;
+  PrecompiledShaderCache cache(nullptr, TestBackend());
   EXPECT_FALSE(cache.loadBundle(bundle.data(), bundle.size()));
   EXPECT_FALSE(cache.isLoaded());
 }
 
 TGFX_TEST(ShaderPermutationTest, FailedBundleReloadPreservesCache) {
   auto original = MakeTestBundle("original", 1, 1, 10);
-  PrecompiledShaderCache cache;
+  PrecompiledShaderCache cache(nullptr, Backend::Unknown);
   ASSERT_TRUE(cache.loadBundle(original.data(), original.size()));
   ASSERT_TRUE(cache.findVertex(10, 0) != nullptr);
   ASSERT_TRUE(cache.findFragment(10 + 0x100, 0) != nullptr);
@@ -1041,7 +1064,7 @@ TGFX_TEST(ShaderPermutationTest, FailedBundleReloadPreservesCache) {
 
 TGFX_TEST(ShaderPermutationTest, SuccessfulBundleReloadReplacesCache) {
   auto original = MakeTestBundle("original", 2, 2, 10);
-  PrecompiledShaderCache cache;
+  PrecompiledShaderCache cache(nullptr, Backend::Unknown);
   ASSERT_TRUE(cache.loadBundle(original.data(), original.size()));
   ASSERT_EQ(cache.vertexEntryCount(), 2u);
   ASSERT_EQ(cache.fragmentEntryCount(), 2u);
@@ -1131,7 +1154,7 @@ TGFX_TEST(ShaderPermutationTest, CompressedBundleLoad) {
   // Production bundles ship compressed; when the resource bundle is already compressed, the
   // load itself is the roundtrip coverage, so just verify entries and tag.
   if (TestReadU16LE(original.data() + 6) != 0u) {
-    PrecompiledShaderCache compressedOnly;
+    PrecompiledShaderCache compressedOnly(nullptr, TestBackend());
     ASSERT_TRUE(compressedOnly.loadBundle(original.data(), original.size()));
     EXPECT_TRUE(compressedOnly.isLoaded());
     std::string tag = TGFX_BACKEND_NAME;
@@ -1182,12 +1205,12 @@ TGFX_TEST(ShaderPermutationTest, CompressedBundleLoad) {
   }
 
   // Load the compressed bundle.
-  PrecompiledShaderCache compressedCache;
+  PrecompiledShaderCache compressedCache(nullptr, TestBackend());
   ASSERT_TRUE(compressedCache.loadBundle(compressed.data(), compressed.size()));
   EXPECT_TRUE(compressedCache.isLoaded());
 
   // Compare with uncompressed load.
-  PrecompiledShaderCache originalCache;
+  PrecompiledShaderCache originalCache(nullptr, TestBackend());
   ASSERT_TRUE(originalCache.loadBundle(original.data(), original.size()));
   EXPECT_EQ(compressedCache.vertexEntryCount(), originalCache.vertexEntryCount());
   EXPECT_EQ(compressedCache.fragmentEntryCount(), originalCache.fragmentEntryCount());
