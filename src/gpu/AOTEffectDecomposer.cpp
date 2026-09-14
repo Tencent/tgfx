@@ -19,6 +19,7 @@
 #include "gpu/AOTEffectDecomposer.h"
 #include "gpu/AOTPlanExecutor.h"
 #include "gpu/ProgramInfo.h"
+#include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/AOTPointwiseTailProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/PerlinNoiseFragmentProcessor.h"
@@ -331,6 +332,21 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
   if (textureLeaves > MaxFusedAOTSamplers) {
     return false;
   }
+  // Planner-level feasibility mirrors AOTPlanExecutor::CanExecute: the fused kernel has a fixed
+  // slot budget and precompiled variants exist only for 0, 1, 2 or 4 texture leaves. Rejecting
+  // here (instead of returning a plan that execution would refuse) lets the tail planner serve
+  // the graph with multiple passes rather than falling back to runtime compilation.
+  size_t chainNodeCount = 0;
+  for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
+    if (graph.nodeAt(AOTNodeID(index))->kind != AOTEffectKind::GeometryColorOpaqueInput) {
+      ++chainNodeCount;
+    }
+  }
+  if (chainNodeCount == 0 || chainNodeCount > AOTPointwiseChainProcessor::MaxSlots ||
+      !AOTPointwiseChainProcessor::HasChainKernelVariant(
+          static_cast<size_t>(textureLeaves))) {
+    return false;
+  }
   AOTEffectPlan result = {};
   AOTPassDescriptor pass = {};
   pass.kernel = AOTKernelKind::PointwiseChain;
@@ -350,13 +366,19 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
 }
 
 bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, AOTEffectPlan* plan) {
+  // A graph that fits the DAG planner's contracts is served in one fused pass with no
+  // intermediate materialization, so it is preferred over the tail planner's segmented passes
+  // (the tail shader's fixed slot count splits ordinary texture + unary chains into multiple
+  // passes even when the whole chain fits the 16-slot chain kernel). Graphs the DAG planner
+  // rejects — device-space sampling, YUV/RGBAAA sources, gather or noise nodes, slot or leaf
+  // budget overruns — keep the established tail/perlin order.
+  if (DecomposePointwiseDAG(graph, plan)) {
+    return true;
+  }
   if (DecomposeLinearPointwiseTail(graph, plan)) {
     return true;
   }
-  if (DecomposePerlinNoiseChain(graph, plan)) {
-    return true;
-  }
-  return DecomposePointwiseDAG(graph, plan);
+  return DecomposePerlinNoiseChain(graph, plan);
 }
 
 AOTDecomposeAnalysis AOTEffectDecomposer::Analyze(const ProgramInfo* programInfo) {

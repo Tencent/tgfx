@@ -1311,10 +1311,11 @@ TGFX_TEST(AOTRenderConsistencyTest, BundleIdentityAndGenerationLifecycle) {
   EXPECT_FALSE(cache->isLoaded());
 }
 
-// Three pointwise operators are packed into two fixed-slot passes: the first pass applies Matrix +
-// Luma, and the terminal device-space pass applies the final Matrix. This exercises both source
-// coordinate domains while requiring only one RGBA8 intermediate.
-TGFX_TEST(AOTRenderConsistencyTest, LinearChainMultiPass) {
+// Three pointwise operators on a plain-sampled texture are served by the fused chain kernel in
+// a single pass: the DAG planner serves the whole graph without materialization (the tail
+// planner previously split the same graph into two fixed-slot passes with one RGBA8
+// intermediate). Multi-pass planning stays covered by the device-space unit test.
+TGFX_TEST(AOTRenderConsistencyTest, LinearChainSinglePass) {
   auto image = MakeImage("resources/apitest/mandrill_128.png");
   ASSERT_TRUE(image != nullptr);
   int width = image->width();
@@ -1332,22 +1333,21 @@ TGFX_TEST(AOTRenderConsistencyTest, LinearChainMultiPass) {
                                  &referenceStats);
   RenderImageWithColorFilterOnce(image, chain, width, height, true, true, false, true, &candidate,
                                  &candidateStats);
-  EXPECT_GE(candidateStats.hits, 2u);
-  EXPECT_GE(candidateStats.pipelines, 2u);
-  EXPECT_GE(candidateStats.programs.precompiledArtifactCreations, 2u);
+  EXPECT_GE(candidateStats.hits, 1u);
+  EXPECT_GE(candidateStats.pipelines, 1u);
+  EXPECT_GE(candidateStats.programs.precompiledArtifactCreations, 1u);
   EXPECT_EQ(candidateStats.programs.programBuilderCreations, 0u);
   EXPECT_EQ(candidateStats.noMatchingRule, 0u);
-  auto intermediateBytes = static_cast<uint64_t>(width) * static_cast<uint64_t>(height) * 4;
   EXPECT_EQ(candidateStats.draws.draws, 1u);
   EXPECT_EQ(candidateStats.draws.completeAOTDraws, 1u);
   EXPECT_EQ(candidateStats.draws.atomicFallbacks, 0u);
-  EXPECT_EQ(candidateStats.draws.kernelInvocations, 2u);
-  EXPECT_EQ(candidateStats.draws.offscreenTargets, 1u);
-  EXPECT_EQ(candidateStats.draws.materializedEdges, 1u);
-  EXPECT_EQ(candidateStats.draws.renderTargetSwitches, 1u);
-  EXPECT_EQ(candidateStats.draws.intermediateReadBytes, intermediateBytes);
-  EXPECT_EQ(candidateStats.draws.intermediateWriteBytes, intermediateBytes);
-  EXPECT_EQ(candidateStats.draws.peakTemporaryBytes, intermediateBytes);
+  EXPECT_EQ(candidateStats.draws.kernelInvocations, 1u);
+  EXPECT_EQ(candidateStats.draws.offscreenTargets, 0u);
+  EXPECT_EQ(candidateStats.draws.materializedEdges, 0u);
+  EXPECT_EQ(candidateStats.draws.renderTargetSwitches, 0u);
+  EXPECT_EQ(candidateStats.draws.intermediateReadBytes, 0u);
+  EXPECT_EQ(candidateStats.draws.intermediateWriteBytes, 0u);
+  EXPECT_EQ(candidateStats.draws.peakTemporaryBytes, 0u);
   ExpectBitmapsIdentical("linear-chain-matrix-luma-matrix", candidate, reference, width, height);
 }
 

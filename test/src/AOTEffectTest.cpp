@@ -29,6 +29,7 @@
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
 #include "gpu/processors/ConstColorProcessor.h"
+#include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/LumaFragmentProcessor.h"
 #include "gpu/processors/PerlinNoiseFragmentProcessor.h"
 #include "gpu/processors/RectEffect.h"
@@ -517,7 +518,7 @@ TGFX_TEST(AOTEffectTest, ColorMatrixChainFusesToSinglePass) {
   AOTEffectPlan plan;
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
-  EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseTail);
+  EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
   EXPECT_EQ(plan.passes[0].nodes, std::vector<AOTNodeID>({AOTNodeID(1), AOTNodeID(2)}));
   EXPECT_FALSE(plan.passes[0].materializesOutput);
 }
@@ -533,11 +534,47 @@ TGFX_TEST(AOTEffectTest, TripleChainFusesToSinglePass) {
   AOTEffectPlan fusedPlan;
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &fusedPlan));
   ASSERT_EQ(fusedPlan.passes.size(), 1u);
-  EXPECT_EQ(fusedPlan.passes[0].kernel, AOTKernelKind::PointwiseTail);
+  EXPECT_EQ(fusedPlan.passes[0].kernel, AOTKernelKind::PointwiseChain);
   EXPECT_EQ(fusedPlan.passes[0].nodes,
             std::vector<AOTNodeID>({AOTNodeID(1), AOTNodeID(2), AOTNodeID(3)}));
   EXPECT_FALSE(fusedPlan.passes[0].materializesOutput);
   EXPECT_TRUE(fusedPlan.passes[0].dependencies.empty());
+}
+
+// A device-space texture chain cannot use the fused chain kernel (it samples in device
+// coordinates), so the tail planner serves it in segmented passes. This keeps multi-pass
+// planning covered after plain linear chains moved to the single-pass DAG planner.
+TGFX_TEST(AOTEffectTest, DeviceSpaceLinearChainUsesPointwiseTailPlanner) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  auto proxy = context->proxyProvider()->createTextureProxy({}, 2, 2, PixelFormat::RGBA_8888);
+  ASSERT_NE(proxy, nullptr);
+  ASSERT_NE(proxy->getTextureView(), nullptr);
+  auto texture = DeviceSpaceTextureEffect::Make(&allocator, std::move(proxy), Matrix::I());
+  auto colorMatrix = ColorMatrixFragmentProcessor::Make(&allocator, IdentityColorMatrix);
+  auto luma = LumaFragmentProcessor::Make(&allocator);
+  auto colorMatrix2 = ColorMatrixFragmentProcessor::Make(&allocator, IdentityColorMatrix);
+  ASSERT_NE(texture, nullptr);
+  ASSERT_NE(colorMatrix, nullptr);
+  ASSERT_NE(luma, nullptr);
+  ASSERT_NE(colorMatrix2, nullptr);
+  AOTEffectGraph graph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower(
+      {texture.get(), colorMatrix.get(), luma.get(), colorMatrix2.get()}, &graph));
+
+  AOTEffectPlan plan;
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
+  ASSERT_GT(plan.passes.size(), 1u);
+  for (const auto& pass : plan.passes) {
+    EXPECT_EQ(pass.kernel, AOTKernelKind::PointwiseTail);
+  }
+  for (size_t index = 0; index + 1 < plan.passes.size(); ++index) {
+    EXPECT_TRUE(plan.passes[index].materializesOutput);
+  }
+  EXPECT_FALSE(plan.passes.back().materializesOutput);
+  EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
 }
 
 TGFX_TEST(AOTEffectTest, DecompositionIsDeterministic) {
@@ -768,7 +805,10 @@ TGFX_TEST(AOTEffectTest, ConstColorChainDecomposesToPointwiseChain) {
   EXPECT_TRUE(AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0]) != nullptr);
 }
 
-TGFX_TEST(AOTEffectTest, LinearTextureChainUsesPointwiseTailPlanner) {
+// A plain linear texture chain fits the fused chain kernel's contracts, so the DAG planner
+// serves it in one pass (the tail planner would split it into segments bounded by its fixed
+// two-slot shader, materializing intermediates unnecessarily).
+TGFX_TEST(AOTEffectTest, LinearTextureChainPrefersSinglePassChain) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
@@ -778,7 +818,7 @@ TGFX_TEST(AOTEffectTest, LinearTextureChainUsesPointwiseTailPlanner) {
   AOTEffectPlan plan;
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
-  EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseTail);
+  EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
   EXPECT_EQ(plan.passes[0].nodes,
             std::vector<AOTNodeID>({AOTNodeID(1), AOTNodeID(2), AOTNodeID(3)}));
   EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
