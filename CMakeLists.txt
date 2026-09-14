@@ -795,7 +795,7 @@ if (TGFX_USE_VULKAN)
     target_include_directories(tgfx SYSTEM PRIVATE third_party/VulkanMemoryAllocator/include)
 endif ()
 merge_libraries_into(tgfx ${TGFX_STATIC_LIBS} "$<TARGET_FILE:tgfx_zstd>")
-target_link_libraries(tgfx ${TGFX_SHARED_LIBS})
+target_link_libraries(tgfx PUBLIC ${TGFX_SHARED_LIBS})
 if (TGFX_USE_WEBGPU)
     target_link_libraries(tgfx libtint)
 endif ()
@@ -957,6 +957,7 @@ if (TGFX_EMBED_SHADER_BUNDLES)
     foreach (B ${TGFX_SHADER_BACKENDS})
         set(BUNDLE_BIN "${TGFX_SHADER_BUNDLE_DIR}/shader_bundle.${B}.bin")
         string(REPLACE "-" "_" BUNDLE_VAR "kShaderBundle_${B}")
+        string(REPLACE "-" "_" FUNC_SUFFIX "${B}")
         if (B STREQUAL "metal")
             set(BACKEND_ENUM "Metal")
         elseif (B STREQUAL "vulkan")
@@ -970,11 +971,38 @@ if (TGFX_EMBED_SHADER_BUNDLES)
         add_custom_command(
                 OUTPUT ${BUNDLE_CPP}
                 COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/BundleToCpp.cmake
-                        ${BUNDLE_BIN} ${BUNDLE_CPP} ${BUNDLE_VAR} ${BACKEND_ENUM}
+                        ${BUNDLE_BIN} ${BUNDLE_CPP} ${BUNDLE_VAR} ${BACKEND_ENUM} ${FUNC_SUFFIX}
                 DEPENDS ${TGFX_SHADER_BUNDLE_STAMP}
                 COMMENT "Embedding shader bundle: ${B}")
         list(APPEND TGFX_EMBEDDED_BUNDLE_SOURCES ${BUNDLE_CPP})
     endforeach ()
+
+    # A generated trampoline aggregates the per-backend registration functions into one symbol
+    # referenced by EmbeddedShaderBundles::GetBundle. That reference chain is what pulls the
+    # bundle objects into any consumer that links tgfx, replacing the whole-archive requirement.
+    set(TRAMPOLINE_CPP "${TGFX_EMBEDDED_BUNDLE_DIR}/EmbeddedBundleTrampoline.cpp")
+    set(TRAMPOLINE_DECLS "")
+    set(TRAMPOLINE_CALLS "")
+    foreach (B ${TGFX_SHADER_BACKENDS})
+        string(REPLACE "-" "_" FUNC_SUFFIX "${B}")
+        string(APPEND TRAMPOLINE_DECLS "void RegisterEmbeddedBundle_${FUNC_SUFFIX}();\n    ")
+        string(APPEND TRAMPOLINE_CALLS "  RegisterEmbeddedBundle_${FUNC_SUFFIX}();\n")
+    endforeach ()
+    file(WRITE "${TRAMPOLINE_CPP}"
+"// Auto-generated — do not edit.
+#include \"gpu/EmbeddedShaderBundles.h\"
+
+namespace tgfx {
+namespace embedded {
+
+${TRAMPOLINE_DECLS}
+void RegisterAllEmbeddedBundles() {
+${TRAMPOLINE_CALLS}}
+
+}  // namespace embedded
+}  // namespace tgfx
+")
+    list(APPEND TGFX_EMBEDDED_BUNDLE_SOURCES ${TRAMPOLINE_CPP})
 
     # Build embedded bundles as a separate static library so that -force_load can target only it
     # (avoiding duplicate symbol issues from force-loading the entire libtgfx).
@@ -982,6 +1010,12 @@ if (TGFX_EMBED_SHADER_BUNDLES)
     target_include_directories(tgfx_embedded_bundles PRIVATE src include)
     add_dependencies(tgfx_embedded_bundles tgfx_shader_bundles)
     set(TGFX_EMBEDDED_BUNDLES_TARGET tgfx_embedded_bundles CACHE INTERNAL "")
+    # The embedded bundles travel with the library itself: EmbeddedShaderBundles::GetBundle
+    # references RegisterAllEmbeddedBundles, which references each per-backend registration, so
+    # linking tgfx pulls the bundle data in through ordinary symbol resolution and no
+    # whole-archive option is needed on the consumer side.
+    target_link_libraries(tgfx PUBLIC tgfx_embedded_bundles)
+    target_compile_definitions(tgfx PRIVATE TGFX_EMBED_SHADER_BUNDLES=1)
 endif ()
 
 if (TGFX_BUILD_HELLO2D)
@@ -1096,15 +1130,9 @@ if (TGFX_BUILD_TESTS)
     endif ()
 
     list(APPEND TGFX_TEST_LIBS tgfx-hello2d tgfx ${TGFX_SHARED_LIBS})
-    if (TGFX_EMBED_SHADER_BUNDLES AND TARGET tgfx_embedded_bundles)
-        list(APPEND TGFX_TEST_LIBS tgfx_embedded_bundles)
-        if (APPLE)
-            list(APPEND TGFX_TEST_LINK_OPTIONS "LINKER:-force_load,$<TARGET_FILE:tgfx_embedded_bundles>")
-        elseif (UNIX)
-            list(APPEND TGFX_TEST_LINK_OPTIONS
-                    "LINKER:--whole-archive" "$<TARGET_FILE:tgfx_embedded_bundles>" "LINKER:--no-whole-archive")
-        endif ()
-    endif ()
+    # Note: no explicit tgfx_embedded_bundles linking or whole-archive options here anymore. The
+    # bundles travel with the tgfx target itself (PUBLIC dependency plus the registration symbol
+    # chain), which is exactly the consumer contract the minimal app verifies.
     list(APPEND TGFX_TEST_INCLUDES src test/src hello2d/include third_party/json/include
             third_party/zstd/lib)
 
@@ -1168,6 +1196,20 @@ if (TGFX_BUILD_TESTS)
     target_include_directories(TGFXFullTest_${TEST_TARGET_SUFFIX} PRIVATE ${TGFX_INCLUDES})
     target_link_options(TGFXFullTest_${TEST_TARGET_SUFFIX} PRIVATE ${TGFX_TEST_LINK_OPTIONS})
     target_link_libraries(TGFXFullTest_${TEST_TARGET_SUFFIX} ${TGFX_TEST_LIBS})
+
+    # Minimal embedding consumer (audit F07): links tgfx and nothing else — no forced loading
+    # and no whole archive. Its link and startup assertions prove the embedded bundle travels
+    # with the library through ordinary symbol resolution.
+    if (TGFX_EMBED_SHADER_BUNDLES AND TARGET tgfx_embedded_bundles
+            AND TEST_TARGET_SUFFIX STREQUAL "OpenGL")
+        add_executable(EmbeddedBundleMinimalApp test/minimal/EmbeddedBundleMinimalApp.cpp)
+        target_compile_definitions(EmbeddedBundleMinimalApp PRIVATE TGFX_BACKEND_NAME="opengl")
+        target_include_directories(EmbeddedBundleMinimalApp PRIVATE include src ${TGFX_INCLUDES})
+        target_link_libraries(EmbeddedBundleMinimalApp tgfx)
+        if (APPLE)
+            target_link_libraries(EmbeddedBundleMinimalApp "-framework OpenGL")
+        endif ()
+    endif ()
 endif ()
 
 # Export TGFX_INCLUDES to the parent scope for external test targets (e.g., web/test).

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/EmbeddedShaderBundles.h"
+#include <mutex>
 
 namespace tgfx {
 
@@ -46,6 +47,12 @@ void EmbeddedShaderBundles::Register(Backend backend, const uint8_t* data, size_
 }
 
 std::pair<const uint8_t*, size_t> EmbeddedShaderBundles::GetBundle(Backend backend) {
+  static std::once_flag registerOnce;
+  std::call_once(registerOnce, [] {
+#if defined(TGFX_EMBED_SHADER_BUNDLES)
+    embedded::RegisterAllEmbeddedBundles();
+#endif
+  });
   auto& entry = GetEntry(backend);
   if (entry.data != nullptr && entry.size > 0) {
     return {entry.data, entry.size};

@@ -25,6 +25,12 @@
 
 namespace tgfx {
 
+namespace embedded {
+/// Defined by the generated EmbeddedBundleTrampoline.cpp when bundles are embedded into the
+/// build (TGFX_EMBED_SHADER_BUNDLES). Calling it executes every per-backend registration.
+void RegisterAllEmbeddedBundles();
+}  // namespace embedded
+
 /// Provides access to precompiled shader bundles that are embedded directly into the library
 /// binary at build time. Only the backends compiled in the current build will have data available.
 class EmbeddedShaderBundles {
@@ -33,7 +39,9 @@ class EmbeddedShaderBundles {
   static void Register(Backend backend, const uint8_t* data, size_t size);
 
   /// Returns the embedded bundle data for the given backend. Returns {nullptr, 0} if no bundle
-  /// is available for that backend.
+  /// is available for that backend. The first call runs the generated registration chain, so
+  /// the bundle data arrives through ordinary symbol resolution instead of self-registering
+  /// static objects (which linkers drop when nothing references them).
   static std::pair<const uint8_t*, size_t> GetBundle(Backend backend);
 };
 

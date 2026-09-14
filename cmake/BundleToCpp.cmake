@@ -9,9 +9,10 @@ set(INPUT_FILE "${CMAKE_ARGV3}")
 set(OUTPUT_FILE "${CMAKE_ARGV4}")
 set(VAR_NAME "${CMAKE_ARGV5}")
 set(BACKEND_ENUM "${CMAKE_ARGV6}")
+set(FUNC_SUFFIX "${CMAKE_ARGV7}")
 
-if(NOT INPUT_FILE OR NOT OUTPUT_FILE OR NOT VAR_NAME OR NOT BACKEND_ENUM)
-    message(FATAL_ERROR "Usage: cmake -P BundleToCpp.cmake <input_bin> <output_cpp> <var_name> <backend_enum>")
+if(NOT INPUT_FILE OR NOT OUTPUT_FILE OR NOT VAR_NAME OR NOT BACKEND_ENUM OR NOT FUNC_SUFFIX)
+    message(FATAL_ERROR "Usage: cmake -P BundleToCpp.cmake <input_bin> <output_cpp> <var_name> <backend_enum> <func_suffix>")
 endif()
 
 file(SIZE "${INPUT_FILE}" BYTE_COUNT)
@@ -42,11 +43,13 @@ static const uint8_t ${VAR_NAME}[] = {${ARRAY_BODY}};
 
 static const size_t ${VAR_NAME}_Size = ${BYTE_COUNT};
 
-static struct ${VAR_NAME}_Registrar {
-  ${VAR_NAME}_Registrar() {
-    EmbeddedShaderBundles::Register(Backend::${BACKEND_ENUM}, ${VAR_NAME}, ${VAR_NAME}_Size);
-  }
-} g_${VAR_NAME}_registrar;
+// Referenced by the generated trampoline (EmbeddedBundleTrampoline.cpp), which is referenced by
+// EmbeddedShaderBundles::GetBundle. This out-of-line function with external linkage is what lets
+// the linker pull this object into any consumer link without whole-archive tricks; a
+// self-registering static object would be dropped instead because nothing references it.
+void RegisterEmbeddedBundle_${FUNC_SUFFIX}() {
+  EmbeddedShaderBundles::Register(Backend::${BACKEND_ENUM}, ${VAR_NAME}, ${VAR_NAME}_Size);
+}
 
 }  // namespace embedded
 }  // namespace tgfx
@@ -95,11 +98,13 @@ static const uint8_t ${VAR_NAME}[] = {${ARRAY_CONTENT}
 
 static const size_t ${VAR_NAME}_Size = ${BYTE_COUNT};
 
-static struct ${VAR_NAME}_Registrar {
-  ${VAR_NAME}_Registrar() {
-    EmbeddedShaderBundles::Register(Backend::${BACKEND_ENUM}, ${VAR_NAME}, ${VAR_NAME}_Size);
-  }
-} g_${VAR_NAME}_registrar;
+// Referenced by the generated trampoline (EmbeddedBundleTrampoline.cpp), which is referenced by
+// EmbeddedShaderBundles::GetBundle. This out-of-line function with external linkage is what lets
+// the linker pull this object into any consumer link without whole-archive tricks; a
+// self-registering static object would be dropped instead because nothing references it.
+void RegisterEmbeddedBundle_${FUNC_SUFFIX}() {
+  EmbeddedShaderBundles::Register(Backend::${BACKEND_ENUM}, ${VAR_NAME}, ${VAR_NAME}_Size);
+}
 
 }  // namespace embedded
 }  // namespace tgfx
