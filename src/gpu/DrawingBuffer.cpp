@@ -17,10 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawingBuffer.h"
-#include <chrono>
-#include "core/utils/Log.h"
 #include "core/utils/UniqueID.h"
-#include "gpu/FrameStats.h"
 #include "gpu/GlobalCache.h"
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/Window.h"
@@ -37,7 +34,6 @@ DrawingBuffer::DrawingBuffer(Context* context)
 
 std::shared_ptr<CommandBuffer> DrawingBuffer::encode() {
   DEBUG_ASSERT(!empty());
-  auto encodeStartTime = std::chrono::steady_clock::now();
   {
     for (auto& task : resourceTasks) {
       task->execute(context);
@@ -60,14 +56,6 @@ std::shared_ptr<CommandBuffer> DrawingBuffer::encode() {
   drawingMaxValueTracker.addValue(drawingAllocator.size());
   auto commandBuffer = commandEncoder->finish();
   context->globalCache()->resetUniformBuffer();
-  auto encodeMs =
-      std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - encodeStartTime)
-          .count();
-  LOGI("Frame stats: encode %.2f ms, renderPasses %d, drawOps %d, bgStyleCache %s", encodeMs,
-       FrameStats::renderPassCount, FrameStats::drawOpCount,
-       FrameStats::backgroundStyleCacheEnabled ? "on" : "off");
-  FrameStats::renderPassCount = 0;
-  FrameStats::drawOpCount = 0;
   return commandBuffer;
 }
 
