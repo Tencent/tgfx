@@ -435,6 +435,38 @@ TGFX_TEST(ImageRenderTest, YUVImage) {
   EXPECT_TRUE(Baseline::Compare(surface, "ImageRenderTest/YUVImage_RGBAA"));
 }
 
+TGFX_TEST(ImageRenderTest, YUVImageWithRowBytesTooSmall) {
+  constexpr int width = 64;
+  constexpr int height = 64;
+  std::vector<uint8_t> yData(static_cast<size_t>(width) * height);
+  std::vector<uint8_t> uvData(static_cast<size_t>(width) * height / 4);
+  const void* addresses[3] = {yData.data(), uvData.data(), uvData.data()};
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // A row of one byte cannot hold a line of any plane, which is what a decoder returns when it
+  // produces a frame that is smaller than the size its caller declared. Such data must not reach the
+  // upload, which would read past the buffers the caller described.
+  const size_t narrowRowBytes[3] = {1, 1, 1};
+  auto narrowI420 =
+      YUVData::MakeFrom(width, height, addresses, narrowRowBytes, YUVData::I420_PLANE_COUNT);
+  ASSERT_TRUE(narrowI420 != nullptr);
+  EXPECT_EQ(TextureView::MakeI420(context, narrowI420.get(), YUVColorSpace::BT601_LIMITED),
+            nullptr);
+  auto narrowNV12 =
+      YUVData::MakeFrom(width, height, addresses, narrowRowBytes, YUVData::NV12_PLANE_COUNT);
+  ASSERT_TRUE(narrowNV12 != nullptr);
+  EXPECT_EQ(TextureView::MakeNV12(context, narrowNV12.get(), YUVColorSpace::BT601_LIMITED),
+            nullptr);
+
+  // The same buffers with rows that can hold a full line are accepted.
+  const size_t rowBytes[3] = {width, width / 2, width / 2};
+  auto validData = YUVData::MakeFrom(width, height, addresses, rowBytes, YUVData::I420_PLANE_COUNT);
+  ASSERT_TRUE(validData != nullptr);
+  EXPECT_NE(TextureView::MakeI420(context, validData.get(), YUVColorSpace::BT601_LIMITED), nullptr);
+}
+
 TGFX_TEST(ImageRenderTest, RotateImageRect) {
   ContextScope scope;
   auto context = scope.getContext();
