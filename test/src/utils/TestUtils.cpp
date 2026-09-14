@@ -49,6 +49,20 @@ ScopedAOTStatsPause::~ScopedAOTStatsPause() {
   }
 }
 
+ScopedAOTDeliberateMiss::ScopedAOTDeliberateMiss(Context* context, bool active) {
+  if (active && context != nullptr) {
+    cache = context->precompiledShaderCache();
+    previous = cache->deliberateMissMarking();
+    cache->setDeliberateMissMarking(true);
+  }
+}
+
+ScopedAOTDeliberateMiss::~ScopedAOTDeliberateMiss() {
+  if (cache != nullptr) {
+    cache->setDeliberateMissMarking(previous);
+  }
+}
+
 #ifdef GENERATE_BASELINE_IMAGES
 static const std::string OUT_ROOT = ProjectPath::Absolute("test/baseline-out/");
 #else

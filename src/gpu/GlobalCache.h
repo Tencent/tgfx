@@ -38,6 +38,8 @@ struct ProgramCacheStats {
   uint64_t cacheMisses = 0;
   uint64_t precompiledArtifactCreations = 0;
   uint64_t programBuilderCreations = 0;
+  // Subset of actual builder creations, never inferred from the number of failed AOT attempts.
+  uint64_t excludedProgramBuilderCreations = 0;
   uint64_t runtimePipelineCreationAttempts = 0;
   uint64_t runtimePipelineCreationSuccesses = 0;
   uint64_t runtimePipelineCreationFailures = 0;
@@ -89,7 +91,8 @@ class GlobalCache {
    * Adds a program to the cache with the specified key. The caller must ensure that the key does
    * not already exist in the cache, otherwise the LRU tracking will be corrupted.
    */
-  void addProgram(const BytesKey& programKey, std::shared_ptr<Program> program);
+  void addProgram(const BytesKey& programKey, std::shared_ptr<Program> program,
+                  bool excludeFromAOTCoverage = false);
 
   /**
    * Removes all cached programs. Intended for testing scenarios where a fresh program compilation

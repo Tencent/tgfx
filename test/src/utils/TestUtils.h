@@ -89,4 +89,17 @@ class ScopedAOTStatsPause {
   bool prevGlobalPaused = false;
 };
 
+// Unlike a stats pause, deliberate marking preserves raw counters for local JIT assertions.
+class ScopedAOTDeliberateMiss {
+ public:
+  explicit ScopedAOTDeliberateMiss(Context* context, bool active = true);
+  ~ScopedAOTDeliberateMiss();
+  ScopedAOTDeliberateMiss(const ScopedAOTDeliberateMiss&) = delete;
+  ScopedAOTDeliberateMiss& operator=(const ScopedAOTDeliberateMiss&) = delete;
+
+ private:
+  PrecompiledShaderCache* cache = nullptr;
+  bool previous = false;
+};
+
 }  // namespace tgfx

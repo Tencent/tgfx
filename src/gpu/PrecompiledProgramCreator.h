@@ -30,7 +30,10 @@ namespace tgfx {
 /// the bundle does not contain the required variant.
 class PrecompiledProgramCreator {
  public:
-  static std::shared_ptr<Program> CreateProgram(Context* context, const ProgramInfo* programInfo);
+  // deferredFallback identifies this attempt's by-design miss, independently of diagnostic
+  // recording. It is false for all other failures and for successful precompiled programs.
+  static std::shared_ptr<Program> CreateProgram(Context* context, const ProgramInfo* programInfo,
+                                                bool* deferredFallback = nullptr);
 };
 
 }  // namespace tgfx

@@ -1164,21 +1164,22 @@ TGFX_TEST(AOTRenderConsistencyTest, TexturedEffect2D) {
 TGFX_TEST(AOTRenderConsistencyTest, DecompositionSwitchControlsDirectDrawEntry) {
   auto image = MakeImage("resources/apitest/mandrill_128.png");
   ASSERT_TRUE(image != nullptr);
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  context->globalCache()->resetProgramStats();
+  cache->resetStats();
   auto renderOnce = [&](bool decompositionEnabled, AOTDrawStats* outDraws,
                         ProgramCacheStats* outPrograms, Bitmap* outBitmap) {
-    ContextScope scope;
-    auto context = scope.getContext();
-    ASSERT_TRUE(context != nullptr);
-    auto* cache = context->precompiledShaderCache();
+    ScopedAOTDeliberateMiss deliberate(context, !decompositionEnabled);
     auto [bundleData, bundleSize] = EmbeddedShaderBundles::GetBundle(context->backend());
     ASSERT_NE(bundleData, nullptr);
     ASSERT_GT(bundleSize, 0u);
     ASSERT_TRUE(cache->loadBundle(bundleData, bundleSize));
     context->globalCache()->clearPrograms();
-    context->globalCache()->resetProgramStats();
     cache->setDecompositionEnabled(decompositionEnabled);
     cache->setDiagnosticRecordingEnabled(true);
-    cache->resetStats();
     auto surface = Surface::Make(context, 240, 240);
     ASSERT_TRUE(surface != nullptr);
     auto* canvas = surface->getCanvas();
@@ -1219,8 +1220,12 @@ TGFX_TEST(AOTRenderConsistencyTest, DecompositionSwitchControlsDirectDrawEntry) 
   renderOnce(true, &onDraws, &onPrograms, &onBitmap);
   renderOnce(false, &offDraws, &offPrograms, &offBitmap);
   EXPECT_GE(onDraws.directChainDraws, 1u);
-  EXPECT_EQ(offDraws.directChainDraws, 0u);
+  EXPECT_EQ(onPrograms.programBuilderCreations, 0u);
+  EXPECT_EQ(onPrograms.excludedProgramBuilderCreations, 0u);
+  EXPECT_EQ(offDraws.directChainDraws, onDraws.directChainDraws);
   EXPECT_GE(offPrograms.programBuilderCreations, 1u);
+  EXPECT_EQ(offPrograms.excludedProgramBuilderCreations, offPrograms.programBuilderCreations);
+  EXPECT_FALSE(cache->deliberateMissMarking());
   ExpectBitmapsIdentical("decomposition-switch-direct-entry", onBitmap, offBitmap, 240, 240);
 }
 
@@ -1266,9 +1271,14 @@ TGFX_TEST(AOTRenderConsistencyTest, BundleIdentityAndGenerationLifecycle) {
 
   // Sequence A: JIT first, then load.
   Bitmap jitBitmap = {};
-  drawOnce(&jitBitmap);
+  {
+    ScopedAOTDeliberateMiss deliberate(context);
+    drawOnce(&jitBitmap);
+  }
   auto jitCreations = context->globalCache()->programStats().programBuilderCreations;
   EXPECT_GE(jitCreations, 1u);
+  EXPECT_EQ(context->globalCache()->programStats().excludedProgramBuilderCreations, jitCreations);
+  EXPECT_FALSE(cache->deliberateMissMarking());
   ASSERT_TRUE(cache->loadBundle(bundleData, bundleSize));
   EXPECT_EQ(cache->bundleGeneration(), generation0 + 2u);  // unload + successful load
   Bitmap aotBitmap = {};
@@ -1276,6 +1286,7 @@ TGFX_TEST(AOTRenderConsistencyTest, BundleIdentityAndGenerationLifecycle) {
   const auto& aotPhaseStats = context->globalCache()->programStats();
   EXPECT_GE(aotPhaseStats.precompiledArtifactCreations, 1u);
   EXPECT_EQ(aotPhaseStats.programBuilderCreations, jitCreations);
+  EXPECT_EQ(aotPhaseStats.excludedProgramBuilderCreations, jitCreations);
   ExpectBitmapsIdentical("bundle-lifecycle-jit-then-aot", aotBitmap, jitBitmap, 128, 128);
 
   // Sequence B: unload invalidates the cached AOT program.
@@ -1283,9 +1294,15 @@ TGFX_TEST(AOTRenderConsistencyTest, BundleIdentityAndGenerationLifecycle) {
   cache->unload();
   EXPECT_EQ(cache->bundleGeneration(), generation0 + 3u);
   Bitmap staleBitmap = {};
-  drawOnce(&staleBitmap);
+  {
+    ScopedAOTDeliberateMiss deliberate(context);
+    drawOnce(&staleBitmap);
+  }
   EXPECT_EQ(context->globalCache()->programStats().precompiledArtifactCreations, aotCreations);
   EXPECT_GE(context->globalCache()->programStats().programBuilderCreations, jitCreations + 1u);
+  EXPECT_EQ(context->globalCache()->programStats().excludedProgramBuilderCreations,
+            context->globalCache()->programStats().programBuilderCreations);
+  EXPECT_FALSE(cache->deliberateMissMarking());
   ExpectBitmapsIdentical("bundle-lifecycle-unload", staleBitmap, aotBitmap, 128, 128);
   cache->setDiagnosticRecordingEnabled(false);
 

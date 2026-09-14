@@ -317,6 +317,10 @@ class PrecompiledShaderCache {
     deliberateMarking.store(marking, std::memory_order_relaxed);
   }
 
+  bool deliberateMissMarking() const {
+    return deliberateMarking.load(std::memory_order_relaxed);
+  }
+
   void setStatsRecordingPaused(bool paused) {
     statsPaused.store(paused, std::memory_order_relaxed);
   }

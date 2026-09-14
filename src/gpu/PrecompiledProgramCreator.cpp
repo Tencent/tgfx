@@ -183,7 +183,11 @@ static PrecompiledFallbackReason ToFallbackReason(PermutationMatchFailure failur
 }
 
 std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* context,
-                                                                  const ProgramInfo* programInfo) {
+                                                                  const ProgramInfo* programInfo,
+                                                                  bool* deferredFallback) {
+  if (deferredFallback != nullptr) {
+    *deferredFallback = false;
+  }
   auto cache = context->precompiledShaderCache();
   cache->recordAOTStage(PrecompiledAOTStage::Attempt);
   if (!cache->isLoaded()) {
@@ -207,6 +211,9 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
                          fp->name() == "DeviceSpaceTextureEffect";
         if (textureFP && fp->numTextureSamplers() == 0) {
           reason = PrecompiledFallbackReason::DeferredTexture;
+          if (deferredFallback != nullptr) {
+            *deferredFallback = true;
+          }
           break;
         }
       }

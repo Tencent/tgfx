@@ -204,7 +204,8 @@ void GlobalCache::resetUniformBuffer() {
   activePacket = reusable;
 }
 
-void GlobalCache::addProgram(const BytesKey& programKey, std::shared_ptr<Program> program) {
+void GlobalCache::addProgram(const BytesKey& programKey, std::shared_ptr<Program> program,
+                             bool excludeFromAOTCoverage) {
   if (program == nullptr) {
     return;
   }
@@ -215,6 +216,9 @@ void GlobalCache::addProgram(const BytesKey& programKey, std::shared_ptr<Program
     _programStats.precompiledArtifactCreations++;
   } else {
     _programStats.programBuilderCreations++;
+    if (excludeFromAOTCoverage) {
+      _programStats.excludedProgramBuilderCreations++;
+    }
   }
   programLRU.push_front(program.get());
   program->cachedPosition = programLRU.begin();

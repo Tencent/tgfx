@@ -46,6 +46,22 @@
 
 namespace tgfx {
 
+AOTCoverageGateResult EvaluateAOTCoverageGate(uint64_t rawNoMatchingRule,
+                                             uint64_t deliberateNoMatchingRule,
+                                             uint64_t rawBuilderCreations,
+                                             uint64_t excludedBuilderCreations) {
+  AOTCoverageGateResult result = {};
+  result.consistent = deliberateNoMatchingRule <= rawNoMatchingRule &&
+                      excludedBuilderCreations <= rawBuilderCreations;
+  result.noMatchingRule = deliberateNoMatchingRule <= rawNoMatchingRule
+                              ? rawNoMatchingRule - deliberateNoMatchingRule
+                              : rawNoMatchingRule;
+  result.runtimeCompiles = excludedBuilderCreations <= rawBuilderCreations
+                               ? rawBuilderCreations - excludedBuilderCreations
+                               : rawBuilderCreations;
+  return result;
+}
+
 #ifndef TGFX_BACKEND_NAME
 #define TGFX_BACKEND_NAME "unknown"
 #endif
@@ -218,6 +234,7 @@ static void AddProgramStats(ProgramCacheStats* target, const ProgramCacheStats& 
   target->cacheMisses += source.cacheMisses;
   target->precompiledArtifactCreations += source.precompiledArtifactCreations;
   target->programBuilderCreations += source.programBuilderCreations;
+  target->excludedProgramBuilderCreations += source.excludedProgramBuilderCreations;
   target->runtimePipelineCreationAttempts += source.runtimePipelineCreationAttempts;
   target->runtimePipelineCreationSuccesses += source.runtimePipelineCreationSuccesses;
   target->runtimePipelineCreationFailures += source.runtimePipelineCreationFailures;
@@ -229,6 +246,7 @@ static nlohmann::json ProgramStatsToJSON(const ProgramCacheStats& stats) {
           {"cacheMisses", stats.cacheMisses},
           {"precompiledArtifactCreations", stats.precompiledArtifactCreations},
           {"programBuilderCreations", stats.programBuilderCreations},
+          {"excludedProgramBuilderCreations", stats.excludedProgramBuilderCreations},
           {"runtimePipelineCreationAttempts", stats.runtimePipelineCreationAttempts},
           {"runtimePipelineCreationSuccesses", stats.runtimePipelineCreationSuccesses},
           {"runtimePipelineCreationFailures", stats.runtimePipelineCreationFailures}};
@@ -372,13 +390,15 @@ static std::string FallbackEffectKey(const PrecompiledFallbackRecord& record) {
 
 static std::string FallbackEffectReasonKey(const PrecompiledFallbackRecord& record) {
   std::stringstream stream;
-  stream << static_cast<uint32_t>(record.reason) << "\n" << FallbackEffectKey(record);
+  stream << static_cast<uint32_t>(record.reason) << "\n" << record.deliberate << "\n"
+         << FallbackEffectKey(record);
   return stream.str();
 }
 
 static std::string FallbackKey(const PrecompiledFallbackRecord& record) {
   std::stringstream stream;
   stream << static_cast<uint32_t>(record.reason) << "\n"
+         << record.deliberate << "\n"
          << record.shaderName << "\n"
          << record.vertPermutationIndex << "\n"
          << record.fragPermutationIndex << "\n"
@@ -524,6 +544,7 @@ static nlohmann::json AxisAnalysisToJSON(const AOTAxisAnalysis& axis) {
 static nlohmann::json FallbackRecordToJSON(const PrecompiledFallbackRecord& record) {
   nlohmann::json result = {{"programKey", record.programKey},
                            {"reason", PrecompiledFallbackReasonName(record.reason)},
+                           {"deliberate", record.deliberate},
                            {"effect", record.effectSignature},
                            {"pipeline", record.pipelineSignature},
                            {"shader", record.shaderName}};
@@ -892,6 +913,7 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
       fallbackEffectsByReasonJSON.push_back(
           {{"reason", PrecompiledFallbackReasonName(effect.record.reason)},
            {"effect", effect.record.effectSignature},
+           {"deliberate", effect.record.deliberate},
            {"shader", effect.record.shaderName},
            {"count", effect.count},
            {"tests", effect.tests}});
@@ -910,21 +932,29 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
       fallbackStructuresJSON.push_back(std::move(json));
     }
 
-    // Records provoked by test fixtures (deliberate) and by-design deferred-texture stubs are
-    // excluded from the production coverage metrics: each corresponds to one runtime program
-    // creation, so subtracting them from the builder count keeps hitRate honest.
     uint64_t excludedFallbacks = 0;
+    AOTCoverageGateResult coverageGate = {};
     for (const auto& result : testResults) {
+      uint64_t deliberateNoMatching = 0;
       for (const auto& record : result.fallbackRecords) {
         if (record.deliberate || record.reason == PrecompiledFallbackReason::DeferredTexture) {
           ++excludedFallbacks;
         }
+        if (record.deliberate && record.reason == PrecompiledFallbackReason::NoMatchingRule) {
+          ++deliberateNoMatching;
+        }
       }
+      // Missing diagnostic records stay in the production count. Exclusions cannot borrow
+      // successful creations from a different test or from failed PrecompiledOnly probes.
+      auto testGate = EvaluateAOTCoverageGate(
+          result.fallbackCounts[static_cast<size_t>(PrecompiledFallbackReason::NoMatchingRule)],
+          deliberateNoMatching, result.programStats.programBuilderCreations,
+          result.programStats.excludedProgramBuilderCreations);
+      coverageGate.noMatchingRule += testGate.noMatchingRule;
+      coverageGate.runtimeCompiles += testGate.runtimeCompiles;
+      coverageGate.consistent = coverageGate.consistent && testGate.consistent;
     }
-    const auto productionBuilderCreations =
-        summary.programStats.programBuilderCreations > excludedFallbacks
-            ? summary.programStats.programBuilderCreations - excludedFallbacks
-            : 0;
+    const auto productionBuilderCreations = coverageGate.runtimeCompiles;
     const auto coldCreations = summary.programStats.precompiledArtifactCreations +
                                summary.programStats.programBuilderCreations;
     const auto productionColdCreations =
@@ -975,6 +1005,11 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
     nlohmann::json report = {
         {"backend", TGFX_BACKEND_NAME},
         {"iteration", currentIteration},
+        {"coverageGate",
+         {{"noMatchingRule", coverageGate.noMatchingRule},
+          {"runtimeCompiles", coverageGate.runtimeCompiles},
+          {"consistent", coverageGate.consistent},
+          {"passed", coverageGate.passed()}}},
         {"metricDefinitions",
          {{"coldAOTHitRate",
            "precompiledArtifactCreations / (precompiledArtifactCreations + "
@@ -1071,12 +1106,11 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
     // inside a hit-rate percentage. The summary runs in blocking mode when
     // TGFX_AOT_COVERAGE_GATE=blocking (delivery/CI full-suite runs): a missed target then fails
     // the test process (exit code 1) instead of printing a warning, so a coverage regression
-    // cannot land silently. Default runs and filtered subsets stay in monitoring mode, because
-    // partial runs do not accumulate the full-suite metrics the targets describe.
-    auto strictNoMatching =
-        summary.fallbackCounts[static_cast<size_t>(PrecompiledFallbackReason::NoMatchingRule)];
-    auto strictRuntimeCompiles = productionBuilderCreations;
-    if (strictNoMatching == 0 && strictRuntimeCompiles == 0) {
+    // cannot land silently. Blocking mode also applies to filtered runs; it verifies only the
+    // selected tests and is not a certificate of full-suite coverage. Default runs monitor.
+    auto strictNoMatching = coverageGate.noMatchingRule;
+    auto strictRuntimeCompiles = coverageGate.runtimeCompiles;
+    if (coverageGate.passed()) {
       std::printf("[Coverage Gate][%s] strict targets MET: noMatchingRule=0 runtimeCompiles=0\n",
                   TGFX_BACKEND_NAME);
     } else {
@@ -1088,7 +1122,8 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
       for (size_t i = 0; i < sortedFallbacks.size(); ++i) {
         // Deliberate records are provoked on purpose by test fixtures (e.g. the creator-funnel
         // artifact-miss test) and are already excluded from the production metrics.
-        if (sortedFallbacks[i].record.deliberate) {
+        if (sortedFallbacks[i].record.deliberate ||
+            sortedFallbacks[i].record.reason == PrecompiledFallbackReason::DeferredTexture) {
           continue;
         }
         std::printf("  PENDING %zu. count=%llu reason=%s effect=%s\n", i + 1,

@@ -18,7 +18,24 @@
 
 #pragma once
 
+#include <cstdint>
+
 namespace tgfx {
+
+struct AOTCoverageGateResult {
+  uint64_t noMatchingRule = 0;
+  uint64_t runtimeCompiles = 0;
+  bool consistent = true;
+
+  bool passed() const {
+    return consistent && noMatchingRule == 0 && runtimeCompiles == 0;
+  }
+};
+
+AOTCoverageGateResult EvaluateAOTCoverageGate(uint64_t rawNoMatchingRule,
+                                             uint64_t deliberateNoMatchingRule,
+                                             uint64_t rawBuilderCreations,
+                                             uint64_t excludedBuilderCreations);
 
 void InstallShaderAOTTestReporter();
 
