@@ -542,6 +542,63 @@ TGFX_TEST(AOTRenderConsistencyTest, TwoChildXferBlendFold) {
   ExpectBitmapsIdentical("two-child-xfer-blend-fold", aotBitmap, runtimeBitmap, 200, 200);
 }
 
+TGFX_TEST(AOTRenderConsistencyTest, TextureFillTriangulatedShapeAA) {
+  auto renderOnce = [&](bool useBundle, Bitmap* outBitmap) {
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto* cache = context->precompiledShaderCache();
+    if (useBundle) {
+      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+    } else {
+      cache->unload();
+    }
+    ScopedAOTStatsPause statsPause(context, !useBundle);
+    context->globalCache()->clearPrograms();
+    auto surface = Surface::Make(context, 240, 240);
+    ASSERT_TRUE(surface != nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::White());
+    // A convex polygon larger than the triangulator's minimum size (162px) triangulates, so
+    // this anti-aliased shape draw reaches DefaultGeometryProcessor with AAType::Coverage and
+    // exactly one TextureEffect color processor — the shape the TextureFill matcher accepts.
+    // The precompiled vertex template does not consume the GP's coverage attribute, so the
+    // match must not be served from the bundle: the runtime codegen carries the edge coverage
+    // through a varying.
+    Path path = {};
+    for (int i = 0; i < 5; ++i) {
+      float angle = static_cast<float>(i) * 72.0f - 90.0f;
+      float x = 120.0f + 95.0f * cosf(angle * kStarPi / 180.0f);
+      float y = 120.0f + 95.0f * sinf(angle * kStarPi / 180.0f);
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+    path.close();
+    auto image = Image::MakeFromFile(ProjectPath::Absolute("resources/apitest/mandrill_128.png"));
+    ASSERT_TRUE(image != nullptr);
+    Paint paint = {};
+    paint.setShader(Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp));
+    canvas->drawShape(Shape::MakeFrom(std::move(path)), paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(240, 240));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+    if (useBundle) {
+      cache->unload();
+    }
+  };
+  Bitmap aotBitmap = {};
+  Bitmap runtimeBitmap = {};
+  renderOnce(true, &aotBitmap);
+  renderOnce(false, &runtimeBitmap);
+  ExpectBitmapsIdentical("texture-fill-triangulated-shape-aa", aotBitmap, runtimeBitmap, 240, 240);
+}
+
 TGFX_TEST(AOTRenderConsistencyTest, LUTGradientMaskFold) {
   Color red = {1.f, 0.f, 0.f, 1.f};
   Color green = {0.f, 1.f, 0.f, 1.f};

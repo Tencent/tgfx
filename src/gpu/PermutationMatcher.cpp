@@ -218,9 +218,18 @@ static std::optional<int> SharedDeviceMaskValue(const ProgramInfo* programInfo) 
   return *coverage == CoverageKind::DeviceMask ? 1 : 0;
 }
 
+static int GetGPCoverage(const GeometryProcessor* gp);
+
 static std::optional<PermutationMatchResult> TryMatchTextureFill(const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
   if (gp->name() != "DefaultGeometryProcessor") {
+    return std::nullopt;
+  }
+  // The precompiled vertex template consumes only the position attribute, so a
+  // DefaultGeometryProcessor carrying vertex coverage (triangulated anti-aliased shapes) must
+  // stay off this artifact: the runtime route carries the edge coverage through a varying,
+  // and the chain rewrite serves the same draw through its coverage-aware vertex variants.
+  if (GetGPCoverage(gp) != 0) {
     return std::nullopt;
   }
   if (programInfo->numColorFragmentProcessors() != 1) {
