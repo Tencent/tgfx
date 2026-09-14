@@ -44,6 +44,7 @@ endif ()
 if (TEST_VULKAN_FILES)
     list(REMOVE_ITEM TEST_SOURCES ${TEST_VULKAN_FILES})
 endif ()
+list(FILTER TEST_SOURCES EXCLUDE REGEX "/test/src/d3d12/")
 
 # Include backend-specific test sources
 if (TGFX_USE_WEBGPU)
@@ -213,6 +214,7 @@ target_include_directories(tgfx-test PRIVATE
     ${TGFX_ROOT}/test/src
     ${TGFX_ROOT}/hello2d/include
     ${TGFX_ROOT}/third_party/json/include
+    ${TGFX_ROOT}/third_party/zstd/lib
     ${TGFX_ROOT}/third_party/harfbuzz/src
     ${TGFX_ROOT}/third_party/googletest/googletest
     ${TGFX_ROOT}/third_party/googletest/googletest/include

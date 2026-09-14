@@ -1,5 +1,8 @@
 include/
 src/
 CMakeLists.txt
+cmake/
+tools/shader_build_tool/
+resources/shaders/
 vendor.json
 DEPS

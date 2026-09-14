@@ -893,7 +893,11 @@ if (TGFX_EMBED_SHADER_BUNDLES)
     file(MAKE_DIRECTORY ${TGFX_SHADER_BUNDLE_DIR})
 
     set(TGFX_SHADER_BUNDLE_STAMP "${TGFX_SHADER_BUNDLE_DIR}/bundle_stamp")
-    file(GLOB_RECURSE TGFX_SHADER_SOURCES
+    set(TGFX_SHADER_BUNDLE_FILES "")
+    foreach (B ${TGFX_SHADER_BACKENDS})
+        list(APPEND TGFX_SHADER_BUNDLE_FILES "${TGFX_SHADER_BUNDLE_DIR}/shader_bundle.${B}.bin")
+    endforeach ()
+    file(GLOB_RECURSE TGFX_SHADER_SOURCES CONFIGURE_DEPENDS
             src/gpu/shaders/glsl/level1/*.frag
             src/gpu/shaders/glsl/level1/*.vert
             src/gpu/shaders/glsl/level1/*.inc)
@@ -918,6 +922,7 @@ if (TGFX_EMBED_SHADER_BUNDLES)
         endforeach ()
         add_custom_command(
                 OUTPUT ${TGFX_SHADER_BUNDLE_STAMP}
+                BYPRODUCTS ${TGFX_SHADER_BUNDLE_FILES}
                 ${TGFX_COPY_BUNDLE_COMMANDS}
                 COMMAND ${CMAKE_COMMAND} -E touch ${TGFX_SHADER_BUNDLE_STAMP}
                 DEPENDS ${TGFX_PREBUILT_BUNDLE_FILES}
@@ -925,8 +930,9 @@ if (TGFX_EMBED_SHADER_BUNDLES)
     else ()
         add_custom_command(
                 OUTPUT ${TGFX_SHADER_BUNDLE_STAMP}
+                BYPRODUCTS ${TGFX_SHADER_BUNDLE_FILES}
                 COMMAND shader_build_tool
-                        --shader-dir ${CMAKE_SOURCE_DIR}/src/gpu/shaders/glsl
+                        --shader-dir ${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/shaders/glsl
                         --out-dir ${TGFX_SHADER_BUNDLE_DIR}
                         --backends ${TGFX_SHADER_BACKENDS_ARG}
                         --compress
@@ -934,7 +940,8 @@ if (TGFX_EMBED_SHADER_BUNDLES)
                 DEPENDS shader_build_tool ${TGFX_SHADER_SOURCES}
                 COMMENT "Compiling precompiled shader bundles (${TGFX_SHADER_BACKENDS})")
     endif ()
-    add_custom_target(tgfx_shader_bundles DEPENDS ${TGFX_SHADER_BUNDLE_STAMP})
+    add_custom_target(tgfx_shader_bundles DEPENDS ${TGFX_SHADER_BUNDLE_STAMP}
+            ${TGFX_SHADER_BUNDLE_FILES})
     if (NOT WEB)
         # Publishes this build's generated bundles to resources/shaders/ so web builds can
         # consume them; run explicitly, nothing depends on it.
@@ -972,7 +979,8 @@ if (TGFX_EMBED_SHADER_BUNDLES)
                 OUTPUT ${BUNDLE_CPP}
                 COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/BundleToCpp.cmake
                         ${BUNDLE_BIN} ${BUNDLE_CPP} ${BUNDLE_VAR} ${BACKEND_ENUM} ${FUNC_SUFFIX}
-                DEPENDS ${TGFX_SHADER_BUNDLE_STAMP}
+                DEPENDS ${TGFX_SHADER_BUNDLE_STAMP} ${BUNDLE_BIN}
+                        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/BundleToCpp.cmake
                 COMMENT "Embedding shader bundle: ${B}")
         list(APPEND TGFX_EMBEDDED_BUNDLE_SOURCES ${BUNDLE_CPP})
     endforeach ()
@@ -988,7 +996,7 @@ if (TGFX_EMBED_SHADER_BUNDLES)
         string(APPEND TRAMPOLINE_DECLS "void RegisterEmbeddedBundle_${FUNC_SUFFIX}();\n    ")
         string(APPEND TRAMPOLINE_CALLS "  RegisterEmbeddedBundle_${FUNC_SUFFIX}();\n")
     endforeach ()
-    file(WRITE "${TRAMPOLINE_CPP}"
+    file(GENERATE OUTPUT "${TRAMPOLINE_CPP}" CONTENT
 "// Auto-generated — do not edit.
 #include \"gpu/EmbeddedShaderBundles.h\"
 

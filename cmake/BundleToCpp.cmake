@@ -1,6 +1,6 @@
 # BundleToCpp.cmake
-# Converts a binary file into a C++ source file containing a const array and self-registration.
-# Usage: cmake -P BundleToCpp.cmake <input_bin> <output_cpp> <variable_name> <backend_enum>
+# Converts a binary file into a C++ source file containing a const array and a registration function.
+# Usage: cmake -P BundleToCpp.cmake <input_bin> <output_cpp> <variable_name> <backend_enum> <func_suffix>
 # backend_enum: Metal, OpenGL, Vulkan, WebGPU
 
 cmake_minimum_required(VERSION 3.12)
