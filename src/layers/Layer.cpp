@@ -2009,7 +2009,9 @@ std::shared_ptr<Image> Layer::renderBackgroundStyleToImage(const DrawArgs& args,
   // The recorded space is the content image space shifted by contentEntry.offset, so translate
   // back to let the caller blit under the consume pass transform.
   *offset = imageOffset - contentEntry.offset;
-  return image->makeTextureImage(args.context);
+  // Rasterize lazily so the texture joins the resource cache (keyed, evictable, reusable) and is
+  // only allocated if a consume pass actually draws it.
+  return image->makeRasterized();
 }
 
 bool Layer::getLayersUnderPointInternal(float x, float y,
