@@ -27,6 +27,7 @@
 #include <limits>
 #include <map>
 #include <set>
+#include <cstring>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -1064,11 +1065,14 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
         TGFX_BACKEND_NAME, static_cast<unsigned long long>(auditFusableNow + auditNeedsLowering),
         static_cast<unsigned long long>(auditFusableNow),
         static_cast<unsigned long long>(auditNeedsLowering));
-    // WP5 strict coverage targets, monitoring mode (flips to blocking at the no-fallback
-    // milestone): the terminal state requires zero NoMatchingRule fallbacks and zero runtime
-    // program compilations across the full suite. Until then every remaining miss prints as a
-    // tracked warning with its effect shape, so a regression adds a name here instead of hiding
-    // inside a hit-rate percentage.
+    // WP5 strict coverage targets. The terminal state requires zero NoMatchingRule fallbacks and
+    // zero runtime program compilations across the full suite; every remaining miss prints as a
+    // tracked entry with its effect shape, so a regression adds a name here instead of hiding
+    // inside a hit-rate percentage. The summary runs in blocking mode when
+    // TGFX_AOT_COVERAGE_GATE=blocking (delivery/CI full-suite runs): a missed target then fails
+    // the test process (exit code 1) instead of printing a warning, so a coverage regression
+    // cannot land silently. Default runs and filtered subsets stay in monitoring mode, because
+    // partial runs do not accumulate the full-suite metrics the targets describe.
     auto strictNoMatching =
         summary.fallbackCounts[static_cast<size_t>(PrecompiledFallbackReason::NoMatchingRule)];
     auto strictRuntimeCompiles = productionBuilderCreations;
@@ -1091,6 +1095,14 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
                     static_cast<unsigned long long>(sortedFallbacks[i].count),
                     PrecompiledFallbackReasonName(sortedFallbacks[i].record.reason),
                     sortedFallbacks[i].record.effectSignature.c_str());
+      }
+      const char* gateMode = std::getenv("TGFX_AOT_COVERAGE_GATE");
+      if (gateMode != nullptr && std::strcmp(gateMode, "blocking") == 0) {
+        std::printf("[Coverage Gate][%s] BLOCKING: strict targets not met (see the PENDING list "
+                    "above); failing the test process\n",
+                    TGFX_BACKEND_NAME);
+        std::fflush(stdout);
+        std::exit(1);
       }
     }
   }

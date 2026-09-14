@@ -33,6 +33,8 @@
 // AOTClosureVerifier covers a different axis (registered shaders' reachable sets fit inside the
 // published bundles); this gate covers the processor-type axis and the two checks coexist.
 
+#include <array>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <regex>
@@ -40,6 +42,12 @@
 #include <string>
 #include <vector>
 #include "base/TGFXTest.h"
+#include "gpu/PrecompiledShaderCache.h"
+#include "tgfx/core/Canvas.h"
+#include "tgfx/core/ColorFilter.h"
+#include "tgfx/core/Paint.h"
+#include "tgfx/core/Surface.h"
+#include "utils/ContextScope.h"
 #include "utils/ProjectPath.h"
 
 namespace tgfx {
@@ -417,6 +425,32 @@ TGFX_TEST(AOTCoverageGateTest, BlendConstructionSitesStayFlattened) {
   }
   EXPECT_TRUE(violations.empty());
   EXPECT_GE(checkedSites, 6);
+}
+
+// Negative control for the blocking summary gate (audit F10): when TGFX_AOT_TEST_INJECT_MISS is
+// set, this test renders one filtered draw without the bundle and without the stats pause, so
+// its runtime compilation lands in the production metrics. With
+// TGFX_AOT_COVERAGE_GATE=blocking also set, the suite-level summary must then fail the process
+// (exit code 1, BLOCKING line). Without the variables this test is inert, which is how the
+// suite normally runs.
+TGFX_TEST(AOTCoverageGateTest, InjectedMissFailsTheBlockingGate) {
+  if (std::getenv("TGFX_AOT_TEST_INJECT_MISS") == nullptr) {
+    GTEST_SKIP() << "negative control only runs when TGFX_AOT_TEST_INJECT_MISS is set";
+    return;
+  }
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  cache->unload();
+  cache->setDiagnosticRecordingEnabled(true);
+  auto surface = Surface::Make(context, 64, 64);
+  ASSERT_NE(surface, nullptr);
+  std::array<float, 20> swapRedBlue = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
+  Paint paint = {};
+  paint.setColorFilter(ColorFilter::Matrix(swapRedBlue));
+  surface->getCanvas()->drawRect(Rect::MakeWH(64, 64), paint);
+  context->flushAndSubmit(true);
 }
 
 }  // namespace
