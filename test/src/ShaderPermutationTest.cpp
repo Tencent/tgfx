@@ -28,6 +28,7 @@
 #include "gpu/EmbeddedShaderBundles.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/PermutationMatcher.h"
+#include "gpu/PrecompiledBundleIdentity.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/processors/ClampedGradientEffect.h"
@@ -1096,8 +1097,9 @@ TGFX_TEST(ShaderPermutationTest, CreatorFunnelRecordsArtifactMiss) {
   cache->unload();
   image = MakeTexture2DImage(context, image);
   ASSERT_TRUE(image != nullptr);
-  auto unrelatedBundle = MakeTestBundle("missing-artifacts", 1, 1, 10);
+  auto unrelatedBundle = MakeTestBundle(ExpectedProfileTag(context->backend()), 1, 1, 10);
   ASSERT_TRUE(cache->loadBundle(unrelatedBundle.data(), unrelatedBundle.size()));
+  EXPECT_EQ(cache->profileTag(), ExpectedProfileTag(context->backend()));
   context->globalCache()->clearPrograms();
   context->globalCache()->resetProgramStats();
   cache->resetStats();
@@ -1124,6 +1126,7 @@ TGFX_TEST(ShaderPermutationTest, CreatorFunnelRecordsArtifactMiss) {
   EXPECT_EQ(fallbackRecords.size(), 1u);
   if (!fallbackRecords.empty()) {
     EXPECT_EQ(fallbackRecords[0].reason, PrecompiledFallbackReason::VertexArtifactMissing);
+    EXPECT_TRUE(fallbackRecords[0].deliberate);
     EXPECT_FALSE(fallbackRecords[0].shaderName.empty());
     EXPECT_FALSE(fallbackRecords[0].effectSignature.empty());
     EXPECT_FALSE(fallbackRecords[0].pipelineSignature.empty());
