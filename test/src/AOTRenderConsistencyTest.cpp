@@ -21,9 +21,15 @@
 #include <string>
 #include <vector>
 #include "base/TGFXTest.h"
+#include "gpu/DrawingManager.h"
 #include "gpu/EmbeddedShaderBundles.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/PrecompiledShaderCache.h"
+#include "gpu/ProxyProvider.h"
+#include "gpu/processors/ColorMatrixFragmentProcessor.h"
+#include "gpu/processors/DeviceSpaceTextureEffect.h"
+#include "gpu/processors/TextureEffect.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/glsl/GLSLBlend.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Bitmap.h"
@@ -1366,6 +1372,140 @@ TGFX_TEST(AOTRenderConsistencyTest, LinearChainSinglePass) {
   EXPECT_EQ(candidateStats.draws.intermediateWriteBytes, 0u);
   EXPECT_EQ(candidateStats.draws.peakTemporaryBytes, 0u);
   ExpectBitmapsIdentical("linear-chain-matrix-luma-matrix", candidate, reference, width, height);
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailPassesPreserveCoordinateDomains) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_NE(image, nullptr);
+  auto sourceSurface = Surface::Make(context, image->width(), image->height(), false, 1, true);
+  ASSERT_NE(sourceSurface, nullptr);
+  {
+    ScopedAOTStatsPause pause(context, true);
+    sourceSurface->getCanvas()->drawImage(image, 0, 0);
+    context->flushAndSubmit(true);
+  }
+  auto source = context->proxyProvider()->wrapExternalTexture(sourceSurface->getBackendTexture());
+  ASSERT_NE(source, nullptr);
+  const std::array<float, 20> swapRedBlue = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0,
+                                             1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
+  auto render = [&](bool deviceSource, bool useBundle, const Point& offset, Bitmap* bitmap,
+                    AOTDrawStats* draws, ProgramCacheStats* programs) {
+    if (useBundle) {
+      auto bundle = EmbeddedShaderBundles::GetBundle(context->backend());
+      ASSERT_TRUE(cache->loadBundle(bundle.first, bundle.second));
+    } else {
+      cache->unload();
+    }
+    ScopedAOTStatsPause pause(context, !useBundle);
+    cache->setDecompositionEnabled(useBundle);
+    cache->setDiagnosticRecordingEnabled(true);
+    cache->resetStats();
+    context->globalCache()->clearPrograms();
+    context->globalCache()->resetProgramStats();
+    auto target = RenderTargetProxy::Make(context, 64, 64, false);
+    ASSERT_NE(target, nullptr);
+    auto allocator = context->drawingAllocator();
+    PlacementPtr<FragmentProcessor> processor = nullptr;
+    if (deviceSource) {
+      processor = DeviceSpaceTextureEffect::Make(allocator, source, Matrix::MakeTrans(3, 5));
+    } else {
+      processor = TextureEffect::Make(allocator, source);
+    }
+    int opCount = deviceSource ? 3 : 17;
+    for (int index = 0; index < opCount; ++index) {
+      processor = FragmentProcessor::Compose(
+          allocator, std::move(processor), ColorMatrixFragmentProcessor::Make(allocator, swapRedBlue));
+    }
+    ASSERT_TRUE(context->drawingManager()->fillRTWithFP(target, std::move(processor), 0, offset));
+    context->flushAndSubmit(true);
+    auto rt = target->getRenderTarget();
+    ASSERT_NE(rt, nullptr);
+    auto surface = Surface::MakeFrom(context, rt->getBackendRenderTarget(), rt->origin());
+    ASSERT_NE(surface, nullptr);
+    ASSERT_TRUE(bitmap->allocPixels(64, 64));
+    auto pixels = bitmap->lockPixels();
+    ASSERT_NE(pixels, nullptr);
+    EXPECT_TRUE(surface->readPixels(bitmap->info(), pixels));
+    bitmap->unlockPixels();
+    *draws = cache->drawStats();
+    *programs = context->globalCache()->programStats();
+    cache->setDiagnosticRecordingEnabled(false);
+    cache->setDecompositionEnabled(true);
+    cache->unload();
+  };
+  for (bool deviceSource : {false, true}) {
+    for (Point offset : {Point::Zero(), Point::Make(11, 7)}) {
+      SCOPED_TRACE(deviceSource);
+      SCOPED_TRACE(offset.x);
+      Bitmap reference;
+      Bitmap candidate;
+      AOTDrawStats referenceDraws;
+      AOTDrawStats candidateDraws;
+      ProgramCacheStats referencePrograms;
+      ProgramCacheStats candidatePrograms;
+      render(deviceSource, false, offset, &reference, &referenceDraws, &referencePrograms);
+      render(deviceSource, true, offset, &candidate, &candidateDraws, &candidatePrograms);
+      uint64_t passCount = deviceSource ? 2 : 9;
+      EXPECT_EQ(candidatePrograms.programBuilderCreations, 0u);
+      EXPECT_GE(candidatePrograms.precompiledArtifactCreations, 1u);
+      EXPECT_EQ(candidateDraws.completeAOTDraws, 1u);
+      EXPECT_EQ(candidateDraws.atomicFallbacks, 0u);
+      EXPECT_EQ(candidateDraws.kernelInvocations, passCount);
+      EXPECT_EQ(candidateDraws.planMaterializedEdges, passCount - 1);
+      EXPECT_EQ(candidateDraws.fpFlattenEdges, 0u);
+      ExpectBitmapsIdentical("offscreen-tail-coordinates", candidate, reference, 64, 64);
+    }
+  }
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, LongLinearChainExecutesMaterializedTailPasses) {
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_NE(image, nullptr);
+  int width = image->width();
+  int height = image->height();
+  const std::array<float, 20> rotateRGB = {0, 1, 0, 0, 0, 0, 0, 1, 0, 0,
+                                           1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
+  for (size_t opCount : {size_t{15}, size_t{16}, size_t{17}}) {
+    SCOPED_TRACE(opCount);
+    std::shared_ptr<ColorFilter> chain = nullptr;
+    for (size_t index = 0; index < opCount; ++index) {
+      chain = ColorFilter::Compose(chain, ColorFilter::Matrix(rotateRGB));
+    }
+    Bitmap reference;
+    Bitmap candidate;
+    ColorFilterRenderStats referenceStats;
+    ColorFilterRenderStats candidateStats;
+    RenderImageWithColorFilterOnce(image, chain, width, height, false, false, false, true,
+                                   &reference, &referenceStats);
+    RenderImageWithColorFilterOnce(image, chain, width, height, true, true, false, true,
+                                   &candidate, &candidateStats);
+    uint64_t passCount = opCount == 15 ? 1 : (opCount + 1) / 2;
+    const auto& draws = candidateStats.draws;
+    EXPECT_EQ(candidateStats.programs.programBuilderCreations, 0u);
+    EXPECT_EQ(candidateStats.noMatchingRule, 0u);
+    EXPECT_GE(candidateStats.programs.precompiledArtifactCreations, 1u);
+    EXPECT_EQ(draws.draws, 1u);
+    EXPECT_EQ(draws.completeAOTDraws, 1u);
+    EXPECT_EQ(draws.atomicFallbacks, 0u);
+    EXPECT_EQ(draws.kernelInvocations, passCount);
+    EXPECT_EQ(draws.offscreenTargets, passCount - 1);
+    EXPECT_EQ(draws.materializedEdges, passCount - 1);
+    EXPECT_EQ(draws.planMaterializedEdges, passCount - 1);
+    EXPECT_EQ(draws.fpFlattenEdges, 0u);
+    if (passCount > 1) {
+      EXPECT_EQ(draws.offscreenPlanDraws, 1u);
+      EXPECT_EQ(draws.planPassHistogram.back(), 1u);
+    }
+    auto bytes = static_cast<uint64_t>(width) * static_cast<uint64_t>(height) * 4 * (passCount - 1);
+    EXPECT_EQ(draws.intermediateReadBytes, bytes);
+    EXPECT_EQ(draws.intermediateWriteBytes, bytes);
+    EXPECT_EQ(draws.peakTemporaryBytes, bytes);
+    ExpectBitmapsIdentical("long-linear-chain-tail", candidate, reference, width, height);
+  }
 }
 
 // Proves AlphaThreshold reaches a fused pointwise slot. The operator was previously rejected by
