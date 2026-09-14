@@ -30,15 +30,13 @@ class Layer;
 class LayerStyle;
 
 /**
- * A snapshot produced during the capture pass for a specific (Layer, LayerStyle) pair. When
- * isStyleOutput is true the image is the rendered style itself and every consume pass blits it
- * instead of re-running LayerStyle::draw. Otherwise it is the raw backdrop slice and the consume
- * pass renders the style as usual. Consumed by LayerStyle::draw via LayerStyleInput::extraSource.
+ * A snapshot of the background image and its offset captured during the capture pass for a
+ * specific (Layer, LayerStyle) pair. Consumed during the consume pass by LayerStyle::draw via
+ * LayerStyleInput::extraSource.
  */
 struct BackgroundSnapshotEntry {
   std::shared_ptr<Image> image = nullptr;
   Point offset = Point::Zero();
-  bool isStyleOutput = false;
 };
 
 /**
@@ -67,6 +65,16 @@ struct BackgroundSnapshotKeyHash {
                                             : static_cast<std::size_t>(0x9e3779b9UL);
     return h1 ^ (h2 + GoldenRatio + (h1 << 6) + (h1 >> 2));
   }
+};
+
+/**
+ * The rendered output of one background-sourced LayerStyle, cached for the duration of a frame so
+ * every consume pass blits it instead of re-running the style. The offset is expressed in the
+ * consume pass's style space, i.e. the coordinate space the style draws in.
+ */
+struct BackgroundStyleResult {
+  std::shared_ptr<Image> image = nullptr;
+  Point offset = Point::Zero();
 };
 
 /**
@@ -99,10 +107,14 @@ struct BackgroundSnapshotMap {
                      BackgroundSnapshotKeyHash>
       snapshots = {};
   std::unordered_map<Layer*, std::unique_ptr<LayerStyleSource>> layerStyleSources = {};
+  // Rendered background styles, filled on the first consume pass that needs one and reused by
+  // every later pass. Rendering happens in the consume pass rather than during capture because
+  // only the consume canvas carries the real contentScale the style must be rasterized at.
+  std::unordered_map<BackgroundSnapshotKey, BackgroundStyleResult, BackgroundSnapshotKeyHash>
+      styleResults = {};
   // Set when one capture pass serves several consume passes (tiled rendering, multiple dirty
-  // rects). The capture pass then renders each background style into an image that every consume
-  // pass blits, instead of re-running the style per pass. Sub-handlers inherit it automatically
-  // because they share this map.
+  // rects), so rendering each background style once and blitting it is worth the extra texture.
+  // Sub-consumers inherit it automatically because they share this map.
   bool shareStyleOutput = false;
 };
 
