@@ -670,7 +670,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   void drawLayerStyleDefault(const DrawArgs& args, Canvas* canvas, float alpha, LayerStyle* style,
                              const LayerStyleSource* source);
 
-  static std::shared_ptr<Image> renderBackgroundStyle(const DrawArgs& args, LayerStyle* style,
+  static std::shared_ptr<Image> RenderBackgroundStyle(const DrawArgs& args, LayerStyle* style,
                                                       const LayerStyleSource* source,
                                                       std::shared_ptr<Image> backgroundImage,
                                                       const Point& backgroundOffset, Point* offset);
