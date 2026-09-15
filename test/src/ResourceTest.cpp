@@ -18,6 +18,10 @@
 
 #include <array>
 #include <atomic>
+#include <chrono>
+#include <condition_variable>
+#include <limits>
+#include <mutex>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -83,6 +87,177 @@ TGFX_TEST(ResourceTest, MaxThreadCountShrink) {
                         std::this_thread::sleep_for(std::chrono::milliseconds(10));
                       } EXPECT_EQ(group->totalThreads, 1u););
   Task::SetMaxThreadCount(0);
+}
+#endif
+
+class TaskWaitGate final : public Task {
+ public:
+  bool waitUntilStarted() {
+    std::unique_lock<std::mutex> lock(mutex);
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+    while (!started) {
+      if (condition.wait_until(lock, deadline) == std::cv_status::timeout) {
+        return started;
+      }
+    }
+    return true;
+  }
+
+  void release() {
+    std::lock_guard<std::mutex> lock(mutex);
+    released = true;
+    condition.notify_all();
+  }
+
+  void onExecute() override {
+    std::unique_lock<std::mutex> lock(mutex);
+    started = true;
+    condition.notify_all();
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+    while (!released) {
+      if (condition.wait_until(lock, deadline) == std::cv_status::timeout) {
+        break;
+      }
+    }
+  }
+
+ private:
+  std::mutex mutex = {};
+  std::condition_variable condition = {};
+  bool started = false;
+  bool released = false;
+};
+
+class TaskWaitCaller {
+ public:
+  explicit TaskWaitCaller(std::shared_ptr<Task> task, uint64_t timeout = 0)
+      : task(std::move(task)), timeout(timeout) {
+  }
+
+  ~TaskWaitCaller() {
+    if (thread.joinable()) {
+      thread.join();
+    }
+  }
+
+  void start() {
+    thread = std::thread(&TaskWaitCaller::run, this);
+  }
+
+  bool waitForResult(uint64_t timeoutMs) {
+    std::unique_lock<std::mutex> lock(mutex);
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMs);
+    while (!finished) {
+      if (condition.wait_until(lock, deadline) == std::cv_status::timeout) {
+        return finished;
+      }
+    }
+    return true;
+  }
+
+  bool result() {
+    std::lock_guard<std::mutex> lock(mutex);
+    return succeeded;
+  }
+
+ private:
+  void run() {
+    auto result = task->wait(timeout);
+    std::lock_guard<std::mutex> lock(mutex);
+    succeeded = result;
+    finished = true;
+    condition.notify_all();
+  }
+
+  std::shared_ptr<Task> task = nullptr;
+  uint64_t timeout = 0;
+  std::thread thread = {};
+  std::mutex mutex = {};
+  std::condition_variable condition = {};
+  bool succeeded = false;
+  bool finished = false;
+};
+
+TGFX_TEST(ResourceTest, TaskWaitInlineNotifiesWaiters) {
+  auto task = std::make_shared<TaskWaitGate>();
+  TaskWaitCaller executor(task);
+  executor.start();
+  ASSERT_TRUE(task->waitUntilStarted());
+  TaskWaitCaller first(task, 500);
+  TaskWaitCaller second(task, 500);
+  first.start();
+  second.start();
+  EXPECT_FALSE(first.waitForResult(20));
+  EXPECT_FALSE(second.waitForResult(20));
+  task->release();
+  EXPECT_TRUE(executor.waitForResult(200));
+  EXPECT_TRUE(first.waitForResult(200));
+  EXPECT_TRUE(second.waitForResult(200));
+  EXPECT_TRUE(first.result());
+  EXPECT_TRUE(second.result());
+  EXPECT_EQ(task->status(), TaskStatus::Finished);
+}
+
+TGFX_TEST_PRIVATE(ResourceTest, TaskWaitIgnoresNotifications) {
+  auto task = std::make_shared<TaskWaitGate>();
+  TaskWaitCaller executor(task);
+  executor.start();
+  ASSERT_TRUE(task->waitUntilStarted());
+  TaskWaitCaller waiter(task, 500);
+  waiter.start();
+  for (int i = 0; i < 5; ++i) {
+    TGFX_PRIVATE_ACCESS(task->condition.notify_all();)
+    EXPECT_FALSE(waiter.waitForResult(10));
+  }
+  EXPECT_EQ(task->status(), TaskStatus::Executing);
+  task->release();
+  EXPECT_TRUE(waiter.waitForResult(200));
+  EXPECT_TRUE(waiter.result());
+}
+
+TGFX_TEST_PRIVATE(ResourceTest, TaskWaitTimeoutUsesFixedDeadline) {
+  auto task = std::make_shared<TaskWaitGate>();
+  TaskWaitCaller executor(task);
+  executor.start();
+  ASSERT_TRUE(task->waitUntilStarted());
+  TaskWaitCaller waiter(task, 80);
+  waiter.start();
+  EXPECT_FALSE(waiter.waitForResult(10));
+  bool returned = false;
+  for (int i = 0; i < 30 && !returned; ++i) {
+    TGFX_PRIVATE_ACCESS(task->condition.notify_all();)
+    returned = waiter.waitForResult(10);
+  }
+  EXPECT_TRUE(returned);
+  EXPECT_FALSE(waiter.result());
+  EXPECT_EQ(task->status(), TaskStatus::Executing);
+  task->release();
+  EXPECT_TRUE(task->wait());
+}
+
+TGFX_TEST(ResourceTest, TaskWaitQueuedAndCanceled) {
+  auto queued = std::make_shared<TaskWaitGate>();
+  queued->release();
+  EXPECT_TRUE(queued->wait(1));
+  EXPECT_EQ(queued->status(), TaskStatus::Finished);
+  auto canceled = std::make_shared<TaskWaitGate>();
+  canceled->cancel();
+  EXPECT_TRUE(canceled->wait());
+  EXPECT_EQ(canceled->status(), TaskStatus::Canceled);
+}
+
+#ifdef TGFX_USE_THREADS
+TGFX_TEST(ResourceTest, TaskWaitWorkerCompletion) {
+  auto task = std::make_shared<TaskWaitGate>();
+  Task::Run(task);
+  ASSERT_TRUE(task->waitUntilStarted());
+  TaskWaitCaller waiter(task, 500);
+  waiter.start();
+  EXPECT_FALSE(waiter.waitForResult(20));
+  task->release();
+  EXPECT_TRUE(waiter.waitForResult(200));
+  EXPECT_TRUE(waiter.result());
+  EXPECT_TRUE(task->wait(std::numeric_limits<uint64_t>::max()));
 }
 #endif
 
