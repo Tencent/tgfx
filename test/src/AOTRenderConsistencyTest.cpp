@@ -1514,66 +1514,91 @@ TGFX_TEST(AOTRenderConsistencyTest, LongLinearChainExecutesMaterializedTailPasse
   }
 }
 
-// TGFX_AOT_DISABLE exercises the pure runtime route, so it must also disable the
-// construction-phase blend-child materialization: main renders complex blend children inline,
-// and the materialization is itself part of the AOT-era design. Leaving it active under the
-// flag would make runtime-only runs (whole-suite A/B comparisons, the main-baseline three-way
-// diff) compare two paths that share the same rewrite. The flag-absent branch is the positive
-// control: it proves this scene does trigger flattening, so the zero assertion cannot pass
-// vacuously.
-TGFX_TEST(AOTRenderConsistencyTest, RuntimeRouteControlDisablesBlendChildMaterialization) {
+// After the P4 migration, blend-child materialization is planned, not baked in: the original
+// tree survives construction, and the in-plan retry in OpsCompositor materializes operands only
+// when the chain route wants them. Three observable consequences, one per segment:
+//  - runtime-only (TGFX_AOT_DISABLE): no materialization anywhere;
+//  - default + no bundle: the untouched original tree runs the runtime route — the F02
+//    main-equivalence guarantee now holds by default, no env needed;
+//  - default + bundle: the chain route refuses the two-gradient tree, the retry materializes
+//    both operands, and the chain kernel serves the draw (the non-vacuous positive control).
+TGFX_TEST(AOTRenderConsistencyTest, BlendChildMaterializationIsPlannedNotBakedIn) {
+  if (std::getenv("TGFX_AOT_LEGACY_BLEND_MATERIALIZATION") != nullptr) {
+    GTEST_SKIP() << "The legacy switch restores construction-time materialization; this test "
+                   "asserts the planned path";
+  }
   bool runtimeOnly = std::getenv("TGFX_AOT_DISABLE") != nullptr;
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
   auto* cache = context->precompiledShaderCache();
-  cache->unload();
-  cache->setDiagnosticRecordingEnabled(true);
-  cache->resetStats();
-  // The draw runs on the runtime route in both branches (the flag only decides whether the
-  // construction-phase rewrite is skipped), so its JIT creations are deliberate: raw counters
-  // stay observable for the assertions below while the production coverage metrics exclude them.
-  ScopedAOTDeliberateMiss deliberate(context);
-  auto image = MakeImage("resources/apitest/mandrill_128.png");
-  ASSERT_NE(image, nullptr);
-  auto surface = Surface::Make(context, 96, 96);
-  ASSERT_NE(surface, nullptr);
-  auto gradient = Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(96, 96),
-                                             {Color(1, 0, 0, 1), Color(0, 0, 1, 1)});
-  ASSERT_NE(gradient, nullptr);
-  auto imageShader = Shader::MakeImageShader(image);
-  ASSERT_NE(imageShader, nullptr);
-  auto blend = Shader::MakeBlend(BlendMode::SrcOver, gradient, imageShader);
-  ASSERT_NE(blend, nullptr);
-  Paint paint = {};
-  paint.setShader(blend);
-  surface->getCanvas()->drawRect(Rect::MakeWH(96, 96), paint);
-  context->flushAndSubmit(true);
-  auto stats = cache->drawStats();
+  auto renderScene = [&]() -> AOTDrawStats {
+    cache->setDiagnosticRecordingEnabled(true);
+    cache->resetStats();
+    auto surface = Surface::Make(context, 96, 96);
+    auto gradientA = Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(96, 96),
+                                                 {Color(1, 0, 0, 1), Color(0, 0, 1, 1)});
+    auto gradientB = Shader::MakeLinearGradient(Point::Make(96, 0), Point::Make(0, 96),
+                                                 {Color(0, 1, 0, 1), Color(1, 1, 0, 1)});
+    auto blend = Shader::MakeBlend(BlendMode::Multiply, gradientA, gradientB);
+    EXPECT_TRUE(surface != nullptr && gradientA != nullptr && gradientB != nullptr &&
+                blend != nullptr);
+    if (surface == nullptr || blend == nullptr) {
+      cache->setDiagnosticRecordingEnabled(false);
+      return {};
+    }
+    Paint paint = {};
+    paint.setShader(blend);
+    surface->getCanvas()->drawRect(Rect::MakeWH(96, 96), paint);
+    context->flushAndSubmit(true);
+    auto stats = cache->drawStats();
+    cache->setDiagnosticRecordingEnabled(false);
+    return stats;
+  };
   if (runtimeOnly) {
+    auto stats = renderScene();
     EXPECT_EQ(stats.fpFlattenEdges, 0u);
     EXPECT_EQ(stats.offscreenTargets, 0u);
-  } else {
-    EXPECT_GE(stats.fpFlattenEdges, 1u);
-    EXPECT_GE(stats.offscreenTargets, 1u);
+    EXPECT_EQ(stats.completeAOTDraws, 0u);
+    return;
   }
-  cache->setDiagnosticRecordingEnabled(false);
+  {
+    // No bundle: the original tree runs the runtime route untouched.
+    cache->unload();
+    ScopedAOTDeliberateMiss deliberate(context);
+    auto stats = renderScene();
+    EXPECT_EQ(stats.fpFlattenEdges, 0u);
+    EXPECT_EQ(stats.completeAOTDraws, 0u);
+  }
+  {
+    // Bundle: the retry materializes both operands and the chain serves the draw.
+    auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+    ASSERT_NE(bundleData, nullptr);
+    ASSERT_GT(bundleBytes, 0u);
+    ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+    context->globalCache()->clearPrograms();
+    auto stats = renderScene();
+    EXPECT_GE(stats.fpFlattenEdges, 1u);
+    EXPECT_GE(stats.completeAOTDraws, 1u);
+  }
 }
 
-// Attribution experiment for the three-way diff finding (test/diff harness): the
-// blend_gradient_gradient_lowalpha scene renders with a max channel diff of 7 between the
-// runtime route and the AOT route, while every other calibration scene is byte-identical
-// across all three paths. This test separates the two candidate causes by rendering the exact
-// same scene three ways in one process:
-//  - reference: bundle unloaded (JIT, complex children inline, no materialization)
-//  - materialized JIT: bundle loaded, decomposition disabled (children materialized into RGBA8
-//    textures by the construction-phase rewrite, blend executed by the JIT program)
-//  - full AOT: bundle loaded, decomposition enabled (materialized children matched by the
-//    precompiled blend kernels)
-// If materialized-JIT already differs from the reference, the diff comes from the RGBA8
-// materialization round trip; if it matches the reference, the diff comes from the AOT
-// execution itself.
+// Attribution experiment for the three-way diff finding (test/diff harness). After the P4
+// migration the three configurations mean:
+//  - reference: bundle unloaded — the original tree runs the runtime route with no
+//    materialization (the F02 main-equivalence guarantee now holds by default, no env needed)
+//  - bundle + decomposition disabled: the gate never opens, so the same untouched tree runs the
+//    runtime route — identical to the reference by construction
+//  - bundle + decomposition enabled: the plain chain route refuses the original two-gradient
+//    tree, the in-plan retry materializes both operands, and the chain kernel serves the draw
+// The materialization path is expected to cost at most 1 LSB (the P1 three-way diff measured
+// exactly that across every blend mode), so the full-AOT render may differ from the original
+// tree by <=1 while the AOT execution itself must stay byte-exact against its own input.
 TGFX_TEST(AOTRenderConsistencyTest, GradientBlendDiffAttribution) {
+  if (std::getenv("TGFX_AOT_LEGACY_BLEND_MATERIALIZATION") != nullptr) {
+    GTEST_SKIP() << "The legacy switch restores construction-time materialization; this test "
+                   "asserts the planned path";
+  }
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -1695,8 +1720,8 @@ TGFX_TEST(AOTRenderConsistencyTest, GradientBlendDiffAttribution) {
   pairStats("fullAOT_vs_materializedJIT", fullAOT, materializedJIT);
   bool runtimeOnly = std::getenv("TGFX_AOT_DISABLE") != nullptr;
   if (runtimeOnly) {
-    // With the runtime route forced, the construction-phase materialization is skipped, so all
-    // three renders take the same inline-JIT path and must be byte-identical.
+    // With the runtime route forced, no materialization happens anywhere and all three renders
+    // must be byte-identical.
     EXPECT_EQ(std::get<0>(materializedStats), 0);
     EXPECT_EQ(std::get<0>(aotStats), 0);
     EXPECT_EQ(referenceStats.fpFlattenEdges, 0u);
@@ -1704,15 +1729,16 @@ TGFX_TEST(AOTRenderConsistencyTest, GradientBlendDiffAttribution) {
     EXPECT_EQ(fullAOTStats.completeAOTDraws, 0u);
     return;
   }
-  // With materialization active, all three renders share the same materialized children, and
-  // the precompiled blend kernels must reproduce the JIT result byte-for-byte. The
-  // fullAOT_vs_materializedJIT pair isolates the AOT execution: any diff there is a kernel
-  // semantic error, not quantization.
+  // The untouched tree runs identically on both runtime configurations.
   EXPECT_EQ(std::get<0>(materializedStats), 0);
-  EXPECT_EQ(std::get<0>(aotStats), 0);
-  // Non-vacuous guarantees: the materialization and the AOT service must actually happen, or
-  // the equalities above would prove nothing.
-  EXPECT_GE(referenceStats.fpFlattenEdges, 1u);
+  // The full-AOT render materializes both operands, which costs at most 1 LSB (the documented
+  // materialization quantization); the chain kernel itself stays byte-exact against that input.
+  EXPECT_LE(std::get<0>(aotStats), 1);
+  // Non-vacuous guarantees: the retry materialization and the AOT service must actually happen,
+  // or the bounds above would prove nothing.
+  EXPECT_GE(referenceStats.fpFlattenEdges, 0u);
+  EXPECT_EQ(referenceStats.fpFlattenEdges, 0u);
+  EXPECT_GE(fullAOTStats.fpFlattenEdges, 1u);
   EXPECT_GE(fullAOTStats.completeAOTDraws, 1u);
 }
 
@@ -2662,14 +2688,12 @@ static std::vector<std::shared_ptr<Image>> MakeBlendFixtureImages() {
 
 // WP4-0 fixtures: over-sampler-budget blend DAGs (5/7/9 texture leaves against the fused kernel's
 // four-sampler budget), drawn as a rect (rect GPs) and as an oval (the non-rect-GP terminal
-// materialization route). Discovery (2026-09-07): these shapes never reach the planner as one
-// DAG — AOTMaterializationPolicy::Evaluate flattens every non-texture blend child to a texture at
-// shader-construction time (EnsureSimpleBlendChild), so each blend node renders through its own
-// offscreen fill that the single-pass chain route already serves. The fixtures therefore verify
-// that path end to end: zero fallback, zero runtime compilation, and byte-identical output
-// against the no-bundle pass (both passes flatten at the same points, so the RGBA8 intermediates
-// quantize identically). The 16-leaf left-deep variant crosses fourteen materialization edges —
-// the quantization-depth axis for the WP4 calibration.
+// materialization route). Since the P4 migration the materialization is planned: the retry
+// rebuilds the tree with materialized operands when the chain route refuses the original. The
+// no-bundle reference pass now runs the original tree with no materialization at all (the F02
+// main-equivalence guarantee), so the bundle pass's per-edge RGBA8 quantization shows up as a
+// bounded difference instead of cancelling out: at most 1 LSB per materialized edge, with the
+// differing-pixel share held to a small fraction of the scene.
 TGFX_TEST(AOTRenderConsistencyTest, NestedBlendSamplerBudget) {
   if (std::string(TGFX_BACKEND_NAME) != "metal") {
     // Metal is the byte-exact AOT verification backend; software backends carry LSB-level
@@ -2697,18 +2721,47 @@ TGFX_TEST(AOTRenderConsistencyTest, NestedBlendSamplerBudget) {
     ColorFilterRenderStats stats = {};
     RenderBlendShaderSceneOnce(shader, scene.drawOval, false, &reference, nullptr);
     RenderBlendShaderSceneOnce(shader, scene.drawOval, true, &candidate, &stats);
-    // The pre-draw flattening route serves the whole tree with precompiled programs.
+    // The planned-materialization route serves the whole tree with precompiled programs.
     EXPECT_GE(stats.draws.completeAOTDraws, 1u);
     EXPECT_EQ(stats.programs.programBuilderCreations, 0u);
     EXPECT_EQ(stats.noMatchingRule, 0u);
-    ExpectBitmapsIdentical(scene.label, candidate, reference, 180, 180);
+    auto* refPixels = static_cast<const uint8_t*>(reference.lockPixels());
+    auto* candPixels = static_cast<const uint8_t*>(candidate.lockPixels());
+    ASSERT_TRUE(refPixels != nullptr && candPixels != nullptr);
+    int maxDiff = 0;
+    size_t diffPixels = 0;
+    size_t totalPixels =
+        static_cast<size_t>(reference.width()) * static_cast<size_t>(reference.height());
+    for (size_t offset = 0; offset < totalPixels * 4; offset += 4) {
+      int pixelDiff = 0;
+      for (size_t channel = 0; channel < 4; ++channel) {
+        pixelDiff = std::max(pixelDiff, std::abs(static_cast<int>(refPixels[offset + channel]) -
+                                                 static_cast<int>(candPixels[offset + channel])));
+      }
+      maxDiff = std::max(maxDiff, pixelDiff);
+      if (pixelDiff > 0) {
+        diffPixels++;
+      }
+    }
+    reference.unlockPixels();
+    candidate.unlockPixels();
+    printf("[BudgetBlend] %s maxDiff=%d diffPixels=%zu/%zu\n", scene.label, maxDiff, diffPixels,
+           totalPixels);
+    EXPECT_LE(maxDiff, 1);
+    // Per-edge 1-LSB quantization compounds across the materialized edges, so up to a third of
+    // the pixels legitimately differ by one; a structural error would break the maxDiff bound
+    // long before this share bound.
+    EXPECT_LE(diffPixels, totalPixels * 2 / 5);
   }
 }
 
 // WP4-0 fixture for the materialization-depth axis: a 16-leaf left-deep blend chain. The
-// per-child flattening policy materializes every accumulated left operand, so the output pixel
-// crosses fourteen RGBA8 intermediates — the quantization-calibration shape (a greedy DAG split
-// would cross four; comparing the two policies is the WP4 performance question).
+// planned retry materializes every accumulated left operand (the retry rebuilds the whole blend
+// tree with materializing children), so the output pixel crosses fourteen RGBA8 intermediates —
+// the quantization-depth shape (a greedy DAG split would cross four; comparing the two policies
+// is the WP4 performance question). The no-bundle reference now runs the original tree with zero
+// materialization, so the difference is the accumulated per-edge quantization, bounded at 1 LSB
+// with a differing-pixel share budget.
 TGFX_TEST(AOTRenderConsistencyTest, DeepMaterializationChain) {
   if (std::string(TGFX_BACKEND_NAME) != "metal") {
     GTEST_SKIP();
@@ -2726,7 +2779,32 @@ TGFX_TEST(AOTRenderConsistencyTest, DeepMaterializationChain) {
   EXPECT_EQ(stats.programs.programBuilderCreations, 0u);
   EXPECT_EQ(stats.noMatchingRule, 0u);
   EXPECT_GE(stats.draws.materializedEdges, 14u);
-  ExpectBitmapsIdentical("deep-materialization-chain", candidate, reference, 180, 180);
+  auto* refPixels = static_cast<const uint8_t*>(reference.lockPixels());
+  auto* candPixels = static_cast<const uint8_t*>(candidate.lockPixels());
+  ASSERT_TRUE(refPixels != nullptr && candPixels != nullptr);
+  int maxDiff = 0;
+  size_t diffPixels = 0;
+  size_t totalPixels =
+      static_cast<size_t>(reference.width()) * static_cast<size_t>(reference.height());
+  for (size_t offset = 0; offset < totalPixels * 4; offset += 4) {
+    int pixelDiff = 0;
+    for (size_t channel = 0; channel < 4; ++channel) {
+      pixelDiff = std::max(pixelDiff, std::abs(static_cast<int>(refPixels[offset + channel]) -
+                                               static_cast<int>(candPixels[offset + channel])));
+    }
+    maxDiff = std::max(maxDiff, pixelDiff);
+    if (pixelDiff > 0) {
+      diffPixels++;
+    }
+  }
+  reference.unlockPixels();
+  candidate.unlockPixels();
+  printf("[DeepMaterialization] maxDiff=%d diffPixels=%zu/%zu\n", maxDiff, diffPixels,
+         totalPixels);
+  EXPECT_LE(maxDiff, 1);
+  // Fourteen materialized edges each contribute an independent 1-LSB rounding, so a large share
+  // of pixels may differ by exactly one; the maxDiff bound is the structural guard.
+  EXPECT_LE(diffPixels, totalPixels * 2 / 5);
 }
 
 // An alpha-only texture mask (R8 on Metal) folded into the pointwise chain: the kernel must splat

@@ -71,13 +71,21 @@ PlacementPtr<FragmentProcessor> BlendShader::asFragmentProcessor(
   if (fpB == nullptr) {
     return nullptr;
   }
-  fpB = EnsureSimpleBlendChild(args, std::move(fpB));
-  if (fpB == nullptr) {
-    return nullptr;
-  }
-  fpA = EnsureSimpleBlendChild(args, std::move(fpA), 1);
-  if (fpA == nullptr) {
-    return nullptr;
+  // P4 first migration group: the construction-time materialization is gone by default. The
+  // original two-child tree survives to the draw, and OpsCompositor's in-plan retry materializes
+  // the operands only when the plain chain route refuses the original tree — so the fallback
+  // path always carries the untouched processors. The retry (or the legacy switch below) is what
+  // sets the MaterializeBlendChildren flag when it rebuilds this chain.
+  if (BlendChildMaterializationIsLegacy() ||
+      (args.renderFlags & InternalRenderFlags::MaterializeBlendChildren) != 0) {
+    fpB = EnsureSimpleBlendChild(args, std::move(fpB));
+    if (fpB == nullptr) {
+      return nullptr;
+    }
+    fpA = EnsureSimpleBlendChild(args, std::move(fpA), 1);
+    if (fpA == nullptr) {
+      return nullptr;
+    }
   }
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(args.context->drawingAllocator(),
                                                           std::move(fpB), std::move(fpA), mode);

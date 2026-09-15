@@ -36,6 +36,17 @@ static bool RuntimeRouteOnly() {
   return runtimeOnly;
 }
 
+// P4: legacy switch for the first migration group. Default off: BlendShader keeps its original
+// tree and the in-plan retry in OpsCompositor materializes only when the retry is warranted.
+static bool LegacyBlendMaterialization() {
+  static const bool legacy = std::getenv("TGFX_AOT_LEGACY_BLEND_MATERIALIZATION") != nullptr;
+  return legacy;
+}
+
+bool BlendChildMaterializationIsLegacy() {
+  return LegacyBlendMaterialization();
+}
+
 PlacementPtr<FragmentProcessor> FlattenToTexture(const FPArgs& args,
                                                  PlacementPtr<FragmentProcessor> fp,
                                                  float apronRadius) {

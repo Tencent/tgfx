@@ -50,6 +50,14 @@ PlacementPtr<FragmentProcessor> FlattenToTexture(const FPArgs& args,
  *    the draw is not already inside a nested rasterization, so the default path is byte-for-byte
  *    identical to before and no baseline shifts.
  */
+/**
+ * True when TGFX_AOT_LEGACY_BLEND_MATERIALIZATION is set: BlendShader materializes its children
+ * at construction time (the pre-P4 behavior). The default keeps the original tree and lets the
+ * in-plan materialization retry in OpsCompositor decide, so a failed retry falls back with the
+ * untouched original processors.
+ */
+bool BlendChildMaterializationIsLegacy();
+
 PlacementPtr<FragmentProcessor> EnsureSimpleBlendChild(const FPArgs& args,
                                                        PlacementPtr<FragmentProcessor> fp,
                                                        size_t childIndex = 0);

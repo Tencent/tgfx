@@ -41,6 +41,15 @@ class InternalRenderFlags {
    * of the resulting image amplifies. Materialization for matchability is skipped under this flag.
    */
   static constexpr uint32_t NestedRasterization = 1u << 16;
+
+  /**
+   * Set by the in-plan materialization retry (OpsCompositor) when it rebuilds a draw's color chain
+   * from the original shader after the plain chain route refused the unmodified tree. BlendShader
+   * materializes its children only under this flag (or the legacy switch), so the original tree on
+   * the op stays untouched until a retry fully succeeds and the fallback path always has the real
+   * original processors to fall back to.
+   */
+  static constexpr uint32_t MaterializeBlendChildren = 1u << 17;
 };
 
 /**

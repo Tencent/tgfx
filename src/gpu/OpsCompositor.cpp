@@ -28,6 +28,7 @@
 #include "core/utils/StrokeUtils.h"
 #include "core/utils/USE.h"
 #include "gpu/AOTEffectDecomposer.h"
+#include "gpu/AOTMaterializationPolicy.h"
 #include "gpu/AOTPlanExecutor.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/PrecompiledShaderCache.h"
@@ -1367,13 +1368,86 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
         context->drawingManager()->addRenderTask(std::move(task));
         return;
       }
-    } else if (cache->diagnosticRecordingEnabled()) {
-      // The route was attempted and refused: record the pure-analysis reason so a silently
-      // falling-back draw carries an observable "why" (which processor lacks a lowering, which
-      // shape no planner covers) instead of nothing. Trivial (empty chain) is not a rejection.
-      auto analysis = AOTEffectDecomposer::AnalyzeChain(colorProcessors);
-      if (analysis.outcome != AOTDecomposeOutcome::Trivial) {
-        cache->recordDecomposeRejection(analysis.outcome);
+    } else {
+      if (cache->diagnosticRecordingEnabled()) {
+        // The route was attempted and refused: record the pure-analysis reason so a silently
+        // falling-back draw carries an observable "why" (which processor lacks a lowering, which
+        // shape no planner covers) instead of nothing. Trivial (empty chain) is not a rejection.
+        auto analysis = AOTEffectDecomposer::AnalyzeChain(colorProcessors);
+        if (analysis.outcome != AOTDecomposeOutcome::Trivial) {
+          cache->recordDecomposeRejection(analysis.outcome);
+        }
+      }
+      // P4 first migration group: in-plan materialization retry. When the plain chain route
+      // refuses the unmodified tree and the color chain is a single two-child blend whose
+      // operands the materialization policy would rewrite, rebuild the chain from the original
+      // shader with the MaterializeBlendChildren flag set — BlendShader then applies the same
+      // EnsureSimpleBlendChild rewrite the construction-time path used to apply. The chain
+      // route is retried first (coverage-free draws only, matching the main path's constraint);
+      // when it cannot serve the materialized tree, or the draw carries GP coverage (e.g. an AA
+      // oval) that the chain does not take, the materialized tree is swapped into the op and the
+      // plain direct-match route serves it below — exactly how the pre-P4 construction-time
+      // materialization was served. Under NestedRasterization only correctness-required
+      // operands are materialized (the helper skips matchability flattening there), so the
+      // retry-warranted check mirrors that split.
+      if (brush.shader != nullptr && colorProcessors.size() == 1) {
+        auto* xfer = colorProcessors[0];
+        bool nested = (args.renderFlags & InternalRenderFlags::NestedRasterization) != 0;
+        if (xfer != nullptr && xfer->numChildProcessors() == 2 &&
+            xfer->name() == "XfermodeFragmentProcessor - two") {
+          bool retryWarranted = false;
+          for (size_t childIndex = 0; childIndex < 2 && !retryWarranted; ++childIndex) {
+            auto decision = AOTMaterializationPolicy::Evaluate(
+                xfer->childProcessor(childIndex), MaterializationConsumer::PointwiseBlend,
+                childIndex);
+            retryWarranted =
+                decision.requiredForCorrectness || (!nested && decision.shouldFlatten);
+          }
+          if (retryWarranted) {
+            FPArgs retryArgs = args;
+            retryArgs.renderFlags |= InternalRenderFlags::MaterializeBlendChildren;
+            auto retryFP =
+                FragmentProcessor::Make(brush.shader, retryArgs, nullptr, dstColorSpace);
+            if (retryFP != nullptr) {
+              std::vector<const FragmentProcessor*> retryProcessors = {retryFP.get()};
+              AOTEffectGraph retryGraph = {};
+              AOTEffectPlan retryPlan = {};
+              if (!op->hasCoverage() &&
+                  AOTEffectDecomposer::Lower(retryProcessors, &retryGraph) &&
+                  AOTEffectDecomposer::ValidateForFusion(retryGraph) &&
+                  AOTEffectDecomposer::Decompose(retryGraph, &retryPlan) &&
+                  !retryPlan.passes.empty() &&
+                  (retryPlan.passes.size() > 1 ||
+                   retryPlan.passes[0].kernel == AOTKernelKind::PointwiseTail ||
+                   retryPlan.passes[0].kernel == AOTKernelKind::PointwiseChain ||
+                   retryPlan.passes[0].kernel == AOTKernelKind::PerlinNoiseFill)) {
+                auto task = AOTPlanExecutor::Make(context, renderFlags, retryGraph, retryPlan,
+                                                  *deviceBounds, renderTarget, &op,
+                                                  Point::Zero());
+                if (task != nullptr) {
+                  submitDrawOps();
+                  context->drawingManager()->addRenderTask(std::move(task));
+                  return;
+                }
+              }
+              // The chain route cannot serve the materialized tree (no chain variant for this
+              // geometry processor, or the draw carries GP coverage), but the plain
+              // direct-match route can: the construction-time materialization this retry
+              // replaces was served exactly that way. Swap the materialized tree into the op
+              // and let the plain route below prepare it. The original tree is dropped here,
+              // matching the pre-P4 behavior where the construction-time rewrite left no
+              // original behind either; a direct-match miss on the materialized tree then
+              // JITs it, again like the pre-P4 path.
+              op->colorProcessors().clear();
+              op->colorProcessors().push_back(std::move(retryFP));
+            } else {
+              // The rebuild itself failed: the original op still carries its untouched
+              // processors and falls through to the plain route below. Any materialization the
+              // rebuild had already enqueued renders unconsumed (wasted work, no pixel effect);
+              // a two-phase commit that defers those enqueues is future work.
+            }
+          }
+        }
       }
     }
   }
