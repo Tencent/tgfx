@@ -162,6 +162,7 @@ class Task {
   void execute();
 
   friend class TaskGroup;
+  friend class TaskPool;
 };
 
 }  // namespace tgfx
