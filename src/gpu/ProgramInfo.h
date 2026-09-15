@@ -172,9 +172,17 @@ class ProgramInfo {
   Backend backend() const;
 
   /**
-   * Returns true when the OpenGL context uses the desktop GLSL 150 profile supported by AOT.
+   * Returns the GLSL profile tag ("opengl" for desktop GL, "opengles" for the GLES-family
+   * contexts: GLES, WebGL, SwiftShader) the precompiled bundle must serve this context from.
    */
-  bool usesOpenGLDesktopAOTProfile() const;
+  std::string glProfileTag() const;
+
+  /**
+   * Returns true when the loaded precompiled bundle was built for this context's GLSL profile;
+   * a bundle for the other GL profile hashes its entries under a different tag and can never
+   * serve this context.
+   */
+  bool glProfileMatchesCache() const;
 
   /**
    * Returns true when every texture sampled by this program uses the 2D texture type.

@@ -899,6 +899,22 @@ AAType OpsCompositor::getAAType(bool antiAlias) const {
   return AAType::None;
 }
 
+// The GL backends' precompiled PorterDuff variants read dst through a bound texture, so a
+// fetch-mode XP under a loaded AOT bundle would leave that sampler bound to a dummy texture and
+// silently blend garbage. Metal keeps its native framebuffer-fetch variants, so only GL gives up
+// the fetch route when a bundle is loaded and takes the dst-texture route instead; the runtime
+// JIT route (no bundle) keeps the native fetch path on every backend.
+static bool UsesRuntimeFrameBufferFetch(Context* context) {
+  if (!context->shaderCaps()->frameBufferFetchSupport) {
+    return false;
+  }
+  if (context->backend() == Backend::OpenGL) {
+    auto cache = context->precompiledShaderCache();
+    return cache == nullptr || !cache->isLoaded();
+  }
+  return true;
+}
+
 std::pair<bool, bool> OpsCompositor::needComputeBounds(const Brush& brush, bool hasCoverage,
                                                        bool hasImageFill) {
   bool needLocalBounds = hasImageFill || brush.shader != nullptr || brush.maskFilter != nullptr;
@@ -940,9 +956,8 @@ std::pair<bool, bool> OpsCompositor::needComputeBounds(const Brush& brush, bool 
     needDeviceBounds = true;
   }
   if (BlendModeNeedDstTexture(brush.blendMode, hasCoverage)) {
-    auto shaderCaps = context->shaderCaps();
     auto features = context->gpu()->features();
-    if (!shaderCaps->frameBufferFetchSupport &&
+    if (!UsesRuntimeFrameBufferFetch(context) &&
         (!features->textureBarrier || renderTarget->asTextureProxy() == nullptr ||
          renderTarget->sampleCount() > 1)) {
       needDeviceBounds = true;
@@ -1214,7 +1229,7 @@ static bool IsFoldableLocalMask(const FragmentProcessor* coverageFP) {
 }
 
 DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AAType aaType) {
-  if (context->shaderCaps()->frameBufferFetchSupport) {
+  if (UsesRuntimeFrameBufferFetch(context)) {
     return {};
   }
   Rect bounds = {};
@@ -1328,8 +1343,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
   auto aaType = getAAType(brush);
   if (BlendModeNeedDstTexture(brush.blendMode, op->hasCoverage())) {
     auto dstTextureInfo = makeDstTextureInfo(deviceBounds.value_or(Rect::MakeEmpty()), aaType);
-    auto shaderCaps = context->shaderCaps();
-    if (!shaderCaps->frameBufferFetchSupport && dstTextureInfo.textureProxy == nullptr) {
+    if (!UsesRuntimeFrameBufferFetch(context) && dstTextureInfo.textureProxy == nullptr) {
       return;
     }
     auto xferProcessor = PorterDuffXferProcessor::Make(drawingAllocator(), brush.blendMode,

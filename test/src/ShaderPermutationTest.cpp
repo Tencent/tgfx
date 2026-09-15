@@ -493,11 +493,13 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
     expectedTag = expectedTag.substr(0, dashPos);
   }
   // Entry counts follow the backend-specific exclusions in the bundle generator
-  // (PermutationCompilesForBackend): the WebGPU bundle drops FBF (subpassInput) variants, which
-  // WGSL cannot express, and their vertex stages.
-  const bool isWebGPU = expectedTag == "webgpu";
-  EXPECT_EQ(cache->vertexEntryCount(), isWebGPU ? 97u : 99u);
-  EXPECT_EQ(cache->fragmentEntryCount(), isWebGPU ? 195u : 291u);
+  // (PermutationCompilesForBackend): the GL bundles drop the FBF (subpassInput) variants because
+  // the compositor serves dst reads through a bound texture under AOT, and the opengles bundle
+  // additionally drops RECT (sampler2DRect has no ES form); both land on the same stage counts
+  // as the WebGPU bundle. Metal and Vulkan keep everything.
+  const bool keepsFramebufferFetch = expectedTag == "metal" || expectedTag == "vulkan";
+  EXPECT_EQ(cache->vertexEntryCount(), keepsFramebufferFetch ? 99u : 97u);
+  EXPECT_EQ(cache->fragmentEntryCount(), keepsFramebufferFetch ? 291u : 195u);
   EXPECT_EQ(cache->profileTag(), expectedTag);
   cache->unload();
 }
@@ -1323,12 +1325,13 @@ TGFX_TEST(ShaderPermutationTest, CompressedBundleLoad) {
     if (dash != std::string::npos) {
       tag = tag.substr(0, dash);
     }
-    // Counts follow the generator's backend exclusions (PermutationCompilesForBackend): the
-    // opengl bundle carries the TEXTURE_KIND=Rect variants, the webgpu bundle drops the FBF
-    // (subpassInput) variants, and metal/vulkan keep everything.
-    const bool isWebGPU = tag == "webgpu";
-    EXPECT_EQ(compressedOnly.vertexEntryCount(), isWebGPU ? 97u : 99u);
-    EXPECT_EQ(compressedOnly.fragmentEntryCount(), isWebGPU ? 195u : 291u);
+    // Counts follow the generator's backend exclusions (PermutationCompilesForBackend): the GL
+    // bundles drop the FBF (subpassInput) variants (the compositor reads dst through a bound
+    // texture under AOT), the opengles bundle additionally drops RECT, and metal/vulkan keep
+    // everything.
+    const bool keepsFramebufferFetch = tag == "metal" || tag == "vulkan";
+    EXPECT_EQ(compressedOnly.vertexEntryCount(), keepsFramebufferFetch ? 99u : 97u);
+    EXPECT_EQ(compressedOnly.fragmentEntryCount(), keepsFramebufferFetch ? 291u : 195u);
     EXPECT_EQ(compressedOnly.profileTag(), tag);
     return;
   }

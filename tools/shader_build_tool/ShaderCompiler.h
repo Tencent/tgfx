@@ -44,8 +44,9 @@ CompileResult CompileGLSL(const std::string& source, ShaderStageType stage,
                           const std::string& shaderName, uint32_t variantIndex,
                           bool optimize = false, bool openGLEnv = false);
 
-/// Translates SPIR-V binary to desktop GLSL 150 via spirv-cross.
-CompileResult TranslateToGLSL(const std::vector<uint32_t>& spirv);
+/// Translates SPIR-V binary to GLSL via spirv-cross: desktop GLSL 330, or GLSL ES 300 when
+/// gles is true (precision qualifiers are added by spirv-cross).
+CompileResult TranslateToGLSL(const std::vector<uint32_t>& spirv, bool gles = false);
 
 /// Translates SPIR-V binary to Metal Shading Language via spirv-cross.
 CompileResult TranslateToMSL(const std::vector<uint32_t>& spirv, ShaderStageType stage);

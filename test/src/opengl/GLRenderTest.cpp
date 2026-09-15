@@ -323,7 +323,7 @@ TGFX_TEST(GLRenderTest, AOTWhitelist) {
     ASSERT_NE(fp, nullptr);
     ProgramInfo programInfo(renderTarget.get(), gp.get(), {fp.get()}, 1, nullptr,
                             BlendMode::SrcOver);
-    EXPECT_TRUE(programInfo.usesOpenGLDesktopAOTProfile());
+    EXPECT_TRUE(programInfo.glProfileMatchesCache());
     EXPECT_TRUE(MatchPermutation(&programInfo).has_value());
   }
 
@@ -414,7 +414,10 @@ TGFX_TEST(GLRenderTest, EmbeddedAOTCreatesPipeline) {
   ASSERT_NE(bundleData, nullptr);
   ASSERT_GT(bundleSize, 0u);
   ASSERT_TRUE(cache->loadBundle(bundleData, bundleSize));
-  EXPECT_EQ(cache->profileTag(), "opengl");
+  // The embedded GL bundle matches the build's GLSL profile: "opengles" for GLES-family builds
+  // (SwiftShader, WebGL, mobile), "opengl" for desktop ones.
+  auto expectedProfileTag = context->shaderCaps()->usesPrecisionModifiers ? "opengles" : "opengl";
+  EXPECT_EQ(cache->profileTag(), expectedProfileTag);
   cache->resetStats();
 
   auto surface = Surface::Make(context, 8, 8);

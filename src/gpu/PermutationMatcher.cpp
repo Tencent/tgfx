@@ -1677,11 +1677,12 @@ static std::optional<PermutationMatchResult> TryMatchPerlin(const ProgramInfo* p
 }
 
 static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramInfo* programInfo) {
-  // OpenGL is served in full on the desktop profile. Non-desktop profiles (GLES/SwiftShader) keep
-  // the ProgramBuilder route, as do External (OES) and rectangle samplers (external adopters only;
-  // every texture the context itself produces is two-dimensional).
+  // OpenGL is served from the bundle profile matching the context (desktop GL or the GLES
+  // family: GLES, WebGL, SwiftShader), as do External (OES) and rectangle samplers (external
+  // adopters only; every texture the context itself produces is two-dimensional) which keep the
+  // ProgramBuilder route.
   if (programInfo->backend() == Backend::OpenGL &&
-      (!programInfo->usesOpenGLDesktopAOTProfile() || !programInfo->samplersAre2D())) {
+      (!programInfo->glProfileMatchesCache() || !programInfo->samplersAre2D())) {
     return std::nullopt;
   }
 

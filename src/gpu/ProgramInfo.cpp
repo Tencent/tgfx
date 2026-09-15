@@ -439,9 +439,17 @@ Backend ProgramInfo::backend() const {
   return renderTarget->getContext()->backend();
 }
 
-bool ProgramInfo::usesOpenGLDesktopAOTProfile() const {
+std::string ProgramInfo::glProfileTag() const {
   auto shaderCaps = renderTarget->getContext()->shaderCaps();
-  return !shaderCaps->usesPrecisionModifiers && shaderCaps->versionDeclString == "#version 150";
+  // ShaderCaps assigns precision modifiers to every GLES-family context (GLES, WebGL,
+  // SwiftShader); desktop GL is the remaining case. The tags mirror the shader_build_tool
+  // backends that produce the matching bundles.
+  return shaderCaps->usesPrecisionModifiers ? "opengles" : "opengl";
+}
+
+bool ProgramInfo::glProfileMatchesCache() const {
+  auto cache = renderTarget->getContext()->precompiledShaderCache();
+  return cache->profileTag() == glProfileTag();
 }
 
 bool ProgramInfo::samplersAre2D() const {

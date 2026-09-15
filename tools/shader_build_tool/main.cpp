@@ -163,7 +163,7 @@ static void PrintUsage() {
       << "Usage: shader_build_tool [options]\n"
       << "  --shader-dir <path>   Directory containing shader sources\n"
       << "  --out-dir <path>      Output directory for build artifacts\n"
-      << "  --backends <list>     Comma-separated backend list (opengl,vulkan,metal,webgpu)\n"
+      << "  --backends <list>     Comma-separated backend list (opengl,opengles,vulkan,metal,webgpu)\n"
       << "  --report-only         Only enumerate and report, do not compile\n"
       << "  --audit               Cross-check legacy compile lists against rule-reachable sets\n"
       << "  --compress            Compress data pool with zlib in output bundles\n";
@@ -476,9 +476,10 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
         }
         vertBlob.assign(wgslVert.wgsl.begin(), wgslVert.wgsl.end());
         fragBlob.assign(wgslFrag.wgsl.begin(), wgslFrag.wgsl.end());
-      } else if (backend == "opengl") {
-        auto glslVert = TranslateToGLSL(*vertSpirv);
-        auto glslFrag = TranslateToGLSL(fragResult.spirv);
+      } else if (backend == "opengl" || backend == "opengles") {
+        bool gles = backend == "opengles";
+        auto glslVert = TranslateToGLSL(*vertSpirv, gles);
+        auto glslFrag = TranslateToGLSL(fragResult.spirv, gles);
         if (!glslVert.success || !glslFrag.success) {
           std::cerr << "  GLSL translation error: "
                     << (glslVert.success ? glslFrag.error : glslVert.error) << "\n";

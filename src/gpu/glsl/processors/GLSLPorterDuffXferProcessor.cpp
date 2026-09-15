@@ -34,8 +34,12 @@ GLSLPorterDuffXferProcessor::GLSLPorterDuffXferProcessor(BlendMode blend,
 void GLSLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
   auto fragBuilder = args.fragBuilder;
   auto uniformHandler = args.uniformHandler;
-  const auto& dstColor = fragBuilder->dstColor();
 
+  // The dst-texture route must not consult dstColor(): on framebuffer-fetch-capable contexts its
+  // name (gl_LastFragData[0] / gl_LastFragColorARM) is not a valid local variable name, and its
+  // call would declare a framebuffer-fetch feature the sampler path never uses. Only the
+  // fetch route (no dst texture) goes through dstColor().
+  std::string dstColor;
   if (args.dstTextureSamplerHandle.isValid()) {
     // While shaders typically don't output negative coverage, we use <= as a precaution against
     // floating point precision errors. We only check the rgb values since the alpha might not be
@@ -60,9 +64,12 @@ void GLSLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
     fragBuilder->codeAppendf("highp vec2 %s = (gl_FragCoord.xy - %s) * %s;", dstTexCoord.c_str(),
                              dstTopLeftName.c_str(), dstCoordScaleName.c_str());
 
+    dstColor = "_dstColor";
     fragBuilder->codeAppendf("vec4 %s = ", dstColor.c_str());
     fragBuilder->appendTextureLookup(args.dstTextureSamplerHandle, dstTexCoord);
     fragBuilder->codeAppend(";");
+  } else {
+    dstColor = fragBuilder->dstColor();
   }
 
   const char* outColor = "localOutputColor";
