@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -1506,6 +1507,52 @@ TGFX_TEST(AOTRenderConsistencyTest, LongLinearChainExecutesMaterializedTailPasse
     EXPECT_EQ(draws.peakTemporaryBytes, bytes);
     ExpectBitmapsIdentical("long-linear-chain-tail", candidate, reference, width, height);
   }
+}
+
+// TGFX_AOT_DISABLE exercises the pure runtime route, so it must also disable the
+// construction-phase blend-child materialization: main renders complex blend children inline,
+// and the materialization is itself part of the AOT-era design. Leaving it active under the
+// flag would make runtime-only runs (whole-suite A/B comparisons, the main-baseline three-way
+// diff) compare two paths that share the same rewrite. The flag-absent branch is the positive
+// control: it proves this scene does trigger flattening, so the zero assertion cannot pass
+// vacuously.
+TGFX_TEST(AOTRenderConsistencyTest, RuntimeRouteControlDisablesBlendChildMaterialization) {
+  bool runtimeOnly = std::getenv("TGFX_AOT_DISABLE") != nullptr;
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  cache->unload();
+  cache->setDiagnosticRecordingEnabled(true);
+  cache->resetStats();
+  // The draw runs on the runtime route in both branches (the flag only decides whether the
+  // construction-phase rewrite is skipped), so its JIT creations are deliberate: raw counters
+  // stay observable for the assertions below while the production coverage metrics exclude them.
+  ScopedAOTDeliberateMiss deliberate(context);
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_NE(image, nullptr);
+  auto surface = Surface::Make(context, 96, 96);
+  ASSERT_NE(surface, nullptr);
+  auto gradient = Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(96, 96),
+                                             {Color(1, 0, 0, 1), Color(0, 0, 1, 1)});
+  ASSERT_NE(gradient, nullptr);
+  auto imageShader = Shader::MakeImageShader(image);
+  ASSERT_NE(imageShader, nullptr);
+  auto blend = Shader::MakeBlend(BlendMode::SrcOver, gradient, imageShader);
+  ASSERT_NE(blend, nullptr);
+  Paint paint = {};
+  paint.setShader(blend);
+  surface->getCanvas()->drawRect(Rect::MakeWH(96, 96), paint);
+  context->flushAndSubmit(true);
+  auto stats = cache->drawStats();
+  if (runtimeOnly) {
+    EXPECT_EQ(stats.fpFlattenEdges, 0u);
+    EXPECT_EQ(stats.offscreenTargets, 0u);
+  } else {
+    EXPECT_GE(stats.fpFlattenEdges, 1u);
+    EXPECT_GE(stats.offscreenTargets, 1u);
+  }
+  cache->setDiagnosticRecordingEnabled(false);
 }
 
 // Proves AlphaThreshold reaches a fused pointwise slot. The operator was previously rejected by

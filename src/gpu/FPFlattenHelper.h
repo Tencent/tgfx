@@ -42,7 +42,9 @@ PlacementPtr<FragmentProcessor> FlattenToTexture(const FPArgs& args,
  *
  * Two independent reasons trigger flattening, both decided by AOTMaterializationPolicy:
  *  - Correctness: the child is too complex to be a valid XfermodeFragmentProcessor child. This
- *    always flattens, regardless of any AOT setting.
+ *    always flattens on the default route. Under TGFX_AOT_DISABLE (the pure runtime route)
+ *    the child stays inline, matching main's recursive child emission, so runtime-only
+ *    comparisons exercise the original tree instead of a shared rewrite.
  *  - AOT matchability: the child is valid inline but its permutation has no precompiled artifact
  *    (e.g. a TiledTextureEffect src). This flattens only when the decomposition route is enabled and
  *    the draw is not already inside a nested rasterization, so the default path is byte-for-byte

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/FPFlattenHelper.h"
+#include <cstdlib>
 #include "gpu/DrawingManager.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/processors/TextureEffect.h"
@@ -24,6 +25,16 @@
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
+
+// TGFX_AOT_DISABLE runs the pure runtime route, which must include the blend-child
+// materialization: main renders these children inline, so the rewrite is itself part of the
+// AOT-era design. Gating it keeps runtime-only runs (whole-suite A/B comparisons and the
+// main-baseline three-way diff) from comparing two paths that share the same rewrite. The flag
+// only ever changes diagnostic runs; the default route is untouched. Read once per process.
+static bool RuntimeRouteOnly() {
+  static const bool runtimeOnly = std::getenv("TGFX_AOT_DISABLE") != nullptr;
+  return runtimeOnly;
+}
 
 PlacementPtr<FragmentProcessor> FlattenToTexture(const FPArgs& args,
                                                  PlacementPtr<FragmentProcessor> fp,
@@ -54,6 +65,9 @@ PlacementPtr<FragmentProcessor> FlattenToTexture(const FPArgs& args,
 PlacementPtr<FragmentProcessor> EnsureSimpleBlendChild(const FPArgs& args,
                                                        PlacementPtr<FragmentProcessor> fp,
                                                        size_t childIndex) {
+  if (RuntimeRouteOnly()) {
+    return fp;
+  }
   auto decision = AOTMaterializationPolicy::Evaluate(
       fp.get(), MaterializationConsumer::PointwiseBlend, childIndex);
   if (decision.requiredForCorrectness) {
