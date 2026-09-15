@@ -67,14 +67,16 @@ bool TextureEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNode
     // The view is not instantiated yet. A proxy with a pending upload gets its view before this
     // draw executes (resource tasks run ahead of the draw ops in the same flush), so the chain
     // route can serve it — otherwise the first frame of every lazily uploaded image takes the
-    // plain direct-match route and a second program gets created once the view exists. Such a
-    // proxy is never YUV: YUV images wrap pre-built plane textures and never go through
-    // TextureUploadTask. The uploaded view always matches the proxy's own size (the task builds
-    // it from the same buffer dimensions), so the size branch of needSubset() cannot fire here
-    // and only the explicit subset can matter. A view-less proxy with no pending upload never
-    // materializes (e.g. a generated mask whose rasterization failed); the chain route must
-    // refuse it so the runtime route's zero-stub behavior stays authoritative.
-    if (!textureProxy->hasPendingUpload()) {
+    // plain direct-match route and a second program gets created once the view exists. The
+    // pending leaf is required to be single-plane: an ImageBuffer-backed YUV source reports its
+    // YUV-ness at proxy creation and is refused here; a generator-backed source is trusted to
+    // decode single-plane (every built-in codec does), with the chain matcher's multi-sampler
+    // rejection as the backstop. The uploaded view always matches the proxy's own size (the
+    // task builds it from the same buffer dimensions), so the size branch of needSubset()
+    // cannot fire here and only the explicit subset can matter. A view-less proxy with no
+    // pending upload never materializes (e.g. a generated mask whose rasterization failed); the
+    // chain route must refuse it so the runtime route's zero-stub behavior stays authoritative.
+    if (!textureProxy->hasPendingUpload() || textureProxy->mayUploadYUV()) {
       return false;
     }
     parameters.isYUV = false;

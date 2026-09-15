@@ -44,6 +44,10 @@ class YUVHardwareBuffer : public ImageBuffer {
     return false;
   }
 
+  bool isYUV() const override {
+    return true;
+  }
+
   const std::shared_ptr<ColorSpace>& colorSpace() const override;
 
  protected:

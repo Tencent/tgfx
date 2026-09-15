@@ -20,6 +20,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <atomic>
 #include <string>
 #include <vector>
 #include "base/TGFXTest.h"
@@ -36,7 +37,9 @@
 #include "gtest/gtest.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Canvas.h"
+#include "tgfx/core/ImageBuffer.h"
 #include "tgfx/core/ImageGenerator.h"
+#include "tgfx/core/YUVData.h"
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/ImageFilter.h"
@@ -1882,6 +1885,91 @@ TGFX_TEST(AOTRenderConsistencyTest, FailedTextureUploadKeepsRoutesAligned) {
     renderScene(&aotResult);
   }
   ExpectBitmapsIdentical("failed-upload-aot-aligned", aotResult, runtimeResult, size, size);
+}
+
+// A pending upload whose proxy has no external consumer must be skipped without decoding. The
+// skip lives in ResourceTask::execute() (use_count() == 1 means only the task holds the proxy),
+// so any subclass that stores a second strong reference to the proxy silently defeats it and
+// wastes a full decode for images nobody draws. The generator counts onMakeBuffer() calls: the
+// kept-alive proxy must decode, the released one must not.
+class CountingImageGenerator : public ImageGenerator {
+ public:
+  CountingImageGenerator(int width, int height) : ImageGenerator(width, height) {}
+
+  bool isAlphaOnly() const override {
+    return false;
+  }
+
+  mutable std::atomic<int> makeCount{0};
+
+ protected:
+  std::shared_ptr<ImageBuffer> onMakeBuffer(bool) const override {
+    makeCount++;
+    return nullptr;
+  }
+};
+
+TGFX_TEST(AOTRenderConsistencyTest, UnreferencedPendingUploadIsSkipped) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* proxyProvider = context->proxyProvider();
+  auto generatorA = std::make_shared<CountingImageGenerator>(32, 32);
+  {
+    auto proxy = proxyProvider->createTextureProxy(generatorA, false, 0);
+    ASSERT_TRUE(proxy != nullptr);
+    context->flushAndSubmit(true);
+    // The proxy is still alive here, so the upload task is not its only owner and the decode
+    // must run (even though it fails; only the call count matters for this test).
+    EXPECT_GE(generatorA->makeCount.load(), 1);
+  }
+  auto generatorB = std::make_shared<CountingImageGenerator>(32, 32);
+  {
+    auto proxy = proxyProvider->createTextureProxy(generatorB, false, 0);
+    ASSERT_TRUE(proxy != nullptr);
+    proxy = nullptr;
+    context->flushAndSubmit(true);
+    // With the only external reference released, the task must skip the decode entirely.
+    EXPECT_EQ(generatorB->makeCount.load(), 0);
+  }
+}
+
+// YUV sources upload into multi-plane texture views, which the chain route cannot serve. Their
+// YUV-ness is known at proxy creation time (the ImageBuffer is alive then), so the proxy must
+// report it and TextureEffect::lowerToAOT must refuse the pending upload instead of assuming a
+// single-plane leaf. Generator-backed proxies report non-YUV: every built-in codec decodes into
+// single-plane buffers, and the chain matcher's multi-sampler rejection is the backstop for a
+// custom generator violating that contract.
+TGFX_TEST(AOTRenderConsistencyTest, YUVSourceReportsItsPlanesToChainPlanning) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* proxyProvider = context->proxyProvider();
+  static uint8_t planeY[16 * 16];
+  static uint8_t planeU[8 * 8];
+  static uint8_t planeV[8 * 8];
+  for (size_t index = 0; index < sizeof(planeY); ++index) {
+    planeY[index] = static_cast<uint8_t>(index);
+  }
+  for (size_t index = 0; index < sizeof(planeU); ++index) {
+    planeU[index] = static_cast<uint8_t>(64 + index);
+    planeV[index] = static_cast<uint8_t>(192 - index);
+  }
+  const void* planeData[3] = {planeY, planeU, planeV};
+  size_t planeRowBytes[3] = {16, 8, 8};
+  auto yuvData = YUVData::MakeFrom(16, 16, planeData, planeRowBytes, 3);
+  ASSERT_TRUE(yuvData != nullptr);
+  auto yuvBuffer = ImageBuffer::MakeI420(yuvData);
+  ASSERT_TRUE(yuvBuffer != nullptr);
+  auto yuvProxy = proxyProvider->createTextureProxy(yuvBuffer, false);
+  ASSERT_TRUE(yuvProxy != nullptr);
+  EXPECT_TRUE(yuvProxy->hasPendingUpload());
+  EXPECT_TRUE(yuvProxy->mayUploadYUV());
+  auto generator = std::make_shared<CountingImageGenerator>(16, 16);
+  auto generatorProxy = proxyProvider->createTextureProxy(generator, false, 0);
+  ASSERT_TRUE(generatorProxy != nullptr);
+  EXPECT_TRUE(generatorProxy->hasPendingUpload());
+  EXPECT_FALSE(generatorProxy->mayUploadYUV());
 }
 
 // Proves AlphaThreshold reaches a fused pointwise slot. The operator was previously rejected by

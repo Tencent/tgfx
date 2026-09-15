@@ -445,10 +445,15 @@ std::shared_ptr<GPUHairlineProxy> ProxyProvider::createGPUHairlineProxy(
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxyByImageSource(
     std::shared_ptr<DataSource<ImageBuffer>> source, int width, int height, bool alphaOnly,
-    bool mipmapped) {
+    bool mipmapped, bool mayUploadYUV) {
   auto format = alphaOnly ? PixelFormat::ALPHA_8 : PixelFormat::Unknown;
   auto proxy = std::shared_ptr<TextureProxy>(new TextureProxy(width, height, format, mipmapped));
   proxy->_hasPendingUpload = true;
+  // ImageBuffer-backed sources know their YUV-ness up front; generator-backed ones are trusted
+  // to decode into single-plane buffers (every built-in codec does), and a custom generator
+  // violating that contract is still caught by the chain matcher's multi-sampler rejection
+  // once the view exists.
+  proxy->_mayUploadYUV = mayUploadYUV;
   addResourceProxy(proxy, {});
   auto task =
       context->drawingAllocator()->make<TextureUploadTask>(proxy, std::move(source), mipmapped);
@@ -466,8 +471,12 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
   auto width = imageBuffer->width();
   auto height = imageBuffer->height();
   auto alphaOnly = imageBuffer->isAlphaOnly();
+  // The buffer is still alive here, so its YUV-ness is known exactly, unlike generator-backed
+  // sources whose decode result only exists after the upload task runs.
+  auto mayUploadYUV = imageBuffer->isYUV();
   auto source = ImageSource::Wrap(std::move(imageBuffer));
-  return createTextureProxyByImageSource(std::move(source), width, height, alphaOnly, mipmapped);
+  return createTextureProxyByImageSource(std::move(source), width, height, alphaOnly, mipmapped,
+                                         mayUploadYUV);
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(

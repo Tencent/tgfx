@@ -55,6 +55,16 @@ class TextureProxy : public ResourceProxy {
   }
 
   /**
+   * Returns true if the pending upload may produce a multi-plane YUV texture view. Only
+   * meaningful while hasPendingUpload() is true: the YUV-ness of the future view is known at
+   * proxy creation for ImageBuffer-backed sources and unknown (reported as may-YUV) for
+   * generator-backed ones. AOT planning that assumes a single-plane leaf must refuse those.
+   */
+  bool mayUploadYUV() const {
+    return _mayUploadYUV;
+  }
+
+  /**
    * Returns the width of the backing store, which may differ from the texture width if the texture
    * view has approximate size.
    */
@@ -124,6 +134,7 @@ class TextureProxy : public ResourceProxy {
   bool _mipmapped = false;
   ImageOrigin _origin = ImageOrigin::TopLeft;
   std::atomic_bool _hasPendingUpload = {false};
+  bool _mayUploadYUV = false;
 
   TextureProxy(int width, int height, PixelFormat pixelFormat, bool mipmapped = false,
                ImageOrigin origin = ImageOrigin::TopLeft)

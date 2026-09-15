@@ -22,7 +22,6 @@
 #include "core/ImageSource.h"
 
 namespace tgfx {
-class TextureProxy;
 class TextureUploadTask : public ResourceTask {
  public:
   TextureUploadTask(std::shared_ptr<ResourceProxy> proxy,
@@ -33,7 +32,6 @@ class TextureUploadTask : public ResourceTask {
   std::shared_ptr<Resource> onMakeResource(Context* context) override;
 
  private:
-  std::shared_ptr<TextureProxy> textureProxy = nullptr;
   std::shared_ptr<DataSource<ImageBuffer>> source = nullptr;
   bool mipmapped = false;
 };

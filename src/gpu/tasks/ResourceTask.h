@@ -40,9 +40,12 @@ class ResourceTask {
  protected:
   virtual std::shared_ptr<Resource> onMakeResource(Context* context) = 0;
 
- private:
+  // Protected so derived tasks can inspect the proxy they were built for without taking a
+  // second strong reference: execute() skips work when the task is the proxy's only owner
+  // (use_count() == 1), and an extra member copy in a subclass would break that check.
   std::shared_ptr<ResourceProxy> proxy = nullptr;
 
+ private:
   friend class DrawingManager;
 };
 }  // namespace tgfx

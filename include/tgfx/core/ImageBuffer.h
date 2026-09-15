@@ -95,6 +95,16 @@ class ImageBuffer {
   virtual bool isAlphaOnly() const = 0;
 
   /**
+   * Returns true if this buffer uploads into a multi-plane YUV texture view instead of a single
+   * RGBA/ALPHA_8 texture. Consumers that need to reason about the future texture shape before
+   * the upload happens (e.g. AOT chain planning for a lazily uploaded proxy) use this to
+   * distinguish YUV sources from plain ones; the default covers every single-plane buffer.
+   */
+  virtual bool isYUV() const {
+    return false;
+  }
+
+  /**
    * Returns true if the ImageBuffer is expired, indicating that it cannot create any new textures.
    * However, you can still safely access all of its properties across threads.
    */
