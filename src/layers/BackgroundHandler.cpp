@@ -347,7 +347,7 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     if (result == snapshots->styleResults.end()) {
       Point resultOffset = {};
       auto styleImage =
-          Layer::RenderBackgroundStyle(args, style, source, bgImage, bgOffset, &resultOffset);
+          Layer::RenderBackgroundStyleImage(args, style, source, bgImage, bgOffset, &resultOffset);
       if (styleImage != nullptr) {
         result = snapshots->styleResults
                      .emplace(key, BackgroundStyleResult{std::move(styleImage), resultOffset})
