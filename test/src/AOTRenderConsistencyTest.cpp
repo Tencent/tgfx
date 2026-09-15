@@ -1581,14 +1581,19 @@ TGFX_TEST(AOTRenderConsistencyTest, GradientBlendDiffAttribution) {
     ASSERT_TRUE(surface != nullptr);
     auto* canvas = surface->getCanvas();
     canvas->clear(Color::White());
-    std::vector<Color> colors = {Color(1, 0, 0, 1), Color(0, 0, 1, 1)};
-    auto gradient =
-        Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(size, size), colors);
-    ASSERT_TRUE(gradient != nullptr);
-    auto blend = Shader::MakeBlend(BlendMode::Multiply, gradient, gradient);
+    std::vector<Color> colorsA = {Color(1, 0, 0, 1), Color(0, 0, 1, 1)};
+    std::vector<Color> colorsB = {Color(0, 1, 0, 1), Color(1, 1, 0, 1)};
+    auto gradientA =
+        Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(size, size), colorsA);
+    auto gradientB =
+        Shader::MakeLinearGradient(Point::Make(size, 0), Point::Make(0, size), colorsB);
+    ASSERT_TRUE(gradientA != nullptr);
+    ASSERT_TRUE(gradientB != nullptr);
+    auto blend = Shader::MakeBlend(BlendMode::Multiply, gradientA, gradientB);
     ASSERT_TRUE(blend != nullptr);
     Paint paint = {};
-    paint.setAlpha(51);
+    // Paint::setAlpha() takes a normalized 0-1 float; 51 was an invalid raw 8-bit value.
+    paint.setAlpha(51.0f / 255.0f);
     paint.setShader(blend);
     canvas->drawRect(Rect::MakeWH(size, size), paint);
     context->flushAndSubmit(true);
