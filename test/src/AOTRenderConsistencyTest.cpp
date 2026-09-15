@@ -36,6 +36,7 @@
 #include "gtest/gtest.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Canvas.h"
+#include "tgfx/core/ImageGenerator.h"
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/ImageFilter.h"
@@ -1707,13 +1708,13 @@ TGFX_TEST(AOTRenderConsistencyTest, GradientBlendDiffAttribution) {
   EXPECT_GE(fullAOTStats.completeAOTDraws, 1u);
 }
 
-// The three-way diff harness (test/diff) shows the first scene of an AOT-enabled process
-// rendering in ~14 ms where the runtime route needs ~0.6 ms, and the anomaly does not appear
-// for later scenes. This test renders the same scene (opaque procedural image + swap matrix)
-// onto three separate surfaces and prints per-pass wall time alongside cumulative program
-// cache statistics, to attribute the overhead to per-surface program recreation, lazy
-// first-draw initialization, or something else. Diagnostic output only; the assertions just
-// pin the execution mode so the printed numbers are interpretable.
+// Guards the single-program first-frame behavior for lazily uploaded images. Historically the
+// first draw of a new image took the plain direct-match route (the chain decomposition refused
+// the un-instantiated view) and the second draw created a second program through the chain
+// route, costing two ~15-20ms program creations per shape. TextureEffect::lowerToAOT now
+// accepts proxies with a pending upload, so the first draw already takes the chain route and
+// exactly one program is created. The printed per-pass timings make regressions visible in the
+// log; the assertions pin the program counts.
 TGFX_TEST(AOTRenderConsistencyTest, FirstSceneSteadyStateAttribution) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -1773,6 +1774,15 @@ TGFX_TEST(AOTRenderConsistencyTest, FirstSceneSteadyStateAttribution) {
       report("shared-surface", pass, drawOnce(canvas));
     }
   }
+  // The first draw of a lazily uploaded image must already take the chain route (the pending
+  // upload is accepted), so exactly one precompiled program exists after three draws and the
+  // second draw already hits the cache. A regression back to the plain direct-match first
+  // frame would create a second program here (the double-creation bug).
+  {
+    auto programs = context->globalCache()->programStats();
+    EXPECT_EQ(programs.precompiledArtifactCreations, 1u);
+    EXPECT_GE(programs.cacheHits, 1u);
+  }
   // Phase 2: one draw onto each of three fresh surfaces (the diff-driver pattern).
   for (int pass = 0; pass < 3; ++pass) {
     auto surface = Surface::Make(context, size, size);
@@ -1782,6 +1792,91 @@ TGFX_TEST(AOTRenderConsistencyTest, FirstSceneSteadyStateAttribution) {
     report("separate-surfaces", pass, drawOnce(canvas));
   }
   EXPECT_GE(cache->drawStats().completeAOTDraws, 6u);
+  EXPECT_EQ(context->globalCache()->programStats().precompiledArtifactCreations, 1u);
+}
+
+// A texture whose upload fails must render identically on the runtime route and the AOT route.
+// This is the safety precondition for letting TextureEffect::lowerToAOT accept proxies with a
+// pending upload: if the chain route served a failed upload differently than the runtime route,
+// first-frame chain decomposition would leak pixels (or crash) where the runtime route stays
+// blank. The generator fails every decode, so the texture view never materializes. The
+// clear-only reference makes the runtime assertion non-vacuous: a failed upload must contribute
+// nothing on top of the white background.
+class FailingUploadGenerator : public ImageGenerator {
+ public:
+  FailingUploadGenerator(int width, int height) : ImageGenerator(width, height) {}
+
+  bool isAlphaOnly() const override {
+    return false;
+  }
+
+ protected:
+  std::shared_ptr<ImageBuffer> onMakeBuffer(bool) const override {
+    return nullptr;
+  }
+};
+
+TGFX_TEST(AOTRenderConsistencyTest, FailedTextureUploadKeepsRoutesAligned) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  constexpr int size = 96;
+  std::array<float, 20> swapRedBlue = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0,
+                                       1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
+  auto renderScene = [&](Bitmap* outBitmap) {
+    auto image = Image::MakeFrom(std::make_shared<FailingUploadGenerator>(size, size));
+    ASSERT_TRUE(image != nullptr);
+    auto surface = Surface::Make(context, size, size);
+    ASSERT_TRUE(surface != nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::White());
+    Paint paint = {};
+    paint.setColorFilter(ColorFilter::Matrix(swapRedBlue));
+    canvas->drawImage(image, 0, 0, &paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(size, size));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+  };
+  auto renderClearOnly = [&](Bitmap* outBitmap) {
+    auto surface = Surface::Make(context, size, size);
+    ASSERT_TRUE(surface != nullptr);
+    surface->getCanvas()->clear(Color::White());
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(size, size));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+  };
+  // Runtime-route reference (no bundle): the failed upload must contribute nothing.
+  Bitmap runtimeResult;
+  {
+    cache->unload();
+    ScopedAOTDeliberateMiss deliberate(context);
+    renderScene(&runtimeResult);
+  }
+  Bitmap clearOnly;
+  renderClearOnly(&clearOnly);
+  ExpectBitmapsIdentical("failed-upload-runtime-zero", runtimeResult, clearOnly, size, size);
+  // AOT-enabled route: must match the runtime reference byte for byte. Today the chain route
+  // refuses the un-instantiated view, so this exercises the plain direct-match path; once
+  // lowerToAOT accepts pending-upload proxies, the first frame runs the chain kernel and this
+  // assertion guards that a failed upload still contributes nothing there.
+  Bitmap aotResult;
+  {
+    auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+    ASSERT_NE(bundleData, nullptr);
+    ASSERT_GT(bundleBytes, 0u);
+    ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+    context->globalCache()->clearPrograms();
+    ScopedAOTDeliberateMiss deliberate(context);
+    renderScene(&aotResult);
+  }
+  ExpectBitmapsIdentical("failed-upload-aot-aligned", aotResult, runtimeResult, size, size);
 }
 
 // Proves AlphaThreshold reaches a fused pointwise slot. The operator was previously rejected by

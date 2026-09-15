@@ -17,13 +17,28 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureUploadTask.h"
+#include "gpu/proxies/TextureProxy.h"
 #include "gpu/resources/TextureView.h"
 
 namespace tgfx {
 TextureUploadTask::TextureUploadTask(std::shared_ptr<ResourceProxy> proxy,
                                      std::shared_ptr<DataSource<ImageBuffer>> source,
                                      bool mipmapped)
-    : ResourceTask(std::move(proxy)), source(std::move(source)), mipmapped(mipmapped) {
+    : ResourceTask(proxy), source(std::move(source)), mipmapped(mipmapped) {
+  // The call sites always hand us a TextureProxy; keep a typed reference so execute() can end
+  // its pending-upload intent.
+  textureProxy = std::static_pointer_cast<TextureProxy>(std::move(proxy));
+}
+
+bool TextureUploadTask::execute(Context* context) {
+  auto success = ResourceTask::execute(context);
+  // The upload intent ends here either way: on success the view is instantiated and the
+  // pending flag no longer matters; on failure the view stays null forever and the flag must
+  // be cleared so later draws go back to refusing the un-instantiated view.
+  if (textureProxy != nullptr) {
+    textureProxy->_hasPendingUpload = false;
+  }
+  return success;
 }
 
 std::shared_ptr<Resource> TextureUploadTask::onMakeResource(Context* context) {

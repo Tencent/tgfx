@@ -48,10 +48,10 @@ TextureEffect::TextureEffect(std::shared_ptr<TextureProxy> proxy, const SamplerS
 }
 
 bool TextureEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const {
-  auto textureView = getTextureView();
-  if (builder == nullptr || output == nullptr || textureView == nullptr) {
+  if (builder == nullptr || output == nullptr) {
     return false;
   }
+  auto textureView = getTextureView();
   AOTTextureParameters parameters = {};
   parameters.textureProxy = textureProxy;
   parameters.samplingKind = AOTTextureSamplingKind::Plain;
@@ -60,11 +60,31 @@ bool TextureEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNode
   parameters.uvMatrix = coordTransform.matrix;
   parameters.subset = subset;
   parameters.alphaStart = alphaStart;
-  parameters.isYUV = textureView->isYUV();
   parameters.isAlphaOnly = textureProxy->isAlphaOnly();
   parameters.hasRGBAAA = alphaStart != Point::Zero();
-  parameters.hasSubset = needSubset();
   parameters.hasPerspective = coordTransform.matrix.hasPerspective();
+  if (textureView == nullptr) {
+    // The view is not instantiated yet. A proxy with a pending upload gets its view before this
+    // draw executes (resource tasks run ahead of the draw ops in the same flush), so the chain
+    // route can serve it — otherwise the first frame of every lazily uploaded image takes the
+    // plain direct-match route and a second program gets created once the view exists. Such a
+    // proxy is never YUV: YUV images wrap pre-built plane textures and never go through
+    // TextureUploadTask. The uploaded view always matches the proxy's own size (the task builds
+    // it from the same buffer dimensions), so the size branch of needSubset() cannot fire here
+    // and only the explicit subset can matter. A view-less proxy with no pending upload never
+    // materializes (e.g. a generated mask whose rasterization failed); the chain route must
+    // refuse it so the runtime route's zero-stub behavior stays authoritative.
+    if (!textureProxy->hasPendingUpload()) {
+      return false;
+    }
+    parameters.isYUV = false;
+    parameters.hasSubset =
+        subset.has_value() &&
+        !subset->contains(Rect::MakeWH(textureProxy->width(), textureProxy->height()));
+  } else {
+    parameters.isYUV = textureView->isYUV();
+    parameters.hasSubset = needSubset();
+  }
   return builder->addTextureSource(input, parameters, output);
 }
 

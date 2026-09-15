@@ -448,6 +448,7 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxyByImageSource(
     bool mipmapped) {
   auto format = alphaOnly ? PixelFormat::ALPHA_8 : PixelFormat::Unknown;
   auto proxy = std::shared_ptr<TextureProxy>(new TextureProxy(width, height, format, mipmapped));
+  proxy->_hasPendingUpload = true;
   addResourceProxy(proxy, {});
   auto task =
       context->drawingAllocator()->make<TextureUploadTask>(proxy, std::move(source), mipmapped);
