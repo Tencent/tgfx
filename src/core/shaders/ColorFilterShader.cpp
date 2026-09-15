@@ -59,12 +59,26 @@ PlacementPtr<FragmentProcessor> ColorFilterShader::asFragmentProcessor(
   }
   // The color filter transforms transparent pixels into non-transparent ones. Use the original
   // shader alpha as a mask to prevent coloring transparent regions.
-  composed = EnsureSimpleBlendChild(args, std::move(composed));
-  if (composed == nullptr) {
-    return nullptr;
+  // P4 migration group two: the construction-time materialization is gone by default, mirroring
+  // BlendShader. The original SrcIn tree survives to the draw, and OpsCompositor's in-plan retry
+  // materializes both operands only when the chain route refuses the original tree — so the
+  // fallback path always carries the untouched processors.
+  if (BlendChildMaterializationIsLegacy() ||
+      (args.renderFlags & InternalRenderFlags::MaterializeBlendChildren) != 0) {
+    composed = EnsureSimpleBlendChild(args, std::move(composed));
+    if (composed == nullptr) {
+      return nullptr;
+    }
+    auto alphaSource = FragmentProcessor::Make(shader, args, uvMatrix, dstColorSpace);
+    alphaSource = EnsureSimpleBlendChild(args, std::move(alphaSource), 1);
+    if (alphaSource == nullptr) {
+      return nullptr;
+    }
+    return XfermodeFragmentProcessor::MakeFromTwoProcessors(allocator, std::move(composed),
+                                                            std::move(alphaSource),
+                                                            BlendMode::SrcIn);
   }
   auto alphaSource = FragmentProcessor::Make(shader, args, uvMatrix, dstColorSpace);
-  alphaSource = EnsureSimpleBlendChild(args, std::move(alphaSource), 1);
   if (alphaSource == nullptr) {
     return nullptr;
   }

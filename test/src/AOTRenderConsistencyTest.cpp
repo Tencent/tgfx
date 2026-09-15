@@ -2868,6 +2868,68 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyMaskFoldsIntoChain) {
   ExpectBitmapsIdentical("alpha-only-mask-fold-chain", candidate, reference, width, height);
 }
 
+// P4 migration group two: a shader paired with an affectsTransparentBlack color filter takes the
+// ColorFilterShader path, whose SrcIn tree (composed chain masked by the original shader alpha)
+// used to be materialized at construction time. The planned path keeps the original tree; when
+// the whole chain lowers (texture + color matrix + SrcIn blend are all pointwise), the chain
+// route serves it fused with no materialization at all — strictly better than the old two-texture
+// rewrite. The bundle segment asserts that non-vacuously; the no-bundle segment asserts the
+// untouched-tree runtime route.
+TGFX_TEST(AOTRenderConsistencyTest, ColorFilterShaderServesFusedTreeWithoutMaterialization) {
+  if (std::getenv("TGFX_AOT_LEGACY_BLEND_MATERIALIZATION") != nullptr) {
+    GTEST_SKIP() << "The legacy switch restores construction-time materialization; this test "
+                   "asserts the planned path";
+  }
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  // Shifts red by 0.25, so the matrix affects transparent black (the ColorFilterShader branch).
+  const std::array<float, 20> offsetRed = {1, 0, 0, 0, 0.25f, 0, 1, 0, 0, 0,
+                                           0, 0, 1, 0, 0,       0, 0, 0, 1, 0};
+  auto renderScene = [&]() -> AOTDrawStats {
+    cache->setDiagnosticRecordingEnabled(true);
+    cache->resetStats();
+    auto image = MakeImage("resources/apitest/mandrill_128.png");
+    EXPECT_TRUE(image != nullptr);
+    auto surface = Surface::Make(context, 96, 96);
+    if (surface == nullptr || image == nullptr) {
+      cache->setDiagnosticRecordingEnabled(false);
+      return {};
+    }
+    Paint paint = {};
+    paint.setShader(Shader::MakeImageShader(image));
+    paint.setColorFilter(ColorFilter::Matrix(offsetRed));
+    surface->getCanvas()->drawRect(Rect::MakeWH(96, 96), paint);
+    context->flushAndSubmit(true);
+    auto stats = cache->drawStats();
+    cache->setDiagnosticRecordingEnabled(false);
+    return stats;
+  };
+  {
+    cache->unload();
+    ScopedAOTDeliberateMiss deliberate(context);
+    auto stats = renderScene();
+    EXPECT_EQ(stats.fpFlattenEdges, 0u);
+    EXPECT_EQ(stats.completeAOTDraws, 0u);
+  }
+  {
+    auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+    ASSERT_NE(bundleData, nullptr);
+    ASSERT_GT(bundleBytes, 0u);
+    ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+    context->globalCache()->clearPrograms();
+    auto stats = renderScene();
+    printf("[ColorFilterShaderPlanned] completeAOT=%u fpFlattenEdges=%u\n",
+           static_cast<unsigned>(stats.completeAOTDraws),
+           static_cast<unsigned>(stats.fpFlattenEdges));
+    fflush(stdout);
+    // The SrcIn tree is fully pointwise, so the fused chain serves it with no materialization.
+    EXPECT_GE(stats.completeAOTDraws, 1u);
+    EXPECT_EQ(stats.fpFlattenEdges, 0u);
+  }
+}
+
 // Encoded images use GL_TEXTURE_RECTANGLE on macOS. The pointwise chain kernel carries a
 // TEXTURE_KIND dimension, so a rectangle image with a color-filter chain is served by a single
 // fused precompiled pass and stays pixel-identical to the runtime fallback.
