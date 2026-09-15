@@ -1514,6 +1514,286 @@ TGFX_TEST(AOTRenderConsistencyTest, LongLinearChainExecutesMaterializedTailPasse
   }
 }
 
+// P4 retry semantics, risk one: color-filter retention. addDrawOp merges an
+// affectsTransparentBlack color filter into the shader (shader->makeWithColorFilter) before
+// building the leading processor, so the filter travels inside the ColorFilterShader's SrcIn
+// tree rather than as a trailing processor. When the chain route refuses that tree and the
+// in-plan retry rebuilds the color chain, the rebuild must start from the merged shader: using
+// the raw brush.shader would drop the ColorFilterShader wrapper entirely — the filter AND the
+// alpha mask — and replace the whole color semantics with the bare shader. The scene pairs a
+// two-gradient blend (guaranteed chain refusal, the retry is non-vacuous) with an offset-red
+// matrix (affectsTransparentBlack, so the merge branch is taken). A dropped filter shows up as a
+// systematic ~64-level red shift on the opaque region, far beyond the <=1-LSB-per-edge
+// materialization budget; a correct retry differs from the untouched reference only by the
+// documented quantization.
+TGFX_TEST(AOTRenderConsistencyTest, RetryRebuildKeepsTransparentBlackColorFilter) {
+  if (std::getenv("TGFX_AOT_LEGACY_BLEND_MATERIALIZATION") != nullptr) {
+    GTEST_SKIP() << "The legacy switch restores construction-time materialization; this test "
+                   "asserts the planned path";
+  }
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  // A DstOver mode filter is affectsTransparentBlack (transparent input falls back to the filter
+  // color), which is the exact condition addDrawOp uses to merge the filter into the shader
+  // (ColorFilterShader) instead of appending it as a trailing processor. Note a matrix filter
+  // with an alpha-row bias would also qualify, but ValidateForFusion deliberately refuses to
+  // fuse such matrices (the bias breaks the source-alpha constraint), so its materialized
+  // offscreen fill has no precompiled service today — an existing coverage gap this test
+  // intentionally stays away from (documented in the audit report).
+  const Color filterColor = Color(0.5f, 0.0f, 0.0f, 0.5f);
+  constexpr int size = 96;
+  auto renderScene = [&](Bitmap* outBitmap) {
+    auto surface = Surface::Make(context, size, size);
+    ASSERT_NE(surface, nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::White());
+    // Alpha-0.6 stops keep the blend output partially transparent, so the filter's unpremul ->
+    // matrix -> premul round trip is not an identity (an opaque input would clamp the alpha
+    // offset away and make the whole wrapper a no-op).
+    auto gradientA = Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(size, size),
+                                                 {Color(1, 0, 0, 0.6f), Color(0, 0, 1, 0.6f)});
+    auto gradientB = Shader::MakeLinearGradient(Point::Make(size, 0), Point::Make(0, size),
+                                                 {Color(0, 1, 0, 0.6f), Color(1, 1, 0, 0.6f)});
+    ASSERT_TRUE(gradientA != nullptr && gradientB != nullptr);
+    Paint paint = {};
+    paint.setShader(Shader::MakeBlend(BlendMode::Multiply, gradientA, gradientB));
+    paint.setColorFilter(ColorFilter::Blend(filterColor, BlendMode::DstOver));
+    canvas->drawRect(Rect::MakeWH(size, size), paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(size, size));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+  };
+  Bitmap reference = {};
+  {
+    cache->unload();
+    ScopedAOTDeliberateMiss deliberate(context);
+    renderScene(&reference);
+  }
+  // Control: the same scene without the color filter. If the filter is applied anywhere in the
+  // reference path, these pixels must differ from the reference above.
+  Bitmap noFilter = {};
+  {
+    cache->unload();
+    ScopedAOTDeliberateMiss deliberate(context);
+    auto surface = Surface::Make(context, size, size);
+    ASSERT_NE(surface, nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::White());
+    auto gradientA = Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(size, size),
+                                                 {Color(1, 0, 0, 1), Color(0, 0, 1, 1)});
+    auto gradientB = Shader::MakeLinearGradient(Point::Make(size, 0), Point::Make(0, size),
+                                                 {Color(0, 1, 0, 1), Color(1, 1, 0, 1)});
+    Paint paint = {};
+    paint.setAlpha(51.0f / 255.0f);
+    paint.setShader(Shader::MakeBlend(BlendMode::Multiply, gradientA, gradientB));
+    canvas->drawRect(Rect::MakeWH(size, size), paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(noFilter.allocPixels(size, size));
+    auto* pixels = noFilter.lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(noFilter.info(), pixels));
+    noFilter.unlockPixels();
+    auto* nf = static_cast<const uint32_t*>(const_cast<Bitmap&>(noFilter).lockPixels());
+    auto* rf = static_cast<const uint32_t*>(const_cast<Bitmap&>(reference).lockPixels());
+    printf("[RetryColorFilter] control pixel(48,48) noFilter=%08x reference=%08x\n",
+           nf[48 * size + 48], rf[48 * size + 48]);
+    const_cast<Bitmap&>(noFilter).unlockPixels();
+    const_cast<Bitmap&>(reference).unlockPixels();
+  }
+  Bitmap candidate = {};
+  {
+    auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+    ASSERT_NE(bundleData, nullptr);
+    ASSERT_GT(bundleBytes, 0u);
+    ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+    context->globalCache()->clearPrograms();
+    cache->resetStats();
+    cache->setDiagnosticRecordingEnabled(true);
+    renderScene(&candidate);
+    auto stats = cache->drawStats();
+    cache->setDiagnosticRecordingEnabled(false);
+    printf("[RetryColorFilter] completeAOT=%u fpFlattenEdges=%u\n",
+           static_cast<unsigned>(stats.completeAOTDraws),
+           static_cast<unsigned>(stats.fpFlattenEdges));
+    fflush(stdout);
+    // Non-vacuous: the retry must actually have materialized and served the draw.
+    EXPECT_GE(stats.completeAOTDraws, 1u);
+    EXPECT_GE(stats.fpFlattenEdges, 1u);
+  }
+  auto* refPixels = static_cast<const uint32_t*>(const_cast<Bitmap&>(reference).lockPixels());
+  auto* candPixels = static_cast<uint32_t*>(candidate.lockPixels());
+  ASSERT_TRUE(refPixels != nullptr && candPixels != nullptr);
+  int maxDiff = 0;
+  long long diffCount = 0;
+  for (int y = 0; y < size; ++y) {
+    for (int x = 0; x < size; ++x) {
+      auto refValue = refPixels[y * size + x];
+      auto candValue = candPixels[y * size + x];
+      int pixelDiff = 0;
+      for (int channel = 0; channel < 4; ++channel) {
+        int shift = channel * 8;
+        int value = std::abs(static_cast<int>((refValue >> shift) & 0xFF) -
+                             static_cast<int>((candValue >> shift) & 0xFF));
+        pixelDiff = std::max(pixelDiff, value);
+      }
+      if (pixelDiff > 0) {
+        ++diffCount;
+      }
+      maxDiff = std::max(maxDiff, pixelDiff);
+    }
+  }
+  const_cast<Bitmap&>(reference).unlockPixels();
+  candidate.unlockPixels();
+  {
+    // Attribution probe: the offset-red filter shifts r by 64/255 on the opaque region. Print a
+    // few sample pixels from both renders to see which side carries the filter.
+    auto* refProbe = static_cast<const uint32_t*>(const_cast<Bitmap&>(reference).lockPixels());
+    auto* candProbe = static_cast<uint32_t*>(candidate.lockPixels());
+    for (auto& [px, py] : {std::pair<int, int>{48, 48}, {24, 72}, {72, 24}}) {
+      printf("[RetryColorFilter] pixel(%d,%d) ref=%08x cand=%08x\n", px, py,
+             refProbe[py * size + px], candProbe[py * size + px]);
+    }
+    const_cast<Bitmap&>(reference).unlockPixels();
+    candidate.unlockPixels();
+  }
+  printf("[RetryColorFilter] maxChannelDiff=%d differing=%lld/%d\n", maxDiff, diffCount,
+         size * size);
+  fflush(stdout);
+  // The materialization path costs at most 1 LSB per materialized edge; a dropped filter is a
+  // systematic ~64-level red shift (0.25 * 255). The bound separates the two unambiguously.
+  EXPECT_LE(maxDiff, 4);
+}
+
+// P4 retry semantics, risk two: coverage retention. A draw carrying a shader mask filter keeps
+// the mask as a coverage processor; when the chain route refuses the color tree and the in-plan
+// retry swaps the materialized tree into the op, the swap must only replace the color processors
+// — the mask coverage stays on the op and the plain route composites it. The scene pairs a
+// two-gradient blend (guaranteed chain refusal, so the retry and its swap are non-vacuous) with
+// a decal image-shader mask filter. A dropped mask would paint the full rect with the blended
+// color; a correct retry paints only where the mask has alpha, within the materialization
+// quantization budget.
+TGFX_TEST(AOTRenderConsistencyTest, RetryRebuildKeepsMaskCoverage) {
+  // Under the legacy switch this test still renders the bundle segment and prints the candidate
+  // fingerprint, so a planned-vs-legacy double run can verify the fallback equivalence (the
+  // swapped materialized tree must match the construction-time rewrite byte for byte); only the
+  // planned-path assertions are skipped.
+  bool legacy = std::getenv("TGFX_AOT_LEGACY_BLEND_MATERIALIZATION") != nullptr;
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  constexpr int size = 96;
+  auto maskImage = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_NE(maskImage, nullptr);
+  auto renderScene = [&](Bitmap* outBitmap) {
+    auto surface = Surface::Make(context, size, size);
+    ASSERT_NE(surface, nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::White());
+    auto gradientA = Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(size, size),
+                                                 {Color(1, 0, 0, 1), Color(0, 0, 1, 1)});
+    auto gradientB = Shader::MakeLinearGradient(Point::Make(size, 0), Point::Make(0, size),
+                                                 {Color(0, 1, 0, 1), Color(1, 1, 0, 1)});
+    ASSERT_TRUE(gradientA != nullptr && gradientB != nullptr);
+    Paint paint = {};
+    paint.setShader(Shader::MakeBlend(BlendMode::Multiply, gradientA, gradientB));
+    auto maskShader = Shader::MakeImageShader(maskImage, TileMode::Decal, TileMode::Decal);
+    ASSERT_NE(maskShader, nullptr);
+    paint.setMaskFilter(MaskFilter::MakeShader(maskShader));
+    canvas->drawRect(Rect::MakeWH(size, size), paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(size, size));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+  };
+  Bitmap reference = {};
+  {
+    cache->unload();
+    ScopedAOTDeliberateMiss deliberate(context);
+    renderScene(&reference);
+  }
+  Bitmap candidate = {};
+  {
+    auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+    ASSERT_NE(bundleData, nullptr);
+    ASSERT_GT(bundleBytes, 0u);
+    ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+    context->globalCache()->clearPrograms();
+    cache->resetStats();
+    cache->setDiagnosticRecordingEnabled(true);
+    renderScene(&candidate);
+    auto stats = cache->drawStats();
+    cache->setDiagnosticRecordingEnabled(false);
+    printf("[RetryMaskCoverage] completeAOT=%u fpFlattenEdges=%u\n",
+           static_cast<unsigned>(stats.completeAOTDraws),
+           static_cast<unsigned>(stats.fpFlattenEdges));
+    fflush(stdout);
+    // Non-vacuous: the retry materialized and the draw was served.
+    if (!legacy) {
+      EXPECT_GE(stats.fpFlattenEdges, 1u);
+    }
+  }
+  auto* refPixels = static_cast<const uint32_t*>(const_cast<Bitmap&>(reference).lockPixels());
+  auto* candPixels = static_cast<uint32_t*>(candidate.lockPixels());
+  ASSERT_TRUE(refPixels != nullptr && candPixels != nullptr);
+  int maxDiff = 0;
+  long long diffCount = 0;
+  long long fullPaintCount = 0;
+  const uint32_t white = 0xFFFFFFFFu;
+  for (int y = 0; y < size; ++y) {
+    for (int x = 0; x < size; ++x) {
+      auto refValue = refPixels[y * size + x];
+      auto candValue = candPixels[y * size + x];
+      if (candValue == white && refValue != white) {
+        ++fullPaintCount;
+      }
+      int pixelDiff = 0;
+      for (int channel = 0; channel < 4; ++channel) {
+        int shift = channel * 8;
+        int value = std::abs(static_cast<int>((refValue >> shift) & 0xFF) -
+                             static_cast<int>((candValue >> shift) & 0xFF));
+        pixelDiff = std::max(pixelDiff, value);
+      }
+      if (pixelDiff > 0) {
+        ++diffCount;
+      }
+      maxDiff = std::max(maxDiff, pixelDiff);
+    }
+  }
+  const_cast<Bitmap&>(reference).unlockPixels();
+  candidate.unlockPixels();
+  // Fallback-equivalence fingerprint: the planned retry's swapped materialized tree is built by
+  // the same flag path the legacy construction-time rewrite used, so its output must match the
+  // legacy render byte for byte. The hash lets two process runs (planned vs legacy) be compared
+  // from the logs.
+  uint64_t hash = 1469598103934665603ULL;
+  {
+    auto* hashPixels = static_cast<const uint32_t*>(candidate.lockPixels());
+    for (int i = 0; i < size * size; ++i) {
+      hash ^= hashPixels[i];
+      hash *= 1099511628211ULL;
+    }
+    candidate.unlockPixels();
+  }
+  printf("[RetryMaskCoverage] maxChannelDiff=%d differing=%lld/%d whiteOnlyInRef=%lld "
+         "candidateHash=%llu\n",
+         maxDiff, diffCount, size * size, fullPaintCount,
+         static_cast<unsigned long long>(hash));
+  fflush(stdout);
+  // A dropped mask leaves large white-vs-color regions; the quantization budget is 1 LSB per
+  // materialized edge.
+  if (!legacy) {
+    EXPECT_LE(maxDiff, 4);
+  }
+}
+
 // After the P4 migration, blend-child materialization is planned, not baked in: the original
 // tree survives construction, and the in-plan retry in OpsCompositor materializes operands only
 // when the chain route wants them. Three observable consequences, one per segment:

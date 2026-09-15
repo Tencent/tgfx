@@ -1276,6 +1276,11 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
 
   FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()), drawScale};
   auto colorFilter = brush.colorFilter;
+  // P4 retry semantics: when the color filter is merged into the shader below, the merged
+  // ColorFilterShader (filter + SrcIn alpha mask) must also be what the in-plan materialization
+  // retry rebuilds from — rebuilding from the raw brush.shader would silently drop the filter
+  // and the mask. Keep a shared reference here so the retry can reach it.
+  std::shared_ptr<Shader> mergedShader = nullptr;
   if (brush.shader) {
     auto shader = brush.shader;
     // If the color filter transforms transparent pixels into non-transparent ones, merge it with
@@ -1283,6 +1288,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     if (colorFilter && colorFilter->affectsTransparentBlack()) {
       shader = shader->makeWithColorFilter(colorFilter);
       colorFilter = nullptr;
+      mergedShader = shader;
     }
     if (auto processor = FragmentProcessor::Make(shader, args, nullptr, dstColorSpace)) {
       op->addColorFP(std::move(processor));
@@ -1470,7 +1476,11 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
             if (brush.shader != nullptr) {
               FPArgs retryArgs = args;
               retryArgs.renderFlags |= InternalRenderFlags::MaterializeBlendChildren;
-              retryFP = FragmentProcessor::Make(brush.shader, retryArgs, nullptr, dstColorSpace);
+              // Rebuild from the merged shader when a transparent-black color filter was folded
+              // into it (see mergedShader above); otherwise the raw brush.shader is the whole
+              // color source and rebuilding from it is correct.
+              auto shaderForRetry = mergedShader != nullptr ? mergedShader : brush.shader;
+              retryFP = FragmentProcessor::Make(shaderForRetry, retryArgs, nullptr, dstColorSpace);
             } else {
               retryFP = rebuildColorChain();
             }
