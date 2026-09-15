@@ -34,6 +34,7 @@
 namespace tgfx {
 
 class Context;
+enum class AOTDecomposeOutcome;
 
 struct ShaderStageBlob {
   std::vector<uint8_t> data;
@@ -182,6 +183,12 @@ struct AOTDrawStats {
   // intermediate passes.
   uint64_t fpFlattenEdges = 0;
   uint64_t planMaterializedEdges = 0;
+  // Draws whose color chain the decomposition route attempted and refused, bucketed by
+  // AOTDecomposeOutcome (index == static_cast<size_t>(outcome)). Recorded through
+  // recordDecomposeRejection() only when diagnostic recording is enabled, so a draw that
+  // silently fell back to the plain route carries an observable "why" instead of nothing.
+  // FusablePointwise never appears here: that outcome means the route was not attempted.
+  std::array<uint64_t, 5> decomposeRejections = {};
 };
 
 /// Runtime cache that loads precompiled shader bundles and provides O(1) lookup by ShaderKey hash.
@@ -359,6 +366,11 @@ class PrecompiledShaderCache {
   /// leaves the Draw-level counters untouched, because an inline flatten is one edge of a Draw
   /// rather than a Draw of its own. `bytes` is the size of the offscreen target it allocated.
   void recordMaterializedEdge(uint64_t bytes);
+
+  /// Records one draw whose color chain the decomposition route attempted and refused, with the
+  /// pure-analysis reason (AOTDecomposeOutcome). Diagnostic-only, like the rest of the draw
+  /// stats: paused stats drop it, and it never influences routing.
+  void recordDecomposeRejection(AOTDecomposeOutcome outcome);
 
   /// Returns a snapshot of accumulated Draw-level metrics since the last reset.
   AOTDrawStats drawStats() const;

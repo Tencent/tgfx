@@ -1972,6 +1972,59 @@ TGFX_TEST(AOTRenderConsistencyTest, YUVSourceReportsItsPlanesToChainPlanning) {
   EXPECT_FALSE(generatorProxy->mayUploadYUV());
 }
 
+// The decomposition route's refusals must be observable, not silent: a draw whose color chain
+// was attempted and refused records its pure-analysis reason (AOTDecomposeOutcome) in the draw
+// stats. Part one is the mechanism (counter accumulation). Part two pins the no-false-positive
+// side: a chain the route serves end-to-end records nothing. The positive side is exercised by
+// real suite scenes through the same recording point (e.g. LUTGradientMaskFold records
+// UnsupportedShape, AACoverageXferDstFold records a fusable-but-unserved coverage draw), and
+// the counter is the observation point for the P4 materialization migration, where
+// un-materialized complex chains will finally reach the route and light it up.
+TGFX_TEST(AOTRenderConsistencyTest, DecomposeRejectionIsRecordedWithReason) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  cache->setDiagnosticRecordingEnabled(true);
+  cache->resetStats();
+  cache->recordDecomposeRejection(AOTDecomposeOutcome::UnsupportedShape);
+  cache->recordDecomposeRejection(AOTDecomposeOutcome::UnsupportedShape);
+  cache->recordDecomposeRejection(AOTDecomposeOutcome::BlockedByLowering);
+  auto stats = cache->drawStats();
+  EXPECT_EQ(stats.decomposeRejections[static_cast<size_t>(AOTDecomposeOutcome::UnsupportedShape)], 2u);
+  EXPECT_EQ(stats.decomposeRejections[static_cast<size_t>(AOTDecomposeOutcome::BlockedByLowering)], 1u);
+  EXPECT_EQ(stats.decomposeRejections[static_cast<size_t>(AOTDecomposeOutcome::FusablePointwise)], 0u);
+
+  // No-false-positive: an image + color-matrix chain the route serves end-to-end must not
+  // record any rejection.
+  cache->resetStats();
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_TRUE(image != nullptr);
+  auto imageShader = Shader::MakeImageShader(image);
+  ASSERT_TRUE(imageShader != nullptr);
+  auto surface = Surface::Make(context, 96, 96);
+  ASSERT_TRUE(surface != nullptr);
+  Paint paint = {};
+  paint.setShader(imageShader);
+  std::array<float, 20> swapRedBlue = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0,
+                                       1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
+  paint.setColorFilter(ColorFilter::Matrix(swapRedBlue));
+  surface->getCanvas()->drawRect(Rect::MakeWH(96, 96), paint);
+  context->flushAndSubmit(true);
+  stats = cache->drawStats();
+  uint64_t totalRejections = 0;
+  for (auto count : stats.decomposeRejections) {
+    totalRejections += count;
+  }
+  printf("[DecomposeRejection] served-chain rejections=%llu completeAOT=%u\n",
+         static_cast<unsigned long long>(totalRejections),
+         static_cast<unsigned>(stats.completeAOTDraws));
+  fflush(stdout);
+  EXPECT_EQ(totalRejections, 0u);
+  EXPECT_GE(stats.completeAOTDraws, 1u);
+  cache->setDiagnosticRecordingEnabled(false);
+}
+
 // Proves AlphaThreshold reaches a fused pointwise slot. The operator was previously rejected by
 // AOTPointwiseTailProcessor::Make, so any chain containing it fell back to the runtime path; each
 // slot now carries the full operator parameter set.

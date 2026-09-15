@@ -161,6 +161,9 @@ static void AddDrawStats(AOTDrawStats* target, const AOTDrawStats& source) {
   for (size_t index = 0; index < target->planPassHistogram.size(); ++index) {
     target->planPassHistogram[index] += source.planPassHistogram[index];
   }
+  for (size_t index = 0; index < target->decomposeRejections.size(); ++index) {
+    target->decomposeRejections[index] += source.decomposeRejections[index];
+  }
 }
 
 static nlohmann::json OffscreenFillStatsToJSON(const OffscreenFillStats& stats) {
@@ -181,10 +184,31 @@ static nlohmann::json OffscreenFillStatsToJSON(const OffscreenFillStats& stats) 
           {"topLevelProcessors", stats.topLevelProcessors}};
 }
 
+static const char* AOTDecomposeOutcomeName(AOTDecomposeOutcome outcome) {
+  switch (outcome) {
+    case AOTDecomposeOutcome::Trivial:
+      return "Trivial";
+    case AOTDecomposeOutcome::FusablePointwise:
+      return "FusablePointwise";
+    case AOTDecomposeOutcome::BlockedByLowering:
+      return "BlockedByLowering";
+    case AOTDecomposeOutcome::BlockedByValidation:
+      return "BlockedByValidation";
+    case AOTDecomposeOutcome::UnsupportedShape:
+      return "UnsupportedShape";
+  }
+  return "Unknown";
+}
+
 static nlohmann::json DrawStatsToJSON(const AOTDrawStats& stats) {
   nlohmann::json passHistogram = nlohmann::json::array();
   for (auto count : stats.planPassHistogram) {
     passHistogram.push_back(count);
+  }
+  nlohmann::json decomposeRejections = nlohmann::json::object();
+  for (size_t index = 0; index < stats.decomposeRejections.size(); ++index) {
+    decomposeRejections[AOTDecomposeOutcomeName(static_cast<AOTDecomposeOutcome>(index))] =
+        stats.decomposeRejections[index];
   }
   return {{"draws", stats.draws},
           {"completeAOTDraws", stats.completeAOTDraws},
@@ -200,7 +224,8 @@ static nlohmann::json DrawStatsToJSON(const AOTDrawStats& stats) {
           {"offscreenPlanDraws", stats.offscreenPlanDraws},
           {"planPassHistogram", passHistogram},
           {"fpFlattenEdges", stats.fpFlattenEdges},
-          {"planMaterializedEdges", stats.planMaterializedEdges}};
+          {"planMaterializedEdges", stats.planMaterializedEdges},
+          {"decomposeRejections", std::move(decomposeRejections)}};
 }
 
 struct AggregatedShader {
@@ -513,22 +538,6 @@ static nlohmann::json BuildRootCauseProgramKeyAttribution(
                               {"rows", std::move(rows)}};
   }
   return output;
-}
-
-static const char* AOTDecomposeOutcomeName(AOTDecomposeOutcome outcome) {
-  switch (outcome) {
-    case AOTDecomposeOutcome::Trivial:
-      return "Trivial";
-    case AOTDecomposeOutcome::FusablePointwise:
-      return "FusablePointwise";
-    case AOTDecomposeOutcome::BlockedByLowering:
-      return "BlockedByLowering";
-    case AOTDecomposeOutcome::BlockedByValidation:
-      return "BlockedByValidation";
-    case AOTDecomposeOutcome::UnsupportedShape:
-      return "UnsupportedShape";
-  }
-  return "Unknown";
 }
 
 static nlohmann::json AxisAnalysisToJSON(const AOTAxisAnalysis& axis) {

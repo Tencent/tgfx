@@ -208,6 +208,18 @@ void PrecompiledShaderCache::recordDraw(const AOTDrawStats& delta, bool complete
   }
 }
 
+void PrecompiledShaderCache::recordDecomposeRejection(AOTDecomposeOutcome outcome) {
+  if (statsRecordingPaused()) {
+    return;
+  }
+  auto index = static_cast<size_t>(outcome);
+  if (index >= _drawStats.decomposeRejections.size()) {
+    return;
+  }
+  std::lock_guard<std::mutex> autoLock(drawStatsMutex);
+  _drawStats.decomposeRejections[index]++;
+}
+
 void PrecompiledShaderCache::recordMaterializedEdge(uint64_t bytes) {
   if (statsRecordingPaused()) {
     return;
@@ -218,8 +230,7 @@ void PrecompiledShaderCache::recordMaterializedEdge(uint64_t bytes) {
   _drawStats.offscreenTargets++;
   _drawStats.renderTargetSwitches++;
   _drawStats.intermediateReadBytes += bytes;
-  _drawStats.intermediateWriteBytes += bytes;
-}
+  _drawStats.intermediateWriteBytes += bytes;}
 
 AOTDrawStats PrecompiledShaderCache::drawStats() const {
   std::lock_guard<std::mutex> autoLock(drawStatsMutex);

@@ -1367,6 +1367,14 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
         context->drawingManager()->addRenderTask(std::move(task));
         return;
       }
+    } else if (cache->diagnosticRecordingEnabled()) {
+      // The route was attempted and refused: record the pure-analysis reason so a silently
+      // falling-back draw carries an observable "why" (which processor lacks a lowering, which
+      // shape no planner covers) instead of nothing. Trivial (empty chain) is not a rejection.
+      auto analysis = AOTEffectDecomposer::AnalyzeChain(colorProcessors);
+      if (analysis.outcome != AOTDecomposeOutcome::Trivial) {
+        cache->recordDecomposeRejection(analysis.outcome);
+      }
     }
   }
   drawOps.emplace_back(std::move(op));

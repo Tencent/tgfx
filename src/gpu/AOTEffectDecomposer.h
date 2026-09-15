@@ -159,6 +159,14 @@ class AOTEffectDecomposer {
   static AOTDecomposeAnalysis Analyze(const ProgramInfo* programInfo);
 
   /**
+   * Pure analysis of a single color-processor chain (no ProgramInfo needed), classifying whether
+   * the chain reduces onto the current kernel basis. Same classification the audit uses, exposed
+   * separately so the runtime decomposition route can record why a draw fell back to the plain
+   * route at op-construction time, before any ProgramInfo exists.
+   */
+  static AOTAxisAnalysis AnalyzeChain(const std::vector<const FragmentProcessor*>& processors);
+
+  /**
    * Statically answers whether the given draw (assumed to have missed every matcher rule) would
    * become matchable if its coverage FPs were folded into the color chain at program-creation
    * time. Runs Lower / ValidateForFusion / Decompose / CanExecute on the concatenated

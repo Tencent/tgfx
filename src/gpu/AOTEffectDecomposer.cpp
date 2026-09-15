@@ -368,6 +368,11 @@ bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, AOTEffectPlan* 
   return DecomposePerlinNoiseChain(graph, plan);
 }
 
+AOTAxisAnalysis AOTEffectDecomposer::AnalyzeChain(
+    const std::vector<const FragmentProcessor*>& processors) {
+  return ClassifyAxis(processors);
+}
+
 AOTDecomposeAnalysis AOTEffectDecomposer::Analyze(const ProgramInfo* programInfo) {
   AOTDecomposeAnalysis result = {};
   if (programInfo == nullptr) {
