@@ -1941,7 +1941,7 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
   layerStyle->draw(canvas, styleInput, alpha);
 }
 
-std::shared_ptr<Image> Layer::renderBackgroundStyle(const DrawArgs& args, LayerStyle* style,
+std::shared_ptr<Image> Layer::RenderBackgroundStyle(const DrawArgs& args, LayerStyle* style,
                                                     const LayerStyleSource* source,
                                                     std::shared_ptr<Image> backgroundImage,
                                                     const Point& backgroundOffset, Point* offset) {
