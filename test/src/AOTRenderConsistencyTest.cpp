@@ -1555,6 +1555,157 @@ TGFX_TEST(AOTRenderConsistencyTest, RuntimeRouteControlDisablesBlendChildMateria
   cache->setDiagnosticRecordingEnabled(false);
 }
 
+// Attribution experiment for the three-way diff finding (test/diff harness): the
+// blend_gradient_gradient_lowalpha scene renders with a max channel diff of 7 between the
+// runtime route and the AOT route, while every other calibration scene is byte-identical
+// across all three paths. This test separates the two candidate causes by rendering the exact
+// same scene three ways in one process:
+//  - reference: bundle unloaded (JIT, complex children inline, no materialization)
+//  - materialized JIT: bundle loaded, decomposition disabled (children materialized into RGBA8
+//    textures by the construction-phase rewrite, blend executed by the JIT program)
+//  - full AOT: bundle loaded, decomposition enabled (materialized children matched by the
+//    precompiled blend kernels)
+// If materialized-JIT already differs from the reference, the diff comes from the RGBA8
+// materialization round trip; if it matches the reference, the diff comes from the AOT
+// execution itself.
+TGFX_TEST(AOTRenderConsistencyTest, GradientBlendDiffAttribution) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  constexpr int size = 96;
+  auto renderScene = [&](Bitmap* outBitmap) {
+    auto surface = Surface::Make(context, size, size);
+    ASSERT_TRUE(surface != nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::White());
+    std::vector<Color> colors = {Color(1, 0, 0, 1), Color(0, 0, 1, 1)};
+    auto gradient =
+        Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(size, size), colors);
+    ASSERT_TRUE(gradient != nullptr);
+    auto blend = Shader::MakeBlend(BlendMode::Multiply, gradient, gradient);
+    ASSERT_TRUE(blend != nullptr);
+    Paint paint = {};
+    paint.setAlpha(51);
+    paint.setShader(blend);
+    canvas->drawRect(Rect::MakeWH(size, size), paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(size, size));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+  };
+  auto loadEmbeddedBundle = [&]() -> bool {
+    auto [bundleData, bundleSize] = EmbeddedShaderBundles::GetBundle(context->backend());
+    if (bundleData == nullptr || bundleSize == 0) {
+      return false;
+    }
+    return cache->loadBundle(bundleData, bundleSize);
+  };
+  auto printStats = [&](const char* label, const AOTDrawStats& draws) {
+    printf("[GradientBlendDiffAttribution] %s: draws=%u completeAOT=%u atomicFallbacks=%u "
+           "kernelInvocations=%u fpFlattenEdges=%u planMaterializedEdges=%u\n",
+           label, static_cast<unsigned>(draws.draws),
+           static_cast<unsigned>(draws.completeAOTDraws),
+           static_cast<unsigned>(draws.atomicFallbacks),
+           static_cast<unsigned>(draws.kernelInvocations),
+           static_cast<unsigned>(draws.fpFlattenEdges),
+           static_cast<unsigned>(draws.planMaterializedEdges));
+    fflush(stdout);
+  };
+  AOTDrawStats referenceStats = {};
+  Bitmap reference;
+  {
+    cache->unload();
+    ScopedAOTDeliberateMiss deliberate(context);
+    cache->resetStats();
+    renderScene(&reference);
+    referenceStats = cache->drawStats();
+    printStats("reference", referenceStats);
+  }
+  AOTDrawStats materializedJITStats = {};
+  Bitmap materializedJIT;
+  {
+    ASSERT_TRUE(loadEmbeddedBundle());
+    cache->setDecompositionEnabled(false);
+    context->globalCache()->clearPrograms();
+    ScopedAOTDeliberateMiss deliberate(context);
+    cache->resetStats();
+    renderScene(&materializedJIT);
+    materializedJITStats = cache->drawStats();
+    printStats("materializedJIT", materializedJITStats);
+  }
+  AOTDrawStats fullAOTStats = {};
+  Bitmap fullAOT;
+  {
+    cache->setDecompositionEnabled(true);
+    context->globalCache()->clearPrograms();
+    cache->resetStats();
+    renderScene(&fullAOT);
+    fullAOTStats = cache->drawStats();
+    printStats("fullAOT", fullAOTStats);
+  }
+  auto pairStats = [&](const char* label, const Bitmap& a, const Bitmap& b)
+      -> std::tuple<int, size_t, size_t> {
+    auto* pa = static_cast<const uint8_t*>(const_cast<Bitmap&>(a).lockPixels());
+    auto* pb = static_cast<const uint8_t*>(const_cast<Bitmap&>(b).lockPixels());
+    EXPECT_TRUE(pa != nullptr && pb != nullptr);
+    if (pa == nullptr || pb == nullptr) {
+      return {0, 0, 0};
+    }
+    int maxDiff = 0;
+    size_t diffCount = 0;
+    size_t gt2Count = 0;
+    auto total = static_cast<size_t>(size) * size * 4;
+    for (size_t offset = 0; offset < total; offset += 4) {
+      int pixelDiff = 0;
+      for (int channel = 0; channel < 4; ++channel) {
+        int value = std::abs(pa[offset + static_cast<size_t>(channel)] -
+                             pb[offset + static_cast<size_t>(channel)]);
+        maxDiff = std::max(maxDiff, value);
+        pixelDiff = std::max(pixelDiff, value);
+      }
+      if (pixelDiff > 0) {
+        diffCount++;
+      }
+      if (pixelDiff > 2) {
+        gt2Count++;
+      }
+    }
+    printf("[GradientBlendDiffAttribution] %s: maxChannelDiff=%d differing=%zu/%d >2=%zu\n",
+           label, maxDiff, diffCount, size * size, gt2Count);
+    fflush(stdout);
+    const_cast<Bitmap&>(a).unlockPixels();
+    const_cast<Bitmap&>(b).unlockPixels();
+    return std::make_tuple(maxDiff, diffCount, gt2Count);
+  };
+  auto materializedStats = pairStats("materializedJIT_vs_reference", materializedJIT, reference);
+  auto aotStats = pairStats("fullAOT_vs_reference", fullAOT, reference);
+  pairStats("fullAOT_vs_materializedJIT", fullAOT, materializedJIT);
+  bool runtimeOnly = std::getenv("TGFX_AOT_DISABLE") != nullptr;
+  if (runtimeOnly) {
+    // With the runtime route forced, the construction-phase materialization is skipped, so all
+    // three renders take the same inline-JIT path and must be byte-identical.
+    EXPECT_EQ(std::get<0>(materializedStats), 0);
+    EXPECT_EQ(std::get<0>(aotStats), 0);
+    EXPECT_EQ(referenceStats.fpFlattenEdges, 0u);
+    EXPECT_EQ(materializedJITStats.fpFlattenEdges, 0u);
+    EXPECT_EQ(fullAOTStats.completeAOTDraws, 0u);
+    return;
+  }
+  // With materialization active, all three renders share the same materialized children, and
+  // the precompiled blend kernels must reproduce the JIT result byte-for-byte. The
+  // fullAOT_vs_materializedJIT pair isolates the AOT execution: any diff there is a kernel
+  // semantic error, not quantization.
+  EXPECT_EQ(std::get<0>(materializedStats), 0);
+  EXPECT_EQ(std::get<0>(aotStats), 0);
+  // Non-vacuous guarantees: the materialization and the AOT service must actually happen, or
+  // the equalities above would prove nothing.
+  EXPECT_GE(referenceStats.fpFlattenEdges, 1u);
+  EXPECT_GE(fullAOTStats.completeAOTDraws, 1u);
+}
+
 // Proves AlphaThreshold reaches a fused pointwise slot. The operator was previously rejected by
 // AOTPointwiseTailProcessor::Make, so any chain containing it fell back to the runtime path; each
 // slot now carries the full operator parameter set.
