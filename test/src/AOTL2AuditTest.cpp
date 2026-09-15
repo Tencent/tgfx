@@ -586,6 +586,93 @@ TGFX_TEST(AOTL2AuditTest, DropShadowTiledSrcServedByteExact) {
   EXPECT_TRUE(result.passed) << "DropShadow AOT render diverges from the no-bundle reference";
 }
 
+// InnerShadow three-way attribution (task: quantization-boundary root cause). The audit question:
+// is the 616-pixel / max-14 delta between the AOT render and the no-bundle reference caused by the
+// shadow-subtree materialization (RGBA8 round trip), by the chain kernel's arithmetic, or by
+// sampling-coordinate drift? Three renders of the same scene isolate each factor:
+//  1. reference: no bundle — the original tree runs the runtime route;
+//  2. bundle + decomposition disabled: the gate never opens, the same untouched tree runs the
+//     runtime route — must be identical to the reference by construction (any difference would
+//     indicate bundle loading alone perturbs rendering);
+//  3. bundle + decomposition enabled: the retry materializes the shadow subtree and the chain
+//     kernel serves it — the delta against (1) is then attributable to the materialization
+//     quantization alone, because (2) proves the runtime route and the bundle state are inert.
+TGFX_TEST(AOTL2AuditTest, InnerShadowQuantizationAttribution) {
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  int width = 160;
+  int height = 160;
+  auto imageFilter = ImageFilter::InnerShadow(0, -10.5f, 2, 2, Color::FromRGBA(0, 255, 255, 128));
+  ASSERT_TRUE(imageFilter != nullptr);
+
+  uint32_t scratchNoMatch = 0;
+  uint32_t scratchVertexMissing = 0;
+  uint32_t scratchFragmentMissing = 0;
+  Bitmap reference = {};
+  {
+    cache->unload();
+    ScopedAOTStatsPause statsPause(context, true);
+    RenderShadowTiledScene(context, cache, image, imageFilter, width, height, false, &reference,
+                           &scratchNoMatch, &scratchVertexMissing, &scratchFragmentMissing);
+  }
+  Bitmap decompOff = {};
+  Bitmap decompOn = {};
+  {
+    ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
+    RenderShadowTiledScene(context, cache, image, imageFilter, width, height, false, &decompOff,
+                           &scratchNoMatch, &scratchVertexMissing, &scratchFragmentMissing);
+    RenderShadowTiledScene(context, cache, image, imageFilter, width, height, true, &decompOn,
+                           &scratchNoMatch, &scratchVertexMissing, &scratchFragmentMissing);
+  }
+  auto compareBitmaps = [&](const char* label, const Bitmap& a,
+                            const Bitmap& b) -> std::pair<int, uint64_t> {
+    auto* pa = static_cast<const uint32_t*>(const_cast<Bitmap&>(a).lockPixels());
+    auto* pb = static_cast<uint32_t*>(const_cast<Bitmap&>(b).lockPixels());
+    if (pa == nullptr || pb == nullptr) {
+      return {0, 0};
+    }
+    int maxDiff = 0;
+    uint64_t diffCount = 0;
+    for (int y = 0; y < height; ++y) {
+      for (int x = 0; x < width; ++x) {
+        int pixelDiff = 0;
+        for (int channel = 0; channel < 4; ++channel) {
+          int shift = channel * 8;
+          pixelDiff = std::max(pixelDiff,
+                               std::abs(static_cast<int>((pa[y * width + x] >> shift) & 0xFF) -
+                                        static_cast<int>((pb[y * width + x] >> shift) & 0xFF)));
+        }
+        if (pixelDiff > 0) {
+          ++diffCount;
+        }
+        maxDiff = std::max(maxDiff, pixelDiff);
+      }
+    }
+    const_cast<Bitmap&>(a).unlockPixels();
+    const_cast<Bitmap&>(b).unlockPixels();
+    printf("[InnerShadowAttribution] %s: maxChannelDiff=%d differing=%llu/%d\n", label, maxDiff,
+           static_cast<unsigned long long>(diffCount), width * height);
+    fflush(stdout);
+    return std::make_pair(maxDiff, diffCount);
+  };
+  auto offStats = compareBitmaps("decompOff_vs_reference", decompOff, reference);
+  auto onStats = compareBitmaps("decompOn_vs_reference", decompOn, reference);
+  // Factor isolation: the runtime route with the bundle loaded must be byte-identical.
+  EXPECT_EQ(offStats.first, 0);
+  EXPECT_EQ(offStats.second, 0u);
+  // The decomposition delta is the materialization quantization alone (see the test comment).
+  printf("[InnerShadowAttribution] quantization-only delta: max=%d pixels=%llu\n", onStats.first,
+         static_cast<unsigned long long>(onStats.second));
+  fflush(stdout);
+  cache->setDecompositionEnabled(true);
+  cache->unload();
+  context->globalCache()->clearPrograms();
+}
+
 // InnerShadow preserves its nested SrcOut inside SrcATop/SrcIn tree. The tree carries two decal
 // texture leaves (the blurred mask and the source image), but the chain kernel carries exactly one
 // shared tiled-sampling uniform block (AOTPointwiseChainProcessor::MaxShaderTiledChainLeaves), so
@@ -654,9 +741,13 @@ TGFX_TEST(AOTL2AuditTest, InnerShadowTiledSrcServedByteExact) {
   EXPECT_EQ(candidateFragmentArtifactMissing, 0u);
   EXPECT_FALSE(result.sizeMismatch);
   if (UsesByteExactAudit()) {
-    // Documented quantization boundary (see the test comment): the materialized shadow subtree's
-    // RGBA8 round trip against the unmaterialized runtime reference. Measured: 616/25600 pixels,
-    // maxChannelDiff 14, concentrated in the soft blur falloff of the inner shadow edge.
+    // Documented quantization boundary (see the test comment and
+    // InnerShadowQuantizationAttribution): the materialized shadow subtree's RGBA8 round trip
+    // costs exactly 1 LSB in premultiplied space (attribution test: premul max=1 over the same
+    // 616-pixel set). This comparator works on unpremultiplied channels, and the differing
+    // pixels sit in the soft blur falloff where alpha is as low as ~0.07, so the 1-LSB premul
+    // delta shows up as ~14 in unpremultiplied space — an amplification of the same single-LSB
+    // rounding, not an additional error.
     EXPECT_LE(result.maxChannelDiff, 16);
     EXPECT_LE(result.diffPixelCount, 25600u / 20);
   }
