@@ -194,30 +194,31 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
       return nullptr;
     }
   }
-  int localRectSlots = 0;
-  int deviceRectSlots = 0;
-  int colorSpaceSlots = 0;
-  int gradientSlots = 0;
-  int rrectSlots = 0;
+  size_t localRectSlots = 0;
+  size_t deviceRectSlots = 0;
+  size_t colorSpaceSlots = 0;
+  size_t gradientSlots = 0;
+  size_t rrectSlots = 0;
   for (const auto& slot : slots) {
     if (slot.op == AOTChainOp::None) {
       return nullptr;
     }
     if (slot.op == AOTChainOp::ColorSpaceXform &&
-        (slot.colorSpaceXform.steps == nullptr || ++colorSpaceSlots > 1)) {
+        (slot.colorSpaceXform.steps == nullptr ||
+         ++colorSpaceSlots > MaxColorSpaceXformSlots)) {
       return nullptr;
     }
-    if (slot.op == AOTChainOp::Gradient && ++gradientSlots > 1) {
+    if (slot.op == AOTChainOp::Gradient && ++gradientSlots > MaxGradientSlots) {
       return nullptr;
     }
-    if (slot.op == AOTChainOp::AARectCoverage && ++deviceRectSlots > 1) {
+    if (slot.op == AOTChainOp::AARectCoverage && ++deviceRectSlots > MaxDeviceRectCoverageSlots) {
       return nullptr;
     }
     // The kernel carries one chain-wide local-rect parameter set and four rrect array elements.
-    if (slot.op == AOTChainOp::LocalRectCoverage && ++localRectSlots > 1) {
+    if (slot.op == AOTChainOp::LocalRectCoverage && ++localRectSlots > MaxLocalRectCoverageSlots) {
       return nullptr;
     }
-    if (slot.op == AOTChainOp::RRectCoverage && ++rrectSlots > 4) {
+    if (slot.op == AOTChainOp::RRectCoverage && ++rrectSlots > MaxRRectCoverageSlots) {
       return nullptr;
     }
     // -1 (the geometry color) is a legitimate blend operand; only an unmapped edge (-2) is invalid.

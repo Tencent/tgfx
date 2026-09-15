@@ -212,12 +212,14 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
         ++plainLeaves;
       } else if (node->kind == AOTEffectKind::ColorSpaceXform) {
         auto parameters = std::get_if<AOTColorSpaceXformParameters>(&node->parameters);
-        if (parameters == nullptr || parameters->steps == nullptr || ++colorSpaceXforms > 1) {
+        if (parameters == nullptr || parameters->steps == nullptr ||
+            ++colorSpaceXforms > AOTPointwiseChainProcessor::MaxColorSpaceXformSlots) {
           return false;
         }
       } else if (node->kind == AOTEffectKind::GradientSource) {
         auto parameters = std::get_if<AOTGradientParameters>(&node->parameters);
-        if (parameters == nullptr || ++gradients > 1) {
+        if (parameters == nullptr ||
+            ++gradients > AOTPointwiseChainProcessor::MaxGradientSlots) {
           return false;
         }
         hasLUT = parameters->colorizerKind == 3;
@@ -231,10 +233,13 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
         }
         const std::array<float, 9> identity = {1, 0, 0, 0, 1, 0, 0, 0, 1};
         auto& count = parameters->deviceToLocal == identity ? deviceRects : localRects;
-        if (++count > 1) {
+        if (++count > (parameters->deviceToLocal == identity
+                           ? AOTPointwiseChainProcessor::MaxDeviceRectCoverageSlots
+                           : AOTPointwiseChainProcessor::MaxLocalRectCoverageSlots)) {
           return false;
         }
-      } else if (node->kind == AOTEffectKind::RRectCoverage && ++rrects > 4) {
+      } else if (node->kind == AOTEffectKind::RRectCoverage &&
+                 ++rrects > AOTPointwiseChainProcessor::MaxRRectCoverageSlots) {
         return false;
       }
     }

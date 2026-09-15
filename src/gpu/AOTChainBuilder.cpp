@@ -585,8 +585,8 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
         if (parameters == nullptr || node->inputs.size() != 1) {
           return nullptr;
         }
-        // The kernel carries one chain-wide gradient parameter block and one gradient coordinate
-        // varying, so a second gradient node cannot be represented.
+        // Single-authority budget: AOTPointwiseChainProcessor::MaxGradientSlots (the kernel
+        // carries one chain-wide gradient parameter block and one gradient coordinate varying).
         if (hasGradient) {
           return nullptr;
         }

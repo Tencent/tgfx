@@ -106,6 +106,18 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
   // shader-tiled leaf is expressible per chain.
   static constexpr size_t MaxShaderTiledChainLeaves = 1;
 
+  // The single authority for the chain kernel's shared parameter-block budgets. The kernel has
+  // exactly one chain-wide gradient block and gradient coordinate varying, one color-space
+  // transform block, one device-space rect coverage block, one local rect coverage block, and
+  // four rrect array elements. The planner (AOTPlanExecutor::CanExecute), the chain builder, and
+  // this processor's constructor all consult these constants instead of hard-coding their own
+  // copies, so a budget change cannot leave the three check sites disagreeing.
+  static constexpr size_t MaxGradientSlots = 1;
+  static constexpr size_t MaxColorSpaceXformSlots = 1;
+  static constexpr size_t MaxDeviceRectCoverageSlots = 1;
+  static constexpr size_t MaxLocalRectCoverageSlots = 1;
+  static constexpr size_t MaxRRectCoverageSlots = 4;
+
   // Logical sampler children before padding. The artifacts bind 0 or 4 samplers; the builder
   // pads 1, 2 and 3 children to 4 without adding sampled DAG slots.
   static bool HasChainKernelVariant(size_t samplerChildren) {
