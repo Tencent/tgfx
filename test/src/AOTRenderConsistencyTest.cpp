@@ -1468,6 +1468,81 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailPassesPreserveCoordinateDomains
   }
 }
 
+// F12 execution-failure contract: a plan task that passed the prepare phase must stop cleanly
+// and record a diagnostic when a pass fails to begin during execution, at any position — the
+// first intermediate pass, a later intermediate pass, or the terminal pass. The destination may
+// carry partially executed passes (the documented non-atomic execution contract), so the
+// assertions cover the observable contract: no crash, the failure is counted, the draw is not
+// counted as complete, and un-injecting restores the normal service.
+TGFX_TEST(AOTRenderConsistencyTest, PlanExecutionFailureIsRecordedNotFatal) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  auto bundle = EmbeddedShaderBundles::GetBundle(context->backend());
+  const auto* bundleData = bundle.first;
+  const auto bundleBytes = bundle.second;
+  ASSERT_NE(bundleData, nullptr);
+  ASSERT_GT(bundleBytes, 0u);
+  const std::array<float, 20> swapRedBlue = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0,
+                                             1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
+  auto sourceSurface = Surface::Make(context, 64, 64);
+  ASSERT_NE(sourceSurface, nullptr);
+  {
+    auto* canvas = sourceSurface->getCanvas();
+    canvas->clear(Color::Red());
+    context->flushAndSubmit(true);
+  }
+  auto source = context->proxyProvider()->wrapExternalTexture(sourceSurface->getBackendTexture());
+  ASSERT_NE(source, nullptr);
+  // Renders a 9-pass tail plan (17 pointwise ops on a plain texture chain) and returns the draw
+  // stats of exactly that fill.
+  auto renderNinePassPlan = [&]() -> AOTDrawStats {
+    AOTDrawStats stats = {};
+    if (!cache->loadBundle(bundleData, bundleBytes)) {
+      return stats;
+    }
+    cache->setDiagnosticRecordingEnabled(true);
+    cache->resetStats();
+    context->globalCache()->clearPrograms();
+    auto target = RenderTargetProxy::Make(context, 64, 64, false);
+    if (target == nullptr) {
+      cache->setDiagnosticRecordingEnabled(false);
+      return stats;
+    }
+    auto allocator = context->drawingAllocator();
+    auto processor = TextureEffect::Make(allocator, source);
+    for (int index = 0; index < 17; ++index) {
+      processor = FragmentProcessor::Compose(
+          allocator, std::move(processor),
+          ColorMatrixFragmentProcessor::Make(allocator, swapRedBlue));
+    }
+    if (!context->drawingManager()->fillRTWithFP(target, std::move(processor), 0,
+                                                 Point::Zero())) {
+      cache->setDiagnosticRecordingEnabled(false);
+      return stats;
+    }
+    context->flushAndSubmit(true);
+    stats = cache->drawStats();
+    cache->setDiagnosticRecordingEnabled(false);
+    return stats;
+  };
+  for (const char* mode : {"first", "middle", "last"}) {
+    SCOPED_TRACE(mode);
+    ASSERT_EQ(::setenv("TGFX_AOT_TEST_INJECT_PASS_FAILURE", mode, 1), 0);
+    auto stats = renderNinePassPlan();
+    ::unsetenv("TGFX_AOT_TEST_INJECT_PASS_FAILURE");
+    // The failure is observable: counted, and the draw never lands as complete.
+    EXPECT_GE(stats.planExecutionFailures, 1u);
+    EXPECT_EQ(stats.completeAOTDraws, 0u);
+  }
+  // Un-injecting restores the normal service: the same nine-pass plan completes.
+  auto healthy = renderNinePassPlan();
+  EXPECT_EQ(healthy.planExecutionFailures, 0u);
+  EXPECT_GE(healthy.completeAOTDraws, 1u);
+  EXPECT_EQ(healthy.kernelInvocations, 9u);
+}
+
 TGFX_TEST(AOTRenderConsistencyTest, LongLinearChainExecutesMaterializedTailPasses) {
   auto image = MakeImage("resources/apitest/mandrill_128.png");
   ASSERT_NE(image, nullptr);

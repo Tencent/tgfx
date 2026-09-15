@@ -17,12 +17,41 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AOTPlanRenderTask.h"
+#include <cstdlib>
+#include <string>
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ops/StandardDrawOp.h"
 #include "gpu/resources/RenderTarget.h"
 #include "tgfx/gpu/RenderPass.h"
 
 namespace tgfx {
+
+// F12 fault injection (diagnostics contract): TGFX_AOT_TEST_INJECT_PASS_FAILURE selects which
+// pass of a plan task fails its render-pass setup during execution — "first" (the first
+// intermediate pass), "middle" (a later intermediate pass), or "last" (the terminal pass onto
+// the destination). The task must stop after the failure, record the execution-failure
+// diagnostic, and not crash; the destination may carry partially executed passes, which is the
+// documented non-atomic execution contract. Read once per process; test-only.
+static const char* InjectedPassFailure() {
+  return std::getenv("TGFX_AOT_TEST_INJECT_PASS_FAILURE");
+}
+
+static bool InjectFailureAt(const char* mode, bool isFirstIntermediate, bool isTerminal) {
+  if (mode == nullptr) {
+    return false;
+  }
+  std::string value = mode;
+  if (value == "first") {
+    return isFirstIntermediate;
+  }
+  if (value == "middle") {
+    return !isFirstIntermediate;
+  }
+  if (value == "last") {
+    return isTerminal;
+  }
+  return false;
+}
 
 static bool ExecutePreparedPass(CommandEncoder* encoder, RenderTarget* renderTarget,
                                 StandardDrawOp* drawOp, LoadAction loadAction,
@@ -113,16 +142,38 @@ void AOTPlanRenderTask::execute(CommandEncoder* encoder) {
     drawStats.peakTemporaryBytes += bytes;
   }
 
+  auto* failureCache = finalTarget->getContext()->precompiledShaderCache();
+  auto recordExecutionFailure = [failureCache]() {
+    if (failureCache != nullptr && failureCache->diagnosticRecordingEnabled()) {
+      AOTDrawStats failStats = {};
+      failStats.planExecutionFailures = 1;
+      failureCache->recordDraw(failStats, false);
+    }
+  };
   for (size_t index = 0; index < intermediatePasses.size(); ++index) {
+    if (InjectFailureAt(InjectedPassFailure(), index == 0, false)) {
+      LOGE("AOTPlanRenderTask::execute() Injected pass failure at intermediate pass %zu", index);
+      recordExecutionFailure();
+      return;
+    }
     if (!ExecutePreparedPass(encoder, renderTargets[index].get(),
                              static_cast<StandardDrawOp*>(intermediatePasses[index].drawOp.get()),
                              LoadAction::Clear, PMColor::Transparent())) {
+      LOGE("AOTPlanRenderTask::execute() Intermediate pass %zu failed to begin", index);
+      recordExecutionFailure();
       return;
     }
+  }
+  if (InjectFailureAt(InjectedPassFailure(), intermediatePasses.empty(), true)) {
+    LOGE("AOTPlanRenderTask::execute() Injected pass failure at the terminal pass");
+    recordExecutionFailure();
+    return;
   }
   if (!ExecutePreparedPass(encoder, finalTarget.get(),
                            static_cast<StandardDrawOp*>(originalDraw.get()), LoadAction::Load,
                            PMColor::Transparent())) {
+    LOGE("AOTPlanRenderTask::execute() Terminal pass failed to begin");
+    recordExecutionFailure();
     return;
   }
   auto cache = finalTarget->getContext()->precompiledShaderCache();

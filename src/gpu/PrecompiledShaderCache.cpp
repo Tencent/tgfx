@@ -203,6 +203,7 @@ void PrecompiledShaderCache::recordDraw(const AOTDrawStats& delta, bool complete
   _drawStats.offscreenPlanDraws += delta.offscreenPlanDraws;
   _drawStats.fpFlattenEdges += delta.fpFlattenEdges;
   _drawStats.planMaterializedEdges += delta.planMaterializedEdges;
+  _drawStats.planExecutionFailures += delta.planExecutionFailures;
   for (size_t index = 0; index < _drawStats.planPassHistogram.size(); ++index) {
     _drawStats.planPassHistogram[index] += delta.planPassHistogram[index];
   }
@@ -656,6 +657,18 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   }
   // offset 8: sourceHash(8), offset 16: toolchainVersion(4)
   uint64_t sourceHash = ReadU64LE(ptr + 8);
+  // Toolchain ABI gate (F04): the content identity hash covers the bytes, but a legacy bundle
+  // without a hash (0) carries no self-description. The recorded toolchain version is the one
+  // contract every writer has stamped since the field existed, so a mismatch here means the
+  // bundle's reflection grammar or uniform contracts predate (or postdate) what this runtime
+  // knows how to consume — reject instead of guessing.
+  uint32_t toolchainVersion = ReadU32LE(ptr + 16);
+  if (toolchainVersion != kExpectedToolchainABI) {
+    LOGE("PrecompiledShaderCache: Bundle toolchain ABI 0x%08x does not match the runtime's "
+         "0x%08x; the reflection/uniform contracts are incompatible",
+         toolchainVersion, kExpectedToolchainABI);
+    return false;
+  }
   uint32_t vertPoolCount = ReadU32LE(ptr + 20);
   uint32_t fragPoolCount = ReadU32LE(ptr + 24);
   uint32_t vertPoolOffset = ReadU32LE(ptr + 28);

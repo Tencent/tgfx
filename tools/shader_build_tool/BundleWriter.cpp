@@ -275,7 +275,7 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
   WriteU16LE(file, 4);                // formatVersion
   WriteU16LE(file, compressionFlag);  // compressionType
   WriteU64LE(file, identityHash);     // sourceHash (bundle identity, see above)
-  WriteU32LE(file, 0x00010000);       // toolchainVersion 1.0.0
+  WriteU32LE(file, kExpectedToolchainABI);  // toolchain ABI (see PrecompiledBundleIdentity.h)
   WriteU32LE(file, vertPoolCount);    // vertPoolCount
   WriteU32LE(file, fragPoolCount);    // fragPoolCount
   WriteU32LE(file, vertPoolOffset);   // vertPoolOffset

@@ -176,6 +176,12 @@ struct AOTDrawStats {
   // the direct decomposition rewrite in StandardDrawOp or the atomic multi-pass plan task.
   uint64_t directChainDraws = 0;
   uint64_t offscreenPlanDraws = 0;
+  // F12 execution-failure diagnostics: a plan task that passed the prepare phase (all programs
+  // resolved, all targets instantiated) but lost an intermediate or terminal pass during
+  // execution (beginRenderPass failed). Such a task stops after the failure — the final target
+  // may carry partial passes — so the count is the observable "why did this draw not land"
+  // signal, not a recoverable event.
+  uint64_t planExecutionFailures = 0;
   // Distribution of executed plan pass counts: bucket k counts plans with k+1 passes, the last
   // bucket accumulates deeper plans.
   std::array<uint64_t, 4> planPassHistogram = {};

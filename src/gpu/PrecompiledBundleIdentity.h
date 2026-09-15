@@ -32,6 +32,17 @@ namespace tgfx {
 // compatibility gap a format version cannot express. Both sides must feed the exact same
 // field sequence; the helpers below are the single source of truth for that sequence.
 
+/**
+ * The toolchain ABI version every bundle records (header offset 16). This is the compatibility
+ * gate for everything the content identity hash cannot express on old bundles (hash 0): the
+ * reflection layout grammar, the uniform block contracts, and the rule semantics the runtime
+ * matchers assume when they turn a pool entry into a program. Bump this constant whenever any of
+ * those contracts change in a way that keeps shader names and pool indices stable but changes
+ * what the bytes mean; the writer picks the new value up automatically and the loader then
+ * refuses every older bundle instead of feeding mismatched layouts to the GPU.
+ */
+inline constexpr uint32_t kExpectedToolchainABI = 0x00010000u;
+
 inline uint64_t BundleIdentityHashInit() {
   return 0x54475346424E4443ULL;  // "TGSF BNDC"
 }

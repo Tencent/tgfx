@@ -796,6 +796,7 @@ static std::vector<uint8_t> MakeTestBundle(const std::string& profileTag, uint32
   std::vector<uint8_t> bundle(dataOffset + dataSize, 0);
   TestWriteU32LE(bundle.data(), 0x54475346);
   TestWriteU16LE(bundle.data() + 4, 3);
+  TestWriteU32LE(bundle.data() + 16, kExpectedToolchainABI);
   TestWriteU32LE(bundle.data() + 20, vertCount);
   TestWriteU32LE(bundle.data() + 24, fragCount);
   TestWriteU32LE(bundle.data() + 28, HeaderSize);
@@ -825,6 +826,7 @@ static std::vector<uint8_t> MakeTestBundle(const std::string& profileTag, uint32
 static std::vector<uint8_t> MakeReflectedTestBundle(uint16_t version) {
   auto bundle = MakeTestBundle("bounds", 1, 1, 50);
   TestWriteU16LE(bundle.data() + 4, version);
+  TestWriteU32LE(bundle.data() + 16, kExpectedToolchainABI);
   TestWriteU32LE(bundle.data() + 44, static_cast<uint32_t>(bundle.size()));
   std::vector<uint8_t> reflection = {
       1, 0, 0, 0, 1, 'u', static_cast<uint8_t>(UniformFormat::Float4)};
@@ -1096,6 +1098,26 @@ TGFX_TEST(ShaderPermutationTest, BundleReflectionContractsWithVerifiedIdentity) 
       }
     }
   }
+}
+
+// F04: the recorded toolchain ABI (header offset 16) is the compatibility gate the content
+// identity hash cannot provide, because a legacy bundle without a hash (0) carries no
+// self-description while its shader names and pool indices may still resolve. A bundle stamped
+// with a different ABI — older or newer — must be rejected outright rather than fed to the
+// matchers, whose reflection grammar and uniform contracts it predates or postdates.
+TGFX_TEST(ShaderPermutationTest, BundleRejectsIncompatibleToolchainABI) {
+  for (uint32_t stamped : {0x00000000u, 0x00000001u, 0x00010001u, 0xFFFFFFFFu}) {
+    SCOPED_TRACE(stamped);
+    auto bundle = MakeTestBundle("toolchain", 1, 0, 50);
+    TestWriteU32LE(bundle.data() + 16, stamped);
+    ExpectBundleRejectedPreservingCache(bundle);
+  }
+  // The matching ABI still loads and serves entries.
+  auto valid = MakeTestBundle("toolchain", 1, 0, 50);
+  TestWriteU32LE(valid.data() + 16, kExpectedToolchainABI);
+  PrecompiledShaderCache cache(nullptr, Backend::Unknown);
+  EXPECT_TRUE(cache.loadBundle(valid.data(), valid.size()));
+  EXPECT_NE(cache.findVertex(50, 0), nullptr);
 }
 
 TGFX_TEST(ShaderPermutationTest, BundleRejectsAllocationAmplification) {
