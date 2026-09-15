@@ -68,6 +68,16 @@ struct BackgroundSnapshotKeyHash {
 };
 
 /**
+ * The rendered output of one background-sourced LayerStyle, cached for the duration of a frame so
+ * every consume pass blits it instead of re-running the style. The offset is expressed in the
+ * consume pass's style space, i.e. the coordinate space the style draws in.
+ */
+struct BackgroundStyleResult {
+  std::shared_ptr<Image> image = nullptr;
+  Point offset = Point::Zero();
+};
+
+/**
  * Carries background snapshots from the capture pass to the consume pass. Each (Layer, LayerStyle)
  * key maps to a vector (not a single entry), since the same pair can be dispatched more than once
  * within one render — e.g. a BackgroundBlur layer that gets split into multiple fragments by a
@@ -97,6 +107,15 @@ struct BackgroundSnapshotMap {
                      BackgroundSnapshotKeyHash>
       snapshots = {};
   std::unordered_map<Layer*, std::unique_ptr<LayerStyleSource>> layerStyleSources = {};
+  // Rendered background styles, filled on the first consume pass that needs one and reused by
+  // every later pass. Rendering happens in the consume pass rather than during capture because
+  // only the consume canvas carries the real contentScale the style must be rasterized at.
+  std::unordered_map<BackgroundSnapshotKey, BackgroundStyleResult, BackgroundSnapshotKeyHash>
+      styleResults = {};
+  // Set when one capture pass serves several consume passes (tiled rendering, multiple dirty
+  // rects), so rendering each background style once and blitting it is worth the extra texture.
+  // Sub-consumers inherit it automatically because they share this map.
+  bool shareStyleOutput = false;
 };
 
 }  // namespace tgfx

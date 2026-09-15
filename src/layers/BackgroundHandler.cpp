@@ -338,6 +338,31 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   auto matrix = Matrix::MakeScale(1.f / source->contentScale, 1.f / source->contentScale);
   matrix.preTranslate(contentEntry.offset.x, contentEntry.offset.y);
   canvas->concat(matrix);
+  if (snapshots != nullptr && snapshots->shareStyleOutput) {
+    // Reuse the style rendered by an earlier consume pass when there is one. Rendering it here
+    // rather than during capture matters: only this canvas carries the contentScale the style has
+    // to be rasterized at, and the capture pass walks a different canvas transform.
+    BackgroundSnapshotKey key{layer, style};
+    auto result = snapshots->styleResults.find(key);
+    if (result == snapshots->styleResults.end()) {
+      Point resultOffset = {};
+      auto styleImage =
+          Layer::RenderBackgroundStyleImage(args, style, source, bgImage, bgOffset, &resultOffset);
+      if (styleImage != nullptr) {
+        result = snapshots->styleResults
+                     .emplace(key, BackgroundStyleResult{std::move(styleImage), resultOffset})
+                     .first;
+      }
+    }
+    if (result != snapshots->styleResults.end()) {
+      Paint paint = {};
+      paint.setAlpha(alpha);
+      paint.setBlendMode(style->blendMode());
+      canvas->drawImage(result->second.image, result->second.offset.x, result->second.offset.y,
+                        &paint);
+      return;
+    }
+  }
   auto backgroundOffset = bgOffset - contentEntry.offset;
   LayerStyleInput styleInput = {};
   styleInput.content = contentEntry.image;
