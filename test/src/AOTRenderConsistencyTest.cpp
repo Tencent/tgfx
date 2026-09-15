@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -1704,6 +1705,83 @@ TGFX_TEST(AOTRenderConsistencyTest, GradientBlendDiffAttribution) {
   // the equalities above would prove nothing.
   EXPECT_GE(referenceStats.fpFlattenEdges, 1u);
   EXPECT_GE(fullAOTStats.completeAOTDraws, 1u);
+}
+
+// The three-way diff harness (test/diff) shows the first scene of an AOT-enabled process
+// rendering in ~14 ms where the runtime route needs ~0.6 ms, and the anomaly does not appear
+// for later scenes. This test renders the same scene (opaque procedural image + swap matrix)
+// onto three separate surfaces and prints per-pass wall time alongside cumulative program
+// cache statistics, to attribute the overhead to per-surface program recreation, lazy
+// first-draw initialization, or something else. Diagnostic output only; the assertions just
+// pin the execution mode so the printed numbers are interpretable.
+TGFX_TEST(AOTRenderConsistencyTest, FirstSceneSteadyStateAttribution) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  if (!cache->isLoaded()) {
+    auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+    if (bundleData != nullptr && bundleBytes > 0) {
+      cache->loadBundle(bundleData, bundleBytes);
+    }
+  }
+  constexpr int size = 96;
+  Bitmap source = {};
+  ASSERT_TRUE(source.allocPixels(size, size));
+  auto* pixels = static_cast<uint32_t*>(source.lockPixels());
+  for (int y = 0; y < size; ++y) {
+    for (int x = 0; x < size; ++x) {
+      pixels[y * size + x] = static_cast<uint32_t>(
+          (255u << 24) | (static_cast<uint32_t>(x * 2.6f) << 16) |
+          (static_cast<uint32_t>(y * 2.6f) << 8) | static_cast<uint32_t>((x + y) * 1.3f));
+    }
+  }
+  source.unlockPixels();
+  auto image = Image::MakeFrom(source);
+  ASSERT_TRUE(image != nullptr);
+  std::array<float, 20> swapRedBlue = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0,
+                                       1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
+  auto drawOnce = [&](tgfx::Canvas* canvas) {
+    Paint paint = {};
+    paint.setColorFilter(ColorFilter::Matrix(swapRedBlue));
+    auto start = std::chrono::steady_clock::now();
+    canvas->drawImage(image, 0, 0, &paint);
+    context->flushAndSubmit(true);
+    return std::chrono::duration_cast<std::chrono::microseconds>(
+               std::chrono::steady_clock::now() - start)
+        .count();
+  };
+  auto report = [&](const char* mode, int pass, long long micros) {
+    auto programs = context->globalCache()->programStats();
+    auto draws = cache->drawStats();
+    printf("[FirstSceneSteadyStateAttribution] %s pass=%d micros=%lld "
+           "cumulative: precompiledCreations=%u cacheHits=%u programBuilders=%u "
+           "completeAOT=%u\n",
+           mode, pass, micros, static_cast<unsigned>(programs.precompiledArtifactCreations),
+           static_cast<unsigned>(programs.cacheHits),
+           static_cast<unsigned>(programs.programBuilderCreations),
+           static_cast<unsigned>(draws.completeAOTDraws));
+    fflush(stdout);
+  };
+  // Phase 1: three draws onto one shared surface.
+  {
+    auto surface = Surface::Make(context, size, size);
+    ASSERT_TRUE(surface != nullptr);
+    auto* canvas = surface->getCanvas();
+    for (int pass = 0; pass < 3; ++pass) {
+      canvas->clear(Color::White());
+      report("shared-surface", pass, drawOnce(canvas));
+    }
+  }
+  // Phase 2: one draw onto each of three fresh surfaces (the diff-driver pattern).
+  for (int pass = 0; pass < 3; ++pass) {
+    auto surface = Surface::Make(context, size, size);
+    ASSERT_TRUE(surface != nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::White());
+    report("separate-surfaces", pass, drawOnce(canvas));
+  }
+  EXPECT_GE(cache->drawStats().completeAOTDraws, 6u);
 }
 
 // Proves AlphaThreshold reaches a fused pointwise slot. The operator was previously rejected by
