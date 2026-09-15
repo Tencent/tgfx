@@ -1963,12 +1963,10 @@ std::shared_ptr<Image> Layer::RenderBackgroundStyleImage(const DrawArgs& args, L
 
   PictureRecorder recorder = {};
   auto* recording = recorder.beginRecording();
-  // Record at content-pixel resolution, then apply the same transform the consume pass uses, so
-  // the picture lands in the content image space the style draws into.
-  recording->scale(contentScale, contentScale);
-  auto matrix = Matrix::MakeScale(1.f / contentScale, 1.f / contentScale);
-  matrix.preTranslate(contentEntry.offset.x, contentEntry.offset.y);
-  recording->concat(matrix);
+  // Keep the CTM unscaled so the picture stays in content-pixel space, which is the space the
+  // style draws in. Scaling here would change the resolution the style is rasterized at, while the
+  // cached image has to keep content pixel density.
+  recording->translate(contentEntry.offset.x, contentEntry.offset.y);
 
   LayerStyleInput styleInput = {};
   styleInput.content = contentEntry.image;
