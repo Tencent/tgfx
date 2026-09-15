@@ -1982,9 +1982,16 @@ std::shared_ptr<Image> Layer::RenderBackgroundStyleImage(const DrawArgs& args, L
     styleInput.extraSources.push_back(std::make_shared<ContourInputSource>(
         std::move(contourImage), contourOffset, source->contentShape));
   }
-  // The style renders itself with its own blend mode into this offscreen, but that blend only
-  // becomes visible when the consume pass composites the result onto the real destination, which
-  // re-applies the same blend mode together with the consume-time alpha.
+  // Lay the backdrop slice down first, so the cached image holds the composited result for this
+  // region instead of the style alone. The consume pass blits the whole image at once, which means
+  // the style has to blend against a real backdrop here rather than the destination it would
+  // otherwise only partially cover.
+  {
+    auto styleSpaceBgOffset = backgroundOffset - contentEntry.offset;
+    Paint bgPaint = {};
+    bgPaint.setBlendMode(BlendMode::Src);
+    recording->drawImage(backgroundImage, styleSpaceBgOffset.x, styleSpaceBgOffset.y, &bgPaint);
+  }
   style->draw(recording, styleInput, 1.0f);
 
   auto picture = recorder.finishRecordingAsPicture();
