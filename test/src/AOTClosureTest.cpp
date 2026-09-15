@@ -36,6 +36,12 @@ static std::string ClosureBundlePath() {
   if (pos != std::string::npos) {
     backend = backend.substr(0, pos);
   }
+  // The SwiftShader build runs an ES context, which the opengles bundle serves.
+#if defined(TGFX_USE_SWIFTSHADER)
+  if (backend == "opengl") {
+    backend = "opengles";
+  }
+#endif
   return "resources/shaders/shader_bundle." + backend + ".bin";
 }
 

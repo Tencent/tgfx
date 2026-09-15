@@ -170,7 +170,8 @@ static GLTextureInfo CreateRectangleTexture(Context* context, int width, int hei
 // (CVOpenGLTextureCache, produces GL_TEXTURE_RECTANGLE) versus a plain GL_TEXTURE_2D upload
 // (genTextures + texImage2D + glFinish). Each round creates and releases a fresh texture like a
 // real image decode would; the pixel source is a single pre-filled buffer so only the import cost
-// is measured.
+// is measured. Desktop-only: the CGL/CVOpenGL symbols do not exist in SwiftShader's EGL build.
+#if !defined(TGFX_USE_SWIFTSHADER)
 TGFX_TEST(GLRenderTest, TextureImportBenchmark) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -297,6 +298,7 @@ TGFX_TEST(GLRenderTest, TextureImportBenchmark) {
     CVPixelBufferRelease(pixelBuffer);
   }
 }
+#endif  // !defined(TGFX_USE_SWIFTSHADER)
 
 TGFX_TEST(GLRenderTest, AOTWhitelist) {
   ContextScope scope;

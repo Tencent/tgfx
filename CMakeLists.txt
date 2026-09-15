@@ -527,6 +527,13 @@ elseif (TGFX_USE_SWIFTSHADER)
         endif ()
         list(APPEND TGFX_SHARED_LIBS ${SWIFTSHADER_LIBS})
         list(APPEND TGFX_FILES ${EGL_PLATFORM_FILES})
+        # Lets test sources detect the SwiftShader build (e.g. to skip desktop-only CGL cases).
+        list(APPEND TGFX_DEFINES TGFX_USE_SWIFTSHADER)
+        if (MACOS)
+            # The GL deprecation silencing normally comes from the MACOS native-GL branch, which
+            # this elseif chain bypasses; the CoreVideo/GL test sources still need it here.
+            list(APPEND TGFX_DEFINES GL_SILENCE_DEPRECATION)
+        endif ()
     endif ()
 elseif (TGFX_USE_ANGLE)
     file(GLOB ANGLE_LIBS vendor/angle/${PLATFORM}/${ARCH}/*${CMAKE_STATIC_LIBRARY_SUFFIX})

@@ -77,13 +77,24 @@ namespace tgfx {
 #define TGFX_BACKEND_NAME "opengl"
 #endif
 
-static std::string BundlePath() {
+// The bundle tag for this build: the backend-name prefix, except that the SwiftShader build runs
+// an ES context and consumes the opengles bundle instead of the desktop one.
+static std::string BundleTag() {
   std::string backend = TGFX_BACKEND_NAME;
   auto pos = backend.find('-');
   if (pos != std::string::npos) {
     backend = backend.substr(0, pos);
   }
-  return "resources/shaders/shader_bundle." + backend + ".bin";
+#if defined(TGFX_USE_SWIFTSHADER)
+  if (backend == "opengl") {
+    backend = "opengles";
+  }
+#endif
+  return backend;
+}
+
+static std::string BundlePath() {
+  return "resources/shaders/shader_bundle." + BundleTag() + ".bin";
 }
 
 // The backend a standalone PrecompiledShaderCache must be constructed with so bundle loads
@@ -487,11 +498,7 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(bundlePath));
-  std::string expectedTag = TGFX_BACKEND_NAME;
-  auto dashPos = expectedTag.find('-');
-  if (dashPos != std::string::npos) {
-    expectedTag = expectedTag.substr(0, dashPos);
-  }
+  std::string expectedTag = BundleTag();
   // Entry counts follow the backend-specific exclusions in the bundle generator
   // (PermutationCompilesForBackend): the GL bundles drop the FBF (subpassInput) variants because
   // the compositor serves dst reads through a bound texture under AOT, and the opengles bundle
@@ -742,11 +749,7 @@ TGFX_TEST(ShaderPermutationTest, EmbeddedBundleLoadFromMemory) {
   EXPECT_TRUE(cache.isLoaded());
   EXPECT_GT(cache.vertexEntryCount(), 0u);
   EXPECT_GT(cache.fragmentEntryCount(), 0u);
-  std::string expectedTag2 = TGFX_BACKEND_NAME;
-  auto dashPos2 = expectedTag2.find('-');
-  if (dashPos2 != std::string::npos) {
-    expectedTag2 = expectedTag2.substr(0, dashPos2);
-  }
+  std::string expectedTag2 = BundleTag();
   EXPECT_EQ(cache.profileTag(), expectedTag2);
 }
 
@@ -1320,11 +1323,7 @@ TGFX_TEST(ShaderPermutationTest, CompressedBundleLoad) {
     PrecompiledShaderCache compressedOnly(nullptr, TestBackend());
     ASSERT_TRUE(compressedOnly.loadBundle(original.data(), original.size()));
     EXPECT_TRUE(compressedOnly.isLoaded());
-    std::string tag = TGFX_BACKEND_NAME;
-    auto dash = tag.find('-');
-    if (dash != std::string::npos) {
-      tag = tag.substr(0, dash);
-    }
+    std::string tag = BundleTag();
     // Counts follow the generator's backend exclusions (PermutationCompilesForBackend): the GL
     // bundles drop the FBF (subpassInput) variants (the compositor reads dst through a bound
     // texture under AOT), the opengles bundle additionally drops RECT, and metal/vulkan keep
@@ -1991,9 +1990,7 @@ TGFX_TEST(ShaderPermutationTest, BlendModesMatchJIT) {
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
 
-  std::string bundlePath = ProjectPath::Absolute(
-      "resources/shaders/shader_bundle." +
-      std::string(TGFX_BACKEND_NAME).substr(0, std::string(TGFX_BACKEND_NAME).find('-')) + ".bin");
+  std::string bundlePath = ProjectPath::Absolute(BundlePath());
 
   // Clear is a degenerate mode (result always transparent, no formula branch exercised) and
   // crashes on Metal's PorterDuff pipeline; skip it.
