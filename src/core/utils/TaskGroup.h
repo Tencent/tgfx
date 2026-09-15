@@ -18,44 +18,115 @@
 
 #pragma once
 
-#include <condition_variable>
-#include <list>
+#include <atomic>
+#include <cstdint>
+#include <memory>
 #include <mutex>
 #include <thread>
 #include <vector>
 #include "concurrentqueue.h"
+#include "lightweightsemaphore.h"
 #include "tgfx/core/Task.h"
 
 namespace tgfx {
 
+/**
+ * A priority task pool with lock-free submission and mutex-protected scheduling. Producers only
+ * pay one atomic admission update, a lock-free enqueue, and a semaphore signal per task; workers
+ * make every scheduling decision (priority, low-priority budget, standby growth, shrink, drain)
+ * inside a single scheduling mutex. Wakeup permits are durable, so a notification can never be
+ * lost the way a condition_variable signal can.
+ */
+class TaskPool {
+ public:
+  TaskPool();
+  ~TaskPool();
+
+  /**
+   * Publishes a task and a durable scheduling notification. Returns false if submission is closed
+   * or the queue rejects the task. An accepted call remains tracked until publication completes.
+   */
+  bool push(std::shared_ptr<Task> task, TaskPriority priority);
+
+  /**
+   * Changes the worker limit. Running tasks are not interrupted. Zero restores the default.
+   */
+  void setMaxThreadCount(size_t maxThreadCount);
+
+  /**
+   * Rejects new submissions and drains accepted work before joining workers. Must not be called
+   * by a task executing in this pool. Concurrent releases are serialized.
+   */
+  void releaseThreads();
+
+  /**
+   * Reopens a fully released pool for subsequent submissions.
+   */
+  void reopen();
+
+  size_t maxThreadCount();
+  size_t totalThreads();
+  size_t sleeperCount();
+  size_t pendingCount();
+
+ private:
+  enum class Phase { Running, Draining, Closed };
+
+  class SubmissionGuard {
+   public:
+    explicit SubmissionGuard(TaskPool* pool) : pool(pool) {
+    }
+    ~SubmissionGuard() {
+      pool->leavePush();
+    }
+    SubmissionGuard(const SubmissionGuard&) = delete;
+    SubmissionGuard& operator=(const SubmissionGuard&) = delete;
+
+   private:
+    TaskPool* pool = nullptr;
+  };
+
+  static constexpr uint64_t CLOSED_BIT = uint64_t{1} << 63;
+  static constexpr uint64_t STARTED_BIT = uint64_t{1} << 62;
+  static constexpr uint64_t PUSH_COUNT_MASK = STARTED_BIT - 1;
+  static constexpr size_t PRIORITY_QUEUE_COUNT = static_cast<size_t>(TaskPriority::Low) + 1;
+  std::atomic<uint64_t> admission = 0;
+  std::mutex lifecycleMutex = {};
+  std::mutex stateMutex = {};
+  moodycamel::ConcurrentQueue<std::shared_ptr<Task>> priorityQueues[PRIORITY_QUEUE_COUNT];
+  moodycamel::LightweightSemaphore workSignal{0, 0};
+  moodycamel::LightweightSemaphore producersDone{0, 0};
+  std::vector<std::thread> threadHandles = {};
+  Phase phase = Phase::Running;
+  size_t liveThreads = 0;
+  size_t busyThreads = 0;
+  size_t waitingThreads = 0;
+  size_t maxThreads = 0;
+  size_t lowPriorityThreads = 0;
+  bool lowNeedsCheck = false;
+
+  bool enterPush();
+  void leavePush();
+  void ensureStarted();
+  void ensureStandbyLocked();
+  void spawnWorkerLocked();
+  std::shared_ptr<Task> waitForTask();
+  std::shared_ptr<Task> claimLocked();
+  void finishTask();
+  void runLoop();
+};
+
 class TaskGroup {
  private:
-  std::mutex locker = {};
-  std::atomic_size_t maxThreads = 32;
-  std::atomic_size_t lowPriorityThreads = 2;
-  std::condition_variable condition = {};
-  std::atomic_size_t totalThreads = 0;
-  std::atomic_bool exited = false;
-  std::atomic_size_t waitingThreads = 0;
-  std::vector<moodycamel::ConcurrentQueue<std::shared_ptr<Task>>*> priorityQueues = {};
-  moodycamel::ConcurrentQueue<std::thread*>* threads = nullptr;
+  TaskPool pool = {};
   static TaskGroup* GetInstance();
-  static void RunLoop(TaskGroup* taskGroup);
-
   TaskGroup();
   void setMaxThreadCount(size_t maxThreadCount);
-  size_t maxThreadCount() const;
-  bool shouldExit() const;
-  bool shrinkThread();
-  bool checkThreads();
+  size_t maxThreadCount();
   bool pushTask(std::shared_ptr<Task> task, TaskPriority priority);
-  std::shared_ptr<Task> tryDequeueTask();
-  std::shared_ptr<Task> popTask();
-  void exit();
   void releaseThreads(bool exit);
 
   friend class Task;
-  friend class TaskThread;
   friend void OnAppExit();
 };
 }  // namespace tgfx

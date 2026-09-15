@@ -76,47 +76,42 @@ void Task::cancel() {
 }
 
 bool Task::wait(uint64_t timeout) {
-  auto oldStatus = _status.load(std::memory_order_acquire);
-  if (oldStatus == TaskStatus::Canceled || oldStatus == TaskStatus::Finished) {
+  // A queued task can run on the calling thread. Use the same completion notification as workers
+  // so other callers waiting for this task are also released.
+  execute();
+  std::unique_lock<std::mutex> autoLock(locker);
+  if (timeout == 0) {
+    while (_status.load(std::memory_order_acquire) == TaskStatus::Executing) {
+      condition.wait(autoLock);
+    }
     return true;
   }
-  // If wait() is called from the thread pool, all threads might block, leaving no thread to execute
-  // this task. To avoid deadlock, execute the task directly on the current thread if it's queued.
-  if (oldStatus == TaskStatus::Queueing) {
-    if (_status.compare_exchange_strong(oldStatus, TaskStatus::Executing, std::memory_order_acq_rel,
-                                        std::memory_order_relaxed)) {
-      onExecute();
-      oldStatus = TaskStatus::Executing;
-      while (!_status.compare_exchange_weak(oldStatus, TaskStatus::Finished,
-                                            std::memory_order_acq_rel, std::memory_order_relaxed)) {
-      }
-      return true;
+  auto now = std::chrono::steady_clock::now();
+  auto maxDeadline = std::chrono::steady_clock::time_point::max();
+  auto maxTimeout =
+      std::chrono::duration_cast<std::chrono::milliseconds>(maxDeadline - now).count();
+  auto deadline = timeout >= static_cast<uint64_t>(maxTimeout)
+                      ? maxDeadline
+                      : now + std::chrono::milliseconds(timeout);
+  while (_status.load(std::memory_order_acquire) == TaskStatus::Executing) {
+    if (condition.wait_until(autoLock, deadline) == std::cv_status::timeout) {
+      return _status.load(std::memory_order_acquire) != TaskStatus::Executing;
     }
-  }
-  std::unique_lock<std::mutex> autoLock(locker);
-  if (_status.load(std::memory_order_acquire) == TaskStatus::Executing) {
-    if (timeout == 0) {
-      condition.wait(autoLock);
-      return true;
-    }
-    auto chronoTimeout = std::chrono::milliseconds(timeout);
-    return condition.wait_for(autoLock, chronoTimeout) == std::cv_status::no_timeout;
   }
   return true;
 }
 
 void Task::execute() {
-  auto oldStatus = _status.load(std::memory_order_acquire);
-  if (oldStatus == TaskStatus::Queueing &&
-      _status.compare_exchange_strong(oldStatus, TaskStatus::Executing, std::memory_order_acq_rel,
-                                      std::memory_order_relaxed)) {
-    onExecute();
-    oldStatus = TaskStatus::Executing;
-    while (!_status.compare_exchange_weak(oldStatus, TaskStatus::Finished,
-                                          std::memory_order_acq_rel, std::memory_order_relaxed)) {
-    }
-    std::unique_lock<std::mutex> autoLock(locker);
-    condition.notify_all();
+  auto oldStatus = TaskStatus::Queueing;
+  if (!_status.compare_exchange_strong(oldStatus, TaskStatus::Executing, std::memory_order_acq_rel,
+                                       std::memory_order_relaxed)) {
+    return;
   }
+  onExecute();
+  {
+    std::lock_guard<std::mutex> autoLock(locker);
+    _status.store(TaskStatus::Finished, std::memory_order_release);
+  }
+  condition.notify_all();
 }
 }  // namespace tgfx
