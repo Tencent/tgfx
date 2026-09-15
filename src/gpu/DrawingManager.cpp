@@ -87,7 +87,8 @@ PlacementPtr<DrawOp> DrawingManager::makeFillDrawOp(std::shared_ptr<RenderTarget
 
 bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
                                   PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags,
-                                  const Point& coordOffset, OffscreenFillSource source) {
+                                  const Point& coordOffset, OffscreenFillSource source,
+                                  ColorChainRebuild rebuildColorChain) {
   auto cache = context->precompiledShaderCache();
   // The decomposition route only pays off for chains the plain route cannot match directly: a
   // composite processor tree (Compose/Xfermode children). A bare single-source fill is already
@@ -120,13 +121,9 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
         source, coordOffset != Point::Zero(), processor->name(), lowerSucceeded, blocker,
         validateSucceeded, decomposeSucceeded, canExecute, kernels);
   }
-  auto drawOp =
-      makeFillDrawOp(renderTarget, std::move(processor), renderFlags, coordOffset, diagnosticKey);
-  if (drawOp == nullptr) {
-    return false;
-  }
-  if (routeCandidate && decomposeSucceeded && canExecute && !plan.passes.empty()) {
-    const auto& firstPass = plan.passes.front();
+  auto makeChainTask = [&](const AOTEffectGraph& taskGraph, const AOTEffectPlan& taskPlan,
+                           PlacementPtr<DrawOp>* originalDraw) -> PlacementPtr<RenderTask> {
+    const auto& firstPass = taskPlan.passes.front();
     bool kernelRoutable = firstPass.kernel == AOTKernelKind::PointwiseTail ||
                           firstPass.kernel == AOTKernelKind::PointwiseChain ||
                           firstPass.kernel == AOTKernelKind::PerlinNoiseFill;
@@ -134,17 +131,77 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
     // single-pass plans (no intermediate texture, byte-identical to the plain fill) may route
     // there. Top-level filter fills carry no such constraint.
     bool nested = (renderFlags & InternalRenderFlags::NestedRasterization) != 0;
-    bool planAccepted = kernelRoutable && (plan.passes.size() == 1 || !nested);
-    if (planAccepted) {
+    if (kernelRoutable && (taskPlan.passes.size() == 1 || !nested)) {
       auto deviceBounds = Rect::MakeWH(static_cast<float>(renderTarget->width()),
                                        static_cast<float>(renderTarget->height()));
-      auto task = AOTPlanExecutor::Make(context, renderFlags, graph, plan, deviceBounds,
-                                        renderTarget, &drawOp, coordOffset);
-      if (task != nullptr) {
-        addRenderTask(std::move(task));
-        addGenerateMipmapsTask(renderTarget->asTextureProxy());
-        return true;
+      return AOTPlanExecutor::Make(context, renderFlags, taskGraph, taskPlan, deviceBounds,
+                                   renderTarget, originalDraw, coordOffset);
+    }
+    return nullptr;
+  };
+  // P4 group three: the retry-warranted verdict must be taken before the processor is moved into
+  // the plain draw op below, so an eventual retry can swap the materialized tree into that op.
+  bool retryWarranted = false;
+  if (routeCandidate && rebuildColorChain != nullptr && processor != nullptr &&
+      processor->numChildProcessors() == 2 &&
+      processor->name() == "XfermodeFragmentProcessor - two") {
+    bool nested = (renderFlags & InternalRenderFlags::NestedRasterization) != 0;
+    for (size_t childIndex = 0; childIndex < 2 && !retryWarranted; ++childIndex) {
+      auto decision = AOTMaterializationPolicy::Evaluate(
+          processor->childProcessor(childIndex), MaterializationConsumer::PointwiseBlend,
+          childIndex);
+      retryWarranted = decision.requiredForCorrectness || (!nested && decision.shouldFlatten);
+    }
+  }
+  auto drawOp =
+      makeFillDrawOp(renderTarget, std::move(processor), renderFlags, coordOffset, diagnosticKey);
+  if (drawOp == nullptr) {
+    return false;
+  }
+  bool chainServed = false;
+  if (routeCandidate && decomposeSucceeded && canExecute && !plan.passes.empty()) {
+    auto task = makeChainTask(graph, plan, &drawOp);
+    if (task != nullptr) {
+      // The plan executor took ownership of the draw op (setOriginalDraw moved it out), so this
+      // fill must stop here: falling through to the plain branch would submit a null op.
+      addRenderTask(std::move(task));
+      addGenerateMipmapsTask(renderTarget->asTextureProxy());
+      chainServed = true;
+    }
+  }
+  if (chainServed) {
+    return true;
+  }
+  if (retryWarranted) {
+    // P4 group three: in-plan materialization retry for filter fills. The unmodified tree was
+    // refused (or its plan not routable), and the caller can rebuild the processor with the
+    // MaterializeBlendChildren flag set — the filter then applies the same
+    // EnsureSimpleBlendChild rewrite the construction-time path used to apply. Retry the chain
+    // with the materialized tree first; when it is still refused, swap it into the plain draw so
+    // the fill below serves it exactly the way the pre-P4 construction-time rewrite was served.
+    auto retryProcessor = rebuildColorChain();
+    if (retryProcessor != nullptr) {
+      AOTEffectGraph retryGraph = {};
+      AOTEffectPlan retryPlan = {};
+      std::string retryBlocker = {};
+      bool retryLower = AOTEffectDecomposer::Lower({retryProcessor.get()}, &retryGraph, &retryBlocker);
+      bool retryValidate = retryLower && AOTEffectDecomposer::ValidateForFusion(retryGraph);
+      bool retryDecompose = retryValidate && AOTEffectDecomposer::Decompose(retryGraph, &retryPlan);
+      bool retryCanExecute = retryDecompose && AOTPlanExecutor::CanExecute(retryGraph, retryPlan);
+      if (retryDecompose && retryCanExecute && !retryPlan.passes.empty()) {
+        auto task = makeChainTask(retryGraph, retryPlan, &drawOp);
+        if (task != nullptr) {
+          addRenderTask(std::move(task));
+          addGenerateMipmapsTask(renderTarget->asTextureProxy());
+          return true;
+        }
       }
+      // The chain route cannot serve the materialized tree either: swap it into the plain draw
+      // op, matching the pre-P4 construction-time behavior (the fill's single color processor is
+      // the materialization-prone source the caller rebuilt).
+      auto& opColors = drawOp->colorProcessors();
+      opColors.clear();
+      opColors.push_back(std::move(retryProcessor));
     }
   }
   auto allocator = drawingAllocator();

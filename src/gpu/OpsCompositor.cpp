@@ -502,6 +502,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, ClipStack clip, Brush br
   std::optional<Rect> localBounds = std::nullopt;
   std::optional<Rect> deviceBounds = std::nullopt;
   std::optional<float> drawScale = std::nullopt;
+  Rect imageDeviceBounds = {};
   // Conservative prediction of whether the final DrawOp will have coverage. This determines if
   // deviceBounds needs to be computed for DstTexture creation. We assume coverage exists unless
   // clip is empty, since some ops (e.g., AtlasTextOp) always have coverage regardless of clip.
@@ -577,6 +578,13 @@ void OpsCompositor::flushPendingOps(PendingOpType type, ClipStack clip, Brush br
       }
     // fallthrough
     case PendingOpType::Image: {
+      // P4 group three: capture the device-space rect union before the provider construction
+      // below moves pendingRects away; the image FP built later decides whether the decomposition
+      // gate needs the bounds recomputed (see the composite-tree recompute after the FP build).
+      imageDeviceBounds = Rect::MakeEmpty();
+      for (auto& record : pendingRects) {
+        imageDeviceBounds.join(record->viewMatrix.mapRect(record->rect));
+      }
       auto subsetMode = UVSubsetMode::None;
       if (pendingConstraint == SrcRectConstraint::Strict && pendingImage) {
         subsetMode = pendingSampling.magFilterMode == FilterMode::Linear ||
@@ -620,6 +628,20 @@ void OpsCompositor::flushPendingOps(PendingOpType type, ClipStack clip, Brush br
     if (processor == nullptr) {
       return;
     }
+    // P4 group three: a filtered image builds a composite processor tree (e.g. a filter's nested
+    // blend) that the plain route cannot match directly — exactly what needComputeBounds'
+    // "needs the chain" features exist to flag, except the filter is hidden behind the image, so
+    // none of brush.colorFilter/shader-derived-chain/maskFilter is set here and the bounds
+    // computation was skipped above. Restore the device bounds captured before the provider
+    // construction moved the rects, so the decomposition gate (and with it the in-plan
+    // materialization retry) can see this draw. Bare image fills (TextureEffect and friends,
+    // numChildProcessors() == 0) keep skipping the route and their single program lookup.
+    if (!needDeviceBounds && processor->numChildProcessors() > 0) {
+      deviceBounds = imageDeviceBounds;
+      if (!deviceBounds->intersect(clipBounds)) {
+        deviceBounds->setEmpty();
+      }
+    }
     drawOp->addColorFP(std::move(processor));
     if (!pendingImage->isAlphaOnly() &&
         NeedConvertColorSpace(pendingImage->colorSpace(), dstColorSpace)) {
@@ -628,6 +650,32 @@ void OpsCompositor::flushPendingOps(PendingOpType type, ClipStack clip, Brush br
           dstColorSpace.get(), AlphaType::Premultiplied);
       drawOp->addColorFP(std::move(xformEffect));
     }
+    // P4 group three: hand addDrawOp a rebuild closure so the materialization retry can also
+    // serve image-driven draws (drawImage builds the leading processor from the image, not from
+    // a brush shader). The closure captures the exact FPArgs the original processor was built
+    // with and adds the MaterializeBlendChildren flag itself. Only build it when the chain route
+    // could actually consume it, so plain configurations pay nothing.
+    ColorChainRebuild rebuildColorChain = nullptr;
+    auto* pendingCache = context->precompiledShaderCache();
+    if (pendingCache != nullptr && pendingCache->isLoaded() &&
+        pendingCache->decompositionEnabled()) {
+      auto image = pendingImage;
+      auto sampling = pendingSampling;
+      auto constraint = pendingConstraint;
+      auto localRect = localBounds;
+      auto scale = drawScale.value_or(1.0f);
+      auto flags = renderFlags;
+      auto* rebuildContext = context;
+      rebuildColorChain = [rebuildContext, flags, localRect, scale, image, sampling, constraint]() {
+        FPArgs retryArgs = {rebuildContext,
+                            flags | InternalRenderFlags::MaterializeBlendChildren,
+                            localRect.value_or(Rect::MakeEmpty()), scale};
+        return FragmentProcessor::Make(image, retryArgs, sampling, constraint);
+      };
+    }
+    addDrawOp(std::move(drawOp), pendingClip, pendingBrush, localBounds, deviceBounds,
+              drawScale.value_or(1.0f), std::move(rebuildColorChain));
+    return;
   }
   addDrawOp(std::move(drawOp), pendingClip, pendingBrush, localBounds, deviceBounds,
             drawScale.value_or(1.0f));
@@ -1211,7 +1259,8 @@ DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AATyp
 
 void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, const Brush& brush,
                               const std::optional<Rect>& localBounds,
-                              const std::optional<Rect>& deviceBounds, float drawScale) {
+                              const std::optional<Rect>& deviceBounds, float drawScale,
+                              ColorChainRebuild rebuildColorChain) {
 
   if (op == nullptr || brush.nothingToDraw()) {
     return;
@@ -1346,8 +1395,12 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
           return;
         }
       }
-      drawOps.emplace_back(std::move(op));
-      return;
+      // The folded chain could not be served (the tree failed lowering or the executor could not
+      // build the task). Fall through to the color-only route instead of returning early: a draw
+      // whose leading processor the materialization policy would rewrite can still be saved by
+      // the in-plan retry below, whose swapped materialized tree the plain direct-match route
+      // serves with the mask still applied as a coverage processor. Draws without a rebuild
+      // source fall straight through to the plain route, exactly like the early return used to.
     }
     AOTEffectGraph graph = {};
     AOTEffectPlan plan = {};
@@ -1355,9 +1408,13 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     // matchers are all single-FP, so a draw still carrying a coverage FP (clip coverage or an
     // unfoldable mask) can never match: attempting the route would only waste a strict prepare
     // before the atomic fallback replays the draw through the runtime path anyway.
-    if (!op->hasCoverage() && AOTEffectDecomposer::Lower(colorProcessors, &graph) &&
-        AOTEffectDecomposer::ValidateForFusion(graph) &&
-        AOTEffectDecomposer::Decompose(graph, &plan) && !plan.passes.empty() &&
+    std::string mainBlocker = {};
+    bool mainLower = !op->hasCoverage() && AOTEffectDecomposer::Lower(colorProcessors, &graph, &mainBlocker);
+    bool mainValidate = mainLower && AOTEffectDecomposer::ValidateForFusion(graph);
+    bool mainDecompose = mainValidate && AOTEffectDecomposer::Decompose(graph, &plan);
+    if (colorProcessors.size() == 1 && colorProcessors[0]->numChildProcessors() > 0) {
+    }
+    if (mainDecompose && !plan.passes.empty() &&
         (plan.passes.size() > 1 || plan.passes[0].kernel == AOTKernelKind::PointwiseTail ||
          plan.passes[0].kernel == AOTKernelKind::PointwiseChain ||
          plan.passes[0].kernel == AOTKernelKind::PerlinNoiseFill)) {
@@ -1381,16 +1438,21 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
       // P4 first migration group: in-plan materialization retry. When the plain chain route
       // refuses the unmodified tree and the color chain is a single two-child blend whose
       // operands the materialization policy would rewrite, rebuild the chain from the original
-      // shader with the MaterializeBlendChildren flag set — BlendShader then applies the same
-      // EnsureSimpleBlendChild rewrite the construction-time path used to apply. The chain
-      // route is retried first (coverage-free draws only, matching the main path's constraint);
-      // when it cannot serve the materialized tree, or the draw carries GP coverage (e.g. an AA
-      // oval) that the chain does not take, the materialized tree is swapped into the op and the
-      // plain direct-match route serves it below — exactly how the pre-P4 construction-time
-      // materialization was served. Under NestedRasterization only correctness-required
-      // operands are materialized (the helper skips matchability flattening there), so the
-      // retry-warranted check mirrors that split.
-      if (brush.shader != nullptr && colorProcessors.size() == 1) {
+      // source with the MaterializeBlendChildren flag set — the source shader or filter then
+      // applies the same EnsureSimpleBlendChild rewrite the construction-time path used to apply.
+      // The chain route is retried first (coverage-free draws only, matching the main path's
+      // constraint); when it cannot serve the materialized tree, or the draw carries GP coverage
+      // (e.g. an AA oval) that the chain does not take, the materialized tree is swapped into the
+      // op and the plain direct-match route serves it below — exactly how the pre-P4
+      // construction-time materialization was served. Under NestedRasterization only
+      // correctness-required operands are materialized (the helper skips matchability flattening
+      // there), so the retry-warranted check mirrors that split.
+      // P4 group three: image-driven draws have no brush shader (drawImage builds the leading
+      // processor straight from the image), so the rebuild can also come from a closure the
+      // flush site captured. Trailing processors behind the rebuilt one (e.g. a
+      // ColorSpaceXformEffect) stay on the op and ride along both the retry and the swap.
+      bool canRebuild = brush.shader != nullptr || rebuildColorChain != nullptr;
+      if (canRebuild && colorProcessors.size() >= 1) {
         auto* xfer = colorProcessors[0];
         bool nested = (args.renderFlags & InternalRenderFlags::NestedRasterization) != 0;
         if (xfer != nullptr && xfer->numChildProcessors() == 2 &&
@@ -1404,12 +1466,19 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
                 decision.requiredForCorrectness || (!nested && decision.shouldFlatten);
           }
           if (retryWarranted) {
-            FPArgs retryArgs = args;
-            retryArgs.renderFlags |= InternalRenderFlags::MaterializeBlendChildren;
-            auto retryFP =
-                FragmentProcessor::Make(brush.shader, retryArgs, nullptr, dstColorSpace);
+            PlacementPtr<FragmentProcessor> retryFP = nullptr;
+            if (brush.shader != nullptr) {
+              FPArgs retryArgs = args;
+              retryArgs.renderFlags |= InternalRenderFlags::MaterializeBlendChildren;
+              retryFP = FragmentProcessor::Make(brush.shader, retryArgs, nullptr, dstColorSpace);
+            } else {
+              retryFP = rebuildColorChain();
+            }
             if (retryFP != nullptr) {
               std::vector<const FragmentProcessor*> retryProcessors = {retryFP.get()};
+              for (size_t i = 1; i < colorProcessors.size(); ++i) {
+                retryProcessors.push_back(colorProcessors[i]);
+              }
               AOTEffectGraph retryGraph = {};
               AOTEffectPlan retryPlan = {};
               if (!op->hasCoverage() &&
@@ -1438,8 +1507,15 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
               // matching the pre-P4 behavior where the construction-time rewrite left no
               // original behind either; a direct-match miss on the materialized tree then
               // JITs it, again like the pre-P4 path.
-              op->colorProcessors().clear();
-              op->colorProcessors().push_back(std::move(retryFP));
+              auto& opColors = op->colorProcessors();
+              std::vector<PlacementPtr<FragmentProcessor>> trailingColors(
+                  std::make_move_iterator(opColors.begin() + 1),
+                  std::make_move_iterator(opColors.end()));
+              opColors.clear();
+              opColors.push_back(std::move(retryFP));
+              for (auto& trailing : trailingColors) {
+                opColors.push_back(std::move(trailing));
+              }
             } else {
               // The rebuild itself failed: the original op still carries its untouched
               // processors and falls through to the plain route below. Any materialization the
@@ -1470,6 +1546,10 @@ void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, co
 }
 
 void OpsCompositor::submitDrawOps() {
+  for (size_t i = 0; i < drawOps.size(); ++i) {
+    if (drawOps[i] == nullptr) {
+    }
+  }
   auto opArray = drawingAllocator()->makeArray(std::move(drawOps));
   context->drawingManager()->addOpsRenderTask(renderTarget, std::move(opArray), clearColor);
   clearColor.reset();

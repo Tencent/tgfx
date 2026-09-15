@@ -62,12 +62,16 @@ class DrawingManager {
 
   /**
    * Fills the render target using the provided fragment processor, and automatically resolves the
-   * render target. Returns false if the render target or fragment processor is nullptr.
+   * render target. Returns false if the render target or fragment processor is nullptr. The
+   * optional rebuild closure lets the in-plan materialization retry re-create the processor with
+   * the MaterializeBlendChildren flag when the chain route refuses the unmodified tree (used by
+   * callers that built the processor from a filter, where no brush shader exists).
    */
   bool fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
                     PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags,
                     const Point& coordOffset = Point::Zero(),
-                    OffscreenFillSource source = OffscreenFillSource::Unknown);
+                    OffscreenFillSource source = OffscreenFillSource::Unknown,
+                    ColorChainRebuild rebuildColorChain = nullptr);
 
   std::shared_ptr<OpsCompositor> addOpsCompositor(std::shared_ptr<RenderTargetProxy> renderTarget,
                                                   uint32_t renderFlags,

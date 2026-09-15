@@ -66,13 +66,19 @@ PlacementPtr<FragmentProcessor> BlendImageFilter::asFragmentProcessor(
     return DstIsRequired(blendMode) ? nullptr : std::move(shaderFP);
   }
   // The shader acts as the src operand and the source image as the dst operand of the blend.
-  shaderFP = EnsureSimpleBlendChild(args, std::move(shaderFP));
-  if (shaderFP == nullptr) {
-    return nullptr;
-  }
-  sourceFP = EnsureSimpleBlendChild(args, std::move(sourceFP), 1);
-  if (sourceFP == nullptr) {
-    return nullptr;
+  // P4 group three: no construction-time materialization by default; the in-plan retry (or the
+  // legacy switch) sets MaterializeBlendChildren when the chain route refuses the original tree,
+  // so the fallback path always carries the untouched processors.
+  if (BlendChildMaterializationIsLegacy() ||
+      (args.renderFlags & InternalRenderFlags::MaterializeBlendChildren) != 0) {
+    shaderFP = EnsureSimpleBlendChild(args, std::move(shaderFP));
+    if (shaderFP == nullptr) {
+      return nullptr;
+    }
+    sourceFP = EnsureSimpleBlendChild(args, std::move(sourceFP), 1);
+    if (sourceFP == nullptr) {
+      return nullptr;
+    }
   }
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(allocator, std::move(shaderFP),
                                                           std::move(sourceFP), blendMode);

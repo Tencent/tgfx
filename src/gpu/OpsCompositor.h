@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <functional>
+
 #include "core/ClipStack.h"
 #include "gpu/ops/RRectDrawOp.h"
 #include "gpu/ops/RectDrawOp.h"
@@ -27,6 +29,15 @@
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
+
+/**
+ * Rebuilds a draw's leading color chain (its materialization-prone source processor) with the
+ * MaterializeBlendChildren flag set, so every EnsureSimpleBlendChild rewrite the
+ * construction-time path used to apply happens now instead. The closure captures the exact FPArgs
+ * (including NestedRasterization) the original processor was built with, so callers have no flags
+ * to thread through. Returns nullptr when the rebuild fails.
+ */
+using ColorChainRebuild = std::function<PlacementPtr<FragmentProcessor>()>;
 
 /**
  * AppliedClipStatus represents the result of applying a clip to a draw operation.
@@ -219,7 +230,7 @@ class OpsCompositor {
   DstTextureInfo makeDstTextureInfo(const Rect& deviceBounds, AAType aaType);
   void addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, const Brush& brush,
                  const std::optional<Rect>& localBounds, const std::optional<Rect>& deviceBounds,
-                 float drawScale);
+                 float drawScale, ColorChainRebuild rebuildColorChain = nullptr);
 
   void submitDrawOps();
 

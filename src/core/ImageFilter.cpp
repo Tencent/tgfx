@@ -65,11 +65,32 @@ std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Imag
                 std::max(textureScaleX, textureScaleY));
   Matrix matrix = Matrix::MakeTrans(renderBounds.left, renderBounds.top);
   matrix.preScale(1.0f / textureScaleX, 1.0f / textureScaleY);
+  // P4 group three: hand the fill an in-plan materialization retry. When the chain route refuses
+  // the unmodified filter tree, the closure rebuilds it with the MaterializeBlendChildren flag
+  // set (the filter then applies the EnsureSimpleBlendChild rewrite the construction-time path
+  // used to apply) so the fill can retry the chain and otherwise serve the materialized tree.
+  // The nested fill flags are captured verbatim, keeping the nested semantics (only
+  // correctness-required operands materialize) intact. The source copy is taken before the
+  // processor construction moves it below.
+  ColorChainRebuild rebuildColorChain = nullptr;
+  {
+    auto* rebuildSelf = this;
+    auto rebuildSource = source;
+    auto rebuildMatrix = matrix;
+    auto rebuildArgs = fpArgs;
+    rebuildColorChain = [rebuildSelf, rebuildSource, rebuildMatrix, rebuildArgs]() {
+      auto retryArgs = rebuildArgs;
+      retryArgs.renderFlags |= InternalRenderFlags::MaterializeBlendChildren;
+      return rebuildSelf->asFragmentProcessor(rebuildSource, retryArgs, {},
+                                              SrcRectConstraint::Fast, &rebuildMatrix);
+    };
+  }
   auto processor =
       asFragmentProcessor(std::move(source), fpArgs, {}, SrcRectConstraint::Fast, &matrix);
   auto drawingManager = args.context->drawingManager();
   if (!drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags,
-                                    Point::Zero(), OffscreenFillSource::ImageFilter)) {
+                                    Point::Zero(), OffscreenFillSource::ImageFilter,
+                                    std::move(rebuildColorChain))) {
     return nullptr;
   }
   return renderTarget->asTextureProxy();
