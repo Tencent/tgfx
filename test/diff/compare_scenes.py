@@ -122,6 +122,24 @@ def main():
     if args.out is not None:
         args.out.write_text(json.dumps(results, indent=2) + "\n")
         print(f"results written to {args.out}")
+
+    # Steady-state wall-time comparison (task 6). Timings are single-sample measurements on
+    # shared hardware; treat them as orders of magnitude, not benchmarks.
+    timings = {}
+    for label, directory in (("A", args.baseline), ("B", args.runtime), ("C", args.aot)):
+        path = directory / "timings.json"
+        if path.exists():
+            timings[label] = json.loads(path.read_text())
+    if len(timings) == 3 and all(set(t) == set(timings["A"]) for t in timings.values()):
+        print("--- steady-state microseconds (A baseline / B runtime / C AOT) ---")
+        for name in scenes:
+            a, b, c = timings["A"][name], timings["B"][name], timings["C"][name]
+            ratio = f" C/A={c / a:.2f}" if a > 0 else ""
+            print(f"{name}: {a} / {b} / {c}{ratio}")
+        results["timings"] = {name: {"A": timings["A"][name], "B": timings["B"][name],
+                                     "C": timings["C"][name]} for name in scenes}
+        if args.out is not None:
+            args.out.write_text(json.dumps(results, indent=2) + "\n")
     return exit_code
 
 

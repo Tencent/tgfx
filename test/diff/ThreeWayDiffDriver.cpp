@@ -6,6 +6,7 @@
 // differences. Bump kSceneRevision whenever a scene is added or changed so stale output
 // directories are rejected instead of compared.
 #include <array>
+#include <chrono>
 #include <cstdio>
 #include <functional>
 #include <memory>
@@ -24,7 +25,8 @@
 
 namespace {
 
-constexpr int kSceneRevision = 1;
+// Bump whenever a scene is added or changed; compare_scenes.py rejects mismatched manifests.
+constexpr int kSceneRevision = 2;
 constexpr int kSize = 96;
 
 const std::array<float, 20> kSwapRedBlue = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0,
@@ -156,6 +158,62 @@ int main(int argc, char** argv) {
     paint.setColorFilter(tgfx::ColorFilter::Luma());
     canvas->drawImage(rampImage, 0, 0, &paint);
   });
+  scenes.emplace_back("alpha_ramp_colormatrix_ultralow", [rampImage](tgfx::Canvas* canvas) {
+    tgfx::Paint paint = {};
+    paint.setAlpha(6);
+    paint.setColorFilter(tgfx::ColorFilter::Matrix(kSwapRedBlue));
+    canvas->drawImage(rampImage, 0, 0, &paint);
+  });
+  // The blend-mode matrix below pairs two procedural gradients (both children materialize on
+  // the AOT path) at a fixed low paint alpha, extending the multiply scene that showed the
+  // materialization-quantization fingerprint across operator families.
+  scenes.emplace_back("blend_gradient_gradient_screen", [gradient](tgfx::Canvas* canvas) {
+    tgfx::Paint paint = {};
+    paint.setAlpha(51);
+    paint.setShader(tgfx::Shader::MakeBlend(tgfx::BlendMode::Screen, gradient, gradient));
+    canvas->drawRect(tgfx::Rect::MakeWH(kSize, kSize), paint);
+  });
+  scenes.emplace_back("blend_gradient_gradient_darken", [gradient](tgfx::Canvas* canvas) {
+    tgfx::Paint paint = {};
+    paint.setAlpha(51);
+    paint.setShader(tgfx::Shader::MakeBlend(tgfx::BlendMode::Darken, gradient, gradient));
+    canvas->drawRect(tgfx::Rect::MakeWH(kSize, kSize), paint);
+  });
+  scenes.emplace_back("blend_gradient_gradient_lighten", [gradient](tgfx::Canvas* canvas) {
+    tgfx::Paint paint = {};
+    paint.setAlpha(51);
+    paint.setShader(tgfx::Shader::MakeBlend(tgfx::BlendMode::Lighten, gradient, gradient));
+    canvas->drawRect(tgfx::Rect::MakeWH(kSize, kSize), paint);
+  });
+  scenes.emplace_back("blend_gradient_gradient_colorburn", [gradient](tgfx::Canvas* canvas) {
+    tgfx::Paint paint = {};
+    paint.setAlpha(51);
+    paint.setShader(tgfx::Shader::MakeBlend(tgfx::BlendMode::ColorBurn, gradient, gradient));
+    canvas->drawRect(tgfx::Rect::MakeWH(kSize, kSize), paint);
+  });
+  scenes.emplace_back("blend_gradient_gradient_colordodge", [gradient](tgfx::Canvas* canvas) {
+    tgfx::Paint paint = {};
+    paint.setAlpha(51);
+    paint.setShader(tgfx::Shader::MakeBlend(tgfx::BlendMode::ColorDodge, gradient, gradient));
+    canvas->drawRect(tgfx::Rect::MakeWH(kSize, kSize), paint);
+  });
+  // Nested materialization: the inner blend materializes its gradient children, then the outer
+  // blend materializes the whole inner blend subtree again.
+  scenes.emplace_back("nested_blend_materialization", [gradient](tgfx::Canvas* canvas) {
+    tgfx::Paint paint = {};
+    auto inner = tgfx::Shader::MakeBlend(tgfx::BlendMode::Multiply, gradient, gradient);
+    paint.setShader(tgfx::Shader::MakeBlend(tgfx::BlendMode::SrcOver, inner, gradient));
+    canvas->drawRect(tgfx::Rect::MakeWH(kSize, kSize), paint);
+  });
+  // Accumulated low-alpha overdraw of the quantization-sensitive scene.
+  scenes.emplace_back("multilayer_lowalpha_blend", [gradient](tgfx::Canvas* canvas) {
+    tgfx::Paint paint = {};
+    paint.setAlpha(51);
+    paint.setShader(tgfx::Shader::MakeBlend(tgfx::BlendMode::Multiply, gradient, gradient));
+    for (int layer = 0; layer < 5; ++layer) {
+      canvas->drawRect(tgfx::Rect::MakeWH(kSize, kSize), paint);
+    }
+  });
   scenes.emplace_back("blend_gradient_image", [gradient, opaqueShader](tgfx::Canvas* canvas) {
     tgfx::Paint paint = {};
     paint.setShader(tgfx::Shader::MakeBlend(tgfx::BlendMode::SrcOver, gradient, opaqueShader));
@@ -217,38 +275,61 @@ int main(int argc, char** argv) {
 
   std::string manifest = "{\"revision\": " + std::to_string(kSceneRevision) +
                          ", \"size\": " + std::to_string(kSize) + ", \"scenes\": [";
+  // Steady-state wall time per scene (task 6): each scene renders twice on separate surfaces
+  // and only the second render is timed, so first-draw program uploads and compilations do
+  // not pollute the comparison between the baseline, runtime, and AOT paths.
+  std::string timings = "{";
   int failures = 0;
   for (size_t index = 0; index < scenes.size(); ++index) {
     const auto& scene = scenes[index];
-    auto surface = tgfx::Surface::Make(context, kSize, kSize);
-    if (surface == nullptr) {
-      fprintf(stderr, "FAIL: surface for %s\n", scene.first.c_str());
-      ++failures;
-      continue;
+    long long steadyMicros = -1;
+    tgfx::Bitmap sceneBitmap = {};
+    for (int pass = 0; pass < 2; ++pass) {
+      auto surface = tgfx::Surface::Make(context, kSize, kSize);
+      if (surface == nullptr) {
+        break;
+      }
+      auto* canvas = surface->getCanvas();
+      canvas->clear(tgfx::Color::White());
+      auto start = std::chrono::steady_clock::now();
+      scene.second(canvas);
+      context->flushAndSubmit(true);
+      steadyMicros = std::chrono::duration_cast<std::chrono::microseconds>(
+                         std::chrono::steady_clock::now() - start)
+                         .count();
+      if (pass == 1) {
+        if (!sceneBitmap.allocPixels(kSize, kSize)) {
+          steadyMicros = -1;
+          break;
+        }
+        auto* pixels = sceneBitmap.lockPixels();
+        bool read = pixels != nullptr && surface->readPixels(sceneBitmap.info(), pixels);
+        sceneBitmap.unlockPixels();
+        if (!read) {
+          steadyMicros = -1;
+          break;
+        }
+      }
     }
-    auto* canvas = surface->getCanvas();
-    canvas->clear(tgfx::Color::White());
-    scene.second(canvas);
-    context->flushAndSubmit(true);
-    tgfx::Bitmap bitmap = {};
-    if (!bitmap.allocPixels(kSize, kSize)) {
-      ++failures;
-      continue;
-    }
-    auto* pixels = bitmap.lockPixels();
-    bool read = pixels != nullptr && surface->readPixels(bitmap.info(), pixels);
-    bitmap.unlockPixels();
-    if (!read || !WriteScene(outDir, scene.first, bitmap)) {
+    if (steadyMicros < 0 || !WriteScene(outDir, scene.first, sceneBitmap)) {
       fprintf(stderr, "FAIL: readback for %s\n", scene.first.c_str());
       ++failures;
       continue;
     }
     manifest += (index == 0 ? "" : ", ") + std::string("\"") + scene.first + "\"";
+    timings += (index == 0 ? "" : ", ") + std::string("\"") + scene.first + "\": " +
+               std::to_string(steadyMicros);
   }
   manifest += "]}\n";
   FILE* file = fopen((outDir + "/manifest.json").c_str(), "w");
   if (file != nullptr) {
     fputs(manifest.c_str(), file);
+    fclose(file);
+  }
+  timings += "}\n";
+  file = fopen((outDir + "/timings.json").c_str(), "w");
+  if (file != nullptr) {
+    fputs(timings.c_str(), file);
     fclose(file);
   }
   device->unlock();
