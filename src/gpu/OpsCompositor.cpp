@@ -667,8 +667,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, ClipStack clip, Brush br
       auto flags = renderFlags;
       auto* rebuildContext = context;
       rebuildColorChain = [rebuildContext, flags, localRect, scale, image, sampling, constraint]() {
-        FPArgs retryArgs = {rebuildContext,
-                            flags | InternalRenderFlags::MaterializeBlendChildren,
+        FPArgs retryArgs = {rebuildContext, flags | InternalRenderFlags::MaterializeBlendChildren,
                             localRect.value_or(Rect::MakeEmpty()), scale};
         return FragmentProcessor::Make(image, retryArgs, sampling, constraint);
       };
@@ -1433,7 +1432,8 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     // unfoldable mask) can never match: attempting the route would only waste a strict prepare
     // before the atomic fallback replays the draw through the runtime path anyway.
     std::string mainBlocker = {};
-    bool mainLower = !op->hasCoverage() && AOTEffectDecomposer::Lower(colorProcessors, &graph, &mainBlocker);
+    bool mainLower =
+        !op->hasCoverage() && AOTEffectDecomposer::Lower(colorProcessors, &graph, &mainBlocker);
     bool mainValidate = mainLower && AOTEffectDecomposer::ValidateForFusion(graph);
     bool mainDecompose = mainValidate && AOTEffectDecomposer::Decompose(graph, &plan);
     if (colorProcessors.size() == 1 && colorProcessors[0]->numChildProcessors() > 0) {
@@ -1486,8 +1486,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
             auto decision = AOTMaterializationPolicy::Evaluate(
                 xfer->childProcessor(childIndex), MaterializationConsumer::PointwiseBlend,
                 childIndex);
-            retryWarranted =
-                decision.requiredForCorrectness || (!nested && decision.shouldFlatten);
+            retryWarranted = decision.requiredForCorrectness || (!nested && decision.shouldFlatten);
           }
           if (retryWarranted) {
             PlacementPtr<FragmentProcessor> retryFP = nullptr;
@@ -1509,8 +1508,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
               }
               AOTEffectGraph retryGraph = {};
               AOTEffectPlan retryPlan = {};
-              if (!op->hasCoverage() &&
-                  AOTEffectDecomposer::Lower(retryProcessors, &retryGraph) &&
+              if (!op->hasCoverage() && AOTEffectDecomposer::Lower(retryProcessors, &retryGraph) &&
                   AOTEffectDecomposer::ValidateForFusion(retryGraph) &&
                   AOTEffectDecomposer::Decompose(retryGraph, &retryPlan) &&
                   !retryPlan.passes.empty() &&
@@ -1519,8 +1517,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
                    retryPlan.passes[0].kernel == AOTKernelKind::PointwiseChain ||
                    retryPlan.passes[0].kernel == AOTKernelKind::PerlinNoiseFill)) {
                 auto task = AOTPlanExecutor::Make(context, renderFlags, retryGraph, retryPlan,
-                                                  *deviceBounds, renderTarget, &op,
-                                                  Point::Zero());
+                                                  *deviceBounds, renderTarget, &op, Point::Zero());
                 if (task != nullptr) {
                   submitDrawOps();
                   context->drawingManager()->addRenderTask(std::move(task));

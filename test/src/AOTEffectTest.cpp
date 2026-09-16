@@ -603,10 +603,9 @@ TGFX_TEST(AOTEffectTest, TwoColorSpaceTransformsRetainTailCandidate) {
   for (bool insertLuma : {false, true}) {
     BlockAllocator allocator;
     auto texture = MakeTextureProcessor(context, &allocator, PixelFormat::RGBA_8888);
-    auto first = ColorSpaceXformEffect::Make(&allocator, ColorSpace::SRGB().get(),
-                                             AlphaType::Premultiplied,
-                                             ColorSpace::SRGBLinear().get(),
-                                             AlphaType::Premultiplied);
+    auto first =
+        ColorSpaceXformEffect::Make(&allocator, ColorSpace::SRGB().get(), AlphaType::Premultiplied,
+                                    ColorSpace::SRGBLinear().get(), AlphaType::Premultiplied);
     auto second = ColorSpaceXformEffect::Make(&allocator, ColorSpace::SRGBLinear().get(),
                                               AlphaType::Premultiplied, ColorSpace::SRGB().get(),
                                               AlphaType::Premultiplied);
@@ -654,15 +653,15 @@ TGFX_TEST(AOTEffectTest, LUTBindingBudgetIsNotOrdinaryLeafBudget) {
     ASSERT_TRUE(builder.addGeometryColor(&current));
     for (int index = 0; index < textureCount; ++index) {
       AOTTextureParameters texture = {};
-      texture.textureProxy = context->proxyProvider()->createTextureProxy({}, 2, 2,
-                                                                          PixelFormat::RGBA_8888);
+      texture.textureProxy =
+          context->proxyProvider()->createTextureProxy({}, 2, 2, PixelFormat::RGBA_8888);
       ASSERT_NE(texture.textureProxy, nullptr);
       ASSERT_TRUE(builder.addTextureSource(current, texture, &current));
     }
     AOTGradientParameters gradient = {};
     gradient.colorizerKind = 3;
-    gradient.lutProxy = context->proxyProvider()->createTextureProxy({}, 2, 2,
-                                                                   PixelFormat::RGBA_8888);
+    gradient.lutProxy =
+        context->proxyProvider()->createTextureProxy({}, 2, 2, PixelFormat::RGBA_8888);
     ASSERT_NE(gradient.lutProxy, nullptr);
     ASSERT_TRUE(builder.addGradientSource(current, gradient, &current));
     AOTEffectGraph graph;
@@ -695,8 +694,8 @@ TGFX_TEST(AOTEffectTest, LinearChainSlotBoundaryPreservesTailFallback) {
     AOTEffectPlan plan;
     ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
     EXPECT_EQ(plan.passes.size(), opCount == 15 ? 1u : 8u);
-    EXPECT_EQ(plan.passes[0].kernel, opCount == 15 ? AOTKernelKind::PointwiseChain
-                                                 : AOTKernelKind::PointwiseTail);
+    EXPECT_EQ(plan.passes[0].kernel,
+              opCount == 15 ? AOTKernelKind::PointwiseChain : AOTKernelKind::PointwiseTail);
     EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
   }
 }
@@ -906,8 +905,8 @@ TGFX_TEST(AOTEffectTest, PointwiseDAGUsesProductionSamplerBudget) {
     ASSERT_EQ(acceptedPlan.passes.size(), 1u);
     EXPECT_TRUE(AOTPlanExecutor::CanExecute(acceptedGraph, acceptedPlan));
     BlockAllocator allocator;
-    auto processor = AOTChainBuilder::BuildChainProcessor(&allocator, acceptedGraph,
-                                                          acceptedPlan.passes[0]);
+    auto processor =
+        AOTChainBuilder::BuildChainProcessor(&allocator, acceptedGraph, acceptedPlan.passes[0]);
     ASSERT_NE(processor, nullptr);
     auto chain = static_cast<const AOTPointwiseChainProcessor*>(processor.get());
     EXPECT_EQ(chain->leafCount(), 4u);

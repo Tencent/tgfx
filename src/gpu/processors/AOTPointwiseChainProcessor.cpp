@@ -179,9 +179,9 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
   // The LUT child binds the sampler right after the DAG leaves; a real mask child's binding point
   // relative to it is undefined, so reject that (currently unreachable) combination. A phantom
   // mask child always binds last, after the padding.
-  if (lutChild != nullptr && (lutLeafIndex < 0 || lutLeafIndex > 1 ||
-                             static_cast<size_t>(lutLeafIndex) != leafCount ||
-                             (maskChild != nullptr && !maskChildIsPhantom))) {
+  if (lutChild != nullptr &&
+      (lutLeafIndex < 0 || lutLeafIndex > 1 || static_cast<size_t>(lutLeafIndex) != leafCount ||
+       (maskChild != nullptr && !maskChildIsPhantom))) {
     return nullptr;
   }
   if (tiledLeafIndex >= 0 &&
@@ -204,8 +204,7 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
       return nullptr;
     }
     if (slot.op == AOTChainOp::ColorSpaceXform &&
-        (slot.colorSpaceXform.steps == nullptr ||
-         ++colorSpaceSlots > MaxColorSpaceXformSlots)) {
+        (slot.colorSpaceXform.steps == nullptr || ++colorSpaceSlots > MaxColorSpaceXformSlots)) {
       return nullptr;
     }
     if (slot.op == AOTChainOp::Gradient && ++gradientSlots > MaxGradientSlots) {

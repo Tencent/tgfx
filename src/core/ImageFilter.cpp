@@ -81,8 +81,8 @@ std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Imag
     rebuildColorChain = [rebuildSelf, rebuildSource, rebuildMatrix, rebuildArgs]() {
       auto retryArgs = rebuildArgs;
       retryArgs.renderFlags |= InternalRenderFlags::MaterializeBlendChildren;
-      return rebuildSelf->asFragmentProcessor(rebuildSource, retryArgs, {},
-                                              SrcRectConstraint::Fast, &rebuildMatrix);
+      return rebuildSelf->asFragmentProcessor(rebuildSource, retryArgs, {}, SrcRectConstraint::Fast,
+                                              &rebuildMatrix);
     };
   }
   auto processor =

@@ -74,9 +74,8 @@ PlacementPtr<FragmentProcessor> ColorFilterShader::asFragmentProcessor(
     if (alphaSource == nullptr) {
       return nullptr;
     }
-    return XfermodeFragmentProcessor::MakeFromTwoProcessors(allocator, std::move(composed),
-                                                            std::move(alphaSource),
-                                                            BlendMode::SrcIn);
+    return XfermodeFragmentProcessor::MakeFromTwoProcessors(
+        allocator, std::move(composed), std::move(alphaSource), BlendMode::SrcIn);
   }
   auto alphaSource = FragmentProcessor::Make(shader, args, uvMatrix, dstColorSpace);
   if (alphaSource == nullptr) {

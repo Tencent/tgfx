@@ -218,8 +218,7 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
         }
       } else if (node->kind == AOTEffectKind::GradientSource) {
         auto parameters = std::get_if<AOTGradientParameters>(&node->parameters);
-        if (parameters == nullptr ||
-            ++gradients > AOTPointwiseChainProcessor::MaxGradientSlots) {
+        if (parameters == nullptr || ++gradients > AOTPointwiseChainProcessor::MaxGradientSlots) {
           return false;
         }
         hasLUT = parameters->colorizerKind == 3;

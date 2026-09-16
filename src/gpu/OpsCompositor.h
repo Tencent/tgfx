@@ -19,7 +19,6 @@
 #pragma once
 
 #include <functional>
-
 #include "core/ClipStack.h"
 #include "gpu/ops/RRectDrawOp.h"
 #include "gpu/ops/RectDrawOp.h"

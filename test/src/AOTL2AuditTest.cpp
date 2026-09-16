@@ -648,9 +648,9 @@ TGFX_TEST(AOTL2AuditTest, InnerShadowQuantizationAttribution) {
         int pixelDiff = 0;
         for (int channel = 0; channel < 4; ++channel) {
           int shift = channel * 8;
-          pixelDiff = std::max(pixelDiff,
-                               std::abs(static_cast<int>((pa[y * width + x] >> shift) & 0xFF) -
-                                        static_cast<int>((pb[y * width + x] >> shift) & 0xFF)));
+          pixelDiff =
+              std::max(pixelDiff, std::abs(static_cast<int>((pa[y * width + x] >> shift) & 0xFF) -
+                                           static_cast<int>((pb[y * width + x] >> shift) & 0xFF)));
         }
         if (pixelDiff > 0) {
           ++diffCount;

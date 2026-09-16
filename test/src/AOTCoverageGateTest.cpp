@@ -431,16 +431,29 @@ TGFX_TEST(AOTCoverageGateTest, BlendConstructionSitesStayFlattened) {
 }
 
 TGFX_TEST(AOTCoverageGateTest, ProductionMetricsPreserveUnmarkedFailures) {
-  EXPECT_TRUE(EvaluateAOTCoverageGate(0, 0, 0, 0).passed());
-  EXPECT_TRUE(EvaluateAOTCoverageGate(1, 1, 2, 2).passed());
-  auto mixed = EvaluateAOTCoverageGate(2, 1, 2, 1);
+  EXPECT_TRUE(EvaluateAOTCoverageGate(0, 0, 0, 0, 0, 0).passed());
+  EXPECT_TRUE(EvaluateAOTCoverageGate(1, 1, 0, 0, 2, 2).passed());
+  auto mixed = EvaluateAOTCoverageGate(2, 1, 0, 0, 2, 1);
   EXPECT_EQ(mixed.noMatchingRule, 1u);
   EXPECT_EQ(mixed.runtimeCompiles, 1u);
   EXPECT_FALSE(mixed.passed());
-  EXPECT_FALSE(EvaluateAOTCoverageGate(1, 0, 0, 0).passed());
-  EXPECT_FALSE(EvaluateAOTCoverageGate(0, 0, 1, 0).passed());
-  EXPECT_FALSE(EvaluateAOTCoverageGate(0, 1, 0, 0).consistent);
-  EXPECT_FALSE(EvaluateAOTCoverageGate(0, 0, 0, 1).passed());
+  EXPECT_FALSE(EvaluateAOTCoverageGate(1, 0, 0, 0, 0, 0).passed());
+  EXPECT_FALSE(EvaluateAOTCoverageGate(0, 0, 1, 0, 0, 0).passed());
+  EXPECT_FALSE(EvaluateAOTCoverageGate(0, 1, 0, 0, 0, 0).consistent);
+  EXPECT_FALSE(EvaluateAOTCoverageGate(0, 0, 0, 1, 0, 0).passed());
+  // By-design and environment exclusions pair with their fallback compilations: the strict
+  // counts drop, the exclusion counts surface, and an unpaired miss still fails.
+  auto byDesign = EvaluateAOTCoverageGate(2, 0, 2, 0, 3, 1);
+  EXPECT_TRUE(byDesign.passed());
+  EXPECT_EQ(byDesign.excludedByDesign, 2u);
+  EXPECT_EQ(byDesign.excludedEnvironment, 0u);
+  auto environment = EvaluateAOTCoverageGate(0, 0, 0, 3, 3, 0);
+  EXPECT_TRUE(environment.passed());
+  EXPECT_EQ(environment.excludedEnvironment, 3u);
+  // An exclusion may never hide a miss it cannot pair with: subtracting more builder creations
+  // than exist flips consistency instead of clamping the count to zero.
+  EXPECT_FALSE(EvaluateAOTCoverageGate(2, 0, 2, 0, 1, 0).consistent);
+  EXPECT_FALSE(EvaluateAOTCoverageGate(0, 0, 0, 0, 0, 1).passed());
 
   GlobalCache programs(nullptr);
   ProgramProvenance provenance = {};
@@ -457,12 +470,13 @@ TGFX_TEST(AOTCoverageGateTest, ProductionMetricsPreserveUnmarkedFailures) {
 
   BytesKey ordinaryKey;
   ordinaryKey.write(2u);
-  programs.addProgram(ordinaryKey, std::make_shared<Program>(nullptr, nullptr, nullptr, provenance));
+  programs.addProgram(ordinaryKey,
+                      std::make_shared<Program>(nullptr, nullptr, nullptr, provenance));
   const auto& stats = programs.programStats();
   EXPECT_EQ(stats.programBuilderCreations, 2u);
   EXPECT_EQ(stats.excludedProgramBuilderCreations, 1u);
-  auto gate = EvaluateAOTCoverageGate(1, 1, stats.programBuilderCreations,
-                                    stats.excludedProgramBuilderCreations);
+  auto gate = EvaluateAOTCoverageGate(1, 1, 0, 0, stats.programBuilderCreations,
+                                      stats.excludedProgramBuilderCreations);
   EXPECT_EQ(gate.runtimeCompiles, 1u);
   EXPECT_FALSE(gate.passed());
 

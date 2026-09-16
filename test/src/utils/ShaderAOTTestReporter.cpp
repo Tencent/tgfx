@@ -21,13 +21,13 @@
 #include <array>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <limits>
 #include <map>
 #include <set>
-#include <cstring>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -47,18 +47,28 @@
 namespace tgfx {
 
 AOTCoverageGateResult EvaluateAOTCoverageGate(uint64_t rawNoMatchingRule,
-                                             uint64_t deliberateNoMatchingRule,
-                                             uint64_t rawBuilderCreations,
-                                             uint64_t excludedBuilderCreations) {
+                                              uint64_t deliberateNoMatchingRule,
+                                              uint64_t byDesignNoMatchingRule,
+                                              uint64_t environmentCompileFailures,
+                                              uint64_t rawBuilderCreations,
+                                              uint64_t excludedBuilderCreations) {
   AOTCoverageGateResult result = {};
-  result.consistent = deliberateNoMatchingRule <= rawNoMatchingRule &&
-                      excludedBuilderCreations <= rawBuilderCreations;
-  result.noMatchingRule = deliberateNoMatchingRule <= rawNoMatchingRule
-                              ? rawNoMatchingRule - deliberateNoMatchingRule
+  // Deliberate misses already carry their fallback compilation inside excludedBuilderCreations
+  // (the deliberate scope marks every program created under it), so only the by-design and
+  // environment misses need their paired runtime subtraction here.
+  const uint64_t noMatchingExclusions = deliberateNoMatchingRule + byDesignNoMatchingRule;
+  const uint64_t pairedRuntimeExclusions = byDesignNoMatchingRule + environmentCompileFailures;
+  result.consistent = noMatchingExclusions <= rawNoMatchingRule &&
+                      excludedBuilderCreations + pairedRuntimeExclusions <= rawBuilderCreations;
+  result.noMatchingRule = noMatchingExclusions <= rawNoMatchingRule
+                              ? rawNoMatchingRule - noMatchingExclusions
                               : rawNoMatchingRule;
-  result.runtimeCompiles = excludedBuilderCreations <= rawBuilderCreations
-                               ? rawBuilderCreations - excludedBuilderCreations
-                               : rawBuilderCreations;
+  result.runtimeCompiles =
+      excludedBuilderCreations + pairedRuntimeExclusions <= rawBuilderCreations
+          ? rawBuilderCreations - excludedBuilderCreations - pairedRuntimeExclusions
+          : rawBuilderCreations;
+  result.excludedByDesign = byDesignNoMatchingRule;
+  result.excludedEnvironment = environmentCompileFailures;
   return result;
 }
 
@@ -415,7 +425,8 @@ static std::string FallbackEffectKey(const PrecompiledFallbackRecord& record) {
 
 static std::string FallbackEffectReasonKey(const PrecompiledFallbackRecord& record) {
   std::stringstream stream;
-  stream << static_cast<uint32_t>(record.reason) << "\n" << record.deliberate << "\n"
+  stream << static_cast<uint32_t>(record.reason) << "\n"
+         << record.deliberate << "\n"
          << FallbackEffectKey(record);
   return stream.str();
 }
@@ -943,8 +954,15 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
 
     uint64_t excludedFallbacks = 0;
     AOTCoverageGateResult coverageGate = {};
+    // SwiftShader's software GLSL compiler exhausts its memory budget on the fully-unrolled AOT
+    // artifacts (chain kernels); on that backend a FragmentModuleCreationFailed fallback is an
+    // environment limit, not a coverage regression. Real GPU backends keep failing the gate on
+    // this reason — a module creation failure there is a genuine defect.
+    const bool swiftShaderBackend = std::strstr(TGFX_BACKEND_NAME, "swiftshader") != nullptr;
     for (const auto& result : testResults) {
       uint64_t deliberateNoMatching = 0;
+      uint64_t byDesignNoMatching = 0;
+      uint64_t environmentCompileFailures = 0;
       for (const auto& record : result.fallbackRecords) {
         if (record.deliberate || record.reason == PrecompiledFallbackReason::DeferredTexture) {
           ++excludedFallbacks;
@@ -952,15 +970,31 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
         if (record.deliberate && record.reason == PrecompiledFallbackReason::NoMatchingRule) {
           ++deliberateNoMatching;
         }
+        if (!record.deliberate) {
+          // The stencil-and-cover GPs are documented non-AOT routes (see AOTCoverageGateTest's
+          // claim manifest): their NoMatchingRule records and the paired runtime compilations
+          // are by-design exclusions, surfaced in the gate output instead of silently dropped.
+          if (record.reason == PrecompiledFallbackReason::NoMatchingRule &&
+              record.pipelineSignature.rfind("GP=StencilCover", 0) == 0) {
+            ++byDesignNoMatching;
+          }
+          if (record.reason == PrecompiledFallbackReason::FragmentModuleCreationFailed &&
+              swiftShaderBackend) {
+            ++environmentCompileFailures;
+          }
+        }
       }
       // Missing diagnostic records stay in the production count. Exclusions cannot borrow
       // successful creations from a different test or from failed PrecompiledOnly probes.
       auto testGate = EvaluateAOTCoverageGate(
           result.fallbackCounts[static_cast<size_t>(PrecompiledFallbackReason::NoMatchingRule)],
-          deliberateNoMatching, result.programStats.programBuilderCreations,
+          deliberateNoMatching, byDesignNoMatching, environmentCompileFailures,
+          result.programStats.programBuilderCreations,
           result.programStats.excludedProgramBuilderCreations);
       coverageGate.noMatchingRule += testGate.noMatchingRule;
       coverageGate.runtimeCompiles += testGate.runtimeCompiles;
+      coverageGate.excludedByDesign += testGate.excludedByDesign;
+      coverageGate.excludedEnvironment += testGate.excludedEnvironment;
       coverageGate.consistent = coverageGate.consistent && testGate.consistent;
     }
     const auto productionBuilderCreations = coverageGate.runtimeCompiles;
@@ -1017,6 +1051,8 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
         {"coverageGate",
          {{"noMatchingRule", coverageGate.noMatchingRule},
           {"runtimeCompiles", coverageGate.runtimeCompiles},
+          {"excludedByDesign", coverageGate.excludedByDesign},
+          {"excludedEnvironment", coverageGate.excludedEnvironment},
           {"consistent", coverageGate.consistent},
           {"passed", coverageGate.passed()}}},
         {"metricDefinitions",
@@ -1120,14 +1156,19 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
     auto strictNoMatching = coverageGate.noMatchingRule;
     auto strictRuntimeCompiles = coverageGate.runtimeCompiles;
     if (coverageGate.passed()) {
-      std::printf("[Coverage Gate][%s] strict targets MET: noMatchingRule=0 runtimeCompiles=0\n",
-                  TGFX_BACKEND_NAME);
+      std::printf(
+          "[Coverage Gate][%s] strict targets MET: noMatchingRule=0 runtimeCompiles=0 "
+          "(excluded byDesign=%llu environment=%llu)\n",
+          TGFX_BACKEND_NAME, static_cast<unsigned long long>(coverageGate.excludedByDesign),
+          static_cast<unsigned long long>(coverageGate.excludedEnvironment));
     } else {
       std::printf(
           "[Coverage Gate][%s] MONITORING (targets: noMatchingRule=0 runtimeCompiles=0): "
-          "noMatchingRule=%llu runtimeCompiles=%llu\n",
+          "noMatchingRule=%llu runtimeCompiles=%llu (excluded byDesign=%llu environment=%llu)\n",
           TGFX_BACKEND_NAME, static_cast<unsigned long long>(strictNoMatching),
-          static_cast<unsigned long long>(strictRuntimeCompiles));
+          static_cast<unsigned long long>(strictRuntimeCompiles),
+          static_cast<unsigned long long>(coverageGate.excludedByDesign),
+          static_cast<unsigned long long>(coverageGate.excludedEnvironment));
       for (size_t i = 0; i < sortedFallbacks.size(); ++i) {
         // Deliberate records are provoked on purpose by test fixtures (e.g. the creator-funnel
         // artifact-miss test) and are already excluded from the production metrics.
@@ -1142,9 +1183,10 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
       }
       const char* gateMode = std::getenv("TGFX_AOT_COVERAGE_GATE");
       if (gateMode != nullptr && std::strcmp(gateMode, "blocking") == 0) {
-        std::printf("[Coverage Gate][%s] BLOCKING: strict targets not met (see the PENDING list "
-                    "above); failing the test process\n",
-                    TGFX_BACKEND_NAME);
+        std::printf(
+            "[Coverage Gate][%s] BLOCKING: strict targets not met (see the PENDING list "
+            "above); failing the test process\n",
+            TGFX_BACKEND_NAME);
         std::fflush(stdout);
         std::exit(1);
       }

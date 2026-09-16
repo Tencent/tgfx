@@ -147,9 +147,9 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
       processor->name() == "XfermodeFragmentProcessor - two") {
     bool nested = (renderFlags & InternalRenderFlags::NestedRasterization) != 0;
     for (size_t childIndex = 0; childIndex < 2 && !retryWarranted; ++childIndex) {
-      auto decision = AOTMaterializationPolicy::Evaluate(
-          processor->childProcessor(childIndex), MaterializationConsumer::PointwiseBlend,
-          childIndex);
+      auto decision =
+          AOTMaterializationPolicy::Evaluate(processor->childProcessor(childIndex),
+                                             MaterializationConsumer::PointwiseBlend, childIndex);
       retryWarranted = decision.requiredForCorrectness || (!nested && decision.shouldFlatten);
     }
   }
@@ -184,7 +184,8 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
       AOTEffectGraph retryGraph = {};
       AOTEffectPlan retryPlan = {};
       std::string retryBlocker = {};
-      bool retryLower = AOTEffectDecomposer::Lower({retryProcessor.get()}, &retryGraph, &retryBlocker);
+      bool retryLower =
+          AOTEffectDecomposer::Lower({retryProcessor.get()}, &retryGraph, &retryBlocker);
       bool retryValidate = retryLower && AOTEffectDecomposer::ValidateForFusion(retryGraph);
       bool retryDecompose = retryValidate && AOTEffectDecomposer::Decompose(retryGraph, &retryPlan);
       bool retryCanExecute = retryDecompose && AOTPlanExecutor::CanExecute(retryGraph, retryPlan);
