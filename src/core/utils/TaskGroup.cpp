@@ -27,6 +27,7 @@
 #endif
 
 namespace tgfx {
+#ifdef TGFX_USE_THREADS
 static constexpr size_t MAX_THREADS_SIZE = 32;
 static constexpr float LOW_PRIORITY_THREAD_RATIO = 0.7f;
 
@@ -261,6 +262,8 @@ void TaskPool::runLoop() {
     finishTask();
   }
 }
+
+#endif
 
 TaskGroup* TaskGroup::GetInstance() {
   static auto& taskGroup = *new TaskGroup();

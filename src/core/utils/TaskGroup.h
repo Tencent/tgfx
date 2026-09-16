@@ -25,10 +25,14 @@
 #include <thread>
 #include <vector>
 #include "concurrentqueue.h"
+#ifdef TGFX_USE_THREADS
 #include "lightweightsemaphore.h"
+#endif
 #include "tgfx/core/Task.h"
 
 namespace tgfx {
+
+#ifdef TGFX_USE_THREADS
 
 /**
  * A priority task pool with lock-free submission and mutex-protected scheduling. Producers only
@@ -115,6 +119,50 @@ class TaskPool {
   void finishTask();
   void runLoop();
 };
+
+#else
+
+/**
+ * Single-threaded builds run every task inline on the submitting thread. The pool keeps the
+ * same interface so callers need no conditional code, but submission always fails and the
+ * caller executes the task itself.
+ */
+class TaskPool {
+ public:
+  bool push(std::shared_ptr<Task> task, TaskPriority priority) {
+    static_cast<void>(task);
+    static_cast<void>(priority);
+    return false;
+  }
+
+  void setMaxThreadCount(size_t maxThreadCount) {
+    static_cast<void>(maxThreadCount);
+  }
+
+  void releaseThreads() {
+  }
+
+  void reopen() {
+  }
+
+  size_t maxThreadCount() {
+    return 0;
+  }
+
+  size_t totalThreads() {
+    return 0;
+  }
+
+  size_t sleeperCount() {
+    return 0;
+  }
+
+  size_t pendingCount() {
+    return 0;
+  }
+};
+
+#endif
 
 class TaskGroup {
  private:
