@@ -42,7 +42,7 @@ namespace tgfx {
 TGFX_TEST(ResourceTest, TaskRelease) {
   Task::ReleaseThreads();
   TGFX_PRIVATE_ACCESS(auto group = TaskGroup::GetInstance();
-                      EXPECT_TRUE(group->pool.threadHandles.empty());
+                      EXPECT_EQ(group->pool.threadHandles.size_approx(), 0u);
                       EXPECT_EQ(group->pool.waitingThreads, 0u);
                       EXPECT_EQ(group->pool.liveThreads, 0u); for (auto& queue
                                                                    : group->pool.priorityQueues) {
@@ -53,6 +53,44 @@ TGFX_TEST(ResourceTest, TaskRelease) {
 }
 
 #ifdef TGFX_USE_THREADS
+TGFX_TEST_PRIVATE(ResourceTest, TaskClosingDropsQueue) {
+  Task::ReleaseThreads();
+  Task::SetMaxThreadCount(2);
+  std::atomic<int> started{0};
+  auto blockTask = [&started] {
+    ++started;
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+  };
+  Task::Run(blockTask);
+  Task::Run(blockTask);
+  while (started.load() < 2) {
+  }
+  std::atomic<int> completed{0};
+  for (int i = 0; i < 10; ++i) {
+    Task::Run([&completed] { completed.fetch_add(1); });
+  }
+  // exit=true closes the pool immediately: busy workers finish their current task, queued ones
+  // are dropped, and no new task is claimed afterwards.
+  TGFX_PRIVATE_ACCESS(TaskGroup::GetInstance()->releaseThreads(true);)
+  TGFX_PRIVATE_ACCESS(auto group = TaskGroup::GetInstance(); EXPECT_EQ(group->pool.liveThreads, 0u);
+                      for (auto& queue
+                           : group->pool.priorityQueues) {
+                        std::shared_ptr<Task> task = nullptr;
+                        queue.try_dequeue(task);
+                        EXPECT_EQ(task, nullptr);
+                      })
+  EXPECT_LT(completed.load(), 10);
+  // Draining release reopens the pool so subsequent submissions run again.
+  Task::ReleaseThreads();
+  Task::Run([&completed] { completed.fetch_add(1); });
+  auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+  while (completed.load() < 1 && std::chrono::steady_clock::now() < deadline) {
+  }
+  // Dropped tasks are gone for good; only the one submitted after reopening runs.
+  EXPECT_EQ(completed.load(), 1);
+  Task::SetMaxThreadCount(0);
+}
+
 TGFX_TEST(ResourceTest, MaxThreadCountShrink) {
   Task::ReleaseThreads();
   Task::SetMaxThreadCount(4);
