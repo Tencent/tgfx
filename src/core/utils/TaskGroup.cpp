@@ -84,6 +84,11 @@ void TaskPool::setMaxThreadCount(size_t maxThreadCount) {
   }
 }
 
+size_t TaskPool::maxThreadCount() {
+  std::lock_guard<std::mutex> lock(stateMutex);
+  return maxThreads;
+}
+
 void TaskPool::releaseThreads(bool exit) {
   std::lock_guard<std::mutex> lifecycleLock(lifecycleMutex);
   auto state = admission.fetch_or(CLOSED_BIT, std::memory_order_acq_rel);
@@ -134,11 +139,6 @@ void TaskPool::reopen() {
   DEBUG_ASSERT(phase == Phase::Closed);
   phase = Phase::Running;
   admission.store(0, std::memory_order_release);
-}
-
-size_t TaskPool::maxThreadCount() {
-  std::lock_guard<std::mutex> lock(stateMutex);
-  return maxThreads;
 }
 
 bool TaskPool::enterPush() {
