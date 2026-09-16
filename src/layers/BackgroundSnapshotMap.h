@@ -78,6 +78,10 @@ struct BackgroundSnapshotKeyHash {
 struct BackgroundStyleResult {
   std::shared_ptr<Image> image = nullptr;
   Matrix drawMatrix = Matrix::I();
+  // The backdrop slice rect inside the image, fractional wherever the image bounds had to be
+  // rounded out. The blit is clipped to it so the rounded-out margin is not stamped over the
+  // destination.
+  Rect contentRect = Rect::MakeEmpty();
 };
 
 /**

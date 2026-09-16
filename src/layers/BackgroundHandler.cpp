@@ -302,9 +302,10 @@ std::shared_ptr<Image> RenderBackgroundStyleImage(const DrawArgs& args, LayerSty
                                                   const LayerStyleSource* source,
                                                   std::shared_ptr<Image> backgroundImage,
                                                   const Point& backgroundOffset,
-                                                  const Matrix& styleToDevice, Matrix* drawMatrix) {
+                                                  const Matrix& styleToDevice, Matrix* drawMatrix,
+                                                  Rect* contentRect) {
   if (args.context == nullptr || style == nullptr || source == nullptr ||
-      backgroundImage == nullptr || drawMatrix == nullptr) {
+      backgroundImage == nullptr || drawMatrix == nullptr || contentRect == nullptr) {
     return nullptr;
   }
   auto groupIndex = static_cast<int>(style->excludeChildEffects());
@@ -348,10 +349,26 @@ std::shared_ptr<Image> RenderBackgroundStyleImage(const DrawArgs& args, LayerSty
       backgroundOffset.x - contentEntry.offset.x, backgroundOffset.y - contentEntry.offset.y,
       static_cast<float>(backgroundImage->width()), static_cast<float>(backgroundImage->height()));
   auto deviceBackdrop = recordMatrix.mapRect(backdropRect);
+  // The slice rect is fractional; the image bounds have to be whole pixels, so they are rounded
+  // out. The rounded-out margin is not part of the backdrop, so it must not be stamped over the
+  // destination — the consumer clips the blit back to this rect.
+  auto sliceRect = deviceBackdrop;
   deviceBackdrop.roundOut();
   Matrix inverse = Matrix::I();
   if (!recordMatrix.invert(&inverse)) {
     return nullptr;
+  }
+  // Lay the backdrop slice down so the style blends against a real backdrop, and clamp its edges
+  // over the rounded-out bounds so the cached image is opaque up to its edges: a transparent edge
+  // would be stamped over the destination by the Src blit.
+  {
+    auto styleSpaceBgOffset = backgroundOffset - contentEntry.offset;
+    auto shader = Shader::MakeImageShader(backgroundImage, TileMode::Clamp, TileMode::Clamp);
+    shader = shader->makeWithMatrix(Matrix::MakeTrans(styleSpaceBgOffset.x, styleSpaceBgOffset.y));
+    Paint bgPaint = {};
+    bgPaint.setShader(std::move(shader));
+    bgPaint.setBlendMode(BlendMode::Src);
+    recording->drawRect(inverse.mapRect(deviceBackdrop.makeOutset(1.0f, 1.0f)), bgPaint);
   }
   style->draw(recording, styleInput, 1.0f);
 
@@ -374,6 +391,8 @@ std::shared_ptr<Image> RenderBackgroundStyleImage(const DrawArgs& args, LayerSty
   // collapses to that pure translation, so the blit stays 1:1.
   *drawMatrix = inverse;
   drawMatrix->preTranslate(imageOffset.x, imageOffset.y);
+  *contentRect = sliceRect;
+  contentRect->offset(-imageOffset.x, -imageOffset.y);
   // Rasterize lazily so the texture joins the resource cache (keyed, evictable, reusable).
   return image->makeRasterized();
 }
@@ -430,30 +449,28 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     auto result = snapshots->styleResults.find(key);
     if (result == snapshots->styleResults.end()) {
       Matrix resultMatrix = Matrix::I();
+      Rect resultRect = Rect::MakeEmpty();
       auto styleImage = RenderBackgroundStyleImage(args, style, source, bgImage, bgOffset,
-                                                   canvas->getMatrix(), &resultMatrix);
+                                                   canvas->getMatrix(), &resultMatrix, &resultRect);
       if (styleImage != nullptr) {
         result = snapshots->styleResults
-                     .emplace(key, BackgroundStyleResult{std::move(styleImage), resultMatrix})
+                     .emplace(key, BackgroundStyleResult{std::move(styleImage), resultMatrix,
+                                                         resultRect})
                      .first;
       }
     }
     if (result != snapshots->styleResults.end()) {
       AutoCanvasRestore restoreBlit(canvas);
       canvas->concat(result->second.drawMatrix);
+      canvas->clipRect(result->second.contentRect);
       Paint paint = {};
       paint.setAlpha(alpha);
-      // The cached image holds the style output alone, with the style's coverage baked into its
-      // alpha, so the style's blend mode is applied when blitting: the destination stays untouched
-      // wherever the style left it visible, exactly as the direct path leaves it. Src is blitted
-      // as SrcOver because a raw Src blit would discard the destination under partially covered
-      // pixels, while the direct path's Src is coverage-masked by the style's own mask.
+      // Replace outright: the image already holds the backdrop with the style composited on top,
+      // so neither the style's blend mode nor this pass's alpha may be applied a second time.
       // Anti-aliasing stays off because the image lands on whole device pixels; smoothing its
-      // edges would bleed coverage into the neighbouring pixel and, under a replacing mode, erase
-      // it.
+      // edges would bleed coverage into the neighbouring pixel and, under Src, erase it.
       paint.setAntiAlias(false);
-      auto blendMode = style->blendMode();
-      paint.setBlendMode(blendMode == BlendMode::Src ? BlendMode::SrcOver : blendMode);
+      paint.setBlendMode(BlendMode::Src);
       canvas->drawImage(result->second.image, 0.0f, 0.0f, &paint);
       return;
     }
