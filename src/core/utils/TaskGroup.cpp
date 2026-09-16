@@ -115,7 +115,9 @@ void TaskPool::releaseThreads(bool exit) {
   }
   {
     std::lock_guard<std::mutex> lock(stateMutex);
-    DEBUG_ASSERT(busyThreads == 0 && waitingThreads == 0);
+    // Detached workers (handle-queue OOM fallback) are not joinable and may still be exiting
+    // here, so no thread-count assertion is made on this path.
+    DEBUG_ASSERT(phase == Phase::Closing || phase == Phase::Draining);
     for (auto& queue : priorityQueues) {
       if (exit) {
         std::shared_ptr<Task> task = nullptr;
