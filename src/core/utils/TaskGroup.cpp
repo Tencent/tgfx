@@ -252,6 +252,8 @@ TaskGroup* TaskGroup::GetInstance() {
   return &taskGroup;
 }
 
+// Forces all pending tasks to be finished when the app is exiting to prevent accessing wild
+// pointers.
 void OnAppExit() {
   TaskGroup::GetInstance()->releaseThreads(true);
 }
