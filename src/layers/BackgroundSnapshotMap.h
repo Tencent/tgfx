@@ -77,6 +77,9 @@ struct BackgroundSnapshotKeyHash {
  */
 struct BackgroundStyleResult {
   std::shared_ptr<Image> image = nullptr;
+  // The matrix the image was rasterized with. A pass may only blit the image when its own matrix
+  // differs from this one by a whole number of device pixels.
+  Matrix recordMatrix = Matrix::I();
   Matrix drawMatrix = Matrix::I();
   // The backdrop slice rect inside the image, fractional wherever the image bounds had to be
   // rounded out. The blit is clipped to it so the rounded-out margin is not stamped over the

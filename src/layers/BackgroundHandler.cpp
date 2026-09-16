@@ -110,6 +110,27 @@ bool ComputeSubGeometry(BackgroundSource* parentSource, const Rect& localBounds,
   return true;
 }
 
+// Returns true when a device-space rect is too large to back with a single GPU texture. Such a
+// render target never gets allocated, so a draw that needs one is dropped silently and the style
+// simply stops showing up.
+bool ExceedsTextureLimit(Context* context, const Rect& bounds) {
+  if (context == nullptr || context->gpu() == nullptr) {
+    return false;
+  }
+  auto limit = static_cast<float>(context->gpu()->limits()->maxTextureDimension2D);
+  return bounds.width() > limit || bounds.height() > limit;
+}
+
+// Returns true when the matrix is a translation by a whole number of pixels.
+bool IsWholePixelTranslation(const Matrix& matrix) {
+  if (!matrix.isTranslate()) {
+    return false;
+  }
+  auto remainderX = fabsf(matrix.getTranslateX() - roundf(matrix.getTranslateX()));
+  auto remainderY = fabsf(matrix.getTranslateY() - roundf(matrix.getTranslateY()));
+  return remainderX < 0.01f && remainderY < 0.01f;
+}
+
 }  // namespace
 
 BackgroundHandler* BackgroundHandler::NoOp() {
@@ -354,6 +375,14 @@ std::shared_ptr<Image> RenderBackgroundStyleImage(const DrawArgs& args, LayerSty
   // destination — the consumer clips the blit back to this rect.
   auto sliceRect = deviceBackdrop;
   deviceBackdrop.roundOut();
+  // The image is rasterized at device resolution over the entire backdrop slice, so on a large
+  // layer at high zoom it can outgrow the GPU's texture limit, after which the blit is dropped
+  // silently and the style stops showing up at all. Such layers draw the style directly instead:
+  // the direct path only ever rasterizes the part the current pass draws.
+  if (ExceedsTextureLimit(args.context, deviceBackdrop)) {
+    return nullptr;
+  }
+
   Matrix inverse = Matrix::I();
   if (!recordMatrix.invert(&inverse)) {
     return nullptr;
@@ -454,25 +483,36 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
                                                    canvas->getMatrix(), &resultMatrix, &resultRect);
       if (styleImage != nullptr) {
         result = snapshots->styleResults
-                     .emplace(key, BackgroundStyleResult{std::move(styleImage), resultMatrix,
-                                                         resultRect})
+                     .emplace(key, BackgroundStyleResult{std::move(styleImage), canvas->getMatrix(),
+                                                         resultMatrix, resultRect})
                      .first;
       }
     }
     if (result != snapshots->styleResults.end()) {
-      AutoCanvasRestore restoreBlit(canvas);
-      canvas->concat(result->second.drawMatrix);
-      canvas->clipRect(result->second.contentRect);
-      Paint paint = {};
-      paint.setAlpha(alpha);
-      // Replace outright: the image already holds the backdrop with the style composited on top,
-      // so neither the style's blend mode nor this pass's alpha may be applied a second time.
-      // Anti-aliasing stays off because the image lands on whole device pixels; smoothing its
-      // edges would bleed coverage into the neighbouring pixel and, under Src, erase it.
-      paint.setAntiAlias(false);
-      paint.setBlendMode(BlendMode::Src);
-      canvas->drawImage(result->second.image, 0.0f, 0.0f, &paint);
-      return;
+      // The image is rasterized at the recording pass's device phase, so blitting it from a pass
+      // that sits on a different phase resamples it onto half pixels and seams the style output
+      // along that pass's edge. Such passes draw the style directly instead.
+      auto relation = canvas->getMatrix();
+      Matrix inverse = Matrix::I();
+      if (result->second.recordMatrix.invert(&inverse)) {
+        relation.preConcat(inverse);
+      }
+      if (IsWholePixelTranslation(relation)) {
+        AutoCanvasRestore restoreBlit(canvas);
+        canvas->concat(result->second.drawMatrix);
+        canvas->clipRect(result->second.contentRect);
+        Paint paint = {};
+        paint.setAlpha(alpha);
+        // Replace outright: the image already holds the backdrop with the style composited on
+        // top, so neither the style's blend mode nor this pass's alpha may be applied a second
+        // time. Anti-aliasing stays off because the image lands on whole device pixels;
+        // smoothing its edges would bleed coverage into the neighbouring pixel and, under Src,
+        // erase it.
+        paint.setAntiAlias(false);
+        paint.setBlendMode(BlendMode::Src);
+        canvas->drawImage(result->second.image, 0.0f, 0.0f, &paint);
+        return;
+      }
     }
   }
   auto backgroundOffset = bgOffset - contentEntry.offset;
