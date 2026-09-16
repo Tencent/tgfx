@@ -184,7 +184,13 @@ std::shared_ptr<Program> StandardDrawOp::prepareDecomposedProgram(
       chainGeometryProcessor != nullptr ? chainGeometryProcessor.get() : geometryProcessor.get();
   auto rewrittenInfo = std::make_unique<ProgramInfo>(
       renderTarget, chainGP, std::move(rewrittenProcessors), 1, xferProcessor.get(), blendMode);
+  // The rewrite only changes the processor expression, never the other pipeline state, so every
+  // non-processor state the original ProgramInfo carries over. A pass with a depth-stencil
+  // attachment rejects pipelines that do not declare the format (see the inheritance note in
+  // prepare()), and dropping the colour write mask would un-mask a write-disabled draw.
   rewrittenInfo->setCullMode(cullMode);
+  rewrittenInfo->setDepthStencil(preparedProgramInfo->getDepthStencil());
+  rewrittenInfo->setColorWriteMask(preparedProgramInfo->getColorWriteMask());
   // Probe before the strict lookup: a chain the matcher rejects (unsupported GP, perspective leaf
   // transforms) must fall back without recording a diagnostic miss against the rewritten tree,
   // which would double-count the draw alongside the original tree's own miss record.

@@ -2759,6 +2759,76 @@ static void RenderFullBlendModeSceneOnce(Context* context, bool useBundle, Bitma
   context->globalCache()->clearPrograms();
 }
 
+// A non-AA concave path fill and an advanced-blend image draw in the same pass. When
+// TGFX_ENABLE_STENCIL_COVER_PATH is on, the path routes through the stencil-and-cover path and
+// OpsRenderTask attaches a depth-stencil buffer to the pass; the blend image's chain rewrite in
+// that same pass must then declare the depth-stencil format on its rebuilt pipeline, or backends
+// that validate pipelines against the pass reject the rewritten program and the draw silently
+// falls back to runtime compilation. With the build flag off (default) the scene degenerates to
+// an ordinary shape + blend scene that still guards the rewrite's state inheritance.
+static void RenderStencilPassPlusChainOnce(Context* context, bool useBundle, Bitmap* outBitmap) {
+  auto* cache = context->precompiledShaderCache();
+  if (useBundle) {
+    ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+  } else {
+    cache->unload();
+  }
+  ScopedAOTStatsPause statsPause(context, !useBundle);
+  context->globalCache()->clearPrograms();
+  auto surface = Surface::Make(context, 180, 180);
+  ASSERT_TRUE(surface != nullptr);
+  auto* canvas = surface->getCanvas();
+  // A convex pentagon (not rect/oval/rrect, so Canvas::drawPath bypasses those fast paths and
+  // reaches the stencil-cover dispatch fork) with antialiasing off: with the stencil-cover build
+  // flag on and the backend supporting stencil attachments, this draw routes through
+  // StencilCoverPathDrawOp and OpsRenderTask attaches the depth-stencil buffer to the pass.
+  Path pentagon = {};
+  pentagon.moveTo(90, 10);
+  pentagon.lineTo(166, 65);
+  pentagon.lineTo(137, 154);
+  pentagon.lineTo(43, 154);
+  pentagon.lineTo(14, 65);
+  pentagon.close();
+  Paint pathPaint = {};
+  pathPaint.setColor(Color::FromRGBA(40, 60, 90, 255));
+  pathPaint.setAntiAlias(false);
+  canvas->drawPath(pentagon, pathPaint);
+  // A two-texture blend shader: the plain matcher has no direct rule for this tree, so the
+  // draw resolves through the decomposition rewrite onto the fused pointwise-chain kernel —
+  // the exact path whose rebuilt ProgramInfo must inherit the depth-stencil format.
+  auto imageA = MakeImage("resources/apitest/mandrill_128.png");
+  auto imageB = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(imageA != nullptr && imageB != nullptr);
+  Paint blendPaint = {};
+  blendPaint.setShader(Shader::MakeBlend(BlendMode::Multiply, Shader::MakeImageShader(imageA),
+                                         Shader::MakeImageShader(imageB)));
+  canvas->drawRect(Rect::MakeXYWH(10, 10, 160, 160), blendPaint);
+  context->flushAndSubmit(true);
+  ASSERT_TRUE(outBitmap->allocPixels(180, 180));
+  auto* pixels = outBitmap->lockPixels();
+  ASSERT_TRUE(pixels != nullptr);
+  ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+  outBitmap->unlockPixels();
+  if (useBundle) {
+    cache->unload();
+    context->globalCache()->clearPrograms();
+  }
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, StencilPassChainRewriteKeepsPipelineState) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  Bitmap aotBitmap = {};
+  Bitmap runtimeBitmap = {};
+  RenderStencilPassPlusChainOnce(context, true, &aotBitmap);
+  // The rewritten blend draw must resolve to a precompiled program, not silently fall back
+  // because its pipeline failed the pass's depth-stencil validation.
+  EXPECT_GE(context->precompiledShaderCache()->drawStats().completeAOTDraws, 1u);
+  RenderStencilPassPlusChainOnce(context, false, &runtimeBitmap);
+  ExpectBitmapsIdentical("stencil-pass-chain-rewrite", aotBitmap, runtimeBitmap, 180, 180);
+}
+
 // The full CanvasTest.BlendModeTest scene (18 blend modes x image + solid rect, MSAA) rendered
 // through both routes. The precompiled blend kernels must match the runtime emission; the
 // Overlay/HardLight operand-pick regression (branch control on the wrong operand) reproduced
