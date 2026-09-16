@@ -296,6 +296,85 @@ const LayerStyleSource* BackgroundConsumer::getCachedLayerStyleSource(Layer* lay
   return it->second.get();
 }
 
+namespace {
+
+std::shared_ptr<Image> RenderBackgroundStyleImage(const DrawArgs& args, LayerStyle* style,
+                                                  const LayerStyleSource* source,
+                                                  std::shared_ptr<Image> backgroundImage,
+                                                  const Point& backgroundOffset, Point* offset) {
+  if (args.context == nullptr || style == nullptr || source == nullptr ||
+      backgroundImage == nullptr || offset == nullptr) {
+    return nullptr;
+  }
+  auto groupIndex = static_cast<int>(style->excludeChildEffects());
+  auto* group = source->groups[groupIndex].get();
+  if (group == nullptr) {
+    return nullptr;
+  }
+  const auto& contentEntry = group->content;
+  auto contentScale = source->contentScale;
+  if (FloatNearlyZero(contentScale)) {
+    return nullptr;
+  }
+
+  PictureRecorder recorder = {};
+  auto* recording = recorder.beginRecording();
+  // Keep the CTM unscaled so the picture stays in content-pixel space, which is the space the
+  // style draws in. Scaling here would change the resolution the style is rasterized at, while the
+  // cached image has to keep content pixel density.
+  recording->translate(contentEntry.offset.x, contentEntry.offset.y);
+
+  LayerStyleInput styleInput = {};
+  styleInput.content = contentEntry.image;
+  styleInput.contentOffset = contentEntry.offset;
+  styleInput.contentScale = contentScale;
+  styleInput.extraSources.push_back(
+      std::make_shared<StyleInputSource>(backgroundImage, backgroundOffset - contentEntry.offset));
+  auto sourceFlags = style->extraSourceType();
+  if ((sourceFlags & static_cast<uint32_t>(LayerStyleExtraSourceType::Contour)) != 0) {
+    auto contourImage = group->contour.has_value() ? group->contour->image : nullptr;
+    auto contourOffset =
+        contourImage ? group->contour->offset - contentEntry.offset : Point::Zero();
+    styleInput.extraSources.push_back(std::make_shared<ContourInputSource>(
+        std::move(contourImage), contourOffset, source->contentShape));
+  }
+  // Lay the backdrop slice down first, so the cached image holds the composited result for this
+  // region instead of the style alone. The consume pass blits the whole image at once, which means
+  // the style has to blend against a real backdrop here rather than the destination it would
+  // otherwise only partially cover.
+  {
+    auto styleSpaceBgOffset = backgroundOffset - contentEntry.offset;
+    Paint bgPaint = {};
+    bgPaint.setBlendMode(BlendMode::Src);
+    recording->drawImage(backgroundImage, styleSpaceBgOffset.x, styleSpaceBgOffset.y, &bgPaint);
+  }
+  style->draw(recording, styleInput, 1.0f);
+
+  auto picture = recorder.finishRecordingAsPicture();
+  if (picture == nullptr) {
+    return nullptr;
+  }
+  Point imageOffset = {};
+  // Crop to the backdrop slice. The style's own outset reaches past it and would otherwise end up
+  // as transparent pixels in the image, which the consume pass blits with Src and would therefore
+  // punch a transparent edge into the destination.
+  auto backdropRect = Rect::MakeXYWH(backgroundOffset.x, backgroundOffset.y,
+                                     static_cast<float>(backgroundImage->width()),
+                                     static_cast<float>(backgroundImage->height()));
+  auto image =
+      ToImageWithOffset(std::move(picture), &imageOffset, &backdropRect, args.dstColorSpace);
+  if (image == nullptr) {
+    return nullptr;
+  }
+  // The recorded space is the content image space shifted by contentEntry.offset, so translate
+  // back to let the caller blit under the consume pass transform.
+  *offset = imageOffset - contentEntry.offset;
+  // Rasterize lazily so the texture joins the resource cache (keyed, evictable, reusable).
+  return image->makeRasterized();
+}
+
+}  // namespace
+
 void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer,
                                              float alpha, LayerStyle* style,
                                              const LayerStyleSource* source) {
@@ -347,7 +426,7 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     if (result == snapshots->styleResults.end()) {
       Point resultOffset = {};
       auto styleImage =
-          Layer::RenderBackgroundStyleImage(args, style, source, bgImage, bgOffset, &resultOffset);
+          RenderBackgroundStyleImage(args, style, source, bgImage, bgOffset, &resultOffset);
       if (styleImage != nullptr) {
         result = snapshots->styleResults
                      .emplace(key, BackgroundStyleResult{std::move(styleImage), resultOffset})
