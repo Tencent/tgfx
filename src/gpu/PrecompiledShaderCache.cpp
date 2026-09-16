@@ -24,6 +24,7 @@
 #include "PrecompiledBundleIdentity.h"
 #include "core/utils/Log.h"
 #include "gpu/GlobalCache.h"
+#include "gpu/ShaderCaps.h"
 #include "tgfx/gpu/Context.h"
 #include "zlib.h"
 #include "zstd.h"
@@ -231,7 +232,8 @@ void PrecompiledShaderCache::recordMaterializedEdge(uint64_t bytes) {
   _drawStats.offscreenTargets++;
   _drawStats.renderTargetSwitches++;
   _drawStats.intermediateReadBytes += bytes;
-  _drawStats.intermediateWriteBytes += bytes;}
+  _drawStats.intermediateWriteBytes += bytes;
+}
 
 AOTDrawStats PrecompiledShaderCache::drawStats() const {
   std::lock_guard<std::mutex> autoLock(drawStatsMutex);
@@ -512,9 +514,8 @@ static bool ReadUniformEntries(const uint8_t* data, size_t maxLen, size_t* offse
     }
     std::string name(reinterpret_cast<const char*>(data + *offset), nameLen);
     if (name.find('\0') != std::string::npos ||
-        std::any_of(out.begin(), out.end(), [&](const Uniform& uniform) {
-          return uniform.name() == name;
-        })) {
+        std::any_of(out.begin(), out.end(),
+                    [&](const Uniform& uniform) { return uniform.name() == name; })) {
       return false;
     }
     *offset += nameLen;
@@ -554,12 +555,12 @@ static bool ParseStageReflection(const uint8_t* data, size_t maxLen, ShaderStage
   uint8_t samplerCount = data[offset++];
   offset += 2;  // reserved
 
-  if (!ReadUniformEntries(data, maxLen, &offset, uniformCount, blob->uniforms, hasArraySize,
-                          false, remainingBytes)) {
+  if (!ReadUniformEntries(data, maxLen, &offset, uniformCount, blob->uniforms, hasArraySize, false,
+                          remainingBytes)) {
     return false;
   }
-  if (!ReadUniformEntries(data, maxLen, &offset, samplerCount, blob->samplers, hasArraySize,
-                          true, remainingBytes)) {
+  if (!ReadUniformEntries(data, maxLen, &offset, samplerCount, blob->samplers, hasArraySize, true,
+                          remainingBytes)) {
     return false;
   }
   return true;
@@ -618,8 +619,8 @@ static bool LoadPool(const uint8_t* fileData, size_t fileSize, size_t poolOffset
         return false;
       }
       size_t absReflOff = reflectionPoolStart + reflOff;
-      if (!ParseStageReflection(fileData + absReflOff, fileSize - absReflOff, &blob,
-                                hasArraySize, remainingBytes)) {
+      if (!ParseStageReflection(fileData + absReflOff, fileSize - absReflOff, &blob, hasArraySize,
+                                remainingBytes)) {
         LOGE("PrecompiledShaderCache: Failed to parse reflection for entry %u", i);
         return false;
       }
@@ -664,9 +665,10 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   // knows how to consume — reject instead of guessing.
   uint32_t toolchainVersion = ReadU32LE(ptr + 16);
   if (toolchainVersion != kExpectedToolchainABI) {
-    LOGE("PrecompiledShaderCache: Bundle toolchain ABI 0x%08x does not match the runtime's "
-         "0x%08x; the reflection/uniform contracts are incompatible",
-         toolchainVersion, kExpectedToolchainABI);
+    LOGE(
+        "PrecompiledShaderCache: Bundle toolchain ABI 0x%08x does not match the runtime's "
+        "0x%08x; the reflection/uniform contracts are incompatible",
+        toolchainVersion, kExpectedToolchainABI);
     return false;
   }
   uint32_t vertPoolCount = ReadU32LE(ptr + 20);
@@ -687,10 +689,21 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   // constructed without a backend (standalone parsing in tests) skips this check, mirroring the
   // legacy-hash skip below: an unspecified identity cannot be verified.
   const char* expectedTag = ExpectedProfileTag(_backend);
-  if (expectedTag[0] != '\0' && profileTag != expectedTag) {
-    LOGE("PrecompiledShaderCache: Bundle profile tag '%s' does not match the running backend "
-         "(expected '%s')",
-         profileTag.c_str(), expectedTag);
+  // An OpenGL context running the ES standard (GLES devices, SwiftShader, WebGL) must be served
+  // from the opengles bundle: the desktop tag only covers desktop GLSL profiles. The GL profile
+  // is a property of the context rather than the backend enum, so a cache without a context
+  // (standalone parsing) leaves the expected profile unspecified and accepts either GL tag,
+  // mirroring the unspecified-identity skip below.
+  bool esProfileContext = _backend == Backend::OpenGL && _context != nullptr &&
+                          _context->shaderCaps()->usesPrecisionModifiers;
+  bool profileUnspecified = _backend == Backend::OpenGL && _context == nullptr;
+  bool tagAccepted = profileUnspecified || profileTag == expectedTag ||
+                     (esProfileContext && profileTag == "opengles");
+  if (expectedTag[0] != '\0' && !tagAccepted) {
+    LOGE(
+        "PrecompiledShaderCache: Bundle profile tag '%s' does not match the running backend "
+        "(expected '%s')",
+        profileTag.c_str(), expectedTag);
     return false;
   }
 
@@ -765,9 +778,8 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
     }
     loadPtr = decompressed.data();
     loadSize = decompressed.size();
-  } else if (dataPoolEnd > size ||
-             (reflectionOffset != 0 &&
-              (dataPoolEnd > reflectionOffset || reflectionOffset > size))) {
+  } else if (dataPoolEnd > size || (reflectionOffset != 0 &&
+                                    (dataPoolEnd > reflectionOffset || reflectionOffset > size))) {
     LOGE("PrecompiledShaderCache: Data or reflection section out of bounds");
     return false;
   }
@@ -778,8 +790,8 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   // warning, keeping old data readable.
   if (sourceHash != 0) {
     uint64_t computed = BundleIdentityHashInit();
-    computed = BundleIdentityHashHeader(computed, formatVersion, vertPoolCount, fragPoolCount,
-                                        ptr + 48);
+    computed =
+        BundleIdentityHashHeader(computed, formatVersion, vertPoolCount, fragPoolCount, ptr + 48);
     for (uint32_t i = 0; i < vertPoolCount; i++) {
       const uint8_t* entry = loadPtr + vertPoolOffset + static_cast<size_t>(i) * POOL_ENTRY_SIZE;
       computed = BundleIdentityHashEntry(computed, ReadU64LE(entry), ReadU64LE(entry + 8),
@@ -798,9 +810,10 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
                                          loadSize - reflectionPoolStart);
     }
     if (computed != sourceHash) {
-      LOGE("PrecompiledShaderCache: Bundle identity hash mismatch (expected 0x%016llx, computed "
-           "0x%016llx); the content does not match its recorded identity",
-           static_cast<unsigned long long>(sourceHash), static_cast<unsigned long long>(computed));
+      LOGE(
+          "PrecompiledShaderCache: Bundle identity hash mismatch (expected 0x%016llx, computed "
+          "0x%016llx); the content does not match its recorded identity",
+          static_cast<unsigned long long>(sourceHash), static_cast<unsigned long long>(computed));
       return false;
     }
   } else {

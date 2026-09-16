@@ -16,11 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
-#include <atomic>
 #include <string>
 #include <vector>
 #include "base/TGFXTest.h"
@@ -29,20 +29,19 @@
 #include "gpu/GlobalCache.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/glsl/GLSLBlend.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
-#include "gpu/glsl/GLSLBlend.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Canvas.h"
-#include "tgfx/core/ImageBuffer.h"
-#include "tgfx/core/ImageGenerator.h"
-#include "tgfx/core/YUVData.h"
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/ColorSpace.h"
+#include "tgfx/core/ImageBuffer.h"
 #include "tgfx/core/ImageFilter.h"
+#include "tgfx/core/ImageGenerator.h"
 #include "tgfx/core/MaskFilter.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
@@ -51,6 +50,7 @@
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/core/Surface.h"
+#include "tgfx/core/YUVData.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ImageLayer.h"
@@ -665,8 +665,7 @@ TGFX_TEST(AOTRenderConsistencyTest, ProgramKeyColorCoverageBoundary) {
     const_cast<Bitmap&>(ref).unlockPixels();
     const_cast<Bitmap&>(mix).unlockPixels();
     EXPECT_EQ(mismatches, 0) << label << ": mask draw changed after the blend draw shared its "
-                             << "program key (first ref=" << firstRef << " mix=" << firstMix
-                             << ")";
+                             << "program key (first ref=" << firstRef << " mix=" << firstMix << ")";
   };
   compareBand("jit", reference, mixed);
   compareBand("aot", referenceAOT, mixedAOT);
@@ -728,109 +727,6 @@ TGFX_TEST(AOTRenderConsistencyTest, TextureFillTriangulatedShapeAA) {
   renderOnce(false, &runtimeBitmap);
   ExpectBitmapsIdentical("texture-fill-triangulated-shape-aa", aotBitmap, runtimeBitmap, 240, 240);
 }
-
-TGFX_TEST(AOTRenderConsistencyTest, ProgramKeyColorCoverageBoundary) {
-  // A shared alpha-gradient image: the left half is opaque, the right half is half-transparent,
-  // so the blue blend draw and the red mask draw produce visibly different pixels when mixed up.
-  Bitmap gradient = {};
-  ASSERT_TRUE(gradient.allocPixels(64, 64));
-  {
-    auto* pixels = static_cast<uint32_t*>(gradient.lockPixels());
-    ASSERT_TRUE(pixels != nullptr);
-    for (int y = 0; y < 64; ++y) {
-      for (int x = 0; x < 64; ++x) {
-        auto alpha = x < 32 ? 255u : 128u;
-        pixels[y * 64 + x] = (alpha << 24) | 0x00FFFFFFu;
-      }
-    }
-    gradient.unlockPixels();
-  }
-  auto image = Image::MakeFrom(gradient);
-  ASSERT_TRUE(image != nullptr);
-
-  auto renderScene = [&](bool withBlendDraw, bool useBundle, Bitmap* outBitmap) {
-    ContextScope scope;
-    auto context = scope.getContext();
-    ASSERT_TRUE(context != nullptr);
-    auto* cache = context->precompiledShaderCache();
-    if (useBundle) {
-      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
-    } else {
-      cache->unload();
-    }
-    ScopedAOTStatsPause statsPause(context, !useBundle);
-    context->globalCache()->clearPrograms();
-    auto surface = Surface::Make(context, 128, 128);
-    ASSERT_TRUE(surface != nullptr);
-    auto* canvas = surface->getCanvas();
-    canvas->clear(Color::White());
-    // Draw A: a SrcIn blend shader whose processor sequence is
-    // [TextureEffect(gradient), Xfermode(SrcIn, DstChild)] in the color chain, with a solid
-    // blue source operand.
-    if (withBlendDraw) {
-      Paint paintA = {};
-      paintA.setShader(Shader::MakeBlend(
-          BlendMode::SrcIn, Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp),
-          Shader::MakeColorShader(Color::Blue())));
-      canvas->drawRect(Rect::MakeXYWH(8, 8, 112, 52), paintA);
-    }
-    // Draw B: a solid red paint with a shader mask filter over the same gradient. Its
-    // processor sequence is structurally identical — [TextureEffect(gradient),
-    // Xfermode(SrcIn, DstChild)] — but the pair sits in the coverage chain. Reusing draw A's
-    // program for draw B would read the paint color through the blend's uniform layout
-    // instead of the geometry color, so the program key must distinguish the two.
-    Paint paintB = {};
-    paintB.setColor(Color::Red());
-    paintB.setMaskFilter(
-        MaskFilter::MakeShader(Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp)));
-    canvas->drawRect(Rect::MakeXYWH(8, 68, 112, 52), paintB);
-    context->flushAndSubmit(true);
-    ASSERT_TRUE(outBitmap->allocPixels(128, 128));
-    auto* pixels = outBitmap->lockPixels();
-    ASSERT_TRUE(pixels != nullptr);
-    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
-    outBitmap->unlockPixels();
-  };
-
-  Bitmap reference = {};
-  renderScene(false, false, &reference);
-  Bitmap mixed = {};
-  renderScene(true, false, &mixed);
-  Bitmap referenceAOT = {};
-  renderScene(false, true, &referenceAOT);
-  Bitmap mixedAOT = {};
-  renderScene(true, true, &mixedAOT);
-  // Compare only draw B's band (rows 60..124): the reference scene never draws A, so the upper
-  // band differs by construction while the lower band must stay identical.
-  auto compareBand = [&](const char* label, const Bitmap& ref, const Bitmap& mix) {
-    auto* refPixels = static_cast<const uint32_t*>(const_cast<Bitmap&>(ref).lockPixels());
-    auto* mixPixels = static_cast<uint32_t*>(const_cast<Bitmap&>(mix).lockPixels());
-    ASSERT_TRUE(refPixels != nullptr && mixPixels != nullptr);
-    int mismatches = 0;
-    uint32_t firstRef = 0;
-    uint32_t firstMix = 0;
-    for (int y = 60; y < 124; ++y) {
-      for (int x = 0; x < 128; ++x) {
-        auto refValue = refPixels[y * 128 + x];
-        auto mixValue = mixPixels[y * 128 + x];
-        if (refValue != mixValue) {
-          if (mismatches == 0) {
-            firstRef = refValue;
-            firstMix = mixValue;
-          }
-          ++mismatches;
-        }
-      }
-    }
-    const_cast<Bitmap&>(ref).unlockPixels();
-    const_cast<Bitmap&>(mix).unlockPixels();
-    EXPECT_EQ(mismatches, 0) << label << ": mask draw changed after the blend draw shared its "
-                             << "program key (first ref=" << firstRef << " mix=" << firstMix << ")";
-  };
-  compareBand("jit", reference, mixed);
-  compareBand("aot", referenceAOT, mixedAOT);
-}
-
 TGFX_TEST(AOTRenderConsistencyTest, LUTGradientMaskFold) {
   Color red = {1.f, 0.f, 0.f, 1.f};
   Color green = {0.f, 1.f, 0.f, 1.f};
@@ -1371,7 +1267,8 @@ TGFX_TEST(AOTRenderConsistencyTest, BundleIdentityAndGenerationLifecycle) {
     auto image = MakeImage("resources/apitest/mandrill_128.png");
     ASSERT_TRUE(image != nullptr);
     Paint paint = {};
-    std::array<float, 20> swapRedBlue = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
+    std::array<float, 20> swapRedBlue = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0,
+                                         1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
     paint.setColorFilter(ColorFilter::Matrix(swapRedBlue));
     surface->getCanvas()->drawImage(image, 0, 0, &paint);
     context->flushAndSubmit(true);
@@ -1430,10 +1327,9 @@ TGFX_TEST(AOTRenderConsistencyTest, BundleIdentityAndGenerationLifecycle) {
   // uncompressed and its layout checks stay structurally valid, so only the identity hash can
   // reject the modified content.
   std::vector<uint8_t> tampered(bundleData, bundleData + bundleSize);
-  uint32_t reflectionOffset = static_cast<uint32_t>(tampered[44]) |
-                              (static_cast<uint32_t>(tampered[45]) << 8) |
-                              (static_cast<uint32_t>(tampered[46]) << 16) |
-                              (static_cast<uint32_t>(tampered[47]) << 24);
+  uint32_t reflectionOffset =
+      static_cast<uint32_t>(tampered[44]) | (static_cast<uint32_t>(tampered[45]) << 8) |
+      (static_cast<uint32_t>(tampered[46]) << 16) | (static_cast<uint32_t>(tampered[47]) << 24);
   ASSERT_GT(tampered.size(), reflectionOffset + 8u);
   tampered[reflectionOffset + (tampered.size() - reflectionOffset) / 2] ^= 0xFF;
   EXPECT_FALSE(cache->loadBundle(tampered.data(), tampered.size()));
@@ -1531,8 +1427,9 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailPassesPreserveCoordinateDomains
     }
     int opCount = deviceSource ? 3 : 17;
     for (int index = 0; index < opCount; ++index) {
-      processor = FragmentProcessor::Compose(
-          allocator, std::move(processor), ColorMatrixFragmentProcessor::Make(allocator, swapRedBlue));
+      processor =
+          FragmentProcessor::Compose(allocator, std::move(processor),
+                                     ColorMatrixFragmentProcessor::Make(allocator, swapRedBlue));
     }
     ASSERT_TRUE(context->drawingManager()->fillRTWithFP(target, std::move(processor), 0, offset));
     context->flushAndSubmit(true);
@@ -1621,12 +1518,11 @@ TGFX_TEST(AOTRenderConsistencyTest, PlanExecutionFailureIsRecordedNotFatal) {
     auto allocator = context->drawingAllocator();
     auto processor = TextureEffect::Make(allocator, source);
     for (int index = 0; index < 17; ++index) {
-      processor = FragmentProcessor::Compose(
-          allocator, std::move(processor),
-          ColorMatrixFragmentProcessor::Make(allocator, swapRedBlue));
+      processor =
+          FragmentProcessor::Compose(allocator, std::move(processor),
+                                     ColorMatrixFragmentProcessor::Make(allocator, swapRedBlue));
     }
-    if (!context->drawingManager()->fillRTWithFP(target, std::move(processor), 0,
-                                                 Point::Zero())) {
+    if (!context->drawingManager()->fillRTWithFP(target, std::move(processor), 0, Point::Zero())) {
       cache->setDiagnosticRecordingEnabled(false);
       return stats;
     }
@@ -1670,8 +1566,8 @@ TGFX_TEST(AOTRenderConsistencyTest, LongLinearChainExecutesMaterializedTailPasse
     ColorFilterRenderStats candidateStats;
     RenderImageWithColorFilterOnce(image, chain, width, height, false, false, false, true,
                                    &reference, &referenceStats);
-    RenderImageWithColorFilterOnce(image, chain, width, height, true, true, false, true,
-                                   &candidate, &candidateStats);
+    RenderImageWithColorFilterOnce(image, chain, width, height, true, true, false, true, &candidate,
+                                   &candidateStats);
     uint64_t passCount = opCount == 15 ? 1 : (opCount + 1) / 2;
     const auto& draws = candidateStats.draws;
     EXPECT_EQ(candidateStats.programs.programBuilderCreations, 0u);
@@ -1712,7 +1608,7 @@ TGFX_TEST(AOTRenderConsistencyTest, LongLinearChainExecutesMaterializedTailPasse
 TGFX_TEST(AOTRenderConsistencyTest, RetryRebuildKeepsTransparentBlackColorFilter) {
   if (std::getenv("TGFX_AOT_LEGACY_BLEND_MATERIALIZATION") != nullptr) {
     GTEST_SKIP() << "The legacy switch restores construction-time materialization; this test "
-                   "asserts the planned path";
+                    "asserts the planned path";
   }
   ContextScope scope;
   auto context = scope.getContext();
@@ -1736,9 +1632,9 @@ TGFX_TEST(AOTRenderConsistencyTest, RetryRebuildKeepsTransparentBlackColorFilter
     // matrix -> premul round trip is not an identity (an opaque input would clamp the alpha
     // offset away and make the whole wrapper a no-op).
     auto gradientA = Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(size, size),
-                                                 {Color(1, 0, 0, 0.6f), Color(0, 0, 1, 0.6f)});
+                                                {Color(1, 0, 0, 0.6f), Color(0, 0, 1, 0.6f)});
     auto gradientB = Shader::MakeLinearGradient(Point::Make(size, 0), Point::Make(0, size),
-                                                 {Color(0, 1, 0, 0.6f), Color(1, 1, 0, 0.6f)});
+                                                {Color(0, 1, 0, 0.6f), Color(1, 1, 0, 0.6f)});
     ASSERT_TRUE(gradientA != nullptr && gradientB != nullptr);
     Paint paint = {};
     paint.setShader(Shader::MakeBlend(BlendMode::Multiply, gradientA, gradientB));
@@ -1768,9 +1664,9 @@ TGFX_TEST(AOTRenderConsistencyTest, RetryRebuildKeepsTransparentBlackColorFilter
     auto* canvas = surface->getCanvas();
     canvas->clear(Color::White());
     auto gradientA = Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(size, size),
-                                                 {Color(1, 0, 0, 1), Color(0, 0, 1, 1)});
+                                                {Color(1, 0, 0, 1), Color(0, 0, 1, 1)});
     auto gradientB = Shader::MakeLinearGradient(Point::Make(size, 0), Point::Make(0, size),
-                                                 {Color(0, 1, 0, 1), Color(1, 1, 0, 1)});
+                                                {Color(0, 1, 0, 1), Color(1, 1, 0, 1)});
     Paint paint = {};
     paint.setAlpha(51.0f / 255.0f);
     paint.setShader(Shader::MakeBlend(BlendMode::Multiply, gradientA, gradientB));
@@ -1879,9 +1775,9 @@ TGFX_TEST(AOTRenderConsistencyTest, RetryRebuildKeepsMaskCoverage) {
     auto* canvas = surface->getCanvas();
     canvas->clear(Color::White());
     auto gradientA = Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(size, size),
-                                                 {Color(1, 0, 0, 1), Color(0, 0, 1, 1)});
+                                                {Color(1, 0, 0, 1), Color(0, 0, 1, 1)});
     auto gradientB = Shader::MakeLinearGradient(Point::Make(size, 0), Point::Make(0, size),
-                                                 {Color(0, 1, 0, 1), Color(1, 1, 0, 1)});
+                                                {Color(0, 1, 0, 1), Color(1, 1, 0, 1)});
     ASSERT_TRUE(gradientA != nullptr && gradientB != nullptr);
     Paint paint = {};
     paint.setShader(Shader::MakeBlend(BlendMode::Multiply, gradientA, gradientB));
@@ -1965,10 +1861,10 @@ TGFX_TEST(AOTRenderConsistencyTest, RetryRebuildKeepsMaskCoverage) {
     }
     candidate.unlockPixels();
   }
-  printf("[RetryMaskCoverage] maxChannelDiff=%d differing=%lld/%d whiteOnlyInRef=%lld "
-         "candidateHash=%llu\n",
-         maxDiff, diffCount, size * size, fullPaintCount,
-         static_cast<unsigned long long>(hash));
+  printf(
+      "[RetryMaskCoverage] maxChannelDiff=%d differing=%lld/%d whiteOnlyInRef=%lld "
+      "candidateHash=%llu\n",
+      maxDiff, diffCount, size * size, fullPaintCount, static_cast<unsigned long long>(hash));
   fflush(stdout);
   // A dropped mask leaves large white-vs-color regions; the quantization budget is 1 LSB per
   // materialized edge.
@@ -1988,7 +1884,7 @@ TGFX_TEST(AOTRenderConsistencyTest, RetryRebuildKeepsMaskCoverage) {
 TGFX_TEST(AOTRenderConsistencyTest, BlendChildMaterializationIsPlannedNotBakedIn) {
   if (std::getenv("TGFX_AOT_LEGACY_BLEND_MATERIALIZATION") != nullptr) {
     GTEST_SKIP() << "The legacy switch restores construction-time materialization; this test "
-                   "asserts the planned path";
+                    "asserts the planned path";
   }
   bool runtimeOnly = std::getenv("TGFX_AOT_DISABLE") != nullptr;
   ContextScope scope;
@@ -2000,9 +1896,9 @@ TGFX_TEST(AOTRenderConsistencyTest, BlendChildMaterializationIsPlannedNotBakedIn
     cache->resetStats();
     auto surface = Surface::Make(context, 96, 96);
     auto gradientA = Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(96, 96),
-                                                 {Color(1, 0, 0, 1), Color(0, 0, 1, 1)});
+                                                {Color(1, 0, 0, 1), Color(0, 0, 1, 1)});
     auto gradientB = Shader::MakeLinearGradient(Point::Make(96, 0), Point::Make(0, 96),
-                                                 {Color(0, 1, 0, 1), Color(1, 1, 0, 1)});
+                                                {Color(0, 1, 0, 1), Color(1, 1, 0, 1)});
     auto blend = Shader::MakeBlend(BlendMode::Multiply, gradientA, gradientB);
     EXPECT_TRUE(surface != nullptr && gradientA != nullptr && gradientB != nullptr &&
                 blend != nullptr);
@@ -2060,7 +1956,7 @@ TGFX_TEST(AOTRenderConsistencyTest, BlendChildMaterializationIsPlannedNotBakedIn
 TGFX_TEST(AOTRenderConsistencyTest, GradientBlendDiffAttribution) {
   if (std::getenv("TGFX_AOT_LEGACY_BLEND_MATERIALIZATION") != nullptr) {
     GTEST_SKIP() << "The legacy switch restores construction-time materialization; this test "
-                   "asserts the planned path";
+                    "asserts the planned path";
   }
   ContextScope scope;
   auto context = scope.getContext();
@@ -2102,14 +1998,13 @@ TGFX_TEST(AOTRenderConsistencyTest, GradientBlendDiffAttribution) {
     return cache->loadBundle(bundleData, bundleSize);
   };
   auto printStats = [&](const char* label, const AOTDrawStats& draws) {
-    printf("[GradientBlendDiffAttribution] %s: draws=%u completeAOT=%u atomicFallbacks=%u "
-           "kernelInvocations=%u fpFlattenEdges=%u planMaterializedEdges=%u\n",
-           label, static_cast<unsigned>(draws.draws),
-           static_cast<unsigned>(draws.completeAOTDraws),
-           static_cast<unsigned>(draws.atomicFallbacks),
-           static_cast<unsigned>(draws.kernelInvocations),
-           static_cast<unsigned>(draws.fpFlattenEdges),
-           static_cast<unsigned>(draws.planMaterializedEdges));
+    printf(
+        "[GradientBlendDiffAttribution] %s: draws=%u completeAOT=%u atomicFallbacks=%u "
+        "kernelInvocations=%u fpFlattenEdges=%u planMaterializedEdges=%u\n",
+        label, static_cast<unsigned>(draws.draws), static_cast<unsigned>(draws.completeAOTDraws),
+        static_cast<unsigned>(draws.atomicFallbacks),
+        static_cast<unsigned>(draws.kernelInvocations), static_cast<unsigned>(draws.fpFlattenEdges),
+        static_cast<unsigned>(draws.planMaterializedEdges));
     fflush(stdout);
   };
   AOTDrawStats referenceStats = {};
@@ -2144,8 +2039,8 @@ TGFX_TEST(AOTRenderConsistencyTest, GradientBlendDiffAttribution) {
     fullAOTStats = cache->drawStats();
     printStats("fullAOT", fullAOTStats);
   }
-  auto pairStats = [&](const char* label, const Bitmap& a, const Bitmap& b)
-      -> std::tuple<int, size_t, size_t> {
+  auto pairStats = [&](const char* label, const Bitmap& a,
+                       const Bitmap& b) -> std::tuple<int, size_t, size_t> {
     auto* pa = static_cast<const uint8_t*>(const_cast<Bitmap&>(a).lockPixels());
     auto* pb = static_cast<const uint8_t*>(const_cast<Bitmap&>(b).lockPixels());
     EXPECT_TRUE(pa != nullptr && pb != nullptr);
@@ -2171,8 +2066,8 @@ TGFX_TEST(AOTRenderConsistencyTest, GradientBlendDiffAttribution) {
         gt2Count++;
       }
     }
-    printf("[GradientBlendDiffAttribution] %s: maxChannelDiff=%d differing=%zu/%d >2=%zu\n",
-           label, maxDiff, diffCount, size * size, gt2Count);
+    printf("[GradientBlendDiffAttribution] %s: maxChannelDiff=%d differing=%zu/%d >2=%zu\n", label,
+           maxDiff, diffCount, size * size, gt2Count);
     fflush(stdout);
     const_cast<Bitmap&>(a).unlockPixels();
     const_cast<Bitmap&>(b).unlockPixels();
@@ -2237,28 +2132,28 @@ TGFX_TEST(AOTRenderConsistencyTest, FirstSceneSteadyStateAttribution) {
   source.unlockPixels();
   auto image = Image::MakeFrom(source);
   ASSERT_TRUE(image != nullptr);
-  std::array<float, 20> swapRedBlue = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0,
-                                       1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
+  std::array<float, 20> swapRedBlue = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
   auto drawOnce = [&](tgfx::Canvas* canvas) {
     Paint paint = {};
     paint.setColorFilter(ColorFilter::Matrix(swapRedBlue));
     auto start = std::chrono::steady_clock::now();
     canvas->drawImage(image, 0, 0, &paint);
     context->flushAndSubmit(true);
-    return std::chrono::duration_cast<std::chrono::microseconds>(
-               std::chrono::steady_clock::now() - start)
+    return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() -
+                                                                 start)
         .count();
   };
   auto report = [&](const char* mode, int pass, long long micros) {
     auto programs = context->globalCache()->programStats();
     auto draws = cache->drawStats();
-    printf("[FirstSceneSteadyStateAttribution] %s pass=%d micros=%lld "
-           "cumulative: precompiledCreations=%u cacheHits=%u programBuilders=%u "
-           "completeAOT=%u\n",
-           mode, pass, micros, static_cast<unsigned>(programs.precompiledArtifactCreations),
-           static_cast<unsigned>(programs.cacheHits),
-           static_cast<unsigned>(programs.programBuilderCreations),
-           static_cast<unsigned>(draws.completeAOTDraws));
+    printf(
+        "[FirstSceneSteadyStateAttribution] %s pass=%d micros=%lld "
+        "cumulative: precompiledCreations=%u cacheHits=%u programBuilders=%u "
+        "completeAOT=%u\n",
+        mode, pass, micros, static_cast<unsigned>(programs.precompiledArtifactCreations),
+        static_cast<unsigned>(programs.cacheHits),
+        static_cast<unsigned>(programs.programBuilderCreations),
+        static_cast<unsigned>(draws.completeAOTDraws));
     fflush(stdout);
   };
   // Phase 1: three draws onto one shared surface.
@@ -2301,7 +2196,8 @@ TGFX_TEST(AOTRenderConsistencyTest, FirstSceneSteadyStateAttribution) {
 // nothing on top of the white background.
 class FailingUploadGenerator : public ImageGenerator {
  public:
-  FailingUploadGenerator(int width, int height) : ImageGenerator(width, height) {}
+  FailingUploadGenerator(int width, int height) : ImageGenerator(width, height) {
+  }
 
   bool isAlphaOnly() const override {
     return false;
@@ -2319,8 +2215,7 @@ TGFX_TEST(AOTRenderConsistencyTest, FailedTextureUploadKeepsRoutesAligned) {
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
   constexpr int size = 96;
-  std::array<float, 20> swapRedBlue = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0,
-                                       1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
+  std::array<float, 20> swapRedBlue = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
   auto renderScene = [&](Bitmap* outBitmap) {
     auto image = Image::MakeFrom(std::make_shared<FailingUploadGenerator>(size, size));
     ASSERT_TRUE(image != nullptr);
@@ -2383,7 +2278,8 @@ TGFX_TEST(AOTRenderConsistencyTest, FailedTextureUploadKeepsRoutesAligned) {
 // kept-alive proxy must decode, the released one must not.
 class CountingImageGenerator : public ImageGenerator {
  public:
-  CountingImageGenerator(int width, int height) : ImageGenerator(width, height) {}
+  CountingImageGenerator(int width, int height) : ImageGenerator(width, height) {
+  }
 
   bool isAlphaOnly() const override {
     return false;
@@ -2480,9 +2376,12 @@ TGFX_TEST(AOTRenderConsistencyTest, DecomposeRejectionIsRecordedWithReason) {
   cache->recordDecomposeRejection(AOTDecomposeOutcome::UnsupportedShape);
   cache->recordDecomposeRejection(AOTDecomposeOutcome::BlockedByLowering);
   auto stats = cache->drawStats();
-  EXPECT_EQ(stats.decomposeRejections[static_cast<size_t>(AOTDecomposeOutcome::UnsupportedShape)], 2u);
-  EXPECT_EQ(stats.decomposeRejections[static_cast<size_t>(AOTDecomposeOutcome::BlockedByLowering)], 1u);
-  EXPECT_EQ(stats.decomposeRejections[static_cast<size_t>(AOTDecomposeOutcome::FusablePointwise)], 0u);
+  EXPECT_EQ(stats.decomposeRejections[static_cast<size_t>(AOTDecomposeOutcome::UnsupportedShape)],
+            2u);
+  EXPECT_EQ(stats.decomposeRejections[static_cast<size_t>(AOTDecomposeOutcome::BlockedByLowering)],
+            1u);
+  EXPECT_EQ(stats.decomposeRejections[static_cast<size_t>(AOTDecomposeOutcome::FusablePointwise)],
+            0u);
 
   // No-false-positive: an image + color-matrix chain the route serves end-to-end must not
   // record any rejection.
@@ -2495,8 +2394,7 @@ TGFX_TEST(AOTRenderConsistencyTest, DecomposeRejectionIsRecordedWithReason) {
   ASSERT_TRUE(surface != nullptr);
   Paint paint = {};
   paint.setShader(imageShader);
-  std::array<float, 20> swapRedBlue = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0,
-                                       1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
+  std::array<float, 20> swapRedBlue = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
   paint.setColorFilter(ColorFilter::Matrix(swapRedBlue));
   surface->getCanvas()->drawRect(Rect::MakeWH(96, 96), paint);
   context->flushAndSubmit(true);
@@ -3262,8 +3160,7 @@ TGFX_TEST(AOTRenderConsistencyTest, DeepMaterializationChain) {
   }
   reference.unlockPixels();
   candidate.unlockPixels();
-  printf("[DeepMaterialization] maxDiff=%d diffPixels=%zu/%zu\n", maxDiff, diffPixels,
-         totalPixels);
+  printf("[DeepMaterialization] maxDiff=%d diffPixels=%zu/%zu\n", maxDiff, diffPixels, totalPixels);
   EXPECT_LE(maxDiff, 1);
   // Fourteen materialized edges each contribute an independent 1-LSB rounding, so a large share
   // of pixels may differ by exactly one; the maxDiff bound is the structural guard.
@@ -3341,7 +3238,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyMaskFoldsIntoChain) {
 TGFX_TEST(AOTRenderConsistencyTest, ColorFilterShaderServesFusedTreeWithoutMaterialization) {
   if (std::getenv("TGFX_AOT_LEGACY_BLEND_MATERIALIZATION") != nullptr) {
     GTEST_SKIP() << "The legacy switch restores construction-time materialization; this test "
-                   "asserts the planned path";
+                    "asserts the planned path";
   }
   ContextScope scope;
   auto context = scope.getContext();
@@ -3349,7 +3246,7 @@ TGFX_TEST(AOTRenderConsistencyTest, ColorFilterShaderServesFusedTreeWithoutMater
   auto* cache = context->precompiledShaderCache();
   // Shifts red by 0.25, so the matrix affects transparent black (the ColorFilterShader branch).
   const std::array<float, 20> offsetRed = {1, 0, 0, 0, 0.25f, 0, 1, 0, 0, 0,
-                                           0, 0, 1, 0, 0,       0, 0, 0, 1, 0};
+                                           0, 0, 1, 0, 0,     0, 0, 0, 1, 0};
   auto renderScene = [&]() -> AOTDrawStats {
     cache->setDiagnosticRecordingEnabled(true);
     cache->resetStats();
