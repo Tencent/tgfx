@@ -280,8 +280,8 @@ TaskGroup* TaskGroup::GetInstance() {
   return &taskGroup;
 }
 
-// Forces all pending tasks to be finished when the app is exiting to prevent accessing wild
-// pointers.
+// Finishes in-flight tasks and drops queued ones when the app is exiting, so no task code runs
+// during static destruction.
 void OnAppExit() {
   TaskGroup::GetInstance()->releaseThreads(true);
 }
