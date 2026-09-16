@@ -1999,7 +1999,14 @@ std::shared_ptr<Image> Layer::RenderBackgroundStyleImage(const DrawArgs& args, L
     return nullptr;
   }
   Point imageOffset = {};
-  auto image = ToImageWithOffset(std::move(picture), &imageOffset, nullptr, args.dstColorSpace);
+  // Crop to the backdrop slice. The style's own outset reaches past it and would otherwise end up
+  // as transparent pixels in the image, which the consume pass blits with Src and would therefore
+  // punch a transparent edge into the destination.
+  auto backdropRect = Rect::MakeXYWH(backgroundOffset.x, backgroundOffset.y,
+                                     static_cast<float>(backgroundImage->width()),
+                                     static_cast<float>(backgroundImage->height()));
+  auto image =
+      ToImageWithOffset(std::move(picture), &imageOffset, &backdropRect, args.dstColorSpace);
   if (image == nullptr) {
     return nullptr;
   }
