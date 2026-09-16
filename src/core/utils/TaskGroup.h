@@ -23,7 +23,6 @@
 #include <memory>
 #include <mutex>
 #include <thread>
-#include <vector>
 #include "concurrentqueue.h"
 #ifdef TGFX_USE_THREADS
 #include "lightweightsemaphore.h"
@@ -103,20 +102,17 @@ class TaskPool {
   void setMaxThreadCount(size_t maxThreadCount);
 
   /**
-   * Rejects new submissions and drains accepted work before joining workers. Must not be called
-   * by a task executing in this pool. Concurrent releases are serialized.
+   * Rejects new submissions and joins all workers. When exit is true, queued tasks are dropped
+   * and workers exit immediately (used on app exit to avoid running task code during static
+   * destruction). When exit is false, accepted work is drained first so the caller can reopen
+   * the pool with no task lost. Must not be called by a task executing in this pool.
    */
-  void releaseThreads();
-
-  /**
-   * Reopens a fully released pool for subsequent submissions.
-   */
-  void reopen();
+  void releaseThreads(bool exit);
 
   size_t maxThreadCount();
 
  private:
-  enum class Phase { Running, Draining, Closed };
+  enum class Phase { Running, Closing, Draining, Closed };
 
   class SubmissionGuard {
    public:
@@ -142,7 +138,7 @@ class TaskPool {
   moodycamel::ConcurrentQueue<std::shared_ptr<Task>> priorityQueues[PRIORITY_QUEUE_COUNT];
   TaskSemaphore workSignal;
   TaskSemaphore producersDone;
-  std::vector<std::thread> threadHandles = {};
+  moodycamel::ConcurrentQueue<std::thread*> threadHandles;
   Phase phase = Phase::Running;
   size_t liveThreads = 0;
   size_t busyThreads = 0;
@@ -151,15 +147,18 @@ class TaskPool {
   size_t lowPriorityThreads = 0;
   bool lowNeedsCheck = false;
 
+  void reopen();
   bool enterPush();
   void leavePush();
-  void ensureStarted();
+  bool ensureStarted();
   void ensureStandbyLocked();
-  void spawnWorkerLocked();
+  bool spawnWorkerLocked();
   std::shared_ptr<Task> waitForTask();
   std::shared_ptr<Task> claimLocked();
   void finishTask();
   void runLoop();
+
+  friend class TaskGroup;
 };
 
 class TaskGroup {

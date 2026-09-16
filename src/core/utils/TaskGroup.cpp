@@ -48,13 +48,12 @@ static size_t GetDefaultMaxThreadCount() {
   return std::min(cpuCores == 0 ? size_t{8} : cpuCores, MAX_THREADS_SIZE);
 }
 
-TaskPool::TaskPool() : maxThreads(GetDefaultMaxThreadCount()) {
+TaskPool::TaskPool() : threadHandles(MAX_THREADS_SIZE), maxThreads(GetDefaultMaxThreadCount()) {
   lowPriorityThreads = LowPriorityThreadCount(maxThreads);
-  threadHandles.reserve(MAX_THREADS_SIZE);
 }
 
 TaskPool::~TaskPool() {
-  releaseThreads();
+  releaseThreads(true);
 }
 
 bool TaskPool::push(std::shared_ptr<Task> task, TaskPriority priority) {
@@ -62,7 +61,9 @@ bool TaskPool::push(std::shared_ptr<Task> task, TaskPriority priority) {
     return false;
   }
   SubmissionGuard guard(this);
-  ensureStarted();
+  if (!ensureStarted()) {
+    return false;
+  }
   if (!priorityQueues[static_cast<size_t>(priority)].enqueue(std::move(task))) {
     return false;
   }
@@ -75,7 +76,7 @@ void TaskPool::setMaxThreadCount(size_t maxThreadCount) {
     maxThreadCount = GetDefaultMaxThreadCount();
   }
   std::lock_guard<std::mutex> lock(stateMutex);
-  maxThreads = std::min(maxThreadCount, MAX_THREADS_SIZE);
+  maxThreads = maxThreadCount;
   lowPriorityThreads = LowPriorityThreadCount(maxThreads);
   if (phase == Phase::Running && (admission.load(std::memory_order_acquire) & STARTED_BIT)) {
     ensureStandbyLocked();
@@ -83,32 +84,42 @@ void TaskPool::setMaxThreadCount(size_t maxThreadCount) {
   }
 }
 
-void TaskPool::releaseThreads() {
+void TaskPool::releaseThreads(bool exit) {
   std::lock_guard<std::mutex> lifecycleLock(lifecycleMutex);
   auto state = admission.fetch_or(CLOSED_BIT, std::memory_order_acq_rel);
   if ((state & PUSH_COUNT_MASK) != 0) {
     while (!producersDone.wait()) {
     }
   }
-  std::vector<std::thread> handles;
   {
     std::lock_guard<std::mutex> lock(stateMutex);
     if (phase == Phase::Closed) {
       return;
     }
-    phase = Phase::Draining;
-    handles.swap(threadHandles);
+    // exit=true drops queued tasks and exits workers immediately (app exit); exit=false drains
+    // accepted work first so the pool can reopen with nothing lost.
+    phase = exit ? Phase::Closing : Phase::Draining;
     workSignal.signal(static_cast<ptrdiff_t>(liveThreads));
   }
-  for (auto& thread : handles) {
-    thread.join();
+  std::thread* handle = nullptr;
+  while (threadHandles.try_dequeue(handle)) {
+    if (handle->joinable()) {
+      handle->join();
+    }
+    delete handle;
   }
   {
     std::lock_guard<std::mutex> lock(stateMutex);
     DEBUG_ASSERT(liveThreads == 0 && busyThreads == 0 && waitingThreads == 0);
     for (auto& queue : priorityQueues) {
-      DEBUG_ASSERT(queue.size_approx() == 0);
-      static_cast<void>(queue);
+      if (exit) {
+        std::shared_ptr<Task> task = nullptr;
+        while (queue.try_dequeue(task)) {
+        }
+      } else {
+        DEBUG_ASSERT(queue.size_approx() == 0);
+        static_cast<void>(queue);
+      }
     }
     while (workSignal.tryWait()) {
     }
@@ -150,16 +161,19 @@ void TaskPool::leavePush() {
   }
 }
 
-void TaskPool::ensureStarted() {
+bool TaskPool::ensureStarted() {
   if (admission.load(std::memory_order_acquire) & STARTED_BIT) {
-    return;
+    return true;
   }
   std::lock_guard<std::mutex> lock(stateMutex);
   if (!(admission.load(std::memory_order_acquire) & STARTED_BIT)) {
     DEBUG_ASSERT(phase == Phase::Running);
-    spawnWorkerLocked();
+    if (!spawnWorkerLocked()) {
+      return false;
+    }
     admission.fetch_or(STARTED_BIT, std::memory_order_release);
   }
+  return true;
 }
 
 void TaskPool::ensureStandbyLocked() {
@@ -168,11 +182,22 @@ void TaskPool::ensureStandbyLocked() {
   }
 }
 
-void TaskPool::spawnWorkerLocked() {
+bool TaskPool::spawnWorkerLocked() {
   // Register the handle while holding stateMutex; a new worker must acquire it before doing any
-  // work. Thread construction failures retain the platform's existing failure behavior.
-  threadHandles.emplace_back(&TaskPool::runLoop, this);
+  // work. Allocation or enqueue failure returns false so the caller falls back to inline
+  // execution, matching the previous behavior.
+  auto thread = new (std::nothrow) std::thread(&TaskPool::runLoop, this);
+  if (thread == nullptr) {
+    return false;
+  }
+  if (!threadHandles.enqueue(thread)) {
+    // The handle queue only fails on OOM. The thread is already running, so it releases its slot
+    // when the pool closes; it just cannot be joined.
+    thread->detach();
+    delete thread;
+  }
   ++liveThreads;
+  return true;
 }
 
 std::shared_ptr<Task> TaskPool::waitForTask() {
@@ -185,6 +210,10 @@ std::shared_ptr<Task> TaskPool::waitForTask() {
     }
     std::lock_guard<std::mutex> lock(stateMutex);
     --waitingThreads;
+    if (phase == Phase::Closing) {
+      --liveThreads;
+      return nullptr;
+    }
     if (phase == Phase::Running && liveThreads > maxThreads) {
       --liveThreads;
       // Shrinking does not hand back a notification: lowering the limit posts liveThreads permits,
@@ -278,7 +307,7 @@ bool TaskGroup::pushTask(std::shared_ptr<Task> task, TaskPriority priority) {
 }
 
 void TaskGroup::releaseThreads(bool exit) {
-  pool.releaseThreads();
+  pool.releaseThreads(exit);
   if (!exit) {
     pool.reopen();
   }
