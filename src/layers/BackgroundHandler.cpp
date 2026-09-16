@@ -25,6 +25,7 @@
 #include "layers/LayerStyleSource.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/PictureRecorder.h"
+#include "tgfx/core/Shader.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/layerstyles/LayerStyle.h"
@@ -322,13 +323,10 @@ std::shared_ptr<Image> RenderBackgroundStyleImage(const DrawArgs& args, LayerSty
   auto* recording = recorder.beginRecording();
   // Bake the consume canvas's matrix into the recording so the image is rasterized at the final
   // device density and the later blit does not pass through a scale, which would resample the
-  // cached image onto half pixels. The translation is snapped first: an integral translation
-  // puts the backdrop slice exactly on the raster grid, so the cropped image has no uncovered
-  // edges that a Src blit would punch into the destination.
+  // cached image onto half pixels. The matrix is applied as-is, keeping the exact (possibly
+  // fractional) device phase so the style output stays aligned with the layer content drawn
+  // after the blit — snapping it here would displace crisp style edges by up to half a pixel.
   auto recordMatrix = styleToDevice;
-  auto residualX = styleToDevice.getTranslateX() - roundf(styleToDevice.getTranslateX());
-  auto residualY = styleToDevice.getTranslateY() - roundf(styleToDevice.getTranslateY());
-  recordMatrix.postTranslate(-residualX, -residualY);
   recording->concat(recordMatrix);
 
   LayerStyleInput styleInput = {};
@@ -345,15 +343,31 @@ std::shared_ptr<Image> RenderBackgroundStyleImage(const DrawArgs& args, LayerSty
     styleInput.extraSources.push_back(std::make_shared<ContourInputSource>(
         std::move(contourImage), contourOffset, source->contentShape));
   }
+  // The crop bounds are the backdrop slice rounded out to whole pixels (image bounds must be
+  // integral). Compute them up front so the backdrop draw below can cover them fully.
+  auto backdropRect = Rect::MakeXYWH(
+      backgroundOffset.x - contentEntry.offset.x, backgroundOffset.y - contentEntry.offset.y,
+      static_cast<float>(backgroundImage->width()), static_cast<float>(backgroundImage->height()));
+  auto deviceBackdrop = recordMatrix.mapRect(backdropRect);
+  deviceBackdrop.roundOut();
+  Matrix inverse = Matrix::I();
+  if (!recordMatrix.invert(&inverse)) {
+    return nullptr;
+  }
   // Lay the backdrop slice down first, so the cached image holds the composited result for this
   // region instead of the style alone. The consume pass blits the whole image at once, which means
   // the style has to blend against a real backdrop here rather than the destination it would
-  // otherwise only partially cover.
+  // otherwise only partially cover. The slice is drawn through a clamping shader over the
+  // rounded-out bounds, outset by a pixel so anti-aliased edges fall outside the crop: an
+  // uncovered transparent edge would be stamped over the destination by the Src blit.
   {
     auto styleSpaceBgOffset = backgroundOffset - contentEntry.offset;
+    auto shader = Shader::MakeImageShader(backgroundImage, TileMode::Clamp, TileMode::Clamp);
+    shader = shader->makeWithMatrix(Matrix::MakeTrans(styleSpaceBgOffset.x, styleSpaceBgOffset.y));
     Paint bgPaint = {};
+    bgPaint.setShader(std::move(shader));
     bgPaint.setBlendMode(BlendMode::Src);
-    recording->drawImage(backgroundImage, styleSpaceBgOffset.x, styleSpaceBgOffset.y, &bgPaint);
+    recording->drawRect(inverse.mapRect(deviceBackdrop.makeOutset(1.0f, 1.0f)), bgPaint);
   }
   style->draw(recording, styleInput, 1.0f);
 
@@ -361,27 +375,19 @@ std::shared_ptr<Image> RenderBackgroundStyleImage(const DrawArgs& args, LayerSty
   if (picture == nullptr) {
     return nullptr;
   }
-  // Crop to the backdrop slice, mapped into device space. The style's own outset reaches past it
-  // and would otherwise end up as transparent pixels in the image, which the consume pass blits
-  // with Src and would therefore punch a transparent edge into the destination.
-  auto backdropRect = Rect::MakeXYWH(
-      backgroundOffset.x - contentEntry.offset.x, backgroundOffset.y - contentEntry.offset.y,
-      static_cast<float>(backgroundImage->width()), static_cast<float>(backgroundImage->height()));
-  auto deviceBackdrop = recordMatrix.mapRect(backdropRect);
   Point imageOffset = {};
+  // Crop to the rounded backdrop bounds. The style's own outset reaches past them and would
+  // otherwise end up as transparent pixels in the image, which the consume pass blits with Src
+  // and would therefore punch a transparent edge into the destination.
   auto image =
       ToImageWithOffset(std::move(picture), &imageOffset, &deviceBackdrop, args.dstColorSpace);
   if (image == nullptr) {
     return nullptr;
   }
-  Matrix inverse = Matrix::I();
-  if (!styleToDevice.invert(&inverse)) {
-    return nullptr;
-  }
-  // The image lives in device space; drawing it with this matrix under the consume canvas
-  // reproduces the exact placement the direct path uses. Whenever a later pass shares the
-  // recording pass's device transform up to an integer translation, the matrix collapses to that
-  // pure translation, so the blit stays 1:1.
+  // The image lives in device space at the exact recording phase; drawing it with this matrix
+  // under the consume canvas reproduces the placement the direct path uses. Whenever a later
+  // pass shares the recording pass's device transform up to an integer translation, the matrix
+  // collapses to that pure translation, so the blit stays 1:1.
   *drawMatrix = inverse;
   drawMatrix->preTranslate(imageOffset.x, imageOffset.y);
   // Rasterize lazily so the texture joins the resource cache (keyed, evictable, reusable).
