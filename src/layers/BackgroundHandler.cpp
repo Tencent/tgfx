@@ -357,10 +357,12 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     if (result != snapshots->styleResults.end()) {
       Paint paint = {};
       paint.setAlpha(alpha);
-      // The cached image carries the style composited over its backdrop, but its bounds include
-      // the style's own outset where nothing was drawn. Those pixels stay transparent, so the blit
-      // must not use Src: it would replace the destination with them and punch a transparent edge.
-      paint.setBlendMode(style->blendMode());
+      // Replace outright: the image already holds the backdrop with the style composited on top,
+      // so neither the style's blend mode nor this pass's alpha may be applied a second time.
+      // Anti-aliasing stays off because the image lands on whole device pixels; smoothing its
+      // edges would bleed coverage into the neighbouring pixel and, under Src, erase it.
+      paint.setAntiAlias(false);
+      paint.setBlendMode(BlendMode::Src);
       canvas->drawImage(result->second.image, result->second.offset.x, result->second.offset.y,
                         &paint);
       return;
