@@ -299,6 +299,13 @@ const LayerStyleSource* BackgroundConsumer::getCachedLayerStyleSource(Layer* lay
 
 namespace {
 
+// A style that blends onto the destination with SrcOver can be cached on its own and blitted back
+// with SrcOver; any other blend mode needs the backdrop composited inside the cache, since
+// blending against transparency is not the same as blending against the destination.
+static bool NeedsCompositeBackdrop(LayerStyle* style) {
+  return style->blendMode() != BlendMode::SrcOver;
+}
+
 std::shared_ptr<Image> RenderBackgroundStyleImage(const DrawArgs& args, LayerStyle* style,
                                                   const LayerStyleSource* source,
                                                   std::shared_ptr<Image> backgroundImage,
@@ -354,13 +361,15 @@ std::shared_ptr<Image> RenderBackgroundStyleImage(const DrawArgs& args, LayerSty
   if (!recordMatrix.invert(&inverse)) {
     return nullptr;
   }
-  // Lay the backdrop slice down first, so the cached image holds the composited result for this
-  // region instead of the style alone. The consume pass blits the whole image at once, which means
-  // the style has to blend against a real backdrop here rather than the destination it would
-  // otherwise only partially cover. The slice is drawn through a clamping shader over the
-  // rounded-out bounds, outset by a pixel so anti-aliased edges fall outside the crop: an
-  // uncovered transparent edge would be stamped over the destination by the Src blit.
-  {
+  // A style that blends onto the destination with SrcOver can be cached on its own and blitted
+  // back with SrcOver: the mask keeps the destination visible exactly where the direct path would
+  // leave it, so nothing depends on the backdrop copy being opaque. Any other blend mode needs a
+  // real backdrop inside the recording.
+  auto compositeBackdrop = NeedsCompositeBackdrop(style);
+  if (compositeBackdrop) {
+    // Lay the backdrop slice down so the style blends against a real backdrop, and clamp its
+    // edges over the rounded-out bounds (outset by a pixel so anti-aliased edges fall outside the
+    // crop): an uncovered transparent edge would be stamped over the destination by the Src blit.
     auto styleSpaceBgOffset = backgroundOffset - contentEntry.offset;
     auto shader = Shader::MakeImageShader(backgroundImage, TileMode::Clamp, TileMode::Clamp);
     shader = shader->makeWithMatrix(Matrix::MakeTrans(styleSpaceBgOffset.x, styleSpaceBgOffset.y));
@@ -459,12 +468,14 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
       canvas->concat(result->second.drawMatrix);
       Paint paint = {};
       paint.setAlpha(alpha);
-      // Replace outright: the image already holds the backdrop with the style composited on top,
-      // so neither the style's blend mode nor this pass's alpha may be applied a second time.
+      // Cached with the backdrop composited in, the image replaces the destination region
+      // outright: neither the style's blend mode nor this pass's alpha may be applied a second
+      // time. Otherwise the image holds the style output alone and is composited back, which
+      // leaves the destination untouched wherever the style left it visible.
       // Anti-aliasing stays off because the image lands on whole device pixels; smoothing its
       // edges would bleed coverage into the neighbouring pixel and, under Src, erase it.
       paint.setAntiAlias(false);
-      paint.setBlendMode(BlendMode::Src);
+      paint.setBlendMode(NeedsCompositeBackdrop(style) ? BlendMode::Src : BlendMode::SrcOver);
       canvas->drawImage(result->second.image, 0.0f, 0.0f, &paint);
       return;
     }
