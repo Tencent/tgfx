@@ -69,9 +69,6 @@ class TaskPool {
   void reopen();
 
   size_t maxThreadCount();
-  size_t totalThreads();
-  size_t sleeperCount();
-  size_t pendingCount();
 
  private:
   enum class Phase { Running, Draining, Closed };

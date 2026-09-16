@@ -131,24 +131,6 @@ size_t TaskPool::maxThreadCount() {
   return maxThreads;
 }
 
-size_t TaskPool::totalThreads() {
-  std::lock_guard<std::mutex> lock(stateMutex);
-  return liveThreads;
-}
-
-size_t TaskPool::sleeperCount() {
-  std::lock_guard<std::mutex> lock(stateMutex);
-  return waitingThreads;
-}
-
-size_t TaskPool::pendingCount() {
-  size_t count = 0;
-  for (auto& queue : priorityQueues) {
-    count += queue.size_approx();
-  }
-  return count;
-}
-
 bool TaskPool::enterPush() {
   auto state = admission.load(std::memory_order_acquire);
   while (!(state & CLOSED_BIT)) {
