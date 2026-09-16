@@ -500,11 +500,11 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   ASSERT_TRUE(cache->loadBundle(bundlePath));
   std::string expectedTag = BundleTag();
   // Entry counts follow the backend-specific exclusions in the bundle generator
-  // (PermutationCompilesForBackend): the GL bundles drop the FBF (subpassInput) variants because
-  // the compositor serves dst reads through a bound texture under AOT, and the opengles bundle
-  // additionally drops RECT (sampler2DRect has no ES form); both land on the same stage counts
-  // as the WebGPU bundle. Metal and Vulkan keep everything.
-  const bool keepsFramebufferFetch = expectedTag == "metal" || expectedTag == "vulkan";
+  // (PermutationCompilesForBackend): the desktop GL and WebGPU bundles drop the FBF
+  // (subpassInput) variants, while the opengles bundle keeps them in the
+  // GL_EXT_shader_framebuffer_fetch dialect; Metal and Vulkan keep everything.
+  const bool keepsFramebufferFetch =
+      expectedTag == "metal" || expectedTag == "vulkan" || expectedTag == "opengles";
   EXPECT_EQ(cache->vertexEntryCount(), keepsFramebufferFetch ? 99u : 97u);
   EXPECT_EQ(cache->fragmentEntryCount(), keepsFramebufferFetch ? 291u : 195u);
   EXPECT_EQ(cache->profileTag(), expectedTag);
@@ -1324,11 +1324,11 @@ TGFX_TEST(ShaderPermutationTest, CompressedBundleLoad) {
     ASSERT_TRUE(compressedOnly.loadBundle(original.data(), original.size()));
     EXPECT_TRUE(compressedOnly.isLoaded());
     std::string tag = BundleTag();
-    // Counts follow the generator's backend exclusions (PermutationCompilesForBackend): the GL
-    // bundles drop the FBF (subpassInput) variants (the compositor reads dst through a bound
-    // texture under AOT), the opengles bundle additionally drops RECT, and metal/vulkan keep
+    // Counts follow the generator's backend exclusions (PermutationCompilesForBackend): the
+    // desktop GL and WebGPU bundles drop the FBF (subpassInput) variants, the opengles bundle
+    // keeps them in the GL_EXT_shader_framebuffer_fetch dialect, and metal/vulkan keep
     // everything.
-    const bool keepsFramebufferFetch = tag == "metal" || tag == "vulkan";
+    const bool keepsFramebufferFetch = tag == "metal" || tag == "vulkan" || tag == "opengles";
     EXPECT_EQ(compressedOnly.vertexEntryCount(), keepsFramebufferFetch ? 99u : 97u);
     EXPECT_EQ(compressedOnly.fragmentEntryCount(), keepsFramebufferFetch ? 291u : 195u);
     EXPECT_EQ(compressedOnly.profileTag(), tag);

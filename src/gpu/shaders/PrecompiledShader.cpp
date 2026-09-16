@@ -50,14 +50,13 @@ bool PermutationCompilesForBackend(const PrecompiledShaderInfo& info, uint32_t v
   if (info.fragDomain.valueOf(fragIndex, "TEXTURE_KIND") == 1 && profileTag != "opengl") {
     return false;
   }
-  // FBF variants (HAS_XP == 2) read the framebuffer through subpassInput. WGSL cannot express it,
-  // and the GL profiles never request it: with a loaded AOT bundle the compositor takes the
-  // dst-texture route (see UsesRuntimeFrameBufferFetch in OpsCompositor), and without one the
-  // runtime path is JIT. Keeping the entries out also protects against a stray fetch-mode request
-  // silently binding a dummy dst texture. Metal and Vulkan consume the subpassInput natively and
-  // keep the variants.
+  // FBF variants (HAS_XP == 2) read the framebuffer through subpassInput, which WGSL cannot
+  // express. The opengles bundle keeps them in the GL_EXT_shader_framebuffer_fetch dialect:
+  // devices with that extension take the fetch route (see UsesRuntimeFrameBufferFetch in
+  // OpsCompositor), everything else — desktop GL included — is routed to the dst-texture
+  // variants, so no other bundle needs the fetch form.
   if (info.fragDomain.valueOf(fragIndex, "HAS_XP") == 2 &&
-      (profileTag == "webgpu" || profileTag == "opengl" || profileTag == "opengles")) {
+      (profileTag == "webgpu" || profileTag == "opengl")) {
     return false;
   }
   return true;

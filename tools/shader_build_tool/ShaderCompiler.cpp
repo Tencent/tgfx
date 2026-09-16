@@ -98,6 +98,14 @@ CompileResult TranslateToGLSL(const std::vector<uint32_t>& spirv, bool gles) {
   // spirv-cross uses exceptions internally, so isolate them at the third-party API boundary.
   try {
     spirv_cross::CompilerGLSL compiler(spirv);
+    if (gles && !compiler.get_shader_resources().subpass_inputs.empty()) {
+      // The PorterDuff fetch-mode variants carry the dst read as a subpassInput. GLES expresses
+      // it through GL_EXT_shader_framebuffer_fetch (the coherent form: reads what the same
+      // pixel held before this draw), so remap the subpass input onto the inout color output.
+      // Devices without the extension never request these variants (the compositor routes them
+      // to the dst-texture form instead), see UsesRuntimeFrameBufferFetch in OpsCompositor.
+      compiler.remap_ext_framebuffer_fetch(0, 0, true);
+    }
     auto options = compiler.get_common_options();
     // Desktop GLSL 330 keeps layout(location=) on vertex inputs, which the precompiled GL pipeline
     // binds attributes by (name-based binding breaks because template attribute names differ

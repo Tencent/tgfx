@@ -899,10 +899,10 @@ AAType OpsCompositor::getAAType(bool antiAlias) const {
   return AAType::None;
 }
 
-// The GL backends' precompiled PorterDuff variants read dst through a bound texture, so a
-// fetch-mode XP under a loaded AOT bundle would leave that sampler bound to a dummy texture and
-// silently blend garbage. Metal keeps its native framebuffer-fetch variants, so only GL gives up
-// the fetch route when a bundle is loaded and takes the dst-texture route instead; the runtime
+// The GL backends' precompiled PorterDuff variants read dst either through a bound texture
+// (HAS_XP=1) or through the GL_EXT_shader_framebuffer_fetch dialect (HAS_XP=2, the opengles
+// bundle only). Devices advertising a different fetch dialect (ARM/NV legacy) keep the
+// dst-texture route under AOT so every device lands on a variant it can compile; the runtime
 // JIT route (no bundle) keeps the native fetch path on every backend.
 static bool UsesRuntimeFrameBufferFetch(Context* context) {
   if (!context->shaderCaps()->frameBufferFetchSupport) {
@@ -910,7 +910,11 @@ static bool UsesRuntimeFrameBufferFetch(Context* context) {
   }
   if (context->backend() == Backend::OpenGL) {
     auto cache = context->precompiledShaderCache();
-    return cache == nullptr || !cache->isLoaded();
+    if (cache == nullptr || !cache->isLoaded()) {
+      return true;
+    }
+    return context->shaderCaps()->frameBufferFetchExtensionString ==
+           "GL_EXT_shader_framebuffer_fetch";
   }
   return true;
 }
