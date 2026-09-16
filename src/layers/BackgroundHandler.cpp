@@ -301,9 +301,10 @@ namespace {
 std::shared_ptr<Image> RenderBackgroundStyleImage(const DrawArgs& args, LayerStyle* style,
                                                   const LayerStyleSource* source,
                                                   std::shared_ptr<Image> backgroundImage,
-                                                  const Point& backgroundOffset, Point* offset) {
+                                                  const Point& backgroundOffset,
+                                                  const Matrix& styleToDevice, Matrix* drawMatrix) {
   if (args.context == nullptr || style == nullptr || source == nullptr ||
-      backgroundImage == nullptr || offset == nullptr) {
+      backgroundImage == nullptr || drawMatrix == nullptr) {
     return nullptr;
   }
   auto groupIndex = static_cast<int>(style->excludeChildEffects());
@@ -319,10 +320,16 @@ std::shared_ptr<Image> RenderBackgroundStyleImage(const DrawArgs& args, LayerSty
 
   PictureRecorder recorder = {};
   auto* recording = recorder.beginRecording();
-  // Keep the CTM unscaled so the picture stays in content-pixel space, which is the space the
-  // style draws in. Scaling here would change the resolution the style is rasterized at, while the
-  // cached image has to keep content pixel density.
-  recording->translate(contentEntry.offset.x, contentEntry.offset.y);
+  // Bake the consume canvas's matrix into the recording so the image is rasterized at the final
+  // device density and the later blit does not pass through a scale, which would resample the
+  // cached image onto half pixels. The translation is snapped first: an integral translation
+  // puts the backdrop slice exactly on the raster grid, so the cropped image has no uncovered
+  // edges that a Src blit would punch into the destination.
+  auto recordMatrix = styleToDevice;
+  auto residualX = styleToDevice.getTranslateX() - roundf(styleToDevice.getTranslateX());
+  auto residualY = styleToDevice.getTranslateY() - roundf(styleToDevice.getTranslateY());
+  recordMatrix.postTranslate(-residualX, -residualY);
+  recording->concat(recordMatrix);
 
   LayerStyleInput styleInput = {};
   styleInput.content = contentEntry.image;
@@ -354,21 +361,29 @@ std::shared_ptr<Image> RenderBackgroundStyleImage(const DrawArgs& args, LayerSty
   if (picture == nullptr) {
     return nullptr;
   }
+  // Crop to the backdrop slice, mapped into device space. The style's own outset reaches past it
+  // and would otherwise end up as transparent pixels in the image, which the consume pass blits
+  // with Src and would therefore punch a transparent edge into the destination.
+  auto backdropRect = Rect::MakeXYWH(
+      backgroundOffset.x - contentEntry.offset.x, backgroundOffset.y - contentEntry.offset.y,
+      static_cast<float>(backgroundImage->width()), static_cast<float>(backgroundImage->height()));
+  auto deviceBackdrop = recordMatrix.mapRect(backdropRect);
   Point imageOffset = {};
-  // Crop to the backdrop slice. The style's own outset reaches past it and would otherwise end up
-  // as transparent pixels in the image, which the consume pass blits with Src and would therefore
-  // punch a transparent edge into the destination.
-  auto backdropRect = Rect::MakeXYWH(backgroundOffset.x, backgroundOffset.y,
-                                     static_cast<float>(backgroundImage->width()),
-                                     static_cast<float>(backgroundImage->height()));
   auto image =
-      ToImageWithOffset(std::move(picture), &imageOffset, &backdropRect, args.dstColorSpace);
+      ToImageWithOffset(std::move(picture), &imageOffset, &deviceBackdrop, args.dstColorSpace);
   if (image == nullptr) {
     return nullptr;
   }
-  // The recorded space is the content image space shifted by contentEntry.offset, so translate
-  // back to let the caller blit under the consume pass transform.
-  *offset = imageOffset - contentEntry.offset;
+  Matrix inverse = Matrix::I();
+  if (!styleToDevice.invert(&inverse)) {
+    return nullptr;
+  }
+  // The image lives in device space; drawing it with this matrix under the consume canvas
+  // reproduces the exact placement the direct path uses. Whenever a later pass shares the
+  // recording pass's device transform up to an integer translation, the matrix collapses to that
+  // pure translation, so the blit stays 1:1.
+  *drawMatrix = inverse;
+  drawMatrix->preTranslate(imageOffset.x, imageOffset.y);
   // Rasterize lazily so the texture joins the resource cache (keyed, evictable, reusable).
   return image->makeRasterized();
 }
@@ -419,21 +434,23 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   canvas->concat(matrix);
   if (snapshots != nullptr && snapshots->shareStyleOutput) {
     // Reuse the style rendered by an earlier consume pass when there is one. Rendering it here
-    // rather than during capture matters: only this canvas carries the contentScale the style has
-    // to be rasterized at, and the capture pass walks a different canvas transform.
+    // rather than during capture matters: only this canvas carries the final device transform,
+    // scale included, that the style has to be rasterized at.
     BackgroundSnapshotKey key{layer, style};
     auto result = snapshots->styleResults.find(key);
     if (result == snapshots->styleResults.end()) {
-      Point resultOffset = {};
-      auto styleImage =
-          RenderBackgroundStyleImage(args, style, source, bgImage, bgOffset, &resultOffset);
+      Matrix resultMatrix = Matrix::I();
+      auto styleImage = RenderBackgroundStyleImage(args, style, source, bgImage, bgOffset,
+                                                   canvas->getMatrix(), &resultMatrix);
       if (styleImage != nullptr) {
         result = snapshots->styleResults
-                     .emplace(key, BackgroundStyleResult{std::move(styleImage), resultOffset})
+                     .emplace(key, BackgroundStyleResult{std::move(styleImage), resultMatrix})
                      .first;
       }
     }
     if (result != snapshots->styleResults.end()) {
+      AutoCanvasRestore restoreBlit(canvas);
+      canvas->concat(result->second.drawMatrix);
       Paint paint = {};
       paint.setAlpha(alpha);
       // Replace outright: the image already holds the backdrop with the style composited on top,
@@ -442,8 +459,7 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
       // edges would bleed coverage into the neighbouring pixel and, under Src, erase it.
       paint.setAntiAlias(false);
       paint.setBlendMode(BlendMode::Src);
-      canvas->drawImage(result->second.image, result->second.offset.x, result->second.offset.y,
-                        &paint);
+      canvas->drawImage(result->second.image, 0.0f, 0.0f, &paint);
       return;
     }
   }

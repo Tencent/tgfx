@@ -22,6 +22,7 @@
 #include <unordered_map>
 #include "layers/LayerStyleSource.h"
 #include "tgfx/core/Image.h"
+#include "tgfx/core/Matrix.h"
 #include "tgfx/core/Point.h"
 
 namespace tgfx {
@@ -69,12 +70,14 @@ struct BackgroundSnapshotKeyHash {
 
 /**
  * The rendered output of one background-sourced LayerStyle, cached for the duration of a frame so
- * every consume pass blits it instead of re-running the style. The offset is expressed in the
- * consume pass's style space, i.e. the coordinate space the style draws in.
+ * every consume pass blits it instead of re-running the style. drawMatrix is concated on the
+ * consume canvas before drawImage(image, 0, 0); it maps the device-space image back onto the
+ * canvas, collapsing to a pure integer translation whenever a pass shares the recording pass's
+ * scale.
  */
 struct BackgroundStyleResult {
   std::shared_ptr<Image> image = nullptr;
-  Point offset = Point::Zero();
+  Matrix drawMatrix = Matrix::I();
 };
 
 /**
@@ -109,7 +112,8 @@ struct BackgroundSnapshotMap {
   std::unordered_map<Layer*, std::unique_ptr<LayerStyleSource>> layerStyleSources = {};
   // Rendered background styles, filled on the first consume pass that needs one and reused by
   // every later pass. Rendering happens in the consume pass rather than during capture because
-  // only the consume canvas carries the real contentScale the style must be rasterized at.
+  // only the consume canvas carries the final device transform, scale included, that the style
+  // has to be rasterized at.
   std::unordered_map<BackgroundSnapshotKey, BackgroundStyleResult, BackgroundSnapshotKeyHash>
       styleResults = {};
   // Set when one capture pass serves several consume passes (tiled rendering, multiple dirty
