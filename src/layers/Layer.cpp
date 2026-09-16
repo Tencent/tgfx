@@ -1972,8 +1972,8 @@ std::shared_ptr<Image> Layer::RenderBackgroundStyleImage(const DrawArgs& args, L
   styleInput.content = contentEntry.image;
   styleInput.contentOffset = contentEntry.offset;
   styleInput.contentScale = contentScale;
-  styleInput.extraSources.push_back(std::make_shared<StyleInputSource>(
-      backgroundImage, backgroundOffset - contentEntry.offset));
+  styleInput.extraSources.push_back(
+      std::make_shared<StyleInputSource>(backgroundImage, backgroundOffset - contentEntry.offset));
   auto sourceFlags = style->extraSourceType();
   if (HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Contour)) {
     auto contourImage = group->contour.has_value() ? group->contour->image : nullptr;
