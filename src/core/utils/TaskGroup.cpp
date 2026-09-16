@@ -27,7 +27,6 @@
 #endif
 
 namespace tgfx {
-#ifdef TGFX_USE_THREADS
 static constexpr size_t MAX_THREADS_SIZE = 32;
 static constexpr float LOW_PRIORITY_THREAD_RATIO = 0.7f;
 
@@ -80,7 +79,7 @@ void TaskPool::setMaxThreadCount(size_t maxThreadCount) {
   lowPriorityThreads = LowPriorityThreadCount(maxThreads);
   if (phase == Phase::Running && (admission.load(std::memory_order_acquire) & STARTED_BIT)) {
     ensureStandbyLocked();
-    workSignal.signal(static_cast<moodycamel::LightweightSemaphore::ssize_t>(liveThreads));
+    workSignal.signal(static_cast<ptrdiff_t>(liveThreads));
   }
 }
 
@@ -99,7 +98,7 @@ void TaskPool::releaseThreads() {
     }
     phase = Phase::Draining;
     handles.swap(threadHandles);
-    workSignal.signal(static_cast<moodycamel::LightweightSemaphore::ssize_t>(liveThreads));
+    workSignal.signal(static_cast<ptrdiff_t>(liveThreads));
   }
   for (auto& thread : handles) {
     thread.join();
@@ -234,7 +233,7 @@ void TaskPool::finishTask() {
     // Continue draining even if Low notifications were consumed before the pool closed.
     workSignal.signal();
   } else if (lowNeedsCheck && busyThreads < lowPriorityThreads) {
-    workSignal.signal(static_cast<moodycamel::LightweightSemaphore::ssize_t>(liveThreads));
+    workSignal.signal(static_cast<ptrdiff_t>(liveThreads));
   }
 }
 
@@ -244,8 +243,6 @@ void TaskPool::runLoop() {
     finishTask();
   }
 }
-
-#endif
 
 TaskGroup* TaskGroup::GetInstance() {
   static auto& taskGroup = *new TaskGroup();

@@ -35,6 +35,51 @@ namespace tgfx {
 #ifdef TGFX_USE_THREADS
 
 /**
+ * A counting semaphore used to wake pool workers. Permits are durable: a signal posted before a
+ * worker starts waiting is still consumed later, so a notification can never be lost.
+ */
+class TaskSemaphore {
+ public:
+  void signal(ptrdiff_t count = 1) {
+    impl.signal(count);
+  }
+
+  bool wait() {
+    return impl.wait();
+  }
+
+  bool tryWait() {
+    return impl.tryWait();
+  }
+
+ private:
+  moodycamel::LightweightSemaphore impl{0, 0};
+};
+
+#else
+
+/**
+ * Single-threaded builds have no workers to wake, so the semaphore is a no-op. tryWait reports
+ * no permit, which keeps the release-path drain loop from spinning.
+ */
+class TaskSemaphore {
+ public:
+  void signal(ptrdiff_t count = 1) {
+    static_cast<void>(count);
+  }
+
+  bool wait() {
+    return true;
+  }
+
+  bool tryWait() {
+    return false;
+  }
+};
+
+#endif
+
+/**
  * A priority task pool with lock-free submission and mutex-protected scheduling. Producers only
  * pay one atomic admission update, a lock-free enqueue, and a semaphore signal per task; workers
  * make every scheduling decision (priority, low-priority budget, standby growth, shrink, drain)
@@ -95,8 +140,8 @@ class TaskPool {
   std::mutex lifecycleMutex = {};
   std::mutex stateMutex = {};
   moodycamel::ConcurrentQueue<std::shared_ptr<Task>> priorityQueues[PRIORITY_QUEUE_COUNT];
-  moodycamel::LightweightSemaphore workSignal{0, 0};
-  moodycamel::LightweightSemaphore producersDone{0, 0};
+  TaskSemaphore workSignal;
+  TaskSemaphore producersDone;
   std::vector<std::thread> threadHandles = {};
   Phase phase = Phase::Running;
   size_t liveThreads = 0;
@@ -116,50 +161,6 @@ class TaskPool {
   void finishTask();
   void runLoop();
 };
-
-#else
-
-/**
- * Single-threaded builds run every task inline on the submitting thread. The pool keeps the
- * same interface so callers need no conditional code, but submission always fails and the
- * caller executes the task itself.
- */
-class TaskPool {
- public:
-  bool push(std::shared_ptr<Task> task, TaskPriority priority) {
-    static_cast<void>(task);
-    static_cast<void>(priority);
-    return false;
-  }
-
-  void setMaxThreadCount(size_t maxThreadCount) {
-    static_cast<void>(maxThreadCount);
-  }
-
-  void releaseThreads() {
-  }
-
-  void reopen() {
-  }
-
-  size_t maxThreadCount() {
-    return 0;
-  }
-
-  size_t totalThreads() {
-    return 0;
-  }
-
-  size_t sleeperCount() {
-    return 0;
-  }
-
-  size_t pendingCount() {
-    return 0;
-  }
-};
-
-#endif
 
 class TaskGroup {
  private:
