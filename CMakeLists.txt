@@ -181,11 +181,11 @@ if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
     if (DEPLOYMENT_TARGET)
         set(CMAKE_OSX_DEPLOYMENT_TARGET ${DEPLOYMENT_TARGET})
     elseif (MACOS)
-        if (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
-            set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0")
-        else ()
-            set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
-        endif ()
+        # 10.15 is no longer a usable default: the libc++ shipped with recent SDKs (Xcode 26 and
+        # later) does not support macOS below 11.0 and emits a warning there, which -Werror turns
+        # into a build failure on every architecture. The architecture no longer has to be guessed
+        # for this decision.
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0")
     elseif (IOS)
         if (TGFX_USE_METAL)
             set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0")
