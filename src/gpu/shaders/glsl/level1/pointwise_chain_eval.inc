@@ -85,10 +85,12 @@ vec4 evalChainSlot(int slot) {
                               : chainResults[Packed.y];
   if (Packed.x == OP_CONST_COLOR) {
     vec4 ConstColor = SlotConstColor[slot];
-    if (Packed.w == 1) {
+    // The input mode occupies the selector's low bits; bits 20-24 carry the result register.
+    int constMode = Packed.w & 0xF;
+    if (constMode == 1) {
       return ConstColor * in0;
     }
-    if (Packed.w == 2) {
+    if (constMode == 2) {
       return ConstColor * in0.a;
     }
     return ConstColor;

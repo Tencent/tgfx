@@ -46,6 +46,9 @@ static void UploadChainSlot(UniformData* uniformData, size_t index, const AOTCha
     // Bits 16-19: the slot's ordinal into the CoverageRRect* parameter arrays.
     selector = rrectOrdinal << 16;
   }
+  // Bits 20-24: the result register + 1 (0 marks a dead instruction whose result nothing reads;
+  // the kernel then skips the chainResults write).
+  selector |= (slot.outRegister + 1) << 20;
   int packed[] = {static_cast<int>(slot.op), slot.in0, slot.in1, selector};
   uniformData->setArrayElementOptional("SlotPacked", index, packed);
   switch (slot.op) {
@@ -157,12 +160,23 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
     int coverageRootSlot, uint32_t coordSourceMask, PlacementPtr<FragmentProcessor> lutChild,
     int lutLeafIndex, std::vector<PlacementPtr<FragmentProcessor>> samplerPadding,
     bool maskChildIsPhantom) {
-  if (allocator == nullptr || slots.empty() || slots.size() > MaxSlots ||
-      rootSlot >= slots.size()) {
+  if (allocator == nullptr || slots.empty() || slots.size() > MaxSlots) {
     return nullptr;
   }
-  if (coverageRootSlot >= 0 && static_cast<size_t>(coverageRootSlot) >= slots.size()) {
+  // rootSlot and coverageRootSlot name chainResults registers (assigned by the register
+  // allocator), and every slot's wiring must stay inside the register budget. in0/in1 may also
+  // carry the kernel's special negative inputs (-1 geometry color ... -5 opaque geometry color).
+  const auto validWiring = [](int reg) {
+    return reg >= -5 && reg < static_cast<int>(MaxRegisters);
+  };
+  if (!validWiring(static_cast<int>(rootSlot)) ||
+      (coverageRootSlot >= 0 && !validWiring(coverageRootSlot))) {
     return nullptr;
+  }
+  for (const auto& slot : slots) {
+    if (!validWiring(slot.outRegister) || !validWiring(slot.in0) || !validWiring(slot.in1)) {
+      return nullptr;
+    }
   }
   auto leafCount = textureLeaves.size();
   // Sampler-binding children include the DAG leaves plus sampler-only children (the LUT gradient

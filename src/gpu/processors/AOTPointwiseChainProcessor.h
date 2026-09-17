@@ -44,13 +44,19 @@ enum class AOTChainOp : int {
   RRectCoverage = ChainOp::RRectCoverage,
 };
 
-/// One node of a pointwise DAG after flattening into the fused kernel's slot array. in0/in1 are
-/// slot indices of this node's inputs: -1 selects the geometry color (the Color uniform), -2 marks
-/// an unused input. Only Blend uses both inputs.
+/// One node of a pointwise DAG after flattening into the fused kernel's instruction array.
+/// in0/in1 are result-register indices: -1 selects the geometry color (the Color uniform), -2
+/// marks an unused input, -3 the coverage unit, -4 opaque white, -5 the geometry color with
+/// opaque alpha. Only Blend uses both inputs. outRegister names the chainResults element the
+/// instruction writes (-1: nothing ever reads the result); registers are recycled by
+/// last-use (AOTChainRegisterAllocator), so the instruction count and the live-result count
+/// are independent budgets.
 struct AOTChainSlot {
   AOTChainOp op = AOTChainOp::None;
   int in0 = -2;
   int in1 = -2;
+  // Result register this instruction writes into chainResults, or -1 when dead.
+  int outRegister = -1;
   // OP_TEXTURE only: 1 modulates the sample by the geometry color alpha (color sources fed
   // directly from the paint color), 0 samples raw (blend operands such as coverage masks, which
   // the runtime emits without input-alpha modulation).
@@ -100,7 +106,15 @@ struct AOTChainSlot {
  */
 class AOTPointwiseChainProcessor : public FragmentProcessor {
  public:
-  static constexpr size_t MaxSlots = 16;
+  // The instruction capacity of the fused kernel: how many DAG nodes (texture leaves, operators,
+  // coverage and clip slots) one chain program may evaluate. Independent of the result-register
+  // count below because the kernel recycles registers by last use.
+  static constexpr size_t MaxSlots = 32;
+
+  // The chainResults storage the kernel evaluates into. The allocator assigns one element per
+  // simultaneously-live intermediate value, so a linear chain of any supported length runs with
+  // two registers while a wide DAG may need up to this many.
+  static constexpr size_t MaxRegisters = 16;
 
   // The chain kernel carries exactly one shared tiled-sampling uniform block, so at most one
   // shader-tiled leaf is expressible per chain.

@@ -1,16 +1,18 @@
 // PointwiseChainShader fragment shader.
-// Evaluates an arbitrary pointwise DAG in one pass. The DAG shape is runtime uniform data: 16
-// statically expanded slots each carry a Packed ivec4 (op, two input-slot indices, blend/const
-// selector), so any topology with the same texture-leaf count shares one program variant. Texture
-// leaves occupy slots 0..NTEX-1 and each samples its own sampler, keeping sampler indexing static.
+// Evaluates an arbitrary pointwise DAG in one pass. The DAG shape is runtime uniform data: 32
+// instruction slots each carry a Packed ivec4 (op, two input-register indices, blend/const
+// selector with the result register in bits 20-24), so any topology with the same texture-leaf
+// count shares one program variant. Intermediate results live in the 16-element chainResults
+// register file, recycled by last use on the CPU side (AOTChainRegisterAllocator), so the
+// instruction count and the live-result count are independent budgets. Texture leaves occupy
+// instructions 0..NTEX-1 and each samples its own sampler, keeping sampler indexing static.
 // TEXTURE_COUNT encodes 0/1/2/4 leaves; a zero-leaf chain evaluates const-color and blend ops
 // against the geometry color alone. With HAS_MASK_TEXTURE a device-space alpha mask child is
 // sampled after the DAG and before the XP stage.
 // Leaf subset rects are runtime uniforms (Subset / Subset_1 / ... following the structural ordinal
 // convention); a leaf without a real subset uploads the full texture bounds, so the clamp is a
 // no-op. ColorSpaceXform parameters are one shared chain-wide block, so a chain may contain at
-// most one color-space op (enforced by the matcher). There is no opcode array, loop, or VM
-// dispatch.
+// most one color-space op (enforced by the matcher).
 #version 450
 
 #ifndef HAS_XP
@@ -254,7 +256,7 @@ layout(location = 0) out vec4 fragColor;
 vec4 chainResults[16];
 
 // Prefetched leaf samples. Fetched with statically bound samplers in main; the OP_TEXTURE branch
-// of evalChainSlot reads them back by slot index.
+// of evalChainSlot reads them back by instruction index.
 vec4 chainLeafTex[4];
 
 // Geometry color source: the unconditional inColor attribute on QuadGP (broadcast for
@@ -305,7 +307,14 @@ void main() {
   }
 #endif
   for (int i = 0; i < SlotCount; ++i) {
-    chainResults[i] = evalChainSlot(i);
+    // Bits 20-24 of the selector carry the result register + 1 (0 = dead instruction, skip the
+    // write). The value is evaluated before the write, so a consumer may share a register with
+    // its just-released producer.
+    vec4 value = evalChainSlot(i);
+    int outRegister = (SlotPacked[i].w >> 20) & 0x1F;
+    if (outRegister != 0) {
+      chainResults[outRegister - 1] = value;
+    }
   }
   vec4 result = chainResults[RootIndex];
 

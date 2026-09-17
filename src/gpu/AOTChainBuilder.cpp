@@ -19,6 +19,7 @@
 #include <utility>
 #include <vector>
 #include "core/shaders/PerlinNoiseShader.h"
+#include "gpu/AOTChainRegisterAllocator.h"
 #include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/AOTPointwiseTailProcessor.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
@@ -813,6 +814,35 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
     maskChildIsPhantom = true;
   }
   const AOTTiledTextureRecipe* recipePtr = tiledLeafIndex >= 0 ? &tiledRecipe : nullptr;
+  // Register allocation: the slot wiring built above uses instruction ordinals; this pass
+  // rewrites every reference into the kernel's recycled chainResults registers, so the
+  // instruction budget (MaxSlots) and the live-result budget (MaxRegisters) are independent. A
+  // DAG whose simultaneous intermediates exceed the register budget fails here and the caller
+  // falls back to the runtime route.
+  std::vector<std::vector<int>> instructionInputs(slots.size());
+  for (size_t index = 0; index < slots.size(); ++index) {
+    for (int input : {slots[index].in0, slots[index].in1}) {
+      if (input >= 0) {
+        instructionInputs[index].push_back(input);
+      }
+    }
+  }
+  AOTChainRegisterAssignment assignment = {};
+  if (!AllocateChainRegisters(instructionInputs, static_cast<int>(rootIndex), coverageRootSlot,
+                              AOTPointwiseChainProcessor::MaxRegisters, &assignment)) {
+    return nullptr;
+  }
+  for (size_t index = 0; index < slots.size(); ++index) {
+    if (slots[index].in0 >= 0) {
+      slots[index].in0 = assignment.outRegister[static_cast<size_t>(slots[index].in0)];
+    }
+    if (slots[index].in1 >= 0) {
+      slots[index].in1 = assignment.outRegister[static_cast<size_t>(slots[index].in1)];
+    }
+    slots[index].outRegister = assignment.outRegister[index];
+  }
+  rootIndex = static_cast<size_t>(assignment.rootRegister);
+  coverageRootSlot = assignment.coverageRootRegister;
   return AOTPointwiseChainProcessor::Make(
       allocator, std::move(leaves), slots, rootIndex, tiledLeafIndex, recipePtr,
       std::move(maskChild), coverageRootSlot, coordSourceMask, std::move(lutChild), lutLeafIndex,

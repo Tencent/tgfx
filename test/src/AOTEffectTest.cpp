@@ -681,7 +681,7 @@ TGFX_TEST(AOTEffectTest, LinearChainSlotBoundaryPreservesTailFallback) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
-  for (size_t opCount : {size_t{15}, size_t{16}}) {
+  for (size_t opCount : {size_t{31}, size_t{32}}) {
     BlockAllocator allocator;
     auto texture = MakeTextureProcessor(context, &allocator, PixelFormat::RGBA_8888);
     auto matrix = ColorMatrixFragmentProcessor::Make(&allocator, IdentityColorMatrix);
@@ -693,9 +693,12 @@ TGFX_TEST(AOTEffectTest, LinearChainSlotBoundaryPreservesTailFallback) {
     ASSERT_TRUE(AOTEffectDecomposer::Lower(processors, &graph));
     AOTEffectPlan plan;
     ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
-    EXPECT_EQ(plan.passes.size(), opCount == 15 ? 1u : 8u);
+    // The chain kernel carries 32 instructions with a recycled 16-entry register file, so a
+    // texture plus 31 operators fuses into one pass; the 32nd operator crosses the instruction
+    // budget and the tail planner takes over (two operators per pass after the source).
+    EXPECT_EQ(plan.passes.size(), opCount == 31 ? 1u : 16u);
     EXPECT_EQ(plan.passes[0].kernel,
-              opCount == 15 ? AOTKernelKind::PointwiseChain : AOTKernelKind::PointwiseTail);
+              opCount == 31 ? AOTKernelKind::PointwiseChain : AOTKernelKind::PointwiseTail);
     EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
   }
 }

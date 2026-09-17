@@ -1481,7 +1481,7 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailPassesPreserveCoordinateDomains
     } else {
       processor = TextureEffect::Make(allocator, source);
     }
-    int opCount = deviceSource ? 3 : 17;
+    int opCount = deviceSource ? 3 : 33;
     for (int index = 0; index < opCount; ++index) {
       processor =
           FragmentProcessor::Compose(allocator, std::move(processor),
@@ -1516,7 +1516,7 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailPassesPreserveCoordinateDomains
       ProgramCacheStats candidatePrograms;
       render(deviceSource, false, offset, &reference, &referenceDraws, &referencePrograms);
       render(deviceSource, true, offset, &candidate, &candidateDraws, &candidatePrograms);
-      uint64_t passCount = deviceSource ? 2 : 9;
+      uint64_t passCount = deviceSource ? 2 : 17;
       EXPECT_EQ(candidatePrograms.programBuilderCreations, 0u);
       EXPECT_GE(candidatePrograms.precompiledArtifactCreations, 1u);
       EXPECT_EQ(candidateDraws.completeAOTDraws, 1u);
@@ -1556,9 +1556,9 @@ TGFX_TEST(AOTRenderConsistencyTest, PlanExecutionFailureIsRecordedNotFatal) {
   }
   auto source = context->proxyProvider()->wrapExternalTexture(sourceSurface->getBackendTexture());
   ASSERT_NE(source, nullptr);
-  // Renders a 9-pass tail plan (17 pointwise ops on a plain texture chain) and returns the draw
+  // Renders a 17-pass tail plan (33 pointwise ops on a plain texture chain) and returns the draw
   // stats of exactly that fill.
-  auto renderNinePassPlan = [&]() -> AOTDrawStats {
+  auto renderMultiPassPlan = [&]() -> AOTDrawStats {
     AOTDrawStats stats = {};
     if (!cache->loadBundle(bundleData, bundleBytes)) {
       return stats;
@@ -1573,7 +1573,7 @@ TGFX_TEST(AOTRenderConsistencyTest, PlanExecutionFailureIsRecordedNotFatal) {
     }
     auto allocator = context->drawingAllocator();
     auto processor = TextureEffect::Make(allocator, source);
-    for (int index = 0; index < 17; ++index) {
+    for (int index = 0; index < 33; ++index) {
       processor =
           FragmentProcessor::Compose(allocator, std::move(processor),
                                      ColorMatrixFragmentProcessor::Make(allocator, swapRedBlue));
@@ -1590,17 +1590,17 @@ TGFX_TEST(AOTRenderConsistencyTest, PlanExecutionFailureIsRecordedNotFatal) {
   for (const char* mode : {"first", "middle", "last"}) {
     SCOPED_TRACE(mode);
     ASSERT_EQ(::setenv("TGFX_AOT_TEST_INJECT_PASS_FAILURE", mode, 1), 0);
-    auto stats = renderNinePassPlan();
+    auto stats = renderMultiPassPlan();
     ::unsetenv("TGFX_AOT_TEST_INJECT_PASS_FAILURE");
     // The failure is observable: counted, and the draw never lands as complete.
     EXPECT_GE(stats.planExecutionFailures, 1u);
     EXPECT_EQ(stats.completeAOTDraws, 0u);
   }
-  // Un-injecting restores the normal service: the same nine-pass plan completes.
-  auto healthy = renderNinePassPlan();
+  // Un-injecting restores the normal service: the same seventeen-pass plan completes.
+  auto healthy = renderMultiPassPlan();
   EXPECT_EQ(healthy.planExecutionFailures, 0u);
   EXPECT_GE(healthy.completeAOTDraws, 1u);
-  EXPECT_EQ(healthy.kernelInvocations, 9u);
+  EXPECT_EQ(healthy.kernelInvocations, 17u);
 }
 
 TGFX_TEST(AOTRenderConsistencyTest, LongLinearChainExecutesMaterializedTailPasses) {
@@ -1610,7 +1610,11 @@ TGFX_TEST(AOTRenderConsistencyTest, LongLinearChainExecutesMaterializedTailPasse
   int height = image->height();
   const std::array<float, 20> rotateRGB = {0, 1, 0, 0, 0, 0, 0, 1, 0, 0,
                                            1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
-  for (size_t opCount : {size_t{15}, size_t{16}, size_t{17}}) {
+  // 15/16/17 probe the old capacity boundary (all single-pass now that the chain kernel carries
+  // 32 instructions); 32/33 cross the new boundary and exercise the tail planner's materialized
+  // passes. The channel-swap matrix survives RGBA8 quantization exactly, so the byte-identical
+  // assertion holds across the materialization edges.
+  for (size_t opCount : {size_t{15}, size_t{16}, size_t{17}, size_t{32}, size_t{33}}) {
     SCOPED_TRACE(opCount);
     std::shared_ptr<ColorFilter> chain = nullptr;
     for (size_t index = 0; index < opCount; ++index) {
@@ -1624,7 +1628,7 @@ TGFX_TEST(AOTRenderConsistencyTest, LongLinearChainExecutesMaterializedTailPasse
                                    &reference, &referenceStats);
     RenderImageWithColorFilterOnce(image, chain, width, height, true, true, false, true, &candidate,
                                    &candidateStats);
-    uint64_t passCount = opCount == 15 ? 1 : (opCount + 1) / 2;
+    uint64_t passCount = opCount <= 31 ? 1 : (opCount + 1) / 2;
     const auto& draws = candidateStats.draws;
     EXPECT_EQ(candidateStats.programs.programBuilderCreations, 0u);
     EXPECT_EQ(candidateStats.noMatchingRule, 0u);
@@ -1685,27 +1689,27 @@ TGFX_TEST(AOTRenderConsistencyTest, NonTrivialLinearChainLengthMatrixMatchesRunt
     EXPECT_EQ(candidateStats.draws.draws, 1u);
     EXPECT_EQ(candidateStats.draws.completeAOTDraws, 1u);
     EXPECT_EQ(candidateStats.draws.atomicFallbacks, 0u);
-    // Current capacity baseline: a texture plus up to 15 operators fits the single-pass chain;
-    // beyond that the tail planner splits at two operators per pass.
-    uint64_t passCount = opCount <= 15 ? 1 : (opCount + 1) / 2;
+    // The chain kernel carries 32 instructions with a recycled 16-entry register file, so a
+    // texture plus up to 31 operators stays in one fused pass; only longer chains split.
+    uint64_t passCount = opCount <= 31 ? 1 : (opCount + 1) / 2;
     EXPECT_EQ(candidateStats.draws.kernelInvocations, passCount);
     EXPECT_EQ(candidateStats.draws.planMaterializedEdges, passCount - 1);
     ExpectBitmapsIdentical("nontrivial-linear-chain-matrix", candidate, reference, width, height);
   }
 }
 
-TGFX_TEST(AOTRenderConsistencyTest, BrushAlphaBeforeThresholdAcrossTailSplit) {
+TGFX_TEST(AOTRenderConsistencyTest, BrushAlphaEntersChainBeforeThreshold) {
   auto image = MakeImage("resources/apitest/mandrill_128.png");
   ASSERT_NE(image, nullptr);
   int width = image->width();
   int height = image->height();
-  // The threshold sits at the head of the chain (closest to the texture) and the 15 trailing
-  // matrices push the graph past the single-pass capacity, so the threshold executes in the
-  // first tail pass while the geometry color stays on the terminal draw. The brush alpha is 0.5
-  // and the opaque source has alpha 1: with the input-alpha-inside semantics, threshold(0.5*1)
-  // is transparent everywhere; with the alpha deferred past the split, threshold(1) keeps the
-  // image visible at half opacity. The two outcomes differ massively, so the byte comparison
-  // cannot hide the ordering.
+  // The threshold sits at the head of the chain (closest to the texture) with 15 trailing
+  // matrices: the whole graph rides the single-pass chain kernel, which folds the brush alpha
+  // into the texture read (selector bit 0) exactly like the runtime's SrcIn wrap. The brush
+  // alpha is 0.5 and the opaque source has alpha 1: with the input-alpha-inside semantics,
+  // threshold(0.5*1) is transparent everywhere; an alpha applied after the chain would keep the
+  // image visible at half opacity (0.5*threshold(1)). The two outcomes differ massively, so the
+  // byte comparison cannot hide the ordering.
   std::shared_ptr<ColorFilter> chain = ColorFilter::AlphaThreshold(0.75f);
   for (size_t index = 0; index < 15; ++index) {
     chain = ColorFilter::Compose(chain, ColorFilter::Matrix(NonTrivialScaleBiasMatrix()));
@@ -1722,10 +1726,10 @@ TGFX_TEST(AOTRenderConsistencyTest, BrushAlphaBeforeThresholdAcrossTailSplit) {
   EXPECT_EQ(candidateStats.noMatchingRule, 0u);
   EXPECT_EQ(candidateStats.draws.completeAOTDraws, 1u);
   EXPECT_EQ(candidateStats.draws.atomicFallbacks, 0u);
-  // One texture + threshold + 15 matrices = 16 operators: the first tail pass takes the source
-  // plus two operators, the remaining seven passes take two each.
-  EXPECT_EQ(candidateStats.draws.kernelInvocations, 8u);
-  EXPECT_EQ(candidateStats.draws.planMaterializedEdges, 7u);
+  // One texture + threshold + 15 matrices = 17 instructions, inside the chain kernel's
+  // 32-instruction budget: a single fused pass with no materialization.
+  EXPECT_EQ(candidateStats.draws.kernelInvocations, 1u);
+  EXPECT_EQ(candidateStats.draws.planMaterializedEdges, 0u);
   ExpectBitmapsIdentical("brush-alpha-before-threshold", candidate, reference, width, height);
 }
 
@@ -1734,10 +1738,11 @@ TGFX_TEST(AOTRenderConsistencyTest, RotatedDrawWithLongChainMatchesRuntime) {
   ASSERT_NE(image, nullptr);
   int width = image->width();
   int height = image->height();
-  // A 30-degree rotation about the image center plus a 17-operator chain forces the tail plan
-  // through nine passes under a non-axis-aligned transform: the first pass must sample the source
-  // through the original draw's local-to-texture mapping, not just an offset. A coordinate
-  // mismatch shows up as rotated-content ghosts in the byte comparison.
+  // A 30-degree rotation about the image center plus a 17-operator chain. The graph fits the
+  // chain kernel's instruction budget, so the plan keeps the original draw (its GP and matrix
+  // intact) and swaps only the color processors: the texture sampling runs in the original
+  // local coordinate space by construction, and a coordinate mismatch would show up as
+  // rotated-content ghosts in the byte comparison.
   auto drawMatrix =
       Matrix::MakeRotate(30.0f, static_cast<float>(width) / 2, static_cast<float>(height) / 2);
   std::shared_ptr<ColorFilter> chain = nullptr;
@@ -1756,8 +1761,8 @@ TGFX_TEST(AOTRenderConsistencyTest, RotatedDrawWithLongChainMatchesRuntime) {
   EXPECT_EQ(candidateStats.noMatchingRule, 0u);
   EXPECT_EQ(candidateStats.draws.completeAOTDraws, 1u);
   EXPECT_EQ(candidateStats.draws.atomicFallbacks, 0u);
-  EXPECT_EQ(candidateStats.draws.kernelInvocations, 9u);
-  EXPECT_EQ(candidateStats.draws.planMaterializedEdges, 8u);
+  EXPECT_EQ(candidateStats.draws.kernelInvocations, 1u);
+  EXPECT_EQ(candidateStats.draws.planMaterializedEdges, 0u);
   ExpectBitmapsIdentical("rotated-long-chain", candidate, reference, width, height);
 }
 
@@ -1766,9 +1771,11 @@ TGFX_TEST(AOTRenderConsistencyTest, LowBrushAlphaLongChainMatchesRuntime) {
   ASSERT_NE(image, nullptr);
   int width = image->width();
   int height = image->height();
-  // A 0.05 brush alpha makes each RGBA8 materialization store a premultiplied color whose
-  // unpremultiplication in the next pass's matrix operator amplifies the stored quantization.
-  // This is the sensitivity probe for the round-trip precision boundary of tail splits.
+  // A 0.05 brush alpha with a 17-operator chain riding the single-pass kernel: no RGBA8
+  // materialization exists on this route, so even the low-alpha amplification regime stays
+  // byte-identical. (When the chain exceeds the instruction budget and splits into tail passes,
+  // each materialized edge quantizes the premultiplied color; that boundary is covered by the
+  // length-matrix test with quantization-exact matrices.)
   std::shared_ptr<ColorFilter> chain = nullptr;
   for (size_t index = 0; index < 17; ++index) {
     chain = ColorFilter::Compose(chain, ColorFilter::Matrix(NonTrivialScaleBiasMatrix()));
@@ -1785,8 +1792,8 @@ TGFX_TEST(AOTRenderConsistencyTest, LowBrushAlphaLongChainMatchesRuntime) {
   EXPECT_EQ(candidateStats.noMatchingRule, 0u);
   EXPECT_EQ(candidateStats.draws.completeAOTDraws, 1u);
   EXPECT_EQ(candidateStats.draws.atomicFallbacks, 0u);
-  EXPECT_EQ(candidateStats.draws.kernelInvocations, 9u);
-  EXPECT_EQ(candidateStats.draws.planMaterializedEdges, 8u);
+  EXPECT_EQ(candidateStats.draws.kernelInvocations, 1u);
+  EXPECT_EQ(candidateStats.draws.planMaterializedEdges, 0u);
   ExpectBitmapsIdentical("low-alpha-long-chain", candidate, reference, width, height);
 }
 
