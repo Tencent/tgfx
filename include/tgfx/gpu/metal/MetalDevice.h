@@ -29,18 +29,23 @@ namespace tgfx {
 class MetalDevice : public Device {
  public:
   /**
-   * Creates a MetalDevice using the system default MTLDevice. If a MetalDevice has already been
-   * created for the same MTLDevice and is still alive, the existing one is returned, so that
-   * multiple callers share the same GPU caches (command queue, shaders, and resources).
+   * Creates a MetalDevice using the system default MTLDevice. MTLCreateSystemDefaultDevice()
+   * returns the system-wide singleton, so calling this method repeatedly yields the same
+   * MetalDevice as long as it is still alive. Do not assume a brand-new independent device is
+   * created.
    */
   static std::shared_ptr<MetalDevice> Make();
 
   /**
-   * Creates a MetalDevice from an existing MTLDevice. If a MetalDevice has already been created
-   * from the same MTLDevice and is still alive, the existing one is returned, so that multiple
-   * MetalDevices with the same MTLDevice share the same GPU caches (command queue, shaders, and
-   * resources). The caller keeps ownership of the MTLDevice and can release it right after this
-   * call returns.
+   * Creates a MetalDevice from an existing MTLDevice.
+   * @param device The MTLDevice to create the MetalDevice from. Must not be nil.
+   * @return The existing live MetalDevice if one has already been created from the same
+   * MTLDevice, so that all callers share the same GPU caches (command queue, shaders, and
+   * resources), otherwise a newly created one. Returns nullptr if device is nil or the GPU fails
+   * to initialize. The caller keeps ownership of the MTLDevice and can release it right after
+   * this call returns. Note that reusing an existing Device for the same native device is
+   * currently a Metal-only semantic: the Vulkan, D3D12, and WebGPU backends still create a new
+   * Device on every call.
    */
   static std::shared_ptr<MetalDevice> MakeFrom(id<MTLDevice> device);
 
