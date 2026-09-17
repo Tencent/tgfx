@@ -21,6 +21,7 @@
 #include "core/utils/MathExtra.h"
 #include "layers/BackgroundSnapshotMap.h"
 #include "layers/BackgroundSource.h"
+#include "layers/CanvasUtils.h"
 #include "layers/DrawArgs.h"
 #include "layers/LayerStyleSource.h"
 #include "tgfx/core/Image.h"
@@ -373,13 +374,14 @@ std::shared_ptr<Image> RenderBackgroundStyleImage(
   // destination — the consumer clips the blit back to this rect.
   auto sliceRect = deviceBackdrop;
   deviceBackdrop.roundOut();
-  // The image covers the whole backdrop slice at device resolution. A slice larger than the target
-  // it is drawn into costs more to rasterize once than to draw per pass, since the direct path
-  // only rasterizes the part each pass covers, and it can outgrow the GPU's texture limit, after
-  // which the blit is dropped silently and the style stops showing up at all. Draw those layers
-  // directly.
-  if ((!targetRect.isEmpty() && (deviceBackdrop.width() > targetRect.width() ||
-                                 deviceBackdrop.height() > targetRect.height())) ||
+  // The image covers the whole backdrop slice at device resolution, while the direct path only
+  // rasterizes the part each pass covers. A slice that does not fit in the target it is drawn into
+  // therefore costs more to cache than to draw per pass, and once it outgrows the GPU's texture
+  // limit the blit is dropped silently and the style stops showing up at all. Draw those directly.
+  // Without a known target there is nothing to compare the slice against, so skip the cache there
+  // as well.
+  if (targetRect.isEmpty() || deviceBackdrop.width() > targetRect.width() ||
+      deviceBackdrop.height() > targetRect.height() ||
       ExceedsTextureLimit(args.context, deviceBackdrop)) {
     return nullptr;
   }
@@ -483,6 +485,14 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
       auto* target = canvas->getSurface();
       auto targetRect =
           target != nullptr ? Rect::MakeWH(target->width(), target->height()) : Rect::MakeEmpty();
+      if (targetRect.isEmpty()) {
+        // Recording passes have no surface of their own; the region they are clipped to is the
+        // only thing bounding what they can draw.
+        auto clipBounds = GetClipBounds(canvas);
+        if (clipBounds.has_value() && !clipBounds->isEmpty()) {
+          targetRect = canvas->getMatrix().mapRect(*clipBounds);
+        }
+      }
       auto styleImage =
           RenderBackgroundStyleImage(args, style, source, bgImage, bgOffset, canvas->getMatrix(),
                                      targetRect, &resultMatrix, &resultRect);
