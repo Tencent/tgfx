@@ -319,12 +319,10 @@ const LayerStyleSource* BackgroundConsumer::getCachedLayerStyleSource(Layer* lay
 
 namespace {
 
-std::shared_ptr<Image> RenderBackgroundStyleImage(const DrawArgs& args, LayerStyle* style,
-                                                  const LayerStyleSource* source,
-                                                  std::shared_ptr<Image> backgroundImage,
-                                                  const Point& backgroundOffset,
-                                                  const Matrix& styleToDevice, Matrix* drawMatrix,
-                                                  Rect* contentRect) {
+std::shared_ptr<Image> RenderBackgroundStyleImage(
+    const DrawArgs& args, LayerStyle* style, const LayerStyleSource* source,
+    std::shared_ptr<Image> backgroundImage, const Point& backgroundOffset,
+    const Matrix& styleToDevice, const Rect& targetRect, Matrix* drawMatrix, Rect* contentRect) {
   if (args.context == nullptr || style == nullptr || source == nullptr ||
       backgroundImage == nullptr || drawMatrix == nullptr || contentRect == nullptr) {
     return nullptr;
@@ -375,11 +373,14 @@ std::shared_ptr<Image> RenderBackgroundStyleImage(const DrawArgs& args, LayerSty
   // destination — the consumer clips the blit back to this rect.
   auto sliceRect = deviceBackdrop;
   deviceBackdrop.roundOut();
-  // The image is rasterized at device resolution over the entire backdrop slice, so on a large
-  // layer at high zoom it can outgrow the GPU's texture limit, after which the blit is dropped
-  // silently and the style stops showing up at all. Such layers draw the style directly instead:
-  // the direct path only ever rasterizes the part the current pass draws.
-  if (ExceedsTextureLimit(args.context, deviceBackdrop)) {
+  // The image covers the whole backdrop slice at device resolution. A slice larger than the target
+  // it is drawn into costs more to rasterize once than to draw per pass, since the direct path
+  // only rasterizes the part each pass covers, and it can outgrow the GPU's texture limit, after
+  // which the blit is dropped silently and the style stops showing up at all. Draw those layers
+  // directly.
+  if ((!targetRect.isEmpty() && (deviceBackdrop.width() > targetRect.width() ||
+                                 deviceBackdrop.height() > targetRect.height())) ||
+      ExceedsTextureLimit(args.context, deviceBackdrop)) {
     return nullptr;
   }
 
@@ -479,8 +480,12 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     if (result == snapshots->styleResults.end()) {
       Matrix resultMatrix = Matrix::I();
       Rect resultRect = Rect::MakeEmpty();
-      auto styleImage = RenderBackgroundStyleImage(args, style, source, bgImage, bgOffset,
-                                                   canvas->getMatrix(), &resultMatrix, &resultRect);
+      auto* target = canvas->getSurface();
+      auto targetRect =
+          target != nullptr ? Rect::MakeWH(target->width(), target->height()) : Rect::MakeEmpty();
+      auto styleImage =
+          RenderBackgroundStyleImage(args, style, source, bgImage, bgOffset, canvas->getMatrix(),
+                                     targetRect, &resultMatrix, &resultRect);
       if (styleImage != nullptr) {
         result = snapshots->styleResults
                      .emplace(key, BackgroundStyleResult{std::move(styleImage), canvas->getMatrix(),
