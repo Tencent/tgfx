@@ -1139,6 +1139,62 @@ static void RenderImageWithColorFilterOnce(const std::shared_ptr<Image>& image,
   context->globalCache()->clearPrograms();
 }
 
+struct BrushRenderStats {
+  uint32_t noMatchingRule = 0;
+  AOTDrawStats draws = {};
+  ProgramCacheStats programs = {};
+};
+
+// Renders the given image with a color filter, brush alpha, and canvas transform, with or without
+// the precompiled bundle. Unlike RenderImageWithColorFilterOnce this exposes the paint alpha and
+// the draw matrix, so tests can probe where the geometry color enters the chain and how the plan's
+// intermediate passes inherit the draw transform.
+static void RenderImageWithBrushOnce(const std::shared_ptr<Image>& image,
+                                     const std::shared_ptr<ColorFilter>& colorFilter,
+                                     float brushAlpha, const Matrix& drawMatrix, int width,
+                                     int height, bool useBundle, Bitmap* outBitmap,
+                                     BrushRenderStats* outStats) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  if (useBundle) {
+    auto [bundleData, bundleSize] = EmbeddedShaderBundles::GetBundle(context->backend());
+    ASSERT_NE(bundleData, nullptr);
+    ASSERT_GT(bundleSize, 0u);
+    ASSERT_TRUE(cache->loadBundle(bundleData, bundleSize));
+  } else {
+    cache->unload();
+  }
+  ScopedAOTStatsPause statsPause(context, !useBundle);
+  cache->setDecompositionEnabled(useBundle);
+  cache->setDiagnosticRecordingEnabled(true);
+  cache->resetStats();
+  context->globalCache()->clearPrograms();
+  context->globalCache()->resetProgramStats();
+  auto surface = Surface::Make(context, width, height);
+  ASSERT_TRUE(surface != nullptr);
+  Paint paint = {};
+  paint.setAlpha(brushAlpha);
+  paint.setColorFilter(colorFilter);
+  auto canvas = surface->getCanvas();
+  canvas->concat(drawMatrix);
+  canvas->drawImage(image, 0, 0, &paint);
+  context->flushAndSubmit(true);
+  ASSERT_TRUE(outBitmap->allocPixels(width, height));
+  auto* pixels = outBitmap->lockPixels();
+  ASSERT_TRUE(pixels != nullptr);
+  ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+  outBitmap->unlockPixels();
+  outStats->noMatchingRule = cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule);
+  outStats->draws = cache->drawStats();
+  outStats->programs = context->globalCache()->programStats();
+  cache->setDiagnosticRecordingEnabled(false);
+  cache->setDecompositionEnabled(true);
+  cache->unload();
+  context->globalCache()->clearPrograms();
+}
+
 TGFX_TEST(AOTRenderConsistencyTest, TexturedEffect2D) {
   auto image = MakeImage("resources/apitest/mandrill_128.png");
   ASSERT_TRUE(image != nullptr);
@@ -1591,6 +1647,147 @@ TGFX_TEST(AOTRenderConsistencyTest, LongLinearChainExecutesMaterializedTailPasse
     EXPECT_EQ(draws.peakTemporaryBytes, bytes);
     ExpectBitmapsIdentical("long-linear-chain-tail", candidate, reference, width, height);
   }
+}
+
+// A non-permutation matrix with fractional scales and biases: every level does real clamped
+// arithmetic, so quantization and ordering differences accumulate instead of cancelling the way
+// the channel-swap chain above does. The alpha row stays [0,0,0,1,0] so ValidateForFusion keeps
+// accepting the chain.
+static const std::array<float, 20>& NonTrivialScaleBiasMatrix() {
+  static const std::array<float, 20> matrix = {0.92f, 0.01f, 0.0f,   0.0f,  0.015f, 0.0f, 0.88f,
+                                               0.02f, 0.0f,  0.022f, 0.01f, 0.0f,   0.9f, 0.0f,
+                                               0.01f, 0.0f,  0.0f,   0.0f,  1.0f,   0.0f};
+  return matrix;
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, NonTrivialLinearChainLengthMatrixMatchesRuntime) {
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_NE(image, nullptr);
+  int width = image->width();
+  int height = image->height();
+  for (size_t opCount :
+       {size_t{1}, size_t{2}, size_t{4}, size_t{14}, size_t{15}, size_t{16}, size_t{17}}) {
+    SCOPED_TRACE(opCount);
+    std::shared_ptr<ColorFilter> chain = nullptr;
+    for (size_t index = 0; index < opCount; ++index) {
+      chain = ColorFilter::Compose(chain, ColorFilter::Matrix(NonTrivialScaleBiasMatrix()));
+    }
+    Bitmap reference = {};
+    Bitmap candidate = {};
+    ColorFilterRenderStats referenceStats = {};
+    ColorFilterRenderStats candidateStats = {};
+    RenderImageWithColorFilterOnce(image, chain, width, height, false, false, false, true,
+                                   &reference, &referenceStats);
+    RenderImageWithColorFilterOnce(image, chain, width, height, true, true, false, true, &candidate,
+                                   &candidateStats);
+    EXPECT_EQ(candidateStats.programs.programBuilderCreations, 0u);
+    EXPECT_EQ(candidateStats.noMatchingRule, 0u);
+    EXPECT_EQ(candidateStats.draws.draws, 1u);
+    EXPECT_EQ(candidateStats.draws.completeAOTDraws, 1u);
+    EXPECT_EQ(candidateStats.draws.atomicFallbacks, 0u);
+    // Current capacity baseline: a texture plus up to 15 operators fits the single-pass chain;
+    // beyond that the tail planner splits at two operators per pass.
+    uint64_t passCount = opCount <= 15 ? 1 : (opCount + 1) / 2;
+    EXPECT_EQ(candidateStats.draws.kernelInvocations, passCount);
+    EXPECT_EQ(candidateStats.draws.planMaterializedEdges, passCount - 1);
+    ExpectBitmapsIdentical("nontrivial-linear-chain-matrix", candidate, reference, width, height);
+  }
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, BrushAlphaBeforeThresholdAcrossTailSplit) {
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_NE(image, nullptr);
+  int width = image->width();
+  int height = image->height();
+  // The threshold sits at the head of the chain (closest to the texture) and the 15 trailing
+  // matrices push the graph past the single-pass capacity, so the threshold executes in the
+  // first tail pass while the geometry color stays on the terminal draw. The brush alpha is 0.5
+  // and the opaque source has alpha 1: with the input-alpha-inside semantics, threshold(0.5*1)
+  // is transparent everywhere; with the alpha deferred past the split, threshold(1) keeps the
+  // image visible at half opacity. The two outcomes differ massively, so the byte comparison
+  // cannot hide the ordering.
+  std::shared_ptr<ColorFilter> chain = ColorFilter::AlphaThreshold(0.75f);
+  for (size_t index = 0; index < 15; ++index) {
+    chain = ColorFilter::Compose(chain, ColorFilter::Matrix(NonTrivialScaleBiasMatrix()));
+  }
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  BrushRenderStats referenceStats = {};
+  BrushRenderStats candidateStats = {};
+  RenderImageWithBrushOnce(image, chain, 0.5f, Matrix::I(), width, height, false, &reference,
+                           &referenceStats);
+  RenderImageWithBrushOnce(image, chain, 0.5f, Matrix::I(), width, height, true, &candidate,
+                           &candidateStats);
+  EXPECT_EQ(candidateStats.programs.programBuilderCreations, 0u);
+  EXPECT_EQ(candidateStats.noMatchingRule, 0u);
+  EXPECT_EQ(candidateStats.draws.completeAOTDraws, 1u);
+  EXPECT_EQ(candidateStats.draws.atomicFallbacks, 0u);
+  // One texture + threshold + 15 matrices = 16 operators: the first tail pass takes the source
+  // plus two operators, the remaining seven passes take two each.
+  EXPECT_EQ(candidateStats.draws.kernelInvocations, 8u);
+  EXPECT_EQ(candidateStats.draws.planMaterializedEdges, 7u);
+  ExpectBitmapsIdentical("brush-alpha-before-threshold", candidate, reference, width, height);
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, RotatedDrawWithLongChainMatchesRuntime) {
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_NE(image, nullptr);
+  int width = image->width();
+  int height = image->height();
+  // A 30-degree rotation about the image center plus a 17-operator chain forces the tail plan
+  // through nine passes under a non-axis-aligned transform: the first pass must sample the source
+  // through the original draw's local-to-texture mapping, not just an offset. A coordinate
+  // mismatch shows up as rotated-content ghosts in the byte comparison.
+  auto drawMatrix =
+      Matrix::MakeRotate(30.0f, static_cast<float>(width) / 2, static_cast<float>(height) / 2);
+  std::shared_ptr<ColorFilter> chain = nullptr;
+  for (size_t index = 0; index < 17; ++index) {
+    chain = ColorFilter::Compose(chain, ColorFilter::Matrix(NonTrivialScaleBiasMatrix()));
+  }
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  BrushRenderStats referenceStats = {};
+  BrushRenderStats candidateStats = {};
+  RenderImageWithBrushOnce(image, chain, 1.0f, drawMatrix, width, height, false, &reference,
+                           &referenceStats);
+  RenderImageWithBrushOnce(image, chain, 1.0f, drawMatrix, width, height, true, &candidate,
+                           &candidateStats);
+  EXPECT_EQ(candidateStats.programs.programBuilderCreations, 0u);
+  EXPECT_EQ(candidateStats.noMatchingRule, 0u);
+  EXPECT_EQ(candidateStats.draws.completeAOTDraws, 1u);
+  EXPECT_EQ(candidateStats.draws.atomicFallbacks, 0u);
+  EXPECT_EQ(candidateStats.draws.kernelInvocations, 9u);
+  EXPECT_EQ(candidateStats.draws.planMaterializedEdges, 8u);
+  ExpectBitmapsIdentical("rotated-long-chain", candidate, reference, width, height);
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, LowBrushAlphaLongChainMatchesRuntime) {
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_NE(image, nullptr);
+  int width = image->width();
+  int height = image->height();
+  // A 0.05 brush alpha makes each RGBA8 materialization store a premultiplied color whose
+  // unpremultiplication in the next pass's matrix operator amplifies the stored quantization.
+  // This is the sensitivity probe for the round-trip precision boundary of tail splits.
+  std::shared_ptr<ColorFilter> chain = nullptr;
+  for (size_t index = 0; index < 17; ++index) {
+    chain = ColorFilter::Compose(chain, ColorFilter::Matrix(NonTrivialScaleBiasMatrix()));
+  }
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  BrushRenderStats referenceStats = {};
+  BrushRenderStats candidateStats = {};
+  RenderImageWithBrushOnce(image, chain, 0.05f, Matrix::I(), width, height, false, &reference,
+                           &referenceStats);
+  RenderImageWithBrushOnce(image, chain, 0.05f, Matrix::I(), width, height, true, &candidate,
+                           &candidateStats);
+  EXPECT_EQ(candidateStats.programs.programBuilderCreations, 0u);
+  EXPECT_EQ(candidateStats.noMatchingRule, 0u);
+  EXPECT_EQ(candidateStats.draws.completeAOTDraws, 1u);
+  EXPECT_EQ(candidateStats.draws.atomicFallbacks, 0u);
+  EXPECT_EQ(candidateStats.draws.kernelInvocations, 9u);
+  EXPECT_EQ(candidateStats.draws.planMaterializedEdges, 8u);
+  ExpectBitmapsIdentical("low-alpha-long-chain", candidate, reference, width, height);
 }
 
 // P4 retry semantics, risk one: color-filter retention. addDrawOp merges an
