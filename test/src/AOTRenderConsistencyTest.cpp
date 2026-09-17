@@ -21,6 +21,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <functional>
 #include <string>
 #include <vector>
 #include "base/TGFXTest.h"
@@ -30,6 +31,7 @@
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/glsl/GLSLBlend.h"
+#include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/TextureEffect.h"
@@ -1527,6 +1529,155 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailPassesPreserveCoordinateDomains
       ExpectBitmapsIdentical("offscreen-tail-coordinates", candidate, reference, 64, 64);
     }
   }
+}
+
+// Shared driver for the offscreen counterexamples below: renders an FP tree through
+// fillRTWithFP (the offscreen materialization route) with and without the bundle, asserting the
+// multi-pass plan served and comparing bytes.
+static void RenderOffscreenCounterexample(
+    Context* context, PrecompiledShaderCache* cache,
+    const std::function<PlacementPtr<FragmentProcessor>(BlockAllocator*)>& buildTree,
+    const char* label, Bitmap* reference, Bitmap* candidate, AOTDrawStats* candidateDraws,
+    uint64_t expectedPasses) {
+  auto render = [&](bool useBundle, Bitmap* outBitmap, AOTDrawStats* outDraws) {
+    if (useBundle) {
+      auto bundle = EmbeddedShaderBundles::GetBundle(context->backend());
+      ASSERT_TRUE(bundle.first != nullptr);
+      ASSERT_TRUE(cache->loadBundle(bundle.first, bundle.second));
+    } else {
+      cache->unload();
+    }
+    ScopedAOTStatsPause pause(context, !useBundle);
+    cache->setDecompositionEnabled(useBundle);
+    cache->setDiagnosticRecordingEnabled(true);
+    cache->resetStats();
+    context->globalCache()->clearPrograms();
+    context->globalCache()->resetProgramStats();
+    auto target = RenderTargetProxy::Make(context, 64, 64, false);
+    ASSERT_NE(target, nullptr);
+    auto processor = buildTree(context->drawingAllocator());
+    ASSERT_NE(processor, nullptr);
+    ASSERT_TRUE(
+        context->drawingManager()->fillRTWithFP(target, std::move(processor), 0, Point::Zero()));
+    context->flushAndSubmit(true);
+    auto rt = target->getRenderTarget();
+    ASSERT_NE(rt, nullptr);
+    auto surface = Surface::MakeFrom(context, rt->getBackendRenderTarget(), rt->origin());
+    ASSERT_NE(surface, nullptr);
+    ASSERT_TRUE(outBitmap->allocPixels(64, 64));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_NE(pixels, nullptr);
+    EXPECT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+    if (outDraws != nullptr) {
+      *outDraws = cache->drawStats();
+    }
+    cache->setDiagnosticRecordingEnabled(false);
+    cache->setDecompositionEnabled(true);
+    cache->unload();
+  };
+  render(false, reference, nullptr);
+  render(true, candidate, candidateDraws);
+  ASSERT_NE(candidateDraws, nullptr);
+  EXPECT_EQ(candidateDraws->completeAOTDraws, 1u);
+  EXPECT_EQ(candidateDraws->atomicFallbacks, 0u);
+  EXPECT_EQ(candidateDraws->kernelInvocations, expectedPasses);
+  EXPECT_EQ(candidateDraws->planMaterializedEdges, expectedPasses - 1);
+  ExpectBitmapsIdentical(label, *candidate, *reference, 64, 64);
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailAlphaEntersChainBeforeThreshold) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_NE(image, nullptr);
+  auto sourceSurface = Surface::Make(context, image->width(), image->height(), false, 1, true);
+  ASSERT_NE(sourceSurface, nullptr);
+  {
+    ScopedAOTStatsPause pause(context, true);
+    sourceSurface->getCanvas()->drawImage(image, 0, 0);
+    context->flushAndSubmit(true);
+  }
+  auto source = context->proxyProvider()->wrapExternalTexture(sourceSurface->getBackendTexture());
+  ASSERT_NE(source, nullptr);
+  // Alpha semantics live INSIDE the FP tree here (a matrix scaling alpha to 0.4) rather than in
+  // the fill's geometry: the offscreen fill's rectangle is opaque by construction, so the only
+  // question is whether the tree-internal alpha survives the materialization boundary between
+  // the tail passes. The threshold (0.35) sits right after the alpha scaling: 0.4 passes,
+  // 0.4 quantized to 102/255 = 0.4 still passes, so a byte-identical comparison cleanly detects
+  // any dropped or re-ordered alpha (a dropped modulation keeps every pixel above 0.35 with full
+  // alpha: a ~150-level difference).
+  const std::array<float, 20> halfAlpha = {1, 0, 0, 0, 0, 0, 1, 0, 0,    0,
+                                           0, 0, 1, 0, 0, 0, 0, 0, 0.4f, 0};
+  const std::array<float, 20> swapRedBlue = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0,
+                                             1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
+  auto buildTree = [&](BlockAllocator* allocator) -> PlacementPtr<FragmentProcessor> {
+    auto processor = TextureEffect::Make(allocator, source);
+    processor = FragmentProcessor::Compose(
+        allocator, std::move(processor), ColorMatrixFragmentProcessor::Make(allocator, halfAlpha));
+    processor = FragmentProcessor::Compose(allocator, std::move(processor),
+                                           AlphaThresholdFragmentProcessor::Make(allocator, 0.35f));
+    for (int index = 0; index < 31; ++index) {
+      processor =
+          FragmentProcessor::Compose(allocator, std::move(processor),
+                                     ColorMatrixFragmentProcessor::Make(allocator, swapRedBlue));
+    }
+    return processor;
+  };
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  AOTDrawStats candidateDraws = {};
+  RenderOffscreenCounterexample(context, cache, buildTree, "offscreen-alpha-before-threshold",
+                                &reference, &candidate, &candidateDraws, 17u);
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailRotatedUVMatrixStaysAligned) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_NE(image, nullptr);
+  auto sourceSurface = Surface::Make(context, image->width(), image->height(), false, 1, true);
+  ASSERT_NE(sourceSurface, nullptr);
+  {
+    ScopedAOTStatsPause pause(context, true);
+    sourceSurface->getCanvas()->drawImage(image, 0, 0);
+    context->flushAndSubmit(true);
+  }
+  auto source = context->proxyProvider()->wrapExternalTexture(sourceSurface->getBackendTexture());
+  ASSERT_NE(source, nullptr);
+  // A rotated UV matrix on the source leaf: the tree defines its own coordinate semantics (the
+  // offscreen fill's rectangle is the tree's coordinate space), so every tail pass must keep
+  // sampling through the same rotated mapping. A misaligned first pass shows up as rotated
+  // ghost content in the byte comparison.
+  const std::array<float, 20> swapRedBlue = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0,
+                                             1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
+  auto buildTree = [&](BlockAllocator* allocator) -> PlacementPtr<FragmentProcessor> {
+    auto uvMatrix = Matrix::MakeRotate(30.0f, static_cast<float>(source->width()) / 2,
+                                       static_cast<float>(source->height()) / 2);
+    SamplingOptions sampling(FilterMode::Linear, MipmapMode::None);
+    SamplingArgs args = {TileMode::Clamp, TileMode::Clamp, sampling, SrcRectConstraint::Fast};
+    auto processor = TextureEffect::Make(allocator, source, args, &uvMatrix);
+    if (processor == nullptr) {
+      return nullptr;
+    }
+    for (int index = 0; index < 32; ++index) {
+      processor =
+          FragmentProcessor::Compose(allocator, std::move(processor),
+                                     ColorMatrixFragmentProcessor::Make(allocator, swapRedBlue));
+    }
+    return processor;
+  };
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  AOTDrawStats candidateDraws = {};
+  // source + 32 matrices = 33 chain nodes: the first tail pass takes the source plus two
+  // operators, the remaining 30 split two per pass -> 16 passes.
+  RenderOffscreenCounterexample(context, cache, buildTree, "offscreen-rotated-uv-tail", &reference,
+                                &candidate, &candidateDraws, 16u);
 }
 
 // F12 execution-failure contract: a plan task that passed the prepare phase must stop cleanly
