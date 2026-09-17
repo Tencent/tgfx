@@ -1225,7 +1225,6 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   }
   auto snapshotMap = std::make_unique<BackgroundSnapshotMap>();
   snapshotMap->shareStyleOutput = shareStyleOutput;
-  snapshotMap->backgroundBounds = viewMatrix.mapRect(bgSource->getBackgroundRect());
   // Draw backgroundColor before the layer tree so that the capture pass includes it as part of
   // the background for blur/backdrop effects.
   if (_backgroundColor != Color::Transparent()) {

@@ -24,7 +24,9 @@
 #include "layers/DrawArgs.h"
 #include "layers/LayerStyleSource.h"
 #include "tgfx/core/Image.h"
+#include "tgfx/core/MaskFilter.h"
 #include "tgfx/core/PictureRecorder.h"
+#include "tgfx/core/Shader.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/layerstyles/LayerStyle.h"
@@ -219,9 +221,6 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     return;
   }
   auto layerBounds = layer->getBounds();
-  auto bounds = layerBounds;
-  bounds.scale(contentScale, contentScale);
-  bounds.roundOut();
   // Use the runtime canvas chain (capture canvas matrix · bgSource->surfaceToWorldMatrix) so
   // capture and consume share the same frame of reference. Do NOT use getGlobalMatrix(): it walks
   // the static layer tree with per-step z-flattening and diverges from the runtime concat chain
@@ -230,6 +229,24 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   if (!localToWorld.invert(&worldToLocal)) {
     return;
   }
+  // Crop the backdrop to the region this frame puts on screen. Left uncropped the snapshot follows
+  // the layer's whole size, which at high zoom is far larger than the screen, and the shared style
+  // output derived from it becomes a texture that cannot be allocated — the style then silently
+  // stops drawing. The rects are already widened by the blur sampling outset upstream, so the
+  // style still finds every pixel it samples.
+  if (args.renderRects != nullptr && !args.renderRects->empty()) {
+    Rect visibleBounds = Rect::MakeEmpty();
+    for (const auto& renderRect : *args.renderRects) {
+      visibleBounds.join(worldToLocal.mapRect(renderRect));
+    }
+    auto croppedBounds = layerBounds;
+    if (croppedBounds.intersect(visibleBounds)) {
+      layerBounds = croppedBounds;
+    }
+  }
+  auto bounds = layerBounds;
+  bounds.scale(contentScale, contentScale);
+  bounds.roundOut();
   auto bgImage = bgSource->getBackgroundImage();
   if (bgImage == nullptr) {
     return;
@@ -323,9 +340,8 @@ std::shared_ptr<Image> RenderBackgroundStyleImage(const DrawArgs& args, LayerSty
                                                   const LayerStyleSource* source,
                                                   std::shared_ptr<Image> backgroundImage,
                                                   const Point& backgroundOffset,
-                                                  const Matrix& styleToDevice,
-                                                  const Rect& backgroundBounds, Matrix* drawMatrix,
-                                                  Rect* contentRect) {
+                                                  const Matrix& styleToDevice, float alpha,
+                                                  Matrix* drawMatrix, Rect* contentRect) {
   if (args.context == nullptr || style == nullptr || source == nullptr ||
       backgroundImage == nullptr || drawMatrix == nullptr || contentRect == nullptr) {
     return nullptr;
@@ -376,15 +392,10 @@ std::shared_ptr<Image> RenderBackgroundStyleImage(const DrawArgs& args, LayerSty
   // destination — the consumer clips the blit back to this rect.
   auto sliceRect = deviceBackdrop;
   deviceBackdrop.roundOut();
-  // The image covers the whole backdrop slice at device resolution, while the direct path only
-  // rasterizes the part each pass covers. A slice that does not fit in the background it samples
-  // from therefore costs more to cache than to draw per pass, and once it outgrows the GPU's
-  // texture limit the blit is dropped silently and the style stops showing up at all. Draw those
-  // directly. Without a known background there is nothing to compare the slice against, so skip
-  // the cache there as well.
-  if (backgroundBounds.isEmpty() || deviceBackdrop.width() > backgroundBounds.width() ||
-      deviceBackdrop.height() > backgroundBounds.height() ||
-      ExceedsTextureLimit(args.context, deviceBackdrop)) {
+  // A slice that outgrows the GPU's texture limit never gets a render target, so the blit is
+  // dropped silently and the style stops showing up at all. Draw those directly: the direct path
+  // rasterizes only the part each pass covers, which always stays within one render target.
+  if (ExceedsTextureLimit(args.context, deviceBackdrop)) {
     return nullptr;
   }
 
@@ -392,28 +403,17 @@ std::shared_ptr<Image> RenderBackgroundStyleImage(const DrawArgs& args, LayerSty
   if (!recordMatrix.invert(&inverse)) {
     return nullptr;
   }
-  // Lay the backdrop slice down so the style blends against a real backdrop, and clamp its edges
-  // over the rounded-out bounds so the cached image is opaque up to its edges: a transparent edge
-  // would be stamped over the destination by the Src blit.
-  {
-    auto styleSpaceBgOffset = backgroundOffset - contentEntry.offset;
-    auto shader = Shader::MakeImageShader(backgroundImage, TileMode::Clamp, TileMode::Clamp);
-    shader = shader->makeWithMatrix(Matrix::MakeTrans(styleSpaceBgOffset.x, styleSpaceBgOffset.y));
-    Paint bgPaint = {};
-    bgPaint.setShader(std::move(shader));
-    bgPaint.setBlendMode(BlendMode::Src);
-    recording->drawRect(inverse.mapRect(deviceBackdrop.makeOutset(1.0f, 1.0f)), bgPaint);
-  }
-  style->draw(recording, styleInput, 1.0f);
+  // No backdrop goes into the recording: the style reads what it samples from the background image
+  // handed in through extraSources, and it confines itself to the layer's shape, so the image ends
+  // up holding just that output and being transparent everywhere else.
+  style->draw(recording, styleInput, alpha);
 
   auto picture = recorder.finishRecordingAsPicture();
   if (picture == nullptr) {
     return nullptr;
   }
   Point imageOffset = {};
-  // Crop to the rounded backdrop bounds. The style's own outset reaches past them and would
-  // otherwise end up as transparent pixels in the image, which the consume pass blits with Src
-  // and would therefore punch a transparent edge into the destination.
+  // Crop to the rounded backdrop bounds; the style's own outset reaches past them.
   auto image =
       ToImageWithOffset(std::move(picture), &imageOffset, &deviceBackdrop, args.dstColorSpace);
   if (image == nullptr) {
@@ -486,7 +486,7 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
       Rect resultRect = Rect::MakeEmpty();
       auto styleImage =
           RenderBackgroundStyleImage(args, style, source, bgImage, bgOffset, canvas->getMatrix(),
-                                     snapshots->backgroundBounds, &resultMatrix, &resultRect);
+                                     alpha, &resultMatrix, &resultRect);
       if (styleImage != nullptr) {
         result = snapshots->styleResults
                      .emplace(key, BackgroundStyleResult{std::move(styleImage), canvas->getMatrix(),
@@ -508,12 +508,27 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
         canvas->concat(result->second.drawMatrix);
         canvas->clipRect(result->second.contentRect);
         Paint paint = {};
-        paint.setAlpha(alpha);
-        // Replace outright: the image already holds the backdrop with the style composited on
-        // top, so neither the style's blend mode nor this pass's alpha may be applied a second
-        // time. Anti-aliasing stays off because the image lands on whole device pixels;
-        // smoothing its edges would bleed coverage into the neighbouring pixel and, under Src,
-        // erase it.
+        // Mask the blit with the same content the style masked itself with, so only where the style
+        // actually paints does the image replace the destination. Drawing the style directly is a
+        // Src draw under that mask, and the image is transparent elsewhere, so an unmasked Src blit
+        // would erase the destination instead of leaving it alone.
+        if (contentEntry.image != nullptr) {
+          auto maskShader =
+              Shader::MakeImageShader(contentEntry.image, TileMode::Decal, TileMode::Decal);
+          if (maskShader != nullptr) {
+            Matrix maskMatrix = Matrix::I();
+            if (result->second.drawMatrix.invert(&maskMatrix)) {
+              maskMatrix.preTranslate(contentEntry.offset.x, contentEntry.offset.y);
+              paint.setMaskFilter(
+                  MaskFilter::MakeShader(maskShader->makeWithMatrix(maskMatrix), false));
+            }
+          }
+        }
+        // Replace outright under the mask: the image already holds the style's output, so the
+        // style's blend mode must not be applied a second time. The pass alpha is not applied here
+        // either — it was handed to LayerStyle::draw while recording, so it scales only the style's
+        // own output; stamping it here would fade the backdrop along with it. Anti-aliasing stays
+        // off because the image lands on whole device pixels.
         paint.setAntiAlias(false);
         paint.setBlendMode(BlendMode::Src);
         canvas->drawImage(result->second.image, 0.0f, 0.0f, &paint);
