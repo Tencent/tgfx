@@ -181,7 +181,9 @@ if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
     if (DEPLOYMENT_TARGET)
         set(CMAKE_OSX_DEPLOYMENT_TARGET ${DEPLOYMENT_TARGET})
     elseif (MACOS)
-        if (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+        # CMake reports "arm64" on Apple Silicon and "aarch64" on other toolchains, so both
+        # spellings have to be treated as the 64-bit ARM target.
+        if (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64")
             set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0")
         else ()
             set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
