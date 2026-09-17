@@ -26,7 +26,7 @@
 namespace tgfx {
 
 static std::mutex deviceMapLocker = {};
-static std::unordered_map<void*, MetalDevice*> deviceMap = {};
+static std::unordered_map<id<MTLDevice>, MetalDevice*> deviceMap = {};
 
 std::shared_ptr<MetalDevice> MetalDevice::Make() {
   @autoreleasepool {
@@ -37,8 +37,8 @@ std::shared_ptr<MetalDevice> MetalDevice::Make() {
   }
 }
 
-std::shared_ptr<MetalDevice> MetalDevice::MakeFrom(void* metalDevice) {
-  if (!metalDevice) {
+std::shared_ptr<MetalDevice> MetalDevice::MakeFrom(id<MTLDevice> metalDevice) {
+  if (metalDevice == nil) {
     return nullptr;
   }
   {
@@ -53,7 +53,7 @@ std::shared_ptr<MetalDevice> MetalDevice::MakeFrom(void* metalDevice) {
     }
   }
   @autoreleasepool {
-    auto gpu = MetalGPU::Make((id<MTLDevice>)metalDevice);
+    auto gpu = MetalGPU::Make(metalDevice);
     if (!gpu) {
       return nullptr;
     }
@@ -74,7 +74,7 @@ MetalDevice::~MetalDevice() {
   deviceMap.erase(metalDevice());
 }
 
-void* MetalDevice::metalDevice() const {
+id<MTLDevice> MetalDevice::metalDevice() const {
   return static_cast<MetalGPU*>(_gpu)->device();
 }
 
