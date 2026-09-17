@@ -1400,11 +1400,17 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     if (foldMask) {
       AOTEffectGraph foldedGraph = {};
       AOTEffectPlan foldedPlan = {};
+      // On-screen draws only accept single-pass plans: a multi-pass tail plan materializes
+      // intermediate passes that inherit neither the original draw's paint alpha (the geometry
+      // color enters only at the terminal draw, so non-linear operators see an unmodulated
+      // input) nor its transform (the first pass samples through the source's local uvMatrix
+      // while running in the offset rectangle's coordinate space). The runtime path stays the
+      // reference for over-budget chains until the executor carries both through.
       if (AOTEffectDecomposer::Lower(foldedProcessors, &foldedGraph) &&
           AOTEffectDecomposer::ValidateForFusion(foldedGraph) &&
-          AOTEffectDecomposer::Decompose(foldedGraph, &foldedPlan) && !foldedPlan.passes.empty() &&
-          (foldedPlan.passes.size() > 1 ||
-           foldedPlan.passes[0].kernel == AOTKernelKind::PointwiseTail ||
+          AOTEffectDecomposer::Decompose(foldedGraph, &foldedPlan) &&
+          foldedPlan.passes.size() == 1 &&
+          (foldedPlan.passes[0].kernel == AOTKernelKind::PointwiseTail ||
            foldedPlan.passes[0].kernel == AOTKernelKind::PointwiseChain ||
            foldedPlan.passes[0].kernel == AOTKernelKind::PerlinNoiseFill)) {
         // The mask now travels inside the color chain, so the terminal draw must not apply it
@@ -1438,8 +1444,10 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     bool mainDecompose = mainValidate && AOTEffectDecomposer::Decompose(graph, &plan);
     if (colorProcessors.size() == 1 && colorProcessors[0]->numChildProcessors() > 0) {
     }
-    if (mainDecompose && !plan.passes.empty() &&
-        (plan.passes.size() > 1 || plan.passes[0].kernel == AOTKernelKind::PointwiseTail ||
+    // Single-pass on-screen acceptance (same rationale as the folded route above): multi-pass
+    // tail plans are refused here so over-budget chains keep the runtime path as their reference.
+    if (mainDecompose && plan.passes.size() == 1 &&
+        (plan.passes[0].kernel == AOTKernelKind::PointwiseTail ||
          plan.passes[0].kernel == AOTKernelKind::PointwiseChain ||
          plan.passes[0].kernel == AOTKernelKind::PerlinNoiseFill)) {
       auto task = AOTPlanExecutor::Make(context, renderFlags, graph, plan, *deviceBounds,
@@ -1511,9 +1519,8 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
               if (!op->hasCoverage() && AOTEffectDecomposer::Lower(retryProcessors, &retryGraph) &&
                   AOTEffectDecomposer::ValidateForFusion(retryGraph) &&
                   AOTEffectDecomposer::Decompose(retryGraph, &retryPlan) &&
-                  !retryPlan.passes.empty() &&
-                  (retryPlan.passes.size() > 1 ||
-                   retryPlan.passes[0].kernel == AOTKernelKind::PointwiseTail ||
+                  retryPlan.passes.size() == 1 &&
+                  (retryPlan.passes[0].kernel == AOTKernelKind::PointwiseTail ||
                    retryPlan.passes[0].kernel == AOTKernelKind::PointwiseChain ||
                    retryPlan.passes[0].kernel == AOTKernelKind::PerlinNoiseFill)) {
                 auto task = AOTPlanExecutor::Make(context, renderFlags, retryGraph, retryPlan,

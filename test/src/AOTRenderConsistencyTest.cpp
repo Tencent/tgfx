@@ -1611,10 +1611,12 @@ TGFX_TEST(AOTRenderConsistencyTest, LongLinearChainExecutesMaterializedTailPasse
   const std::array<float, 20> rotateRGB = {0, 1, 0, 0, 0, 0, 0, 1, 0, 0,
                                            1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
   // 15/16/17 probe the old capacity boundary (all single-pass now that the chain kernel carries
-  // 32 instructions); 32/33 cross the new boundary and exercise the tail planner's materialized
-  // passes. The channel-swap matrix survives RGBA8 quantization exactly, so the byte-identical
-  // assertion holds across the materialization edges.
-  for (size_t opCount : {size_t{15}, size_t{16}, size_t{17}, size_t{32}, size_t{33}}) {
+  // 32 instructions). 33 crosses the new boundary: the on-screen decomposition route refuses
+  // multi-pass plans (their intermediate passes inherit neither the paint alpha nor the draw
+  // transform), so the draw falls back to the runtime path — still correct, byte-identical to
+  // the reference, just not AOT-served. The multi-pass tail execution itself stays covered by
+  // the offscreen tests (OffscreenTailPassesPreserveCoordinateDomains and the 33-op case there).
+  for (size_t opCount : {size_t{15}, size_t{16}, size_t{17}, size_t{33}}) {
     SCOPED_TRACE(opCount);
     std::shared_ptr<ColorFilter> chain = nullptr;
     for (size_t index = 0; index < opCount; ++index) {
@@ -1628,27 +1630,30 @@ TGFX_TEST(AOTRenderConsistencyTest, LongLinearChainExecutesMaterializedTailPasse
                                    &reference, &referenceStats);
     RenderImageWithColorFilterOnce(image, chain, width, height, true, true, false, true, &candidate,
                                    &candidateStats);
-    uint64_t passCount = opCount <= 31 ? 1 : (opCount + 1) / 2;
     const auto& draws = candidateStats.draws;
-    EXPECT_EQ(candidateStats.programs.programBuilderCreations, 0u);
-    EXPECT_EQ(candidateStats.noMatchingRule, 0u);
-    EXPECT_GE(candidateStats.programs.precompiledArtifactCreations, 1u);
     EXPECT_EQ(draws.draws, 1u);
-    EXPECT_EQ(draws.completeAOTDraws, 1u);
-    EXPECT_EQ(draws.atomicFallbacks, 0u);
-    EXPECT_EQ(draws.kernelInvocations, passCount);
-    EXPECT_EQ(draws.offscreenTargets, passCount - 1);
-    EXPECT_EQ(draws.materializedEdges, passCount - 1);
-    EXPECT_EQ(draws.planMaterializedEdges, passCount - 1);
-    EXPECT_EQ(draws.fpFlattenEdges, 0u);
-    if (passCount > 1) {
-      EXPECT_EQ(draws.offscreenPlanDraws, 1u);
-      EXPECT_EQ(draws.planPassHistogram.back(), 1u);
+    if (opCount <= 31) {
+      // Inside the chain kernel's instruction budget: one fused AOT pass, no materialization.
+      EXPECT_EQ(candidateStats.programs.programBuilderCreations, 0u);
+      EXPECT_EQ(candidateStats.noMatchingRule, 0u);
+      EXPECT_GE(candidateStats.programs.precompiledArtifactCreations, 1u);
+      EXPECT_EQ(draws.completeAOTDraws, 1u);
+      EXPECT_EQ(draws.atomicFallbacks, 0u);
+      EXPECT_EQ(draws.kernelInvocations, 1u);
+      EXPECT_EQ(draws.offscreenTargets, 0u);
+      EXPECT_EQ(draws.materializedEdges, 0u);
+      EXPECT_EQ(draws.planMaterializedEdges, 0u);
+      EXPECT_EQ(draws.fpFlattenEdges, 0u);
+      EXPECT_EQ(draws.intermediateReadBytes, 0u);
+      EXPECT_EQ(draws.intermediateWriteBytes, 0u);
+      EXPECT_EQ(draws.peakTemporaryBytes, 0u);
+    } else {
+      // Over budget on the on-screen route: the runtime path serves the draw (one program
+      // compiled on first use), byte-identical to the reference.
+      EXPECT_GE(candidateStats.programs.programBuilderCreations, 1u);
+      EXPECT_EQ(draws.completeAOTDraws, 0u);
+      EXPECT_EQ(draws.atomicFallbacks, 0u);
     }
-    auto bytes = static_cast<uint64_t>(width) * static_cast<uint64_t>(height) * 4 * (passCount - 1);
-    EXPECT_EQ(draws.intermediateReadBytes, bytes);
-    EXPECT_EQ(draws.intermediateWriteBytes, bytes);
-    EXPECT_EQ(draws.peakTemporaryBytes, bytes);
     ExpectBitmapsIdentical("long-linear-chain-tail", candidate, reference, width, height);
   }
 }
