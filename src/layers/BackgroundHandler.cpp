@@ -112,6 +112,13 @@ bool ComputeSubGeometry(BackgroundSource* parentSource, const Rect& localBounds,
   return true;
 }
 
+// Returns true when the matrix is affine rather than projective. A 3D subtree flattens into a
+// matrix with a perspective row, and mapping the rendered rects back through its inverse does not
+// bound the layer's visible area reliably, so anything derived from that mapping is skipped.
+bool IsAffineTransform(const Matrix& matrix) {
+  return FloatNearlyZero(matrix.getPerspX()) && FloatNearlyZero(matrix.getPerspY());
+}
+
 // Returns true when a device-space rect is too large to back with a single GPU texture. Such a
 // render target never gets allocated, so a draw that needs one is dropped silently and the style
 // simply stops showing up.
@@ -229,12 +236,14 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   if (!localToWorld.invert(&worldToLocal)) {
     return;
   }
-  // Crop the backdrop to the region this frame puts on screen. Left uncropped the snapshot follows
-  // the layer's whole size, which at high zoom is far larger than the screen, and the shared style
-  // output derived from it becomes a texture that cannot be allocated — the style then silently
-  // stops drawing. The rects are already widened by the blur sampling outset upstream, so the
-  // style still finds every pixel it samples.
-  if (args.renderRects != nullptr && !args.renderRects->empty()) {
+  // Crop the backdrop to the region this frame puts on screen. Only the shared style output needs
+  // this: it rasterizes the whole slice into one texture, which at high zoom is far larger than the
+  // screen and fails to allocate, silently dropping the style. Passes that draw the style directly
+  // only ever rasterize their own clip, so cropping their backdrop would just cut away pixels the
+  // blur has to sample. The rects are already widened by the blur sampling outset upstream, and the
+  // mapping back into layer space is only reliable while the transform is affine.
+  if (snapshots != nullptr && snapshots->shareStyleOutput && args.renderRects != nullptr &&
+      !args.renderRects->empty() && IsAffineTransform(localToWorld)) {
     Rect visibleBounds = Rect::MakeEmpty();
     for (const auto& renderRect : *args.renderRects) {
       visibleBounds.join(worldToLocal.mapRect(renderRect));
