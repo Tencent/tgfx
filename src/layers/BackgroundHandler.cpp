@@ -21,7 +21,6 @@
 #include "core/utils/MathExtra.h"
 #include "layers/BackgroundSnapshotMap.h"
 #include "layers/BackgroundSource.h"
-#include "layers/CanvasUtils.h"
 #include "layers/DrawArgs.h"
 #include "layers/LayerStyleSource.h"
 #include "tgfx/core/Image.h"
@@ -320,10 +319,13 @@ const LayerStyleSource* BackgroundConsumer::getCachedLayerStyleSource(Layer* lay
 
 namespace {
 
-std::shared_ptr<Image> RenderBackgroundStyleImage(
-    const DrawArgs& args, LayerStyle* style, const LayerStyleSource* source,
-    std::shared_ptr<Image> backgroundImage, const Point& backgroundOffset,
-    const Matrix& styleToDevice, const Rect& targetRect, Matrix* drawMatrix, Rect* contentRect) {
+std::shared_ptr<Image> RenderBackgroundStyleImage(const DrawArgs& args, LayerStyle* style,
+                                                  const LayerStyleSource* source,
+                                                  std::shared_ptr<Image> backgroundImage,
+                                                  const Point& backgroundOffset,
+                                                  const Matrix& styleToDevice,
+                                                  const Rect& backgroundBounds, Matrix* drawMatrix,
+                                                  Rect* contentRect) {
   if (args.context == nullptr || style == nullptr || source == nullptr ||
       backgroundImage == nullptr || drawMatrix == nullptr || contentRect == nullptr) {
     return nullptr;
@@ -375,13 +377,13 @@ std::shared_ptr<Image> RenderBackgroundStyleImage(
   auto sliceRect = deviceBackdrop;
   deviceBackdrop.roundOut();
   // The image covers the whole backdrop slice at device resolution, while the direct path only
-  // rasterizes the part each pass covers. A slice that does not fit in the target it is drawn into
-  // therefore costs more to cache than to draw per pass, and once it outgrows the GPU's texture
-  // limit the blit is dropped silently and the style stops showing up at all. Draw those directly.
-  // Without a known target there is nothing to compare the slice against, so skip the cache there
-  // as well.
-  if (targetRect.isEmpty() || deviceBackdrop.width() > targetRect.width() ||
-      deviceBackdrop.height() > targetRect.height() ||
+  // rasterizes the part each pass covers. A slice that does not fit in the background it samples
+  // from therefore costs more to cache than to draw per pass, and once it outgrows the GPU's
+  // texture limit the blit is dropped silently and the style stops showing up at all. Draw those
+  // directly. Without a known background there is nothing to compare the slice against, so skip
+  // the cache there as well.
+  if (backgroundBounds.isEmpty() || deviceBackdrop.width() > backgroundBounds.width() ||
+      deviceBackdrop.height() > backgroundBounds.height() ||
       ExceedsTextureLimit(args.context, deviceBackdrop)) {
     return nullptr;
   }
@@ -482,20 +484,9 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     if (result == snapshots->styleResults.end()) {
       Matrix resultMatrix = Matrix::I();
       Rect resultRect = Rect::MakeEmpty();
-      auto* target = canvas->getSurface();
-      auto targetRect =
-          target != nullptr ? Rect::MakeWH(target->width(), target->height()) : Rect::MakeEmpty();
-      if (targetRect.isEmpty()) {
-        // Recording passes have no surface of their own; the region they are clipped to is the
-        // only thing bounding what they can draw.
-        auto clipBounds = GetClipBounds(canvas);
-        if (clipBounds.has_value() && !clipBounds->isEmpty()) {
-          targetRect = canvas->getMatrix().mapRect(*clipBounds);
-        }
-      }
       auto styleImage =
           RenderBackgroundStyleImage(args, style, source, bgImage, bgOffset, canvas->getMatrix(),
-                                     targetRect, &resultMatrix, &resultRect);
+                                     snapshots->backgroundBounds, &resultMatrix, &resultRect);
       if (styleImage != nullptr) {
         result = snapshots->styleResults
                      .emplace(key, BackgroundStyleResult{std::move(styleImage), canvas->getMatrix(),

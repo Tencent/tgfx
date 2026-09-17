@@ -127,6 +127,10 @@ struct BackgroundSnapshotMap {
   // rects), so rendering each background style once and blitting it is worth the extra texture.
   // Sub-consumers inherit it automatically because they share this map.
   bool shareStyleOutput = false;
+  // Device-space rect the background source covers: the region this frame renders, widened by the
+  // blur sampling outset. A style whose backdrop slice does not fit inside it is drawn per pass
+  // rather than rasterized into a texture of its own.
+  Rect backgroundBounds = Rect::MakeEmpty();
 };
 
 }  // namespace tgfx
