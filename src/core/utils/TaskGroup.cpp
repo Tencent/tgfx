@@ -84,6 +84,11 @@ void TaskPool::setMaxThreadCount(size_t maxThreadCount) {
   }
 }
 
+size_t TaskPool::maxThreadCount() {
+  std::lock_guard<std::mutex> lock(stateMutex);
+  return maxThreads;
+}
+
 void TaskPool::releaseThreads(bool exit) {
   std::lock_guard<std::mutex> lifecycleLock(lifecycleMutex);
   auto state = admission.fetch_or(CLOSED_BIT, std::memory_order_acq_rel);
@@ -110,7 +115,9 @@ void TaskPool::releaseThreads(bool exit) {
   }
   {
     std::lock_guard<std::mutex> lock(stateMutex);
-    DEBUG_ASSERT(liveThreads == 0 && busyThreads == 0 && waitingThreads == 0);
+    // Detached workers (handle-queue OOM fallback) are not joinable and may still be exiting
+    // here, so no thread-count assertion is made on this path.
+    DEBUG_ASSERT(phase == Phase::Closing || phase == Phase::Draining);
     for (auto& queue : priorityQueues) {
       if (exit) {
         std::shared_ptr<Task> task = nullptr;
@@ -131,14 +138,9 @@ void TaskPool::releaseThreads(bool exit) {
 void TaskPool::reopen() {
   std::lock_guard<std::mutex> lifecycleLock(lifecycleMutex);
   std::lock_guard<std::mutex> lock(stateMutex);
-  DEBUG_ASSERT(phase == Phase::Closed && liveThreads == 0);
+  DEBUG_ASSERT(phase == Phase::Closed);
   phase = Phase::Running;
   admission.store(0, std::memory_order_release);
-}
-
-size_t TaskPool::maxThreadCount() {
-  std::lock_guard<std::mutex> lock(stateMutex);
-  return maxThreads;
 }
 
 bool TaskPool::enterPush() {
@@ -184,8 +186,10 @@ void TaskPool::ensureStandbyLocked() {
 
 bool TaskPool::spawnWorkerLocked() {
   // Register the handle while holding stateMutex; a new worker must acquire it before doing any
-  // work. Allocation or enqueue failure returns false so the caller falls back to inline
-  // execution, matching the previous behavior.
+  // work. Allocation failure returns false so the caller falls back to inline execution. If the
+  // handle queue rejects the thread (OOM), the thread keeps running detached and exits when the
+  // pool closes; it just cannot be joined, so liveThreads may briefly stay above zero after the
+  // last join.
   auto thread = new (std::nothrow) std::thread(&TaskPool::runLoop, this);
   if (thread == nullptr) {
     return false;
@@ -278,8 +282,8 @@ TaskGroup* TaskGroup::GetInstance() {
   return &taskGroup;
 }
 
-// Forces all pending tasks to be finished when the app is exiting to prevent accessing wild
-// pointers.
+// Finishes in-flight tasks and drops queued ones when the app is exiting, so no task code runs
+// during static destruction.
 void OnAppExit() {
   TaskGroup::GetInstance()->releaseThreads(true);
 }
