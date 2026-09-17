@@ -28,13 +28,18 @@ namespace tgfx {
 class MetalDevice : public Device {
  public:
   /**
-   * Creates a new MetalDevice using the system default MTLDevice.
+   * Creates a MetalDevice using the system default MTLDevice. If a MetalDevice has already been
+   * created for the same MTLDevice and is still alive, the existing one is returned, so that
+   * multiple callers share the same GPU caches (command queue, shaders, and resources).
    */
   static std::shared_ptr<MetalDevice> Make();
 
   /**
-   * Creates a new MetalDevice from an existing MTLDevice. The device parameter is a pointer to an
-   * id<MTLDevice> object.
+   * Creates a MetalDevice from an existing MTLDevice. The device parameter is a pointer to an
+   * id<MTLDevice> object. If a MetalDevice has already been created from the same id<MTLDevice>
+   * and is still alive, the existing one is returned, so that multiple MetalDevices with the same
+   * MTLDevice share the same GPU caches (command queue, shaders, and resources). The caller keeps
+   * ownership of the MTLDevice and can release it right after this call returns.
    */
   static std::shared_ptr<MetalDevice> MakeFrom(void* device);
 

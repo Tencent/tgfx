@@ -17,11 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MetalDevice.h"
+#include <mutex>
+#include <unordered_map>
 #include "MetalCommandQueue.h"
 #include "MetalGPU.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
+
+static std::mutex deviceMapLocker = {};
+static std::unordered_map<void*, MetalDevice*> deviceMap = {};
 
 std::shared_ptr<MetalDevice> MetalDevice::Make() {
   @autoreleasepool {
@@ -36,6 +41,17 @@ std::shared_ptr<MetalDevice> MetalDevice::MakeFrom(void* metalDevice) {
   if (!metalDevice) {
     return nullptr;
   }
+  {
+    std::lock_guard<std::mutex> autoLock(deviceMapLocker);
+    auto result = deviceMap.find(metalDevice);
+    if (result != deviceMap.end()) {
+      auto device = result->second->weakThis.lock();
+      if (device != nullptr) {
+        return std::static_pointer_cast<MetalDevice>(device);
+      }
+      deviceMap.erase(result);
+    }
+  }
   @autoreleasepool {
     auto gpu = MetalGPU::Make((id<MTLDevice>)metalDevice);
     if (!gpu) {
@@ -43,6 +59,8 @@ std::shared_ptr<MetalDevice> MetalDevice::MakeFrom(void* metalDevice) {
     }
     auto device = std::shared_ptr<MetalDevice>(new MetalDevice(std::move(gpu)));
     device->weakThis = device;
+    std::lock_guard<std::mutex> autoLock(deviceMapLocker);
+    deviceMap[metalDevice] = device.get();
     return device;
   }
 }
@@ -52,6 +70,8 @@ MetalDevice::MetalDevice(std::unique_ptr<MetalGPU> gpu) : Device(std::move(gpu))
 
 MetalDevice::~MetalDevice() {
   static_cast<MetalGPU*>(_gpu)->releaseAll(true);
+  std::lock_guard<std::mutex> autoLock(deviceMapLocker);
+  deviceMap.erase(metalDevice());
 }
 
 void* MetalDevice::metalDevice() const {
