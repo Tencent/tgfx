@@ -1976,11 +1976,10 @@ TGFX_TEST(AOTRenderConsistencyTest, RetryRebuildKeepsTransparentBlackColorFilter
   auto* cache = context->precompiledShaderCache();
   // A DstOver mode filter is affectsTransparentBlack (transparent input falls back to the filter
   // color), which is the exact condition addDrawOp uses to merge the filter into the shader
-  // (ColorFilterShader) instead of appending it as a trailing processor. Note a matrix filter
-  // with an alpha-row bias would also qualify, but ValidateForFusion deliberately refuses to
-  // fuse such matrices (the bias breaks the source-alpha constraint), so its materialized
-  // offscreen fill has no precompiled service today — an existing coverage gap this test
-  // intentionally stays away from (documented in the audit report).
+  // (ColorFilterShader) instead of appending it as a trailing processor. A matrix filter with
+  // an alpha-row bias qualifies the same way and fuses like any other matrix — see
+  // AlphaBiasColorFilterOnBlendShaderMatchesRuntime, which locked that in after the historical
+  // ValidateForFusion rejection proved conservative.
   const Color filterColor = Color(0.5f, 0.0f, 0.0f, 0.5f);
   constexpr int size = 96;
   auto renderScene = [&](Bitmap* outBitmap) {
@@ -2106,6 +2105,147 @@ TGFX_TEST(AOTRenderConsistencyTest, RetryRebuildKeepsTransparentBlackColorFilter
   // The materialization path costs at most 1 LSB per materialized edge; a dropped filter is a
   // systematic ~64-level red shift (0.25 * 255). The bound separates the two unambiguously.
   EXPECT_LE(maxDiff, 4);
+}
+
+// The alpha-bias color-matrix coverage gap: a matrix whose alpha row carries a constant bias
+// (matrix[19] != 0) makes transparent-black input gain alpha (affectsTransparentBlack), so addDrawOp
+// merges it into the shader as a ColorFilterShader SrcIn wrap instead of a trailing processor. A
+// glow filter on a blend shader (gradient background over a transparent-edged sticker) is the
+// canonical shape: the transparent edge must end up with the bias-driven glow alpha, and the byte
+// comparison must hold over the transparent rim specifically — a dropped or re-ordered bias shows
+// up there as a massive alpha difference, not just in the opaque interior.
+TGFX_TEST(AOTRenderConsistencyTest, AlphaBiasColorFilterOnBlendShaderMatchesRuntime) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_NE(image, nullptr);
+  constexpr int size = 96;
+  // A transparent-rimmed sticker: the image drawn into the center of a larger transparent
+  // surface, so the rim pixels exercise the affectsTransparentBlack semantics.
+  auto stickerSurface = Surface::Make(context, size, size, false, 1, true);
+  ASSERT_NE(stickerSurface, nullptr);
+  {
+    ScopedAOTStatsPause pause(context, true);
+    auto* canvas = stickerSurface->getCanvas();
+    auto srcRect = Rect::MakeXYWH(0.0f, 0.0f, static_cast<float>(image->width()),
+                                  static_cast<float>(image->height()));
+    auto dstRect = Rect::MakeXYWH(16.0f, 16.0f, 64.0f, 64.0f);
+    canvas->drawImageRect(image, srcRect, dstRect);
+    context->flushAndSubmit(true);
+  }
+  auto sticker = stickerSurface->makeImageSnapshot();
+  ASSERT_NE(sticker, nullptr);
+  // The glow matrix: slight warm tint on the RGB rows, alpha row = [0, 0, 0, 0.5, 0.5] so the
+  // bias (matrix[19] = 0.5) lifts the transparent rim to half-visible while the opaque interior
+  // clamps to full alpha.
+  const std::array<float, 20> glowMatrix = {0.9f, 0.0f, 0.0f,  0.0f, 0.1f, 0.0f, 0.9f,
+                                            0.0f, 0.0f, 0.05f, 0.0f, 0.0f, 0.9f, 0.0f,
+                                            0.0f, 0.0f, 0.0f,  0.0f, 0.5f, 0.5f};
+  auto renderScene = [&](Bitmap* outBitmap) {
+    auto surface = Surface::Make(context, size, size);
+    ASSERT_NE(surface, nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::White());
+    auto bg = Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(size, size),
+                                         {Color(0, 1, 0, 0.6f), Color(0, 0, 1, 0.6f)});
+    auto stickerShader = Shader::MakeImageShader(sticker, TileMode::Clamp, TileMode::Clamp);
+    ASSERT_TRUE(bg != nullptr && stickerShader != nullptr);
+    Paint paint = {};
+    paint.setShader(Shader::MakeBlend(BlendMode::SrcOver, bg, stickerShader));
+    paint.setColorFilter(ColorFilter::Matrix(glowMatrix));
+    canvas->drawRect(Rect::MakeWH(size, size), paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(size, size));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+  };
+  Bitmap reference = {};
+  {
+    cache->unload();
+    ScopedAOTDeliberateMiss deliberate(context);
+    renderScene(&reference);
+  }
+  // Control: the same scene without the color filter. The transparent rim (source alpha 0.6 from
+  // the gradient, filter absent) must differ from the reference above, proving the filter — and
+  // with it the bias — is actually engaged in the reference path.
+  Bitmap noFilter = {};
+  {
+    cache->unload();
+    ScopedAOTDeliberateMiss deliberate(context);
+    auto surface = Surface::Make(context, size, size);
+    ASSERT_NE(surface, nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::White());
+    auto bg = Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(size, size),
+                                         {Color(0, 1, 0, 0.6f), Color(0, 0, 1, 0.6f)});
+    auto stickerShader = Shader::MakeImageShader(sticker, TileMode::Clamp, TileMode::Clamp);
+    ASSERT_TRUE(bg != nullptr && stickerShader != nullptr);
+    Paint paint = {};
+    paint.setShader(Shader::MakeBlend(BlendMode::SrcOver, bg, stickerShader));
+    canvas->drawRect(Rect::MakeWH(size, size), paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(noFilter.allocPixels(size, size));
+    auto* pixels = noFilter.lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(noFilter.info(), pixels));
+    noFilter.unlockPixels();
+    auto* nf = static_cast<const uint32_t*>(const_cast<Bitmap&>(noFilter).lockPixels());
+    auto* rf = static_cast<const uint32_t*>(const_cast<Bitmap&>(reference).lockPixels());
+    // The render target is cleared opaque white, so the alpha shows up in the premultiplied
+    // RGB instead of the alpha channel: the glow's bias lifts the rim's effective coverage and
+    // its RGB rows tint it, so a rim pixel must differ between the filtered and unfiltered
+    // renders (proving the filter — and with it the bias — is engaged in the reference path).
+    EXPECT_NE(nf[2 * size + 2], rf[2 * size + 2]);
+    const_cast<Bitmap&>(noFilter).unlockPixels();
+    const_cast<Bitmap&>(reference).unlockPixels();
+  }
+  Bitmap candidate = {};
+  uint64_t candidateNoMatch = 0;
+  uint64_t candidateBuilderCreations = 0;
+  {
+    auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+    ASSERT_NE(bundleData, nullptr);
+    ASSERT_GT(bundleBytes, 0u);
+    ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+    cache->setDecompositionEnabled(true);
+    cache->setDiagnosticRecordingEnabled(true);
+    cache->resetStats();
+    context->globalCache()->clearPrograms();
+    context->globalCache()->resetProgramStats();
+    renderScene(&candidate);
+    candidateNoMatch = cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule);
+    candidateBuilderCreations = context->globalCache()->programStats().programBuilderCreations;
+    cache->setDiagnosticRecordingEnabled(false);
+    cache->unload();
+  }
+  // The gap this test closes: the alpha-bias matrix must be served by the precompiled path (no
+  // JIT programs, no unmatched rules), not silently fall back to the runtime builder.
+  EXPECT_EQ(candidateBuilderCreations, 0u);
+  EXPECT_EQ(candidateNoMatch, 0u);
+  // The planned path materializes the blend operands before the chain serves the tree, and each
+  // materialized edge costs at most 1 LSB; the historical worry — the fusion silently dropping
+  // the source-alpha constraint — would show up as a systematic alpha/coverage difference orders
+  // of magnitude above this bound, so the bound separates the two unambiguously.
+  auto* refPixels = static_cast<const uint8_t*>(const_cast<Bitmap&>(reference).lockPixels());
+  auto* candPixels = static_cast<uint8_t*>(candidate.lockPixels());
+  ASSERT_TRUE(refPixels != nullptr && candPixels != nullptr);
+  size_t totalBytes = static_cast<size_t>(size) * static_cast<size_t>(size) * 4;
+  int maxDiff = 0;
+  size_t diffCount = 0;
+  for (size_t i = 0; i < totalBytes; ++i) {
+    int value = std::abs(static_cast<int>(refPixels[i]) - static_cast<int>(candPixels[i]));
+    if (value > 0) {
+      ++diffCount;
+    }
+    maxDiff = std::max(maxDiff, value);
+  }
+  const_cast<Bitmap&>(reference).unlockPixels();
+  candidate.unlockPixels();
+  EXPECT_LE(maxDiff, 4) << "diffBytes=" << diffCount << "/" << totalBytes;
 }
 
 // P4 retry semantics, risk two: coverage retention. A draw carrying a shader mask filter keeps
