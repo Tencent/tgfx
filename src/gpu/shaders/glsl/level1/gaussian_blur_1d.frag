@@ -44,6 +44,12 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Clamp;
   vec2 Dimension;
   int TiledChild;
+  // 1 when the child texture is alpha-only: every tap's raw sample (R8 reads back (r,0,0,1) on
+  // GL, (r,0,0,1) on Metal) is splatted .rrrr, mirroring the runtime's
+  // Swizzle::ForRead(ALPHA_8) readback so the alpha channel carries the mask value.
+  int AlphaChild;
+  // 1 when the render target is alpha-only (AAAA write swizzle); applied to fragColor at output.
+  int OutputAlphaSwizzle;
 #include "coverage_uniforms.inc"
 #include "xp_uniforms.inc"
 };
@@ -148,6 +154,12 @@ void main() {
       sampleCoord = clamp(sampleCoord, Subset.xy, Subset.zw);
       texColor = texture(TextureSampler_0, sampleCoord);
     }
+    if (AlphaChild != 0) {
+      // The runtime child readback samples with Swizzle::ForRead(ALPHA_8) = .rrrr, so an
+      // alpha-only tap carries the mask value in every channel; the raw (r,0,0,1) readback
+      // would leave the alpha channel constant 1.
+      texColor = texColor.rrrr;
+    }
     sum += texColor * weight;
 
     if (i == radius) {
@@ -161,4 +173,5 @@ void main() {
 #define TGFX_COVERAGE_SRC_COLOR blurResult
 #include "coverage_output.inc"
 #include "xp_output.inc"
+#include "output_swizzle.inc"
 }

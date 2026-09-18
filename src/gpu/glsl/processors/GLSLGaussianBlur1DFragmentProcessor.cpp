@@ -21,6 +21,8 @@
 #include <cmath>
 #include <string>
 #include <string_view>
+#include "gpu/processors/TextureEffect.h"
+#include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
 
@@ -134,5 +136,15 @@ void GLSLGaussianBlur1DFragmentProcessor::onSetData(UniformData* /*vertexUniform
   fragmentUniformData->setDataOptional("HasDeviceMask", 0);
   fragmentUniformData->setDataOptional("TiledChild",
                                        processor->name() == "TiledTextureEffect" ? 1 : 0);
+  // Alpha-only child flag: the kernel splats each tap's sample .rrrr, mirroring the runtime's
+  // Swizzle::ForRead(ALPHA_8) readback. ProgramBuilder layouts do not declare this field, hence
+  // the optional write; the precompiled layout receives the actual value on every draw.
+  bool alphaChild = false;
+  if (processor->name() == "TextureEffect") {
+    alphaChild = static_cast<const TextureEffect*>(processor)->isAlphaOnly();
+  } else if (processor->name() == "TiledTextureEffect") {
+    alphaChild = static_cast<const TiledTextureEffect*>(processor)->isAlphaOnly();
+  }
+  fragmentUniformData->setDataOptional("AlphaChild", alphaChild ? 1 : 0);
 }
 }  // namespace tgfx

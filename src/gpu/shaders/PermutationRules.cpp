@@ -1094,9 +1094,11 @@ std::optional<RuleComposedValues> ComposePointwiseChain(const PointwiseChainInpu
     default:
       return std::nullopt;
   }
-  // Coverage subtrees draw their unit input from the GP coverage, which only the rect layouts
-  // supply (the ellipse layout's coverage is evaluated per-pixel at the end).
-  if (inputs.hasCoverageSubtree && gpLayout != 0) {
+  // Coverage subtrees draw their unit input from the GP coverage. The rect layouts supply it as
+  // the vCoverage varying; the ellipse layout evaluates its per-pixel edge coverage ahead of the
+  // chain in the kernel (ellipseGpCoverage), so both rect and ellipse layouts carry subtrees.
+  // The remaining non-rect layouts (mesh, atlas) supply neither and stay rejected.
+  if (inputs.hasCoverageSubtree && gpLayout > 1) {
     return std::nullopt;
   }
   // Four-leaf variants apply the mask through a runtime uniform, so the compile-time mask

@@ -1693,8 +1693,10 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
     return std::nullopt;
   }
   if (outputSwizzle == Swizzle::AAAA()) {
-    // Alpha-only targets: only the fill kernels that apply the write swizzle at output (via the
-    // OutputAlphaSwizzle uniform) may serve the draw. Other kernels assume RGBA output.
+    // Alpha-only targets: only the kernels that apply the write swizzle at output (via the
+    // OutputAlphaSwizzle uniform) may serve the draw. Other kernels assume RGBA output. The
+    // gaussian blur kernel applies it too (an alpha-only blur pass writes its mask accumulation
+    // through the AAAA swizzle), with the AlphaChild flag carrying the .rrrr readback.
     if (auto result = TryMatchSolidColorFill(programInfo)) {
       return result;
     }
@@ -1702,6 +1704,9 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
       return result;
     }
     if (auto result = TryMatchQuadTextureFill(programInfo)) {
+      return result;
+    }
+    if (auto result = TryMatchGaussianBlur1D(programInfo)) {
       return result;
     }
     return std::nullopt;

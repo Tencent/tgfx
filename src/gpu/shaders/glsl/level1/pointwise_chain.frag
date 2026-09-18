@@ -259,6 +259,11 @@ vec4 chainResults[16];
 // of evalChainSlot reads them back by instruction index.
 vec4 chainLeafTex[4];
 
+// The ellipse layout's per-pixel edge coverage (GP_LAYOUT=1). Computed ahead of the chain
+// evaluation in main so the coverage subtree's unit input can consume it like the rect
+// layouts' vCoverage varying; 1.0 keeps the define valid for every other variant.
+highp float ellipseGpCoverage = 1.0;
+
 // Geometry color source: the unconditional inColor attribute on QuadGP (broadcast for
 // common-color draws), the Color uniform otherwise.
 #if HAS_COLOR
@@ -268,10 +273,13 @@ vec4 chainLeafTex[4];
 #endif
 
 // The coverage subtree's unit input (slot designator -3): the GP's output coverage, which is
-// what the runtime coverage chain starts from. Only GP_LAYOUT=0 chains carry coverage subtrees
-// (matcher-enforced); the vec4(1.0) form keeps the define valid for every other variant.
+// what the runtime coverage chain starts from. The rect layouts carry it as the vCoverage
+// varying; the ellipse layout evaluates its per-pixel edge coverage ahead of the chain (see
+// ellipseGpCoverage). The vec4(1.0) form keeps the define valid for the remaining variants.
 #if GP_LAYOUT == 0 && HAS_COVERAGE
 #define TGFX_CHAIN_UNIT_COVERAGE vec4(vCoverage)
+#elif GP_LAYOUT == 1
+#define TGFX_CHAIN_UNIT_COVERAGE vec4(ellipseGpCoverage)
 #else
 #define TGFX_CHAIN_UNIT_COVERAGE vec4(1.0)
 #endif
@@ -279,6 +287,13 @@ vec4 chainLeafTex[4];
 #include "pointwise_chain_eval.inc"
 
 void main() {
+#if GP_LAYOUT == 1
+  // The ellipse edge coverage depends only on varyings, so it is evaluated ahead of the chain:
+  // a coverage subtree's unit input consumes it (the -3 designator), and the tail below folds it
+  // into the final coverage exactly once (the subtree already carries it, so the coverage-root
+  // path must not multiply it in again).
+  ellipseGpCoverage = ellipseEdgeCoverage(vEllipseOffsets, vEllipseRadii, StrokeEnabled);
+#endif
   // Active slots are contiguous from 0 by construction (texture leaves first, then the rest in
   // topological order, root last), so a uniform guard skips the whole evaluation of unused slots —
   // including the Packed read — instead of relying on the OP_NONE early-out alone.
@@ -334,12 +349,16 @@ void main() {
 #endif
 
 #if GP_LAYOUT == 1
-  // Ellipse edge AA, computed per pixel from the ellipse varyings (verbatim shared math).
-  highp float gpCoverage = ellipseEdgeCoverage(vEllipseOffsets, vEllipseRadii, StrokeEnabled);
-  deviceMask *= gpCoverage;
-#define TGFX_XP_SRC_COLOR (result * vec4(deviceMask))
+  // Ellipse edge AA: the per-pixel coverage was evaluated ahead of the chain (ellipseGpCoverage).
+  // A coverage subtree's root already carries it (its unit input is it), so the root path folds
+  // in only the device mask; the bare path multiplies the whole edge coverage once.
+  highp vec4 ellipseFinalCoverage = vec4(deviceMask * ellipseGpCoverage);
+  if (CoverageRootIndex >= 0) {
+    ellipseFinalCoverage = chainResults[CoverageRootIndex] * vec4(deviceMask);
+  }
+#define TGFX_XP_SRC_COLOR (result * ellipseFinalCoverage)
 #define TGFX_XP_SRC_UNPREMUL result
-#define TGFX_XP_COVERAGE vec4(deviceMask)
+#define TGFX_XP_COVERAGE ellipseFinalCoverage
 #elif HAS_COVERAGE
   // A coverage subtree's root already carries the GP coverage (fed in through the -3 unit
   // input), so it replaces the plain vCoverage modulation instead of doubling it.

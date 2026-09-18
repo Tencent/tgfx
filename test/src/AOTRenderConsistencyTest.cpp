@@ -5011,14 +5011,10 @@ TGFX_TEST(AOTRenderConsistencyTest, MaskCoverageBlendModesOnOpaqueBackground) {
 }
 
 // Counterexample audit B3, remaining combination: the GP's own fractional AA coverage and a
-// shader mask coexisting on one draw. RULING: explicitly unsupported by the chain kernel
-// (PermutationRules.cpp rejects coverage subtrees on non-rect GP layouts — the subtree's unit
-// input is the GP coverage varying, which the ellipse layout evaluates per-pixel at the end and
-// cannot feed as a chain origin). The draw falls back to the runtime stitching route: this test
-// records that boundary — the fallback must produce exactly one runtime program (no silent
-// partial-chain attempt) and stay pixel-identical to the reference (trivially so, both renders
-// share the route; the value is the recorded counts plus the regression tripwire if the
-// constraint is ever lifted without a kernel that honors it).
+// shader mask coexisting on one draw. The ellipse layout's per-pixel edge coverage is evaluated
+// ahead of the chain and feeds the coverage subtree's unit input, so the blend-rooted subtree
+// (the mask shader) rides the chain with the GP coverage folded in at the unit — the draw must
+// take the precompiled route with no fallback and stay byte-identical to the runtime reference.
 TGFX_TEST(AOTRenderConsistencyTest, GPCoverageAndMaskCoexistOnAAEdge) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -5062,10 +5058,10 @@ TGFX_TEST(AOTRenderConsistencyTest, GPCoverageAndMaskCoexistOnAAEdge) {
     cache->resetStats();
     context->globalCache()->resetProgramStats();
     renderScene(&candidate);
-    // The recorded boundary: the ellipse GP + blend-rooted coverage subtree is rejected by the
-    // admission layer and served by exactly one runtime-stitched program.
-    EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 1u);
-    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 1u);
+    // The ellipse GP + blend-rooted coverage subtree rides the precompiled chain: no fallback,
+    // no runtime program build.
+    EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
     cache->setDiagnosticRecordingEnabled(false);
     cache->unload();
     context->globalCache()->clearPrograms();
@@ -5345,14 +5341,12 @@ TGFX_TEST(AOTRenderConsistencyTest, DifferentLeafCountsShareVariant) {
 }
 
 // Counterexample audit E1: blurring an alpha-only source through the real ImageFilter path.
-// RULING: explicitly unsupported by the precompiled set. The blur pipeline materializes the
-// alpha-only source into an ALPHA_8 intermediate (Swizzle=aaaa, Format=1 — verified via the miss
-// pipeline signature) and the GaussianBlur1D(TiledTextureEffect) draw is rejected by the alpha-only
-// tiled-texture admission (PermutationMatcher), so the blur pass itself runs on the runtime
-// stitching route. The composite end (tinted draw of the blurred mask) is served by the AOT set.
-// This records the boundary: exactly one NoMatchingRule + one runtime program for the blur pass,
-// pixel-identical output. Lifting it needs kernel-side alpha-only support in the blur shader
-// (alpha-channel accumulation and the aaaa output swizzle), not just an admission change.
+// The blur pipeline materializes the alpha-only source into an ALPHA_8 intermediate
+// (Swizzle=aaaa) and draws GaussianBlur1D(TiledTextureEffect) onto it. The kernel carries the
+// alpha-only child semantics (the AlphaChild splat mirrors the runtime's
+// Swizzle::ForRead(ALPHA_8)=.rrrr readback) and the AAAA write swizzle (OutputAlphaSwizzle),
+// so the blur pass rides the precompiled GaussianBlur1DShader with no fallback. The composite
+// end (tinted draw of the blurred mask) is served by the AOT set as before.
 TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyImageBlurMatchesRuntime) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -5415,10 +5409,10 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyImageBlurMatchesRuntime) {
       context->globalCache()->resetProgramStats();
       renderScene(&candidate, tint);
       auto stats = context->globalCache()->programStats();
-      // The recorded boundary: the alpha-only blur pass takes the runtime route (one miss, one
-      // runtime program) while the composite draws hit the precompiled set.
-      EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 1u);
-      EXPECT_EQ(stats.programBuilderCreations, 1u);
+      // The alpha-only blur pass now rides the precompiled kernel: no miss, no runtime program,
+      // and the composite draws hit the precompiled set.
+      EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+      EXPECT_EQ(stats.programBuilderCreations, 0u);
       EXPECT_GE(stats.precompiledArtifactCreations, 1u);
       cache->setDiagnosticRecordingEnabled(false);
       cache->unload();
