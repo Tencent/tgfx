@@ -110,10 +110,10 @@ bool ComputeSubGeometry(BackgroundSource* parentSource, const Rect& localBounds,
   return true;
 }
 
-// Returns the style-space visible region for a layer, or null when the capture pass could not
-// determine one.
-const Rect* GetVisibleStyle(BackgroundSnapshotMap* snapshots, Layer* layer) {
-  auto it = snapshots->styleVisibleBounds.find(layer);
+// Returns the style-space visible region for a (layer, style) pair, or null when the capture
+// pass could not determine one.
+const Rect* GetVisibleStyle(BackgroundSnapshotMap* snapshots, Layer* layer, LayerStyle* style) {
+  auto it = snapshots->styleVisibleBounds.find(BackgroundSnapshotKey{layer, style});
   return it != snapshots->styleVisibleBounds.end() ? &it->second : nullptr;
 }
 
@@ -261,17 +261,18 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   if (!localToWorld.invert(&worldToLocal)) {
     return;
   }
-  // Precompute the visible region in style space for the consumer. The style space is the
-  // layer's own, shared by every pass in the frame, so one rect per layer bounds the
-  // recorded style output for all of them.
-  if (args.renderRects != nullptr && !args.renderRects->empty() && source->groups[0] != nullptr) {
+  // Precompute the visible region in style space for the consumer. The style space is defined
+  // by the style's excludeChildEffects bucket, shared by every pass in the frame, so one rect
+  // per (layer, style) pair bounds the recorded style output for all of them.
+  auto* visibleGroup = source->groups[static_cast<int>(style->excludeChildEffects())].get();
+  if (args.renderRects != nullptr && !args.renderRects->empty() && visibleGroup != nullptr) {
     Rect visibleWorld = Rect::MakeEmpty();
     for (const auto& renderRect : *args.renderRects) {
       visibleWorld.join(renderRect);
     }
     auto visibleLocal = worldToLocal.mapRect(visibleWorld);
-    auto& contentOffset = source->groups[0]->content.offset;
-    snapshots->styleVisibleBounds[layer] =
+    auto& contentOffset = visibleGroup->content.offset;
+    snapshots->styleVisibleBounds[BackgroundSnapshotKey{layer, style}] =
         Rect::MakeXYWH(visibleLocal.left * contentScale - contentOffset.x,
                        visibleLocal.top * contentScale - contentOffset.y,
                        visibleLocal.width() * contentScale, visibleLocal.height() * contentScale);
@@ -434,7 +435,8 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     BackgroundSnapshotKey key{layer, style};
     auto output = snapshots->styleOutputs.find(key);
     if (output == snapshots->styleOutputs.end()) {
-      auto picture = RecordStyleOutput(style, styleInput, alpha, GetVisibleStyle(snapshots, layer));
+      auto picture =
+          RecordStyleOutput(style, styleInput, alpha, GetVisibleStyle(snapshots, layer, style));
       if (picture != nullptr) {
         auto shapeRect = Rect::MakeWH(static_cast<float>(contentEntry.image->width()),
                                       static_cast<float>(contentEntry.image->height()));
