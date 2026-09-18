@@ -50,8 +50,7 @@ void SubtreeCache::addCache(Context* context, int longEdge,
   cacheEntries[sizeUniqueKey] = CacheEntry{imageMatrix, colorSpace, contentScale};
 }
 
-const SubtreeCache::CacheEntry* SubtreeCache::getValidEntry(Context* context,
-                                                            int longEdge) const {
+const SubtreeCache::CacheEntry* SubtreeCache::getValidEntry(Context* context, int longEdge) const {
   if (context == nullptr) {
     return nullptr;
   }

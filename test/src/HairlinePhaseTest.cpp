@@ -24,10 +24,10 @@
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/VectorLayer.h"
-#include "tgfx/layers/vectors/SolidColor.h"
-#include "tgfx/layers/vectors/VectorGroup.h"
 #include "tgfx/layers/vectors/ShapePath.h"
+#include "tgfx/layers/vectors/SolidColor.h"
 #include "tgfx/layers/vectors/StrokeStyle.h"
+#include "tgfx/layers/vectors/VectorGroup.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
@@ -318,9 +318,7 @@ TGFX_TEST(HairlinePhaseTest, SubtreeCacheScaleDrift) {
     bitmap.unlockPixels();
     return bitmap;
   };
-  auto inkOf = [&](const Bitmap& bitmap, float zoomScale) {
-    return measureInk(bitmap, zoomScale);
-  };
+  auto inkOf = [&](const Bitmap& bitmap, float zoomScale) { return measureInk(bitmap, zoomScale); };
 
   // Render a few frames at 0.8 to bake the subtree cache, then zoom within the same mip
   // bucket and let the refinement settle. The settled ink must track the actual zoom.
@@ -328,8 +326,8 @@ TGFX_TEST(HairlinePhaseTest, SubtreeCacheScaleDrift) {
     renderAt(0.8f);
   }
   auto inkAt08 = inkOf(renderAt(0.8f), 0.8f);
-  TGFX_PRIVATE_ACCESS(printf("[HairlinePhaseTest] lineLayer subtreeCache=%d\n",
-                             layer->subtreeCache != nullptr);)
+  TGFX_PRIVATE_ACCESS(
+      printf("[HairlinePhaseTest] lineLayer subtreeCache=%d\n", layer->subtreeCache != nullptr);)
   auto settledBitmap = renderAt(0.5f);
   for (int i = 0; i < 6; ++i) {
     settledBitmap = renderAt(0.5f);
@@ -356,7 +354,8 @@ TGFX_TEST(HairlinePhaseTest, SubtreeCacheScaleDrift) {
   freshLayer->setContents({freshGroup});
   freshLayer->setMatrix(Matrix::MakeTrans(50.0f, 40.0f));
   freshLayer->setPassThroughBackground(false);
-  freshList->root()->addChild(freshLayer);  float freshInk = 0.0f;
+  freshList->root()->addChild(freshLayer);
+  float freshInk = 0.0f;
   float freshPeak = 0.0f;
   float directInk08 = 0.0f;
   {
@@ -383,9 +382,10 @@ TGFX_TEST(HairlinePhaseTest, SubtreeCacheScaleDrift) {
       directInk08 = measureInk(bitmap, 0.8f);
     }
   }
-  printf("[HairlinePhaseTest] subtreeCache ink@0.8=%.4f direct@0.8=%.4f settled@0.5=%.4f "
-         "fresh@0.5=%.4f settledPeak=%.4f freshPeak=%.4f\n",
-         inkAt08, directInk08, inkAt05, freshInk, peakAt05, freshPeak);
+  printf(
+      "[HairlinePhaseTest] subtreeCache ink@0.8=%.4f direct@0.8=%.4f settled@0.5=%.4f "
+      "fresh@0.5=%.4f settledPeak=%.4f freshPeak=%.4f\n",
+      inkAt08, directInk08, inkAt05, freshInk, peakAt05, freshPeak);
   // The settled cached-render must match a cache-free direct render at the same zoom, both in
   // total ink and peak-row sharpness.
   EXPECT_NEAR(inkAt05, freshInk, freshInk * 0.2f + 0.1f);
