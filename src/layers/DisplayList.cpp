@@ -349,7 +349,7 @@ std::vector<Rect> DisplayList::renderDirect(Surface* surface, bool autoClear) co
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
   std::unique_ptr<BackgroundSnapshotMap> snapshotMap = nullptr;
   if (_root->hasBackgroundStyle()) {
-    snapshotMap = captureBackgrounds(surface, {surfaceRect}, false);
+    snapshotMap = captureBackgrounds(surface, {surfaceRect});
   }
   drawRootLayer(surface, surfaceRect, getViewMatrix(), autoClear, snapshotMap.get());
   return {Rect::MakeEmpty()};
@@ -410,7 +410,7 @@ std::vector<Rect> DisplayList::renderPartial(Surface* surface, bool autoClear,
   // gaps between scattered dirty regions get skipped.
   std::unique_ptr<BackgroundSnapshotMap> snapshotMap = nullptr;
   if (_root->hasBackgroundStyle()) {
-    snapshotMap = captureBackgrounds(surface, renderRects, renderRects.size() > 1);
+    snapshotMap = captureBackgrounds(surface, renderRects);
   }
   auto canvas = surface->getCanvas();
   for (auto& drawRect : renderRects) {
@@ -456,7 +456,7 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
       captureRect.offset(_contentOffset.x, _contentOffset.y);
       captureRects.push_back(captureRect);
     }
-    snapshotMap = captureBackgrounds(surface, captureRects, tileTasks.size() > 1);
+    snapshotMap = captureBackgrounds(surface, captureRects);
   }
   std::vector<Rect> dirtyRects = {};
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
@@ -1171,13 +1171,14 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   // background-sourced styles, snapshots is null and we fall back to NoOp, which makes
   // background-sourced styles (if any show up unexpectedly) silently no-op — matching the
   // contour / 3D subtree semantics.
-  BackgroundConsumer consumer(snapshots);
+  BackgroundConsumer consumer(
+      snapshots, snapshots != nullptr && _backgroundColor.isOpaque() && snapshots->multiPass);
   args.backgroundHandler = snapshots ? &consumer : BackgroundHandler::NoOp();
   _root->drawLayer(args, surface->getCanvas(), 1.0f, BlendMode::SrcOver);
 }
 
 std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
-    Surface* surface, const std::vector<Rect>& renderRects, bool shareStyleOutput) const {
+    Surface* surface, const std::vector<Rect>& renderRects) const {
   DEBUG_ASSERT(surface != nullptr);
   if (!_root->hasBackgroundStyle()) {
     return nullptr;
@@ -1224,7 +1225,10 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
     return nullptr;
   }
   auto snapshotMap = std::make_unique<BackgroundSnapshotMap>();
-  snapshotMap->shareStyleOutput = shareStyleOutput;
+  snapshotMap->multiPass = renderRects.size() > 1;
+  // SrcOver compositing of the shared style output matches the style's own Src draw only over
+  // an opaque backdrop, so sharing is enabled only when the background color is fully opaque.
+
   // Draw backgroundColor before the layer tree so that the capture pass includes it as part of
   // the background for blur/backdrop effects.
   if (_backgroundColor != Color::Transparent()) {

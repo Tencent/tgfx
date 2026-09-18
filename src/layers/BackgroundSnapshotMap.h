@@ -69,25 +69,6 @@ struct BackgroundSnapshotKeyHash {
 };
 
 /**
- * The rendered output of one background-sourced LayerStyle, cached for the duration of a frame so
- * every consume pass blits it instead of re-running the style. drawMatrix is concated on the
- * consume canvas before drawImage(image, 0, 0); it maps the device-space image back onto the
- * canvas, collapsing to a pure integer translation whenever a pass shares the recording pass's
- * scale.
- */
-struct BackgroundStyleResult {
-  std::shared_ptr<Image> image = nullptr;
-  // The matrix the image was rasterized with. A pass may only blit the image when its own matrix
-  // differs from this one by a whole number of device pixels.
-  Matrix recordMatrix = Matrix::I();
-  Matrix drawMatrix = Matrix::I();
-  // The backdrop slice rect inside the image, fractional wherever the image bounds had to be
-  // rounded out. The blit is clipped to it so the rounded-out margin is not stamped over the
-  // destination.
-  Rect contentRect = Rect::MakeEmpty();
-};
-
-/**
  * Carries background snapshots from the capture pass to the consume pass. Each (Layer, LayerStyle)
  * key maps to a vector (not a single entry), since the same pair can be dispatched more than once
  * within one render — e.g. a BackgroundBlur layer that gets split into multiple fragments by a
@@ -117,16 +98,19 @@ struct BackgroundSnapshotMap {
                      BackgroundSnapshotKeyHash>
       snapshots = {};
   std::unordered_map<Layer*, std::unique_ptr<LayerStyleSource>> layerStyleSources = {};
-  // Rendered background styles, filled on the first consume pass that needs one and reused by
-  // every later pass. Rendering happens in the consume pass rather than during capture because
-  // only the consume canvas carries the final device transform, scale included, that the style
-  // has to be rasterized at.
-  std::unordered_map<BackgroundSnapshotKey, BackgroundStyleResult, BackgroundSnapshotKeyHash>
-      styleResults = {};
-  // Set when one capture pass serves several consume passes (tiled rendering, multiple dirty
-  // rects), so rendering each background style once and blitting it is worth the extra texture.
-  // Sub-consumers inherit it automatically because they share this map.
-  bool shareStyleOutput = false;
+  // True when this frame renders through multiple passes (tiles or dirty rects), which is
+  // when caching the style output pays for its rasterization.
+  bool multiPass = false;
+  // Style-space visible region per layer, computed during capture. The style space is defined
+  // by the layer's own transform, which every pass in a frame shares, so one rect per layer
+  // bounds the recorded style output for all passes.
+  std::unordered_map<Layer*, Rect> styleVisibleBounds = {};
+  struct StyleOutput {
+    std::shared_ptr<Image> image = nullptr;
+    Matrix drawMatrix = Matrix::I();
+  };
+  std::unordered_map<BackgroundSnapshotKey, StyleOutput, BackgroundSnapshotKeyHash> styleOutputs =
+      {};
 };
 
 }  // namespace tgfx

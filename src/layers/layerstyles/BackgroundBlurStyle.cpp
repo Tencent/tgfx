@@ -98,7 +98,6 @@ void BackgroundBlurStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, f
     }
     imageRect.roundOut();
   }
-
   auto subsetImage = bgImage->makeSubset(imageRect);
   if (subsetImage == nullptr) {
     subsetImage = bgImage;

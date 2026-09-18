@@ -24,9 +24,7 @@
 #include "layers/DrawArgs.h"
 #include "layers/LayerStyleSource.h"
 #include "tgfx/core/Image.h"
-#include "tgfx/core/MaskFilter.h"
 #include "tgfx/core/PictureRecorder.h"
-#include "tgfx/core/Shader.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/layerstyles/LayerStyle.h"
@@ -112,32 +110,56 @@ bool ComputeSubGeometry(BackgroundSource* parentSource, const Rect& localBounds,
   return true;
 }
 
-// Returns true when the matrix is affine rather than projective. A 3D subtree flattens into a
-// matrix with a perspective row, and mapping the rendered rects back through its inverse does not
-// bound the layer's visible area reliably, so anything derived from that mapping is skipped.
-bool IsAffineTransform(const Matrix& matrix) {
-  return FloatNearlyZero(matrix.getPerspX()) && FloatNearlyZero(matrix.getPerspY());
+// Returns the style-space visible region for a layer, or null when the capture pass could not
+// determine one.
+const Rect* GetVisibleStyle(BackgroundSnapshotMap* snapshots, Layer* layer) {
+  auto it = snapshots->styleVisibleBounds.find(layer);
+  return it != snapshots->styleVisibleBounds.end() ? &it->second : nullptr;
 }
 
-// Returns true when a device-space rect is too large to back with a single GPU texture. Such a
-// render target never gets allocated, so a draw that needs one is dropped silently and the style
-// simply stops showing up.
-bool ExceedsTextureLimit(Context* context, const Rect& bounds) {
-  if (context == nullptr || context->gpu() == nullptr) {
-    return false;
+// Records the style's output in style space, clipped to the visible region. The picture carries
+// no device transform, so replaying it on any style-space canvas lands the style exactly where
+// it drew. A null visibleStyle skips the clip.
+std::shared_ptr<Picture> RecordStyleOutput(LayerStyle* style, const LayerStyleInput& styleInput,
+                                           float alpha, const Rect* visibleStyle) {
+  PictureRecorder recorder = {};
+  auto* recording = recorder.beginRecording();
+  if (visibleStyle != nullptr) {
+    recording->clipRect(*visibleStyle);
   }
-  auto limit = static_cast<float>(context->gpu()->limits()->maxTextureDimension2D);
-  return bounds.width() > limit || bounds.height() > limit;
+  style->draw(recording, styleInput, alpha);
+  return recorder.finishRecordingAsPicture();
 }
 
-// Returns true when the matrix is a translation by a whole number of pixels.
-bool IsWholePixelTranslation(const Matrix& matrix) {
-  if (!matrix.isTranslate()) {
-    return false;
+// Rasterizes a style-space picture at device resolution and stores it in the frame's style
+// output cache, so later passes composite one texture with SrcOver instead of re-running the
+// style.
+void CacheStyleOutput(BackgroundSnapshotMap* snapshots, Layer* layer, LayerStyle* style,
+                      const std::shared_ptr<Picture>& picture, const Matrix& recordMatrix,
+                      const Rect& shapeRect, std::shared_ptr<ColorSpace> dstColorSpace) {
+  PictureRecorder deviceRecorder = {};
+  auto* deviceRecording = deviceRecorder.beginRecording();
+  deviceRecording->concat(recordMatrix);
+  deviceRecording->drawPicture(picture);
+  auto devicePicture = deviceRecorder.finishRecordingAsPicture();
+  if (devicePicture == nullptr) {
+    return;
   }
-  auto remainderX = fabsf(matrix.getTranslateX() - roundf(matrix.getTranslateX()));
-  auto remainderY = fabsf(matrix.getTranslateY() - roundf(matrix.getTranslateY()));
-  return remainderX < 0.01f && remainderY < 0.01f;
+  auto deviceShape = recordMatrix.mapRect(shapeRect);
+  deviceShape.roundOut();
+  if (deviceShape.isEmpty()) {
+    return;
+  }
+  Point imageOffset = {};
+  auto image =
+      ToImageWithOffset(std::move(devicePicture), &imageOffset, &deviceShape, dstColorSpace);
+  Matrix drawMatrix = Matrix::I();
+  if (image == nullptr || !recordMatrix.invert(&drawMatrix)) {
+    return;
+  }
+  drawMatrix.preTranslate(imageOffset.x, imageOffset.y);
+  snapshots->styleOutputs[BackgroundSnapshotKey{layer, style}] = {image->makeRasterized(),
+                                                                  drawMatrix};
 }
 
 }  // namespace
@@ -228,6 +250,9 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     return;
   }
   auto layerBounds = layer->getBounds();
+  auto bounds = layerBounds;
+  bounds.scale(contentScale, contentScale);
+  bounds.roundOut();
   // Use the runtime canvas chain (capture canvas matrix · bgSource->surfaceToWorldMatrix) so
   // capture and consume share the same frame of reference. Do NOT use getGlobalMatrix(): it walks
   // the static layer tree with per-step z-flattening and diverges from the runtime concat chain
@@ -236,26 +261,21 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   if (!localToWorld.invert(&worldToLocal)) {
     return;
   }
-  // Crop the backdrop to the region this frame puts on screen. Only the shared style output needs
-  // this: it rasterizes the whole slice into one texture, which at high zoom is far larger than the
-  // screen and fails to allocate, silently dropping the style. Passes that draw the style directly
-  // only ever rasterize their own clip, so cropping their backdrop would just cut away pixels the
-  // blur has to sample. The rects are already widened by the blur sampling outset upstream, and the
-  // mapping back into layer space is only reliable while the transform is affine.
-  if (snapshots != nullptr && snapshots->shareStyleOutput && args.renderRects != nullptr &&
-      !args.renderRects->empty() && IsAffineTransform(localToWorld)) {
-    Rect visibleBounds = Rect::MakeEmpty();
+  // Precompute the visible region in style space for the consumer. The style space is the
+  // layer's own, shared by every pass in the frame, so one rect per layer bounds the
+  // recorded style output for all of them.
+  if (args.renderRects != nullptr && !args.renderRects->empty() && source->groups[0] != nullptr) {
+    Rect visibleWorld = Rect::MakeEmpty();
     for (const auto& renderRect : *args.renderRects) {
-      visibleBounds.join(worldToLocal.mapRect(renderRect));
+      visibleWorld.join(renderRect);
     }
-    auto croppedBounds = layerBounds;
-    if (croppedBounds.intersect(visibleBounds)) {
-      layerBounds = croppedBounds;
-    }
+    auto visibleLocal = worldToLocal.mapRect(visibleWorld);
+    auto& contentOffset = source->groups[0]->content.offset;
+    snapshots->styleVisibleBounds[layer] =
+        Rect::MakeXYWH((visibleLocal.left - contentOffset.x) * contentScale,
+                       (visibleLocal.top - contentOffset.y) * contentScale,
+                       visibleLocal.width() * contentScale, visibleLocal.height() * contentScale);
   }
-  auto bounds = layerBounds;
-  bounds.scale(contentScale, contentScale);
-  bounds.roundOut();
   auto bgImage = bgSource->getBackgroundImage();
   if (bgImage == nullptr) {
     return;
@@ -343,105 +363,6 @@ const LayerStyleSource* BackgroundConsumer::getCachedLayerStyleSource(Layer* lay
   return it->second.get();
 }
 
-namespace {
-
-std::shared_ptr<Image> RenderBackgroundStyleImage(const DrawArgs& args, LayerStyle* style,
-                                                  const LayerStyleSource* source,
-                                                  std::shared_ptr<Image> backgroundImage,
-                                                  const Point& backgroundOffset,
-                                                  const Matrix& styleToDevice, float alpha,
-                                                  Matrix* drawMatrix, Rect* contentRect) {
-  if (args.context == nullptr || style == nullptr || source == nullptr ||
-      backgroundImage == nullptr || drawMatrix == nullptr || contentRect == nullptr) {
-    return nullptr;
-  }
-  auto groupIndex = static_cast<int>(style->excludeChildEffects());
-  auto* group = source->groups[groupIndex].get();
-  if (group == nullptr) {
-    return nullptr;
-  }
-  const auto& contentEntry = group->content;
-  auto contentScale = source->contentScale;
-  if (FloatNearlyZero(contentScale)) {
-    return nullptr;
-  }
-
-  PictureRecorder recorder = {};
-  auto* recording = recorder.beginRecording();
-  // Bake the consume canvas's matrix into the recording so the image is rasterized at the final
-  // device density and the later blit does not pass through a scale, which would resample the
-  // cached image onto half pixels. The matrix is applied as-is, keeping the exact (possibly
-  // fractional) device phase so the style output stays aligned with the layer content drawn
-  // after the blit — snapping it here would displace crisp style edges by up to half a pixel.
-  auto recordMatrix = styleToDevice;
-  recording->concat(recordMatrix);
-
-  LayerStyleInput styleInput = {};
-  styleInput.content = contentEntry.image;
-  styleInput.contentOffset = contentEntry.offset;
-  styleInput.contentScale = contentScale;
-  styleInput.extraSources.push_back(
-      std::make_shared<StyleInputSource>(backgroundImage, backgroundOffset - contentEntry.offset));
-  auto sourceFlags = style->extraSourceType();
-  if ((sourceFlags & static_cast<uint32_t>(LayerStyleExtraSourceType::Contour)) != 0) {
-    auto contourImage = group->contour.has_value() ? group->contour->image : nullptr;
-    auto contourOffset =
-        contourImage ? group->contour->offset - contentEntry.offset : Point::Zero();
-    styleInput.extraSources.push_back(std::make_shared<ContourInputSource>(
-        std::move(contourImage), contourOffset, source->contentShape));
-  }
-  // The crop bounds are the backdrop slice rounded out to whole pixels (image bounds must be
-  // integral). Compute them up front so the backdrop draw below can cover them fully.
-  auto backdropRect = Rect::MakeXYWH(
-      backgroundOffset.x - contentEntry.offset.x, backgroundOffset.y - contentEntry.offset.y,
-      static_cast<float>(backgroundImage->width()), static_cast<float>(backgroundImage->height()));
-  auto deviceBackdrop = recordMatrix.mapRect(backdropRect);
-  // The slice rect is fractional; the image bounds have to be whole pixels, so they are rounded
-  // out. The rounded-out margin is not part of the backdrop, so it must not be stamped over the
-  // destination — the consumer clips the blit back to this rect.
-  auto sliceRect = deviceBackdrop;
-  deviceBackdrop.roundOut();
-  // A slice that outgrows the GPU's texture limit never gets a render target, so the blit is
-  // dropped silently and the style stops showing up at all. Draw those directly: the direct path
-  // rasterizes only the part each pass covers, which always stays within one render target.
-  if (ExceedsTextureLimit(args.context, deviceBackdrop)) {
-    return nullptr;
-  }
-
-  Matrix inverse = Matrix::I();
-  if (!recordMatrix.invert(&inverse)) {
-    return nullptr;
-  }
-  // No backdrop goes into the recording: the style reads what it samples from the background image
-  // handed in through extraSources, and it confines itself to the layer's shape, so the image ends
-  // up holding just that output and being transparent everywhere else.
-  style->draw(recording, styleInput, alpha);
-
-  auto picture = recorder.finishRecordingAsPicture();
-  if (picture == nullptr) {
-    return nullptr;
-  }
-  Point imageOffset = {};
-  // Crop to the rounded backdrop bounds; the style's own outset reaches past them.
-  auto image =
-      ToImageWithOffset(std::move(picture), &imageOffset, &deviceBackdrop, args.dstColorSpace);
-  if (image == nullptr) {
-    return nullptr;
-  }
-  // The image lives in device space at the exact recording phase; drawing it with this matrix
-  // under the consume canvas reproduces the placement the direct path uses. Whenever a later
-  // pass shares the recording pass's device transform up to an integer translation, the matrix
-  // collapses to that pure translation, so the blit stays 1:1.
-  *drawMatrix = inverse;
-  drawMatrix->preTranslate(imageOffset.x, imageOffset.y);
-  *contentRect = sliceRect;
-  contentRect->offset(-imageOffset.x, -imageOffset.y);
-  // Rasterize lazily so the texture joins the resource cache (keyed, evictable, reusable).
-  return image->makeRasterized();
-}
-
-}  // namespace
-
 void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer,
                                              float alpha, LayerStyle* style,
                                              const LayerStyleSource* source) {
@@ -484,67 +405,7 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   auto matrix = Matrix::MakeScale(1.f / source->contentScale, 1.f / source->contentScale);
   matrix.preTranslate(contentEntry.offset.x, contentEntry.offset.y);
   canvas->concat(matrix);
-  if (snapshots != nullptr && snapshots->shareStyleOutput) {
-    // Reuse the style rendered by an earlier consume pass when there is one. Rendering it here
-    // rather than during capture matters: only this canvas carries the final device transform,
-    // scale included, that the style has to be rasterized at.
-    BackgroundSnapshotKey key{layer, style};
-    auto result = snapshots->styleResults.find(key);
-    if (result == snapshots->styleResults.end()) {
-      Matrix resultMatrix = Matrix::I();
-      Rect resultRect = Rect::MakeEmpty();
-      auto styleImage =
-          RenderBackgroundStyleImage(args, style, source, bgImage, bgOffset, canvas->getMatrix(),
-                                     alpha, &resultMatrix, &resultRect);
-      if (styleImage != nullptr) {
-        result = snapshots->styleResults
-                     .emplace(key, BackgroundStyleResult{std::move(styleImage), canvas->getMatrix(),
-                                                         resultMatrix, resultRect})
-                     .first;
-      }
-    }
-    if (result != snapshots->styleResults.end()) {
-      // The image is rasterized at the recording pass's device phase, so blitting it from a pass
-      // that sits on a different phase resamples it onto half pixels and seams the style output
-      // along that pass's edge. Such passes draw the style directly instead.
-      auto relation = canvas->getMatrix();
-      Matrix inverse = Matrix::I();
-      if (result->second.recordMatrix.invert(&inverse)) {
-        relation.preConcat(inverse);
-      }
-      if (IsWholePixelTranslation(relation)) {
-        AutoCanvasRestore restoreBlit(canvas);
-        canvas->concat(result->second.drawMatrix);
-        canvas->clipRect(result->second.contentRect);
-        Paint paint = {};
-        // Mask the blit with the same content the style masked itself with, so only where the style
-        // actually paints does the image replace the destination. Drawing the style directly is a
-        // Src draw under that mask, and the image is transparent elsewhere, so an unmasked Src blit
-        // would erase the destination instead of leaving it alone.
-        if (contentEntry.image != nullptr) {
-          auto maskShader =
-              Shader::MakeImageShader(contentEntry.image, TileMode::Decal, TileMode::Decal);
-          if (maskShader != nullptr) {
-            Matrix maskMatrix = Matrix::I();
-            if (result->second.drawMatrix.invert(&maskMatrix)) {
-              maskMatrix.preTranslate(contentEntry.offset.x, contentEntry.offset.y);
-              paint.setMaskFilter(
-                  MaskFilter::MakeShader(maskShader->makeWithMatrix(maskMatrix), false));
-            }
-          }
-        }
-        // Replace outright under the mask: the image already holds the style's output, so the
-        // style's blend mode must not be applied a second time. The pass alpha is not applied here
-        // either — it was handed to LayerStyle::draw while recording, so it scales only the style's
-        // own output; stamping it here would fade the backdrop along with it. Anti-aliasing stays
-        // off because the image lands on whole device pixels.
-        paint.setAntiAlias(false);
-        paint.setBlendMode(BlendMode::Src);
-        canvas->drawImage(result->second.image, 0.0f, 0.0f, &paint);
-        return;
-      }
-    }
-  }
+
   auto backgroundOffset = bgOffset - contentEntry.offset;
   LayerStyleInput styleInput = {};
   styleInput.content = contentEntry.image;
@@ -563,6 +424,37 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     styleInput.extraSources.push_back(std::make_shared<ContourInputSource>(
         std::move(contourImage), contourOffset, source->contentShape));
   }
+
+  // On the first pass that needs it, rasterize the style's output once and cache it; every
+  // pass — this one included — composites the same texture back with SrcOver. The image
+  // carries the style's own mask as its alpha, so compositing it once reproduces the direct
+  // draw for opaque backdrops, and passes within a frame differ only by an integer
+  // translation, so the blit stays 1:1.
+  if (snapshots != nullptr && shareStyleOutput) {
+    BackgroundSnapshotKey key{layer, style};
+    auto output = snapshots->styleOutputs.find(key);
+    if (output == snapshots->styleOutputs.end()) {
+      auto picture = RecordStyleOutput(style, styleInput, alpha, GetVisibleStyle(snapshots, layer));
+      if (picture != nullptr) {
+        auto shapeRect = Rect::MakeXYWH(contentEntry.offset.x, contentEntry.offset.y,
+                                        static_cast<float>(contentEntry.image->width()),
+                                        static_cast<float>(contentEntry.image->height()));
+        CacheStyleOutput(snapshots, layer, style, picture, canvas->getMatrix(), shapeRect,
+                         args.dstColorSpace);
+        output = snapshots->styleOutputs.find(key);
+      }
+    }
+    if (output != snapshots->styleOutputs.end()) {
+      AutoCanvasRestore restoreBlit(canvas);
+      canvas->concat(output->second.drawMatrix);
+      Paint paint = {};
+      paint.setAntiAlias(false);
+      paint.setBlendMode(BlendMode::SrcOver);
+      canvas->drawImage(output->second.image, 0.0f, 0.0f, &paint);
+      return;
+    }
+  }
+
   style->draw(canvas, styleInput, alpha);
 }
 
