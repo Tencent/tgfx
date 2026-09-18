@@ -436,9 +436,8 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     if (output == snapshots->styleOutputs.end()) {
       auto picture = RecordStyleOutput(style, styleInput, alpha, GetVisibleStyle(snapshots, layer));
       if (picture != nullptr) {
-        auto shapeRect = Rect::MakeXYWH(contentEntry.offset.x, contentEntry.offset.y,
-                                        static_cast<float>(contentEntry.image->width()),
-                                        static_cast<float>(contentEntry.image->height()));
+        auto shapeRect = Rect::MakeWH(static_cast<float>(contentEntry.image->width()),
+                                      static_cast<float>(contentEntry.image->height()));
         CacheStyleOutput(snapshots, layer, style, picture, canvas->getMatrix(), shapeRect,
                          args.dstColorSpace);
         output = snapshots->styleOutputs.find(key);
