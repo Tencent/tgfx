@@ -272,8 +272,8 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     auto visibleLocal = worldToLocal.mapRect(visibleWorld);
     auto& contentOffset = source->groups[0]->content.offset;
     snapshots->styleVisibleBounds[layer] =
-        Rect::MakeXYWH((visibleLocal.left - contentOffset.x) * contentScale,
-                       (visibleLocal.top - contentOffset.y) * contentScale,
+        Rect::MakeXYWH(visibleLocal.left * contentScale - contentOffset.x,
+                       visibleLocal.top * contentScale - contentOffset.y,
                        visibleLocal.width() * contentScale, visibleLocal.height() * contentScale);
   }
   auto bgImage = bgSource->getBackgroundImage();
