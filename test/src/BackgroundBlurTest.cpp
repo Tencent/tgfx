@@ -257,7 +257,7 @@ TGFX_TEST(BackgroundBlurTest, SharedStyleOutput) {
 
   auto panelChild = ShapeLayer::Make();
   auto childPath = Path();
-  childPath.addRect(Rect::MakeXYWH(20, 15, 100, 40));
+  childPath.addRect(Rect::MakeXYWH(20, 15, 100, 110));
   panelChild->setPath(childPath);
   panelChild->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 90)));
   panel->addChild(panelChild);
@@ -1202,26 +1202,27 @@ TGFX_TEST(BackgroundBlurTest, SharedStyleOutput3D) {
 
   auto marker1 = ShapeLayer::Make();
   auto marker1Path = Path();
-  marker1Path.addRect(Rect::MakeXYWH(15, 15, 20, 20));
+  marker1Path.addRect(Rect::MakeXYWH(140, 140, 20, 20));
   marker1->setPath(marker1Path);
   marker1->setFillStyle(ShapeStyle::Make(Color::FromRGBA(250, 60, 60, 255)));
   displayList.root()->addChild(marker1);
 
   auto marker2 = ShapeLayer::Make();
   auto marker2Path = Path();
-  marker2Path.addRect(Rect::MakeXYWH(15, 215, 20, 20));
+  marker2Path.addRect(Rect::MakeXYWH(210, 220, 20, 20));
   marker2->setPath(marker2Path);
   marker2->setFillStyle(ShapeStyle::Make(Color::FromRGBA(250, 60, 60, 255)));
   displayList.root()->addChild(marker2);
 
   // Perspective-transformed layer with a background blur style: its flattened canvas matrix
-  // carries perspective when the style draws.
+  // carries perspective when the style draws. It covers the whole surface so every dirty tile's
+  // pass draws it, which is what makes the shared output get reused across passes.
   auto styledLayer = SolidLayer::Make();
   styledLayer->setColor(Color::FromRGBA(255, 255, 255, 60));
-  styledLayer->setWidth(90);
-  styledLayer->setHeight(70);
+  styledLayer->setWidth(250);
+  styledLayer->setHeight(250);
   {
-    auto size = Size::Make(90, 70);
+    auto size = Size::Make(250, 250);
     auto anchor = Point::Make(0.5f, 0.5f);
     auto offsetToAnchor =
         Matrix3D::MakeTranslate(-anchor.x * size.width, -anchor.y * size.height, 0);
@@ -1242,6 +1243,70 @@ TGFX_TEST(BackgroundBlurTest, SharedStyleOutput3D) {
   marker2->setFillStyle(ShapeStyle::Make(Color::FromRGBA(60, 60, 250, 255)));
   displayList.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/SharedStyleOutput3D"));
+}
+
+/**
+ * A background blur style must survive a large display list zoom, where the background source is
+ * heavily downsampled and the layer's content extent is orders of magnitude larger than the
+ * render target.
+ *
+ * Note: this is an end-to-end regression test for the direct path only. At zoom levels large
+ * enough for the style-output bound to matter, the blur outset covers the whole screen, so the
+ * dirty rects of any small change merge into a single region and the frame never renders through
+ * multiple passes — the shared output path is structurally unreachable here. The bound itself is
+ * covered by the shared-path tests above.
+ */
+TGFX_TEST(BackgroundBlurTest, BackgroundBlurUnderHighZoom) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 300);
+  DisplayList displayList;
+  displayList.setRenderMode(RenderMode::Tiled);
+  displayList.setTileSize(100);
+  displayList.setBackgroundColor(Color::White());
+  displayList.setZoomScale(512.0f);
+
+  const float inverseZoom = 1.0f / 512.0f;
+  auto back = SolidLayer::Make();
+  back->setColor(Color::FromRGBA(70, 130, 190, 255));
+  back->setWidth(200 * inverseZoom);
+  back->setHeight(200 * inverseZoom);
+  back->setMatrix(Matrix::MakeTrans(50 * inverseZoom, 50 * inverseZoom));
+  displayList.root()->addChild(back);
+
+  auto marker1 = ShapeLayer::Make();
+  auto marker1Path = Path();
+  marker1Path.addRect(
+      Rect::MakeXYWH(60 * inverseZoom, 60 * inverseZoom, 20 * inverseZoom, 20 * inverseZoom));
+  marker1->setPath(marker1Path);
+  marker1->setFillStyle(ShapeStyle::Make(Color::FromRGBA(250, 60, 60, 255)));
+  displayList.root()->addChild(marker1);
+
+  auto marker2 = ShapeLayer::Make();
+  auto marker2Path = Path();
+  marker2Path.addRect(
+      Rect::MakeXYWH(230 * inverseZoom, 230 * inverseZoom, 20 * inverseZoom, 20 * inverseZoom));
+  marker2->setPath(marker2Path);
+  marker2->setFillStyle(ShapeStyle::Make(Color::FromRGBA(250, 60, 60, 255)));
+  displayList.root()->addChild(marker2);
+
+  // Blur panel covering both marker tiles, so the frame rasterizes its output once and reuses it
+  // in every dirty tile's pass.
+  auto styledLayer = SolidLayer::Make();
+  styledLayer->setColor(Color::FromRGBA(255, 255, 255, 60));
+  styledLayer->setWidth(200 * inverseZoom);
+  styledLayer->setHeight(200 * inverseZoom);
+  styledLayer->setMatrix(Matrix::MakeTrans(50 * inverseZoom, 50 * inverseZoom));
+  styledLayer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
+  displayList.root()->addChild(styledLayer);
+
+  displayList.render(surface.get());
+
+  marker1->setFillStyle(ShapeStyle::Make(Color::FromRGBA(60, 60, 250, 255)));
+  marker2->setFillStyle(ShapeStyle::Make(Color::FromRGBA(60, 60, 250, 255)));
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/BackgroundBlurUnderHighZoom"));
 }
 
 }  // namespace tgfx

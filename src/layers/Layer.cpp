@@ -938,7 +938,6 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
       // rooted, or this layer's local bounds when orphan.
       Layer* captureRoot = _root ? _root : this;
       Rect captureRect = _root ? renderRect : clippedBounds;
-      snapshotMap.visibleRects = {captureRect};
       BackgroundCapturer::Run(captureRoot, args, std::move(bgSource), &snapshotMap, {captureRect});
       snapshotsPtr = &snapshotMap;
     }
