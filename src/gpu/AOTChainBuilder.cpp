@@ -252,18 +252,21 @@ static PlacementPtr<FragmentProcessor> BuildPerlinNoiseFillFP(BlockAllocator* al
 }
 
 // Maps a DAG input edge onto a chain slot index. GeometryColor is not a slot: it maps to -1, the
-// geometry color. GeometryCoverage (the coverage subtree's unit input) maps to -3 when consumed
-// by the coverage root (the true GP coverage, matching the runtime coverage-chain origin) and to
-// -4 otherwise (nested blend children receive an opaque input in the runtime emission). Anything
-// unmapped is -2, which callers treat as a build error.
+// geometry color. GeometryCoverage (the coverage subtree's unit input) always maps to -3, the
+// true GP coverage: the kernel replaces the plain vCoverage modulation with the coverage root's
+// value, so the chain must inject the GP coverage exactly once at the unit, wherever the unit is
+// consumed — a chain whose first analytic node reads opaque white instead silently drops the GP
+// coverage at AA edges. Opaque-white inputs are explicit GeometryWhiteInput nodes (single-child
+// blend operands), never the coverage unit. Anything unmapped is -2, which callers treat as a
+// build error.
 static int MapChainInput(const std::vector<const AOTEffectNode*>& nodes,
-                         const std::vector<size_t>& slotOf, size_t nodeIndex, bool isCoverageRoot) {
+                         const std::vector<size_t>& slotOf, size_t nodeIndex) {
   auto* node = nodes[nodeIndex];
   if (node->kind == AOTEffectKind::GeometryColor) {
     return -1;
   }
   if (node->kind == AOTEffectKind::GeometryCoverage) {
-    return isCoverageRoot ? -3 : -4;
+    return -3;
   }
   if (node->kind == AOTEffectKind::GeometryColorOpaqueInput) {
     return -5;
@@ -422,7 +425,7 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
     const size_t inputBase = combined < colorCount ? 0 : colorCount;
     const bool isCoverageRoot = combined == covRootCombined;
     auto mapInput = [&](AOTNodeID input) {
-      return MapChainInput(nodes, slotOf, inputBase + input.index(), isCoverageRoot);
+      return MapChainInput(nodes, slotOf, inputBase + input.index());
     };
     auto& slot = slots[index];
     switch (node->kind) {
@@ -450,8 +453,9 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
         // A texture fed directly by the geometry color is a color source and gets the paint-alpha
         // modulation folded into its read (as the runtime's SrcIn wrap does). Any other texture —
         // a coverage mask or a blend operand — must sample raw, matching the runtime emission.
-        slot.textureModulate =
-            !node->inputs.empty() && inputBase == 0 && node->inputs[0] == AOTNodeID(0) ? 1 : 0;
+        const bool inputIsGeometryColor =
+            !node->inputs.empty() && inputBase == 0 && node->inputs[0] == AOTNodeID(0);
+        slot.textureModulate = inputIsGeometryColor ? 1 : 0;
         // A leaf that is the coverage subtree's root modulates by the coverage unit's alpha
         // (bit 2), matching the runtime coverage-FP readback (tex * coverageIn.a).
         if (isCoverageRoot && !node->inputs.empty() && node->inputs[0].index() == 0) {
@@ -461,22 +465,25 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
         // raw sample would otherwise read alpha as constant 1.
         slot.textureAlphaOnly =
             static_cast<const TextureEffect*>(leaf.get())->isAlphaOnly() ? 1 : 0;
-        // The runtime alpha-only readback is sample.a * inputColor — the mask carries the input
-        // color's RGB, not just its alpha. The input's shape rides on the designator node the
-        // lowering attached: the color root (a texture fed by the geometry color) multiplies by
-        // the full geometry color (textureModulate keeps the alpha half, so the pair reproduces
-        // mask * geom), and a two-child blend operand — whose input node is the opaque geometry
-        // designator — multiplies by (geom.rgb, 1.0) because the xfer emission feeds each child
+        // The runtime alpha-only readback is sample.a * inputColor, so the leaf's input
+        // environment decides the modulation shape — expressed as ONE complete operation per
+        // shape: the color root multiplies by the full geometry color in a single step (bit 4;
+        // the RGB is already premultiplied, so one multiply carries both halves — the former
+        // bit0+bit3 pair applied the paint alpha to the RGB twice), and a two-child blend
+        // operand — whose input node is the opaque geometry designator — multiplies by
+        // (geom.rgb, 1.0) (bit 3) because the xfer emission feeds each child
         // vec4(inputColor.rgb, 1.0). White inputs (single-child operands, folded masks) and
         // coverage leaves keep the raw splat, matching the runtime emission.
         bool inputIsOpaqueDesignator = !node->inputs.empty() &&
                                        nodes[inputBase + node->inputs[0].index()] != nullptr &&
                                        nodes[inputBase + node->inputs[0].index()]->kind ==
                                            AOTEffectKind::GeometryColorOpaqueInput;
-        slot.textureModulateGeometryRGB =
-            slot.textureAlphaOnly != 0 && (slot.textureModulate != 0 || inputIsOpaqueDesignator)
-                ? 1
-                : 0;
+        if (slot.textureAlphaOnly != 0 && inputIsGeometryColor) {
+          slot.textureModulate = 0;
+          slot.textureModulateFullInput = 1;
+        } else if (slot.textureAlphaOnly != 0 && inputIsOpaqueDesignator) {
+          slot.textureModulateGeometryRGB = 1;
+        }
         if (coverageLeafFromUVCoord && inputBase != 0) {
           // Atlas text: the coverage leaf sources its coordinates from the maskCoord attribute
           // (the uvCoord slot), while color leaves and gradients keep the position source.

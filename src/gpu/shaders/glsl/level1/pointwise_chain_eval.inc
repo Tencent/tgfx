@@ -65,12 +65,15 @@ vec4 evalChainSlot(int slot) {
       // channel carries the mask value, matching the runtime TextureEffect alpha-only readback.
       texColor = vec4(texColor.r);
       if ((Packed.w & 8) != 0) {
-        // The runtime alpha-only readback multiplies the mask by its FULL input color
-        // (sample.a * inputColor), not just the alpha: the color root sees the geometry color
-        // (bit 0 supplies the alpha half, so bit0|bit3 reproduces mask * geom), and a two-child
-        // blend operand sees (geom.rgb, 1.0) — see GLSLXfermodeFragmentProcessor's inputColor
-        // shape. Single-child operands (white input) and coverage masks keep the raw splat.
+        // A two-child blend operand: the xfer emission feeds each child vec4(inputColor.rgb,
+        // 1.0), so the mask modulates by the geometry RGB with opaque alpha.
         texColor *= vec4(TGFX_CHAIN_GEOM_COLOR.rgb, 1.0);
+      }
+      if ((Packed.w & 16) != 0) {
+        // The color root: the runtime readback multiplies the mask by its FULL input color
+        // (sample.a * inputColor), one multiply over the premul geometry color — RGB and alpha
+        // in a single step (the former bit0|bit3 pair applied the paint alpha to the RGB twice).
+        texColor *= TGFX_CHAIN_GEOM_COLOR;
       }
     }
     if ((Packed.w & 4) != 0) {

@@ -4083,6 +4083,96 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyColorRootKeepsPaintTint) {
   ExpectBitmapsIdentical("alpha-only-color-root-tint", candidate, reference, size, size);
 }
 
+// Counterexample audit D1: the alpha-only color root under a paint alpha below 1. The runtime
+// readback is sample.a * inputColor, so a half-transparent red paint (premul (0.5, 0, 0, 0.5))
+// over a constant 0x80 mask must yield exactly (0.25, 0, 0, 0.25) — byte (64, 0, 0, 64). The
+// kernel's current selector combination multiplies the splat by the geometry RGB first (bit 3)
+// and then by the geometry alpha again (bit 0), double-attenuating the RGB to (0.125, 0, 0,
+// 0.25) — byte (32, 0, 0, 64). The tint test above only covered alpha = 1, where the alpha
+// multiply is the identity, which is why this defect survived it.
+TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyColorRootPaintAlphaBelowOne) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  constexpr int size = 48;
+  Bitmap maskBitmap = {};
+  ASSERT_TRUE(maskBitmap.allocPixels(size, size, true));
+  auto* maskPixels = static_cast<uint8_t*>(maskBitmap.lockPixels());
+  ASSERT_NE(maskPixels, nullptr);
+  for (size_t y = 0; y < static_cast<size_t>(size); ++y) {
+    memset(maskPixels + y * maskBitmap.rowBytes(), 0x80, static_cast<size_t>(size));
+  }
+  maskBitmap.unlockPixels();
+  auto maskImage = Image::MakeFrom(maskBitmap);
+  ASSERT_NE(maskImage, nullptr);
+  auto renderScene = [&](Bitmap* outBitmap) {
+    auto surface = Surface::Make(context, size, size);
+    ASSERT_NE(surface, nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::Transparent());
+    auto maskShader = Shader::MakeImageShader(maskImage, TileMode::Clamp, TileMode::Clamp);
+    ASSERT_NE(maskShader, nullptr);
+    Paint paint = {};
+    paint.setColor(Color(1.0f, 0.0f, 0.0f, 0.5f));
+    paint.setShader(maskShader);
+    // The color filter forces the draw off the dedicated QuadTextureFill shader and onto the
+    // precompiled pointwise chain, where the alpha-only readback's modulation bits live. The
+    // matrix halves RGB and keeps alpha, so its contribution stays hand-computable.
+    std::array<float, 20> matrix = {0.5f, 0, 0, 0, 0, 0, 0.5f, 0, 0, 0,
+                                    0,    0, 0, 0, 0, 0, 0,    0, 1, 0};
+    paint.setColorFilter(ColorFilter::Matrix(matrix));
+    canvas->drawRect(Rect::MakeWH(size, size), paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(size, size));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_NE(pixels, nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+  };
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  {
+    cache->unload();
+    ScopedAOTDeliberateMiss deliberate(context);
+    renderScene(&reference);
+  }
+  {
+    // Hand check on the runtime reference: the readback is 128/255 * premul(1, 0, 0, 0.5) =
+    // (0.25098, 0, 0, 0.25098); the matrix then unpremultiplies (1, 0, 0), halves RGB to
+    // (0.5, 0, 0) and re-premultiplies, giving (0.12549, 0, 0, 0.25098) — byte (32, 0, 0, 64).
+    // The byte position of red follows the bitmap's platform format (BGRA on Apple, RGBA
+    // elsewhere), so assert per channel.
+    auto* pixels = static_cast<const uint8_t*>(const_cast<Bitmap&>(reference).lockPixels());
+    ASSERT_NE(pixels, nullptr);
+    const uint8_t* center = pixels + 24 * reference.rowBytes() + 24 * 4;
+    EXPECT_EQ(center[3], 64);
+    EXPECT_EQ(center[0] + center[2], 32);
+    EXPECT_EQ(center[0] * center[2], 0);
+    EXPECT_EQ(center[1], 0);
+    const_cast<Bitmap&>(reference).unlockPixels();
+  }
+  {
+    auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+    ASSERT_NE(bundleData, nullptr);
+    ASSERT_GT(bundleBytes, 0u);
+    ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+    cache->setDecompositionEnabled(true);
+    cache->setDiagnosticRecordingEnabled(true);
+    cache->resetStats();
+    context->globalCache()->resetProgramStats();
+    renderScene(&candidate);
+    // The draw must take the precompiled chain route; a fallback would trivially match the
+    // runtime and prove nothing about the kernel's alpha-only modulation.
+    EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
+    cache->setDiagnosticRecordingEnabled(false);
+    cache->unload();
+    context->globalCache()->clearPrograms();
+  }
+  ExpectBitmapsIdentical("alpha-only-color-root-paint-alpha", candidate, reference, size, size);
+}
+
 // Counterexample audit B3: two stacked analytic AA clips over an AA oval. The coverage subtree is
 // a two-level analytic chain (RectEffect x2) while the GP emits a fractional coverage at the oval
 // edge. The chain must keep the GP coverage as the chain's starting unit: at pixels where both
@@ -4130,6 +4220,80 @@ TGFX_TEST(AOTRenderConsistencyTest, StackedClipsKeepGPCoverageOnAAEdge) {
     cache->unload();
   }
   ExpectBitmapsIdentical("stacked-clips-gp-coverage", candidate, reference, size, size);
+}
+
+// Counterexample audit D2, end-to-end reachability ruling: the D2 defect (a chained analytic
+// coverage whose first node reads opaque white instead of the GP coverage unit, silently
+// dropping the GP coverage) is verified constructively in AOTEffectTest
+// (ChainedRectCoverageFeedsFromUnitCoverage asserts the -3 unit designator). Reaching it end to
+// end would need a draw with fractional GP coverage under a multi-leaf analytic clip chain, but
+// every renderer that produces fractional coverage here also emits a second coverage FP (the AA
+// path adds a TextureEffect coverage alongside the clip Compose), and the two-FP branch rejects
+// that combination — so the defect is UNREACHABLE through public APIs today and this test
+// records the fallback boundary as a tripwire: if the two-FP gate ever opens without the chain
+// honoring the unit, the pixel comparison below flips.
+TGFX_TEST(AOTRenderConsistencyTest, ChainedAnalyticClipsOnAAPathRecordsFallbackBoundary) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  constexpr int size = 96;
+  auto renderScene = [&](Bitmap* outBitmap) {
+    auto surface = Surface::Make(context, size, size);
+    ASSERT_NE(surface, nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::Transparent());
+    // The two clip shapes partially overlap (the rrect extends past the rect's right and bottom
+    // edges), so their intersection is not an analytic shape and the clip stack keeps both
+    // elements — the coverage lowers as a two-leaf analytic chain, not a merged single element.
+    canvas->clipRect(Rect::MakeLTRB(8.5f, 8.5f, size * 0.75f, size * 0.75f), true);
+    canvas->clipRRect(
+        RRect::MakeRectXY(Rect::MakeLTRB(16.5f, 16.5f, size - 16.5f, size - 16.5f), 12, 12), true);
+    Paint paint = {};
+    paint.setColor(Color(0, 1, 0, 1));
+    paint.setAntiAlias(true);
+    Path path = {};
+    path.moveTo(48, 12);
+    path.lineTo(84, 80);
+    path.lineTo(12, 80);
+    path.close();
+    canvas->drawPath(path, paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(size, size));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_NE(pixels, nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+  };
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  {
+    cache->unload();
+    ScopedAOTDeliberateMiss deliberate(context);
+    renderScene(&reference);
+  }
+  {
+    auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+    ASSERT_NE(bundleData, nullptr);
+    ASSERT_GT(bundleBytes, 0u);
+    ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+    cache->setDecompositionEnabled(true);
+    cache->setDiagnosticRecordingEnabled(true);
+    cache->resetStats();
+    context->globalCache()->resetProgramStats();
+    renderScene(&candidate);
+    // RULING: the coverage carries two FPs here (the clip's analytic Compose plus the AA path's
+    // TextureEffect), which the chain's two-FP branch refuses, so the draw falls back to the
+    // runtime route — exactly one program build, no partial-chain attempt. This records the
+    // boundary; a zero here would mean the gate opened and the unit wiring must be re-verified.
+    EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 1u);
+    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 1u);
+    cache->setDiagnosticRecordingEnabled(false);
+    cache->unload();
+    context->globalCache()->clearPrograms();
+  }
+  ExpectBitmapsIdentical("chained-analytic-clips-fallback-boundary", candidate, reference, size,
+                         size);
 }
 
 // Counterexample audit D1: program identity. Three draws in one context whose color trees share
