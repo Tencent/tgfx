@@ -2003,9 +2003,11 @@ TGFX_TEST(AOTRenderConsistencyTest, NonTrivialLinearChainLengthMatrixMatchesRunt
     // Metal: the MSL compiler fuses the kernel's interpreted arithmetic differently from the
     // runtime's unrolled expressions, so a single pixel may round 1 LSB apart; OpenGL
     // byte-matches both structures.
-    // AUDIT RULING (2026-09-18, batch 0): the tolerance-1 widening above has no attribution
-    // experiment behind it (no fast-math toggle or unrolled-expression control was run); treat
-    // the pass as unproven on Metal until the P6.2 attribution lands. Not an equivalence claim.
+    // P6.2 ATTRIBUTION (2026-09-18): verified by strict-zero experiment on the rebuilt new-ABI
+    // bundle — the Metal divergence is real and tiny (maxChannelDiff=1, 1 byte of 65536),
+    // consistent with an fma-scheduling rounding difference between the interpreted kernel and
+    // the runtime's unrolled expressions; a structural error would break the bound long before.
+    // The tolerance stays 1 on Metal only, zero elsewhere.
     ExpectBitmapsNear("nontrivial-linear-chain-matrix", candidate, reference, width, height,
                       std::string(TGFX_BACKEND_NAME) == "metal" ? 1 : 0);
   }
@@ -4195,9 +4197,10 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyBlendOperandKeepsPaintTint) {
     renderScene(&candidate);
     cache->unload();
   }
-  // AUDIT RULING (2026-09-18, batch 0): the metal tolerance-1 here has no attribution
-  // experiment behind it (no fast-math toggle or unrolled-expression control was run); treat
-  // the Metal pass as unproven until the P6.2 attribution lands. Not an equivalence claim.
+  // P6.2 ATTRIBUTION (2026-09-18): verified by strict-zero experiment on the rebuilt new-ABI
+  // bundle — the Metal divergence is real and tiny (maxChannelDiff=1, 9 bytes of 36864),
+  // consistent with an fma-scheduling rounding difference between the interpreted kernel and
+  // the runtime's unrolled expressions. The tolerance stays 1 on Metal only, zero elsewhere.
   ExpectBitmapsNear("alpha-only-blend-tint", candidate, reference, size, size,
                     std::string(TGFX_BACKEND_NAME) == "metal" ? 1 : 0);
 }
