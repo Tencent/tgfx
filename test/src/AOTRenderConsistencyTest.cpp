@@ -4793,4 +4793,88 @@ TGFX_TEST(AOTRenderConsistencyTest, DifferentLeafCountsShareVariant) {
   EXPECT_NE(doubled.isEmpty(), true);
 }
 
+// Counterexample audit E1: blurring an alpha-only source through the real ImageFilter path.
+// RULING: explicitly unsupported by the precompiled set. The blur pipeline materializes the
+// alpha-only source into an ALPHA_8 intermediate (Swizzle=aaaa, Format=1 — verified via the miss
+// pipeline signature) and the GaussianBlur1D(TiledTextureEffect) draw is rejected by the alpha-only
+// tiled-texture admission (PermutationMatcher), so the blur pass itself runs on the runtime
+// stitching route. The composite end (tinted draw of the blurred mask) is served by the AOT set.
+// This records the boundary: exactly one NoMatchingRule + one runtime program for the blur pass,
+// pixel-identical output. Lifting it needs kernel-side alpha-only support in the blur shader
+// (alpha-channel accumulation and the aaaa output swizzle), not just an admission change.
+TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyImageBlurMatchesRuntime) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  constexpr int size = 96;
+  // An alpha-only mask: a soft blob in the center, zero at the borders.
+  Bitmap maskBitmap = {};
+  ASSERT_TRUE(maskBitmap.allocPixels(size, size, true));
+  auto* maskPixels = static_cast<uint8_t*>(maskBitmap.lockPixels());
+  ASSERT_NE(maskPixels, nullptr);
+  auto rowBytes = maskBitmap.rowBytes();
+  for (int y = 0; y < size; ++y) {
+    for (int x = 0; x < size; ++x) {
+      float dx = (x - size / 2.0f) / (size / 4.0f);
+      float dy = (y - size / 2.0f) / (size / 4.0f);
+      float d = sqrtf(dx * dx + dy * dy);
+      maskPixels[static_cast<size_t>(y) * rowBytes + static_cast<size_t>(x)] =
+          static_cast<uint8_t>(255.0f * (d < 1.0f ? (1.0f - d * d) : 0.0f));
+    }
+  }
+  maskBitmap.unlockPixels();
+  auto maskImage = Image::MakeFrom(maskBitmap);
+  ASSERT_NE(maskImage, nullptr);
+  auto blur = ImageFilter::Blur(0.0f, 6.0f);
+  ASSERT_NE(blur, nullptr);
+  auto renderScene = [&](Bitmap* outBitmap, const std::shared_ptr<ColorFilter>& tint) {
+    auto surface = Surface::Make(context, size, size);
+    ASSERT_NE(surface, nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color(0.0f, 0.1f, 0.9f, 1.0f));
+    Paint paint = {};
+    paint.setColorFilter(tint);
+    canvas->drawImage(maskImage->makeWithFilter(blur), 0, 0, &paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(size, size));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_NE(pixels, nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+  };
+  const std::array<float, 20> redTint = {1.0f, 0, 0,    0, 0, 0, 0.15f, 0, 0, 0,
+                                         0,    0, 0.1f, 0, 0, 0, 0,     0, 1, 0};
+  for (const auto& tint : {std::shared_ptr<ColorFilter>(nullptr), ColorFilter::Matrix(redTint)}) {
+    Bitmap reference = {};
+    Bitmap candidate = {};
+    {
+      cache->unload();
+      ScopedAOTDeliberateMiss deliberate(context);
+      renderScene(&reference, tint);
+    }
+    {
+      auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+      ASSERT_NE(bundleData, nullptr);
+      ASSERT_GT(bundleBytes, 0u);
+      ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+      cache->setDecompositionEnabled(true);
+      cache->setDiagnosticRecordingEnabled(true);
+      cache->resetStats();
+      context->globalCache()->resetProgramStats();
+      renderScene(&candidate, tint);
+      auto stats = context->globalCache()->programStats();
+      // The recorded boundary: the alpha-only blur pass takes the runtime route (one miss, one
+      // runtime program) while the composite draws hit the precompiled set.
+      EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 1u);
+      EXPECT_EQ(stats.programBuilderCreations, 1u);
+      EXPECT_GE(stats.precompiledArtifactCreations, 1u);
+      cache->setDiagnosticRecordingEnabled(false);
+      cache->unload();
+      context->globalCache()->clearPrograms();
+    }
+    ExpectBitmapsIdentical("alpha-only-blur", candidate, reference, size, size);
+  }
+}
+
 }  // namespace tgfx
