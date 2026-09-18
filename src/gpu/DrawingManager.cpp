@@ -127,11 +127,13 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
     bool kernelRoutable = firstPass.kernel == AOTKernelKind::PointwiseTail ||
                           firstPass.kernel == AOTKernelKind::PointwiseChain ||
                           firstPass.kernel == AOTKernelKind::PerlinNoiseFill;
-    // A nested rasterization must not add an RGBA8 quantization round trip of its own, so only
-    // single-pass plans (no intermediate texture, byte-identical to the plain fill) may route
-    // there. Top-level filter fills carry no such constraint.
-    bool nested = (renderFlags & InternalRenderFlags::NestedRasterization) != 0;
-    if (kernelRoutable && (taskPlan.passes.size() == 1 || !nested)) {
+    // Only single-pass plans may route to the precompiled kernels. A multi-pass tail plan
+    // materializes RGBA8 intermediates: every boundary quantizes to the 1/255 grid, and a
+    // discontinuous operator (AlphaThreshold) reading a materialized input can flip its step()
+    // decision outright (audit D5, exact-rational counterexample) — a divergence no tolerance
+    // can bound. Over-budget chains keep the runtime reference everywhere (the on-screen route
+    // already refuses them), which evaluates the whole tree in one shader at float precision.
+    if (kernelRoutable && taskPlan.passes.size() == 1) {
       auto deviceBounds = Rect::MakeWH(static_cast<float>(renderTarget->width()),
                                        static_cast<float>(renderTarget->height()));
       return AOTPlanExecutor::Make(context, renderFlags, taskGraph, taskPlan, deviceBounds,
