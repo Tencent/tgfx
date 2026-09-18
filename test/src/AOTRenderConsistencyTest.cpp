@@ -4195,7 +4195,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyColorRootKeepsPaintTint) {
     auto stats = context->globalCache()->programStats();
     EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
     EXPECT_EQ(stats.programBuilderCreations, 0u);
-    EXPECT_GE(stats.precompiledArtifactCreations, 1u);
+    EXPECT_EQ(stats.precompiledArtifactCreations, 1u);
     cache->setDiagnosticRecordingEnabled(false);
     cache->unload();
     context->globalCache()->clearPrograms();
@@ -4732,6 +4732,95 @@ TGFX_TEST(AOTRenderConsistencyTest, SameVariantDifferentChainsShareProgram) {
   ExpectBitmapsIdentical("shared-program-chain-three", three, refThree, size, size);
 }
 
+// Counterexample audit P5: true A-B-A interleaving. The A->B->C shape above cannot expose a
+// program whose uniform state was polluted by an intervening draw: only A's SECOND appearance
+// proves the per-draw upload fully rewrites whatever B left behind. Two same-variant chains
+// (one matrix vs luma) alternate A, B, A: one artifact creation, two cache hits (the second A
+// must hit the program B just used), and A's re-render must stay byte-identical to its first.
+TGFX_TEST(AOTRenderConsistencyTest, ABAInterleavedDrawsReuseProgramWithoutStateLeak) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_NE(image, nullptr);
+  constexpr int size = 64;
+  const std::array<float, 20> brighten = {1.2f, 0, 0,     0, 0.05f, 0, 1.1f, 0, 0, 0.03f,
+                                          0,    0, 1.15f, 0, 0.02f, 0, 0,    0, 1, 0};
+  auto renderWith = [&](const std::shared_ptr<ColorFilter>& filter) -> Bitmap {
+    auto surface = Surface::Make(context, size, size);
+    if (surface == nullptr) {
+      return {};
+    }
+    Paint paint = {};
+    paint.setColorFilter(filter);
+    surface->getCanvas()->drawImage(image, 0, 0, &paint);
+    context->flushAndSubmit(true);
+    Bitmap bitmap = {};
+    if (!bitmap.allocPixels(size, size)) {
+      return {};
+    }
+    auto* pixels = bitmap.lockPixels();
+    if (pixels == nullptr) {
+      return {};
+    }
+    if (!surface->readPixels(bitmap.info(), pixels)) {
+      bitmap.unlockPixels();
+      return {};
+    }
+    bitmap.unlockPixels();
+    return bitmap;
+  };
+  auto filterA = ColorFilter::Matrix(brighten);
+  auto filterB = ColorFilter::Luma();
+  // Runtime references through the stitching path.
+  Bitmap refA1 = {};
+  Bitmap refB = {};
+  Bitmap refA2 = {};
+  {
+    cache->unload();
+    ScopedAOTDeliberateMiss deliberate(context);
+    refA1 = renderWith(filterA);
+    refB = renderWith(filterB);
+    refA2 = renderWith(filterA);
+  }
+  auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+  ASSERT_NE(bundleData, nullptr);
+  ASSERT_GT(bundleBytes, 0u);
+  ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+  cache->setDecompositionEnabled(true);
+  cache->setDiagnosticRecordingEnabled(true);
+  cache->resetStats();
+  context->globalCache()->clearPrograms();
+  context->globalCache()->resetProgramStats();
+  auto a1 = renderWith(filterA);
+  auto b = renderWith(filterB);
+  auto a2 = renderWith(filterA);
+  auto stats = context->globalCache()->programStats();
+  cache->setDiagnosticRecordingEnabled(false);
+  cache->unload();
+  context->globalCache()->clearPrograms();
+  // One variant serves both chains: a single artifact creation, and the second A must hit the
+  // same program B just drew with (two cache hits across the three draws).
+  EXPECT_EQ(stats.precompiledArtifactCreations, 1u);
+  EXPECT_EQ(stats.cacheHits, 2u);
+  EXPECT_EQ(stats.programBuilderCreations, 0u);
+  // The two chains must produce different output (non-vacuous pair).
+  auto* pa = static_cast<const uint32_t*>(const_cast<Bitmap&>(a1).lockPixels());
+  auto* pb = static_cast<const uint32_t*>(const_cast<Bitmap&>(b).lockPixels());
+  ASSERT_NE(pa, nullptr);
+  ASSERT_NE(pb, nullptr);
+  EXPECT_NE(pa[32 * size + 32], pb[32 * size + 32]);
+  const_cast<Bitmap&>(a1).unlockPixels();
+  const_cast<Bitmap&>(b).unlockPixels();
+  // The second A must match the first A byte for byte: any uniform state B left behind (kernel
+  // slots, matrices, luma coefficients) would show up here.
+  ExpectBitmapsIdentical("aba-first-a", a1, refA1, size, size);
+  ExpectBitmapsIdentical("aba-b", b, refB, size, size);
+  ExpectBitmapsIdentical("aba-second-a", a2, refA2, size, size);
+  ExpectBitmapsIdentical("aba-self-consistent", a2, a1, size, size);
+}
+
 // Counterexample audit B2: a single-child blend operand wrapping a Compose-shaped child. drawMesh
 // with vertex colors wraps the brush shader's FP in a SrcChild(Modulate) xfer (OpsCompositor).
 // The runtime feeds that child white, and Compose passes its own input through to its first
@@ -4798,7 +4887,7 @@ TGFX_TEST(AOTRenderConsistencyTest, MeshVertexColorsWithComposedShaderChildInput
     EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
     auto stats = context->globalCache()->programStats();
     EXPECT_EQ(stats.programBuilderCreations, 0u);
-    EXPECT_GE(stats.precompiledArtifactCreations, 1u);
+    EXPECT_EQ(stats.precompiledArtifactCreations, 1u);
     cache->setDiagnosticRecordingEnabled(false);
     cache->unload();
     context->globalCache()->clearPrograms();
@@ -4877,7 +4966,7 @@ TGFX_TEST(AOTRenderConsistencyTest, OutOfRangeGradientStopBlendClampOrder) {
     EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
     auto stats = context->globalCache()->programStats();
     EXPECT_EQ(stats.programBuilderCreations, 0u);
-    EXPECT_GE(stats.precompiledArtifactCreations, 1u);
+    EXPECT_EQ(stats.precompiledArtifactCreations, 1u);
     auto drawStats = cache->drawStats();
     EXPECT_EQ(drawStats.kernelInvocations, 1u);
     EXPECT_EQ(drawStats.planMaterializedEdges, 0u);
@@ -5330,11 +5419,11 @@ TGFX_TEST(AOTRenderConsistencyTest, DifferentLeafCountsShareVariant) {
          static_cast<unsigned>(stats.precompiledArtifactCreations),
          static_cast<unsigned>(stats.cacheHits));
   fflush(stdout);
-  // Record the current boundary: a one-leaf draw (padded to four samplers) and a two-leaf blend
-  // (two real leaves plus padding) map to the same four-sampler artifact. Whether they share one
-  // program depends on whether the padding children's keys equal a real child's; the printf above
-  // records the actual split for the boundary ledger.
-  EXPECT_GE(stats.precompiledArtifactCreations, 1u);
+  // A one-leaf draw (padded to four samplers) and a two-leaf blend (two real leaves plus
+  // padding) map to the same four-sampler artifact: one artifact creation and one cache hit
+  // across the two draws (verified: the padding children's keys equal the real child's).
+  EXPECT_EQ(stats.precompiledArtifactCreations, 1u);
+  EXPECT_EQ(stats.cacheHits, 1u);
   EXPECT_EQ(stats.programBuilderCreations, 0u);
   EXPECT_NE(single.isEmpty(), true);
   EXPECT_NE(doubled.isEmpty(), true);
@@ -5409,11 +5498,13 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyImageBlurMatchesRuntime) {
       context->globalCache()->resetProgramStats();
       renderScene(&candidate, tint);
       auto stats = context->globalCache()->programStats();
-      // The alpha-only blur pass now rides the precompiled kernel: no miss, no runtime program,
-      // and the composite draws hit the precompiled set.
+      // The alpha-only blur pass now rides the precompiled kernel: no miss, no runtime program.
+      // The scene resolves through three distinct precompiled artifacts (the blur pass's
+      // GaussianBlur1D, and the composite's QuadTexture/chain variants), each created exactly
+      // once with zero artifact misses.
       EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
       EXPECT_EQ(stats.programBuilderCreations, 0u);
-      EXPECT_GE(stats.precompiledArtifactCreations, 1u);
+      EXPECT_EQ(stats.precompiledArtifactCreations, 3u);
       cache->setDiagnosticRecordingEnabled(false);
       cache->unload();
       context->globalCache()->clearPrograms();
