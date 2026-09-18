@@ -17,10 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
+#include "core/shaders/RRectBlurShader.h"
+#include "core/shaders/RectBlurShader.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "layers/SpreadUtils.h"
+#include "layers/layerstyles/AnalyticShadowUtils.h"
+#include "tgfx/core/Canvas.h"
 #include "tgfx/core/ImageFilter.h"
+#include "tgfx/core/MaskFilter.h"
 
 namespace tgfx {
 
@@ -114,6 +119,67 @@ uint32_t DropShadowStyle::extraSourceType() const {
   return static_cast<uint32_t>(LayerStyleExtraSourceType::None);
 }
 
+bool DropShadowStyle::tryDrawAnalytic(Canvas* canvas, const LayerStyleInput& input, float alpha,
+                                      BlendMode blendMode) {
+  DEBUG_ASSERT(!FloatNearlyZero(_spread));
+  const auto sigmaX = _blurrinessX * input.contentScale;
+  const auto sigmaY = _blurrinessY * input.contentScale;
+  // The closed form normalizes by sigma per axis, so a zero sigma cannot be expressed. Supporting
+  // an axis with zero blur would require additional shader branches, whose benefit has not been
+  // validated.
+  if (FloatNearlyZero(sigmaX) || FloatNearlyZero(sigmaY)) {
+    return false;
+  }
+  const auto shape = AnalyticShadowUtils::MakeShadowShape(input, _spread);
+  if (!shape.has_value()) {
+    return false;
+  }
+  // A negative spread can erase the shadow shape entirely, leaving nothing to draw.
+  if (shape->rect().isEmpty()) {
+    return true;
+  }
+  // radii()[0] stands for all four corners: AnalyticShadowUtils::MakeShadowShape never returns a
+  // complex RRect.
+  DEBUG_ASSERT(!shape->isComplex());
+  std::shared_ptr<Shader> shader = nullptr;
+  if (shape->isRect()) {
+    shader = RectBlurShader::Make(shape->rect(), sigmaX, sigmaY, _color);
+  } else {
+    shader = RRectBlurShader::Make(shape->rect(), shape->radii()[0], sigmaX, sigmaY, _color);
+  }
+  DEBUG_ASSERT(shader != nullptr);
+  if (shader == nullptr) {
+    return false;
+  }
+
+  // The closed form needs the rect axis-aligned, and the shader gets that by mapping the
+  // coordinates it is given back into the shape's own space, so a rotated or skewed canvas matrix
+  // needs no handling here.
+  auto drawRect = shape->rect().makeOutset(2.0f * sigmaX, 2.0f * sigmaY);
+  const auto offsetX = _offsetX * input.contentScale;
+  const auto offsetY = _offsetY * input.contentScale;
+  Paint paint = {};
+  auto* knockoutContour =
+      _showBehindLayer ? nullptr : input.findExtraSource(StyleInputSource::Type::Contour);
+  if (knockoutContour != nullptr && knockoutContour->image() != nullptr) {
+    auto contourShader =
+        Shader::MakeImageShader(knockoutContour->image(), TileMode::Decal, TileMode::Decal, {});
+    auto contourOffset = knockoutContour->imageOffset();
+    // The canvas translation below moves the mask along with the shadow, so the offset is
+    // cancelled here.
+    auto matrixShader = contourShader->makeWithMatrix(
+        Matrix::MakeTrans(contourOffset.x - offsetX, contourOffset.y - offsetY));
+    paint.setMaskFilter(MaskFilter::MakeShader(matrixShader, true));
+  }
+  paint.setShader(std::move(shader));
+  paint.setBlendMode(blendMode);
+  paint.setAlpha(alpha);
+  AutoCanvasRestore restoreCanvas(canvas);
+  canvas->translate(offsetX, offsetY);
+  canvas->drawRect(drawRect, paint);
+  return true;
+}
+
 void DropShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alpha,
                              BlendMode blendMode) {
   Point offset = {};
@@ -124,6 +190,13 @@ void DropShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float
   std::shared_ptr<Image> filterSource = input.content;
   Point filterSourceOffset = {};
   if (!FloatNearlyZero(_spread)) {
+    // contentShape covers only the layer's own content, not its children: a shadow derived from it
+    // follows the layer itself, while the no-spread shadow follows the whole subtree. Only the
+    // spread case can therefore be evaluated in closed form.
+    // TODO: let contentShape describe the whole subtree, then lift this restriction.
+    if (tryDrawAnalytic(canvas, input, alpha, blendMode)) {
+      return;
+    }
     auto spreadImage = SpreadUtils::MakeSpreadShapeImage(input, _spread);
     // The spread shadow is drawn from the spread shape image. When the vector shape is unavailable
     // (e.g. a group layer with only children) or exceeds the content image, the spread cannot be
@@ -149,11 +222,12 @@ void DropShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float
                       ? SamplingOptions(FilterMode::Nearest, MipmapMode::None)
                       : SamplingOptions();
   Paint paint = {};
-  auto* contour = input.findExtraSource(StyleInputSource::Type::Contour);
-  if (!_showBehindLayer && contour != nullptr && contour->image() != nullptr) {
-    auto shader =
-        Shader::MakeImageShader(contour->image(), TileMode::Decal, TileMode::Decal, sampling);
-    auto contourOffset = contour->imageOffset();
+  auto* knockoutContour =
+      _showBehindLayer ? nullptr : input.findExtraSource(StyleInputSource::Type::Contour);
+  if (knockoutContour != nullptr && knockoutContour->image() != nullptr) {
+    auto shader = Shader::MakeImageShader(knockoutContour->image(), TileMode::Decal,
+                                          TileMode::Decal, sampling);
+    auto contourOffset = knockoutContour->imageOffset();
     auto matrixShader = shader->makeWithMatrix(Matrix::MakeTrans(contourOffset.x, contourOffset.y));
     paint.setMaskFilter(MaskFilter::MakeShader(matrixShader, true));
   }

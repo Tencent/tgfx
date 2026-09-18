@@ -196,7 +196,19 @@ class Shader {
   std::shared_ptr<Shader> makeWithColorFilter(std::shared_ptr<ColorFilter> colorFilter) const;
 
  protected:
-  enum class Type { Color, ColorFilter, Image, Blend, Matrix, Gradient, PerlinNoise };
+  enum class Type {
+    Color,
+    ColorFilter,
+    Image,
+    Blend,
+    Matrix,
+    Gradient,
+    PerlinNoise,
+    RectBlur,
+    RRectBlur,
+    RectInnerShadow,
+    RRectInnerShadow
+  };
 
   /**
    * Returns the type of this shader.
