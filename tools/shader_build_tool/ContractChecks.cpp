@@ -87,6 +87,9 @@ size_t ValidateChainOpCodes(const std::string& shaderDir) {
       {"OP_GRADIENT", ChainOp::Gradient},
       {"OP_LOCAL_RECT_COVERAGE", ChainOp::LocalRectCoverage},
       {"OP_RRECT_COVERAGE", ChainOp::RRectCoverage},
+      {"OP_TEX_MODULATE", ChainOp::TexModulate},
+      {"OP_INPUT_OPAQUE", ChainOp::InputOpaque},
+      {"OP_MUL_ALPHA", ChainOp::MulAlpha},
   };
 
   size_t errors = 0;

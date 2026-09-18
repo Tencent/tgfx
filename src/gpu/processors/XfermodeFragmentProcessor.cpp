@@ -170,22 +170,39 @@ bool XfermodeFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID in
       // by the input's alpha. The alpha override is idempotent, so when this xfer's input is
       // already the opaque-alpha geometry input the children reuse it; the white input (a
       // single-child operand's child environment) already carries opaque alpha and an identity
-      // alpha multiply, so it passes through unchanged. Any other input keeps the plain route.
+      // alpha multiply, so it passes through unchanged. A computed input C materializes both
+      // halves explicitly: an InputOpaque node gives the children vec4(C.rgb, 1.0), and the
+      // epilogue's multiply by C.a becomes an explicit MulAlpha instruction over the blend.
       inputIsPlainGeometryColor = input == AOTNodeID(0);
       AOTNodeID childInput = input;
+      bool inputIsComputed = false;
       if (inputIsPlainGeometryColor) {
         if (!builder->addGeometryColorOpaqueInput(&childInput)) {
           return false;
         }
       } else if (!builder->isGeometryColorOpaqueInput(input) &&
                  !builder->isGeometryWhiteInput(input)) {
-        return false;
+        if (!builder->addInputOpaque(input, &childInput)) {
+          return false;
+        }
+        inputIsComputed = true;
       }
       if (!childProcessor(0)->lowerToAOT(builder, childInput, &src)) {
         return false;
       }
       if (!childProcessor(1)->lowerToAOT(builder, childInput, &dst)) {
         return false;
+      }
+      if (inputIsComputed) {
+        AOTBlendParameters computedParameters = {};
+        computedParameters.blendMode = static_cast<int>(mode);
+        computedParameters.childType = static_cast<int>(child);
+        computedParameters.multiplyInputAlpha = false;
+        AOTNodeID blended = AOTNodeID::Invalid();
+        if (!builder->addBlend(src, dst, computedParameters, &blended)) {
+          return false;
+        }
+        return builder->addMulAlpha(blended, input, output);
       }
       break;
     }

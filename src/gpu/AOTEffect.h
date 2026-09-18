@@ -95,6 +95,14 @@ enum class AOTEffectKind {
   // child emission omits the input color, which defaults to vec4(1.0)). Never becomes a chain
   // slot; as an op input it maps to the -4 designator.
   GeometryWhiteInput,
+  // vec4(input.rgb, 1.0) over a COMPUTED input — the child input environment a two-child xfer
+  // builds when its own input is a computed node C (the runtime feeds the children
+  // vec4(inputColor.rgb, 1.0)). Unlike the GeometryColorOpaqueInput designator this is a real
+  // chain slot (OP_INPUT_OPAQUE), because the source value is a runtime result register.
+  InputOpaque,
+  // in0 * in1.a — the two-child xfer epilogue's re-multiply by the xfer input's alpha, with a
+  // computed input C supplying the alpha. A real chain slot (OP_MUL_ALPHA).
+  MulAlpha,
 };
 
 enum class EffectDomain {
@@ -369,6 +377,10 @@ class AOTNodeBuilder {
                          AOTNodeID* output);
 
   bool addGeometryCoverage(AOTNodeID* output);
+
+  bool addInputOpaque(AOTNodeID input, AOTNodeID* output);
+
+  bool addMulAlpha(AOTNodeID value, AOTNodeID alphaSource, AOTNodeID* output);
 
   bool finish(AOTNodeID root, AOTEffectGraph* graph) const;
 

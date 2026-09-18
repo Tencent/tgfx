@@ -56,6 +56,9 @@ constexpr int AARectCoverage = 8;
 constexpr int Gradient = 9;
 constexpr int LocalRectCoverage = 10;
 constexpr int RRectCoverage = 11;
+constexpr int TexModulate = 12;
+constexpr int InputOpaque = 13;
+constexpr int MulAlpha = 14;
 
 }  // namespace ChainOp
 

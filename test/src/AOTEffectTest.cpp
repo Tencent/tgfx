@@ -1244,6 +1244,112 @@ TGFX_TEST(AOTEffectTest, WhiteInputFeedsTwoChildBlendChildren) {
   EXPECT_NE(AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0]), nullptr);
 }
 
+// Counterexample audit D4: a texture whose runtime input is a computed value — an alpha-only
+// mask followed by an image-shader texture (the drawImage(A8) + paint.shader shape). The
+// sequential lowering feeds the first texture's node into the second as its input, so the
+// second texture's modulation source is a computed register, not a designator. The kernel's
+// sampling slot must stay in the leading block (static sampler binding) while its modulation
+// follows topological order, which the OP_TEX_MODULATE instruction expresses.
+TGFX_TEST(AOTEffectTest, TextureConsumingComputedInputLowersToChain) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  auto maskTexture = MakeTextureProcessor(context, &allocator, PixelFormat::ALPHA_8);
+  auto imageTexture = MakeTextureProcessor(context, &allocator, PixelFormat::RGBA_8888);
+  ASSERT_NE(maskTexture, nullptr);
+  ASSERT_NE(imageTexture, nullptr);
+
+  AOTEffectGraph graph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower({maskTexture.get(), imageTexture.get()}, &graph));
+  AOTEffectPlan plan;
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
+  ASSERT_EQ(plan.passes.size(), 1u);
+  EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
+  auto processor = AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0]);
+  ASSERT_NE(processor, nullptr);
+  auto chain = static_cast<const AOTPointwiseChainProcessor*>(processor.get());
+  // Slots: [mask texture (alpha-only color root: bit1 splat + full-input modulate, P1.1
+  // semantics), image texture (raw sampling, computed input), TEX_MODULATE]. The modulate
+  // instruction reads the image leaf's prefetched sample and the mask slot's result register:
+  // the RGBA readback is sample * input.a, in topological order after the producer.
+  ASSERT_GE(chain->slotCount(), 3u);
+  EXPECT_EQ(chain->slot(0).op, AOTChainOp::Texture);
+  EXPECT_EQ(chain->slot(0).textureAlphaOnly, 1);
+  EXPECT_EQ(chain->slot(0).textureModulateFullInput, 1);
+  EXPECT_EQ(chain->slot(1).op, AOTChainOp::Texture);
+  EXPECT_EQ(chain->slot(1).textureModulate, 0);
+  EXPECT_EQ(chain->slot(1).textureAlphaOnly, 0);
+  EXPECT_EQ(chain->slot(2).op, AOTChainOp::TexModulate);
+  EXPECT_EQ(chain->slot(2).texModulateSourceSlot, 1);
+  EXPECT_EQ(chain->slot(2).texModulateAlphaOnly, 0);
+  EXPECT_EQ(chain->slot(2).in0, chain->slot(0).outRegister);
+}
+
+// Counterexample audit P2.3: a two-child xfer whose input is a computed node — a mask texture
+// followed by a two-child blend (the drawImage(A8) + paint.shader=BlendShader shape). The
+// runtime feeds the children vec4(C.rgb, 1.0) and re-multiplies the blend output by C.a; the
+// lowering expresses both halves explicitly: an InputOpaque node for the children's
+// environment (which itself is a computed input to the child textures, exercising the
+// TEX_MODULATE path) and a MulAlpha instruction for the epilogue.
+TGFX_TEST(AOTEffectTest, TwoChildBlendOverComputedInputLowers) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  auto maskTexture = MakeTextureProcessor(context, &allocator, PixelFormat::ALPHA_8);
+  auto textureA = MakeTextureProcessor(context, &allocator, PixelFormat::RGBA_8888);
+  auto textureB = MakeTextureProcessor(context, &allocator, PixelFormat::RGBA_8888);
+  ASSERT_NE(maskTexture, nullptr);
+  ASSERT_NE(textureA, nullptr);
+  ASSERT_NE(textureB, nullptr);
+  auto blend = XfermodeFragmentProcessor::MakeFromTwoProcessors(
+      &allocator, std::move(textureA), std::move(textureB), BlendMode::Multiply);
+  ASSERT_NE(blend, nullptr);
+
+  AOTEffectGraph graph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower({maskTexture.get(), blend.get()}, &graph));
+  AOTEffectPlan plan;
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
+  ASSERT_EQ(plan.passes.size(), 1u);
+  EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
+  auto processor = AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0]);
+  ASSERT_NE(processor, nullptr);
+  auto chain = static_cast<const AOTPointwiseChainProcessor*>(processor.get());
+  // The mask leaf is an alpha-only color root; the two child textures sample raw and modulate
+  // through TEX_MODULATE over the InputOpaque node; the blend carries no selector alpha bit;
+  // the MulAlpha epilogue reads the blend result and the mask's register.
+  int inputOpaqueCount = 0;
+  int mulAlphaCount = 0;
+  int texModulateCount = 0;
+  int maskRegister = -1;
+  for (size_t index = 0; index < chain->slotCount(); ++index) {
+    const auto& slot = chain->slot(index);
+    if (slot.op == AOTChainOp::Texture && slot.textureAlphaOnly != 0) {
+      maskRegister = slot.outRegister;
+    }
+    if (slot.op == AOTChainOp::InputOpaque) {
+      ++inputOpaqueCount;
+      EXPECT_EQ(slot.in0, maskRegister);
+    }
+    if (slot.op == AOTChainOp::MulAlpha) {
+      ++mulAlphaCount;
+      EXPECT_EQ(slot.in1, maskRegister);
+    }
+    if (slot.op == AOTChainOp::TexModulate) {
+      ++texModulateCount;
+      EXPECT_EQ(slot.texModulateAlphaOnly, 0);
+    }
+    if (slot.op == AOTChainOp::Blend) {
+      EXPECT_EQ(slot.blend.multiplyInputAlpha, 0);
+    }
+  }
+  EXPECT_EQ(inputOpaqueCount, 1);
+  EXPECT_EQ(mulAlphaCount, 1);
+  EXPECT_EQ(texModulateCount, 2);
+  EXPECT_GE(maskRegister, 0);
+}
+
 TGFX_TEST(AOTEffectTest, PerlinNoisePlusTwoOpsFusesToSinglePass) {
   ContextScope scope;
   auto context = scope.getContext();

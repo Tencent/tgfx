@@ -174,6 +174,20 @@ bool AOTNodeBuilder::addGradientSource(AOTNodeID input, const AOTGradientParamet
   return addUnaryNode(AOTEffectKind::GradientSource, input, traits, parameters, output);
 }
 
+bool AOTNodeBuilder::addInputOpaque(AOTNodeID input, AOTNodeID* output) {
+  // Forcing the alpha to 1.0 changes the alpha representation, and the input's RGB is consumed
+  // verbatim, so this is pointwise over the input color without preserving either invariant.
+  EffectTraits traits = {EffectDomain::Pointwise, EffectInputUsage::ColorRGBA, false, false, false};
+  return addUnaryNode(AOTEffectKind::InputOpaque, input, traits, {}, output);
+}
+
+bool AOTNodeBuilder::addMulAlpha(AOTNodeID value, AOTNodeID alphaSource, AOTNodeID* output) {
+  // A plain multiply of two already-evaluated chain values at the same coordinate: pointwise.
+  // The alpha multiply changes the alpha representation.
+  EffectTraits traits = {EffectDomain::Pointwise, EffectInputUsage::ColorRGBA, false, false, false};
+  return addBinaryNode(AOTEffectKind::MulAlpha, value, alphaSource, traits, {}, output);
+}
+
 bool AOTNodeBuilder::addGeometryCoverage(AOTNodeID* output) {
   if (output == nullptr || !nodes.empty()) {
     return false;

@@ -373,15 +373,50 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
     nodes.push_back(node);
   }
   std::vector<size_t> slotOf(nodes.size(), SIZE_MAX);
+  // For a computed-input texture node, the leading raw-sampling slot's position (sampler
+  // binding); the node's value for consumers is the topologically-ordered TEX_MODULATE slot
+  // tracked in slotOf.
+  std::vector<size_t> rawSlotOf(nodes.size(), SIZE_MAX);
   std::vector<size_t> ordered = {};
   ordered.reserve(pass.nodes.size() + covCount);
+  // A texture whose input is a computed node (not one of the designators): its sampling needs
+  // no computed value, but its modulation must follow the producer, so the node occupies a raw
+  // sampling slot in the leading block plus a TEX_MODULATE slot in the op phase.
+  auto hasComputedInput = [&](size_t combined) {
+    auto* node = nodes[combined];
+    if (node->kind != AOTEffectKind::TextureSource || node->inputs.empty()) {
+      return false;
+    }
+    const size_t inputBase = combined < colorCount ? 0 : colorCount;
+    auto* inputNode = nodes[inputBase + node->inputs[0].index()];
+    if (inputNode == nullptr) {
+      return false;
+    }
+    return inputNode->kind != AOTEffectKind::GeometryColor &&
+           inputNode->kind != AOTEffectKind::GeometryColorOpaqueInput &&
+           inputNode->kind != AOTEffectKind::GeometryWhiteInput &&
+           inputNode->kind != AOTEffectKind::GeometryCoverage;
+  };
   // Texture leaves first (color pass, then coverage subtree), then the remaining nodes in
   // topological order (color ops, then coverage ops). The two subtrees never reference each
-  // other, so this layout keeps every input ahead of its consumer.
+  // other, so this layout keeps every input ahead of its consumer. A computed-input texture
+  // appears in both phases: the texture phase holds its raw sampling slot, the op phase its
+  // TEX_MODULATE instruction (slotOf points there, so consumers reference the modulated value).
   auto collect = [&](bool texturePhase) {
     for (auto nodeID : pass.nodes) {
       auto* node = graph.nodeAt(nodeID);
-      if ((node->kind == AOTEffectKind::TextureSource) == texturePhase) {
+      if (node->kind == AOTEffectKind::TextureSource) {
+        if (texturePhase) {
+          rawSlotOf[nodeID.index()] = ordered.size();
+          ordered.push_back(nodeID.index());
+          if (!hasComputedInput(nodeID.index())) {
+            slotOf[nodeID.index()] = rawSlotOf[nodeID.index()];
+          }
+        } else if (slotOf[nodeID.index()] == SIZE_MAX) {
+          slotOf[nodeID.index()] = ordered.size();
+          ordered.push_back(nodeID.index());
+        }
+      } else if (!texturePhase) {
         slotOf[nodeID.index()] = ordered.size();
         ordered.push_back(nodeID.index());
       }
@@ -396,7 +431,18 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
             node->kind == AOTEffectKind::GeometryColorOpaqueInput) {
           continue;
         }
-        if ((node->kind == AOTEffectKind::TextureSource) == texturePhase) {
+        if (node->kind == AOTEffectKind::TextureSource) {
+          if (texturePhase) {
+            rawSlotOf[colorCount + index] = ordered.size();
+            ordered.push_back(colorCount + index);
+            if (!hasComputedInput(colorCount + index)) {
+              slotOf[colorCount + index] = rawSlotOf[colorCount + index];
+            }
+          } else if (slotOf[colorCount + index] == SIZE_MAX) {
+            slotOf[colorCount + index] = ordered.size();
+            ordered.push_back(colorCount + index);
+          }
+        } else if (!texturePhase) {
           slotOf[colorCount + index] = ordered.size();
           ordered.push_back(colorCount + index);
         }
@@ -430,59 +476,75 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
     auto& slot = slots[index];
     switch (node->kind) {
       case AOTEffectKind::TextureSource: {
+        if (index != rawSlotOf[combined]) {
+          // Op-phase entry of a computed-input texture: the explicit modulate instruction.
+          // Its input is the producing node's register (any computed node — an upstream
+          // texture, a gradient, an operator), and its source is the raw sample prefetched
+          // into chainLeafTex at the leading slot. The two modulations mirror the runtime
+          // TextureEffect readback: alpha-only is sample.a * inputColor, RGBA is
+          // sample * inputColor.a.
+          auto* textureParameters = std::get_if<AOTTextureParameters>(&node->parameters);
+          if (textureParameters == nullptr) {
+            return nullptr;
+          }
+          slot.op = AOTChainOp::TexModulate;
+          slot.in0 = mapInput(node->inputs[0]);
+          slot.texModulateSourceSlot = static_cast<int>(rawSlotOf[combined]);
+          slot.texModulateAlphaOnly = textureParameters->isAlphaOnly ? 1 : 0;
+          if (slot.in0 < 0) {
+            // The producer is a designator after all (hasComputedInput disagreed with
+            // mapInput) or is not part of this pass; both are build errors.
+            return nullptr;
+          }
+          if (slot.texModulateSourceSlot >= MaxFusedAOTSamplers) {
+            return nullptr;
+          }
+          break;
+        }
         auto leaf = BuildFPForNode(allocator, node, nullptr);
         if (leaf == nullptr || leaf->name() != "TextureEffect") {
           return nullptr;
         }
-        // Input-environment guard: a texture's input must be one of the designator nodes the
-        // lowering produces — the geometry color (a color source modulating by the paint alpha),
-        // the opaque geometry input (a two-child blend operand), white (a single-child blend
-        // operand or a folded mask), or the coverage unit (a coverage leaf). A computed input
-        // means a shape whose runtime semantics (sample * inputColor) the chain's raw or
-        // designator-driven sampling does not reproduce; refuse instead of silently sampling raw.
-        if (!node->inputs.empty()) {
-          auto* inputNode = nodes[inputBase + node->inputs[0].index()];
-          if (inputNode != nullptr && inputNode->kind != AOTEffectKind::GeometryColor &&
-              inputNode->kind != AOTEffectKind::GeometryColorOpaqueInput &&
-              inputNode->kind != AOTEffectKind::GeometryWhiteInput &&
-              inputNode->kind != AOTEffectKind::GeometryCoverage) {
-            return nullptr;
-          }
-        }
         slot.op = AOTChainOp::Texture;
-        // A texture fed directly by the geometry color is a color source and gets the paint-alpha
-        // modulation folded into its read (as the runtime's SrcIn wrap does). Any other texture —
-        // a coverage mask or a blend operand — must sample raw, matching the runtime emission.
-        const bool inputIsGeometryColor =
-            !node->inputs.empty() && inputBase == 0 && node->inputs[0] == AOTNodeID(0);
-        slot.textureModulate = inputIsGeometryColor ? 1 : 0;
-        // A leaf that is the coverage subtree's root modulates by the coverage unit's alpha
-        // (bit 2), matching the runtime coverage-FP readback (tex * coverageIn.a).
-        if (isCoverageRoot && !node->inputs.empty() && node->inputs[0].index() == 0) {
-          slot.textureModulateUnit = 1;
-        }
-        // Alpha-only leaves (e.g. shape masks) need the kernel to splat .r into all channels; the
-        // raw sample would otherwise read alpha as constant 1.
-        slot.textureAlphaOnly =
-            static_cast<const TextureEffect*>(leaf.get())->isAlphaOnly() ? 1 : 0;
-        // The runtime alpha-only readback is sample.a * inputColor, so the leaf's input
-        // environment decides the modulation shape — expressed as ONE complete operation per
-        // shape: the color root multiplies by the full geometry color in a single step (bit 4;
-        // the RGB is already premultiplied, so one multiply carries both halves — the former
-        // bit0+bit3 pair applied the paint alpha to the RGB twice), and a two-child blend
-        // operand — whose input node is the opaque geometry designator — multiplies by
-        // (geom.rgb, 1.0) (bit 3) because the xfer emission feeds each child
-        // vec4(inputColor.rgb, 1.0). White inputs (single-child operands, folded masks) and
-        // coverage leaves keep the raw splat, matching the runtime emission.
-        bool inputIsOpaqueDesignator = !node->inputs.empty() &&
-                                       nodes[inputBase + node->inputs[0].index()] != nullptr &&
-                                       nodes[inputBase + node->inputs[0].index()]->kind ==
-                                           AOTEffectKind::GeometryColorOpaqueInput;
-        if (slot.textureAlphaOnly != 0 && inputIsGeometryColor) {
-          slot.textureModulate = 0;
-          slot.textureModulateFullInput = 1;
-        } else if (slot.textureAlphaOnly != 0 && inputIsOpaqueDesignator) {
-          slot.textureModulateGeometryRGB = 1;
+        // Texture-phase entry of a computed-input texture is raw sampling only: the modulation
+        // lives in the op-phase TEX_MODULATE slot, so no flags here, and the result register
+        // stays dead because only the modulate instruction reads the prefetched sample.
+        const bool rawSamplingOnly = slotOf[combined] != index;
+        if (!rawSamplingOnly) {
+          // A texture fed directly by the geometry color is a color source and gets the paint-alpha
+          // modulation folded into its read (as the runtime's SrcIn wrap does). Any other texture —
+          // a coverage mask or a blend operand — must sample raw, matching the runtime emission.
+          const bool inputIsGeometryColor =
+              !node->inputs.empty() && inputBase == 0 && node->inputs[0] == AOTNodeID(0);
+          slot.textureModulate = inputIsGeometryColor ? 1 : 0;
+          // A leaf that is the coverage subtree's root modulates by the coverage unit's alpha
+          // (bit 2), matching the runtime coverage-FP readback (tex * coverageIn.a).
+          if (isCoverageRoot && !node->inputs.empty() && node->inputs[0].index() == 0) {
+            slot.textureModulateUnit = 1;
+          }
+          // Alpha-only leaves (e.g. shape masks) need the kernel to splat .r into all channels; the
+          // raw sample would otherwise read alpha as constant 1.
+          slot.textureAlphaOnly =
+              static_cast<const TextureEffect*>(leaf.get())->isAlphaOnly() ? 1 : 0;
+          // The runtime alpha-only readback is sample.a * inputColor, so the leaf's input
+          // environment decides the modulation shape — expressed as ONE complete operation per
+          // shape: the color root multiplies by the full geometry color in a single step (bit 4;
+          // the RGB is already premultiplied, so one multiply carries both halves — the former
+          // bit0+bit3 pair applied the paint alpha to the RGB twice), and a two-child blend
+          // operand — whose input node is the opaque geometry designator — multiplies by
+          // (geom.rgb, 1.0) (bit 3) because the xfer emission feeds each child
+          // vec4(inputColor.rgb, 1.0). White inputs (single-child operands, folded masks) and
+          // coverage leaves keep the raw splat, matching the runtime emission.
+          bool inputIsOpaqueDesignator = !node->inputs.empty() &&
+                                         nodes[inputBase + node->inputs[0].index()] != nullptr &&
+                                         nodes[inputBase + node->inputs[0].index()]->kind ==
+                                             AOTEffectKind::GeometryColorOpaqueInput;
+          if (slot.textureAlphaOnly != 0 && inputIsGeometryColor) {
+            slot.textureModulate = 0;
+            slot.textureModulateFullInput = 1;
+          } else if (slot.textureAlphaOnly != 0 && inputIsOpaqueDesignator) {
+            slot.textureModulateGeometryRGB = 1;
+          }
         }
         if (coverageLeafFromUVCoord && inputBase != 0) {
           // Atlas text: the coverage leaf sources its coordinates from the maskCoord attribute
@@ -533,6 +595,23 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
         slot.alphaThreshold = pointwise.alphaThreshold;
         slot.colorSpaceXform = pointwise.colorSpaceXform;
         slot.in0 = mapInput(node->inputs[0]);
+        break;
+      }
+      case AOTEffectKind::InputOpaque: {
+        if (node->inputs.size() != 1) {
+          return nullptr;
+        }
+        slot.op = AOTChainOp::InputOpaque;
+        slot.in0 = mapInput(node->inputs[0]);
+        break;
+      }
+      case AOTEffectKind::MulAlpha: {
+        if (node->inputs.size() != 2) {
+          return nullptr;
+        }
+        slot.op = AOTChainOp::MulAlpha;
+        slot.in0 = mapInput(node->inputs[0]);
+        slot.in1 = mapInput(node->inputs[1]);
         break;
       }
       case AOTEffectKind::Blend: {
@@ -609,7 +688,8 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
         return nullptr;
     }
     if (slot.op != AOTChainOp::Texture &&
-        (slot.in0 == -2 || (slot.op == AOTChainOp::Blend && slot.in1 == -2))) {
+        (slot.in0 == -2 ||
+         ((slot.op == AOTChainOp::Blend || slot.op == AOTChainOp::MulAlpha) && slot.in1 == -2))) {
       return nullptr;
     }
   }

@@ -19,6 +19,9 @@
 #define OP_TEXTURE 5
 #define OP_CONST_COLOR 6
 #define OP_BLEND 7
+#define OP_TEX_MODULATE 12
+#define OP_INPUT_OPAQUE 13
+#define OP_MUL_ALPHA 14
 #define OP_AARECT_COVERAGE 8
 #define OP_GRADIENT 9
 #define OP_LOCAL_RECT_COVERAGE 10
@@ -94,6 +97,40 @@ vec4 evalChainSlot(int slot) {
              : Packed.y == -5 ? vec4(TGFX_CHAIN_GEOM_COLOR.rgb, 1.0)
              : Packed.y < 0   ? vec4(0.0)
                               : chainResults[Packed.y];
+  vec4 in1 = Packed.z == -1   ? TGFX_CHAIN_GEOM_COLOR
+             : Packed.z == -3 ? TGFX_CHAIN_UNIT_COVERAGE
+             : Packed.z == -4 ? vec4(1.0)
+             : Packed.z == -5 ? vec4(TGFX_CHAIN_GEOM_COLOR.rgb, 1.0)
+             : Packed.z < 0   ? vec4(0.0)
+                              : chainResults[Packed.z];
+  if (Packed.x == OP_TEX_MODULATE) {
+    // A texture whose runtime input is a computed value splits into a raw sampling slot in the
+    // leading block (static sampler binding) plus this modulate instruction in topological
+    // order. chainLeafTex is prefetched in main and never recycled, so any later slot may read
+    // it by index. The two modulations mirror the runtime TextureEffect readback line for line
+    // (GLSLTextureEffect::emitCode): alpha-only is sample.a * inputColor, RGBA is
+    // sample * inputColor.a. The source slot ordinal and the alpha-only flag ride the
+    // selector (bits 16-19 and bit 0), not Packed.z, because the register allocator rewrites
+    // every non-negative Packed.y/Packed.z into a result register index.
+    int srcSlot = (Packed.w >> 16) & 0xF;
+    vec4 tex = chainLeafTex[srcSlot];
+    if ((Packed.w & 1) != 0) {
+      return vec4(tex.r) * in0;
+    }
+    return tex * in0.a;
+  }
+  if (Packed.x == OP_INPUT_OPAQUE) {
+    // A two-child xfer whose input is a computed node C feeds its children
+    // vec4(inputColor.rgb, 1.0); this instruction materializes that child input environment
+    // as an ordinary chain value (the runtime's alpha override applied to C).
+    return vec4(in0.rgb, 1.0);
+  }
+  if (Packed.x == OP_MUL_ALPHA) {
+    // The two-child xfer epilogue re-multiplies the blended output by the xfer input's alpha;
+    // with a computed input C that alpha is C.a, so the multiply is an explicit instruction
+    // rather than the selector's fixed geometry-alpha bit.
+    return in0 * in1.a;
+  }
   if (Packed.x == OP_CONST_COLOR) {
     vec4 ConstColor = SlotConstColor[slot];
     // The input mode occupies the selector's low bits; bits 20-24 carry the result register.
@@ -107,12 +144,6 @@ vec4 evalChainSlot(int slot) {
     return ConstColor;
   }
   if (Packed.x == OP_BLEND) {
-    vec4 in1 = Packed.z == -1   ? TGFX_CHAIN_GEOM_COLOR
-               : Packed.z == -3 ? TGFX_CHAIN_UNIT_COVERAGE
-               : Packed.z == -4 ? vec4(1.0)
-               : Packed.z == -5 ? vec4(TGFX_CHAIN_GEOM_COLOR.rgb, 1.0)
-               : Packed.z < 0   ? vec4(0.0)
-                                : chainResults[Packed.z];
     vec4 blendResult = xpBlendColors(in0, in1, Packed.w & 0xFF);
     // Bit 8 of the selector: the two-child xfer epilogue re-multiplies by the input color's
     // alpha, which at the color root is the geometry color's alpha.

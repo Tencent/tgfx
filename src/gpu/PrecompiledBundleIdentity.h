@@ -41,7 +41,7 @@ namespace tgfx {
  * what the bytes mean; the writer picks the new value up automatically and the loader then
  * refuses every older bundle instead of feeding mismatched layouts to the GPU.
  */
-inline constexpr uint32_t kExpectedToolchainABI = 0x00010000u;
+inline constexpr uint32_t kExpectedToolchainABI = 0x00010001u;
 
 inline uint64_t BundleIdentityHashInit() {
   return 0x54475346424E4443ULL;  // "TGSF BNDC"

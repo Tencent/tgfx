@@ -1112,7 +1112,10 @@ TGFX_TEST(ShaderPermutationTest, BundleReflectionContractsWithVerifiedIdentity) 
 // with a different ABI — older or newer — must be rejected outright rather than fed to the
 // matchers, whose reflection grammar and uniform contracts it predates or postdates.
 TGFX_TEST(ShaderPermutationTest, BundleRejectsIncompatibleToolchainABI) {
-  for (uint32_t stamped : {0x00000000u, 0x00000001u, 0x00010001u, 0xFFFFFFFFu}) {
+  // Derived from the expected ABI so a bump never collides with a hard-coded "mismatch" value
+  // (the historical 0x00010001 stamp became the expected ABI itself after the P2 bump).
+  for (uint32_t stamped :
+       {0x00000000u, kExpectedToolchainABI - 1u, kExpectedToolchainABI + 1u, 0xFFFFFFFFu}) {
     SCOPED_TRACE(stamped);
     auto bundle = MakeTestBundle("toolchain", 1, 0, 50);
     TestWriteU32LE(bundle.data() + 16, stamped);

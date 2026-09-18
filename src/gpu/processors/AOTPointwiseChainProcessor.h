@@ -42,6 +42,9 @@ enum class AOTChainOp : int {
   Gradient = ChainOp::Gradient,
   LocalRectCoverage = ChainOp::LocalRectCoverage,
   RRectCoverage = ChainOp::RRectCoverage,
+  TexModulate = ChainOp::TexModulate,
+  InputOpaque = ChainOp::InputOpaque,
+  MulAlpha = ChainOp::MulAlpha,
 };
 
 /// One node of a pointwise DAG after flattening into the fused kernel's instruction array.
@@ -81,6 +84,12 @@ struct AOTChainSlot {
   // Set on a leaf that is the coverage subtree's root, matching the runtime coverage-FP readback
   // (tex * coverageIn.a).
   int textureModulateUnit = 0;
+  // OP_TEX_MODULATE only: the leading raw-sampling texture slot this instruction reads (packed
+  // into selector bits 16-19), and whether that leaf is alpha-only (selector bit 0 — the same
+  // encoding the texture slot itself uses for bit 1, reused because the raw slot's own flags
+  // are all clear).
+  int texModulateSourceSlot = -1;
+  int texModulateAlphaOnly = 0;
   AOTColorMatrixParameters colorMatrix = {};
   AOTLumaParameters luma = {};
   AOTAlphaThresholdParameters alphaThreshold = {};

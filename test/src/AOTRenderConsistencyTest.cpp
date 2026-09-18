@@ -4243,6 +4243,154 @@ TGFX_TEST(AOTRenderConsistencyTest, MeshColorBlendShaderWithTwoChildBlend) {
   ExpectBitmapsIdentical("mesh-color-blend-shader-two-child", candidate, reference, size, size);
 }
 
+// Counterexample audit D4: an alpha-only image drawn with a paint that carries a shader.
+// GetBrushForImage keeps the shader for alpha-only images, so the draw carries two color FPs —
+// the A8 image's texture first, the paint shader's texture second, the second consuming the
+// first's output as its runtime input (sample * input.a). The chain previously refused the
+// computed input; the raw-sampling slot plus the topologically-ordered TEX_MODULATE
+// instruction now carries it.
+TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyImageWithPaintShaderMatchesRuntime) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  constexpr int size = 96;
+  Bitmap maskBitmap = {};
+  ASSERT_TRUE(maskBitmap.allocPixels(size, size, true));
+  auto* maskPixels = static_cast<uint8_t*>(maskBitmap.lockPixels());
+  ASSERT_NE(maskPixels, nullptr);
+  auto rowBytes = maskBitmap.rowBytes();
+  for (size_t y = 0; y < static_cast<size_t>(size); ++y) {
+    for (size_t x = 0; x < static_cast<size_t>(size); ++x) {
+      maskPixels[y * rowBytes + x] = static_cast<uint8_t>((x * 3 + y * 5) % 256);
+    }
+  }
+  maskBitmap.unlockPixels();
+  auto maskImage = Image::MakeFrom(maskBitmap);
+  ASSERT_NE(maskImage, nullptr);
+  auto patternImage = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_NE(patternImage, nullptr);
+  auto patternShader = Shader::MakeImageShader(patternImage, TileMode::Clamp, TileMode::Clamp);
+  ASSERT_NE(patternShader, nullptr);
+  auto renderScene = [&](Bitmap* outBitmap) {
+    auto surface = Surface::Make(context, size, size);
+    ASSERT_NE(surface, nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::Transparent());
+    Paint paint = {};
+    paint.setColor(Color::Red());
+    paint.setShader(patternShader);
+    canvas->drawImage(maskImage, 0, 0, &paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(size, size));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_NE(pixels, nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+  };
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  {
+    cache->unload();
+    ScopedAOTDeliberateMiss deliberate(context);
+    renderScene(&reference);
+  }
+  {
+    auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+    ASSERT_NE(bundleData, nullptr);
+    ASSERT_GT(bundleBytes, 0u);
+    ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+    cache->setDecompositionEnabled(true);
+    cache->setDiagnosticRecordingEnabled(true);
+    cache->resetStats();
+    context->globalCache()->resetProgramStats();
+    renderScene(&candidate);
+    // The D4 expression gap is closed: the two-texture tree rides the precompiled chain.
+    EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
+    cache->setDiagnosticRecordingEnabled(false);
+    cache->unload();
+    context->globalCache()->clearPrograms();
+  }
+  ExpectBitmapsIdentical("alpha-only-image-with-paint-shader", candidate, reference, size, size);
+}
+
+// Counterexample audit P2.3, end to end: an alpha-only image drawn with a paint whose shader is
+// a BlendShader. The color chain carries [A8 texture, two-child blend over the blend shader's
+// children], so the blend's xfer input is the mask texture's computed output. The runtime
+// feeds the children vec4(C.rgb, 1.0) and re-multiplies the blend result by C.a; the chain
+// expresses this through the InputOpaque and MulAlpha instructions over TEX_MODULATE children.
+TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyImageWithBlendShaderMatchesRuntime) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  constexpr int size = 96;
+  Bitmap maskBitmap = {};
+  ASSERT_TRUE(maskBitmap.allocPixels(size, size, true));
+  auto* maskPixels = static_cast<uint8_t*>(maskBitmap.lockPixels());
+  ASSERT_NE(maskPixels, nullptr);
+  auto rowBytes = maskBitmap.rowBytes();
+  for (size_t y = 0; y < static_cast<size_t>(size); ++y) {
+    for (size_t x = 0; x < static_cast<size_t>(size); ++x) {
+      maskPixels[y * rowBytes + x] = static_cast<uint8_t>((x * 3 + y * 5) % 256);
+    }
+  }
+  maskBitmap.unlockPixels();
+  auto maskImage = Image::MakeFrom(maskBitmap);
+  ASSERT_NE(maskImage, nullptr);
+  auto imageA = MakeImage("resources/apitest/mandrill_128.png");
+  auto imageB = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_NE(imageA, nullptr);
+  ASSERT_NE(imageB, nullptr);
+  auto shaderA = Shader::MakeImageShader(imageA, TileMode::Clamp, TileMode::Clamp);
+  auto shaderB = Shader::MakeImageShader(imageB, TileMode::Clamp, TileMode::Clamp);
+  ASSERT_NE(shaderA, nullptr);
+  ASSERT_NE(shaderB, nullptr);
+  auto blendShader = Shader::MakeBlend(BlendMode::Multiply, shaderA, shaderB);
+  ASSERT_NE(blendShader, nullptr);
+  auto renderScene = [&](Bitmap* outBitmap) {
+    auto surface = Surface::Make(context, size, size);
+    ASSERT_NE(surface, nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::Transparent());
+    Paint paint = {};
+    paint.setColor(Color::Red());
+    paint.setShader(blendShader);
+    canvas->drawImage(maskImage, 0, 0, &paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(size, size));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_NE(pixels, nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+  };
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  {
+    cache->unload();
+    ScopedAOTDeliberateMiss deliberate(context);
+    renderScene(&reference);
+  }
+  {
+    auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+    ASSERT_NE(bundleData, nullptr);
+    ASSERT_GT(bundleBytes, 0u);
+    ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+    cache->setDecompositionEnabled(true);
+    cache->setDiagnosticRecordingEnabled(true);
+    cache->resetStats();
+    context->globalCache()->resetProgramStats();
+    renderScene(&candidate);
+    EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
+    cache->setDiagnosticRecordingEnabled(false);
+    cache->unload();
+    context->globalCache()->clearPrograms();
+  }
+  ExpectBitmapsIdentical("alpha-only-image-with-blend-shader", candidate, reference, size, size);
+}
+
 // Counterexample audit B3: two stacked analytic AA clips over an AA oval. The coverage subtree is
 // a two-level analytic chain (RectEffect x2) while the GP emits a fractional coverage at the oval
 // edge. The chain must keep the GP coverage as the chain's starting unit: at pixels where both

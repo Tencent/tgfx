@@ -46,6 +46,11 @@ static void UploadChainSlot(UniformData* uniformData, size_t index, const AOTCha
                (slot.textureModulateUnit << 2) | (slot.textureModulateGeometryRGB << 3) |
                (slot.textureModulateFullInput << 4);
   }
+  if (slot.op == AOTChainOp::TexModulate) {
+    // Bit 0: the source leaf is alpha-only. Bits 16-19: the leading raw-sampling slot's index
+    // into chainLeafTex (not Packed.z, which the register allocator rewrites).
+    selector = slot.texModulateAlphaOnly | (slot.texModulateSourceSlot << 16);
+  }
   if (slot.op == AOTChainOp::RRectCoverage) {
     // Bits 16-19: the slot's ordinal into the CoverageRRect* parameter arrays.
     selector = rrectOrdinal << 16;

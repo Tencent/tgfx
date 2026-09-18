@@ -316,6 +316,11 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
         // A designator-only input node (two-child xfer children / single-child xfer child): never
         // a chain slot, so it stays out of the pass node list.
         continue;
+      case AOTEffectKind::InputOpaque:
+      case AOTEffectKind::MulAlpha:
+        // Explicit input-environment and epilogue instructions for a two-child xfer over a
+        // computed input; real chain slots (OP_INPUT_OPAQUE / OP_MUL_ALPHA).
+        break;
       default:
         // GeometryColor only legal at index 0; anything else (Gather/Neighborhood/External) is not
         // fusable into one pass.
