@@ -4173,6 +4173,76 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyColorRootPaintAlphaBelowOne) {
   ExpectBitmapsIdentical("alpha-only-color-root-paint-alpha", candidate, reference, size, size);
 }
 
+// Counterexample audit D3: a single-child xfer whose child contains a two-child blend, reached
+// through public APIs by drawMesh with vertex colors and a blend shader. The mesh route wraps
+// the shader in a Modulate SrcChild xfer whose child lowers from the white input, and the child
+// (the two-child BlendShader) previously refused that white input — an expression gap, not a
+// semantic limit: the runtime feeds the xfer children vec4(inputColor.rgb, 1.0), and against
+// white both the child input and the output's input-alpha multiply are the identity, so the
+// chain can carry the tree verbatim.
+TGFX_TEST(AOTRenderConsistencyTest, MeshColorBlendShaderWithTwoChildBlend) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  constexpr int size = 96;
+  auto imageA = MakeImage("resources/apitest/mandrill_128.png");
+  auto imageB = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_NE(imageA, nullptr);
+  ASSERT_NE(imageB, nullptr);
+  auto renderScene = [&](Bitmap* outBitmap) {
+    auto surface = Surface::Make(context, size, size);
+    ASSERT_NE(surface, nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::White());
+    auto shaderA = Shader::MakeImageShader(imageA, TileMode::Clamp, TileMode::Clamp);
+    auto shaderB = Shader::MakeImageShader(imageB, TileMode::Clamp, TileMode::Clamp);
+    ASSERT_NE(shaderA, nullptr);
+    ASSERT_NE(shaderB, nullptr);
+    auto blendShader = Shader::MakeBlend(BlendMode::Multiply, shaderA, shaderB);
+    ASSERT_NE(blendShader, nullptr);
+    Point positions[] = {{8, 8}, {size - 8, 8}, {8, size - 8}, {size - 8, size - 8}};
+    Color colors[] = {Color::White(), Color::White(), Color::White(), Color::White()};
+    auto mesh = Mesh::MakeCopy(MeshTopology::TriangleStrip, 4, positions, nullptr, colors);
+    ASSERT_NE(mesh, nullptr);
+    Paint paint = {};
+    paint.setShader(blendShader);
+    canvas->drawMesh(mesh, paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(size, size));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_NE(pixels, nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+  };
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  {
+    cache->unload();
+    ScopedAOTDeliberateMiss deliberate(context);
+    renderScene(&reference);
+  }
+  {
+    auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+    ASSERT_NE(bundleData, nullptr);
+    ASSERT_GT(bundleBytes, 0u);
+    ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+    cache->setDecompositionEnabled(true);
+    cache->setDiagnosticRecordingEnabled(true);
+    cache->resetStats();
+    context->globalCache()->resetProgramStats();
+    renderScene(&candidate);
+    // The D3 expression gap is closed: the tree lowers and rides the precompiled chain with no
+    // fallback and no runtime program build.
+    EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
+    cache->setDiagnosticRecordingEnabled(false);
+    cache->unload();
+    context->globalCache()->clearPrograms();
+  }
+  ExpectBitmapsIdentical("mesh-color-blend-shader-two-child", candidate, reference, size, size);
+}
+
 // Counterexample audit B3: two stacked analytic AA clips over an AA oval. The coverage subtree is
 // a two-level analytic chain (RectEffect x2) while the GP emits a fractional coverage at the oval
 // edge. The chain must keep the GP coverage as the chain's starting unit: at pixels where both

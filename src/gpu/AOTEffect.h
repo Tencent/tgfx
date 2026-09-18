@@ -381,6 +381,10 @@ class AOTNodeBuilder {
            nodes[nodeID.index()].kind == AOTEffectKind::GeometryColorOpaqueInput;
   }
 
+  bool isGeometryWhiteInput(AOTNodeID nodeID) const {
+    return contains(nodeID) && nodes[nodeID.index()].kind == AOTEffectKind::GeometryWhiteInput;
+  }
+
  private:
   friend class AOTEffectDecomposer;
   friend class FragmentProcessor;

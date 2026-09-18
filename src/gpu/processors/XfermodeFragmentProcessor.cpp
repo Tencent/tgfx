@@ -168,15 +168,17 @@ bool XfermodeFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID in
       }
       // The runtime feeds both children vec4(inputColor.rgb, 1.0) and re-multiplies the output
       // by the input's alpha. The alpha override is idempotent, so when this xfer's input is
-      // already the opaque-alpha geometry input the children reuse it; otherwise the input must
-      // be the geometry color itself. Any other input keeps the plain route.
+      // already the opaque-alpha geometry input the children reuse it; the white input (a
+      // single-child operand's child environment) already carries opaque alpha and an identity
+      // alpha multiply, so it passes through unchanged. Any other input keeps the plain route.
       inputIsPlainGeometryColor = input == AOTNodeID(0);
       AOTNodeID childInput = input;
       if (inputIsPlainGeometryColor) {
         if (!builder->addGeometryColorOpaqueInput(&childInput)) {
           return false;
         }
-      } else if (!builder->isGeometryColorOpaqueInput(input)) {
+      } else if (!builder->isGeometryColorOpaqueInput(input) &&
+                 !builder->isGeometryWhiteInput(input)) {
         return false;
       }
       if (!childProcessor(0)->lowerToAOT(builder, childInput, &src)) {

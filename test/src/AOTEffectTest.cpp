@@ -1217,6 +1217,33 @@ TGFX_TEST(AOTEffectTest, ChainedRectCoverageFeedsFromUnitCoverage) {
   EXPECT_EQ(chain->slot(2).in0, -3);
 }
 
+TGFX_TEST(AOTEffectTest, WhiteInputFeedsTwoChildBlendChildren) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  // A single-child DstChild xfer (the SrcIn wrap ShaderMaskFilter produces) lowers its child
+  // from the explicit white input; the child here is itself a two-child blend, whose lowering
+  // previously rejected the white input — the D3 expression gap. Against white both the
+  // children's input (vec4(inputColor.rgb, 1.0) == white) and the epilogue's input-alpha
+  // multiply are the identity, so the whole tree must lower and fuse.
+  auto childBlend = XfermodeFragmentProcessor::MakeFromTwoProcessors(
+      &allocator, MakeTextureProcessor(context, &allocator, PixelFormat::RGBA_8888),
+      MakeTextureProcessor(context, &allocator, PixelFormat::RGBA_8888), BlendMode::Multiply);
+  ASSERT_NE(childBlend, nullptr);
+  auto maskWrap = XfermodeFragmentProcessor::MakeFromDstProcessor(&allocator, std::move(childBlend),
+                                                                  BlendMode::SrcIn);
+  ASSERT_NE(maskWrap, nullptr);
+
+  AOTEffectGraph graph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower({maskWrap.get()}, &graph));
+  AOTEffectPlan plan;
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
+  ASSERT_EQ(plan.passes.size(), 1u);
+  EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
+  EXPECT_NE(AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0]), nullptr);
+}
+
 TGFX_TEST(AOTEffectTest, PerlinNoisePlusTwoOpsFusesToSinglePass) {
   ContextScope scope;
   auto context = scope.getContext();
