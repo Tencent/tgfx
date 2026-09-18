@@ -297,19 +297,15 @@ void AOTPointwiseChainProcessor::emitCode(EmitArgs& args) const {
 }
 
 void AOTPointwiseChainProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
-  bytesKey->write(static_cast<uint32_t>(_slotCount));
-  bytesKey->write(static_cast<uint32_t>(rootSlot));
-  bytesKey->write(static_cast<uint32_t>(numChildProcessors()));
-  bytesKey->write(static_cast<uint32_t>(hasMaskChild ? 1 : 0));
-  bytesKey->write(static_cast<uint32_t>(coverageRootSlot + 1));
-  bytesKey->write(coordSourceMask);
-  bytesKey->write(static_cast<uint32_t>(lutLeafIndex + 1));
-  for (size_t index = 0; index < _slotCount; ++index) {
-    bytesKey->write(static_cast<uint32_t>(slots[index].op));
-    if (slots[index].op == AOTChainOp::ColorSpaceXform) {
-      bytesKey->write(ColorSpaceXformSteps::XFormKey(slots[index].colorSpaceXform.steps.get()));
-    }
-  }
+  // The chain's whole instruction structure — slot count, wiring, opcodes, root, coverage root,
+  // coord-source mask, LUT leaf — travels in per-draw uniforms that onSetData rewrites before
+  // every draw, and the base class already keys this processor by class ID plus the children's
+  // keys (texture identities, sampler flags), so the variant selection is preserved. Two chains
+  // sharing a variant and a texture set therefore share one program and the per-draw data
+  // differentiates them; encoding the instruction structure here would split the program cache
+  // by effect topology and defeat the variant reuse that is the point of the chain kernel.
+  static constexpr uint32_t ChainProgramTag = 0xA07C41A7u;
+  bytesKey->write(ChainProgramTag);
 }
 
 void AOTPointwiseChainProcessor::onSetData(UniformData* vertexUniformData,

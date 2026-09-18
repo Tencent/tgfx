@@ -4093,10 +4093,10 @@ TGFX_TEST(AOTRenderConsistencyTest, StackedClipsKeepGPCoverageOnAAEdge) {
 
 // Counterexample audit D1: program identity. Three draws in one context whose color trees share
 // the same variant (same GP layout, one texture leaf, no XP difference) but differ only in the
-// instruction sequence (one matrix vs two matrices vs luma). If the program key correctly
-// collapsed to the artifact/pipeline identity, all three would share one program; if it still
-// encodes the instruction structure, each draw creates a new precompiled program (three artifact
-// creations, zero cache hits). This test records the current behavior so the fix has a baseline.
+// instruction sequence (one matrix vs two matrices vs luma). The program key must collapse to the
+// artifact/pipeline identity — the instruction structure is per-draw uniform data — so all three
+// draws share one program (one artifact creation, two cache hits) while each render keeps its own
+// byte-exact output, proving the per-draw uniforms are rewritten between the interleaved draws.
 TGFX_TEST(AOTRenderConsistencyTest, SameVariantDifferentChainsShareProgram) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -4109,15 +4109,6 @@ TGFX_TEST(AOTRenderConsistencyTest, SameVariantDifferentChainsShareProgram) {
                                           0,    0, 1.15f, 0, 0.02f, 0, 0,    0, 1, 0};
   const std::array<float, 20> swapRedBlue = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0,
                                              1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
-  auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
-  ASSERT_NE(bundleData, nullptr);
-  ASSERT_GT(bundleBytes, 0u);
-  ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
-  cache->setDecompositionEnabled(true);
-  cache->setDiagnosticRecordingEnabled(true);
-  cache->resetStats();
-  context->globalCache()->clearPrograms();
-  context->globalCache()->resetProgramStats();
   auto renderWith = [&](const std::shared_ptr<ColorFilter>& filter) -> Bitmap {
     auto surface = Surface::Make(context, size, size);
     if (surface == nullptr) {
@@ -4142,17 +4133,41 @@ TGFX_TEST(AOTRenderConsistencyTest, SameVariantDifferentChainsShareProgram) {
     bitmap.unlockPixels();
     return bitmap;
   };
-  auto one = renderWith(ColorFilter::Matrix(brighten));
-  auto two = renderWith(
-      ColorFilter::Compose(ColorFilter::Matrix(brighten), ColorFilter::Matrix(swapRedBlue)));
-  auto three = renderWith(ColorFilter::Luma());
+  auto filterOne = ColorFilter::Matrix(brighten);
+  auto filterTwo =
+      ColorFilter::Compose(ColorFilter::Matrix(brighten), ColorFilter::Matrix(swapRedBlue));
+  auto filterThree = ColorFilter::Luma();
+  // Runtime references: the same three filters through the stitching path.
+  Bitmap refOne = {};
+  Bitmap refTwo = {};
+  Bitmap refThree = {};
+  {
+    cache->unload();
+    ScopedAOTDeliberateMiss deliberate(context);
+    refOne = renderWith(filterOne);
+    refTwo = renderWith(filterTwo);
+    refThree = renderWith(filterThree);
+  }
+  auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+  ASSERT_NE(bundleData, nullptr);
+  ASSERT_GT(bundleBytes, 0u);
+  ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+  cache->setDecompositionEnabled(true);
+  cache->setDiagnosticRecordingEnabled(true);
+  cache->resetStats();
+  context->globalCache()->clearPrograms();
+  context->globalCache()->resetProgramStats();
+  auto one = renderWith(filterOne);
+  auto two = renderWith(filterTwo);
+  auto three = renderWith(filterThree);
   auto stats = context->globalCache()->programStats();
   cache->setDiagnosticRecordingEnabled(false);
   cache->unload();
-  // Record the current identity behavior: the trees share one variant (same shader, same GP,
-  // same single texture leaf), so artifact creations above one mean the program key still splits
-  // by instruction structure. This documents the gap; the fix flips the expectations.
-  EXPECT_GE(stats.precompiledArtifactCreations, 1u);
+  context->globalCache()->clearPrograms();
+  // The trees share one variant (same shader, same GP, same single texture leaf): one artifact
+  // creation and two cache hits mean the interleaved draws reuse a single program.
+  EXPECT_EQ(stats.precompiledArtifactCreations, 1u);
+  EXPECT_EQ(stats.cacheHits, 2u);
   EXPECT_EQ(stats.programBuilderCreations, 0u);
   printf("[ProgramIdentity] artifactCreations=%u cacheHits=%u cacheMisses=%u\n",
          static_cast<unsigned>(stats.precompiledArtifactCreations),
@@ -4167,6 +4182,11 @@ TGFX_TEST(AOTRenderConsistencyTest, SameVariantDifferentChainsShareProgram) {
   const_cast<Bitmap&>(one).unlockPixels();
   const_cast<Bitmap&>(two).unlockPixels();
   const_cast<Bitmap&>(three).unlockPixels();
+  // Sharing one program must not leak state between the interleaved draws: each render matches
+  // its runtime reference byte for byte.
+  ExpectBitmapsIdentical("shared-program-chain-one", one, refOne, size, size);
+  ExpectBitmapsIdentical("shared-program-chain-two", two, refTwo, size, size);
+  ExpectBitmapsIdentical("shared-program-chain-three", three, refThree, size, size);
 }
 
 }  // namespace tgfx
