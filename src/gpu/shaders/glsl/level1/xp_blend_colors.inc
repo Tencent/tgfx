@@ -51,6 +51,11 @@ vec3 xpSetSaturation(vec3 hueLumColor, vec3 satColor) {
 }
 
 vec4 xpBlendColors(vec4 S, vec4 D, int mode) {
+  // The coefficient modes (3-14) mirror the runtime's AppendCoeffBlend, whose Add/Subtract
+  // operations clamp the result to [0,1] (GLSLBlend.cpp). Porter-Duff is closed over in-range
+  // premultiplied inputs, so the clamp is a no-op for well-formed colors, but out-of-range leaf
+  // values (gradient stops accept unclamped floats) must not propagate unclamped into later
+  // operators: the runtime clamps at the blend while the chain would defer it.
   vec4 result;
   if (mode == 0) {
     result = vec4(0.0);
@@ -59,29 +64,29 @@ vec4 xpBlendColors(vec4 S, vec4 D, int mode) {
   } else if (mode == 2) {
     result = D;
   } else if (mode == 3) {
-    result = S + D * (1.0 - S.a);
+    result = clamp(S + D * (1.0 - S.a), 0.0, 1.0);
   } else if (mode == 4) {
-    result = S * (1.0 - D.a) + D;
+    result = clamp(S * (1.0 - D.a) + D, 0.0, 1.0);
   } else if (mode == 5) {
-    result = S * D.a;
+    result = clamp(S * D.a, 0.0, 1.0);
   } else if (mode == 6) {
-    result = D * S.a;
+    result = clamp(D * S.a, 0.0, 1.0);
   } else if (mode == 7) {
-    result = S * (1.0 - D.a);
+    result = clamp(S * (1.0 - D.a), 0.0, 1.0);
   } else if (mode == 8) {
-    result = D * (1.0 - S.a);
+    result = clamp(D * (1.0 - S.a), 0.0, 1.0);
   } else if (mode == 9) {
-    result = S * D.a + D * (1.0 - S.a);
+    result = clamp(S * D.a + D * (1.0 - S.a), 0.0, 1.0);
   } else if (mode == 10) {
-    result = S * (1.0 - D.a) + D * S.a;
+    result = clamp(S * (1.0 - D.a) + D * S.a, 0.0, 1.0);
   } else if (mode == 11) {
-    result = S * (1.0 - D.a) + D * (1.0 - S.a);
+    result = clamp(S * (1.0 - D.a) + D * (1.0 - S.a), 0.0, 1.0);
   } else if (mode == 12) {
     result = clamp(S + D, 0.0, 1.0);
   } else if (mode == 13) {
-    result = S * D;
+    result = clamp(S * D, 0.0, 1.0);
   } else if (mode == 14) {
-    result = S + D - S * D;
+    result = clamp(S + D - S * D, 0.0, 1.0);
   } else if (mode == 15 || mode == 20) {
     // Overlay and HardLight share one branch: Overlay == HardLight with operands swapped.
     // Two structurally-related branches in the if-chain miscompile under Chrome WebGPU (dawn

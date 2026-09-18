@@ -91,6 +91,10 @@ enum class AOTEffectKind {
   // in the runtime emission (vec4(inputColor.rgb, 1.0)). Never becomes a chain slot; as an op
   // input it maps to the -5 designator.
   GeometryColorOpaqueInput,
+  // Opaque white — the input a single-child xfer feeds its child in the runtime emission (the
+  // child emission omits the input color, which defaults to vec4(1.0)). Never becomes a chain
+  // slot; as an op input it maps to the -4 designator.
+  GeometryWhiteInput,
 };
 
 enum class EffectDomain {
@@ -328,6 +332,10 @@ class AOTNodeBuilder {
   bool addGeometryColor(AOTNodeID* output);
 
   bool addGeometryColorOpaqueInput(AOTNodeID* output);
+
+  // Adds an opaque-white input designator node (the single-child xfer child input). Like the
+  // opaque geometry input, it never becomes a chain slot; consumers map it to the -4 designator.
+  bool addGeometryWhiteInput(AOTNodeID* output);
 
   bool addTextureSource(AOTNodeID input, const AOTTextureParameters& parameters, AOTNodeID* output);
 

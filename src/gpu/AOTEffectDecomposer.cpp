@@ -312,8 +312,9 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
       case AOTEffectKind::GradientSource:
         break;
       case AOTEffectKind::GeometryColorOpaqueInput:
-        // A designator-only input node (two-child xfer children): never a chain slot, so it
-        // stays out of the pass node list.
+      case AOTEffectKind::GeometryWhiteInput:
+        // A designator-only input node (two-child xfer children / single-child xfer child): never
+        // a chain slot, so it stays out of the pass node list.
         continue;
       default:
         // GeometryColor only legal at index 0; anything else (Gather/Neighborhood/External) is not
@@ -331,7 +332,8 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
   pass.materializesOutput = false;
   for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
     auto node = graph.nodeAt(AOTNodeID(index));
-    if (node->kind == AOTEffectKind::GeometryColorOpaqueInput) {
+    if (node->kind == AOTEffectKind::GeometryColorOpaqueInput ||
+        node->kind == AOTEffectKind::GeometryWhiteInput) {
       continue;
     }
     pass.nodes.push_back(AOTNodeID(index));

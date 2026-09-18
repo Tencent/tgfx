@@ -4189,4 +4189,160 @@ TGFX_TEST(AOTRenderConsistencyTest, SameVariantDifferentChainsShareProgram) {
   ExpectBitmapsIdentical("shared-program-chain-three", three, refThree, size, size);
 }
 
+// Counterexample audit B2: a single-child blend operand wrapping a Compose-shaped child. drawMesh
+// with vertex colors wraps the brush shader's FP in a SrcChild(Modulate) xfer (OpsCompositor).
+// The runtime feeds that child white, and Compose passes its own input through to its first
+// child, so the texture samples raw. The chain's whiteInputOperand marking only covers the
+// blend's direct input node (the Compose root); the texture one level deeper stays unmarked, so
+// its bit0 modulates by the geometry color's alpha — which for a mesh with vertex colors is the
+// vertex color itself. With a 0.5-alpha vertex color over an opaque image, the runtime keeps the
+// image alpha at 1 before the Modulate multiply while the chain halves it twice.
+TGFX_TEST(AOTRenderConsistencyTest, MeshVertexColorsWithComposedShaderChildInput) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_NE(image, nullptr);
+  constexpr int size = 96;
+  std::array<Point, 4> positions = {Point(0, 0), Point(size, 0), Point(0, size), Point(size, size)};
+  std::array<Point, 4> texCoords = {Point(0, 0), Point(size, 0), Point(0, size), Point(size, size)};
+  std::array<Color, 4> vertexColors = {Color(1, 1, 1, 0.5f), Color(1, 1, 1, 0.5f),
+                                       Color(1, 1, 1, 0.5f), Color(1, 1, 1, 0.5f)};
+  auto mesh = Mesh::MakeCopy(MeshTopology::TriangleStrip, 4, positions.data(), texCoords.data(),
+                             vertexColors.data());
+  ASSERT_NE(mesh, nullptr);
+  auto renderScene = [&](Bitmap* outBitmap) {
+    auto surface = Surface::Make(context, size, size);
+    ASSERT_NE(surface, nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::Transparent());
+    auto imageShader = Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp);
+    ASSERT_NE(imageShader, nullptr);
+    // A Compose-shaped shader FP (texture, then color matrix) sits under the mesh's Modulate
+    // xfer; the matrix keeps the alpha row identity so the alpha divergence stays visible.
+    auto composedShader =
+        imageShader->makeWithColorFilter(ColorFilter::Matrix(NonTrivialScaleBiasMatrix()));
+    ASSERT_NE(composedShader, nullptr);
+    Paint paint = {};
+    paint.setShader(composedShader);
+    canvas->drawMesh(mesh, paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(size, size));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_NE(pixels, nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+  };
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  {
+    cache->unload();
+    ScopedAOTDeliberateMiss deliberate(context);
+    renderScene(&reference);
+  }
+  {
+    auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+    ASSERT_NE(bundleData, nullptr);
+    ASSERT_GT(bundleBytes, 0u);
+    ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+    cache->setDecompositionEnabled(true);
+    cache->setDiagnosticRecordingEnabled(true);
+    cache->resetStats();
+    context->globalCache()->resetProgramStats();
+    renderScene(&candidate);
+    // The mesh draw must take the precompiled chain route for the comparison to be a real check.
+    EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+    auto stats = context->globalCache()->programStats();
+    EXPECT_EQ(stats.programBuilderCreations, 0u);
+    EXPECT_GE(stats.precompiledArtifactCreations, 1u);
+    cache->setDiagnosticRecordingEnabled(false);
+    cache->unload();
+    context->globalCache()->clearPrograms();
+  }
+  ExpectBitmapsIdentical("mesh-vertex-colors-composed-child", candidate, reference, size, size);
+}
+
+// Counterexample audit B5: coefficient-blend clamp asymmetry under out-of-range leaf values.
+// Gradient stops accept unclamped float colors. The runtime's AppendCoeffBlend clamps the blend
+// result (GLSLBlend.cpp Add/Subtract operations) while the chain kernel's xpBlendColors does not,
+// so an out-of-range stop reaches the following color matrix unclamped on the chain path: the
+// runtime feeds clamp(2.0) = 1.0 into a 0.5-scale matrix (output ~0.5) while the chain feeds 2.0
+// (output ~1.0). The scene keeps a single gradient plus a single texture so the whole tree stays
+// in one fused pass — two gradients would exceed MaxGradientSlots, materialize both operands to
+// RGBA8 and hide the divergence behind the unorm clamp (verified experimentally).
+TGFX_TEST(AOTRenderConsistencyTest, OutOfRangeGradientStopBlendClampOrder) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_NE(image, nullptr);
+  constexpr int size = 96;
+  auto renderScene = [&](Bitmap* outBitmap) {
+    auto surface = Surface::Make(context, size, size);
+    ASSERT_NE(surface, nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::Transparent());
+    // A constant out-of-range red gradient (rgb = 2.0) blended over the opaque image: SrcOver
+    // with src alpha 1 reduces to the src value — clamp(2) = 1.0 on the runtime path. The g/b
+    // stops (0.21) avoid the 25.5 half-value quantization boundary after the 0.5-scale matrix,
+    // so any residual difference can only come from the clamp ordering, not rounding luck.
+    std::vector<Color> hotColors = {Color(2.0f, 0.21f, 0.21f, 1.0f),
+                                    Color(2.0f, 0.21f, 0.21f, 1.0f)};
+    auto hot = Shader::MakeLinearGradient(Point(0, 0), Point(0, size), hotColors, {0.0f, 1.0f});
+    ASSERT_NE(hot, nullptr);
+    auto imageShader = Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp);
+    ASSERT_NE(imageShader, nullptr);
+    auto blendShader = Shader::MakeBlend(BlendMode::SrcOver, imageShader, hot);
+    ASSERT_NE(blendShader, nullptr);
+    Paint paint = {};
+    paint.setShader(blendShader);
+    // A 0.5-scale matrix after the blend: the runtime feeds clamp(2.0) = 1.0 (output ~0.5),
+    // the chain feeds 2.0 (output ~1.0) — a ~0.5 gap if the clamp is missing.
+    std::array<float, 20> halfScale = {0.5f, 0, 0,    0, 0, 0, 0.5f, 0, 0, 0,
+                                       0,    0, 0.5f, 0, 0, 0, 0,    0, 1, 0};
+    paint.setColorFilter(ColorFilter::Matrix(halfScale));
+    canvas->drawRect(Rect::MakeWH(size, size), paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(size, size));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_NE(pixels, nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+  };
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  {
+    cache->unload();
+    ScopedAOTDeliberateMiss deliberate(context);
+    renderScene(&reference);
+  }
+  {
+    auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+    ASSERT_NE(bundleData, nullptr);
+    ASSERT_GT(bundleBytes, 0u);
+    ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+    cache->setDecompositionEnabled(true);
+    cache->setDiagnosticRecordingEnabled(true);
+    cache->resetStats();
+    context->globalCache()->resetProgramStats();
+    renderScene(&candidate);
+    // The blend-then-matrix chain must take the precompiled route in a single fused pass — a
+    // materialized multi-pass plan would clamp the out-of-range value at the RGBA8 boundary and
+    // hide the very asymmetry this test probes.
+    EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+    auto stats = context->globalCache()->programStats();
+    EXPECT_EQ(stats.programBuilderCreations, 0u);
+    EXPECT_GE(stats.precompiledArtifactCreations, 1u);
+    auto drawStats = cache->drawStats();
+    EXPECT_EQ(drawStats.kernelInvocations, 1u);
+    EXPECT_EQ(drawStats.planMaterializedEdges, 0u);
+    cache->setDiagnosticRecordingEnabled(false);
+    cache->unload();
+    context->globalCache()->clearPrograms();
+  }
+  ExpectBitmapsIdentical("out-of-range-stop-blend-clamp", candidate, reference, size, size);
+}
+
 }  // namespace tgfx

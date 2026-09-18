@@ -766,14 +766,23 @@ TGFX_TEST(AOTEffectTest, XfermodeDstLowersToBinaryBlend) {
 
   AOTEffectGraph graph;
   ASSERT_TRUE(AOTEffectDecomposer::Lower({xfermode.get()}, &graph));
-  // node0=geometry, node1=texture(dst), node2=blend(src=geometry, dst=texture).
-  ASSERT_EQ(graph.nodeCount(), 3u);
-  auto blend = graph.nodeAt(AOTNodeID(2));
+  // node0=geometry, node1=white input (the runtime feeds a single-child xfer's child white),
+  // node2=texture(dst, input edge = the white designator), node3=blend(src=geometry, dst=texture).
+  ASSERT_EQ(graph.nodeCount(), 4u);
+  auto white = graph.nodeAt(AOTNodeID(1));
+  ASSERT_NE(white, nullptr);
+  EXPECT_EQ(white->kind, AOTEffectKind::GeometryWhiteInput);
+  auto texture = graph.nodeAt(AOTNodeID(2));
+  ASSERT_NE(texture, nullptr);
+  EXPECT_EQ(texture->kind, AOTEffectKind::TextureSource);
+  ASSERT_EQ(texture->inputs.size(), 1u);
+  EXPECT_EQ(texture->inputs[0], AOTNodeID(1));  // the child lowers from the white input
+  auto blend = graph.nodeAt(AOTNodeID(3));
   ASSERT_NE(blend, nullptr);
   EXPECT_EQ(blend->kind, AOTEffectKind::Blend);
   ASSERT_EQ(blend->inputs.size(), 2u);
   EXPECT_EQ(blend->inputs[0], AOTNodeID(0));  // src = input color
-  EXPECT_EQ(blend->inputs[1], AOTNodeID(1));  // dst = child texture
+  EXPECT_EQ(blend->inputs[1], AOTNodeID(2));  // dst = child texture
   auto parameters = std::get_if<AOTBlendParameters>(&blend->parameters);
   ASSERT_NE(parameters, nullptr);
   EXPECT_EQ(parameters->childType, 0);

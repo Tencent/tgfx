@@ -268,6 +268,9 @@ static int MapChainInput(const std::vector<const AOTEffectNode*>& nodes,
   if (node->kind == AOTEffectKind::GeometryColorOpaqueInput) {
     return -5;
   }
+  if (node->kind == AOTEffectKind::GeometryWhiteInput) {
+    return -4;
+  }
   auto slot = slotOf[nodeIndex];
   return slot == SIZE_MAX ? -2 : static_cast<int>(slot);
 }
@@ -417,8 +420,14 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
     }
     if (coverageGraph != nullptr) {
       // Index 0 of the coverage graph is the GeometryCoverage unit, which never becomes a slot.
+      // Designator-only input nodes (white / opaque geometry inputs lowered by xfer children) stay
+      // out too: their value rides on the input-edge designators, not on a chain slot.
       for (size_t index = 1; index < covCount; ++index) {
         auto* node = coverageGraph->nodeAt(AOTNodeID(static_cast<uint32_t>(index)));
+        if (node->kind == AOTEffectKind::GeometryWhiteInput ||
+            node->kind == AOTEffectKind::GeometryColorOpaqueInput) {
+          continue;
+        }
         if ((node->kind == AOTEffectKind::TextureSource) == texturePhase) {
           slotOf[colorCount + index] = ordered.size();
           ordered.push_back(colorCount + index);

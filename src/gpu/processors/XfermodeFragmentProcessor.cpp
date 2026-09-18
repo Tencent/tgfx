@@ -127,13 +127,29 @@ bool XfermodeFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID in
   AOTNodeID src = AOTNodeID::Invalid();
   AOTNodeID dst = AOTNodeID::Invalid();
   bool inputIsPlainGeometryColor = false;
+  AOTNodeID whiteInput = AOTNodeID::Invalid();
+  // The runtime emission feeds a single-child xfer's child white (the child emission omits the
+  // input color, which defaults to vec4(1.0)), never the xfer's own input — see
+  // GLSLXfermodeFragmentProcessor::emitCode. Lower the child from an explicit white input node so
+  // the whole child subtree sees the same input environment the runtime gives it, instead of the
+  // builder guessing which descendant should sample raw (the old whiteInputOperand marking only
+  // covered the direct child, so a Compose-shaped child leaked the xfer input to the texture
+  // deeper inside).
+  auto whiteInputNode = [&]() {
+    if (!whiteInput.isValid()) {
+      if (!builder->addGeometryWhiteInput(&whiteInput)) {
+        return false;
+      }
+    }
+    return true;
+  };
   switch (child) {
     case Child::DstChild:
       if (numChildProcessors() != 1) {
         return false;
       }
       src = input;
-      if (!childProcessor(0)->lowerToAOT(builder, input, &dst)) {
+      if (!whiteInputNode() || !childProcessor(0)->lowerToAOT(builder, whiteInput, &dst)) {
         return false;
       }
       break;
@@ -142,7 +158,7 @@ bool XfermodeFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID in
         return false;
       }
       dst = input;
-      if (!childProcessor(0)->lowerToAOT(builder, input, &src)) {
+      if (!whiteInputNode() || !childProcessor(0)->lowerToAOT(builder, whiteInput, &src)) {
         return false;
       }
       break;
