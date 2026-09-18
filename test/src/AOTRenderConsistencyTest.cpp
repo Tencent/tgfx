@@ -4877,4 +4877,238 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyImageBlurMatchesRuntime) {
   }
 }
 
+// Counterexample audit F1: the threshold operator straddling a materialization pass boundary
+// under quantization-sensitive input. The offscreen fill drives a 34-instruction tree (texture,
+// 16 matrices, threshold, 16 matrices) through the 17-pass tail plan, so the threshold executes
+// mid-chain around pass 9 — its input arrives from an RGBA8 materialized intermediate. The
+// source is an alpha sweep (0..255), so a row of pixels always sits within one quantum (1/255)
+// of the 0.5 threshold: exactly where the stored intermediate could flip the step() decision
+// relative to the runtime's direct evaluation.
+TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailThresholdQuantizationBand) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  constexpr int srcSize = 96;
+  // An alpha-sweep source: white rgb, alpha 0..255 down the rows.
+  Bitmap sweepBitmap = {};
+  ASSERT_TRUE(sweepBitmap.allocPixels(srcSize, srcSize));
+  auto* sweepPixels = static_cast<uint32_t*>(sweepBitmap.lockPixels());
+  ASSERT_NE(sweepPixels, nullptr);
+  for (int y = 0; y < srcSize; ++y) {
+    uint32_t alpha = static_cast<uint32_t>(y * 255 / (srcSize - 1));
+    for (int x = 0; x < srcSize; ++x) {
+      sweepPixels[static_cast<size_t>(y) * srcSize + static_cast<size_t>(x)] =
+          (alpha << 24) | 0x00FFFFFFu;
+    }
+  }
+  sweepBitmap.unlockPixels();
+  auto sweepImage = Image::MakeFrom(sweepBitmap);
+  ASSERT_NE(sweepImage, nullptr);
+  auto sourceSurface = Surface::Make(context, srcSize, srcSize, false, 1, true);
+  ASSERT_NE(sourceSurface, nullptr);
+  {
+    ScopedAOTStatsPause pause(context, true);
+    sourceSurface->getCanvas()->drawImage(sweepImage, 0, 0);
+    context->flushAndSubmit(true);
+  }
+  auto source = context->proxyProvider()->wrapExternalTexture(sourceSurface->getBackendTexture());
+  ASSERT_NE(source, nullptr);
+  auto buildTree = [&](BlockAllocator* allocator) -> PlacementPtr<FragmentProcessor> {
+    auto processor = TextureEffect::Make(allocator, source);
+    for (size_t index = 0; index < 16; ++index) {
+      processor = FragmentProcessor::Compose(
+          allocator, std::move(processor),
+          ColorMatrixFragmentProcessor::Make(allocator, NonTrivialScaleBiasMatrix()));
+    }
+    processor = FragmentProcessor::Compose(allocator, std::move(processor),
+                                           AlphaThresholdFragmentProcessor::Make(allocator, 0.5f));
+    for (size_t index = 0; index < 16; ++index) {
+      processor = FragmentProcessor::Compose(
+          allocator, std::move(processor),
+          ColorMatrixFragmentProcessor::Make(allocator, NonTrivialScaleBiasMatrix()));
+    }
+    return processor;
+  };
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  AOTDrawStats candidateDraws = {};
+  auto render = [&](bool useBundle, Bitmap* outBitmap, AOTDrawStats* outDraws) {
+    if (useBundle) {
+      auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+      ASSERT_NE(bundleData, nullptr);
+      ASSERT_GT(bundleBytes, 0u);
+      ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+    } else {
+      cache->unload();
+    }
+    ScopedAOTStatsPause pause(context, !useBundle);
+    cache->setDecompositionEnabled(useBundle);
+    cache->setDiagnosticRecordingEnabled(true);
+    cache->resetStats();
+    context->globalCache()->clearPrograms();
+    context->globalCache()->resetProgramStats();
+    auto target = RenderTargetProxy::Make(context, 64, 64, false);
+    ASSERT_NE(target, nullptr);
+    auto processor = buildTree(context->drawingAllocator());
+    ASSERT_NE(processor, nullptr);
+    ASSERT_TRUE(context->drawingManager()->fillRTWithFP(target, std::move(processor), 0));
+    context->flushAndSubmit(true);
+    auto rt = target->getRenderTarget();
+    ASSERT_NE(rt, nullptr);
+    auto surface = Surface::MakeFrom(context, rt->getBackendRenderTarget(), rt->origin());
+    ASSERT_NE(surface, nullptr);
+    ASSERT_TRUE(outBitmap->allocPixels(64, 64));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_NE(pixels, nullptr);
+    EXPECT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+    if (outDraws != nullptr) {
+      *outDraws = cache->drawStats();
+    }
+    cache->setDiagnosticRecordingEnabled(false);
+    cache->setDecompositionEnabled(true);
+    cache->unload();
+    context->globalCache()->clearPrograms();
+  };
+  render(false, &reference, nullptr);
+  render(true, &candidate, &candidateDraws);
+  EXPECT_EQ(candidateDraws.completeAOTDraws, 1u);
+  EXPECT_EQ(candidateDraws.atomicFallbacks, 0u);
+  EXPECT_EQ(candidateDraws.kernelInvocations, 17u);
+  EXPECT_EQ(candidateDraws.planMaterializedEdges, 16u);
+  // The quantization-band ruling: the 8-bit source's alpha reaches the threshold as the same
+  // quantized value on both routes (the identity alpha row of every matrix keeps it aligned), so
+  // the step() decision never flips; the residual is the ordinary ±1 RGBA8 round-trip
+  // propagation, not a decision flip. A maxDiff above 1 would mean a flipped threshold row.
+  auto* refPixels = static_cast<const uint32_t*>(const_cast<Bitmap&>(reference).lockPixels());
+  auto* candPixels = static_cast<const uint32_t*>(const_cast<Bitmap&>(candidate).lockPixels());
+  int maxDiff = 0;
+  size_t diffBytes = 0;
+  for (size_t i = 0; i < 64 * 64; ++i) {
+    for (int shift = 0; shift < 32; shift += 8) {
+      int d = std::abs(static_cast<int>((refPixels[i] >> shift) & 0xFF) -
+                       static_cast<int>((candPixels[i] >> shift) & 0xFF));
+      if (d > 0) {
+        ++diffBytes;
+      }
+      maxDiff = std::max(maxDiff, d);
+    }
+  }
+  const_cast<Bitmap&>(reference).unlockPixels();
+  const_cast<Bitmap&>(candidate).unlockPixels();
+  printf("[F1QuantBand] maxDiff=%d diffBytes=%zu\n", maxDiff, diffBytes);
+  fflush(stdout);
+  EXPECT_LE(maxDiff, 1);
+}
+
+// Counterexample audit F2: materialized multi-pass sampling under translation, magnification,
+// and minification with mipmap filtering. The offscreen fill drives a 36-instruction tree (a
+// device-space texture source with a transform-carrying uvMatrix plus 35 matrices) through the
+// tail plan, so every source sample happens through a materialization chain; the uvMatrix
+// probes the intermediate's coordinate mapping (offset, magnification, and minification where
+// the mipmap-filtered source matters).
+TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailSamplingTransforms) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_NE(image, nullptr);
+  auto sourceSurface = Surface::Make(context, image->width(), image->height(), false, 1, true);
+  ASSERT_NE(sourceSurface, nullptr);
+  {
+    ScopedAOTStatsPause pause(context, true);
+    sourceSurface->getCanvas()->drawImage(image, 0, 0);
+    context->flushAndSubmit(true);
+  }
+  auto source = context->proxyProvider()->wrapExternalTexture(sourceSurface->getBackendTexture());
+  ASSERT_NE(source, nullptr);
+  struct TransformCase {
+    const char* label;
+    Matrix uvMatrix;
+  };
+  const std::array<TransformCase, 3> cases = {{
+      {"translate", Matrix::MakeTrans(31, 17)},
+      {"magnify", Matrix::MakeScale(0.5f, 0.5f)},
+      {"minify-mipmap", Matrix::MakeScale(3.2f, 3.2f)},
+  }};
+  for (const auto& transformCase : cases) {
+    SCOPED_TRACE(transformCase.label);
+    auto render = [&](bool useBundle, Bitmap* outBitmap, AOTDrawStats* outDraws) {
+      if (useBundle) {
+        auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+        ASSERT_NE(bundleData, nullptr);
+        ASSERT_GT(bundleBytes, 0u);
+        ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+      } else {
+        cache->unload();
+      }
+      ScopedAOTStatsPause pause(context, !useBundle);
+      cache->setDecompositionEnabled(useBundle);
+      cache->setDiagnosticRecordingEnabled(true);
+      cache->resetStats();
+      context->globalCache()->clearPrograms();
+      context->globalCache()->resetProgramStats();
+      auto target = RenderTargetProxy::Make(context, 64, 64, false);
+      ASSERT_NE(target, nullptr);
+      auto allocator = context->drawingAllocator();
+      PlacementPtr<FragmentProcessor> processor =
+          DeviceSpaceTextureEffect::Make(allocator, source, transformCase.uvMatrix);
+      ASSERT_NE(processor, nullptr);
+      for (size_t index = 0; index < 35; ++index) {
+        processor = FragmentProcessor::Compose(
+            allocator, std::move(processor),
+            ColorMatrixFragmentProcessor::Make(allocator, NonTrivialScaleBiasMatrix()));
+      }
+      ASSERT_TRUE(context->drawingManager()->fillRTWithFP(target, std::move(processor), 0));
+      context->flushAndSubmit(true);
+      auto rt = target->getRenderTarget();
+      ASSERT_NE(rt, nullptr);
+      auto surface = Surface::MakeFrom(context, rt->getBackendRenderTarget(), rt->origin());
+      ASSERT_NE(surface, nullptr);
+      ASSERT_TRUE(outBitmap->allocPixels(64, 64));
+      auto* pixels = outBitmap->lockPixels();
+      ASSERT_NE(pixels, nullptr);
+      EXPECT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+      outBitmap->unlockPixels();
+      if (outDraws != nullptr) {
+        *outDraws = cache->drawStats();
+      }
+      cache->setDiagnosticRecordingEnabled(false);
+      cache->setDecompositionEnabled(true);
+      cache->unload();
+      context->globalCache()->clearPrograms();
+    };
+    Bitmap reference = {};
+    Bitmap candidate = {};
+    AOTDrawStats candidateDraws = {};
+    render(false, &reference, nullptr);
+    render(true, &candidate, &candidateDraws);
+    EXPECT_EQ(candidateDraws.completeAOTDraws, 1u);
+    EXPECT_EQ(candidateDraws.atomicFallbacks, 0u);
+    EXPECT_EQ(candidateDraws.kernelInvocations, 18u);
+    EXPECT_EQ(candidateDraws.planMaterializedEdges, 17u);
+    // The sampling-transform ruling: the 18-pass materialization chain accumulates at most ~3
+    // LSB of RGBA8 round-trip spread under every transform (translate, magnify, minify with
+    // mipmaps); the coordinate mapping itself introduces no structural error (a mis-mapped
+    // intermediate would show a maxDiff near the full dynamic range). Recorded as the
+    // materialization quantization boundary, not an equivalence claim.
+    auto* refPixels = static_cast<const uint32_t*>(const_cast<Bitmap&>(reference).lockPixels());
+    auto* candPixels = static_cast<const uint32_t*>(const_cast<Bitmap&>(candidate).lockPixels());
+    int maxDiff = 0;
+    for (size_t i = 0; i < 64 * 64; ++i) {
+      for (int shift = 0; shift < 32; shift += 8) {
+        maxDiff = std::max(maxDiff, std::abs(static_cast<int>((refPixels[i] >> shift) & 0xFF) -
+                                             static_cast<int>((candPixels[i] >> shift) & 0xFF)));
+      }
+    }
+    const_cast<Bitmap&>(reference).unlockPixels();
+    const_cast<Bitmap&>(candidate).unlockPixels();
+    printf("[F2Sampling] %s maxDiff=%d\n", transformCase.label, maxDiff);
+    fflush(stdout);
+    EXPECT_LE(maxDiff, 3);
+  }
+}
+
 }  // namespace tgfx
