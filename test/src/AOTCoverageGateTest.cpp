@@ -106,6 +106,8 @@ const ProcessorClaim ProcessorClaims[] = {
     {"ConstColorProcessor", "ConstColorProcessor", kLowering,
      "served as a chain slot through the lowering"},
     {"DeviceSpaceTextureEffect", "DeviceSpaceTextureEffect", kMatcher | kLowering, ""},
+    {"AOTYUVChainProcessor", "AOTYUVChainProcessor", kMatcher,
+     "the YUV color-grade route: matcher-claimed through TryMatchYUVTextureFill"},
     {"LumaFragmentProcessor", "LumaFragmentProcessor", kMatcher | kLowering, ""},
     {"PerlinNoiseFragmentProcessor", "PerlinNoiseFragmentProcessor", kMatcher | kLowering, ""},
     {"RectEffect", "RectEffect", kMatcher | kLowering, ""},

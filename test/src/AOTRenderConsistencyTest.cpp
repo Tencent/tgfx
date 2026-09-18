@@ -3017,11 +3017,9 @@ TGFX_TEST(AOTRenderConsistencyTest, YUVSourceReportsItsPlanesToChainPlanning) {
 }
 
 // Counterexample audit P4.3: a YUV video frame drawn with a paint color filter (the video
-// player's color-grade path). The YUV matcher only admits a bare TextureEffect, so the
-// Compose(YUV texture, matrix) tree falls back to runtime stitching today. The YUV kernel
-// carries its conversion in fixed plane math; the follow-up design parameterizes a bounded
-// pointwise tail after the conversion so the common color-grade shapes ride the precompiled
-// route. Until then this records the boundary: one miss, one runtime program, pixel-identical.
+// player's color-grade path). The YUVTextureFillShader kernel carries three pointwise slots
+// after its plane conversion, and the DecomposeYUVChain planner folds the Compose(YUV texture,
+// matrix) tree onto them, so the color-grade draw rides the precompiled route in one fused pass.
 TGFX_TEST(AOTRenderConsistencyTest, YUVImageWithColorFilterMatchesRuntime) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -3079,11 +3077,10 @@ TGFX_TEST(AOTRenderConsistencyTest, YUVImageWithColorFilterMatchesRuntime) {
     cache->resetStats();
     context->globalCache()->resetProgramStats();
     renderScene(&candidate);
-    // BOUNDARY (pre-P4.3): the YUV + color-filter tree is refused and served by one runtime
-    // program. When P4.3 lands, these flip to 0/0 and the artifact count asserts the
-    // precompiled route.
-    EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 1u);
-    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 1u);
+    // The color-grade tree rides the precompiled YUV kernel: no fallback, no runtime program.
+    EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
+    EXPECT_GE(context->globalCache()->programStats().precompiledArtifactCreations, 1u);
     cache->setDiagnosticRecordingEnabled(false);
     cache->unload();
     context->globalCache()->clearPrograms();

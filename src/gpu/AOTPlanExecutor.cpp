@@ -106,6 +106,32 @@ static bool ValidateLinearPlan(const AOTEffectGraph& graph, const AOTEffectPlan&
       if (!pass.dependencies.empty()) {
         return false;
       }
+      if (pass.kernel == AOTKernelKind::YUVTextureFill) {
+        // One fused pass: a YUV source plus up to three unary pointwise-operator slots,
+        // matching the three slot records the YUVTextureFillShader kernel carries. Blends and
+        // deeper tails are rejected at planning time and never reach here.
+        if (pass.nodes.empty() || pass.nodes.size() > 4) {
+          return false;
+        }
+        auto sourceNode = graph.nodeAt(pass.nodes[0]);
+        auto parameters = sourceNode != nullptr
+                              ? std::get_if<AOTTextureParameters>(&sourceNode->parameters)
+                              : nullptr;
+        if (sourceNode == nullptr || sourceNode->kind != AOTEffectKind::TextureSource ||
+            sourceNode->inputs.size() != 1 || sourceNode->inputs[0] != AOTNodeID(0) ||
+            parameters == nullptr || !parameters->isYUV || parameters->hasRGBAAA ||
+            parameters->samplingKind != AOTTextureSamplingKind::Plain) {
+          return false;
+        }
+        AOTNodeID expectedInput = pass.nodes[0];
+        for (size_t opIndex = 1; opIndex < pass.nodes.size(); ++opIndex) {
+          if (!ValidatePointwiseTailOp(graph, pass.nodes[opIndex], expectedInput)) {
+            return false;
+          }
+          expectedInput = pass.nodes[opIndex];
+        }
+        continue;
+      }
       if (pass.kernel == AOTKernelKind::PerlinNoiseFill) {
         // One fused pass: a perlin source plus up to three pointwise-operator slots, matching the
         // three slot records the PerlinNoiseFillShader kernel carries. A slot may also be a

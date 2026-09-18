@@ -1412,7 +1412,8 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
           foldedPlan.passes.size() == 1 &&
           (foldedPlan.passes[0].kernel == AOTKernelKind::PointwiseTail ||
            foldedPlan.passes[0].kernel == AOTKernelKind::PointwiseChain ||
-           foldedPlan.passes[0].kernel == AOTKernelKind::PerlinNoiseFill)) {
+           foldedPlan.passes[0].kernel == AOTKernelKind::PerlinNoiseFill ||
+           foldedPlan.passes[0].kernel == AOTKernelKind::YUVTextureFill)) {
         // The mask now travels inside the color chain, so the terminal draw must not apply it
         // again as a coverage processor.
         op->moveCoveragesToColors();
@@ -1449,7 +1450,8 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     if (mainDecompose && plan.passes.size() == 1 &&
         (plan.passes[0].kernel == AOTKernelKind::PointwiseTail ||
          plan.passes[0].kernel == AOTKernelKind::PointwiseChain ||
-         plan.passes[0].kernel == AOTKernelKind::PerlinNoiseFill)) {
+         plan.passes[0].kernel == AOTKernelKind::PerlinNoiseFill ||
+         plan.passes[0].kernel == AOTKernelKind::YUVTextureFill)) {
       auto task = AOTPlanExecutor::Make(context, renderFlags, graph, plan, *deviceBounds,
                                         renderTarget, &op, Point::Zero());
       if (task != nullptr) {

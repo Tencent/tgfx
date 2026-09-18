@@ -21,6 +21,7 @@
 #include "gpu/Swizzle.h"
 #include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/AOTPointwiseTailProcessor.h"
+#include "gpu/processors/AOTYUVChainProcessor.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ClampedGradientEffect.h"
@@ -361,10 +362,21 @@ static std::optional<PermutationMatchResult> TryMatchYUVTextureFill(
     return std::nullopt;
   }
   auto fp = programInfo->getFragmentProcessor(0);
-  if (fp->name() != "TextureEffect") {
+  const TextureEffect* texture = nullptr;
+  if (fp->name() == "AOTYUVChainProcessor") {
+    // The decomposed color-grade route: the multi-plane source plus folded pointwise slots,
+    // all carried by the same YUVTextureFillShader variant set (the operators are per-draw
+    // uniform data, so no dimension changes).
+    auto* chain = static_cast<const AOTYUVChainProcessor*>(fp);
+    if (chain->source() == nullptr || chain->source()->name() != "TextureEffect") {
+      return std::nullopt;
+    }
+    texture = static_cast<const TextureEffect*>(chain->source());
+  } else if (fp->name() == "TextureEffect") {
+    texture = static_cast<const TextureEffect*>(fp);
+  } else {
     return std::nullopt;
   }
-  auto* texture = static_cast<const TextureEffect*>(fp);
   if (!texture->isYUV()) {
     return std::nullopt;
   }

@@ -1,9 +1,14 @@
 // YUVTextureFillShader fragment shader
-// Processor layout: QuadPerEdgeAAGeometryProcessor + TextureEffect(YUV) +
-// EmptyXferProcessor/PorterDuffXP
+// Processor layout: QuadPerEdgeAAGeometryProcessor + TextureEffect(YUV) [+ bounded pointwise ops]
+// + EmptyXferProcessor/PorterDuffXP
 // Permutation dimensions (frag): YUV_FORMAT (0=I420 three planes, 1=NV12 two planes), HAS_XP.
 // The plane sampling and conversion mirror GLSLTextureEffect::emitYUVTextureCode; the limited
 // range offset is a runtime uniform (YUVLimitedRange) since it is pure fragment math.
+// The three pointwise-operator slots carry a bounded color-grade tail (ColorMatrix / Luma /
+// AlphaThreshold / ColorSpaceXform): per-slot uniform arrays with a runtime-bound slot loop,
+// exactly the tail kernel's mechanism — the tail rides the same pass as the plane conversion,
+// so a video frame with a paint color filter never takes the runtime stitching route. A draw
+// with no operators leaves every slot at OP_NONE (a passthrough), byte-identical to before.
 #version 450
 
 #ifndef YUV_FORMAT
@@ -32,6 +37,12 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   int XPBlendMode;
 #endif
   int OutputAlphaSwizzle;
+
+int PointwiseSlotCount;
+
+#define TGFX_SLOT_ARRAY_SUFFIX [3]
+#include "pointwise_op_uniforms.inc"
+#undef TGFX_SLOT_ARRAY_SUFFIX
 };
 
 layout(location = 0) in vec3 TransformedCoords_0;
@@ -51,6 +62,10 @@ layout(set = 1, binding = 2) uniform sampler2D TextureSampler_2;
 #include "clip_coverage.inc"
 
 layout(location = 0) out vec4 fragColor;
+
+#include "pointwise_slot_array_bind.inc"
+#include "pointwise_op.inc"
+#include "pointwise_slot_array_unbind.inc"
 
 void main() {
   vec4 outputColor = vColor;
@@ -85,12 +100,19 @@ void main() {
   }
   color = color * outputColor.a;
 
+  // The bounded pointwise tail, mirroring the runtime Compose order (operators apply after the
+  // texture readback, including the paint-alpha multiply above).
+  vec4 result = color;
+  for (int i = 0; i < PointwiseSlotCount; ++i) {
+    result = applyPointwiseOp(i, result);
+  }
+
   float totalCoverage = vCoverage * clipCoverage();
 
 #if HAS_XP
-  fragColor = applyPorterDuffXP(color, vec4(totalCoverage));
+  fragColor = applyPorterDuffXP(result, vec4(totalCoverage));
 #else
-  fragColor = color * totalCoverage;
+  fragColor = result * totalCoverage;
 #endif
 #include "output_swizzle.inc"
 }

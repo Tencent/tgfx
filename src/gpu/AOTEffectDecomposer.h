@@ -42,6 +42,10 @@ enum class AOTKernelKind {
   // DecomposePerlinNoiseChain; the plan is always a single pass — shapes beyond the slot budget
   // are rejected rather than split.
   PerlinNoiseFill = 6,
+  // A YUV video source (TextureEffect over an I420/NV12 proxy) optionally followed by up to
+  // three bounded pointwise operator slots, matching YUVTextureFillShader's color-grade tail.
+  // Produced by DecomposeYUVChain; single pass, over-budget shapes are rejected.
+  YUVTextureFill = 7,
 };
 
 struct AOTPassDescriptor {

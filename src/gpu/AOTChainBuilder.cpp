@@ -22,6 +22,7 @@
 #include "gpu/AOTChainRegisterAllocator.h"
 #include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/AOTPointwiseTailProcessor.h"
+#include "gpu/processors/AOTYUVChainProcessor.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
 #include "gpu/processors/ColorSpaceXFormEffect.h"
@@ -1043,6 +1044,28 @@ PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildFPForPass(
       return nullptr;
     }
     return BuildPerlinNoiseFillFP(allocator, graph, pass);
+  }
+  if (pass.kernel == AOTKernelKind::YUVTextureFill) {
+    if (current != nullptr || pass.nodes.empty()) {
+      return nullptr;
+    }
+    // The YUV source node plus the bounded pointwise tail: rebuild the multi-plane source and
+    // fold the operators into the processor's slot records, one YUVTextureFillShader program.
+    auto sourceNode = graph.nodeAt(pass.nodes[0]);
+    auto source = sourceNode != nullptr ? BuildFPForNode(allocator, sourceNode, nullptr) : nullptr;
+    if (source == nullptr || source->name() != "TextureEffect") {
+      return nullptr;
+    }
+    std::vector<AOTPointwiseSlot> slots = {};
+    slots.reserve(pass.nodes.size() - 1);
+    for (size_t index = 1; index < pass.nodes.size(); ++index) {
+      AOTPointwiseSlot slot = {};
+      if (!BuildPointwiseSlot(graph, graph.nodeAt(pass.nodes[index]), &slot)) {
+        return nullptr;
+      }
+      slots.push_back(slot);
+    }
+    return AOTYUVChainProcessor::Make(allocator, std::move(source), slots);
   }
   for (size_t index = 0; index < pass.nodes.size(); ++index) {
     auto node = graph.nodeAt(pass.nodes[index]);

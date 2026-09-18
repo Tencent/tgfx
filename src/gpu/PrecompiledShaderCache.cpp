@@ -256,6 +256,8 @@ static const char* OffscreenKernelName(AOTKernelKind kernel) {
       return "PointwiseTail";
     case AOTKernelKind::PerlinNoiseFill:
       return "PerlinNoiseFill";
+    case AOTKernelKind::YUVTextureFill:
+      return "YUVTextureFill";
   }
   return "Unknown";
 }

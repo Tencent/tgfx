@@ -268,6 +268,54 @@ static bool DecomposePerlinNoiseChain(const AOTEffectGraph& graph, AOTEffectPlan
   return true;
 }
 
+// Planner for a YUV video source with a bounded color-grade tail: GeometryColor -> YUV
+// TextureSource -> [0..3 unary pointwise ops]. YUVTextureFillShader carries the plane sampling
+// and conversion plus three pointwise slots, so the color-grade shapes (a paint color filter
+// over a video frame) ride a single fused pass. Anything beyond the budget — a blend, a fourth
+// operator, any non-pointwise node — is rejected and keeps the runtime route.
+static bool DecomposeYUVChain(const AOTEffectGraph& graph, AOTEffectPlan* plan) {
+  if (plan == nullptr || graph.nodeCount() < 3 || graph.root().index() + 1 != graph.nodeCount()) {
+    return false;
+  }
+  auto geometryNode = graph.nodeAt(AOTNodeID(0));
+  if (geometryNode == nullptr || geometryNode->kind != AOTEffectKind::GeometryColor) {
+    return false;
+  }
+  auto sourceNode = graph.nodeAt(AOTNodeID(1));
+  if (sourceNode == nullptr || sourceNode->kind != AOTEffectKind::TextureSource ||
+      sourceNode->inputs.size() != 1 || sourceNode->inputs[0] != AOTNodeID(0)) {
+    return false;
+  }
+  auto parameters = std::get_if<AOTTextureParameters>(&sourceNode->parameters);
+  if (parameters == nullptr || !parameters->isYUV || parameters->hasRGBAAA ||
+      parameters->samplingKind != AOTTextureSamplingKind::Plain) {
+    return false;
+  }
+  AOTNodeID prev = AOTNodeID(1);
+  for (uint32_t index = 2; index < graph.nodeCount(); ++index) {
+    auto node = graph.nodeAt(AOTNodeID(index));
+    if (!IsPointwiseTailOp(node) || node->inputs[0] != prev) {
+      return false;
+    }
+    prev = AOTNodeID(index);
+  }
+  if (graph.nodeCount() - 2 > 3) {
+    return false;
+  }
+  AOTEffectPlan result = {};
+  AOTPassDescriptor pass = {};
+  pass.kernel = AOTKernelKind::YUVTextureFill;
+  for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
+    pass.nodes.push_back(AOTNodeID(index));
+  }
+  pass.output = graph.root();
+  pass.materializesOutput = false;
+  result.passes.push_back(std::move(pass));
+  result.output = graph.root();
+  *plan = std::move(result);
+  return true;
+}
+
 // New planner: a pointwise DAG whose only leaves are texture sources / const colors and whose
 // interior nodes are pure pointwise or blend ops. Such a DAG evaluates in a single fused pass (the
 // PointwiseChain kernel) with no intermediate materialization. Resolved plain and tiled texture
@@ -363,6 +411,9 @@ bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, AOTEffectPlan* 
     return true;
   }
   if (DecomposeLinearPointwiseTail(graph, plan)) {
+    return true;
+  }
+  if (DecomposeYUVChain(graph, plan)) {
     return true;
   }
   return DecomposePerlinNoiseChain(graph, plan);
