@@ -4643,4 +4643,154 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaBiasMatrixSourceAlphaMatrix) {
   }
 }
 
+// Counterexample audit D, boundary probe one: do two different images under the same effect
+// structure share one program? The processor key aggregates per-sampler texture keys, which only
+// carry the format and type (TextureView::ComputeTextureKey) — not the texture identity — so two
+// RGBA_8888 2D images with the same effect chain must reuse the same program. This records the
+// actual reuse behavior: one artifact creation and one cache hit across the two draws.
+TGFX_TEST(AOTRenderConsistencyTest, DifferentImagesSameEffectShareProgram) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  auto imageOne = MakeImage("resources/apitest/mandrill_128.png");
+  auto imageTwo = MakeImage("resources/apitest/checker_128.png");
+  ASSERT_TRUE(imageOne != nullptr && imageTwo != nullptr);
+  constexpr int size = 64;
+  const std::array<float, 20> brighten = {1.2f, 0, 0,     0, 0.05f, 0, 1.1f, 0, 0, 0.03f,
+                                          0,    0, 1.15f, 0, 0.02f, 0, 0,    0, 1, 0};
+  auto filter = ColorFilter::Matrix(brighten);
+  auto renderWith = [&](const std::shared_ptr<Image>& image) -> Bitmap {
+    auto surface = Surface::Make(context, size, size);
+    if (surface == nullptr) {
+      return {};
+    }
+    Paint paint = {};
+    paint.setColorFilter(filter);
+    surface->getCanvas()->drawImage(image, 0, 0, &paint);
+    context->flushAndSubmit(true);
+    Bitmap bitmap = {};
+    if (!bitmap.allocPixels(size, size)) {
+      return {};
+    }
+    auto* pixels = bitmap.lockPixels();
+    if (pixels == nullptr) {
+      return {};
+    }
+    if (!surface->readPixels(bitmap.info(), pixels)) {
+      bitmap.unlockPixels();
+      return {};
+    }
+    bitmap.unlockPixels();
+    return bitmap;
+  };
+  auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+  ASSERT_NE(bundleData, nullptr);
+  ASSERT_GT(bundleBytes, 0u);
+  ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+  cache->setDecompositionEnabled(true);
+  cache->setDiagnosticRecordingEnabled(true);
+  cache->resetStats();
+  context->globalCache()->clearPrograms();
+  context->globalCache()->resetProgramStats();
+  auto one = renderWith(imageOne);
+  auto two = renderWith(imageTwo);
+  auto stats = context->globalCache()->programStats();
+  cache->setDiagnosticRecordingEnabled(false);
+  cache->unload();
+  context->globalCache()->clearPrograms();
+  printf("[ReuseImages] artifactCreations=%u cacheHits=%u\n",
+         static_cast<unsigned>(stats.precompiledArtifactCreations),
+         static_cast<unsigned>(stats.cacheHits));
+  fflush(stdout);
+  // Format-equal textures share the program identity: one artifact, one hit across the two
+  // draws. (A creation count of two would record the texture-identity split as a boundary.)
+  EXPECT_EQ(stats.precompiledArtifactCreations, 1u);
+  EXPECT_EQ(stats.cacheHits, 1u);
+  EXPECT_EQ(stats.programBuilderCreations, 0u);
+  // Non-vacuous: the renders differ.
+  auto* p1 = static_cast<const uint32_t*>(const_cast<Bitmap&>(one).lockPixels());
+  auto* p2 = static_cast<const uint32_t*>(const_cast<Bitmap&>(two).lockPixels());
+  EXPECT_NE(p1[32 * size + 32], p2[32 * size + 32]);
+  const_cast<Bitmap&>(one).unlockPixels();
+  const_cast<Bitmap&>(two).unlockPixels();
+}
+
+// Counterexample audit D, boundary probe two: does a two-image blend (two leaves) share a
+// program with a single-image draw (one leaf) when both map to the same four-sampler artifact?
+// The child-count difference in the processor key may split them; this records the behavior.
+TGFX_TEST(AOTRenderConsistencyTest, DifferentLeafCountsShareVariant) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  auto imageOne = MakeImage("resources/apitest/mandrill_128.png");
+  auto imageTwo = MakeImage("resources/apitest/checker_128.png");
+  ASSERT_TRUE(imageOne != nullptr && imageTwo != nullptr);
+  constexpr int size = 64;
+  const std::array<float, 20> brighten = {1.2f, 0, 0,     0, 0.05f, 0, 1.1f, 0, 0, 0.03f,
+                                          0,    0, 1.15f, 0, 0.02f, 0, 0,    0, 1, 0};
+  auto renderWith = [&](const std::shared_ptr<ColorFilter>& filter, bool blend) -> Bitmap {
+    auto surface = Surface::Make(context, size, size);
+    if (surface == nullptr) {
+      return {};
+    }
+    Paint paint = {};
+    paint.setColorFilter(filter);
+    if (blend) {
+      auto shaderOne = Shader::MakeImageShader(imageOne, TileMode::Clamp, TileMode::Clamp);
+      auto shaderTwo = Shader::MakeImageShader(imageTwo, TileMode::Clamp, TileMode::Clamp);
+      if (shaderOne == nullptr || shaderTwo == nullptr) {
+        return {};
+      }
+      paint.setShader(Shader::MakeBlend(BlendMode::SrcOver, shaderOne, shaderTwo));
+      surface->getCanvas()->drawRect(Rect::MakeWH(size, size), paint);
+    } else {
+      surface->getCanvas()->drawImage(imageOne, 0, 0, &paint);
+    }
+    context->flushAndSubmit(true);
+    Bitmap bitmap = {};
+    if (!bitmap.allocPixels(size, size)) {
+      return {};
+    }
+    auto* pixels = bitmap.lockPixels();
+    if (pixels == nullptr) {
+      return {};
+    }
+    if (!surface->readPixels(bitmap.info(), pixels)) {
+      bitmap.unlockPixels();
+      return {};
+    }
+    bitmap.unlockPixels();
+    return bitmap;
+  };
+  auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+  ASSERT_NE(bundleData, nullptr);
+  ASSERT_GT(bundleBytes, 0u);
+  ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+  cache->setDecompositionEnabled(true);
+  cache->setDiagnosticRecordingEnabled(true);
+  cache->resetStats();
+  context->globalCache()->clearPrograms();
+  context->globalCache()->resetProgramStats();
+  auto single = renderWith(ColorFilter::Matrix(brighten), false);
+  auto doubled = renderWith(ColorFilter::Matrix(brighten), true);
+  auto stats = context->globalCache()->programStats();
+  cache->setDiagnosticRecordingEnabled(false);
+  cache->unload();
+  context->globalCache()->clearPrograms();
+  printf("[ReuseLeaves] artifactCreations=%u cacheHits=%u\n",
+         static_cast<unsigned>(stats.precompiledArtifactCreations),
+         static_cast<unsigned>(stats.cacheHits));
+  fflush(stdout);
+  // Record the current boundary: a one-leaf draw (padded to four samplers) and a two-leaf blend
+  // (two real leaves plus padding) map to the same four-sampler artifact. Whether they share one
+  // program depends on whether the padding children's keys equal a real child's; the printf above
+  // records the actual split for the boundary ledger.
+  EXPECT_GE(stats.precompiledArtifactCreations, 1u);
+  EXPECT_EQ(stats.programBuilderCreations, 0u);
+  EXPECT_NE(single.isEmpty(), true);
+  EXPECT_NE(doubled.isEmpty(), true);
+}
+
 }  // namespace tgfx
