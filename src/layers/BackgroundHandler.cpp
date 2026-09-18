@@ -442,13 +442,12 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
         // full-content textures.
         auto shapeRect = Rect::MakeWH(static_cast<float>(contentEntry.image->width()),
                                       static_cast<float>(contentEntry.image->height()));
-        if (visibleStyle != nullptr) {
-          shapeRect.intersect(*visibleStyle);
-        }
-        if (!shapeRect.isEmpty()) {
-          CacheStyleOutput(snapshots, layer, style, picture, canvas->getMatrix(), shapeRect,
-                           args.dstColorSpace);
-          output = snapshots->styleOutputs.find(key);
+        if (visibleStyle == nullptr || shapeRect.intersect(*visibleStyle)) {
+          if (!shapeRect.isEmpty()) {
+            CacheStyleOutput(snapshots, layer, style, picture, canvas->getMatrix(), shapeRect,
+                             args.dstColorSpace);
+            output = snapshots->styleOutputs.find(key);
+          }
         }
       }
     }
