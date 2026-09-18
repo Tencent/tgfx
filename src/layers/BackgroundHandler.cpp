@@ -430,8 +430,13 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   // pass — this one included — composites the same texture back with SrcOver. The image
   // carries the style's own mask as its alpha, so compositing it once reproduces the direct
   // draw for opaque backdrops, and passes within a frame differ only by an integer
-  // translation, so the blit stays 1:1.
-  if (snapshots != nullptr && shareStyleOutput) {
+  // translation, so the blit stays 1:1. A perspective canvas matrix is excluded: the cached
+  // texture would be resampled through a projective transform and no longer match the direct
+  // draw, and perspective fragments are small enough that per-pass drawing costs little.
+  auto recordMatrix = canvas->getMatrix();
+  auto isAffine =
+      FloatNearlyZero(recordMatrix.getPerspX()) && FloatNearlyZero(recordMatrix.getPerspY());
+  if (snapshots != nullptr && shareStyleOutput && isAffine) {
     BackgroundSnapshotKey key{layer, style};
     auto output = snapshots->styleOutputs.find(key);
     if (output == snapshots->styleOutputs.end()) {
@@ -444,7 +449,7 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
                                       static_cast<float>(contentEntry.image->height()));
         if (visibleStyle == nullptr || shapeRect.intersect(*visibleStyle)) {
           if (!shapeRect.isEmpty()) {
-            CacheStyleOutput(snapshots, layer, style, picture, canvas->getMatrix(), shapeRect,
+            CacheStyleOutput(snapshots, layer, style, picture, recordMatrix, shapeRect,
                              args.dstColorSpace);
             output = snapshots->styleOutputs.find(key);
           }

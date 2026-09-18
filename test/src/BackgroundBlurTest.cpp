@@ -207,6 +207,85 @@ TGFX_TEST(BackgroundBlurTest, SimpleBackgroundBlur) {
 }
 
 /**
+ * Exercises the shared style output path: an opaque background color plus multiple dirty tiles
+ * make the consumer rasterize each style's output once and composite it back with SrcOver. The
+ * top panel holds its content away from the layer origin (a non-zero content offset), and the
+ * bottom panel's style excludes child effects (the second source group), so the offset math and
+ * both source buckets of the cached path are covered. The first render primes the tile cache;
+ * recoloring both markers then dirties several tiles at once, which is what turns sharing on.
+ */
+TGFX_TEST(BackgroundBlurTest, SharedStyleOutput) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 300);
+  DisplayList displayList;
+  displayList.setRenderMode(RenderMode::Tiled);
+  displayList.setTileSize(100);
+  displayList.setBackgroundColor(Color::White());
+
+  auto rootLayer = displayList.root();
+
+  auto baseLayer = SolidLayer::Make();
+  baseLayer->setColor(Color::FromRGBA(70, 130, 190, 255));
+  baseLayer->setWidth(300);
+  baseLayer->setHeight(300);
+  rootLayer->addChild(baseLayer);
+
+  auto marker1 = ShapeLayer::Make();
+  auto marker1Path = Path();
+  marker1Path.addRect(Rect::MakeXYWH(95, 95, 20, 20));
+  marker1->setPath(marker1Path);
+  marker1->setFillStyle(ShapeStyle::Make(Color::FromRGBA(250, 60, 60, 255)));
+  rootLayer->addChild(marker1);
+
+  auto marker2 = ShapeLayer::Make();
+  auto marker2Path = Path();
+  marker2Path.addRect(Rect::MakeXYWH(95, 215, 20, 20));
+  marker2->setPath(marker2Path);
+  marker2->setFillStyle(ShapeStyle::Make(Color::FromRGBA(250, 60, 60, 255)));
+  rootLayer->addChild(marker2);
+
+  // Scaled panel with its child away from the layer origin: the content image gets a non-zero
+  // offset, and the layer scale makes the content scale differ from 1.
+  auto panel = Layer::Make();
+  auto panelMatrix = Matrix::MakeScale(1.5f);
+  panelMatrix.postTranslate(60, 60);
+  panel->setMatrix(panelMatrix);
+  panel->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
+  rootLayer->addChild(panel);
+
+  auto panelChild = ShapeLayer::Make();
+  auto childPath = Path();
+  childPath.addRect(Rect::MakeXYWH(20, 15, 100, 40));
+  panelChild->setPath(childPath);
+  panelChild->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 90)));
+  panel->addChild(panelChild);
+
+  // Panel whose style excludes child effects, exercising the second source group.
+  auto excludedPanel = Layer::Make();
+  excludedPanel->setMatrix(Matrix::MakeTrans(60, 180));
+  auto excludedBlur = BackgroundBlurStyle::Make(10, 10);
+  excludedBlur->setExcludeChildEffects(true);
+  excludedPanel->setLayerStyles({excludedBlur});
+  rootLayer->addChild(excludedPanel);
+
+  auto excludedChild = ShapeLayer::Make();
+  auto excludedPath = Path();
+  excludedPath.addRect(Rect::MakeXYWH(20, 15, 120, 50));
+  excludedChild->setPath(excludedPath);
+  excludedChild->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 200, 120, 160)));
+  excludedPanel->addChild(excludedChild);
+
+  displayList.render(surface.get());
+
+  marker1->setFillStyle(ShapeStyle::Make(Color::FromRGBA(60, 60, 250, 255)));
+  marker2->setFillStyle(ShapeStyle::Make(Color::FromRGBA(60, 60, 250, 255)));
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/SharedStyleOutput"));
+}
+
+/**
  * Test PassThrough mode with BackgroundBlurStyle.
  * In pass-through mode, the image drawn to canvas contains the blended background,
  * while the image drawn to backgroundCanvas should be the layer content without background blending.
