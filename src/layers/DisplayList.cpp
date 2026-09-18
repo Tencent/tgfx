@@ -1171,6 +1171,9 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   // background-sourced styles, snapshots is null and we fall back to NoOp, which makes
   // background-sourced styles (if any show up unexpectedly) silently no-op — matching the
   // contour / 3D subtree semantics.
+  // SrcOver compositing of the shared style output matches the style's own Src draw only over
+  // an opaque backdrop, and caching only pays off when the frame renders through multiple
+  // passes, so sharing is gated on both.
   BackgroundConsumer consumer(
       snapshots, snapshots != nullptr && _backgroundColor.isOpaque() && snapshots->multiPass);
   args.backgroundHandler = snapshots ? &consumer : BackgroundHandler::NoOp();
@@ -1226,9 +1229,6 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   }
   auto snapshotMap = std::make_unique<BackgroundSnapshotMap>();
   snapshotMap->multiPass = renderRects.size() > 1;
-  // SrcOver compositing of the shared style output matches the style's own Src draw only over
-  // an opaque backdrop, so sharing is enabled only when the background color is fully opaque.
-
   // Draw backgroundColor before the layer tree so that the capture pass includes it as part of
   // the background for blur/backdrop effects.
   if (_backgroundColor != Color::Transparent()) {
