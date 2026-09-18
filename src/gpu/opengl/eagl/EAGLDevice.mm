@@ -19,6 +19,7 @@
 #include "tgfx/gpu/opengl/eagl/EAGLDevice.h"
 #import <OpenGLES/ES2/gl.h>
 #import <OpenGLES/ES3/glext.h>
+#include "gpu/DeviceRegistry.h"
 #include "gpu/opengl/eagl/EAGLGPU.h"
 
 namespace tgfx {
@@ -168,7 +169,7 @@ std::shared_ptr<EAGLDevice> EAGLDevice::Wrap(EAGLContext* eaglContext, bool exte
     device = std::shared_ptr<EAGLDevice>(new EAGLDevice(std::move(gpu), eaglContext),
                                          EAGLDevice::NotifyReferenceReachedZero);
     device->externallyOwned = externallyOwned;
-    device->weakThis = device;
+    device = std::static_pointer_cast<EAGLDevice>(Device::RegisterNative(device, {eaglContext}));
   }
   if (oldEAGLContext != eaglContext) {
     [EAGLContext setCurrentContext:oldEAGLContext];
