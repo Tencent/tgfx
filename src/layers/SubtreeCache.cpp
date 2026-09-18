@@ -28,6 +28,10 @@ namespace {
 // Bounds the drift between the baked contentScale and the actual contentScale of a reusable
 // texture. Scale-dependent rasterization (such as hairline stroke coverage) is baked into the
 // texture, so a larger drift would produce visibly shifted results when it is resampled.
+// Trade-off: every drift beyond this bound re-rasterizes the whole subtree and replaces the
+// bucket entry, so a monotonic zoom across a 4x range re-bakes ~28 times per cached layer. If
+// zoom-time re-rasterization shows up in profiles, re-bake asynchronously while still drawing
+// the stale texture instead of widening this tolerance.
 constexpr float MAX_CONTENT_SCALE_DRIFT = 0.05f;
 }  // namespace
 

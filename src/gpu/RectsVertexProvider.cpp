@@ -98,25 +98,49 @@ class AARectsVertexProvider : public RectsVertexProvider {
         uintColor = ToUintPMColor(record->color, steps.get());
       }
 
-      auto scale = sqrtf(viewMatrix.getScaleX() * viewMatrix.getScaleX() +
-                         viewMatrix.getSkewY() * viewMatrix.getSkewY());
+      auto scaleX = sqrtf(viewMatrix.getScaleX() * viewMatrix.getScaleX() +
+                          viewMatrix.getSkewY() * viewMatrix.getSkewY());
+      auto scaleY = sqrtf(viewMatrix.getSkewX() * viewMatrix.getSkewX() +
+                          viewMatrix.getScaleY() * viewMatrix.getScaleY());
       // we want the new edge to be .5px away from the old line.
-      auto padding = 0.5f / scale;
+      auto padding = 0.5f / scaleX;
       // A rect thinner than 1 device pixel cannot be inset by the full padding without flipping
       // its edges, which overlaps the coverage-1 quad with the AA ring and blends coverage twice.
       // Collapse such an axis to the rect center instead and modulate the inner coverage by the
-      // device-pixel extent, so the rendered ink never exceeds the paint alpha and stays
-      // independent of the subpixel phase.
-      auto insetX = std::min(padding, rect.width() * 0.5f);
-      auto insetY = std::min(padding, rect.height() * 0.5f);
-      auto insetBounds = rect.makeInset(insetX, insetY);
+      // device-pixel extent, so the rendered ink never exceeds the paint alpha. Each axis is
+      // measured against its own device scale, so non-uniform matrices do not misclassify an
+      // axis that is wide enough in device pixels as sub-pixel.
+      auto subpixelX = rect.width() * scaleX < 1.0f;
+      auto subpixelY = rect.height() * scaleY < 1.0f;
+      auto insetX = subpixelX ? rect.width() * 0.5f : padding;
+      auto insetY = subpixelY ? rect.height() * 0.5f : padding;
+      // Snap the collapsed axis to the nearest device pixel-center row/column. When the collapsed
+      // center line lands between pixel rows, the linear AA ramp is sampled asymmetrically and
+      // the total ink varies with the subpixel phase (up to 67% for a 0.3px rect). Centering the
+      // ramp on a pixel center makes the adjacent rows share the coverage symmetrically, so the
+      // ink matches the device extent and is independent of the phase. Only translation/scale
+      // matrices are snapped; sheared rects keep their original position.
+      auto drawRect = rect;
+      if ((subpixelX || subpixelY) && viewMatrix.getSkewX() == 0.f &&
+          viewMatrix.getSkewY() == 0.f) {
+        if (subpixelY && viewMatrix.getScaleY() != 0.f) {
+          auto deviceCenterY = rect.centerY() * viewMatrix.getScaleY() + viewMatrix.getTranslateY();
+          auto snappedCenterY = roundf(deviceCenterY - 0.5f) + 0.5f;
+          drawRect.offset(0.0f, (snappedCenterY - deviceCenterY) / viewMatrix.getScaleY());
+        }
+        if (subpixelX && viewMatrix.getScaleX() != 0.f) {
+          auto deviceCenterX = rect.centerX() * viewMatrix.getScaleX() + viewMatrix.getTranslateX();
+          auto snappedCenterX = roundf(deviceCenterX - 0.5f) + 0.5f;
+          drawRect.offset((snappedCenterX - deviceCenterX) / viewMatrix.getScaleX(), 0.0f);
+        }
+      }
+      auto insetBounds = drawRect.makeInset(insetX, insetY);
       auto insetQuad = Quad::MakeFrom(insetBounds, &viewMatrix);
-      auto outsetBounds = rect.makeOutset(padding, padding);
+      auto outsetBounds = drawRect.makeOutset(padding, padding);
       auto outsetQuad = Quad::MakeFrom(outsetBounds, &viewMatrix);
       auto innerCoverage = 1.0f;
-      if (insetX < padding || insetY < padding) {
-        innerCoverage =
-            std::min(1.0f, std::min(rect.width() * scale, rect.height() * scale) / 1.0f);
+      if (subpixelX || subpixelY) {
+        innerCoverage = std::min(1.0f, std::min(rect.width() * scaleX, rect.height() * scaleY));
       }
       auto insetUV = insetBounds;
       auto outsetUV = outsetBounds;

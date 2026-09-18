@@ -223,6 +223,8 @@ TGFX_TEST(HairlinePhaseTest, SubpixelFillRectConsistency) {
   };
   for (float rectHeight : {0.3f, 0.5f, 0.75f}) {
     // Two subpixel phases: y = 100.0 and y = 150.25.
+    float phaseInks[2] = {};
+    int phaseIndex = 0;
     for (float topY : {100.0f, 150.25f}) {
       auto canvas = surface->getCanvas();
       canvas->clear(Color::White());
@@ -236,12 +238,16 @@ TGFX_TEST(HairlinePhaseTest, SubpixelFillRectConsistency) {
       EXPECT_TRUE(surface->readPixels(bitmap.info(), pixels));
       bitmap.unlockPixels();
       auto ink = measureInk(bitmap, static_cast<int>(std::lround(topY + rectHeight * 0.5f)));
-      // Expected ink: device extent * paint alpha * 41 sampled columns.
+      phaseInks[phaseIndex++] = ink;
+      // Expected ink: device extent * paint alpha * 41 sampled columns. 8-bit alpha
+      // quantization keeps the rendered ink about 2% below the unquantized expectation.
       auto expected = rectHeight * 0.08f * 41.0f;
       printf("[HairlinePhaseTest] fillRect height=%.2f top=%.2f ink=%.4f expected=%.4f\n",
              rectHeight, topY, ink, expected);
-      EXPECT_NEAR(ink, expected, 1.0f);
+      EXPECT_NEAR(ink, expected, expected * 0.1f);
     }
+    // Identical rects must render with the same total ink regardless of subpixel phase.
+    EXPECT_NEAR(phaseInks[0], phaseInks[1], std::max(phaseInks[0], phaseInks[1]) * 0.05f);
   }
 }
 
