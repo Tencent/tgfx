@@ -435,14 +435,21 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     BackgroundSnapshotKey key{layer, style};
     auto output = snapshots->styleOutputs.find(key);
     if (output == snapshots->styleOutputs.end()) {
-      auto picture =
-          RecordStyleOutput(style, styleInput, alpha, GetVisibleStyle(snapshots, layer, style));
+      auto visibleStyle = GetVisibleStyle(snapshots, layer, style);
+      auto picture = RecordStyleOutput(style, styleInput, alpha, visibleStyle);
       if (picture != nullptr) {
+        // Bound the cached texture to the visible region, so small dirty rects do not allocate
+        // full-content textures.
         auto shapeRect = Rect::MakeWH(static_cast<float>(contentEntry.image->width()),
                                       static_cast<float>(contentEntry.image->height()));
-        CacheStyleOutput(snapshots, layer, style, picture, canvas->getMatrix(), shapeRect,
-                         args.dstColorSpace);
-        output = snapshots->styleOutputs.find(key);
+        if (visibleStyle != nullptr) {
+          shapeRect.intersect(*visibleStyle);
+        }
+        if (!shapeRect.isEmpty()) {
+          CacheStyleOutput(snapshots, layer, style, picture, canvas->getMatrix(), shapeRect,
+                           args.dstColorSpace);
+          output = snapshots->styleOutputs.find(key);
+        }
       }
     }
     if (output != snapshots->styleOutputs.end()) {
