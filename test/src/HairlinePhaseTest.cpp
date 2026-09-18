@@ -396,12 +396,16 @@ TGFX_TEST(HairlinePhaseTest, SubtreeCacheScaleDrift) {
   // total ink and peak-row sharpness.
   EXPECT_NEAR(inkAt05, freshInk, freshInk * 0.2f + 0.1f);
   EXPECT_NEAR(peakAt05, freshPeak, freshPeak * 0.25f);
-  // The cached render at the bake zoom must also match the direct render there. Software
-  // renderers (SwiftShader) rasterize sub-pixel AA with lower precision than hardware, and the
-  // cached texture is bilinearly resampled back to the screen, so the two paths drift further
-  // apart than on hardware backends (measured ~12% on vulkan-swiftshader vs ~1% on
-  // Metal/OpenGL hardware). Keep the tighter bound on hardware so the original mip-bucket bake
-  // bug (~13% error) still fails.
+  // The cached render at the bake zoom must also match the direct render there. The cache
+  // texture is bilinearly resampled into the tile, which splits each ~8/255-alpha texel across
+  // two rows. Vulkan leaves the rounding mode of the blend-to-8-bit conversion
+  // implementation-defined: hardware GPUs round to nearest (per-column split (6,2), ink within
+  // ~1% of the direct render), while SwiftShader truncates (per-column split (6,1), a 1-LSB
+  // loss on every column that adds up to ~12% on vulkan-swiftshader and ~7% on
+  // opengl-swiftshader). The direct reference itself is bit-identical across all backends, so
+  // this wider tolerance only absorbs the software rasterizer's quantization rounding, not a
+  // bake-scale error. Keep the tighter bound on hardware so the original mip-bucket bake bug
+  // (~13% error) still fails.
   auto gpuInfo = context->gpu()->info();
   bool isSwiftShader =
       gpuInfo->renderer.find("SwiftShader") != std::string::npos || gpuInfo->vendor == "6880";
