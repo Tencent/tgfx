@@ -38,9 +38,11 @@ static void UploadChainSlot(UniformData* uniformData, size_t index, const AOTCha
   }
   if (slot.op == AOTChainOp::Texture) {
     // Bit 0: modulate by the paint alpha. Bit 1: alpha-only leaf, splat .r into all channels.
-    // Bit 2: coverage-root leaf, modulate by the coverage unit alpha.
-    selector =
-        slot.textureModulate | (slot.textureAlphaOnly << 1) | (slot.textureModulateUnit << 2);
+    // Bit 2: coverage-root leaf, modulate by the coverage unit alpha. Bit 3: alpha-only leaf
+    // modulated by the geometry color's RGB (the runtime readback multiplies the mask by its
+    // full input color, whose shape depends on the leaf's tree position).
+    selector = slot.textureModulate | (slot.textureAlphaOnly << 1) |
+               (slot.textureModulateUnit << 2) | (slot.textureModulateGeometryRGB << 3);
   }
   if (slot.op == AOTChainOp::RRectCoverage) {
     // Bits 16-19: the slot's ordinal into the CoverageRRect* parameter arrays.

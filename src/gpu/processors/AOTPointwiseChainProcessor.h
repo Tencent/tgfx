@@ -66,6 +66,12 @@ struct AOTChainSlot {
   // the runtime TextureEffect readback. Uploaded as bit 1 of the slot selector; textureModulate
   // remains bit 0.
   int textureAlphaOnly = 0;
+  // OP_TEXTURE only: 1 modulates an alpha-only leaf by the geometry color's RGB (bit 3 of the
+  // selector). The runtime alpha-only readback is sample.a * inputColor, so the leaf's input
+  // environment decides the shape: the color root multiplies by the full geometry color (bit 0
+  // carries the alpha half) and a two-child blend operand by (geom.rgb, 1.0). Single-child
+  // operands receive white and coverage masks stay raw.
+  int textureModulateGeometryRGB = 0;
   // OP_TEXTURE only: 1 modulates the sample by the coverage unit's alpha (bit 2 of the selector).
   // Set on a leaf that is the coverage subtree's root, matching the runtime coverage-FP readback
   // (tex * coverageIn.a).

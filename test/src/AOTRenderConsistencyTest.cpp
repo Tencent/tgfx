@@ -3900,4 +3900,273 @@ TGFX_TEST(AOTRenderConsistencyTest, MultiPassUnsupportedSourceFallsBackAtomicall
                          height);
 }
 
+// Counterexample audit B1: an alpha-only image as a two-child blend operand under a non-white
+// paint. The runtime's two-child xfer emission feeds each child vec4(inputColor.rgb, 1.0), and
+// GLSLTextureEffect's alpha-only readback is sample.a * inputColor — so the mask is TINTED by the
+// paint RGB. The chain kernel's alpha-only leaf only splats .r and multiplies by the unit's alpha
+// (or nothing for blend operands), so a red paint must still produce a red-tinted mask, not a
+// gray one. A wrong input environment shows up as a full-saturation color difference.
+TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyBlendOperandKeepsPaintTint) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  auto colorImage = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_NE(colorImage, nullptr);
+  constexpr int size = 96;
+  Bitmap maskBitmap = {};
+  ASSERT_TRUE(maskBitmap.allocPixels(size, size, true));
+  auto* maskPixels = static_cast<uint8_t*>(maskBitmap.lockPixels());
+  ASSERT_NE(maskPixels, nullptr);
+  auto rowBytes = maskBitmap.rowBytes();
+  for (size_t y = 0; y < static_cast<size_t>(size); ++y) {
+    for (size_t x = 0; x < static_cast<size_t>(size); ++x) {
+      maskPixels[y * rowBytes + x] = static_cast<uint8_t>((x * 3 + y * 5) % 256);
+    }
+  }
+  maskBitmap.unlockPixels();
+  auto maskImage = Image::MakeFrom(maskBitmap);
+  ASSERT_NE(maskImage, nullptr);
+  auto renderScene = [&](Bitmap* outBitmap) {
+    auto surface = Surface::Make(context, size, size);
+    ASSERT_NE(surface, nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::Transparent());
+    auto colorShader = Shader::MakeImageShader(colorImage, TileMode::Clamp, TileMode::Clamp);
+    auto maskShader = Shader::MakeImageShader(maskImage, TileMode::Clamp, TileMode::Clamp);
+    ASSERT_TRUE(colorShader != nullptr && maskShader != nullptr);
+    Paint paint = {};
+    // A non-white paint: the runtime tints the alpha-only operand with this RGB.
+    paint.setColor(Color(1.0f, 0.2f, 0.1f, 1.0f));
+    paint.setShader(Shader::MakeBlend(BlendMode::Multiply, colorShader, maskShader));
+    canvas->drawRect(Rect::MakeWH(size, size), paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(size, size));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_NE(pixels, nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+  };
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  {
+    cache->unload();
+    ScopedAOTDeliberateMiss deliberate(context);
+    renderScene(&reference);
+  }
+  {
+    auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+    ASSERT_NE(bundleData, nullptr);
+    ASSERT_GT(bundleBytes, 0u);
+    ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+    cache->setDecompositionEnabled(true);
+    renderScene(&candidate);
+    cache->unload();
+  }
+  ExpectBitmapsIdentical("alpha-only-blend-tint", candidate, reference, size, size);
+}
+
+// Counterexample audit B1, part two: an alpha-only image as the color root under a non-white
+// paint. The runtime feeds the root processor the GP's full output color, and GLSLTextureEffect's
+// alpha-only readback is sample.a * inputColor — so the mask is TINTED by the paint RGB. The
+// chain kernel's color-root alpha-only leaf must therefore modulate by the geometry color's RGB
+// (bit 3) in addition to its alpha (bit 0); the old alpha-only form only multiplied by .a and
+// produced a gray mask under a red paint.
+TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyColorRootKeepsPaintTint) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  constexpr int size = 96;
+  Bitmap maskBitmap = {};
+  ASSERT_TRUE(maskBitmap.allocPixels(size, size, true));
+  auto* maskPixels = static_cast<uint8_t*>(maskBitmap.lockPixels());
+  ASSERT_NE(maskPixels, nullptr);
+  auto rowBytes = maskBitmap.rowBytes();
+  for (size_t y = 0; y < static_cast<size_t>(size); ++y) {
+    for (size_t x = 0; x < static_cast<size_t>(size); ++x) {
+      maskPixels[y * rowBytes + x] = static_cast<uint8_t>((x * 3 + y * 5) % 256);
+    }
+  }
+  maskBitmap.unlockPixels();
+  auto maskImage = Image::MakeFrom(maskBitmap);
+  ASSERT_NE(maskImage, nullptr);
+  auto renderScene = [&](Bitmap* outBitmap) {
+    auto surface = Surface::Make(context, size, size);
+    ASSERT_NE(surface, nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::Transparent());
+    // The mask is the shader root: the runtime multiplies it by the full geometry color (the red
+    // paint), tinting every visible pixel red instead of gray.
+    auto maskShader = Shader::MakeImageShader(maskImage, TileMode::Clamp, TileMode::Clamp);
+    ASSERT_NE(maskShader, nullptr);
+    Paint paint = {};
+    paint.setColor(Color(1.0f, 0.2f, 0.1f, 1.0f));
+    paint.setShader(maskShader);
+    canvas->drawRect(Rect::MakeWH(size, size), paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(size, size));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_NE(pixels, nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+  };
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  {
+    cache->unload();
+    ScopedAOTDeliberateMiss deliberate(context);
+    renderScene(&reference);
+  }
+  {
+    auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+    ASSERT_NE(bundleData, nullptr);
+    ASSERT_GT(bundleBytes, 0u);
+    ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+    cache->setDecompositionEnabled(true);
+    cache->setDiagnosticRecordingEnabled(true);
+    cache->resetStats();
+    context->globalCache()->resetProgramStats();
+    renderScene(&candidate);
+    // The mask draw must take the precompiled chain route (not a fallback that would trivially
+    // match the runtime), so the tint comparison is a real check of the kernel's alpha-only
+    // color-root modulation.
+    auto stats = context->globalCache()->programStats();
+    EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+    EXPECT_EQ(stats.programBuilderCreations, 0u);
+    EXPECT_GE(stats.precompiledArtifactCreations, 1u);
+    cache->setDiagnosticRecordingEnabled(false);
+    cache->unload();
+    context->globalCache()->clearPrograms();
+  }
+  ExpectBitmapsIdentical("alpha-only-color-root-tint", candidate, reference, size, size);
+}
+
+// Counterexample audit B3: two stacked analytic AA clips over an AA oval. The coverage subtree is
+// a two-level analytic chain (RectEffect x2) while the GP emits a fractional coverage at the oval
+// edge. The chain must keep the GP coverage as the chain's starting unit: at pixels where both
+// clips evaluate to 1 but the oval edge is half covered, the final coverage must stay ~0.5, not
+// snap to 1. Sampled on the oval's rim only (the interior is coverage 1 everywhere).
+TGFX_TEST(AOTRenderConsistencyTest, StackedClipsKeepGPCoverageOnAAEdge) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  constexpr int size = 96;
+  auto renderScene = [&](Bitmap* outBitmap) {
+    auto surface = Surface::Make(context, size, size);
+    ASSERT_NE(surface, nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::Transparent());
+    // Two stacked AA clip rects, both fully containing the oval's rim so the clips themselves
+    // contribute coverage 1 on the sampled pixels — only the oval's own AA edge is fractional.
+    canvas->clipRect(Rect::MakeLTRB(8, 8, size - 8, size - 8), true);
+    canvas->clipRect(Rect::MakeLTRB(12, 12, size - 12, size - 12), true);
+    Paint paint = {};
+    paint.setColor(Color(0, 1, 0, 1));
+    canvas->drawOval(Rect::MakeLTRB(24, 24, size - 24, size - 24), paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(size, size));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_NE(pixels, nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+  };
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  {
+    cache->unload();
+    ScopedAOTDeliberateMiss deliberate(context);
+    renderScene(&reference);
+  }
+  {
+    auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+    ASSERT_NE(bundleData, nullptr);
+    ASSERT_GT(bundleBytes, 0u);
+    ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+    cache->setDecompositionEnabled(true);
+    renderScene(&candidate);
+    cache->unload();
+  }
+  ExpectBitmapsIdentical("stacked-clips-gp-coverage", candidate, reference, size, size);
+}
+
+// Counterexample audit D1: program identity. Three draws in one context whose color trees share
+// the same variant (same GP layout, one texture leaf, no XP difference) but differ only in the
+// instruction sequence (one matrix vs two matrices vs luma). If the program key correctly
+// collapsed to the artifact/pipeline identity, all three would share one program; if it still
+// encodes the instruction structure, each draw creates a new precompiled program (three artifact
+// creations, zero cache hits). This test records the current behavior so the fix has a baseline.
+TGFX_TEST(AOTRenderConsistencyTest, SameVariantDifferentChainsShareProgram) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_NE(image, nullptr);
+  constexpr int size = 64;
+  const std::array<float, 20> brighten = {1.2f, 0, 0,     0, 0.05f, 0, 1.1f, 0, 0, 0.03f,
+                                          0,    0, 1.15f, 0, 0.02f, 0, 0,    0, 1, 0};
+  const std::array<float, 20> swapRedBlue = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0,
+                                             1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
+  auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+  ASSERT_NE(bundleData, nullptr);
+  ASSERT_GT(bundleBytes, 0u);
+  ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+  cache->setDecompositionEnabled(true);
+  cache->setDiagnosticRecordingEnabled(true);
+  cache->resetStats();
+  context->globalCache()->clearPrograms();
+  context->globalCache()->resetProgramStats();
+  auto renderWith = [&](const std::shared_ptr<ColorFilter>& filter) -> Bitmap {
+    auto surface = Surface::Make(context, size, size);
+    if (surface == nullptr) {
+      return {};
+    }
+    Paint paint = {};
+    paint.setColorFilter(filter);
+    surface->getCanvas()->drawImage(image, 0, 0, &paint);
+    context->flushAndSubmit(true);
+    Bitmap bitmap = {};
+    if (!bitmap.allocPixels(size, size)) {
+      return {};
+    }
+    auto* pixels = bitmap.lockPixels();
+    if (pixels == nullptr) {
+      return {};
+    }
+    if (!surface->readPixels(bitmap.info(), pixels)) {
+      bitmap.unlockPixels();
+      return {};
+    }
+    bitmap.unlockPixels();
+    return bitmap;
+  };
+  auto one = renderWith(ColorFilter::Matrix(brighten));
+  auto two = renderWith(
+      ColorFilter::Compose(ColorFilter::Matrix(brighten), ColorFilter::Matrix(swapRedBlue)));
+  auto three = renderWith(ColorFilter::Luma());
+  auto stats = context->globalCache()->programStats();
+  cache->setDiagnosticRecordingEnabled(false);
+  cache->unload();
+  // Record the current identity behavior: the trees share one variant (same shader, same GP,
+  // same single texture leaf), so artifact creations above one mean the program key still splits
+  // by instruction structure. This documents the gap; the fix flips the expectations.
+  EXPECT_GE(stats.precompiledArtifactCreations, 1u);
+  EXPECT_EQ(stats.programBuilderCreations, 0u);
+  printf("[ProgramIdentity] artifactCreations=%u cacheHits=%u cacheMisses=%u\n",
+         static_cast<unsigned>(stats.precompiledArtifactCreations),
+         static_cast<unsigned>(stats.cacheHits), static_cast<unsigned>(stats.cacheMisses));
+  fflush(stdout);
+  // Sanity: the three renders must differ from each other (non-vacuous chains).
+  auto* p1 = static_cast<const uint32_t*>(const_cast<Bitmap&>(one).lockPixels());
+  auto* p2 = static_cast<const uint32_t*>(const_cast<Bitmap&>(two).lockPixels());
+  auto* p3 = static_cast<const uint32_t*>(const_cast<Bitmap&>(three).lockPixels());
+  EXPECT_NE(p1[32 * size + 32], p2[32 * size + 32]);
+  EXPECT_NE(p2[32 * size + 32], p3[32 * size + 32]);
+  const_cast<Bitmap&>(one).unlockPixels();
+  const_cast<Bitmap&>(two).unlockPixels();
+  const_cast<Bitmap&>(three).unlockPixels();
+}
+
 }  // namespace tgfx

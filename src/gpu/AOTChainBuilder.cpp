@@ -476,6 +476,18 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
         // raw sample would otherwise read alpha as constant 1.
         slot.textureAlphaOnly =
             static_cast<const TextureEffect*>(leaf.get())->isAlphaOnly() ? 1 : 0;
+        // The runtime alpha-only readback is sample.a * inputColor — the mask carries the input
+        // color's RGB, not just its alpha. The color root (a texture fed by the geometry color)
+        // sees the full geometry color (textureModulate keeps the alpha half, so the pair
+        // reproduces mask * geom), and a two-child blend operand sees (geom.rgb, 1.0) because the
+        // xfer emission feeds each child vec4(inputColor.rgb, 1.0). Single-child operands receive
+        // white and coverage masks keep the raw splat, matching the runtime emission.
+        slot.textureModulateGeometryRGB =
+            slot.textureAlphaOnly != 0 &&
+                    (slot.textureModulate != 0 ||
+                     (opaqueBlendOperand[combined] && !whiteInputOperand[combined]))
+                ? 1
+                : 0;
         if (coverageLeafFromUVCoord && inputBase != 0) {
           // Atlas text: the coverage leaf sources its coordinates from the maskCoord attribute
           // (the uvCoord slot), while color leaves and gradients keep the position source.

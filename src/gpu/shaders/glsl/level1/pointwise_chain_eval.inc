@@ -64,6 +64,14 @@ vec4 evalChainSlot(int slot) {
       // Alpha-only leaf (R8 on Metal returns (r,0,0,1)): splat .r into all channels so the alpha
       // channel carries the mask value, matching the runtime TextureEffect alpha-only readback.
       texColor = vec4(texColor.r);
+      if ((Packed.w & 8) != 0) {
+        // The runtime alpha-only readback multiplies the mask by its FULL input color
+        // (sample.a * inputColor), not just the alpha: the color root sees the geometry color
+        // (bit 0 supplies the alpha half, so bit0|bit3 reproduces mask * geom), and a two-child
+        // blend operand sees (geom.rgb, 1.0) — see GLSLXfermodeFragmentProcessor's inputColor
+        // shape. Single-child operands (white input) and coverage masks keep the raw splat.
+        texColor *= vec4(TGFX_CHAIN_GEOM_COLOR.rgb, 1.0);
+      }
     }
     if ((Packed.w & 4) != 0) {
       // Coverage-root leaf: modulated by the coverage unit's alpha, matching the runtime
