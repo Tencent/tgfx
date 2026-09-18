@@ -1883,6 +1883,9 @@ TGFX_TEST(AOTRenderConsistencyTest, NonTrivialLinearChainLengthMatrixMatchesRunt
     // Metal: the MSL compiler fuses the kernel's interpreted arithmetic differently from the
     // runtime's unrolled expressions, so a single pixel may round 1 LSB apart; OpenGL
     // byte-matches both structures.
+    // AUDIT RULING (2026-09-18, batch 0): the tolerance-1 widening above has no attribution
+    // experiment behind it (no fast-math toggle or unrolled-expression control was run); treat
+    // the pass as unproven on Metal until the P6.2 attribution lands. Not an equivalence claim.
     ExpectBitmapsNear("nontrivial-linear-chain-matrix", candidate, reference, width, height,
                       std::string(TGFX_BACKEND_NAME) == "metal" ? 1 : 0);
   }
@@ -3997,6 +4000,9 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyBlendOperandKeepsPaintTint) {
     renderScene(&candidate);
     cache->unload();
   }
+  // AUDIT RULING (2026-09-18, batch 0): the metal tolerance-1 here has no attribution
+  // experiment behind it (no fast-math toggle or unrolled-expression control was run); treat
+  // the Metal pass as unproven until the P6.2 attribution lands. Not an equivalence claim.
   ExpectBitmapsNear("alpha-only-blend-tint", candidate, reference, size, size,
                     std::string(TGFX_BACKEND_NAME) == "metal" ? 1 : 0);
 }
@@ -4572,6 +4578,14 @@ TGFX_TEST(AOTRenderConsistencyTest, GPCoverageAndMaskCoexistOnAAEdge) {
 // while the bias<=0 matrices take the plain Compose route where the texture modulates by the
 // paint alpha. The identity-alpha control isolates the bias contribution: only the alpha row
 // differs between the two matrices of each pair.
+//
+// AUDIT RULING (2026-09-18, batch 0): evidence insufficient, conclusion withdrawn. The claimed
+// SrcIn-wrap-versus-Compose contrast is never actually constructed here: the makeWithColorFilter
+// merge that produces the SrcIn wrap only happens when brush.shader is set (OpsCompositor's
+// affectsTransparentBlack branch), and this scene builds the brush through drawImage +
+// setColorFilter, so the claimed two routes do not both execute. Passing asserts below prove
+// nothing about either route. Redo as part of the input-contract batch with a scene that
+// provably reaches both paths.
 TGFX_TEST(AOTRenderConsistencyTest, AlphaBiasMatrixSourceAlphaMatrix) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -4919,6 +4933,15 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyImageBlurMatchesRuntime) {
 // source is an alpha sweep (0..255), so a row of pixels always sits within one quantum (1/255)
 // of the 0.5 threshold: exactly where the stored intermediate could flip the step() decision
 // relative to the runtime's direct evaluation.
+//
+// AUDIT RULING (2026-09-18, batch 0): evidence insufficient, conclusion withdrawn for two
+// reasons. First, the sweep source (alpha<<24)|0x00FFFFFF has RGB=255 with alpha<255, which
+// violates the premul invariant (RGB<=A) required of legal bitmap inputs, so the reference
+// semantics themselves are undefined at the boundary. Second, the matrices' identity alpha rows
+// keep alpha byte-aligned all the way to the threshold, so the step() decision never has the
+// chance to flip that the test claims to probe (the in-test comment admits this). A maxDiff<=1
+// pass here proves only ordinary round-trip propagation. Redo with a legal premul source whose
+// alpha is pushed off the byte grid by a matrix before the threshold (plan P3.3).
 TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailThresholdQuantizationBand) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -5043,6 +5066,14 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailThresholdQuantizationBand) {
 // tail plan, so every source sample happens through a materialization chain; the uvMatrix
 // probes the intermediate's coordinate mapping (offset, magnification, and minification where
 // the mipmap-filtered source matters).
+//
+// AUDIT RULING (2026-09-18, batch 0): evidence insufficient for the mipmap claim, conclusion
+// narrowed to translate/magnify only. The "minify-mipmap" case never actually exercises
+// mipmap filtering: DeviceSpaceTextureEffect::Make is called without a sampler-state override,
+// and the source is a wrapped render target with no mip levels, so no mipmap sampling can
+// occur on either route. Passing asserts say nothing about mipmap behavior across
+// materialization boundaries. Redo with a real mipmap sampler (DeviceSpaceTextureEffect needs
+// a sampler-state override) per plan P3.3.
 TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailSamplingTransforms) {
   ContextScope scope;
   auto context = scope.getContext();
