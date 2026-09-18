@@ -439,6 +439,10 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   // draw for opaque backdrops, and passes within a frame differ only by an integer
   // translation, so the blit stays 1:1.
   auto recordMatrix = canvas->getMatrix();
+  // A projective recordMatrix resamples the cached texture on blit instead of evaluating the
+  // style per pass, which differs by at most 1/255 (rounding only). That is accepted: the cached
+  // output still covers every visible pixel, and a non-degenerate projective map of the visible
+  // rect stays inside its corner hull, so deviceShape remains a valid bound.
   if (snapshots != nullptr && shareStyleOutput) {
     BackgroundSnapshotKey key{layer, style};
     auto output = snapshots->styleOutputs.find(key);
