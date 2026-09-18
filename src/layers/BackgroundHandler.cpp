@@ -125,7 +125,7 @@ std::shared_ptr<Picture> RecordStyleOutput(LayerStyle* style, const LayerStyleIn
   PictureRecorder recorder = {};
   auto* recording = recorder.beginRecording();
   if (visibleStyle != nullptr) {
-    recording->clipRect(*visibleStyle);
+    recording->clipRect(*visibleStyle, false);
   }
   style->draw(recording, styleInput, alpha);
   return recorder.finishRecordingAsPicture();
