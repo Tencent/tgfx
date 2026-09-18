@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <unordered_map>
+#include <vector>
 #include "layers/LayerStyleSource.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Matrix.h"
@@ -101,6 +102,11 @@ struct BackgroundSnapshotMap {
   // True when this frame renders through multiple passes (tiles or dirty rects), which is
   // when caching the style output pays for its rasterization.
   bool multiPass = false;
+  // World-space rects this frame actually paints, before capture widens them by
+  // maxBackgroundOutset for blur sampling. A style's output is only visible inside these rects, so
+  // they bound the shared style output texture to the on-screen size instead of the layer's full
+  // content extent, which under zoom can be orders of magnitude larger.
+  std::vector<Rect> visibleRects = {};
   // Style-space visible region per (Layer, LayerStyle) pair, computed during capture. The style
   // space depends on the style's excludeChildEffects bucket (each bucket's content image has its
   // own offset), while every pass in a frame shares it, so one rect per pair bounds the recorded

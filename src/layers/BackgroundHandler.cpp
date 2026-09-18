@@ -263,11 +263,15 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   }
   // Precompute the visible region in style space for the consumer. The style space is defined
   // by the style's excludeChildEffects bucket, shared by every pass in the frame, so one rect
-  // per (layer, style) pair bounds the recorded style output for all of them.
+  // per (layer, style) pair bounds the recorded style output for all of them. Use the frame's
+  // on-screen rects rather than args.renderRects: the latter is widened by maxBackgroundOutset so
+  // the capture pass also paints the blur sampling margin, and a style's own output is never
+  // visible outside the on-screen rects. Bounding to the widened rects would size the cached
+  // texture by that margin, which under zoom grows far past the render target.
   auto* visibleGroup = source->groups[static_cast<int>(style->excludeChildEffects())].get();
-  if (args.renderRects != nullptr && !args.renderRects->empty() && visibleGroup != nullptr) {
+  if (!snapshots->visibleRects.empty() && visibleGroup != nullptr) {
     Rect visibleWorld = Rect::MakeEmpty();
-    for (const auto& renderRect : *args.renderRects) {
+    for (const auto& renderRect : snapshots->visibleRects) {
       visibleWorld.join(renderRect);
     }
     auto visibleLocal = worldToLocal.mapRect(visibleWorld);
@@ -430,13 +434,9 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   // pass — this one included — composites the same texture back with SrcOver. The image
   // carries the style's own mask as its alpha, so compositing it once reproduces the direct
   // draw for opaque backdrops, and passes within a frame differ only by an integer
-  // translation, so the blit stays 1:1. A perspective canvas matrix is excluded: the cached
-  // texture would be resampled through a projective transform and no longer match the direct
-  // draw, and perspective fragments are small enough that per-pass drawing costs little.
+  // translation, so the blit stays 1:1.
   auto recordMatrix = canvas->getMatrix();
-  auto isAffine =
-      FloatNearlyZero(recordMatrix.getPerspX()) && FloatNearlyZero(recordMatrix.getPerspY());
-  if (snapshots != nullptr && shareStyleOutput && isAffine) {
+  if (snapshots != nullptr && shareStyleOutput) {
     BackgroundSnapshotKey key{layer, style};
     auto output = snapshots->styleOutputs.find(key);
     if (output == snapshots->styleOutputs.end()) {

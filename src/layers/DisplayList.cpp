@@ -1214,6 +1214,7 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   if (worldRects.empty()) {
     return nullptr;
   }
+  auto visibleRects = worldRects;
   // Expand by the max blur outset so layers whose bounds sit just outside the dirty rects but
   // still contribute pixels to the blur sampling region are not culled by the capture pass.
   for (auto& rect : worldRects) {
@@ -1229,6 +1230,7 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   }
   auto snapshotMap = std::make_unique<BackgroundSnapshotMap>();
   snapshotMap->multiPass = renderRects.size() > 1;
+  snapshotMap->visibleRects = std::move(visibleRects);
   // Draw backgroundColor before the layer tree so that the capture pass includes it as part of
   // the background for blur/backdrop effects.
   if (_backgroundColor != Color::Transparent()) {

@@ -1179,4 +1179,69 @@ TGFX_TEST(BackgroundBlurTest, BackgroundBlur3DLayer) {
   EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/BackgroundBlur3DLayer_Nested3D"));
 }
 
+/**
+ * Exercises the shared style output under a perspective transform: an opaque background color
+ * plus multiple dirty tiles turn sharing on while the styled layer sits inside a 3D subtree,
+ * so the canvas matrix carries perspective when the style output is recorded and blitted back.
+ */
+TGFX_TEST(BackgroundBlurTest, SharedStyleOutput3D) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 250, 250);
+  DisplayList displayList;
+  displayList.setRenderMode(RenderMode::Tiled);
+  displayList.setTileSize(100);
+  displayList.setBackgroundColor(Color::White());
+
+  auto backImage = MakeImage("resources/assets/HappyNewYear.png");
+  auto layerA = ImageLayer::Make();
+  layerA->setImage(backImage);
+  layerA->setMatrix(Matrix::MakeScale(250.f / 1024.f));
+  displayList.root()->addChild(layerA);
+
+  auto marker1 = ShapeLayer::Make();
+  auto marker1Path = Path();
+  marker1Path.addRect(Rect::MakeXYWH(15, 15, 20, 20));
+  marker1->setPath(marker1Path);
+  marker1->setFillStyle(ShapeStyle::Make(Color::FromRGBA(250, 60, 60, 255)));
+  displayList.root()->addChild(marker1);
+
+  auto marker2 = ShapeLayer::Make();
+  auto marker2Path = Path();
+  marker2Path.addRect(Rect::MakeXYWH(15, 215, 20, 20));
+  marker2->setPath(marker2Path);
+  marker2->setFillStyle(ShapeStyle::Make(Color::FromRGBA(250, 60, 60, 255)));
+  displayList.root()->addChild(marker2);
+
+  // Perspective-transformed layer with a background blur style: its flattened canvas matrix
+  // carries perspective when the style draws.
+  auto styledLayer = SolidLayer::Make();
+  styledLayer->setColor(Color::FromRGBA(255, 255, 255, 60));
+  styledLayer->setWidth(90);
+  styledLayer->setHeight(70);
+  {
+    auto size = Size::Make(90, 70);
+    auto anchor = Point::Make(0.5f, 0.5f);
+    auto offsetToAnchor =
+        Matrix3D::MakeTranslate(-anchor.x * size.width, -anchor.y * size.height, 0);
+    auto invOffsetToAnchor =
+        Matrix3D::MakeTranslate(anchor.x * size.width, anchor.y * size.height, 0);
+    auto rotate = Matrix3D::MakeRotate({0, 1, 0}, 25);
+    auto perspective = Matrix3D::I();
+    perspective.setRowColumn(3, 2, -1.0f / 500.0f);
+    auto origin = Matrix3D::MakeTranslate(125, 125, 0);
+    styledLayer->setMatrix3D(origin * invOffsetToAnchor * perspective * rotate * offsetToAnchor);
+  }
+  styledLayer->setLayerStyles({BackgroundBlurStyle::Make(6, 6)});
+  displayList.root()->addChild(styledLayer);
+
+  displayList.render(surface.get());
+
+  marker1->setFillStyle(ShapeStyle::Make(Color::FromRGBA(60, 60, 250, 255)));
+  marker2->setFillStyle(ShapeStyle::Make(Color::FromRGBA(60, 60, 250, 255)));
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/SharedStyleOutput3D"));
+}
+
 }  // namespace tgfx
