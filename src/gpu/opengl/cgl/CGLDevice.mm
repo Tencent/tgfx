@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/opengl/cgl/CGLDevice.h"
+#include "gpu/DeviceRegistry.h"
 #include "gpu/opengl/cgl/CGLGPU.h"
 
 #pragma clang diagnostic push
@@ -86,7 +87,7 @@ std::shared_ptr<CGLDevice> CGLDevice::Wrap(CGLContextObj cglContext, bool extern
       auto gpu = std::make_unique<CGLGPU>(std::move(interface), cglContext);
       device = std::shared_ptr<CGLDevice>(new CGLDevice(std::move(gpu), cglContext));
       device->externallyOwned = externallyOwned;
-      device->weakThis = device;
+      device = std::static_pointer_cast<CGLDevice>(Device::RegisterNative(device, {cglContext}));
     }
     if (oldCGLContext != cglContext) {
       CGLSetCurrentContext(oldCGLContext);
