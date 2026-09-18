@@ -2612,7 +2612,9 @@ TGFX_TEST_PRIVATE(LayerTest, LayerRecorder) {
     EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorder_LinePathFill"));
   }
 
-  // Test 7: Line path with stroke should be converted to rect
+  // Test 7: Line path with stroke must stay a PathContent. Converting it to a filled rect at
+  // recording time loses the stroke semantics, and sub-pixel stroked lines then render with
+  // phase-dependent brightness in the AA rect pipeline.
   {
     auto surface = Surface::Make(context, 200, 100);
     LayerRecorder recorder = {};
@@ -2621,8 +2623,8 @@ TGFX_TEST_PRIVATE(LayerTest, LayerRecorder) {
     linePath.lineTo(190, 50);
     recorder.addPath(linePath, strokePaint);
     TGFX_PRIVATE_ACCESS(auto content = recorder.finishRecording(); ASSERT_TRUE(content != nullptr);
-                        // Should be single RectContent (line converted to rect)
-                        EXPECT_EQ(content->type(), LayerContent::Type::Rect);
+                        // Should be single PathContent (stroke kept for the canvas to resolve)
+                        EXPECT_EQ(content->type(), LayerContent::Type::Path);
                         content->drawDefault(surface->getCanvas(), 1.0f, true));
     EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorder_LinePathStroke"));
   }

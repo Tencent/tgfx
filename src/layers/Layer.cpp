@@ -1449,8 +1449,8 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
 }
 
 SubtreeCache* Layer::getValidSubtreeCache(const DrawArgs& args, int longEdge,
-                                          const Rect& layerBounds) {
-  if (subtreeCache->hasCache(args.context, longEdge)) {
+                                          const Rect& layerBounds, float contentScale) {
+  if (subtreeCache->hasCache(args.context, longEdge, contentScale)) {
     return subtreeCache.get();
   }
   if (args.renderFlags & RenderFlags::DisableCache || longEdge > args.subtreeCacheMaxSize) {
@@ -1460,14 +1460,17 @@ SubtreeCache* Layer::getValidSubtreeCache(const DrawArgs& args, int longEdge,
   if (FloatNearlyZero(maxBoundsSize)) {
     return nullptr;
   }
-  auto cacheScale = static_cast<float>(longEdge) / maxBoundsSize;
+  // Rasterize at the actual contentScale instead of the mip-bucket scale: scale-dependent
+  // results such as hairline stroke coverage must match what direct rendering would produce,
+  // otherwise strokes freeze at the brightness of whichever scale first created the cache.
   auto imageMatrix = Matrix::I();
-  auto image = createSubtreeCacheImage(args, cacheScale, layerBounds, &imageMatrix);
+  auto image = createSubtreeCacheImage(args, contentScale, layerBounds, &imageMatrix);
   if (image == nullptr) {
     return nullptr;
   }
   auto textureProxy = std::static_pointer_cast<TextureImage>(image)->getTextureProxy();
-  subtreeCache->addCache(args.context, longEdge, textureProxy, imageMatrix, args.dstColorSpace);
+  subtreeCache->addCache(args.context, longEdge, textureProxy, imageMatrix, args.dstColorSpace,
+                         contentScale);
   return subtreeCache.get();
 }
 
@@ -1479,7 +1482,7 @@ bool Layer::drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alp
   auto layerBounds = getBounds();
   auto contentScale = canvas->getMatrix().getMaxScale();
   auto longEdge = GetMipmapCacheLongEdge(args.subtreeCacheMaxSize, contentScale, layerBounds);
-  auto cache = getValidSubtreeCache(args, longEdge, layerBounds);
+  auto cache = getValidSubtreeCache(args, longEdge, layerBounds, contentScale);
   if (cache == nullptr) {
     return false;
   }

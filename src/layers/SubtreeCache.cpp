@@ -17,11 +17,19 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SubtreeCache.h"
+#include <cmath>
 #include "core/images/TextureImage.h"
 #include "gpu/ProxyProvider.h"
 #include "tgfx/core/ColorSpace.h"
 
 namespace tgfx {
+
+namespace {
+// Bounds the drift between the baked contentScale and the actual contentScale of a reusable
+// texture. Scale-dependent rasterization (such as hairline stroke coverage) is baked into the
+// texture, so a larger drift would produce visibly shifted results when it is resampled.
+constexpr float MAX_CONTENT_SCALE_DRIFT = 0.05f;
+}  // namespace
 
 UniqueKey SubtreeCache::makeSizeKey(int longEdge) const {
   uint32_t sizeData[1] = {static_cast<uint32_t>(longEdge)};
@@ -31,7 +39,7 @@ UniqueKey SubtreeCache::makeSizeKey(int longEdge) const {
 
 void SubtreeCache::addCache(Context* context, int longEdge,
                             std::shared_ptr<TextureProxy> textureProxy, const Matrix& imageMatrix,
-                            const std::shared_ptr<ColorSpace>& colorSpace) {
+                            const std::shared_ptr<ColorSpace>& colorSpace, float contentScale) {
   if (context == nullptr || textureProxy == nullptr) {
     return;
   }
@@ -39,20 +47,36 @@ void SubtreeCache::addCache(Context* context, int longEdge,
   auto proxyProvider = context->proxyProvider();
   proxyProvider->assignProxyUniqueKey(textureProxy, sizeUniqueKey);
   textureProxy->assignUniqueKey(sizeUniqueKey);
-  cacheEntries[sizeUniqueKey] = CacheEntry{imageMatrix, colorSpace};
+  cacheEntries[sizeUniqueKey] = CacheEntry{imageMatrix, colorSpace, contentScale};
 }
 
-bool SubtreeCache::hasCache(Context* context, int longEdge) const {
+const SubtreeCache::CacheEntry* SubtreeCache::getValidEntry(Context* context,
+                                                            int longEdge) const {
   if (context == nullptr) {
-    return false;
+    return nullptr;
   }
   auto sizeUniqueKey = makeSizeKey(longEdge);
   auto it = cacheEntries.find(sizeUniqueKey);
   if (it == cacheEntries.end()) {
-    return false;
+    return nullptr;
   }
   auto proxyProvider = context->proxyProvider();
-  return proxyProvider->findOrWrapTextureProxy(sizeUniqueKey) != nullptr;
+  if (proxyProvider->findOrWrapTextureProxy(sizeUniqueKey) == nullptr) {
+    return nullptr;
+  }
+  return &it->second;
+}
+
+bool SubtreeCache::hasCache(Context* context, int longEdge) const {
+  return getValidEntry(context, longEdge) != nullptr;
+}
+
+bool SubtreeCache::hasCache(Context* context, int longEdge, float contentScale) const {
+  auto entry = getValidEntry(context, longEdge);
+  if (entry == nullptr) {
+    return false;
+  }
+  return fabsf(entry->contentScale - contentScale) <= contentScale * MAX_CONTENT_SCALE_DRIFT;
 }
 
 void SubtreeCache::draw(Context* context, int longEdge, Canvas* canvas, const Paint& paint) const {

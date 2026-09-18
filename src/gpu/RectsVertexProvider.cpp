@@ -102,10 +102,22 @@ class AARectsVertexProvider : public RectsVertexProvider {
                          viewMatrix.getSkewY() * viewMatrix.getSkewY());
       // we want the new edge to be .5px away from the old line.
       auto padding = 0.5f / scale;
-      auto insetBounds = rect.makeInset(padding, padding);
+      // A rect thinner than 1 device pixel cannot be inset by the full padding without flipping
+      // its edges, which overlaps the coverage-1 quad with the AA ring and blends coverage twice.
+      // Collapse such an axis to the rect center instead and modulate the inner coverage by the
+      // device-pixel extent, so the rendered ink never exceeds the paint alpha and stays
+      // independent of the subpixel phase.
+      auto insetX = std::min(padding, rect.width() * 0.5f);
+      auto insetY = std::min(padding, rect.height() * 0.5f);
+      auto insetBounds = rect.makeInset(insetX, insetY);
       auto insetQuad = Quad::MakeFrom(insetBounds, &viewMatrix);
       auto outsetBounds = rect.makeOutset(padding, padding);
       auto outsetQuad = Quad::MakeFrom(outsetBounds, &viewMatrix);
+      auto innerCoverage = 1.0f;
+      if (insetX < padding || insetY < padding) {
+        innerCoverage =
+            std::min(1.0f, std::min(rect.width() * scale, rect.height() * scale) / 1.0f);
+      }
       auto insetUV = insetBounds;
       auto outsetUV = outsetBounds;
       auto subset = rect;
@@ -126,7 +138,7 @@ class AARectsVertexProvider : public RectsVertexProvider {
       for (int j = 0; j < 2; ++j) {
         auto& quad = j == 0 ? insetQuad : outsetQuad;
         auto& uvQuad = j == 0 ? uvInsetQuad : uvOutsetQuad;
-        auto coverage = j == 0 ? 1.0f : 0.0f;
+        auto coverage = j == 0 ? innerCoverage : 0.0f;
         for (size_t k = 0; k < 4; ++k) {
           vertices[index++] = quad.point(k).x;
           vertices[index++] = quad.point(k).y;
