@@ -11,6 +11,7 @@
         "BackgroundBlurStyleTest3": "0598172b",
         "BackgroundBlurStyleTest4": "0598172b",
         "BackgroundBlurStyleTest5": "351c4df9",
+        "BackgroundBlurUnderHighZoom": "7df2647bb",
         "BackgroundBlurWithMask": "351c4df9",
         "BackgroundLayerIndexWithNestedHierarchy": "351c4df9",
         "GroupOpacityNestedBackgroundBlur": "0598172b",
@@ -23,8 +24,8 @@
         "PassThroughWithBackgroundBlur": "351c4df9",
         "PassThroughWithBackgroundBlur_clipped": "351c4df9",
         "ScaledInnerShadowWithBackgroundBlur": "351c4df9",
-        "SharedStyleOutput": "d5d516c22",
-        "SharedStyleOutput3D": "d5d516c22",
+        "SharedStyleOutput": "7df2647bb",
+        "SharedStyleOutput3D": "7df2647bb",
         "SimpleBackgroundBlur_tiled": "351c4df9",
         "backgroundLayerBlur": "351c4df9"
     },
