@@ -873,11 +873,17 @@ TGFX_TEST(AOTEffectTest, PointwiseDAGUsesProductionSamplerBudget) {
   ASSERT_NE(context, nullptr);
 
   // Build the DAG directly: a geometry color plus N texture leaves folded by single-child
-  // blends, so the fused-pass sampler budget is the only thing under test.
+  // blends, so the fused-pass sampler budget is the only thing under test. The leaves after the
+  // first are DstChild blend children: the real lowering feeds them the white input designator
+  // (XfermodeFragmentProcessor::lowerToAOT), so the hand-built graph does the same.
   auto makeBlendGraph = [&](int textureCount, AOTEffectGraph* graph) {
     AOTNodeBuilder builder = {};
     AOTNodeID geometry = AOTNodeID::Invalid();
     if (!builder.addGeometryColor(&geometry)) {
+      return false;
+    }
+    AOTNodeID white = AOTNodeID::Invalid();
+    if (!builder.addGeometryWhiteInput(&white)) {
       return false;
     }
     AOTNodeID current = AOTNodeID::Invalid();
@@ -889,7 +895,7 @@ TGFX_TEST(AOTEffectTest, PointwiseDAGUsesProductionSamplerBudget) {
       AOTTextureParameters textureParams = {};
       textureParams.textureProxy = std::move(proxy);
       AOTNodeID texture = AOTNodeID::Invalid();
-      if (!builder.addTextureSource(index == 0 ? geometry : current, textureParams, &texture)) {
+      if (!builder.addTextureSource(index == 0 ? geometry : white, textureParams, &texture)) {
         return false;
       }
       if (index == 0) {
