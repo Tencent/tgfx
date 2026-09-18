@@ -3014,6 +3014,81 @@ TGFX_TEST(AOTRenderConsistencyTest, YUVSourceReportsItsPlanesToChainPlanning) {
   EXPECT_FALSE(generatorProxy->mayUploadYUV());
 }
 
+// Counterexample audit P4.3: a YUV video frame drawn with a paint color filter (the video
+// player's color-grade path). The YUV matcher only admits a bare TextureEffect, so the
+// Compose(YUV texture, matrix) tree falls back to runtime stitching today. The YUV kernel
+// carries its conversion in fixed plane math; the follow-up design parameterizes a bounded
+// pointwise tail after the conversion so the common color-grade shapes ride the precompiled
+// route. Until then this records the boundary: one miss, one runtime program, pixel-identical.
+TGFX_TEST(AOTRenderConsistencyTest, YUVImageWithColorFilterMatchesRuntime) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  constexpr int size = 96;
+  static uint8_t planeY[16 * 16];
+  static uint8_t planeU[8 * 8];
+  static uint8_t planeV[8 * 8];
+  for (size_t index = 0; index < sizeof(planeY); ++index) {
+    planeY[index] = static_cast<uint8_t>(index);
+  }
+  for (size_t index = 0; index < sizeof(planeU); ++index) {
+    planeU[index] = static_cast<uint8_t>(64 + index);
+    planeV[index] = static_cast<uint8_t>(192 - index);
+  }
+  const void* planeData[3] = {planeY, planeU, planeV};
+  size_t planeRowBytes[3] = {16, 8, 8};
+  auto yuvData = YUVData::MakeFrom(16, 16, planeData, planeRowBytes, 3);
+  ASSERT_NE(yuvData, nullptr);
+  auto yuvImage = Image::MakeI420(yuvData);
+  ASSERT_NE(yuvImage, nullptr);
+  const std::array<float, 20> warmGrade = {1.1f, 0.05f, 0,    0, 0,     0, 1.0f, 0,     0, 0,
+                                           0,    0,     0.9f, 0, 0.04f, 0, 0,    0.95f, 0, 0};
+  auto renderScene = [&](Bitmap* outBitmap) {
+    auto surface = Surface::Make(context, size, size);
+    ASSERT_NE(surface, nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::Transparent());
+    Paint paint = {};
+    paint.setColorFilter(ColorFilter::Matrix(warmGrade));
+    canvas->drawImageRect(yuvImage, Rect::MakeXYWH(0, 0, size, size),
+                          Rect::MakeXYWH(0, 0, size, size), {}, &paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(size, size));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_NE(pixels, nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+  };
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  {
+    cache->unload();
+    ScopedAOTDeliberateMiss deliberate(context);
+    renderScene(&reference);
+  }
+  {
+    auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+    ASSERT_NE(bundleData, nullptr);
+    ASSERT_GT(bundleBytes, 0u);
+    ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+    cache->setDecompositionEnabled(true);
+    cache->setDiagnosticRecordingEnabled(true);
+    cache->resetStats();
+    context->globalCache()->resetProgramStats();
+    renderScene(&candidate);
+    // BOUNDARY (pre-P4.3): the YUV + color-filter tree is refused and served by one runtime
+    // program. When P4.3 lands, these flip to 0/0 and the artifact count asserts the
+    // precompiled route.
+    EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 1u);
+    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 1u);
+    cache->setDiagnosticRecordingEnabled(false);
+    cache->unload();
+    context->globalCache()->clearPrograms();
+  }
+  ExpectBitmapsIdentical("yuv-image-with-color-filter", candidate, reference, size, size);
+}
+
 // The decomposition route's refusals must be observable, not silent: a draw whose color chain
 // was attempted and refused records its pure-analysis reason (AOTDecomposeOutcome) in the draw
 // stats. Part one is the mechanism (counter accumulation). Part two pins the no-false-positive
