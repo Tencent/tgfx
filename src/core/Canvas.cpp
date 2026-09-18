@@ -247,8 +247,9 @@ static Rect SnapLineRectToPixels(const Rect& rect, const Matrix& matrix, bool ho
   // of their subpixel phase: the leading edge rounds to a device pixel boundary and the extent
   // quantizes to whole pixels (minimum one). Rounding both edges independently would let the
   // same stroke collapse to floor(w) or ceil(w) pixels depending on phase. Only applies to
-  // axis-aligned (translation + scale) matrices; rotation/shear keeps the original rect.
-  if (matrix.getSkewX() != 0.f || matrix.getSkewY() != 0.f) {
+  // axis-aligned (translation + scale) matrices; rotation, shear, and perspective keep the
+  // original rect.
+  if (matrix.getSkewX() != 0.f || matrix.getSkewY() != 0.f || matrix.hasPerspective()) {
     return rect;
   }
   auto deviceRect = matrix.mapRect(rect);

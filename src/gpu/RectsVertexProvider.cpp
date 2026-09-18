@@ -119,10 +119,11 @@ class AARectsVertexProvider : public RectsVertexProvider {
       // the total ink varies with the subpixel phase (up to 67% for a 0.3px rect). Centering the
       // ramp on a pixel center makes the adjacent rows share the coverage symmetrically, so the
       // ink matches the device extent and is independent of the phase. Only translation/scale
-      // matrices are snapped; sheared rects keep their original position.
+      // matrices without perspective are snapped; sheared or perspective-projected rects keep
+      // their original position (the affine center formula below ignores the perspective divide).
       auto drawRect = rect;
       if ((subpixelX || subpixelY) && viewMatrix.getSkewX() == 0.f &&
-          viewMatrix.getSkewY() == 0.f) {
+          viewMatrix.getSkewY() == 0.f && !viewMatrix.hasPerspective()) {
         if (subpixelY && viewMatrix.getScaleY() != 0.f) {
           auto deviceCenterY = rect.centerY() * viewMatrix.getScaleY() + viewMatrix.getTranslateY();
           auto snappedCenterY = roundf(deviceCenterY - 0.5f) + 0.5f;

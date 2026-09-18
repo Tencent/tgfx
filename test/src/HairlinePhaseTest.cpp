@@ -382,6 +382,7 @@ TGFX_TEST(HairlinePhaseTest, SubtreeCacheScaleDrift) {
     freshList->setZoomScale(0.8f);
     surface->getCanvas()->clear(Color::White());
     freshList->render(surface.get(), false);
+    pixels = bitmap.lockPixels();
     auto ok = surface->readPixels(bitmap.info(), pixels);
     bitmap.unlockPixels();
     if (ok) {
