@@ -269,7 +269,10 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   // visible outside the on-screen rects. Bounding to the widened rects would size the cached
   // texture by that margin, which under zoom grows far past the render target.
   auto* visibleGroup = source->groups[static_cast<int>(style->excludeChildEffects())].get();
-  if (!snapshots->visibleRects.empty() && visibleGroup != nullptr) {
+  // The capture-side content offset is rasterized at capture density, which no longer matches
+  // the consumer's style space once the background surface is downsampled, so the consumer
+  // falls back to the unclipped path (visibleStyle == nullptr).
+  if (surfaceScale == 1.0f && !snapshots->visibleRects.empty() && visibleGroup != nullptr) {
     Rect visibleWorld = Rect::MakeEmpty();
     for (const auto& renderRect : snapshots->visibleRects) {
       visibleWorld.join(renderRect);
