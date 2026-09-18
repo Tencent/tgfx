@@ -4345,4 +4345,302 @@ TGFX_TEST(AOTRenderConsistencyTest, OutOfRangeGradientStopBlendClampOrder) {
   ExpectBitmapsIdentical("out-of-range-stop-blend-clamp", candidate, reference, size, size);
 }
 
+// Counterexample audit B4, part one: fractional GP coverage against an opaque background across
+// blend modes. The AA oval edge carries fractional coverage c, so the final composite must be
+// O = c*Blend(S,D) + (1-c)*D — an opaque blue destination makes the (1-c)*D term visible and
+// Multiply/Darken exercise the dst-reading XP path while Src/SrcOver take the fixed-function
+// coefficient route. A wrong coverage application (e.g. c multiplying only the color, or the
+// dst attenuation dropped) shows up on the rim pixels.
+TGFX_TEST(AOTRenderConsistencyTest, CoverageBlendModesOnOpaqueBackground) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  constexpr int size = 96;
+  for (auto mode : {BlendMode::Src, BlendMode::SrcOver, BlendMode::Multiply, BlendMode::Darken}) {
+    SCOPED_TRACE(static_cast<int>(mode));
+    auto renderScene = [&](Bitmap* outBitmap) {
+      auto surface = Surface::Make(context, size, size);
+      ASSERT_NE(surface, nullptr);
+      auto* canvas = surface->getCanvas();
+      // An opaque blue destination: the uncovered term (1-c)*D must stay blue on the rim.
+      canvas->clear(Color(0.0f, 0.1f, 0.9f, 1.0f));
+      Paint paint = {};
+      paint.setColor(Color(1.0f, 0.1f, 0.1f, 1.0f));
+      paint.setBlendMode(mode);
+      canvas->drawOval(Rect::MakeLTRB(16, 16, size - 16, size - 16), paint);
+      context->flushAndSubmit(true);
+      ASSERT_TRUE(outBitmap->allocPixels(size, size));
+      auto* pixels = outBitmap->lockPixels();
+      ASSERT_NE(pixels, nullptr);
+      ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+      outBitmap->unlockPixels();
+    };
+    Bitmap reference = {};
+    Bitmap candidate = {};
+    {
+      cache->unload();
+      ScopedAOTDeliberateMiss deliberate(context);
+      renderScene(&reference);
+    }
+    {
+      auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+      ASSERT_NE(bundleData, nullptr);
+      ASSERT_GT(bundleBytes, 0u);
+      ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+      cache->setDecompositionEnabled(true);
+      cache->setDiagnosticRecordingEnabled(true);
+      cache->resetStats();
+      context->globalCache()->resetProgramStats();
+      renderScene(&candidate);
+      // Whether the draw resolves through the plain matcher or the chain kernel, it must not
+      // fall back to runtime program building.
+      EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
+      cache->setDiagnosticRecordingEnabled(false);
+      cache->unload();
+      context->globalCache()->clearPrograms();
+    }
+    ExpectBitmapsIdentical("coverage-blend-opaque-bg", candidate, reference, size, size);
+  }
+}
+
+// Counterexample audit B4, part two: a mask-sourced fractional coverage under the same blend
+// matrix. The MaskFilter's shader alpha provides the coverage (a linear alpha gradient 0..1 over
+// the rect), so the draw carries no GP coverage varying but still composites with fractional c.
+// This is the mask application point of the chain kernel (device mask / coverage subtree) against
+// the dst-reading and coefficient XP routes.
+TGFX_TEST(AOTRenderConsistencyTest, MaskCoverageBlendModesOnOpaqueBackground) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  constexpr int size = 96;
+  // An alpha gradient (transparent -> opaque) as the mask shader: every column has a distinct
+  // fractional coverage, not just an AA rim.
+  std::vector<Color> maskColors = {Color(0, 0, 0, 0), Color(0, 0, 0, 1)};
+  auto maskShader =
+      Shader::MakeLinearGradient(Point(0, 0), Point(size, 0), maskColors, {0.0f, 1.0f});
+  ASSERT_NE(maskShader, nullptr);
+  for (auto mode : {BlendMode::Src, BlendMode::SrcOver, BlendMode::Multiply, BlendMode::Darken}) {
+    SCOPED_TRACE(static_cast<int>(mode));
+    auto renderScene = [&](Bitmap* outBitmap) {
+      auto surface = Surface::Make(context, size, size);
+      ASSERT_NE(surface, nullptr);
+      auto* canvas = surface->getCanvas();
+      canvas->clear(Color(0.0f, 0.1f, 0.9f, 1.0f));
+      Paint paint = {};
+      paint.setColor(Color(1.0f, 0.1f, 0.1f, 1.0f));
+      paint.setBlendMode(mode);
+      paint.setMaskFilter(MaskFilter::MakeShader(maskShader));
+      canvas->drawRect(Rect::MakeWH(size, size), paint);
+      context->flushAndSubmit(true);
+      ASSERT_TRUE(outBitmap->allocPixels(size, size));
+      auto* pixels = outBitmap->lockPixels();
+      ASSERT_NE(pixels, nullptr);
+      ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+      outBitmap->unlockPixels();
+    };
+    Bitmap reference = {};
+    Bitmap candidate = {};
+    {
+      cache->unload();
+      ScopedAOTDeliberateMiss deliberate(context);
+      renderScene(&reference);
+    }
+    {
+      auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+      ASSERT_NE(bundleData, nullptr);
+      ASSERT_GT(bundleBytes, 0u);
+      ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+      cache->setDecompositionEnabled(true);
+      cache->setDiagnosticRecordingEnabled(true);
+      cache->resetStats();
+      context->globalCache()->resetProgramStats();
+      renderScene(&candidate);
+      EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+      EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
+      cache->setDiagnosticRecordingEnabled(false);
+      cache->unload();
+      context->globalCache()->clearPrograms();
+    }
+    ExpectBitmapsIdentical("mask-coverage-blend-opaque-bg", candidate, reference, size, size);
+  }
+}
+
+// Counterexample audit B3, remaining combination: the GP's own fractional AA coverage and a
+// shader mask coexisting on one draw. RULING: explicitly unsupported by the chain kernel
+// (PermutationRules.cpp rejects coverage subtrees on non-rect GP layouts — the subtree's unit
+// input is the GP coverage varying, which the ellipse layout evaluates per-pixel at the end and
+// cannot feed as a chain origin). The draw falls back to the runtime stitching route: this test
+// records that boundary — the fallback must produce exactly one runtime program (no silent
+// partial-chain attempt) and stay pixel-identical to the reference (trivially so, both renders
+// share the route; the value is the recorded counts plus the regression tripwire if the
+// constraint is ever lifted without a kernel that honors it).
+TGFX_TEST(AOTRenderConsistencyTest, GPCoverageAndMaskCoexistOnAAEdge) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  constexpr int size = 96;
+  std::vector<Color> maskColors = {Color(0, 0, 0, 0), Color(0, 0, 0, 1)};
+  auto maskShader =
+      Shader::MakeLinearGradient(Point(0, 0), Point(size, 0), maskColors, {0.0f, 1.0f});
+  ASSERT_NE(maskShader, nullptr);
+  auto renderScene = [&](Bitmap* outBitmap) {
+    auto surface = Surface::Make(context, size, size);
+    ASSERT_NE(surface, nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::Transparent());
+    Paint paint = {};
+    paint.setColor(Color::Green());
+    paint.setMaskFilter(MaskFilter::MakeShader(maskShader));
+    canvas->drawOval(Rect::MakeLTRB(12, 12, size - 12, size - 12), paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(size, size));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_NE(pixels, nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+  };
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  {
+    cache->unload();
+    ScopedAOTDeliberateMiss deliberate(context);
+    renderScene(&reference);
+  }
+  {
+    auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+    ASSERT_NE(bundleData, nullptr);
+    ASSERT_GT(bundleBytes, 0u);
+    ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+    cache->setDecompositionEnabled(true);
+    cache->setDiagnosticRecordingEnabled(true);
+    cache->resetStats();
+    context->globalCache()->resetProgramStats();
+    renderScene(&candidate);
+    // The recorded boundary: the ellipse GP + blend-rooted coverage subtree is rejected by the
+    // admission layer and served by exactly one runtime-stitched program.
+    EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 1u);
+    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 1u);
+    cache->setDiagnosticRecordingEnabled(false);
+    cache->unload();
+    context->globalCache()->clearPrograms();
+  }
+  ExpectBitmapsIdentical("gp-coverage-and-mask-coexist", candidate, reference, size, size);
+}
+
+// Counterexample audit B6, redone as a parameter matrix: an alpha-only color matrix over a source
+// with varying alpha and a paint with varying alpha, on a transparent target. The bias>0 matrix
+// affects transparent black (ColorFilterShader wraps in SrcIn(composed, alphaSource) — the
+// original shader's alpha masks the filtered color so transparent regions stay transparent),
+// while the bias<=0 matrices take the plain Compose route where the texture modulates by the
+// paint alpha. The identity-alpha control isolates the bias contribution: only the alpha row
+// differs between the two matrices of each pair.
+TGFX_TEST(AOTRenderConsistencyTest, AlphaBiasMatrixSourceAlphaMatrix) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  constexpr int size = 48;
+  // A source image with a controlled per-case alpha: a solid color bitmap rebuilt per alpha.
+  auto makeSource = [&](float alpha) {
+    Bitmap bitmap = {};
+    EXPECT_TRUE(bitmap.allocPixels(size, size));
+    auto* pixels = static_cast<uint32_t*>(bitmap.lockPixels());
+    auto channel = [](float v) { return static_cast<uint32_t>(v * 255.0f + 0.5f); };
+    uint32_t value =
+        (channel(alpha) << 24) | (channel(0.3f) << 16) | (channel(0.5f) << 8) | channel(0.8f);
+    for (size_t i = 0; i < static_cast<size_t>(size) * size; ++i) {
+      pixels[i] = value;
+    }
+    bitmap.unlockPixels();
+    return Image::MakeFrom(bitmap);
+  };
+  // Matrices touching only the alpha row: (scale, bias) pairs against the identity control.
+  struct MatrixCase {
+    const char* label;
+    float scale;
+    float bias;
+    bool affectsTransparentBlack;
+  };
+  const std::array<MatrixCase, 3> cases = {{
+      {"identity-alpha", 1.0f, 0.0f, false},
+      {"half-scale", 0.5f, 0.0f, false},
+      {"positive-bias", 1.0f, 0.25f, true},
+  }};
+  for (float sourceAlpha : {0.0f, 0.25f, 0.6f, 1.0f}) {
+    for (float paintAlpha : {1.0f, 0.3f}) {
+      for (const auto& matrixCase : cases) {
+        SCOPED_TRACE(testing::Message() << "srcA=" << sourceAlpha << " paintA=" << paintAlpha
+                                        << " matrix=" << matrixCase.label);
+        auto image = makeSource(sourceAlpha);
+        ASSERT_NE(image, nullptr);
+        std::array<float, 20> matrix = {1,
+                                        0,
+                                        0,
+                                        0,
+                                        0,
+                                        0,
+                                        1,
+                                        0,
+                                        0,
+                                        0,
+                                        0,
+                                        0,
+                                        1,
+                                        0,
+                                        0,
+                                        0,
+                                        0,
+                                        0,
+                                        matrixCase.scale,
+                                        matrixCase.bias};
+        auto filter = ColorFilter::Matrix(matrix);
+        ASSERT_NE(filter, nullptr);
+        auto renderScene = [&](Bitmap* outBitmap) {
+          auto surface = Surface::Make(context, size, size);
+          ASSERT_NE(surface, nullptr);
+          auto* canvas = surface->getCanvas();
+          canvas->clear(Color::Transparent());
+          Paint paint = {};
+          paint.setAlpha(paintAlpha);
+          paint.setColorFilter(filter);
+          canvas->drawImage(image, 0, 0, &paint);
+          context->flushAndSubmit(true);
+          ASSERT_TRUE(outBitmap->allocPixels(size, size));
+          auto* pixels = outBitmap->lockPixels();
+          ASSERT_NE(pixels, nullptr);
+          ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+          outBitmap->unlockPixels();
+        };
+        Bitmap reference = {};
+        Bitmap candidate = {};
+        {
+          cache->unload();
+          ScopedAOTDeliberateMiss deliberate(context);
+          renderScene(&reference);
+        }
+        {
+          auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+          ASSERT_NE(bundleData, nullptr);
+          ASSERT_GT(bundleBytes, 0u);
+          ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+          cache->setDecompositionEnabled(true);
+          cache->setDiagnosticRecordingEnabled(true);
+          cache->resetStats();
+          context->globalCache()->resetProgramStats();
+          renderScene(&candidate);
+          EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+          EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
+          cache->setDiagnosticRecordingEnabled(false);
+          cache->unload();
+          context->globalCache()->clearPrograms();
+        }
+        ExpectBitmapsIdentical("alpha-bias-source-alpha-matrix", candidate, reference, size, size);
+      }
+    }
+  }
+}
+
 }  // namespace tgfx
