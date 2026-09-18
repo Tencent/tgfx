@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Canvas.h"
+#include <cmath>
 #include "core/CanvasState.h"
 #include "core/ClipStack.h"
 #include "core/DrawContext.h"
@@ -241,17 +242,52 @@ void Canvas::drawLine(float x0, float y0, float x1, float y1, const Paint& paint
   drawLine(line, _matrix, *clipStack, paint.getBrush(), stroke);
 }
 
+static Rect SnapLineRectToPixels(const Rect& rect, const Matrix& matrix, bool horizontal) {
+  // Snaps an axis-aligned stroked-line rect so identical strokes render identically regardless
+  // of their subpixel phase: the leading edge rounds to a device pixel boundary and the extent
+  // quantizes to whole pixels (minimum one). Rounding both edges independently would let the
+  // same stroke collapse to floor(w) or ceil(w) pixels depending on phase. Only applies to
+  // axis-aligned (translation + scale) matrices; rotation/shear keeps the original rect.
+  if (matrix.getSkewX() != 0.f || matrix.getSkewY() != 0.f) {
+    return rect;
+  }
+  auto deviceRect = matrix.mapRect(rect);
+  if (horizontal) {
+    auto height = roundf(std::max(1.0f, deviceRect.height()));
+    deviceRect.top = roundf(deviceRect.top);
+    deviceRect.bottom = deviceRect.top + height;
+  } else {
+    auto width = roundf(std::max(1.0f, deviceRect.width()));
+    deviceRect.left = roundf(deviceRect.left);
+    deviceRect.right = deviceRect.left + width;
+  }
+  Matrix inverse = Matrix::I();
+  if (!matrix.invert(&inverse)) {
+    return rect;
+  }
+  return inverse.mapRect(deviceRect);
+}
+
 void Canvas::drawLine(const Point line[2], const Matrix& matrix, const ClipStack& clip,
                       const Brush& brush, const Stroke& stroke) const {
-  Rect rect = {};
-  if (StrokeLineToRect(stroke, line, &rect)) {
-    drawContext->drawRect(rect, matrix, clip, brush, nullptr);
-    return;
-  }
-  RRect rRect = {};
-  if (StrokeLineToRRect(stroke, line, &rRect)) {
-    drawContext->drawRRect(rRect, matrix, clip, brush, nullptr);
-    return;
+  // Thin strokes (at most 1 device pixel) must not take the rect/rrect fast paths: the
+  // sub-pixel filled rect inverts the inset quad in RectsVertexProvider, which overlaps the AA
+  // ring and blends coverage twice, so identical strokes render at visibly different brightness
+  // depending on their subpixel phase. They render through the hairline path instead, which
+  // snaps to pixel centers and modulates alpha by the scaled stroke width.
+  if (!TreatStrokeAsHairline(stroke, matrix)) {
+    Rect rect = {};
+    if (StrokeLineToRect(stroke, line, &rect)) {
+      auto horizontal = line[0].y == line[1].y;
+      rect = SnapLineRectToPixels(rect, matrix, horizontal);
+      drawContext->drawRect(rect, matrix, clip, brush, nullptr);
+      return;
+    }
+    RRect rRect = {};
+    if (StrokeLineToRRect(stroke, line, &rRect)) {
+      drawContext->drawRRect(rRect, matrix, clip, brush, nullptr);
+      return;
+    }
   }
   Path path = {};
   path.moveTo(line[0].x, line[0].y);

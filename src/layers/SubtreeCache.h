@@ -42,9 +42,18 @@ class SubtreeCache {
   }
 
   void addCache(Context* context, int longEdge, std::shared_ptr<TextureProxy> textureProxy,
-                const Matrix& imageMatrix, const std::shared_ptr<ColorSpace>& colorSpace);
+                const Matrix& imageMatrix, const std::shared_ptr<ColorSpace>& colorSpace,
+                float contentScale);
 
   bool hasCache(Context* context, int longEdge) const;
+
+  /**
+   * Same as hasCache(), but additionally requires that the texture was rasterized at a
+   * contentScale within drift tolerance of the given contentScale. Subtree content is rasterized
+   * at a fixed scale, so scale-dependent results (such as hairline stroke coverage) are baked
+   * into the texture and must not be reused once the actual contentScale drifts too far.
+   */
+  bool hasCache(Context* context, int longEdge, float contentScale) const;
 
   void draw(Context* context, int longEdge, Canvas* canvas, const Paint& paint) const;
 
@@ -52,7 +61,11 @@ class SubtreeCache {
   struct CacheEntry {
     Matrix imageMatrix = {};
     std::shared_ptr<ColorSpace> colorSpace = nullptr;
+    float contentScale = 0.0f;
   };
+
+  const CacheEntry* getValidEntry(Context* context, int longEdge) const;
+
   int _maxSize = 0;
   UniqueKey _uniqueKey = UniqueKey::Make();
   ResourceKeyMap<CacheEntry> cacheEntries = {};

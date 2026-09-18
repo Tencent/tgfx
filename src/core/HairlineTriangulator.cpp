@@ -336,8 +336,17 @@ class PathDecomposer {
 // Creates 2 inner vertices with full coverage and 4 outer vertices with zero coverage to achieve
 // smooth AA transitions. For subpixel-length lines, modulates coverage to ensure correct rendering.
 void AddLine(const Point p[2], LineVertex** vert) {
-  const auto a = p[0];
-  const auto b = p[1];
+  auto a = p[0];
+  auto b = p[1];
+
+  // Snap axis-aligned hairlines to the nearest pixel-center row/column. Otherwise the diamond AA
+  // spreads over two pixel rows whenever the line lands between them, and identical strokes
+  // render with visibly different brightness depending on their subpixel phase.
+  if (a.y == b.y) {
+    a.y = b.y = roundf(a.y - 0.5f) + 0.5f;
+  } else if (a.x == b.x) {
+    a.x = b.x = roundf(a.x - 0.5f) + 0.5f;
+  }
 
   auto ortho = Point::Zero();
   auto vec = b - a;

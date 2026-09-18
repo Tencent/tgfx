@@ -225,20 +225,11 @@ bool LayerRecorder::tryAddSimplifiedPath(const Path& path, const LayerPaint& pai
     if (paint.style != PaintStyle::Stroke) {
       return true;
     }
-    Rect rect = {};
-    if (StrokeLineToRect(paint.stroke, line, &rect)) {
-      LayerPaint fillPaint = paint;
-      fillPaint.style = PaintStyle::Fill;
-      addRect(rect, fillPaint, matrix);
-      return true;
-    }
-    RRect rRect = {};
-    if (StrokeLineToRRect(paint.stroke, line, &rRect)) {
-      LayerPaint fillPaint = paint;
-      fillPaint.style = PaintStyle::Fill;
-      addRRect(rRect, fillPaint, matrix);
-      return true;
-    }
+    // Do not convert a stroked line into a filled rect here. The layer matrix at recording time
+    // carries no device scale, and a sub-pixel filled rect blends coverage twice in the AA rect
+    // pipeline (the inverted inset quad overlaps the AA ring), so identical strokes render at
+    // visibly different brightness depending on their subpixel phase. Keep the stroke paint and
+    // let the canvas pick the hairline or rect path with the real device scale at draw time.
     return false;
   }
   Rect rect = {};
