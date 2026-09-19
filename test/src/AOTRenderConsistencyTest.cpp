@@ -903,6 +903,73 @@ TGFX_TEST(AOTRenderConsistencyTest, AtlasTextGradientFold) {
   ExpectBitmapsIdentical("atlas-text-gradient-fold", aotBitmap, runtimeBitmap, 200, 100);
 }
 
+// Counterexample audit A2-3 semantic probe (2026-09-19, batch 1 residue): atlas text under a
+// non-SrcOver blend mode. The audit's static claim: the chain's no-coverage-varying layout folds
+// the glyph mask into the source and composites with coverage 1, so a Src blend would lose the
+// background's share at fractional glyph coverage (c*S instead of c*S+(1-c)*D). The B4 evidence
+// proved MaskFilter masks are source modulation in the runtime; whether the ATLAS glyph mask is
+// also source modulation (probe passes) or true coverage like the dedicated MaskFill shader's
+// TGFX_XP_COVERAGE (probe diverges at glyph edges) decides the ruling. The color filter forces
+// the plain-matcher miss that routes the draw onto the chain rewrite's atlas path; the blue
+// background makes any missing (1-c)*D term visible on the glyph rim.
+TGFX_TEST(AOTRenderConsistencyTest, AtlasTextNonSrcOverBlendKeepsDstProbe) {
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  ASSERT_TRUE(typeface != nullptr);
+  auto font = Font(typeface, 50);
+  auto textBlob = TextBlob::MakeFrom("TGFX", font);
+  ASSERT_TRUE(textBlob != nullptr);
+  auto renderOnce = [&](bool useBundle, Bitmap* outBitmap) {
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto* cache = context->precompiledShaderCache();
+    if (useBundle) {
+      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+    } else {
+      cache->unload();
+    }
+    ScopedAOTStatsPause statsPause(context, !useBundle);
+    context->globalCache()->clearPrograms();
+    auto surface = Surface::Make(context, 200, 100);
+    ASSERT_TRUE(surface != nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color(0.0f, 0.1f, 0.9f, 1.0f));
+    Paint paint;
+    paint.setColor(Color::Red());
+    paint.setBlendMode(BlendMode::Src);
+    paint.setColorFilter(ColorFilter::Blend(Color::Red(), BlendMode::Multiply));
+    if (useBundle) {
+      // The refusal is observable: the rewrite declines the non-SrcOver atlas draw, so exactly
+      // one runtime program build serves it (a zero would mean the chain took it and the
+      // destination attenuation must be re-verified).
+      cache->setDiagnosticRecordingEnabled(true);
+      cache->resetStats();
+      context->globalCache()->resetProgramStats();
+    }
+    canvas->drawTextBlob(textBlob, 25, 60, paint);
+    context->flushAndSubmit(true);
+    if (useBundle) {
+      EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 1u);
+      EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 1u);
+      cache->setDiagnosticRecordingEnabled(false);
+    }
+    ASSERT_TRUE(outBitmap->allocPixels(200, 100));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+    if (useBundle) {
+      cache->unload();
+    }
+  };
+  Bitmap aotBitmap = {};
+  Bitmap runtimeBitmap = {};
+  renderOnce(true, &aotBitmap);
+  renderOnce(false, &runtimeBitmap);
+  ExpectBitmapsIdentical("atlas-text-src-blend-probe", aotBitmap, runtimeBitmap, 200, 100);
+}
+
 TGFX_TEST(AOTRenderConsistencyTest, MeshTextureAndColorsXferSrcFold) {
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);

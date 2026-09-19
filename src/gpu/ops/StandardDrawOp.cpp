@@ -159,6 +159,15 @@ std::shared_ptr<Program> StandardDrawOp::prepareDecomposedProgram(
     // Atlas text: the GP-owned atlas becomes a synthesized coverage leaf (the glyph mask), and
     // the rewrite needs a sampler-free twin GP. A null override means the draw is not servable
     // this way (e.g. a color-emoji atlas), so keep the original route.
+    // The glyph mask is TRUE coverage in the runtime composite (AtlasTextNonSrcOverBlendKeepsDst
+    // Probe: the JIT reference attenuates the destination by the fractional glyph coverage —
+    // c*S+(1-c)*D — matching the dedicated MaskFill shader's coverage handling, unlike a
+    // MaskFilter's source-modulating mask). The no-coverage-varying chain layout folds it into
+    // the source with coverage 1, which is only equivalent for SrcOver-class blending, so refuse
+    // the rewrite otherwise (audit A2-3, probe measured maxChannelDiff=255 over 11485 bytes).
+    if (!(xferProcessor == nullptr && blendMode == BlendMode::SrcOver)) {
+      return nullptr;
+    }
     chainGeometryProcessor = onMakeChainGeometryProcessor(&ownedChainCoverageFPs);
     if (chainGeometryProcessor == nullptr) {
       return nullptr;
