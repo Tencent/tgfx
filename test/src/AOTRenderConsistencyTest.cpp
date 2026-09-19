@@ -3155,6 +3155,249 @@ TGFX_TEST(AOTRenderConsistencyTest, YUVImageWithColorFilterMatchesRuntime) {
   ExpectBitmapsIdentical("yuv-image-with-color-filter", candidate, reference, size, size);
 }
 
+// Counterexample audit A3-3 (2026-09-19, batch 2): NV12's UV plane is an RG_88 texture whose
+// runtime read applies the ForRead swizzle (rgrg) before .ra — netting (U, V) — while the
+// precompiled kernel's `texture(...).ra` reads the raw RG8 sample (U, 1): V is pinned to the
+// alpha (1) instead of the V texel, so every NV12 draw on the precompiled route carries a fixed
+// +0.5 V offset after the chroma shift, a visible color cast on neutral and asymmetric chroma
+// alike. The U/V planes here carry distinct asymmetric chroma so the V error is unmistakable.
+TGFX_TEST(AOTRenderConsistencyTest, NV12ImageWithColorFilterMatchesRuntime) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  constexpr int size = 96;
+  static uint8_t planeY[16 * 16];
+  static uint8_t planeUV[8 * 16];  // 8 rows of 8 interleaved (U, V) pairs.
+  for (size_t index = 0; index < sizeof(planeY); ++index) {
+    planeY[index] = static_cast<uint8_t>(32 + index % 160);
+  }
+  for (size_t row = 0; row < 8; ++row) {
+    for (size_t col = 0; col < 8; ++col) {
+      planeUV[row * 16 + col * 2] = static_cast<uint8_t>(48 + (col * 11) % 160);      // U
+      planeUV[row * 16 + col * 2 + 1] = static_cast<uint8_t>(200 - (col * 9) % 160);  // V
+    }
+  }
+  const void* planeData[2] = {planeY, planeUV};
+  size_t planeRowBytes[2] = {16, 16};
+  auto yuvData = YUVData::MakeFrom(16, 16, planeData, planeRowBytes, 2);
+  ASSERT_NE(yuvData, nullptr);
+  auto yuvImage = Image::MakeNV12(yuvData);
+  ASSERT_NE(yuvImage, nullptr);
+  const std::array<float, 20> warmGrade = {1.1f, 0.05f, 0,    0, 0,     0, 1.0f, 0,     0, 0,
+                                           0,    0,     0.9f, 0, 0.04f, 0, 0,    0.95f, 0, 0};
+  auto renderScene = [&](Bitmap* outBitmap) {
+    auto surface = Surface::Make(context, size, size);
+    ASSERT_NE(surface, nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::Transparent());
+    Paint paint = {};
+    paint.setColorFilter(ColorFilter::Matrix(warmGrade));
+    canvas->drawImageRect(yuvImage, Rect::MakeXYWH(0, 0, size, size),
+                          Rect::MakeXYWH(0, 0, size, size), {}, &paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(size, size));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_NE(pixels, nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+  };
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  {
+    cache->unload();
+    ScopedAOTDeliberateMiss deliberate(context);
+    renderScene(&reference);
+  }
+  {
+    auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+    ASSERT_NE(bundleData, nullptr);
+    ASSERT_GT(bundleBytes, 0u);
+    ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+    cache->setDecompositionEnabled(true);
+    cache->setDiagnosticRecordingEnabled(true);
+    cache->resetStats();
+    context->globalCache()->resetProgramStats();
+    renderScene(&candidate);
+    // The color-grade tree must ride the precompiled NV12 kernel: no fallback, no runtime build.
+    EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
+    cache->setDiagnosticRecordingEnabled(false);
+    cache->unload();
+    context->globalCache()->clearPrograms();
+  }
+  ExpectBitmapsIdentical("nv12-image-with-color-filter", candidate, reference, size, size);
+}
+
+// Counterexample audit A3-1 (2026-09-19, batch 2), reachability ruling + regression fence: the
+// runtime's RepeatLinearNone sampling reads the opposite edge texel and mixes it by the clamp
+// error at every wrap seam (.75B + .25A at a quarter-texel error); the chain's tiled leaf
+// previously had no seam read, so every tile edge snapped to the clamped edge texel. The kernel
+// now carries the seam blend (tiledSeamBlend in pointwise_chain.frag, ported from the runtime
+// emission — the same port the blur kernel already had). REACHABILITY: this shape needs a
+// subset-bearing tiled leaf (a subset NOT spanning the full texture is what disables the
+// hardware wrap and turns on shader tiling), and every public API path that produces one today
+// (plain image shaders span their texture; blur products are Exact-backed; drawImageRect has no
+// tile modes) resolves to hardware wrap — so the defect is UNREACHABLE through public APIs and
+// this test records the hardware-wrap path stays byte-identical (the seam branch is dead code
+// here). AOTEffectTest.TiledSamplingLowering pins the chain-side acceptance of the mode, so any
+// future subset+Repeat entry point lights up against the seam blend instead of the old snap.
+TGFX_TEST(AOTRenderConsistencyTest, TiledRepeatLinearSeamBlendOnChain) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  constexpr int size = 96;
+  Bitmap sourceBitmap = {};
+  ASSERT_TRUE(sourceBitmap.allocPixels(8, 8));
+  {
+    auto* pixels = static_cast<uint32_t*>(sourceBitmap.lockPixels());
+    ASSERT_NE(pixels, nullptr);
+    for (int y = 0; y < 8; ++y) {
+      for (int x = 0; x < 8; ++x) {
+        pixels[static_cast<size_t>(y) * 8 + static_cast<size_t>(x)] =
+            x < 4 ? 0xFF0000FFu : 0xFFFF0000u;  // premul red | premul blue
+      }
+    }
+    sourceBitmap.unlockPixels();
+  }
+  EXPECT_TRUE(BitmapPremulLegal(sourceBitmap));
+  auto image = Image::MakeFrom(sourceBitmap);
+  ASSERT_NE(image, nullptr);
+  // A non-trivial color filter (channels halved): enough to force the plain-matcher miss that
+  // routes the draw onto the chain rewrite with the tiled leaf. The seam blend survives the
+  // filter (pointwise), so the comparison still isolates the seam behavior.
+  const std::array<float, 20> halve = {0.5f, 0, 0, 0, 0, 0, 0.5f, 0, 0, 0,
+                                       0,    0, 0, 0, 0, 0, 0,    0, 1, 0};
+  auto renderScene = [&](Bitmap* outBitmap) {
+    auto surface = Surface::Make(context, size, size);
+    ASSERT_NE(surface, nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::Transparent());
+    Paint paint = {};
+    paint.setColorFilter(ColorFilter::Matrix(halve));
+    // drawImageRect with a src subset: the subset (left 6 columns: red | red | red | red | blue |
+    // blue) does not span the full texture, so hardware wrap cannot serve the Repeat+Linear
+    // sampling and the draw lowers as a TiledTextureEffect with ShaderMode::RepeatLinearNone.
+    // The dst is 16 subsets wide, so the wrap seam (blue right edge into red left edge) repeats
+    // across the row: the runtime blends the opposite edge in by the clamp error, the chain
+    // (missing the seam read) clamps to the edge texel.
+    canvas->drawImageRect(image, Rect::MakeXYWH(0, 0, 6, 8), Rect::MakeWH(size, size),
+                          SamplingOptions(FilterMode::Linear), &paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(size, size));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_NE(pixels, nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+  };
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  {
+    cache->unload();
+    ScopedAOTDeliberateMiss deliberate(context);
+    renderScene(&reference);
+  }
+  {
+    auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+    ASSERT_NE(bundleData, nullptr);
+    ASSERT_GT(bundleBytes, 0u);
+    ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+    cache->setDecompositionEnabled(true);
+    cache->setDiagnosticRecordingEnabled(true);
+    cache->resetStats();
+    context->globalCache()->resetProgramStats();
+    renderScene(&candidate);
+    // The tiled leaf rides the chain (the color filter forces the plain-matcher miss): no
+    // fallback, no runtime build. A fallback here would make the comparison trivially pass.
+    EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
+    cache->setDiagnosticRecordingEnabled(false);
+    cache->unload();
+    context->globalCache()->clearPrograms();
+  }
+  ExpectBitmapsIdentical("tiled-repeat-linear-seam", candidate, reference, size, size);
+}
+
+// Counterexample audit A3-1, blur-product probe (2026-09-19, batch 2): the blur kernel already
+// carries its own per-tap seam blend (gaussian_blur_1d.frag, ported from the runtime emission),
+// so the A3-1 gap was the CHAIN's tiled leaf alone — now closed by the same port. This probe
+// tried to reach the chain's tiled leaf through a makeWithFilter(Blur(Repeat)) product: the
+// blur's intermediate wrap rides the blur kernel (seam-blended), and the product's final
+// backing is Exact with a full-span subset, so the outer draw resolves to the hardware wrap —
+// the seam branch never executes. Kept as a second fence: the blur-product + color-filter
+// chain route must stay byte-identical and chain-served (no fallback) as the kernel evolves.
+TGFX_TEST(AOTRenderConsistencyTest, TiledRepeatLinearSeamBlendOnChainViaBlur) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  constexpr int size = 96;
+  Bitmap sourceBitmap = {};
+  ASSERT_TRUE(sourceBitmap.allocPixels(8, 8));
+  {
+    auto* pixels = static_cast<uint32_t*>(sourceBitmap.lockPixels());
+    ASSERT_NE(pixels, nullptr);
+    for (int y = 0; y < 8; ++y) {
+      for (int x = 0; x < 8; ++x) {
+        pixels[static_cast<size_t>(y) * 8 + static_cast<size_t>(x)] =
+            x < 4 ? 0xFF0000FFu : 0xFFFF0000u;  // premul red | premul blue
+      }
+    }
+    sourceBitmap.unlockPixels();
+  }
+  EXPECT_TRUE(BitmapPremulLegal(sourceBitmap));
+  auto image = Image::MakeFrom(sourceBitmap);
+  ASSERT_NE(image, nullptr);
+  Point filterOffset = {};
+  auto blurred = image->makeWithFilter(ImageFilter::Blur(4, 4, TileMode::Repeat), &filterOffset);
+  ASSERT_NE(blurred, nullptr);
+  const std::array<float, 20> halve = {0.5f, 0, 0, 0, 0, 0, 0.5f, 0, 0, 0,
+                                       0,    0, 0, 0, 0, 0, 0,    0, 1, 0};
+  auto renderScene = [&](Bitmap* outBitmap) {
+    auto surface = Surface::Make(context, size, size);
+    ASSERT_NE(surface, nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::Transparent());
+    Paint paint = {};
+    paint.setColorFilter(ColorFilter::Matrix(halve));
+    canvas->drawImage(blurred, -filterOffset.x, -filterOffset.y, &paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(size, size));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_NE(pixels, nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+  };
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  {
+    cache->unload();
+    ScopedAOTDeliberateMiss deliberate(context);
+    renderScene(&reference);
+  }
+  {
+    auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+    ASSERT_NE(bundleData, nullptr);
+    ASSERT_GT(bundleBytes, 0u);
+    ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+    cache->setDecompositionEnabled(true);
+    cache->setDiagnosticRecordingEnabled(true);
+    cache->resetStats();
+    context->globalCache()->resetProgramStats();
+    renderScene(&candidate);
+    // The blurred source's TiledTextureEffect must ride the chain's tiled leaf (the color filter
+    // forces the plain-matcher miss): no fallback, no runtime build. A fallback would make the
+    // comparison trivially pass and prove nothing about the seam behavior.
+    EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
+    cache->setDiagnosticRecordingEnabled(false);
+    cache->unload();
+    context->globalCache()->clearPrograms();
+  }
+  ExpectBitmapsIdentical("tiled-repeat-linear-seam-blur", candidate, reference, size, size);
+}
+
 // The decomposition route's refusals must be observable, not silent: a draw whose color chain
 // was attempted and refused records its pure-analysis reason (AOTDecomposeOutcome) in the draw
 // stats. Part one is the mechanism (counter accumulation). Part two pins the no-false-positive

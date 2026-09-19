@@ -1397,6 +1397,37 @@ TGFX_TEST(AOTEffectTest, NonRootCoverageTextureModulatesByUnit) {
   EXPECT_EQ(chain->slot(static_cast<size_t>(maskSlot)).textureModulateUnit, 1);
 }
 
+// Counterexample audit A3-2 (2026-09-19, batch 2): the runtime applies Swizzle::ForRead to every
+// texture lookup (GRAY_8 -> .rrra, RG_88 -> .rgrg), so a gray source reads (g, g, g, 1); the
+// chain's plain leaf samples raw (g, 0, 0, 1) on GL/Metal R8 — the G and B channels silently
+// drop to zero. GRAY_8/RG_88 textures are user-reachable as standalone sources through external
+// hardware buffers (Android AHardwareBuffer), so TextureEffect::lowerToAOT now fails closed on
+// these formats. Instantiating such a view needs a real GRAY_8 upload (a HardwareBuffer-backed
+// image), which this test environment cannot construct — the format gate itself is the shipped
+// behavior; a hardware-buffer-capable environment should extend this test with a pixel-level
+// gray-image draw asserting the runtime route serves it.
+TGFX_TEST(AOTEffectTest, ChainRejectsNonRGBAColorFormats) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  auto colorMatrix = ColorMatrixFragmentProcessor::Make(&allocator, IdentityColorMatrix);
+  ASSERT_NE(colorMatrix, nullptr);
+  for (auto format : {PixelFormat::GRAY_8, PixelFormat::RG_88}) {
+    auto grayLeaf = MakeTextureProcessor(context, &allocator, format);
+    if (grayLeaf == nullptr ||
+        static_cast<const TextureEffect*>(grayLeaf.get())->getTextureView() == nullptr) {
+      // No view can be instantiated for this format here (no upload source exists): the gate's
+      // observable behavior needs a HardwareBuffer-backed environment.
+      continue;
+    }
+    SCOPED_TRACE(static_cast<int>(format));
+    AOTEffectGraph graph = {};
+    // The lowering must refuse the leaf (no swizzle contract on the chain's plain path).
+    EXPECT_FALSE(AOTEffectDecomposer::Lower({grayLeaf.get(), colorMatrix.get()}, &graph));
+  }
+}
+
 TGFX_TEST(AOTEffectTest, PerlinNoisePlusTwoOpsFusesToSinglePass) {
   ContextScope scope;
   auto context = scope.getContext();

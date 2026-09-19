@@ -38,7 +38,7 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #endif
   int OutputAlphaSwizzle;
 
-int PointwiseSlotCount;
+  int PointwiseSlotCount;
 
 #define TGFX_SLOT_ARRAY_SUFFIX [3]
 #include "pointwise_op_uniforms.inc"
@@ -53,18 +53,18 @@ layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
 layout(set = 1, binding = 1) uniform sampler2D TextureSampler_1;
 #if YUV_FORMAT == 0
 layout(set = 1, binding = 2) uniform sampler2D TextureSampler_2;
-  #define XP_DST_TEX_BINDING 3
+#define XP_DST_TEX_BINDING 3
 #else
-  #define XP_DST_TEX_BINDING 2
+#define XP_DST_TEX_BINDING 2
 #endif
+#include "clip_coverage.inc"
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
-#include "clip_coverage.inc"
 
 layout(location = 0) out vec4 fragColor;
 
-#include "pointwise_slot_array_bind.inc"
 #include "pointwise_op.inc"
+#include "pointwise_slot_array_bind.inc"
 #include "pointwise_slot_array_unbind.inc"
 
 void main() {
@@ -79,7 +79,12 @@ void main() {
   yuv.y = texture(TextureSampler_1, finalCoord).r;
   yuv.z = texture(TextureSampler_2, finalCoord).r;
 #else
-  yuv.yz = texture(TextureSampler_1, finalCoord).ra;
+  // The UV plane is an RG_88 texture. The runtime's read is texture(...).rgrg.ra — the ForRead
+  // swizzle replicates (r, g) so .ra nets (U, V); the precompiled sampler is a plain RG8 binding
+  // with no swizzle, where .ra would read (U, 1) and pin V to alpha (audit A3-3: a fixed +0.5
+  // chroma offset on every NV12 draw, maxChannelDiff=71 over half the pixels). .rg reads (U, V)
+  // directly on every backend's plain RG8 binding.
+  yuv.yz = texture(TextureSampler_1, finalCoord).rg;
 #endif
   if (YUVLimitedRange != 0) {
     yuv.x -= (16.0 / 255.0);

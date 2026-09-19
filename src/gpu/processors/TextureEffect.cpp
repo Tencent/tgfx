@@ -84,6 +84,17 @@ bool TextureEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNode
         subset.has_value() &&
         !subset->contains(Rect::MakeWH(textureProxy->width(), textureProxy->height()));
   } else {
+    // Format gate (audit A3-2): the runtime applies Swizzle::ForRead to every texture lookup
+    // (GRAY_8 -> .rrra, RG_88 -> .rgrg), which the chain's plain leaf does not carry — a gray
+    // source would read (g, 0, 0, 1) instead of (g, g, g, 1). These formats exist as
+    // user-reachable standalone textures through external hardware buffers, so the chain must
+    // fail closed on them; the runtime route stays authoritative.
+    if (!textureView->isYUV()) {
+      auto format = textureView->getTexture()->format();
+      if (format == PixelFormat::GRAY_8 || format == PixelFormat::RG_88) {
+        return false;
+      }
+    }
     parameters.isYUV = textureView->isYUV();
     parameters.hasSubset = needSubset();
   }

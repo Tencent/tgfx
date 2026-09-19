@@ -113,55 +113,55 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 
 #include "pointwise_chain_uniforms.inc"
 
-// Gradient source block (OP_GRADIENT): at most one gradient slot per chain. All fields are
-// runtime uniforms written only when a gradient slot is present; names mirror the dedicated
-// gradient kernels with a "Gradient" prefix.
-int GradientLayoutType;
-float GradientBias;
-float GradientScale;
-int GradientColorizerKind;
-vec4 GradientLeftBorder;
-vec4 GradientRightBorder;
-vec4 GradientStart;
-vec4 GradientEnd;
-vec4 GradientScale01;
-vec4 GradientBias01;
-vec4 GradientScale23;
-vec4 GradientBias23;
-float GradientThreshold;
-int GradientIntervalCount;
-vec4 GradientThresholds1_7;
-vec4 GradientThresholds9_13;
-vec4 GradientScale0_1;
-vec4 GradientScale2_3;
-vec4 GradientScale4_5;
-vec4 GradientScale6_7;
-vec4 GradientScale8_9;
-vec4 GradientScale10_11;
-vec4 GradientScale12_13;
-vec4 GradientScale14_15;
-vec4 GradientBias0_1;
-vec4 GradientBias2_3;
-vec4 GradientBias4_5;
-vec4 GradientBias6_7;
-vec4 GradientBias8_9;
-vec4 GradientBias10_11;
-vec4 GradientBias12_13;
-vec4 GradientBias14_15;
-// Leaf index of the LUT gradient texture (a sampler-only child with no DAG slot), read by the
-// OP_GRADIENT LUT colorizer branch. -1 when no LUT gradient is present.
-int GradientLUTLeaf;
+  // Gradient source block (OP_GRADIENT): at most one gradient slot per chain. All fields are
+  // runtime uniforms written only when a gradient slot is present; names mirror the dedicated
+  // gradient kernels with a "Gradient" prefix.
+  int GradientLayoutType;
+  float GradientBias;
+  float GradientScale;
+  int GradientColorizerKind;
+  vec4 GradientLeftBorder;
+  vec4 GradientRightBorder;
+  vec4 GradientStart;
+  vec4 GradientEnd;
+  vec4 GradientScale01;
+  vec4 GradientBias01;
+  vec4 GradientScale23;
+  vec4 GradientBias23;
+  float GradientThreshold;
+  int GradientIntervalCount;
+  vec4 GradientThresholds1_7;
+  vec4 GradientThresholds9_13;
+  vec4 GradientScale0_1;
+  vec4 GradientScale2_3;
+  vec4 GradientScale4_5;
+  vec4 GradientScale6_7;
+  vec4 GradientScale8_9;
+  vec4 GradientScale10_11;
+  vec4 GradientScale12_13;
+  vec4 GradientScale14_15;
+  vec4 GradientBias0_1;
+  vec4 GradientBias2_3;
+  vec4 GradientBias4_5;
+  vec4 GradientBias6_7;
+  vec4 GradientBias8_9;
+  vec4 GradientBias10_11;
+  vec4 GradientBias12_13;
+  vec4 GradientBias14_15;
+  // Leaf index of the LUT gradient texture (a sampler-only child with no DAG slot), read by the
+  // OP_GRADIENT LUT colorizer branch. -1 when no LUT gradient is present.
+  int GradientLUTLeaf;
 
-// Tiled leaf support: at most one leaf per chain may need shader-side tiling (wrap or border
-// emulation). TiledLeafIndex selects it (-1 = none); the recipe fields are uploaded by the chain
-// processor from the resolved sampling, leaving plain leaves on the Subset-clamp path.
-int TiledLeafIndex;
-int TiledModeX;
-int TiledModeY;
-vec4 TiledSubset;
-vec4 TiledClamp;
-vec2 TiledDimension;
-int TiledStrict;
+  // Tiled leaf support: at most one leaf per chain may need shader-side tiling (wrap or border
+  // emulation). TiledLeafIndex selects it (-1 = none); the recipe fields are uploaded by the chain
+  // processor from the resolved sampling, leaving plain leaves on the Subset-clamp path.
+  int TiledLeafIndex;
+  int TiledModeX;
+  int TiledModeY;
+  vec4 TiledSubset;
+  vec4 TiledClamp;
+  vec2 TiledDimension;
+  int TiledStrict;
 
 #include "xp_uniforms.inc"
 };
@@ -236,6 +236,38 @@ layout(set = 1, binding = NTEX) uniform sampler2D MaskTextureSampler;
 #define Clamp TiledClamp
 #define Dimension TiledDimension
 #include "tiled_sample.inc"
+// RepeatLinearNone(3) seam blend, ported from the runtime GLSLTiledTextureEffect emission (and
+// the blur kernel's per-tap copy): a wrapped coordinate that clamps means the linear footprint
+// crosses the subset edge, so blend with a sample at the opposite clamp edge (diagonal read when
+// both axes clamp). Mode 3 uses pixel-space coordinates, so the repeat reads scale by Dimension
+// exactly like tiledMapCoord's returned sample coord. Without this, every tile edge on the chain
+// route snaps to the clamped edge texel while the runtime blends (audit A3-1; the chain-side
+// shape needs a subset-bearing tiled leaf, which the hardware wrap never produces).
+vec4 tiledSeamBlend(CHAIN_LEAF_SAMPLER texSampler, vec4 texColor, vec2 subsetCoord,
+                    vec2 clampedCoord) {
+  bool repeatX = TiledModeX == 3 && subsetCoord.x != clampedCoord.x;
+  bool repeatY = TiledModeY == 3 && subsetCoord.y != clampedCoord.y;
+  if (!repeatX && !repeatY) {
+    return texColor;
+  }
+  float errX = subsetCoord.x - clampedCoord.x;
+  float errY = subsetCoord.y - clampedCoord.y;
+  float repeatCoordX = errX > 0.0 ? TiledClamp.x : TiledClamp.z;
+  float repeatCoordY = errY > 0.0 ? TiledClamp.y : TiledClamp.w;
+  if (repeatX && repeatY) {
+    vec4 repeatReadX = texture(texSampler, vec2(repeatCoordX, clampedCoord.y) * TiledDimension);
+    vec4 repeatReadY = texture(texSampler, vec2(clampedCoord.x, repeatCoordY) * TiledDimension);
+    vec4 repeatReadXY = texture(texSampler, vec2(repeatCoordX, repeatCoordY) * TiledDimension);
+    return mix(mix(texColor, repeatReadX, abs(errX)), mix(repeatReadY, repeatReadXY, abs(errX)),
+               abs(errY));
+  }
+  if (repeatX) {
+    vec4 repeatReadX = texture(texSampler, vec2(repeatCoordX, clampedCoord.y) * TiledDimension);
+    return mix(texColor, repeatReadX, errX);
+  }
+  vec4 repeatReadY = texture(texSampler, vec2(clampedCoord.x, repeatCoordY) * TiledDimension);
+  return mix(texColor, repeatReadY, errY);
+}
 #undef ShaderModeX
 #undef ShaderModeY
 #undef Subset
@@ -254,7 +286,9 @@ vec4 chainLeafFetch(CHAIN_LEAF_SAMPLER texSampler, vec3 coord, vec4 leafSubset, 
     vec2 subsetCoord = vec2(0.0);
     vec2 clampedCoord = vec2(0.0);
     vec2 sampleCoord = tiledMapCoord(uv, TiledStrict != 0, inCoord, subsetCoord, clampedCoord);
-    return tiledApplyBorder(texture(texSampler, sampleCoord), inCoord, subsetCoord, clampedCoord);
+    vec4 texColor = texture(texSampler, sampleCoord);
+    texColor = tiledSeamBlend(texSampler, texColor, subsetCoord, clampedCoord);
+    return tiledApplyBorder(texColor, inCoord, subsetCoord, clampedCoord);
   }
   return texture(texSampler, clamp(uv, leafSubset.xy, leafSubset.zw));
 }
@@ -395,9 +429,10 @@ void main() {
   // coverage subtree stays in the source: the runtime itself modulates the source with it, so
   // blend(c*S, D) — not c*blend(S,D) + (1-c)*D — is the matching semantics there.
   vec4 noCovCoverage = clipCoverage * vec4(deviceMask);
-#define TGFX_XP_SRC_COLOR                                                                 \
-  (CoverageRootIndex >= 0 ? result * chainResults[CoverageRootIndex] * noCovCoverage : result * noCovCoverage)
-#define TGFX_XP_SRC_UNPREMUL                                                              \
+#define TGFX_XP_SRC_COLOR                                                            \
+  (CoverageRootIndex >= 0 ? result * chainResults[CoverageRootIndex] * noCovCoverage \
+                          : result * noCovCoverage)
+#define TGFX_XP_SRC_UNPREMUL \
   (CoverageRootIndex >= 0 ? result * chainResults[CoverageRootIndex] : result)
 #define TGFX_XP_COVERAGE noCovCoverage
 #endif
