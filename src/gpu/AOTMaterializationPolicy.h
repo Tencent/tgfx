@@ -123,6 +123,17 @@ struct MaterializedTarget {
 };
 
 /**
+ * True when the processor tree rooted at `root` (children included, recursively) contains an
+ * operator whose output can flip discontinuously when an input value crosses an RGBA8
+ * quantization boundary. Proven class: AlphaThreshold's step() — a materialized input whose
+ * float value rounds across the threshold's grid gap flips the output by 255 LSBs (audit A1,
+ * BlendRetryMaterializationFlipsThreshold; the same exact-rational class as audit D5's
+ * multi-pass tail). Any materialization retry on such a tree must be refused so the runtime's
+ * single-shader float evaluation stays authoritative.
+ */
+bool TreeContainsQuantizationFlipRisk(const FragmentProcessor* root);
+
+/**
  * AOTMaterializationPolicy is the single authority that decides where to insert materialization
  * edges to convert an otherwise unmatchable FragmentProcessor chain into a sequence of
  * AOT-matchable kernels. Callers at FragmentProcessor-build sites consult it instead of hand-coding

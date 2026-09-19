@@ -142,11 +142,16 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
     return nullptr;
   };
   // P4 group three: the retry-warranted verdict must be taken before the processor is moved into
-  // the plain draw op below, so an eventual retry can swap the materialized tree into that op.
+  // the plain draw op below. ADMISSION RULE (audit A1): a tree carrying a discontinuous operator
+  // (the proven class: AlphaThreshold — a stored byte rounding across the threshold's grid gap
+  // flips step() by 255 LSBs; BlendRetryMaterializationFlipsThreshold) must never be
+  // materialized; the fill then keeps its original processor and the runtime's float evaluation
+  // stays authoritative.
   bool retryWarranted = false;
   if (routeCandidate && rebuildColorChain != nullptr && processor != nullptr &&
       processor->numChildProcessors() == 2 &&
-      processor->name() == "XfermodeFragmentProcessor - two") {
+      processor->name() == "XfermodeFragmentProcessor - two" &&
+      !TreeContainsQuantizationFlipRisk(processor.get())) {
     bool nested = (renderFlags & InternalRenderFlags::NestedRasterization) != 0;
     for (size_t childIndex = 0; childIndex < 2 && !retryWarranted; ++childIndex) {
       auto decision =
@@ -199,12 +204,11 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
           return true;
         }
       }
-      // The chain route cannot serve the materialized tree either: swap it into the plain draw
-      // op, matching the pre-P4 construction-time behavior (the fill's single color processor is
-      // the materialization-prone source the caller rebuilt).
-      auto& opColors = drawOp->colorProcessors();
-      opColors.clear();
-      opColors.push_back(std::move(retryProcessor));
+      // The chain route cannot serve the materialized tree either: drop the retry result. The
+      // plain draw op below still carries the fill's ORIGINAL processor — the reference
+      // semantics (audit A4: the pre-fix swap replaced it with the materialized tree, baking a
+      // quantization boundary into the fill that the reference never had). The rebuild's
+      // materialization fills render unconsumed (wasted work, no pixel effect).
     }
   }
   auto allocator = drawingAllocator();

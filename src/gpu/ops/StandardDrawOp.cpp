@@ -218,6 +218,16 @@ std::shared_ptr<Program> StandardDrawOp::prepareDecomposedProgram(
   return rewrittenProgram;
 }
 
+bool StandardDrawOp::prepareForTask(RenderTarget* renderTarget, ProgramLookupMode mode,
+                                    std::optional<ColorProcessorList> colorOverride) {
+  // Mirror execute()'s ordering: onPrepare() may veto the op (empty asynchronous buffers);
+  // skipping it here would leave those ops drawing from null resources (audit A5-1).
+  if (!onPrepare()) {
+    return false;
+  }
+  return prepare(renderTarget, mode, std::move(colorOverride));
+}
+
 void StandardDrawOp::executePrepared(RenderPass* renderPass, RenderTarget* renderTarget,
                                      bool recordDrawStats) {
   if (preparedProgramInfo == nullptr || preparedProgram == nullptr ||

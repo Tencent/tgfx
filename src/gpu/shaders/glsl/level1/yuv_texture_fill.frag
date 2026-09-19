@@ -57,14 +57,20 @@ layout(set = 1, binding = 2) uniform sampler2D TextureSampler_2;
 #else
 #define XP_DST_TEX_BINDING 2
 #endif
-#include "clip_coverage.inc"
+// NOTE: include order is semantic in this file — the interleaved comments below split the
+// include blocks so clang-format's sorting cannot reorder across them. In particular,
+// pointwise_slot_array_bind.inc defines the array-suffix bindings pointwise_op.inc's functions
+// are written against; compiling op before bind yields array/scalar type mismatches.
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
+// The clip helper follows the XP includes.
+#include "clip_coverage.inc"
 
 layout(location = 0) out vec4 fragColor;
 
-#include "pointwise_op.inc"
 #include "pointwise_slot_array_bind.inc"
+// The op functions are written against the array bindings above.
+#include "pointwise_op.inc"
 #include "pointwise_slot_array_unbind.inc"
 
 void main() {

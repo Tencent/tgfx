@@ -3229,6 +3229,90 @@ TGFX_TEST(AOTRenderConsistencyTest, NV12ImageWithColorFilterMatchesRuntime) {
   ExpectBitmapsIdentical("nv12-image-with-color-filter", candidate, reference, size, size);
 }
 
+// Counterexample audit A1 (2026-09-19, batch 3), red light -> admission rule: the blend retry's
+// materialization boundary flips a downstream threshold. Two gradients exceed the chain's
+// single-gradient budget, so the DAG planner refuses the original tree and the in-plan retry
+// rebuilt it with both children flattened to RGBA8 textures; the sweep gradient's alpha
+// quantizes onto the 1/255 grid on the way through, and the threshold (1027/2048, sitting in the
+// exact-rational gap between the float values that round to byte 128 and 128/255 itself) flipped
+// a band of columns by 255 LSBs — the pre-fix red light measured maxChannelDiff=255 over 672
+// bytes. The ADMISSION RULE now refuses the retry outright when the color tree carries a
+// discontinuous operator (TreeContainsQuantizationFlipRisk; the proven class is AlphaThreshold):
+// the draw keeps its original processors and the runtime's single-shader float evaluation stays
+// authoritative. This test records that refusal boundary: exactly one plain-matcher miss and one
+// runtime program build serve the original tree, byte-identical to the reference. A zero here
+// would mean the gate opened and the quantization-flip risk must be re-verified first.
+TGFX_TEST(AOTRenderConsistencyTest, BlendRetryMaterializationFlipsThreshold) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  constexpr int size = 96;
+  // A slow alpha sweep crossing the threshold zone (0.49 -> 0.51 over the width). The flip band
+  // is [127.5/255, 1027/2048) = [0.49804, 0.50146): columns whose float alpha rounds to stored
+  // byte 128 (>= 128/255 > threshold) while staying below the threshold at float precision —
+  // roughly 16 of the 96 columns.
+  auto sweep =
+      Shader::MakeLinearGradient(Point(0, 0), Point(static_cast<float>(size), 0),
+                                 {Color(0, 0, 0, 0.49f), Color(0, 0, 0, 0.51f)}, {0.0f, 1.0f});
+  ASSERT_NE(sweep, nullptr);
+  auto white = Shader::MakeLinearGradient(Point(0, 0), Point(static_cast<float>(size), 0),
+                                          {Color::White(), Color::White()}, {0.0f, 1.0f});
+  ASSERT_NE(white, nullptr);
+  // DstIn(dst=sweep, src=white): out = D * S.a = sweep * 1 = the sweep itself (the alpha
+  // sweeping 0.49 -> 0.51 reaches the threshold untouched). NOTE: Multiply would NOT work —
+  // tgfx's Multiply is the advanced separable mode ((1-Da)S + (1-Sa)D + SD), which turns
+  // white x transparent-black into opaque gray and buries the sweep.
+  auto blend = Shader::MakeBlend(BlendMode::DstIn, sweep, white);
+  ASSERT_NE(blend, nullptr);
+  auto renderScene = [&](Bitmap* outBitmap) {
+    auto surface = Surface::Make(context, size, size);
+    ASSERT_NE(surface, nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::Transparent());
+    Paint paint = {};
+    paint.setShader(blend);
+    // 1027/2048 = 0.50146484375 sits exactly between the float value 513/1024 = 0.5009765625
+    // and its RGBA8 rounding 128/255 = 0.50196078431: the exact-rational gap from audit D5.
+    paint.setColorFilter(ColorFilter::AlphaThreshold(1027.0f / 2048.0f));
+    canvas->drawRect(Rect::MakeWH(size, size), paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(size, size));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_NE(pixels, nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+  };
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  {
+    cache->unload();
+    ScopedAOTDeliberateMiss deliberate(context);
+    renderScene(&reference);
+  }
+  {
+    auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+    ASSERT_NE(bundleData, nullptr);
+    ASSERT_GT(bundleBytes, 0u);
+    ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+    cache->setDecompositionEnabled(true);
+    cache->setDiagnosticRecordingEnabled(true);
+    cache->resetStats();
+    context->globalCache()->resetProgramStats();
+    renderScene(&candidate);
+    // RULING: the admission rule refused the retry (the tree carries an AlphaThreshold), so the
+    // draw keeps its original processors — exactly one plain-matcher miss (the two-gradient
+    // blend + threshold tree has no plain rule) and one runtime program build serve it. A zero
+    // here would mean the retry fired despite the flip risk.
+    EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 1u);
+    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 1u);
+    cache->setDiagnosticRecordingEnabled(false);
+    cache->unload();
+    context->globalCache()->clearPrograms();
+  }
+  ExpectBitmapsIdentical("blend-retry-materialization-flip", candidate, reference, size, size);
+}
+
 // Counterexample audit A3-1 (2026-09-19, batch 2), reachability ruling + regression fence: the
 // runtime's RepeatLinearNone sampling reads the opposite edge texel and mixes it by the clamp
 // error at every wrap seam (.75B + .25A at a quarter-texel error); the chain's tiled leaf

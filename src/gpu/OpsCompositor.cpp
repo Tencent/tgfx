@@ -1411,6 +1411,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
       // input) nor its transform (the first pass samples through the source's local uvMatrix
       // while running in the offset rectangle's coordinate space). The runtime path stays the
       // reference for over-budget chains until the executor carries both through.
+      bool coverageMoved = false;
       if (AOTEffectDecomposer::Lower(foldedProcessors, &foldedGraph) &&
           AOTEffectDecomposer::ValidateForFusion(foldedGraph) &&
           AOTEffectDecomposer::Decompose(foldedGraph, &foldedPlan) &&
@@ -1420,8 +1421,10 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
            foldedPlan.passes[0].kernel == AOTKernelKind::PerlinNoiseFill ||
            foldedPlan.passes[0].kernel == AOTKernelKind::YUVTextureFill)) {
         // The mask now travels inside the color chain, so the terminal draw must not apply it
-        // again as a coverage processor.
+        // again as a coverage processor. The move happens before Make so the task's own
+        // fallback path (which prepares the op with its own processors) sees the folded tree.
         op->moveCoveragesToColors();
+        coverageMoved = true;
         auto task = AOTPlanExecutor::Make(context, renderFlags, foldedGraph, foldedPlan,
                                           *deviceBounds, renderTarget, &op, Point::Zero());
         if (task != nullptr) {
@@ -1430,12 +1433,20 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
           return;
         }
       }
-      // The folded chain could not be served (the tree failed lowering or the executor could not
-      // build the task). Fall through to the color-only route instead of returning early: a draw
-      // whose leading processor the materialization policy would rewrite can still be saved by
-      // the in-plan retry below, whose swapped materialized tree the plain direct-match route
-      // serves with the mask still applied as a coverage processor. Draws without a rebuild
-      // source fall straight through to the plain route, exactly like the early return used to.
+      if (coverageMoved) {
+        // The fold's task could not be built AFTER the coverage moved into the op's color
+        // processors. That state is valid for the plain route (the fold only runs for
+        // SrcOver-class XP, where a trailing coverage multiply is pixel-equivalent) but NOT
+        // for the color-only route below: it plans from the ORIGINAL color list (without the
+        // coverage) while the op no longer carries any coverage, so a successful plan would
+        // silently drop the mask/clip (audit A5-4). Go straight to the plain route.
+        drawOps.emplace_back(std::move(op));
+        return;
+      }
+      // The fold never moved anything (the folded tree failed lowering or planning): fall
+      // through to the color-only route — a draw whose leading processor the materialization
+      // policy would rewrite can still be saved by the in-plan retry below. Draws without a
+      // rebuild source fall straight through to the plain route.
     }
     AOTEffectGraph graph = {};
     AOTEffectPlan plan = {};
@@ -1480,17 +1491,29 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
       // source with the MaterializeBlendChildren flag set — the source shader or filter then
       // applies the same EnsureSimpleBlendChild rewrite the construction-time path used to apply.
       // The chain route is retried first (coverage-free draws only, matching the main path's
-      // constraint); when it cannot serve the materialized tree, or the draw carries GP coverage
-      // (e.g. an AA oval) that the chain does not take, the materialized tree is swapped into the
-      // op and the plain direct-match route serves it below — exactly how the pre-P4
-      // construction-time materialization was served. Under NestedRasterization only
-      // correctness-required operands are materialized (the helper skips matchability flattening
-      // there), so the retry-warranted check mirrors that split.
+      // constraint); when it cannot serve the materialized tree, the original op is kept as-is
+      // and the plain route below serves it with its ORIGINAL processors — a failed retry must
+      // never leave a rewritten (materialized) tree on the draw (audit A4: the pre-fix swap
+      // replaced the original with the materialized tree, so even the fallback executed a
+      // quantization boundary the reference never had).
+      // ADMISSION RULE (audit A1): the materialization boundary is an RGBA8 quantization step. A
+      // tree carrying a discontinuous operator (the proven class: AlphaThreshold — a stored byte
+      // rounding across the threshold's grid gap flips step() by 255 LSBs;
+      // BlendRetryMaterializationFlipsThreshold) must never be materialized: refuse the retry
+      // outright so the runtime's single-shader float evaluation stays authoritative. The draw
+      // then falls through to the plain route below (its program is cached after the first use).
+      bool flipRisk = false;
+      for (auto* processor : colorProcessors) {
+        if (TreeContainsQuantizationFlipRisk(processor)) {
+          flipRisk = true;
+          break;
+        }
+      }
       // P4 group three: image-driven draws have no brush shader (drawImage builds the leading
       // processor straight from the image), so the rebuild can also come from a closure the
       // flush site captured. Trailing processors behind the rebuilt one (e.g. a
-      // ColorSpaceXformEffect) stay on the op and ride along both the retry and the swap.
-      bool canRebuild = brush.shader != nullptr || rebuildColorChain != nullptr;
+      // ColorSpaceXformEffect) stay on the op and ride along the retry.
+      bool canRebuild = !flipRisk && (brush.shader != nullptr || rebuildColorChain != nullptr);
       if (canRebuild && colorProcessors.size() >= 1) {
         auto* xfer = colorProcessors[0];
         bool nested = (args.renderFlags & InternalRenderFlags::NestedRasterization) != 0;
@@ -1539,22 +1562,14 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
                 }
               }
               // The chain route cannot serve the materialized tree (no chain variant for this
-              // geometry processor, or the draw carries GP coverage), but the plain
-              // direct-match route can: the construction-time materialization this retry
-              // replaces was served exactly that way. Swap the materialized tree into the op
-              // and let the plain route below prepare it. The original tree is dropped here,
-              // matching the pre-P4 behavior where the construction-time rewrite left no
-              // original behind either; a direct-match miss on the materialized tree then
-              // JITs it, again like the pre-P4 path.
-              auto& opColors = op->colorProcessors();
-              std::vector<PlacementPtr<FragmentProcessor>> trailingColors(
-                  std::make_move_iterator(opColors.begin() + 1),
-                  std::make_move_iterator(opColors.end()));
-              opColors.clear();
-              opColors.push_back(std::move(retryFP));
-              for (auto& trailing : trailingColors) {
-                opColors.push_back(std::move(trailing));
-              }
+              // geometry processor, or the draw carries GP coverage). The original op still
+              // carries its untouched processors: drop the retry result and let the plain route
+              // below serve the ORIGINAL tree — the reference semantics (audit A4: the pre-fix
+              // swap replaced the original with the materialized tree, so the fallback executed
+              // a quantization boundary the reference never had, and a JIT of the swapped tree
+              // baked that boundary into the cached program). The materialization fills the
+              // rebuild already enqueued render unconsumed (wasted work, no pixel effect); a
+              // two-phase commit that defers those enqueues is future work.
             } else {
               // The rebuild itself failed: the original op still carries its untouched
               // processors and falls through to the plain route below. Any materialization the

@@ -23,6 +23,27 @@
 
 namespace tgfx {
 
+static bool FPSubtreeContainsFlipRisk(const FragmentProcessor* fp) {
+  if (fp == nullptr) {
+    return false;
+  }
+  // The threshold processor's runtime name (AlphaThresholdFragmentProcessor::name) — the
+  // discontinuous step() is the proven flip class (audit A1).
+  if (fp->name() == "AlphaStepFragmentProcessor") {
+    return true;
+  }
+  for (size_t index = 0; index < fp->numChildProcessors(); ++index) {
+    if (FPSubtreeContainsFlipRisk(fp->childProcessor(index))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool TreeContainsQuantizationFlipRisk(const FragmentProcessor* root) {
+  return FPSubtreeContainsFlipRisk(root);
+}
+
 static bool IsPointwiseBlendLeafMatchable(const FragmentProcessor* fp, size_t childIndex) {
   if (fp == nullptr) {
     return true;

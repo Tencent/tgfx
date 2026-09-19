@@ -59,6 +59,18 @@ class StandardDrawOp : public DrawOp {
   void executePrepared(RenderPass* renderPass, RenderTarget* renderTarget,
                        bool recordDrawStats = true);
 
+  /**
+   * The task-driven equivalent of execute()'s prepare half: runs onPrepare() FIRST and then
+   * prepare(). Callers that drive prepare()/executePrepared() directly (the AOT plan task,
+   * whose passes render through its own render-pass sequence) must use this entry point
+   * instead of prepare(): prepare() alone skips the onPrepare() lifecycle hook, and ops that
+   * validate asynchronously produced buffers there (hairline ops with possibly-empty vertex
+   * segments) would reach onDraw() with null buffers — execute() runs the hook, so a
+   * task-driven op must not silently lose it.
+   */
+  bool prepareForTask(RenderTarget* renderTarget, ProgramLookupMode mode,
+                      std::optional<ColorProcessorList> colorOverride = std::nullopt);
+
  protected:
   StandardDrawOp(BlockAllocator* allocator, AAType aaType) : DrawOp(allocator, aaType) {
   }
