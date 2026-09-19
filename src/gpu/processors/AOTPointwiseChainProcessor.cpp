@@ -168,7 +168,7 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
     const AOTTiledTextureRecipe* tiledRecipe, PlacementPtr<FragmentProcessor> maskChild,
     int coverageRootSlot, uint32_t coordSourceMask, PlacementPtr<FragmentProcessor> lutChild,
     int lutLeafIndex, std::vector<PlacementPtr<FragmentProcessor>> samplerPadding,
-    bool maskChildIsPhantom) {
+    bool maskChildIsPhantom, int clipCoverageRegister) {
   if (allocator == nullptr || slots.empty() || slots.size() > MaxSlots) {
     return nullptr;
   }
@@ -248,10 +248,13 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
       return nullptr;
     }
   }
+  if (clipCoverageRegister >= static_cast<int>(MaxRegisters)) {
+    return nullptr;
+  }
   return allocator->make<AOTPointwiseChainProcessor>(
       std::move(textureLeaves), slots, rootSlot, tiledLeafIndex, tiledRecipe, std::move(maskChild),
       coverageRootSlot, coordSourceMask, std::move(lutChild), lutLeafIndex,
-      std::move(samplerPadding), maskChildIsPhantom);
+      std::move(samplerPadding), maskChildIsPhantom, clipCoverageRegister);
 }
 
 AOTPointwiseChainProcessor::AOTPointwiseChainProcessor(
@@ -260,12 +263,12 @@ AOTPointwiseChainProcessor::AOTPointwiseChainProcessor(
     const AOTTiledTextureRecipe* tiledRecipe, PlacementPtr<FragmentProcessor> maskChildFP,
     int coverageRootSlot, uint32_t coordSourceMask, PlacementPtr<FragmentProcessor> lutChildFP,
     int lutLeafIndex, std::vector<PlacementPtr<FragmentProcessor>> samplerPadding,
-    bool maskChildIsPhantom)
+    bool maskChildIsPhantom, int clipCoverageRegister)
     : FragmentProcessor(ClassID()), _slotCount(newSlots.size()), rootSlot(rootSlot),
       tiledLeafIndex(tiledLeafIndex), hasMaskSlotChild(maskChildFP != nullptr),
       hasMaskChild(maskChildFP != nullptr && !maskChildIsPhantom),
-      coverageRootSlot(coverageRootSlot), coordSourceMask(coordSourceMask),
-      lutLeafIndex(lutLeafIndex) {
+      coverageRootSlot(coverageRootSlot), clipCoverageRegister(clipCoverageRegister),
+      coordSourceMask(coordSourceMask), lutLeafIndex(lutLeafIndex) {
   if (tiledRecipe != nullptr) {
     _tiledRecipe = *tiledRecipe;
   }
@@ -329,6 +332,7 @@ void AOTPointwiseChainProcessor::onSetData(UniformData* vertexUniformData,
   fragmentUniformData->setDataOptional("HasMaskTexture", hasMaskChild ? 1 : 0);
   fragmentUniformData->setDataOptional("RootIndex", static_cast<int>(rootSlot));
   fragmentUniformData->setDataOptional("CoverageRootIndex", coverageRootSlot);
+  fragmentUniformData->setDataOptional("ClipCoverageRegister", clipCoverageRegister);
   fragmentUniformData->setDataOptional("SlotCount", static_cast<int>(_slotCount));
   fragmentUniformData->setDataOptional("TiledLeafIndex", tiledLeafIndex);
   fragmentUniformData->setDataOptional("GradientLUTLeaf", lutLeafIndex);

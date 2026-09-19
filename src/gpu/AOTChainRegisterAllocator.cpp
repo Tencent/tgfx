@@ -21,7 +21,8 @@
 namespace tgfx {
 
 bool AllocateChainRegisters(const std::vector<std::vector<int>>& instructionInputs,
-                            int rootInstruction, int coverageRootInstruction, size_t registerCount,
+                            int rootInstruction, int coverageRootInstruction,
+                            int clipCoverageInstruction, size_t registerCount,
                             AOTChainRegisterAssignment* assignment) {
   if (assignment == nullptr) {
     return false;
@@ -31,7 +32,8 @@ bool AllocateChainRegisters(const std::vector<std::vector<int>>& instructionInpu
     return index >= 0 && static_cast<size_t>(index) < instructionCount;
   };
   if ((rootInstruction != -1 && !inRange(rootInstruction)) ||
-      (coverageRootInstruction != -1 && !inRange(coverageRootInstruction))) {
+      (coverageRootInstruction != -1 && !inRange(coverageRootInstruction)) ||
+      (clipCoverageInstruction != -1 && !inRange(clipCoverageInstruction))) {
     return false;
   }
   std::vector<int> lastUse(instructionCount, -1);
@@ -46,13 +48,16 @@ bool AllocateChainRegisters(const std::vector<std::vector<int>>& instructionInpu
       lastUse[static_cast<size_t>(input)] = static_cast<int>(index);
     }
   }
-  // The root and coverage-root results are read after the whole loop, so their registers outlive
-  // every release point inside it.
+  // The root, coverage-root and clip-coverage results are read after the whole loop, so their
+  // registers outlive every release point inside it.
   if (rootInstruction >= 0) {
     lastUse[static_cast<size_t>(rootInstruction)] = static_cast<int>(instructionCount);
   }
   if (coverageRootInstruction >= 0) {
     lastUse[static_cast<size_t>(coverageRootInstruction)] = static_cast<int>(instructionCount);
+  }
+  if (clipCoverageInstruction >= 0) {
+    lastUse[static_cast<size_t>(clipCoverageInstruction)] = static_cast<int>(instructionCount);
   }
   std::vector<std::vector<int>> releaseAt(instructionCount);
   for (size_t index = 0; index < instructionCount; ++index) {
@@ -92,6 +97,10 @@ bool AllocateChainRegisters(const std::vector<std::vector<int>>& instructionInpu
   assignment->coverageRootRegister =
       coverageRootInstruction >= 0
           ? assignment->outRegister[static_cast<size_t>(coverageRootInstruction)]
+          : -1;
+  assignment->clipCoverageRegister =
+      clipCoverageInstruction >= 0
+          ? assignment->outRegister[static_cast<size_t>(clipCoverageInstruction)]
           : -1;
   return true;
 }

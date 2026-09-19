@@ -96,28 +96,6 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, ProgramLookupMode mode,
 // their original funnel accounting. A single coverage FP is folded into the chain (an AA rect clip
 // as a coverage slot, a device-space alpha mask as the mask child, Compose(mask, rect) as both);
 // other coverage forms stay on their original route.
-// True when the coverage FP folds into the chain as geometric coverage (analytic clip slots or
-// the device mask child): analytic Rect/RRect leaves, alone or inside a composed clip chain, or a
-// device-space texture mask. These attenuate the destination in the runtime composite, so their
-// fold is restricted to SrcOver-class blending (see the guard in prepareDecomposedProgram).
-static bool ChainFoldCarriesGeometricCoverage(const FragmentProcessor* fp) {
-  if (fp == nullptr) {
-    return false;
-  }
-  const auto name = fp->name();
-  if (name == "RectEffect" || name == "RRectEffect" || name == "DeviceSpaceTextureEffect") {
-    return true;
-  }
-  if (name == "ComposeFragmentProcessor") {
-    for (size_t index = 0; index < fp->numChildProcessors(); ++index) {
-      if (ChainFoldCarriesGeometricCoverage(fp->childProcessor(index))) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
 std::shared_ptr<Program> StandardDrawOp::prepareDecomposedProgram(
     RenderTarget* renderTarget, const ColorProcessorList& activeColors) {
   auto cache = renderTarget->getContext()->precompiledShaderCache();
@@ -127,22 +105,12 @@ std::shared_ptr<Program> StandardDrawOp::prepareDecomposedProgram(
   if (MatchPermutation(preparedProgramInfo.get()).has_value()) {
     return nullptr;
   }
-  // Coverage folding guard (audit A2-1, refined by MaskCoverageBlendModesOnOpaqueBackground):
-  // folding GEOMETRIC coverage (analytic clip slots — Rect/RRect chains — or the device mask
-  // child) into the chain bakes it into the source color, which composites correctly only for
-  // SrcOver-class blending; every other mode attenuates the destination by the coverage itself
-  // (Src: c*S + (1-c)*D; red light NarrowAAClipWithSrcBlendKeepsDstOnEdge measured maxChannelDiff=
-  // 192 on the clip rim). A MaskFilter's shader coverage is a different semantic: the runtime
-  // itself modulates the source with it (byte-parity across Src/SrcOver/Multiply/Darken), so
-  // those subtrees keep folding for any XP. The geometric leaves are identified by name,
-  // including inside composed clip chains.
-  if (!coverages.empty() && !(xferProcessor == nullptr && blendMode == BlendMode::SrcOver)) {
-    for (auto& coverage : coverages) {
-      if (ChainFoldCarriesGeometricCoverage(coverage.get())) {
-        return nullptr;
-      }
-    }
-  }
+  // The coverage forms the chain carries are now semantically routed: geometric coverage (the
+  // narrow clip slots, the device mask, the atlas glyph subtree via the clip-coverage register,
+  // analytic subtrees via CoverageRootIndex) composites as the XP's coverage input, while a
+  // MaskFilter's source-modulating mask subtree keeps the CoverageRootIndex source route — so no
+  // blend-mode restriction remains here (the A2-1/A2-3 interim guards are gone; see
+  // NarrowAAClipWithSrcBlendKeepsDstOnEdge and AtlasTextNonSrcOverBlendKeepsDstProbe).
   std::vector<const FragmentProcessor*> coverageFPs = {};
   std::vector<PlacementPtr<FragmentProcessor>> ownedChainCoverageFPs = {};
   if (!coverages.empty()) {
@@ -158,16 +126,10 @@ std::shared_ptr<Program> StandardDrawOp::prepareDecomposedProgram(
   } else if (geometryProcessor->name() == "AtlasTextGeometryProcessor") {
     // Atlas text: the GP-owned atlas becomes a synthesized coverage leaf (the glyph mask), and
     // the rewrite needs a sampler-free twin GP. A null override means the draw is not servable
-    // this way (e.g. a color-emoji atlas), so keep the original route.
-    // The glyph mask is TRUE coverage in the runtime composite (AtlasTextNonSrcOverBlendKeepsDst
-    // Probe: the JIT reference attenuates the destination by the fractional glyph coverage —
-    // c*S+(1-c)*D — matching the dedicated MaskFill shader's coverage handling, unlike a
-    // MaskFilter's source-modulating mask). The no-coverage-varying chain layout folds it into
-    // the source with coverage 1, which is only equivalent for SrcOver-class blending, so refuse
-    // the rewrite otherwise (audit A2-3, probe measured maxChannelDiff=255 over 11485 bytes).
-    if (!(xferProcessor == nullptr && blendMode == BlendMode::SrcOver)) {
-      return nullptr;
-    }
+    // this way (e.g. a color-emoji atlas), so keep the original route. The glyph mask is TRUE
+    // coverage in the runtime composite, and the builder routes the subtree's root through the
+    // chain's clip-coverage register so it composites as the XP's coverage input for every blend
+    // mode (AtlasTextNonSrcOverBlendKeepsDstProbe) — no blend-mode restriction here.
     chainGeometryProcessor = onMakeChainGeometryProcessor(&ownedChainCoverageFPs);
     if (chainGeometryProcessor == nullptr) {
       return nullptr;

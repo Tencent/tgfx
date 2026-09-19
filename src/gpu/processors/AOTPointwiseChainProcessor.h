@@ -165,7 +165,7 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
       PlacementPtr<FragmentProcessor> maskChild = nullptr, int coverageRootSlot = -1,
       uint32_t coordSourceMask = ~0u, PlacementPtr<FragmentProcessor> lutChild = nullptr,
       int lutLeafIndex = -1, std::vector<PlacementPtr<FragmentProcessor>> samplerPadding = {},
-      bool maskChildIsPhantom = false);
+      bool maskChildIsPhantom = false, int clipCoverageRegister = -1);
 
   AOTPointwiseChainProcessor(std::vector<PlacementPtr<FragmentProcessor>> textureLeaves,
                              const std::vector<AOTChainSlot>& slots, size_t rootSlot,
@@ -174,7 +174,7 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
                              uint32_t coordSourceMask, PlacementPtr<FragmentProcessor> lutChild,
                              int lutLeafIndex,
                              std::vector<PlacementPtr<FragmentProcessor>> samplerPadding,
-                             bool maskChildIsPhantom);
+                             bool maskChildIsPhantom, int clipCoverageRegister);
 
   std::string name() const override {
     return "AOTPointwiseChainProcessor";
@@ -206,6 +206,13 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
   // plain coverage modulation.
   int coverageRoot() const {
     return coverageRootSlot;
+  }
+
+  // Register index of the narrow clip slots' product (and the atlas path's glyph-mask subtree
+  // root), or -1 when the chain has none. The value is a pure coverage that rides the XP's
+  // coverage input — see the kernel's ClipCoverageRegister.
+  int clipCoverage() const {
+    return clipCoverageRegister;
   }
 
   // Index of the leaf that needs shader-side tiling (wrap/border emulation), or -1 when every
@@ -253,6 +260,8 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
   // without a gradient slot exposes a default identity transform here.
   CoordTransform gradientCoordTransform = {};
   int coverageRootSlot = -1;
+  // Register index of the narrow clip product / atlas coverage root; -1 when absent.
+  int clipCoverageRegister = -1;
   // Per-target coordinate source for the chain vertex stage: bit k set sources leaf k from the
   // uvCoord attribute, bit 4 does the same for the gradient coordinates; clear bits source from
   // aPosition. All-ones reproduces the legacy shared-source behavior (quads, meshes); atlas text

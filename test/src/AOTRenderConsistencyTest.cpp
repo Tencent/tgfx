@@ -903,16 +903,13 @@ TGFX_TEST(AOTRenderConsistencyTest, AtlasTextGradientFold) {
   ExpectBitmapsIdentical("atlas-text-gradient-fold", aotBitmap, runtimeBitmap, 200, 100);
 }
 
-// Counterexample audit A2-3 semantic probe (2026-09-19, batch 1 residue): atlas text under a
-// non-SrcOver blend mode. The audit's static claim: the chain's no-coverage-varying layout folds
-// the glyph mask into the source and composites with coverage 1, so a Src blend would lose the
-// background's share at fractional glyph coverage (c*S instead of c*S+(1-c)*D). The B4 evidence
-// proved MaskFilter masks are source modulation in the runtime; whether the ATLAS glyph mask is
-// also source modulation (probe passes) or true coverage like the dedicated MaskFill shader's
-// TGFX_XP_COVERAGE (probe diverges at glyph edges) decides the ruling. The color filter forces
-// the plain-matcher miss that routes the draw onto the chain rewrite's atlas path; the blue
-// background makes any missing (1-c)*D term visible on the glyph rim.
-TGFX_TEST(AOTRenderConsistencyTest, AtlasTextNonSrcOverBlendKeepsDstProbe) {
+// Counterexample audit A2-3 (2026-09-19, batch 1 residue), fixed on the chain: atlas text under
+// a non-SrcOver blend mode. The glyph mask is TRUE coverage in the runtime composite (the probe's
+// pre-fix red light measured maxChannelDiff=255 over 11485 bytes when the chain folded it into
+// the source with coverage 1), unlike a MaskFilter's source-modulating mask. The builder now
+// routes the atlas subtree's root through the clip-coverage register, so the chain serves every
+// mode: this test asserts the chain route (no fallback, no runtime build) and byte-parity.
+TGFX_TEST(AOTRenderConsistencyTest, AtlasTextNonSrcOverBlendKeepsDstOnChain) {
   auto typeface =
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
   ASSERT_TRUE(typeface != nullptr);
@@ -940,9 +937,6 @@ TGFX_TEST(AOTRenderConsistencyTest, AtlasTextNonSrcOverBlendKeepsDstProbe) {
     paint.setBlendMode(BlendMode::Src);
     paint.setColorFilter(ColorFilter::Blend(Color::Red(), BlendMode::Multiply));
     if (useBundle) {
-      // The refusal is observable: the rewrite declines the non-SrcOver atlas draw, so exactly
-      // one runtime program build serves it (a zero would mean the chain took it and the
-      // destination attenuation must be re-verified).
       cache->setDiagnosticRecordingEnabled(true);
       cache->resetStats();
       context->globalCache()->resetProgramStats();
@@ -950,8 +944,10 @@ TGFX_TEST(AOTRenderConsistencyTest, AtlasTextNonSrcOverBlendKeepsDstProbe) {
     canvas->drawTextBlob(textBlob, 25, 60, paint);
     context->flushAndSubmit(true);
     if (useBundle) {
-      EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 1u);
-      EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 1u);
+      // The chain serves the atlas draw through the clip-coverage channel: no fallback, no
+      // runtime program build.
+      EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+      EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
       cache->setDiagnosticRecordingEnabled(false);
     }
     ASSERT_TRUE(outBitmap->allocPixels(200, 100));
@@ -5327,16 +5323,14 @@ TGFX_TEST(AOTRenderConsistencyTest, GPCoverageAndMaskCoexistOnAAEdge) {
   ExpectBitmapsIdentical("gp-coverage-and-mask-coexist", candidate, reference, size, size);
 }
 
-// Counterexample audit (2026-09-19, batch 1 / finding A2-1), fold-refusal boundary record: a
-// chain-served draw under an AA analytic clip with a Src blend mode. Coverage compositing must
-// attenuate the DESTINATION outside the clip — the edge pixel is c*S+(1-c)*D — but coverage
-// folding bakes the clip into the color root and hands the XP a pre-attenuated source, yielding
-// c*S (the background's half vanishes at the rim; the pre-fix red light measured maxChannelDiff=
-// 192 on the clip rim). The fold is therefore refused for every non-SrcOver-class XP at both the
-// OpsCompositor fold and the StandardDrawOp chain rewrite: the draw keeps its coverages and the
-// runtime route serves it. This test records that boundary: a zero fallback count here would mean
-// the gate opened and the destination attenuation must be re-verified before the fold returns.
-TGFX_TEST(AOTRenderConsistencyTest, NarrowAAClipWithSrcBlendRecordsFoldRefusal) {
+// Counterexample audit A2-1 (2026-09-19, batch 1 residue), fixed on the chain: a chain-served
+// draw under an AA analytic clip with a Src blend mode. Coverage compositing must attenuate the
+// DESTINATION outside the clip — the edge pixel is c*S+(1-c)*D — but coverage folding used to
+// bake the clip into the color root and hand the XP a pre-attenuated source (maxChannelDiff=192
+// on the clip rim). The interim fix refused the fold for non-SrcOver-class XP; the kernel now
+// carries the clip product through the ClipCoverageRegister coverage input, so the chain serves
+// every mode: this test asserts the chain route (no fallback, no runtime build) and byte-parity.
+TGFX_TEST(AOTRenderConsistencyTest, NarrowAAClipWithSrcBlendKeepsDstOnEdge) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
@@ -5383,12 +5377,11 @@ TGFX_TEST(AOTRenderConsistencyTest, NarrowAAClipWithSrcBlendRecordsFoldRefusal) 
     cache->resetStats();
     context->globalCache()->resetProgramStats();
     renderScene(&candidate);
-    // RULING: the coverage fold is refused for the Src XP, so the draw keeps its clip coverage
-    // and the plain route serves it — exactly one plain-matcher miss (the composed color filter
-    // has no plain rule) and one runtime program build. A zero here would mean the fold gate
-    // opened without the destination attenuation being verified.
-    EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 1u);
-    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 1u);
+    // The chain now serves the draw through the clip-coverage channel: no fallback, no runtime
+    // program build — the pre-fix red light measured maxChannelDiff=192 on the clip rim with the
+    // coverage folded into the source.
+    EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
     cache->setDiagnosticRecordingEnabled(false);
     cache->unload();
     context->globalCache()->clearPrograms();

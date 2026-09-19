@@ -30,18 +30,20 @@ struct AOTChainRegisterAssignment {
   std::vector<int> outRegister = {};
   int rootRegister = -1;
   int coverageRootRegister = -1;
+  int clipCoverageRegister = -1;
 };
 
 // Assigns result registers to a topologically ordered instruction sequence so that a result's
 // register is recycled once its last consumer has executed, decoupling the instruction count
 // from the register count. instructionInputs[i] lists the instruction indices instruction i
 // reads; negative entries are the kernel's special inputs (geometry color, coverage unit, ...)
-// and are ignored. rootInstruction and coverageRootInstruction name the instructions whose
-// results the kernel reads after the evaluation loop; -1 when absent. Returns false when the
-// live ranges exceed registerCount, the sequence is not topologically ordered, or a root index
-// is out of range.
+// and are ignored. rootInstruction, coverageRootInstruction and clipCoverageInstruction name
+// the instructions whose results the kernel reads after the evaluation loop; -1 when absent.
+// Returns false when the live ranges exceed registerCount, the sequence is not topologically
+// ordered, or a root index is out of range.
 bool AllocateChainRegisters(const std::vector<std::vector<int>>& instructionInputs,
-                            int rootInstruction, int coverageRootInstruction, size_t registerCount,
+                            int rootInstruction, int coverageRootInstruction,
+                            int clipCoverageInstruction, size_t registerCount,
                             AOTChainRegisterAssignment* assignment);
 
 }  // namespace tgfx

@@ -775,6 +775,42 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
   if (rootIndex == SIZE_MAX) {
     return nullptr;
   }
+  // The clip-coverage channel (kernel: ClipCoverageRegister). The narrow clip slots below chain
+  // from the coverage unit through clipChainInput; early-fold clips arrive differently — the
+  // fold routes the clip coverage into the color graph as a RectCoverage/RRectCoverage trailing
+  // suffix multiplying the root. Geometric coverage must ride the XP's coverage input instead of
+  // the source (audit A2-1), so pop that suffix and rewire it like the narrow clip slots: the
+  // innermost link chains from the unit, outer links chain upward, the color root moves to the
+  // node under the suffix, and the outermost link's register becomes the clip-coverage value.
+  int clipCoverageSlot = -1;
+  int clipChainInput = -3;
+  {
+    // Walk in NODE-ordinal space (slotOf maps nodes to slots); the suffix stays in the color
+    // chain when the node under it is a designator with no slot (e.g. a bare clip over the
+    // geometry color) — that shape keeps the old source-fold form, which the entry guards
+    // restrict to SrcOver-class blending.
+    std::vector<size_t> suffixNodes = {};
+    std::vector<size_t> suffixSlots = {};
+    size_t walkNode = pass.output.index();
+    while (walkNode < nodes.size() && nodes[walkNode] != nullptr &&
+           (nodes[walkNode]->kind == AOTEffectKind::RectCoverage ||
+            nodes[walkNode]->kind == AOTEffectKind::RRectCoverage)) {
+      if (nodes[walkNode]->inputs.empty()) {
+        break;
+      }
+      suffixNodes.push_back(walkNode);
+      suffixSlots.push_back(slotOf[walkNode]);
+      walkNode = nodes[walkNode]->inputs[0].index();
+    }
+    if (!suffixNodes.empty() && walkNode < nodes.size() && slotOf[walkNode] != SIZE_MAX) {
+      rootIndex = slotOf[walkNode];
+      for (size_t i = 0; i < suffixSlots.size(); ++i) {
+        slots[suffixSlots[i]].in0 =
+            i + 1 < suffixSlots.size() ? static_cast<int>(suffixSlots[i + 1]) : -3;
+      }
+      clipCoverageSlot = static_cast<int>(suffixSlots.front());
+    }
+  }
   int coverageRootSlot = -1;
   if (coverageGraph != nullptr) {
     // Acceptance gate, kept tight to the byte-verified shapes. Accepted roots: a single blend
@@ -833,8 +869,21 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
       return nullptr;
     }
     coverageRootSlot = static_cast<int>(covSlot);
+    if (coverageLeafFromUVCoord && coverageRootSlot >= 0) {
+      // The atlas glyph mask is TRUE coverage in the runtime composite (the dedicated MaskFill
+      // shader carries it as coverage — see AtlasTextNonSrcOverBlendKeepsDstProbe), unlike a
+      // MaskFilter's source-modulating mask, whose subtree keeps the CoverageRootIndex source
+      // route. Route the atlas subtree's root through the clip-coverage register so it rides the
+      // XP's coverage input with the unpremultiplied source.
+      clipCoverageSlot = coverageRootSlot;
+      coverageRootSlot = -1;
+    }
   }
-  // The narrow clip slots multiply the color root; each appended slot becomes the new root.
+  // The narrow clip slots no longer multiply the color root: they chain from the coverage unit
+  // (-3, the innermost link) so their product is a pure coverage value the kernel reads through
+  // ClipCoverageRegister and composites as the XP's coverage input — folding them into the
+  // source was only correct for SrcOver-class blending (audit A2-1). The color root stays the
+  // pre-clip result.
   if (clipSlots.deviceRect != nullptr) {
     if (slots.size() >= AOTPointwiseChainProcessor::MaxSlots) {
       return nullptr;
@@ -843,8 +892,9 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
     rectSlot.op = AOTChainOp::AARectCoverage;
     const auto& rect = clipSlots.deviceRect->getRect();
     rectSlot.rectCoverage.rect = {rect.left, rect.top, rect.right, rect.bottom};
-    rectSlot.in0 = static_cast<int>(rootIndex);
-    rootIndex = slots.size();
+    rectSlot.in0 = clipChainInput;
+    clipChainInput = static_cast<int>(slots.size());
+    clipCoverageSlot = clipChainInput;
     slots.push_back(rectSlot);
   }
   if (clipSlots.localRect != nullptr) {
@@ -859,8 +909,9 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
     localRectSlot.localRectCoverage.deviceToLocal = {matrix[0], matrix[1], matrix[2],
                                                      matrix[3], matrix[4], matrix[5],
                                                      matrix[6], matrix[7], matrix[8]};
-    localRectSlot.in0 = static_cast<int>(rootIndex);
-    rootIndex = slots.size();
+    localRectSlot.in0 = clipChainInput;
+    clipChainInput = static_cast<int>(slots.size());
+    clipCoverageSlot = clipChainInput;
     slots.push_back(localRectSlot);
   }
   for (auto* rrectEffect : clipSlots.rrects) {
@@ -880,8 +931,9 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
     rrectSlot.rrectCoverage.deviceToLocal = {matrix[0], matrix[1], matrix[2], matrix[3], matrix[4],
                                              matrix[5], matrix[6], matrix[7], matrix[8]};
     rrectSlot.rrectCoverage.antiAlias = rrectEffect->isAntiAlias() ? 1.0f : 0.0f;
-    rrectSlot.in0 = static_cast<int>(rootIndex);
-    rootIndex = slots.size();
+    rrectSlot.in0 = clipChainInput;
+    clipChainInput = static_cast<int>(slots.size());
+    clipCoverageSlot = clipChainInput;
     slots.push_back(rrectSlot);
   }
   PlacementPtr<FragmentProcessor> maskChild = nullptr;
@@ -924,7 +976,8 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
   }
   AOTChainRegisterAssignment assignment = {};
   if (!AllocateChainRegisters(instructionInputs, static_cast<int>(rootIndex), coverageRootSlot,
-                              AOTPointwiseChainProcessor::MaxRegisters, &assignment)) {
+                              clipCoverageSlot, AOTPointwiseChainProcessor::MaxRegisters,
+                              &assignment)) {
     return nullptr;
   }
   for (size_t index = 0; index < slots.size(); ++index) {
@@ -938,10 +991,11 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
   }
   rootIndex = static_cast<size_t>(assignment.rootRegister);
   coverageRootSlot = assignment.coverageRootRegister;
+  const int clipCoverageRegister = assignment.clipCoverageRegister;
   return AOTPointwiseChainProcessor::Make(
       allocator, std::move(leaves), slots, rootIndex, tiledLeafIndex, recipePtr,
       std::move(maskChild), coverageRootSlot, coordSourceMask, std::move(lutChild), lutLeafIndex,
-      std::move(samplerPadding), maskChildIsPhantom);
+      std::move(samplerPadding), maskChildIsPhantom, clipCoverageRegister);
 }
 
 }  // namespace

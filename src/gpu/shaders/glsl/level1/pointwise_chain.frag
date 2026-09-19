@@ -48,6 +48,14 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   // subtree's value replaces the plain coverage modulation (it already carries the GP coverage
   // through the -3 unit input).
   int CoverageRootIndex;
+  // Register index of the narrow clip slots' product, -1 when the chain has none. The clip slots
+  // chain from the coverage unit instead of multiplying the color root, so this value is a pure
+  // coverage: it rides the XP's coverage input together with the device mask (and the atlas
+  // subtree's root, which the builder routes here because the glyph mask is true coverage), while
+  // the source stays unpremultiplied — compositing correctly for every blend mode (the kernel's
+  // xpBlendWithCoverage carries the runtime's per-mode forms; folding coverage into the source
+  // was only equivalent for SrcOver — audits A2-1/A2-3).
+  int ClipCoverageRegister;
   int SlotCount;
   // Per-leaf subset rects, named for the structural ordinals the TextureEffect writers use.
   vec4 Subset;
@@ -333,6 +341,15 @@ void main() {
   }
   vec4 result = chainResults[RootIndex];
 
+  // The narrow clip slots chain from the coverage unit (-3) instead of multiplying the color
+  // root, so their product is a pure coverage value (see ClipCoverageRegister above). The atlas
+  // path routes its glyph-mask subtree root through the same register: the glyph mask is TRUE
+  // coverage in the runtime composite (the dedicated MaskFill shader carries it as
+  // TGFX_XP_COVERAGE), unlike a MaskFilter's source-modulating mask, whose subtree keeps the
+  // CoverageRootIndex source route (MaskCoverageBlendModesOnOpaqueBackground, byte-parity across
+  // Src/SrcOver/Multiply/Darken).
+  vec4 clipCoverage = ClipCoverageRegister >= 0 ? chainResults[ClipCoverageRegister] : vec4(1.0);
+
   // The device-space mask is draw COVERAGE (a clip/mask on the whole draw), so it multiplies the
   // coverage chain like the runtime's DeviceSpaceTextureEffect compositing — never the bare color.
   // Baking it into the color instead leaves the XferProcessor's dst attenuation without the mask
@@ -356,6 +373,7 @@ void main() {
   if (CoverageRootIndex >= 0) {
     ellipseFinalCoverage = chainResults[CoverageRootIndex] * vec4(deviceMask);
   }
+  ellipseFinalCoverage *= clipCoverage;
 #define TGFX_XP_SRC_COLOR (result * ellipseFinalCoverage)
 #define TGFX_XP_SRC_UNPREMUL result
 #define TGFX_XP_COVERAGE ellipseFinalCoverage
@@ -364,13 +382,24 @@ void main() {
   // input), so it replaces the plain vCoverage modulation instead of doubling it.
   vec4 finalCoverage = CoverageRootIndex >= 0 ? chainResults[CoverageRootIndex] : vec4(vCoverage);
   finalCoverage *= deviceMask;
+  finalCoverage *= clipCoverage;
 #define TGFX_XP_SRC_COLOR (result * finalCoverage)
 #define TGFX_XP_SRC_UNPREMUL result
 #define TGFX_XP_COVERAGE finalCoverage
 #else
-  vec4 noCovCoverage = vec4(deviceMask);
+  // The no-coverage-varying layouts previously left TGFX_XP_COVERAGE at its vec4(1.0) default
+  // with every coverage form (clips, device mask, the coverage subtree) premultiplied into the
+  // source — composites correctly only for SrcOver-class blending. The TRUE coverage forms (the
+  // clip product and the device mask) now ride C with the unpremultiplied source, compositing
+  // through the per-mode forms like every other layout (audits A2-1/A2-3). A MaskFilter's
+  // coverage subtree stays in the source: the runtime itself modulates the source with it, so
+  // blend(c*S, D) — not c*blend(S,D) + (1-c)*D — is the matching semantics there.
+  vec4 noCovCoverage = clipCoverage * vec4(deviceMask);
 #define TGFX_XP_SRC_COLOR                                                                 \
   (CoverageRootIndex >= 0 ? result * chainResults[CoverageRootIndex] * noCovCoverage : result * noCovCoverage)
+#define TGFX_XP_SRC_UNPREMUL                                                              \
+  (CoverageRootIndex >= 0 ? result * chainResults[CoverageRootIndex] : result)
+#define TGFX_XP_COVERAGE noCovCoverage
 #endif
 #include "xp_output.inc"
 }

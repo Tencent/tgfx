@@ -94,7 +94,7 @@ TGFX_TEST(AOTRegisterAllocatorTest, LinearChainSharesRegisters) {
     }
   }
   AOTChainRegisterAssignment assignment = {};
-  ASSERT_TRUE(AllocateChainRegisters(inputs, 31, -1, 16, &assignment));
+  ASSERT_TRUE(AllocateChainRegisters(inputs, 31, -1, -1, 16, &assignment));
   EXPECT_LE(DistinctRegisters(assignment), 2u);
   EXPECT_EQ(assignment.rootRegister, assignment.outRegister[31]);
   auto registers = SimulateRegisters(inputs, assignment, 16);
@@ -107,8 +107,8 @@ TGFX_TEST(AOTRegisterAllocatorTest, ExhaustedRegistersFail) {
   // (the merge itself reuses a released producer's register after reading it).
   std::vector<std::vector<int>> inputs = {{-1}, {0}, {0, 1}, {0, 1, 2}};
   AOTChainRegisterAssignment assignment = {};
-  ASSERT_FALSE(AllocateChainRegisters(inputs, 3, -1, 2, &assignment));
-  ASSERT_TRUE(AllocateChainRegisters(inputs, 3, -1, 3, &assignment));
+  ASSERT_FALSE(AllocateChainRegisters(inputs, 3, -1, -1, 2, &assignment));
+  ASSERT_TRUE(AllocateChainRegisters(inputs, 3, -1, -1, 3, &assignment));
   auto registers = SimulateRegisters(inputs, assignment, 3);
   auto reference = ReferenceValues(inputs);
   EXPECT_EQ(registers[static_cast<size_t>(assignment.rootRegister)], reference[3]);
@@ -123,7 +123,7 @@ TGFX_TEST(AOTRegisterAllocatorTest, DiamondFitsTwoRegisters) {
   // the peak live count is two, not three.
   std::vector<std::vector<int>> inputs = {{-1}, {0}, {0}, {1, 2}};
   AOTChainRegisterAssignment assignment = {};
-  ASSERT_TRUE(AllocateChainRegisters(inputs, 3, -1, 2, &assignment));
+  ASSERT_TRUE(AllocateChainRegisters(inputs, 3, -1, -1, 2, &assignment));
   auto registers = SimulateRegisters(inputs, assignment, 2);
   auto reference = ReferenceValues(inputs);
   EXPECT_EQ(registers[static_cast<size_t>(assignment.rootRegister)], reference[3]);
@@ -134,7 +134,7 @@ TGFX_TEST(AOTRegisterAllocatorTest, SharedInputHeldAcrossConsumers) {
   // Instruction 2 consumes both 0 and 1, so both results are live together.
   std::vector<std::vector<int>> inputs = {{-1}, {0}, {0, 1}};
   AOTChainRegisterAssignment assignment = {};
-  ASSERT_TRUE(AllocateChainRegisters(inputs, 2, -1, 2, &assignment));
+  ASSERT_TRUE(AllocateChainRegisters(inputs, 2, -1, -1, 2, &assignment));
   auto registers = SimulateRegisters(inputs, assignment, 2);
   auto reference = ReferenceValues(inputs);
   EXPECT_EQ(registers[static_cast<size_t>(assignment.rootRegister)], reference[2]);
@@ -145,7 +145,7 @@ TGFX_TEST(AOTRegisterAllocatorTest, CoverageRootSurvivesLaterInstructions) {
   // reads it after the loop, so a later instruction must not recycle it.
   std::vector<std::vector<int>> inputs = {{-1}, {0}, {1}, {-3}};
   AOTChainRegisterAssignment assignment = {};
-  ASSERT_TRUE(AllocateChainRegisters(inputs, 2, 3, 2, &assignment));
+  ASSERT_TRUE(AllocateChainRegisters(inputs, 2, 3, -1, 2, &assignment));
   EXPECT_EQ(assignment.rootRegister, assignment.outRegister[2]);
   EXPECT_EQ(assignment.coverageRootRegister, assignment.outRegister[3]);
   EXPECT_NE(assignment.coverageRootRegister, assignment.rootRegister);
@@ -155,12 +155,28 @@ TGFX_TEST(AOTRegisterAllocatorTest, CoverageRootSurvivesLaterInstructions) {
   EXPECT_EQ(registers[static_cast<size_t>(assignment.coverageRootRegister)], reference[3]);
 }
 
+TGFX_TEST(AOTRegisterAllocatorTest, ClipCoverageSurvivesLaterInstructions) {
+  // The clip-coverage product's register must survive instructions that execute after it (the
+  // kernel reads it after the loop, like the roots), while a dead result between the roots is
+  // still recycled.
+  std::vector<std::vector<int>> inputs = {{-1}, {-3}, {0}, {1}};
+  AOTChainRegisterAssignment assignment = {};
+  ASSERT_TRUE(AllocateChainRegisters(inputs, 3, -1, 2, 2, &assignment));
+  EXPECT_EQ(assignment.rootRegister, assignment.outRegister[3]);
+  EXPECT_EQ(assignment.clipCoverageRegister, assignment.outRegister[2]);
+  EXPECT_NE(assignment.clipCoverageRegister, assignment.rootRegister);
+  auto registers = SimulateRegisters(inputs, assignment, 2);
+  auto reference = ReferenceValues(inputs);
+  EXPECT_EQ(registers[static_cast<size_t>(assignment.rootRegister)], reference[3]);
+  EXPECT_EQ(registers[static_cast<size_t>(assignment.clipCoverageRegister)], reference[2]);
+}
+
 TGFX_TEST(AOTRegisterAllocatorTest, DeadInstructionGetsNoRegister) {
   // Instruction 2 is read by nothing and is neither root: it must not consume a register the
   // live chain could need.
   std::vector<std::vector<int>> inputs = {{-1}, {0}, {-1}};
   AOTChainRegisterAssignment assignment = {};
-  ASSERT_TRUE(AllocateChainRegisters(inputs, 1, -1, 1, &assignment));
+  ASSERT_TRUE(AllocateChainRegisters(inputs, 1, -1, -1, 1, &assignment));
   EXPECT_EQ(assignment.outRegister[2], -1);
   EXPECT_EQ(assignment.rootRegister, assignment.outRegister[1]);
   auto registers = SimulateRegisters(inputs, assignment, 1);
@@ -171,7 +187,7 @@ TGFX_TEST(AOTRegisterAllocatorTest, DeadInstructionGetsNoRegister) {
 TGFX_TEST(AOTRegisterAllocatorTest, SpecialNegativeInputsAreIgnored) {
   std::vector<std::vector<int>> inputs = {{-1, -3, -4, -5}};
   AOTChainRegisterAssignment assignment = {};
-  ASSERT_TRUE(AllocateChainRegisters(inputs, 0, -1, 1, &assignment));
+  ASSERT_TRUE(AllocateChainRegisters(inputs, 0, -1, -1, 1, &assignment));
   EXPECT_EQ(assignment.outRegister[0], 0);
   EXPECT_EQ(assignment.rootRegister, 0);
 }
@@ -179,21 +195,21 @@ TGFX_TEST(AOTRegisterAllocatorTest, SpecialNegativeInputsAreIgnored) {
 TGFX_TEST(AOTRegisterAllocatorTest, NonTopologicalInputFails) {
   std::vector<std::vector<int>> inputs = {{1}, {-1}};
   AOTChainRegisterAssignment assignment = {};
-  EXPECT_FALSE(AllocateChainRegisters(inputs, 1, -1, 16, &assignment));
+  EXPECT_FALSE(AllocateChainRegisters(inputs, 1, -1, -1, 16, &assignment));
 }
 
 TGFX_TEST(AOTRegisterAllocatorTest, InvalidRootIndexFails) {
   std::vector<std::vector<int>> inputs = {{-1}};
   AOTChainRegisterAssignment assignment = {};
-  EXPECT_FALSE(AllocateChainRegisters(inputs, 5, -1, 16, &assignment));
-  EXPECT_FALSE(AllocateChainRegisters(inputs, -1, 5, 16, &assignment));
-  EXPECT_FALSE(AllocateChainRegisters(inputs, -1, -1, 16, nullptr));
+  EXPECT_FALSE(AllocateChainRegisters(inputs, 5, -1, -1, 16, &assignment));
+  EXPECT_FALSE(AllocateChainRegisters(inputs, -1, 5, -1, 16, &assignment));
+  EXPECT_FALSE(AllocateChainRegisters(inputs, -1, -1, -1, 16, nullptr));
 }
 
 TGFX_TEST(AOTRegisterAllocatorTest, EmptySequenceSucceeds) {
   std::vector<std::vector<int>> inputs = {};
   AOTChainRegisterAssignment assignment = {};
-  ASSERT_TRUE(AllocateChainRegisters(inputs, -1, -1, 16, &assignment));
+  ASSERT_TRUE(AllocateChainRegisters(inputs, -1, -1, -1, 16, &assignment));
   EXPECT_TRUE(assignment.outRegister.empty());
   EXPECT_EQ(assignment.rootRegister, -1);
   EXPECT_EQ(assignment.coverageRootRegister, -1);
@@ -202,7 +218,7 @@ TGFX_TEST(AOTRegisterAllocatorTest, EmptySequenceSucceeds) {
 TGFX_TEST(AOTRegisterAllocatorTest, SingleRootInstruction) {
   std::vector<std::vector<int>> inputs = {{-1}};
   AOTChainRegisterAssignment assignment = {};
-  ASSERT_TRUE(AllocateChainRegisters(inputs, 0, -1, 1, &assignment));
+  ASSERT_TRUE(AllocateChainRegisters(inputs, 0, -1, -1, 1, &assignment));
   EXPECT_EQ(assignment.outRegister[0], 0);
   EXPECT_EQ(assignment.rootRegister, 0);
 }
@@ -212,7 +228,7 @@ TGFX_TEST(AOTRegisterAllocatorTest, BranchedDagMatchesReference) {
   // simulated result must match the unlimited-storage reference exactly.
   std::vector<std::vector<int>> inputs = {{-1}, {0}, {0}, {1, 2}, {3}, {3}, {4, 5}};
   AOTChainRegisterAssignment assignment = {};
-  ASSERT_TRUE(AllocateChainRegisters(inputs, 6, -1, 4, &assignment));
+  ASSERT_TRUE(AllocateChainRegisters(inputs, 6, -1, -1, 4, &assignment));
   auto registers = SimulateRegisters(inputs, assignment, 4);
   auto reference = ReferenceValues(inputs);
   EXPECT_EQ(registers[static_cast<size_t>(assignment.rootRegister)], reference[6]);
