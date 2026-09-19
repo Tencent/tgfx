@@ -77,7 +77,7 @@ class Bitmap;
  * A == 0 => RGB == 0. The channel byte order (RGBA vs BGRA) does not matter: the alpha is the
  * top byte of the packed value in both, and the check bounds all three color bytes against it.
  * Illegal-premul fixtures make the reference semantics undefined at alpha boundaries (audit
- * batch 0, cross-cutting acceptance rule 2), so new fixtures assert this and existing ones were
+ *), so new fixtures assert this and existing ones were
  * fixed. The result carries up to four offending samples for the failure message.
  */
 testing::AssertionResult BitmapPremulLegal(const Bitmap& bitmap);
@@ -85,7 +85,7 @@ testing::AssertionResult BitmapPremulLegal(const Bitmap& bitmap);
 /**
  * Counts pixels with strictly fractional alpha (0 < a < 255): the observable footprint of an AA
  * edge (or a fractional mask) in a rendered result. A coverage test that claims to probe AA
- * edges must show this count is non-zero on its reference (audit batch 0, non-vacuity rule) —
+ * edges must show this count is non-zero on its reference (non-vacuity) —
  * an all-or-nothing image proves nothing about fractional coverage handling.
  */
 size_t CountFractionalAlphaPixels(const Bitmap& bitmap);

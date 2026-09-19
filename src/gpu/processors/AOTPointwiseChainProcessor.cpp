@@ -172,7 +172,7 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
   if (allocator == nullptr || slots.empty() || slots.size() > MaxSlots) {
     return nullptr;
   }
-  // Validation domains are separated (audit A6, fail-closed): in0/in1 are INPUT selectors and
+  // Validation domains are separated (fail-closed): in0/in1 are INPUT selectors and
   // may carry the kernel's special negative designators (-1 geometry color ... -5 opaque
   // geometry color) or a result register; outRegister / rootSlot / coverageRootSlot /
   // clipCoverageRegister are OUTPUT registers and must name a real chainResults slot (>= 0) or

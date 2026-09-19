@@ -1244,7 +1244,7 @@ TGFX_TEST(AOTEffectTest, WhiteInputFeedsTwoChildBlendChildren) {
   EXPECT_NE(AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0]), nullptr);
 }
 
-// Counterexample audit D4: a texture whose runtime input is a computed value — an alpha-only
+// a texture whose runtime input is a computed value — an alpha-only
 // mask followed by an image-shader texture (the drawImage(A8) + paint.shader shape). The
 // sequential lowering feeds the first texture's node into the second as its input, so the
 // second texture's modulation source is a computed register, not a designator. The kernel's
@@ -1286,7 +1286,7 @@ TGFX_TEST(AOTEffectTest, TextureConsumingComputedInputLowersToChain) {
   EXPECT_EQ(chain->slot(2).in0, chain->slot(0).outRegister);
 }
 
-// Counterexample audit P2.3: a two-child xfer whose input is a computed node — a mask texture
+// A two-child xfer whose input is a computed node — a mask texture
 // followed by a two-child blend (the drawImage(A8) + paint.shader=BlendShader shape). The
 // runtime feeds the children vec4(C.rgb, 1.0) and re-multiplies the blend output by C.a; the
 // lowering expresses both halves explicitly: an InputOpaque node for the children's
@@ -1350,7 +1350,7 @@ TGFX_TEST(AOTEffectTest, TwoChildBlendOverComputedInputLowers) {
   EXPECT_GE(maskRegister, 0);
 }
 
-// Counterexample audit (2026-09-19, batch 1 / finding A2-2): a coverage subtree whose non-root
+// : a coverage subtree whose non-root
 // texture consumes the GP coverage unit. The runtime coverage-FP readback is tex * input.a and the
 // subtree's input starts from the unit, so an A8 mask under an analytic root must modulate by the
 // GP coverage. The builder only sets textureModulateUnit when the texture IS the coverage root,
@@ -1397,7 +1397,7 @@ TGFX_TEST(AOTEffectTest, NonRootCoverageTextureModulatesByUnit) {
   EXPECT_EQ(chain->slot(static_cast<size_t>(maskSlot)).textureModulateUnit, 1);
 }
 
-// Counterexample audit A3-2 (2026-09-19, batch 2): the runtime applies Swizzle::ForRead to every
+// : the runtime applies Swizzle::ForRead to every
 // texture lookup (GRAY_8 -> .rrra, RG_88 -> .rgrg), so a gray source reads (g, g, g, 1); the
 // chain's plain leaf samples raw (g, 0, 0, 1) on GL/Metal R8 — the G and B channels silently
 // drop to zero. GRAY_8/RG_88 textures are user-reachable as standalone sources through external
@@ -1428,7 +1428,7 @@ TGFX_TEST(AOTEffectTest, ChainRejectsNonRGBAColorFormats) {
   }
 }
 
-// Audit A6 (2026-09-19, batch 4): the admission budget must count FINAL ENCODED instructions,
+// Audit A6: the admission budget must count FINAL ENCODED instructions,
 // not graph nodes. A computed-input texture occupies two slots (a raw sampling slot plus a
 // TEX_MODULATE instruction after its producer), so a 32-node graph carrying one is 33 encoded
 // instructions and must be refused by CanExecute (and by the DAG planner that consults it) —
@@ -1458,8 +1458,7 @@ TGFX_TEST(AOTEffectTest, ComputedInputExpansionCountsTowardSlotBudget) {
     AOTEffectGraph graph = {};
     AOTEffectPlan plan = {};
     // The DAG planner consults CanExecute: a budget overrun must surface as a planning refusal.
-    return AOTEffectDecomposer::Lower(raw, &graph) &&
-           AOTEffectDecomposer::Decompose(graph, &plan);
+    return AOTEffectDecomposer::Lower(raw, &graph) && AOTEffectDecomposer::Decompose(graph, &plan);
   };
   // mask(1) + computed-input image(1) + 29 matrices = 31 nodes, 32 encoded: accepted.
   EXPECT_TRUE(build(29));

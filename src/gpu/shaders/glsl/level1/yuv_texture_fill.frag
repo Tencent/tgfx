@@ -87,7 +87,7 @@ void main() {
 #else
   // The UV plane is an RG_88 texture. The runtime's read is texture(...).rgrg.ra — the ForRead
   // swizzle replicates (r, g) so .ra nets (U, V); the precompiled sampler is a plain RG8 binding
-  // with no swizzle, where .ra would read (U, 1) and pin V to alpha (audit A3-3: a fixed +0.5
+  // with no swizzle, where .ra would read (U, 1) and pin V to alpha (: a fixed +0.5
   // chroma offset on every NV12 draw, maxChannelDiff=71 over half the pixels). .rg reads (U, V)
   // directly on every backend's plain RG8 binding.
   yuv.yz = texture(TextureSampler_1, finalCoord).rg;

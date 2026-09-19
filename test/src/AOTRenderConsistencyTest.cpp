@@ -595,7 +595,7 @@ TGFX_TEST(AOTRenderConsistencyTest, TwoChildXferBlendFold) {
 TGFX_TEST(AOTRenderConsistencyTest, ProgramKeyColorCoverageBoundary) {
   // The program cache key does not encode the color/coverage boundary (numColorProcessors is
   // absent from buildProgramKey), so two draws with identical processor sequences but different
-  // boundaries share one cache entry. Verification result (2026-09-14, JIT and AOT both): the
+  // boundaries share one cache entry. Verification result (JIT and AOT both): the
   // Xfermode uniform layout makes the reuse self-consistent on this shape — its onSetData
   // writes the same uniform slots in either position — so no visible error is produced. This
   // test stays as a regression fence: any future layout asymmetry between the color and
@@ -903,7 +903,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AtlasTextGradientFold) {
   ExpectBitmapsIdentical("atlas-text-gradient-fold", aotBitmap, runtimeBitmap, 200, 100);
 }
 
-// Counterexample audit A2-3 (2026-09-19, batch 1 residue), fixed on the chain: atlas text under
+// fixed on the chain: atlas text under
 // a non-SrcOver blend mode. The glyph mask is TRUE coverage in the runtime composite (the probe's
 // pre-fix red light measured maxChannelDiff=255 over 11485 bytes when the chain folded it into
 // the source with coverage 1), unlike a MaskFilter's source-modulating mask. The builder now
@@ -1400,7 +1400,7 @@ TGFX_TEST(AOTRenderConsistencyTest, DecompositionSwitchControlsDirectDrawEntry) 
   ExpectBitmapsIdentical("decomposition-switch-direct-entry", onBitmap, offBitmap, 240, 240);
 }
 
-// Bundle identity and program-cache generations (audit F04/F06). Sequence A: draw without a
+// Bundle identity and program-cache generations (4/F06). Sequence A: draw without a
 // bundle first (a JIT program occupies the cache key), then load — the load must invalidate
 // that program so the redraw creates and caches the AOT program (previously the JIT program
 // kept occupying the key). Sequence B: unload — the cached AOT program must not be served
@@ -1636,7 +1636,7 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailOverBudgetPlansRefused) {
 
 // Shared driver for the offscreen counterexamples below: renders an FP tree through
 // fillRTWithFP (the offscreen materialization route) with and without the bundle. Multi-pass
-// tail plans are refused on every route (audit D5: a discontinuous operator reading an RGBA8
+// tail plans are refused on every route (: a discontinuous operator reading an RGBA8
 // materialized input can flip its step() decision), so these trees — all over the tail
 // budget — record the rejection boundary: the runtime reference serves the fill
 // (byte-identical, one program build, no AOT draw), and any of the multi-pass invocation
@@ -1868,7 +1868,7 @@ TGFX_TEST(AOTRenderConsistencyTest, PlanExecutionFailureIsRecordedNotFatal) {
   EXPECT_EQ(healthy.kernelInvocations, 1u);
 }
 
-// Counterexample audit D5: a discontinuous operator (AlphaThreshold) whose input is produced by
+// a discontinuous operator (AlphaThreshold) whose input is produced by
 // matrices over a device-space source, through the offscreen tail route. The exact-rational
 // construction: the source is black, a matrix scales alpha to 513/1024, the threshold is
 // 1027/2048. Direct evaluation keeps alpha at 513/1024 < 1027/2048, so step() yields 0; after
@@ -1980,7 +1980,7 @@ TGFX_TEST(AOTRenderConsistencyTest, LongLinearChainExecutesMaterializedTailPasse
                                            1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
   // 15/16/17 probe the old capacity boundary (all single-pass now that the chain kernel carries
   // 32 instructions). 33 crosses the boundary: multi-pass tail plans are refused on every route
-  // (audit D5 — a discontinuous operator reading an RGBA8 materialized input can flip its
+  // ( — a discontinuous operator reading an RGBA8 materialized input can flip its
   // step() decision), so the draw falls back to the runtime path — still correct, byte-identical
   // to the reference, just not AOT-served. The offscreen rejection boundary is recorded by
   // OffscreenTailOverBudgetPlansRefused and OffscreenThresholdAcrossBoundaryFlips.
@@ -2070,7 +2070,7 @@ TGFX_TEST(AOTRenderConsistencyTest, NonTrivialLinearChainLengthMatrixMatchesRunt
     // Metal: the MSL compiler fuses the kernel's interpreted arithmetic differently from the
     // runtime's unrolled expressions, so a single pixel may round 1 LSB apart; OpenGL
     // byte-matches both structures.
-    // P6.2 ATTRIBUTION (2026-09-18): verified by strict-zero experiment on the rebuilt new-ABI
+    // Attribution: verified by strict-zero experiment on the rebuilt new-ABI
     // bundle — the Metal divergence is real and tiny (maxChannelDiff=1, 1 byte of 65536),
     // consistent with an fma-scheduling rounding difference between the interpreted kernel and
     // the runtime's unrolled expressions; a structural error would break the bound long before.
@@ -3083,7 +3083,7 @@ TGFX_TEST(AOTRenderConsistencyTest, YUVSourceReportsItsPlanesToChainPlanning) {
   EXPECT_FALSE(generatorProxy->mayUploadYUV());
 }
 
-// Counterexample audit P4.3: a YUV video frame drawn with a paint color filter (the video
+// a YUV video frame drawn with a paint color filter (the video
 // player's color-grade path). The YUVTextureFillShader kernel carries three pointwise slots
 // after its plane conversion, and the DecomposeYUVChain planner folds the Compose(YUV texture,
 // matrix) tree onto them, so the color-grade draw rides the precompiled route in one fused pass.
@@ -3155,7 +3155,7 @@ TGFX_TEST(AOTRenderConsistencyTest, YUVImageWithColorFilterMatchesRuntime) {
   ExpectBitmapsIdentical("yuv-image-with-color-filter", candidate, reference, size, size);
 }
 
-// Counterexample audit A3-3 (2026-09-19, batch 2): NV12's UV plane is an RG_88 texture whose
+// : NV12's UV plane is an RG_88 texture whose
 // runtime read applies the ForRead swizzle (rgrg) before .ra — netting (U, V) — while the
 // precompiled kernel's `texture(...).ra` reads the raw RG8 sample (U, 1): V is pinned to the
 // alpha (1) instead of the V texel, so every NV12 draw on the precompiled route carries a fixed
@@ -3229,7 +3229,7 @@ TGFX_TEST(AOTRenderConsistencyTest, NV12ImageWithColorFilterMatchesRuntime) {
   ExpectBitmapsIdentical("nv12-image-with-color-filter", candidate, reference, size, size);
 }
 
-// Counterexample audit A1 (2026-09-19, batch 3), red light -> admission rule: the blend retry's
+// red light -> admission rule: the blend retry's
 // materialization boundary flips a downstream threshold. Two gradients exceed the chain's
 // single-gradient budget, so the DAG planner refuses the original tree and the in-plan retry
 // rebuilt it with both children flattened to RGBA8 textures; the sweep gradient's alpha
@@ -3273,7 +3273,7 @@ TGFX_TEST(AOTRenderConsistencyTest, BlendRetryMaterializationFlipsThreshold) {
     Paint paint = {};
     paint.setShader(blend);
     // 1027/2048 = 0.50146484375 sits exactly between the float value 513/1024 = 0.5009765625
-    // and its RGBA8 rounding 128/255 = 0.50196078431: the exact-rational gap from audit D5.
+    // and its RGBA8 rounding 128/255 = 0.50196078431: an exact-rational grid gap.
     paint.setColorFilter(ColorFilter::AlphaThreshold(1027.0f / 2048.0f));
     canvas->drawRect(Rect::MakeWH(size, size), paint);
     context->flushAndSubmit(true);
@@ -3313,7 +3313,7 @@ TGFX_TEST(AOTRenderConsistencyTest, BlendRetryMaterializationFlipsThreshold) {
   ExpectBitmapsIdentical("blend-retry-materialization-flip", candidate, reference, size, size);
 }
 
-// Counterexample audit A3-1 (2026-09-19, batch 2), reachability ruling + regression fence: the
+// reachability ruling + regression fence: the
 // runtime's RepeatLinearNone sampling reads the opposite edge texel and mixes it by the clamp
 // error at every wrap seam (.75B + .25A at a quarter-texel error); the chain's tiled leaf
 // previously had no seam read, so every tile edge snapped to the clamped edge texel. The kernel
@@ -3403,9 +3403,9 @@ TGFX_TEST(AOTRenderConsistencyTest, TiledRepeatLinearSeamBlendOnChain) {
   ExpectBitmapsIdentical("tiled-repeat-linear-seam", candidate, reference, size, size);
 }
 
-// Counterexample audit A3-1, blur-product probe (2026-09-19, batch 2): the blur kernel already
+// The blur kernel already
 // carries its own per-tap seam blend (gaussian_blur_1d.frag, ported from the runtime emission),
-// so the A3-1 gap was the CHAIN's tiled leaf alone — now closed by the same port. This probe
+// so the gap was the CHAIN's tiled leaf alone — now closed by the same port. This probe
 // tried to reach the chain's tiled leaf through a makeWithFilter(Blur(Repeat)) product: the
 // blur's intermediate wrap rides the blur kernel (seam-blended), and the product's final
 // backing is Exact with a full-span subset, so the outer draw resolves to the hardware wrap —
@@ -4525,7 +4525,7 @@ TGFX_TEST(AOTRenderConsistencyTest, MultiPassUnsupportedSourceFallsBackAtomicall
                          height);
 }
 
-// Counterexample audit B1: an alpha-only image as a two-child blend operand under a non-white
+// an alpha-only image as a two-child blend operand under a non-white
 // paint. The runtime's two-child xfer emission feeds each child vec4(inputColor.rgb, 1.0), and
 // GLSLTextureEffect's alpha-only readback is sample.a * inputColor — so the mask is TINTED by the
 // paint RGB. The chain kernel's alpha-only leaf only splats .r and multiplies by the unit's alpha
@@ -4588,7 +4588,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyBlendOperandKeepsPaintTint) {
     renderScene(&candidate);
     cache->unload();
   }
-  // P6.2 ATTRIBUTION (2026-09-18): verified by strict-zero experiment on the rebuilt new-ABI
+  // Attribution: verified by strict-zero experiment on the rebuilt new-ABI
   // bundle — the Metal divergence is real and tiny (maxChannelDiff=1, 9 bytes of 36864),
   // consistent with an fma-scheduling rounding difference between the interpreted kernel and
   // the runtime's unrolled expressions. The tolerance stays 1 on Metal only, zero elsewhere.
@@ -4596,7 +4596,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyBlendOperandKeepsPaintTint) {
                     std::string(TGFX_BACKEND_NAME) == "metal" ? 1 : 0);
 }
 
-// Counterexample audit B1, part two: an alpha-only image as the color root under a non-white
+// an alpha-only image as the color root under a non-white
 // paint. The runtime feeds the root processor the GP's full output color, and GLSLTextureEffect's
 // alpha-only readback is sample.a * inputColor — so the mask is TINTED by the paint RGB. The
 // chain kernel's color-root alpha-only leaf must therefore modulate by the geometry color's RGB
@@ -4672,7 +4672,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyColorRootKeepsPaintTint) {
   ExpectBitmapsIdentical("alpha-only-color-root-tint", candidate, reference, size, size);
 }
 
-// Counterexample audit D1: the alpha-only color root under a paint alpha below 1. The runtime
+// the alpha-only color root under a paint alpha below 1. The runtime
 // readback is sample.a * inputColor, so a half-transparent red paint (premul (0.5, 0, 0, 0.5))
 // over a constant 0x80 mask must yield exactly (0.25, 0, 0, 0.25) — byte (64, 0, 0, 64). The
 // kernel's current selector combination multiplies the splat by the geometry RGB first (bit 3)
@@ -4762,7 +4762,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyColorRootPaintAlphaBelowOne) {
   ExpectBitmapsIdentical("alpha-only-color-root-paint-alpha", candidate, reference, size, size);
 }
 
-// Counterexample audit D3: a single-child xfer whose child contains a two-child blend, reached
+// a single-child xfer whose child contains a two-child blend, reached
 // through public APIs by drawMesh with vertex colors and a blend shader. The mesh route wraps
 // the shader in a Modulate SrcChild xfer whose child lowers from the white input, and the child
 // (the two-child BlendShader) previously refused that white input — an expression gap, not a
@@ -4832,7 +4832,7 @@ TGFX_TEST(AOTRenderConsistencyTest, MeshColorBlendShaderWithTwoChildBlend) {
   ExpectBitmapsIdentical("mesh-color-blend-shader-two-child", candidate, reference, size, size);
 }
 
-// Counterexample audit D4: an alpha-only image drawn with a paint that carries a shader.
+// an alpha-only image drawn with a paint that carries a shader.
 // GetBrushForImage keeps the shader for alpha-only images, so the draw carries two color FPs —
 // the A8 image's texture first, the paint shader's texture second, the second consuming the
 // first's output as its runtime input (sample * input.a). The chain previously refused the
@@ -4904,7 +4904,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyImageWithPaintShaderMatchesRuntime)
   ExpectBitmapsIdentical("alpha-only-image-with-paint-shader", candidate, reference, size, size);
 }
 
-// Counterexample audit P2.3, end to end: an alpha-only image drawn with a paint whose shader is
+// an alpha-only image drawn with a paint whose shader is
 // a BlendShader. The color chain carries [A8 texture, two-child blend over the blend shader's
 // children], so the blend's xfer input is the mask texture's computed output. The runtime
 // feeds the children vec4(C.rgb, 1.0) and re-multiplies the blend result by C.a; the chain
@@ -4980,7 +4980,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyImageWithBlendShaderMatchesRuntime)
   ExpectBitmapsIdentical("alpha-only-image-with-blend-shader", candidate, reference, size, size);
 }
 
-// Counterexample audit B3: two stacked analytic AA clips over an AA oval. The coverage subtree is
+// two stacked analytic AA clips over an AA oval. The coverage subtree is
 // a two-level analytic chain (RectEffect x2) while the GP emits a fractional coverage at the oval
 // edge. The chain must keep the GP coverage as the chain's starting unit: at pixels where both
 // clips evaluate to 1 but the oval edge is half covered, the final coverage must stay ~0.5, not
@@ -5016,7 +5016,7 @@ TGFX_TEST(AOTRenderConsistencyTest, StackedClipsKeepGPCoverageOnAAEdge) {
     cache->unload();
     ScopedAOTDeliberateMiss deliberate(context);
     renderScene(&reference);
-    // Non-vacuity (batch 0): the oval's AA rim must actually produce fractional pixels — an
+    // Non-vacuity: the oval's AA rim must actually produce fractional pixels — an
     // all-or-nothing image would prove nothing about fractional coverage handling.
     EXPECT_GT(CountFractionalAlphaPixels(reference), 0u);
   }
@@ -5032,7 +5032,7 @@ TGFX_TEST(AOTRenderConsistencyTest, StackedClipsKeepGPCoverageOnAAEdge) {
   ExpectBitmapsIdentical("stacked-clips-gp-coverage", candidate, reference, size, size);
 }
 
-// Counterexample audit D2, end-to-end reachability ruling: the D2 defect (a chained analytic
+// the defect (a chained analytic
 // coverage whose first node reads opaque white instead of the GP coverage unit, silently
 // dropping the GP coverage) is verified constructively in AOTEffectTest
 // (ChainedRectCoverageFeedsFromUnitCoverage asserts the -3 unit designator). Reaching it end to
@@ -5106,7 +5106,7 @@ TGFX_TEST(AOTRenderConsistencyTest, ChainedAnalyticClipsOnAAPathRecordsFallbackB
                          size);
 }
 
-// Counterexample audit D1: program identity. Three draws in one context whose color trees share
+// program identity. Three draws in one context whose color trees share
 // the same variant (same GP layout, one texture leaf, no XP difference) but differ only in the
 // instruction sequence (one matrix vs two matrices vs luma). The program key must collapse to the
 // artifact/pipeline identity — the instruction structure is per-draw uniform data — so all three
@@ -5204,7 +5204,7 @@ TGFX_TEST(AOTRenderConsistencyTest, SameVariantDifferentChainsShareProgram) {
   ExpectBitmapsIdentical("shared-program-chain-three", three, refThree, size, size);
 }
 
-// Counterexample audit P5: true A-B-A interleaving. The A->B->C shape above cannot expose a
+// true A-B-A interleaving. The A->B->C shape above cannot expose a
 // program whose uniform state was polluted by an intervening draw: only A's SECOND appearance
 // proves the per-draw upload fully rewrites whatever B left behind. Two same-variant chains
 // (one matrix vs luma) alternate A, B, A: one artifact creation, two cache hits (the second A
@@ -5293,7 +5293,7 @@ TGFX_TEST(AOTRenderConsistencyTest, ABAInterleavedDrawsReuseProgramWithoutStateL
   ExpectBitmapsIdentical("aba-self-consistent", a2, a1, size, size);
 }
 
-// Counterexample audit B2: a single-child blend operand wrapping a Compose-shaped child. drawMesh
+// a single-child blend operand wrapping a Compose-shaped child. drawMesh
 // with vertex colors wraps the brush shader's FP in a SrcChild(Modulate) xfer (OpsCompositor).
 // The runtime feeds that child white, and Compose passes its own input through to its first
 // child, so the texture samples raw. The chain's whiteInputOperand marking only covers the
@@ -5367,7 +5367,7 @@ TGFX_TEST(AOTRenderConsistencyTest, MeshVertexColorsWithComposedShaderChildInput
   ExpectBitmapsIdentical("mesh-vertex-colors-composed-child", candidate, reference, size, size);
 }
 
-// Counterexample audit B5: coefficient-blend clamp asymmetry under out-of-range leaf values.
+// coefficient-blend clamp asymmetry under out-of-range leaf values.
 // Gradient stops accept unclamped float colors. The runtime's AppendCoeffBlend clamps the blend
 // result (GLSLBlend.cpp Add/Subtract operations) while the chain kernel's xpBlendColors does not,
 // so an out-of-range stop reaches the following color matrix unclamped on the chain path: the
@@ -5449,7 +5449,7 @@ TGFX_TEST(AOTRenderConsistencyTest, OutOfRangeGradientStopBlendClampOrder) {
   ExpectBitmapsIdentical("out-of-range-stop-blend-clamp", candidate, reference, size, size);
 }
 
-// Counterexample audit B4, part one: fractional GP coverage against an opaque background across
+// fractional GP coverage against an opaque background across
 // blend modes. The AA oval edge carries fractional coverage c, so the final composite must be
 // O = c*Blend(S,D) + (1-c)*D — an opaque blue destination makes the (1-c)*D term visible and
 // Multiply/Darken exercise the dst-reading XP path while Src/SrcOver take the fixed-function
@@ -5508,7 +5508,7 @@ TGFX_TEST(AOTRenderConsistencyTest, CoverageBlendModesOnOpaqueBackground) {
   }
 }
 
-// Counterexample audit B4, part two: a mask-sourced fractional coverage under the same blend
+// a mask-sourced fractional coverage under the same blend
 // matrix. The MaskFilter's shader alpha provides the coverage (a linear alpha gradient 0..1 over
 // the rect), so the draw carries no GP coverage varying but still composites with fractional c.
 // This is the mask application point of the chain kernel (device mask / coverage subtree) against
@@ -5571,7 +5571,7 @@ TGFX_TEST(AOTRenderConsistencyTest, MaskCoverageBlendModesOnOpaqueBackground) {
   }
 }
 
-// Counterexample audit B3, remaining combination: the GP's own fractional AA coverage and a
+// the GP's own fractional AA coverage and a
 // shader mask coexisting on one draw. The ellipse layout's per-pixel edge coverage is evaluated
 // ahead of the chain and feeds the coverage subtree's unit input, so the blend-rooted subtree
 // (the mask shader) rides the chain with the GP coverage folded in at the unit — the draw must
@@ -5608,7 +5608,7 @@ TGFX_TEST(AOTRenderConsistencyTest, GPCoverageAndMaskCoexistOnAAEdge) {
     cache->unload();
     ScopedAOTDeliberateMiss deliberate(context);
     renderScene(&reference);
-    // Non-vacuity (batch 0): a control render WITHOUT the mask proves the oval's own AA edge
+    // Non-vacuity: a control render WITHOUT the mask proves the oval's own AA edge
     // produces fractional coverage — otherwise the fractional pixels in the main render could
     // come from the mask gradient alone, and the GP-coverage handling would be untested.
     Bitmap control = {};
@@ -5650,7 +5650,7 @@ TGFX_TEST(AOTRenderConsistencyTest, GPCoverageAndMaskCoexistOnAAEdge) {
   ExpectBitmapsIdentical("gp-coverage-and-mask-coexist", candidate, reference, size, size);
 }
 
-// Counterexample audit A2-1 (2026-09-19, batch 1 residue), fixed on the chain: a chain-served
+// fixed on the chain: a chain-served
 // draw under an AA analytic clip with a Src blend mode. Coverage compositing must attenuate the
 // DESTINATION outside the clip — the edge pixel is c*S+(1-c)*D — but coverage folding used to
 // bake the clip into the color root and hand the XP a pre-attenuated source (maxChannelDiff=192
@@ -5716,7 +5716,7 @@ TGFX_TEST(AOTRenderConsistencyTest, NarrowAAClipWithSrcBlendKeepsDstOnEdge) {
   ExpectBitmapsIdentical("narrow-aa-clip-src-blend", candidate, reference, size, size);
 }
 
-// Counterexample audit B6, redone as a parameter matrix: an alpha-only color matrix over a source
+// an alpha-only color matrix over a source
 // with varying alpha and a paint with varying alpha, on a transparent target. The bias>0 matrix
 // affects transparent black (ColorFilterShader wraps in SrcIn(composed, alphaSource) — the
 // original shader's alpha masks the filtered color so transparent regions stay transparent),
@@ -5724,7 +5724,7 @@ TGFX_TEST(AOTRenderConsistencyTest, NarrowAAClipWithSrcBlendKeepsDstOnEdge) {
 // paint alpha. The identity-alpha control isolates the bias contribution: only the alpha row
 // differs between the two matrices of each pair.
 //
-// AUDIT RULING (2026-09-18, batch 0): evidence insufficient, conclusion withdrawn. The claimed
+// evidence insufficient, conclusion withdrawn. The claimed
 // SrcIn-wrap-versus-Compose contrast is never actually constructed here: the makeWithColorFilter
 // merge that produces the SrcIn wrap only happens when brush.shader is set (OpsCompositor's
 // affectsTransparentBlack branch), and this scene builds the brush through drawImage +
@@ -5841,7 +5841,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaBiasMatrixSourceAlphaMatrix) {
   }
 }
 
-// Counterexample audit D, boundary probe one: do two different images under the same effect
+// Boundary probe one: do two different images under the same effect
 // structure share one program? The processor key aggregates per-sampler texture keys, which only
 // carry the format and type (TextureView::ComputeTextureKey) — not the texture identity — so two
 // RGBA_8888 2D images with the same effect chain must reuse the same program. This records the
@@ -5914,7 +5914,7 @@ TGFX_TEST(AOTRenderConsistencyTest, DifferentImagesSameEffectShareProgram) {
   const_cast<Bitmap&>(two).unlockPixels();
 }
 
-// Counterexample audit D, boundary probe two: does a two-image blend (two leaves) share a
+// Boundary probe two: does a two-image blend (two leaves) share a
 // program with a single-image draw (one leaf) when both map to the same four-sampler artifact?
 // The child-count difference in the processor key may split them; this records the behavior.
 TGFX_TEST(AOTRenderConsistencyTest, DifferentLeafCountsShareVariant) {
@@ -5991,7 +5991,7 @@ TGFX_TEST(AOTRenderConsistencyTest, DifferentLeafCountsShareVariant) {
   EXPECT_NE(doubled.isEmpty(), true);
 }
 
-// Counterexample audit E1: blurring an alpha-only source through the real ImageFilter path.
+// blurring an alpha-only source through the real ImageFilter path.
 // The blur pipeline materializes the alpha-only source into an ALPHA_8 intermediate
 // (Swizzle=aaaa) and draws GaussianBlur1D(TiledTextureEffect) onto it. The kernel carries the
 // alpha-only child semantics (the AlphaChild splat mirrors the runtime's
@@ -6075,17 +6075,17 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyImageBlurMatchesRuntime) {
   }
 }
 
-// Counterexample audit F1: the threshold operator straddling a materialization pass boundary
+// the threshold operator straddling a materialization pass boundary
 // under quantization-sensitive input. The offscreen fill drives a 34-instruction tree (texture,
 // 16 matrices, threshold, 16 matrices) — formerly through a 17-pass tail plan with the
 // threshold executing mid-chain over an RGBA8 materialized intermediate.
 //
-// AUDIT RULING (2026-09-18, batch 0): evidence insufficient — the sweep source violates the
+// evidence insufficient — the sweep source violates the
 // premul invariant and the identity alpha rows never let the step() decision flip, so the old
 // maxDiff<=1 pass proved nothing.
 //
-// RULING UPDATE (2026-09-18, batch 3 / P3.2): multi-pass tail plans are refused on every route
-// (audit D5: a discontinuous operator reading an RGBA8 materialized input can flip its step()
+// multi-pass tail plans are refused on every route
+// (: a discontinuous operator reading an RGBA8 materialized input can flip its step()
 // decision — a 255-LSB divergence no tolerance bounds; see
 // OffscreenThresholdAcrossBoundaryFlips for the exact-rational proof). Rebuilding the scene as
 // a "valid" quantization probe is moot: the risk class no longer executes. This test now
@@ -6193,17 +6193,17 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailThresholdQuantizationBand) {
   ExpectBitmapsIdentical("offscreen-tail-threshold-refused", candidate, reference, 64, 64);
 }
 
-// Counterexample audit F2: materialized multi-pass sampling under translation, magnification,
+// materialized multi-pass sampling under translation, magnification,
 // and minification with mipmap filtering. The offscreen fill drives a 36-instruction tree (a
 // device-space texture source with a transform-carrying uvMatrix plus 35 matrices) — formerly
 // through an 18-pass tail plan where every source sample rode a materialization chain.
 //
-// AUDIT RULING (2026-09-18, batch 0): evidence insufficient — the "minify-mipmap" case never
+// evidence insufficient — the "minify-mipmap" case never
 // executed mipmap sampling (no sampler override, no mip levels), so the old maxDiff<=3 pass
 // said nothing about sampling across materialization boundaries.
 //
-// RULING UPDATE (2026-09-18, batch 3 / P3.2): multi-pass tail plans are refused on every route
-// (audit D5 ruling; see OffscreenThresholdAcrossBoundaryFlips). Sampling across materialized
+// multi-pass tail plans are refused on every route
+// ( ruling; see OffscreenThresholdAcrossBoundaryFlips). Sampling across materialized
 // intermediates no longer executes at all, so re-probing it with a real mipmap sampler is moot.
 // This test now records the rejection boundary under every transform: the runtime reference
 // serves the fill, byte-identical.

@@ -195,7 +195,7 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
         pass.materializesOutput || pass.nodes.empty() || !pass.dependencies.empty()) {
       return false;
     }
-    // Final encoded-instruction budget (audit A6): the node count underestimates what the
+    // Final encoded-instruction budget (): the node count underestimates what the
     // builder emits. A computed-input texture occupies TWO slots (a raw sampling slot plus a
     // TEX_MODULATE instruction following its producer), so the admission check must count the
     // expansion — a graph of exactly MaxSlots nodes with one computed-input texture would pass

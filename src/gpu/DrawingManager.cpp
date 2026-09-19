@@ -130,7 +130,7 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
     // Only single-pass plans may route to the precompiled kernels. A multi-pass tail plan
     // materializes RGBA8 intermediates: every boundary quantizes to the 1/255 grid, and a
     // discontinuous operator (AlphaThreshold) reading a materialized input can flip its step()
-    // decision outright (audit D5, exact-rational counterexample) — a divergence no tolerance
+    // decision outright (exact-rational counterexample) — a divergence no tolerance
     // can bound. Over-budget chains keep the runtime reference everywhere (the on-screen route
     // already refuses them), which evaluates the whole tree in one shader at float precision.
     if (kernelRoutable && taskPlan.passes.size() == 1) {
@@ -142,7 +142,7 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
     return nullptr;
   };
   // P4 group three: the retry-warranted verdict must be taken before the processor is moved into
-  // the plain draw op below. ADMISSION RULE (audit A1): a tree carrying a discontinuous operator
+  // the plain draw op below. ADMISSION RULE (): a tree carrying a discontinuous operator
   // (the proven class: AlphaThreshold — a stored byte rounding across the threshold's grid gap
   // flips step() by 255 LSBs; BlendRetryMaterializationFlipsThreshold) must never be
   // materialized; the fill then keeps its original processor and the runtime's float evaluation
@@ -206,7 +206,7 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
       }
       // The chain route cannot serve the materialized tree either: drop the retry result. The
       // plain draw op below still carries the fill's ORIGINAL processor — the reference
-      // semantics (audit A4: the pre-fix swap replaced it with the materialized tree, baking a
+      // semantics (: the pre-fix swap replaced it with the materialized tree, baking a
       // quantization boundary into the fill that the reference never had). The rebuild's
       // materialization fills render unconsumed (wasted work, no pixel effect).
     }

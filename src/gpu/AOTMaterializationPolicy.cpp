@@ -28,7 +28,7 @@ static bool FPSubtreeContainsFlipRisk(const FragmentProcessor* fp) {
     return false;
   }
   // The threshold processor's runtime name (AlphaThresholdFragmentProcessor::name) — the
-  // discontinuous step() is the proven flip class (audit A1).
+  // discontinuous step() is the proven flip class ().
   if (fp->name() == "AlphaStepFragmentProcessor") {
     return true;
   }

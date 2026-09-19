@@ -516,7 +516,7 @@ TGFX_TEST(AOTCoverageGateTest, DeliberateScopeRestoresNestedState) {
   EXPECT_FALSE(cache->deliberateMissMarking());
 }
 
-// Negative control for the blocking summary gate (audit F10): when TGFX_AOT_TEST_INJECT_MISS is
+// Negative control for the blocking summary gate (0): when TGFX_AOT_TEST_INJECT_MISS is
 // set, this test renders one filtered draw without the bundle and without the stats pause, so
 // its runtime compilation lands in the production metrics. With
 // TGFX_AOT_COVERAGE_GATE=blocking also set, the suite-level summary must then fail the process

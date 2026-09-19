@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-// P7 performance matrix (plan v3, batch 7). Five scenario families, each measured cold (first
+// Performance matrix:  Five scenario families, each measured cold (first
 // frame after a program-cache wipe) and hot (steady state after warm-up), Release build, on both
 // routes — the precompiled AOT chain and the runtime stitching reference — so every number has a
 // like-for-like counterpart. The output is a table of medians over N_ROUNDS rounds; the raw
@@ -30,7 +30,7 @@
 //      length.
 //   2. Same layout, different effects: the program-reuse benefit (same variant, different
 //      instruction sequences).
-//   3. Mask/clip/blend short chains: the cost of the batch 1/2 semantic fixes.
+//   3. Mask/clip/blend short chains: the cost of the coverage/XP semantic fixes.
 //   4. Real materialization (dual gradients): passes, intermediate bytes, target switches.
 //   5. Control group: the runtime stitching route running the same scenes.
 
@@ -231,7 +231,7 @@ TGFX_TEST(AOTPerformanceMatrixTest, SameLayoutEffectReuse) {
   PrintResult("reuse-same-variant", "runtime", runtime);
 }
 
-// Scenario 3: mask/clip/blend short chains — the shapes the batch 1/2 fixes serve (alpha-only
+// Scenario 3: mask/clip/blend short chains — the shapes the coverage/XP fixes serve (alpha-only
 // color root under paint alpha, blend operands). Their steady-state cost carries the fix's
 // instructions.
 TGFX_TEST(AOTPerformanceMatrixTest, MaskClipBlendShortChain) {

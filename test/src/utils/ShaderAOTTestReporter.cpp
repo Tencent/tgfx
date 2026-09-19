@@ -47,7 +47,7 @@
 
 namespace tgfx {
 
-// Report identity binding (batch 0): every report must attribute itself to the exact artifact it
+// Report identity binding: every report must attribute itself to the exact artifact it
 // consumed. The git head is read once per process from the repository; the bundle identity comes
 // from the last context the pool can produce at write time. A report whose identity block is
 // missing or "unknown" cannot be cited as evidence for a specific HEAD.

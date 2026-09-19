@@ -54,7 +54,7 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   // subtree's root, which the builder routes here because the glyph mask is true coverage), while
   // the source stays unpremultiplied — compositing correctly for every blend mode (the kernel's
   // xpBlendWithCoverage carries the runtime's per-mode forms; folding coverage into the source
-  // was only equivalent for SrcOver — audits A2-1/A2-3).
+  // was only equivalent for SrcOver — folding coverage into the source was only correct for SrcOver).
   int ClipCoverageRegister;
   int SlotCount;
   // Per-leaf subset rects, named for the structural ordinals the TextureEffect writers use.
@@ -241,7 +241,7 @@ layout(set = 1, binding = NTEX) uniform sampler2D MaskTextureSampler;
 // crosses the subset edge, so blend with a sample at the opposite clamp edge (diagonal read when
 // both axes clamp). Mode 3 uses pixel-space coordinates, so the repeat reads scale by Dimension
 // exactly like tiledMapCoord's returned sample coord. Without this, every tile edge on the chain
-// route snaps to the clamped edge texel while the runtime blends (audit A3-1; the chain-side
+// route snaps to the clamped edge texel while the runtime blends (the chain-side
 // shape needs a subset-bearing tiled leaf, which the hardware wrap never produces).
 vec4 tiledSeamBlend(CHAIN_LEAF_SAMPLER texSampler, vec4 texColor, vec2 subsetCoord,
                     vec2 clampedCoord) {
@@ -425,7 +425,7 @@ void main() {
   // with every coverage form (clips, device mask, the coverage subtree) premultiplied into the
   // source — composites correctly only for SrcOver-class blending. The TRUE coverage forms (the
   // clip product and the device mask) now ride C with the unpremultiplied source, compositing
-  // through the per-mode forms like every other layout (audits A2-1/A2-3). A MaskFilter's
+  // through the per-mode forms like every other layout (the clip-fold and atlas defects). A MaskFilter's
   // coverage subtree stays in the source: the runtime itself modulates the source with it, so
   // blend(c*S, D) — not c*blend(S,D) + (1-c)*D — is the matching semantics there.
   vec4 noCovCoverage = clipCoverage * vec4(deviceMask);

@@ -1398,7 +1398,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     // The fold's clip coverage rides the chain kernel's clip-coverage channel (composited as the
     // XP's coverage input — see ClipCoverageRegister in pointwise_chain.frag), so it is correct
     // for every mode the dst-texture gate below admits; the geometric-clip restriction of the
-    // A2-1 interim guard is gone. (The gate itself keeps dst-reading modes like Src+coverage on
+    // interim blend-mode guard is gone. (The gate itself keeps dst-reading modes like Src+coverage on
     // the plain route with their PorterDuff XP, where the chain's C input composites them.)
     bool foldMask = !foldBlocked && foldedProcessors.size() > colorProcessors.size() &&
                     !BlendModeNeedDstTexture(brush.blendMode, true);
@@ -1439,7 +1439,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
         // SrcOver-class XP, where a trailing coverage multiply is pixel-equivalent) but NOT
         // for the color-only route below: it plans from the ORIGINAL color list (without the
         // coverage) while the op no longer carries any coverage, so a successful plan would
-        // silently drop the mask/clip (audit A5-4). Go straight to the plain route.
+        // silently drop the mask/clip (). Go straight to the plain route.
         drawOps.emplace_back(std::move(op));
         return;
       }
@@ -1493,10 +1493,10 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
       // The chain route is retried first (coverage-free draws only, matching the main path's
       // constraint); when it cannot serve the materialized tree, the original op is kept as-is
       // and the plain route below serves it with its ORIGINAL processors — a failed retry must
-      // never leave a rewritten (materialized) tree on the draw (audit A4: the pre-fix swap
+      // never leave a rewritten (materialized) tree on the draw (: the pre-fix swap
       // replaced the original with the materialized tree, so even the fallback executed a
       // quantization boundary the reference never had).
-      // ADMISSION RULE (audit A1): the materialization boundary is an RGBA8 quantization step. A
+      // ADMISSION RULE (): the materialization boundary is an RGBA8 quantization step. A
       // tree carrying a discontinuous operator (the proven class: AlphaThreshold — a stored byte
       // rounding across the threshold's grid gap flips step() by 255 LSBs;
       // BlendRetryMaterializationFlipsThreshold) must never be materialized: refuse the retry
@@ -1564,7 +1564,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
               // The chain route cannot serve the materialized tree (no chain variant for this
               // geometry processor, or the draw carries GP coverage). The original op still
               // carries its untouched processors: drop the retry result and let the plain route
-              // below serve the ORIGINAL tree — the reference semantics (audit A4: the pre-fix
+              // below serve the ORIGINAL tree — the reference semantics (: the pre-fix
               // swap replaced the original with the materialized tree, so the fallback executed
               // a quantization boundary the reference never had, and a JIT of the swapped tree
               // baked that boundary into the cached program). The materialization fills the

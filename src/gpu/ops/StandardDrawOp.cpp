@@ -109,7 +109,7 @@ std::shared_ptr<Program> StandardDrawOp::prepareDecomposedProgram(
   // narrow clip slots, the device mask, the atlas glyph subtree via the clip-coverage register,
   // analytic subtrees via CoverageRootIndex) composites as the XP's coverage input, while a
   // MaskFilter's source-modulating mask subtree keeps the CoverageRootIndex source route — so no
-  // blend-mode restriction remains here (the A2-1/A2-3 interim guards are gone; see
+  // blend-mode restriction remains here (the interim blend-mode guards are gone; see
   // NarrowAAClipWithSrcBlendKeepsDstOnEdge and AtlasTextNonSrcOverBlendKeepsDstProbe).
   std::vector<const FragmentProcessor*> coverageFPs = {};
   std::vector<PlacementPtr<FragmentProcessor>> ownedChainCoverageFPs = {};
@@ -221,7 +221,7 @@ std::shared_ptr<Program> StandardDrawOp::prepareDecomposedProgram(
 bool StandardDrawOp::prepareForTask(RenderTarget* renderTarget, ProgramLookupMode mode,
                                     std::optional<ColorProcessorList> colorOverride) {
   // Mirror execute()'s ordering: onPrepare() may veto the op (empty asynchronous buffers);
-  // skipping it here would leave those ops drawing from null resources (audit A5-1).
+  // skipping it here would leave those ops drawing from null resources ().
   if (!onPrepare()) {
     return false;
   }

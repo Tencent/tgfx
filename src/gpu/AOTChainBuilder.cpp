@@ -520,7 +520,7 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
           // A leaf in the coverage subtree modulates by the coverage unit's alpha (bit 2) whenever
           // its input IS the unit — root or not. The runtime coverage-FP readback (tex * input.a)
           // applies wherever the mask sits in the subtree, so the modulation must not depend on
-          // which node consumes it (audit A2-2: a non-root mask dropped the GP coverage; with GP
+          // which node consumes it (: a non-root mask dropped the GP coverage; with GP
           // coverage q=.5, mask m=.5 and an inner rect, the chain produced m*r instead of q*m*r).
           // The unit is the coverage graph's node 0 (addGeometryCoverage runs first), so within
           // the coverage graph (combined >= colorCount) an input index of 0 is exactly the unit.
@@ -779,7 +779,7 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
   // from the coverage unit through clipChainInput; early-fold clips arrive differently — the
   // fold routes the clip coverage into the color graph as a RectCoverage/RRectCoverage trailing
   // suffix multiplying the root. Geometric coverage must ride the XP's coverage input instead of
-  // the source (audit A2-1), so pop that suffix and rewire it like the narrow clip slots: the
+  // the source (), so pop that suffix and rewire it like the narrow clip slots: the
   // innermost link chains from the unit, outer links chain upward, the color root moves to the
   // node under the suffix, and the outermost link's register becomes the clip-coverage value.
   int clipCoverageSlot = -1;
@@ -882,7 +882,7 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
   // The narrow clip slots no longer multiply the color root: they chain from the coverage unit
   // (-3, the innermost link) so their product is a pure coverage value the kernel reads through
   // ClipCoverageRegister and composites as the XP's coverage input — folding them into the
-  // source was only correct for SrcOver-class blending (audit A2-1). The color root stays the
+  // source was only correct for SrcOver-class blending (). The color root stays the
   // pre-clip result.
   if (clipSlots.deviceRect != nullptr) {
     if (slots.size() >= AOTPointwiseChainProcessor::MaxSlots) {
