@@ -5260,6 +5260,75 @@ TGFX_TEST(AOTRenderConsistencyTest, GPCoverageAndMaskCoexistOnAAEdge) {
   ExpectBitmapsIdentical("gp-coverage-and-mask-coexist", candidate, reference, size, size);
 }
 
+// Counterexample audit (2026-09-19, batch 1 / finding A2-1), fold-refusal boundary record: a
+// chain-served draw under an AA analytic clip with a Src blend mode. Coverage compositing must
+// attenuate the DESTINATION outside the clip — the edge pixel is c*S+(1-c)*D — but coverage
+// folding bakes the clip into the color root and hands the XP a pre-attenuated source, yielding
+// c*S (the background's half vanishes at the rim; the pre-fix red light measured maxChannelDiff=
+// 192 on the clip rim). The fold is therefore refused for every non-SrcOver-class XP at both the
+// OpsCompositor fold and the StandardDrawOp chain rewrite: the draw keeps its coverages and the
+// runtime route serves it. This test records that boundary: a zero fallback count here would mean
+// the gate opened and the destination attenuation must be re-verified before the fold returns.
+TGFX_TEST(AOTRenderConsistencyTest, NarrowAAClipWithSrcBlendRecordsFoldRefusal) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  constexpr int size = 96;
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_NE(image, nullptr);
+  std::array<float, 20> matrix = {0.5f, 0, 0, 0, 0, 0, 0.5f, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0};
+  auto renderScene = [&](Bitmap* outBitmap) {
+    auto surface = Surface::Make(context, size, size);
+    ASSERT_NE(surface, nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::Blue());
+    // An AA clip whose edge sits mid-image: pixels on the 10.5 boundary are half covered.
+    canvas->clipRect(Rect::MakeLTRB(10.5f, 10.5f, size - 10.5f, size - 10.5f), true);
+    auto shader = Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp);
+    ASSERT_NE(shader, nullptr);
+    Paint paint = {};
+    paint.setShader(shader);
+    paint.setColorFilter(ColorFilter::Compose(ColorFilter::Matrix(matrix), ColorFilter::Luma()));
+    paint.setBlendMode(BlendMode::Src);
+    canvas->drawRect(Rect::MakeWH(size, size), paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(size, size));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_NE(pixels, nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+  };
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  {
+    cache->unload();
+    ScopedAOTDeliberateMiss deliberate(context);
+    renderScene(&reference);
+  }
+  {
+    auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+    ASSERT_NE(bundleData, nullptr);
+    ASSERT_GT(bundleBytes, 0u);
+    ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+    cache->setDecompositionEnabled(true);
+    cache->setDiagnosticRecordingEnabled(true);
+    cache->resetStats();
+    context->globalCache()->resetProgramStats();
+    renderScene(&candidate);
+    // RULING: the coverage fold is refused for the Src XP, so the draw keeps its clip coverage
+    // and the plain route serves it — exactly one plain-matcher miss (the composed color filter
+    // has no plain rule) and one runtime program build. A zero here would mean the fold gate
+    // opened without the destination attenuation being verified.
+    EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 1u);
+    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 1u);
+    cache->setDiagnosticRecordingEnabled(false);
+    cache->unload();
+    context->globalCache()->clearPrograms();
+  }
+  ExpectBitmapsIdentical("narrow-aa-clip-src-blend", candidate, reference, size, size);
+}
+
 // Counterexample audit B6, redone as a parameter matrix: an alpha-only color matrix over a source
 // with varying alpha and a paint with varying alpha, on a transparent target. The bias>0 matrix
 // affects transparent black (ColorFilterShader wraps in SrcIn(composed, alphaSource) — the

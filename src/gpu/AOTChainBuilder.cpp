@@ -470,7 +470,6 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
     const size_t combined = ordered[index];
     auto node = nodes[combined];
     const size_t inputBase = combined < colorCount ? 0 : colorCount;
-    const bool isCoverageRoot = combined == covRootCombined;
     auto mapInput = [&](AOTNodeID input) {
       return MapChainInput(nodes, slotOf, inputBase + input.index());
     };
@@ -518,9 +517,16 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
           const bool inputIsGeometryColor =
               !node->inputs.empty() && inputBase == 0 && node->inputs[0] == AOTNodeID(0);
           slot.textureModulate = inputIsGeometryColor ? 1 : 0;
-          // A leaf that is the coverage subtree's root modulates by the coverage unit's alpha
-          // (bit 2), matching the runtime coverage-FP readback (tex * coverageIn.a).
-          if (isCoverageRoot && !node->inputs.empty() && node->inputs[0].index() == 0) {
+          // A leaf in the coverage subtree modulates by the coverage unit's alpha (bit 2) whenever
+          // its input IS the unit — root or not. The runtime coverage-FP readback (tex * input.a)
+          // applies wherever the mask sits in the subtree, so the modulation must not depend on
+          // which node consumes it (audit A2-2: a non-root mask dropped the GP coverage; with GP
+          // coverage q=.5, mask m=.5 and an inner rect, the chain produced m*r instead of q*m*r).
+          // The unit is the coverage graph's node 0 (addGeometryCoverage runs first), so within
+          // the coverage graph (combined >= colorCount) an input index of 0 is exactly the unit.
+          const bool inputIsCoverageUnit =
+              combined >= colorCount && !node->inputs.empty() && node->inputs[0].index() == 0;
+          if (inputIsCoverageUnit) {
             slot.textureModulateUnit = 1;
           }
           // Alpha-only leaves (e.g. shape masks) need the kernel to splat .r into all channels; the

@@ -96,6 +96,28 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, ProgramLookupMode mode,
 // their original funnel accounting. A single coverage FP is folded into the chain (an AA rect clip
 // as a coverage slot, a device-space alpha mask as the mask child, Compose(mask, rect) as both);
 // other coverage forms stay on their original route.
+// True when the coverage FP folds into the chain as geometric coverage (analytic clip slots or
+// the device mask child): analytic Rect/RRect leaves, alone or inside a composed clip chain, or a
+// device-space texture mask. These attenuate the destination in the runtime composite, so their
+// fold is restricted to SrcOver-class blending (see the guard in prepareDecomposedProgram).
+static bool ChainFoldCarriesGeometricCoverage(const FragmentProcessor* fp) {
+  if (fp == nullptr) {
+    return false;
+  }
+  const auto name = fp->name();
+  if (name == "RectEffect" || name == "RRectEffect" || name == "DeviceSpaceTextureEffect") {
+    return true;
+  }
+  if (name == "ComposeFragmentProcessor") {
+    for (size_t index = 0; index < fp->numChildProcessors(); ++index) {
+      if (ChainFoldCarriesGeometricCoverage(fp->childProcessor(index))) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 std::shared_ptr<Program> StandardDrawOp::prepareDecomposedProgram(
     RenderTarget* renderTarget, const ColorProcessorList& activeColors) {
   auto cache = renderTarget->getContext()->precompiledShaderCache();
@@ -104,6 +126,22 @@ std::shared_ptr<Program> StandardDrawOp::prepareDecomposedProgram(
   }
   if (MatchPermutation(preparedProgramInfo.get()).has_value()) {
     return nullptr;
+  }
+  // Coverage folding guard (audit A2-1, refined by MaskCoverageBlendModesOnOpaqueBackground):
+  // folding GEOMETRIC coverage (analytic clip slots — Rect/RRect chains — or the device mask
+  // child) into the chain bakes it into the source color, which composites correctly only for
+  // SrcOver-class blending; every other mode attenuates the destination by the coverage itself
+  // (Src: c*S + (1-c)*D; red light NarrowAAClipWithSrcBlendKeepsDstOnEdge measured maxChannelDiff=
+  // 192 on the clip rim). A MaskFilter's shader coverage is a different semantic: the runtime
+  // itself modulates the source with it (byte-parity across Src/SrcOver/Multiply/Darken), so
+  // those subtrees keep folding for any XP. The geometric leaves are identified by name,
+  // including inside composed clip chains.
+  if (!coverages.empty() && !(xferProcessor == nullptr && blendMode == BlendMode::SrcOver)) {
+    for (auto& coverage : coverages) {
+      if (ChainFoldCarriesGeometricCoverage(coverage.get())) {
+        return nullptr;
+      }
+    }
   }
   std::vector<const FragmentProcessor*> coverageFPs = {};
   std::vector<PlacementPtr<FragmentProcessor>> ownedChainCoverageFPs = {};

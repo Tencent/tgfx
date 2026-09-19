@@ -1395,8 +1395,20 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
         foldBlocked = true;
       }
     }
+    // Coverage folding guard (audit A2-1, refined by MaskCoverageBlendModesOnOpaqueBackground):
+    // the fold bakes coverage into the color chain's source, which composites correctly for any
+    // XP only when the runtime itself treats the coverage as source modulation. That holds for
+    // the local texture mask (a pointwise multiply, byte-parity across Src/SrcOver/Multiply/
+    // Darken) but NOT for the geometric AA-rect clip: the runtime attenuates the destination by
+    // the clip coverage (Src: c*S + (1-c)*D; red light NarrowAAClipWithSrcBlendKeepsDstOnEdge
+    // measured maxChannelDiff=192 on the clip rim), so folding it drops the destination's share
+    // for every non-SrcOver-class XP. Refuse the fold when a geometric clip is in the set; the
+    // draw keeps its coverages and the plain route serves it.
+    const bool foldIncludesGeometricClip = clipCoverage != nullptr;
+    const bool xpAbsorbsGeometricCoverage = brush.blendMode == BlendMode::SrcOver;
     bool foldMask = !foldBlocked && foldedProcessors.size() > colorProcessors.size() &&
-                    !BlendModeNeedDstTexture(brush.blendMode, true);
+                    !BlendModeNeedDstTexture(brush.blendMode, true) &&
+                    (!foldIncludesGeometricClip || xpAbsorbsGeometricCoverage);
     if (foldMask) {
       AOTEffectGraph foldedGraph = {};
       AOTEffectPlan foldedPlan = {};

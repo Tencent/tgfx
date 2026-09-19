@@ -1350,6 +1350,53 @@ TGFX_TEST(AOTEffectTest, TwoChildBlendOverComputedInputLowers) {
   EXPECT_GE(maskRegister, 0);
 }
 
+// Counterexample audit (2026-09-19, batch 1 / finding A2-2): a coverage subtree whose non-root
+// texture consumes the GP coverage unit. The runtime coverage-FP readback is tex * input.a and the
+// subtree's input starts from the unit, so an A8 mask under an analytic root must modulate by the
+// GP coverage. The builder only sets textureModulateUnit when the texture IS the coverage root,
+// so a non-root texture drops the GP coverage: with GP coverage q=.5, mask m=.5 and an inner rect
+// r=1, the runtime produces q*m*r=.25 while the chain produces m*r=.5.
+TGFX_TEST(AOTEffectTest, NonRootCoverageTextureModulatesByUnit) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  auto texture = MakeTextureProcessor(context, &allocator, PixelFormat::RGBA_8888);
+  auto colorMatrix = ColorMatrixFragmentProcessor::Make(&allocator, IdentityColorMatrix);
+  ASSERT_NE(texture, nullptr);
+  ASSERT_NE(colorMatrix, nullptr);
+  // A local A8 mask composed with a device-space AA rect: the Compose lowers through the general
+  // coverage-subtree path, the texture consumes the unit, and the analytic rect is the root.
+  auto mask = MakeTextureProcessor(context, &allocator, PixelFormat::ALPHA_8);
+  ASSERT_NE(mask, nullptr);
+  auto rect = RectEffect::Make(&allocator, Rect::MakeLTRB(10.5f, 10.5f, 90.5f, 90.5f));
+  ASSERT_NE(rect, nullptr);
+  auto coverage = FragmentProcessor::Compose(&allocator, std::move(mask), std::move(rect));
+  ASSERT_NE(coverage, nullptr);
+
+  AOTEffectGraph graph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower({texture.get(), colorMatrix.get()}, &graph));
+  AOTEffectPlan plan;
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
+  ASSERT_EQ(plan.passes.size(), 1u);
+  auto processor =
+      AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0], {coverage.get()});
+  ASSERT_NE(processor, nullptr);
+  auto chain = static_cast<const AOTPointwiseChainProcessor*>(processor.get());
+  // The A8 mask leaf's input is the coverage unit, so it must carry the unit modulation: the
+  // runtime multiplies the mask by the unit's alpha exactly once, wherever in the subtree the
+  // mask sits — a value that must not depend on which node consumes it.
+  int maskSlot = -1;
+  for (size_t index = 0; index < chain->slotCount(); ++index) {
+    if (chain->slot(index).op == AOTChainOp::Texture && chain->slot(index).textureAlphaOnly == 1) {
+      ASSERT_EQ(maskSlot, -1);
+      maskSlot = static_cast<int>(index);
+    }
+  }
+  ASSERT_GE(maskSlot, 0);
+  EXPECT_EQ(chain->slot(static_cast<size_t>(maskSlot)).textureModulateUnit, 1);
+}
+
 TGFX_TEST(AOTEffectTest, PerlinNoisePlusTwoOpsFusesToSinglePass) {
   ContextScope scope;
   auto context = scope.getContext();
