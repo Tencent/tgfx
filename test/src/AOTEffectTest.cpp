@@ -1428,6 +1428,45 @@ TGFX_TEST(AOTEffectTest, ChainRejectsNonRGBAColorFormats) {
   }
 }
 
+// Audit A6 (2026-09-19, batch 4): the admission budget must count FINAL ENCODED instructions,
+// not graph nodes. A computed-input texture occupies two slots (a raw sampling slot plus a
+// TEX_MODULATE instruction after its producer), so a 32-node graph carrying one is 33 encoded
+// instructions and must be refused by CanExecute (and by the DAG planner that consults it) —
+// the pre-fix check compared the node count to MaxSlots directly, let 33-instruction graphs
+// through the promise, and failed inside BuildChainProcessor instead.
+TGFX_TEST(AOTEffectTest, ComputedInputExpansionCountsTowardSlotBudget) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  auto build = [&](size_t matrixCount) {
+    std::vector<PlacementPtr<FragmentProcessor>> processors = {};
+    auto mask = MakeTextureProcessor(context, &allocator, PixelFormat::ALPHA_8);
+    auto image = MakeTextureProcessor(context, &allocator, PixelFormat::RGBA_8888);
+    if (mask == nullptr || image == nullptr) {
+      return false;
+    }
+    processors.push_back(std::move(mask));
+    processors.push_back(std::move(image));
+    for (size_t index = 0; index < matrixCount; ++index) {
+      processors.push_back(ColorMatrixFragmentProcessor::Make(&allocator, IdentityColorMatrix));
+    }
+    std::vector<const FragmentProcessor*> raw = {};
+    for (auto& fp : processors) {
+      raw.push_back(fp.get());
+    }
+    AOTEffectGraph graph = {};
+    AOTEffectPlan plan = {};
+    // The DAG planner consults CanExecute: a budget overrun must surface as a planning refusal.
+    return AOTEffectDecomposer::Lower(raw, &graph) &&
+           AOTEffectDecomposer::Decompose(graph, &plan);
+  };
+  // mask(1) + computed-input image(1) + 29 matrices = 31 nodes, 32 encoded: accepted.
+  EXPECT_TRUE(build(29));
+  // ... + 1 more matrix = 32 nodes, 33 encoded: refused by the admission budget.
+  EXPECT_FALSE(build(30));
+}
+
 TGFX_TEST(AOTEffectTest, PerlinNoisePlusTwoOpsFusesToSinglePass) {
   ContextScope scope;
   auto context = scope.getContext();

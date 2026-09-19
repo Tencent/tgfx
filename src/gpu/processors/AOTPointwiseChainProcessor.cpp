@@ -172,19 +172,48 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
   if (allocator == nullptr || slots.empty() || slots.size() > MaxSlots) {
     return nullptr;
   }
-  // rootSlot and coverageRootSlot name chainResults registers (assigned by the register
-  // allocator), and every slot's wiring must stay inside the register budget. in0/in1 may also
-  // carry the kernel's special negative inputs (-1 geometry color ... -5 opaque geometry color).
-  const auto validWiring = [](int reg) {
-    return reg >= -5 && reg < static_cast<int>(MaxRegisters);
+  // Validation domains are separated (audit A6, fail-closed): in0/in1 are INPUT selectors and
+  // may carry the kernel's special negative designators (-1 geometry color ... -5 opaque
+  // geometry color) or a result register; outRegister / rootSlot / coverageRootSlot /
+  // clipCoverageRegister are OUTPUT registers and must name a real chainResults slot (>= 0) or
+  // the explicit dead-instruction marker -1 (a raw sampling slot whose result nothing reads —
+  // the computed-input texture's leading fetch). The upload packs the output as
+  // (outRegister + 1) << 20, so any value below -1 would shift left into undefined behavior
+  // instead of being rejected here.
+  const auto validInput = [](int reg) { return reg >= -5 && reg < static_cast<int>(MaxRegisters); };
+  const auto validOutput = [](int reg) {
+    return reg >= -1 && reg < static_cast<int>(MaxRegisters);
   };
-  if (!validWiring(static_cast<int>(rootSlot)) ||
-      (coverageRootSlot >= 0 && !validWiring(coverageRootSlot))) {
+  if (!validOutput(static_cast<int>(rootSlot)) ||
+      (coverageRootSlot >= 0 && !validOutput(coverageRootSlot))) {
     return nullptr;
   }
   for (const auto& slot : slots) {
-    if (!validWiring(slot.outRegister) || !validWiring(slot.in0) || !validWiring(slot.in1)) {
+    if (!validOutput(slot.outRegister) || !validInput(slot.in0) || !validInput(slot.in1)) {
       return nullptr;
+    }
+    // Opcode whitelist: the kernel's evaluation switch has no default branch (an unknown value
+    // falls through into the ColorSpaceXform evaluation), so an out-of-enum opcode must be
+    // rejected here rather than silently misinterpreted.
+    switch (slot.op) {
+      case AOTChainOp::ColorMatrix:
+      case AOTChainOp::Luma:
+      case AOTChainOp::AlphaThreshold:
+      case AOTChainOp::ColorSpaceXform:
+      case AOTChainOp::Texture:
+      case AOTChainOp::ConstColor:
+      case AOTChainOp::Blend:
+      case AOTChainOp::AARectCoverage:
+      case AOTChainOp::Gradient:
+      case AOTChainOp::LocalRectCoverage:
+      case AOTChainOp::RRectCoverage:
+      case AOTChainOp::TexModulate:
+      case AOTChainOp::InputOpaque:
+      case AOTChainOp::MulAlpha:
+        break;
+      case AOTChainOp::None:
+      default:
+        return nullptr;
     }
   }
   auto leafCount = textureLeaves.size();

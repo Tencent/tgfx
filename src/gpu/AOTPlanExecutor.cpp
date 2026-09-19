@@ -192,8 +192,33 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
   if (plan.passes.size() == 1 && plan.passes[0].kernel == AOTKernelKind::PointwiseChain) {
     const auto& pass = plan.passes[0];
     if (!plan.output.isValid() || plan.output != graph.root() || pass.output != plan.output ||
-        pass.materializesOutput || pass.nodes.empty() || !pass.dependencies.empty() ||
-        pass.nodes.size() > AOTPointwiseChainProcessor::MaxSlots) {
+        pass.materializesOutput || pass.nodes.empty() || !pass.dependencies.empty()) {
+      return false;
+    }
+    // Final encoded-instruction budget (audit A6): the node count underestimates what the
+    // builder emits. A computed-input texture occupies TWO slots (a raw sampling slot plus a
+    // TEX_MODULATE instruction following its producer), so the admission check must count the
+    // expansion — a graph of exactly MaxSlots nodes with one computed-input texture would pass
+    // the old check and fail inside BuildChainProcessor after CanExecute promised success.
+    // Appended clip slots (from the draw's coverage FPs, not the plan) remain invisible here;
+    // the builder's own MaxSlots check rejects those at construction and the caller falls back.
+    size_t encodedInstructions = pass.nodes.size();
+    for (auto nodeID : pass.nodes) {
+      auto node = graph.nodeAt(nodeID);
+      if (node == nullptr) {
+        return false;
+      }
+      if (node->kind == AOTEffectKind::TextureSource && !node->inputs.empty()) {
+        auto* inputNode = graph.nodeAt(node->inputs[0]);
+        if (inputNode != nullptr && inputNode->kind != AOTEffectKind::GeometryColor &&
+            inputNode->kind != AOTEffectKind::GeometryColorOpaqueInput &&
+            inputNode->kind != AOTEffectKind::GeometryWhiteInput &&
+            inputNode->kind != AOTEffectKind::GeometryCoverage) {
+          ++encodedInstructions;
+        }
+      }
+    }
+    if (encodedInstructions > AOTPointwiseChainProcessor::MaxSlots) {
       return false;
     }
     // Check kernel-wide parameter budgets before accepting a DAG candidate. Logical texture
