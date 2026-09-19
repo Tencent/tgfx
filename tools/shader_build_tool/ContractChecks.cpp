@@ -35,8 +35,8 @@ static bool HasUniform(const StageReflectionData& reflection, const std::string&
 // ClipContract constants) would silently skip their upload and the clip would read stale data.
 size_t ValidateClipContractFields(const std::vector<VariantData>& variants) {
   const std::string contractFields[] = {
-      ClipContract::Rect,    ClipContract::HasClip,      ClipContract::LocalRect,
-      ClipContract::RadiiX,  ClipContract::RadiiY,       ClipContract::AntiAlias,
+      ClipContract::Rect,          ClipContract::HasClip, ClipContract::LocalRect,
+      ClipContract::RadiiX,        ClipContract::RadiiY,  ClipContract::AntiAlias,
       ClipContract::DeviceToLocal,
   };
   size_t errors = 0;
@@ -46,8 +46,8 @@ size_t ValidateClipContractFields(const std::vector<VariantData>& variants) {
     }
     for (const auto& field : contractFields) {
       if (!HasUniform(variant.fragmentReflection, field)) {
-        std::cerr << "[ContractCheck] " << variant.shaderName
-                  << " (frag " << variant.fragPermutationIndex
+        std::cerr << "[ContractCheck] " << variant.shaderName << " (frag "
+                  << variant.fragPermutationIndex
                   << ") carries the clip contract but is missing uniform '" << field << "'\n";
         ++errors;
       }
@@ -62,8 +62,7 @@ size_t ValidateClipContractFields(const std::vector<VariantData>& variants) {
 size_t ValidateChainOpCodes(const std::string& shaderDir) {
   std::ifstream file(shaderDir + "/level1/pointwise_chain_eval.inc");
   if (!file.is_open()) {
-    std::cerr << "[ContractCheck] cannot open pointwise_chain_eval.inc under " << shaderDir
-              << "\n";
+    std::cerr << "[ContractCheck] cannot open pointwise_chain_eval.inc under " << shaderDir << "\n";
     return 1;
   }
   std::stringstream buffer;
@@ -108,27 +107,64 @@ size_t ValidateChainOpCodes(const std::string& shaderDir) {
     auto valueEnd = source.find('\n', valueStart);
     auto valueText = source.substr(valueStart, valueEnd - valueStart);
     // Trim surrounding whitespace.
-    while (!valueText.empty() && (valueText.front() == ' ' || valueText.front() == '\t' ||
-                                  valueText.front() == '\r')) {
+    while (!valueText.empty() &&
+           (valueText.front() == ' ' || valueText.front() == '\t' || valueText.front() == '\r')) {
       valueText.erase(valueText.begin());
     }
-    while (!valueText.empty() && (valueText.back() == ' ' || valueText.back() == '\t' ||
-                                  valueText.back() == '\r')) {
+    while (!valueText.empty() &&
+           (valueText.back() == ' ' || valueText.back() == '\t' || valueText.back() == '\r')) {
       valueText.pop_back();
     }
-    int parsed = 0;
-    try {
-      parsed = std::stoi(valueText);
-    } catch (...) {
-      std::cerr << "[ContractCheck] cannot parse " << op.name << " value '" << valueText << "'\n";
+    // The whole trimmed text must be a decimal integer: stoi alone accepts prefixes like
+    // "0 + 1" (parsing 0 and ignoring the rest), which would silently pass a malformed define.
+    bool allDigits = !valueText.empty();
+    for (char ch : valueText) {
+      if (ch < '0' || ch > '9') {
+        allDigits = false;
+        break;
+      }
+    }
+    if (!allDigits) {
+      std::cerr << "[ContractCheck] cannot parse " << op.name << " value '" << valueText
+                << "' (expected a bare decimal integer)\n";
       ++errors;
       continue;
     }
+    int parsed = std::stoi(valueText);
     if (parsed != op.value) {
-      std::cerr << "[ContractCheck] " << op.name << " is " << parsed
-                << " but AOTChainOp says " << op.value << "\n";
+      std::cerr << "[ContractCheck] " << op.name << " is " << parsed << " but AOTChainOp says "
+                << op.value << "\n";
       ++errors;
     }
+  }
+  // An OP_* define outside the expected set means the kernel grew a new opcode the C++ side has
+  // not anchored yet — fail loudly instead of letting the mismatch surface as misinterpretation
+  // at runtime (the kernel's evaluation switch has no default branch).
+  size_t scanPosition = 0;
+  while (true) {
+    auto defineStart = source.find("#define OP_", scanPosition);
+    if (defineStart == std::string::npos) {
+      break;
+    }
+    auto nameStart = defineStart + 8;  // past "#define "
+    auto nameEnd = source.find(' ', nameStart);
+    if (nameEnd == std::string::npos) {
+      break;
+    }
+    auto defineName = source.substr(nameStart, nameEnd - nameStart);
+    bool known = false;
+    for (const auto& op : expected) {
+      if (defineName == op.name) {
+        known = true;
+        break;
+      }
+    }
+    if (!known) {
+      std::cerr << "[ContractCheck] unknown OP define in pointwise_chain_eval.inc: " << defineName
+                << " (add it to AOTChainOp or remove the define)\n";
+      ++errors;
+    }
+    scanPosition = nameEnd;
   }
   return errors;
 }

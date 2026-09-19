@@ -163,7 +163,8 @@ static void PrintUsage() {
       << "Usage: shader_build_tool [options]\n"
       << "  --shader-dir <path>   Directory containing shader sources\n"
       << "  --out-dir <path>      Output directory for build artifacts\n"
-      << "  --backends <list>     Comma-separated backend list (opengl,opengles,vulkan,metal,webgpu)\n"
+      << "  --backends <list>     Comma-separated backend list "
+         "(opengl,opengles,vulkan,metal,webgpu)\n"
       << "  --report-only         Only enumerate and report, do not compile\n"
       << "  --audit               Cross-check legacy compile lists against rule-reachable sets\n"
       << "  --compress            Compress data pool with zlib in output bundles\n";
@@ -466,8 +467,7 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
         // recompile like the vulkan branch instead of reusing the combined-sampler SPIR-V.
         auto expandedVertWgsl = PrependDefines(vertSource, vertDefines);
         auto expandedFragWgsl = PrependDefines(fragSource, fragDefines);
-        auto wgslVert =
-            CompileGLSLToWGSL(expandedVertWgsl, ShaderStageType::Vertex, info.name, vi);
+        auto wgslVert = CompileGLSLToWGSL(expandedVertWgsl, ShaderStageType::Vertex, info.name, vi);
         auto wgslFrag =
             CompileGLSLToWGSL(expandedFragWgsl, ShaderStageType::Fragment, info.name, fi);
         if (!wgslVert.success || !wgslFrag.success) {
@@ -519,15 +519,20 @@ static bool WriteReportJson(const BuildReport& report, const std::string& outDir
     return false;
   }
   auto artifactStats = CollectArtifactStats(report.variants, report.profileErrorCounts);
-  // Per-shader logical stage bytes: each unique (shader, permutationIndex) stage counts once.
+  // Per-shader logical stage bytes: each unique (shader, permutationIndex, profile) stage
+  // counts once. The profile is part of the key because the same permutation compiles to a
+  // different blob per backend (SPIR-V vs metallib vs WGSL): without it, the first backend
+  // processed would define the reported figure and the number would drift with backend order.
   std::map<std::string, std::pair<uint64_t, uint64_t>> shaderStageBytes;
-  std::set<std::pair<std::string, uint32_t>> seenVerts;
-  std::set<std::pair<std::string, uint32_t>> seenFrags;
+  std::set<std::tuple<std::string, uint32_t, std::string>> seenVerts;
+  std::set<std::tuple<std::string, uint32_t, std::string>> seenFrags;
   for (const auto& variant : report.variants) {
-    if (seenVerts.insert({variant.shaderName, variant.vertPermutationIndex}).second) {
+    if (seenVerts.insert({variant.shaderName, variant.vertPermutationIndex, variant.profileTag})
+            .second) {
       shaderStageBytes[variant.shaderName].first += variant.vertexBlob.size();
     }
-    if (seenFrags.insert({variant.shaderName, variant.fragPermutationIndex}).second) {
+    if (seenFrags.insert({variant.shaderName, variant.fragPermutationIndex, variant.profileTag})
+            .second) {
       shaderStageBytes[variant.shaderName].second += variant.fragmentBlob.size();
     }
   }
