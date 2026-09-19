@@ -313,6 +313,13 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
                static_cast<std::streamsize>(reflPool.size()));
   }
 
+  // A failed stream (disk full, permission) must not report success: the caller would treat the
+  // truncated or missing file as a valid bundle.
+  if (!file.good()) {
+    std::cerr << "BundleWriter: stream error while writing bundle (disk full or I/O failure)\n";
+    file.close();
+    return false;
+  }
   file.close();
   return true;
 }

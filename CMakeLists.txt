@@ -874,22 +874,28 @@ if (TGFX_EMBED_SHADER_BUNDLES)
     if (TGFX_USE_WEBGPU)
         list(APPEND TGFX_SHADER_BACKENDS "webgpu")
     endif ()
+    # The GL bundle profile follows the build target: GLES-family environments (Android,
+    # WebGL, SwiftShader, ANGLE, OHOS, iOS) consume the ES 300 bundle; desktop builds keep
+    # the GLSL 330 one. Only one GL profile is embedded per build. When no dedicated GPU
+    # backend is enabled, GL is the RUNTIME backend and its bundle must always be present —
+    # an extra-product request below appends to the set, never replaces it (the old
+    # "if (NOT TGFX_SHADER_BACKENDS)" guard made a GL-only build with the WebGPU bundle
+    # request drop the GL bundle entirely, leaving the runtime backend without artifacts).
+    set(TGFX_GL_RUNTIME_BACKEND "opengl")
+    if (ANDROID OR WEB OR OHOS OR TGFX_USE_SWIFTSHADER OR TGFX_USE_ANGLE OR
+            CMAKE_SYSTEM_NAME STREQUAL "iOS")
+        set(TGFX_GL_RUNTIME_BACKEND "opengles")
+    endif ()
     # Native builds can request the WebGPU bundle explicitly: the Emscripten toolchain cannot
     # run shader_build_tool at build time (it shells out to host tools), so the bundle is
     # generated natively, published to resources/shaders/, and consumed by web builds.
     if (TGFX_BUILD_WEBGPU_BUNDLE AND NOT WEB)
-        list(APPEND TGFX_SHADER_BACKENDS "webgpu")
-    endif ()
-    if (NOT TGFX_SHADER_BACKENDS)
-        # The GL bundle profile follows the build target: GLES-family environments (Android,
-        # WebGL, SwiftShader, ANGLE, OHOS, iOS) consume the ES 300 bundle; desktop builds keep
-        # the GLSL 330 one. Only one GL profile is embedded per build.
-        if (ANDROID OR WEB OR OHOS OR TGFX_USE_SWIFTSHADER OR TGFX_USE_ANGLE OR
-                CMAKE_SYSTEM_NAME STREQUAL "iOS")
-            list(APPEND TGFX_SHADER_BACKENDS "opengles")
-        else ()
-            list(APPEND TGFX_SHADER_BACKENDS "opengl")
+        if (NOT "webgpu" IN_LIST TGFX_SHADER_BACKENDS)
+            list(APPEND TGFX_SHADER_BACKENDS "webgpu")
         endif ()
+    endif ()
+    if (NOT TGFX_USE_VULKAN AND NOT TGFX_USE_METAL AND NOT TGFX_USE_WEBGPU)
+        list(APPEND TGFX_SHADER_BACKENDS ${TGFX_GL_RUNTIME_BACKEND})
     endif ()
     # Pass all backends as the single comma-separated argument expected by shader_build_tool.
     string(JOIN "," TGFX_SHADER_BACKENDS_ARG ${TGFX_SHADER_BACKENDS})
@@ -916,6 +922,11 @@ if (TGFX_EMBED_SHADER_BUNDLES)
             src/gpu/shaders/glsl/level1/*.frag
             src/gpu/shaders/glsl/level1/*.vert
             src/gpu/shaders/glsl/level1/*.inc)
+    # The toolchain ABI constant rides in a regular header outside the shader directory; a bump
+    # changes what the writer stamps into every bundle, so it must trigger a rebuild like a
+    # shader-source change (otherwise the bundles keep the old ABI and the runtime rejects them).
+    list(APPEND TGFX_SHADER_SOURCES
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/PrecompiledBundleIdentity.h")
     if (WEB)
         # The Emscripten toolchain cannot run shader_build_tool at build time (it shells out to
         # host tools), so web builds consume prebuilt bundles from resources/shaders/. Publish

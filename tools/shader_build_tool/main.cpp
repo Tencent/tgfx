@@ -350,7 +350,6 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
   for (const auto& permutation : *reachable) {
     uint32_t vi = permutation.first;
     uint32_t fi = permutation.second;
-    report.compiledCount++;
 
     if (options.reportOnly || vertSource.empty() || fragSource.empty()) {
       continue;
@@ -404,6 +403,10 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
 
     // Extract reflection from SPIR-V
     auto reflection = ExtractReflection(*vertSpirv, fragResult.spirv);
+    // Counted only here — after both stages compiled successfully — so compiledCount is the
+    // true "compiled" figure, distinct from rawCount (the reachable-permutation total) and
+    // independent of backend-level exclusions counted below.
+    report.compiledCount++;
     // Update vert reflection cache on first successful extraction
     if (vertReflData->uniforms.empty() && vertReflData->samplers.empty()) {
       *vertReflData = reflection.vertexReflection;
