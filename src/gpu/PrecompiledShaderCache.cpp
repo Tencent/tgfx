@@ -429,6 +429,8 @@ void PrecompiledShaderCache::unload() {
   vertEntries.clear();
   fragEntries.clear();
   _profileTag.clear();
+  _bundleIdentityHash = 0;
+  _bundleToolchainABI = 0;
   _generation.fetch_add(1, std::memory_order_relaxed);
   if (_context != nullptr) {
     // Dropping the bundle is a generation change: cached precompiled programs must not outlive
@@ -834,6 +836,8 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   }
 
   _profileTag = std::move(profileTag);
+  _bundleIdentityHash = sourceHash;
+  _bundleToolchainABI = toolchainVersion;
   vertEntries = std::move(newVertEntries);
   fragEntries = std::move(newFragEntries);
   _generation.fetch_add(1, std::memory_order_relaxed);

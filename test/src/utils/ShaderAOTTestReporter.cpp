@@ -34,6 +34,7 @@
 #include "gpu/AOTEffect.h"
 #include "gpu/EmbeddedShaderBundles.h"
 #include "gpu/GlobalCache.h"
+#include "gpu/PrecompiledBundleIdentity.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gtest/gtest.h"
 #pragma clang diagnostic push
@@ -45,6 +46,37 @@
 #include "utils/ProjectPath.h"
 
 namespace tgfx {
+
+// Report identity binding (batch 0): every report must attribute itself to the exact artifact it
+// consumed. The git head is read once per process from the repository; the bundle identity comes
+// from the last context the pool can produce at write time. A report whose identity block is
+// missing or "unknown" cannot be cited as evidence for a specific HEAD.
+static std::string GitHeadAtRun() {
+  static const std::string head = [] {
+#ifdef _WIN32
+    FILE* pipe = _popen("git rev-parse HEAD 2>nul", "r");
+#else
+    FILE* pipe = popen("git rev-parse HEAD 2>/dev/null", "r");
+#endif
+    if (pipe == nullptr) {
+      return std::string("unavailable");
+    }
+    char buffer[64] = {};
+    size_t read = fread(buffer, 1, sizeof(buffer) - 1, pipe);
+#ifdef _WIN32
+    _pclose(pipe);
+#else
+    pclose(pipe);
+#endif
+    std::string value(buffer, read);
+    while (!value.empty() &&
+           (value.back() == '\n' || value.back() == '\r' || value.back() == ' ')) {
+      value.pop_back();
+    }
+    return value.empty() ? std::string("unknown") : value;
+  }();
+  return head;
+}
 
 AOTCoverageGateResult EvaluateAOTCoverageGate(uint64_t rawNoMatchingRule,
                                               uint64_t deliberateNoMatchingRule,
@@ -1045,8 +1077,31 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
            {"programBuilderCanExecute", correlation.programBuilderCanExecute}});
     }
 
+    nlohmann::json identity = {{"backend", TGFX_BACKEND_NAME},
+#ifdef NDEBUG
+                               {"buildType", "release"},
+#else
+                               {"buildType", "debug"},
+#endif
+                               {"gitHead", GitHeadAtRun()},
+                               {"runtimeToolchainABI", kExpectedToolchainABI}};
+    {
+      auto device = DevicePool::Make();
+      if (device != nullptr) {
+        auto context = device->lockContext();
+        if (context != nullptr) {
+          auto cache = context->precompiledShaderCache();
+          identity["bundleLoaded"] = cache->isLoaded();
+          identity["bundleProfileTag"] = cache->profileTag();
+          identity["bundleIdentityHash"] = cache->bundleIdentityHash();
+          identity["bundleToolchainABI"] = cache->bundleToolchainABI();
+          device->unlock();
+        }
+      }
+    }
     nlohmann::json report = {
         {"backend", TGFX_BACKEND_NAME},
+        {"identity", std::move(identity)},
         {"iteration", currentIteration},
         {"coverageGate",
          {{"noMatchingRule", coverageGate.noMatchingRule},

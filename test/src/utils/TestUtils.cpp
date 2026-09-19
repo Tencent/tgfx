@@ -17,12 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TestUtils.h"
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include "ProjectPath.h"
 #include "core/utils/Log.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/PrecompiledShaderCache.h"
+#include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/gpu/Context.h"
@@ -61,6 +63,63 @@ ScopedAOTDeliberateMiss::~ScopedAOTDeliberateMiss() {
   if (cache != nullptr) {
     cache->setDeliberateMissMarking(previous);
   }
+}
+
+testing::AssertionResult BitmapPremulLegal(const Bitmap& bitmap) {
+  if (bitmap.isEmpty()) {
+    return testing::AssertionFailure() << "bitmap is empty";
+  }
+  auto& mutableBitmap = const_cast<Bitmap&>(bitmap);
+  auto* pixels = static_cast<const uint32_t*>(mutableBitmap.lockPixels());
+  if (pixels == nullptr) {
+    mutableBitmap.unlockPixels();
+    return testing::AssertionFailure() << "bitmap pixels could not be locked";
+  }
+  testing::AssertionResult result = testing::AssertionSuccess();
+  size_t illegal = 0;
+  for (int y = 0; y < bitmap.height() && illegal < 4; ++y) {
+    for (int x = 0; x < bitmap.width() && illegal < 4; ++x) {
+      auto value =
+          pixels[static_cast<size_t>(y) * (bitmap.rowBytes() / 4) + static_cast<size_t>(x)];
+      auto alpha = value >> 24;
+      // All three color bytes are bounded by alpha in either RGBA or BGRA packing.
+      auto maxChannel = std::max({value & 0xFFu, (value >> 8) & 0xFFu, (value >> 16) & 0xFFu});
+      if (maxChannel > alpha) {
+        if (illegal == 0) {
+          result = testing::AssertionFailure()
+                   << "premul violation: RGB > A or (A=0 with RGB!=0) at (" << x << "," << y
+                   << ") and others, e.g. ARGB=" << std::hex << value;
+        }
+        ++illegal;
+      }
+    }
+  }
+  mutableBitmap.unlockPixels();
+  return result;
+}
+
+size_t CountFractionalAlphaPixels(const Bitmap& bitmap) {
+  if (bitmap.isEmpty()) {
+    return 0;
+  }
+  auto& mutableBitmap = const_cast<Bitmap&>(bitmap);
+  auto* pixels = static_cast<const uint32_t*>(mutableBitmap.lockPixels());
+  if (pixels == nullptr) {
+    mutableBitmap.unlockPixels();
+    return 0;
+  }
+  size_t count = 0;
+  for (int y = 0; y < bitmap.height(); ++y) {
+    for (int x = 0; x < bitmap.width(); ++x) {
+      auto alpha =
+          pixels[static_cast<size_t>(y) * (bitmap.rowBytes() / 4) + static_cast<size_t>(x)] >> 24;
+      if (alpha != 0 && alpha != 255) {
+        ++count;
+      }
+    }
+  }
+  mutableBitmap.unlockPixels();
+  return count;
 }
 
 #ifdef GENERATE_BASELINE_IMAGES

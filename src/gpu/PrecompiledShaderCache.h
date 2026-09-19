@@ -257,6 +257,19 @@ class PrecompiledShaderCache {
     return _profileTag;
   }
 
+  /// Returns the content identity hash recorded in the loaded bundle's header (0 for legacy
+  /// bundles without one). Read-only diagnostics for report binding: it identifies WHICH bundle
+  /// bytes a run consumed, so a report can be attributed to an exact artifact rather than a
+  /// presumed one.
+  uint64_t bundleIdentityHash() const {
+    return _bundleIdentityHash;
+  }
+
+  /// Returns the toolchain ABI version of the loaded bundle (0 when no bundle is loaded).
+  uint32_t bundleToolchainABI() const {
+    return _bundleToolchainABI;
+  }
+
   /// Returns the number of successful lookups where both vertex and fragment artifacts were found.
   uint32_t hitCount() const {
     return _hitCount.load(std::memory_order_relaxed);
@@ -419,6 +432,8 @@ class PrecompiledShaderCache {
   Backend _backend = Backend::Unknown;
   std::atomic<uint64_t> _generation{0};
   std::string _profileTag;
+  uint64_t _bundleIdentityHash = 0;
+  uint32_t _bundleToolchainABI = 0;
   std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> vertEntries;
   std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> fragEntries;
   std::atomic<uint32_t> _hitCount{0};

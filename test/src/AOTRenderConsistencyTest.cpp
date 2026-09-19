@@ -604,6 +604,9 @@ TGFX_TEST(AOTRenderConsistencyTest, ProgramKeyColorCoverageBoundary) {
   // applied without a failing case.
   // A shared alpha-gradient image: the left half is opaque, the right half is half-transparent,
   // so the blue blend draw and the red mask draw produce visibly different pixels when mixed up.
+  // Batch 0 premul fix: the color channels scale with the alpha (legal premul). The former
+  // constant 0x00FFFFFF kept RGB=255 under alpha<255, which left the reference semantics
+  // undefined at the half-transparent boundary.
   Bitmap gradient = {};
   ASSERT_TRUE(gradient.allocPixels(64, 64));
   {
@@ -612,11 +615,12 @@ TGFX_TEST(AOTRenderConsistencyTest, ProgramKeyColorCoverageBoundary) {
     for (int y = 0; y < 64; ++y) {
       for (int x = 0; x < 64; ++x) {
         auto alpha = x < 32 ? 255u : 128u;
-        pixels[y * 64 + x] = (alpha << 24) | 0x00FFFFFFu;
+        pixels[y * 64 + x] = (alpha << 24) | (alpha << 16) | (alpha << 8) | alpha;
       }
     }
     gradient.unlockPixels();
   }
+  EXPECT_TRUE(BitmapPremulLegal(gradient));
   auto image = Image::MakeFrom(gradient);
   ASSERT_TRUE(image != nullptr);
 
@@ -4622,6 +4626,9 @@ TGFX_TEST(AOTRenderConsistencyTest, StackedClipsKeepGPCoverageOnAAEdge) {
     cache->unload();
     ScopedAOTDeliberateMiss deliberate(context);
     renderScene(&reference);
+    // Non-vacuity (batch 0): the oval's AA rim must actually produce fractional pixels — an
+    // all-or-nothing image would prove nothing about fractional coverage handling.
+    EXPECT_GT(CountFractionalAlphaPixels(reference), 0u);
   }
   {
     auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
@@ -5211,6 +5218,26 @@ TGFX_TEST(AOTRenderConsistencyTest, GPCoverageAndMaskCoexistOnAAEdge) {
     cache->unload();
     ScopedAOTDeliberateMiss deliberate(context);
     renderScene(&reference);
+    // Non-vacuity (batch 0): a control render WITHOUT the mask proves the oval's own AA edge
+    // produces fractional coverage — otherwise the fractional pixels in the main render could
+    // come from the mask gradient alone, and the GP-coverage handling would be untested.
+    Bitmap control = {};
+    {
+      auto surface = Surface::Make(context, size, size);
+      ASSERT_NE(surface, nullptr);
+      auto* canvas = surface->getCanvas();
+      canvas->clear(Color::Transparent());
+      Paint paint = {};
+      paint.setColor(Color::Green());
+      canvas->drawOval(Rect::MakeLTRB(12, 12, size - 12, size - 12), paint);
+      context->flushAndSubmit(true);
+      ASSERT_TRUE(control.allocPixels(size, size));
+      auto* pixels = control.lockPixels();
+      ASSERT_NE(pixels, nullptr);
+      ASSERT_TRUE(surface->readPixels(control.info(), pixels));
+      control.unlockPixels();
+    }
+    EXPECT_GT(CountFractionalAlphaPixels(control), 0u);
   }
   {
     auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
@@ -5255,17 +5282,21 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaBiasMatrixSourceAlphaMatrix) {
   auto* cache = context->precompiledShaderCache();
   constexpr int size = 48;
   // A source image with a controlled per-case alpha: a solid color bitmap rebuilt per alpha.
+  // Batch 0 premul fix: the color channels scale with the alpha (legal premul). The former
+  // constant (0.3, 0.5, 0.8) regardless of alpha left the reference semantics undefined at
+  // low alpha — a withdrawn-evidence test still needs defined input to serve as a fence.
   auto makeSource = [&](float alpha) {
     Bitmap bitmap = {};
     EXPECT_TRUE(bitmap.allocPixels(size, size));
     auto* pixels = static_cast<uint32_t*>(bitmap.lockPixels());
     auto channel = [](float v) { return static_cast<uint32_t>(v * 255.0f + 0.5f); };
-    uint32_t value =
-        (channel(alpha) << 24) | (channel(0.3f) << 16) | (channel(0.5f) << 8) | channel(0.8f);
+    uint32_t value = (channel(alpha) << 24) | (channel(0.8f * alpha) << 16) |
+                     (channel(0.5f * alpha) << 8) | channel(0.3f * alpha);
     for (size_t i = 0; i < static_cast<size_t>(size) * size; ++i) {
       pixels[i] = value;
     }
     bitmap.unlockPixels();
+    EXPECT_TRUE(BitmapPremulLegal(bitmap));
     return Image::MakeFrom(bitmap);
   };
   // Matrices touching only the alpha row: (scale, bias) pairs against the identity control.
@@ -5609,7 +5640,9 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailThresholdQuantizationBand) {
   ASSERT_NE(context, nullptr);
   auto* cache = context->precompiledShaderCache();
   constexpr int srcSize = 96;
-  // An alpha-sweep source: white rgb, alpha 0..255 down the rows.
+  // An alpha-sweep source: white scaled by the row alpha (legal premul), alpha 0..255 down the
+  // rows. Batch 0 premul fix: the former constant 0x00FFFFFF kept RGB=255 under alpha<255, which
+  // left the reference semantics undefined at the sweep's low rows.
   Bitmap sweepBitmap = {};
   ASSERT_TRUE(sweepBitmap.allocPixels(srcSize, srcSize));
   auto* sweepPixels = static_cast<uint32_t*>(sweepBitmap.lockPixels());
@@ -5618,10 +5651,11 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailThresholdQuantizationBand) {
     uint32_t alpha = static_cast<uint32_t>(y * 255 / (srcSize - 1));
     for (int x = 0; x < srcSize; ++x) {
       sweepPixels[static_cast<size_t>(y) * srcSize + static_cast<size_t>(x)] =
-          (alpha << 24) | 0x00FFFFFFu;
+          (alpha << 24) | (alpha << 16) | (alpha << 8) | alpha;
     }
   }
   sweepBitmap.unlockPixels();
+  EXPECT_TRUE(BitmapPremulLegal(sweepBitmap));
   auto sweepImage = Image::MakeFrom(sweepBitmap);
   ASSERT_NE(sweepImage, nullptr);
   auto sourceSurface = Surface::Make(context, srcSize, srcSize, false, 1, true);
