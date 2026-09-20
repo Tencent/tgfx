@@ -15,11 +15,15 @@
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/ColorFilter.h"
+#include "tgfx/core/Font.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Surface.h"
+#include "tgfx/core/TextBlob.h"
+#include "tgfx/core/Typeface.h"
+#include "tgfx/core/YUVData.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
 
@@ -29,7 +33,10 @@ namespace {
 // Revision 3: legal float paint alpha (Paint::setAlpha takes 0-1, the previous revision passed
 // raw 8-bit values), premultiplied alpha-ramp inputs, distinct gradients on both blend sides,
 // visible inner branches in nested scenes, and a genuinely non-pixel-aligned AA clip.
-constexpr int kSceneRevision = 3;
+// Revision 4: coverage/XP, channel, and materialization-admission scenes — a Src blend under an
+// AA clip, atlas text under Src, an NV12 frame with a color grade, a dual-gradient threshold
+// (the materialization admission refusal shape), and an alpha-only blend tint chain.
+constexpr int kSceneRevision = 4;
 constexpr int kSize = 96;
 
 // Paint::setAlpha() replaces brush.color.alpha directly with a 0-1 float; it neither divides by
@@ -46,7 +53,7 @@ const std::array<float, 20> kRotateRGB = {0, 1, 0, 0, 0, 0, 0, 1, 0, 0,
 // Shifts red up by 0.25, so it maps transparent black to non-transparent: exercises the
 // affectsTransparentBlack branch of the color-filter shader path.
 const std::array<float, 20> kOffsetRed = {1, 0, 0, 0, 0.25f, 0, 1, 0, 0, 0,
-                                          0, 0, 1, 0, 0, 0, 0, 0, 1, 0};
+                                          0, 0, 1, 0, 0,     0, 0, 0, 1, 0};
 
 tgfx::Bitmap MakeOpaqueImage() {
   tgfx::Bitmap bitmap = {};
@@ -73,10 +80,10 @@ tgfx::Bitmap MakeAlphaRampImage() {
       // allocPixels() allocates a premultiplied buffer, so each RGB channel must be scaled by
       // its own alpha; the earlier non-premultiplied writes produced alpha=0 pixels with
       // non-zero RGB, which is not a legal input contract.
-      pixels[y * kSize + x] =
-          (alpha << 24) | ((static_cast<uint32_t>(x * 2.6f) * alpha / 255) << 16) |
-          ((static_cast<uint32_t>(y * 2.6f) * alpha / 255) << 8) |
-          (static_cast<uint32_t>((x + y) * 1.3f) * alpha / 255);
+      pixels[y * kSize + x] = (alpha << 24) |
+                              ((static_cast<uint32_t>(x * 2.6f) * alpha / 255) << 16) |
+                              ((static_cast<uint32_t>(y * 2.6f) * alpha / 255) << 8) |
+                              (static_cast<uint32_t>((x + y) * 1.3f) * alpha / 255);
     }
   }
   bitmap.unlockPixels();
@@ -89,9 +96,9 @@ tgfx::Bitmap MakeSmallImage() {
   auto* pixels = static_cast<uint32_t*>(bitmap.lockPixels());
   for (int y = 0; y < kSize / 4; ++y) {
     for (int x = 0; x < kSize / 4; ++x) {
-      pixels[y * (kSize / 4) + x] = static_cast<uint32_t>(
-          (255u << 24) | (static_cast<uint32_t>(x * 12) << 16) |
-          (static_cast<uint32_t>(y * 12) << 8) | 96u);
+      pixels[y * (kSize / 4) + x] =
+          static_cast<uint32_t>((255u << 24) | (static_cast<uint32_t>(x * 12) << 16) |
+                                (static_cast<uint32_t>(y * 12) << 8) | 96u);
     }
   }
   bitmap.unlockPixels();
@@ -146,12 +153,10 @@ int main(int argc, char** argv) {
   auto rampShader = tgfx::Shader::MakeImageShader(rampImage);
   std::vector<tgfx::Color> gradientColorsA = {tgfx::Color(1, 0, 0, 1), tgfx::Color(0, 0, 1, 1)};
   std::vector<tgfx::Color> gradientColorsB = {tgfx::Color(0, 1, 0, 1), tgfx::Color(1, 1, 0, 1)};
-  auto gradientA =
-      tgfx::Shader::MakeLinearGradient(tgfx::Point::Make(0, 0), tgfx::Point::Make(kSize, kSize),
-                                       gradientColorsA);
-  auto gradientB =
-      tgfx::Shader::MakeLinearGradient(tgfx::Point::Make(kSize, 0), tgfx::Point::Make(0, kSize),
-                                       gradientColorsB);
+  auto gradientA = tgfx::Shader::MakeLinearGradient(
+      tgfx::Point::Make(0, 0), tgfx::Point::Make(kSize, kSize), gradientColorsA);
+  auto gradientB = tgfx::Shader::MakeLinearGradient(tgfx::Point::Make(kSize, 0),
+                                                    tgfx::Point::Make(0, kSize), gradientColorsB);
   if (opaqueShader == nullptr || rampShader == nullptr || gradientA == nullptr ||
       gradientB == nullptr) {
     fprintf(stderr, "FAIL: shaders\n");
@@ -186,36 +191,41 @@ int main(int argc, char** argv) {
   // The blend-mode matrix below pairs two distinct gradients (different colors, opposite sweep
   // directions) at a fixed low paint alpha, so both operands always influence the output; the
   // earlier same-object pairing made both children identical.
-  scenes.emplace_back("blend_gradient_gradient_screen", [gradientA, gradientB](tgfx::Canvas* canvas) {
-    tgfx::Paint paint = {};
-    paint.setAlpha(kLowAlpha);
-    paint.setShader(tgfx::Shader::MakeBlend(tgfx::BlendMode::Screen, gradientA, gradientB));
-    canvas->drawRect(tgfx::Rect::MakeWH(kSize, kSize), paint);
-  });
-  scenes.emplace_back("blend_gradient_gradient_darken", [gradientA, gradientB](tgfx::Canvas* canvas) {
-    tgfx::Paint paint = {};
-    paint.setAlpha(kLowAlpha);
-    paint.setShader(tgfx::Shader::MakeBlend(tgfx::BlendMode::Darken, gradientA, gradientB));
-    canvas->drawRect(tgfx::Rect::MakeWH(kSize, kSize), paint);
-  });
-  scenes.emplace_back("blend_gradient_gradient_lighten", [gradientA, gradientB](tgfx::Canvas* canvas) {
-    tgfx::Paint paint = {};
-    paint.setAlpha(kLowAlpha);
-    paint.setShader(tgfx::Shader::MakeBlend(tgfx::BlendMode::Lighten, gradientA, gradientB));
-    canvas->drawRect(tgfx::Rect::MakeWH(kSize, kSize), paint);
-  });
-  scenes.emplace_back("blend_gradient_gradient_colorburn", [gradientA, gradientB](tgfx::Canvas* canvas) {
-    tgfx::Paint paint = {};
-    paint.setAlpha(kLowAlpha);
-    paint.setShader(tgfx::Shader::MakeBlend(tgfx::BlendMode::ColorBurn, gradientA, gradientB));
-    canvas->drawRect(tgfx::Rect::MakeWH(kSize, kSize), paint);
-  });
-  scenes.emplace_back("blend_gradient_gradient_colordodge", [gradientA, gradientB](tgfx::Canvas* canvas) {
-    tgfx::Paint paint = {};
-    paint.setAlpha(kLowAlpha);
-    paint.setShader(tgfx::Shader::MakeBlend(tgfx::BlendMode::ColorDodge, gradientA, gradientB));
-    canvas->drawRect(tgfx::Rect::MakeWH(kSize, kSize), paint);
-  });
+  scenes.emplace_back(
+      "blend_gradient_gradient_screen", [gradientA, gradientB](tgfx::Canvas* canvas) {
+        tgfx::Paint paint = {};
+        paint.setAlpha(kLowAlpha);
+        paint.setShader(tgfx::Shader::MakeBlend(tgfx::BlendMode::Screen, gradientA, gradientB));
+        canvas->drawRect(tgfx::Rect::MakeWH(kSize, kSize), paint);
+      });
+  scenes.emplace_back(
+      "blend_gradient_gradient_darken", [gradientA, gradientB](tgfx::Canvas* canvas) {
+        tgfx::Paint paint = {};
+        paint.setAlpha(kLowAlpha);
+        paint.setShader(tgfx::Shader::MakeBlend(tgfx::BlendMode::Darken, gradientA, gradientB));
+        canvas->drawRect(tgfx::Rect::MakeWH(kSize, kSize), paint);
+      });
+  scenes.emplace_back(
+      "blend_gradient_gradient_lighten", [gradientA, gradientB](tgfx::Canvas* canvas) {
+        tgfx::Paint paint = {};
+        paint.setAlpha(kLowAlpha);
+        paint.setShader(tgfx::Shader::MakeBlend(tgfx::BlendMode::Lighten, gradientA, gradientB));
+        canvas->drawRect(tgfx::Rect::MakeWH(kSize, kSize), paint);
+      });
+  scenes.emplace_back(
+      "blend_gradient_gradient_colorburn", [gradientA, gradientB](tgfx::Canvas* canvas) {
+        tgfx::Paint paint = {};
+        paint.setAlpha(kLowAlpha);
+        paint.setShader(tgfx::Shader::MakeBlend(tgfx::BlendMode::ColorBurn, gradientA, gradientB));
+        canvas->drawRect(tgfx::Rect::MakeWH(kSize, kSize), paint);
+      });
+  scenes.emplace_back(
+      "blend_gradient_gradient_colordodge", [gradientA, gradientB](tgfx::Canvas* canvas) {
+        tgfx::Paint paint = {};
+        paint.setAlpha(kLowAlpha);
+        paint.setShader(tgfx::Shader::MakeBlend(tgfx::BlendMode::ColorDodge, gradientA, gradientB));
+        canvas->drawRect(tgfx::Rect::MakeWH(kSize, kSize), paint);
+      });
   // Nested materialization with both branches visible: the inner blend (two distinct gradients)
   // is the SrcOver foreground at a reduced paint alpha, so the background gradient shows
   // through and the inner result is not masked by an opaque cover.
@@ -243,12 +253,13 @@ int main(int argc, char** argv) {
     paint.setShader(tgfx::Shader::MakeBlend(tgfx::BlendMode::SrcOver, opaqueShader, gradientB));
     canvas->drawRect(tgfx::Rect::MakeWH(kSize, kSize), paint);
   });
-  scenes.emplace_back("blend_gradient_gradient_lowalpha", [gradientA, gradientB](tgfx::Canvas* canvas) {
-    tgfx::Paint paint = {};
-    paint.setAlpha(kLowAlpha);
-    paint.setShader(tgfx::Shader::MakeBlend(tgfx::BlendMode::Multiply, gradientA, gradientB));
-    canvas->drawRect(tgfx::Rect::MakeWH(kSize, kSize), paint);
-  });
+  scenes.emplace_back(
+      "blend_gradient_gradient_lowalpha", [gradientA, gradientB](tgfx::Canvas* canvas) {
+        tgfx::Paint paint = {};
+        paint.setAlpha(kLowAlpha);
+        paint.setShader(tgfx::Shader::MakeBlend(tgfx::BlendMode::Multiply, gradientA, gradientB));
+        canvas->drawRect(tgfx::Rect::MakeWH(kSize, kSize), paint);
+      });
   scenes.emplace_back("long_chain_17", [rampImage](tgfx::Canvas* canvas) {
     std::shared_ptr<tgfx::ColorFilter> chain;
     for (int index = 0; index < 17; ++index) {
@@ -285,7 +296,7 @@ int main(int argc, char** argv) {
   });
   scenes.emplace_back("transparent_black_compose_chain", [rampImage](tgfx::Canvas* canvas) {
     auto inner = tgfx::ColorFilter::Compose(tgfx::ColorFilter::Luma(),
-                                             tgfx::ColorFilter::Matrix(kOffsetRed));
+                                            tgfx::ColorFilter::Matrix(kOffsetRed));
     auto composed = tgfx::ColorFilter::Compose(tgfx::ColorFilter::Matrix(kSwapRedBlue), inner);
     tgfx::Paint paint = {};
     paint.setColorFilter(composed);
@@ -297,6 +308,90 @@ int main(int argc, char** argv) {
     tgfx::Paint paint = {};
     paint.setImageFilter(tgfx::ImageFilter::Compose(blur, shadow));
     canvas->drawImage(rampImage, 0, 0, &paint);
+  });
+  // A Src blend under a non-pixel-aligned AA clip over a colored background: coverage must
+  // attenuate the destination outside the clip (c*S + (1-c)*D), not premultiply into the source.
+  scenes.emplace_back("clip_src_blend_image", [opaqueImage](tgfx::Canvas* canvas) {
+    canvas->clear(tgfx::Color(0.1f, 0.2f, 0.9f, 1.0f));
+    tgfx::Paint paint = {};
+    paint.setColorFilter(tgfx::ColorFilter::Matrix(kSwapRedBlue));
+    paint.setBlendMode(tgfx::BlendMode::Src);
+    canvas->clipRect(tgfx::Rect::MakeLTRB(12.5f, 10.5f, 83.4f, 85.6f), true);
+    canvas->drawImage(opaqueImage, 4, 4, &paint);
+  });
+  // Atlas text under a Src blend over a colored background: the glyph mask is true coverage
+  // (the destination is attenuated by the fractional glyph alpha), not source modulation.
+  scenes.emplace_back("atlas_text_src_blend", [](tgfx::Canvas* canvas) {
+    canvas->clear(tgfx::Color(0.0f, 0.3f, 0.8f, 1.0f));
+    auto typeface = tgfx::Typeface::MakeFromPath("resources/font/NotoSerifSC-Regular.otf");
+    if (typeface == nullptr) {
+      return;
+    }
+    tgfx::Font font(typeface, 40);
+    auto blob = tgfx::TextBlob::MakeFrom("TGFX", font);
+    if (blob == nullptr) {
+      return;
+    }
+    tgfx::Paint paint = {};
+    paint.setColor(tgfx::Color::Red());
+    paint.setBlendMode(tgfx::BlendMode::Src);
+    canvas->drawTextBlob(blob, 14, 58, paint);
+  });
+  // An NV12 frame with a color grade: the UV plane's chroma must read (U, V) on every backend
+  // binding, not (U, 1).
+  scenes.emplace_back("nv12_color_grade", [](tgfx::Canvas* canvas) {
+    static uint8_t planeY[16 * 16];
+    static uint8_t planeUV[8 * 16];
+    for (size_t index = 0; index < sizeof(planeY); ++index) {
+      planeY[index] = static_cast<uint8_t>(32 + index % 160);
+    }
+    for (size_t row = 0; row < 8; ++row) {
+      for (size_t col = 0; col < 8; ++col) {
+        planeUV[row * 16 + col * 2] = static_cast<uint8_t>(48 + (col * 11) % 160);
+        planeUV[row * 16 + col * 2 + 1] = static_cast<uint8_t>(200 - (col * 9) % 160);
+      }
+    }
+    const void* planeData[2] = {planeY, planeUV};
+    size_t planeRowBytes[2] = {16, 16};
+    auto yuvData = tgfx::YUVData::MakeFrom(16, 16, planeData, planeRowBytes, 2);
+    if (yuvData == nullptr) {
+      return;
+    }
+    auto image = tgfx::Image::MakeNV12(yuvData);
+    if (image == nullptr) {
+      return;
+    }
+    tgfx::Paint paint = {};
+    paint.setColorFilter(tgfx::ColorFilter::Matrix(kSwapRedBlue));
+    canvas->drawImageRect(image, tgfx::Rect::MakeXYWH(0, 0, 16, 16),
+                          tgfx::Rect::MakeWH(kSize, kSize), {}, &paint);
+  });
+  // A dual-gradient DstIn blend with a downstream threshold: the tree exceeds the chain's
+  // single-gradient budget, and the threshold makes the materialization admission refuse the
+  // blend retry (a stored byte rounding across the threshold's grid gap would flip step()), so
+  // the draw keeps its original tree on every path.
+  scenes.emplace_back(
+      "dual_gradient_dstin_threshold", [gradientA, gradientB](tgfx::Canvas* canvas) {
+        tgfx::Paint paint = {};
+        paint.setShader(tgfx::Shader::MakeBlend(tgfx::BlendMode::DstIn, gradientA, gradientB));
+        paint.setColorFilter(tgfx::ColorFilter::AlphaThreshold(1027.0f / 2048.0f));
+        canvas->drawRect(tgfx::Rect::MakeWH(kSize, kSize), paint);
+      });
+  // An alpha-only mask blended over a color image with a non-white paint tint: the alpha-only
+  // readback modulates by the child input, the advanced Multiply applies, and the paint tint
+  // rides the geometry color.
+  scenes.emplace_back("alpha_only_blend_tint", [opaqueImage, rampImage](tgfx::Canvas* canvas) {
+    auto colorShader =
+        tgfx::Shader::MakeImageShader(opaqueImage, tgfx::TileMode::Clamp, tgfx::TileMode::Clamp);
+    auto maskShader =
+        tgfx::Shader::MakeImageShader(rampImage, tgfx::TileMode::Clamp, tgfx::TileMode::Clamp);
+    if (colorShader == nullptr || maskShader == nullptr) {
+      return;
+    }
+    tgfx::Paint paint = {};
+    paint.setColor(tgfx::Color(1.0f, 0.2f, 0.1f, 1.0f));
+    paint.setShader(tgfx::Shader::MakeBlend(tgfx::BlendMode::Multiply, colorShader, maskShader));
+    canvas->drawRect(tgfx::Rect::MakeWH(kSize, kSize), paint);
   });
 
   std::string manifest = "{\"revision\": " + std::to_string(kSceneRevision) +
@@ -343,8 +438,8 @@ int main(int argc, char** argv) {
       continue;
     }
     manifest += (index == 0 ? "" : ", ") + std::string("\"") + scene.first + "\"";
-    timings += (index == 0 ? "" : ", ") + std::string("\"") + scene.first + "\": " +
-               std::to_string(steadyMicros);
+    timings += (index == 0 ? "" : ", ") + std::string("\"") + scene.first +
+               "\": " + std::to_string(steadyMicros);
   }
   manifest += "]}\n";
   FILE* file = fopen((outDir + "/manifest.json").c_str(), "w");
