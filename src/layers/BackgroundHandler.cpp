@@ -476,17 +476,25 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     BackgroundSnapshotKey key{layer, style};
     auto output = snapshots->styleOutputs.find(key);
     if (output == snapshots->styleOutputs.end()) {
-      auto visibleStyle = GetVisibleStyle(snapshots, layer, style);
-      auto picture = RecordStyleOutput(style, styleInput, alpha, visibleStyle);
-      if (picture != nullptr) {
-        // Bound the cached texture to the visible region, so small dirty rects do not allocate
-        // full-content textures.
-        auto shapeRect = Rect::MakeWH(static_cast<float>(contentEntry.image->width()),
-                                      static_cast<float>(contentEntry.image->height()));
-        if (visibleStyle == nullptr || shapeRect.intersect(*visibleStyle)) {
-          if (!shapeRect.isEmpty()) {
-            CacheStyleOutput(snapshots, args.context, layer, style, picture, recordMatrix,
-                             shapeRect, args.dstColorSpace);
+      // Capture pushes one entry per dispatch, so more than one entry for this key means the style
+      // was dispatched repeatedly in this frame, which a 3D subtree does by splitting the layer
+      // across BSP fragments. Each dispatch sampled a different backdrop, and one texture cannot
+      // serve them all, so let the null placeholder below force the direct path.
+      auto entryIt = snapshots->snapshots.find(key);
+      auto singleDispatch = entryIt == snapshots->snapshots.end() || entryIt->second.size() <= 1;
+      if (singleDispatch) {
+        auto visibleStyle = GetVisibleStyle(snapshots, layer, style);
+        auto picture = RecordStyleOutput(style, styleInput, alpha, visibleStyle);
+        if (picture != nullptr) {
+          // Bound the cached texture to the visible region, so small dirty rects do not allocate
+          // full-content textures.
+          auto shapeRect = Rect::MakeWH(static_cast<float>(contentEntry.image->width()),
+                                        static_cast<float>(contentEntry.image->height()));
+          if (visibleStyle == nullptr || shapeRect.intersect(*visibleStyle)) {
+            if (!shapeRect.isEmpty()) {
+              CacheStyleOutput(snapshots, args.context, layer, style, picture, recordMatrix,
+                               shapeRect, args.dstColorSpace);
+            }
           }
         }
       }
