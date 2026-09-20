@@ -485,16 +485,17 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
           if (!shapeRect.isEmpty()) {
             CacheStyleOutput(snapshots, args.context, layer, style, picture, recordMatrix,
                              shapeRect, args.dstColorSpace);
-            output = snapshots->styleOutputs.find(key);
-            if (output == snapshots->styleOutputs.end()) {
-              // The output could not be cached (an empty device shape, or rasterization failed).
-              // Remember the decision with a null entry so later passes draw the style directly
-              // instead of re-recording it only to reject it again.
-              snapshots->styleOutputs[key] = BackgroundSnapshotMap::StyleOutput();
-              output = snapshots->styleOutputs.find(key);
-            }
           }
         }
+      }
+      output = snapshots->styleOutputs.find(key);
+      if (output == snapshots->styleOutputs.end()) {
+        // Nothing was cached: no picture was recorded, the visible region does not meet the
+        // content, the device shape is empty, or the texture was rejected as too large. Remember
+        // the decision with a null entry so later passes draw the style directly instead of
+        // re-recording it only to discard it again.
+        snapshots->styleOutputs[key] = BackgroundSnapshotMap::StyleOutput();
+        output = snapshots->styleOutputs.find(key);
       }
     }
     if (output != snapshots->styleOutputs.end() && output->second.image != nullptr) {
