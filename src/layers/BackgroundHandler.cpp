@@ -299,7 +299,10 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   // The capture-side content offset is rasterized at capture density, which no longer matches
   // the consumer's style space once the background surface is downsampled, so the consumer
   // falls back to the unclipped path (visibleStyle == nullptr).
-  if (surfaceScale == 1.0f && !snapshots->visibleRects.empty() && visibleGroup != nullptr) {
+  // Only multi-pass frames share the style output, so single-pass frames skip this bound since
+  // nothing would read it.
+  if (snapshots->multiPass && surfaceScale == 1.0f && !snapshots->visibleRects.empty() &&
+      visibleGroup != nullptr) {
     Rect visibleWorld = Rect::MakeEmpty();
     for (const auto& renderRect : snapshots->visibleRects) {
       visibleWorld.join(renderRect);
