@@ -95,6 +95,21 @@ if (TGFX_USE_FREETYPE)
     set(TGFX_USE_PNG_DECODE ON)
 endif ()
 
+# Resolved before the backend checks below, which read CMAKE_OSX_DEPLOYMENT_TARGET to validate
+# their own requirements and would otherwise see an empty value.
+if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+    if (DEPLOYMENT_TARGET)
+        set(CMAKE_OSX_DEPLOYMENT_TARGET ${DEPLOYMENT_TARGET})
+    elseif (MACOS)
+        # Recent Apple toolchains reject the old 10.15/11.0 defaults: libc++ warns below 11.0
+        # (-Werror makes it fatal) and the SDK refuses below 12.0 with the Xcode generator.
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0")
+    elseif (IOS)
+        # libc++ and the SDK both reject a deployment target below 15.0.
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "15.0")
+    endif ()
+endif ()
+
 if (TGFX_USE_VULKAN)
     if (NOT WIN32 AND NOT APPLE AND NOT OHOS AND NOT ANDROID)
         message(FATAL_ERROR "TGFX_USE_VULKAN is currently supported on Windows, macOS, OHOS and Android only.")
@@ -176,24 +191,6 @@ message("TGFX_BUILD_TESTS: ${TGFX_BUILD_TESTS}")
 message("TGFX_BUILD_FRAMEWORK: ${TGFX_BUILD_FRAMEWORK}")
 message("TGFX_USE_TEXT_GAMMA_CORRECTION: ${TGFX_USE_TEXT_GAMMA_CORRECTION}")
 message("TGFX_ENABLE_STENCIL_COVER_PATH: ${TGFX_ENABLE_STENCIL_COVER_PATH}")
-
-if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
-    if (DEPLOYMENT_TARGET)
-        set(CMAKE_OSX_DEPLOYMENT_TARGET ${DEPLOYMENT_TARGET})
-    elseif (MACOS)
-        # 10.15 is no longer a usable default: the libc++ shipped with recent SDKs (Xcode 26 and
-        # later) does not support macOS below 11.0 and emits a warning there, which -Werror turns
-        # into a build failure on every architecture. The architecture no longer has to be guessed
-        # for this decision.
-        set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0")
-    elseif (IOS)
-        if (TGFX_USE_METAL)
-            set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0")
-        else ()
-            set(CMAKE_OSX_DEPLOYMENT_TARGET "9.0")
-        endif ()
-    endif ()
-endif ()
 
 file(GLOB_RECURSE TGFX_HEADERS include/*.h)
 list(APPEND TGFX_FILES ${TGFX_HEADERS})

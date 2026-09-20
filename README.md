@@ -18,10 +18,10 @@ and various video-editing apps.
 
 ## Platform Support
 
-- iOS 9.0+
+- iOS 15.0+
 - Android 5.0+
 - HarmonyOS 5.0+
-- macOS 10.15+
+- macOS 12.0+
 - Windows 7.0+
 - Linux (No specific version requirement)
 - Chrome 69.0+ (Web)
@@ -40,7 +40,7 @@ and various video-editing apps.
 
 TGFX uses **C++17** features. Here are the minimum tools needed to build TGFX on different platforms:
 
-- Xcode 11.0+
+- Xcode 13.0+
 - GCC 9.0+
 - Visual Studio 2019+
 - NodeJS 14.14.0+
