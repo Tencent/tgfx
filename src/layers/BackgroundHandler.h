@@ -216,8 +216,8 @@ class BackgroundConsumer : public BackgroundHandler {
   // rather than masking it with synthesis.
   // shareStyleOutput: the display list enables this only when the background color is fully
   // opaque (which is what makes SrcOver compositing of the cached output match the style's own
-  // Src draw) and the frame renders through multiple passes, since that is when caching pays
-  // for its rasterization.
+  // Src draw), the frame renders through multiple passes, and those passes cover compact render
+  // rects, since that is when caching pays for its rasterization.
   BackgroundConsumer(BackgroundSnapshotMap* snapshots, bool shareStyleOutput)
       : snapshots(snapshots), shareStyleOutput(shareStyleOutput) {
   }
