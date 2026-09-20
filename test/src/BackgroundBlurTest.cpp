@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <algorithm>
+#include <vector>
+#include "layers/BackgroundSnapshotMap.h"
 #include "layers/RootLayer.h"
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/layers/DisplayList.h"
@@ -1209,7 +1211,7 @@ TGFX_TEST(BackgroundBlurTest, SharedStyleOutput3D) {
 
   auto marker2 = ShapeLayer::Make();
   auto marker2Path = Path();
-  marker2Path.addRect(Rect::MakeXYWH(210, 220, 20, 20));
+  marker2Path.addRect(Rect::MakeXYWH(200, 140, 20, 20));
   marker2->setPath(marker2Path);
   marker2->setFillStyle(ShapeStyle::Make(Color::FromRGBA(250, 60, 60, 255)));
   displayList.root()->addChild(marker2);
@@ -1307,6 +1309,113 @@ TGFX_TEST(BackgroundBlurTest, BackgroundBlurUnderHighZoom) {
   marker2->setFillStyle(ShapeStyle::Make(Color::FromRGBA(60, 60, 250, 255)));
   displayList.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/BackgroundBlurUnderHighZoom"));
+}
+
+/**
+ * The shared style output is rasterized over the union of the frame's render rects, so sharing only
+ * pays off while that union stays close to the sum of the rects it covers: adjacent dirty rects
+ * keep the union at their own size, while rects in opposite corners make it the whole surface and
+ * measuring shows per-pass drawing is then several times faster. The gate is a pure function of the
+ * render rects, so assert it directly instead of through a screenshot: sharing and direct drawing
+ * produce the same pixels, which makes any screenshot unable to tell the two paths apart.
+ */
+TGFX_TEST(BackgroundBlurTest, StyleShareCompactGate) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  DisplayList displayList;
+  displayList.setBackgroundColor(Color::White());
+  auto blurLayer = SolidLayer::Make();
+  blurLayer->setWidth(400);
+  blurLayer->setHeight(400);
+  blurLayer->setLayerStyles({BackgroundBlurStyle::Make(2, 2)});
+  displayList.root()->addChild(blurLayer);
+  // One frame so the tree is prepared and its background outset is known; captureBackgrounds
+  // returns null before that.
+  displayList.render(surface.get());
+
+  // Two 100x100 rects across the diagonal of a 200x200 box: the union is exactly twice their sum,
+  // which is the gate's boundary, and the boundary itself still shares.
+  auto atBoundary = displayList.captureBackgrounds(
+      surface.get(), {Rect::MakeXYWH(0, 0, 100, 100), Rect::MakeXYWH(100, 100, 100, 100)});
+  EXPECT_TRUE(atBoundary != nullptr);
+  EXPECT_TRUE(atBoundary->styleShareCompact);
+
+  // One pixel further apart and the union grows past the boundary.
+  auto pastBoundary = displayList.captureBackgrounds(
+      surface.get(), {Rect::MakeXYWH(0, 0, 100, 100), Rect::MakeXYWH(101, 100, 100, 100)});
+  EXPECT_TRUE(pastBoundary != nullptr);
+  EXPECT_FALSE(pastBoundary->styleShareCompact);
+
+  // Opposite corners of the surface: the union is the whole surface.
+  auto scattered = displayList.captureBackgrounds(
+      surface.get(), {Rect::MakeXYWH(0, 0, 100, 100), Rect::MakeXYWH(300, 300, 100, 100)});
+  EXPECT_TRUE(scattered != nullptr);
+  EXPECT_FALSE(scattered->styleShareCompact);
+
+  // Submitting flushes the render tasks these captures queued, so they do not leak into the next
+  // test through the shared drawing buffer.
+  context->flushAndSubmit();
+}
+
+/**
+ * The cached style output is rasterized in device space, so it is clipped to the render target:
+ * past the target is never visible. Without the clip the texture spans the style's content extent
+ * instead, which under a 512x zoom is 20000 device pixels wide, because the style-space bound is
+ * unavailable when the background surface is downsampled. The clip leaves no trace in the pixels
+ * — a larger texture simply paints the same on-screen area — so assert the cached size directly.
+ */
+TGFX_TEST(BackgroundBlurTest, StyleOutputClippedToTarget) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  constexpr int TargetWidth = 2048;
+  constexpr int TargetHeight = 256;
+  auto surface = Surface::Make(context, TargetWidth, TargetHeight);
+  DisplayList displayList;
+  displayList.setBackgroundColor(Color::White());
+  displayList.setZoomScale(512.0f);
+
+  const float inverseZoom = 1.0f / 512.0f;
+  auto back = SolidLayer::Make();
+  back->setColor(Color::FromRGBA(70, 130, 190, 255));
+  back->setWidth(2048 * inverseZoom);
+  back->setHeight(256 * inverseZoom);
+  displayList.root()->addChild(back);
+
+  // Content 20000 device pixels wide: only the clip to the render target bounds the cached output.
+  auto styledLayer = SolidLayer::Make();
+  styledLayer->setColor(Color::FromRGBA(255, 255, 255, 60));
+  styledLayer->setWidth(20000 * inverseZoom);
+  styledLayer->setHeight(256 * inverseZoom);
+  styledLayer->setLayerStyles({BackgroundBlurStyle::Make(1, 1)});
+  displayList.root()->addChild(styledLayer);
+
+  // One frame first: captureBackgrounds needs the tree's background outset, which is computed
+  // while rendering.
+  displayList.render(surface.get());
+
+  // Two rects covering the target in halves turn multi-pass rendering on while staying compact,
+  // which is what the shared style output requires.
+  const auto halfWidth = static_cast<float>(TargetWidth) * 0.5f;
+  const auto height = static_cast<float>(TargetHeight);
+  auto snapshots = displayList.captureBackgrounds(
+      surface.get(),
+      {Rect::MakeWH(halfWidth, height), Rect::MakeXYWH(halfWidth, 0.f, halfWidth, height)});
+  ASSERT_TRUE(snapshots != nullptr);
+  displayList.drawRootLayer(surface.get(), Rect::MakeWH(static_cast<float>(TargetWidth), height),
+                            displayList.getViewMatrix(), true, snapshots.get());
+
+  // Submitting flushes the render tasks this frame queued, so they do not leak into the next test
+  // through the shared drawing buffer.
+  context->flushAndSubmit();
+
+  ASSERT_EQ(snapshots->styleOutputs.size(), 1u);
+  auto image = snapshots->styleOutputs.begin()->second.image;
+  EXPECT_TRUE(image != nullptr);
+  EXPECT_EQ(static_cast<int>(image->width()), TargetWidth);
+  EXPECT_EQ(static_cast<int>(image->height()), TargetHeight);
 }
 
 }  // namespace tgfx

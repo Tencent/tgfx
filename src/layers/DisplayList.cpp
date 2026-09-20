@@ -1174,8 +1174,8 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   // SrcOver compositing of the shared style output matches the style's own Src draw only over
   // an opaque backdrop, and caching only pays off when the frame renders through multiple
   // passes, so sharing is gated on both.
-  BackgroundConsumer consumer(
-      snapshots, snapshots != nullptr && _backgroundColor.isOpaque() && snapshots->multiPass);
+  BackgroundConsumer consumer(snapshots, snapshots != nullptr && _backgroundColor.isOpaque() &&
+                                             snapshots->multiPass && snapshots->styleShareCompact);
   args.backgroundHandler = snapshots ? &consumer : BackgroundHandler::NoOp();
   _root->drawLayer(args, surface->getCanvas(), 1.0f, BlendMode::SrcOver);
 }
@@ -1231,6 +1231,23 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   auto snapshotMap = std::make_unique<BackgroundSnapshotMap>();
   snapshotMap->multiPass = renderRects.size() > 1;
   snapshotMap->visibleRects = std::move(visibleRects);
+  snapshotMap->renderTargetWidth = surface->width();
+  snapshotMap->renderTargetHeight = surface->height();
+  {
+    auto unionRect = Rect::MakeEmpty();
+    for (const auto& rect : renderRects) {
+      unionRect.join(rect);
+    }
+    auto sumArea = 0.0;
+    for (const auto& rect : renderRects) {
+      sumArea += static_cast<double>(rect.width()) * static_cast<double>(rect.height());
+    }
+    constexpr double MaxUnionOverSum = 2.0;
+    snapshotMap->styleShareCompact =
+        sumArea <= 0.0 ||
+        static_cast<double>(unionRect.width()) * static_cast<double>(unionRect.height()) <=
+            MaxUnionOverSum * sumArea;
+  }
   // Draw backgroundColor before the layer tree so that the capture pass includes it as part of
   // the background for blur/backdrop effects.
   if (_backgroundColor != Color::Transparent()) {

@@ -134,10 +134,9 @@ std::shared_ptr<Picture> RecordStyleOutput(LayerStyle* style, const LayerStyleIn
 // Rasterizes a style-space picture at device resolution and stores it in the frame's style
 // output cache, so later passes composite one texture with SrcOver instead of re-running the
 // style.
-void CacheStyleOutput(BackgroundSnapshotMap* snapshots, Context* context, Layer* layer,
-                      LayerStyle* style, const std::shared_ptr<Picture>& picture,
-                      const Matrix& recordMatrix, const Rect& shapeRect,
-                      std::shared_ptr<ColorSpace> dstColorSpace) {
+void CacheStyleOutput(BackgroundSnapshotMap* snapshots, Layer* layer, LayerStyle* style,
+                      const std::shared_ptr<Picture>& picture, const Matrix& recordMatrix,
+                      const Rect& shapeRect, std::shared_ptr<ColorSpace> dstColorSpace) {
   PictureRecorder deviceRecorder = {};
   auto* deviceRecording = deviceRecorder.beginRecording();
   deviceRecording->concat(recordMatrix);
@@ -148,20 +147,17 @@ void CacheStyleOutput(BackgroundSnapshotMap* snapshots, Context* context, Layer*
   }
   auto deviceShape = recordMatrix.mapRect(shapeRect);
   deviceShape.roundOut();
+  // The cached output is rasterized in device space, so clip it to the render target: past the
+  // target is never visible. This is what keeps the texture at on-screen size when the
+  // style-space bound is unavailable (a downsampled background surface, where the capture density
+  // no longer matches the consumer's style space and shapeRect spans the whole content) or when
+  // the content extent is orders of magnitude larger than the target.
+  if (snapshots->renderTargetWidth > 0 && snapshots->renderTargetHeight > 0) {
+    deviceShape.intersect(Rect::MakeWH(static_cast<float>(snapshots->renderTargetWidth),
+                                       static_cast<float>(snapshots->renderTargetHeight)));
+  }
   if (deviceShape.isEmpty()) {
     return;
-  }
-  // The visible-region bound normally keeps the cached texture at on-screen size, but it is
-  // unavailable when the background surface is downsampled (capture density no longer matches
-  // the consumer's style space), and shapeRect then spans the whole content. A texture past the
-  // GPU limit is never allocated, so the blit is dropped silently and the style stops showing
-  // up. Draw those directly instead: the direct path rasterizes only the part each pass covers,
-  // which always fits in one render target.
-  if (context != nullptr && context->gpu() != nullptr) {
-    auto limit = static_cast<float>(context->gpu()->limits()->maxTextureDimension2D);
-    if (deviceShape.width() > limit || deviceShape.height() > limit) {
-      return;
-    }
   }
   Point imageOffset = {};
   auto image =
@@ -469,13 +465,13 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
                                       static_cast<float>(contentEntry.image->height()));
         if (visibleStyle == nullptr || shapeRect.intersect(*visibleStyle)) {
           if (!shapeRect.isEmpty()) {
-            CacheStyleOutput(snapshots, args.context, layer, style, picture, recordMatrix,
-                             shapeRect, args.dstColorSpace);
+            CacheStyleOutput(snapshots, layer, style, picture, recordMatrix, shapeRect,
+                             args.dstColorSpace);
             output = snapshots->styleOutputs.find(key);
             if (output == snapshots->styleOutputs.end()) {
-              // The output could not be cached (a texture past the GPU limit, or an empty
-              // shape). Remember the decision with a null entry so later passes draw the style
-              // directly instead of re-recording it only to reject it again.
+              // The output could not be cached (an empty device shape, or rasterization failed).
+              // Remember the decision with a null entry so later passes draw the style directly
+              // instead of re-recording it only to reject it again.
               snapshots->styleOutputs[key] = BackgroundSnapshotMap::StyleOutput();
               output = snapshots->styleOutputs.find(key);
             }
