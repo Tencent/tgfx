@@ -1293,8 +1293,8 @@ TGFX_TEST(BackgroundBlurTest, BackgroundBlurUnderHighZoom) {
   marker2->setFillStyle(ShapeStyle::Make(Color::FromRGBA(250, 60, 60, 255)));
   displayList.root()->addChild(marker2);
 
-  // Blur panel covering both marker tiles, so the frame rasterizes its output once and reuses it
-  // in every dirty tile's pass.
+  // Blur panel covering both markers: at this zoom their dirty rects expand past the panel and
+  // merge into a single pass, so the frame draws the style directly instead of caching it.
   auto styledLayer = SolidLayer::Make();
   styledLayer->setColor(Color::FromRGBA(255, 255, 255, 60));
   styledLayer->setWidth(200 * inverseZoom);
