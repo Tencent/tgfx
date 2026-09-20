@@ -134,9 +134,10 @@ std::shared_ptr<Picture> RecordStyleOutput(LayerStyle* style, const LayerStyleIn
 // Rasterizes a style-space picture at device resolution and stores it in the frame's style
 // output cache, so later passes composite one texture with SrcOver instead of re-running the
 // style.
-void CacheStyleOutput(BackgroundSnapshotMap* snapshots, Layer* layer, LayerStyle* style,
-                      const std::shared_ptr<Picture>& picture, const Matrix& recordMatrix,
-                      const Rect& shapeRect, std::shared_ptr<ColorSpace> dstColorSpace) {
+void CacheStyleOutput(BackgroundSnapshotMap* snapshots, Context* context, Layer* layer,
+                      LayerStyle* style, const std::shared_ptr<Picture>& picture,
+                      const Matrix& recordMatrix, const Rect& shapeRect,
+                      std::shared_ptr<ColorSpace> dstColorSpace) {
   PictureRecorder deviceRecorder = {};
   auto* deviceRecording = deviceRecorder.beginRecording();
   deviceRecording->concat(recordMatrix);
@@ -147,16 +148,33 @@ void CacheStyleOutput(BackgroundSnapshotMap* snapshots, Layer* layer, LayerStyle
   }
   auto deviceShape = recordMatrix.mapRect(shapeRect);
   deviceShape.roundOut();
-  // The cached output is rasterized in device space, so clip it to the render target: past the
-  // target is never visible. This is what keeps the texture at on-screen size when the
-  // style-space bound is unavailable (a downsampled background surface, where the capture density
-  // no longer matches the consumer's style space and shapeRect spans the whole content) or when
-  // the content extent is orders of magnitude larger than the target.
-  if (snapshots->renderTargetWidth > 0 && snapshots->renderTargetHeight > 0) {
-    deviceShape.intersect(Rect::MakeWH(static_cast<float>(snapshots->renderTargetWidth),
-                                       static_cast<float>(snapshots->renderTargetHeight)));
-  }
   if (deviceShape.isEmpty()) {
+    return;
+  }
+  // The visible-region bound normally keeps the cached texture at on-screen size, but it is
+  // unavailable when the background surface is downsampled (the capture density no longer matches
+  // the consumer's style space) and shapeRect then spans the whole content. Under zoom that is
+  // orders of magnitude larger than the render target, so a texture past the GPU limit would fail
+  // to allocate, be dropped silently and take the style down with it. Draw those directly instead:
+  // the direct path rasterizes only the part each pass covers, which always fits in one target.
+  // Clipping deviceShape to the render target is not an option here: the device space of a tile's
+  // canvas is not the render target's space, and Rect::intersect leaves the rect unchanged when
+  // the two do not overlap, which is exactly the far-out zoom case.
+  if (context != nullptr && context->gpu() != nullptr) {
+    auto limit = static_cast<float>(context->gpu()->limits()->maxTextureDimension2D);
+    if (deviceShape.width() > limit || deviceShape.height() > limit) {
+      return;
+    }
+  }
+  // A texture that fits both dimensions can still be enormous (e.g. 16000x16000 RGBA is ~1GB) and
+  // this cache is rebuilt every frame, so cap the total area as well.
+  constexpr double MaxAreaFactor = 4.0;
+  auto targetArea = static_cast<double>(snapshots->renderTargetWidth) *
+                    static_cast<double>(snapshots->renderTargetHeight);
+  auto areaBudget = targetArea * MaxAreaFactor;
+  if (areaBudget > 0.0 &&
+      static_cast<double>(deviceShape.width()) * static_cast<double>(deviceShape.height()) >
+          areaBudget) {
     return;
   }
   Point imageOffset = {};
@@ -465,8 +483,8 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
                                       static_cast<float>(contentEntry.image->height()));
         if (visibleStyle == nullptr || shapeRect.intersect(*visibleStyle)) {
           if (!shapeRect.isEmpty()) {
-            CacheStyleOutput(snapshots, layer, style, picture, recordMatrix, shapeRect,
-                             args.dstColorSpace);
+            CacheStyleOutput(snapshots, args.context, layer, style, picture, recordMatrix,
+                             shapeRect, args.dstColorSpace);
             output = snapshots->styleOutputs.find(key);
             if (output == snapshots->styleOutputs.end()) {
               // The output could not be cached (an empty device shape, or rasterization failed).

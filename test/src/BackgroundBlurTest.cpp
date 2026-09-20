@@ -1360,13 +1360,13 @@ TGFX_TEST(BackgroundBlurTest, StyleShareCompactGate) {
 }
 
 /**
- * The cached style output is rasterized in device space, so it is clipped to the render target:
- * past the target is never visible. Without the clip the texture spans the style's content extent
- * instead, which under a 512x zoom is 20000 device pixels wide, because the style-space bound is
- * unavailable when the background surface is downsampled. The clip leaves no trace in the pixels
- * — a larger texture simply paints the same on-screen area — so assert the cached size directly.
+ * A style whose content extent is far larger than the render target (here a 20000-pixel-wide layer
+ * under a 512x zoom, where the style-space bound is unavailable because the background surface is
+ * downsampled) cannot have its output cached: no texture can hold it. The frame records that
+ * decision so every pass draws the style directly instead of retrying the oversized rasterization,
+ * which is what keeps the style on screen.
  */
-TGFX_TEST(BackgroundBlurTest, StyleOutputClippedToTarget) {
+TGFX_TEST(BackgroundBlurTest, StyleOutputOversizeFallsBack) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -1384,7 +1384,7 @@ TGFX_TEST(BackgroundBlurTest, StyleOutputClippedToTarget) {
   back->setHeight(256 * inverseZoom);
   displayList.root()->addChild(back);
 
-  // Content 20000 device pixels wide: only the clip to the render target bounds the cached output.
+  // Content 20000 device pixels wide: the cached output cannot fit in one texture.
   auto styledLayer = SolidLayer::Make();
   styledLayer->setColor(Color::FromRGBA(255, 255, 255, 60));
   styledLayer->setWidth(20000 * inverseZoom);
@@ -1411,11 +1411,10 @@ TGFX_TEST(BackgroundBlurTest, StyleOutputClippedToTarget) {
   // through the shared drawing buffer.
   context->flushAndSubmit();
 
+  // The decision is remembered as a null entry, which is what sends the later passes down the
+  // direct path.
   ASSERT_EQ(snapshots->styleOutputs.size(), 1u);
-  auto image = snapshots->styleOutputs.begin()->second.image;
-  EXPECT_TRUE(image != nullptr);
-  EXPECT_EQ(static_cast<int>(image->width()), TargetWidth);
-  EXPECT_EQ(static_cast<int>(image->height()), TargetHeight);
+  EXPECT_TRUE(snapshots->styleOutputs.begin()->second.image == nullptr);
 }
 
 }  // namespace tgfx
