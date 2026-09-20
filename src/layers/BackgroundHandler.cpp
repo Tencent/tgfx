@@ -464,15 +464,14 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   }
 
   // On the first pass that needs it, rasterize the style's output once and cache it; every
-  // pass — this one included — composites the same texture back with SrcOver. The image
-  // carries the style's own mask as its alpha, so compositing it once reproduces the direct
-  // draw for opaque backdrops, and passes within a frame differ only by an integer
-  // translation, so the blit stays 1:1.
+  // pass — this one included — composites the same texture back with SrcOver. The image carries
+  // the style's own mask as its alpha, so compositing it once reproduces the direct draw for
+  // opaque backdrops. Passes within a frame normally differ by an integer translation, which
+  // keeps the blit 1:1; a projective recordMatrix instead resamples the cached texture on blit,
+  // which is accepted: the cached output still covers every visible pixel, and a non-degenerate
+  // projective map of the visible rect stays inside its corner hull, so deviceShape remains a
+  // valid bound.
   auto recordMatrix = canvas->getMatrix();
-  // A projective recordMatrix resamples the cached texture on blit instead of evaluating the
-  // style per pass, which differs by at most 1/255 (rounding only). That is accepted: the cached
-  // output still covers every visible pixel, and a non-degenerate projective map of the visible
-  // rect stays inside its corner hull, so deviceShape remains a valid bound.
   if (snapshots != nullptr && shareStyleOutput) {
     BackgroundSnapshotKey key{layer, style};
     auto output = snapshots->styleOutputs.find(key);
