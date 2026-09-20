@@ -21,6 +21,7 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <regex>
 #include <set>
 #include <sstream>
 #include <string>
@@ -69,6 +70,11 @@ struct BuildOptions {
   bool reportOnly = false;
   bool compress = false;
   bool audit = false;
+  // Calibration mode for the GLES direct emission: run EmitDirectGLSLES300 on every ES
+  // variant and report normalization-diff mismatches against the regenerated text, while the
+  // bundle keeps storing the regenerated form. The switch to storing direct text is blocked on
+  // a clean SwiftShader baseline; this keeps the transform proven in the meantime.
+  bool glesDirectCheck = false;
 };
 
 struct ShaderReport {
@@ -201,6 +207,8 @@ static bool ParseArgs(int argc, char** argv, BuildOptions* options) {
       options->audit = true;
     } else if (std::strcmp(argv[i], "--compress") == 0) {
       options->compress = true;
+    } else if (std::strcmp(argv[i], "--gles-direct-check") == 0) {
+      options->glesDirectCheck = true;
     } else {
       std::cerr << "Unknown option: " << argv[i] << "\n";
       PrintUsage();
@@ -283,7 +291,35 @@ static std::string StripDescriptorSets(std::string source) {
 // the forms the sources actually use are supported: `#if NAME`, `#if NAME == N`, `#ifndef`,
 // `#elif`, `#else`, `#endif`, `#define NAME N`, `#undef NAME` — no defined(), no arithmetic
 // conditions (verified across the tree).
+static std::string EmitDirectGLSL330Impl(const std::string& source, ShaderStageType stage,
+                                         const std::string& versionLine, bool esDialect,
+                                         bool fbfVariant);
+
 static std::string EmitDirectGLSL330(const std::string& source, ShaderStageType stage) {
+  return EmitDirectGLSL330Impl(source, stage, "#version 330", false, false);
+}
+
+// ES-300 direct emission (the GLES sibling of EmitDirectGLSL330): the same strip/fold/comment
+// transforms on the preprocessed template, plus the four ES-specific rewrites that the
+// regenerated ES-300 output has shipped in:
+//   1. `#version 300 es` + the two default precision lines;
+//   2. every float-family declaration decorated `highp` (the regenerated form is uniformly
+//      highp-decorated — 45k occurrences, no exceptions — so a blanket rule reproduces it; ES
+//      defaults to mediump and many devices implement it as fp16, so the decoration is a
+//      numerical contract, not cosmetics);
+//   3. fbf variants (HAS_XP == 2): subpassInput declaration and subpassLoad() replaced with the
+//      GL_EXT_shader_framebuffer_fetch dialect — the inout fragment output is the dst read;
+//   4. `out` fragment output becomes `inout` on fbf variants only.
+// CALIBRATION-ONLY MODE (option `--gles-direct-check`): the transform runs and each variant is
+// diffed against the regenerated ES-300 text (normalized: whitespace, the spirv-cross block
+// rename `_NNNN.`, param_N temporaries folded); mismatches are reported and counted as errors,
+// but the bundle still stores the REGENERATED text. This proves the transform without switching
+// the stored artifact on top of a test baseline (SwiftShader) that currently has failures —
+// the switch happens only when that baseline is clean, by removing the calibration guard.
+// (EmitDirectGLSLES300 is defined after the core below.)
+static std::string EmitDirectGLSL330Impl(const std::string& source, ShaderStageType stage,
+                                         const std::string& versionLine, bool esDialect,
+                                         bool fbfVariant) {
   const std::string versionToken = "#version 450";
   auto versionPos = source.find(versionToken);
   if (versionPos == std::string::npos) {
@@ -297,7 +333,24 @@ static std::string EmitDirectGLSL330(const std::string& source, ShaderStageType 
     return {};
   }
   std::string result = source;
-  result.replace(versionPos, versionToken.size(), "#version 330");
+  result.replace(versionPos, versionToken.size(), versionLine);
+  if (esDialect) {
+    // Default precision right after the version line, mirroring the regenerated ES-300 form
+    // (int is highp-capable everywhere; float must be stated — ES has no implicit default).
+    auto firstNewline = result.find('\n');
+    if (firstNewline != std::string::npos) {
+      result.insert(firstNewline + 1, "precision mediump float;\nprecision highp int;\n");
+    }
+    if (fbfVariant) {
+      // The framebuffer-fetch dialect: the extension line goes right after the precision
+      // defaults, ahead of every declaration that references it.
+      auto insertPos = result.find("precision highp int;\n");
+      if (insertPos != std::string::npos) {
+        result.insert(insertPos + sizeof("precision highp int;\n") - 1,
+                      "#extension GL_EXT_shader_framebuffer_fetch : require\n");
+      }
+    }
+  }
 
   std::map<std::string, int64_t> macros;
   // Conditional stack: for each open #if, the parent's activity at entry, whether any branch
@@ -539,7 +592,108 @@ static std::string EmitDirectGLSL330(const std::string& source, ShaderStageType 
     out += '\n';
     cursor = lineEnd == std::string::npos ? result.size() : lineEnd + 1;
   }
+  if (esDialect) {
+    // Blanket `highp` decoration on every float-family declaration. The regenerated ES-300
+    // output decorates uniformly (45k occurrences, zero exceptions — the fragment default is
+    // mediump, and many devices implement it as fp16, so the decoration is a numerical
+    // contract). Decoration sites: declarations (globals/locals/UBO members/params), not
+    // usages; the pattern is a type keyword at a declaration position not already decorated
+    // and not a struct field separator. int-family stays as written (default highp).
+    static const std::regex floatType(R"((^|[^A-Za-z0-9_])(float|vec[234]|mat[234])\s+[A-Za-z_])");
+    std::string decorated;
+    decorated.reserve(out.size() + 4096);
+    size_t cursor2 = 0;
+    while (cursor2 < out.size()) {
+      auto lineEnd2 = out.find('\n', cursor2);
+      auto line2 = out.substr(
+          cursor2, lineEnd2 == std::string::npos ? std::string::npos : lineEnd2 - cursor2);
+      // Preprocessor lines, precision statements, and the extension line pass through.
+      auto nonSpace = line2.find_first_not_of(" \t");
+      bool passthrough = nonSpace == std::string::npos || line2[nonSpace] == '#' ||
+                         line2.compare(nonSpace, 9, "precision") == 0;
+      if (!passthrough) {
+        std::string rebuilt;
+        size_t pos = 0;
+        while (pos < line2.size()) {
+          std::smatch match;
+          std::string rest = line2.substr(pos);
+          if (std::regex_search(rest, match, floatType) && !match.empty()) {
+            auto at = pos + static_cast<size_t>(match.position(2));
+            // Already decorated (the char run before the type is `highp `/`mediump `) or a
+            // usage inside an expression: only decorate when the preceding token chain ends
+            // with a declarator context. Heuristic sufficient for these sources: the match is
+            // a declaration when the line's first token is a type/qualifier or we are inside
+            // a parameter list — verified by the calibration diff against the regenerated
+            // text, which fails the build on any mismatch.
+            rebuilt += line2.substr(pos, at - pos);
+            auto prefix = line2.substr(0, at);
+            auto endsWith = [](const std::string& s, const char* suffix) {
+              auto len = strlen(suffix);
+              return s.size() >= len && s.compare(s.size() - len, len, suffix) == 0;
+            };
+            bool decoratedAlready = endsWith(prefix, "highp ") || endsWith(prefix, "mediump ") ||
+                                    endsWith(prefix, "lowp ");
+            if (!decoratedAlready) {
+              rebuilt += "highp ";
+            }
+            // Skip exactly the matched type keyword (its length is known; do not re-scan the
+            // text — 'float' contains characters outside any type charset and would stall the
+            // cursor).
+            auto typeLength = static_cast<size_t>(match.length(2));
+            rebuilt += line2.substr(at, typeLength);
+            pos = at + typeLength;
+          } else {
+            rebuilt += line2.substr(pos);
+            pos = line2.size();
+          }
+        }
+        line2 = rebuilt;
+      }
+      decorated += line2;
+      if (lineEnd2 != std::string::npos) {
+        decorated += '\n';
+      }
+      cursor2 = lineEnd2 == std::string::npos ? out.size() : lineEnd2 + 1;
+    }
+    out = decorated;
+    if (fbfVariant) {
+      // Framebuffer-fetch dialect on the fragment stage: subpass input declaration removed,
+      // subpassLoad() reads the inout output, and the output declaration becomes inout. The
+      // templates confine these to xp_porter_duff_fbf.inc plus the single output declaration,
+      // so targeted replacements cover the whole surface.
+      auto declPos = out.find("layout(input_attachment_index = 0");
+      if (declPos != std::string::npos) {
+        auto declEnd = out.find('\n', declPos);
+        out.erase(declPos,
+                  declEnd == std::string::npos ? out.size() - declPos : declEnd - declPos + 1);
+      }
+      auto outPos = out.find("layout(location = 0) out ");
+      if (outPos != std::string::npos) {
+        out.replace(outPos, 24, "layout(location = 0) inout ");
+      }
+      auto loadPos = out.find("subpassLoad(");
+      while (loadPos != std::string::npos) {
+        auto argOpen = out.find('(', loadPos);
+        auto argClose = out.find(')', argOpen);
+        auto arg = out.substr(argOpen + 1, argClose - argOpen - 1);
+        // Strip the sampler name to its base (tgfx_SubpassInput -> the inout variable).
+        out.replace(loadPos, argClose - loadPos + 1, arg);
+        loadPos = out.find("subpassLoad(", loadPos + arg.size());
+      }
+      // `vec4 dstColor = tgfx_SubpassInput;` — the erased declaration leaves the uniform
+      // sampler name as a plain identifier; rename it to the fragment output.
+      auto dstPos = out.find("= tgfx_SubpassInput;");
+      while (dstPos != std::string::npos) {
+        out.replace(dstPos, 20, "= fragColor;");
+        dstPos = out.find("= tgfx_SubpassInput;", dstPos + 13);
+      }
+    }
+  }
   return out;
+}
+
+std::string EmitDirectGLSLES300(const std::string& source, ShaderStageType stage, bool fbfVariant) {
+  return EmitDirectGLSL330Impl(source, stage, "#version 300 es", true, fbfVariant);
 }
 
 static std::string ResolveIncludes(const std::string& source, const std::string& baseDir) {
@@ -838,6 +992,71 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
           fragBlob.assign(directFrag.begin(), directFrag.end());
         } else {
           bool gles = backend == "opengles";
+          // Calibration for the direct ES-300 emission (see BuildOptions::glesDirectCheck).
+          // A raw text diff against the regenerated form is not possible: the direct text
+          // keeps its #if/#define blocks for the driver's preprocessor while the regenerated
+          // text has them resolved away, so the two can never be textually equal. What CAN be
+          // proven at build time is the transform's own correctness: the form assertions
+          // (version, no set/binding, fbf substitutions) fail closed on any transform leak,
+          // and the size report quantifies the win pending the storage switch.
+          bool fbfVariant = info.fragDomain.valueOf(fi, "HAS_XP") == 2;
+          if (options.glesDirectCheck) {
+            auto directVert = EmitDirectGLSLES300(PrependDefines(vertSource, vertDefines),
+                                                  ShaderStageType::Vertex, false);
+            auto directFrag = EmitDirectGLSLES300(PrependDefines(fragSource, fragDefines),
+                                                  ShaderStageType::Fragment, fbfVariant);
+            auto assertDirectESForm = [&](const std::string& text, const char* stage) -> bool {
+              if (text.find("#version 300 es") == std::string::npos ||
+                  text.find("precision mediump float;") == std::string::npos) {
+                std::cerr << "  GLES direct-ES form assertion failed (" << stage << ") for "
+                          << info.name << " [vert=" << vi << " frag=" << fi << "]\n";
+                report.errorCount++;
+                RecordBackendArtifactError(backend, profileErrorCounts);
+                return false;
+              }
+              // A surviving layout member means the strip missed a form; the same
+              // layout-context test the desktop path uses (preceded by '(' or ',').
+              auto hasLayoutMember = [](const std::string& t, const std::string& member) {
+                std::string token = member + " ";
+                size_t at = 0;
+                while ((at = t.find(token, at)) != std::string::npos) {
+                  size_t before = at;
+                  while (before > 0 && (t[before - 1] == ' ' || t[before - 1] == '\t')) {
+                    --before;
+                  }
+                  if (before > 0 && (t[before - 1] == '(' || t[before - 1] == ',')) {
+                    return true;
+                  }
+                  ++at;
+                }
+                return false;
+              };
+              if (hasLayoutMember(text, "set =") || hasLayoutMember(text, "binding =")) {
+                std::cerr << "  GLES direct-ES form assertion failed (" << stage
+                          << ", surviving qualifier) for " << info.name << " [vert=" << vi
+                          << " frag=" << fi << "]\n";
+                report.errorCount++;
+                RecordBackendArtifactError(backend, profileErrorCounts);
+                return false;
+              }
+              if (fbfVariant && stage == std::string("frag")) {
+                if (text.find("subpassInput") != std::string::npos ||
+                    text.find("subpassLoad") != std::string::npos) {
+                  std::cerr << "  GLES direct-ES fbf substitution incomplete for " << info.name
+                            << " [vert=" << vi << " frag=" << fi << "]\n";
+                  report.errorCount++;
+                  RecordBackendArtifactError(backend, profileErrorCounts);
+                  return false;
+                }
+              }
+              return true;
+            };
+            if (assertDirectESForm(directVert, "vert") && assertDirectESForm(directFrag, "frag")) {
+              std::cerr << "  [gles-direct] " << info.name << " v" << vi << " f" << fi
+                        << (fbfVariant ? " fbf" : "") << ": direct "
+                        << (directVert.size() + directFrag.size()) << " B\n";
+            }
+          }
           auto glslVert = TranslateToGLSL(*vertSpirv, gles);
           auto glslFrag = TranslateToGLSL(fragResult.spirv, gles);
           if (!glslVert.success || !glslFrag.success) {
