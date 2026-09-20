@@ -61,6 +61,11 @@ namespace {
 constexpr int kSize = 128;
 constexpr int kWarmUpFrames = 20;
 constexpr int kRounds = 30;
+// Cold samples per route (program-cold: the program cache is cleared and the bundle reloaded
+// before each sample; process-cold is a property of how the test binary is launched, not
+// repeatable in-process, and is documented as such). 3 samples give a min/median spread for
+// the single-sample cold numbers the audit flagged.
+constexpr int kColdSamples = 3;
 
 // A stable, non-trivial color matrix for chain construction.
 const std::array<float, 20>& WarmMatrix() {
@@ -70,9 +75,12 @@ const std::array<float, 20>& WarmMatrix() {
 }
 
 struct TimingResult {
-  double coldMs = 0.0;
+  std::vector<double> coldSamples = {};
+  double coldMedianMs = 0.0;
+  std::vector<double> hotSamples = {};
   double hotMedianMs = 0.0;
   double hotMinMs = 0.0;
+  double hotP95Ms = 0.0;
   uint32_t aotDraws = 0;
   uint32_t runtimePrograms = 0;
 };
@@ -85,13 +93,24 @@ double Median(std::vector<double>& values) {
   return values[values.size() / 2];
 }
 
-// Measures one route (useBundle selects AOT vs runtime) over one scene. Cold = first frame after
-// clearing the program cache and (for AOT) reloading the bundle; hot = median over kRounds
-// batches of kBatchFrames frames each (a batch shares one surface so per-frame surface setup
-// stays out of the measurement).
+double Percentile(std::vector<double> values, double percentile) {
+  if (values.empty()) {
+    return 0.0;
+  }
+  std::sort(values.begin(), values.end());
+  auto index = static_cast<size_t>(percentile * static_cast<double>(values.size() - 1));
+  return values[index];
+}
+
+// Measures one route (useBundle selects AOT vs runtime) over one scene. Cold = kColdSamples
+// first frames after clearing the program cache and (for AOT) reloading the bundle — the
+// in-process, program-level cold (process cold is a launch property, not measurable here).
+// Hot = median/p95 over kRounds batches of kBatchFrames frames each (a batch shares one
+// surface so per-frame surface setup stays out of the measurement). `size` parameterizes the
+// surface so the fill-rate axis (128 vs 512) is covered by the representative chain scenario.
 template <typename Scene>
 TimingResult MeasureRoute(Context* context, PrecompiledShaderCache* cache, bool useBundle,
-                          const Scene& scene) {
+                          const Scene& scene, int size = kSize) {
   TimingResult result = {};
   if (useBundle) {
     auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
@@ -102,20 +121,25 @@ TimingResult MeasureRoute(Context* context, PrecompiledShaderCache* cache, bool 
   } else {
     cache->unload();
   }
-  auto surface = Surface::Make(context, kSize, kSize);
+  auto surface = Surface::Make(context, size, size);
   if (surface == nullptr) {
     return result;
   }
-  // Cold frame: every program gets looked up (and created on the runtime route).
-  context->globalCache()->clearPrograms();
-  context->globalCache()->resetProgramStats();
-  cache->resetStats();
-  cache->setDiagnosticRecordingEnabled(true);
-  auto start = std::chrono::steady_clock::now();
-  scene(surface->getCanvas());
-  context->flushAndSubmit(true);
-  auto end = std::chrono::steady_clock::now();
-  result.coldMs = std::chrono::duration<double, std::milli>(end - start).count();
+  // Cold frames: every program gets looked up (and created on the runtime route). Each sample
+  // clears the program cache independently; the samples' spread (min..max) shows the stability
+  // the audit's single-cold-sample design could not.
+  for (int cold = 0; cold < kColdSamples; ++cold) {
+    context->globalCache()->clearPrograms();
+    context->globalCache()->resetProgramStats();
+    cache->resetStats();
+    cache->setDiagnosticRecordingEnabled(true);
+    auto start = std::chrono::steady_clock::now();
+    scene(surface->getCanvas());
+    context->flushAndSubmit(true);
+    auto end = std::chrono::steady_clock::now();
+    result.coldSamples.push_back(std::chrono::duration<double, std::milli>(end - start).count());
+  }
+  result.coldMedianMs = Median(result.coldSamples);
   auto stats = context->globalCache()->programStats();
   result.aotDraws = static_cast<uint32_t>(cache->drawStats().completeAOTDraws);
   result.runtimePrograms = static_cast<uint32_t>(stats.programBuilderCreations);
@@ -147,15 +171,34 @@ TimingResult MeasureRoute(Context* context, PrecompiledShaderCache* cache, bool 
   for (double value : samples) {
     result.hotMinMs = std::min(result.hotMinMs, value);
   }
+  result.hotP95Ms = Percentile(samples, 0.95);
+  result.hotSamples = std::move(samples);
   return result;
 }
 
-void PrintResult(const char* scenario, const char* route, const TimingResult& result) {
+void PrintResult(const char* scenario, const char* route, const TimingResult& result,
+                 int size = kSize) {
+#ifdef NDEBUG
+  constexpr const char* kBuildType = "release";
+#else
+  constexpr const char* kBuildType = "debug";
+#endif
   printf(
-      "[P7Perf] %-28s %-8s cold=%8.3fms hotMed=%8.3fms hotMin=%8.3fms aotDraws=%u "
-      "runtimePrograms=%u\n",
-      scenario, route, result.coldMs, result.hotMedianMs, result.hotMinMs, result.aotDraws,
-      result.runtimePrograms);
+      "[P7Perf] %-28s %-8s %7s %4d coldMed=%8.3fms hotMed=%8.3fms hotMin=%8.3fms "
+      "hotP95=%8.3fms aotDraws=%u runtimePrograms=%u\n",
+      scenario, route, kBuildType, size, result.coldMedianMs, result.hotMedianMs, result.hotMinMs,
+      result.hotP95Ms, result.aotDraws, result.runtimePrograms);
+  // Raw per-round samples for offline aggregation: the cold spread and every hot round, so
+  // dispersion and outliers survive the console capture (audit rule: raw data lands on disk).
+  printf("[P7PerfRaw] %s %s size=%d cold=[", scenario, route, size);
+  for (size_t index = 0; index < result.coldSamples.size(); ++index) {
+    printf("%s%.3f", index > 0 ? "," : "", result.coldSamples[index]);
+  }
+  printf("] hot=[");
+  for (size_t index = 0; index < result.hotSamples.size(); ++index) {
+    printf("%s%.3f", index > 0 ? "," : "", result.hotSamples[index]);
+  }
+  printf("]\n");
   fflush(stdout);
 }
 
@@ -182,22 +225,33 @@ TGFX_TEST(AOTPerformanceMatrixTest, ShortChainSteadyState) {
   auto image = MakeImage("resources/apitest/mandrill_128.png");
   ASSERT_NE(image, nullptr);
 
-  for (size_t opCount : {size_t{1}, size_t{3}, size_t{5}}) {
-    char label[32];
-    snprintf(label, sizeof(label), "chain-%zu-op", opCount);
-    auto filter = MakeMatrixChain(opCount);
-    auto scene = [&](Canvas* canvas) {
-      Paint paint = {};
-      paint.setColorFilter(filter);
-      canvas->drawImage(image, 0, 0, &paint);
-    };
-    auto aot = MeasureRoute(context, cache, true, scene);
-    // Routing check: every AOT frame must be served by the precompiled set.
-    EXPECT_EQ(aot.runtimePrograms, 0u);
-    EXPECT_GE(aot.aotDraws, 1u);
-    auto runtime = MeasureRoute(context, cache, false, scene);
-    PrintResult(label, "aot", aot);
-    PrintResult(label, "runtime", runtime);
+  for (int size : {128, 512}) {
+    for (size_t opCount : {size_t{1}, size_t{3}, size_t{5}}) {
+      char label[32];
+      snprintf(label, sizeof(label), "chain-%zu-op", opCount);
+      auto filter = MakeMatrixChain(opCount);
+      auto scene = [&](Canvas* canvas) {
+        // Fill the whole surface: the fill-rate axis scales the fragment work with the size,
+        // so the 512 rounds measure a real cost difference rather than a fixed overhead.
+        canvas->save();
+        canvas->scale(static_cast<float>(size) / 128.0f, static_cast<float>(size) / 128.0f);
+        Paint paint = {};
+        paint.setColorFilter(filter);
+        canvas->drawImage(image, 0, 0, &paint);
+        canvas->restore();
+      };
+      // Route-order symmetry (audit rule): a discarded runtime measurement first, so the
+      // recorded AOT numbers do not enjoy first-touch resource states the runtime numbers
+      // never see (and vice versa for the second runtime pass).
+      MeasureRoute(context, cache, false, scene, size);
+      auto aot = MeasureRoute(context, cache, true, scene, size);
+      // Routing check: every AOT frame must be served by the precompiled set.
+      EXPECT_EQ(aot.runtimePrograms, 0u);
+      EXPECT_GE(aot.aotDraws, 1u);
+      auto runtime = MeasureRoute(context, cache, false, scene, size);
+      PrintResult(label, "aot", aot, size);
+      PrintResult(label, "runtime", runtime, size);
+    }
   }
 }
 
@@ -224,6 +278,8 @@ TGFX_TEST(AOTPerformanceMatrixTest, SameLayoutEffectReuse) {
     two.setColorFilter(ColorFilter::Luma());
     canvas->drawImage(image, 0, 0, &two);
   };
+  // Route-order symmetry (audit rule): a discarded runtime pass first (see ShortChainSteadyState).
+  MeasureRoute(context, cache, false, sceneSameVariant);
   auto aot = MeasureRoute(context, cache, true, sceneSameVariant);
   EXPECT_EQ(aot.runtimePrograms, 0u);
   auto runtime = MeasureRoute(context, cache, false, sceneSameVariant);
@@ -258,6 +314,8 @@ TGFX_TEST(AOTPerformanceMatrixTest, MaskClipBlendShortChain) {
     paint.setColorFilter(ColorFilter::Matrix(WarmMatrix()));
     canvas->drawImage(maskImage, 0, 0, &paint);
   };
+  // Route-order symmetry (audit rule): a discarded runtime pass first (see ShortChainSteadyState).
+  MeasureRoute(context, cache, false, scene);
   auto aot = MeasureRoute(context, cache, true, scene);
   EXPECT_EQ(aot.runtimePrograms, 0u);
   auto runtime = MeasureRoute(context, cache, false, scene);
@@ -286,6 +344,8 @@ TGFX_TEST(AOTPerformanceMatrixTest, DualGradientMaterialization) {
     paint.setShader(Shader::MakeBlend(BlendMode::Multiply, warm, cool));
     canvas->drawRect(Rect::MakeWH(size, size), paint);
   };
+  // Route-order symmetry (audit rule): a discarded runtime pass first (see ShortChainSteadyState).
+  MeasureRoute(context, cache, false, scene);
   auto aot = MeasureRoute(context, cache, true, scene);
   auto runtime = MeasureRoute(context, cache, false, scene);
   PrintResult("dual-gradient-blend", "aot", aot);

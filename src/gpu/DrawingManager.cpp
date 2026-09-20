@@ -356,6 +356,14 @@ std::shared_ptr<DrawingBuffer> DrawingManager::flush() {
   if (currentBuffer == nullptr) {
     createDrawingBuffer();
   }
+  // Settle the simultaneously-live materialized bytes before the recorded draws execute: the
+  // offscreen textures built during this flush cycle (blend-child flattens, plan intermediates)
+  // coexist until their consumers run, so the running total at this point is the cycle's
+  // peak-live footprint. Diagnostic-only, and never influences routing.
+  if (auto* statsCache = context->precompiledShaderCache();
+      statsCache != nullptr && statsCache->diagnosticRecordingEnabled()) {
+    statsCache->settleActiveTemporaryBytes();
+  }
   while (!compositors.empty()) {
     auto compositor = compositors.back();
     // The makeClosed() method may add more compositors to the list.

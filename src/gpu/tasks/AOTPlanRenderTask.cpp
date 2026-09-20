@@ -140,6 +140,12 @@ void AOTPlanRenderTask::execute(CommandEncoder* encoder) {
     drawStats.intermediateReadBytes += bytes;
     drawStats.intermediateWriteBytes += bytes;
     drawStats.peakTemporaryBytes += bytes;
+    // The plan's intermediates also join the flush cycle's simultaneously-live set (the
+    // per-draw delta above is a different, draw-local view of the same bytes).
+    if (auto* statsCache = finalTarget->getContext()->precompiledShaderCache();
+        statsCache != nullptr && statsCache->diagnosticRecordingEnabled()) {
+      statsCache->recordActiveTemporaryBytes(bytes);
+    }
   }
 
   auto* failureCache = finalTarget->getContext()->precompiledShaderCache();

@@ -233,6 +233,27 @@ void PrecompiledShaderCache::recordMaterializedEdge(uint64_t bytes) {
   _drawStats.renderTargetSwitches++;
   _drawStats.intermediateReadBytes += bytes;
   _drawStats.intermediateWriteBytes += bytes;
+  // The materialized texture stays live until its consumer draw runs, so this edge's bytes join
+  // the current flush cycle's simultaneously-live set (settled into peakTemporaryBytes by
+  // settleActiveTemporaryBytes at flush time).
+  _activeTemporaryBytes += bytes;
+}
+
+void PrecompiledShaderCache::settleActiveTemporaryBytes() {
+  if (statsRecordingPaused()) {
+    return;
+  }
+  std::lock_guard<std::mutex> autoLock(drawStatsMutex);
+  _drawStats.peakTemporaryBytes = std::max(_drawStats.peakTemporaryBytes, _activeTemporaryBytes);
+  _activeTemporaryBytes = 0;
+}
+
+void PrecompiledShaderCache::recordActiveTemporaryBytes(uint64_t bytes) {
+  if (statsRecordingPaused()) {
+    return;
+  }
+  std::lock_guard<std::mutex> autoLock(drawStatsMutex);
+  _activeTemporaryBytes += bytes;
 }
 
 AOTDrawStats PrecompiledShaderCache::drawStats() const {

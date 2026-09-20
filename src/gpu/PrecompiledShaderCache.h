@@ -386,6 +386,18 @@ class PrecompiledShaderCache {
   /// rather than a Draw of its own. `bytes` is the size of the offscreen target it allocated.
   void recordMaterializedEdge(uint64_t bytes);
 
+  /// Settles the simultaneously-live materialized bytes accumulated by recordMaterializedEdge
+  /// (and the offscreen plan targets) into peakTemporaryBytes and resets the running total.
+  /// Called once per flush cycle, before the recorded draws execute: the settled value is the
+  /// maximum set of offscreen bytes that coexisted while the frame was being built.
+  void settleActiveTemporaryBytes();
+
+  /// Adds `bytes` to the simultaneously-live running total without touching any per-edge or
+  /// per-draw counter — for offscreen targets created outside recordMaterializedEdge's path
+  /// (e.g. an offscreen plan's intermediate render targets, which are already counted by
+  /// recordDraw's delta and must not double-count the edge counters).
+  void recordActiveTemporaryBytes(uint64_t bytes);
+
   /// Records one draw whose color chain the decomposition route attempted and refused, with the
   /// pure-analysis reason (AOTDecomposeOutcome). Diagnostic-only, like the rest of the draw
   /// stats: paused stats drop it, and it never influences routing.
@@ -434,6 +446,14 @@ class PrecompiledShaderCache {
   std::string _profileTag;
   uint64_t _bundleIdentityHash = 0;
   uint32_t _bundleToolchainABI = 0;
+  // Simultaneously-live materialized-texture accounting (peakTemporaryBytes): materialization
+  // edges created during a flush cycle (blend-child flattens, offscreen plan targets) add their
+  // bytes to this running total; flush() settles it into peakTemporaryBytes and resets. The
+  // resulting peak is the maximum set of offscreen bytes coexisting within one flush cycle —
+  // the honest footprint of a full-effect frame (a draw's materialized children plus any plan
+  // intermediates), instead of the previous zero that ignored construction-time materialization
+  // while the traffic counters recorded hundreds of megabytes over the same edges.
+  uint64_t _activeTemporaryBytes = 0;
   std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> vertEntries;
   std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> fragEntries;
   std::atomic<uint32_t> _hitCount{0};
