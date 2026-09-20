@@ -274,8 +274,7 @@ struct SamplerParamFunction {
   std::string paramName;
 };
 
-static std::vector<SamplerParamFunction> collectSamplerParamFunctions(
-    const std::string& source) {
+static std::vector<SamplerParamFunction> collectSamplerParamFunctions(const std::string& source) {
   static std::regex sigRegex(R"(\w+\s+(\w+)\s*\(\s*(?:CHAIN_LEAF_SAMPLER|sampler2D)\s+(\w+)\s*,)");
   std::vector<SamplerParamFunction> functions = {};
   std::smatch match;
@@ -454,8 +453,8 @@ CompileResult CompileGLSLToWGSL(const std::string& source, ShaderStageType stage
   // instead of silently emitting an empty WebGPU bundle.
   (void)source;
   (void)stage;
-  result.error = errorPrefix +
-                 "WebGPU translation is unavailable: build with -DTGFX_BUILD_WEBGPU_BUNDLE=ON";
+  result.error =
+      errorPrefix + "WebGPU translation is unavailable: build with -DTGFX_BUILD_WEBGPU_BUNDLE=ON";
   return result;
 #endif
 }
@@ -481,11 +480,16 @@ std::vector<uint8_t> CompileMSLToMetallib(const std::string& mslSource, ShaderSt
   }
 
   // Compile MSL to AIR.
-  char cmd[512];
+  // TGFX_METAL_EXTRA_FLAGS (experiment hook): appended verbatim to the xcrun metal invocation.
+  // Used by the FMA-attribution experiments (fast-math/contraction/optimization-level controls)
+  // to rebuild the bundle under different compilation settings without touching the default
+  // pipeline. Unset in production builds.
+  const char* extraFlags = std::getenv("TGFX_METAL_EXTRA_FLAGS");
+  char cmd[768];
   const char* stageFlag = (stage == ShaderStageType::Vertex) ? "vertex" : "fragment";
   snprintf(cmd, sizeof(cmd),
-           "xcrun -sdk macosx metal -std=macos-metal2.3 -O2 -c %s -o %s 2>/dev/null", tmpMsl,
-           tmpAir);
+           "xcrun -sdk macosx metal -std=macos-metal2.3 -O2 %s -c %s -o %s 2>/dev/null",
+           extraFlags != nullptr ? extraFlags : "", tmpMsl, tmpAir);
   (void)stageFlag;
   int ret = std::system(cmd);
   std::remove(tmpMsl);

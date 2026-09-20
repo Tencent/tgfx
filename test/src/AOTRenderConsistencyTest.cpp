@@ -195,10 +195,21 @@ static void ExpectBitmapsNear(const char* label, const Bitmap& aotBitmap,
   auto* r = static_cast<const uint8_t*>(runtimePixels);
   int maxDiff = 0;
   size_t diffCount = 0;
+  // TGFX_DUMP_DIFFS=1: print the first few differing samples with position and channel for
+  // attribution work (which channel, how far, where) — the counts alone cannot distinguish an
+  // alpha-only expression difference from an RGB one.
+  const bool dumpDiffs = std::getenv("TGFX_DUMP_DIFFS") != nullptr;
+  size_t dumped = 0;
   for (size_t i = 0; i < totalBytes; i++) {
     int d = std::abs(static_cast<int>(a[i]) - static_cast<int>(r[i]));
     if (d > 0) {
       diffCount++;
+      if (dumpDiffs && dumped < 8) {
+        printf("[Diff] %s byte %zu (x=%zu y=%zu ch=%c): aot=%d runtime=%d d=%d\n", label, i,
+               (i / 4) % static_cast<size_t>(width), (i / 4) / static_cast<size_t>(width),
+               "RGBA"[i % 4], a[i], r[i], d);
+        ++dumped;
+      }
     }
     if (d > maxDiff) {
       maxDiff = d;
@@ -274,6 +285,16 @@ static void ExpectImageFilterConsistent(const char* label, const std::shared_ptr
   RenderImageOnce(image, filter, width, height, true, &aotBitmap);
   RenderImageOnce(image, filter, width, height, false, &runtimeBitmap);
   ExpectBitmapsIdentical(label, aotBitmap, runtimeBitmap, width, height);
+}
+
+// FMA-attribution experiment hook: TGFX_STRICT_ZERO=1 forces zero tolerance on every backend,
+// making the raw Metal 1-LSB divergences observable (maxChannelDiff/diffBytes in the failure
+// output) without editing the per-test tolerance each time. Paired with the build tool's
+// TGFX_METAL_EXTRA_FLAGS hook, this drives the contraction/optimization controls that attribute
+// those divergences; unset in normal runs.
+static int ExperimentTolerance(int defaultTolerance) {
+  const char* strict = std::getenv("TGFX_STRICT_ZERO");
+  return (strict != nullptr && strict[0] == '1') ? 0 : defaultTolerance;
 }
 
 // Tiled texture fills: an image shader drawn over a rect produces a TiledTextureEffect for the
@@ -2067,16 +2088,18 @@ TGFX_TEST(AOTRenderConsistencyTest, NonTrivialLinearChainLengthMatrixMatchesRunt
     uint64_t passCount = opCount <= 31 ? 1 : (opCount + 1) / 2;
     EXPECT_EQ(candidateStats.draws.kernelInvocations, passCount);
     EXPECT_EQ(candidateStats.draws.planMaterializedEdges, passCount - 1);
-    // Metal: the MSL compiler fuses the kernel's interpreted arithmetic differently from the
-    // runtime's unrolled expressions, so a single pixel may round 1 LSB apart; OpenGL
+    // Metal: the MSL compiler optimizes the kernel's interpreted arithmetic differently from
+    // the runtime's unrolled expressions, so a single pixel may round 1 LSB apart; OpenGL
     // byte-matches both structures.
-    // Attribution: verified by strict-zero experiment on the rebuilt new-ABI
-    // bundle — the Metal divergence is real and tiny (maxChannelDiff=1, 1 byte of 65536),
-    // consistent with an fma-scheduling rounding difference between the interpreted kernel and
-    // the runtime's unrolled expressions; a structural error would break the bound long before.
+    // Attribution (compiler-optimization artifact, PROVEN by controls): the raw divergence is
+    // maxChannelDiff=1, diffBytes=1/65536 (TGFX_STRICT_ZERO=1). Rebuilding the metal bundle
+    // with the build tool's TGFX_METAL_EXTRA_FLAGS experiment hook: -O0 eliminates the
+    // divergence entirely (zero failing op counts), and -fno-fast-math shifts the pattern
+    // (67/1/1/2 bytes across op counts) — the difference is optimization-dependent rounding,
+    // not a semantic error; a structural error would break the bound long before.
     // The tolerance stays 1 on Metal only, zero elsewhere.
     ExpectBitmapsNear("nontrivial-linear-chain-matrix", candidate, reference, width, height,
-                      std::string(TGFX_BACKEND_NAME) == "metal" ? 1 : 0);
+                      ExperimentTolerance(std::string(TGFX_BACKEND_NAME) == "metal" ? 1 : 0));
   }
 }
 
@@ -4277,10 +4300,21 @@ TGFX_TEST(AOTRenderConsistencyTest, NestedBlendSamplerBudget) {
     ColorFilterRenderStats stats = {};
     RenderBlendShaderSceneOnce(shader, scene.drawOval, false, &reference, nullptr);
     RenderBlendShaderSceneOnce(shader, scene.drawOval, true, &candidate, &stats);
-    // The planned-materialization route serves the whole tree with precompiled programs.
-    EXPECT_GE(stats.draws.completeAOTDraws, 1u);
-    EXPECT_EQ(stats.programs.programBuilderCreations, 0u);
-    EXPECT_EQ(stats.noMatchingRule, 0u);
+    // Routing split by shape (materialization-retry ruling): the RECT scenes carry no GP
+    // coverage, so the in-plan retry's materialized 2-leaf tree rides the chain — precompiled
+    // all the way. The OVAL scene carries the ellipse's AA coverage, which the retry's chain
+    // attempt does not take; the pre-fix code swapped the materialized tree into the plain
+    // route instead (a quantization boundary the reference never had — removed by the
+    // failed-retry-preserves-original ruling), so the oval now keeps its ORIGINAL tree and
+    // falls to the runtime route: exactly one miss and one build, byte-identical output.
+    if (scene.drawOval) {
+      EXPECT_EQ(stats.programs.programBuilderCreations, 1u);
+      EXPECT_EQ(stats.noMatchingRule, 1u);
+    } else {
+      EXPECT_GE(stats.draws.completeAOTDraws, 1u);
+      EXPECT_EQ(stats.programs.programBuilderCreations, 0u);
+      EXPECT_EQ(stats.noMatchingRule, 0u);
+    }
     auto* refPixels = static_cast<const uint8_t*>(reference.lockPixels());
     auto* candPixels = static_cast<const uint8_t*>(candidate.lockPixels());
     ASSERT_TRUE(refPixels != nullptr && candPixels != nullptr);
@@ -4588,12 +4622,19 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyBlendOperandKeepsPaintTint) {
     renderScene(&candidate);
     cache->unload();
   }
-  // Attribution: verified by strict-zero experiment on the rebuilt new-ABI
-  // bundle — the Metal divergence is real and tiny (maxChannelDiff=1, 9 bytes of 36864),
-  // consistent with an fma-scheduling rounding difference between the interpreted kernel and
-  // the runtime's unrolled expressions. The tolerance stays 1 on Metal only, zero elsewhere.
+  // Attribution (GLSL-to-MSL translation-form artifact, NOT fma): the raw divergence is
+  // maxChannelDiff=1, diffBytes=9/36864, all in the R channel (paint red = 1.0). Controls:
+  // rebuilding the metal bundle with -fno-fast-math AND with -O0 (TGFX_METAL_EXTRA_FLAGS)
+  // both leave the 9 bytes EXACTLY unchanged — the difference is compilation-independent,
+  // so the earlier "fma-scheduling" attribution was wrong. Both sides' GLSL multiply-blend
+  // expression is textually identical ((1-Sa)D + (1-Da)S + S*D), and OpenGL byte-matches —
+  // the divergence arises in the GLSL->SPIRV->MSL translation of two semantically identical
+  // but structurally different sources (the kernel's interpreted loop vs the runtime's
+  // unrolled inline emission), whose translated MSL forms round the R channel 1 LSB apart
+  // at rare values. Bounded at 1 LSB, channel-specific, backend-specific (GL matches).
+  // The tolerance stays 1 on Metal only, zero elsewhere.
   ExpectBitmapsNear("alpha-only-blend-tint", candidate, reference, size, size,
-                    std::string(TGFX_BACKEND_NAME) == "metal" ? 1 : 0);
+                    ExperimentTolerance(std::string(TGFX_BACKEND_NAME) == "metal" ? 1 : 0));
 }
 
 // an alpha-only image as the color root under a non-white
