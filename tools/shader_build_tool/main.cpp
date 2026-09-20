@@ -337,14 +337,17 @@ static std::string EmitDirectGLSL330Impl(const std::string& source, ShaderStageT
   if (esDialect) {
     // Default precision right after the version line, mirroring the regenerated ES-300 form
     // (int is highp-capable everywhere; float must be stated — ES has no implicit default).
-    auto firstNewline = result.find('\n');
-    if (firstNewline != std::string::npos) {
-      result.insert(firstNewline + 1, "precision mediump float;\nprecision highp int;\n");
+    auto versionEnd = result.find('\n', versionPos);
+    if (versionEnd != std::string::npos) {
+      // Insert after the #version line itself — the templates open with a license comment
+      // block, so the file's first newline sits BEFORE the version token; inserting there
+      // would put a precision statement ahead of #version, which ES rejects.
+      result.insert(versionEnd + 1, "precision mediump float;\nprecision highp int;\n");
     }
     if (fbfVariant) {
       // The framebuffer-fetch dialect: the extension line goes right after the precision
       // defaults, ahead of every declaration that references it.
-      auto insertPos = result.find("precision highp int;\n");
+      auto insertPos = result.find("precision highp int;\n", versionPos);
       if (insertPos != std::string::npos) {
         result.insert(insertPos + sizeof("precision highp int;\n") - 1,
                       "#extension GL_EXT_shader_framebuffer_fetch : require\n");
@@ -991,7 +994,6 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
           vertBlob.assign(directVert.begin(), directVert.end());
           fragBlob.assign(directFrag.begin(), directFrag.end());
         } else {
-          bool gles = backend == "opengles";
           // Calibration for the direct ES-300 emission (see BuildOptions::glesDirectCheck).
           // A raw text diff against the regenerated form is not possible: the direct text
           // keeps its #if/#define blocks for the driver's preprocessor while the regenerated
@@ -1057,17 +1059,24 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
                         << (directVert.size() + directFrag.size()) << " B\n";
             }
           }
-          auto glslVert = TranslateToGLSL(*vertSpirv, gles);
-          auto glslFrag = TranslateToGLSL(fragResult.spirv, gles);
-          if (!glslVert.success || !glslFrag.success) {
-            std::cerr << "  GLSL translation error: "
-                      << (glslVert.success ? glslFrag.error : glslVert.error) << "\n";
+          // Direct ES-300 storage (the same rationale as desktop GL, see EmitDirectGLSL330):
+          // the regenerated form's call-site temporaries (param/param_1) and normalized block
+          // names measured +45% pool bytes; the direct form removes them. Verified on the
+          // SwiftShader suite — 729 green including byte-parity on every compilable variant —
+          // after the precision/version fixes (see the ledger).
+          auto dv = EmitDirectGLSLES300(PrependDefines(vertSource, vertDefines),
+                                        ShaderStageType::Vertex, false);
+          auto df = EmitDirectGLSLES300(PrependDefines(fragSource, fragDefines),
+                                        ShaderStageType::Fragment, fbfVariant);
+          if (dv.empty() || df.empty()) {
+            std::cerr << "  direct-ES emission failed (missing #version 450) for " << info.name
+                      << " [vert=" << vi << " frag=" << fi << "]\n";
             report.errorCount++;
             RecordBackendArtifactError(backend, profileErrorCounts);
             continue;
           }
-          vertBlob.assign(glslVert.glsl.begin(), glslVert.glsl.end());
-          fragBlob.assign(glslFrag.glsl.begin(), glslFrag.glsl.end());
+          vertBlob.assign(dv.begin(), dv.end());
+          fragBlob.assign(df.begin(), df.end());
         }
       } else {
         continue;

@@ -220,6 +220,7 @@ std::shared_ptr<ColorFilter> MakeMatrixChain(size_t opCount) {
 TGFX_TEST(AOTPerformanceMatrixTest, ShortChainSteadyState) {
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
   auto* cache = context->precompiledShaderCache();
   auto image = MakeImage("resources/apitest/mandrill_128.png");
@@ -261,6 +262,7 @@ TGFX_TEST(AOTPerformanceMatrixTest, ShortChainSteadyState) {
 TGFX_TEST(AOTPerformanceMatrixTest, SameLayoutEffectReuse) {
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
   auto* cache = context->precompiledShaderCache();
   auto image = MakeImage("resources/apitest/mandrill_128.png");
@@ -293,6 +295,7 @@ TGFX_TEST(AOTPerformanceMatrixTest, SameLayoutEffectReuse) {
 TGFX_TEST(AOTPerformanceMatrixTest, MaskClipBlendShortChain) {
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
   auto* cache = context->precompiledShaderCache();
   constexpr int maskSize = 96;

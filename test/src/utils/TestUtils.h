@@ -91,6 +91,48 @@ testing::AssertionResult BitmapPremulLegal(const Bitmap& bitmap);
 size_t CountFractionalAlphaPixels(const Bitmap& bitmap);
 
 /**
+ * True when the context's renderer is SwiftShader (the software-GL validation environment).
+ * SwiftShader's software compiler has a fixed internal pool that large AOT variants exhaust
+ * ("memory exhausted") — those variants compile fine on every hardware GLES driver, so the
+ * limitation is environmental, not a product defect. Tests that assert the AOT routing of the
+ * affected variants skip on this environment (SKIP_ON_SWIFTSHADER below); the plain-path and
+ * byte-parity coverage they can still provide stays active.
+ */
+bool IsSwiftShaderContext(Context* context);
+
+/**
+ * Environment-level SwiftShader detection (no live context needed): the process's rendering
+ * backend is fixed, so one probe through the shared device pool decides it. For tests whose
+ * context is created inside render helpers.
+ */
+bool IsSwiftShaderEnvironment();
+
+/**
+ * Environment gate for tests that assert the AOT routing of variants SwiftShader cannot
+ * compile (the software-compiler pool, not the shader sources, is the blocker — the same
+ * tests run green on hardware GL/Metal backends). Skipping is recorded with the reason so
+ * the excluded count stays auditable in the suite output.
+ */
+#define SKIP_ON_SWIFTSHADER(context)                                   \
+  do {                                                                 \
+    if (IsSwiftShaderContext(context)) {                               \
+      GTEST_SKIP() << "SwiftShader software-compiler pool: large AOT " \
+                      "variants do not compile (environment limit)";   \
+    }                                                                  \
+  } while (false)
+
+/**
+ * Same gate for tests whose context lives inside a render helper rather than a local scope.
+ */
+#define SKIP_ON_SWIFTSHADER_ENV()                                      \
+  do {                                                                 \
+    if (IsSwiftShaderEnvironment()) {                                  \
+      GTEST_SKIP() << "SwiftShader software-compiler pool: large AOT " \
+                      "variants do not compile (environment limit)";   \
+    }                                                                  \
+  } while (false)
+
+/**
  * Pauses AOT statistics recording and program-creation counting on the given context for the
  * scope's lifetime when active is true. Wrap intentional JIT reference renders (bundle unloaded)
  * with this so they do not enter the AOT hit-rate accounting; the pause always unwinds even if

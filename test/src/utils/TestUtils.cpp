@@ -98,6 +98,30 @@ testing::AssertionResult BitmapPremulLegal(const Bitmap& bitmap) {
   return result;
 }
 
+bool IsSwiftShaderContext(Context* context) {
+  if (context == nullptr || context->gpu() == nullptr) {
+    return false;
+  }
+  const auto& renderer = context->gpu()->info()->renderer;
+  return renderer.find("SwiftShader") != std::string::npos;
+}
+
+bool IsSwiftShaderEnvironment() {
+  static const bool isSwiftShader = [] {
+    auto device = DevicePool::Make();
+    if (device == nullptr) {
+      return false;
+    }
+    auto context = device->lockContext();
+    bool result = IsSwiftShaderContext(context);
+    if (context != nullptr) {
+      device->unlock();
+    }
+    return result;
+  }();
+  return isSwiftShader;
+}
+
 size_t CountFractionalAlphaPixels(const Bitmap& bitmap) {
   if (bitmap.isEmpty()) {
     return 0;

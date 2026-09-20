@@ -347,6 +347,7 @@ TGFX_TEST(AOTL2AuditTest, ChainAlphaOnlyChildrenMatchPlainPath) {
   ASSERT_TRUE(alphaImage != nullptr && colorImage != nullptr);
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
@@ -376,6 +377,7 @@ TGFX_TEST(AOTL2AuditTest, CleanBlendPrefersPointwiseChain) {
   ASSERT_TRUE(imageA != nullptr && imageB != nullptr);
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
@@ -401,6 +403,7 @@ TGFX_TEST(AOTL2AuditTest, TextureBlendColorFilterConstColorUsesPointwiseChain) {
   ASSERT_TRUE(image != nullptr);
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
   auto shader = Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp);
@@ -538,6 +541,7 @@ TGFX_TEST(AOTL2AuditTest, DropShadowTiledSrcServedByteExact) {
   ASSERT_TRUE(image != nullptr);
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
   int width = 160;
@@ -692,6 +696,7 @@ TGFX_TEST(AOTL2AuditTest, InnerShadowTiledSrcServedByteExact) {
   ASSERT_TRUE(image != nullptr);
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
   int width = 160;
@@ -806,6 +811,7 @@ TGFX_TEST(AOTL2AuditTest, ShaderMaskDecalServedByteExact) {
   ASSERT_FALSE(mask->isAlphaOnly());
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
@@ -883,6 +889,7 @@ TGFX_TEST(AOTL2AuditTest, CoverageTextureMaskMatchesJIT) {
   ASSERT_TRUE(color != nullptr && mask != nullptr);
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
 

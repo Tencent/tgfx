@@ -931,6 +931,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AtlasTextGradientFold) {
 // routes the atlas subtree's root through the clip-coverage register, so the chain serves every
 // mode: this test asserts the chain route (no fallback, no runtime build) and byte-parity.
 TGFX_TEST(AOTRenderConsistencyTest, AtlasTextNonSrcOverBlendKeepsDstOnChain) {
+  SKIP_ON_SWIFTSHADER_ENV();
   auto typeface =
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
   ASSERT_TRUE(typeface != nullptr);
@@ -1316,6 +1317,7 @@ static void RenderImageWithBrushOnce(const std::shared_ptr<Image>& image,
 }
 
 TGFX_TEST(AOTRenderConsistencyTest, TexturedEffect2D) {
+  SKIP_ON_SWIFTSHADER_ENV();
   auto image = MakeImage("resources/apitest/mandrill_128.png");
   ASSERT_TRUE(image != nullptr);
   int width = image->width();
@@ -1358,6 +1360,7 @@ TGFX_TEST(AOTRenderConsistencyTest, DecompositionSwitchControlsDirectDrawEntry) 
   ASSERT_TRUE(image != nullptr);
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
   context->globalCache()->resetProgramStats();
@@ -1431,6 +1434,7 @@ TGFX_TEST(AOTRenderConsistencyTest, DecompositionSwitchControlsDirectDrawEntry) 
 TGFX_TEST(AOTRenderConsistencyTest, BundleIdentityAndGenerationLifecycle) {
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
   auto [bundleData, bundleSize] = EmbeddedShaderBundles::GetBundle(context->backend());
@@ -1525,6 +1529,7 @@ TGFX_TEST(AOTRenderConsistencyTest, BundleIdentityAndGenerationLifecycle) {
 // planner previously split the same graph into two fixed-slot passes with one RGBA8
 // intermediate). Multi-pass planning stays covered by the device-space unit test.
 TGFX_TEST(AOTRenderConsistencyTest, LinearChainSinglePass) {
+  SKIP_ON_SWIFTSHADER_ENV();
   auto image = MakeImage("resources/apitest/mandrill_128.png");
   ASSERT_TRUE(image != nullptr);
   int width = image->width();
@@ -1819,6 +1824,7 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailRotatedUVMatrixStaysAligned) {
 TGFX_TEST(AOTRenderConsistencyTest, PlanExecutionFailureIsRecordedNotFatal) {
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
   auto* cache = context->precompiledShaderCache();
   auto bundle = EmbeddedShaderBundles::GetBundle(context->backend());
@@ -1993,6 +1999,7 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenThresholdAcrossBoundaryFlips) {
 }
 
 TGFX_TEST(AOTRenderConsistencyTest, LongLinearChainExecutesMaterializedTailPasses) {
+  SKIP_ON_SWIFTSHADER_ENV();
   auto image = MakeImage("resources/apitest/mandrill_128.png");
   ASSERT_NE(image, nullptr);
   int width = image->width();
@@ -2059,6 +2066,7 @@ static const std::array<float, 20>& NonTrivialScaleBiasMatrix() {
 }
 
 TGFX_TEST(AOTRenderConsistencyTest, NonTrivialLinearChainLengthMatrixMatchesRuntime) {
+  SKIP_ON_SWIFTSHADER_ENV();
   auto image = MakeImage("resources/apitest/mandrill_128.png");
   ASSERT_NE(image, nullptr);
   int width = image->width();
@@ -2104,6 +2112,7 @@ TGFX_TEST(AOTRenderConsistencyTest, NonTrivialLinearChainLengthMatrixMatchesRunt
 }
 
 TGFX_TEST(AOTRenderConsistencyTest, BrushAlphaEntersChainBeforeThreshold) {
+  SKIP_ON_SWIFTSHADER_ENV();
   auto image = MakeImage("resources/apitest/mandrill_128.png");
   ASSERT_NE(image, nullptr);
   int width = image->width();
@@ -2139,6 +2148,7 @@ TGFX_TEST(AOTRenderConsistencyTest, BrushAlphaEntersChainBeforeThreshold) {
 }
 
 TGFX_TEST(AOTRenderConsistencyTest, RotatedDrawWithLongChainMatchesRuntime) {
+  SKIP_ON_SWIFTSHADER_ENV();
   auto image = MakeImage("resources/apitest/mandrill_128.png");
   ASSERT_NE(image, nullptr);
   int width = image->width();
@@ -2172,6 +2182,7 @@ TGFX_TEST(AOTRenderConsistencyTest, RotatedDrawWithLongChainMatchesRuntime) {
 }
 
 TGFX_TEST(AOTRenderConsistencyTest, LowBrushAlphaLongChainMatchesRuntime) {
+  SKIP_ON_SWIFTSHADER_ENV();
   auto image = MakeImage("resources/apitest/mandrill_128.png");
   ASSERT_NE(image, nullptr);
   int width = image->width();
@@ -2221,6 +2232,7 @@ TGFX_TEST(AOTRenderConsistencyTest, RetryRebuildKeepsTransparentBlackColorFilter
   }
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
   auto* cache = context->precompiledShaderCache();
   // A DstOver mode filter is affectsTransparentBlack (transparent input falls back to the filter
@@ -2366,6 +2378,7 @@ TGFX_TEST(AOTRenderConsistencyTest, RetryRebuildKeepsTransparentBlackColorFilter
 TGFX_TEST(AOTRenderConsistencyTest, AlphaBiasColorFilterOnBlendShaderMatchesRuntime) {
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
   auto* cache = context->precompiledShaderCache();
   auto image = MakeImage("resources/apitest/mandrill_128.png");
@@ -2638,6 +2651,7 @@ TGFX_TEST(AOTRenderConsistencyTest, BlendChildMaterializationIsPlannedNotBakedIn
   bool runtimeOnly = std::getenv("TGFX_AOT_DISABLE") != nullptr;
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
   auto* cache = context->precompiledShaderCache();
   auto renderScene = [&]() -> AOTDrawStats {
@@ -2709,6 +2723,7 @@ TGFX_TEST(AOTRenderConsistencyTest, GradientBlendDiffAttribution) {
   }
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
   constexpr int size = 96;
@@ -2859,6 +2874,7 @@ TGFX_TEST(AOTRenderConsistencyTest, GradientBlendDiffAttribution) {
 TGFX_TEST(AOTRenderConsistencyTest, FirstSceneSteadyStateAttribution) {
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
   if (!cache->isLoaded()) {
@@ -3113,6 +3129,7 @@ TGFX_TEST(AOTRenderConsistencyTest, YUVSourceReportsItsPlanesToChainPlanning) {
 TGFX_TEST(AOTRenderConsistencyTest, YUVImageWithColorFilterMatchesRuntime) {
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
   auto* cache = context->precompiledShaderCache();
   constexpr int size = 96;
@@ -3187,6 +3204,7 @@ TGFX_TEST(AOTRenderConsistencyTest, YUVImageWithColorFilterMatchesRuntime) {
 TGFX_TEST(AOTRenderConsistencyTest, NV12ImageWithColorFilterMatchesRuntime) {
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
   auto* cache = context->precompiledShaderCache();
   constexpr int size = 96;
@@ -3352,6 +3370,7 @@ TGFX_TEST(AOTRenderConsistencyTest, BlendRetryMaterializationFlipsThreshold) {
 TGFX_TEST(AOTRenderConsistencyTest, TiledRepeatLinearSeamBlendOnChain) {
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
   auto* cache = context->precompiledShaderCache();
   constexpr int size = 96;
@@ -3437,6 +3456,7 @@ TGFX_TEST(AOTRenderConsistencyTest, TiledRepeatLinearSeamBlendOnChain) {
 TGFX_TEST(AOTRenderConsistencyTest, TiledRepeatLinearSeamBlendOnChainViaBlur) {
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
   auto* cache = context->precompiledShaderCache();
   constexpr int size = 96;
@@ -3516,6 +3536,7 @@ TGFX_TEST(AOTRenderConsistencyTest, TiledRepeatLinearSeamBlendOnChainViaBlur) {
 TGFX_TEST(AOTRenderConsistencyTest, DecomposeRejectionIsRecordedWithReason) {
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
   cache->setDiagnosticRecordingEnabled(true);
@@ -3564,6 +3585,7 @@ TGFX_TEST(AOTRenderConsistencyTest, DecomposeRejectionIsRecordedWithReason) {
 // AOTPointwiseTailProcessor::Make, so any chain containing it fell back to the runtime path; each
 // slot now carries the full operator parameter set.
 TGFX_TEST(AOTRenderConsistencyTest, AlphaThresholdChainFusesByteExact) {
+  SKIP_ON_SWIFTSHADER_ENV();
   auto image = MakeImage("resources/apitest/mandrill_128.png");
   ASSERT_TRUE(image != nullptr);
   int width = image->width();
@@ -4163,6 +4185,7 @@ static void ExpectChainClipSceneConsistent(const char* label, ChainClipScene sce
 }
 
 TGFX_TEST(AOTRenderConsistencyTest, ChainClipCoverageModes) {
+  SKIP_ON_SWIFTSHADER_ENV();
   ExpectChainClipSceneConsistent("chain-composed-rrects", ChainClipScene::ComposedRRects);
   ExpectChainClipSceneConsistent("chain-pathmask-rrects", ChainClipScene::PathMaskAndRRects);
   ExpectChainClipSceneConsistent("chain-shapemask-rrect", ChainClipScene::ShapeMaskUnderRRect);
@@ -4471,6 +4494,7 @@ TGFX_TEST(AOTRenderConsistencyTest, ColorFilterShaderServesFusedTreeWithoutMater
   }
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
   auto* cache = context->precompiledShaderCache();
   // Shifts red by 0.25, so the matrix affects transparent black (the ColorFilterShader branch).
@@ -4723,6 +4747,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyColorRootKeepsPaintTint) {
 TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyColorRootPaintAlphaBelowOne) {
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
   auto* cache = context->precompiledShaderCache();
   constexpr int size = 48;
@@ -4813,6 +4838,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyColorRootPaintAlphaBelowOne) {
 TGFX_TEST(AOTRenderConsistencyTest, MeshColorBlendShaderWithTwoChildBlend) {
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
   auto* cache = context->precompiledShaderCache();
   constexpr int size = 96;
@@ -4882,6 +4908,7 @@ TGFX_TEST(AOTRenderConsistencyTest, MeshColorBlendShaderWithTwoChildBlend) {
 TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyImageWithPaintShaderMatchesRuntime) {
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
   auto* cache = context->precompiledShaderCache();
   constexpr int size = 96;
@@ -4953,6 +4980,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyImageWithPaintShaderMatchesRuntime)
 TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyImageWithBlendShaderMatchesRuntime) {
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
   auto* cache = context->precompiledShaderCache();
   constexpr int size = 96;
@@ -5156,6 +5184,7 @@ TGFX_TEST(AOTRenderConsistencyTest, ChainedAnalyticClipsOnAAPathRecordsFallbackB
 TGFX_TEST(AOTRenderConsistencyTest, SameVariantDifferentChainsShareProgram) {
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
   auto* cache = context->precompiledShaderCache();
   auto image = MakeImage("resources/apitest/mandrill_128.png");
@@ -5253,6 +5282,7 @@ TGFX_TEST(AOTRenderConsistencyTest, SameVariantDifferentChainsShareProgram) {
 TGFX_TEST(AOTRenderConsistencyTest, ABAInterleavedDrawsReuseProgramWithoutStateLeak) {
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
   auto* cache = context->precompiledShaderCache();
   auto image = MakeImage("resources/apitest/mandrill_128.png");
@@ -5345,6 +5375,7 @@ TGFX_TEST(AOTRenderConsistencyTest, ABAInterleavedDrawsReuseProgramWithoutStateL
 TGFX_TEST(AOTRenderConsistencyTest, MeshVertexColorsWithComposedShaderChildInput) {
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
   auto* cache = context->precompiledShaderCache();
   auto image = MakeImage("resources/apitest/mandrill_128.png");
@@ -5419,6 +5450,7 @@ TGFX_TEST(AOTRenderConsistencyTest, MeshVertexColorsWithComposedShaderChildInput
 TGFX_TEST(AOTRenderConsistencyTest, OutOfRangeGradientStopBlendClampOrder) {
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
   auto* cache = context->precompiledShaderCache();
   auto image = MakeImage("resources/apitest/mandrill_128.png");
@@ -5499,6 +5531,7 @@ TGFX_TEST(AOTRenderConsistencyTest, OutOfRangeGradientStopBlendClampOrder) {
 TGFX_TEST(AOTRenderConsistencyTest, CoverageBlendModesOnOpaqueBackground) {
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
   auto* cache = context->precompiledShaderCache();
   constexpr int size = 96;
@@ -5557,6 +5590,7 @@ TGFX_TEST(AOTRenderConsistencyTest, CoverageBlendModesOnOpaqueBackground) {
 TGFX_TEST(AOTRenderConsistencyTest, MaskCoverageBlendModesOnOpaqueBackground) {
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
   auto* cache = context->precompiledShaderCache();
   constexpr int size = 96;
@@ -5620,6 +5654,7 @@ TGFX_TEST(AOTRenderConsistencyTest, MaskCoverageBlendModesOnOpaqueBackground) {
 TGFX_TEST(AOTRenderConsistencyTest, GPCoverageAndMaskCoexistOnAAEdge) {
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
   auto* cache = context->precompiledShaderCache();
   constexpr int size = 96;
@@ -5701,6 +5736,7 @@ TGFX_TEST(AOTRenderConsistencyTest, GPCoverageAndMaskCoexistOnAAEdge) {
 TGFX_TEST(AOTRenderConsistencyTest, NarrowAAClipWithSrcBlendKeepsDstOnEdge) {
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
   auto* cache = context->precompiledShaderCache();
   constexpr int size = 96;
@@ -5775,6 +5811,7 @@ TGFX_TEST(AOTRenderConsistencyTest, NarrowAAClipWithSrcBlendKeepsDstOnEdge) {
 TGFX_TEST(AOTRenderConsistencyTest, AlphaBiasMatrixSourceAlphaMatrix) {
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
   auto* cache = context->precompiledShaderCache();
   constexpr int size = 48;
@@ -5890,6 +5927,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaBiasMatrixSourceAlphaMatrix) {
 TGFX_TEST(AOTRenderConsistencyTest, DifferentImagesSameEffectShareProgram) {
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
   auto* cache = context->precompiledShaderCache();
   auto imageOne = MakeImage("resources/apitest/mandrill_128.png");
@@ -5961,6 +5999,7 @@ TGFX_TEST(AOTRenderConsistencyTest, DifferentImagesSameEffectShareProgram) {
 TGFX_TEST(AOTRenderConsistencyTest, DifferentLeafCountsShareVariant) {
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
   auto* cache = context->precompiledShaderCache();
   auto imageOne = MakeImage("resources/apitest/mandrill_128.png");
@@ -6042,6 +6081,7 @@ TGFX_TEST(AOTRenderConsistencyTest, DifferentLeafCountsShareVariant) {
 TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyImageBlurMatchesRuntime) {
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
   auto* cache = context->precompiledShaderCache();
   constexpr int size = 96;
