@@ -1319,7 +1319,7 @@ TGFX_TEST(BackgroundBlurTest, BackgroundBlurUnderHighZoom) {
  * render rects, so assert it directly instead of through a screenshot: sharing and direct drawing
  * produce the same pixels, which makes any screenshot unable to tell the two paths apart.
  */
-TGFX_TEST(BackgroundBlurTest, StyleShareCompactGate) {
+TGFX_TEST_PRIVATE(BackgroundBlurTest, StyleShareCompactGate){TGFX_PRIVATE_ACCESS({
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -1357,7 +1357,7 @@ TGFX_TEST(BackgroundBlurTest, StyleShareCompactGate) {
   // Submitting flushes the render tasks these captures queued, so they do not leak into the next
   // test through the shared drawing buffer.
   context->flushAndSubmit();
-}
+})}
 
 /**
  * A style whose content extent is far larger than the render target (here a 20000-pixel-wide layer
@@ -1366,55 +1366,57 @@ TGFX_TEST(BackgroundBlurTest, StyleShareCompactGate) {
  * decision so every pass draws the style directly instead of retrying the oversized rasterization,
  * which is what keeps the style on screen.
  */
-TGFX_TEST(BackgroundBlurTest, StyleOutputOversizeFallsBack) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  EXPECT_TRUE(context != nullptr);
-  constexpr int TargetWidth = 2048;
-  constexpr int TargetHeight = 256;
-  auto surface = Surface::Make(context, TargetWidth, TargetHeight);
-  DisplayList displayList;
-  displayList.setBackgroundColor(Color::White());
-  displayList.setZoomScale(512.0f);
+TGFX_TEST_PRIVATE(BackgroundBlurTest, StyleOutputOversizeFallsBack) {
+  TGFX_PRIVATE_ACCESS({
+    ContextScope scope;
+    auto context = scope.getContext();
+    EXPECT_TRUE(context != nullptr);
+    constexpr int TargetWidth = 2048;
+    constexpr int TargetHeight = 256;
+    auto surface = Surface::Make(context, TargetWidth, TargetHeight);
+    DisplayList displayList;
+    displayList.setBackgroundColor(Color::White());
+    displayList.setZoomScale(512.0f);
 
-  const float inverseZoom = 1.0f / 512.0f;
-  auto back = SolidLayer::Make();
-  back->setColor(Color::FromRGBA(70, 130, 190, 255));
-  back->setWidth(2048 * inverseZoom);
-  back->setHeight(256 * inverseZoom);
-  displayList.root()->addChild(back);
+    const float inverseZoom = 1.0f / 512.0f;
+    auto back = SolidLayer::Make();
+    back->setColor(Color::FromRGBA(70, 130, 190, 255));
+    back->setWidth(2048 * inverseZoom);
+    back->setHeight(256 * inverseZoom);
+    displayList.root()->addChild(back);
 
-  // Content 20000 device pixels wide: the cached output cannot fit in one texture.
-  auto styledLayer = SolidLayer::Make();
-  styledLayer->setColor(Color::FromRGBA(255, 255, 255, 60));
-  styledLayer->setWidth(20000 * inverseZoom);
-  styledLayer->setHeight(256 * inverseZoom);
-  styledLayer->setLayerStyles({BackgroundBlurStyle::Make(1, 1)});
-  displayList.root()->addChild(styledLayer);
+    // Content 20000 device pixels wide: the cached output cannot fit in one texture.
+    auto styledLayer = SolidLayer::Make();
+    styledLayer->setColor(Color::FromRGBA(255, 255, 255, 60));
+    styledLayer->setWidth(20000 * inverseZoom);
+    styledLayer->setHeight(256 * inverseZoom);
+    styledLayer->setLayerStyles({BackgroundBlurStyle::Make(1, 1)});
+    displayList.root()->addChild(styledLayer);
 
-  // One frame first: captureBackgrounds needs the tree's background outset, which is computed
-  // while rendering.
-  displayList.render(surface.get());
+    // One frame first: captureBackgrounds needs the tree's background outset, which is computed
+    // while rendering.
+    displayList.render(surface.get());
 
-  // Two rects covering the target in halves turn multi-pass rendering on while staying compact,
-  // which is what the shared style output requires.
-  const auto halfWidth = static_cast<float>(TargetWidth) * 0.5f;
-  const auto height = static_cast<float>(TargetHeight);
-  auto snapshots = displayList.captureBackgrounds(
-      surface.get(),
-      {Rect::MakeWH(halfWidth, height), Rect::MakeXYWH(halfWidth, 0.f, halfWidth, height)});
-  ASSERT_TRUE(snapshots != nullptr);
-  displayList.drawRootLayer(surface.get(), Rect::MakeWH(static_cast<float>(TargetWidth), height),
-                            displayList.getViewMatrix(), true, snapshots.get());
+    // Two rects covering the target in halves turn multi-pass rendering on while staying compact,
+    // which is what the shared style output requires.
+    const auto halfWidth = static_cast<float>(TargetWidth) * 0.5f;
+    const auto height = static_cast<float>(TargetHeight);
+    auto snapshots = displayList.captureBackgrounds(
+        surface.get(),
+        {Rect::MakeWH(halfWidth, height), Rect::MakeXYWH(halfWidth, 0.f, halfWidth, height)});
+    ASSERT_TRUE(snapshots != nullptr);
+    displayList.drawRootLayer(surface.get(), Rect::MakeWH(static_cast<float>(TargetWidth), height),
+                              displayList.getViewMatrix(), true, snapshots.get());
 
-  // Submitting flushes the render tasks this frame queued, so they do not leak into the next test
-  // through the shared drawing buffer.
-  context->flushAndSubmit();
+    // Submitting flushes the render tasks this frame queued, so they do not leak into the next test
+    // through the shared drawing buffer.
+    context->flushAndSubmit();
 
-  // The decision is remembered as a null entry, which is what sends the later passes down the
-  // direct path.
-  ASSERT_EQ(snapshots->styleOutputs.size(), 1u);
-  EXPECT_TRUE(snapshots->styleOutputs.begin()->second.image == nullptr);
+    // The decision is remembered as a null entry, which is what sends the later passes down the
+    // direct path.
+    ASSERT_EQ(snapshots->styleOutputs.size(), 1u);
+    EXPECT_TRUE(snapshots->styleOutputs.begin()->second.image == nullptr);
+  })
 }
 
 }  // namespace tgfx
