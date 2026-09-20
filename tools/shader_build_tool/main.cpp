@@ -261,6 +261,287 @@ static std::string StripDescriptorSets(std::string source) {
   return result;
 }
 
+// Rewrites a preprocessed template (GLSL 450 with Vulkan-style set/binding layout qualifiers)
+// into the desktop-GL 330 form the precompiled GL pipeline consumes: drop the `set = N` and
+// `binding = N` layout members (330 has no descriptor-set syntax; the runtime binds the UBO at a
+// fixed point and the samplers in declaration order — exactly what the spirv-cross 330 output
+// relies on), lower the version header, fold macro-expression layout ids to literals, and strip
+// line comments. Storing the template's own spelling instead of the regenerated one removes the
+// SSA-to-source round trip, whose call-site temporaries (param/param_1) and normalized block
+// names measured +79% lines on the chain interpreter — every stored GL blob the driver must
+// parse and compile carries that inflation. Reflection keeps coming from the common SPIR-V
+// (same template, same names, same std140 layout), so the loader contract and the ABI are
+// unchanged. GLES keeps the regenerated path: its ES-300 precision form and the
+// framebuffer-fetch remap are spirv-cross IR-level features with no template-side equivalent.
+// Returns an empty string when the source does not carry the expected version, so the caller
+// fails the variant closed instead of storing an untransformed 450 text.
+//
+// The macro-state machine below is a minimal conditional preprocessor: the driver's 330
+// front-end rejects non-literal layout ids where the regenerated form carried folded literals
+// (spirv-cross reads them back from SPIR-V), and the templates write `location = NTEX + 1` /
+// `CHAIN_TEX_LOC_BASE + 0` with defines that depend on the injected permutation defines. Only
+// the forms the sources actually use are supported: `#if NAME`, `#if NAME == N`, `#ifndef`,
+// `#elif`, `#else`, `#endif`, `#define NAME N`, `#undef NAME` — no defined(), no arithmetic
+// conditions (verified across the tree).
+static std::string EmitDirectGLSL330(const std::string& source, ShaderStageType stage) {
+  const std::string versionToken = "#version 450";
+  auto versionPos = source.find(versionToken);
+  if (versionPos == std::string::npos) {
+    return {};
+  }
+  auto lineStart = source.rfind('\n', versionPos);
+  bool atFileHead =
+      versionPos == 0 || (lineStart != std::string::npos &&
+                          source.compare(lineStart + 1, versionToken.size(), versionToken) == 0);
+  if (!atFileHead) {
+    return {};
+  }
+  std::string result = source;
+  result.replace(versionPos, versionToken.size(), "#version 330");
+
+  std::map<std::string, int64_t> macros;
+  // Conditional stack: for each open #if, the parent's activity at entry, whether any branch
+  // was taken yet, and whether the current branch is active. A branch inside a dead outer
+  // region stays dead no matter its own condition — the earlier parentActive derivation
+  // (`branchTaken.size() > 1`) was always-true and let dead-outer/live-inner #else blocks
+  // execute their #defines, polluting the macro table.
+  std::vector<bool> branchActive;
+  std::vector<bool> branchParent;
+  std::vector<bool> branchTaken;
+  auto activeNow = [&branchActive]() { return branchActive.empty() || branchActive.back(); };
+  std::string out;
+  out.reserve(result.size() / 2);
+
+  auto macroValue = [&macros](const std::string& name) -> int64_t {
+    auto it = macros.find(name);
+    return it == macros.end() ? 0 : it->second;
+  };
+  auto evalCondition = [&](const std::string& expr) -> int64_t {
+    // `NAME` (truthiness) or `NAME == N` / `NAME != N`; unknown names evaluate to 0 like a
+    // real preprocessor.
+    auto eq = expr.find("==");
+    auto ne = expr.find("!=");
+    if (eq != std::string::npos || ne != std::string::npos) {
+      auto opPos = eq != std::string::npos ? eq : ne;
+      auto left = expr.substr(0, opPos);
+      auto right = expr.substr(expr.find_first_not_of("= ", opPos));
+      auto trim = [](std::string s) {
+        auto a = s.find_first_not_of(" \t\r");
+        auto b = s.find_last_not_of(" \t\r");
+        return a == std::string::npos ? std::string() : s.substr(a, b - a + 1);
+      };
+      left = trim(left);
+      right = trim(right);
+      int64_t rhs = 0;
+      try {
+        rhs = std::stoll(right);
+      } catch (...) {
+        rhs = macroValue(right);
+      }
+      int64_t lhs = isdigit(left[0]) ? std::stoll(left) : macroValue(left);
+      return eq != std::string::npos ? (lhs == rhs) : (lhs != rhs);
+    }
+    auto trim = [](std::string s) {
+      auto a = s.find_first_not_of(" \t\r");
+      auto b = s.find_last_not_of(" \t\r");
+      return a == std::string::npos ? std::string() : s.substr(a, b - a + 1);
+    };
+    auto name = trim(expr);
+    return isdigit(name[0]) ? std::stoll(name) : macroValue(name);
+  };
+
+  size_t cursor = 0;
+  while (cursor < result.size()) {
+    auto lineEnd = result.find('\n', cursor);
+    auto line =
+        result.substr(cursor, lineEnd == std::string::npos ? std::string::npos : lineEnd - cursor);
+    bool active = activeNow();
+    auto directive = line.find_first_not_of(" \t");
+    if (directive != std::string::npos && line[directive] == '#') {
+      auto head = line.substr(directive);
+      if (head.rfind("#if ", 0) == 0 || head.rfind("#if\t", 0) == 0) {
+        bool parent = activeNow();
+        bool taken = parent && evalCondition(head.substr(3)) != 0;
+        branchActive.push_back(taken);
+        branchParent.push_back(parent);
+        branchTaken.push_back(taken);
+      } else if (head.rfind("#ifndef ", 0) == 0) {
+        auto name = head.substr(8);
+        auto trim = name.find_first_not_of(" \t\r");
+        name = name.substr(trim);
+        bool parent = activeNow();
+        bool taken = parent && macros.find(name) == macros.end();
+        branchActive.push_back(taken);
+        branchParent.push_back(parent);
+        branchTaken.push_back(taken);
+      } else if (head.rfind("#ifdef ", 0) == 0) {
+        auto name = head.substr(7);
+        auto trim = name.find_first_not_of(" \t\r");
+        name = name.substr(trim);
+        bool parent = activeNow();
+        bool taken = parent && macros.find(name) != macros.end();
+        branchActive.push_back(taken);
+        branchParent.push_back(parent);
+        branchTaken.push_back(taken);
+      } else if (head.rfind("#elif ", 0) == 0) {
+        if (!branchActive.empty()) {
+          bool taken =
+              branchParent.back() && !branchTaken.back() && evalCondition(head.substr(5)) != 0;
+          branchActive.back() = taken;
+          branchTaken.back() = branchTaken.back() || taken;
+        }
+      } else if (head.rfind("#else", 0) == 0) {
+        if (!branchActive.empty()) {
+          branchActive.back() = branchParent.back() && !branchTaken.back();
+          branchTaken.back() = true;
+        }
+      } else if (head.rfind("#endif", 0) == 0) {
+        if (!branchActive.empty()) {
+          branchActive.pop_back();
+          branchParent.pop_back();
+          branchTaken.pop_back();
+        }
+      } else if (activeNow() && head.rfind("#define ", 0) == 0) {
+        auto body = head.substr(8);
+        auto nameEnd = body.find_first_of(" \t");
+        if (nameEnd != std::string::npos) {
+          auto name = body.substr(0, nameEnd);
+          auto valueStart = body.find_first_not_of(" \t", nameEnd);
+          if (valueStart != std::string::npos) {
+            try {
+              int64_t value = std::stoll(body.substr(valueStart));
+              macros[name] = value;
+            } catch (...) {
+              // Non-numeric macro (e.g. CHAIN_LEAF_SAMPLER): not a layout-id input.
+            }
+          } else {
+            macros.erase(name);
+          }
+        }
+      } else if (active && head.rfind("#undef ", 0) == 0) {
+        macros.erase(head.substr(7));
+      }
+      // Directives stay in the output verbatim: the driver's own preprocessor consumes
+      // #version/#define/#if pairs — the state machine above only mirrors it to know the
+      // macro values at each layout id.
+      auto directiveComment = line.find("//");
+      out += directiveComment == std::string::npos ? line : line.substr(0, directiveComment);
+      out += '\n';
+      cursor = lineEnd == std::string::npos ? result.size() : lineEnd + 1;
+      continue;
+    }
+    // Strip the line comment, then drop the line when only whitespace remains. Dead
+    // preprocessor branches keep their lines verbatim (the driver's preprocessor removes
+    // them), but their comments are stripped too — they never reach the driver.
+    auto comment = line.find("//");
+    auto code = comment == std::string::npos ? line : line.substr(0, comment);
+    if (code.find_first_not_of(" \t\r") == std::string::npos) {
+      cursor = lineEnd == std::string::npos ? result.size() : lineEnd + 1;
+      continue;
+    }
+    if (active) {
+      // Track live defines only; dead-branch defines never reach the driver.
+    }
+    // Rewrite layout(...) lists on every line — dead preprocessor branches keep their text
+    // for the driver's preprocessor to drop, but rewriting them too is harmless and keeps the
+    // form assertion meaningful (a surviving set/binding member is a strip miss, whether or
+    // not the branch is live).
+    {
+      auto open = code.find("layout(");
+      while (open != std::string::npos) {
+        auto close = code.find(')', open);
+        if (close == std::string::npos) {
+          break;
+        }
+        std::string inner = code.substr(open + 7, close - open - 7);
+        std::string kept;
+        size_t tokenCursor = 0;
+        while (tokenCursor <= inner.size()) {
+          auto comma = inner.find(',', tokenCursor);
+          auto token = inner.substr(
+              tokenCursor, comma == std::string::npos ? std::string::npos : comma - tokenCursor);
+          auto headWs = token.find_first_not_of(" \t");
+          if (headWs == std::string::npos) {
+            if (comma == std::string::npos) break;
+            tokenCursor = comma + 1;
+            continue;
+          }
+          std::string member = token.substr(headWs);
+          if (member.compare(0, 4, "set ") != 0 && member.compare(0, 8, "binding ") != 0) {
+            // GLSL 330 allows layout(location) only on vertex inputs and fragment outputs;
+            // varyings (vertex out / fragment in) must link by name — 4.1 introduced explicit
+            // varying locations. spirv-cross already strips them in its 330 output; the direct
+            // emission drops the member instead. Attribute/out declarations are identified by
+            // the `in`/`out` keyword on the declaration line.
+            auto isVarying =
+                code.find(" in ") != std::string::npos
+                    ? stage == ShaderStageType::Fragment
+                    : (code.find(" out ") != std::string::npos && stage == ShaderStageType::Vertex);
+            auto eq = member.find("= ");
+            if (member.rfind("location", 0) == 0 && eq != std::string::npos) {
+              if (isVarying) {
+                member.clear();  // drop the location member from a varying declaration
+              } else {
+                // Fold `location = <expr>` to a literal using the current macro state.
+                auto expr = member.substr(eq + 2);
+                int64_t folded = 0;
+                bool ok = true;
+                // Sum/difference of macros and integers — the only forms the sources use.
+                size_t partCursor = 0;
+                bool negate = false;
+                while (partCursor < expr.size()) {
+                  auto op = expr.find_first_of("+-", partCursor == 0 ? 0 : partCursor);
+                  auto part = expr.substr(
+                      partCursor, op == std::string::npos ? std::string::npos : op - partCursor);
+                  auto partWs = part.find_first_not_of(" \t\r");
+                  if (partWs != std::string::npos) {
+                    auto partEnd = part.find_last_not_of(" \t\r");
+                    part = part.substr(partWs, partEnd - partWs + 1);
+                    int64_t v = 0;
+                    if (isdigit(part[0])) {
+                      try {
+                        v = std::stoll(part);
+                      } catch (...) {
+                        ok = false;
+                      }
+                    } else if (isalpha(part[0]) || part[0] == '_') {
+                      v = macroValue(part);
+                    } else {
+                      ok = false;
+                    }
+                    folded += negate ? -v : v;
+                  }
+                  if (op == std::string::npos) break;
+                  negate = expr[op] == '-';
+                  partCursor = op + 1;
+                }
+                if (ok) {
+                  member = "location = " + std::to_string(folded);
+                }
+              }
+            }
+            if (!member.empty()) {
+              if (!kept.empty()) {
+                kept += ", ";
+              }
+              kept += member;
+            }
+          }
+          if (comma == std::string::npos) break;
+          tokenCursor = comma + 1;
+        }
+        std::string replacement = kept.empty() ? "" : "layout(" + kept + ")";
+        code.replace(open, close - open + 1, replacement);
+        open = code.find("layout(", open + replacement.size());
+      }
+    }
+    out += code;
+    out += '\n';
+    cursor = lineEnd == std::string::npos ? result.size() : lineEnd + 1;
+  }
+  return out;
+}
+
 static std::string ResolveIncludes(const std::string& source, const std::string& baseDir) {
   std::string result;
   std::istringstream stream(source);
@@ -480,18 +761,95 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
         vertBlob.assign(wgslVert.wgsl.begin(), wgslVert.wgsl.end());
         fragBlob.assign(wgslFrag.wgsl.begin(), wgslFrag.wgsl.end());
       } else if (backend == "opengl" || backend == "opengles") {
-        bool gles = backend == "opengles";
-        auto glslVert = TranslateToGLSL(*vertSpirv, gles);
-        auto glslFrag = TranslateToGLSL(fragResult.spirv, gles);
-        if (!glslVert.success || !glslFrag.success) {
-          std::cerr << "  GLSL translation error: "
-                    << (glslVert.success ? glslFrag.error : glslVert.error) << "\n";
-          report.errorCount++;
-          RecordBackendArtifactError(backend, profileErrorCounts);
-          continue;
+        if (backend == "opengl") {
+          // Desktop GL direct emission (see EmitDirectGLSL330): store the preprocessed template
+          // in its own 330 spelling. The mandatory compile check below runs the exact stored
+          // text through glslang's OpenGL target, so a template using syntax beyond GL 330 (or
+          // a leak of Vulkan-only qualifiers like subpassInput into a desktop variant) fails
+          // the build here instead of surfacing as a runtime module-creation fallback.
+          auto directVert =
+              EmitDirectGLSL330(PrependDefines(vertSource, vertDefines), ShaderStageType::Vertex);
+          auto directFrag =
+              EmitDirectGLSL330(PrependDefines(fragSource, fragDefines), ShaderStageType::Fragment);
+          if (directVert.empty() || directFrag.empty()) {
+            std::cerr << "  direct-GL 330 emission failed (missing #version 450 header) for "
+                      << info.name << " [vert=" << vi << " frag=" << fi << "]\n";
+            report.errorCount++;
+            RecordBackendArtifactError(backend, profileErrorCounts);
+            continue;
+          }
+          // Direct-emission verification is layered, because glslang's 330 front-end is stricter
+          // than the real drivers (it rejects the very no-binding-block / located-out forms the
+          // regenerated 330 output has shipped in for months, and macro-folded layout ids):
+          //   1. Semantics: the common 450 SPIR-V compile above already validates every
+          //      expression of the same preprocessed source.
+          //   2. Form: the assertions below fail closed on any transform leak (a surviving
+          //      set/binding qualifier, a Vulkan-only subpassInput reaching a desktop variant).
+          //   3. Driver acceptance: the byte-parity consistency suite compiles the stored text
+          //      on the actual GL driver.
+          // A word-boundary hazard: variable names like `offset = ` contain the substring
+          // "set = ", so the leak check must see the layout-qualifier context (the token is
+          // preceded by '(' or ','), the same test StripDescriptorSets uses.
+          auto hasLayoutMember = [](const std::string& text, const std::string& member) -> int64_t {
+            std::string token = member + " ";
+            size_t cursor = 0;
+            while ((cursor = text.find(token, cursor)) != std::string::npos) {
+              size_t before = cursor;
+              while (before > 0 && (text[before - 1] == ' ' || text[before - 1] == '\t')) {
+                --before;
+              }
+              if (before > 0 && (text[before - 1] == '(' || text[before - 1] == ',')) {
+                return static_cast<int64_t>(cursor);
+              }
+              ++cursor;
+            }
+            return -1;
+          };
+          auto assertDirectForm = [&](const std::string& text, const char* stage) {
+            // Runs on the un-preprocessed text, so only transform-level leaks are checkable
+            // here: a surviving set/binding qualifier (the strip missed a form) or a missing
+            // version rewrite. Vulkan-only syntax inside a `#if HAS_XP == 2` block is NOT a
+            // leak — the block is dead for every desktop variant, and the live-block routing
+            // (PermutationCompilesForBackend excludes XP=2 from opengl) is audited elsewhere.
+            auto setPos = hasLayoutMember(text, "set =");
+            auto bindingPos = hasLayoutMember(text, "binding =");
+            if (setPos >= 0 || bindingPos >= 0 || text.find("#version 330") == std::string::npos) {
+              std::cerr << "  direct-GL 330 form assertion failed (" << stage << ") for "
+                        << info.name << " [vert=" << vi << " frag=" << fi << "]";
+              for (auto [pos, label] :
+                   {std::pair<int64_t, const char*>{setPos, "set"}, {bindingPos, "binding"}}) {
+                if (pos >= 0) {
+                  std::cerr << " [" << label << " @ "
+                            << text.substr(std::max<size_t>(0, static_cast<size_t>(pos) - 40), 90)
+                            << "]";
+                }
+              }
+              std::cerr << "\n";
+              report.errorCount++;
+              RecordBackendArtifactError(backend, profileErrorCounts);
+              return false;
+            }
+            return true;
+          };
+          if (!assertDirectForm(directVert, "vert") || !assertDirectForm(directFrag, "frag")) {
+            continue;
+          }
+          vertBlob.assign(directVert.begin(), directVert.end());
+          fragBlob.assign(directFrag.begin(), directFrag.end());
+        } else {
+          bool gles = backend == "opengles";
+          auto glslVert = TranslateToGLSL(*vertSpirv, gles);
+          auto glslFrag = TranslateToGLSL(fragResult.spirv, gles);
+          if (!glslVert.success || !glslFrag.success) {
+            std::cerr << "  GLSL translation error: "
+                      << (glslVert.success ? glslFrag.error : glslVert.error) << "\n";
+            report.errorCount++;
+            RecordBackendArtifactError(backend, profileErrorCounts);
+            continue;
+          }
+          vertBlob.assign(glslVert.glsl.begin(), glslVert.glsl.end());
+          fragBlob.assign(glslFrag.glsl.begin(), glslFrag.glsl.end());
         }
-        vertBlob.assign(glslVert.glsl.begin(), glslVert.glsl.end());
-        fragBlob.assign(glslFrag.glsl.begin(), glslFrag.glsl.end());
       } else {
         continue;
       }
