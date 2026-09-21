@@ -431,6 +431,69 @@ TGFX_TEST(AOTL2AuditTest, TextureBlendColorFilterConstColorUsesPointwiseChain) {
                              << " diffPixels=" << result.diffPixelCount;
 }
 
+// P4 probe: the producer API accepts ConstColor and Blend as chain slots (AOTPointwiseOpType
+// 6/7). This matrix verifies the AOT chain kernel's execution matches the JIT fallback for
+// every advanced blend mode, in two operand forms: two image shaders (texture operands) and a
+// solid color shader blended with an image (the ConstColor slot form). Each mode renders with
+// the decomposition gate OFF (JIT reference) and ON (AOT chain) and compares with the same
+// tolerance the single-mode Multiply audit uses.
+TGFX_TEST(AOTL2AuditTest, BlendModeMatrixMatchesJIT) {
+  auto image = MakeImage("resources/apitest/test_timestretch.png");
+  ASSERT_TRUE(image != nullptr);
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
+
+  int width = 128;
+  int height = 128;
+  auto plain = Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp);
+  ASSERT_TRUE(plain != nullptr);
+  const BlendMode modes[] = {
+      BlendMode::Multiply,   BlendMode::Screen,     BlendMode::Overlay,    BlendMode::Darken,
+      BlendMode::Lighten,    BlendMode::ColorDodge, BlendMode::ColorBurn,  BlendMode::HardLight,
+      BlendMode::SoftLight,  BlendMode::Difference, BlendMode::Exclusion,  BlendMode::Hue,
+      BlendMode::Saturation, BlendMode::Color,      BlendMode::Luminosity, BlendMode::PlusDarker};
+  for (auto mode : modes) {
+    for (int form = 0; form < 2; form++) {
+      std::shared_ptr<Shader> blend;
+      if (form == 0) {
+        blend = Shader::MakeBlend(mode, plain, plain);
+      } else {
+        auto solid = Shader::MakeColorShader(Color::FromRGBA(200, 120, 60, 200));
+        ASSERT_TRUE(solid != nullptr);
+        blend = Shader::MakeBlend(mode, solid, plain);
+      }
+      ASSERT_TRUE(blend != nullptr);
+      Bitmap jitBitmap = {};
+      Bitmap aotBitmap = {};
+      uint32_t jitHits = 0;
+      uint32_t aotHits = 0;
+      uint32_t jitNoMatch = 0;
+      uint32_t aotNoMatch = 0;
+      RenderShaderScene(context, cache, blend, width, height, false, &jitBitmap, &jitHits,
+                        &jitNoMatch);
+      RenderShaderScene(context, cache, blend, width, height, true, &aotBitmap, &aotHits,
+                        &aotNoMatch);
+      ASSERT_TRUE(aotHits > 0) << "AOT path did not hit for mode=" << static_cast<int>(mode)
+                               << " form=" << form;
+      Pixmap jitPixmap(jitBitmap);
+      Pixmap aotPixmap(aotBitmap);
+      AOTToleranceSpec spec = {};
+      spec.maxChannelDiff = 1;
+      spec.maxDiffPixelRatio = 1.0;
+      spec.structuralChannelDiff = 2;
+      auto result = AOTToleranceCompare::Compare(jitPixmap, aotPixmap, spec);
+      EXPECT_TRUE(result.passed) << "AOT vs JIT diverged for blend mode=" << static_cast<int>(mode)
+                                 << " form=" << form << " maxDelta=" << result.maxChannelDiff
+                                 << " diffPixels=" << result.diffPixelCount;
+    }
+  }
+  cache->setDecompositionEnabled(true);
+  cache->unload();
+}
+
 TGFX_TEST(AOTL2AuditTest, TiledInBlendMatchesPlainPath) {
   auto image = MakeImage("resources/apitest/test_timestretch.png");
   ASSERT_TRUE(image != nullptr);
