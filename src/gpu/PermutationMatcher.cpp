@@ -587,6 +587,14 @@ static std::optional<PermutationMatchResult> TryMatchDeviceSpaceTexture(
   if (programInfo->numFragmentProcessors() != 1) {
     return std::nullopt;
   }
+  // The effect must be the COLOR processor. In the coverage role a device-space texture is a
+  // draw mask: its sample value must ride the XP's coverage input (C·S + (1-C)·D), while this
+  // template folds it into the source color with coverage pinned to 1 — correct only for
+  // SrcOver-class blending. A mask-role effect stays off this artifact and rides the chain's
+  // mask-child route (or the runtime), both of which composite it as true coverage.
+  if (programInfo->numColorFragmentProcessors() != 1) {
+    return std::nullopt;
+  }
   auto fp = programInfo->getFragmentProcessor(0);
   if (fp->name() != "DeviceSpaceTextureEffect") {
     return std::nullopt;
