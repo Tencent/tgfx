@@ -19,6 +19,8 @@
 #include "gpu/processors/AOTPointwiseTailProcessor.h"
 #include "gpu/AOTPointwiseSlotWriter.h"
 #include "gpu/ColorSpaceXformHelper.h"
+#include "gpu/glsl/GLSLBlend.h"
+#include "gpu/processors/ConstColorProcessor.h"
 
 namespace tgfx {
 namespace {}  // namespace
@@ -104,6 +106,43 @@ void AOTPointwiseTailProcessor::emitCode(EmitArgs& args) const {
                                     stepped.c_str());
       args.fragBuilder->codeAppend("}");
       args.fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), stepped.c_str());
+    } else if (current.type == AOTPointwiseOpType::ConstColor) {
+      auto value = declareSlotField("ConstColorValue", UniformFormat::Float4, index);
+      // Mirrors GLSLConstColorProcessor's emission for the same input mode. The precompiled kernel
+      // folds the mode into the ConstInputMode runtime uniform; the JIT bakes it per slot, so the
+      // shared upload's ConstInputMode write is an optional no-op here.
+      switch (static_cast<InputMode>(current.constColor.inputMode)) {
+        case InputMode::Ignore:
+          args.fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), value.c_str());
+          break;
+        case InputMode::ModulateRGBA:
+          args.fragBuilder->codeAppendf("%s = %s * %s;", args.outputColor.c_str(), value.c_str(),
+                                        args.inputColor.c_str());
+          break;
+        case InputMode::ModulateA:
+          args.fragBuilder->codeAppendf("%s = %s * %s.a;", args.outputColor.c_str(), value.c_str(),
+                                        args.inputColor.c_str());
+          break;
+      }
+    } else if (current.type == AOTPointwiseOpType::Blend) {
+      // Blend with a constant operand, matching the precompiled kernel's OP_BLEND: the operand
+      // order follows BlendConstFirst, the mode is baked per slot (the shared upload's
+      // BlendModeValue write is an optional no-op here).
+      auto value = declareSlotField("ConstColorValue", UniformFormat::Float4, index);
+      auto srcName = "pointwiseTailBlendSrc" + std::to_string(index);
+      auto dstName = "pointwiseTailBlendDst" + std::to_string(index);
+      // childType mirrors XfermodeFragmentProcessor::Child: SrcChild (1) puts the constant in the
+      // src operand, DstChild (0) in the dst operand — same mapping as the shared upload's
+      // BlendConstFirst bit.
+      if (current.blend.childType == 1) {
+        args.fragBuilder->codeAppendf("vec4 %s = %s;", srcName.c_str(), value.c_str());
+        args.fragBuilder->codeAppendf("vec4 %s = %s;", dstName.c_str(), args.outputColor.c_str());
+      } else {
+        args.fragBuilder->codeAppendf("vec4 %s = %s;", srcName.c_str(), args.outputColor.c_str());
+        args.fragBuilder->codeAppendf("vec4 %s = %s;", dstName.c_str(), value.c_str());
+      }
+      AppendMode(args.fragBuilder, srcName, "vec4(1.0)", dstName, args.outputColor,
+                 static_cast<BlendMode>(current.blend.blendMode), false);
     } else {
       // Emit the color-space steps through the shared helper and builder routine so this slot's
       // generated code matches the standalone ColorSpaceXformEffect exactly.

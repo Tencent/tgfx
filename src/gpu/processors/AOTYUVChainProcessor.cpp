@@ -19,6 +19,8 @@
 #include "gpu/processors/AOTYUVChainProcessor.h"
 #include "gpu/AOTPointwiseSlotWriter.h"
 #include "gpu/ColorSpaceXformHelper.h"
+#include "gpu/glsl/GLSLBlend.h"
+#include "gpu/processors/ConstColorProcessor.h"
 
 namespace tgfx {
 
@@ -99,6 +101,48 @@ void AOTYUVChainProcessor::emitCode(EmitArgs& args) const {
       args.fragBuilder->codeAppend("}");
       args.fragBuilder->codeAppendf("%s = yuvStep%d;", args.outputColor.c_str(),
                                     static_cast<int>(index));
+    } else if (current.type == AOTPointwiseOpType::ConstColor) {
+      auto value = args.uniformHandler->addUniform("ConstColorValue", UniformFormat::Float4,
+                                                   ShaderStage::Fragment, MaxPointwiseSlots);
+      // Mirrors GLSLConstColorProcessor's emission for the same input mode (the precompiled
+      // kernel folds it into the ConstInputMode runtime uniform; the JIT bakes it per slot).
+      switch (static_cast<InputMode>(current.constColor.inputMode)) {
+        case InputMode::Ignore:
+          args.fragBuilder->codeAppendf("%s = %s[%d];", args.outputColor.c_str(), value.c_str(),
+                                        static_cast<int>(index));
+          break;
+        case InputMode::ModulateRGBA:
+          args.fragBuilder->codeAppendf("%s = %s[%d] * %s;", args.outputColor.c_str(),
+                                        value.c_str(), static_cast<int>(index),
+                                        args.inputColor.c_str());
+          break;
+        case InputMode::ModulateA:
+          args.fragBuilder->codeAppendf("%s = %s[%d] * %s.a;", args.outputColor.c_str(),
+                                        value.c_str(), static_cast<int>(index),
+                                        args.inputColor.c_str());
+          break;
+      }
+    } else if (current.type == AOTPointwiseOpType::Blend) {
+      // Blend with a constant operand, matching the precompiled kernel's OP_BLEND: the operand
+      // order follows BlendConstFirst, the mode is baked per slot.
+      auto value = args.uniformHandler->addUniform("ConstColorValue", UniformFormat::Float4,
+                                                   ShaderStage::Fragment, MaxPointwiseSlots);
+      auto srcName = "yuvBlendSrc" + std::to_string(index);
+      auto dstName = "yuvBlendDst" + std::to_string(index);
+      // childType mirrors XfermodeFragmentProcessor::Child: SrcChild (1) puts the constant in the
+      // src operand, DstChild (0) in the dst operand — same mapping as the shared upload's
+      // BlendConstFirst bit.
+      if (current.blend.childType == 1) {
+        args.fragBuilder->codeAppendf("vec4 %s = %s[%d];", srcName.c_str(), value.c_str(),
+                                      static_cast<int>(index));
+        args.fragBuilder->codeAppendf("vec4 %s = %s;", dstName.c_str(), args.outputColor.c_str());
+      } else {
+        args.fragBuilder->codeAppendf("vec4 %s = %s;", srcName.c_str(), args.outputColor.c_str());
+        args.fragBuilder->codeAppendf("vec4 %s = %s[%d];", dstName.c_str(), value.c_str(),
+                                      static_cast<int>(index));
+      }
+      AppendMode(args.fragBuilder, srcName, "vec4(1.0)", dstName, args.outputColor,
+                 static_cast<BlendMode>(current.blend.blendMode), false);
     } else {
       // ColorSpaceXform rides the same ColorSpaceXformHelper path the tail processor uses;
       // slots beyond the count stay OP_NONE in the precompiled kernel.
