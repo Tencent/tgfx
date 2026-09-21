@@ -6383,7 +6383,7 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailSamplingTransforms) {
 // background under the blend modes whose output depends on the dst contribution, so any
 // S/C wiring error diverges from the runtime path.
 static void RenderCoverageXPScene(bool useBundle, BlendMode mode, Bitmap* outBitmap,
-                                  bool useGradient) {
+                                  bool useGradient, bool useInstancedShapes = false) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -6414,6 +6414,26 @@ static void RenderCoverageXPScene(bool useBundle, BlendMode mode, Bitmap* outBit
         {Color::FromRGBA(0, 255, 255, 255), Color::FromRGBA(255, 0, 255, 128)}, {}));
     paint.setAlpha(160);
     canvas->drawRect(Rect::MakeXYWH(15, 15, 90, 90), paint);
+  } else if (useInstancedShapes) {
+    // ShapeInstancedFill path: a generic polygon path (not reducible to rect/oval/rrect, so
+    // Canvas::drawPath keeps the generic drawContext->drawPath route) drawn repeatedly at
+    // translate-only offsets, which OpsCompositor batches into a ShapeInstancedDrawOp
+    // (count > 1). Instances do NOT overlap and stay inside the surface: overlapping or
+    // clipped instances under a dst-copy blend change the dst texture semantics into an
+    // independent problem, not a coverage-contract probe. No shader keeps the pipeline at
+    // 0 fragment processors, which the matcher requires.
+    Path shape = {};
+    shape.moveTo(6, 2);
+    shape.lineTo(26, 2);
+    shape.lineTo(16, 24);
+    shape.close();
+    paint.setColor(Color::FromRGBA(0, 255, 255, 128));
+    for (int i = 0; i < 3; i++) {
+      canvas->save();
+      canvas->translate(8.0f + static_cast<float>(i) * 40.0f, 48.0f);
+      canvas->drawPath(shape, paint);
+      canvas->restore();
+    }
   } else {
     // RoundStrokeRectFill path: the GP is created only for a Round line join on a stroked
     // rect (RectDrawOp routes LineJoin::Round to RoundStrokeRectGeometryProcessor), so a
@@ -6459,6 +6479,17 @@ TGFX_TEST(AOTRenderConsistencyTest, UnifiedGradientVCoverageXPContract) {
     RenderCoverageXPScene(true, mode, &aotBitmap, true);
     RenderCoverageXPScene(false, mode, &runtimeBitmap, true);
     ExpectBitmapsIdentical("unified-gradient-vcoverage-xp", aotBitmap, runtimeBitmap, 120, 120);
+  }
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, ShapeInstancedCoverageXPContract) {
+  for (auto mode : COVERAGE_XP_PROBE_MODES) {
+    Bitmap aotBitmap = {};
+    Bitmap runtimeBitmap = {};
+    RenderCoverageXPScene(true, mode, &aotBitmap, false, true);
+    RenderCoverageXPScene(false, mode, &runtimeBitmap, false, true);
+    auto label = "shape-instanced-coverage-xp mode=" + std::to_string(static_cast<int>(mode));
+    ExpectBitmapsNear(label.c_str(), aotBitmap, runtimeBitmap, 120, 120, 0);
   }
 }
 
