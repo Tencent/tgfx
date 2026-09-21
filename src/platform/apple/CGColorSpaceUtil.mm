@@ -25,15 +25,7 @@ CGColorSpaceRef CreateCGColorSpace(const std::shared_ptr<ColorSpace>& colorSpace
       if (CFDataRef cfData =
               CFDataCreate(kCFAllocatorDefault, reinterpret_cast<const UInt8*>(iccData->data()),
                            static_cast<CFIndex>(iccData->size()))) {
-        CGColorSpaceRef cgColorSpace = nullptr;
-        if (@available(iOS 10.0, macOS 10.12, *)) {
-          cgColorSpace = CGColorSpaceCreateWithICCData(cfData);
-        } else {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-          cgColorSpace = CGColorSpaceCreateWithICCProfile(cfData);
-#pragma clang diagnostic pop
-        }
+        CGColorSpaceRef cgColorSpace = CGColorSpaceCreateWithICCData(cfData);
         CFRelease(cfData);
         if (cgColorSpace != nullptr) {
           return cgColorSpace;
