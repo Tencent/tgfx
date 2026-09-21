@@ -1852,6 +1852,11 @@ TGFX_TEST(AOTRenderConsistencyTest, PlanExecutionFailureIsRecordedNotFatal) {
     }
     cache->setDiagnosticRecordingEnabled(true);
     cache->resetStats();
+    // Pair the cache-side reset with the program-stats reset (like every other epoch reset in
+    // this suite): clearPrograms() alone wipes the program map but keeps the cumulative
+    // precompiledArtifactCreations, which would leak the injected-failure run's creation into
+    // the healthy run's epoch and skew the pipeline-vs-program consistency delta.
+    context->globalCache()->resetProgramStats();
     context->globalCache()->clearPrograms();
     auto target = RenderTargetProxy::Make(context, 64, 64, false);
     if (target == nullptr) {
