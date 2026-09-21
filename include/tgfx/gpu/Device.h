@@ -57,6 +57,12 @@ class Device {
    */
   void unlock();
 
+  /**
+   * Returns a snapshot of all live registered devices. Devices are registered via
+   * RegisterNative() (see the protected section) as their backends create them.
+   */
+  static std::vector<std::shared_ptr<Device>> GetAllNative();
+
  protected:
   std::mutex locker = {};
   GPU* _gpu = nullptr;
@@ -87,11 +93,6 @@ class Device {
    * none.
    */
   static std::shared_ptr<Device> FindNative(const DeviceKey& key);
-
-  /**
-   * Returns a snapshot of all live registered devices.
-   */
-  static std::vector<std::shared_ptr<Device>> GetAllNative();
 
  private:
   uint32_t _uniqueID = 0;
