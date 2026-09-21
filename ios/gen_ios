@@ -8,11 +8,11 @@ const xcodeGen = require("path").resolve(__dirname, "../third_party/vendor_tools
 const extraArgs = process.argv.slice(2).join(" ");
 
 childProcess.execSync(
-    `node "${xcodeGen}" ../ -w -DTGFX_BUILD_HELLO2D=ON -DTGFX_USE_METAL=ON -DDEPLOYMENT_TARGET=15.0 -p ios -o metal ${extraArgs}`,
+    `node "${xcodeGen}" ../ -w -DTGFX_BUILD_HELLO2D=ON -DTGFX_USE_METAL=ON -p ios -o metal ${extraArgs}`,
     {stdio: "inherit"}
 );
 
 childProcess.execSync(
-    `node "${xcodeGen}" ../ -w -DTGFX_BUILD_HELLO2D=ON -DDEPLOYMENT_TARGET=15.0 -p ios -o opengl ${extraArgs}`,
+    `node "${xcodeGen}" ../ -w -DTGFX_BUILD_HELLO2D=ON -p ios -o opengl ${extraArgs}`,
     {stdio: "inherit"}
 );

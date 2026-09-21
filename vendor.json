@@ -285,8 +285,7 @@
           "-DSHADERC_SKIP_TESTS=ON",
           "-DSHADERC_SKIP_EXAMPLES=ON",
           "-DSHADERC_SKIP_INSTALL=ON",
-          "-DCMAKE_CXX_FLAGS=\"-w\"",
-          "-DDEPLOYMENT_TARGET=15.0"
+          "-DCMAKE_CXX_FLAGS=\"-w\""
         ],
         "platforms": [
           "ios"
@@ -321,8 +320,7 @@
         ],
         "arguments": [
           "-DSPIRV_CROSS_ENABLE_TESTS=OFF",
-          "-DCMAKE_CXX_FLAGS=\"-w\"",
-          "-DDEPLOYMENT_TARGET=15.0"
+          "-DCMAKE_CXX_FLAGS=\"-w\""
         ],
         "platforms": [
           "ios"
