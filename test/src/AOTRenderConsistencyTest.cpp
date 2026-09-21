@@ -6544,4 +6544,73 @@ TGFX_TEST(AOTRenderConsistencyTest, ShapeInstancedCoverageXPContract) {
   }
 }
 
+// DeviceSpaceTexture path: a complex (non-rect/non-rrect) clip path is rasterized into a texture
+// mask, and a plain solid draw under that clip carries exactly one fragment processor (the
+// device-space clip mask), which is this family's match shape. The probe draws an AA solid rect
+// under a star-shaped clip with each blend mode.
+static void RenderDeviceSpaceClipScene(bool useBundle, BlendMode mode, Bitmap* outBitmap) {
+  constexpr int width = 160;
+  constexpr int height = 160;
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  if (useBundle) {
+    ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+  } else {
+    cache->unload();
+  }
+  ScopedAOTStatsPause statsPause(context, !useBundle);
+  context->globalCache()->clearPrograms();
+  auto surface = Surface::Make(context, width, height);
+  ASSERT_TRUE(surface != nullptr);
+  auto* canvas = surface->getCanvas();
+  canvas->clear(Color::FromRGBA(255, 128, 0, 255));
+  Paint background = {};
+  background.setColor(Color::FromRGBA(0, 0, 255, 255));
+  canvas->drawRect(Rect::MakeXYWH(0, 80, width, 80), background);
+  // A complex clip path forces the clip into a texture mask rather than the analytic clip
+  // contract.
+  Path clipPath = {};
+  clipPath.moveTo(80, 14);
+  clipPath.lineTo(104, 62);
+  clipPath.lineTo(146, 62);
+  clipPath.lineTo(116, 100);
+  clipPath.lineTo(132, 148);
+  clipPath.lineTo(80, 116);
+  clipPath.lineTo(28, 148);
+  clipPath.lineTo(44, 100);
+  clipPath.lineTo(14, 62);
+  clipPath.lineTo(56, 62);
+  clipPath.close();
+  canvas->save();
+  canvas->clipPath(clipPath, true);
+  Paint paint = {};
+  paint.setAntiAlias(true);
+  paint.setBlendMode(mode);
+  paint.setColor(Color::FromRGBA(0, 255, 255, 128));
+  canvas->drawRect(Rect::MakeXYWH(20, 30, 120, 100), paint);
+  canvas->restore();
+  context->flushAndSubmit(true);
+  ASSERT_TRUE(outBitmap->allocPixels(width, height));
+  auto* pixels = outBitmap->lockPixels();
+  ASSERT_TRUE(pixels != nullptr);
+  ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+  outBitmap->unlockPixels();
+  if (useBundle) {
+    cache->unload();
+  }
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, DeviceSpaceClipCoverageXPContract) {
+  for (auto mode : COVERAGE_XP_PROBE_MODES) {
+    Bitmap aotBitmap = {};
+    Bitmap runtimeBitmap = {};
+    RenderDeviceSpaceClipScene(true, mode, &aotBitmap);
+    RenderDeviceSpaceClipScene(false, mode, &runtimeBitmap);
+    auto label = "device-space-clip-coverage-xp mode=" + std::to_string(static_cast<int>(mode));
+    ExpectBitmapsIdentical(label.c_str(), aotBitmap, runtimeBitmap, 160, 160);
+  }
+}
+
 }  // namespace tgfx
