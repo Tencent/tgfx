@@ -61,7 +61,6 @@ class Device {
   std::mutex locker = {};
   GPU* _gpu = nullptr;
   Context* context = nullptr;
-  std::weak_ptr<Device> weakThis;
   /**
    * A permanent one-way flag indicating the GPU context has been irreversibly lost (e.g., due to a
    * GPU reset). Once set to true, lockContext() will always return nullptr.

@@ -43,9 +43,9 @@ class MetalDevice : public Device {
    * MTLDevice, so that all callers share the same GPU caches (command queue, shaders, and
    * resources), otherwise a newly created one. Returns nullptr if device is nil or the GPU fails
    * to initialize. The caller keeps ownership of the MTLDevice and can release it right after
-   * this call returns. Note that reusing an existing Device for the same native device is
-   * currently a Metal-only semantic: the Vulkan, D3D12, and WebGPU backends still create a new
-   * Device on every call.
+   * this call returns. Note that both the Metal and the OpenGL backends return the existing
+   * live Device when one has already been created from the same native device; the Vulkan,
+   * D3D12, and WebGPU backends still create a new Device on every call.
    */
   static std::shared_ptr<MetalDevice> MakeFrom(id<MTLDevice> device);
 

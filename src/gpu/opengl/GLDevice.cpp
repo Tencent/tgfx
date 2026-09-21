@@ -33,7 +33,7 @@ std::shared_ptr<GLDevice> GLDevice::MakeWithFallback() {
   {
     for (auto& item : Device::GetAllNative()) {
       device = std::static_pointer_cast<GLDevice>(item);
-      if (device != nullptr && !device->externallyOwned) {
+      if (!device->externallyOwned) {
         LOGE(
             "GLDevice::MakeWithFallback(): Failed to create a new GLDevice! Fall back to the "
             "existing one.");

@@ -25,14 +25,13 @@
 namespace tgfx {
 static std::atomic_bool appInBackground = {true};
 
-struct DeviceRegistry {
-  std::mutex deviceLocker = {};
-  std::vector<EAGLDevice*> deviceList = {};
-  std::vector<EAGLDevice*> delayPurgeList = {};
+struct DelayPurgeRegistry {
+  std::mutex locker = {};
+  std::vector<EAGLDevice*> devices = {};
 };
 
-static DeviceRegistry& GetRegistry() {
-  static auto* registry = new DeviceRegistry();
+static DelayPurgeRegistry& GetPurgeRegistry() {
+  static auto* registry = new DelayPurgeRegistry();
   return *registry;
 }
 
@@ -51,29 +50,22 @@ void ApplicationDidEnterBackground() {
   // (e.g. by CADisplayLink callbacks during the inactive period) could still slip through and be
   // executed by the GPU after the app is suspended, which would terminate the process.
   appInBackground = true;
-  std::vector<std::shared_ptr<EAGLDevice>> devices = {};
-  {
-    auto& registry = GetRegistry();
-    std::lock_guard<std::mutex> autoLock(registry.deviceLocker);
-    devices.reserve(registry.deviceList.size());
-    for (auto& device : registry.deviceList) {
-      auto shared = std::static_pointer_cast<EAGLDevice>(device->weakThis.lock());
-      if (shared) {
-        devices.push_back(std::move(shared));
-      }
-    }
-  }
+  // GetAllNative() only returns devices whose shared_ptr is still alive; devices parked on the
+  // delay purge list (reference count already zero) are filtered out, matching the previous
+  // weakThis.lock() behavior. This is the only backend compiled on iOS, so all registered
+  // devices are EAGLDevices.
+  auto devices = Device::GetAllNative();
   for (auto& device : devices) {
-    device->finish();
+    std::static_pointer_cast<EAGLDevice>(device)->finish();
   }
 }
 
 void ApplicationWillEnterForeground() {
   // The application is about to return to the foreground. OpenGL ES calls are legal again from
   // this point on, so:
-  //   1) Drain delayPurgeList first, while the gate is still closed. EAGLDevice instances whose
-  //      reference count reached zero during the background period were parked on this list
-  //      because deleting them would have issued GL commands (e.g. glDeleteTextures from
+  //   1) Drain delay purge list first, while the gate is still closed. EAGLDevice instances
+  //      whose reference count reached zero during the background period were parked on this
+  //      list because deleting them would have issued GL commands (e.g. glDeleteTextures from
   //      releaseAll()) at a moment when GL was forbidden. Now is the right time to actually
   //      delete them.
   //   2) Open the gate only after the purge has completed.
@@ -86,9 +78,9 @@ void ApplicationWillEnterForeground() {
   // work scheduled after the gate opens.
   std::vector<EAGLDevice*> delayList = {};
   {
-    auto& registry = GetRegistry();
-    std::lock_guard<std::mutex> autoLock(registry.deviceLocker);
-    std::swap(delayList, registry.delayPurgeList);
+    auto& registry = GetPurgeRegistry();
+    std::lock_guard<std::mutex> autoLock(registry.locker);
+    std::swap(delayList, registry.devices);
   }
   for (auto& device : delayList) {
     delete device;
@@ -183,32 +175,17 @@ void EAGLDevice::NotifyReferenceReachedZero(EAGLDevice* device) {
     delete device;
     return;
   }
-  auto& registry = GetRegistry();
-  std::lock_guard<std::mutex> autoLock(registry.deviceLocker);
-  registry.delayPurgeList.push_back(device);
+  auto& registry = GetPurgeRegistry();
+  std::lock_guard<std::mutex> autoLock(registry.locker);
+  registry.devices.push_back(device);
 }
 
 EAGLDevice::EAGLDevice(std::unique_ptr<GPU> gpu, EAGLContext* eaglContext)
     : GLDevice(std::move(gpu), eaglContext), _eaglContext(eaglContext) {
   [_eaglContext retain];
-  auto& registry = GetRegistry();
-  std::lock_guard<std::mutex> autoLock(registry.deviceLocker);
-  auto index = registry.deviceList.size();
-  registry.deviceList.push_back(this);
-  cacheArrayIndex = index;
 }
 
 EAGLDevice::~EAGLDevice() {
-  {
-    auto& registry = GetRegistry();
-    std::lock_guard<std::mutex> autoLock(registry.deviceLocker);
-    auto& deviceList = registry.deviceList;
-    auto tail = *(deviceList.end() - 1);
-    auto index = cacheArrayIndex;
-    deviceList[index] = tail;
-    tail->cacheArrayIndex = index;
-    deviceList.pop_back();
-  }
   releaseAll();
   [_eaglContext release];
 }
