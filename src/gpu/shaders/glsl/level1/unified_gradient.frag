@@ -120,10 +120,10 @@ void main() {
     gradColor = vec4(0.0);
 #endif
   } else {
-    gradColor = gradientColorizeUnrolled(t, IntervalCount, thresholds1_7, thresholds9_13, scale0_1,
-                                         bias0_1, scale2_3, bias2_3, scale4_5, bias4_5, scale6_7,
-                                         bias6_7, scale8_9, bias8_9, scale10_11, bias10_11,
-                                         scale12_13, bias12_13, scale14_15, bias14_15);
+    gradColor = gradientColorizeUnrolled(t, thresholds1_7, thresholds9_13, scale0_1, bias0_1,
+                                         scale2_3, bias2_3, scale4_5, bias4_5, scale6_7, bias6_7,
+                                         scale8_9, bias8_9, scale10_11, bias10_11, scale12_13,
+                                         bias12_13, scale14_15, bias14_15);
   }
 
   gradColor.rgb *= gradColor.a;

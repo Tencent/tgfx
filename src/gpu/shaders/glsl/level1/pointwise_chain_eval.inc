@@ -222,11 +222,11 @@ vec4 evalChainSlot(int slot) {
 #endif
     } else {
       gradColor = gradientColorizeUnrolled(
-          gradT, GradientIntervalCount, GradientThresholds1_7, GradientThresholds9_13,
-          GradientScale0_1, GradientBias0_1, GradientScale2_3, GradientBias2_3, GradientScale4_5,
-          GradientBias4_5, GradientScale6_7, GradientBias6_7, GradientScale8_9, GradientBias8_9,
-          GradientScale10_11, GradientBias10_11, GradientScale12_13, GradientBias12_13,
-          GradientScale14_15, GradientBias14_15);
+          gradT, GradientThresholds1_7, GradientThresholds9_13, GradientScale0_1, GradientBias0_1,
+          GradientScale2_3, GradientBias2_3, GradientScale4_5, GradientBias4_5, GradientScale6_7,
+          GradientBias6_7, GradientScale8_9, GradientBias8_9, GradientScale10_11,
+          GradientBias10_11, GradientScale12_13, GradientBias12_13, GradientScale14_15,
+          GradientBias14_15);
     }
     gradColor.rgb *= gradColor.a;
     return gradColor * in0.a;
