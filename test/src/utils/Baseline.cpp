@@ -162,6 +162,10 @@ static bool CompareVersionAndMd5(const std::string& md5, const std::string& key,
     return false;
   }
   SetJSONValue(OutputVersion, key, baselineVersion);
+  // Record the passing MD5 too so the out md5.json is a full per-run pixel evidence list,
+  // not just the failures. The version json alone cannot answer "did the pixels actually
+  // change when the version bump skipped the comparison".
+  SetJSONValue(OutputMD5, key, md5);
   if (callback) {
     callback(true);
   }
