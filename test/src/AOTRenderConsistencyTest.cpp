@@ -6690,4 +6690,56 @@ TGFX_TEST(AOTRenderConsistencyTest, NonAARRectTiledModes) {
   }
 }
 
+// A bundle that does not match the runtime's format or toolchain contract must be rejected at
+// load time, not partially parsed: this is the runtime-side complement of the build tool's
+// --verify-bundle gate (P4 fallback coverage, class 4 of 6 — incompatible-bundle rejection).
+TGFX_TEST(AOTRenderConsistencyTest, IncompatibleBundleIsRejectedNotLoaded) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  auto [bundleData, bundleSize] = EmbeddedShaderBundles::GetBundle(context->backend());
+  ASSERT_NE(bundleData, nullptr);
+  ASSERT_GT(bundleSize, 80u);
+  std::vector<uint8_t> bytes(bundleData, bundleData + bundleSize);
+  cache->unload();
+
+  // Sanity: the untouched bytes load, so the rejections below are about the corruption, not the
+  // environment.
+  ASSERT_TRUE(cache->loadBundle(bytes.data(), bytes.size()));
+  cache->unload();
+
+  // Broken magic (offset 0).
+  {
+    auto broken = bytes;
+    broken[0] = 'X';
+    EXPECT_FALSE(cache->loadBundle(broken.data(), broken.size()));
+  }
+  // Unknown format version (offset 4, u16 LE): only 3 and 4 parse.
+  {
+    auto broken = bytes;
+    broken[4] = 0x63;
+    broken[5] = 0x00;
+    EXPECT_FALSE(cache->loadBundle(broken.data(), broken.size()));
+  }
+  // Toolchain ABI mismatch (offset 16, u32 LE): a bundle whose reflection/uniform contracts
+  // predate or postdate this runtime must be refused instead of guessed at.
+  {
+    auto broken = bytes;
+    broken[16] = 0xEF;
+    broken[17] = 0xBE;
+    broken[18] = 0xAD;
+    broken[19] = 0xDE;
+    EXPECT_FALSE(cache->loadBundle(broken.data(), broken.size()));
+  }
+  // Truncated below the 80-byte header.
+  EXPECT_FALSE(cache->loadBundle(bytes.data(), 79));
+
+  // None of the rejected loads may leave a half-initialized cache behind: the good bytes still
+  // load afterwards, and a final unload restores the pre-test state.
+  EXPECT_TRUE(cache->loadBundle(bytes.data(), bytes.size()));
+  cache->unload();
+}
+
 }  // namespace tgfx
