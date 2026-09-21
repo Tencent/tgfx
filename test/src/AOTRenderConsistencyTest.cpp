@@ -614,15 +614,15 @@ TGFX_TEST(AOTRenderConsistencyTest, TwoChildXferBlendFold) {
 }
 
 TGFX_TEST(AOTRenderConsistencyTest, ProgramKeyColorCoverageBoundary) {
-  // The program cache key does not encode the color/coverage boundary (numColorProcessors is
-  // absent from buildProgramKey), so two draws with identical processor sequences but different
-  // boundaries share one cache entry. Verification result (JIT and AOT both): the
-  // Xfermode uniform layout makes the reuse self-consistent on this shape — its onSetData
-  // writes the same uniform slots in either position — so no visible error is produced. This
-  // test stays as a regression fence: any future layout asymmetry between the color and
-  // coverage positions of a shared FP would turn this pair into a real misrender, and the key
-  // fix (encoding the boundary) is deferred until such a case is reproduced rather than being
-  // applied without a failing case.
+  // The program cache key now encodes the color/coverage boundary (numColorProcessors rides
+  // buildProgramKey). Before that fix, two draws with identical processor sequences but
+  // different boundaries shared one cache entry: on this Xfermode shape the reuse happened to
+  // be self-consistent (its onSetData writes the same uniform slots in either position), but
+  // the full-chain audit showed the general case is unsound — ProgramBuilder emits different
+  // code for a color-position FP and a coverage-position FP (e.g. ConstColorProcessor), so a
+  // JIT hot hit could replay the first role's baked code for the second role. This test stays
+  // as the pixel fence for the boundary pair; the key separation makes the two roles distinct
+  // cache entries by construction.
   // A shared alpha-gradient image: the left half is opaque, the right half is half-transparent,
   // so the blue blend draw and the red mask draw produce visibly different pixels when mixed up.
   // Batch 0 premul fix: the color channels scale with the alpha (legal premul). The former

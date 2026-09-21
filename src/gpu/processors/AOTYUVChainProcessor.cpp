@@ -113,11 +113,22 @@ void AOTYUVChainProcessor::emitCode(EmitArgs& args) const {
 }
 
 void AOTYUVChainProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
-  // The operator structure travels in per-draw uniforms (the slot arrays the kernel reads);
-  // the source child's own key (plane format, sampler flags) rides the base class's child-key
-  // walk, so two grades over the same YUV source share one program.
+  // The operator structure travels in per-draw uniforms on the AOT path (the slot arrays the
+  // kernel reads), so the artifact key needs none of it. The JIT path is different: emitCode()
+  // bakes a different code structure per slot type (and per color-space step set), so two
+  // AOTYUVChainProcessors over the same YUV source with different slots must not share a JIT
+  // program — mirror the tail processor's key shape here (slot count, every slot's type, and
+  // the color-space step key) or a hot cache hit replays the first structure's baked code.
   static constexpr uint32_t YUVChainTag = 0xA07C594Eu;
   bytesKey->write(YUVChainTag);
+  bytesKey->write(static_cast<uint32_t>(slotCount));
+  for (size_t index = 0; index < slotCount; ++index) {
+    bytesKey->write(static_cast<uint32_t>(pointwiseSlots[index].type));
+    if (pointwiseSlots[index].type == AOTPointwiseOpType::ColorSpaceXform) {
+      bytesKey->write(
+          ColorSpaceXformSteps::XFormKey(pointwiseSlots[index].colorSpaceXform.steps.get()));
+    }
+  }
 }
 
 void AOTYUVChainProcessor::onSetData(UniformData*, UniformData* fragmentUniformData) const {

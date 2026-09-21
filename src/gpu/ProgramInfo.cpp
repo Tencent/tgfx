@@ -155,6 +155,12 @@ BytesKey ProgramInfo::buildProgramKey() const {
   for (const auto& processor : fragmentProcessors) {
     processor->computeProcessorKey(context, &key);
   }
+  // The color/coverage boundary is semantic, not structural: the same processor sequence with a
+  // different boundary composites differently (a color FP replaces the paint color; a coverage FP
+  // modulates the draw coverage). The cache lookup happens before any matcher or validation can
+  // re-check it, so the boundary itself must ride the key or a hot hit can return a program built
+  // for the other role.
+  key.write(static_cast<uint32_t>(numColorProcessors));
   if (xferProcessor != nullptr) {
     xferProcessor->computeProcessorKey(context, &key);
   }
