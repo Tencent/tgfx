@@ -32,4 +32,14 @@ size_t ValidateClipContractFields(const std::vector<VariantData>& variants);
 /// anchor the AOTChainOp enum. Returns the error count.
 size_t ValidateChainOpCodes(const std::string& shaderDir);
 
+/// Validates the OP_* defines in pointwise_op.inc against the PointwiseOp constants that anchor
+/// the AOTPointwiseOpType enum. Returns the error count.
+size_t ValidatePointwiseOpCodes(const std::string& shaderDir);
+
+/// Validates reflection-level invariants across every compiled variant: texture samplers must be
+/// named TextureSampler_<N> with N dense from zero, array sizes must be at least one (and exactly
+/// one for samplers), and uniform/sampler names must be unique and NUL-free — everything the
+/// runtime loader rejects, caught at build time instead. Returns the error count.
+size_t ValidateReflectionContracts(const std::vector<VariantData>& variants);
+
 }  // namespace tgfx

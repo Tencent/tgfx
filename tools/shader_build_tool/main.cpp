@@ -1273,8 +1273,10 @@ int main(int argc, char** argv) {
   // Cross-language contract checks: the clip contract fields and the chain op codes must match
   // the C++ constants, otherwise the runtime uploads would silently miss their targets.
   size_t contractErrors = tgfx::ValidateClipContractFields(report.variants);
+  contractErrors += tgfx::ValidateReflectionContracts(report.variants);
   if (!options.reportOnly && !options.shaderDir.empty()) {
     contractErrors += tgfx::ValidateChainOpCodes(options.shaderDir);
+    contractErrors += tgfx::ValidatePointwiseOpCodes(options.shaderDir);
   }
   if (contractErrors > 0) {
     std::cerr << "Build failed: " << contractErrors << " kernel contract violation(s).\n";

@@ -29,6 +29,7 @@
 #include "gpu/SamplerState.h"
 #include "gpu/TiledTextureSampling.h"
 #include "gpu/proxies/TextureProxy.h"
+#include "gpu/shaders/KernelContract.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Matrix.h"
 
@@ -284,15 +285,15 @@ using AOTEffectParameters =
 // declare every operator's parameter block unconditionally and select at draw time via a uniform,
 // so the operator kind is never a compile-time permutation axis.
 enum class AOTPointwiseOpType : int {
-  ColorMatrix = 0,
-  Luma = 1,
-  AlphaThreshold = 2,
-  ColorSpaceXform = 3,
-  None = 4,
+  ColorMatrix = PointwiseOp::ColorMatrix,
+  Luma = PointwiseOp::Luma,
+  AlphaThreshold = PointwiseOp::AlphaThreshold,
+  ColorSpaceXform = PointwiseOp::ColorSpaceXform,
+  None = PointwiseOp::None,
   // 5 is OP_TEXTURE in the chain kernel's slot ABI and never a pointwise op. 6/7 mirror the
   // chain kernel's OP_CONST_COLOR / OP_BLEND values.
-  ConstColor = 6,
-  Blend = 7,
+  ConstColor = PointwiseOp::ConstColor,
+  Blend = PointwiseOp::Blend,
 };
 
 // One pointwise-operator slot of a fused kernel, carrying the full parameter set of whichever

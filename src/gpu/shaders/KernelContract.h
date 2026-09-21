@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <string>
+
 namespace tgfx {
 
 // Single source of truth for the cross-language kernel contracts, consumed by the runtime
@@ -61,5 +63,42 @@ constexpr int InputOpaque = 13;
 constexpr int MulAlpha = 14;
 
 }  // namespace ChainOp
+
+namespace PointwiseOp {
+
+// The plain pointwise-slot operator codes, mirrored by the OP_* defines in pointwise_op.inc and
+// the AOTPointwiseOpType enum (which anchors to these constants). The chain-only operators
+// (Texture=5, the coverage ops, and the modulators) deliberately have no value here: a plain
+// slot never carries them.
+constexpr int ColorMatrix = 0;
+constexpr int Luma = 1;
+constexpr int AlphaThreshold = 2;
+constexpr int ColorSpaceXform = 3;
+constexpr int None = 4;
+constexpr int ConstColor = 6;
+constexpr int Blend = 7;
+
+}  // namespace PointwiseOp
+
+namespace SamplerContract {
+
+// Every semantic sampler name a precompiled kernel may declare. Ordinary texture bindings use the
+// generic TextureSampler_<N> pattern (N dense from zero, checked by shader_build_tool); the names
+// below carry dedicated meaning and appear verbatim in the kernels, the runtime emitters, and the
+// onSetData writers. A new semantic sampler must be registered here or the bundle build fails —
+// the point is that adding a binding interface is a deliberate contract change, not a typo.
+constexpr const char* DstTexture = "DstTextureSampler";
+constexpr const char* MaskTexture = "MaskTextureSampler";
+constexpr const char* Mask = "MaskSampler";
+constexpr const char* LocalMask = "LocalMaskSampler";
+constexpr const char* EdgeMask = "EdgeMaskSampler";
+constexpr const char* GradientTexture = "GradientTexture";
+
+inline bool IsSemanticSamplerName(const std::string& name) {
+  return name == DstTexture || name == MaskTexture || name == Mask || name == LocalMask ||
+         name == EdgeMask || name == GradientTexture;
+}
+
+}  // namespace SamplerContract
 
 }  // namespace tgfx
