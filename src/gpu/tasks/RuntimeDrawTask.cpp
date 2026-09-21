@@ -140,7 +140,10 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
     return nullptr;
   }
   renderPass->setPipeline(program->getPipeline());
-  programInfo.setUniformsAndSamplers(renderPass.get(), program.get());
+  if (!programInfo.setUniformsAndSamplers(renderPass.get(), program.get())) {
+    renderPass->end();
+    return nullptr;
+  }
   renderPass->setVertexBuffer(0, vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
   renderPass->draw(PrimitiveType::TriangleStrip, 4);
   renderPass->end();

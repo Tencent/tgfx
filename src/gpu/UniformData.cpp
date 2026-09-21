@@ -63,6 +63,9 @@ void UniformData::setBuffer(void* buffer) {
 void UniformData::onSetArrayElement(const std::string& name, size_t index, const void* data,
                                     size_t size, bool optional) const {
   DEBUG_ASSERT(_buffer != nullptr);
+  if (_buffer == nullptr) {
+    return;
+  }
 
   const auto& key = skipSuffix ? name + structuralSuffix : name + nameSuffix;
   auto field = findField(key);
@@ -83,6 +86,11 @@ void UniformData::onSetArrayElement(const std::string& name, size_t index, const
 void UniformData::onSetData(const std::string& name, const void* data, size_t size,
                             bool optional) const {
   DEBUG_ASSERT(_buffer != nullptr);
+  if (_buffer == nullptr) {
+    // A failed UBO allocation/map leaves no backing store: writing would be a null deref, so
+    // drop the write (the caller aborts the draw separately when the buffer is unavailable).
+    return;
+  }
 
   const auto& key = skipSuffix ? name + structuralSuffix : name + nameSuffix;
   auto field = findField(key);
@@ -96,7 +104,13 @@ void UniformData::onSetData(const std::string& name, const void* data, size_t si
     }
     return;
   }
-  DEBUG_ASSERT(field->size == size);
+  // Size is checked in release too: a reflection/upload mismatch would otherwise memcpy past the
+  // field (and possibly past the whole allocation) instead of failing loudly.
+  if (field->size != size) {
+    LOGE("UniformData::onSetData() uniform '%s' size mismatch (field %zu bytes, upload %zu)!",
+         name.c_str(), field->size, size);
+    return;
+  }
 
   memcpy(_buffer + field->offset, data, size);
 }

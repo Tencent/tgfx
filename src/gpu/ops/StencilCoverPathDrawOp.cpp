@@ -185,7 +185,9 @@ bool StencilCoverPathDrawOp::bindStencilPipeline(RenderPass* renderPass,
     return false;
   }
   renderPass->setPipeline(stencilProgram->getPipeline());
-  stencilInfo.setUniformsAndSamplers(renderPass, stencilProgram.get());
+  if (!stencilInfo.setUniformsAndSamplers(renderPass, stencilProgram.get())) {
+    return false;
+  }
   // Constrain stencil writes to the cover-quad device bounds intersected with the op's
   // clip region. See applyStencilScissor() for why relying on DrawOp::applyScissor() alone
   // is unsafe here.
@@ -221,7 +223,9 @@ bool StencilCoverPathDrawOp::bindCoverPipeline(RenderPass* renderPass, RenderTar
     return false;
   }
   renderPass->setPipeline(coverProgram->getPipeline());
-  coverInfo.setUniformsAndSamplers(renderPass, coverProgram.get());
+  if (!coverInfo.setUniformsAndSamplers(renderPass, coverProgram.get())) {
+    return false;
+  }
   applyScissor(renderPass, renderTarget);
   return true;
 }

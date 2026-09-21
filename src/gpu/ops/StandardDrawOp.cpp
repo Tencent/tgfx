@@ -236,7 +236,10 @@ void StandardDrawOp::executePrepared(RenderPass* renderPass, RenderTarget* rende
     return;
   }
   renderPass->setPipeline(preparedProgram->getPipeline());
-  preparedProgramInfo->setUniformsAndSamplers(renderPass, preparedProgram.get());
+  if (!preparedProgramInfo->setUniformsAndSamplers(renderPass, preparedProgram.get())) {
+    // No uniform backing store: submitting would draw with unwritten (or garbage) uniforms.
+    return;
+  }
   if (offscreenFillKey != InvalidOffscreenFillKey) {
     auto cache = preparedRenderTarget->getContext()->precompiledShaderCache();
     cache->recordOffscreenFillProgram(offscreenFillKey, preparedProgram->getProvenance().program);

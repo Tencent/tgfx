@@ -109,7 +109,12 @@ class ProgramInfo {
   /**
    * Sets the uniform data and texture samplers on the render pass for the given program.
    */
-  void setUniformsAndSamplers(RenderPass* renderPass, Program* program) const;
+  /**
+   * Uploads every uniform and binds the samplers of the program. Returns false when the program
+   * needs a uniform block but no backing store is available (allocation/map failure): the caller
+   * must skip the draw rather than submit it with unwritten uniforms.
+   */
+  bool setUniformsAndSamplers(RenderPass* renderPass, Program* program) const;
 
   /**
    * Returns the cull face mode used for rendering.

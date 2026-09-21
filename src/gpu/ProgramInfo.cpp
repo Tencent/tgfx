@@ -260,6 +260,11 @@ std::shared_ptr<GPUBuffer> ProgramInfo::getUniformBuffer(const Program* program,
     if (uniformBuffer != nullptr) {
       auto buffer = static_cast<uint8_t*>(
           uniformBuffer->map(lastUniformBufferOffset, totalUniformBufferSize));
+      if (buffer == nullptr) {
+        // A failed map leaves no writable backing store: hand back no buffer so the caller
+        // aborts the draw instead of the uploads writing through a null pointer.
+        return nullptr;
+      }
       if (vertexUniformData != nullptr) {
         vertexUniformData->setBuffer(buffer);
         *vertexOffset = lastUniformBufferOffset;
@@ -314,7 +319,7 @@ static AddressMode ToAddressMode(TileMode tileMode) {
   return AddressMode::ClampToEdge;
 }
 
-void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* program) const {
+bool ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* program) const {
   DEBUG_ASSERT(renderTarget != nullptr);
   size_t vertexOffset = 0;
   size_t fragmentOffset = 0;
@@ -322,6 +327,14 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
 
   auto vertexUniformData = program->getUniformData(ShaderStage::Vertex);
   auto fragmentUniformData = program->getUniformData(ShaderStage::Fragment);
+  if (uniformBuffer == nullptr &&
+      (vertexUniformData != nullptr || fragmentUniformData != nullptr)) {
+    // The program needs a uniform block but no backing store is available (allocation or map
+    // failed). Aborting the draw loses one frame's content; uploading anyway would write through
+    // a null pointer. Tell the caller to skip the draw.
+    LOGE("ProgramInfo::setUniformsAndSamplers() no uniform buffer available; skipping the draw");
+    return false;
+  }
 
   // UniformData is reused across draws, so clear the per-texture structural ordinal left over from a
   // previous draw before writing the base-name uniforms below (RTAdjust / OutputAlphaSwizzle). A
@@ -439,6 +452,7 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
     auto sampler = gpu->createSampler(descriptor);
     renderPass->setTexture(textureBinding, texture, sampler);
   }
+  return true;
 }
 
 Backend ProgramInfo::backend() const {
