@@ -39,7 +39,8 @@ PlacementPtr<AOTYUVChainProcessor> AOTYUVChainProcessor::Make(
     if (slot.type == AOTPointwiseOpType::None) {
       return nullptr;
     }
-    if (slot.type == AOTPointwiseOpType::ColorSpaceXform && slot.colorSpaceXform.steps == nullptr) {
+    if (slot.type == AOTPointwiseOpType::ColorSpaceXform &&
+        !ColorSpaceXformStepsSupported(slot.colorSpaceXform.steps.get())) {
       return nullptr;
     }
   }

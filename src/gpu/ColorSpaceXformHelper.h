@@ -37,6 +37,16 @@ namespace tgfx {
 int TFTypeToIndex(gfx::skcms_TFType type);
 
 /**
+ * Single admission gate for a color-space step set riding any precompiled path. Returns false
+ * when an enabled linearize/encode step carries a transfer function whose kind the shared math
+ * does not implement: the matcher already rejects such steps for the standalone effect, and this
+ * gate extends the same rule to the owned-slot paths (tail / YUV / Perlin / chain) and the graph
+ * builder, so an unsupported transfer function fails before a program is created instead of the
+ * upload path logging and silently rendering with the sRGB branch.
+ */
+bool ColorSpaceXformStepsSupported(const ColorSpaceXformSteps* steps);
+
+/**
  * Declares and uploads the uniforms of a color-space transform. All uniform names are prefixed with
  * namePrefix; an empty prefix yields the plain names used by the standalone ColorSpaceXformEffect.
  * When slotIndex >= 0 the plain names are declared and written as per-slot arrays of

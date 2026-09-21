@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/AOTEffect.h"
+#include "gpu/ColorSpaceXformHelper.h"
 
 namespace tgfx {
 
@@ -99,7 +100,11 @@ bool AOTNodeBuilder::addAlphaThreshold(AOTNodeID input,
 bool AOTNodeBuilder::addColorSpaceXform(AOTNodeID input,
                                         const AOTColorSpaceXformParameters& parameters,
                                         AOTNodeID* output) {
-  if (parameters.steps == nullptr) {
+  // The shared admission gate (single source with the matcher and the owned-slot factories): an
+  // unsupported transfer-function kind fails the whole lowering here — before any tree rewrite or
+  // program creation — instead of surfacing at the upload path, which can only log and render the
+  // sRGB branch.
+  if (!ColorSpaceXformStepsSupported(parameters.steps.get())) {
     return false;
   }
   // The transform moves the color between color spaces and may unpremultiply/repremultiply around

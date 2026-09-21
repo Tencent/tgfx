@@ -166,7 +166,7 @@ PlacementPtr<PerlinNoiseFragmentProcessor> PerlinNoiseFragmentProcessor::MakeFro
   for (const auto& slot : slots) {
     if (slot.type == AOTPointwiseOpType::None ||
         (slot.type == AOTPointwiseOpType::ColorSpaceXform &&
-         slot.colorSpaceXform.steps == nullptr)) {
+         !ColorSpaceXformStepsSupported(slot.colorSpaceXform.steps.get()))) {
       return nullptr;
     }
   }

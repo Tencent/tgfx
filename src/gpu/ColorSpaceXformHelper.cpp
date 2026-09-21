@@ -34,6 +34,23 @@ int TFTypeToIndex(gfx::skcms_TFType type) {
   }
 }
 
+bool ColorSpaceXformStepsSupported(const ColorSpaceXformSteps* steps) {
+  if (steps == nullptr) {
+    return false;
+  }
+  if (steps->flags.linearize &&
+      TFTypeToIndex(gfx::skcms_TransferFunction_getType(
+          reinterpret_cast<const gfx::skcms_TransferFunction*>(&steps->srcTransferFunction))) < 0) {
+    return false;
+  }
+  if (steps->flags.encode && TFTypeToIndex(gfx::skcms_TransferFunction_getType(
+                                 reinterpret_cast<const gfx::skcms_TransferFunction*>(
+                                     &steps->dstTransferFunctionInverse))) < 0) {
+    return false;
+  }
+  return true;
+}
+
 std::string ColorSpaceXformHelper::declare(UniformHandler* uniformHandler, const std::string& field,
                                            UniformFormat format, ShaderStage stage) {
   if (slot >= 0) {

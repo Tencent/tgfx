@@ -256,7 +256,8 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
       return nullptr;
     }
     if (slot.op == AOTChainOp::ColorSpaceXform &&
-        (slot.colorSpaceXform.steps == nullptr || ++colorSpaceSlots > MaxColorSpaceXformSlots)) {
+        (!ColorSpaceXformStepsSupported(slot.colorSpaceXform.steps.get()) ||
+         ++colorSpaceSlots > MaxColorSpaceXformSlots)) {
       return nullptr;
     }
     if (slot.op == AOTChainOp::Gradient && ++gradientSlots > MaxGradientSlots) {
