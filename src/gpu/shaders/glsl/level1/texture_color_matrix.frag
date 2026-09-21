@@ -32,6 +32,7 @@ layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
 #define XP_DST_TEX_BINDING 1
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
+#include "texture_decode.inc"
 
 layout(location = 0) out vec4 fragColor;
 
@@ -44,25 +45,15 @@ void main() {
 
   vec4 texColor = texture(TextureSampler_0, finalCoord);
 
-  if (AlphaOnly != 0) {
-    // Alpha-only textures use R8 format in Metal. Use .r to get the actual alpha value.
-    texColor = vec4(texColor.r);
-  }
+  texColor = tdDecodeSample(texColor, AlphaOnly);
 
   if (HasRgbaaa != 0) {
-    texColor = clamp(texColor, 0.0, 1.0);
     highp vec2 alphaCoord = finalCoord + AlphaStart;
-    vec4 alpha = texture(TextureSampler_0, alphaCoord);
-    alpha = clamp(alpha, 0.0, 1.0);
-    texColor = vec4(texColor.rgb * alpha.r, alpha.r);
+    texColor = tdApplyRgbaaa(texColor, texture(TextureSampler_0, alphaCoord));
   }
 
   // TextureEffect post-processing: alpha multiply
-  if (AlphaOnly != 0) {
-    texColor = texColor.a * outputColor;
-  } else {
-    texColor = texColor * outputColor.a;
-  }
+  texColor = tdModulateByPaint(texColor, outputColor, AlphaOnly);
 
   // ColorMatrixFragmentProcessor: apply color matrix to the texture color
   // Unpremultiply

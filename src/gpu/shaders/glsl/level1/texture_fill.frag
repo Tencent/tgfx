@@ -47,6 +47,7 @@ layout(set = 1, binding = 1) uniform sampler2D MaskTextureSampler;
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
 #include "clip_coverage.inc"
+#include "texture_decode.inc"
 
 layout(location = 0) out vec4 fragColor;
 
@@ -59,26 +60,15 @@ void main() {
 
   vec4 color = texture(TextureSampler_0, finalCoord);
 
-  if (AlphaOnly != 0) {
-    // Alpha-only textures use R8 format in Metal. The sampler returns (r, 0, 0, 1).
-    // Use .r (replicated to all channels) to get the actual alpha value.
-    color = vec4(color.r);
-  }
+  color = tdDecodeSample(color, AlphaOnly);
 
   if (HasRgbaaa != 0) {
-    color = clamp(color, 0.0, 1.0);
     highp vec2 alphaCoord = finalCoord + AlphaStart;
-    vec4 alpha = texture(TextureSampler_0, alphaCoord);
-    alpha = clamp(alpha, 0.0, 1.0);
-    color = vec4(color.rgb * alpha.r, alpha.r);
+    color = tdApplyRgbaaa(color, texture(TextureSampler_0, alphaCoord));
   }
 
   // Post-processing: alpha multiply
-  if (AlphaOnly != 0) {
-    color = color.a * outputColor;
-  } else {
-    color = color * outputColor.a;
-  }
+  color = tdModulateByPaint(color, outputColor, AlphaOnly);
 
 #define TGFX_COVERAGE_SRC_COLOR color
 #include "coverage_output.inc"
