@@ -16,9 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #include "ColorSpaceXformHelper.h"
+#include "core/utils/Log.h"
 namespace tgfx {
 
-static int TFTypeToIndex(gfx::skcms_TFType type) {
+int TFTypeToIndex(gfx::skcms_TFType type) {
   switch (type) {
     case gfx::skcms_TFType_sRGBish:
       return 0;
@@ -29,7 +30,7 @@ static int TFTypeToIndex(gfx::skcms_TFType type) {
     case gfx::skcms_TFType_HLGinvish:
       return 3;
     default:
-      return 0;
+      return -1;
   }
 }
 
@@ -101,7 +102,15 @@ void ColorSpaceXformHelper::setData(UniformData* uniformData,
     int srcType = TFTypeToIndex(
         gfx::skcms_TransferFunction_getType(reinterpret_cast<const gfx::skcms_TransferFunction*>(
             &colorSpaceXform->srcTransferFunction)));
-    writeOptional(uniformData, "SrcTFType", srcType);
+    if (srcType < 0) {
+      // The matcher rejects unsupported transfer functions before a program is created, so
+      // reaching here means an entry point bypassed that check. Report loudly instead of
+      // silently rendering with the sRGB branch.
+      LOGE(
+          "ColorSpaceXformHelper: unsupported source transfer function; the draw reached the "
+          "upload path without the matcher rejecting it");
+    }
+    writeOptional(uniformData, "SrcTFType", srcType < 0 ? 0 : srcType);
   } else {
     writeOptional(uniformData, "SrcTF0", kZero4);
     writeOptional(uniformData, "SrcTF1", kZero4);
@@ -150,7 +159,12 @@ void ColorSpaceXformHelper::setData(UniformData* uniformData,
     int dstType = TFTypeToIndex(
         gfx::skcms_TransferFunction_getType(reinterpret_cast<const gfx::skcms_TransferFunction*>(
             &colorSpaceXform->dstTransferFunctionInverse)));
-    writeOptional(uniformData, "DstTFType", dstType);
+    if (dstType < 0) {
+      LOGE(
+          "ColorSpaceXformHelper: unsupported destination transfer function; the draw reached "
+          "the upload path without the matcher rejecting it");
+    }
+    writeOptional(uniformData, "DstTFType", dstType < 0 ? 0 : dstType);
   } else {
     writeOptional(uniformData, "DstTF0", kZero4);
     writeOptional(uniformData, "DstTF1", kZero4);

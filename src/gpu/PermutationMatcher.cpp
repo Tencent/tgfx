@@ -18,6 +18,7 @@
 
 #include "PermutationMatcher.h"
 #include <skcms.h>
+#include "ColorSpaceXformHelper.h"
 #include "gpu/Swizzle.h"
 #include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/AOTPointwiseTailProcessor.h"
@@ -946,20 +947,9 @@ static std::optional<PermutationMatchResult> TryMatchAtlasTextFill(const Program
   return PermutationMatchResult{"AtlasTextFillShader", vertIndex, fragIndex};
 }
 
-static int TFTypeToIndex(gfx::skcms_TFType type) {
-  switch (type) {
-    case gfx::skcms_TFType_sRGBish:
-      return 0;
-    case gfx::skcms_TFType_PQish:
-      return 1;
-    case gfx::skcms_TFType_HLGish:
-      return 2;
-    case gfx::skcms_TFType_HLGinvish:
-      return 3;
-    default:
-      return -1;
-  }
-}
+// TFTypeToIndex lives in ColorSpaceXformHelper as the single mapping authority: unknown kinds
+// return -1 there, which this matcher treats as "cannot ride the AOT path" and the upload path
+// reports loudly instead of silently downgrading (see that header for the contract).
 
 // Matches a single pointwise operator applied straight to the input color, with no texture source:
 // Luma, AlphaThreshold or ColorSpaceXform. These were three separate shaders whose skeletons were

@@ -26,6 +26,16 @@
 #include "gpu/ShaderVar.h"
 
 namespace tgfx {
+
+/**
+ * Maps an skcms transfer-function kind to the TFType uniform index the shaders switch on.
+ * Returns -1 for kinds the precompiled math does not implement: the matcher treats that as
+ * "this color space cannot ride the AOT path" (the draw falls back to runtime), and the upload
+ * path treats it as a contract violation to report loudly — never as a silent downgrade to the
+ * sRGB branch. This is the single authority for the mapping; do not re-derive it locally.
+ */
+int TFTypeToIndex(gfx::skcms_TFType type);
+
 /**
  * Declares and uploads the uniforms of a color-space transform. All uniform names are prefixed with
  * namePrefix; an empty prefix yields the plain names used by the standalone ColorSpaceXformEffect.
