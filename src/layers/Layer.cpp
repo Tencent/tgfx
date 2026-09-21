@@ -1449,8 +1449,8 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
 }
 
 SubtreeCache* Layer::getValidSubtreeCache(const DrawArgs& args, int longEdge,
-                                          const Rect& layerBounds) {
-  if (subtreeCache->hasCache(args.context, longEdge)) {
+                                          const Rect& layerBounds, float contentScale) {
+  if (subtreeCache->hasCache(args.context, longEdge, contentScale)) {
     return subtreeCache.get();
   }
   if (args.renderFlags & RenderFlags::DisableCache || longEdge > args.subtreeCacheMaxSize) {
@@ -1460,14 +1460,17 @@ SubtreeCache* Layer::getValidSubtreeCache(const DrawArgs& args, int longEdge,
   if (FloatNearlyZero(maxBoundsSize)) {
     return nullptr;
   }
-  auto cacheScale = static_cast<float>(longEdge) / maxBoundsSize;
+  // Rasterize at the actual contentScale so scale-dependent rasterization (hairline coverage)
+  // matches a direct render; the cache entry is keyed by the quantized scale, so other
+  // densities in the same bucket keep their own entries instead of being overwritten.
   auto imageMatrix = Matrix::I();
-  auto image = createSubtreeCacheImage(args, cacheScale, layerBounds, &imageMatrix);
+  auto image = createSubtreeCacheImage(args, contentScale, layerBounds, &imageMatrix);
   if (image == nullptr) {
     return nullptr;
   }
   auto textureProxy = std::static_pointer_cast<TextureImage>(image)->getTextureProxy();
-  subtreeCache->addCache(args.context, longEdge, textureProxy, imageMatrix, args.dstColorSpace);
+  subtreeCache->addCache(args.context, longEdge, contentScale, textureProxy, imageMatrix,
+                         args.dstColorSpace);
   return subtreeCache.get();
 }
 
@@ -1479,7 +1482,7 @@ bool Layer::drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alp
   auto layerBounds = getBounds();
   auto contentScale = canvas->getMatrix().getMaxScale();
   auto longEdge = GetMipmapCacheLongEdge(args.subtreeCacheMaxSize, contentScale, layerBounds);
-  auto cache = getValidSubtreeCache(args, longEdge, layerBounds);
+  auto cache = getValidSubtreeCache(args, longEdge, layerBounds, contentScale);
   if (cache == nullptr) {
     return false;
   }
@@ -1490,7 +1493,7 @@ bool Layer::drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alp
   paint.setAntiAlias(bitFields.allowsEdgeAntialiasing);
   paint.setAlpha(alpha);
   paint.setBlendMode(blendMode);
-  cache->draw(args.context, longEdge, canvas, paint);
+  cache->draw(args.context, longEdge, contentScale, canvas, paint);
   return true;
 }
 
