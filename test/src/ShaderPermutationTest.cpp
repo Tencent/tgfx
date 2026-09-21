@@ -315,7 +315,7 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistry) {
       // runtime uniform (Rect / HasClip), not a compile-time dimension.
       EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 6u);
       EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 2u);
-      EXPECT_EQ(shaderInfo.vertexFile, "level1/texture_fill.vert");
+      EXPECT_EQ(shaderInfo.vertexFile, "level1/plain_texture.vert");
       EXPECT_EQ(shaderInfo.fragmentFile, "level1/texture_fill.frag");
     }
   }
