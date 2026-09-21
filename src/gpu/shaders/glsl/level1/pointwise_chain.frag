@@ -49,12 +49,12 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   // through the -3 unit input).
   int CoverageRootIndex;
   // Register index of the narrow clip slots' product, -1 when the chain has none. The clip slots
-  // chain from the coverage unit instead of multiplying the color root, so this value is a pure
-  // coverage: it rides the XP's coverage input together with the device mask (and the atlas
-  // subtree's root, which the builder routes here because the glyph mask is true coverage), while
-  // the source stays unpremultiplied — compositing correctly for every blend mode (the kernel's
-  // xpBlendWithCoverage carries the runtime's per-mode forms; folding coverage into the source
-  // was only equivalent for SrcOver — folding coverage into the source was only correct for SrcOver).
+  // chain from the scalar unit one (-4) instead of multiplying the color root, so this value is
+  // the pure clip coverage: it rides the XP's coverage input together with the GP coverage and
+  // the device mask (and the atlas subtree's root, which the builder routes here because the
+  // glyph mask is true coverage), while the source stays unpremultiplied — compositing correctly
+  // for every blend mode (the kernel's xpBlendWithCoverage carries the runtime's per-mode forms;
+  // folding coverage into the source was only correct for SrcOver).
   int ClipCoverageRegister;
   int SlotCount;
   // Per-leaf subset rects, named for the structural ordinals the TextureEffect writers use.
@@ -375,8 +375,8 @@ void main() {
   }
   vec4 result = chainResults[RootIndex];
 
-  // The narrow clip slots chain from the coverage unit (-3) instead of multiplying the color
-  // root, so their product is a pure coverage value (see ClipCoverageRegister above). The atlas
+  // The narrow clip slots chain from the scalar unit one (-4) instead of multiplying the color
+  // root, so their product is the pure clip coverage (see ClipCoverageRegister above). The atlas
   // path routes its glyph-mask subtree root through the same register: the glyph mask is TRUE
   // coverage in the runtime composite (the dedicated MaskFill shader carries it as
   // TGFX_XP_COVERAGE), unlike a MaskFilter's source-modulating mask, whose subtree keeps the

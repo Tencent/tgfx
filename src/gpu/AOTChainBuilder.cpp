@@ -775,15 +775,19 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
   if (rootIndex == SIZE_MAX) {
     return nullptr;
   }
-  // The clip-coverage channel (kernel: ClipCoverageRegister). The narrow clip slots below chain
-  // from the coverage unit through clipChainInput; early-fold clips arrive differently — the
-  // fold routes the clip coverage into the color graph as a RectCoverage/RRectCoverage trailing
-  // suffix multiplying the root. Geometric coverage must ride the XP's coverage input instead of
-  // the source (), so pop that suffix and rewire it like the narrow clip slots: the
-  // innermost link chains from the unit, outer links chain upward, the color root moves to the
-  // node under the suffix, and the outermost link's register becomes the clip-coverage value.
+  // The clip-coverage channel (kernel: ClipCoverageRegister). The narrow clip slots chain from
+  // the scalar unit one (-4) through clipChainInput — NOT from the coverage unit (-3): the tail
+  // multiplies the clip product in on top of the GP coverage (vCoverage / ellipseGpCoverage /
+  // the coverage root), so a clip chain that already starts from the GP coverage would square it
+  // (q * (q * clip)). The clip slots' product is therefore a pure clip value. Early-fold clips
+  // arrive differently — the fold routes the clip coverage into the color graph as a
+  // RectCoverage/RRectCoverage trailing suffix multiplying the root. Geometric coverage must ride
+  // the XP's coverage input instead of the source (), so pop that suffix and rewire it like the
+  // narrow clip slots: the innermost link chains from the unit one, outer links chain upward, the
+  // color root moves to the node under the suffix, and the outermost link's register becomes the
+  // clip-coverage value.
   int clipCoverageSlot = -1;
-  int clipChainInput = -3;
+  int clipChainInput = -4;
   {
     // Walk in NODE-ordinal space (slotOf maps nodes to slots); the suffix stays in the color
     // chain when the node under it is a designator with no slot (e.g. a bare clip over the
@@ -806,7 +810,7 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
       rootIndex = slotOf[walkNode];
       for (size_t i = 0; i < suffixSlots.size(); ++i) {
         slots[suffixSlots[i]].in0 =
-            i + 1 < suffixSlots.size() ? static_cast<int>(suffixSlots[i + 1]) : -3;
+            i + 1 < suffixSlots.size() ? static_cast<int>(suffixSlots[i + 1]) : -4;
       }
       clipCoverageSlot = static_cast<int>(suffixSlots.front());
     }
@@ -879,10 +883,11 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
       coverageRootSlot = -1;
     }
   }
-  // The narrow clip slots no longer multiply the color root: they chain from the coverage unit
-  // (-3, the innermost link) so their product is a pure coverage value the kernel reads through
-  // ClipCoverageRegister and composites as the XP's coverage input — folding them into the
-  // source was only correct for SrcOver-class blending (). The color root stays the
+  // The narrow clip slots no longer multiply the color root: they chain from the scalar unit one
+  // (-4, the innermost link) so their product is a pure clip coverage value the kernel reads
+  // through ClipCoverageRegister and composites as the XP's coverage input on top of the GP
+  // coverage — folding them into the source was only correct for SrcOver-class blending, and
+  // chaining them from the coverage unit (-3) squared the GP coverage. The color root stays the
   // pre-clip result.
   if (clipSlots.deviceRect != nullptr) {
     if (slots.size() >= AOTPointwiseChainProcessor::MaxSlots) {
