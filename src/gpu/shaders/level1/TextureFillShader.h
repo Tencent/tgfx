@@ -77,7 +77,7 @@ class TextureFillShader : public PrecompiledShader {
 
   PrecompiledShaderInfo info() const override {
     return {Name(),
-            "level1/texture_fill.vert",
+            "level1/plain_texture.vert",
             "level1/texture_fill.frag",
             VD::domain(),
             FD::domain(),

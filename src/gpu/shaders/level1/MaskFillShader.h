@@ -44,7 +44,7 @@ class MaskFillShader : public PrecompiledShader {
 
   PrecompiledShaderInfo info() const override {
     return {"MaskFillShader",
-            "level1/mask_fill.vert",
+            "level1/plain_texture.vert",
             "level1/mask_fill.frag",
             PermutationDomain({}),
             D::domain(),

@@ -41,7 +41,7 @@ class TextureColorMatrixShader : public PrecompiledShader {
 
   PrecompiledShaderInfo info() const override {
     return {"TextureColorMatrixShader",
-            "level1/texture_color_matrix.vert",
+            "level1/plain_texture.vert",
             "level1/texture_color_matrix.frag",
             PermutationDomain({}),
             D::domain(),

@@ -64,7 +64,7 @@ class GaussianBlur1DShader : public PrecompiledShader {
 
   PrecompiledShaderInfo info() const override {
     return {"GaussianBlur1DShader",
-            "level1/gaussian_blur_1d.vert",
+            "level1/blur_texture.vert",
             "level1/gaussian_blur_1d.frag",
             VD::domain(),
             FD::domain(),

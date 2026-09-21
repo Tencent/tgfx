@@ -66,7 +66,7 @@ class GlassUDFTentBlurShader : public PrecompiledShader {
 
   PrecompiledShaderInfo info() const override {
     return {"GlassUDFTentBlurShader",
-            "level1/glass_udf_tent_blur.vert",
+            "level1/blur_texture.vert",
             "level1/glass_udf_tent_blur.frag",
             VD::domain(),
             FD::domain(),
