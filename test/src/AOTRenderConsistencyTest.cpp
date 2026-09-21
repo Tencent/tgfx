@@ -6482,14 +6482,65 @@ TGFX_TEST(AOTRenderConsistencyTest, UnifiedGradientVCoverageXPContract) {
   }
 }
 
+// ShapeInstancedFill (the triangulated 0-FP variant, not the mask-coverage one): the shape proxy
+// only triangulates when the path's max dimension exceeds MIN_TRIANGULATE_SIZE (162px), so the
+// probe uses a large triangle on a large surface. Instances stay non-overlapping and inside the
+// surface to keep the dst-copy semantics out of the coverage-contract comparison.
+static void RenderShapeInstancedLargeScene(bool useBundle, BlendMode mode, Bitmap* outBitmap) {
+  constexpr int width = 600;
+  constexpr int height = 240;
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  if (useBundle) {
+    ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+  } else {
+    cache->unload();
+  }
+  ScopedAOTStatsPause statsPause(context, !useBundle);
+  context->globalCache()->clearPrograms();
+  auto surface = Surface::Make(context, width, height);
+  ASSERT_TRUE(surface != nullptr);
+  auto* canvas = surface->getCanvas();
+  canvas->clear(Color::FromRGBA(255, 128, 0, 255));
+  Paint background = {};
+  background.setColor(Color::FromRGBA(0, 0, 255, 255));
+  canvas->drawRect(Rect::MakeXYWH(0, 120, width, 120), background);
+  Paint paint = {};
+  paint.setAntiAlias(true);
+  paint.setBlendMode(mode);
+  paint.setColor(Color::FromRGBA(0, 255, 255, 128));
+  Path shape = {};
+  shape.moveTo(8, 4);
+  shape.lineTo(172, 4);
+  shape.lineTo(90, 200);
+  shape.close();
+  for (int i = 0; i < 3; i++) {
+    canvas->save();
+    canvas->translate(12.0f + static_cast<float>(i) * 195.0f, 18.0f);
+    canvas->drawPath(shape, paint);
+    canvas->restore();
+  }
+  context->flushAndSubmit(true);
+  ASSERT_TRUE(outBitmap->allocPixels(width, height));
+  auto* pixels = outBitmap->lockPixels();
+  ASSERT_TRUE(pixels != nullptr);
+  ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+  outBitmap->unlockPixels();
+  if (useBundle) {
+    cache->unload();
+  }
+}
+
 TGFX_TEST(AOTRenderConsistencyTest, ShapeInstancedCoverageXPContract) {
   for (auto mode : COVERAGE_XP_PROBE_MODES) {
     Bitmap aotBitmap = {};
     Bitmap runtimeBitmap = {};
-    RenderCoverageXPScene(true, mode, &aotBitmap, false, true);
-    RenderCoverageXPScene(false, mode, &runtimeBitmap, false, true);
+    RenderShapeInstancedLargeScene(true, mode, &aotBitmap);
+    RenderShapeInstancedLargeScene(false, mode, &runtimeBitmap);
     auto label = "shape-instanced-coverage-xp mode=" + std::to_string(static_cast<int>(mode));
-    ExpectBitmapsNear(label.c_str(), aotBitmap, runtimeBitmap, 120, 120, 0);
+    ExpectBitmapsIdentical(label.c_str(), aotBitmap, runtimeBitmap, 600, 240);
   }
 }
 
