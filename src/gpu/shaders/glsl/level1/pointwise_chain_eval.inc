@@ -38,6 +38,7 @@
 
 #include "gradient_layout.inc"
 #include "gradient_colorize.inc"
+#include "pointwise_math.inc"
 
 #include "transfer_function.inc"
 
@@ -132,16 +133,9 @@ vec4 evalChainSlot(int slot) {
     return in0 * in1.a;
   }
   if (Packed.x == OP_CONST_COLOR) {
-    vec4 ConstColor = SlotConstColor[slot];
     // The input mode occupies the selector's low bits; bits 20-24 carry the result register.
     int constMode = Packed.w & 0xF;
-    if (constMode == 1) {
-      return ConstColor * in0;
-    }
-    if (constMode == 2) {
-      return ConstColor * in0.a;
-    }
-    return ConstColor;
+    return pmApplyConstColor(SlotConstColor[slot], in0, constMode);
   }
   if (Packed.x == OP_BLEND) {
     vec4 blendResult = xpBlendColors(in0, in1, Packed.w & 0xFF);
@@ -154,23 +148,13 @@ vec4 evalChainSlot(int slot) {
   }
   vec4 color = in0;
   if (Packed.x == OP_COLOR_MATRIX) {
-    // Unpremultiply, apply matrix + vector, clamp, re-premultiply.
-    color = vec4(color.rgb / max(color.a, 9.9999997473787516e-05), color.a);
-    color = clamp(SlotColorMatrix[slot] * color + SlotColorVector[slot], 0.0, 1.0);
-    color.rgb *= color.a;
-    return color;
+    return pmApplyColorMatrix(color, SlotColorMatrix[slot], SlotColorVector[slot]);
   }
   if (Packed.x == OP_LUMA) {
-    return vec4(dot(color.rgb, SlotLumaThresh[slot].rgb));
+    return pmApplyLuma(color, SlotLumaThresh[slot].rgb);
   }
   if (Packed.x == OP_ALPHA_THRESHOLD) {
-    vec4 result = vec4(0.0);
-    if (color.a > 0.0) {
-      result.rgb = color.rgb / color.a;
-      result.a = step(SlotLumaThresh[slot].a, color.a);
-      result = clamp(result, 0.0, 1.0);
-    }
-    return result;
+    return pmApplyAlphaThreshold(color, SlotLumaThresh[slot].a);
   }
   if (Packed.x == OP_AARECT_COVERAGE) {
     // Analytic AA-rect coverage (identical math to GLSLRectEffect): falloff from the fragment's

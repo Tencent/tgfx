@@ -33,6 +33,7 @@
 // include is guarded, so the per-slot re-inclusions of this file stay harmless.
 #include "transfer_function.inc"
 #include "xp_blend_colors.inc"
+#include "pointwise_math.inc"
 
 // ColorSpaceXform transfer functions bound to this slot's uniform names.
 float src_tf(int slot, float x) {
@@ -50,30 +51,14 @@ vec4 applyPointwiseOp(int slot, vec4 color) {
   }
   vec4 result;
   if (OpType == OP_COLOR_MATRIX) {
-    // Unpremultiply, apply matrix + vector, clamp, re-premultiply.
-    color = vec4(color.rgb / max(color.a, 9.9999997473787516e-05), color.a);
-    color = clamp(ColorMatrix * color + ColorVector, 0.0, 1.0);
-    color.rgb *= color.a;
-    result = color;
+    result = pmApplyColorMatrix(color, ColorMatrix, ColorVector);
   } else if (OpType == OP_LUMA) {
-    result = vec4(dot(color.rgb, vec3(Kr, Kg, Kb)));
+    result = pmApplyLuma(color, vec3(Kr, Kg, Kb));
   } else if (OpType == OP_ALPHA_THRESHOLD) {
-    result = vec4(0.0);
-    if (color.a > 0.0) {
-      result.rgb = color.rgb / color.a;
-      result.a = step(Threshold, color.a);
-      result = clamp(result, 0.0, 1.0);
-    }
+    result = pmApplyAlphaThreshold(color, Threshold);
   } else if (OpType == OP_CONST_COLOR) {
-    // Matches the chain kernel's const-color op and the runtime ConstColorProcessor emission:
-    // 0 = Ignore (replace), 1 = ModulateRGBA, 2 = ModulateA.
-    if (ConstInputMode == 1) {
-      result = ConstColorValue * color;
-    } else if (ConstInputMode == 2) {
-      result = ConstColorValue * color.a;
-    } else {
-      result = ConstColorValue;
-    }
+    // Matches the chain kernel's const-color op and the runtime ConstColorProcessor emission.
+    result = pmApplyConstColor(ConstColorValue, color, ConstInputMode);
   } else if (OpType == OP_BLEND) {
     // Blend with a constant operand; the operand order follows the source fragment processor's
     // child position (BlendConstFirst mirrors XfermodeFragmentProcessor::Child). Select the
