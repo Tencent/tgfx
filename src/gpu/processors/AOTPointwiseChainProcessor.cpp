@@ -215,6 +215,39 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
       default:
         return nullptr;
     }
+    // Selector sub-field domains: the upload packs these ints straight into the selector's bit
+    // fields, so an out-of-domain value does not merely misbehave — it bleeds into neighboring
+    // bits (the result register rides bits 20-24, the rrect/tex-source ordinals bits 16-19) and
+    // can index chainResults/chainLeafTex out of bounds in the kernel. The owned API is public
+    // surface, so fail closed here instead of trusting the builder.
+    if (slot.op == AOTChainOp::ConstColor &&
+        (slot.constColor.inputMode < 0 || slot.constColor.inputMode > 2)) {
+      return nullptr;
+    }
+    if (slot.op == AOTChainOp::Blend && (slot.blend.blendMode < 0 || slot.blend.blendMode > 0xFF ||
+                                         slot.blend.childType < 0 || slot.blend.childType > 2)) {
+      return nullptr;
+    }
+    if (slot.op == AOTChainOp::Texture &&
+        ((slot.textureModulate | slot.textureAlphaOnly | slot.textureModulateGeometryRGB |
+          slot.textureModulateFullInput | slot.textureModulateUnit) &
+         ~1) != 0) {
+      return nullptr;
+    }
+    if (slot.op == AOTChainOp::TexModulate &&
+        (slot.texModulateSourceSlot < 0 || slot.texModulateSourceSlot > 3 ||
+         (slot.texModulateAlphaOnly & ~1) != 0)) {
+      return nullptr;
+    }
+    // Required-input checks: the kernel resolves an unmapped input (-2) to vec4(0.0) silently, so
+    // an operator that actually consumes its input must not leave it unmapped. Texture slots
+    // carry flags in in0/in1 rather than register indices, and Texture is exempt.
+    if (slot.op != AOTChainOp::Texture && slot.in0 == -2) {
+      return nullptr;
+    }
+    if ((slot.op == AOTChainOp::Blend || slot.op == AOTChainOp::MulAlpha) && slot.in1 == -2) {
+      return nullptr;
+    }
   }
   auto leafCount = textureLeaves.size();
   // Sampler-binding children include the DAG leaves plus sampler-only children (the LUT gradient
