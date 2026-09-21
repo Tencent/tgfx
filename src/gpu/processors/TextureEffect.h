@@ -59,6 +59,13 @@ class TextureEffect : public FragmentProcessor {
     return needSubset();
   }
 
+  // True when the coordinate transform carries a projective matrix. The plain precompiled texture
+  // templates transform coordinates affinely (no w division), so matchers use this to keep a
+  // projective source off them; the runtime route emits a perspective-divided coordinate.
+  bool hasPerspective() const {
+    return coordTransform.matrix.hasPerspective();
+  }
+
   /**
    * Computes the normalized subset rectangle used to clamp texture sample coordinates. The result
    * is written to rect as {left, top, right, bottom}, matching the layout of the "Subset" uniform.

@@ -222,6 +222,14 @@ static std::optional<int> SharedDeviceMaskValue(const ProgramInfo* programInfo) 
 
 static int GetGPCoverage(const GeometryProcessor* gp);
 
+// True when the TextureEffect's coordinate transform carries a projective matrix. The plain
+// precompiled texture templates transform coordinates affinely ((CoordTransformMatrix * vec3(pos,
+// 1)).xy with no w division), so a projective source must stay off them and ride the runtime
+// route, which emits a perspective-divided coordinate (emitPerspTextCoord).
+static bool TextureEffectIsProjective(const TextureEffect* te) {
+  return te->hasPerspective();
+}
+
 static std::optional<PermutationMatchResult> TryMatchTextureFill(const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
   if (gp->name() != "DefaultGeometryProcessor") {
@@ -256,6 +264,11 @@ static std::optional<PermutationMatchResult> TryMatchTextureFill(const ProgramIn
   // YUV textures require additional dimensions (Limited/Full range, I420/NV12 format) that are not
   // yet covered by the precompiled shader. Fall back to ProgramBuilder for YUV.
   if (te->isYUV()) {
+    return std::nullopt;
+  }
+  // The precompiled vertex template transforms the coordinate affinely; a projective source must
+  // stay off this artifact (see TextureEffectIsProjective).
+  if (TextureEffectIsProjective(te)) {
     return std::nullopt;
   }
   // alphaOnly / hasRGBAAA are runtime uniforms (AlphaOnly / HasRgbaaa) written by
@@ -885,7 +898,21 @@ static std::optional<PermutationMatchResult> TryMatchTextureColorMatrix(
   if (gp->name() != "DefaultGeometryProcessor") {
     return std::nullopt;
   }
+  // This dedicated family's vertex template is the plain position-only one (no coverage varying),
+  // so a DefaultGP carrying vertex coverage must stay off it; the runtime route carries the edge
+  // coverage, and the equivalent Compose(Texture, Matrix) form reaches the coverage-aware
+  // TexturedEffect family below instead. Without this check the sequential [Texture, Matrix]
+  // spelling loses the GP coverage while the Compose spelling keeps it — the same draw taking a
+  // different result depending only on how the tree was wrapped.
+  if (GetGPCoverage(gp) != 0) {
+    return std::nullopt;
+  }
   if (programInfo->numFragmentProcessors() != 2) {
+    return std::nullopt;
+  }
+  // Both processors must be color processors: a matrix that is actually a coverage processor is a
+  // different draw, and the dedicated template applies the matrix to the sampled color only.
+  if (programInfo->numColorFragmentProcessors() != 2) {
     return std::nullopt;
   }
   auto fp0 = programInfo->getFragmentProcessor(0);
@@ -895,6 +922,11 @@ static std::optional<PermutationMatchResult> TryMatchTextureColorMatrix(
   }
   auto* te = static_cast<const TextureEffect*>(fp0);
   if (te->isYUV()) {
+    return std::nullopt;
+  }
+  // The plain vertex template transforms coordinates affinely; a projective source must ride the
+  // runtime route (see TextureEffectIsProjective).
+  if (TextureEffectIsProjective(te)) {
     return std::nullopt;
   }
   TextureColorMatrixInputs inputs;
@@ -960,6 +992,21 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseDirect(
   int gpType = GetGPType(gp);
   if (gpType < 0 || programInfo->numFragmentProcessors() != 1) {
     return std::nullopt;
+  }
+  // The operator must be the COLOR processor: the same FP as a coverage processor is a different
+  // draw (it modulates the draw coverage instead of replacing the paint color), and the Direct
+  // template applies applyPointwiseOp to the paint color only.
+  if (programInfo->numColorFragmentProcessors() != 1) {
+    return std::nullopt;
+  }
+  if (gpType == 1) {
+    // The Direct vertex template reads only position (+ optional coverage) and the fragment reads
+    // the Color uniform: a quad without a common color carries per-vertex colors the template
+    // cannot express.
+    auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
+    if (!quadGP->hasCommonColor()) {
+      return std::nullopt;
+    }
   }
   int xpType = GetXPType(programInfo);
   if (xpType < 0) {
@@ -1087,6 +1134,11 @@ static std::optional<PermutationMatchResult> TryMatchComposedTexture(
   }
   auto* te = static_cast<const TextureEffect*>(child0);
   if (te->isYUV() || te->isAlphaOnly() || te->hasRGBAAA()) {
+    return std::nullopt;
+  }
+  // The precompiled vertex template transforms the coordinate affinely; a projective source must
+  // stay off this artifact (see TextureEffectIsProjective).
+  if (TextureEffectIsProjective(te)) {
     return std::nullopt;
   }
 
