@@ -253,6 +253,11 @@ static Rect SnapLineRectToPixels(const Rect& rect, const Matrix& matrix, bool ho
     return rect;
   }
   auto deviceRect = matrix.mapRect(rect);
+  // A zero-length line produces a degenerate rect with zero thickness on the snapped axis;
+  // quantizing that up to one pixel would draw a solid bar where nothing rendered before.
+  if ((horizontal && deviceRect.height() <= 0.0f) || (!horizontal && deviceRect.width() <= 0.0f)) {
+    return rect;
+  }
   if (horizontal) {
     auto height = roundf(std::max(1.0f, deviceRect.height()));
     deviceRect.top = roundf(deviceRect.top);
