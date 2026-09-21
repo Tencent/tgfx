@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <algorithm>
+#include <vector>
+#include "layers/BackgroundSnapshotMap.h"
 #include "layers/RootLayer.h"
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/layers/DisplayList.h"
@@ -204,6 +206,85 @@ TGFX_TEST(BackgroundBlurTest, SimpleBackgroundBlur) {
   displayList.setContentOffset(-100, -100);
   displayList.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/SimpleBackgroundBlur_tiled"));
+}
+
+/**
+ * Exercises the shared style output path: an opaque background color plus multiple dirty tiles
+ * make the consumer rasterize each style's output once and composite it back with SrcOver. The
+ * top panel holds its content away from the layer origin (a non-zero content offset), and the
+ * bottom panel's style excludes child effects (the second source group), so the offset math and
+ * both source buckets of the cached path are covered. The first render primes the tile cache;
+ * recoloring both markers then dirties several tiles at once, which is what turns sharing on.
+ */
+TGFX_TEST(BackgroundBlurTest, SharedStyleOutput) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 300);
+  DisplayList displayList;
+  displayList.setRenderMode(RenderMode::Tiled);
+  displayList.setTileSize(100);
+  displayList.setBackgroundColor(Color::White());
+
+  auto rootLayer = displayList.root();
+
+  auto baseLayer = SolidLayer::Make();
+  baseLayer->setColor(Color::FromRGBA(70, 130, 190, 255));
+  baseLayer->setWidth(300);
+  baseLayer->setHeight(300);
+  rootLayer->addChild(baseLayer);
+
+  auto marker1 = ShapeLayer::Make();
+  auto marker1Path = Path();
+  marker1Path.addRect(Rect::MakeXYWH(95, 95, 20, 20));
+  marker1->setPath(marker1Path);
+  marker1->setFillStyle(ShapeStyle::Make(Color::FromRGBA(250, 60, 60, 255)));
+  rootLayer->addChild(marker1);
+
+  auto marker2 = ShapeLayer::Make();
+  auto marker2Path = Path();
+  marker2Path.addRect(Rect::MakeXYWH(95, 215, 20, 20));
+  marker2->setPath(marker2Path);
+  marker2->setFillStyle(ShapeStyle::Make(Color::FromRGBA(250, 60, 60, 255)));
+  rootLayer->addChild(marker2);
+
+  // Scaled panel with its child away from the layer origin: the content image gets a non-zero
+  // offset, and the layer scale makes the content scale differ from 1.
+  auto panel = Layer::Make();
+  auto panelMatrix = Matrix::MakeScale(1.5f);
+  panelMatrix.postTranslate(60, 60);
+  panel->setMatrix(panelMatrix);
+  panel->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
+  rootLayer->addChild(panel);
+
+  auto panelChild = ShapeLayer::Make();
+  auto childPath = Path();
+  childPath.addRect(Rect::MakeXYWH(20, 15, 100, 110));
+  panelChild->setPath(childPath);
+  panelChild->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 90)));
+  panel->addChild(panelChild);
+
+  // Panel whose style excludes child effects, exercising the second source group.
+  auto excludedPanel = Layer::Make();
+  excludedPanel->setMatrix(Matrix::MakeTrans(60, 180));
+  auto excludedBlur = BackgroundBlurStyle::Make(10, 10);
+  excludedBlur->setExcludeChildEffects(true);
+  excludedPanel->setLayerStyles({excludedBlur});
+  rootLayer->addChild(excludedPanel);
+
+  auto excludedChild = ShapeLayer::Make();
+  auto excludedPath = Path();
+  excludedPath.addRect(Rect::MakeXYWH(20, 15, 120, 50));
+  excludedChild->setPath(excludedPath);
+  excludedChild->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 200, 120, 160)));
+  excludedPanel->addChild(excludedChild);
+
+  displayList.render(surface.get());
+
+  marker1->setFillStyle(ShapeStyle::Make(Color::FromRGBA(60, 60, 250, 255)));
+  marker2->setFillStyle(ShapeStyle::Make(Color::FromRGBA(60, 60, 250, 255)));
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/SharedStyleOutput"));
 }
 
 /**
@@ -1098,6 +1179,244 @@ TGFX_TEST(BackgroundBlurTest, BackgroundBlur3DLayer) {
 
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/BackgroundBlur3DLayer_Nested3D"));
+}
+
+/**
+ * Exercises the shared style output under a perspective transform: an opaque background color
+ * plus multiple dirty tiles turn sharing on while the styled layer sits inside a 3D subtree,
+ * so the canvas matrix carries perspective when the style output is recorded and blitted back.
+ */
+TGFX_TEST(BackgroundBlurTest, SharedStyleOutput3D) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 250, 250);
+  DisplayList displayList;
+  displayList.setRenderMode(RenderMode::Tiled);
+  displayList.setTileSize(100);
+  displayList.setBackgroundColor(Color::White());
+
+  auto backImage = MakeImage("resources/assets/HappyNewYear.png");
+  auto layerA = ImageLayer::Make();
+  layerA->setImage(backImage);
+  layerA->setMatrix(Matrix::MakeScale(250.f / 1024.f));
+  displayList.root()->addChild(layerA);
+
+  auto marker1 = ShapeLayer::Make();
+  auto marker1Path = Path();
+  marker1Path.addRect(Rect::MakeXYWH(140, 140, 20, 20));
+  marker1->setPath(marker1Path);
+  marker1->setFillStyle(ShapeStyle::Make(Color::FromRGBA(250, 60, 60, 255)));
+  displayList.root()->addChild(marker1);
+
+  auto marker2 = ShapeLayer::Make();
+  auto marker2Path = Path();
+  marker2Path.addRect(Rect::MakeXYWH(200, 140, 20, 20));
+  marker2->setPath(marker2Path);
+  marker2->setFillStyle(ShapeStyle::Make(Color::FromRGBA(250, 60, 60, 255)));
+  displayList.root()->addChild(marker2);
+
+  // Perspective-transformed layer with a background blur style: its flattened canvas matrix
+  // carries perspective when the style draws. It covers the whole surface so every dirty tile's
+  // pass draws it, which is what makes the shared output get reused across passes.
+  auto styledLayer = SolidLayer::Make();
+  styledLayer->setColor(Color::FromRGBA(255, 255, 255, 60));
+  styledLayer->setWidth(250);
+  styledLayer->setHeight(250);
+  {
+    auto size = Size::Make(250, 250);
+    auto anchor = Point::Make(0.5f, 0.5f);
+    auto offsetToAnchor =
+        Matrix3D::MakeTranslate(-anchor.x * size.width, -anchor.y * size.height, 0);
+    auto invOffsetToAnchor =
+        Matrix3D::MakeTranslate(anchor.x * size.width, anchor.y * size.height, 0);
+    auto rotate = Matrix3D::MakeRotate({0, 1, 0}, 25);
+    auto perspective = Matrix3D::I();
+    perspective.setRowColumn(3, 2, -1.0f / 500.0f);
+    auto origin = Matrix3D::MakeTranslate(125, 125, 0);
+    styledLayer->setMatrix3D(origin * invOffsetToAnchor * perspective * rotate * offsetToAnchor);
+  }
+  styledLayer->setLayerStyles({BackgroundBlurStyle::Make(6, 6)});
+  displayList.root()->addChild(styledLayer);
+
+  displayList.render(surface.get());
+
+  marker1->setFillStyle(ShapeStyle::Make(Color::FromRGBA(60, 60, 250, 255)));
+  marker2->setFillStyle(ShapeStyle::Make(Color::FromRGBA(60, 60, 250, 255)));
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/SharedStyleOutput3D"));
+}
+
+/**
+ * A background blur style must survive a large display list zoom, where the background source is
+ * heavily downsampled and the layer's content extent is orders of magnitude larger than the
+ * render target.
+ *
+ * Note: this is an end-to-end regression test for the direct path only. At zoom levels large
+ * enough for the style-output bound to matter, the blur outset covers the whole screen, so the
+ * dirty rects of any small change merge into a single region and the frame never renders through
+ * multiple passes — the shared output path is structurally unreachable here. The bound itself is
+ * covered by the shared-path tests above.
+ */
+TGFX_TEST(BackgroundBlurTest, BackgroundBlurUnderHighZoom) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 300);
+  DisplayList displayList;
+  displayList.setRenderMode(RenderMode::Tiled);
+  displayList.setTileSize(100);
+  displayList.setBackgroundColor(Color::White());
+  displayList.setZoomScale(512.0f);
+
+  const float inverseZoom = 1.0f / 512.0f;
+  auto back = SolidLayer::Make();
+  back->setColor(Color::FromRGBA(70, 130, 190, 255));
+  back->setWidth(200 * inverseZoom);
+  back->setHeight(200 * inverseZoom);
+  back->setMatrix(Matrix::MakeTrans(50 * inverseZoom, 50 * inverseZoom));
+  displayList.root()->addChild(back);
+
+  auto marker1 = ShapeLayer::Make();
+  auto marker1Path = Path();
+  marker1Path.addRect(
+      Rect::MakeXYWH(60 * inverseZoom, 60 * inverseZoom, 20 * inverseZoom, 20 * inverseZoom));
+  marker1->setPath(marker1Path);
+  marker1->setFillStyle(ShapeStyle::Make(Color::FromRGBA(250, 60, 60, 255)));
+  displayList.root()->addChild(marker1);
+
+  auto marker2 = ShapeLayer::Make();
+  auto marker2Path = Path();
+  marker2Path.addRect(
+      Rect::MakeXYWH(230 * inverseZoom, 230 * inverseZoom, 20 * inverseZoom, 20 * inverseZoom));
+  marker2->setPath(marker2Path);
+  marker2->setFillStyle(ShapeStyle::Make(Color::FromRGBA(250, 60, 60, 255)));
+  displayList.root()->addChild(marker2);
+
+  // Blur panel covering both markers: at this zoom their dirty rects expand past the panel and
+  // merge into a single pass, so the frame draws the style directly instead of caching it.
+  auto styledLayer = SolidLayer::Make();
+  styledLayer->setColor(Color::FromRGBA(255, 255, 255, 60));
+  styledLayer->setWidth(200 * inverseZoom);
+  styledLayer->setHeight(200 * inverseZoom);
+  styledLayer->setMatrix(Matrix::MakeTrans(50 * inverseZoom, 50 * inverseZoom));
+  styledLayer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
+  displayList.root()->addChild(styledLayer);
+
+  displayList.render(surface.get());
+
+  marker1->setFillStyle(ShapeStyle::Make(Color::FromRGBA(60, 60, 250, 255)));
+  marker2->setFillStyle(ShapeStyle::Make(Color::FromRGBA(60, 60, 250, 255)));
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/BackgroundBlurUnderHighZoom"));
+}
+
+/**
+ * The shared style output is rasterized over the union of the frame's render rects, so sharing only
+ * pays off while that union stays close to the sum of the rects it covers: adjacent dirty rects
+ * keep the union at their own size, while rects in opposite corners make it the whole surface and
+ * measuring shows per-pass drawing is then several times faster. The gate is a pure function of the
+ * render rects, so assert it directly instead of through a screenshot: sharing and direct drawing
+ * produce the same pixels, which makes any screenshot unable to tell the two paths apart.
+ */
+TGFX_TEST_PRIVATE(BackgroundBlurTest, StyleShareCompactGate){TGFX_PRIVATE_ACCESS({
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  DisplayList displayList;
+  displayList.setBackgroundColor(Color::White());
+  auto blurLayer = SolidLayer::Make();
+  blurLayer->setWidth(400);
+  blurLayer->setHeight(400);
+  blurLayer->setLayerStyles({BackgroundBlurStyle::Make(2, 2)});
+  displayList.root()->addChild(blurLayer);
+  // One frame so the tree is prepared and its background outset is known; captureBackgrounds
+  // returns null before that.
+  displayList.render(surface.get());
+
+  // Two 100x100 rects across the diagonal of a 200x200 box: the union is exactly twice their sum,
+  // which is the gate's boundary, and the boundary itself still shares.
+  auto atBoundary = displayList.captureBackgrounds(
+      surface.get(), {Rect::MakeXYWH(0, 0, 100, 100), Rect::MakeXYWH(100, 100, 100, 100)});
+  EXPECT_TRUE(atBoundary != nullptr);
+  EXPECT_TRUE(atBoundary->styleShareCompact);
+
+  // One pixel further apart and the union grows past the boundary.
+  auto pastBoundary = displayList.captureBackgrounds(
+      surface.get(), {Rect::MakeXYWH(0, 0, 100, 100), Rect::MakeXYWH(101, 100, 100, 100)});
+  EXPECT_TRUE(pastBoundary != nullptr);
+  EXPECT_FALSE(pastBoundary->styleShareCompact);
+
+  // Opposite corners of the surface: the union is the whole surface.
+  auto scattered = displayList.captureBackgrounds(
+      surface.get(), {Rect::MakeXYWH(0, 0, 100, 100), Rect::MakeXYWH(300, 300, 100, 100)});
+  EXPECT_TRUE(scattered != nullptr);
+  EXPECT_FALSE(scattered->styleShareCompact);
+
+  // Submitting flushes the render tasks these captures queued, so they do not leak into the next
+  // test through the shared drawing buffer.
+  context->flushAndSubmit();
+})}
+
+/**
+ * A style whose content extent is far larger than the render target (here a 20000-pixel-wide layer
+ * under a 512x zoom, where the style-space bound is unavailable because the background surface is
+ * downsampled) cannot have its output cached: no texture can hold it. The frame records that
+ * decision so every pass draws the style directly instead of retrying the oversized rasterization,
+ * which is what keeps the style on screen.
+ */
+TGFX_TEST_PRIVATE(BackgroundBlurTest, StyleOutputOversizeFallsBack) {
+  TGFX_PRIVATE_ACCESS({
+    ContextScope scope;
+    auto context = scope.getContext();
+    EXPECT_TRUE(context != nullptr);
+    constexpr int TargetWidth = 2048;
+    constexpr int TargetHeight = 256;
+    auto surface = Surface::Make(context, TargetWidth, TargetHeight);
+    DisplayList displayList;
+    displayList.setBackgroundColor(Color::White());
+    displayList.setZoomScale(512.0f);
+
+    const float inverseZoom = 1.0f / 512.0f;
+    auto back = SolidLayer::Make();
+    back->setColor(Color::FromRGBA(70, 130, 190, 255));
+    back->setWidth(2048 * inverseZoom);
+    back->setHeight(256 * inverseZoom);
+    displayList.root()->addChild(back);
+
+    // Content 20000 device pixels wide: the cached output cannot fit in one texture.
+    auto styledLayer = SolidLayer::Make();
+    styledLayer->setColor(Color::FromRGBA(255, 255, 255, 60));
+    styledLayer->setWidth(20000 * inverseZoom);
+    styledLayer->setHeight(256 * inverseZoom);
+    styledLayer->setLayerStyles({BackgroundBlurStyle::Make(1, 1)});
+    displayList.root()->addChild(styledLayer);
+
+    // One frame first: captureBackgrounds needs the tree's background outset, which is computed
+    // while rendering.
+    displayList.render(surface.get());
+
+    // Two rects covering the target in halves turn multi-pass rendering on while staying compact,
+    // which is what the shared style output requires.
+    const auto halfWidth = static_cast<float>(TargetWidth) * 0.5f;
+    const auto height = static_cast<float>(TargetHeight);
+    auto snapshots = displayList.captureBackgrounds(
+        surface.get(),
+        {Rect::MakeWH(halfWidth, height), Rect::MakeXYWH(halfWidth, 0.f, halfWidth, height)});
+    ASSERT_TRUE(snapshots != nullptr);
+    displayList.drawRootLayer(surface.get(), Rect::MakeWH(static_cast<float>(TargetWidth), height),
+                              displayList.getViewMatrix(), true, snapshots.get());
+
+    // Submitting flushes the render tasks this frame queued, so they do not leak into the next test
+    // through the shared drawing buffer.
+    context->flushAndSubmit();
+
+    // The decision is remembered as a null entry, which is what sends the later passes down the
+    // direct path.
+    ASSERT_EQ(snapshots->styleOutputs.size(), 1u);
+    EXPECT_TRUE(snapshots->styleOutputs.begin()->second.image == nullptr);
+  })
 }
 
 }  // namespace tgfx
