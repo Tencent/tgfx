@@ -59,6 +59,14 @@ class TextureEffect : public FragmentProcessor {
     return needSubset();
   }
 
+  // The child's tile modes. The precompiled blur kernel clamps plain-child taps to the subset
+  // (edge stretch), which is only the correct tap semantics for Clamp — a Decal child must stay
+  // transparent outside its subset, so matchers use this to keep it off that kernel.
+  void getTileModes(TileMode* modeX, TileMode* modeY) const {
+    *modeX = samplerState.tileModeX;
+    *modeY = samplerState.tileModeY;
+  }
+
   // True when the coordinate transform carries a projective matrix. The plain precompiled texture
   // templates transform coordinates affinely (no w division), so matchers use this to keep a
   // projective source off them; the runtime route emits a perspective-divided coordinate.

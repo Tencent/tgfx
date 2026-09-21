@@ -1208,6 +1208,16 @@ static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
     if (childTE->numTextureSamplers() == 0) {
       return std::nullopt;
     }
+    // The kernel clamps plain-child taps to the subset (edge stretch), which is only the Clamp
+    // tap semantics. A Decal child must return transparent outside its subset — a drop shadow's
+    // blurred source is exactly that, and its edge taps decide the shadow's alpha — so a non-
+    // Clamp plain child falls back to the runtime route.
+    TileMode modeX = TileMode::Clamp;
+    TileMode modeY = TileMode::Clamp;
+    childTE->getTileModes(&modeX, &modeY);
+    if (modeX != TileMode::Clamp || modeY != TileMode::Clamp) {
+      return std::nullopt;
+    }
   } else if (childFP->name() == "TiledTextureEffect") {
     auto* childTiled = static_cast<const TiledTextureEffect*>(childFP);
     if (childTiled->numTextureSamplers() == 0 || childTiled->hasPerspective()) {
@@ -1276,6 +1286,14 @@ static std::optional<PermutationMatchResult> TryMatchGlassUDFTentBlur(
   if (childFP->name() == "TextureEffect") {
     auto* childTE = static_cast<const TextureEffect*>(childFP);
     if (childTE->numTextureSamplers() == 0) {
+      return std::nullopt;
+    }
+    // Same Clamp-only rule as the Gaussian matcher: this kernel also clamps plain-child taps to
+    // the subset, so a Decal (or otherwise non-Clamp) plain child falls back to the runtime.
+    TileMode modeX = TileMode::Clamp;
+    TileMode modeY = TileMode::Clamp;
+    childTE->getTileModes(&modeX, &modeY);
+    if (modeX != TileMode::Clamp || modeY != TileMode::Clamp) {
       return std::nullopt;
     }
   } else if (childFP->name() == "TiledTextureEffect") {
