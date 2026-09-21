@@ -6375,4 +6375,91 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailSamplingTransforms) {
   }
 }
 
+// P2 coverage/XP output-contract probes. The fused kernels must hand the XferProcessor an
+// uncovered source color (S) separate from the total coverage (C); premultiplying the geometry
+// coverage into the source and letting the xp_output.inc defaults answer for the missing
+// TGFX_XP_SRC_UNPREMUL/TGFX_XP_COVERAGE definitions is only equivalent for SrcOver-style modes.
+// The probes below draw an AA shape with a half-transparent color over a non-black, opaque
+// background under the blend modes whose output depends on the dst contribution, so any
+// S/C wiring error diverges from the runtime path.
+static void RenderCoverageXPScene(bool useBundle, BlendMode mode, Bitmap* outBitmap,
+                                  bool useGradient) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  if (useBundle) {
+    ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+  } else {
+    cache->unload();
+  }
+  context->globalCache()->clearPrograms();
+  auto surface = Surface::Make(context, 120, 120);
+  ASSERT_TRUE(surface != nullptr);
+  auto* canvas = surface->getCanvas();
+  // A non-black, non-trivial dst: two color blocks so the dst contribution is visible per region.
+  canvas->clear(Color::FromRGBA(255, 128, 0, 255));
+  Paint background = {};
+  background.setColor(Color::FromRGBA(0, 0, 255, 255));
+  canvas->drawRect(Rect::MakeXYWH(0, 60, 120, 60), background);
+  Paint paint = {};
+  paint.setAntiAlias(true);
+  paint.setBlendMode(mode);
+  if (useGradient) {
+    // UnifiedGradient path: a linear gradient shader over an AA rect, with a half-transparent
+    // input color so the gradient output alpha differs from 1 and any vCoverage handling error
+    // changes the result by a visible factor.
+    paint.setShader(Shader::MakeLinearGradient(
+        Point{10, 10}, Point{110, 110},
+        {Color::FromRGBA(0, 255, 255, 255), Color::FromRGBA(255, 0, 255, 128)}, {}));
+    paint.setAlpha(160);
+    canvas->drawRect(Rect::MakeXYWH(15, 15, 90, 90), paint);
+  } else {
+    // RoundStrokeRectFill path: the GP is created only for a Round line join on a stroked
+    // rect (RectDrawOp routes LineJoin::Round to RoundStrokeRectGeometryProcessor), so a
+    // plain drawRRect never reaches this family. Half-transparent color keeps the coverage
+    // factor visible in the output.
+    paint.setStyle(PaintStyle::Stroke);
+    paint.setStrokeWidth(10);
+    paint.setLineJoin(LineJoin::Round);
+    paint.setColor(Color::FromRGBA(0, 255, 255, 128));
+    canvas->drawRect(Rect::MakeXYWH(20, 20, 80, 80), paint);
+  }
+  context->flushAndSubmit(true);
+  ASSERT_TRUE(outBitmap->allocPixels(120, 120));
+  auto* pixels = outBitmap->lockPixels();
+  ASSERT_TRUE(pixels != nullptr);
+  ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+  outBitmap->unlockPixels();
+  if (useBundle) {
+    cache->unload();
+  }
+}
+
+// The dst-dependent modes: with C missing (defaulted to 1) and S premultiplied by C, these
+// produce visibly wrong coverage bands; SrcOver is the control that stays correct either way.
+static const BlendMode COVERAGE_XP_PROBE_MODES[] = {
+    BlendMode::Src,     BlendMode::Clear,       BlendMode::SrcIn,    BlendMode::DstIn,
+    BlendMode::SrcOver, BlendMode::PlusLighter, BlendMode::Modulate, BlendMode::Overlay};
+
+TGFX_TEST(AOTRenderConsistencyTest, RoundStrokeRectCoverageXPContract) {
+  for (auto mode : COVERAGE_XP_PROBE_MODES) {
+    Bitmap aotBitmap = {};
+    Bitmap runtimeBitmap = {};
+    RenderCoverageXPScene(true, mode, &aotBitmap, false);
+    RenderCoverageXPScene(false, mode, &runtimeBitmap, false);
+    ExpectBitmapsIdentical("round-stroke-rect-coverage-xp", aotBitmap, runtimeBitmap, 120, 120);
+  }
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, UnifiedGradientVCoverageXPContract) {
+  for (auto mode : COVERAGE_XP_PROBE_MODES) {
+    Bitmap aotBitmap = {};
+    Bitmap runtimeBitmap = {};
+    RenderCoverageXPScene(true, mode, &aotBitmap, true);
+    RenderCoverageXPScene(false, mode, &runtimeBitmap, true);
+    ExpectBitmapsIdentical("unified-gradient-vcoverage-xp", aotBitmap, runtimeBitmap, 120, 120);
+  }
+}
+
 }  // namespace tgfx
