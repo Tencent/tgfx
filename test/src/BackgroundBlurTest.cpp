@@ -1104,15 +1104,15 @@ TGFX_TEST(BackgroundBlurTest, BackgroundBlurWithDropShadow) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 240, 240);
+  auto surface = Surface::Make(context, 250, 250);
   DisplayList displayList;
 
-  auto frame = SolidLayer::Make();
-  frame->setColor(Color::White());
-  frame->setWidth(150);
-  frame->setHeight(150);
-  frame->setMatrix(Matrix::MakeTrans(50, 50));
-  displayList.root()->addChild(frame);
+  auto background = SolidLayer::Make();
+  background->setColor(Color::White());
+  background->setWidth(150);
+  background->setHeight(150);
+  background->setMatrix(Matrix::MakeTrans(50, 50));
+  displayList.root()->addChild(background);
 
   auto bottomRect = SolidLayer::Make();
   bottomRect->setColor(Color::FromRGBA(143, 0, 0));
