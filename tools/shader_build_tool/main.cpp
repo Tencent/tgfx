@@ -740,6 +740,53 @@ static std::string ResolveIncludes(const std::string& source, const std::string&
   return result;
 }
 
+// Process-wide reuse of the common GLSL-to-SPIR-V compilation and reflection extraction across
+// the per-backend build passes. CompileOneShader runs once per (shader, backend), but the common
+// unoptimized SPIR-V and the reflection depend only on (shaderName, permutationIndex, stage,
+// optimize, openGLEnv) — the sources cannot change mid-run — so with N backends the cache turns
+// N identical compilations into one. Backend-specific conversions (MSL/metallib, WGSL, direct
+// GL emission) each already run in exactly one backend pass and are not cached. The cache key
+// must never reuse a permutation index across different inputs: it always carries the shader
+// name, mirroring the rule that a permutation index is only meaningful within its family.
+struct SpirvCacheEntry {
+  bool success = false;
+  std::vector<uint32_t> spirv;
+  std::string error;
+};
+static std::map<std::tuple<std::string, uint32_t, int, bool, bool>, SpirvCacheEntry> spirvCache;
+
+static const SpirvCacheEntry& CompileGLSLShared(const std::string& source, ShaderStageType stage,
+                                                const std::string& shaderName,
+                                                uint32_t variantIndex, bool optimize,
+                                                bool openGLEnv) {
+  auto key =
+      std::make_tuple(shaderName, variantIndex, static_cast<int>(stage), optimize, openGLEnv);
+  auto it = spirvCache.find(key);
+  if (it == spirvCache.end()) {
+    auto result = CompileGLSL(source, stage, shaderName, variantIndex, optimize, openGLEnv);
+    SpirvCacheEntry entry;
+    entry.success = result.success;
+    entry.spirv = std::move(result.spirv);
+    entry.error = std::move(result.error);
+    it = spirvCache.emplace(std::move(key), std::move(entry)).first;
+  }
+  return it->second;
+}
+
+static std::map<std::tuple<std::string, uint32_t, uint32_t>, ReflectionResult> reflectionCache;
+
+static const ReflectionResult& ExtractReflectionShared(const std::string& shaderName,
+                                                       uint32_t vertIndex, uint32_t fragIndex,
+                                                       const std::vector<uint32_t>& vertSpirv,
+                                                       const std::vector<uint32_t>& fragSpirv) {
+  auto key = std::make_tuple(shaderName, vertIndex, fragIndex);
+  auto it = reflectionCache.find(key);
+  if (it == reflectionCache.end()) {
+    it = reflectionCache.emplace(std::move(key), ExtractReflection(vertSpirv, fragSpirv)).first;
+  }
+  return it->second;
+}
+
 static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const BuildOptions& options,
                                      std::vector<VariantData>* outVariants,
                                      std::map<std::string, uint64_t>* profileErrorCounts) {
@@ -777,14 +824,6 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
     }
   }
 
-  // Cache compiled vertex shaders by vertPermutationIndex to avoid redundant compilation when
-  // multiple frag variants share the same vert variant.
-  struct VertCacheEntry {
-    std::vector<uint32_t> spirv;
-    StageReflectionData reflection;
-  };
-  std::map<uint32_t, VertCacheEntry> vertCache;
-
   // The compile list comes from the matcher rules' reachable sets (the Compose single source of
   // truth in PermutationRules.cpp), enumerated at build time. This replaces the former cartesian
   // domain walk filtered by ShouldCompile; the --audit mode verified both sides agree for every
@@ -813,28 +852,18 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
     auto vertDefines = vertDomain.defineListFor(vi);
     auto fragDefines = fragDomain.defineListFor(fi);
 
-    // Compile vertex shader (use cache if already compiled for this vertIndex)
-    std::vector<uint32_t>* vertSpirv = nullptr;
-    StageReflectionData* vertReflData = nullptr;
-    auto vertIt = vertCache.find(vi);
-    if (vertIt != vertCache.end()) {
-      vertSpirv = &vertIt->second.spirv;
-      vertReflData = &vertIt->second.reflection;
-    } else {
-      auto expandedVert = PrependDefines(vertSource, vertDefines);
-      auto vertResult = CompileGLSL(expandedVert, ShaderStageType::Vertex, info.name, vi);
-      if (!vertResult.success) {
-        std::cerr << "  " << vertResult.error << "\n";
-        report.errorCount++;
-        RecordCommonArtifactError(profileErrorCounts);
-        continue;
-      }
-      // Store a dummy reflection for now; we'll fill it after frag compilation
-      auto& cacheEntry = vertCache[vi];
-      cacheEntry.spirv = std::move(vertResult.spirv);
-      vertSpirv = &cacheEntry.spirv;
-      vertReflData = &cacheEntry.reflection;
+    // Compile vertex shader. The shared cache also covers the multiple-frag-per-vert reuse the
+    // old per-backend vertCache handled, plus the cross-backend repeats.
+    const auto& vertResult =
+        CompileGLSLShared(PrependDefines(vertSource, vertDefines), ShaderStageType::Vertex,
+                          info.name, vi, false, false);
+    if (!vertResult.success) {
+      std::cerr << "  " << vertResult.error << "\n";
+      report.errorCount++;
+      RecordCommonArtifactError(profileErrorCounts);
+      continue;
     }
+    const auto* vertSpirv = &vertResult.spirv;
 
     auto expandedFrag = PrependDefines(fragSource, fragDefines);
     if (rectVariant) {
@@ -842,8 +871,8 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
       // 'set = N, ' fragment while keeping binding (which the reflection and GLSL output use).
       expandedFrag = StripDescriptorSets(std::move(expandedFrag));
     }
-    auto fragResult =
-        CompileGLSL(expandedFrag, ShaderStageType::Fragment, info.name, fi, false, rectVariant);
+    const auto& fragResult = CompileGLSLShared(expandedFrag, ShaderStageType::Fragment, info.name,
+                                               fi, false, rectVariant);
     if (!fragResult.success) {
       std::cerr << "  " << fragResult.error << "\n";
       report.errorCount++;
@@ -851,16 +880,13 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
       continue;
     }
 
-    // Extract reflection from SPIR-V
-    auto reflection = ExtractReflection(*vertSpirv, fragResult.spirv);
+    // Extract reflection from SPIR-V (shared across backend passes, like the compiles above).
+    const auto& reflection =
+        ExtractReflectionShared(info.name, vi, fi, *vertSpirv, fragResult.spirv);
     // Counted only here — after both stages compiled successfully — so compiledCount is the
     // true "compiled" figure, distinct from rawCount (the reachable-permutation total) and
     // independent of backend-level exclusions counted below.
     report.compiledCount++;
-    // Update vert reflection cache on first successful extraction
-    if (vertReflData->uniforms.empty() && vertReflData->samplers.empty()) {
-      *vertReflData = reflection.vertexReflection;
-    }
 
     for (const auto& backend : options.backends) {
       // Backend-specific exclusions (RECT, WebGPU FBF) share one source of truth with the
@@ -874,9 +900,11 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
       if (backend == "vulkan") {
         // Re-compile with optimization for smaller SPIR-V output.
         auto expandedVertOpt = PrependDefines(vertSource, vertDefines);
-        auto vertOpt = CompileGLSL(expandedVertOpt, ShaderStageType::Vertex, info.name, vi, true);
+        auto vertOpt =
+            CompileGLSLShared(expandedVertOpt, ShaderStageType::Vertex, info.name, vi, true, false);
         auto expandedFragOpt = PrependDefines(fragSource, fragDefines);
-        auto fragOpt = CompileGLSL(expandedFragOpt, ShaderStageType::Fragment, info.name, fi, true);
+        auto fragOpt = CompileGLSLShared(expandedFragOpt, ShaderStageType::Fragment, info.name, fi,
+                                         true, false);
         if (!vertOpt.success || !fragOpt.success) {
           // Fallback to unoptimized if optimization fails.
           auto* vp = reinterpret_cast<const uint8_t*>(vertSpirv->data());
