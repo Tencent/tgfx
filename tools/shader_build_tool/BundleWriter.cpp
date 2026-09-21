@@ -115,9 +115,7 @@ static void WriteUniformEntries(std::vector<uint8_t>& blob,
   }
 }
 
-// Serializes stage reflection: [uniformCount:u8][samplerCount:u8][reserved:u8][reserved:u8]
-//                              For each: [nameLen:u8][name:bytes][format:u8][arraySize:u16]
-static std::vector<uint8_t> SerializeStageReflection(const StageReflectionData& reflection) {
+std::vector<uint8_t> SerializeStageReflection(const StageReflectionData& reflection) {
   std::vector<uint8_t> blob;
   blob.push_back(static_cast<uint8_t>(reflection.uniforms.size()));
   blob.push_back(static_cast<uint8_t>(reflection.samplers.size()));
@@ -256,9 +254,8 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
   char tagBuf[32] = {};
   std::strncpy(tagBuf, profileTag.c_str(), sizeof(tagBuf) - 1);
   uint64_t identityHash = BundleIdentityHashInit();
-  identityHash =
-      BundleIdentityHashHeader(identityHash, 4, vertPoolCount, fragPoolCount,
-                               reinterpret_cast<const uint8_t*>(tagBuf));
+  identityHash = BundleIdentityHashHeader(identityHash, 4, vertPoolCount, fragPoolCount,
+                                          reinterpret_cast<const uint8_t*>(tagBuf));
   for (const auto& entry : vertPool) {
     identityHash = BundleIdentityHashEntry(identityHash, entry.hash.hi, entry.hash.lo,
                                            entry.dataOffset, entry.dataSize, entry.reflOffset);
@@ -271,17 +268,17 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
   identityHash = BundleIdentityHashBytes(identityHash, reflPool.data(), reflPool.size());
 
   // Header
-  WriteU32LE(file, 0x54475346);       // magic "TGSF"
-  WriteU16LE(file, 4);                // formatVersion
-  WriteU16LE(file, compressionFlag);  // compressionType
-  WriteU64LE(file, identityHash);     // sourceHash (bundle identity, see above)
-  WriteU32LE(file, kExpectedToolchainABI);  // toolchain ABI (see PrecompiledBundleIdentity.h)
-  WriteU32LE(file, vertPoolCount);    // vertPoolCount
-  WriteU32LE(file, fragPoolCount);    // fragPoolCount
-  WriteU32LE(file, vertPoolOffset);   // vertPoolOffset
-  WriteU32LE(file, fragPoolOffset);   // fragPoolOffset
-  WriteU32LE(file, dataOffset);       // dataOffset
-  WriteU32LE(file, dataSize);         // dataSize (uncompressed)
+  WriteU32LE(file, 0x54475346);              // magic "TGSF"
+  WriteU16LE(file, 4);                       // formatVersion
+  WriteU16LE(file, compressionFlag);         // compressionType
+  WriteU64LE(file, identityHash);            // sourceHash (bundle identity, see above)
+  WriteU32LE(file, kExpectedToolchainABI);   // toolchain ABI (see PrecompiledBundleIdentity.h)
+  WriteU32LE(file, vertPoolCount);           // vertPoolCount
+  WriteU32LE(file, fragPoolCount);           // fragPoolCount
+  WriteU32LE(file, vertPoolOffset);          // vertPoolOffset
+  WriteU32LE(file, fragPoolOffset);          // fragPoolOffset
+  WriteU32LE(file, dataOffset);              // dataOffset
+  WriteU32LE(file, dataSize);                // dataSize (uncompressed)
   WriteU32LE(file, actualReflectionOffset);  // reflectionOffset
   file.write(tagBuf, sizeof(tagBuf));
 

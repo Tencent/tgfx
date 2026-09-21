@@ -58,6 +58,12 @@ ShaderKeyHash ComputeShaderKeyHash(const std::string& shaderName, uint32_t permu
 /// Computes a stable 128-bit content hash without copying the blob.
 ShaderKeyHash ComputeBlobHash(const std::vector<uint8_t>& blob);
 
+/// Serializes stage reflection into the bundle's on-disk reflection format:
+/// [uniformCount:u8][samplerCount:u8][reserved:u8][reserved:u8] followed by the uniform entries
+/// then the sampler entries, each [nameLen:u8][name:bytes][format:u8][arraySize:u16]. Exposed so
+/// audit reporting can reproduce the exact byte-level reflection identity the bundle stores.
+std::vector<uint8_t> SerializeStageReflection(const StageReflectionData& reflection);
+
 /// Writes a v3 shader bundle file with separate vertex and fragment pools.
 /// When compress is true, the data pool is zlib-compressed (compressionType=1 in header).
 bool WriteBundle(const std::string& outPath, const std::string& profileTag,

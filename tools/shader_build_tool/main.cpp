@@ -27,10 +27,12 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include "BundleVerifier.h"
 #include "BundleWriter.h"
 #include "ContractChecks.h"
 #include "ReflectionExtractor.h"
 #include "ShaderCompiler.h"
+#include "StageReport.h"
 #include "gpu/shaders/PermutationRules.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/level1/AtlasTextFillShader.h"
@@ -70,6 +72,8 @@ struct BuildOptions {
   bool reportOnly = false;
   bool compress = false;
   bool audit = false;
+  std::string stageReportPath;
+  std::string verifyBundleDir;
   // Calibration mode for the GLES direct emission: run EmitDirectGLSLES300 on every ES
   // variant and report normalization-diff mismatches against the regenerated text, while the
   // bundle keeps storing the regenerated form. The switch to storing direct text is blocked on
@@ -173,6 +177,9 @@ static void PrintUsage() {
          "(opengl,opengles,vulkan,metal,webgpu)\n"
       << "  --report-only         Only enumerate and report, do not compile\n"
       << "  --audit               Cross-check legacy compile lists against rule-reachable sets\n"
+      << "  --stage-report <path> Write the per-stage audit report (requires a full compile)\n"
+      << "  --verify-bundle <dir> Verify existing bundles in <dir> against the reachable set and\n"
+      << "                        exit; checks headers, identity hash, and pool completeness\n"
       << "  --compress            Compress data pool with zlib in output bundles\n";
 }
 
@@ -205,6 +212,10 @@ static bool ParseArgs(int argc, char** argv, BuildOptions* options) {
       options->reportOnly = true;
     } else if (std::strcmp(argv[i], "--audit") == 0) {
       options->audit = true;
+    } else if (std::strcmp(argv[i], "--stage-report") == 0 && i + 1 < argc) {
+      options->stageReportPath = argv[++i];
+    } else if (std::strcmp(argv[i], "--verify-bundle") == 0 && i + 1 < argc) {
+      options->verifyBundleDir = argv[++i];
     } else if (std::strcmp(argv[i], "--compress") == 0) {
       options->compress = true;
     } else if (std::strcmp(argv[i], "--gles-direct-check") == 0) {
@@ -1218,6 +1229,10 @@ int main(int argc, char** argv) {
     return tgfx::RunAuditMode();
   }
 
+  if (!options.verifyBundleDir.empty()) {
+    return tgfx::VerifyBundles(options.verifyBundleDir);
+  }
+
   tgfx::BuildReport report;
   for (const auto& backend : options.backends) {
     report.profileErrorCounts.emplace(backend, 0);
@@ -1246,6 +1261,13 @@ int main(int argc, char** argv) {
 
   if (!tgfx::WriteReportJson(report, options.outDir)) {
     return 1;
+  }
+
+  // Must run before the variants are moved into the per-backend bundles below.
+  if (!options.stageReportPath.empty() && !report.variants.empty()) {
+    if (!tgfx::WriteStageReport(options.stageReportPath, report.variants)) {
+      return 1;
+    }
   }
 
   // Cross-language contract checks: the clip contract fields and the chain op codes must match
