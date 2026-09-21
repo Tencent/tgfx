@@ -6735,6 +6735,17 @@ TGFX_TEST(AOTRenderConsistencyTest, IncompatibleBundleIsRejectedNotLoaded) {
   }
   // Truncated below the 80-byte header.
   EXPECT_FALSE(cache->loadBundle(bytes.data(), 79));
+  // Duplicate stage key with conflicting content: copy the second vertex pool entry's key (the
+  // first 16 bytes of its 28-byte record) over the first entry's, so two entries share a key but
+  // carry different code blobs. The writer rejects this at build time; a bundle carrying it was
+  // hand-edited or corrupted and must be refused instead of one variant silently winning.
+  {
+    auto broken = bytes;
+    const size_t vertEntry0 = 80;       // header is 80 bytes, vert pool starts right after
+    const size_t vertEntry1 = 80 + 28;  // POOL_ENTRY_SIZE is 28
+    std::memcpy(broken.data() + vertEntry0, broken.data() + vertEntry1, 16);
+    EXPECT_FALSE(cache->loadBundle(broken.data(), broken.size()));
+  }
 
   // None of the rejected loads may leave a half-initialized cache behind: the good bytes still
   // load afterwards, and a final unload restores the pre-test state.

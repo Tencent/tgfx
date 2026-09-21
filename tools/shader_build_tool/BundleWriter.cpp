@@ -21,6 +21,7 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <set>
 #include "gpu/PrecompiledBundleIdentity.h"
 #include "zlib.h"
@@ -110,40 +111,59 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
       return a.lo < b.lo;
     }
   };
-  std::set<ShaderKeyHash, HashKeyLess> vertSeen;
-  std::set<ShaderKeyHash, HashKeyLess> fragSeen;
+  // A repeated stage key is only legal when the content is byte-identical (true deduplication);
+  // two different code or reflection blobs under one key would silently drop one of them — the
+  // first here, the last in the runtime loader — so the collision itself must fail the build.
+  struct SeenEntry {
+    std::vector<uint8_t> code;
+    std::vector<uint8_t> reflection;
+  };
+  std::map<ShaderKeyHash, SeenEntry, HashKeyLess> vertSeen;
+  std::map<ShaderKeyHash, SeenEntry, HashKeyLess> fragSeen;
 
   for (const auto& v : variants) {
     // Vertex entry: key = hash(shaderName + "_Vert", vertPermutationIndex, profileTag)
     auto vertHash =
         ComputeShaderKeyHash(v.shaderName + "_Vert", v.vertPermutationIndex, v.profileTag);
-    if (vertSeen.find(vertHash) == vertSeen.end()) {
-      vertSeen.insert(vertHash);
+    auto vertReflBlob = SerializeStageReflection(v.vertexReflection);
+    auto vertIt = vertSeen.find(vertHash);
+    if (vertIt == vertSeen.end()) {
+      vertSeen.emplace(vertHash, SeenEntry{v.vertexBlob, vertReflBlob});
       PoolEntry entry;
       entry.hash = vertHash;
       entry.dataOffset = static_cast<uint32_t>(dataPool.size());
       entry.dataSize = static_cast<uint32_t>(v.vertexBlob.size());
       dataPool.insert(dataPool.end(), v.vertexBlob.begin(), v.vertexBlob.end());
-      auto reflBlob = SerializeStageReflection(v.vertexReflection);
       entry.reflOffset = static_cast<uint32_t>(reflPool.size());
-      reflPool.insert(reflPool.end(), reflBlob.begin(), reflBlob.end());
+      reflPool.insert(reflPool.end(), vertReflBlob.begin(), vertReflBlob.end());
       vertPool.push_back(entry);
+    } else if (vertIt->second.code != v.vertexBlob || vertIt->second.reflection != vertReflBlob) {
+      std::cerr << "BundleWriter: conflicting content for duplicate vertex key (shader "
+                << v.shaderName << ", vert index " << v.vertPermutationIndex << ", profile "
+                << v.profileTag << "); refusing to silently drop either variant\n";
+      return false;
     }
 
     // Fragment entry: key = hash(shaderName + "_Frag", fragPermutationIndex, profileTag)
     auto fragHash =
         ComputeShaderKeyHash(v.shaderName + "_Frag", v.fragPermutationIndex, v.profileTag);
-    if (fragSeen.find(fragHash) == fragSeen.end()) {
-      fragSeen.insert(fragHash);
+    auto fragReflBlob = SerializeStageReflection(v.fragmentReflection);
+    auto fragIt = fragSeen.find(fragHash);
+    if (fragIt == fragSeen.end()) {
+      fragSeen.emplace(fragHash, SeenEntry{v.fragmentBlob, fragReflBlob});
       PoolEntry entry;
       entry.hash = fragHash;
       entry.dataOffset = static_cast<uint32_t>(dataPool.size());
       entry.dataSize = static_cast<uint32_t>(v.fragmentBlob.size());
       dataPool.insert(dataPool.end(), v.fragmentBlob.begin(), v.fragmentBlob.end());
-      auto reflBlob = SerializeStageReflection(v.fragmentReflection);
       entry.reflOffset = static_cast<uint32_t>(reflPool.size());
-      reflPool.insert(reflPool.end(), reflBlob.begin(), reflBlob.end());
+      reflPool.insert(reflPool.end(), fragReflBlob.begin(), fragReflBlob.end());
       fragPool.push_back(entry);
+    } else if (fragIt->second.code != v.fragmentBlob || fragIt->second.reflection != fragReflBlob) {
+      std::cerr << "BundleWriter: conflicting content for duplicate fragment key (shader "
+                << v.shaderName << ", frag index " << v.fragPermutationIndex << ", profile "
+                << v.profileTag << "); refusing to silently drop either variant\n";
+      return false;
     }
   }
 

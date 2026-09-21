@@ -652,7 +652,35 @@ static bool LoadPool(const uint8_t* fileData, size_t fileSize, size_t poolOffset
     }
 
     PrecompiledShaderCache::HashKey key{hashHi, hashLo};
-    entries[key] = std::move(blob);
+    auto existing = entries.find(key);
+    if (existing != entries.end()) {
+      // A repeated stage key is only legal as byte-identical duplication; the writer rejects
+      // conflicting content at build time, so a real conflict here means the bundle was hand-
+      // edited or corrupted — reject it instead of silently keeping the last one.
+      auto uniformListsEqual = [](const std::vector<Uniform>& a, const std::vector<Uniform>& b) {
+        if (a.size() != b.size()) {
+          return false;
+        }
+        for (size_t u = 0; u < a.size(); ++u) {
+          if (a[u].name() != b[u].name() || a[u].format() != b[u].format() ||
+              a[u].arraySize() != b[u].arraySize()) {
+            return false;
+          }
+        }
+        return true;
+      };
+      if (existing->second.data != blob.data ||
+          !uniformListsEqual(existing->second.uniforms, blob.uniforms) ||
+          !uniformListsEqual(existing->second.samplers, blob.samplers)) {
+        LOGE(
+            "PrecompiledShaderCache: Conflicting content for duplicate pool entry (key "
+            "%016llx%016llx)",
+            static_cast<unsigned long long>(hashHi), static_cast<unsigned long long>(hashLo));
+        return false;
+      }
+    } else {
+      entries[key] = std::move(blob);
+    }
   }
   return true;
 }

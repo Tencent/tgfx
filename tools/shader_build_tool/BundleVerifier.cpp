@@ -227,10 +227,15 @@ BundleCheckResult VerifyOneBundle(const std::string& path, const std::string& ex
               << header.profileTag << "\" does not match the backend\n";
     result.violations++;
   }
-  if (header.vertPoolOffset != HEADER_SIZE ||
-      header.fragPoolOffset != HEADER_SIZE + header.vertPoolCount * POOL_ENTRY_SIZE ||
-      header.dataOffset != header.fragPoolOffset + header.fragPoolCount * POOL_ENTRY_SIZE ||
-      header.reflectionOffset < header.dataOffset || header.reflectionOffset > fileBytes.size()) {
+  // All layout arithmetic runs in size_t: the u32 fields can carry counts whose 28-byte strides
+  // overflow 32 bits (0x40000000 entries wrap to zero), which would otherwise slip past these
+  // checks and read past the end of the file below.
+  auto vertPoolEnd = HEADER_SIZE + static_cast<size_t>(header.vertPoolCount) * POOL_ENTRY_SIZE;
+  auto fragPoolEnd = static_cast<size_t>(header.fragPoolOffset) +
+                     static_cast<size_t>(header.fragPoolCount) * POOL_ENTRY_SIZE;
+  if (header.vertPoolOffset != HEADER_SIZE || header.fragPoolOffset != vertPoolEnd ||
+      header.dataOffset != fragPoolEnd || header.reflectionOffset < header.dataOffset ||
+      header.reflectionOffset > fileBytes.size()) {
     // Bail out before any pool arithmetic below: a bad layout would underflow the stored-bytes
     // subtraction or read out of bounds.
     std::cout << "[verify] " << expectedTag << ": VIOLATION inconsistent pool layout ("
@@ -260,6 +265,14 @@ BundleCheckResult VerifyOneBundle(const std::string& path, const std::string& ex
     auto poolOffset = isVertexPool ? header.vertPoolOffset : header.fragPoolOffset;
     for (uint32_t i = 0; i < count; i++) {
       auto entryOffset = poolOffset + static_cast<size_t>(i) * POOL_ENTRY_SIZE;
+      if (entryOffset + POOL_ENTRY_SIZE > fileBytes.size()) {
+        std::cout << "[verify] " << expectedTag << ": VIOLATION "
+                  << (isVertexPool ? "vert" : "frag") << " pool entry " << i
+                  << " lies outside the file (offset " << entryOffset << ", file "
+                  << fileBytes.size() << " bytes)\n";
+        poolViolations++;
+        continue;
+      }
       PoolEntryOnDisk entry;
       entry.hash.hi = ReadU64(fileBytes, entryOffset);
       entry.hash.lo = ReadU64(fileBytes, entryOffset + 8);
@@ -267,7 +280,12 @@ BundleCheckResult VerifyOneBundle(const std::string& path, const std::string& ex
       entry.dataSize = ReadU32(fileBytes, entryOffset + 20);
       entry.reflOffset = ReadU32(fileBytes, entryOffset + 24);
       auto key = std::make_pair(entry.hash.hi, entry.hash.lo);
-      storedKeys.insert(key);
+      if (!storedKeys.insert(key).second) {
+        std::cout << "[verify] " << expectedTag << ": VIOLATION "
+                  << (isVertexPool ? "vert" : "frag") << " entry " << i << " key "
+                  << FormatKeyHex(key) << " appears more than once in the pool\n";
+        poolViolations++;
+      }
       auto candidate = expected.find(key);
       if (candidate == expected.end()) {
         std::cout << "[verify] " << expectedTag << ": VIOLATION "
@@ -284,14 +302,15 @@ BundleCheckResult VerifyOneBundle(const std::string& path, const std::string& ex
         std::cout << "\n";
         poolViolations++;
       }
-      if (entry.dataOffset + entry.dataSize > dataPool.size()) {
+      if (static_cast<size_t>(entry.dataOffset) + entry.dataSize > dataPool.size()) {
         std::cout << "[verify] " << expectedTag << ": VIOLATION "
                   << (isVertexPool ? "vert" : "frag") << " entry " << i << " data range ["
-                  << entry.dataOffset << ", " << entry.dataOffset + entry.dataSize
+                  << entry.dataOffset << ", "
+                  << static_cast<size_t>(entry.dataOffset) + entry.dataSize
                   << ") exceeds the data pool (" << dataPool.size() << " bytes)\n";
         poolViolations++;
       }
-      if (entry.reflOffset + 4 > reflPoolSize) {
+      if (static_cast<size_t>(entry.reflOffset) + 4 > reflPoolSize) {
         std::cout << "[verify] " << expectedTag << ": VIOLATION "
                   << (isVertexPool ? "vert" : "frag") << " entry " << i << " reflection offset "
                   << entry.reflOffset << " outside the reflection pool\n";
