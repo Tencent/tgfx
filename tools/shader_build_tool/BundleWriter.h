@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include "gpu/ShaderKeyHash.h"
 
 namespace tgfx {
 
@@ -45,18 +46,6 @@ struct VariantData {
   StageReflectionData vertexReflection;
   StageReflectionData fragmentReflection;
 };
-
-struct ShaderKeyHash {
-  uint64_t hi = 0;
-  uint64_t lo = 0;
-};
-
-/// Computes a 128-bit hash for a ShaderKey (shaderName + permutationIndex + profileTag).
-ShaderKeyHash ComputeShaderKeyHash(const std::string& shaderName, uint32_t permutationIndex,
-                                   const std::string& profileTag);
-
-/// Computes a stable 128-bit content hash without copying the blob.
-ShaderKeyHash ComputeBlobHash(const std::vector<uint8_t>& blob);
 
 /// Serializes stage reflection into the bundle's on-disk reflection format:
 /// [uniformCount:u8][samplerCount:u8][reserved:u8][reserved:u8] followed by the uniform entries
