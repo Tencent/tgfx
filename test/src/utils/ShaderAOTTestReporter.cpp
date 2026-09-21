@@ -524,6 +524,8 @@ static nlohmann::json BuildRootCauseProgramKeyAttribution(
     for (const auto& jit : result.jitProgramRecords) {
       jitByKey[jit.programKey]++;
     }
+    // Keys whose JIT creations this test has already attributed; resets per test result.
+    std::set<std::string> attributed;
     for (const auto& fallback : result.fallbackRecords) {
       if (fallback.reason != PrecompiledFallbackReason::NoMatchingRule) {
         continue;
@@ -543,7 +545,11 @@ static nlohmann::json BuildRootCauseProgramKeyAttribution(
       row.effects.insert(fallback.effectSignature);
       row.pipelines.insert(fallback.pipelineSignature);
       auto jit = jitByKey.find(key);
-      if (jit != jitByKey.end()) {
+      if (jit != jitByKey.end() && attributed.insert(key).second) {
+        // Attribute a test's JIT creations for this key exactly once: multiple fallback records
+        // for the same key in one test describe the same miss being retried, so adding the full
+        // JIT count per record would multiply the count (two fallbacks + one creation used to
+        // report two creations).
         row.jitRecords += jit->second;
         row.jitTests.insert(result.testName);
       }
@@ -560,11 +566,10 @@ static nlohmann::json BuildRootCauseProgramKeyAttribution(
       fallbacks += row.fallbacks;
       jitRecords += row.jitRecords;
       if (row.jitRecords > 0) matchedKeys++;
-      auto keyEnd = item.first.find('\n');
-      auto key = item.first.substr(0, keyEnd);
-      auto route = std::stoul(item.first.substr(keyEnd + 1));
-      rows.push_back({{"programKey", key},
-                      {"route", route},
+      // The program key is a plain "size:hex" string (ProgramKeyForDiagnostics); there is no
+      // embedded route field. The former '\n' split never matched and stoul() parsed the size
+      // prefix as a bogus route number.
+      rows.push_back({{"programKey", item.first},
                       {"fallbackOccurrences", row.fallbacks},
                       {"jitCreationEvents", row.jitRecords},
                       {"jitKeyMatched", row.jitRecords > 0},
