@@ -584,8 +584,9 @@ static std::optional<PermutationMatchResult> TryMatchDeviceSpaceTexture(
   if (!composed) {
     return std::nullopt;
   }
-  auto index = DeviceSpaceTextureShader::Dims::domain().encode(composed->fragValues);
-  return PermutationMatchResult{"DeviceSpaceTextureShader", index, index};
+  auto vertIndex = DeviceSpaceTextureShader::VD::domain().encode(composed->vertValues);
+  auto fragIndex = DeviceSpaceTextureShader::FD::domain().encode(composed->fragValues);
+  return PermutationMatchResult{"DeviceSpaceTextureShader", vertIndex, fragIndex};
 }
 
 static int GetGPType(const GeometryProcessor* gp) {

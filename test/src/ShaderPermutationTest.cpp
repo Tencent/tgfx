@@ -505,8 +505,8 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   // GL_EXT_shader_framebuffer_fetch dialect; Metal and Vulkan keep everything.
   const bool keepsFramebufferFetch =
       expectedTag == "metal" || expectedTag == "vulkan" || expectedTag == "opengles";
-  EXPECT_EQ(cache->vertexEntryCount(), keepsFramebufferFetch ? 99u : 97u);
-  EXPECT_EQ(cache->fragmentEntryCount(), keepsFramebufferFetch ? 291u : 195u);
+  EXPECT_EQ(cache->vertexEntryCount(), 95u);
+  EXPECT_EQ(cache->fragmentEntryCount(), keepsFramebufferFetch ? 267u : 179u);
   EXPECT_EQ(cache->profileTag(), expectedTag);
   cache->unload();
 }
@@ -1332,8 +1332,8 @@ TGFX_TEST(ShaderPermutationTest, CompressedBundleLoad) {
     // keeps them in the GL_EXT_shader_framebuffer_fetch dialect, and metal/vulkan keep
     // everything.
     const bool keepsFramebufferFetch = tag == "metal" || tag == "vulkan" || tag == "opengles";
-    EXPECT_EQ(compressedOnly.vertexEntryCount(), keepsFramebufferFetch ? 99u : 97u);
-    EXPECT_EQ(compressedOnly.fragmentEntryCount(), keepsFramebufferFetch ? 291u : 195u);
+    EXPECT_EQ(compressedOnly.vertexEntryCount(), 95u);
+    EXPECT_EQ(compressedOnly.fragmentEntryCount(), keepsFramebufferFetch ? 267u : 179u);
     EXPECT_EQ(compressedOnly.profileTag(), tag);
     return;
   }

@@ -28,10 +28,11 @@ class MeshFillShader : public PrecompiledShader {
   using D = Dims;
 
   struct FragDims {
-    enum : uint32_t { HAS_TEX_COORDS, HAS_COLOR, HAS_COVERAGE, HAS_XP, COUNT };
+    // HAS_TEX_COORDS stays vertex-only: the fragment stage never branches on it (mesh_fill.frag
+    // does not reference the define), so it is not part of the fragment domain.
+    enum : uint32_t { HAS_COLOR, HAS_COVERAGE, HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationBool("HAS_TEX_COORDS"),
           PermutationBool("HAS_COLOR"),
           PermutationBool("HAS_COVERAGE"),
           PermutationInt("HAS_XP", 3),
@@ -39,7 +40,7 @@ class MeshFillShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(D::COUNT == 3 && FD::COUNT == 4,
+  static_assert(D::COUNT == 3 && FD::COUNT == 3,
                 "Update the Compose mapping when dimensions change.");
 
   PrecompiledShaderInfo info() const override {

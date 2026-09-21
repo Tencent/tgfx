@@ -29,10 +29,20 @@ namespace tgfx {
 /// not a compile-time permutation.
 class DeviceSpaceTextureShader : public PrecompiledShader {
  public:
-  struct Dims {
-    // HAS_COVERAGE carries the geometry processor's AA coverage varying: the runtime composites
-    // it into the sampled device-space coverage (texture.r * vCoverage), so it must be a
-    // mirrored vert/frag dimension. HAS_XP rides the same domain.
+  struct VertDims {
+    // HAS_COVERAGE adds the AA coverage attribute/varying pair, so it stays a vertex dimension.
+    // HAS_XP is fragment-only (the vertex stage never branches on it), so the vertex domain
+    // carries coverage alone.
+    enum : uint32_t { HAS_COVERAGE, COUNT };
+    static PermutationDomain domain() {
+      return PermutationDomain({
+          PermutationBool("HAS_COVERAGE"),
+      });
+    }
+  };
+  using VD = VertDims;
+
+  struct FragDims {
     enum : uint32_t { HAS_COVERAGE, HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
@@ -41,14 +51,15 @@ class DeviceSpaceTextureShader : public PrecompiledShader {
       });
     }
   };
-  using FD = Dims;
-  static_assert(FD::COUNT == 2, "Update info() when dimensions change.");
+  using FD = FragDims;
+  static_assert(VD::COUNT == 1 && FD::COUNT == 2,
+                "Update info() and the Compose mapping when dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"DeviceSpaceTextureShader",
             "level1/device_space_texture.vert",
             "level1/device_space_texture.frag",
-            FD::domain(),
+            VD::domain(),
             FD::domain(),
             PermutationDomain({}),
             "",

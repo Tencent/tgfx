@@ -28,18 +28,20 @@ class RoundStrokeRectFillShader : public PrecompiledShader {
   using D = Dims;
 
   struct FragDims {
-    enum : uint32_t { HAS_AA, HAS_COMMON_COLOR, HAS_UV_MATRIX, HAS_XP, COUNT };
+    // HAS_UV_MATRIX stays vertex-only: the fragment stage never branches on it
+    // (round_stroke_rect_fill.frag does not reference the define), so it is not part of the
+    // fragment domain.
+    enum : uint32_t { HAS_AA, HAS_COMMON_COLOR, HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationBool("HAS_AA"),
           PermutationBool("HAS_COMMON_COLOR"),
-          PermutationBool("HAS_UV_MATRIX"),
           PermutationInt("HAS_XP", 3),
       });
     }
   };
   using FD = FragDims;
-  static_assert(D::COUNT == 3 && FD::COUNT == 4,
+  static_assert(D::COUNT == 3 && FD::COUNT == 3,
                 "Update the Compose mapping when dimensions change.");
 
   PrecompiledShaderInfo info() const override {

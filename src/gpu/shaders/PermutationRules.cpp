@@ -63,7 +63,6 @@ std::optional<RuleComposedValues> ComposeRoundStrokeRect(const RoundStrokeRectIn
   values.fragValues.resize(FD::COUNT);
   values.fragValues[FD::HAS_AA] = values.vertValues[D::HAS_AA];
   values.fragValues[FD::HAS_COMMON_COLOR] = values.vertValues[D::HAS_COMMON_COLOR];
-  values.fragValues[FD::HAS_UV_MATRIX] = values.vertValues[D::HAS_UV_MATRIX];
   values.fragValues[FD::HAS_XP] = inputs.xpType;
   return values;
 }
@@ -414,7 +413,6 @@ std::optional<RuleComposedValues> ComposeMeshFill(const MeshFillInputs& inputs) 
   values.vertValues[D::HAS_COLOR] = inputs.hasColors ? 1 : 0;
   values.vertValues[D::HAS_COVERAGE] = inputs.hasCoverage ? 1 : 0;
   values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::HAS_TEX_COORDS] = values.vertValues[D::HAS_TEX_COORDS];
   values.fragValues[FD::HAS_COLOR] = values.vertValues[D::HAS_COLOR];
   values.fragValues[FD::HAS_COVERAGE] = values.vertValues[D::HAS_COVERAGE];
   values.fragValues[FD::HAS_XP] = inputs.xpType;
@@ -550,13 +548,15 @@ std::optional<RuleComposedValues> ComposeDeviceSpaceTexture(
   if (inputs.xpType < 0) {
     return std::nullopt;
   }
-  using FD = DeviceSpaceTextureShader::Dims;
+  using VD = DeviceSpaceTextureShader::VD;
+  using FD = DeviceSpaceTextureShader::FD;
   RuleComposedValues values;
-  values.vertValues.resize(FD::COUNT);
-  values.vertValues[FD::HAS_COVERAGE] = inputs.hasCoverage ? 1 : 0;
+  values.vertValues.resize(VD::COUNT);
+  values.vertValues[VD::HAS_COVERAGE] = inputs.hasCoverage ? 1 : 0;
+  values.fragValues.resize(FD::COUNT);
   // ALPHA_ONLY is a runtime uniform (AlphaOnly), not a permutation dimension.
-  values.vertValues[FD::HAS_XP] = inputs.xpType;
-  values.fragValues = values.vertValues;
+  values.fragValues[FD::HAS_COVERAGE] = values.vertValues[VD::HAS_COVERAGE];
+  values.fragValues[FD::HAS_XP] = inputs.xpType;
   return values;
 }
 
@@ -571,8 +571,9 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateDeviceSpaceTextureReachable() {
       if (!composed) {
         continue;
       }
-      auto index = DeviceSpaceTextureShader::Dims::domain().encode(composed->fragValues);
-      result.insert({index, index});
+      auto vertIndex = DeviceSpaceTextureShader::VD::domain().encode(composed->vertValues);
+      auto fragIndex = DeviceSpaceTextureShader::FD::domain().encode(composed->fragValues);
+      result.insert({vertIndex, fragIndex});
     }
   }
   return result;
