@@ -6613,4 +6613,76 @@ TGFX_TEST(AOTRenderConsistencyTest, DeviceSpaceClipCoverageXPContract) {
   }
 }
 
+// NonAARRectFill textured branch: a NON-AA rounded-rect draw (RectDrawOp/RRectDrawOp with
+// AAType::None produces NonAARRectGeometryProcessor) with an image shader produces the
+// TiledTextureEffect child this family accepts for the single-tap tile modes. The probe walks
+// the same mode combinations as the TiledTextureFillModes test plus a real subset, so any seam
+// or border divergence between this kernel's use of tiled_sample.inc and the runtime shows up
+// byte-for-byte.
+static void RenderNonAARectTiledOnce(bool useBundle, TileMode modeX, TileMode modeY, bool useSubset,
+                                     Bitmap* outBitmap) {
+  constexpr int width = 200;
+  constexpr int height = 200;
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  if (useBundle) {
+    ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+  } else {
+    cache->unload();
+  }
+  ScopedAOTStatsPause statsPause(context, !useBundle);
+  context->globalCache()->clearPrograms();
+  auto surface = Surface::Make(context, width, height);
+  ASSERT_TRUE(surface != nullptr);
+  auto* canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  auto image = MakeImage("resources/apitest/test_timestretch.png");
+  ASSERT_TRUE(image != nullptr);
+  Paint paint = {};
+  paint.setAntiAlias(false);
+  paint.setShader(Shader::MakeImageShader(image, modeX, modeY));
+  if (useSubset) {
+    // A src subset smaller than the texture forces shader-side tiling math instead of the
+    // hardware sampler path.
+    canvas->drawImageRect(image, Rect::MakeXYWH(0, 0, 40, 40), Rect::MakeXYWH(20, 20, 160, 160),
+                          SamplingOptions(FilterMode::Linear), &paint);
+  } else {
+    auto rRect = RRect::MakeRectXY(Rect::MakeXYWH(30, 30, 140, 140), 24, 24);
+    canvas->drawRRect(rRect, paint);
+  }
+  context->flushAndSubmit(true);
+  ASSERT_TRUE(outBitmap->allocPixels(width, height));
+  auto* pixels = outBitmap->lockPixels();
+  ASSERT_TRUE(pixels != nullptr);
+  ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+  outBitmap->unlockPixels();
+  if (useBundle) {
+    cache->unload();
+  }
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, NonAARRectTiledModes) {
+  const std::pair<TileMode, TileMode> combos[] = {
+      {TileMode::Repeat, TileMode::Repeat}, {TileMode::Mirror, TileMode::Mirror},
+      {TileMode::Repeat, TileMode::Mirror}, {TileMode::Mirror, TileMode::Repeat},
+      {TileMode::Repeat, TileMode::Decal},  {TileMode::Decal, TileMode::Repeat},
+      {TileMode::Repeat, TileMode::Clamp},  {TileMode::Decal, TileMode::Mirror},
+  };
+  for (auto& [modeX, modeY] : combos) {
+    for (bool useSubset : {false, true}) {
+      Bitmap aotBitmap = {};
+      Bitmap runtimeBitmap = {};
+      RenderNonAARectTiledOnce(true, modeX, modeY, useSubset, &aotBitmap);
+      RenderNonAARectTiledOnce(false, modeX, modeY, useSubset, &runtimeBitmap);
+      std::string label = "non-aa-rect-tiled ";
+      label +=
+          std::to_string(static_cast<int>(modeX)) + "x" + std::to_string(static_cast<int>(modeY));
+      label += useSubset ? " subset" : " full";
+      ExpectBitmapsIdentical(label.c_str(), aotBitmap, runtimeBitmap, 200, 200);
+    }
+  }
+}
+
 }  // namespace tgfx
