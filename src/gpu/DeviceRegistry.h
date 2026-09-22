@@ -19,7 +19,6 @@
 #pragma once
 
 #include <cstddef>
-#include <cstdint>
 #include <functional>
 
 namespace tgfx {
@@ -31,23 +30,13 @@ namespace tgfx {
 struct DeviceKey {
 #if defined(TGFX_USE_METAL)
   const void* device = nullptr;
-#elif defined(TGFX_USE_VULKAN)
-  const void* instance = nullptr;
-  const void* physicalDevice = nullptr;
-  const void* device = nullptr;
-  const void* queue = nullptr;
-  uint32_t queueFamilyIndex = 0;
-#else  // OpenGL / WebGL
+#else  // OpenGL / WebGL (D3D12 / WebGPU builds also fall here but never register)
   const void* nativeHandle = nullptr;
 #endif
 
   bool operator==(const DeviceKey& other) const {
 #if defined(TGFX_USE_METAL)
     return device == other.device;
-#elif defined(TGFX_USE_VULKAN)
-    return instance == other.instance && physicalDevice == other.physicalDevice &&
-           device == other.device && queue == other.queue &&
-           queueFamilyIndex == other.queueFamilyIndex;
 #else
     return nativeHandle == other.nativeHandle;
 #endif
@@ -58,13 +47,6 @@ struct DeviceKeyHash {
   size_t operator()(const DeviceKey& key) const {
 #if defined(TGFX_USE_METAL)
     return std::hash<const void*>()(key.device);
-#elif defined(TGFX_USE_VULKAN)
-    size_t seed = std::hash<const void*>()(key.instance);
-    seed ^= std::hash<const void*>()(key.physicalDevice) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-    seed ^= std::hash<const void*>()(key.device) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-    seed ^= std::hash<const void*>()(key.queue) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-    seed ^= std::hash<uint32_t>()(key.queueFamilyIndex) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-    return seed;
 #else
     return std::hash<const void*>()(key.nativeHandle);
 #endif

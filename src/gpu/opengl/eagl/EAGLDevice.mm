@@ -50,10 +50,13 @@ void ApplicationDidEnterBackground() {
   // (e.g. by CADisplayLink callbacks during the inactive period) could still slip through and be
   // executed by the GPU after the app is suspended, which would terminate the process.
   appInBackground = true;
+  EAGLDevice::FlushAllDevices();
+}
+
+void EAGLDevice::FlushAllDevices() {
   // GetAllNative() only returns devices whose shared_ptr is still alive; devices parked on the
-  // delay purge list (reference count already zero) are filtered out, matching the previous
-  // weakThis.lock() behavior. This is the only backend compiled on iOS, so all registered
-  // devices are EAGLDevices.
+  // delay purge registry (reference count already zero) are filtered out. This is the only
+  // backend compiled on iOS, so all registered devices are EAGLDevices.
   auto devices = Device::GetAllNative();
   for (auto& device : devices) {
     std::static_pointer_cast<EAGLDevice>(device)->finish();
@@ -91,9 +94,9 @@ void ApplicationWillEnterForeground() {
 void ApplicationDidBecomeActive() {
   // Cold-launch is the only lifecycle path where applicationWillEnterForeground: is not
   // delivered (the system posts didBecomeActive: directly), so this is the canonical fallback
-  // for opening the gate. delayPurgeList is necessarily empty on the cold-launch path because
-  // no EAGLDevice could have been registered, then released, before the process had even
-  // started, so no purge step is needed here.
+  // for opening the gate. The delay purge registry is necessarily empty on the cold-launch
+  // path because no EAGLDevice could have been registered, then released, before the process
+  // had even started, so no purge step is needed here.
   appInBackground = false;
 }
 
