@@ -395,10 +395,6 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       backgroundInputRect.outset(1.0f, 1.0f);
     }
     backgroundInputRect.roundOut();
-    // Layer styles can expand the captured background beyond the content, but the frost blur
-    // should only sample within the content's own bounds.
-    backgroundInputRect.intersect(
-        Rect::MakeWH(contentWidth * frostDownscale, contentHeight * frostDownscale));
     auto availableBackground =
         Rect::MakeXYWH(bgOffset.x, bgOffset.y, static_cast<float>(bgImage->width()),
                        static_cast<float>(bgImage->height()));
@@ -420,22 +416,6 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
   }
 
   if (!usesLocalEvaluation) {
-    // Same content clamp as the local-evaluation window above.
-    auto bgBounds =
-        Rect::MakeWH(static_cast<float>(bgImage->width()), static_cast<float>(bgImage->height()));
-    auto contentRect = Rect::MakeXYWH(-bgOffset.x, -bgOffset.y, contentWidth * scaleRatioX,
-                                      contentHeight * scaleRatioY);
-    if (!contentRect.intersect(bgBounds)) {
-      return;
-    }
-    contentRect.roundOut();
-    if (contentRect != bgBounds) {
-      auto subsetImage = bgImage->makeSubset(contentRect);
-      if (subsetImage != nullptr) {
-        bgImage = std::move(subsetImage);
-        bgOffset += Point{contentRect.left, contentRect.top};
-      }
-    }
     float bgMaxDim = static_cast<float>(std::max(bgImage->width(), bgImage->height()));
     float targetMaxDim =
         std::min(bgMaxDim, std::min(static_cast<float>(maxTextureSize), MaxBackgroundSize));

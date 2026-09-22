@@ -99,18 +99,6 @@ void BackgroundBlurStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, f
     imageRect.roundOut();
   }
 
-  // Layer styles can expand the captured background beyond the content, but the blur should only
-  // sample within the content's own bounds.
-  if (input.content != nullptr) {
-    auto contentRect = Rect::MakeWH(static_cast<float>(input.content->width()),
-                                    static_cast<float>(input.content->height()));
-    contentRect.offset(-bgOffset.x, -bgOffset.y);
-    if (!imageRect.intersect(contentRect)) {
-      return;
-    }
-    imageRect.roundOut();
-  }
-
   auto subsetImage = bgImage->makeSubset(imageRect);
   if (subsetImage == nullptr) {
     subsetImage = bgImage;
