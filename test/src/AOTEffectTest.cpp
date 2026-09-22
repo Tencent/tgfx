@@ -453,6 +453,39 @@ TGFX_TEST(AOTEffectTest, ChainRejectsTwoDifferentShaderTiledLeaves) {
   EXPECT_FALSE(AOTPlanExecutor::CanExecute(graph, plan));
 }
 
+TGFX_TEST(AOTEffectTest, ChainRejectsThirdShaderTiledLeaf) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  auto sampleArea = Rect::MakeXYWH(1, 1, 6, 4);
+  // Three IDENTICAL-recipe tiled leaves (nested two-child blends): the first two ride the shared
+  // tiled block through TiledLeafIndex/TiledLeafIndex2, but the kernel has no third selector —
+  // the capacity boundary is MaxShaderTiledChainLeaves, and both the planner and CanExecute must
+  // enforce it rather than let a third leaf silently fall to the plain Subset-clamp path.
+  auto makeLeaf = [&]() {
+    return MakeTiledTextureProcessor(context, &allocator, TileMode::Decal, TileMode::Clamp,
+                                     PixelFormat::RGBA_8888, SrcRectConstraint::Strict, sampleArea);
+  };
+  auto first = makeLeaf();
+  auto second = makeLeaf();
+  auto third = makeLeaf();
+  ASSERT_NE(first, nullptr);
+  ASSERT_NE(second, nullptr);
+  ASSERT_NE(third, nullptr);
+  auto inner = XfermodeFragmentProcessor::MakeFromTwoProcessors(
+      &allocator, std::move(first), std::move(second), BlendMode::SrcOver);
+  ASSERT_NE(inner, nullptr);
+  auto outer = XfermodeFragmentProcessor::MakeFromTwoProcessors(
+      &allocator, std::move(inner), std::move(third), BlendMode::SrcOver);
+  ASSERT_NE(outer, nullptr);
+
+  AOTEffectGraph graph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower({outer.get()}, &graph));
+  AOTEffectPlan plan;
+  EXPECT_FALSE(AOTEffectDecomposer::Decompose(graph, &plan));
+}
+
 TGFX_TEST(AOTEffectTest, TiledAlphaOnlySnapshotMatchesLowering) {
   ContextScope scope;
   auto context = scope.getContext();

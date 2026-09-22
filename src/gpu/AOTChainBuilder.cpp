@@ -49,12 +49,15 @@ bool AOTChainBuilder::IsChainCompatibleTiledMode(TiledTextureShaderMode mode) {
 
 bool AOTChainBuilder::SameTiledShaderRecipe(const AOTTiledTextureRecipe& a,
                                             const AOTTiledTextureRecipe& b) {
-  // Compares only the fields the chain kernel's single tiled uniform block consumes (the modes,
-  // the subset/clamp rects, the dimensions and the strict flag). CPU-side fields (hardware
-  // sampler, coord matrix) are per-leaf bindings and never ride the shared block.
+  // Compares the fields the chain kernel's single tiled uniform block consumes, INCLUDING
+  // usesShaderDimensions: the uploader only writes TiledDimension when it is set, so two recipes
+  // that differ only in that flag would silently disagree about whether the shared block's
+  // dimension field is meaningful. CPU-side fields (hardware sampler, coord matrix) are per-leaf
+  // bindings and never ride the shared block.
   return a.shaderModeX == b.shaderModeX && a.shaderModeY == b.shaderModeY &&
          a.shaderSubset == b.shaderSubset && a.shaderClamp == b.shaderClamp &&
-         a.shaderDimensions == b.shaderDimensions && a.strict == b.strict;
+         a.shaderDimensions == b.shaderDimensions && a.strict == b.strict &&
+         a.usesShaderDimensions == b.usesShaderDimensions;
 }
 
 namespace {

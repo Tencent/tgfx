@@ -136,11 +136,13 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
   // two registers while a wide DAG may need up to this many.
   static constexpr size_t MaxRegisters = 16;
 
-  // The chain kernel carries exactly one shared tiled-sampling uniform block. Up to two leaves
-  // may ride it when their recipes are identical (the image-filter shape: source and shadow
-  // children sample the same filter domain, selected by TiledLeafIndex/TiledLeafIndex2); a
-  // second leaf with a DIFFERENT recipe is not expressible and stays on the materialized route.
-  static constexpr size_t MaxShaderTiledChainLeaves = 1;
+  // The chain kernel carries exactly one shared tiled-sampling uniform block; at most this many
+  // leaves may ride it, and only when their recipes are identical (the image-filter shape:
+  // source and shadow children sample the same filter domain, selected by
+  // TiledLeafIndex/TiledLeafIndex2). A leaf with a DIFFERENT recipe is not expressible and stays
+  // on the materialized route. This constant is the capacity authority for CanExecute; the
+  // builder enforces the same two-slot limit through its second-index bookkeeping.
+  static constexpr size_t MaxShaderTiledChainLeaves = 2;
 
   // The single authority for the chain kernel's shared parameter-block budgets. The kernel has
   // exactly one chain-wide gradient block and gradient coordinate varying, one color-space

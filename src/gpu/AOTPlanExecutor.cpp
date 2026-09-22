@@ -251,14 +251,15 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
           }
           if (recipe->shaderModeX != TiledTextureShaderMode::None ||
               recipe->shaderModeY != TiledTextureShaderMode::None) {
-            // PointwiseChainShader carries exactly one shared tiled-sampling uniform block, but
-            // two leaves may ride it when their recipes are identical (the image-filter shape:
-            // source and shadow children sample the same filter domain). A second leaf with a
-            // different recipe, or a third one, cannot be represented — reject before planning
-            // execution rather than letting construction fail after CanExecute promised success.
+            // PointwiseChainShader carries exactly one shared tiled-sampling uniform block; up to
+            // MaxShaderTiledChainLeaves leaves may ride it when their recipes are identical (the
+            // image-filter shape: source and shadow children sample the same filter domain). A
+            // leaf with a different recipe beyond the first cannot be represented — reject before
+            // planning execution rather than letting construction fail after CanExecute promised
+            // success.
             if (shaderTiledLeaves == 0) {
               firstShaderTiledRecipe = recipe;
-            } else if (shaderTiledLeaves > 1 ||
+            } else if (shaderTiledLeaves >= AOTPointwiseChainProcessor::MaxShaderTiledChainLeaves ||
                        !AOTChainBuilder::SameTiledShaderRecipe(*firstShaderTiledRecipe, *recipe)) {
               return false;
             }

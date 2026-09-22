@@ -17,12 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Performance matrix:  Five scenario families, each measured cold (first
-// frame after a program-cache wipe) and hot (steady state after warm-up), Release build, on both
-// routes — the precompiled AOT chain and the runtime stitching reference — so every number has a
+// frame after a program-cache wipe) and hot (steady state after warm-up) on both routes — the
+// precompiled AOT chain and the runtime stitching reference — so every number has a
 // like-for-like counterpart. The output is a table of medians over N_ROUNDS rounds; the raw
-// per-round numbers print too. This suite asserts nothing about timing (performance is not a
-// pass/fail gate here) — it only asserts routing correctness (the AOT runs really ride the
-// precompiled kernels) so the timings measure the intended path.
+// per-round numbers print too. The suite first asserts routing correctness (the AOT runs really
+// ride the precompiled kernels) so the timings measure the intended path, then applies the
+// calibrated ratio gates in AssertPerformanceGates (see its comment for scope and limits —
+// the budgets bound further degradation; they do not approve the current absolute cost).
 //
 // Scenarios (plan P7):
 //   1. Short chains of 1-5 operators, steady state: the interpreter + full-slot onSetData upload
@@ -83,6 +84,9 @@ struct TimingResult {
   double hotP95Ms = 0.0;
   uint32_t aotDraws = 0;
   uint32_t runtimePrograms = 0;
+  // False when the measurement itself failed (bundle load or surface creation): a failed
+  // measurement must fail the gate, never pass it with zero timings.
+  bool measurementValid = false;
 };
 
 double Median(std::vector<double>& values) {
@@ -108,22 +112,36 @@ double Percentile(std::vector<double> values, double percentile) {
 // Hot = median/p95 over kRounds batches of kBatchFrames frames each (a batch shares one
 // surface so per-frame surface setup stays out of the measurement). `size` parameterizes the
 // surface so the fill-rate axis (128 vs 512) is covered by the representative chain scenario.
-// P9 ratio gates (machine-relative, so they hold across CI hosts). Calibrated 2026-09-22 on
-// Apple M4 Pro, 10 full-matrix runs per backend; medians and maxima recorded in the manifest:
+// P9 ratio gates. Calibrated 2026-09-22, Apple M4 Pro, Debug build, 10 full-matrix runs per
+// backend (medians/maxima in the manifest) — the budgets are set above the observed maxima so
+// the gate catches FURTHER degradation; they are not an approval of the current absolute cost,
+// and they are not validated on other machines or build types (re-calibrate before relying on
+// them elsewhere):
 //   Metal cold aot/runtime: med 0.03-0.06, max 0.08 → budget 0.15. The bundle carries real
-//     metallib binaries, so creating a pipeline from them must stay vastly cheaper than
-//     compiling the JIT tree's MSL; this gate protects the AOT route's core value.
+//     metallib binaries, so pipeline creation from them stays far cheaper than compiling the
+//     JIT tree's MSL; this protects the AOT route's main cold-start advantage.
 //   GL cold aot/runtime:    med 5.7-12.6, max 14.6  → budget 20. The GL bundle stores SOURCE,
 //     so first use compiles the (large) chain kernel while the JIT route compiles a small
-//     specialized tree — structurally slower, accepted; the gate only guards against further
-//     cold regressions (bundle/reflection bloat, slower program assembly).
-//   Both hot aot/runtime:   med 1.5-2.7,  max 3.63  → budget 4.0. The chain kernel is a
-//     uniform-driven interpreter over up-to-16 slots vs the JIT's specialized tree; that
-//     interpreter tax is the design's accepted steady-state cost — the gate catches it growing
-//     (slot-loop bloat, uniform-array expansion, more forced materialization).
+//     specialized tree; currently slower on this axis — the budget only bounds further cold
+//     regressions (bundle/reflection bloat, slower program assembly).
+//   Both hot aot/runtime:   med 1.5-2.7,  max 3.63  → budget 4.0. The chain kernel interprets a
+//     uniform-driven slot program while the JIT route runs a specialized tree; the measured
+//     steady-state ratio lands here. The budget bounds growth of that gap — it does not assert
+//     the current gap is acceptable.
+// A failed or empty measurement fails the gate instead of silently passing with zero ratios.
 void AssertPerformanceGates(Context* context, const std::string& label, const TimingResult& aot,
                             const TimingResult& runtime) {
-  if (runtime.coldMedianMs <= 0.0 || runtime.hotMedianMs <= 0.0) {
+  EXPECT_TRUE(aot.measurementValid) << label << " aot measurement failed (bundle/surface)";
+  EXPECT_TRUE(runtime.measurementValid) << label << " runtime measurement failed (surface)";
+  if (!aot.measurementValid || !runtime.measurementValid) {
+    return;
+  }
+  EXPECT_GT(aot.coldMedianMs, 0.0) << label << " aot cold timing is zero";
+  EXPECT_GT(aot.hotMedianMs, 0.0) << label << " aot hot timing is zero";
+  EXPECT_GT(runtime.coldMedianMs, 0.0) << label << " runtime cold timing is zero";
+  EXPECT_GT(runtime.hotMedianMs, 0.0) << label << " runtime hot timing is zero";
+  if (runtime.coldMedianMs <= 0.0 || runtime.hotMedianMs <= 0.0 || aot.coldMedianMs <= 0.0 ||
+      aot.hotMedianMs <= 0.0) {
     return;
   }
   const double coldBudget = context->backend() == Backend::Metal ? 0.15 : 20.0;
@@ -197,6 +215,7 @@ TimingResult MeasureRoute(Context* context, PrecompiledShaderCache* cache, bool 
   }
   result.hotP95Ms = Percentile(samples, 0.95);
   result.hotSamples = std::move(samples);
+  result.measurementValid = true;
   return result;
 }
 
@@ -377,6 +396,7 @@ TGFX_TEST(AOTPerformanceMatrixTest, DualGradientMaterialization) {
   // Route-order symmetry (audit rule): a discarded runtime pass first (see ShortChainSteadyState).
   MeasureRoute(context, cache, false, scene);
   auto aot = MeasureRoute(context, cache, true, scene);
+  EXPECT_GE(aot.aotDraws, 1u);
   auto runtime = MeasureRoute(context, cache, false, scene);
   AssertPerformanceGates(context, "dual-gradient-blend", aot, runtime);
   PrintResult("dual-gradient-blend", "aot", aot);

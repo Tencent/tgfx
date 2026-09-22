@@ -740,14 +740,15 @@ static std::string ResolveIncludes(const std::string& source, const std::string&
   return result;
 }
 
-// Process-wide reuse of the common GLSL-to-SPIR-V compilation and reflection extraction across
-// the per-backend build passes. CompileOneShader runs once per (shader, backend), but the common
-// unoptimized SPIR-V and the reflection depend only on (shaderName, permutationIndex, stage,
-// optimize, openGLEnv) — the sources cannot change mid-run — so with N backends the cache turns
-// N identical compilations into one. Backend-specific conversions (MSL/metallib, WGSL, direct
-// GL emission) each already run in exactly one backend pass and are not cached. The cache key
-// must never reuse a permutation index across different inputs: it always carries the shader
-// name, mirroring the rule that a permutation index is only meaningful within its family.
+// Process-wide reuse of GLSL-to-SPIR-V compilation and reflection extraction results. The common
+// compile loop runs before the per-backend emission passes, so what the cache actually saves is
+// the repeats WITHIN that loop: multiple frag variants sharing one vert permutation, revisit
+// patterns in later passes, and the optimized re-compiles. (The earlier claim that it collapses
+// N per-backend compilations into one was wrong: the common compiles already run once, outside
+// the backend loop.) Backend-specific conversions (MSL/metallib, WGSL, direct GL emission) each
+// run in exactly one backend pass and are not cached. The cache key must never reuse a
+// permutation index across different inputs: it always carries the shader name, mirroring the
+// rule that a permutation index is only meaningful within its family.
 struct SpirvCacheEntry {
   bool success = false;
   std::vector<uint32_t> spirv;

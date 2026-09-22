@@ -402,6 +402,7 @@ TGFX_TEST(GLRenderTest, InvalidShaderReturnsNull) {
 TGFX_TEST(GLRenderTest, EmbeddedAOTCreatesPipeline) {
   ContextScope scope;
   auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
   auto cache = context->precompiledShaderCache();
   cache->unload();

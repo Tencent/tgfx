@@ -6733,6 +6733,18 @@ TGFX_TEST(AOTRenderConsistencyTest, IncompatibleBundleIsRejectedNotLoaded) {
     broken[19] = 0xDE;
     EXPECT_FALSE(cache->loadBundle(broken.data(), broken.size()));
   }
+  // The immediately preceding ABI value must also be refused — not just garbage values. The
+  // 0x00010004 bundles predate TiledLeafIndex2, so accepting one would silently downgrade the
+  // second tiled leaf to the plain Subset-clamp path; an off-by-one-version acceptance bug here
+  // would only show up as wrong pixels, never as a load error.
+  {
+    auto broken = bytes;
+    broken[16] = 0x04;
+    broken[17] = 0x00;
+    broken[18] = 0x01;
+    broken[19] = 0x00;
+    EXPECT_FALSE(cache->loadBundle(broken.data(), broken.size()));
+  }
   // Truncated below the 80-byte header.
   EXPECT_FALSE(cache->loadBundle(bytes.data(), 79));
   // Duplicate stage key with conflicting content: copy the second vertex pool entry's key (the

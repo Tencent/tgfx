@@ -154,8 +154,10 @@ TGFX_TEST(AOTRenderConsistencyTest, ScaledPictureImageAotJitDiff) {
       100.0 * static_cast<double>(diffCount) / (static_cast<double>(width) * height), minX, minY,
       maxX, maxY, maxDelta, channelHits[0], channelHits[1], channelHits[2], channelHits[3]);
   // Diagnostic oracle: both paths must render the same non-empty content; the diff statistics
-  // above classify the known residual divergence for tracking.
+  // above classify any divergence for tracking. After the shared-recipe tiled-block fix this
+  // scene is exactly identical, so gate it: a regression fails the test instead of only printing.
   EXPECT_TRUE(nonzeroAot > 0);
+  EXPECT_EQ(diffCount, 0u);
 }
 
 TGFX_TEST(AOTRenderConsistencyTest, SinglePassBlurAotJitDiff) {
@@ -257,7 +259,7 @@ TGFX_TEST(AOTRenderConsistencyTest, SinglePassBlurAotJitDiff) {
         continue;
       }
       ++diffCount;
-      if (diffCount <= 6) {
+      if (diffCount <= 40) {
         size_t ax = (a >> 24) & 0xFF;
         size_t bx = (b >> 24) & 0xFF;
         printf("[SingleBlurDiff] pixel(%d,%d): aot=%08x jit=%08x (a-delta=%d)\n", x, y, a, b,
@@ -280,6 +282,10 @@ TGFX_TEST(AOTRenderConsistencyTest, SinglePassBlurAotJitDiff) {
   printf("[SingleBlurDiff] diffPixels=%zu/%d maxDelta=%zu channels(r,g,b,a)=(%zu,%zu,%zu,%zu)\n",
          diffCount, kSize * kSize, maxDelta, channelHits[0], channelHits[1], channelHits[2],
          channelHits[3]);
+  // Gate, not just a diagnostic: after the shared-recipe tiled-block fix, this scene must be
+  // AOT/JIT identical. If it regresses (a second tiled leaf routed back to the plain path, a new
+  // materialization), this fails instead of only printing.
+  EXPECT_EQ(diffCount, 0u);
 }
 
 }  // namespace tgfx

@@ -60,24 +60,42 @@ size_t ValidateClipContractFields(const std::vector<VariantData>& variants) {
 // Parses every "#define OP_<NAME> <decimal>" line of an include into a name->value map. The value
 // must be a bare decimal integer: stoi alone accepts prefixes like "0 + 1", which would silently
 // pass a malformed define. Unparseable or non-standalone values are reported as errors.
+// Line comments are stripped first: a "// #define OP_X ..." mention in a comment otherwise
+// matches the scan and its value would overwrite the real define's (the parser keeps the LAST
+// occurrence), so a comment could mask a genuine opcode mismatch.
 static std::map<std::string, int> ParseOpDefines(const std::string& source, const char* fileName,
                                                  size_t* errors) {
   std::map<std::string, int> defines;
+  std::string stripped;
+  stripped.reserve(source.size());
+  size_t scan = 0;
+  while (scan < source.size()) {
+    auto lineEnd = source.find('\n', scan);
+    auto line =
+        source.substr(scan, (lineEnd == std::string::npos ? source.size() : lineEnd) - scan);
+    auto comment = line.find("//");
+    if (comment != std::string::npos) {
+      line = line.substr(0, comment);
+    }
+    stripped += line;
+    stripped += '\n';
+    scan = lineEnd == std::string::npos ? source.size() : lineEnd + 1;
+  }
   size_t scanPosition = 0;
   while (true) {
-    auto defineStart = source.find("#define OP_", scanPosition);
+    auto defineStart = stripped.find("#define OP_", scanPosition);
     if (defineStart == std::string::npos) {
       break;
     }
     auto nameStart = defineStart + 8;  // past "#define "
-    auto nameEnd = source.find(' ', nameStart);
+    auto nameEnd = stripped.find(' ', nameStart);
     if (nameEnd == std::string::npos) {
       break;
     }
-    auto defineName = source.substr(nameStart, nameEnd - nameStart);
-    auto valueStart = source.find_first_not_of(" \t", nameEnd);
-    auto valueEnd = source.find('\n', valueStart);
-    auto valueText = source.substr(valueStart, valueEnd - valueStart);
+    auto defineName = stripped.substr(nameStart, nameEnd - nameStart);
+    auto valueStart = stripped.find_first_not_of(" \t", nameEnd);
+    auto valueEnd = stripped.find('\n', valueStart);
+    auto valueText = stripped.substr(valueStart, valueEnd - valueStart);
     while (!valueText.empty() &&
            (valueText.back() == ' ' || valueText.back() == '\t' || valueText.back() == '\r')) {
       valueText.pop_back();
@@ -180,6 +198,16 @@ size_t ValidateReflectionContracts(const std::vector<VariantData>& variants) {
   for (const auto& variant : variants) {
     const StageReflectionData* stages[] = {&variant.vertexReflection, &variant.fragmentReflection};
     for (const auto* reflection : stages) {
+      // The bundle writer serializes name lengths and per-stage entry counts as uint8
+      // (BundleWriter's WriteU8 sites): values over 255 would wrap silently (a 256-byte name is
+      // written with length 0), so reject them here at build time instead.
+      if (reflection->uniforms.size() > 255 || reflection->samplers.size() > 255) {
+        std::cerr << "[ContractCheck] " << variant.shaderName
+                  << " reflection exceeds the 255-entry serialization limit (uniforms="
+                  << reflection->uniforms.size() << ", samplers=" << reflection->samplers.size()
+                  << ")\n";
+        ++errors;
+      }
       std::map<std::string, int> seenNames;
       for (const auto* list : {&reflection->uniforms, &reflection->samplers}) {
         bool isSamplerList = list == &reflection->samplers;
@@ -187,6 +215,12 @@ size_t ValidateReflectionContracts(const std::vector<VariantData>& variants) {
           if (entry.name.find('\0') != std::string::npos) {
             std::cerr << "[ContractCheck] " << variant.shaderName
                       << " reflection carries an embedded NUL in a name\n";
+            ++errors;
+            continue;
+          }
+          if (entry.name.size() > 255) {
+            std::cerr << "[ContractCheck] " << variant.shaderName << " entry '" << entry.name
+                      << "' exceeds the 255-byte name serialization limit\n";
             ++errors;
             continue;
           }

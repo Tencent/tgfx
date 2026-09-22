@@ -40,8 +40,14 @@ namespace tgfx {
  * those contracts change in a way that keeps shader names and pool indices stable but changes
  * what the bytes mean; the writer picks the new value up automatically and the loader then
  * refuses every older bundle instead of feeding mismatched layouts to the GPU.
+ *
+ * 0x00010005: the chain kernel's FragmentUniformBlock gained TiledLeafIndex2 (two shader-tiled
+ * leaves sharing one recipe block). Bundles from before that change describe a uniform layout
+ * without the second selector; a new runtime fed such a bundle would silently leave the second
+ * tiled leaf on the plain Subset-clamp path (a semantic downgrade, not a crash), so they are
+ * refused instead.
  */
-inline constexpr uint32_t kExpectedToolchainABI = 0x00010004u;
+inline constexpr uint32_t kExpectedToolchainABI = 0x00010005u;
 
 inline uint64_t BundleIdentityHashInit() {
   return 0x54475346424E4443ULL;  // "TGSF BNDC"
