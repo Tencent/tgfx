@@ -98,14 +98,32 @@ class AARectsVertexProvider : public RectsVertexProvider {
         uintColor = ToUintPMColor(record->color, steps.get());
       }
 
-      auto scale = sqrtf(viewMatrix.getScaleX() * viewMatrix.getScaleX() +
-                         viewMatrix.getSkewY() * viewMatrix.getSkewY());
+      auto scaleX = sqrtf(viewMatrix.getScaleX() * viewMatrix.getScaleX() +
+                          viewMatrix.getSkewY() * viewMatrix.getSkewY());
+      auto scaleY = sqrtf(viewMatrix.getSkewX() * viewMatrix.getSkewX() +
+                          viewMatrix.getScaleY() * viewMatrix.getScaleY());
       // we want the new edge to be .5px away from the old line.
-      auto padding = 0.5f / scale;
-      auto insetBounds = rect.makeInset(padding, padding);
+      auto padding = 0.5f / scaleX;
+      // A rect thinner than 1 device pixel cannot be inset by the full padding without flipping
+      // its edges, which overlaps the coverage-1 quad with the AA ring and blends coverage twice,
+      // so identical rects render up to 2.3x brighter than the paint alpha and at visibly
+      // different brightness depending on their subpixel phase. Collapse such an axis to the
+      // rect center instead and modulate the inner coverage by the device-pixel extent, so the
+      // rendered ink never exceeds the paint alpha. Each axis is measured against its own device
+      // scale, so non-uniform matrices do not misclassify an axis that is wide enough in device
+      // pixels as sub-pixel.
+      auto subpixelX = rect.width() * scaleX < 1.0f;
+      auto subpixelY = rect.height() * scaleY < 1.0f;
+      auto insetX = subpixelX ? rect.width() * 0.5f : padding;
+      auto insetY = subpixelY ? rect.height() * 0.5f : padding;
+      auto insetBounds = rect.makeInset(insetX, insetY);
       auto insetQuad = Quad::MakeFrom(insetBounds, &viewMatrix);
       auto outsetBounds = rect.makeOutset(padding, padding);
       auto outsetQuad = Quad::MakeFrom(outsetBounds, &viewMatrix);
+      auto innerCoverage = 1.0f;
+      if (subpixelX || subpixelY) {
+        innerCoverage = std::min(1.0f, std::min(rect.width() * scaleX, rect.height() * scaleY));
+      }
       auto insetUV = insetBounds;
       auto outsetUV = outsetBounds;
       auto subset = rect;
@@ -126,7 +144,7 @@ class AARectsVertexProvider : public RectsVertexProvider {
       for (int j = 0; j < 2; ++j) {
         auto& quad = j == 0 ? insetQuad : outsetQuad;
         auto& uvQuad = j == 0 ? uvInsetQuad : uvOutsetQuad;
-        auto coverage = j == 0 ? 1.0f : 0.0f;
+        auto coverage = j == 0 ? innerCoverage : 0.0f;
         for (size_t k = 0; k < 4; ++k) {
           vertices[index++] = quad.point(k).x;
           vertices[index++] = quad.point(k).y;
