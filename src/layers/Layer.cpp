@@ -947,7 +947,7 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   // skip (same as contour / 3D subtrees). A null snapshot map signals the picture-canvas path,
   // which makes the consumer synthesize backdrops on the fly via PictureRecorder.
   AutoCanvasRestore autoRestore(canvas);
-  BackgroundConsumer consumer(snapshotsPtr);
+  BackgroundConsumer consumer(snapshotsPtr, false);
   BackgroundHandler* handler =
       needBackground ? static_cast<BackgroundHandler*>(&consumer) : BackgroundHandler::NoOp();
   DrawArgs drawArgs = args;
