@@ -3,7 +3,7 @@
         "BackgroundBlur3DLayer_DirectDraw": "0598172b",
         "BackgroundBlur3DLayer_Flat": "351c4df9",
         "BackgroundBlur3DLayer_Nested3D": "351c4df9",
-        "BackgroundBlur3DLayer_NestedOffscreen": "71a8bad6",
+        "BackgroundBlur3DLayer_NestedOffscreen": "0598172b",
         "BackgroundBlur3DLayer_Preserve3D": "0598172b",
         "BackgroundBlur3DLayer_Preserve3DFallback": "351c4df9",
         "BackgroundBlurStyleTest1": "0598172b",
@@ -28,7 +28,7 @@
         "SharedStyleOutput": "7df2647bb",
         "SharedStyleOutput3D": "7df2647bb",
         "SimpleBackgroundBlur_tiled": "351c4df9",
-        "backgroundLayerBlur": "71a8bad6"
+        "backgroundLayerBlur": "351c4df9"
     },
     "CanvasTest": {
         "AARRectOp": "f377f9d5d",
@@ -279,9 +279,9 @@
     },
     "LayerTest": {
         "AdaptiveDashEffect": "eefb7a46",
-        "BackgroundBlurAlignment": "71a8bad6",
-        "BackgroundBlurWithFilter_Partial": "71a8bad6",
-        "BackgroundBlurWithFilter_Tiled": "71a8bad6",
+        "BackgroundBlurAlignment": "443d915b3",
+        "BackgroundBlurWithFilter_Partial": "351c4df9",
+        "BackgroundBlurWithFilter_Tiled": "351c4df9",
         "BackgroundColor_Draw": "f0f48dd2",
         "BackgroundColor_Render": "f0f48dd2",
         "BottomLeftSurface": "bd0c09cff",
