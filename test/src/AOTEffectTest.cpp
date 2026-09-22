@@ -384,20 +384,51 @@ TGFX_TEST(AOTEffectTest, TiledShaderModesAndStrictSubsetMatchLowering) {
   }
 }
 
-TGFX_TEST(AOTEffectTest, ChainRejectsTwoShaderTiledLeaves) {
+TGFX_TEST(AOTEffectTest, ChainSharesTiledBlockBetweenIdenticalLeaves) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
   BlockAllocator allocator;
   auto sampleArea = Rect::MakeXYWH(1, 1, 6, 4);
-  // Decal over a strict subset resolves to ClampToBorderLinear on Metal: both leaves are
-  // individually chain-compatible, but PointwiseChainShader has only one shared tiled-uniform
-  // block. CanExecute must therefore agree with BuildChainFP and reject the pair.
+  // Decal over a strict subset resolves to ClampToBorderLinear: both leaves are individually
+  // chain-compatible AND their recipes are identical (the image-filter shape — source and shadow
+  // children sample the same filter domain), so the pair rides the single shared tiled-uniform
+  // block through TiledLeafIndex/TiledLeafIndex2 instead of falling back to materialization.
   auto src =
       MakeTiledTextureProcessor(context, &allocator, TileMode::Decal, TileMode::Clamp,
                                 PixelFormat::RGBA_8888, SrcRectConstraint::Strict, sampleArea);
   auto dst =
       MakeTiledTextureProcessor(context, &allocator, TileMode::Decal, TileMode::Clamp,
+                                PixelFormat::RGBA_8888, SrcRectConstraint::Strict, sampleArea);
+  ASSERT_NE(src, nullptr);
+  ASSERT_NE(dst, nullptr);
+  auto blend = XfermodeFragmentProcessor::MakeFromTwoProcessors(&allocator, std::move(src),
+                                                                std::move(dst), BlendMode::SrcOver);
+  ASSERT_NE(blend, nullptr);
+
+  AOTEffectGraph graph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower({blend.get()}, &graph));
+  AOTEffectPlan plan;
+  EXPECT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
+  // Decompose already ran CanExecute on the single fused pass it built; assert it directly so the
+  // shared-recipe admission stays pinned independently of the planner's internal call.
+  EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
+}
+
+TGFX_TEST(AOTEffectTest, ChainRejectsTwoDifferentShaderTiledLeaves) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  auto sampleArea = Rect::MakeXYWH(1, 1, 6, 4);
+  // Both leaves are individually chain-compatible, but their recipes differ (Decal vs Repeat on
+  // the X axis), and PointwiseChainShader carries only one shared tiled-uniform block. CanExecute
+  // must therefore agree with BuildChainFP and reject the pair.
+  auto src =
+      MakeTiledTextureProcessor(context, &allocator, TileMode::Decal, TileMode::Clamp,
+                                PixelFormat::RGBA_8888, SrcRectConstraint::Strict, sampleArea);
+  auto dst =
+      MakeTiledTextureProcessor(context, &allocator, TileMode::Repeat, TileMode::Clamp,
                                 PixelFormat::RGBA_8888, SrcRectConstraint::Strict, sampleArea);
   ASSERT_NE(src, nullptr);
   ASSERT_NE(dst, nullptr);

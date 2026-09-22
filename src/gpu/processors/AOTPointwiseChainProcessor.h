@@ -136,8 +136,10 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
   // two registers while a wide DAG may need up to this many.
   static constexpr size_t MaxRegisters = 16;
 
-  // The chain kernel carries exactly one shared tiled-sampling uniform block, so at most one
-  // shader-tiled leaf is expressible per chain.
+  // The chain kernel carries exactly one shared tiled-sampling uniform block. Up to two leaves
+  // may ride it when their recipes are identical (the image-filter shape: source and shadow
+  // children sample the same filter domain, selected by TiledLeafIndex/TiledLeafIndex2); a
+  // second leaf with a DIFFERENT recipe is not expressible and stays on the materialized route.
   static constexpr size_t MaxShaderTiledChainLeaves = 1;
 
   // The single authority for the chain kernel's shared parameter-block budgets. The kernel has
@@ -165,7 +167,7 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
       PlacementPtr<FragmentProcessor> maskChild = nullptr, int coverageRootSlot = -1,
       uint32_t coordSourceMask = ~0u, PlacementPtr<FragmentProcessor> lutChild = nullptr,
       int lutLeafIndex = -1, std::vector<PlacementPtr<FragmentProcessor>> samplerPadding = {},
-      bool maskChildIsPhantom = false, int clipCoverageRegister = -1);
+      bool maskChildIsPhantom = false, int clipCoverageRegister = -1, int tiledLeafIndex2 = -1);
 
   AOTPointwiseChainProcessor(std::vector<PlacementPtr<FragmentProcessor>> textureLeaves,
                              const std::vector<AOTChainSlot>& slots, size_t rootSlot,
@@ -174,7 +176,8 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
                              uint32_t coordSourceMask, PlacementPtr<FragmentProcessor> lutChild,
                              int lutLeafIndex,
                              std::vector<PlacementPtr<FragmentProcessor>> samplerPadding,
-                             bool maskChildIsPhantom, int clipCoverageRegister);
+                             bool maskChildIsPhantom, int clipCoverageRegister,
+                             int tiledLeafIndex2);
 
   std::string name() const override {
     return "AOTPointwiseChainProcessor";
@@ -249,6 +252,9 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
   size_t _slotCount = 0;
   size_t rootSlot = 0;
   int tiledLeafIndex = -1;
+  // Second leaf sharing the tiled recipe (image-filter shape: source and shadow children sample
+  // the same filter domain, so their recipes are identical); -1 when absent.
+  int tiledLeafIndex2 = -1;
   AOTTiledTextureRecipe _tiledRecipe = {};
   std::array<AOTChainSlot, MaxSlots> slots = {};
   // Kept only to mark the mask's presence; the mask itself is the last registered child.

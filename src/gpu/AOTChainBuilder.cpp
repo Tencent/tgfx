@@ -47,6 +47,16 @@ bool AOTChainBuilder::IsChainCompatibleTiledMode(TiledTextureShaderMode mode) {
          mode == TiledTextureShaderMode::ClampToBorderLinear;
 }
 
+bool AOTChainBuilder::SameTiledShaderRecipe(const AOTTiledTextureRecipe& a,
+                                            const AOTTiledTextureRecipe& b) {
+  // Compares only the fields the chain kernel's single tiled uniform block consumes (the modes,
+  // the subset/clamp rects, the dimensions and the strict flag). CPU-side fields (hardware
+  // sampler, coord matrix) are per-leaf bindings and never ride the shared block.
+  return a.shaderModeX == b.shaderModeX && a.shaderModeY == b.shaderModeY &&
+         a.shaderSubset == b.shaderSubset && a.shaderClamp == b.shaderClamp &&
+         a.shaderDimensions == b.shaderDimensions && a.strict == b.strict;
+}
+
 namespace {
 
 static PlacementPtr<FragmentProcessor> BuildFPForNode(BlockAllocator* allocator,
@@ -456,6 +466,7 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
   std::vector<PlacementPtr<FragmentProcessor>> leaves = {};
   leaves.reserve(leafCount);
   int tiledLeafIndex = -1;
+  int tiledLeafIndex2 = -1;
   AOTTiledTextureRecipe tiledRecipe = {};
   bool hasRectCoverage = false;
   bool hasLocalRectCoverage = false;
@@ -563,12 +574,20 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
             parameters->tiledRecipe.has_value() &&
             (parameters->tiledRecipe->shaderModeX != TiledTextureShaderMode::None ||
              parameters->tiledRecipe->shaderModeY != TiledTextureShaderMode::None)) {
-          // At most one shader-tiled leaf per chain; a second one cannot be represented.
-          if (tiledLeafIndex >= 0) {
+          // The kernel carries one shared tiled-sampling uniform block, selected by
+          // TiledLeafIndex/TiledLeafIndex2. A second shader-tiled leaf with the IDENTICAL recipe
+          // (the image-filter shape: source and shadow children sample the same filter domain)
+          // shares the block through the second index; a second leaf with a different recipe
+          // still cannot be represented.
+          if (tiledLeafIndex < 0) {
+            tiledLeafIndex = static_cast<int>(leaves.size());
+            tiledRecipe = *parameters->tiledRecipe;
+          } else if (tiledLeafIndex2 < 0 && AOTChainBuilder::SameTiledShaderRecipe(
+                                                tiledRecipe, *parameters->tiledRecipe)) {
+            tiledLeafIndex2 = static_cast<int>(leaves.size());
+          } else {
             return nullptr;
           }
-          tiledLeafIndex = static_cast<int>(leaves.size());
-          tiledRecipe = *parameters->tiledRecipe;
         }
         leaves.push_back(std::move(leaf));
         break;
@@ -1000,7 +1019,7 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
   return AOTPointwiseChainProcessor::Make(
       allocator, std::move(leaves), slots, rootIndex, tiledLeafIndex, recipePtr,
       std::move(maskChild), coverageRootSlot, coordSourceMask, std::move(lutChild), lutLeafIndex,
-      std::move(samplerPadding), maskChildIsPhantom, clipCoverageRegister);
+      std::move(samplerPadding), maskChildIsPhantom, clipCoverageRegister, tiledLeafIndex2);
 }
 
 }  // namespace

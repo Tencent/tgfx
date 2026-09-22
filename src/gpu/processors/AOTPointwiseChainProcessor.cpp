@@ -168,7 +168,7 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
     const AOTTiledTextureRecipe* tiledRecipe, PlacementPtr<FragmentProcessor> maskChild,
     int coverageRootSlot, uint32_t coordSourceMask, PlacementPtr<FragmentProcessor> lutChild,
     int lutLeafIndex, std::vector<PlacementPtr<FragmentProcessor>> samplerPadding,
-    bool maskChildIsPhantom, int clipCoverageRegister) {
+    bool maskChildIsPhantom, int clipCoverageRegister, int tiledLeafIndex2) {
   if (allocator == nullptr || slots.empty() || slots.size() > MaxSlots) {
     return nullptr;
   }
@@ -273,6 +273,13 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
       (static_cast<size_t>(tiledLeafIndex) >= leafCount || tiledRecipe == nullptr)) {
     return nullptr;
   }
+  // The second tiled leaf shares the first's recipe through the same uniform block, so it requires
+  // the same recipe pointer and must also name a real leaf.
+  if (tiledLeafIndex2 >= 0 &&
+      (tiledLeafIndex < 0 || static_cast<size_t>(tiledLeafIndex2) >= leafCount ||
+       tiledRecipe == nullptr || tiledLeafIndex2 == tiledLeafIndex)) {
+    return nullptr;
+  }
   // Leaves pair slot-for-slot with samplers: slot k must be the leaf that samples TextureSampler_k.
   for (size_t index = 0; index < leafCount; ++index) {
     if (textureLeaves[index] == nullptr || slots[index].op != AOTChainOp::Texture) {
@@ -317,7 +324,7 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
   return allocator->make<AOTPointwiseChainProcessor>(
       std::move(textureLeaves), slots, rootSlot, tiledLeafIndex, tiledRecipe, std::move(maskChild),
       coverageRootSlot, coordSourceMask, std::move(lutChild), lutLeafIndex,
-      std::move(samplerPadding), maskChildIsPhantom, clipCoverageRegister);
+      std::move(samplerPadding), maskChildIsPhantom, clipCoverageRegister, tiledLeafIndex2);
 }
 
 AOTPointwiseChainProcessor::AOTPointwiseChainProcessor(
@@ -326,9 +333,10 @@ AOTPointwiseChainProcessor::AOTPointwiseChainProcessor(
     const AOTTiledTextureRecipe* tiledRecipe, PlacementPtr<FragmentProcessor> maskChildFP,
     int coverageRootSlot, uint32_t coordSourceMask, PlacementPtr<FragmentProcessor> lutChildFP,
     int lutLeafIndex, std::vector<PlacementPtr<FragmentProcessor>> samplerPadding,
-    bool maskChildIsPhantom, int clipCoverageRegister)
+    bool maskChildIsPhantom, int clipCoverageRegister, int tiledLeafIndex2)
     : FragmentProcessor(ClassID()), _slotCount(newSlots.size()), rootSlot(rootSlot),
-      tiledLeafIndex(tiledLeafIndex), hasMaskSlotChild(maskChildFP != nullptr),
+      tiledLeafIndex(tiledLeafIndex), tiledLeafIndex2(tiledLeafIndex2),
+      hasMaskSlotChild(maskChildFP != nullptr),
       hasMaskChild(maskChildFP != nullptr && !maskChildIsPhantom),
       coverageRootSlot(coverageRootSlot), clipCoverageRegister(clipCoverageRegister),
       coordSourceMask(coordSourceMask), lutLeafIndex(lutLeafIndex) {
@@ -398,6 +406,9 @@ void AOTPointwiseChainProcessor::onSetData(UniformData* vertexUniformData,
   fragmentUniformData->setDataOptional("ClipCoverageRegister", clipCoverageRegister);
   fragmentUniformData->setDataOptional("SlotCount", static_cast<int>(_slotCount));
   fragmentUniformData->setDataOptional("TiledLeafIndex", tiledLeafIndex);
+  // The second tiled leaf shares the same recipe uniform block (identical recipe by construction,
+  // verified in the builder), so only its selector index needs uploading.
+  fragmentUniformData->setDataOptional("TiledLeafIndex2", tiledLeafIndex2);
   fragmentUniformData->setDataOptional("GradientLUTLeaf", lutLeafIndex);
   if (tiledLeafIndex >= 0) {
     int modeX = static_cast<int>(_tiledRecipe.shaderModeX);

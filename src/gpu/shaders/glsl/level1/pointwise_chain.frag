@@ -152,10 +152,14 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   // OP_GRADIENT LUT colorizer branch. -1 when no LUT gradient is present.
   int GradientLUTLeaf;
 
-  // Tiled leaf support: at most one leaf per chain may need shader-side tiling (wrap or border
-  // emulation). TiledLeafIndex selects it (-1 = none); the recipe fields are uploaded by the chain
-  // processor from the resolved sampling, leaving plain leaves on the Subset-clamp path.
+  // Tiled leaf support: leaves sharing this recipe go through the shader-side tiling (wrap or
+  // border emulation). TiledLeafIndex selects the first; TiledLeafIndex2 the second (-1 = none).
+  // The two indices share the single recipe below — valid because an image-filter tree samples
+  // its source and shadow children inside the SAME filter domain (same subset, same mode), so the
+  // recipes are identical by construction. Two leaves with DIFFERENT recipes still cannot be
+  // represented; the builder rejects that case and keeps the materialized fallback.
   int TiledLeafIndex;
+  int TiledLeafIndex2;
   int TiledModeX;
   int TiledModeY;
   vec4 TiledSubset;
@@ -281,7 +285,7 @@ vec4 chainLeafFetch(CHAIN_LEAF_SAMPLER texSampler, vec3 coord, vec4 leafSubset, 
   // QuadTextureFillShader); the tiled/subset math below then runs on the divided coordinate,
   // matching the runtime's emitPerspTextCoord ordering.
   highp vec2 uv = coord.xy / coord.z;
-  if (leafIndex == TiledLeafIndex) {
+  if (leafIndex == TiledLeafIndex || leafIndex == TiledLeafIndex2) {
     vec2 inCoord = vec2(0.0);
     vec2 subsetCoord = vec2(0.0);
     vec2 clampedCoord = vec2(0.0);

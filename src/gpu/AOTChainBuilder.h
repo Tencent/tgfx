@@ -35,6 +35,11 @@ class AOTChainBuilder {
   /** Whether the chain kernel's tiled path can execute the given shader wrap mode directly. */
   static bool IsChainCompatibleTiledMode(TiledTextureShaderMode mode);
 
+  /// Compares only the recipe fields the chain kernel's single tiled uniform block consumes.
+  /// Two shader-tiled leaves with identical recipes can share the block (the image-filter shape:
+  /// source and shadow children sample the same filter domain); different recipes cannot.
+  static bool SameTiledShaderRecipe(const AOTTiledTextureRecipe& a, const AOTTiledTextureRecipe& b);
+
   /**
    * Rebuilds the color processor of one plan pass: a fused chain/perlin kernel for the matching
    * single-pass kernels, or the pass's source node followed by its pointwise tail slots when
