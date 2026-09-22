@@ -1866,11 +1866,11 @@ float Layer::drawBackgroundLayers(const DrawArgs& args, Canvas* canvas) {
 }
 
 std::shared_ptr<Image> Layer::synthesizeBackgroundImage(const DrawArgs& args, float contentScale,
-                                                        Point* offset) {
+                                                        const Rect& contentBounds, Point* offset) {
   if (FloatNearlyZero(contentScale)) {
     return nullptr;
   }
-  auto bounds = getBounds();
+  auto bounds = contentBounds;
   bounds.scale(contentScale, contentScale);
   bounds.roundOut();
   if (bounds.isEmpty()) {
