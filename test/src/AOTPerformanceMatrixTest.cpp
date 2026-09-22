@@ -41,6 +41,8 @@
 #include <cstdint>
 #include <cstdio>
 #include <functional>
+#include <set>
+#include <string>
 #include <vector>
 #include "base/TGFXTest.h"
 #include "gpu/EmbeddedShaderBundles.h"
@@ -84,6 +86,17 @@ struct TimingResult {
   double hotP95Ms = 0.0;
   uint32_t aotDraws = 0;
   uint32_t runtimePrograms = 0;
+  // Routing evidence, snapshotted from the cold window (the only window with diagnostic
+  // recording on). The hit list is deduplicated "shader(vN,fN)" — creation events, so a variant
+  // appears once regardless of how many draws reused it; the pass-structure counters come from
+  // the same snapshot and describe what this scene actually did, so a scene label never has to
+  // be trusted as a family name again.
+  std::string hitVariants = "-";
+  uint32_t draws = 0;
+  uint32_t directChainDraws = 0;
+  uint32_t offscreenPlanDraws = 0;
+  uint32_t materializedEdges = 0;
+  uint32_t renderTargetSwitches = 0;
   // False when the measurement itself failed (bundle load or surface creation): a failed
   // measurement must fail the gate, never pass it with zero timings.
   bool measurementValid = false;
@@ -183,8 +196,30 @@ TimingResult MeasureRoute(Context* context, PrecompiledShaderCache* cache, bool 
   }
   result.coldMedianMs = Median(result.coldSamples);
   auto stats = context->globalCache()->programStats();
-  result.aotDraws = static_cast<uint32_t>(cache->drawStats().completeAOTDraws);
+  auto drawStats = cache->drawStats();
+  result.aotDraws = static_cast<uint32_t>(drawStats.completeAOTDraws);
   result.runtimePrograms = static_cast<uint32_t>(stats.programBuilderCreations);
+  result.draws = static_cast<uint32_t>(drawStats.draws);
+  result.directChainDraws = static_cast<uint32_t>(drawStats.directChainDraws);
+  result.offscreenPlanDraws = static_cast<uint32_t>(drawStats.offscreenPlanDraws);
+  result.materializedEdges = static_cast<uint32_t>(drawStats.materializedEdges);
+  result.renderTargetSwitches = static_cast<uint32_t>(drawStats.renderTargetSwitches);
+  {
+    // Deduplicated variant list from this window's creation events (see TimingResult).
+    std::set<std::string> variants;
+    for (const auto& record : cache->hitRecords()) {
+      variants.insert(record.shaderName + "(v" + std::to_string(record.vertPermutationIndex) +
+                      ",f" + std::to_string(record.fragPermutationIndex) + ")");
+    }
+    std::string joined;
+    for (const auto& variant : variants) {
+      if (!joined.empty()) {
+        joined += " ";
+      }
+      joined += variant;
+    }
+    result.hitVariants = joined.empty() ? "-" : joined;
+  }
   cache->setDiagnosticRecordingEnabled(false);
   // Hot frames: steady state, programs cached on both routes (the runtime route's program cache
   // serves its stitched programs). Each sample times
@@ -231,6 +266,13 @@ void PrintResult(const char* scenario, const char* route, const TimingResult& re
       "hotP95=%8.3fms aotDraws=%u runtimePrograms=%u\n",
       scenario, route, kBuildType, size, result.coldMedianMs, result.hotMedianMs, result.hotMinMs,
       result.hotP95Ms, result.aotDraws, result.runtimePrograms);
+  // Routing evidence for the same window: which variants were actually created (scene label is
+  // NOT a family name), and the pass structure this scene really executed.
+  printf(
+      "[P7PerfRoute] %s %s size=%d draws=%u directChain=%u offscreenPlan=%u materialized=%u "
+      "rtSwitches=%u hits=%s\n",
+      scenario, route, size, result.draws, result.directChainDraws, result.offscreenPlanDraws,
+      result.materializedEdges, result.renderTargetSwitches, result.hitVariants.c_str());
   // Raw per-round samples for offline aggregation: the cold spread and every hot round, so
   // dispersion and outliers survive the console capture (audit rule: raw data lands on disk).
   printf("[P7PerfRaw] %s %s size=%d cold=[", scenario, route, size);
