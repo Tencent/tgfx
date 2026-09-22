@@ -610,6 +610,10 @@ TGFX_TEST(AOTPerformanceMatrixTest, ChainVsDedicatedDecomposition) {
         runtime.hotMedianMs > 0 ? dedicated.hotMedianMs / runtime.hotMedianMs : 0.0,
         runtime.hotMedianMs > 0 ? chain.hotMedianMs / runtime.hotMedianMs : 0.0);
   }
+  // The dedicated route above turns the decomposition switch off, and the ContextScope reuses
+  // the thread-local cached Context across tests — restore the production default so later
+  // tests (e.g. the atlas chain-route assertions) are not served with it disabled.
+  cache->setDecompositionEnabled(true);
 }
 
 }  // namespace tgfx
