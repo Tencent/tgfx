@@ -403,4 +403,120 @@ TGFX_TEST(AOTPerformanceMatrixTest, DualGradientMaterialization) {
   PrintResult("dual-gradient-blend", "runtime", runtime);
 }
 
+// Per-family matrix: one representative scene per top-hit family (the chain kernel has its own
+// five scenarios above), measured on both routes so a per-family AOT/JIT gap shows up by family
+// instead of only on the chain. Each row prints aotDraws — a row with aotDraws=0 did not ride the
+// AOT route and its ratios are meaningless (drop it from the analysis). Gate budgets stay at the
+// chain-calibrated values; the analysis reads the printed ratios, the gate is only a backstop.
+TGFX_TEST(AOTPerformanceMatrixTest, PerFamilyMatrix) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_NE(image, nullptr);
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  ASSERT_NE(typeface, nullptr);
+  Font font(typeface, 30.f);
+
+  constexpr int maskSize = 96;
+  Bitmap maskBitmap = {};
+  ASSERT_TRUE(maskBitmap.allocPixels(maskSize, maskSize, true));
+  auto* maskPixels = static_cast<uint8_t*>(maskBitmap.lockPixels());
+  for (size_t y = 0; y < static_cast<size_t>(maskSize); ++y) {
+    for (size_t x = 0; x < static_cast<size_t>(maskSize); ++x) {
+      maskPixels[y * maskBitmap.rowBytes() + x] = static_cast<uint8_t>((x * 3 + y * 5) % 256);
+    }
+  }
+  maskBitmap.unlockPixels();
+  auto maskImage = Image::MakeFrom(maskBitmap);
+  ASSERT_NE(maskImage, nullptr);
+  auto imageShader = Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp);
+  auto tileShader = Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Repeat);
+  ASSERT_NE(imageShader, nullptr);
+  ASSERT_NE(tileShader, nullptr);
+  std::vector<Color> warmColors = {Color(1.0f, 0.3f, 0.0f, 1.0f), Color(0.9f, 0.1f, 0.2f, 1.0f)};
+  auto gradient =
+      Shader::MakeLinearGradient(Point(0, 0), Point(128, 128), warmColors, {0.0f, 1.0f});
+  ASSERT_NE(gradient, nullptr);
+
+  struct SceneEntry {
+    const char* label;
+    std::function<void(Canvas*)> scene;
+  };
+  const std::vector<SceneEntry> scenes = {
+      {"quad-texture",
+       [&](Canvas* canvas) {
+         Paint paint = {};
+         canvas->drawImage(image, 0, 0, &paint);
+       }},
+      {"quad-color",
+       [&](Canvas* canvas) {
+         Paint paint = {};
+         paint.setColor(Color(1.0f, 1.0f, 1.0f, 0.6f));
+         canvas->drawImage(image, 0, 0, &paint);
+       }},
+      {"solid-color",
+       [&](Canvas* canvas) {
+         Paint paint = {};
+         paint.setColor(Color(0.2f, 0.6f, 0.9f, 1.0f));
+         canvas->drawRect(Rect::MakeWH(120, 120), paint);
+       }},
+      {"ellipse-fill",
+       [&](Canvas* canvas) {
+         Paint paint = {};
+         paint.setColor(Color(0.9f, 0.4f, 0.2f, 1.0f));
+         canvas->drawOval(Rect::MakeWH(120, 90), paint);
+       }},
+      {"unified-gradient",
+       [&](Canvas* canvas) {
+         Paint paint = {};
+         paint.setShader(gradient);
+         canvas->drawRect(Rect::MakeWH(128, 128), paint);
+       }},
+      {"tiled-texture",
+       [&](Canvas* canvas) {
+         Paint paint = {};
+         paint.setShader(tileShader);
+         canvas->drawRect(Rect::MakeWH(128, 128), paint);
+       }},
+      {"nonaa-rect",
+       [&](Canvas* canvas) {
+         Paint paint = {};
+         paint.setAntiAlias(false);
+         paint.setColor(Color(0.3f, 0.8f, 0.5f, 1.0f));
+         canvas->drawRect(Rect::MakeWH(120, 120), paint);
+       }},
+      {"gaussian-blur",
+       [&](Canvas* canvas) {
+         Paint paint = {};
+         paint.setImageFilter(ImageFilter::Blur(10, 10));
+         canvas->drawImage(image, 0, 0, &paint);
+       }},
+      {"mask-fill",
+       [&](Canvas* canvas) {
+         Paint paint = {};
+         canvas->drawImage(maskImage, 0, 0, &paint);
+       }},
+      {"atlas-text",
+       [&](Canvas* canvas) {
+         Paint paint = {};
+         paint.setColor(Color::Black());
+         canvas->drawSimpleText("Hello TGFX", 0, 100, font, paint);
+       }},
+  };
+  for (const auto& entry : scenes) {
+    // Route-order symmetry (audit rule): a discarded runtime pass first (see ShortChainSteadyState).
+    MeasureRoute(context, cache, false, entry.scene);
+    auto aot = MeasureRoute(context, cache, true, entry.scene);
+    auto runtime = MeasureRoute(context, cache, false, entry.scene);
+    AssertPerformanceGates(context, entry.label, aot, runtime);
+    PrintResult(entry.label, "aot", aot);
+    PrintResult(entry.label, "runtime", runtime);
+  }
+}
+
 }  // namespace tgfx
