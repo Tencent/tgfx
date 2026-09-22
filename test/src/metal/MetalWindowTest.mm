@@ -20,6 +20,7 @@
 #include <QuartzCore/QuartzCore.h>
 #include <cmath>
 #include <memory>
+#include "gpu/RenderContext.h"
 #include "gpu/metal/MetalDrawableProxy.h"
 #include "gpu/metal/MetalGPU.h"
 #include "tgfx/core/Canvas.h"
@@ -37,12 +38,11 @@ static bool NearlyMatches(const RGBA4f<AlphaType::Premultiplied>& pixel, const C
 }
 
 /**
- * Reproduces the drawable lifecycle issue of MetalWindow: MetalDrawableProxy::getRenderTarget()
- * acquires a drawable from the CAMetalLayer rotation pool, while MetalWindow::onPresent() hands
- * the drawable back to the pool immediately after the command buffer is submitted. A
- * readPixels() between two frames then re-acquires an arbitrary drawable from the pool, so the
- * readback returns whichever stale frame happens to be in rotation (or an untouched drawable)
- * instead of the last presented frame.
+ * Verifies the drawable lifecycle of MetalWindow: MetalDrawableProxy::getRenderTarget() acquires
+ * a drawable from the CAMetalLayer rotation pool, and the previously presented drawable is held
+ * until the next frame acquires a new one. A readPixels() call between two frames must therefore
+ * return the content of the last presented frame, not an arbitrary drawable from the rotation
+ * pool.
  */
 TGFX_TEST(MetalWindowTest, ReadPixelsAfterPresent) {
   ContextScope scope;
@@ -78,7 +78,7 @@ TGFX_TEST(MetalWindowTest, ReadPixelsAfterPresent) {
   }
   auto& lastFrameColor = frameColors[FrameCount - 1];
 
-  auto proxy = std::static_pointer_cast<MetalDrawableProxy>(window->drawableProxy);
+  auto proxy = std::static_pointer_cast<MetalDrawableProxy>(surface->renderContext->renderTarget);
   ASSERT_TRUE(proxy != nullptr);
   auto drawableAfterPresent = proxy->getMetalDrawable();
   auto pixel = surface->getColor(Width / 2, Height / 2);

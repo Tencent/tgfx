@@ -30,6 +30,10 @@ MetalDrawableProxy::MetalDrawableProxy(Context* context, int width, int height,
     : _context(context), _width(width), _height(height), _format(format), _metalLayer(metalLayer) {
 }
 
+MetalDrawableProxy::~MetalDrawableProxy() {
+  [_metalDrawable release];
+}
+
 Context* MetalDrawableProxy::getContext() const {
   return _context;
 }
@@ -64,10 +68,17 @@ std::shared_ptr<TextureView> MetalDrawableProxy::getTextureView() const {
 
 std::shared_ptr<RenderTarget> MetalDrawableProxy::getRenderTarget() const {
   if (_renderTarget == nullptr) {
-    _metalDrawable = [_metalLayer nextDrawable];
-    if (_metalDrawable == nil) {
+    auto drawable = [_metalLayer nextDrawable];
+    if (drawable == nil) {
       return nullptr;
     }
+    // Retain the new drawable before releasing the previous one. The previous drawable is kept
+    // until this point (instead of being released right after presentation) so that a
+    // readPixels() call between two frames still reads the last presented content, and is never
+    // handed back to the layer's drawable rotation pool early.
+    auto newDrawable = [drawable retain];
+    [_metalDrawable release];
+    _metalDrawable = newDrawable;
     // Schedule the drawable to be presented when the command buffer is committed, so that the
     // GPU finishes rendering before the drawable is displayed on screen.
     auto metalQueue = static_cast<MetalCommandQueue*>(_context->gpu()->queue());
@@ -87,8 +98,4 @@ id<CAMetalDrawable> MetalDrawableProxy::getMetalDrawable() const {
   return _metalDrawable;
 }
 
-void MetalDrawableProxy::releaseDrawable() {
-  _metalDrawable = nil;
-  _renderTarget = nullptr;
-}
 }  // namespace tgfx

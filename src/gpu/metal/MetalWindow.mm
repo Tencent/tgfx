@@ -125,17 +125,7 @@ std::shared_ptr<RenderTargetProxy> MetalWindow::onCreateRenderTarget(Context* co
     return nullptr;
   }
   auto pixelFormat = MetalPixelFormatToPixelFormat(static_cast<unsigned>(metalLayer.pixelFormat));
-  drawableProxy =
-      std::make_shared<MetalDrawableProxy>(context, width, height, metalLayer, pixelFormat);
-  return drawableProxy;
-}
-
-void MetalWindow::onPresent(Context*) {
-  if (drawableProxy == nullptr) {
-    return;
-  }
-  auto proxy = std::static_pointer_cast<MetalDrawableProxy>(drawableProxy);
-  proxy->releaseDrawable();
+  return std::make_shared<MetalDrawableProxy>(context, width, height, metalLayer, pixelFormat);
 }
 
 }  // namespace tgfx
