@@ -165,14 +165,14 @@ void AssertPerformanceGates(Context* context, const std::string& label, const Ti
 
 template <typename Scene>
 TimingResult MeasureRoute(Context* context, PrecompiledShaderCache* cache, bool useBundle,
-                          const Scene& scene, int size = kSize) {
+                          const Scene& scene, int size = kSize, bool decompositionEnabled = true) {
   TimingResult result = {};
   if (useBundle) {
     auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
     if (!cache->loadBundle(bundleData, bundleBytes)) {
       return result;
     }
-    cache->setDecompositionEnabled(true);
+    cache->setDecompositionEnabled(decompositionEnabled);
   } else {
     cache->unload();
   }
@@ -558,6 +558,57 @@ TGFX_TEST(AOTPerformanceMatrixTest, PerFamilyMatrix) {
     AssertPerformanceGates(context, entry.label, aot, runtime);
     PrintResult(entry.label, "aot", aot);
     PrintResult(entry.label, "runtime", runtime);
+  }
+}
+
+// Decomposition of the chain route's steady-state gap, one scene, three routes:
+//   (a) bundle + decomposition ON  — the tree is rewritten into the chain kernel (offscreen plan
+//       route, interpreter execution);
+//   (b) bundle + decomposition OFF — the original tree reaches the matcher, so the dedicated
+//       families (TextureColorMatrix / TexturedEffect shapes) serve it;
+//   (c) runtime (no bundle)        — JIT reference.
+// (b) vs (c) validates the dedicated route; (a) vs (b) is the chain route's total premium
+// (plan-task overhead + interpreter execution). Route evidence prints with each row so the
+// (b) row's actual family is verified, not assumed.
+TGFX_TEST(AOTPerformanceMatrixTest, ChainVsDedicatedDecomposition) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_NE(image, nullptr);
+
+  for (int size : {128, 512}) {
+    // The chain-1-op shape: a drawn image whose paint carries one color matrix. On the chain
+    // route this fuses into the PointwiseChain kernel; with decomposition off the sequential
+    // [TextureEffect, ColorMatrix] tree is exactly the dedicated family's contract shape.
+    auto scene = [&](Canvas* canvas) {
+      canvas->save();
+      canvas->scale(static_cast<float>(size) / 128.0f, static_cast<float>(size) / 128.0f);
+      Paint paint = {};
+      paint.setColorFilter(ColorFilter::Matrix(WarmMatrix()));
+      canvas->drawImage(image, 0, 0, &paint);
+      canvas->restore();
+    };
+    // Warm-up run first (audit rule: discard first-touch resource states).
+    MeasureRoute(context, cache, false, scene, size);
+    auto chain = MeasureRoute(context, cache, true, scene, size, true);
+    EXPECT_EQ(chain.runtimePrograms, 0u);
+    auto dedicated = MeasureRoute(context, cache, true, scene, size, false);
+    EXPECT_EQ(dedicated.runtimePrograms, 0u);
+    auto runtime = MeasureRoute(context, cache, false, scene, size);
+    AssertPerformanceGates(context, "chain-route", chain, runtime);
+    PrintResult("decomp-chain", "aot", chain, size);
+    PrintResult("decomp-dedicated", "aot", dedicated, size);
+    PrintResult("decomp-runtime", "runtime", runtime, size);
+    printf(
+        "[DecompGap] size=%d chainHot=%.3fms dedicatedHot=%.3fms runtimeHot=%.3fms "
+        "chain/dedicated=%.2fx dedicated/runtime=%.2fx chain/runtime=%.2fx\n",
+        size, chain.hotMedianMs, dedicated.hotMedianMs, runtime.hotMedianMs,
+        dedicated.hotMedianMs > 0 ? chain.hotMedianMs / dedicated.hotMedianMs : 0.0,
+        runtime.hotMedianMs > 0 ? dedicated.hotMedianMs / runtime.hotMedianMs : 0.0,
+        runtime.hotMedianMs > 0 ? chain.hotMedianMs / runtime.hotMedianMs : 0.0);
   }
 }
 
