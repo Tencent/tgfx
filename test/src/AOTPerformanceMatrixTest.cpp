@@ -108,6 +108,30 @@ double Percentile(std::vector<double> values, double percentile) {
 // Hot = median/p95 over kRounds batches of kBatchFrames frames each (a batch shares one
 // surface so per-frame surface setup stays out of the measurement). `size` parameterizes the
 // surface so the fill-rate axis (128 vs 512) is covered by the representative chain scenario.
+// P9 ratio gates (machine-relative, so they hold across CI hosts). Calibrated 2026-09-22 on
+// Apple M4 Pro, 10 full-matrix runs per backend; medians and maxima recorded in the manifest:
+//   Metal cold aot/runtime: med 0.03-0.06, max 0.08 → budget 0.15. The bundle carries real
+//     metallib binaries, so creating a pipeline from them must stay vastly cheaper than
+//     compiling the JIT tree's MSL; this gate protects the AOT route's core value.
+//   GL cold aot/runtime:    med 5.7-12.6, max 14.6  → budget 20. The GL bundle stores SOURCE,
+//     so first use compiles the (large) chain kernel while the JIT route compiles a small
+//     specialized tree — structurally slower, accepted; the gate only guards against further
+//     cold regressions (bundle/reflection bloat, slower program assembly).
+//   Both hot aot/runtime:   med 1.5-2.7,  max 3.63  → budget 4.0. The chain kernel is a
+//     uniform-driven interpreter over up-to-16 slots vs the JIT's specialized tree; that
+//     interpreter tax is the design's accepted steady-state cost — the gate catches it growing
+//     (slot-loop bloat, uniform-array expansion, more forced materialization).
+void AssertPerformanceGates(Context* context, const std::string& label, const TimingResult& aot,
+                            const TimingResult& runtime) {
+  if (runtime.coldMedianMs <= 0.0 || runtime.hotMedianMs <= 0.0) {
+    return;
+  }
+  const double coldBudget = context->backend() == Backend::Metal ? 0.15 : 20.0;
+  EXPECT_LE(aot.coldMedianMs / runtime.coldMedianMs, coldBudget)
+      << label << " cold ratio (aot/runtime)";
+  EXPECT_LE(aot.hotMedianMs / runtime.hotMedianMs, 4.0) << label << " hot ratio (aot/runtime)";
+}
+
 template <typename Scene>
 TimingResult MeasureRoute(Context* context, PrecompiledShaderCache* cache, bool useBundle,
                           const Scene& scene, int size = kSize) {
@@ -250,6 +274,7 @@ TGFX_TEST(AOTPerformanceMatrixTest, ShortChainSteadyState) {
       EXPECT_EQ(aot.runtimePrograms, 0u);
       EXPECT_GE(aot.aotDraws, 1u);
       auto runtime = MeasureRoute(context, cache, false, scene, size);
+      AssertPerformanceGates(context, label, aot, runtime);
       PrintResult(label, "aot", aot, size);
       PrintResult(label, "runtime", runtime, size);
     }
@@ -285,6 +310,7 @@ TGFX_TEST(AOTPerformanceMatrixTest, SameLayoutEffectReuse) {
   auto aot = MeasureRoute(context, cache, true, sceneSameVariant);
   EXPECT_EQ(aot.runtimePrograms, 0u);
   auto runtime = MeasureRoute(context, cache, false, sceneSameVariant);
+  AssertPerformanceGates(context, "reuse-same-variant", aot, runtime);
   PrintResult("reuse-same-variant", "aot", aot);
   PrintResult("reuse-same-variant", "runtime", runtime);
 }
@@ -322,6 +348,7 @@ TGFX_TEST(AOTPerformanceMatrixTest, MaskClipBlendShortChain) {
   auto aot = MeasureRoute(context, cache, true, scene);
   EXPECT_EQ(aot.runtimePrograms, 0u);
   auto runtime = MeasureRoute(context, cache, false, scene);
+  AssertPerformanceGates(context, "alpha-root-paint-alpha", aot, runtime);
   PrintResult("alpha-root-paint-alpha", "aot", aot);
   PrintResult("alpha-root-paint-alpha", "runtime", runtime);
 }
@@ -351,6 +378,7 @@ TGFX_TEST(AOTPerformanceMatrixTest, DualGradientMaterialization) {
   MeasureRoute(context, cache, false, scene);
   auto aot = MeasureRoute(context, cache, true, scene);
   auto runtime = MeasureRoute(context, cache, false, scene);
+  AssertPerformanceGates(context, "dual-gradient-blend", aot, runtime);
   PrintResult("dual-gradient-blend", "aot", aot);
   PrintResult("dual-gradient-blend", "runtime", runtime);
 }
