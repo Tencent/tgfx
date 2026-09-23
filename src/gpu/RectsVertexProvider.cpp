@@ -101,24 +101,15 @@ class AARectsVertexProvider : public RectsVertexProvider {
       auto scales = viewMatrix.getAxisScales();
       auto scaleX = scales.x;
       auto scaleY = scales.y;
-      // we want the new edge to be .5px away from the old line, measured along each axis's own
-      // device scale so that the AA ring stays half a device pixel wide on both axes.
+      // Keep each AA ring edge .5 device px away from the rect edge, measured along the axis's
+      // own device scale.
       auto paddingX = 0.5f / scaleX;
       auto paddingY = 0.5f / scaleY;
-      // A rect thinner than 1 device pixel cannot be inset by the full padding without flipping
-      // its edges, which overlaps the coverage quad with the AA ring and blends coverage twice,
-      // so identical rects render up to 2.3x brighter than the paint alpha and at visibly
-      // different brightness depending on their subpixel phase. Collapse such an axis to the
-      // rect center instead and widen its outset so that inset + outset == 2 * padding and the
-      // ring covers one full device pixel on each side (the same structure the stroke branch
-      // below uses). The inner coverage is set to the rect's device-pixel area coverage, so the
-      // ring's integrated ink equals that area and never exceeds the paint alpha. When only one
-      // axis collapses the ring's linear ramp conserves that ink exactly; when both axes collapse
-      // the inner quad degenerates to a point and the corner-triangle interpolation over-deposits
-      // up to 4/3 of the area, an inherent limit of interpolating coverage from vertices rather
-      // than evaluating it per pixel. Each axis is measured against its own device scale, so
-      // non-uniform matrices neither misclassify an axis that is wide enough in device pixels as
-      // sub-pixel nor leave an axis flippable.
+      // An axis thinner than 1 device pixel flips when inset by the padding, blending the
+      // coverage quad into the ring and rendering up to 2.3x brighter than the paint alpha.
+      // Collapse it to the rect center and widen the outset to one full device pixel per side,
+      // so the ring's ink matches the rect's device-pixel area. A collapsed dot still
+      // over-deposits up to 4/3 of the area due to vertex-interpolated coverage.
       auto subpixelX = rect.width() * scaleX < 1.0f;
       auto subpixelY = rect.height() * scaleY < 1.0f;
       auto insetX = subpixelX ? rect.width() * 0.5f : paddingX;

@@ -3237,13 +3237,11 @@ static RectInkStats MeasureRectInk(Surface* surface) {
 }
 
 /**
- * Pixel-level regression for the sub-pixel axis handling of AA filled rects. A rect whose
- * device-space width or height falls below one pixel must deposit exactly its device-pixel area
- * of ink, with the AA ring's peak coverage capped by that area, and a non-uniform matrix must
- * not flip the inset of an axis that is wide enough in device pixels (sx = 0.5, sy = 4 with a
- * 0.3-unit-tall rect gives a 1.2-device-pixel axis). Version-keyed baselines skip local
- * comparison after acceptance, so without these assertions a regression of the coverage fix
- * would go unnoticed.
+ * Pixel-level regression for the sub-pixel axis handling of AA filled rects: sub-pixel rects
+ * must deposit their device-pixel area of ink with the peak coverage capped by that area, and
+ * a non-uniform matrix must not flip the inset of an axis that is wide enough in device pixels.
+ * Version-keyed baselines skip local comparison after acceptance, so these assertions are the
+ * only guard against regressing the coverage fix.
  */
 TGFX_TEST(CanvasTest, SubpixelRectInkConservation) {
   ContextScope scope;
@@ -3263,9 +3261,7 @@ TGFX_TEST(CanvasTest, SubpixelRectInkConservation) {
   EXPECT_LE(stats.maxCoverage, 0.5f + 1.0f / 255.0f);
 
   // A 0.5 x 0.5 device-pixel rect: both axes collapsed, peak coverage 0.25. The collapsed inner
-  // quad degenerates to a point, so the ring's coverage is interpolated across corner triangles
-  // instead of a separable profile; the integrated ink is therefore 4/3 of the geometric area
-  // (vertex-interpolated AA cannot be area-exact for dots), while the peak stays capped.
+  // quad degenerates to a point, so the interpolated ink is 4/3 of the geometric area.
   canvas->clear();
   canvas->drawRect(Rect::MakeXYWH(32.0f, 32.0f, 0.5f, 0.5f), paint);
   stats = MeasureRectInk(surface.get());
