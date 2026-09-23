@@ -43,7 +43,7 @@ std::shared_ptr<MetalWindow> MetalWindow::MakeFrom(CAMetalLayer* layer,
   }
   if (device == nullptr) {
     if (layer.device != nil) {
-      device = MetalDevice::MakeFrom((__bridge void*)layer.device);
+      device = MetalDevice::MakeFrom(layer.device);
     } else {
       device = MetalDevice::Make();
     }
@@ -52,7 +52,7 @@ std::shared_ptr<MetalWindow> MetalWindow::MakeFrom(CAMetalLayer* layer,
     return nullptr;
   }
   if (layer.device == nil) {
-    layer.device = (__bridge id<MTLDevice>)device->metalDevice();
+    layer.device = device->metalDevice();
   }
   ApplyColorSpace(layer, colorSpace);
   return std::shared_ptr<MetalWindow>(
@@ -69,13 +69,12 @@ std::shared_ptr<MetalWindow> MetalWindow::MakeFrom(MTKView* view,
   if (layer == nil) {
     return nullptr;
   }
-  auto device = layer.device != nil ? MetalDevice::MakeFrom((__bridge void*)layer.device)
-                                    : MetalDevice::Make();
+  auto device = layer.device != nil ? MetalDevice::MakeFrom(layer.device) : MetalDevice::Make();
   if (device == nullptr) {
     return nullptr;
   }
   if (layer.device == nil) {
-    layer.device = (__bridge id<MTLDevice>)device->metalDevice();
+    layer.device = device->metalDevice();
   }
   ApplyColorSpace(layer, colorSpace);
   return std::shared_ptr<MetalWindow>(

@@ -18,6 +18,7 @@
 #include "tgfx/gpu/opengl/webgl/WebGLDevice.h"
 #include <emscripten/val.h>
 #include "core/utils/Log.h"
+#include "gpu/DeviceRegistry.h"
 #include "gpu/opengl/webgl/WebGLGPU.h"
 #include "platform/web/WebNamedColorSpace.h"
 
@@ -104,7 +105,8 @@ std::shared_ptr<WebGLDevice> WebGLDevice::Wrap(EMSCRIPTEN_WEBGL_CONTEXT_HANDLE w
     device = std::shared_ptr<WebGLDevice>(new WebGLDevice(std::move(gpu), webglContext));
     device->externallyOwned = externallyOwned;
     device->context = webglContext;
-    device->weakThis = device;
+    device = std::static_pointer_cast<WebGLDevice>(
+        Device::RegisterNative(device, {reinterpret_cast<const void*>(webglContext)}));
   }
 
   if (oldContext != webglContext) {
