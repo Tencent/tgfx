@@ -29,8 +29,9 @@ std::shared_ptr<WindowDrawable> WindowDrawable::Make(Context* context,
   if (renderTarget == nullptr) {
     return nullptr;
   }
+  auto colorSpace = window->colorSpace();
   return std::shared_ptr<WindowDrawable>(new WindowDrawable(
-      context, std::move(renderTarget), std::move(window), window->colorSpace()));
+      context, std::move(renderTarget), std::move(window), std::move(colorSpace)));
 }
 
 WindowDrawable::WindowDrawable(Context* context, std::shared_ptr<RenderTargetProxy> renderTarget,
