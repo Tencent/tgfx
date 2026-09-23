@@ -34,6 +34,17 @@ std::shared_ptr<Shader> MatrixShader::MakeFrom(std::shared_ptr<Shader> source,
   return shader;
 }
 
+const Shader& UnwrapMatrixShader(const Shader& shader, Matrix* matrix) {
+  *matrix = Matrix::I();
+  const auto* current = &shader;
+  while (Types::Get(current) == Types::ShaderType::Matrix) {
+    const auto* matrixShader = static_cast<const MatrixShader*>(current);
+    matrix->preConcat(matrixShader->matrix);
+    current = matrixShader->source.get();
+  }
+  return *current;
+}
+
 MatrixShader::MatrixShader(std::shared_ptr<Shader> source, const Matrix& matrix)
     : source(std::move(source)), matrix(matrix) {
 }

@@ -35,6 +35,10 @@
 #include "core/shaders/ColorShader.h"
 #include "core/shaders/ImageShader.h"
 #include "core/shaders/MatrixShader.h"
+#include "core/shaders/RRectBlurShader.h"
+#include "core/shaders/RRectInnerShadowShader.h"
+#include "core/shaders/RectBlurShader.h"
+#include "core/shaders/RectInnerShadowShader.h"
 #include "core/utils/ColorHelper.h"
 #include "core/utils/Log.h"
 #include "core/utils/PlacementPtr.h"
@@ -64,6 +68,7 @@
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathTypes.h"
 #include "tgfx/core/Picture.h"
+#include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/SamplingOptions.h"
@@ -178,6 +183,9 @@ void PDFExportContext::drawFill(const Brush& brush) {
 
 void PDFExportContext::drawRect(const Rect& rect, const Matrix& matrix, const ClipStack& clip,
                                 const Brush& brush, const Stroke* stroke) {
+  if (drawRectWithUnsupportedShader(rect, brush, matrix, clip, stroke)) {
+    return;
+  }
   Path path;
   path.addRect(rect);
   if (stroke) {
@@ -764,6 +772,152 @@ void PDFExportContext::drawBlurLayer(const std::shared_ptr<Picture>& picture,
   }
 }
 
+// Returns the clip to draw with: clip unchanged when srcRect lies fully inside dstRect, or clip
+// with dstRect appended otherwise.
+static ClipStack ClipSrcRectToRect(const ClipStack& clip, const Rect& srcRect,
+                                   const Matrix& srcMatrix, const Rect& dstRect,
+                                   const Matrix& dstMatrix) {
+  if (dstRect.contains(srcMatrix.mapRect(srcRect))) {
+    return clip;
+  }
+
+  auto clippedClip = clip;
+  clippedClip.clipRect(dstRect, dstMatrix, false);
+  return clippedClip;
+}
+
+bool PDFExportContext::drawRectWithUnsupportedShader(const Rect& rect, const Brush& brush,
+                                                     const Matrix& matrix, const ClipStack& clip,
+                                                     const Stroke* stroke) {
+  if (brush.shader == nullptr) {
+    return false;
+  }
+  Matrix shaderMatrix = Matrix::I();
+  const auto* shader = &UnwrapMatrixShader(*brush.shader, &shaderMatrix);
+  const auto type = Types::Get(shader);
+  const bool supported =
+      type == Types::ShaderType::RectBlur || type == Types::ShaderType::RRectBlur ||
+      type == Types::ShaderType::RectInnerShadow || type == Types::ShaderType::RRectInnerShadow;
+  // The analytic shadow shaders only appear on plain fills, so a stroked draw never carries one.
+  DEBUG_ASSERT(!supported || stroke == nullptr);
+  if (!supported || stroke != nullptr) {
+    return false;
+  }
+
+  Brush drawBrush = brush;
+  drawBrush.shader = nullptr;
+  switch (Types::Get(shader)) {
+    case Types::ShaderType::RectBlur: {
+      const auto* blur = static_cast<const RectBlurShader*>(shader);
+      return exportDropShadowImage(RRect::MakeRect(blur->rect), blur->sigmaX, blur->sigmaY,
+                                   blur->color, matrix, shaderMatrix, clip, rect, drawBrush);
+    }
+    case Types::ShaderType::RRectBlur: {
+      const auto* blur = static_cast<const RRectBlurShader*>(shader);
+      return exportDropShadowImage(RRect::MakeRectXY(blur->rect, blur->radius.x, blur->radius.y),
+                                   blur->sigmaX, blur->sigmaY, blur->color, matrix, shaderMatrix,
+                                   clip, rect, drawBrush);
+    }
+    case Types::ShaderType::RectInnerShadow: {
+      const auto* inner = static_cast<const RectInnerShadowShader*>(shader);
+      return exportInnerShadowImage(RRect::MakeRect(inner->shadowRect),
+                                    RRect::MakeRect(inner->maskRect), inner->sigmaX, inner->sigmaY,
+                                    inner->color, matrix, shaderMatrix, clip, rect, drawBrush);
+    }
+    case Types::ShaderType::RRectInnerShadow: {
+      const auto* inner = static_cast<const RRectInnerShadowShader*>(shader);
+      return exportInnerShadowImage(
+          RRect::MakeRectXY(inner->shadowRect, inner->shadowRadius.x, inner->shadowRadius.y),
+          RRect::MakeRectXY(inner->maskRect, inner->maskRadius.x, inner->maskRadius.y),
+          inner->sigmaX, inner->sigmaY, inner->color, matrix, shaderMatrix, clip, rect, drawBrush);
+    }
+    default:
+      return false;
+  }
+}
+
+bool PDFExportContext::exportDropShadowImage(const RRect& shape, float sigmaX, float sigmaY,
+                                             const Color& color, const Matrix& matrix,
+                                             const Matrix& shaderMatrix, const ClipStack& clip,
+                                             const Rect& extraClip, const Brush& brush) {
+  PictureRecorder recorder = {};
+  auto* recordingCanvas = recorder.beginRecording();
+  Paint shapePaint = {};
+  // The filter consumes only the source's alpha, so any opaque color works here.
+  shapePaint.setColor(Color::White());
+  recordingCanvas->drawRRect(shape, shapePaint);
+  auto picture = recorder.finishRecordingAsPicture();
+  if (picture == nullptr) {
+    return false;
+  }
+  auto filter = ImageFilter::DropShadowOnly(0.0f, 0.0f, sigmaX, sigmaY, color);
+  if (filter == nullptr) {
+    return false;
+  }
+
+  auto realClip =
+      ClipSrcRectToRect(clip, filter->filterBounds(shape.rect()), shaderMatrix, extraClip, matrix);
+  auto imageMatrix = matrix;
+  imageMatrix.preConcat(shaderMatrix);
+  drawDropShadowBeforeLayer(picture, static_cast<const DropShadowImageFilter*>(filter.get()),
+                            imageMatrix, realClip, brush);
+  return true;
+}
+
+bool PDFExportContext::exportInnerShadowImage(const RRect& shadowShape, const RRect& maskShape,
+                                              float sigmaX, float sigmaY, const Color& color,
+                                              const Matrix& matrix, const Matrix& shaderMatrix,
+                                              const ClipStack& clip, const Rect& extraClip,
+                                              const Brush& brush) {
+  auto blurFilter = ImageFilter::Blur(sigmaX, sigmaY);
+  if (blurFilter == nullptr) {
+    return false;
+  }
+  // PDF has neither a blur primitive nor an inverted mask form; both force rasterization, so
+  // the mask is rasterized here.
+  auto bounds = blurFilter->filterBounds(maskShape.rect());
+  auto surface = Surface::Make(document->context(), static_cast<int>(bounds.width()),
+                               static_cast<int>(bounds.height()), false, 1, false, 0,
+                               document->dstColorSpace());
+  if (surface == nullptr) {
+    return false;
+  }
+  auto* canvas = surface->getCanvas();
+  canvas->clear(Color::Transparent());
+  canvas->translate(-bounds.x(), -bounds.y());
+  Paint maskPaint = {};
+  maskPaint.setColor(Color::White());
+  maskPaint.setAntiAlias(true);
+  maskPaint.setImageFilter(blurFilter);
+  canvas->drawRRect(maskShape, maskPaint);
+  auto maskImage = surface->makeImageSnapshot();
+  if (maskImage != nullptr) {
+    maskImage = maskImage->makeTextureImage(document->context());
+  }
+  if (maskImage == nullptr) {
+    return false;
+  }
+  auto maskShader =
+      Shader::MakeImageShader(std::move(maskImage), TileMode::Decal, TileMode::Decal, {});
+  if (maskShader == nullptr) {
+    return false;
+  }
+  maskShader = maskShader->makeWithMatrix(Matrix::MakeTrans(bounds.x(), bounds.y()));
+
+  auto realClip = ClipSrcRectToRect(clip, shadowShape.rect(), shaderMatrix, extraClip, matrix);
+  Brush shadowBrush = brush;
+  shadowBrush.color = color;
+  shadowBrush.color.alpha *= brush.color.alpha;
+  shadowBrush.maskFilter = MaskFilter::MakeShader(std::move(maskShader), true);
+  auto imageMatrix = matrix;
+  imageMatrix.preConcat(shaderMatrix);
+
+  Path path = {};
+  path.addRRect(shadowShape);
+  onDrawPath(imageMatrix, realClip, path, shadowBrush);
+  return true;
+}
+
 void PDFExportContext::drawLayer(std::shared_ptr<Picture> picture,
                                  std::shared_ptr<ImageFilter> imageFilter, const Matrix& matrix,
                                  const ClipStack& clip, const Brush& brush) {
@@ -837,19 +991,14 @@ void PDFExportContext::onDrawPath(const Matrix& matrix, const ClipStack& clip, c
   // Keep strict constraints to avoid changing non-rectangular/path-based shader behavior.
   Rect pathRect;
   if (!path.isInverseFillType() && path.isRect(&pathRect) && brush.shader) {
-    auto shader = brush.shader;
     Matrix shaderMatrix = Matrix::I();
+    const auto* shader = &UnwrapMatrixShader(*brush.shader, &shaderMatrix);
     bool isSimpleImageShader = true;
-    while (Types::Get(shader.get()) == Types::ShaderType::Matrix) {
-      const auto matrixShader = static_cast<const MatrixShader*>(shader.get());
-      shaderMatrix.preConcat(matrixShader->matrix);
-      shader = matrixShader->source;
-    }
-    if (Types::Get(shader.get()) != Types::ShaderType::Image) {
+    if (Types::Get(shader) != Types::ShaderType::Image) {
       isSimpleImageShader = false;
     }
     if (isSimpleImageShader) {
-      const auto imageShader = static_cast<const ImageShader*>(shader.get());
+      const auto imageShader = static_cast<const ImageShader*>(shader);
       auto image = imageShader->image;
       if (image && imageShader->tileModeX == TileMode::Clamp &&
           imageShader->tileModeY == TileMode::Clamp) {

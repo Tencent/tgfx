@@ -3515,9 +3515,9 @@ enum class ShadowType { Drop, Inner };
 
 static inline std::shared_ptr<LayerStyle> MakeShadow(ShadowType type, float offsetX, float offsetY,
                                                      float blurX, float blurY, const Color& color,
-                                                     float spread, bool dropBehindLayer = true) {
+                                                     float spread, bool showBehindLayer = true) {
   if (type == ShadowType::Drop) {
-    auto style = DropShadowStyle::Make(offsetX, offsetY, blurX, blurY, color, dropBehindLayer);
+    auto style = DropShadowStyle::Make(offsetX, offsetY, blurX, blurY, color, showBehindLayer);
     style->setSpread(spread);
     return style;
   }
@@ -3867,6 +3867,86 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
         {MakeShadow(type, 25, 25, 3, 3, Color::Green(), i == 0 ? 0.0f : 6.0f, false)});
     displayList.root()->addChild(vectorLayer);
   }
+
+  // Case 18: ShapeLayer thin strip 160x4 fill with a large blur, spread=8. The strip's short side
+  // is far smaller than the blur kernel and the aspect ratio is extreme.
+  for (int i = 0; i < 2; ++i) {
+    auto layer = ShapeLayer::Make();
+    Path path = {};
+    path.addRect(Rect::MakeXYWH(0.0f, 28.0f, 160.0f, 4.0f));
+    layer->setPath(path);
+    layer->setFillStyle(ShapeStyle::Make(Color::Red()));
+    layer->setMatrix(
+        Matrix::MakeTrans(cellW * 2 + (i == 0 ? lItemXOffset : rItemXOffset), cellH * 5 + gap));
+    layer->setLayerStyles({MakeShadow(type, 25, 25, 10, 10, YELLOW_COLOR, i == 0 ? 0.0f : 8.0f)});
+    displayList.root()->addChild(layer);
+  }
+
+  // Case 19: SolidLayer at half alpha under a non-uniform scale matrix, spread=8. The shadow must
+  // land on the scaled shape with elliptical corners and render at half strength following the
+  // layer's alpha.
+  for (int i = 0; i < 2; ++i) {
+    auto layer = SolidLayer::Make();
+    layer->setColor(Color::Red());
+    layer->setWidth(80);
+    layer->setHeight(40);
+    layer->setRadiusX(8);
+    layer->setRadiusY(8);
+    layer->setAlpha(0.5f);
+    auto matrix = Matrix::MakeTrans(i == 0 ? lItemXOffset : rItemXOffset, cellH * 6 + gap);
+    matrix.postScale(2.0f, 1.5f);
+    layer->setMatrix(matrix);
+    layer->setLayerStyles({MakeShadow(type, 25, 25, 3, 3, YELLOW_COLOR, i == 0 ? 0.0f : 8.0f)});
+    displayList.root()->addChild(layer);
+  }
+
+  // Case 20: SolidLayer with an offset drop shadow that stays hidden behind the layer
+  // (showBehindLayer = false), spread=8. The knockout combines with the analytic shadow path,
+  // unlike the earlier hidden-behind-layer cases whose stroked or complex shapes fall back to the
+  // filter path.
+  for (int i = 0; i < 2; ++i) {
+    auto layer = SolidLayer::Make();
+    layer->setColor(Color::Red());
+    layer->setWidth(100);
+    layer->setHeight(60);
+    layer->setRadiusX(10);
+    layer->setRadiusY(10);
+    layer->setMatrix(
+        Matrix::MakeTrans(cellW + (i == 0 ? lItemXOffset : rItemXOffset), cellH * 6 + gap));
+    layer->setLayerStyles(
+        {MakeShadow(type, 25, 25, 3, 3, YELLOW_COLOR, i == 0 ? 0.0f : 8.0f, false)});
+    displayList.root()->addChild(layer);
+  }
+
+  // Case 21: SolidLayer whose spread consumes the shape entirely. The drop shadow shrinks to
+  // nothing while the inner shadow covers the whole shape.
+  for (int i = 0; i < 2; ++i) {
+    auto layer = SolidLayer::Make();
+    layer->setColor(Color::Red());
+    layer->setWidth(100);
+    layer->setHeight(60);
+    layer->setRadiusX(10);
+    layer->setRadiusY(10);
+    layer->setMatrix(
+        Matrix::MakeTrans(cellW * 2 + (i == 0 ? lItemXOffset : rItemXOffset), cellH * 6 + gap));
+    auto collapseSpread = type == ShadowType::Drop ? -35.0f : 35.0f;
+    layer->setLayerStyles(
+        {MakeShadow(type, 25, 25, 3, 3, YELLOW_COLOR, i == 0 ? 0.0f : collapseSpread)});
+    displayList.root()->addChild(layer);
+  }
+
+  // Case 22: SolidLayer with an anisotropic blur (12, 4), spread=8
+  for (int i = 0; i < 2; ++i) {
+    auto layer = SolidLayer::Make();
+    layer->setColor(Color::Red());
+    layer->setWidth(100);
+    layer->setHeight(60);
+    layer->setRadiusX(10);
+    layer->setRadiusY(10);
+    layer->setMatrix(Matrix::MakeTrans(i == 0 ? lItemXOffset : rItemXOffset, cellH * 7 + gap));
+    layer->setLayerStyles({MakeShadow(type, 25, 25, 12, 4, YELLOW_COLOR, i == 0 ? 0.0f : 8.0f)});
+    displayList.root()->addChild(layer);
+  }
 }
 
 TGFX_TEST(LayerTest, DropShadow) {
@@ -3877,7 +3957,7 @@ TGFX_TEST(LayerTest, DropShadow) {
   constexpr float cellH = 120.0f;
   constexpr float gap = 30.0f;
   auto surface =
-      Surface::Make(context, static_cast<int>(cellW * 3 + gap), static_cast<int>(cellH * 6 + gap));
+      Surface::Make(context, static_cast<int>(cellW * 3 + gap), static_cast<int>(cellH * 8 + gap));
   auto displayList = std::make_unique<DisplayList>();
   BuildShadowTestLayers(*displayList, ShadowType::Drop, cellW, cellH, gap);
   displayList->render(surface.get());
@@ -3892,7 +3972,7 @@ TGFX_TEST(LayerTest, InnerShadow) {
   constexpr float cellH = 120.0f;
   constexpr float gap = 30.0f;
   auto surface =
-      Surface::Make(context, static_cast<int>(cellW * 3 + gap), static_cast<int>(cellH * 6 + gap));
+      Surface::Make(context, static_cast<int>(cellW * 3 + gap), static_cast<int>(cellH * 8 + gap));
   auto displayList = std::make_unique<DisplayList>();
   BuildShadowTestLayers(*displayList, ShadowType::Inner, cellW, cellH, gap);
   displayList->render(surface.get());

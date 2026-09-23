@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "layers/OffscreenRenderer.h"
+#include "core/utils/PictureUtils.h"
 #include "layers/BackgroundHandler.h"
-#include "layers/LayerStyleSource.h"
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/Layer.h"

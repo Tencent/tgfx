@@ -894,7 +894,7 @@ TGFX_TEST(PDFExportTest, DropShadowLayer) {
   layerA->setLayerStyles({DropShadowStyle::Make(20.f, 20.f, 10.f, 10.f, Color::Blue(), false)});
   root->addChild(layerA);
 
-  // Right: showBehindLayer=true
+  // Center: showBehindLayer=true
   auto layerB = ShapeLayer::Make();
   Path pathB;
   pathB.addRect(Rect::MakeWH(200.f, 200.f));
@@ -904,11 +904,35 @@ TGFX_TEST(PDFExportTest, DropShadowLayer) {
   layerB->setLayerStyles({DropShadowStyle::Make(20.f, 20.f, 10.f, 10.f, Color::Blue(), true)});
   root->addChild(layerB);
 
+  // Right: analytic drop shadow on a rounded rect
+  auto layerC = ShapeLayer::Make();
+  Path pathC;
+  pathC.addRRect(RRect::MakeRectXY(Rect::MakeWH(200.f, 200.f), 20.f, 20.f));
+  layerC->setPath(pathC);
+  layerC->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 0, 0, 127)));
+  layerC->setPosition(Point{650.f, 50.f});
+  auto spreadStyle = DropShadowStyle::Make(20.f, 20.f, 10.f, 10.f, Color::Blue(), true);
+  spreadStyle->setSpread(10.f);
+  layerC->setLayerStyles({spreadStyle});
+  root->addChild(layerC);
+
+  // Far right: analytic inner shadow on a rounded rect
+  auto layerD = ShapeLayer::Make();
+  Path pathD;
+  pathD.addRRect(RRect::MakeRectXY(Rect::MakeWH(200.f, 200.f), 20.f, 20.f));
+  layerD->setPath(pathD);
+  layerD->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 0, 0, 127)));
+  layerD->setPosition(Point{950.f, 50.f});
+  auto spreadInnerStyle = InnerShadowStyle::Make(20.f, 20.f, 10.f, 10.f, Color::Blue());
+  spreadInnerStyle->setSpread(10.f);
+  layerD->setLayerStyles({spreadInnerStyle});
+  root->addChild(layerD);
+
   auto PDFStream = MemoryWriteStream::Make();
   auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
 
   // Page 1: rectangles
-  auto canvas = document->beginPage(650.f, 350.f);
+  auto canvas = document->beginPage(1250.f, 350.f);
   canvas->drawColor(Color::FromRGBA(200, 200, 200));
   root->draw(canvas);
   document->endPage();

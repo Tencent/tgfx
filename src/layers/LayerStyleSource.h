@@ -20,13 +20,8 @@
 
 #include <memory>
 #include <optional>
-#include "core/utils/MathExtra.h"
-#include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/Image.h"
-#include "tgfx/core/Matrix.h"
-#include "tgfx/core/Picture.h"
 #include "tgfx/core/Point.h"
-#include "tgfx/core/Rect.h"
 #include "tgfx/layers/layerstyles/StyledShape.h"
 
 namespace tgfx {
@@ -68,35 +63,5 @@ struct LayerStyleSource {
   // spread). std::nullopt when no LayerStyle needs it.
   std::optional<StyledShape> contentShape = std::nullopt;
 };
-
-/**
- * Turns a recorded Picture into an Image whose origin is placed at imageBounds (or the picture's
- * own bounds when imageBounds is null). offset receives the resulting top-left corner in the
- * source coordinate system so callers can align consumers. roundOutBounds should be true for
- * offscreen compositing (where the canvas matrix has already been baked into the picture) and
- * false for caching scenarios (where the canvas matrix is applied separately at draw time).
- */
-inline std::shared_ptr<Image> ToImageWithOffset(
-    std::shared_ptr<Picture> picture, Point* offset, const Rect* imageBounds = nullptr,
-    std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB(), bool roundOutBounds = true) {
-  if (picture == nullptr) {
-    return nullptr;
-  }
-  auto bounds = imageBounds ? *imageBounds : picture->getBounds();
-  if (roundOutBounds) {
-    // In off-screen rendering scenarios, the canvas matrix is applied to the picture, requiring
-    // bounds to be rounded out to keep offsets integral and avoid redundant sampling.
-    // During caching, the canvas matrix is not applied to the picture, so rounding is unnecessary.
-    bounds.roundOut();
-  }
-  auto matrix = Matrix::MakeTrans(-bounds.x(), -bounds.y());
-  auto image = Image::MakeFrom(std::move(picture), FloatCeilToInt(bounds.width()),
-                               FloatCeilToInt(bounds.height()), &matrix, std::move(colorSpace));
-  if (offset) {
-    offset->x = bounds.left;
-    offset->y = bounds.top;
-  }
-  return image;
-}
 
 }  // namespace tgfx

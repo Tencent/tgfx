@@ -20,8 +20,8 @@
 #include <algorithm>
 #include "core/shapes/MatrixShape.h"
 #include "core/utils/Log.h"
+#include "core/utils/PictureUtils.h"
 #include "core/utils/ShapeUtils.h"
-#include "layers/LayerStyleSource.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/RRect.h"
@@ -31,8 +31,12 @@
 namespace tgfx {
 
 static inline RRect MakeSpreadRRect(const RRect& rRect, float distance) {
+  return SpreadUtils::MakeSpreadRRect(rRect, {distance, distance});
+}
+
+RRect SpreadUtils::MakeSpreadRRect(const RRect& rRect, Point distance) {
   auto bounds = rRect.rect();
-  bounds.outset(distance, distance);
+  bounds.outset(distance.x, distance.y);
   if (bounds.width() <= 0.0f || bounds.height() <= 0.0f) {
     return {};
   }
@@ -41,10 +45,10 @@ static inline RRect MakeSpreadRRect(const RRect& rRect, float distance) {
   auto radii = rRect.radii();
   for (auto& corner : radii) {
     if (corner.x > 0.0f) {
-      corner.x = std::max(0.0f, corner.x + distance);
+      corner.x = std::max(0.0f, corner.x + distance.x);
     }
     if (corner.y > 0.0f) {
-      corner.y = std::max(0.0f, corner.y + distance);
+      corner.y = std::max(0.0f, corner.y + distance.y);
     }
   }
   RRect result = {};

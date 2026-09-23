@@ -133,7 +133,6 @@ class SVGExportContext : public DrawContext {
 
   void exportGlyphRunAsPath(const GlyphRun& glyphRun, const Matrix& matrix, const Brush& brush,
                             const Stroke* stroke);
-
   void exportGlyphRunAsText(const GlyphRun& glyphRun, const Matrix& matrix, const Brush& brush,
                             const Stroke* stroke);
 
@@ -151,6 +150,17 @@ class SVGExportContext : public DrawContext {
       const std::string& clipID, const std::string& blendStyle, float alpha);
 
   static SVGPathParser::PathEncoding PathEncodingType();
+
+  bool drawRectWithUnsupportedShader(const Rect& rect, const Brush& brush, const Matrix& matrix,
+                                     const ClipStack& clip, const Stroke* stroke);
+
+  bool drawDropShadow(const RRect& shape, float sigmaX, float sigmaY, const Color& color,
+                      const Matrix& matrix, const Matrix& shaderMatrix, const ClipStack& clip,
+                      const Rect& extraClip, const Brush& brush);
+
+  bool drawInnerShadow(const RRect& shadowShape, const RRect& maskShape, float sigmaX, float sigmaY,
+                       const Color& color, const Matrix& matrix, const Matrix& shaderMatrix,
+                       const ClipStack& clip, const Rect& extraClip, const Brush& brush);
 
   uint32_t exportFlags = {};
   Context* context = nullptr;

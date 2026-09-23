@@ -1193,6 +1193,17 @@ void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader, Co
       resources->filter = "pending";
       break;
     }
+    case Types::ShaderType::RectBlur:
+    case Types::ShaderType::RRectBlur:
+    case Types::ShaderType::RectInnerShadow:
+    case Types::ShaderType::RRectInnerShadow:
+      // Analytic shadow shaders carry the shapes they blur and must be intercepted at the draw
+      // entry (SVGExportContext::drawRectWithUnsupportedShader), which rewrites the whole draw as
+      // an image filter. Reaching here means a producer bypassed that interception, and the paint
+      // falls back to the brush color.
+      DEBUG_ASSERT(false);
+      reportUnsupportedElement("Analytic shadow shader outside the draw-entry interception");
+      break;
     default:
       reportUnsupportedElement("Unsupported shader");
   }

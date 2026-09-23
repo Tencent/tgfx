@@ -56,4 +56,9 @@ class MatrixShader final : public Shader {
 
   MatrixShader(std::shared_ptr<Shader> source, const Matrix& matrix);
 };
+
+/**
+ * Returns the shader behind any MatrixShader wrappers, accumulating their transforms into matrix.
+ */
+const Shader& UnwrapMatrixShader(const Shader& shader, Matrix* matrix);
 }  // namespace tgfx
