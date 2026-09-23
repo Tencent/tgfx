@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/opengl/wgl/WGLDevice.h"
+#include "gpu/DeviceRegistry.h"
 #include "gpu/opengl/wgl/WGLGPU.h"
 #include "gpu/opengl/wgl/WGLInterface.h"
 
@@ -276,7 +277,7 @@ std::shared_ptr<WGLDevice> WGLDevice::Wrap(HDC deviceContext, HGLRC glContext, H
     device->externallyOwned = externallyOwned;
     device->deviceContext = deviceContext;
     device->sharedContext = sharedContext;
-    device->weakThis = device;
+    device = std::static_pointer_cast<WGLDevice>(Device::RegisterNative(device, {glContext}));
   }
   if (oldGLContext != glContext) {
     wglMakeCurrent(deviceContext, nullptr);

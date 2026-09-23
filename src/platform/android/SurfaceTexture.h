@@ -77,7 +77,7 @@ class SurfaceTexture : public ImageStream {
 
   unsigned makeExternalOESTexture(Context* context);
 
-  ISize updateTexImage();
+  bool updateTexImage();
 
   friend class JNIInit;
 };

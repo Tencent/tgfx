@@ -35,16 +35,22 @@ std::shared_ptr<VulkanShaderModule> VulkanShaderModule::Make(
   return module;
 }
 
-VulkanShaderModule::VulkanShaderModule(VulkanGPU* gpu, const ShaderModuleDescriptor& descriptor) {
+VulkanShaderModule::VulkanShaderModule(VulkanGPU* gpu, const ShaderModuleDescriptor& descriptor)
+    : VaryingShaderModule(ExtractVaryingDecls(descriptor.code, descriptor.stage), {}) {
   VkShaderModuleCreateInfo createInfo = {};
   createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 
   std::vector<uint32_t> compiledSPIRV;
   if (descriptor.format == ShaderCodeFormat::SPIRV) {
+    // Precompiled SPIR-V carries no parseable GLSL for the runtime slot collection, so the baked
+    // block bindings arrive via the descriptor (filled by the pipeline creator from the offline
+    // templates' declared bindings).
+    setUniformSlots(descriptor.uniformSlots);
     createInfo.codeSize = descriptor.binaryData.size();
     createInfo.pCode = reinterpret_cast<const uint32_t*>(descriptor.binaryData.data());
   } else {
-    std::string vulkanGLSL = PreprocessGLSL(descriptor.code);
+    std::string vulkanGLSL = PreprocessGLSL(descriptor.code, descriptor.stage);
+    setUniformSlots(detail::CollectUniformSlots(vulkanGLSL));
     compiledSPIRV = CompileGLSLToSPIRV(gpu->shaderCompiler(), vulkanGLSL, descriptor.stage);
     if (compiledSPIRV.empty()) {
       LOGE("VulkanShaderModule: GLSL to SPIR-V compilation failed.");

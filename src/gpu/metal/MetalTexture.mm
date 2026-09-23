@@ -95,15 +95,18 @@ std::shared_ptr<MetalTexture> MetalTexture::Make(MetalGPU* gpu,
 }
 
 std::shared_ptr<MetalTexture> MetalTexture::MakeFrom(MetalGPU* gpu, id<MTLTexture> metalTexture,
-                                                     uint32_t usage, bool adopted) {
+                                                     int width, int height, uint32_t usage,
+                                                     bool adopted) {
   if (!gpu || !metalTexture) {
     return nullptr;
   }
 
-  // Build descriptor from the Metal texture properties
+  // Build descriptor from the caller-declared dimensions. The underlying MTLTexture may be larger
+  // than the logical texture (e.g. a subregion), so trust the declared width/height to stay
+  // consistent with the OpenGL backend, which also uses the BackendTexture dimensions.
   TextureDescriptor descriptor = {};
-  descriptor.width = static_cast<int>(metalTexture.width);
-  descriptor.height = static_cast<int>(metalTexture.height);
+  descriptor.width = width;
+  descriptor.height = height;
   descriptor.format = ToPixelFormat(metalTexture.pixelFormat);
   descriptor.mipLevelCount = static_cast<int>(metalTexture.mipmapLevelCount);
   descriptor.sampleCount = static_cast<int>(metalTexture.sampleCount);
@@ -139,8 +142,7 @@ BackendTexture MetalTexture::getBackendTexture() const {
   MetalTextureInfo metalInfo;
   metalInfo.texture = (__bridge const void*)texture;
   metalInfo.format = static_cast<unsigned>(texture.pixelFormat);
-  return BackendTexture(metalInfo, static_cast<int>(texture.width),
-                        static_cast<int>(texture.height));
+  return BackendTexture(metalInfo, descriptor.width, descriptor.height);
 }
 
 BackendRenderTarget MetalTexture::getBackendRenderTarget() const {
@@ -150,8 +152,7 @@ BackendRenderTarget MetalTexture::getBackendRenderTarget() const {
   MetalTextureInfo metalInfo;
   metalInfo.texture = (__bridge const void*)texture;
   metalInfo.format = static_cast<unsigned>(texture.pixelFormat);
-  return BackendRenderTarget(metalInfo, static_cast<int>(texture.width),
-                             static_cast<int>(texture.height));
+  return BackendRenderTarget(metalInfo, descriptor.width, descriptor.height);
 }
 
 }  // namespace tgfx

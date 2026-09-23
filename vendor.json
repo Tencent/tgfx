@@ -196,6 +196,7 @@
         "arguments": [
           "-DCMAKE_DISABLE_FIND_PACKAGE_BZip2=TRUE",
           "-DCMAKE_DISABLE_FIND_PACKAGE_HarfBuzz=TRUE",
+          "-DFT_DISABLE_HARFBUZZ=TRUE",
           "-DFT_DISABLE_BROTLI=TRUE",
           "-DFT_REQUIRE_PNG=TRUE",
           "-DCMAKE_C_FLAGS=\"-w\""
@@ -284,8 +285,7 @@
           "-DSHADERC_SKIP_TESTS=ON",
           "-DSHADERC_SKIP_EXAMPLES=ON",
           "-DSHADERC_SKIP_INSTALL=ON",
-          "-DCMAKE_CXX_FLAGS=\"-w\"",
-          "-DDEPLOYMENT_TARGET=13.0"
+          "-DCMAKE_CXX_FLAGS=\"-w\""
         ],
         "platforms": [
           "ios"
@@ -320,8 +320,7 @@
         ],
         "arguments": [
           "-DSPIRV_CROSS_ENABLE_TESTS=OFF",
-          "-DCMAKE_CXX_FLAGS=\"-w\"",
-          "-DDEPLOYMENT_TARGET=13.0"
+          "-DCMAKE_CXX_FLAGS=\"-w\""
         ],
         "platforms": [
           "ios"

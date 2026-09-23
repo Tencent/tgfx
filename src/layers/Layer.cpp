@@ -947,7 +947,7 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   // skip (same as contour / 3D subtrees). A null snapshot map signals the picture-canvas path,
   // which makes the consumer synthesize backdrops on the fly via PictureRecorder.
   AutoCanvasRestore autoRestore(canvas);
-  BackgroundConsumer consumer(snapshotsPtr);
+  BackgroundConsumer consumer(snapshotsPtr, false);
   BackgroundHandler* handler =
       needBackground ? static_cast<BackgroundHandler*>(&consumer) : BackgroundHandler::NoOp();
   DrawArgs drawArgs = args;
@@ -1012,17 +1012,10 @@ void Layer::detachProperty(LayerProperty* property) {
 }
 
 std::optional<StyledShape> Layer::onGetContentShape() {
-  auto* content = getContent();
-  if (content == nullptr) {
-    return std::nullopt;
-  }
-  auto bounds = content->getTightBounds(Matrix::I());
-  if (bounds.isEmpty()) {
-    return std::nullopt;
-  }
-  Path path = {};
-  path.addRect(bounds);
-  return StyledShape::Make(Shape::MakeFrom(path), StyledShapeType::Fill, 0, StrokeAlign::Center);
+  // The default implementation has no exact vector outline to offer: deriving a rect from the
+  // content bounds would be an approximation, which the exact-or-null StyledShape contract
+  // forbids. Layer types whose content is an exact vector shape override this.
+  return std::nullopt;
 }
 
 void Layer::onAttachToRoot(RootLayer* rootLayer) {
@@ -1873,11 +1866,11 @@ float Layer::drawBackgroundLayers(const DrawArgs& args, Canvas* canvas) {
 }
 
 std::shared_ptr<Image> Layer::synthesizeBackgroundImage(const DrawArgs& args, float contentScale,
-                                                        Point* offset) {
+                                                        const Rect& contentBounds, Point* offset) {
   if (FloatNearlyZero(contentScale)) {
     return nullptr;
   }
-  auto bounds = getBounds();
+  auto bounds = contentBounds;
   bounds.scale(contentScale, contentScale);
   bounds.roundOut();
   if (bounds.isEmpty()) {

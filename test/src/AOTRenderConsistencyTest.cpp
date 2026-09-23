@@ -3071,7 +3071,10 @@ TGFX_TEST(AOTRenderConsistencyTest, UnreferencedPendingUploadIsSkipped) {
   auto* proxyProvider = context->proxyProvider();
   auto generatorA = std::make_shared<CountingImageGenerator>(32, 32);
   {
-    auto proxy = proxyProvider->createTextureProxy(generatorA, false, 0);
+    // The async image source submits its decode to the task pool at creation, which would run
+    // the decode regardless of the proxy's reference state. Disable it so the decode happens
+    // only inside the upload task, which is what this test measures.
+    auto proxy = proxyProvider->createTextureProxy(generatorA, false, RenderFlags::DisableAsyncTask);
     ASSERT_TRUE(proxy != nullptr);
     context->flushAndSubmit(true);
     // The proxy is still alive here, so the upload task is not its only owner and the decode
@@ -3080,7 +3083,7 @@ TGFX_TEST(AOTRenderConsistencyTest, UnreferencedPendingUploadIsSkipped) {
   }
   auto generatorB = std::make_shared<CountingImageGenerator>(32, 32);
   {
-    auto proxy = proxyProvider->createTextureProxy(generatorB, false, 0);
+    auto proxy = proxyProvider->createTextureProxy(generatorB, false, RenderFlags::DisableAsyncTask);
     ASSERT_TRUE(proxy != nullptr);
     proxy = nullptr;
     context->flushAndSubmit(true);

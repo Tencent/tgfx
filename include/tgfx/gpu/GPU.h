@@ -151,6 +151,13 @@ class GPU {
   /**
    * Creates a RenderPipeline that manages the vertex and fragment shader stages for use in a
    * RenderPass. Returns nullptr if pipeline creation fails.
+   *
+   * The vertex and fragment shader stages must declare the same set of varyings: every vertex
+   * `out` varying must be consumed by the fragment stage and every fragment `in` varying must be
+   * produced by the vertex stage, with matching array lengths. On SPIR-V based backends (Metal,
+   * Vulkan, D3D12, WebGPU), a mismatch between the two stages makes pipeline creation fail and
+   * return nullptr, because those backends pair varyings by location and cannot silently drop an
+   * unmatched declaration.
    */
   virtual std::shared_ptr<RenderPipeline> createRenderPipeline(
       const RenderPipelineDescriptor& descriptor) = 0;

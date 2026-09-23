@@ -68,19 +68,11 @@ void MetalCaps::initFeatureSet(id<MTLDevice> device) {
   // stencil attachment capability is unconditionally available.
   _features.stencilAttachmentSupported = true;
 
-  // Check for clamp to border support
+  // supportsFamily: needs macOS 10.15 / iOS 13.0, both well below the minimum deployment target.
 #if TARGET_OS_OSX
-  if (@available(macOS 10.15, *)) {
-    clampToBorderSupported = [device supportsFamily:MTLGPUFamilyMac2];
-  } else {
-    clampToBorderSupported = false;
-  }
+  clampToBorderSupported = [device supportsFamily:MTLGPUFamilyMac2];
 #else
-  if (@available(iOS 13.0, *)) {
-    clampToBorderSupported = [device supportsFamily:MTLGPUFamilyApple4];
-  } else {
-    clampToBorderSupported = false;
-  }
+  clampToBorderSupported = [device supportsFamily:MTLGPUFamilyApple4];
 #endif
 
   _features.clampToBorder = clampToBorderSupported;
@@ -95,12 +87,8 @@ void MetalCaps::initLimits(id<MTLDevice> device) {
   (void)device;
   _limits.maxTextureDimension2D = 16384;
 #else
-  if (@available(iOS 13.0, *)) {
-    if ([device supportsFamily:MTLGPUFamilyApple3]) {
-      _limits.maxTextureDimension2D = 16384;
-    } else {
-      _limits.maxTextureDimension2D = 4096;
-    }
+  if ([device supportsFamily:MTLGPUFamilyApple3]) {
+    _limits.maxTextureDimension2D = 16384;
   } else {
     _limits.maxTextureDimension2D = 4096;
   }

@@ -19,9 +19,11 @@
 #pragma once
 
 #include <webgpu/webgpu.h>
+#include <map>
 #include <unordered_map>
 #include <vector>
 #include "WebGPUResource.h"
+#include "gpu/VaryingShaderModule.h"
 #include "tgfx/gpu/RenderPipeline.h"
 
 namespace tgfx {
@@ -40,13 +42,15 @@ class WebGPURenderPipeline : public RenderPipeline, public WebGPUResource {
                : pipeline;
   }
 
-  WGPUBindGroupLayout bindGroupLayout() const {
-    return _bindGroupLayout;
+  WGPUBindGroupLayout bindGroupLayout(unsigned group) const {
+    return group < 3 ? bindGroupLayouts[group] : nullptr;
   }
 
   unsigned getTextureIndex(unsigned binding) const;
 
-  uint32_t getUniformBlockVisibility(unsigned binding) const;
+  /// Returns the per-stage physical bindings for the given public logical binding, or nullptr if
+  /// the pipeline does not use that binding.
+  const UniformSlotMapping* getUniformSlots(unsigned binding) const;
 
   void onRelease(WebGPUGPU* gpu) override;
 
@@ -58,10 +62,10 @@ class WebGPURenderPipeline : public RenderPipeline, public WebGPUResource {
 
   WGPURenderPipeline pipeline = nullptr;       // TriangleList
   WGPURenderPipeline pipelineStrip = nullptr;  // TriangleStrip
-  WGPUBindGroupLayout _bindGroupLayout = nullptr;
+  WGPUBindGroupLayout bindGroupLayouts[3] = {};
   WGPUPipelineLayout pipelineLayout = nullptr;
   std::unordered_map<unsigned, unsigned> textureUnits = {};
-  std::unordered_map<unsigned, uint32_t> uniformBlockVisibility = {};
+  std::map<unsigned, UniformSlotMapping> uniformSlots = {};
   WGPUCullMode cullMode = WGPUCullMode_None;
   WGPUFrontFace frontFace = WGPUFrontFace_CCW;
 

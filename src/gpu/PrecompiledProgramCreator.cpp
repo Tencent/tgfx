@@ -270,6 +270,13 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
   } else {
     vertexDesc.code = std::string(vertBlob->data.begin(), vertBlob->data.end());
   }
+  if (!vertBlob->uniforms.empty()) {
+    // The stage's uniform block bindings are constants baked into every offline template (see
+    // UniformData.h); a stage without uniforms stays slot-less so the pipeline-time two-way
+    // layout check sees neither side.
+    vertexDesc.uniformSlots = {
+        {std::string(VertexUniformBlockName), static_cast<unsigned>(VERTEX_UBO_BINDING_POINT)}};
+  }
 
   ShaderModuleDescriptor fragmentDesc = {};
   fragmentDesc.format = format;
@@ -278,6 +285,10 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
     fragmentDesc.binaryData = fragBlob->data;
   } else {
     fragmentDesc.code = std::string(fragBlob->data.begin(), fragBlob->data.end());
+  }
+  if (!fragBlob->uniforms.empty()) {
+    fragmentDesc.uniformSlots = {
+        {std::string(FragmentUniformBlockName), static_cast<unsigned>(FRAGMENT_UBO_BINDING_POINT)}};
   }
 
   if (const char* dumpDir = getenv("TGFX_AOT_DUMP_DIR")) {

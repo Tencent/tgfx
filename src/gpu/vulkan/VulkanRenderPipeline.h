@@ -18,9 +18,11 @@
 
 #pragma once
 
+#include <map>
 #include <unordered_map>
 #include <unordered_set>
 #include "core/utils/Log.h"
+#include "gpu/VaryingShaderModule.h"
 #include "gpu/vulkan/VulkanAPI.h"
 #include "gpu/vulkan/VulkanResource.h"
 #include "tgfx/gpu/RenderPass.h"
@@ -56,23 +58,26 @@ class VulkanRenderPipeline : public RenderPipeline, public VulkanResource {
     return pipelineLayout;
   }
 
-  /// Returns the descriptor set layout for UBO bindings (set 0).
-  VkDescriptorSetLayout vulkanUboSetLayout() const {
-    return uboSetLayout;
+  /// Returns the descriptor set layout for the vertex UBO set (descriptor set 0).
+  VkDescriptorSetLayout vulkanVertexUboSetLayout() const {
+    return vertexUboSetLayout;
   }
 
-  /// Returns the descriptor set layout for texture/sampler bindings (set 1).
+  /// Returns the descriptor set layout for the fragment UBO set (descriptor set 1).
+  VkDescriptorSetLayout vulkanFragmentUboSetLayout() const {
+    return fragmentUboSetLayout;
+  }
+
+  /// Returns the descriptor set layout for the texture sampler set (descriptor set 2).
   VkDescriptorSetLayout vulkanTextureSetLayout() const {
     return textureSetLayout;
   }
 
   unsigned getTextureIndex(unsigned binding) const;
 
-  uint32_t getUniformBlockVisibility(unsigned binding) const;
-
-  bool hasUniformBinding(unsigned binding) const {
-    return uniformBindingSet.count(binding) > 0;
-  }
+  /// Returns the per-stage physical UBO slots for the given public logical binding, or nullptr if
+  /// the pipeline does not use that binding.
+  const UniformSlotMapping* getUniformSlots(unsigned binding) const;
 
   const std::unordered_set<unsigned>& getTextureBindings() const {
     return textureBindingSet;
@@ -93,13 +98,11 @@ class VulkanRenderPipeline : public RenderPipeline, public VulkanResource {
   VkPipeline pipeline = VK_NULL_HANDLE;
   VkPipeline stripPipeline = VK_NULL_HANDLE;
   VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
-  // Descriptor set 0: UBO bindings (vertex UBO at binding 0, fragment UBO at binding 1).
-  VkDescriptorSetLayout uboSetLayout = VK_NULL_HANDLE;
-  // Descriptor set 1: texture/sampler bindings (binding 0, 1, 2, ...).
+  VkDescriptorSetLayout vertexUboSetLayout = VK_NULL_HANDLE;
+  VkDescriptorSetLayout fragmentUboSetLayout = VK_NULL_HANDLE;
   VkDescriptorSetLayout textureSetLayout = VK_NULL_HANDLE;
   std::unordered_map<unsigned, unsigned> textureUnits = {};
-  std::unordered_map<unsigned, uint32_t> uniformBlockVisibility = {};
-  std::unordered_set<unsigned> uniformBindingSet = {};
+  std::map<unsigned, UniformSlotMapping> uniformSlots = {};
   std::unordered_set<unsigned> textureBindingSet = {};
 
   friend class VulkanGPU;

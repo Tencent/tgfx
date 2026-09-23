@@ -17,9 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "HardwareBufferUtil.h"
-#if defined(__APPLE__)
-#include <TargetConditionals.h>
-#endif
 
 namespace tgfx {
 ImageInfo GetImageInfo(HardwareBufferRef hardwareBuffer, std::shared_ptr<ColorSpace> colorSpace) {
@@ -49,12 +46,7 @@ PixelFormat GetRenderableFormat(HardwareBufferFormat hardwareBufferFormat) {
     case HardwareBufferFormat::RGBA_8888:
       return PixelFormat::RGBA_8888;
     case HardwareBufferFormat::BGRA_8888:
-#if TARGET_OS_MAC && !TARGET_OS_IPHONE
-      // On macOS, hardware textures always use the RGBA format.
-      return PixelFormat::RGBA_8888;
-#else
       return PixelFormat::BGRA_8888;
-#endif
     default:
       break;
   }

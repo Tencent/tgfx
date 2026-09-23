@@ -20,8 +20,10 @@
 
 #include <memory>
 #include <unordered_map>
+#include <vector>
 #include "layers/LayerStyleSource.h"
 #include "tgfx/core/Image.h"
+#include "tgfx/core/Matrix.h"
 #include "tgfx/core/Point.h"
 
 namespace tgfx {
@@ -97,6 +99,35 @@ struct BackgroundSnapshotMap {
                      BackgroundSnapshotKeyHash>
       snapshots = {};
   std::unordered_map<Layer*, std::unique_ptr<LayerStyleSource>> layerStyleSources = {};
+  // True when this frame renders through multiple passes (tiles or dirty rects), which is
+  // when caching the style output pays for its rasterization.
+  bool multiPass = false;
+  // True when the frame's render rects are compact enough for the style output cache to pay off:
+  // the cache rasterizes their bounding union once, so it only beats per-pass drawing when that
+  // union stays close to the sum of the rects it covers. Scattered dirty rects make the union the
+  // whole screen while the per-pass work stays small, which measures several times slower.
+  bool styleShareCompact = false;
+  // World-space rects this frame actually paints, before capture widens them by
+  // maxBackgroundOutset for blur sampling. A style's output is only visible inside these rects, so
+  // they bound the shared style output texture to the on-screen size instead of the layer's full
+  // content extent, which under zoom can be orders of magnitude larger.
+  std::vector<Rect> visibleRects = {};
+  // Device size of this frame's render target. The shared style output is rasterized in device
+  // space, so this bounds it — anything outside the target is never visible.
+  int renderTargetWidth = 0;
+  int renderTargetHeight = 0;
+  // Style-space visible region per (Layer, LayerStyle) pair, computed during capture. The style
+  // space depends on the style's excludeChildEffects bucket (each bucket's content image has its
+  // own offset), while every pass in a frame shares it, so one rect per pair bounds the recorded
+  // style output for all passes.
+  std::unordered_map<BackgroundSnapshotKey, Rect, BackgroundSnapshotKeyHash> styleVisibleBounds =
+      {};
+  struct StyleOutput {
+    std::shared_ptr<Image> image = nullptr;
+    Matrix drawMatrix = Matrix::I();
+  };
+  std::unordered_map<BackgroundSnapshotKey, StyleOutput, BackgroundSnapshotKeyHash> styleOutputs =
+      {};
 };
 
 }  // namespace tgfx

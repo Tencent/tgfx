@@ -69,11 +69,10 @@ class D3D12RenderPipeline : public RenderPipeline, public D3D12Resource {
     return pipelineState.Get();
   }
 
-  /**
-   * Returns the root-parameter index that holds the CBV for the given uniform-block binding,
-   * or UINT32_MAX if the binding is not present in the pipeline.
-   */
-  uint32_t getUniformRootParameterIndex(unsigned binding) const;
+  /// Returns the root-parameter indices of the CBVs that consume the given public logical uniform
+  /// binding, or nullptr if the pipeline does not use that binding. A binding visible to both
+  /// stages yields two indices (vertex CBV then fragment CBV).
+  const std::vector<uint32_t>* getUniformRootParameterIndices(unsigned binding) const;
 
   /**
    * Returns the root-parameter index of the descriptor table holding the SRV for the given
@@ -110,7 +109,7 @@ class D3D12RenderPipeline : public RenderPipeline, public D3D12Resource {
   ComPtr<ID3D12RootSignature> rootSignature = nullptr;
   ComPtr<ID3D12PipelineState> pipelineState = nullptr;
 
-  std::unordered_map<unsigned, uint32_t> uniformRootParameterIndex = {};
+  std::unordered_map<unsigned, std::vector<uint32_t>> uniformRootParameterIndices = {};
   std::unordered_map<unsigned, uint32_t> textureRootParameterIndex = {};
   std::unordered_map<unsigned, uint32_t> samplerRootParameterIndex = {};
   std::vector<uint32_t> vertexStrides = {};

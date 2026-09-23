@@ -18,12 +18,11 @@
 
 #include "tgfx/gpu/opengl/GLDevice.h"
 #include <thread>
+#include "gpu/DeviceRegistry.h"
 #include "gpu/ResourceCache.h"
 #include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
-static std::mutex deviceMapLocker = {};
-static std::unordered_map<void*, GLDevice*> deviceMap = {};
 
 std::shared_ptr<GLDevice> GLDevice::MakeWithFallback() {
   auto device = GLDevice::Make();
@@ -32,10 +31,9 @@ std::shared_ptr<GLDevice> GLDevice::MakeWithFallback() {
   }
 #ifndef TGFX_BUILD_FOR_WEB
   {
-    std::lock_guard<std::mutex> autoLock(deviceMapLocker);
-    for (auto& item : deviceMap) {
-      device = std::static_pointer_cast<GLDevice>(item.second->weakThis.lock());
-      if (device != nullptr && !device->externallyOwned) {
+    for (auto& item : Device::GetAllNative()) {
+      device = std::static_pointer_cast<GLDevice>(item);
+      if (!device->externallyOwned) {
         LOGE(
             "GLDevice::MakeWithFallback(): Failed to create a new GLDevice! Fall back to the "
             "existing one.");
@@ -51,39 +49,26 @@ std::shared_ptr<GLDevice> GLDevice::Get(void* nativeHandle) {
   if (nativeHandle == nullptr) {
     return nullptr;
   }
-  std::lock_guard<std::mutex> autoLock(deviceMapLocker);
-  auto result = deviceMap.find(nativeHandle);
-  if (result != deviceMap.end()) {
-    auto device = result->second->weakThis.lock();
-    if (device) {
-      return std::static_pointer_cast<GLDevice>(device);
-    }
-    deviceMap.erase(result);
-  }
-  return nullptr;
+  return std::static_pointer_cast<GLDevice>(Device::FindNative({nativeHandle}));
 }
 
 GLDevice::GLDevice(std::unique_ptr<GPU> gpu, void* nativeHandle)
     : Device(std::move(gpu)), nativeHandle(nativeHandle) {
-  std::lock_guard<std::mutex> autoLock(deviceMapLocker);
-  deviceMap[nativeHandle] = this;
 }
 
 GLDevice::~GLDevice() {
   // Subclasses must call releaseAll() before GLDevice is destroyed to clean up all GPU resources in
   // the context. Otherwise, GPU resources may leak due to OpenGL context loss.
   DEBUG_ASSERT(context == nullptr);
-  std::lock_guard<std::mutex> autoLock(deviceMapLocker);
-  deviceMap.erase(nativeHandle);
 }
 
 void GLDevice::MarkAllContextsLost() {
-  std::lock_guard<std::mutex> autoLock(deviceMapLocker);
-  for (auto& item : deviceMap) {
-    item.second->_contextLost = true;
+  auto devices = Device::GetAllNative();
+  for (auto& device : devices) {
+    static_cast<GLDevice*>(device.get())->_contextLost = true;
   }
   LOGE("GLDevice::MarkAllContextsLost() All %zu GL contexts have been marked as lost.",
-       deviceMap.size());
+       devices.size());
 }
 
 void GLDevice::releaseAll() {

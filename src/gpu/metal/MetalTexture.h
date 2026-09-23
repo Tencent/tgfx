@@ -34,10 +34,13 @@ class MetalTexture : public Texture, public MetalResource {
   static std::shared_ptr<MetalTexture> Make(MetalGPU* gpu, const TextureDescriptor& descriptor);
 
   /**
-   * Creates a MetalTexture wrapper from an external Metal texture.
+   * Creates a MetalTexture wrapper from an external Metal texture. The width and height come from
+   * the caller's declared dimensions (e.g. BackendTexture/BackendRenderTarget) rather than the
+   * underlying MTLTexture size, so the logical size can be a subregion of the physical texture.
    */
   static std::shared_ptr<MetalTexture> MakeFrom(MetalGPU* gpu, id<MTLTexture> metalTexture,
-                                                uint32_t usage, bool adopted);
+                                                int width, int height, uint32_t usage,
+                                                bool adopted);
 
   /**
    * Returns the Metal texture.

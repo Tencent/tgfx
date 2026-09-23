@@ -18,39 +18,160 @@
 
 #pragma once
 
-#include <condition_variable>
-#include <list>
+#include <atomic>
+#include <cstdint>
+#include <memory>
 #include <mutex>
 #include <thread>
-#include <vector>
 #include "concurrentqueue.h"
+#ifdef TGFX_USE_THREADS
+#include "lightweightsemaphore.h"
+#endif
 #include "tgfx/core/Task.h"
 
 namespace tgfx {
 
+#ifdef TGFX_USE_THREADS
+
+/**
+ * A counting semaphore used to wake pool workers. Permits are durable: a signal posted before a
+ * worker starts waiting is still consumed later, so a notification can never be lost.
+ */
+class TaskSemaphore {
+ public:
+  void signal(ptrdiff_t count = 1) {
+    impl.signal(count);
+  }
+
+  bool wait() {
+    return impl.wait();
+  }
+
+  bool tryWait() {
+    return impl.tryWait();
+  }
+
+ private:
+  moodycamel::LightweightSemaphore impl{0, 0};
+};
+
+#else
+
+/**
+ * Single-threaded builds have no workers to wake, so the semaphore is a no-op. tryWait reports
+ * no permit, which keeps the release-path drain loop from spinning.
+ */
+class TaskSemaphore {
+ public:
+  void signal(ptrdiff_t count = 1) {
+    static_cast<void>(count);
+  }
+
+  bool wait() {
+    return true;
+  }
+
+  bool tryWait() {
+    return false;
+  }
+};
+
+#endif
+
+/**
+ * A priority task pool with lock-free submission and mutex-protected scheduling. Producers only
+ * pay one atomic admission update, a lock-free enqueue, and a semaphore signal per task; workers
+ * make every scheduling decision (priority, low-priority budget, standby growth, shrink, drain)
+ * inside a single scheduling mutex. Wakeup permits are durable, so a notification can never be
+ * lost the way a condition_variable signal can.
+ */
+class TaskPool {
+ public:
+  TaskPool();
+  ~TaskPool();
+
+  /**
+   * Publishes a task and a durable scheduling notification. Returns false if submission is closed
+   * or the queue rejects the task. An accepted call remains tracked until publication completes.
+   */
+  bool push(std::shared_ptr<Task> task, TaskPriority priority);
+
+  /**
+   * Changes the worker limit. Running tasks are not interrupted. Zero restores the default.
+   */
+  void setMaxThreadCount(size_t maxThreadCount);
+
+  /**
+   * Rejects new submissions and joins all workers. When exit is true, queued tasks are dropped
+   * and workers exit immediately (used on app exit to avoid running task code during static
+   * destruction). When exit is false, accepted work is drained first so the caller can reopen
+   * the pool with no task lost. Must not be called by a task executing in this pool.
+   */
+  void releaseThreads(bool exit);
+
+  size_t maxThreadCount();
+
+ private:
+  enum class Phase { Running, Closing, Draining, Closed };
+
+  class SubmissionGuard {
+   public:
+    explicit SubmissionGuard(TaskPool* pool) : pool(pool) {
+    }
+    ~SubmissionGuard() {
+      pool->leavePush();
+    }
+    SubmissionGuard(const SubmissionGuard&) = delete;
+    SubmissionGuard& operator=(const SubmissionGuard&) = delete;
+
+   private:
+    TaskPool* pool = nullptr;
+  };
+
+  static constexpr uint64_t CLOSED_BIT = uint64_t{1} << 63;
+  static constexpr uint64_t STARTED_BIT = uint64_t{1} << 62;
+  static constexpr uint64_t PUSH_COUNT_MASK = STARTED_BIT - 1;
+  static constexpr size_t PRIORITY_QUEUE_COUNT = static_cast<size_t>(TaskPriority::Low) + 1;
+  std::atomic<uint64_t> admission = 0;
+  std::mutex lifecycleMutex = {};
+  std::mutex stateMutex = {};
+  moodycamel::ConcurrentQueue<std::shared_ptr<Task>> priorityQueues[PRIORITY_QUEUE_COUNT];
+  TaskSemaphore workSignal;
+  TaskSemaphore producersDone;
+  moodycamel::ConcurrentQueue<std::thread*> threadHandles;
+  Phase phase = Phase::Running;
+  size_t liveThreads = 0;
+  size_t busyThreads = 0;
+  size_t waitingThreads = 0;
+  size_t maxThreads = 0;
+  size_t lowPriorityThreads = 0;
+  bool lowNeedsCheck = false;
+
+  void reopen();
+  bool enterPush();
+  void leavePush();
+  bool ensureStarted();
+  void ensureStandbyLocked();
+  bool spawnWorkerLocked();
+  std::shared_ptr<Task> waitForTask();
+  std::shared_ptr<Task> claimLocked();
+  void finishTask();
+  void runLoop();
+
+  friend class TaskGroup;
+};
+
 class TaskGroup {
  private:
-  std::mutex locker = {};
-  int maxThreads = 32;
-  int lowPriorityThreads = 2;
-  std::condition_variable condition = {};
-  std::atomic_int totalThreads = 0;
-  std::atomic_bool exited = false;
-  std::atomic_int waitingThreads = 0;
-  std::vector<moodycamel::ConcurrentQueue<std::shared_ptr<Task>>*> priorityQueues = {};
-  moodycamel::ConcurrentQueue<std::thread*>* threads = nullptr;
+  TaskPool pool = {};
   static TaskGroup* GetInstance();
-  static void RunLoop(TaskGroup* taskGroup);
-
   TaskGroup();
-  bool checkThreads();
+  void setMaxThreadCount(size_t maxThreadCount);
+  size_t maxThreadCount();
   bool pushTask(std::shared_ptr<Task> task, TaskPriority priority);
-  std::shared_ptr<Task> popTask();
-  void exit();
   void releaseThreads(bool exit);
 
   friend class Task;
-  friend class TaskThread;
   friend void OnAppExit();
 };
 }  // namespace tgfx

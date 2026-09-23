@@ -28,6 +28,8 @@
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Paint.h"
+#include "tgfx/core/Picture.h"
+#include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/RRect.h"
 #include "tgfx/core/Rect.h"
@@ -1013,6 +1015,53 @@ TGFX_TEST(PDFExportTest, BitmapMask) {
   PDFStream->flush();
 
   EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/BitmapMask"));
+}
+
+TGFX_TEST(PDFExportTest, PictureMask) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  // The mask picture draws a rounded rect (pill) at an offset inside a larger coordinate space,
+  // and it is cropped into a PictureImage the way layer content is wrapped by ToImageWithOffset.
+  // Masking a fill with it should reproduce the pill exactly; when the crop matrix is dropped
+  // (the bug this guards) the pill is torn into a hard-edged fragment instead, mirroring the
+  // production symptom. BitmapMask covers the bitmap path instead.
+  PictureRecorder recorder = {};
+  auto recordCanvas = recorder.beginRecording();
+  Paint shapePaint = {};
+  shapePaint.setColor(Color::White());
+  recordCanvas->drawRRect(RRect::MakeRectXY(Rect::MakeXYWH(40.f, 40.f, 120.f, 120.f), 24.f, 24.f),
+                          shapePaint);
+  auto picture = recorder.finishRecordingAsPicture();
+  EXPECT_TRUE(picture != nullptr);
+
+  // Crop the picture to (40, 40)-(160, 160): the pill lands at image (0, 0) exactly. A dropped
+  // crop matrix shifts it by 40 pixels on both axes.
+  auto cropMatrix = Matrix::MakeTrans(-40.f, -40.f);
+  auto maskImage = Image::MakeFrom(picture, 120, 120, &cropMatrix);
+  EXPECT_TRUE(maskImage != nullptr);
+
+  // Mirror the layer style construction: an image shader placed with a matrix, then wrapped in a
+  // ShaderMaskFilter.
+  auto maskShader = Shader::MakeImageShader(maskImage, TileMode::Decal, TileMode::Decal);
+  maskShader = maskShader->makeWithMatrix(Matrix::MakeScale(1.f, 1.f));
+  auto maskFilter = MaskFilter::MakeShader(maskShader);
+
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  auto canvas = document->beginPage(300.f, 300.f);
+  canvas->drawColor(Color::White());
+  canvas->translate(50.f, 50.f);
+  Paint paint = {};
+  paint.setColor(Color::Red());
+  paint.setMaskFilter(maskFilter);
+  canvas->drawRect(Rect::MakeWH(120.f, 120.f), paint);
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/PictureMask"));
 }
 
 TGFX_TEST(PDFExportTest, DropShadowLayer) {

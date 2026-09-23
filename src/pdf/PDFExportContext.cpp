@@ -1397,6 +1397,9 @@ std::tuple<std::shared_ptr<Picture>, Matrix> MaskFilterToPicture(
       auto image = imageShader->image;
       if (Types::Get(image.get()) == Types::ImageType::Picture) {
         const auto pictureImage = static_cast<const PictureImage*>(imageShader->image.get());
+        if (pictureImage->matrix) {
+          matrix.preConcat(*pictureImage->matrix);
+        }
         return {pictureImage->picture, matrix};
       }
       return {nullptr, Matrix::I()};

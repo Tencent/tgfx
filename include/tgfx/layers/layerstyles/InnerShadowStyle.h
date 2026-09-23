@@ -102,9 +102,7 @@ class InnerShadowStyle : public LayerStyle {
    * When zero (the default), the inner shadow is rendered directly from the layer's rasterized
    * content image without any spread adjustment.
    * When positive, the shadow coverage grows inward, making the shadow thicker. When negative,
-   * the shadow coverage shrinks, making the shadow thinner. The spread is derived from the layer's
-   * vector shape (e.g. Rect, Oval, or RRect); when the vector shape cannot be extracted (e.g. a
-   * group layer with only children), the inner shadow spread is skipped rather than drawn.
+   * the shadow coverage shrinks, making the shadow thinner.
    */
   float spread() const {
     return _spread;

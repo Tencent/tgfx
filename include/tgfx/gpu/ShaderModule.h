@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
 #include "tgfx/gpu/ShaderStage.h"
@@ -65,6 +66,18 @@ class ShaderModuleDescriptor {
    * Pre-compiled shader binary data (e.g. SPIR-V). Only used when format is SPIRV.
    */
   std::vector<uint8_t> binaryData;
+
+  /**
+   * Uniform-block name to physical binding slot, for pre-compiled shader artifacts (SPIR-V,
+   * metallib, WGSL) that carry no parseable GLSL for the runtime slot collection to scan. The
+   * offline toolchain bakes these bindings into the artifacts, and the precompiled pipeline
+   * creator fills this map from the generated GLSL's declared bindings (the vertex block at
+   * binding 0, the fragment block at binding 1). The runtime GLSL path ignores this field: its
+   * slots are collected from the preprocessed source at construction time.
+   * @param key    The uniform block name declared by the shader artifact.
+   * @param value  The physical binding slot the offline toolchain baked into the artifact.
+   */
+  std::map<std::string, unsigned> uniformSlots;
 
   /**
    * The format of the shader code or binary. Defaults to GLSL for backward compatibility with the

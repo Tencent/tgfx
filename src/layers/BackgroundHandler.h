@@ -214,7 +214,12 @@ class BackgroundConsumer : public BackgroundHandler {
   // Layer::synthesizeBackgroundImage. When snapshots is non-null (surface path) the map is
   // authoritative — a miss there indicates a capture-side coverage bug, so we silently skip
   // rather than masking it with synthesis.
-  explicit BackgroundConsumer(BackgroundSnapshotMap* snapshots) : snapshots(snapshots) {
+  // shareStyleOutput: the display list enables this only when the background color is fully
+  // opaque (which is what makes SrcOver compositing of the cached output match the style's own
+  // Src draw), the frame renders through multiple passes, and those passes cover compact render
+  // rects, since that is when caching pays for its rasterization.
+  BackgroundConsumer(BackgroundSnapshotMap* snapshots, bool shareStyleOutput)
+      : snapshots(snapshots), shareStyleOutput(shareStyleOutput) {
   }
 
   void drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer, float alpha,
@@ -224,6 +229,7 @@ class BackgroundConsumer : public BackgroundHandler {
 
  private:
   BackgroundSnapshotMap* snapshots = nullptr;
+  bool shareStyleOutput = false;
   // Per-consumer read cursors: each (Layer, LayerStyle) entry list is consumed in dispatch order
   // through this map, so a shared snapshot map can be consumed by multiple consumers (e.g. one
   // per tile in tiled rendering) without cursors interfering.

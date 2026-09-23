@@ -97,6 +97,27 @@ if (TGFX_USE_FREETYPE)
     set(TGFX_USE_PNG_DECODE ON)
 endif ()
 
+# Resolved before the backend checks below, which read CMAKE_OSX_DEPLOYMENT_TARGET to validate
+# their own requirements and would otherwise see an empty value.
+if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+    if (DEPLOYMENT_TARGET)
+        set(CMAKE_OSX_DEPLOYMENT_TARGET ${DEPLOYMENT_TARGET})
+    elseif (MACOS)
+        # Recent Apple toolchains reject the old 10.15/11.0 defaults: libc++ warns below 11.0
+        # (-Werror makes it fatal) and the SDK refuses below 12.0 with the Xcode generator.
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0")
+    elseif (IOS)
+        # libc++ and the SDK both reject a deployment target below 15.0.
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "15.0")
+    endif ()
+endif ()
+
+# iOS 15.0 is the lowest target both Xcode 26 (iOS 15-26) and Xcode 27 (iOS 15-27) accept, and it
+# already covers the Metal backend's own floor (MSL 2.3 needs iOS 14.0).
+if (IOS AND CMAKE_OSX_DEPLOYMENT_TARGET VERSION_LESS "15.0")
+    message(FATAL_ERROR "Building for iOS requires CMAKE_OSX_DEPLOYMENT_TARGET >= 15.0.")
+endif ()
+
 if (TGFX_USE_VULKAN)
     if (NOT WIN32 AND NOT APPLE AND NOT OHOS AND NOT ANDROID)
         message(FATAL_ERROR "TGFX_USE_VULKAN is currently supported on Windows, macOS, OHOS and Android only.")
@@ -120,9 +141,6 @@ elseif (TGFX_USE_D3D12)
 elseif (TGFX_USE_METAL)
     if (NOT APPLE)
         message(FATAL_ERROR "TGFX_USE_METAL is only supported on Apple platforms.")
-    endif ()
-    if (IOS AND CMAKE_OSX_DEPLOYMENT_TARGET VERSION_LESS "13.0")
-        message(FATAL_ERROR "TGFX_USE_METAL on iOS requires CMAKE_OSX_DEPLOYMENT_TARGET >= 13.0.")
     endif ()
     set(TGFX_USE_OPENGL OFF)
     set(TGFX_USE_QT OFF)
@@ -179,24 +197,6 @@ message("TGFX_BUILD_FRAMEWORK: ${TGFX_BUILD_FRAMEWORK}")
 message("TGFX_USE_TEXT_GAMMA_CORRECTION: ${TGFX_USE_TEXT_GAMMA_CORRECTION}")
 message("TGFX_ENABLE_STENCIL_COVER_PATH: ${TGFX_ENABLE_STENCIL_COVER_PATH}")
 
-if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
-    if (DEPLOYMENT_TARGET)
-        set(CMAKE_OSX_DEPLOYMENT_TARGET ${DEPLOYMENT_TARGET})
-    elseif (MACOS)
-        if (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
-            set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0")
-        else ()
-            set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
-        endif ()
-    elseif (IOS)
-        if (TGFX_USE_METAL)
-            set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0")
-        else ()
-            set(CMAKE_OSX_DEPLOYMENT_TARGET "9.0")
-        endif ()
-    endif ()
-endif ()
-
 file(GLOB_RECURSE TGFX_HEADERS include/*.h)
 list(APPEND TGFX_FILES ${TGFX_HEADERS})
 # collects tgfx common files.
@@ -223,7 +223,7 @@ file(GLOB PLATFORM_COMMON_FILES
 list(APPEND TGFX_FILES ${PLATFORM_COMMON_FILES})
 
 if (NOT TGFX_USE_METAL AND NOT TGFX_USE_VULKAN AND NOT TGFX_USE_D3D12)
-    file(GLOB SHADER_COMPILER_FILES src/gpu/ShaderCompiler.*)
+    file(GLOB SHADER_COMPILER_FILES src/gpu/ShaderCompiler.cpp)
     if (SHADER_COMPILER_FILES)
         list(REMOVE_ITEM TGFX_FILES ${SHADER_COMPILER_FILES})
     endif ()

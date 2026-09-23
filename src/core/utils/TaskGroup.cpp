@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TaskGroup.h"
-#include <cmath>
+#include <algorithm>
 #include <cstdlib>
 #include "MathExtra.h"
 #include "core/utils/Log.h"
@@ -27,28 +27,254 @@
 #endif
 
 namespace tgfx {
-static constexpr auto THREAD_TIMEOUT = std::chrono::seconds(10);
-static constexpr int MAX_THREADS_SIZE = 32;
-static constexpr size_t TASK_PRIORITY_SIZE = 3;
-// 70% of max threads can run low priority tasks
+static constexpr size_t MAX_THREADS_SIZE = 32;
 static constexpr float LOW_PRIORITY_THREAD_RATIO = 0.7f;
 
-static int GetMaxThreads() {
-  int cpuCores = 0;
+static size_t LowPriorityThreadCount(size_t maxThreadCount) {
+  return std::max(size_t{1}, static_cast<size_t>(FloatRoundToInt(
+                                 static_cast<float>(maxThreadCount) * LOW_PRIORITY_THREAD_RATIO)));
+}
+
+static size_t GetDefaultMaxThreadCount() {
+  size_t cpuCores = 0;
 #ifdef __APPLE__
-  size_t len = sizeof(cpuCores);
-  // We can get the exact number of physical CPUs on apple platforms.
-  sysctlbyname("hw.physicalcpu", &cpuCores, &len, nullptr, 0);
+  int cores = 0;
+  size_t len = sizeof(cores);
+  sysctlbyname("hw.physicalcpu", &cores, &len, nullptr, 0);
+  cpuCores = cores > 0 ? static_cast<size_t>(cores) : 0;
 #else
-  cpuCores = static_cast<int>(std::thread::hardware_concurrency());
+  cpuCores = std::thread::hardware_concurrency();
 #endif
-  if (cpuCores <= 0) {
-    cpuCores = 8;
+  return std::min(cpuCores == 0 ? size_t{8} : cpuCores, MAX_THREADS_SIZE);
+}
+
+TaskPool::TaskPool() : threadHandles(MAX_THREADS_SIZE), maxThreads(GetDefaultMaxThreadCount()) {
+  lowPriorityThreads = LowPriorityThreadCount(maxThreads);
+}
+
+TaskPool::~TaskPool() {
+  releaseThreads(true);
+}
+
+bool TaskPool::push(std::shared_ptr<Task> task, TaskPriority priority) {
+  if (!enterPush()) {
+    return false;
   }
-  if (cpuCores > MAX_THREADS_SIZE) {
-    cpuCores = MAX_THREADS_SIZE;
+  SubmissionGuard guard(this);
+  if (!ensureStarted()) {
+    return false;
   }
-  return cpuCores;
+  if (!priorityQueues[static_cast<size_t>(priority)].enqueue(std::move(task))) {
+    return false;
+  }
+  workSignal.signal();
+  return true;
+}
+
+void TaskPool::setMaxThreadCount(size_t maxThreadCount) {
+  if (maxThreadCount == 0) {
+    maxThreadCount = GetDefaultMaxThreadCount();
+  }
+  std::lock_guard<std::mutex> lock(stateMutex);
+  maxThreads = maxThreadCount;
+  lowPriorityThreads = LowPriorityThreadCount(maxThreads);
+  if (phase == Phase::Running && (admission.load(std::memory_order_acquire) & STARTED_BIT)) {
+    ensureStandbyLocked();
+    workSignal.signal(static_cast<ptrdiff_t>(liveThreads));
+  }
+}
+
+size_t TaskPool::maxThreadCount() {
+  std::lock_guard<std::mutex> lock(stateMutex);
+  return maxThreads;
+}
+
+void TaskPool::releaseThreads(bool exit) {
+  std::lock_guard<std::mutex> lifecycleLock(lifecycleMutex);
+  auto state = admission.fetch_or(CLOSED_BIT, std::memory_order_acq_rel);
+  if ((state & PUSH_COUNT_MASK) != 0) {
+    while (!producersDone.wait()) {
+    }
+  }
+  {
+    std::lock_guard<std::mutex> lock(stateMutex);
+    if (phase == Phase::Closed) {
+      return;
+    }
+    // exit=true drops queued tasks and exits workers immediately (app exit); exit=false drains
+    // accepted work first so the pool can reopen with nothing lost.
+    phase = exit ? Phase::Closing : Phase::Draining;
+    workSignal.signal(static_cast<ptrdiff_t>(liveThreads));
+  }
+  std::thread* handle = nullptr;
+  while (threadHandles.try_dequeue(handle)) {
+    if (handle->joinable()) {
+      handle->join();
+    }
+    delete handle;
+  }
+  {
+    std::lock_guard<std::mutex> lock(stateMutex);
+    // Detached workers (handle-queue OOM fallback) are not joinable and may still be exiting
+    // here, so no thread-count assertion is made on this path.
+    DEBUG_ASSERT(phase == Phase::Closing || phase == Phase::Draining);
+    for (auto& queue : priorityQueues) {
+      if (exit) {
+        std::shared_ptr<Task> task = nullptr;
+        while (queue.try_dequeue(task)) {
+        }
+      } else {
+        DEBUG_ASSERT(queue.size_approx() == 0);
+        static_cast<void>(queue);
+      }
+    }
+    while (workSignal.tryWait()) {
+    }
+    lowNeedsCheck = false;
+    phase = Phase::Closed;
+  }
+}
+
+void TaskPool::reopen() {
+  std::lock_guard<std::mutex> lifecycleLock(lifecycleMutex);
+  std::lock_guard<std::mutex> lock(stateMutex);
+  DEBUG_ASSERT(phase == Phase::Closed);
+  phase = Phase::Running;
+  admission.store(0, std::memory_order_release);
+}
+
+bool TaskPool::enterPush() {
+  auto state = admission.load(std::memory_order_acquire);
+  while (!(state & CLOSED_BIT)) {
+    DEBUG_ASSERT((state & PUSH_COUNT_MASK) != PUSH_COUNT_MASK);
+    if (admission.compare_exchange_weak(state, state + 1, std::memory_order_acq_rel,
+                                        std::memory_order_acquire)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void TaskPool::leavePush() {
+  auto state = admission.fetch_sub(1, std::memory_order_acq_rel);
+  DEBUG_ASSERT((state & PUSH_COUNT_MASK) > 0);
+  if ((state & CLOSED_BIT) && (state & PUSH_COUNT_MASK) == 1) {
+    producersDone.signal();
+  }
+}
+
+bool TaskPool::ensureStarted() {
+  if (admission.load(std::memory_order_acquire) & STARTED_BIT) {
+    return true;
+  }
+  std::lock_guard<std::mutex> lock(stateMutex);
+  if (!(admission.load(std::memory_order_acquire) & STARTED_BIT)) {
+    DEBUG_ASSERT(phase == Phase::Running);
+    if (!spawnWorkerLocked()) {
+      return false;
+    }
+    admission.fetch_or(STARTED_BIT, std::memory_order_release);
+  }
+  return true;
+}
+
+void TaskPool::ensureStandbyLocked() {
+  if (phase == Phase::Running && liveThreads == busyThreads && liveThreads < maxThreads) {
+    spawnWorkerLocked();
+  }
+}
+
+bool TaskPool::spawnWorkerLocked() {
+  // Register the handle while holding stateMutex; a new worker must acquire it before doing any
+  // work. Allocation failure returns false so the caller falls back to inline execution. If the
+  // handle queue rejects the thread (OOM), the thread keeps running detached and exits when the
+  // pool closes; it just cannot be joined, so liveThreads may briefly stay above zero after the
+  // last join.
+  auto thread = new (std::nothrow) std::thread(&TaskPool::runLoop, this);
+  if (thread == nullptr) {
+    return false;
+  }
+  if (!threadHandles.enqueue(thread)) {
+    // The handle queue only fails on OOM. The thread is already running, so it releases its slot
+    // when the pool closes; it just cannot be joined.
+    thread->detach();
+    delete thread;
+  }
+  ++liveThreads;
+  return true;
+}
+
+std::shared_ptr<Task> TaskPool::waitForTask() {
+  while (true) {
+    {
+      std::lock_guard<std::mutex> lock(stateMutex);
+      ++waitingThreads;
+    }
+    while (!workSignal.wait()) {
+    }
+    std::lock_guard<std::mutex> lock(stateMutex);
+    --waitingThreads;
+    if (phase == Phase::Closing) {
+      --liveThreads;
+      return nullptr;
+    }
+    if (phase == Phase::Running && liveThreads > maxThreads) {
+      --liveThreads;
+      // Shrinking does not hand back a notification: lowering the limit posts liveThreads permits,
+      // which already covers every waiting worker; the exiting worker's consumed permit is covered
+      // by that extra signal.
+      return nullptr;
+    }
+    auto task = claimLocked();
+    if (task != nullptr) {
+      ++busyThreads;
+      ensureStandbyLocked();
+      return task;
+    }
+    if (phase == Phase::Draining) {
+      --liveThreads;
+      return nullptr;
+    }
+  }
+}
+
+std::shared_ptr<Task> TaskPool::claimLocked() {
+  std::shared_ptr<Task> task = nullptr;
+  for (size_t i = 0; i < static_cast<size_t>(TaskPriority::Low); ++i) {
+    if (priorityQueues[i].try_dequeue(task)) {
+      return task;
+    }
+  }
+  if (phase == Phase::Draining || busyThreads < lowPriorityThreads) {
+    if (priorityQueues[static_cast<size_t>(TaskPriority::Low)].try_dequeue(task)) {
+      return task;
+    }
+    lowNeedsCheck = false;
+  } else {
+    // Keep this hint until an eligible dequeue actually finds the Low queue empty. Notifications
+    // consumed while its budget was exhausted must not strand tasks after other work completes.
+    lowNeedsCheck = true;
+  }
+  return nullptr;
+}
+
+void TaskPool::finishTask() {
+  std::lock_guard<std::mutex> lock(stateMutex);
+  DEBUG_ASSERT(busyThreads > 0);
+  --busyThreads;
+  if (phase == Phase::Draining) {
+    // Continue draining even if Low notifications were consumed before the pool closed.
+    workSignal.signal();
+  } else if (lowNeedsCheck && busyThreads < lowPriorityThreads) {
+    workSignal.signal(static_cast<ptrdiff_t>(liveThreads));
+  }
+}
+
+void TaskPool::runLoop() {
+  while (auto task = waitForTask()) {
+    task->execute();
+    finishTask();
+  }
 }
 
 TaskGroup* TaskGroup::GetInstance() {
@@ -56,132 +282,38 @@ TaskGroup* TaskGroup::GetInstance() {
   return &taskGroup;
 }
 
-void TaskGroup::RunLoop(TaskGroup* taskGroup) {
-  while (true) {
-    auto task = taskGroup->popTask();
-    if (task == nullptr) {
-      if (taskGroup->exited) {
-        break;
-      }
-      continue;
-    }
-    task->execute();
-  }
-}
-
+// Finishes in-flight tasks and drops queued ones when the app is exiting, so no task code runs
+// during static destruction.
 void OnAppExit() {
-  // Forces all pending tasks to be finished when the app is exiting to prevent accessing wild
-  // pointers.
-  TaskGroup::GetInstance()->exit();
+  TaskGroup::GetInstance()->releaseThreads(true);
 }
 
-TaskGroup::TaskGroup() : maxThreads(GetMaxThreads()) {
-  lowPriorityThreads = FloatRoundToInt(static_cast<float>(maxThreads) * LOW_PRIORITY_THREAD_RATIO);
-  if (lowPriorityThreads < 1) {
-    lowPriorityThreads = 1;
-  }
-  threads = new moodycamel::ConcurrentQueue<std::thread*>(static_cast<size_t>(maxThreads));
-  priorityQueues.reserve(TASK_PRIORITY_SIZE);
-  for (size_t i = 0; i < TASK_PRIORITY_SIZE; i++) {
-    auto queue = new moodycamel::ConcurrentQueue<std::shared_ptr<Task>>();
-    priorityQueues.push_back(queue);
-  }
+TaskGroup::TaskGroup() {
   std::atexit(OnAppExit);
 }
 
-bool TaskGroup::checkThreads() {
-  if (waitingThreads == 0 && totalThreads < maxThreads) {
-    auto thread = new (std::nothrow) std::thread(TaskGroup::RunLoop, this);
-    if (thread) {
-      if (threads->enqueue(thread)) {
-        ++totalThreads;
-      } else {
-        delete thread;
-        return false;
-      }
-    }
-  } else {
-    return true;
-  }
-  return totalThreads > 0;
+void TaskGroup::setMaxThreadCount(size_t maxThreadCount) {
+  pool.setMaxThreadCount(maxThreadCount);
+}
+
+size_t TaskGroup::maxThreadCount() {
+  return pool.maxThreadCount();
 }
 
 bool TaskGroup::pushTask(std::shared_ptr<Task> task, TaskPriority priority) {
 #ifndef TGFX_USE_THREADS
+  static_cast<void>(task);
+  static_cast<void>(priority);
   return false;
+#else
+  return pool.push(std::move(task), priority);
 #endif
-  if (exited || !checkThreads()) {
-    return false;
-  }
-  auto& queue = priorityQueues[static_cast<size_t>(priority)];
-  if (!queue->enqueue(task)) {
-    return false;
-  }
-  if (waitingThreads > 0) {
-    condition.notify_one();
-  }
-  return true;
-}
-
-std::shared_ptr<Task> TaskGroup::popTask() {
-  while (!exited) {
-    std::shared_ptr<Task> task = nullptr;
-    for (size_t i = 0; i < static_cast<size_t>(TaskPriority::Low); i++) {
-      if (priorityQueues[i]->try_dequeue(task)) {
-        return task;
-      }
-    }
-    if (totalThreads - waitingThreads < lowPriorityThreads) {
-      auto& queue = priorityQueues[static_cast<size_t>(TaskPriority::Low)];
-      if (queue->try_dequeue(task)) {
-        return task;
-      }
-    }
-    if (exited) {
-      return nullptr;
-    }
-    ++waitingThreads;
-    {
-      std::unique_lock<std::mutex> autoLock(locker);
-      auto status = condition.wait_for(autoLock, THREAD_TIMEOUT);
-      if (status == std::cv_status::timeout) {
-        --waitingThreads;
-        return nullptr;
-      }
-    }
-    --waitingThreads;
-  }
-  return nullptr;
-}
-
-void TaskGroup::exit() {
-  releaseThreads(true);
-}
-
-static void ReleaseThread(std::thread* thread) {
-  if (thread->joinable()) {
-    thread->join();
-  }
-  delete thread;
 }
 
 void TaskGroup::releaseThreads(bool exit) {
-  exited = true;
-  condition.notify_all();
-  std::thread* thread = nullptr;
-  while (threads->try_dequeue(thread)) {
-    ReleaseThread(thread);
-  }
-  totalThreads = 0;
-  DEBUG_ASSERT(waitingThreads == 0)
-  if (exit) {
-    delete threads;
-    for (auto& queue : priorityQueues) {
-      delete queue;
-    }
-    priorityQueues.clear();
-  } else {
-    exited = false;
+  pool.releaseThreads(exit);
+  if (!exit) {
+    pool.reopen();
   }
 }
 }  // namespace tgfx

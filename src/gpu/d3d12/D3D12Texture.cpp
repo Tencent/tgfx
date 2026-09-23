@@ -128,7 +128,8 @@ std::shared_ptr<D3D12Texture> D3D12Texture::Make(D3D12GPU* gpu,
 }
 
 std::shared_ptr<D3D12Texture> D3D12Texture::MakeFrom(D3D12GPU* gpu, ComPtr<ID3D12Resource> resource,
-                                                     unsigned dxgiFormat, uint32_t usage) {
+                                                     unsigned dxgiFormat, int width, int height,
+                                                     uint32_t usage) {
   if (gpu == nullptr || resource == nullptr) {
     return nullptr;
   }
@@ -141,10 +142,8 @@ std::shared_ptr<D3D12Texture> D3D12Texture::MakeFrom(D3D12GPU* gpu, ComPtr<ID3D1
 
   auto desc = resource->GetDesc();
   TextureDescriptor descriptor = {};
-  // D3D12 caps dimensions at D3D12_REQ_TEXTURE2D_U_OR_V_DIMENSION (16384), well below INT_MAX,
-  // so the UINT64/UINT→int narrow cast is always safe.
-  descriptor.width = static_cast<int>(desc.Width);
-  descriptor.height = static_cast<int>(desc.Height);
+  descriptor.width = width;
+  descriptor.height = height;
   descriptor.format = pixelFormat;
   descriptor.mipLevelCount = static_cast<int>(desc.MipLevels);
   descriptor.sampleCount = static_cast<int>(desc.SampleDesc.Count);

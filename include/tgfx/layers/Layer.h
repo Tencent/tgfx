@@ -591,9 +591,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
   void detachProperty(LayerProperty* property);
 
   /**
-   * Returns the content shape of this layer.
-   * The base class generates a shape from the content's bounding rect. Subclasses can override
-   * this to provide a more precise shape.
+   * Returns the content shape of this layer. A returned shape always matches the rendered
+   * content outline exactly (see StyledShape). The base class returns nullopt; layer types
+   * whose content is exactly a vector shape override this.
    */
   virtual std::optional<StyledShape> onGetContentShape();
 
@@ -677,11 +677,12 @@ class Layer : public std::enable_shared_from_this<Layer> {
   float drawBackgroundLayers(const DrawArgs& args, Canvas* canvas);
 
   // Synthesize a picture-backed backdrop image by walking ancestors and prior siblings via
-  // drawBackgroundLayers and composing this layer's Below styles. Returns nullptr when bounds
-  // collapse to empty or recording produces no picture. Used by BackgroundConsumer fallback when
-  // the snapshot map is empty (picture-canvas draw path).
+  // drawBackgroundLayers and composing this layer's Below styles. The result is clipped to
+  // contentBounds (layer-local). Returns nullptr when bounds collapse to empty or recording
+  // produces no picture. Used by BackgroundConsumer fallback when the snapshot map is empty
+  // (picture-canvas draw path).
   std::shared_ptr<Image> synthesizeBackgroundImage(const DrawArgs& args, float contentScale,
-                                                   Point* offset);
+                                                   const Rect& contentBounds, Point* offset);
 
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
 
