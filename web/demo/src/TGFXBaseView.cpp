@@ -36,13 +36,32 @@ TGFXBaseView::TGFXBaseView(const std::string& canvasID) : canvasID(canvasID) {
   displayList.setMaxTileCount(512);
 }
 
+TGFXBaseView::TGFXBaseView(emscripten::val canvas) : canvas(std::move(canvas)) {
+  appHost = std::make_shared<hello2d::AppHost>();
+  displayList.setRenderMode(tgfx::RenderMode::Tiled);
+  displayList.setTileUpdateMode(tgfx::TileUpdateMode::Smooth);
+  displayList.setMaxTileCount(512);
+}
+
+std::shared_ptr<tgfx::Window> TGFXBaseView::createWindow() {
+#ifdef TGFX_USE_WEBGPU
+  // WebGPUWindow only takes a canvas selector, so the canvas object path falls through to WebGL.
+  if (!canvas.as<bool>()) {
+    return tgfx::WebGPUWindow::MakeFrom(canvasID);
+  }
+#endif
+  if (canvas.as<bool>()) {
+    return tgfx::WebGLWindow::MakeFrom(canvas);
+  }
+  if (canvasID.empty()) {
+    return nullptr;
+  }
+  return tgfx::WebGLWindow::MakeFrom(canvasID);
+}
+
 void TGFXBaseView::updateSize() {
   if (window == nullptr) {
-#ifdef TGFX_USE_WEBGPU
-    window = tgfx::WebGPUWindow::MakeFrom(canvasID);
-#else
-    window = tgfx::WebGLWindow::MakeFrom(canvasID);
-#endif
+    window = createWindow();
   }
   if (window == nullptr) {
     return;
@@ -64,6 +83,10 @@ void TGFXBaseView::updateSize() {
     presentImmediately = true;
   }
   device->unlock();
+}
+
+void TGFXBaseView::setLayoutDensity(float density) {
+  layoutDensity = density;
 }
 
 void TGFXBaseView::setImagePath(const std::string& name, tgfx::NativeImageRef nativeImage) {
@@ -104,11 +127,7 @@ void TGFXBaseView::updateLayerTree(int drawIndex) {
 
 void TGFXBaseView::draw() {
   if (window == nullptr) {
-#ifdef TGFX_USE_WEBGPU
-    window = tgfx::WebGPUWindow::MakeFrom(canvasID);
-#else
-    window = tgfx::WebGLWindow::MakeFrom(canvasID);
-#endif
+    window = createWindow();
   }
   if (window == nullptr) {
     return;
@@ -137,10 +156,15 @@ void TGFXBaseView::draw() {
 
   auto canvas = surface->getCanvas();
   canvas->clear();
-  auto cssWidth = static_cast<double>(surface->width());
-  auto cssHeight = static_cast<double>(surface->height());
-  emscripten_get_element_css_size(canvasID.c_str(), &cssWidth, &cssHeight);
-  auto density = static_cast<float>(surface->width()) / static_cast<float>(cssWidth);
+  auto density = layoutDensity;
+  if (density <= 0.0f && !canvasID.empty()) {
+    // No density was pushed in, so read the layout size from the DOM. This is the single-threaded
+    // path; it cannot work on a worker because there is no document there.
+    auto cssWidth = static_cast<double>(surface->width());
+    auto cssHeight = static_cast<double>(surface->height());
+    emscripten_get_element_css_size(canvasID.c_str(), &cssWidth, &cssHeight);
+    density = static_cast<float>(surface->width()) / static_cast<float>(cssWidth);
+  }
   DrawBackground(canvas, surface->width(), surface->height(), density);
 
   displayList.render(surface.get(), false);

@@ -20,7 +20,11 @@ app.get('/', (req, res) => {
 const port = 8081;
 const args = process.argv.slice(2);
 var fileName;
-if(args.includes('webgpu')){
+if(args.includes('worker-st')){
+  fileName = 'index-worker-st';
+}else if(args.includes('worker-mt')){
+  fileName = 'index-worker-mt';
+}else if(args.includes('webgpu')){
   fileName = args.includes('wasm-mt') ? 'index-webgpu':'index-webgpu-st';
 }else{
   fileName = args.includes('wasm-mt') ? 'index':'index-st';

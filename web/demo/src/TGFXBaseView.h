@@ -37,9 +37,30 @@ class TGFXBaseView {
  public:
   TGFXBaseView(const std::string& canvasID);
 
+  /**
+   * Creates a view that renders into an existing canvas object rather than a canvas looked up by id.
+   *
+   * Use this when the view is created on a thread without a DOM, such as a worker that received an
+   * OffscreenCanvas. The canvas has to stay alive for as long as the view does.
+   *
+   * @param canvas An HTMLCanvasElement or an OffscreenCanvas. Must not be null.
+   */
+  TGFXBaseView(emscripten::val canvas);
+
   void setImagePath(const std::string& name, tgfx::NativeImageRef nativeImage);
 
   void updateSize();
+
+  /**
+   * Sets the ratio between the canvas backing store and the canvas layout size, replacing the DOM
+   * query done in draw(). A worker has no document, so when rendering off the main thread the
+   * owner of the OffscreenCanvas has to report the device pixel ratio it sized the canvas with.
+   * Until this is called, draw() keeps querying the DOM, which leaves the single-threaded demos
+   * working unchanged.
+   *
+   * @param density Backing store size divided by layout size, normally window.devicePixelRatio.
+   */
+  void setLayoutDensity(float density);
 
   void updateLayerTree(int drawIndex);
 
@@ -69,7 +90,13 @@ class TGFXBaseView {
  private:
   void applyCenteringTransform();
 
+  // Shared by the constructor paths: builds the platform window from whichever of the canvas object
+  // and the canvas id this view was created with.
+  std::shared_ptr<tgfx::Window> createWindow();
+
   std::string canvasID = "";
+  // Set only when the view was created from a canvas object, in which case canvasID is unused.
+  emscripten::val canvas;
   std::shared_ptr<tgfx::Window> window = nullptr;
   std::shared_ptr<tgfx::Surface> surface = nullptr;
   tgfx::DisplayList displayList = {};
@@ -79,6 +106,8 @@ class TGFXBaseView {
   int lastSurfaceWidth = 0;
   int lastSurfaceHeight = 0;
   bool presentImmediately = true;
+  // Zero means "not pushed in yet", in which case draw() falls back to querying the DOM.
+  float layoutDensity = 0.0f;
 
   // Async readback state
   std::shared_ptr<tgfx::SurfaceReadback> pendingReadback = nullptr;

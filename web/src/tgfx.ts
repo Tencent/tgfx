@@ -20,7 +20,7 @@ import {getCanvas2D, isCanvas, releaseCanvas2D} from './utils/canvas';
 import {BitmapImage} from './core/bitmap-image';
 import {isInstanceOf} from './utils/type-utils';
 
-import {EmscriptenGL, TGFX, WindowColorSpace} from './types';
+import {EmscriptenGL, EmscriptenGLContextAttributes, TGFX, WindowColorSpace} from './types';
 import type {wx} from './wechat/interfaces';
 import {getTGFXModule} from './tgfx-module';
 
@@ -266,6 +266,30 @@ export const uploadVideoToWebGPUTexture = (source: HTMLVideoElement, texturePtr:
         {texture: gpuTexture, premultipliedAlpha: true},
         [width, height]
     );
+};
+
+/**
+ * Creates a WebGL context from a canvas object and registers it with the Emscripten GL runtime,
+ * returning the context handle.
+ *
+ * This is the entry point for a thread that has no DOM. tgfx's id based overloads resolve a canvas
+ * through the Emscripten canvas lookup, which falls back to document.querySelector(); an
+ * OffscreenCanvas in a worker cannot be found that way, so the canvas object itself has to be handed
+ * over. Doing that also keeps the final executable from needing -sOFFSCREENCANVAS_SUPPORT, since
+ * nothing here goes through the Emscripten canvas lookup.
+ *
+ * @param GL The Emscripten GL runtime (module.GL).
+ * @param canvas The canvas to create the context from.
+ * @param webGLContextAttributes The context attributes, mirroring the object Emscripten builds for
+ *     its own context creation.
+ * @return The context handle, or 0 if the context could not be created.
+ */
+export const createCanvasContext = (GL: EmscriptenGL, canvas: HTMLCanvasElement | OffscreenCanvas,
+                                    webGLContextAttributes: EmscriptenGLContextAttributes) => {
+    if (!canvas || typeof canvas.getContext !== 'function') {
+        return 0;
+    }
+    return GL.createContext(canvas, webGLContextAttributes);
 };
 
 export {getCanvas2D as createCanvas2D};

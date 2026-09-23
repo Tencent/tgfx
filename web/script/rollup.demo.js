@@ -16,6 +16,8 @@ if(backend === 'webgpu'){
     fileName = (arch === 'wasm-mt' ? 'index-webgpu':'index-webgpu-st');
 }else if(backend === 'webgl'){
     fileName = (arch === 'wasm-mt' ? 'index':'index-st');
+}else if(backend === 'worker'){
+    fileName = 'index-worker';
 }
 
 const plugins = [
@@ -35,6 +37,21 @@ const plugins = [
     },
 ];
 
+// The worker backend also needs its own bundle: the worker script runs in a separate realm and
+// loads the wasm module there, so it cannot be part of the page bundle.
+const extraConfigs = backend === 'worker' ? [
+    {
+        input: 'demo/worker-render.ts',
+        output: {
+            banner,
+            file: `demo/${filePath}/worker-render.js`,
+            format: 'esm',
+            sourcemap: true
+        },
+        plugins: plugins,
+    }
+] : [];
+
 export default [
     {
         input: `demo/${fileName}.ts`,
@@ -45,5 +62,6 @@ export default [
             sourcemap: true
         },
         plugins: plugins,
-    }
+    },
+    ...extraConfigs
 ];
