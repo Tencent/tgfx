@@ -23,12 +23,19 @@
 #include "layers/DrawArgs.h"
 
 namespace tgfx {
-static float UnionArea(const Rect& rect1, const Rect& rect2) {
-  auto left = rect1.left < rect2.left ? rect1.left : rect2.left;
-  auto right = rect1.right > rect2.right ? rect1.right : rect2.right;
-  auto top = rect1.top < rect2.top ? rect1.top : rect2.top;
-  auto bottom = rect1.bottom > rect2.bottom ? rect1.bottom : rect2.bottom;
-  return (right - left) * (bottom - top);
+// Areas below are accumulated in double: a float product overflows to infinity once an edge
+// exceeds ~1.8e19, which used to turn merge costs into NaN and stall the dirty list convergence.
+static double RectArea(const Rect& rect) {
+  return (static_cast<double>(rect.right) - static_cast<double>(rect.left)) *
+         (static_cast<double>(rect.bottom) - static_cast<double>(rect.top));
+}
+
+// Every rect in the dirty list is non-empty (filtered by invalidateRect), so join() yields the
+// plain min/max union here.
+static double UnionArea(const Rect& rect1, const Rect& rect2) {
+  auto bounds = rect1;
+  bounds.join(rect2);
+  return RectArea(bounds);
 }
 
 std::shared_ptr<RootLayer> RootLayer::Make() {
@@ -47,7 +54,7 @@ void RootLayer::invalidateRect(const Rect& rect) {
   }
   DEBUG_ASSERT(dirtyRects.size() <= MAX_DIRTY_REGIONS);
   dirtyRects.push_back(rect);
-  dirtyAreas.push_back(rect.area());
+  dirtyAreas.push_back(RectArea(rect));
   mergeDirtyList(dirtyRects.size() == MAX_DIRTY_REGIONS + 1);
 }
 
@@ -57,9 +64,12 @@ bool RootLayer::mergeDirtyList(bool forceMerge) {
   if (dirtySize <= 1) {
     return false;
   }
-  float bestDelta = forceMerge ? std::numeric_limits<float>::max() : 0;
+  auto bestDelta = forceMerge ? std::numeric_limits<double>::infinity() : 0.0;
   size_t mergeA = 0;
-  size_t mergeB = 0;
+  // A forced merge must always produce a pair: non-finite rect coordinates can make every delta a
+  // NaN, which loses every comparison below. Default to the first pair so the dirty list still
+  // converges, while keeping the cheapest-merge choice intact whenever the deltas are comparable.
+  size_t mergeB = forceMerge ? 1 : 0;
   for (size_t i = 0; i < dirtySize; i++) {
     for (size_t j = i + 1; j < dirtySize; j++) {
       auto delta = UnionArea(dirtyRects[i], dirtyRects[j]) - dirtyAreas[i] - dirtyAreas[j];
@@ -72,7 +82,7 @@ bool RootLayer::mergeDirtyList(bool forceMerge) {
   }
   if (mergeA != mergeB) {
     dirtyRects[mergeA].join(dirtyRects[mergeB]);
-    dirtyAreas[mergeA] = dirtyRects[mergeA].area();
+    dirtyAreas[mergeA] = RectArea(dirtyRects[mergeA]);
     dirtyRects.erase(dirtyRects.begin() + static_cast<long>(mergeB));
     dirtyAreas.erase(dirtyAreas.begin() + static_cast<long>(mergeB));
     return true;

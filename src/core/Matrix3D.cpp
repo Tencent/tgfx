@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Matrix3D.h"
+#include <algorithm>
 #include "core/utils/VecUtils.h"
 #include "utils/Log.h"
 #include "utils/MathExtra.h"
@@ -168,6 +169,8 @@ static Rect MapRectAffine(const Rect& srcRect, const float mat[16]) {
 }
 
 static Rect MapRectPerspective(const Rect& srcRect, const float mat[16]) {
+  constexpr float wNearPlane = 1.f / (1 << 14);
+
   auto c0 = Vec4::Load(mat);
   auto c1 = Vec4::Load(mat + 4);
   auto c3 = Vec4::Load(mat + 12);
@@ -177,16 +180,23 @@ static Rect MapRectPerspective(const Rect& srcRect, const float mat[16]) {
   auto bl = c0 * srcRect.left + c1 * srcRect.bottom + c3;
   auto br = c0 * srcRect.right + c1 * srcRect.bottom + c3;
 
+  // W is linear in (x, y) on the z = 0 plane, so if no corner reaches the near plane, no interior
+  // point does either. The whole rect is clipped away by the near plane; return an empty rect to
+  // keep the result finite for callers.
+  if (std::max({tl[3], tr[3], bl[3], br[3]}) < wNearPlane) {
+    return Rect::MakeEmpty();
+  }
+
   constexpr Vec4 flip{1.f, 1.f, -1.f, -1.f};
   auto project = [&flip](const Vec4& p0, const Vec4& p1, const Vec4& p2) {
     const float w0 = p0[3];
-    if (constexpr float w0PlaneDistance = 1.f / (1 << 14); w0 >= w0PlaneDistance) {
+    if (w0 >= wNearPlane) {
       return flip * VecUtils::Shuffle<0, 1, 0, 1>(Vec2(p0.x, p0.y)) / w0;
     } else {
       auto clip = [&](const Vec4& p) {
-        if (const float w = p[3]; w >= w0PlaneDistance) {
-          const float t = (w0PlaneDistance - w0) / (w - w0);
-          auto c = (t * Vec2::Load(p.ptr()) + (1.f - t) * Vec2::Load(p0.ptr())) / w0PlaneDistance;
+        if (const float w = p[3]; w >= wNearPlane) {
+          const float t = (wNearPlane - w0) / (w - w0);
+          auto c = (t * Vec2::Load(p.ptr()) + (1.f - t) * Vec2::Load(p0.ptr())) / wNearPlane;
           return flip * VecUtils::Shuffle<0, 1, 0, 1>(c);
         } else {
           return Vec4(std::numeric_limits<float>::infinity());

@@ -82,7 +82,7 @@ class RootLayer : public Layer {
 
  private:
   std::vector<Rect> dirtyRects = {};
-  std::vector<float> dirtyAreas = {};
+  std::vector<double> dirtyAreas = {};
 
   bool mergeDirtyList(bool forceMerge);
 
