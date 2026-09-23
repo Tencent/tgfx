@@ -42,9 +42,7 @@ class WindowDrawable : public Drawable {
 
  private:
   WindowDrawable(Context* context, std::shared_ptr<RenderTargetProxy> renderTarget,
-                 std::shared_ptr<Window> window, std::shared_ptr<ColorSpace> colorSpace);
-
-  std::shared_ptr<Window> _window = nullptr;
+                 std::shared_ptr<ColorSpace> colorSpace);
 };
 
 }  // namespace tgfx

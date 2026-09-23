@@ -52,13 +52,18 @@ std::shared_ptr<Drawable> Window::nextDrawable(Context* context) {
     LOGE("Window::nextDrawable() The window must be owned by a shared_ptr!");
     return nullptr;
   }
-  return onNextDrawable(context);
+  auto window = shared_from_this();
+  auto drawable = onNextDrawable(context);
+  if (drawable != nullptr) {
+    drawable->_window = std::move(window);
+  }
+  return drawable;
 }
 
 std::shared_ptr<Drawable> Window::onNextDrawable(Context* context) {
   return WindowDrawable::Make(context, shared_from_this());
 }
 
-void Window::onPresent(Context*) {
+void Window::onPresent(Context*, const std::shared_ptr<RenderTargetProxy>&) {
 }
 }  // namespace tgfx

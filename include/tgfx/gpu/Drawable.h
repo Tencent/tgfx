@@ -27,14 +27,16 @@ namespace tgfx {
 class Context;
 class RenderTargetProxy;
 class Surface;
+class Window;
 
 /**
  * Drawable represents a single displayable frame buffer of a Window, similar to
  * id&lt;CAMetalDrawable&gt; on the Metal platform. It is the only well-defined way to read back
  * pixels rendered to a Window: a readPixels() call on a Surface created from a Window has no
  * guaranteed content once the Surface is presented, because the underlying frame buffer is
- * recycled immediately after presentation. A Drawable is instead held by the caller for its
- * whole lifetime, so its content stays readable.
+ * recycled immediately after presentation. A Drawable is instead retained by its Surface and by
+ * the caller, so its content stays readable for its whole lifetime. A Drawable also retains the
+ * Window it was acquired from so all platform presentation resources remain valid.
  *
  * Use Window::nextDrawable() to acquire a Drawable, then Surface::MakeFrom(context, drawable) to
  * render into it. The rendering commands must be submitted with Context::flushAndSubmit() before
@@ -105,13 +107,23 @@ class Drawable {
     return _context;
   }
 
+  const std::shared_ptr<RenderTargetProxy>& getRenderTarget() const {
+    return _renderTarget;
+  }
+
+  const std::shared_ptr<Window>& getWindow() const {
+    return _window;
+  }
+
  private:
   friend class Surface;
+  friend class Window;
 
   Context* _context = nullptr;
   std::shared_ptr<RenderTargetProxy> _renderTarget = nullptr;
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;
   std::weak_ptr<Surface> _surface = {};
+  std::shared_ptr<Window> _window = nullptr;
   bool _presented = false;
 };
 

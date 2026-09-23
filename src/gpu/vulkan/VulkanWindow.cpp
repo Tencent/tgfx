@@ -813,12 +813,11 @@ std::shared_ptr<RenderTargetProxy> VulkanWindow::onCreateRenderTarget(Context* c
   return _platformState->swapchainProxy;
 }
 
-void VulkanWindow::onPresent(Context*) {
-  if (!_platformState->swapchainProxy) {
-    return;
+void VulkanWindow::onPresent(Context*, const std::shared_ptr<RenderTargetProxy>& renderTarget) {
+  auto proxy = std::static_pointer_cast<VulkanSwapchainProxy>(renderTarget);
+  if (proxy != nullptr) {
+    proxy->releaseFrame();
   }
-  auto proxy = std::static_pointer_cast<VulkanSwapchainProxy>(_platformState->swapchainProxy);
-  proxy->releaseFrame();
 }
 
 std::shared_ptr<Drawable> VulkanWindow::onNextDrawable(Context* context) {

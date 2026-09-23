@@ -104,6 +104,7 @@ std::shared_ptr<Surface> Surface::MakeFrom(Context* context, std::shared_ptr<Dra
       MakeFrom(drawable->_renderTarget, renderFlags, true, drawable->colorSpace(), nullptr);
   if (surface != nullptr) {
     drawable->_surface = surface;
+    surface->_drawable = std::move(drawable);
   }
   return surface;
 }

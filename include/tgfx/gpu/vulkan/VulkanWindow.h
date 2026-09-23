@@ -93,7 +93,7 @@ class VulkanWindow : public Window {
 
  protected:
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
-  void onPresent(Context* context) override;
+  void onPresent(Context* context, const std::shared_ptr<RenderTargetProxy>& renderTarget) override;
   std::shared_ptr<Drawable> onNextDrawable(Context* context) override;
 
  private:

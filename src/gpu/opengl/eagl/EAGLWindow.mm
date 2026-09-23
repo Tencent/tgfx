@@ -69,7 +69,7 @@ std::shared_ptr<RenderTargetProxy> EAGLWindow::onCreateRenderTarget(Context* con
   return RenderTargetProxy::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
 }
 
-void EAGLWindow::onPresent(Context* context) {
+void EAGLWindow::onPresent(Context* context, const std::shared_ptr<RenderTargetProxy>&) {
   auto gl = static_cast<GLGPU*>(context->gpu())->functions();
   gl->bindRenderbuffer(GL_RENDERBUFFER, layerTexture->colorBufferID());
   auto eaglContext = static_cast<EAGLDevice*>(context->device())->eaglContext();

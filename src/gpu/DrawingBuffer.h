@@ -28,6 +28,7 @@
 
 namespace tgfx {
 
+class RenderTargetProxy;
 class Window;
 
 class DrawingBuffer {
@@ -70,6 +71,11 @@ class DrawingBuffer {
   void presentWindows(Context* context);
 
  private:
+  struct WindowPresentation {
+    std::weak_ptr<Window> window = {};
+    std::shared_ptr<RenderTargetProxy> renderTarget = nullptr;
+  };
+
   Context* context = nullptr;
   uint32_t _uniqueID = 0;
   uint64_t _generation = 0;
@@ -82,7 +88,7 @@ class DrawingBuffer {
   std::vector<PlacementPtr<ResourceTask>> resourceTasks = {};
   std::vector<PlacementPtr<RenderTask>> renderTasks = {};
   std::vector<PlacementPtr<AtlasUploadTask>> atlasTasks = {};
-  std::vector<std::weak_ptr<Window>> windows = {};
+  std::vector<WindowPresentation> windowPresentations = {};
 
   friend class DrawingManager;
 };

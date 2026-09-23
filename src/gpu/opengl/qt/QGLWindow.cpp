@@ -135,7 +135,6 @@ QGLWindow::QGLWindow(QQuickItem* quickItem, bool singleBufferMode,
 
 QGLWindow::~QGLWindow() {
   delete deviceCreator;
-  drawableProxy = nullptr;
   textureSlots.clear();
   delete presentedQSGTexture;
 }
@@ -193,18 +192,15 @@ std::shared_ptr<RenderTargetProxy> QGLWindow::onCreateRenderTarget(Context* cont
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
-  drawableProxy = std::make_shared<QGLDrawableProxy>(context, width, height, PixelFormat::RGBA_8888,
-                                                     1, ImageOrigin::TopLeft, this);
-  std::static_pointer_cast<QGLDrawableProxy>(drawableProxy)->weakThis = drawableProxy;
-  return drawableProxy;
+  return std::make_shared<QGLDrawableProxy>(context, width, height, PixelFormat::RGBA_8888, 1,
+                                            ImageOrigin::TopLeft, this);
 }
 
-void QGLWindow::onPresent(Context*) {
-  if (presentingProxy == nullptr) {
+void QGLWindow::onPresent(Context*, const std::shared_ptr<RenderTargetProxy>& renderTarget) {
+  auto proxy = std::static_pointer_cast<QGLDrawableProxy>(renderTarget);
+  if (proxy == nullptr) {
     return;
   }
-  auto proxy = std::static_pointer_cast<QGLDrawableProxy>(presentingProxy);
-  presentingProxy = nullptr;
   if (proxy->getTextureView() == nullptr) {
     proxy->releaseTexture();
     return;

@@ -131,17 +131,14 @@ std::shared_ptr<RenderTargetProxy> MetalWindow::onCreateRenderTarget(Context* co
     return nullptr;
   }
   auto pixelFormat = MetalPixelFormatToPixelFormat(static_cast<unsigned>(metalLayer.pixelFormat));
-  drawableProxy =
-      std::make_shared<MetalDrawableProxy>(context, width, height, metalLayer, pixelFormat);
-  return drawableProxy;
+  return std::make_shared<MetalDrawableProxy>(context, width, height, metalLayer, pixelFormat);
 }
 
-void MetalWindow::onPresent(Context*) {
-  if (drawableProxy == nullptr) {
-    return;
+void MetalWindow::onPresent(Context*, const std::shared_ptr<RenderTargetProxy>& renderTarget) {
+  auto proxy = std::static_pointer_cast<MetalDrawableProxy>(renderTarget);
+  if (proxy != nullptr) {
+    proxy->releaseDrawable();
   }
-  auto proxy = std::static_pointer_cast<MetalDrawableProxy>(drawableProxy);
-  proxy->releaseDrawable();
 }
 
 std::shared_ptr<Drawable> MetalWindow::onNextDrawable(Context* context) {

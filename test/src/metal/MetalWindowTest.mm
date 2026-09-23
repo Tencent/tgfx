@@ -127,6 +127,81 @@ TGFX_TEST(MetalWindowTest, DrawableRotation) {
   }
 }
 
+TGFX_TEST(MetalWindowTest, SurfaceRetainsDrawable) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  if (context == nullptr) {
+    GTEST_SKIP() << "Metal backend not available";
+  }
+  auto gpu = static_cast<MetalGPU*>(context->gpu());
+  auto layer = MakeTestLayer(gpu->device(), 16, 16);
+  auto window = MetalWindow::MakeFrom(layer, nullptr, nullptr, false);
+  ASSERT_TRUE(window != nullptr);
+
+  auto surface = Surface::MakeFrom(context, window->nextDrawable(context));
+  ASSERT_TRUE(surface != nullptr);
+  std::weak_ptr<Drawable> weakDrawable = surface->_drawable;
+  EXPECT_FALSE(weakDrawable.expired());
+  surface->getCanvas()->clear(Color::Red());
+  context->flushAndSubmit(true);
+  surface = nullptr;
+  EXPECT_TRUE(weakDrawable.expired());
+}
+
+TGFX_TEST(MetalWindowTest, DrawableRetainsWindow) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  if (context == nullptr) {
+    GTEST_SKIP() << "Metal backend not available";
+  }
+  auto gpu = static_cast<MetalGPU*>(context->gpu());
+  auto layer = MakeTestLayer(gpu->device(), 16, 16);
+  auto window = MetalWindow::MakeFrom(layer, nullptr, nullptr, false);
+  ASSERT_TRUE(window != nullptr);
+
+  std::weak_ptr<Window> weakWindow = window;
+  auto drawable = window->nextDrawable(context);
+  ASSERT_TRUE(drawable != nullptr);
+  auto surface = Surface::MakeFrom(context, drawable);
+  ASSERT_TRUE(surface != nullptr);
+  surface->getCanvas()->clear(Color::Green());
+  context->flushAndSubmit(true);
+
+  window = nullptr;
+  EXPECT_FALSE(weakWindow.expired());
+  surface = nullptr;
+  EXPECT_FALSE(weakWindow.expired());
+  drawable = nullptr;
+  EXPECT_TRUE(weakWindow.expired());
+}
+
+TGFX_TEST(MetalWindowTest, PresentsEachSurfaceRenderTarget) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  if (context == nullptr) {
+    GTEST_SKIP() << "Metal backend not available";
+  }
+  auto gpu = static_cast<MetalGPU*>(context->gpu());
+  auto layer = MakeTestLayer(gpu->device(), 16, 16);
+  auto window = MetalWindow::MakeFrom(layer, nullptr, nullptr, false);
+  ASSERT_TRUE(window != nullptr);
+
+  auto firstSurface = Surface::MakeFrom(context, window);
+  auto secondSurface = Surface::MakeFrom(context, window);
+  ASSERT_TRUE(firstSurface != nullptr);
+  ASSERT_TRUE(secondSurface != nullptr);
+  auto firstProxy =
+      std::static_pointer_cast<MetalDrawableProxy>(firstSurface->renderContext->renderTarget);
+  auto secondProxy =
+      std::static_pointer_cast<MetalDrawableProxy>(secondSurface->renderContext->renderTarget);
+  firstSurface->getCanvas()->clear(Color::Red());
+  secondSurface->getCanvas()->clear(Color::Blue());
+  context->flushAndSubmit(true);
+
+  EXPECT_TRUE(firstProxy->getMetalDrawable() == nil);
+  EXPECT_TRUE(secondProxy->getMetalDrawable() == nil);
+}
+
 /**
  * Verifies that the automatic presentation path does not hold the drawable after present: the
  * drawable is returned to the layer's rotation pool right away, which keeps nextDrawable() from

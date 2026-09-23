@@ -110,11 +110,12 @@ class Surface {
 
   /**
    * Creates a new Surface for rendering to the specified Drawable, which was acquired from a
-   * Window via Window::nextDrawable(). The returned Surface is never presented automatically at
-   * submit time; call Drawable::present() to display the rendered content, which also happens
-   * automatically when the Drawable is released. The color space is obtained from the Drawable.
-   * Returns nullptr if the context is nullptr, the drawable is nullptr, or the drawable was
-   * acquired from a different context.
+   * Window via Window::nextDrawable(). The returned Surface retains the Drawable and is never
+   * presented automatically at submit time; call Drawable::present() to display the rendered
+   * content, which also happens automatically when both the Surface and all other references to the
+   * Drawable are released. The color space is obtained from the Drawable. Returns nullptr if the
+   * context is nullptr, the drawable is nullptr, or the drawable was acquired from a different
+   * context.
    */
   static std::shared_ptr<Surface> MakeFrom(Context* context, std::shared_ptr<Drawable> drawable,
                                            uint32_t renderFlags = 0);
@@ -229,6 +230,7 @@ class Surface {
   Canvas* canvas = nullptr;
   std::shared_ptr<Image> cachedImage = nullptr;
   std::shared_ptr<Window> _window = nullptr;
+  std::shared_ptr<Drawable> _drawable = nullptr;
 
   static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
                                            uint32_t renderFlags = 0, bool clearAll = false,

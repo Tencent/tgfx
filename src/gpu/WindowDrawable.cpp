@@ -30,15 +30,13 @@ std::shared_ptr<WindowDrawable> WindowDrawable::Make(Context* context,
     return nullptr;
   }
   auto colorSpace = window->colorSpace();
-  return std::shared_ptr<WindowDrawable>(new WindowDrawable(
-      context, std::move(renderTarget), std::move(window), std::move(colorSpace)));
+  return std::shared_ptr<WindowDrawable>(
+      new WindowDrawable(context, std::move(renderTarget), std::move(colorSpace)));
 }
 
 WindowDrawable::WindowDrawable(Context* context, std::shared_ptr<RenderTargetProxy> renderTarget,
-                               std::shared_ptr<Window> window,
                                std::shared_ptr<ColorSpace> colorSpace)
-    : Drawable(context, std::move(renderTarget), std::move(colorSpace)),
-      _window(std::move(window)) {
+    : Drawable(context, std::move(renderTarget), std::move(colorSpace)) {
 }
 
 WindowDrawable::~WindowDrawable() {
@@ -46,7 +44,7 @@ WindowDrawable::~WindowDrawable() {
 }
 
 void WindowDrawable::onPresent() {
-  _window->onPresent(getContext());
+  getWindow()->onPresent(getContext(), getRenderTarget());
 }
 
 }  // namespace tgfx

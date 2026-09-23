@@ -50,10 +50,11 @@ class Window : public std::enable_shared_from_this<Window> {
    * The returned Drawable is used to create a Surface via Surface::MakeFrom(context, drawable).
    * The rendering commands must be submitted before calling Drawable::readPixels() or
    * Drawable::present(); the frame is presented either manually via Drawable::present() or
-   * automatically when the Drawable is released. Only one Drawable should be held at a time,
-   * otherwise frame acquisition may stall. Returns nullptr if the context is nullptr, the window
-   * is not owned by a shared_ptr, or the window cannot provide a drawable right now (for example,
-   * the window has a zero size or the platform frame buffer is unavailable).
+   * automatically when the Drawable is released. The Drawable retains this Window until the frame
+   * is released. Only one Drawable should be held at a time, otherwise frame acquisition may stall.
+   * Returns nullptr if the context is nullptr or belongs to a different Device, the window is not
+   * owned by a shared_ptr, or the window cannot provide a drawable right now (for example, the
+   * window has a zero size or the platform frame buffer is unavailable).
    */
   std::shared_ptr<Drawable> nextDrawable(Context* context);
 
@@ -90,10 +91,12 @@ class Window : public std::enable_shared_from_this<Window> {
   virtual std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) = 0;
 
   /**
-   * Called after command buffer submission to present the rendered content. The default
+   * Called after command buffer submission to present the specified render target. The default
    * implementation does nothing.
+   * @param context The Context that submitted the rendering commands.
+   * @param renderTarget The exact render target that produced the frame being presented.
    */
-  virtual void onPresent(Context* context);
+  virtual void onPresent(Context* context, const std::shared_ptr<RenderTargetProxy>& renderTarget);
 
   /**
    * Creates a backend-specific Drawable for nextDrawable(). The default implementation wraps this
