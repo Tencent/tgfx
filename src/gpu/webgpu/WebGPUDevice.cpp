@@ -88,7 +88,6 @@ std::shared_ptr<WebGPUDevice> WebGPUDevice::Make() {
     return nullptr;
   }
   auto device = std::shared_ptr<WebGPUDevice>(new WebGPUDevice(std::move(gpu)));
-  device->weakThis = device;
   return device;
 }
 
@@ -103,7 +102,6 @@ std::shared_ptr<WebGPUDevice> WebGPUDevice::MakeFrom(void* device) {
     return nullptr;
   }
   auto webgpuDevice = std::shared_ptr<WebGPUDevice>(new WebGPUDevice(std::move(gpu)));
-  webgpuDevice->weakThis = webgpuDevice;
   return webgpuDevice;
 }
 

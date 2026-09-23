@@ -27,7 +27,6 @@ std::shared_ptr<VulkanDevice> VulkanDevice::Make() {
     return nullptr;
   }
   auto device = std::shared_ptr<VulkanDevice>(new VulkanDevice(std::move(gpu)));
-  device->weakThis = device;
   return device;
 }
 
@@ -41,7 +40,6 @@ std::shared_ptr<VulkanDevice> VulkanDevice::MakeFrom(void* instance, void* physi
     return nullptr;
   }
   auto vulkanDevice = std::shared_ptr<VulkanDevice>(new VulkanDevice(std::move(gpu)));
-  vulkanDevice->weakThis = vulkanDevice;
   return vulkanDevice;
 }
 
