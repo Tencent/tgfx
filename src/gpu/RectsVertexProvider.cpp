@@ -98,39 +98,49 @@ class AARectsVertexProvider : public RectsVertexProvider {
         uintColor = ToUintPMColor(record->color, steps.get());
       }
 
-      auto scaleX = sqrtf(viewMatrix.getScaleX() * viewMatrix.getScaleX() +
-                          viewMatrix.getSkewY() * viewMatrix.getSkewY());
-      auto scaleY = sqrtf(viewMatrix.getSkewX() * viewMatrix.getSkewX() +
-                          viewMatrix.getScaleY() * viewMatrix.getScaleY());
-      // we want the new edge to be .5px away from the old line.
-      auto padding = 0.5f / scaleX;
+      auto scales = viewMatrix.getAxisScales();
+      auto scaleX = scales.x;
+      auto scaleY = scales.y;
+      // we want the new edge to be .5px away from the old line, measured along each axis's own
+      // device scale so that the AA ring stays half a device pixel wide on both axes.
+      auto paddingX = 0.5f / scaleX;
+      auto paddingY = 0.5f / scaleY;
       // A rect thinner than 1 device pixel cannot be inset by the full padding without flipping
-      // its edges, which overlaps the coverage-1 quad with the AA ring and blends coverage twice,
+      // its edges, which overlaps the coverage quad with the AA ring and blends coverage twice,
       // so identical rects render up to 2.3x brighter than the paint alpha and at visibly
       // different brightness depending on their subpixel phase. Collapse such an axis to the
-      // rect center instead and modulate the inner coverage by the device-pixel extent, so the
-      // rendered ink never exceeds the paint alpha. Each axis is measured against its own device
-      // scale, so non-uniform matrices do not misclassify an axis that is wide enough in device
-      // pixels as sub-pixel.
+      // rect center instead and widen its outset so that inset + outset == 2 * padding and the
+      // ring covers one full device pixel on each side (the same structure the stroke branch
+      // below uses). The inner coverage is set to the rect's device-pixel area coverage, so the
+      // ring's integrated ink equals that area and never exceeds the paint alpha. When only one
+      // axis collapses the ring's linear ramp conserves that ink exactly; when both axes collapse
+      // the inner quad degenerates to a point and the corner-triangle interpolation over-deposits
+      // up to 4/3 of the area, which vertex-interpolated AA cannot avoid without per-fragment
+      // edge-equation coverage. Each axis is measured against its own device scale, so
+      // non-uniform matrices neither misclassify an axis that is wide enough in device pixels as
+      // sub-pixel nor leave an axis flippable.
       auto subpixelX = rect.width() * scaleX < 1.0f;
       auto subpixelY = rect.height() * scaleY < 1.0f;
-      auto insetX = subpixelX ? rect.width() * 0.5f : padding;
-      auto insetY = subpixelY ? rect.height() * 0.5f : padding;
+      auto insetX = subpixelX ? rect.width() * 0.5f : paddingX;
+      auto insetY = subpixelY ? rect.height() * 0.5f : paddingY;
+      auto outsetX = subpixelX ? 2.0f * paddingX - insetX : paddingX;
+      auto outsetY = subpixelY ? 2.0f * paddingY - insetY : paddingY;
       auto insetBounds = rect.makeInset(insetX, insetY);
       auto insetQuad = Quad::MakeFrom(insetBounds, &viewMatrix);
-      auto outsetBounds = rect.makeOutset(padding, padding);
+      auto outsetBounds = rect.makeOutset(outsetX, outsetY);
       auto outsetQuad = Quad::MakeFrom(outsetBounds, &viewMatrix);
       auto innerCoverage = 1.0f;
       if (subpixelX || subpixelY) {
-        innerCoverage = std::min(1.0f, std::min(rect.width() * scaleX, rect.height() * scaleY));
+        innerCoverage =
+            std::min(1.0f, rect.width() * scaleX) * std::min(1.0f, rect.height() * scaleY);
       }
       auto insetUV = insetBounds;
       auto outsetUV = outsetBounds;
       auto subset = rect;
       if (hasUVRect) {
         auto& uvRect = *uvRects[i];
-        insetUV = uvRect.makeInset(padding, padding);
-        outsetUV = uvRect.makeOutset(padding, padding);
+        insetUV = uvRect.makeInset(insetX, insetY);
+        outsetUV = uvRect.makeOutset(outsetX, outsetY);
         subset = uvRect;
       }
       if (hasSubsetRect) {
