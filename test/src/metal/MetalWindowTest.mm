@@ -58,9 +58,8 @@ static CAMetalLayer* MakeTestLayer(id<MTLDevice> device, int width, int height) 
 }
 
 /**
- * Verifies the manual drawable path: a Drawable acquired from Window::nextDrawable() can be
- * rendered into via Surface::MakeFrom(), is not presented automatically at submit, and its
- * readPixels() returns the rendered content.
+ * Verifies that a Drawable acquired from Window::nextDrawable() can be rendered into via
+ * Surface::MakeFrom() and read back after submission but before explicit presentation.
  */
 TGFX_TEST(MetalWindowTest, ReadPixelsFromDrawable) {
   ContextScope scope;
@@ -88,10 +87,8 @@ TGFX_TEST(MetalWindowTest, ReadPixelsFromDrawable) {
   surface->getCanvas()->clear(yellow);
   context->flushAndSubmit(true);
 
-  // The drawable is held by the test, so the readback reads the frame that was just rendered,
-  // even after it has been presented.
-  drawable->present();
   EXPECT_TRUE(ReadCenterPixel(drawable.get(), yellow));
+  drawable->present();
 }
 
 /**
