@@ -21,10 +21,12 @@
 #include <atomic>
 #include <memory>
 #include <mutex>
+#include <vector>
 
 namespace tgfx {
 class Context;
 class GPU;
+struct DeviceKey;
 
 /**
  * The GPU interface for drawing graphics.
@@ -59,7 +61,6 @@ class Device {
   std::mutex locker = {};
   GPU* _gpu = nullptr;
   Context* context = nullptr;
-  std::weak_ptr<Device> weakThis;
   /**
    * A permanent one-way flag indicating the GPU context has been irreversibly lost (e.g., due to a
    * GPU reset). Once set to true, lockContext() will always return nullptr.
@@ -69,6 +70,28 @@ class Device {
   explicit Device(std::unique_ptr<GPU> gpu);
   virtual bool onLockContext();
   virtual void onUnlockContext();
+
+  /**
+   * Registers the given device under the specified native key. If a live device has already been
+   * registered under the same key, that device is returned and the given one is not adopted
+   * (the caller can safely let it go out of scope). Otherwise the given device is registered
+   * and returned. The registration is removed automatically when the device is destroyed. The
+   * DeviceKey structure is defined in the internal header src/gpu/DeviceRegistry.h and its
+   * layout depends on the GPU backend compiled in.
+   */
+  static std::shared_ptr<Device> RegisterNative(const std::shared_ptr<Device>& device,
+                                                const DeviceKey& key);
+
+  /**
+   * Returns the live device registered under the specified native key, or nullptr if there is
+   * none.
+   */
+  static std::shared_ptr<Device> FindNative(const DeviceKey& key);
+
+  /**
+   * Returns a snapshot of all live registered devices.
+   */
+  static std::vector<std::shared_ptr<Device>> GetAllNative();
 
  private:
   uint32_t _uniqueID = 0;

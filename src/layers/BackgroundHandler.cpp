@@ -276,8 +276,21 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   if (FloatNearlyZero(contentScale)) {
     return;
   }
-  auto layerBounds = layer->getBounds();
-  auto bounds = layerBounds;
+  // The background must cover exactly the content rect (the style's LayerStyleSource group):
+  // layer->getBounds() would also capture this layer's other styles (e.g. a drop shadow).
+  auto groupIndex = static_cast<int>(style->excludeChildEffects());
+  auto* group = source->groups[groupIndex].get();
+  if (group == nullptr || group->content.image == nullptr) {
+    return;
+  }
+  auto& contentEntry = group->content;
+  DEBUG_ASSERT(!FloatNearlyZero(source->contentScale));
+  auto contentScaleToLocal = 1.0f / source->contentScale;
+  auto contentBounds = Rect::MakeXYWH(
+      contentEntry.offset.x * contentScaleToLocal, contentEntry.offset.y * contentScaleToLocal,
+      static_cast<float>(contentEntry.image->width()) * contentScaleToLocal,
+      static_cast<float>(contentEntry.image->height()) * contentScaleToLocal);
+  auto bounds = contentBounds;
   bounds.scale(contentScale, contentScale);
   bounds.roundOut();
   // Use the runtime canvas chain (capture canvas matrix · bgSource->surfaceToWorldMatrix) so
@@ -323,7 +336,7 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   Matrix bgPixelToLocal = worldToLocal;
   bgPixelToLocal.preConcat(bgSource->backgroundMatrix());
   Point smallBgOffset = {};
-  auto smallBgImage = MakeDetachedBgCopy(args.context, bgImage, bgPixelToLocal, layerBounds,
+  auto smallBgImage = MakeDetachedBgCopy(args.context, bgImage, bgPixelToLocal, contentBounds,
                                          &smallBgOffset, args.dstColorSpace);
   PictureRecorder recorder = {};
   auto* recording = recorder.beginRecording();
@@ -436,7 +449,16 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   } else {
     // Picture-canvas path: capture was skipped because there is no GPU context. Synthesize the
     // backdrop on the fly by walking ancestors and prior siblings via PictureRecorder.
-    bgImage = layer->synthesizeBackgroundImage(args, source->contentScale, &bgOffset);
+    if (contentEntry.image == nullptr) {
+      return;
+    }
+    auto contentScaleToLocal = 1.0f / source->contentScale;
+    auto contentBounds = Rect::MakeXYWH(
+        contentEntry.offset.x * contentScaleToLocal, contentEntry.offset.y * contentScaleToLocal,
+        static_cast<float>(contentEntry.image->width()) * contentScaleToLocal,
+        static_cast<float>(contentEntry.image->height()) * contentScaleToLocal);
+    bgImage =
+        layer->synthesizeBackgroundImage(args, source->contentScale, contentBounds, &bgOffset);
     if (bgImage == nullptr) {
       return;
     }

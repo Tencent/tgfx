@@ -5040,4 +5040,39 @@ TGFX_TEST(LayerTest, NestedOffscreenTiledZoom) {
                                  "LayerTest/NestedOffscreenTiledZoom");
 }
 
+TGFX_TEST(LayerTest, GlassStyleWithDropShadow) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 250, 250);
+  DisplayList displayList;
+
+  auto background = SolidLayer::Make();
+  background->setColor(Color::White());
+  background->setWidth(150);
+  background->setHeight(150);
+  background->setMatrix(Matrix::MakeTrans(50, 50));
+  displayList.root()->addChild(background);
+
+  auto bottomRect = SolidLayer::Make();
+  bottomRect->setColor(Color::FromRGBA(143, 0, 0));
+  bottomRect->setWidth(100);
+  bottomRect->setHeight(100);
+  bottomRect->setMatrix(Matrix::MakeTrans(70, 70));
+  displayList.root()->addChild(bottomRect);
+
+  auto topRect = SolidLayer::Make();
+  topRect->setColor(Color::FromRGBA(143, 0, 0, 26));
+  topRect->setWidth(100);
+  topRect->setHeight(100);
+  topRect->setMatrix(Matrix::MakeTrans(70, 70));
+  auto dropShadow = DropShadowStyle::Make(20, 20, 0, 0, Color::FromRGBA(0, 0, 0, 255));
+  dropShadow->setShowBehindLayer(false);
+  topRect->setLayerStyles({dropShadow, GlassStyle::Make(0, 50, 100, 0, 0, 0, 0)});
+  displayList.root()->addChild(topRect);
+
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleWithDropShadow"));
+}
+
 }  // namespace tgfx

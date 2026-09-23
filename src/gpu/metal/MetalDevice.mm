@@ -19,6 +19,7 @@
 #include "MetalDevice.h"
 #include "MetalCommandQueue.h"
 #include "MetalGPU.h"
+#include "gpu/DeviceRegistry.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
@@ -32,18 +33,25 @@ std::shared_ptr<MetalDevice> MetalDevice::Make() {
   }
 }
 
-std::shared_ptr<MetalDevice> MetalDevice::MakeFrom(void* metalDevice) {
-  if (!metalDevice) {
+std::shared_ptr<MetalDevice> MetalDevice::MakeFrom(id<MTLDevice> metalDevice) {
+  if (metalDevice == nil) {
     return nullptr;
   }
+  // Fast path: check the registry before creating a MetalGPU, which would build a temporary
+  // MTLCommandQueue, query device capabilities, and start a shaderc::Compiler just to be thrown
+  // away when a live device already exists. Concurrent first creations are still deduplicated
+  // by RegisterNative() below.
+  if (auto existing = Device::FindNative({(__bridge const void*)metalDevice})) {
+    return std::static_pointer_cast<MetalDevice>(existing);
+  }
   @autoreleasepool {
-    auto gpu = MetalGPU::Make((id<MTLDevice>)metalDevice);
+    auto gpu = MetalGPU::Make(metalDevice);
     if (!gpu) {
       return nullptr;
     }
     auto device = std::shared_ptr<MetalDevice>(new MetalDevice(std::move(gpu)));
-    device->weakThis = device;
-    return device;
+    return std::static_pointer_cast<MetalDevice>(
+        Device::RegisterNative(device, {(__bridge const void*)metalDevice}));
   }
 }
 
@@ -54,7 +62,7 @@ MetalDevice::~MetalDevice() {
   static_cast<MetalGPU*>(_gpu)->releaseAll(true);
 }
 
-void* MetalDevice::metalDevice() const {
+id<MTLDevice> MetalDevice::metalDevice() const {
   return static_cast<MetalGPU*>(_gpu)->device();
 }
 
