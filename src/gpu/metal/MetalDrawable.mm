@@ -63,10 +63,6 @@ MetalDrawable::~MetalDrawable() {
   [_metalDrawable release];
 }
 
-id<CAMetalDrawable> MetalDrawable::getMetalDrawable() const {
-  return _metalDrawable;
-}
-
 void MetalDrawable::onPresent() {
   // Presenting the drawable directly schedules the presentation after all command buffers that
   // have been enqueued so far, so the GPU finishes rendering before the drawable is displayed.

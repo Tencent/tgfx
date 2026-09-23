@@ -45,8 +45,6 @@ class MetalDrawable : public Drawable {
 
   ~MetalDrawable() override;
 
-  id<CAMetalDrawable> getMetalDrawable() const;
-
  protected:
   void onPresent() override;
 
