@@ -61,9 +61,7 @@ std::shared_ptr<CommandBuffer> DrawingBuffer::encode() {
 
 void DrawingBuffer::presentWindows(Context* context) {
   for (auto& presentation : windowPresentations) {
-    if (auto window = presentation.window.lock()) {
-      window->onPresent(context, presentation.renderTarget);
-    }
+    presentation.window->onPresent(context, presentation.renderTargets);
   }
   windowPresentations.clear();
 }

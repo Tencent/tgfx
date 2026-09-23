@@ -134,11 +134,17 @@ std::shared_ptr<RenderTargetProxy> MetalWindow::onCreateRenderTarget(Context* co
   return std::make_shared<MetalDrawableProxy>(context, width, height, metalLayer, pixelFormat);
 }
 
-void MetalWindow::onPresent(Context*, const std::shared_ptr<RenderTargetProxy>& renderTarget) {
-  auto proxy = std::static_pointer_cast<MetalDrawableProxy>(renderTarget);
-  if (proxy != nullptr) {
-    proxy->releaseDrawable();
+void MetalWindow::onPresent(Context*,
+                            const std::vector<std::shared_ptr<RenderTargetProxy>>& renderTargets) {
+  if (renderTargets.empty()) {
+    return;
   }
+  auto proxy = std::static_pointer_cast<MetalDrawableProxy>(renderTargets.front());
+  proxy->releaseDrawable();
+}
+
+bool MetalWindow::hasIndependentPresentationTargets() const {
+  return true;
 }
 
 std::shared_ptr<Drawable> MetalWindow::onNextDrawable(Context* context) {

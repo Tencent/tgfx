@@ -170,21 +170,29 @@ void DrawingManager::addAtlasCellTask(std::shared_ptr<TextureProxy> textureProxy
   atlasUploadTask->addCell(allocator, std::move(codec), atlasOffset);
 }
 
-void DrawingManager::collectWindow(std::weak_ptr<Window> window,
+void DrawingManager::collectWindow(std::shared_ptr<Window> window,
                                    std::shared_ptr<RenderTargetProxy> renderTarget) {
-  if (window.expired() || renderTarget == nullptr) {
+  if (window == nullptr || renderTarget == nullptr) {
     return;
   }
   auto drawingBuffer = getDrawingBuffer();
   auto& presentations = drawingBuffer->windowPresentations;
-  for (const auto& presentation : presentations) {
-    auto sameWindow =
-        !presentation.window.owner_before(window) && !window.owner_before(presentation.window);
-    if (sameWindow && presentation.renderTarget == renderTarget) {
+  auto independentTargets = window->hasIndependentPresentationTargets();
+  for (auto& presentation : presentations) {
+    if (presentation.window != window) {
+      continue;
+    }
+    for (const auto& target : presentation.renderTargets) {
+      if (target == renderTarget) {
+        return;
+      }
+    }
+    if (!independentTargets) {
+      presentation.renderTargets.push_back(std::move(renderTarget));
       return;
     }
   }
-  presentations.push_back({std::move(window), std::move(renderTarget)});
+  presentations.push_back({std::move(window), {std::move(renderTarget)}});
 }
 
 std::shared_ptr<DrawingBuffer> DrawingManager::flush() {

@@ -64,6 +64,10 @@ std::shared_ptr<Drawable> Window::onNextDrawable(Context* context) {
   return WindowDrawable::Make(context, shared_from_this());
 }
 
-void Window::onPresent(Context*, const std::shared_ptr<RenderTargetProxy>&) {
+void Window::onPresent(Context*, const std::vector<std::shared_ptr<RenderTargetProxy>>&) {
+}
+
+bool Window::hasIndependentPresentationTargets() const {
+  return false;
 }
 }  // namespace tgfx

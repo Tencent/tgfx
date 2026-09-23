@@ -425,7 +425,8 @@ std::shared_ptr<RenderTargetProxy> D3D12Window::onCreateRenderTarget(Context* co
                                                _platformState->width, _platformState->height);
 }
 
-void D3D12Window::onPresent(Context*, const std::shared_ptr<RenderTargetProxy>& renderTarget) {
+void D3D12Window::onPresent(Context*,
+                            const std::vector<std::shared_ptr<RenderTargetProxy>>& renderTargets) {
   if (_platformState->swapChain == nullptr) {
     return;
   }
@@ -440,8 +441,8 @@ void D3D12Window::onPresent(Context*, const std::shared_ptr<RenderTargetProxy>& 
   if (FAILED(hr)) {
     LOGE("D3D12Window: Present failed, HRESULT=0x%08X", static_cast<unsigned>(hr));
   }
-  auto proxy = std::static_pointer_cast<D3D12SwapchainProxy>(renderTarget);
-  if (proxy != nullptr) {
+  for (const auto& renderTarget : renderTargets) {
+    auto proxy = std::static_pointer_cast<D3D12SwapchainProxy>(renderTarget);
     proxy->releaseFrame();
   }
 }

@@ -196,11 +196,12 @@ std::shared_ptr<RenderTargetProxy> QGLWindow::onCreateRenderTarget(Context* cont
                                             ImageOrigin::TopLeft, this);
 }
 
-void QGLWindow::onPresent(Context*, const std::shared_ptr<RenderTargetProxy>& renderTarget) {
-  auto proxy = std::static_pointer_cast<QGLDrawableProxy>(renderTarget);
-  if (proxy == nullptr) {
+void QGLWindow::onPresent(Context*,
+                          const std::vector<std::shared_ptr<RenderTargetProxy>>& renderTargets) {
+  if (renderTargets.empty()) {
     return;
   }
+  auto proxy = std::static_pointer_cast<QGLDrawableProxy>(renderTargets.front());
   if (proxy->getTextureView() == nullptr) {
     proxy->releaseTexture();
     return;
@@ -217,6 +218,10 @@ void QGLWindow::onPresent(Context*, const std::shared_ptr<RenderTargetProxy>& re
     reuseTexture(oldProxy);
   }
   QMetaObject::invokeMethod(quickItem, "update", Qt::AutoConnection);
+}
+
+bool QGLWindow::hasIndependentPresentationTargets() const {
+  return true;
 }
 
 std::shared_ptr<RenderTargetProxy> QGLWindow::acquireTexture(Context* context, int width,

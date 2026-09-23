@@ -110,7 +110,7 @@ void EGLWindow::setPresentationTime(int64_t time) {
   presentationTime = time;
 }
 
-void EGLWindow::onPresent(Context*, const std::shared_ptr<RenderTargetProxy>&) {
+void EGLWindow::onPresent(Context*, const std::vector<std::shared_ptr<RenderTargetProxy>>&) {
   auto device = std::static_pointer_cast<EGLDevice>(this->device);
   auto eglDisplay = device->eglDisplay;
   // eglSurface cannot be nullptr in EGLWindow.

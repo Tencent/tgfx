@@ -83,7 +83,8 @@ class DrawingManager {
   /**
    * Collects a Window and its exact render target for presentation after command submission.
    */
-  void collectWindow(std::weak_ptr<Window> window, std::shared_ptr<RenderTargetProxy> renderTarget);
+  void collectWindow(std::shared_ptr<Window> window,
+                     std::shared_ptr<RenderTargetProxy> renderTarget);
 
   /**
    * Flushes all pending drawing operations and returns the DrawingBuffer. Returns nullptr if there

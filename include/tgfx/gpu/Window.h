@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <mutex>
+#include <vector>
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/Device.h"
@@ -91,12 +92,21 @@ class Window : public std::enable_shared_from_this<Window> {
   virtual std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) = 0;
 
   /**
-   * Called after command buffer submission to present the specified render target. The default
-   * implementation does nothing.
+   * Called after command buffer submission to present a group of render targets with the same
+   * presentation identity. Backends with a shared native backbuffer receive all render targets for
+   * the Window in one call. Backends with independent frame buffers receive one render target per
+   * call. The default implementation does nothing.
    * @param context The Context that submitted the rendering commands.
-   * @param renderTarget The exact render target that produced the frame being presented.
+   * @param renderTargets The render targets that produced the frame being presented.
    */
-  virtual void onPresent(Context* context, const std::shared_ptr<RenderTargetProxy>& renderTarget);
+  virtual void onPresent(Context* context,
+                         const std::vector<std::shared_ptr<RenderTargetProxy>>& renderTargets);
+
+  /**
+   * Returns true if every RenderTargetProxy represents an independently presentable frame. The
+   * default is false for backends where all proxies target one shared native backbuffer.
+   */
+  virtual bool hasIndependentPresentationTargets() const;
 
   /**
    * Creates a backend-specific Drawable for nextDrawable(). The default implementation wraps this
@@ -109,6 +119,7 @@ class Window : public std::enable_shared_from_this<Window> {
 
  private:
   friend class DrawingBuffer;
+  friend class DrawingManager;
   friend class Surface;
   friend class WindowDrawable;
 };

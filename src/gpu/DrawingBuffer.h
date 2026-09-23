@@ -72,8 +72,8 @@ class DrawingBuffer {
 
  private:
   struct WindowPresentation {
-    std::weak_ptr<Window> window = {};
-    std::shared_ptr<RenderTargetProxy> renderTarget = nullptr;
+    std::shared_ptr<Window> window = nullptr;
+    std::vector<std::shared_ptr<RenderTargetProxy>> renderTargets = {};
   };
 
   Context* context = nullptr;

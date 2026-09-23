@@ -50,7 +50,9 @@ class WebGPUWindow : public Window {
 
  protected:
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
-  void onPresent(Context* context, const std::shared_ptr<RenderTargetProxy>& renderTarget) override;
+  void onPresent(Context* context,
+                 const std::vector<std::shared_ptr<RenderTargetProxy>>& renderTargets) override;
+  bool hasIndependentPresentationTargets() const override;
 
  private:
   WebGPUWindow(std::shared_ptr<Device> device, void* surface, int width, int height,

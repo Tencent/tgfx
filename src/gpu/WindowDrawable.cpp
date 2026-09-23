@@ -44,7 +44,7 @@ WindowDrawable::~WindowDrawable() {
 }
 
 void WindowDrawable::onPresent() {
-  getWindow()->onPresent(getContext(), getRenderTarget());
+  getWindow()->onPresent(getContext(), {getRenderTarget()});
 }
 
 }  // namespace tgfx

@@ -16,13 +16,46 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "gpu/proxies/RenderTargetProxy.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Context.h"
+#include "tgfx/gpu/Window.h"
+#include "utils/DevicePool.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
+namespace {
+class RecordingWindow final : public Window {
+ public:
+  RecordingWindow(std::shared_ptr<Device> device, bool* destroyed, int* presentCount,
+                  size_t* presentedTargetCount)
+      : Window(std::move(device)), destroyed(destroyed), presentCount(presentCount),
+        presentedTargetCount(presentedTargetCount) {
+  }
+
+  ~RecordingWindow() override {
+    *destroyed = true;
+  }
+
+ protected:
+  std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override {
+    return RenderTargetProxy::Make(context, 16, 16, false);
+  }
+
+  void onPresent(Context*,
+                 const std::vector<std::shared_ptr<RenderTargetProxy>>& renderTargets) override {
+    (*presentCount)++;
+    *presentedTargetCount = renderTargets.size();
+  }
+
+ private:
+  bool* destroyed = nullptr;
+  int* presentCount = nullptr;
+  size_t* presentedTargetCount = nullptr;
+};
+}  // namespace
 
 TGFX_TEST(RecordingTest, BasicFlushAndSubmit) {
   ContextScope scope;
@@ -216,6 +249,36 @@ TGFX_TEST(RecordingTest, RecordingWithSemaphore) {
 
   context->submit(std::move(recording));
   EXPECT_TRUE(Baseline::Compare(surface, "RecordingTest/RecordingWithSemaphore"));
+}
+
+TGFX_TEST(RecordingTest, RetainsWindowAndCoalescesSharedPresentation) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  bool destroyed = false;
+  int presentCount = 0;
+  size_t presentedTargetCount = 0;
+  auto window = std::make_shared<RecordingWindow>(DevicePool::Make(), &destroyed, &presentCount,
+                                                  &presentedTargetCount);
+  auto firstSurface = Surface::MakeFrom(context, window);
+  auto secondSurface = Surface::MakeFrom(context, window);
+  ASSERT_TRUE(firstSurface != nullptr);
+  ASSERT_TRUE(secondSurface != nullptr);
+  firstSurface->getCanvas()->clear(Color::Red());
+  secondSurface->getCanvas()->clear(Color::Blue());
+
+  auto recording = context->flush();
+  ASSERT_TRUE(recording != nullptr);
+  firstSurface = nullptr;
+  secondSurface = nullptr;
+  window = nullptr;
+  EXPECT_FALSE(destroyed);
+
+  context->submit(std::move(recording), true);
+  EXPECT_EQ(presentCount, 1);
+  EXPECT_EQ(presentedTargetCount, 2);
+  EXPECT_TRUE(destroyed);
 }
 
 }  // namespace tgfx
