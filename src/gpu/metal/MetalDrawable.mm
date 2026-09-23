@@ -29,7 +29,10 @@ std::shared_ptr<MetalDrawable> MetalDrawable::Make(Context* context, CAMetalLaye
   if (metalLayer == nil) {
     return nullptr;
   }
-  auto metalDrawable = [metalLayer nextDrawable];
+  id<CAMetalDrawable> metalDrawable = nil;
+  @autoreleasepool {
+    metalDrawable = [[metalLayer nextDrawable] retain];
+  }
   if (metalDrawable == nil) {
     return nullptr;
   }
@@ -41,6 +44,7 @@ std::shared_ptr<MetalDrawable> MetalDrawable::Make(Context* context, CAMetalLaye
   BackendRenderTarget backendRT(metalInfo, width, height);
   auto renderTarget = RenderTargetProxy::MakeFrom(context, backendRT, ImageOrigin::TopLeft);
   if (renderTarget == nullptr) {
+    [metalDrawable release];
     return nullptr;
   }
   return std::shared_ptr<MetalDrawable>(
@@ -51,7 +55,7 @@ MetalDrawable::MetalDrawable(Context* context, std::shared_ptr<RenderTargetProxy
                              id<CAMetalDrawable> metalDrawable,
                              std::shared_ptr<ColorSpace> colorSpace)
     : Drawable(context, std::move(renderTarget), std::move(colorSpace)),
-      _metalDrawable([metalDrawable retain]) {
+      _metalDrawable(metalDrawable) {
 }
 
 MetalDrawable::~MetalDrawable() {

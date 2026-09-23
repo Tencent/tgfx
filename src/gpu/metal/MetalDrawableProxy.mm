@@ -68,13 +68,15 @@ std::shared_ptr<TextureView> MetalDrawableProxy::getTextureView() const {
 
 std::shared_ptr<RenderTarget> MetalDrawableProxy::getRenderTarget() const {
   if (_renderTarget == nullptr) {
-    auto drawable = [_metalLayer nextDrawable];
+    id<CAMetalDrawable> drawable = nil;
+    @autoreleasepool {
+      drawable = [[_metalLayer nextDrawable] retain];
+    }
     if (drawable == nil) {
       return nullptr;
     }
-    auto newDrawable = [drawable retain];
     [_metalDrawable release];
-    _metalDrawable = newDrawable;
+    _metalDrawable = drawable;
     // Schedule the drawable to be presented when the command buffer is committed, so that the
     // GPU finishes rendering before the drawable is displayed on screen. The command buffer
     // retains the drawable until it completes, so the proxy can drop its reference once the
