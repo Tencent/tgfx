@@ -149,8 +149,7 @@ export type EmscriptenGLContextAttributes =
     {
         majorVersion: number;
         minorVersion: number;
-        // Emscripten's own extras, which the WebGL specification does not define. They travel with
-        // the attribute object that GL.createContext()/GL.registerContext() receive.
+        // Emscripten's own extras, which the WebGL specification does not define.
         enableExtensionsByDefault?: boolean;
         explicitSwapControl?: boolean;
         proxyContextToMainThread?: number;

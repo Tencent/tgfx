@@ -269,14 +269,9 @@ export const uploadVideoToWebGPUTexture = (source: HTMLVideoElement, texturePtr:
 };
 
 /**
- * Creates a WebGL context from a canvas object and registers it with the Emscripten GL runtime,
- * returning the context handle.
- *
- * This is the entry point for a thread that has no DOM. tgfx's id based overloads resolve a canvas
- * through the Emscripten canvas lookup, which falls back to document.querySelector(); an
- * OffscreenCanvas in a worker cannot be found that way, so the canvas object itself has to be handed
- * over. Doing that also keeps the final executable from needing -sOFFSCREENCANVAS_SUPPORT, since
- * nothing here goes through the Emscripten canvas lookup.
+ * Creates a WebGL context from a canvas object. Used for canvases that tgfx cannot reach by id, such
+ * as an OffscreenCanvas on a worker thread; call it on the thread that will do the rendering, since
+ * the returned handle is only valid there.
  *
  * @param GL The Emscripten GL runtime (module.GL).
  * @param canvas The canvas to create the context from.

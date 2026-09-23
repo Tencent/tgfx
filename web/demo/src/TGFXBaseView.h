@@ -52,11 +52,10 @@ class TGFXBaseView {
   void updateSize();
 
   /**
-   * Sets the ratio between the canvas backing store and the canvas layout size, replacing the DOM
-   * query done in draw(). A worker has no document, so when rendering off the main thread the
-   * owner of the OffscreenCanvas has to report the device pixel ratio it sized the canvas with.
-   * Until this is called, draw() keeps querying the DOM, which leaves the single-threaded demos
-   * working unchanged.
+   * Sets the ratio between the canvas backing store and its layout size. Needed when the view runs
+   * where that ratio cannot be read from the page, such as a worker rendering into an
+   * OffscreenCanvas. Until it is called the ratio is taken from the page, so the single-threaded
+   * demos do not have to call it.
    *
    * @param density Backing store size divided by layout size, normally window.devicePixelRatio.
    */
