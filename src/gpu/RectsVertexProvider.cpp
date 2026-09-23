@@ -115,8 +115,8 @@ class AARectsVertexProvider : public RectsVertexProvider {
       // ring's integrated ink equals that area and never exceeds the paint alpha. When only one
       // axis collapses the ring's linear ramp conserves that ink exactly; when both axes collapse
       // the inner quad degenerates to a point and the corner-triangle interpolation over-deposits
-      // up to 4/3 of the area, which vertex-interpolated AA cannot avoid without per-fragment
-      // edge-equation coverage. Each axis is measured against its own device scale, so
+      // up to 4/3 of the area, an inherent limit of interpolating coverage from vertices rather
+      // than evaluating it per pixel. Each axis is measured against its own device scale, so
       // non-uniform matrices neither misclassify an axis that is wide enough in device pixels as
       // sub-pixel nor leave an axis flippable.
       auto subpixelX = rect.width() * scaleX < 1.0f;
