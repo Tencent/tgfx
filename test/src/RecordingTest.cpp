@@ -277,7 +277,7 @@ TGFX_TEST(RecordingTest, RetainsWindowAndCoalescesSharedPresentation) {
 
   context->submit(std::move(recording), true);
   EXPECT_EQ(presentCount, 1);
-  EXPECT_EQ(presentedTargetCount, 2);
+  EXPECT_EQ(presentedTargetCount, 2u);
   EXPECT_TRUE(destroyed);
 }
 

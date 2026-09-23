@@ -25,6 +25,7 @@
 #include "gpu/tasks/RenderTargetCopyTask.h"
 #include "gpu/tasks/RuntimeDrawTask.h"
 #include "tasks/TransferPixelsTask.h"
+#include "tgfx/gpu/Window.h"
 
 namespace tgfx {
 DrawingManager::DrawingManager(Context* context) : context(context) {
