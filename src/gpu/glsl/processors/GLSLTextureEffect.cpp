@@ -200,9 +200,21 @@ void GLSLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
 
 void GLSLTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
                                   UniformData* fragmentUniformData) const {
+  // TGFX_GLASS_UDF_DEBUG prints entry before any early return so an A/B run can see whether this
+  // child's data upload runs at all on each route and whether the precompiled layout actually
+  // carries the Subset field. Diagnostic only.
+  if (std::getenv("TGFX_GLASS_UDF_DEBUG") != nullptr) {
+    std::printf("[GlassUDF] TextureEffect onSetData entry view=%d fragData=%d\n",
+                getTextureView() != nullptr ? 1 : 0, fragmentUniformData != nullptr ? 1 : 0);
+  }
   auto textureView = getTextureView();
   if (textureView == nullptr || fragmentUniformData == nullptr) {
     return;
+  }
+  if (std::getenv("TGFX_GLASS_UDF_DEBUG") != nullptr) {
+    std::printf("[GlassUDF] TextureEffect onSetData tex=%dx%d hasSubsetField=%d\n",
+                textureProxy->width(), textureProxy->height(),
+                fragmentUniformData->hasField("Subset") ? 1 : 0);
   }
   // Default for kernels with a runtime device mask (absent elsewhere); a present mask FP
   // overwrites it with 1 later in traversal.
@@ -253,6 +265,13 @@ void GLSLTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
   if (fragmentUniformData != nullptr && fragmentUniformData->hasField("Subset")) {
     float rect[4];
     computeSubsetRect(rect);
+    // TGFX_GLASS_UDF_DEBUG prints the uploaded subset so an A/B run can diff the exact clamp
+    // bounds each route sent. Diagnostic only.
+    if (std::getenv("TGFX_GLASS_UDF_DEBUG") != nullptr) {
+      std::printf("[GlassUDF] TextureEffect Subset=(%g,%g,%g,%g) needSubset=%d tex=%dx%d\n",
+                  rect[0], rect[1], rect[2], rect[3], needSubset() ? 1 : 0, textureProxy->width(),
+                  textureProxy->height());
+    }
     fragmentUniformData->setData("Subset", rect);
   }
   // Alpha-only is a runtime uniform in the precompiled QuadTextureFillShader (folded out of the

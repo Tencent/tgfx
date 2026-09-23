@@ -37,6 +37,7 @@
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gtest/gtest.h"
+#include "layers/layerstyles/GlassUDF.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/ColorFilter.h"
@@ -57,6 +58,13 @@
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/Layer.h"
+#include "tgfx/layers/ShapeLayer.h"
+#include "tgfx/layers/ShapeStyle.h"
+#include "tgfx/layers/SolidLayer.h"
+#include "tgfx/layers/filters/BlurFilter.h"
+#include "tgfx/layers/filters/DropShadowFilter.h"
+#include "tgfx/layers/filters/InnerShadowFilter.h"
+#include "tgfx/layers/layerstyles/GlassStyle.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
@@ -6768,6 +6776,511 @@ TGFX_TEST(AOTRenderConsistencyTest, IncompatibleBundleIsRejectedNotLoaded) {
   // load afterwards, and a final unload restores the pre-test state.
   EXPECT_TRUE(cache->loadBundle(bytes.data(), bytes.size()));
   cache->unload();
+}
+
+// Copies a UDF texture proxy back to the CPU through a plain identity fill. The fill itself matches
+// the (fixed) QuadTextureFillShader kernel on the AOT side, but an identity copy is lossless, so any
+// difference between the two bitmaps belongs to the UDF generation and not to the readback.
+static bool ReadBackUDFProxy(Context* context, std::shared_ptr<TextureProxy> proxy, Bitmap* out) {
+  auto width = proxy->width();
+  auto height = proxy->height();
+  auto target = RenderTargetProxy::Make(context, width, height, false, 1, false,
+                                        ImageOrigin::TopLeft, BackingFit::Exact);
+  if (target == nullptr) {
+    return false;
+  }
+  auto fillProcessor = TextureEffect::Make(context->drawingAllocator(), std::move(proxy));
+  if (fillProcessor == nullptr) {
+    return false;
+  }
+  if (!context->drawingManager()->fillRTWithFP(target, std::move(fillProcessor), 0, Point::Zero(),
+                                               OffscreenFillSource::FPFlatten)) {
+    return false;
+  }
+  auto surface = Surface::MakeFrom(target);
+  if (surface == nullptr) {
+    return false;
+  }
+  context->flushAndSubmit(true);
+  if (!out->allocPixels(width, height)) {
+    return false;
+  }
+  auto* pixels = out->lockPixels();
+  if (pixels == nullptr) {
+    return false;
+  }
+  auto result = surface->readPixels(out->info(), pixels);
+  out->unlockPixels();
+  return result;
+}
+
+// Isolates the GlassUDF tent-blur pipeline from the full glass style: the same coverage source and
+// request run twice (JIT first, then AOT with the embedded bundle), and each generated UDF texture
+// is read back and compared. The coverage source is drawn once under JIT and shared by both runs
+// (the rasterized-image cache pins the input), so a mismatch localizes the divergence to the UDF
+// generation itself; a match clears the tent-blur kernels and points at the refraction consumer.
+TGFX_TEST(AOTRenderConsistencyTest, GlassUDFTentBlurPipelineAOTMatchesJIT) {
+  // The debug-texture collection inside GenerateGlassUDFTexture is gated on the same environment
+  // flag as the diagnostic prints; enable it for this probe so the pass captures work without an
+  // external env.
+  setenv("TGFX_GLASS_UDF_DEBUG", "1", 1);
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  cache->unload();
+
+  auto maskSurface = Surface::Make(context, 384, 256);
+  ASSERT_TRUE(maskSurface != nullptr);
+  Paint paint;
+  paint.setColor(Color::White());
+  maskSurface->getCanvas()->drawOval(Rect::MakeLTRB(40, 30, 340, 220), paint);
+  context->flushAndSubmit(true);
+  auto source = maskSurface->makeImageSnapshot();
+  ASSERT_TRUE(source != nullptr);
+
+  GlassUDFRequest request = {};
+  request.source = source;
+  request.coreWidth = 384;
+  request.coreHeight = 256;
+  request.textureRect = Rect::MakeLTRB(-5, -5, 389, 261);
+  request.fineRadius = {44.8f, 44.8f};
+  request.coarseRadius = {4, 4};
+  request.field = GlassUDFField::Refraction;
+  Bitmap jitBitmap = {};
+  auto jitProxy = GenerateGlassUDFTexture(context, request);
+  ASSERT_TRUE(jitProxy != nullptr);
+  ASSERT_TRUE(ReadBackUDFProxy(context, std::move(jitProxy), &jitBitmap));
+
+  GlassUDFRequest edgeLightRequest = request;
+  edgeLightRequest.textureRect = Rect::MakeLTRB(-3, -3, 383, 259);
+  edgeLightRequest.field = GlassUDFField::EdgeLight;
+  Bitmap edgeJitBitmap = {};
+  auto edgeJitProxy = GenerateGlassUDFTexture(context, edgeLightRequest);
+  ASSERT_TRUE(edgeJitProxy != nullptr);
+  ASSERT_TRUE(ReadBackUDFProxy(context, std::move(edgeJitProxy), &edgeJitBitmap));
+
+  // The in-scene capture showed the EdgeLight field (coarse radius 4 over a 180x120 rrect
+  // coverage) diverging while the Refraction field stayed identical, so this variant replays the
+  // scene's exact shape and window to reproduce it in isolation.
+  auto edgeMaskSurface = Surface::Make(context, 180, 120);
+  ASSERT_TRUE(edgeMaskSurface != nullptr);
+  Path rrectPath = {};
+  rrectPath.addRoundRect(Rect::MakeWH(180, 120), 40, 20);
+  Paint edgePaint;
+  edgePaint.setColor(Color::White());
+  edgeMaskSurface->getCanvas()->drawPath(rrectPath, edgePaint);
+  context->flushAndSubmit(true);
+  auto edgeSource = edgeMaskSurface->makeImageSnapshot();
+  ASSERT_TRUE(edgeSource != nullptr);
+  TakeGlassUDFDebugTextures();
+  GlassUDFRequest sceneEdgeRequest = {};
+  sceneEdgeRequest.source = edgeSource;
+  sceneEdgeRequest.coreWidth = 180;
+  sceneEdgeRequest.coreHeight = 120;
+  sceneEdgeRequest.textureRect = Rect::MakeLTRB(-3, -3, 183, 123);
+  sceneEdgeRequest.fineRadius = {0, 0};
+  sceneEdgeRequest.coarseRadius = {4, 4};
+  sceneEdgeRequest.field = GlassUDFField::EdgeLight;
+  Bitmap sceneEdgeJitBitmap = {};
+  auto sceneEdgeJitProxy = GenerateGlassUDFTexture(context, sceneEdgeRequest);
+  ASSERT_TRUE(sceneEdgeJitProxy != nullptr);
+  ASSERT_TRUE(ReadBackUDFProxy(context, std::move(sceneEdgeJitProxy), &sceneEdgeJitBitmap));
+  auto sceneEdgeJitPasses = TakeGlassUDFDebugTextures();
+
+  auto bundle = EmbeddedShaderBundles::GetBundle(context->backend());
+  ASSERT_TRUE(bundle.first != nullptr && bundle.second > 0);
+  ASSERT_TRUE(cache->loadBundle(bundle.first, bundle.second));
+  context->globalCache()->clearPrograms();
+
+  Bitmap aotBitmap = {};
+  auto aotProxy = GenerateGlassUDFTexture(context, request);
+  ASSERT_TRUE(aotProxy != nullptr);
+  ASSERT_TRUE(ReadBackUDFProxy(context, std::move(aotProxy), &aotBitmap));
+
+  Bitmap edgeAotBitmap = {};
+  auto edgeAotProxy = GenerateGlassUDFTexture(context, edgeLightRequest);
+  ASSERT_TRUE(edgeAotProxy != nullptr);
+  ASSERT_TRUE(ReadBackUDFProxy(context, std::move(edgeAotProxy), &edgeAotBitmap));
+
+  TakeGlassUDFDebugTextures();
+  Bitmap sceneEdgeAotBitmap = {};
+  auto sceneEdgeAotProxy = GenerateGlassUDFTexture(context, sceneEdgeRequest);
+  ASSERT_TRUE(sceneEdgeAotProxy != nullptr);
+  ASSERT_TRUE(ReadBackUDFProxy(context, std::move(sceneEdgeAotProxy), &sceneEdgeAotBitmap));
+  auto sceneEdgeAotPasses = TakeGlassUDFDebugTextures();
+  cache->unload();
+
+  // Compare the horizontal intermediates of the scene-shaped EdgeLight request: a difference here
+  // localizes the bug to the horizontal pass (plain-child sampling of the source), while a match
+  // moves the suspicion to the vertical pass (tiled-child sampling of the horizontal target).
+  std::printf("[GlassUDFProbe] passes sizes jit=%zu aot=%zu\n", sceneEdgeJitPasses.size(),
+              sceneEdgeAotPasses.size());
+  ASSERT_EQ(sceneEdgeJitPasses.size(), static_cast<size_t>(2));
+  ASSERT_EQ(sceneEdgeAotPasses.size(), static_cast<size_t>(2));
+  for (size_t pass = 0; pass < 2; ++pass) {
+    Bitmap passJitBitmap = {};
+    Bitmap passAotBitmap = {};
+    ASSERT_TRUE(ReadBackUDFProxy(context, sceneEdgeJitPasses[pass], &passJitBitmap));
+    ASSERT_TRUE(ReadBackUDFProxy(context, sceneEdgeAotPasses[pass], &passAotBitmap));
+    auto* passJitPixels =
+        static_cast<const uint32_t*>(const_cast<Bitmap&>(passJitBitmap).lockPixels());
+    auto* passAotPixels =
+        static_cast<const uint32_t*>(const_cast<Bitmap&>(passAotBitmap).lockPixels());
+    ASSERT_TRUE(passJitPixels != nullptr && passAotPixels != nullptr);
+    size_t passDiffCount = 0;
+    int passMaxChannelDelta = 0;
+    auto passPixelCount =
+        static_cast<size_t>(passJitBitmap.width()) * static_cast<size_t>(passJitBitmap.height());
+    for (size_t i = 0; i < passPixelCount; ++i) {
+      if (passJitPixels[i] == passAotPixels[i]) {
+        continue;
+      }
+      ++passDiffCount;
+      for (int shift = 0; shift < 32; shift += 8) {
+        auto delta = std::abs(static_cast<int>((passJitPixels[i] >> shift) & 0xff) -
+                              static_cast<int>((passAotPixels[i] >> shift) & 0xff));
+        passMaxChannelDelta = std::max(passMaxChannelDelta, delta);
+      }
+    }
+    const_cast<Bitmap&>(passJitBitmap).unlockPixels();
+    const_cast<Bitmap&>(passAotBitmap).unlockPixels();
+    std::printf(
+        "[GlassUDFProbe] SceneEdgeLight pass[%zu] %dx%d diffPixels=%zu/%zu maxChannelDelta=%d\n",
+        pass, passJitBitmap.width(), passJitBitmap.height(), passDiffCount, passPixelCount,
+        passMaxChannelDelta);
+  }
+
+  auto* jitPixels = static_cast<const uint32_t*>(const_cast<Bitmap&>(jitBitmap).lockPixels());
+  auto* aotPixels = static_cast<const uint32_t*>(const_cast<Bitmap&>(aotBitmap).lockPixels());
+  ASSERT_TRUE(jitPixels != nullptr && aotPixels != nullptr);
+  size_t diffCount = 0;
+  int maxChannelDelta = 0;
+  size_t reported = 0;
+  auto pixelCount = static_cast<size_t>(394) * 266;
+  for (size_t i = 0; i < pixelCount; ++i) {
+    if (jitPixels[i] == aotPixels[i]) {
+      continue;
+    }
+    ++diffCount;
+    auto x = static_cast<int>(i % 394);
+    auto y = static_cast<int>(i / 394);
+    auto jx = jitPixels[i];
+    auto ax = aotPixels[i];
+    for (int shift = 0; shift < 32; shift += 8) {
+      auto delta =
+          std::abs(static_cast<int>((jx >> shift) & 0xff) - static_cast<int>((ax >> shift) & 0xff));
+      maxChannelDelta = std::max(maxChannelDelta, delta);
+    }
+    if (reported < 8) {
+      ++reported;
+      std::printf("[GlassUDFProbe] diff at (%d,%d): jit=%08x aot=%08x\n", x, y, jx, ax);
+    }
+  }
+  const_cast<Bitmap&>(jitBitmap).unlockPixels();
+  const_cast<Bitmap&>(aotBitmap).unlockPixels();
+  std::printf("[GlassUDFProbe] Refraction field diffPixels=%zu/%zu maxChannelDelta=%d\n", diffCount,
+              pixelCount, maxChannelDelta);
+  EXPECT_EQ(diffCount, static_cast<size_t>(0));
+
+  auto* edgeJitPixels =
+      static_cast<const uint32_t*>(const_cast<Bitmap&>(edgeJitBitmap).lockPixels());
+  auto* edgeAotPixels =
+      static_cast<const uint32_t*>(const_cast<Bitmap&>(edgeAotBitmap).lockPixels());
+  ASSERT_TRUE(edgeJitPixels != nullptr && edgeAotPixels != nullptr);
+  size_t edgeDiffCount = 0;
+  int edgeMaxChannelDelta = 0;
+  size_t edgeReported = 0;
+  auto edgePixelCount = static_cast<size_t>(386) * 262;
+  for (size_t i = 0; i < edgePixelCount; ++i) {
+    if (edgeJitPixels[i] == edgeAotPixels[i]) {
+      continue;
+    }
+    ++edgeDiffCount;
+    auto ejx = edgeJitPixels[i];
+    auto eax = edgeAotPixels[i];
+    for (int shift = 0; shift < 32; shift += 8) {
+      auto delta = std::abs(static_cast<int>((ejx >> shift) & 0xff) -
+                            static_cast<int>((eax >> shift) & 0xff));
+      edgeMaxChannelDelta = std::max(edgeMaxChannelDelta, delta);
+    }
+    if (edgeReported < 8) {
+      ++edgeReported;
+      std::printf("[GlassUDFProbe] EdgeLight diff at (%d,%d): jit=%08x aot=%08x\n",
+                  static_cast<int>(i % 386), static_cast<int>(i / 386), ejx, eax);
+    }
+  }
+  const_cast<Bitmap&>(edgeJitBitmap).unlockPixels();
+  const_cast<Bitmap&>(edgeAotBitmap).unlockPixels();
+  std::printf("[GlassUDFProbe] EdgeLight field diffPixels=%zu/%zu maxChannelDelta=%d\n",
+              edgeDiffCount, edgePixelCount, edgeMaxChannelDelta);
+  EXPECT_EQ(edgeDiffCount, static_cast<size_t>(0));
+
+  auto* sceneEdgeJitPixels =
+      static_cast<const uint32_t*>(const_cast<Bitmap&>(sceneEdgeJitBitmap).lockPixels());
+  auto* sceneEdgeAotPixels =
+      static_cast<const uint32_t*>(const_cast<Bitmap&>(sceneEdgeAotBitmap).lockPixels());
+  ASSERT_TRUE(sceneEdgeJitPixels != nullptr && sceneEdgeAotPixels != nullptr);
+  size_t sceneEdgeDiffCount = 0;
+  int sceneEdgeMaxChannelDelta = 0;
+  size_t sceneEdgeReported = 0;
+  auto sceneEdgePixelCount = static_cast<size_t>(186) * 126;
+  for (size_t i = 0; i < sceneEdgePixelCount; ++i) {
+    if (sceneEdgeJitPixels[i] == sceneEdgeAotPixels[i]) {
+      continue;
+    }
+    ++sceneEdgeDiffCount;
+    auto sejx = sceneEdgeJitPixels[i];
+    auto seax = sceneEdgeAotPixels[i];
+    for (int shift = 0; shift < 32; shift += 8) {
+      auto delta = std::abs(static_cast<int>((sejx >> shift) & 0xff) -
+                            static_cast<int>((seax >> shift) & 0xff));
+      sceneEdgeMaxChannelDelta = std::max(sceneEdgeMaxChannelDelta, delta);
+    }
+    if (sceneEdgeReported < 8) {
+      ++sceneEdgeReported;
+      std::printf("[GlassUDFProbe] SceneEdgeLight diff at (%d,%d): jit=%08x aot=%08x\n",
+                  static_cast<int>(i % 186), static_cast<int>(i / 186), sejx, seax);
+    }
+  }
+  const_cast<Bitmap&>(sceneEdgeJitBitmap).unlockPixels();
+  const_cast<Bitmap&>(sceneEdgeAotBitmap).unlockPixels();
+  std::printf("[GlassUDFProbe] SceneEdgeLight field diffPixels=%zu/%zu maxChannelDelta=%d\n",
+              sceneEdgeDiffCount, sceneEdgePixelCount, sceneEdgeMaxChannelDelta);
+  EXPECT_EQ(sceneEdgeDiffCount, static_cast<size_t>(0));
+}
+
+// Renders the LayerFilterTest.Filters scene once and reads the result back.
+static Bitmap RenderFiltersScene(Context* renderContext) {
+  auto surface = Surface::Make(renderContext, 150, 150);
+  EXPECT_TRUE(surface != nullptr);
+  DisplayList displayList;
+  auto shapeLayer = ShapeLayer::Make();
+  EXPECT_TRUE(shapeLayer != nullptr);
+  shapeLayer->setMatrix(Matrix::MakeTrans(30, 30));
+  Path path;
+  path.addRect(Rect::MakeWH(100, 100));
+  shapeLayer->setPath(path);
+  shapeLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(100, 0, 0, 128)));
+  shapeLayer->setLineWidth(1.0f);
+  shapeLayer->setFilters({BlurFilter::Make(5, 5),
+                          DropShadowFilter::Make(10, 10, 0, 0, Color::Black()),
+                          InnerShadowFilter::Make(10, 10, 0, 0, Color::White())});
+  displayList.root()->addChild(shapeLayer);
+  displayList.render(surface.get());
+  renderContext->flushAndSubmit(true);
+  Bitmap bitmap = {};
+  EXPECT_TRUE(bitmap.allocPixels(150, 150));
+  auto* pixels = bitmap.lockPixels();
+  EXPECT_TRUE(pixels != nullptr);
+  EXPECT_TRUE(surface->readPixels(bitmap.info(), pixels));
+  bitmap.unlockPixels();
+  return bitmap;
+}
+
+// Replays the LayerFilterTest.Filters scene (a shape layer carrying blur + drop-shadow +
+// inner-shadow filters) as a same-process A/B render: JIT first, then the embedded bundle, on two
+// fresh surfaces. The scene is the deny-bisect attribute of the PointwiseChainShader content-level
+// divergence, so a mismatch here is the minimal in-process reproducer for the chain route.
+TGFX_TEST(AOTRenderConsistencyTest, FiltersSceneAOTMatchesJIT) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  cache->unload();
+
+  auto jitBitmap = RenderFiltersScene(context);
+
+  auto bundle = EmbeddedShaderBundles::GetBundle(context->backend());
+  ASSERT_TRUE(bundle.first != nullptr && bundle.second > 0);
+  ASSERT_TRUE(cache->loadBundle(bundle.first, bundle.second));
+  context->globalCache()->clearPrograms();
+  auto aotBitmap = RenderFiltersScene(context);
+  cache->unload();
+
+  auto* jitPixels = static_cast<const uint32_t*>(const_cast<Bitmap&>(jitBitmap).lockPixels());
+  auto* aotPixels = static_cast<const uint32_t*>(const_cast<Bitmap&>(aotBitmap).lockPixels());
+  ASSERT_TRUE(jitPixels != nullptr && aotPixels != nullptr);
+  size_t diffCount = 0;
+  int maxChannelDelta = 0;
+  size_t reported = 0;
+  auto pixelCount = static_cast<size_t>(150) * 150;
+  for (size_t i = 0; i < pixelCount; ++i) {
+    if (jitPixels[i] == aotPixels[i]) {
+      continue;
+    }
+    ++diffCount;
+    for (int shift = 0; shift < 32; shift += 8) {
+      auto delta = std::abs(static_cast<int>((jitPixels[i] >> shift) & 0xff) -
+                            static_cast<int>((aotPixels[i] >> shift) & 0xff));
+      maxChannelDelta = std::max(maxChannelDelta, delta);
+    }
+    if (reported < 8) {
+      ++reported;
+      std::printf("[FiltersProbe] diff at (%d,%d): jit=%08x aot=%08x\n", static_cast<int>(i % 150),
+                  static_cast<int>(i / 150), jitPixels[i], aotPixels[i]);
+    }
+  }
+  const_cast<Bitmap&>(jitBitmap).unlockPixels();
+  const_cast<Bitmap&>(aotBitmap).unlockPixels();
+  std::printf("[FiltersProbe] diffPixels=%zu/%zu maxChannelDelta=%d\n", diffCount, pixelCount,
+              maxChannelDelta);
+  EXPECT_EQ(diffCount, static_cast<size_t>(0));
+}
+
+// Renders the GlassStyleEllipticalCornerSingleCell scene once and reads the result back: a
+// checker background, two contrast shapes, and one elliptical-corner glass panel.
+static Bitmap RenderGlassCellScene(Context* renderContext) {
+  constexpr float cellSize = 200;
+  auto surface =
+      Surface::Make(renderContext, static_cast<int>(cellSize), static_cast<int>(cellSize));
+  EXPECT_TRUE(surface != nullptr);
+  DisplayList displayList;
+  auto bgImage = MakeImage("resources/apitest/checker_128.png");
+  EXPECT_TRUE(bgImage != nullptr);
+  auto container = Layer::Make();
+  auto imgLayer = ImageLayer::Make();
+  imgLayer->setImage(bgImage);
+  auto scale = cellSize / static_cast<float>(std::max(bgImage->width(), bgImage->height()));
+  imgLayer->setMatrix(Matrix::MakeScale(scale, scale));
+  container->addChild(imgLayer);
+  auto blueRect = ShapeLayer::Make();
+  Path bluePath = {};
+  bluePath.addRect(
+      Rect::MakeXYWH(cellSize * 0.15f, cellSize * 0.15f, cellSize * 0.35f, cellSize * 0.35f));
+  blueRect->setPath(bluePath);
+  blueRect->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 100, 255, 255)));
+  container->addChild(blueRect);
+  auto greenCircle = ShapeLayer::Make();
+  Path greenPath = {};
+  greenPath.addOval(
+      Rect::MakeXYWH(cellSize * 0.45f, cellSize * 0.45f, cellSize * 0.4f, cellSize * 0.4f));
+  greenCircle->setPath(greenPath);
+  greenCircle->setFillStyle(ShapeStyle::Make(Color::FromRGBA(50, 200, 80, 200)));
+  container->addChild(greenCircle);
+  auto glassLayer = SolidLayer::Make();
+  glassLayer->setColor(Color::FromRGBA(255, 255, 255, 128));
+  glassLayer->setWidth(180);
+  glassLayer->setHeight(120);
+  glassLayer->setRadiusX(40);
+  glassLayer->setRadiusY(20);
+  glassLayer->setMatrix(Matrix::MakeTrans((cellSize - 180) * 0.5f, (cellSize - 120) * 0.5f));
+  // TGFX_GLASS_PROBE_STYLE selects a degenerate glass configuration: "nolight" disables the edge
+  // light (no EdgeLight UDF field), "norefraction" disables the refraction offset, isolating which
+  // stage amplifies the divergence. Diagnostic only.
+  const char* styleMode = std::getenv("TGFX_GLASS_PROBE_STYLE");
+  float refraction = 50;
+  float depth = 100;
+  float lightIntensity = 50;
+  if (styleMode != nullptr && std::strcmp(styleMode, "nolight") == 0) {
+    lightIntensity = 0;
+  } else if (styleMode != nullptr && std::strcmp(styleMode, "norefraction") == 0) {
+    refraction = 0;
+    depth = 0;
+  }
+  glassLayer->setLayerStyles({GlassStyle::Make(refraction, depth, 0, 0, 50, 135, lightIntensity)});
+  container->addChild(glassLayer);
+  displayList.root()->addChild(container);
+  displayList.render(surface.get());
+  renderContext->flushAndSubmit(true);
+  Bitmap bitmap = {};
+  EXPECT_TRUE(bitmap.allocPixels(static_cast<int>(cellSize), static_cast<int>(cellSize)));
+  auto* pixels = bitmap.lockPixels();
+  EXPECT_TRUE(pixels != nullptr);
+  EXPECT_TRUE(surface->readPixels(bitmap.info(), pixels));
+  bitmap.unlockPixels();
+  return bitmap;
+}
+
+// Replays the GlassStyleEllipticalCornerSingleCell scene as a same-process A/B render. The scene is
+// the deny-bisect attribute of both the GlassUDFTentBlurShader and GlassRefractionShader kernel
+// families; the isolated UDF probes already cleared the tent-blur generation, so a mismatch here
+// localizes the remaining glass divergence to the refraction consumer or cross-draw state.
+TGFX_TEST(AOTRenderConsistencyTest, GlassCellSceneAOTMatchesJIT) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  cache->unload();
+
+  auto jitBitmap = RenderGlassCellScene(context);
+  auto jitUDFTextures = TakeGlassUDFDebugTextures();
+
+  auto bundle = EmbeddedShaderBundles::GetBundle(context->backend());
+  ASSERT_TRUE(bundle.first != nullptr && bundle.second > 0);
+  ASSERT_TRUE(cache->loadBundle(bundle.first, bundle.second));
+  context->globalCache()->clearPrograms();
+  auto aotBitmap = RenderGlassCellScene(context);
+  auto aotUDFTextures = TakeGlassUDFDebugTextures();
+  cache->unload();
+
+  // Compare the in-scene UDF textures first: the isolated probes proved the tent-blur kernel
+  // bit-identical on identical inputs, so a mismatch here means the in-scene fill received
+  // different state (uniforms or bindings), which is the divergence root to chase.
+  ASSERT_EQ(jitUDFTextures.size(), aotUDFTextures.size());
+  for (size_t index = 0; index < jitUDFTextures.size(); ++index) {
+    Bitmap jitUDFBitmap = {};
+    Bitmap aotUDFBitmap = {};
+    ASSERT_TRUE(ReadBackUDFProxy(context, jitUDFTextures[index], &jitUDFBitmap));
+    ASSERT_TRUE(ReadBackUDFProxy(context, aotUDFTextures[index], &aotUDFBitmap));
+    auto* jitUDFPixels =
+        static_cast<const uint32_t*>(const_cast<Bitmap&>(jitUDFBitmap).lockPixels());
+    auto* aotUDFPixels =
+        static_cast<const uint32_t*>(const_cast<Bitmap&>(aotUDFBitmap).lockPixels());
+    ASSERT_TRUE(jitUDFPixels != nullptr && aotUDFPixels != nullptr);
+    size_t udfDiffCount = 0;
+    int udfMaxChannelDelta = 0;
+    auto udfPixelCount =
+        static_cast<size_t>(jitUDFBitmap.width()) * static_cast<size_t>(jitUDFBitmap.height());
+    for (size_t i = 0; i < udfPixelCount; ++i) {
+      if (jitUDFPixels[i] == aotUDFPixels[i]) {
+        continue;
+      }
+      ++udfDiffCount;
+      for (int shift = 0; shift < 32; shift += 8) {
+        auto delta = std::abs(static_cast<int>((jitUDFPixels[i] >> shift) & 0xff) -
+                              static_cast<int>((aotUDFPixels[i] >> shift) & 0xff));
+        udfMaxChannelDelta = std::max(udfMaxChannelDelta, delta);
+      }
+    }
+    const_cast<Bitmap&>(jitUDFBitmap).unlockPixels();
+    const_cast<Bitmap&>(aotUDFBitmap).unlockPixels();
+    std::printf("[GlassCellProbe] UDF[%zu] %dx%d diffPixels=%zu/%zu maxChannelDelta=%d\n", index,
+                jitUDFBitmap.width(), jitUDFBitmap.height(), udfDiffCount, udfPixelCount,
+                udfMaxChannelDelta);
+    EXPECT_EQ(udfDiffCount, static_cast<size_t>(0));
+  }
+
+  auto* jitPixels = static_cast<const uint32_t*>(const_cast<Bitmap&>(jitBitmap).lockPixels());
+  auto* aotPixels = static_cast<const uint32_t*>(const_cast<Bitmap&>(aotBitmap).lockPixels());
+  ASSERT_TRUE(jitPixels != nullptr && aotPixels != nullptr);
+  size_t diffCount = 0;
+  int maxChannelDelta = 0;
+  size_t reported = 0;
+  auto pixelCount = static_cast<size_t>(200) * 200;
+  for (size_t i = 0; i < pixelCount; ++i) {
+    if (jitPixels[i] == aotPixels[i]) {
+      continue;
+    }
+    ++diffCount;
+    auto jx = jitPixels[i];
+    auto ax = aotPixels[i];
+    for (int shift = 0; shift < 32; shift += 8) {
+      auto delta =
+          std::abs(static_cast<int>((jx >> shift) & 0xff) - static_cast<int>((ax >> shift) & 0xff));
+      maxChannelDelta = std::max(maxChannelDelta, delta);
+    }
+    if (reported < 8) {
+      ++reported;
+      std::printf("[GlassCellProbe] diff at (%d,%d): jit=%08x aot=%08x\n",
+                  static_cast<int>(i % 200), static_cast<int>(i / 200), jx, ax);
+    }
+  }
+  const_cast<Bitmap&>(jitBitmap).unlockPixels();
+  const_cast<Bitmap&>(aotBitmap).unlockPixels();
+  std::printf("[GlassCellProbe] diffPixels=%zu/%zu maxChannelDelta=%d\n", diffCount, pixelCount,
+              maxChannelDelta);
+  EXPECT_EQ(diffCount, static_cast<size_t>(0));
 }
 
 }  // namespace tgfx

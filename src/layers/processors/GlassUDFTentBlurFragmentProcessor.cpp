@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "layers/processors/GlassUDFTentBlurFragmentProcessor.h"
+#include <cstdio>
+#include <cstdlib>
 #include "core/utils/Log.h"
 
 namespace tgfx {
@@ -160,6 +162,13 @@ void GlassUDFTentBlurFragmentProcessor::onSetData(UniformData*,
   Point radii = {fineRadius, coarseRadius};
   fragmentUniformData->setData("GlassUDFRadius", radii);
   fragmentUniformData->setData("GlassUDFStep", step);
+  // The precompiled tent-blur kernel selects its tap path with this flag: a TiledTextureEffect
+  // child must run the Decal/tiling tap semantics (out-of-subset reads resolve to the border),
+  // while a plain TextureEffect child only clamps to the subset. GaussianBlur1D uploads the same
+  // flag for the same reason; without it the kernel stays on the plain-clamp path and pulls edge
+  // texels into the blur wherever the sampling window leaves the subset.
+  fragmentUniformData->setDataOptional("TiledChild",
+                                       processor->name() == "TiledTextureEffect" ? 1 : 0);
   // The precompiled tent-blur kernel folds the field selection and the packed-input decode into
   // runtime uniforms, so both values ride this same onSetData path.
   if (fragmentUniformData->hasField("Field")) {
@@ -167,6 +176,13 @@ void GlassUDFTentBlurFragmentProcessor::onSetData(UniformData*,
   }
   if (fragmentUniformData->hasField("InputIsPacked")) {
     fragmentUniformData->setData("InputIsPacked", inputIsPacked ? 1 : 0);
+  }
+  // TGFX_GLASS_UDF_DEBUG prints the uploaded uniform values so an A/B run can diff the exact data
+  // each route sent. Diagnostic only.
+  if (std::getenv("TGFX_GLASS_UDF_DEBUG") != nullptr) {
+    std::printf("[GlassUDF] setData dir=%d fine=%g coarse=%g field=%d packed=%d step=(%g,%g)\n",
+                static_cast<int>(direction), fineRadius, coarseRadius, static_cast<int>(field),
+                inputIsPacked ? 1 : 0, step.x, step.y);
   }
 }
 

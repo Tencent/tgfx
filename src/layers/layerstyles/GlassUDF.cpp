@@ -17,13 +17,25 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GlassUDF.h"
+#include <cstdio>
+#include <cstdlib>
 #include "gpu/DrawingManager.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "layers/processors/GlassUDFTentBlurFragmentProcessor.h"
+#include "tgfx/core/Bitmap.h"
+#include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Context.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
+
+// Debug-only collection backing TakeGlassUDFDebugTextures; fills only while
+// TGFX_GLASS_UDF_DEBUG is set.
+static std::vector<std::shared_ptr<TextureProxy>>& GlassUDFDebugTextures() {
+  static std::vector<std::shared_ptr<TextureProxy>> textures = {};
+  return textures;
+}
 
 bool GlassUDFRequest::isValid() const {
   if (source == nullptr || coreWidth <= 0 || coreHeight <= 0 || textureRect.isEmpty()) {
@@ -37,6 +49,15 @@ std::shared_ptr<TextureProxy> GenerateGlassUDFTexture(Context* context,
                                                       const GlassUDFRequest& request) {
   if (context == nullptr || !request.isValid()) {
     return nullptr;
+  }
+  // TGFX_GLASS_UDF_DEBUG prints the request parameters once per call so probe tests can replay a
+  // production scene's exact shape. Diagnostic only; read once per call.
+  if (std::getenv("TGFX_GLASS_UDF_DEBUG") != nullptr) {
+    std::printf("[GlassUDF] core=%dx%d rect=(%g,%g,%g,%g) fine=(%g,%g) coarse=(%g,%g) field=%d\n",
+                request.coreWidth, request.coreHeight, request.textureRect.left,
+                request.textureRect.top, request.textureRect.right, request.textureRect.bottom,
+                request.fineRadius.x, request.fineRadius.y, request.coarseRadius.x,
+                request.coarseRadius.y, static_cast<int>(request.field));
   }
   auto& textureRect = request.textureRect;
   auto& fineRadius = request.fineRadius;
@@ -149,7 +170,18 @@ std::shared_ptr<TextureProxy> GenerateGlassUDFTexture(Context* context,
                                                Point::Zero(), OffscreenFillSource::GlassUDF)) {
     return nullptr;
   }
-  return verticalTarget->asTextureProxy();
+  auto result = verticalTarget->asTextureProxy();
+  if (std::getenv("TGFX_GLASS_UDF_DEBUG") != nullptr) {
+    GlassUDFDebugTextures().push_back(horizontalTarget->asTextureProxy());
+    GlassUDFDebugTextures().push_back(result);
+  }
+  return result;
+}
+
+std::vector<std::shared_ptr<TextureProxy>> TakeGlassUDFDebugTextures() {
+  auto collected = GlassUDFDebugTextures();
+  GlassUDFDebugTextures().clear();
+  return collected;
 }
 
 }  // namespace tgfx
