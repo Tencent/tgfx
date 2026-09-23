@@ -44,6 +44,10 @@ std::shared_ptr<Drawable> Window::nextDrawable(Context* context) {
   if (context == nullptr) {
     return nullptr;
   }
+  if (context->device() != device.get()) {
+    LOGE("Window::nextDrawable() The context must belong to the window's device!");
+    return nullptr;
+  }
   if (weak_from_this().expired()) {
     LOGE("Window::nextDrawable() The window must be owned by a shared_ptr!");
     return nullptr;
