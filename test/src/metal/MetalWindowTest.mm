@@ -116,15 +116,17 @@ TGFX_TEST(MetalWindowTest, DrawableRotation) {
   Color frameColors[] = {Color::Red(),   Color::Green(), Color::Blue(),
                          Color::White(), Color::Black(), Color::FromRGBA(255, 255, 0)};
   for (const auto& color : frameColors) {
-    auto drawable = window->nextDrawable(context);
-    ASSERT_TRUE(drawable != nullptr);
-    auto surface = Surface::MakeFrom(context, drawable);
-    ASSERT_TRUE(surface != nullptr);
-    surface->getCanvas()->clear(color);
-    context->flushAndSubmit(true);
-    drawable->present();
-    // Metal keeps the drawable readable after present() as long as it is held.
-    EXPECT_TRUE(ReadCenterPixel(drawable.get(), color));
+    @autoreleasepool {
+      auto drawable = window->nextDrawable(context);
+      ASSERT_TRUE(drawable != nullptr);
+      auto surface = Surface::MakeFrom(context, drawable);
+      ASSERT_TRUE(surface != nullptr);
+      surface->getCanvas()->clear(color);
+      context->flushAndSubmit(true);
+      drawable->present();
+      // Metal keeps the drawable readable after present() as long as it is held.
+      EXPECT_TRUE(ReadCenterPixel(drawable.get(), color));
+    }
   }
 }
 
