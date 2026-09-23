@@ -25,14 +25,17 @@
 #include "tgfx/gpu/Device.h"
 
 namespace tgfx {
+class Drawable;
 class RenderTargetProxy;
 
 /**
  * Window represents a native displayable resource that can be rendered to by a Device. Use
  * Surface::MakeFrom(context, window) to obtain a Surface for rendering, then call
- * context->submit() to automatically present the result.
+ * context->submit() to automatically present the result. To read back the rendered content, use
+ * nextDrawable() to acquire a Drawable instead, which keeps the frame buffer readable and allows
+ * manual presentation.
  */
-class Window {
+class Window : public std::enable_shared_from_this<Window> {
  public:
   virtual ~Window() = default;
 
@@ -41,6 +44,18 @@ class Window {
    * the process of initializing.
    */
   std::shared_ptr<Device> getDevice();
+
+  /**
+   * Acquires the next single-frame Drawable for rendering with manual presentation and readback.
+   * The returned Drawable is used to create a Surface via Surface::MakeFrom(context, drawable).
+   * The rendering commands must be submitted before calling Drawable::readPixels() or
+   * Drawable::present(); the frame is presented either manually via Drawable::present() or
+   * automatically when the Drawable is released. Only one Drawable should be held at a time,
+   * otherwise frame acquisition may stall. Returns nullptr if the context is nullptr, the window
+   * is not owned by a shared_ptr, or the window cannot provide a drawable right now (for example,
+   * the window has a zero size or the platform frame buffer is unavailable).
+   */
+  std::shared_ptr<Drawable> nextDrawable(Context* context);
 
   /**
    * Returns the color space associated with this Window. Returns nullptr for the default sRGB.
@@ -80,8 +95,18 @@ class Window {
    */
   virtual void onPresent(Context* context);
 
+  /**
+   * Creates a backend-specific Drawable for nextDrawable(). The default implementation wraps this
+   * window's onCreateRenderTarget() and onPresent(), which works for backends that present inside
+   * onPresent(). Backends that schedule the presentation when the drawable is acquired (Metal,
+   * Vulkan) override this to defer the presentation to Drawable::present(). The default
+   * implementation returns nullptr if the window cannot provide a render target right now.
+   */
+  virtual std::shared_ptr<Drawable> onNextDrawable(Context* context);
+
  private:
   friend class DrawingBuffer;
   friend class Surface;
+  friend class WindowDrawable;
 };
 }  // namespace tgfx

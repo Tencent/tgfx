@@ -38,11 +38,6 @@ class MetalWindow : public Window {
    * @param vsyncEnabled Whether presentation is synchronized to the display's refresh rate. Fixed
    * for the lifetime of the window. Defaults to true.
    * @return A new MetalWindow, or nullptr if the layer or device is invalid.
-   *
-   * The window holds the last presented drawable until the next frame acquires a new one, so a
-   * readPixels() call between two frames reads the last presented content. Such readback requires
-   * the layer's framebufferOnly property to be set to NO, otherwise the drawable texture cannot
-   * be used as a blit source.
    */
   static std::shared_ptr<MetalWindow> MakeFrom(CAMetalLayer* layer,
                                                std::shared_ptr<MetalDevice> device = nullptr,
@@ -62,10 +57,13 @@ class MetalWindow : public Window {
 
  protected:
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
+  void onPresent(Context* context) override;
+  std::shared_ptr<Drawable> onNextDrawable(Context* context) override;
 
  private:
   CAMetalLayer* metalLayer = nil;
   MTKView* metalView = nil;
+  std::shared_ptr<RenderTargetProxy> drawableProxy = nullptr;
 
   MetalWindow(std::shared_ptr<Device> device, CAMetalLayer* layer,
               std::shared_ptr<ColorSpace> colorSpace, bool vsyncEnabled);

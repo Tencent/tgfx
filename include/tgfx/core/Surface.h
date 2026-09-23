@@ -29,6 +29,7 @@
 namespace tgfx {
 class Canvas;
 class Context;
+class Drawable;
 class RenderContext;
 class RenderTargetProxy;
 class Window;
@@ -100,8 +101,22 @@ class Surface {
    * call MakeFrom() again to obtain a new Surface that matches the updated dimensions.
    * The color space is automatically obtained from the Window via window->colorSpace().
    * Returns nullptr if the context is nullptr or the window cannot provide a valid render target.
+   * Note that the window's frame buffer is recycled right after presentation, so readPixels() on
+   * the returned Surface has no guaranteed content once it has been submitted. Use
+   * Window::nextDrawable() and Drawable::readPixels() instead when readback is required.
    */
   static std::shared_ptr<Surface> MakeFrom(Context* context, std::shared_ptr<Window> window,
+                                           uint32_t renderFlags = 0);
+
+  /**
+   * Creates a new Surface for rendering to the specified Drawable, which was acquired from a
+   * Window via Window::nextDrawable(). The returned Surface is never presented automatically at
+   * submit time; call Drawable::present() to display the rendered content, which also happens
+   * automatically when the Drawable is released. The color space is obtained from the Drawable.
+   * Returns nullptr if the context is nullptr, the drawable is nullptr, or the drawable was
+   * acquired from a different context.
+   */
+  static std::shared_ptr<Surface> MakeFrom(Context* context, std::shared_ptr<Drawable> drawable,
                                            uint32_t renderFlags = 0);
 
   virtual ~Surface();
@@ -197,6 +212,10 @@ class Surface {
    * does not exceed Surface (width(), height()). Pixels are always provided in top-left origin
    * format; if the Surface's origin is bottom-left, the pixels are flipped during the copy. Pixels
    * are copied only if pixel conversion is possible. Returns true if pixels are copied to dstPixels.
+   * Note that for a Surface created from a Window, the content is not defined once the Surface has
+   * been submitted, because the window's frame buffer is recycled right after presentation. Use
+   * Window::nextDrawable() and Drawable::readPixels() instead when readback of window content is
+   * required.
    */
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0, int srcY = 0);
   /**
@@ -222,6 +241,7 @@ class Surface {
 
   bool aboutToDraw(bool discardContent = false);
 
+  friend class Drawable;
   friend class RenderContext;
 };
 }  // namespace tgfx

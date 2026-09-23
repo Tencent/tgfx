@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Window.h"
+#include "core/utils/Log.h"
+#include "gpu/WindowDrawable.h"
 #include "tgfx/gpu/Device.h"
 
 namespace tgfx {
@@ -36,6 +38,21 @@ bool Window::vsyncEnabled() const {
 std::shared_ptr<Device> Window::getDevice() {
   std::lock_guard<std::mutex> autoLock(locker);
   return device;
+}
+
+std::shared_ptr<Drawable> Window::nextDrawable(Context* context) {
+  if (context == nullptr) {
+    return nullptr;
+  }
+  if (weak_from_this().expired()) {
+    LOGE("Window::nextDrawable() The window must be owned by a shared_ptr!");
+    return nullptr;
+  }
+  return onNextDrawable(context);
+}
+
+std::shared_ptr<Drawable> Window::onNextDrawable(Context* context) {
+  return WindowDrawable::Make(context, shared_from_this());
 }
 
 void Window::onPresent(Context*) {

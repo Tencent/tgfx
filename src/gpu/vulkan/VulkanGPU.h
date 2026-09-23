@@ -204,6 +204,9 @@ class VulkanGPU : public GPU {
       uint32_t imageIndex = 0;
       VkSemaphore imageAvailable = VK_NULL_HANDLE;
       VkSemaphore renderFinished = VK_NULL_HANDLE;
+      // When true, the submission only wires the acquire/present semaphore pair; the actual
+      // vkQueuePresentKHR is deferred to presentNow() so the image stays readable in between.
+      bool deferredPresent = false;
     };
     std::optional<PresentInfo> present;
   };
@@ -214,6 +217,17 @@ class VulkanGPU : public GPU {
   void reclaimAbandonedSession(FrameSession session);
   VkDescriptorPool acquireDescriptorPool();
   void releaseDescriptorPool(VkDescriptorPool pool);
+
+  /**
+   * Presents a swapchain image that was rendered by an earlier executeSubmission() whose
+   * PresentInfo had deferredPresent set. The submission signaled renderFinished; this records the
+   * GENERAL -> PRESENT_SRC_KHR layout transition, waits for it to complete on the CPU (the render
+   * is typically already done because a readback usually preceded this call), and then calls
+   * vkQueuePresentKHR. Waiting on the CPU avoids presenting a binary semaphore wait, whose
+   * lifetime would otherwise outlive this call.
+   */
+  void presentNow(VkSwapchainKHR swapchain, uint32_t imageIndex, VkImage image,
+                  VkSemaphore renderFinished);
 
   // Presentation (used by VulkanWindow/SwapchainProxy)
   // Binary semaphore pairs for swapchain acquire/present sync. Indexed per frame-in-flight to

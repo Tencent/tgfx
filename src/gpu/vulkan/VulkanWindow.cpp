@@ -29,6 +29,7 @@
 #include <vector>
 #include "core/utils/Log.h"
 #include "gpu/vulkan/VulkanAPI.h"
+#include "gpu/vulkan/VulkanDrawable.h"
 #include "gpu/vulkan/VulkanGPU.h"
 #include "gpu/vulkan/VulkanSwapchainProxy.h"
 #include "gpu/vulkan/VulkanUtil.h"
@@ -764,7 +765,8 @@ bool VulkanWindow::PlatformState::recreateSwapchain(VkDevice device,
   return true;
 }
 
-std::shared_ptr<RenderTargetProxy> VulkanWindow::onCreateRenderTarget(Context* context) {
+std::shared_ptr<RenderTargetProxy> VulkanWindow::createSwapchainProxy(Context* context,
+                                                                      bool manualPresent) {
   auto vulkanGPU = static_cast<VulkanGPU*>(context->gpu());
   auto vkDevice = vulkanGPU->device();
   auto physicalDevice = vulkanGPU->physicalDevice();
@@ -775,7 +777,7 @@ std::shared_ptr<RenderTargetProxy> VulkanWindow::onCreateRenderTarget(Context* c
   auto extent = capabilities.currentExtent;
   if (extent.width == 0xFFFFFFFF) {
     // The surface does not report a fixed extent (e.g. Wayland). Skip this frame and let the
-    // next onCreateRenderTarget call re-query the capabilities for an updated extent.
+    // next createSwapchainProxy call re-query the capabilities for an updated extent.
     return nullptr;
   }
 
@@ -799,10 +801,15 @@ std::shared_ptr<RenderTargetProxy> VulkanWindow::onCreateRenderTarget(Context* c
     }
   }
 
-  _platformState->swapchainProxy = std::make_shared<VulkanSwapchainProxy>(
+  return std::make_shared<VulkanSwapchainProxy>(
       context, vulkanGPU, _platformState->swapchain, _platformState->format, _platformState->width,
       _platformState->height, _platformState->imageViews, _platformState->images,
-      vulkanGPU->acquirePresentationSlot());
+      vulkanGPU->acquirePresentationSlot(), manualPresent);
+}
+
+std::shared_ptr<RenderTargetProxy> VulkanWindow::onCreateRenderTarget(Context* context) {
+  auto proxy = createSwapchainProxy(context, false);
+  _platformState->swapchainProxy = std::move(proxy);
   return _platformState->swapchainProxy;
 }
 
@@ -812,6 +819,17 @@ void VulkanWindow::onPresent(Context*) {
   }
   auto proxy = std::static_pointer_cast<VulkanSwapchainProxy>(_platformState->swapchainProxy);
   proxy->releaseFrame();
+}
+
+std::shared_ptr<Drawable> VulkanWindow::onNextDrawable(Context* context) {
+  // A manual-present proxy is intentionally not stored in PlatformState: the auto presentation
+  // path tracks the last proxy for out-of-date detection, while this proxy is owned by the
+  // returned drawable for its single-frame lifetime.
+  auto proxy = std::static_pointer_cast<VulkanSwapchainProxy>(createSwapchainProxy(context, true));
+  if (proxy == nullptr) {
+    return nullptr;
+  }
+  return VulkanDrawable::Make(context, std::move(proxy), colorSpace());
 }
 
 }  // namespace tgfx

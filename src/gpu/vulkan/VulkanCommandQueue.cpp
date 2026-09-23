@@ -270,7 +270,7 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
   cmdBuffers.push_back(cmd);
 
   VkCommandBuffer presentCmd = VK_NULL_HANDLE;
-  if (present.has_value() && renderPool != VK_NULL_HANDLE) {
+  if (present.has_value() && !present->deferredPresent && renderPool != VK_NULL_HANDLE) {
     VkCommandBufferAllocateInfo presentAllocInfo = {};
     presentAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     presentAllocInfo.commandPool = renderPool;
@@ -313,9 +313,9 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
   request.waitSemaphore = std::move(waitSem);
   request.frameTime = _frameTime;
   if (present.has_value()) {
-    request.present = VulkanGPU::SubmitRequest::PresentInfo{present->swapchain, present->imageIndex,
-                                                            present->imageAvailableSemaphore,
-                                                            present->renderFinishedSemaphore};
+    request.present = VulkanGPU::SubmitRequest::PresentInfo{
+        present->swapchain, present->imageIndex, present->imageAvailableSemaphore,
+        present->renderFinishedSemaphore, present->deferredPresent};
   }
 
   gpu->executeSubmission(std::move(request));
@@ -339,8 +339,11 @@ void VulkanCommandQueue::waitSemaphore(std::shared_ptr<Semaphore> semaphore) {
 
 void VulkanCommandQueue::schedulePresent(VkSwapchainKHR swapchain, uint32_t imageIndex,
                                          VkImage image, VkSemaphore imageAvailableSemaphore,
-                                         VkSemaphore renderFinishedSemaphore) {
-  pendingPresent = {swapchain, imageIndex, image, imageAvailableSemaphore, renderFinishedSemaphore};
+                                         VkSemaphore renderFinishedSemaphore,
+                                         bool deferredPresent) {
+  pendingPresent = {
+      swapchain,      imageIndex, image, imageAvailableSemaphore, renderFinishedSemaphore,
+      deferredPresent};
 }
 
 void VulkanCommandQueue::waitUntilCompleted() {

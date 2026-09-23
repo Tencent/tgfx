@@ -72,15 +72,13 @@ std::shared_ptr<RenderTarget> MetalDrawableProxy::getRenderTarget() const {
     if (drawable == nil) {
       return nullptr;
     }
-    // Retain the new drawable before releasing the previous one. The previous drawable is kept
-    // until this point (instead of being released right after presentation) so that a
-    // readPixels() call between two frames still reads the last presented content, and is never
-    // handed back to the layer's drawable rotation pool early.
     auto newDrawable = [drawable retain];
     [_metalDrawable release];
     _metalDrawable = newDrawable;
     // Schedule the drawable to be presented when the command buffer is committed, so that the
-    // GPU finishes rendering before the drawable is displayed on screen.
+    // GPU finishes rendering before the drawable is displayed on screen. The command buffer
+    // retains the drawable until it completes, so the proxy can drop its reference once the
+    // presentation has been scheduled (see releaseDrawable()).
     auto metalQueue = static_cast<MetalCommandQueue*>(_context->gpu()->queue());
     metalQueue->schedulePresent(_metalDrawable);
     MetalTextureInfo metalInfo = {};
@@ -96,6 +94,12 @@ std::shared_ptr<RenderTarget> MetalDrawableProxy::getRenderTarget() const {
 
 id<CAMetalDrawable> MetalDrawableProxy::getMetalDrawable() const {
   return _metalDrawable;
+}
+
+void MetalDrawableProxy::releaseDrawable() {
+  [_metalDrawable release];
+  _metalDrawable = nil;
+  _renderTarget = nullptr;
 }
 
 }  // namespace tgfx

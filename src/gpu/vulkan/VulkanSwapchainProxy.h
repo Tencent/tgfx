@@ -36,12 +36,18 @@ namespace tgfx {
  *   - present: scheduled via VulkanCommandQueue::schedulePresent() during acquire. The queue
  *     appends a GENERAL to PRESENT_SRC layout transition to the render batch and calls
  *     vkQueuePresentKHR after submit, waiting on renderFinished.
+ *
+ * In manual present mode (used by VulkanDrawable), the deferred schedulePresent() only wires the
+ * semaphore waits/signals into the render submission; the layout transition and the actual
+ * vkQueuePresentKHR are deferred to presentFrame(), which the caller invokes after reading back
+ * the image.
  */
 class VulkanSwapchainProxy : public RenderTargetProxy {
  public:
   VulkanSwapchainProxy(Context* context, VulkanGPU* gpu, VkSwapchainKHR swapchain, VkFormat format,
                        int width, int height, const std::vector<VkImageView>& imageViews,
-                       const std::vector<VkImage>& images, const VulkanGPU::PresentationSlot& slot);
+                       const std::vector<VkImage>& images, const VulkanGPU::PresentationSlot& slot,
+                       bool manualPresent = false);
   ~VulkanSwapchainProxy() override = default;
 
   Context* getContext() const override;
@@ -64,6 +70,13 @@ class VulkanSwapchainProxy : public RenderTargetProxy {
 
   void releaseFrame();
 
+  /**
+   * Presents the acquired swapchain image. Only valid in manual present mode, after the rendering
+   * commands have been submitted. Does nothing if no image has been acquired or the frame has
+   * already been presented.
+   */
+  void presentFrame();
+
  private:
   Context* _context = nullptr;
   VulkanGPU* _gpu = nullptr;
@@ -79,6 +92,8 @@ class VulkanSwapchainProxy : public RenderTargetProxy {
   mutable uint32_t _currentImageIndex = 0;
   mutable bool _outOfDate = false;
   mutable std::shared_ptr<RenderTarget> _renderTarget = nullptr;
+  bool _manualPresent = false;
+  bool _framePresented = false;
 };
 
 }  // namespace tgfx

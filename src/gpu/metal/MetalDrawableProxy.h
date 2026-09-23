@@ -23,13 +23,6 @@
 
 namespace tgfx {
 
-/**
- * MetalDrawableProxy wraps the drawables of a CAMetalLayer as a render target. A drawable is
- * acquired lazily on the first getRenderTarget() call and held until the next frame acquires a new
- * one, instead of being released right after presentation. This keeps a readPixels() call between
- * two frames reading the last presented content. Reading back requires the layer's framebufferOnly
- * property to be NO, otherwise the drawable texture cannot be used as a blit source.
- */
 class MetalDrawableProxy : public RenderTargetProxy {
  public:
   MetalDrawableProxy(Context* context, int width, int height, CAMetalLayer* metalLayer,
@@ -47,6 +40,13 @@ class MetalDrawableProxy : public RenderTargetProxy {
   std::shared_ptr<RenderTarget> getRenderTarget() const override;
 
   id<CAMetalDrawable> getMetalDrawable() const;
+
+  /**
+   * Releases the drawable and the cached render target right after the drawable has been
+   * scheduled for presentation, so the drawable is returned to the layer's rotation pool without
+   * being held across frames.
+   */
+  void releaseDrawable();
 
  private:
   Context* _context = nullptr;

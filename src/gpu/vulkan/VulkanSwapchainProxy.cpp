@@ -30,10 +30,12 @@ VulkanSwapchainProxy::VulkanSwapchainProxy(Context* context, VulkanGPU* gpu,
                                            VkSwapchainKHR swapchain, VkFormat format, int width,
                                            int height, const std::vector<VkImageView>& imageViews,
                                            const std::vector<VkImage>& images,
-                                           const VulkanGPU::PresentationSlot& slot)
+                                           const VulkanGPU::PresentationSlot& slot,
+                                           bool manualPresent)
     : _context(context), _gpu(gpu), _swapchain(swapchain), _format(format), _width(width),
       _height(height), _imageViews(imageViews), _images(images),
-      _imageAvailableSemaphore(slot.imageAvailable), _renderFinishedSemaphore(slot.renderFinished) {
+      _imageAvailableSemaphore(slot.imageAvailable), _renderFinishedSemaphore(slot.renderFinished),
+      _manualPresent(manualPresent) {
 }
 
 Context* VulkanSwapchainProxy::getContext() const {
@@ -88,10 +90,12 @@ std::shared_ptr<RenderTarget> VulkanSwapchainProxy::getRenderTarget() const {
     }
 
     // Schedule the present to happen at the end of the next submit(). The submit will wait on
-    // imageAvailable and signal renderFinished; present will wait on renderFinished.
+    // imageAvailable and signal renderFinished; present will wait on renderFinished. In manual
+    // present mode the layout transition and vkQueuePresentKHR are deferred to presentFrame(),
+    // so the image stays readable between the render submission and the presentation.
     auto queue = static_cast<VulkanCommandQueue*>(_context->gpu()->queue());
     queue->schedulePresent(_swapchain, _currentImageIndex, _images[_currentImageIndex],
-                           _imageAvailableSemaphore, _renderFinishedSemaphore);
+                           _imageAvailableSemaphore, _renderFinishedSemaphore, _manualPresent);
 
     VulkanImageInfo vulkanInfo = {};
     vulkanInfo.image = reinterpret_cast<uint64_t>(_images[_currentImageIndex]);
@@ -105,6 +109,16 @@ std::shared_ptr<RenderTarget> VulkanSwapchainProxy::getRenderTarget() const {
 
 void VulkanSwapchainProxy::releaseFrame() {
   _renderTarget = nullptr;
+}
+
+void VulkanSwapchainProxy::presentFrame() {
+  if (!_manualPresent || _framePresented || _renderTarget == nullptr) {
+    return;
+  }
+  _framePresented = true;
+  _gpu->presentNow(_swapchain, _currentImageIndex, _images[_currentImageIndex],
+                   _renderFinishedSemaphore);
+  releaseFrame();
 }
 
 }  // namespace tgfx

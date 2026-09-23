@@ -920,7 +920,7 @@ void VulkanGPU::executeSubmission(SubmitRequest request) {
 
   // Step 7: Execute pending present. The renderFinished semaphore ensures the presentation
   // engine waits for rendering to complete before displaying the image.
-  if (request.present.has_value()) {
+  if (request.present.has_value() && !request.present->deferredPresent) {
     VkPresentInfoKHR presentInfo = {};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     presentInfo.swapchainCount = 1;
@@ -930,6 +930,100 @@ void VulkanGPU::executeSubmission(SubmitRequest request) {
     presentInfo.pWaitSemaphores = &request.present->renderFinished;
     vkQueuePresentKHR(vulkanQueue, &presentInfo);
   }
+}
+
+void VulkanGPU::presentNow(VkSwapchainKHR swapchain, uint32_t imageIndex, VkImage image,
+                           VkSemaphore renderFinished) {
+  if (contextLost) {
+    return;
+  }
+
+  VkCommandPoolCreateInfo poolInfo = {};
+  poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+  poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+  poolInfo.queueFamilyIndex = queueFamilyIndex;
+  VkCommandPool pool = VK_NULL_HANDLE;
+  if (vkCreateCommandPool(vulkanDevice, &poolInfo, nullptr, &pool) != VK_SUCCESS) {
+    LOGE("VulkanGPU::presentNow: failed to create command pool for the present barrier.");
+    return;
+  }
+  VkCommandBufferAllocateInfo allocInfo = {};
+  allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  allocInfo.commandPool = pool;
+  allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  allocInfo.commandBufferCount = 1;
+  VkCommandBuffer cmd = VK_NULL_HANDLE;
+  if (vkAllocateCommandBuffers(vulkanDevice, &allocInfo, &cmd) != VK_SUCCESS) {
+    LOGE("VulkanGPU::presentNow: failed to allocate command buffer for the present barrier.");
+    vkDestroyCommandPool(vulkanDevice, pool, nullptr);
+    return;
+  }
+  VkCommandBufferBeginInfo beginInfo = {};
+  beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+  vkBeginCommandBuffer(cmd, &beginInfo);
+  VkImageMemoryBarrier barrier = {};
+  barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+  barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+  barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+  barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.image = image;
+  barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+  barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+  barrier.dstAccessMask = 0;
+  vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                       VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1,
+                       &barrier);
+  vkEndCommandBuffer(cmd);
+
+  VkSemaphore waitSemaphores[] = {renderFinished};
+  VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+  VkSubmitInfo submitInfo = {};
+  submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  submitInfo.commandBufferCount = 1;
+  submitInfo.pCommandBuffers = &cmd;
+  submitInfo.waitSemaphoreCount = 1;
+  submitInfo.pWaitSemaphores = waitSemaphores;
+  submitInfo.pWaitDstStageMask = waitStages;
+  VkFence fence = acquireFence();
+  if (fence == VK_NULL_HANDLE) {
+    LOGE("VulkanGPU::presentNow: fence allocation failed, skipping present.");
+    vkDestroyCommandPool(vulkanDevice, pool, nullptr);
+    return;
+  }
+  auto result = vkQueueSubmit(vulkanQueue, 1, &submitInfo, fence);
+  if (result != VK_SUCCESS) {
+    LOGE("VulkanGPU::presentNow: vkQueueSubmit failed (result=%d), skipping present.",
+         static_cast<int>(result));
+    if (result == VK_ERROR_DEVICE_LOST) {
+      contextLost = true;
+    }
+    recycleFence(fence);
+    vkDestroyCommandPool(vulkanDevice, pool, nullptr);
+    return;
+  }
+  // Waiting for the fence also waits for the rendering: the barrier above executes only after
+  // renderFinished is signaled, so the image is in PRESENT_SRC_KHR layout once the fence signals.
+  // This allows presenting without a semaphore whose lifetime would outlive this call.
+  result = vkWaitForFences(vulkanDevice, 1, &fence, VK_TRUE, UINT64_MAX);
+  if (result != VK_SUCCESS) {
+    LOGE("VulkanGPU::presentNow: vkWaitForFences returned %d, skipping present.",
+         static_cast<int>(result));
+    contextLost = true;
+  }
+  recycleFence(fence);
+  vkDestroyCommandPool(vulkanDevice, pool, nullptr);
+  if (result != VK_SUCCESS) {
+    return;
+  }
+  VkPresentInfoKHR presentInfo = {};
+  presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+  presentInfo.swapchainCount = 1;
+  presentInfo.pSwapchains = &swapchain;
+  presentInfo.pImageIndices = &imageIndex;
+  vkQueuePresentKHR(vulkanQueue, &presentInfo);
+  pollCompletedSubmissions();
 }
 
 void VulkanGPU::releaseAll(bool releaseGPU) {

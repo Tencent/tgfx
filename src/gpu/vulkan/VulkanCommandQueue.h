@@ -69,9 +69,13 @@ class VulkanCommandQueue : public CommandQueue {
   void waitUntilCompleted() override;
 
   /// Schedules a swapchain image to be presented at the end of the next submit(). The layout
-  /// transition (GENERAL -> PRESENT_SRC_KHR) is automatically appended to the render command batch.
+  /// transition (GENERAL -> PRESENT_SRC_KHR) is automatically appended to the render command
+  /// batch. When deferredPresent is true, only the semaphore waits/signals are wired into the
+  /// submission; the layout transition and vkQueuePresentKHR are left to VulkanGPU::presentNow()
+  /// so the image stays readable between the render submission and the presentation.
   void schedulePresent(VkSwapchainKHR swapchain, uint32_t imageIndex, VkImage image,
-                       VkSemaphore imageAvailableSemaphore, VkSemaphore renderFinishedSemaphore);
+                       VkSemaphore imageAvailableSemaphore, VkSemaphore renderFinishedSemaphore,
+                       bool deferredPresent = false);
 
  private:
   void flushUploads(VkCommandBuffer commandBuffer, std::vector<VulkanGPU::PendingUpload>& uploads);
@@ -95,6 +99,7 @@ class VulkanCommandQueue : public CommandQueue {
     VkImage image = VK_NULL_HANDLE;
     VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
     VkSemaphore renderFinishedSemaphore = VK_NULL_HANDLE;
+    bool deferredPresent = false;
   };
   std::optional<PendingPresent> pendingPresent;
 };
