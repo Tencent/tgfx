@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PrecompiledProgramCreator.h"
+#include <cstdlib>
+#include <cstring>
 #include <iomanip>
 #include <sstream>
 #include "core/utils/Log.h"
@@ -235,6 +237,28 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
     return nullptr;
   }
   cache->recordAOTStage(PrecompiledAOTStage::PermutationMatched);
+
+  // TGFX_AOT_DENY holds a comma-separated list of shader names whose precompiled match is
+  // rejected so the draw falls back to the runtime JIT program. Diagnostic only: it isolates a
+  // single kernel family in A/B pixel diffs. Read once per process.
+  static const char* deniedShaders = std::getenv("TGFX_AOT_DENY");
+  if (deniedShaders != nullptr) {
+    std::string name = matchResult->shaderName;
+    size_t begin = 0;
+    while (begin <= std::string(deniedShaders).size()) {
+      auto end = std::string(deniedShaders).find(',', begin);
+      auto token = std::string(deniedShaders).substr(begin, end - begin);
+      if (token == name) {
+        cache->recordArtifactMiss(PrecompiledFallbackReason::Unspecified,
+                                  MakeFallbackRecord(cache, programInfo, &*matchResult));
+        return nullptr;
+      }
+      if (end == std::string::npos) {
+        break;
+      }
+      begin = end + 1;
+    }
+  }
 
   auto vertHash = ComputeVertexKeyHash(matchResult->shaderName, matchResult->vertPermutationIndex,
                                        cache->profileTag());

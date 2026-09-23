@@ -299,9 +299,12 @@ static std::string StripDescriptorSets(std::string source) {
 // front-end rejects non-literal layout ids where the regenerated form carried folded literals
 // (spirv-cross reads them back from SPIR-V), and the templates write `location = NTEX + 1` /
 // `CHAIN_TEX_LOC_BASE + 0` with defines that depend on the injected permutation defines. Only
-// the forms the sources actually use are supported: `#if NAME`, `#if NAME == N`, `#ifndef`,
-// `#elif`, `#else`, `#endif`, `#define NAME N`, `#undef NAME` — no defined(), no arithmetic
-// conditions (verified across the tree).
+// the forms the sources actually use are supported: `#if NAME`, `#if NAME == N` (either side
+// may be a macro), `#ifndef`, `#elif`, `#else`, `#endif`, `#define NAME N`,
+// `#define NAME OTHER_MACRO` (numeric alias) and `#undef NAME` — no defined(), no arithmetic
+// conditions. A dropped alias define previously made quad_texture_fill.vert's attribute
+// location chain fall through to the #else branches, folding every HAS_UV_COORD=0 permutation
+// with the uv slot present (color/subset one location too high).
 static std::string EmitDirectGLSL330Impl(const std::string& source, ShaderStageType stage,
                                          const std::string& versionLine, bool esDialect,
                                          bool fbfVariant);
@@ -479,7 +482,22 @@ static std::string EmitDirectGLSL330Impl(const std::string& source, ShaderStageT
               int64_t value = std::stoll(body.substr(valueStart));
               macros[name] = value;
             } catch (...) {
-              // Non-numeric macro (e.g. CHAIN_LEAF_SAMPLER): not a layout-id input.
+              // Non-numeric macro (e.g. CHAIN_LEAF_SAMPLER): not a layout-id input. A value
+              // that names a known numeric macro is an alias (e.g. `#define LOC_AFTER_UV_COORD
+              // LOC_AFTER_COVERAGE` in quad_texture_fill.vert): record the aliased value so
+              // later `#if ALIAS == N` conditions and layout folds resolve the real number.
+              // Snapshotting at the definition site is correct because the macro table mirrors
+              // branch activity, so the alias always follows the value current at its site.
+              // Anything else (parenthesized expressions, color-expression macros) stays
+              // unrecorded exactly as before.
+              auto valueEnd = body.find_first_of(" \t", valueStart);
+              auto alias = body.substr(valueStart, valueEnd == std::string::npos
+                                                        ? std::string::npos
+                                                        : valueEnd - valueStart);
+              if (!alias.empty() && (isalpha(static_cast<unsigned char>(alias[0])) || alias[0] == '_') &&
+                  macros.find(alias) != macros.end()) {
+                macros[name] = macros[alias];
+              }
             }
           } else {
             macros.erase(name);
