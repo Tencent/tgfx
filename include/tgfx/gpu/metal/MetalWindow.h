@@ -50,6 +50,7 @@ class MetalWindow : public Window {
    * @param colorSpace An optional color space for rendering. If nullptr, the default sRGB is used.
    * @param vsyncEnabled Whether presentation is synchronized to the display's refresh rate. Fixed
    * for the lifetime of the window. Defaults to true.
+   * @return A new MetalWindow, or nullptr if the view, its CAMetalLayer, or the device is invalid.
    */
   static std::shared_ptr<MetalWindow> MakeFrom(MTKView* view,
                                                std::shared_ptr<ColorSpace> colorSpace = nullptr,
