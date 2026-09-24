@@ -23,8 +23,10 @@ import {ShareData, loadImage, onClickEvent, bindCanvasZoomAndPanEvents} from './
 
 const canvas = document.getElementById('hello2d') as HTMLCanvasElement;
 const container = document.getElementById('container') as HTMLDivElement;
-const hud = document.getElementById('hud') as HTMLDivElement;
-const statsElement = document.getElementById('stats') as HTMLPreElement;
+// The readouts and the controls are optional: a page that only wants to show the result leaves the
+// elements out, and everything below then just does nothing.
+const hud = document.getElementById('hud') as HTMLDivElement | null;
+const statsElement = document.getElementById('stats') as HTMLPreElement | null;
 
 // The page bundle is emitted once per worker backend, and the HTML page declares which one it is.
 const useWebGPU = new URL(import.meta.url).searchParams.has('webgpu');
@@ -37,6 +39,9 @@ const worker = new Worker(new URL('./worker-render.js', import.meta.url), {type:
 const HUD_MAX_LINES = 12;
 const hudLines: string[] = [];
 const log = (text: string) => {
+    if (!hud) {
+        return;
+    }
     hudLines.push(text);
     if (hudLines.length > HUD_MAX_LINES) {
         hudLines.splice(0, hudLines.length - HUD_MAX_LINES);
@@ -76,13 +81,15 @@ worker.onmessage = (event: MessageEvent) => {
             syncBoxToBacking(message.width, message.height);
             break;
         case 'stats':
-            statsElement.textContent =
-                'worker fps           ' + message.fps.toFixed(1) + '\n' +
-                'frame gap max (win)  ' + message.maxFrameInterval.toFixed(1) + ' ms\n' +
-                'frame gap max (ever) ' + message.maxFrameIntervalEver.toFixed(1) + ' ms\n' +
-                'resize apply last    ' + message.lastApplyMs.toFixed(1) + ' ms\n' +
-                'resize apply max     ' + message.maxApplyMs.toFixed(1) + ' ms\n' +
-                'resize applies       ' + message.applyCount;
+            if (statsElement) {
+                statsElement.textContent =
+                    'worker fps           ' + message.fps.toFixed(1) + '\n' +
+                    'frame gap max (win)  ' + message.maxFrameInterval.toFixed(1) + ' ms\n' +
+                    'frame gap max (ever) ' + message.maxFrameIntervalEver.toFixed(1) + ' ms\n' +
+                    'resize apply last    ' + message.lastApplyMs.toFixed(1) + ' ms\n' +
+                    'resize apply max     ' + message.maxApplyMs.toFixed(1) + ' ms\n' +
+                    'resize applies       ' + message.applyCount;
+            }
             break;
         case 'error':
             log('worker error: ' + message.message);
@@ -141,26 +148,33 @@ function readLayout() {
     layout.dpr = window.devicePixelRatio || 1;
 }
 
-const sizingSelect = document.getElementById('sizing') as HTMLSelectElement;
-const resizeSelect = document.getElementById('resize') as HTMLSelectElement;
-sizingSelect.value = sizingMode;
-resizeSelect.value = String(resizeIntervalMs);
-sizingSelect.addEventListener('change', () => {
-    sizingMode = sizingSelect.value as 'container' | 'backing';
-    applySizingMode();
-    log('sizing -> ' + sizingMode);
-});
-document.getElementById('resetStats').addEventListener('click', () => {
-    // Zeroes the "ever" maxima so a single drag can be measured on its own.
-    worker.postMessage({type: 'config', resetStats: true});
-    log('stats reset');
-});
-resizeSelect.addEventListener('change', () => {
-    resizeIntervalMs = Number(resizeSelect.value);
-    // The worker owns the resize handling, so it needs to be told.
-    worker.postMessage({type: 'config', resizeIntervalMs});
-    log('resize apply interval -> ' + resizeIntervalMs + ' ms');
-});
+const sizingSelect = document.getElementById('sizing') as HTMLSelectElement | null;
+const resizeSelect = document.getElementById('resize') as HTMLSelectElement | null;
+const resetStatsButton = document.getElementById('resetStats') as HTMLButtonElement | null;
+if (sizingSelect) {
+    sizingSelect.value = sizingMode;
+    sizingSelect.addEventListener('change', () => {
+        sizingMode = sizingSelect.value as 'container' | 'backing';
+        applySizingMode();
+        log('sizing -> ' + sizingMode);
+    });
+}
+if (resetStatsButton) {
+    resetStatsButton.addEventListener('click', () => {
+        // Zeroes the "ever" maxima so a single drag can be measured on its own.
+        worker.postMessage({type: 'config', resetStats: true});
+        log('stats reset');
+    });
+}
+if (resizeSelect) {
+    resizeSelect.value = String(resizeIntervalMs);
+    resizeSelect.addEventListener('change', () => {
+        resizeIntervalMs = Number(resizeSelect.value);
+        // The worker owns the resize handling, so it needs to be told.
+        worker.postMessage({type: 'config', resizeIntervalMs});
+        log('resize apply interval -> ' + resizeIntervalMs + ' ms');
+    });
+}
 
 function applyLayout() {
     layoutScheduled = false;
