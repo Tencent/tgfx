@@ -30,6 +30,10 @@ MetalDrawableProxy::MetalDrawableProxy(Context* context, int width, int height,
     : _context(context), _width(width), _height(height), _format(format), _metalLayer(metalLayer) {
 }
 
+MetalDrawableProxy::~MetalDrawableProxy() {
+  [_metalDrawable release];
+}
+
 Context* MetalDrawableProxy::getContext() const {
   return _context;
 }
@@ -64,12 +68,19 @@ std::shared_ptr<TextureView> MetalDrawableProxy::getTextureView() const {
 
 std::shared_ptr<RenderTarget> MetalDrawableProxy::getRenderTarget() const {
   if (_renderTarget == nullptr) {
-    _metalDrawable = [_metalLayer nextDrawable];
-    if (_metalDrawable == nil) {
+    id<CAMetalDrawable> drawable = nil;
+    @autoreleasepool {
+      drawable = [[_metalLayer nextDrawable] retain];
+    }
+    if (drawable == nil) {
       return nullptr;
     }
+    [_metalDrawable release];
+    _metalDrawable = drawable;
     // Schedule the drawable to be presented when the command buffer is committed, so that the
-    // GPU finishes rendering before the drawable is displayed on screen.
+    // GPU finishes rendering before the drawable is displayed on screen. The command buffer
+    // retains the drawable until it completes, so the proxy can drop its reference once the
+    // presentation has been scheduled (see releaseDrawable()).
     auto metalQueue = static_cast<MetalCommandQueue*>(_context->gpu()->queue());
     metalQueue->schedulePresent(_metalDrawable);
     MetalTextureInfo metalInfo = {};
@@ -88,7 +99,9 @@ id<CAMetalDrawable> MetalDrawableProxy::getMetalDrawable() const {
 }
 
 void MetalDrawableProxy::releaseDrawable() {
+  [_metalDrawable release];
   _metalDrawable = nil;
   _renderTarget = nullptr;
 }
+
 }  // namespace tgfx

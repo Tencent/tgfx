@@ -19,8 +19,8 @@
 #pragma once
 
 #include <memory>
-#include <optional>
 #include <vector>
+#include "VulkanPresentationState.h"
 #include "gpu/vulkan/VulkanGPU.h"
 #include "tgfx/gpu/CommandQueue.h"
 
@@ -35,7 +35,8 @@ class VulkanTexture;
  *
  * Holds only the data accumulated between two consecutive submit() calls:
  *   - pendingUploads: staging buffers from writeTexture(), consumed by submit().
- *   - pendingPresent: swapchain info from schedulePresent(), consumed by submit().
+ *   - pendingPresents: one swapchain frame per window from schedulePresent(), consumed by
+ *     submit() and aggregated into a single vkQueueSubmit + vkQueuePresentKHR batch.
  *   - pendingSignal/WaitSemaphore: from insertSemaphore()/waitSemaphore(), consumed by submit().
  *
  * On submit(), this class assembles the upload/render/present command buffers and the SubmitRequest
@@ -68,10 +69,15 @@ class VulkanCommandQueue : public CommandQueue {
 
   void waitUntilCompleted() override;
 
-  /// Schedules a swapchain image to be presented at the end of the next submit(). The layout
-  /// transition (GENERAL -> PRESENT_SRC_KHR) is automatically appended to the render command batch.
+  /// Schedules one swapchain frame to be presented at the end of the next submit(). The image
+  /// is already acquired; imageAvailableSemaphore ownership moves to the queue and is destroyed
+  /// with the render fence. Automatic frames also get a layout transition to PRESENT_SRC_KHR and
+  /// are presented by the render submission itself. Manual frames only wait on acquisition here
+  /// and are presented later by VulkanGPU::presentNow(), so their content stays readable.
   void schedulePresent(VkSwapchainKHR swapchain, uint32_t imageIndex, VkImage image,
-                       VkSemaphore imageAvailableSemaphore, VkSemaphore renderFinishedSemaphore);
+                       VkSemaphore imageAvailableSemaphore, VkSemaphore presentSemaphore,
+                       std::shared_ptr<VkImageLayout> layout, std::shared_ptr<bool> outOfDate,
+                       std::shared_ptr<VulkanFrameState> frameState, bool manualPresent = false);
 
  private:
   void flushUploads(VkCommandBuffer commandBuffer, std::vector<VulkanGPU::PendingUpload>& uploads);
@@ -94,9 +100,15 @@ class VulkanCommandQueue : public CommandQueue {
     uint32_t imageIndex = 0;
     VkImage image = VK_NULL_HANDLE;
     VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
-    VkSemaphore renderFinishedSemaphore = VK_NULL_HANDLE;
+    VkSemaphore presentSemaphore = VK_NULL_HANDLE;
+    std::shared_ptr<VkImageLayout> layout;
+    std::shared_ptr<bool> outOfDate;
+    std::shared_ptr<VulkanFrameState> frameState;
+    bool manualPresent = false;
   };
-  std::optional<PendingPresent> pendingPresent;
+  std::vector<PendingPresent> pendingPresents;
+
+  void abandonPresents(std::vector<PendingPresent>& presents);
 };
 
 }  // namespace tgfx

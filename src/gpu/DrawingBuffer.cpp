@@ -60,11 +60,10 @@ std::shared_ptr<CommandBuffer> DrawingBuffer::encode() {
 }
 
 void DrawingBuffer::presentWindows(Context* context) {
-  for (auto& pendingWindow : windows) {
-    if (auto window = pendingWindow.lock()) {
-      window->onPresent(context);
-    }
+  for (auto& presentation : windowPresentations) {
+    presentation.window->onPresent(context, presentation.renderTargets);
   }
+  windowPresentations.clear();
 }
 
 bool DrawingBuffer::empty() const {
@@ -75,7 +74,7 @@ void DrawingBuffer::reset() {
   renderTasks.clear();
   resourceTasks.clear();
   atlasTasks.clear();
-  windows.clear();
+  windowPresentations.clear();
   vertexAllocator.clear(vertexMaxValueTracker.getMaxValue());
   instanceAllocator.clear(instanceMaxValueTracker.getMaxValue());
   drawingAllocator.clear(drawingMaxValueTracker.getMaxValue());

@@ -129,14 +129,9 @@ struct D3D12Window::PlatformState {
   int width = 0;
   int height = 0;
 
-  // currentProxyRaw mirrors the currentProxy owner so onPresent can call releaseFrame without
-  // a static_cast from the base RenderTargetProxy. The two are written and cleared together.
-  std::shared_ptr<RenderTargetProxy> currentProxy;
-  D3D12SwapchainProxy* currentProxyRaw = nullptr;
-
   bool buildBackBuffers();
-  // Releases every tgfx-side owner of the backbuffers (proxy, ExternalRenderTargets in the
-  // ResourceCache, recycled command lists). Required before ResizeBuffers or swapchain release
+  // Releases tgfx-side owners of the backbuffers (ExternalRenderTargets in the ResourceCache and
+  // recycled command lists). Required before ResizeBuffers or swapchain release
   // to avoid DXGI_ERROR_INVALID_CALL / OBJECT_DELETED_WHILE_STILL_IN_USE.
   void drainBackBufferOwners(Context* context, D3D12GPU* gpu);
   // Waits for tgfx-managed submissions, then signals a fresh fence to cover the GPU-side flip
@@ -187,8 +182,6 @@ bool D3D12Window::PlatformState::rebuild(Context* context, int newWidth, int new
 }
 
 void D3D12Window::PlatformState::drainBackBufferOwners(Context* context, D3D12GPU* gpu) {
-  currentProxy = nullptr;
-  currentProxyRaw = nullptr;
   backBuffers.clear();
   context->purgeResourcesNotUsedSince(std::chrono::steady_clock::now());
   gpu->processUnreferencedResources();
@@ -401,8 +394,6 @@ D3D12Window::~D3D12Window() {
   } else {
     // The device context is unavailable, so GPU work cannot be drained. Release the remaining
     // COM references without submitting another composition update.
-    _platformState->currentProxy = nullptr;
-    _platformState->currentProxyRaw = nullptr;
     _platformState->backBuffers.clear();
     _platformState->compositionVisual = nullptr;
     _platformState->compositionTarget = nullptr;
@@ -429,15 +420,13 @@ std::shared_ptr<RenderTargetProxy> D3D12Window::onCreateRenderTarget(Context* co
   }
   // One proxy per Surface; it re-queries the current backbuffer on every getRenderTarget()
   // call to follow flip-model rotation. Allocating per frame would leak and skip rotation.
-  auto proxy = std::make_shared<D3D12SwapchainProxy>(
-      context, _platformState->swapChain.Get(), &_platformState->backBuffers,
-      _platformState->format, _platformState->width, _platformState->height);
-  _platformState->currentProxyRaw = proxy.get();
-  _platformState->currentProxy = std::move(proxy);
-  return _platformState->currentProxy;
+  return std::make_shared<D3D12SwapchainProxy>(context, _platformState->swapChain.Get(),
+                                               &_platformState->backBuffers, _platformState->format,
+                                               _platformState->width, _platformState->height);
 }
 
-void D3D12Window::onPresent(Context* /*context*/) {
+void D3D12Window::onPresent(Context*,
+                            const std::vector<std::shared_ptr<RenderTargetProxy>>& renderTargets) {
   if (_platformState->swapChain == nullptr) {
     return;
   }
@@ -452,8 +441,9 @@ void D3D12Window::onPresent(Context* /*context*/) {
   if (FAILED(hr)) {
     LOGE("D3D12Window: Present failed, HRESULT=0x%08X", static_cast<unsigned>(hr));
   }
-  if (_platformState->currentProxyRaw != nullptr) {
-    _platformState->currentProxyRaw->releaseFrame();
+  for (const auto& renderTarget : renderTargets) {
+    auto proxy = std::static_pointer_cast<D3D12SwapchainProxy>(renderTarget);
+    proxy->releaseFrame();
   }
 }
 

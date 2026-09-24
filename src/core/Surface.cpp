@@ -25,6 +25,7 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RenderContext.h"
+#include "tgfx/gpu/Drawable.h"
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/Window.h"
 
@@ -92,6 +93,20 @@ std::shared_ptr<Surface> Surface::MakeFrom(Context* context, std::shared_ptr<Win
   }
   auto colorSpace = window->colorSpace();
   return MakeFrom(std::move(proxy), renderFlags, true, std::move(colorSpace), std::move(window));
+}
+
+std::shared_ptr<Surface> Surface::MakeFrom(Context* context, std::shared_ptr<Drawable> drawable,
+                                           uint32_t renderFlags) {
+  if (context == nullptr || drawable == nullptr || drawable->_context != context) {
+    return nullptr;
+  }
+  auto surface =
+      MakeFrom(drawable->_renderTarget, renderFlags, true, drawable->colorSpace(), nullptr);
+  if (surface != nullptr) {
+    drawable->_surface = surface;
+    surface->_drawable = std::move(drawable);
+  }
+  return surface;
 }
 
 std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<RenderTargetProxy> renderTargetProxy,

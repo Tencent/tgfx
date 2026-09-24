@@ -21,6 +21,7 @@
 #import <MetalKit/MetalKit.h>
 #include "core/utils/Log.h"
 #include "gpu/metal/MetalDefines.h"
+#include "gpu/metal/MetalDrawable.h"
 #include "gpu/metal/MetalDrawableProxy.h"
 #include "platform/apple/CGColorSpaceUtil.h"
 
@@ -107,34 +108,52 @@ MetalWindow::MetalWindow(std::shared_ptr<Device> device, MTKView* view, CAMetalL
   ApplyVSync(metalLayer, vsyncEnabled);
 }
 
-std::shared_ptr<RenderTargetProxy> MetalWindow::onCreateRenderTarget(Context* context) {
+static bool GetDrawableSize(CAMetalLayer* metalLayer, MTKView* metalView, int* width, int* height) {
   if (metalView != nil) {
     if (![NSThread isMainThread]) {
-      LOGE("MetalWindow::onCreateRenderTarget() must be called on the main thread when the "
-           "window is created from an MTKView, because MTKView is a UIView/NSView subclass "
-           "annotated with @MainActor. Create the Surface on the main thread, then render on "
+      LOGE("MetalWindow render target creation must be called on the main thread when the window "
+           "is created from an MTKView, because MTKView is a UIView/NSView subclass annotated "
+           "with @MainActor. Create the Surface or Drawable on the main thread, then render on "
            "any thread.");
     }
     metalLayer.drawableSize = metalView.drawableSize;
   }
   auto drawableSize = metalLayer.drawableSize;
-  auto width = static_cast<int>(drawableSize.width);
-  auto height = static_cast<int>(drawableSize.height);
-  if (width <= 0 || height <= 0) {
+  *width = static_cast<int>(drawableSize.width);
+  *height = static_cast<int>(drawableSize.height);
+  return *width > 0 && *height > 0;
+}
+
+std::shared_ptr<RenderTargetProxy> MetalWindow::onCreateRenderTarget(Context* context) {
+  int width = 0;
+  int height = 0;
+  if (!GetDrawableSize(metalLayer, metalView, &width, &height)) {
     return nullptr;
   }
   auto pixelFormat = MetalPixelFormatToPixelFormat(static_cast<unsigned>(metalLayer.pixelFormat));
-  drawableProxy =
-      std::make_shared<MetalDrawableProxy>(context, width, height, metalLayer, pixelFormat);
-  return drawableProxy;
+  return std::make_shared<MetalDrawableProxy>(context, width, height, metalLayer, pixelFormat);
 }
 
-void MetalWindow::onPresent(Context*) {
-  if (drawableProxy == nullptr) {
+void MetalWindow::onPresent(Context*,
+                            const std::vector<std::shared_ptr<RenderTargetProxy>>& renderTargets) {
+  if (renderTargets.empty()) {
     return;
   }
-  auto proxy = std::static_pointer_cast<MetalDrawableProxy>(drawableProxy);
+  auto proxy = std::static_pointer_cast<MetalDrawableProxy>(renderTargets.front());
   proxy->releaseDrawable();
+}
+
+bool MetalWindow::hasIndependentPresentationTargets() const {
+  return true;
+}
+
+std::shared_ptr<Drawable> MetalWindow::onNextDrawable(Context* context) {
+  int width = 0;
+  int height = 0;
+  if (!GetDrawableSize(metalLayer, metalView, &width, &height)) {
+    return nullptr;
+  }
+  return MetalDrawable::Make(context, metalLayer, colorSpace());
 }
 
 }  // namespace tgfx

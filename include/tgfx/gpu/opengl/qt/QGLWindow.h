@@ -60,7 +60,9 @@ class QGLWindow : public Window {
 
  protected:
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
-  void onPresent(Context* context) override;
+  void onPresent(Context* context,
+                 const std::vector<std::shared_ptr<RenderTargetProxy>>& renderTargets) override;
+  bool hasIndependentPresentationTargets() const override;
 
  private:
   struct TextureSlot {
@@ -76,8 +78,6 @@ class QGLWindow : public Window {
   QGLDeviceCreator* deviceCreator = nullptr;
   QSGTexture* presentedQSGTexture = nullptr;
   std::shared_ptr<RenderTargetProxy> pendingProxy = nullptr;
-  std::shared_ptr<RenderTargetProxy> drawableProxy = nullptr;
-  std::shared_ptr<RenderTargetProxy> presentingProxy = nullptr;
 
   explicit QGLWindow(QQuickItem* quickItem, bool singleBufferMode = false,
                      std::shared_ptr<ColorSpace> colorSpace = nullptr);

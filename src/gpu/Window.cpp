@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Window.h"
+#include "core/utils/Log.h"
+#include "gpu/WindowDrawable.h"
 #include "tgfx/gpu/Device.h"
 
 namespace tgfx {
@@ -38,6 +40,34 @@ std::shared_ptr<Device> Window::getDevice() {
   return device;
 }
 
-void Window::onPresent(Context*) {
+std::shared_ptr<Drawable> Window::nextDrawable(Context* context) {
+  if (context == nullptr) {
+    return nullptr;
+  }
+  if (context->device() != device.get()) {
+    LOGE("Window::nextDrawable() The context must belong to the window's device!");
+    return nullptr;
+  }
+  if (weak_from_this().expired()) {
+    LOGE("Window::nextDrawable() The window must be owned by a shared_ptr!");
+    return nullptr;
+  }
+  auto window = shared_from_this();
+  auto drawable = onNextDrawable(context);
+  if (drawable != nullptr) {
+    drawable->_window = std::move(window);
+  }
+  return drawable;
+}
+
+std::shared_ptr<Drawable> Window::onNextDrawable(Context* context) {
+  return WindowDrawable::Make(context, shared_from_this());
+}
+
+void Window::onPresent(Context*, const std::vector<std::shared_ptr<RenderTargetProxy>>&) {
+}
+
+bool Window::hasIndependentPresentationTargets() const {
+  return false;
 }
 }  // namespace tgfx

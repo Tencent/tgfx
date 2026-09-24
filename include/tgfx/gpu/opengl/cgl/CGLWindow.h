@@ -40,7 +40,8 @@ class CGLWindow : public Window {
 
  protected:
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
-  void onPresent(Context* context) override;
+  void onPresent(Context* context,
+                 const std::vector<std::shared_ptr<RenderTargetProxy>>& renderTargets) override;
 
  private:
   NSView* view = nil;

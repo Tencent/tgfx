@@ -58,9 +58,6 @@ bool QGLDrawableProxy::externallyOwned() const {
 void QGLDrawableProxy::ensureTextureRTProxy() const {
   if (textureRTProxy == nullptr) {
     textureRTProxy = _window->acquireTexture(_context, _width, _height);
-    if (textureRTProxy != nullptr) {
-      _window->presentingProxy = weakThis.lock();
-    }
   }
 }
 

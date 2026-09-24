@@ -273,7 +273,7 @@ RenderContext::RenderContext(std::shared_ptr<RenderTargetProxy> proxy, uint32_t 
     opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags,
                                                      PMColor::Transparent(), _colorSpace);
     if (surface && surface->_window) {
-      drawingManager->collectWindow(surface->_window);
+      drawingManager->collectWindow(surface->_window, renderTarget);
     }
   }
 }
@@ -488,7 +488,7 @@ OpsCompositor* RenderContext::getOpsCompositor(bool discardContent) {
     opsCompositor =
         drawingManager->addOpsCompositor(renderTarget, renderFlags, std::nullopt, _colorSpace);
     if (surface && surface->_window) {
-      drawingManager->collectWindow(surface->_window);
+      drawingManager->collectWindow(surface->_window, renderTarget);
     }
   } else if (discardContent) {
     opsCompositor->discardAll();
