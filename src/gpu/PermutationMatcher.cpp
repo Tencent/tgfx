@@ -565,6 +565,26 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   QuadTextureFillInputs inputs;
   inputs.hasUVCoord = !quadGP->hasUVMatrix();
   inputs.hasSubset = quadGP->getHasSubset();
+  // The precompiled vTexSubset path transforms the subset corners WITHOUT a perspective divide
+  // (quad_texture_fill.vert: perspLT = (CoordTransformMatrix_0 * vec3(src, 1)).xy), while the
+  // runtime route's emitTransformedPoint divides by w when the transform is projective. A
+  // projective source carrying a GP subset would clamp the texture coordinate to wrong bounds
+  // (one edge-line class of A/B divergence), so it must stay on the runtime route — the same
+  // conservative policy TextureEffectIsProjective applies in TryMatchTextureFill. Projective
+  // draws without a GP subset are fine: TransformedCoords_0 is a vec3 varying that the fragment
+  // shader divides.
+  if (inputs.hasSubset && (quadGP->getHasUVPerspective() || te->hasPerspective())) {
+    return std::nullopt;
+  }
+  // TGFX_QTF_DEBUG prints the match inputs so A/B runs can see which QuadTextureFill variants
+  // each draw actually selects. Diagnostic only.
+  if (std::getenv("TGFX_QTF_DEBUG") != nullptr) {
+    std::printf(
+        "[QTF] hasUVCoord=%d hasSubset=%d localMask=%d xp=%d uvPersp=%d tePersp=%d "
+        "teSubset=%d\n",
+        inputs.hasUVCoord, inputs.hasSubset, inputs.hasLocalMask, inputs.xpType,
+        quadGP->getHasUVPerspective(), te->hasPerspective(), te->hasSubset());
+  }
   inputs.hasLocalMask = hasLocalMask;
   inputs.xpType = xpType;
   auto composed = ComposeQuadTextureFill(inputs);
