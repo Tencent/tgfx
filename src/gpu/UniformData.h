@@ -214,6 +214,10 @@ class UniformData {
   static const char* ToUniformFormatName(UniformFormat format);
 
   void dump() const;
+
+  // Prints every field's current value (floats/ints read from the backing buffer), for A/B
+  // diffing the uniforms two routes upload for the same draw. Diagnostic only.
+  void dumpValues(const char* label) const;
 #endif
 
   friend class ProgramInfo;

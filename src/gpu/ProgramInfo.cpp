@@ -373,13 +373,22 @@ bool ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
   // BlendModeValue_1, ...). The first processor of each class keeps the base name, so kernels with
   // at most one instance of a class are byte-for-byte unchanged. On the JIT path structuralSuffix is
   // unused (nameSuffix already disambiguates by processor index).
+  // TextureEffect and TiledTextureEffect must share ONE ordinal sequence: both write the same
+  // per-texture uniform names (Subset/AlphaOnly/...). Under per-name grouping a TextureEffect color
+  // source and a TiledTextureEffect local mask each got ordinal 0 (empty suffix), and the mask's
+  // full-bounds Subset silently overwrote the color's real subset on the precompiled path —
+  // the JIT route is immune because its _P{index} name suffix isolates the two writers.
   std::unordered_map<std::string, int> classOrdinals;
+  auto uniformSpaceKey = [](const FragmentProcessor* fp) {
+    auto name = fp->name();
+    return name == "TiledTextureEffect" ? std::string("TextureEffect") : name;
+  };
   for (auto& fragmentProcessor : fragmentProcessors) {
     FragmentProcessor::Iter iter(fragmentProcessor);
     const FragmentProcessor* fp = iter.next();
     while (fp) {
       updateUniformDataSuffix(vertexUniformData, fragmentUniformData, fp);
-      int ordinal = classOrdinals[fp->name()]++;
+      int ordinal = classOrdinals[uniformSpaceKey(fp)]++;
       std::string structural = ordinal > 0 ? "_" + std::to_string(ordinal) : "";
       if (vertexUniformData != nullptr) {
         vertexUniformData->structuralSuffix = structural;
@@ -400,6 +409,29 @@ bool ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
   updateUniformDataSuffix(vertexUniformData, fragmentUniformData, processor);
   processor->setData(vertexUniformData, fragmentUniformData);
   updateUniformDataSuffix(vertexUniformData, fragmentUniformData, nullptr);
+
+  // TGFX_UNIF_DUMP prints the fully-assembled uniform values (after every writer ran) so an A/B
+  // run can diff what the two routes actually upload for the same draw shape. Filtered to programs
+  // carrying a coord-transform (both routes declare it; the JIT suffixes the name with the
+  // processor index) to keep the output bounded. Diagnostic only.
+#if DEBUG
+  static const char* unifDump = std::getenv("TGFX_UNIF_DUMP");
+  if (unifDump != nullptr && vertexUniformData != nullptr) {
+    bool hasCoordTransform = false;
+    for (const auto& uniform : vertexUniformData->uniforms()) {
+      if (uniform.name().rfind("CoordTransformMatrix_0", 0) == 0) {
+        hasCoordTransform = true;
+        break;
+      }
+    }
+    if (hasCoordTransform) {
+      vertexUniformData->dumpValues(unifDump);
+      if (fragmentUniformData != nullptr) {
+        fragmentUniformData->dumpValues(unifDump);
+      }
+    }
+  }
+#endif
 
   bindUniformBufferAndUnloadToGPU(program, std::move(uniformBuffer), renderPass, vertexOffset,
                                   fragmentOffset);

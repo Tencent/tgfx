@@ -218,5 +218,35 @@ void UniformData::dump() const {
   LOGI("Total buffer size = %zu bytes", size());
   LOGI("-------------- UniformData Layout dump end --------------\n");
 }
+
+void UniformData::dumpValues(const char* label) const {
+  if (_buffer == nullptr) {
+    return;
+  }
+  std::vector<Field> sortedFields;
+  sortedFields.reserve(fieldMap.size());
+  for (const auto& [name, field] : fieldMap) {
+    sortedFields.push_back(field);
+  }
+  std::sort(sortedFields.begin(), sortedFields.end(),
+            [](const Field& a, const Field& b) { return a.offset < b.offset; });
+  std::printf("[UNIF %s] route=%s suffix=%s%s fields=%zu\n", label, skipSuffix ? "AOT" : "JIT",
+              nameSuffix.c_str(), structuralSuffix.c_str(), sortedFields.size());
+  for (const auto& field : sortedFields) {
+    std::printf("  %-24s = [", field.name.c_str());
+    bool isInt = field.format == UniformFormat::Int || field.format == UniformFormat::Int2 ||
+                 field.format == UniformFormat::Int3 || field.format == UniformFormat::Int4;
+    auto wordCount = field.size / 4;
+    for (size_t w = 0; w < wordCount; ++w) {
+      auto* p = _buffer + field.offset + w * 4;
+      if (isInt) {
+        std::printf("%d ", *reinterpret_cast<const int32_t*>(p));
+      } else {
+        std::printf("%.6g ", *reinterpret_cast<const float*>(p));
+      }
+    }
+    std::printf("]\n");
+  }
+}
 #endif
 }  // namespace tgfx
