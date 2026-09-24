@@ -260,10 +260,21 @@ class Matrix3D {
   static Matrix3D Perspective(float fovyDegrees, float aspect, float nearZ, float farZ);
 
   /**
+   * The camera near-plane distance, expressed as a homogeneous W value. A vertex whose W falls
+   * below this distance sits on or inside the near plane, where the perspective division is
+   * unbounded, so mapRect() clips it against the plane instead of dividing by it.
+   */
+  static constexpr float W_NEAR_PLANE = 1.f / (1 << 14);
+
+  /**
    * Maps a rectangle using this matrix.
    * If the matrix contains a perspective transformation, each corner of the rectangle is mapped as a
    * 4D point (x, y, 0, 1), and the resulting rectangle is computed from the projected points
-   * (after perspective division).
+   * (after perspective division). Corners whose homogeneous W falls below W_NEAR_PLANE are clipped
+   * against the near plane first, which magnifies the result by up to 1 / W_NEAR_PLANE; callers
+   * that size a surface from the result must clip it against their own viewport. If every corner
+   * is clipped away, the whole rectangle lies inside the near plane and an empty rect is returned
+   * rather than an infinite one.
    */
   Rect mapRect(const Rect& src) const;
 

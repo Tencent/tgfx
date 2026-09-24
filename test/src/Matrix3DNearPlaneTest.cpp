@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <cmath>
+#include <limits>
 #include "base/TGFXTest.h"
 #include "core/Matrix3DUtils.h"
 #include "gtest/gtest.h"
@@ -30,7 +31,7 @@ namespace tgfx {
 namespace {
 
 // Near-plane distance used by Matrix3D::mapRect() when perspective is present.
-constexpr float kNearPlaneW = 1.f / (1 << 14);
+constexpr float kNearPlaneW = Matrix3D::W_NEAR_PLANE;
 
 bool RectIsFinite(const Rect& rect) {
   return std::isfinite(rect.left) && std::isfinite(rect.top) && std::isfinite(rect.right) &&
@@ -140,36 +141,6 @@ TGFX_TEST(Matrix3DNearPlaneTest, RectStraddlingNearPlaneStaysFinite) {
       << mapped.right << ", " << mapped.bottom << "}";
 }
 
-// Straddling mapRect() results are finite but astronomic (~1e6 px per side). Their areas (~4.5e11)
-// stay far below float limits, so a single projection cannot overflow by itself; the RootLayer
-// overflow bug needs multi-level 3D matrix composition or larger source bounds. This case guards
-// the single-level baseline: the dirty list never exceeds MAX_DIRTY_REGIONS and stays finite.
-TGFX_TEST(Matrix3DNearPlaneTest, StraddlingRectsKeepRootLayerConverging) {
-  const auto eyeDistance = 1200.f;
-  constexpr auto tiltDegrees = 0.042f;
-  auto model = Matrix3D::MakeTranslate(0.f, 0.f, eyeDistance * (1.f - kNearPlaneW));
-  model.preRotate({0.f, 1.f, 0.f}, tiltDegrees);
-  auto perspective = Matrix3D();
-  perspective.setRowColumn(3, 2, -1.f / eyeDistance);
-  const auto matrix = perspective * model;
-
-  const auto mapped = matrix.mapRect(kSquare);
-  ASSERT_TRUE(RectIsFinite(mapped));
-
-  auto root = RootLayer::Make();
-  root->invalidateRect(mapped);
-  root->invalidateRect(
-      Rect::MakeLTRB(mapped.left + 1e7f, mapped.top, mapped.right + 1e7f, mapped.bottom));
-  root->invalidateRect(
-      Rect::MakeLTRB(mapped.left + 2e7f, mapped.top, mapped.right + 2e7f, mapped.bottom));
-  root->invalidateRect(
-      Rect::MakeLTRB(mapped.left + 3e7f, mapped.top, mapped.right + 3e7f, mapped.bottom));
-  EXPECT_LE(root->currentDirtyRects().size(), MAX_DIRTY_REGIONS);
-  for (const auto& rect : root->currentDirtyRects()) {
-    EXPECT_TRUE(RectIsFinite(rect));
-  }
-}
-
 // Regression guard for double area accumulation: each edge below is 2e19, so a float area product
 // (4e38) overflows to infinity and every merge cost degenerates into NaN. The forced-merge
 // fallback alone would still converge, so this case also pins down which pair gets merged: the
@@ -198,6 +169,20 @@ TGFX_TEST(Matrix3DNearPlaneTest, AstronomicDirtyRectsKeepRootLayerConverging) {
   }
   EXPECT_TRUE(mergedCheapestPair)
       << "forced merge did not pick the zero-cost pair; merge costs are no longer comparable";
+}
+
+// Regression guard for the forced-merge fallback pair: an infinite extent is not filtered out by
+// invalidateRect() because left < right still holds, so every area and every union area is
+// infinite and every merge cost degenerates into NaN, losing all comparisons. Without the fallback
+// no pair is ever selected and the dirty list stops converging.
+TGFX_TEST(Matrix3DNearPlaneTest, NonFiniteDirtyRectsStillConverge) {
+  const auto infinity = std::numeric_limits<float>::infinity();
+  auto root = RootLayer::Make();
+  for (int i = 0; i < 4; i++) {
+    const auto top = static_cast<float>(2 * i);
+    root->invalidateRect(Rect::MakeLTRB(-infinity, top, infinity, top + 1.f));
+  }
+  EXPECT_LE(root->currentDirtyRects().size(), MAX_DIRTY_REGIONS);
 }
 
 }  // namespace tgfx

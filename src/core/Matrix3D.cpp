@@ -169,7 +169,7 @@ static Rect MapRectAffine(const Rect& srcRect, const float mat[16]) {
 }
 
 static Rect MapRectPerspective(const Rect& srcRect, const float mat[16]) {
-  constexpr float wNearPlane = 1.f / (1 << 14);
+  constexpr float wNearPlane = Matrix3D::W_NEAR_PLANE;
 
   auto c0 = Vec4::Load(mat);
   auto c1 = Vec4::Load(mat + 4);

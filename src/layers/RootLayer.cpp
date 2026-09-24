@@ -23,8 +23,9 @@
 #include "layers/DrawArgs.h"
 
 namespace tgfx {
-// Areas below are accumulated in double: a float product overflows to infinity once an edge
-// exceeds ~1.8e19, which used to turn merge costs into NaN and stall the dirty list convergence.
+// Areas below are accumulated in double: a float product overflows to infinity once the product of
+// the two edges exceeds FLT_MAX, which used to turn merge costs into NaN and stall the dirty list
+// convergence.
 static double RectArea(const Rect& rect) {
   return (static_cast<double>(rect.right) - static_cast<double>(rect.left)) *
          (static_cast<double>(rect.bottom) - static_cast<double>(rect.top));
