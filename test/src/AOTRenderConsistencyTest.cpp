@@ -378,6 +378,116 @@ TGFX_TEST(AOTRenderConsistencyTest, AACoverageXferDstFold) {
   ExpectBitmapsIdentical("aa-xfer-dst-fold", aotBitmap, runtimeBitmap, 200, 200);
 }
 
+// QuadTextureFill v4_f8 shape: an image draw (QuadPerEdgeAA + TextureEffect) whose coverage is a
+// ShaderMaskFilter over a plain ImageShader (Xfermode-dst SrcIn + TextureEffect child => LocalMask)
+// with an advanced blend that needs the dst texture. This is the background-blur compositing shape;
+// any CoordTransformMatrix_1 / LocalMaskSampler mis-wiring shows up here as a byte difference.
+TGFX_TEST(AOTRenderConsistencyTest, QuadTextureLocalMaskXferDst) {
+  auto image = MakeImage("resources/apitest/imageReplacement.jpg");
+  ASSERT_TRUE(image != nullptr);
+  // A gradient-alpha mask: an opaque mask would make localMaskAlpha constantly 1, hiding any
+  // mask-coordinate mis-wiring (the original probe passed for exactly that reason). The mask is
+  // rendered through an offscreen surface snapshot so it carries the BottomLeft origin of a GL
+  // render target, like the background-blur compositing textures do.
+  Bitmap maskBitmap = {};
+  ASSERT_TRUE(maskBitmap.allocPixels(128, 128));
+  {
+    auto* pixels = static_cast<uint32_t*>(maskBitmap.lockPixels());
+    for (uint32_t y = 0; y < 128; y++) {
+      for (uint32_t x = 0; x < 128; x++) {
+        auto alpha = static_cast<uint8_t>(255U - x * 2U);
+        pixels[y * 128U + x] = (static_cast<uint32_t>(alpha) << 24) | 0x00FFFFFFU;
+      }
+    }
+    maskBitmap.unlockPixels();
+  }
+  auto maskImage = Image::MakeFrom(maskBitmap);
+  ASSERT_TRUE(maskImage != nullptr);
+  // A gradient-alpha COLOR source too: the background-blur compositing texture has fractional
+  // alpha along its blurred edges, and the dst-weight contract ((1 - coverage) vs
+  // (1 - srcAlpha*coverage)) only diverges where source alpha < 1.
+  Bitmap colorBitmap = {};
+  ASSERT_TRUE(colorBitmap.allocPixels(160, 160));
+  {
+    auto* pixels = static_cast<uint32_t*>(colorBitmap.lockPixels());
+    for (uint32_t y = 0; y < 160; y++) {
+      for (uint32_t x = 0; x < 160; x++) {
+        auto alpha = static_cast<uint8_t>(x * 255U / 160U);
+        pixels[y * 160U + x] = (static_cast<uint32_t>(alpha) << 24) | 0x0099CCFFU;
+      }
+    }
+    colorBitmap.unlockPixels();
+  }
+  auto colorImage = Image::MakeFrom(colorBitmap);
+  ASSERT_TRUE(colorImage != nullptr);
+  auto renderOnce = [&](bool useBundle, Bitmap* outBitmap) {
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto* cache = context->precompiledShaderCache();
+    if (useBundle) {
+      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+    } else {
+      cache->unload();
+    }
+    ScopedAOTStatsPause statsPause(context, !useBundle);
+    context->globalCache()->clearPrograms();
+    auto surface = Surface::Make(context, 200, 200);
+    ASSERT_TRUE(surface != nullptr);
+    // GPU-born mask: render the gradient-alpha content into an offscreen surface and snapshot it,
+    // so the mask texture carries the BottomLeft origin of a GL render target — the same class of
+    // texture the background-blur compositing samples. A CPU-uploaded bitmap (TopLeft) exercises a
+    // different coordinate-flip path and can hide origin-handling divergences.
+    auto maskSurface = Surface::Make(context, 128, 128);
+    ASSERT_TRUE(maskSurface != nullptr);
+    maskSurface->getCanvas()->drawImage(maskImage, 0, 0);
+    context->flushAndSubmit(true);
+    auto gpuMaskImage = maskSurface->makeImageSnapshot();
+    ASSERT_TRUE(gpuMaskImage != nullptr);
+    // The COLOR source is also a GPU render target in the real blur compositing (the blurred
+    // backdrop snapshot), so it rides the same BottomLeft origin path.
+    auto colorSurface = Surface::Make(context, 160, 160);
+    ASSERT_TRUE(colorSurface != nullptr);
+    colorSurface->getCanvas()->drawImage(colorImage, 0, 0);
+    context->flushAndSubmit(true);
+    auto gpuColorImage = colorSurface->makeImageSnapshot();
+    ASSERT_TRUE(gpuColorImage != nullptr);
+    auto* canvas = surface->getCanvas();
+    // StyleTest3/jit_13 shape: Src blend + coverage forces the dst-texture route
+    // (MakeCoverageDstCoeffZeroFormula has a secondary output), the ShaderMaskFilter contributes
+    // the local mask, and an AA rect clip rides the runtime clip contract. All three v4_f8
+    // features at once.
+    canvas->save();
+    canvas->clipRect(Rect::MakeXYWH(30.3f, 25.6f, 120.7f, 100.4f), true);
+    auto maskShader = Shader::MakeImageShader(gpuMaskImage, TileMode::Clamp, TileMode::Clamp);
+    Paint paint = {};
+    paint.setMaskFilter(MaskFilter::MakeShader(maskShader));
+    paint.setBlendMode(BlendMode::Src);
+    canvas->scale(2.0f, 2.0f);
+    // Three back-to-back draws of the same image trigger the pendingImage batching
+    // (pendingRects/pendingUVRects/pendingSubsetRects arrays) the blur compositing uses, instead
+    // of a single-quad draw.
+    canvas->drawImage(gpuColorImage, 20.2f, 15.7f, &paint);
+    canvas->drawImage(gpuColorImage, 40.1f, 30.9f, &paint);
+    canvas->drawImage(gpuColorImage, 10.4f, 50.2f, &paint);
+    canvas->restore();
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(200, 200));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+    if (useBundle) {
+      cache->unload();
+    }
+  };
+  Bitmap aotBitmap = {};
+  Bitmap runtimeBitmap = {};
+  renderOnce(true, &aotBitmap);
+  renderOnce(false, &runtimeBitmap);
+  ExpectBitmapsIdentical("quad-local-mask-xfer-dst", aotBitmap, runtimeBitmap, 200, 200);
+}
+
 TGFX_TEST(AOTRenderConsistencyTest, ChainMaskWithSolidFill) {
   auto renderOnce = [&](bool useBundle, Bitmap* outBitmap) {
     ContextScope scope;

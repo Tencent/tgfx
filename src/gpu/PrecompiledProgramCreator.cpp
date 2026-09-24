@@ -248,7 +248,27 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
     while (begin <= std::string(deniedShaders).size()) {
       auto end = std::string(deniedShaders).find(',', begin);
       auto token = std::string(deniedShaders).substr(begin, end - begin);
-      if (token == name) {
+      // A token of the form "name:vert:frag" additionally pins the permutation indices, so a
+      // single variant of a kernel family can be isolated; a bare "name" denies the whole family.
+      auto sep = token.find(':');
+      bool matched = false;
+      if (sep != std::string::npos) {
+        auto sep2 = token.find(':', sep + 1);
+        if (sep2 != std::string::npos) {
+          try {
+            matched = token.substr(0, sep) == name &&
+                      std::stoi(token.substr(sep + 1, sep2 - sep - 1)) ==
+                          static_cast<int>(matchResult->vertPermutationIndex) &&
+                      std::stoi(token.substr(sep2 + 1)) ==
+                          static_cast<int>(matchResult->fragPermutationIndex);
+          } catch (...) {
+            matched = false;
+          }
+        }
+      } else {
+        matched = token == name;
+      }
+      if (matched) {
         cache->recordArtifactMiss(PrecompiledFallbackReason::Unspecified,
                                   MakeFallbackRecord(cache, programInfo, &*matchResult));
         return nullptr;

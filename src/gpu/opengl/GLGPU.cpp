@@ -17,6 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLGPU.h"
+#include <atomic>
+#include <cstdio>
+#include <cstdlib>
+#include <string>
 #include "gpu/opengl/GLBuffer.h"
 #if defined(__EMSCRIPTEN__)
 #include "gpu/opengl/webgl/WebGLBuffer.h"
@@ -218,6 +222,20 @@ std::shared_ptr<ShaderModule> GLGPU::createShaderModule(const ShaderModuleDescri
   if (descriptor.code.empty()) {
     LOGE("GLGPU::createShaderModule() shader code is empty!");
     return nullptr;
+  }
+  // TGFX_JIT_DUMP_DIR saves every runtime-generated shader source for A/B diffs against the
+  // precompiled artifacts. Diagnostic only; read once per process.
+  static const char* jitDumpDir = std::getenv("TGFX_JIT_DUMP_DIR");
+  if (jitDumpDir != nullptr) {
+    static std::atomic<uint32_t> jitShaderCounter{0};
+    auto index = jitShaderCounter.fetch_add(1);
+    auto stage = descriptor.stage == ShaderStage::Vertex ? "vert" : "frag";
+    auto path = std::string(jitDumpDir) + "/jit_" + std::to_string(index) + "_" + stage + ".glsl";
+    auto* file = fopen(path.c_str(), "w");
+    if (file != nullptr) {
+      fwrite(descriptor.code.data(), 1, descriptor.code.size(), file);
+      fclose(file);
+    }
   }
   unsigned shaderType = 0;
   switch (descriptor.stage) {

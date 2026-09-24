@@ -274,6 +274,14 @@ void GLSLTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
     }
     fragmentUniformData->setData("Subset", rect);
   }
+  // SubsetClampOn mirrors the runtime TextureEffect's needSubset() gate onto the precompiled
+  // fill kernels: the JIT only clamps when needSubset() holds, so an unconditional clamp in the
+  // kernel diverges on out-of-range coordinates (zeroed mip derivatives, half-texel edge shifts).
+  // Kernels without the field (JIT programs) skip the write.
+  if (fragmentUniformData != nullptr && fragmentUniformData->hasField("SubsetClampOn")) {
+    int subsetClampOn = needSubset() ? 1 : 0;
+    fragmentUniformData->setData("SubsetClampOn", subsetClampOn);
+  }
   // Alpha-only is a runtime uniform in the precompiled QuadTextureFillShader (folded out of the
   // permutation set). The runtime GLSL codegen bakes it in and does not declare the field, so this
   // only fires on the AOT path where the field exists.

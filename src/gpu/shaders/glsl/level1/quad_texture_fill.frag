@@ -62,6 +62,11 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   int AlphaOnly;
   int HasRgbaaa;
   int OutputAlphaSwizzle;
+  // Gates the Subset-uniform clamp. The runtime (JIT) TextureEffect only clamps when
+  // needSubset() holds; a unconditional clamp here diverges where coordinates leave [0,1]
+  // (perspective outsides, quad edge extrapolation): clamping zeroes the mip-level derivatives
+  // and shifts bilinear edge texels by half a texel. Uploaders set this from needSubset().
+  int SubsetClampOn;
   // Exact common-color override: the vColor varying is UByte4Normalized (8-bit quantized), which
   // shifts fractional-alpha outputs by one LSB versus the runtime renderer's float Color uniform.
   // HasCommonColor selects the Color uniform for uniform-color draws (same contract as
@@ -118,11 +123,16 @@ void main() {
 #if HAS_SUBSET
   // Full subset: clamp first by per-quad varying bounds, then by uniform safe range.
   finalCoord = clamp(finalCoord, vTexSubset.xy, vTexSubset.zw);
-  finalCoord = clamp(finalCoord, Subset.xy, Subset.zw);
+  if (SubsetClampOn != 0) {
+    finalCoord = clamp(finalCoord, Subset.xy, Subset.zw);
+  }
 #else
-  // Uniform-only clamp. Subset holds the full texture bounds when no real subset applies, so this
-  // degenerates to a no-op; otherwise it bounds the sample to the valid texel region.
-  finalCoord = clamp(finalCoord, Subset.xy, Subset.zw);
+  // Uniform-only clamp, mirroring the runtime TextureEffect's needSubset() gate: without the
+  // gate the clamp fires on out-of-range coordinates (perspective extrapolation, edge quads),
+  // zeroing the mip derivatives and diverging from the runtime codegen.
+  if (SubsetClampOn != 0) {
+    finalCoord = clamp(finalCoord, Subset.xy, Subset.zw);
+  }
 #endif
 
   vec4 color = texture(TextureSampler_0, finalCoord);
