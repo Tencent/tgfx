@@ -124,6 +124,9 @@ export const uploadToTexture = (
 ) => {
     let renderSource = source instanceof BitmapImage ? source.bitmap : source;
     if (!renderSource) return;
+    // Without EXPORTED_RUNTIME_METHODS=GL the runtime object is missing entirely, and dereferencing it
+    // below would throw out of the wasm call instead of letting the caller report the failure.
+    if (!GL) return;
     if (isInstanceOf(renderSource, globalThis.HTMLVideoElement)) {
         syncVideoFrame(renderSource as HTMLVideoElement);
     }
@@ -144,7 +147,9 @@ export const setColorSpace = (
     GL: EmscriptenGL,
     colorSpace: WindowColorSpace
 ) => {
-    if (colorSpace === WindowColorSpace.Others) {
+    // Without EXPORTED_RUNTIME_METHODS=GL the runtime object is missing entirely. Report that as an
+    // unsupported color space so the C++ caller takes its existing fallback path.
+    if (!GL || colorSpace === WindowColorSpace.Others) {
         return false;
     }
     const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
@@ -285,7 +290,9 @@ export const uploadVideoToWebGPUTexture = (source: HTMLVideoElement, texturePtr:
  */
 export const createCanvasContext = (GL: EmscriptenGL, canvas: HTMLCanvasElement | OffscreenCanvas,
                                     webGLContextAttributes: EmscriptenGLContextAttributes) => {
-    if (!canvas || typeof canvas.getContext !== 'function') {
+    // Without EXPORTED_RUNTIME_METHODS=GL the runtime object is missing entirely, and this is the
+    // entry point that creates the context, so there is nothing to fall back to.
+    if (!GL || !canvas || typeof canvas.getContext !== 'function') {
         return 0;
     }
     return GL.createContext(canvas, webGLContextAttributes);

@@ -42,6 +42,9 @@ class WebGLDevice : public GLDevice {
    * belongs to the calling thread: it has to be rendered with and destroyed on that thread, and the
    * canvas has to stay alive for as long as the device does.
    *
+   * On Web, the final executable must export the GL runtime method (see the Web build section in
+   * README.md); this overload returns nullptr without it.
+   *
    * @param canvas An HTMLCanvasElement or an OffscreenCanvas. Returns nullptr if it is null or no
    *     context can be created from it.
    * @param colorSpace An optional color space for rendering. If nullptr, the default sRGB is used.
