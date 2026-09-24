@@ -279,6 +279,11 @@ Note that `EXPORTED_RUNTIME_METHODS` is an overwrite-style list, not additive: l
 method your program needs. `-sUSE_WEBGPU=1` must also be set at link time when building the WebGPU
 backend, as the library's compile options do not propagate to the final link.
 
+The canvas object overloads of `WebGLDevice` / `WebGLWindow` and `WebGPUWindow` / `WebGPUDevice`
+additionally need the JS entry points that ship with the Web build (`createCanvasContext`,
+`createWebGPUSurface`, `importWebGPUDevice`). The WeChat mini-program binding exposes a smaller set
+and does not provide them yet, so those overloads are not available in a mini-program build.
+
 To build a single-threaded WebGL version:
 
 ```
