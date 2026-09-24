@@ -55,9 +55,9 @@ class WebGPUDevice : public Device {
    * shutdown.
    *
    * On Web, the final executable must export the WebGPU runtime method (see the Web build section
-   * in README.md); this method returns nullptr without it.
+   * in README.md); without it the device cannot be created.
    *
-   * @param device A GPUDevice. Returns nullptr if it is null or exposes no command queue.
+   * @param device A GPUDevice. Returns nullptr if it is null.
    */
   static std::shared_ptr<WebGPUDevice> MakeFrom(emscripten::val device);
 

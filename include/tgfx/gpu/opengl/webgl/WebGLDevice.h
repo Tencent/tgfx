@@ -43,7 +43,7 @@ class WebGLDevice : public GLDevice {
    * canvas has to stay alive for as long as the device does.
    *
    * On Web, the final executable must export the GL runtime method (see the Web build section in
-   * README.md); this overload returns nullptr without it.
+   * README.md); without it no context can be created.
    *
    * @param canvas An HTMLCanvasElement or an OffscreenCanvas. Returns nullptr if it is null or no
    *     context can be created from it.

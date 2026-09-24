@@ -55,18 +55,14 @@ class WebGPUWindow : public Window {
    * what is rendered into it.
    *
    * On Web, the final executable must export the WebGPU runtime method (see the Web build section
-   * in README.md). Both overloads need it: without it the selector overload above renders without
-   * color space configuration and without video texture uploads, and this overload cannot create the
-   * surface at all and returns nullptr instead.
+   * in README.md); without it the surface cannot be created.
    *
    * @param canvas An HTMLCanvasElement or an OffscreenCanvas. Returns nullptr if it is null or the
    *     window cannot be created.
    * @param device An optional WebGPUDevice. Required on a thread that cannot obtain the default
    *     device, such as a worker thread. If nullptr, a default device is created automatically.
    * @param colorSpace An optional target color space for the drawing buffer. If nullptr, the
-   *     default sRGB color space is used. When a non-null color space is provided, the canvas's
-   *     WebGPU context is reconfigured with the color space so that the rendered content is
-   *     displayed correctly.
+   *     default sRGB color space is used.
    */
   static std::shared_ptr<WebGPUWindow> MakeFrom(emscripten::val canvas,
                                                 std::shared_ptr<WebGPUDevice> device = nullptr,

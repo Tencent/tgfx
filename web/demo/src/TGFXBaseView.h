@@ -54,11 +54,8 @@ class TGFXBaseView {
   /**
    * Sets the ratio between the canvas backing store and its layout size. Needed when the view runs
    * where that ratio cannot be read from the page, such as a worker rendering into an
-   * OffscreenCanvas.
-   *
-   * A view created from a canvas object cannot read the ratio from the page at all, so until this is
-   * called it falls back to 1. A view created from a canvas id reads it from the page instead, which
-   * is why the single-threaded demos do not have to call this.
+   * OffscreenCanvas. Until it is called the ratio falls back to 1 for a canvas object, and to the
+   * page for a canvas id.
    *
    * @param density Backing store size divided by layout size, normally window.devicePixelRatio.
    */

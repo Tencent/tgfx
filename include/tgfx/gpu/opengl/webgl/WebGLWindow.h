@@ -44,9 +44,7 @@ class WebGLWindow : public Window {
    * rendered into it.
    *
    * On Web, the final executable must export the GL runtime method (see the Web build section in
-   * README.md). Both overloads need it: without it the id overload above renders without color space
-   * configuration and without image/video texture uploads, and this overload cannot create the
-   * context at all and returns nullptr instead.
+   * README.md); without it the context cannot be created.
    *
    * @param canvas An HTMLCanvasElement or an OffscreenCanvas. Returns nullptr if it is null or the
    *     window cannot be created.
