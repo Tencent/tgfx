@@ -107,6 +107,8 @@ class VulkanCommandQueue : public CommandQueue {
     bool manualPresent = false;
   };
   std::vector<PendingPresent> pendingPresents;
+
+  void abandonPresents(std::vector<PendingPresent>& presents);
 };
 
 }  // namespace tgfx

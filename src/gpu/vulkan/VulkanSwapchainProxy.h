@@ -31,7 +31,8 @@ class VulkanSwapchainProxy : public RenderTargetProxy {
                        int width, int height, const std::vector<VkImage>& images,
                        const std::vector<std::shared_ptr<VulkanSwapchainImageState>>& imageStates,
                        std::shared_ptr<bool> outOfDate,
-                       std::shared_ptr<VulkanManualToken> manualToken, bool manualPresent = false);
+                       std::shared_ptr<VulkanManualToken> manualToken,
+                       std::shared_ptr<uint64_t> swapchainGeneration, bool manualPresent = false);
   ~VulkanSwapchainProxy() override;
 
   Context* getContext() const override;
@@ -43,6 +44,11 @@ class VulkanSwapchainProxy : public RenderTargetProxy {
   bool externallyOwned() const override;
   std::shared_ptr<TextureView> getTextureView() const override;
   std::shared_ptr<RenderTarget> getRenderTarget() const override;
+
+  /**
+   * Returns true if this proxy has acquired a swapchain image that has not been presented yet.
+   */
+  bool hasPendingFrame() const;
 
   void releaseFrame();
   void presentFrame();
@@ -60,8 +66,9 @@ class VulkanSwapchainProxy : public RenderTargetProxy {
   std::vector<std::shared_ptr<VulkanSwapchainImageState>> _imageStates;
   std::shared_ptr<bool> _outOfDate;
   std::shared_ptr<VulkanManualToken> _manualToken;
+  std::shared_ptr<uint64_t> _swapchainGeneration;
+  uint64_t _generationValue = 0;
 
-  mutable VkSemaphore _imageAvailableSemaphore = VK_NULL_HANDLE;
   mutable uint32_t _currentImageIndex = 0;
   mutable std::shared_ptr<RenderTarget> _renderTarget = nullptr;
   mutable std::shared_ptr<VulkanFrameState> _frameState = nullptr;

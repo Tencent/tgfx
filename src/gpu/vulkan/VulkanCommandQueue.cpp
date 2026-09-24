@@ -222,21 +222,33 @@ void VulkanCommandQueue::abandonSubmit(FrameSession session,
   }
 }
 
-void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
-  if (!commandBuffer) {
+void VulkanCommandQueue::abandonPresents(std::vector<PendingPresent>& presents) {
+  if (presents.empty()) {
     return;
   }
-  auto vulkanCmdBuffer = std::static_pointer_cast<VulkanCommandBuffer>(commandBuffer);
-  auto cmd = vulkanCmdBuffer->vulkanCommandBuffer();
-  if (cmd == VK_NULL_HANDLE) {
-    return;
+  // The acquired images can no longer be presented, so the swapchains must be rebuilt before
+  // their images and semaphores can be safely reused.
+  vkDeviceWaitIdle(gpu->device());
+  for (auto& present : presents) {
+    vkDestroySemaphore(gpu->device(), present.imageAvailableSemaphore, nullptr);
+    *present.outOfDate = true;
   }
+  presents.clear();
+}
 
-  // Capture the command pool before moving the session, since vulkanCommandPool() reads from it.
-  auto renderPool = vulkanCmdBuffer->vulkanCommandPool();
+void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
+  VkCommandBuffer cmd = VK_NULL_HANDLE;
+  VkCommandPool renderPool = VK_NULL_HANDLE;
+  FrameSession session = {};
+  if (commandBuffer) {
+    auto vulkanCmdBuffer = std::static_pointer_cast<VulkanCommandBuffer>(commandBuffer);
+    cmd = vulkanCmdBuffer->vulkanCommandBuffer();
+    // Capture the command pool before moving the session, since vulkanCommandPool() reads from it.
+    renderPool = vulkanCmdBuffer->vulkanCommandPool();
+    session = std::move(vulkanCmdBuffer->frameSession());
+  }
 
   // Move all pending state to local scope so that any early return leaves the queue clean.
-  auto session = std::move(vulkanCmdBuffer->frameSession());
   auto uploads = std::move(pendingUploads);
   auto signalSem = std::move(pendingSignalSemaphore);
   auto waitSem = std::move(pendingWaitSemaphore);
@@ -245,6 +257,15 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
   pendingSignalSemaphore = nullptr;
   pendingWaitSemaphore = nullptr;
   pendingPresents.clear();
+
+  if (cmd == VK_NULL_HANDLE) {
+    // Encoding failed after images were acquired. The frames can never be presented, so destroy
+    // their acquire semaphores and force the swapchains to rebuild instead of leaking the pending
+    // state into an unrelated later submission.
+    abandonSubmit(std::move(session), std::move(uploads));
+    abandonPresents(presents);
+    return;
+  }
 
   VkCommandBuffer uploadCmd = VK_NULL_HANDLE;
   if (!uploads.empty() && renderPool != VK_NULL_HANDLE) {
@@ -265,11 +286,7 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
       LOGE("VulkanCommandQueue::submit: failed to allocate upload command buffer (result=%d).",
            static_cast<int>(result));
       abandonSubmit(std::move(session), std::move(uploads));
-      vkDeviceWaitIdle(gpu->device());
-      for (auto& present : presents) {
-        vkDestroySemaphore(gpu->device(), present.imageAvailableSemaphore, nullptr);
-        *present.outOfDate = true;
-      }
+      abandonPresents(presents);
       return;
     }
   }
@@ -307,11 +324,7 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
     if (vkAllocateCommandBuffers(gpu->device(), &presentAllocInfo, &presentCmd) != VK_SUCCESS) {
       LOGE("VulkanCommandQueue::submit: failed to allocate present command buffer.");
       abandonSubmit(std::move(session), std::move(uploads));
-      vkDeviceWaitIdle(gpu->device());
-      for (auto& present : presents) {
-        vkDestroySemaphore(gpu->device(), present.imageAvailableSemaphore, nullptr);
-        *present.outOfDate = true;
-      }
+      abandonPresents(presents);
       return;
     }
     VkCommandBufferBeginInfo presentBeginInfo = {};
@@ -377,6 +390,9 @@ void VulkanCommandQueue::waitUntilCompleted() {
   if (gpu == nullptr) {
     return;
   }
+  // Frames that were acquired but never submitted can never be presented; release them instead of
+  // leaking the pending state into a later submission.
+  abandonPresents(pendingPresents);
   if (!pendingUploads.empty()) {
     VkCommandPool pool = VK_NULL_HANDLE;
     VkCommandPoolCreateInfo poolInfo = {};
