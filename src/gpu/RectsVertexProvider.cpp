@@ -295,11 +295,12 @@ class AAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
       const auto& stroke = strokes[i];
       const auto& record = rects[i];
       auto& viewMatrix = record->viewMatrix;
-      const auto scale = std::sqrt(viewMatrix.getScaleX() * viewMatrix.getScaleX() +
-                                   viewMatrix.getSkewY() * viewMatrix.getSkewY());
-      // we want the new edge to be 0.5px away from the old line.
-      const auto padding = 0.5f / scale;
-      auto strokeWidth = stroke->width > 0.0f ? stroke->width : 1.0f / scale;
+      const auto scales = viewMatrix.getAxisScales();
+      // we want the new edge to be 0.5px away from the old line, measured along each axis's own
+      // device scale.
+      const auto paddingX = 0.5f / scales.x;
+      const auto paddingY = 0.5f / scales.y;
+      auto strokeWidth = stroke->width > 0.0f ? stroke->width : 1.0f / std::max(scales.x, scales.y);
       const auto halfWidth = strokeWidth * 0.5f;
       auto& rect = record->rect;
       auto outSide = rect.makeOutset(halfWidth, halfWidth);
@@ -347,67 +348,74 @@ class AAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
       }
 
       // How much do we inset toward the inside of the strokes?
-      const float inset = std::min(padding, halfWidth);
+      const float insetX = std::min(paddingX, halfWidth);
+      const float insetY = std::min(paddingY, halfWidth);
       auto innerCoverage = 1.0f;
-      if (inset < padding) {
-        // Stroke is subpixel, so reduce the coverage to simulate the narrower strokes.
-        innerCoverage = 2.0f * inset / (inset + padding);
+      if (insetX < paddingX || insetY < paddingY) {
+        // Stroke is subpixel on at least one axis, so reduce the coverage to simulate the
+        // narrower strokes. The coverage is a single scalar shared by all four edges, so take
+        // the smaller per-axis value; uniform matrices reproduce the original formula.
+        auto coverageX = insetX < paddingX ? 2.0f * insetX / (insetX + paddingX) : 1.0f;
+        auto coverageY = insetY < paddingY ? 2.0f * insetY / (insetY + paddingY) : 1.0f;
+        innerCoverage = std::min(coverageX, coverageY);
       }
 
       // How much do we outset away from the outside of the strokes?
       // We always want to keep the AA picture frame one pixel wide.
-      const auto outset = 2.0f * padding - inset;
+      const auto outsetX = 2.0f * paddingX - insetX;
+      const auto outsetY = 2.0f * paddingY - insetY;
       constexpr float outerCoverage = 0.0f;
 
       // How much do we outset away from the interior side of the stroke (toward the center)?
-      const auto interiorOutset = outset;
+      const auto interiorOutsetX = outsetX;
+      const auto interiorOutsetY = outsetY;
       const auto interiorCoverage = outerCoverage;
 
       // Exterior outset rect (away from stroke).
-      const auto outOutsetQuad = Quad::MakeFrom(outSide.makeOutset(outset, outset), &viewMatrix);
+      const auto outOutsetQuad = Quad::MakeFrom(outSide.makeOutset(outsetX, outsetY), &viewMatrix);
       if (hasUVCoord) {
-        uvQuad = Quad::MakeFrom(outUV.makeOutset(outset, outset));
+        uvQuad = Quad::MakeFrom(outUV.makeOutset(outsetX, outsetY));
       }
       writeQuad(vertices, index, outOutsetQuad, uvQuad, uintColor, outerCoverage);
       if (isBevelJoin) {
         const auto assistOutsetQuad =
-            Quad::MakeFrom(outSideAssist.makeOutset(outset, outset), &viewMatrix);
+            Quad::MakeFrom(outSideAssist.makeOutset(outsetX, outsetY), &viewMatrix);
         if (hasUVCoord) {
-          uvQuad = Quad::MakeFrom(assistUV.makeOutset(outset, outset));
+          uvQuad = Quad::MakeFrom(assistUV.makeOutset(outsetX, outsetY));
         }
         writeQuad(vertices, index, assistOutsetQuad, uvQuad, uintColor, outerCoverage);
       }
-      const auto outInsetQuad = Quad::MakeFrom(outSide.makeInset(inset, inset), &viewMatrix);
+      const auto outInsetQuad = Quad::MakeFrom(outSide.makeInset(insetX, insetY), &viewMatrix);
       if (hasUVCoord) {
-        uvQuad = Quad::MakeFrom(outUV.makeInset(inset, inset));
+        uvQuad = Quad::MakeFrom(outUV.makeInset(insetX, insetY));
       }
       writeQuad(vertices, index, outInsetQuad, uvQuad, uintColor, innerCoverage);
       if (isBevelJoin) {
         const auto assistInsetQuad =
-            Quad::MakeFrom(outSideAssist.makeInset(inset, inset), &viewMatrix);
+            Quad::MakeFrom(outSideAssist.makeInset(insetX, insetY), &viewMatrix);
         if (hasUVCoord) {
-          uvQuad = Quad::MakeFrom(assistUV.makeInset(inset, inset));
+          uvQuad = Quad::MakeFrom(assistUV.makeInset(insetX, insetY));
         }
         writeQuad(vertices, index, assistInsetQuad, uvQuad, uintColor, innerCoverage);
       }
       if (!isDegenerate) {
         // Interior inset rect (toward stroke).
-        const auto innerInsetQuad = Quad::MakeFrom(inSide.makeOutset(inset, inset), &viewMatrix);
+        const auto innerInsetQuad = Quad::MakeFrom(inSide.makeOutset(insetX, insetY), &viewMatrix);
         if (hasUVCoord) {
-          uvQuad = Quad::MakeFrom(inUV.makeOutset(inset, inset));
+          uvQuad = Quad::MakeFrom(inUV.makeOutset(insetX, insetY));
         }
         writeQuad(vertices, index, innerInsetQuad, uvQuad, uintColor, innerCoverage);
         // Interior outset rect (away from stroke, toward center of rect).
-        Rect interiorAABoundary = inSide.makeInset(interiorOutset, interiorOutset);
+        Rect interiorAABoundary = inSide.makeInset(interiorOutsetX, interiorOutsetY);
         float coverageBackset = 0.0f;  // Adds back coverage when the interior AA edges cross.
         if (interiorAABoundary.left > interiorAABoundary.right) {
           coverageBackset =
-              (interiorAABoundary.left - interiorAABoundary.right) / (interiorOutset * 2.0f);
+              (interiorAABoundary.left - interiorAABoundary.right) / (interiorOutsetX * 2.0f);
           interiorAABoundary.left = interiorAABoundary.right = interiorAABoundary.centerX();
         }
         if (interiorAABoundary.top > interiorAABoundary.bottom) {
           coverageBackset = std::max(
-              (interiorAABoundary.top - interiorAABoundary.bottom) / (interiorOutset * 2.0f),
+              (interiorAABoundary.top - interiorAABoundary.bottom) / (interiorOutsetY * 2.0f),
               coverageBackset);
           interiorAABoundary.top = interiorAABoundary.bottom = interiorAABoundary.centerY();
         }
@@ -420,7 +428,7 @@ class AAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
         }
         const auto innerAAQuad = Quad::MakeFrom(interiorAABoundary, &viewMatrix);
         if (hasUVCoord) {
-          auto uvBoundary = inUV.makeInset(interiorOutset, interiorOutset);
+          auto uvBoundary = inUV.makeInset(interiorOutsetX, interiorOutsetY);
           if (uvBoundary.isEmpty()) {
             uvBoundary.left = uvBoundary.right = inUV.centerX();
             uvBoundary.top = uvBoundary.bottom = inUV.centerY();
@@ -503,9 +511,8 @@ class NonAAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
       // we want the new edge to be 0.5px away from the old line.
       auto strokeWidth = stroke->width;
       if (strokeWidth < 0.0f) {
-        const auto scale = std::sqrt(viewMatrix.getScaleX() * viewMatrix.getScaleX() +
-                                     viewMatrix.getSkewY() * viewMatrix.getSkewY());
-        strokeWidth = 1.0f / scale;
+        const auto scales = viewMatrix.getAxisScales();
+        strokeWidth = 1.0f / std::max(scales.x, scales.y);
       }
       const auto halfWidth = strokeWidth * 0.5f;
       auto rect = record->rect;
