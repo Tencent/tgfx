@@ -36,7 +36,7 @@ TGFXBaseView::TGFXBaseView(const std::string& canvasID) : canvasID(canvasID) {
   displayList.setMaxTileCount(512);
 }
 
-TGFXBaseView::TGFXBaseView(emscripten::val canvas) : canvas(std::move(canvas)) {
+TGFXBaseView::TGFXBaseView(emscripten::val canvas) : canvasVal(std::move(canvas)) {
   appHost = std::make_shared<hello2d::AppHost>();
   displayList.setRenderMode(tgfx::RenderMode::Tiled);
   displayList.setTileUpdateMode(tgfx::TileUpdateMode::Smooth);
@@ -45,20 +45,22 @@ TGFXBaseView::TGFXBaseView(emscripten::val canvas) : canvas(std::move(canvas)) {
 
 std::shared_ptr<tgfx::Window> TGFXBaseView::createWindow() {
 #ifdef TGFX_USE_WEBGPU
-  std::shared_ptr<tgfx::WebGPUDevice> webgpuDevice = nullptr;
-  if (webgpuDeviceVal.as<bool>()) {
+  // Importing a GPUDevice registers it, and its command queue, with the WebGPU runtime, and that
+  // registration is never released. draw() calls this method again on every frame while the window
+  // cannot be built, so the import is done once and then reused.
+  if (webgpuDevice == nullptr && webgpuDeviceVal.as<bool>()) {
     webgpuDevice = tgfx::WebGPUDevice::MakeFrom(webgpuDeviceVal);
   }
-  if (canvas.as<bool>()) {
-    return tgfx::WebGPUWindow::MakeFrom(canvas, webgpuDevice);
+  if (canvasVal.as<bool>()) {
+    return tgfx::WebGPUWindow::MakeFrom(canvasVal, webgpuDevice);
   }
   if (canvasID.empty()) {
     return nullptr;
   }
   return tgfx::WebGPUWindow::MakeFrom(canvasID, webgpuDevice);
 #else
-  if (canvas.as<bool>()) {
-    return tgfx::WebGLWindow::MakeFrom(canvas);
+  if (canvasVal.as<bool>()) {
+    return tgfx::WebGLWindow::MakeFrom(canvasVal);
   }
   if (canvasID.empty()) {
     return nullptr;
@@ -100,6 +102,8 @@ void TGFXBaseView::setLayoutDensity(float density) {
 #ifdef TGFX_USE_WEBGPU
 void TGFXBaseView::setWebGPUDevice(emscripten::val device) {
   webgpuDeviceVal = std::move(device);
+  // Drop the imported form so the new device is the one that gets imported.
+  webgpuDevice = nullptr;
 }
 #endif
 
@@ -168,18 +172,25 @@ void TGFXBaseView::draw() {
     return;
   }
 
-  auto canvas = surface->getCanvas();
-  canvas->clear();
+  auto surfaceCanvas = surface->getCanvas();
+  surfaceCanvas->clear();
   auto density = layoutDensity;
-  if (density <= 0.0f && !canvasID.empty()) {
-    // No density was pushed in, so read the layout size from the DOM. This is the single-threaded
-    // path; it cannot work on a worker because there is no document there.
-    auto cssWidth = static_cast<double>(surface->width());
-    auto cssHeight = static_cast<double>(surface->height());
-    emscripten_get_element_css_size(canvasID.c_str(), &cssWidth, &cssHeight);
-    density = static_cast<float>(surface->width()) / static_cast<float>(cssWidth);
+  if (density <= 0.0f) {
+    if (!canvasID.empty()) {
+      // No density was pushed in, so read the layout size from the DOM. This is the single-threaded
+      // path; it cannot work on a worker because there is no document there.
+      auto cssWidth = static_cast<double>(surface->width());
+      auto cssHeight = static_cast<double>(surface->height());
+      emscripten_get_element_css_size(canvasID.c_str(), &cssWidth, &cssHeight);
+      density = static_cast<float>(surface->width()) / static_cast<float>(cssWidth);
+    } else {
+      // Canvas object path: there is no page to read the ratio from. Assume the backing store matches
+      // the layout size instead of leaving the ratio at zero, which would silently halve the
+      // background grid at a device pixel ratio of two.
+      density = 1.0f;
+    }
   }
-  DrawBackground(canvas, surface->width(), surface->height(), density);
+  DrawBackground(surfaceCanvas, surface->width(), surface->height(), density);
 
   displayList.render(surface.get(), false);
 

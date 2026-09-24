@@ -54,6 +54,11 @@ class WebGPUWindow : public Window {
    * has to be done to present the result: if the canvas is shown on the page, the browser displays
    * what is rendered into it.
    *
+   * On Web, the final executable must export the WebGPU runtime method (see the Web build section
+   * in README.md). The selector overload above only needs it for color space configuration and
+   * video texture uploads, so it still works without it; this overload cannot create the surface at
+   * all and returns nullptr instead.
+   *
    * @param canvas An HTMLCanvasElement or an OffscreenCanvas. Returns nullptr if it is null or the
    *     window cannot be created.
    * @param device An optional WebGPUDevice. Required on a thread that cannot obtain the default

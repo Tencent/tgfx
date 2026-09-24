@@ -257,9 +257,11 @@ npm run server:webgpu
 When integrating tgfx into your own Web build, the emscripten link options must export the runtime
 methods tgfx depends on. The library itself does not propagate these link options:
 
-- `GL`: required for the WebGL backend (color space configuration, image/video texture uploads).
+- `GL`: required for the WebGL backend (making a context from a canvas object, color space
+  configuration, image/video texture uploads).
 - `HEAPU8`: required for reading wasm memory (image decode and canvas pixel readback).
-- `WebGPU`: required for the WebGPU color space configuration and video frame uploads.
+- `WebGPU`: required for the WebGPU backend (making a surface from a canvas object, color space
+  configuration, video frame uploads).
 
 Configure them on your final executable target with CMake:
 

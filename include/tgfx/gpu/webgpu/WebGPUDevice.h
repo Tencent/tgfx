@@ -54,6 +54,9 @@ class WebGPUDevice : public Device {
    * has to stay alive for as long as the returned WebGPUDevice does. tgfx will NOT release it on
    * shutdown.
    *
+   * On Web, the final executable must export the WebGPU runtime method (see the Web build section
+   * in README.md); this method returns nullptr without it.
+   *
    * @param device A GPUDevice. Returns nullptr if it is null or exposes no command queue.
    */
   static std::shared_ptr<WebGPUDevice> MakeFrom(emscripten::val device);

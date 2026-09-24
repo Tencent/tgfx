@@ -41,9 +41,6 @@ std::shared_ptr<tgfx::Data> GetDataFromEmscripten(const val& emscriptenData) {
 TGFXThreadsView::TGFXThreadsView(const std::string& canvasID) : TGFXBaseView(canvasID) {
 }
 
-TGFXThreadsView::TGFXThreadsView(emscripten::val canvas) : TGFXBaseView(std::move(canvas)) {
-}
-
 void TGFXThreadsView::registerFonts(const val& fontVal, const val& emojiFontVal) {
   auto fontData = GetDataFromEmscripten(fontVal);
   if (fontData) {

@@ -43,6 +43,11 @@ class WebGLWindow : public Window {
    * done to present the result: if the canvas is shown on the page, the browser displays what is
    * rendered into it.
    *
+   * On Web, the final executable must export the GL runtime method (see the Web build section in
+   * README.md). The id overload above only needs it for color space configuration and image/video
+   * texture uploads, so it still works without it; this overload cannot create the context at all
+   * and returns nullptr instead.
+   *
    * @param canvas An HTMLCanvasElement or an OffscreenCanvas. Returns nullptr if it is null or the
    *     window cannot be created.
    * @param colorSpace An optional color space for rendering. If nullptr, the default sRGB is used.

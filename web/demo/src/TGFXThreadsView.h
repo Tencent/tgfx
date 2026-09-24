@@ -27,12 +27,6 @@ class TGFXThreadsView : public TGFXBaseView {
  public:
   TGFXThreadsView(const std::string& canvasID);
 
-  /**
-   * Creates the view from a canvas object instead of an id, for threads without a DOM.
-   * See TGFXBaseView(emscripten::val).
-   */
-  TGFXThreadsView(emscripten::val canvas);
-
   void registerFonts(const val& fontVal, const val& emojiFontVal);
 };
 

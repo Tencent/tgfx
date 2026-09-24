@@ -54,8 +54,11 @@ class TGFXBaseView {
   /**
    * Sets the ratio between the canvas backing store and its layout size. Needed when the view runs
    * where that ratio cannot be read from the page, such as a worker rendering into an
-   * OffscreenCanvas. Until it is called the ratio is taken from the page, so the single-threaded
-   * demos do not have to call it.
+   * OffscreenCanvas.
+   *
+   * A view created from a canvas object cannot read the ratio from the page at all, so until this is
+   * called it falls back to 1. A view created from a canvas id reads it from the page instead, which
+   * is why the single-threaded demos do not have to call this.
    *
    * @param density Backing store size divided by layout size, normally window.devicePixelRatio.
    */
@@ -105,8 +108,9 @@ class TGFXBaseView {
   std::shared_ptr<tgfx::Window> createWindow();
 
   std::string canvasID = "";
-  // Set only when the view was created from a canvas object, in which case canvasID is unused.
-  emscripten::val canvas;
+  // Set only when the view was created from a canvas object, in which case canvasID is unused. Named
+  // canvasVal so that it cannot be confused with the tgfx::Canvas that draw() works on.
+  emscripten::val canvasVal;
   std::shared_ptr<tgfx::Window> window = nullptr;
   std::shared_ptr<tgfx::Surface> surface = nullptr;
   tgfx::DisplayList displayList = {};
@@ -121,6 +125,9 @@ class TGFXBaseView {
 #ifdef TGFX_USE_WEBGPU
   // Set only when a device was pushed in, in which case it is used instead of the default device.
   emscripten::val webgpuDeviceVal;
+  // The imported form of webgpuDeviceVal. Kept so that the import, which registers the device and
+  // its queue with the runtime for good, only happens once. See createWindow().
+  std::shared_ptr<tgfx::WebGPUDevice> webgpuDevice = nullptr;
 #endif
 
   // Async readback state

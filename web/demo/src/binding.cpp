@@ -61,11 +61,5 @@ EMSCRIPTEN_BINDINGS(TGFXDemo) {
                         }
                         return std::make_shared<TGFXThreadsView>(canvasID);
                       }))
-      .class_function("MakeFromCanvas", optional_override([](const val& canvas) {
-                        if (!canvas.as<bool>()) {
-                          return std::shared_ptr<TGFXThreadsView>(nullptr);
-                        }
-                        return std::make_shared<TGFXThreadsView>(canvas);
-                      }))
       .function("registerFonts", &TGFXThreadsView::registerFonts);
 }
