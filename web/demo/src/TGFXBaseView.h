@@ -37,9 +37,40 @@ class TGFXBaseView {
  public:
   TGFXBaseView(const std::string& canvasID);
 
+  /**
+   * Creates a view that renders into an existing canvas object rather than a canvas looked up by id.
+   *
+   * Use this when the view is created on a thread without a DOM, such as a worker that received an
+   * OffscreenCanvas. The canvas has to stay alive for as long as the view does.
+   *
+   * @param canvas An HTMLCanvasElement or an OffscreenCanvas. Must not be null.
+   */
+  TGFXBaseView(emscripten::val canvas);
+
   void setImagePath(const std::string& name, tgfx::NativeImageRef nativeImage);
 
   void updateSize();
+
+  /**
+   * Sets the ratio between the canvas backing store and its layout size. Needed when the view runs
+   * where that ratio cannot be read from the page, such as a worker rendering into an
+   * OffscreenCanvas. Until it is called the ratio falls back to 1 for a canvas object, and to the
+   * page for a canvas id.
+   *
+   * @param density Backing store size divided by layout size, normally window.devicePixelRatio.
+   */
+  void setLayoutDensity(float density);
+
+#ifdef TGFX_USE_WEBGPU
+  /**
+   * Supplies the GPUDevice the view renders with. Required when the view is created on a thread that
+   * cannot obtain the default device, such as a worker. Must be called before the first updateSize()
+   * or draw(); the device has to stay alive for as long as the view does.
+   *
+   * @param device A GPUDevice obtained from navigator.gpu, or null to use the default device.
+   */
+  void setWebGPUDevice(emscripten::val device);
+#endif
 
   void updateLayerTree(int drawIndex);
 
@@ -69,7 +100,14 @@ class TGFXBaseView {
  private:
   void applyCenteringTransform();
 
+  // Shared by the constructor paths: builds the platform window from whichever of the canvas object
+  // and the canvas id this view was created with.
+  std::shared_ptr<tgfx::Window> createWindow();
+
   std::string canvasID = "";
+  // Set only when the view was created from a canvas object, in which case canvasID is unused. Named
+  // canvasVal so that it cannot be confused with the tgfx::Canvas that draw() works on.
+  emscripten::val canvasVal;
   std::shared_ptr<tgfx::Window> window = nullptr;
   std::shared_ptr<tgfx::Surface> surface = nullptr;
   tgfx::DisplayList displayList = {};
@@ -79,6 +117,15 @@ class TGFXBaseView {
   int lastSurfaceWidth = 0;
   int lastSurfaceHeight = 0;
   bool presentImmediately = true;
+  // Zero means "not pushed in yet", in which case draw() falls back to querying the DOM.
+  float layoutDensity = 0.0f;
+#ifdef TGFX_USE_WEBGPU
+  // Set only when a device was pushed in, in which case it is used instead of the default device.
+  emscripten::val webgpuDeviceVal;
+  // The imported form of webgpuDeviceVal. Kept so that the import, which registers the device and
+  // its queue with the runtime for good, only happens once. See createWindow().
+  std::shared_ptr<tgfx::WebGPUDevice> webgpuDevice = nullptr;
+#endif
 
   // Async readback state
   std::shared_ptr<tgfx::SurfaceReadback> pendingReadback = nullptr;

@@ -46,6 +46,28 @@ class WebGPUWindow : public Window {
                                                 std::shared_ptr<WebGPUDevice> device = nullptr,
                                                 std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
+  /**
+   * Creates a new window from an existing canvas, which may be an OffscreenCanvas.
+   *
+   * Can be created from any thread that holds the canvas, including a worker thread; the window
+   * then belongs to that thread and the canvas has to stay alive for as long as it does. Nothing
+   * has to be done to present the result: if the canvas is shown on the page, the browser displays
+   * what is rendered into it.
+   *
+   * On Web, the final executable must export the WebGPU runtime method (see the Web build section
+   * in README.md); without it the surface cannot be created.
+   *
+   * @param canvas An HTMLCanvasElement or an OffscreenCanvas. Returns nullptr if it is null or the
+   *     window cannot be created.
+   * @param device An optional WebGPUDevice. Required on a thread that cannot obtain the default
+   *     device, such as a worker thread. If nullptr, a default device is created automatically.
+   * @param colorSpace An optional target color space for the drawing buffer. If nullptr, the
+   *     default sRGB color space is used.
+   */
+  static std::shared_ptr<WebGPUWindow> MakeFrom(emscripten::val canvas,
+                                                std::shared_ptr<WebGPUDevice> device = nullptr,
+                                                std::shared_ptr<ColorSpace> colorSpace = nullptr);
+
   ~WebGPUWindow() override;
 
  protected:
@@ -56,6 +78,13 @@ class WebGPUWindow : public Window {
   WebGPUWindow(std::shared_ptr<Device> device, void* surface, int width, int height,
                const std::string& canvasSelector, std::shared_ptr<ColorSpace> colorSpace);
 
+  // Shared tail of both MakeFrom() overloads. The canvas is null on the selector path, in which
+  // case the surface and the drawing buffer size come from the page instead.
+  static std::shared_ptr<WebGPUWindow> MakeFromCanvas(emscripten::val canvas,
+                                                      const std::string& canvasSelector,
+                                                      std::shared_ptr<WebGPUDevice> device,
+                                                      std::shared_ptr<ColorSpace> colorSpace);
+
   // Configures the canvas's WebGPU context to use the target color space. Must be called after
   // each wgpuSurfaceConfigure() call, since the emscripten surface configuration does not carry
   // the color space information.
@@ -63,6 +92,9 @@ class WebGPUWindow : public Window {
                            WGPUCompositeAlphaMode alphaMode);
 
   std::string _canvasSelector;
+  // Set only by the canvas object overload, in which case the drawing buffer size and the WebGPU
+  // context both come from this canvas rather than from the page.
+  emscripten::val _canvas;
   void* _surface = nullptr;
   int _width = 0;
   int _height = 0;

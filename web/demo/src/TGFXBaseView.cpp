@@ -36,13 +36,42 @@ TGFXBaseView::TGFXBaseView(const std::string& canvasID) : canvasID(canvasID) {
   displayList.setMaxTileCount(512);
 }
 
+TGFXBaseView::TGFXBaseView(emscripten::val canvas) : canvasVal(std::move(canvas)) {
+  appHost = std::make_shared<hello2d::AppHost>();
+  displayList.setRenderMode(tgfx::RenderMode::Tiled);
+  displayList.setTileUpdateMode(tgfx::TileUpdateMode::Smooth);
+  displayList.setMaxTileCount(512);
+}
+
+std::shared_ptr<tgfx::Window> TGFXBaseView::createWindow() {
+#ifdef TGFX_USE_WEBGPU
+  // Importing a GPUDevice registers it, and its command queue, with the WebGPU runtime, and that
+  // registration is never released. draw() calls this method again on every frame while the window
+  // cannot be built, so the import is done once and then reused.
+  if (webgpuDevice == nullptr && webgpuDeviceVal.as<bool>()) {
+    webgpuDevice = tgfx::WebGPUDevice::MakeFrom(webgpuDeviceVal);
+  }
+  if (canvasVal.as<bool>()) {
+    return tgfx::WebGPUWindow::MakeFrom(canvasVal, webgpuDevice);
+  }
+  if (canvasID.empty()) {
+    return nullptr;
+  }
+  return tgfx::WebGPUWindow::MakeFrom(canvasID, webgpuDevice);
+#else
+  if (canvasVal.as<bool>()) {
+    return tgfx::WebGLWindow::MakeFrom(canvasVal);
+  }
+  if (canvasID.empty()) {
+    return nullptr;
+  }
+  return tgfx::WebGLWindow::MakeFrom(canvasID);
+#endif
+}
+
 void TGFXBaseView::updateSize() {
   if (window == nullptr) {
-#ifdef TGFX_USE_WEBGPU
-    window = tgfx::WebGPUWindow::MakeFrom(canvasID);
-#else
-    window = tgfx::WebGLWindow::MakeFrom(canvasID);
-#endif
+    window = createWindow();
   }
   if (window == nullptr) {
     return;
@@ -65,6 +94,18 @@ void TGFXBaseView::updateSize() {
   }
   device->unlock();
 }
+
+void TGFXBaseView::setLayoutDensity(float density) {
+  layoutDensity = density;
+}
+
+#ifdef TGFX_USE_WEBGPU
+void TGFXBaseView::setWebGPUDevice(emscripten::val device) {
+  webgpuDeviceVal = std::move(device);
+  // Drop the imported form so the new device is the one that gets imported.
+  webgpuDevice = nullptr;
+}
+#endif
 
 void TGFXBaseView::setImagePath(const std::string& name, tgfx::NativeImageRef nativeImage) {
   auto image = tgfx::Image::MakeFrom(nativeImage);
@@ -104,11 +145,7 @@ void TGFXBaseView::updateLayerTree(int drawIndex) {
 
 void TGFXBaseView::draw() {
   if (window == nullptr) {
-#ifdef TGFX_USE_WEBGPU
-    window = tgfx::WebGPUWindow::MakeFrom(canvasID);
-#else
-    window = tgfx::WebGLWindow::MakeFrom(canvasID);
-#endif
+    window = createWindow();
   }
   if (window == nullptr) {
     return;
@@ -135,13 +172,25 @@ void TGFXBaseView::draw() {
     return;
   }
 
-  auto canvas = surface->getCanvas();
-  canvas->clear();
-  auto cssWidth = static_cast<double>(surface->width());
-  auto cssHeight = static_cast<double>(surface->height());
-  emscripten_get_element_css_size(canvasID.c_str(), &cssWidth, &cssHeight);
-  auto density = static_cast<float>(surface->width()) / static_cast<float>(cssWidth);
-  DrawBackground(canvas, surface->width(), surface->height(), density);
+  auto surfaceCanvas = surface->getCanvas();
+  surfaceCanvas->clear();
+  auto density = layoutDensity;
+  if (density <= 0.0f) {
+    if (!canvasID.empty()) {
+      // No density was pushed in, so read the layout size from the DOM. This is the single-threaded
+      // path; it cannot work on a worker because there is no document there.
+      auto cssWidth = static_cast<double>(surface->width());
+      auto cssHeight = static_cast<double>(surface->height());
+      emscripten_get_element_css_size(canvasID.c_str(), &cssWidth, &cssHeight);
+      density = static_cast<float>(surface->width()) / static_cast<float>(cssWidth);
+    } else {
+      // Canvas object path: there is no page to read the ratio from. Assume the backing store matches
+      // the layout size instead of leaving the ratio at zero, which would silently halve the
+      // background grid at a device pixel ratio of two.
+      density = 1.0f;
+    }
+  }
+  DrawBackground(surfaceCanvas, surface->width(), surface->height(), density);
 
   displayList.render(surface.get(), false);
 

@@ -69,6 +69,23 @@ std::shared_ptr<WebGPUWindow> WebGPUWindow::MakeFrom(const std::string& canvasSe
   if (canvasSelector.empty()) {
     return nullptr;
   }
+  return MakeFromCanvas(emscripten::val::null(), canvasSelector, std::move(device),
+                        std::move(colorSpace));
+}
+
+std::shared_ptr<WebGPUWindow> WebGPUWindow::MakeFrom(emscripten::val canvas,
+                                                     std::shared_ptr<WebGPUDevice> device,
+                                                     std::shared_ptr<ColorSpace> colorSpace) {
+  if (!canvas.as<bool>()) {
+    return nullptr;
+  }
+  return MakeFromCanvas(std::move(canvas), "", std::move(device), std::move(colorSpace));
+}
+
+std::shared_ptr<WebGPUWindow> WebGPUWindow::MakeFromCanvas(emscripten::val canvas,
+                                                           const std::string& canvasSelector,
+                                                           std::shared_ptr<WebGPUDevice> device,
+                                                           std::shared_ptr<ColorSpace> colorSpace) {
   if (device == nullptr) {
     device = WebGPUDevice::Make();
   }
@@ -78,17 +95,25 @@ std::shared_ptr<WebGPUWindow> WebGPUWindow::MakeFrom(const std::string& canvasSe
 
   WGPUSurface surface = nullptr;
 #ifdef __EMSCRIPTEN__
-  WGPUSurfaceDescriptorFromCanvasHTMLSelector canvasDesc = {};
-  canvasDesc.chain.sType = WGPUSType_SurfaceDescriptorFromCanvasHTMLSelector;
-  canvasDesc.selector = canvasSelector.c_str();
+  if (canvas.as<bool>()) {
+    // Canvas object path: build the surface from the canvas itself. The Emscripten surface lookup in
+    // the other branch only resolves a selector through the DOM, which a worker has no access to.
+    auto handle = emscripten::val::module_property("tgfx").call<int>(
+        "createWebGPUSurface", emscripten::val::module_property("WebGPU"), canvas);
+    surface = reinterpret_cast<WGPUSurface>(static_cast<uintptr_t>(handle));
+  } else {
+    WGPUSurfaceDescriptorFromCanvasHTMLSelector canvasDesc = {};
+    canvasDesc.chain.sType = WGPUSType_SurfaceDescriptorFromCanvasHTMLSelector;
+    canvasDesc.selector = canvasSelector.c_str();
 
-  WGPUSurfaceDescriptor surfaceDesc = {};
-  surfaceDesc.nextInChain = reinterpret_cast<const WGPUChainedStruct*>(&canvasDesc);
+    WGPUSurfaceDescriptor surfaceDesc = {};
+    surfaceDesc.nextInChain = reinterpret_cast<const WGPUChainedStruct*>(&canvasDesc);
 
-  auto wgpuInstance = wgpuCreateInstance(nullptr);
-  surface = wgpuInstanceCreateSurface(wgpuInstance, &surfaceDesc);
-  if (wgpuInstance != nullptr) {
-    wgpuInstanceRelease(wgpuInstance);
+    auto wgpuInstance = wgpuCreateInstance(nullptr);
+    surface = wgpuInstanceCreateSurface(wgpuInstance, &surfaceDesc);
+    if (wgpuInstance != nullptr) {
+      wgpuInstanceRelease(wgpuInstance);
+    }
   }
 #endif
 
@@ -102,7 +127,12 @@ std::shared_ptr<WebGPUWindow> WebGPUWindow::MakeFrom(const std::string& canvasSe
   int canvasWidth = 0;
   int canvasHeight = 0;
 #ifdef __EMSCRIPTEN__
-  emscripten_get_canvas_element_size(canvasSelector.c_str(), &canvasWidth, &canvasHeight);
+  if (canvas.as<bool>()) {
+    canvasWidth = canvas["width"].as<int>();
+    canvasHeight = canvas["height"].as<int>();
+  } else {
+    emscripten_get_canvas_element_size(canvasSelector.c_str(), &canvasWidth, &canvasHeight);
+  }
 #endif
   if (canvasWidth <= 0 || canvasHeight <= 0) {
     wgpuSurfaceRelease(surface);
@@ -127,6 +157,7 @@ std::shared_ptr<WebGPUWindow> WebGPUWindow::MakeFrom(const std::string& canvasSe
   auto window = std::shared_ptr<WebGPUWindow>(
       new WebGPUWindow(std::move(device), surface, canvasWidth, canvasHeight, canvasSelector,
                        std::move(colorSpace)));
+  window->_canvas = std::move(canvas);
   window->configureColorSpace(config.format, config.usage, config.alphaMode);
   return window;
 }
@@ -155,11 +186,13 @@ void WebGPUWindow::configureColorSpace(WGPUTextureFormat format, WGPUTextureUsag
   // along so that this WGPUSurfaceConfiguration stays the single source of truth for the canvas.
   auto wgpuDevice =
       static_cast<WGPUDevice>(static_cast<WebGPUDevice*>(getDevice().get())->webgpuDevice());
+  // Hand over the canvas object when the window was created from one: there is no selector to look
+  // up on a thread that has no document.
+  auto canvas = _canvas.as<bool>() ? _canvas : emscripten::val(_canvasSelector);
   bool supported = emscripten::val::module_property("tgfx").call<bool>(
-      "configureWebGPUColorSpace", emscripten::val(_canvasSelector),
-      static_cast<int>(namedColorSpace), reinterpret_cast<uintptr_t>(wgpuDevice),
-      emscripten::val(ToWebGPUFormatString(format)), static_cast<unsigned>(usage),
-      emscripten::val(ToAlphaModeString(alphaMode)));
+      "configureWebGPUColorSpace", canvas, static_cast<int>(namedColorSpace),
+      reinterpret_cast<uintptr_t>(wgpuDevice), emscripten::val(ToWebGPUFormatString(format)),
+      static_cast<unsigned>(usage), emscripten::val(ToAlphaModeString(alphaMode)));
   if (!supported) {
     LOGE(
         "WebGPUWindow::configureColorSpace() The specified ColorSpace is not supported on this "
@@ -183,7 +216,12 @@ std::shared_ptr<RenderTargetProxy> WebGPUWindow::onCreateRenderTarget(Context* c
 #ifdef __EMSCRIPTEN__
   int canvasWidth = 0;
   int canvasHeight = 0;
-  emscripten_get_canvas_element_size(_canvasSelector.c_str(), &canvasWidth, &canvasHeight);
+  if (_canvas.as<bool>()) {
+    canvasWidth = _canvas["width"].as<int>();
+    canvasHeight = _canvas["height"].as<int>();
+  } else {
+    emscripten_get_canvas_element_size(_canvasSelector.c_str(), &canvasWidth, &canvasHeight);
+  }
   if (canvasWidth > 0 && canvasHeight > 0) {
     _width = canvasWidth;
     _height = canvasHeight;

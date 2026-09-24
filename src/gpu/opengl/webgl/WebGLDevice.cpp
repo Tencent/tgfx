@@ -24,6 +24,41 @@
 
 namespace tgfx {
 
+static void InitContextAttributes(EmscriptenWebGLContextAttributes* attrs) {
+  emscripten_webgl_init_context_attributes(attrs);
+  attrs->depth = EM_FALSE;
+  attrs->stencil = EM_FALSE;
+  attrs->antialias = EM_FALSE;
+  attrs->powerPreference = EM_WEBGL_POWER_PREFERENCE_HIGH_PERFORMANCE;
+  attrs->enableExtensionsByDefault = EM_TRUE;
+  attrs->majorVersion = 2;
+  attrs->minorVersion = 0;
+}
+
+// Mirrors the attribute object that emscripten_webgl_create_context() builds internally before
+// handing it to GL.createContext(). The property names are the same as the struct field names;
+// only the power preference has to be turned into its string form.
+static emscripten::val ToContextAttributes(const EmscriptenWebGLContextAttributes& attrs) {
+  static const char* POWER_PREFERENCES[] = {"default", "low-power", "high-performance"};
+  auto powerPreference = static_cast<size_t>(attrs.powerPreference);
+  auto result = emscripten::val::object();
+  result.set("alpha", attrs.alpha);
+  result.set("depth", attrs.depth);
+  result.set("stencil", attrs.stencil);
+  result.set("antialias", attrs.antialias);
+  result.set("premultipliedAlpha", attrs.premultipliedAlpha);
+  result.set("preserveDrawingBuffer", attrs.preserveDrawingBuffer);
+  result.set("powerPreference", POWER_PREFERENCES[powerPreference < 3 ? powerPreference : 0]);
+  result.set("failIfMajorPerformanceCaveat", attrs.failIfMajorPerformanceCaveat);
+  result.set("majorVersion", attrs.majorVersion);
+  result.set("minorVersion", attrs.minorVersion);
+  result.set("enableExtensionsByDefault", attrs.enableExtensionsByDefault);
+  result.set("explicitSwapControl", attrs.explicitSwapControl);
+  result.set("proxyContextToMainThread", static_cast<int>(attrs.proxyContextToMainThread));
+  result.set("renderViaOffscreenBackBuffer", attrs.renderViaOffscreenBackBuffer);
+  return result;
+}
+
 void* GLDevice::CurrentNativeHandle() {
   return reinterpret_cast<void*>(emscripten_webgl_get_current_context());
 }
@@ -43,22 +78,38 @@ std::shared_ptr<GLDevice> GLDevice::Make(void*) {
 
 std::shared_ptr<WebGLDevice> WebGLDevice::MakeFrom(const std::string& canvasID,
                                                    std::shared_ptr<ColorSpace> colorSpace) {
-  auto oldContext = emscripten_webgl_get_current_context();
-
   EmscriptenWebGLContextAttributes attrs;
-  emscripten_webgl_init_context_attributes(&attrs);
-  attrs.depth = EM_FALSE;
-  attrs.stencil = EM_FALSE;
-  attrs.antialias = EM_FALSE;
-  attrs.powerPreference = EM_WEBGL_POWER_PREFERENCE_HIGH_PERFORMANCE;
-  attrs.enableExtensionsByDefault = EM_TRUE;
-  attrs.majorVersion = 2;
-  attrs.minorVersion = 0;
+  InitContextAttributes(&attrs);
   auto context = emscripten_webgl_create_context(canvasID.c_str(), &attrs);
   if (context == 0) {
     LOGE("WebGLDevice::MakeFrom emscripten_webgl_create_context 2.0 error");
     return nullptr;
   }
+  return MakeFromContext(context, std::move(colorSpace));
+}
+
+std::shared_ptr<WebGLDevice> WebGLDevice::MakeFrom(emscripten::val canvas,
+                                                   std::shared_ptr<ColorSpace> colorSpace) {
+  if (!canvas.as<bool>()) {
+    LOGE("WebGLDevice::MakeFrom The canvas is null.");
+    return nullptr;
+  }
+  EmscriptenWebGLContextAttributes attrs;
+  InitContextAttributes(&attrs);
+  auto handle = emscripten::val::module_property("tgfx").call<int>(
+      "createCanvasContext", emscripten::val::module_property("GL"), canvas,
+      ToContextAttributes(attrs));
+  if (handle <= 0) {
+    LOGE("WebGLDevice::MakeFrom createCanvasContext error");
+    return nullptr;
+  }
+  return MakeFromContext(static_cast<EMSCRIPTEN_WEBGL_CONTEXT_HANDLE>(handle),
+                         std::move(colorSpace));
+}
+
+std::shared_ptr<WebGLDevice> WebGLDevice::MakeFromContext(EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context,
+                                                          std::shared_ptr<ColorSpace> colorSpace) {
+  auto oldContext = emscripten_webgl_get_current_context();
   auto result = emscripten_webgl_make_context_current(context);
   if (result != EMSCRIPTEN_RESULT_SUCCESS) {
     emscripten_webgl_destroy_context(context);
