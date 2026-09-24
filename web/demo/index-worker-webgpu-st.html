@@ -21,53 +21,11 @@
             width: 100%;
             height: 100%;
         }
-
-        /* ?sizing=backing switches the page to sizing the box from the backing store instead. */
-        body.sizing-backing #hello2d {
-            width: auto;
-            height: auto;
-        }
-
-        #controls {
-            position: absolute;
-            right: 8px;
-            bottom: 8px;
-            z-index: 1000001;
-            padding: 6px 8px;
-            font: 11px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
-            color: #eee;
-            background: rgba(0, 0, 0, 0.55);
-        }
-
-        #controls label {
-            display: block;
-        }
-
-        #controls select {
-            font: inherit;
-        }
     </style>
 </head>
 <body>
 <div id="container" class="container">
     <canvas id="hello2d"></canvas>
-</div>
-<div id="controls">
-    <label>sizing
-        <select id="sizing">
-            <option value="container">container (fills, can rescale)</option>
-            <option value="backing">backing (never rescales)</option>
-        </select>
-    </label>
-    <label>resize apply
-        <select id="resize">
-            <option value="0">immediate</option>
-            <option value="50">50 ms</option>
-            <option value="100">100 ms</option>
-            <option value="300">300 ms</option>
-        </select>
-    </label>
-    <button id="resetStats">reset stats</button>
 </div>
 <script type="module" src="./wasm/index-worker-webgpu.js?webgpu"></script>
 </body>
