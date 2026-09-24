@@ -122,7 +122,8 @@ std::shared_ptr<VulkanTexture> VulkanTexture::Make(VulkanGPU* gpu,
 std::shared_ptr<VulkanTexture> VulkanTexture::MakeFrom(VulkanGPU* gpu, VkImage image,
                                                        VkFormat format, int width, int height,
                                                        uint32_t usage, bool adopted,
-                                                       VkImageLayout initialLayout) {
+                                                       VkImageLayout initialLayout,
+                                                       std::shared_ptr<VkImageLayout> layoutState) {
   if (!gpu || image == VK_NULL_HANDLE) {
     return nullptr;
   }
@@ -152,16 +153,21 @@ std::shared_ptr<VulkanTexture> VulkanTexture::MakeFrom(VulkanGPU* gpu, VkImage i
   }
 
   return gpu->makeResource<VulkanTexture>(descriptor, image, imageView, VK_NULL_HANDLE,
-                                          VK_NULL_HANDLE, format, adopted, initialLayout);
+                                          VK_NULL_HANDLE, format, adopted, initialLayout,
+                                          std::move(layoutState));
 }
 
 VulkanTexture::VulkanTexture(const TextureDescriptor& descriptor, VkImage image,
                              VkImageView imageView, VkImageView renderImageView,
                              VmaAllocation allocation, VkFormat format, bool adopted,
-                             VkImageLayout initialLayout)
+                             VkImageLayout initialLayout,
+                             std::shared_ptr<VkImageLayout> externalLayoutState)
     : Texture(descriptor), image(image), imageView(imageView), renderImageView(renderImageView),
-      allocation(allocation), format(format), adopted(adopted) {
-  layout = initialLayout;
+      allocation(allocation), format(format), layoutState(std::move(externalLayoutState)),
+      adopted(adopted) {
+  if (layoutState == nullptr) {
+    layoutState = std::make_shared<VkImageLayout>(initialLayout);
+  }
 }
 
 void VulkanTexture::onRelease(VulkanGPU* gpu) {
@@ -190,7 +196,7 @@ BackendTexture VulkanTexture::getBackendTexture() const {
   VulkanImageInfo vulkanInfo;
   vulkanInfo.image = reinterpret_cast<uint64_t>(image);
   vulkanInfo.format = static_cast<uint32_t>(format);
-  vulkanInfo.layout = static_cast<uint32_t>(layout);
+  vulkanInfo.layout = static_cast<uint32_t>(*layoutState);
   return BackendTexture(vulkanInfo, descriptor.width, descriptor.height);
 }
 
@@ -201,7 +207,7 @@ BackendRenderTarget VulkanTexture::getBackendRenderTarget() const {
   VulkanImageInfo vulkanInfo;
   vulkanInfo.image = reinterpret_cast<uint64_t>(image);
   vulkanInfo.format = static_cast<uint32_t>(format);
-  vulkanInfo.layout = static_cast<uint32_t>(layout);
+  vulkanInfo.layout = static_cast<uint32_t>(*layoutState);
   return BackendRenderTarget(vulkanInfo, descriptor.width, descriptor.height);
 }
 

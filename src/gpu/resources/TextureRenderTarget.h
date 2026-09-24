@@ -22,6 +22,7 @@
 #include "gpu/resources/RenderTarget.h"
 
 namespace tgfx {
+class VulkanSwapchainProxy;
 class TextureRenderTarget : public DefaultTextureView, public RenderTarget {
  public:
   Context* getContext() const override {
@@ -69,5 +70,6 @@ class TextureRenderTarget : public DefaultTextureView, public RenderTarget {
   }
 
   friend class RenderTarget;
+  friend class VulkanSwapchainProxy;
 };
 }  // namespace tgfx

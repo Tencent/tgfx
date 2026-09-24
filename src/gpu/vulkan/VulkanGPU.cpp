@@ -141,9 +141,6 @@ std::unique_ptr<VulkanGPU> VulkanGPU::MakeFrom(VkInstance instance, VkPhysicalDe
   gpu->caps = std::make_unique<VulkanCaps>(physicalDevice, gpu->_extensions);
   gpu->commandQueue = std::make_unique<VulkanCommandQueue>(gpu.get());
   gpu->compiler = std::make_unique<shaderc::Compiler>();
-  if (!gpu->createPresentationSlots()) {
-    return nullptr;
-  }
   return gpu;
 }
 
@@ -181,9 +178,6 @@ bool VulkanGPU::initVulkan() {
   caps = std::make_unique<VulkanCaps>(vulkanPhysicalDevice, _extensions);
   commandQueue = std::make_unique<VulkanCommandQueue>(this);
   compiler = std::make_unique<shaderc::Compiler>();
-  if (!createPresentationSlots()) {
-    return false;
-  }
   return true;
 }
 
@@ -658,10 +652,12 @@ void VulkanGPU::reclaimAbandonedSession(FrameSession session) {
 
 void VulkanGPU::reclaimSubmission(InflightSubmission& submission) {
   auto& s = submission.session;
-  // Staging buffers are owned by the queue (not the encoder), so they are stored in uploads
-  // rather than in the FrameSession. Destroyed here after the fence confirms GPU completion.
+  // Staging buffers and one-shot acquire semaphores are destroyed only after this render fence.
   for (auto& upload : submission.uploads) {
     vmaDestroyBuffer(vmaAllocator, upload.stagingBuffer, upload.stagingAlloc);
+  }
+  for (auto semaphore : submission.ownedSemaphores) {
+    vkDestroySemaphore(vulkanDevice, semaphore, nullptr);
   }
   // Command pool destruction implicitly frees all command buffers allocated from it.
   if (s.commandPool != VK_NULL_HANDLE) {
@@ -683,6 +679,21 @@ void VulkanGPU::reclaimSubmission(InflightSubmission& submission) {
   // ReturnQueue and be destroyed during the next processUnreferencedResources() call.
   s.retainedResources.clear();
   recycleFence(submission.fence);
+}
+
+void VulkanGPU::abandonPresents(std::vector<SubmitRequest::PresentInfo>& presents) {
+  if (!presents.empty()) {
+    vkDeviceWaitIdle(vulkanDevice);
+  }
+  for (auto& present : presents) {
+    if (present.imageAvailable != VK_NULL_HANDLE) {
+      vkDestroySemaphore(vulkanDevice, present.imageAvailable, nullptr);
+      present.imageAvailable = VK_NULL_HANDLE;
+    }
+    if (present.outOfDate != nullptr) {
+      *present.outOfDate = true;
+    }
+  }
 }
 
 void VulkanGPU::pollCompletedSubmissions() {
@@ -734,34 +745,6 @@ void VulkanGPU::waitAllInflightSubmissions() {
   processUnreferencedResources();
 }
 
-bool VulkanGPU::createPresentationSlots() {
-  VkSemaphoreCreateInfo semInfo = {};
-  semInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-  for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-    if (vkCreateSemaphore(vulkanDevice, &semInfo, nullptr, &presentationSlots[i].imageAvailable) !=
-            VK_SUCCESS ||
-        vkCreateSemaphore(vulkanDevice, &semInfo, nullptr, &presentationSlots[i].renderFinished) !=
-            VK_SUCCESS) {
-      LOGE("VulkanGPU::createPresentationSlots: failed at slot %zu.", i);
-      return false;
-    }
-  }
-  presentationSlotsCreated = true;
-  return true;
-}
-
-const VulkanGPU::PresentationSlot& VulkanGPU::acquirePresentationSlot() {
-  pollCompletedSubmissions();
-  if (inflightSubmissions.size() >= MAX_FRAMES_IN_FLIGHT) {
-    auto& oldest = inflightSubmissions.front();
-    vkWaitForFences(vulkanDevice, 1, &oldest.fence, VK_TRUE, UINT64_MAX);
-    pollCompletedSubmissions();
-  }
-  auto& slot = presentationSlots[presentationSlotIndex];
-  presentationSlotIndex = (presentationSlotIndex + 1) % MAX_FRAMES_IN_FLIGHT;
-  return slot;
-}
-
 void VulkanGPU::executeSubmission(SubmitRequest request) {
   // Early out if a previous fatal error (e.g. DEVICE_LOST) was detected. Reclaim resources
   // immediately to prevent leaks; all subsequent Vulkan calls would fail anyway.
@@ -770,6 +753,7 @@ void VulkanGPU::executeSubmission(SubmitRequest request) {
     for (auto& upload : request.uploads) {
       vmaDestroyBuffer(vmaAllocator, upload.stagingBuffer, upload.stagingAlloc);
     }
+    abandonPresents(request.presents);
     return;
   }
 
@@ -792,6 +776,7 @@ void VulkanGPU::executeSubmission(SubmitRequest request) {
     for (auto& upload : request.uploads) {
       vmaDestroyBuffer(vmaAllocator, upload.stagingBuffer, upload.stagingAlloc);
     }
+    abandonPresents(request.presents);
     return;
   }
 
@@ -802,15 +787,25 @@ void VulkanGPU::executeSubmission(SubmitRequest request) {
   //       semaphore ensures A's submission completes before B's fragment shader reads it.
   //       Wait stage: FRAGMENT_SHADER (vertex work can proceed in parallel).
   //
-  //   (b) Binary semaphore pair — standard Vulkan presentation sync (acquire → render → present).
-  //       imageAvailable: signaled by vkAcquireNextImageKHR, waited at COLOR_ATTACHMENT_OUTPUT.
-  //       renderFinished: signaled by this submit, waited by vkQueuePresentKHR.
+  //   (b) Per-window acquire semaphores — standard Vulkan presentation sync. Each pending
+  //       window waits on its own imageAvailable semaphore created for its latest
+  //       vkAcquireNextImageKHR call. Automatic frames additionally signal their per-image
+  //       presentation semaphore; manual frames wait only, and present from a later submit.
   //
+  VulkanSubmissionPlan presentationPlan;
+  for (auto& present : request.presents) {
+    presentationPlan.add(present.manualPresent);
+  }
   std::vector<VkSemaphore> waitSemaphores;
   std::vector<VkPipelineStageFlags> waitStages;
   std::vector<uint64_t> waitValues;
   std::vector<VkSemaphore> signalSemaphores;
   std::vector<uint64_t> signalValues;
+  waitSemaphores.reserve(presentationPlan.acquireWaitCount + 1);
+  waitStages.reserve(presentationPlan.acquireWaitCount + 1);
+  waitValues.reserve(presentationPlan.acquireWaitCount + 1);
+  signalSemaphores.reserve(presentationPlan.signalCount + 1);
+  signalValues.reserve(presentationPlan.signalCount + 1);
 
   // (a) Timeline semaphore wait/signal for cross-Surface dependency.
   if (request.waitSemaphore) {
@@ -823,13 +818,16 @@ void VulkanGPU::executeSubmission(SubmitRequest request) {
     signalValues.push_back(request.signalSemaphore->nextSignalValue());
   }
 
-  // (b) Binary semaphore pair for presentation sync.
-  if (request.present.has_value()) {
-    waitSemaphores.push_back(request.present->imageAvailable);
+  // (b) One acquire semaphore per pending window. Automatic frames signal their per-image
+  // presentation semaphore; manual frames only wait for acquisition and present in a later submit.
+  for (auto& present : request.presents) {
+    waitSemaphores.push_back(present.imageAvailable);
     waitStages.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
     waitValues.push_back(0);
-    signalSemaphores.push_back(request.present->renderFinished);
-    signalValues.push_back(0);
+    if (!present.manualPresent) {
+      signalSemaphores.push_back(present.presentSemaphore);
+      signalValues.push_back(0);
+    }
   }
 
   VkSubmitInfo submitInfo = {};
@@ -896,6 +894,7 @@ void VulkanGPU::executeSubmission(SubmitRequest request) {
     failed.session = std::move(request.session);
     failed.uploads = std::move(request.uploads);
     reclaimSubmission(failed);
+    abandonPresents(request.presents);
     return;
   }
 
@@ -916,27 +915,60 @@ void VulkanGPU::executeSubmission(SubmitRequest request) {
     request.signalSemaphore->commitSignalValue();
     submission.session.retainedResources.push_back(std::move(request.signalSemaphore));
   }
+  for (auto& present : request.presents) {
+    submission.ownedSemaphores.push_back(present.imageAvailable);
+    present.imageAvailable = VK_NULL_HANDLE;
+    present.frameState->markRenderSubmitted();
+    if (!present.manualPresent) {
+      *present.layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    }
+  }
   inflightSubmissions.push_back(std::move(submission));
 
-  // Step 7: Execute pending present. The renderFinished semaphore ensures the presentation
-  // engine waits for rendering to complete before displaying the image.
-  if (request.present.has_value() && !request.present->deferredPresent) {
+  std::vector<VkSwapchainKHR> swapchains;
+  std::vector<uint32_t> imageIndices;
+  std::vector<VkSemaphore> presentSemaphores;
+  std::vector<VkResult> presentResults;
+  for (auto& present : request.presents) {
+    if (!present.manualPresent) {
+      swapchains.push_back(present.swapchain);
+      imageIndices.push_back(present.imageIndex);
+      presentSemaphores.push_back(present.presentSemaphore);
+      presentResults.push_back(VK_SUCCESS);
+    }
+  }
+  if (!swapchains.empty()) {
     VkPresentInfoKHR presentInfo = {};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-    presentInfo.swapchainCount = 1;
-    presentInfo.pSwapchains = &request.present->swapchain;
-    presentInfo.pImageIndices = &request.present->imageIndex;
-    presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = &request.present->renderFinished;
-    vkQueuePresentKHR(vulkanQueue, &presentInfo);
+    presentInfo.swapchainCount = static_cast<uint32_t>(swapchains.size());
+    presentInfo.pSwapchains = swapchains.data();
+    presentInfo.pImageIndices = imageIndices.data();
+    presentInfo.waitSemaphoreCount = static_cast<uint32_t>(presentSemaphores.size());
+    presentInfo.pWaitSemaphores = presentSemaphores.data();
+    presentInfo.pResults = presentResults.data();
+    auto batchResult = vkQueuePresentKHR(vulkanQueue, &presentInfo);
+    size_t automaticIndex = 0;
+    for (auto& present : request.presents) {
+      if (present.manualPresent) {
+        continue;
+      }
+      auto result = presentResults[automaticIndex++];
+      if (batchResult == VK_ERROR_OUT_OF_DATE_KHR || batchResult == VK_SUBOPTIMAL_KHR ||
+          result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+        *present.outOfDate = true;
+      }
+    }
   }
 }
 
 void VulkanGPU::presentNow(VkSwapchainKHR swapchain, uint32_t imageIndex, VkImage image,
-                           VkSemaphore renderFinished) {
+                           VkSemaphore presentSemaphore, std::shared_ptr<VkImageLayout> layout,
+                           std::shared_ptr<bool> outOfDate) {
   if (contextLost) {
+    *outOfDate = true;
     return;
   }
+  pollCompletedSubmissions();
 
   VkCommandPoolCreateInfo poolInfo = {};
   poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -944,7 +976,7 @@ void VulkanGPU::presentNow(VkSwapchainKHR swapchain, uint32_t imageIndex, VkImag
   poolInfo.queueFamilyIndex = queueFamilyIndex;
   VkCommandPool pool = VK_NULL_HANDLE;
   if (vkCreateCommandPool(vulkanDevice, &poolInfo, nullptr, &pool) != VK_SUCCESS) {
-    LOGE("VulkanGPU::presentNow: failed to create command pool for the present barrier.");
+    *outOfDate = true;
     return;
   }
   VkCommandBufferAllocateInfo allocInfo = {};
@@ -954,8 +986,8 @@ void VulkanGPU::presentNow(VkSwapchainKHR swapchain, uint32_t imageIndex, VkImag
   allocInfo.commandBufferCount = 1;
   VkCommandBuffer cmd = VK_NULL_HANDLE;
   if (vkAllocateCommandBuffers(vulkanDevice, &allocInfo, &cmd) != VK_SUCCESS) {
-    LOGE("VulkanGPU::presentNow: failed to allocate command buffer for the present barrier.");
     vkDestroyCommandPool(vulkanDevice, pool, nullptr);
+    *outOfDate = true;
     return;
   }
   VkCommandBufferBeginInfo beginInfo = {};
@@ -964,66 +996,58 @@ void VulkanGPU::presentNow(VkSwapchainKHR swapchain, uint32_t imageIndex, VkImag
   vkBeginCommandBuffer(cmd, &beginInfo);
   VkImageMemoryBarrier barrier = {};
   barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-  barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+  barrier.oldLayout = *layout;
   barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
   barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
   barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
   barrier.image = image;
   barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-  barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+  barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
   barrier.dstAccessMask = 0;
-  vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+  vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
                        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1,
                        &barrier);
   vkEndCommandBuffer(cmd);
 
-  VkSemaphore waitSemaphores[] = {renderFinished};
-  VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
   VkSubmitInfo submitInfo = {};
   submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   submitInfo.commandBufferCount = 1;
   submitInfo.pCommandBuffers = &cmd;
-  submitInfo.waitSemaphoreCount = 1;
-  submitInfo.pWaitSemaphores = waitSemaphores;
-  submitInfo.pWaitDstStageMask = waitStages;
+  submitInfo.signalSemaphoreCount = 1;
+  submitInfo.pSignalSemaphores = &presentSemaphore;
   VkFence fence = acquireFence();
   if (fence == VK_NULL_HANDLE) {
-    LOGE("VulkanGPU::presentNow: fence allocation failed, skipping present.");
     vkDestroyCommandPool(vulkanDevice, pool, nullptr);
+    *outOfDate = true;
     return;
   }
   auto result = vkQueueSubmit(vulkanQueue, 1, &submitInfo, fence);
   if (result != VK_SUCCESS) {
-    LOGE("VulkanGPU::presentNow: vkQueueSubmit failed (result=%d), skipping present.",
-         static_cast<int>(result));
     if (result == VK_ERROR_DEVICE_LOST) {
       contextLost = true;
     }
     recycleFence(fence);
     vkDestroyCommandPool(vulkanDevice, pool, nullptr);
+    *outOfDate = true;
     return;
   }
-  // Waiting for the fence also waits for the rendering: the barrier above executes only after
-  // renderFinished is signaled, so the image is in PRESENT_SRC_KHR layout once the fence signals.
-  // This allows presenting without a semaphore whose lifetime would outlive this call.
-  result = vkWaitForFences(vulkanDevice, 1, &fence, VK_TRUE, UINT64_MAX);
-  if (result != VK_SUCCESS) {
-    LOGE("VulkanGPU::presentNow: vkWaitForFences returned %d, skipping present.",
-         static_cast<int>(result));
-    contextLost = true;
-  }
-  recycleFence(fence);
-  vkDestroyCommandPool(vulkanDevice, pool, nullptr);
-  if (result != VK_SUCCESS) {
-    return;
-  }
+  *layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+  InflightSubmission submission = {};
+  submission.fence = fence;
+  submission.session.commandPool = pool;
+  inflightSubmissions.push_back(std::move(submission));
+
   VkPresentInfoKHR presentInfo = {};
   presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
   presentInfo.swapchainCount = 1;
   presentInfo.pSwapchains = &swapchain;
   presentInfo.pImageIndices = &imageIndex;
-  vkQueuePresentKHR(vulkanQueue, &presentInfo);
-  pollCompletedSubmissions();
+  presentInfo.waitSemaphoreCount = 1;
+  presentInfo.pWaitSemaphores = &presentSemaphore;
+  result = vkQueuePresentKHR(vulkanQueue, &presentInfo);
+  if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+    *outOfDate = true;
+  }
 }
 
 void VulkanGPU::releaseAll(bool releaseGPU) {
@@ -1043,21 +1067,6 @@ void VulkanGPU::releaseAll(bool releaseGPU) {
     vkDestroyFence(vulkanDevice, fence, nullptr);
   }
   fencePool.clear();
-
-  // 3b. Destroy presentation semaphore slots.
-  if (presentationSlotsCreated) {
-    for (auto& slot : presentationSlots) {
-      if (slot.imageAvailable != VK_NULL_HANDLE) {
-        vkDestroySemaphore(vulkanDevice, slot.imageAvailable, nullptr);
-        slot.imageAvailable = VK_NULL_HANDLE;
-      }
-      if (slot.renderFinished != VK_NULL_HANDLE) {
-        vkDestroySemaphore(vulkanDevice, slot.renderFinished, nullptr);
-        slot.renderFinished = VK_NULL_HANDLE;
-      }
-    }
-    presentationSlotsCreated = false;
-  }
 
   // 4. Clear caches. Sampler cache holds shared_ptrs that may trigger ReturnQueue on release.
   samplerCache.clear();

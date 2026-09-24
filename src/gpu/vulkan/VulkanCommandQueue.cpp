@@ -33,6 +33,12 @@ VulkanCommandQueue::VulkanCommandQueue(VulkanGPU* gpu) : gpu(gpu) {
 
 VulkanCommandQueue::~VulkanCommandQueue() {
   cleanupPendingUploads();
+  if (!pendingPresents.empty()) {
+    vkDeviceWaitIdle(gpu->device());
+    for (auto& present : pendingPresents) {
+      vkDestroySemaphore(gpu->device(), present.imageAvailableSemaphore, nullptr);
+    }
+  }
 }
 
 std::chrono::steady_clock::time_point VulkanCommandQueue::completedFrameTime() const {
@@ -234,11 +240,11 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
   auto uploads = std::move(pendingUploads);
   auto signalSem = std::move(pendingSignalSemaphore);
   auto waitSem = std::move(pendingWaitSemaphore);
-  auto present = std::move(pendingPresent);
+  auto presents = std::move(pendingPresents);
   pendingUploads.clear();
   pendingSignalSemaphore = nullptr;
   pendingWaitSemaphore = nullptr;
-  pendingPresent.reset();
+  pendingPresents.clear();
 
   VkCommandBuffer uploadCmd = VK_NULL_HANDLE;
   if (!uploads.empty() && renderPool != VK_NULL_HANDLE) {
@@ -259,6 +265,11 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
       LOGE("VulkanCommandQueue::submit: failed to allocate upload command buffer (result=%d).",
            static_cast<int>(result));
       abandonSubmit(std::move(session), std::move(uploads));
+      vkDeviceWaitIdle(gpu->device());
+      for (auto& present : presents) {
+        vkDestroySemaphore(gpu->device(), present.imageAvailableSemaphore, nullptr);
+        *present.outOfDate = true;
+      }
       return;
     }
   }
@@ -269,40 +280,49 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
   }
   cmdBuffers.push_back(cmd);
 
-  VkCommandBuffer presentCmd = VK_NULL_HANDLE;
-  if (present.has_value() && !present->deferredPresent && renderPool != VK_NULL_HANDLE) {
+  std::vector<VkImageMemoryBarrier> presentBarriers;
+  for (auto& present : presents) {
+    if (present.manualPresent) {
+      continue;
+    }
+    VkImageMemoryBarrier barrier = {};
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.oldLayout = *present.layout;
+    barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = present.image;
+    barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+    barrier.dstAccessMask = 0;
+    presentBarriers.push_back(barrier);
+  }
+  if (!presentBarriers.empty() && renderPool != VK_NULL_HANDLE) {
     VkCommandBufferAllocateInfo presentAllocInfo = {};
     presentAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     presentAllocInfo.commandPool = renderPool;
     presentAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     presentAllocInfo.commandBufferCount = 1;
-    if (vkAllocateCommandBuffers(gpu->device(), &presentAllocInfo, &presentCmd) == VK_SUCCESS) {
-      VkCommandBufferBeginInfo presentBeginInfo = {};
-      presentBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-      presentBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-      vkBeginCommandBuffer(presentCmd, &presentBeginInfo);
-
-      VkImageMemoryBarrier barrier = {};
-      barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-      barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-      barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-      barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-      barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-      barrier.image = present->image;
-      barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-      barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-      barrier.dstAccessMask = 0;
-      vkCmdPipelineBarrier(presentCmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                           VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1,
-                           &barrier);
-      vkEndCommandBuffer(presentCmd);
-      cmdBuffers.push_back(presentCmd);
-    } else {
-      LOGE(
-          "VulkanCommandQueue::submit: failed to allocate present command buffer, skipping "
-          "present.");
-      present.reset();
+    VkCommandBuffer presentCmd = VK_NULL_HANDLE;
+    if (vkAllocateCommandBuffers(gpu->device(), &presentAllocInfo, &presentCmd) != VK_SUCCESS) {
+      LOGE("VulkanCommandQueue::submit: failed to allocate present command buffer.");
+      abandonSubmit(std::move(session), std::move(uploads));
+      vkDeviceWaitIdle(gpu->device());
+      for (auto& present : presents) {
+        vkDestroySemaphore(gpu->device(), present.imageAvailableSemaphore, nullptr);
+        *present.outOfDate = true;
+      }
+      return;
     }
+    VkCommandBufferBeginInfo presentBeginInfo = {};
+    presentBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    presentBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    vkBeginCommandBuffer(presentCmd, &presentBeginInfo);
+    vkCmdPipelineBarrier(presentCmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr,
+                         static_cast<uint32_t>(presentBarriers.size()), presentBarriers.data());
+    vkEndCommandBuffer(presentCmd);
+    cmdBuffers.push_back(presentCmd);
   }
 
   VulkanGPU::SubmitRequest request = {};
@@ -312,10 +332,14 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
   request.signalSemaphore = std::move(signalSem);
   request.waitSemaphore = std::move(waitSem);
   request.frameTime = _frameTime;
-  if (present.has_value()) {
-    request.present = VulkanGPU::SubmitRequest::PresentInfo{
-        present->swapchain, present->imageIndex, present->imageAvailableSemaphore,
-        present->renderFinishedSemaphore, present->deferredPresent};
+  for (auto& present : presents) {
+    request.presents.push_back(VulkanGPU::SubmitRequest::PresentInfo{
+        present.swapchain, present.imageIndex, present.imageAvailableSemaphore,
+        present.presentSemaphore, present.layout, present.outOfDate, present.frameState,
+        present.manualPresent});
+    if (!present.manualPresent) {
+      *present.layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    }
   }
 
   gpu->executeSubmission(std::move(request));
@@ -339,11 +363,14 @@ void VulkanCommandQueue::waitSemaphore(std::shared_ptr<Semaphore> semaphore) {
 
 void VulkanCommandQueue::schedulePresent(VkSwapchainKHR swapchain, uint32_t imageIndex,
                                          VkImage image, VkSemaphore imageAvailableSemaphore,
-                                         VkSemaphore renderFinishedSemaphore,
-                                         bool deferredPresent) {
-  pendingPresent = {
-      swapchain,      imageIndex, image, imageAvailableSemaphore, renderFinishedSemaphore,
-      deferredPresent};
+                                         VkSemaphore presentSemaphore,
+                                         std::shared_ptr<VkImageLayout> layout,
+                                         std::shared_ptr<bool> outOfDate,
+                                         std::shared_ptr<VulkanFrameState> frameState,
+                                         bool manualPresent) {
+  pendingPresents.push_back({swapchain, imageIndex, image, imageAvailableSemaphore,
+                             presentSemaphore, std::move(layout), std::move(outOfDate),
+                             std::move(frameState), manualPresent});
 }
 
 void VulkanCommandQueue::waitUntilCompleted() {

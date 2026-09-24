@@ -23,7 +23,6 @@
 #include <deque>
 #include <list>
 #include <memory>
-#include <optional>
 #include <unordered_map>
 #include <vector>
 #include "core/utils/ReturnQueue.h"
@@ -31,6 +30,7 @@
 #include "gpu/vulkan/VulkanCaps.h"
 #include "gpu/vulkan/VulkanExtensions.h"
 #include "gpu/vulkan/VulkanFrameSession.h"
+#include "gpu/vulkan/VulkanPresentationState.h"
 #include "tgfx/gpu/GPU.h"
 
 VK_DEFINE_HANDLE(VmaAllocator)
@@ -67,8 +67,7 @@ class VulkanTexture;
  *     long-lived resources from being destroyed while the GPU is still reading them.
  *
  * Shutdown ordering (releaseAll):
- *   waitAllInflightSubmissions -> commandQueue -> fencePool -> presentationSlots -> caches ->
- *   resources -> VMA -> Device
+ *   waitAllInflightSubmissions -> commandQueue -> fencePool -> caches -> resources -> VMA -> Device
  */
 class VulkanGPU : public GPU {
  public:
@@ -203,12 +202,13 @@ class VulkanGPU : public GPU {
       VkSwapchainKHR swapchain = VK_NULL_HANDLE;
       uint32_t imageIndex = 0;
       VkSemaphore imageAvailable = VK_NULL_HANDLE;
-      VkSemaphore renderFinished = VK_NULL_HANDLE;
-      // When true, the submission only wires the acquire/present semaphore pair; the actual
-      // vkQueuePresentKHR is deferred to presentNow() so the image stays readable in between.
-      bool deferredPresent = false;
+      VkSemaphore presentSemaphore = VK_NULL_HANDLE;
+      std::shared_ptr<VkImageLayout> layout;
+      std::shared_ptr<bool> outOfDate;
+      std::shared_ptr<VulkanFrameState> frameState;
+      bool manualPresent = false;
     };
-    std::optional<PresentInfo> present;
+    std::vector<PresentInfo> presents;
   };
 
   void executeSubmission(SubmitRequest request);
@@ -219,26 +219,12 @@ class VulkanGPU : public GPU {
   void releaseDescriptorPool(VkDescriptorPool pool);
 
   /**
-   * Presents a swapchain image that was rendered by an earlier executeSubmission() whose
-   * PresentInfo had deferredPresent set. The submission signaled renderFinished; this records the
-   * GENERAL -> PRESENT_SRC_KHR layout transition, waits for it to complete on the CPU (the render
-   * is typically already done because a readback usually preceded this call), and then calls
-   * vkQueuePresentKHR. Waiting on the CPU avoids presenting a binary semaphore wait, whose
-   * lifetime would otherwise outlive this call.
+   * Submits the final layout transition for a manually presented image, signals its per-image
+   * semaphore, and queues presentation without waiting on the CPU.
    */
   void presentNow(VkSwapchainKHR swapchain, uint32_t imageIndex, VkImage image,
-                  VkSemaphore renderFinished);
-
-  // Presentation (used by VulkanWindow/SwapchainProxy)
-  // Binary semaphore pairs for swapchain acquire/present sync. Indexed per frame-in-flight to
-  // prevent reuse while still in flight (VUID-vkAcquireNextImageKHR-semaphore-01779).
-  // acquirePresentationSlot() blocks if needed to ensure the returned pair is safe.
-  struct PresentationSlot {
-    VkSemaphore imageAvailable = VK_NULL_HANDLE;
-    VkSemaphore renderFinished = VK_NULL_HANDLE;
-  };
-
-  const PresentationSlot& acquirePresentationSlot();
+                  VkSemaphore presentSemaphore, std::shared_ptr<VkImageLayout> layout,
+                  std::shared_ptr<bool> outOfDate);
 
  private:
   VulkanGPU();
@@ -250,7 +236,6 @@ class VulkanGPU : public GPU {
   bool pickPhysicalDevice();
   bool createDevice();
   bool createAllocator(uint32_t apiVersion);
-  bool createPresentationSlots();
 
   // Device handles (immutable after init; when adopted==true, caller owns device and instance)
   VkInstance vulkanInstance = VK_NULL_HANDLE;
@@ -279,16 +264,18 @@ class VulkanGPU : public GPU {
   std::unordered_map<uint32_t, std::shared_ptr<Sampler>> samplerCache = {};
   std::vector<VkDescriptorPool> descriptorPoolCache = {};
 
-  // Submission state (fence pool, inflight queue, presentation slots)
+  // Submission state (fence pool and inflight queue)
   // InflightSubmission holds per-frame resources until the fence confirms GPU completion.
   struct InflightSubmission {
     VkFence fence = VK_NULL_HANDLE;
     std::chrono::steady_clock::time_point frameTime = {};
     FrameSession session;
     std::vector<PendingUpload> uploads;
+    std::vector<VkSemaphore> ownedSemaphores;
   };
 
   void reclaimSubmission(InflightSubmission& submission);
+  void abandonPresents(std::vector<SubmitRequest::PresentInfo>& presents);
   void pollCompletedSubmissions();
   VkFence acquireFence();
   void recycleFence(VkFence fence);
@@ -296,10 +283,6 @@ class VulkanGPU : public GPU {
   std::deque<InflightSubmission> inflightSubmissions;
   std::vector<VkFence> fencePool;
   std::atomic<int64_t> _lastFenceSignalTime = {0};
-
-  PresentationSlot presentationSlots[MAX_FRAMES_IN_FLIGHT] = {};
-  uint32_t presentationSlotIndex = 0;
-  bool presentationSlotsCreated = false;
 
   bool contextLost = false;
 };
