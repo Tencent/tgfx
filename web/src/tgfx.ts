@@ -20,7 +20,7 @@ import {getCanvas2D, isCanvas, releaseCanvas2D} from './utils/canvas';
 import {BitmapImage} from './core/bitmap-image';
 import {isInstanceOf} from './utils/type-utils';
 
-import {EmscriptenGL, EmscriptenGLContextAttributes, TGFX, WindowColorSpace} from './types';
+import {EmscriptenGL, EmscriptenGLContextAttributes, EmscriptenWebGPU, TGFX, WindowColorSpace} from './types';
 import type {wx} from './wechat/interfaces';
 import {getTGFXModule} from './tgfx-module';
 
@@ -177,9 +177,11 @@ const resolveWebGPUDevice = (module: any, deviceId?: number): any => {
 // getContext('webgpu') is idempotent and returns the same context object already used by the
 // emscripten WebGPU surface, so reconfiguring it only updates the color space.
 // format, usage and alphaMode are passed in from the C++ side so that the WGPUSurfaceConfiguration
-// stays the single source of truth for the canvas configuration.
+// stays the single source of truth for the canvas configuration. The first parameter is either a
+// canvas selector or the canvas object itself, which is what tgfx passes on a thread that has no
+// document to query, such as a worker.
 export const configureWebGPUColorSpace = (
-    canvasSelector: string,
+    canvasOrSelector: string | HTMLCanvasElement | OffscreenCanvas,
     colorSpace: WindowColorSpace,
     deviceId?: number,
     format?: string,
@@ -189,7 +191,9 @@ export const configureWebGPUColorSpace = (
     if (colorSpace === WindowColorSpace.Others) {
         return false;
     }
-    const canvas = document.querySelector(canvasSelector) as HTMLCanvasElement | null;
+    const canvas = typeof canvasOrSelector === 'string'
+        ? document.querySelector(canvasOrSelector) as HTMLCanvasElement | null
+        : canvasOrSelector;
     if (!canvas) {
         return false;
     }
@@ -285,6 +289,42 @@ export const createCanvasContext = (GL: EmscriptenGL, canvas: HTMLCanvasElement 
         return 0;
     }
     return GL.createContext(canvas, webGLContextAttributes);
+};
+
+/**
+ * Creates a WebGPU surface for a canvas object. Used for canvases that tgfx cannot reach by
+ * selector, such as an OffscreenCanvas on a worker thread; call it on the thread that will do the
+ * rendering, since the returned handle is only valid there.
+ *
+ * @param WebGPU The Emscripten WebGPU runtime (module.WebGPU).
+ * @param canvas The canvas to create the surface from.
+ * @return The surface handle, or 0 if the surface could not be created.
+ */
+export const createWebGPUSurface = (WebGPU: EmscriptenWebGPU,
+                                    canvas: HTMLCanvasElement | OffscreenCanvas) => {
+    if (!WebGPU || !canvas || typeof canvas.getContext !== 'function') {
+        return 0;
+    }
+    const context = canvas.getContext('webgpu') as any;
+    if (!context || typeof context.configure !== 'function') {
+        return 0;
+    }
+    return WebGPU.mgrSurface.create(context);
+};
+
+/**
+ * Registers a GPUDevice with the WebGPU runtime and returns the handle to render with.
+ *
+ * @param WebGPU The Emscripten WebGPU runtime (module.WebGPU).
+ * @param device A GPUDevice obtained from navigator.gpu.
+ * @return The device handle, or 0 if the device is invalid.
+ */
+export const importWebGPUDevice = (WebGPU: EmscriptenWebGPU, device: any) => {
+    if (!WebGPU || !device || !device.queue) {
+        return 0;
+    }
+    // The command queue has to travel with the device, otherwise the runtime cannot resolve it.
+    return WebGPU.mgrDevice.create(device, {queueId: WebGPU.mgrQueue.create(device.queue)});
 };
 
 export {getCanvas2D as createCanvas2D};

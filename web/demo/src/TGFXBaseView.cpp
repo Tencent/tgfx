@@ -45,11 +45,18 @@ TGFXBaseView::TGFXBaseView(emscripten::val canvas) : canvas(std::move(canvas)) {
 
 std::shared_ptr<tgfx::Window> TGFXBaseView::createWindow() {
 #ifdef TGFX_USE_WEBGPU
-  // WebGPUWindow only takes a canvas selector, so the canvas object path falls through to WebGL.
-  if (!canvas.as<bool>()) {
-    return tgfx::WebGPUWindow::MakeFrom(canvasID);
+  std::shared_ptr<tgfx::WebGPUDevice> webgpuDevice = nullptr;
+  if (webgpuDeviceVal.as<bool>()) {
+    webgpuDevice = tgfx::WebGPUDevice::MakeFrom(webgpuDeviceVal);
   }
-#endif
+  if (canvas.as<bool>()) {
+    return tgfx::WebGPUWindow::MakeFrom(canvas, webgpuDevice);
+  }
+  if (canvasID.empty()) {
+    return nullptr;
+  }
+  return tgfx::WebGPUWindow::MakeFrom(canvasID, webgpuDevice);
+#else
   if (canvas.as<bool>()) {
     return tgfx::WebGLWindow::MakeFrom(canvas);
   }
@@ -57,6 +64,7 @@ std::shared_ptr<tgfx::Window> TGFXBaseView::createWindow() {
     return nullptr;
   }
   return tgfx::WebGLWindow::MakeFrom(canvasID);
+#endif
 }
 
 void TGFXBaseView::updateSize() {
@@ -88,6 +96,12 @@ void TGFXBaseView::updateSize() {
 void TGFXBaseView::setLayoutDensity(float density) {
   layoutDensity = density;
 }
+
+#ifdef TGFX_USE_WEBGPU
+void TGFXBaseView::setWebGPUDevice(emscripten::val device) {
+  webgpuDeviceVal = std::move(device);
+}
+#endif
 
 void TGFXBaseView::setImagePath(const std::string& name, tgfx::NativeImageRef nativeImage) {
   auto image = tgfx::Image::MakeFrom(nativeImage);

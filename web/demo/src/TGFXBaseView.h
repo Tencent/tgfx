@@ -61,6 +61,17 @@ class TGFXBaseView {
    */
   void setLayoutDensity(float density);
 
+#ifdef TGFX_USE_WEBGPU
+  /**
+   * Supplies the GPUDevice the view renders with. Required when the view is created on a thread that
+   * cannot obtain the default device, such as a worker. Must be called before the first updateSize()
+   * or draw(); the device has to stay alive for as long as the view does.
+   *
+   * @param device A GPUDevice obtained from navigator.gpu, or null to use the default device.
+   */
+  void setWebGPUDevice(emscripten::val device);
+#endif
+
   void updateLayerTree(int drawIndex);
 
   void updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY);
@@ -107,6 +118,10 @@ class TGFXBaseView {
   bool presentImmediately = true;
   // Zero means "not pushed in yet", in which case draw() falls back to querying the DOM.
   float layoutDensity = 0.0f;
+#ifdef TGFX_USE_WEBGPU
+  // Set only when a device was pushed in, in which case it is used instead of the default device.
+  emscripten::val webgpuDeviceVal;
+#endif
 
   // Async readback state
   std::shared_ptr<tgfx::SurfaceReadback> pendingReadback = nullptr;

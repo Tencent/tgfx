@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <emscripten/val.h>
 #include "tgfx/gpu/Device.h"
 
 namespace tgfx {
@@ -43,6 +44,19 @@ class WebGPUDevice : public Device {
    * overwritten. The callback is not restored on destruction.
    */
   static std::shared_ptr<WebGPUDevice> MakeFrom(void* device);
+
+  /**
+   * Creates a new WebGPUDevice from an existing GPUDevice object, such as one obtained from
+   * navigator.gpu.
+   *
+   * Use this on a thread that cannot obtain the default device, such as a worker thread. The device
+   * belongs to the calling thread: it has to be rendered with and destroyed on that thread, and it
+   * has to stay alive for as long as the returned WebGPUDevice does. tgfx will NOT release it on
+   * shutdown.
+   *
+   * @param device A GPUDevice. Returns nullptr if it is null or exposes no command queue.
+   */
+  static std::shared_ptr<WebGPUDevice> MakeFrom(emscripten::val device);
 
   ~WebGPUDevice() override;
 

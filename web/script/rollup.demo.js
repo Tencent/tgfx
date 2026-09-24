@@ -11,13 +11,20 @@ const banner = readFileSync(fileHeaderPath, 'utf-8');
 const arch = process.env.ARCH;
 const backend = process.env.BACKEND;
 var filePath = (arch === 'wasm-mt' ? 'wasm-mt' : 'wasm');
-var fileName = '';
+// The page source to bundle, and the name the bundle is written as. The two differ for the WebGPU
+// worker backend, which reuses the WebGL worker page source: the page tells the two apart through
+// its own URL, which the HTML page sets, so only the output name has to carry the backend.
+var inputName = '';
+var outputName = '';
 if(backend === 'webgpu'){
-    fileName = (arch === 'wasm-mt' ? 'index-webgpu':'index-webgpu-st');
+    inputName = outputName = (arch === 'wasm-mt' ? 'index-webgpu':'index-webgpu-st');
 }else if(backend === 'webgl'){
-    fileName = (arch === 'wasm-mt' ? 'index':'index-st');
+    inputName = outputName = (arch === 'wasm-mt' ? 'index':'index-st');
 }else if(backend === 'worker'){
-    fileName = 'index-worker';
+    inputName = outputName = 'index-worker';
+}else if(backend === 'worker-webgpu'){
+    inputName = 'index-worker';
+    outputName = 'index-worker-webgpu';
 }
 
 const plugins = [
@@ -37,9 +44,9 @@ const plugins = [
     },
 ];
 
-// The worker backend also needs its own bundle: the worker script runs in a separate realm and
+// The worker backends also need their own bundle: the worker script runs in a separate realm and
 // loads the wasm module there, so it cannot be part of the page bundle.
-const extraConfigs = backend === 'worker' ? [
+const extraConfigs = (backend === 'worker' || backend === 'worker-webgpu') ? [
     {
         input: 'demo/worker-render.ts',
         output: {
@@ -54,10 +61,10 @@ const extraConfigs = backend === 'worker' ? [
 
 export default [
     {
-        input: `demo/${fileName}.ts`,
+        input: `demo/${inputName}.ts`,
         output: {
             banner,
-            file: `demo/${filePath}/${fileName}.js`,
+            file: `demo/${filePath}/${outputName}.js`,
             format: 'esm',
             sourcemap: true
         },

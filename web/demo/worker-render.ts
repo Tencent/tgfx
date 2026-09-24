@@ -22,8 +22,12 @@
 // worker owns the display target. Frames are presented by the browser straight out of this thread:
 // there is no hand-off back to the main thread, no transferToImageBitmap() and no explicit present
 // call. Everything the settings panel would report is mirrored back with postMessage().
-import Hello2D from './wasm/hello2d';
 import {TGFXBind} from '../lib/tgfx';
+
+// Resolved at runtime against this worker's own URL so that each build directory loads the module
+// built for it. A static import is resolved at build time, which made the pthreads page run the
+// single-threaded module.
+const hello2dUrl = new URL('./hello2d.js', import.meta.url).href;
 
 let module: any = null;
 let view: any = null;
@@ -87,6 +91,7 @@ async function onInit(message: any) {
     density = message.dpr || 1;
     setBackingSize(message.cssWidth, message.cssHeight, density);
 
+    const Hello2D = (await import(hello2dUrl)).default;
     module = await Hello2D({
         // The wasm binary sits next to this worker script, and a module worker resolves relative
         // URLs against its own script URL.
@@ -106,6 +111,12 @@ async function onInit(message: any) {
     if (!view) {
         send('error', {message: 'TGFXView.MakeFrom() returned null'});
         return;
+    }
+    if (message.useWebGPU) {
+        // The device has to be created on this thread: a GPUDevice cannot be transferred from the
+        // page, and a worker has no default device to fall back on. It has to be supplied before
+        // updateSize() builds the window.
+        view.setWebGPUDevice(await createWebGPUDevice());
     }
 
     for (const image of message.images) {
@@ -237,4 +248,22 @@ async function registerWorkerFonts(fonts: {default: ArrayBuffer; emoji: ArrayBuf
         await face.load();
         workerFonts.add(face);
     }
+}
+
+// A GPUDevice cannot be moved across a worker boundary, so it is created on this thread instead of
+// being handed over by the page. navigator.gpu is available in a dedicated worker.
+async function createWebGPUDevice(): Promise<any> {
+    const gpu = (navigator as unknown as {gpu?: any}).gpu;
+    if (!gpu) {
+        throw new Error('WebGPU is not supported in this browser.');
+    }
+    const adapter = await gpu.requestAdapter();
+    if (!adapter) {
+        throw new Error('Failed to get the WebGPU adapter.');
+    }
+    const device = await adapter.requestDevice();
+    if (!device) {
+        throw new Error('Failed to get the WebGPU device.');
+    }
+    return device;
 }

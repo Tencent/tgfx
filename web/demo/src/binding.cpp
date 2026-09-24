@@ -28,6 +28,9 @@ EMSCRIPTEN_BINDINGS(TGFXDemo) {
       .function("setImagePath", &TGFXBaseView::setImagePath)
       .function("updateSize", &TGFXBaseView::updateSize)
       .function("setLayoutDensity", &TGFXBaseView::setLayoutDensity)
+#ifdef TGFX_USE_WEBGPU
+      .function("setWebGPUDevice", &TGFXBaseView::setWebGPUDevice)
+#endif
       .function("updateLayerTree", &TGFXBaseView::updateLayerTree)
       .function("updateZoomScaleAndOffset", &TGFXBaseView::updateZoomScaleAndOffset)
       .function("draw", &TGFXBaseView::draw)

@@ -26,7 +26,11 @@ const container = document.getElementById('container') as HTMLDivElement;
 const hud = document.getElementById('hud') as HTMLDivElement;
 const statsElement = document.getElementById('stats') as HTMLPreElement;
 
-const worker = new Worker('./wasm/worker-render.js', {type: 'module'});
+// The page bundle is emitted once per worker backend, and the HTML page declares which one it is.
+const useWebGPU = new URL(import.meta.url).searchParams.has('webgpu');
+
+// Resolved against this bundle's own URL so that each build directory loads its own worker script.
+const worker = new Worker(new URL('./worker-render.js', import.meta.url), {type: 'module'});
 
 // Keeps only the most recent lines: during a drag a resize line arrives per step, and appending to a
 // DOM node on every one of them is main thread work that the whole point of this demo is to avoid.
@@ -211,6 +215,7 @@ window.onload = async () => {
         worker.postMessage({
             type: 'init',
             canvas: offscreen,
+            useWebGPU,
             ...layout,
             images: [{name: 'bridge', bitmap: bridgeBitmap}, {name: 'TGFX', bitmap: tgfxBitmap}],
             fonts: {default: fontBuffer, emoji: emojiBuffer},

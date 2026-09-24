@@ -173,10 +173,18 @@ export interface EmscriptenGL {
     textures: (WebGLTexture | null)[];
 }
 
+export interface EmscriptenWebGPU {
+    mgrSurface: {create: (context: any) => number};
+    mgrDevice: {create: (device: any, wrapper?: any) => number};
+    mgrQueue: {create: (queue: any) => number};
+    [key: string]: any;
+}
+
 export interface TGFX extends EmscriptenModule {
     TGFXLineCap: TGFXLineCap;
     TGFXLineJoin: TGFXLineJoin;
     GL: EmscriptenGL;
+    WebGPU: EmscriptenWebGPU;
     TGFXPathFillType: TGFXPathFillType;
     /**
      * Sets the maximum number of worker threads that can be created for running tasks. Pass zero to
