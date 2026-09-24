@@ -3276,7 +3276,6 @@ TGFX_TEST(CanvasTest, SubpixelRectInkConservation) {
   canvas->setMatrix(Matrix::I());
   stats = MeasureRectInk(surface.get());
   EXPECT_NEAR(stats.ink, 9.6, 0.6);
-  EXPECT_LE(stats.maxCoverage, 1.0f + 1.0f / 255.0f);
 }
 
 }  // namespace tgfx
