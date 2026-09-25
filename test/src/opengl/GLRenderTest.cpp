@@ -19,8 +19,10 @@
 #include <CoreVideo/CoreVideo.h>
 #include <OpenGL/CGLContext.h>
 #include <OpenGL/CGLCurrent.h>
+#include <algorithm>
 #include <array>
 #include <chrono>
+#include <cstring>
 #include <vector>
 #include "core/utils/BlockAllocator.h"
 #include "core/utils/PixelFormatUtil.h"
@@ -46,6 +48,10 @@
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Surface.h"
 #include "utils/TestUtils.h"
+#if !defined(TGFX_USE_SWIFTSHADER)
+#include "gpu/opengl/cgl/CGLHardwareTexture.h"
+#include "tgfx/platform/HardwareBuffer.h"
+#endif
 
 namespace tgfx {
 
@@ -166,12 +172,259 @@ static GLTextureInfo CreateRectangleTexture(Context* context, int width, int hei
   return glInfo;
 }
 
+#if !defined(TGFX_USE_SWIFTSHADER)
+namespace {
+struct HardwareImportTestResources {
+  explicit HardwareImportTestResources(GLGPU* gpu) : gpu(gpu), gl(gpu->functions()) {
+  }
+  ~HardwareImportTestResources() {
+    gl->bindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+    gl->deleteBuffers(1, &unpackBuffer);
+    gl->deleteFramebuffers(2, framebuffers.data());
+    gl->deleteTextures(1, &rectangle);
+    if (buffer != nullptr) {
+      HardwareBufferRelease(buffer);
+    }
+    gpu->resetGLState();
+  }
+  GLGPU* gpu;
+  const GLFunctions* gl;
+  HardwareBufferRef buffer = nullptr;
+  std::array<unsigned, 2> framebuffers = {};
+  unsigned rectangle = 0;
+  unsigned unpackBuffer = 0;
+};
+
+using ImportState = std::array<int, 6>;
+ImportState ReadImportState(const GLFunctions* gl) {
+  const unsigned names[] = {
+      GL_ACTIVE_TEXTURE,           GL_TEXTURE_BINDING_2D,       GL_TEXTURE_BINDING_RECTANGLE,
+      GL_READ_FRAMEBUFFER_BINDING, GL_DRAW_FRAMEBUFFER_BINDING, GL_PIXEL_UNPACK_BUFFER_BINDING};
+  ImportState state = {};
+  for (size_t i = 0; i < state.size(); ++i) {
+    gl->getIntegerv(names[i], &state[i]);
+  }
+  return state;
+}
+
+GLDeleteTextures* originalImportDeleteTextures = nullptr;
+unsigned watchedImportTexture = 0;
+int watchedImportDeletes = 0;
+void TrackImportDeleteTextures(int count, const unsigned* textures) {
+  for (int i = 0; i < count; ++i) {
+    if (textures[i] == watchedImportTexture) {
+      ++watchedImportDeletes;
+    }
+  }
+  originalImportDeleteTextures(count, textures);
+}
+
+class ScopedImportFailure {
+ public:
+  enum class Stage { Framebuffer, Allocation, Copy };
+  ScopedImportFailure(const GLFunctions* gl, Stage stage)
+      : functions(const_cast<GLFunctions*>(gl)), saved(*gl), stage(stage) {
+    current = this;
+    functions->genTextures = [](int count, unsigned* ids) {
+      current->saved.genTextures(count, ids);
+      current->createdTextures.insert(current->createdTextures.end(), ids, ids + count);
+    };
+    functions->deleteTextures = [](int count, const unsigned* ids) {
+      current->deletedTextures.insert(current->deletedTextures.end(), ids, ids + count);
+      current->saved.deleteTextures(count, ids);
+    };
+    functions->genFramebuffers = [](int count, unsigned* ids) {
+      current->saved.genFramebuffers(count, ids);
+      current->createdFramebuffers.insert(current->createdFramebuffers.end(), ids, ids + count);
+    };
+    functions->deleteFramebuffers = [](int count, const unsigned* ids) {
+      current->deletedFramebuffers.insert(current->deletedFramebuffers.end(), ids, ids + count);
+      current->saved.deleteFramebuffers(count, ids);
+    };
+    functions->checkFramebufferStatus = [](unsigned target) -> unsigned {
+      return current->stage == Stage::Framebuffer ? GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT
+                                                  : current->saved.checkFramebufferStatus(target);
+    };
+    functions->texImage2D = [](unsigned target, int level, int format, int width, int height,
+                               int border, unsigned externalFormat, unsigned type,
+                               const void* pixels) {
+      current->saved.texImage2D(target, level, format,
+                                current->stage == Stage::Allocation ? -1 : width, height, border,
+                                externalFormat, type, pixels);
+    };
+    functions->copyTexSubImage2D = [](unsigned target, int level, int xOffset, int yOffset, int x,
+                                      int y, int width, int height) {
+      current->saved.copyTexSubImage2D(target, level, xOffset, yOffset, x, y,
+                                       current->stage == Stage::Copy ? -1 : width, height);
+    };
+  }
+  ~ScopedImportFailure() {
+    *functions = saved;
+    current = nullptr;
+  }
+  ScopedImportFailure(const ScopedImportFailure&) = delete;
+  ScopedImportFailure& operator=(const ScopedImportFailure&) = delete;
+
+  std::vector<unsigned> createdTextures = {};
+  std::vector<unsigned> deletedTextures = {};
+  std::vector<unsigned> createdFramebuffers = {};
+  std::vector<unsigned> deletedFramebuffers = {};
+
+ private:
+  static thread_local ScopedImportFailure* current;
+  GLFunctions* functions;
+  GLFunctions saved;
+  Stage stage;
+};
+thread_local ScopedImportFailure* ScopedImportFailure::current = nullptr;
+}  // namespace
+
+TGFX_TEST(GLRenderTest, HardwareImportFailureRestoresState) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto gpu = static_cast<GLGPU*>(context->gpu());
+  auto gl = gpu->functions();
+  HardwareImportTestResources resources(gpu);
+  resources.buffer = HardwareBufferAllocate(13, 7);
+  ASSERT_NE(resources.buffer, nullptr);
+  TextureDescriptor descriptor = {8,     8, PixelFormat::RGBA_8888,
+                                  false, 1, TextureUsage::TEXTURE_BINDING};
+  auto sentinel = std::static_pointer_cast<GLTexture>(gpu->createTexture(descriptor));
+  ASSERT_NE(sentinel, nullptr);
+  gl->genFramebuffers(2, resources.framebuffers.data());
+  gl->genBuffers(1, &resources.unpackBuffer);
+  gpu->state()->bindTexture(sentinel.get(), 3);
+  gl->bindFramebuffer(GL_READ_FRAMEBUFFER, resources.framebuffers[0]);
+  gl->bindFramebuffer(GL_DRAW_FRAMEBUFFER, resources.framebuffers[1]);
+  gl->bindBuffer(GL_PIXEL_UNPACK_BUFFER, resources.unpackBuffer);
+  auto before = ReadImportState(gl);
+  EXPECT_TRUE(
+      CGLHardwareTexture::MakeFrom(gpu, nullptr, TextureUsage::TEXTURE_BINDING, nullptr).empty());
+  for (auto stage : {ScopedImportFailure::Stage::Framebuffer,
+                     ScopedImportFailure::Stage::Allocation, ScopedImportFailure::Stage::Copy}) {
+    SCOPED_TRACE(static_cast<int>(stage));
+    ScopedImportFailure failure(gl, stage);
+    auto imported = gpu->importHardwareTextures(resources.buffer, TextureUsage::TEXTURE_BINDING);
+    EXPECT_TRUE(imported.empty());
+    EXPECT_EQ(ReadImportState(gl), before);
+    EXPECT_EQ(failure.createdFramebuffers.size(), 1u);
+    EXPECT_EQ(failure.createdFramebuffers, failure.deletedFramebuffers);
+    EXPECT_EQ(failure.createdTextures.size(),
+              stage == ScopedImportFailure::Stage::Framebuffer ? 0u : 1u);
+    EXPECT_EQ(failure.createdTextures, failure.deletedTextures);
+    gpu->state()->bindTexture(sentinel.get(), 3);
+    EXPECT_EQ(ReadImportState(gl), before);
+    EXPECT_TRUE(CheckGLError(gl));
+  }
+}
+
+TGFX_TEST(GLRenderTest, HardwareImportPreservesBindings) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto gpu = static_cast<GLGPU*>(context->gpu());
+  auto gl = gpu->functions();
+  HardwareImportTestResources resources(gpu);
+  resources.buffer = HardwareBufferAllocate(13, 7);
+  ASSERT_NE(resources.buffer, nullptr);
+  auto* pixels = static_cast<uint8_t*>(HardwareBufferLock(resources.buffer));
+  ASSERT_NE(pixels, nullptr);
+  auto info = HardwareBufferGetInfo(resources.buffer);
+  std::memset(pixels, 0x7f, info.rowBytes * static_cast<size_t>(info.height));
+  HardwareBufferUnlock(resources.buffer);
+  TextureDescriptor descriptor = {8,     8, PixelFormat::RGBA_8888,
+                                  false, 1, TextureUsage::TEXTURE_BINDING};
+  auto sentinel = std::static_pointer_cast<GLTexture>(gpu->createTexture(descriptor));
+  ASSERT_NE(sentinel, nullptr);
+  gl->genFramebuffers(2, resources.framebuffers.data());
+  gl->genTextures(1, &resources.rectangle);
+  gl->genBuffers(1, &resources.unpackBuffer);
+  gpu->state()->bindTexture(sentinel.get(), 3);
+  gl->bindTexture(GL_TEXTURE_RECTANGLE, resources.rectangle);
+  gl->bindFramebuffer(GL_READ_FRAMEBUFFER, resources.framebuffers[0]);
+  gl->bindFramebuffer(GL_DRAW_FRAMEBUFFER, resources.framebuffers[1]);
+  auto before = ReadImportState(gl);
+  ClearGLError(gl);
+  for (bool withUnpackBuffer : {false, true}) {
+    SCOPED_TRACE(withUnpackBuffer);
+    gl->bindBuffer(GL_PIXEL_UNPACK_BUFFER, withUnpackBuffer ? resources.unpackBuffer : 0);
+    before = ReadImportState(gl);
+    auto imported = gpu->importHardwareTextures(resources.buffer, TextureUsage::TEXTURE_BINDING);
+    ASSERT_EQ(imported.size(), 1u);
+    EXPECT_EQ(imported.front()->type(), TextureType::TwoD);
+    EXPECT_EQ(ReadImportState(gl), before);
+    gpu->state()->bindTexture(sentinel.get(), 3);
+    EXPECT_EQ(ReadImportState(gl), before);
+    EXPECT_TRUE(CheckGLError(gl));
+  }
+}
+
+TGFX_TEST(GLRenderTest, HardwareImportCopyAndRelease) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto gpu = static_cast<GLGPU*>(context->gpu());
+  auto gl = gpu->functions();
+  HardwareImportTestResources resources(gpu);
+  resources.buffer = HardwareBufferAllocate(13, 7);
+  ASSERT_NE(resources.buffer, nullptr);
+  auto* pixels = static_cast<uint8_t*>(HardwareBufferLock(resources.buffer));
+  ASSERT_NE(pixels, nullptr);
+  auto info = HardwareBufferGetInfo(resources.buffer);
+  std::vector<uint8_t> expected(13 * 7 * 4);
+  for (size_t y = 0; y < 7; ++y) {
+    for (size_t x = 0; x < 13; ++x) {
+      uint8_t rgba[] = {static_cast<uint8_t>(x * 7), static_cast<uint8_t>(y * 13), 31,
+                        static_cast<uint8_t>(128 + x + y)};
+      auto offset = (y * 13 + x) * 4;
+      std::copy(rgba, rgba + 4, expected.begin() + static_cast<ptrdiff_t>(offset));
+      auto dst = pixels + y * info.rowBytes + x * 4;
+      dst[0] = rgba[2];
+      dst[1] = rgba[1];
+      dst[2] = rgba[0];
+      dst[3] = rgba[3];
+    }
+  }
+  HardwareBufferUnlock(resources.buffer);
+  for (int i = 0; i < 3; ++i) {
+    auto imported = gpu->importHardwareTextures(resources.buffer, TextureUsage::TEXTURE_BINDING);
+    ASSERT_EQ(imported.size(), 1u);
+    auto texture = std::static_pointer_cast<GLTexture>(imported.front());
+    gl->genFramebuffers(1, &resources.framebuffers[0]);
+    gl->bindFramebuffer(GL_READ_FRAMEBUFFER, resources.framebuffers[0]);
+    gl->framebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, texture->target(),
+                             texture->textureID(), 0);
+    ASSERT_EQ(gl->checkFramebufferStatus(GL_READ_FRAMEBUFFER),
+              static_cast<unsigned>(GL_FRAMEBUFFER_COMPLETE));
+    std::vector<uint8_t> actual(expected.size());
+    gl->bindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+    gl->pixelStorei(GL_PACK_ROW_LENGTH, 0);
+    gl->pixelStorei(GL_PACK_ALIGNMENT, 1);
+    gl->readPixels(0, 0, 13, 7, GL_RGBA, GL_UNSIGNED_BYTE, actual.data());
+    EXPECT_EQ(actual, expected);
+    gl->deleteFramebuffers(1, &resources.framebuffers[0]);
+    resources.framebuffers[0] = 0;
+    gpu->resetGLState();
+    watchedImportTexture = texture->textureID();
+    watchedImportDeletes = 0;
+    auto functions = const_cast<GLFunctions*>(gl);
+    originalImportDeleteTextures = functions->deleteTextures;
+    functions->deleteTextures = TrackImportDeleteTextures;
+    imported.clear();
+    texture.reset();
+    gpu->processUnreferencedResources();
+    functions->deleteTextures = originalImportDeleteTextures;
+    EXPECT_EQ(watchedImportDeletes, 1);
+    EXPECT_TRUE(CheckGLError(gl));
+  }
+}
+
 // Measures the two image import paths on desktop OpenGL: the IOSurface zero-copy import
 // (CVOpenGLTextureCache, produces GL_TEXTURE_RECTANGLE) versus a plain GL_TEXTURE_2D upload
 // (genTextures + texImage2D + glFinish). Each round creates and releases a fresh texture like a
 // real image decode would; the pixel source is a single pre-filled buffer so only the import cost
 // is measured. Desktop-only: the CGL/CVOpenGL symbols do not exist in SwiftShader's EGL build.
-#if !defined(TGFX_USE_SWIFTSHADER)
 TGFX_TEST(GLRenderTest, TextureImportBenchmark) {
   ContextScope scope;
   auto context = scope.getContext();
