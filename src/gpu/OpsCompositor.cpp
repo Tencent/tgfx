@@ -1430,6 +1430,11 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
         if (task != nullptr) {
           submitDrawOps();
           context->drawingManager()->addRenderTask(std::move(task));
+          // The chain task writes level 0 directly, so a mipmapped target must regenerate its
+          // lower levels afterwards — every other path that renders into a mipmapped render
+          // target schedules this (see addOpsRenderTask), and skipping it leaves downscaled
+          // consumers sampling stale transparent levels.
+          context->drawingManager()->addGenerateMipmapsTask(renderTarget->asTextureProxy());
           return;
         }
       }
@@ -1473,6 +1478,8 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
       if (task != nullptr) {
         submitDrawOps();
         context->drawingManager()->addRenderTask(std::move(task));
+        // Same mipmap regeneration as the folded route above.
+        context->drawingManager()->addGenerateMipmapsTask(renderTarget->asTextureProxy());
         return;
       }
     } else {
@@ -1558,6 +1565,8 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
                 if (task != nullptr) {
                   submitDrawOps();
                   context->drawingManager()->addRenderTask(std::move(task));
+                  // Same mipmap regeneration as the folded route above.
+                  context->drawingManager()->addGenerateMipmapsTask(renderTarget->asTextureProxy());
                   return;
                 }
               }
