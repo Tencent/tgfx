@@ -45,9 +45,10 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 };
 
 #if GP_KIND == 1
-// Quad form: the background coordinate arrives as a vec3 (perspective-safe; the affine case
-// divides by 1.0), and the quad's per-vertex edge coverage replaces the analytic ellipse coverage.
-layout(location = 0) in vec3 TransformedCoords_0;
+// Quad form: the background coordinate arrives already divided as a vec2 (the matcher rejects
+// projective transforms, so emitTransforms' affine path is the only one to reproduce — see the
+// vertex kernel), and the quad's per-vertex edge coverage replaces the analytic ellipse coverage.
+layout(location = 0) in vec2 TransformedCoords_0;
 layout(location = 1) in float vCoverage;
 #else
 layout(location = 0) in vec2 vEllipseOffsets;
@@ -227,11 +228,8 @@ void main() {
   // The refraction body mirrors GLSLGlassRefractionFragmentProcessor::emitCode
   // expression-for-expression; the static dispersion/lighting branches of the runtime emission
   // ride the DispersionOn/LightingOn uniforms here with identical math.
-#if GP_KIND == 1
-  vec2 backgroundUV = TransformedCoords_0.xy / TransformedCoords_0.z;
-#else
+  // Both GP forms now carry the affine vec2 coordinate; only the varying location differs.
   vec2 backgroundUV = TransformedCoords_0;
-#endif
   vec2 sourceUV = backgroundUV * GlassOpticsP0.xy;
   vec2 glassUV = backgroundUV * GlassOpticsP2.xy + GlassOpticsP3.xy;
 

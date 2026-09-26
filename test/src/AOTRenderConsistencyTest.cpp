@@ -7244,7 +7244,12 @@ TGFX_TEST(AOTRenderConsistencyTest, FiltersSceneAOTMatchesJIT) {
 
 // Renders the GlassStyleEllipticalCornerSingleCell scene once and reads the result back: a
 // checker background, two contrast shapes, and one elliptical-corner glass panel.
-static Bitmap RenderGlassCellScene(Context* renderContext) {
+// cornerRadius selects the glass panel's shape class, which decides the geometry processor the
+// terminal draw uses: a rounded panel resolves to an RRect (EllipseGeometryProcessor), while a
+// zero radius makes it a plain rect that draws through QuadPerEdgeAAGeometryProcessor. The two
+// GPs have DIFFERENT vertex attribute layouts, so both must be covered here.
+static Bitmap RenderGlassCellScene(Context* renderContext, float cornerRadiusX = 40.0f,
+                                   float cornerRadiusY = 20.0f) {
   constexpr float cellSize = 200;
   auto surface =
       Surface::Make(renderContext, static_cast<int>(cellSize), static_cast<int>(cellSize));
@@ -7276,8 +7281,8 @@ static Bitmap RenderGlassCellScene(Context* renderContext) {
   glassLayer->setColor(Color::FromRGBA(255, 255, 255, 128));
   glassLayer->setWidth(180);
   glassLayer->setHeight(120);
-  glassLayer->setRadiusX(40);
-  glassLayer->setRadiusY(20);
+  glassLayer->setRadiusX(cornerRadiusX);
+  glassLayer->setRadiusY(cornerRadiusY);
   glassLayer->setMatrix(Matrix::MakeTrans((cellSize - 180) * 0.5f, (cellSize - 120) * 0.5f));
   // TGFX_GLASS_PROBE_STYLE selects a degenerate glass configuration: "nolight" disables the edge
   // light (no EdgeLight UDF field), "norefraction" disables the refraction offset, isolating which
@@ -7395,6 +7400,59 @@ TGFX_TEST(AOTRenderConsistencyTest, GlassCellSceneAOTMatchesJIT) {
   std::printf("[GlassCellProbe] diffPixels=%zu/%zu maxChannelDelta=%d\n", diffCount, pixelCount,
               maxChannelDelta);
   EXPECT_EQ(diffCount, static_cast<size_t>(0));
+}
+
+// Same A/B as above with a SHARP-cornered glass panel. A zero corner radius makes the panel a
+// plain rect, which the glass style draws through QuadPerEdgeAAGeometryProcessor instead of the
+// rounded panel's EllipseGeometryProcessor — a different vertex attribute layout, and therefore a
+// different GP_KIND permutation of GlassRefractionShader. The rounded case above exercises only
+// GP_KIND=0, so without this test the quad vertex kernel has no coverage at all: it shipped
+// reading a uvCoord attribute that this GP form does not declare, which silently bound the colour
+// attribute as the background coordinate and flooded the panel with a single sampled colour.
+TGFX_TEST(AOTRenderConsistencyTest, GlassSharpCornerSceneAOTMatchesJIT) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  cache->unload();
+
+  auto jitBitmap = RenderGlassCellScene(context, 0.0f, 0.0f);
+
+  auto bundle = EmbeddedShaderBundles::GetBundle(context->backend());
+  ASSERT_TRUE(bundle.first != nullptr && bundle.second > 0);
+  ASSERT_TRUE(cache->loadBundle(bundle.first, bundle.second));
+  context->globalCache()->clearPrograms();
+  auto aotBitmap = RenderGlassCellScene(context, 0.0f, 0.0f);
+  cache->unload();
+
+  ASSERT_EQ(jitBitmap.width(), aotBitmap.width());
+  ASSERT_EQ(jitBitmap.height(), aotBitmap.height());
+  auto* jitSharpPixels = static_cast<const uint32_t*>(const_cast<Bitmap&>(jitBitmap).lockPixels());
+  auto* aotSharpPixels = static_cast<const uint32_t*>(const_cast<Bitmap&>(aotBitmap).lockPixels());
+  ASSERT_TRUE(jitSharpPixels != nullptr && aotSharpPixels != nullptr);
+  size_t sharpDiffCount = 0;
+  int sharpMaxChannelDelta = 0;
+  auto sharpPixelCount =
+      static_cast<size_t>(jitBitmap.width()) * static_cast<size_t>(jitBitmap.height());
+  for (size_t i = 0; i < sharpPixelCount; ++i) {
+    if (jitSharpPixels[i] == aotSharpPixels[i]) {
+      continue;
+    }
+    ++sharpDiffCount;
+    for (int shift = 0; shift < 32; shift += 8) {
+      auto delta = std::abs(static_cast<int>((jitSharpPixels[i] >> shift) & 0xff) -
+                            static_cast<int>((aotSharpPixels[i] >> shift) & 0xff));
+      sharpMaxChannelDelta = std::max(sharpMaxChannelDelta, delta);
+    }
+  }
+  const_cast<Bitmap&>(jitBitmap).unlockPixels();
+  const_cast<Bitmap&>(aotBitmap).unlockPixels();
+  std::printf("[GlassSharpProbe] diffPixels=%zu/%zu maxChannelDelta=%d\n", sharpDiffCount,
+              sharpPixelCount, sharpMaxChannelDelta);
+  // The wrong-attribute bug produced maxChannelDelta=127 over ~60% of the panel. The residual
+  // tolerated here is the same 1-LSB rounding the other AOT/JIT probes accept.
+  EXPECT_LE(sharpMaxChannelDelta, 1);
+  EXPECT_LE(sharpDiffCount, sharpPixelCount / 100);
 }
 
 }  // namespace tgfx

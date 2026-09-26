@@ -1362,10 +1362,11 @@ static std::optional<PermutationMatchResult> TryMatchGlassRefraction(
     gpKind = 0;
   } else if (gp->name() == "QuadPerEdgeAAGeometryProcessor") {
     auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
-    // The quad vertex reads the uvCoord attribute for the background transform and the per-edge
-    // coverage for the glass edge alpha; a subset-carrying quad has a different transform
-    // contract and stays on the fallback route.
-    if (!quadGP->hasCommonColor() || !quadGP->hasUVMatrix() || quadGP->getHasSubset()) {
+    // The uvMatrix form is required: it declares no uvCoord attribute, so the GP transforms the
+    // position for the background coordinate, which is what the quad vertex kernel reads. A
+    // subset-carrying quad has a different transform contract and stays on the fallback route.
+    if (!quadGP->hasCommonColor() || !quadGP->hasUVMatrix() || quadGP->getHasSubset() ||
+        quadGP->getHasUVPerspective()) {
       return std::nullopt;
     }
     gpKind = 1;
@@ -1385,6 +1386,13 @@ static std::optional<PermutationMatchResult> TryMatchGlassRefraction(
   }
   auto* refraction = static_cast<const GlassRefractionFragmentProcessor*>(fp);
   if (refraction->numChildProcessors() != 1 || refraction->numTextureSamplers() != 1) {
+    return std::nullopt;
+  }
+  // Both vertex kernels emit the affine coordinate form ((Matrix * vec3(pos, 1)).xy computed in
+  // the vertex stage), matching GeometryProcessor::emitTransforms' non-perspective branch. A
+  // projective transform makes the runtime emit a vec3 varying divided in the fragment stage, so
+  // it must ride the runtime route — the same policy TextureEffectIsProjective applies above.
+  if (fp->numCoordTransforms() > 0 && fp->coordTransform(0)->matrix.hasPerspective()) {
     return std::nullopt;
   }
   auto child = refraction->childProcessor(0);
