@@ -270,16 +270,18 @@ struct GlassUDFTentBlurInputs {
 
 /**
  * Input contract of the GlassRefractionShader matcher rule. The GP selects the GP_KIND dimension
- * (0=ellipse common color, 1=quad common color with uvCoord and per-edge coverage) because it
- * changes the vertex attribute layout and the initial-coverage source. The geometry child selects
- * the GEOMETRY_KIND dimension (0=SDF rounded rect, 1=SDF ellipse, 2=UDF, 3=UDF + edge light)
- * because it changes the sampler layout; the dispersion and lighting branches ride runtime
- * uniforms.
+ * (0=ellipse common color, 1=quad common color in its uvMatrix form with per-edge coverage)
+ * because it changes the vertex attribute layout and the initial-coverage source. The geometry
+ * child selects the GEOMETRY_KIND dimension (0=SDF rounded rect, 1=SDF ellipse, 2=UDF, 3=UDF +
+ * edge light) because it changes the sampler layout. Dispersion selects DISPERSION_ON because the
+ * runtime folds the same predicate into the program key and emits only one tap path; the lighting
+ * branch rides a runtime uniform since it cannot move a texture coordinate.
  */
 struct GlassRefractionInputs {
-  int gpKind = -1;        // -1 = unrepresentable geometry processor form.
-  int geometryKind = -1;  // -1 = unrepresentable geometry child.
-  int xpType = -1;        // -1 = no representable XferProcessor.
+  int gpKind = -1;            // -1 = unrepresentable geometry processor form.
+  int geometryKind = -1;      // -1 = unrepresentable geometry child.
+  bool dispersionOn = false;  // Mirrors GlassRefractionFragmentProcessor::hasDispersion().
+  int xpType = -1;            // -1 = no representable XferProcessor.
 };
 
 /**

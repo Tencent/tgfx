@@ -1415,6 +1415,9 @@ static std::optional<PermutationMatchResult> TryMatchGlassRefraction(
   GlassRefractionInputs inputs;
   inputs.gpKind = gpKind;
   inputs.geometryKind = geometryKind;
+  // Same predicate the runtime folds into the program key, so the compile-time variant tracks the
+  // runtime program one-for-one.
+  inputs.dispersionOn = refraction->hasDispersion();
   inputs.xpType = xpType;
   auto composed = ComposeGlassRefraction(inputs);
   if (!composed) {

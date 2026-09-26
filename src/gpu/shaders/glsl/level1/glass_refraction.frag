@@ -37,8 +37,8 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 GlassFineMaskUV;
   vec2 GlassEdgeSpan;
   vec4 GlassEdgeMaskUV;
-  // Runtime branches replacing the runtime emission's static dispersion/lighting branches.
-  int DispersionOn;
+  // Edge lighting stays a runtime branch: it only adds to an already-sampled colour, so it cannot
+  // move a texture coordinate. Dispersion is a compile-time dimension instead (see DISPERSION_ON).
   int LightingOn;
 #include "coverage_uniforms.inc"
 #include "xp_uniforms.inc"
@@ -243,20 +243,24 @@ void main() {
 
   vec3 finalColor;
   float srcAlpha;
-  if (DispersionOn != 0) {
-    vec2 uvR = sourceUV + uvOffset * (1.0 + GlassOpticsP0.z);
-    vec2 uvG = sourceUV + uvOffset;
-    vec2 uvB = sourceUV + uvOffset * (1.0 - GlassOpticsP0.z);
-    vec4 srcG = texture(TextureSampler_0, uvG);
-    finalColor.r = texture(TextureSampler_0, uvR).r;
-    finalColor.g = srcG.g;
-    finalColor.b = texture(TextureSampler_0, uvB).b;
-    srcAlpha = srcG.a;
-  } else {
-    vec4 srcColor = texture(TextureSampler_0, sourceUV + uvOffset);
-    finalColor = srcColor.rgb;
-    srcAlpha = srcColor.a;
-  }
+  // Compile-time, not a runtime branch: keeping both taps in one text lets the compiler hoist the
+  // shared `sourceUV + uvOffset` across the branch, which shifts the sampled coordinate by an ULP
+  // against the runtime's branch-free program and flips the occasional texel. #if reproduces the
+  // runtime emission's structure exactly — it emits one path or the other and never both.
+#if DISPERSION_ON
+  vec2 uvR = sourceUV + uvOffset * (1.0 + GlassOpticsP0.z);
+  vec2 uvG = sourceUV + uvOffset;
+  vec2 uvB = sourceUV + uvOffset * (1.0 - GlassOpticsP0.z);
+  vec4 srcG = texture(TextureSampler_0, uvG);
+  finalColor.r = texture(TextureSampler_0, uvR).r;
+  finalColor.g = srcG.g;
+  finalColor.b = texture(TextureSampler_0, uvB).b;
+  srcAlpha = srcG.a;
+#else
+  vec4 srcColor = texture(TextureSampler_0, sourceUV + uvOffset);
+  finalColor = srcColor.rgb;
+  srcAlpha = srcColor.a;
+#endif
 
   if (LightingOn != 0) {
     if (edgeWeight > 0.0) {

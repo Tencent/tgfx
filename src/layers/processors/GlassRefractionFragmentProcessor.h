@@ -52,6 +52,16 @@ class GlassRefractionFragmentProcessor : public FragmentProcessor {
     return "GlassRefractionFragmentProcessor";
   }
 
+  /**
+   * Returns whether the chromatic dispersion path is active. This is the same predicate
+   * onComputeProcessorKey folds into the program key and GLSLGlassRefractionFragmentProcessor
+   * branches on when emitting code, so a precompiled kernel selecting a compile-time variant on
+   * it stays in lockstep with the runtime program identity.
+   */
+  bool hasDispersion() const {
+    return params.dispersion >= 0.01f;
+  }
+
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   size_t onCountTextureSamplers() const override;

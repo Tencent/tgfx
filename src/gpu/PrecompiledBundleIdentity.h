@@ -46,8 +46,15 @@ namespace tgfx {
  * without the second selector; a new runtime fed such a bundle would silently leave the second
  * tiled leaf on the plain Subset-clamp path (a semantic downgrade, not a crash), so they are
  * refused instead.
+ *
+ * 0x00010006: GlassRefractionShader turned dispersion into the DISPERSION_ON compile-time
+ * dimension and dropped the DispersionOn uniform. Both halves of that change are invisible to
+ * the identity hash: inserting a dimension shifts every fragment permutation index (an old
+ * index names a different variant now), and the uniform block lost a field the old kernels
+ * still read. A new runtime fed a pre-change bundle would bind a mismatched variant and leave
+ * that field uninitialized, so those bundles are refused.
  */
-inline constexpr uint32_t kExpectedToolchainABI = 0x00010005u;
+inline constexpr uint32_t kExpectedToolchainABI = 0x00010006u;
 
 inline uint64_t BundleIdentityHashInit() {
   return 0x54475346424E4443ULL;  // "TGSF BNDC"

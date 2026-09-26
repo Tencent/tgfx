@@ -30,8 +30,13 @@ namespace tgfx {
 /// transforms the position instead. The geometry child
 /// selects the GEOMETRY_KIND compile-time dimension because it changes the sampler layout: the SDF
 /// kinds are purely procedural (source texture only), while the UDF kinds add the height mask and
-/// the edge-light mask. Dispersion and edge lighting ride runtime-uniform branches that mirror the
-/// runtime emission's static branches expression-for-expression, so they add no variants.
+/// the edge-light mask. DISPERSION_ON is a compile-time dimension for the same reason the runtime
+/// makes it part of the program key (onComputeProcessorKey folds it into the key, and
+/// GLSLGlassRefractionFragmentProcessor emits one path or the other): a runtime-uniform branch
+/// would keep both paths in one text, and the compiler's cross-branch optimization then shifts the
+/// sampled coordinate by an ULP relative to the runtime's branch-free program. Edge lighting still
+/// rides a runtime uniform — it only adds to a colour already sampled, so it cannot move a texture
+/// coordinate.
 ///
 /// Vertex dimensions:
 ///   GP_KIND (int, 2 values): 0=Ellipse common color, 1=QuadPerEdgeAA (uvMatrix + edge coverage)
@@ -39,6 +44,7 @@ namespace tgfx {
 /// Fragment dimensions:
 ///   GP_KIND (int, 2 values): selects the initial-coverage source and the coordinate varying form
 ///   GEOMETRY_KIND (int, 4 values): 0=SDF rounded rect, 1=SDF ellipse, 2=UDF, 3=UDF + edge light
+///   DISPERSION_ON (int, 2 values): 0=single tap, 1=three chromatic taps
 ///   HAS_XP (int, 3 values): XferProcessor type
 class GlassRefractionShader : public PrecompiledShader {
  public:
@@ -53,17 +59,18 @@ class GlassRefractionShader : public PrecompiledShader {
   using VD = VertDims;
 
   struct FragDims {
-    enum : uint32_t { GP_KIND, GEOMETRY_KIND, HAS_XP, COUNT };
+    enum : uint32_t { GP_KIND, GEOMETRY_KIND, DISPERSION_ON, HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("GP_KIND", 2),
           PermutationInt("GEOMETRY_KIND", 4),
+          PermutationInt("DISPERSION_ON", 2),
           PermutationInt("HAS_XP", 3),
       });
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 3, "Update info() when fragment dimensions change.");
+  static_assert(FD::COUNT == 4, "Update info() when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"GlassRefractionShader",
