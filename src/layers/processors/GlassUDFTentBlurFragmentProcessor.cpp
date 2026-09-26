@@ -169,6 +169,12 @@ void GlassUDFTentBlurFragmentProcessor::onSetData(UniformData*,
   // texels into the blur wherever the sampling window leaves the subset.
   fragmentUniformData->setDataOptional("TiledChild",
                                        processor->name() == "TiledTextureEffect" ? 1 : 0);
+  // Default for the shared kernel's runtime device mask; a present mask FP overwrites it with 1
+  // later in traversal. The uniform ring buffer is recycled without clearing, so leaving this
+  // unwritten makes the draw inherit an earlier draw's flag and sample the padded dummy mask
+  // (or skip a real one) — the same default GaussianBlur1D and the other runtime-mask kernels
+  // upload.
+  fragmentUniformData->setDataOptional("HasDeviceMask", 0);
   // The precompiled tent-blur kernel folds the field selection and the packed-input decode into
   // runtime uniforms, so both values ride this same onSetData path.
   if (fragmentUniformData->hasField("Field")) {
