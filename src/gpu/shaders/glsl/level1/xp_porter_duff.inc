@@ -21,11 +21,25 @@ layout(set = 1, binding = XP_DST_TEX_BINDING) uniform sampler2D DstTextureSample
 
 #if HAS_XP == 1
 vec4 applyPorterDuffXP(vec4 srcColor, vec4 coverage) {
-  // No zero-coverage discard here: the Apple desktop GL driver miscompiles the conditional
-  // discard in this helper (fragments die even when the condition never fires, verified by
-  // replacing it with an equivalent early-out color write). The runtime-generated shader keeps
-  // its inline discard in main() where it compiles correctly. Dropping it is pixel-exact: at
-  // zero coverage the expression below reduces to dstColor, which is the framebuffer content.
+  // Zero-coverage discard, identical to GLSLPorterDuffXferProcessor::emitCode, which emits it
+  // whenever a dst texture sampler is bound. It is not optional: the dst texture is either a copy
+  // of the target taken before the draw or the target itself read without a barrier between the
+  // draw's own primitives, so a zero-coverage fragment that wrote `dstColor` back would replace
+  // what an earlier primitive of the same draw already blended there with the pre-draw value.
+  // Overlapping glyph quads hit this constantly (text_shape, emojiTextStrokeBlending lost whole
+  // strokes); any overlapping batch with a dst-reading blend mode does too.
+  //
+  // This helper once dropped the discard, citing an Apple desktop GL miscompile ("fragments die
+  // even when the condition never fires"). The miscompile is real but narrower than that: it
+  // reproduced only in pointwise_chain.frag, whose coverage was read back after the evaluation
+  // loop as chainResults[<uniform>]. With that read-back, a discard on the coverage killed every
+  // fragment of the draw, while the identical expression selected the correct colour when used
+  // without a discard. Capturing the registers inside the loop (see pointwise_chain.frag) makes
+  // the discard behave; the driver-internal cause was not established. No other kernel routed
+  // here reads its coverage from a uniform-indexed array.
+  if (coverage.r <= 0.0 && coverage.g <= 0.0 && coverage.b <= 0.0) {
+    discard;
+  }
   highp vec2 dstCoord = (gl_FragCoord.xy - DstTextureUpperLeft) * DstTextureCoordScale;
   vec4 dstColor = texture(DstTextureSampler, dstCoord);
   return xpBlendWithCoverage(srcColor, dstColor, coverage, XPBlendMode);

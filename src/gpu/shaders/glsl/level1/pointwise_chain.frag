@@ -367,6 +367,16 @@ void main() {
     chainLeafTex[3] = chainLeafFetch(TextureSampler_3, TransformedCoords_3, Subset_3, 3);
   }
 #endif
+  // The three registers the epilogue consumes (root, clip coverage, coverage subtree root) are
+  // captured as the loop writes them instead of being read back as chainResults[<uniform>] after
+  // the loop. Registers are reused, so "the last write to that register" is exactly what the
+  // read-back returned. The capture is required, not cosmetic: on the Apple desktop GL driver, the
+  // zero-coverage discard in applyPorterDuffXP (xp_porter_duff.inc) killed every fragment of the
+  // draw while the coverage came from that read-back, although the same expression selected the
+  // correct colour when no discard was present. Capturing inside the loop avoids it.
+  vec4 result = vec4(0.0);
+  vec4 clipRegister = vec4(0.0);
+  vec4 coverageRootRegister = vec4(0.0);
   for (int i = 0; i < SlotCount; ++i) {
     // Bits 20-24 of the selector carry the result register + 1 (0 = dead instruction, skip the
     // write). The value is evaluated before the write, so a consumer may share a register with
@@ -374,10 +384,19 @@ void main() {
     vec4 value = evalChainSlot(i);
     int outRegister = (SlotPacked[i].w >> 20) & 0x1F;
     if (outRegister != 0) {
-      chainResults[outRegister - 1] = value;
+      int written = outRegister - 1;
+      chainResults[written] = value;
+      if (written == RootIndex) {
+        result = value;
+      }
+      if (written == ClipCoverageRegister) {
+        clipRegister = value;
+      }
+      if (written == CoverageRootIndex) {
+        coverageRootRegister = value;
+      }
     }
   }
-  vec4 result = chainResults[RootIndex];
 
   // The narrow clip slots chain from the scalar unit one (-4) instead of multiplying the color
   // root, so their product is the pure clip coverage (see ClipCoverageRegister above). The atlas
@@ -386,7 +405,7 @@ void main() {
   // TGFX_XP_COVERAGE), unlike a MaskFilter's source-modulating mask, whose subtree keeps the
   // CoverageRootIndex source route (MaskCoverageBlendModesOnOpaqueBackground, byte-parity across
   // Src/SrcOver/Multiply/Darken).
-  vec4 clipCoverage = ClipCoverageRegister >= 0 ? chainResults[ClipCoverageRegister] : vec4(1.0);
+  vec4 clipCoverage = ClipCoverageRegister >= 0 ? clipRegister : vec4(1.0);
 
   // The device-space mask is draw COVERAGE (a clip/mask on the whole draw), so it multiplies the
   // coverage chain like the runtime's DeviceSpaceTextureEffect compositing — never the bare color.
@@ -409,7 +428,7 @@ void main() {
   // in only the device mask; the bare path multiplies the whole edge coverage once.
   highp vec4 ellipseFinalCoverage = vec4(deviceMask * ellipseGpCoverage);
   if (CoverageRootIndex >= 0) {
-    ellipseFinalCoverage = chainResults[CoverageRootIndex] * vec4(deviceMask);
+    ellipseFinalCoverage = coverageRootRegister * vec4(deviceMask);
   }
   ellipseFinalCoverage *= clipCoverage;
 #define TGFX_XP_SRC_COLOR (result * ellipseFinalCoverage)
@@ -418,7 +437,7 @@ void main() {
 #elif HAS_COVERAGE
   // A coverage subtree's root already carries the GP coverage (fed in through the -3 unit
   // input), so it replaces the plain vCoverage modulation instead of doubling it.
-  vec4 finalCoverage = CoverageRootIndex >= 0 ? chainResults[CoverageRootIndex] : vec4(vCoverage);
+  vec4 finalCoverage = CoverageRootIndex >= 0 ? coverageRootRegister : vec4(vCoverage);
   finalCoverage *= deviceMask;
   finalCoverage *= clipCoverage;
 #define TGFX_XP_SRC_COLOR (result * finalCoverage)
@@ -433,11 +452,10 @@ void main() {
   // coverage subtree stays in the source: the runtime itself modulates the source with it, so
   // blend(c*S, D) — not c*blend(S,D) + (1-c)*D — is the matching semantics there.
   vec4 noCovCoverage = clipCoverage * vec4(deviceMask);
-#define TGFX_XP_SRC_COLOR                                                            \
-  (CoverageRootIndex >= 0 ? result * chainResults[CoverageRootIndex] * noCovCoverage \
+#define TGFX_XP_SRC_COLOR                                                       \
+  (CoverageRootIndex >= 0 ? result * coverageRootRegister * noCovCoverage \
                           : result * noCovCoverage)
-#define TGFX_XP_SRC_UNPREMUL \
-  (CoverageRootIndex >= 0 ? result * chainResults[CoverageRootIndex] : result)
+#define TGFX_XP_SRC_UNPREMUL (CoverageRootIndex >= 0 ? result * coverageRootRegister : result)
 #define TGFX_XP_COVERAGE noCovCoverage
 #endif
 #include "xp_output.inc"
