@@ -28,6 +28,24 @@ static std::array<float, 12> MatrixColumnMajor(const std::array<float, 9>& value
           values[7], 0.0f,      values[2], values[5], values[8], 0.0f};
 }
 
+// Uploads one tiled recipe into the kernel's Tiled<field><suffix> uniform set ("" for the first
+// recipe, "2" for the second).
+static void UploadTiledRecipe(UniformData* uniformData, const AOTTiledTextureRecipe& recipe,
+                              const std::string& suffix) {
+  uniformData->setDataOptional("TiledModeX" + suffix, static_cast<int>(recipe.shaderModeX));
+  uniformData->setDataOptional("TiledModeY" + suffix, static_cast<int>(recipe.shaderModeY));
+  float subsetRect[] = {recipe.shaderSubset.left, recipe.shaderSubset.top,
+                        recipe.shaderSubset.right, recipe.shaderSubset.bottom};
+  uniformData->setDataOptional("TiledSubset" + suffix, subsetRect);
+  float clampRect[] = {recipe.shaderClamp.left, recipe.shaderClamp.top, recipe.shaderClamp.right,
+                       recipe.shaderClamp.bottom};
+  uniformData->setDataOptional("TiledClamp" + suffix, clampRect);
+  if (recipe.usesShaderDimensions) {
+    uniformData->setDataOptional("TiledDimension" + suffix, recipe.shaderDimensions);
+  }
+  uniformData->setDataOptional("TiledStrict" + suffix, recipe.strict ? 1 : 0);
+}
+
 static void UploadChainSlot(UniformData* uniformData, size_t index, const AOTChainSlot& slot,
                             int rrectOrdinal) {
   int selector = slot.op == AOTChainOp::Blend
@@ -168,7 +186,8 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
     const AOTTiledTextureRecipe* tiledRecipe, PlacementPtr<FragmentProcessor> maskChild,
     int coverageRootSlot, uint32_t coordSourceMask, PlacementPtr<FragmentProcessor> lutChild,
     int lutLeafIndex, std::vector<PlacementPtr<FragmentProcessor>> samplerPadding,
-    bool maskChildIsPhantom, int clipCoverageRegister, int tiledLeafIndex2) {
+    bool maskChildIsPhantom, int clipCoverageRegister, int tiledLeafIndex2,
+    const AOTTiledTextureRecipe* tiledRecipe2) {
   if (allocator == nullptr || slots.empty() || slots.size() > MaxSlots) {
     return nullptr;
   }
@@ -273,11 +292,11 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
       (static_cast<size_t>(tiledLeafIndex) >= leafCount || tiledRecipe == nullptr)) {
     return nullptr;
   }
-  // The second tiled leaf shares the first's recipe through the same uniform block, so it requires
-  // the same recipe pointer and must also name a real leaf.
+  // The second tiled leaf reads its own recipe (the Tiled*2 uniform set), so it requires that
+  // recipe, must name a real leaf distinct from the first, and only exists alongside the first.
   if (tiledLeafIndex2 >= 0 &&
       (tiledLeafIndex < 0 || static_cast<size_t>(tiledLeafIndex2) >= leafCount ||
-       tiledRecipe == nullptr || tiledLeafIndex2 == tiledLeafIndex)) {
+       tiledRecipe2 == nullptr || tiledLeafIndex2 == tiledLeafIndex)) {
     return nullptr;
   }
   // Leaves pair slot-for-slot with samplers: slot k must be the leaf that samples TextureSampler_k.
@@ -324,7 +343,8 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
   return allocator->make<AOTPointwiseChainProcessor>(
       std::move(textureLeaves), slots, rootSlot, tiledLeafIndex, tiledRecipe, std::move(maskChild),
       coverageRootSlot, coordSourceMask, std::move(lutChild), lutLeafIndex,
-      std::move(samplerPadding), maskChildIsPhantom, clipCoverageRegister, tiledLeafIndex2);
+      std::move(samplerPadding), maskChildIsPhantom, clipCoverageRegister, tiledLeafIndex2,
+      tiledRecipe2);
 }
 
 AOTPointwiseChainProcessor::AOTPointwiseChainProcessor(
@@ -333,7 +353,8 @@ AOTPointwiseChainProcessor::AOTPointwiseChainProcessor(
     const AOTTiledTextureRecipe* tiledRecipe, PlacementPtr<FragmentProcessor> maskChildFP,
     int coverageRootSlot, uint32_t coordSourceMask, PlacementPtr<FragmentProcessor> lutChildFP,
     int lutLeafIndex, std::vector<PlacementPtr<FragmentProcessor>> samplerPadding,
-    bool maskChildIsPhantom, int clipCoverageRegister, int tiledLeafIndex2)
+    bool maskChildIsPhantom, int clipCoverageRegister, int tiledLeafIndex2,
+    const AOTTiledTextureRecipe* tiledRecipe2)
     : FragmentProcessor(ClassID()), _slotCount(newSlots.size()), rootSlot(rootSlot),
       tiledLeafIndex(tiledLeafIndex), tiledLeafIndex2(tiledLeafIndex2),
       hasMaskSlotChild(maskChildFP != nullptr),
@@ -342,6 +363,9 @@ AOTPointwiseChainProcessor::AOTPointwiseChainProcessor(
       coordSourceMask(coordSourceMask), lutLeafIndex(lutLeafIndex) {
   if (tiledRecipe != nullptr) {
     _tiledRecipe = *tiledRecipe;
+  }
+  if (tiledRecipe2 != nullptr) {
+    _tiledRecipe2 = *tiledRecipe2;
   }
   for (size_t index = 0; index < newSlots.size(); ++index) {
     slots[index] = newSlots[index];
@@ -405,27 +429,16 @@ void AOTPointwiseChainProcessor::onSetData(UniformData* vertexUniformData,
   fragmentUniformData->setDataOptional("CoverageRootIndex", coverageRootSlot);
   fragmentUniformData->setDataOptional("ClipCoverageRegister", clipCoverageRegister);
   fragmentUniformData->setDataOptional("SlotCount", static_cast<int>(_slotCount));
+  // Each selector names the leaf that reads the matching recipe set; the kernel never reads a set
+  // whose selector is -1, so an absent recipe needs no upload.
   fragmentUniformData->setDataOptional("TiledLeafIndex", tiledLeafIndex);
-  // The second tiled leaf shares the same recipe uniform block (identical recipe by construction,
-  // verified in the builder), so only its selector index needs uploading.
   fragmentUniformData->setDataOptional("TiledLeafIndex2", tiledLeafIndex2);
   fragmentUniformData->setDataOptional("GradientLUTLeaf", lutLeafIndex);
   if (tiledLeafIndex >= 0) {
-    int modeX = static_cast<int>(_tiledRecipe.shaderModeX);
-    int modeY = static_cast<int>(_tiledRecipe.shaderModeY);
-    fragmentUniformData->setDataOptional("TiledModeX", modeX);
-    fragmentUniformData->setDataOptional("TiledModeY", modeY);
-    float subsetRect[] = {_tiledRecipe.shaderSubset.left, _tiledRecipe.shaderSubset.top,
-                          _tiledRecipe.shaderSubset.right, _tiledRecipe.shaderSubset.bottom};
-    fragmentUniformData->setDataOptional("TiledSubset", subsetRect);
-    float clampRect[] = {_tiledRecipe.shaderClamp.left, _tiledRecipe.shaderClamp.top,
-                         _tiledRecipe.shaderClamp.right, _tiledRecipe.shaderClamp.bottom};
-    fragmentUniformData->setDataOptional("TiledClamp", clampRect);
-    if (_tiledRecipe.usesShaderDimensions) {
-      fragmentUniformData->setDataOptional("TiledDimension", _tiledRecipe.shaderDimensions);
-    }
-    int strict = _tiledRecipe.strict ? 1 : 0;
-    fragmentUniformData->setDataOptional("TiledStrict", strict);
+    UploadTiledRecipe(fragmentUniformData, _tiledRecipe, "");
+  }
+  if (tiledLeafIndex2 >= 0) {
+    UploadTiledRecipe(fragmentUniformData, _tiledRecipe2, "2");
   }
   // RRect coverage slots consume the CoverageRRect* arrays in slot order; the upload assigns the
   // ordinals the same way, so the selector's bits 16-19 match the array element written here.

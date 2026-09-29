@@ -225,7 +225,6 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
     // leaves are padded to the existing four-sampler artifacts by the chain builder.
     size_t plainLeaves = 0;
     size_t shaderTiledLeaves = 0;
-    std::optional<AOTTiledTextureRecipe> firstShaderTiledRecipe = {};
     size_t colorSpaceXforms = 0;
     size_t gradients = 0;
     size_t deviceRects = 0;
@@ -251,16 +250,11 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
           }
           if (recipe->shaderModeX != TiledTextureShaderMode::None ||
               recipe->shaderModeY != TiledTextureShaderMode::None) {
-            // PointwiseChainShader carries exactly one shared tiled-sampling uniform block; up to
-            // MaxShaderTiledChainLeaves leaves may ride it when their recipes are identical (the
-            // image-filter shape: source and shadow children sample the same filter domain). A
-            // leaf with a different recipe beyond the first cannot be represented — reject before
-            // planning execution rather than letting construction fail after CanExecute promised
-            // success.
-            if (shaderTiledLeaves == 0) {
-              firstShaderTiledRecipe = recipe;
-            } else if (shaderTiledLeaves >= AOTPointwiseChainProcessor::MaxShaderTiledChainLeaves ||
-                       !AOTChainBuilder::SameTiledShaderRecipe(*firstShaderTiledRecipe, *recipe)) {
+            // PointwiseChainShader carries MaxShaderTiledChainLeaves independent tiled-sampling
+            // recipes, one per selector; a leaf beyond that has no selector and cannot be
+            // represented — reject before planning execution rather than letting construction
+            // fail after CanExecute promised success.
+            if (shaderTiledLeaves >= AOTPointwiseChainProcessor::MaxShaderTiledChainLeaves) {
               return false;
             }
             ++shaderTiledLeaves;

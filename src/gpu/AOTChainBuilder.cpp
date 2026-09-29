@@ -47,19 +47,6 @@ bool AOTChainBuilder::IsChainCompatibleTiledMode(TiledTextureShaderMode mode) {
          mode == TiledTextureShaderMode::ClampToBorderLinear;
 }
 
-bool AOTChainBuilder::SameTiledShaderRecipe(const AOTTiledTextureRecipe& a,
-                                            const AOTTiledTextureRecipe& b) {
-  // Compares the fields the chain kernel's single tiled uniform block consumes, INCLUDING
-  // usesShaderDimensions: the uploader only writes TiledDimension when it is set, so two recipes
-  // that differ only in that flag would silently disagree about whether the shared block's
-  // dimension field is meaningful. CPU-side fields (hardware sampler, coord matrix) are per-leaf
-  // bindings and never ride the shared block.
-  return a.shaderModeX == b.shaderModeX && a.shaderModeY == b.shaderModeY &&
-         a.shaderSubset == b.shaderSubset && a.shaderClamp == b.shaderClamp &&
-         a.shaderDimensions == b.shaderDimensions && a.strict == b.strict &&
-         a.usesShaderDimensions == b.usesShaderDimensions;
-}
-
 namespace {
 
 static PlacementPtr<FragmentProcessor> BuildFPForNode(BlockAllocator* allocator,
@@ -471,6 +458,7 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
   int tiledLeafIndex = -1;
   int tiledLeafIndex2 = -1;
   AOTTiledTextureRecipe tiledRecipe = {};
+  AOTTiledTextureRecipe tiledRecipe2 = {};
   bool hasRectCoverage = false;
   bool hasLocalRectCoverage = false;
   bool hasGradient = false;
@@ -577,17 +565,16 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
             parameters->tiledRecipe.has_value() &&
             (parameters->tiledRecipe->shaderModeX != TiledTextureShaderMode::None ||
              parameters->tiledRecipe->shaderModeY != TiledTextureShaderMode::None)) {
-          // The kernel carries one shared tiled-sampling uniform block, selected by
-          // TiledLeafIndex/TiledLeafIndex2. A second shader-tiled leaf with the IDENTICAL recipe
-          // (the image-filter shape: source and shadow children sample the same filter domain)
-          // shares the block through the second index; a second leaf with a different recipe
-          // still cannot be represented.
+          // The kernel carries two independent tiled-sampling recipes, selected by
+          // TiledLeafIndex/TiledLeafIndex2. Each shader-tiled leaf keeps its own recipe (a drop
+          // shadow's source and offset shadow resolve to different clamp rects); a third one has
+          // no selector and cannot be represented.
           if (tiledLeafIndex < 0) {
             tiledLeafIndex = static_cast<int>(leaves.size());
             tiledRecipe = *parameters->tiledRecipe;
-          } else if (tiledLeafIndex2 < 0 && AOTChainBuilder::SameTiledShaderRecipe(
-                                                tiledRecipe, *parameters->tiledRecipe)) {
+          } else if (tiledLeafIndex2 < 0) {
             tiledLeafIndex2 = static_cast<int>(leaves.size());
+            tiledRecipe2 = *parameters->tiledRecipe;
           } else {
             return nullptr;
           }
@@ -988,6 +975,7 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
     maskChildIsPhantom = true;
   }
   const AOTTiledTextureRecipe* recipePtr = tiledLeafIndex >= 0 ? &tiledRecipe : nullptr;
+  const AOTTiledTextureRecipe* recipePtr2 = tiledLeafIndex2 >= 0 ? &tiledRecipe2 : nullptr;
   // Register allocation: the slot wiring built above uses instruction ordinals; this pass
   // rewrites every reference into the kernel's recycled chainResults registers, so the
   // instruction budget (MaxSlots) and the live-result budget (MaxRegisters) are independent. A
@@ -1022,7 +1010,8 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
   return AOTPointwiseChainProcessor::Make(
       allocator, std::move(leaves), slots, rootIndex, tiledLeafIndex, recipePtr,
       std::move(maskChild), coverageRootSlot, coordSourceMask, std::move(lutChild), lutLeafIndex,
-      std::move(samplerPadding), maskChildIsPhantom, clipCoverageRegister, tiledLeafIndex2);
+      std::move(samplerPadding), maskChildIsPhantom, clipCoverageRegister, tiledLeafIndex2,
+      recipePtr2);
 }
 
 }  // namespace

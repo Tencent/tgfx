@@ -53,8 +53,13 @@ namespace tgfx {
  * index names a different variant now), and the uniform block lost a field the old kernels
  * still read. A new runtime fed a pre-change bundle would bind a mismatched variant and leave
  * that field uninitialized, so those bundles are refused.
+ *
+ * 0x00010007: the chain kernel's second tiled leaf reads its own recipe (the Tiled*2 uniform set)
+ * instead of sharing the first leaf's. A pre-change kernel would apply the first leaf's recipe to
+ * the second leaf, clamping it to the wrong domain, while the runtime now admits leaves with
+ * different recipes, so those bundles are refused.
  */
-inline constexpr uint32_t kExpectedToolchainABI = 0x00010006u;
+inline constexpr uint32_t kExpectedToolchainABI = 0x00010007u;
 
 inline uint64_t BundleIdentityHashInit() {
   return 0x54475346424E4443ULL;  // "TGSF BNDC"

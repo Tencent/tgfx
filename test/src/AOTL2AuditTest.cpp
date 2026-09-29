@@ -659,17 +659,16 @@ TGFX_TEST(AOTL2AuditTest, DropShadowTiledSrcServedByteExact) {
   EXPECT_TRUE(result.passed) << "DropShadow AOT render diverges from the no-bundle reference";
 }
 
-// InnerShadow three-way attribution (task: quantization-boundary root cause). The audit question:
-// is the 616-pixel / max-14 delta between the AOT render and the no-bundle reference caused by the
-// shadow-subtree materialization (RGBA8 round trip), by the chain kernel's arithmetic, or by
-// sampling-coordinate drift? Three renders of the same scene isolate each factor:
+// InnerShadow three-way attribution. Three renders of the same scene isolate the factors behind
+// any delta between the AOT render and the no-bundle reference:
 //  1. reference: no bundle — the original tree runs the runtime route;
 //  2. bundle + decomposition disabled: the gate never opens, the same untouched tree runs the
 //     runtime route — must be identical to the reference by construction (any difference would
 //     indicate bundle loading alone perturbs rendering);
-//  3. bundle + decomposition enabled: the retry materializes the shadow subtree and the chain
-//     kernel serves it — the delta against (1) is then attributable to the materialization
-//     quantization alone, because (2) proves the runtime route and the bundle state are inert.
+//  3. bundle + decomposition enabled: the chain kernel serves the tree. Its two decal leaves now
+//     fuse in one pass with independent tiled recipes (earlier the differing recipes forced a
+//     shadow-subtree materialization whose RGBA8 round trip showed up as a 616-pixel delta); the
+//     reported delta against (1) is InnerShadowTiledSrcServedByteExact's byte-exact contract.
 TGFX_TEST(AOTL2AuditTest, InnerShadowQuantizationAttribution) {
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);
@@ -747,13 +746,11 @@ TGFX_TEST(AOTL2AuditTest, InnerShadowQuantizationAttribution) {
 }
 
 // InnerShadow preserves its nested SrcOut inside SrcATop/SrcIn tree. The tree carries two decal
-// texture leaves (the blurred mask and the source image), but the chain kernel carries exactly one
-// shared tiled-sampling uniform block (AOTPointwiseChainProcessor::MaxShaderTiledChainLeaves), so
-// the unmodified tree cannot fuse into a single pass. P4 keeps the tree unmaterialized for the
-// runtime reference (strictly more precise than the old both-sides-materialized comparison) and
-// materializes only the shadow subtree on the AOT side, whose RGBA8 round trip shows up as a small
-// quantization delta against that reference — the same documented boundary as the quantization
-// sensitive blend modes. Coverage stays strict: the whole tree is served by precompiled programs.
+// texture leaves (the blurred mask and the source image) whose tiled recipes differ; the chain
+// kernel gives each of its two tiled selectors an independent recipe
+// (AOTPointwiseChainProcessor::MaxShaderTiledChainLeaves), so the unmodified tree fuses into a
+// single pass with no materialization and must match the runtime reference byte for byte. Coverage
+// stays strict: the whole tree is served by precompiled programs.
 TGFX_TEST(AOTL2AuditTest, InnerShadowTiledSrcServedByteExact) {
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);
@@ -792,11 +789,8 @@ TGFX_TEST(AOTL2AuditTest, InnerShadowTiledSrcServedByteExact) {
   Pixmap candidatePixmap(candidateBitmap);
   auto spec = AuditSpec();
   if (UsesByteExactAudit()) {
-    // Quantization boundary spec (see the test comment): the shadow subtree materialization's
-    // RGBA8 round trip against the unmaterialized runtime reference.
-    spec.maxChannelDiff = 16;
-    spec.structuralChannelDiff = 17;
-    spec.maxDiffPixelRatio = 0.05f;
+    // Single fused pass, no materialization: nothing on the AOT side can introduce a delta.
+    spec.maxChannelDiff = 0;
   }
   auto result = AOTToleranceCompare::Compare(referencePixmap, candidatePixmap, spec);
   LOGI(
@@ -815,15 +809,8 @@ TGFX_TEST(AOTL2AuditTest, InnerShadowTiledSrcServedByteExact) {
   EXPECT_EQ(candidateFragmentArtifactMissing, 0u);
   EXPECT_FALSE(result.sizeMismatch);
   if (UsesByteExactAudit()) {
-    // Documented quantization boundary (see the test comment and
-    // InnerShadowQuantizationAttribution): the materialized shadow subtree's RGBA8 round trip
-    // costs exactly 1 LSB in premultiplied space (attribution test: premul max=1 over the same
-    // 616-pixel set). This comparator works on unpremultiplied channels, and the differing
-    // pixels sit in the soft blur falloff where alpha is as low as ~0.07, so the 1-LSB premul
-    // delta shows up as ~14 in unpremultiplied space — an amplification of the same single-LSB
-    // rounding, not an additional error.
-    EXPECT_LE(result.maxChannelDiff, 16);
-    EXPECT_LE(result.diffPixelCount, 25600u / 20);
+    EXPECT_EQ(result.diffPixelCount, 0u);
+    EXPECT_EQ(result.maxChannelDiff, 0);
   }
   EXPECT_TRUE(result.passed) << "InnerShadow AOT render diverges from the no-bundle reference";
 }

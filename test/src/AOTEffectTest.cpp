@@ -391,9 +391,9 @@ TGFX_TEST(AOTEffectTest, ChainSharesTiledBlockBetweenIdenticalLeaves) {
   BlockAllocator allocator;
   auto sampleArea = Rect::MakeXYWH(1, 1, 6, 4);
   // Decal over a strict subset resolves to ClampToBorderLinear: both leaves are individually
-  // chain-compatible AND their recipes are identical (the image-filter shape — source and shadow
-  // children sample the same filter domain), so the pair rides the single shared tiled-uniform
-  // block through TiledLeafIndex/TiledLeafIndex2 instead of falling back to materialization.
+  // chain-compatible and their recipes are identical, so the pair fuses through
+  // TiledLeafIndex/TiledLeafIndex2 (each selector carrying the same recipe) instead of falling back
+  // to materialization.
   auto src =
       MakeTiledTextureProcessor(context, &allocator, TileMode::Decal, TileMode::Clamp,
                                 PixelFormat::RGBA_8888, SrcRectConstraint::Strict, sampleArea);
@@ -415,42 +415,64 @@ TGFX_TEST(AOTEffectTest, ChainSharesTiledBlockBetweenIdenticalLeaves) {
   EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
 }
 
-TGFX_TEST(AOTEffectTest, ChainRejectsTwoDifferentShaderTiledLeaves) {
+TGFX_TEST(AOTEffectTest, ChainKeepsIndependentRecipesForTwoTiledLeaves) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
   BlockAllocator allocator;
+  // Two individually chain-compatible tiled leaves whose recipes differ must fuse into one chain
+  // pass, each leaf reading its own recipe: (a) different modes (Decal vs Repeat on X), and (b)
+  // the drop-shadow shape — the same Decal mode over different sample areas, so only the subset
+  // and clamp rects differ. Sharing one recipe would clamp the second leaf to the first's domain.
+  struct RecipeCase {
+    TileMode tileModeX2;
+    Rect sampleArea2;
+  };
   auto sampleArea = Rect::MakeXYWH(1, 1, 6, 4);
-  // Both leaves are individually chain-compatible, but their recipes differ (Decal vs Repeat on
-  // the X axis), and PointwiseChainShader carries only one shared tiled-uniform block. CanExecute
-  // must therefore agree with BuildChainFP and reject the pair.
-  auto src =
-      MakeTiledTextureProcessor(context, &allocator, TileMode::Decal, TileMode::Clamp,
-                                PixelFormat::RGBA_8888, SrcRectConstraint::Strict, sampleArea);
-  auto dst =
-      MakeTiledTextureProcessor(context, &allocator, TileMode::Repeat, TileMode::Clamp,
-                                PixelFormat::RGBA_8888, SrcRectConstraint::Strict, sampleArea);
-  ASSERT_NE(src, nullptr);
-  ASSERT_NE(dst, nullptr);
-  auto blend = XfermodeFragmentProcessor::MakeFromTwoProcessors(&allocator, std::move(src),
-                                                                std::move(dst), BlendMode::SrcOver);
-  ASSERT_NE(blend, nullptr);
+  const RecipeCase cases[] = {{TileMode::Repeat, sampleArea},
+                              {TileMode::Decal, Rect::MakeXYWH(2, 1, 5, 3)}};
+  for (const auto& recipeCase : cases) {
+    auto src =
+        MakeTiledTextureProcessor(context, &allocator, TileMode::Decal, TileMode::Clamp,
+                                  PixelFormat::RGBA_8888, SrcRectConstraint::Strict, sampleArea);
+    auto dst = MakeTiledTextureProcessor(context, &allocator, recipeCase.tileModeX2,
+                                         TileMode::Clamp, PixelFormat::RGBA_8888,
+                                         SrcRectConstraint::Strict, recipeCase.sampleArea2);
+    ASSERT_NE(src, nullptr);
+    ASSERT_NE(dst, nullptr);
+    auto srcRecipe = static_cast<TiledTextureEffect*>(src.get())->resolveSampling();
+    auto dstRecipe = static_cast<TiledTextureEffect*>(dst.get())->resolveSampling();
+    ASSERT_NE(srcRecipe, nullptr);
+    ASSERT_NE(dstRecipe, nullptr);
+    ASSERT_TRUE(srcRecipe->shaderModeX != dstRecipe->shaderModeX ||
+                srcRecipe->shaderClamp != dstRecipe->shaderClamp);
+    auto blend = XfermodeFragmentProcessor::MakeFromTwoProcessors(
+        &allocator, std::move(src), std::move(dst), BlendMode::SrcOver);
+    ASSERT_NE(blend, nullptr);
 
-  AOTEffectGraph graph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({blend.get()}, &graph));
-  AOTEffectPlan plan;
-  EXPECT_FALSE(AOTEffectDecomposer::Decompose(graph, &plan));
-  plan.output = graph.root();
-  AOTPassDescriptor unsupported = {};
-  unsupported.kernel = AOTKernelKind::PointwiseChain;
-  unsupported.output = graph.root();
-  for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
-    if (graph.nodeAt(AOTNodeID(index))->kind != AOTEffectKind::GeometryColorOpaqueInput) {
-      unsupported.nodes.push_back(AOTNodeID(index));
-    }
+    AOTEffectGraph graph;
+    ASSERT_TRUE(AOTEffectDecomposer::Lower({blend.get()}, &graph));
+    AOTEffectPlan plan;
+    ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
+    ASSERT_EQ(plan.passes.size(), 1u);
+    EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
+    EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
+    auto processor = AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0]);
+    ASSERT_NE(processor, nullptr);
+    auto chain = static_cast<const AOTPointwiseChainProcessor*>(processor.get());
+    ASSERT_GE(chain->tiledLeaf(), 0);
+    ASSERT_GE(chain->tiledLeaf2(), 0);
+    EXPECT_NE(chain->tiledLeaf(), chain->tiledLeaf2());
+    // Whichever leaf lands on which selector, the two selectors carry the two source recipes.
+    auto matches = [](const AOTTiledTextureRecipe& recipe, const TiledTextureSampling& source) {
+      return recipe.shaderModeX == source.shaderModeX && recipe.shaderModeY == source.shaderModeY &&
+             recipe.shaderSubset == source.shaderSubset && recipe.shaderClamp == source.shaderClamp;
+    };
+    const auto& first = chain->tiledRecipe();
+    const auto& second = chain->tiledRecipe2();
+    EXPECT_TRUE((matches(first, *srcRecipe) && matches(second, *dstRecipe)) ||
+                (matches(first, *dstRecipe) && matches(second, *srcRecipe)));
   }
-  plan.passes.push_back(unsupported);
-  EXPECT_FALSE(AOTPlanExecutor::CanExecute(graph, plan));
 }
 
 TGFX_TEST(AOTEffectTest, ChainRejectsThirdShaderTiledLeaf) {
@@ -459,8 +481,8 @@ TGFX_TEST(AOTEffectTest, ChainRejectsThirdShaderTiledLeaf) {
   ASSERT_NE(context, nullptr);
   BlockAllocator allocator;
   auto sampleArea = Rect::MakeXYWH(1, 1, 6, 4);
-  // Three IDENTICAL-recipe tiled leaves (nested two-child blends): the first two ride the shared
-  // tiled block through TiledLeafIndex/TiledLeafIndex2, but the kernel has no third selector —
+  // Three tiled leaves (nested two-child blends): the first two ride the two recipe sets through
+  // TiledLeafIndex/TiledLeafIndex2, but the kernel has no third selector —
   // the capacity boundary is MaxShaderTiledChainLeaves, and both the planner and CanExecute must
   // enforce it rather than let a third leaf silently fall to the plain Subset-clamp path.
   auto makeLeaf = [&]() {

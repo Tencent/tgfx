@@ -136,12 +136,11 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
   // two registers while a wide DAG may need up to this many.
   static constexpr size_t MaxRegisters = 16;
 
-  // The chain kernel carries exactly one shared tiled-sampling uniform block; at most this many
-  // leaves may ride it, and only when their recipes are identical (the image-filter shape:
-  // source and shadow children sample the same filter domain, selected by
-  // TiledLeafIndex/TiledLeafIndex2). A leaf with a DIFFERENT recipe is not expressible and stays
-  // on the materialized route. This constant is the capacity authority for CanExecute; the
-  // builder enforces the same two-slot limit through its second-index bookkeeping.
+  // The chain kernel carries two independent tiled-sampling recipes, selected by
+  // TiledLeafIndex/TiledLeafIndex2, so at most this many leaves may use shader-side tiling; their
+  // recipes need not match (a drop shadow's source and offset shadow resolve to different clamp
+  // rects). This constant is the capacity authority for CanExecute; the builder enforces the same
+  // two-slot limit through its second-index bookkeeping.
   static constexpr size_t MaxShaderTiledChainLeaves = 2;
 
   // The single authority for the chain kernel's shared parameter-block budgets. The kernel has
@@ -169,7 +168,8 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
       PlacementPtr<FragmentProcessor> maskChild = nullptr, int coverageRootSlot = -1,
       uint32_t coordSourceMask = ~0u, PlacementPtr<FragmentProcessor> lutChild = nullptr,
       int lutLeafIndex = -1, std::vector<PlacementPtr<FragmentProcessor>> samplerPadding = {},
-      bool maskChildIsPhantom = false, int clipCoverageRegister = -1, int tiledLeafIndex2 = -1);
+      bool maskChildIsPhantom = false, int clipCoverageRegister = -1, int tiledLeafIndex2 = -1,
+      const AOTTiledTextureRecipe* tiledRecipe2 = nullptr);
 
   AOTPointwiseChainProcessor(std::vector<PlacementPtr<FragmentProcessor>> textureLeaves,
                              const std::vector<AOTChainSlot>& slots, size_t rootSlot,
@@ -178,8 +178,8 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
                              uint32_t coordSourceMask, PlacementPtr<FragmentProcessor> lutChild,
                              int lutLeafIndex,
                              std::vector<PlacementPtr<FragmentProcessor>> samplerPadding,
-                             bool maskChildIsPhantom, int clipCoverageRegister,
-                             int tiledLeafIndex2);
+                             bool maskChildIsPhantom, int clipCoverageRegister, int tiledLeafIndex2,
+                             const AOTTiledTextureRecipe* tiledRecipe2);
 
   std::string name() const override {
     return "AOTPointwiseChainProcessor";
@@ -220,10 +220,15 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
     return clipCoverageRegister;
   }
 
-  // Index of the leaf that needs shader-side tiling (wrap/border emulation), or -1 when every
-  // leaf is plain. At most one tiled leaf is supported per chain.
+  // Index of the leaf that reads the first shader-side tiling recipe (wrap/border emulation), or
+  // -1 when every leaf is plain.
   int tiledLeaf() const {
     return tiledLeafIndex;
+  }
+
+  // Index of the leaf that reads the second tiling recipe, or -1 when at most one leaf is tiled.
+  int tiledLeaf2() const {
+    return tiledLeafIndex2;
   }
 
   // Sampler index of the LUT gradient child, or -1 when the chain has none. The LUT child binds a
@@ -235,6 +240,10 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
 
   const AOTTiledTextureRecipe& tiledRecipe() const {
     return _tiledRecipe;
+  }
+
+  const AOTTiledTextureRecipe& tiledRecipe2() const {
+    return _tiledRecipe2;
   }
 
   const AOTChainSlot& slot(size_t index) const {
@@ -254,10 +263,10 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
   size_t _slotCount = 0;
   size_t rootSlot = 0;
   int tiledLeafIndex = -1;
-  // Second leaf sharing the tiled recipe (image-filter shape: source and shadow children sample
-  // the same filter domain, so their recipes are identical); -1 when absent.
+  // Second shader-tiled leaf, reading its own recipe (_tiledRecipe2); -1 when absent.
   int tiledLeafIndex2 = -1;
   AOTTiledTextureRecipe _tiledRecipe = {};
+  AOTTiledTextureRecipe _tiledRecipe2 = {};
   std::array<AOTChainSlot, MaxSlots> slots = {};
   // Kept only to mark the mask's presence; the mask itself is the last registered child.
   // The mask sampler slot is occupied (real mask or phantom) — four-leaf chains always occupy it.

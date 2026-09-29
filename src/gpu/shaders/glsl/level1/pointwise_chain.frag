@@ -152,12 +152,12 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   // OP_GRADIENT LUT colorizer branch. -1 when no LUT gradient is present.
   int GradientLUTLeaf;
 
-  // Tiled leaf support: leaves sharing this recipe go through the shader-side tiling (wrap or
-  // border emulation). TiledLeafIndex selects the first; TiledLeafIndex2 the second (-1 = none).
-  // The two indices share the single recipe below — valid because an image-filter tree samples
-  // its source and shadow children inside the SAME filter domain (same subset, same mode), so the
-  // recipes are identical by construction. Two leaves with DIFFERENT recipes still cannot be
-  // represented; the builder rejects that case and keeps the materialized fallback.
+  // Tiled leaf support: up to two leaves go through the shader-side tiling (wrap or border
+  // emulation), each with its own recipe. TiledLeafIndex selects the leaf that reads the first
+  // recipe (Tiled*), TiledLeafIndex2 the leaf that reads the second (Tiled*2); -1 = none. The
+  // recipes are independent: a drop shadow's source and offset shadow children resolve to
+  // different clamp rects, and sharing one recipe would clamp the second leaf to the first's
+  // domain.
   int TiledLeafIndex;
   int TiledLeafIndex2;
   int TiledModeX;
@@ -166,6 +166,12 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 TiledClamp;
   vec2 TiledDimension;
   int TiledStrict;
+  int TiledModeX2;
+  int TiledModeY2;
+  vec4 TiledSubset2;
+  vec4 TiledClamp2;
+  vec2 TiledDimension2;
+  int TiledStrict2;
 
 #include "xp_uniforms.inc"
 };
@@ -232,13 +238,21 @@ layout(set = 1, binding = NTEX) uniform sampler2D MaskTextureSampler;
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
 
-// Rebind the shared tiled-sampling helpers to the chain's Tiled* uniforms; the include expects
-// the standalone names used by the single-texture kernels.
-#define ShaderModeX TiledModeX
-#define ShaderModeY TiledModeY
-#define Subset TiledSubset
-#define Clamp TiledClamp
-#define Dimension TiledDimension
+// The recipe of the tiled leaf being fetched. chainLeafFetch loads it from the first (Tiled*) or
+// second (Tiled*2) uniform set before calling the helpers, so the coordinate mapping, the seam
+// blend and the border post-pass all read the same leaf's recipe.
+int chainTiledModeX;
+int chainTiledModeY;
+highp vec4 chainTiledSubset;
+highp vec4 chainTiledClamp;
+highp vec2 chainTiledDimension;
+// Rebind the shared tiled-sampling helpers to the current recipe; the include expects the
+// standalone names used by the single-texture kernels.
+#define ShaderModeX chainTiledModeX
+#define ShaderModeY chainTiledModeY
+#define Subset chainTiledSubset
+#define Clamp chainTiledClamp
+#define Dimension chainTiledDimension
 #include "tiled_sample.inc"
 // RepeatLinearNone(3) seam blend, ported from the runtime GLSLTiledTextureEffect emission (and
 // the blur kernel's per-tap copy): a wrapped coordinate that clamps means the linear footprint
@@ -249,27 +263,27 @@ layout(set = 1, binding = NTEX) uniform sampler2D MaskTextureSampler;
 // shape needs a subset-bearing tiled leaf, which the hardware wrap never produces).
 vec4 tiledSeamBlend(CHAIN_LEAF_SAMPLER texSampler, vec4 texColor, vec2 subsetCoord,
                     vec2 clampedCoord) {
-  bool repeatX = TiledModeX == 3 && subsetCoord.x != clampedCoord.x;
-  bool repeatY = TiledModeY == 3 && subsetCoord.y != clampedCoord.y;
+  bool repeatX = ShaderModeX == 3 && subsetCoord.x != clampedCoord.x;
+  bool repeatY = ShaderModeY == 3 && subsetCoord.y != clampedCoord.y;
   if (!repeatX && !repeatY) {
     return texColor;
   }
   float errX = subsetCoord.x - clampedCoord.x;
   float errY = subsetCoord.y - clampedCoord.y;
-  float repeatCoordX = errX > 0.0 ? TiledClamp.x : TiledClamp.z;
-  float repeatCoordY = errY > 0.0 ? TiledClamp.y : TiledClamp.w;
+  float repeatCoordX = errX > 0.0 ? Clamp.x : Clamp.z;
+  float repeatCoordY = errY > 0.0 ? Clamp.y : Clamp.w;
   if (repeatX && repeatY) {
-    vec4 repeatReadX = texture(texSampler, vec2(repeatCoordX, clampedCoord.y) * TiledDimension);
-    vec4 repeatReadY = texture(texSampler, vec2(clampedCoord.x, repeatCoordY) * TiledDimension);
-    vec4 repeatReadXY = texture(texSampler, vec2(repeatCoordX, repeatCoordY) * TiledDimension);
+    vec4 repeatReadX = texture(texSampler, vec2(repeatCoordX, clampedCoord.y) * Dimension);
+    vec4 repeatReadY = texture(texSampler, vec2(clampedCoord.x, repeatCoordY) * Dimension);
+    vec4 repeatReadXY = texture(texSampler, vec2(repeatCoordX, repeatCoordY) * Dimension);
     return mix(mix(texColor, repeatReadX, abs(errX)), mix(repeatReadY, repeatReadXY, abs(errX)),
                abs(errY));
   }
   if (repeatX) {
-    vec4 repeatReadX = texture(texSampler, vec2(repeatCoordX, clampedCoord.y) * TiledDimension);
+    vec4 repeatReadX = texture(texSampler, vec2(repeatCoordX, clampedCoord.y) * Dimension);
     return mix(texColor, repeatReadX, errX);
   }
-  vec4 repeatReadY = texture(texSampler, vec2(clampedCoord.x, repeatCoordY) * TiledDimension);
+  vec4 repeatReadY = texture(texSampler, vec2(clampedCoord.x, repeatCoordY) * Dimension);
   return mix(texColor, repeatReadY, errY);
 }
 #undef ShaderModeX
@@ -286,10 +300,17 @@ vec4 chainLeafFetch(CHAIN_LEAF_SAMPLER texSampler, vec3 coord, vec4 leafSubset, 
   // matching the runtime's emitPerspTextCoord ordering.
   highp vec2 uv = coord.xy / coord.z;
   if (leafIndex == TiledLeafIndex || leafIndex == TiledLeafIndex2) {
+    bool secondRecipe = leafIndex == TiledLeafIndex2;
+    chainTiledModeX = secondRecipe ? TiledModeX2 : TiledModeX;
+    chainTiledModeY = secondRecipe ? TiledModeY2 : TiledModeY;
+    chainTiledSubset = secondRecipe ? TiledSubset2 : TiledSubset;
+    chainTiledClamp = secondRecipe ? TiledClamp2 : TiledClamp;
+    chainTiledDimension = secondRecipe ? TiledDimension2 : TiledDimension;
+    bool strict = (secondRecipe ? TiledStrict2 : TiledStrict) != 0;
     vec2 inCoord = vec2(0.0);
     vec2 subsetCoord = vec2(0.0);
     vec2 clampedCoord = vec2(0.0);
-    vec2 sampleCoord = tiledMapCoord(uv, TiledStrict != 0, inCoord, subsetCoord, clampedCoord);
+    vec2 sampleCoord = tiledMapCoord(uv, strict, inCoord, subsetCoord, clampedCoord);
     vec4 texColor = texture(texSampler, sampleCoord);
     texColor = tiledSeamBlend(texSampler, texColor, subsetCoord, clampedCoord);
     return tiledApplyBorder(texColor, inCoord, subsetCoord, clampedCoord);
