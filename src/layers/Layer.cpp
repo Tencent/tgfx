@@ -63,6 +63,12 @@ static bool NeedsContourSource(uint32_t sourceFlags) {
   return HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Contour);
 }
 
+// Inverted masks retain content outside their bounds, so those bounds cannot clip the content.
+static bool IsInvertedMask(LayerMaskType type) {
+  return type == LayerMaskType::AlphaInverted || type == LayerMaskType::ContourInverted ||
+         type == LayerMaskType::LuminanceInverted;
+}
+
 // The minimum size (longest edge) for subtree cache. This prevents creating excessively small
 // mipmap levels that would be inefficient to cache.
 static constexpr int SUBTREE_CACHE_MIN_SIZE = 32;
@@ -750,7 +756,7 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
         continue;
       }
     }
-    if (child->hasValidMask()) {
+    if (child->hasValidMask() && !IsInvertedMask(child->maskType())) {
       auto maskRelativeMatrix = child->_mask->getRelativeMatrix3D(child.get());
       maskRelativeMatrix.postConcat(childMatrix);
       auto maskBounds = child->_mask->getBoundsInternal(maskRelativeMatrix, computeTightBounds);
@@ -1250,9 +1256,7 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
       maskType == LayerMaskType::Contour || maskType == LayerMaskType::ContourInverted;
   bool needLuminance =
       maskType == LayerMaskType::Luminance || maskType == LayerMaskType::LuminanceInverted;
-  bool inverted = maskType == LayerMaskType::AlphaInverted ||
-                  maskType == LayerMaskType::LuminanceInverted ||
-                  maskType == LayerMaskType::ContourInverted;
+  bool inverted = IsInvertedMask(maskType);
 
   auto relativeMatrix3D = _mask->getRelativeMatrix3D(this);
   auto maskPicture = getMaskPicture(args, isContourMode, scale, relativeMatrix3D);
@@ -2069,7 +2073,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     if (child->_scrollRect) {
       clipRect = *child->_scrollRect;
     }
-    if (child->hasValidMask()) {
+    if (child->hasValidMask() && !IsInvertedMask(child->maskType())) {
       auto maskBounds = child->_mask->getBounds(child.get());
       if (clipRect.has_value()) {
         if (!clipRect->intersect(maskBounds)) {

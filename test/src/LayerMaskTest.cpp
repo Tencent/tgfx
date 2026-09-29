@@ -16,7 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <vector>
 #include "layers/RootLayer.h"
+#include "tgfx/core/Surface.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/ShapeLayer.h"
@@ -525,6 +527,152 @@ TGFX_TEST(LayerMaskTest, InvertedMask) {
   auto surface = Surface::Make(context, 500, 100);
   list.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerMaskTest/InvertedMask"));
+}
+
+TGFX_TEST(LayerMaskTest, InvertedMaskBounds) {
+  const LayerMaskType maskTypes[][2] = {
+      {LayerMaskType::Alpha, LayerMaskType::AlphaInverted},
+      {LayerMaskType::Contour, LayerMaskType::ContourInverted},
+      {LayerMaskType::Luminance, LayerMaskType::LuminanceInverted},
+  };
+  for (const auto& types : maskTypes) {
+    for (bool useScrollRect : {false, true}) {
+      for (const auto& maskRect :
+           {Rect::MakeEmpty(), Rect::MakeXYWH(80, 0, 16, 64), Rect::MakeWH(16, 64)}) {
+        DisplayList list;
+        auto parent = Layer::Make();
+        list.root()->addChild(parent);
+        auto content = SolidLayer::Make();
+        content->setWidth(64);
+        content->setHeight(64);
+        parent->addChild(content);
+        auto mask = SolidLayer::Make();
+        mask->setWidth(maskRect.width());
+        mask->setHeight(maskRect.height());
+        mask->setPosition({maskRect.left, maskRect.top});
+        parent->addChild(mask);
+        content->setMask(mask);
+        if (useScrollRect) {
+          content->setScrollRect(Rect::MakeWH(48, 64));
+        }
+        const auto contentBounds = Rect::MakeWH(useScrollRect ? 48 : 64, 64);
+        for (int mode : {1, 0, 1}) {
+          SCOPED_TRACE(testing::Message() << "maskType=" << static_cast<int>(types[mode])
+                                          << " scroll=" << useScrollRect << " maskLeft="
+                                          << maskRect.left << " maskWidth=" << maskRect.width());
+          content->setMaskType(types[mode]);
+          auto expected = contentBounds;
+          if (mode == 0 && !expected.intersect(maskRect)) {
+            expected.setEmpty();
+          }
+          EXPECT_EQ(parent->getBounds(nullptr, true), expected);
+          EXPECT_EQ(parent->getBounds(), expected);
+        }
+      }
+    }
+  }
+}
+
+TGFX_TEST(LayerMaskTest, InvertedMaskPartialUpdates) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  const LayerMaskType maskTypes[][2] = {
+      {LayerMaskType::Alpha, LayerMaskType::AlphaInverted},
+      {LayerMaskType::Contour, LayerMaskType::ContourInverted},
+      {LayerMaskType::Luminance, LayerMaskType::LuminanceInverted},
+  };
+  struct Frame {
+    Color color;
+    Rect maskRect;
+    float contentX;
+    bool inverted;
+  };
+  const Frame frames[] = {
+      {Color::Red(), Rect::MakeEmpty(), 0, true},
+      {Color::Blue(), Rect::MakeEmpty(), 0, true},
+      {Color::Red(), Rect::MakeXYWH(32, 0, 4, 8), 0, true},
+      {Color::Blue(), Rect::MakeXYWH(32, 0, 4, 8), 0, true},
+      {Color::Red(), Rect::MakeWH(4, 8), 0, true},
+      {Color::Blue(), Rect::MakeWH(4, 8), 0, true},
+      {Color::Blue(), Rect::MakeXYWH(2, 0, 4, 8), 0, true},
+      {Color::Blue(), Rect::MakeXYWH(2, 0, 4, 8), 0, false},
+      {Color::Blue(), Rect::MakeXYWH(2, 0, 4, 8), 0, true},
+      {Color::Blue(), Rect::MakeEmpty(), 0, false},
+      {Color::Blue(), Rect::MakeEmpty(), 0, true},
+      {Color::Blue(), Rect::MakeEmpty(), 8, true},
+      {Color::Red(), Rect::MakeEmpty(), 8, true},
+  };
+  const auto info = ImageInfo::Make(116, 116, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  for (const auto& types : maskTypes) {
+    for (bool useBlur : {false, true}) {
+      for (bool useScrollRect : {false, true}) {
+        DisplayList lists[2];
+        lists[0].setRenderMode(RenderMode::Partial);
+        lists[1].setRenderMode(RenderMode::Direct);
+        std::shared_ptr<SolidLayer> contents[2];
+        std::shared_ptr<SolidLayer> masks[2];
+        std::shared_ptr<Surface> surfaces[2];
+        for (int i = 0; i < 2; ++i) {
+          surfaces[i] = Surface::Make(context, info.width(), info.height());
+          ASSERT_TRUE(surfaces[i] != nullptr);
+          auto parent = Layer::Make();
+          parent->setPosition({50, 50});
+          parent->setScrollRect(Rect::MakeWH(16, 16));
+          if (useBlur) {
+            parent->setFilters({BlurFilter::Make(10, 10)});
+          }
+          lists[i].root()->addChild(parent);
+          auto background = SolidLayer::Make();
+          background->setWidth(64);
+          background->setHeight(64);
+          background->setColor(Color::White());
+          parent->addChild(background);
+          contents[i] = SolidLayer::Make();
+          contents[i]->setWidth(8);
+          contents[i]->setHeight(8);
+          if (useScrollRect) {
+            contents[i]->setScrollRect(Rect::MakeWH(6, 8));
+          }
+          parent->addChild(contents[i]);
+          masks[i] = SolidLayer::Make();
+          masks[i]->setColor(Color::White());
+          parent->addChild(masks[i]);
+          contents[i]->setMask(masks[i]);
+        }
+        std::vector<uint8_t> partialPixels(info.byteSize());
+        std::vector<uint8_t> directPixels(info.byteSize());
+        std::vector<uint8_t> firstPixels;
+        int frameIndex = 0;
+        for (const auto& frame : frames) {
+          SCOPED_TRACE(testing::Message()
+                       << "maskType=" << static_cast<int>(types[1]) << " blur=" << useBlur
+                       << " scroll=" << useScrollRect << " frame=" << frameIndex);
+          for (int i = 0; i < 2; ++i) {
+            contents[i]->setColor(frame.color);
+            contents[i]->setPosition({frame.contentX, 0});
+            contents[i]->setMaskType(types[frame.inverted ? 1 : 0]);
+            masks[i]->setWidth(frame.maskRect.width());
+            masks[i]->setHeight(frame.maskRect.height());
+            masks[i]->setPosition({frame.maskRect.left, frame.maskRect.top});
+            lists[i].render(surfaces[i].get());
+          }
+          ASSERT_TRUE(surfaces[0]->readPixels(info, partialPixels.data()));
+          ASSERT_TRUE(surfaces[1]->readPixels(info, directPixels.data()));
+          EXPECT_EQ(partialPixels, directPixels);
+          const auto sample = 54 * info.rowBytes() + 54 * 4;
+          if (frameIndex == 0) {
+            EXPECT_GT(directPixels[sample], directPixels[sample + 2]);
+            firstPixels = partialPixels;
+          } else if (frameIndex == 1) {
+            EXPECT_LT(directPixels[sample], directPixels[sample + 2]);
+            EXPECT_NE(partialPixels, firstPixels);
+          }
+          ++frameIndex;
+        }
+      }
+    }
+  }
 }
 
 TGFX_TEST(LayerMaskTest, ChildMask) {
