@@ -78,8 +78,10 @@ PlacementPtr<AtlasUploadTask> AtlasUploadTask::Make(BlockAllocator* allocator,
 AtlasUploadTask::AtlasUploadTask(std::shared_ptr<TextureProxy> proxy)
     : textureProxy(std::move(proxy)) {
   DEBUG_ASSERT(textureProxy != nullptr);
+  // Writing into the locked buffer replaces the texture upload only when the imported texture
+  // aliases the buffer's memory; otherwise fall back to explicit per-cell uploads.
   auto hardwareBuffer = textureProxy->getHardwareBuffer();
-  if (hardwareBuffer != nullptr) {
+  if (hardwareBuffer != nullptr && HardwareBufferTexturesAliasMemory()) {
     hardwarePixels = HardwareBufferLock(hardwareBuffer);
     hardwareInfo = GetImageInfo(hardwareBuffer, ColorSpace::SRGB());
   }

@@ -43,10 +43,13 @@
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/ColorFilter.h"
+#include "tgfx/core/Font.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Surface.h"
+#include "tgfx/core/Typeface.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 #include "utils/TestUtils.h"
 #if !defined(TGFX_USE_SWIFTSHADER)
 #include "gpu/opengl/cgl/CGLHardwareTexture.h"
@@ -753,6 +756,78 @@ TGFX_TEST(GLRenderTest, rectangleTextureAsBlendDst) {
   EXPECT_TRUE(Baseline::Compare(surface, "ImageRenderTest/hardware_render_target_blend"));
   auto gl = static_cast<GLGPU*>(context->gpu())->functions();
   gl->deleteTextures(1, &(glInfo.id));
+}
+
+static constexpr int GlyphSurfaceWidth = 160;
+static constexpr int GlyphSurfaceHeight = 100;
+
+static std::shared_ptr<Surface> DrawColorGlyph(Context* context,
+                                               const std::shared_ptr<Typeface>& typeface,
+                                               const std::string& text) {
+  auto surface = Surface::Make(context, GlyphSurfaceWidth, GlyphSurfaceHeight);
+  if (surface == nullptr) {
+    return nullptr;
+  }
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+  Font font(typeface, 64);
+  Paint paint;
+  canvas->drawSimpleText(text, 20, 80, font, paint);
+  return surface;
+}
+
+static std::vector<uint8_t> ReadGlyphSurface(Surface* surface) {
+  std::vector<uint8_t> pixels(static_cast<size_t>(GlyphSurfaceWidth * GlyphSurfaceHeight * 4));
+  auto info = ImageInfo::Make(GlyphSurfaceWidth, GlyphSurfaceHeight, ColorType::RGBA_8888,
+                              AlphaType::Premultiplied);
+  if (surface == nullptr || !surface->readPixels(info, pixels.data())) {
+    return {};
+  }
+  return pixels;
+}
+
+// Draws two color glyphs on a fresh device, adding them to the atlas in the same order either
+// within one flush or across two flushes, and returns the pixels of the second glyph.
+static std::vector<uint8_t> RenderSecondColorGlyph(const std::shared_ptr<Typeface>& typeface,
+                                                   bool flushBetween) {
+  auto device = GLDevice::Make();
+  if (device == nullptr) {
+    return {};
+  }
+  auto context = device->lockContext();
+  if (context == nullptr) {
+    return {};
+  }
+  auto first = DrawColorGlyph(context, typeface, "\xF0\x9F\x98\x80");
+  if (flushBetween) {
+    ReadGlyphSurface(first.get());
+  }
+  auto second = DrawColorGlyph(context, typeface, "\xF0\x9F\x8E\x89");
+  auto pixels = ReadGlyphSurface(second.get());
+  device->unlock();
+  return pixels;
+}
+
+// A color glyph added to an atlas page that an earlier flush already uploaded must still reach the
+// GPU. On desktop GL an IOSurface-backed page is copied into a 2D texture at import, so writing
+// later glyphs into the locked IOSurface never reached the texture and the glyph rendered blank.
+// Both runs add the same glyphs in the same order, so the cells land at the same atlas offsets
+// and the only difference is whether the second glyph arrives in a later flush; the results must
+// be identical.
+TGFX_TEST(GLRenderTest, ColorGlyphAtlasIncrementalUpload) {
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"));
+  ASSERT_TRUE(typeface != nullptr);
+  auto reference = RenderSecondColorGlyph(typeface, false);
+  ASSERT_FALSE(reference.empty());
+  size_t coveredPixels = 0;
+  for (size_t i = 3; i < reference.size(); i += 4) {
+    coveredPixels += reference[i] != 0 ? 1 : 0;
+  }
+  ASSERT_GT(coveredPixels, 0u);
+  auto incremental = RenderSecondColorGlyph(typeface, true);
+  ASSERT_FALSE(incremental.empty());
+  EXPECT_EQ(incremental, reference);
 }
 
 }  // namespace tgfx

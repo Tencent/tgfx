@@ -500,7 +500,9 @@ if (TGFX_USE_QT)
     if (MACOS)
         file(GLOB CGL_PLATFORM_FILES src/gpu/opengl/cgl/CGLHardwareTexture.mm)
         list(APPEND TGFX_FILES ${CGL_PLATFORM_FILES})
-        list(APPEND TGFX_DEFINES GL_SILENCE_DEPRECATION)
+        # CGLHardwareTexture copies imported pixel buffers into GL_TEXTURE_2D (see
+        # HardwareBufferTexturesAliasMemory).
+        list(APPEND TGFX_DEFINES GL_SILENCE_DEPRECATION TGFX_HARDWARE_TEXTURE_COPIES)
         find_library(OpenGL_LIBS OpenGL REQUIRED)
         list(APPEND TGFX_SHARED_LIBS ${OpenGL_LIBS})
     endif ()
@@ -666,7 +668,9 @@ elseif (MACOS)
     list(APPEND TGFX_FILES ${PLATFORM_FILES})
 
     if (TGFX_USE_NATIVE_GL)
-        list(APPEND TGFX_DEFINES GL_SILENCE_DEPRECATION)
+        # CGLHardwareTexture copies imported pixel buffers into GL_TEXTURE_2D (see
+        # HardwareBufferTexturesAliasMemory).
+        list(APPEND TGFX_DEFINES GL_SILENCE_DEPRECATION TGFX_HARDWARE_TEXTURE_COPIES)
         find_library(OpenGL_LIBS OpenGL REQUIRED)
         list(APPEND TGFX_SHARED_LIBS ${OpenGL_LIBS})
         file(GLOB_RECURSE GPU_PLATFORM_FILES src/gpu/opengl/cgl/*.*)

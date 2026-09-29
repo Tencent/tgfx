@@ -52,4 +52,14 @@ PixelFormat GetRenderableFormat(HardwareBufferFormat hardwareBufferFormat) {
   }
   return PixelFormat::Unknown;
 }
+
+bool HardwareBufferTexturesAliasMemory() {
+  // TGFX_HARDWARE_TEXTURE_COPIES is defined by the build wherever CGLHardwareTexture.mm is
+  // compiled, keeping this answer tied to the one import implementation that copies.
+#ifdef TGFX_HARDWARE_TEXTURE_COPIES
+  return false;
+#else
+  return true;
+#endif
+}
 }  // namespace tgfx

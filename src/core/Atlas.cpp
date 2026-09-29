@@ -18,6 +18,7 @@
 
 #include "Atlas.h"
 #include "core/PixelRef.h"
+#include "core/utils/HardwareBufferUtil.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
@@ -102,11 +103,17 @@ bool Atlas::activateNewPage() {
   }
   pages.push_back(std::move(page));
   std::shared_ptr<TextureProxy> proxy = nullptr;
-  auto hardwareBuffer =
-      HardwareBufferAllocate(textureWidth, textureHeight, pixelFormat == PixelFormat::ALPHA_8);
-  if (hardwareBuffer != nullptr) {
-    proxy = proxyProvider->createTextureProxy(hardwareBuffer);
-    HardwareBufferRelease(hardwareBuffer);
+  // A hardware-buffer page lets AtlasUploadTask write glyphs straight into the locked buffer, which
+  // only works when the imported texture aliases that memory. Where the import copies the buffer
+  // instead, every glyph added after the first upload would never reach the texture, so those
+  // backends use a plain texture and upload each cell explicitly.
+  if (HardwareBufferTexturesAliasMemory()) {
+    auto hardwareBuffer =
+        HardwareBufferAllocate(textureWidth, textureHeight, pixelFormat == PixelFormat::ALPHA_8);
+    if (hardwareBuffer != nullptr) {
+      proxy = proxyProvider->createTextureProxy(hardwareBuffer);
+      HardwareBufferRelease(hardwareBuffer);
+    }
   }
   if (proxy == nullptr) {
     proxy = proxyProvider->createTextureProxy({}, textureWidth, textureHeight, pixelFormat);

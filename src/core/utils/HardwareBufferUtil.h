@@ -35,4 +35,14 @@ ImageInfo GetImageInfo(HardwareBufferRef hardwareBuffer,
  * returns PixelFormat::Unknown.
  */
 PixelFormat GetRenderableFormat(HardwareBufferFormat hardwareBufferFormat);
+
+/**
+ * Returns true if textures imported from a hardware buffer alias the buffer's memory, so CPU writes
+ * made to the locked buffer after the import become visible to the GPU without an explicit upload.
+ * Returns false on backends whose import copies the buffer into a separate texture (desktop OpenGL
+ * on macOS, where CVOpenGLTextureCache only yields rectangle textures and CGLHardwareTexture copies
+ * them into GL_TEXTURE_2D). Callers that keep writing into a buffer after importing it, such as the
+ * glyph atlas, must not rely on hardware-buffer backing when this returns false.
+ */
+bool HardwareBufferTexturesAliasMemory();
 }  // namespace tgfx
