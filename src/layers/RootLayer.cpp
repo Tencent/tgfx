@@ -23,16 +23,12 @@
 #include "layers/DrawArgs.h"
 
 namespace tgfx {
-// Areas below are accumulated in double: a float product overflows to infinity once the product of
-// the two edges exceeds FLT_MAX, which used to turn merge costs into NaN and stall the dirty list
-// convergence.
+// Use double to avoid area overflow for finite float coordinates.
 static double RectArea(const Rect& rect) {
   return (static_cast<double>(rect.right) - static_cast<double>(rect.left)) *
          (static_cast<double>(rect.bottom) - static_cast<double>(rect.top));
 }
 
-// Every rect in the dirty list is non-empty (filtered by invalidateRect), so join() yields the
-// plain min/max union here.
 static double UnionArea(const Rect& rect1, const Rect& rect2) {
   auto bounds = rect1;
   bounds.join(rect2);
@@ -67,9 +63,7 @@ bool RootLayer::mergeDirtyList(bool forceMerge) {
   }
   auto bestDelta = forceMerge ? std::numeric_limits<double>::infinity() : 0.0;
   size_t mergeA = 0;
-  // A forced merge must always produce a pair: non-finite rect coordinates can make every delta a
-  // NaN, which loses every comparison below. Default to the first pair so the dirty list still
-  // converges, while keeping the cheapest-merge choice intact whenever the deltas are comparable.
+  // Guarantee a forced merge even when non-finite coordinates make every cost incomparable.
   size_t mergeB = forceMerge ? 1 : 0;
   for (size_t i = 0; i < dirtySize; i++) {
     for (size_t j = i + 1; j < dirtySize; j++) {

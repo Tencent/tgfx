@@ -216,8 +216,8 @@ Vec3 MapHomogeneousHWYImpl(const Matrix& m, float x, float y, float w) {
 // Minimum w value for perspective clipping to avoid division by near-zero values.
 constexpr float W0_PLANE_DISTANCE = 1.f / (1 << 14);
 
-// Clips an edge against the w=0 plane. Returns the intersection point's contribution to the
-// bounding box as (x, y, -x, -y). If both endpoints are behind the camera, returns infinity.
+// For p0 below W0_PLANE_DISTANCE, returns the clipped edge's (x, y, -x, -y),
+// or infinity if p1 is also below the threshold.
 static auto ClipEdgeToW0Plane(const Vec3& p0, const Vec3& p1) {
   if (p1.z >= W0_PLANE_DISTANCE) {
     const float t = (W0_PLANE_DISTANCE - p0.z) / (p1.z - p0.z);

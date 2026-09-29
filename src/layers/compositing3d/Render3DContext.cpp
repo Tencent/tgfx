@@ -349,20 +349,14 @@ bool Render3DContext::ComputeRasterInfo(const Matrix3D& localToCompositor, const
   if (Matrix3DUtils::IsRectBehindCamera(localBounds, localToCompositor)) {
     return false;
   }
-  // Size the raster from the clip-visible local footprint: when it covers the whole leaf, keep the
-  // 1:1 contentScale density; otherwise derive density from the (dest / local) ratio of the clipped
-  // region, which stays bounded by the viewport. IsRectBehindCamera already rejected near-plane
-  // straddles, so the visible region never touches the near plane here and the density stays
-  // finite; the homography clip would otherwise blow up at that singular boundary.
+  // Keep contentScale density for a fully visible leaf; otherwise use its clipped projected size.
   Rect localFootprint = {};
   Rect destFootprint = {};
   if (!Matrix3DUtils::ComputeVisibleFootprints(localBounds, compositorViewport, localToCompositor,
                                                &localFootprint, &destFootprint)) {
     return false;
   }
-  // Near-plane clipping can push clipped vertices a hair past localBounds when interpolating in
-  // homogeneous space. Clamp again after roundOut so the compositing polygon never expands past
-  // the leaf's declared range.
+  // Clipping and rounding must not expand the footprint beyond the leaf's bounds.
   localFootprint.roundOut();
   if (!localFootprint.intersect(localBounds)) {
     return false;

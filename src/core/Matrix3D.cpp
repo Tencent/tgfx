@@ -180,9 +180,7 @@ static Rect MapRectPerspective(const Rect& srcRect, const float mat[16]) {
   auto bl = c0 * srcRect.left + c1 * srcRect.bottom + c3;
   auto br = c0 * srcRect.right + c1 * srcRect.bottom + c3;
 
-  // W is linear in (x, y) on the z = 0 plane, so if no corner reaches the near plane, no interior
-  // point does either. The whole rect is clipped away by the near plane; return an empty rect to
-  // keep the result finite for callers.
+  // W is affine over the rectangle, so no interior point survives if every corner is clipped.
   if (std::max({tl[3], tr[3], bl[3], br[3]}) < wNearPlane) {
     return Rect::MakeEmpty();
   }

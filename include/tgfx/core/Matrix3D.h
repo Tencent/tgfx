@@ -266,10 +266,8 @@ class Matrix3D {
   static constexpr float W_NEAR_PLANE = 1.f / (1 << 14);
 
   /**
-   * Maps a rectangle using this matrix. With perspective, corners are mapped as 4D points
-   * (x, y, 0, 1) and the rectangle is clipped to W >= W_NEAR_PLANE before perspective division.
-   * The reciprocal W is at most 1 / W_NEAR_PLANE, but large transformed coordinates can still
-   * overflow. Callers allocating a surface must validate and clip the result to their viewport.
+   * Maps a rectangle on z = 0, clipping to W >= W_NEAR_PLANE before perspective division.
+   * Large transformed coordinates may still overflow; validate bounds before allocating a surface.
    * @param src The rectangle in the z = 0 plane to map.
    * @return Bounds of the retained projected region, or a finite empty rectangle if every corner
    * falls below W_NEAR_PLANE.

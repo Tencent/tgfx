@@ -34,7 +34,6 @@ namespace tgfx {
 
 namespace {
 
-// Near-plane distance used by Matrix3D::mapRect() when perspective is present.
 constexpr float NearPlaneW = Matrix3D::W_NEAR_PLANE;
 
 bool RectIsFinite(const Rect& rect) {
@@ -42,8 +41,7 @@ bool RectIsFinite(const Rect& rect) {
          std::isfinite(rect.bottom);
 }
 
-// Builds a "perspective(eyeDistance) x translateZ(depth)" matrix. A local point (x, y, 0) is
-// projected with the homogeneous component W = 1 - depth / eyeDistance.
+// On z = 0, the resulting W is 1 - depth / eyeDistance.
 Matrix3D MakePerspectiveDepth(float eyeDistance, float depth) {
   auto model = Matrix3D::MakeTranslate(0.f, 0.f, depth);
   auto perspective = Matrix3D();
@@ -102,17 +100,13 @@ TGFX_TEST(Matrix3DNearPlaneTest, RectBehindCameraIsDiscarded) {
   EXPECT_TRUE(bounds.isEmpty());
 }
 
-// Bug exposure: all corners have positive W below the near-plane distance (0 < W < 1/2^14).
-// IsRectBehindCamera() releases the rect, then MapRectPerspective() clips every corner against
-// the near plane and returns a rect of infinities. Expected: mapRect() should return an empty
-// rect when every vertex is clipped away by the near plane.
+// Fully clipped bounds must be finite and empty, not {+Inf, +Inf, -Inf, -Inf}.
 TGFX_TEST(Matrix3DNearPlaneTest, RectInsideNearPlaneMustNotProduceInfinity) {
   const auto eyeDistance = 1200.f;
-  const auto depth = eyeDistance * (1.f - 0.5f * NearPlaneW);  // W = 0.5 * (1/2^14) > 0
+  const auto depth = eyeDistance * (1.f - 0.5f * NearPlaneW);
   const auto matrix = MakePerspectiveDepth(eyeDistance, depth);
 
-  // The case depends on 1 - depth / eyeDistance landing inside the narrow band (0, 2^-14) after
-  // rounding; assert the premise so the case fails loudly instead of degrading silently.
+  // Verify rounding preserves 0 < W < NearPlaneW.
   const auto tlW = CornerW(matrix, Square.left, Square.top);
   const auto trW = CornerW(matrix, Square.right, Square.top);
   const auto blW = CornerW(matrix, Square.left, Square.bottom);
@@ -140,13 +134,9 @@ TGFX_TEST(Matrix3DNearPlaneTest, RectInsideNearPlaneMustNotProduceInfinity) {
   EXPECT_EQ(bounds, Rect::MakeEmpty());
 }
 
-// A rotated rect straddling the near plane: the reference corner is below the near plane while
-// its siblings sit just above it. The clip branch divides by the near-plane distance and yields
-// a finite but extremely magnified rect.
 TGFX_TEST(Matrix3DNearPlaneTest, RectStraddlingNearPlaneStaysFinite) {
   const auto eyeDistance = 1200.f;
-  // The center W sits exactly on the near plane; a ~0.042-degree Y rotation shifts the two
-  // x-corners by about half the near-plane distance in W, so they straddle the plane.
+  // This tilt places opposite edges on either side of NearPlaneW while keeping W positive.
   constexpr auto tiltDegrees = 0.042f;
   auto model = Matrix3D::MakeTranslate(0.f, 0.f, eyeDistance * (1.f - NearPlaneW));
   model.preRotate({0.f, 1.f, 0.f}, tiltDegrees);
@@ -156,8 +146,7 @@ TGFX_TEST(Matrix3DNearPlaneTest, RectStraddlingNearPlaneStaysFinite) {
 
   ASSERT_FALSE(Matrix3DUtils::IsRectBehindCamera(Square, matrix));
 
-  // The tilt angle targets a very narrow floating-point window; assert the straddling premise so
-  // the case fails loudly instead of silently degrading into the non-clipped fast path.
+  // Verify rounding preserves the threshold crossing.
   const auto leftW = CornerW(matrix, Square.left, Square.top);
   const auto rightW = CornerW(matrix, Square.right, Square.top);
   ASSERT_TRUE((leftW < NearPlaneW) != (rightW < NearPlaneW))
@@ -278,11 +267,8 @@ TGFX_TEST_PRIVATE(Matrix3DNearPlaneTest, LayerDirtyRegionsSurviveNearPlaneTransi
   }
 }
 
-// Regression guard for double area accumulation: each edge below is 2e19, so a float area product
-// (4e38) overflows to infinity and every merge cost degenerates into NaN. The forced-merge
-// fallback alone would still converge, so this case also pins down which pair gets merged: the
-// adjacent pair at index 1 and 2 costs no extra area and must win over the fallback pair at
-// index 0 and 1. Accumulating the areas in float again makes that choice impossible.
+// These finite coordinates overflow float areas. Double precision must preserve the cheapest
+// merge choice rather than merely converge via the fallback pair.
 TGFX_TEST(Matrix3DNearPlaneTest, AstronomicDirtyRectsKeepRootLayerConverging) {
   const auto edge = 2e19f;
   auto root = RootLayer::Make();
@@ -311,10 +297,7 @@ TGFX_TEST(Matrix3DNearPlaneTest, AstronomicDirtyRectsKeepRootLayerConverging) {
       << "forced merge did not pick the zero-cost pair; merge costs are no longer comparable";
 }
 
-// Regression guard for the forced-merge fallback pair: an infinite extent is not filtered out by
-// invalidateRect() because left < right still holds, so every area and every union area is
-// infinite and every merge cost degenerates into NaN, losing all comparisons. Without the fallback
-// no pair is ever selected and the dirty list stops converging.
+// Non-empty infinite bounds produce NaN merge costs and require the forced-merge fallback.
 TGFX_TEST(Matrix3DNearPlaneTest, NonFiniteDirtyRectsStillConverge) {
   const auto infinity = std::numeric_limits<float>::infinity();
   auto root = RootLayer::Make();

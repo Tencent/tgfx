@@ -867,14 +867,17 @@ class Matrix {
   void mapRect(Rect* dst, const Rect& src) const;
 
   /**
-   * Sets rect to bounds of rect corners mapped by Matrix.
+   * Maps a rectangle in place using the clipping rules of mapRect(dst, src).
+   * @param rect The rectangle to map and replace with the mapped bounds.
    */
   void mapRect(Rect* rect) const {
     mapRect(rect, *rect);
   }
 
   /**
-   * Returns bounds of src corners mapped by Matrix.
+   * Maps a rectangle using the clipping rules of mapRect(dst, src).
+   * @param src The rectangle to map.
+   * @return The mapped bounds.
    */
   Rect mapRect(const Rect& src) const {
     Rect dst = {};
