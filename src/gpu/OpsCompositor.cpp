@@ -962,7 +962,7 @@ std::pair<bool, bool> OpsCompositor::needComputeBounds(const Brush& brush, bool 
     auto features = context->gpu()->features();
     if (!UsesRuntimeFrameBufferFetch(context) &&
         (!features->textureBarrier || renderTarget->asTextureProxy() == nullptr ||
-         renderTarget->sampleCount() > 1)) {
+         !renderTarget->canBeSampledDirectly() || renderTarget->sampleCount() > 1)) {
       needDeviceBounds = true;
     }
   }
@@ -1237,7 +1237,11 @@ DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AATyp
   }
   Rect bounds = {};
   auto features = context->gpu()->features();
-  auto textureProxy = features->textureBarrier ? renderTarget->asTextureProxy() : nullptr;
+  // A render target that cannot be sampled in place (see canBeSampledDirectly) takes the copy
+  // route below, exactly like a GPU without texture barriers.
+  auto textureProxy = features->textureBarrier && renderTarget->canBeSampledDirectly()
+                          ? renderTarget->asTextureProxy()
+                          : nullptr;
   if (textureProxy == nullptr || renderTarget->sampleCount() > 1) {
     if (deviceBounds.isEmpty()) {
       return {};

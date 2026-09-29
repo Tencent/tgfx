@@ -27,6 +27,7 @@
 #include "core/utils/BlockAllocator.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/EmbeddedShaderBundles.h"
+#include "gpu/GlobalCache.h"
 #include "gpu/PermutationMatcher.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProxyProvider.h"
@@ -756,6 +757,112 @@ TGFX_TEST(GLRenderTest, rectangleTextureAsBlendDst) {
   EXPECT_TRUE(Baseline::Compare(surface, "ImageRenderTest/hardware_render_target_blend"));
   auto gl = static_cast<GLGPU*>(context->gpu())->functions();
   gl->deleteTextures(1, &(glInfo.id));
+}
+
+// Reads the BGRA pixel at (x, y) of a locked CVPixelBuffer as RGBA.
+static std::array<uint8_t, 4> ReadHardwarePixel(HardwareBufferRef buffer, int x, int y) {
+  std::array<uint8_t, 4> rgba = {};
+  auto info = HardwareBufferGetInfo(buffer);
+  auto* pixels = static_cast<const uint8_t*>(HardwareBufferLock(buffer));
+  if (pixels == nullptr) {
+    return rgba;
+  }
+  auto* p = pixels + static_cast<size_t>(y) * info.rowBytes + static_cast<size_t>(x) * 4;
+  rgba = {p[2], p[1], p[0], p[3]};
+  HardwareBufferUnlock(buffer);
+  return rgba;
+}
+
+// A Surface created from a hardware buffer must render into that buffer: the caller already holds
+// the buffer and may read it straight after a synchronous flush, without calling
+// Surface::getHardwareBuffer(). Copying the pixel buffer into a private 2D texture at import broke
+// this, because nothing ever copied the rendered pixels back into the IOSurface.
+TGFX_TEST(GLRenderTest, HardwareSurfaceRendersIntoPixelBuffer) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto buffer = HardwareBufferAllocate(32, 16);
+  ASSERT_NE(buffer, nullptr);
+  auto surface = Surface::MakeFrom(context, buffer);
+  ASSERT_NE(surface, nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::FromRGBA(0, 0, 255, 255));
+  Paint paint;
+  paint.setColor(Color::FromRGBA(255, 0, 0, 255));
+  canvas->drawRect(Rect::MakeXYWH(0, 0, 16, 16), paint);
+  context->flushAndSubmit(true);
+  EXPECT_EQ(ReadHardwarePixel(buffer, 4, 8), (std::array<uint8_t, 4>{255, 0, 0, 255}));
+  EXPECT_EQ(ReadHardwarePixel(buffer, 24, 8), (std::array<uint8_t, 4>{0, 0, 255, 255}));
+
+  // Content the caller writes into the buffer between frames must be what the next frame draws on.
+  auto info = HardwareBufferGetInfo(buffer);
+  auto* pixels = static_cast<uint8_t*>(HardwareBufferLock(buffer));
+  ASSERT_NE(pixels, nullptr);
+  for (int y = 0; y < 16; ++y) {
+    for (int x = 16; x < 32; ++x) {
+      auto* p = pixels + static_cast<size_t>(y) * info.rowBytes + static_cast<size_t>(x) * 4;
+      p[0] = 0;
+      p[1] = 255;
+      p[2] = 0;
+      p[3] = 255;
+    }
+  }
+  HardwareBufferUnlock(buffer);
+  paint.setColor(Color::FromRGBA(255, 255, 255, 255));
+  canvas->drawRect(Rect::MakeXYWH(0, 0, 4, 4), paint);
+  context->flushAndSubmit(true);
+  EXPECT_EQ(ReadHardwarePixel(buffer, 24, 8), (std::array<uint8_t, 4>{0, 255, 0, 255}));
+  EXPECT_EQ(ReadHardwarePixel(buffer, 1, 1), (std::array<uint8_t, 4>{255, 255, 255, 255}));
+  surface = nullptr;
+  HardwareBufferRelease(buffer);
+}
+
+// Sampling a hardware-buffer Surface must see its current content and must stay on the
+// precompiled pipeline: a snapshot, and a dst-reading blend mode that samples the render target,
+// both read pixels that live in a rectangle texture on desktop GL. They must go through a 2D copy,
+// since the precompiled kernels only declare 2D samplers.
+TGFX_TEST(GLRenderTest, HardwareSurfaceSamplingUsesTwoDCopy) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto buffer = HardwareBufferAllocate(32, 16);
+  ASSERT_NE(buffer, nullptr);
+  auto surface = Surface::MakeFrom(context, buffer);
+  ASSERT_NE(surface, nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::FromRGBA(200, 100, 50, 255));
+  auto snapshot = surface->makeImageSnapshot();
+  ASSERT_NE(snapshot, nullptr);
+  canvas->clear(Color::FromRGBA(0, 0, 0, 255));
+
+  auto target = Surface::Make(context, 32, 16);
+  ASSERT_NE(target, nullptr);
+  target->getCanvas()->clear();
+  target->getCanvas()->drawImage(snapshot);
+  std::array<uint8_t, 4> snapshotPixel = {};
+  auto rgbaInfo = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  ASSERT_TRUE(target->readPixels(rgbaInfo, snapshotPixel.data(), 8, 8));
+  // The snapshot keeps the content from before the later clear.
+  EXPECT_EQ(snapshotPixel, (std::array<uint8_t, 4>{200, 100, 50, 255}));
+
+  canvas->clear(Color::FromRGBA(0, 128, 255, 255));
+  context->flushAndSubmit(true);
+  auto* cache = context->precompiledShaderCache();
+  bool aotLoaded = cache != nullptr && cache->isLoaded();
+  auto buildsBefore = context->globalCache()->programStats().programBuilderCreations;
+  Paint paint;
+  paint.setColor(Color::FromRGBA(255, 255, 255, 255));
+  paint.setBlendMode(BlendMode::Difference);
+  canvas->drawRect(Rect::MakeXYWH(0, 0, 32, 16), paint);
+  context->flushAndSubmit(true);
+  EXPECT_EQ(ReadHardwarePixel(buffer, 8, 8), (std::array<uint8_t, 4>{255, 127, 0, 255}));
+  if (aotLoaded) {
+    // Sampling the rectangle render target in place would force a runtime program build.
+    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, buildsBefore);
+  }
+  surface = nullptr;
+  snapshot = nullptr;
+  HardwareBufferRelease(buffer);
 }
 
 static constexpr int GlyphSurfaceWidth = 160;

@@ -104,43 +104,56 @@ std::vector<std::shared_ptr<Texture>> CGLHardwareTexture::MakeFrom(
     if (textureID == 0 || !CheckGLError(gl)) {
       return {};
     }
-    // CVOpenGLTextureCache only ever yields GL_TEXTURE_RECTANGLE objects, and rectangle
-    // textures cannot share the precompiled pipeline with regular two-dimensional ones
-    // (per-sampler type declarations, no hardware wrap modes). Copy the surface into a plain
-    // GL_TEXTURE_2D once at import: the pixel buffer keeps its zero-copy path on Metal, and
-    // every texture the GL context produces stays two-dimensional. The copy runs inside
-    // ScopedCGLImport, so every GL binding it touches is restored before returning.
-    gl->genFramebuffers(1, &resources.copyFramebuffer);
-    if (resources.copyFramebuffer == 0) {
-      return {};
+    if (usage & TextureUsage::RENDER_ATTACHMENT) {
+      // A render target must write into the pixel buffer itself, so it keeps the rectangle
+      // texture that aliases the IOSurface instead of a private copy. It is never sampled
+      // directly: HardwareRenderTargetProxy::canBeSampledDirectly() is false on desktop GL, so
+      // every reader (snapshots, dst-reading blends) copies the pixels into a 2D texture first
+      // and the precompiled pipeline keeps seeing 2D samplers only.
+      glTexture = gpu->makeResource<CGLHardwareTexture>(descriptor, pixelBuffer, textureCache,
+                                                        target, textureID);
+      glTexture->cvTexture = resources.texture;
+      resources.texture = nullptr;
+    } else {
+      // CVOpenGLTextureCache only ever yields GL_TEXTURE_RECTANGLE objects, and rectangle
+      // textures cannot share the precompiled pipeline with regular two-dimensional ones
+      // (per-sampler type declarations, no hardware wrap modes). Copy the surface into a plain
+      // GL_TEXTURE_2D once at import: the pixel buffer keeps its zero-copy path on Metal, and
+      // every texture the GL context produces stays two-dimensional. The copy runs inside
+      // ScopedCGLImport, so every GL binding it touches is restored before returning.
+      gl->genFramebuffers(1, &resources.copyFramebuffer);
+      if (resources.copyFramebuffer == 0) {
+        return {};
+      }
+      gl->bindFramebuffer(GL_READ_FRAMEBUFFER, resources.copyFramebuffer);
+      gl->framebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, target, textureID, 0);
+      auto status = gl->checkFramebufferStatus(GL_READ_FRAMEBUFFER);
+      if (!CheckGLError(gl) || status != GL_FRAMEBUFFER_COMPLETE) {
+        LOGE("CGLHardwareTexture::MakeFrom() incomplete copy source framebuffer!");
+        return {};
+      }
+      gl->genTextures(1, &resources.copyTexture);
+      if (resources.copyTexture == 0) {
+        return {};
+      }
+      gl->bindTexture(GL_TEXTURE_2D, resources.copyTexture);
+      gl->bindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+      const auto& textureFormat = gpu->caps()->getTextureFormat(format);
+      gl->texImage2D(GL_TEXTURE_2D, 0, static_cast<int>(textureFormat.internalFormatTexImage),
+                     width, height, 0, textureFormat.externalFormat, textureFormat.externalType,
+                     nullptr);
+      if (!CheckGLError(gl)) {
+        return {};
+      }
+      gl->copyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, width, height);
+      if (!CheckGLError(gl)) {
+        return {};
+      }
+      glTexture = gpu->makeResource<CGLHardwareTexture>(descriptor, pixelBuffer, textureCache,
+                                                        static_cast<unsigned>(GL_TEXTURE_2D),
+                                                        resources.copyTexture);
+      resources.copyTexture = 0;
     }
-    gl->bindFramebuffer(GL_READ_FRAMEBUFFER, resources.copyFramebuffer);
-    gl->framebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, target, textureID, 0);
-    auto status = gl->checkFramebufferStatus(GL_READ_FRAMEBUFFER);
-    if (!CheckGLError(gl) || status != GL_FRAMEBUFFER_COMPLETE) {
-      LOGE("CGLHardwareTexture::MakeFrom() incomplete copy source framebuffer!");
-      return {};
-    }
-    gl->genTextures(1, &resources.copyTexture);
-    if (resources.copyTexture == 0) {
-      return {};
-    }
-    gl->bindTexture(GL_TEXTURE_2D, resources.copyTexture);
-    gl->bindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
-    const auto& textureFormat = gpu->caps()->getTextureFormat(format);
-    gl->texImage2D(GL_TEXTURE_2D, 0, static_cast<int>(textureFormat.internalFormatTexImage), width,
-                   height, 0, textureFormat.externalFormat, textureFormat.externalType, nullptr);
-    if (!CheckGLError(gl)) {
-      return {};
-    }
-    gl->copyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, width, height);
-    if (!CheckGLError(gl)) {
-      return {};
-    }
-    glTexture = gpu->makeResource<CGLHardwareTexture>(descriptor, pixelBuffer, textureCache,
-                                                      static_cast<unsigned>(GL_TEXTURE_2D),
-                                                      resources.copyTexture);
-    resources.copyTexture = 0;
   }
   if (usage & TextureUsage::RENDER_ATTACHMENT && !glTexture->checkFrameBuffer(gpu)) {
     return {};
@@ -160,6 +173,9 @@ CGLHardwareTexture::CGLHardwareTexture(const TextureDescriptor& descriptor,
 }
 
 CGLHardwareTexture::~CGLHardwareTexture() {
+  if (cvTexture != nullptr) {
+    CVOpenGLTextureRelease(cvTexture);
+  }
   CFRelease(pixelBuffer);
   if (textureCache != nil) {
     CFRelease(textureCache);
@@ -167,10 +183,17 @@ CGLHardwareTexture::~CGLHardwareTexture() {
 }
 
 void CGLHardwareTexture::onReleaseTexture(GLGPU* gpu) {
-  // The 2D copy texture was created by us rather than owned by CoreVideo, so it must go
-  // through the base GLTexture release (glDeleteTextures) instead of only flushing the
-  // CV texture cache, which never deletes it.
-  GLTexture::onReleaseTexture(gpu);
+  if (cvTexture != nullptr) {
+    // The rectangle texture name belongs to CoreVideo: releasing the CVOpenGLTexture and
+    // flushing the cache frees it, so it must not also go through glDeleteTextures.
+    CVOpenGLTextureRelease(cvTexture);
+    cvTexture = nullptr;
+  } else {
+    // The 2D copy texture was created by us rather than owned by CoreVideo, so it must go
+    // through the base GLTexture release (glDeleteTextures) instead of only flushing the
+    // CV texture cache, which never deletes it.
+    GLTexture::onReleaseTexture(gpu);
+  }
   if (textureCache != nil) {
     CVOpenGLTextureCacheFlush(textureCache, 0);
     CFRelease(textureCache);

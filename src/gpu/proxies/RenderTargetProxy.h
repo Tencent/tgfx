@@ -105,6 +105,16 @@ class RenderTargetProxy {
   }
 
   /**
+   * Returns true if a draw may sample this render target's own texture (asTextureProxy()) in
+   * place, e.g. as the dst texture of a dst-reading blend behind a texture barrier. Returns false
+   * when the backing texture has a sampler type the precompiled kernels do not declare, so readers
+   * must copy the pixels into a regular 2D texture first.
+   */
+  virtual bool canBeSampledDirectly() const {
+    return true;
+  }
+
+  /**
    * Returns the TextureView associated with the RenderTargetProxy. Returns nullptr if the proxy is
    * not instantiated yet, or it is not backed by a texture view.
    */

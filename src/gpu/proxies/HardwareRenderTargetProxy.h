@@ -19,6 +19,7 @@
 #pragma once
 
 #include "TextureRenderTargetProxy.h"
+#include "core/utils/HardwareBufferUtil.h"
 
 namespace tgfx {
 class HardwareRenderTargetProxy : public TextureRenderTargetProxy {
@@ -27,6 +28,15 @@ class HardwareRenderTargetProxy : public TextureRenderTargetProxy {
 
   HardwareBufferRef getHardwareBuffer() const override {
     return hardwareBuffer;
+  }
+
+  /**
+   * On desktop OpenGL the render target is the CoreVideo rectangle texture aliasing the pixel
+   * buffer (see CGLHardwareTexture). The precompiled kernels only declare 2D samplers, so readers
+   * copy it into a 2D texture instead of sampling it in place.
+   */
+  bool canBeSampledDirectly() const override {
+    return HardwareBufferTexturesAliasMemory();
   }
 
  protected:
