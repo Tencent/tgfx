@@ -196,7 +196,16 @@ RegionTransformer::RegionTransformer(std::shared_ptr<RegionTransformer> outer)
 
 void RegionTransformer::transform(Rect* bounds) const {
   DEBUG_ASSERT(bounds != nullptr);
+  if (bounds->isEmpty()) {
+    bounds->setEmpty();
+    return;
+  }
   onTransform(bounds);
+  // A clipped-away region must not be expanded back into visible content by outer effects.
+  if (bounds->isEmpty()) {
+    bounds->setEmpty();
+    return;
+  }
   if (outer) {
     outer->transform(bounds);
   }

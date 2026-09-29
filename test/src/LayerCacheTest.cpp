@@ -16,6 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <algorithm>
+#include <limits>
 #include "layers/SubtreeCache.h"
 #include "layers/TileCache.h"
 #include "tgfx/layers/DisplayList.h"
@@ -28,6 +30,113 @@
 #include "utils/TestUtils.h"
 
 namespace tgfx {
+
+TGFX_TEST(LayerCacheTest, TileQueryPreservesCoverage) {
+  TileCache cache(128);
+  for (int x = 0; x < 4; ++x) {
+    auto tile = std::make_shared<Tile>();
+    tile->tileX = x;
+    tile->sourceX = x;
+    cache.addTile(tile);
+  }
+  bool continuous = false;
+  auto tiles = cache.getTilesUnderRect(Rect::MakeWH(256, 128), true, &continuous);
+  ASSERT_EQ(tiles.size(), 2u);
+  EXPECT_TRUE(continuous);
+  EXPECT_NE(std::find(tiles.begin(), tiles.end(), cache.getTile(0, 0)), tiles.end());
+  EXPECT_NE(std::find(tiles.begin(), tiles.end(), cache.getTile(1, 0)), tiles.end());
+  tiles = cache.getTilesUnderRect(Rect::MakeWH(512, 128), true, &continuous);
+  EXPECT_EQ(tiles.size(), 4u);
+  EXPECT_TRUE(continuous);
+  cache.getTile(1, 0)->sourceX = 10;
+  tiles = cache.getTilesUnderRect(Rect::MakeWH(256, 128), true, &continuous);
+  EXPECT_EQ(tiles.size(), 2u);
+  EXPECT_FALSE(continuous);
+  cache.removeTile(1, 0);
+  tiles = cache.getTilesUnderRect(Rect::MakeWH(256, 128), false, &continuous);
+  ASSERT_EQ(tiles.size(), 1u);
+  EXPECT_EQ(tiles.front(), cache.getTile(0, 0));
+  EXPECT_FALSE(continuous);
+  EXPECT_TRUE(cache.getTilesUnderRect(Rect::MakeWH(256, 128), true, &continuous).empty());
+  EXPECT_FALSE(continuous);
+}
+
+TGFX_TEST(LayerCacheTest, TileQueryHandlesUnboundedRegions) {
+  TileCache cache(128);
+  for (int x : {-1, 0, 1}) {
+    auto tile = std::make_shared<Tile>();
+    tile->tileX = x;
+    cache.addTile(tile);
+  }
+  const auto infinity = std::numeric_limits<float>::infinity();
+  const auto maximum = std::numeric_limits<float>::max();
+  const Rect queries[] = {
+      Rect::MakeLTRB(-infinity, -infinity, infinity, infinity),
+      Rect::MakeLTRB(-maximum, -maximum, maximum, maximum),
+      Rect::MakeLTRB(-infinity, 0, infinity, 128),
+      Rect::MakeLTRB(-1e12f, 0, 1e12f, 128),
+  };
+  for (const auto& rect : queries) {
+    bool continuous = true;
+    const auto tiles = cache.getTilesUnderRect(rect, false, &continuous);
+    EXPECT_EQ(tiles.size(), 3u);
+    EXPECT_FALSE(continuous);
+    for (int x : {-1, 0, 1}) {
+      EXPECT_NE(std::find(tiles.begin(), tiles.end(), cache.getTile(x, 0)), tiles.end());
+    }
+    EXPECT_TRUE(cache.getTilesUnderRect(rect, true, &continuous).empty());
+    EXPECT_FALSE(continuous);
+  }
+  auto tiles = cache.getTilesUnderRect(Rect::MakeLTRB(0, -infinity, 128, infinity));
+  ASSERT_EQ(tiles.size(), 1u);
+  EXPECT_EQ(tiles.front(), cache.getTile(0, 0));
+  const auto nan = std::numeric_limits<float>::quiet_NaN();
+  const Rect emptyQueries[] = {
+      Rect::MakeEmpty(),
+      Rect::MakeLTRB(infinity, infinity, -infinity, -infinity),
+      Rect::MakeLTRB(nan, 0, 128, 128),
+      Rect::MakeLTRB(1e20f, 0, 2e20f, 128),
+      Rect::MakeLTRB(-2e20f, 0, -1e20f, 128),
+  };
+  for (const auto& rect : emptyQueries) {
+    bool continuous = true;
+    EXPECT_TRUE(cache.getTilesUnderRect(rect, false, &continuous).empty());
+    EXPECT_FALSE(continuous);
+  }
+}
+
+TGFX_TEST(LayerCacheTest, TileQueryPreservesIntegerLimits) {
+  TileCache cache(1);
+  for (int x : {std::numeric_limits<int>::min(), std::numeric_limits<int>::max()}) {
+    auto tile = std::make_shared<Tile>();
+    tile->tileX = x;
+    cache.addTile(tile);
+  }
+  const auto limit = 2147483648.f;
+  bool continuous = true;
+  const auto tiles =
+      cache.getTilesUnderRect(Rect::MakeLTRB(-limit, 0, limit, 1), false, &continuous);
+  EXPECT_EQ(tiles.size(), 2u);
+  EXPECT_FALSE(continuous);
+  EXPECT_TRUE(cache.getTilesUnderRect(Rect::MakeLTRB(-limit, 0, limit, 1), true).empty());
+  for (int x : {std::numeric_limits<int>::min(), std::numeric_limits<int>::max()}) {
+    EXPECT_NE(std::find(tiles.begin(), tiles.end(), cache.getTile(x, 0)), tiles.end());
+  }
+}
+
+TGFX_TEST(LayerCacheTest, TileQueryContinuityDoesNotOverflow) {
+  TileCache cache(128);
+  auto first = std::make_shared<Tile>();
+  first->sourceX = std::numeric_limits<int>::min();
+  cache.addTile(first);
+  auto second = std::make_shared<Tile>();
+  second->tileX = 1;
+  second->sourceX = std::numeric_limits<int>::max();
+  cache.addTile(second);
+  bool continuous = true;
+  EXPECT_EQ(cache.getTilesUnderRect(Rect::MakeWH(256, 128), true, &continuous).size(), 2u);
+  EXPECT_FALSE(continuous);
+}
 
 TGFX_TEST_PRIVATE(LayerCacheTest, LayerCache) {
   ContextScope scope;

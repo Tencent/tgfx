@@ -260,21 +260,19 @@ class Matrix3D {
   static Matrix3D Perspective(float fovyDegrees, float aspect, float nearZ, float farZ);
 
   /**
-   * The camera near-plane distance, expressed as a homogeneous W value. A vertex whose W falls
-   * below this distance sits on or inside the near plane, where the perspective division is
-   * unbounded, so mapRect() clips it against the plane instead of dividing by it.
+   * Minimum homogeneous W retained by mapRect() during perspective clipping. This numerical
+   * threshold limits division by near-zero W and is independent of Perspective()'s nearZ plane.
    */
   static constexpr float W_NEAR_PLANE = 1.f / (1 << 14);
 
   /**
-   * Maps a rectangle using this matrix.
-   * If the matrix contains a perspective transformation, each corner of the rectangle is mapped as a
-   * 4D point (x, y, 0, 1), and the resulting rectangle is computed from the projected points
-   * (after perspective division). Corners whose homogeneous W falls below W_NEAR_PLANE are clipped
-   * against the near plane first, which magnifies the result by up to 1 / W_NEAR_PLANE; callers
-   * that size a surface from the result must clip it against their own viewport. If every corner
-   * is clipped away, the whole rectangle lies inside the near plane and an empty rect is returned
-   * rather than an infinite one.
+   * Maps a rectangle using this matrix. With perspective, corners are mapped as 4D points
+   * (x, y, 0, 1) and the rectangle is clipped to W >= W_NEAR_PLANE before perspective division.
+   * The reciprocal W is at most 1 / W_NEAR_PLANE, but large transformed coordinates can still
+   * overflow. Callers allocating a surface must validate and clip the result to their viewport.
+   * @param src The rectangle in the z = 0 plane to map.
+   * @return Bounds of the retained projected region, or a finite empty rectangle if every corner
+   * falls below W_NEAR_PLANE.
    */
   Rect mapRect(const Rect& src) const;
 

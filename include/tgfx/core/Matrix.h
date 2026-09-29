@@ -858,7 +858,11 @@ class Matrix {
   bool rectStaysRect() const;
 
   /**
-   * Sets dst to bounds of src corners mapped by Matrix.
+   * Sets dst to the bounds of src mapped by this matrix. With perspective, the rectangle is clipped
+   * to homogeneous W >= 1 / 16384 before division. If every corner is clipped away, dst is set to
+   * a finite empty rectangle. Large transformed coordinates may still overflow.
+   * @param dst Receives the mapped bounds and may alias src.
+   * @param src The rectangle to map.
    */
   void mapRect(Rect* dst, const Rect& src) const;
 

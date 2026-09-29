@@ -17,12 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TileCache.h"
+#include <cmath>
+#include <limits>
 #include "core/utils/Log.h"
 #include "core/utils/TileSortCompareFunc.h"
 
 namespace tgfx {
 constexpr int64_t TileKey(int tileX, int tileY) {
-  return (static_cast<int64_t>(tileX) << 32) | static_cast<uint32_t>(tileY);
+  return static_cast<int64_t>(tileX) * (int64_t{1} << 32) + static_cast<uint32_t>(tileY);
 }
 
 std::shared_ptr<Tile> TileCache::getTile(int tileX, int tileY) const {
@@ -40,17 +42,23 @@ std::vector<std::shared_ptr<Tile>> TileCache::getTilesUnderRect(const Rect& rect
     }
     return {};
   }
-  int startTileX = static_cast<int>(std::floor(rect.left / static_cast<float>(tileSize)));
-  int startTileY = static_cast<int>(std::floor(rect.top / static_cast<float>(tileSize)));
-  int endTileX = static_cast<int>(std::ceil(rect.right / static_cast<float>(tileSize)));
-  int endTileY = static_cast<int>(std::ceil(rect.bottom / static_cast<float>(tileSize)));
+  // Keep unclamped bounds so oversized dirty regions still invalidate every intersecting tile.
+  auto startTileX = std::floor(static_cast<double>(rect.left) / tileSize);
+  auto startTileY = std::floor(static_cast<double>(rect.top) / tileSize);
+  auto endTileX = std::ceil(static_cast<double>(rect.right) / tileSize);
+  auto endTileY = std::ceil(static_cast<double>(rect.bottom) / tileSize);
+  auto requestTileCount = (endTileX - startTileX) * (endTileY - startTileY);
+  auto canEnumerate = startTileX >= std::numeric_limits<int>::min() &&
+                      startTileY >= std::numeric_limits<int>::min() &&
+                      endTileX <= std::numeric_limits<int>::max() &&
+                      endTileY <= std::numeric_limits<int>::max();
   std::vector<std::shared_ptr<Tile>> tiles = {};
-  auto requestTileCount =
-      static_cast<size_t>(endTileX - startTileX) * static_cast<size_t>(endTileY - startTileY);
-  if (requestTileCount < tileMap.size()) {
-    tiles.reserve(requestTileCount);
-    for (int tileY = startTileY; tileY < endTileY; ++tileY) {
-      for (int tileX = startTileX; tileX < endTileX; ++tileX) {
+  if (canEnumerate && requestTileCount < static_cast<double>(tileMap.size())) {
+    tiles.reserve(static_cast<size_t>(requestTileCount));
+    auto endX = static_cast<int>(endTileX);
+    auto endY = static_cast<int>(endTileY);
+    for (int tileY = static_cast<int>(startTileY); tileY < endY; ++tileY) {
+      for (int tileX = static_cast<int>(startTileX); tileX < endX; ++tileX) {
         auto key = TileKey(tileX, tileY);
         auto result = tileMap.find(key);
         if (result != tileMap.end()) {
@@ -69,7 +77,7 @@ std::vector<std::shared_ptr<Tile>> TileCache::getTilesUnderRect(const Rect& rect
     }
   }
 
-  auto allFound = tiles.size() == requestTileCount;
+  auto allFound = static_cast<double>(tiles.size()) == requestTileCount;
   if (requireFullCoverage && !allFound) {
     tiles.clear();
   }
@@ -78,8 +86,10 @@ std::vector<std::shared_ptr<Tile>> TileCache::getTilesUnderRect(const Rect& rect
       auto firstTile = tiles.front();
       *continuous = true;
       for (auto& tile : tiles) {
-        if (tile->tileX - firstTile->tileX != tile->sourceX - firstTile->sourceX ||
-            tile->tileY - firstTile->tileY != tile->sourceY - firstTile->sourceY) {
+        if (static_cast<int64_t>(tile->tileX) - firstTile->tileX !=
+                static_cast<int64_t>(tile->sourceX) - firstTile->sourceX ||
+            static_cast<int64_t>(tile->tileY) - firstTile->tileY !=
+                static_cast<int64_t>(tile->sourceY) - firstTile->sourceY) {
           *continuous = false;
           break;
         }

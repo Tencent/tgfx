@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <algorithm>
 #include <limits>
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Vec.h"
@@ -252,6 +253,12 @@ static void MapRectPerspective(const Matrix& m, Rect* dst, const Rect& src) {
   auto tr = MapHomogeneousHWYImpl(m, src.right, src.top, 1.f);
   auto bl = MapHomogeneousHWYImpl(m, src.left, src.bottom, 1.f);
   auto br = MapHomogeneousHWYImpl(m, src.right, src.bottom, 1.f);
+
+  // W is affine over the rectangle, so no interior point survives if every corner is clipped.
+  if (std::max({tl.z, tr.z, bl.z, br.z}) < W0_PLANE_DISTANCE) {
+    dst->setEmpty();
+    return;
+  }
 
   auto pTL = ProjectCornerWithClip(tl, tr, bl);
   auto pTR = ProjectCornerWithClip(tr, br, tl);

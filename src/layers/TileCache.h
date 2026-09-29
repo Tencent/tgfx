@@ -88,13 +88,14 @@ class TileCache {
   std::shared_ptr<Tile> getTile(int tileX, int tileY) const;
 
   /**
-   * Returns a vector of tiles that intersect the specified rectangle and removes them from the
-   * cache. The rectangle is in the tile cache's coordinate space, without any content offset.
+   * Returns cached tiles intersecting the rectangle without removing them. The rectangle is in
+   * the tile cache's coordinate space, without any content offset. Unbounded rectangles can match
+   * cached tiles but cannot be fully covered.
    * @param rect The rectangle to check for tiles.
    * @param requireFullCoverage If true, only returns tiles when the rectangle is fully covered.
    * @param continuous This output parameter is set to true if all tiles in the region exist and
    * their source coordinates (sourceX/sourceY) form a contiguous, aligned block on the surface.
-   * @return
+   * @return The matching tiles, or an empty vector when required full coverage is unavailable.
    */
   std::vector<std::shared_ptr<Tile>> getTilesUnderRect(const Rect& rect,
                                                        bool requireFullCoverage = false,
