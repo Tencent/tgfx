@@ -53,17 +53,11 @@ class VulkanManualToken {
 struct VulkanSubmissionPlan {
   size_t acquireWaitCount = 0;
   size_t signalCount = 0;
-  size_t barrierCount = 0;
-  size_t presentCount = 0;
-  size_t ownedSemaphoreCount = 0;
 
   void add(bool manualPresent) {
     acquireWaitCount++;
-    ownedSemaphoreCount++;
     if (!manualPresent) {
       signalCount++;
-      barrierCount++;
-      presentCount++;
     }
   }
 };

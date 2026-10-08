@@ -27,10 +27,7 @@ TGFX_TEST(VulkanPresentationStateTest, SubmissionAggregation) {
   plan.add(false);
   plan.add(true);
   EXPECT_EQ(plan.acquireWaitCount, 3u);
-  EXPECT_EQ(plan.ownedSemaphoreCount, 3u);
   EXPECT_EQ(plan.signalCount, 2u);
-  EXPECT_EQ(plan.barrierCount, 2u);
-  EXPECT_EQ(plan.presentCount, 2u);
 }
 
 TGFX_TEST(VulkanPresentationStateTest, ManualPhaseAndToken) {
