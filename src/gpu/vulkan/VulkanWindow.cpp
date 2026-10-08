@@ -26,6 +26,7 @@
 #ifdef __ANDROID__
 #include <android/native_window.h>
 #endif
+#include <algorithm>
 #include <vector>
 #include "core/utils/Log.h"
 #include "gpu/vulkan/VulkanAPI.h"
@@ -804,7 +805,10 @@ std::shared_ptr<RenderTargetProxy> VulkanWindow::createSwapchainProxy(Context* c
 
   std::shared_ptr<VulkanManualToken> token = nullptr;
   if (manualPresent) {
-    if (!_platformState->supportsReadback || !_platformState->manualToken->acquire()) {
+    // Only the single-frame manual token gates manual drawables. presentNow never requires
+    // TRANSFER_SRC usage, so pure presentation must not be disabled on surfaces without
+    // readback support.
+    if (!_platformState->manualToken->acquire()) {
       return nullptr;
     }
     token = _platformState->manualToken;
@@ -813,7 +817,13 @@ std::shared_ptr<RenderTargetProxy> VulkanWindow::createSwapchainProxy(Context* c
       context, vulkanGPU, _platformState->swapchain, _platformState->format, _platformState->width,
       _platformState->height, _platformState->images, _platformState->imageStates,
       _platformState->outOfDate, std::move(token), _platformState->generation, manualPresent);
-  _platformState->activeProxies.push_back(proxy);
+  // Prune proxies that have gone away so the tracking list stays bounded; entries would
+  // otherwise only be cleaned up on the next needsRebuild pass.
+  auto& proxies = _platformState->activeProxies;
+  proxies.erase(std::remove_if(proxies.begin(), proxies.end(),
+                               [](const auto& weakProxy) { return weakProxy.expired(); }),
+                proxies.end());
+  proxies.push_back(proxy);
   return proxy;
 }
 
