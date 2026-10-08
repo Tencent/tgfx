@@ -20,37 +20,36 @@
 
 #import <QuartzCore/QuartzCore.h>
 #include <memory>
-#include "tgfx/core/ColorSpace.h"
 #include "tgfx/gpu/Drawable.h"
 
 namespace tgfx {
 
 /**
- * A Drawable backed by an id<CAMetalDrawable> acquired from a CAMetalLayer. Unlike the window's
- * automatic presentation path, which schedules the presentation on the command queue and releases
- * the drawable right away, this drawable is held by the caller until it is released, so
- * readPixels() returns the rendered content even after present(). Reading back requires the
- * layer's framebufferOnly property to be NO, otherwise the drawable texture cannot be used as a
- * blit source.
+ * A Drawable backed by an id<CAMetalDrawable> acquired from a CAMetalLayer. The drawable is
+ * acquired at nextDrawable() time and the frame is imported into a Context later; the frame
+ * stays readable until it is presented through Context::present(). Reading back requires the
+ * layer's framebufferOnly property to be NO, otherwise the drawable texture cannot be used as
+ * a blit source.
  */
 class MetalDrawable : public Drawable {
  public:
   /**
-   * Acquires a drawable from the specified CAMetalLayer and wraps it. The call blocks until the
-   * layer can provide a drawable. Returns nullptr if the layer is nil or has no drawable
-   * available.
+   * Acquires a drawable from the specified CAMetalLayer. The call blocks until the layer can
+   * provide a drawable. Returns nullptr if the layer is nil or has no drawable available.
    */
-  static std::shared_ptr<MetalDrawable> Make(Context* context, CAMetalLayer* metalLayer,
+  static std::shared_ptr<MetalDrawable> Make(CAMetalLayer* metalLayer,
                                              std::shared_ptr<ColorSpace> colorSpace);
 
   ~MetalDrawable() override;
 
  protected:
-  void onPresent() override;
+  std::shared_ptr<RenderTargetProxy> onImport(Context* context) override;
+  bool onSchedulePresent(Context* context) override;
+  void onPresent(Context* context) override;
 
  private:
-  MetalDrawable(Context* context, std::shared_ptr<RenderTargetProxy> renderTarget,
-                id<CAMetalDrawable> metalDrawable, std::shared_ptr<ColorSpace> colorSpace);
+  MetalDrawable(id<CAMetalDrawable> metalDrawable, int width, int height,
+                std::shared_ptr<ColorSpace> colorSpace);
 
   id<CAMetalDrawable> _metalDrawable = nil;
 };

@@ -61,7 +61,8 @@ class MetalWindow : public Window {
   void onPresent(Context* context,
                  const std::vector<std::shared_ptr<RenderTargetProxy>>& renderTargets) override;
   bool hasIndependentPresentationTargets() const override;
-  std::shared_ptr<Drawable> onNextDrawable(Context* context) override;
+  std::shared_ptr<Drawable> onNextDrawable() override;
+  bool onSupportsReadback() const override;
 
  private:
   CAMetalLayer* metalLayer = nil;

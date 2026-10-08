@@ -40,28 +40,30 @@ std::shared_ptr<Device> Window::getDevice() {
   return device;
 }
 
-std::shared_ptr<Drawable> Window::nextDrawable(Context* context) {
-  if (context == nullptr) {
-    return nullptr;
-  }
-  if (context->device() != device.get()) {
-    LOGE("Window::nextDrawable() The context must belong to the window's device!");
-    return nullptr;
-  }
+std::shared_ptr<Drawable> Window::nextDrawable() {
   if (weak_from_this().expired()) {
     LOGE("Window::nextDrawable() The window must be owned by a shared_ptr!");
     return nullptr;
   }
-  auto window = shared_from_this();
-  auto drawable = onNextDrawable(context);
+  auto drawable = onNextDrawable();
   if (drawable != nullptr) {
-    drawable->_window = std::move(window);
+    // The frame handle keeps its window alive until the frame is delivered; device validation
+    // happens later, when the frame is imported into a Context.
+    drawable->_window = shared_from_this();
   }
   return drawable;
 }
 
-std::shared_ptr<Drawable> Window::onNextDrawable(Context* context) {
-  return WindowDrawable::Make(context, shared_from_this());
+bool Window::supportsReadback() {
+  return onSupportsReadback();
+}
+
+std::shared_ptr<Drawable> Window::onNextDrawable() {
+  return WindowDrawable::Make(shared_from_this());
+}
+
+bool Window::onSupportsReadback() const {
+  return false;
 }
 
 void Window::onPresent(Context*, const std::vector<std::shared_ptr<RenderTargetProxy>>&) {

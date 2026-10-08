@@ -834,15 +834,14 @@ bool VulkanWindow::hasIndependentPresentationTargets() const {
   return true;
 }
 
-std::shared_ptr<Drawable> VulkanWindow::onNextDrawable(Context* context) {
-  // A manual-present proxy is intentionally not stored in PlatformState: the auto presentation
-  // path tracks the last proxy for out-of-date detection, while this proxy is owned by the
-  // returned drawable for its single-frame lifetime.
-  auto proxy = std::static_pointer_cast<VulkanSwapchainProxy>(createSwapchainProxy(context, true));
-  if (proxy == nullptr) {
-    return nullptr;
-  }
-  return VulkanDrawable::Make(context, std::move(proxy), colorSpace());
+std::shared_ptr<Drawable> VulkanWindow::onNextDrawable() {
+  // The frame handle is created without a Context; its manual-present proxy is resolved when
+  // the frame is imported (VulkanDrawable::onImport()).
+  return VulkanDrawable::Make(std::static_pointer_cast<VulkanWindow>(shared_from_this()));
+}
+
+bool VulkanWindow::onSupportsReadback() const {
+  return _platformState->supportsReadback;
 }
 
 }  // namespace tgfx

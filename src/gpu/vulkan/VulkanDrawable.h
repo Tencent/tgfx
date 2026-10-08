@@ -19,35 +19,32 @@
 #pragma once
 
 #include <memory>
-#include "gpu/vulkan/VulkanSwapchainProxy.h"
 #include "tgfx/gpu/Drawable.h"
 
 namespace tgfx {
 
+class VulkanWindow;
+
 /**
- * A Drawable backed by a Vulkan swapchain image. Unlike the window's automatic presentation path,
- * which presents the image at the end of the render submission, the presentation is deferred to
- * present(), so readPixels() between the render submission and the presentation reads the image
- * that was just rendered. Reading after present() is not supported on this backend because the
- * presentation engine owns the image once it has been presented.
+ * A Drawable backed by a Vulkan swapchain frame. The frame handle is created without a Context;
+ * its manual-present proxy (which acquires the swapchain image) is resolved when the frame is
+ * imported into a Context. The frame stays readable between the render submission and
+ * Context::present(); reading after the presentation is not supported because the presentation
+ * engine owns the image once it has been presented.
  */
 class VulkanDrawable : public Drawable {
  public:
-  static std::shared_ptr<VulkanDrawable> Make(Context* context,
-                                              std::shared_ptr<VulkanSwapchainProxy> proxy,
-                                              std::shared_ptr<ColorSpace> colorSpace);
+  static std::shared_ptr<VulkanDrawable> Make(std::shared_ptr<VulkanWindow> window);
 
   ~VulkanDrawable() override;
 
  protected:
-  void onPresent() override;
+  std::shared_ptr<RenderTargetProxy> onImport(Context* context) override;
+  void onPresent(Context* context) override;
+  void onAbandon() override;
 
  private:
-  VulkanDrawable(Context* context, std::shared_ptr<RenderTargetProxy> renderTarget,
-                 std::shared_ptr<VulkanSwapchainProxy> proxy,
-                 std::shared_ptr<ColorSpace> colorSpace);
-
-  std::shared_ptr<VulkanSwapchainProxy> _proxy = nullptr;
+  explicit VulkanDrawable(std::shared_ptr<ColorSpace> colorSpace);
 };
 
 }  // namespace tgfx

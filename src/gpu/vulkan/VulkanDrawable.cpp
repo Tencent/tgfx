@@ -17,32 +17,52 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "VulkanDrawable.h"
+#include "VulkanSwapchainProxy.h"
+#include "tgfx/gpu/vulkan/VulkanWindow.h"
 
 namespace tgfx {
 
-std::shared_ptr<VulkanDrawable> VulkanDrawable::Make(Context* context,
-                                                     std::shared_ptr<VulkanSwapchainProxy> proxy,
-                                                     std::shared_ptr<ColorSpace> colorSpace) {
-  if (proxy == nullptr) {
+std::shared_ptr<VulkanDrawable> VulkanDrawable::Make(std::shared_ptr<VulkanWindow> window) {
+  if (window == nullptr) {
     return nullptr;
   }
-  auto renderTarget = proxy;
-  return std::shared_ptr<VulkanDrawable>(new VulkanDrawable(
-      context, std::move(renderTarget), std::move(proxy), std::move(colorSpace)));
+  return std::shared_ptr<VulkanDrawable>(new VulkanDrawable(window->colorSpace()));
 }
 
-VulkanDrawable::VulkanDrawable(Context* context, std::shared_ptr<RenderTargetProxy> renderTarget,
-                               std::shared_ptr<VulkanSwapchainProxy> proxy,
-                               std::shared_ptr<ColorSpace> colorSpace)
-    : Drawable(context, std::move(renderTarget), std::move(colorSpace)), _proxy(std::move(proxy)) {
+VulkanDrawable::VulkanDrawable(std::shared_ptr<ColorSpace> colorSpace)
+    : Drawable(0, 0, std::move(colorSpace)) {
+  // The frame size is not known until the frame is imported; Drawable::import() backfills it
+  // from the resolved render target.
 }
 
 VulkanDrawable::~VulkanDrawable() {
-  present();
+  abandon();
 }
 
-void VulkanDrawable::onPresent() {
-  _proxy->presentFrame();
+std::shared_ptr<RenderTargetProxy> VulkanDrawable::onImport(Context* context) {
+  if (_window == nullptr) {
+    return nullptr;
+  }
+  auto window = static_cast<VulkanWindow*>(_window.get());
+  return window->createSwapchainProxy(context, true);
+}
+
+void VulkanDrawable::onPresent(Context*) {
+  if (_importedTarget == nullptr) {
+    return;
+  }
+  auto proxy = std::static_pointer_cast<VulkanSwapchainProxy>(_importedTarget);
+  proxy->presentFrame();
+}
+
+void VulkanDrawable::onAbandon() {
+  if (_importedTarget == nullptr) {
+    return;
+  }
+  // The acquired image can no longer be presented; force a swapchain rebuild so the image and
+  // its semaphores are reclaimed without any GPU calls from here.
+  auto proxy = std::static_pointer_cast<VulkanSwapchainProxy>(_importedTarget);
+  proxy->discardFrame();
 }
 
 }  // namespace tgfx

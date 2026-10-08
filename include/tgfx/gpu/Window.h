@@ -33,8 +33,8 @@ class RenderTargetProxy;
  * Window represents a native displayable resource that can be rendered to by a Device. Use
  * Surface::MakeFrom(context, window) to obtain a Surface for rendering, then call
  * context->submit() to automatically present the result. To read back the rendered content, use
- * nextDrawable() to acquire a Drawable instead, which keeps the frame buffer readable and allows
- * manual presentation.
+ * nextDrawable() to acquire a Drawable instead, which keeps the frame readable until it is
+ * presented through Context::present().
  */
 class Window : public std::enable_shared_from_this<Window> {
  public:
@@ -47,17 +47,24 @@ class Window : public std::enable_shared_from_this<Window> {
   std::shared_ptr<Device> getDevice();
 
   /**
-   * Acquires the next single-frame Drawable for rendering with manual presentation and readback.
-   * The returned Drawable is used to create a Surface via Surface::MakeFrom(context, drawable).
-   * The rendering commands must be submitted before calling Drawable::readPixels() or
-   * Drawable::present(); the frame is presented either manually via Drawable::present() or
-   * automatically when the Drawable is released. The Drawable retains this Window until the frame
-   * is released. Only one Drawable should be held at a time, otherwise frame acquisition may stall.
-   * Returns nullptr if the context is nullptr or belongs to a different Device, the window is not
-   * owned by a shared_ptr, or the window cannot provide a drawable right now (for example, the
-   * window has a zero size or the platform frame buffer is unavailable).
+   * Acquires the usage right of the next single frame of this Window. No drawing Context is
+   * involved: acquisition only talks to the platform presentation endpoint (drawable pool or
+   * swapchain). Import the frame into a Context later via Surface::MakeFrom(context, drawable),
+   * then present it via Context::present(drawable). The returned Drawable keeps this Window
+   * alive until its frame is presented or discarded. Only one drawable should be held at a
+   * time, otherwise frame acquisition may stall. Returns nullptr if the window is not owned by
+   * a shared_ptr or cannot provide a frame right now (for example, the window has a zero size
+   * or the platform frame buffer is unavailable).
    */
-  std::shared_ptr<Drawable> nextDrawable(Context* context);
+  std::shared_ptr<Drawable> nextDrawable();
+
+  /**
+   * Returns true when this window's frames can be copied before presentation, for example through
+   * Surface::asyncReadPixels() on a Surface created from a Drawable. False on windows whose
+   * platform frame buffer cannot act as a copy source (a CAMetalLayer with framebufferOnly set to
+   * YES, a Vulkan swapchain without TRANSFER_SRC usage, or a WebGPU canvas without CopySrc usage).
+   */
+  bool supportsReadback();
 
   /**
    * Returns the color space associated with this Window. Returns nullptr for the default sRGB.
@@ -109,15 +116,22 @@ class Window : public std::enable_shared_from_this<Window> {
   virtual bool hasIndependentPresentationTargets() const;
 
   /**
-   * Creates a backend-specific Drawable for nextDrawable(). The default implementation wraps this
-   * window's onCreateRenderTarget() and onPresent(), which works for backends that present inside
-   * onPresent(). Backends that schedule the presentation when the drawable is acquired (Metal,
-   * Vulkan) override this to defer the presentation to Drawable::present(). The default
-   * implementation returns nullptr if the window cannot provide a render target right now.
+   * Creates a backend-specific Drawable for nextDrawable(). Backends only talk to the platform
+   * presentation endpoint here; the frame is imported into a Context later through
+   * Drawable::onImport(). The default implementation returns a WindowDrawable, which resolves its
+   * frame through onCreateRenderTarget()/onPresent() at import time. Returns nullptr if the window
+   * cannot provide a frame right now.
    */
-  virtual std::shared_ptr<Drawable> onNextDrawable(Context* context);
+  virtual std::shared_ptr<Drawable> onNextDrawable();
+
+  /**
+   * Returns true when this window's frames can act as a copy source before presentation. The
+   * default implementation returns false.
+   */
+  virtual bool onSupportsReadback() const;
 
  private:
+  friend class Drawable;
   friend class DrawingBuffer;
   friend class DrawingManager;
   friend class Surface;

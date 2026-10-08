@@ -25,24 +25,23 @@
 namespace tgfx {
 
 /**
- * The default Drawable implementation returned by Window::onNextDrawable(). It delegates render
- * target creation and presentation to the window's onCreateRenderTarget() and onPresent(), which
- * is sufficient for backends that present inside onPresent() (OpenGL, D3D12, WebGPU, Qt).
- * Backends that schedule the presentation when the drawable is acquired (Metal, Vulkan) provide
- * their own Drawable subclasses instead.
+ * The default Drawable implementation returned by Window::onNextDrawable(). The frame is resolved
+ * through the window's onCreateRenderTarget() when it is imported into a Context, which keeps GL
+ * and EAGL target creation on a current context, and presented through the window's
+ * onPresent() with the frame's own render target.
  */
 class WindowDrawable : public Drawable {
  public:
-  static std::shared_ptr<WindowDrawable> Make(Context* context, std::shared_ptr<Window> window);
+  static std::shared_ptr<WindowDrawable> Make(std::shared_ptr<Window> window);
 
   ~WindowDrawable() override;
 
  protected:
-  void onPresent() override;
+  std::shared_ptr<RenderTargetProxy> onImport(Context* context) override;
+  void onPresent(Context* context) override;
 
  private:
-  WindowDrawable(Context* context, std::shared_ptr<RenderTargetProxy> renderTarget,
-                 std::shared_ptr<ColorSpace> colorSpace);
+  WindowDrawable(std::shared_ptr<ColorSpace> colorSpace);
 };
 
 }  // namespace tgfx

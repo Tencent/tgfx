@@ -20,111 +20,124 @@
 
 #include <memory>
 #include "tgfx/core/ColorSpace.h"
-#include "tgfx/core/ImageInfo.h"
 
 namespace tgfx {
 
 class Context;
 class RenderTargetProxy;
-class Surface;
 class Window;
 
 /**
- * Drawable represents a single displayable frame buffer of a Window, similar to
- * id&lt;CAMetalDrawable&gt; on the Metal platform. It is the only well-defined way to read back
- * pixels rendered to a Window: a readPixels() call on a Surface created from a Window has no
- * guaranteed content once the Surface is presented, because the underlying frame buffer is
- * recycled immediately after presentation. A Drawable is instead retained by its Surface and by
- * the caller, so its content stays readable for its whole lifetime. A Drawable also retains the
- * Window it was acquired from so all platform presentation resources remain valid.
- *
- * Use Window::nextDrawable() to acquire a Drawable, then Surface::MakeFrom(context, drawable) to
- * render into it. The rendering commands must be submitted with Context::flushAndSubmit() before
- * calling readPixels() or present(). A Surface created from a Drawable is never presented
- * automatically at submit time; call present() manually, or let the Drawable present itself when
- * it is released if present() is never called.
- *
- * A Drawable is single-frame: acquire a new one for every frame and release it as soon as
- * possible. Holding multiple drawables of the same Window at once can stall frame acquisition.
+ * Drawable represents the usage right of a single displayable frame of a Window. It carries only
+ * the frame identity and its delivery state: it holds no drawing Context and never references a
+ * Surface. The frame is imported into a Context via Surface::MakeFrom(context, drawable), which
+ * resolves backend targets that need a current context, and is presented via
+ * Context::present(drawable). Readback goes through Surface::asyncReadPixels() while the frame has
+ * been submitted but not presented yet. Dropping a Drawable without presenting it discards the
+ * frame; backends release it without any GPU calls.
  */
 class Drawable {
  public:
   virtual ~Drawable() = default;
 
   /**
-   * Returns the width of the drawable in pixels.
+   * Returns the width of the frame in pixels.
    */
-  int width() const;
+  int width() const {
+    return _width;
+  }
 
   /**
-   * Returns the height of the drawable in pixels.
+   * Returns the height of the frame in pixels.
    */
-  int height() const;
+  int height() const {
+    return _height;
+  }
 
   /**
-   * Returns the color space associated with this Drawable, which is inherited from the Window it
-   * was acquired from. Returns nullptr for the default sRGB.
+   * Returns the color space associated with this frame, inherited from its Window. Returns
+   * nullptr for the default sRGB.
    */
-  std::shared_ptr<ColorSpace> colorSpace() const;
-
-  /**
-   * Presents the content rendered into this Drawable to the screen. The rendering commands must
-   * have been submitted (Context::flushAndSubmit()) before calling this method. present() is
-   * idempotent; if it is never called, the Drawable is presented automatically when it is
-   * released.
-   */
-  void present();
-
-  /**
-   * Copies a rect of pixels rendered into this Drawable to dstPixels with the specified ImageInfo.
-   * Copy starts at (srcX, srcY) and does not exceed the Drawable bounds. Pixels are always
-   * provided in top-left origin format; if the Drawable's origin is bottom-left, the pixels are
-   * flipped during the copy. The returned data reflects the rendered content from the moment the
-   * rendering commands are submitted until present() is called. The Metal backend additionally
-   * allows reading after present(). Reading back requires the underlying frame buffer to be
-   * readable; for example, a CAMetalLayer must have its framebufferOnly property set to NO.
-   * @param dstInfo the ImageInfo describing the destination pixels.
-   * @param dstPixels the destination pixel buffer, must not be nullptr.
-   * @param srcX the column index to start reading from, defaults to 0.
-   * @param srcY the row index to start reading from, defaults to 0.
-   * @return true if pixels are copied to dstPixels.
-   */
-  bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0, int srcY = 0);
+  std::shared_ptr<ColorSpace> colorSpace() const {
+    return _colorSpace;
+  }
 
  protected:
-  Drawable(Context* context, std::shared_ptr<RenderTargetProxy> renderTarget,
-           std::shared_ptr<ColorSpace> colorSpace = nullptr);
+  Drawable(int width, int height, std::shared_ptr<ColorSpace> colorSpace);
 
   /**
-   * Presents the drawable to the screen. Called at most once, either from present() or from the
-   * automatic presentation at release. Subclasses must also invoke present() in their destructors
-   * to provide the fallback, since the base class cannot dispatch to onPresent() while it is
-   * being destroyed.
+   * Imports the frame target into the given Context. Called by Surface::MakeFrom() while the
+   * Context is locked and current, so backends that need a current context (GL, EAGL) resolve
+   * their targets here. Returns nullptr if the frame cannot be imported right now.
    */
-  virtual void onPresent() = 0;
+  virtual std::shared_ptr<RenderTargetProxy> onImport(Context* context) = 0;
 
-  Context* getContext() const {
-    return _context;
-  }
+  /**
+   * Called by Context::present() when the frame's rendering has not been submitted yet. Returns
+   * true when the presentation is attached to the upcoming submission itself, in which case the
+   * submit pipeline only marks the frame presented. The default implementation returns false,
+   * which defers to onPresent() at the end of the submission that carries the frame's rendering
+   * commands.
+   */
+  virtual bool onSchedulePresent(Context* context);
 
-  const std::shared_ptr<RenderTargetProxy>& getRenderTarget() const {
-    return _renderTarget;
-  }
+  /**
+   * Presents the frame. The frame's rendering commands have been submitted; the presentation must
+   * be ordered after them without blocking the CPU. The Context is still valid and current.
+   */
+  virtual void onPresent(Context* context) = 0;
 
-  const std::shared_ptr<Window>& getWindow() const {
-    return _window;
-  }
+  /**
+   * Discards the frame without presenting it. No GPU calls are allowed; backends only release
+   * CPU-side references and mark state for later recovery.
+   */
+  virtual void onAbandon();
+
+  /**
+   * Must be invoked by subclass destructors to discard an undelivered frame, since the base class
+   * cannot dispatch to onAbandon() while it is being destroyed.
+   */
+  void abandon();
+
+  std::shared_ptr<Window> _window = nullptr;
+  std::shared_ptr<RenderTargetProxy> _importedTarget = nullptr;
 
  private:
+  friend class Context;
+  friend class DrawingBuffer;
   friend class Surface;
   friend class Window;
 
-  Context* _context = nullptr;
-  std::shared_ptr<RenderTargetProxy> _renderTarget = nullptr;
+  enum class Delivery {
+    Acquired,
+    Imported,
+    Submitted,
+    PresentRequested,
+    Presented,
+    Abandoned,
+  };
+
+  // Imports the frame while the Context is locked. Returns nullptr if the frame was already
+  // imported or the import failed.
+  std::shared_ptr<RenderTargetProxy> import(Context* context);
+
+  // Returns true when readback may still be scheduled for this frame.
+  bool canReadBack() const;
+
+  // Registers or executes a presentation request. Returns false on an invalid delivery state.
+  bool requestPresent(Context* context);
+
+  // Marks the frame as submitted; presents it if a presentation was requested earlier.
+  void onSubmissionCompleted(Context* context);
+
+  // Drops the strong references that are only needed while the frame is undelivered.
+  void releaseFrameHandles();
+
+  bool _presentationAttached = false;
+  Delivery _delivery = Delivery::Acquired;
+  int _width = 0;
+  int _height = 0;
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;
-  std::weak_ptr<Surface> _surface = {};
-  std::shared_ptr<Window> _window = nullptr;
-  bool _presented = false;
 };
 
 }  // namespace tgfx

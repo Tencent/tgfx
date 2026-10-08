@@ -28,6 +28,7 @@
 
 namespace tgfx {
 
+class Drawable;
 class RenderTargetProxy;
 class Window;
 
@@ -70,6 +71,12 @@ class DrawingBuffer {
    */
   void presentWindows(Context* context);
 
+  /**
+   * Marks the frames of all collected drawables as submitted and presents the ones whose
+   * presentation was requested before the submission, after command buffer submission.
+   */
+  void presentDrawables(Context* context);
+
  private:
   struct WindowPresentation {
     std::shared_ptr<Window> window = nullptr;
@@ -89,6 +96,7 @@ class DrawingBuffer {
   std::vector<PlacementPtr<RenderTask>> renderTasks = {};
   std::vector<PlacementPtr<AtlasUploadTask>> atlasTasks = {};
   std::vector<WindowPresentation> windowPresentations = {};
+  std::vector<std::weak_ptr<Drawable>> drawables = {};
 
   friend class DrawingManager;
 };

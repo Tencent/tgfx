@@ -103,19 +103,21 @@ class Surface {
    * Returns nullptr if the context is nullptr or the window cannot provide a valid render target.
    * Note that the window's frame buffer is recycled right after presentation, so readPixels() on
    * the returned Surface has no guaranteed content once it has been submitted. Use
-   * Window::nextDrawable() and Drawable::readPixels() instead when readback is required.
+   * Window::nextDrawable() and Surface::asyncReadPixels() before Context::present() instead when
+   * readback is required.
    */
   static std::shared_ptr<Surface> MakeFrom(Context* context, std::shared_ptr<Window> window,
                                            uint32_t renderFlags = 0);
 
   /**
-   * Creates a new Surface for rendering to the specified Drawable, which was acquired from a
-   * Window via Window::nextDrawable(). The returned Surface retains the Drawable and is never
-   * presented automatically at submit time; call Drawable::present() to display the rendered
-   * content, which also happens automatically when both the Surface and all other references to the
-   * Drawable are released. The color space is obtained from the Drawable. Returns nullptr if the
-   * context is nullptr, the drawable is nullptr, or the drawable was acquired from a different
-   * context.
+   * Creates a new Surface by importing the single frame of the specified Drawable, which was
+   * acquired from a Window via Window::nextDrawable(). The frame identity is fixed: the returned
+   * Surface renders exactly this frame and never acquires the next one. The frame is presented
+   * via Context::present(drawable); dropping the Drawable without presenting it discards the
+   * frame. Readback through asyncReadPixels() is defined from the moment the frame's rendering
+   * has been submitted until the frame is presented. The color space is obtained from the
+   * Drawable. Returns nullptr if the context is nullptr, the drawable is nullptr, the context
+   * belongs to a different device, or the drawable's frame has already been imported.
    */
   static std::shared_ptr<Surface> MakeFrom(Context* context, std::shared_ptr<Drawable> drawable,
                                            uint32_t renderFlags = 0);
@@ -215,8 +217,8 @@ class Surface {
    * are copied only if pixel conversion is possible. Returns true if pixels are copied to dstPixels.
    * Note that for a Surface created from a Window, the content is not defined once the Surface has
    * been submitted, because the window's frame buffer is recycled right after presentation. Use
-   * Window::nextDrawable() and Drawable::readPixels() instead when readback of window content is
-   * required.
+   * Window::nextDrawable() and Surface::asyncReadPixels() before Context::present() instead when
+   * readback of window content is required.
    */
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0, int srcY = 0);
   /**

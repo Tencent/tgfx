@@ -31,6 +31,7 @@
 
 namespace tgfx {
 struct RuntimeInputTexture;
+class Drawable;
 
 class DrawingManager {
  public:
@@ -79,6 +80,12 @@ class DrawingManager {
 
   void addAtlasCellTask(std::shared_ptr<TextureProxy> textureProxy, const Point& atlasOffset,
                         std::shared_ptr<ImageCodec> codec);
+
+  /**
+   * Collects a drawable-backed frame so that its delivery state is advanced when the submission
+   * carrying its rendering commands completes.
+   */
+  void collectDrawable(std::shared_ptr<Drawable> drawable);
 
   /**
    * Collects a Window and its exact render target for presentation after command submission.

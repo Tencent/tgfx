@@ -154,6 +154,13 @@ void VulkanSwapchainProxy::presentFrame() {
   releaseManualToken();
 }
 
+void VulkanSwapchainProxy::discardFrame() {
+  if (_outOfDate != nullptr) {
+    *_outOfDate = true;
+  }
+  releaseFrame();
+}
+
 void VulkanSwapchainProxy::releaseManualToken() {
   if (_manualToken != nullptr) {
     _manualToken->release();

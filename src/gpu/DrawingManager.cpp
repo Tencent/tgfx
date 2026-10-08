@@ -25,6 +25,7 @@
 #include "gpu/tasks/RenderTargetCopyTask.h"
 #include "gpu/tasks/RuntimeDrawTask.h"
 #include "tasks/TransferPixelsTask.h"
+#include "tgfx/gpu/Drawable.h"
 #include "tgfx/gpu/Window.h"
 
 namespace tgfx {
@@ -169,6 +170,19 @@ void DrawingManager::addAtlasCellTask(std::shared_ptr<TextureProxy> textureProxy
     atlasTaskMap[taskKey] = atlasUploadTask;
   }
   atlasUploadTask->addCell(allocator, std::move(codec), atlasOffset);
+}
+
+void DrawingManager::collectDrawable(std::shared_ptr<Drawable> drawable) {
+  if (drawable == nullptr) {
+    return;
+  }
+  auto drawingBuffer = getDrawingBuffer();
+  for (auto& pendingDrawable : drawingBuffer->drawables) {
+    if (pendingDrawable.lock() == drawable) {
+      return;
+    }
+  }
+  drawingBuffer->drawables.push_back(std::move(drawable));
 }
 
 void DrawingManager::collectWindow(std::shared_ptr<Window> window,

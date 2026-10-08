@@ -18,54 +18,66 @@
 
 #include "MetalDrawable.h"
 #import <Metal/Metal.h>
+#include "gpu/metal/MetalCommandQueue.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "tgfx/gpu/Backend.h"
+#include "tgfx/gpu/Context.h"
+#include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/metal/MetalTypes.h"
 
 namespace tgfx {
 
-std::shared_ptr<MetalDrawable> MetalDrawable::Make(Context* context, CAMetalLayer* metalLayer,
+std::shared_ptr<MetalDrawable> MetalDrawable::Make(CAMetalLayer* metalLayer,
                                                    std::shared_ptr<ColorSpace> colorSpace) {
   if (metalLayer == nil) {
     return nullptr;
   }
   id<CAMetalDrawable> metalDrawable = nil;
   @autoreleasepool {
+    // nextDrawable returns an autoreleased (+0) drawable; retain it inside the pool so the
+    // reference stays valid after the pool drains. The constructor takes over this retain.
     metalDrawable = [[metalLayer nextDrawable] retain];
   }
   if (metalDrawable == nil) {
     return nullptr;
   }
-  MetalTextureInfo metalInfo = {};
-  metalInfo.texture = (__bridge const void*)metalDrawable.texture;
-  metalInfo.format = static_cast<unsigned>(metalDrawable.texture.pixelFormat);
   auto width = static_cast<int>(metalDrawable.texture.width);
   auto height = static_cast<int>(metalDrawable.texture.height);
-  BackendRenderTarget backendRT(metalInfo, width, height);
-  auto renderTarget = RenderTargetProxy::MakeFrom(context, backendRT, ImageOrigin::TopLeft);
-  if (renderTarget == nullptr) {
-    [metalDrawable release];
-    return nullptr;
-  }
   return std::shared_ptr<MetalDrawable>(
-      new MetalDrawable(context, std::move(renderTarget), metalDrawable, std::move(colorSpace)));
+      new MetalDrawable(metalDrawable, width, height, std::move(colorSpace)));
 }
 
-MetalDrawable::MetalDrawable(Context* context, std::shared_ptr<RenderTargetProxy> renderTarget,
-                             id<CAMetalDrawable> metalDrawable,
+MetalDrawable::MetalDrawable(id<CAMetalDrawable> metalDrawable, int width, int height,
                              std::shared_ptr<ColorSpace> colorSpace)
-    : Drawable(context, std::move(renderTarget), std::move(colorSpace)),
-      _metalDrawable(metalDrawable) {
+    : Drawable(width, height, std::move(colorSpace)) {
+  // Takes over the single retain acquired in Make(); balanced by the destructor release.
+  _metalDrawable = metalDrawable;
 }
 
 MetalDrawable::~MetalDrawable() {
-  present();
+  abandon();
   [_metalDrawable release];
 }
 
-void MetalDrawable::onPresent() {
+std::shared_ptr<RenderTargetProxy> MetalDrawable::onImport(Context* context) {
+  MetalTextureInfo metalInfo = {};
+  metalInfo.texture = (__bridge const void*)_metalDrawable.texture;
+  metalInfo.format = static_cast<unsigned>(_metalDrawable.texture.pixelFormat);
+  BackendRenderTarget backendRT(metalInfo, width(), height());
+  return RenderTargetProxy::MakeFrom(context, backendRT, ImageOrigin::TopLeft);
+}
+
+bool MetalDrawable::onSchedulePresent(Context* context) {
+  // Attach the presentation to the upcoming command buffer, so that the presentation waits for
+  // the GPU to finish rendering before the frame is displayed.
+  auto metalQueue = static_cast<MetalCommandQueue*>(context->gpu()->queue());
+  metalQueue->schedulePresent(_metalDrawable);
+  return true;
+}
+
+void MetalDrawable::onPresent(Context*) {
   // Presenting the drawable directly schedules the presentation after all command buffers that
-  // have been enqueued so far, so the GPU finishes rendering before the drawable is displayed.
+  // have been enqueued so far, so the GPU finishes rendering before the frame is displayed.
   [_metalDrawable present];
 }
 

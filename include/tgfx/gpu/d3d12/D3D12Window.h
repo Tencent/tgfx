@@ -78,6 +78,9 @@ class D3D12Window : public Window {
 
  protected:
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
+  bool onSupportsReadback() const override {
+    return true;
+  }
   void onPresent(Context* context,
                  const std::vector<std::shared_ptr<RenderTargetProxy>>& renderTargets) override;
 

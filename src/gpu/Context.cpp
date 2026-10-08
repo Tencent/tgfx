@@ -29,6 +29,7 @@
 #include "gpu/ResourceCache.h"
 #include "gpu/ShaderCaps.h"
 #include "tgfx/core/Clock.h"
+#include "tgfx/gpu/Drawable.h"
 #include "tgfx/gpu/GPU.h"
 
 #define ASSERT_OWNER_THREAD ASSERT_SINGLE_OWNER(*singleOwner)
@@ -141,6 +142,7 @@ void Context::submit(std::unique_ptr<Recording> recording, bool syncCpu) {
       }
       queue->submit(std::move(commandBuffer));
       drawingBuffer->presentWindows(this);
+      drawingBuffer->presentDrawables(this);
       pendingDrawingBuffers.pop_front();
       if (isLast) {
         break;
@@ -160,6 +162,14 @@ bool Context::flushAndSubmit(bool syncCpu) {
     submit(std::move(recording), syncCpu);
   }
   return hasRecording;
+}
+
+void Context::present(std::shared_ptr<Drawable> drawable) {
+  ASSERT_OWNER_THREAD;
+  if (drawable == nullptr) {
+    return;
+  }
+  drawable->requestPresent(this);
 }
 
 size_t Context::memoryUsage() const {

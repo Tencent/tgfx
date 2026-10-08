@@ -53,6 +53,12 @@ class VulkanSwapchainProxy : public RenderTargetProxy {
   void releaseFrame();
   void presentFrame();
 
+  /**
+   * Discards an acquired frame without presenting it. No GPU calls are made; the out-of-date
+   * flag is set so the next proxy creation rebuilds the swapchain and reclaims the image.
+   */
+  void discardFrame();
+
  private:
   void releaseManualToken();
 

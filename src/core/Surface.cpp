@@ -97,14 +97,23 @@ std::shared_ptr<Surface> Surface::MakeFrom(Context* context, std::shared_ptr<Win
 
 std::shared_ptr<Surface> Surface::MakeFrom(Context* context, std::shared_ptr<Drawable> drawable,
                                            uint32_t renderFlags) {
-  if (context == nullptr || drawable == nullptr || drawable->_context != context) {
+  if (context == nullptr || drawable == nullptr) {
+    return nullptr;
+  }
+  // Import the frame into this Context, which also validates that the context belongs to the
+  // frame's window device and that the frame has not been imported before.
+  auto renderTarget = drawable->import(context);
+  if (renderTarget == nullptr) {
     return nullptr;
   }
   auto surface =
-      MakeFrom(drawable->_renderTarget, renderFlags, true, drawable->colorSpace(), nullptr);
+      MakeFrom(std::move(renderTarget), renderFlags, true, drawable->colorSpace(), nullptr);
   if (surface != nullptr) {
-    drawable->_surface = surface;
-    surface->_drawable = std::move(drawable);
+    surface->_drawable = drawable;
+    // The drawable's frame must be tracked by the current drawing buffer, so that its delivery
+    // state advances when the submission carrying the frame's rendering commands completes.
+    // (The RenderContext cannot collect it: the surface's _drawable is only assigned here.)
+    context->drawingManager()->collectDrawable(drawable);
   }
   return surface;
 }
@@ -225,6 +234,10 @@ RGBA4f<AlphaType::Premultiplied> Surface::getColor(int x, int y,
 
 std::shared_ptr<SurfaceReadback> Surface::asyncReadPixels(const Rect& rect) {
   if (rect.isEmpty()) {
+    return nullptr;
+  }
+  if (_drawable != nullptr && !_drawable->canReadBack()) {
+    // The frame has already been presented or discarded; its content is no longer defined.
     return nullptr;
   }
   auto surfaceRect = Rect::MakeWH(width(), height());

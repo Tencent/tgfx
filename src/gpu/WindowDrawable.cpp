@@ -20,31 +20,35 @@
 
 namespace tgfx {
 
-std::shared_ptr<WindowDrawable> WindowDrawable::Make(Context* context,
-                                                     std::shared_ptr<Window> window) {
+std::shared_ptr<WindowDrawable> WindowDrawable::Make(std::shared_ptr<Window> window) {
   if (window == nullptr) {
     return nullptr;
   }
-  auto renderTarget = window->onCreateRenderTarget(context);
-  if (renderTarget == nullptr) {
-    return nullptr;
-  }
-  auto colorSpace = window->colorSpace();
-  return std::shared_ptr<WindowDrawable>(
-      new WindowDrawable(context, std::move(renderTarget), std::move(colorSpace)));
+  return std::shared_ptr<WindowDrawable>(new WindowDrawable(window->colorSpace()));
 }
 
-WindowDrawable::WindowDrawable(Context* context, std::shared_ptr<RenderTargetProxy> renderTarget,
-                               std::shared_ptr<ColorSpace> colorSpace)
-    : Drawable(context, std::move(renderTarget), std::move(colorSpace)) {
+WindowDrawable::WindowDrawable(std::shared_ptr<ColorSpace> colorSpace)
+    : Drawable(0, 0, std::move(colorSpace)) {
+  // The frame size is not known until the frame is imported; Drawable::import() backfills it
+  // from the resolved render target.
 }
 
 WindowDrawable::~WindowDrawable() {
-  present();
+  abandon();
 }
 
-void WindowDrawable::onPresent() {
-  getWindow()->onPresent(getContext(), {getRenderTarget()});
+std::shared_ptr<RenderTargetProxy> WindowDrawable::onImport(Context* context) {
+  if (_window == nullptr) {
+    return nullptr;
+  }
+  return _window->onCreateRenderTarget(context);
+}
+
+void WindowDrawable::onPresent(Context* context) {
+  if (_window == nullptr || _importedTarget == nullptr) {
+    return;
+  }
+  _window->onPresent(context, {_importedTarget});
 }
 
 }  // namespace tgfx

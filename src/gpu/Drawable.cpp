@@ -17,51 +17,109 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Drawable.h"
+#include "core/utils/Log.h"
 #include "gpu/proxies/RenderTargetProxy.h"
-#include "tgfx/core/Surface.h"
+#include "tgfx/gpu/Context.h"
+#include "tgfx/gpu/Window.h"
 
 namespace tgfx {
 
-Drawable::Drawable(Context* context, std::shared_ptr<RenderTargetProxy> renderTarget,
-                   std::shared_ptr<ColorSpace> colorSpace)
-    : _context(context), _renderTarget(std::move(renderTarget)),
-      _colorSpace(std::move(colorSpace)) {
+Drawable::Drawable(int width, int height, std::shared_ptr<ColorSpace> colorSpace)
+    : _width(width), _height(height), _colorSpace(std::move(colorSpace)) {
 }
 
-int Drawable::width() const {
-  return _renderTarget->width();
+bool Drawable::onSchedulePresent(Context*) {
+  return false;
 }
 
-int Drawable::height() const {
-  return _renderTarget->height();
+void Drawable::onAbandon() {
 }
 
-std::shared_ptr<ColorSpace> Drawable::colorSpace() const {
-  return _colorSpace;
-}
-
-void Drawable::present() {
-  if (_presented) {
+void Drawable::abandon() {
+  if (_delivery == Delivery::Presented || _delivery == Delivery::Abandoned) {
     return;
   }
-  _presented = true;
-  onPresent();
+  onAbandon();
+  _delivery = Delivery::Abandoned;
+  releaseFrameHandles();
 }
 
-bool Drawable::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) {
-  if (_renderTarget == nullptr) {
+std::shared_ptr<RenderTargetProxy> Drawable::import(Context* context) {
+  if (context == nullptr || _window == nullptr) {
+    return nullptr;
+  }
+  if (context->device() != _window->getDevice().get()) {
+    LOGE("Drawable::import() The context must belong to the frame's window device!");
+    return nullptr;
+  }
+  if (_delivery != Delivery::Acquired) {
+    LOGE("Drawable::import() The frame has already been imported!");
+    return nullptr;
+  }
+  auto target = onImport(context);
+  if (target == nullptr) {
+    return nullptr;
+  }
+  _importedTarget = target;
+  // Deferred backends do not know the frame size at acquisition time; resolve it from the
+  // imported target.
+  if (_width == 0 || _height == 0) {
+    _width = target->width();
+    _height = target->height();
+  }
+  _delivery = Delivery::Imported;
+  return target;
+}
+
+bool Drawable::canReadBack() const {
+  return _delivery == Delivery::Imported || _delivery == Delivery::Submitted ||
+         _delivery == Delivery::PresentRequested;
+}
+
+bool Drawable::requestPresent(Context* context) {
+  if (context == nullptr || _window == nullptr) {
     return false;
   }
-  auto surface = _surface.lock();
-  if (surface == nullptr) {
-    // The Surface created from this Drawable has been released. Use a temporary Surface that
-    // shares the render target, which is still valid because this Drawable holds it.
-    surface = Surface::MakeFrom(_renderTarget, 0, false, _colorSpace);
-    if (surface == nullptr) {
-      return false;
-    }
+  if (context->device() != _window->getDevice().get()) {
+    LOGE("Drawable::requestPresent() The context must belong to the frame's window device!");
+    return false;
   }
-  return surface->readPixels(dstInfo, dstPixels, srcX, srcY);
+  if (_delivery == Delivery::Imported) {
+    // The frame's rendering has not been submitted yet: register the request and let it ride
+    // along with the submission that carries the frame's rendering commands.
+    _delivery = Delivery::PresentRequested;
+    _presentationAttached = onSchedulePresent(context);
+    return true;
+  }
+  if (_delivery == Delivery::Submitted) {
+    // The rendering has been submitted (for example a readback was scheduled in between):
+    // present immediately, ordered after all previously submitted work.
+    onPresent(context);
+    _delivery = Delivery::Presented;
+    releaseFrameHandles();
+    return true;
+  }
+  LOGE("Drawable::requestPresent() The frame is not in a presentable state!");
+  return false;
+}
+
+void Drawable::onSubmissionCompleted(Context* context) {
+  if (_delivery == Delivery::Imported) {
+    _delivery = Delivery::Submitted;
+    return;
+  }
+  if (_delivery == Delivery::PresentRequested) {
+    if (!_presentationAttached) {
+      onPresent(context);
+    }
+    _delivery = Delivery::Presented;
+    releaseFrameHandles();
+  }
+}
+
+void Drawable::releaseFrameHandles() {
+  _window = nullptr;
+  _importedTarget = nullptr;
 }
 
 }  // namespace tgfx

@@ -275,6 +275,9 @@ RenderContext::RenderContext(std::shared_ptr<RenderTargetProxy> proxy, uint32_t 
     if (surface && surface->_window) {
       drawingManager->collectWindow(surface->_window, renderTarget);
     }
+    if (surface && surface->_drawable) {
+      drawingManager->collectDrawable(surface->_drawable);
+    }
   }
 }
 
@@ -489,6 +492,9 @@ OpsCompositor* RenderContext::getOpsCompositor(bool discardContent) {
         drawingManager->addOpsCompositor(renderTarget, renderFlags, std::nullopt, _colorSpace);
     if (surface && surface->_window) {
       drawingManager->collectWindow(surface->_window, renderTarget);
+    }
+    if (surface && surface->_drawable) {
+      drawingManager->collectDrawable(surface->_drawable);
     }
   } else if (discardContent) {
     opsCompositor->discardAll();

@@ -147,13 +147,18 @@ bool MetalWindow::hasIndependentPresentationTargets() const {
   return true;
 }
 
-std::shared_ptr<Drawable> MetalWindow::onNextDrawable(Context* context) {
+std::shared_ptr<Drawable> MetalWindow::onNextDrawable() {
   int width = 0;
   int height = 0;
   if (!GetDrawableSize(metalLayer, metalView, &width, &height)) {
     return nullptr;
   }
-  return MetalDrawable::Make(context, metalLayer, colorSpace());
+  return MetalDrawable::Make(metalLayer, colorSpace());
+}
+
+bool MetalWindow::onSupportsReadback() const {
+  // Reading back blits from the drawable texture, which requires sample/blit access.
+  return metalLayer.framebufferOnly == NO;
 }
 
 }  // namespace tgfx

@@ -19,6 +19,7 @@
 #include "DrawingBuffer.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/GlobalCache.h"
+#include "tgfx/gpu/Drawable.h"
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/Window.h"
 
@@ -66,6 +67,15 @@ void DrawingBuffer::presentWindows(Context* context) {
   windowPresentations.clear();
 }
 
+void DrawingBuffer::presentDrawables(Context* context) {
+  for (auto& pendingDrawable : drawables) {
+    if (auto drawable = pendingDrawable.lock()) {
+      drawable->onSubmissionCompleted(context);
+    }
+  }
+  drawables.clear();
+}
+
 bool DrawingBuffer::empty() const {
   return resourceTasks.empty() && renderTasks.empty() && atlasTasks.empty();
 }
@@ -75,6 +85,7 @@ void DrawingBuffer::reset() {
   resourceTasks.clear();
   atlasTasks.clear();
   windowPresentations.clear();
+  drawables.clear();
   vertexAllocator.clear(vertexMaxValueTracker.getMaxValue());
   instanceAllocator.clear(instanceMaxValueTracker.getMaxValue());
   drawingAllocator.clear(drawingMaxValueTracker.getMaxValue());
