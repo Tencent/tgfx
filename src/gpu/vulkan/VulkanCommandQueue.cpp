@@ -37,6 +37,9 @@ VulkanCommandQueue::~VulkanCommandQueue() {
     vkDeviceWaitIdle(gpu->device());
     for (auto& present : pendingPresents) {
       vkDestroySemaphore(gpu->device(), present.imageAvailableSemaphore, nullptr);
+      // Align with abandonPresents(): the acquired image can no longer be presented, so the
+      // swapchain must be rebuilt before its images and semaphores are reused.
+      *present.outOfDate = true;
     }
   }
 }
@@ -350,9 +353,6 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
         present.swapchain, present.imageIndex, present.imageAvailableSemaphore,
         present.presentSemaphore, present.layout, present.outOfDate, present.frameState,
         present.manualPresent});
-    if (!present.manualPresent) {
-      *present.layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    }
   }
 
   gpu->executeSubmission(std::move(request));
