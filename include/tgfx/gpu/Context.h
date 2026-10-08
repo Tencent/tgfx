@@ -181,8 +181,9 @@ class Context {
    * - The frame's rendering has not been submitted yet: the request rides along with the
    *   submission that carries the frame's rendering commands.
    * - The rendering has already been submitted (for example a readback was scheduled in
-   *   between): the presentation is executed immediately, ordered after all previously
-   *   submitted work, without blocking the CPU.
+   *   between): any still-pending work of the context (such as an unsubmitted readback transfer)
+   *   is flushed and submitted first, then the presentation is executed immediately, ordered
+   *   after all submitted work, without blocking the CPU.
    * Dropping a Drawable without calling present() discards its frame. Must be called while the
    * Context is valid, before Device::unlock().
    */

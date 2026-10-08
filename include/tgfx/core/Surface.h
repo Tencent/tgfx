@@ -114,8 +114,8 @@ class Surface {
    * acquired from a Window via Window::nextDrawable(). The frame identity is fixed: the returned
    * Surface renders exactly this frame and never acquires the next one. The frame is presented
    * via Context::present(drawable); dropping the Drawable without presenting it discards the
-   * frame. Readback through asyncReadPixels() is defined from the moment the frame's rendering
-   * has been submitted until the frame is presented. The color space is obtained from the
+   * frame. Readback through asyncReadPixels() is defined until a presentation is registered or
+   * the frame is presented. The color space is obtained from the
    * Drawable. Returns nullptr if the context is nullptr, the drawable is nullptr, the context
    * belongs to a different device, or the drawable's frame has already been imported.
    */

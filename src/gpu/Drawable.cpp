@@ -72,11 +72,11 @@ std::shared_ptr<RenderTargetProxy> Drawable::import(Context* context) {
 }
 
 bool Drawable::canReadBack() const {
-  // The frame must still be valid: presented or abandoned frames are terminal states, and
-  // releaseFrameHandles() has already cleared _window for them, so check the delivery state
-  // before dereferencing _window.
-  if (_delivery != Delivery::Imported && _delivery != Delivery::Submitted &&
-      _delivery != Delivery::PresentRequested) {
+  // The frame must still be valid: presented or abandoned frames are terminal states, a
+  // presentation has already been registered for PresentRequested frames (later readbacks would
+  // be ordered after the presentation), and releaseFrameHandles() has already cleared _window
+  // for them, so check the delivery state before dereferencing _window.
+  if (_delivery != Delivery::Imported && _delivery != Delivery::Submitted) {
     return false;
   }
   // The frame is readable only when its source window also supports readback: blitting from a
@@ -104,8 +104,12 @@ bool Drawable::requestPresent(Context* context) {
     return true;
   }
   if (_delivery == Delivery::Submitted) {
-    // The rendering has been submitted (for example a readback was scheduled in between):
-    // present immediately, ordered after all previously submitted work.
+    // The rendering has been submitted (for example a readback was scheduled in between): flush
+    // and submit any pending work first — readback transfers scheduled after the frame's
+    // rendering submission are still unsubmitted at this point and must be submitted before the
+    // presentation, otherwise they would execute on an already-presented frame. This is a no-op
+    // when there is nothing pending. Then present immediately, ordered after all submitted work.
+    context->flushAndSubmit();
     onPresent(context);
     _delivery = Delivery::Presented;
     releaseFrameHandles();

@@ -32,10 +32,10 @@ class Window;
  * the frame identity and its delivery state: it holds no drawing Context and never references a
  * Surface. The frame is imported into a Context via Surface::MakeFrom(context, drawable), which
  * resolves backend targets that need a current context, and is presented via
- * Context::present(drawable). Readback goes through Surface::asyncReadPixels() while the frame has
- * been submitted but not presented yet, and only if the frame's window supports readback (see
- * Window::supportsReadback()). Dropping a Drawable without presenting it discards the
- * frame; backends release it without any GPU calls.
+ * Context::present(drawable). Readback goes through Surface::asyncReadPixels() until a
+ * presentation is registered or the frame is presented, and only if the frame's window supports
+ * readback (see Window::supportsReadback()). Dropping a Drawable without presenting it discards
+ * the frame; backends release it without any GPU calls.
  */
 class Drawable {
  public:
