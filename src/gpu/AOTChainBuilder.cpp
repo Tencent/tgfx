@@ -172,7 +172,9 @@ static bool BuildPointwiseSlot(const AOTEffectGraph& graph, const AOTEffectNode*
       return false;
     }
     auto constParams = std::get_if<AOTConstColorParameters>(&constNode->parameters);
-    if (constParams == nullptr) {
+    // The blend slot uploads the constant as-is (its input mode is not applied), which is only
+    // correct when the constant does not depend on its input edge.
+    if (constParams == nullptr || !AOTConstColorIsInputIndependent(graph, constNode)) {
       return false;
     }
     slot->type = AOTPointwiseOpType::Blend;

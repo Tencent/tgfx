@@ -263,4 +263,20 @@ bool AOTNodeBuilder::contains(AOTNodeID nodeID) const {
   return nodeID.isValid() && nodeID.index() < nodes.size();
 }
 
+bool AOTConstColorIsInputIndependent(const AOTEffectGraph& graph, const AOTEffectNode* node) {
+  if (node == nullptr || node->kind != AOTEffectKind::ConstColor || node->inputs.size() != 1) {
+    return false;
+  }
+  auto parameters = std::get_if<AOTConstColorParameters>(&node->parameters);
+  if (parameters == nullptr) {
+    return false;
+  }
+  // AOTConstColorParameters::inputMode mirrors tgfx::InputMode, where 0 is Ignore.
+  if (parameters->inputMode == 0) {
+    return true;
+  }
+  auto input = graph.nodeAt(node->inputs[0]);
+  return input != nullptr && input->kind == AOTEffectKind::GeometryWhiteInput;
+}
+
 }  // namespace tgfx

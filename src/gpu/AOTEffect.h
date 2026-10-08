@@ -336,6 +336,15 @@ class AOTEffectGraph {
   AOTNodeID rootNode = AOTNodeID::Invalid();
 };
 
+/**
+ * Returns true when the given ConstColor node evaluates to its own constant regardless of the value
+ * on its input edge: it either ignores its input (InputMode::Ignore), or it is fed the opaque-white
+ * designator a single-child xfer gives its child, under which every input mode reduces to the
+ * constant (c * 1 and c * 1.a are both c). Kernels whose blend slot reads the constant directly
+ * (the OP_BLEND ConstColorValue record) may only accept const operands for which this holds.
+ */
+bool AOTConstColorIsInputIndependent(const AOTEffectGraph& graph, const AOTEffectNode* node);
+
 class AOTNodeBuilder {
  public:
   bool addGeometryColor(AOTNodeID* output);

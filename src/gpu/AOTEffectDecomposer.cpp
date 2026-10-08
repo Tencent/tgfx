@@ -199,9 +199,12 @@ static bool IsPerlinNoiseSource(const AOTEffectNode* node) {
 // fold into a single fused pass with no materialization. Besides the pure pointwise ops, a slot
 // may be a ConstColor op or a Blend whose other operand is a ConstColor node (the side constant
 // stays out of pass.nodes; its value is read from the blend node's inputs at build time).
+// A single-child xfer lowers its constant child from an explicit opaque-white designator
+// (GeometryWhiteInput, see XfermodeFragmentProcessor::lowerToAOT). The designator never becomes a
+// slot, so it is skipped here exactly as the DAG planner skips it; the slot budget, not the raw
+// node count, bounds the pass.
 static bool DecomposePerlinNoiseChain(const AOTEffectGraph& graph, AOTEffectPlan* plan) {
-  if (plan == nullptr || graph.nodeCount() < 2 || graph.nodeCount() > 6 ||
-      graph.root().index() + 1 != graph.nodeCount()) {
+  if (plan == nullptr || graph.nodeCount() < 2 || graph.root().index() + 1 != graph.nodeCount()) {
     return false;
   }
   auto geometryNode = graph.nodeAt(AOTNodeID(0));
@@ -218,6 +221,15 @@ static bool DecomposePerlinNoiseChain(const AOTEffectGraph& graph, AOTEffectPlan
     if (node == nullptr) {
       return false;
     }
+    if (node->kind == AOTEffectKind::GeometryWhiteInput) {
+      // Designator only; its single consumer (the xfer's constant child) is checked below, and any
+      // other consumer is rejected when the loop reaches it.
+      ++index;
+      continue;
+    }
+    if (slotCount >= PerlinNoiseFragmentProcessor::MaxPointwiseSlots) {
+      return false;
+    }
     if (IsPointwiseTailOp(node) && node->inputs.size() == 1 && node->inputs[0] == prev) {
       passNodes.push_back(AOTNodeID(index));
       ++slotCount;
@@ -225,8 +237,7 @@ static bool DecomposePerlinNoiseChain(const AOTEffectGraph& graph, AOTEffectPlan
       ++index;
       continue;
     }
-    if (node->kind == AOTEffectKind::ConstColor && node->inputs.size() == 1 &&
-        node->inputs[0] == prev) {
+    if (node->kind == AOTEffectKind::ConstColor && node->inputs.size() == 1) {
       auto next = index + 1 < graph.nodeCount() ? graph.nodeAt(AOTNodeID(index + 1)) : nullptr;
       if (next != nullptr && next->kind == AOTEffectKind::Blend && next->inputs.size() == 2 &&
           ((next->inputs[0] == AOTNodeID(index) && next->inputs[1] == prev) ||
@@ -237,18 +248,26 @@ static bool DecomposePerlinNoiseChain(const AOTEffectGraph& graph, AOTEffectPlan
         if (blendParams == nullptr || blendParams->childType == 2) {
           return false;
         }
+        // The OP_BLEND slot reads the constant straight from its uniform record, so the operand
+        // must not depend on its own input edge.
+        if (!AOTConstColorIsInputIndependent(graph, node)) {
+          return false;
+        }
         passNodes.push_back(AOTNodeID(index + 1));
         ++slotCount;
         prev = AOTNodeID(index + 1);
         index += 2;
         continue;
       }
-      // A const-color op of its own.
-      passNodes.push_back(AOTNodeID(index));
-      ++slotCount;
-      prev = AOTNodeID(index);
-      ++index;
-      continue;
+      if (node->inputs[0] == prev) {
+        // A const-color op of its own, applied to the chain value (OP_CONST_COLOR honors the
+        // input mode).
+        passNodes.push_back(AOTNodeID(index));
+        ++slotCount;
+        prev = AOTNodeID(index);
+        ++index;
+        continue;
+      }
     }
     return false;
   }

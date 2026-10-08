@@ -3794,6 +3794,90 @@ TGFX_TEST(AOTRenderConsistencyTest, PerlinNoiseLuminanceAlphaThreshold) {
   ExpectBitmapsIdentical("perlin-luminance-alphathreshold", candidate, reference, width, height);
 }
 
+// Shader::makeWithColorFilter over Perlin noise with a constant blend filter that keeps transparent
+// black transparent (SrcIn, Multiply): the filter lowers to Xfermode-src(Const), whose constant
+// child reads the opaque-white designator. These are the shapes of CanvasTest.NoiseShaderAlphaBlend
+// (panels two and three) and the SVG export's noise panel; they must ride the PerlinNoiseFill
+// kernel with no runtime program and no materialization.
+TGFX_TEST(AOTRenderConsistencyTest, PerlinNoiseConstBlendServedWithoutRuntimeProgram) {
+  constexpr std::array<float, 20> luminanceToAlpha = {
+      0.0f,    0.0f,    0.0f,    0.0f, 0.0f,  //
+      0.0f,    0.0f,    0.0f,    0.0f, 0.0f,  //
+      0.0f,    0.0f,    0.0f,    0.0f, 0.0f,  //
+      0.2126f, 0.7152f, 0.0722f, 0.0f, 0.0f,
+  };
+  struct Scene {
+    const char* label;
+    std::shared_ptr<ColorFilter> filter;
+  };
+  auto thresholdChain =
+      ColorFilter::Compose(ColorFilter::Compose(ColorFilter::Matrix(luminanceToAlpha),
+                                                ColorFilter::AlphaThreshold(0.51f)),
+                           ColorFilter::Blend(Color::White(), BlendMode::SrcIn));
+  std::vector<Scene> scenes = {
+      {"perlin-const-srcin", ColorFilter::Blend(Color::White(), BlendMode::SrcIn)},
+      {"perlin-const-modulate",
+       ColorFilter::Blend(Color::FromRGBA(255, 128, 0), BlendMode::Modulate)},
+      {"perlin-luma-threshold-const-srcin", thresholdChain},
+  };
+  constexpr int width = 80;
+  constexpr int height = 80;
+  for (const auto& scene : scenes) {
+    ASSERT_TRUE(scene.filter != nullptr) << scene.label;
+    Bitmap reference = {};
+    Bitmap candidate = {};
+    ProgramCacheStats candidatePrograms = {};
+    AOTDrawStats candidateDraws = {};
+    uint64_t candidateNoMatch = 0;
+    for (int pass = 0; pass < 2; ++pass) {
+      bool useBundle = pass == 1;
+      ContextScope scope;
+      auto context = scope.getContext();
+      ASSERT_TRUE(context != nullptr);
+      auto* cache = context->precompiledShaderCache();
+      if (useBundle) {
+        ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+      } else {
+        cache->unload();
+      }
+      ScopedAOTStatsPause statsPause(context, !useBundle);
+      cache->setDiagnosticRecordingEnabled(true);
+      cache->resetStats();
+      context->globalCache()->clearPrograms();
+      context->globalCache()->resetProgramStats();
+      auto surface = Surface::Make(context, width, height);
+      ASSERT_TRUE(surface != nullptr);
+      Paint paint = {};
+      paint.setShader(
+          Shader::MakeFractalNoise(0.25f, 0.25f, 3, 6903)->makeWithColorFilter(scene.filter));
+      paint.setAlpha(0.25f);
+      surface->getCanvas()->drawRect(
+          Rect::MakeWH(static_cast<float>(width), static_cast<float>(height)), paint);
+      context->flushAndSubmit(true);
+      auto* outBitmap = useBundle ? &candidate : &reference;
+      ASSERT_TRUE(outBitmap->allocPixels(width, height));
+      auto* pixels = outBitmap->lockPixels();
+      ASSERT_TRUE(pixels != nullptr);
+      ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+      outBitmap->unlockPixels();
+      if (useBundle) {
+        candidatePrograms = context->globalCache()->programStats();
+        candidateDraws = cache->drawStats();
+        candidateNoMatch = cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule);
+      }
+      cache->setDiagnosticRecordingEnabled(false);
+      cache->unload();
+      context->globalCache()->clearPrograms();
+    }
+    EXPECT_EQ(candidatePrograms.programBuilderCreations, 0u) << scene.label;
+    EXPECT_GE(candidatePrograms.precompiledArtifactCreations, 1u) << scene.label;
+    EXPECT_EQ(candidateNoMatch, 0u) << scene.label;
+    EXPECT_EQ(candidateDraws.fpFlattenEdges, 0u) << scene.label;
+    EXPECT_EQ(candidateDraws.materializedEdges, 0u) << scene.label;
+    ExpectBitmapsIdentical(scene.label, candidate, reference, width, height);
+  }
+}
+
 // An anti-aliased, non-pixel-aligned rect clip produces a device-space RectEffect coverage FP. It must fold
 // into the pointwise chain as an OP_AARECT_COVERAGE node, so a clipped texture draw hits
 // PointwiseChainShader in one pass and stays byte-identical to the runtime path.

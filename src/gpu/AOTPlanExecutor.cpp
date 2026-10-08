@@ -163,7 +163,8 @@ static bool ValidateLinearPlan(const AOTEffectGraph& graph, const AOTEffectPlan&
             bool dstIsConst = dstNode != nullptr && dstNode->kind == AOTEffectKind::ConstColor;
             AOTNodeID chained = srcIsConst ? node->inputs[1] : node->inputs[0];
             if (blendParams == nullptr || blendParams->childType == 2 || srcIsConst == dstIsConst ||
-                chained != expectedInput) {
+                chained != expectedInput ||
+                !AOTConstColorIsInputIndependent(graph, srcIsConst ? srcNode : dstNode)) {
               return false;
             }
             expectedInput = pass.nodes[opIndex];

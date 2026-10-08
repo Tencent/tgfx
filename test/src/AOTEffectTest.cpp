@@ -1577,4 +1577,123 @@ TGFX_TEST(AOTEffectTest, PerlinNoisePlusTwoOpsFusesToSinglePass) {
   EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
 }
 
+// Shader::makeWithColorFilter(ColorFilter::Blend(c, mode)) lowers to Perlin -> Xfermode-src(Const).
+// The single-child xfer lowers its constant child from an explicit opaque-white designator, which
+// the Perlin planner must skip rather than reject (regression: the designator was added to the
+// lowering without the planner learning about it, sending these draws to the runtime path).
+TGFX_TEST(AOTEffectTest, PerlinNoiseConstBlendFusesToSinglePass) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  auto perlin = MakePerlinProcessor(context);
+  ASSERT_NE(perlin, nullptr);
+  auto white = ConstColorProcessor::Make(&allocator, PMColor::White(), InputMode::Ignore);
+  ASSERT_NE(white, nullptr);
+  auto blend = XfermodeFragmentProcessor::MakeFromSrcProcessor(&allocator, std::move(white),
+                                                               BlendMode::SrcIn);
+  ASSERT_NE(blend, nullptr);
+
+  AOTEffectGraph graph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower({perlin.get(), blend.get()}, &graph));
+  // node0=geometry, node1=perlin, node2=white designator, node3=const (input = node2),
+  // node4=blend(src=const, dst=perlin).
+  ASSERT_EQ(graph.nodeCount(), 5u);
+  EXPECT_EQ(graph.nodeAt(AOTNodeID(2))->kind, AOTEffectKind::GeometryWhiteInput);
+  AOTEffectPlan plan;
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
+  ASSERT_EQ(plan.passes.size(), 1u);
+  EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PerlinNoiseFill);
+  EXPECT_EQ(plan.passes[0].nodes, std::vector<AOTNodeID>({AOTNodeID(1), AOTNodeID(4)}));
+  EXPECT_FALSE(plan.passes[0].materializesOutput);
+  EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
+  EXPECT_NE(AOTChainBuilder::BuildPerlinNoiseFP(&allocator, graph, plan.passes[0]), nullptr);
+}
+
+// The SVG feTurbulence shape with a trailing colorize: Perlin -> luminanceToAlpha -> threshold ->
+// Xfermode-src(Const). Seven graph nodes but only three slots; the designator must not count
+// against the pass budget.
+TGFX_TEST(AOTEffectTest, PerlinNoiseOpsThenConstBlendFusesToSinglePass) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  auto perlin = MakePerlinProcessor(context);
+  ASSERT_NE(perlin, nullptr);
+  auto colorMatrix = ColorMatrixFragmentProcessor::Make(&allocator, IdentityColorMatrix);
+  auto alphaThreshold = AlphaThresholdFragmentProcessor::Make(&allocator, 0.5f);
+  auto white = ConstColorProcessor::Make(&allocator, PMColor::White(), InputMode::Ignore);
+  ASSERT_NE(colorMatrix, nullptr);
+  ASSERT_NE(alphaThreshold, nullptr);
+  ASSERT_NE(white, nullptr);
+  auto blend = XfermodeFragmentProcessor::MakeFromSrcProcessor(&allocator, std::move(white),
+                                                               BlendMode::SrcIn);
+  ASSERT_NE(blend, nullptr);
+
+  AOTEffectGraph graph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower(
+      {perlin.get(), colorMatrix.get(), alphaThreshold.get(), blend.get()}, &graph));
+  ASSERT_EQ(graph.nodeCount(), 7u);
+  AOTEffectPlan plan;
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
+  ASSERT_EQ(plan.passes.size(), 1u);
+  EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PerlinNoiseFill);
+  EXPECT_EQ(plan.passes[0].nodes,
+            std::vector<AOTNodeID>({AOTNodeID(1), AOTNodeID(2), AOTNodeID(3), AOTNodeID(6)}));
+  EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
+  EXPECT_NE(AOTChainBuilder::BuildPerlinNoiseFP(&allocator, graph, plan.passes[0]), nullptr);
+}
+
+// The Perlin blend slot uploads the constant operand as-is. An operand whose value depends on its
+// input edge (a modulating const fed by the chain value) cannot ride that slot and must be refused
+// by the planner, the executor check, and the builder alike; an Ignore-mode operand fed by the
+// chain value is input-independent and stays accepted.
+TGFX_TEST(AOTEffectTest, PerlinNoiseBlendRefusesInputDependentConstOperand) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  auto perlin = MakePerlinProcessor(context);
+  ASSERT_NE(perlin, nullptr);
+  auto buildGraph = [&](int inputMode, AOTEffectGraph* graph) {
+    AOTNodeBuilder builder;
+    AOTNodeID geometry;
+    AOTNodeID noise;
+    AOTNodeID constant;
+    AOTNodeID blended;
+    if (!builder.addGeometryColor(&geometry) || !perlin->lowerToAOT(&builder, geometry, &noise)) {
+      return false;
+    }
+    AOTConstColorParameters constParameters = {};
+    constParameters.color = {1.0f, 1.0f, 1.0f, 1.0f};
+    constParameters.inputMode = inputMode;
+    AOTBlendParameters blendParameters = {};
+    blendParameters.blendMode = static_cast<int>(BlendMode::SrcIn);
+    blendParameters.childType = 1;  // XfermodeFragmentProcessor::Child::SrcChild
+    return builder.addConstColor(noise, constParameters, &constant) &&
+           builder.addBlend(constant, noise, blendParameters, &blended) &&
+           builder.finish(blended, graph);
+  };
+  auto servedByPerlin = [&](const AOTEffectGraph& graph) {
+    AOTEffectPlan plan;
+    return AOTEffectDecomposer::Decompose(graph, &plan) && plan.passes.size() == 1 &&
+           plan.passes[0].kernel == AOTKernelKind::PerlinNoiseFill;
+  };
+  AOTEffectGraph ignoreGraph;
+  ASSERT_TRUE(buildGraph(static_cast<int>(InputMode::Ignore), &ignoreGraph));
+  EXPECT_TRUE(servedByPerlin(ignoreGraph));
+  AOTEffectGraph modulateGraph;
+  ASSERT_TRUE(buildGraph(static_cast<int>(InputMode::ModulateRGBA), &modulateGraph));
+  EXPECT_FALSE(servedByPerlin(modulateGraph));
+  AOTEffectPlan forcedPlan;
+  forcedPlan.passes.emplace_back();
+  forcedPlan.passes[0].kernel = AOTKernelKind::PerlinNoiseFill;
+  forcedPlan.passes[0].nodes = {AOTNodeID(1), AOTNodeID(3)};
+  forcedPlan.passes[0].output = AOTNodeID(3);
+  forcedPlan.output = modulateGraph.root();
+  EXPECT_FALSE(AOTPlanExecutor::CanExecute(modulateGraph, forcedPlan));
+  EXPECT_EQ(AOTChainBuilder::BuildPerlinNoiseFP(&allocator, modulateGraph, forcedPlan.passes[0]),
+            nullptr);
+}
+
 }  // namespace tgfx
