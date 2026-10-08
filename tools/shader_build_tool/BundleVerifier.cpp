@@ -28,6 +28,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include "BundleManifest.h"
 #include "BundleWriter.h"
 #include "gpu/PrecompiledBundleIdentity.h"
 #include "gpu/shaders/PermutationRules.h"
@@ -172,7 +173,72 @@ struct BundleCheckResult {
   bool opened = false;
 };
 
-BundleCheckResult VerifyOneBundle(const std::string& path, const std::string& expectedTag) {
+// Checks the manifest next to a bundle: that it exists, that it describes exactly this file, and
+// (when a shader directory is given) that the sources it was built from are the current ones.
+// Everything the bundle's own identity hash cannot say lives here, because that hash only covers
+// the bundle's bytes: a bundle built from yesterday's shaders is perfectly self-consistent.
+size_t CheckManifest(const std::string& bundlePath, const std::string& expectedTag,
+                     const std::vector<uint8_t>& fileBytes, const BundleHeader& header,
+                     const std::string& shaderDir) {
+  size_t violations = 0;
+  auto manifestPath = ManifestPathFor(bundlePath);
+  BundleManifest manifest;
+  std::string error;
+  if (!ReadBundleManifest(manifestPath, &manifest, &error)) {
+    std::cout << "[verify] " << expectedTag << ": VIOLATION " << error
+              << "; the bundle cannot be proven to match any sources\n";
+    return 1;
+  }
+  if (manifest.manifestVersion != kBundleManifestVersion) {
+    std::cout << "[verify] " << expectedTag << ": VIOLATION manifest version "
+              << manifest.manifestVersion << " (expected " << kBundleManifestVersion << ")\n";
+    violations++;
+  }
+  auto slash = bundlePath.rfind('/');
+  auto fileName = slash == std::string::npos ? bundlePath : bundlePath.substr(slash + 1);
+  if (manifest.backend != expectedTag || manifest.file != fileName) {
+    std::cout << "[verify] " << expectedTag << ": VIOLATION manifest describes " << manifest.backend
+              << "/" << manifest.file << ", not " << expectedTag << "/" << fileName << "\n";
+    violations++;
+  }
+  if (manifest.fileSize != fileBytes.size() ||
+      manifest.fileHash != HashBundleBytes(fileBytes.data(), fileBytes.size())) {
+    std::cout << "[verify] " << expectedTag
+              << ": VIOLATION the bundle file is not the one its manifest was written for "
+                 "(size or content hash differs)\n";
+    violations++;
+  }
+  if (manifest.identityHash != header.identityHash ||
+      manifest.toolchainABI != header.toolchainABI ||
+      manifest.formatVersion != header.formatVersion) {
+    std::cout << "[verify] " << expectedTag
+              << ": VIOLATION manifest header fields disagree with the bundle header\n";
+    violations++;
+  }
+  if (shaderDir.empty()) {
+    std::cout << "[verify] " << expectedTag
+              << ": freshness NOT checked (pass --shader-dir to compare against the sources)\n";
+    return violations;
+  }
+  auto current = ComputeSourceDigest(shaderDir, expectedTag);
+  if (!current.ok) {
+    std::cout << "[verify] " << expectedTag
+              << ": VIOLATION cannot compute the current source digest: " << current.error << "\n";
+    return violations + 1;
+  }
+  if (current.digest != manifest.sourceDigest) {
+    std::cout << "[verify] " << expectedTag
+              << ": VIOLATION bundle is stale: built from sources with "
+              << "digest 0x" << std::hex << manifest.sourceDigest << ", the current sources in "
+              << shaderDir << " have 0x" << current.digest << std::dec << " ("
+              << manifest.stageCount << " stages recorded, " << current.stageCount << " now)\n";
+    violations++;
+  }
+  return violations;
+}
+
+BundleCheckResult VerifyOneBundle(const std::string& path, const std::string& expectedTag,
+                                  const std::string& shaderDir) {
   BundleCheckResult result;
   std::ifstream file(path, std::ios::binary);
   if (!file.is_open()) {
@@ -365,6 +431,8 @@ BundleCheckResult VerifyOneBundle(const std::string& path, const std::string& ex
     result.violations++;
   }
 
+  result.violations += CheckManifest(path, expectedTag, fileBytes, header, shaderDir);
+
   std::cout << "[verify] " << expectedTag << ": " << (result.violations == 0 ? "OK" : "FAILED")
             << " (" << header.vertPoolCount << " vert + " << header.fragPoolCount
             << " frag entries, " << (poolViolations + missing) << " pool violations)\n";
@@ -373,13 +441,13 @@ BundleCheckResult VerifyOneBundle(const std::string& path, const std::string& ex
 
 }  // namespace
 
-int VerifyBundles(const std::string& bundleDir) {
+int VerifyBundles(const std::string& bundleDir, const std::string& shaderDir) {
   static const char* BACKENDS[] = {"opengl", "opengles", "vulkan", "metal", "webgpu"};
   int totalViolations = 0;
   size_t openedBundles = 0;
   for (const auto* backend : BACKENDS) {
     auto path = bundleDir + "/shader_bundle." + backend + ".bin";
-    auto result = VerifyOneBundle(path, backend);
+    auto result = VerifyOneBundle(path, backend, shaderDir);
     if (result.opened) {
       openedBundles++;
     }

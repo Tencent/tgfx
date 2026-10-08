@@ -27,8 +27,12 @@ namespace tgfx {
 /// constants match the current writer contract (magic, format version, toolchain ABI), the
 /// layout offsets are consistent, the stored identity hash recomputes, every pool entry resolves
 /// to exactly one candidate stage (family, stage, permutation index) for that backend, and no
-/// expected candidate is missing from the bundle. Returns the violation count (0 = clean) so the
-/// process exit code can reject a mismatched or stale bundle.
-int VerifyBundles(const std::string& bundleDir);
+/// expected candidate is missing from the bundle. It also requires the manifest written next to the
+/// bundle (shader_bundle.<tag>.manifest) to describe exactly that file. When shaderDir is not
+/// empty, the manifest's source digest must equal the digest of the sources in shaderDir, which is
+/// what makes a bundle built from older shaders fail even though it is internally consistent. An
+/// empty shaderDir skips only that last comparison and says so in the output. Returns the
+/// violation count (0 = clean) so the process exit code can reject a mismatched or stale bundle.
+int VerifyBundles(const std::string& bundleDir, const std::string& shaderDir = "");
 
 }  // namespace tgfx

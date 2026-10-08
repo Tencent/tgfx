@@ -63,6 +63,11 @@ CompileResult CompileGLSLToWGSL(const std::string& source, ShaderStageType stage
 /// Returns empty vector on failure.
 std::vector<uint8_t> CompileMSLToMetallib(const std::string& mslSource, ShaderStageType stage);
 
+/// Describes how metallibs are produced (compiler invocation, link command, and the
+/// TGFX_METAL_EXTRA_FLAGS experiment hook). Part of the Metal bundle's source digest: a different
+/// invocation can produce different binaries from identical shader text.
+std::string MetalCompilerFingerprint();
+
 /// Prepends #define directives to shader source from a list of "NAME=value" strings.
 std::string PrependDefines(const std::string& source, const std::vector<std::string>& defines);
 

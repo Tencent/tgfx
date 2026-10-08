@@ -27,11 +27,13 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include "BundleManifest.h"
 #include "BundleVerifier.h"
 #include "BundleWriter.h"
 #include "ContractChecks.h"
 #include "ReflectionExtractor.h"
 #include "ShaderCompiler.h"
+#include "ShaderSources.h"
 #include "StageReport.h"
 #include "gpu/shaders/PermutationRules.h"
 #include "gpu/shaders/PrecompiledShader.h"
@@ -179,7 +181,9 @@ static void PrintUsage() {
       << "  --audit               Cross-check legacy compile lists against rule-reachable sets\n"
       << "  --stage-report <path> Write the per-stage audit report (requires a full compile)\n"
       << "  --verify-bundle <dir> Verify existing bundles in <dir> against the reachable set and\n"
-      << "                        exit; checks headers, identity hash, and pool completeness\n"
+      << "                        exit; checks headers, identity hash, and pool completeness.\n"
+      << "                        With --shader-dir it also fails any bundle whose manifest\n"
+      << "                        records different sources than the ones in that directory\n"
       << "  --compress            Compress data pool with zlib in output bundles\n";
 }
 
@@ -232,7 +236,7 @@ static bool ParseArgs(int argc, char** argv, BuildOptions* options) {
   return true;
 }
 
-static std::string ReadFileContents(const std::string& path) {
+std::string ReadFileContents(const std::string& path) {
   std::ifstream file(path);
   if (!file.is_open()) {
     return "";
@@ -728,7 +732,7 @@ std::string EmitDirectGLSLES300(const std::string& source, ShaderStageType stage
   return EmitDirectGLSL330Impl(source, stage, "#version 300 es", true, fbfVariant);
 }
 
-static std::string ResolveIncludes(const std::string& source, const std::string& baseDir) {
+std::string ResolveIncludes(const std::string& source, const std::string& baseDir) {
   std::string result;
   std::istringstream stream(source);
   std::string line;
@@ -1277,7 +1281,7 @@ int main(int argc, char** argv) {
   }
 
   if (!options.verifyBundleDir.empty()) {
-    return tgfx::VerifyBundles(options.verifyBundleDir);
+    return tgfx::VerifyBundles(options.verifyBundleDir, options.shaderDir);
   }
 
   tgfx::BuildReport report;
@@ -1349,6 +1353,15 @@ int main(int argc, char** argv) {
         return 1;
       }
       std::cout << "Bundle written: " << filename << " (" << pair.second.size() << " entries)\n";
+      // The manifest ties the bundle to the exact sources it was built from; --verify-bundle
+      // recomputes the digest to tell a stale bundle from a fresh one.
+      auto digest = tgfx::ComputeSourceDigest(options.shaderDir, pair.first);
+      std::string manifestError;
+      if (!digest.ok || !tgfx::WriteBundleManifest(path, pair.first, digest, &manifestError)) {
+        std::cerr << "Failed to write the manifest of " << filename << ": "
+                  << (digest.ok ? manifestError : digest.error) << "\n";
+        return 1;
+      }
     }
   }
 

@@ -459,6 +459,18 @@ CompileResult CompileGLSLToWGSL(const std::string& source, ShaderStageType stage
 #endif
 }
 
+// The fixed part of the Metal toolchain invocation. Kept as constants shared with
+// MetalCompilerFingerprint() so the bundle's source digest changes whenever the way metallibs are
+// produced changes.
+static const char* const kMetalCompileFlags = "-sdk macosx metal -std=macos-metal2.3 -O2";
+static const char* const kMetalLinkCommand = "xcrun -sdk macosx metallib";
+
+std::string MetalCompilerFingerprint() {
+  const char* extraFlags = std::getenv("TGFX_METAL_EXTRA_FLAGS");
+  return std::string("compile=xcrun ") + kMetalCompileFlags + ";link=" + kMetalLinkCommand +
+         ";extra=" + (extraFlags != nullptr ? extraFlags : "");
+}
+
 std::vector<uint8_t> CompileMSLToMetallib(const std::string& mslSource, ShaderStageType stage) {
   // Use xcrun metal to compile MSL to AIR, then xcrun metallib to produce .metallib binary.
   // Thread-safe via unique temp file names using the address of the source string.
@@ -487,8 +499,7 @@ std::vector<uint8_t> CompileMSLToMetallib(const std::string& mslSource, ShaderSt
   const char* extraFlags = std::getenv("TGFX_METAL_EXTRA_FLAGS");
   char cmd[768];
   const char* stageFlag = (stage == ShaderStageType::Vertex) ? "vertex" : "fragment";
-  snprintf(cmd, sizeof(cmd),
-           "xcrun -sdk macosx metal -std=macos-metal2.3 -O2 %s -c %s -o %s 2>/dev/null",
+  snprintf(cmd, sizeof(cmd), "xcrun %s %s -c %s -o %s 2>/dev/null", kMetalCompileFlags,
            extraFlags != nullptr ? extraFlags : "", tmpMsl, tmpAir);
   (void)stageFlag;
   int ret = std::system(cmd);
@@ -499,7 +510,7 @@ std::vector<uint8_t> CompileMSLToMetallib(const std::string& mslSource, ShaderSt
   }
 
   // Link AIR to metallib.
-  snprintf(cmd, sizeof(cmd), "xcrun -sdk macosx metallib %s -o %s 2>/dev/null", tmpAir, tmpLib);
+  snprintf(cmd, sizeof(cmd), "%s %s -o %s 2>/dev/null", kMetalLinkCommand, tmpAir, tmpLib);
   ret = std::system(cmd);
   std::remove(tmpAir);
   if (ret != 0) {
