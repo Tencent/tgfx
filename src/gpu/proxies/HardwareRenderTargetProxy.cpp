@@ -36,6 +36,7 @@ std::shared_ptr<TextureView> HardwareRenderTargetProxy::onMakeTexture(Context* c
   auto renderTarget = RenderTarget::MakeFrom(context, hardwareBuffer, _sampleCount);
   if (renderTarget == nullptr) {
     LOGE("HardwareRenderTargetProxy::onMakeTexture() Failed to create the render target!");
+    return nullptr;
   }
   return renderTarget->asTextureView();
 }
